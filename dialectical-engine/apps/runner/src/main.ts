@@ -65,6 +65,8 @@ import { startLapsedClaimResend } from "./runner-lapsed-resend.js";
 import { postgresRunnerPreviewTeamGateStore, refusePreviewOutsiderWork } from "./runner-preview-team-gate.js";
 import { announceRunnerReady } from "./runner-ready.js";
 import {
+  countModelCalls,
+  createModelCallCounter,
   createRunnerRetirementSignal,
   createTaskExecutionCounter,
   postgresRunnerRetirementStore,
@@ -246,6 +248,12 @@ const modelSpendStore = new PostgresModelSpendStore(pool);
  */
 const gatewayInFlight = createRunInFlight();
 const moneyInFlight = createRunInFlight();
+/**
+ * R1 (final review): EVERY model call of this process in flight — the debate's, the story's, a structure repair, a
+ * claim-time probe — from the ask until it settles (`countModelCalls`). The two counters above see only the calls
+ * their check binds (the story's calls are under neither), so the backstop reads this one before this release ends.
+ */
+const modelCalls = createModelCallCounter();
 /**
  * B9 (budget spec §2.9, paid-plans spec §2.4.1–2.4.2) — THE SHARED WALL WHILE
  * ARGUING, in two independent halves, built whenever hosted.
@@ -443,8 +451,12 @@ function targetGateway(target: (typeof providerTargets)[number]): ProviderGatewa
 const targetGateways = new Map(providerTargets.map((target) => [target.providerRef, targetGateway(target)] as const));
 const structureRepairRoute = previewConfig === undefined ? null : structureRepairThroughLane(
   previewStructureRepairRoute(providerTargets, (providerRef) => targetGateways.get(providerRef)), previewCallSubjects(previewConfig));
+// R1: every model call the runner and the story make goes through one of these members, so each is counted here, from
+// the ask until it settles: the preview's one 60-second unbilled resend and a structure repair's call (the route's
+// gateway is only ever called inside the call it repairs) included.
 const providerTopology = createRunnerProviderTopology(providerTargets,
-  (target) => withStructureRepair(targetGateways.get(target.providerRef)!, structureRepairRoute));
+  (target) => countModelCalls(
+    withStructureRepair(targetGateways.get(target.providerRef)!, structureRepairRoute), modelCalls));
 const runRepository = new RunRepository(pool);
 // V-20: taken on the DECLARED targets, because the three optional keys describe
 // what the operator wrote, credential included — a credential resolved from a
@@ -483,6 +495,8 @@ const storyWriter = new StoryWriter({
  * keeps the LAST observation (the runner records it). Off the preview: one probe, exactly as before.
  */
 function observeClaimTarget(target: (typeof providerTargets)[number]) {
+  // R1: a probe is a model call through the gate too (its 60-second resend included): counted until it settles.
+  const leave = modelCalls.enter();
   return observeClaimTimeTarget({
     preview: previewConfig !== undefined,
     target,
@@ -490,7 +504,7 @@ function observeClaimTarget(target: (typeof providerTargets)[number]) {
     ...(previewConfig === undefined ? {} : previewProbeControls(target)),
     fetchImplementation: previewFetch,
     clock: () => new Date()
-  });
+  }).finally(leave);
 }
 // Side-by-side spec §3: every work repository this process builds serves only this release's work items (claims,
 // renewals, the start-up re-send, failure writes), and its failure writes land only under this worker's live claim.
@@ -719,6 +733,8 @@ const retirement = startRunnerRetirement({
   releaseKey: environment.RELEASE_KEY,
   store: postgresRunnerRetirementStore(pool, workFence),
   executions,
+  // R1: the backstop never retires under a model call still in flight.
+  calls: modelCalls,
   signal: retirementSignal,
   stopWorker: async () => { lapsedResend.stop(); await worker.stop(); },
   log: (line) => console.warn(JSON.stringify(line)),

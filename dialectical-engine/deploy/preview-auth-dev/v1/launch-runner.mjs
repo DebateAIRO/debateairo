@@ -14,7 +14,10 @@ export const RUNNER_RETIRED_PROCESS_EVENT='debateai:runner-retired';
  * worker.stop(), so a stop that rejects inside the runner or never settles could leave main pending for ever
  * (side-by-side spec §4, B10 review): after this bound the end is still the asked one. 30 s is ample for a
  * worker with no task left to end its listener; the timer is not unref'd, so an emptied event loop cannot
- * end the process unreported first. Tests shorten it through startRunner's third argument only.
+ * end the process unreported first. Tests shorten it through startRunner's third argument only. The runner
+ * never announces with a model call of it still in flight (runner-retirement.ts, R1: the backstop then leaves
+ * the end to root's forced stop), so what this bound can cut after the backstop's settle expired is a task's
+ * non-call wait, never a call the gate holds open.
  */
 export const RETIRED_SETTLE_MS=30_000;
 /**

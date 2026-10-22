@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
+import type { ProviderCallRequest, ProviderCallResult } from "@debateai/providers";
 import {
+  countModelCalls,
+  createModelCallCounter,
   createRunnerRetirementSignal,
   createTaskExecutionCounter,
   RUNNER_RETIRED_PROCESS_EVENT,
   RUNNER_RETIREMENT_TIMING,
   startRunnerRetirement,
+  type ModelCallCounter,
   type ReleaseRetirementFacts
 } from "../../apps/runner/src/runner-retirement.js";
 
@@ -24,6 +28,31 @@ describe("the task counter and the retirement signal (side-by-side §4)", () => 
     expect(executions.count()).toBe(1);
     leaveFirst();
     expect(executions.count()).toBe(1);
+  });
+
+  it("counts each model call from the ask until it settles, answered, failed or thrown at once (R1)", async () => {
+    const calls = createModelCallCounter();
+    const settlers: Array<Readonly<{ answer(): void; fail(error: Error): void }>> = [];
+    const gateway = countModelCalls({
+      call: () => new Promise<ProviderCallResult>((resolve, reject) => {
+        settlers.push({ answer: () => resolve({} as ProviderCallResult), fail: reject });
+      })
+    }, calls);
+    expect(calls.count()).toBe(0);
+    const answered = gateway.call({} as ProviderCallRequest);
+    const failed = gateway.call({} as ProviderCallRequest);
+    expect(calls.count()).toBe(2);
+    settlers[0]!.answer();
+    await answered;
+    expect(calls.count()).toBe(1);
+    const failure = new Error("vendor refused");
+    settlers[1]!.fail(failure);
+    await expect(failed).rejects.toBe(failure);
+    expect(calls.count()).toBe(0);
+    const thrown = new TypeError("PROVIDER_RUN_REQUIRED");
+    const throwing = countModelCalls({ call: () => { throw thrown; } }, calls);
+    await expect(throwing.call({} as ProviderCallRequest)).rejects.toBe(thrown);
+    expect(calls.count()).toBe(0);
   });
 
   it("starts with claims and calls allowed, and each stop turns on only its own half", () => {
@@ -102,6 +131,8 @@ function monitor(options: Readonly<{
   running?: (read: number) => number;
   /** The backstop's set-aside: `setAside(n)` answers the n-th call (1-based). */
   setAside?: (call: number) => Promise<number>;
+  /** This process's model calls in flight (R1); none unless a case says so. */
+  calls?: Pick<ModelCallCounter, "count">;
 }>) {
   const time = fakeClock();
   const signal = createRunnerRetirementSignal();
@@ -126,6 +157,7 @@ function monitor(options: Readonly<{
       }
     },
     executions: { count: () => (options.running ?? (() => 0))(reads.length) },
+    calls: options.calls ?? { count: () => 0 },
     signal,
     stopWorker: async () => { order.push("stopWorker"); },
     log: (line) => { lines.push(line); },
@@ -205,6 +237,7 @@ describe("a draining release's runner retires by itself (side-by-side §4)", () 
       releaseKey: KEY,
       store: { readFacts: async () => { reads.push(time.now()); return drained(); }, setAsideOpenWork: async () => 0 },
       executions: { count: () => 0 },
+      calls: { count: () => 0 },
       signal: createRunnerRetirementSignal(),
       stopWorker: async () => { order.push("stopWorker"); throw failure; },
       log: (line) => { lines.push(line); },
@@ -232,6 +265,7 @@ describe("a draining release's runner retires by itself (side-by-side §4)", () 
       releaseKey: KEY,
       store: { readFacts: async () => drained(), setAsideOpenWork: async () => 0 },
       executions: { count: () => 0 },
+      calls: { count: () => 0 },
       signal: createRunnerRetirementSignal(),
       stopWorker: async () => { order.push("stopWorker"); },
       log: (line) => { lines.push(line); },
@@ -305,6 +339,7 @@ describe("a draining release's runner retires by itself (side-by-side §4)", () 
         setAsideOpenWork: async () => 0
       },
       executions: { count: () => 0 },
+      calls: { count: () => 0 },
       signal: createRunnerRetirementSignal(),
       stopWorker: async () => undefined,
       log: () => undefined,
@@ -375,7 +410,7 @@ describe("the backstop is a request the runner honours (side-by-side §4)", () =
     expect(run.setAsides).toHaveLength(1);
   });
 
-  it("waits at most 1,200 s for a task still running, then sets the rest aside (the task is never killed)", async () => {
+  it("waits at most 1,200 s for a task still running with no model call in flight, then sets the rest aside and retires", async () => {
     const run = monitor({ facts: async () => requested(), running: () => 1, setAside: async () => 2 });
     await run.time.advance(60_000);
     await run.time.advance(1_199_999);
@@ -389,6 +424,49 @@ describe("the backstop is a request the runner honours (side-by-side §4)", () =
       line("BACKSTOP_SET_ASIDE", { count: 2 }),
       line("RETIRING", { how: "BACKSTOP" })
     ]);
+    expect(run.order).toEqual(["setAside", "announce", "emit", "stopWorker"]);
+    await expect(run.retirement.retired).resolves.toBe("BACKSTOP");
+  });
+
+  // R1 (final review): a preview call may take 1,260 s plus a 60 s unbilled resend, longer than the 1,200 s settle. A
+  // runner that retired then would end its process under a call the gate holds open, and the gate both releases share
+  // halts. The count is the runner's own model-call accounting (`countModelCalls` around every gateway), not the tasks.
+  it("a model call still in flight after 1,200 s: the rest is set aside with its waivers, but it never retires (R1)", async () => {
+    const calls = createModelCallCounter();
+    let answer: (result: ProviderCallResult) => void = () => undefined;
+    const gateway = countModelCalls({ call: () => new Promise<ProviderCallResult>((resolve) => { answer = resolve; }) }, calls);
+    const run = monitor({ facts: async () => requested(), running: () => 1, setAside: async () => 2, calls });
+    const sent = gateway.call({} as ProviderCallRequest);
+    expect(calls.count()).toBe(1);
+    await run.time.advance(60_000);
+    await run.time.advance(1_200_000);
+    expect(run.setAsides).toEqual([{ key: "r1-aaaaaaaaaaaa", reason: "BACKSTOP", at: 1_260_000 }]);
+    expect(run.lines).toEqual([
+      line("BACKSTOP_STARTED", { executing: 1, openWork: 2 }),
+      line("BACKSTOP_SETTLE_EXPIRED", { executing: 1 }),
+      line("BACKSTOP_SET_ASIDE", { count: 2 }),
+      line("RUNNER_BACKSTOP_CALL_IN_FLIGHT", { calls: 1 })
+    ]);
+    expect(run.order).toEqual(["setAside"]);
+    expect(run.announced).toEqual([]);
+    expect(run.emitted).toEqual([]);
+    // The end is root's 25-minute forced stop: the call settling later retires nothing and reads nothing more.
+    answer({} as ProviderCallResult);
+    await sent;
+    expect(calls.count()).toBe(0);
+    await run.time.advance(600_000);
+    expect(run.reads).toHaveLength(1);
+    expect(run.order).toEqual(["setAside"]);
+    expect(run.outcome()).toBeUndefined();
+  });
+
+  it("a call that settles during the set-aside is not in flight: the backstop retires (R1)", async () => {
+    let inFlight = 1;
+    const run = monitor({
+      facts: async () => requested(), running: () => 1, calls: { count: () => inFlight },
+      setAside: async () => { inFlight = 0; return 2; }
+    });
+    await run.time.advance(1_260_000);
     expect(run.order).toEqual(["setAside", "announce", "emit", "stopWorker"]);
     await expect(run.retirement.retired).resolves.toBe("BACKSTOP");
   });
@@ -467,6 +545,7 @@ describe("the backstop is a request the runner honours (side-by-side §4)", () =
           setAsideOpenWork: async () => { order.push("setAside"); return 2; }
         },
         executions: { count: () => 0 },
+        calls: { count: () => 0 },
         signal: createRunnerRetirementSignal(),
         stopWorker: async () => { order.push("stopWorker"); if (failingStep === "stopWorker") throw failure; },
         log: (entry) => { if (entry.event === failedEvent) throw new Error("log sink closed"); },

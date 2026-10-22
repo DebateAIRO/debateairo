@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import { WorkItemRepository, type WorkItemFence } from "@debateai/battery";
 import { readReleaseState, type ReleaseLifecycleState } from "@debateai/db";
+import type { ProviderCallRequest, ProviderCallResult, ProviderGateway } from "@debateai/providers";
 
 /**
  * Side-by-side spec §4 (D1): how a release retires inside its own process. A retiring release "stops claiming; it lets
@@ -39,6 +40,50 @@ export function createTaskExecutionCounter(): TaskExecutionCounter {
       };
     },
     count: () => running
+  });
+}
+
+/**
+ * R1 (final review): this process's model calls in flight, every one of them: the debate's, the verdict story's, a
+ * structure repair, a claim-time probe. A call is counted from the moment its gateway is asked until its promise
+ * settles, answered or failed, so on the preview the one 60-second unbilled resend inside the call is counted too. The
+ * backstop reads it after its settle: a preview call may take 1,260 s plus that resend, longer than the 1,200 s settle,
+ * and a process that ends under a call the gate still holds open halts the gate both releases share.
+ */
+export interface ModelCallCounter {
+  /** A call started; the returned `leave` ends it. Calling `leave` more than once counts once. */
+  enter(): () => void;
+  /** The calls in flight now. */
+  count(): number;
+}
+
+export function createModelCallCounter(): ModelCallCounter {
+  let inFlight = 0;
+  return Object.freeze({
+    enter() {
+      inFlight += 1;
+      let left = false;
+      return () => {
+        if (left) return;
+        left = true;
+        inFlight -= 1;
+      };
+    },
+    count: () => inFlight
+  });
+}
+
+/** R1: `gateway`, with each of its calls counted in `calls` from the ask until the call settles (main.ts wraps them all). */
+export function countModelCalls(gateway: ProviderGateway, calls: Pick<ModelCallCounter, "enter">): ProviderGateway {
+  return Object.freeze({
+    async call(request: ProviderCallRequest): Promise<ProviderCallResult> {
+      const leave = calls.enter();
+      try {
+        return await gateway.call(request);
+      } finally {
+        leave();
+      }
+    }
   });
 }
 
@@ -87,7 +132,10 @@ export function createRunnerRetirementSignal(): RunnerRetirementSignal {
  *   3. it records what is left FAILED as RUN_SET_ASIDE:BACKSTOP with each run's waiver in the same transaction
  *      (spec §9: no quota use; the site day keeps counting real spend), retried every 5 s on failure, never skipped
  *      (BACKSTOP_SET_ASIDE_FAILED, then BACKSTOP_SET_ASIDE with the count);
- *   4. it retires as above (announce, emit, then stop the worker) and `retired` resolves "BACKSTOP".
+ *   4. it retires as above (announce, emit, then stop the worker) and `retired` resolves "BACKSTOP" — unless a model
+ *      call of this process is still in flight (R1, the model-call counter, never the task counter): then it says
+ *      RUNNER_BACKSTOP_CALL_IN_FLIGHT, does not retire, and leaves the end to root's forced stop. So when it does retire
+ *      after BACKSTOP_SETTLE_EXPIRED, what still runs is a task's non-call wait, which the launcher's 30 s bound may cut.
  * A pass that throws is logged (BACKSTOP_FAILED) and runs again at the next read; every step is safe to repeat.
  * `stop()` ends a backstop between steps: the process is ending on its own signal.
  *
@@ -208,6 +256,8 @@ export function startRunnerRetirement(input: Readonly<{
   releaseKey: string;
   store: RunnerRetirementStore;
   executions: Pick<TaskExecutionCounter, "count">;
+  /** R1: this process's model calls in flight (main.ts: every gateway and claim probe, `countModelCalls`). */
+  calls: Pick<ModelCallCounter, "count">;
   signal: RunnerRetirementSignal;
   stopWorker(): Promise<void>;
   log(line: Readonly<Record<string, string | number>>): void;
@@ -303,6 +353,16 @@ export function startRunnerRetirement(input: Readonly<{
     }
     input.log(Object.freeze({ kind: KIND, event: "BACKSTOP_SET_ASIDE", count }));
     if (stopped) return;
+    // R1 (final review): read AFTER the set-aside, the latest word. A model call still in flight (only possible after
+    // BACKSTOP_SETTLE_EXPIRED: a preview call may take 1,260 s plus its 60 s unbilled resend) is never cut by this
+    // release ending itself: the launcher would end the process under it and halt the gate both releases share. The
+    // debates are set aside with their waivers all the same; `retiring` stays set, so no further read, and the end is
+    // root's 25-minute forced stop (which re-opens a gate it halted). A call that settled meanwhile retires as below.
+    const callsInFlight = input.calls.count();
+    if (callsInFlight > 0) {
+      input.log(Object.freeze({ kind: KIND, event: "RUNNER_BACKSTOP_CALL_IN_FLIGHT", calls: callsInFlight }));
+      return;
+    }
     await retire("BACKSTOP");
   };
 

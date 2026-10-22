@@ -289,6 +289,19 @@ describe('the real readiness seam', () => {
     expect(source.slice(ended)).toContain('lapsedResend.stop();\nretirement.stop();');
     expect(source).toContain('stopWorker: async () => { lapsedResend.stop(); await worker.stop(); }');
   });
+
+  // R1 (final review): the backstop reads the runner's own model-call accounting before this release ends itself. Every
+  // call the runner and the story make goes through a provider member, and a claim probe is a call through the gate too.
+  it('runner main counts every model call (each provider member, each claim probe) and hands the count to the backstop', async () => {
+    const source = await readFile(resolve('apps/runner/src/main.ts'), 'utf8');
+    expect(source).toContain('const modelCalls = createModelCallCounter();');
+    expect(source.match(/createRunnerProviderTopology\(/g)).toHaveLength(1);
+    expect(source).toContain('(target) => countModelCalls(\n    withStructureRepair(targetGateways.get(target.providerRef)!, structureRepairRoute), modelCalls));');
+    const probe = source.slice(source.indexOf('function observeClaimTarget('), source.indexOf('const workFence ='));
+    expect(probe).toContain('const leave = modelCalls.enter();');
+    expect(probe).toContain('}).finally(leave);');
+    expect(source.slice(source.indexOf('startRunnerRetirement({'))).toContain('calls: modelCalls,');
+  });
 });
 
 describe('launch-runner.mjs: start mirrors launch-api.mjs, prepare-only stays the default', () => {
