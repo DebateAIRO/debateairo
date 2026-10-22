@@ -1,5 +1,5 @@
 import { exactKeys, refuse } from './custody.mjs';
-import { RELEASE_LABEL } from './launch-plan.mjs';
+import { RELEASE_LABEL, labelOfSourceRoot } from './launch-plan.mjs';
 /**
  * The database-ahead file (side-by-side spec 2026-10-21 §5, "database ahead"; plan D, task D5). During an upload the
  * newer release moves the shared database forward by n1-expand steps while the older release keeps running; the older
@@ -23,7 +23,8 @@ import { RELEASE_LABEL } from './launch-plan.mjs';
  *                        keepsVerifier). verify-native.ts hands it to plan A's verifyDatabaseAhead as `newerChain`.
  *
  * release-artifacts.mjs `database-ahead` writes it; native-operator.mjs reads it; prestart.mjs accept-ahead checks it
- * before pinning. Every refusal is PREVIEW_DATABASE_AHEAD_REFUSED (the operator line stays opaque).
+ * before pinning (both hold it to the newer manifest with newerManifestMatches). Every refusal is
+ * PREVIEW_DATABASE_AHEAD_REFUSED (the operator line stays opaque).
  */
 export const DATABASE_AHEAD_SCHEMA='preview-database-ahead-v1';
 /** The folder root keeps every per-release file in (native-plan-<label>.json, database-ahead-<label>.json). */
@@ -70,4 +71,19 @@ export function validateDatabaseAheadFile(value) {
  const tail=newerChain.slice(newerChain.length-steps.length);
  if(steps.some((step,index)=>tail[index].name!==step.name||tail[index].sourceSha256!==step.sha256||tail[index].n1Expand!==true||tail[index].keepsVerifier!==true))refuse(CODE);
  return value;
+}
+
+/**
+ * The newer release's candidate API source manifest (as readPublicArtifact returned it from the file's
+ * newerSourceManifest path and sha256) is the one the file speaks for: root-owned, an API manifest of newerLabel at
+ * newerSourceRevision, listing every step at `dialectical-engine/migrations/<name>` with the step's own sha256.
+ * The native operator's restart verify and prestart's accept-ahead both use this one rule (side-by-side spec §5;
+ * D15 review: accept-ahead runs before the newer release is pinned, so the manifest is what names it).
+ */
+export function newerManifestMatches(ahead,manifest) {
+ let newerLabel;
+ try{newerLabel=labelOfSourceRoot(manifest?.sourceRoot,'api');}catch{return false;}
+ if(manifest.uid!==0||manifest.role!=='api'||newerLabel!==ahead.newerLabel||manifest.sourceRevision!==ahead.newerSourceRevision||!Array.isArray(manifest.files))return false;
+ const listed=new Map(manifest.files.map(entry=>[entry?.path,entry?.sha256]));
+ return ahead.steps.every(step=>listed.get(`dialectical-engine/migrations/${step.name}`)===step.sha256);
 }

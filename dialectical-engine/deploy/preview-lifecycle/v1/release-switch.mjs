@@ -13,13 +13,14 @@
 //   - switch --finish: the database write of a switch landed but the command did not get to the end (a crash or a lost
 //             ssh session after the write, SWITCH_OUTCOME_UNKNOWN, or BACKSTOP/TARGET in `bad`): the steps after the
 //             write run again (each one repeats safely): edge, old pair's stop, its record, backstop, boot target, checks;
+//             after a drained switch (`--old-pair-stopped`) it takes the same flag: the old runner is expected stopped;
 //   - rollback after a switch: the older release is staged again, its runner starts first (database-ahead mode, prestart),
 //             then its API and website, then the same switch the other way; before a switch: the new release goes away.
 //
 //   release-switch.mjs stage --label <new>
 //   release-switch.mjs seed --label <T>
 //   release-switch.mjs switch --to <new> --from <old> [--old-pair-stopped]
-//   release-switch.mjs switch --finish --to <new> --from <old>
+//   release-switch.mjs switch --finish --to <new> --from <old> [--old-pair-stopped]
 //   release-switch.mjs rollback --to <older> --from <newer>
 //   release-switch.mjs rollback --before-switch --label <new>
 //   switch --to <first>      the public server's first release only (deploy/vps/release.mjs, bootMode 'enable')
@@ -489,8 +490,12 @@ async function revert({ to, toKey, fromKey, recordedBy, tally, layout, io }) {
  * one); the old pair's stop and its record; the backstop (none for an old release that already RETIRED); the boot
  * target; the gate files (a finish keeps the ones the switch wrote); the final checks. Every step repeats safely, and
  * each one runs even when an earlier one failed: a failed step is named in `bad`, never a reason to leave the rest undone.
+ * `oldPairStopped` (the drained path only, D15 review: `switch --old-pair-stopped` and its `switch --finish
+ * --old-pair-stopped`): the operator stopped the old runner on purpose with nothing open, and marks the old release
+ * RETIRED only after the switch (release-retire.mjs mark-retired), so a stopped old runner is fine there; everywhere
+ * else it must still run or its release must have RETIRED.
  */
-async function afterWrite({ to, from, toKey, fromKey, recordedBy, tally, keepGateFiles, layout, io }) {
+async function afterWrite({ to, from, toKey, fromKey, recordedBy, tally, keepGateFiles, oldPairStopped = false, layout, io }) {
   await io.sleep(HEALTH_INTERVAL_S * 1000 + 500);
   const bad = [];
   const step = async (code, body) => { try { if (await body() === false) bad.push(code); } catch { bad.push(code); } };
@@ -518,8 +523,11 @@ async function afterWrite({ to, from, toKey, fromKey, recordedBy, tally, keepGat
     await io.writeStateFile(path, `${JSON.stringify({ schema: GATE_FILES_SCHEMA, releaseKey: toKey, label: to, recordedAt: new Date(io.now()).toISOString(), gates })}\n`);
   });
   // Final checks (spec §12 step 13.6). The old runner may already have retired (no open work left): that is fine.
-  await step('RUNNER_FROM', async () => await unitState(unitNameFor(layout, 'runner', from), layout, io) === 'active'
-    || (await io.readReleaseState({ releaseKey: fromKey })).state === 'RETIRED');
+  await step('RUNNER_FROM', async () => {
+    const runnerFrom = await unitState(unitNameFor(layout, 'runner', from), layout, io);
+    return runnerFrom === 'active' || (oldPairStopped && STOPPED.includes(runnerFrom))
+      || (await io.readReleaseState({ releaseKey: fromKey })).state === 'RETIRED';
+  });
   await step('RUNNER_TO', async () => await unitState(unitNameFor(layout, 'runner', to), layout, io) === 'active');
   for (const gate of layout.gates) await step(`GATE_${gate.name.toUpperCase()}`, async () => await io.gateState(gate) === 'active');
   await step('EDGE_AFTER_STOP', async () => {
@@ -544,13 +552,13 @@ async function runSwitch({ to, from, oldPairStopped, rollback, layout, io }) {
   try {
     await recordSwitch(io, { newKey: toKey, expectedCurrentKey: fromKey, seconds: TAKE_TRAFFIC_AFTER_S, recordedBy });
   } catch (error) {
-    if (error?.code === 'SWITCH_OUTCOME_UNKNOWN') refuse('SWITCH_OUTCOME_UNKNOWN', { next: `if the release table names ${toKey} current: ${toolOf(layout)} switch --finish --to ${to} --from ${from}` });
+    if (error?.code === 'SWITCH_OUTCOME_UNKNOWN') refuse('SWITCH_OUTCOME_UNKNOWN', { next: `if the release table names ${toKey} current: ${toolOf(layout)} switch --finish --to ${to} --from ${from}${oldPairStopped ? ' --old-pair-stopped' : ''}` });
     throw error;
   }
   const switchedAt = new Date(io.now()).toISOString();
   const edgeConfirmedMs = await confirmEdge(toKey, tally, layout, io);
   if (edgeConfirmedMs === null) await revert({ to, toKey, fromKey, recordedBy, tally, layout, io });
-  const { backstopAt, bad } = await afterWrite({ to, from, toKey, fromKey, recordedBy, tally, keepGateFiles: false, layout, io });
+  const { backstopAt, bad } = await afterWrite({ to, from, toKey, fromKey, recordedBy, tally, keepGateFiles: false, oldPairStopped, layout, io });
   return Object.freeze({ event: 'PREVIEW_RELEASE_SWITCHED', to, from, toKey, fromKey, switchedAt, edgeConfirmedMs, edgeFailures: tally.edgeFailures, backstopAt, bad });
 }
 
@@ -558,9 +566,10 @@ async function runSwitch({ to, from, oldPairStopped, rollback, layout, io }) {
  * `switch --finish` (D10 review): the release table already names `to` current and `from` drains (or already retired),
  * but the switch command did not get to its end. Read-only preconditions (FINISH_PRECONDITION_FAILED), then the edge must
  * show `to` three times in a row (FINISH_EDGE_UNCONFIRMED otherwise, nothing stopped; there is no revert here: the
- * database decided), then afterWrite. Never writes the release switch itself.
+ * database decided), then afterWrite. Never writes the release switch itself. `oldPairStopped`: the switch it finishes
+ * was the drained one (`--old-pair-stopped`), so the old runner is expected stopped (D15 review).
  */
-export async function finishSwitch({ to, from, layout = LAYOUT, deps = {} }) {
+export async function finishSwitch({ to, from, oldPairStopped = false, layout = LAYOUT, deps = {} }) {
   requireLabel(to); requireLabel(from);
   if (to === from) refuse('FINISH_PRECONDITION_FAILED', ['labels']);
   const io = withDefaults(layout, deps);
@@ -579,7 +588,7 @@ export async function finishSwitch({ to, from, layout = LAYOUT, deps = {} }) {
   const tally = { edgeFailures: 0 };
   const edgeConfirmedMs = await confirmEdge(toKey, tally, layout, io);
   if (edgeConfirmedMs === null) refuse('FINISH_EDGE_UNCONFIRMED', { edgeFailures: tally.edgeFailures });
-  const { backstopAt, bad } = await afterWrite({ to, from, toKey, fromKey, recordedBy: RECORDED_BY, tally, keepGateFiles: true, layout, io });
+  const { backstopAt, bad } = await afterWrite({ to, from, toKey, fromKey, recordedBy: RECORDED_BY, tally, keepGateFiles: true, oldPairStopped: oldPairStopped === true, layout, io });
   return Object.freeze({ event: 'PREVIEW_RELEASE_SWITCH_FINISHED', to, from, toKey, fromKey, edgeConfirmedMs, edgeFailures: tally.edgeFailures, backstopAt, bad });
 }
 
@@ -816,13 +825,13 @@ export async function rollbackRelease({ to, from, beforeSwitch = false, layout =
  * server); the preview's first release is its transition's `seed`.
  */
 function parseArguments(argv, layout) {
-  const [a, b, c, d, e, f] = argv;
+  const [a, b, c, d, e, f, g] = argv;
   const n = argv.length;
   const isLabel = value => typeof value === 'string' && RELEASE_LABEL.test(value);
   if (n === 3 && (a === 'stage' || a === 'seed') && b === '--label' && isLabel(c)) return { command: a, label: c };
   if (n === 3 && a === 'switch' && b === '--to' && isLabel(c) && enablesUnits(layout)) return { command: 'switch', to: c, first: true };
   if ((n === 5 || (n === 6 && f === '--old-pair-stopped')) && a === 'switch' && b === '--to' && isLabel(c) && d === '--from' && isLabel(e)) return { command: 'switch', to: c, from: e, oldPairStopped: n === 6 };
-  if (n === 6 && a === 'switch' && b === '--finish' && c === '--to' && isLabel(d) && e === '--from' && isLabel(f)) return { command: 'switch', to: d, from: f, finish: true };
+  if ((n === 6 || (n === 7 && g === '--old-pair-stopped')) && a === 'switch' && b === '--finish' && c === '--to' && isLabel(d) && e === '--from' && isLabel(f)) return { command: 'switch', to: d, from: f, finish: true, oldPairStopped: n === 7 };
   if (n === 5 && a === 'rollback' && b === '--to' && isLabel(c) && d === '--from' && isLabel(e)) return { command: 'rollback', to: c, from: e };
   if (n === 4 && a === 'rollback' && b === '--before-switch' && c === '--label' && isLabel(d)) return { command: 'rollback', label: d, beforeSwitch: true };
   return refuse('ARGUMENTS_REFUSED');
@@ -831,7 +840,8 @@ const COMMANDS = Object.freeze({
   stage: (args, layout, deps) => stageRelease({ label: args.label, layout, deps }),
   seed: (args, layout, deps) => seedRelease({ label: args.label, layout, deps }),
   switch: (args, layout, deps) => (args.first ? firstSwitchRelease({ to: args.to, layout, deps })
-    : args.finish ? finishSwitch({ to: args.to, from: args.from, layout, deps }) : switchRelease({ to: args.to, from: args.from, oldPairStopped: args.oldPairStopped, layout, deps })),
+    : args.finish ? finishSwitch({ to: args.to, from: args.from, oldPairStopped: args.oldPairStopped, layout, deps })
+      : switchRelease({ to: args.to, from: args.from, oldPairStopped: args.oldPairStopped, layout, deps })),
   rollback: (args, layout, deps) => (args.beforeSwitch ? rollbackRelease({ from: args.label, beforeSwitch: true, layout, deps }) : rollbackRelease({ to: args.to, from: args.from, layout, deps }))
 });
 const FAILED_EVENT = Object.freeze({ stage: 'PREVIEW_RELEASE_STAGE_REFUSED', seed: 'PREVIEW_RELEASE_SEED_REFUSED', switch: 'PREVIEW_RELEASE_SWITCH_REFUSED', rollback: 'PREVIEW_RELEASE_ROLLBACK_REFUSED' });

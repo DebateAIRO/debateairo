@@ -2,8 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { computeRegisterSnapshotSha256 } from '@debateai/register';
 import { loadMigrationPlan } from '../../packages/db/src/migration-lineage.js';
 import { NativeVerifyDatabaseAheadError,NativeVerifyPendingForwardStepError,pendingForwardSteps,refusePendingForwardSteps,verifyNativeState } from '../../deploy/preview-auth-dev/v1/verify-native.js';
-// migrate() is replaced so these synthetic pools never run it; verifyNativeState must call it only on a database that is not ahead.
-const migrate=vi.hoisted(()=>vi.fn(async()=>({appliedSteps:[],extraSteps:[]})));
+// migrate() is replaced so these synthetic pools never run it: verifyNativeState runs it once on every database it accepts,
+// with the pinned newer chain on a database ahead (D5 review). By default it reports a database that is not ahead.
+const migrate=vi.hoisted(()=>vi.fn(async(_pool:unknown,_options?:unknown)=>({appliedSteps:[] as string[],extraSteps:[] as string[]})));
 vi.mock('@debateai/db',async original=>({...(await original<typeof import('@debateai/db')>()),migrate}));
 const operator=await import('../../deploy/'+'preview-auth-dev/v1/native-operator.mjs');
 const ahead=await import('../../deploy/'+'preview-auth-dev/v1/database-ahead.mjs');
@@ -101,6 +102,7 @@ describe('native verify on a database ahead of this source (side-by-side spec §
   expect(proof.databaseAhead).toBeNull();
   expect(proof.forwardCount).toBe(1);
   expect(migrate).toHaveBeenCalledTimes(1);
+  expect(migrate.mock.calls[0]![1]).toEqual({});
   expect(verifyDatabaseAhead).not.toHaveBeenCalled();
  });
  it('refuses a database ahead of this source with its own line when no newer list is pinned',async()=>{
@@ -114,15 +116,18 @@ describe('native verify on a database ahead of this source (side-by-side spec §
  });
  it('accepts a database ahead by a prefix of the pinned list and records it in the proof',async()=>{
   migrate.mockClear();
+  migrate.mockResolvedValueOnce({appliedSteps:[],extraSteps:[NEXT]});
   const verifyDatabaseAhead=vi.fn(async()=>({mode:'AHEAD' as const,knownSteps:OWN_CHAIN.length,extraSteps:[NEXT]}));
   const pool=poolWithLedger([...KNOWN,NEXT]);
   const proof=await verifyNativeState(pool,binding,{databaseAhead:pinned(),verifyDatabaseAhead});
   expect(proof.databaseAhead).toEqual({fileSha256:H,newerLabel:'new-v1',extraSteps:[NEXT]});
-  // Plan A's own check, with the newer release's whole chain; migrate() never runs on a database ahead.
+  // Plan A's read-only check first, then the full replay, both with the newer release's whole chain.
   expect(verifyDatabaseAhead).toHaveBeenCalledWith(pool,{newerChain:NEWER_CHAIN});
-  expect(migrate).not.toHaveBeenCalled();
+  expect(migrate).toHaveBeenCalledTimes(1);
+  expect(migrate).toHaveBeenCalledWith(pool,{newerChain:NEWER_CHAIN});
+  expect(verifyDatabaseAhead.mock.invocationCallOrder[0]!).toBeLessThan(migrate.mock.invocationCallOrder[0]!);
   expect(proof).toMatchObject({forwardCount:1,ledgerCount:KNOWN.length+1,currentContractVerified:true,publication});
-  expect(pool.statements.every(text=>/^\s*(SELECT|BEGIN READ ONLY|COMMIT)/.test(text))).toBe(true);
+  migrate.mockResolvedValueOnce({appliedSteps:[],extraSteps:[NEXT,MORE]});
   const both=vi.fn(async()=>({mode:'AHEAD' as const,knownSteps:OWN_CHAIN.length,extraSteps:[NEXT,MORE]}));
   expect((await verifyNativeState(poolWithLedger([...KNOWN,NEXT,MORE]),binding,{databaseAhead:pinned(),verifyDatabaseAhead:both})).databaseAhead).toEqual({fileSha256:H,newerLabel:'new-v1',extraSteps:[NEXT,MORE]});
  });
@@ -140,6 +145,18 @@ describe('native verify on a database ahead of this source (side-by-side spec §
   await expect(verifyNativeState(poolWithLedger([...KNOWN,NEXT]),binding,{databaseAhead:pinned(),verifyDatabaseAhead:vi.fn(async()=>{throw refusal;})})).rejects.toBe(refusal);
   const other=vi.fn(async()=>({mode:'AHEAD' as const,knownSteps:OWN_CHAIN.length,extraSteps:[NEXT,MORE]}));
   await expect(verifyNativeState(poolWithLedger([...KNOWN,NEXT]),binding,{databaseAhead:pinned(),verifyDatabaseAhead:other})).rejects.toThrow('PREVIEW_NATIVE_VERIFICATION_REFUSED');
+ });
+ it('refuses a replay that applied a step or reports other extra steps, and passes the replay\'s own refusal through',async()=>{
+  const accepted=vi.fn(async()=>({mode:'AHEAD' as const,knownSteps:OWN_CHAIN.length,extraSteps:[NEXT]}));
+  for(const report of [{appliedSteps:[],extraSteps:[]},{appliedSteps:[],extraSteps:[NEXT,MORE]},{appliedSteps:[NEXT],extraSteps:[NEXT]}]){
+   migrate.mockResolvedValueOnce(report);
+   await expect(verifyNativeState(poolWithLedger([...KNOWN,NEXT]),binding,{databaseAhead:pinned(),verifyDatabaseAhead:accepted})).rejects.toThrow('PREVIEW_NATIVE_VERIFICATION_REFUSED');
+  }
+  migrate.mockResolvedValueOnce({appliedSteps:['0123_side_by_side_releases.sql'],extraSteps:[]});
+  await expect(verifyNativeState(poolWithLedger(KNOWN),binding)).rejects.toThrow('PREVIEW_NATIVE_VERIFICATION_REFUSED');
+  const refusal=Object.assign(new Error('DATABASE_AHEAD_NOT_ACCEPTED NEWER_CHAIN_MISMATCH 0124_side_next.sql'),{code:'DATABASE_AHEAD_NOT_ACCEPTED'});
+  migrate.mockRejectedValueOnce(refusal);
+  await expect(verifyNativeState(poolWithLedger([...KNOWN,NEXT]),binding,{databaseAhead:pinned(),verifyDatabaseAhead:accepted})).rejects.toBe(refusal);
  });
  it('still refuses a pending step of its own first, ahead or not',async()=>{
   await expect(verifyNativeState(poolWithLedger([...KNOWN.slice(0,-1),NEXT]),binding,{databaseAhead:pinned()})).rejects.toMatchObject({code:'PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP',pending:[KNOWN.at(-1)]});

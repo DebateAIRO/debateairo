@@ -2,8 +2,8 @@ import { tsImport } from 'tsx/esm/api';
 import { join } from 'node:path';
 import { fileURLToPath,pathToFileURL } from 'node:url';
 import { withPrivateBytes,strictJson,exactKeys,refuse,sha256 } from './custody.mjs';
-import { RELEASE_LABEL,labelOfSourceRoot,readPublicArtifact } from './launch-plan.mjs';
-import { DATABASE_AHEAD_MAX_BYTES,DATABASE_AHEAD_ROOT,databaseAheadPathForLabel,validateDatabaseAheadFile } from './database-ahead.mjs';
+import { RELEASE_LABEL,readPublicArtifact } from './launch-plan.mjs';
+import { DATABASE_AHEAD_MAX_BYTES,DATABASE_AHEAD_ROOT,databaseAheadPathForLabel,newerManifestMatches,validateDatabaseAheadFile } from './database-ahead.mjs';
 import { verifySourceManifest,operatorManifestSha256 } from './source-manifest.mjs';
 import { withActiveNativePool } from './native-peer.mjs';
 const NATIVE_PLAN_KEYS=['schema','operation','sourceRoot','sourceRevision','sourceTree','sourceManifest','operatorManifestSha256','selectedBaseRegisterVersion','selectedBaseSnapshotSha256','publicationId','approval'];
@@ -169,8 +169,9 @@ export function parseOperatorArguments(argv) {
  * Side-by-side spec §5 ("database ahead", plan D task D5): this release's root-owned database-ahead file
  * (database-ahead-<label>.json, root 0644), checked whole (database-ahead.mjs), written for this release and this
  * revision, naming the newer release's candidate API source manifest (read through readPublicArtifact: root-owned, its
- * sha256 checked), whose label and revision it names, and listing each step's bytes at its migration path exactly.
- * Returns what verify-native.ts needs: the file's sha256, the newer label, the steps and the newer chain.
+ * sha256 checked), whose label and revision it names, and listing each step's bytes at its migration path exactly
+ * (newerManifestMatches, the rule prestart's accept-ahead uses too). Returns what verify-native.ts needs: the file's
+ * sha256, the newer label, the steps and the newer chain.
  * `io` replaces the two reads in unit tests.
  */
 export async function readDatabaseAhead({label,plan},io={}) {
@@ -179,12 +180,7 @@ export async function readDatabaseAhead({label,plan},io={}) {
  const file=await readFile(databaseAheadPathForLabel(label));
  const ahead=validateDatabaseAheadFile(file.value);
  if(ahead.olderLabel!==label||ahead.olderSourceRevision!==plan.sourceRevision)refuse('PREVIEW_DATABASE_AHEAD_REFUSED');
- const newer=await readManifest(ahead.newerSourceManifest);
- let newerLabel;
- try{newerLabel=labelOfSourceRoot(newer?.sourceRoot,'api');}catch{refuse('PREVIEW_DATABASE_AHEAD_REFUSED');}
- if(newer.uid!==0||newer.role!=='api'||newerLabel!==ahead.newerLabel||newer.sourceRevision!==ahead.newerSourceRevision||!Array.isArray(newer.files))refuse('PREVIEW_DATABASE_AHEAD_REFUSED');
- const listed=new Map(newer.files.map(entry=>[entry?.path,entry?.sha256]));
- if(ahead.steps.some(step=>listed.get(`dialectical-engine/migrations/${step.name}`)!==step.sha256))refuse('PREVIEW_DATABASE_AHEAD_REFUSED');
+ if(!newerManifestMatches(ahead,await readManifest(ahead.newerSourceManifest)))refuse('PREVIEW_DATABASE_AHEAD_REFUSED');
  return Object.freeze({fileSha256:file.sha256,newerLabel:ahead.newerLabel,accepted:ahead.steps,newerChain:ahead.newerChain});
 }
 /** This release's public plan + fixed private peer FD. No database URL, role, secret or env override argument. */

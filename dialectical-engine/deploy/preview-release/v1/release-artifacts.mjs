@@ -617,16 +617,34 @@ async function readMigration(sourceRoot, name, layout) {
   try { return await withPrivateBytes(path, { root: dirname(path), uid: layout.ownerUid, mode: 0o644, maxBytes: MAX_PUBLIC_ARTIFACT_BYTES }, raw => Buffer.from(raw)); } catch { return refuse('MIGRATION_UNREADABLE', [name]); }
 }
 
+/** The account the newer release's chain is described as: no files, no group, no database (D5 review). */
+export const DESCRIBE_CHAIN_ACCOUNT = 'nobody';
+const DESCRIBE_CHAIN_TOOLS = Object.freeze({ runuser: '/usr/sbin/runuser', env: '/usr/bin/env' });
+/** The child's whole program: import the module named by its one argument and print its chain as JSON. */
+export const DESCRIBE_CHAIN_SCRIPT = "const {pathToFileURL}=await import('node:url');const ahead=await import(pathToFileURL(process.argv[1]).href);process.stdout.write(JSON.stringify(await ahead.describeForwardSteps()));";
 /**
- * The newer release's whole forward chain, as its own code describes it (packages/db/src/migration-ahead.ts
- * describeForwardSteps): loaded from its verified folder through its own tsx, exactly as the native operator loads its
- * release's code. Side-by-side spec §5: the older release's native verify binds the extra steps to this list.
+ * The child that prints the newer release's whole forward chain, as its own code describes it
+ * (packages/db/src/migration-ahead.ts describeForwardSteps), side-by-side spec §5. Root never loads that code itself
+ * (D5 review): the child runs as `nobody` (runuser, then env -i), from the verified engine folder, through that folder's
+ * own tsx loader, with exactly PATH, TSX_DISABLE_CACHE=1 (no compile cache in a shared temp folder) and
+ * TSX_TSCONFIG_PATH=<engine>/tsconfig.json (no tsconfig found by walking up from somewhere else): the environment the
+ * generated-contract proof uses (source-manifest.mjs proveGeneratedContract).
  */
-async function describeForwardSteps(sourceRoot) {
+export function describeChainArgv({ sourceRoot, execPath = process.execPath }) {
   const engine = join(sourceRoot, 'dialectical-engine');
-  const { tsImport } = await import(pathToFileURL(join(engine, 'node_modules/tsx/dist/esm/api/index.mjs')).href);
-  const ahead = await tsImport(join(engine, 'packages/db/src/migration-ahead.ts'), import.meta.url);
-  return ahead.describeForwardSteps();
+  return [DESCRIBE_CHAIN_TOOLS.runuser, '-u', DESCRIBE_CHAIN_ACCOUNT, '--', DESCRIBE_CHAIN_TOOLS.env, '-i',
+    `PATH=${dirname(execPath)}:/usr/bin:/bin`, 'TSX_DISABLE_CACHE=1', `TSX_TSCONFIG_PATH=${join(engine, 'tsconfig.json')}`,
+    execPath, '--import', join(engine, 'node_modules/tsx/dist/loader.mjs'), '--input-type=module', '-e', DESCRIBE_CHAIN_SCRIPT,
+    join(engine, 'packages/db/src/migration-ahead.ts')];
+}
+/**
+ * Runs that child, bounded (60 s, 256 KiB): any failure, any stderr or output that is not one strict JSON value refuses
+ * DATABASE_AHEAD_CHAIN_UNREADABLE. The caller checks the chain itself (validateDatabaseAheadFile).
+ */
+async function describeForwardSteps(sourceRoot, { run = runBounded, execPath = process.execPath } = {}) {
+  const result = await run(describeChainArgv({ sourceRoot, execPath }), { cwd: join(sourceRoot, 'dialectical-engine'), env: {}, timeoutMs: 60_000, maxOutputBytes: 262_144 });
+  if (result.timedOut || result.overflow || result.error || result.code !== 0 || result.stderr?.length) refuse('DATABASE_AHEAD_CHAIN_UNREADABLE');
+  try { return strictJson(result.stdout); } catch { return refuse('DATABASE_AHEAD_CHAIN_UNREADABLE'); }
 }
 
 /**
@@ -662,7 +680,7 @@ async function databaseAheadCommand(options, { layout, deps }) {
     if (!header.expand || !header.keepsVerifier) undeclared.push(step.name);
   }
   if (undeclared.length) refuse('MIGRATION_NOT_N1_EXPAND', undeclared);
-  const newerChain = await (deps.describeForwardSteps ?? describeForwardSteps)(newer.value.sourceRoot);
+  const newerChain = await describeForwardSteps(newer.value.sourceRoot, { run: deps.runBounded, execPath: deps.execPath });
   const file = {
     schema: DATABASE_AHEAD_SCHEMA, olderLabel, olderSourceRevision: older.value.sourceRevision, newerLabel, newerSourceRevision: newer.value.sourceRevision,
     newerSourceManifest: { path: newer.path, sha256: newer.sha256 }, steps: steps.map(({ name, sha256: digest }) => ({ name, sha256: digest })),
