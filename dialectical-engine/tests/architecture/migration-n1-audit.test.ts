@@ -101,6 +101,12 @@ describe("side-by-side §5: the N-1 audit", () => {
       ["ALTER TABLE core.run ENABLE ROW LEVEL SECURITY;", "N1_FORBIDDEN_ROW_SECURITY"],
       ["CREATE POLICY p ON core.run FOR SELECT USING (true);", "N1_FORBIDDEN_ROW_SECURITY"],
       ["CREATE RULE r AS ON INSERT TO core.run DO INSTEAD NOTHING;", "N1_FORBIDDEN_RULE"],
+      // A8 re-review: the rule's table is read after TO (not the event word), and a rule switched on or off counts too.
+      ["CREATE OR REPLACE RULE r AS ON UPDATE TO core.run DO INSTEAD NOTHING;", "N1_FORBIDDEN_RULE"],
+      ["ALTER TABLE core.run DISABLE RULE r;", "N1_FORBIDDEN_RULE"],
+      ["ALTER TABLE core.run ENABLE RULE r;", "N1_FORBIDDEN_RULE"],
+      // A8 re-review: a default that merely starts with NULL is not cut there (NULL + random() is volatile).
+      ["ALTER TABLE core.run ADD COLUMN IF NOT EXISTS k double precision DEFAULT NULL + random();", "N1_STRONG_LOCK_REWRITE"],
       ["ALTER TABLE core.run DISABLE TRIGGER run_guard;", "N1_FORBIDDEN_TRIGGER"],
       ["ALTER TABLE core.run ENABLE TRIGGER run_guard;", "N1_FORBIDDEN_TRIGGER"],
       // A8 review, item 3: CREATE TABLE IF NOT EXISTS of a table an earlier step made does not make it new.
@@ -112,6 +118,10 @@ describe("side-by-side §5: the N-1 audit", () => {
       expect(findings[0], body).toContain(` ${code} `);
       // `${name}:${line} ${CODE} ${detail}`: the offending statement is the body's last line, after three header lines.
       expect(findings[0], body).toMatch(new RegExp(`^${PROBE}:${3 + body.split("\n").length} ${code} \\S`, "u"));
+    }
+    // The rule rows above pass for the right reason: the finding names the table after TO, never the event word.
+    for (const body of ["CREATE RULE r AS ON INSERT TO core.run DO INSTEAD NOTHING;", "ALTER TABLE core.run DISABLE RULE r;"]) {
+      expect(expandFindings(body)[0], body).toMatch(new RegExp(`^${PROBE}:4 N1_FORBIDDEN_RULE core\\.run `, "u"));
     }
   });
 
@@ -131,7 +141,15 @@ describe("side-by-side §5: the N-1 audit", () => {
         "ALTER TABLE core.run ADD COLUMN IF NOT EXISTS u jsonb NOT NULL DEFAULT '{}'::jsonb;",
         "ALTER TABLE core.run ADD COLUMN IF NOT EXISTS t timestamptz NOT NULL DEFAULT now();",
         "ALTER TABLE core.run ADD COLUMN IF NOT EXISTS s timestamptz DEFAULT CURRENT_TIMESTAMP;",
-        "ALTER TABLE core.run ADD COLUMN IF NOT EXISTS r boolean NOT NULL DEFAULT false;"
+        "ALTER TABLE core.run ADD COLUMN IF NOT EXISTS r boolean NOT NULL DEFAULT false;",
+        "ALTER TABLE core.run ADD COLUMN IF NOT EXISTS q text DEFAULT NULL;",
+        "ALTER TABLE core.run ADD COLUMN IF NOT EXISTS o text DEFAULT NULL NULL;"
+      ],
+      [
+        // A rule on a table the step itself creates, switched off again: the release before never queries it.
+        "CREATE TABLE IF NOT EXISTS core.ruled (a int);",
+        "CREATE RULE ruled_insert AS ON INSERT TO core.ruled DO INSTEAD NOTHING;",
+        "ALTER TABLE core.ruled DISABLE RULE ruled_insert;"
       ],
       [
         "-- n1: reviewed every row the release before writes has a positive a",

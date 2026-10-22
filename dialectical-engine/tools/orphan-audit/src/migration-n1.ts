@@ -124,6 +124,16 @@ function reviewedAbove(lines: readonly string[], line: number): boolean {
 const CONSTANT_DEFAULT = new RegExp(String.raw`^\(?\s*(?:[-+]?\d+(?:\.\d+)?|TRUE|FALSE|NULL|ARRAY\s*\[\s*\]|now\s*\(\s*\)|CURRENT_TIMESTAMP|CURRENT_DATE|LOCALTIMESTAMP)?\s*\)?(?:\s*::\s*${NAME_PART}(?:\.${NAME_PART})?(?:\s*\([\d,\s]*\))?(?:\s*\[\s*\])*)*\s*$`, "iu");
 /** Where a column default ends: the next column constraint word. */
 const DEFAULT_END = /\b(?:NOT\s+NULL|NULL|CHECK|REFERENCES|UNIQUE|PRIMARY|CONSTRAINT|GENERATED|COLLATE)\b/iu;
+/**
+ * The default expression after DEFAULT: up to the next column constraint word, never cut at its own leading NULL
+ * (`DEFAULT NULL + random()` is volatile, `DEFAULT NULL` alone is the constant NULL; A8 re-review).
+ */
+function defaultExpression(afterDefault: string): string {
+  const rest = afterDefault.trimStart();
+  const from = /^NULL\b/iu.exec(rest)?.[0].length ?? 0;
+  const end = rest.slice(from).search(DEFAULT_END);
+  return end < 0 ? rest : rest.slice(0, from + end);
+}
 
 const DROP_TRIGGER_PAIR = new RegExp(String.raw`^DROP\s+TRIGGER\s+IF\s+EXISTS\s+${NAME}\s+ON\s+${NAME}$`, "iu");
 const DROP_CONSTRAINT_PAIR = new RegExp(String.raw`^ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:ONLY\s+)?${NAME}\s+DROP\s+CONSTRAINT\s+IF\s+EXISTS\s+${NAME}$`, "iu");
@@ -131,7 +141,10 @@ const ALTER_TABLE = new RegExp(String.raw`^ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?
 const ADD_CONSTRAINT = new RegExp(String.raw`^ADD\s+CONSTRAINT\s+${NAME}\s`, "iu");
 const CREATE_TRIGGER = new RegExp(String.raw`^CREATE\s+(?:OR\s+REPLACE\s+)?(?:CONSTRAINT\s+)?TRIGGER\s+${NAME}\b[\s\S]*?\bON\s+${NAME}`, "iu");
 const CREATE_INDEX = new RegExp(String.raw`^CREATE\s+(?:UNIQUE\s+)?INDEX\s+(CONCURRENTLY\s+)?(?:IF\s+NOT\s+EXISTS\s+)?(?:${NAME_PART}\s+)?ON\s+(?:ONLY\s+)?${NAME}`, "iu");
-const CREATE_POLICY_OR_RULE = new RegExp(String.raw`^(?:CREATE|ALTER)\s+(POLICY|(?:OR\s+REPLACE\s+)?RULE)\s+${NAME_PART}\b[\s\S]*?\b(?:ON|TO)\s+${NAME}`, "iu");
+const CREATE_POLICY = new RegExp(String.raw`^(?:CREATE|ALTER)\s+POLICY\s+${NAME_PART}\s+ON\s+${NAME}`, "iu");
+/** A rule's table follows TO (`CREATE RULE r AS ON INSERT TO core.t`), never the event word after ON (A8 re-review). */
+const CREATE_RULE = new RegExp(String.raw`^CREATE\s+(?:OR\s+REPLACE\s+)?RULE\s+${NAME_PART}\s+AS\s+ON\s+(?:SELECT|INSERT|UPDATE|DELETE)\s+TO\s+${NAME}`, "iu");
+const ALTER_RULE = new RegExp(String.raw`^ALTER\s+RULE\s+${NAME_PART}\s+ON\s+${NAME}`, "iu");
 const REVOKE_KIND = String.raw`(?:(?:TABLE|SEQUENCE|FUNCTION|PROCEDURE|ROUTINE|SCHEMA|TYPE|DOMAIN)\s+)?`;
 const REVOKE_ALL_IN_SCHEMA = /^ALL\s+(?:TABLES|SEQUENCES|FUNCTIONS|PROCEDURES|ROUTINES)\s+IN\s+SCHEMA\s+/iu;
 const STRONG_UNIQUE = /\b(?:UNIQUE|PRIMARY\s+KEY|EXCLUDE)\b/iu;
@@ -273,7 +286,7 @@ export function auditMigrationN1Compatibility(name: string, source: string, cont
             report(index, "N1_STRONG_LOCK_CONSTRAINT", `${table} gains a column indexed under its strongest lock`);
           }
           const defaulted = /\bDEFAULT\b([\s\S]*)$/iu.exec(part.text);
-          const expression = defaulted === null ? "" : defaulted[1]!.split(DEFAULT_END)[0]!;
+          const expression = defaulted === null ? "" : defaultExpression(defaulted[1]!);
           if (/\b(?:SMALL|BIG)?SERIAL\b|\bSERIAL[248]\b|\bGENERATED\b/iu.test(part.text) || !CONSTANT_DEFAULT.test(expression)) {
             report(index, "N1_STRONG_LOCK_REWRITE", `${table} is rewritten to fill the new column (a non-constant default or a generated value)`);
           }
@@ -281,6 +294,8 @@ export function auditMigrationN1Compatibility(name: string, source: string, cont
           report(index, "N1_STRONG_LOCK_REWRITE", `${table} is rewritten under its strongest lock`);
         } else if (/^(?:ENABLE|DISABLE)\s+(?:REPLICA\s+|ALWAYS\s+)?TRIGGER\b/iu.test(part.text) && existing(table)) {
           report(index, "N1_FORBIDDEN_TRIGGER", `${table} changes which triggers the release before's writes meet`);
+        } else if (/^(?:ENABLE|DISABLE)\s+(?:REPLICA\s+|ALWAYS\s+)?RULE\b/iu.test(part.text) && existing(table)) {
+          report(index, "N1_FORBIDDEN_RULE", `${table} changes which rules the release before's queries meet`);
         }
       }
     }
@@ -308,10 +323,13 @@ export function auditMigrationN1Compatibility(name: string, source: string, cont
     if (trigger !== null && existing(trigger[2]) && !pairedTriggers.has(`${normal(trigger[1]!)}|${normal(trigger[2]!)}`)) {
       report(at, "N1_FORBIDDEN_TRIGGER", `${trigger[2]} gains a trigger the release before's writes would meet`);
     }
-    const policyOrRule = CREATE_POLICY_OR_RULE.exec(text);
-    if (policyOrRule !== null && existing(policyOrRule[2])) {
-      const rule = /RULE$/iu.test(policyOrRule[1]!);
-      report(at, rule ? "N1_FORBIDDEN_RULE" : "N1_FORBIDDEN_ROW_SECURITY", `${policyOrRule[2]} gains a ${rule ? "rule" : "policy"} the release before's queries meet`);
+    const policy = CREATE_POLICY.exec(text);
+    if (policy !== null && existing(policy[1])) {
+      report(at, "N1_FORBIDDEN_ROW_SECURITY", `${policy[1]} gains a policy the release before's queries meet`);
+    }
+    const rule = CREATE_RULE.exec(text) ?? ALTER_RULE.exec(text);
+    if (rule !== null && existing(rule[1])) {
+      report(at, "N1_FORBIDDEN_RULE", `${rule[1]} gains a rule the release before's queries meet`);
     }
     const index = CREATE_INDEX.exec(text);
     if (index !== null && index[1] === undefined && existing(index[2])) {

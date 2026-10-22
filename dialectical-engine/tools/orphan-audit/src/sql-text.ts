@@ -1,7 +1,11 @@
 /**
- * SQL text helpers of the migration audits (tools/orphan-audit): the replay-safety audit (index.ts) and the N-1 audit
- * (migration-n1.ts, side-by-side spec 2026-10-21 §5) read migrations through the same masks, so a comment, a quoted
- * literal or a dollar-quoted body never reads as SQL to one audit and as text to the other.
+ * SQL text helpers of the migration audits (tools/orphan-audit). They do NOT yet read migrations the same way (A8
+ * re-review):
+ * - the N-1 audit (migration-n1.ts, side-by-side spec 2026-10-21 §5) reads through ONE lexer pass, lexSql below, so a
+ *   comment marker inside a literal hides nothing and a quote inside a comment opens nothing;
+ * - the replay-safety audit (index.ts auditMigrationReplaySafety) still uses the older separate passes, maskSqlComments,
+ *   maskSqlQuotedLiterals and sqlDoBlocks. maskSqlComments runs on the raw text, so there a `--` inside a quoted literal
+ *   still reads as the start of a comment. Moving that audit to lexSql is a change of its own, with its own tests.
  */
 export function lineAt(source: string, index: number): number {
   return source.slice(0, index).split("\n").length;
