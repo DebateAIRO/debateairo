@@ -5,6 +5,7 @@ import {
   createModelCallCounter,
   createRunnerRetirementSignal,
   createTaskExecutionCounter,
+  honourStandingRetireRequest,
   RUNNER_RETIRED_PROCESS_EVENT,
   RUNNER_RETIREMENT_TIMING,
   startRunnerRetirement,
@@ -582,5 +583,57 @@ describe("the backstop is a request the runner honours (side-by-side §4)", () =
     expect(run.setAsides).toEqual([]);
     expect(run.order).toEqual([]);
     expect(run.outcome()).toBeUndefined();
+  });
+});
+
+/**
+ * X2 (final review): a runner (re)started under a standing retire request would re-send and run its lapsed and READY work
+ * (paid calls) for up to 60 s before its first retirement read, and the backstop would then set those debates aside. So
+ * main.ts reads the release's facts ONCE before its worker starts: under a standing request on a DRAINING release both
+ * stops are on before the first claim (every claim answers NO_WORK, the backstop finds nothing executing) and main skips
+ * the start-up re-send.
+ */
+describe("a standing retire request is honoured before the worker starts (X2)", () => {
+  const boot = (facts: () => Promise<ReleaseRetirementFacts>) => {
+    const signal = createRunnerRetirementSignal();
+    const reads: string[] = [];
+    const lines: Array<Readonly<Record<string, string | number>>> = [];
+    const standing = honourStandingRetireRequest({
+      releaseKey: KEY,
+      store: { readFacts: (releaseKey) => { reads.push(releaseKey); return facts(); } },
+      signal,
+      log: (line) => { lines.push(line); }
+    });
+    return { signal, reads, lines, standing };
+  };
+
+  it("DRAINING with retire requested: both stops on before any claim, one line, and the start-up re-send is skipped", async () => {
+    const run = boot(async () => drained({ retireRequested: true, frontPairStopped: false, openWork: 3 }));
+    await expect(run.standing).resolves.toBe(true);
+    expect(run.reads).toEqual([KEY]);
+    expect(run.signal.claimsStopped()).toBe(true);
+    expect(run.signal.callsStopped()).toBe(true);
+    expect(run.lines).toEqual([{ kind: "DEBATEAI_RUNNER_RETIREMENT", event: "RETIRE_REQUEST_STANDING", openWork: 3 }]);
+  });
+
+  it.each([
+    ["DRAINING with no request", drained()],
+    ["a request on a CURRENT release (ignored, D5)", drained({ state: "CURRENT", retireRequested: true })],
+    ["a request on a STAGED release", drained({ state: "STAGED", retireRequested: true })],
+    ["no release row (dev, tests)", Object.freeze({ state: null, frontPairStopped: false, retireRequested: true, openWork: 0 })]
+  ] as const)("%s: nothing is stopped, no line, and the start-up re-send runs", async (_case, facts) => {
+    const run = boot(async () => facts as ReleaseRetirementFacts);
+    await expect(run.standing).resolves.toBe(false);
+    expect(run.signal.claimsStopped()).toBe(false);
+    expect(run.signal.callsStopped()).toBe(false);
+    expect(run.lines).toEqual([]);
+  });
+
+  it("a read that fails fails the boot like every other boot read, and stops nothing", async () => {
+    const failure = Object.assign(new Error("terminating connection"), { code: "57P01" });
+    const run = boot(async () => { throw failure; });
+    await expect(run.standing).rejects.toBe(failure);
+    expect(run.signal.claimsStopped()).toBe(false);
+    expect(run.lines).toEqual([]);
   });
 });

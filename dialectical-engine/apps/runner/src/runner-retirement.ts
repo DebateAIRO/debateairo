@@ -125,7 +125,8 @@ export function createRunnerRetirementSignal(): RunnerRetirementSignal {
  *
  * Part 3, spec §4 "the backstop is a request, not a kill": root records "retire now" for a DRAINING release (switch
  * plus 7.5 hours), and the runner honours it at the next read, a request standing since before this process started
- * included, whether or not its front pair is recorded stopped yet (root stops the old pair anyway):
+ * included (X2: main.ts reads that one once before its worker starts, `honourStandingRetireRequest`, so both stops are
+ * on before the first claim), whether or not its front pair is recorded stopped yet (root stops the old pair anyway):
  *   1. it stops claiming and stops new model calls (BACKSTOP_STARTED);
  *   2. it lets the calls in flight settle: every 5 s it reads the task counter, until no task runs or 1,200 s have
  *      passed (the gate's call deadline; BACKSTOP_SETTLE_EXPIRED). A call in flight is never killed;
@@ -226,6 +227,29 @@ export function postgresRunnerRetirementStore(
       }
     }
   });
+}
+
+/**
+ * X2 (final review): the one read main.ts makes BEFORE its worker starts. A runner (re)started under a standing retire
+ * request (a reboot or a crash mid-drain, then `systemctl start`) would otherwise re-send and run its lapsed and READY
+ * work, paid calls included, until its first retirement read 60 s later, and the backstop would then set those debates
+ * aside. Under a request on a DRAINING release both stops go on before the first claim, so every claim answers NO_WORK
+ * and the backstop's pass finds nothing executing; true tells main to skip the start-up re-send (it would only hand the
+ * runner work to refuse). Any other state (a request on a release that is not DRAINING is ignored, D5) changes nothing.
+ * A read that fails is thrown: the boot fails like every other boot read, loud, with nothing stopped.
+ */
+export async function honourStandingRetireRequest(input: Readonly<{
+  releaseKey: string;
+  store: Pick<RunnerRetirementStore, "readFacts">;
+  signal: RunnerRetirementSignal;
+  log(line: Readonly<Record<string, string | number>>): void;
+}>): Promise<boolean> {
+  const facts = await input.store.readFacts(input.releaseKey);
+  if (facts.state !== "DRAINING" || !facts.retireRequested) return false;
+  input.signal.stopClaims();
+  input.signal.stopCalls();
+  input.log(Object.freeze({ kind: KIND, event: "RETIRE_REQUEST_STANDING", openWork: facts.openWork }));
+  return true;
 }
 
 type RetirementClock = Readonly<{

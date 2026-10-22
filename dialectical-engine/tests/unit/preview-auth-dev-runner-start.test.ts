@@ -290,6 +290,22 @@ describe('the real readiness seam', () => {
     expect(source).toContain('stopWorker: async () => { lapsedResend.stop(); await worker.stop(); }');
   });
 
+  // X2 (final review): a standing retire request is read once BEFORE the worker starts; under it both stops are on before
+  // the first claim and the start-up re-send is skipped (it would only hand the runner work to refuse).
+  it('runner main honours a standing retire request before the worker starts, and then skips the start-up re-send', async () => {
+    const source = await readFile(resolve('apps/runner/src/main.ts'), 'utf8');
+    const store = source.indexOf('const retirementStore = postgresRunnerRetirementStore(pool, workFence);'),
+      standing = source.indexOf('const retireRequestStanding = await honourStandingRetireRequest({'),
+      start = source.indexOf('worker.start()'), reconcile = source.indexOf('await reconcileRunnerStartupWork(');
+    expect(store).toBeGreaterThan(0);
+    expect(store).toBeLessThan(standing); expect(standing).toBeLessThan(start); expect(start).toBeLessThan(reconcile);
+    expect(source.slice(standing, start)).toContain('store: retirementStore,');
+    expect(source.slice(standing, start)).toContain('signal: retirementSignal,');
+    expect(source).toContain('const startupReconciliation = retireRequestStanding\n  ? Object.freeze({ dispatched: 0 })\n  : await reconcileRunnerStartupWork({');
+    expect(source.slice(source.indexOf('startRunnerRetirement({'))).toContain('store: retirementStore,');
+    expect(source.match(/postgresRunnerRetirementStore\(/g)).toHaveLength(1);
+  });
+
   // R1 (final review): the backstop reads the runner's own model-call accounting before this release ends itself. Every
   // call the runner and the story make goes through a provider member, and a claim probe is a call through the gate too.
   it('runner main counts every model call (each provider member, each claim probe) and hands the count to the backstop', async () => {

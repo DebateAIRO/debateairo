@@ -69,6 +69,7 @@ import {
   createModelCallCounter,
   createRunnerRetirementSignal,
   createTaskExecutionCounter,
+  honourStandingRetireRequest,
   postgresRunnerRetirementStore,
   RUNNER_RETIRED_PROCESS_EVENT,
   startRunnerRetirement
@@ -684,23 +685,35 @@ await refusePreviewOutsiderWork({
 // (packages/db/src/pool-budget.ts). Unset, Hatchet hands one worker 100.
 const worker = await hatchet.worker(environment.HATCHET_WORKER_NAME, { slots: RUNNER_CAPACITY.concurrentRuns });
 await worker.registerWorkflows([task]);
+const retirementStore = postgresRunnerRetirementStore(pool, workFence);
+// X2 (final review): one read of this release's facts BEFORE the worker starts. Under a standing retire request on a
+// DRAINING release (a restart mid-drain) both stops are on before the first claim, so nothing is claimed or paid for
+// before the backstop's first pass, and the start-up re-send is skipped (it would only hand this runner work to refuse).
+const retireRequestStanding = await honourStandingRetireRequest({
+  releaseKey: environment.RELEASE_KEY,
+  store: retirementStore,
+  signal: retirementSignal,
+  log: (line) => console.warn(JSON.stringify(line))
+});
 const started = worker.start();
 await worker.waitUntilReady(30_000);
-const startupReconciliation = await reconcileRunnerStartupWork({
-  work: new WorkItemRepository(pool, workFence),
-  dispatcher: {
-    dispatch: async ({ runId, workItemId }) => {
-      await hatchet.runNoWait(taskName, { runId, workItemId }, {
-        additionalMetadata: {
-          v3RunId: runId,
-          v3WorkItemId: workItemId,
-          sourceOfRecord: "core.work_item",
-          dispatchSource: "runner-startup-reconciliation"
-        }
-      });
+const startupReconciliation = retireRequestStanding
+  ? Object.freeze({ dispatched: 0 })
+  : await reconcileRunnerStartupWork({
+    work: new WorkItemRepository(pool, workFence),
+    dispatcher: {
+      dispatch: async ({ runId, workItemId }) => {
+        await hatchet.runNoWait(taskName, { runId, workItemId }, {
+          additionalMetadata: {
+            v3RunId: runId,
+            v3WorkItemId: workItemId,
+            sourceOfRecord: "core.work_item",
+            dispatchSource: "runner-startup-reconciliation"
+          }
+        });
+      }
     }
-  }
-});
+  });
 announceRunnerReady({
   kind: "DEBATEAI_RUNNER_READY",
   worker: environment.HATCHET_WORKER_NAME,
@@ -731,7 +744,7 @@ const lapsedResend = startLapsedClaimResend({
 // (stdout and the in-process event the preview launcher hears) BEFORE it stops the worker, so main ends as asked.
 const retirement = startRunnerRetirement({
   releaseKey: environment.RELEASE_KEY,
-  store: postgresRunnerRetirementStore(pool, workFence),
+  store: retirementStore,
   executions,
   // R1: the backstop never retires under a model call still in flight.
   calls: modelCalls,
