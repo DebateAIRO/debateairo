@@ -245,7 +245,7 @@ describe("side-by-side C8 the waker's start asks the gate too", () => {
   it("room on the site: the run starts", async () => {
     const run = waitingRun({ waitsFor: "SITE_BUSY" });
     const { room, asked, holds, started } = arrange({ active: 7, line: [run] });
-    expect(await room.startWaiting(run, enqueue)).toEqual({ kind: "STARTED", value: "work-item" });
+    expect(await room.startWaiting(run, enqueue)).toEqual({ kind: "STARTED", runId: run.runId, value: "work-item" });
     expect(asked).toEqual(["current:tx", "isWaiting", SITE_LOCK, "active:tx"]);
     expect([holds, started]).toEqual([[run.runId], [run.runId]]);
   });

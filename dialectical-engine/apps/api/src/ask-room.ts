@@ -19,9 +19,10 @@ import {
   type WaitsFor,
   waitingShapeClassOf
 } from "@debateai/budget";
-import type { RunOwnershipAccess, WaitReason, WaitingRun, WaitingRunCursor, WaitingRunRef } from "@debateai/db";
+import { recordRunSupersession, type RunOwnershipAccess, type WaitReason, type WaitingRun, type WaitingRunCursor, type WaitingRunRef } from "@debateai/db";
 import { debateShapePlanKeyOf, planById, type BillingPlans, type DebateShapePlanKey, type PlanId } from "@debateai/register";
 import { runShapeClassOf } from "./debate-shape-ask.js";
+import type { ReadmissionPlan } from "./readmission.js";
 
 /**
  * Budget spec 2026-09-28 §2.4–§2.7, amended by the paid-plans spec 2026-09-29
@@ -228,17 +229,39 @@ export interface AskRoomReader {
 /**
  * B7b: what trying to start one waiting run came to. Side-by-side C8: SITE_BUSY, the site runs its cap of debates;
  * SWITCHING, this release is not the current one. Either ends the waker's pass, as SITE_FULL does.
+ * Side-by-side C11 (spec §4, O3): STARTED names the run that started — the waiting run itself, or the NEW run that
+ * re-admits it. NEEDS_READMISSION: another release admitted the run (or the plan was made for another billing plan),
+ * nothing was written, and the waker plans its re-admission for `planId`, the billing plan read under the lock (null
+ * without billing, for a legacy asker or for internal funding). ASK_AGAIN: the room would start it, but the new version
+ * no longer offers one of its choices; nothing was written, and the waker closes it ("please ask again").
  */
 export type WaitingStart<T> =
-  | Readonly<{ kind: "STARTED"; value: T }>
+  | Readonly<{ kind: "STARTED"; runId: string; value: T }>
   | Readonly<{ kind: "SITE_FULL" | "PERSON_FULL" | "GONE" | "PLAN_CHANGED" | "FUNDING_FAILED" | "ACCOUNT_HELD" }>
-  | Readonly<{ kind: "SITE_BUSY" | "SWITCHING" }>;
+  | Readonly<{ kind: "SITE_BUSY" | "SWITCHING" | "ASK_AGAIN" }>
+  | Readonly<{ kind: "NEEDS_READMISSION"; planId: PlanId | null }>;
+
+/**
+ * Side-by-side C11: what the waker hands `startWaiting` the second time, once it has planned a re-admission outside
+ * every lock (apps/api/src/readmission.ts). `createRun` writes the NEW run (its row, pins and memory question, the way
+ * `#submitWithRoom` writes a new run) and returns its id, committed; the room calls it only after START is decided,
+ * under the spend lock, and at most once.
+ */
+export type Readmission = Readonly<{
+  plan: Extract<ReadmissionPlan, { kind: "READMIT" | "ASK_AGAIN" }>;
+  createRun(): Promise<string>;
+}>;
 
 /** What the waker asks of the room (B7b). */
 export interface AskWaitingLinePort {
   wakeCandidates(input: Readonly<{ after: WaitingRunCursor | null; everyPerson: boolean }>): Promise<ReadonlyArray<WaitingRun>>;
-  /** `enqueue` queues the run's first job on the transaction it is given: the start's own, as its last statement. */
-  startWaiting<T>(run: WaitingRun, enqueue: (tx: PoolClient) => Promise<T>): Promise<WaitingStart<T>>;
+  /**
+   * `enqueue` queues the started run's first job on the transaction it is given (the start's own, as its last
+   * statement); side-by-side C11: `runId` is the run that starts, the new run of a re-admission included.
+   */
+  startWaiting<T>(
+    run: WaitingRun, enqueue: (tx: PoolClient, runId: string) => Promise<T>, readmission?: Readmission
+  ): Promise<WaitingStart<T>>;
 }
 
 /**
@@ -341,6 +364,22 @@ export function settingsClassOfWaitingRun(run: WaitingRun): RunSettingsClass {
     depth: run.depth,
     ...(shape === null ? {} : { shape })
   });
+}
+
+/**
+ * Side-by-side spec §4 (0123 §4): a run superseded by its re-admission never starts. 0123's trigger on
+ * core.run_wait_start refuses the start (23514, MESSAGE RUN_SUPERSEDED) when another release's waker wrote the edge
+ * while this start waited for its lock; the waker reads it as the typed RUN_SUPERSEDED (the run is not its to start).
+ */
+async function markStartedUnlessSuperseded(line: AskRoomLine, tx: PoolClient, runId: string, at: Date): Promise<void> {
+  try {
+    await line.markStarted(tx, runId, at);
+  } catch (error) {
+    if (error instanceof Error && error.message === "RUN_SUPERSEDED" && (error as { code?: unknown }).code === "23514") {
+      throw new TypedDomainError("RUN_SUPERSEDED", "A superseded run never starts: its re-admission runs instead");
+    }
+    throw error;
+  }
 }
 
 export function accessOfWaitingRun(run: WaitingRun): RunOwnershipAccess {
@@ -574,10 +613,30 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
    * Side-by-side C8 (with a gate): a release that is not current starts nothing and writes nothing (SWITCHING), asked
    * before anything else; a run the room would START while the site runs its cap of debates is held back (SITE_BUSY,
    * its reason appended only when it was not already SITE_BUSY).
+   *
+   * Side-by-side spec §4, O3 (Q1 → a); INTERFACE run_supersession — THE TWO-PHASE RULE (with a gate). A run another
+   * release admitted (`run.releaseKey` is not this release's) never starts on its own row: no code, setting or prompt
+   * of another release may touch it (O1). Each step below writes nothing unless it says so.
+   *   1. SWITCHING, then still waiting, its funding and PLAN_CHANGED: as for any run.
+   *   2. Phase one (no `readmission`): it is measured with its old settings-class estimate; a START the cap allows
+   *      answers NEEDS_READMISSION, and anything else answers as for any run. The waker then plans the re-admission
+   *      outside every lock (the only place a probe may run) and comes back with the plan, under the owner's lease.
+   *   3. ASK_AGAIN: a START answers ASK_AGAIN (the waker closes the old run); anything else as for any run.
+   *   4. READMIT: measured with the plan's hold (the picker's figure, else the estimate of the plan's settings class).
+   *      A plan made for another billing plan than the one read under this lock is NEEDS_READMISSION again. On a START
+   *      the cap allows: `createRun()` (the new run's row, committed), then on this transaction the supersession edge
+   *      (old → new, READMITTED), the new run's hold and charge scope (pinned to the old run's funding), and the new
+   *      run's first job LAST. All of it commits, or none of it: a failure leaves the new row with no edge, no hold
+   *      and no job, which the waker records FAILED (RUN_SETUP_FAILED:READMISSION); the old run keeps its place.
+   * Without a gate (every room before C8, and every test that builds none) no release is compared: today's start.
    */
-  async startWaiting<T>(run: WaitingRun, enqueue: (tx: PoolClient) => Promise<T>): Promise<WaitingStart<T>> {
+  async startWaiting<T>(
+    run: WaitingRun, enqueue: (tx: PoolClient, runId: string) => Promise<T>, readmission?: Readmission
+  ): Promise<WaitingStart<T>> {
     const access = accessOfWaitingRun(run);
     const gate = this.#options.gate;
+    const readmit = readmission?.plan.kind === "READMIT" ? readmission.plan : null;
+    const stale = gate !== undefined && run.releaseKey !== gate.releaseKey;
     return this.#locked(run.ownerRef, async (tx, now): Promise<WaitingStart<T>> => {
       if (gate !== undefined && !(await gate.ownReleaseIsCurrent(tx))) return Object.freeze({ kind: "SWITCHING" as const });
       if (!(await this.#options.line.isWaiting(tx, run.runId))) return Object.freeze({ kind: "GONE" as const });
@@ -600,9 +659,15 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
       if (entitlement !== null && this.#tierOf(entitlement.planId) === "free" && (run.planTier ?? "premium") === "premium") {
         return Object.freeze({ kind: "PLAN_CHANGED" as const });
       }
+      const planId = entitlement?.planId ?? null;
+      // Side-by-side C11, step 4: the plan was made for the billing plan read in phase one; another one now plans again.
+      if (readmit !== null && planId !== readmit.planId) return Object.freeze({ kind: "NEEDS_READMISSION" as const, planId });
       // RULINGS-R2 Q-11: the hold is B2's estimate for the run's settings class; the
       // waker never re-picks the run's models (a known limit, bounded by B9's wall).
-      const estimateMicros = await this.#options.estimator.estimateMicros(settingsClassOfWaitingRun(run));
+      // Side-by-side C11: a re-admission is a new admission, measured with its plan's own hold (step 4).
+      const estimateMicros = readmit === null
+        ? await this.#options.estimator.estimateMicros(settingsClassOfWaitingRun(run))
+        : readmit.holdMicros ?? await this.#options.estimator.estimateMicros(readmit.settingsClass);
       const { rooms, waitReason } = await this.#measure(access, estimateMicros, now, run.runId);
       const admission = decideAdmission({
         rooms,
@@ -625,10 +690,20 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
         }
         return Object.freeze({ kind: "SITE_BUSY" as const });
       }
+      // Side-by-side C11, steps 2-4: a START the cap allows, for a run another release admitted.
+      if (readmission === undefined && stale) return Object.freeze({ kind: "NEEDS_READMISSION" as const, planId });
+      if (readmission?.plan.kind === "ASK_AGAIN") return Object.freeze({ kind: "ASK_AGAIN" as const });
+      if (readmission !== undefined && readmit !== null) {
+        const newRunId = await readmission.createRun();
+        await recordRunSupersession(tx, { oldRunId: run.runId, newRunId });
+        await this.#openStartWith(tx, { runId: newRunId, access, heldMicros: estimateMicros, now }, entitlement, basis);
+        const value = await enqueue(tx, newRunId);
+        return Object.freeze({ kind: "STARTED" as const, runId: newRunId, value });
+      }
       await this.#openStartWith(tx, { runId: run.runId, access, heldMicros: estimateMicros, now }, entitlement, basis);
-      await this.#options.line.markStarted(tx, run.runId, now);
-      const value = await enqueue(tx);
-      return Object.freeze({ kind: "STARTED" as const, value });
+      await markStartedUnlessSuperseded(this.#options.line, tx, run.runId, now);
+      const value = await enqueue(tx, run.runId);
+      return Object.freeze({ kind: "STARTED" as const, runId: run.runId, value });
     });
   }
 

@@ -122,7 +122,11 @@ import {
   withRunContentLease,
   type CryptoEnvelope,
   type DiscoveredPanelMember,
+  type OwnerAskAdmissionLease,
+  type ReadmissionPrincipal,
   type RunOwnershipAccess,
+  type StoredAsk,
+  type WaitingRun,
   type WaitingRunCursor
 } from "@debateai/db";
 import { ServeRepository, type MemoryQuestionRegistration } from "@debateai/serve";
@@ -225,6 +229,7 @@ import {
 import type { AdmissionDecision, AdmissionLimiter, AdmissionScope } from "./admission.js";
 import {
   AskAlreadyWaitingError,
+  accessOfWaitingRun,
   nextWholeMinute,
   runSettingsClassOfAsk,
   type AskRoomAnswer,
@@ -233,6 +238,7 @@ import {
   type AskWaitingLinePort,
   type WaitingStart
 } from "./ask-room.js";
+import { planReadmission, readmittedArgumentLanguage, readmittedAskContract, type ReadmissionPlan } from "./readmission.js";
 import {
   ASK_SIGN_IN_REQUIRED,
   appliedAskOf,
@@ -250,7 +256,8 @@ import {
   type EngineSettings,
   type EngineVersionPolicy,
   type LengthGuidance,
-  type LengthGuidancePolicy
+  type LengthGuidancePolicy,
+  type PlanId
 } from "@debateai/register";
 import { debateShapeForPanel, normaliseAskForDebateShape, roomDepthParams } from "./debate-shape-ask.js";
 import { engineForAsk } from "./engine-ask.js";
@@ -4924,6 +4931,21 @@ function logReleaseNotServed(error: ReleaseNotServedError): void {
   })));
 }
 
+/** Side-by-side C11: the typed refusals that leave a waiting run as it was, for the waker to skip (named in its line). */
+const READMISSION_SKIPS: ReadonlySet<string> = new Set([
+  "RUN_READMISSION_TAKEN", "RUN_READMISSION_INVALID", "RUN_READMISSION_OWNER_GONE", "RUN_SUPERSEDED"
+]);
+
+/**
+ * Side-by-side C11: whose new run a re-admission writes — the owner's, encrypted (content-provision pool), when the old
+ * run's content was; otherwise the legacy asker's, in the clear, under the old run's own asker id.
+ */
+function readmissionPrincipalOf(run: WaitingRun, stored: StoredAsk): ReadmissionPrincipal {
+  if (!stored.contentEncrypted) return Object.freeze({ kind: "legacy" as const, legacyAskerId: stored.askerId });
+  if (run.ownerRef === null) throw new TypeError("READMISSION_OWNER_MISSING");
+  return Object.freeze({ kind: "readmitted-owner" as const, ownerRef: run.ownerRef });
+}
+
 /** B7b: what one tick of the waiting line did — counts only, for the operator's log. */
 export type WaitingLineTick = Readonly<{
   /** The runs the tick looked at (only those worth trying: never a person-blocked run that is not due). */
@@ -5256,7 +5278,9 @@ export class PostgresAskApplication implements AskApplication {
    * most likely the same outage — the run keeps reading QUEUED, so the one
    * line that names it goes to the operator's log (ids and codes only).
    */
-  async #recordRunSetupFailure(runId: string, step: RunSetupStep | "FUNDING_ENDED" | typeof PREVIEW_TEAM_ONLY): Promise<void> {
+  async #recordRunSetupFailure(
+    runId: string, step: RunSetupStep | "FUNDING_ENDED" | "CHOICE_UNAVAILABLE" | "READMISSION" | typeof PREVIEW_TEAM_ONLY
+  ): Promise<void> {
     const reason = `RUN_SETUP_FAILED:${step}`;
     try {
       await this.#work.recordSetupFailure({ runId, ...firstRunJob(runId), reason });
@@ -5559,6 +5583,12 @@ export class PostgresAskApplication implements AskApplication {
    * (`#previewTeamRuns`): an outsider's is recorded FAILED
    * (`RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY`) and counted failed; with no team listed
    * nothing is started, handed over or failed. Ids and counts only.
+   * Side-by-side spec §4, O3 (plan C task C11): a run another release admitted is never started on its own row. The
+   * room answers NEEDS_READMISSION, writing nothing; `#startReadmitted` plans it under this release and asks again
+   * under the owner's lease, and a START writes a NEW run that supersedes it (dispatched as `outcome.runId`). A plan
+   * that is NOT_NOW, or made for a billing plan no longer in force, skips it (it keeps its place); a choice this release
+   * no longer offers records it FAILED (`RUN_SETUP_FAILED:CHOICE_UNAVAILABLE`: "please ask again"); a START that fails
+   * after the new row committed records the new run FAILED (`RUN_SETUP_FAILED:READMISSION`) and the old run waits on.
    */
   async wakeWaitingRuns(): Promise<WaitingLineTick> {
     const line = this.settings.waitingLine;
@@ -5596,12 +5626,42 @@ export class PostgresAskApplication implements AskApplication {
           continue;
         }
         persons.add(person);
+        // Side-by-side C11: the first job of the run that starts — the waiting run, or the new run re-admitting it.
+        const enqueue = (tx: PoolClient, runId: string) => this.#work.enqueueOn(tx, { runId, ...firstRunJob(runId), nodeSet: [] });
+        // Set the moment a re-admission's new row commits: the START can still fail after that (the orphan path).
+        const readmitted: { runId?: string } = {};
         let outcome: WaitingStart<string>;
         try {
-          outcome = await line.startWaiting(run, (tx) => this.#work.enqueueOn(tx, {
-            runId: run.runId, ...firstRunJob(run.runId), nodeSet: []
-          }));
+          outcome = await line.startWaiting(run, enqueue);
+          if (outcome.kind === "NEEDS_READMISSION") {
+            const second = await this.#startReadmitted(run, outcome.planId, line, enqueue, readmitted);
+            // NOT_NOW, or a plan made for another billing plan than the one now in force: the run keeps its place.
+            if (second === null || second.kind === "NEEDS_READMISSION") {
+              skipped += 1;
+              continue;
+            }
+            outcome = second;
+          }
         } catch (error) {
+          if (readmitted.runId !== undefined) {
+            // Side-by-side C11, the orphan path: the new row committed and the START did not. It never runs (FAILED;
+            // 0123 frees the old run for the next tick), and the old run, untouched, keeps its place in line.
+            failed += 1;
+            await this.#recordRunSetupFailure(readmitted.runId, "READMISSION");
+            console.error(JSON.stringify(Object.freeze({
+              event: "api.wait.readmission_failed", runId: run.runId, newRunId: readmitted.runId,
+              diagnostic: apiOperationalErrorDiagnostic(error)
+            })));
+            continue;
+          }
+          // Side-by-side C11: 0123 refused the re-admission before anything was written — another one of this run is
+          // pending or alive (TAKEN), the run no longer waits (INVALID), its owner's account is no longer active
+          // (OWNER_GONE) — or the run was superseded while this start waited for its lock. Not this tick's to start.
+          if (error instanceof TypedDomainError && READMISSION_SKIPS.has(error.code)) {
+            skipped += 1;
+            console.info(JSON.stringify(Object.freeze({ event: "api.wait.readmission_skipped", runId: run.runId, code: error.code })));
+            continue;
+          }
           failed += 1;
           console.error(JSON.stringify(Object.freeze({
             event: "api.wait.start_failed", runId: run.runId, diagnostic: apiOperationalErrorDiagnostic(error)
@@ -5622,14 +5682,24 @@ export class PostgresAskApplication implements AskApplication {
           await this.#recordRunSetupFailure(run.runId, "PLAN_CHANGED");
           continue;
         }
+        // Side-by-side C11: one of its choices is no longer offered. It never started and used none of the person's
+        // allowance; the debate page says so and asks them to ask again (CHOICE_GONE).
+        if (outcome.kind === "ASK_AGAIN") {
+          failed += 1;
+          await this.#recordRunSetupFailure(run.runId, "CHOICE_UNAVAILABLE");
+          continue;
+        }
         if (outcome.kind !== "STARTED") {
           skipped += 1;
           continue;
         }
+        if (outcome.runId !== run.runId) {
+          console.info(JSON.stringify(Object.freeze({ event: "api.wait.readmitted", runId: run.runId, newRunId: outcome.runId })));
+        }
         try {
-          await this.dispatcher.dispatch({ runId: run.runId, workItemId: outcome.value });
+          await this.dispatcher.dispatch({ runId: outcome.runId, workItemId: outcome.value });
           started += 1;
-          console.info(JSON.stringify(Object.freeze({ event: "api.wait.started", runId: run.runId })));
+          console.info(JSON.stringify(Object.freeze({ event: "api.wait.started", runId: outcome.runId })));
         } catch (error) {
           failed += 1;
           // Side-by-side C4: the job already carries RELEASE_NOT_SERVED (and the run its waiver); no DISPATCH over it.
@@ -5637,7 +5707,7 @@ export class PostgresAskApplication implements AskApplication {
             logReleaseNotServed(error);
             continue;
           }
-          await this.#recordRunSetupFailure(run.runId, "DISPATCH");
+          await this.#recordRunSetupFailure(outcome.runId, "DISPATCH");
         }
       }
     }
@@ -5646,6 +5716,106 @@ export class PostgresAskApplication implements AskApplication {
     const tick: WaitingLineTick = Object.freeze({ waiting, started, skipped, failed, stopped, redispatched });
     if (waiting > 0 || redispatched > 0) console.info(JSON.stringify(Object.freeze({ event: "api.wait.tick", ...tick })));
     return tick;
+  }
+
+  /**
+   * Side-by-side spec §4, O3 (Q1 → a; plan C task C11) — PHASE TWO OF A RE-ADMISSION, for a run another release admitted
+   * that the room would start (`NEEDS_READMISSION`, nothing written). Outside every lock, the old run's stored ask is
+   * read and planned under this release (`planReadmission`; its evaluation is the only place a probe may run, and only
+   * here, after the room said START). NOT_NOW, or a run with no stored ask any more, answers null: the run keeps its
+   * place. Otherwise the owner's lease is taken FIRST, as `#submitWithRoom` takes it (then the room's spend lock), and
+   * the room is asked again with the plan; `#readmit` writes the new run only if the room still says START.
+   */
+  async #startReadmitted(
+    run: WaitingRun,
+    planId: PlanId | null,
+    line: AskWaitingLinePort,
+    enqueue: (tx: PoolClient, runId: string) => Promise<string>,
+    readmitted: { runId?: string }
+  ): Promise<WaitingStart<string> | null> {
+    const stored = await this.#runs.readStoredAsk(run.runId);
+    if (stored === null) return null;
+    const plan = await planReadmission({
+      stored, planId, settings: this.settings,
+      evaluate: (ask, shapePlan) => evaluationOrRefusal(this.settings, ask, null, shapePlan)
+    });
+    if (plan.kind === "NOT_NOW") {
+      console.info(JSON.stringify(Object.freeze({ event: "api.wait.readmission_not_now", runId: run.runId, code: plan.code })));
+      return null;
+    }
+    const principal = readmissionPrincipalOf(run, stored);
+    const admissionPool = principal.kind === "readmitted-owner" ? this.#serverAskAdmissionPool : this.#legacyAskAdmissionPool;
+    return withOwnerAskAdmissionLease(admissionPool, accessOfWaitingRun(run), (lease) => line.startWaiting(run, enqueue, {
+      plan,
+      // The room never asks an ASK_AGAIN plan for a run.
+      createRun: plan.kind === "READMIT"
+        ? () => this.#readmit(run, plan, principal, lease, readmitted)
+        : () => Promise.reject(new TypeError("ASK_ROOM_READMISSION_WITHOUT_PLAN"))
+    }));
+  }
+
+  /**
+   * Side-by-side C11 — THE NEW RUN of a re-admission, written as `#submitWithRoom` writes a new run, on the same pools:
+   * the row under this release (`startReadmittedRun` on the owner's lease client: the content-provision login for an
+   * owner's encrypted run), then the model assignment and the role rotation the plan's evaluation pinned, then the
+   * memory question under the old run's asker and caller scope. No liveness query is recorded: this is not a new ask.
+   * `readmitted.runId` is set the moment the row commits, so a failure after it — a failed pin included — records the
+   * new run FAILED (RUN_SETUP_FAILED:READMISSION) in the waker's catch, and the error is rethrown.
+   */
+  async #readmit(
+    run: WaitingRun,
+    plan: Extract<ReadmissionPlan, { kind: "READMIT" }>,
+    principal: ReadmissionPrincipal,
+    lease: OwnerAskAdmissionLease,
+    readmitted: { runId?: string }
+  ): Promise<string> {
+    const evaluation = plan.evaluation;
+    const language = readmittedArgumentLanguage(plan);
+    const runId = await this.#runs.startReadmittedRun({
+      fromRunId: run.runId,
+      principal,
+      questionLine: plan.ask.question_line,
+      argumentLanguageTag: language.tag,
+      argumentLanguageName: language.nameEn,
+      asOf: new Date(plan.ask.as_of),
+      askerRiskTier: plan.ask.risk_tier,
+      effectiveRiskTier: evaluation.risk.effectiveRiskTier,
+      tierSource: evaluation.risk.tierSource,
+      tierProvenanceRef: evaluation.risk.tierProvenanceRef,
+      compositionBudgetTier: plan.ask.composition_budget_tier,
+      planTier: plan.ask.plan_tier,
+      depthParams: plan.ask.depth_params,
+      discoveredPanel: evaluation.discoveredPanel,
+      strangerSampleRate: this.settings.strangerSampleRate,
+      envelopeBasis: evaluation.envelopeBasis,
+      registerVersion: this.settings.registerVersion,
+      releaseKey: this.settings.releaseKey,
+      batteryVersion: this.settings.batteryVersion,
+      askContract: readmittedAskContract(plan),
+      batteryRows: createInitialBatteryRows({ settlementWatchHandle: this.settings.settlementWatchHandle })
+    }, lease.client);
+    readmitted.runId = runId;
+    if (evaluation.modelAssignment !== undefined) {
+      await insertRunRoleAssignment(this.pool, {
+        runId,
+        assignment: { ...evaluation.modelAssignment.assignment },
+        strength: evaluation.modelAssignment.appliedStrength,
+        steppedDown: evaluation.modelAssignment.steppedDown
+      });
+    }
+    if (evaluation.roleRotation !== undefined) {
+      await insertRunRoleRotation(this.pool, { runId, ...rotationPinFields(evaluation.roleRotation) });
+    }
+    await this.#serve.recordMemoryQuestion({
+      runId,
+      questionLine: plan.ask.question_line,
+      callerScope: plan.stored.callerScope,
+      askerScope: plan.stored.askerId,
+      asOf: plan.ask.as_of,
+      policyVersion: this.settings.registerVersion,
+      ...(this.settings.memoryPullPolicy === undefined ? {} : { pullPolicy: this.settings.memoryPullPolicy })
+    }, accessOfWaitingRun(run));
+    return runId;
   }
 
   /**

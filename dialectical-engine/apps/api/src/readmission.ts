@@ -6,6 +6,7 @@ import { debateShapePlanKeyOf, type DebateShapePlanKey, type PlanId } from "@deb
 import { runSettingsClassOfAsk } from "./ask-room.js";
 import { normaliseAskForDebateShape } from "./debate-shape-ask.js";
 import { AskRefusal, type PlannedAskAdmission, type RunCreationSettings } from "./index.js";
+import { runLanguageOf } from "./question-language/decider.js";
 
 /**
  * Side-by-side uploads spec 2026-10-21 §4, O3 (Q1 → a; plan C task C10) — THE RE-ADMISSION PLAN. A debate that waited
@@ -133,4 +134,19 @@ export function readmittedAskContract(plan: Extract<ReadmissionPlan, { kind: "RE
     critic_unavailable_cap: plan.evaluation.criticUnavailableCap,
     ...(shaped && language !== undefined ? { question_language: language } : {})
   });
+}
+
+/**
+ * Side-by-side C11 (C10's open question, ruling L-SHAPED-ONLY): the new run's argument language. When the new evaluation
+ * minted a shape and the stored contract carries the question-language lock — the member `readmittedAskContract`
+ * carries — it is that lock's language, as the run stored it. Otherwise it is what the non-shaped path stores today:
+ * the local guess from the question (`runLanguageOf(null, …)`). The language is never decided again: no fast call.
+ */
+export function readmittedArgumentLanguage(plan: Extract<ReadmissionPlan, { kind: "READMIT" }>): Readonly<{ tag: string; nameEn: string }> {
+  const language = plan.stored.askContract.question_language as Readonly<Record<string, unknown>> | undefined;
+  const shaped = (plan.evaluation.envelopeBasis.shape ?? null) !== null;
+  if (shaped && typeof language?.code === "string" && typeof language.name === "string") {
+    return Object.freeze({ tag: language.code, nameEn: language.name });
+  }
+  return runLanguageOf(null, plan.ask.question_line);
 }

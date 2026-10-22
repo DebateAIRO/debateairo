@@ -1,14 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AskRequest } from "@debateai/contract";
 import type { StoredAsk } from "@debateai/db";
-import { TypedDomainError } from "@debateai/kernel";
+import { TypedDomainError, detectArgumentLanguage } from "@debateai/kernel";
 import {
   debateShapePolicyStartValues, lengthGuidancePolicyStartValues, parseDebateShapePolicy, type DebateShapePlanKey, type DebateShapePolicy
 } from "@debateai/register";
 import { AskRefusal, type PlannedAskAdmission } from "@debateai/api";
 import { runSettingsClassOfAsk } from "../../apps/api/src/ask-room.js";
 import {
-  READMISSION_CHOICE_REFUSALS, READMISSION_PERMANENT_REFUSALS, planReadmission, readmittedAskContract, type ReadmissionPlan
+  READMISSION_CHOICE_REFUSALS, READMISSION_PERMANENT_REFUSALS, planReadmission, readmittedArgumentLanguage, readmittedAskContract,
+  type ReadmissionPlan
 } from "../../apps/api/src/readmission.js";
 
 /**
@@ -237,5 +238,27 @@ describe("readmittedAskContract (ruling L-SHAPED-ONLY)", () => {
       stored: stored({ askContract: noLanguage }), evaluate: async () => admission({ envelopeBasis: { shape: { plan: "free" } } })
     }).result);
     expect(readmittedAskContract(withoutStored)).not.toHaveProperty("question_language");
+  });
+});
+
+describe("readmittedArgumentLanguage (side-by-side C11, ruling L-SHAPED-ONLY)", () => {
+  // The stored lock names Romanian for an English question, so the two sources can be told apart.
+  const romanianLock = Object.freeze({ code: "ro", name: "Romanian", source: "CHOICE", site_language: "ro", rewrite_accepted: false });
+  const withLock = stored({ askContract: { ...stored().askContract, question_language: romanianLock } });
+
+  it("is the stored lock's language when the new evaluation minted a shape", async () => {
+    const shaped = readmitted(await plan({ stored: withLock, evaluate: async () => admission({ envelopeBasis: { shape: { plan: "free" } } }) }).result);
+    expect(readmittedArgumentLanguage(shaped)).toEqual({ tag: "ro", nameEn: "Romanian" });
+  });
+
+  it("is today's local guess from the question when the new evaluation has no shape, or nothing was stored", async () => {
+    const guess = detectArgumentLanguage(QUESTION);
+    const unshaped = readmitted(await plan({ stored: withLock, evaluate: async () => admission({ envelopeBasis: { shape: null } }) }).result);
+    expect(readmittedArgumentLanguage(unshaped)).toEqual({ tag: guess.tag, nameEn: guess.nameEn });
+    const { question_language: _gone, ...noLanguage } = stored().askContract;
+    const bare = readmitted(await plan({
+      stored: stored({ askContract: noLanguage }), evaluate: async () => admission({ envelopeBasis: { shape: { plan: "free" } } })
+    }).result);
+    expect(readmittedArgumentLanguage(bare)).toEqual({ tag: guess.tag, nameEn: guess.nameEn });
   });
 });
