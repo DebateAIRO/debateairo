@@ -1625,7 +1625,7 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
   }, 120_000);
 
   it("applies migration 0038 replay-safely", async () => {
-    await expect(migrate(database.pool)).resolves.toBeUndefined();
+    await expect(migrate(database.pool)).resolves.toEqual({ appliedSteps: [], extraSteps: [] });
     const applied = await database.pool.query<{ count: string }>(
       `SELECT count(*)::text AS count FROM public.debateai_schema_migration
        WHERE name='0038_content_encryption.sql'`
@@ -1898,7 +1898,9 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
         "core.complete_run_key_provision(uuid,uuid,uuid,uuid)",
         "core.create_encrypted_run(jsonb,uuid,uuid,jsonb)",
         "core.claim_run_key_provision_cleanup(integer)",
-        "core.complete_run_key_provision_cleanup(uuid,uuid)"
+        "core.complete_run_key_provision_cleanup(uuid,uuid)",
+        // 0123 §4 (side-by-side spec §4): the readmitted run's provision is the content role's alone too.
+        "core.prepare_readmitted_run_key_provision(uuid,uuid)"
       ] as const;
       for (const signature of provisionSignatures) {
         await database.pool.query(`GRANT EXECUTE ON FUNCTION ${signature} TO ${runtimeLogin}`);

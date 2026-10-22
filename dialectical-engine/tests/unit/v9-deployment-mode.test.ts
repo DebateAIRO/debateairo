@@ -519,7 +519,9 @@ describe("S02 — the development stack names its deployment mode", () => {
       ready: Promise.resolve({
         kind: "DEBATEAI_RUNNER_READY",
         worker: "debateai-dev-runner",
-        registerVersion: "424242"
+        registerVersion: "424242",
+        // Side-by-side §1: the ready line names the release the runner was handed.
+        releaseKey: ["r424242", "000000000000"].join("-")
       }),
       exited,
       async terminate() {
@@ -531,6 +533,8 @@ describe("S02 — the development stack names its deployment mode", () => {
         return Object.freeze({
           PROVIDER_DISCOVERY_TARGETS_JSON: TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson,
           REGISTER_VERSION: "424242",
+          // Side-by-side §1: the dev API's derived key, which the dev runner forwards.
+          RELEASE_KEY: ["r424242", "000000000000"].join("-"),
           REGISTER_DEPLOYMENT_RECEIPT_SHA256: "a".repeat(64),
           REGISTER_DEPLOYMENT_RECEIPT_FILE: "/workspace/.local/dev-auth/deployment-register-receipt.v1.json",
           KEK_PATH: "/private/dev/kek.bin",

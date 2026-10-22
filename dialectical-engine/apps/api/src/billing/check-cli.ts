@@ -309,12 +309,12 @@ async function notifyLine(deps: BillingCheckDeps, publicAppUrl: string): Promise
     return tick(`${address} gives the notify route's own answer to an unsigned message (HTTP 503, "retry"), with no redirect, so NETOPIA's messages can reach it.`);
   }
   if (status >= 500) {
-    return cross(`${address} answered HTTP ${String(status)}: the site answered, but the API behind it did not, so NETOPIA's messages cannot reach it now (start debateai-api, then run the check again).`);
+    return cross(`${address} answered HTTP ${String(status)}: the site answered, but the API behind it did not, so NETOPIA's messages cannot reach it now (start the current release's API, debateai-api@<label>, then run the check again).`);
   }
   if (status === 404) {
     return cross(`${address} answered HTTP 404: the API does not serve NETOPIA's notify route, so NETOPIA's messages cannot reach it.`
       + " The API serves it only with NETOPIA's four settings complete, and reads them only when it starts: after the setup,"
-      + " restart it (systemctl restart debateai-api), then run the check again.");
+      + " restart the current release's API (systemctl restart debateai-api@<label>), then run the check again.");
   }
   if (status === 429) {
     return cross(`${address} answered HTTP 429: too many messages reached it just now; run the check again in a few minutes.`);

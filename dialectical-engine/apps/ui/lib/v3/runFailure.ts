@@ -1,7 +1,7 @@
 import { t,type MessageCatalog } from "../i18n/translate.js";
 
 /**
- * What the asker is told when their debate FAILED: one of five fixed
+ * What the asker is told when their debate FAILED: one of seven fixed
  * sentences, chosen from the run's terminal reason code and never containing
  * it. Same shape as `requestFailure.ts` (DL3-F7): a closed alphabet, nothing
  * derived from the stored value beyond which group it belongs to.
@@ -18,6 +18,10 @@ import { t,type MessageCatalog } from "../i18n/translate.js";
  *
  * Owner ruling, 3 October 2026 (Part 4): a waiting question whose paid plan
  * ended is told so (PLAN_ENDED), not "something went wrong on our side".
+ *
+ * Side-by-side uploads spec 2026-10-21 §4, §9: a question an upload overtook
+ * while it waited is told so (CHOICE_GONE, plan C13), and a debate an upload
+ * set aside is told it used none of their allowance (SET_ASIDE, plan B15).
  */
 
 export const RUN_FAILURE_KINDS = Object.freeze([
@@ -41,6 +45,18 @@ export const RUN_FAILURE_KINDS = Object.freeze([
   /** The run's own ceiling refused its very first call. */
   "RUN_LIMIT_REACHED",
   /**
+   * Not a fault (`RUN_SET_ASIDE:<waiver reason>`, side-by-side uploads spec
+   * 2026-10-21 §4, §9, plan B D7): the debate was set aside because of an
+   * upload — by the old release's backstop (BACKSTOP), because no runner serves
+   * its release (RELEASE_NOT_SERVED), because its settings version is one this
+   * release cannot run (SETTINGS_VERSION_UNSUPPORTED), or later by the owner's
+   * stop (OWNER_STOPPED). It is never charged: the waiver is written with its
+   * FAILED row. The owner asks again. (A waiting question the API could not send
+   * to a serving release, `RUN_SETUP_FAILED:RELEASE_NOT_SERVED`, never began and
+   * stays NOT_STARTED.)
+   */
+  "SET_ASIDE",
+  /**
    * Anything else, a code nobody has mapped, or no code at all. Budget spec
    * 2026-09-28 §2.11: that includes the site's day and a person's allowance
    * (`DAILY_COST_ENVELOPE_REACHED`, `PERSON_ALLOWANCE_REACHED`). With the budget
@@ -48,7 +64,15 @@ export const RUN_FAILURE_KINDS = Object.freeze([
    * question the day holds back waits in line (sentence C) instead, so a stray
    * one reads as stopped partway.
    */
-  "STOPPED"
+  "STOPPED",
+  /**
+   * Not a fault (`RUN_SETUP_FAILED:CHOICE_UNAVAILABLE`, side-by-side uploads
+   * spec 2026-10-21 §4, plan C11): a question waited in line across an upload,
+   * and the new release no longer offers one of the choices it was asked with
+   * (a model, a depth, a length). It never started and was never charged (the
+   * waiver); the owner asks again.
+   */
+  "CHOICE_GONE"
 ] as const);
 
 export type RunFailureKind = typeof RUN_FAILURE_KINDS[number];
@@ -82,7 +106,14 @@ export const RUN_FAILURE_CODES: Readonly<Record<string, RunFailureKind>> = Objec
    * it at claim, before any model is asked, so the debate never began.
    */
   RUN_ROLE_ROTATION_INVALID: "NOT_STARTED",
-  RUN_CEILING_BELOW_FIRST_CALL: "RUN_LIMIT_REACHED"
+  RUN_CEILING_BELOW_FIRST_CALL: "RUN_LIMIT_REACHED",
+  /**
+   * Side-by-side uploads (plan B5's `runSetAsideReason`, D7): every set-aside
+   * reason, whatever its suffix, as written. A wrapped
+   * `RUNNER_EXECUTION_FAILED:RUN_SET_ASIDE:<reason>` would read the same; the
+   * runner writes none today.
+   */
+  RUN_SET_ASIDE: "SET_ASIDE"
 });
 
 /**
@@ -92,7 +123,13 @@ export const RUN_FAILURE_CODES: Readonly<Record<string, RunFailureKind>> = Objec
  */
 export const RUN_FAILURE_FULL_CODES: Readonly<Record<string, RunFailureKind>> = Object.freeze({
   /** Part 4 (part4-scope.md §4.1): the API's waiting-line waker, B7b. */
-  "RUN_SETUP_FAILED:PLAN_CHANGED": "PLAN_ENDED"
+  "RUN_SETUP_FAILED:PLAN_CHANGED": "PLAN_ENDED",
+  /**
+   * Side-by-side uploads (plan C11): the waker's re-admission under a new
+   * release. Its other two steps, RELEASE_NOT_SERVED and READMISSION, keep the
+   * head rule: those debates never began (NOT_STARTED).
+   */
+  "RUN_SETUP_FAILED:CHOICE_UNAVAILABLE": "CHOICE_GONE"
 });
 
 export function runFailureKind(reason: string | null | undefined): RunFailureKind {

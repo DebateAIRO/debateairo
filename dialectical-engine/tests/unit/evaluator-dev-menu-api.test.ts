@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { fixtureReleaseKey } from "../support/apiEnvironmentFixture.js";
 import {
   buildApi,
   type AskApplication,
@@ -51,7 +52,7 @@ describe("dev-only evaluator API", () => {
       ERASURE_DATABASE_URL: "postgresql://erasure:fixture@localhost/debateai",
       ACCOUNT_ERASURE_GRACE_MS: "604800000",
       API_HOST: "127.0.0.1", API_PORT: "3001", STRANGER_SAMPLE_RATE: "0",
-      REGISTER_VERSION: "1", BATTERY_VERSION: "test", SETTLEMENT_WATCH_HANDLE: "test",
+      REGISTER_VERSION: "1", RELEASE_KEY: fixtureReleaseKey("1"), BATTERY_VERSION: "test", SETTLEMENT_WATCH_HANDLE: "test",
       HATCHET_CLIENT_TOKEN: "fixture", HATCHET_HOST_PORT: "localhost:7070",
       HATCHET_API_URL: "http://localhost:7070", HATCHET_TENANT_ID: "fixture",
       HATCHET_WORKFLOW_NAME: "fixture", HATCHET_TLS_STRATEGY: "none",

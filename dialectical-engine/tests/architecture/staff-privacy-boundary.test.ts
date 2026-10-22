@@ -5,7 +5,7 @@ describe('staff production composition boundary',()=>{
   const main=await readFile('apps/api/src/main.ts','utf8');
   expect(main).toContain('createStaffRuntime');expect(main).not.toContain('acknowledgements: new Map()');
   expect(main).toContain('targetInvitationTransport: staffAlerts.targetInvitationTransport');
-  expect(main).toContain('staffAlerts?.close()');expect(main).toContain('staffAlerts?.start()');
+  expect(main).toContain('staffAlerts?.close()');expect(main).toContain('staffAlerts?.start({ when: () => releaseWatcher.ownIsCurrent() })');
   expect(main).not.toContain('publishStaffIndependentAlertReadiness');expect(main).not.toContain('PostgresStaffIndependentReadinessPublisher');
  });
  it('propagates private peer cancellation into lifecycle and key/lease preparation',async()=>{

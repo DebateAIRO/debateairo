@@ -70,5 +70,8 @@
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
-  "chrome.footer.consumerProtection": "消費者保護"
+  "chrome.footer.consumerProtection": "消費者保護",
+  "chrome.release.newerVersion": "サイトが更新されました。ページを再読み込みしてください。",
+  "chrome.release.reload": "再読み込み",
+  "chrome.release.madeByNewer": "このディベートは、より新しいバージョンのサイトで作成されたものです。ページを再読み込みするか、数分後にもう一度お試しください。"
 }

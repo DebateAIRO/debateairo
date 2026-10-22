@@ -5,7 +5,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
+import type { PoolClient } from "pg";
 import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
+import { runOutsideTransactionStep, type ChainStep } from "../../packages/db/src/migration-forward-chain.js";
+import { MIGRATION_LOCK_TIMEOUT_MS } from "../../packages/db/src/migration-transaction.js";
 
 /**
  * PR-54 (task N26n), PR-58 (task F10): NETOPIA's migration runs as the forward step 0111, chained after dev's 0110
@@ -54,7 +57,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     // export's 0115 follows 0114 (V-41), the mail locale (0116) follows 0115 (S01-C05), the debate shape's map (0117)
     // follows 0116, the language check's site cost (0118) follows 0117, the reclaim resume (0119) follows 0118, then the
     // reply measures (0120, spec 2026-10-15), then the engine verdict (0121, spec 2026-10-15 engine redesign R2), then
-    // the engine's map answer step (0122), last (spec 2026-10-15 engine redesign R3) (migrations/lineage/README.md).
+    // the engine's map answer step (0122, spec 2026-10-15 engine redesign R3), then the side-by-side releases (0123),
+    // last (spec 2026-10-21 side-by-side uploads) (migrations/lineage/README.md).
     expect(plan.forwardChain.map((step) => step.name)).toEqual([
       "0111_billing_netopia.sql",
       "0112_auth_db_batch.sql",
@@ -67,7 +71,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0119_reclaim_resume.sql",
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
-      "0122_engine_map_check.sql"
+      "0122_engine_map_check.sql",
+      "0123_side_by_side_releases.sql"
     ]);
     const [step] = plan.forwardChain;
     // 0110 runs the sealed effective-capability verifier after its SQL (applyForward110) and its own manifest names it
@@ -120,7 +125,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0119_reclaim_resume.sql",
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
-      "0122_engine_map_check.sql"
+      "0122_engine_map_check.sql",
+      "0123_side_by_side_releases.sql"
     ]);
     // The verifier in force after 0112 is the one 0112's manifest names (it adds no billing object): 0111's.
     const batchManifest = JSON.parse((await bytesOf("lineage/auth-db-batch-forward.json")).toString("utf8"));
@@ -167,7 +173,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0119_reclaim_resume.sql",
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
-      "0122_engine_map_check.sql"
+      "0122_engine_map_check.sql",
+      "0123_side_by_side_releases.sql"
     ]);
     expect(partC!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/role-rotation-forward0114.json")).toString("utf8"));
@@ -210,7 +217,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0119_reclaim_resume.sql",
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
-      "0122_engine_map_check.sql"
+      "0122_engine_map_check.sql",
+      "0123_side_by_side_releases.sql"
     ]);
     expect(mailLocale!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/debate-shape-map-forward0117.json")).toString("utf8"));
@@ -253,7 +261,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0119_reclaim_resume.sql",
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
-      "0122_engine_map_check.sql"
+      "0122_engine_map_check.sql",
+      "0123_side_by_side_releases.sql"
     ]);
     expect(mapStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/language-check-spend-forward0118.json")).toString("utf8"));
@@ -296,7 +305,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0119_reclaim_resume.sql",
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
-      "0122_engine_map_check.sql"
+      "0122_engine_map_check.sql",
+      "0123_side_by_side_releases.sql"
     ]);
     expect(languageStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/reclaim-resume-forward0119.json")).toString("utf8"));
@@ -525,10 +535,10 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     for (const needle of ["0121", "0122_engine_map_check.sql", "engine-map-check-forward0122.json", "verify-effective-capabilities-111.sql",
       "packages/db/src/migration-forward0122.ts", "replayVerifierSql", "core.map_answer_check", "MIGRATION_FORWARD0122_", "`STEPS`", "renumber"
     ]) expect(section.slice(0, section.indexOf("\n## ", 1)), needle).toContain(needle);
-    expect(readme.replace(/\s+/gu, " ")).toContain("the engine verdict (0121, below) the eleventh and the engine's map answer step (0122, below) the twelfth");
+    expect(readme.replace(/\s+/gu, " ")).toContain("the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth");
   });
 
-  it("refuses a changed 0111, 0113, 0114, 0117, 0118, 0119, 0120, 0121 or 0122, a manifest bound to the wrong previous step, and an undeclared file, before any database", async () => {
+  it("refuses a changed 0111, 0113, 0114, 0117, 0118, 0119, 0120, 0121, 0122 or 0123, a manifest bound to the wrong previous step, and an undeclared file, before any database", async () => {
     const root = await mkdtemp(join(tmpdir(), "forward-chain-111-"));
     try {
       await mkdir(join(root, "packages/db/src"), { recursive: true });
@@ -664,6 +674,38 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       }, "MIGRATION_FORWARD0122_MANIFEST");
       // The same refusal when 0121's own manifest changes under 0122: 0121 stays valid, 0122 alone refuses.
       await refusal("lineage/engine-verdict-forward0121.json", (text) => `${text}\n`, "MIGRATION_FORWARD0122_MANIFEST");
+      // The side-by-side releases 0123 changed by one character, and its manifest bound to 0121 instead of 0122.
+      await refusal("0123_side_by_side_releases.sql", (text) => text.replace("SIDE_BY_SIDE_RELEASE_STAMP_CONTRACT_INCOMPLETE", "SIDE_BY_SIDE_RELEASE_STAMP_CONTRACT_INCOMPLETe"),
+        "MIGRATION_FORWARD0123_SOURCE_DIGEST");
+      const verdictDigest = sha256(await bytesOf("lineage/engine-verdict-forward0121.json"));
+      await refusal("lineage/side-by-side-releases-forward0123.json", (text) => {
+        const manifest = JSON.parse(text);
+        manifest.previous.name = "0121_engine_verdict.sql";
+        manifest.previous.manifestSha256 = verdictDigest;
+        return `${JSON.stringify(manifest, null, 2)}\n`;
+      }, "MIGRATION_FORWARD0123_MANIFEST");
+      // The same refusal when 0122's own manifest changes under 0123: 0122 stays valid, 0123 alone refuses.
+      await refusal("lineage/engine-map-check-forward0122.json", (text) => `${text}\n`, "MIGRATION_FORWARD0123_MANIFEST");
+      // Side-by-side §5 (A6 review): 0123 without its `-- n1: keeps-verifier` line, its manifest re-digested so 0123's own
+      // loader accepts the bytes: the header now says the verifier changes while the manifest names the one before, so
+      // the chain refuses the disagreement (an older release trusts keeps-verifier when it accepts a database ahead).
+      {
+        const sqlPath = join(root, "migrations/0123_side_by_side_releases.sql");
+        const manifestPath = join(root, "migrations/lineage/side-by-side-releases-forward0123.json");
+        const [originalSql, originalManifest] = [await readFile(sqlPath, "utf8"), await readFile(manifestPath, "utf8")];
+        const changed = originalSql.replace("-- n1: keeps-verifier\n", "");
+        expect(changed).not.toBe(originalSql);
+        const manifest = JSON.parse(originalManifest);
+        manifest.migration.sha256 = sha256(changed);
+        try {
+          await writeFile(sqlPath, changed);
+          await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+          await expect(run()).rejects.toMatchObject({ stderr: expect.stringContaining("MIGRATION_FORWARD_CHAIN_N1_KEEPS_VERIFIER 0123_side_by_side_releases.sql") });
+        } finally {
+          await writeFile(sqlPath, originalSql);
+          await writeFile(manifestPath, originalManifest);
+        }
+      }
       const extra = join(root, "migrations/0199_unbound_step.sql");
       await writeFile(extra, "SELECT 1;\n");
       await expect(run()).rejects.toMatchObject({ stderr: expect.stringContaining("MIGRATION_LINEAGE_REFUSED SOURCE_INVENTORY") });
@@ -673,4 +715,58 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       await rm(root, { recursive: true, force: true });
     }
   }, 120_000);
+
+  it("keeps loadMigrationPlan's import closure self-contained: node built-ins and ./migration-*.js only (A6 ruling B)", async () => {
+    // The plan is loaded by standalone probes (the temporary copies above, which hold only packages/db/src/migration-*.ts)
+    // and by the preview's superuser JIT creator (deploy/preview-lifecycle/v1/jit-creator-actor.mjs). A package import
+    // (for example @debateai/kernel for TypedDomainError) would break the first and widen the second, so the loader
+    // family's refusals are plain Errors carrying `.code` (migration-n1.ts migrationRefusal). Type-only imports are erased.
+    const seen = new Set<string>();
+    const pending = ["migration-lineage.ts"];
+    while (pending.length > 0) {
+      const file = pending.pop()!;
+      if (seen.has(file)) continue;
+      seen.add(file);
+      const source = await readFile(new URL(file, DB_SOURCE), "utf8");
+      expect(source, file).not.toMatch(/\bimport\s*\(|\brequire\s*\(/u);
+      for (const [statement, specifier] of [...source.matchAll(/^\s*(?:import|export)\s[^'"]*?\bfrom\s*['"]([^'"]+)['"]|^\s*import\s*['"]([^'"]+)['"]/gmu)]
+        .map((match) => [match[0], match[1] ?? match[2]!] as const)) {
+        if (/^\s*(?:import|export)\s+type\s/u.test(statement)) continue;
+        if (specifier.startsWith("node:")) continue;
+        expect(specifier, `${file} imports ${specifier}`).toMatch(/^\.\/migration-[a-z0-9-]+\.js$/u);
+        pending.push(specifier.slice(2).replace(/\.js$/u, ".ts"));
+      }
+    }
+    // The walk reaches the n1 parser; the per-step transaction module (house TypedDomainError) stays outside it.
+    expect(seen).toContain("migration-forward-chain.ts");
+    expect(seen).toContain("migration-n1.ts");
+    expect(seen).not.toContain("migration-transaction.ts");
+  });
+
+  it("refuses an outside-transaction step that names no plain index, before any SQL (A6 review)", async () => {
+    const sent: string[] = [];
+    const client = { query: async (text: string) => { sent.push(text); return { rows: [] }; } } as unknown as PoolClient;
+    const step = (n1: ChainStep["n1"]): ChainStep => ({ name: "0199_probe.sql", n1 } as unknown as ChainStep);
+    const declared = { expand: true, drained: false, keepsVerifier: true, outsideTransaction: true } as const;
+    for (const n1 of [
+      { ...declared, concurrentIndex: null },
+      { ...declared, outsideTransaction: false, concurrentIndex: { schema: "core", table: "run", name: "probe_idx" } },
+      { ...declared, concurrentIndex: { schema: "core; DROP TABLE core.run", table: "run", name: "probe_idx" } },
+      { ...declared, concurrentIndex: { schema: "core", table: "run x", name: "probe_idx" } },
+      { ...declared, concurrentIndex: { schema: "core", table: "run", name: "Probe" } }
+    ]) {
+      await expect(runOutsideTransactionStep(client, step(n1)), JSON.stringify(n1))
+        .rejects.toMatchObject({ code: "MIGRATION_FORWARD_CHAIN_OUTSIDE_TRANSACTION_UNDECLARED", message: "MIGRATION_FORWARD_CHAIN_OUTSIDE_TRANSACTION_UNDECLARED 0199_probe.sql" });
+    }
+    expect(sent).toEqual([]);
+  });
+
+  it("writes every migration lock wait as MIGRATION_LOCK_TIMEOUT_MS (A6 review)", async () => {
+    // The step transaction's SET LOCAL and the outside-transaction build's session SET: each module holds exactly one.
+    const seconds = `${MIGRATION_LOCK_TIMEOUT_MS / 1000}s`;
+    for (const file of ["migration-transaction.ts", "migration-forward-chain.ts"]) {
+      const literals = [...(await readFile(new URL(file, DB_SOURCE), "utf8")).matchAll(/lock_timeout = '([^']*)'/gu)].map((match) => match[1]);
+      expect(literals, file).toEqual([seconds]);
+    }
+  });
 });

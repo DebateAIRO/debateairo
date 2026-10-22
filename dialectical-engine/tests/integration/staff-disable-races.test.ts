@@ -6,6 +6,7 @@ import { createPool, migrate, PostgresStaffRepository, type Pool } from '@debate
 import { StaffWebAuthnService } from '../../apps/api/src/staff/webauthn.js';
 import { b64, digest, fixture, key, origin, rpId } from '../support/staffWebAuthnFixtures.js';
 import { startTestDatabase, type TestDatabase } from '../support/testDatabase.js';
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 const access = await import('../../apps/api/src/staff/access.js');
 let database: TestDatabase, runtime: Pool, repo: PostgresStaffRepository, web: StaffWebAuthnService;
 const env = { v: 1 as const, keyId: 'fixture', nonce: 'AAAAAAAAAAAAAAAA', tag: 'AAAAAAAAAAAAAAAAAAAAAA==', ct: 'YQ==' };
@@ -141,7 +142,7 @@ describe('Task4 guards and actual disable races', () => {
 it('cancels the actual private PostgreSQL snapshot query and its waiting iterator on abort', async () => {
     const { PostgresAskApplication } = await import('../../apps/api/src/index.js');
     const a = await staff(), controller = new AbortController(), first = await database.pool.connect();
-    const app = new PostgresAskApplication(runtime, {} as never, {} as never, { read: async () => [] }, runtime, { server: {} as never, legacy: {} as never });
+    const app = new PostgresAskApplication(runtime, {} as never, { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, { read: async () => [] }, runtime, { server: {} as never, legacy: {} as never });
     const session = { session_id: a.ordinarySessionId, asker_id: 'owner:' + a.ownerRef, caller_scope: 'ASKER' as const, ownership_provenance: 'server_session' as const, provisional_identity_model: false as const };
     let pending: Promise<string> | undefined;
     try {

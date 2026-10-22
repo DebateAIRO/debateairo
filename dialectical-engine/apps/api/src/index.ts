@@ -2,6 +2,7 @@ import { validatePreviewProviderTestConfig, previewPlanTierRosters, previewTeamA
 import { registerPasswordResetRoutes, passwordResetPolicyInventory } from "./password-reset-routes.js";
 import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-routes.js";
 import type { PasswordResetApplication } from "./password-reset.js";
+import type { ReleaseLifecycleState, ReleaseState, ReleaseWatcher } from "./release-state.js";
 import type { BackupEmailApplication, MfaRecoveryApplication } from "./email-mfa-recovery.js";
 import type { SocialStepUpApplication } from './social-step-up.js';
 import { SocialAuthError, SOCIAL_BROWSER_COOKIE, SOCIAL_FLOW_COOKIE, SOCIAL_APPLE_FLOW_COOKIE, type SocialAuthApplication } from './social-auth.js';
@@ -48,6 +49,8 @@ import {
   InvestigationRequestSchema,
   LegacyRunClaimRequestSchema,
   LegacyRunClaimResultSchema,
+  MADE_BY_NEWER_RELEASE,
+  MadeByNewerReleaseSchema,
   PrivateDebateErasureRequestSchema,
   PrivateDebateErasureStatusSchema,
   PLAN_TIER_ROSTERS,
@@ -107,6 +110,7 @@ import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository 
 import type { SpendScope, WaitsFor } from "@debateai/budget";
 import {
   MAX_OWNER_PRIVATE_HISTORY_SCAN,
+  RELEASE_LIFECYCLE_STATES,
   RunCostSubstitutionRepository,
   RunRepository,
   decryptLeasedContentForRun,
@@ -115,11 +119,16 @@ import {
   isDatabasePoolBusy,
   prepareLeasedContentEncryptionForRun,
   queryPrivateStream,
+  resolveRunRef,
   withOwnerAskAdmissionLease,
   withRunContentLease,
   type CryptoEnvelope,
   type DiscoveredPanelMember,
+  type OwnerAskAdmissionLease,
+  type ReadmissionPrincipal,
   type RunOwnershipAccess,
+  type StoredAsk,
+  type WaitingRun,
   type WaitingRunCursor
 } from "@debateai/db";
 import { ServeRepository, type MemoryQuestionRegistration } from "@debateai/serve";
@@ -200,6 +209,8 @@ import {
   meetsMinimumAge,
   MIN_AGE,
   parseDeclaredRegion,
+  parseReleaseKey,
+  releaseTaskName,
   TypedDomainError,
   type DeclaredRegion,
   type RiskTier,
@@ -220,14 +231,17 @@ import {
 import type { AdmissionDecision, AdmissionLimiter, AdmissionScope } from "./admission.js";
 import {
   AskAlreadyWaitingError,
+  accessOfWaitingRun,
   nextWholeMinute,
   runSettingsClassOfAsk,
   type AskRoomAnswer,
   type AskRoomPort,
   type AskRoomReader,
   type AskWaitingLinePort,
+  type RoomPreview,
   type WaitingStart
 } from "./ask-room.js";
+import { planReadmission, readmittedArgumentLanguage, readmittedAskContract, type ReadmissionPlan } from "./readmission.js";
 import {
   ASK_SIGN_IN_REQUIRED,
   appliedAskOf,
@@ -258,6 +272,7 @@ import { registerStaffRoutes, staffAuthorizationPolicyInventory, type StaffHttpA
 import { exactStaffCookie, exactStaffCsrfPair, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME, STAFF_CSRF_HEADER, streamAuthorizedEvents, type StaffAccessApplication, type StaffAuthentication } from "./staff/access.js";
 export { staffRoutePolicy, staffCookies, clearStaffCookies, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME, STAFF_CSRF_HEADER } from "./staff/access.js";
 import type { PublicationApplication } from "./publications.js";
+import { MadeByNewerReleaseError, madeByNewerRelease } from "./made-by-newer-release.js";
 import type { PublicationContentCheck } from "./publication-check/check.js";
 import type { AnswerStoryApplication } from "./stories.js";
 import type { AnswerDisclosureApplication } from "./disclosures.js";
@@ -1433,6 +1448,10 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/asks/room", auth: "user", resource: "run-owner", action: "read-room" },
   { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
   { route: "GET /v1/deployment", auth: "operator", resource: "deployment", action: "read" },
+  // Side-by-side spec §6 (plan C5): the process probes. Public and session-free (the website's /readyz and Caddy poll
+  // them); neither reads a person's data nor charges an admission budget.
+  { route: "GET /livez", auth: "public", resource: "deployment", action: "liveness" },
+  { route: "GET /readyz", auth: "public", resource: "deployment", action: "readiness" },
   { route: "GET /v1/dev/evaluator", auth: "operator", resource: "evaluator", action: "read" },
   { route: "POST /v1/dev/evaluator/consumer-selection", auth: "operator", resource: "evaluator", action: "select-consumer" },
   { route: "GET /v1/answers", auth: "user", resource: "run-owner", action: "list" },
@@ -1648,7 +1667,30 @@ export interface AskApplication {
    * events route follows the run on one open stream; without it the route answers the snapshot alone.
    */
   eventMark?(runId: string, session: Session, ownership: RunOwnershipAccess, signal?: AbortSignal): Promise<RunEventMark | null>;
+  /**
+   * Side-by-side uploads spec 2026-10-21 §4 (plan C task C9): the newest run of a re-admitted debate
+   * (`core.resolve_run_ref`), or the id itself when it was never superseded. Every run-id route follows it,
+   * so an old link or an open page names the run that actually runs. A step-up grant does NOT (controller
+   * ruling (h) on the C9 review): it stays bound to the id the page sent, which the debate page takes from
+   * the run projection's own run_ref. Absent: ids pass through unchanged.
+   */
+  resolveRunRef?(runId: string): Promise<string>;
+  /**
+   * Side-by-side uploads spec 2026-10-21 §5, §6 (plan C task C14): the release a run was admitted by
+   * (`core.run.release_key`), or null when no such run exists. Read only after an owner-gated debate read of that run
+   * failed its contract parse, to tell a newer release's data (409 MADE_BY_NEWER_RELEASE) from this release's own bug
+   * (a loud 500). Absent: every such failure stays a 500.
+   */
+  readRunReleaseKey?(runId: string): Promise<string | null>;
+  /** The same for an answer: the release of the run that answered it (`serve.answer.run_id`), or null. */
+  readAnswerReleaseKey?(answerId: string): Promise<string | null>;
 }
+
+/** Side-by-side C9: a parsed run id followed to its newest run; the id itself when the application cannot resolve. */
+async function resolvedRunId(options: Pick<ApiOptions, "application">, id: string): Promise<string> {
+  return options.application.resolveRunRef === undefined ? id : options.application.resolveRunRef(id);
+}
+
 
 export type AskPrincipal =
   | Readonly<{ readonly kind: "server"; readonly userId: string; readonly ownerRef: string }>
@@ -1758,6 +1800,17 @@ export interface ApiOptions {
   readonly evaluatorDevMenu?: EvaluatorDevMenuApplication;
   readonly evaluatorDevMenuRegisterVersion?: number;
   readonly evaluatorDevMenuClock?: () => Date;
+  /**
+   * Side-by-side spec §6 (plan C5): this process's RELEASE_KEY, sent as `x-debateai-release` on every response (JSON,
+   * refusals, the house 404, the run-event stream's raw head). Always supplied by main; absent, no header is sent.
+   */
+  readonly releaseKey?: string;
+  /**
+   * Side-by-side spec §6 (plan C5): the release watcher's answers behind GET /readyz. Always supplied by main; absent
+   * (test compositions), /readyz answers ready with `releaseKey` (null when that is absent too) and no reasons.
+   * /readyz reads only `readiness()`; `draining()` ends every live run-event stream at its next poll (plan C6).
+   */
+  readonly readiness?: Pick<ReleaseWatcher, "readiness" | "draining">;
   /** B10 admission budgets; optional for test compositions, always supplied by main. */
   readonly admission?: AdmissionLimiter;
   readonly admissionClock?: () => Date;
@@ -1972,6 +2025,46 @@ export class AskAlreadyWaitingRefusal extends AskRefusal {
   }
 }
 
+/** Side-by-side C14: the 409 MADE_BY_NEWER_RELEASE refusal of a debate read (made-by-newer-release.ts). */
+export { MadeByNewerReleaseError };
+
+/**
+ * Side-by-side C14: one debate read whose contract parse failed (a `ZodError`), answered as a newer release's data when
+ * the debate is stamped by a NEWER release (`madeByNewerRelease`). Anything else is rethrown as it was: this release's
+ * own data, or an older release's, failing this code's parse is a real bug and stays a loud 500, as does any non-parse
+ * failure, an API that names no release of its own, a debate with no readable key, or a key read that itself fails.
+ */
+async function withNewerReleaseFallback<T>(
+  read: () => Promise<T>,
+  releaseKeyOf: () => Promise<string | null>,
+  ownReleaseKey: string | undefined,
+  debate: Readonly<{ route: string; id: string }>
+): Promise<T> {
+  try {
+    return await read();
+  } catch (error) {
+    if (!(error instanceof Error) || error.name !== "ZodError" || ownReleaseKey === undefined) throw error;
+    // C14 review: a key reader that throws synchronously is a failed read like any other; it never replaces the parse
+    // failure.
+    const releaseKey = await Promise.resolve().then(releaseKeyOf).catch(() => null);
+    if (releaseKey === null || !madeByNewerRelease(releaseKey, ownReleaseKey)) throw error;
+    // C14 review: one operator line, content-free (the route, the resolved run id (C9) or the answer id, the debate's
+    // release key), and the parse failure kept as the error's cause.
+    console.error(JSON.stringify({ event: "api.debate.made_by_newer_release", route: debate.route, id: debate.id, releaseKey }));
+    throw new MadeByNewerReleaseError(error);
+  }
+}
+
+/**
+ * Side-by-side C14: the `event_type` of a run event this release could not read, for the journal line — only when it
+ * has the shape of an event name (lowercase words joined by `.` or `_`, at most 64 characters); anything else is null,
+ * so the line stays content-free.
+ */
+function unreadableEventType(event: unknown): string | null {
+  const eventType = typeof event === "object" && event !== null ? (event as Record<string, unknown>).event_type : undefined;
+  return typeof eventType === "string" && /^[a-z][a-z0-9_.]{0,63}$/u.test(eventType) ? eventType : null;
+}
+
 class MalformedRequestError extends Error {
   /**
    * L1-F5: a ZodError message is the entire issue list — every field path,
@@ -2158,6 +2251,16 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   warmCrisisCheck();
   const allowedOrigin = options.allowedOrigin === undefined
     ? undefined : new URL(options.allowedOrigin).origin;
+  /**
+   * The headers every answer carries: the security set, no-store, and (side-by-side spec §6, plan C5) the release that
+   * wrote it — the browser compares its code part. Set by the onSend hook below and by `frameworkErrors`, whose replies
+   * Fastify builds without onSend.
+   */
+  const setResponseHeaders = (reply: FastifyReply): void => {
+    for (const [name, value] of Object.entries(SECURITY_HEADERS)) reply.header(name, value);
+    reply.header("cache-control", "no-store");
+    if (options.releaseKey !== undefined) reply.header("x-debateai-release", options.releaseKey);
+  };
   const api = Fastify({
     logger: false,
     trustProxy: [...TRUSTED_UI_PROXY_NETWORKS],
@@ -2170,11 +2273,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
      * them itself, and its 414 quotes the offending URL straight back at the
      * caller (L1-F6). They take the same constant typed envelopes here, and an
      * unrecognised one falls back to the constant 400 rather than a framework
-     * body. Nothing here echoes any part of the request.
+     * body. Nothing here echoes any part of the request. These replies skip the onSend hooks (Fastify builds them with
+     * no route context), so they set the common headers themselves (side-by-side C5 fix round 1).
      */
     frameworkErrors: (error: FastifyError, _request: FastifyRequest, reply: FastifyReply) => {
       const fault = TRANSPORT_FAULT_ENVELOPES.get(error.code)
         ?? { statusCode: 400 as const, code: "MALFORMED_REQUEST" as const };
+      setResponseHeaders(reply);
       void reply.status(fault.statusCode).send({ error: fault.code, message: fault.code });
     }
   });
@@ -2299,8 +2404,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     ? Object.freeze({ ownerRef: null, legacyAskerId: request.session.asker_id })
     : Object.freeze({ ownerRef: request.authenticatedSession.ownerRef, legacyAskerId: null });
   api.addHook("onSend", async (request, reply, payload) => {
-    for (const [name, value] of Object.entries(SECURITY_HEADERS)) reply.header(name, value);
-    reply.header("cache-control", "no-store");
+    setResponseHeaders(reply);
     // Reissue the same opaque generation after successful cookie auth so the
     // browser transport observes the ruled sliding 14-day idle lifetime. The
     // conditional database refresh remains the sole authorization decision,
@@ -2613,6 +2717,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         ...(knownError.waitsFor === null ? {} : { waits_for: knownError.waitsFor })
       }));
     }
+    // Side-by-side spec §5, §6 (plan C14): a debate a newer release made — "open it on the current site", not a fault.
+    if (knownError instanceof MadeByNewerReleaseError) {
+      return reply.status(409).send(MadeByNewerReleaseSchema.parse({
+        error: MADE_BY_NEWER_RELEASE, message: MADE_BY_NEWER_RELEASE
+      }));
+    }
     const malformed = knownError instanceof MalformedRequestError || knownError instanceof SyntaxError;
     const authFlow = knownError instanceof AuthFlowError;
     // Only an error marked at the ask-evaluation stage is a refusal. Register,
@@ -2890,6 +3000,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       if (!passwordWithinRequestBound(body)) {
         return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
       }
+      // Side-by-side C9, controller ruling (h): a run target is NOT followed to its newest run. The grant stays bound to
+      // the id the page sent and is echoed back exactly (no successor disclosed); the page acts on the run projection's
+      // own run_ref, so after a re-admission it sends the newest run here and on the path alike.
       const authorization = body.authorization === undefined
         ? undefined
         : parseRequest(StepUpAuthorizationRequestSchema, body.authorization);
@@ -3261,9 +3374,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     "/v1/debates/:id",
     credentialRoutePolicy("DELETE /v1/debates/{id}"),
     async (request,reply)=>{
-      const runId=ResourceIdSchema.safeParse(request.params.id);
+      const parsedRunId=ResourceIdSchema.safeParse(request.params.id);
+      const runId=parsedRunId.success ? await resolvedRunId(options,parsedRunId.data) : null;
       const authenticated=request.authenticatedSession;
-      if (!runId.success || authenticated===undefined) {
+      if (runId===null || authenticated===undefined) {
         return reply.status(404).send({ error:"NOT_FOUND" });
       }
       const input=parseRequest(PrivateDebateErasureRequestSchema,request.body);
@@ -3271,7 +3385,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         return reply.status(503).send({ error:"ACCOUNT_ERASURE_UNAVAILABLE" });
       }
       const outcome=await options.accountErasure.deletePrivateDebate({
-        runId:runId.data,authenticated,grantToken:input.step_up_grant,
+        runId,authenticated,grantToken:input.step_up_grant,
         source:sourceFor(request)
       });
       if (outcome==="NOT_FOUND") return reply.status(404).send({ error:"NOT_FOUND" });
@@ -3488,6 +3602,19 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     return reply.send(DeploymentSchema.parse(await options.application.readDeployment(request.session)));
   });
 
+  /**
+   * Side-by-side spec §6 (plan C5): the process probes. Neither needs a session, reads the database or charges an
+   * admission budget: /readyz answers from the release watcher's last read (never a query of its own), so the website's
+   * /readyz and Caddy's health check can poll it every second. `cache-control: no-store` comes from the onSend hook.
+   */
+  api.get("/livez", routePolicy("GET /livez"), async (_request, reply) => reply.send({ live: true }));
+  api.get("/readyz", routePolicy("GET /readyz"), async (_request, reply) => {
+    const readiness = options.readiness?.readiness()
+      ?? Object.freeze({ ready: true, releaseKey: options.releaseKey ?? null, reasons: Object.freeze([]) });
+    return reply.status(readiness.ready ? 200 : 503)
+      .send({ ready: readiness.ready, releaseKey: readiness.releaseKey, reasons: [...readiness.reasons] });
+  });
+
   if (options.evaluatorDevMenu !== undefined) {
     if (!Number.isInteger(options.evaluatorDevMenuRegisterVersion)
       || options.evaluatorDevMenuRegisterVersion! < 1) {
@@ -3657,7 +3784,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (version !== undefined && (!Number.isInteger(version) || version < 1)) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
-    const answer = await readOwnerAnswer(options, answerId.data, version, request.session, ownershipFor(request));
+    // Side-by-side C14: an answer a newer release made reads as 409 MADE_BY_NEWER_RELEASE, keyed through its run.
+    const answer = await withNewerReleaseFallback(
+      () => readOwnerAnswer(options, answerId.data, version, request.session, ownershipFor(request)),
+      () => options.application.readAnswerReleaseKey?.(answerId.data) ?? Promise.resolve(null),
+      options.releaseKey,
+      { route: "GET /v1/answers/{id}", id: answerId.data }
+    );
     return answer === null ? reply.status(404).send({ error: "ANSWER_NOT_FOUND" }) : reply.send(answer);
   });
 
@@ -3778,23 +3911,31 @@ export function buildApi(options: ApiOptions): FastifyInstance {
 
   api.get<{ Params: { id: string } }>("/v1/runs/:id/events", routePolicy("GET /v1/runs/{id}/events"), async (request, reply) => {
     if (!admitOrRefuse(reply, "publicReads", "GET /v1/runs/{id}/events", sourceFor(request).ip)) return reply;
-    const runId = ResourceIdSchema.safeParse(request.params.id);
+    const parsedRunId = ResourceIdSchema.safeParse(request.params.id);
     const ownership = ownershipFor(request);
-    if (!runId.success || await options.application.readRun(runId.data, request.session, ownership) === null) {
+    // Side-by-side C9: the stream follows the newest run; a stream still open on an old id reads a null mark
+    // (eventMark) and ends with the clean close the page treats as "reconnect", and the reconnect lands here.
+    const runId = parsedRunId.success ? await resolvedRunId(options, parsedRunId.data) : null;
+    if (runId === null || await options.application.readRun(runId, request.session, ownership) === null) {
       return reply.status(404).send({ error: "RUN_NOT_FOUND" });
     }
     reply.raw.writeHead(200, {
       ...SECURITY_HEADERS,
       "content-type": "text/event-stream",
       "cache-control": "no-store",
+      // writeHead bypasses onSend: the stream names its release here (side-by-side spec §6, plan C5).
+      ...(options.releaseKey === undefined ? {} : { "x-debateai-release": options.releaseKey }),
       ...(request.cookieRefresh === undefined
         ? {} : { "set-cookie": [...refreshedCookies(request.cookieRefresh)] }),
       connection: "keep-alive"
     });
     // Live run events (2026-10-11): one admission (above) buys one long-lived stream that
-    // replays the stored events, then follows the run until its terminal event.
+    // replays the stored events, then follows the run until its terminal event — or until this
+    // process drains (side-by-side spec §6, plan C6): a clean close, and the page reconnects and
+    // replays. A replay-only stream (no change mark) ends on its own.
     const application = options.application;
-    const snapshot = (signal: AbortSignal) => options.application.events(runId.data, request.session, ownership, signal);
+    const readiness = options.readiness;
+    const snapshot = (signal: AbortSignal) => options.application.events(runId, request.session, ownership, signal);
     await streamAuthorizedEvents({
       events: signal => application.eventMark === undefined
         ? snapshotRunEventItems(snapshot(signal))
@@ -3802,8 +3943,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
           snapshot,
           mark: markSignal => application.eventMark === undefined
             ? Promise.resolve(null)
-            : application.eventMark(runId.data, request.session, ownership, markSignal),
+            : application.eventMark(runId, request.session, ownership, markSignal),
           signal,
+          ...(readiness === undefined ? {} : { draining: () => readiness.draining() }),
           ...(options.runEventTail === undefined ? {} : { timing: options.runEventTail }),
           ...(options.runEventTail?.clock === undefined ? {} : { clock: options.runEventTail.clock })
         }),
@@ -3816,29 +3958,47 @@ export function buildApi(options: ApiOptions): FastifyInstance {
           reply.raw.write(RUN_EVENT_HEARTBEAT_FRAME);
           return;
         }
-        const event = RunEventSchema.parse(item.event);
+        // Side-by-side spec §6 (plan C14): an event this release cannot read (a newer release's kind or shape) is
+        // skipped with one journal line; the stream goes on. Throwing here ended the stream, the page reconnected,
+        // replayed the same event and ended again, forever. No new event type is ever sent.
+        const parsed = RunEventSchema.safeParse(item.event);
+        if (!parsed.success) {
+          console.error(JSON.stringify(Object.freeze({
+            event: "api.run_event.unreadable", runId, event_type: unreadableEventType(item.event)
+          })));
+          return;
+        }
+        const event = parsed.data;
         reply.raw.write(`id: ${event.event_id}\nevent: ${event.event_type}\ndata: ${JSON.stringify(event)}\n\n`);
       },
       close: () => { if (!reply.raw.destroyed) reply.raw.end(); }, peer: reply.raw
     });
   });
   api.get<{ Params: { id: string } }>("/v1/runs/:id", routePolicy("GET /v1/runs/{id}"), async (request, reply) => {
-    const runId = ResourceIdSchema.safeParse(request.params.id);
-    if (!runId.success) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
-    const run = await readOwnerRun(options, runId.data, request.session, ownershipFor(request));
+    const parsedRunId = ResourceIdSchema.safeParse(request.params.id);
+    if (!parsedRunId.success) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    const runId = await resolvedRunId(options, parsedRunId.data);
+    // Side-by-side C14: after C9's resolution, so the key read is the newest run's.
+    const run = await withNewerReleaseFallback(
+      () => readOwnerRun(options, runId, request.session, ownershipFor(request)),
+      () => options.application.readRunReleaseKey?.(runId) ?? Promise.resolve(null),
+      options.releaseKey,
+      { route: "GET /v1/runs/{id}", id: runId }
+    );
     return run === null ? reply.status(404).send({ error: "RUN_NOT_FOUND" }) : reply.send(run);
   });
   api.get<{ Params: { id: string } }>(
     "/v1/runs/:id/visibility",
     routePolicy("GET /v1/runs/{id}/visibility"),
     async (request, reply) => {
-      const runId = ResourceIdSchema.safeParse(request.params.id);
+      const parsedRunId = ResourceIdSchema.safeParse(request.params.id);
+      const runId = parsedRunId.success ? await resolvedRunId(options, parsedRunId.data) : null;
       const authenticated = request.authenticatedSession;
-      if (!runId.success || authenticated === undefined || options.publications === undefined) {
+      if (runId === null || authenticated === undefined || options.publications === undefined) {
         return reply.status(404).send({ error: "RUN_NOT_FOUND" });
       }
       const visibility = await options.publications.readOwnedVisibility({
-        runId: runId.data,
+        runId,
         authenticated
       });
       return visibility === null
@@ -3847,18 +4007,26 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
   );
   api.get<{ Params: { id: string } }>("/v1/runs/:id/answer", routePolicy("GET /v1/runs/{id}/answer"), async (request, reply) => {
-    const runId = ResourceIdSchema.safeParse(request.params.id);
-    if (!runId.success) return reply.status(404).send({ error: "ANSWER_NOT_SERVED" });
-    const answer = await readOwnerRunAnswer(options, runId.data, request.session, ownershipFor(request));
+    const parsedRunId = ResourceIdSchema.safeParse(request.params.id);
+    if (!parsedRunId.success) return reply.status(404).send({ error: "ANSWER_NOT_SERVED" });
+    const runId = await resolvedRunId(options, parsedRunId.data);
+    // Side-by-side C14: after C9's resolution, so the key read is the newest run's.
+    const answer = await withNewerReleaseFallback(
+      () => readOwnerRunAnswer(options, runId, request.session, ownershipFor(request)),
+      () => options.application.readRunReleaseKey?.(runId) ?? Promise.resolve(null),
+      options.releaseKey,
+      { route: "GET /v1/runs/{id}/answer", id: runId }
+    );
     return answer === null ? reply.status(404).send({ error: "ANSWER_NOT_SERVED" }) : reply.send(answer);
   });
   api.post<{ Params: { id: string } }>(
     "/v1/runs/:id/publish",
     credentialRoutePolicy("POST /v1/runs/{id}/publish"),
     async (request, reply) => {
-      const runId = ResourceIdSchema.safeParse(request.params.id);
+      const parsedRunId = ResourceIdSchema.safeParse(request.params.id);
+      const runId = parsedRunId.success ? await resolvedRunId(options, parsedRunId.data) : null;
       const authenticated = request.authenticatedSession;
-      if (!runId.success || authenticated === undefined) {
+      if (runId === null || authenticated === undefined) {
         return reply.status(404).send({ error: "RUN_NOT_FOUND" });
       }
       const input = parseRequest(PublishDebateRequestSchema, request.body);
@@ -3866,7 +4034,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         return reply.status(503).send({ error: "PUBLICATION_UNAVAILABLE" });
       }
       if (!await options.publications.preflightGrant({
-        runId: runId.data,
+        runId,
         authenticated,
         grantToken: input.step_up_grant,
         action: "PUBLISH"
@@ -3881,12 +4049,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       // for its own reads and writes; `publish` awaits the content check — up to D on an external judge — under
       // none, and re-reads the answer under a fresh lease before it commits.
       const contentLease = {
-        run: <T>(use: () => Promise<T>) => options.application.withContentLease(runId.data, use),
-        readAnswer: () => options.application.readRunAnswer(runId.data, request.session, ownershipFor(request))
+        run: <T>(use: () => Promise<T>) => options.application.withContentLease(runId, use),
+        readAnswer: () => options.application.readRunAnswer(runId, request.session, ownershipFor(request))
       };
       const answer = await contentLease.run(contentLease.readAnswer);
       const published = answer === null ? null : await options.publications.publish({
-        runId: runId.data,
+        runId,
         answer,
         authenticated,
         grantToken: input.step_up_grant,
@@ -3917,9 +4085,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     "/v1/runs/:id/unpublish",
     credentialRoutePolicy("POST /v1/runs/{id}/unpublish"),
     async (request, reply) => {
-      const runId = ResourceIdSchema.safeParse(request.params.id);
+      const parsedRunId = ResourceIdSchema.safeParse(request.params.id);
+      const runId = parsedRunId.success ? await resolvedRunId(options, parsedRunId.data) : null;
       const authenticated = request.authenticatedSession;
-      if (!runId.success || authenticated === undefined) {
+      if (runId === null || authenticated === undefined) {
         return reply.status(404).send({ error: "RUN_NOT_FOUND" });
       }
       const input = parseRequest(UnpublishDebateRequestSchema, request.body);
@@ -3927,7 +4096,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         return reply.status(503).send({ error: "PUBLICATION_UNAVAILABLE" });
       }
       if (!await options.publications.preflightGrant({
-        runId: runId.data,
+        runId,
         authenticated,
         grantToken: input.step_up_grant,
         action: "UNPUBLISH"
@@ -3939,13 +4108,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         return reply.status(404).send({ error: "RUN_NOT_FOUND" });
       }
       const owned = await options.application.readRun(
-        runId.data,
+        runId,
         request.session,
         ownershipFor(request)
       );
       if (owned === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
       const unpublished = await options.publications.unpublish({
-        runId: runId.data,
+        runId,
         authenticated,
         grantToken: input.step_up_grant,
         source: sourceFor(request)
@@ -4016,25 +4185,180 @@ export interface Dispatcher {
   dispatch(input: { readonly runId: string; readonly workItemId: string }): Promise<void>;
 }
 
-export class HatchetDispatcher implements Dispatcher {
-  constructor(
-    private readonly client: Pick<Hatchet, "runNoWait">,
-    private readonly workflowName: string
-  ) {
-    if (workflowName.trim().length === 0) throw new TypeError("Hatchet workflow name must be a register value");
+/**
+ * Side-by-side spec §2, §4 (plan C task C4) — A SEND THE RUN'S RELEASE NO LONGER SERVES. The routed dispatcher has
+ * already closed the run's never-claimed first job FAILED (`RUN_SETUP_FAILED:RELEASE_NOT_SERVED`) and written its waiver
+ * when `closed`; `closed` is false when a runner claimed the job meanwhile (that debate is under way) or it was settled.
+ * Every send site handles it: the asker reads QUEUED (the debate page says it did not start), the waker counts it
+ * failed, the stalled-start re-send logs it, and none records a DISPATCH failure over it.
+ */
+export class ReleaseNotServedError extends TypedDomainError {
+  constructor(readonly runId: string, readonly releaseKey: string, readonly closed: boolean) {
+    super("RELEASE_NOT_SERVED", "The run's release no longer serves it");
+  }
+}
+
+/** A run's own release (`core.run.release_key`), that release's state (null: never recorded, or `legacy`), and whether any release is current. */
+export interface RunReleaseLookup {
+  lookup(runId: string): Promise<Readonly<{ releaseKey: string; state: ReleaseState | null; anyCurrent: boolean }> | null>;
+}
+
+/**
+ * The lookup over 0123 (A-x2: the API's runtime login reads `core.run.release_key` and executes both definer readers),
+ * one statement per send on the runtime pool; null when there is no such run. Results are frozen.
+ */
+export class PostgresRunReleaseLookup implements RunReleaseLookup {
+  constructor(private readonly pool: Pick<Pool, "query">) {}
+
+  async lookup(runId: string): Promise<Readonly<{ releaseKey: string; state: ReleaseState | null; anyCurrent: boolean }> | null> {
+    const result = await this.pool.query<{
+      release_key: string; state: string | null; front_pair_stopped: boolean | null; retire_requested: boolean | null;
+      still_draining: boolean | null; any_current: boolean;
+    }>(
+      `SELECT run.release_key, state.state, state.front_pair_stopped, state.retire_requested, state.still_draining,
+              EXISTS (SELECT 1 FROM core.read_current_release()) AS any_current
+       FROM core.run AS run
+       LEFT JOIN LATERAL core.read_release_state(run.release_key) AS state ON true
+       WHERE run.run_id = $1`,
+      [runId]
+    );
+    const row = result.rows[0];
+    if (row === undefined) return null;
+    if (row.state !== null && !RELEASE_LIFECYCLE_STATES.has(row.state)) throw new TypeError("RELEASE_STATE_ROW_INVALID");
+    return Object.freeze({
+      releaseKey: row.release_key,
+      state: row.state === null ? null : Object.freeze({
+        state: row.state as ReleaseLifecycleState,
+        frontPairStopped: row.front_pair_stopped === true,
+        retireRequested: row.retire_requested === true,
+        stillDraining: row.still_draining === true
+      }),
+      anyCurrent: row.any_current === true
+    });
+  }
+}
+
+/**
+ * Side-by-side spec §4: a release serves its runs while it is CURRENT, and while it DRAINS until root asks it to retire
+ * (its runner still claims and finishes its own debates). A draining release staged again for a rollback reads STAGED
+ * yet still drains (final review A4: `stillDraining`), so it keeps serving its drained debates until a retire request,
+ * as it did while DRAINING; a STAGED release that never drained serves nothing. With no release recorded anywhere a
+ * local deployment is today's single-release world, and every run is served; a hosted one fails closed (plan C's area
+ * constraint).
+ */
+export function releaseServes(input: Readonly<{ state: ReleaseState | null; anyCurrent: boolean; hosted: boolean }>): boolean {
+  if (input.state?.state === "CURRENT") return true;
+  if (input.state?.state === "DRAINING" && !input.state.retireRequested) return true;
+  if (input.state?.state === "STAGED" && input.state.stillDraining && !input.state.retireRequested) return true;
+  return !input.anyCurrent && !input.hosted;
+}
+
+/** Spec §4: one journal line per release key per half hour at most, so a burst of refused sends is one line. */
+const RELEASE_NOT_SERVED_ALERT_WINDOW_MS = 1_800_000;
+
+/**
+ * Side-by-side spec §4 (plan C task C4) — A REFUSED SEND IS JOURNALED. The API emails nobody about releases: it prints
+ * `DEBATEAI_RELEASE_NOT_SERVED {"releaseKey":…,"state":…|null}` on stderr, at most once per release key per `windowMs` in
+ * this process. That journal line is all there is: no deploy watcher mails it (final fix wave X5), so the owner sees it
+ * in the API's journal (deploy/vps/README.md lists it with the waker's api.wait.release_not_served row). Content-free: a
+ * key we mint and a lifecycle word.
+ */
+export function createReleaseNotServedAlert(options: Readonly<{
+  clock?: () => number; windowMs?: number; write?: (line: string) => void;
+}> = {}): Readonly<{ note(releaseKey: string, state: ReleaseLifecycleState | null): void }> {
+  const clock = options.clock ?? Date.now;
+  const windowMs = options.windowMs ?? RELEASE_NOT_SERVED_ALERT_WINDOW_MS;
+  const write = options.write ?? ((line: string) => { process.stderr.write(`${line}\n`); });
+  const lastAt = new Map<string, number>();
+  return Object.freeze({
+    note(releaseKey: string, state: ReleaseLifecycleState | null): void {
+      const now = clock();
+      const last = lastAt.get(releaseKey);
+      if (last !== undefined && now - last < windowMs) return;
+      lastAt.set(releaseKey, now);
+      write(`DEBATEAI_RELEASE_NOT_SERVED ${JSON.stringify({ releaseKey, state })}`);
+    }
+  });
+}
+
+/** The failure reason a refused send closes the run's first job with (plain failure sentences read it NOT_STARTED). */
+const RELEASE_NOT_SERVED_SETUP_FAILURE = "RUN_SETUP_FAILED:RELEASE_NOT_SERVED";
+
+/**
+ * Side-by-side spec §2, §3, §4 (plan C task C4) — EVERY SEND IS ROUTED BY THE RUN'S OWN RELEASE. Two releases live at
+ * once never share a Hatchet task, so each send reads the run's `release_key` and that release's state and sends to
+ * `releaseTaskName(base, release_key)` (`legacy` keeps the bare base name) while that release serves the run
+ * (`releaseServes`). Otherwise nothing is sent (O1: a debate is never touched by another release's code), and the send
+ * is refused loudly and harmlessly: the never-claimed first job is closed FAILED as RUN_SETUP_FAILED:RELEASE_NOT_SERVED
+ * (`recordSetupFailure` closes a READY job only, and is not fenced by release, so the API's legacy-fenced repository
+ * closes another release's job without widening any claim fence), the run's waiver is written when that closed it
+ * (spec §9: never the person's quota), one content-free journal line, the owner alert, and ReleaseNotServedError. A run
+ * that does not exist is RUN_NOT_FOUND, and nothing is sent or closed. This is the API's only sender (the unrouted
+ * dispatcher it replaces is deleted), so no path bypasses the routing.
+ */
+export class ReleaseRoutedDispatcher implements Dispatcher {
+  readonly #client: Pick<Hatchet, "runNoWait">;
+  readonly #workflowName: string;
+  readonly #hosted: boolean;
+  readonly #lookup: RunReleaseLookup;
+  readonly #work: Pick<WorkItemRepository, "recordSetupFailure">;
+  readonly #waive: (runId: string) => Promise<void>;
+  readonly #alert: ReturnType<typeof createReleaseNotServedAlert>;
+
+  constructor(options: Readonly<{
+    client: Pick<Hatchet, "runNoWait">; workflowName: string; hosted: boolean;
+    lookup: RunReleaseLookup; work: Pick<WorkItemRepository, "recordSetupFailure">;
+    waive: (runId: string) => Promise<void>; alert: ReturnType<typeof createReleaseNotServedAlert>;
+  }>) {
+    if (options.workflowName.trim().length === 0) throw new TypeError("Hatchet workflow name must be a register value");
+    this.#client = options.client;
+    this.#workflowName = options.workflowName;
+    this.#hosted = options.hosted;
+    this.#lookup = options.lookup;
+    this.#work = options.work;
+    this.#waive = options.waive;
+    this.#alert = options.alert;
   }
 
   async dispatch(input: { readonly runId: string; readonly workItemId: string }): Promise<void> {
-    await this.client.runNoWait(this.workflowName, {
-      runId: input.runId,
-      workItemId: input.workItemId
-    }, {
-      additionalMetadata: {
-        v3RunId: input.runId,
-        v3WorkItemId: input.workItemId,
-        sourceOfRecord: "core.work_item"
-      }
+    const release = await this.#lookup.lookup(input.runId);
+    if (release === null) throw new TypedDomainError("RUN_NOT_FOUND", "The run to send does not exist");
+    if (releaseServes({ state: release.state, anyCurrent: release.anyCurrent, hosted: this.#hosted })) {
+      await this.#client.runNoWait(releaseTaskName(this.#workflowName, release.releaseKey), {
+        runId: input.runId,
+        workItemId: input.workItemId
+      }, {
+        additionalMetadata: {
+          v3RunId: input.runId,
+          v3WorkItemId: input.workItemId,
+          sourceOfRecord: "core.work_item"
+        }
+      });
+      return;
+    }
+    const closed = await this.#work.recordSetupFailure({
+      runId: input.runId, ...firstRunJob(input.runId), reason: RELEASE_NOT_SERVED_SETUP_FAILURE
     });
+    if (closed) {
+      // C4 ruling: the job is closed and never claimed, so it holds no spend and a missing waiver costs the person
+      // nothing; a failed waiver write must not escape untyped. One content-free line lets the owner see it, the
+      // alert and the typed refusal below still follow.
+      try {
+        await this.#waive(input.runId);
+      } catch (error) {
+        const code = typeof error === "object" && error !== null ? (error as { code?: unknown }).code : undefined;
+        console.error(JSON.stringify(Object.freeze({
+          event: "api.dispatch.release_not_served_waiver_failed", runId: input.runId, releaseKey: release.releaseKey,
+          sqlstate: typeof code === "string" ? code : null
+        })));
+      }
+    }
+    const state = release.state?.state ?? null;
+    console.error(JSON.stringify(Object.freeze({
+      event: "api.dispatch.release_not_served", runId: input.runId, releaseKey: release.releaseKey, state, closed
+    })));
+    this.#alert.note(release.releaseKey, state);
+    throw new ReleaseNotServedError(input.runId, release.releaseKey, closed);
   }
 }
 
@@ -4050,6 +4374,14 @@ export interface RunCreationSettings {
   readonly previewTeamUserIds?: readonly string[];
   readonly strangerSampleRate: number;
   readonly registerVersion: number;
+  /**
+   * Side-by-side spec §1 (INTERFACE "core.run.release_key"): the release this API is (its checked RELEASE_KEY). Every
+   * run it admits — the direct path, a room START and a room WAIT — is stamped with it, so a debate is never served by
+   * another release's runner (ruling O1). Checked at construction: `legacy` or a malformed key refuses
+   * RELEASE_KEY_INVALID, and a key whose number is not `registerVersion` RELEASE_KEY_REGISTER_MISMATCH, before anything
+   * is admitted.
+   */
+  readonly releaseKey: string;
   readonly batteryVersion: string;
   readonly settlementWatchHandle: string;
   readonly memoryPullPolicy?: MemoryQuestionRegistration["pullPolicy"];
@@ -4653,8 +4985,11 @@ type RunSetupStep =
  */
 type AskEvaluation = Awaited<ReturnType<typeof evaluateAskAdmission>>;
 
-/** An ask's admission with its refusal kept as a value, not thrown (B8); any other failure still throws. */
-async function evaluationOrRefusal(
+/**
+ * An ask's admission with its refusal kept as a value, not thrown (B8); any other failure still throws. Side-by-side C10:
+ * exported as the re-admission plan's `evaluate` (apps/api/src/readmission.ts), which the waker passes in C11.
+ */
+export async function evaluationOrRefusal(
   settings: RunCreationSettings,
   ask: AskRequest,
   personRoom: PersonRoomInput | null = null,
@@ -4680,6 +5015,36 @@ type RoomOutcome =
  */
 function firstRunJob(runId: string): Readonly<{ batteryRowId: "Q1"; commandKey: string }> {
   return Object.freeze({ batteryRowId: "Q1", commandKey: `S00:${runId}:Q1` });
+}
+
+/** Side-by-side C4: the waker's line for a start or re-send its run's release no longer serves (ids we mint only). */
+function logReleaseNotServed(error: ReleaseNotServedError): void {
+  console.error(JSON.stringify(Object.freeze({
+    event: "api.wait.release_not_served", runId: error.runId, releaseKey: error.releaseKey, closed: error.closed
+  })));
+}
+
+/** Side-by-side C11: the typed refusals that leave a waiting run as it was, for the waker to skip (named in its line). */
+const READMISSION_SKIPS: ReadonlySet<string> = new Set([
+  "RUN_READMISSION_TAKEN", "RUN_READMISSION_INVALID", "RUN_READMISSION_OWNER_GONE", "RUN_SUPERSEDED"
+]);
+
+/**
+ * Side-by-side C11: how far one re-admission got, so the waker handles a later throw for what it left behind. `runId`
+ * is set the moment the new run's row commits (`#readmit`): a throw after it is the orphan path. `startedRunId` (C11
+ * review) is set the moment the START that supersedes the old run committed — its edge, its hold and its first job — so
+ * only the owner lease's release can still throw, and that run must never be recorded FAILED.
+ */
+type ReadmissionProgress = { runId?: string; startedRunId?: string };
+
+/**
+ * Side-by-side C11: whose new run a re-admission writes — the owner's, encrypted (content-provision pool), when the old
+ * run's content was; otherwise the legacy asker's, in the clear, under the old run's own asker id.
+ */
+function readmissionPrincipalOf(run: WaitingRun, stored: StoredAsk): ReadmissionPrincipal {
+  if (!stored.contentEncrypted) return Object.freeze({ kind: "legacy" as const, legacyAskerId: stored.askerId });
+  if (run.ownerRef === null) throw new TypeError("READMISSION_OWNER_MISSING");
+  return Object.freeze({ kind: "readmitted-owner" as const, ownerRef: run.ownerRef });
 }
 
 /** B7b: what one tick of the waiting line did — counts only, for the operator's log. */
@@ -4735,6 +5100,13 @@ export class PostgresAskApplication implements AskApplication {
     runProvisionPool:Pool,
     askAdmissionPools:Readonly<{ server:Pool;legacy:Pool }>
   ) {
+    // Side-by-side spec §1: an API never admits under a key no runner could serve (RELEASE_KEY_INVALID), nor under a
+    // key whose number is not the register version it admits with (RELEASE_KEY_REGISTER_MISMATCH, as
+    // assertReleaseKeyForRegister refuses at boot), so no run is stamped with one release while carrying another's
+    // settings version.
+    if (parseReleaseKey(settings.releaseKey).siteVersion !== settings.registerVersion) {
+      throw new TypedDomainError("RELEASE_KEY_REGISTER_MISMATCH", "The release key's number is not this application's register version");
+    }
     validatePreviewProviderTestConfig(settings.previewProviderTestConfig);
     if(settings.previewProviderTestConfig!==undefined&&settings.modelPicker?.scorecard.state==="VALID")throw new TypedDomainError("PREVIEW_SCORECARD_CONFLICT","Preview roster cannot override a valid scorecard");
     if (askAdmissionPools.server===pool || askAdmissionPools.legacy===pool
@@ -4745,7 +5117,8 @@ export class PostgresAskApplication implements AskApplication {
     }
     this.#runs = new RunRepository(pool,runProvisionPool);
     this.#work = new WorkItemRepository(pool);
-    this.#serve = new ServeRepository(pool);
+    // Side-by-side spec §5 (plan C15): the answer read shows another release's judges recount only under its own rule.
+    this.#serve = new ServeRepository(pool, { releaseKey: settings.releaseKey });
     this.#splitLifecycle = splitLifecycle ?? new SplitLifecycleProjection(pool);
     this.#liveness = new LivenessRepository(pool);
     this.#substitutions = new RunCostSubstitutionRepository(pool);
@@ -4894,6 +5267,7 @@ export class PostgresAskApplication implements AskApplication {
           strangerSampleRate: this.settings.strangerSampleRate,
           envelopeBasis,
           registerVersion: this.settings.registerVersion,
+          releaseKey: this.settings.releaseKey,
           batteryVersion: this.settings.batteryVersion,
           askContract: {
             decision_scope: ask.decision_scope,
@@ -4977,7 +5351,13 @@ export class PostgresAskApplication implements AskApplication {
       // The job is READY: the next ask's estimate holds this debate from here on.
       await previewAdmissionLock?.release();
       setupStep = "DISPATCH";
-      await this.dispatcher.dispatch({ runId, workItemId });
+      try {
+        await this.dispatcher.dispatch({ runId, workItemId });
+      } catch (error) {
+        // Side-by-side C4: the routed dispatcher already closed the job (RELEASE_NOT_SERVED) and wrote the waiver; the
+        // asker reads QUEUED, the debate page says it did not start, and no DISPATCH failure is recorded over it.
+        if (!(error instanceof ReleaseNotServedError)) throw error;
+      }
     } catch (error) {
       await this.#recordRunSetupFailure(runId, setupStep);
       throw error;
@@ -5001,7 +5381,9 @@ export class PostgresAskApplication implements AskApplication {
    * most likely the same outage — the run keeps reading QUEUED, so the one
    * line that names it goes to the operator's log (ids and codes only).
    */
-  async #recordRunSetupFailure(runId: string, step: RunSetupStep | "FUNDING_ENDED" | typeof PREVIEW_TEAM_ONLY): Promise<void> {
+  async #recordRunSetupFailure(
+    runId: string, step: RunSetupStep | "FUNDING_ENDED" | "CHOICE_UNAVAILABLE" | "READMISSION" | typeof PREVIEW_TEAM_ONLY
+  ): Promise<void> {
     const reason = `RUN_SETUP_FAILED:${step}`;
     try {
       await this.#work.recordSetupFailure({ runId, ...firstRunJob(runId), reason });
@@ -5168,6 +5550,7 @@ export class PostgresAskApplication implements AskApplication {
             strangerSampleRate: this.settings.strangerSampleRate,
             envelopeBasis: evaluated.envelopeBasis,
             registerVersion: this.settings.registerVersion,
+            releaseKey: this.settings.releaseKey,
             batteryVersion: this.settings.batteryVersion,
             askContract: {
               decision_scope: runAsk.decision_scope,
@@ -5271,8 +5654,11 @@ export class PostgresAskApplication implements AskApplication {
     try {
       await this.dispatcher.dispatch({ runId: outcome.runId, workItemId: outcome.workItemId });
     } catch (error) {
-      await this.#recordRunSetupFailure(outcome.runId, "DISPATCH");
-      throw error;
+      // Side-by-side C4: a send the run's release no longer serves already closed the job and wrote the waiver: QUEUED.
+      if (!(error instanceof ReleaseNotServedError)) {
+        await this.#recordRunSetupFailure(outcome.runId, "DISPATCH");
+        throw error;
+      }
     }
     // A5: nothing fitted the person's room at any strength, and it started on the cheapest choice (content-free: ids only).
     if (pinned.personRoomTight === true) {
@@ -5291,7 +5677,8 @@ export class PostgresAskApplication implements AskApplication {
    * (`RUN_SETUP_FAILED:DISPATCH`, PR #33). A premium question whose owner is now
    * on Free is recorded FAILED (`RUN_SETUP_FAILED:PLAN_CHANGED`) and leaves the
    * line. The tick stops at the first run the site's day cannot hold, because
-   * nobody after it fits the day; a run whose own person is full is skipped. A
+   * nobody after it fits the day (side-by-side C8: likewise at a busy site or on
+   * a release that is not current); a run whose own person is full is skipped. A
    * start that throws wrote nothing and stays in line for the next tick. Then
    * (final review Part 1b, Important 4) the started runs whose first job was
    * never handed to a runner are handed over again (`#redispatchStalledStarts`).
@@ -5299,6 +5686,15 @@ export class PostgresAskApplication implements AskApplication {
    * (`#previewTeamRuns`): an outsider's is recorded FAILED
    * (`RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY`) and counted failed; with no team listed
    * nothing is started, handed over or failed. Ids and counts only.
+   * Side-by-side spec §4, O3 (plan C task C11): a run another release admitted is never started on its own row. The
+   * room answers NEEDS_READMISSION, writing nothing; `#startReadmitted` plans it under this release and asks again
+   * under the owner's lease, and a START writes a NEW run that supersedes it (dispatched as `outcome.runId`). A plan
+   * that is NOT_NOW, or made for a billing plan no longer in force, skips it (it keeps its place); a choice this release
+   * no longer offers records it FAILED (`RUN_SETUP_FAILED:CHOICE_UNAVAILABLE`: "please ask again"); a START that fails
+   * after the new row committed records the new run FAILED (`RUN_SETUP_FAILED:READMISSION`) and the old run waits on.
+   * C11 review: a new row whose START never committed and was never recorded FAILED (the process died in between) is
+   * recorded FAILED by a later tick, under the owner's lease (`#closeUnstartedReadmissions`), so the debate is never
+   * stranded; and a START that committed is never recorded FAILED when only the lease's release fails afterwards.
    */
   async wakeWaitingRuns(): Promise<WaitingLineTick> {
     const line = this.settings.waitingLine;
@@ -5336,19 +5732,65 @@ export class PostgresAskApplication implements AskApplication {
           continue;
         }
         persons.add(person);
+        // Side-by-side C11: the first job of the run that starts — the waiting run, or the new run re-admitting it.
+        const enqueue = (tx: PoolClient, runId: string) => this.#work.enqueueOn(tx, { runId, ...firstRunJob(runId), nodeSet: [] });
+        // How far a re-admission got: its new row committed (the orphan path), its START committed (C11 review).
+        const readmitted: ReadmissionProgress = {};
         let outcome: WaitingStart<string>;
         try {
-          outcome = await line.startWaiting(run, (tx) => this.#work.enqueueOn(tx, {
-            runId: run.runId, ...firstRunJob(run.runId), nodeSet: []
-          }));
+          outcome = await line.startWaiting(run, enqueue);
+          if (outcome.kind === "NEEDS_READMISSION") {
+            const second = await this.#startReadmitted(run, outcome, line, enqueue, readmitted);
+            // NOT_NOW, or a plan made for another billing plan than the one now in force: the run keeps its place.
+            if (second === null || second.kind === "NEEDS_READMISSION") {
+              skipped += 1;
+              continue;
+            }
+            outcome = second;
+          }
         } catch (error) {
+          if (readmitted.startedRunId !== undefined) {
+            // C11 review, Minor 3: the START committed — the new run supersedes the old one, with its hold and its
+            // READY first job — and only the owner lease's release failed (as `#submitWithRoom`'s ADMISSION_RELEASE
+            // step: the decision committed, what can still fail inside the lease is its release). Recording it FAILED
+            // would end the debate, since the old run no longer waits; #redispatchStalledStarts hands its job over
+            // once it stalls.
+            failed += 1;
+            console.error(JSON.stringify(Object.freeze({
+              event: "api.wait.readmission_release_failed", runId: run.runId, newRunId: readmitted.startedRunId,
+              diagnostic: apiOperationalErrorDiagnostic(error)
+            })));
+            continue;
+          }
+          if (readmitted.runId !== undefined) {
+            // Side-by-side C11, the orphan path: the new row committed and the START did not. It never runs (FAILED;
+            // 0123 frees the old run for the next tick), and the old run, untouched, keeps its place in line.
+            failed += 1;
+            await this.#recordRunSetupFailure(readmitted.runId, "READMISSION");
+            console.error(JSON.stringify(Object.freeze({
+              event: "api.wait.readmission_failed", runId: run.runId, newRunId: readmitted.runId,
+              diagnostic: apiOperationalErrorDiagnostic(error)
+            })));
+            continue;
+          }
+          // Side-by-side C11: 0123 refused the re-admission before anything was written — another one of this run is
+          // pending or alive (TAKEN; one whose START never committed was just recorded FAILED under the lease, so the
+          // next tick re-admits), the run no longer waits (INVALID), its owner's account is no longer active
+          // (OWNER_GONE) — or the run was superseded while this start waited for its lock. Not this tick's to start.
+          if (error instanceof TypedDomainError && READMISSION_SKIPS.has(error.code)) {
+            skipped += 1;
+            console.info(JSON.stringify(Object.freeze({ event: "api.wait.readmission_skipped", runId: run.runId, code: error.code })));
+            continue;
+          }
           failed += 1;
           console.error(JSON.stringify(Object.freeze({
             event: "api.wait.start_failed", runId: run.runId, diagnostic: apiOperationalErrorDiagnostic(error)
           })));
           continue;
         }
-        if (outcome.kind === "SITE_FULL") {
+        // Side-by-side C8: a busy site (its cap of debates) or a release that is not current holds back every run
+        // after this one too, so the pass ends here, as for a full site's day.
+        if (outcome.kind === "SITE_FULL" || outcome.kind === "SITE_BUSY" || outcome.kind === "SWITCHING") {
           stopped = true;
           break;
         }
@@ -5360,17 +5802,32 @@ export class PostgresAskApplication implements AskApplication {
           await this.#recordRunSetupFailure(run.runId, "PLAN_CHANGED");
           continue;
         }
+        // Side-by-side C11: one of its choices is no longer offered. It never started and used none of the person's
+        // allowance; the debate page says so and asks them to ask again (CHOICE_GONE).
+        if (outcome.kind === "ASK_AGAIN") {
+          failed += 1;
+          await this.#recordRunSetupFailure(run.runId, "CHOICE_UNAVAILABLE");
+          continue;
+        }
         if (outcome.kind !== "STARTED") {
           skipped += 1;
           continue;
         }
+        if (outcome.runId !== run.runId) {
+          console.info(JSON.stringify(Object.freeze({ event: "api.wait.readmitted", runId: run.runId, newRunId: outcome.runId })));
+        }
         try {
-          await this.dispatcher.dispatch({ runId: run.runId, workItemId: outcome.value });
+          await this.dispatcher.dispatch({ runId: outcome.runId, workItemId: outcome.value });
           started += 1;
-          console.info(JSON.stringify(Object.freeze({ event: "api.wait.started", runId: run.runId })));
-        } catch {
+          console.info(JSON.stringify(Object.freeze({ event: "api.wait.started", runId: outcome.runId })));
+        } catch (error) {
           failed += 1;
-          await this.#recordRunSetupFailure(run.runId, "DISPATCH");
+          // Side-by-side C4: the job already carries RELEASE_NOT_SERVED (and the run its waiver); no DISPATCH over it.
+          if (error instanceof ReleaseNotServedError) {
+            logReleaseNotServed(error);
+            continue;
+          }
+          await this.#recordRunSetupFailure(outcome.runId, "DISPATCH");
         }
       }
     }
@@ -5379,6 +5836,152 @@ export class PostgresAskApplication implements AskApplication {
     const tick: WaitingLineTick = Object.freeze({ waiting, started, skipped, failed, stopped, redispatched });
     if (waiting > 0 || redispatched > 0) console.info(JSON.stringify(Object.freeze({ event: "api.wait.tick", ...tick })));
     return tick;
+  }
+
+  /**
+   * Side-by-side spec §4, O3 (Q1 → a; plan C task C11) — PHASE TWO OF A RE-ADMISSION, for a run another release admitted
+   * that the room would start (`NEEDS_READMISSION`, nothing written). Outside every lock, the old run's stored ask is
+   * read and planned under this release (`planReadmission`; its evaluation is the only place a probe may run, and only
+   * here, after the room said START), inside the person's room exactly as `#submitWithRoom` plans an ask
+   * (`personRoomOf(preview)`, the room phase one measured under the lock: C11 review), so the picker can step down to
+   * fit it. NOT_NOW, or a run with no stored ask any more, answers null: the run keeps its place. Otherwise the owner's
+   * lease is taken FIRST, as `#submitWithRoom` takes it (then the room's spend lock), and the room is asked again with
+   * the plan; `#readmit` writes the new run only if the room still says START.
+   * C11 review (controller ruling 2026-10-22): under that lease no START of this person is in flight, so a re-admission
+   * of this run whose START never committed is an orphan, closed FAILED (`#closeUnstartedReadmissions`) — a legacy
+   * asker's before the room is asked (it provisions no key, so nothing refuses it), an owner's when 0123 refuses TAKEN
+   * because of it (the run is then skipped; the next tick re-admits it).
+   */
+  async #startReadmitted(
+    run: WaitingRun,
+    first: Extract<WaitingStart<string>, { kind: "NEEDS_READMISSION" }>,
+    line: AskWaitingLinePort,
+    enqueue: (tx: PoolClient, runId: string) => Promise<string>,
+    readmitted: ReadmissionProgress
+  ): Promise<WaitingStart<string> | null> {
+    const stored = await this.#runs.readStoredAsk(run.runId);
+    if (stored === null) return null;
+    const personRoom = first.preview === undefined ? null : personRoomOf(first.preview);
+    const plan = await planReadmission({
+      stored, planId: first.planId, settings: this.settings,
+      evaluate: (ask, shapePlan) => evaluationOrRefusal(this.settings, ask, personRoom, shapePlan)
+    });
+    if (plan.kind === "NOT_NOW") {
+      console.info(JSON.stringify(Object.freeze({ event: "api.wait.readmission_not_now", runId: run.runId, code: plan.code })));
+      return null;
+    }
+    const principal = readmissionPrincipalOf(run, stored);
+    const admissionPool = principal.kind === "readmitted-owner" ? this.#serverAskAdmissionPool : this.#legacyAskAdmissionPool;
+    return withOwnerAskAdmissionLease(admissionPool, accessOfWaitingRun(run), async (lease) => {
+      if (principal.kind === "legacy") await this.#closeUnstartedReadmissions(run.runId);
+      try {
+        const outcome = await line.startWaiting(run, enqueue, {
+          plan,
+          // The room never asks an ASK_AGAIN plan for a run.
+          createRun: plan.kind === "READMIT"
+            ? () => this.#readmit(run, plan, principal, lease, readmitted)
+            : () => Promise.reject(new TypeError("ASK_ROOM_READMISSION_WITHOUT_PLAN"))
+        });
+        // The START committed (edge, hold, first job): from here only the lease's release can throw.
+        if (outcome.kind === "STARTED") readmitted.startedRunId = outcome.runId;
+        return outcome;
+      } catch (error) {
+        if (error instanceof TypedDomainError && error.code === "RUN_READMISSION_TAKEN") {
+          await this.#closeUnstartedReadmissions(run.runId);
+        }
+        throw error;
+      }
+    });
+  }
+
+  /**
+   * Side-by-side C11 review (controller ruling 2026-10-22) — A WAITING RUN'S RE-ADMISSIONS WHOSE START NEVER
+   * COMMITTED, recorded FAILED (RUN_SETUP_FAILED:READMISSION). Called only under the old run's owner ask-admission lease, where no
+   * START of that person is in flight, so every run 0123 lists (`listUnstartedReadmissions`: no edge, no work item) is
+   * one the process left when it died between the new row and its START, or whose FAILED record never landed. Recording
+   * it frees the old run (0123's prepare then no longer refuses TAKEN). Never throws: a failed read is logged and read
+   * again under a later tick's lease; a failed record is logged by `#recordRunSetupFailure`. Ids only.
+   */
+  async #closeUnstartedReadmissions(oldRunId: string): Promise<void> {
+    let orphans: readonly string[];
+    try {
+      orphans = await this.#runs.listUnstartedReadmissions(oldRunId);
+    } catch (error) {
+      console.error(JSON.stringify(Object.freeze({
+        event: "api.wait.readmission_orphans_unread", runId: oldRunId, diagnostic: apiOperationalErrorDiagnostic(error)
+      })));
+      return;
+    }
+    for (const orphan of orphans) {
+      console.info(JSON.stringify(Object.freeze({
+        event: "api.wait.readmission_orphan", runId: oldRunId, newRunId: orphan
+      })));
+      await this.#recordRunSetupFailure(orphan, "READMISSION");
+    }
+  }
+
+  /**
+   * Side-by-side C11 — THE NEW RUN of a re-admission, written as `#submitWithRoom` writes a new run, on the same pools:
+   * the row under this release (`startReadmittedRun` on the owner's lease client: the content-provision login for an
+   * owner's encrypted run), then the model assignment and the role rotation the plan's evaluation pinned, then the
+   * memory question under the old run's asker and caller scope. No liveness query is recorded: this is not a new ask.
+   * `readmitted.runId` is set the moment the row commits, so a failure after it — a failed pin included — records the
+   * new run FAILED (RUN_SETUP_FAILED:READMISSION) in the waker's catch, and the error is rethrown.
+   */
+  async #readmit(
+    run: WaitingRun,
+    plan: Extract<ReadmissionPlan, { kind: "READMIT" }>,
+    principal: ReadmissionPrincipal,
+    lease: OwnerAskAdmissionLease,
+    readmitted: ReadmissionProgress
+  ): Promise<string> {
+    const evaluation = plan.evaluation;
+    const language = readmittedArgumentLanguage(plan);
+    const runId = await this.#runs.startReadmittedRun({
+      fromRunId: run.runId,
+      principal,
+      questionLine: plan.ask.question_line,
+      argumentLanguageTag: language.tag,
+      argumentLanguageName: language.nameEn,
+      asOf: new Date(plan.ask.as_of),
+      askerRiskTier: plan.ask.risk_tier,
+      effectiveRiskTier: evaluation.risk.effectiveRiskTier,
+      tierSource: evaluation.risk.tierSource,
+      tierProvenanceRef: evaluation.risk.tierProvenanceRef,
+      compositionBudgetTier: plan.ask.composition_budget_tier,
+      planTier: plan.ask.plan_tier,
+      depthParams: plan.ask.depth_params,
+      discoveredPanel: evaluation.discoveredPanel,
+      strangerSampleRate: this.settings.strangerSampleRate,
+      envelopeBasis: evaluation.envelopeBasis,
+      registerVersion: this.settings.registerVersion,
+      releaseKey: this.settings.releaseKey,
+      batteryVersion: this.settings.batteryVersion,
+      askContract: readmittedAskContract(plan),
+      batteryRows: createInitialBatteryRows({ settlementWatchHandle: this.settings.settlementWatchHandle })
+    }, lease.client);
+    readmitted.runId = runId;
+    if (evaluation.modelAssignment !== undefined) {
+      await insertRunRoleAssignment(this.pool, {
+        runId,
+        assignment: { ...evaluation.modelAssignment.assignment },
+        strength: evaluation.modelAssignment.appliedStrength,
+        steppedDown: evaluation.modelAssignment.steppedDown
+      });
+    }
+    if (evaluation.roleRotation !== undefined) {
+      await insertRunRoleRotation(this.pool, { runId, ...rotationPinFields(evaluation.roleRotation) });
+    }
+    await this.#serve.recordMemoryQuestion({
+      runId,
+      questionLine: plan.ask.question_line,
+      callerScope: plan.stored.callerScope,
+      askerScope: plan.stored.askerId,
+      asOf: plan.ask.as_of,
+      policyVersion: this.settings.registerVersion,
+      ...(this.settings.memoryPullPolicy === undefined ? {} : { pullPolicy: this.settings.memoryPullPolicy })
+    }, accessOfWaitingRun(run));
+    return runId;
   }
 
   /**
@@ -5420,6 +6023,11 @@ export class PostgresAskApplication implements AskApplication {
       try {
         await this.dispatcher.dispatch({ runId: job.runId, workItemId: job.workItemId });
       } catch (error) {
+        // Side-by-side C4: the run's release no longer serves it; the dispatcher closed what it could. Counted nowhere.
+        if (error instanceof ReleaseNotServedError) {
+          logReleaseNotServed(error);
+          continue;
+        }
         console.error(JSON.stringify(Object.freeze({
           event: "api.wait.redispatch_failed", runId: job.runId, diagnostic: apiOperationalErrorDiagnostic(error)
         })));
@@ -5505,6 +6113,36 @@ export class PostgresAskApplication implements AskApplication {
 
   readAnswerIndex(_session: Session, limit: number, offset: number, ownership: RunOwnershipAccess): Promise<AnswerIndex> {
     return this.#serve.readAnswerIndex(ownership, limit, offset);
+  }
+
+  /**
+   * Side-by-side C9: `core.resolve_run_ref` (0123 §4; EXECUTE for the API's runtime role) on the runtime pool, through
+   * @debateai/db's `resolveRunRef` (`SELECT core.resolve_run_ref($1::uuid)::text`, typed refusals) — the newest run of a
+   * re-admitted debate, the id itself when nothing superseded it. It reads no ownership: every caller hands the result
+   * to an owner-gated read, and a re-admission keeps the debate's owner.
+   */
+  resolveRunRef(runId: string): Promise<string> {
+    return resolveRunRef(this.pool, runId);
+  }
+
+  /**
+   * Side-by-side C14: `core.run.release_key` (0123 §1) on the runtime pool. Called only after an owner-gated read of the
+   * same run failed its contract parse; the key names a release, never the debate's content, so it reads no ownership.
+   */
+  async readRunReleaseKey(runId: string): Promise<string | null> {
+    const result = await this.pool.query<{ release_key: string }>(
+      "SELECT release_key FROM core.run WHERE run_id = $1::uuid", [runId]
+    );
+    return result.rows[0]?.release_key ?? null;
+  }
+
+  /** Side-by-side C14: the release of the run that answered (`serve.answer.run_id`), every version alike. */
+  async readAnswerReleaseKey(answerId: string): Promise<string | null> {
+    const result = await this.pool.query<{ release_key: string }>(
+      `SELECT run.release_key FROM serve.answer AS answer JOIN core.run AS run ON run.run_id = answer.run_id
+        WHERE answer.answer_id = $1::uuid LIMIT 1`, [answerId]
+    );
+    return result.rows[0]?.release_key ?? null;
   }
 
   readInspection(answerId: string, _session: Session, version: number | undefined, ownership: RunOwnershipAccess): Promise<Inspection | null> {
@@ -5683,6 +6321,8 @@ export class PostgresAskApplication implements AskApplication {
    * reads — stored progress events, failed (and unfinished) work items, spawned nodes and their
    * edges, judgement ledger entries, propagation runs. Its mark moves whenever the snapshot could
    * hold a new event; the stream reads the snapshot again only then. No content, no key work.
+   * Side-by-side C9: a superseded run has no mark, so a stream still open on it ends with the clean
+   * close the page treats as "reconnect", and the reconnect follows `resolveRunRef` to the newest run.
    */
   async eventMark(runId: string, _session: Session, ownership: RunOwnershipAccess, signal?: AbortSignal): Promise<RunEventMark | null> {
     if (signal?.aborted) return null;
@@ -5702,7 +6342,8 @@ export class PostgresAskApplication implements AskApplication {
          COALESCE((SELECT max(propagation.at_seq) FROM ledger.propagation_run AS propagation
                    WHERE propagation.run_id = run.run_id), 0)::text AS propagated
        FROM core.run AS run
-       WHERE run.run_id = $1 AND core.run_is_owned_by(run.run_id,$2,$3)`,
+       WHERE run.run_id = $1 AND core.run_is_owned_by(run.run_id,$2,$3)
+         AND NOT EXISTS (SELECT 1 FROM core.run_supersession AS s WHERE s.old_run_id = run.run_id)`,
       [runId, ownership.ownerRef, ownership.legacyAskerId], signal
     );
     const row = result.rows[0];

@@ -15,9 +15,13 @@ const prestart = await import('../../deploy/' + 'preview-lifecycle/v1/prestart.m
 const sha = (bytes: string | Buffer) => createHash('sha256').update(bytes).digest('hex');
 const me = { uid: process.getuid!(), gid: process.getgid!() };
 const digest = 'a'.repeat(64), revision = 'a'.repeat(40), tree = 'b'.repeat(40), newRevision = 'c'.repeat(40), newTree = 'd'.repeat(40);
+// Side-by-side spec §1: the new release's key, r<site version>-<first 12 hex of the UI source manifest's revision>.
+const NEW_KEY = `r10-${newRevision.slice(0, 12)}`;
 const publication = { publicationId: '11111111-1111-4111-8111-111111111111', publicationKind: 'GENERAL', baseRegisterVersion: '8', registerVersion: '9', requestSha256: digest, snapshotSha256: digest, rowCount: 68, recordedAt: '2026-10-06T12:00:00.000Z' };
-const OLD_ROOT = '/opt/debateai-v3-preview/releases/auth-dev-candidate-old-api';
-const NEW_ROOT = { api: '/opt/debateai-v3-preview/releases/auth-dev-candidate-new-api', ui: '/opt/debateai-v3-preview/releases/auth-dev-candidate-new-ui', runner: '/opt/debateai-v3-preview/releases/auth-dev-candidate-new-runner' } as const;
+// Release roots end in their service (side-by-side spec §10): the label is what sits between the kind and the service.
+const OLD_ROOT = { api: '/opt/debateai-v3-preview/releases/auth-dev-candidate-old-v1-api', ui: '/opt/debateai-v3-preview/releases/auth-dev-candidate-old-v1-ui', runner: '/opt/debateai-v3-preview/releases/auth-dev-candidate-old-v1-runner' } as const;
+const NEW_ROOT = { api: '/opt/debateai-v3-preview/releases/auth-dev-candidate-new-v1-api', ui: '/opt/debateai-v3-preview/releases/auth-dev-candidate-new-v1-ui', runner: '/opt/debateai-v3-preview/releases/auth-dev-candidate-new-v1-runner' } as const;
+const ENV_ROOT = '/etc/debateai-v3-preview/auth-dev-v1';
 const OPERATOR = 'dialectical-engine/deploy/preview-auth-dev/v1/';
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -43,22 +47,22 @@ const sourceManifest = (role: 'api' | 'ui' | 'runner', patch: Record<string, unk
   packageLinks: [], dependencyInventory: [], generatedContract: null, nativeSha256: '9'.repeat(64), contractSha256: '8'.repeat(64), promptStoryProviderSha256: digest, packageLockSha256: digest, ...patch
 });
 const oldPlan = (service: 'api' | 'ui' | 'runner') => ({
-  schema: 'preview-auth-dev-launch-v1', service, artifact: 'candidate', sourceRoot: OLD_ROOT, sourceRevision: revision, sourceTree: tree,
+  schema: 'preview-auth-dev-launch-v1', service, artifact: 'candidate', sourceRoot: OLD_ROOT[service], sourceRevision: revision, sourceTree: tree,
   serviceUid: 994, serviceGid: 977, sourceManifest: { path: '/opt/debateai-v3-preview/artifacts/old/api-source.json', sha256: 'c'.repeat(64) },
   nativeAttestation: { path: '/opt/debateai-v3-preview/artifacts/old/native.json', sha256: 'd'.repeat(64) },
   uiBuild: service === 'ui' ? { path: '/opt/debateai-v3-preview/artifacts/old/ui-build.json', sha256: 'e'.repeat(64) } : null,
   publication, operatorManifestSha256: 'f'.repeat(64),
-  environment: { path: `/etc/debateai-v3-preview/auth-dev-v1/${service}.env`, root: '/etc/debateai-v3-preview/auth-dev-v1', uid: 0, gid: 977, mode: 0o640, parentUid: 0 },
-  apiPort: '3101', uiPort: '3100', mailExecutable: `${OLD_ROOT}/dialectical-engine/deploy/preview-auth-dev/v1/mail-handoff.mjs`, mailFrom: 'noreply@dezbatere.ro'
+  environment: { path: `${ENV_ROOT}/${service}-old-v1.env`, root: ENV_ROOT, uid: 0, gid: 977, mode: 0o640, parentUid: 0 },
+  apiPort: '3101', uiPort: '3100', mailExecutable: `${OLD_ROOT[service]}/dialectical-engine/deploy/preview-auth-dev/v1/mail-handoff.mjs`, mailFrom: 'noreply@dezbatere.ro'
 });
 const attestation = (patch: Record<string, unknown> = {}) => ({
   schema: 'preview-auth-dev-native-v1', sourceRevision: newRevision, sourceTree: newTree, nativeSourceSha256: '9'.repeat(64), verifiedAt: '2026-10-09T10:00:00.000Z', postgresMajor: 18,
   executorRole: 'debateai_prod_migrator', executorOid: 16388, ledgerOwnerOid: 16388, billingOwnerOid: 16388, defaultOwnerCount: 6, ledgerCount: 129,
   resolutionCount: 1, forwardCount: 1, catalogSha256: digest, ledgerSha256: digest, resolutionSha256: digest, forwardSha256: digest, cohortCount: 0,
-  capabilityCounts: { debateai_runtime: 10 }, currentContractVerified: true, publication, ...patch
+  capabilityCounts: { debateai_runtime: 10 }, currentContractVerified: true, publication, databaseAhead: null, ...patch
 });
 const oldNativePlan = (patch: Record<string, unknown> = {}) => ({
-  schema: 'preview-auth-dev-native-plan-v1', operation: 'verify', sourceRoot: OLD_ROOT, sourceRevision: revision, sourceTree: tree,
+  schema: 'preview-auth-dev-native-plan-v1', operation: 'verify', sourceRoot: OLD_ROOT.api, sourceRevision: revision, sourceTree: tree,
   sourceManifest: { path: '/opt/debateai-v3-preview/artifacts/old/api-source.json', sha256: 'c'.repeat(64) }, operatorManifestSha256: 'f'.repeat(64),
   selectedBaseRegisterVersion: '8', selectedBaseSnapshotSha256: digest, publicationId: publication.publicationId,
   approval: { runtimeObservedAt: '2026-10-06T11:00:00.000Z', baseRegisterVersion: '8', baseSnapshotSha256: digest, snapshotSha256: digest, deltaSha256: digest, publication }, ...patch
@@ -74,7 +78,10 @@ const run = (argv: string[], layout: any, deps: Record<string, unknown> = {}) =>
 
 describe('command line', () => {
   it('accepts each subcommand with exactly its flags', () => {
-    expect(tool.parseArguments(['build-env'])).toMatchObject({ command: 'build-env' });
+    expect(tool.parseArguments(['build-env', '--release-key', NEW_KEY])).toMatchObject({ command: 'build-env' });
+    // Side-by-side spec §1: the website is built only for a named release.
+    expect(() => tool.parseArguments(['build-env'])).toThrow(/ARGUMENTS_REFUSED/);
+    expect(() => tool.parseArguments(['ui-build', '--source', '/x.json', '--out', '/y.json'])).toThrow(/ARGUMENTS_REFUSED/);
     expect(tool.parseArguments(['verify', '--source', '/x.json', '--ui-build', '/y.json']).options['--ui-build']).toBe('/y.json');
   });
   it.each([
@@ -217,36 +224,43 @@ describe('operator digest', () => {
 
 describe('UI build values', () => {
   const runtimeOnly = { PORT: '3100', DIALECTICAL_UI_HOST: '127.0.0.1', DIALECTICAL_API_BASE: 'http://127.0.0.1:3101' };
+  const plan = { uiPort: '3100', apiPort: '3101', sourceRevision: newRevision }, pin = { registerVersion: '10' };
   it('are exactly what the reviewed runtime gate demands from ui.env, from the same constants', () => {
-    expect(tool.UI_PUBLIC_BUILD_VALUES).toEqual({ NODE_ENV: 'production', PUBLIC_APP_URL: turnstile.PREVIEW_ORIGIN, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: environment.PREVIEW_FREE_MODEL_IDS_JSON, TURNSTILE_SITE_KEY: turnstile.PREVIEW_SITE_KEY });
-    expect(tool.UI_PUBLIC_BUILD_VALUES).toEqual(tool.uiPublicBuildValues('glm-only'));
+    expect(tool.UI_PUBLIC_BUILD_VALUES).toEqual({ NODE_ENV: 'production', PUBLIC_APP_URL: turnstile.PREVIEW_ORIGIN, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: environment.PREVIEW_FREE_MODEL_IDS_JSON, TURNSTILE_SITE_KEY: turnstile.PREVIEW_SITE_KEY, RELEASE_KEY: tool.RELEASE_KEY_NOT_GIVEN });
+    // The template's RELEASE_KEY is never a key: every build names its own (--release-key), and a build given the template refuses.
+    expect(environment.RELEASE_KEY_PATTERN.test(tool.UI_PUBLIC_BUILD_VALUES.RELEASE_KEY)).toBe(false);
+    expect(tool.uiPublicBuildValues(NEW_KEY, 'glm-only')).toEqual({ ...tool.UI_PUBLIC_BUILD_VALUES, RELEASE_KEY: NEW_KEY });
     expect(tool.UI_MODEL_ROSTERS).toEqual(['glm-only', 'multi-model', 'all-models']);
     for (const models of tool.UI_MODEL_ROSTERS) {
-      const values = tool.uiPublicBuildValues(models), built = { builtModelRosterFlag: environment.PREVIEW_MODEL_ROSTER_FLAGS[models] };
-      expect(values).toEqual({ ...tool.UI_PUBLIC_BUILD_VALUES, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: environment.PREVIEW_MODEL_ROSTER_FLAGS[models] });
-      expect(() => environment.narrowEnvironment('ui', { ...values, ...runtimeOnly }, built, null, { uiPort: '3100', apiPort: '3101' })).not.toThrow();
+      const values = tool.uiPublicBuildValues(NEW_KEY, models), built = { builtModelRosterFlag: environment.PREVIEW_MODEL_ROSTER_FLAGS[models] };
+      expect(values).toEqual({ ...tool.UI_PUBLIC_BUILD_VALUES, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: environment.PREVIEW_MODEL_ROSTER_FLAGS[models], RELEASE_KEY: NEW_KEY });
+      expect(() => environment.narrowEnvironment('ui', { ...values, ...runtimeOnly }, built, pin, plan)).not.toThrow();
       for (const key of Object.keys(values)) {
-        expect(() => environment.narrowEnvironment('ui', { ...values, ...runtimeOnly, [key]: 'other' }, built, null, { uiPort: '3100', apiPort: '3101' })).toThrow();
+        expect(() => environment.narrowEnvironment('ui', { ...values, ...runtimeOnly, [key]: 'other' }, built, pin, plan)).toThrow();
       }
     }
-    for (const models of ['multi', '', 'GLM-ONLY', 'constructor']) expect(() => tool.uiPublicBuildValues(models)).toThrow(/ARGUMENTS_REFUSED/);
+    for (const models of ['multi', '', 'GLM-ONLY', 'constructor']) expect(() => tool.uiPublicBuildValues(NEW_KEY, models)).toThrow(/ARGUMENTS_REFUSED/);
+    for (const key of [undefined, '', 'legacy', 'R10-CCCCCCCCCCCC', 'r10-cccccccccccc ', ['r0', 'cccccccccccc'].join('-'), tool.RELEASE_KEY_NOT_GIVEN]) expect(() => tool.uiPublicBuildValues(key, 'glm-only'), String(key)).toThrow(/RELEASE_KEY_REFUSED/);
   });
 
   it('the build child gets only the public values plus fixed tool settings, never a secret path or a stray public flag', () => {
-    expect(Object.keys(tool.UI_BUILD_ENVIRONMENT).sort()).toEqual(['CI', 'LANG', 'LC_ALL', 'NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON', 'NEXT_TELEMETRY_DISABLED', 'NODE_ENV', 'PATH', 'PUBLIC_APP_URL', 'TURNSTILE_SITE_KEY', 'TZ']);
+    expect(Object.keys(tool.UI_BUILD_ENVIRONMENT).sort()).toEqual(['CI', 'LANG', 'LC_ALL', 'NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON', 'NEXT_TELEMETRY_DISABLED', 'NODE_ENV', 'PATH', 'PUBLIC_APP_URL', 'RELEASE_KEY', 'TURNSTILE_SITE_KEY', 'TZ']);
     expect(tool.UI_BUILD_ENVIRONMENT.PATH).toBe('/usr/local/bin:/usr/bin:/bin');
   });
 
   it('build-env prints each value with its sha256 so ui.env can be compared by hash only', async () => {
-    const report = await run(['build-env'], tool.LAYOUT);
+    const report = await run(['build-env', '--release-key', NEW_KEY], tool.LAYOUT);
     expect(report.values.TURNSTILE_SITE_KEY).toEqual({ value: turnstile.PREVIEW_SITE_KEY, sha256: sha(turnstile.PREVIEW_SITE_KEY) });
+    expect(report.values.RELEASE_KEY).toEqual({ value: NEW_KEY, sha256: sha(NEW_KEY) });
     expect(Object.keys(report.values)).toEqual(Object.keys(tool.UI_PUBLIC_BUILD_VALUES));
     expect(report.values.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON.value).toBe(environment.PREVIEW_MODEL_ROSTER_FLAGS['glm-only']);
-    const multi = await run(['build-env', '--models', 'multi-model'], tool.LAYOUT);
+    const multi = await run(['build-env', '--models', 'multi-model', '--release-key', NEW_KEY], tool.LAYOUT);
     expect(multi.values.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON).toEqual({ value: environment.PREVIEW_MODEL_ROSTER_FLAGS['multi-model'], sha256: sha(environment.PREVIEW_MODEL_ROSTER_FLAGS['multi-model']) });
-    const all = await run(['build-env', '--models', 'all-models'], tool.LAYOUT);
+    const all = await run(['build-env', '--release-key', NEW_KEY, '--models', 'all-models'], tool.LAYOUT);
     expect(all.values.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON).toEqual({ value: environment.PREVIEW_MODEL_ROSTER_FLAGS['all-models'], sha256: sha(environment.PREVIEW_MODEL_ROSTER_FLAGS['all-models']) });
-    await expect(run(['build-env', '--models', 'everything'], tool.LAYOUT)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED' });
+    await expect(run(['build-env', '--models', 'everything', '--release-key', NEW_KEY], tool.LAYOUT)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED' });
+    for (const key of ['legacy', 'R10-CCCCCCCCCCCC', 'r10-ccccccccccc'])
+      await expect(run(['build-env', '--release-key', key], tool.LAYOUT), key).rejects.toMatchObject({ code: 'RELEASE_KEY_REFUSED' });
   });
 });
 
@@ -257,9 +271,9 @@ describe('ui-build and verify', () => {
     const events: string[] = [];
     const build = { schema: 'preview-auth-dev-ui-build-v1', buildId: 'x', files: [] };
     const out = join(s.art, 'candidate-ui-build.json');
-    const result = await run(['ui-build', '--source', source.path, '--out', out], s.layout, {
+    const result = await run(['ui-build', '--source', source.path, '--release-key', NEW_KEY, '--out', out], s.layout, {
       verifySourceManifest: async (_m: unknown, binding: any) => { events.push(`verify:${binding.manifestSha256}`); },
-      buildUiArtifact: async (m: any, env: unknown) => { events.push('build'); expect(m.role).toBe('ui'); expect(env).toEqual({ ...tool.UI_BUILD_ENVIRONMENT, PATH: '/opt/node/bin:/usr/local/bin:/usr/bin:/bin' }); return build; },
+      buildUiArtifact: async (m: any, env: unknown) => { events.push('build'); expect(m.role).toBe('ui'); expect(env).toEqual({ ...tool.UI_BUILD_ENVIRONMENT, RELEASE_KEY: NEW_KEY, PATH: '/opt/node/bin:/usr/local/bin:/usr/bin:/bin' }); return build; },
       verifyUiBuildManifest: async () => { events.push('verify-build'); }, execPath: '/opt/node/bin/node'
     });
     expect(events).toEqual([`verify:${source.sha256}`, 'build', `verify:${source.sha256}`, 'verify-build']);
@@ -271,21 +285,39 @@ describe('ui-build and verify', () => {
     const s = server();
     const source = s.write(join(s.art, 'candidate-ui-source.json'), sourceManifest('ui'));
     let seen: any;
-    await run(['ui-build', '--source', source.path, '--models', 'multi-model', '--out', join(s.art, 'candidate-ui-build.json')], s.layout, {
+    await run(['ui-build', '--source', source.path, '--models', 'multi-model', '--release-key', NEW_KEY, '--out', join(s.art, 'candidate-ui-build.json')], s.layout, {
       verifySourceManifest: async () => undefined, verifyUiBuildManifest: async () => undefined, execPath: '/opt/node/bin/node',
       buildUiArtifact: async (_m: unknown, env: any) => { seen = env; return { schema: 'preview-auth-dev-ui-build-v1' }; }
     });
-    expect(seen).toEqual({ ...tool.UI_BUILD_ENVIRONMENT, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: environment.PREVIEW_MODEL_ROSTER_FLAGS['multi-model'], PATH: '/opt/node/bin:/usr/local/bin:/usr/bin:/bin' });
+    expect(seen).toEqual({ ...tool.UI_BUILD_ENVIRONMENT, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: environment.PREVIEW_MODEL_ROSTER_FLAGS['multi-model'], RELEASE_KEY: NEW_KEY, PATH: '/opt/node/bin:/usr/local/bin:/usr/bin:/bin' });
     const never = { verifySourceManifest: async () => { throw new Error('ran'); }, buildUiArtifact: async () => { throw new Error('ran'); } };
-    await expect(run(['ui-build', '--source', source.path, '--models', 'all', '--out', join(s.art, 'other-ui-build.json')], s.layout, never)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED' });
+    await expect(run(['ui-build', '--source', source.path, '--models', 'all', '--release-key', NEW_KEY, '--out', join(s.art, 'other-ui-build.json')], s.layout, never)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED' });
     expect(existsSync(join(s.art, 'other-ui-build.json'))).toBe(false);
+  });
+
+  // Side-by-side spec §1, §7: the website bakes its release's code part in when it is built, so the key must be this source's.
+  it('--release-key of another revision, or not a release key, refuses RELEASE_KEY_REFUSED before anything is verified or built', async () => {
+    const s = server();
+    const source = s.write(join(s.art, 'candidate-ui-source.json'), sourceManifest('ui'));
+    const never = { verifySourceManifest: async () => { throw new Error('ran'); }, buildUiArtifact: async () => { throw new Error('ran'); }, verifyUiBuildManifest: async () => { throw new Error('ran'); } };
+    for (const key of [`r17-${'d'.repeat(12)}`, ['r10', 'cccccccccccd'].join('-'), 'legacy', 'R10-CCCCCCCCCCCC', 'r10-ccccccccccc', tool.RELEASE_KEY_NOT_GIVEN]) {
+      await expect(run(['ui-build', '--source', source.path, '--release-key', key, '--out', join(s.art, 'candidate-ui-build.json')], s.layout, never), key).rejects.toMatchObject({ code: 'RELEASE_KEY_REFUSED' });
+    }
+    expect(existsSync(join(s.art, 'candidate-ui-build.json'))).toBe(false);
+    // Any site version is admitted with this source's 12 hex (the number is checked when the release starts).
+    let seen: any;
+    await run(['ui-build', '--source', source.path, '--release-key', `r17-${newRevision.slice(0, 12)}`, '--out', join(s.art, 'candidate-ui-build.json')], s.layout, {
+      verifySourceManifest: async () => undefined, verifyUiBuildManifest: async () => undefined, execPath: '/opt/node/bin/node',
+      buildUiArtifact: async (_m: unknown, env: any) => { seen = env; return { schema: 'preview-auth-dev-ui-build-v1' }; }
+    });
+    expect(seen.RELEASE_KEY).toBe(`r17-${newRevision.slice(0, 12)}`);
   });
 
   it('writes nothing when the build changed an inventoried source byte', async () => {
     const s = server();
     const source = s.write(join(s.art, 'candidate-ui-source.json'), sourceManifest('ui'));
     let calls = 0;
-    await expect(run(['ui-build', '--source', source.path, '--out', join(s.art, 'candidate-ui-build.json')], s.layout, {
+    await expect(run(['ui-build', '--source', source.path, '--release-key', NEW_KEY, '--out', join(s.art, 'candidate-ui-build.json')], s.layout, {
       verifySourceManifest: async () => { if (++calls === 2) throw new TypeError('PREVIEW_SOURCE_INVENTORY_REFUSED'); },
       buildUiArtifact: async () => ({ schema: 'preview-auth-dev-ui-build-v1' }), verifyUiBuildManifest: async () => undefined
     })).rejects.toThrow('PREVIEW_SOURCE_INVENTORY_REFUSED');
@@ -299,15 +331,15 @@ describe('ui-build and verify', () => {
     const layout = { ...s.layout, releasesRoot: releases };
     const source = s.write(join(s.art, 'candidate-ui-source.json'), sourceManifest('ui', { sourceRoot: root }));
     const never = { buildUiArtifact: async () => { throw new Error('built'); }, verifySourceManifest: async () => { throw new Error('verified'); } };
-    await expect(run(['ui-build', '--source', source.path, '--out', join(s.art, 'candidate-ui-build.json')], layout, never)).rejects.toMatchObject({ code: 'UI_BUILD_EXISTS' });
+    await expect(run(['ui-build', '--source', source.path, '--release-key', NEW_KEY, '--out', join(s.art, 'candidate-ui-build.json')], layout, never)).rejects.toMatchObject({ code: 'UI_BUILD_EXISTS' });
     const out = s.write(join(s.art, 'candidate-ui-build.json'), '{}').path;
-    await expect(run(['ui-build', '--source', source.path, '--out', out], layout, never)).rejects.toMatchObject({ code: 'OUTPUT_EXISTS' });
+    await expect(run(['ui-build', '--source', source.path, '--release-key', NEW_KEY, '--out', out], layout, never)).rejects.toMatchObject({ code: 'OUTPUT_EXISTS' });
   });
 
   it('refuses to build from a non-UI manifest', async () => {
     const s = server();
     const source = s.write(join(s.art, 'candidate-api-source.json'), sourceManifest('api'));
-    await expect(run(['ui-build', '--source', source.path, '--out', join(s.art, 'b.json')], s.layout, { buildUiArtifact: async () => { throw new Error('built'); } })).rejects.toMatchObject({ code: 'SOURCE_ROLE_REFUSED' });
+    await expect(run(['ui-build', '--source', source.path, '--release-key', NEW_KEY, '--out', join(s.art, 'b.json')], s.layout, { buildUiArtifact: async () => { throw new Error('built'); } })).rejects.toMatchObject({ code: 'SOURCE_ROLE_REFUSED' });
   });
 
   it('verify re-runs the reviewed verifiers against the exact manifest bytes', async () => {
@@ -351,7 +383,7 @@ describe('launch-plan', () => {
     const attest = s.write(join(s.art, 'native-first-verify.json'), attestation(native));
     const build = s.write(join(s.art, 'candidate-ui-build.json'), { schema: 'preview-auth-dev-ui-build-v1', sourceRoot: NEW_ROOT.ui, sourceRevision: newRevision, sourceTree: newTree, contractSha256: '8'.repeat(64) });
     const argv = (patch: Record<string, string | null> = {}) => {
-      const flags: Record<string, string | null> = { '--service': service, '--from': from.path, '--root': NEW_ROOT[service], '--source-manifest': source.path, '--native-attestation': attest.path, '--out': join(s.art, `${service}-launch.json`), ...(service === 'ui' ? { '--ui-build': build.path } : {}), ...patch };
+      const flags: Record<string, string | null> = { '--service': service, '--slot': 'A', '--from': from.path, '--root': NEW_ROOT[service], '--source-manifest': source.path, '--native-attestation': attest.path, '--out': join(s.art, `${service}-launch.json`), ...(service === 'ui' ? { '--ui-build': build.path } : {}), ...patch };
       return ['launch-plan', ...Object.entries(flags).filter(([, v]) => v !== null).flat() as string[]];
     };
     return { s, from, source, attest, build, argv };
@@ -363,9 +395,50 @@ describe('launch-plan', () => {
     const plan = JSON.parse(readFileSync(result.path, 'utf8'));
     expect(plan).toEqual({ ...oldPlan('api'), sourceRoot: NEW_ROOT.api, sourceRevision: newRevision, sourceTree: newTree,
       sourceManifest: { path: t.source.path, sha256: t.source.sha256 }, nativeAttestation: { path: t.attest.path, sha256: t.attest.sha256 },
-      operatorManifestSha256: manifestModule.operatorManifestSha256(sourceManifest('api')), mailExecutable: `${NEW_ROOT.api}/dialectical-engine/deploy/preview-auth-dev/v1/mail-handoff.mjs` });
+      operatorManifestSha256: manifestModule.operatorManifestSha256(sourceManifest('api')), mailExecutable: `${NEW_ROOT.api}/dialectical-engine/deploy/preview-auth-dev/v1/mail-handoff.mjs`,
+      environment: { ...oldPlan('api').environment, path: `${ENV_ROOT}/api-new-v1.env` } });
     expect(readFileSync(result.path, 'utf8')).toBe(JSON.stringify(plan));
     expect(statSync(result.path).mode & 0o7777).toBe(0o644);
+  });
+
+  // Side-by-side spec §6, §10: the slot alone names the ports, the release root alone names the env file.
+  it('--slot B writes slot B\'s ports and the new release\'s own env file', async () => {
+    const t = staged('api');
+    const plan = JSON.parse(readFileSync((await run(t.argv({ '--slot': 'B' }), t.s.layout, { validateLaunchPlan: realValidator(t.s.layout) })).path, 'utf8'));
+    expect(plan).toMatchObject({ uiPort: '3200', apiPort: '3201', environment: { ...oldPlan('api').environment, path: `${ENV_ROOT}/api-new-v1.env` } });
+  });
+  it('takes the ports from the slot, never from --from', async () => {
+    const t = staged('ui');
+    const from = t.s.write(join(t.s.art, 'old-b-ui-launch.json'), { ...oldPlan('ui'), uiPort: '3200', apiPort: '3201' });
+    const plan = JSON.parse(readFileSync((await run(t.argv({ '--from': from.path, '--slot': 'A' }), t.s.layout, { validateLaunchPlan: realValidator(t.s.layout) })).path, 'utf8'));
+    expect(plan).toMatchObject({ uiPort: '3100', apiPort: '3101', environment: { path: `${ENV_ROOT}/ui-new-v1.env` } });
+  });
+  // The transition (release T): R19's live plans predate per-release env files and name /etc/…/api.env.
+  const r19Plan = (service: 'api' | 'ui' | 'runner') => {
+    const root = `/opt/debateai-v3-preview/releases/auth-dev-candidate-r19x-${service}`;
+    return { ...oldPlan(service), sourceRoot: root, mailExecutable: `${root}/dialectical-engine/deploy/preview-auth-dev/v1/mail-handoff.mjs`,
+      environment: { ...oldPlan(service).environment, path: `${ENV_ROOT}/${service}.env` } };
+  };
+  it.each(['api', 'ui', 'runner'] as const)('accepts an R19-shaped %s plan as --from and writes a valid new plan', async service => {
+    const t = staged(service);
+    const from = t.s.write(join(t.s.art, `r19-${service}-launch.json`), r19Plan(service));
+    const plan = JSON.parse(readFileSync((await run(t.argv({ '--from': from.path }), t.s.layout, { validateLaunchPlan: realValidator(t.s.layout) })).path, 'utf8'));
+    expect(plan).toMatchObject({ sourceRoot: NEW_ROOT[service], uiPort: '3100', apiPort: '3101', environment: { ...oldPlan(service).environment, path: `${ENV_ROOT}/${service}-new-v1.env` } });
+    expect(() => realValidator(t.s.layout)(plan)).not.toThrow();
+  });
+  it.each([
+    ['another sender', { mailFrom: 'x@dezbatere.ro' }], ['a mixed port pair', { uiPort: '3100', apiPort: '3201' }], ['a root of another service', { sourceRoot: '/opt/debateai-v3-preview/releases/auth-dev-candidate-r19x-ui' }],
+    ['an env file outside the env folder', { environment: { ...r19Plan('api').environment, root: '/etc' } }], ['an env file of the wrong group', { environment: { ...r19Plan('api').environment, gid: 1 } }]
+  ])('still refuses an R19-shaped --from with %s', async (_name, patch) => {
+    const t = staged('api');
+    const from = t.s.write(join(t.s.art, 'r19-api-launch.json'), { ...r19Plan('api'), ...patch });
+    await expect(run(t.argv({ '--from': from.path }), t.s.layout, { validateLaunchPlan: realValidator(t.s.layout) })).rejects.toMatchObject({ code: 'FROM_PLAN_INVALID' });
+    expect(existsSync(join(t.s.art, 'api-launch.json'))).toBe(false);
+  });
+  it.each([['no --slot', { '--slot': null }], ['--slot C', { '--slot': 'C' }], ['--slot a', { '--slot': 'a' }]])('refuses %s and writes nothing', async (_name, patch) => {
+    const t = staged('api');
+    await expect(run(t.argv(patch), t.s.layout, { validateLaunchPlan: realValidator(t.s.layout) })).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED' });
+    expect(existsSync(join(t.s.art, 'api-launch.json'))).toBe(false);
   });
 
   it('binds the UI build for the website and a fallback root becomes artifact fallback', async () => {
@@ -373,10 +446,10 @@ describe('launch-plan', () => {
     const plan = JSON.parse(readFileSync((await run(t.argv(), t.s.layout, { validateLaunchPlan: realValidator(t.s.layout) })).path, 'utf8'));
     expect(plan.uiBuild).toEqual({ path: t.build.path, sha256: t.build.sha256 });
     const f = staged('runner');
-    const fallbackRoot = '/opt/debateai-v3-preview/releases/auth-dev-fallback-new-runner';
+    const fallbackRoot = '/opt/debateai-v3-preview/releases/auth-dev-fallback-new-v1-runner';
     const source = f.s.write(join(f.s.art, 'fallback-runner-source.json'), sourceManifest('runner', { sourceRoot: fallbackRoot }));
     const fallback = JSON.parse(readFileSync((await run(f.argv({ '--root': fallbackRoot, '--source-manifest': source.path }), f.s.layout, { validateLaunchPlan: realValidator(f.s.layout) })).path, 'utf8'));
-    expect(fallback).toMatchObject({ artifact: 'fallback', sourceRoot: fallbackRoot, uiBuild: null });
+    expect(fallback).toMatchObject({ artifact: 'fallback', sourceRoot: fallbackRoot, uiBuild: null, environment: { path: `${ENV_ROOT}/runner-new-v1.env` } });
   });
 
   it.each([
@@ -388,6 +461,9 @@ describe('launch-plan', () => {
     ['a native proof of another publication', (t: any) => ({ '--native-attestation': t.s.write(join(t.s.art, 'n.json'), attestation({ publication: { ...publication, registerVersion: '10' } })).path }), 'NATIVE_ATTESTATION_MISMATCH'],
     ['a UI build for the API', (t: any) => ({ '--ui-build': t.build.path }), 'ARGUMENTS_REFUSED'],
     ['a root outside the release folders', () => ({ '--root': '/opt/debateai-v3-preview/releases/old106' }), 'RELEASE_ROOT_REFUSED'],
+    ['a root of another service', () => ({ '--root': NEW_ROOT.ui }), 'RELEASE_ROOT_REFUSED'],
+    ['a root with no label', () => ({ '--root': '/opt/debateai-v3-preview/releases/auth-dev-candidate-api' }), 'RELEASE_ROOT_REFUSED'],
+    ['a root whose label ends in a dash', () => ({ '--root': '/opt/debateai-v3-preview/releases/auth-dev-candidate-new--api' }), 'RELEASE_ROOT_REFUSED'],
     ['an out name for another service', (t: any) => ({ '--out': join(t.s.art, 'ui-launch.json') }), 'OUTPUT_PATH_REFUSED']
   ])('refuses %s and writes nothing', async (_name, patch, code) => {
     const t = staged('api');
@@ -398,7 +474,7 @@ describe('launch-plan', () => {
   it('refuses a UI plan without a build, or with the build of another root', async () => {
     const t = staged('ui');
     await expect(run(t.argv({ '--ui-build': null }), t.s.layout, { validateLaunchPlan: realValidator(t.s.layout) })).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED' });
-    const other = t.s.write(join(t.s.art, 'other-build.json'), { schema: 'preview-auth-dev-ui-build-v1', sourceRoot: '/opt/debateai-v3-preview/releases/auth-dev-fallback-new-ui', sourceRevision: newRevision, sourceTree: newTree, contractSha256: '8'.repeat(64) });
+    const other = t.s.write(join(t.s.art, 'other-build.json'), { schema: 'preview-auth-dev-ui-build-v1', sourceRoot: '/opt/debateai-v3-preview/releases/auth-dev-fallback-new-v1-ui', sourceRevision: newRevision, sourceTree: newTree, contractSha256: '8'.repeat(64) });
     await expect(run(t.argv({ '--ui-build': other.path }), t.s.layout, { validateLaunchPlan: realValidator(t.s.layout) })).rejects.toMatchObject({ code: 'UI_BUILD_MISMATCH' });
   });
 
@@ -427,7 +503,7 @@ describe('launch-plan', () => {
       const plan = JSON.parse(readFileSync(result.path, 'utf8'));
       expect(lookups).toBe(1);
       expect(plan).toEqual({ ...oldPlan('api'), service: 'runner', serviceUid: 992, serviceGid: 975, uiBuild: null,
-        environment: { path: '/etc/debateai-v3-preview/auth-dev-v1/runner.env', root: '/etc/debateai-v3-preview/auth-dev-v1', uid: 0, gid: 975, mode: 0o640, parentUid: 0 },
+        environment: { path: '/etc/debateai-v3-preview/auth-dev-v1/runner-new-v1.env', root: '/etc/debateai-v3-preview/auth-dev-v1', uid: 0, gid: 975, mode: 0o640, parentUid: 0 },
         sourceRoot: NEW_ROOT.runner, sourceRevision: newRevision, sourceTree: newTree,
         sourceManifest: { path: t.source.path, sha256: t.source.sha256 }, nativeAttestation: { path: t.attest.path, sha256: t.attest.sha256 },
         operatorManifestSha256: manifestModule.operatorManifestSha256(sourceManifest('runner')), mailExecutable: `${NEW_ROOT.runner}/dialectical-engine/deploy/preview-auth-dev/v1/mail-handoff.mjs` });
@@ -436,7 +512,7 @@ describe('launch-plan', () => {
     it('a runner plan as --from keeps its own identity and never asks the account', async () => {
       const t = staged('runner');
       const plan = JSON.parse(readFileSync((await run(t.argv(), t.s.layout, { validateLaunchPlan: realValidator(t.s.layout), lookupRunnerAccount: async () => { throw new Error('asked'); } })).path, 'utf8'));
-      expect(plan).toMatchObject({ serviceUid: 994, serviceGid: 977, environment: oldPlan('runner').environment });
+      expect(plan).toMatchObject({ serviceUid: 994, serviceGid: 977, environment: { ...oldPlan('runner').environment, path: `${ENV_ROOT}/runner-new-v1.env` } });
     });
     it('refuses a UI plan as --from', async () => {
       const t = fromApi();
@@ -980,7 +1056,7 @@ describe('native-plan: publish kit v2 (plan -> owner review -> publish -> verify
     const published = t.s.write(join(t.s.art, 'native-publish.json'), JSON.stringify(attestation({ publication: t.newPublication })));
     const from = t.s.write(join(t.s.art, 'old-runner-launch.json'), oldPlan('runner'));
     const source = t.s.write(join(t.s.art, 'candidate-runner-source.json'), sourceManifest('runner'));
-    const argv = (proof: string) => ['launch-plan', '--service', 'runner', '--from', from.path, '--root', NEW_ROOT.runner, '--source-manifest', source.path, '--native-attestation', proof, '--publication', published.path, '--out', join(t.s.art, 'runner-launch.json')];
+    const argv = (proof: string) => ['launch-plan', '--service', 'runner', '--slot', 'A', '--from', from.path, '--root', NEW_ROOT.runner, '--source-manifest', source.path, '--native-attestation', proof, '--publication', published.path, '--out', join(t.s.art, 'runner-launch.json')];
     const stale = t.s.write(join(t.s.art, 'native-old-verify.json'), JSON.stringify(attestation()));
     await expect(run(argv(stale.path), t.s.layout, { validateLaunchPlan: realValidator(t.s.layout) })).rejects.toMatchObject({ code: 'NATIVE_ATTESTATION_MISMATCH' });
     const fresh = t.s.write(join(t.s.art, 'native-first-verify.json'), JSON.stringify(attestation({ publication: t.newPublication })));
@@ -1132,5 +1208,143 @@ describe('native-plan: the hosted preview (publish kit v3, owner rulings 2026-10
       expect(() => operator.validateNativePlan({ ...t.plan, hostedBilling: bad }), name).toThrow('PREVIEW_NATIVE_PLAN_REFUSED');
       expect(() => kit.previewHostedBillingChoice(bad), name).toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
     }
+  });
+});
+
+// Side-by-side spec §5 (G6): the newer release's list of the database steps it adds, which the older release's native verify
+// accepts only once root pinned it (prestart.mjs accept-ahead).
+describe('database-ahead', () => {
+  const migrationText = (name: string, header = '-- n1: expand\n-- n1: keeps-verifier\n') => `-- ${name}\n${header}\nCREATE TABLE x_${name.slice(0, 4)} (id int);\n`;
+  const SEALED = ['0122_engine_map_check.sql', '0123_side_by_side_releases.sql'];
+  const row = (name: string, text = migrationText(name)) => ({ path: `dialectical-engine/migrations/${name}`, sha256: sha(text), mode: 0o644 });
+  const chainEntry = (name: string, sourceSha256: string, patch: Record<string, unknown> = {}) => ({ name, manifestSha256: '5'.repeat(64), sourceSha256, verifierSha256: '6'.repeat(64), n1Expand: true, keepsVerifier: true, outsideTransaction: false, ...patch });
+  function staged({ added = ['0124_side_next.sql', '0125_more.sql'], texts = {} as Record<string, string>, onDisk = {} as Record<string, string>, chain }: { added?: string[]; texts?: Record<string, string>; onDisk?: Record<string, string>; chain?: unknown[] } = {}) {
+    const s = server();
+    const text = (name: string) => texts[name] ?? migrationText(name);
+    const base = sourceManifest('api').files;
+    const older = s.write(join(s.art, 'old-api-source.json'), sourceManifest('api', { sourceRoot: OLD_ROOT.api, sourceRevision: revision, sourceTree: tree, files: [...base, ...SEALED.map(name => row(name))] }));
+    const newer = s.write(join(s.art, 'candidate-api-source.json'), sourceManifest('api', { files: [...base, ...SEALED.map(name => row(name)), ...added.map(name => row(name, text(name)))] }));
+    const newerChain = chain ?? [chainEntry('0111_billing_netopia.sql', '4'.repeat(64)), ...SEALED.map(name => chainEntry(name, sha(migrationText(name)))), ...added.map(name => chainEntry(name, sha(text(name))))];
+    const reads: string[] = [];
+    const children: { argv: string[]; options: Record<string, unknown> }[] = [];
+    const deps = {
+      readMigration: async (root: string, name: string) => { reads.push(`${root}|${name}`); return Buffer.from(onDisk[name] ?? text(name)); },
+      execPath: '/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node',
+      // The newer release describes its own chain in a child process (D5 review); this stands in for that child.
+      runBounded: async (argv: string[], options: Record<string, unknown>) => {
+        reads.push(`chain|${options.cwd}`); children.push({ argv, options });
+        return { code: 0, timedOut: false, overflow: false, stdout: Buffer.from(JSON.stringify(newerChain)), stderr: Buffer.alloc(0) };
+      }
+    };
+    const out = join(s.art, 'database-ahead-old-v1.json');
+    const argv = ['database-ahead', '--older-source-manifest', older.path, '--newer-source-manifest', newer.path, '--out', out];
+    return { s, older, newer, newerChain, deps, reads, children, out, argv, text };
+  }
+
+  it('writes the exact file: both releases, the newer manifest, the added steps and the newer release\'s own chain', async () => {
+    const t = staged();
+    const result = await run(t.argv, t.s.layout, t.deps);
+    const written = JSON.parse(readFileSync(t.out, 'utf8'));
+    expect(written).toEqual({
+      schema: 'preview-database-ahead-v1', olderLabel: 'old-v1', olderSourceRevision: revision, newerLabel: 'new-v1', newerSourceRevision: newRevision,
+      newerSourceManifest: { path: t.newer.path, sha256: t.newer.sha256 },
+      steps: [{ name: '0124_side_next.sql', sha256: sha(t.text('0124_side_next.sql')) }, { name: '0125_more.sql', sha256: sha(t.text('0125_more.sql')) }],
+      newerChain: t.newerChain
+    });
+    expect(result).toMatchObject({ path: t.out, sha256: sha(readFileSync(t.out)) });
+    expect(statSync(t.out).mode & 0o7777).toBe(0o644);
+    // Each step's bytes come from the newer release's own folder; the chain is the newer release's description of itself.
+    expect(t.reads).toEqual([`${NEW_ROOT.api}|0124_side_next.sql`, `${NEW_ROOT.api}|0125_more.sql`, `chain|${NEW_ROOT.api}/dialectical-engine`]);
+    // prestart.mjs accept-ahead takes exactly this file for the older release.
+    expect(tool.parseArguments(t.argv)).toMatchObject({ command: 'database-ahead' });
+  });
+
+  it('root never loads the newer code: a bounded child as nobody, from the verified engine, with no tsx cache and its own tsconfig', async () => {
+    const t = staged();
+    await run(t.argv, t.s.layout, t.deps);
+    const engine = `${NEW_ROOT.api}/dialectical-engine`, node = t.deps.execPath;
+    expect(t.children).toHaveLength(1);
+    expect(t.children[0]!.argv).toEqual(['/usr/sbin/runuser', '-u', 'nobody', '--', '/usr/bin/env', '-i',
+      'PATH=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin:/usr/bin:/bin', 'TSX_DISABLE_CACHE=1', `TSX_TSCONFIG_PATH=${engine}/tsconfig.json`,
+      node, '--import', `${engine}/node_modules/tsx/dist/loader.mjs`, '--input-type=module', '-e', tool.DESCRIBE_CHAIN_SCRIPT, `${engine}/packages/db/src/migration-ahead.ts`]);
+    expect(t.children[0]!.options).toEqual({ cwd: engine, env: {}, timeoutMs: 60_000, maxOutputBytes: 262_144 });
+    expect(tool.describeChainArgv({ sourceRoot: NEW_ROOT.api, execPath: node })).toEqual(t.children[0]!.argv);
+  });
+
+  it.each([
+    ['a non-zero exit', { code: 1 }], ['any stderr', { stderr: Buffer.from('warning') }], ['a timeout', { timedOut: true }], ['an output overflow', { overflow: true }],
+    ['a spawn error', { error: new Error('ENOENT') }], ['output that is not strict JSON', { stdout: Buffer.from('[{"a":1,"a":2}]') }]
+  ])('refuses a chain child with %s, and writes nothing', async (_name, outcome) => {
+    const t = staged();
+    const runBounded = async () => ({ code: 0, timedOut: false, overflow: false, stdout: Buffer.from(JSON.stringify(t.newerChain)), stderr: Buffer.alloc(0), ...outcome });
+    await expect(run(t.argv, t.s.layout, { ...t.deps, runBounded })).rejects.toMatchObject({ code: 'DATABASE_AHEAD_CHAIN_UNREADABLE' });
+    expect(existsSync(t.out)).toBe(false);
+  });
+
+  it('refuses a step without both header lines and names every such step', async () => {
+    const t = staged({ texts: { '0124_side_next.sql': '-- 0124\n-- n1: expand\nCREATE TABLE y (id int);\n', '0125_more.sql': '-- 0125\nCREATE TABLE z (id int);\n-- n1: expand\n-- n1: keeps-verifier\n' } });
+    await expect(run(t.argv, t.s.layout, t.deps)).rejects.toMatchObject({ code: 'MIGRATION_NOT_N1_EXPAND', fields: ['0124_side_next.sql', '0125_more.sql'] });
+    expect(existsSync(t.out)).toBe(false);
+  });
+
+  it('refuses step bytes that differ from the newer manifest', async () => {
+    const t = staged({ onDisk: { '0125_more.sql': migrationText('0125_more.sql', '-- n1: expand\n-- n1: keeps-verifier\n-- edited\n') } });
+    await expect(run(t.argv, t.s.layout, t.deps)).rejects.toMatchObject({ code: 'MIGRATION_BYTES_MISMATCH', fields: ['0125_more.sql'] });
+    expect(existsSync(t.out)).toBe(false);
+  });
+
+  it('refuses when the newer release adds no migration, and writes nothing', async () => {
+    const t = staged({ added: [] });
+    await expect(run(t.argv, t.s.layout, t.deps)).rejects.toMatchObject({ code: 'DATABASE_AHEAD_NOT_NEEDED' });
+    expect(existsSync(t.out)).toBe(false);
+    expect(t.reads).toEqual([]);
+  });
+
+  it('refuses a newer chain whose last steps are not exactly the added steps, as declared', async () => {
+    for (const chain of [
+      [chainEntry('0124_side_next.sql', '1'.repeat(64)), chainEntry('0125_more.sql', '2'.repeat(64))].slice(0, 1),
+      [chainEntry('0123_side_by_side_releases.sql', '3'.repeat(64)), chainEntry('0125_more.sql', sha(migrationText('0125_more.sql'))), chainEntry('0124_side_next.sql', sha(migrationText('0124_side_next.sql')))],
+      [chainEntry('0124_side_next.sql', sha(migrationText('0124_side_next.sql'))), chainEntry('0125_more.sql', sha(migrationText('0125_more.sql')), { n1Expand: false })],
+      [chainEntry('0124_side_next.sql', sha(migrationText('0124_side_next.sql'))), chainEntry('0125_more.sql', '2'.repeat(64))]
+    ]) {
+      const t = staged({ chain });
+      await expect(run(t.argv, t.s.layout, t.deps)).rejects.toThrow('PREVIEW_DATABASE_AHEAD_REFUSED');
+      expect(existsSync(t.out)).toBe(false);
+    }
+  });
+
+  it('re-verifies the newer release folder before reading anything from it', async () => {
+    const t = staged();
+    await expect(run(t.argv, t.s.layout, { ...t.deps, verifySourceManifest: async () => { throw new TypeError('PREVIEW_SOURCE_INVENTORY_REFUSED'); } })).rejects.toThrow('PREVIEW_SOURCE_INVENTORY_REFUSED');
+    expect(t.reads).toEqual([]);
+    expect(existsSync(t.out)).toBe(false);
+  });
+
+  it.each([
+    ['an older manifest of the same release', 'older', { sourceRoot: NEW_ROOT.api }, 'DATABASE_AHEAD_LABELS_REFUSED'],
+    ['a UI manifest', 'newer', { role: 'ui', sourceRoot: NEW_ROOT.ui }, 'SOURCE_ROLE_REFUSED'],
+    ['a fallback root', 'older', { sourceRoot: '/opt/debateai-v3-preview/releases/auth-dev-fallback-old-v1-api' }, 'NATIVE_ROOT_NOT_CANDIDATE']
+  ] as const)('refuses %s', async (_name, which, patch, code) => {
+    const t = staged();
+    const path = which === 'older' ? t.older.path : t.newer.path;
+    const current = JSON.parse(readFileSync(path, 'utf8'));
+    rmSync(path);
+    t.s.write(path, { ...current, ...patch });
+    await expect(run(t.argv, t.s.layout, t.deps)).rejects.toMatchObject({ code });
+    expect(existsSync(t.out)).toBe(false);
+  });
+
+  it('refuses a newer release that drops or edits a step of the older one', async () => {
+    const t = staged();
+    const current = JSON.parse(readFileSync(t.newer.path, 'utf8'));
+    rmSync(t.newer.path);
+    t.s.write(t.newer.path, { ...current, files: current.files.filter((file: { path: string }) => !file.path.endsWith('0122_engine_map_check.sql')) });
+    await expect(run(t.argv, t.s.layout, t.deps)).rejects.toMatchObject({ code: 'DATABASE_AHEAD_NOT_A_SUPERSET' });
+  });
+
+  it('writes only the older release\'s own file name', async () => {
+    const t = staged();
+    const argv = [...t.argv.slice(0, -1), join(t.s.art, 'database-ahead-new-v1.json')];
+    await expect(run(argv, t.s.layout, t.deps)).rejects.toMatchObject({ code: 'OUTPUT_PATH_REFUSED' });
   });
 });

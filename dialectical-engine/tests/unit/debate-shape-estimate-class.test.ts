@@ -3,11 +3,12 @@ import { RecentRunsCostEstimator, settingsClassKey, waitingShapeClassOf, type Ru
 import type { AskRequest } from "@debateai/contract";
 import type { WaitingRun } from "@debateai/db";
 import { runSettingsClassOfAsk, settingsClassOfWaitingRun } from "../../apps/api/src/ask-room.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const BASE: RunSettingsClass = Object.freeze({ planTier: "free", compositionBudgetTier: "low", makerCount: 2, depth: 1 });
 const PRO = Object.freeze({ plan: "pro", depthMode: "fixed", scrutiny: "deep", answerLength: "detailed" } as const);
 const waiting = (extra: Partial<WaitingRun> = {}): WaitingRun => Object.freeze({
-  runId: "00000000-0000-4000-8000-000000000001", waitingSince: new Date(0), ownerRef: null, legacyAskerId: "legacy:a",
+  runId: "00000000-0000-4000-8000-000000000001", waitingSince: new Date(0), releaseKey: TEST_RELEASE_KEY, ownerRef: null, legacyAskerId: "legacy:a",
   planTier: "premium", compositionBudgetTier: "low", depth: 2, makerCount: 5, waitsFor: null, personRecheckAt: null, reasonAt: null, ...extra });
 const ask = (depthParams: AskRequest["depth_params"]): Pick<AskRequest, "plan_tier" | "composition_budget_tier" | "depth_params"> =>
   Object.freeze({ plan_tier: "premium", composition_budget_tier: "low", depth_params: depthParams });

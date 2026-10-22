@@ -93,9 +93,11 @@ describe("hosted settings: read, with the server-only settings set aside unread"
   ];
 
   it("reads a hosted export as hosted, and a hosted export carrying the server-only settings keeps only their names", () => {
-    expect(parsePracticeSettings(base("hosted").join("\n"))).toMatchObject({ runner: { DEPLOYMENT_MODE: "hosted", REGISTER_VERSION: 13 },
-      setAsideKeys: [] });
-    const settings = parsePracticeSettings([...base("hosted"), ...serverOnly].join("\n"));
+    // Side-by-side §1 (B6): a hosted practice names its release from the checkout's source revision.
+    const sourceRevision = "0123456789ab".padEnd(40, "c");
+    expect(parsePracticeSettings(base("hosted").join("\n"), { sourceRevision })).toMatchObject({
+      runner: { DEPLOYMENT_MODE: "hosted", REGISTER_VERSION: 13, RELEASE_KEY: ["r13", "0123456789ab"].join("-") }, setAsideKeys: [] });
+    const settings = parsePracticeSettings([...base("hosted"), ...serverOnly].join("\n"), { sourceRevision });
     expect(settings.runner.DEPLOYMENT_MODE).toBe("hosted");
     expect(settings.setAsideKeys).toEqual(serverOnly.map((line) => line.slice(0, line.indexOf("="))));
     // No value of theirs is kept anywhere in what the practice holds.
@@ -199,6 +201,7 @@ describe("--register-next on the hosted preview: publish kit v3, as the server's
     expect(cli).toContain("if (nextInputs?.kit === \"v2\" && settings.runner.DEPLOYMENT_MODE === \"hosted\") {");
     const debate = read("tools/preview-practice/practice-debate.ts");
     expect(debate).toContain("...(receipt.codeNext.composer === undefined ? {} : { DEPLOYMENT_MODE: \"hosted\" as const })");
+    expect(debate).toContain("nextReleaseKey(receipt.codeNext.composer === undefined ? input.settings.runner.DEPLOYMENT_MODE : \"hosted\")");
   });
 });
 

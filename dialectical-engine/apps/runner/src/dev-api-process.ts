@@ -4,7 +4,8 @@ import { open } from "node:fs/promises";
 import { get } from "node:http";
 import { join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { parseApiEnvironment } from "@debateai/register";
+import { developmentReleaseKey } from "@debateai/kernel";
+import { parseApiEnvironment, registerVersionToSafeLegacyNumber } from "@debateai/register";
 import { DEVELOPMENT_API_ENVIRONMENT_KEYS } from "./dev-api-environment.js";
 import {
   DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
@@ -212,7 +213,9 @@ function validateExactEnvironment(
       ["HATCHET_API_URL", `http://127.0.0.1:${profile.hatchetApiPort}`],
       ["HATCHET_WORKFLOW_NAME", "debateai-dev"],
       ["HATCHET_TLS_STRATEGY", "none"],
-      ["DEBATEAI_DEPLOYMENT_MODE", "local"]
+      ["DEBATEAI_DEPLOYMENT_MODE", "local"],
+      // Side-by-side §1: the key dev-api-environment.ts derives from the same receipt.
+      ["RELEASE_KEY", developmentReleaseKey(registerVersionToSafeLegacyNumber(registerReceipt.registerVersion))]
     ]);
     for (const [key, expected] of exact) {
       if (values[key] !== expected) {

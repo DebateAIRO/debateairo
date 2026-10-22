@@ -15,6 +15,7 @@ import {
   PreviewChargeBookedMax,
   PreviewGateUnavailable,
   PreviewModelCooling,
+  PreviewModelNotServed,
   PreviewUnbilledRefusal,
   PreviewVendorRefusedUnbilled,
   parsePreviewProviderTestConfig,
@@ -26,8 +27,10 @@ import {
 } from "@debateai/providers";
 import { loadStoryPack, resolveStoryPackDir } from "@debateai/story";
 import { DEVELOPMENT_ORGAN_COST_BOUNDS } from "../../apps/runner/src/dev-deployment-register.js";
-import { PracticeGateObserver, PRACTICE_GATE_STOPPED, practiceStopIsPause, vendorUsage } from "../../tools/preview-practice/practice-gate-observer.js";
-import { onePerModel, practiceBusyWaitMs, practiceTurnOrder, runPracticeFormats, type PracticeSample } from "../../tools/preview-practice/practice-formats.js";
+import { PracticeGateObserver, PRACTICE_GATE_STOPPED, practiceStopIsPause, vendorUsage, type PracticeWireEvent }
+  from "../../tools/preview-practice/practice-gate-observer.js";
+import { onePerModel, practiceBusyWaitMs, practiceNextBusyWait, practiceTurnOrder, runPracticeFormats, type PracticeSample,
+  type PracticeWaitBudget } from "../../tools/preview-practice/practice-formats.js";
 import { jitteredGap, limitPort, PracticeSemaphore, runModelQueues } from "../../tools/preview-practice/practice-concurrency.js";
 import { practiceInterruptGate, takeOverSignals } from "../../tools/preview-practice/practice-interrupt.js";
 import { EventEmitter } from "node:events";
@@ -59,6 +62,7 @@ import {
   PracticeRefusal,
   parseGateStatus,
   parsePracticeSettings,
+  practiceReleaseKeyAt,
   practiceSocketsFromEnvironment
 } from "../../tools/preview-practice/practice-settings.js";
 import { latencySummary, percentile, practiceVerdict, type PracticeVerdictInput } from "../../tools/preview-practice/practice-verdict.js";
@@ -165,7 +169,7 @@ describe("practice redaction", () => {
 describe("practice gate brake", () => {
   const body = (model: string) => JSON.stringify({ model, max_tokens: 1, messages: [] });
   const execution = (model: string) => ({ operationId: "op", requestBody: body(model), requestSha256: "0".repeat(64), reservedUsd: "0.1" });
-  type Step = "OK" | "UNBILLED" | "COOLING" | "NOTREACHED" | "INFLIGHT" | "DAILY" | "HALTED";
+  type Step = "OK" | "UNBILLED" | "COOLING" | "NOTSERVED" | "NOTREACHED" | "INFLIGHT" | "DAILY" | "HALTED";
   function scriptedPort(steps: Step[]) {
     let sent = 0;
     const port: PreviewBudgetPort = {
@@ -176,6 +180,8 @@ describe("practice gate brake", () => {
         if (step === "UNBILLED") throw new PreviewVendorRefusedUnbilled();
         // Gate v4's MODEL_COOLING: this one model cools off; nothing was reserved or sent.
         if (step === "COOLING") throw new PreviewModelCooling(60);
+        // Side-by-side §9: the gate's MODEL_NOT_ALLOWED (this GO no longer serves the model), refused before anything.
+        if (step === "NOTSERVED") throw new PreviewModelNotServed("MODEL_NOT_ALLOWED");
         // The gate's PROVIDER_NOT_REACHED (the connection failed before a byte was written), as previewAuthorityRefusal maps it.
         if (step === "NOTREACHED") throw new PreviewUnbilledRefusal();
         // The gate's own CONCURRENCY_LIMIT_REACHED, as previewAuthorityRefusal maps it.
@@ -218,6 +224,23 @@ describe("practice gate brake", () => {
     await expect(watched.execute(execution("qwen"))).resolves.toMatchObject({ status: 200 });
     expect(observer.stopped("deepinfra")).toBeNull();
     expect(observer.summary("deepinfra")).toMatchObject({ unbilled: 5, modelCooling: 5, notReached: 0, longestNotReachedRun: 0, stop: null });
+    expect(observer.modelsEndingBusy()).toEqual(["glm"]);
+  });
+  it("a model the gate no longer serves is labelled NOT_SERVED, never the vendor's busy refusal, and never stops the gate", async () => {
+    const observer = new PracticeGateObserver();
+    const gate = scriptedPort(["NOTREACHED", "NOTSERVED", "NOTREACHED", "OK"]);
+    const watched = observer.wrap("deepinfra", gate.port);
+    await expect(watched.execute(execution("m"))).rejects.toBeInstanceOf(PreviewUnbilledRefusal);
+    await expect(watched.execute(execution("glm"))).rejects.toBeInstanceOf(PreviewModelNotServed);
+    await expect(watched.execute(execution("m"))).rejects.toBeInstanceOf(PreviewUnbilledRefusal);
+    await expect(watched.execute(execution("qwen"))).resolves.toMatchObject({ status: 200 });
+    expect(observer.events.filter((event) => event.model === "glm").map((event) => event.unbilledKind)).toEqual(["NOT_SERVED"]);
+    expect(observer.stopped("deepinfra")).toBeNull();
+    // Refused before anything was reserved: it neither adds to nor resets the connection-failure run.
+    expect(observer.summary("deepinfra")).toMatchObject({ unbilled: 3, notServed: 1, vendorRefused: 0, modelCooling: 0,
+      notReached: 2, longestNotReachedRun: 2, stop: null });
+    // The runner makes it sit out as it does a busy model (the sit-out book reads the same refusal), so it was not
+    // exercised to the end.
     expect(observer.modelsEndingBusy()).toEqual(["glm"]);
   });
   it("a vendor refusal or a cool-off in between neither adds to nor resets the connection-failure run (the gate's own rule)", async () => {
@@ -349,6 +372,41 @@ describe("practice start refusals", () => {
     expect(settings.runner).toMatchObject({ REGISTER_VERSION: 11, DEPLOYMENT_MODE: "local", CLAIM_MS: 3_000_000 });
     expect(settings.previewConfig.scope_id).toBe("preview-practice-unit");
   });
+  describe("the practice's release key: one key for its ask and its runner (side-by-side §1, §3)", () => {
+    // Version 1, so the keys below (r1-…) match the settings' REGISTER_VERSION as assertReleaseKeyForRegister requires.
+    const versionOne = (mode: "local" | "hosted") => lines.map((line) => line.startsWith("REGISTER_VERSION=") ? "REGISTER_VERSION=1"
+      : line.startsWith("DEBATEAI_DEPLOYMENT_MODE=") ? `DEBATEAI_DEPLOYMENT_MODE=${mode}` : line);
+    const head = "d50e33165a1b" + "0".repeat(28);
+    it("a RELEASE_KEY line wins, checked against the register version and the mode", () => {
+      expect(parsePracticeSettings([...versionOne("hosted"), "RELEASE_KEY=r1-0123456789ab"].join("\n"), { sourceRevision: head })
+        .runner.RELEASE_KEY).toBe(["r1", "0123456789ab"].join("-"));
+      expect(() => parsePracticeSettings([...versionOne("local"), "RELEASE_KEY=r2-0123456789ab"].join("\n")))
+        .toThrow("PRACTICE_SETTINGS_VALUE_INVALID: RELEASE_KEY");
+      expect(() => parsePracticeSettings([...versionOne("hosted"), "RELEASE_KEY=r1-000000000000"].join("\n")))
+        .toThrow("PRACTICE_SETTINGS_VALUE_INVALID: RELEASE_KEY");
+    });
+    it("without one, the source revision names it; a hosted practice with neither refuses; local falls back to the development key", () => {
+      expect(parsePracticeSettings(versionOne("hosted").join("\n"), { sourceRevision: head }).runner.RELEASE_KEY).toBe(["r1", "d50e33165a1b"].join("-"));
+      expect(parsePracticeSettings(versionOne("local").join("\n"), { sourceRevision: head }).runner.RELEASE_KEY).toBe(["r1", "d50e33165a1b"].join("-"));
+      let refusal: unknown;
+      try { parsePracticeSettings(versionOne("hosted").join("\n"), { sourceRevision: null }); } catch (error) { refusal = error; }
+      expect(refusal).toBeInstanceOf(PracticeRefusal);
+      expect((refusal as PracticeRefusal).code).toBe("PRACTICE_SETTINGS_VALUE_INVALID");
+      expect(() => parsePracticeSettings(versionOne("hosted").join("\n"), { sourceRevision: "d50e33165a1b" })).toThrow(PracticeRefusal);
+      expect(parsePracticeSettings(versionOne("local").join("\n")).runner.RELEASE_KEY).toBe(["r1", "000000000000"].join("-"));
+    });
+    it("renumbered for the next version, the key is checked again against the mode the practice finally runs in", () => {
+      expect(practiceReleaseKeyAt(["r1", "0123456789ab"].join("-"), 2, "hosted")).toBe(["r2", "0123456789ab"].join("-"));
+      expect(practiceReleaseKeyAt(["r1", "000000000000"].join("-"), 2, "local")).toBe(["r2", "000000000000"].join("-"));
+      // A local development key, renumbered when --register-next switches the practice to hosted: refused, as the
+      // settings parser refuses it (B6 review).
+      let refusal: unknown;
+      try { practiceReleaseKeyAt(["r1", "000000000000"].join("-"), 2, "hosted"); } catch (error) { refusal = error; }
+      expect(refusal).toBeInstanceOf(PracticeRefusal);
+      expect((refusal as PracticeRefusal).code).toBe("PRACTICE_SETTINGS_VALUE_INVALID");
+      expect((refusal as Error).message).toBe("PRACTICE_SETTINGS_VALUE_INVALID: RELEASE_KEY: RELEASE_KEY_INVALID");
+    });
+  });
   it("refuses a key outside the allow-list (a database address, a team list), a key-shaped value, a credential; admits hosted mode", () => {
     expect(() => parsePracticeSettings([...lines, "DATABASE_URL=postgresql://x"].join("\n"))).toThrow("PRACTICE_SETTINGS_KEY_REFUSED");
     expect(() => parsePracticeSettings([...lines, "PREVIEW_TEAM_USER_IDS_JSON=[]"].join("\n"))).toThrow("PRACTICE_SETTINGS_KEY_REFUSED");
@@ -357,8 +415,9 @@ describe("practice start refusals", () => {
     // 2026-10-14 (the hosted preview, owner's ask "make the practice tool available also for the hosted part"): hosted
     // mode is practised now, no longer refused (PRACTICE_REQUIRES_LOCAL_MODE is gone); its own rules are in
     // tests/unit/preview-practice-hosted.test.ts.
-    expect(parsePracticeSettings(lines.map((line) => line.startsWith("DEBATEAI_DEPLOYMENT_MODE=") ? "DEBATEAI_DEPLOYMENT_MODE=hosted" : line).join("\n"))
-      .runner.DEPLOYMENT_MODE).toBe("hosted");
+    // Side-by-side §1 (B6): a hosted practice names its release from the source revision (or a RELEASE_KEY line).
+    expect(parsePracticeSettings(lines.map((line) => line.startsWith("DEBATEAI_DEPLOYMENT_MODE=") ? "DEBATEAI_DEPLOYMENT_MODE=hosted" : line).join("\n"),
+      { sourceRevision: "a".repeat(40) }).runner.DEPLOYMENT_MODE).toBe("hosted");
     expect(() => parsePracticeSettings(lines.map((line) => line.startsWith("PROVIDER_DISCOVERY_TARGETS_JSON=")
       ? 'PROVIDER_DISCOVERY_TARGETS_JSON=[{"authorization_file":"/x"}]' : line).join("\n"))).toThrow("PRACTICE_SETTINGS_VALUE_INVALID");
     expect(() => parsePracticeSettings(lines.filter((line) => !line.startsWith("CLAIM_MS=")).join("\n"))).toThrow("PRACTICE_SETTINGS_KEY_MISSING");
@@ -911,6 +970,25 @@ describe("practice formats: a busy model waits out its cool-off and retries the 
     expect(practiceBusyWaitMs({ retryAfterSeconds: null, waitsInARow: 0, random: () => 1 })).toBe(75_000);
     expect(practiceBusyWaitMs({ retryAfterSeconds: null, waitsInARow: 3, random: () => 1 })).toBe(600_000);
     expect(practiceBusyWaitMs({ retryAfterSeconds: null, waitsInARow: 9, random: () => 1 })).toBe(600_000);
+  });
+
+  it("a model the gate does not serve gets no wait: its last refusal NOT_SERVED ends the budget's use at once", () => {
+    const event = (seq: number, unbilledKind: PracticeWireEvent["unbilledKind"]): PracticeWireEvent => ({ seq, gate: "deepinfra",
+      model: "glm", startedAt: "2026-10-16T00:00:00.000Z", latencyMs: 1, outcome: "UNBILLED", vendorStatus: null,
+      refusalCode: "PROVIDER_CALL_FAILED", concurrencyLimit: false, unbilledKind, inputTokens: null, outputTokens: null,
+      reasoningTokens: null });
+    const fresh = (): PracticeWaitBudget => ({ usedMs: 0, waits: 0, inARow: 0 });
+    // Not served, even after a busy refusal before it: waiting cannot make the gate serve the model.
+    for (const wire of [[event(1, "NOT_SERVED")], [event(1, "VENDOR_REFUSED"), event(2, "NOT_SERVED")]]) {
+      const budget = fresh();
+      expect(practiceNextBusyWait(budget, 600_000, wire, () => 0)).toBeNull();
+      expect(budget).toEqual(fresh());
+    }
+    // A busy refusal after it is a wait as before.
+    const budget = fresh();
+    expect(practiceNextBusyWait(budget, 600_000, [event(1, "NOT_SERVED"), event(2, "VENDOR_REFUSED")], () => 0))
+      .toEqual({ waitMs: 60_000, reason: "VENDOR_REFUSED", retryAfterSeconds: null });
+    expect(budget).toEqual({ usedMs: 60_000, waits: 1, inARow: 1 });
   });
 
   it("parallel: only the busy model is parked; the others finish their jobs while it waits; then the SAME job is retried", async () => {

@@ -32,13 +32,13 @@
  *  - All pools are the throwaway database's (its superuser): a missing grant on the live roles would not show here.
  *  - Hosted: billing kept off (above); the room's money ledger and waiting line are the throwaway database's, so the
  *    site's day holds only this practice's spend; no waker is started (a practice ask that would WAIT is reported as
- *    not admitted, ASK_WAITING_IN_LINE); the staff settings are not exported, so an internal-funding selection refuses
- *    (INTERNAL_FUNDING_UNAVAILABLE), as on the preview, whose api.env must name none (README H1).
+ *    not admitted, ASK_WAITING_IN_LINE); the staff settings are not exported, and with billing off no funding source is
+ *    built, so an internal-funding selection is neither read nor refused (side-by-side spec §9, C17, as main.ts).
  */
 import type { Pool } from "pg";
 import { PostgresAskApplication, preserveSubmittedTierSource, type Dispatcher, type RunCreationSettings } from "@debateai/api";
 import type { AskRequest } from "@debateai/contract";
-import { PostgresInternalAllowanceRepository, ProviderProbeRepository, readRoleRotationCounts, RunWaitRepository } from "@debateai/db";
+import { ProviderProbeRepository, readRoleRotationCounts, RunWaitRepository } from "@debateai/db";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes } from "@debateai/contract";
@@ -104,6 +104,7 @@ import {
 import { composeAskModelPicker } from "../../apps/api/src/ask-model-picker.js";
 import { assertEngineHasLengthPolicy } from "../../apps/api/src/engine-ask.js";
 import { AskRoom } from "../../apps/api/src/ask-room.js";
+import { PostgresAskAdmissionGate } from "../../apps/api/src/release-state.js";
 import { buildApiProviderPriceMap, createProviderDiscoveryResolver } from "../../apps/api/src/provider-discovery.js";
 import { readPreviewBudgetGateSettings } from "../../apps/api/src/preview-budget-estimate.js";
 import { composeQuestionLanguage, questionLanguageRouteFor } from "../../apps/api/src/question-language/boot.js";
@@ -134,10 +135,12 @@ export async function composePracticeAskMoney(input: Readonly<{
   roomDecisionPool?: Pool;
   registerVersion: number;
   deploymentMode: DeploymentMode;
+  /** Side-by-side spec §1, §3: the practice's one release key is read from here, as its runner reads it. */
+  settings: Readonly<{ runner: Pick<PracticeSettings["runner"], "RELEASE_KEY"> }>;
   declaredProviderTargets: Parameters<typeof buildApiProviderPriceMap>[0];
   log?: (line: string) => void;
 }>) {
-  const { pool } = input;
+  const { pool, settings } = input;
   const environment = Object.freeze({ DEPLOYMENT_MODE: input.deploymentMode, REGISTER_VERSION: input.registerVersion });
   if (environment.DEPLOYMENT_MODE !== "hosted") return null;
   assertHostedCostEnvelopesSealed(environment.DEPLOYMENT_MODE);
@@ -177,10 +180,8 @@ export async function composePracticeAskMoney(input: Readonly<{
     assertAskRoomAdmissionSealed({ envelope: costEnvelopeRows.runPolicy, admission: admissionPolicy });
     const spend = new PostgresModelSpendStore(pool);
     const entitlements = null;
-    const allowances = new PostgresInternalAllowanceRepository(pool,{registerVersion:environment.REGISTER_VERSION});
-    const selectedFunding = await allowances.readPolicy();
-    // The preview's api.env names no internal allowance (README H1), so main.ts's `configuredFunding` is undefined there.
-    if (selectedFunding !== null) throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","The configured funding selection is mismatched");
+    // Side-by-side spec §9 (C17), as main.ts: no funding read and no funding refusal at boot. main.ts builds the funding
+    // source only with billing on; billing is kept off here, so there is none (the room gets no `funding`).
     const personAllowance = NO_PERSON_ALLOWANCE;
     const estimator = new RecentRunsCostEstimator({
       source: new PostgresRecentRunUsageSource(pool),
@@ -198,7 +199,12 @@ export async function composePracticeAskMoney(input: Readonly<{
       billingPlans,
       dailyCeilingMicros: costEnvelopeRows.runPolicy.dailyCeilingMicros,
       closeBasisPoints: band.closeBasisPoints,
-      waitingLinePerPerson: band.waitingLinePerPerson
+      waitingLinePerPerson: band.waitingLinePerPerson,
+      // Side-by-side C8, as main.ts: the site's cap of debates and the release re-check, in the decision's lock. The
+      // practice's throwaway database records no release and its runner lives in this process, so it is the only
+      // release there is: read as not hosted ("no row, not hosted" is current), under the key its runs are stamped with
+      // and its runner claims under (settings.runner.RELEASE_KEY, practice-settings.ts practiceReleaseKey).
+      gate: new PostgresAskAdmissionGate({ releaseKey: settings.runner.RELEASE_KEY, hosted: false })
     });
     askRoom = room;
   }
@@ -314,7 +320,7 @@ export async function composePracticeAsk(input: Readonly<{
   });
   // Hosted only: the money stages (null in local mode, which builds none of them).
   const money = await composePracticeAskMoney({
-    pool, registerVersion: version, deploymentMode: settings.runner.DEPLOYMENT_MODE, declaredProviderTargets,
+    pool, registerVersion: version, deploymentMode: settings.runner.DEPLOYMENT_MODE, settings, declaredProviderTargets,
     ...(input.roomDecisionPool === undefined ? {} : { roomDecisionPool: input.roomDecisionPool }),
     ...(input.log === undefined ? {} : { log: input.log })
   });
@@ -381,6 +387,10 @@ export async function composePracticeAsk(input: Readonly<{
     previewBudgetGate,
     strangerSampleRate: settings.strangerSampleRate,
     registerVersion: version,
+    // Side-by-side spec §1, §3, as main.ts: every practice run is stamped, with the one key its runner claims under
+    // (practice-runner-composition.ts reads the same settings.runner.RELEASE_KEY); a run stamped with another key would
+    // be NO_WORK for that runner.
+    releaseKey: settings.runner.RELEASE_KEY,
     batteryVersion: settings.batteryVersion,
     settlementWatchHandle: settings.settlementWatchHandle,
     // Hosted, as main.ts: the room when it is composed (the band), else the daily guard; neither locally. No `billing`.

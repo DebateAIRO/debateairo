@@ -2,7 +2,7 @@
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import {
   assertProviderOnlyNotifySealed,
   billingModeOf,
@@ -10,6 +10,7 @@ import {
   loadNetopiaConnectors,
   type TrustedKeyFileOwners
 } from "../../apps/api/src/billing/connectors.js";
+import { createProviderOnlyJobs, type ProviderOnlyJobsDeps } from "../../apps/api/src/billing/provider-only-jobs.js";
 import { testNetopiaKeys } from "../support/netopia-notice.js";
 
 const POS = ["PROV", "0001", "0002", "0003", "0004"].join("-");
@@ -100,5 +101,43 @@ describe("N8 — the provider-only mode (spec §2.7.3, ruling C-9)", () => {
     expect(() => assertProviderOnlyNotifySealed({
       billingNotify: { key: "source", limit: 120, windowMs: 60_000, capacity: 120 }
     })).not.toThrow();
+  });
+});
+
+/**
+ * Side-by-side uploads spec 2026-10-21 §4 (plan C task C7): the provider-only mode's daily card job and its 10-minute
+ * spool replay run only while `when()` says this release is current. A pool that only counts: the job would touch it.
+ */
+describe("side-by-side C7 the provider-only jobs run only while the release is current", () => {
+  afterEach(() => { vi.useRealTimers(); });
+  function composed() {
+    const touches = { count: 0 };
+    const query = async () => { touches.count += 1; throw new Error("COUNTING_POOL_ANSWERS_NOTHING"); };
+    const replaySpool = vi.fn(async () => 0);
+    const jobs = createProviderOnlyJobs({
+      pool: { query, connect: query } as unknown as ProviderOnlyJobsDeps["pool"], paymentEnvironment: "sandbox",
+      publicAppUrl: "https://app.debateai.test", audit: () => undefined, clock: () => new Date(),
+      reportPending: () => undefined, notices: { replaySpool } as unknown as NonNullable<ProviderOnlyJobsDeps["notices"]>
+    });
+    return { jobs, touches, replaySpool };
+  }
+
+  it("asks nothing for two days while not current; runs the start pass, the spool and the daily job while current", async () => {
+    vi.useFakeTimers();
+    const off = composed();
+    try {
+      off.jobs.start({ when: () => false });
+      await vi.advanceTimersByTimeAsync(2 * 86_400_000);
+      expect(off.touches.count).toBe(0);
+      expect(off.replaySpool).toHaveBeenCalledTimes(0);
+    } finally { off.jobs.stop(); }
+    const on = composed();
+    try {
+      on.jobs.start({ when: () => true });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(on.touches.count).toBeGreaterThan(0);
+      await vi.advanceTimersByTimeAsync(3_600_000);
+      expect(on.replaySpool).toHaveBeenCalledTimes(6);
+    } finally { on.jobs.stop(); }
   });
 });

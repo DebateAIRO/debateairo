@@ -117,6 +117,9 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "GET /v1/asks/room", auth: "user", resource: "run-owner", action: "read-room" },
   { route: "GET /v1/session", auth: "user", resource: "session-self", action: "read" },
   { route: "GET /v1/deployment", auth: "operator", resource: "deployment", action: "read" },
+  // Side-by-side C5 (spec §6): the process probes, public and session-free.
+  { route: "GET /livez", auth: "public", resource: "deployment", action: "liveness" },
+  { route: "GET /readyz", auth: "public", resource: "deployment", action: "readiness" },
   { route: "GET /v1/dev/evaluator", auth: "operator", resource: "evaluator", action: "read" },
   { route: "POST /v1/dev/evaluator/consumer-selection", auth: "operator", resource: "evaluator", action: "select-consumer" },
   { route: "GET /v1/answers", auth: "user", resource: "run-owner", action: "list" },
@@ -331,8 +334,8 @@ describe("S7 deny-by-default authorization", () => {
     // allowance routes; set equality and Fastify mounting above check each one. NETOPIA's card page (N13) adds
     // GET /v1/billing/subscription/card, the auth DB batch's four MFA-recovery wait routes, beside dev's 158, and
     // data-export S01's 3 routes.
-    // Debate shape P2c adds GET /v1/answers/{id}/map.
-    expect(contractInventory.routes).toHaveLength(167);
+    // Debate shape P2c adds GET /v1/answers/{id}/map. Side-by-side C5 adds GET /livez and GET /readyz.
+    expect(contractInventory.routes).toHaveLength(169);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 

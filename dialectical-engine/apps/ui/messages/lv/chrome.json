@@ -70,5 +70,8 @@
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
-  "chrome.footer.consumerProtection": "Patērētāju tiesību aizsardzība"
+  "chrome.footer.consumerProtection": "Patērētāju tiesību aizsardzība",
+  "chrome.release.newerVersion": "Vietne ir atjaunināta. Pārlādējiet lapu.",
+  "chrome.release.reload": "Pārlādēt",
+  "chrome.release.madeByNewer": "Šīs debates izveidoja jaunāka vietnes versija. Pārlādējiet lapu vai mēģiniet vēlreiz pēc dažām minūtēm."
 }

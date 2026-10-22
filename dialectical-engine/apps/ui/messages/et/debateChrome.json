@@ -302,6 +302,8 @@
   "runFailure.RUN_LIMIT_REACHED": "See väitlus jõudis oma piirini enne, kui suutis vastuse anda.",
   "runFailure.STOPPED": "See väitlus katkes poole pealt meiepoolse probleemi tõttu. Palun esitage oma küsimus uuesti.",
   "runFailure.PLAN_ENDED": "Teie tasuline pakett lõppes või peatati sel ajal, kui see küsimus ootas, seega väitlus ei alanud. Võite selle uuesti esitada.",
+  "runFailure.CHOICE_GONE": "Veebisaiti uuendati sel ajal, kui teie küsimus ootas, ja üks teie valitud võimalustest ei ole enam saadaval. Palun küsige uuesti. Teie limiidist ei kulutatud midagi.",
+  "runFailure.SET_ASIDE": "Seda väitlust ei õnnestunud meie poolel tehtud uuenduse tõttu lõpuni viia. See ei kulutanud teie limiiti. Palun esitage oma küsimus uuesti.",
   "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "See väitlus maksaks rohkem, kui see sait ühe väitluse jaoks lubab.",
   "requestFailure.kind.MODEL_UNAVAILABLE": "Koordinaator lükkas taotluse tagasi: ühe väitluse ülesande jaoks pole praegu ühtegi kättesaadavat tehisintellektimudelit. Proovige hiljem uuesti.",
   "debateChrome.condition.backupModelUsed": "Kui kavandatud tehisintellektimudelit ei saanud kasutada, asendas selle teine"

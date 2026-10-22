@@ -281,6 +281,32 @@ Everything in the dev database is discarded by `down -v`; dev users, runs and
 publications are recreated, not migrated. A **fresh clone needs none of this**:
 `pnpm dev:auth:up` generates the file before it starts compose.
 
+## A newer register: let the open debates finish first
+
+A local stack runs as one release, `r<register version>-000000000000`: it does not
+know its source revision, so its release key carries only the register version.
+Every debate belongs to the release that admitted it, and only a runner of that
+same release ever runs it (side-by-side uploads: a debate is never touched by
+another release's code or settings). Seeding a newer register
+(`pnpm dev:auth:seed-register`) and restarting the stack on it (`pnpm dev:auth:up`)
+brings the API and the runner up as a new release. A debate that was still running
+under the old key then has no runner left: it stays open for good, and nothing
+says so.
+
+So drain before a local register upgrade. Stop asking new questions, wait until
+none of yours is still running, and check from `dialectical-engine/` that no
+started debate has work left (the count must be `0`):
+
+```sh
+docker compose --env-file .env.compose \
+  --env-file "${DEBATEAI_DEV_CUSTODY_ROOT:-$PWD/.local/dev-auth}/compose-secrets.env" \
+  -f compose.dev.yaml exec -T postgres psql -U debateai -d debateai -Atc \
+  "SELECT count(*) FROM core.work_item WHERE state IN ('READY','CLAIMED')"
+```
+
+Then seed the newer register and restart. A debate stranded by mistake cannot be
+moved to the new release: ask the question again.
+
 ## Checks owed on the next `pnpm dev:auth:up` (V-21b)
 
 Two assumptions about the pinned `hatchet-lite` image were reasoned from its

@@ -44,6 +44,18 @@ async function selectFunding() {
   }
   await database.pool.query("INSERT INTO staff.funding_policy_selection(singleton,register_version) VALUES(true,2) ON CONFLICT(singleton) DO UPDATE SET register_version=2");
 }
+let publishedNext = false;
+/** Publishes the same synthetic policy as sealed version 3 (once) and moves the funding selection to it. */
+async function selectNextFunding() {
+  if (!publishedNext) {
+    const policy = internalAllowancePolicyFromValue(rawPolicy, "test:synthetic-funding");
+    if (!policy.enabled) throw new Error("Enabled synthetic policy required");
+    const rows = await buildDevelopmentStaffV2DeploymentRegisterPublicationRows(await loadBootstrapRegister(), TEST_DEVELOPMENT_PROVIDER_PANEL, undefined, "local", policy);
+    await createPostgresRegisterPublicationPort(database.pool).importHistorical({ registerVersion: parseRegisterVersionText("3"), rows });
+    publishedNext = true;
+  }
+  await database.pool.query("UPDATE staff.funding_policy_selection SET register_version=3 WHERE singleton");
+}
 async function fundedActor() {
   await selectFunding();
   const actor = await owner();
@@ -69,12 +81,16 @@ async function boundProof(actor: Awaited<ReturnType<typeof fundedActor>>, comman
   const binding = { action, targetId, expectedRevision: command.expectedRevision, operationId: command.operationId,
     bodySha256: createHash("sha256").update(typeof command.amountMicros === "number" && !Number.isSafeInteger(command.amountMicros)
       ? JSON.stringify(body) : parseCanonicalRegisterJson(Buffer.from(JSON.stringify(body)))).digest("hex") };
+  return storeProof(actor, binding);
+}
+/** A verified action proof for `binding` (as the WebAuthn ceremony stores one) and its authorized alert intent. */
+async function storeProof(actor: Awaited<ReturnType<typeof fundedActor>>, binding: Readonly<{ action: string; operationId: string }> & Record<string, unknown>) {
   const proofId = randomUUID();
   await database.pool.query(`INSERT INTO staff.action_proof(proof_id,staff_id,user_id,ordinary_session_id,privilege_session_id,security_epoch,account_security_epoch,grant_revision,binding,credential_id,expires_at)
     VALUES($1,$2,$3,$4,$5,0,0,0,$6,'fixture-key',now()+interval '5 minutes')`, [proofId, actor.staffId, actor.userId, actor.sessionId, actor.privilegeId, binding]);
-  await authorizeStaffAlertFixture(database.pool, command.operationId);
-  const alert = { schema: "staff-alert-v1", event: action === "ALLOWANCE_CONFIGURE" ? "ALLOWANCE_CONFIGURED" : "ALLOWANCE_REVOKED",
-    operationId: command.operationId, envelope: { v: 1, keyId: "fixture-key", nonce: "AAAAAAAAAAAAAAAA", tag: "AAAAAAAAAAAAAAAAAAAAAA==", ct: "YQ==" } };
+  await authorizeStaffAlertFixture(database.pool, binding.operationId);
+  const alert = { schema: "staff-alert-v1", event: binding.action === "ALLOWANCE_CONFIGURE" ? "ALLOWANCE_CONFIGURED" : "ALLOWANCE_REVOKED",
+    operationId: binding.operationId, envelope: { v: 1, keyId: "fixture-key", nonce: "AAAAAAAAAAAAAAAA", tag: "AAAAAAAAAAAAAAAAAAAAAA==", ct: "YQ==" } };
   return { proofId, binding, alert };
 }
 async function configure(actor: Awaited<ReturnType<typeof fundedActor>>, command: ReturnType<typeof configureCommand>, proof?: Awaited<ReturnType<typeof boundProof>>) {
@@ -82,13 +98,13 @@ async function configure(actor: Awaited<ReturnType<typeof fundedActor>>, command
   return runtime.query("SELECT staff.configure_internal_allowance($1::jsonb,$2::uuid,$3::jsonb,$4::jsonb,$5::jsonb) AS receipt", [actor.context, bound.proofId, bound.binding, command, bound.alert]);
 }
 
- async function revoke(actor: Awaited<ReturnType<typeof fundedActor>>, grantId:string, expectedRevision=1) {
-  const command=configureCommand(actor,{expectedRevision}),proof=await boundProof(actor,command,"ALLOWANCE_REVOKE",grantId);
-  return runtime.query("SELECT staff.revoke_internal_allowance($1::jsonb,$2,$3::jsonb,$4::jsonb,$5::jsonb)",[actor.context,proof.proofId,proof.binding,{ownerRef:actor.ownerRef,grantId,expectedRevision,policyRegisterVersion:2,operationId:command.operationId,reason:command.reason},proof.alert]);
+ async function revoke(actor: Awaited<ReturnType<typeof fundedActor>>, grantId:string, expectedRevision=1, policyRegisterVersion=2) {
+  const command=configureCommand(actor,{expectedRevision,policyRegisterVersion}),proof=await boundProof(actor,command,"ALLOWANCE_REVOKE",grantId);
+  return runtime.query("SELECT staff.revoke_internal_allowance($1::jsonb,$2,$3::jsonb,$4::jsonb,$5::jsonb) AS receipt",[actor.context,proof.proofId,proof.binding,{ownerRef:actor.ownerRef,grantId,expectedRevision,policyRegisterVersion,operationId:command.operationId,reason:command.reason},proof.alert]);
  }
- async function run(ownerRef:string, planTier:"free"|"premium"="premium") {
-  const runId=await new RunRepository(pool).startRun({questionLine:"Can finite internal funding admit this fake provider?", principal:{kind:"legacy",legacyAskerId:`task11:${randomUUID()}`},sessionId:randomUUID(),callerScope:"ASKER",asOf:new Date(),askerRiskTier:"casual",effectiveRiskTier:"casual",tierSource:"ASKER",tierProvenanceRef:"asker:test",compositionBudgetTier:"low",planTier,depthParams:{depth:1},discoveredPanel:fixtureDiscoveredPanel(2),strangerSampleRate:0,envelopeBasis:fixtureStructuralCeiling(4),registerVersion:2,batteryVersion:"test",askContract:{},batteryRows:[]});
+ async function run(ownerRef:string, planTier:"free"|"premium"="premium", registerVersion=2) {
+  const runId=await new RunRepository(pool).startRun({questionLine:"Can finite internal funding admit this fake provider?", principal:{kind:"legacy",legacyAskerId:`task11:${randomUUID()}`},sessionId:randomUUID(),callerScope:"ASKER",asOf:new Date(),askerRiskTier:"casual",effectiveRiskTier:"casual",tierSource:"ASKER",tierProvenanceRef:"asker:test",compositionBudgetTier:"low",planTier,depthParams:{depth:1},discoveredPanel:fixtureDiscoveredPanel(2),strangerSampleRate:0,envelopeBasis:fixtureStructuralCeiling(4),registerVersion,batteryVersion:"test",askContract:{},batteryRows:[]});
   await pool.query("SELECT core.append_run_ownership_event($1,$2)",[runId,ownerRef]);return runId;
  }
- return {fundedActor,configureCommand,configure,revoke,run,selectFunding};
+ return {fundedActor,configureCommand,configure,revoke,run,selectFunding,selectNextFunding,storeProof,ordinaryTokenHash:(actor:{sessionId:string})=>hash(actor.sessionId)};
 }

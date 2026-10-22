@@ -83,7 +83,7 @@ describe('refusePreviewOutsiderWork', () => {
 });
 
 describe('the store applies the API rule on the runner pool', () => {
-  it('lists every open run job and asks the shared team query with uuid arrays', async () => {
+  it("lists every open job of this release's runs and asks the shared team query with uuid arrays", async () => {
     const queries: Array<{ text: string; values: unknown[] }> = [];
     const query = async (text: string, values: unknown[]) => {
       queries.push({ text, values });
@@ -93,17 +93,21 @@ describe('the store applies the API rule on the runner pool', () => {
     };
     const client = { query: async (text: string, values: unknown[] = []) => (/^(BEGIN|COMMIT|ROLLBACK)$/.test(text) ? { rows: [] } : query(text, values)), release: () => undefined };
     const pool = { query, connect: async () => client };
-    const store = postgresRunnerPreviewTeamGateStore(pool as never);
+    const store = postgresRunnerPreviewTeamGateStore(pool as never, ['r1', 'aaaaaaaaaaaa'].join('-'));
     expect(await store.work.listOpenRunWork(101)).toEqual([{ runId: run(1), workItemId: job(1), claimLive: false }]);
     expect(queries[0]!.text).toMatch(/state IN \('READY', 'CLAIMED'\)/);
     expect(queries[0]!.text).toMatch(/run_id IS NOT NULL/);
-    expect(queries[0]!.values).toEqual([101]);
+    // Side-by-side spec §3: only this release's runs.
+    expect(queries[0]!.text.replace(/\s+/g, ' ')).toContain('FROM core.work_item AS item JOIN core.run AS run ON run.run_id = item.run_id AND run.release_key = $2');
+    expect(queries[0]!.values).toEqual([101, ['r1', 'aaaaaaaaaaaa'].join('-')]);
     expect([...await store.teamRuns([run(1), run(2)], [ALICE])]).toEqual([run(1)]);
     expect(queries[1]).toEqual({ text: PREVIEW_TEAM_RUNS_SQL, values: [[run(1), run(2)], [ALICE]] });
     expect(await store.work.failClaimable({ runId: run(1), workItemId: job(1), reason: 'RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY' })).toBe(true);
     // Only what claimById could still take: never a DONE/FAILED job, a live claim or a settled attempt.
     expect(queries[2]!.text.replace(/\s+/g, ' ')).toContain("WHERE work_item_id = $1 AND run_id = $2 AND settled_attempt_id IS NULL AND (state = 'READY' OR (state = 'CLAIMED' AND claim_deadline <= clock_timestamp()))");
-    expect(queries[2]!.values).toEqual([job(1), run(1), 'RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY']);
+    // ...and never another release's job (side-by-side spec §3).
+    expect(queries[2]!.text.replace(/\s+/g, ' ')).toContain('AND EXISTS (SELECT 1 FROM core.run r WHERE r.run_id = $2 AND r.release_key = $4)');
+    expect(queries[2]!.values).toEqual([job(1), run(1), 'RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY', ['r1', 'aaaaaaaaaaaa'].join('-')]);
   });
 
   it('the API waker reads the very same query', async () => {

@@ -10,6 +10,7 @@ import {
   type RunKeepAlive,
   type RunnerTaskControl
 } from "../../apps/runner/src/run-keep-alive.js";
+import { endsThisCopy } from "../../apps/runner/src/engine-judging.js";
 
 /**
  * L4-F9 repair (owner ruling 2026-10-11, options 1 + 3). A debate is ONE work
@@ -302,6 +303,64 @@ describe("Owner ruling 2026-10-11 — 60 minutes means 60 minutes without a fini
     await clock.advance(10 * LIMIT_MS);
     expect(stopCode(keepAlive)).toBeNull();
     keepAlive.stop();
+  });
+});
+
+describe("side-by-side spec §4 — a retiring release starts no new model call", () => {
+  const renewed = (clock: ReturnType<typeof manualClock>) => async (): Promise<ClaimRenewal> =>
+    ({ kind: "RENEWED", claimDeadline: new Date(clock.now() + 30 * MINUTE) });
+
+  it("refuses the next model call with RUNNER_RETIRING once the release stops its calls", () => {
+    const clock = manualClock();
+    let stopped = false;
+    const keepAlive = startRunKeepAlive({
+      claimDeadline: new Date(T0 + 30 * MINUTE), renewEveryMs: 10 * MINUTE, renew: renewed(clock), clock,
+      stopCalls: () => stopped
+    });
+    expect(stopCode(keepAlive)).toBeNull();
+    stopped = true;
+    expect(stopCode(keepAlive)).toBe("RUNNER_RETIRING");
+    keepAlive.stop();
+  });
+
+  it("names a lost claim first: another copy holds the debate, whatever this release is doing", async () => {
+    const clock = manualClock();
+    const keepAlive = startRunKeepAlive({
+      claimDeadline: new Date(T0 + 30 * MINUTE), renewEveryMs: 10 * MINUTE,
+      renew: async (): Promise<ClaimRenewal> => ({ kind: "LOST" }), clock, stopCalls: () => true
+    });
+    expect(stopCode(keepAlive)).toBe("RUNNER_RETIRING");
+    await clock.advance(10 * MINUTE);
+    expect(stopCode(keepAlive)).toBe("RUNNER_CLAIM_LOST");
+    keepAlive.stop();
+  });
+
+  it("names the retirement before the time limit", () => {
+    const clock = manualClock();
+    const controller = new AbortController();
+    const { task } = hatchetTask({ signal: controller.signal });
+    controller.abort();
+    const keepAlive = startRunKeepAlive({
+      claimDeadline: new Date(T0 + 30 * MINUTE), renewEveryMs: 10 * MINUTE, renew: renewed(clock), task, clock,
+      stopCalls: () => true
+    });
+    expect(stopCode(keepAlive)).toBe("RUNNER_RETIRING");
+    keepAlive.stop();
+  });
+
+  it("lets every call through while the release is not retiring", () => {
+    const clock = manualClock();
+    const keepAlive = startRunKeepAlive({
+      claimDeadline: new Date(T0 + 30 * MINUTE), renewEveryMs: 10 * MINUTE, renew: renewed(clock), clock,
+      stopCalls: () => false
+    });
+    expect(stopCode(keepAlive)).toBeNull();
+    keepAlive.stop();
+  });
+
+  it("engine 2's judging step lets the refusal end this copy, as a lost claim does", () => {
+    expect(endsThisCopy(new TypedDomainError("RUNNER_RETIRING", "x"))).toBe(true);
+    expect(endsThisCopy(new TypedDomainError("RUNNER_CLAIM_LOST", "x"))).toBe(true);
   });
 });
 
