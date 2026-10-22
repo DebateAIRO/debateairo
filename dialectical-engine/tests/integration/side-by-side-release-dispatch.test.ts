@@ -18,6 +18,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  */
 const R16 = ["r16", "0123456789ab"].join("-");
 const R17 = ["r17", "0123456789ab"].join("-");
+const R18 = ["r18", "0123456789ab"].join("-");
 const BASE = "dialectical-run";
 const BY = "test:side-by-side-release-dispatch";
 
@@ -104,7 +105,9 @@ describe("every send is routed by the run's own release (side-by-side C4)", () =
     const r16 = await startedRun(R16, 1);
     const lookup = new PostgresRunReleaseLookup(api);
     expect(await lookup.lookup(r16.runId)).toEqual({
-      releaseKey: R16, state: { state: "RETIRED", frontPairStopped: false, retireRequested: false }, anyCurrent: true
+      releaseKey: R16,
+      state: { state: "RETIRED", frontPairStopped: false, retireRequested: false, stillDraining: false },
+      anyCurrent: true
     });
     expect(await lookup.lookup(randomUUID())).toBeNull();
     await database.pool.query(
@@ -142,6 +145,28 @@ describe("every send is routed by the run's own release (side-by-side C4)", () =
 
   it("sends the current release's run to its own task name, and its job stays READY", async () => {
     const r17 = await startedRun(R17, 500);
+    const { dispatcher, sent, alerts } = routedDispatcher();
+    await expect(dispatcher.dispatch(r17)).resolves.toBeUndefined();
+    expect(sent).toEqual(["dialectical-run-r17-0123456789ab"]);
+    expect(await jobRow(r17.workItemId)).toEqual({ state: "READY", terminal_reason: null });
+    expect(await waivers(r17.runId)).toEqual([]);
+    expect(alerts).toEqual([]);
+  });
+
+  // Final review A4: a draining release staged again for a rollback reads STAGED, yet its drained debates may run.
+  it("sends the run of a draining release staged again for a rollback (STAGED, still draining)", async () => {
+    const r17 = await startedRun(R17, 300);
+    // r18 becomes current (r17 drains), then a rollback stages r17 again.
+    await recordReleaseEvent(database.pool, { releaseKey: R18, kind: "STAGED", recordedBy: BY });
+    await recordReleaseSwitch(database.pool, {
+      newReleaseKey: R18, expectedCurrent: R17, takeTrafficFrom: new Date(), recordedBy: BY
+    });
+    await recordReleaseEvent(database.pool, { releaseKey: R17, kind: "STAGED", recordedBy: BY });
+    expect(await new PostgresRunReleaseLookup(api).lookup(r17.runId)).toEqual({
+      releaseKey: R17,
+      state: { state: "STAGED", frontPairStopped: false, retireRequested: false, stillDraining: true },
+      anyCurrent: true
+    });
     const { dispatcher, sent, alerts } = routedDispatcher();
     await expect(dispatcher.dispatch(r17)).resolves.toBeUndefined();
     expect(sent).toEqual(["dialectical-run-r17-0123456789ab"]);

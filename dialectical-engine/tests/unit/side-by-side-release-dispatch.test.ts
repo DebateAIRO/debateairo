@@ -22,8 +22,10 @@ const OTHER_KEY = ["r18", "0123456789ab"].join("-");
 const TASK = "dialectical-run-r17-0123456789ab";
 const REASON = "RUN_SETUP_FAILED:RELEASE_NOT_SERVED";
 
-const state = (s: ReleaseState["state"], retireRequested = false): ReleaseState =>
-  Object.freeze({ state: s, frontPairStopped: retireRequested, retireRequested });
+// still_draining (final review A4): a DRAINING event with no later RETIRED one, so every DRAINING state reads true
+// and a draining release staged again for a rollback reads STAGED and true.
+const state = (s: ReleaseState["state"], retireRequested = false, stillDraining = s === "DRAINING"): ReleaseState =>
+  Object.freeze({ state: s, frontPairStopped: retireRequested, retireRequested, stillDraining });
 
 type Found = Readonly<{ releaseKey: string; state: ReleaseState | null; anyCurrent: boolean }> | null;
 
@@ -72,6 +74,9 @@ describe("releaseServes (side-by-side spec §4)", () => {
       [state("DRAINING", true), true, true, false],
       [state("RETIRED"), true, true, false],
       [state("STAGED"), true, true, false],
+      // Final review A4: a draining release staged again for a rollback still serves its drained debates.
+      [state("STAGED", false, true), true, true, true],
+      [state("STAGED", true, true), true, true, false],
       [null, true, false, false],
       [null, false, false, true],
       [null, false, true, false],
@@ -102,6 +107,16 @@ describe("ReleaseRoutedDispatcher sends to the run's own release (side-by-side s
     expect(sent.map(([name]) => name)).toEqual([TASK]);
   });
 
+  it("sends a run of a draining release staged again for a rollback (STAGED, still draining)", async () => {
+    const { dispatcher, sent, closedJobs, alerts } = arrange({
+      found: { releaseKey: KEY, state: state("STAGED", false, true), anyCurrent: true }
+    });
+    await dispatcher.dispatch(job());
+    expect(sent.map(([name]) => name)).toEqual([TASK]);
+    expect(closedJobs).toEqual([]);
+    expect(alerts).toEqual([]);
+  });
+
   it("with no current row anywhere, a local site sends to the run's own name; a legacy run to the bare base name", async () => {
     const own = arrange({ found: { releaseKey: KEY, state: null, anyCurrent: false }, hosted: false });
     await own.dispatcher.dispatch(job());
@@ -124,6 +139,7 @@ describe("ReleaseRoutedDispatcher never sends to a release that no longer serves
   const refused: ReadonlyArray<readonly [string, Found, boolean]> = [
     ["DRAINING with the retire request", { releaseKey: KEY, state: state("DRAINING", true), anyCurrent: true }, true],
     ["RETIRED", { releaseKey: KEY, state: state("RETIRED"), anyCurrent: true }, true],
+    ["STAGED and never drained", { releaseKey: KEY, state: state("STAGED"), anyCurrent: true }, true],
     ["never recorded while another release is current", { releaseKey: KEY, state: null, anyCurrent: true }, true],
     ["no current row anywhere on a hosted site", { releaseKey: KEY, state: null, anyCurrent: false }, true]
   ];

@@ -4212,9 +4212,10 @@ export class PostgresRunReleaseLookup implements RunReleaseLookup {
 
   async lookup(runId: string): Promise<Readonly<{ releaseKey: string; state: ReleaseState | null; anyCurrent: boolean }> | null> {
     const result = await this.pool.query<{
-      release_key: string; state: string | null; front_pair_stopped: boolean | null; retire_requested: boolean | null; any_current: boolean;
+      release_key: string; state: string | null; front_pair_stopped: boolean | null; retire_requested: boolean | null;
+      still_draining: boolean | null; any_current: boolean;
     }>(
-      `SELECT run.release_key, state.state, state.front_pair_stopped, state.retire_requested,
+      `SELECT run.release_key, state.state, state.front_pair_stopped, state.retire_requested, state.still_draining,
               EXISTS (SELECT 1 FROM core.read_current_release()) AS any_current
        FROM core.run AS run
        LEFT JOIN LATERAL core.read_release_state(run.release_key) AS state ON true
@@ -4229,7 +4230,8 @@ export class PostgresRunReleaseLookup implements RunReleaseLookup {
       state: row.state === null ? null : Object.freeze({
         state: row.state as ReleaseLifecycleState,
         frontPairStopped: row.front_pair_stopped === true,
-        retireRequested: row.retire_requested === true
+        retireRequested: row.retire_requested === true,
+        stillDraining: row.still_draining === true
       }),
       anyCurrent: row.any_current === true
     });
@@ -4238,12 +4240,16 @@ export class PostgresRunReleaseLookup implements RunReleaseLookup {
 
 /**
  * Side-by-side spec §4: a release serves its runs while it is CURRENT, and while it DRAINS until root asks it to retire
- * (its runner still claims and finishes its own debates). With no release recorded anywhere a local deployment is
- * today's single-release world, and every run is served; a hosted one fails closed (plan C's area constraint).
+ * (its runner still claims and finishes its own debates). A draining release staged again for a rollback reads STAGED
+ * yet still drains (final review A4: `stillDraining`), so it keeps serving its drained debates until a retire request,
+ * as it did while DRAINING; a STAGED release that never drained serves nothing. With no release recorded anywhere a
+ * local deployment is today's single-release world, and every run is served; a hosted one fails closed (plan C's area
+ * constraint).
  */
 export function releaseServes(input: Readonly<{ state: ReleaseState | null; anyCurrent: boolean; hosted: boolean }>): boolean {
   if (input.state?.state === "CURRENT") return true;
   if (input.state?.state === "DRAINING" && !input.state.retireRequested) return true;
+  if (input.state?.state === "STAGED" && input.state.stillDraining && !input.state.retireRequested) return true;
   return !input.anyCurrent && !input.hosted;
 }
 

@@ -32,7 +32,14 @@ import type { AskAdmissionGate } from "./ask-room.js";
  * last successful answer, as they do for an unreachable database (plan C6, from C3's review).
  */
 export type { ReleaseLifecycleState };
-export type ReleaseState = Readonly<{ state: ReleaseLifecycleState; frontPairStopped: boolean; retireRequested: boolean }>;
+/**
+ * One release's state as the per-send lookup reads it from 0123's `core.read_release_state`: the lifecycle word, the
+ * two flags, and `stillDraining` (final review A4: a DRAINING event with no later RETIRED one, so a draining release
+ * staged again for a rollback reads STAGED and true while its drained debates may still run).
+ */
+export type ReleaseState = Readonly<{
+  state: ReleaseLifecycleState; frontPairStopped: boolean; retireRequested: boolean; stillDraining: boolean;
+}>;
 export type ReadinessReason = "BOOTING" | "DATABASE_UNREACHABLE" | "DRAINING" | "NOT_CURRENT" | "BEFORE_TAKE_TRAFFIC_FROM";
 export type ReleaseReadiness = Readonly<{ ready: boolean; releaseKey: string; reasons: readonly ReadinessReason[] }>;
 
@@ -44,10 +51,13 @@ export const RELEASE_WATCH_TIMING: Readonly<{ pollMs: number; staleMs: number }>
 export const RELEASE_WATCH_POLL_MS: number = RELEASE_WATCH_TIMING.pollMs;
 export const RELEASE_WATCH_STALE_MS: number = RELEASE_WATCH_TIMING.staleMs;
 
-/** `signal` aborts a read the caller gave up on: the reader then frees whatever the read holds. */
+/**
+ * `signal` aborts a read the caller gave up on: the reader then frees whatever the read holds. `readState` answers
+ * packages/db readReleaseState's three fields (no `stillDraining`: only the per-send lookup needs it).
+ */
 export interface ReleaseStateReader {
   readCurrent(signal?: AbortSignal): Promise<Readonly<{ releaseKey: string; takeTrafficFrom: Date | null }> | null>;
-  readState(releaseKey: string, signal?: AbortSignal): Promise<ReleaseState | null>;
+  readState(releaseKey: string, signal?: AbortSignal): Promise<Omit<ReleaseState, "stillDraining"> | null>;
 }
 
 const readTimeout = (): Error => Object.assign(new Error("RELEASE_READ_TIMEOUT"), { code: "RELEASE_READ_TIMEOUT" });
@@ -71,7 +81,7 @@ export class PostgresReleaseStateReader implements ReleaseStateReader {
     return this.#withClient(signal, (client) => readCurrentRelease(client));
   }
 
-  readState(releaseKey: string, signal?: AbortSignal): Promise<ReleaseState | null> {
+  readState(releaseKey: string, signal?: AbortSignal): Promise<Omit<ReleaseState, "stillDraining"> | null> {
     return this.#withClient(signal, (client) => readReleaseState(client, releaseKey));
   }
 
