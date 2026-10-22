@@ -273,6 +273,7 @@ import { registerStaffRoutes, staffAuthorizationPolicyInventory, type StaffHttpA
 import { exactStaffCookie, exactStaffCsrfPair, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME, STAFF_CSRF_HEADER, streamAuthorizedEvents, type StaffAccessApplication, type StaffAuthentication } from "./staff/access.js";
 export { staffRoutePolicy, staffCookies, clearStaffCookies, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME, STAFF_CSRF_HEADER } from "./staff/access.js";
 import type { PublicationApplication } from "./publications.js";
+import { MadeByNewerReleaseError } from "./made-by-newer-release.js";
 import type { PublicationContentCheck } from "./publication-check/check.js";
 import type { AnswerStoryApplication } from "./stories.js";
 import type { AnswerDisclosureApplication } from "./disclosures.js";
@@ -2025,21 +2026,8 @@ export class AskAlreadyWaitingRefusal extends AskRefusal {
   }
 }
 
-/**
- * Side-by-side uploads spec 2026-10-21 §5, §6 (plan C task C14): the debate asked for was made by a newer release than
- * this API, and holds a value this code does not know. The error handler answers 409
- * `{error:"MADE_BY_NEWER_RELEASE", message:"MADE_BY_NEWER_RELEASE"}` (the page says "open it on the current site"),
- * never a 404 or a 500. Thrown on debate reads only — `withNewerReleaseFallback` around a run, its answer and an answer,
- * and `readPublicDebate` — because the website's note names "this debate" for any call refused with it (C13).
- */
-export class MadeByNewerReleaseError extends TypedDomainError {
-  /** `cause`: the parse failure that showed it (C14 review), for whoever inspects the error; never sent. */
-  constructor(cause?: unknown) {
-    super(MADE_BY_NEWER_RELEASE, MADE_BY_NEWER_RELEASE);
-    this.name = "MadeByNewerReleaseError";
-    if (cause !== undefined) this.cause = cause;
-  }
-}
+/** Side-by-side C14: the 409 MADE_BY_NEWER_RELEASE refusal of a debate read (made-by-newer-release.ts). */
+export { MadeByNewerReleaseError };
 
 /**
  * Side-by-side C14: one debate read whose contract parse failed (a `ZodError`), answered as a newer release's data when

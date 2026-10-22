@@ -28,7 +28,7 @@ import {
 import { NO_MAP_VIEWS, answerNodeIds, type MapViewReader } from "./map-views.js";
 import { TypedDomainError } from "@debateai/kernel";
 import type { AuthenticatedSession } from "./sessions.js";
-import { MadeByNewerReleaseError } from "./index.js";
+import { MadeByNewerReleaseError } from "./made-by-newer-release.js";
 import type { PublicationContentCheck } from "./publication-check/check.js";
 type LabeledNumber = Node["base_score"];
 function redactLabeledNumber(
