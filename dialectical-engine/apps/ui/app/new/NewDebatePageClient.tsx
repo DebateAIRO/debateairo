@@ -10,6 +10,7 @@ import { createDebate, contractClient } from "@/lib/api";
 import { modelDot } from "@/lib/models";
 import {
   classifyRequestFailure,
+  isAskSettingsChanged,
   isQuestionLanguageCheckStale,
   QuestionLanguageChoiceNeededError,
   requestFailureMessage
@@ -237,10 +238,15 @@ function NewDebateForm({
       : lengthSettings ? { answer_length: answerLength } : {})
   };
   const [room, setRoom] = useAskRoom(contractClient, roomQuery);
+  // Side-by-side spec §13 (Task S12): the settings version the last room read that named one was read from; the ask
+  // sends it back, so a version switched under the page asks the person to choose again instead of silently changing
+  // their choices. Kept across a later failed read, like the flags above (the choices on screen are still that version's).
+  const [settingsVersion, setSettingsVersion] = useState<number | undefined>(undefined);
   useEffect(() => {
     if (room?.shape_settings === true) setShapeSettings(true);
     if (room?.length_settings === true) setLengthSettings(true);
     if (room?.answer_words !== undefined) setAnswerWords(room.answer_words);
+    if (room?.settings_version !== undefined) setSettingsVersion(room.settings_version);
   }, [room]);
   // Paid plans (spec 2026-09-29 §2.3.4; ruling Q-8): the plan the SERVER decided
   // for this person (B8), as the room read (and B10c's usage read) names it. It
@@ -346,7 +352,9 @@ function NewDebateForm({
         asOfWasEdited: false,
         riskTierWasEdited,
         // A21 O4: a locked control sends nothing, so the deployment's own default applies.
-        modelStrength: strengthControl.locked ? null : modelStrength
+        modelStrength: strengthControl.locked ? null : modelStrength,
+        // Side-by-side spec §13 (Task S12): the version the choices above were offered under, when a room read named one.
+        ...(settingsVersion === undefined ? {} : { settingsVersion })
       }, submitTime, catalog);
       // Question language (spec 2026-10-13; ruling CR-5, D1 order). Every ask carries the page's
       // language — but only once the room read has said the shape row is in force (ruling
@@ -417,11 +425,25 @@ function NewDebateForm({
         crisis.offer();
         return;
       }
+      // Side-by-side spec §13 (Task S12): the choices for new debates changed under the page. Nothing started; the room is
+      // read again, so the page offers what the new version offers (its shape and length switches follow that read, the
+      // one case they may also turn off), and the one plain sentence asks the person to check and ask again. A failed
+      // re-read (or one naming no version) forgets the old version, so the next press is the new version's ask rather
+      // than the same refusal again.
+      if (isAskSettingsChanged(exc)) {
+        const fresh = await readAskRoom(contractClient, roomQuery);
+        if (fresh?.settings_version === undefined) setSettingsVersion(undefined);
+        else {
+          setShapeSettings(fresh.shape_settings === true);
+          setLengthSettings(fresh.length_settings === true);
+        }
+        if (fresh !== null) setRoom(fresh);
+        setError(requestFailureMessage("DEBATE_CREATE", exc, catalog));
       // DL3-F7: see lib/v3/requestFailure.ts. ALREADY_WAITING is answered by
       // the room notice (sentence D, with its start time), not by a banner:
       // from the room re-read, or, when that read fails, from the refusal's
       // own body. The banner is the last fallback, when neither has a time.
-      if (classifyRequestFailure("DEBATE_CREATE", exc).kind === "ALREADY_WAITING") {
+      } else if (classifyRequestFailure("DEBATE_CREATE", exc).kind === "ALREADY_WAITING") {
         const fresh = await readAskRoom(contractClient, roomQuery);
         const shown = fresh === null ? waitingRoomOf(exc) : fresh;
         setRoom(shown);

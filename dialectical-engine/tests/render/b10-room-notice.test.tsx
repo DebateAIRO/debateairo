@@ -300,6 +300,43 @@ describe("/new reads the room for the ask it would send", () => {
   });
 });
 
+/**
+ * Side-by-side spec §13 (Task S12): the page sends back the settings version its room read named; when the API answers
+ * 409 ASK_SETTINGS_CHANGED (the choices changed under the page), the page reads the room again and shows the one plain
+ * sentence, and its next ask names the version that read named.
+ */
+describe("/new asks the person to choose again when the settings changed under the page", () => {
+  const changed = () => new ContractHttpError("SERVER_FAILURE", 409, "ASK_SETTINGS_CHANGED: x", "ASK_SETTINGS_CHANGED");
+  const sentVersions = () => mocks.createDebate.mock.calls.map(([, config]) => (config as Record<string, unknown>).settings_version);
+
+  it("sends the read's version, and on the 409 re-reads the room, shows the sentence, and asks next on the new version", async () => {
+    mocks.getAskRoom.mockResolvedValueOnce(room({ settings_version: 17 })).mockResolvedValue(room({ settings_version: 18 }));
+    mocks.createDebate.mockRejectedValueOnce(changed()).mockResolvedValueOnce({ id: "run:new" });
+    const container = await mount(newPage());
+    await type(container.querySelector<HTMLTextAreaElement>("#topic")!, "Cities should ban cars downtown");
+    const readsBefore = mocks.getAskRoom.mock.calls.length;
+    await submitForm(container);
+    expect(sentVersions()).toEqual([17]);
+    expect(mocks.getAskRoom.mock.calls.length).toBeGreaterThan(readsBefore);
+    const banners = [...container.querySelectorAll(".error")].map((banner) => banner.textContent ?? "");
+    expect(banners).toContain(en["newDebate.settingsChanged"]);
+    expect(banners.join(" ")).not.toContain("ASK_SETTINGS_CHANGED");
+    expect(mocks.push).not.toHaveBeenCalled();
+    await submitForm(container);
+    expect(sentVersions()).toEqual([17, 18]);
+    expect(mocks.push).toHaveBeenCalledWith("/debate/run%3Anew?starting=1");
+  });
+
+  it("a room read that names no version sends none (an older API): today's ask", async () => {
+    mocks.createDebate.mockResolvedValue({ id: "run:new" });
+    const container = await mount(newPage());
+    await type(container.querySelector<HTMLTextAreaElement>("#topic")!, "Cities should ban cars downtown");
+    await submitForm(container);
+    expect(mocks.createDebate).toHaveBeenCalledTimes(1);
+    expect(mocks.createDebate.mock.calls[0]![1]).not.toHaveProperty("settings_version");
+  });
+});
+
 describe("/new hides the plan chooser and names the plan the server decided (spec §2.3.4, ruling Q-8)", () => {
   const chooser = (container: HTMLElement) => container.querySelector('.ndTier[role="radiogroup"]');
   const planLine = (container: HTMLElement) => container.querySelector(".ndPlanCurrent")?.textContent ?? null;

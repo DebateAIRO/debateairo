@@ -100,6 +100,11 @@ export type NewDebateAskDefaults = {
   readonly depthMode?: DepthMode;
   readonly scrutiny?: Scrutiny;
   readonly answerLength?: AnswerLength;
+  /**
+   * Side-by-side spec §13 (Task S12): the settings version the room read named (`settings_version`); absent sends
+   * nothing, so the API normalises the ask as before.
+   */
+  readonly settingsVersion?: number;
 };
 
 export function buildNewDebateAskConfig(
@@ -130,6 +135,7 @@ export function buildNewDebateAskConfig(
       : { model_strength: defaults.modelStrength }),
     ...(defaults.depthMode === undefined ? {} : { depth_mode: defaults.depthMode }),
     ...(defaults.scrutiny === undefined ? {} : { scrutiny: defaults.scrutiny }),
-    ...(defaults.answerLength === undefined ? {} : { answer_length: defaults.answerLength })
+    ...(defaults.answerLength === undefined ? {} : { answer_length: defaults.answerLength }),
+    ...(defaults.settingsVersion === undefined ? {} : { settings_version: defaults.settingsVersion })
   };
 }

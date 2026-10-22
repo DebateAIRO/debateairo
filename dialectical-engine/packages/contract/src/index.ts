@@ -225,6 +225,9 @@ export const QuestionLanguageChoiceSchema = z.object({
 }).strict();
 export type QuestionLanguageChoice = z.infer<typeof QuestionLanguageChoiceSchema>;
 
+/** Side-by-side spec §13 (Task S12): a sealed settings version's number, as the room read names it and an ask echoes it. */
+const SettingsVersionSchema = z.number().int().positive();
+
 export const AskRequestSchema = z.object({
   question_line: z.string().trim().min(1),
   risk_tier: RiskTierSchema,
@@ -240,7 +243,11 @@ export const AskRequestSchema = z.object({
   steering_annotations: z.array(z.string().min(1)),
   // Question language (spec 2026-10-13): read only when the debate shape row is present; ignored otherwise.
   site_language: SiteLanguageSchema.optional(),
-  question_language_choice: QuestionLanguageChoiceSchema.optional()
+  question_language_choice: QuestionLanguageChoiceSchema.optional(),
+  // Side-by-side spec §13 (Task S12): the settings version the /new page's room read answered from (its
+  // `settings_version`). Present and no longer the active one, an ask whose choices the active version does not offer is
+  // refused 409 ASK_SETTINGS_CHANGED ("please choose again"); absent (an older page), the ask is normalised as before.
+  settings_version: SettingsVersionSchema.optional()
 }).strict();
 export type AskRequest = z.infer<typeof AskRequestSchema>;
 
@@ -425,7 +432,10 @@ const CustomerAskRoomResponseSchema = z.object({
   // Length guidance (spec 2026-10-15 §3.8): present only with the length row (its plan's words) or the shape row (its
   // answer lengths); `length_settings` only when the length row is in force, so the page offers the answer length.
   answer_words: AnswerWordsSchema.optional(),
-  length_settings: z.literal(true).optional()
+  length_settings: z.literal(true).optional(),
+  // Side-by-side spec §13 (Task S12): the settings version this answer was read from (the active one), present when the
+  // API answers the pages from the activation pointer. The page sends it back with the ask (`AskRequest.settings_version`).
+  settings_version: SettingsVersionSchema.optional()
 }).strict().superRefine((answer, context) => {
   if (answer.waits_for !== undefined
     && (!(answer.room === "FULL" || answer.room === "ALREADY_WAITING") || !PERSON_SCOPES.has(answer.scope ?? ""))) {
@@ -445,7 +455,9 @@ const CustomerAskRoomResponseSchema = z.object({
 const InternalFundingUsageSchema = z.object({kind:z.literal("INTERNAL"),expires_at:z.iso.datetime()}).strict();
 const InternalAskRoomResponseSchema = z.object({
   room:z.enum(["FITS","CLOSE","FULL","ALREADY_WAITING"]),scope:z.enum(["SITE_DAY","PERSON_DAY","PERSON_WEEK","PERSON_GRANT"]).nullable(),
-  resets_at:z.iso.datetime().nullable(),waiting_run_ref:z.string().min(1).nullable(),plan_id:z.null(),funding:InternalFundingUsageSchema,waits_for:WaitsForSchema.optional(),shape_settings:z.literal(true).optional(),answer_words:AnswerWordsSchema.optional(),length_settings:z.literal(true).optional()
+  resets_at:z.iso.datetime().nullable(),waiting_run_ref:z.string().min(1).nullable(),plan_id:z.null(),funding:InternalFundingUsageSchema,waits_for:WaitsForSchema.optional(),shape_settings:z.literal(true).optional(),answer_words:AnswerWordsSchema.optional(),length_settings:z.literal(true).optional(),
+  // Side-by-side spec §13 (Task S12): as the customer answer's `settings_version`.
+  settings_version:SettingsVersionSchema.optional()
 }).strict().superRefine((answer,context)=>{
   if ((answer.room==="FITS") !== (answer.scope===null) || (answer.room==="FITS" && answer.resets_at!==null)
     || ((answer.room==="ALREADY_WAITING") !== (answer.waiting_run_ref!==null))

@@ -243,7 +243,9 @@ import {
   type RoomPreview,
   type WaitingStart
 } from "./ask-room.js";
-import { planReadmission, readmittedArgumentLanguage, readmittedAskContract, type ReadmissionPlan } from "./readmission.js";
+import {
+  keepsEveryStoredChoice, planReadmission, readmittedArgumentLanguage, readmittedAskContract, type ReadmissionPlan
+} from "./readmission.js";
 import {
   ASK_SIGN_IN_REQUIRED,
   appliedAskOf,
@@ -1970,8 +1972,18 @@ export function askRefusalStatus(code: string): 401 | 403 | 409 | 422 | 429 {
   if (code === PREVIEW_TEAM_ONLY) return 403;
   // Question language (spec 2026-10-13): a stale, forged or mismatched choice; the page checks the question again.
   if (QUESTION_LANGUAGE_CHOICE_REFUSALS.has(code)) return 409;
+  // Side-by-side spec §13 (Task S12): the settings changed under the page; it reads the room again and says so.
+  if (code === ASK_SETTINGS_CHANGED) return 409;
   return code === "DAILY_COST_ENVELOPE_REACHED" ? 429 : 422;
 }
+
+/**
+ * Side-by-side spec §13 (Task S12) — "PLEASE CHOOSE AGAIN": the ask names the settings version the /new page's room read
+ * answered from, the active version has moved since, and it no longer offers one of the person's choices
+ * (`askSettingsChangedUnderPage`). A 409 like the question-language refusals: nothing was decided, so the page reads the
+ * room again and shows one plain sentence (`newDebate.settingsChanged`); the code itself is never shown.
+ */
+const ASK_SETTINGS_CHANGED = "ASK_SETTINGS_CHANGED";
 
 /** Question language (spec 2026-10-13): the refusals of the person's answer to an offer (reference.ts, decider.ts). */
 const QUESTION_LANGUAGE_CHOICE_REFUSALS: ReadonlySet<string> = new Set([
@@ -3834,7 +3846,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         const words = lengthAnswerWordsFor(view.lengthGuidancePolicy, view.debateShapePolicy, roomPlanKey);
         return words === null ? {} : { answer_words: { short: words.short, standard: words.standard, detailed: words.detailed } };
       })(),
-      ...(view.lengthGuidancePolicy === undefined ? {} : { length_settings: true as const })
+      ...(view.lengthGuidancePolicy === undefined ? {} : { length_settings: true as const }),
+      // Side-by-side spec §13 (Task S12): the version this answer was read from, which the page sends back with its ask;
+      // without the view (no version named) the member is never written: today's body, byte for byte.
+      ...(view.registerVersion === undefined ? {} : { settings_version: view.registerVersion })
     }));
   });
 
@@ -4664,6 +4679,34 @@ function settingsUnavailableRefusal(): never {
   return markAskRefusal(new PreviewGateUnavailableRefusal(new Date(Date.now() + ADMISSION_SETTINGS_RETRY_MS)));
 }
 
+/**
+ * Side-by-side spec §13 (Task S12) — DID THE SETTINGS CHANGE UNDER THE PAGE? Plain words: the /new page offered the
+ * person's choices as the version its room read named (`settings_version`); if the owners switched the active version
+ * since, and the new one no longer offers one of those choices, the person is asked to choose again rather than given a
+ * debate silently different from what they picked. True only when the ask names a version other than the one it is
+ * admitted on (`settings.registerVersion`) AND either it carries a model strength while that version scores no models,
+ * or that version's shape and length rows, under the person's plan key, drop or change a member of the depth settings
+ * the plan left them (`keepsEveryStoredChoice`, the re-admission rule: a member the normaliser adds is a new default,
+ * kept). The plan key is the one the room read and submit use: with billing on, the person's plan
+ * (`decideRoomSettingsAndPlan`, a read; nothing is written or charged), so a plan's own normalisation is never mistaken for
+ * the version's. An ask naming no version (an older page) or the active one is today's ask: false, nothing read.
+ */
+async function askSettingsChangedUnderPage(
+  ask: AskRequest, settings: RunCreationSettings, principal: AskPrincipal
+): Promise<boolean> {
+  if (ask.settings_version === undefined || ask.settings_version === settings.registerVersion) return false;
+  if (ask.model_strength !== undefined && settings.modelPicker?.scorecard.state !== "VALID") return true;
+  const decided = await decideRoomSettingsAndPlan({
+    plan_tier: ask.plan_tier, composition_budget_tier: ask.composition_budget_tier, depth_params: ask.depth_params
+  }, principal.kind === "server" ? principal.ownerRef : null, settings.billing);
+  // An unknown tier (a direct caller) is keyed as Free, as submit keys it until today's typed check refuses it.
+  const plan: DebateShapePlanKey = Object.hasOwn(PLAN_TIER_ROSTERS, decided.settings.plan_tier as string)
+    ? debateShapePlanKeyOf(decided.planId, decided.settings.plan_tier) : "free";
+  const normalised = normaliseAskForDebateShape(decided.settings, settings.debateShapePolicy ?? null, plan,
+    settings.lengthGuidancePolicy ?? null);
+  return !keepsEveryStoredChoice(decided.settings.depth_params, normalised.depth_params);
+}
+
 /** One planned admission: the run's basis, panel and (with a VALID scorecard) its assignment. */
 export type PlannedAskAdmission = {
   readonly risk: ReturnType<RunCreationSettings["resolveRisk"]>;
@@ -5340,6 +5383,12 @@ export class PostgresAskApplication implements AskApplication {
     if (!previewTeamAdmits(validatePreviewProviderTestConfig(settings.previewProviderTestConfig),
       settings.previewTeamUserIds, principal.kind === "server" ? principal.userId : undefined)) {
       markAskRefusal(new TypedDomainError(PREVIEW_TEAM_ONLY, PREVIEW_TEAM_ONLY));
+    }
+    // Side-by-side spec §13 (Task S12): "please choose again" — before the question-language decider (which may make a
+    // fast AI call), billing, admission and any lock, so a refused ask has written, charged and queued nothing. A version
+    // this API cannot load (`settingsUnavailable`) has no rows to compare with: the ask waits or is refused as S11 says.
+    if (!settingsUnavailable && await askSettingsChangedUnderPage(requestedAsk, settings, principal)) {
+      markAskRefusal(new TypedDomainError(ASK_SETTINGS_CHANGED, ASK_SETTINGS_CHANGED));
     }
     // Paid plans (spec 2026-09-29 §2.3.4, §2.6 item 7; R1 A5; ruling R-28).
     // With billing on, the SERVER decides the ask. Every later step reads `ask`

@@ -40,7 +40,7 @@ vi.mock("../../apps/api/src/preview-budget-estimate.js", async (importOriginal) 
 }));
 
 import {
-  PostgresAskApplication, buildApi, type AskApplication, type AskModelPickerSettings, type RunCreationSettings
+  PostgresAskApplication, askRefusalStatus, buildApi, type AskApplication, type AskModelPickerSettings, type RunCreationSettings
 } from "@debateai/api";
 import { WorkItemRepository } from "@debateai/battery";
 import type { CostEstimator } from "@debateai/budget";
@@ -554,7 +554,8 @@ describe("(5) the room read and GET /v1/session answer from the active version (
     await withApi(view, async (api, identity, read) => {
       const response = await api.inject({ method: "GET", url: QUERY, headers: testSessionHeaders(identity) });
       expect(response.statusCode).toBe(200);
-      expect(response.json()).toMatchObject({ shape_settings: true, length_settings: true });
+      // Task S12: the body names the version it was read from, which the page sends back with its ask.
+      expect(response.json()).toMatchObject({ shape_settings: true, length_settings: true, settings_version: ACTIVE });
       expect(read).toHaveLength(1);
       expect(read[0]).toMatchObject({ registerVersion: ACTIVE,
         settingsClass: { shape: { plan: "premium", depthMode: "fixed", scrutiny: "deep", answerLength: "short" } } });
@@ -576,6 +577,7 @@ describe("(5) the room read and GET /v1/session answer from the active version (
     await withApi(undefined, async (api, identity, read) => {
       const room = await api.inject({ method: "GET", url: QUERY, headers: testSessionHeaders(identity) });
       expect(room.json()).not.toHaveProperty("shape_settings");
+      expect(room.json()).not.toHaveProperty("settings_version");
       expect(read[0]).not.toHaveProperty("registerVersion");
       const sessionRead = await api.inject({ method: "GET", url: "/v1/session", headers: testSessionHeaders(identity) });
       expect(sessionRead.json()).toMatchObject({ model_scorecard_in_force: false });
@@ -1100,5 +1102,100 @@ describe("(S11) the admission re-check also needs a passed settings version (sid
     const { application, settingsAsked } = arrange({ noReader: true });
     await expect(application.submit(ask(), session, principal)).resolves.toMatchObject({ status: "QUEUED" });
     expect(settingsAsked).toEqual([]);
+  });
+});
+
+/**
+ * Side-by-side spec §13 (Task S12) — "PLEASE CHOOSE AGAIN". Plain words: the /new page offered the person's choices as
+ * the version its room read named, and sends that version back with the ask. If the owners switched the active version
+ * in between and the new one no longer offers one of those choices, the ask is refused 409 ASK_SETTINGS_CHANGED before
+ * anything is decided (no fast language call, no billing read of the ask, no room line, nothing written or charged); the
+ * page reads the room again and says so in one sentence. An ask whose choices are all still offered is admitted on the
+ * new version as usual; an ask that names no version (an older page) is normalised silently, as today.
+ */
+describe("(S12) an ask whose choices the active version no longer offers is asked to choose again", () => {
+  const SHAPED = Object.freeze({ depth: 2, depthMode: "fixed" as const, scrutiny: "deep" as const, answerLength: "short" as const });
+  /** The site (17) has the shape and length rows; 18 has neither (its members carry none). */
+  const shapedSite = () => ({ debateShapePolicy: debateShapePolicyStartValues(), lengthGuidancePolicy: lengthGuidancePolicyStartValues() });
+
+  function refusedUntouched(arranged: Arranged): void {
+    expect(arranged.started).toEqual([]);
+    expect(arranged.memory).toEqual([]);
+    expect(arranged.used).not.toContain("discovery");
+    expect(arranged.settingsAsked).toEqual([]);
+    expect(vi.mocked(WorkItemRepository.prototype.enqueue)).not.toHaveBeenCalled();
+    expect(vi.mocked(WorkItemRepository.prototype.enqueueOn)).not.toHaveBeenCalled();
+  }
+
+  it("17's shaped choices under 18 (no shape row): 409 ASK_SETTINGS_CHANGED, nothing written, decided or charged", async () => {
+    const arranged = arrange({ site: shapedSite });
+    await expect(arranged.application.submit(ask({ depth_params: SHAPED, settings_version: SITE }), session, principal))
+      .rejects.toMatchObject({ name: "AskRefusal", code: "ASK_SETTINGS_CHANGED", message: "ASK_SETTINGS_CHANGED" });
+    refusedUntouched(arranged);
+    expect(askRefusalStatus("ASK_SETTINGS_CHANGED")).toBe(409);
+  });
+
+  it("is refused before the question-language decider (a fast AI call) and before the room: no line row", async () => {
+    // 18 has the shape row, but its premium plan no longer offers a fixed depth; its decider would be asked next.
+    const start = debateShapePolicyStartValues();
+    const noFixed = Object.freeze({ ...start, plans: Object.freeze({ ...start.plans,
+      premium: Object.freeze({ ...start.plans.premium, fixedDepthAllowed: false }) }) });
+    const decide = vi.fn(async () => null);
+    const { room, questions } = recordingRoom();
+    const arranged = arrange({ room, site: shapedSite, members: (version, into) => versionMembers(version, into,
+      version === ACTIVE ? { debateShapePolicy: noFixed, questionLanguage: { decide } as never } : {}) });
+    await expect(arranged.application.submit(ask({ depth_params: SHAPED, settings_version: SITE }), session, principal))
+      .rejects.toMatchObject({ code: "ASK_SETTINGS_CHANGED" });
+    expect(decide).not.toHaveBeenCalled();
+    expect(questions).toEqual([]);
+    refusedUntouched(arranged);
+  });
+
+  it("a model strength while 18 scores no models (17 did): 409, nothing written", async () => {
+    const arranged = arrange({ site: () => ({ modelPicker: VALID_PICKER }) });
+    await expect(arranged.application.submit(ask({ model_strength: "BEST", settings_version: SITE }), session, principal))
+      .rejects.toMatchObject({ code: "ASK_SETTINGS_CHANGED" });
+    refusedUntouched(arranged);
+  });
+
+  it("with billing on, the person's own plan key decides (PRO without a fixed depth refuses what premium would keep)", async () => {
+    const start = debateShapePolicyStartValues();
+    const proNoFixed = Object.freeze({ ...start, plans: Object.freeze({ ...start.plans,
+      pro: Object.freeze({ ...start.plans.pro, fixedDepthAllowed: false }) }) });
+    const coarse = vi.fn();
+    const billing: AskBilling = Object.freeze({
+      plans: billingPlansFromValue(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value, BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.sourceRef),
+      entitlements: { current: async () => ({ planId: "PRO" as const, eventId: "55555555-5555-4555-8555-555555555555" }) },
+      coarseFit: Object.freeze({ personAllowance: { read: async () => { coarse(); return []; } },
+        spend: { readOwnerSpentMicros: async () => 0, readOwnerCountedHoldsMicros: async () => 0 }, estimator: estimator(1_000) }),
+      clock: () => NOW
+    });
+    const arranged = arrange({ billing, site: shapedSite, members: (version, into) => versionMembers(version, into,
+      version === ACTIVE ? { debateShapePolicy: proNoFixed } : {}) });
+    await expect(arranged.application.submit(ask({ depth_params: SHAPED, settings_version: SITE }), session, principal))
+      .rejects.toMatchObject({ code: "ASK_SETTINGS_CHANGED" });
+    expect(coarse).not.toHaveBeenCalled();
+    refusedUntouched(arranged);
+  });
+
+  it("the same version's choices all still offered under 18: admitted on 18 as usual (a new default is kept)", async () => {
+    // 17 had no rows; 18 has the shape row, which adds its defaults to the person's `{ depth }`.
+    const { application, started } = arrange({ members: (version, into) => versionMembers(version, into,
+      version === ACTIVE ? { debateShapePolicy: debateShapePolicyStartValues() } : {}) });
+    await expect(application.submit(ask({ depth_params: { depth: 2 }, settings_version: SITE }), session, principal))
+      .resolves.toMatchObject({ run_ref: RUN_ID, status: "QUEUED" });
+    expect(started[0]!.registerVersion).toBe(ACTIVE);
+    expect(started[0]!.depthParams).toMatchObject({ depth: 2 });
+  });
+
+  it("an ask naming no version (an older page), or the active one: today's silent normalisation, unchanged", async () => {
+    for (const named of [{}, { settings_version: ACTIVE }]) {
+      const { application, started } = arrange({ site: shapedSite });
+      await expect(application.submit(ask({ depth_params: SHAPED, ...named }), session, principal))
+        .resolves.toMatchObject({ status: "QUEUED" });
+      expect(started[0]!.depthParams).toEqual({ depth: 2 });
+      expect(started[0]!.registerVersion).toBe(ACTIVE);
+      vi.restoreAllMocks();
+    }
   });
 });
