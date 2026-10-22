@@ -171,7 +171,9 @@ describe('online backup before side-by-side migrations', () => {
     const server = fakeServer(t);
     const event = await backup.runOnlineBackup({ out, envPaths: envs(t), layout: t.layout, deps: { run: server.run } });
     const argvs = server.calls.map(call => call.argv);
-    expect(argvs[0]).toEqual([...AS_POSTGRES, `${PG}/psql`, '--no-psqlrc', '--no-align', '--tuples-only', '--quiet', '--field-separator=|', '-v', 'ON_ERROR_STOP=1',
+    // The database list is read through the release table's psqlArgv, which gives up connecting after 3 s.
+    expect(argvs[0]).toEqual([...AS_POSTGRES, 'PGCONNECT_TIMEOUT=3',
+      `${PG}/psql`, '--no-psqlrc', '--no-align', '--tuples-only', '--quiet', '--field-separator=|', '-v', 'ON_ERROR_STOP=1',
       '--host=/run/debateai-v3-preview/postgresql', '--port=5434', '--dbname=debateai', '-f', '-']);
     expect(server.calls[0]!.stdin).toContain('SELECT datname FROM pg_database WHERE NOT datistemplate AND datallowconn ORDER BY 1;');
     expect(argvs.slice(1)).toEqual([
