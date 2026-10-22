@@ -2,21 +2,29 @@ import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Pool, PoolClient, QueryResult } from "pg";
-import { PostgresAskApplication, ReleaseNotServedError, type RunCreationSettings } from "@debateai/api";
+import {
+  PostgresAskApplication, ReleaseNotServedError, type AskModelPickerSettings, type AskTargetFacts, type RunCreationSettings
+} from "@debateai/api";
 import { WorkItemRepository } from "@debateai/battery";
-import { RunRepository, type StoredAsk, type WaitingRun } from "@debateai/db";
-import { TypedDomainError } from "@debateai/kernel";
-import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue } from "@debateai/register";
+import { PLAN_TIER_ROSTERS } from "@debateai/contract";
+import { RunRepository, type DiscoveredPanelMember, type StoredAsk, type WaitingRun } from "@debateai/db";
+import { DEBATE_ROLES, TypedDomainError } from "@debateai/kernel";
+import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, computeStructuralCeilingBasis } from "@debateai/register";
+import type { PickerSettings } from "@debateai/scorecard";
+import { ServeRepository } from "@debateai/serve";
 import {
   AskRoom,
   type AskAdmissionGate,
   type AskRoomEntitlements,
   type AskWaitingLinePort,
   type Readmission,
+  type RoomPreview,
   type WaitingStart
 } from "../../apps/api/src/ask-room.js";
 import type { ReadmissionPlan } from "../../apps/api/src/readmission.js";
+import { fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
+import { economyCaps, roleNumbers, testCandidate, testEntry, testScorecard } from "../support/scorecardFixtures.js";
 
 const NOW = new Date("2026-10-01T00:00:30.000Z");
 const MONTH_RESET = new Date("2026-10-15T00:00:00.000Z");
@@ -34,6 +42,23 @@ function stubPool(): Pool {
   return { connect: vi.fn(async () => client), query } as unknown as Pool;
 }
 
+/**
+ * Side-by-side C11 review: an owner ask-admission pool whose lease is taken ("lease") and given back ("release") into
+ * `events`, so a case can tell what ran under it; `unlockFails` makes the release refuse (its unlock answers false).
+ */
+function leasePool(events: string[], unlockFails: boolean): Pool {
+  const query = vi.fn(async (text: string) => {
+    if (text.includes("pg_advisory_unlock")) {
+      events.push("release");
+      return { rows: [{ unlocked: !unlockFails }], rowCount: 1 } as unknown as QueryResult;
+    }
+    if (text.includes("pg_advisory_lock")) events.push("lease");
+    return { rows: [{ locked: true }], rowCount: 1 } as unknown as QueryResult;
+  });
+  const client = Object.assign(new EventEmitter(), { query, release: vi.fn() }) as unknown as PoolClient;
+  return { connect: vi.fn(async () => client), query } as unknown as Pool;
+}
+
 function waitingRun(person: Readonly<{ ownerRef?: string; legacyAskerId?: string }>, extra: Partial<WaitingRun> = {}): WaitingRun {
   return Object.freeze({
     runId: randomUUID(), waitingSince: new Date("2026-09-30T12:00:00.000Z"), releaseKey: TEST_RELEASE_KEY,
@@ -45,8 +70,12 @@ function waitingRun(person: Readonly<{ ownerRef?: string; legacyAskerId?: string
 }
 
 type Outcome = "SITE_FULL" | "PERSON_FULL" | "GONE" | "PLAN_CHANGED" | "THROW";
-/** Side-by-side C11: one answer of the fake line per `startWaiting` call, in order. */
-type Step = "NEEDS_READMISSION" | "ASK_AGAIN" | Readonly<{ startAs: string }>;
+/**
+ * Side-by-side C11: one answer of the fake line per `startWaiting` call, in order. TAKEN: 0123 refused the re-admission's
+ * key provision (an earlier one of the run is pending or alive), nothing written. `startAs`: STARTED — for a READMIT
+ * plan the new run is written first, as the room does (`createRun`), and that run starts.
+ */
+type Step = "NEEDS_READMISSION" | "ASK_AGAIN" | "TAKEN" | "SITE_FULL" | Readonly<{ startAs: string }>;
 
 /** A waiting debate's stored ask, as C10's `readStoredAsk` reads it (another release admitted it). */
 function storedAsk(runId: string, overrides: Partial<StoredAsk> = {}): StoredAsk {
@@ -75,6 +104,14 @@ function arrange(input: {
   readonly notServed?: ReadonlySet<string>;
   /** Important 4: the started runs whose first job is still READY past the bound (the repository's answer). */
   readonly stalled?: ReadonlyArray<string>;
+  /** Side-by-side C11 review: what phase one's NEEDS_READMISSION carries — the room as measured under the lock. */
+  readonly preview?: RoomPreview;
+  /** Side-by-side C11 review: per old run, its re-admissions whose START never committed (0123's reader). */
+  readonly orphans?: Readonly<Record<string, ReadonlyArray<string>>>;
+  /** Side-by-side C11 review: the owner lease's release fails after what ran under it. */
+  readonly unlockFails?: boolean;
+  /** Settings a case adds (a planner that can READMIT, a model picker). */
+  readonly extra?: Partial<RunCreationSettings>;
 }) {
   let pages = input.pages;
   const tried: string[] = [];
@@ -82,11 +119,20 @@ function arrange(input: {
   const dispatched: string[] = [];
   const recorded: unknown[] = [];
   const storedReads: string[] = [];
+  /** Side-by-side C11 review: the line's starts, the owner lease and the orphan reads, in the order they happened. */
+  const events: string[] = [];
   vi.spyOn(RunRepository.prototype, "readStoredAsk").mockImplementation(async (runId) => {
     storedReads.push(runId);
     if (input.stored === undefined) throw new Error("test: no stored ask was expected to be read");
     return input.stored(runId);
   });
+  vi.spyOn(RunRepository.prototype, "listUnstartedReadmissions").mockImplementation(async (runId) => {
+    events.push(`orphans:${runId}`);
+    return input.orphans?.[runId] ?? [];
+  });
+  // Side-by-side C11: a READMIT's new run, as `#readmit` writes it (the row, then the memory question).
+  vi.spyOn(RunRepository.prototype, "startReadmittedRun").mockImplementation(async ({ fromRunId }) => `new:${fromRunId}`);
+  vi.spyOn(ServeRepository.prototype, "recordMemoryQuestion").mockResolvedValue(undefined as never);
   const reads: Array<Readonly<{ after: string | null; everyPerson: boolean }>> = [];
   const stalledAsked: unknown[] = [];
   vi.spyOn(WorkItemRepository.prototype, "listStalledStarts").mockImplementation(async (asked) => {
@@ -117,15 +163,23 @@ function arrange(input: {
       const call = tried.filter((runId) => runId === run.runId).length;
       tried.push(run.runId);
       readmissions.push(readmission);
+      events.push(`start:${run.runId}`);
       const outcome = input.outcomes?.[run.runId];
       if (outcome === "THROW") throw new Error("test: the start's transaction failed");
       if (outcome !== undefined) return { kind: outcome };
       const typed = input.typedThrow?.[run.runId];
       if (typed !== undefined) throw new TypedDomainError(typed, "test: typed refusal");
       const step = input.steps?.[run.runId]?.[call];
-      if (step === "NEEDS_READMISSION") return { kind: "NEEDS_READMISSION", planId: null };
+      if (step === "NEEDS_READMISSION") {
+        return { kind: "NEEDS_READMISSION", planId: null, ...(input.preview === undefined ? {} : { preview: input.preview }) };
+      }
       if (step === "ASK_AGAIN") return { kind: "ASK_AGAIN" };
-      if (step !== undefined) return { kind: "STARTED", runId: step.startAs, value: await enqueue(TX, step.startAs) };
+      if (step === "SITE_FULL") return { kind: "SITE_FULL" };
+      if (step === "TAKEN") throw new TypedDomainError("RUN_READMISSION_TAKEN", "test: an earlier re-admission is pending or alive");
+      if (step !== undefined) {
+        const started = readmission?.plan.kind === "READMIT" ? await readmission.createRun() : step.startAs;
+        return { kind: "STARTED", runId: started, value: await enqueue(TX, started) };
+      }
       return { kind: "STARTED", runId: run.runId, value: await enqueue(TX, run.runId) };
     }
   };
@@ -133,6 +187,7 @@ function arrange(input: {
     strangerSampleRate: 0, releaseKey: TEST_RELEASE_KEY, registerVersion: 1, batteryVersion: "b7b", settlementWatchHandle: "b7b",
     resolveDiscoveredPanel: async () => [], resolveEnvelopeBasis: async () => ({}),
     resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({ effectiveRiskTier, tierSource: tierSource as never, tierProvenanceRef }),
+    ...input.extra,
     waitingLine
   };
   const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
@@ -145,11 +200,31 @@ function arrange(input: {
       if (workItemId !== `job:${runId}`) throw new Error("test: dispatched a job the tick did not queue");
       dispatched.push(runId);
     }) },
-    settings, { read: async () => [] }, stubPool(), { server: stubPool(), legacy: stubPool() }
+    settings, { read: async () => [] }, stubPool(),
+    { server: leasePool(events, input.unlockFails === true), legacy: leasePool(events, input.unlockFails === true) }
   );
   const lines = () => [...info.mock.calls, ...error.mock.calls].map(([line]) => JSON.parse(String(line)) as Record<string, unknown>);
   const setPages = (next: ReadonlyArray<ReadonlyArray<WaitingRun>>) => { pages = next; };
-  return { application, tried, readmissions, dispatched, recorded, reads, lines, setPages, stalledAsked, storedReads };
+  return { application, tried, readmissions, dispatched, recorded, reads, lines, setPages, stalledAsked, storedReads, events };
+}
+
+/** Side-by-side C11 review: what the waker records for a re-admission that never started (the orphan path). */
+const readmissionFailure = (runId: string) =>
+  ({ runId, batteryRowId: "Q1", commandKey: `S00:${runId}:Q1`, reason: "RUN_SETUP_FAILED:READMISSION" });
+
+/**
+ * Side-by-side C11 review: settings under which a stored free ask plans READMIT — every roster model discovered, each of
+ * its own maker, and a structural ceiling for the panel — as tests/integration/side-by-side-readmission.test.ts does.
+ */
+function readmittable(): Partial<RunCreationSettings> {
+  const models = [...new Set([...PLAN_TIER_ROSTERS.free, ...PLAN_TIER_ROSTERS.premium])];
+  return {
+    resolveDiscoveredPanel: async () => models.map((modelId, index) => Object.freeze({
+      provider_ref: `provider:b7b:${String(index + 1)}`, maker: `maker:b7b:${String(index + 1)}`, model_id: modelId,
+      probe_evidence_ref: `probe:b7b:${String(index + 1)}`, probed_at: "2026-10-01T00:00:00.000Z"
+    })),
+    resolveEnvelopeBasis: async ({ panelSize }) => fixtureStructuralCeiling(12, panelSize, 1)
+  };
 }
 
 afterEach(() => { vi.restoreAllMocks(); });
@@ -317,6 +392,178 @@ describe("side-by-side C11: the waker re-admits a run another release admitted",
     await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ started: 1, failed: 0 });
     expect(dispatched).toEqual(["new"]);
   });
+
+  /**
+   * C11 review, Important (controller ruling 2026-10-22): a re-admission whose row committed while its START did not
+   * (the process died in between, or its FAILED record never landed) must never strand the debate. Under the old run's
+   * owner lease no START of that person is in flight, so every re-admission 0123 lists as unstarted is an orphan.
+   */
+  it("TAKEN in phase two: each unstarted re-admission of the owner's run is recorded FAILED under the lease, then skipped", async () => {
+    const a = waitingRun({ ownerRef: OWNER }, { releaseKey: OLD_RELEASE });
+    const { application, events, recorded, dispatched, lines } = arrange({
+      pages: [[a]], steps: { [a.runId]: ["NEEDS_READMISSION", "TAKEN"] }, extra: readmittable(),
+      stored: (runId) => storedAsk(runId, { askerId: `owner:${OWNER}`, contentEncrypted: true }),
+      orphans: { [a.runId]: ["orphan-1", "orphan-2"] }
+    });
+    await expect(application.wakeWaitingRuns()).resolves.toEqual({ waiting: 1, started: 0, skipped: 1, failed: 0, stopped: false, redispatched: 0 });
+    expect(events).toEqual([`start:${a.runId}`, "lease", `start:${a.runId}`, `orphans:${a.runId}`, "release"]);
+    expect(recorded).toEqual([readmissionFailure("orphan-1"), readmissionFailure("orphan-2")]);
+    expect(dispatched).toEqual([]);
+    expect(lines()).toContainEqual({ event: "api.wait.readmission_orphan", runId: a.runId, newRunId: "orphan-1" });
+    expect(lines()).toContainEqual({ event: "api.wait.readmission_orphan", runId: a.runId, newRunId: "orphan-2" });
+    expect(lines()).toContainEqual({ event: "api.wait.readmission_skipped", runId: a.runId, code: "RUN_READMISSION_TAKEN" });
+  });
+
+  it("an owner's re-admission that starts reads no orphans: TAKEN is what reveals one", async () => {
+    const a = waitingRun({ ownerRef: OWNER }, { releaseKey: OLD_RELEASE });
+    const { application, events, recorded, dispatched } = arrange({
+      pages: [[a]], steps: { [a.runId]: ["NEEDS_READMISSION", { startAs: "unused" }] }, extra: readmittable(),
+      stored: (runId) => storedAsk(runId, { askerId: `owner:${OWNER}`, contentEncrypted: true })
+    });
+    await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ started: 1, failed: 0 });
+    expect(events).toEqual([`start:${a.runId}`, "lease", `start:${a.runId}`, "release"]);
+    expect(recorded).toEqual([]);
+    expect(dispatched).toEqual([`new:${a.runId}`]);
+  });
+
+  it("a legacy asker's unstarted re-admission is recorded FAILED under the lease before the room is asked again; the run is re-admitted", async () => {
+    // A legacy re-admission is never refused TAKEN (it provisions no key), so its orphan is looked for first.
+    const a = waitingRun({ legacyAskerId: "legacy:a" }, { releaseKey: OLD_RELEASE });
+    const { application, events, recorded, dispatched, lines } = arrange({
+      pages: [[a]], steps: { [a.runId]: ["NEEDS_READMISSION", { startAs: "unused" }] }, extra: readmittable(),
+      stored: (runId) => storedAsk(runId), orphans: { [a.runId]: ["orphan-1"] }
+    });
+    await expect(application.wakeWaitingRuns()).resolves.toEqual({ waiting: 1, started: 1, skipped: 0, failed: 0, stopped: false, redispatched: 0 });
+    expect(events).toEqual([`start:${a.runId}`, "lease", `orphans:${a.runId}`, `start:${a.runId}`, "release"]);
+    expect(recorded).toEqual([readmissionFailure("orphan-1")]);
+    expect(dispatched).toEqual([`new:${a.runId}`]);
+    expect(lines()).toContainEqual({ event: "api.wait.readmission_orphan", runId: a.runId, newRunId: "orphan-1" });
+  });
+
+  it("a START that committed is never recorded FAILED when the lease's release then fails: its job is handed over later", async () => {
+    // C11 review, Minor 3: the new run supersedes the old one (edge, hold and READY job committed); FAILED would end the
+    // debate. #redispatchStalledStarts hands its READY job over once it has stalled.
+    const a = waitingRun({ legacyAskerId: "legacy:a" }, { releaseKey: OLD_RELEASE });
+    const { application, recorded, dispatched, lines } = arrange({
+      pages: [[a]], steps: { [a.runId]: ["NEEDS_READMISSION", { startAs: "unused" }] }, extra: readmittable(),
+      stored: (runId) => storedAsk(runId), unlockFails: true
+    });
+    await expect(application.wakeWaitingRuns()).resolves.toEqual({ waiting: 1, started: 0, skipped: 0, failed: 1, stopped: false, redispatched: 0 });
+    expect(recorded).toEqual([]);
+    expect(dispatched).toEqual([]);
+    expect(lines()).toContainEqual({
+      event: "api.wait.readmission_release_failed", runId: a.runId, newRunId: `new:${a.runId}`, diagnostic: expect.any(String)
+    });
+    expect(lines().some((line) => line.event === "api.wait.readmission_failed")).toBe(false);
+  });
+
+  it("(control) a START that fails after the new row committed still records that row FAILED", async () => {
+    const a = waitingRun({ legacyAskerId: "legacy:a" }, { releaseKey: OLD_RELEASE });
+    vi.spyOn(WorkItemRepository.prototype, "enqueueOn").mockRejectedValueOnce(new Error("test: the first job could not be queued"));
+    const { application, recorded, lines } = arrange({
+      pages: [[a]], steps: { [a.runId]: ["NEEDS_READMISSION", { startAs: "unused" }] }, extra: readmittable(),
+      stored: (runId) => storedAsk(runId)
+    });
+    await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ started: 0, failed: 1 });
+    expect(recorded).toEqual([readmissionFailure(`new:${a.runId}`)]);
+    expect(lines()).toContainEqual({
+      event: "api.wait.readmission_failed", runId: a.runId, newRunId: `new:${a.runId}`, diagnostic: expect.any(String)
+    });
+  });
+
+  /**
+   * C11 review, Minor 2: phase two plans the new run inside the person's room exactly as `#submitWithRoom` does
+   * (`personRoomOf(preview)`), the room phase one measured under the lock, so the picker can step down to fit it. The
+   * cast is tests/unit/s4b-free-cost-cap.test.ts's A5 cast: no strength fits a 10-micro room, so a plan made inside it
+   * starts person-room-tight (A5), and one made with no room does not.
+   */
+  describe("the person's room reaches the picker", () => {
+    const [FREE_A, FREE_B] = PLAN_TIER_ROSTERS.free;
+    const [PAID_A] = PLAN_TIER_ROSTERS.premium;
+    const member = (providerRef: string, maker: string, modelId: string): DiscoveredPanelMember => Object.freeze({
+      provider_ref: providerRef, maker, model_id: modelId, probe_evidence_ref: `probe:${providerRef}`, probed_at: "2026-10-01T00:00:00.000Z"
+    });
+    const PANEL = Object.freeze([
+      member("provider:b7b:paid", "OpenAI", PAID_A!), member("provider:b7b:free-a", "OpenAI", FREE_A!),
+      member("provider:b7b:free-b", "Anthropic", FREE_B!)
+    ]);
+    const MICROS_PER_CALL = new Map<string, number>([[FREE_A!, 100], [FREE_B!, 250], [PAID_A!, 50]]);
+    const QUALITY = new Map<string, number>([[FREE_A!, 85], [FREE_B!, 92], [PAID_A!, 99]]);
+    const candidates = PANEL.map((entry) => testCandidate(entry.model_id, entry.maker, { modelId: entry.model_id }));
+    const caps = (micros: number) => Object.fromEntries(DEBATE_ROLES.map((role) => [role, { moneyMicrosPerCall: micros }]));
+    const scorecard = testScorecard(candidates, Object.fromEntries(DEBATE_ROLES.map((role) => [
+      role, candidates.map((candidate) => testEntry(candidate.candidateId, QUALITY.get(candidate.modelId)!, 10))
+    ])), {
+      diversityShare: 0.2,
+      planStrengthCaps: { free: "ECONOMY" },
+      economyCap: economyCaps(Object.fromEntries(DEBATE_ROLES.map((role) => [role, { moneyMicrosPerCall: 300, secondsPerCall: 300 }]))),
+      freeCap: caps(150) as NonNullable<PickerSettings["freeCap"]>
+    });
+    const CEILING = 50_000_000;
+    function hosted(log: (line: string) => void): Partial<RunCreationSettings> {
+      const modelPicker: AskModelPickerSettings = Object.freeze({
+        scorecard: Object.freeze({ state: "VALID" as const, scorecard, sourceRef: "test:b7b" }),
+        mode: "HOSTED" as const,
+        // One testEntry call is 1000 input tokens: `micros * 1000` per million tokens costs `micros` a call.
+        targetFacts: new Map<string, AskTargetFacts>(PANEL.map((entry) => [entry.provider_ref, Object.freeze({
+          thinkingLevels: Object.freeze([]), contextWindowTokens: null,
+          price: Object.freeze({ inputMicrosPerMTok: MICROS_PER_CALL.get(entry.model_id)! * 1000, outputMicrosPerMTok: 0 })
+        })])),
+        perRunCeilingMicros: CEILING,
+        moneyPolicy: Object.freeze({ perRunCeilingMicros: CEILING }),
+        runMaximumMicros: CEILING,
+        answerTokenCeilings: roleNumbers({}, 2048),
+        plansSold: true,
+        log
+      });
+      return {
+        modelPicker,
+        resolveDiscoveredPanel: async () => PANEL,
+        resolveEnvelopeBasis: async ({ depthParams, panelSize, backupSequencesProvisioned }) => computeStructuralCeilingBasis({
+          judgeMaxAttempts: 3, organMaxAttempts: 3, maxRecompose: 1, maxCooldownHoldsPerRun: 1, finalRetryAttempts: 1,
+          branchingFactor: 2, compositionSegmentCap: 4, fixedOrgansPerComposition: 6, reviewerCallsPerNode: 1,
+          synthesizerMaxRounds: 3, evaluatorMaxRounds: 3, maxDepth: 5,
+          panelSize, depth: Number(depthParams.depth), backupSequencesProvisioned
+        })
+      };
+    }
+    /** Phase one's START for an owner whose day window holds 10 micros. */
+    const tinyRoom: RoomPreview = Object.freeze({
+      admission: Object.freeze({ kind: "START" as const, worst: "FITS" as const, worstScope: null }),
+      estimateMicros: 700,
+      now: NOW,
+      personUses: Object.freeze([Object.freeze({
+        scope: "PERSON_DAY" as const, limitMicros: 10, usedMicros: 0, resetsAt: new Date("2026-10-02T00:00:00.000Z"), closeBasisPoints: 9_500
+      })]),
+      waitReason: Object.freeze({ waitsFor: "SITE" as const, personRecheckAt: null })
+    });
+
+    async function planned(preview: RoomPreview | undefined) {
+      const a = waitingRun({ ownerRef: OWNER }, { releaseKey: OLD_RELEASE });
+      const picker: string[] = [];
+      const { application, readmissions } = arrange({
+        pages: [[a]], steps: { [a.runId]: ["NEEDS_READMISSION", "SITE_FULL"] }, extra: hosted((line) => picker.push(line)),
+        stored: (runId) => storedAsk(runId, { askerId: `owner:${OWNER}`, contentEncrypted: true }),
+        ...(preview === undefined ? {} : { preview })
+      });
+      await application.wakeWaitingRuns();
+      const plan = readmissions[1]?.plan;
+      if (plan?.kind !== "READMIT") throw new Error(`test: expected a READMIT plan, got ${String(plan?.kind)}`);
+      return { evaluation: plan.evaluation, picker };
+    }
+
+    it("plans inside the room phase one measured: nothing fits 10 micros, so it starts person-room-tight", async () => {
+      const { evaluation, picker } = await planned(tinyRoom);
+      expect(evaluation.personRoomTight).toBe(true);
+      expect(picker).toContain("MODEL_PICKER note PERSON_ROOM_BELOW_ECONOMY");
+    });
+
+    it("(control) with no person room measured, the same plan is not person-room-tight", async () => {
+      const { evaluation, picker } = await planned(undefined);
+      expect(evaluation.personRoomTight).toBe(false);
+      expect(picker).not.toContain("MODEL_PICKER note PERSON_ROOM_BELOW_ECONOMY");
+    });
+  });
 });
 
 /**
@@ -409,6 +656,8 @@ describe("B7b AskRoom.startWaiting decides like an admission, under the same loc
     const client = {
       query: vi.fn(async (text: string, values: readonly unknown[] = []) => {
         statements.push(text.includes("pg_advisory_xact_lock") ? `LOCK:${String(values[0])}` : text);
+        // Side-by-side C11 review: the supersession edge joins the start's writes, in the order they happen.
+        if (text.includes("INSERT INTO core.run_supersession")) writes.push(`edge:${String(values[0])}->${String(values[1])}`);
         return { rows: [], rowCount: 0 };
       }),
       release: vi.fn()
@@ -536,7 +785,15 @@ describe("B7b AskRoom.startWaiting decides like an admission, under the same loc
 
   it("side-by-side C11: a run another release admitted, which the room would START, is NEEDS_READMISSION and nothing is written", async () => {
     const { askRoom, writes, reasons, statements } = room({ gate });
-    await expect(askRoom.startWaiting(stale, never)).resolves.toEqual({ kind: "NEEDS_READMISSION", planId: null });
+    // C11 review, Minor 2: with the room as measured under the lock — the owner's windows — for the plan's picker.
+    await expect(askRoom.startWaiting(stale, never)).resolves.toEqual({
+      kind: "NEEDS_READMISSION", planId: null,
+      preview: {
+        admission: expect.objectContaining({ kind: "START" }), estimateMicros: 700, now: NOW,
+        personUses: [{ scope: "PERSON_MONTH", limitMicros: 1_000, usedMicros: 0, resetsAt: MONTH_RESET, closeBasisPoints: 9_500 }],
+        waitReason: { waitsFor: "SITE", personRecheckAt: null }
+      }
+    });
     expect(writes).toEqual([]);
     expect(reasons).toEqual([]);
     expect(statements.at(-1)).toBe("COMMIT");
@@ -562,8 +819,9 @@ describe("B7b AskRoom.startWaiting decides like an admission, under the same loc
       return "job:new";
     }, { plan: readmitPlan(), createRun });
     expect(outcome).toEqual({ kind: "STARTED", runId: "new-run", value: "job:new" });
-    // The old run is never marked started: the edge takes it out of the line.
-    expect(writes).toEqual(["createRun", "hold:700", "enqueue:new-run"]);
+    // The old run is never marked started: the edge takes it out of the line. One ordered list: the new run, its edge,
+    // its hold, its first job.
+    expect(writes).toEqual(["createRun", `edge:${stale.runId}->new-run`, "hold:700", "enqueue:new-run"]);
     expect(given).toBe(client);
     const edge = statements.findIndex((text) => text.includes("INSERT INTO core.run_supersession"));
     expect(edge).toBeGreaterThan(-1);
@@ -575,7 +833,7 @@ describe("B7b AskRoom.startWaiting decides like an admission, under the same loc
   it("side-by-side C11: the hold is the plan's picked figure when it has one", async () => {
     const { askRoom, writes } = room({ gate });
     await askRoom.startWaiting(stale, async () => "job:new", { plan: readmitPlan({ holdMicros: 123 }), createRun: async () => "new-run" });
-    expect(writes).toEqual(["hold:123"]);
+    expect(writes).toEqual([`edge:${stale.runId}->new-run`, "hold:123"]);
   });
 
   it("side-by-side C11: a plan made for another billing plan is NEEDS_READMISSION again, with the plan read under the lock", async () => {

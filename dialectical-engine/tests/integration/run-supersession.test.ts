@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PoolClient } from "pg";
 import { encrypt, generateDek } from "@debateai/crypto";
 import { WorkItemRepository } from "@debateai/battery";
-import { RunRepository, RunWaitRepository, recordRunSupersession, resolveRunRef } from "@debateai/db";
+import { RunRepository, RunWaitRepository, recordRunSupersession, resolveRunRef, type StartRunInput } from "@debateai/db";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { startContentRunFixture, type ContentRunFixture } from "../support/contentRunFixture.js";
 
@@ -15,8 +15,9 @@ import { startContentRunFixture, type ContentRunFixture } from "../support/conte
  * follows the chain (at most 16 hops); core.run_waiting_v no longer lists a superseded run. The wait reasons widen with
  * SITE_BUSY and SWITCHING. A superseded run's start is refused RUN_SUPERSEDED. An owner's encrypted waiting run gets
  * its new run's key provision without a live session, once per old run while that re-admission lives (A-x1); an edge
- * links two runs of one person only; only the API's role records and resolves supersessions,
- * while both runtimes read the stamp and the release state (A-x2). CI skips this directory; run it alone.
+ * links two runs of one person only; only the API's role records and resolves supersessions and lists a waiting run's
+ * re-admissions whose START never committed (C11 review), while both runtimes read the stamp and the release state
+ * (A-x2). CI skips this directory; run it alone.
  */
 let fixture: ContentRunFixture;
 const waits = (): RunWaitRepository => new RunWaitRepository(fixture.database.pool);
@@ -44,7 +45,7 @@ async function inTransaction<T>(use: (client: PoolClient) => Promise<T>): Promis
 const ASKER = `legacy-run-supersession-${randomUUID()}`;
 
 /** A legacy run of `askerId` (re-admission copies the old run's asker into the new run, plan C11). */
-function legacyRun(askerId = ASKER): Promise<string> {
+function legacyRun(askerId = ASKER, overrides: Partial<StartRunInput> = {}): Promise<string> {
   return new RunRepository(fixture.database.pool).startRun({
     questionLine: "Should a waiting debate keep its place after an upload?",
     principal: { kind: "legacy", legacyAskerId: askerId },
@@ -63,13 +64,14 @@ function legacyRun(askerId = ASKER): Promise<string> {
     registerVersion: 1,
     batteryVersion: "run-supersession",
     askContract: {},
-    batteryRows: []
+    batteryRows: [],
+    ...overrides
   });
 }
 
 /** A legacy run that has taken its place in line (the ask's WAIT), with its SITE reason. */
-async function waitingRun(askerId = ASKER): Promise<string> {
-  const runId = await legacyRun(askerId);
+async function waitingRun(askerId = ASKER, overrides: Partial<StartRunInput> = {}): Promise<string> {
+  const runId = await legacyRun(askerId, overrides);
   await inTransaction(async (client) => {
     await waits().enterWait(client, runId, new Date());
     await waits().recordReason(client, runId, { waitsFor: "SITE", personRecheckAt: null, at: new Date() });
@@ -530,6 +532,61 @@ describe("0123 §4: the readmitted run's key provision (A-x1) and the runtime's 
     expect(await intents()).toBe(before);
   });
 
+  /**
+   * C11 review (controller ruling 2026-10-22): START commits the new run's row before the START itself, so a crash
+   * between the two, or a FAILED record that never lands, leaves a new run with no edge and no job. The API asks
+   * core.list_unstarted_readmissions under the old run's owner lease (no START in flight) and records each FAILED.
+   */
+  it("lists the re-admissions of a waiting run whose START never committed: an owner's and a legacy asker's", async () => {
+    const pool = fixture.database.pool;
+    const listed = (oldRunId: string): Promise<string[]> => asRole("debateai_billing_runtime", async (client) =>
+      (await client.query<{ run_id: string }>(
+        "SELECT listed.run_id::text AS run_id FROM core.list_unstarted_readmissions($1::uuid) AS listed(run_id)", [oldRunId]
+      )).rows.map((row) => row.run_id));
+    // An owner's: the new run is written (its binding names the old run), and nothing started it.
+    const old = await waitingEncryptedRun();
+    const orphan = randomUUID();
+    const prepared = (await prepareReadmitted(pool, old, orphan)).rows[0]!;
+    expect(await createDirectly(pool, await encryptedRunDocument(orphan, prepared.execution_ref))).toBe(true);
+    expect(await listed(old)).toEqual([orphan]);
+    await expect(new RunRepository(pool).listUnstartedReadmissions(old)).resolves.toEqual([orphan]);
+    // Recorded FAILED (plan C11's orphan path), it leaves the list, and the old run may be re-admitted again.
+    await new WorkItemRepository(pool).recordSetupFailure({
+      runId: orphan, batteryRowId: "Q1", commandKey: `S00:${orphan}:Q1`, reason: "RUN_SETUP_FAILED:READMISSION"
+    });
+    expect(await listed(old)).toEqual([]);
+    // A provision still pending has no run to record: not listed (0040's sweep removes it with its intent).
+    await prepareReadmitted(pool, old, randomUUID());
+    expect(await listed(old)).toEqual([]);
+    // A started re-admission (its edge written) is not listed.
+    const startedOld = await waitingEncryptedRun();
+    const started = randomUUID();
+    const startedPrepared = (await prepareReadmitted(pool, startedOld, started)).rows[0]!;
+    expect(await createDirectly(pool, await encryptedRunDocument(started, startedPrepared.execution_ref))).toBe(true);
+    await supersede(startedOld, started);
+    expect(await listed(startedOld)).toEqual([]);
+
+    // A legacy asker's: the plain copy of the old row (same asker, session and question) under another release, never
+    // in line, with no edge and no job. A run of another session, one under the old run's own release and one that
+    // waits are not copies of it.
+    const session = randomUUID();
+    const oldRelease = ["r16", "0123456789ab"].join("-");
+    const newRelease = ["r17", "0123456789ab"].join("-");
+    const legacyOld = await waitingRun(ASKER, { sessionId: session, releaseKey: oldRelease, registerVersion: 16 });
+    const copy = await legacyRun(ASKER, { sessionId: session, releaseKey: newRelease, registerVersion: 17 });
+    await legacyRun(ASKER, { sessionId: randomUUID(), releaseKey: newRelease, registerVersion: 17 });
+    await legacyRun(ASKER, { sessionId: session, releaseKey: oldRelease, registerVersion: 16 });
+    await waitingRun(ASKER, { sessionId: session, releaseKey: newRelease, registerVersion: 17 });
+    expect(await listed(legacyOld)).toEqual([copy]);
+    await new WorkItemRepository(pool).recordSetupFailure({
+      runId: copy, batteryRowId: "Q1", commandKey: `S00:${copy}:Q1`, reason: "RUN_SETUP_FAILED:READMISSION"
+    });
+    expect(await listed(legacyOld)).toEqual([]);
+    // A run that never waited has no unstarted re-admission; neither has an unknown id.
+    expect(await listed(await legacyRun())).toEqual([]);
+    expect(await listed(randomUUID())).toEqual([]);
+  });
+
   it("only the API's role records and resolves; both runtimes read the stamp and the release state", async () => {
     const pool = fixture.database.pool;
     const grants = (await pool.query<Record<string, boolean>>(`
@@ -548,12 +605,17 @@ describe("0123 §4: the readmitted run's key provision (A-x1) and the runtime's 
         has_function_privilege('debateai_runtime','core.prepare_readmitted_run_key_provision(uuid,uuid)','EXECUTE') AS readmit_runtime,
         has_function_privilege('public','core.prepare_readmitted_run_key_provision(uuid,uuid)','EXECUTE') AS readmit_public,
         has_function_privilege('debateai_content_provision','core.lock_readmitted_run_key_provision_for_commit(uuid,uuid,uuid,uuid)','EXECUTE') AS lock_provision,
-        has_function_privilege('public','core.lock_readmitted_run_key_provision_for_commit(uuid,uuid,uuid,uuid)','EXECUTE') AS lock_public
+        has_function_privilege('public','core.lock_readmitted_run_key_provision_for_commit(uuid,uuid,uuid,uuid)','EXECUTE') AS lock_public,
+        has_function_privilege('debateai_billing_runtime','core.list_unstarted_readmissions(uuid)','EXECUTE') AS unstarted,
+        has_function_privilege('debateai_runtime','core.list_unstarted_readmissions(uuid)','EXECUTE') AS runner_unstarted,
+        has_function_privilege('debateai_content_provision','core.list_unstarted_readmissions(uuid)','EXECUTE') AS provision_unstarted,
+        has_function_privilege('public','core.list_unstarted_readmissions(uuid)','EXECUTE') AS unstarted_public
     `)).rows[0];
     expect(grants).toEqual({
       supersession_select: true, supersession_insert: true, supersession_more: false, runner_supersession: false,
       release_key_select: true, read_current: true, read_state: true, resolve: true, runner_resolve: false, resolve_public: false,
-      readmit_provision: true, readmit_runtime: false, readmit_public: false, lock_provision: false, lock_public: false
+      readmit_provision: true, readmit_runtime: false, readmit_public: false, lock_provision: false, lock_public: false,
+      unstarted: true, runner_unstarted: false, provision_unstarted: false, unstarted_public: false
     });
     // And it works as the API's role: record an edge, resolve it, read the line, the stamp and the release state.
     const w = await waitingRun();
@@ -573,6 +635,7 @@ describe("0123 §4: the readmitted run's key provision (A-x1) and the runtime's 
       expect((await client.query("SELECT release_key FROM core.run WHERE run_id=$1", [n])).rows).toEqual([{ release_key: "legacy" }]);
       expect((await client.query("SELECT count(*)::int AS n FROM core.read_release_state('r17-0123456789ab')")).rows).toEqual([{ n: 0 }]);
       expect(codeOf(await refusal(resolveRunRef(client, w)))).toBe("42501");
+      expect(codeOf(await refusal(client.query("SELECT * FROM core.list_unstarted_readmissions($1::uuid)", [w])))).toBe("42501");
       await client.query("BEGIN");
       expect(codeOf(await refusal(recordRunSupersession(client, { oldRunId: n, newRunId: m })))).toBe("42501");
       await client.query("ROLLBACK");

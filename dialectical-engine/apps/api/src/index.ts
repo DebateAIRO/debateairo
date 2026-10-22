@@ -239,6 +239,7 @@ import {
   type AskRoomPort,
   type AskRoomReader,
   type AskWaitingLinePort,
+  type RoomPreview,
   type WaitingStart
 } from "./ask-room.js";
 import { planReadmission, readmittedArgumentLanguage, readmittedAskContract, type ReadmissionPlan } from "./readmission.js";
@@ -259,8 +260,7 @@ import {
   type EngineSettings,
   type EngineVersionPolicy,
   type LengthGuidance,
-  type LengthGuidancePolicy,
-  type PlanId
+  type LengthGuidancePolicy
 } from "@debateai/register";
 import { debateShapeForPanel, normaliseAskForDebateShape, roomDepthParams } from "./debate-shape-ask.js";
 import { engineForAsk } from "./engine-ask.js";
@@ -5040,6 +5040,14 @@ const READMISSION_SKIPS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Side-by-side C11: how far one re-admission got, so the waker handles a later throw for what it left behind. `runId`
+ * is set the moment the new run's row commits (`#readmit`): a throw after it is the orphan path. `startedRunId` (C11
+ * review) is set the moment the START that supersedes the old run committed — its edge, its hold and its first job — so
+ * only the owner lease's release can still throw, and that run must never be recorded FAILED.
+ */
+type ReadmissionProgress = { runId?: string; startedRunId?: string };
+
+/**
  * Side-by-side C11: whose new run a re-admission writes — the owner's, encrypted (content-provision pool), when the old
  * run's content was; otherwise the legacy asker's, in the clear, under the old run's own asker id.
  */
@@ -5694,6 +5702,9 @@ export class PostgresAskApplication implements AskApplication {
    * that is NOT_NOW, or made for a billing plan no longer in force, skips it (it keeps its place); a choice this release
    * no longer offers records it FAILED (`RUN_SETUP_FAILED:CHOICE_UNAVAILABLE`: "please ask again"); a START that fails
    * after the new row committed records the new run FAILED (`RUN_SETUP_FAILED:READMISSION`) and the old run waits on.
+   * C11 review: a new row whose START never committed and was never recorded FAILED (the process died in between) is
+   * recorded FAILED by a later tick, under the owner's lease (`#closeUnstartedReadmissions`), so the debate is never
+   * stranded; and a START that committed is never recorded FAILED when only the lease's release fails afterwards.
    */
   async wakeWaitingRuns(): Promise<WaitingLineTick> {
     const line = this.settings.waitingLine;
@@ -5733,13 +5744,13 @@ export class PostgresAskApplication implements AskApplication {
         persons.add(person);
         // Side-by-side C11: the first job of the run that starts — the waiting run, or the new run re-admitting it.
         const enqueue = (tx: PoolClient, runId: string) => this.#work.enqueueOn(tx, { runId, ...firstRunJob(runId), nodeSet: [] });
-        // Set the moment a re-admission's new row commits: the START can still fail after that (the orphan path).
-        const readmitted: { runId?: string } = {};
+        // How far a re-admission got: its new row committed (the orphan path), its START committed (C11 review).
+        const readmitted: ReadmissionProgress = {};
         let outcome: WaitingStart<string>;
         try {
           outcome = await line.startWaiting(run, enqueue);
           if (outcome.kind === "NEEDS_READMISSION") {
-            const second = await this.#startReadmitted(run, outcome.planId, line, enqueue, readmitted);
+            const second = await this.#startReadmitted(run, outcome, line, enqueue, readmitted);
             // NOT_NOW, or a plan made for another billing plan than the one now in force: the run keeps its place.
             if (second === null || second.kind === "NEEDS_READMISSION") {
               skipped += 1;
@@ -5748,6 +5759,19 @@ export class PostgresAskApplication implements AskApplication {
             outcome = second;
           }
         } catch (error) {
+          if (readmitted.startedRunId !== undefined) {
+            // C11 review, Minor 3: the START committed — the new run supersedes the old one, with its hold and its
+            // READY first job — and only the owner lease's release failed (as `#submitWithRoom`'s ADMISSION_RELEASE
+            // step: the decision committed, what can still fail inside the lease is its release). Recording it FAILED
+            // would end the debate, since the old run no longer waits; #redispatchStalledStarts hands its job over
+            // once it stalls.
+            failed += 1;
+            console.error(JSON.stringify(Object.freeze({
+              event: "api.wait.readmission_release_failed", runId: run.runId, newRunId: readmitted.startedRunId,
+              diagnostic: apiOperationalErrorDiagnostic(error)
+            })));
+            continue;
+          }
           if (readmitted.runId !== undefined) {
             // Side-by-side C11, the orphan path: the new row committed and the START did not. It never runs (FAILED;
             // 0123 frees the old run for the next tick), and the old run, untouched, keeps its place in line.
@@ -5760,7 +5784,8 @@ export class PostgresAskApplication implements AskApplication {
             continue;
           }
           // Side-by-side C11: 0123 refused the re-admission before anything was written — another one of this run is
-          // pending or alive (TAKEN), the run no longer waits (INVALID), its owner's account is no longer active
+          // pending or alive (TAKEN; one whose START never committed was just recorded FAILED under the lease, so the
+          // next tick re-admits), the run no longer waits (INVALID), its owner's account is no longer active
           // (OWNER_GONE) — or the run was superseded while this start waited for its lock. Not this tick's to start.
           if (error instanceof TypedDomainError && READMISSION_SKIPS.has(error.code)) {
             skipped += 1;
@@ -5827,22 +5852,29 @@ export class PostgresAskApplication implements AskApplication {
    * Side-by-side spec §4, O3 (Q1 → a; plan C task C11) — PHASE TWO OF A RE-ADMISSION, for a run another release admitted
    * that the room would start (`NEEDS_READMISSION`, nothing written). Outside every lock, the old run's stored ask is
    * read and planned under this release (`planReadmission`; its evaluation is the only place a probe may run, and only
-   * here, after the room said START). NOT_NOW, or a run with no stored ask any more, answers null: the run keeps its
-   * place. Otherwise the owner's lease is taken FIRST, as `#submitWithRoom` takes it (then the room's spend lock), and
-   * the room is asked again with the plan; `#readmit` writes the new run only if the room still says START.
+   * here, after the room said START), inside the person's room exactly as `#submitWithRoom` plans an ask
+   * (`personRoomOf(preview)`, the room phase one measured under the lock: C11 review), so the picker can step down to
+   * fit it. NOT_NOW, or a run with no stored ask any more, answers null: the run keeps its place. Otherwise the owner's
+   * lease is taken FIRST, as `#submitWithRoom` takes it (then the room's spend lock), and the room is asked again with
+   * the plan; `#readmit` writes the new run only if the room still says START.
+   * C11 review (controller ruling 2026-10-22): under that lease no START of this person is in flight, so a re-admission
+   * of this run whose START never committed is an orphan, closed FAILED (`#closeUnstartedReadmissions`) — a legacy
+   * asker's before the room is asked (it provisions no key, so nothing refuses it), an owner's when 0123 refuses TAKEN
+   * because of it (the run is then skipped; the next tick re-admits it).
    */
   async #startReadmitted(
     run: WaitingRun,
-    planId: PlanId | null,
+    first: Extract<WaitingStart<string>, { kind: "NEEDS_READMISSION" }>,
     line: AskWaitingLinePort,
     enqueue: (tx: PoolClient, runId: string) => Promise<string>,
-    readmitted: { runId?: string }
+    readmitted: ReadmissionProgress
   ): Promise<WaitingStart<string> | null> {
     const stored = await this.#runs.readStoredAsk(run.runId);
     if (stored === null) return null;
+    const personRoom = first.preview === undefined ? null : personRoomOf(first.preview);
     const plan = await planReadmission({
-      stored, planId, settings: this.settings,
-      evaluate: (ask, shapePlan) => evaluationOrRefusal(this.settings, ask, null, shapePlan)
+      stored, planId: first.planId, settings: this.settings,
+      evaluate: (ask, shapePlan) => evaluationOrRefusal(this.settings, ask, personRoom, shapePlan)
     });
     if (plan.kind === "NOT_NOW") {
       console.info(JSON.stringify(Object.freeze({ event: "api.wait.readmission_not_now", runId: run.runId, code: plan.code })));
@@ -5850,13 +5882,52 @@ export class PostgresAskApplication implements AskApplication {
     }
     const principal = readmissionPrincipalOf(run, stored);
     const admissionPool = principal.kind === "readmitted-owner" ? this.#serverAskAdmissionPool : this.#legacyAskAdmissionPool;
-    return withOwnerAskAdmissionLease(admissionPool, accessOfWaitingRun(run), (lease) => line.startWaiting(run, enqueue, {
-      plan,
-      // The room never asks an ASK_AGAIN plan for a run.
-      createRun: plan.kind === "READMIT"
-        ? () => this.#readmit(run, plan, principal, lease, readmitted)
-        : () => Promise.reject(new TypeError("ASK_ROOM_READMISSION_WITHOUT_PLAN"))
-    }));
+    return withOwnerAskAdmissionLease(admissionPool, accessOfWaitingRun(run), async (lease) => {
+      if (principal.kind === "legacy") await this.#closeUnstartedReadmissions(run.runId);
+      try {
+        const outcome = await line.startWaiting(run, enqueue, {
+          plan,
+          // The room never asks an ASK_AGAIN plan for a run.
+          createRun: plan.kind === "READMIT"
+            ? () => this.#readmit(run, plan, principal, lease, readmitted)
+            : () => Promise.reject(new TypeError("ASK_ROOM_READMISSION_WITHOUT_PLAN"))
+        });
+        // The START committed (edge, hold, first job): from here only the lease's release can throw.
+        if (outcome.kind === "STARTED") readmitted.startedRunId = outcome.runId;
+        return outcome;
+      } catch (error) {
+        if (error instanceof TypedDomainError && error.code === "RUN_READMISSION_TAKEN") {
+          await this.#closeUnstartedReadmissions(run.runId);
+        }
+        throw error;
+      }
+    });
+  }
+
+  /**
+   * Side-by-side C11 review (controller ruling 2026-10-22) — A WAITING RUN'S RE-ADMISSIONS WHOSE START NEVER
+   * COMMITTED, recorded FAILED (RUN_SETUP_FAILED:READMISSION). Called only under the old run's owner ask-admission lease, where no
+   * START of that person is in flight, so every run 0123 lists (`listUnstartedReadmissions`: no edge, no work item) is
+   * one the process left when it died between the new row and its START, or whose FAILED record never landed. Recording
+   * it frees the old run (0123's prepare then no longer refuses TAKEN). Never throws: a failed read is logged and read
+   * again under a later tick's lease; a failed record is logged by `#recordRunSetupFailure`. Ids only.
+   */
+  async #closeUnstartedReadmissions(oldRunId: string): Promise<void> {
+    let orphans: readonly string[];
+    try {
+      orphans = await this.#runs.listUnstartedReadmissions(oldRunId);
+    } catch (error) {
+      console.error(JSON.stringify(Object.freeze({
+        event: "api.wait.readmission_orphans_unread", runId: oldRunId, diagnostic: apiOperationalErrorDiagnostic(error)
+      })));
+      return;
+    }
+    for (const orphan of orphans) {
+      console.info(JSON.stringify(Object.freeze({
+        event: "api.wait.readmission_orphan", runId: oldRunId, newRunId: orphan
+      })));
+      await this.#recordRunSetupFailure(orphan, "READMISSION");
+    }
   }
 
   /**
@@ -5872,7 +5943,7 @@ export class PostgresAskApplication implements AskApplication {
     plan: Extract<ReadmissionPlan, { kind: "READMIT" }>,
     principal: ReadmissionPrincipal,
     lease: OwnerAskAdmissionLease,
-    readmitted: { runId?: string }
+    readmitted: ReadmissionProgress
   ): Promise<string> {
     const evaluation = plan.evaluation;
     const language = readmittedArgumentLanguage(plan);

@@ -676,6 +676,8 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // Side-by-side releases C11 (2026-10-22, spec 2026-10-21 §4, O3): the reviewed module after startRun's insert moved into
 // a private helper shared with the new RunRepository.startReadmittedRun (ReadmissionPrincipal, StartReadmittedRunInput).
 // migrate() is byte-identical.
+// Side-by-side releases C11 review (2026-10-22, spec 2026-10-21 §4, O3): the reviewed module after it gained
+// RunRepository.listUnstartedReadmissions (0123's core.list_unstarted_readmissions). migrate() is byte-identical.
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): migrate() CHANGED. It takes the schema-migrations advisory
 // lock for its session, runs a prologue transaction (the ledger tables, lineage, base recipe, 0108, 0110 and
 // replayForwardChain), then each pending forward step in its own transaction (withMigrationStepTransaction: 2 s lock
@@ -689,7 +691,9 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // Side-by-side integration (2026-10-22): the merged module of lane C (C10, C11) and lane 1 (A6, A7) above, pinned once.
 // Side-by-side integration fix (2026-10-22): readStoredAsk casts register_version in SQL (::integer) instead of Number()
 // (the register law bans JavaScript version coercion). migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "40831ac9288a4a5532f76855dfaf2dd464a933477d83b0176fd53e9dba25e25f";
+// Side-by-side integration round 2 (2026-10-22): the merged module after lane C's C11 review above
+// (listUnstartedReadmissions) joined the integration branch's module. migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "eb61b605427f7bc16bf9147eed029b6b790b8088093acc9a804fa6cd893d6546";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each

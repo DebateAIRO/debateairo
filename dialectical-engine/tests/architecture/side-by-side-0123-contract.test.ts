@@ -165,15 +165,34 @@ describe("0123: the side-by-side releases step", () => {
     expect(sql).toContain("CREATE UNIQUE INDEX IF NOT EXISTS run_key_provision_intent_one_readmission_idx");
     expect(sql).toContain("RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'RUN_READMISSION_TAKEN';");
     expect(sql).toContain("SIDE_BY_SIDE_READMISSION_CONTRACT_INCOMPLETE");
-    // The loader digests the table whole and the four functions; the view and the CHECK are not digested.
+    // C11 review (controller ruling 2026-10-22): the re-admissions of a waiting run whose START never committed, next
+    // to the readmitted provision it frees: a STABLE definer with the pinned path, reading the binding's marker, for the
+    // API's role alone (the waker records each FAILED under the old run's owner lease).
+    const unstartedAt = sql.indexOf("CREATE OR REPLACE FUNCTION core.list_unstarted_readmissions(p_old_run_id uuid)");
+    expect(unstartedAt).toBeGreaterThan(sql.indexOf("CREATE OR REPLACE FUNCTION core.lock_readmitted_run_key_provision_for_commit("));
+    expect(unstartedAt).toBeLessThan(sql.indexOf("-- §5. Two new wait reasons"));
+    const unstarted = sql.slice(unstartedAt, sql.indexOf("$$;", unstartedAt));
+    for (const line of ["RETURNS SETOF uuid", "STABLE", "SECURITY DEFINER", "SET search_path = pg_catalog",
+      "WHERE marked.readmitted_from_run_id = p_old_run_id",
+      "AND NOT EXISTS (SELECT 1 FROM core.work_item AS work WHERE work.run_id = marked.run_id)"]) {
+      expect(unstarted).toContain(line);
+    }
+    expect(sql).toContain("REVOKE ALL ON FUNCTION core.list_unstarted_readmissions(uuid) FROM PUBLIC;");
+    expect(sql).toContain("GRANT EXECUTE ON FUNCTION core.list_unstarted_readmissions(uuid) TO debateai_billing_runtime;");
+    expect(sql.match(/GRANT [^;]*core\.list_unstarted_readmissions[^;]*;/gu)).toEqual([
+      "GRANT EXECUTE ON FUNCTION core.list_unstarted_readmissions(uuid) TO debateai_billing_runtime;"
+    ]);
+    // The loader digests the table whole and the six functions; the view and the CHECK are not digested.
     const loader = read("packages/db/src/migration-forward0123.ts");
     expect(loader).toContain("const TABLES=['core.release_event','core.run_supersession',"); // §7 appends the waiver
     for (const signature of ["core.guard_run_supersession()", "core.resolve_run_ref(uuid)", "core.refuse_starting_superseded_run()",
-      "core.prepare_readmitted_run_key_provision(uuid,uuid)", "core.lock_readmitted_run_key_provision_for_commit(uuid,uuid,uuid,uuid)"]) {
+      "core.prepare_readmitted_run_key_provision(uuid,uuid)", "core.lock_readmitted_run_key_provision_for_commit(uuid,uuid,uuid,uuid)",
+      "core.list_unstarted_readmissions(uuid)"]) {
       expect(loader).toContain(`'${signature}'`);
     }
     expect(loader).toContain("const VIEWS=['core.release_state_v'] as const;");
     expect(read("packages/db/src/index.ts")).toContain('"core.prepare_readmitted_run_key_provision(uuid,uuid)"');
+    expect(read("packages/db/src/index.ts")).toContain("FROM core.list_unstarted_readmissions($1::uuid) AS listed(run_id)");
   });
 
   it("§5 widens the wait reasons with SITE_BUSY and SWITCHING, NOT VALID then validated", () => {

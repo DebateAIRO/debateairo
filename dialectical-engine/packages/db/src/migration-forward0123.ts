@@ -14,7 +14,8 @@ import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-cha
  * core.guard_run_supersession(), the start guard core.refuse_starting_superseded_run() (its trigger on
  * core.run_wait_start is checked by the closing block), core.resolve_run_ref(uuid), the readmitted run's key provision
  * and its commit lock, the marker columns on core.run_key_provision_intent and identity.run_execution_binding (one live
- * re-admission per old run), and redefines core.run_waiting_v; §5 widens core.run_wait_reason's waits_for CHECK; §6
+ * re-admission per old run), core.list_unstarted_readmissions(uuid) (the re-admissions whose START never committed,
+ * plan C11 review), and redefines core.run_waiting_v; §5 widens core.run_wait_reason's waits_for CHECK; §6
  * redefines in place the five funding functions that tied a grant to the selection's or the run's version (billing's
  * reserve_internal_provider_call, read_internal_run_state, read_internal_allowance and guard_internal_charge_scope, and
  * staff.revoke_internal_allowance), and staff.read_self_allowance_command so a revoke names its grant's own version,
@@ -37,11 +38,11 @@ const COLUMNS=['core.run.release_key','core.run_key_provision_intent.readmitted_
 /** §1: the CHECKs 0123 adds, as table.constraint. */
 const CONSTRAINTS=['core.run.run_release_key_shape'] as const;
 /**
- * §2: the function 0123 redefines in place, §3: the four it adds, §4: the five it adds, §6: the one it adds (whole: owner,
- * definer, path, volatility, definition, ACL).
+ * §2: the function 0123 redefines in place, §3: the four it adds, §4: the six it adds, §6: the one it adds (whole:
+ * owner, definer, path, volatility, definition, ACL).
  */
 const FUNCTIONS=['core.create_encrypted_run(jsonb,uuid,uuid,jsonb)','core.guard_run_supersession()',
- 'core.lock_readmitted_run_key_provision_for_commit(uuid,uuid,uuid,uuid)',
+ 'core.list_unstarted_readmissions(uuid)','core.lock_readmitted_run_key_provision_for_commit(uuid,uuid,uuid,uuid)',
  'core.prepare_readmitted_run_key_provision(uuid,uuid)','core.read_current_release()','core.read_release_state(text)',
  'core.record_release_event(text,text,text,text)','core.record_release_switch(text,text,timestamptz,text,bigint)',
  'core.refuse_starting_superseded_run()','core.resolve_run_ref(uuid)','staff.read_internal_funding_policy_at(bigint)'] as const;
