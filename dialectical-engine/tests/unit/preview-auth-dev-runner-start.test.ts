@@ -1,6 +1,6 @@
 // GAP-RUNNER (2026-10-09): the reviewed start mode of deploy/preview-auth-dev/v1/launch-runner.mjs,
 // its content-free startup event, the runner's narrowed environment and its unit template.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -228,6 +228,40 @@ describe('the real readiness seam', () => {
     expect(heard).toEqual([announced]);
     expect((heard[0] as { releaseKey?: unknown }).releaseKey).toBe('r1-0123456789ab');
     expect(Object.isFrozen(heard[0])).toBe(true);
+  });
+
+  // Side-by-side spec §10 (D16b): on the public server the runner runs without a launcher, and root's release tool reads
+  // its start from the unit's journal: the runner's own `DEBATEAI_RUNNER_READY {json}` line (VPS_LAYOUT.startedLines).
+  it('the runner prints its ready message on stdout as the line the public server reads, beside the in-process event', async () => {
+    const common = await import('../../deploy/' + 'preview-lifecycle/v1/common.mjs');
+    const lines: string[] = [];
+    const heard: unknown[] = [];
+    const listener = (value: unknown) => heard.push(value);
+    process.once(RUNNER_READY_PROCESS_EVENT, listener);
+    const announced = { ...ready, registerVersion: '20', releaseKey: 'r20-0123456789ab', startupDispatched: 2 };
+    announceRunnerReady(announced as never, line => lines.push(line));
+    expect(heard).toEqual([announced]);
+    expect(lines).toHaveLength(1);
+    const prefix = `${common.VPS_LAYOUT.startedLines.runner} `;
+    expect(lines[0]!.startsWith(prefix)).toBe(true);
+    expect(lines[0]!.endsWith('\n')).toBe(true);
+    expect(lines[0]!.slice(0, -1)).not.toContain('\n');
+    expect(JSON.parse(lines[0]!.slice(prefix.length))).toEqual(announced);
+    // The preview keeps its own start line: its launcher's PREVIEW_RUNNER_STARTED, never this one.
+    expect(common.LAYOUT.startedLines.runner).toBe('PREVIEW_RUNNER_STARTED');
+  });
+
+  it('by default the ready line goes to stdout', () => {
+    const written: unknown[] = [];
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation(chunk => { written.push(chunk); return true; });
+    const listener = () => {};
+    process.once(RUNNER_READY_PROCESS_EVENT, listener);
+    try {
+      announceRunnerReady({ ...ready, releaseKey: 'r12-0123456789ab' } as never);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(written).toEqual([`DEBATEAI_RUNNER_READY ${JSON.stringify({ ...ready, releaseKey: 'r12-0123456789ab' })}\n`]);
   });
 
   // Side-by-side spec §4: the launcher hears the runner's self-retirement as the same in-process event it emits.
