@@ -3246,17 +3246,36 @@ the company's name (`legalName`), its registered office (`registeredOffice`) and
 (`emails.general`), so until each is filled the API refuses with `BILLING_COMPANY_FACTS_UNVERIFIED:legalName`,
 `BILLING_COMPANY_FACTS_UNVERIFIED:registeredOffice` or `BILLING_COMPANY_FACTS_UNVERIFIED:emails.general`.
 
-**The card marks and NETOPIA's mark.** Put the official Visa and Mastercard artwork at
-`apps/ui/public/payment-marks/visa.svg` and `apps/ui/public/payment-marks/mastercard.svg`. The footer shows a mark only
-when its file is there. The website reads
-the list of files in that folder only when it starts, so after copying the files in, restart it with
-`systemctl restart debateai-ui@$label`. Until then the footer shows them as broken images. No rebuild is needed.
+**NETOPIA's mark and the card marks.** NETOPIA's shop approval asks for NETOPIA's own mark beside the Visa and
+Mastercard marks, in the footer and on the checkout (under its Continue button). Their official files are never in the
+repository or a release folder: the repository is public, the brands' terms forbid redistributing their artwork, and a
+release folder must equal git exactly. Root keeps them in `/etc/debateai/payment-marks/` as `netopia.svg`, `visa.svg`
+and `mastercard.svg`, and Caddy serves them at `/payment-marks/<name>.svg` (§6).
 
-NETOPIA's shop approval also asks for NETOPIA's own mark beside the card marks, in the footer and on the checkout.
-Keep its official artwork at `apps/ui/public/payment-marks/netopia.svg` with the other two. The footer and the checkout
-(under its Continue button) show NETOPIA's mark first, then Visa and Mastercard, each only when its file is there, so
-put all three files in place, and restart the website as above, before NETOPIA checks the site (go-live rows 17 and
-N-23).
+On the public server, as root, create the folder once with
+`install -d -m 0755 -o root -g root /etc/debateai/payment-marks`. Then copy each official file in, for example
+`install -m 0644 -o root -g root <file> /etc/debateai/payment-marks/visa.svg`, where `<file>` is the official file
+you received. Do the same for `/etc/debateai/payment-marks/mastercard.svg` and
+`/etc/debateai/payment-marks/netopia.svg`. Caddy serves a file as soon as it is there, with no restart; §6's check
+prints `200 image/svg+xml` for it.
+
+Then tell the website which marks to show: add one line to `/etc/debateai/ui.env` that names the marks whose files are
+in the folder, separated by commas, for example `PAYMENT_MARKS_AVAILABLE=visa,mastercard`. The website reads this line
+only when it starts. So restart the current release's website (`systemctl restart debateai-ui@$label`, §5 "The
+current release"; its pages wait a few seconds while it starts), or let the next release pick the line up. Then look
+at the footer of any page and at the checkout.
+
+A name in the line whose file is not in the folder shows a broken image, so copy the file in first and add its name
+after. The order of the names does not matter: the footer and the checkout always show NETOPIA's mark first, then
+Visa and Mastercard. When NETOPIA's official logo arrives, copy it in as `netopia.svg`, then add `netopia` to the
+line (`PAYMENT_MARKS_AVAILABLE=netopia,visa,mastercard`) and restart the website as above. All three must show before
+NETOPIA checks the site (go-live rows 17 and N-23).
+
+**On the test site** the folder is `/etc/debateai-v3-preview/public/payment-marks/`. The preview release guide
+(`deploy/preview-release/v1/README.md`, section "Payment marks: the files and Caddy's rule") has the steps: PM1 copies
+the files in, PM2 adds Caddy's rule, and SB5b adds the line to the new release's own ui file. Never add the line to
+the ui file of a release older than T+1 (the guide's "Side-by-side release (from T+1)"): its website would refuse to
+start.
 
 **What NETOPIA checks on the site before it approves the shop.** NETOPIA looks at the live site (or at the test
 server, if it agrees: go-live row N-26) before it lets the POS take real payments. Make sure each of these is there and
