@@ -108,7 +108,20 @@ describe('the website\'s model list: one reviewed value per stage of the switch-
   ['the multi-model value with the all-models config',MULTI_FLAG,apiConfig({free_model_ids:ALL_FIVE,premium_model_ids:ALL_FIVE,anthropic_budget_socket:ANTHROPIC_SOCKET}),false],
   ['no API config',LEGACY_FLAG,undefined,false],
   ['an API config that is not JSON',LEGACY_FLAG,'{',false],
-  ['an unreviewed website list that matches the config',JSON.stringify([GLM,DEEPSEEK]),apiConfig({free_model_ids:[GLM,DEEPSEEK]}),false]
+  ['an unreviewed website list that matches the config',JSON.stringify([GLM,DEEPSEEK]),apiConfig({free_model_ids:[GLM,DEEPSEEK]}),false],
+  // Addition D14/D24 items 5-6 (owner 2026-10-22): the sockets-only API config names no line-up (it lives in the settings
+  // version), so any reviewed website list matches it; the list only feeds the new-debate page's fallback and the ask ceiling.
+  ['the legacy array with the sockets-only config',LEGACY_FLAG,apiConfig({}),true],
+  ['the two-list value with the sockets-only config',MULTI_FLAG,apiConfig({}),true],
+  ['the all-models value with the sockets-only config',ALL_FLAG,apiConfig({}),true],
+  ['the legacy array with the sockets-only config plus the Anthropic socket',LEGACY_FLAG,apiConfig({anthropic_budget_socket:ANTHROPIC_SOCKET}),true],
+  ['the two-list value with the sockets-only config plus the Anthropic socket',MULTI_FLAG,apiConfig({anthropic_budget_socket:ANTHROPIC_SOCKET}),true],
+  ['the all-models value with the sockets-only config plus the Anthropic socket',ALL_FLAG,apiConfig({anthropic_budget_socket:ANTHROPIC_SOCKET}),true],
+  ['an unreviewed website list with the sockets-only config',JSON.stringify([GLM,DEEPSEEK]),apiConfig({}),false],
+  ['an unreviewed two-list value with the sockets-only config',JSON.stringify({free:ALL_FIVE.slice(0,4),premium:ALL_FIVE.slice(0,4)}),apiConfig({anthropic_budget_socket:ANTHROPIC_SOCKET}),false],
+  ['the sockets-only config with a thinking_levels table (no line-up to apply it to)',LEGACY_FLAG,apiConfig({thinking_levels:{[GLM]:{level:'high'}}}),false],
+  ['the sockets-only config with an extra key',ALL_FLAG,apiConfig({extra:true}),false],
+  ['the sockets-only config missing its scope',LEGACY_FLAG,JSON.stringify({deployment:'v3-preview',requested_thinking_level:'high',budget_socket:'/run/debateai-v3-preview/deepinfra-budget-v3.sock'}),false]
  ])('the stage check: %s',(_name,flag,config,expected)=>{expect(env.uiRosterMatchesApiConfig(flag,config)).toBe(expected);});
 });
 
@@ -135,7 +148,10 @@ describe('hosted preview environment', async () => {
   ['hosted with NETOPIA\'s other sandbox base', { ...NETOPIA, ...INVOICING, NETOPIA_API_BASE_URL: 'https://secure.sandbox.netopia-payments.com' }],
   // B3a (NETOPIA answers 2026-10-21): the optional spool of NETOPIA messages the database could not store.
   ['hosted with NETOPIA\'s sandbox alone and the billing notice spool', { ...NETOPIA, BILLING_NOTICE_SPOOL_PATH: SPOOL }],
-  ['hosted with the whole billing group and the billing notice spool', { ...NETOPIA, ...INVOICING, BILLING_NOTICE_SPOOL_PATH: SPOOL }]
+  ['hosted with the whole billing group and the billing notice spool', { ...NETOPIA, ...INVOICING, BILLING_NOTICE_SPOOL_PATH: SPOOL }],
+  // Addition D14 (owner 2026-10-22): the preview configuration may carry only the gate part (the line-up lives in settings).
+  ['hosted with the sockets-only preview configuration', { PREVIEW_PROVIDER_TEST_CONFIG_JSON: JSON.stringify({ deployment: 'v3-preview', requested_thinking_level: 'high',
+   budget_socket: '/run/debateai-v3-preview/team-budget-v2.sock', anthropic_budget_socket: '/run/debateai-v3-preview/anthropic-budget-v1.sock', scope_id: 'preview-team-v2-20261009' }) }]
  ])('admits %s', (_name, patch) => {
   const result = narrow({ ...hosted(), ...patch });
   expect(result.deploymentMode).toBe('hosted');

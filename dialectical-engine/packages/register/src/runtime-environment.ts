@@ -1,4 +1,4 @@
-import { parsePreviewProviderTestConfig, parsePreviewTeamUserIds } from "@debateai/providers";
+import { parsePreviewEnvironmentConfig, parsePreviewProviderTestConfig, parsePreviewTeamUserIds } from "@debateai/providers";
 import { isAbsolute } from "node:path";
 import { internalAllowancePolicyFromValue } from "./internal-allowance-policy.js";
 import {
@@ -769,9 +769,32 @@ export function parseApiEnvironment(
 ) {
   const staffAccess = parseStaffAccessEnvironment(source);
   const environment = validateApiEnvironment(parseEnvironmentSource(apiEnvironmentShape, source));
-  const previewConfig = parsePreviewProviderTestConfig(source.PREVIEW_PROVIDER_TEST_CONFIG_JSON);
-  return { ...environment, STAFF_ACCESS: staffAccess, PREVIEW_PROVIDER_TEST_CONFIG: previewConfig,
-    PREVIEW_TEAM_USER_IDS: parsePreviewTeamUserIds(environment.PREVIEW_TEAM_USER_IDS_JSON, previewConfig !== undefined) };
+  const preview = parsePreviewEnvironment(source.PREVIEW_PROVIDER_TEST_CONFIG_JSON);
+  return { ...environment, STAFF_ACCESS: staffAccess, ...preview,
+    PREVIEW_TEAM_USER_IDS: parsePreviewTeamUserIds(environment.PREVIEW_TEAM_USER_IDS_JSON, preview.PREVIEW_GATE_SETTINGS !== undefined) };
+}
+
+/**
+ * Side-by-side spec §13 ADDITION D13-D14 (owner 2026-10-22): the one preview variable, PREVIEW_PROVIDER_TEST_CONFIG_JSON,
+ * parsed for the API and the runner alike (no new variable). It may carry the gate part with a line-up (the two old
+ * forms) or the gate part alone (the sockets-only form: the line-up then lives in the settings version,
+ * previewLineUpPolicy). Three parsed keys:
+ * - PREVIEW_GATE_SETTINGS: the gate part (deployment, wire word, sockets, scope), present for every form; "is this the
+ *   preview?" keys on it (the team rule, the hosted preview's check, the runner launcher's start rule);
+ * - PREVIEW_ENV_LINE_UP: the old forms' rosters and table (the fallback for a settings version without the row, D14),
+ *   null for the sockets-only form;
+ * - PREVIEW_PROVIDER_TEST_CONFIG: exactly today's parse of the two old forms (parsePreviewProviderTestConfig, unchanged),
+ *   undefined for the sockets-only form (its readers move to the per-version line-up in SA4/SA6).
+ * All three are undefined without the variable. A refused value throws the parsers' own codes, as before; whether a
+ * sockets-only value may boot beside a given site version is the boot's decision (D15), not this parse's.
+ */
+function parsePreviewEnvironment(source: string | undefined) {
+  const parsed = parsePreviewEnvironmentConfig(source);
+  return {
+    PREVIEW_GATE_SETTINGS: parsed?.gate,
+    PREVIEW_ENV_LINE_UP: parsed?.envLineUp,
+    PREVIEW_PROVIDER_TEST_CONFIG: parsed === undefined || parsed.envLineUp === null ? undefined : parsePreviewProviderTestConfig(source)
+  };
 }
 
 /** NETOPIA (spec 2026-10-05 §2.17.1): the payment system's four settings, in the order a missing one is reported. */
@@ -1065,15 +1088,16 @@ export function parseRunnerEnvironment(source: EnvironmentSource) {
     throw new TypeError("RUNNER_PRIMARY_PROVIDER_KEYS_INCOMPLETE");
   }
   assertProductionFloors(environment);
-  const previewConfig = parsePreviewProviderTestConfig(environment.PREVIEW_PROVIDER_TEST_CONFIG_JSON);
-  const previewTeamUserIds = parsePreviewTeamUserIds(environment.PREVIEW_TEAM_USER_IDS_JSON, previewConfig !== undefined);
+  // Addition D14: the gate part, the env line-up and today's config (parsePreviewEnvironment, the API's same parse).
+  const preview = parsePreviewEnvironment(environment.PREVIEW_PROVIDER_TEST_CONFIG_JSON);
+  const previewTeamUserIds = parsePreviewTeamUserIds(environment.PREVIEW_TEAM_USER_IDS_JSON, preview.PREVIEW_GATE_SETTINGS !== undefined);
   const deploymentMode = resolveDeploymentMode(environment.DEBATEAI_DEPLOYMENT_MODE, environment.NODE_ENV);
   // Side-by-side §1: the same check as the API's, so a runner never serves under another release's name.
   const releaseKey = assertReleaseKeyForRegister(environment.RELEASE_KEY, environment.REGISTER_VERSION, deploymentMode);
   return {
     ...environment,
     RELEASE_KEY: releaseKey,
-    PREVIEW_PROVIDER_TEST_CONFIG: previewConfig,
+    ...preview,
     PREVIEW_TEAM_USER_IDS: previewTeamUserIds,
     DEPLOYMENT_MODE: deploymentMode
   };

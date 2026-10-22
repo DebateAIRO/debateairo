@@ -57,8 +57,9 @@ export async function launchRunner(argv) {
  const selected=narrowEnvironment('runner',configured,runtime,plan.publication,plan);
  // Starting is preview-only: the start-up team gate is off without the preview configuration, so
  // a start without it (or with no team) is refused here rather than run without the team rule.
+ // Addition D14: the configuration's gate part (PREVIEW_GATE_SETTINGS) is present for all three forms, sockets-only included.
  const parsed=runtime.parseRunnerEnvironment(configured);
- if(parsed.PREVIEW_PROVIDER_TEST_CONFIG===undefined||!Array.isArray(parsed.PREVIEW_TEAM_USER_IDS)||parsed.PREVIEW_TEAM_USER_IDS.length===0)refuse('PREVIEW_RUNNER_TEAM_REQUIRED');
+ if(parsed.PREVIEW_GATE_SETTINGS===undefined||!Array.isArray(parsed.PREVIEW_TEAM_USER_IDS)||parsed.PREVIEW_TEAM_USER_IDS.length===0)refuse('PREVIEW_RUNNER_TEAM_REQUIRED');
  const verify=await tsImport('./verify-native.ts',import.meta.url);
  await verify.assertSelectedRunnerConnection(configured,plan.publication);
  const entry=join(engine,'apps/runner/src/main.ts'),main=source.files.find(file=>file.path==='dialectical-engine/apps/runner/src/main.ts');

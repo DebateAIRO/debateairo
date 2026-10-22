@@ -9,6 +9,8 @@
  *  - OK, then one row per AI: its usual level and its step overrides (an entry for a model not on this config's rosters
  *    is accepted, and the row says it is unused), or
  *  - the parser's exact refusal: PREVIEW_THINKING_LEVELS_INVALID:<detail> or PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID.
+ * Addition D14 (owner 2026-10-22): a sockets-only value (the gate part alone) carries no line-up and so no table: it prints
+ * OK and says the line-up lives in the settings version (previewLineUpPolicy).
  * Exit 0 OK, 1 the value is refused, 2 the check could not run (no value, two values, an unreadable file, a key-shaped
  * value). It sends nothing and reads no environment. OK prints only model ids, level words and step names (all checked
  * against the reviewed rows); a refusal's detail may name the unreviewed table key or step word it refuses, with every
@@ -21,6 +23,7 @@ import { pathToFileURL } from "node:url";
 import {
   PREVIEW_THINKING_LEVELS_INVALID,
   PREVIEW_THINKING_STEPS,
+  parsePreviewEnvironmentConfig,
   parsePreviewProviderTestConfig,
   previewModelRow,
   type PreviewProviderTestConfig
@@ -30,6 +33,7 @@ import { settingsValueIsKeyShaped } from "./practice-settings.js";
 
 const KEY = "PREVIEW_PROVIDER_TEST_CONFIG_JSON";
 const CONFIG_INVALID = "PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID";
+const SOCKETS_ONLY_NOTE = "No line-up in this setting: it lives in the settings version (previewLineUpPolicy).";
 const USAGE = "usage: check-thinking-levels.ts [--settings <settings.env>]  (without --settings: the value on stdin)";
 
 export type ThinkingLevelsCheck = Readonly<{ exitCode: 0 | 1 | 2; lines: readonly string[] }>;
@@ -74,6 +78,8 @@ export function checkThinkingLevels(text: string): ThinkingLevelsCheck {
   if (settingsValueIsKeyShaped(value)) return refused(`${KEY} holds something key-shaped (nothing of it printed)`);
   let config: PreviewProviderTestConfig | undefined;
   try {
+    // Addition D14: the env's three forms, read by the boot's own parser; the sockets-only form has no line-up here.
+    if (parsePreviewEnvironmentConfig(value)?.envLineUp === null) return Object.freeze({ exitCode: 0, lines: Object.freeze(["OK", SOCKETS_ONLY_NOTE]) });
     config = parsePreviewProviderTestConfig(value);
   } catch (error) {
     const message = error instanceof Error ? error.message : "";

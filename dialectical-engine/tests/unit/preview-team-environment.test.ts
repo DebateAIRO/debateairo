@@ -4,8 +4,8 @@
 // refuses to boot (it must never silently apply to the real site); missing or empty with
 // the preview boots and refuses every ask at request time (fail closed).
 import { describe, expect, it } from "vitest";
-import { API_ENVIRONMENT_KEYS, parseApiEnvironment } from "../../packages/register/src/runtime-environment.js";
-import { validApiEnvironmentFixture } from "../support/apiEnvironmentFixture.js";
+import { API_ENVIRONMENT_KEYS, parseApiEnvironment, parseRunnerEnvironment } from "../../packages/register/src/runtime-environment.js";
+import { validApiEnvironmentFixture, validRunnerEnvironmentFixture } from "../support/apiEnvironmentFixture.js";
 
 const PREVIEW = JSON.stringify({
   deployment: "v3-preview", free_model_ids: ["zai-org/GLM-5.3-Flash"], requested_thinking_level: "high",
@@ -75,6 +75,64 @@ describe("PREVIEW_TEAM_USER_IDS_JSON", () => {
 
   it("is absent on the real site, where no team rule exists", () => {
     expect(parse({}).PREVIEW_TEAM_USER_IDS).toBeUndefined();
+  });
+});
+
+// Side-by-side §13 ADDITION D14 (owner 2026-10-22): the same variable may carry only the gate part (the sockets-only
+// form); the line-up then lives in the settings version (previewLineUpPolicy). Both processes parse it into the gate part
+// (PREVIEW_GATE_SETTINGS) and the env line-up (PREVIEW_ENV_LINE_UP, null for the sockets-only form);
+// PREVIEW_PROVIDER_TEST_CONFIG stays exactly today's parse of the two old forms and is undefined for the new one.
+describe("the env setting's three forms, in both parsed environments (addition D14)", () => {
+  const GLM = "zai-org/GLM-5.3-Flash", DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash", QWEN = "Qwen/Qwen3.8-Flash";
+  const DEEPINFRA_SOCKET = "/run/debateai-v3-preview/provider-budget.sock";
+  const ANTHROPIC_SOCKET = "/run/debateai-v3-preview/anthropic-budget-v1.sock";
+  const GATE = { deployment: "v3-preview", requested_thinking_level: "high", budget_socket: DEEPINFRA_SOCKET, scope_id: "fixture" };
+  const SOCKETS_ONLY = JSON.stringify({ ...GATE, anthropic_budget_socket: ANTHROPIC_SOCKET });
+  const ROSTERS = JSON.stringify({ ...GATE, free_model_ids: [GLM, DEEPSEEK], premium_model_ids: [GLM, DEEPSEEK, QWEN],
+    thinking_levels: { [QWEN]: { level: "low" } } });
+  const parsers = [
+    ["API", (extra: Record<string, string>) => parseApiEnvironment({ ...validApiEnvironmentFixture(), ...extra })],
+    ["runner", (extra: Record<string, string>) => parseRunnerEnvironment({ ...validRunnerEnvironmentFixture(), ...extra })]
+  ] as const;
+
+  it.each(parsers)("%s: the sockets-only form carries the gate part, no env line-up, no old config, and admits the team", (_name, parseWith) => {
+    const parsed = parseWith({ PREVIEW_PROVIDER_TEST_CONFIG_JSON: SOCKETS_ONLY, PREVIEW_TEAM_USER_IDS_JSON: JSON.stringify([ALICE]) });
+    expect(parsed.PREVIEW_GATE_SETTINGS).toEqual({ ...GATE, anthropic_budget_socket: ANTHROPIC_SOCKET });
+    expect(Object.isFrozen(parsed.PREVIEW_GATE_SETTINGS)).toBe(true);
+    expect(parsed.PREVIEW_ENV_LINE_UP).toBeNull();
+    expect(parsed.PREVIEW_PROVIDER_TEST_CONFIG).toBeUndefined();
+    expect(parsed.PREVIEW_TEAM_USER_IDS).toEqual([ALICE]);
+    // Without the team value the preview still boots with an empty team (every ask refused later), as today.
+    expect(parseWith({ PREVIEW_PROVIDER_TEST_CONFIG_JSON: JSON.stringify(GATE) }).PREVIEW_TEAM_USER_IDS).toEqual([]);
+  });
+
+  it.each(parsers)("%s: an old-form value carries all three, the env line-up equal to its rosters and table", (_name, parseWith) => {
+    for (const [source, free, premium, table] of [
+      [PREVIEW, [GLM], [GLM], null],
+      [ROSTERS, [GLM, DEEPSEEK], [GLM, DEEPSEEK, QWEN], { [QWEN]: { level: "low" } }]
+    ] as const) {
+      const parsed = parseWith({ PREVIEW_PROVIDER_TEST_CONFIG_JSON: source, PREVIEW_TEAM_USER_IDS_JSON: JSON.stringify([BOB]) });
+      expect(parsed.PREVIEW_GATE_SETTINGS).toEqual(GATE);
+      expect(parsed.PREVIEW_PROVIDER_TEST_CONFIG?.free_model_ids).toEqual(free);
+      expect(parsed.PREVIEW_PROVIDER_TEST_CONFIG?.premium_model_ids).toEqual(premium);
+      expect(parsed.PREVIEW_ENV_LINE_UP).toEqual({ free_model_ids: free, premium_model_ids: premium, thinking_levels: table });
+      expect(parsed.PREVIEW_ENV_LINE_UP?.free_model_ids).toEqual(parsed.PREVIEW_PROVIDER_TEST_CONFIG?.free_model_ids);
+      expect(parsed.PREVIEW_ENV_LINE_UP?.thinking_levels ?? undefined).toEqual(parsed.PREVIEW_PROVIDER_TEST_CONFIG?.thinking_levels);
+      expect(parsed.PREVIEW_TEAM_USER_IDS).toEqual([BOB]);
+    }
+  });
+
+  it.each(parsers)("%s: without the variable all three are absent, and a team value still refuses to boot", (_name, parseWith) => {
+    const parsed = parseWith({});
+    expect(parsed.PREVIEW_GATE_SETTINGS).toBeUndefined();
+    expect(parsed.PREVIEW_ENV_LINE_UP).toBeUndefined();
+    expect(parsed.PREVIEW_PROVIDER_TEST_CONFIG).toBeUndefined();
+    expect(() => parseWith({ PREVIEW_TEAM_USER_IDS_JSON: "[]" })).toThrow("PREVIEW_TEAM_USER_IDS_WITHOUT_PREVIEW");
+  });
+
+  it.each(parsers)("%s: a sockets-only value with a table (no line-up to apply it to) refuses to boot", (_name, parseWith) => {
+    expect(() => parseWith({ PREVIEW_PROVIDER_TEST_CONFIG_JSON: JSON.stringify({ ...GATE, thinking_levels: { [GLM]: { level: "high" } } }) }))
+      .toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
   });
 });
 

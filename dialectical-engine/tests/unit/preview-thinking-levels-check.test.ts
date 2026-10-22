@@ -91,6 +91,19 @@ describe("check-thinking-levels: the offline table check (spec 2026-10-12 §4.2)
     }
   });
 
+  // Addition D14 (owner 2026-10-22): the setting may carry only the gate part; the line-up and its table then live in the
+  // settings version (previewLineUpPolicy), so there is no table here to check.
+  it("a sockets-only value: OK, and it says the line-up lives in the settings version, exit 0", () => {
+    const { free_model_ids: _free, premium_model_ids: _premium, ...gate } = BASE;
+    const expected = { exitCode: 0, lines: ["OK", "No line-up in this setting: it lives in the settings version (previewLineUpPolicy)."] };
+    expect(checkThinkingLevels(line(gate))).toEqual(expected);
+    const { anthropic_budget_socket: _anthropic, ...deepinfraOnly } = gate;
+    expect(checkThinkingLevels(`${JSON.stringify(deepinfraOnly)}\n`)).toEqual(expected);
+    // A table with no line-up to apply it to is the parser's refusal, as at boot.
+    expect(checkThinkingLevels(line({ ...gate, thinking_levels: { [GLM]: { level: "low" } } })))
+      .toEqual({ exitCode: 1, lines: ["PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID"] });
+  });
+
   it("refuses no value, or two values", () => {
     expect(checkThinkingLevels("NODE_ENV=production")).toEqual({ exitCode: 2,
       lines: ["CHECK_REFUSED: no PREVIEW_PROVIDER_TEST_CONFIG_JSON= line (or bare JSON) found"] });
