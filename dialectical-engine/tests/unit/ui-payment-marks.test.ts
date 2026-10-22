@@ -1,35 +1,35 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { availablePaymentMarks } from "../../apps/ui/lib/billing/paymentMarks.js";
+import { availablePaymentMarks, PAYMENT_MARK_NAMES, PAYMENT_MARKS_SETTING } from "../../apps/ui/lib/billing/paymentMarks.js";
 
-describe("P21, N25b NETOPIA's, Visa's and Mastercard's marks appear only when the owner's files are there", () => {
-  it("finds them from the UI's own directory and from the repository root, and reports each one", () => {
-    const root = mkdtempSync(join(tmpdir(), "debateai-marks-"));
-    try {
-      expect(availablePaymentMarks(root)).toEqual({ netopia: false, visa: false, mastercard: false });
-      mkdirSync(join(root, "apps/ui/public/payment-marks"), { recursive: true });
-      writeFileSync(join(root, "apps/ui/public/payment-marks/visa.svg"), "<svg/>");
-      expect(availablePaymentMarks(root)).toEqual({ netopia: false, visa: true, mastercard: false });
-      mkdirSync(join(root, "ui/public/payment-marks"), { recursive: true });
-      writeFileSync(join(root, "ui/public/payment-marks/mastercard.svg"), "<svg/>");
-      writeFileSync(join(root, "ui/public/payment-marks/visa.svg"), "<svg/>");
-      expect(availablePaymentMarks(join(root, "ui"))).toEqual({ netopia: false, visa: true, mastercard: true });
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
+const NONE = { netopia: false, visa: false, mastercard: false };
+const marks = (value: string) => availablePaymentMarks({ PAYMENT_MARKS_AVAILABLE: value });
+
+describe("P21, N25b NETOPIA's, Visa's and Mastercard's marks appear only when the server's PAYMENT_MARKS_AVAILABLE setting names them", () => {
+  it("shows nothing when the setting is absent or empty", () => {
+    expect(availablePaymentMarks({})).toEqual(NONE);
+    expect(marks("")).toEqual(NONE);
   });
 
-  it("finds NETOPIA's mark on its own (spec §2.18), and none of the three without their files", () => {
-    const root = mkdtempSync(join(tmpdir(), "debateai-marks-"));
-    try {
-      mkdirSync(join(root, "public/payment-marks"), { recursive: true });
-      expect(availablePaymentMarks(root)).toEqual({ netopia: false, visa: false, mastercard: false });
-      writeFileSync(join(root, "public/payment-marks/netopia.svg"), "<svg/>");
-      expect(availablePaymentMarks(root)).toEqual({ netopia: true, visa: false, mastercard: false });
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
+  it("shows exactly the marks the setting names", () => {
+    expect(marks("visa,mastercard")).toEqual({ netopia: false, visa: true, mastercard: true });
+    expect(marks("netopia")).toEqual({ netopia: true, visa: false, mastercard: false });
+    expect(marks("netopia,visa,mastercard")).toEqual({ netopia: true, visa: true, mastercard: true });
+  });
+
+  it("forgives spaces and capitals, and ignores unknown names one by one", () => {
+    expect(marks(" Netopia , VISA ")).toEqual({ netopia: true, visa: true, mastercard: false });
+    expect(marks("visa,amex,,x")).toEqual({ netopia: false, visa: true, mastercard: false });
+    expect(marks("amex")).toEqual(NONE);
+    expect(marks("visa,visa")).toEqual({ netopia: false, visa: true, mastercard: false });
+    expect(Object.isFrozen(marks("visa"))).toBe(true);
+  });
+
+  it("never reads the disk: the files live outside every release, served by Caddy", () => {
+    const source = readFileSync(new URL("../../apps/ui/lib/billing/paymentMarks.ts", import.meta.url), "utf8");
+    expect(source).not.toMatch(/node:fs|existsSync|readdirSync/);
+    expect(PAYMENT_MARK_NAMES).toEqual(["netopia", "visa", "mastercard"]);
+    expect(Object.isFrozen(PAYMENT_MARK_NAMES)).toBe(true);
+    expect(PAYMENT_MARKS_SETTING).toBe("PAYMENT_MARKS_AVAILABLE");
   });
 });

@@ -59,8 +59,8 @@ const MARK_IMAGES = [
 ] as const satisfies ReadonlyArray<Readonly<{ mark: keyof PaymentMarks; src: string; altKey: string }>>;
 
 /**
- * The marks whose artwork the owner supplied (`availablePaymentMarks()`, read by a server page), in one group: the full
- * footer's, and the checkout's under its Continue button (N25b). Nothing at all when none of the files is there.
+ * The marks that the server's `PAYMENT_MARKS_AVAILABLE` setting names (`availablePaymentMarks()`, read by a server page), in
+ * one group: the full footer's, and the checkout's under its Continue button (N25b). Nothing at all when it names none.
  */
 export function PaymentMarksGroup({ marks }: { marks: PaymentMarks }) {
   const { catalog } = useChromeI18n();
@@ -88,8 +88,8 @@ export function PaymentMarksGroup({ marks }: { marks: PaymentMarks }) {
  *
  * Paid plans (P21, R3-4) extend the `full` shape only, through the optional `billing` facts a server page hands over
  * (`siteFooterBilling()`, `billingPageFooter()`, the landing's `landingPlans`): the DB-IP credit always, and while billing
- * is on the pricing, cancel and withdraw links and the marks whose artwork the owner supplied (NETOPIA's logo, Visa,
- * Mastercard: `PaymentMarksGroup`). Without the prop (local mode alike) nothing about paying shows. The `line` shape
+ * is on the pricing, cancel and withdraw links and the marks that the server's `PAYMENT_MARKS_AVAILABLE` setting names
+ * (NETOPIA's logo, Visa, Mastercard: `PaymentMarksGroup`). Without the prop (local mode alike) nothing about paying shows. The `line` shape
  * never knows billing's state: it renders on every page.
  */
 export function SiteFooter({ variant, billing = null }: { variant: "full" | "line"; billing?: SiteFooterBilling | null }) {

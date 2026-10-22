@@ -86,11 +86,20 @@ describe("P21 the site footer, extended for paid plans (R3-4; the card processor
     expect(hrefs(line)).toEqual([...LEGAL_PAGES.map(({ href }) => href), "https://reclamatiisal.anpc.ro/"]);
   });
 
-  it("takes billing's state from the one plans read, and the marks from the owner's files (none in the repository)", async () => {
-    mocks.billingOn = false;
-    expect(await siteFooterBilling()).toEqual({ billingOn: false, marks: NO_MARKS });
-    mocks.billingOn = true;
-    expect(await siteFooterBilling()).toEqual({ billingOn: true, marks: NO_MARKS });
-    expect(billingPageFooter()).toEqual({ billingOn: true, marks: NO_MARKS });
+  it("takes billing's state from the one plans read, and the marks from the PAYMENT_MARKS_AVAILABLE setting", async () => {
+    const before = process.env.PAYMENT_MARKS_AVAILABLE;
+    try {
+      delete process.env.PAYMENT_MARKS_AVAILABLE;
+      mocks.billingOn = false;
+      expect(await siteFooterBilling()).toEqual({ billingOn: false, marks: NO_MARKS });
+      mocks.billingOn = true;
+      expect(await siteFooterBilling()).toEqual({ billingOn: true, marks: NO_MARKS });
+      expect(billingPageFooter()).toEqual({ billingOn: true, marks: NO_MARKS });
+      process.env.PAYMENT_MARKS_AVAILABLE = "netopia,mastercard";
+      expect(billingPageFooter().marks).toEqual({ netopia: true, visa: false, mastercard: true });
+    } finally {
+      if (before === undefined) delete process.env.PAYMENT_MARKS_AVAILABLE;
+      else process.env.PAYMENT_MARKS_AVAILABLE = before;
+    }
   });
 });
