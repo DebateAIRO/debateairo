@@ -199,9 +199,12 @@ cd "$CAPI/dialectical-engine" && /bin/sh -c 'exec 5<&0; p=$1; shift; printf %s "
 ```
 
 The proof only has to be the right proof for the base plans: `prestart.mjs` makes a fresh one
-before every start. With the lifecycle installed, the live plans are named in its lock:
+before every start. With the lifecycle installed, the live plans are named in its lock. The two `jq` lines below are for
+the old layout only (lock v1, one release under `.services`): lock v2 (from transition T on) keeps each release's plans
+under `.releases.<label>.services`, and "Side-by-side release (from T+1)" reads them in SB1.
 
 ```sh
+# old layout only (lock v1): on lock v2 these print null; use SB1's old-plans.txt instead
 OLDA=$(jq -r .services.api.basePlan.path /etc/debateai-v3-preview/lifecycle/release-lock.json)
 OLDU=$(jq -r .services.ui.basePlan.path /etc/debateai-v3-preview/lifecycle/release-lock.json)
 rel launch-plan --service api --slot "$SLOT" --from "$OLDA" --root "$CAPI" --source-manifest "$ART/candidate-api-source.json" --native-attestation "$ART/native-first-verify.json" --out "$ART/api-launch.json"
@@ -2189,6 +2192,10 @@ transition"):
 
 From T+1 on, every upload follows "Side-by-side release (from T+1)" below.
 
+**T's commit must contain D5** (each release's own native plan `native-plan-<label>.json`, `release-artifacts.mjs
+database-ahead` and `prestart.mjs accept-ahead`): the scripts below use them. It does: the side-by-side integration branch
+carries D5, so a dev commit taken after that branch was merged has it.
+
 **Going back from T is never side by side** (spec §11). R19 cannot run beside a newer database, so the way back from
 T's migrations on is rbB-T: the cold copy, which loses every debate and payment since TB2. That is why T carries no
 product change: a problem in T is fixed forward.
@@ -2313,7 +2320,7 @@ case "$(stat -c '%a %U' "$EDGE")" in "600 root"|"640 root") ;; *) echo "TA0_NOT_
 [ "$(stat -c '%a %U:%G' /root/preview-archive)" = "700 root:root" ] || { echo "TA0_NOT_DONE: /root/preview-archive is not root-only 0700 (the receipt and every copy live there)"; exit 1; }
 [ -z "$(ss -ltnH '( sport = :3090 or sport = :3200 or sport = :3201 )')" ] || { echo "TA0_NOT_DONE: something listens on 3090, 3200 or 3201"; exit 1; }
 [ ! -e /etc/systemd/system/debateai-preview.target.d ] || { echo "TA0_NOT_DONE: debateai-preview.target.d exists already (look first)"; exit 1; }
-CF=$(psqlq "SHOW config_file")
+CF=$(psqlq "SHOW config_file") || { echo "TA0_NOT_DONE: SHOW config_file is unreadable (nothing written yet)"; exit 1; }
 case "$CF" in /etc/debateai-v3-preview/postgresql/*) ;; *) echo "TA0_NOT_DONE: the PostgreSQL config is not under /etc/debateai-v3-preview/postgresql (the cold copy would not hold it): ask"; exit 1;; esac
 [ "$(psqlq "SHOW max_connections")" = 200 ] && [ "$(psqlq "SELECT sourcefile FROM pg_settings WHERE name = 'max_connections'")" = "$CF" ] && [ "$(grep -cE '^[[:space:]]*max_connections[[:space:]]*=' "$CF")" = 1 ] && [ "$(grep -cE '^max_connections = 200([^0-9]|$)' "$CF")" = 1 ] || { echo "TA0_NOT_DONE: max_connections is not set by exactly one line 'max_connections = 200' of $CF (TB2 changes that one line): ask"; exit 1; }
 install -d -o root -g root -m 0700 "$P"
@@ -2333,6 +2340,25 @@ done
 grep '^MemAvailable:' /proc/meminfo | tee -a "$P/memory"
 echo "files under /etc/systemd/system naming a fixed unit:"; { grep -rlE 'debateai-preview-(api|ui|runner)\.service' /etc/systemd/system 2>/dev/null || true; } | sort | tee "$P/fixed-unit-mentions"
 echo "links to a fixed unit:"; find /etc/systemd/system -path '*.wants/*' \( -name debateai-preview-api.service -o -name debateai-preview-ui.service -o -name debateai-preview-runner.service \) | sort | tee "$P/fixed-unit-links"
+# A baseline: R19's three live units pass systemd-analyze verify (TB5 and TB6 verify T's units the same way).
+systemd-analyze verify /etc/systemd/system/debateai-preview-api.service /etc/systemd/system/debateai-preview-ui.service /etc/systemd/system/debateai-preview-runner.service > "$P/verify-r19.txt" 2>&1 || { cut -c1-300 "$P/verify-r19.txt"; echo "TA0_NOT_DONE: systemd-analyze verify refuses R19's own live units (above), so TB6's verify of T's instances could not pass either: ask"; exit 1; }
+echo "systemd-analyze verify of R19's three units: OK"
+# The default migration reader (release-check.mjs, release-artifacts.mjs) reads a migration only when every folder from
+# it up to its release folder is root's, not group- or world-writable and no link: read that path in R19's API folder.
+RAPI=$(jq -r .services.api.sourceRoot "$LOCK")
+[ "$(realpath "$RAPI")" = "$RAPI" ] || { echo "TA0_NOT_DONE: R19's API folder is reached through a link (the migration reader refuses that): ask"; exit 1; }
+RM=$(find "$RAPI/dialectical-engine/migrations" -maxdepth 1 -type f -name '*.sql' | LC_ALL=C sort | tail -n 1)
+[ -n "$RM" ] || { echo "TA0_NOT_DONE: no migration file in R19's API folder"; exit 1; }
+D=$(dirname "$RM"); while :; do SM=$(stat -c '%F %U %a' "$D"); echo "reader path: $D $SM" | tee -a "$P/reader-path"; case "$SM" in "directory root "*) ;; *) echo "TA0_NOT_DONE: $D is not a root-owned folder (the migration reader refuses it): ask"; exit 1;; esac; [ $(( 8#${SM##* } & 8#022 )) = 0 ] || { echo "TA0_NOT_DONE: $D is group- or world-writable (the migration reader refuses it): ask"; exit 1; }; [ "$D" = "$RAPI" ] && break; [ "$D" != / ] || { echo "TA0_NOT_DONE: the migration is not inside R19's API folder: ask"; exit 1; }; D=$(dirname "$D"); done
+[ "$(stat -c '%F %U %a %h' "$RM")" = "regular file root 644 1" ] || { echo "TA0_NOT_DONE: $RM is not a root-owned 0644 file with one link: ask"; exit 1; }
+# D5's chain child (release-artifacts.mjs database-ahead, from T+1's SB5) runs as nobody, from the verified release
+# folder, through that folder's own tsx loader: nobody must run node with it and read the folder.
+getent passwd nobody >/dev/null || { echo "TA0_NOT_DONE: there is no nobody account (the database-ahead child runs as nobody): ask"; exit 1; }
+NB=$(cd "$RAPI/dialectical-engine" && runuser -u nobody -- /usr/bin/env -i PATH=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin:/usr/bin:/bin TSX_DISABLE_CACHE=1 TSX_TSCONFIG_PATH="$RAPI/dialectical-engine/tsconfig.json" /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node --import "$RAPI/dialectical-engine/node_modules/tsx/dist/loader.mjs" --input-type=module -e "process.stdout.write('ok')" 2>&1 || true)
+[ "$NB" = ok ] || { echo "$NB" | cut -c1-300; echo "TA0_NOT_DONE: nobody cannot run node with a release folder's own tsx loader (above): ask"; exit 1; }
+UR=$(cd / && runuser -u nobody -- /usr/bin/find "$RAPI/dialectical-engine/packages/db/src" "$RAPI/dialectical-engine/migrations" "$RAPI/dialectical-engine/tsconfig.json" ! -readable -print 2>&1 | head -n 5 || true)
+[ -z "$UR" ] || { echo "$UR"; echo "TA0_NOT_DONE: nobody cannot read part of a release folder (above): ask"; exit 1; }
+echo "nobody runs a release folder's tsx loader and reads its database code: OK"
 # Facts the retirement tools rely on (Linux only).
 JX=0; JO=$(journalctl -u debateai-preview-alert@ta0-probe-none.service --since=-1min -q -o cat --no-pager) || JX=$?
 echo "journalctl -q for a unit with no entries: exit $JX, ${#JO} bytes"
@@ -2362,6 +2388,9 @@ How to read what it printed:
 - PID 1's line must show `pid` `"1"`, the backup unit and `invocation` `true` (the receipt's journal evidence); the start
   line count must be at least 1 (the switch reads start lines the same way). If either is missing, tell the owner
   before TB1.
+- `reader path` lists owner and mode of every folder from a migration up to R19's API folder: the staging makes every
+  release folder the same way, so a newer release's migrations will be readable by the release check and the
+  database-ahead tool. The `nobody` line proves the database-ahead child can run there (it never runs as root).
 - `STAMP_AT_START yes`: a reboot that skips a backstop time still fires it at the next boot. `no`: that catch-up is not
   proven on this systemd; after a reboot during a drain, run `systemctl start debateai-preview-runner-retire@<label>.service`
   by hand once the backstop time has passed (`release-check.mjs status` shows which release drains).
@@ -2510,17 +2539,20 @@ is safe for R19 and for rbA-T.
 ### TA-units. The API and website templates
 
 `unit-templates.mjs render` copies R19's live units (as TA0 captured them) into the template files, changing only the
-env file path to the instance's own file (`…/<service>-%i.env`) and leaving out the base unit's `[Install]`, the old
-`50-lifecycle.conf` (the repo's `@.service.d/50-lifecycle.conf` replaces it) and the old release drop-in (each instance
-gets its own). It refuses any line that still names something of one release: another service's env file, port 3100 or
-3101, `lifecycle-current`, a fixed unit name, or an instance specifier. The owner reads the file list and the changed
-lines it prints.
+env file path to the instance's own file (`…/<service>-%i.env`), on every line that names it (`EnvironmentFile=` and
+any other, such as `ReadOnlyPaths=`), and leaving out the base unit's `[Install]`, the old `50-lifecycle.conf` (the
+repo's `@.service.d/50-lifecycle.conf` replaces it) and the old release drop-in (each instance gets its own). It refuses
+any line that still names something of one release: another service's env file, port 3100 or 3101,
+`lifecycle-current`, a fixed unit name, or an instance specifier. The script then makes the same two changes to each
+live file itself (the path, and the base unit's `[Install]` left out) and requires the result to equal the template
+byte for byte. The owner reads the file list and the changed lines it prints.
 
 ```sh
 set -euo pipefail
 . /root/preview-archive/rNN-names.sh
 # TA-units: the API and website templates rendered from R19's live units into S/templates. Nothing is installed (TB5 does).
 UD=/etc/systemd/system
+noinst() { awk '{ t = $0; sub(/^[ \t\r]+/, "", t); sub(/[ \t\r]+$/, "", t) } t ~ /^\[/ { inst = (t == "[Install]") } !inst'; }
 for SVC in api ui; do [ ! -e "$S/templates/$SVC" ] || { echo "TA_UNITS_NOT_DONE: $S/templates/$SVC exists (look first)"; exit 1; }; done
 for SVC in api ui; do cmp -s <(systemctl cat "debateai-preview-$SVC.service") "$S/preflight/$SVC.cat" || { echo "TA_UNITS_NOT_DONE: the live $SVC unit changed since TA0: ask"; exit 1; }; done
 install -d -o root -g root -m 0700 "$S/templates" "$S/templates/api" "$S/templates/ui"
@@ -2532,25 +2564,25 @@ for SVC in api ui; do
   T=$S/templates/$SVC
   echo "== $SVC: the live drop-ins left out:"
   for F in "$UD/debateai-preview-$SVC.service.d"/*.conf; do [ -e "$F" ] || continue; [ -e "$T/debateai-preview-$SVC@.service.d/$(basename "$F")" ] || basename "$F"; done
-  echo "== $SVC: the changed lines (only env file paths and the base unit's [Install] may change):"
+  echo "== $SVC: the changed lines (the env file path on every line that names it, and the base unit's [Install] left out):"
   OTHER=0
   for F in "$T/debateai-preview-$SVC@.service" "$T/debateai-preview-$SVC@.service.d"/*.conf; do
     [ -e "$F" ] || continue
-    case "$F" in *.conf) SRC=$UD/debateai-preview-$SVC.service.d/$(basename "$F");; *) SRC=$UD/debateai-preview-$SVC.service;; esac
-    D=$(diff "$SRC" "$F" | grep -E '^[<>]' || true)
-    printf '%s\n' "$D" | grep -E '^[<>] *-?EnvironmentFile=|^< *\[Install\]|^< *(WantedBy|RequiredBy|Alias|Also|DefaultInstance|UpheldBy)=' || true
-    NO=$(printf '%s\n' "$D" | grep -E '^[<>]' | grep -vcE '^[<>] *-?EnvironmentFile=|^< *\[Install\]|^< *(WantedBy|RequiredBy|Alias|Also|DefaultInstance|UpheldBy)=|^< *(#.*)?$' || true)
-    OTHER=$((OTHER + NO))
+    case "$F" in *.conf) SRC=$UD/debateai-preview-$SVC.service.d/$(basename "$F"); CUT=cat;; *) SRC=$UD/debateai-preview-$SVC.service; CUT=noinst;; esac
+    diff "$SRC" "$F" | grep -E '^[<>]' || true
+    cmp -s <(sed "s#$E/$SVC.env#$E/$SVC-%i.env#g" "$SRC" | "$CUT") "$F" || { echo "   $(basename "$F") differs beyond the env path and the [Install] section"; OTHER=$((OTHER + 1)); }
   done
-  [ "$OTHER" = 0 ] || { echo "TA_UNITS_NOT_DONE: $OTHER other line(s) of the $SVC template differ from the live files: ask"; exit 1; }
+  [ "$OTHER" = 0 ] || { echo "TA_UNITS_NOT_DONE: $OTHER file(s) of the $SVC template differ from the live files beyond render's two changes: ask"; exit 1; }
 done
 echo TA_UNITS_DONE
 ```
 
 Expect two `PREVIEW_UNIT_TEMPLATE_RENDERED` lines, each listing `debateai-preview-<service>@.service` and the copied
 drop-ins (for the API: the hosted egress drop-in, the old nine-z drop-in and, from H9, the billing notice spool
-drop-in), then for each service its left-out drop-ins (`50-lifecycle.conf`, `zzzzzzzzzz-lifecycle-release.conf`) and its
-`EnvironmentFile=` lines going from `…/<service>.env` to `…/<service>-%i.env`.
+drop-in), then for each service its left-out drop-ins (`50-lifecycle.conf`, `zzzzzzzzzz-lifecycle-release.conf`), every
+line naming `…/<service>.env` (the `EnvironmentFile=` lines, and others such as `ReadOnlyPaths=`) going to
+`…/<service>-%i.env`, and the base unit's `[Install]` lines left out. A line `… differs beyond the env path and the
+[Install] section` stops the step.
 
 ### TA-caddy. The two-slot Caddyfile
 
@@ -2727,11 +2759,11 @@ umask 077
 tar -C "$PGP" -czf "$S/pg18-v3-preview-cold.tgz" v3-preview || { echo "TB2_NOT_DONE: the data tar failed; the database is STOPPED"; exit 1; }
 tar -C /etc/debateai-v3-preview -czf "$S/pg18-v3-preview-config.tgz" postgresql || { echo "TB2_NOT_DONE: the config tar failed; the database is STOPPED"; exit 1; }
 sha256sum "$S/pg18-v3-preview-cold.tgz" "$S/pg18-v3-preview-config.tgz" > "$S/pg18-cold.sha256"
-cp -p "$CF" "$S/postgresql.conf.before-320"
+cp -p "$CF" "$S/postgresql.conf.before-320" || { echo "TB2_NOT_DONE: the copy of $CF failed (nothing edited); the database is STOPPED (start it: systemctl start debateai-preview-postgresql, then B2's restart part by hand)"; exit 1; }
 umask 022
 sha256sum -c --quiet "$S/pg18-cold.sha256" || { echo "TB2_NOT_DONE: the copy does not match its own sha256; the database is STOPPED"; exit 1; }
 cat "$S/pg18-cold.sha256"
-sed -i -E 's/^max_connections = 200([^0-9]|$)/max_connections = 320\1/' "$CF"
+sed -i -E 's/^max_connections = 200([^0-9]|$)/max_connections = 320\1/' "$CF" || { if cmp -s "$S/postgresql.conf.before-320" "$CF"; then W="unchanged"; else W="CHANGED (its copy is $S/postgresql.conf.before-320)"; fi; echo "TB2_NOT_DONE: the max_connections edit failed; $CF is $W; the database is STOPPED (start it: systemctl start debateai-preview-postgresql, then B2's restart part by hand)"; exit 1; }
 [ "$(grep -cE '^[[:space:]]*max_connections[[:space:]]*=' "$CF")" = 1 ] && [ "$(grep -cE '^max_connections = 320([^0-9]|$)' "$CF")" = 1 ] && diff <(grep -vE '^max_connections = ' "$S/postgresql.conf.before-320") <(grep -vE '^max_connections = ' "$CF") >/dev/null || { cp -p "$S/postgresql.conf.before-320" "$CF"; echo "TB2_NOT_DONE: the edit was not exactly the one line; the config is back as it was; the database is STOPPED (start it: systemctl start debateai-preview-postgresql, then B2's restart part by hand)"; exit 1; }
 back200() { systemctl stop debateai-preview-postgresql || true; cp -p "$S/postgresql.conf.before-320" "$CF"; systemctl start debateai-preview-postgresql || true; for i in $(seq 1 30); do /usr/lib/postgresql/18/bin/pg_isready -q -h "$SOCK" -p 5434 && break; sleep 2; done; echo "TB2_NOT_DONE: $1; the config is back at 200 and PostgreSQL was started on it; Hatchet and the gateway are NOT started (B2's restart part by hand, then rbA-T, or ask)"; exit 1; }
 systemctl start debateai-preview-postgresql || back200 "PostgreSQL did not start with max_connections 320"
@@ -2863,19 +2895,19 @@ install -d -o root -g root -m 0755 "$NEWOP"
 git -C "$ART/source-reference" archive --format=tar "$REV" dialectical-engine/deploy/preview-lifecycle dialectical-engine/deploy/preview-auth-dev dialectical-engine/deploy/preview-release | tar -x -C "$NEWOP" --no-same-owner
 chown -R root:root "$NEWOP"; find "$NEWOP" -type d -exec chmod 0755 {} +; find "$NEWOP" -type f -exec chmod 0644 {} +
 for D in preview-lifecycle preview-auth-dev preview-release; do diff -r "$NEWOP/dialectical-engine/deploy/$D" "$CAPI/dialectical-engine/deploy/$D" >/dev/null || { echo "TB5_NOT_DONE: the new operator folder's $D differs from T's checked API folder (nothing installed; $NEWOP stays for a look)"; exit 1; }; done
-mv "$OP" "$S/operator-lifecycle-v1.before"
-mv "$NEWOP" "$OP"
+mv "$OP" "$S/operator-lifecycle-v1.before" || { echo "TB5_NOT_DONE: R19's operator folder did not move aside (nothing installed; T's folder stays in $NEWOP)"; exit 1; }
+mv "$NEWOP" "$OP" || { echo "TB5_NOT_DONE: T's operator folder did not move in: NO operator folder is installed (R19's is $S/operator-lifecycle-v1.before, T's is $NEWOP): move R19's back by hand, then ask"; exit 1; }
 [ -f "$L/release-switch.mjs" ] && [ -f "$L/prestart.mjs" ] || { echo "TB5_NOT_DONE: the installed operator folder is not T's (way back: rbB-T)"; exit 1; }
 umask 077
 install -d -o root -g root -m 0700 "$S/systemd-old" "$S/systemd-old-wants"
 printf '' > "$S/systemd-old.txt"; printf '' > "$S/systemd-T.list"
 for N in debateai-preview-api.service debateai-preview-api.service.d debateai-preview-ui.service debateai-preview-ui.service.d debateai-preview-runner.service debateai-preview-runner.service.d; do
-  if [ -e "$UD/$N" ] || [ -L "$UD/$N" ]; then mv "$UD/$N" "$S/systemd-old/$N"; printf '%s\n' "$N" >> "$S/systemd-old.txt"; fi
+  if [ -e "$UD/$N" ] || [ -L "$UD/$N" ]; then mv "$UD/$N" "$S/systemd-old/$N" || { echo "TB5_NOT_DONE: $N did not move aside; the operator folder is T's and the files in $S/systemd-old.txt are aside (way back: rbB-T)"; exit 1; }; printf '%s\n' "$N" >> "$S/systemd-old.txt"; fi
 done
 ( cd "$UD" && find . -path './*.wants/*' \( -name debateai-preview-api.service -o -name debateai-preview-ui.service -o -name debateai-preview-runner.service \) | sed 's#^\./##' ) > "$S/systemd-old-wants.txt"
-while read -r F; do install -d -o root -g root -m 0700 "$S/systemd-old-wants/$(dirname "$F")"; mv "$UD/$F" "$S/systemd-old-wants/$F"; done < "$S/systemd-old-wants.txt"
+while read -r F; do install -d -o root -g root -m 0700 "$S/systemd-old-wants/$(dirname "$F")"; mv "$UD/$F" "$S/systemd-old-wants/$F" || { echo "TB5_NOT_DONE: the link $F did not move aside (R19's unit files are aside, and the links listed before it in $S/systemd-old-wants.txt): ask"; exit 1; }; done < "$S/systemd-old-wants.txt"
 umask 022
-inst() { if [ -e "$UD/$2" ] || [ -L "$UD/$2" ]; then mv "$UD/$2" "$S/systemd-old/$2" && printf '%s\n' "$2" >> "$S/systemd-old.txt"; fi; install -o root -g root -m 0644 "$1" "$UD/$2" && printf '%s\n' "$2" >> "$S/systemd-T.list"; }
+inst() { if [ -e "$UD/$2" ] || [ -L "$UD/$2" ]; then mv "$UD/$2" "$S/systemd-old/$2" || return 1; printf '%s\n' "$2" >> "$S/systemd-old.txt" || return 1; fi; install -o root -g root -m 0644 "$1" "$UD/$2" && printf '%s\n' "$2" >> "$S/systemd-T.list"; }
 DEP=$OP/dialectical-engine/deploy; LSD=$DEP/preview-lifecycle/v1/systemd
 inst "$DEP/preview-auth-dev/v1/debateai-preview-runner@.service" debateai-preview-runner@.service || { echo "TB5_NOT_DONE: the runner template did not install (way back: rbB-T)"; exit 1; }
 for SVC in api ui; do
@@ -2885,7 +2917,7 @@ for SVC in api ui; do
   install -o root -g root -m 0644 "$LSD/debateai-preview-$SVC@.service.d/50-lifecycle.conf" "$UD/debateai-preview-$SVC@.service.d/50-lifecycle.conf"
 done
 for N in debateai-preview-runner-retire@.service debateai-preview-runner-retire@.timer debateai-preview-runner-retire-check@.service debateai-preview-runner-retire-check@.timer debateai-preview-team-unlock.service debateai-preview.target; do inst "$LSD/$N" "$N" || { echo "TB5_NOT_DONE: $N did not install (way back: rbB-T)"; exit 1; }; done
-systemctl daemon-reload
+systemctl daemon-reload || { echo "TB5_NOT_DONE: systemctl daemon-reload failed: the template units are in place but systemd has not read them; nothing runs (way back: rbB-T)"; exit 1; }
 echo "put aside: $(tr '\n' ' ' < "$S/systemd-old.txt") $(tr '\n' ' ' < "$S/systemd-old-wants.txt")"
 echo "installed: $(tr '\n' ' ' < "$S/systemd-T.list")"
 for SVC in api ui; do systemctl show -p FragmentPath -p LoadState "debateai-preview-$SVC@$LABEL.service" | tr '\n' ' '; echo; done
@@ -2980,7 +3012,7 @@ cmp -s "$C" "$S/preflight/Caddyfile.live" || { echo "TB7_NOT_DONE: the live Cadd
 [ -s "$S/Caddyfile.two-slot" ] && [ ! -e "$S/Caddyfile.before-two-slot" ] || { echo "TB7_NOT_DONE: the two-slot file is missing, or TB7 ran before (look first)"; exit 1; }
 cad validate --config "$S/Caddyfile.two-slot" --adapter caddyfile >/dev/null 2>&1 || { echo "TB7_NOT_DONE: Caddy's validation refused the two-slot file (nothing changed)"; exit 1; }
 cp -p "$C" "$S/Caddyfile.before-two-slot"
-back() { install -o root -g root -m 0644 "$S/Caddyfile.before-two-slot" "$C.new" && mv "$C.new" "$C" && systemctl restart caddy; echo "TB7_NOT_DONE: $1; the old Caddyfile is back and Caddy restarted: the site runs T on slot A, side by side is not ready (ask)"; exit 1; }
+back() { R="is back"; install -o root -g root -m 0644 "$S/Caddyfile.before-two-slot" "$C.new" && mv "$C.new" "$C" && cmp -s "$S/Caddyfile.before-two-slot" "$C" || R="did NOT go back (the live file may still be the two-slot one)"; systemctl restart caddy || true; CA=$(systemctl is-active caddy || true); echo "TB7_NOT_DONE: $1; the old Caddyfile $R; after its restart Caddy is $CA (active: the site runs T on slot A and side by side is not ready; anything else: the site is DOWN, look at caddy now) (ask)"; exit 1; }
 install -o root -g root -m 0644 "$S/Caddyfile.two-slot" "$C.new"
 mv "$C.new" "$C"
 systemctl restart caddy || back "caddy did not restart on the two-slot file"
@@ -3140,7 +3172,7 @@ for D in "$OCAPI" "$OCUI" "$OCRUN"; do [ -d "$D/dialectical-engine" ] || { echo 
 cmp -s "$S/native-plan.before.json" "$ONP" || { echo "RBB_T_NOT_DONE: native-plan.json moved (nothing stopped): ask"; exit 1; }
 for F in api.env runner.env ui.env; do cmp -s "$S/$F.before" "$E/$F" || { echo "RBB_T_NOT_DONE: the live $F moved (nothing stopped): ask"; exit 1; }; done
 CC=$S/rbB-config-check-$TS; install -d -o root -g root -m 0700 "$CC"; tar -C "$CC" -xzf "$S/pg18-v3-preview-config.tgz"
-CD=$(diff -r "$CC/postgresql" "$PGC" | grep -E '^[<>]' || true)
+CD=$(diff -r "$CC/postgresql" "$PGC" | grep -vE '^(diff -r |[0-9]+(,[0-9]+)?[acd][0-9]+(,[0-9]+)?$|---$)' || true)
 [ -z "$CD" ] || [ "$(printf '%s\n' "$CD" | grep -vcE '^[<>] max_connections = (200|320)([^0-9]|$)' || true)" = 0 ] || { echo "RBB_T_NOT_DONE: the live PostgreSQL config differs from the copy's by more than max_connections (nothing stopped; look first)"; exit 1; }
 if [ -e "$S/systemd-old.txt" ]; then while read -r NM; do [ -e "$S/systemd-old/$NM" ] || [ -L "$S/systemd-old/$NM" ] || { echo "RBB_T_NOT_DONE: $S/systemd-old/$NM is missing (nothing stopped)"; exit 1; }; done < "$S/systemd-old.txt"; fi
 MODE0=$(stat -c '%a %U:%G' "$PGP/v3-preview"); CMODE0=$(stat -c '%a %U:%G' "$PGC")
@@ -3233,8 +3265,10 @@ check says `DRAINED_PATH` (a migration that is not `n1: expand`) takes "Drained 
 release's whole forward chain (schema `preview-database-ahead-v1`, `steps` 1 to 64, `newerChain` 1 to 128, at most
 65,536 bytes) as `$ART/database-ahead-$OLABEL.json`; root installs it as
 `/etc/debateai-v3-preview/auth-dev-v1/database-ahead-$OLABEL.json` and pins it on the old release with
-`prestart.mjs accept-ahead`, before the migrations. From then on the old release's prestart verifies with
-`--database-ahead` and its proof names the file.
+`prestart.mjs accept-ahead`, before the migrations. The new release is pinned only later (SB10), so accept-ahead holds
+the file to the new release's own source manifest it names (root-owned, the sha256 the file names, an API manifest of
+the new label and revision listing each step's bytes); SB8 checks the same before it runs. From then on the old
+release's prestart verifies with `--database-ahead` and its proof names the file.
 
 **The order, and the way back from each point.**
 
@@ -3350,7 +3384,7 @@ for SVC in api ui runner; do cp -p "$E/$SVC-$OLABEL.env" "$S/$SVC-$OLABEL.env.be
 cp -p "$LOCK" "$S/release-lock.before.json"
 cp -a "$ONP" "$S/native-plan.before.json"
 jq -r --arg o "$OLABEL" '.releases[$o].services.api.basePlan.path, .releases[$o].services.ui.basePlan.path, .releases[$o].services.runner.basePlan.path' "$LOCK" > "$S/old-plans.txt"
-( cd /etc/systemd/system && tar -czf "$S/systemd-before.tgz" debateai-preview-* )
+( cd /etc/systemd/system && tar -czf "$S/systemd-before.tgz" debateai-preview-* debateai-preview.target debateai-preview.target.d ) || { echo "SB1_NOT_DONE: the copy of the systemd files failed (the boot target or its drop-in is missing?): ask"; exit 1; }
 psqlq "SELECT count(*)||'|'||max(name) FROM public.debateai_schema_migration" > "$S/ledger-before"
 psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1" > "$S/register-before"
 umask 022
@@ -3547,6 +3581,11 @@ cmp -s "$S/native-plan.before.json" "$ONP" && cmp -s "$ART/native-plan-plan.json
 [ ! -e "$ART/native-plan-apply-and-plan.json" ] && [ ! -e "$ART/native-apply-and-plan.json" ] || { echo "SB8_NOT_DONE: earlier apply-and-plan files exist (look first)"; exit 1; }
 install -o root -g root -m 0644 "$ART/database-ahead-$OLABEL.json" "$E/database-ahead-$OLABEL.json"
 cmp -s "$ART/database-ahead-$OLABEL.json" "$E/database-ahead-$OLABEL.json" || { echo "SB8_NOT_DONE: the installed database-ahead file differs"; exit 1; }
+DA=$E/database-ahead-$OLABEL.json; NM=$ART/candidate-api-source.json
+[ "$(jq -r '[.olderLabel, .olderSourceRevision, .newerLabel, .newerSourceRevision, .newerSourceManifest.path] | map(tostring) | join(" ")' "$DA")" = "$OLABEL $OREV $LABEL $REV $NM" ] || { echo "SB8_NOT_DONE: the database-ahead file does not name the old release at OREV and this release's manifest at REV (nothing applied)"; exit 1; }
+[ "$(jq -r .newerSourceManifest.sha256 "$DA")" = "$(sha256sum "$NM" | cut -d' ' -f1)" ] && [ "$(stat -c '%U %a %h' "$NM")" = "root 644 1" ] || { echo "SB8_NOT_DONE: this release's manifest is not the root-owned 0644 file with the sha256 the database-ahead file names (accept-ahead would refuse; nothing applied)"; exit 1; }
+[ "$(jq -r '[.role, .sourceRoot, .sourceRevision, .uid] | map(tostring) | join(" ")' "$NM")" = "api $CAPI $REV 0" ] || { echo "SB8_NOT_DONE: the manifest is not this release's root-owned API manifest at REV (nothing applied)"; exit 1; }
+for M in $(jq -r '.steps[] | "\(.name)=\(.sha256)"' "$DA"); do [ "$(jq -r --arg p "dialectical-engine/migrations/${M%%=*}" '[.files[] | select(.path == $p) | .sha256] | join(" ")' "$NM")" = "${M#*=}" ] || { echo "SB8_NOT_DONE: the manifest does not list ${M%%=*} with the bytes the database-ahead file names (nothing applied)"; exit 1; }; done
 AH=$(pre accept-ahead --label "$OLABEL" --from "$E/database-ahead-$OLABEL.json" 2>&1) || { echo "$AH"; echo "SB8_NOT_DONE: the pin was refused (nothing applied)"; exit 1; }
 echo "$AH"
 [ "$(jq -r '[.event, .label, .newerLabel] | map(tostring) | join(" ")' <<<"$AH")" = "PREVIEW_LIFECYCLE_DATABASE_AHEAD_PINNED $OLABEL $LABEL" ] && [ "$(jq -r --arg o "$OLABEL" '.releases[$o].databaseAhead.newerLabel' "$LOCK")" = "$LABEL" ] || { echo "SB8_NOT_DONE: the lock does not pin the database-ahead file on the old release (nothing applied)"; exit 1; }
@@ -4131,7 +4170,12 @@ RC=000; for i in $(seq 1 60); do RZ=$(readyz "$UIP"); RC=${RZ##*$'\n'}; [ "$RC" 
 [ "$RC" = 503 ] || { echo "DR6_NOT_DONE: the new website is not up and waiting (way back: rbD-B)"; exit 1; }
 SC=0; SW=$(lc release-switch.mjs switch --to "$LABEL" --from "$OLABEL" --old-pair-stopped 2>&1) || SC=$?
 echo "$SW"
-[ "$SC" = 0 ] || { echo "DR6_NOT_DONE: the switch did not finish cleanly (reason or bad above; WB4 after SWITCH_OUTCOME_UNKNOWN)"; exit 1; }
+case "$SC" in
+  0) ;;
+  2) echo "DR6_NOT_DONE: the switch is done, but a check after it failed: bad $(jq -c .bad <<<"$SW" 2>/dev/null || echo '(unread)') (BACKSTOP or TARGET: WB4; anything else: ask)"; exit 1;;
+  *) echo "DR6_NOT_DONE: the switch refused (reason above; WB4 after SWITCH_OUTCOME_UNKNOWN; otherwise the way back is rbD-B)"; exit 1;;
+esac
+[ "$(jq -r '[.event, .toKey, .fromKey, (.bad | length)] | map(tostring) | join(" ")' <<<"$SW")" = "PREVIEW_RELEASE_SWITCHED $KEY $OKEY 0" ] || { echo "DR6_NOT_DONE: the switch line is not this switch with nothing in bad"; exit 1; }
 MR=$(lc release-retire.mjs mark-retired --label "$OLABEL" 2>&1) || { echo "$MR"; echo "DR6_NOT_DONE: the old release could not be marked retired (reason above): ask"; exit 1; }
 echo "$MR"
 [ "$(edgekey)" = "200 $KEY" ] || { echo "DR6_NOT_DONE: the edge does not answer from the new release"; exit 1; }
@@ -4142,6 +4186,10 @@ echo DR6_DONE
 
 Then SB13b (the team member's test debate) and, later, SB15 as usual. The old release has no retirement receipt (it
 never retired by itself); its `RETIRED` row says `DRAINED`.
+
+The switch accepts the old runner stopped only on this path (`--old-pair-stopped`). After `SWITCH_OUTCOME_UNKNOWN`, WB4's
+`switch --finish` does not know that, so its `bad` names `RUNNER_FROM` here: with nothing else in `bad`, that one is
+expected; run DR6's lines from `release-retire.mjs mark-retired` on by hand.
 
 **rbD-A: before DR4** (no migration ran). The old release is still CURRENT and untouched: start it again.
 
@@ -4170,7 +4218,9 @@ echo RBD_A_DONE
 **rbD-B: from DR4 on.** The new release stops (its runner only with nothing open), the cold copy's data and config
 folders come back (the current ones moved aside, never deleted), the lock goes back to its copy from SB1 (the new
 release's entry leaves it; the old one's is byte for byte the same), the new release's instance drop-ins move into
-`$S/systemd-new/`, and the old release starts again. Everything written to the database after DR3 is lost with it.
+`$S/systemd-new/`, the old release's retire timers are turned off (the switch armed them; mark-retired may not have
+run) and the boot target's drop-in goes back to SB1's copy (the switch pointed it at the new pair; the current one moves
+into `$S`), and the old release starts again. Everything written to the database after DR3 is lost with it.
 
 ```sh
 set -euo pipefail
@@ -4188,6 +4238,15 @@ case "$(systemctl is-active "debateai-preview-runner@$LABEL" || true)" in
      systemctl stop "debateai-preview-runner@$LABEL" || true;;
 esac
 for U in "runner@$LABEL" "ui@$LABEL" "api@$LABEL" "runner@$OLABEL" "ui@$OLABEL" "api@$OLABEL"; do case "$(systemctl is-active "debateai-preview-$U" || true)" in inactive|failed) ;; *) echo "RBD_B_NOT_DONE: $U is still running"; exit 1;; esac; done
+for TM in "debateai-preview-runner-retire@$OLABEL.timer" "debateai-preview-runner-retire-check@$OLABEL.timer"; do if [ "$(systemctl show -p LoadState --value "$TM")" = loaded ]; then systemctl disable --now "$TM" || { echo "RBD_B_NOT_DONE: systemctl disable --now $TM failed; the new release is stopped, nothing restored yet"; exit 1; }; fi; done
+TG=$UD/debateai-preview.target.d/60-current-release.conf; TGC=$S/rbD-target-$TS
+install -d -o root -g root -m 0700 "$TGC"
+tar -C "$TGC" -xzf "$S/systemd-before.tgz" debateai-preview.target.d/60-current-release.conf || { echo "RBD_B_NOT_DONE: SB1's copy of the boot target drop-in is missing; the new release is stopped, nothing restored yet"; exit 1; }
+grep -qxF "Wants=debateai-preview-api@$OLABEL.service debateai-preview-ui@$OLABEL.service" "$TGC/debateai-preview.target.d/60-current-release.conf" || { echo "RBD_B_NOT_DONE: SB1's copy of the boot target drop-in does not name the old pair; nothing restored yet: ask"; exit 1; }
+if ! cmp -s "$TGC/debateai-preview.target.d/60-current-release.conf" "$TG"; then
+  if [ -e "$TG" ]; then mv "$TG" "$S/60-current-release.conf.after-$TS" || { echo "RBD_B_NOT_DONE: the boot target drop-in did not move aside; nothing restored yet"; exit 1; }; fi
+  install -o root -g root -m 0644 "$TGC/debateai-preview.target.d/60-current-release.conf" "$TG" || { echo "RBD_B_NOT_DONE: SB1's boot target drop-in did not go back (the switch's one is $S/60-current-release.conf.after-$TS)"; exit 1; }
+fi
 install -d -o root -g root -m 0700 "$S/systemd-new"
 for SVC in api ui runner; do if [ -e "$UD/debateai-preview-$SVC@$LABEL.service.d" ]; then mv "$UD/debateai-preview-$SVC@$LABEL.service.d" "$S/systemd-new/"; fi; done
 mv "$LOCK" "$S/release-lock.after-$TS.json"; cp -p "$S/release-lock.before.json" "$LOCK"
@@ -4221,7 +4280,7 @@ systemctl start debateai-preview-backup.timer || { echo "RBD_B_NOT_DONE: the bac
 T1=$(date +%s); systemctl start "debateai-preview-runner@$OLABEL" || echo "systemctl start of the old runner returned non-zero"
 for i in $(seq 1 80); do [ "$(journalctl -u "debateai-preview-runner@$OLABEL" --since "@$T1" -o cat --no-pager | grep -cE 'PREVIEW_RUNNER_(STARTED|STARTUP_REFUSED|STOPPED_ON_FAILURE)|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" -gt 0 ] && break; sleep 3; done
 [ "$(journalctl -u "debateai-preview-runner@$OLABEL" --since "@$T1" -o cat --no-pager | grep '^PREVIEW_RUNNER_STARTED ' | grep -c "\"releaseKey\":\"$OKEY\"" || true)" -ge 1 ] || { echo "RBD_B_NOT_DONE: the old runner did not start cleanly"; exit 1; }
-echo "kept for the owner: $PGP/v3-preview.after-$TS and $PGC.after-$TS (they hold secrets), $S/systemd-new, $S/release-lock.after-$TS.json"
+echo "kept for the owner: $PGP/v3-preview.after-$TS and $PGC.after-$TS (they hold secrets), $S/systemd-new, $S/release-lock.after-$TS.json (and $S/60-current-release.conf.after-$TS when the switch had run)"
 echo RBD_B_DONE
 ```
 

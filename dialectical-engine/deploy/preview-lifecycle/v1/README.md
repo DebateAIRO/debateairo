@@ -650,7 +650,10 @@ The transition records its release with `release-switch.mjs seed` instead. The t
 current release's API, chosen through the release table and the lock: they work only while the table is readable and
 its current release is pinned. `prestart.mjs accept-ahead --label <older> --from
 /etc/debateai-v3-preview/auth-dev-v1/database-ahead-<older>.json` pins a newer release's database-ahead file on the
-older release, and `prestart.mjs unpin --label <label>` drops a RETIRED release (`release-archive.mjs` does it). The
+older release before the newer release's migrations, so before the newer release is pinned: it holds the file to the
+newer release's own source manifest the file names (root-owned, that sha256, the newer label and revision, each step's
+bytes) and, once the newer release is pinned, to its pinned revision. `prestart.mjs unpin --label <label>` drops a
+RETIRED release (`release-archive.mjs` does it). The
 whole order, with its checks, is `deploy/preview-release/v1/README.md`, "Side-by-side release (from T+1)".
 
 Until you pin, prestart refuses a new plan (`RELEASE_LOCK_RELEASE_MISSING`, `RELEASE_LOCK_MISMATCH` or

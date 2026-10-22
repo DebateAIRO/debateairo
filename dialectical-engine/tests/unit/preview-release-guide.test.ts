@@ -208,6 +208,28 @@ describe('the preview release guide: transition T, side by side, the way back, t
     }
   });
 
+  it('nothing is overwritten: a unit file or the boot target goes in only after the one in its place moved into S', () => {
+    const tb5 = scriptOf('TB5').lines;
+    const inst = tb5.find(line => line.startsWith('inst() {'))!;
+    expect(inst).toBeDefined();
+    // inst(): the file in the way moves aside first, and a failed move ends inst before anything is installed.
+    const exists = inst.indexOf('[ -e "$UD/$2" ] || [ -L "$UD/$2" ]');
+    const aside = inst.indexOf('mv "$UD/$2" "$S/systemd-old/$2" || return 1;');
+    const install = inst.indexOf('install -o root -g root -m 0644 "$1" "$UD/$2"');
+    expect(exists).toBeGreaterThan(-1);
+    expect(exists).toBeLessThan(aside);
+    expect(aside).toBeLessThan(install);
+    expect(inst).toMatch(/printf '%s\\n' "\$2" >> "\$S\/systemd-old\.txt" \|\| return 1;/);
+    // Every file TB5 installs at the top of /etc/systemd/system goes through inst (drop-ins go into folders TB5 made).
+    expect(tb5.filter(code).filter(line => line !== inst && /install -o root -g root -m 0644 \S+ "\$UD\/[^"/]+"/.test(line))).toEqual([]);
+    // rbD-B: SB1's boot target drop-in goes back only after the current one moved into S.
+    const rbd = scriptOf('RBD_B').lines;
+    const moved = rbd.findIndex(line => line.includes('mv "$TG" "$S/60-current-release.conf.after-$TS"'));
+    const restored = rbd.findIndex(line => line.includes('"$TG" || { echo "RBD_B_NOT_DONE'));
+    expect(moved).toBeGreaterThan(-1);
+    expect(moved).toBeLessThan(restored);
+  });
+
   it('the R19 traps are carried: no runner prepare-only, the all-models build, migrations before any start', () => {
     for (const block of allBlocks) for (const line of block.lines.filter(code)) if (/launch-runner\.mjs/.test(line)) expect(line).toMatch(/--start/);
     expect(scriptOf('SB1B').lines.join('\n')).toContain('rel build-env --models all-models --release-key "$KEY"');
@@ -310,32 +332,12 @@ function invocations(): Invocation[] {
 const sink = () => { const out: string[] = []; return { out, stream: { write: (chunk: string) => { out.push(String(chunk)); return true; } } }; };
 const reasonOf = (lines: string[]) => { try { return JSON.parse(lines.join('').trim().split('\n').at(-1)!).reason as string; } catch { return 'NO_JSON_LINE'; } };
 
-/**
- * D5 (built in another lane, merged before the release) adds `database-ahead` to release-artifacts.mjs. Until this copy
- * of the tool has it, the call is held to D5's usage text instead: exactly `--older-source-manifest <old candidate api
- * manifest> --newer-source-manifest <new candidate api manifest> --out <artifacts folder>/database-ahead-<older label>.json`.
- */
-async function releaseToolKnows(command: string): Promise<boolean> {
-  const tool = await import('../../deploy/' + 'preview-release/v1/release-artifacts.mjs');
-  try { tool.parseArguments([command]); } catch (error) { return (error as { fields?: unknown }).fields !== undefined; }
-  return true;
-}
-function databaseAheadShape(argv: readonly string[]): string {
-  const [command, ...rest] = argv;
-  const flags = rest.filter((_word, index) => index % 2 === 0);
-  const value = (flag: string) => rest[rest.indexOf(flag) + 1] ?? '';
-  if (command !== 'database-ahead' || rest.length !== 6 || flags.join(' ') !== '--older-source-manifest --newer-source-manifest --out') return 'ARGUMENTS_REFUSED';
-  if (!/^\/opt\/debateai-v3-preview\/artifacts\/[a-z0-9-]+\/candidate-api-source\.json$/.test(value('--older-source-manifest'))
-    || !/^\/opt\/debateai-v3-preview\/artifacts\/[a-z0-9-]+\/candidate-api-source\.json$/.test(value('--newer-source-manifest'))) return 'INPUT_PATH_REFUSED';
-  return value('--out') === `${ART}/database-ahead-${OLABEL}.json` ? 'ACTOR_REFUSED' : 'OUTPUT_PATH_REFUSED';
-}
-
 /** The reason the tool gives when the platform is refused; ACTOR_REFUSED means every word passed its parser. */
 async function parserReason(call: Invocation): Promise<string> {
   const { stream: stdout } = sink(), err = sink();
   if (call.tool === 'release-artifacts') {
     const tool = await import('../../deploy/' + 'preview-release/v1/release-artifacts.mjs');
-    if (call.argv[0] === 'database-ahead' && !(await releaseToolKnows('database-ahead'))) return databaseAheadShape(call.argv);
+    // D5 is merged here: `database-ahead` goes through the tool's own parser like every other command.
     try { tool.parseArguments([...call.argv]); } catch (error) { return (error as { code: string }).code; }
     const slot = call.argv[call.argv.indexOf('--slot') + 1];
     if (call.argv[0] === 'launch-plan' && slot !== 'A' && slot !== 'B') return 'SLOT_REFUSED';
@@ -387,6 +389,33 @@ describe('the guide\'s commands are the tools\' real command lines (D1-D13)', ()
     expect(install).toBeGreaterThan(-1);
     expect(install).toBeLessThan(pin);
     expect(pin).toBeLessThan(apply);
+    // The newer manifest the file names is checked before the pin (accept-ahead verifies it: the new release is pinned
+    // only in SB10, after the migrations).
+    const check = sb8.findIndex(line => line.includes('.newerSourceManifest.sha256') && line.includes('sha256sum "$NM"'));
+    expect(check).toBeGreaterThan(install);
+    expect(check).toBeLessThan(pin);
+    expect(sb8.findIndex(line => line.includes('"api $CAPI $REV 0"'))).toBeLessThan(pin);
+    // D5 is in T's commit (the integration branch carries it): one plain line says so, and no step is marked as waiting for it.
+    expect(sectionOf(guide, TRANSITION)).toContain("**T's commit must contain D5**");
     expect(newSections).not.toContain('needs D5');
+  });
+
+  it('the drained switch must end with nothing in bad before the old release is marked retired, and its way back undoes what the switch armed', () => {
+    const dr6 = scriptOf('DR6').lines;
+    const sw = dr6.findIndex(line => line.includes('lc release-switch.mjs switch --to "$LABEL" --from "$OLABEL" --old-pair-stopped'));
+    const bad = dr6.findIndex(line => line.includes('(.bad | length)') && line.includes('"PREVIEW_RELEASE_SWITCHED $KEY $OKEY 0"'));
+    const retired = dr6.findIndex(line => line.includes('lc release-retire.mjs mark-retired --label "$OLABEL"'));
+    expect(sw).toBeGreaterThan(-1);
+    expect(sw).toBeLessThan(bad);
+    expect(bad).toBeLessThan(retired);
+    const rbd = scriptOf('RBD_B').lines;
+    const timers = rbd.findIndex(line => line.includes('"debateai-preview-runner-retire@$OLABEL.timer" "debateai-preview-runner-retire-check@$OLABEL.timer"') && line.includes('systemctl disable --now "$TM"'));
+    const target = rbd.findIndex(line => line.includes('tar -C "$TGC" -xzf "$S/systemd-before.tgz" debateai-preview.target.d/60-current-release.conf'));
+    const reload = rbd.findIndex(line => line === 'systemctl daemon-reload');
+    expect(timers).toBeGreaterThan(-1);
+    expect(target).toBeGreaterThan(-1);
+    expect(Math.max(timers, target)).toBeLessThan(reload);
+    // SB1's copy holds the boot target and its drop-in (the debateai-preview-* glob does not match debateai-preview.target).
+    expect(scriptOf('SB1').lines.join('\n')).toContain('tar -czf "$S/systemd-before.tgz" debateai-preview-* debateai-preview.target debateai-preview.target.d');
   });
 });
