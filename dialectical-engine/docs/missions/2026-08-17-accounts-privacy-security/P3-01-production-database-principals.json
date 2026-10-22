@@ -2274,6 +2274,20 @@
       "grants": [
         "SELECT ON ledger.model_spend_waiver"
       ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0124_settings_activation.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION register.read_active_settings_version()"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0124_settings_activation.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION register.settings_version_passed(text,bigint), register.read_passed_settings_versions(text)"
+      ]
     }
   ],
   "deploymentObligations": [

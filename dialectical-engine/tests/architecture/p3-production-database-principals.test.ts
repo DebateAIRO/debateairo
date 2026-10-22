@@ -729,6 +729,23 @@ describe("P3-01 production database-principal manifest", () => {
   "grants": [
     "SELECT ON ledger.model_spend_waiver"
   ]
+},
+// Side-by-side spec §13 (migration 0124, plan S1, D8), in source order: the activation pointer's one reader for the API's
+// role alone (the runner's login holds debateai_runtime only, so it cannot read the pointer), then the two pass readers
+// for the runtime. The release owner and operator stay outside this manifest until Phase 3 (sideBySideReleaseRoles).
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0124_settings_activation.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION register.read_active_settings_version()"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0124_settings_activation.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION register.settings_version_passed(text,bigint), register.read_passed_settings_versions(text)"
+  ]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))
@@ -1018,4 +1035,22 @@ it("discloses exactly 0123's grants to the runtime, the API's billing role and t
   // table grants. The append-only tables are never writable beyond INSERT.
   expect(declared).toHaveLength(15);
   expect(declared.some(grant => /\b(?:UPDATE|DELETE|TRUNCATE)\b/u.test(grant))).toBe(false);
+});
+
+it("discloses exactly 0124's grants to the runtime and the API's billing role (side-by-side §13, D8)", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0124_settings_activation.sql", "utf8");
+  const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime";
+  // As for 0123: every GRANT line naming one of the disclosed roles names it alone.
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
+    .filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+      && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = [...sql.matchAll(new RegExp(`^GRANT [^\\n]+ TO (?:${disclosed});$`, "gm"))]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0124_settings_activation.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  // The pointer reader for the API's role; the two pass readers for the runtime. Nothing else, and no table grant.
+  expect(declared).toHaveLength(2);
+  expect(declared.some(grant => /\bON register\.settings_/u.test(grant))).toBe(false);
 });
