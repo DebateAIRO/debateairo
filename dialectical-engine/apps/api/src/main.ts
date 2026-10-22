@@ -691,7 +691,11 @@ const askRoomComposition = askRoomReadiness === undefined ? undefined : boot.run
     waitingLinePerPerson: band.waitingLinePerPerson,
     // Side-by-side spec §9, §13 (plan C8): at most SITE_CONCURRENT_DEBATES debates across releases, and an ask
     // admitted while this release is not current waits in line; both read inside the room's spend-decision lock.
-    gate: new PostgresAskAdmissionGate({ releaseKey: environment.RELEASE_KEY, hosted: environment.DEPLOYMENT_MODE === "hosted" })
+    // Side-by-side spec §13 (C14, Task S13): with the site version, the gate reads the activation pointer on a waiting
+    // debate's START transaction (this pool's login is the API's runtime login, which may: D8).
+    gate: new PostgresAskAdmissionGate({
+      releaseKey: environment.RELEASE_KEY, hosted: environment.DEPLOYMENT_MODE === "hosted", siteVersion: environment.REGISTER_VERSION
+    })
   });
   // B7a (the usage read) and B8 (the server-decided ask and its coarse fit)
   // reuse these same instances and this one readiness answer.

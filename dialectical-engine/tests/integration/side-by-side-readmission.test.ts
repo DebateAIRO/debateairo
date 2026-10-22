@@ -10,10 +10,14 @@ import {
 } from "@debateai/db";
 import { ServeRepository } from "@debateai/serve";
 import {
-  BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, debateShapePolicyStartValues, parseDebateShapePolicy
+  BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, debateShapePolicyStartValues, parseDebateShapePolicy,
+  parseRegisterVersionText, registerVersionToSafeLegacyNumber
 } from "@debateai/register";
+import { createActiveSettingsVersionReader, readActiveSettingsVersionOn } from "../../apps/api/src/active-settings-version.js";
+import type { AdmissionRunMembers } from "../../apps/api/src/admission-settings.js";
 import { AskRoom, type AskRoomOptions } from "../../apps/api/src/ask-room.js";
 import { PostgresAskAdmissionGate } from "../../apps/api/src/release-state.js";
+import { importHistoricalRegisterFixture, publishReplacementRegisterFixture, registerFixtureRow } from "../support/registerFixtures.js";
 import { startContentRunFixture, type ContentRunFixture } from "../support/contentRunFixture.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
@@ -682,5 +686,107 @@ describe("side-by-side C11: a waiting debate is re-admitted under the current re
     expect(await supersessionCount()).toBe(edges);
     expect(await jobsOf(waiting.run_ref)).toEqual([{ command_key: `S00:${waiting.run_ref}:Q1`, state: "READY", terminal_reason: null }]);
     expect(probes.count).toBe(0);
+  });
+});
+
+/**
+ * Side-by-side spec §13 (C14, Task S13) — A WAITING DEBATE STARTED AFTER AN ACTIVATION IS RE-ADMITTED ON THE ACTIVE
+ * VERSION, on migration 0124's real pointer. r17 stays current (above). A debate r17 placed in line on its own site
+ * version (17) waits while the owners activate a sealed GENERAL version r17 has passed (a PASS verdict); the next tick
+ * of r17's waker, built as main.ts builds it (the gate reads the pointer on the START transaction, the cached reader
+ * plans the new run), starts it as a NEW run stamped with the active version: the edge, the hold at that version's
+ * estimate, its first job, and the person still has exactly one place in line (none, once it started).
+ */
+describe("side-by-side S13: a debate waiting across an activation starts on the active version", () => {
+  const SITE = 17;
+  const DIGEST = "d".repeat(64);
+  const ACTIVE_ESTIMATE = 2_345;
+
+  beforeEach(async () => {
+    await fixture.database.pool.query(
+      "UPDATE core.work_item SET state='DONE', claimed_by=NULL, claim_deadline=NULL WHERE state IN ('READY','CLAIMED')"
+    );
+    await fixture.database.pool.query(
+      "INSERT INTO core.run_wait_start (run_id, started_at) SELECT run_id, clock_timestamp() FROM core.run_waiting_v"
+    );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /** A sealed GENERAL version (published over a historical v4), passed by r17 and activated: the pointer's new version. */
+  async function activateGeneralVersion(): Promise<number> {
+    const pool = fixture.database.pool;
+    const sourceRef = "fixture:side-by-side-s13";
+    await importHistoricalRegisterFixture(pool, 4, [registerFixtureRow("sideBySideS13Probe", "v4", sourceRef)]);
+    const general = registerVersionToSafeLegacyNumber((await publishReplacementRegisterFixture(pool, parseRegisterVersionText("4"),
+      [registerFixtureRow("sideBySideS13Probe", "general", sourceRef)], `${sourceRef}:general`)).registerVersion);
+    await pool.query("SELECT register.record_settings_verdict($1::text, $2::bigint, 'PASS', $3::text)", [NEW_RELEASE, general, DIGEST]);
+    await pool.query("SELECT register.activate_settings_version($1::bigint, NULL, $2::text, 'owner', 'side-by-side S13')",
+      [general, NEW_RELEASE]);
+    return general;
+  }
+
+  it("activated while it waits: the next START re-admits it as a new r17 run stamped with the active version, its hold at that version's estimate", async () => {
+    now = new Date("2034-05-08T10:00:00.000Z");
+    await fillDay("2034-05-08", FULL_DAY);
+    const askerId = `s13:activation:${randomUUID()}`;
+    const waiting = await submitAs(newApplication(roomOf({ releaseKey: NEW_RELEASE, ceiling: FULL_DAY })), askerId);
+    expect(waiting.status).toBe("WAITING");
+    const old = waiting.run_ref;
+    expect(await stampOf(old)).toEqual({ release_key: NEW_RELEASE, register_version: String(SITE) });
+
+    const active = await activateGeneralVersion();
+    expect(active).not.toBe(SITE);
+    // The API's runtime login (debateai_billing_runtime) reads the pointer on a transaction's own client, as the START does.
+    const client = await fixture.database.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SET LOCAL ROLE debateai_billing_runtime");
+      expect(await readActiveSettingsVersionOn(client, SITE)).toBe(active);
+      await client.query("COMMIT");
+    } finally {
+      client.release();
+    }
+
+    // r17's waker as main.ts composes it: the gate with the site version, the cached reader, each version's members.
+    now = new Date("2034-05-08T10:01:00.000Z");
+    const reader = createActiveSettingsVersionReader({ pool: fixture.database.pool, siteVersion: SITE });
+    const members = (version: number): AdmissionRunMembers => Object.freeze({
+      registerVersion: version,
+      resolveEnvelopeBasis: async ({ panelSize }) => fixtureStructuralCeiling(12, panelSize, 1),
+      resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({
+        effectiveRiskTier, tierSource: tierSource as "ASKER" | "MACHINE_DEFAULT" | "DEPLOYMENT_POLICY", tierProvenanceRef
+      })
+    });
+    const room = roomOf({
+      ceiling: RAISED_DAY,
+      gate: new PostgresAskAdmissionGate({ releaseKey: NEW_RELEASE, hosted: false, siteVersion: SITE }),
+      estimatorFor: async (version) => ({ estimateMicros: async () => version === active ? ACTIVE_ESTIMATE : ESTIMATE })
+    });
+    const dispatched: string[] = [];
+    const tick = await newApplication(room, {
+      dispatched,
+      extra: { admissionSettings: { activeSettingsVersion: () => reader.current(), admissionSettingsFor: async (version) => members(version) } }
+    }).wakeWaitingRuns();
+    expect(tick).toMatchObject({ started: 1, failed: 0 });
+
+    const edges = await supersessionOf(old);
+    expect(edges).toHaveLength(1);
+    const created = edges[0]!.new_run_id;
+    expect(edges).toEqual([{ old_run_id: old, new_run_id: created, reason: "READMITTED" }]);
+    expect(await stampOf(created)).toEqual({ release_key: NEW_RELEASE, register_version: String(active) });
+    expect(await holdOf(created)).toBe(ACTIVE_ESTIMATE);
+    expect(await holdOf(old)).toBeNull();
+    expect(await jobsOf(created)).toEqual([{ command_key: `S00:${created}:Q1`, state: "READY", terminal_reason: null }]);
+    expect(await jobsOf(old)).toEqual([]);
+    expect(dispatched).toEqual([created]);
+    // One place in line per person: the old run's row only (now out of the line, by its edge); the new run never had one.
+    expect(await count(
+      "SELECT count(*)::integer AS n FROM core.run_wait AS wait JOIN core.run AS run USING (run_id) WHERE run.asker_id = $1", [askerId]
+    )).toBe(1);
+    expect(await waitingIds()).not.toContain(old);
+    expect(await waitingIds()).not.toContain(created);
   });
 });

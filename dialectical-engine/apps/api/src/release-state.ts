@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from "pg";
 import { SITE_CONCURRENT_DEBATES, readCurrentRelease, readReleaseState, type ReleaseLifecycleState } from "@debateai/db";
+import { readActiveSettingsVersionOn } from "./active-settings-version.js";
 import type { AskAdmissionGate } from "./ask-room.js";
 
 /**
@@ -353,21 +354,33 @@ export function siteCapBootLine(input: Readonly<{ hosted: boolean; roomComposed:
  *   within a tick, re-admitted under O3 (S13). Without a version, the release alone, as in Phase 1.
  * - `activeDebates` counts the runs with a READY or CLAIMED job across every release (0083's partial index
  *   work_item_live_run_idx answers it without reading history).
+ * - `activeSettingsVersion` (side-by-side spec §13, C14, Task S13; only when built with `siteVersion`, as main.ts and
+ *   the practice build it): the activation pointer read on the decision's own transaction
+ *   (`readActiveSettingsVersionOn`, the one SQL constant of ./active-settings-version.ts; NULL = `siteVersion`). A
+ *   waiting debate's START compares it with the run's stamp and re-checks the version it will start on with it.
  *
- * Every read is debateai_runtime's (EXECUTE on 0123's reader and on 0124's `register.settings_version_passed`, SELECT
- * on core.work_item), the room decision pool's login.
+ * Every read but the pointer is debateai_runtime's (EXECUTE on 0123's reader and on 0124's
+ * `register.settings_version_passed`, SELECT on core.work_item); the pointer is debateai_billing_runtime's (D8). The
+ * room decision pool's login is the API's runtime login (DATABASE_URL, as the main pool), which holds both
+ * (debateai_billing_runtime inherits debateai_runtime: P3 membershipGrants).
  */
 export class PostgresAskAdmissionGate implements AskAdmissionGate {
   readonly releaseKey: string;
   readonly siteConcurrentDebates: number;
   readonly #hosted: boolean;
+  readonly activeSettingsVersion?: (tx: Pick<PoolClient, "query">) => Promise<number>;
 
-  constructor(options: Readonly<{ releaseKey: string; hosted: boolean; siteConcurrentDebates?: number }>) {
+  constructor(options: Readonly<{ releaseKey: string; hosted: boolean; siteConcurrentDebates?: number; siteVersion?: number }>) {
     const cap = options.siteConcurrentDebates ?? SITE_CONCURRENT_DEBATES;
     if (!Number.isSafeInteger(cap) || cap < 1) throw new TypeError("ASK_ADMISSION_GATE_INVALID");
     this.releaseKey = options.releaseKey;
     this.siteConcurrentDebates = cap;
     this.#hosted = options.hosted;
+    const siteVersion = options.siteVersion;
+    if (siteVersion !== undefined) {
+      if (!Number.isSafeInteger(siteVersion) || siteVersion < 1) throw new TypeError("ASK_ADMISSION_GATE_INVALID");
+      this.activeSettingsVersion = (tx) => readActiveSettingsVersionOn(tx, siteVersion);
+    }
   }
 
   async ownReleaseIsCurrent(tx: Pick<PoolClient, "query">, registerVersion?: number): Promise<boolean> {

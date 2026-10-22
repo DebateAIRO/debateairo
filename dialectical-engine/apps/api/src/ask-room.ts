@@ -175,6 +175,14 @@ export interface AskAdmissionGate {
    */
   ownReleaseIsCurrent(tx: Pick<PoolClient, "query">, registerVersion?: number): Promise<boolean>;
   activeDebates(tx: Pick<PoolClient, "query">): Promise<number>;
+  /**
+   * Side-by-side spec §13 (C14, Task S13): the active settings version (the activation pointer, or the site version
+   * while it is empty), read on the decision's own transaction. Asked by `startWaiting` only, first: a waiting run whose
+   * version is not this one is re-admitted onto it (the two-phase rule), and the re-check above asks about the version
+   * the start will actually run on. Absent (a gate built without the site version, every test that builds none): no
+   * version is compared, Phase 1's start.
+   */
+  readonly activeSettingsVersion?: (tx: Pick<PoolClient, "query">) => Promise<number>;
 }
 
 export type AskRoomOptions = Readonly<{
@@ -652,18 +660,29 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
    * Side-by-side spec §13 "The API re-checks at admission" (Task S11): the same first question also needs this release
    * to have passed the version the start would run on (`startVersion`); not passed is SWITCHING too, and the waker's
    * tick stops there (ruling R11).
+   * Side-by-side spec §13 (C14, Task S13; rulings R48, R49): with a gate that reads the activation pointer, the active
+   * version is read FIRST, on this START transaction (`gate.activeSettingsVersion`), never at a tick and never cached. A
+   * run whose version is not the active one is re-admitted exactly as a run another release admitted (below): it never
+   * starts on its own stamp, whatever its release. So `startVersion` is the active version for a run that starts on its
+   * own row, the planned version for a READMIT (whose plan must name the active version, else NEEDS_READMISSION again),
+   * and nothing (the release alone) for phase one and ASK_AGAIN — a FAIL verdict on a version that is no longer active
+   * stops no tick, and a run stamped with the site version while the active version cannot be loaded is not started on
+   * the site version (its re-admission keeps its place: `#startReadmitted`).
    *
    * Side-by-side spec §4, O3 (Q1 → a); INTERFACE run_supersession — THE TWO-PHASE RULE (with a gate). A run another
-   * release admitted (`run.releaseKey` is not this release's) never starts on its own row: no code, setting or prompt
-   * of another release may touch it (O1). Each step below writes nothing unless it says so.
+   * release admitted (`run.releaseKey` is not this release's), or (S13) one stamped with a version that is not the
+   * active one, never starts on its own row: no code, setting or prompt of another release may touch it (O1), and a
+   * debate started after an activation runs on the active version (C14). Each step below writes nothing unless it says
+   * so.
    *   1. SWITCHING, then still waiting, its funding and PLAN_CHANGED: as for any run.
    *   2. Phase one (no `readmission`): it is measured with its old settings-class estimate; a START the cap allows
    *      answers NEEDS_READMISSION, with that measure (`preview`: the person's room for the plan's picker), and
    *      anything else answers as for any run. The waker then plans the re-admission outside every lock (the only
    *      place a probe may run) and comes back with the plan, under the owner's lease.
    *   3. ASK_AGAIN: a START answers ASK_AGAIN (the waker closes the old run); anything else as for any run.
-   *   4. READMIT: measured with the plan's hold (the picker's figure, else the estimate of the plan's settings class).
-   *      A plan made for another billing plan than the one read under this lock is NEEDS_READMISSION again. On a START
+   *   4. READMIT: measured with the plan's hold (the picker's figure, else the estimate of the plan's settings class at
+   *      the plan's version, `Readmission.registerVersion`: S13). A plan made for another billing plan than the one read
+   *      under this lock, or (S13) on a version that is not the active one read under it, is NEEDS_READMISSION again. On a START
    *      the cap allows: `createRun()` (the new run's row, committed), then on this transaction the supersession edge
    *      (old → new, READMITTED), the new run's hold and charge scope (pinned to the old run's funding), and the new
    *      run's first job LAST. All of it commits, or none of it: a failure leaves the new row with no edge, no hold
@@ -676,13 +695,19 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     const access = accessOfWaitingRun(run);
     const gate = this.#options.gate;
     const readmit = readmission?.plan.kind === "READMIT" ? readmission.plan : null;
-    const stale = gate !== undefined && run.releaseKey !== gate.releaseKey;
-    // Side-by-side spec §13 (Task S11): the version this start would run on — the run's own stamp, or a re-admission's
-    // new one. Phase one of a run another release admitted starts nothing (its old version is not this release's to
-    // pass), and neither does an ASK_AGAIN plan: the release alone.
-    const startVersion = readmit !== null ? readmission?.registerVersion
-      : readmission === undefined && !stale ? run.registerVersion : undefined;
     return this.#locked(run.ownerRef, async (tx, now): Promise<WaitingStart<T>> => {
+      // Side-by-side spec §13 (C14, Task S13): the active version, read on THIS transaction before anything else, so the
+      // version compare and the re-check below see the same pointer as the start they decide.
+      const active = gate?.activeSettingsVersion === undefined ? undefined : await gate.activeSettingsVersion(tx);
+      // Re-admitted, never started on its own row: another release admitted it, or (S13) its version is not the active one.
+      const stale = gate !== undefined && (run.releaseKey !== gate.releaseKey || (active !== undefined && run.registerVersion !== active));
+      // S13: a READMIT planned on a version that is no longer the active one plans again (step 4).
+      const planMoved = readmit !== null && active !== undefined && readmission?.registerVersion !== active;
+      // Side-by-side spec §13 (Task S11, S13): the version this start would run on — the run's own stamp (the active
+      // version, when the pointer is read), or a re-admission's new one. Phase one of a stale run starts nothing (its old
+      // version is not this start's to pass), and neither does an ASK_AGAIN plan or a moved plan: the release alone.
+      const startVersion = readmit !== null ? (planMoved ? undefined : readmission?.registerVersion)
+        : readmission === undefined && !stale ? run.registerVersion : undefined;
       if (gate !== undefined && !(await gate.ownReleaseIsCurrent(tx, startVersion))) return Object.freeze({ kind: "SWITCHING" as const });
       if (!(await this.#options.line.isWaiting(tx, run.runId))) return Object.freeze({ kind: "GONE" as const });
       const basis = await this.#options.entitlements?.readRunFundingBasis?.(run.runId) ?? null;
@@ -706,15 +731,16 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
       }
       const planId = entitlement?.planId ?? null;
       // Side-by-side C11, step 4: the plan was made for the billing plan read in phase one; another one now plans again.
-      if (readmit !== null && planId !== readmit.planId) return Object.freeze({ kind: "NEEDS_READMISSION" as const, planId });
+      // S13: so does a plan made on a version that is no longer the active one (an activation between plan and START).
+      if (readmit !== null && (planId !== readmit.planId || planMoved)) return Object.freeze({ kind: "NEEDS_READMISSION" as const, planId });
       // RULINGS-R2 Q-11: the hold is B2's estimate for the run's settings class; the
       // waker never re-picks the run's models (a known limit, bounded by B9's wall).
       // Side-by-side spec §13 (S10): at the version the run was stamped with (its own per-run cap).
-      // Side-by-side C11: a re-admission is a new admission, measured with its plan's own hold (step 4); its estimate
-      // stays the room's own until S13 re-admits onto the active version with that version's estimator.
+      // Side-by-side C11: a re-admission is a new admission, measured with its plan's own hold (step 4). S13: else with
+      // the estimator of the version the new run is admitted on (the active one), as an ask on it is estimated.
       const estimateMicros = readmit === null
         ? await (await this.#estimatorFor(run.registerVersion)).estimateMicros(settingsClassOfWaitingRun(run))
-        : readmit.holdMicros ?? await this.#options.estimator.estimateMicros(readmit.settingsClass);
+        : readmit.holdMicros ?? await (await this.#estimatorFor(readmission?.registerVersion)).estimateMicros(readmit.settingsClass);
       const { rooms, personUses, waitReason } = await this.#measure(access, estimateMicros, now, run.runId);
       const admission = decideAdmission({
         rooms,

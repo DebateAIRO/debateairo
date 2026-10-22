@@ -5320,6 +5320,12 @@ export class PostgresAskApplication implements AskApplication {
   readonly #legacyAskAdmissionPool: Pool;
   /** B7b: set once a tick of this process has read the whole line with every person-recorded run in it. */
   #wakeSweptEveryPerson = false;
+  /**
+   * Side-by-side spec §13 (C14, Task S13): the active settings version the waker last observed (null before its first
+   * tick, or without the reader). A new one clears `#wakeSweptEveryPerson`, so the next tick sweeps every person once,
+   * as a restart does: a version's own estimates may let a run recorded as its person's wait fit now.
+   */
+  #wakeObservedSettingsVersion: number | null = null;
   /** Important 4: when this process last handed each stalled first job over again (epoch ms), by work item id. */
   readonly #redispatchedAt = new Map<string, number>();
 
@@ -5956,12 +5962,17 @@ export class PostgresAskApplication implements AskApplication {
    * C11 review: a new row whose START never committed and was never recorded FAILED (the process died in between) is
    * recorded FAILED by a later tick, under the owner's lease (`#closeUnstartedReadmissions`), so the debate is never
    * stranded; and a START that committed is never recorded FAILED when only the lease's release fails afterwards.
+   * Side-by-side spec §13 (C14, Task S13): a run stamped with a version that is not the active one is re-admitted the
+   * same way, onto the active version, decided inside its START only (the room reads the pointer on the START's own
+   * transaction; nothing is re-admitted at a tick whose room stays closed). Each tick first asks the reader for the
+   * active version (`#observeSettingsVersion`); a new one makes this tick sweep every person once (`everyPerson`).
    */
   async wakeWaitingRuns(): Promise<WaitingLineTick> {
     const line = this.settings.waitingLine;
     if (line === undefined) {
       return Object.freeze({ waiting: 0, started: 0, skipped: 0, failed: 0, stopped: false, redispatched: 0 });
     }
+    await this.#observeSettingsVersion();
     const everyPerson = !this.#wakeSweptEveryPerson;
     const persons = new Set<string>();
     let waiting = 0;
@@ -6002,7 +6013,8 @@ export class PostgresAskApplication implements AskApplication {
           outcome = await line.startWaiting(run, enqueue);
           if (outcome.kind === "NEEDS_READMISSION") {
             const second = await this.#startReadmitted(run, outcome, line, enqueue, readmitted);
-            // NOT_NOW, or a plan made for another billing plan than the one now in force: the run keeps its place.
+            // NOT_NOW, or a plan made for another billing plan (S13: or settings version) than the one now in force: the
+            // run keeps its place.
             if (second === null || second.kind === "NEEDS_READMISSION") {
               skipped += 1;
               continue;
@@ -6101,6 +6113,27 @@ export class PostgresAskApplication implements AskApplication {
   }
 
   /**
+   * Side-by-side spec §13 (C14, Task S13) — THE WAKER OBSERVES AN ACTIVATION. The reader's answer (cached for a second;
+   * the site version while the pointer is empty) is compared with the last one this waker saw; a change clears the
+   * full-sweep mark, once per observed change. Advisory only: which version a run starts on is decided by its START,
+   * on its own transaction. A failed read changes nothing (the reader keeps and logs its last good value; only a first
+   * read can fail, and the boot made it). Without the reader nothing is observed: one version, as before.
+   */
+  async #observeSettingsVersion(): Promise<void> {
+    const source = this.settings.admissionSettings;
+    if (source === undefined) return;
+    let version: number;
+    try {
+      version = await source.activeSettingsVersion();
+    } catch {
+      return;
+    }
+    if (version === this.#wakeObservedSettingsVersion) return;
+    this.#wakeObservedSettingsVersion = version;
+    this.#wakeSweptEveryPerson = false;
+  }
+
+  /**
    * Side-by-side spec §4, O3 (Q1 → a; plan C task C11) — PHASE TWO OF A RE-ADMISSION, for a run another release admitted
    * that the room would start (`NEEDS_READMISSION`, nothing written). Outside every lock, the old run's stored ask is
    * read and planned under this release (`planReadmission`; its evaluation is the only place a probe may run, and only
@@ -6124,11 +6157,13 @@ export class PostgresAskApplication implements AskApplication {
     const stored = await this.#runs.readStoredAsk(run.runId);
     if (stored === null) return null;
     const personRoom = first.preview === undefined ? null : personRoomOf(first.preview);
-    // Side-by-side spec §13 (S10/S13 boundary): a re-admission is planned, and its new run stamped, on the settings of
-    // ONE version read through the ask's own per-version path (`askSettingsOf`), the version `#readmit` stamps. While the
-    // pointer is empty that is this release's site version: today's re-admission, byte for byte. S13 owns re-admitting a
-    // run onto the active version (the pointer read on the START transaction, and the room's estimate at that version).
-    // S11 (ruling R47): a version this API cannot load starts nothing; the run keeps its place, as for NOT_NOW.
+    // Side-by-side spec §13 (S10, S13): a re-admission is planned, and its new run stamped, on the settings of ONE
+    // version read through the ask's own per-version path (`askSettingsOf` = `admissionSettingsFor(active)`), the version
+    // `#readmit` stamps and the room's START re-checks and estimates with (`registerVersion` below). While the pointer is
+    // empty that is this release's site version: today's re-admission, byte for byte. Should the START read another
+    // active version on its own transaction (an activation in between), it plans again (NEEDS_READMISSION: skipped).
+    // S11 (ruling R47): a version this API cannot load starts nothing; the run keeps its place, as for NOT_NOW — so a
+    // run stamped with the site version is never started on it while the active version cannot be loaded (R49).
     const { settings, settingsUnavailable } = await askSettingsOf(this.settings);
     if (settingsUnavailable) {
       console.info(JSON.stringify(Object.freeze({ event: "api.wait.readmission_not_now", runId: run.runId, code: ADMISSION_SETTINGS_UNSUPPORTED })));
@@ -6149,7 +6184,8 @@ export class PostgresAskApplication implements AskApplication {
       try {
         const outcome = await line.startWaiting(run, enqueue, {
           plan,
-          // S11: the START re-checks that this release has passed the version the new run is stamped with.
+          // S11, S13: the START re-checks that this release has passed the version the new run is stamped with, that it
+          // is still the active one, and estimates the new run's hold at it.
           registerVersion: settings.registerVersion,
           // The room never asks an ASK_AGAIN plan for a run.
           createRun: plan.kind === "READMIT"

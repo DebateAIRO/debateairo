@@ -46,7 +46,8 @@ import { WorkItemRepository } from "@debateai/battery";
 import type { CostEstimator } from "@debateai/budget";
 import { PLAN_TIER_ROSTERS, type AskRequest, type Session } from "@debateai/contract";
 import {
-  RunCostSubstitutionRepository, RunRepository, type DiscoveredPanelMember, type StartRunInput, type WaitingRun, type WaitingRunRef
+  RunCostSubstitutionRepository, RunRepository, type DiscoveredPanelMember, type StartRunInput, type StoredAsk, type WaitingRun,
+  type WaitingRunRef
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import { LivenessRepository } from "@debateai/liveness";
@@ -63,8 +64,8 @@ import type { AdmissionRunMembers, AdmissionVersionSettings } from "../../apps/a
 import { createAdmissionSettingsCache, createAdmissionView } from "../../apps/api/src/admission-settings.js";
 import type { AskBilling } from "../../apps/api/src/ask-billing.js";
 import {
-  AskRoom, type AskAdmissionGate, type AskRoomLine, type AskRoomPort, type AskRoomReader, type AskRoomSpend, type Readmission,
-  type RoomDecision, type RoomQuestion
+  AskRoom, type AskAdmissionGate, type AskRoomLine, type AskRoomPort, type AskRoomReader, type AskRoomSpend, type AskWaitingLinePort,
+  type Readmission, type RoomDecision, type RoomQuestion
 } from "../../apps/api/src/ask-room.js";
 import { PostgresAskAdmissionGate } from "../../apps/api/src/release-state.js";
 import type { PreviewBudgetGateSettings, PreviewVersionTerms } from "../../apps/api/src/preview-budget-estimate.js";
@@ -209,6 +210,8 @@ function arrange(input: Readonly<{
   panel?: readonly DiscoveredPanelMember[];
   noReader?: boolean;
   room?: AskRoomPort;
+  /** Task S13: the waker's line (the room, as main.ts hands it both). */
+  waitingLine?: AskWaitingLinePort;
   billing?: AskBilling;
   refuse?: (version: number) => unknown;
   /** Task S11: what the direct path's re-check answers (default: passed). */
@@ -252,6 +255,7 @@ function arrange(input: Readonly<{
       return input.panel ?? ROSTER_PANEL;
     },
     ...(input.room === undefined ? {} : { room: input.room }),
+    ...(input.waitingLine === undefined ? {} : { waitingLine: input.waitingLine }),
     ...(input.billing === undefined ? {} : { billing: input.billing }),
     ...(input.noReader === true ? {} : { admissionSettings: { activeSettingsVersion: pointer, admissionSettingsFor: membersFor } })
   };
@@ -1206,5 +1210,273 @@ describe("(S12) an ask whose choices the active version no longer offers is aske
       expect(started[0]!.registerVersion).toBe(ACTIVE);
       vi.restoreAllMocks();
     }
+  });
+});
+
+/**
+ * Side-by-side spec §13 (C14, Task S13) — A WAITING DEBATE STARTED AFTER AN ACTIVATION IS RE-ADMITTED ON THE ACTIVE
+ * VERSION. Plain words: a debate that waited in line while the owners switched the settings version starts on the new
+ * version, never on the one it was admitted on. Which version is active is read on the very transaction that starts it
+ * (never at a tick, never from a cache), and a run stamped with another version takes Phase 1's re-admission path: a
+ * new run, stamped with the active version, its receipt and estimate from that version's settings, the hold on the new
+ * run; a choice the active version no longer offers is "please ask again", with nothing charged. A room that is still
+ * closed touches nothing, and a person never has two places in line.
+ */
+describe("(S13) a waiting debate started after an activation is re-admitted on the active version (C14)", () => {
+  const RELEASE = testReleaseKey(SITE);
+  const CLASS = Object.freeze({ planTier: "free" as const, compositionBudgetTier: "low" as const, makerCount: 2, depth: 1 });
+  /** Each version's own estimate (its per-run cap), and the room's own (the site's, for a run without a version). */
+  const ESTIMATES: Readonly<Record<number, number>> = Object.freeze({ [SITE]: 1_000, [ACTIVE]: 1_800 });
+  const never = async (): Promise<string> => { throw new Error("test: nothing may be queued"); };
+
+  /**
+   * A room whose gate reads the pointer (`active`), recording on which client and in which order the START asks: the
+   * pointer ("pointer:tx") and the re-check ("release:<version>:tx"). Its writes are recorded too: holds (with their
+   * figure), line entries, start marks, reasons and supersession edges.
+   */
+  function s13Room(input: Readonly<{
+    active: () => number; passed?: (version: number) => boolean; line?: readonly WaitingRun[]; daySpent?: number;
+  }>) {
+    const steps: string[] = [];
+    const holds: Array<Readonly<{ runId: string; heldMicros: number }>> = [];
+    const entered: string[] = [];
+    const started: string[] = [];
+    const reasons: string[] = [];
+    const edges: string[] = [];
+    const client = {
+      query: vi.fn(async (text: string, values: readonly unknown[] = []) => {
+        if (text.includes("INSERT INTO core.run_supersession")) edges.push(`${String(values[0])}->${String(values[1])}`);
+        return { rows: [], rowCount: 0 };
+      }),
+      release: vi.fn()
+    };
+    const where = (executor: unknown): string => executor === (client as unknown) ? "tx" : "elsewhere";
+    const gate: AskAdmissionGate = {
+      releaseKey: RELEASE,
+      siteConcurrentDebates: 8,
+      ownReleaseIsCurrent: async (executor, version) => {
+        steps.push(`release:${String(version)}:${where(executor)}`);
+        return version === undefined || (input.passed?.(version) ?? true);
+      },
+      activeDebates: async () => 0,
+      activeSettingsVersion: async (executor) => {
+        steps.push(`pointer:${where(executor)}`);
+        return input.active();
+      }
+    };
+    const spend: AskRoomSpend = {
+      readDaySpentMicros: async () => input.daySpent ?? 0, readSiteCountedHoldsMicros: async () => 0,
+      readOwnerSpentMicros: async () => 0, readOwnerCountedHoldsMicros: async () => 0,
+      openHold: async (_client, hold) => { holds.push(Object.freeze({ runId: hold.runId, heldMicros: hold.heldMicros })); }
+    };
+    const line: AskRoomLine = {
+      // One page: the whole line from the start, nothing after a cursor (the waker reads until a page comes back empty).
+      siteLineBlocking: async () => false, wakeCandidates: async ({ after }) => (after === null ? [...(input.line ?? [])] : []),
+      waitingForOwner: async () => [],
+      waitingForLegacyAsker: async () => [],
+      readWaiting: async (runId) => (input.line ?? []).find((run) => run.runId === runId) ?? null,
+      isWaiting: async (_executor, runId) => (input.line ?? []).some((run) => run.runId === runId),
+      enterWait: async (_client, runId) => { entered.push(runId); },
+      recordReason: async (_client, runId, reason) => { reasons.push(`${runId}:${reason.waitsFor}`); },
+      markStarted: async (_client, runId) => { started.push(runId); }
+    };
+    const room = new AskRoom({
+      lockPool: { connect: vi.fn(async () => client) } as unknown as Pool,
+      spend, line, estimator: estimator(700),
+      estimatorFor: async (version) => estimator(ESTIMATES[version] ?? 9_999),
+      personAllowance: { read: async () => [] }, entitlements: null,
+      dailyCeilingMicros: 100_000, closeBasisPoints: 9_500, waitingLinePerPerson: 1, clock: () => NOW, gate
+    });
+    return { room, steps, holds, entered, started, reasons, edges, client };
+  }
+
+  function waiting(extra: Partial<WaitingRun> = {}): WaitingRun {
+    return Object.freeze({ runId: randomUUID(), waitingSince: new Date("2026-10-22T11:00:00.000Z"), releaseKey: RELEASE,
+      ownerRef: null, legacyAskerId: "legacy:s13", planTier: "free", compositionBudgetTier: "low", depth: 1, makerCount: 2,
+      waitsFor: "SITE", personRecheckAt: null, reasonAt: new Date("2026-10-22T11:00:00.000Z"), ...extra });
+  }
+
+  /** A READMIT plan as the waker hands it the second time, on `version`; its hold comes from the room (no picker). */
+  function readmitOn(version: number, createRun: () => Promise<string>): Readmission {
+    return {
+      plan: { kind: "READMIT", planId: null, holdMicros: null, settingsClass: CLASS } as unknown as Readmission["plan"],
+      createRun,
+      registerVersion: version
+    };
+  }
+
+  it("(1, room) a run of this release stamped 17 while 18 is active: phase one, decided on the START transaction, writes nothing", async () => {
+    const run = waiting({ registerVersion: SITE });
+    const r = s13Room({ active: () => ACTIVE, line: [run] });
+    await expect(r.room.startWaiting(run, never)).resolves.toMatchObject({
+      kind: "NEEDS_READMISSION", planId: null, preview: { estimateMicros: ESTIMATES[SITE] }
+    });
+    // (5) The pointer first, on the start's own client; then the release alone (17 is not the version it would start on).
+    expect(r.steps).toEqual(["pointer:tx", "release:undefined:tx"]);
+    expect([r.holds, r.entered, r.started, r.reasons, r.edges]).toEqual([[], [], [], [], []]);
+  });
+
+  it("(1, room) its READMIT on 18: the new run, the edge, the hold on the NEW run at version 18's estimate, its first job last", async () => {
+    const run = waiting({ registerVersion: SITE });
+    const r = s13Room({ active: () => ACTIVE, line: [run] });
+    const order: string[] = [];
+    const createRun = vi.fn(async () => { order.push("createRun"); return "new-run"; });
+    const outcome = await r.room.startWaiting(run, async (tx, runId) => {
+      order.push(`enqueue:${runId}:${tx === (r.client as unknown) ? "tx" : "elsewhere"}`);
+      return "job:new";
+    }, readmitOn(ACTIVE, createRun));
+    expect(outcome).toEqual({ kind: "STARTED", runId: "new-run", value: "job:new" });
+    expect(r.steps).toEqual(["pointer:tx", `release:${String(ACTIVE)}:tx`]);
+    expect(r.holds).toEqual([{ runId: "new-run", heldMicros: ESTIMATES[ACTIVE] }]);
+    expect(r.edges).toEqual([`${run.runId}->new-run`]);
+    expect(order).toEqual(["createRun", "enqueue:new-run:tx"]);
+    // (4) The old run is never marked started and the new one never enters the line: the edge takes the old one out.
+    expect(r.started).toEqual([]);
+    expect(r.entered).toEqual([]);
+  });
+
+  it("(2) its room still closed at the tick: untouched — no new row, no hold, no reason it did not already have", async () => {
+    const run = waiting({ registerVersion: SITE });
+    const r = s13Room({ active: () => ACTIVE, line: [run], daySpent: 100_000 });
+    const createRun = vi.fn(async () => "never");
+    await expect(r.room.startWaiting(run, never)).resolves.toEqual({ kind: "SITE_FULL" });
+    await expect(r.room.startWaiting(run, never, readmitOn(ACTIVE, createRun))).resolves.toEqual({ kind: "SITE_FULL" });
+    expect(createRun).not.toHaveBeenCalled();
+    expect([r.holds, r.entered, r.started, r.reasons, r.edges]).toEqual([[], [], [], [], []]);
+  });
+
+  it("a READMIT planned on 18 while its START reads 19 (an activation in between) plans again: nothing written, 18 never asked", async () => {
+    const run = waiting({ registerVersion: SITE });
+    const r = s13Room({ active: () => 19, line: [run] });
+    const createRun = vi.fn(async () => "never");
+    await expect(r.room.startWaiting(run, never, readmitOn(ACTIVE, createRun))).resolves.toEqual({ kind: "NEEDS_READMISSION", planId: null });
+    expect(r.steps).toEqual(["pointer:tx", "release:undefined:tx"]);
+    expect(createRun).not.toHaveBeenCalled();
+    expect([r.holds, r.edges]).toEqual([[], []]);
+  });
+
+  it("(5) a run stamped 18 while 18 is active starts on its own row, re-checked about 18 on the same transaction", async () => {
+    const run = waiting({ registerVersion: ACTIVE });
+    const r = s13Room({ active: () => ACTIVE, line: [run] });
+    await expect(r.room.startWaiting(run, async () => "job")).resolves.toEqual({ kind: "STARTED", runId: run.runId, value: "job" });
+    expect(r.steps).toEqual(["pointer:tx", `release:${String(ACTIVE)}:tx`]);
+    expect(r.holds).toEqual([{ runId: run.runId, heldMicros: ESTIMATES[ACTIVE] }]);
+    expect(r.started).toEqual([run.runId]);
+    expect(r.edges).toEqual([]);
+  });
+
+  it("(R48) a run stamped with a version that is no longer active (a FAIL verdict on it) does not stop the tick: phase one, release alone", async () => {
+    const run = waiting({ registerVersion: ACTIVE });
+    const r = s13Room({ active: () => SITE, line: [run], passed: (version) => version !== ACTIVE });
+    await expect(r.room.startWaiting(run, never)).resolves.toMatchObject({ kind: "NEEDS_READMISSION" });
+    expect(r.steps).toEqual(["pointer:tx", "release:undefined:tx"]);
+  });
+
+  it("(5, the real gate) the pointer is read on the client it is given, with the one SQL constant; NULL is the site version", async () => {
+    const SQL = "SELECT register.read_active_settings_version() AS version";
+    const answers: unknown[] = [null, "18", 18, "0"];
+    const asked: unknown[][] = [];
+    const tx = {
+      query: vi.fn(async (sql: string, values?: unknown) => {
+        asked.push([sql, values]);
+        return { rows: [{ version: answers.shift() }] };
+      })
+    } as unknown as PoolClient;
+    const gate = new PostgresAskAdmissionGate({ releaseKey: RELEASE, hosted: false, siteVersion: SITE });
+    expect(await gate.activeSettingsVersion!(tx)).toBe(SITE);
+    expect(await gate.activeSettingsVersion!(tx)).toBe(ACTIVE);
+    expect(await gate.activeSettingsVersion!(tx)).toBe(ACTIVE);
+    await expect(gate.activeSettingsVersion!(tx)).rejects.toMatchObject({ code: "ACTIVE_SETTINGS_VERSION_INVALID" });
+    expect(asked).toEqual([[SQL, undefined], [SQL, undefined], [SQL, undefined], [SQL, undefined]]);
+    // Without the site version the gate reads no pointer (Phase 1's start); a site version that is no version refuses.
+    expect(new PostgresAskAdmissionGate({ releaseKey: RELEASE, hosted: false }).activeSettingsVersion).toBeUndefined();
+    expect(() => new PostgresAskAdmissionGate({ releaseKey: RELEASE, hosted: false, siteVersion: 0 })).toThrow("ASK_ADMISSION_GATE_INVALID");
+    // One runtime module holds the pointer's SQL (S16): the gate and the room never spell it.
+    for (const file of ["release-state.ts", "ask-room.ts"]) {
+      const source = readFileSync(new URL(`../../apps/api/src/${file}`, import.meta.url), "utf8");
+      expect(source, file).not.toContain("read_active_settings_version");
+    }
+    const reader = readFileSync(new URL("../../apps/api/src/active-settings-version.ts", import.meta.url), "utf8");
+    expect(reader).toContain("export async function readActiveSettingsVersionOn(");
+    expect(reader).toContain("client.query<{ version: unknown }>(ACTIVE_SETTINGS_VERSION_SQL)");
+  });
+
+  /** The waiting run's stored ask, as C10's `readStoredAsk` reads it (a legacy asker's, in the clear). */
+  function storedOf(run: WaitingRun): StoredAsk {
+    return Object.freeze({
+      runId: run.runId, releaseKey: RELEASE, registerVersion: run.registerVersion ?? SITE,
+      questionLine: "Should a debate that waited through an activation start on the new settings?",
+      askContract: Object.freeze({ decision_scope: "s13 re-admission", steering_presets: [], steering_annotations: [] }),
+      askerId: "legacy:s13", sessionId: randomUUID(), callerScope: "ASKER", asOf: new Date("2026-10-22T00:00:00.000Z"),
+      askerRiskTier: "casual", tierSource: "ASKER", tierProvenanceRef: "asker:s13", compositionBudgetTier: "low",
+      planTier: "free", depthParams: Object.freeze({ depth: 1 }), argumentLanguageTag: "en", argumentLanguageName: "English",
+      contentEncrypted: false
+    });
+  }
+
+  /** The waker over the room above: the run's stored ask, no orphans, the new row written as `#readmit` writes it. */
+  function wakerOver(r: ReturnType<typeof s13Room>, run: WaitingRun, extra: Parameters<typeof arrange>[0] = {}) {
+    vi.spyOn(RunRepository.prototype, "readStoredAsk").mockImplementation(async (runId) => (runId === run.runId ? storedOf(run) : null));
+    vi.spyOn(RunRepository.prototype, "listUnstartedReadmissions").mockResolvedValue([]);
+    const startReadmittedRun = vi.spyOn(RunRepository.prototype, "startReadmittedRun")
+      .mockImplementation(async ({ fromRunId }) => `new:${fromRunId}`);
+    vi.spyOn(WorkItemRepository.prototype, "listStalledStarts").mockResolvedValue([]);
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const arranged = arrange({ room: r.room, waitingLine: r.room, ...extra });
+    return { ...arranged, startReadmittedRun };
+  }
+
+  it("(1, through the waker) stamped 17, 18 active, its room open: a new run stamped 18 with 18's receipt and estimate, its hold and job", async () => {
+    const old = waiting({ registerVersion: SITE });
+    const r = s13Room({ active: () => ACTIVE, line: [old] });
+    const { application, startReadmittedRun, memory, used } = wakerOver(r, old);
+    await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ started: 1, failed: 0, skipped: 0 });
+    const created = `new:${old.runId}`;
+    const row = startReadmittedRun.mock.calls[0]![0];
+    expect(row).toMatchObject({ fromRunId: old.runId, registerVersion: ACTIVE, releaseKey: RELEASE, tierProvenanceRef: "asker:s13:v18" });
+    expect(row.envelopeBasis).toMatchObject({ version_mark: ACTIVE });
+    expect(memory).toMatchObject([{ runId: created, policyVersion: ACTIVE }]);
+    // Version 18's receipt only: nothing of the run's own version 17 was used to plan it.
+    expect(used.filter((part) => part.startsWith("receipt:"))).toEqual([`receipt:${String(ACTIVE)}`]);
+    expect(r.holds).toEqual([{ runId: created, heldMicros: ESTIMATES[ACTIVE] }]);
+    expect(r.edges).toEqual([`${old.runId}->${created}`]);
+    expect(vi.mocked(WorkItemRepository.prototype.enqueueOn)).toHaveBeenCalledWith(r.client, expect.objectContaining({ runId: created }));
+    // Both STARTs read the pointer on their own transaction; the second re-checks the version the new run starts on.
+    expect(r.steps).toEqual(["pointer:tx", "release:undefined:tx", "pointer:tx", `release:${String(ACTIVE)}:tx`]);
+    // (4) One place in line per person: the new run never enters it, the old one is never marked started (the edge ends it).
+    expect(r.entered).toEqual([]);
+    expect(r.started).toEqual([]);
+  });
+
+  it("(3) a choice version 18 no longer offers (its sealed maximum depth): please ask again, no new run, no hold, no charge", async () => {
+    const old = waiting({ registerVersion: SITE });
+    const r = s13Room({ active: () => ACTIVE, line: [old] });
+    const { application, startReadmittedRun } = wakerOver(r, old, {
+      members: (version, into) => versionMembers(version, into, version === ACTIVE ? {
+        resolveEnvelopeBasis: async () => {
+          throw new TypedDomainError("STRUCTURAL_CEILING_DEPTH_ABOVE_SEALED_MAXIMUM", "STRUCTURAL_CEILING_DEPTH_ABOVE_SEALED_MAXIMUM");
+        }
+      } : {})
+    });
+    await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ started: 0, failed: 1 });
+    expect(vi.mocked(WorkItemRepository.prototype.recordSetupFailure)).toHaveBeenCalledWith(expect.objectContaining({
+      runId: old.runId, reason: "RUN_SETUP_FAILED:CHOICE_UNAVAILABLE"
+    }));
+    expect(startReadmittedRun).not.toHaveBeenCalled();
+    expect([r.holds, r.edges, r.started, r.entered]).toEqual([[], [], [], []]);
+  });
+
+  it("(R49) a run stamped with the site version while the active version cannot be loaded is not started on the site version", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const old = waiting({ registerVersion: SITE });
+    const r = s13Room({ active: () => ACTIVE, line: [old] });
+    const { application, startReadmittedRun } = wakerOver(r, old, {
+      refuse: (version) => version === ACTIVE ? new TypedDomainError("PREVIEW_LINE_UP_REQUIRED", "PREVIEW_LINE_UP_REQUIRED") : undefined
+    });
+    await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ started: 0, skipped: 1, failed: 0 });
+    expect(startReadmittedRun).not.toHaveBeenCalled();
+    expect(r.steps).toEqual(["pointer:tx", "release:undefined:tx"]);
+    expect([r.holds, r.edges, r.started, r.entered]).toEqual([[], [], [], []]);
+    expect(vi.mocked(WorkItemRepository.prototype.recordSetupFailure)).not.toHaveBeenCalled();
   });
 });

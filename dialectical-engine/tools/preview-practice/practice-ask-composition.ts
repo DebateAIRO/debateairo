@@ -168,6 +168,8 @@ export function composePracticeAskRoom(input: Readonly<{
   money: NonNullable<Awaited<ReturnType<typeof composePracticeAskMoney>>>;
   estimator: CostEstimator | null;
   estimatorFor: (registerVersion: number) => Promise<CostEstimator>;
+  /** Side-by-side spec §13 (C14, Task S13), as main.ts: the gate reads the activation pointer, NULL = this version. */
+  siteVersion: number;
 }>): AskRoom | undefined {
   const { pool, settings, money } = input;
   const band = money.band;
@@ -197,7 +199,8 @@ export function composePracticeAskRoom(input: Readonly<{
     // practice's throwaway database records no release and its runner lives in this process, so it is the only
     // release there is: read as not hosted ("no row, not hosted" is current), under the key its runs are stamped with
     // and its runner claims under (settings.runner.RELEASE_KEY, practice-settings.ts practiceReleaseKey).
-    gate: new PostgresAskAdmissionGate({ releaseKey: settings.runner.RELEASE_KEY, hosted: false })
+    // Side-by-side spec §13 (C14, Task S13), as main.ts: a waiting debate's START reads the pointer on its own transaction.
+    gate: new PostgresAskAdmissionGate({ releaseKey: settings.runner.RELEASE_KEY, hosted: false, siteVersion: input.siteVersion })
   });
   return room;
 }
@@ -293,7 +296,7 @@ export async function composePracticeAsk(input: Readonly<{
   });
   await activeSettings.current();
   const askRoom = money === null ? undefined : composePracticeAskRoom({
-    pool, settings, money, estimator: siteAdmission.estimator,
+    pool, settings, money, estimator: siteAdmission.estimator, siteVersion: environment.REGISTER_VERSION,
     estimatorFor: async (version) => (await admissionCache.admissionSettingsFor(version)).estimator!,
     ...(input.roomDecisionPool === undefined ? {} : { roomDecisionPool: input.roomDecisionPool })
   });

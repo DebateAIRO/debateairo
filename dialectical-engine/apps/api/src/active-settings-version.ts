@@ -1,4 +1,4 @@
-import type { Pool, QueryConfig } from "pg";
+import type { Pool, PoolClient, QueryConfig } from "pg";
 import { TypedDomainError } from "@debateai/kernel";
 
 /**
@@ -12,8 +12,9 @@ import { TypedDomainError } from "@debateai/kernel";
  * reader, D8; the runner never names it). An empty pointer means "this release's own site version" (D1), which is
  * today's behaviour.
  *
- * The SQL text lives here exactly once, as ACTIVE_SETTINGS_VERSION_SQL (S13 adds the on-client read beside the cached
- * one with the same constant; S16 pins "exactly once").
+ * The SQL text lives here exactly once, as ACTIVE_SETTINGS_VERSION_SQL: the cached reader below and, beside it, the
+ * on-client read of a waiting debate's START transaction (`readActiveSettingsVersionOn`, Task S13) send the same
+ * constant (S16 pins "exactly once").
  */
 
 /**
@@ -73,6 +74,24 @@ function versionOfRow(value: unknown, siteVersion: number): number {
 function failureCodeOf(error: unknown): string {
   if (error instanceof TypedDomainError) return error.code;
   return error instanceof Error && /^[A-Z][A-Z0-9_]{2,}$/u.test(error.message) ? error.message : "UNTYPED";
+}
+
+/**
+ * Side-by-side spec §13 (C14, Task S13) — THE POINTER, READ ON A TRANSACTION'S OWN CLIENT. Plain words: when a waiting
+ * debate is about to start, the room asks which settings version is active on the very transaction that starts it, so
+ * the answer and the start are one step (an activation that commits first is seen; one that commits after cannot have
+ * changed what this start decided). Never cached; the same one SQL constant as the cached reader; NULL (no activation
+ * yet) is `siteVersion` (D1); an answer that is not a positive whole number refuses ACTIVE_SETTINGS_VERSION_INVALID. No
+ * driver timeout of its own: it runs under the decision's lock like every other read there, and a failure rolls the
+ * whole START back (nothing written; the run keeps its place). The client's login needs EXECUTE on the reader
+ * (debateai_billing_runtime, D8: the API's runtime login, the room decision pool's).
+ */
+export async function readActiveSettingsVersionOn(client: Pick<PoolClient, "query">, siteVersion: number): Promise<number> {
+  if (!Number.isSafeInteger(siteVersion) || siteVersion < 1) {
+    throw new TypedDomainError(ACTIVE_SETTINGS_VERSION_INVALID, ACTIVE_SETTINGS_VERSION_INVALID);
+  }
+  const result = await client.query<{ version: unknown }>(ACTIVE_SETTINGS_VERSION_SQL);
+  return versionOfRow(result.rows[0]?.version ?? null, siteVersion);
 }
 
 /**

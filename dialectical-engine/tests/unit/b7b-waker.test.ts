@@ -323,6 +323,45 @@ describe("B7b one tick of the waiting line (budget spec §2.7)", () => {
     expect(reads.filter((read) => read.after === null).map((read) => read.everyPerson)).toEqual([true, true, false]);
   });
 
+  it("side-by-side §13 (S13): after the reader observes a new active version, the next tick sweeps every person once", async () => {
+    // The pointer as each tick's first read sees it: 17, 17, then an activation of 18 (read twice), then 18 again.
+    const answers = [17, 17, 18, 18];
+    const pointer = vi.fn(async () => answers.length > 1 ? answers.shift()! : answers[0]!);
+    const a = waitingRun({ legacyAskerId: "legacy:a" });
+    const { application, reads } = arrange({
+      pages: [[a]], extra: { admissionSettings: { activeSettingsVersion: pointer, admissionSettingsFor: async () => { throw new Error("unused"); } } }
+    });
+    for (let tick = 0; tick < 5; tick += 1) await application.wakeWaitingRuns();
+    expect(reads.filter((read) => read.after === null).map((read) => read.everyPerson)).toEqual([true, false, true, false, false]);
+    expect(pointer).toHaveBeenCalledTimes(5);
+  });
+
+  it("side-by-side §13 (S13): a full sweep cut short by the site's day is owed again after a new version too; a failed read changes nothing", async () => {
+    const answers: Array<number | Error> = [17, 18, 18, new Error("test: the pointer read failed")];
+    const pointer = vi.fn(async () => {
+      const next = answers.length > 1 ? answers.shift()! : answers[0]!;
+      if (next instanceof Error) throw next;
+      return next;
+    });
+    const a = waitingRun({ legacyAskerId: "legacy:a" });
+    const b = waitingRun({ legacyAskerId: "legacy:b" });
+    const { application, reads, setPages } = arrange({
+      pages: [[a]], outcomes: { [b.runId]: "SITE_FULL" },
+      extra: { admissionSettings: { activeSettingsVersion: pointer, admissionSettingsFor: async () => { throw new Error("unused"); } } }
+    });
+    // 17: the first tick sweeps every person and gets through the whole line.
+    await application.wakeWaitingRuns();
+    // 18 observed: this tick sweeps every person again, but the site's day stops it, so the sweep is still owed.
+    setPages([[b]]);
+    await application.wakeWaitingRuns();
+    // 18 again (no change): the owed sweep runs and completes; then the read fails, which changes nothing: only those due.
+    setPages([[a]]);
+    await application.wakeWaitingRuns();
+    await application.wakeWaitingRuns();
+    expect(reads.filter((read) => read.after === null).map((read) => read.everyPerson)).toEqual([true, true, true, false]);
+    expect(pointer).toHaveBeenCalledTimes(4);
+  });
+
   it("does nothing, and logs nothing, with an empty line", async () => {
     const { application, lines } = arrange({ pages: [] });
     await expect(application.wakeWaitingRuns()).resolves.toEqual({ waiting: 0, started: 0, skipped: 0, failed: 0, stopped: false, redispatched: 0 });
@@ -465,7 +504,8 @@ describe("side-by-side C11: the waker re-admits a run another release admitted",
     expect(row).toMatchObject({ fromRunId: a.runId, registerVersion: 2, tierProvenanceRef: "asker:b7b:v2", releaseKey: TEST_RELEASE_KEY });
     expect(row.envelopeBasis).toMatchObject({ version_mark: 2 });
     expect(vi.mocked(ServeRepository.prototype.recordMemoryQuestion).mock.calls[0]![0]).toMatchObject({ policyVersion: 2 });
-    expect(pointer).toHaveBeenCalledTimes(1);
+    // One read for the plan (the per-version path), and S13's one read as the tick begins (does it sweep every person?).
+    expect(pointer).toHaveBeenCalledTimes(2);
   });
 
   it("side-by-side §13 (S11, ruling R47): a version this API cannot load re-admits nothing; the run keeps its place", async () => {
