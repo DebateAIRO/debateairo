@@ -71,7 +71,7 @@
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
   "chrome.footer.consumerProtection": "Tüketicinin korunması",
-  "chrome.release.newerVersion": "Sitenin daha yeni bir sürümü mevcut.",
+  "chrome.release.newerVersion": "Site güncellendi. Lütfen sayfayı yeniden yükleyin.",
   "chrome.release.reload": "Yeniden yükle",
   "chrome.release.madeByNewer": "Bu tartışma, sitenin daha yeni bir sürümü tarafından oluşturuldu. Sayfayı yeniden yükleyin veya birkaç dakika sonra tekrar deneyin."
 }

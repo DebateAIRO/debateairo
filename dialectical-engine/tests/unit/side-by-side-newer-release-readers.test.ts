@@ -376,4 +376,19 @@ describe("side-by-side C14: MADE_BY_NEWER_RELEASE is sent on debate reads only",
     expect(watch).toContain('MADE_BY_NEWER_RELEASE } from "@debateai/contract";');
     expect(watch).not.toContain('= "MADE_BY_NEWER_RELEASE"');
   });
+
+  it("the public read uses the owner reads' one rule, and main.ts hands it this release's key and the run key reader (P5)", () => {
+    // Final fix wave P5: one copy of the rule (made-by-newer-release.ts), used by the owner fallback and readPublicDebate.
+    const rule = readFileSync(join(SOURCE_ROOT, "made-by-newer-release.ts"), "utf8");
+    expect(count(rule, "export function madeByNewerRelease(")).toBe(1);
+    for (const file of ["index.ts", "publications.ts"]) {
+      const text = readFileSync(join(SOURCE_ROOT, file), "utf8");
+      expect(text, file).not.toContain("function madeByNewerRelease(");
+      expect(count(text, "madeByNewerRelease("), file).toBe(1);
+    }
+    const main = readFileSync(join(SOURCE_ROOT, "main.ts"), "utf8");
+    expect(main).toContain(
+      "{ ownReleaseKey: environment.RELEASE_KEY, readRunReleaseKey: (runId) => application.readRunReleaseKey(runId) }"
+    );
+  });
 });

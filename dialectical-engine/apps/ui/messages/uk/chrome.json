@@ -71,7 +71,7 @@
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
   "chrome.footer.consumerProtection": "Захист прав споживачів",
-  "chrome.release.newerVersion": "Доступна новіша версія сайту.",
+  "chrome.release.newerVersion": "Сайт було оновлено. Перезавантажте сторінку.",
   "chrome.release.reload": "Перезавантажити",
   "chrome.release.madeByNewer": "Ці дебати створено новішою версією сайту. Перезавантажте сторінку або спробуйте ще раз за кілька хвилин."
 }

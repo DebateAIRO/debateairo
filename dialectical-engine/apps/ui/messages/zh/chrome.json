@@ -71,7 +71,7 @@
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
   "chrome.footer.consumerProtection": "消费者保护",
-  "chrome.release.newerVersion": "网站有更新的版本可用。",
+  "chrome.release.newerVersion": "网站已更新。请重新加载页面。",
   "chrome.release.reload": "重新加载",
   "chrome.release.madeByNewer": "这场辩论由较新版本的网站创建。请重新加载页面，或几分钟后再试一次。"
 }

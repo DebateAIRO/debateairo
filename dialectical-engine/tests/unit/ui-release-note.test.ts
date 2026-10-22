@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Side-by-side uploads spec 2026-10-21 §7 (plan C13): a page opened under an older release sees "a newer version is
- * available" instead of failing. The browser compares only the code part of the x-debateai-release header with the code
+ * Side-by-side uploads spec 2026-10-21 §7 (plan C13): a page opened under another release sees "the site was updated"
+ * instead of failing. The browser compares only the code part of the x-debateai-release header with the code
  * baked into its build; a settings-only release keeps the code part, so it shows no note.
  */
 type ReleaseWatch = typeof import("../../apps/ui/lib/v3/releaseWatch.js");

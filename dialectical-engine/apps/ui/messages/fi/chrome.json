@@ -71,7 +71,7 @@
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
   "chrome.footer.consumerProtection": "Kuluttajansuoja",
-  "chrome.release.newerVersion": "Sivustosta on saatavilla uudempi versio.",
+  "chrome.release.newerVersion": "Sivusto on päivitetty. Lataa sivu uudelleen.",
   "chrome.release.reload": "Lataa uudelleen",
   "chrome.release.madeByNewer": "Tämän väittelyn teki sivuston uudempi versio. Lataa sivu uudelleen tai yritä muutaman minuutin kuluttua uudelleen."
 }

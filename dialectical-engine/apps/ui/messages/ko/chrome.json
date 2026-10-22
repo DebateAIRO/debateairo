@@ -71,7 +71,7 @@
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
   "chrome.footer.consumerProtection": "소비자 보호",
-  "chrome.release.newerVersion": "사이트에 새 버전이 나와 있습니다.",
+  "chrome.release.newerVersion": "사이트가 업데이트되었습니다. 페이지를 새로고침해 주세요.",
   "chrome.release.reload": "새로고침",
   "chrome.release.madeByNewer": "이 토론은 사이트의 더 새로운 버전에서 만들어졌습니다. 페이지를 새로고침하거나 몇 분 뒤에 다시 시도해 주세요."
 }

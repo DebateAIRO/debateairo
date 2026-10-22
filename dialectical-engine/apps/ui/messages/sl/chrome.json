@@ -71,7 +71,7 @@
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
   "chrome.footer.consumerProtection": "Varstvo potrošnikov",
-  "chrome.release.newerVersion": "Na voljo je novejša različica spletnega mesta.",
+  "chrome.release.newerVersion": "Spletno mesto je bilo posodobljeno. Znova naložite stran.",
   "chrome.release.reload": "Znova naloži",
   "chrome.release.madeByNewer": "To razpravo je ustvarila novejša različica spletnega mesta. Znova naložite stran ali poskusite znova čez nekaj minut."
 }

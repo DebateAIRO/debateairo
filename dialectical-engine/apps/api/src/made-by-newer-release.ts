@@ -1,5 +1,5 @@
 import { MADE_BY_NEWER_RELEASE } from "@debateai/contract";
-import { TypedDomainError } from "@debateai/kernel";
+import { LEGACY_RELEASE_KEY, TypedDomainError, parseReleaseKey } from "@debateai/kernel";
 
 /**
  * Side-by-side uploads spec 2026-10-21 §5, §6 (plan C task C14): the debate asked for was made by a newer release than
@@ -17,5 +17,22 @@ export class MadeByNewerReleaseError extends TypedDomainError {
     super(MADE_BY_NEWER_RELEASE, MADE_BY_NEWER_RELEASE);
     this.name = "MadeByNewerReleaseError";
     if (cause !== undefined) this.cause = cause;
+  }
+}
+
+/**
+ * Side-by-side C14 (controller ruling on its concern 1): a run's release is newer than this API's when its key is not
+ * `legacy`, differs from this API's own, and its site version (`parseReleaseKey(...).siteVersion`) is at least this
+ * API's own. An EQUAL number with another code part is a code-only upgrade: the other side is treated as newer. A lower
+ * site version is older (its data failing this code's parse is our own bug), and a key on either side that does not
+ * parse cannot be compared: both read false. The one rule of the owner reads (index.ts withNewerReleaseFallback) and
+ * the public read (publications.ts readPublicDebate, final fix wave P5), so it lives here, beside the error.
+ */
+export function madeByNewerRelease(runReleaseKey: string, ownReleaseKey: string): boolean {
+  if (runReleaseKey === LEGACY_RELEASE_KEY || runReleaseKey === ownReleaseKey) return false;
+  try {
+    return parseReleaseKey(runReleaseKey).siteVersion >= parseReleaseKey(ownReleaseKey).siteVersion;
+  } catch {
+    return false;
   }
 }

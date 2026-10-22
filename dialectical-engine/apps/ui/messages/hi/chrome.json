@@ -71,7 +71,7 @@
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
   "chrome.footer.consumerProtection": "उपभोक्ता संरक्षण",
-  "chrome.release.newerVersion": "वेबसाइट का एक नया संस्करण उपलब्ध है।",
+  "chrome.release.newerVersion": "वेबसाइट को अपडेट किया गया है। पेज फिर से लोड करें।",
   "chrome.release.reload": "फिर से लोड करें",
   "chrome.release.madeByNewer": "यह वाद-विवाद वेबसाइट के नए संस्करण से बनाया गया है। पेज फिर से लोड करें, या कुछ मिनट बाद फिर से कोशिश करें।"
 }

@@ -5,13 +5,15 @@ import { DEVELOPMENT_CODE_REVISION, LEGACY_RELEASE_KEY, releaseCodePart } from "
  * OLD OPEN PAGES (side-by-side uploads spec 2026-10-21 §7; plan C13).
  *
  * During an upload the new release takes traffic while pages built by the old one are still open. Such a page must
- * not fail or retry forever: it shows one small, plain, non-blocking note ("A newer version of the site is available.
- * Reload", components/NewVersionNote.tsx) and keeps working where it can.
+ * not fail or retry forever: it shows one small, plain, non-blocking note ("The site was updated. Please reload the
+ * page." + Reload, components/NewVersionNote.tsx) and keeps working where it can. The sentence is neutral (final fix
+ * wave W4): after a way back the release now serving is OLDER than this page's build, so it never says "newer".
  *
  * - NEWER_BUILD: an answer names a release (x-debateai-release, on every API answer) whose code part differs from the
- *   code baked into this build (NEXT_PUBLIC_DEBATEAI_RELEASE_CODE, next.config.mjs); or an answer did not parse
- *   (INVALID_RESPONSE: a newer API's shape). Only the code part is compared: a settings-only release keeps its code
- *   part and does not rebuild the website, so it shows no note.
+ *   code baked into this build (NEXT_PUBLIC_DEBATEAI_RELEASE_CODE, next.config.mjs) — a newer release, or an older one
+ *   after a way back; or an answer did not parse (INVALID_RESPONSE: another release's API shape). The name stays
+ *   NEWER_BUILD (the common case). Only the code part is compared: a settings-only release keeps its code part and
+ *   does not rebuild the website, so it shows no note.
  * - MADE_BY_NEWER: the server says what was asked for was made by a newer release (MADE_BY_NEWER_RELEASE, plan C14).
  *
  * Nothing is compared when either side does not know its revision: a development build or launcher carries the code
@@ -34,9 +36,9 @@ export function bakedReleaseCode(): string {
 }
 
 /**
- * Reads one answer's x-debateai-release. A well-formed key whose code part differs from this build's announces
- * NEWER_BUILD; a missing or malformed value, `legacy`, the same code part, or an unknown revision on either side is
- * ignored.
+ * Reads one answer's x-debateai-release. A well-formed key whose code part differs from this build's (newer, or older
+ * after a way back) announces NEWER_BUILD; a missing or malformed value, `legacy`, the same code part, or an unknown
+ * revision on either side is ignored.
  */
 export function noteReleaseHeader(value: string | null): void {
   if (value === null || value === LEGACY_RELEASE_KEY) return;
@@ -68,8 +70,12 @@ export function subscribeNewerVersion(listener: (reason: NewerVersionReason) => 
   return () => { listeners.delete(listener); };
 }
 
-/** The reason a refused call tells, or null for every other refusal. */
-function reasonOf(failure: unknown): NewerVersionReason | null {
+/**
+ * The reason a refused call tells, or null for every other refusal. A page that catches such a refusal leaves the
+ * telling to the note (final fix wave W1): no error banner and no raw code beside it (DebatePageClient's re-read and
+ * recorded-event replay).
+ */
+export function newerVersionReasonOf(failure: unknown): NewerVersionReason | null {
   if (!(failure instanceof ContractHttpError)) return null;
   if (failure.code === "INVALID_RESPONSE") return "NEWER_BUILD";
   if (failure.serverCode === MADE_BY_NEWER_RELEASE) return "MADE_BY_NEWER";
@@ -95,7 +101,7 @@ export function withNewerVersionWatch<T extends object>(client: T): T {
         const result: unknown = Reflect.apply(member, client, args);
         if (!(result instanceof Promise)) return result;
         return result.catch((failure: unknown) => {
-          const told = reasonOf(failure);
+          const told = newerVersionReasonOf(failure);
           if (told !== null) announceNewerVersion(told);
           throw failure;
         });

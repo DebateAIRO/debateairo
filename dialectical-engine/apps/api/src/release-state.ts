@@ -23,8 +23,9 @@ import type { AskAdmissionGate } from "./ask-room.js";
  *
  * Polls chain with setTimeout (unref'd), so they never overlap and never hold the process open. A read that has not
  * answered within `staleMs` counts as a failed read (RELEASE_READ_TIMEOUT) and is aborted: the Postgres reader then
- * gives its own client back DESTROYED (release with an error), so a read hung on a lock or a dead socket never keeps a
- * slot of the 20-connection runtime pool, and the database stops the statement itself (a transaction-local
+ * gives its own client back DESTROYED (release with an error), so a read hung on a lock or a dead socket never keeps the
+ * one connection of its own pool (`api:release-watch`, final fix wave P1: never the runtime pool, where a burst of page
+ * reads could hold it past the stale bound), and the database stops the statement itself (a transaction-local
  * statement_timeout of the same bound). Every log line is content-free: an event code and at most a driver code, never
  * an error's text, a key or a value; a read that fails after stop() prints nothing. A wall clock stepped back
  * makes the last read stale (fail closed until a new read) without forgetting it: draining() and NOT_CURRENT keep the
@@ -314,6 +315,17 @@ export class ReleaseWatcher {
   #line(event: WatchEvent, code?: string): void {
     this.#log(`DEBATEAI_RELEASE_WATCH ${JSON.stringify(code === undefined ? { event } : { event, code })}`);
   }
+}
+
+/**
+ * Side-by-side final fix wave P7 — the boot line of a hosted API that composed no ask room (no costEnvelopePolicy row in
+ * force, or one without the band). The site's cap of debates across releases (SITE_CONCURRENT_DEBATES) and the SWITCHING
+ * hold are read inside the room's spend decision (PostgresAskAdmissionGate below), so without the room neither holds and
+ * asks start as they did before it. Not a refusal: one content-free line for the operator's journal. A local API runs
+ * one release, so it has no cap to lose and prints nothing.
+ */
+export function siteCapBootLine(input: Readonly<{ hosted: boolean; roomComposed: boolean }>): string | null {
+  return input.hosted && !input.roomComposed ? JSON.stringify({ event: "api.release.no_site_cap" }) : null;
 }
 
 /**

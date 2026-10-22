@@ -6,8 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import chromeEnglish from "../../apps/ui/messages/en/chrome.json" with { type: "json" };
 
 /**
- * Side-by-side uploads spec 2026-10-21 §7 (plan C13): a page opened under an older release shows one small, plain,
- * non-blocking line — "A newer version of the site is available." with a Reload button — instead of failing; a public
+ * Side-by-side uploads spec 2026-10-21 §7 (plan C13): a page opened under another release shows one small, plain,
+ * non-blocking line — "The site was updated. Please reload the page." with a Reload button — instead of failing; a public
  * debate made by a newer release says so in a plain sentence instead of "not found".
  */
 const mocks = vi.hoisted(() => ({ readPublicDebate: vi.fn() }));
@@ -53,7 +53,8 @@ afterEach(async () => {
 
 describe("NewVersionNote", () => {
   it("English strings say it plainly", () => {
-    expect(NEWER).toBe("A newer version of the site is available.");
+    // Final fix wave W4: neutral — after a way back the site is older, so the note never says "newer".
+    expect(NEWER).toBe("The site was updated. Please reload the page.");
     expect(chromeEnglish["chrome.release.reload"]).toBe("Reload");
     expect(MADE_BY_NEWER).toBe("This was made by a newer version of the site. Reload the page, or try again in a few minutes.");
   });

@@ -28,7 +28,7 @@ import {
 import { NO_MAP_VIEWS, answerNodeIds, type MapViewReader } from "./map-views.js";
 import { TypedDomainError } from "@debateai/kernel";
 import type { AuthenticatedSession } from "./sessions.js";
-import { MadeByNewerReleaseError } from "./made-by-newer-release.js";
+import { MadeByNewerReleaseError, madeByNewerRelease } from "./made-by-newer-release.js";
 import type { PublicationContentCheck } from "./publication-check/check.js";
 type LabeledNumber = Node["base_score"];
 function redactLabeledNumber(
@@ -374,6 +374,16 @@ export interface PublicationApplication {
   }>>;
 }
 
+/**
+ * Side-by-side final fix wave P5: what readPublicDebate needs to tell a newer release's snapshot from this release's own
+ * (or an older one's) — this API's release key and a reader of a run's `core.run.release_key` (the runtime pool's
+ * PostgresAskApplication.readRunReleaseKey, wired in main.ts). The rule is the owner reads' (madeByNewerRelease).
+ */
+export type PublicSnapshotReleases = Readonly<{
+  ownReleaseKey: string;
+  readRunReleaseKey(runId: string): Promise<string | null>;
+}>;
+
 export class PostgresPublicationApplication implements PublicationApplication {
   constructor(
     private readonly repository: PostgresPublicationRepository,
@@ -381,7 +391,9 @@ export class PostgresPublicationApplication implements PublicationApplication {
     private readonly clock: () => Date = () => new Date(),
     private readonly cleanupRepository: PostgresPublicationRepository = repository,
     private readonly stories: PublicationStoryReader = NO_PUBLICATION_STORIES,
-    private readonly mapViews: MapViewReader = NO_MAP_VIEWS
+    private readonly mapViews: MapViewReader = NO_MAP_VIEWS,
+    /** Final fix wave P5: null (no release to compare with) reads an unparsable snapshot as before C14: not found. */
+    private readonly releases: PublicSnapshotReleases | null = null
   ) {}
 
   async preflightGrant(input: Readonly<{
@@ -681,8 +693,11 @@ export class PostgresPublicationApplication implements PublicationApplication {
   /**
    * The public debate, or null (404) when it is not published, its key or ciphertext does not open, it names another
    * publication, or it stopped being public meanwhile. Side-by-side spec §5, §6 (plan C14): a snapshot that passed all
-   * of that but does not parse holds a member this release does not know — a newer release made it — and rejects with
-   * `MadeByNewerReleaseError` (409, "open it on the current site") instead of the 404 it read as before.
+   * of that but does not parse holds a member this release does not know. Final fix wave P5, the owner reads' rule: when
+   * its run is stamped by a NEWER release (madeByNewerRelease) it rejects with `MadeByNewerReleaseError` (409, "open it
+   * on the current site"); this release's own, an older one's, `legacy`, or a key that cannot be read or compared is the
+   * old not found (null), with one content-free journal line (api.publication.snapshot_unreadable), since it is not a
+   * newer release's data. The key is read only after the parse failed, inside the same content lease.
    */
   async readPublicDebate(publicationRef: string): Promise<PublicDebate | null> {
     return this.repository.withContentLease(publicationRef,async () => {
@@ -711,9 +726,25 @@ export class PostgresPublicationApplication implements PublicationApplication {
         prepared?.close();
       }
       const publicDebate = PublicDebateSchema.safeParse(decrypted);
-      if (!publicDebate.success) throw new MadeByNewerReleaseError(publicDebate.error);
-      return publicDebate.data;
+      if (publicDebate.success) return publicDebate.data;
+      const releaseKey = await this.#runReleaseKey(snapshot.runId);
+      if (releaseKey !== null && this.releases !== null && madeByNewerRelease(releaseKey, this.releases.ownReleaseKey)) {
+        // The owner reads' line (index.ts withNewerReleaseFallback): content-free — the route, the public id, the key.
+        console.error(JSON.stringify({
+          event: "api.debate.made_by_newer_release", route: "GET /v1/public/debates/{id}", id: publicationRef, releaseKey
+        }));
+        throw new MadeByNewerReleaseError(publicDebate.error);
+      }
+      console.error(JSON.stringify({ event: "api.publication.snapshot_unreadable", id: publicationRef, releaseKey }));
+      return null;
     });
+  }
+
+  /** The snapshot run's release key, or null when none is wired, there is no such run, or the read fails (P5). */
+  async #runReleaseKey(runId: string): Promise<string | null> {
+    const releases = this.releases;
+    if (releases === null) return null;
+    return Promise.resolve().then(() => releases.readRunReleaseKey(runId)).catch(() => null);
   }
 
   async list(limit: number, offset: number): Promise<Readonly<{

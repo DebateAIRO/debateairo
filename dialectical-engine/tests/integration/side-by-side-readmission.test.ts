@@ -6,8 +6,9 @@ import { WorkItemRepository } from "@debateai/battery";
 import { PostgresModelSpendStore } from "@debateai/budget";
 import { PLAN_TIER_ROSTERS, type AskRequest, type Session } from "@debateai/contract";
 import {
-  EntitlementRepository, RunRepository, RunWaitRepository, type ReadmissionPrincipal, type StartRunInput
+  EntitlementRepository, RunRepository, RunWaitRepository, type ReadmissionPrincipal, type RunOwnershipAccess, type StartRunInput
 } from "@debateai/db";
+import { ServeRepository } from "@debateai/serve";
 import {
   BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, debateShapePolicyStartValues, parseDebateShapePolicy
 } from "@debateai/register";
@@ -315,6 +316,15 @@ async function stampOf(runId: string) {
   )).rows[0];
 }
 
+/**
+ * Final fix wave P4: the person's library list as the route reads it (ServeRepository.readAnswerIndex), the runs it names
+ * and its count. A large page, so `total` equals the runs named when nothing is left out of one but not the other.
+ */
+async function libraryOf(ownership: RunOwnershipAccess): Promise<Readonly<{ refs: readonly string[]; total: number }>> {
+  const index = await new ServeRepository(fixture.database.pool).readAnswerIndex(ownership, 100, 0);
+  return { refs: [...index.items.map((item) => item.run_ref), ...index.open_runs.map((run) => run.run_ref)], total: index.total };
+}
+
 /** The runs a person has besides `except`: a legacy re-admission keeps the old run's asker id. */
 async function otherRunsOf(askerId: string, except: string): Promise<string[]> {
   return (await fixture.database.pool.query<{ run_id: string }>(
@@ -539,6 +549,8 @@ describe("side-by-side C11: a waiting debate is re-admitted under the current re
     expect(dispatched).toEqual([]);
     const lines = failures.mock.calls.map(([line]) => JSON.parse(String(line)) as Record<string, unknown>);
     expect(lines).toContainEqual({ event: "api.wait.readmission_failed", runId: old, newRunId: orphan, diagnostic: expect.any(String) });
+    // Final fix wave P4: the person's list shows the waiting question once, never the FAILED copy beside it.
+    expect(await libraryOf({ ownerRef: null, legacyAskerId: askerId })).toEqual({ refs: [old], total: 1 });
 
     now = new Date("2034-05-06T10:02:00.000Z");
     await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ started: 1, failed: 0 });
@@ -546,6 +558,7 @@ describe("side-by-side C11: a waiting debate is re-admitted under the current re
     expect(edges).toHaveLength(1);
     expect(edges[0]!.new_run_id).not.toBe(orphan);
     expect(dispatched).toEqual([edges[0]!.new_run_id]);
+    expect(await libraryOf({ ownerRef: null, legacyAskerId: askerId })).toEqual({ refs: [edges[0]!.new_run_id], total: 1 });
   });
 
   // C11 review, Important (controller ruling 2026-10-22): a re-admission whose START never committed (the process died
@@ -558,6 +571,8 @@ describe("side-by-side C11: a waiting debate is re-admitted under the current re
     const old = await storedWaiting({ questionLine: question, principal: { kind: "legacy", legacyAskerId: askerId }, sessionId: randomUUID() });
     const orphan = await crashedReadmission(old, { kind: "legacy", legacyAskerId: askerId }, question);
     expect(await jobsOf(orphan)).toEqual([]);
+    // Final fix wave P4: the copy that never started is no second debate in the person's list.
+    expect(await libraryOf({ ownerRef: null, legacyAskerId: askerId })).toEqual({ refs: [old], total: 1 });
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
     const dispatched: string[] = [];
 
@@ -572,6 +587,8 @@ describe("side-by-side C11: a waiting debate is re-admitted under the current re
     expect(dispatched).toEqual([edges[0]!.new_run_id]);
     const lines = journalLines(info.mock.calls);
     expect(lines).toContainEqual({ event: "api.wait.readmission_orphan", runId: old, newRunId: orphan });
+    // The re-admitted debate shows once, as its new run: not the superseded old one, not the FAILED copy.
+    expect(await libraryOf({ ownerRef: null, legacyAskerId: askerId })).toEqual({ refs: [edges[0]!.new_run_id], total: 1 });
   });
 
   it("an owner's re-admission whose START never committed is closed FAILED when the next tick meets TAKEN; the tick after re-admits", async () => {
@@ -586,6 +603,13 @@ describe("side-by-side C11: a waiting debate is re-admitted under the current re
       "SELECT readmitted_from_run_id::text AS readmitted_from_run_id FROM identity.run_execution_binding WHERE run_id = $1", [orphan]
     )).rows).toEqual([{ readmitted_from_run_id: old }]);
     expect(await jobsOf(orphan)).toEqual([]);
+    // Final fix wave P4: the owner's list names the waiting run and never the copy that did not start (the owner has
+    // other runs from earlier cases, so the count is checked against the runs the list names).
+    const owner: RunOwnershipAccess = { ownerRef: fixture.ownerRef, legacyAskerId: null };
+    const before = await libraryOf(owner);
+    expect(before.refs).toContain(old);
+    expect(before.refs).not.toContain(orphan);
+    expect(before.total).toBe(before.refs.length);
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
     const dispatched: string[] = [];
     const application = newApplication(roomOf({ releaseKey: NEW_RELEASE, ceiling: RAISED_DAY }), { dispatched });
@@ -601,6 +625,11 @@ describe("side-by-side C11: a waiting debate is re-admitted under the current re
     const lines = journalLines(info.mock.calls);
     expect(lines).toContainEqual({ event: "api.wait.readmission_orphan", runId: old, newRunId: orphan });
     expect(lines).toContainEqual({ event: "api.wait.readmission_skipped", runId: old, code: "RUN_READMISSION_TAKEN" });
+    // Recorded FAILED (RUN_SETUP_FAILED:READMISSION), the copy still stays out of the list; the old run is there once.
+    const closed = await libraryOf(owner);
+    expect(closed.refs.filter((ref) => ref === old)).toHaveLength(1);
+    expect(closed.refs).not.toContain(orphan);
+    expect(closed.total).toBe(closed.refs.length);
 
     // The next tick re-admits it.
     now = new Date("2034-05-09T10:02:00.000Z");
@@ -611,6 +640,27 @@ describe("side-by-side C11: a waiting debate is re-admitted under the current re
     expect(created).not.toBe(orphan);
     expect(dispatched).toEqual([created]);
     expect((await new RunRepository(fixture.database.pool).readStoredAsk(created))?.questionLine).toBe(question);
+  });
+
+  it("the list's re-admission filter reads only what the API's runtime login may, with no migration (final fix wave P4)", async () => {
+    // packages/serve readAnswerIndex runs on the API's runtime pool, whose login holds debateai_billing_runtime (a
+    // member of debateai_runtime, 0093): each object its P4 clauses read, read as that role.
+    const client = await fixture.database.pool.connect();
+    try {
+      await client.query("SET ROLE debateai_billing_runtime");
+      await client.query(
+        `SELECT listed.run_id FROM core.run_wait AS wait
+         CROSS JOIN LATERAL core.list_unstarted_readmissions(wait.run_id) AS listed(run_id)
+         WHERE NOT EXISTS (SELECT 1 FROM core.run_wait_start AS started WHERE started.run_id = wait.run_id)
+           AND NOT EXISTS (SELECT 1 FROM core.run_supersession AS s WHERE s.old_run_id = wait.run_id)`
+      );
+      await client.query(
+        "SELECT count(*) FROM core.work_item WHERE state = 'FAILED' AND terminal_reason = 'RUN_SETUP_FAILED:READMISSION'"
+      );
+    } finally {
+      await client.query("RESET ROLE").catch(() => undefined);
+      client.release();
+    }
   });
 
   it("the same release: a waiting run stamped r17 starts on its own row, with no supersession and no new run", async () => {

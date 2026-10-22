@@ -206,7 +206,6 @@ import {
   checkDob,
   dobFromIso,
   isMailAddress,
-  LEGACY_RELEASE_KEY,
   meetsMinimumAge,
   MIN_AGE,
   parseDeclaredRegion,
@@ -273,7 +272,7 @@ import { registerStaffRoutes, staffAuthorizationPolicyInventory, type StaffHttpA
 import { exactStaffCookie, exactStaffCsrfPair, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME, STAFF_CSRF_HEADER, streamAuthorizedEvents, type StaffAccessApplication, type StaffAuthentication } from "./staff/access.js";
 export { staffRoutePolicy, staffCookies, clearStaffCookies, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME, STAFF_CSRF_HEADER } from "./staff/access.js";
 import type { PublicationApplication } from "./publications.js";
-import { MadeByNewerReleaseError } from "./made-by-newer-release.js";
+import { MadeByNewerReleaseError, madeByNewerRelease } from "./made-by-newer-release.js";
 import type { PublicationContentCheck } from "./publication-check/check.js";
 import type { AnswerStoryApplication } from "./stories.js";
 import type { AnswerDisclosureApplication } from "./disclosures.js";
@@ -2053,22 +2052,6 @@ async function withNewerReleaseFallback<T>(
     // release key), and the parse failure kept as the error's cause.
     console.error(JSON.stringify({ event: "api.debate.made_by_newer_release", route: debate.route, id: debate.id, releaseKey }));
     throw new MadeByNewerReleaseError(error);
-  }
-}
-
-/**
- * Side-by-side C14 (controller ruling on its concern 1): a run's release is newer than this API's when its key is not
- * `legacy`, differs from this API's own, and its site version (`parseReleaseKey(...).siteVersion`) is at least this
- * API's own. An EQUAL number with another code part is a code-only upgrade: the other side is treated as newer. A lower
- * site version is older (its data failing this code's parse is our own bug), and a key on either side that does not
- * parse cannot be compared: both read false, so the caller rethrows the loud 500.
- */
-function madeByNewerRelease(runReleaseKey: string, ownReleaseKey: string): boolean {
-  if (runReleaseKey === LEGACY_RELEASE_KEY || runReleaseKey === ownReleaseKey) return false;
-  try {
-    return parseReleaseKey(runReleaseKey).siteVersion >= parseReleaseKey(ownReleaseKey).siteVersion;
-  } catch {
-    return false;
   }
 }
 
@@ -4264,14 +4247,15 @@ export function releaseServes(input: Readonly<{ state: ReleaseState | null; anyC
   return !input.anyCurrent && !input.hosted;
 }
 
-/** Spec §4 / plan D: one owner mail per release key per half hour at most, so a burst of refused sends is one line. */
+/** Spec §4: one journal line per release key per half hour at most, so a burst of refused sends is one line. */
 const RELEASE_NOT_SERVED_ALERT_WINDOW_MS = 1_800_000;
 
 /**
- * Side-by-side spec §4 (plan C task C4) — THE OWNER HEARS OF A REFUSED SEND. The API emails nobody about releases: it
- * prints `DEBATEAI_RELEASE_NOT_SERVED {"releaseKey":…,"state":…|null}` on stderr, at most once per release key per
- * `windowMs` in this process, and plan D's root-side watcher mails the owner from it. Content-free: a key we mint and a
- * lifecycle word.
+ * Side-by-side spec §4 (plan C task C4) — A REFUSED SEND IS JOURNALED. The API emails nobody about releases: it prints
+ * `DEBATEAI_RELEASE_NOT_SERVED {"releaseKey":…,"state":…|null}` on stderr, at most once per release key per `windowMs` in
+ * this process. That journal line is all there is: no deploy watcher mails it (final fix wave X5), so the owner sees it
+ * in the API's journal (deploy/vps/README.md lists it with the waker's api.wait.release_not_served row). Content-free: a
+ * key we mint and a lifecycle word.
  */
 export function createReleaseNotServedAlert(options: Readonly<{
   clock?: () => number; windowMs?: number; write?: (line: string) => void;
