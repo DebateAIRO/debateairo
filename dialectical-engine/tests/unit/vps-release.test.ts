@@ -208,11 +208,11 @@ function host(releases: Release[], options: Options = {}) {
     if (currentKey() !== key) return site(key, 503, ["NOT_CURRENT"]);
     return clock >= events[latest(key, ["CURRENT"])]!.ttf! ? site(key) : site(key, 503, ["BEFORE_TAKE_TRAFFIC_FROM"]);
   };
-  /** Caddy holds a request up to 10 s (lb_try_duration) while no slot is ready, then answers it itself (no release header). */
+  /** Caddy holds a request up to 12 s (lb_try_duration) while no slot is ready, then answers it itself (no release header). */
   const edgeAnswer = (): Answer => {
     const key = currentKey();
     const ttf = key === null ? Infinity : events[latest(key, ["CURRENT"])]!.ttf!;
-    if (key !== null && clock < ttf && ttf - clock <= 10_000) clock = ttf;
+    if (key !== null && clock < ttf && ttf - clock <= 12_000) clock = ttf;
     const answer = key === null ? "refused" : websiteAnswer(releases.find((entry) => entry.key === key)!.label);
     if (answer !== "refused" && answer.status === 200) return answer;
     clock += 10_000;

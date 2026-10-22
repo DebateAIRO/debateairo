@@ -1,6 +1,6 @@
 (debateai_slots) {
 	lb_policy first
-	lb_try_duration 10s
+	lb_try_duration 12s
 	lb_try_interval 250ms
 	health_uri /readyz
 	health_interval 2s

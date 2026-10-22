@@ -20,7 +20,7 @@
 # asks each website's /readyz every 2 s; a website is ready only while its own API's release is current and the
 # release table's "take traffic from" time has passed, so at most one slot is ever healthy. At a switch the old pair
 # turns not-ready at once and the new pair a few seconds later (break-before-make); a request that arrives in between
-# waits up to 10 s (lb_try_duration) instead of failing. Caddy runs with `admin off`, so this file only takes effect
+# waits up to 12 s (lb_try_duration) instead of failing. Caddy runs with `admin off`, so this file only takes effect
 # through `systemctl restart caddy`, never a reload (README §6).
 
 {
@@ -31,9 +31,9 @@
 # The one proxy, imported by the public site and by the loopback check site below.
 (debateai_slots) {
 	reverse_proxy 127.0.0.1:3001 127.0.0.1:3002 {
-		# The first healthy upstream takes every request; with none healthy, hold and retry every 250 ms for 10 s.
+		# The first healthy upstream takes every request; with none healthy, hold and retry every 250 ms for 12 s.
 		lb_policy first
-		lb_try_duration 10s
+		lb_try_duration 12s
 		lb_try_interval 250ms
 		health_uri /readyz
 		health_status 200

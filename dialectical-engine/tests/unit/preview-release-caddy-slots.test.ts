@@ -75,7 +75,7 @@ const LIVE_PREVIEW = [
 const SNIPPET_LINES = [
   '(debateai_slots) {',
   '\tlb_policy first',
-  '\tlb_try_duration 10s',
+  '\tlb_try_duration 12s',
   '\tlb_try_interval 250ms',
   '\thealth_uri /readyz',
   '\thealth_interval 2s',

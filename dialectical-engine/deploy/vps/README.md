@@ -1732,7 +1732,7 @@ refuses would leave the site down after the restart.
   refuses `/readyz` itself (`respond /readyz 404`): every request it proxies carries the edge
   secret, so the website would trust a visitor's `/readyz` too. Readiness is read only by those
   health checks and through the loopback check site below. A request that arrives while no slot is ready,
-  for the few seconds of a switch, is held and retried for up to 10 s (`lb_try_duration`) instead
+  for the few seconds of a switch, is held and retried for up to 12 s (`lb_try_duration`) instead
   of failing.
 - **The loopback check site `127.0.0.1:3090`** is the same front without TLS, bound to loopback
   only. The release tool asks it whether Caddy already sends traffic to the new pair. A local

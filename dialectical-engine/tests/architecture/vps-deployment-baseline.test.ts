@@ -338,7 +338,7 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
     expect(snippet).not.toBe("");
     for (const needle of [
       "reverse_proxy 127.0.0.1:3001 127.0.0.1:3002 {",
-      "lb_policy first", "lb_try_duration 10s", "lb_try_interval 250ms",
+      "lb_policy first", "lb_try_duration 12s", "lb_try_interval 250ms",
       "health_uri /readyz", "health_status 200", "health_interval 2s", "health_timeout 1s", "health_passes 1", "health_fails 1",
       "header_up X-Forwarded-For {remote_host}",
       "header_up X-Forwarded-Proto https",

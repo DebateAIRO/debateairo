@@ -42,7 +42,7 @@
 // never the edge secret and never a response body. Root writes only the release table here, never a debate table.
 //
 // The edge (controller ruling D10 Q1): root reads readiness through Caddy's loopback listener (127.0.0.1:3090, GET
-// /readyz only, caddy-slots.mjs). Every request may wait out Caddy's 10 s hold, so each one gets 12 s. A website's own
+// /readyz only, caddy-slots.mjs). Every request may wait out Caddy's 12 s hold, so each one gets 15 s. A website's own
 // answer always names its release in x-debateai-release, so an answer without that header is one Caddy made itself (no
 // slot ready when its hold ran out); those, timeouts and connection errors are the switch's edge failures. A website's
 // 503 during the break-before-make gap is an answer, not a failure. There is no background poller (controller ruling,
@@ -67,8 +67,12 @@ import { RELEASE_KEY_PATTERN, countOpenWork, readCurrentRelease, readReleaseEven
  * one more second of margin: 5 + 2 + 1 = 8 s, so the new pair never takes traffic while the old one still does.
  */
 export const HEALTH_INTERVAL_S = 2, TAKE_TRAFFIC_AFTER_S = 8, EDGE_WAIT_MS = 30_000, EDGE_CONFIRMATIONS = 3, BACKSTOP_S = 27_000;
-/** One edge request every 500 ms (after the previous one answered), each allowed 12 s: longer than lb_try_duration 10 s. */
-export const EDGE_POLL_MS = 500, EDGE_REQUEST_TIMEOUT_MS = 12_000;
+/**
+ * One edge request every 500 ms (after the previous one answered), each allowed 15 s: longer than lb_try_duration 12 s
+ * (integration M11: the no-slot window of a switch grew to about 10 s with the 8 s take-traffic delay), so a request
+ * Caddy holds is answered by Caddy, never cut by this client.
+ */
+export const EDGE_POLL_MS = 500, EDGE_REQUEST_TIMEOUT_MS = 15_000;
 /** A release notice code is the label with `_` for `-`, at most 64 characters (alert.mjs, D6): longer labels never stage. */
 export const MAX_LABEL_LENGTH = 64;
 /** The rollback's waits: a runner's ready line (its prestart verifies first), then an API's (TimeoutStartSec=300 + 30 s). */

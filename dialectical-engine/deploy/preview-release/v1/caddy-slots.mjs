@@ -4,7 +4,7 @@
 // side, both slots' website ports (3100 and 3200) must be its upstreams. Caddy then asks each website's /readyz every
 // 2 s, straight at the slot's port (with the edge secret, or the website treats the check as an untrusted peer), and
 // sends each request to the first ready slot. The public route itself refuses /readyz (Caddy's own 404, before the
-// password: every proxied request carries the edge secret, so the website would trust a visitor's /readyz too). A request that arrives while neither slot is ready, during a switch, waits up to 10 s instead of failing.
+// password: every proxied request carries the edge secret, so the website would trust a visitor's /readyz too). A request that arrives while neither slot is ready, during a switch, waits up to 12 s instead of failing.
 // The preview's Caddy runs with `admin off`, so this is a file change and a restart, done once in the transition
 // window (side-by-side plan D15), never a reload. A loopback-only listener (127.0.0.1:3090, no password) lets root
 // poll /readyz through Caddy itself: it proxies GET /readyz and nothing else (every other request is a plain 404).

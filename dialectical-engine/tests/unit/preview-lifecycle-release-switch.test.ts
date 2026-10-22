@@ -324,12 +324,13 @@ describe('the switch (side-by-side spec §6)', () => {
 
   it('takes traffic from the database clock + 8 s and waits one more health interval after three confirmations', async () => {
     // 8 s = the API watcher's 5 s stale bound + one health interval + 1 s (final fix wave P6).
-    expect([HEALTH_INTERVAL_S, TAKE_TRAFFIC_AFTER_S, EDGE_WAIT_MS, EDGE_CONFIRMATIONS, BACKSTOP_S, EDGE_REQUEST_TIMEOUT_MS]).toEqual([2, 8, 30_000, 3, 27_000, 12_000]);
+    expect([HEALTH_INTERVAL_S, TAKE_TRAFFIC_AFTER_S, EDGE_WAIT_MS, EDGE_CONFIRMATIONS, BACKSTOP_S, EDGE_REQUEST_TIMEOUT_MS]).toEqual([2, 8, 30_000, 3, 27_000, 15_000]);
     expect(EDGE_URL).toBe('http://127.0.0.1:3090/readyz');
     const h = host();
     await switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps });
-    // Every edge request may wait out Caddy's 10 s hold (controller ruling D10 Q1); the website itself answers in 5 s.
-    expect(new Set(h.timeouts.filter(([url]) => url === EDGE_URL).map(([, ms]) => ms))).toEqual(new Set([12_000]));
+    // Every edge request may wait out Caddy's 12 s hold (controller ruling D10 Q1, integration M11); the website itself
+    // answers in 5 s.
+    expect(new Set(h.timeouts.filter(([url]) => url === EDGE_URL).map(([, ms]) => ms))).toEqual(new Set([15_000]));
     expect(h.timeouts.filter(([url]) => url !== EDGE_URL)).toEqual([['http://127.0.0.1:3200/readyz', 5000]]);
   });
 
