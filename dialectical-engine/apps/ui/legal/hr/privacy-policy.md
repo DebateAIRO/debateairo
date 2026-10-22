@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ukratko
-eyebrow: PRAVILA O PRIVATNOSTI · v3.4 · NA SNAZI OD 12. LISTOPADA 2026.
+eyebrow: PRAVILA O PRIVATNOSTI · v3.5 · NA SNAZI OD 12. LISTOPADA 2026.
 title: Što pohranjujemo i zašto
 lede: Vaša prava i naše obveze prema Uredbi GDPR (EU) 2016/679, jednostavnim jezikom. Četrnaest odjeljaka i Prilog B — pomaknite se do kraja.
-endMarker: KRAJ PRAVILA · GDPR (EU) 2016/679 · v3.4
+endMarker: KRAJ PRAVILA · GDPR (EU) 2016/679 · v3.5
 bodyLabel: Tekst Pravila o privatnosti
 annexTitle: Prilog B — Regionalne odredbe o privatnosti
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 KOLAČIĆI
 -->
 
-**Version 3.4 · Effective 12. listopada 2026. · Prethodne verzije na dezbatere.ro/privacy/versions · Voditelj obrade: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.5 · Effective 12. listopada 2026. · Prethodne verzije na dezbatere.ro/privacy/versions · Voditelj obrade: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Prikupljamo ono što je potrebno za račun i ono što odlučite upisati. Vaša se pitanja šalju pružateljima usluga umjetne inteligencije navedenima u našem Registru; ne upotrebljavaju se za treniranje modela. Naš pružatelj usluga smještaja pohranjuje vaš račun i vaše rasprave u Londonu, u Ujedinjenoj Kraljevini; odjeljak 5 navodi kamo još idu vaši podaci. Rasprave su privatne osim ako ih objavite. Brisanjem računa uništavaju se ključevi vaših privatnih podataka; pri zakazivanju birate hoće li se i vaše objavljene rasprave ukloniti ili ostati javne pod vašim pseudonimom koji se više ne upotrebljava. Možete nam se obratiti na privacy@dezbatere.ro, a osobe imenovane u raspravi mogu zatražiti uklanjanje i bez računa.
 
@@ -43,7 +43,7 @@ Prikupljamo samo ono što je potrebno za rad računa, ono što nam odlučite dat
 | **Sadržaj rasprave** | Pitanje koje upišete; usmjeravajuće bilješke koje postavite; tvrdnje, kritike, upućivanja na dokaze, rezultati i presude koje sustav stvara; doslovan zapis onoga što je svaki pružatelj usluga umjetne inteligencije vratio; upiti za dohvaćanje i upućivanja na izvore. Sve se to pohranjuje šifrirano ključem koji je specifičan za vaš račun | Vi i modeli umjetne inteligencije koji obrađuju vaše pitanje |
 | **Podrška** | Poruke koje razmjenjujete s pomoćnikom za podršku ili osobom, pohranjene šifrirano; upotrijebljeni jezik; jeste li pomoćniku dopustili da vidi status (nikada sadržaj) vaših rasprava; ocjene koje dajete. Ako poruka aktivira kontrole zlouporabe, čuvamo sažetak poruke i sažetak IP adrese s koje je poslana | Vi |
 | **Evidencija prihvaćanja i privola** | Verzija i sažetak sadržaja Uvjeta koje ste prihvatili i pravila koja su vam prikazana; vrijeme; upotrijebljeni zaslon i mehanizam; vaš jezik; vaša IP adresa i korisnički agent u tom trenutku; svaka privola koju ste dali ili povukli i kada ste to učinili | Vaš preglednik, pri registraciji i svaki put kada promijenite odabir |
-| **Plaćanja** (kada plaćeni planovi započnu) | Tarifa, cijena, obračunsko razdoblje, upućivanja na transakcije, dokazi o poreznoj lokaciji. Podatke o kartici čuva naš pružatelj platnih usluga, a nikada mi | Vi i pružatelj platnih usluga |
+| **Plaćanja** (kada plaćeni planovi započnu) | Tarifa, cijena, obračunsko razdoblje, upućivanja na transakcije, dokazi o poreznoj lokaciji. Podaci za naplatu koje unosite pri plaćanju: vaše ime, broj telefona i adresa za naplatu te, ako kupujete kao tvrtka, njezin naziv, PDV identifikacijski broj i adresa; i IP adresa s koje plaćate. Podatke o kartici unosite na stranici našeg pružatelja platnih usluga, pa vaš puni broj kartice i sigurnosni kod nikada ne dolaze do nas. Od podataka o vašoj kartici čuvamo njezine posljednje četiri znamenke, mjesec i godinu isteka te zemlju u kojoj je izdana — kako bismo znali kojom je karticom izvršeno plaćanje, kako bismo vas podsjetili prije isteka kartice i kako bismo primijenili pravila za tu zemlju — kao i, pohranjen u šifriranom obliku, kod pružatelja platnih usluga kojim on može teretiti istu karticu pri svakom obnavljanju. Tijekom 14 dana čuvamo i, u šifriranom obliku, svaku poruku koju nam pružatelj platnih usluga pošalje o plaćanju, točno onakvu kakva je stigla; ona sadržava i prve znamenke broja kartice, koje identificiraju banku koja je izdala karticu, te naziv te banke | Vi i pružatelj platnih usluga |
 | **Osobe koje nisu naši korisnici** | Osobni podaci o drugim osobama koje uključite u pitanje ili koje sustav stvori odgovarajući na njega. Molimo vas da to ne činite; odjeljak 11 objašnjava što činimo kada se to ipak dogodi | Vi, neizravno |
 
 Pri registraciji provjeravamo državu IP adrese i dob. Datum rođenja služi samo za provjeru i ne pohranjuje se. Provjera IP adrese obavlja se lokalno, bez slanja adrese trećoj strani. Prije svake nove rasprave lokalno provjeravamo i državu IP adrese; raspravu odbijamo ako je država uvijek blokirana.
@@ -126,6 +126,8 @@ Kada zakažete brisanje računa, birate što će se dogoditi s raspravama koje s
 | Razgovori i predmeti podrške | Do zatvaranja i još 12 mjeseci | Ključevi se uništavaju |
 | Evidencija prihvaćanja i privola | Trajanje računa uz još 6 godina — najdulji rok zastare koji se na nas primjenjuje | Briše se |
 | Evidencija plaćanja (kada plaćeni planovi započnu) | 10 godina, kako zahtijeva rumunjsko računovodstveno pravo | Briše se |
+| Spremljena kartica: kod pružatelja platnih usluga, s posljednje četiri znamenke, datumom isteka i zemljom kartice | Do jednog dana nakon što kartica prestane plaćati aktivni plan — kada plan završi, kada zamijenite karticu ili kada zatvorite račun | Briše se; posljednje četiri znamenke, datum isteka i zemlja ostaju i u evidenciji svakog plaćanja izvršenog tom karticom |
+| Poruke pružatelja platnih usluga o plaćanjima, onakve kakve su stigle | 14 dana | Briše se |
 | Sigurnosne kopije | Do 8 tjedana nakon brisanja aktivnog primjerka | Prepisuju se |
 
 **Što se brisanjem doista čini.** Vaše privatne rasprave i podaci o računu šifrirani su ključevima specifičnima za vaš račun i za svaku raspravu. Brisanjem računa uništavaju se ti ključevi, nakon čega ni mi ni itko drugi ne može pročitati šifrirane zapise, a zapis o vašem računu brišemo. Ključ javne kopije objavljene rasprave uništava se pri brisanju samo ako ste označili „Izbrišite i moje javne rasprave” (odjeljak 6). To opisujemo kao brisanje jer je takav njegov učinak i o tome imamo dokumentiranu procjenu; ako želite znati više, pitajte nas. Trebate znati tri stvari: sigurnosni revizijski trag može se samo dopunjavati i ne briše se, ali ne sadržava vaše čitljive identifikatore; mali broj starijih rasprava prethodi našoj trenutačnoj shemi šifriranja, a ako se to odnosi na vaš račun, obavijestit ćemo vas o tome što zatvaranje računa znači za te rasprave; te se na kopije podataka već poslane pružatelju usluga umjetne inteligencije primjenjuju uvjeti čuvanja tog pružatelja navedeni u Registru, a ne naše brisanje.
@@ -213,7 +215,7 @@ Da biste odbili ove stavke, blokirajte ili izbrišite kolačiće i podatke web-m
 
 Kada izmijenimo ova pravila, objavljujemo novu verziju sa sažetkom izmjena i novim datumom stupanja na snagu te čuvamo prethodne verzije na dezbatere.ro/privacy/versions. Za izmjenu kojom se dodaje nova svrha ili novi primatelj obavještavamo vas prije početka nove obrade, e-poštom i u proizvodu, te vam dajemo vrijeme za prigovor. Ako nova svrha ovisi o vašoj privoli — primjerice ako ikada poželimo upotrebljavati sadržaj za poboljšavanje modela — tu privolu tražimo zasebno i određeno; prihvaćanje ažuriranih Uvjeta nikada ne smatramo privolom za novu obradu. Za pojašnjenja koja ništa ne mijenjaju u vezi s našim postupanjem jednostavno objavljujemo novu verziju.
 
-Ova su pravila posljednji put ažurirana 12. listopada 2026. Verzija 3.4 zamijenila je verziju 3.3: u odjeljku 13. sada stoji da kolačić debateai.locale također određuje jezik kojim pišemo e-poruke koje vam šaljemo, a dodan je odlomak prema kojem svaka e-poruka koju za vas stavimo u red čekanja zadržava jezik koji ste odabrali dok je ne pošaljemo.
+Ova su pravila posljednji put ažurirana 12. listopada 2026. Verzija 3.5 zamijenila je verziju 3.4: u odjeljku 2. sada stoji koje podatke za naplatu i koje podatke o kartici čuvamo te da vaš puni broj kartice nikada ne dolazi do nas, a u odjeljku 7. stoji koliko dugo čuvamo spremljenu karticu i poruke pružatelja platnih usluga o plaćanjima.
 
 ## Annex B — Regionalne odredbe o privatnosti
 

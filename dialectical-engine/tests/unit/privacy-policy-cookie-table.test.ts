@@ -154,15 +154,15 @@ describe("Privacy Policy §13 — the twenty actual stored items in every locale
     }
   });
 
-  it("the English 3.4 summary names the two 3.4 changes and no 3.3-only change", () => {
+  it("the English 3.5 summary names the 3.5 changes and no 3.4-only change", () => {
     const line = /^This policy was last updated on .*$/m.exec(readFileSync(join(LEGAL_DIR, "en", "privacy-policy.md"), "utf8"))?.[0] ?? "";
-    const summary = line.split("Version 3.4 replaced version 3.3:")[1] ?? "";
-    expect(summary, "the version 3.4 summary follows the version line").not.toBe("");
-    for (const phrase of ["regions we serve", "names our company", "content-delivery", "Cloudflare bot check"]) {
-      expect(summary, `the 3.4 summary still names the 3.3 change "${phrase}"`).not.toContain(phrase);
+    const summary = line.split("Version 3.5 replaced version 3.4:")[1] ?? "";
+    expect(summary, "the version 3.5 summary follows the version line").not.toBe("");
+    for (const phrase of ["debateai.locale", "queue"]) {
+      expect(summary, `the 3.5 summary still names the 3.4 change "${phrase}"`).not.toContain(phrase);
     }
-    for (const keyword of ["debateai.locale", "language", "queue"]) {
-      expect(summary, `the 3.4 summary does not name the 3.4 change "${keyword}"`).toContain(keyword);
+    for (const keyword of ["section 2", "card", "section 7", "payment provider"]) {
+      expect(summary, `the 3.5 summary does not name the 3.5 change "${keyword}"`).toContain(keyword);
     }
   });
 

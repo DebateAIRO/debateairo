@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Na kratko
-eyebrow: PRAVILNIK O ZASEBNOSTI · v3.4 · VELJA OD 12. OKTOBRA 2026
+eyebrow: PRAVILNIK O ZASEBNOSTI · v3.5 · VELJA OD 12. OKTOBRA 2026
 title: Kaj hranimo in zakaj
 lede: Vaše pravice in naše obveznosti po GDPR (EU) 2016/679 v razumljivem jeziku. Štirinajst razdelkov in Priloga B — pomaknite se do konca.
-endMarker: KONEC PRAVILNIKA · GDPR (EU) 2016/679 · v3.4
+endMarker: KONEC PRAVILNIKA · GDPR (EU) 2016/679 · v3.5
 bodyLabel: Besedilo pravilnika o zasebnosti
 annexTitle: Priloga B — Regionalne določbe o zasebnosti
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 PIŠKOTKI
 -->
 
-**Version 3.4 · Effective 12. oktobra 2026 · Prejšnje različice na dezbatere.ro/privacy/versions · Upravljavec: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.5 · Effective 12. oktobra 2026 · Prejšnje različice na dezbatere.ro/privacy/versions · Upravljavec: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Zbiramo podatke, ki jih potrebuje račun, in to, kar se odločite vnesti. Vaša vprašanja se pošljejo ponudnikom umetne inteligence, navedenim v našem Registru; ne uporabljajo se za učenje modelov. Naš ponudnik gostovanja hrani vaš račun in vaše razprave v Londonu v Združenem kraljestvu; razdelek 5 pojasnjuje, kam še gredo vaši podatki. Razprave so zasebne, razen če jih objavite. Z izbrisom računa se uničijo ključi vaših zasebnih podatkov; ob načrtovanju izbrisa izberete, ali bodo odstranjene tudi objavljene razprave ali bodo ostale javne pod vašim umaknjenim psevdonimom. Dosegljivi smo na privacy@dezbatere.ro, osebe, navedene v razpravi, pa lahko zahtevajo odstranitev brez računa.
 
@@ -43,7 +43,7 @@ Zbiramo samo podatke, ki jih račun potrebuje za delovanje, podatke, ki nam jih 
 | **Vsebina razprave** | Vprašanje, ki ga vnesete; usmerjevalne opombe, ki jih nastavite; trditve, kritike, sklici na dokaze, ocene in razsodbe, ki jih ustvari sistem; dobesedni zapis odgovora vsakega ponudnika umetne inteligence; iskalne poizvedbe in sklici na vire. Vse to je shranjeno šifrirano s ključem, ki je poseben za vaš račun | Vi in modeli umetne inteligence, ki obravnavajo vaše vprašanje |
 | **Podpora** | Sporočila, ki jih izmenjate s pomočnikom za podporo ali osebo, shranjena šifrirano; uporabljeni jezik; ali ste pomočniku dovolili vpogled v stanje (nikoli v vsebino) svojih razprav; vaše ocene. Če sporočilo sproži ukrepe proti zlorabi, hranimo zgoščeno vrednost sporočila in zgoščeno vrednost naslova IP, s katerega je bilo poslano | Vi |
 | **Evidence sprejetja in privolitev** | Različica in zgoščena vrednost vsebine Pogojev, ki ste jih sprejeli, ter pravilnika, ki vam je bil prikazan; čas; uporabljeni zaslon in mehanizem; vaš jezik; vaš naslov IP in user-agent v tistem trenutku; vsaka privolitev, ki ste jo dali ali preklicali, in čas dogodka | Vaš brskalnik ob registraciji in ob vsaki spremembi izbire |
-| **Plačila** (ko bodo na voljo plačljivi paketi) | Paket, cena, obračunsko obdobje, sklici transakcij, dokazila o davčni lokaciji. Podatke o kartici hrani naš ponudnik plačilnih storitev, mi pa nikoli | Vi in ponudnik plačilnih storitev |
+| **Plačila** (ko bodo na voljo plačljivi paketi) | Paket, cena, obračunsko obdobje, sklici transakcij, dokazila o davčni lokaciji. Podatki za obračun, ki jih vnesete pri plačilu: vaše ime, telefonska številka in naslov za obračun ter, če kupujete kot podjetje, njegovo ime, identifikacijska številka za DDV in naslov; ter naslov IP, s katerega plačujete. Podatke o kartici vnesete na strani našega ponudnika plačilnih storitev, zato vaša celotna številka kartice in varnostna koda nikoli ne prideta do nas. Od podatkov o vaši kartici hranimo njene zadnje štiri števke, mesec in leto poteka veljavnosti ter državo, v kateri je bila izdana — da vemo, s katero kartico je bilo opravljeno plačilo, da vas opomnimo, preden kartica poteče, in da uporabimo pravila za to državo — ter šifrirano shranjeno kodo ponudnika plačilnih storitev, s katero lahko ta pri vsakem podaljšanju bremeni isto kartico. Poleg tega 14 dni hranimo, šifrirano, vsako sporočilo, ki nam ga ponudnik plačilnih storitev pošlje o plačilu, natanko takšno, kot je prispelo; vsebuje tudi prve števke številke kartice, ki identificirajo banko, ki je kartico izdala, in ime te banke | Vi in ponudnik plačilnih storitev |
 | **Osebe, ki niso naši uporabniki** | Osebni podatki o drugih osebah, ki jih vključite v vprašanje ali jih sistem ustvari pri odgovarjanju. Prosimo vas, da tega ne počnete; razdelek 11 pojasnjuje, kako ravnamo, če se to kljub temu zgodi | Vi, posredno |
 
 Ob registraciji lokalno preverimo državo naslova IP s podatki DB-IP Lite in seznamom izhodnih vozlišč Tor; naslova ne pošljemo tretji osebi. Registracijo zavrnemo iz držav, kjer storitev ni na voljo, z izhodnih vozlišč Tor in z naslovov, katerih države ne poznamo. Pred vsako novo razpravo prav tako lokalno preverimo državo naslova IP in lahko razpravo zavrnemo, če je država na seznamu vedno blokiranih. Rojstni datum vnesete samo zaradi preverjanja starosti; ne shranimo ga. Ob uspešni registraciji shranimo rezultat »uspešen«; pri obstoječih računih je lahko rezultat tudi »zavrnjen«. Navedete še državo prebivališča in v ZDA zvezno državo, da uporabimo ustrezna pravila varstva potrošnikov, zasebnosti in davkov.
@@ -126,6 +126,8 @@ Ko načrtujete izbris računa, izberete, kaj se zgodi z razpravami, ki ste jih o
 | Pogovori in primeri podpore | Do zaprtja in še 12 mesecev | Ključi se uničijo |
 | Evidence sprejetja in privolitev | Življenjska doba računa in še 6 let — najdaljši zastaralni rok, ki velja za nas | Izbrišejo se |
 | Evidence plačil (ko bodo na voljo plačljivi paketi) | 10 let, kot zahteva romunska računovodska zakonodaja | Izbrišejo se |
+| Shranjena kartica: koda ponudnika plačilnih storitev z zadnjimi štirimi števkami, datumom poteka veljavnosti in državo kartice | Do enega dne po tem, ko kartica preneha plačevati aktivni paket — ko se paket konča, ko kartico zamenjate ali ko zaprete račun | Izbrišejo se; zadnje štiri števke, datum poteka veljavnosti in država ostanejo tudi v evidenci vsakega plačila, opravljenega s to kartico |
+| Sporočila ponudnika plačilnih storitev o plačilih, takšna, kot so prispela | 14 dni | Izbrišejo se |
 | Varnostne kopije | Do 8 tednov po izbrisu žive kopije | Prepišejo se |
 
 **Kaj izbris dejansko naredi.** Vaše zasebne razprave in podatki računa so šifrirani s ključi, posebnimi za vaš račun in posamezno razpravo. Izbris računa uniči te ključe, zato šifriranih zapisov ne moremo več prebrati ne mi ne kdo drug, zapis vašega računa pa izbrišemo. Ključ javne kopije objavljene razprave se ob izbrisu uniči samo, če ste označili »Izbriši tudi moje javne razprave« (razdelek 6). To opisujemo kot izbris, ker je tak njegov učinek, in imamo dokumentirano oceno, ki to podpira; če želite izvedeti več, vprašajte. Vedeti morate tri stvari: varnostna revizijska sled omogoča samo dodajanje in se ne izbriše, vendar ne vsebuje vaših berljivih identifikatorjev; majhno število starejših razprav je nastalo pred našo sedanjo shemo šifriranja in če to velja za vaš račun, vam pojasnimo učinek zaprtja; kopije podatkov, ki so že bile poslane ponudniku umetne inteligence, pa urejajo pogoji hrambe tega ponudnika v Registru, ne naš izbris.
@@ -213,7 +215,7 @@ Brskalniki lahko pošiljajo signal »Do Not Track« ali podoben signal. Dialecti
 
 Ko ta pravilnik spremenimo, objavimo novo različico s povzetkom sprememb in novim datumom začetka veljavnosti, prejšnje različice pa ohranimo na dezbatere.ro/privacy/versions. O spremembi, ki dodaja nov namen ali novega prejemnika, vas obvestimo po e-pošti in v izdelku pred začetkom nove obdelave ter vam damo čas za ugovor. Kadar je nov namen odvisen od vaše privolitve — na primer, če bi kadar koli želeli uporabiti vsebino za izboljševanje modelov — vas za to privolitev zaprosimo ločeno in posebej; sprejetja posodobljenih Pogojev nikoli ne obravnavamo kot privolitev za novo obdelavo. Pri pojasnilih, ki ničesar ne spremenijo glede našega ravnanja, preprosto objavimo novo različico.
 
-Ta pravilnik je bil nazadnje posodobljen 12. oktobra 2026. Različica 3.4 je nadomestila različico 3.3: razdelek 13 zdaj navaja, da piškotek debateai.locale poleg jezika vmesnika nastavlja tudi jezik e-poštnih sporočil, ki vam jih pošiljamo, in dodaja odstavek, da vsako e-poštno sporočilo, ki ga za vas postavimo v čakalno vrsto, ohrani jezik, ki ste ga izbrali, dokler ga ne pošljemo.
+Ta pravilnik je bil nazadnje posodobljen 12. oktobra 2026. Različica 3.5 je nadomestila različico 3.4: razdelek 2 zdaj navaja, katere podatke za obračun in katere podatke o kartici hranimo ter da vaša celotna številka kartice nikoli ne pride do nas, razdelek 7 pa navaja, kako dolgo hranimo shranjeno kartico in sporočila ponudnika plačilnih storitev o plačilih.
 
 ## Annex B — Regionalne določbe o zasebnosti
 

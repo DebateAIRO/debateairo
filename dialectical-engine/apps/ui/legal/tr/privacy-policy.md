@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kısaca
-eyebrow: GİZLİLİK POLİTİKASI · v3.4 · YÜRÜRLÜK TARİHİ 12 EKİM 2026
+eyebrow: GİZLİLİK POLİTİKASI · v3.5 · YÜRÜRLÜK TARİHİ 12 EKİM 2026
 title: Neleri neden saklıyoruz?
 lede: GDPR (EU) 2016/679 kapsamındaki haklarınız ve yükümlülüklerimiz sade bir dille açıklanmıştır. On dört bölüm ve Ek B — sonuna kadar kaydırın.
-endMarker: POLİTİKANIN SONU · GDPR (EU) 2016/679 · v3.4
+endMarker: POLİTİKANIN SONU · GDPR (EU) 2016/679 · v3.5
 bodyLabel: Gizlilik Politikası metni
 annexTitle: Ek B — Bölgesel gizlilik hükümleri
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 ÇEREZLER
 -->
 
-**Version 3.4 · Effective 12 Ekim 2026 · Önceki sürümler: dezbatere.ro/privacy/versions · Veri sorumlusu: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.5 · Effective 12 Ekim 2026 · Önceki sürümler: dezbatere.ro/privacy/versions · Veri sorumlusu: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Bir hesabın ihtiyaç duyduğu bilgileri ve yazmayı seçtiğiniz içerikleri toplarız. Sorularınız Sicilimizde listelenen yapay zekâ sağlayıcılarına gider; model eğitimi için kullanılmazlar. Barındırma sağlayıcımız hesabınızı ve tartışmalarınızı Birleşik Krallık'taki Londra'da saklar; verilerinizin başka nerelere gittiğini bölüm 5 anlatır. Tartışmalar, siz yayımlamadıkça gizlidir. Hesabınızı silmek özel verilerinizin anahtarlarını imha eder; silme işlemini planlarken yayımlanmış tartışmalarınızın da kaldırılmasını veya kullanımdan kaldırılmış takma adınız altında herkese açık kalmasını seçersiniz. Bize privacy@dezbatere.ro adresinden ulaşabilirsiniz; bir tartışmada adı geçen kişiler de hesapları olmadan kaldırma talebinde bulunabilir.
 
@@ -43,7 +43,7 @@ Yalnızca bir hesabın çalışması için gerekenleri, bize vermeyi seçtiğini
 | **Tartışma içeriği** | Yazdığınız soru; belirlediğiniz yönlendirme notları; motorun oluşturduğu iddialar, eleştiriler, kanıt referansları, puanlar ve hükümler; her yapay zekâ sağlayıcısının döndürdüğü yanıtın kelimesi kelimesine kaydı; erişim sorguları ve kaynak referansları. Bunların tümü hesabınıza özgü bir anahtar altında şifrelenmiş olarak saklanır | Siz ve sorunuz üzerinde çalışan yapay zekâ modelleri |
 | **Destek** | Destek asistanıyla veya bir kişiyle karşılıklı gönderdiğiniz ve şifrelenmiş olarak saklanan mesajlar; kullanılan dil; asistanın tartışmalarınızın durumunu (içeriğini hiçbir zaman değil) görmesine izin verip vermediğiniz; verdiğiniz puanlar. Bir mesaj kötüye kullanım kontrollerini tetiklerse mesajın karma değerini ve geldiği IP adresinin karma değerini saklarız | Siz |
 | **Kabul ve rıza kayıtları** | Kabul ettiğiniz Koşulların ve size gösterilen politikanın sürümü ve içerik karması; zaman; kullanılan ekran ve mekanizma; diliniz; o andaki IP adresiniz ve kullanıcı aracınız; verdiğiniz veya geri çektiğiniz her rıza ve bunların zamanı | Tarayıcınız, kayıt sırasında ve bir seçimi her değiştirdiğinizde |
-| **Ödemeler** (ücretli planlar başladığında) | Plan, fiyat, faturalandırma dönemi, işlem referansları, vergi konumuna ilişkin kanıtlar. Kart bilgileri bizim tarafımızdan değil, ödeme sağlayıcımız tarafından tutulur | Siz ve ödeme sağlayıcısı |
+| **Ödemeler** (ücretli planlar başladığında) | Plan, fiyat, faturalandırma dönemi, işlem referansları, vergi konumuna ilişkin kanıtlar. Ödeme sırasında verdiğiniz fatura bilgileri: adınız, telefon numaranız ve fatura adresiniz ile şirket olarak satın alıyorsanız şirketin unvanı, KDV numarası ve adresi; ayrıca ödeme yaptığınız IP adresi. Kart bilgilerinizi ödeme sağlayıcımızın sayfasına girersiniz; bu nedenle tam kart numaranız ve güvenlik kodunuz hiçbir zaman bize ulaşmaz. Kartınıza ilişkin olarak son dört hanesini, son kullanma ayını ve yılını ve kartın düzenlendiği ülkeyi — bir ödemenin hangi kartla yapıldığını bilmek, kartın süresi dolmadan önce size hatırlatmak ve o ülkenin kurallarını uygulamak için — ve ayrıca ödeme sağlayıcısından alınan, şifrelenmiş olarak saklanan ve sağlayıcının her yenilemede aynı karttan tahsilat yapmasını sağlayan bir kodu saklarız. Ayrıca ödeme sağlayıcısının bir ödemeyle ilgili bize gönderdiği her mesajı, geldiği hâliyle, 14 gün boyunca yine şifrelenmiş olarak saklarız; bu mesaj, kart numarasının kartı düzenleyen bankayı tanımlayan ilk hanelerini ve o bankanın adını da içerir | Siz ve ödeme sağlayıcısı |
 | **Kullanıcımız olmayan kişiler** | Bir soruya dâhil ettiğiniz veya motorun soruyu yanıtlarken oluşturduğu, başka kişilere ait kişisel veriler. Bunu yapmamanızı isteriz; yine de gerçekleştiğinde ne yaptığımız bölüm 11'de açıklanır | Dolaylı olarak siz |
 
 Kayıt sırasında IP adresinizin ülkesini DB-IP Lite ile yerel olarak belirler, Tor çıkış adresleri listesini ayrıca kontrol ederiz; adresi üçüncü tarafa göndermeyiz. Hizmet sunmadığımız ülkelerden, Tor çıkış adreslerinden ve ülkesi bilinmeyen adreslerden kaydı reddederiz. Her yeni tartışma başlamadan önce IP adresinin ülkesini yine yerel olarak kontrol eder ve ülke her zaman engellenenler listesindeyse tartışmayı reddedebiliriz. Doğum tarihinizi yalnızca yaş kontrolü için girersiniz; saklamayız. Başarılı kayıtta saklanan sonuç “geçti”dir; mevcut hesapların kontrolünde sonuç “geçti” veya “reddedildi” olabilir. Tüketici, gizlilik ve vergi kurallarını uygulamak için ikamet ülkenizi, ABD’deyseniz eyaletinizi de seçersiniz.
@@ -126,6 +126,8 @@ Hesabınızın silinmesini planladığınızda yayımladığınız tartışmalar
 | Destek görüşmeleri ve vakaları | Kapatılana kadar, ardından 12 ay | Anahtarlar imha edilir |
 | Kabul ve rıza kayıtları | Hesabın ömrü artı 6 yıl — bizim için geçerli en uzun zamanaşımı süresi | Silinir |
 | Ödeme kayıtları (ücretli planlar başladığında) | Romanya muhasebe hukukunun gerektirdiği üzere 10 yıl | Silinir |
+| Kayıtlı kart: ödeme sağlayıcısının kodu, kartın son dört hanesi, son kullanma tarihi ve ülkesiyle birlikte | Kart etkin bir planın ödemesini yapmayı bıraktıktan bir gün sonrasına kadar — plan sona erdiğinde, kartı değiştirdiğinizde veya hesabınızı kapattığınızda | Silinir; son dört hane, son kullanma tarihi ve ülke, o kartla yapılan her ödemenin kaydında da kalır |
+| Ödeme sağlayıcısının ödemelerle ilgili mesajları, geldikleri hâliyle | 14 gün | Silinir |
 | Yedekler | Canlı kopya silindikten sonra en fazla 8 hafta | Üzerine yazılır |
 
 **Silmenin fiilen yaptığı.** Özel tartışmalarınız ve hesap verileriniz, hesabınıza ve her tartışmaya özgü anahtarlar altında şifrelenir. Hesabınızın silinmesi bu anahtarları imha eder; bunun ardından şifreli kayıtlar bizim veya başka herhangi birinin okuyamayacağı hâle gelir ve hesap kaydınızı sileriz. Yayımlanmış bir tartışmanın herkese açık kopyasının anahtarı silme sırasında yalnızca "Herkese açık tartışmalarımı da sil" seçeneğini işaretlediyseniz imha edilir (bölüm 6). Etkisi bu olduğu için bunu silme olarak tanımlarız ve bunun dayanağı olan belgelenmiş bir değerlendirmeyi tutarız; daha fazla bilgi edinmek isterseniz sorabilirsiniz. Bilmeniz gereken üç husus vardır: güvenlik denetim izi yalnızca ekleme yapılabilir niteliktedir ve silinmez, ancak size ait okunabilir tanımlayıcı içermez; az sayıdaki eski tartışma mevcut şifreleme düzenimizden daha eskidir ve bu durum hesabınız için geçerliyse kapatmanın bunlar bakımından ne sağladığını size bildiririz; ayrıca bir yapay zekâ sağlayıcısına daha önce gönderilmiş veri kopyaları bizim silme işlemimize değil, o sağlayıcının Sicildeki saklama koşullarına tabidir.
@@ -213,7 +215,7 @@ Bu öğeleri reddetmek için tarayıcı ayarlarınızda bu sitenin çerezlerini 
 
 Bu politikayı değiştirdiğimizde yeni sürümü, değişikliklerin özeti ve yeni bir yürürlük tarihiyle birlikte yayımlar ve önceki sürümleri dezbatere.ro/privacy/versions adresinde tutarız. Yeni bir amaç veya yeni bir alıcı ekleyen değişikliklerde, yeni işleme başlamadan önce size e-postayla ve ürün içinde bilgi verir ve itiraz etmeniz için süre tanırız. Yeni bir amaç rızanıza bağlıysa — örneğin bir gün içeriği modelleri geliştirmek için kullanmak istersek — bu rızayı ayrıca ve özel olarak isteriz; güncellenmiş Koşulların kabulünü hiçbir zaman yeni işleme için rıza saymayız. Yaptıklarımızı değiştirmeyen açıklamalar bakımından yeni sürümü yayımlamakla yetiniriz.
 
-Bu politika en son 12 Ekim 2026 tarihinde güncellenmiştir. Sürüm 3.4, sürüm 3.3'ün yerine geçmiştir: 13. bölüm, debateai.locale çerezinin size gönderdiğimiz e-postaların dilini de belirlediğini artık söylüyor ve sıraya aldığımız her e-postanın, biz gönderene kadar seçtiğiniz dili koruduğunu belirten bir paragraf ekliyor.
+Bu politika en son 12 Ekim 2026 tarihinde güncellenmiştir. Sürüm 3.5, sürüm 3.4'ün yerine geçmiştir: 2. bölüm artık hangi fatura ve kart bilgilerini sakladığımızı ve tam kart numaranızın hiçbir zaman bize ulaşmadığını söylüyor; 7. bölüm ise kayıtlı bir kartı ve ödeme sağlayıcısının ödemelerle ilgili mesajlarını ne kadar süreyle sakladığımızı söylüyor.
 
 ## Annex B — Bölgesel gizlilik hükümleri
 

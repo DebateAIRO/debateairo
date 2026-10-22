@@ -56,7 +56,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Debate content — The question you type; the steering annotations you set; the claims, critiques, evidence references, scores and verdicts the engine generates; a verbatim record of what each AI provider returned; retrieval queries and source references. All of this is stored encrypted under a key specific to your account — You, and the AI models working on your question",
         "Support — Messages you exchange with the support assistant or a person, stored encrypted; the language used; whether you allowed the assistant to see the status (never the content) of your debates; ratings you give. If a message triggers abuse controls we keep a hash of the message and a hash of the IP address it came from — You",
         "Acceptance and consent records — The version and content hash of the Terms you accepted and the policy you were shown; the time; the screen and mechanism used; your language; your IP address and user-agent at that moment; each consent you gave or withdrew and when — Your browser, at sign-up and whenever you change a choice",
-        "Payments (once paid plans start) — Plan, price, billing period, transaction references, tax location evidence. Card details are held by our payment provider, never by us — You, and the payment provider",
+        "Payments (once paid plans start) — Plan, price, billing period, transaction references, tax location evidence. The billing details you give at checkout: your name, phone number and billing address and, if you buy as a company, its name, VAT number and address; and the IP address you pay from. You type your card details on our payment provider's page, so your full card number and security code never reach us. Of your card, we keep its last four digits, its expiry month and year and the country where it was issued — to tell which card a payment was made with, to remind you before the card expires and to apply the rules for that country — and, stored encrypted, a code from the payment provider that lets it charge the same card at each renewal. For 14 days we also keep, encrypted, each message the payment provider sends us about a payment, exactly as it arrived; it also shows the first digits of the card number, which identify the bank that issued the card, and that bank's name — You, and the payment provider",
         "People who are not our users — Personal data about other people that you include in a question or that the engine generates in answering it. We ask you not to do this; section 11 explains what we do when it happens anyway — You, indirectly"
         ]
       },
@@ -150,6 +150,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Support conversations and cases — Until closed plus 12 months — Keys destroyed",
         "Acceptance and consent records — Life of the account plus 6 years — the longest limitation period that applies to us — Deleted",
         "Payment records (once paid plans start) — 10 years, as Romanian accounting law requires — Deleted",
+        "Saved card: the payment provider's code, with the card's last four digits, expiry and country — Until one day after the card stops paying for a live plan — when the plan ends, you replace the card or you close your account — Deleted; the last four digits, expiry and country also stay in the record of each payment made with that card",
+        "The payment provider's messages about payments, as they arrived — 14 days — Deleted",
         "Backups — Up to 8 weeks after the live copy is deleted — Overwritten"
         ]
       },
@@ -258,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "When we change this policy we post the new version with a summary of what changed and a new effective date, and keep the previous versions at dezbatere.ro/privacy/versions. For a change that adds a new purpose or a new recipient we tell you before the new processing starts, by email and in the product, and give you time to object. Where a new purpose depends on your consent — for example if we ever wanted to use content to improve models — we ask for that consent separately and specifically; we never treat acceptance of updated Terms as consent to new processing. For clarifications that change nothing about what we do, we simply post the new version." },
-      { kind: "p", text: "This policy was last updated on 12 October 2026. Version 3.4 replaced version 3.3: section 13 now says that the cookie debateai.locale also sets the language in which we write the emails we send you, and it adds a paragraph saying that each email we queue for you keeps the language you had selected until we send it." }
+      { kind: "p", text: "This policy was last updated on 12 October 2026. Version 3.5 replaced version 3.4: section 2 now says which billing and card details we keep and that your full card number never reaches us, and section 7 says how long we keep a saved card and the payment provider's messages about payments." }
     ]
   },
   {
@@ -330,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.4",
-  sha256: "2c2f688b8be538e9e2f47123c4a16051da4be81ce344f6c2994519892d688c63",
-  eyebrow: "PRIVACY POLICY · v3.4 · EFFECTIVE 12 OCTOBER 2026",
+  version: "3.5",
+  sha256: "d6e1f3d42e8396739fc573efeca88c8dbecf7c95f160f7b1221ebff31f61495d",
+  eyebrow: "PRIVACY POLICY · v3.5 · EFFECTIVE 12 OCTOBER 2026",
   title: "What we store, and why",
   lede: "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end.",
-  endMarker: "END OF POLICY · GDPR (EU) 2016/679 · v3.4",
+  endMarker: "END OF POLICY · GDPR (EU) 2016/679 · v3.5",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privacy Policy text",
   sectionIdPrefix: "policy-section-",

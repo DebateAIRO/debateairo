@@ -56,7 +56,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Tartışma içeriği — Yazdığınız soru; belirlediğiniz yönlendirme notları; motorun oluşturduğu iddialar, eleştiriler, kanıt referansları, puanlar ve hükümler; her yapay zekâ sağlayıcısının döndürdüğü yanıtın kelimesi kelimesine kaydı; erişim sorguları ve kaynak referansları. Bunların tümü hesabınıza özgü bir anahtar altında şifrelenmiş olarak saklanır — Siz ve sorunuz üzerinde çalışan yapay zekâ modelleri",
         "Destek — Destek asistanıyla veya bir kişiyle karşılıklı gönderdiğiniz ve şifrelenmiş olarak saklanan mesajlar; kullanılan dil; asistanın tartışmalarınızın durumunu (içeriğini hiçbir zaman değil) görmesine izin verip vermediğiniz; verdiğiniz puanlar. Bir mesaj kötüye kullanım kontrollerini tetiklerse mesajın karma değerini ve geldiği IP adresinin karma değerini saklarız — Siz",
         "Kabul ve rıza kayıtları — Kabul ettiğiniz Koşulların ve size gösterilen politikanın sürümü ve içerik karması; zaman; kullanılan ekran ve mekanizma; diliniz; o andaki IP adresiniz ve kullanıcı aracınız; verdiğiniz veya geri çektiğiniz her rıza ve bunların zamanı — Tarayıcınız, kayıt sırasında ve bir seçimi her değiştirdiğinizde",
-        "Ödemeler (ücretli planlar başladığında) — Plan, fiyat, faturalandırma dönemi, işlem referansları, vergi konumuna ilişkin kanıtlar. Kart bilgileri bizim tarafımızdan değil, ödeme sağlayıcımız tarafından tutulur — Siz ve ödeme sağlayıcısı",
+        "Ödemeler (ücretli planlar başladığında) — Plan, fiyat, faturalandırma dönemi, işlem referansları, vergi konumuna ilişkin kanıtlar. Ödeme sırasında verdiğiniz fatura bilgileri: adınız, telefon numaranız ve fatura adresiniz ile şirket olarak satın alıyorsanız şirketin unvanı, KDV numarası ve adresi; ayrıca ödeme yaptığınız IP adresi. Kart bilgilerinizi ödeme sağlayıcımızın sayfasına girersiniz; bu nedenle tam kart numaranız ve güvenlik kodunuz hiçbir zaman bize ulaşmaz. Kartınıza ilişkin olarak son dört hanesini, son kullanma ayını ve yılını ve kartın düzenlendiği ülkeyi — bir ödemenin hangi kartla yapıldığını bilmek, kartın süresi dolmadan önce size hatırlatmak ve o ülkenin kurallarını uygulamak için — ve ayrıca ödeme sağlayıcısından alınan, şifrelenmiş olarak saklanan ve sağlayıcının her yenilemede aynı karttan tahsilat yapmasını sağlayan bir kodu saklarız. Ayrıca ödeme sağlayıcısının bir ödemeyle ilgili bize gönderdiği her mesajı, geldiği hâliyle, 14 gün boyunca yine şifrelenmiş olarak saklarız; bu mesaj, kart numarasının kartı düzenleyen bankayı tanımlayan ilk hanelerini ve o bankanın adını da içerir — Siz ve ödeme sağlayıcısı",
         "Kullanıcımız olmayan kişiler — Bir soruya dâhil ettiğiniz veya motorun soruyu yanıtlarken oluşturduğu, başka kişilere ait kişisel veriler. Bunu yapmamanızı isteriz; yine de gerçekleştiğinde ne yaptığımız bölüm 11'de açıklanır — Dolaylı olarak siz"
         ]
       },
@@ -150,6 +150,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Destek görüşmeleri ve vakaları — Kapatılana kadar, ardından 12 ay — Anahtarlar imha edilir",
         "Kabul ve rıza kayıtları — Hesabın ömrü artı 6 yıl — bizim için geçerli en uzun zamanaşımı süresi — Silinir",
         "Ödeme kayıtları (ücretli planlar başladığında) — Romanya muhasebe hukukunun gerektirdiği üzere 10 yıl — Silinir",
+        "Kayıtlı kart: ödeme sağlayıcısının kodu, kartın son dört hanesi, son kullanma tarihi ve ülkesiyle birlikte — Kart etkin bir planın ödemesini yapmayı bıraktıktan bir gün sonrasına kadar — plan sona erdiğinde, kartı değiştirdiğinizde veya hesabınızı kapattığınızda — Silinir; son dört hane, son kullanma tarihi ve ülke, o kartla yapılan her ödemenin kaydında da kalır",
+        "Ödeme sağlayıcısının ödemelerle ilgili mesajları, geldikleri hâliyle — 14 gün — Silinir",
         "Yedekler — Canlı kopya silindikten sonra en fazla 8 hafta — Üzerine yazılır"
         ]
       },
@@ -258,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Bu politikayı değiştirdiğimizde yeni sürümü, değişikliklerin özeti ve yeni bir yürürlük tarihiyle birlikte yayımlar ve önceki sürümleri dezbatere.ro/privacy/versions adresinde tutarız. Yeni bir amaç veya yeni bir alıcı ekleyen değişikliklerde, yeni işleme başlamadan önce size e-postayla ve ürün içinde bilgi verir ve itiraz etmeniz için süre tanırız. Yeni bir amaç rızanıza bağlıysa — örneğin bir gün içeriği modelleri geliştirmek için kullanmak istersek — bu rızayı ayrıca ve özel olarak isteriz; güncellenmiş Koşulların kabulünü hiçbir zaman yeni işleme için rıza saymayız. Yaptıklarımızı değiştirmeyen açıklamalar bakımından yeni sürümü yayımlamakla yetiniriz." },
-      { kind: "p", text: "Bu politika en son 12 Ekim 2026 tarihinde güncellenmiştir. Sürüm 3.4, sürüm 3.3'ün yerine geçmiştir: 13. bölüm, debateai.locale çerezinin size gönderdiğimiz e-postaların dilini de belirlediğini artık söylüyor ve sıraya aldığımız her e-postanın, biz gönderene kadar seçtiğiniz dili koruduğunu belirten bir paragraf ekliyor." }
+      { kind: "p", text: "Bu politika en son 12 Ekim 2026 tarihinde güncellenmiştir. Sürüm 3.5, sürüm 3.4'ün yerine geçmiştir: 2. bölüm artık hangi fatura ve kart bilgilerini sakladığımızı ve tam kart numaranızın hiçbir zaman bize ulaşmadığını söylüyor; 7. bölüm ise kayıtlı bir kartı ve ödeme sağlayıcısının ödemelerle ilgili mesajlarını ne kadar süreyle sakladığımızı söylüyor." }
     ]
   },
   {
@@ -330,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.4",
-  sha256: "24c0f376d86c6e0f6328dad4d3487fae6eb713551ffb002119c01cbb1c691dfd",
-  eyebrow: "GİZLİLİK POLİTİKASI · v3.4 · YÜRÜRLÜK TARİHİ 12 EKİM 2026",
+  version: "3.5",
+  sha256: "71381c38a9f7d4d4b8c226b1a611b281918d86e45c5c06fd2040c61d05929875",
+  eyebrow: "GİZLİLİK POLİTİKASI · v3.5 · YÜRÜRLÜK TARİHİ 12 EKİM 2026",
   title: "Neleri neden saklıyoruz?",
   lede: "GDPR (EU) 2016/679 kapsamındaki haklarınız ve yükümlülüklerimiz sade bir dille açıklanmıştır. On dört bölüm ve Ek B — sonuna kadar kaydırın.",
-  endMarker: "POLİTİKANIN SONU · GDPR (EU) 2016/679 · v3.4",
+  endMarker: "POLİTİKANIN SONU · GDPR (EU) 2016/679 · v3.5",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Gizlilik Politikası metni",
   sectionIdPrefix: "policy-section-",

@@ -56,7 +56,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Contenuto dei dibattiti — La domanda che digiti; le annotazioni di orientamento che imposti; le affermazioni, le critiche, i riferimenti probatori, i punteggi e i verdetti generati dal motore; una registrazione letterale di quanto restituito da ciascun fornitore di IA; le query di ricerca e i riferimenti alle fonti. Tutto ciò è conservato in forma cifrata con una chiave specifica per il tuo account — Tu e i modelli di IA che elaborano la tua domanda",
         "Assistenza — I messaggi scambiati con l'assistente di supporto o con una persona, conservati in forma cifrata; la lingua utilizzata; se hai consentito all'assistente di vedere lo stato (mai il contenuto) dei tuoi dibattiti; le valutazioni che fornisci. Se un messaggio attiva i controlli sugli abusi, conserviamo un hash del messaggio e un hash dell'indirizzo IP da cui proviene — Tu",
         "Registri di accettazione e consenso — La versione e l'hash del contenuto delle Condizioni accettate e dell'informativa che ti è stata mostrata; il momento; la schermata e il meccanismo utilizzati; la tua lingua; il tuo indirizzo IP e lo user-agent in quel momento; ciascun consenso prestato o revocato e il relativo momento — Il tuo browser, all'iscrizione e ogni volta che modifichi una scelta",
-        "Pagamenti (dall'avvio dei piani a pagamento) — Piano, prezzo, periodo di fatturazione, riferimenti delle transazioni, prove della località fiscale. I dati della carta sono detenuti dal nostro fornitore di servizi di pagamento, mai da noi — Tu e il fornitore di servizi di pagamento",
+        "Pagamenti (dall'avvio dei piani a pagamento) — Piano, prezzo, periodo di fatturazione, riferimenti delle transazioni, prove della località fiscale. I dati di fatturazione che fornisci al momento del pagamento: il tuo nome, il tuo numero di telefono e il tuo indirizzo di fatturazione e, se acquisti come società, la sua denominazione, la sua partita IVA e il suo indirizzo; e l'indirizzo IP da cui paghi. Inserisci i dati della tua carta nella pagina del nostro fornitore di servizi di pagamento, quindi il numero completo della tua carta e il codice di sicurezza non ci arrivano mai. Della tua carta conserviamo le ultime quattro cifre, il mese e l'anno di scadenza e il Paese in cui è stata emessa — per sapere con quale carta è stato effettuato un pagamento, per avvisarti prima che la carta scada e per applicare le regole di quel Paese — e, conservato in forma cifrata, un codice del fornitore di servizi di pagamento che gli consente di addebitare la stessa carta a ogni rinnovo. Per 14 giorni conserviamo inoltre, in forma cifrata, ogni messaggio che il fornitore di servizi di pagamento ci invia in merito a un pagamento, esattamente come è arrivato; il messaggio riporta anche le prime cifre del numero della carta, che identificano la banca che l'ha emessa, e il nome di tale banca — Tu e il fornitore di servizi di pagamento",
         "Persone che non sono nostri utenti — Dati personali relativi ad altre persone che includi in una domanda o che il motore genera nel rispondere. Ti chiediamo di non farlo; la sezione 11 spiega cosa facciamo quando accade comunque — Tu, indirettamente"
         ]
       },
@@ -150,6 +150,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Conversazioni e casi di assistenza — Fino alla chiusura più 12 mesi — Chiavi distrutte",
         "Registri di accettazione e consenso — Durata dell'account più 6 anni — il termine di prescrizione più lungo a noi applicabile — Cancellati",
         "Registri dei pagamenti (dall'avvio dei piani a pagamento) — 10 anni, come richiesto dalla normativa contabile rumena — Cancellati",
+        "Carta salvata: il codice del fornitore di servizi di pagamento, con le ultime quattro cifre, la scadenza e il Paese della carta — Fino a un giorno dopo che la carta smette di pagare un piano attivo — quando il piano termina, sostituisci la carta o chiudi il tuo account — Cancellati; le ultime quattro cifre, la scadenza e il Paese restano anche nel registro di ciascun pagamento effettuato con quella carta",
+        "I messaggi del fornitore di servizi di pagamento sui pagamenti, così come sono arrivati — 14 giorni — Cancellati",
         "Backup — Fino a 8 settimane dopo la cancellazione della copia attiva — Sovrascritti"
         ]
       },
@@ -258,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Quando modifichiamo la presente informativa, pubblichiamo la nuova versione insieme a una sintesi delle modifiche e a una nuova data di entrata in vigore e conserviamo le versioni precedenti su dezbatere.ro/privacy/versions. Per una modifica che aggiunga una nuova finalità o un nuovo destinatario, ti informiamo per email e all'interno del prodotto prima dell'inizio del nuovo trattamento e ti concediamo il tempo necessario per opporti. Laddove una nuova finalità dipenda dal tuo consenso — ad esempio, se in futuro volessimo utilizzare i contenuti per migliorare i modelli — chiediamo tale consenso separatamente e in modo specifico; non consideriamo mai l'accettazione di Condizioni aggiornate come consenso a un nuovo trattamento. Per chiarimenti che non modificano in alcun modo le nostre attività, ci limitiamo a pubblicare la nuova versione." },
-      { kind: "p", text: "La presente informativa è stata aggiornata da ultimo il 12 ottobre 2026. La versione 3.4 ha sostituito la versione 3.3: la sezione 13 ora precisa che il cookie debateai.locale imposta anche la lingua in cui scriviamo le e-mail che ti inviamo, e aggiunge un paragrafo che spiega che ogni e-mail che mettiamo in coda per te conserva la lingua che avevi selezionato finché non la inviamo." }
+      { kind: "p", text: "La presente informativa è stata aggiornata da ultimo il 12 ottobre 2026. La versione 3.5 ha sostituito la versione 3.4: la sezione 2 ora precisa quali dati di fatturazione e della carta conserviamo e che il numero completo della tua carta non ci arriva mai, e la sezione 7 precisa per quanto tempo conserviamo una carta salvata e i messaggi del fornitore di servizi di pagamento sui pagamenti." }
     ]
   },
   {
@@ -330,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.4",
-  sha256: "a52389243c83163fae289f7a6e9416edaaf69818ba4bc399e60984d3ab6f3ebe",
-  eyebrow: "INFORMATIVA SULLA PRIVACY · v3.4 · IN VIGORE DAL 12 OTTOBRE 2026",
+  version: "3.5",
+  sha256: "218e4c54b369cbf1ff0a72a67b8790a621944971b058cadf41796ad66f5246da",
+  eyebrow: "INFORMATIVA SULLA PRIVACY · v3.5 · IN VIGORE DAL 12 OTTOBRE 2026",
   title: "Cosa conserviamo e perché",
   lede: "I tuoi diritti e i nostri obblighi ai sensi del GDPR (EU) 2016/679, in un linguaggio chiaro. Quattordici sezioni e Allegato B — scorri fino alla fine.",
-  endMarker: "FINE DELL'INFORMATIVA · GDPR (EU) 2016/679 · v3.4",
+  endMarker: "FINE DELL'INFORMATIVA · GDPR (EU) 2016/679 · v3.5",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Testo dell'Informativa sulla privacy",
   sectionIdPrefix: "policy-section-",

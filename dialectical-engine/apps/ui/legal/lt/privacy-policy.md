@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Trumpai
-eyebrow: PRIVATUMO POLITIKA · v3.4 · ĮSIGALIOJA 2026 M. SPALIO 12 D.
+eyebrow: PRIVATUMO POLITIKA · v3.5 · ĮSIGALIOJA 2026 M. SPALIO 12 D.
 title: Ką saugome ir kodėl
 lede: Jūsų teisės ir mūsų pareigos pagal GDPR (EU) 2016/679, paaiškintos paprastai. Keturiolika skyrių ir B priedas — slinkite iki pabaigos.
-endMarker: POLITIKOS PABAIGA · GDPR (EU) 2016/679 · v3.4
+endMarker: POLITIKOS PABAIGA · GDPR (EU) 2016/679 · v3.5
 bodyLabel: Privatumo politikos tekstas
 annexTitle: B priedas — Regioninės privatumo sąlygos
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 SLAPUKAI
 -->
 
-**Version 3.4 · Effective 2026 m. spalio 12 d. · Ankstesnės versijos adresu dezbatere.ro/privacy/versions · Duomenų valdytojas: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.5 · Effective 2026 m. spalio 12 d. · Ankstesnės versijos adresu dezbatere.ro/privacy/versions · Duomenų valdytojas: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Renkame tai, ko reikia paskyrai, ir tai, ką nusprendžiate įvesti. Jūsų klausimai perduodami mūsų Registre išvardytiems DI paslaugų teikėjams; jie nenaudojami modeliams mokyti. Mūsų prieglobos paslaugų teikėjas jūsų paskyrą ir debatus saugo Londone, Jungtinėje Karalystėje; 5 skyriuje nurodyta, kur dar siunčiami jūsų duomenys. Debatai yra privatūs, nebent juos paskelbiate. Ištrynus paskyrą sunaikinami jūsų privačių duomenų raktai; planuodami ištrynimą pasirenkate, ar bus pašalinti ir paskelbti debatai, ar jie liks vieši su jūsų nebenaudojamu slapyvardžiu. Su mumis galite susisiekti adresu privacy@dezbatere.ro, o debatuose paminėti asmenys gali prašyti pašalinti duomenis ir neturėdami paskyros.
 
@@ -43,7 +43,7 @@ Renkame tik tai, ko reikia paskyrai veikti, ką nusprendžiate mums pateikti ir 
 | **Debatų turinys** | Jūsų įvestas klausimas; jūsų nustatytos valdymo pastabos; variklio sugeneruoti teiginiai, kritika, įrodymų nuorodos, įverčiai ir verdiktai; pažodinis kiekvieno DI paslaugų teikėjo atsakymo įrašas; paieškos užklausos ir šaltinių nuorodos. Visa tai saugoma užšifruota jūsų paskyrai būdingu raktu | Jūs ir su jūsų klausimu dirbantys DI modeliai |
 | **Pagalba** | Žinutės, kuriomis keičiatės su pagalbos asistentu ar asmeniu, saugomos užšifruotos; vartota kalba; ar leidote asistentui matyti jūsų debatų būseną (niekada ne turinį); jūsų įvertinimai. Jei žinutė suaktyvina piktnaudžiavimo kontrolę, saugome žinutės maišą ir IP adreso, iš kurio ji gauta, maišą | Jūs |
 | **Sutikimo su sąlygomis ir kitų sutikimų įrašai** | Sąlygų, su kuriomis sutikote, versija ir turinio maiša bei jums parodyta politika; laikas; naudotas ekranas ir būdas; jūsų kalba; tuo metu naudotas IP adresas ir naudotojo agentas; kiekvienas jūsų duotas ar atšauktas sutikimas ir jo laikas | Jūsų naršyklė registruojantis ir kaskart pakeitus pasirinkimą |
-| **Mokėjimai** (pradėjus taikyti mokamus planus) | Planas, kaina, atsiskaitymo laikotarpis, operacijų nuorodos, mokesčių vietos įrodymai. Kortelės duomenis saugo mūsų mokėjimo paslaugų teikėjas, o ne mes | Jūs ir mokėjimo paslaugų teikėjas |
+| **Mokėjimai** (pradėjus taikyti mokamus planus) | Planas, kaina, atsiskaitymo laikotarpis, operacijų nuorodos, mokesčių vietos įrodymai. Atsiskaitymo duomenys, kuriuos pateikiate apmokėdami: jūsų vardas, pavardė, telefono numeris ir atsiskaitymo adresas, o jei perkate kaip įmonė, jos pavadinimas, PVM mokėtojo kodas ir adresas; taip pat IP adresas, iš kurio mokate. Kortelės duomenis įvedate mūsų mokėjimo paslaugų teikėjo puslapyje, todėl visas jūsų kortelės numeris ir saugos kodas niekada mūsų nepasiekia. Iš jūsų kortelės duomenų saugome paskutinius keturis jos skaitmenis, galiojimo pabaigos mėnesį ir metus bei šalį, kurioje kortelė išduota — kad žinotume, kokia kortele atliktas mokėjimas, galėtume jums priminti prieš baigiantis kortelės galiojimui ir taikytume tos šalies taisykles — taip pat užšifruotą iš mokėjimo paslaugų teikėjo gautą kodą, kuriuo šis teikėjas kiekvieno atnaujinimo metu gali nuskaičiuoti lėšas iš tos pačios kortelės. Be to, 14 dienų užšifruotą saugome kiekvieną pranešimą, kurį mokėjimo paslaugų teikėjas mums siunčia apie mokėjimą, tiksliai tokį, kokį jį gavome; jame matyti ir pirmieji kortelės numerio skaitmenys, pagal kuriuos nustatomas kortelę išdavęs bankas, ir to banko pavadinimas | Jūs ir mokėjimo paslaugų teikėjas |
 | **Asmenys, kurie nėra mūsų naudotojai** | Kitų asmenų duomenys, kuriuos įtraukiate į klausimą arba kuriuos variklis sugeneruoja į jį atsakydamas. Prašome to nedaryti; 11 skyriuje paaiškinta, ką darome, jei taip vis dėlto nutinka | Netiesiogiai iš jūsų |
 
 Registruojantis tikriname IP adreso šalį ir amžių. Gimimo data perduodama tik patikrai ir nesaugoma. IP patikra atliekama vietoje, nesiunčiant adreso trečiajai šaliai. Prieš kiekvienus naujus debatus taip pat vietoje tikriname IP adreso šalį; debatus atmetame, jei šalis visada blokuojama.
@@ -126,6 +126,8 @@ Planuodami paskyros ištrynimą pasirenkate, kas nutiks jūsų paskelbtiems deba
 | Pagalbos pokalbiai ir atvejai | Iki uždarymo ir dar 12 mėnesių | Raktai sunaikinami |
 | Sutikimo su sąlygomis ir kitų sutikimų įrašai | Paskyros gyvavimo laiką ir dar 6 metus — ilgiausią mums taikomą senaties terminą | Ištrinami |
 | Mokėjimų įrašai (pradėjus taikyti mokamus planus) | 10 metų, kaip reikalauja Rumunijos apskaitos teisė | Ištrinami |
+| Išsaugota kortelė: mokėjimo paslaugų teikėjo kodas su paskutiniais keturiais kortelės skaitmenimis, galiojimo pabaigos data ir šalimi | Iki vienos dienos po to, kai kortele nebemokama už aktyvų planą — kai planas baigiasi, pakeičiate kortelę arba uždarote paskyrą | Ištrinami; paskutiniai keturi skaitmenys, galiojimo pabaigos data ir šalis taip pat lieka kiekvieno ta kortele atlikto mokėjimo įraše |
+| Mokėjimo paslaugų teikėjo pranešimai apie mokėjimus, tokie, kokie buvo gauti | 14 dienų | Ištrinami |
 | Atsarginės kopijos | Iki 8 savaičių po to, kai aktyvioji kopija ištrinama | Perrašomos |
 
 **Ką ištrynimas iš tikrųjų reiškia.** Jūsų privačių debatų ir paskyros duomenys užšifruojami jūsų paskyrai ir kiekvieniems debatams būdingais raktais. Ištrynus paskyrą šie raktai sunaikinami, todėl nei mes, nei kas nors kitas nebegali perskaityti užšifruotų įrašų, be to, ištriname jūsų paskyros įrašą. Paskelbtų debatų viešos kopijos raktas ištrynimo metu sunaikinamas tik jei pažymėjote „Taip pat ištrinti mano viešus debatus“ (6 skyrius). Tai vadiname ištrynimu, nes toks yra šio veiksmo rezultatas, ir turime jį pagrindžiantį dokumentuotą vertinimą; jei norite sužinoti daugiau, klauskite. Svarbu žinoti tris dalykus: į saugumo audito žurnalą įrašai tik pridedami, esamų įrašų negalima keisti, o pats žurnalas neištrinamas, tačiau jame nėra perskaitomų jūsų identifikatorių; nedidelis skaičius senesnių debatų sukurtas anksčiau nei dabartinė šifravimo schema, ir jei tai taikoma jūsų paskyrai, paaiškinsime, ką jiems reiškia paskyros uždarymas; o DI paslaugų teikėjui jau išsiųstoms duomenų kopijoms taikomos to teikėjo Registre nurodytos saugojimo sąlygos, o ne mūsų atliekamas ištrynimas.
@@ -213,7 +215,7 @@ Norėdami atsisakyti šių elementų, naršyklės nustatymuose užblokuokite arb
 
 Pakeitę šią politiką paskelbiame naują versiją kartu su pakeitimų santrauka ir nauja įsigaliojimo data, o ankstesnes versijas saugome adresu dezbatere.ro/privacy/versions. Jei pakeitimu pridedamas naujas tikslas ar naujas gavėjas, prieš pradėdami naują tvarkymą informuojame jus el. paštu ir produkte bei suteikiame laiko nesutikti. Jei naujas tikslas priklauso nuo jūsų sutikimo — pavyzdžiui, jei kada nors norėtume naudoti turinį modeliams tobulinti — tokio sutikimo prašome atskirai ir konkrečiai; atnaujintų Sąlygų priėmimo niekada nelaikome sutikimu su nauju duomenų tvarkymu. Jei paaiškinimai nieko nekeičia mūsų veikloje, tiesiog paskelbiame naują versiją.
 
-Ši politika paskutinį kartą atnaujinta 2026 m. spalio 12 d. 3.4 versija pakeitė 3.3 versiją: 13 skyriuje dabar nurodyta, kad slapukas debateai.locale taip pat nustato kalbą, kuria rašome jums siunčiamus el. laiškus, ir pridėta pastraipa, kad kiekvienas jums eilėje laukiantis el. laiškas išlaiko kalbą, kurią buvote pasirinkę, kol jį išsiųsime.
+Ši politika paskutinį kartą atnaujinta 2026 m. spalio 12 d. 3.5 versija pakeitė 3.4 versiją: 2 skyriuje dabar nurodyta, kokius atsiskaitymo ir kortelės duomenis saugome ir kad visas jūsų kortelės numeris niekada mūsų nepasiekia, o 7 skyriuje nurodyta, kiek laiko saugome išsaugotą kortelę ir mokėjimo paslaugų teikėjo pranešimus apie mokėjimus.
 
 ## Annex B — Regioninės privatumo sąlygos
 

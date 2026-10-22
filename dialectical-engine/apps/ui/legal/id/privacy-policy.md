@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ringkasnya
-eyebrow: KEBIJAKAN PRIVASI · v3.4 · BERLAKU 12 OKTOBER 2026
+eyebrow: KEBIJAKAN PRIVASI · v3.5 · BERLAKU 12 OKTOBER 2026
 title: Apa yang kami simpan, dan alasannya
 lede: Hak Anda dan kewajiban kami berdasarkan GDPR (EU) 2016/679, dalam bahasa yang mudah dipahami. Empat belas bagian dan Lampiran B — gulir hingga akhir.
-endMarker: AKHIR KEBIJAKAN · GDPR (EU) 2016/679 · v3.4
+endMarker: AKHIR KEBIJAKAN · GDPR (EU) 2016/679 · v3.5
 bodyLabel: Teks Kebijakan Privasi
 annexTitle: Lampiran B — Ketentuan privasi regional
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 KUKI
 -->
 
-**Version 3.4 · Effective 12 Oktober 2026 · Versi sebelumnya di dezbatere.ro/privacy/versions · Pengendali: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.5 · Effective 12 Oktober 2026 · Versi sebelumnya di dezbatere.ro/privacy/versions · Pengendali: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Kami mengumpulkan apa yang diperlukan akun dan apa yang Anda pilih untuk diketik. Pertanyaan Anda dikirim kepada penyedia AI yang tercantum dalam Daftar kami; pertanyaan tersebut tidak digunakan untuk melatih model. Penyedia hos kami menyimpan akun dan debat Anda di London, Britania Raya; bagian 5 menjelaskan ke mana lagi data Anda dikirim. Debat bersifat privat kecuali Anda memublikasikannya. Penghapusan akun memusnahkan kunci data pribadi Anda; saat menjadwalkannya, Anda memilih apakah debat yang Anda publikasikan juga diturunkan atau tetap dapat diakses publik dengan nama samaran yang tidak lagi digunakan. Anda dapat menghubungi kami di privacy@dezbatere.ro, dan orang yang disebut dalam debat dapat meminta penghapusan tanpa memiliki akun.
 
@@ -43,7 +43,7 @@ Kami hanya mengumpulkan apa yang diperlukan agar akun berfungsi, apa yang Anda p
 | **Konten debat** | Pertanyaan yang Anda ketik; anotasi pengarahan yang Anda tetapkan; klaim, kritik, referensi bukti, skor, dan putusan yang dihasilkan mesin; catatan verbatim tentang apa yang dikembalikan setiap penyedia AI; kueri pengambilan dan referensi sumber. Semua ini disimpan secara terenkripsi di bawah kunci khusus untuk akun Anda | Anda, dan model AI yang mengerjakan pertanyaan Anda |
 | **Dukungan** | Pesan yang Anda pertukarkan dengan asisten dukungan atau seseorang, disimpan secara terenkripsi; bahasa yang digunakan; apakah Anda mengizinkan asisten melihat status (tidak pernah konten) debat Anda; penilaian yang Anda berikan. Jika pesan memicu pengendalian penyalahgunaan, kami menyimpan hash pesan dan hash alamat IP asalnya | Anda |
 | **Catatan penerimaan dan persetujuan** | Versi dan hash konten Ketentuan yang Anda terima dan kebijakan yang ditampilkan kepada Anda; waktu; layar dan mekanisme yang digunakan; bahasa Anda; alamat IP dan agen pengguna Anda pada saat itu; setiap persetujuan yang Anda berikan atau tarik beserta waktunya | Peramban Anda, saat pendaftaran dan setiap kali Anda mengubah pilihan |
-| **Pembayaran** (setelah paket berbayar dimulai) | Paket, harga, periode penagihan, referensi transaksi, bukti lokasi pajak. Detail kartu disimpan oleh penyedia pembayaran kami, tidak pernah oleh kami | Anda, dan penyedia pembayaran |
+| **Pembayaran** (setelah paket berbayar dimulai) | Paket, harga, periode penagihan, referensi transaksi, bukti lokasi pajak. Detail penagihan yang Anda berikan saat melakukan pembayaran: nama, nomor telepon, dan alamat penagihan Anda serta, jika Anda membeli sebagai perusahaan, nama, nomor PPN, dan alamat perusahaan tersebut; dan alamat IP yang Anda gunakan untuk membayar. Anda mengetikkan detail kartu Anda di halaman penyedia pembayaran kami, sehingga nomor kartu lengkap dan kode keamanan Anda tidak pernah sampai kepada kami. Dari kartu Anda, kami menyimpan empat digit terakhirnya, bulan dan tahun kedaluwarsanya, serta negara penerbitnya — untuk mengetahui kartu mana yang digunakan untuk suatu pembayaran, untuk mengingatkan Anda sebelum kartu kedaluwarsa, dan untuk menerapkan aturan negara tersebut — serta, disimpan secara terenkripsi, sebuah kode dari penyedia pembayaran yang memungkinkannya menagih kartu yang sama pada setiap perpanjangan. Selama 14 hari kami juga menyimpan, secara terenkripsi, setiap pesan yang dikirim penyedia pembayaran kepada kami tentang suatu pembayaran, persis seperti saat diterima; pesan itu juga menampilkan digit-digit awal nomor kartu, yang mengidentifikasi bank penerbit kartu, serta nama bank tersebut | Anda, dan penyedia pembayaran |
 | **Orang yang bukan pengguna kami** | Data pribadi tentang orang lain yang Anda sertakan dalam pertanyaan atau yang dihasilkan mesin saat menjawabnya. Kami meminta Anda untuk tidak melakukan ini; bagian 11 menjelaskan tindakan kami jika hal itu tetap terjadi | Anda, secara tidak langsung |
 
 Saat mendaftar, kami memeriksa negara alamat IP dan usia Anda. Tanggal lahir dikirim untuk pemeriksaan saja dan tidak disimpan. Pemeriksaan IP dilakukan secara lokal tanpa mengirimkan alamat itu ke pihak ketiga. Sebelum setiap debat baru, kami juga memeriksa negara IP secara lokal; debat ditolak jika negaranya selalu diblokir.
@@ -126,6 +126,8 @@ Saat Anda menjadwalkan penghapusan akun, Anda memilih apa yang terjadi pada deba
 | Percakapan dan kasus dukungan | Hingga ditutup ditambah 12 bulan | Kunci dimusnahkan |
 | Catatan penerimaan dan persetujuan | Masa berlaku akun ditambah 6 tahun — periode pembatasan terpanjang yang berlaku bagi kami | Dihapus |
 | Catatan pembayaran (setelah paket berbayar dimulai) | 10 tahun, sebagaimana diwajibkan hukum akuntansi Rumania | Dihapus |
+| Kartu tersimpan: kode penyedia pembayaran, beserta empat digit terakhir, tanggal kedaluwarsa, dan negara kartu | Hingga satu hari setelah kartu tidak lagi membayar paket yang aktif — saat paket berakhir, saat Anda mengganti kartu, atau saat Anda menutup akun Anda | Dihapus; empat digit terakhir, tanggal kedaluwarsa, dan negara juga tetap ada dalam catatan setiap pembayaran yang dilakukan dengan kartu tersebut |
+| Pesan penyedia pembayaran tentang pembayaran, persis seperti saat diterima | 14 hari | Dihapus |
 | Cadangan | Hingga 8 minggu setelah salinan aktif dihapus | Ditimpa |
 
 **Apa yang sebenarnya dilakukan penghapusan.** Debat privat dan data akun Anda dienkripsi di bawah kunci yang khusus untuk akun Anda dan setiap debat. Menghapus akun Anda memusnahkan kunci tersebut, setelah itu catatan terenkripsi tidak dapat dibaca oleh kami atau siapa pun, dan kami menghapus catatan akun Anda. Kunci salinan publik dari debat yang dipublikasikan dimusnahkan saat penghapusan hanya jika Anda mencentang "Hapus juga debat publik saya" (bagian 6). Kami menyebutnya penghapusan karena demikianlah akibatnya, dan kami memiliki penilaian terdokumentasi yang mendasarinya; jika Anda ingin mengetahui lebih lanjut, silakan bertanya. Tiga hal yang perlu diketahui: jejak audit keamanan hanya dapat ditambahi, bukan diubah atau dihapus; jejak tersebut tetap disimpan, tetapi tidak berisi pengenal Anda yang dapat dibaca; sejumlah kecil debat lama mendahului skema enkripsi kami saat ini, dan jika hal itu berlaku pada akun Anda, kami memberi tahu apa yang dicapai penutupan terhadapnya; dan salinan data yang telah dikirim kepada penyedia AI diatur oleh ketentuan retensi penyedia tersebut dalam Daftar, bukan oleh penghapusan kami.
@@ -213,7 +215,7 @@ Untuk menolak item ini, blokir atau hapus kuki dan data situs untuk situs ini di
 
 Ketika mengubah kebijakan ini, kami menerbitkan versi baru beserta ringkasan perubahan dan tanggal berlaku baru, serta menyimpan versi sebelumnya di dezbatere.ro/privacy/versions. Untuk perubahan yang menambahkan tujuan atau penerima baru, kami memberi tahu Anda sebelum pemrosesan baru dimulai, melalui email dan di dalam produk, serta memberi waktu untuk mengajukan keberatan. Jika tujuan baru bergantung pada persetujuan Anda — misalnya jika kami suatu saat ingin menggunakan konten untuk meningkatkan model — kami meminta persetujuan tersebut secara terpisah dan spesifik; kami tidak pernah menganggap penerimaan Ketentuan yang diperbarui sebagai persetujuan atas pemrosesan baru. Untuk klarifikasi yang tidak mengubah apa pun tentang tindakan kami, kami hanya menerbitkan versi baru.
 
-Kebijakan ini terakhir diperbarui pada 12 Oktober 2026. Versi 3.4 menggantikan versi 3.3: bagian 13 kini menyatakan bahwa kuki debateai.locale juga menentukan bahasa tempat kami menulis email yang kami kirimkan kepada Anda, dan menambahkan paragraf yang menyatakan bahwa setiap email yang kami masukkan ke antrean untuk Anda tetap menggunakan bahasa yang sudah Anda pilih hingga kami mengirimkannya.
+Kebijakan ini terakhir diperbarui pada 12 Oktober 2026. Versi 3.5 menggantikan versi 3.4: bagian 2 kini menyatakan detail penagihan dan detail kartu mana yang kami simpan dan bahwa nomor kartu lengkap Anda tidak pernah sampai kepada kami, dan bagian 7 menyatakan berapa lama kami menyimpan kartu tersimpan dan pesan penyedia pembayaran tentang pembayaran.
 
 ## Annex B — Ketentuan privasi regional
 

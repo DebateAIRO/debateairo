@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Pe scurt
-eyebrow: POLITICA DE CONFIDENȚIALITATE · v3.4 · ÎN VIGOARE DE LA 12 OCTOMBRIE 2026
+eyebrow: POLITICA DE CONFIDENȚIALITATE · v3.5 · ÎN VIGOARE DE LA 12 OCTOMBRIE 2026
 title: Ce stocăm și de ce
 lede: Drepturile dumneavoastră și obligațiile noastre în temeiul GDPR (EU) 2016/679, într-un limbaj clar. Paisprezece secțiuni și Anexa B — derulați până la final.
-endMarker: SFÂRȘITUL POLITICII · GDPR (EU) 2016/679 · v3.4
+endMarker: SFÂRȘITUL POLITICII · GDPR (EU) 2016/679 · v3.5
 bodyLabel: Textul Politicii de confidențialitate
 annexTitle: Anexa B — Condiții regionale privind confidențialitatea
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 MODULE COOKIE
 -->
 
-**Version 3.4 · Effective 12 octombrie 2026 · Versiunile anterioare la dezbatere.ro/privacy/versions · Operator: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.5 · Effective 12 octombrie 2026 · Versiunile anterioare la dezbatere.ro/privacy/versions · Operator: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Colectăm ceea ce este necesar unui cont și ceea ce alegeți să introduceți. Întrebările dumneavoastră sunt transmise furnizorilor de IA enumerați în Registrul furnizorilor de IA; acestea nu sunt folosite pentru antrenarea modelelor. Furnizorul nostru de găzduire vă stochează contul și dezbaterile la Londra, în Regatul Unit; secțiunea 5 arată unde ajung în rest datele dumneavoastră. Dezbaterile sunt private dacă nu le publicați. Ștergerea contului distruge cheile datelor dumneavoastră private; când o programați, alegeți dacă dezbaterile publicate sunt și ele eliminate sau rămân publice sub pseudonimul dumneavoastră retras. Ne puteți contacta la privacy@dezbatere.ro, iar persoanele menționate într-o dezbatere pot solicita eliminarea fără a avea cont.
 
@@ -43,7 +43,7 @@ Colectăm numai ceea ce este necesar pentru funcționarea unui cont, ceea ce ale
 | **Conținutul dezbaterii** | Întrebarea introdusă; indicațiile de orientare stabilite; susținerile, criticile, trimiterile la dovezi, punctajele și verdictele generate de motor; o înregistrare textuală exactă a răspunsului fiecărui furnizor de IA; interogările de regăsire și referințele la surse. Toate acestea sunt stocate criptat cu o cheie specifică contului dumneavoastră | Dumneavoastră și modelele de IA care lucrează la întrebarea dumneavoastră |
 | **Asistență** | Mesajele schimbate cu asistentul de suport sau cu o persoană, stocate criptat; limba folosită; dacă ați permis asistentului să vadă starea (niciodată conținutul) dezbaterilor; evaluările acordate. Dacă un mesaj declanșează controalele împotriva abuzurilor, păstrăm un hash al mesajului și un hash al adresei IP de la care a provenit | Dumneavoastră |
 | **Evidențe privind acceptarea și consimțământul** | Versiunea și hash-ul conținutului Termenilor acceptați și al politicii care v-a fost prezentată; momentul; ecranul și mecanismul utilizate; limba dumneavoastră; adresa IP și user-agent-ul din acel moment; fiecare consimțământ acordat sau retras și data acestuia | Browserul dumneavoastră, la înregistrare și ori de câte ori modificați o opțiune |
-| **Plăți** (odată ce încep planurile cu plată) | Planul, prețul, perioada de facturare, referințele tranzacției, dovezile privind localizarea fiscală. Datele cardului sunt deținute de furnizorul nostru de plăți, niciodată de noi | Dumneavoastră și furnizorul de plăți |
+| **Plăți** (odată ce încep planurile cu plată) | Planul, prețul, perioada de facturare, referințele tranzacției, dovezile privind localizarea fiscală. Datele de facturare pe care le introduceți la plată: numele, numărul de telefon și adresa de facturare, iar dacă cumpărați în numele unei firme, denumirea, codul de TVA și adresa acesteia; adresa IP de la care plătiți. Datele cardului le introduceți pe pagina furnizorului nostru de plăți, așa că numărul complet al cardului și codul de securitate nu ajung niciodată la noi. Din datele cardului păstrăm ultimele patru cifre, luna și anul expirării și țara în care a fost emis — pentru a ști cu ce card s-a făcut o plată, pentru a vă anunța înainte să expire cardul și pentru a aplica regulile acelei țări — precum și, criptat, un cod primit de la furnizorul de plăți, cu care acesta poate debita același card la fiecare reînnoire. Timp de 14 zile păstrăm, tot criptat, fiecare mesaj pe care furnizorul de plăți ni-l trimite despre o plată, exact așa cum a sosit; mesajul conține și primele cifre ale numărului cardului, care identifică banca emitentă, precum și numele acestei bănci | Dumneavoastră și furnizorul de plăți |
 | **Persoane care nu sunt utilizatorii noștri** | Date cu caracter personal despre alte persoane pe care le includeți într-o întrebare sau pe care motorul le generează atunci când răspunde. Vă solicităm să nu faceți acest lucru; secțiunea 11 explică ce facem dacă totuși se întâmplă | Dumneavoastră, indirect |
 
 La înregistrare, stabilim local țara adresei IP cu DB-IP Lite și verificăm separat lista adreselor de ieșire Tor, fără a trimite adresa unui terț. Refuzăm înregistrarea din țările în care serviciul nu este disponibil, de la adresele de ieșire Tor și de la adresele a căror țară nu este cunoscută. La începutul fiecărei dezbateri noi, verificăm tot local țara adresei IP și putem refuza dezbaterea dacă țara se află pe lista celor blocate întotdeauna. Introduceți data nașterii numai pentru verificarea vârstei; nu o stocăm. Pentru înregistrările reușite, rezultatul păstrat este „admis”; pentru conturile deja existente, poate fi „admis” sau „respins”. Declarați și țara în care locuiți, precum și statul dacă locuiți în SUA, pentru a aplica normele privind consumatorii, confidențialitatea și taxele.
@@ -126,6 +126,8 @@ Când programați ștergerea contului, alegeți ce se întâmplă cu dezbaterile
 | Conversații și cazuri de asistență | Până la închidere, plus 12 luni | Cheile sunt distruse |
 | Evidențe privind acceptarea și consimțământul | Durata de viață a contului plus 6 ani — cel mai lung termen de prescripție care ni se aplică | Șterse |
 | Evidențe de plată (odată ce încep planurile cu plată) | 10 ani, conform cerințelor legislației contabile române | Șterse |
+| Cardul salvat: codul furnizorului de plăți, cu ultimele patru cifre, data expirării și țara cardului | Până la o zi după ce cardul nu mai plătește un plan activ — când planul se încheie, înlocuiți cardul sau vă închideți contul | Șterse; ultimele patru cifre, data expirării și țara rămân și în evidența fiecărei plăți făcute cu acel card |
+| Mesajele furnizorului de plăți despre plăți, așa cum au sosit | 14 zile | Șterse |
 | Copii de siguranță | Până la 8 săptămâni după ștergerea copiei active | Suprascrise |
 
 **Ce produce efectiv ștergerea.** Dezbaterile private și datele contului sunt criptate cu chei specifice contului și fiecărei dezbateri. Ștergerea contului distruge aceste chei, după care înregistrările criptate nu mai pot fi citite de noi sau de altcineva, iar noi ștergem înregistrarea contului. Cheia copiei publice a unei dezbateri publicate este distrusă la ștergere numai dacă ați bifat „Ștergeți și dezbaterile mele publice” (secțiunea 6). Numim acest lucru ștergere deoarece acesta este efectul său și deținem o evaluare documentată care îl susține; dacă doriți mai multe informații, întrebați-ne. Trebuie cunoscute trei aspecte: jurnalul de audit al securității este exclusiv cu adăugare și nu se șterge, dar nu conține identificatori lizibili despre dumneavoastră; un număr mic de dezbateri mai vechi precedă schema noastră actuală de criptare, iar dacă aceasta este situația contului dumneavoastră vă explicăm ce efect are închiderea asupra lor; copiile datelor deja trimise unui furnizor de IA sunt guvernate de condițiile de păstrare ale furnizorului din Registru, nu de ștergerea efectuată de noi.
@@ -213,7 +215,7 @@ Pentru a refuza aceste elemente, blocați sau ștergeți modulele cookie și dat
 
 Când modificăm această politică, publicăm noua versiune împreună cu un rezumat al modificărilor și o nouă dată de intrare în vigoare și păstrăm versiunile anterioare la dezbatere.ro/privacy/versions. Pentru o modificare care adaugă un scop sau un destinatar nou, vă informăm prin e-mail și în produs înainte de începerea noii prelucrări și vă acordăm timp pentru a vă opune. Dacă un scop nou depinde de consimțământul dumneavoastră — de exemplu, dacă am dori vreodată să folosim conținutul pentru îmbunătățirea modelelor — solicităm consimțământul separat și specific; nu considerăm niciodată acceptarea Termenilor actualizați drept consimțământ pentru o prelucrare nouă. Pentru clarificări care nu schimbă nimic din ceea ce facem, publicăm pur și simplu noua versiune.
 
-Această politică a fost actualizată ultima dată la 12 octombrie 2026. Versiunea 3.4 a înlocuit versiunea 3.3: secțiunea 13 spune acum că modulul cookie debateai.locale stabilește și limba în care vă trimitem e-mailurile, iar un paragraf nou arată că fiecare e-mail pus în coadă pentru dumneavoastră păstrează limba selectată până la trimitere.
+Această politică a fost actualizată ultima dată la 12 octombrie 2026. Versiunea 3.5 a înlocuit versiunea 3.4: secțiunea 2 spune acum ce date de facturare și ce date ale cardului păstrăm și că numărul complet al cardului nu ajunge niciodată la noi, iar secțiunea 7 spune cât timp păstrăm un card salvat și mesajele furnizorului de plăți despre plăți.
 
 ## Annex B — Condiții regionale privind confidențialitatea
 

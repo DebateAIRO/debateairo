@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručně
-eyebrow: ZÁSADY OCHRANY OSOBNÍCH ÚDAJŮ · v3.4 · ÚČINNÉ OD 12. ŘÍJNA 2026
+eyebrow: ZÁSADY OCHRANY OSOBNÍCH ÚDAJŮ · v3.5 · ÚČINNÉ OD 12. ŘÍJNA 2026
 title: Co uchováváme a proč
 lede: Vaše práva a naše povinnosti podle GDPR (EU) 2016/679 srozumitelným jazykem. Čtrnáct oddílů a příloha B — přejděte až na konec.
-endMarker: KONEC ZÁSAD · GDPR (EU) 2016/679 · v3.4
+endMarker: KONEC ZÁSAD · GDPR (EU) 2016/679 · v3.5
 bodyLabel: Text zásad ochrany osobních údajů
 annexTitle: Příloha B — Regionální podmínky ochrany osobních údajů
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 SOUBORY COOKIE
 -->
 
-**Version 3.4 · Effective 12. října 2026 · Předchozí verze na dezbatere.ro/privacy/versions · Správce: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.5 · Effective 12. října 2026 · Předchozí verze na dezbatere.ro/privacy/versions · Správce: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Shromažďujeme údaje nezbytné pro účet a údaje, které se rozhodnete zadat. Vaše otázky jsou předávány poskytovatelům AI uvedeným v našem Registru; nepoužívají se k trénování modelů. Náš poskytovatel hostingu uchovává váš účet a vaše debaty v Londýně ve Spojeném království; oddíl 5 uvádí, kam dále vaše údaje putují. Debaty jsou soukromé, dokud je nezveřejníte. Výmaz účtu zničí klíče k vašim soukromým údajům; při jeho plánování si zvolíte, zda se odstraní i vaše zveřejněné debaty, nebo zůstanou veřejné pod vaším vyřazeným pseudonymem. Můžete nás kontaktovat na privacy@dezbatere.ro a osoby uvedené v debatě mohou požádat o odstranění i bez účtu.
 
@@ -43,7 +43,7 @@ Shromažďujeme pouze údaje, které účet potřebuje ke svému fungování, kt
 | **Obsah debaty** | Otázka, kterou zadáte; řídicí anotace, které nastavíte; tvrzení, kritiky, odkazy na důkazy, hodnocení a závěry vytvořené systémem; doslovný záznam odpovědí jednotlivých poskytovatelů AI; vyhledávací dotazy a odkazy na zdroje. Vše je uloženo šifrovaně pod klíčem určeným konkrétně pro váš účet | Vy a modely AI pracující na vaší otázce |
 | **Podpora** | Zprávy, které si vyměníte s asistentem podpory nebo osobou, uložené šifrovaně; použitý jazyk; zda jste asistentovi dovolili zobrazit stav (nikoli obsah) vašich debat; vámi udělená hodnocení. Pokud zpráva aktivuje kontrolní mechanismy proti zneužití, uchováme hash zprávy a hash IP adresy, ze které pochází | Vy |
 | **Záznamy o přijetí a souhlasech** | Verze a hash obsahu Podmínek, které jste přijali, a zásad, jež vám byly zobrazeny; čas; použitá obrazovka a mechanismus; váš jazyk; vaše IP adresa a user-agent v daném okamžiku; každý udělený či odvolaný souhlas a okamžik tohoto úkonu | Váš prohlížeč při registraci a při každé změně volby |
-| **Platby** (od spuštění placených tarifů) | Tarif, cena, fakturační období, odkazy na transakce a doklady o místě zdanění. Údaje o kartě uchovává náš poskytovatel platebních služeb, nikoli my | Vy a poskytovatel platebních služeb |
+| **Platby** (od spuštění placených tarifů) | Tarif, cena, fakturační období, odkazy na transakce a doklady o místě zdanění. Fakturační údaje, které zadáte při platbě: vaše jméno, telefonní číslo a fakturační adresa, a pokud nakupujete jako firma, její název, DIČ a adresa; a také IP adresa, ze které platíte. Údaje o kartě zadáváte na stránce našeho poskytovatele platebních služeb, takže celé číslo vaší karty a bezpečnostní kód se k nám nikdy nedostanou. Z vaší karty uchováváme její poslední čtyři číslice, měsíc a rok konce platnosti a zemi, ve které byla vydána — abychom poznali, kterou kartou byla platba provedena, abychom vás mohli upozornit před skončením platnosti karty a abychom uplatnili pravidla dané země — a dále šifrovaně uložený kód od poskytovatele platebních služeb, který mu umožňuje strhávat platby ze stejné karty při každém obnovení. Po dobu 14 dnů také šifrovaně uchováváme každou zprávu, kterou nám poskytovatel platebních služeb pošle o platbě, přesně v podobě, v jaké dorazila; jsou v ní uvedeny i první číslice čísla karty, podle kterých lze určit banku, jež kartu vydala, a název této banky | Vy a poskytovatel platebních služeb |
 | **Osoby, které nejsou našimi uživateli** | Osobní údaje o jiných osobách, které uvedete v otázce nebo které systém vytvoří při odpovědi. Žádáme vás, abyste tak nečinili; oddíl 11 vysvětluje, jak postupujeme, pokud k tomu přesto dojde | Vy, nepřímo |
 
 Při registraci místně ověřujeme zemi podle IP adresy a odmítáme registrace ze zemí, kde službu neposkytujeme, z výstupních adres sítě Tor a z adres, jejichž zemi nelze určit. IP adresu k této kontrole neposíláme třetí straně. Datum narození použijeme k ověření věku, ale neuložíme je; uvádíte také zemi svého bydliště a případný stát USA. Při zahájení každé nové debaty zemi podle IP adresy také místně ověřujeme a debatu můžeme odmítnout, je-li země trvale blokována; odmítnutí kvůli Tor nebo neznámé zemi se týká registrace.
@@ -126,6 +126,8 @@ Když naplánujete smazání účtu, zvolíte, co se stane s debatami, které js
 | Konverzace a případy podpory | Do uzavření a dalších 12 měsíců | Klíče jsou zničeny |
 | Záznamy o přijetí a souhlasech | Po dobu existence účtu a dalších 6 let — nejdelší promlčecí lhůta, která se na nás vztahuje | Vymazány |
 | Záznamy o platbách (od spuštění placených tarifů) | 10 let, jak vyžadují rumunské účetní předpisy | Vymazány |
+| Uložená karta: kód poskytovatele platebních služeb s posledními čtyřmi číslicemi karty, datem konce platnosti a zemí | Do jednoho dne poté, co karta přestane sloužit k placení aktivního tarifu — když tarif skončí, kartu vyměníte nebo uzavřete účet | Vymazány; poslední čtyři číslice, datum konce platnosti a země zůstávají také v záznamu o každé platbě provedené touto kartou |
+| Zprávy poskytovatele platebních služeb o platbách v podobě, v jaké dorazily | 14 dnů | Vymazány |
 | Zálohy | Až 8 týdnů po vymazání aktivní kopie | Přepsány |
 
 **Co výmaz ve skutečnosti znamená.** Vaše soukromé debaty a údaje účtu jsou šifrovány pomocí klíčů určených konkrétně pro váš účet a jednotlivé debaty. Výmaz účtu tyto klíče zničí, po čemž zašifrované záznamy nemůžeme přečíst my ani nikdo jiný, a záznam účtu vymažeme. Klíč k veřejné kopii zveřejněné debaty se při výmazu zničí pouze tehdy, pokud jste zaškrtli „Smazat také mé veřejné debaty“ (oddíl 6). Označujeme to jako výmaz, protože takový je jeho účinek, a máme pro něj zdokumentované posouzení; chcete-li vědět více, zeptejte se. Je třeba vědět tři věci: bezpečnostní auditní stopa je pouze doplňována a nemaže se, neobsahuje však žádné vaše čitelné identifikátory; malý počet starších debat vznikl před naším současným systémem šifrování, a pokud se to týká vašeho účtu, sdělíme vám, čeho u nich uzavření účtu dosáhne; a kopie údajů, které již byly odeslány poskytovateli AI, se řídí podmínkami uchovávání daného poskytovatele v Registru, nikoli naším výmazem.
@@ -213,7 +215,7 @@ Chcete-li tyto položky odmítnout, zablokujte nebo smažte soubory cookie a dat
 
 Při změně těchto zásad zveřejníme novou verzi se shrnutím změn a novým datem účinnosti a předchozí verze ponecháme na dezbatere.ro/privacy/versions. O změně, která přidává nový účel nebo nového příjemce, vás informujeme e-mailem a v produktu před zahájením nového zpracování a poskytneme vám čas vznést námitku. Pokud nový účel závisí na vašem souhlasu — například kdybychom někdy chtěli používat obsah ke zlepšování modelů — požádáme o tento souhlas samostatně a konkrétně; přijetí aktualizovaných Podmínek nikdy nepovažujeme za souhlas s novým zpracováním. Upřesnění, která nic nemění na našem postupu, pouze zveřejníme v nové verzi.
 
-Tyto zásady byly naposledy aktualizovány dne 12. října 2026. Verze 3.4 nahradila verzi 3.3: oddíl 13 nyní uvádí, že soubor cookie debateai.locale nastavuje také jazyk, ve kterém vám píšeme e-maily, a přidává odstavec, podle něhož každý e-mail, který pro vás zařazujeme do fronty, zůstává v jazyce, který jste zvolili, dokud jej neodešleme.
+Tyto zásady byly naposledy aktualizovány dne 12. října 2026. Verze 3.5 nahradila verzi 3.4: oddíl 2 nyní uvádí, jaké fakturační údaje a údaje o kartě uchováváme a že celé číslo vaší karty se k nám nikdy nedostane, a oddíl 7 uvádí, jak dlouho uchováváme uloženou kartu a zprávy poskytovatele platebních služeb o platbách.
 
 ## Annex B — Regionální podmínky ochrany osobních údajů
 

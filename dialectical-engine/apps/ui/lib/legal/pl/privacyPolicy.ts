@@ -56,7 +56,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Treść debaty — Wpisane przez Ciebie pytanie; ustawione przez Ciebie adnotacje sterujące; twierdzenia, krytyki, odwołania do dowodów, wyniki i werdykty generowane przez silnik; dosłowny zapis odpowiedzi każdego dostawcy AI; zapytania wyszukiwania i odwołania do źródeł. Wszystko to jest przechowywane w postaci zaszyfrowanej przy użyciu klucza właściwego dla Twojego konta — Ty oraz modele AI pracujące nad Twoim pytaniem",
         "Wsparcie — Wiadomości wymieniane z asystentem wsparcia lub człowiekiem, przechowywane w postaci zaszyfrowanej; używany język; informacja, czy zezwolono asystentowi na wgląd w status (nigdy w treść) Twoich debat; wystawione przez Ciebie oceny. Jeśli wiadomość uruchomi mechanizmy kontroli nadużyć, zachowujemy skrót wiadomości oraz skrót adresu IP, z którego ją wysłano — Ty",
         "Rejestry akceptacji i zgód — Wersja i skrót treści zaakceptowanych Warunków świadczenia usług oraz polityki, którą Ci przedstawiono; czas; użyty ekran i mechanizm; Twój język; Twój adres IP i user-agent w tej chwili; każda udzielona lub wycofana zgoda oraz chwila jej udzielenia lub wycofania — Twoja przeglądarka, podczas rejestracji i przy każdej zmianie wyboru",
-        "Płatności (po uruchomieniu planów płatnych) — Plan, cena, okres rozliczeniowy, odwołania do transakcji, dowody lokalizacji podatkowej. Dane karty przechowuje nasz dostawca płatności, nigdy my — Ty i dostawca płatności",
+        "Płatności (po uruchomieniu planów płatnych) — Plan, cena, okres rozliczeniowy, odwołania do transakcji, dowody lokalizacji podatkowej. Dane rozliczeniowe, które podajesz podczas płatności: Twoje imię i nazwisko, numer telefonu i adres rozliczeniowy, a jeśli kupujesz jako firma, jej nazwa, numer VAT i adres; a także adres IP, z którego płacisz. Dane karty wpisujesz na stronie naszego dostawcy płatności, więc pełny numer Twojej karty i kod zabezpieczający nigdy do nas nie trafiają. Z danych Twojej karty przechowujemy jej cztery ostatnie cyfry, miesiąc i rok ważności oraz kraj, w którym została wydana — aby wiedzieć, którą kartą dokonano płatności, przypomnieć Ci o tym, zanim karta straci ważność, i stosować przepisy właściwe dla tego kraju — a także przechowywany w postaci zaszyfrowanej kod od dostawcy płatności, który pozwala mu obciążać tę samą kartę przy każdym odnowieniu. Przez 14 dni przechowujemy też, w postaci zaszyfrowanej, każdą wiadomość, którą dostawca płatności przesyła nam w sprawie płatności, dokładnie w takiej postaci, w jakiej do nas dotarła; widać w niej również pierwsze cyfry numeru karty, pozwalające ustalić bank, który wydał kartę, oraz nazwę tego banku — Ty i dostawca płatności",
         "Osoby, które nie są naszymi użytkownikami — Dane osobowe innych osób zamieszczone przez Ciebie w pytaniu lub wygenerowane przez silnik w odpowiedzi. Prosimy, aby tego nie robić; sekcja 11 wyjaśnia, co robimy, gdy mimo to do tego dojdzie — Ty, pośrednio"
         ]
       },
@@ -150,6 +150,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Rozmowy i sprawy dotyczące wsparcia — Do zamknięcia sprawy plus 12 miesięcy — Klucze zostają zniszczone",
         "Rejestry akceptacji i zgód — Przez okres istnienia konta oraz 6 lat — najdłuższy mający do nas zastosowanie termin przedawnienia — Zostają usunięte",
         "Rejestry płatności (po uruchomieniu planów płatnych) — 10 lat, zgodnie z wymogami rumuńskiego prawa rachunkowego — Zostają usunięte",
+        "Zapisana karta: kod dostawcy płatności wraz z czterema ostatnimi cyframi karty, datą ważności i krajem — Do upływu jednego dnia od chwili, gdy karta przestanie służyć do opłacania aktywnego planu — gdy plan się zakończy, wymienisz kartę lub zamkniesz konto — Zostają usunięte; cztery ostatnie cyfry, data ważności i kraj pozostają również w rejestrze każdej płatności dokonanej tą kartą",
+        "Wiadomości dostawcy płatności dotyczące płatności, w postaci, w jakiej dotarły — 14 dni — Zostają usunięte",
         "Kopie zapasowe — Do 8 tygodni od usunięcia kopii aktywnej — Zostają nadpisane"
         ]
       },
@@ -258,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Gdy zmieniamy niniejszą politykę, publikujemy nową wersję wraz z podsumowaniem zmian i nową datą wejścia w życie, a poprzednie wersje zachowujemy pod adresem dezbatere.ro/privacy/versions. O zmianie wprowadzającej nowy cel lub nowego odbiorcę informujemy Cię przed rozpoczęciem nowego przetwarzania, pocztą elektroniczną i w produkcie, oraz zapewniamy czas na wniesienie sprzeciwu. Jeżeli nowy cel zależy od Twojej zgody — na przykład gdybyśmy kiedykolwiek chcieli wykorzystać treści do ulepszania modeli — prosimy o tę zgodę osobno i w sposób konkretny; nigdy nie traktujemy akceptacji zaktualizowanych Warunków świadczenia usług jako zgody na nowe przetwarzanie. W przypadku wyjaśnień, które nie zmieniają naszych działań, po prostu publikujemy nową wersję." },
-      { kind: "p", text: "Niniejsza polityka została ostatnio zaktualizowana 12 października 2026. Wersja 3.4 zastąpiła wersję 3.3: sekcja 13 mówi teraz, że plik cookie debateai.locale ustawia także język, w którym piszemy wiadomości e-mail, które wysyłamy, oraz zawiera akapit o tym, że każda wiadomość e-mail, którą dla Ciebie umieszczamy w kolejce, zachowuje język wybrany wcześniej przez Ciebie, aż do chwili jej wysłania." }
+      { kind: "p", text: "Niniejsza polityka została ostatnio zaktualizowana 12 października 2026. Wersja 3.5 zastąpiła wersję 3.4: sekcja 2 mówi teraz, jakie dane rozliczeniowe i dane karty przechowujemy oraz że pełny numer Twojej karty nigdy do nas nie trafia, a sekcja 7 mówi, jak długo przechowujemy zapisaną kartę i wiadomości dostawcy płatności dotyczące płatności." }
     ]
   },
   {
@@ -330,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.4",
-  sha256: "558eeab75fd2f63c75a007d2dac18878a0504e1eb4fde257f6ffd3c2357d3b33",
-  eyebrow: "POLITYKA PRYWATNOŚCI · v3.4 · OBOWIĄZUJE OD 12 PAŹDZIERNIKA 2026",
+  version: "3.5",
+  sha256: "e4842622c30b97093f83e94d1581a79fdb79eb4f4fe75aaa27fd930444b62a3b",
+  eyebrow: "POLITYKA PRYWATNOŚCI · v3.5 · OBOWIĄZUJE OD 12 PAŹDZIERNIKA 2026",
   title: "Co przechowujemy i dlaczego",
   lede: "Twoje prawa i nasze obowiązki wynikające z RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679), wyjaśnione prostym językiem. Czternaście sekcji i załącznik B — przewiń do końca.",
-  endMarker: "KONIEC POLITYKI · RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679) · v3.4",
+  endMarker: "KONIEC POLITYKI · RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679) · v3.5",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Tekst Polityki prywatności",
   sectionIdPrefix: "policy-section-",
