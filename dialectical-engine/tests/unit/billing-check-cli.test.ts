@@ -216,7 +216,7 @@ describe("N21 pnpm billing:check", () => {
     const address = "https://dezbatere.test/api/v1/billing/netopia/notify";
     const notifyAnswer = async (notify: () => Response) => (await runBillingCheck(depsFor(environment, { notify })))
       .filter((line) => line.text.startsWith(address));
-    const apiDown = `${address} answered HTTP 502: the site answered, but the API behind it did not, so NETOPIA's messages cannot reach it now (start debateai-api, then run the check again).`;
+    const apiDown = `${address} answered HTTP 502: the site answered, but the API behind it did not, so NETOPIA's messages cannot reach it now (start the current release's API, debateai-api@<label>, then run the check again).`;
     expect(await notifyAnswer(() => json({ error: "API_UPSTREAM_UNREACHABLE" }, 502))).toEqual([{ ok: false, text: apiDown }]);
     // A 503 that is not the route's own "retry" (a proxy's own page, say) is the API not answering too.
     expect(await notifyAnswer(() => new Response("Service Unavailable", { status: 503 }))).toEqual([{
@@ -238,7 +238,7 @@ describe("N21 pnpm billing:check", () => {
       ok: false,
       text: `${address} answered HTTP 404: the API does not serve NETOPIA's notify route, so NETOPIA's messages cannot reach it.`
         + " The API serves it only with NETOPIA's four settings complete, and reads them only when it starts: after the setup,"
-        + " restart it (systemctl restart debateai-api), then run the check again."
+        + " restart the current release's API (systemctl restart debateai-api@<label>), then run the check again."
     }]);
     for (const status of [301, 302, 307, 308]) {
       expect(await notifyAnswer(() => new Response(null, { status, headers: { location: "https://www.dezbatere.test/" } }))).toEqual([{
@@ -260,7 +260,7 @@ describe("N21 pnpm billing:check", () => {
       return new Response(failed.body, { status: failed.status, headers: { "content-type": "application/json" } });
     })).toEqual([{
       ok: false,
-      text: `${address} answered HTTP 503: the site answered, but the API behind it did not, so NETOPIA's messages cannot reach it now (start debateai-api, then run the check again).`
+      text: `${address} answered HTTP 503: the site answered, but the API behind it did not, so NETOPIA's messages cannot reach it now (start the current release's API, debateai-api@<label>, then run the check again).`
     }]);
   });
 
