@@ -449,8 +449,10 @@ export class PreviewModelCooling extends PreviewVendorRefusedUnbilled {
  * Side-by-side spec §9 (decision D6): MODEL_NOT_ALLOWED or RESERVATION_MISMATCH. During an upload two releases share
  * one gate, and the gate's GO may no longer serve a model (its row is gone) or a price (this release reserved another
  * amount) that this release's debate still asks for. The gate refuses before reserving or sending anything. For the
- * app this is that one model sitting out the rest of the run, exactly like a busy model: a REFUSED row, the one
- * 60-second resend, then the sit-out book (apps/runner/src/run-sit-out.ts) drops it. Never a money stop.
+ * app this is that one model sitting out the rest of the run, like a busy model: a REFUSED row, then the sit-out book
+ * (apps/runner/src/run-sit-out.ts) drops it, but at once (R5, final review): the call policy sends no 60-second resend,
+ * as the GO will not serve it again within the minute. Never a money stop. (The claim-time probe's own one resend,
+ * provider-probe.ts, still reads every unbilled refusal alike.)
  */
 export class PreviewModelNotServed extends PreviewVendorRefusedUnbilled {
   /** The gate's own word for it, so a journal or the practice can tell it from the vendor's busy refusal. */
@@ -670,6 +672,10 @@ export function withPreviewProviderCallPolicy(
     if (storyRepair) return firstSend();
     return firstSend().catch(async (error: unknown) => {
       if (!previewCallWasUnbilled(error)) throw error;
+      // R5 (final review), side-by-side §9 (D6): a model or price the shared gate no longer serves is not busy and will
+      // not come back within the minute; it ends now, and the runner's sit-out book drops that model for the run. Never
+      // made the busy coordinator's probe either: the model's other calls meet the same refusal and end the same way.
+      if (previewRefusalOf(error, PreviewModelNotServed) !== undefined) throw error;
       if (previewCallWasVendorBusy(error)) {
         const turn = await busy.refusedBusy(reviewed.model, retryAfterOf(error));
         if (turn === "GIVE_UP") throw error;
