@@ -20,8 +20,8 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 /**
  * "Database ahead" start mode (side-by-side spec 2026-10-21 §5; plan A, task A7, Review Focus 3): an older release starts
  * on a database that a newer release has already moved forward by steps it declared `-- n1: expand` and
- * `-- n1: keeps-verifier`, all from ONE newer chain, recorded in the migrator-private declaration table
- * public.debateai_schema_migration_step_n1. migrate() replays its own steps, applies nothing and reports the extra
+ * `-- n1: keeps-verifier`, all from ONE newer chain (its own list proves it when given, else one chain head), recorded
+ * in the migrator-private declaration table public.debateai_schema_migration_step_n1. migrate() replays its own steps, applies nothing and reports the extra
  * steps; verifyDatabaseAhead makes the same acceptance check read-only. Anything else is refused
  * DATABASE_AHEAD_NOT_ACCEPTED <DETAIL> <name>. CI skips this directory; run it alone.
  */
@@ -191,10 +191,28 @@ describe("an older release on a database a newer release moved forward (Review F
     await refused("RECEIPT_MISSING", FIRST);
   });
 
-  it("refuses MORE_THAN_ONE_RELEASE: extra steps declared by two different newer chains", async () => {
+  it("refuses MORE_THAN_ONE_RELEASE: extra steps declared by two different newer chains, without the newer release's list", async () => {
     await seed(first());
     await seed(second({ head: hex("c") }));
     await refused("MORE_THAN_ONE_RELEASE", SECOND);
+  });
+
+  // Final review A1: T+1 applied 0124 and was rolled back; its fix release T+1b keeps 0124 byte for byte and adds 0125.
+  // Each migrate() records its own chain head, so the two extra steps carry two heads. With the newer release's own list
+  // (the preview always passes it), rules 3 and 7 prove one linear chain of that one release, so the heads are not
+  // compared; without the list, the heads are the only proof of one release, and two heads still refuse.
+  it("an aborted release's step then its fix release's step: accepted with the fix release's list only (final review A1)", async () => {
+    await seed(first({ head: hex("1") })); // T+1's chain ends at 0124
+    await seed(second({ head: hex("2") })); // T+1b's chain ends at 0125
+    const own = await describeForwardSteps();
+    const newerChain = [...own, declaration(first()), declaration(second())];
+    expect(await migrate(db.pool, { newerChain })).toEqual({ appliedSteps: [], extraSteps: [FIRST, SECOND] });
+    expect(await verifyDatabaseAhead(db.pool, { newerChain })).toEqual({ mode: "AHEAD", knownSteps: 13, extraSteps: [FIRST, SECOND] });
+    await refused("MORE_THAN_ONE_RELEASE", SECOND);
+    // Rule 7 still binds without rule 6: the fix release's step must be in its list as the database recorded it, and
+    // the aborted release's own list (which ends at 0124) does not reach 0125.
+    await refused("NEWER_CHAIN_MISMATCH", SECOND, { newerChain: [...own, declaration(first()), declaration(second({ manifest: hex("7") }))] });
+    await refused("NEWER_CHAIN_MISMATCH", SECOND, { newerChain: [...own, declaration(first())] });
   });
 
   it("refuses NEWER_CHAIN_MISMATCH: the newer release's own list disagrees with the database or with this code", async () => {

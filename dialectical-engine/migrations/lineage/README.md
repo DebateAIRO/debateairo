@@ -364,11 +364,16 @@ accepts the extra steps only when every rule holds, and otherwise refuses
    (`VERIFIER_CHANGED`);
 5. every extra step has a declaration row (`NOT_DECLARED`) with `n1_expand` (`NOT_EXPAND`) and `keeps_verifier`
    (`NOT_KEEPS_VERIFIER`);
-6. all extra steps carry one `chain_head_manifest_sha256`, so they come from at most one newer release
-   (`MORE_THAN_ONE_RELEASE`);
+6. without `newerChain`: all extra steps carry one `chain_head_manifest_sha256`, so they come from at most one newer
+   release (`MORE_THAN_ONE_RELEASE`);
 7. with `migrate(pool, { newerChain })` (the newer release's `describeForwardSteps()`, from its root-owned plan): this
    code's chain is a prefix of it by name, manifest, source and verifier, and the extra steps are a prefix of the rest
    with the receipts' manifests and sources, each declared expand and keeps-verifier (`NEWER_CHAIN_MISMATCH`).
+
+Rule 6 is skipped when `newerChain` is given (the preview always passes it; final review A1). A release T+1 that
+applied 0124 and was rolled back, then its fix release T+1b that keeps 0124 byte for byte and adds 0125, leave two
+chain heads (each `migrate()` records its own), yet rules 3 and 7 already prove one linear chain of that one newer
+release, so T can still restart. Without the newer release's list the heads are the only proof of one release.
 
 Accepted, `migrate()` has replayed every one of its own steps (receipts, own checks, postconditions, and its own last
 verifier, which rule 4 shows is the one in force), applies nothing and returns

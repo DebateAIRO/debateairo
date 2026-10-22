@@ -89,10 +89,14 @@ type AheadDeclaration = Readonly<{ n1_expand: boolean; keeps_verifier: boolean; 
  *    (VERIFIER_CHANGED);
  * 5. every extra step has a declaration row (NOT_DECLARED) saying n1 expand (NOT_EXPAND) and keeps-verifier
  *    (NOT_KEEPS_VERIFIER);
- * 6. all extra steps carry one chain head: one newer release (MORE_THAN_ONE_RELEASE);
+ * 6. without `newerChain`: all extra steps carry one chain head, one newer release (MORE_THAN_ONE_RELEASE);
  * 7. with `newerChain`: this code's chain is a prefix of it (name, manifest, source, verifier), and the extra steps are
  *    a prefix of the rest with the receipts' manifests and sources, each declared expand and keeps-verifier
  *    (NEWER_CHAIN_MISMATCH).
+ * Rule 6 is skipped when `newerChain` is given (final review A1, controller ruling 2026-10-22): a release T+1 that
+ * applied 0124 and was rolled back, then its fix release T+1b that keeps 0124 and adds 0125, leave two chain heads
+ * (each migrate() records its own), yet rules 3 and 7 prove one linear chain of that one newer release, so T can still
+ * restart. Without the newer release's list the heads are the only proof of one release, so rule 6 stays.
  * The two tables are read only after their ACL passes (assertForwardRecordsPrivate), so a row a runtime could have
  * written is never trusted.
  */
@@ -125,11 +129,13 @@ export async function assertDatabaseAheadAccepted(
     if (declaration.keeps_verifier !== true) notAccepted("NOT_KEEPS_VERIFIER", name);
     return declaration;
   });
-  for (const [index, declaration] of extraDeclarations.entries()) {
-    if (declaration.chain_head_manifest_sha256 !== extraDeclarations[0]!.chain_head_manifest_sha256) notAccepted("MORE_THAN_ONE_RELEASE", extra[index]!);
-  }
   const newer = options.newerChain;
-  if (newer === undefined) return;
+  if (newer === undefined) {
+    for (const [index, declaration] of extraDeclarations.entries()) {
+      if (declaration.chain_head_manifest_sha256 !== extraDeclarations[0]!.chain_head_manifest_sha256) notAccepted("MORE_THAN_ONE_RELEASE", extra[index]!);
+    }
+    return;
+  }
   for (const [index, step] of plan.forwardChain.entries()) {
     const entry = newer[index];
     if (entry?.name !== step.name || entry.manifestSha256 !== step.manifestSha256 || entry.sourceSha256 !== step.sourceSha256
