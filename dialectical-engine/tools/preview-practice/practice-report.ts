@@ -550,7 +550,8 @@ export function reportMarkdown(report: PracticeReport): string {
     for (const [gate, block] of Object.entries(gates)) {
       const observed = (block.observed ?? block) as PracticeGateSummary;
       lines.push(`- ${gate}: ${String(observed.calls)} calls, ${String(observed.unbilled)} refused, not billed (vendor busy `
-        + `${String(observed.vendorRefused)}, cooling off ${String(observed.modelCooling)}, not reached ${String(observed.notReached)}, `
+        + `${String(observed.vendorRefused)}, cooling off ${String(observed.modelCooling)}, not served ${String(observed.notServed ?? 0)}, `
+        + `not reached ${String(observed.notReached)}, `
         + `vendor error not billed ${String(observed.vendorErrorUnbilled ?? 0)}), `
         + (observed.bookedMax ? `${String(observed.bookedMax)} booked at their maximum (sent, then timed out or cut off; `
           + "the gate charged each its full reservation and kept going), " : "")

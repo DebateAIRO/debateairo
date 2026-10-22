@@ -424,7 +424,7 @@ describe('how a started runner ends (startRunner, real process and signals)', ()
     expect(result).toEqual({ code: 0, signal: null, stdout: 'READY\nPREVIEW_RUNNER_RETIRED\n', stderr: '' });
     expect(Date.now() - began).toBeGreaterThanOrEqual(bound);
   });
-  it('production waits RETIRED_SETTLE_MS (30 s) for main to end after retirement; only tests shorten it', async () => {
+  it('production passes no settle override: the executable uses RETIRED_SETTLE_MS (30 s)', async () => {
     expect(launcher.RETIRED_SETTLE_MS).toBe(30_000);
     const code = await readFile(resolve(OPERATOR, 'launch-runner.mjs'), 'utf8');
     expect(code).toContain('{retiredSettleMs=RETIRED_SETTLE_MS}={}');

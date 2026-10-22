@@ -1,8 +1,9 @@
 import { tsImport } from 'tsx/esm/api';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { withPrivateBytes,strictJson,exactKeys,refuse } from './custody.mjs';
-import { readPublicArtifact } from './launch-plan.mjs';
+import { fileURLToPath,pathToFileURL } from 'node:url';
+import { withPrivateBytes,strictJson,exactKeys,refuse,sha256 } from './custody.mjs';
+import { RELEASE_LABEL,labelOfSourceRoot,readPublicArtifact } from './launch-plan.mjs';
+import { DATABASE_AHEAD_MAX_BYTES,DATABASE_AHEAD_ROOT,databaseAheadPathForLabel,validateDatabaseAheadFile } from './database-ahead.mjs';
 import { verifySourceManifest,operatorManifestSha256 } from './source-manifest.mjs';
 import { withActiveNativePool } from './native-peer.mjs';
 const NATIVE_PLAN_KEYS=['schema','operation','sourceRoot','sourceRevision','sourceTree','sourceManifest','operatorManifestSha256','selectedBaseRegisterVersion','selectedBaseSnapshotSha256','publicationId','approval'];
@@ -139,20 +140,74 @@ export function snapshotProposal({runtimeObservedAt,source,plan,snapshot}) {
   baseRegisterVersion:snapshot.baseRegisterVersion,baseSnapshotSha256:snapshot.baseSnapshotSha256,snapshotSha256:snapshot.snapshotSha256,deltaSha256:snapshot.deltaSha256,
   rowCount:snapshot.rows.length,rowKeys:snapshot.rows.map(row=>row.rowKey),addedKeys:snapshot.addedKeys,changedKeys:snapshot.changedKeys,delta:snapshot.delta};
 }
-/** Fixed public plan + fixed private peer FD. No database URL, role, secret or env override argument. */
-export async function runNativeOperator() {
- const plan=validateNativePlan(await withPrivateBytes('/etc/debateai-v3-preview/auth-dev-v1/native-plan.json',{root:'/etc/debateai-v3-preview/auth-dev-v1',uid:0,mode:0o644,maxBytes:32768},raw=>strictJson(raw)));
+/** Root's folder of per-release plans (side-by-side spec §10): native-plan-<label>.json, database-ahead-<label>.json. */
+const NATIVE_PLAN_ROOT=DATABASE_AHEAD_ROOT;
+const RELEASES_ROOT='/opt/debateai-v3-preview/releases';
+/** This operator inside a candidate API release folder: `…/auth-dev-candidate-<label>-api/dialectical-engine/deploy/preview-auth-dev/v1/native-operator.mjs`. */
+const ENTRY=new RegExp(`^${RELEASES_ROOT}/auth-dev-candidate-(${RELEASE_LABEL.source.slice(1,-1)})-api/dialectical-engine/deploy/preview-auth-dev/v1/native-operator\\.mjs$`);
+const entryLabel=entryPath=>(typeof entryPath==='string'?ENTRY.exec(entryPath)?.[1]:undefined)??refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+/**
+ * Side-by-side spec §10 (plan D task D5): each release has its own verify plan, named by the release label of the API
+ * folder this operator runs from. Any other location refuses, so a release never reads another release's plan.
+ */
+export function nativePlanPathForEntry(entryPath) {
+ return `${NATIVE_PLAN_ROOT}/native-plan-${entryLabel(entryPath)}.json`;
+}
+/**
+ * The operator's whole command line: nothing, or exactly `--credential-fd 3`, optionally followed by `--database-ahead`
+ * (prestart.mjs passes it when the lock pins a database-ahead file on this release, side-by-side spec §5). The fixed
+ * peer module (native-common106.mjs assertPeerActor106) admits only nothing or the credential pair, so it is handed
+ * just that pair after this exact check.
+ */
+export function parseOperatorArguments(argv) {
+ const credential=argv?.length>=2&&argv[0]==='--credential-fd'&&argv[1]==='3';
+ if(Array.isArray(argv)&&argv.length===0)return {databaseAhead:false,peerArguments:[]};
+ if(!credential||argv.length>3||(argv.length===3&&argv[2]!=='--database-ahead'))refuse('PREVIEW_NATIVE_INPUT_REFUSED');
+ return {databaseAhead:argv.length===3,peerArguments:['--credential-fd','3']};
+}
+/**
+ * Side-by-side spec §5 ("database ahead", plan D task D5): this release's root-owned database-ahead file
+ * (database-ahead-<label>.json, root 0644), checked whole (database-ahead.mjs), written for this release and this
+ * revision, naming the newer release's candidate API source manifest (read through readPublicArtifact: root-owned, its
+ * sha256 checked), whose label and revision it names, and listing each step's bytes at its migration path exactly.
+ * Returns what verify-native.ts needs: the file's sha256, the newer label, the steps and the newer chain.
+ * `io` replaces the two reads in unit tests.
+ */
+export async function readDatabaseAhead({label,plan},io={}) {
+ const readFile=io.readFile??(path=>withPrivateBytes(path,{root:NATIVE_PLAN_ROOT,uid:0,mode:0o644,maxBytes:DATABASE_AHEAD_MAX_BYTES},raw=>({value:strictJson(raw),sha256:sha256(raw)})));
+ const readManifest=io.readManifest??(file=>readPublicArtifact(file,'source'));
+ const file=await readFile(databaseAheadPathForLabel(label));
+ const ahead=validateDatabaseAheadFile(file.value);
+ if(ahead.olderLabel!==label||ahead.olderSourceRevision!==plan.sourceRevision)refuse('PREVIEW_DATABASE_AHEAD_REFUSED');
+ const newer=await readManifest(ahead.newerSourceManifest);
+ let newerLabel;
+ try{newerLabel=labelOfSourceRoot(newer?.sourceRoot,'api');}catch{refuse('PREVIEW_DATABASE_AHEAD_REFUSED');}
+ if(newer.uid!==0||newer.role!=='api'||newerLabel!==ahead.newerLabel||newer.sourceRevision!==ahead.newerSourceRevision||!Array.isArray(newer.files))refuse('PREVIEW_DATABASE_AHEAD_REFUSED');
+ const listed=new Map(newer.files.map(entry=>[entry?.path,entry?.sha256]));
+ if(ahead.steps.some(step=>listed.get(`dialectical-engine/migrations/${step.name}`)!==step.sha256))refuse('PREVIEW_DATABASE_AHEAD_REFUSED');
+ return Object.freeze({fileSha256:file.sha256,newerLabel:ahead.newerLabel,accepted:ahead.steps,newerChain:ahead.newerChain});
+}
+/** This release's public plan + fixed private peer FD. No database URL, role, secret or env override argument. */
+export async function runNativeOperator(argv=process.argv.slice(2)) {
+ const {databaseAhead:aheadMode,peerArguments}=parseOperatorArguments(argv);
+ const entry=fileURLToPath(import.meta.url),label=entryLabel(entry);
+ const plan=validateNativePlan(await withPrivateBytes(nativePlanPathForEntry(entry),{root:NATIVE_PLAN_ROOT,uid:0,mode:0o644,maxBytes:32768},raw=>strictJson(raw)));
+ // The plan is this release's own: its source root is the folder this operator runs from.
+ if(plan.sourceRoot!==`${RELEASES_ROOT}/auth-dev-candidate-${label}-api`)refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ // Only the automatic restart's verify reads a database-ahead file (prestart.mjs); plan, publish and apply-and-plan never do.
+ if(aheadMode&&plan.operation!=='verify')refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  const source=await readPublicArtifact(plan.sourceManifest,'source');
  if(source.uid!==0)refuse('PREVIEW_SOURCE_OWNER_REFUSED');
  await verifySourceManifest(source,{sourceRevision:plan.sourceRevision,sourceTree:plan.sourceTree,sourceRoot:plan.sourceRoot,role:'api',manifestSha256:plan.sourceManifest.sha256,execution:{entryUrl:import.meta.url,entryName:'native-operator.mjs',operatorManifestSha256:plan.operatorManifestSha256}});
  if(operatorManifestSha256(source)!==plan.operatorManifestSha256)refuse('PREVIEW_OPERATOR_SOURCE_REFUSED');
+ const databaseAhead=aheadMode?await readDatabaseAhead({label,plan}):null;
  const engine=join(plan.sourceRoot,'dialectical-engine');
  // Owner rulings 2026-10-13: a plan with the owner's hosted-billing inputs composes with kit v3 (hosted rows); every
  // other plan with kit v2, exactly as before.
  const hosted=Object.hasOwn(plan,'hostedBilling');
  const [db,lineage,register,publisher,verify]=await Promise.all([tsImport(join(engine,'packages/db/src/index.ts'),import.meta.url),tsImport(join(engine,'packages/db/src/migration-lineage.ts'),import.meta.url),tsImport(join(engine,'packages/register/src/index.ts'),import.meta.url),tsImport(hosted?'./publish-register-v3.ts':'./publish-register-v2.ts',import.meta.url),tsImport('./verify-native.ts',import.meta.url)]);
  const migration=await lineage.loadMigrationPlan();
- return withActiveNativePool({publicPeerModule:'/opt/debateai-v3-preview/operator/recovery106-v1/native-common106.mjs',auth106Names:migration.manifest.cohorts.auth106},async pool=>{
+ return withActiveNativePool({publicPeerModule:'/opt/debateai-v3-preview/operator/recovery106-v1/native-common106.mjs',auth106Names:migration.manifest.cohorts.auth106,peerArguments},async pool=>{
   if(plan.operation==='apply-and-plan')await db.migrate(pool);
   const base=await publisher.readSealedSnapshot(pool,plan.selectedBaseRegisterVersion);
   if(base.snapshotSha256!==plan.selectedBaseSnapshotSha256)refuse('PREVIEW_SELECTED_BASE_DRIFT');
@@ -173,16 +228,23 @@ export async function runNativeOperator() {
   if(plan.operation==='publish')await verify.refusePendingForwardSteps(pool);
   const input={publicationId:plan.publicationId,sourceRef:`preview-auth-dev-v1 ${source.sourceRevision}/${source.sourceTree}; operator sha256:${plan.operatorManifestSha256}`,snapshot,approval};
   const receipt=plan.operation!=='publish'?publication:hosted?await publisher.publishPreviewRegisterV3(pool,input):await publisher.publishPreviewRegisterV2(pool,input);
-  return verify.verifyNativeState(pool,{sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,nativeSourceSha256:source.nativeSha256,publication:receipt});
+  return verify.verifyNativeState(pool,{sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,nativeSourceSha256:source.nativeSha256,publication:receipt},{databaseAhead});
  });
 }
 /** The exact refusal verify-native.ts gives a database that lacks a forward step of this source (any number of steps). */
 const PENDING_FORWARD_STEP=/^PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: \d{4}_[a-z0-9_]+\.sql(?:, \d{4}_[a-z0-9_]+\.sql){0,63}\. Verify never applies a migration; run the native operator with operation apply-and-plan first\.$/;
 /** Fixed text of publish-register-v2.ts BASE_NOT_CURRENT, which v3 re-exports (both load lazily through tsx; a unit test pins the two equal). */
 export const BASE_NOT_CURRENT_LINE='PREVIEW_REGISTER_BASE_NOT_CURRENT: a sealed register version exists above the selected base; plan again from the newest publication';
-/** Every failure stays opaque except a pending forward step (its line says to run apply-and-plan) or a stale register base (its line says to plan again). */
+/** The exact refusal verify-native.ts gives a database ahead of this source with no database-ahead file pinned (side-by-side spec §5). */
+const DATABASE_AHEAD=/^PREVIEW_NATIVE_VERIFY_DATABASE_AHEAD: the database has steps this release does not know: \d{4}_[a-z0-9_]+\.sql(?:, \d{4}_[a-z0-9_]+\.sql){0,63}\. Pin the newer release's database-ahead file with prestart\.mjs accept-ahead first\.$/;
+/**
+ * Every failure stays opaque except a pending forward step (its line says to run apply-and-plan), a database ahead with
+ * no pinned file (its line says to pin the newer release's database-ahead file) or a stale register base (its line says
+ * to plan again).
+ */
 export function operatorRefusalLine(error){
  if(error?.code==='PREVIEW_REGISTER_BASE_NOT_CURRENT'&&error.message===BASE_NOT_CURRENT_LINE)return `${error.message}\n`;
+ if(error?.code==='PREVIEW_NATIVE_VERIFY_DATABASE_AHEAD'&&typeof error.message==='string'&&DATABASE_AHEAD.test(error.message))return `${error.message}\n`;
  return error?.code==='PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP'&&typeof error.message==='string'&&PENDING_FORWARD_STEP.test(error.message)?`${error.message}\n`:'PREVIEW_NATIVE_OPERATION_REFUSED\n';
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){try{process.stdout.write(`${JSON.stringify(await runNativeOperator())}\n`);}catch(error){process.stderr.write(operatorRefusalLine(error));process.exitCode=1;}}

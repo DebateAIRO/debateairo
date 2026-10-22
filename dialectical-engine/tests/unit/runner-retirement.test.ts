@@ -450,6 +450,44 @@ describe("the backstop is a request the runner honours (side-by-side §4)", () =
     expect(run.reads).toHaveLength(2);
   });
 
+  it.each([
+    ["RETIREMENT_ANNOUNCE_FAILED", "announce"],
+    ["RETIREMENT_STOP_FAILED", "stopWorker"]
+  ] as const)(
+    "a log sink that throws on %s still rejects retired once, and the next read announces nothing again",
+    async (failedEvent, failingStep) => {
+      const time = fakeClock();
+      const order: string[] = [];
+      const reads: number[] = [];
+      const failure = new Error("way out failed");
+      const retirement = startRunnerRetirement({
+        releaseKey: KEY,
+        store: {
+          readFacts: async () => { reads.push(time.now()); return requested(); },
+          setAsideOpenWork: async () => { order.push("setAside"); return 2; }
+        },
+        executions: { count: () => 0 },
+        signal: createRunnerRetirementSignal(),
+        stopWorker: async () => { order.push("stopWorker"); if (failingStep === "stopWorker") throw failure; },
+        log: (entry) => { if (entry.event === failedEvent) throw new Error("log sink closed"); },
+        announce: () => { order.push("announce"); if (failingStep === "announce") throw failure; },
+        emit: () => { order.push("emit"); },
+        clock: time.clock
+      });
+      let rejections = 0;
+      void retirement.retired.catch(() => { rejections += 1; });
+      await time.advance(60_000);
+      await expect(retirement.retired).rejects.toBe(failure);
+      const firstPass = [...order];
+      // The tick's catch never saw a throw: `retiring` stays set, so no further read, set-aside or announcement.
+      await time.advance(300_000);
+      expect(reads).toEqual([60_000]);
+      expect(order).toEqual(firstPass);
+      expect(order.filter((step) => step === "announce")).toHaveLength(1);
+      expect(rejections).toBe(1);
+    }
+  );
+
   it("a front pair not yet recorded stopped does not delay it (root asked; the old pair is stopped anyway)", async () => {
     const run = monitor({ facts: async () => requested({ frontPairStopped: false, openWork: 1 }), setAside: async () => 1 });
     await run.time.advance(60_000);

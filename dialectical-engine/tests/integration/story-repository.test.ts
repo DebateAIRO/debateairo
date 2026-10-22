@@ -619,7 +619,7 @@ describe("serve.answer_story — the encrypted, insert-once story row", () => {
       await expect(database.pool.query(await readFile(new URL(replayed, directory), "utf8")))
         .resolves.toBeDefined();
     }
-    await expect(migrate(database.pool)).resolves.toBeUndefined();
+    await expect(migrate(database.pool)).resolves.toEqual({ appliedSteps: [], extraSteps: [] });
 
     const triggers = await database.pool.query<{ tgname: string; function_name: string; enabled: string }>(
       `SELECT trigger.tgname, trigger.tgfoid::regproc::text AS function_name, trigger.tgenabled AS enabled

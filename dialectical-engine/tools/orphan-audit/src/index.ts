@@ -637,7 +637,11 @@ function constraintHasReplayGuard(source: string, index: number, name: string): 
   return false;
 }
 
-export type NativeMigrationReplayContext = Readonly<{ plan: MigrationPlan; migrateSource: string }>;
+/**
+ * The reviewed migrator the native once-per-ledger classification relies on: migrate()'s module (packages/db/src/index.ts)
+ * and, since side-by-side spec 2026-10-21 §5, its per-step transaction module (packages/db/src/migration-transaction.ts).
+ */
+export type NativeMigrationReplayContext = Readonly<{ plan: MigrationPlan; migrateSource: string; transactionSource: string }>;
 const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2";
 // Finite reviewed executable module: comments/strings/dead code cannot stand in for its controls.
 // N26m/N26n (PR-54): the reviewed module after the NETOPIA branch merged dev (its billing exports and #101's
@@ -667,48 +671,86 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // migrate() is byte-identical.
 // Side-by-side releases A5 (2026-10-22, spec 2026-10-21 §9, C10): the reviewed module after it re-exported
 // ./spend-waiver.js (SPEND_WAIVER_REASONS, recordSpendWaiver, SpendWaiverReason). migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "944ddd9e6e966d227068f55c34bbc7d22b13a8d108b79255c0aef603dc595a4b";
+// Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): migrate() CHANGED. It takes the schema-migrations advisory
+// lock for its session, runs a prologue transaction (the ledger tables, lineage, base recipe, 0108, 0110 and
+// replayForwardChain), then each pending forward step in its own transaction (withMigrationStepTransaction: 2 s lock
+// wait, five tries) through applyForwardStep, re-sealing the compatibility row inside each step; an outside-transaction
+// step builds its index first (runOutsideTransactionStep). The controls below follow that shape.
+// Side-by-side releases A7 (2026-10-22, spec 2026-10-21 §5, "database ahead"): migrate() CHANGED. It takes options and
+// returns its report (migrate(pool, options): MigrateReport), splits the ledger (splitLedger: the steps a newer release
+// added are kept out of identifyLineage), and right after replayForwardChain accepts or refuses them
+// (assertDatabaseAheadAccepted, migration-ahead.ts); it re-exports the database-ahead readers. Two controls bind the split
+// and the acceptance.
+const NATIVE_MIGRATE_MODULE_SHA256 = "bc1c3b969c6f329efbfe8a97d8d57627aa559127fa5f360e8c78b6b3452354f9";
+// Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
+// ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
+// SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each
+// wait, not the step), so it is re-sealed; the code is byte-identical.
+const NATIVE_MIGRATE_TRANSACTION_SHA256 = "16e9e66b5328f9dcb1ab90e810422bc8ae016ce6cb6fe27e4d5596583fe5326b";
+const NATIVE_MIGRATE_TRANSACTION_CONTROLS = [
+  'await client.query("BEGIN");', "await client.query(\"SET LOCAL lock_timeout = '2s'\");", 'await client.query("COMMIT");',
+  'await client.query("ROLLBACK");', "throw error;", '?.code !== "55P03"'
+] as const;
 const NATIVE_ONCE_SOURCES = new Set([
   "0104_password_only_reset.sql", "0105_backup_email_verification.sql",
   "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"
 ]);
 
+/**
+ * The reviewed migrator's ordered controls alone, on the text (side-by-side §5; A6 review): migrate()'s slice of its
+ * module, from its exact signature to the next export, and the per-step transaction module. assertNativeReplayBinding
+ * runs it after the two module hashes; tests run it on altered text directly, since any altered byte fails a hash
+ * first. Comments, strings and dead code still cannot stand in for a control: the hashes pin the reviewed bytes.
+ */
+export function auditNativeMigratorControls(migrateSource: string, transactionSource: string): void {
+  const refused = (): never => { throw new Error("MIGRATION_NATIVE_AUDIT_BINDING_REFUSED"); };
+  const begin = migrateSource.indexOf("export async function migrate(pool: Pool, options: MigrateOptions = {}): Promise<MigrateReport> {");
+  const end = migrateSource.indexOf("\nexport ", begin + 1);
+  if (begin < 0 || end < 0) refused();
+  const native = migrateSource.slice(begin, end);
+  // Side-by-side §5 (A6): the session lock, the prologue transaction, one transaction per pending step with its
+  // compatibility re-seal, the unlock in `finally` and the release. (A7): the ledger split before the lineage, and the
+  // database-ahead acceptance right after the replay.
+  const controls = [
+    "const plan = await loadMigrationPlan();", "const client = await pool.connect();",
+    "pg_advisory_lock(hashtextextended('debateai:schema-migrations', 0))", 'await withMigrationStepTransaction(client, "PROLOGUE"',
+    "const { known: applied, extra } = splitLedger(plan, ledger);",
+    "const lineage = identifyLineage(plan, applied, resolutions.map", "const appliedSet = new Set(applied);",
+    "const resolvedSet = new Set(resolutions.map", "for (const name of plan.manifest.order)",
+    "if (appliedSet.has(name) || resolvedSet.has(name)) continue;", "await client.query(plan.sources.get(name)!.sql);",
+    "INSERT INTO public.debateai_schema_migration (name, applied_at)", "[name]",
+    "await client.query(plan.effectiveCapabilityVerifierSql);", "await applyForward108(client,plan,lineage,",
+    "await applyForward110(client,plan,lineage,", "await replayForwardChain(client,plan,", "await assertDatabaseAheadAccepted(client,plan,",
+    "for (const step of pending)", "await withMigrationStepTransaction(client, step.name",
+    "await applyForwardStep(client,plan,step,", "[compatEvidenceAfterStep,compat.logicalName]", "} finally {",
+    "pg_advisory_unlock(hashtextextended('debateai:schema-migrations', 0))", "client.release();"
+  ];
+  const inOrder = (text: string, ordered: readonly string[]): void => {
+    let cursor = 0;
+    for (const control of ordered) {
+      const at = text.indexOf(control, cursor);
+      if (at < 0) refused();
+      cursor = at + control.length;
+    }
+  };
+  inOrder(native, controls);
+  inOrder(transactionSource, NATIVE_MIGRATE_TRANSACTION_CONTROLS);
+}
+
 /** The frozen native recipe owns replay through an atomic, full-name migration ledger. */
-function assertNativeReplayBinding(name: string, source: string, { plan, migrateSource }: NativeMigrationReplayContext): void {
+function assertNativeReplayBinding(name: string, source: string, { plan, migrateSource, transactionSource }: NativeMigrationReplayContext): void {
   const refused = (): never => { throw new Error("MIGRATION_NATIVE_AUDIT_BINDING_REFUSED"); };
   const bareName = name.slice("migrations/".length);
   const declared = plan.sources.get(bareName);
   if (name !== `migrations/${bareName}` || !NATIVE_ONCE_SOURCES.has(bareName)
     || plan.recipeSha256 !== NATIVE_ONCE_RECIPE_SHA256
     || sha256(migrateSource) !== NATIVE_MIGRATE_MODULE_SHA256
+    || sha256(transactionSource) !== NATIVE_MIGRATE_TRANSACTION_SHA256
     || sha256(JSON.stringify(plan.manifest, null, 2) + "\n") !== NATIVE_ONCE_RECIPE_SHA256
     || !plan.manifest.order.includes(bareName) || declared?.sql !== source
     || declared.sha256 !== sha256(source)
     || plan.manifest.sources.find((entry) => entry.name === bareName)?.sha256 !== declared.sha256) refused();
-  const begin = migrateSource.indexOf("export async function migrate(pool: Pool): Promise<void> {");
-  const end = migrateSource.indexOf("\nexport ", begin + 1);
-  if (begin < 0 || end < 0) refused();
-  const native = migrateSource.slice(begin, end);
-  const controls = [
-    "const plan = await loadMigrationPlan();", "const client = await pool.connect();",
-    'await client.query("BEGIN")', "pg_advisory_xact_lock",
-    "const lineage = identifyLineage(plan, applied, resolutions.map",
-    "const appliedSet = new Set(applied);", "const resolvedSet = new Set(resolutions.map",
-    "for (const name of plan.manifest.order)", "if (appliedSet.has(name) || resolvedSet.has(name)) continue;",
-    "await client.query(plan.sources.get(name)!.sql);",
-    "INSERT INTO public.debateai_schema_migration (name, applied_at)", "[name]",
-    "await client.query(plan.effectiveCapabilityVerifierSql);", "await applyForward108(client,plan,lineage,", "await applyForward110(client,plan,lineage,",
-    "await applyForwardChain(client,plan,",
-    "[compatEvidenceAfterChain,compat.logicalName]",
-    'await client.query("COMMIT")', "} catch (error) {", 'await client.query("ROLLBACK")',
-    "throw error;", "} finally {", "client.release();"
-  ];
-  let cursor = 0;
-  for (const control of controls) {
-    const at = native.indexOf(control, cursor);
-    if (at < 0) refused();
-    cursor = at + control.length;
-  }
+  auditNativeMigratorControls(migrateSource, transactionSource);
   if (bareName === "0107_auth_dev_integration.sql"
     && !/ALTER TABLE identity\.step_up_grant DROP CONSTRAINT step_up_grant_action_check;\s*ALTER TABLE identity\.step_up_grant ADD CONSTRAINT step_up_grant_action_check CHECK \(/.test(source)) refused();
 }
@@ -836,9 +878,10 @@ export async function auditSourceRules(): Promise<{ readonly blocking: readonly 
   const migrationsDirectory = join(root, "migrations");
   const nativePlan = await loadMigrationPlan();
   const migrateSource = await readFile(join(root, "packages/db/src/index.ts"), "utf8");
+  const transactionSource = await readFile(join(root, "packages/db/src/migration-transaction.ts"), "utf8");
   for (const name of (await readdir(migrationsDirectory)).filter((entry) => entry.endsWith(".sql")).sort()) {
     const source = await readFile(join(migrationsDirectory, name), "utf8");
-    blocking.push(...auditMigrationReplaySafety(`migrations/${name}`, source, { plan: nativePlan, migrateSource }));
+    blocking.push(...auditMigrationReplaySafety(`migrations/${name}`, source, { plan: nativePlan, migrateSource, transactionSource }));
   }
   await auditOrphans();
   if (gatewayDeclarations !== 1) blocking.push(`ProviderGateway declaration count is ${gatewayDeclarations}, expected 1`);

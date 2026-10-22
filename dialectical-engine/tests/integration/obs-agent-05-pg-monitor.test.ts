@@ -128,7 +128,7 @@ afterAll(async () => {
 
 describe("OBS-05 V-29 statistics window replaces pg_monitor", () => {
   it("leaves the agent's principal in no predefined role and applies 0068 once, replay-safe", async () => {
-    await expect(migrate(fixture().pool)).resolves.toBeUndefined();
+    await expect(migrate(fixture().pool)).resolves.toEqual({ appliedSteps: [], extraSteps: [] });
     const predefinedMemberships = `
       SELECT coalesce(array_agg(granted.rolname ORDER BY granted.rolname), '{}')::text[] AS roles
       FROM pg_catalog.pg_roles AS granted

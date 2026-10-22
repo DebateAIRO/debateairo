@@ -4833,8 +4833,9 @@ export class PostgresAskApplication implements AskApplication {
     askAdmissionPools:Readonly<{ server:Pool;legacy:Pool }>
   ) {
     // Side-by-side spec §1: an API never admits under a key no runner could serve (RELEASE_KEY_INVALID), nor under a
-    // key whose number is not the register version it admits with (RELEASE_KEY_REGISTER_MISMATCH, as checkedReleaseKey
-    // refuses at boot), so no run is stamped with one release while carrying another's settings version.
+    // key whose number is not the register version it admits with (RELEASE_KEY_REGISTER_MISMATCH, as
+    // assertReleaseKeyForRegister refuses at boot), so no run is stamped with one release while carrying another's
+    // settings version.
     if (parseReleaseKey(settings.releaseKey).siteVersion !== settings.registerVersion) {
       throw new TypedDomainError("RELEASE_KEY_REGISTER_MISMATCH", "The release key's number is not this application's register version");
     }

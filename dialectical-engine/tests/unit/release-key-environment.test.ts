@@ -3,7 +3,6 @@ import {
   API_ENVIRONMENT_KEYS,
   RUNNER_ENVIRONMENT_KEYS,
   assertReleaseKeyForRegister,
-  checkedReleaseKey,
   parseApiEnvironment,
   parseRunnerEnvironment
 } from "../../packages/register/src/runtime-environment.js";
@@ -87,8 +86,8 @@ describe("RELEASE_KEY in the API and runner environments (side-by-side §1)", ()
     expect(codeOf(() => assertReleaseKeyForRegister(`r17-${CODE}`, 18, "local"))).toBe("RELEASE_KEY_REGISTER_MISMATCH");
     expect(codeOf(() => assertReleaseKeyForRegister(`r17-${DEVELOPMENT}`, 18, "hosted"))).toBe("RELEASE_KEY_INVALID");
     expect(codeOf(() => assertReleaseKeyForRegister("legacy", 17, "local"))).toBe("RELEASE_KEY_INVALID");
-    expect(codeOf(() => checkedReleaseKey(undefined, 17, "local"))).toBe("RELEASE_KEY_REQUIRED");
-    expect(codeOf(() => checkedReleaseKey("", 17, "local"))).toBe("RELEASE_KEY_REQUIRED");
-    expect(checkedReleaseKey(`r17-${CODE}`, 17, "hosted")).toBe(`r17-${CODE}`);
+    expect(codeOf(() => assertReleaseKeyForRegister(undefined, 17, "local"))).toBe("RELEASE_KEY_REQUIRED");
+    expect(codeOf(() => assertReleaseKeyForRegister("", 17, "local"))).toBe("RELEASE_KEY_REQUIRED");
+    expect(assertReleaseKeyForRegister(`r17-${CODE}`, 17, "hosted")).toBe(`r17-${CODE}`);
   });
 });

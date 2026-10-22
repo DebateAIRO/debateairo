@@ -174,11 +174,15 @@ describe('verifyNativeState refuses a pending forward step before migrate() runs
   const body = text.slice(start);
   const check108 = body.indexOf("name='0108_preview_recovery_verified_bindings.sql'");
   const refusal = body.indexOf('await refusePendingForwardSteps(pool,plan);');
-  const replay = body.indexOf('await migrate(pool);');
+  // Side-by-side spec §5 (D5 review): one replay for every database; on a database ahead it carries the pinned newer chain.
+  const replay = body.indexOf('const replayed=await migrate(pool,ahead===null?{}:{newerChain:ahead.newerChain});');
   expect(check108).toBeGreaterThan(-1);
   expect(refusal).toBeGreaterThan(check108);
   expect(replay).toBeGreaterThan(refusal);
-  expect(body.indexOf('migrate(')).toBe(replay+'await '.length); // the first migrate( of verifyNativeState
+  expect(body.indexOf('migrate(')).toBe(replay+'const replayed=await '.length); // the first migrate( of verifyNativeState
+  expect(body.split('migrate(')).toHaveLength(2); // and its only one
+  // Nothing it applied counts as a verify: a replay that applied a step refuses.
+  expect(body).toContain('if(replayed.appliedSteps.length!==0||!sameSteps(replayed.extraSteps,extra))fail();');
  });
 });
 

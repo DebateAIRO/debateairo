@@ -1,9 +1,11 @@
 import { applyForward108, base108Lineage } from "./migration-forward108.js";
 import { applyForward110 } from "./migration-forward110.js";
-import { applyForwardChain, effectiveForwardVerifierSql } from "./migration-forward-chain.js";
+import { applyForwardStep, effectiveForwardVerifierSql, pendingForwardSteps, replayForwardChain, runOutsideTransactionStep } from "./migration-forward-chain.js";
+import { withMigrationLockRetry, withMigrationStepTransaction } from "./migration-transaction.js";
+import { assertDatabaseAheadAccepted, type MigrateOptions, type MigrateReport } from "./migration-ahead.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
-import { assertAuth106Catalog, compatibilityPreconditionDigest, identifyLineage, lineageEvidence, loadMigrationPlan, sha256, transactionBodyPostconditionEvidence, transactionBodyPreconditionDigest } from "./migration-lineage.js";
+import { assertAuth106Catalog, compatibilityPreconditionDigest, identifyLineage, lineageEvidence, loadMigrationPlan, sha256, splitLedger, transactionBodyPostconditionEvidence, transactionBodyPreconditionDigest } from "./migration-lineage.js";
 import type { Pool, PoolClient } from "pg";
 import pg from "pg";
 import type {
@@ -20,6 +22,17 @@ export * from "./pool-budget.js";
 export * from "./release-state.js";
 export { recordRunSupersession, resolveRunRef } from "./run-supersession.js";
 export { SPEND_WAIVER_REASONS, recordSpendWaiver, type SpendWaiverReason } from "./spend-waiver.js";
+export {
+  DATABASE_AHEAD_NOT_ACCEPTED,
+  describeChain,
+  describeForwardSteps,
+  readPendingForwardSteps,
+  verifyDatabaseAhead,
+  type DatabaseAheadReport,
+  type ForwardStepDeclaration,
+  type MigrateOptions,
+  type MigrateReport
+} from "./migration-ahead.js";
 import { SUPPORT_CONTROL_PLANE_POOL } from "./pool-budget.js";
 export { abortablePrivateWork, queryPrivateStream } from "./private-stream.js";
 import { abortablePrivateWork, cancelAndDestroyPrivateClient } from "./private-stream.js";
@@ -1038,161 +1051,201 @@ export function createSupportControlPlanePool(connectionString: string): Pool {
   return pool;
 }
 
-export async function migrate(pool: Pool): Promise<void> {
+/**
+ * Applies this code's pending migrations and replays the applied ones (migrations/lineage/README.md). Side-by-side spec
+ * 2026-10-21 §5 ("database ahead", migration-ahead.ts): on a database a newer release moved forward by expand steps it
+ * declared, it replays its own steps, applies nothing and reports those steps as `extraSteps`; `options.newerChain` (the
+ * newer release's describeForwardSteps()) binds them to that release's own list.
+ */
+export async function migrate(pool: Pool, options: MigrateOptions = {}): Promise<MigrateReport> {
   const plan = await loadMigrationPlan();
+  const compat = plan.manifest.compatibility;
   const client = await pool.connect();
   try {
-    await client.query("BEGIN");
-    const isolation = await client.query<{ transaction_isolation: string }>("SHOW transaction_isolation");
-    if (isolation.rows[0]?.transaction_isolation !== "read committed") {
-      throw new Error("MIGRATION_ISOLATION_REQUIRES_READ_COMMITTED");
-    }
-    await client.query("SELECT pg_advisory_xact_lock(hashtextextended('debateai:schema-migrations', 0))");
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS public.debateai_schema_migration (
-        name text PRIMARY KEY CHECK (length(btrim(name)) > 0),
-        applied_at timestamptz NOT NULL
-      )
-    `);
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS public.debateai_schema_migration_resolution (
-        logical_name text PRIMARY KEY,
-        original_source_sha256 text NOT NULL CHECK(original_source_sha256 ~ '^[0-9a-f]{64}$'),
-        resolution_id text NOT NULL,
-        recipe_sha256 text NOT NULL CHECK(recipe_sha256 ~ '^[0-9a-f]{64}$'),
-        executable_path text NOT NULL,
-        executable_sha256 text NOT NULL CHECK(executable_sha256 ~ '^[0-9a-f]{64}$'),
-        precondition_evidence_digest text NOT NULL CHECK(precondition_evidence_digest ~ '^[0-9a-f]{64}$'),
-        postcondition_evidence_digest text NOT NULL CHECK(postcondition_evidence_digest ~ '^[0-9a-f]{64}$'),
-        executed_at timestamptz NOT NULL
-      )
-    `);
-    await client.query("REVOKE ALL ON public.debateai_schema_migration_resolution FROM PUBLIC");
-    const resolutionAcl = await client.query<{ valid: boolean }>(`
-      SELECT pg_get_userbyid(c.relowner)=current_user
-        AND NOT EXISTS(SELECT 1 FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a
-          WHERE a.grantee<>c.relowner)
-        AND NOT EXISTS(SELECT 1 FROM pg_roles service WHERE service.rolname LIKE 'debateai\\_%'
-          AND service.oid<>c.relowner AND pg_has_role(service.oid,c.relowner,'MEMBER')) AS valid
-      FROM pg_class c WHERE c.oid='public.debateai_schema_migration_resolution'::regclass
-    `);
-    if (resolutionAcl.rows[0]?.valid !== true) throw new Error("MIGRATION_RESOLUTION_ACL_DRIFT");
-    const applied = (await client.query<{ name: string }>("SELECT name FROM public.debateai_schema_migration ORDER BY name")).rows.map(({ name }) => name);
-    const resolutions = (await client.query<{
-      logical_name: string; original_source_sha256: string; resolution_id: string; recipe_sha256: string;
-      executable_path: string; executable_sha256: string; precondition_evidence_digest: string;
-      postcondition_evidence_digest: string;
-    }>("SELECT * FROM public.debateai_schema_migration_resolution ORDER BY logical_name")).rows;
-    const lineage = identifyLineage(plan, applied, resolutions.map(({ logical_name }) => logical_name));
-    const baseLineage=base108Lineage(lineage);
-    const authLineage = lineage === "auth94" || lineage === "auth103" || lineage === "auth106";
-    if (baseLineage === "auth106" || baseLineage === "integrated-original" || baseLineage === "integrated-compatibility" || baseLineage === "integrated-fresh-resolutions") await assertAuth106Catalog(client);
-    if (lineage === "dev95") {
-      // Retained active, expired and consumed withdrawal grants all block the
-      // immutable Auth CHECK replacements. The lock keeps the predicate stable.
-      await client.query("LOCK TABLE identity.step_up_grant IN SHARE ROW EXCLUSIVE MODE");
-      const retained = await client.query<{ retained: boolean }>(
-        "SELECT EXISTS(SELECT 1 FROM identity.step_up_grant WHERE action='WITHDRAW_SUBSCRIPTION') retained"
-      );
-      if (retained.rows[0]?.retained) throw new Error("MIGRATION_WITHDRAWAL_ROWS_RETAINED");
-    }
-    const compat = plan.manifest.compatibility;
-    if (baseLineage === "integrated-fresh-resolutions") {
-      for (const body of plan.manifest.transactionBodies) {
-        const receipt = resolutions.find(({ logical_name }) => logical_name === body.logicalName);
-        if (receipt?.original_source_sha256 !== plan.sources.get(body.logicalName)!.sha256
-          || receipt.resolution_id !== body.resolutionId || receipt.recipe_sha256 !== plan.recipeSha256
-          || receipt.executable_path !== body.executablePath || receipt.executable_sha256 !== body.executableSha256
-          || receipt.precondition_evidence_digest !== transactionBodyPreconditionDigest(plan, body.logicalName)
-          || receipt.postcondition_evidence_digest !== await transactionBodyPostconditionEvidence(client, body.logicalName)) {
+    // Side-by-side spec 2026-10-21 §5 ("Each step runs on its own"): one migrator at a time, held for the session (not
+    // one transaction) because the prologue and every forward step now commit on their own; released in `finally`.
+    await client.query("SELECT pg_advisory_lock(hashtextextended('debateai:schema-migrations', 0))");
+    // The prologue: the ledger tables, the lineage and its receipts, the base recipe, 0108, 0110 and the replay of
+    // every applied chain step, in one transaction with the 2 s lock wait (migration-transaction.ts). It returns the
+    // applied prefix of the chain and the steps a newer release added (accepted in it, or refused).
+    const prologue = await withMigrationStepTransaction(client, "PROLOGUE", async () => {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS public.debateai_schema_migration (
+          name text PRIMARY KEY CHECK (length(btrim(name)) > 0),
+          applied_at timestamptz NOT NULL
+        )
+      `);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS public.debateai_schema_migration_resolution (
+          logical_name text PRIMARY KEY,
+          original_source_sha256 text NOT NULL CHECK(original_source_sha256 ~ '^[0-9a-f]{64}$'),
+          resolution_id text NOT NULL,
+          recipe_sha256 text NOT NULL CHECK(recipe_sha256 ~ '^[0-9a-f]{64}$'),
+          executable_path text NOT NULL,
+          executable_sha256 text NOT NULL CHECK(executable_sha256 ~ '^[0-9a-f]{64}$'),
+          precondition_evidence_digest text NOT NULL CHECK(precondition_evidence_digest ~ '^[0-9a-f]{64}$'),
+          postcondition_evidence_digest text NOT NULL CHECK(postcondition_evidence_digest ~ '^[0-9a-f]{64}$'),
+          executed_at timestamptz NOT NULL
+        )
+      `);
+      await client.query("REVOKE ALL ON public.debateai_schema_migration_resolution FROM PUBLIC");
+      const resolutionAcl = await client.query<{ valid: boolean }>(`
+        SELECT pg_get_userbyid(c.relowner)=current_user
+          AND NOT EXISTS(SELECT 1 FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a
+            WHERE a.grantee<>c.relowner)
+          AND NOT EXISTS(SELECT 1 FROM pg_roles service WHERE service.rolname LIKE 'debateai\\_%'
+            AND service.oid<>c.relowner AND pg_has_role(service.oid,c.relowner,'MEMBER')) AS valid
+        FROM pg_class c WHERE c.oid='public.debateai_schema_migration_resolution'::regclass
+      `);
+      if (resolutionAcl.rows[0]?.valid !== true) throw new Error("MIGRATION_RESOLUTION_ACL_DRIFT");
+      const ledger = (await client.query<{ name: string }>("SELECT name FROM public.debateai_schema_migration ORDER BY name")).rows.map(({ name }) => name);
+      // Side-by-side §5 ("database ahead"): the steps a newer release added after this code's last one are split off and
+      // judged after the replay below; the lineage is identified from the rest, where any other unknown name still
+      // refuses UNKNOWN_APPLIED_NAME.
+      const { known: applied, extra } = splitLedger(plan, ledger);
+      const resolutions = (await client.query<{
+        logical_name: string; original_source_sha256: string; resolution_id: string; recipe_sha256: string;
+        executable_path: string; executable_sha256: string; precondition_evidence_digest: string;
+        postcondition_evidence_digest: string;
+      }>("SELECT * FROM public.debateai_schema_migration_resolution ORDER BY logical_name")).rows;
+      const lineage = identifyLineage(plan, applied, resolutions.map(({ logical_name }) => logical_name));
+      const baseLineage=base108Lineage(lineage);
+      const authLineage = lineage === "auth94" || lineage === "auth103" || lineage === "auth106";
+      if (baseLineage === "auth106" || baseLineage === "integrated-original" || baseLineage === "integrated-compatibility" || baseLineage === "integrated-fresh-resolutions") await assertAuth106Catalog(client);
+      if (lineage === "dev95") {
+        // Retained active, expired and consumed withdrawal grants all block the
+        // immutable Auth CHECK replacements. The lock keeps the predicate stable.
+        await client.query("LOCK TABLE identity.step_up_grant IN SHARE ROW EXCLUSIVE MODE");
+        const retained = await client.query<{ retained: boolean }>(
+          "SELECT EXISTS(SELECT 1 FROM identity.step_up_grant WHERE action='WITHDRAW_SUBSCRIPTION') retained"
+        );
+        if (retained.rows[0]?.retained) throw new Error("MIGRATION_WITHDRAWAL_ROWS_RETAINED");
+      }
+      if (baseLineage === "integrated-fresh-resolutions") {
+        for (const body of plan.manifest.transactionBodies) {
+          const receipt = resolutions.find(({ logical_name }) => logical_name === body.logicalName);
+          if (receipt?.original_source_sha256 !== plan.sources.get(body.logicalName)!.sha256
+            || receipt.resolution_id !== body.resolutionId || receipt.recipe_sha256 !== plan.recipeSha256
+            || receipt.executable_path !== body.executablePath || receipt.executable_sha256 !== body.executableSha256
+            || receipt.precondition_evidence_digest !== transactionBodyPreconditionDigest(plan, body.logicalName)
+            || receipt.postcondition_evidence_digest !== await transactionBodyPostconditionEvidence(client, body.logicalName)) {
+            throw new Error("MIGRATION_RESOLUTION_BINDING_DRIFT");
+          }
+        }
+      }
+      if (baseLineage === "integrated-compatibility") {
+        const receipt = resolutions[0];
+        const source = plan.sources.get(compat.logicalName)!;
+        if (receipt?.original_source_sha256 !== source.sha256 || receipt.resolution_id !== compat.resolutionId
+          || receipt.recipe_sha256 !== plan.recipeSha256 || receipt.executable_path !== compat.executablePath
+          || receipt.executable_sha256 !== compat.executableSha256
+          || !(["auth94", "auth103", "auth106"] as const)
+            .some((cohort) => receipt.precondition_evidence_digest === compatibilityPreconditionDigest(plan, cohort))
+          || receipt.postcondition_evidence_digest !== await lineageEvidence(client)) {
           throw new Error("MIGRATION_RESOLUTION_BINDING_DRIFT");
         }
       }
-    }
-    if (baseLineage === "integrated-compatibility") {
-      const receipt = resolutions[0];
-      const source = plan.sources.get(compat.logicalName)!;
-      if (receipt?.original_source_sha256 !== source.sha256 || receipt.resolution_id !== compat.resolutionId
-        || receipt.recipe_sha256 !== plan.recipeSha256 || receipt.executable_path !== compat.executablePath
-        || receipt.executable_sha256 !== compat.executableSha256
-        || !(["auth94", "auth103", "auth106"] as const)
-          .some((cohort) => receipt.precondition_evidence_digest === compatibilityPreconditionDigest(plan, cohort))
-        || receipt.postcondition_evidence_digest !== await lineageEvidence(client)) {
-        throw new Error("MIGRATION_RESOLUTION_BINDING_DRIFT");
-      }
-    }
-    const appliedSet = new Set(applied);
-    const resolvedSet = new Set(resolutions.map(({ logical_name }) => logical_name));
-    for (const name of plan.manifest.order) {
-      if (appliedSet.has(name) || resolvedSet.has(name)) continue;
-      const body = lineage === "fresh" ? plan.manifest.transactionBodies.find(({ logicalName }) => logicalName === name) : undefined;
-      if (body !== undefined) {
-        const terminal = [...appliedSet,...resolvedSet].sort();
-        const preceding = plan.manifest.order.slice(0,plan.manifest.order.indexOf(name)).sort();
-        if (terminal.length !== preceding.length || terminal.some((entry,index) => entry !== preceding[index])) {
-          throw new Error("MIGRATION_TRANSACTION_BODY_ORDER_DRIFT");
+      const appliedSet = new Set(applied);
+      const resolvedSet = new Set(resolutions.map(({ logical_name }) => logical_name));
+      for (const name of plan.manifest.order) {
+        if (appliedSet.has(name) || resolvedSet.has(name)) continue;
+        const body = lineage === "fresh" ? plan.manifest.transactionBodies.find(({ logicalName }) => logicalName === name) : undefined;
+        if (body !== undefined) {
+          const terminal = [...appliedSet,...resolvedSet].sort();
+          const preceding = plan.manifest.order.slice(0,plan.manifest.order.indexOf(name)).sort();
+          if (terminal.length !== preceding.length || terminal.some((entry,index) => entry !== preceding[index])) {
+            throw new Error("MIGRATION_TRANSACTION_BODY_ORDER_DRIFT");
+          }
+          await client.query(plan.transactionBodySql.get(name)!);
+          const postconditionEvidence = await transactionBodyPostconditionEvidence(client,name);
+          await client.query(`
+            INSERT INTO public.debateai_schema_migration_resolution
+            (logical_name,original_source_sha256,resolution_id,recipe_sha256,executable_path,executable_sha256,
+             precondition_evidence_digest,postcondition_evidence_digest,executed_at)
+            VALUES($1,$2,$3,$4,$5,$6,$7,$8,statement_timestamp())
+          `,[name,plan.sources.get(name)!.sha256,body.resolutionId,plan.recipeSha256,body.executablePath,
+            body.executableSha256,transactionBodyPreconditionDigest(plan,name),postconditionEvidence]);
+          resolvedSet.add(name);
+          continue;
         }
-        await client.query(plan.transactionBodySql.get(name)!);
-        const postconditionEvidence = await transactionBodyPostconditionEvidence(client,name);
-        await client.query(`
-          INSERT INTO public.debateai_schema_migration_resolution
-          (logical_name,original_source_sha256,resolution_id,recipe_sha256,executable_path,executable_sha256,
-           precondition_evidence_digest,postcondition_evidence_digest,executed_at)
-          VALUES($1,$2,$3,$4,$5,$6,$7,$8,statement_timestamp())
-        `,[name,plan.sources.get(name)!.sha256,body.resolutionId,plan.recipeSha256,body.executablePath,
-          body.executableSha256,transactionBodyPreconditionDigest(plan,name),postconditionEvidence]);
-        resolvedSet.add(name);
-        continue;
-      }
-      if (name === compat.logicalName && authLineage) {
-        const source = plan.sources.get(name)!;
-        const preconditionEvidence = compatibilityPreconditionDigest(plan, lineage);
-        if (preconditionEvidence !== sha256(JSON.stringify({ lineage, applied: [...appliedSet].sort(), source: source.sha256 }))) {
-          throw new Error("MIGRATION_COMPATIBILITY_ORDER_DRIFT");
+        if (name === compat.logicalName && authLineage) {
+          const source = plan.sources.get(name)!;
+          const preconditionEvidence = compatibilityPreconditionDigest(plan, lineage);
+          if (preconditionEvidence !== sha256(JSON.stringify({ lineage, applied: [...appliedSet].sort(), source: source.sha256 }))) {
+            throw new Error("MIGRATION_COMPATIBILITY_ORDER_DRIFT");
+          }
+          await client.query(plan.compatibilitySql);
+          const postconditionEvidence = await lineageEvidence(client);
+          await client.query(`
+            INSERT INTO public.debateai_schema_migration_resolution
+            (logical_name,original_source_sha256,resolution_id,recipe_sha256,executable_path,executable_sha256,
+             precondition_evidence_digest,postcondition_evidence_digest,executed_at)
+            VALUES($1,$2,$3,$4,$5,$6,$7,$8,statement_timestamp())
+          `,[name,source.sha256,compat.resolutionId,plan.recipeSha256,compat.executablePath,
+            compat.executableSha256,preconditionEvidence,postconditionEvidence]);
+          resolvedSet.add(name);
+          continue;
         }
-        await client.query(plan.compatibilitySql);
-        const postconditionEvidence = await lineageEvidence(client);
-        await client.query(`
-          INSERT INTO public.debateai_schema_migration_resolution
-          (logical_name,original_source_sha256,resolution_id,recipe_sha256,executable_path,executable_sha256,
-           precondition_evidence_digest,postcondition_evidence_digest,executed_at)
-          VALUES($1,$2,$3,$4,$5,$6,$7,$8,statement_timestamp())
-        `,[name,source.sha256,compat.resolutionId,plan.recipeSha256,compat.executablePath,
-          compat.executableSha256,preconditionEvidence,postconditionEvidence]);
-        resolvedSet.add(name);
-        continue;
+        await client.query(plan.sources.get(name)!.sql);
+        await client.query(
+          "INSERT INTO public.debateai_schema_migration (name, applied_at) VALUES ($1, statement_timestamp())",
+          [name]
+        );
+        appliedSet.add(name);
       }
-      await client.query(plan.sources.get(name)!.sql);
-      await client.query(
-        "INSERT INTO public.debateai_schema_migration (name, applied_at) VALUES ($1, statement_timestamp())",
-        [name]
-      );
-      appliedSet.add(name);
+      if (authLineage) {
+        const final = await lineageEvidence(client);
+        await client.query("UPDATE public.debateai_schema_migration_resolution SET postcondition_evidence_digest=$1 WHERE logical_name=$2",[final,compat.logicalName]);
+      }
+      // PR-54: once a forward step after 0108 is applied, its verifier supersedes the sealed one (lineage/README.md).
+      const forwardVerifierSql = effectiveForwardVerifierSql(plan, appliedSet);
+      if (forwardVerifierSql === undefined) await client.query(plan.effectiveCapabilityVerifierSql);
+      else await client.query(forwardVerifierSql);
+      await applyForward108(client,plan,lineage,new Set([...appliedSet,...resolvedSet]));
+      await applyForward110(client,plan,lineage,new Set([...appliedSet,...resolvedSet]));
+      const replayed = await replayForwardChain(client,plan,new Set([...appliedSet,...resolvedSet]),extra);
+      // Accepted only when every rule of migration-ahead.ts holds (one newer release, expand and keeps-verifier steps
+      // chained from this code's last one, this code's verifier still in force), else DATABASE_AHEAD_NOT_ACCEPTED and
+      // the prologue rolls back. Accepted, every step of this code is applied, so nothing below is pending.
+      await assertDatabaseAheadAccepted(client,plan,appliedSet,extra,options);
+      return { done: replayed, extra };
+    });
+    let done = prologue.done;
+    const appliedSteps: string[] = [];
+    // Each pending step in its own transaction: a step's locks end with it, a step that fails (or a kill) leaves every
+    // earlier step committed, and the next run continues at the next step. A lock wait that ran out is tried again,
+    // five tries, then MIGRATION_LOCK_TIMEOUT names the step.
+    const pending = pendingForwardSteps(plan, done);
+    for (const step of pending) {
+      // n1 outside-transaction: the concurrent index build runs on the session first; the step transaction then
+      // refuses unless that index is valid, and records the step like any other.
+      if (step.n1.outsideTransaction) {
+        await withMigrationLockRetry(step.name, () => runOutsideTransactionStep(client, step));
+      }
+      const before = done;
+      await withMigrationStepTransaction(client, step.name, async () => {
+        const compatEvidenceBeforeStep = await lineageEvidence(client);
+        await applyForwardStep(client,plan,step,before);
+        // data-export 0115 (V-41; the re-seal is V-28's): a chain step that moves lineageEvidence
+        // (step_up_grant_action_check, valid_consumer_authorization_internal) re-seals the compatibility row it moved,
+        // in the step's own transaction (side-by-side §5), so the row is never stale between steps; the prologue's
+        // check guards every later run (V-18).
+        const compatEvidenceAfterStep = await lineageEvidence(client);
+        if (compatEvidenceAfterStep !== compatEvidenceBeforeStep) {
+          await client.query("UPDATE public.debateai_schema_migration_resolution SET postcondition_evidence_digest=$1 WHERE logical_name=$2",[compatEvidenceAfterStep,compat.logicalName]);
+        }
+      });
+      done = [...before, step];
+      appliedSteps.push(step.name);
     }
-    if (authLineage) {
-      const final = await lineageEvidence(client);
-      await client.query("UPDATE public.debateai_schema_migration_resolution SET postcondition_evidence_digest=$1 WHERE logical_name=$2",[final,compat.logicalName]);
-    }
-    // PR-54: once a forward step after 0108 is applied, its verifier supersedes the sealed one (lineage/README.md).
-    const forwardVerifierSql = effectiveForwardVerifierSql(plan, appliedSet);
-    if (forwardVerifierSql === undefined) await client.query(plan.effectiveCapabilityVerifierSql);
-    else await client.query(forwardVerifierSql);
-    await applyForward108(client,plan,lineage,new Set([...appliedSet,...resolvedSet]));
-    await applyForward110(client,plan,lineage,new Set([...appliedSet,...resolvedSet]));
-    const compatEvidenceBeforeChain = await lineageEvidence(client);
-    await applyForwardChain(client,plan,new Set([...appliedSet,...resolvedSet]));
-    // data-export 0115 (V-41; the re-seal is V-28's): a chain step that moves lineageEvidence (step_up_grant_action_check, valid_consumer_authorization_internal)
-    // re-seals the compatibility row it moved; the check above guards every later run (V-18).
-    const compatEvidenceAfterChain = await lineageEvidence(client);
-    if (compatEvidenceAfterChain !== compatEvidenceBeforeChain) {
-      await client.query("UPDATE public.debateai_schema_migration_resolution SET postcondition_evidence_digest=$1 WHERE logical_name=$2",[compatEvidenceAfterChain,compat.logicalName]);
-    }
-    await client.query("COMMIT");
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
+    return Object.freeze({ appliedSteps: Object.freeze(appliedSteps), extraSteps: prologue.extra });
   } finally {
-    client.release();
+    // A session lock must never outlive the run: when the unlock cannot be sent, the connection is destroyed, which
+    // ends the session and its lock, and the run's own outcome (its refusal, or success) stands.
+    const unlocked = await client.query("SELECT pg_advisory_unlock(hashtextextended('debateai:schema-migrations', 0))")
+      .then(() => true, () => false);
+    if (unlocked) client.release();
+    else client.release(true);
   }
 }
 

@@ -83,7 +83,8 @@ describe("a retiring release starts no new model call (side-by-side §4 backstop
     expect(gates.requests.length).toBe(gates.arrivals.length);
     // No call reached a gate after the stop.
     expect(gates.arrivals.filter((arrival) => arrival.at > stoppedAt!)).toEqual([]);
-    // Left as is for this release's backstop (spec §4 step 3): still this runner's claim, not FAILED by the stop.
+    // Left as is for this release's backstop, which sets it aside FAILED with the waiver (spec §4 step 3); the §3
+    // fence keeps every other release off it. Still this runner's claim, not FAILED by the stop.
     expect(await jobRow(debate.workItemId)).toEqual({ state: "CLAIMED", claimed_by: "runner:preview-busy-model" });
     expect(composed.lanes[0]!.stats().running).toBe(0);
   }, 300_000);

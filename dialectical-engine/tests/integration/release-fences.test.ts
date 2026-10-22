@@ -5,6 +5,7 @@ import { WorkItemRepository, runSetAsideReason, RUN_SET_ASIDE } from "@debateai/
 import { RunRepository, createPool, migrate, withWriteTransaction } from "@debateai/db";
 import { LEGACY_RELEASE_KEY } from "@debateai/kernel";
 import { acceptanceFailureRecorder, ACCEPTANCE_WORKER_ID } from "../../acceptance/main.js";
+import { ACCEPTANCE_RELEASE_KEY } from "../../acceptance/seed-register.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
@@ -206,7 +207,8 @@ describe("work items are fenced by release (side-by-side §3)", () => {
   });
 
   it("the acceptance runner's failure recorder writes under that runner's own live claim (D2)", async () => {
-    const live = await runWithJob(), others = await runWithJob();
+    // B16: acceptance runs are stamped with ACCEPTANCE_RELEASE_KEY, the key the acceptance runner claims under.
+    const live = await runWithJob(ACCEPTANCE_RELEASE_KEY), others = await runWithJob(ACCEPTANCE_RELEASE_KEY);
     await claim(live, ACCEPTANCE_WORKER_ID, true);
     await claim(others, "worker:other", true);
     const recorder = acceptanceFailureRecorder(runtime);
@@ -214,6 +216,14 @@ describe("work items are fenced by release (side-by-side §3)", () => {
     expect(await jobRow(live.workItemId)).toEqual({ state: "FAILED", terminal_reason: "ACCEPTANCE_EXECUTION_FAILED:TEST_LAYER", claimed_by: null });
     expect(await recorder.recordTerminalFailure({ ...others, reason: "ACCEPTANCE_EXECUTION_FAILED:TEST_LAYER" })).toBe(false);
     expect(await jobRow(others.workItemId)).toMatchObject({ state: "CLAIMED", claimed_by: "worker:other" });
+  });
+
+  it("the acceptance failure recorder writes only under the acceptance key, never a `legacy` run (B16)", async () => {
+    const legacy = await runWithJob();
+    await claim(legacy, ACCEPTANCE_WORKER_ID, true);
+    const recorder = acceptanceFailureRecorder(runtime);
+    expect(await recorder.recordTerminalFailure({ ...legacy, reason: "ACCEPTANCE_EXECUTION_FAILED:TEST_LAYER" })).toBe(false);
+    expect(await jobRow(legacy.workItemId)).toMatchObject({ state: "CLAIMED", claimed_by: ACCEPTANCE_WORKER_ID });
   });
 
   it("names a set-aside by its waiver reason", () => {

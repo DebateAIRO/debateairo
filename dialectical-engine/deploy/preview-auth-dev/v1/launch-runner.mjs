@@ -93,13 +93,13 @@ export async function startRunner(argv,launch=launchRunner,{retiredSettleMs=RETI
  const stopped=()=>{process.stdout.write('PREVIEW_RUNNER_STOPPED\n');process.exit(0);};
  // Listening replaces Node's default end on the signal; with no worker listening too, end here.
  for(const signal of ['SIGTERM','SIGINT'])process.on(signal,()=>{asked=true;if(process.listenerCount(signal)===1)stopped();});
- let retired=false;
+ let retired=false,settleTimer;
  const retiredEnd=()=>{process.stdout.write('PREVIEW_RUNNER_RETIRED\n');process.exit(0);};
  // A worker.stop() that hangs inside the runner must not keep this process up: end anyway after the bound.
- process.once(RUNNER_RETIRED_PROCESS_EVENT,()=>{retired=true;setTimeout(retiredEnd,retiredSettleMs);});
+ process.once(RUNNER_RETIRED_PROCESS_EVENT,()=>{retired=true;settleTimer=setTimeout(retiredEnd,retiredSettleMs);});
  // A long-running worker that ends unasked (returned) or fails (even during an asked stop) is
- // reported, never a silent exit 0.
- await started.running.then(()=>retired?retiredEnd():asked?stopped():stop(),stop);
+ // reported, never a silent exit 0. Main settling first clears the bound: one end, never two.
+ await started.running.finally(()=>clearTimeout(settleTimer)).then(()=>retired?retiredEnd():asked?stopped():stop(),stop);
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  const argv=process.argv.slice(2);

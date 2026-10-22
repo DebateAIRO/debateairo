@@ -59,7 +59,7 @@ const attestation = (patch: Record<string, unknown> = {}) => ({
   schema: 'preview-auth-dev-native-v1', sourceRevision: newRevision, sourceTree: newTree, nativeSourceSha256: '9'.repeat(64), verifiedAt: '2026-10-09T10:00:00.000Z', postgresMajor: 18,
   executorRole: 'debateai_prod_migrator', executorOid: 16388, ledgerOwnerOid: 16388, billingOwnerOid: 16388, defaultOwnerCount: 6, ledgerCount: 129,
   resolutionCount: 1, forwardCount: 1, catalogSha256: digest, ledgerSha256: digest, resolutionSha256: digest, forwardSha256: digest, cohortCount: 0,
-  capabilityCounts: { debateai_runtime: 10 }, currentContractVerified: true, publication, ...patch
+  capabilityCounts: { debateai_runtime: 10 }, currentContractVerified: true, publication, databaseAhead: null, ...patch
 });
 const oldNativePlan = (patch: Record<string, unknown> = {}) => ({
   schema: 'preview-auth-dev-native-plan-v1', operation: 'verify', sourceRoot: OLD_ROOT.api, sourceRevision: revision, sourceTree: tree,
@@ -1208,5 +1208,143 @@ describe('native-plan: the hosted preview (publish kit v3, owner rulings 2026-10
       expect(() => operator.validateNativePlan({ ...t.plan, hostedBilling: bad }), name).toThrow('PREVIEW_NATIVE_PLAN_REFUSED');
       expect(() => kit.previewHostedBillingChoice(bad), name).toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
     }
+  });
+});
+
+// Side-by-side spec §5 (G6): the newer release's list of the database steps it adds, which the older release's native verify
+// accepts only once root pinned it (prestart.mjs accept-ahead).
+describe('database-ahead', () => {
+  const migrationText = (name: string, header = '-- n1: expand\n-- n1: keeps-verifier\n') => `-- ${name}\n${header}\nCREATE TABLE x_${name.slice(0, 4)} (id int);\n`;
+  const SEALED = ['0122_engine_map_check.sql', '0123_side_by_side_releases.sql'];
+  const row = (name: string, text = migrationText(name)) => ({ path: `dialectical-engine/migrations/${name}`, sha256: sha(text), mode: 0o644 });
+  const chainEntry = (name: string, sourceSha256: string, patch: Record<string, unknown> = {}) => ({ name, manifestSha256: '5'.repeat(64), sourceSha256, verifierSha256: '6'.repeat(64), n1Expand: true, keepsVerifier: true, outsideTransaction: false, ...patch });
+  function staged({ added = ['0124_side_next.sql', '0125_more.sql'], texts = {} as Record<string, string>, onDisk = {} as Record<string, string>, chain }: { added?: string[]; texts?: Record<string, string>; onDisk?: Record<string, string>; chain?: unknown[] } = {}) {
+    const s = server();
+    const text = (name: string) => texts[name] ?? migrationText(name);
+    const base = sourceManifest('api').files;
+    const older = s.write(join(s.art, 'old-api-source.json'), sourceManifest('api', { sourceRoot: OLD_ROOT.api, sourceRevision: revision, sourceTree: tree, files: [...base, ...SEALED.map(name => row(name))] }));
+    const newer = s.write(join(s.art, 'candidate-api-source.json'), sourceManifest('api', { files: [...base, ...SEALED.map(name => row(name)), ...added.map(name => row(name, text(name)))] }));
+    const newerChain = chain ?? [chainEntry('0111_billing_netopia.sql', '4'.repeat(64)), ...SEALED.map(name => chainEntry(name, sha(migrationText(name)))), ...added.map(name => chainEntry(name, sha(text(name))))];
+    const reads: string[] = [];
+    const children: { argv: string[]; options: Record<string, unknown> }[] = [];
+    const deps = {
+      readMigration: async (root: string, name: string) => { reads.push(`${root}|${name}`); return Buffer.from(onDisk[name] ?? text(name)); },
+      execPath: '/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node',
+      // The newer release describes its own chain in a child process (D5 review); this stands in for that child.
+      runBounded: async (argv: string[], options: Record<string, unknown>) => {
+        reads.push(`chain|${options.cwd}`); children.push({ argv, options });
+        return { code: 0, timedOut: false, overflow: false, stdout: Buffer.from(JSON.stringify(newerChain)), stderr: Buffer.alloc(0) };
+      }
+    };
+    const out = join(s.art, 'database-ahead-old-v1.json');
+    const argv = ['database-ahead', '--older-source-manifest', older.path, '--newer-source-manifest', newer.path, '--out', out];
+    return { s, older, newer, newerChain, deps, reads, children, out, argv, text };
+  }
+
+  it('writes the exact file: both releases, the newer manifest, the added steps and the newer release\'s own chain', async () => {
+    const t = staged();
+    const result = await run(t.argv, t.s.layout, t.deps);
+    const written = JSON.parse(readFileSync(t.out, 'utf8'));
+    expect(written).toEqual({
+      schema: 'preview-database-ahead-v1', olderLabel: 'old-v1', olderSourceRevision: revision, newerLabel: 'new-v1', newerSourceRevision: newRevision,
+      newerSourceManifest: { path: t.newer.path, sha256: t.newer.sha256 },
+      steps: [{ name: '0124_side_next.sql', sha256: sha(t.text('0124_side_next.sql')) }, { name: '0125_more.sql', sha256: sha(t.text('0125_more.sql')) }],
+      newerChain: t.newerChain
+    });
+    expect(result).toMatchObject({ path: t.out, sha256: sha(readFileSync(t.out)) });
+    expect(statSync(t.out).mode & 0o7777).toBe(0o644);
+    // Each step's bytes come from the newer release's own folder; the chain is the newer release's description of itself.
+    expect(t.reads).toEqual([`${NEW_ROOT.api}|0124_side_next.sql`, `${NEW_ROOT.api}|0125_more.sql`, `chain|${NEW_ROOT.api}/dialectical-engine`]);
+    // prestart.mjs accept-ahead takes exactly this file for the older release.
+    expect(tool.parseArguments(t.argv)).toMatchObject({ command: 'database-ahead' });
+  });
+
+  it('root never loads the newer code: a bounded child as nobody, from the verified engine, with no tsx cache and its own tsconfig', async () => {
+    const t = staged();
+    await run(t.argv, t.s.layout, t.deps);
+    const engine = `${NEW_ROOT.api}/dialectical-engine`, node = t.deps.execPath;
+    expect(t.children).toHaveLength(1);
+    expect(t.children[0]!.argv).toEqual(['/usr/sbin/runuser', '-u', 'nobody', '--', '/usr/bin/env', '-i',
+      'PATH=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin:/usr/bin:/bin', 'TSX_DISABLE_CACHE=1', `TSX_TSCONFIG_PATH=${engine}/tsconfig.json`,
+      node, '--import', `${engine}/node_modules/tsx/dist/loader.mjs`, '--input-type=module', '-e', tool.DESCRIBE_CHAIN_SCRIPT, `${engine}/packages/db/src/migration-ahead.ts`]);
+    expect(t.children[0]!.options).toEqual({ cwd: engine, env: {}, timeoutMs: 60_000, maxOutputBytes: 262_144 });
+    expect(tool.describeChainArgv({ sourceRoot: NEW_ROOT.api, execPath: node })).toEqual(t.children[0]!.argv);
+  });
+
+  it.each([
+    ['a non-zero exit', { code: 1 }], ['any stderr', { stderr: Buffer.from('warning') }], ['a timeout', { timedOut: true }], ['an output overflow', { overflow: true }],
+    ['a spawn error', { error: new Error('ENOENT') }], ['output that is not strict JSON', { stdout: Buffer.from('[{"a":1,"a":2}]') }]
+  ])('refuses a chain child with %s, and writes nothing', async (_name, outcome) => {
+    const t = staged();
+    const runBounded = async () => ({ code: 0, timedOut: false, overflow: false, stdout: Buffer.from(JSON.stringify(t.newerChain)), stderr: Buffer.alloc(0), ...outcome });
+    await expect(run(t.argv, t.s.layout, { ...t.deps, runBounded })).rejects.toMatchObject({ code: 'DATABASE_AHEAD_CHAIN_UNREADABLE' });
+    expect(existsSync(t.out)).toBe(false);
+  });
+
+  it('refuses a step without both header lines and names every such step', async () => {
+    const t = staged({ texts: { '0124_side_next.sql': '-- 0124\n-- n1: expand\nCREATE TABLE y (id int);\n', '0125_more.sql': '-- 0125\nCREATE TABLE z (id int);\n-- n1: expand\n-- n1: keeps-verifier\n' } });
+    await expect(run(t.argv, t.s.layout, t.deps)).rejects.toMatchObject({ code: 'MIGRATION_NOT_N1_EXPAND', fields: ['0124_side_next.sql', '0125_more.sql'] });
+    expect(existsSync(t.out)).toBe(false);
+  });
+
+  it('refuses step bytes that differ from the newer manifest', async () => {
+    const t = staged({ onDisk: { '0125_more.sql': migrationText('0125_more.sql', '-- n1: expand\n-- n1: keeps-verifier\n-- edited\n') } });
+    await expect(run(t.argv, t.s.layout, t.deps)).rejects.toMatchObject({ code: 'MIGRATION_BYTES_MISMATCH', fields: ['0125_more.sql'] });
+    expect(existsSync(t.out)).toBe(false);
+  });
+
+  it('refuses when the newer release adds no migration, and writes nothing', async () => {
+    const t = staged({ added: [] });
+    await expect(run(t.argv, t.s.layout, t.deps)).rejects.toMatchObject({ code: 'DATABASE_AHEAD_NOT_NEEDED' });
+    expect(existsSync(t.out)).toBe(false);
+    expect(t.reads).toEqual([]);
+  });
+
+  it('refuses a newer chain whose last steps are not exactly the added steps, as declared', async () => {
+    for (const chain of [
+      [chainEntry('0124_side_next.sql', '1'.repeat(64)), chainEntry('0125_more.sql', '2'.repeat(64))].slice(0, 1),
+      [chainEntry('0123_side_by_side_releases.sql', '3'.repeat(64)), chainEntry('0125_more.sql', sha(migrationText('0125_more.sql'))), chainEntry('0124_side_next.sql', sha(migrationText('0124_side_next.sql')))],
+      [chainEntry('0124_side_next.sql', sha(migrationText('0124_side_next.sql'))), chainEntry('0125_more.sql', sha(migrationText('0125_more.sql')), { n1Expand: false })],
+      [chainEntry('0124_side_next.sql', sha(migrationText('0124_side_next.sql'))), chainEntry('0125_more.sql', '2'.repeat(64))]
+    ]) {
+      const t = staged({ chain });
+      await expect(run(t.argv, t.s.layout, t.deps)).rejects.toThrow('PREVIEW_DATABASE_AHEAD_REFUSED');
+      expect(existsSync(t.out)).toBe(false);
+    }
+  });
+
+  it('re-verifies the newer release folder before reading anything from it', async () => {
+    const t = staged();
+    await expect(run(t.argv, t.s.layout, { ...t.deps, verifySourceManifest: async () => { throw new TypeError('PREVIEW_SOURCE_INVENTORY_REFUSED'); } })).rejects.toThrow('PREVIEW_SOURCE_INVENTORY_REFUSED');
+    expect(t.reads).toEqual([]);
+    expect(existsSync(t.out)).toBe(false);
+  });
+
+  it.each([
+    ['an older manifest of the same release', 'older', { sourceRoot: NEW_ROOT.api }, 'DATABASE_AHEAD_LABELS_REFUSED'],
+    ['a UI manifest', 'newer', { role: 'ui', sourceRoot: NEW_ROOT.ui }, 'SOURCE_ROLE_REFUSED'],
+    ['a fallback root', 'older', { sourceRoot: '/opt/debateai-v3-preview/releases/auth-dev-fallback-old-v1-api' }, 'NATIVE_ROOT_NOT_CANDIDATE']
+  ] as const)('refuses %s', async (_name, which, patch, code) => {
+    const t = staged();
+    const path = which === 'older' ? t.older.path : t.newer.path;
+    const current = JSON.parse(readFileSync(path, 'utf8'));
+    rmSync(path);
+    t.s.write(path, { ...current, ...patch });
+    await expect(run(t.argv, t.s.layout, t.deps)).rejects.toMatchObject({ code });
+    expect(existsSync(t.out)).toBe(false);
+  });
+
+  it('refuses a newer release that drops or edits a step of the older one', async () => {
+    const t = staged();
+    const current = JSON.parse(readFileSync(t.newer.path, 'utf8'));
+    rmSync(t.newer.path);
+    t.s.write(t.newer.path, { ...current, files: current.files.filter((file: { path: string }) => !file.path.endsWith('0122_engine_map_check.sql')) });
+    await expect(run(t.argv, t.s.layout, t.deps)).rejects.toMatchObject({ code: 'DATABASE_AHEAD_NOT_A_SUPERSET' });
+  });
+
+  it('writes only the older release\'s own file name', async () => {
+    const t = staged();
+    const argv = [...t.argv.slice(0, -1), join(t.s.art, 'database-ahead-new-v1.json')];
+    await expect(run(argv, t.s.layout, t.deps)).rejects.toMatchObject({ code: 'OUTPUT_PATH_REFUSED' });
   });
 });
