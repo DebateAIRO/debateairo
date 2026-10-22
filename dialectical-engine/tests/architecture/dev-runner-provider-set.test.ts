@@ -41,7 +41,13 @@ describe("production runner provider topology", () => {
 
   it("loads every mandatory runner policy from the selected sealed register version", async () => {
     const source = await readFile("apps/runner/src/main.ts", "utf8");
-    expect(source).toContain("readDevelopmentRunnerPolicy(pool, environment.REGISTER_VERSION)");
+    // Side-by-side spec §13: the policy is read by the one per-version loader, for the version it loads (main.ts loads its
+    // site version, REGISTER_VERSION, through it), and its debate members are mapped once, by runnerSettingsOfVersion,
+    // which main.ts's settings literal spreads. The process members stay in main.ts's literal.
+    const loader = await readFile("apps/runner/src/run-settings.ts", "utf8");
+    expect(loader).toContain("readDevelopmentRunnerPolicy(pool, version)");
+    expect(source).toContain("const siteVersionSettings = await runnerSettings.requireSettings(environment.REGISTER_VERSION);");
+    expect(source).toContain("...runnerSettingsOfVersion(siteVersionSettings),");
     for (const setting of [
       "compositionRow: policy.compositionRow",
       "servePolicy:",
@@ -64,7 +70,9 @@ describe("production runner provider topology", () => {
       // shipped one. At 44836ecf that made a correctly sealed deployment refuse
       // every multi-maker work item. Same class as the two entries above, so it is
       // pinned the same way rather than left to the next merge to rediscover.
-      "stoppingPolicy: policy.stoppingPolicy",
+      "stoppingPolicy: policy.stoppingPolicy"
+    ]) expect(loader).toContain(setting);
+    for (const setting of [
       // T3C / F34 (J20): DR-182 VROW-5's claim-time re-probe. Its absence is not a
       // stop — both consumers are guarded by `!== undefined` — so a shipped
       // composition that omits it degrades SILENTLY: a member pinned at ask time
@@ -129,6 +137,7 @@ describe("production runner provider topology", () => {
   it("composes every optional WalkingSkeletonSettings member, or declares it intentionally absent", async () => {
     const runnerSource = await readFile("apps/runner/src/index.ts", "utf8");
     const mainSource = await readFile("apps/runner/src/main.ts", "utf8");
+    const mappingSource = await readFile("apps/runner/src/run-settings.ts", "utf8");
 
     /**
      * Blanks comments and string/template literals in place (length-preserving), so a
@@ -272,7 +281,23 @@ describe("production runner provider topology", () => {
     while (/\s/u.test(blankedMain.charAt(lastArgumentStart))) lastArgumentStart += 1;
     const settingsSpan = balanced(blankedMain, lastArgumentStart, "{", "}");
     expect(settingsSpan).not.toBeNull();
-    const composed = [...new Set(literalKeys(blankedMain, settingsSpan![0], settingsSpan![1]))];
+    const literalComposed = literalKeys(blankedMain, settingsSpan![0], settingsSpan![1]);
+    // Side-by-side spec §13: the version's debate members come from ONE mapping, `runnerSettingsOfVersion`
+    // (run-settings.ts), spread at the top level of the literal. Its returned literal's keys count as composed ONLY
+    // while main.ts's literal really spreads it; the same depth and spread rules read it.
+    const settingsLiteral = blankedMain.slice(settingsSpan![0], settingsSpan![1]);
+    const spreadsMapping = /^\s*\.\.\.runnerSettingsOfVersion\(siteVersionSettings\),$/mu.test(settingsLiteral);
+    expect(spreadsMapping).toBe(true);
+    const blankedMapping = blank(mappingSource);
+    const mappingFunction = blankedMapping.indexOf("export function runnerSettingsOfVersion(");
+    expect(mappingFunction).toBeGreaterThan(-1);
+    const mappingSpan = balanced(blankedMapping, blankedMapping.indexOf("{", blankedMapping.indexOf("return Object.freeze(", mappingFunction)), "{", "}");
+    expect(mappingSpan).not.toBeNull();
+    const mapped = spreadsMapping ? literalKeys(blankedMapping, mappingSpan![0], mappingSpan![1]) : [];
+    const mappingLiteral = mappingSource.slice(mappingSpan![0], mappingSpan![1]);
+    // One source per member: no key is both mapped and set by main.ts's literal.
+    expect(mapped.filter((key) => literalComposed.includes(key))).toEqual([]);
+    const composed = [...new Set([...literalComposed, ...mapped])];
 
     // ---- the scan must PROVE its own depth and spread rules -------------------
     // Depth: `failureCode:` really is present inside the settings literal, nested one
@@ -282,17 +307,24 @@ describe("production runner provider topology", () => {
     // hole this gate exists to prevent, and it shipped in the first version. (It was
     // `clock:` inside `observeProviderTarget({ ... })` until spec 2026-10-11 busy model
     // §2 moved that call into main.ts's `observeClaimTarget`, outside the literal.)
-    const settingsLiteral = blankedMain.slice(settingsSpan![0], settingsSpan![1]);
     expect(settingsLiteral).toContain("failureCode:");
     expect(composed).not.toContain("failureCode");
     // Spread: `critique` is contributed ONLY by a conditional top-level spread, so a
     // scan that ignores spreads would wrongly report a composed member as unwired.
     expect(mainSource).toContain("{ critique: providerTopology.critique }");
     expect(composed).toContain("critique");
-    // Shorthand: `debateShape` (25a3bab58) is composed as `debateShape,` with no colon; a colon-only scan reported a
-    // composed member as unwired. The scan must read it, and must not read a value or a spread's operand as a key.
-    expect(settingsLiteral).toMatch(/,\s*debateShape,/u);
+    // Shorthand: `debateShape` (25a3bab58) was composed as `debateShape,` with no colon; a colon-only scan reported a
+    // composed member as unwired. The scan must read a shorthand, and must not read a value or a spread's operand as a
+    // key. Side-by-side spec §13 moved `debateShape` into the mapping (`debateShape: version.debateShape,`), so the
+    // shorthand rule is proved on a literal of its own, and the moved member through the mapping.
+    const sample = blank("{ shorthandKey, valued: someValue, ...spreadOperand, last }");
+    expect(literalKeys(sample, 0, sample.length - 1)).toEqual(["shorthandKey", "valued", "last"]);
+    expect(mappingLiteral).toContain("debateShape: version.debateShape,");
     expect(composed).toContain("debateShape");
+    expect(mapped.length).toBeGreaterThanOrEqual(10);
+    expect(mapped).toContain("factBundleVersion");
+    expect(mapped).not.toContain("version");
+    expect(mapped).not.toContain("policy");
     expect(composed).not.toContain("runnerCallScheduler");
     expect(composed).not.toContain("previewConfig");
 

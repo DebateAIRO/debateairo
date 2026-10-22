@@ -121,7 +121,12 @@ describe("verdict story — wired into the shipped runner, after settle, never i
     expect(main).toContain("resolveStoryPackDir({");
     expect(main).toContain("[STORY_SHAPES_DIR_ENV_KEY]: environment.DEBATEAI_STORY_SHAPES_DIR");
     expect(main).toContain("moduleUrl: import.meta.url");
-    expect(main).toContain("readStoryPolicyFromRegister(pool, environment.REGISTER_VERSION)");
+    // Side-by-side spec §13: the optional story rows are read by the one per-version loader, for its version; main.ts
+    // loads its site version through it and never reads the story policy itself.
+    const loader = await read("apps/runner/src/run-settings.ts");
+    expect(loader).toContain("readStoryPolicyFromRegister(pool, version)");
+    expect(main).not.toContain("readStoryPolicyFromRegister(");
+    expect(main).toContain("const { storyPolicy } = siteVersionSettings;");
     expect(main).toContain("new StoryWriter({");
     // A detail key can never overwrite the line's kind or event.
     expect(main).toContain('console.warn(JSON.stringify({ ...detail, kind: "DEBATEAI_STORY", event }));');

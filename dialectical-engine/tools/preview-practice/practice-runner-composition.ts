@@ -43,34 +43,27 @@ import { TypedDomainError } from "@debateai/kernel";
 import {
   assertHostedCostEnvelopesSealed,
   costEnvelopeBand,
-  costEnvelopeCeilings,
   effectiveCallConcurrency,
   readBillingPlans,
   readCallConcurrencyPolicy,
   readCostEnvelopePolicy,
-  readEngineVersion,
-  readModelScorecard,
-  readStoryPolicyFromRegister,
   type CallConcurrencyPolicy,
+  type CostEnvelopeBand,
+  type CostEnvelopePolicy,
   type DeploymentMode,
   type StoryPolicy
 } from "@debateai/register";
 import {
   CostEnvelopeGuard,
   PostgresModelSpendStore,
-  assertRunCeilingCoversOneCall,
   costEnvelopeGuardPolicy,
   type CostEnvelopePhase,
   type SharedWallApplication
 } from "@debateai/budget";
-import { PLAN_TIER_ROSTERS, askQuestionMaxBytes } from "@debateai/contract";
-import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
-import { firstCallPlanModels } from "@debateai/scorecard";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
   assertDeploymentProviderTargets,
-  assertPreviewProviderTargets,
-  assertPreviewRoleTargets,
+  assertPreviewTargetSet,
   assertPricedProviderTargets,
   createPreviewBusyCoordinator,
   createPreviewGuardedFetch,
@@ -79,7 +72,6 @@ import {
   PREVIEW_GLM_DEADLINE_MS,
   previewFinalWriterTierUnreadLine,
   previewProbeControls,
-  previewRunnerPolicy,
   previewRunResilience,
   previewSealedRoleFallbackCovered,
   previewStructureRepairCeiling,
@@ -88,19 +80,18 @@ import {
   providerTargetGatewayControls,
   providerTargetPrice,
   resolveProviderTargetCredentials,
-  type ProviderDiscoveryTarget,
   withPreviewProviderCallPolicy,
   withStructureRepair,
   type PreviewBudgetPorts,
   type PreviewFinalWriterTierUnread,
   type PreviewGateRemaining,
+  type PreviewGateSettings,
+  type PreviewLineUp,
   type PreviewProviderName,
-  type PreviewProviderTestConfig,
   type ProviderGateway
 } from "@debateai/providers";
 import { StoryWriter, loadStoryPack, resolveStoryPackDir, type StoryPack } from "@debateai/story";
 import {
-  assertRegisterPromptContractHashes,
   buildProviderPriceMap,
   createPostgresProviderGateway,
   logBodyCostFallback,
@@ -109,12 +100,12 @@ import {
   WalkingSkeletonRunner
 } from "@debateai/runner";
 import { assertRunnerPrimaryProviderConfiguration, createRunnerProviderTopology } from "../../apps/runner/src/provider-topology.js";
-import { readDevelopmentRunnerPolicy } from "../../apps/runner/src/dev-runner-policy.js";
 import { createCallScheduler, type CallSubject } from "../../apps/runner/src/call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateNames, structureRepairThroughLane } from "../../apps/runner/src/call-lane-gateway.js";
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
-import { readDebateShapeRunnerSettings } from "../../apps/runner/src/debate-shape-boot.js";
-import { readEngineRunnerSettings } from "../../apps/runner/src/engine-boot.js";
+import {
+  createRunnerSettingsCache, loadRunnerVersionSettings, runnerSettingsOfVersion, type RunnerSiteContext
+} from "../../apps/runner/src/run-settings.js";
 import { createRunnerRetirementSignal } from "../../apps/runner/src/runner-retirement.js";
 import { PracticeCallStats } from "./practice-parallel.js";
 
@@ -126,7 +117,12 @@ export type PracticeRunnerSettings = Readonly<{
    * as this key and its ask stamps every run with it, so the runner never answers NO_WORK to its own practice debate.
    */
   RELEASE_KEY: string;
-  PREVIEW_PROVIDER_TEST_CONFIG: PreviewProviderTestConfig;
+  /**
+   * Addition D14-D16, as main.ts's environment carries them: the preview configuration's gate part, and the line-up its
+   * env form carries (null for the sockets-only form), the fallback for a settings version without the line-up row.
+   */
+  PREVIEW_GATE_SETTINGS: PreviewGateSettings;
+  PREVIEW_ENV_LINE_UP: PreviewLineUp | null;
   PROVIDER_DISCOVERY_TARGETS_JSON: string;
   DEPLOYMENT_MODE: DeploymentMode;
   NODE_ENV: "development" | "test" | "production" | undefined;
@@ -149,28 +145,24 @@ export type PracticeRunnerComposition = Awaited<ReturnType<typeof composePractic
 
 /**
  * HOSTED only: main.ts's money wiring, line for line (its V-28 per-run envelope, B9 shared wall, internal-funding
- * refusal, the guard over both money rows and B9's run-ceiling-below-one-call refusal), on the throwaway database.
- * Returns null in local mode, where main.ts builds none of it. tests/unit/preview-practice-hosted.test.ts pins the
- * statements below against main.ts's.
+ * refusal and the guard over both money rows), on the throwaway database. B9's run-ceiling-below-one-call refusal is
+ * the settings loader's (run-settings.ts), as in main.ts. Returns null in local mode, where main.ts builds none of it.
+ * tests/unit/preview-practice-wiring-drift.test.ts pins the statements below against main.ts's.
  */
 export async function composePracticeRunnerMoney(input: Readonly<{
   pool: Pool;
   environment: PracticeRunnerSettings;
-  declaredProviderTargets: readonly ProviderDiscoveryTarget[];
-  judgeTokenCeiling: number;
+  /** The site's money row and its band, read as main.ts reads them before its settings loader (null in local mode). */
+  costEnvelopePolicy: CostEnvelopePolicy | null;
+  envelopeBand: CostEnvelopeBand | null;
+  /** The site version's story policy, from the settings loader. */
   storyPolicy: StoryPolicy | null;
-  /** The debate shape main.ts resolved at boot (null without the row): the first call is priced with the locked language. */
-  debateShape: Awaited<ReturnType<typeof readDebateShapeRunnerSettings>>;
   log?: (line: string) => void;
 }>) {
-  const { pool, environment, declaredProviderTargets, storyPolicy } = input;
+  const { pool, environment, costEnvelopePolicy, envelopeBand, storyPolicy } = input;
   if (environment.DEPLOYMENT_MODE !== "hosted") return null;
-  const costEnvelopePolicy = environment.DEPLOYMENT_MODE === "hosted"
-    ? await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION)
-    : null;
   const modelSpendStore = new PostgresModelSpendStore(pool);
   const moneyInFlight = createRunInFlight();
-  const envelopeBand = costEnvelopePolicy === null ? null : costEnvelopeBand(costEnvelopePolicy);
   const billingPlans = costEnvelopePolicy === null ? null : await readBillingPlans(pool, environment.REGISTER_VERSION);
   if (costEnvelopePolicy !== null && billingPlans === null) {
     (input.log ?? console.warn)(JSON.stringify({ kind: "DEBATEAI_PERSON_WALL", event: "PLANS_UNRESOLVED" }));
@@ -205,27 +197,6 @@ export async function composePracticeRunnerMoney(input: Readonly<{
         ...(fundingAllowance === undefined ? {} : {fundingAdmission:fundingAllowance}),
         inFlight: moneyInFlight
       });
-  if (costEnvelopePolicy !== null && envelopeBand !== null) {
-    const firstCalls = firstPositionCallProjections({
-      targets: declaredProviderTargets,
-      judgeTokenCeiling: input.judgeTokenCeiling,
-      questionMaxBytes: askQuestionMaxBytes(),
-      // Ruling L-B9R (P2L Task 17), as main.ts: with ANY debateShapePolicy row (enabled false too) a run's first call may
-      // carry the locked language, so it is priced at the longest lock too. No row: today's price.
-      questionLanguageLocked: input.debateShape !== null
-    });
-    assertRunCeilingCoversOneCall({
-      bodyCeilingMicros: costEnvelopeCeilings(costEnvelopePolicy).bodyMicros,
-      firstCallsByRoster: firstCallsByPlanRoster({
-        projections: firstCalls,
-        rosters: firstCallPlanModels({
-          scorecardInForce: (await readModelScorecard(pool, environment.REGISTER_VERSION, await readEngineVersion())).state === "VALID",
-          rosters: PLAN_TIER_ROSTERS,
-          models: firstCalls.map((call) => call.model)
-        })
-      })
-    });
-  }
   return Object.freeze({
     costEnvelopeGuard: costEnvelopeGuard!,
     envelopeBand,
@@ -260,27 +231,11 @@ export async function composePracticeRunner(input: Readonly<{
   storyLog?: (event: string, detail: Record<string, unknown>) => void;
 }>) {
   const { pool, environment } = input;
-  const previewConfig = environment.PREVIEW_PROVIDER_TEST_CONFIG;
+  // Addition D14-D16, as main.ts: the gate part is the process's; the line-up is each settings version's own.
+  const previewGate = environment.PREVIEW_GATE_SETTINGS;
   // As main.ts's first line: a hosted deployment may not claim work until the envelopes are sealed (local: nothing).
   assertHostedCostEnvelopesSealed(environment.DEPLOYMENT_MODE);
-  const policy = previewRunnerPolicy(await readDevelopmentRunnerPolicy(pool, environment.REGISTER_VERSION), previewConfig);
-  // As main.ts: a register that does not carry this code's prompt fingerprints refuses the start.
-  assertRegisterPromptContractHashes(policy.hashes, environment.REGISTER_VERSION);
-  /**
-   * Debate shape (spec 2026-10-12 §3.1, §4; controller ruling PF10), as apps/runner/src/main.ts resolves it, in both
-   * modes: the optional row (absent = today's shape; malformed = refused, DEBATE_SHAPE_POLICY_INVALID) and, only with
-   * it, the sealed map contracts (DEBATE_SHAPE_MAP_HASH_UNSEALED / MAP_CONTRACT_HASH_MISMATCH).
-   */
-  const debateShape = await readDebateShapeRunnerSettings(pool, environment.REGISTER_VERSION);
-  // Engine redesign (R1d; INTERFACE §2.3), as apps/runner/src/main.ts resolves it, in both modes: the optional engine row
-  // and, only with it, the length row's presence and the sealed engineContractHash.
-  const engine = await readEngineRunnerSettings(pool, environment.REGISTER_VERSION);
   const storyLog = input.storyLog ?? (() => undefined);
-  const storyPolicy = await readStoryPolicyFromRegister(pool, environment.REGISTER_VERSION)
-    .catch((error: unknown) => {
-      storyLog("STORY_POLICY_UNREADABLE", { code: error instanceof TypedDomainError ? error.code : "UNTYPED" });
-      return null;
-    });
   let storyPack: StoryPack | { readonly error: string };
   try {
     storyPack = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta.url }));
@@ -299,21 +254,43 @@ export async function composePracticeRunner(input: Readonly<{
     mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV
   });
   assertPricedProviderTargets(declaredProviderTargets, environment.DEPLOYMENT_MODE);
-  assertPreviewProviderTargets(previewConfig, declaredProviderTargets);
-  assertPreviewRoleTargets(previewConfig, declaredProviderTargets, [
-    policy.synthesisRolePolicy.synthesizerRoleRef, policy.synthesisRolePolicy.evaluatorRoleRef,
-    ...(storyPolicy === null ? [] : [storyPolicy.storytellerRoleRef, storyPolicy.storyCheckerRoleRef])
-  ]);
-  if ((await readModelScorecard(pool, environment.REGISTER_VERSION, await readEngineVersion())).state === "VALID") {
-    throw new TypedDomainError("PREVIEW_SCORECARD_CONFLICT", "Preview roster cannot override a valid scorecard");
+  // Addition D16, as main.ts: the reviewed provider set once; the rosters, roles and scorecard per version (the loader).
+  if (previewGate !== undefined) {
+    assertPreviewTargetSet(declaredProviderTargets);
   }
   const previewFetch = createPreviewGuardedFetch(input.budgetPorts);
+  // Hosted only (null in local mode), as main.ts: the site's money row and its band, read before the settings loader.
+  const costEnvelopePolicy = environment.DEPLOYMENT_MODE === "hosted"
+    ? await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION)
+    : null;
+  const envelopeBand = costEnvelopePolicy === null ? null : costEnvelopeBand(costEnvelopePolicy);
+  /**
+   * Side-by-side spec §13, as main.ts: every per-version read (the runner policy and its prompt fingerprints, the story's
+   * rows, the preview line-up, the debate shape, the engine, the preview's roster, role and scorecard checks, the run
+   * ceiling against one call, the call lanes) through the ONE loader (apps/runner/src/run-settings.ts), in both modes.
+   */
+  const runnerSite: RunnerSiteContext = Object.freeze({
+    siteVersion: environment.REGISTER_VERSION,
+    deploymentMode: environment.DEPLOYMENT_MODE,
+    preview: previewGate === undefined ? undefined : { gate: previewGate, envLineUp: environment.PREVIEW_ENV_LINE_UP ?? null },
+    declaredProviderTargets,
+    siteCostEnvelopePolicy: costEnvelopePolicy,
+    envelopeBand
+  });
+  const runnerSettings = createRunnerSettingsCache({
+    // The practice's story lines go to its own story log (main.ts's go to standard error).
+    load: (version) => loadRunnerVersionSettings(pool, version, runnerSite, {
+      log: ({ event, ...detail }) => { storyLog(String(event), detail); }
+    }),
+    log: (line) => { console.warn(JSON.stringify(line)); }
+  });
+  const siteVersionSettings = await runnerSettings.requireSettings(environment.REGISTER_VERSION);
+  const { policy, storyPolicy } = siteVersionSettings;
   // Hosted only (null in local mode): main.ts's per-run and daily envelopes, the story's money row and the shared wall.
-  const money = await composePracticeRunnerMoney({ pool, environment, declaredProviderTargets,
-    judgeTokenCeiling: policy.bounds.JUDGE.tokenCeiling, storyPolicy, debateShape, log: (line) => { console.warn(line); } });
+  const money = await composePracticeRunnerMoney({ pool, environment, costEnvelopePolicy, envelopeBand, storyPolicy,
+    log: (line) => { console.warn(line); } });
   const costEnvelopeGuard = money?.costEnvelopeGuard;
   const storyCeilingMicros = money?.storyCeilingMicros ?? null;
-  const envelopeBand = money?.envelopeBand ?? null;
   // Parallel AI calls (spec 2026-10-12 §3.2-§3.5), as main.ts composes them on the preview.
   const gatewayInFlight = createRunInFlight();
   const callStats = new PracticeCallStats();
@@ -323,7 +300,7 @@ export async function composePracticeRunner(input: Readonly<{
   const runnerCallScheduler = callStats.observeScheduler(createCallScheduler({ policy: callPolicy }));
   await applyPreviewGateCapacities({
     scheduler: runnerCallScheduler,
-    gates: previewGateNames(previewConfig).map((gate) => ({ gate, remaining: input.remaining[gate] })),
+    gates: previewGateNames(previewGate).map((gate) => ({ gate, remaining: input.remaining[gate] })),
     log: (line) => { callStats.gateCapacityLog(line); console.warn(line); }
   });
   const previewBusy = callStats.observeBusy(createPreviewBusyCoordinator());
@@ -346,7 +323,7 @@ export async function composePracticeRunner(input: Readonly<{
       model: target.model,
       maker: target.maker,
       ...providerTargetGatewayControls(target),
-      ...previewTargetGatewayControls(previewConfig, target),
+      ...previewTargetGatewayControls(previewGate, target),
       inFlight: gatewayInFlight,
       // Hosted only, as main.ts: each call charged to the run's envelope (and the story's calls to the story's own).
       ...(costEnvelopeGuard === undefined || price === null ? {} : {
@@ -361,7 +338,9 @@ export async function composePracticeRunner(input: Readonly<{
       })
     });
     // Spec §3.4, as main.ts: the gate is marked unhealthy on its FIRST unsent refusal, before the resend wait.
-    return withPreviewProviderCallPolicy(gateway, previewConfig, target, {
+    // Addition D16-D17, as main.ts: the site version's thinking table until each call reads its own run's (SA5). Its
+    // composed config exists whenever the gate part does: the loader refuses a preview version it cannot compose.
+    return withPreviewProviderCallPolicy(gateway, siteVersionSettings.previewConfig!, target, {
       busy: previewBusy,
       onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); },
       gateRemaining: input.remaining,
@@ -378,7 +357,7 @@ export async function composePracticeRunner(input: Readonly<{
    */
   const targetGateways = new Map(providerTargets.map((target) => [target.providerRef, targetGateway(target)] as const));
   const structureRepairRoute = structureRepairThroughLane(
-    previewStructureRepairRoute(providerTargets, (providerRef) => targetGateways.get(providerRef)), previewCallSubjects(previewConfig));
+    previewStructureRepairRoute(providerTargets, (providerRef) => targetGateways.get(providerRef)), previewCallSubjects(previewGate));
   const providerTopology = createRunnerProviderTopology(providerTargets,
     (target) => withStructureRepair(targetGateways.get(target.providerRef)!, structureRepairRoute));
   const runRepository = new RunRepository(pool);
@@ -420,36 +399,17 @@ export async function composePracticeRunner(input: Readonly<{
     releaseKey: environment.RELEASE_KEY,
     // Side-by-side spec §4, as main.ts: the practice never retires (both stops stay off); the drift guard keeps the keys equal.
     retirement: createRunnerRetirementSignal(),
-    judgeBound: policy.bounds.JUDGE,
-    composerBound: policy.bounds.COMPOSER,
-    conformanceBound: policy.bounds.CONFORMANCE,
+    // Side-by-side spec §13 runner point 7, as main.ts: every debate member of the site version, written once.
+    ...runnerSettingsOfVersion(siteVersionSettings),
     providerRef: providerTopology.primary.providerRef, maker: providerTopology.primary.maker,
     ...(providerTopology.critique === undefined
       ? {} : { critique: providerTopology.critique }),
     additionalMakers: providerTopology.additionalMakers,
-    judgeContractHash: policy.hashes.judge,
-    composerContractHash: policy.hashes.composer,
-    conformanceContractHash: policy.hashes.conformance,
-    propagationContractHash: policy.hashes.propagation,
-    serveContractHash: policy.hashes.serve,
-    maxRecompose: environment.MAX_RECOMPOSE, factBundleVersion: environment.REGISTER_VERSION,
+    maxRecompose: environment.MAX_RECOMPOSE,
     judgementNumberKind: environment.JUDGEMENT_NUMBER_KIND, judgementProducer: environment.JUDGEMENT_PRODUCER,
     propagationNumberKind: environment.PROPAGATION_NUMBER_KIND,
     propagationProducer: environment.PROPAGATION_PRODUCER,
     resolveTerminalActivations: createTerminalActivationEvaluator(pool),
-    compositionRow: policy.compositionRow,
-    servePolicy: {
-      compositionBudgets: policy.compositionBudgets,
-      candidateConfidenceBand: policy.candidateConfidenceBand,
-      bandCeiling: policy.bandCeiling
-    },
-    judgementPolicy: policy.judgementPolicy,
-    scoringOperator: policy.scoringOperator,
-    runDeathPolicy: policy.runDeathPolicy,
-    hiddenNodeScoreThreshold: policy.hiddenNodeScoreThreshold,
-    verdictLabelPolicy: policy.verdictLabelPolicy,
-    panelPolicy: policy.panelPolicy,
-    stoppingPolicy: policy.stoppingPolicy,
     claimTimeProbe: async (member) => {
       const target = providerTargets.find((candidate) => candidate.providerRef === member.provider_ref);
       if (target === undefined) {
@@ -462,7 +422,6 @@ export async function composePracticeRunner(input: Readonly<{
         failureCode: observation.failureCode
       };
     },
-    synthesisRolePolicy: policy.synthesisRolePolicy,
     story: storyWriter,
     providerPrices: buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE),
     // LG-A (Task 14 carry), as main.ts: root 0's room adds the structure-repair call to its first attempt and retry (the sum).
@@ -481,17 +440,13 @@ export async function composePracticeRunner(input: Readonly<{
     // Run resilience (spec docs/superpowers/specs/2026-10-12-preview-run-resilience-design.md; ruling R-c), as main.ts
     // composes it on the preview: each maker's own attempt allowance, a busy member or a halted gate sitting out the
     // rest of the run, and the answer and story roles moving on from it. The practice is always the preview.
-    runResilience: previewRunResilience(previewConfig)!,
+    runResilience: previewRunResilience(previewGate)!,
     answerRoleFallbackCovered: ({ roleRef, panel }: Readonly<{ roleRef: string; panel: readonly Readonly<{ provider_ref: string; model_id: string }>[] }>) =>
       previewSealedRoleFallbackCovered(roleRef, panel),
     // Parallel AI calls (spec 2026-10-12 §3.2, §3.6), as main.ts: the one scheduler's lane per debate, each ref's
     // model, vendor and gate, and the claim renewals on their own pool.
     callScheduler: runnerCallScheduler,
-    // Debate shape, as main.ts: resolved at boot above; null without the row (today's runner).
-    debateShape,
-    // Engine redesign (R1d), as main.ts: resolved at boot above; null without the engine row (engine 1).
-    engine,
-    callSubjects: previewCallSubjects(previewConfig),
+    callSubjects: previewCallSubjects(previewGate),
     // Ruling R31, as main.ts: a call to a busy model waits on the busy coordinator BEFORE it takes any slot.
     callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model),
     renewals: new WorkItemRepository(input.keepAlivePool, { releaseKey: environment.RELEASE_KEY, workerId: environment.RUNNER_WORKER_ID }),

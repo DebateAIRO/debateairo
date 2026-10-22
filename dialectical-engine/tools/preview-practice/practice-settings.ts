@@ -12,7 +12,7 @@
  */
 import { lstatSync, readFileSync } from "node:fs";
 import { isAbsolute } from "node:path";
-import { PREVIEW_THINKING_LEVELS_INVALID, parsePreviewProviderTestConfig, type PreviewProviderTestConfig } from "@debateai/providers";
+import { PREVIEW_THINKING_LEVELS_INVALID, parsePreviewEnvironmentConfig, parsePreviewProviderTestConfig, type PreviewProviderTestConfig } from "@debateai/providers";
 import { developmentReleaseKey, parseReleaseKey, TypedDomainError } from "@debateai/kernel";
 import { assertReleaseKeyForRegister, resolveDeploymentMode, type DeploymentMode } from "@debateai/register";
 import { redactKeyShapes } from "./practice-redaction.js";
@@ -200,6 +200,9 @@ export function parsePracticeSettings(text: string, context?: Readonly<{ sourceR
   if (previewConfig === undefined || previewConfig.anthropic_budget_socket === undefined) {
     throw new PracticeRefusal("PRACTICE_SETTINGS_VALUE_INVALID", "PREVIEW_PROVIDER_TEST_CONFIG_JSON names no Anthropic gate");
   }
+  // Addition D14-D16: the runner's two preview keys, exactly as the runner's environment parses the same value (one key
+  // check behind both parsers): its gate part and its line-up, the fallback for a settings version without the row.
+  const previewEnvironment = parsePreviewEnvironmentConfig(get("PREVIEW_PROVIDER_TEST_CONFIG_JSON"))!;
   // The preview declares no credential: a target with an inline header or a credential file is refused.
   let targets: unknown;
   try { targets = JSON.parse(get("PROVIDER_DISCOVERY_TARGETS_JSON")); } catch {
@@ -227,7 +230,8 @@ export function parsePracticeSettings(text: string, context?: Readonly<{ sourceR
   const runner: PracticeRunnerSettings = Object.freeze({
     REGISTER_VERSION: registerVersion,
     RELEASE_KEY: practiceReleaseKey(values.get("RELEASE_KEY"), registerVersion, mode, context?.sourceRevision),
-    PREVIEW_PROVIDER_TEST_CONFIG: previewConfig,
+    PREVIEW_GATE_SETTINGS: previewEnvironment.gate,
+    PREVIEW_ENV_LINE_UP: previewEnvironment.envLineUp,
     PROVIDER_DISCOVERY_TARGETS_JSON: get("PROVIDER_DISCOVERY_TARGETS_JSON"),
     DEPLOYMENT_MODE: mode,
     NODE_ENV: nodeEnv as PracticeRunnerSettings["NODE_ENV"],

@@ -44,11 +44,20 @@ describe("the runner reads the engine from the receipt only", () => {
   });
 
   it("main.ts and the practice runner read the boot settings once, after the shape's, and hand them on", () => {
+    // Side-by-side spec §13: the read is the one per-version loader's (run-settings.ts), exactly once, after the shape's;
+    // neither composition calls it, and both hand the version's engine on through runnerSettingsOfVersion.
+    const loader = read("apps/runner/src/run-settings.ts");
+    const engineRead = "const engine = await readEngineRunnerSettings(pool, version);";
+    expect(loader.split(engineRead)).toHaveLength(2);
+    const shapeAt = loader.indexOf("const debateShape = await readDebateShapeRunnerSettings(pool, version);");
+    expect(shapeAt).toBeGreaterThan(-1);
+    expect(loader.indexOf(engineRead)).toBeGreaterThan(shapeAt);
+    expect(loader).toContain("engine: version.engine,");
+    expect(loader).not.toContain("resolveEngineRunnerSettings(");
     for (const file of ["apps/runner/src/main.ts", "tools/preview-practice/practice-runner-composition.ts"]) {
       const text = read(file);
-      const engineRead = "const engine = await readEngineRunnerSettings(pool, environment.REGISTER_VERSION);";
-      expect(text.split(engineRead), file).toHaveLength(2);
-      expect(text.indexOf(engineRead), file).toBeGreaterThan(text.indexOf("const debateShape = await readDebateShapeRunnerSettings(pool, environment.REGISTER_VERSION);"));
+      expect(text, file).not.toContain("readEngineRunnerSettings(");
+      expect(text, file).toContain("...runnerSettingsOfVersion(siteVersionSettings),");
       expect(text, file).not.toContain("resolveEngineRunnerSettings(");
     }
   });

@@ -8,6 +8,7 @@
  * three accepted forms, the composition back into today's config shape (so every reader that takes that shape keeps its
  * code, D16), and the set of models a version can seat (D20). Providers stays below the register: no import of it here.
  */
+import { TypedDomainError } from "@debateai/kernel";
 import { previewModelRow, previewModelRowForRef, previewRostersHonourMakerRule, PREVIEW_MODEL_ROWS } from "./preview-models.js";
 import {
   PREVIEW_PROVIDER_SOCKET_KEYS, PREVIEW_STRUCTURE_REPAIR_MODEL, readPreviewEnvironmentSource, validatePreviewProviderTestConfig,
@@ -102,6 +103,48 @@ export function composePreviewProviderTestConfig(gate: PreviewGateSettings, line
   // validatePreviewProviderTestConfig returns undefined only for an undefined value; the object above never is.
   if (composed === undefined) throw new TypeError("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
   return composed;
+}
+
+/**
+ * Addition D14-D16 (owner 2026-10-22) — THE ONE RESOLUTION RULE of a settings version's preview line-up, written once
+ * here so the runner's loader (apps/runner/src/run-settings.ts, resolvePreviewVersionConfig) and the API's admission
+ * loader (SA6) cannot drift (ruling R17). `preview` is the env's parse (parsePreviewEnvironmentConfig: the gate part and
+ * the old forms' line-up, or undefined without the variable); `row` is the version's previewLineUpPolicy (null without
+ * it); `isSiteVersion` says whether the version is the release's own (its REGISTER_VERSION).
+ *
+ * - no preview, no row: undefined (hosted production, local mode: today's runner and API);
+ * - a row without the preview: TypedDomainError PREVIEW_LINE_UP_WITHOUT_PREVIEW (D15: a boot refusal on the site
+ *   version, an unsupported version otherwise);
+ * - a row on the site version while the env still carries rosters or a table: PREVIEW_LINE_UP_ENV_CONFLICT (D15: one
+ *   source of truth per release; an env member is refused, never silently ignored);
+ * - a row: its composition over the env's gate part (on another version the row wins over the env's line-up, D14);
+ * - no row and the env's line-up (the old forms): the env's composition, which is today's config byte for byte;
+ * - no row and the sockets-only env: PREVIEW_LINE_UP_REQUIRED (D14).
+ * The composition refuses as composePreviewProviderTestConfig does (a roster model whose gate has no socket here).
+ */
+export function resolvePreviewLineUp(input: Readonly<{
+  preview: PreviewEnvironmentConfig | undefined;
+  row: PreviewLineUp | null;
+  isSiteVersion: boolean;
+}>): PreviewProviderTestConfig | undefined {
+  const { preview, row } = input;
+  if (preview === undefined) {
+    if (row === null) return undefined;
+    throw new TypedDomainError("PREVIEW_LINE_UP_WITHOUT_PREVIEW",
+      "A settings version carries the preview line-up, but this deployment has no preview configuration");
+  }
+  if (row !== null) {
+    if (input.isSiteVersion && preview.envLineUp !== null) {
+      throw new TypedDomainError("PREVIEW_LINE_UP_ENV_CONFLICT",
+        "The site settings version carries the preview line-up, so the preview configuration may carry only its gate part");
+    }
+    return composePreviewProviderTestConfig(preview.gate, row);
+  }
+  if (preview.envLineUp === null) {
+    throw new TypedDomainError("PREVIEW_LINE_UP_REQUIRED",
+      "The preview configuration carries only its gate part, and this settings version carries no preview line-up");
+  }
+  return composePreviewProviderTestConfig(preview.gate, preview.envLineUp);
 }
 
 /**

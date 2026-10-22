@@ -543,6 +543,9 @@ export async function resolve(specifier, context, nextResolve) {
       // Phase 2b replaced the guard with \`readMapContractHash\` (the boot resolves the shape settings, apps/runner/src/debate-shape-boot.ts).
       "@debateai/register": "export function loadRunnerEnvironment() {} export function assertHostedCostEnvelopesSealed() {} export function readCostEnvelopePolicy() {} export function readStoryPolicyFromRegister() {} export function readEngineVersion() {} export function readModelScorecard() {} export function costEnvelopeBand() {} export function costEnvelopeCeilings() {} export function readBillingPlans() {} export function readCallConcurrencyPolicy() {} export function effectiveCallConcurrency() {} export function readDebateShapePolicy() {} export function readMapContractHash() {}",
       "./index.js": "export function createPostgresProviderGateway() {} export function declareHatchetWalkingSkeletonTask() {} export class WalkingSkeletonRunner {}",
+      // Side-by-side spec §13 moved the per-version reads (policy, story, shape, engine, scorecard) behind the one
+      // settings loader: main.ts imports these three from it.
+      "./run-settings.js": "export function createRunnerSettingsCache() {} export function loadRunnerVersionSettings() {} export function runnerSettingsOfVersion() {}",
     };
     if (Object.hasOwn(stubs, specifier)) {
       return { url: "data:text/javascript," + encodeURIComponent(stubs[specifier]), shortCircuit: true };

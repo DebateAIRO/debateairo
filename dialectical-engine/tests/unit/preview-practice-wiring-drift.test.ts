@@ -109,6 +109,11 @@ const RUNNER_MAIN = read("apps/runner/src/main.ts");
 const PRACTICE_RUNNER = read("tools/preview-practice/practice-runner-composition.ts");
 const API_MAIN = read("apps/api/src/main.ts");
 const PRACTICE_ASK = read("tools/preview-practice/practice-ask-composition.ts");
+/** Side-by-side spec §13: the one per-version settings loader both runner compositions boot through. */
+const RUN_SETTINGS = read("apps/runner/src/run-settings.ts");
+/** The keys `runnerSettingsOfVersion` returns: the debate members both literals spread. */
+const DEBATE_MEMBERS_ANCHOR = "const { policy } = version;\n  return Object.freeze({";
+const DEBATE_MEMBERS_SPREAD = "...runnerSettingsOfVersion(siteVersionSettings),";
 
 /**
  * The one setting the practice never passes: `billing` (hosted with billing on). The practice composes the hosted ask
@@ -117,11 +122,20 @@ const PRACTICE_ASK = read("tools/preview-practice/practice-ask-composition.ts");
  */
 const HOSTED_ONLY_ASK_KEYS = new Set(["billing"]);
 
+/** Without comments, every run of white space one space: a statement reads the same however it is wrapped. */
+const flat = (source: string) => withoutComments(source).replace(/\s+/gu, " ");
+
 describe("the practice runs the shipped composition (drift guard)", () => {
   it("hands WalkingSkeletonRunner exactly the settings apps/runner/src/main.ts hands it", () => {
     const shipped = objectAfter(RUNNER_MAIN, "new WalkingSkeletonRunner(pool, providerTopology.primary.provider, {");
     const practice = objectAfter(PRACTICE_RUNNER, "new WalkingSkeletonRunner(pool, providerTopology.primary.provider, {");
-    expect(shipped.size).toBeGreaterThan(30);
+    // Side-by-side spec §13: both literals take the version's debate members from the one mapping, by the same spread,
+    // so the settings each hands the runner are its own keys plus the mapping's.
+    for (const source of [RUNNER_MAIN, PRACTICE_RUNNER]) expect(source.split(DEBATE_MEMBERS_SPREAD)).toHaveLength(2);
+    const debateMembers = objectAfter(RUN_SETTINGS, DEBATE_MEMBERS_ANCHOR);
+    expect(debateMembers.has("factBundleVersion")).toBe(true);
+    expect([...debateMembers].filter((key) => shipped.has(key))).toEqual([]);
+    expect(shipped.size + debateMembers.size).toBeGreaterThan(30);
     expect([...practice].sort()).toEqual([...shipped].sort());
   });
 
@@ -134,12 +148,13 @@ describe("the practice runs the shipped composition (drift guard)", () => {
 
   it("the gateway is wrapped by the preview call policy on both sides, over the guarded fetch", () => {
     for (const source of [RUNNER_MAIN, PRACTICE_RUNNER]) {
-      expect(source).toContain("withPreviewProviderCallPolicy(gateway, previewConfig, target");
-      expect(source).toContain("...previewTargetGatewayControls(previewConfig, target)");
+      // Addition D16-D17: the call policy takes the site version's composed config (its thinking table) until SA5.
+      expect(source).toContain("withPreviewProviderCallPolicy(gateway, siteVersionSettings.previewConfig!, target");
+      expect(source).toContain("...previewTargetGatewayControls(previewGate, target)");
       expect(source).toContain("...providerTargetGatewayControls(target)");
       expect(source).toContain("createPreviewGuardedFetch(");
       // Run resilience (spec 2026-10-12): the runner's sit-out book is the preview's own, on both sides.
-      expect(source).toContain("runResilience: previewRunResilience(previewConfig)!");
+      expect(source).toContain("runResilience: previewRunResilience(previewGate)!");
     }
     for (const source of [API_MAIN, PRACTICE_ASK]) {
       expect(source).toMatch(/probeControlsFor: previewProbeControls, fetchImplementation: previewFetch!?, previewRound: true/u);
@@ -154,10 +169,10 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       expect(code).toContain("effectiveCallConcurrency(await readCallConcurrencyPolicy(");
       expect(code.match(/createCallScheduler\(/gu) ?? []).toHaveLength(1);
       expect(code.match(/createPreviewBusyCoordinator\(\)/gu) ?? []).toHaveLength(1);
-      expect(code).toContain("withPreviewProviderCallPolicy(gateway, previewConfig, target");
+      expect(code).toContain("withPreviewProviderCallPolicy(gateway, siteVersionSettings.previewConfig!, target");
       expect(code).toMatch(/busy: previewBusy/u);
       expect(code).toContain("inFlight: gatewayInFlight");
-      expect(code).toContain("previewCallSubjects(previewConfig)");
+      expect(code).toContain("previewCallSubjects(previewGate)");
       expect(code).toContain("await applyPreviewGateCapacities({");
       expect(code).toMatch(/renewals: new WorkItemRepository\(/u);
       // Ruling R31 and spec §3.4 (final review): the busy wait before the slot, and the gate marked on its first
@@ -178,14 +193,34 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     // runner's runResilience is a spread guarded by the preview config, which only the preview's environment carries.
     const code = withoutComments(RUNNER_MAIN);
     expect(code.match(/\brunResilience\b/gu) ?? []).toHaveLength(1);
-    expect(code).toContain("...(previewConfig === undefined ? {} : { runResilience: previewRunResilience(previewConfig)! })");
-    expect(code).toMatch(/const previewConfig = environment\.PREVIEW_PROVIDER_TEST_CONFIG;/u);
+    expect(code).toContain("...(previewGate === undefined ? {} : { runResilience: previewRunResilience(previewGate)! })");
+    // Addition D14 / ruling R25: "is this the preview?" keys on the env's gate part, present for every accepted form
+    // (a sockets-only env leaves PREVIEW_PROVIDER_TEST_CONFIG undefined, which would switch the preview's rules off).
+    expect(code).toMatch(/const previewGate = environment\.PREVIEW_GATE_SETTINGS;/u);
+    expect(code).not.toContain("PREVIEW_PROVIDER_TEST_CONFIG");
     // Control: the unguarded form is not what ships.
-    expect(code).not.toMatch(/^\s*runResilience: previewRunResilience\(previewConfig\)!,/mu);
+    expect(code).not.toMatch(/^\s*runResilience: previewRunResilience\(previewGate\)!,/mu);
   });
 
-  /** Without comments, every run of white space one space: a statement reads the same however it is wrapped. */
-  const flat = (source: string) => withoutComments(source).replace(/\s+/gu, " ");
+  it("both compositions hand the loader the same site context (addition D14-D16), and the practice keys on the gate part", () => {
+    const preview = "preview: previewGate === undefined ? undefined : { gate: previewGate, envLineUp: environment.PREVIEW_ENV_LINE_UP ?? null },";
+    const shipped = objectAfter(RUNNER_MAIN, "const runnerSite: RunnerSiteContext = Object.freeze(");
+    const practice = objectAfter(PRACTICE_RUNNER, "const runnerSite: RunnerSiteContext = Object.freeze(");
+    expect([...shipped].sort()).toEqual(["declaredProviderTargets", "deploymentMode", "envelopeBand", "preview",
+      "siteCostEnvelopePolicy", "siteVersion"]);
+    expect([...practice].sort()).toEqual([...shipped].sort());
+    for (const source of [RUNNER_MAIN, PRACTICE_RUNNER]) {
+      const code = flat(source);
+      expect(code).toContain(preview);
+      expect(code).toContain("siteVersion: environment.REGISTER_VERSION,");
+      expect(code).toContain("siteCostEnvelopePolicy: costEnvelopePolicy,");
+      expect(code).toContain("const siteVersionSettings = await runnerSettings.requireSettings(environment.REGISTER_VERSION);");
+    }
+    const practiceCode = withoutComments(PRACTICE_RUNNER);
+    expect(practiceCode).toContain("const previewGate = environment.PREVIEW_GATE_SETTINGS;");
+    expect(practiceCode).not.toContain("PREVIEW_PROVIDER_TEST_CONFIG");
+  });
+
 
   it("hosted (2026-10-14): the runner's money wiring is main.ts's, statement for statement", () => {
     const shipped = flat(RUNNER_MAIN);
@@ -202,8 +237,6 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       "const fundingAllowance = billingPlans === null ? undefined : new FundingAwarePersonAllowanceSource({ allowances,entitlements:{...fundingEntitlements.readOnlyPort(),readRunFundingBasis:(runId)=>fundingEntitlements.readRunFundingBasis(runId)}, plans:billingPlans,closeBasisPoints:envelopeBand?.closeBasisPoints ?? 10000 });",
       "finishBasisPoints: envelopeBand === null ? null : envelopeBand.finishBasisPoints, persons: billingPlans === null ? plansUnresolvedPersonAllowance() : fundingAllowance ?? new BillingPersonAllowanceSource({ entitlements: new EntitlementRepository(pool).readOnlyPort(), plans: billingPlans, closeBasisPoints: envelopeBand === null ? 10_000 : envelopeBand.closeBasisPoints }), owners: modelSpendStore",
       "store: modelSpendStore, policy: costEnvelopeGuardPolicy(costEnvelopePolicy, storyPolicy), ...(sharedWallTerms === null ? {} : { sharedWall: sharedWallTerms }), ...(fundingAllowance === undefined ? {} : {fundingAdmission:fundingAllowance}), inFlight: moneyInFlight",
-      "if (costEnvelopePolicy !== null && envelopeBand !== null) { const firstCalls = firstPositionCallProjections({ targets: declaredProviderTargets,",
-      "bodyCeilingMicros: costEnvelopeCeilings(costEnvelopePolicy).bodyMicros,",
       "if (costEnvelopeGuard !== undefined && price === null) { throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`); }",
       "buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => costEnvelopeGuard.providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }),",
       "...(storyCeilingMicros === null ? {} : { buildStoryCostEnvelopeSeam: (runId: string) => costEnvelopeGuard.storySeam({ runId, price, requireReportedUsage: true }) })",
@@ -219,6 +252,17 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       expect(shipped, gone).not.toContain(gone);
       expect(practice, gone).not.toContain(gone);
     }
+    // Side-by-side spec §13: B9's run ceiling against one call is the version's, checked by the one loader both
+    // compositions boot through (over the version's per-run ceiling and the site's day and band), never inline.
+    for (const source of [shipped, practice]) {
+      expect(source).not.toContain("assertRunCeilingCoversOneCall(");
+      expect(source).not.toContain("firstPositionCallProjections(");
+    }
+    const loader = flat(RUN_SETTINGS);
+    for (const statement of [
+      "if (siteCostEnvelopePolicy !== null && envelopeBand !== null) { const debateEnvelope = composeDebateCostEnvelope(siteCostEnvelopePolicy, await readCostEnvelopePolicy(pool, version)); const firstCalls = firstPositionCallProjections({ targets: declaredProviderTargets,",
+      "bodyCeilingMicros: costEnvelopeCeilings(debateEnvelope).bodyMicros,"
+    ]) expect(loader, statement).toContain(statement);
     // The local-only refusal is gone; local mode builds no guard (composePracticeRunnerMoney returns null there).
     expect(practice).not.toContain("PRACTICE_REQUIRES_LOCAL_MODE");
     expect(practice).toContain("if (environment.DEPLOYMENT_MODE !== \"hosted\") return null;");
@@ -272,18 +316,27 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     // price the first call with the locked language exactly as main.ts does, in both modes.
     const runnerMain = flat(RUNNER_MAIN);
     const practiceRunner = flat(PRACTICE_RUNNER);
-    const shapeRead = "const debateShape = await readDebateShapeRunnerSettings(pool, environment.REGISTER_VERSION);";
-    expect(runnerMain).toContain(shapeRead);
-    expect(practiceRunner).toContain(shapeRead);
-    // Engine redesign (R1d Task 5): the runner's engine boot read, in both modes, on both sides.
-    const engineRead = "const engine = await readEngineRunnerSettings(pool, environment.REGISTER_VERSION);";
-    expect(runnerMain).toContain(engineRead);
-    expect(practiceRunner).toContain(engineRead);
-    expect(runnerMain).toContain("questionLanguageLocked: debateShape !== null");
-    expect(practiceRunner).toContain("questionLanguageLocked: input.debateShape !== null");
-    expect(practiceRunner).toContain("storyPolicy, debateShape, log:");
-    // Read before the money wiring, never only in one mode.
-    expect(practiceRunner.indexOf(shapeRead)).toBeLessThan(practiceRunner.indexOf("const money = await composePracticeRunnerMoney("));
+    const loader = flat(RUN_SETTINGS);
+    // Side-by-side spec §13: the shape and engine reads are the one loader's, for the version it loads; neither
+    // composition reads them itself, and both boot through the loader, in both modes.
+    const shapeRead = "const debateShape = await readDebateShapeRunnerSettings(pool, version);";
+    expect(loader.split(shapeRead)).toHaveLength(2);
+    // Engine redesign (R1d Task 5): the runner's engine boot read, in both modes, after the shape's.
+    const engineRead = "const engine = await readEngineRunnerSettings(pool, version);";
+    expect(loader.split(engineRead)).toHaveLength(2);
+    expect(loader.indexOf(engineRead)).toBeGreaterThan(loader.indexOf(shapeRead));
+    expect(loader).toContain("questionLanguageLocked: debateShape !== null");
+    const boot = "const siteVersionSettings = await runnerSettings.requireSettings(environment.REGISTER_VERSION);";
+    for (const source of [runnerMain, practiceRunner]) {
+      expect(source).not.toContain("readDebateShapeRunnerSettings(");
+      expect(source).not.toContain("readEngineRunnerSettings(");
+      expect(source).not.toContain("questionLanguageLocked");
+      expect(source).toContain("load: (version) => loadRunnerVersionSettings(pool, version, runnerSite");
+      expect(source).toContain(boot);
+    }
+    // The practice's money takes the site rows and the loader's story policy; the loader runs before the money wiring.
+    expect(practiceRunner).toContain("composePracticeRunnerMoney({ pool, environment, costEnvelopePolicy, envelopeBand, storyPolicy, log:");
+    expect(practiceRunner.indexOf(boot)).toBeLessThan(practiceRunner.indexOf("const money = await composePracticeRunnerMoney("));
     const apiMain = flat(API_MAIN);
     const practiceAsk = flat(PRACTICE_ASK);
     for (const source of [apiMain, practiceAsk]) {

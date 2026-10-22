@@ -70,7 +70,8 @@ import {
   resolveScoringOperator,
   type AdaptiveStoppingControls,
   type EngineSettings,
-  type LengthGuidance
+  type LengthGuidance,
+  type StoryPolicy
 } from "@debateai/register";
 import {
   BudgetRepository,
@@ -2724,6 +2725,14 @@ export interface WalkingSkeletonSettings {
    * (ENGINE_RUNNER_UNCONFIGURED otherwise); a run without the member never reads it. Absent: engine 1, today's runner.
    */
   readonly engine?: EngineRunnerSettings | null;
+  /**
+   * Side-by-side spec §13 (S5 adds them, S6 reads them): the debate's own version's story policy (null: the version
+   * sealed no story rows) and its call-lane limits (`perDebate`, `perModelPerDebate`, from its callConcurrencyPolicy
+   * row; absent: one call at a time). Both come from `runnerSettingsOfVersion` (apps/runner/src/run-settings.ts).
+   * Unread until S6; absent: the story writer's boot policy and the scheduler's own limits, today's runner.
+   */
+  readonly storyPolicy?: StoryPolicy | null;
+  readonly callLaneLimits?: Readonly<{ perDebate: number; perModelPerDebate: number }>;
   /**
    * The model, vendor and preview gate each provider ref's calls use (`previewCallSubjects` on the preview,
    * `targetCallSubjects` elsewhere). Read only with `callScheduler`; absent, each ref is its own model behind no gate.
@@ -11931,6 +11940,10 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "PERSON_ALLOWANCE_REACHED",
   "POSITIVE_CAPTURE_REQUIRED",
   "PRESENT_SIGNAL_FRESHNESS_UNKNOWN",
+  "PREVIEW_LINE_UP_ENV_CONFLICT",
+  "PREVIEW_LINE_UP_POLICY_INVALID",
+  "PREVIEW_LINE_UP_REQUIRED",
+  "PREVIEW_LINE_UP_WITHOUT_PREVIEW",
   "PRIVATE_CONTENT_ERASED",
   "PRODUCER_GRADING_FORBIDDEN",
   "PRODUCING_RUN_REQUIRED",

@@ -228,18 +228,29 @@ describe("B9d · readJudgeTokenCeiling", () => {
 
 describe("B9d · both hosted boots run the check, under the new settings only", () => {
   it("the runner, beside the guard it builds, only with the band, one group per plan", async () => {
+    // Side-by-side spec §13: the check is the one per-version settings loader's (apps/runner/src/run-settings.ts), over
+    // the version's own per-run ceiling and the site's day and band, and main.ts boots through that loader with the
+    // site's money row and band, which it reads first.
     const main = await readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8");
-    expect(main).toContain("if (costEnvelopePolicy !== null && envelopeBand !== null) {");
-    expect(main).toContain("assertRunCeilingCoversOneCall({");
-    expect(main).toContain("bodyCeilingMicros: costEnvelopeCeilings(costEnvelopePolicy).bodyMicros,");
-    expect(main).toContain("firstCallsByRoster: firstCallsByPlanRoster({");
-    expect(main).toContain("judgeTokenCeiling: policy.bounds.JUDGE.tokenCeiling,");
-    expect(main).toContain("questionMaxBytes: askQuestionMaxBytes()");
-    expect(main).toContain("rosters: PLAN_TIER_ROSTERS");
+    const loader = await readFile(new URL("../../apps/runner/src/run-settings.ts", import.meta.url), "utf8");
+    expect(loader).toContain("if (siteCostEnvelopePolicy !== null && envelopeBand !== null) {");
+    expect(loader).toContain("assertRunCeilingCoversOneCall({");
+    expect(loader).toContain("const debateEnvelope = composeDebateCostEnvelope(siteCostEnvelopePolicy, await readCostEnvelopePolicy(pool, version));");
+    expect(loader).toContain("bodyCeilingMicros: costEnvelopeCeilings(debateEnvelope).bodyMicros,");
+    expect(loader).toContain("firstCallsByRoster: firstCallsByPlanRoster({");
+    expect(loader).toContain("judgeTokenCeiling: policy.bounds.JUDGE.tokenCeiling,");
+    expect(loader).toContain("questionMaxBytes: askQuestionMaxBytes()");
+    expect(loader).toContain("rosters: PLAN_TIER_ROSTERS");
     // Ruling L-B9R (P2L Task 17): the runner prices the longest lock whenever ANY debateShapePolicy row is present
     // (`debateShape`, read raw before this check: enabled false too); no row, today's price.
-    expect(main).toContain("questionLanguageLocked: debateShape !== null");
-    expect(main.indexOf("questionLanguageLocked: debateShape !== null")).toBeGreaterThan(main.indexOf("const debateShape = await readDebateShapeRunnerSettings("));
+    expect(loader).toContain("questionLanguageLocked: debateShape !== null");
+    expect(loader.indexOf("questionLanguageLocked: debateShape !== null")).toBeGreaterThan(loader.indexOf("const debateShape = await readDebateShapeRunnerSettings("));
+    expect(loader.indexOf("const debateShape = await readDebateShapeRunnerSettings(")).toBeGreaterThan(-1);
+    // main.ts hands the loader the site's row and band (read before it), and no longer runs the check inline.
+    expect(main).toContain("siteCostEnvelopePolicy: costEnvelopePolicy,");
+    expect(main).not.toContain("assertRunCeilingCoversOneCall(");
+    expect(main.indexOf("const siteVersionSettings = await runnerSettings.requireSettings(environment.REGISTER_VERSION);"))
+      .toBeGreaterThan(main.indexOf("const envelopeBand = costEnvelopePolicy === null ? null : costEnvelopeBand(costEnvelopePolicy);"));
   });
 
   it("the API, after its provider targets are read, over the policy row its boot already read, one group per plan", async () => {

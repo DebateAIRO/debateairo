@@ -92,7 +92,7 @@ describe("model scorecard — a provider target declares its thinking levels and
       main.indexOf("const runRepository = new RunRepository(pool);")
     );
     expect(factory).toContain("...providerTargetGatewayControls(target),");
-    expect(factory).toContain("return previewConfig === undefined ? gateway : withPreviewProviderCallPolicy(gateway, previewConfig, target, {\n    busy: previewBusy,\n    onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); },\n    gateRemaining: previewGateRemaining,\n    onFinalWriterTierUnread: previewFinalWriterTierUnread\n  });");
+    expect(factory).toContain("return previewGate === undefined ? gateway : withPreviewProviderCallPolicy(gateway, siteVersionSettings.previewConfig!, target, {\n    busy: previewBusy,\n    onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); },\n    gateRemaining: previewGateRemaining,\n    onFinalWriterTierUnread: previewFinalWriterTierUnread\n  });");
   });
 });
 

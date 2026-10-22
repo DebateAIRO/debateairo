@@ -127,13 +127,15 @@ describe("S2 · both hosted boots hand the check the picker's lists", () => {
   });
 
   it("the runner, asking the sealed scorecard row at its own register version", async () => {
-    const main = await readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8");
-    const block = main.indexOf("if (costEnvelopePolicy !== null && envelopeBand !== null) {");
+    // Side-by-side spec §13: the runner's check is the per-version loader's, at the version it loads (main.ts's boot
+    // loads its site version through it).
+    const loader = await readFile(new URL("../../apps/runner/src/run-settings.ts", import.meta.url), "utf8");
+    const block = loader.indexOf("if (siteCostEnvelopePolicy !== null && envelopeBand !== null) {");
     expect(block).toBeGreaterThan(-1);
-    expect(main.indexOf(
-      "scorecardInForce: (await readModelScorecard(pool, environment.REGISTER_VERSION, await readEngineVersion())).state === \"VALID\","
+    expect(loader.indexOf(
+      "scorecardInForce: (await readModelScorecard(pool, version, await readEngineVersion())).state === \"VALID\","
     )).toBeGreaterThan(block);
-    expect(main).toContain("rosters: firstCallPlanModels({");
-    expect(main).toContain("models: firstCalls.map((call) => call.model)");
+    expect(loader).toContain("rosters: firstCallPlanModels({");
+    expect(loader).toContain("models: firstCalls.map((call) => call.model)");
   });
 });

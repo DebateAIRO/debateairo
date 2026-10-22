@@ -44,15 +44,26 @@ describe("T9 production entry point wiring", () => {
       new URL("../../apps/runner/src/main.ts", import.meta.url),
       "utf8"
     );
-    const policyIndex = source.indexOf("await readDevelopmentRunnerPolicy(pool");
-    const constructionIndex = source.indexOf("new WalkingSkeletonRunner");
-    const wiringIndex = source.indexOf("synthesisRolePolicy: policy.synthesisRolePolicy");
-
+    // Side-by-side spec §13: the policy is read by the one per-version loader and the family is mapped by
+    // runnerSettingsOfVersion (run-settings.ts), after the read; main.ts loads its site version before it constructs
+    // the runner and spreads the mapping into the runner's settings.
+    const loader = await readFile(new URL("../../apps/runner/src/run-settings.ts", import.meta.url), "utf8");
+    const policyIndex = loader.indexOf("await readDevelopmentRunnerPolicy(pool");
+    const mappingIndex = loader.indexOf("export function runnerSettingsOfVersion(");
+    const wiringIndex = loader.indexOf("synthesisRolePolicy: policy.synthesisRolePolicy");
     expect(policyIndex).toBeGreaterThan(-1);
-    expect(constructionIndex).toBeGreaterThan(policyIndex);
-    expect(wiringIndex).toBeGreaterThan(constructionIndex);
+    expect(mappingIndex).toBeGreaterThan(policyIndex);
+    expect(wiringIndex).toBeGreaterThan(mappingIndex);
+
+    const loadIndex = source.indexOf("const siteVersionSettings = await runnerSettings.requireSettings(environment.REGISTER_VERSION);");
+    const constructionIndex = source.indexOf("new WalkingSkeletonRunner");
+    const spreadIndex = source.indexOf("...runnerSettingsOfVersion(siteVersionSettings),");
+    expect(loadIndex).toBeGreaterThan(-1);
+    expect(constructionIndex).toBeGreaterThan(loadIndex);
+    expect(spreadIndex).toBeGreaterThan(constructionIndex);
     // Never assembled at the call site out of parts this file chose.
     expect(source).not.toMatch(/synthesisRolePolicy:\s*\{/u);
+    expect(loader).not.toMatch(/synthesisRolePolicy:\s*\{/u);
   });
 
   /**

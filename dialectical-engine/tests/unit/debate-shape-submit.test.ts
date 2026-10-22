@@ -386,11 +386,13 @@ describe("the boot reads the optional row (note 8) and the practice runner resol
   });
 
   /**
-   * The practice mirrors apps/runner/src/main.ts's boot order (the wiring-drift rule): the sealed envelopes, then the
-   * development runner policy and its prompt fingerprints, THEN the shape. So the scripted pool first answers the
-   * policy step with the code's own development register rows (the dev builders, round-tripped through JSON as the
-   * database hands them back), then answers only the two shape keys; any read after the shape step throws
-   * PRACTICE_TEST_NEXT_READ ("passed on"). The two shape keys are the test's to script, never the builders'.
+   * The practice mirrors apps/runner/src/main.ts's boot order (the wiring-drift rule): the sealed envelopes, the sealed
+   * provider set and the declared targets (side-by-side spec §13: the one settings loader needs them), then, in the
+   * loader, the development runner policy and its prompt fingerprints, the story rows and the preview line-up, THEN the
+   * shape. So the scripted pool first answers the policy step with the code's own development register rows (the dev
+   * builders, round-tripped through JSON as the database hands them back), then answers only the two shape keys; any
+   * read after the shape step throws PRACTICE_TEST_NEXT_READ ("passed on"). The two shape keys are the test's to script,
+   * never the builders'; the environment declares the two practice makers' targets.
    */
   const SHAPE_KEYS = new Set(["debateShapePolicy", "mapContractHash"]);
   async function policyRegister() {
@@ -441,7 +443,10 @@ describe("the boot reads the optional row (note 8) and the practice runner resol
   }
   const compose = (pool: Pool) => composePracticeRunner({
     pool, keepAlivePool: pool, budgetPorts: {} as never, remaining: {} as never,
-    environment: { DEPLOYMENT_MODE: "local", REGISTER_VERSION: 7 } as never
+    environment: { DEPLOYMENT_MODE: "local", REGISTER_VERSION: 7, PROVIDER_DISCOVERY_TARGETS_JSON: JSON.stringify([
+      { provider_ref: "practice-maker-a", base_url: "http://127.0.0.1:9100/v1", model: "practice-model-a" },
+      { provider_ref: "practice-maker-b", base_url: "http://127.0.0.1:9101/v1", model: "practice-model-b" }
+    ]) } as never
   });
 
   it("a valid row without its map hash refuses the practice runner after the two reads; with the code's hash it passes on; a malformed one refuses; no row passes on", async () => {
