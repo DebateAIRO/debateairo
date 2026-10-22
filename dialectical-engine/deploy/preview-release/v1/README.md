@@ -2204,7 +2204,8 @@ product change: a problem in T is fixed forward.
 root with `bash -s`, `set -euo pipefail` first and the names file second (TA0 and TA1 make it), every guard written
 `… || { echo "<STEP>_NOT_DONE: …"; exit 1; }`, the last line `<STEP>_DONE`, and nothing more after a `_NOT_DONE`
 (read the way back and decide with the owner). The scripts print no env value other than `REGISTER_VERSION`,
-`RELEASE_KEY`, `DEBATEAI_DEPLOYMENT_MODE`, `MAIL_SENDMAIL_PATH` and ports. Every trap of that section still holds:
+`RELEASE_KEY`, `DEBATEAI_DEPLOYMENT_MODE`, `MAIL_SENDMAIL_PATH`, `PAYMENT_MARKS_AVAILABLE` (not secret) and ports. Every
+trap of that section still holds:
 - `nat` always exits 0: its line is captured and tested (`OUT=$(nat "$F"); [ "$OUT" = "exit 0" ] || …`), never chained;
 - a pin writes `pinnedAt`, so a lock is compared without the pin times, or not re-pinned at all;
 - the build roster is `all-models`;
@@ -3346,7 +3347,8 @@ check says `DRAINED_PATH` (a migration that is not `n1: expand`) takes "Drained 
 
 **How each step runs.** As in the transition: one script per step, `set -euo pipefail`, the names file (SB1 makes it),
 `<STEP>_NOT_DONE` guards, `<STEP>_DONE` last, no env value printed except `REGISTER_VERSION`, `RELEASE_KEY`,
-`DEBATEAI_DEPLOYMENT_MODE`, `MAIL_SENDMAIL_PATH` and ports. The traps of the transition hold. Two more:
+`DEBATEAI_DEPLOYMENT_MODE`, `MAIL_SENDMAIL_PATH`, `PAYMENT_MARKS_AVAILABLE` (not secret) and ports. The traps of the
+transition hold. Two more:
 - **One switch command at a time.** Each `release-switch.mjs` command takes
   `/etc/debateai-v3-preview/lifecycle/release-switch.lock`; another one meanwhile refuses `RELEASE_SWITCH_BUSY`. A lock
   left by an ssh drop names its path and how to clear it (WB4).
@@ -3375,6 +3377,7 @@ release's prestart verifies with `--database-ahead` and its proof names the file
 | SB5 | the three env files; the database-ahead file | up | nothing to undo (unused files) |
 | SB5b | only when the payment marks list changes: the list in the new release's ui file | up | nothing to undo (an unused file; the one before is in `$S`) |
 | SB6 | the owner's fresh yes | up | – |
+| MT1, PM2, MT2 | only the first upload that lists the marks: Caddy's rule (see "Payment marks: the files and Caddy's rule") | up (one Caddy restart, about a second) | PM2 puts the old Caddyfile back itself |
 | SB7 | the online backup | up | nothing to undo |
 | SB8 | the database-ahead pin, then the migrations (the old release keeps serving) | up | the old release serves on; WB1 once SB10 staged the new one |
 | SB9 | publish | up | WB1 (the version stays published, unused) |
@@ -3631,10 +3634,13 @@ echo SB5_DONE
 The website shows the payment marks its setting `PAYMENT_MARKS_AVAILABLE` names: `netopia`, `visa` and `mastercard`,
 joined by commas (`deploy/vps/README.md` §14.7; NETOPIA's mark always comes first on the page, whatever the order
 here). Each release has its own `ui-<label>.env`, derived from the old release's file in SB5, so once a release's file
-holds the line every later release carries it: SB5b runs only when the list changes, the first time at T+1 ("Payment
-marks: the files and Caddy's rule" below has the order). A release before T+1 refuses the name (its website starter
-lets through only the settings it lists, and stops with `PREVIEW_UI_STARTUP_REFUSED`), so the line never goes into an
-older release's file; that matters on the way back too, which starts the old release from its own file as it is.
+holds the line every later release carries it: SB5b runs only when the list changes, the first time in the first upload
+whose code has these steps (T+1 at the earliest; "Payment marks: the files and Caddy's rule" below has the order). It
+is also needed in the first upload after going back to a release whose ui file has no line: the next upload derives its
+file from that one, so without SB5b the marks would vanish at its switch, with no error. A release before T+1 refuses
+the name (its website starter lets through only the settings it lists, and stops with `PREVIEW_UI_STARTUP_REFUSED`), so
+the line never goes into an older release's file; that matters on the way back too, which starts the old release from
+its own file as it is.
 
 PM1 comes first: every listed mark's file must be in `/etc/debateai-v3-preview/public/payment-marks/` (a listed mark
 without its file shows a broken image). An empty value is refused by the test site's settings reader (every
@@ -3790,7 +3796,8 @@ The three launch plans take the new slot. Each pin adds the new release's entry 
 byte for byte (no re-pin, so no new `pinnedAt`). `release-switch.mjs stage` records the new release STAGED: prestart
 starts nothing of it before that. When SB4's `LIFECYCLE_FILES` said `changed (reviewed)`, the shared operator folder is
 swapped first, so the pins, drop-ins and the stage are written by the tools the new release was reviewed with (the old
-release uses them too from then on; its folder moves to `$S/operator-lifecycle-v1.before`).
+release uses them too from then on; its folder moves to `$S/operator-lifecycle-v1.before`). When the new release's ui
+file names payment marks, SB10 first checks that Caddy serves them (PM2 ran), and stops otherwise with nothing changed.
 
 ```sh
 set -euo pipefail
@@ -3801,6 +3808,7 @@ UD=/etc/systemd/system; OP=/opt/debateai-v3-preview/operator/lifecycle-v1; NEWOP
 V=$(cat "$S/new-register-version")
 cmp -s "$ART/native-plan-publish.json" "$NP" && [ "$(psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1")" = "$V" ] || { echo "SB10_NOT_DONE: SB9 is not done"; exit 1; }
 for F in native-plan-verify.json native-first-verify.json api-launch.json ui-launch.json runner-launch.json; do [ ! -e "$ART/$F" ] || { echo "SB10_NOT_DONE: $F exists (look first)"; exit 1; }; done
+if grep -q '^PAYMENT_MARKS_AVAILABLE=' "$E/ui-$LABEL.env"; then grep -qF '@paymentMarks path /payment-marks/netopia.svg /payment-marks/visa.svg /payment-marks/mastercard.svg' "$C" || { echo "SB10_NOT_DONE: ui-$LABEL.env names payment marks but Caddy does not serve them (PM2 first, or put $S/ui-$LABEL.env.before-marks back); nothing changed"; exit 1; }; fi
 OLDA=$(sed -n 1p "$S/old-plans.txt"); OLDU=$(sed -n 2p "$S/old-plans.txt"); OLDR=$(sed -n 3p "$S/old-plans.txt")
 [ "$OLDA" = "$(jq -r --arg o "$OLABEL" '.releases[$o].services.api.basePlan.path' "$LOCK")" ] && [ "$OLDU" = "$(jq -r --arg o "$OLABEL" '.releases[$o].services.ui.basePlan.path' "$LOCK")" ] && [ "$OLDR" = "$(jq -r --arg o "$OLABEL" '.releases[$o].services.runner.basePlan.path' "$LOCK")" ] || { echo "SB10_NOT_DONE: old-plans.txt is not the old release's three plans"; exit 1; }
 rel native-plan --operation verify --from "$ART/native-plan-publish.json" --publication "$ART/register-published.json" --source-manifest "$ART/candidate-api-source.json" --out "$ART/native-plan-verify.json" || { echo "SB10_NOT_DONE: the release tool refused the verify plan"; exit 1; }
@@ -4225,14 +4233,17 @@ pgrep -f '[r]elease-switch.mjs' || mv /etc/debateai-v3-preview/lifecycle/release
 could not run beside the new database (spec §5's escape hatch). Then the upload goes the old way once more, on the
 template layout: a quiet moment, the old release stopped with nothing open, a cold copy, the migrations, and a switch
 with the old pair already stopped. SB1 to SB4 stand as they are (the names, the staging, the practice, the plan); SB5's
-database-ahead file is not made. To change the payment marks on this path, run SB5b right after DR1.
+database-ahead file is not made. To change the payment marks on this path, run SB5b right after DR1. The first time
+the marks are listed, MT1, PM2 and MT2 ("Payment marks: the files and Caddy's rule") go after DR1 and SB5b, before DR2.
 
 **The owner's yes, fresh in the live chat right before DR2.** It names the downtime, the cold copy, the migrations by
 number (and which one is not expand-only), the publish with its delta hash, and the new commit with its release key.
+When this upload adds the Caddy payment-marks rule, the yes before DR2 names PM2 too, and comes before MT1.
 
 | Step | What | The site | The way back from here |
 |---|---|---|---|
 | DR1 | the three env files | up | nothing to undo |
+| MT1, PM2, MT2 | only the first upload that lists the marks: Caddy's rule (see "Payment marks: the files and Caddy's rule") | up (one Caddy restart, about a second) | PM2 puts the old Caddyfile back itself |
 | DR2 | wait for nothing open or waiting; stop the old website and API, then the old runner (nothing open) and the backup timer | **down** | rbD-A |
 | DR3 | cold copy | down | rbD-A |
 | DR4 | migrations | down | **only the cold copy: rbD-B** |
@@ -4346,7 +4357,8 @@ echo DR4_DONE
 #### DR5. Publish, verify plan, first proof, launch plans, pins, drop-ins, stage
 
 SB9 and SB10 in one step, on a stopped site. The operator folder swap of SB10 applies here too, when SB4 said
-`changed (reviewed)`: run it by hand from SB10 first.
+`changed (reviewed)`: run it by hand from SB10 first. As in SB10, DR5 first checks that Caddy serves the payment marks
+when the new release's ui file names them, and stops otherwise with nothing changed.
 
 ```sh
 set -euo pipefail
@@ -4359,6 +4371,7 @@ UD=/etc/systemd/system; REG0=$(cat "$S/register-before"); VK=${KEY#r}; VK=${VK%%
 cmp -s "$ART/native-plan-apply-and-plan.json" "$NP" || { echo "DR5_NOT_DONE: DR4 is not done"; exit 1; }
 sha256sum -c --quiet "$S/plan-proposal.sha256" && [ "$(jq -r .deltaSha256 "$ART/register-proposal.json")" = "$YES" ] || { echo "DR5_NOT_DONE: the proposal is not the approved one"; exit 1; }
 for F in native-plan-publish.json register-published.json native-plan-verify.json native-first-verify.json api-launch.json ui-launch.json runner-launch.json; do [ ! -e "$ART/$F" ] || { echo "DR5_NOT_DONE: $F exists (look first)"; exit 1; }; done
+if grep -q '^PAYMENT_MARKS_AVAILABLE=' "$E/ui-$LABEL.env"; then grep -qF '@paymentMarks path /payment-marks/netopia.svg /payment-marks/visa.svg /payment-marks/mastercard.svg' "$C" || { echo "DR5_NOT_DONE: ui-$LABEL.env names payment marks but Caddy does not serve them (PM2 first, or put $S/ui-$LABEL.env.before-marks back); nothing changed"; exit 1; }; fi
 OLDA=$(sed -n 1p "$S/old-plans.txt"); OLDU=$(sed -n 2p "$S/old-plans.txt"); OLDR=$(sed -n 3p "$S/old-plans.txt")
 rel native-plan --operation publish --from "$ART/native-plan-plan.json" --proposal "$ART/register-proposal.json" --approved-delta-sha256 "$YES" --source-manifest "$ART/candidate-api-source.json" --out "$ART/native-plan-publish.json" || { echo "DR5_NOT_DONE: the release tool refused the publish plan (nothing published)"; exit 1; }
 put "$ART/native-plan-publish.json" || { echo "DR5_NOT_DONE: put of the publish plan failed (nothing published)"; exit 1; }
@@ -4536,7 +4549,8 @@ PostgreSQL, Hatchet, Caddy and the gates' software are shared by both releases, 
 while no release drains (spec §4): a restart would cut a draining runner's calls. `release-check.mjs maintenance` must
 pass first; the flag `/etc/debateai-v3-preview/lifecycle/maintenance-pending` then exists while the work is planned and
 done (no switch or rollback starts, and the release check says `NO_MAINTENANCE` BAD), and moves into `$S` after. The
-maintenance itself follows its own reviewed steps. Both scripts read the names file of the release that is current now.
+maintenance itself follows its own reviewed steps. Both scripts read the names file of the release that is current now,
+or, for PM2 inside them, the uploading release's (see "Payment marks: the files and Caddy's rule").
 
 ```sh
 set -euo pipefail
@@ -4575,15 +4589,18 @@ terms forbid redistributing their artwork, and a release folder must equal git e
 release, and Caddy serves exactly those three names from there, behind the test-site password. The website shows the
 marks its setting `PAYMENT_MARKS_AVAILABLE` names, in its release's own ui file. Three steps:
 - PM1 copies the files in. It runs any time after SB1, and again whenever a file changes (for example when NETOPIA's
-  logo arrives). It never removes a file. Caddy serves a new file at once, with no restart.
+  logo arrives). It never removes a file. Once PM2's rule is in, Caddy serves a new file at once, with no restart.
 - PM2 adds Caddy's rule, once, inside a maintenance window (MT1 before it, MT2 after it), on the owner's yes.
 - SB5b ("Side-by-side release" above) writes the list into the new release's ui file. The website reads it when it
   starts, so the footer changes with the switch.
 
-**The first time (T+1).** PM1 (any time after SB1) → SB5b → SB6 (the owner's yes names PM2) → MT1, PM2, MT2 → SB7 …
-SB13. All of them run with T+1's names file (SB1's): its `cslots` is T+1's own tool, which knows `add-payment-marks`
-(T's does not; MT1 and MT2 only need its `lc` and `$S`). T's website never shows the marks; T+1's shows them from the
-switch on. **Later**, the rule stays: a change of the list is PM1 and SB5b only, in the next upload.
+**The first time (the first upload whose code has these steps, T+1 at the earliest).** PM1 (any time after SB1) → SB5b →
+SB6 (the owner's yes names PM2) → MT1, PM2, MT2 → SB7 … SB13 (on the drained path: DR1, SB5b, then MT1, PM2, MT2, then
+DR2). All of them run with that upload's names file (SB1's): its `cslots` is that release's own tool, which knows
+`add-payment-marks` (T's does not; MT1 and MT2 only need its `lc` and `$S`). T's website never shows the marks; the new
+release's shows them from the switch on. **Later**, the rule stays: a change of the list is PM1 and SB5b only, in the
+next upload. SB5b is needed again after going back to a release whose ui file has no line (the next upload derives its
+file from that one, so the marks would vanish at its switch, with no error).
 
 #### PM1. The files
 
@@ -4608,7 +4625,7 @@ for M in netopia visa mastercard; do
   [ "$(stat -c '%F %h' "$F")" = "regular file 1" ] || { echo "PM1_NOT_DONE: $F is not a regular file with one link"; exit 1; }
   [ "$(stat -c '%s' "$F")" -le 524288 ] || { echo "PM1_NOT_DONE: $F is larger than 512 KiB"; exit 1; }
   grep -q '<svg' <(head -c 2048 "$F") || { echo "PM1_NOT_DONE: $F has no <svg in its first 2048 bytes"; exit 1; }
-  if grep -qiE '<script|javascript:|<foreignObject|[[:space:]]on[a-z]+=' "$F"; then echo "PM1_NOT_DONE: $F holds a script, a javascript: link, a foreignObject or an on...= handler (ask for a clean file)"; exit 1; fi
+  if grep -qiE '<script|javascript:|<foreignObject|[[:space:]]on[a-z]+[[:space:]]*=' "$F"; then echo "PM1_NOT_DONE: $F holds a script, a javascript: link, a foreignObject or an on...= handler (ask for a clean file)"; exit 1; fi
   FOUND="$FOUND $M"
 done
 [ -n "$FOUND" ] || { echo "PM1_NOT_DONE: none of netopia.svg, visa.svg, mastercard.svg is in $IN"; exit 1; }
@@ -4636,7 +4653,8 @@ The first time only, between MT1 and MT2, after the owner's fresh yes names it (
 add-payment-marks` writes a copy of the live two-slot file into `$S` with only the marks rule added: the three names,
 from root's folder, right before the public route's main proxy (after the readiness refusal and the password). As in
 TB7, the new file goes in with a restart (about one second), never a reload; on any miss the old file goes back and
-Caddy restarts again: the site runs on as before, without the rule.
+Caddy restarts again: the site runs on as before, without the rule. PM2 first checks the site answers 200, and keeps
+its copy of the live file before the tool reads it; it installs nothing if the live file changed meanwhile.
 
 ```sh
 set -euo pipefail
@@ -4647,9 +4665,12 @@ PMD=/etc/debateai-v3-preview/public/payment-marks
 PMJ='["/payment-marks/netopia.svg","/payment-marks/visa.svg","/payment-marks/mastercard.svg"]'
 [ -e /etc/debateai-v3-preview/lifecycle/maintenance-pending ] || { echo "PM2_NOT_DONE: there is no maintenance flag (MT1 first; nothing changed)"; exit 1; }
 grep -q 'add-payment-marks' "$CAPI/dialectical-engine/deploy/preview-release/v1/caddy-slots.mjs" || { echo "PM2_NOT_DONE: this names file's caddy-slots.mjs has no add-payment-marks: use the names file of a release from T+1 on (nothing changed)"; exit 1; }
+EK=$(edgekey); echo "edge 127.0.0.1:3090/readyz before PM2: $EK"
+[ "${EK%% *}" = 200 ] || { echo "PM2_NOT_DONE: the site is not healthy before PM2 (the edge answered $EK, not 200; nothing changed): ask"; exit 1; }
 [ "$(stat -c '%F %U %G %a' "$PMD")" = "directory root root 755" ] && [ "$(realpath "$PMD")" = "$PMD" ] || { echo "PM2_NOT_DONE: $PMD is not root's own 0755 folder (PM1 first; nothing changed)"; exit 1; }
 [ ! -e "$S/Caddyfile.payment-marks" ] && [ ! -e "$S/Caddyfile.before-payment-marks" ] || { echo "PM2_NOT_DONE: $S/Caddyfile.payment-marks or $S/Caddyfile.before-payment-marks exists (PM2 ran before, or a refused run's file stays: look first)"; exit 1; }
 [ "$(stat -c '%a %U' "$C")" = "644 root" ] || { echo "PM2_NOT_DONE: the Caddyfile is not root-owned 0644 (nothing changed)"; exit 1; }
+cp -p "$C" "$S/Caddyfile.before-payment-marks"
 TR=$(cslots add-payment-marks --in "$C" --out "$S/Caddyfile.payment-marks" 2>&1) || { echo "$TR"; echo "PM2_NOT_DONE: the tool refused (reason above; CADDY_ALREADY_PAYMENT_MARKS: the live file mentions payment-marks already, look at it first; nothing changed)"; exit 1; }
 echo "$TR"
 [ "$(jq -r '[.event, .folder, (.files | join(","))] | map(tostring) | join(" ")' <<<"$TR")" = "PREVIEW_CADDY_PAYMENT_MARKS $PMD netopia.svg,visa.svg,mastercard.svg" ] || { echo "PM2_NOT_DONE: the tool did not report the marks rule for $PMD (nothing changed)"; exit 1; }
@@ -4666,8 +4687,8 @@ echo "file servers: $FS; roots: $VR; one route for exactly the three marks: $MR"
 [ "$FS" = 1 ] || { echo "PM2_NOT_DONE: the new file has $FS file servers, not exactly one (nothing changed): ask"; exit 1; }
 [ "$VR" = "$PMD" ] || { echo "PM2_NOT_DONE: the new file serves files from $VR, not only $PMD (nothing changed): ask"; exit 1; }
 [ "$MR" = true ] || { echo "PM2_NOT_DONE: not exactly one route matches exactly the three marks' paths (nothing changed): ask"; exit 1; }
-cp -p "$C" "$S/Caddyfile.before-payment-marks"
 back() { R="is back"; install -o root -g root -m 0644 "$S/Caddyfile.before-payment-marks" "$C.new" && mv "$C.new" "$C" && cmp -s "$S/Caddyfile.before-payment-marks" "$C" || R="did NOT go back (the live file may still be the one with the marks rule)"; systemctl restart caddy || true; CA=$(systemctl is-active caddy || true); echo "PM2_NOT_DONE: $1; the old Caddyfile $R; after its restart Caddy is $CA (active: the site runs as before, without the marks rule; anything else: the site is DOWN, look at caddy now) (ask)"; exit 1; }
+cmp -s "$C" "$S/Caddyfile.before-payment-marks" || { echo "PM2_NOT_DONE: the live Caddyfile changed during PM2 (nothing changed): ask"; exit 1; }
 install -o root -g root -m 0644 "$S/Caddyfile.payment-marks" "$C.new"
 mv "$C.new" "$C"
 systemctl restart caddy || back "caddy did not restart on the new file"
@@ -4686,7 +4707,13 @@ echo "Caddy restarted with the payment-marks rule, checked $(( $(date +%s) - T0 
 echo PM2_DONE
 ```
 
+If PM2 stops, do not go on to SB7 (or DR2) with the list in place: run PM2 again once the cause is fixed (a stopped
+run leaves its copies `$S/Caddyfile.before-payment-marks` and `$S/Caddyfile.payment-marks`: move them aside first), or
+put `$S/ui-$LABEL.env.before-marks` back as `ui-$LABEL.env`. SB10 and DR5 refuse to go on while the ui file names marks
+that Caddy does not serve.
+
 Then MT2. In the browser, with the test-site password, open `https://v3-preview.dezbatere.ro/payment-marks/visa.svg`:
-the mark shows (one PM1 copied in). `https://v3-preview.dezbatere.ro/payment-marks/amex.svg` answers 404 from the
-website: any other path under `/payment-marks/` goes on to the website as before. The footer shows the marks only
-from the switch to a release whose ui file names them (SB5b).
+the mark shows (one PM1 copied in). If it does not show, stop here, before SB7 (or DR2), and ask.
+`https://v3-preview.dezbatere.ro/payment-marks/amex.svg` answers 404 from the website: any other path under
+`/payment-marks/` goes on to the website as before. The footer shows the marks only from the switch to a release whose
+ui file names them (SB5b).

@@ -325,6 +325,16 @@ describe('the preview release guide: transition T, side by side, the way back, t
     expect(flag).toBeGreaterThan(-1);
     expect(knows).toBeGreaterThan(flag);
     expect(run).toBeGreaterThan(knows);
+    // Before anything changes, the site answers 200 at the edge.
+    const healthy = pm2.findIndex(line => line.startsWith('[ "${EK%% *}" = 200 ] || {') && line.includes('PM2_NOT_DONE: the site is not healthy before PM2'));
+    expect(pm2[healthy - 1]).toMatch(/^EK=\$\(edgekey\); /);
+    expect(healthy).toBeGreaterThan(knows);
+    // The copy of the live file is taken before the tool reads it, after the guard that no earlier copy exists.
+    const fresh = pm2.findIndex(line => line.startsWith('[ ! -e "$S/Caddyfile.payment-marks" ] && [ ! -e "$S/Caddyfile.before-payment-marks" ] ||'));
+    const copy = pm2.findIndex(line => line.startsWith('cp -p "$C" "$S/Caddyfile.before-payment-marks"'));
+    expect(healthy).toBeLessThan(fresh);
+    expect(fresh).toBeLessThan(copy);
+    expect(copy).toBeLessThan(run);
     // The refusal never claims the rule is in place: the live file merely mentions payment-marks.
     expect(pm2[run]).toContain('CADDY_ALREADY_PAYMENT_MARKS: the live file mentions payment-marks already');
     // The handler order leaves out exactly the marks route, with TA-caddy's filter; one route serves the three paths.
@@ -339,8 +349,10 @@ describe('the preview release guide: transition T, side by side, the way back, t
     expect(pm2[back]!.indexOf(restoreLine)).toBeLessThan(pm2[back]!.indexOf('systemctl restart caddy'));
     expect(pm2[back]!.indexOf('systemctl restart caddy')).toBeLessThan(pm2[back]!.indexOf('PM2_NOT_DONE'));
     const install = pm2.findIndex(line => line.startsWith('install -o root -g root -m 0644 "$S/Caddyfile.payment-marks" "$C.new"'));
-    expect(pm2.findIndex(line => line.startsWith('cp -p "$C" "$S/Caddyfile.before-payment-marks"'))).toBeLessThan(install);
+    expect(copy).toBeLessThan(install);
     expect(run).toBeLessThan(install);
+    // Right before the install: the live file is still the copy back() restores, or nothing is installed.
+    expect(pm2[install - 1]).toBe('cmp -s "$C" "$S/Caddyfile.before-payment-marks" || { echo "PM2_NOT_DONE: the live Caddyfile changed during PM2 (nothing changed): ask"; exit 1; }');
     expect(back).toBeLessThan(install);
     const afterInstall = pm2.slice(install, -1);
     expect(afterInstall.filter(line => / \|\| back /.test(line)).length).toBeGreaterThanOrEqual(7);
@@ -355,11 +367,46 @@ describe('the preview release guide: transition T, side by side, the way back, t
     // The owner's yes names PM2, and the first time runs it between MT1 and MT2.
     expect(sectionOf(guide, sideBySide.split('\n').find(line => line.startsWith('### SB6. '))!)).toContain('- the Caddy payment-marks rule (PM2), when this upload adds it.');
     expect(sectionOf(guide, PAYMENT_MARKS)).toMatch(/MT1, PM2, MT2/);
+    // The order table has the marks window after the yes, and a stopped PM2 never lets the list reach SB7.
+    const row = '| MT1, PM2, MT2 | only the first upload that lists the marks: Caddy\'s rule (see "Payment marks: the files and Caddy\'s rule") | up (one Caddy restart, about a second) | PM2 puts the old Caddyfile back itself |';
+    const table = sideBySide.split('\n');
+    expect(table.indexOf(row)).toBe(table.findIndex(line => line.startsWith('| SB6 |')) + 1);
+    expect(sectionOf(guide, PAYMENT_MARKS).replace(/\s+/g, ' ')).toContain('If PM2 stops, do not go on to SB7 (or DR2) with the list in place: run PM2 again once the cause is fixed');
+    expect(sectionOf(guide, PAYMENT_MARKS).replace(/\s+/g, ' ')).toContain('If it does not show, stop here, before SB7 (or DR2), and ask.');
+  });
+
+  it('SB10 and DR5 make no launch plan while the ui file names marks that Caddy does not serve', async () => {
+    const { PAYMENT_MARKS: MARKS } = await import('../../deploy/' + 'preview-release/v1/caddy-slots.mjs');
+    const matcher = `@paymentMarks path ${MARKS.files.map((file: string) => `/payment-marks/${file}`).join(' ')}`;
+    expect(read('deploy/preview-release/v1/caddy-slots.mjs')).toContain('`@paymentMarks path ${');
+    for (const step of ['SB10', 'DR5']) {
+      const lines = scriptOf(step).lines;
+      const guard = `if grep -q '^PAYMENT_MARKS_AVAILABLE=' "$E/ui-$LABEL.env"; then grep -qF '${matcher}' "$C" || { echo "${step}_NOT_DONE: ui-$LABEL.env names payment marks but Caddy does not serve them (PM2 first, or put $S/ui-$LABEL.env.before-marks back); nothing changed"; exit 1; }; fi`;
+      const at = lines.indexOf(guard);
+      expect(at, step).toBeGreaterThan(-1);
+      const firstPlan = lines.findIndex(line => line.startsWith('rel launch-plan '));
+      expect(firstPlan, step).toBeGreaterThan(at);
+      // Before anything changes: no put, publish, pin or stage comes before it.
+      for (const line of lines.slice(0, at).filter(code)) expect(line, `${step}: ${line}`).not.toMatch(/^(rel |put |OUT=|PIN=|SG=)/);
+    }
+    // The guard reads the line through bash: a ui file with the list and a Caddyfile without the rule stops, and
+    // either a Caddyfile with the rule or a ui file without the list goes on.
+    const guard = scriptOf('SB10').lines.find(line => line.startsWith("if grep -q '^PAYMENT_MARKS_AVAILABLE='"))!;
+    const dir = mkdtempSync(join(tmpdir(), 'guide-marks-guard-'));
+    try {
+      const run = (ui: string, caddy: string) => {
+        writeFileSync(join(dir, 'ui-rX.env'), ui); writeFileSync(join(dir, 'Caddyfile'), caddy);
+        try { return execFileSync('bash', ['-c', ['set -euo pipefail', `E='${dir}'; C='${dir}/Caddyfile'; S='${dir}'; LABEL=rX`, guard, 'echo GUARD_OK'].join('\n')], { encoding: 'utf8' }).trim(); } catch (error) { return String((error as { stdout?: string }).stdout ?? '').trim(); }
+      };
+      expect(run('PORT=3200\nPAYMENT_MARKS_AVAILABLE=visa\n', 'v3-preview.dezbatere.ro {\n}\n')).toMatch(/^SB10_NOT_DONE: /);
+      expect(run('PORT=3200\nPAYMENT_MARKS_AVAILABLE=visa\n', `v3-preview.dezbatere.ro {\n\t${matcher}\n}\n`)).toBe('GUARD_OK');
+      expect(run('PORT=3200\n', 'v3-preview.dezbatere.ro {\n}\n')).toBe('GUARD_OK');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
   it('PM1 copies only an SVG with no script in it, and its marks list is built without ending the script', () => {
     const pm1 = scriptOf('PM1').lines;
-    const unsafe = pm1.find(line => line.trimStart().startsWith("if grep -qiE '<script|javascript:|<foreignObject|[[:space:]]on[a-z]+=' \"$F\"; then echo \"PM1_NOT_DONE: "))!;
+    const unsafe = pm1.find(line => line.trimStart().startsWith("if grep -qiE '<script|javascript:|<foreignObject|[[:space:]]on[a-z]+[[:space:]]*=' \"$F\"; then echo \"PM1_NOT_DONE: "))!;
     expect(unsafe).toBeDefined();
     // `[ … ] && printf` inside $(…) ends a set -e script when the test is false: the list is built with an if.
     for (const line of pm1.filter(code)) expect(line, line).not.toMatch(/\$\([^)]*\] && printf/);
@@ -372,6 +419,8 @@ describe('the preview release guide: transition T, side by side, the way back, t
       };
       expect(check('<svg xmlns="http://www.w3.org/2000/svg"/>')).toBe('SVG_OK');
       for (const bad of ['<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>', '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>',
+        // XML allows spaces around `=`: the handler is still refused.
+        '<svg xmlns="http://www.w3.org/2000/svg" onload = "alert(1)"/>',
         '<svg xmlns="http://www.w3.org/2000/svg"><a href="JavaScript:alert(1)"/></svg>', '<svg xmlns="http://www.w3.org/2000/svg"><foreignObject/></svg>']) expect(check(bad), bad).toMatch(/^PM1_NOT_DONE: /);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
