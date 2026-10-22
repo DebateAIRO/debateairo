@@ -9,8 +9,9 @@ import { join, posix, resolve } from 'node:path';
 const caddySlots = await import('../../deploy/' + 'preview-release/v1/caddy-slots.mjs');
 const plans = await import('../../deploy/' + 'preview-auth-dev/v1/launch-plan.mjs');
 
-const { EDGE_LISTENER, SLOT_UPSTREAMS, PUBLIC_READYZ_REFUSAL, main } = caddySlots;
+const { EDGE_LISTENER, SLOT_UPSTREAMS, PUBLIC_READYZ_REFUSAL, PAYMENT_MARKS, main } = caddySlots;
 const transformCaddyfile = caddySlots.transformCaddyfile as (liveText: unknown) => string;
+const addPaymentMarks = caddySlots.addPaymentMarks as (liveText: unknown) => string;
 const PREVIEW_SLOTS = plans.PREVIEW_SLOTS as Readonly<Record<'A' | 'B', Readonly<{ uiPort: string; apiPort: string }>>>;
 const me = { uid: process.getuid!(), gid: process.getgid!() };
 
@@ -307,6 +308,96 @@ describe('transformCaddyfile', () => {
   });
 });
 
+/** The payment marks rule as add-payment-marks writes it into a tab file whose main proxy sits at two tabs (README §14.7). */
+const MARKS_LINES = [
+  '\t\t# The payment marks (NETOPIA, Visa, Mastercard; README §14.7): root\'s own files, outside every release, served by Caddy behind the password.',
+  '\t\t@paymentMarks path /payment-marks/netopia.svg /payment-marks/visa.svg /payment-marks/mastercard.svg',
+  '\t\thandle @paymentMarks {',
+  '\t\t\troot * /etc/debateai-v3-preview/public/payment-marks',
+  '\t\t\turi strip_prefix /payment-marks',
+  '\t\t\theader Content-Type image/svg+xml',
+  '\t\t\theader Content-Security-Policy "default-src \'none\'; style-src \'unsafe-inline\'; sandbox"',
+  '\t\t\theader X-Content-Type-Options nosniff',
+  '\t\t\tfile_server',
+  '\t\t}'
+];
+const MAIN_PROXY_LINE = '\t\treverse_proxy 127.0.0.1:3100 127.0.0.1:3200 {';
+const blockOf = (text: string, opening: string) => { const lines = text.split('\n'); return blockAt(lines, lines.indexOf(opening)); };
+
+describe('addPaymentMarks (the live two-slot file, after the transition upload T)', () => {
+  it('add-payment-marks adds only the marks rule, right before the main proxy and after the password', () => {
+    const out = addPaymentMarks(once);
+    expect(diffLines(once, out)).toEqual({ removed: [], added: MARKS_LINES });
+    const route = blockAt(blockOf(out, 'v3-preview.dezbatere.ro {'), blockOf(out, 'v3-preview.dezbatere.ro {').indexOf('\troute {'));
+    const rule = route.indexOf(MARKS_LINES[0]!);
+    // In a `route` Caddy runs the directives as written: the readiness refusal and the password come first.
+    expect(route.slice(rule, rule + MARKS_LINES.length + 1)).toEqual([...MARKS_LINES, MAIN_PROXY_LINE]);
+    expect(rule).toBeGreaterThan(route.indexOf('\t\tbasic_auth {'));
+    expect(rule).toBeGreaterThan(route.indexOf(PUBLIC_READYZ_LINES[1]));
+    expect(out.split('\n').filter(line => line.includes('@paymentMarks path'))).toHaveLength(1);
+    // The notify handle and the loopback listener (both holding two-slot proxies too) are untouched.
+    expect(blockOf(out, '\t\thandle @netopia_notify {')).toEqual(blockOf(once, '\t\thandle @netopia_notify {'));
+    expect(blockOf(out, '\t\thandle @netopia_notify {').join('\n')).not.toContain('payment-marks');
+    expect(out.slice(out.indexOf(':3090 {'))).toBe(once.slice(once.indexOf(':3090 {')));
+  });
+
+  it('serves exactly the three names from the marks folder itself', () => {
+    expect(PAYMENT_MARKS).toEqual({ folder: '/etc/debateai-v3-preview/public/payment-marks', files: ['netopia.svg', 'visa.svg', 'mastercard.svg'] });
+    expect(Object.isFrozen(PAYMENT_MARKS) && Object.isFrozen(PAYMENT_MARKS.files)).toBe(true);
+    const out = addPaymentMarks(once), lines = out.split('\n');
+    const matcher = lines.filter(line => line.trim().startsWith('@paymentMarks '));
+    expect(matcher).toHaveLength(1);
+    const [name, kind, ...paths] = matcher[0]!.trim().split(' ');
+    expect([name, kind]).toEqual(['@paymentMarks', 'path']);
+    // Exact paths only (no `*`, no prefix): Caddy's path matcher then takes nothing but these three requests.
+    expect(paths).toEqual(PAYMENT_MARKS.files.map((file: string) => `/payment-marks/${file}`));
+    expect(matcher[0]).not.toContain('*');
+    for (const asked of ['/payment-marks/', '/payment-marks/x.svg', '/payment-marks/../Caddyfile', '/payment-marks/visa.svg/', '/payment-marks', '/payment-marks/VISA.svg.bak']) {
+      expect([asked, paths.includes(posix.normalize(asked))]).toEqual([asked, false]);
+    }
+    const rule = blockOf(out, '\t\thandle @paymentMarks {').map(line => line.trim());
+    // The root is the marks folder itself (never its parent), so the stripped name is looked up inside it.
+    expect(rule.filter(line => line.startsWith('root '))).toEqual([`root * ${PAYMENT_MARKS.folder}`]);
+    expect(rule.filter(line => line.startsWith('file_server'))).toEqual(['file_server']);
+    expect(out).not.toContain('browse');
+    expect(rule).toEqual(expect.arrayContaining(['header Content-Type image/svg+xml', 'header X-Content-Type-Options nosniff',
+      'header Content-Security-Policy "default-src \'none\'; style-src \'unsafe-inline\'; sandbox"']));
+  });
+
+  it('follows the file\'s own indentation', () => {
+    const fourSpaces = (text: string) => text.replace(/^\t+/gm, tabs => '    '.repeat(tabs.length));
+    const spaced = fourSpaces(once);
+    const out = addPaymentMarks(spaced);
+    expect(diffLines(spaced, out)).toEqual({ removed: [], added: MARKS_LINES.map(fourSpaces) });
+    expect(out).toBe(fourSpaces(addPaymentMarks(once)));
+  });
+
+  it('refuses a one-slot file, a second run, and a file it was not written for', () => {
+    expect(() => addPaymentMarks(LIVE_PREVIEW)).toThrow('CADDY_NOT_TWO_SLOTS');
+    expect(() => addPaymentMarks(once.replace(/^[ \t]*import debateai_slots\n/gm, ''))).toThrow('CADDY_NOT_TWO_SLOTS');
+    expect(() => addPaymentMarks(once.replaceAll(' 127.0.0.1:3200', ''))).toThrow('CADDY_NOT_TWO_SLOTS');
+    expect(() => addPaymentMarks(addPaymentMarks(once))).toThrow('CADDY_ALREADY_PAYMENT_MARKS');
+    expect(() => addPaymentMarks(once.replace('\t\t\t-Server\n', '\t\t\t-Server\n\t\t\t# payment-marks: later\n'))).toThrow('CADDY_ALREADY_PAYMENT_MARKS');
+    const refusal = `${PUBLIC_READYZ_LINES[1]}\n`;
+    for (const text of [
+      once.replace(refusal, ''),
+      once.replace(refusal, refusal + refusal),
+      once.replace('\tadmin off\n', ''),
+      // A second proxy (or none) at the main route's own top level: no single place for the rule (the leading newline
+      // keeps the notify handle's deeper proxy line, which contains the main one's text, out of the change).
+      once.replace(`\n${MAIN_PROXY_LINE}\n`, `\n\t\treverse_proxy 127.0.0.1:3100 127.0.0.1:3200\n${MAIN_PROXY_LINE}\n`),
+      once.replace(`\n${MAIN_PROXY_LINE}\n`, '\n\t\thandle {\n'),
+      // No password before the main proxy: the marks are served behind the password or not at all.
+      once.replace('\t\tbasic_auth {\n\t\t\t{$PREVIEW_BASIC_AUTH_USER} {$PREVIEW_BASIC_AUTH_HASH}\n\t\t}\n', ''),
+      42
+    ]) {
+      // Every change really happened (a replace that finds nothing would test the good file).
+      expect(text).not.toBe(once);
+      expect(() => addPaymentMarks(text)).toThrow('CADDY_SHAPE_REFUSED');
+    }
+  });
+});
+
 describe('caddy-slots.mjs (root CLI)', () => {
   const roots: string[] = [];
   afterAll(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -390,6 +481,43 @@ describe('caddy-slots.mjs (root CLI)', () => {
     for (const actor of [{ ...ROOT_ACTOR, uid: 1000 }, { ...ROOT_ACTOR, platform: 'darwin' }, { ...ROOT_ACTOR, version: 'v24.0.0' }, { ...ROOT_ACTOR, env: { PATH: '/usr/bin', HOME: '/root' } }]) {
       expect(reason(await run(['transform', '--in', live, '--out', out], actor))).toBe('ACTOR_REFUSED');
     }
+    expect(existsSync(out)).toBe(false);
+  });
+
+  it('add-payment-marks on the command line: one JSON line, a new 0644 file read back, never the live file', async () => {
+    const { live, out, run } = setup(once);
+    const result = await run(['add-payment-marks', '--in', live, '--out', out]);
+    expect(result).toEqual({ code: 0, stderr: '', stdout: `${JSON.stringify({ event: 'PREVIEW_CADDY_PAYMENT_MARKS', folder: '/etc/debateai-v3-preview/public/payment-marks', files: ['netopia.svg', 'visa.svg', 'mastercard.svg'] })}\n` });
+    expect(readFileSync(out, 'utf8')).toBe(addPaymentMarks(once));
+    expect(statSync(out).mode & 0o777).toBe(0o644);
+    expect(readFileSync(live, 'utf8')).toBe(once);
+    // An output already there is refused and kept; the live file as its own output is the same case.
+    expect(reason(await run(['add-payment-marks', '--in', live, '--out', out]))).toBe('OUTPUT_EXISTS');
+    expect(readFileSync(out, 'utf8')).toBe(addPaymentMarks(once));
+    expect(reason(await run(['add-payment-marks', '--in', live, '--out', live]))).toBe('OUTPUT_EXISTS');
+    expect(readFileSync(live, 'utf8')).toBe(once);
+    // A one-slot file, a second run or a file without the readiness refusal: refused, and nothing is written.
+    for (const [text, code] of [[LIVE_PREVIEW, 'CADDY_NOT_TWO_SLOTS'], [addPaymentMarks(once), 'CADDY_ALREADY_PAYMENT_MARKS'], [once.replace(`${PUBLIC_READYZ_LINES[1]}\n`, ''), 'CADDY_SHAPE_REFUSED']] as const) {
+      const other = setup(text);
+      const refused = await other.run(['add-payment-marks', '--in', other.live, '--out', other.out]);
+      expect(refused).toEqual({ code: 1, stdout: '', stderr: `${JSON.stringify({ event: 'PREVIEW_CADDY_REFUSED', reason: code })}\n` });
+      expect(existsSync(other.out)).toBe(false);
+    }
+    // A short write is read back and refused, the same as for transform.
+    const short = async (path: string, bytes: Buffer) => { writeFileSync(path, bytes.subarray(0, bytes.length - 2), { flag: 'wx', mode: 0o644 }); chmodSync(path, 0o644); };
+    const third = setup(once);
+    expect(reason(await third.run(['add-payment-marks', '--in', third.live, '--out', third.out], ROOT_ACTOR, { write: short }))).toBe('OUTPUT_READBACK_REFUSED');
+  });
+
+  it('add-payment-marks refuses wrong arguments, and (arguments first) anyone but root', async () => {
+    const { live, out, run } = setup(once);
+    for (const argv of [['add-payment-marks'], ['add-payment-marks', '--in', live], ['add-payment-marks', '--in', live, '--out', out, '--out', out],
+      ['add-payment-marks', '--in', 'Caddyfile', '--out', out], ['add-payment-marks', '--out', out, '--x', live], ['add-payment-marks', '--in', live, '--in', out]]) {
+      expect(reason(await run(argv))).toBe('ARGUMENTS_REFUSED');
+    }
+    // Wrong arguments are refused as such even for a refused actor (the guide test hands every call to main that way).
+    expect(reason(await run(['add-payment-marks', '--in', live], { ...ROOT_ACTOR, uid: 1000 }))).toBe('ARGUMENTS_REFUSED');
+    expect(reason(await run(['add-payment-marks', '--in', live, '--out', out], { ...ROOT_ACTOR, uid: 1000 }))).toBe('ACTOR_REFUSED');
     expect(existsSync(out)).toBe(false);
   });
 });
