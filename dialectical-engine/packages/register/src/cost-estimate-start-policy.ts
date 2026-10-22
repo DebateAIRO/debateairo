@@ -11,7 +11,7 @@ import type { Pool } from "pg";
  * limit" and every premium Plus ask (day allowance $1.00) ran on the Free AIs. The owner ruled:
  *  - `min_samples`: the history needed before the sample is trusted (5; at most the sample size, 20);
  *  - `start_micros_by_depth`: until then, the estimate is this figure for the ask's depth (depth 1 $0.30, depth 2
- *    $0.60, depth 3 $1.00), still capped at the run's maximum; a depth without a figure (4, 5) answers the maximum.
+ *    $0.60, depth 3 $1.00), still capped at the run's maximum; a depth without a figure (the deepest ones today) answers the maximum.
  *    One figure for every plan and line-up (the careful side for smaller line-ups). Measured: a depth-1 debate of five
  *    AIs with its story cost $0.25 (R19 practice).
  * Money in USD micro-units, named on the row as costEnvelopePolicy names them.
@@ -36,7 +36,7 @@ const costEstimateStartPolicyValueSchema = z.object({
   currency: z.literal("USD"),
   minor_units_per_unit: z.literal(1_000_000),
   min_samples: z.number().int().min(1).max(MAX_SAMPLES),
-  /** Keyed by the debate's depth as text ("1" … "5", the contract's EXPANSION_DEPTH range); each key optional. */
+  /** Keyed by the debate's depth as text (the contract's EXPANSION_DEPTH range); each key optional. */
   start_micros_by_depth: z.object({
     "1": figure.optional(),
     "2": figure.optional(),
@@ -81,7 +81,7 @@ export async function readCostEstimateStartPolicy(
 
 export const COST_ESTIMATE_START_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
   rowKey: COST_ESTIMATE_START_POLICY_ROW_KEY,
-  sourceRef: "owner rulings 2026-10-22 (fresh-site estimate): trust the sample from 5 settled runs of a class; until"
+  sourceRef: "owner rulings 2026-10-22 (fresh-site estimate): trust the sample from five settled runs of a class; until"
     + " then depth 1 $0.30, depth 2 $0.60, depth 3 $1.00, capped at the run's maximum; measured depth-1 five-AI debate"
     + " with story $0.25 (R19 practice)",
   value: Object.freeze({
