@@ -2325,6 +2325,8 @@ case "$(stat -c '%a %U' "$EDGE")" in "600 root"|"640 root") ;; *) echo "TA0_NOT_
 # The boot target's drop-in folder is shared: the Anthropic gate's 50-anthropic-gate.conf lives there (README-anthropic.md,
 # "Switch it on"). Only the switch's own file must not exist yet; the folder and the gate's file stay as they are.
 [ ! -e /etc/systemd/system/debateai-preview.target.d/60-current-release.conf ] || { echo "TA0_NOT_DONE: debateai-preview.target.d/60-current-release.conf exists already (look first)"; exit 1; }
+# The switch's writer (release-switch.mjs, ensureDirectory) writes that file only into a root-owned 0755 folder that is no link.
+[ "$(stat -c '%F %U %a' /etc/systemd/system/debateai-preview.target.d)" = "directory root 755" ] && [ "$(realpath /etc/systemd/system/debateai-preview.target.d)" = /etc/systemd/system/debateai-preview.target.d ] || { echo "TA0_NOT_DONE: the boot target's drop-in folder is not root 0755 (the switch's writer refuses it): ask"; exit 1; }
 CF=$(psqlq "SHOW config_file") || { echo "TA0_NOT_DONE: SHOW config_file is unreadable (nothing written yet)"; exit 1; }
 case "$CF" in /etc/debateai-v3-preview/postgresql/*) ;; *) echo "TA0_NOT_DONE: the PostgreSQL config is not under /etc/debateai-v3-preview/postgresql (the cold copy would not hold it): ask"; exit 1;; esac
 [ "$(psqlq "SHOW max_connections")" = 200 ] && [ "$(psqlq "SELECT sourcefile FROM pg_settings WHERE name = 'max_connections'")" = "$CF" ] && [ "$(grep -cE '^[[:space:]]*max_connections[[:space:]]*=' "$CF")" = 1 ] && [ "$(grep -cE '^max_connections = 200([^0-9]|$)' "$CF")" = 1 ] || { echo "TA0_NOT_DONE: max_connections is not set by exactly one line 'max_connections = 200' of $CF (TB2 changes that one line): ask"; exit 1; }
@@ -2355,10 +2357,10 @@ RAPI=$(jq -r .services.api.sourceRoot "$LOCK")
 # The boot target: TB5 replaces the file with T's copy (no fixed API or website). A line of the live file that R19's own
 # copy does not have (a Wants= added by hand) would be lost there: ask first. The drop-ins in debateai-preview.target.d stay.
 LT=/etc/systemd/system/debateai-preview.target; RT=$RAPI/dialectical-engine/deploy/preview-lifecycle/v1/systemd/debateai-preview.target
-[ -f "$LT" ] && [ -f "$RT" ] || { echo "TA0_NOT_DONE: the live debateai-preview.target or R19's copy of it is missing: ask"; exit 1; }
+[ -f "$LT" ] && [ -f "$RT" ] || { echo "TA0_NOT_DONE: the live debateai-preview.target or R19's copy of it is missing: ask ($P exists: move it aside)"; exit 1; }
 unitlines() { grep -vE '^[[:space:]]*(#|$)' "$1" | LC_ALL=C sort -u; }
 XT=$(LC_ALL=C comm -13 <(unitlines "$RT") <(unitlines "$LT"))
-[ -z "$XT" ] || { echo "$XT"; echo "TA0_NOT_DONE: the live debateai-preview.target has a line R19's copy does not (above); TB5 replaces the file with T's and would lose it: ask"; exit 1; }
+[ -z "$XT" ] || { echo "$XT"; echo "TA0_NOT_DONE: the live debateai-preview.target has a line R19's copy does not (above); TB5 replaces the file with T's and would lose it: ask ($P exists: move it aside)"; exit 1; }
 echo "lines of R19's boot target the live one lacks (T's copy has them, except the fixed API and website): $(LC_ALL=C comm -23 <(unitlines "$RT") <(unitlines "$LT") | tr '\n' ';')"
 cp -p "$LT" "$P/debateai-preview.target.live"
 echo "boot target drop-ins (they stay): $(find /etc/systemd/system/debateai-preview.target.d -maxdepth 1 -name '*.conf' -printf '%f ' 2>/dev/null || true)" | tee "$P/target-dropins"
@@ -2502,7 +2504,7 @@ cp -p "$LOCK" "$S/release-lock.before.json"
 cp -a "$ONP" "$S/native-plan.before.json"
 jq -r '.services.api.basePlan.path, .services.ui.basePlan.path, .services.runner.basePlan.path' "$LOCK" > "$S/old-plans.txt"
 # The debateai-preview-* glob does not match debateai-preview.target: the boot target and its drop-in folder (the gate's) are named.
-( cd /etc/systemd/system && tar -czf "$S/systemd-before.tgz" debateai-preview-* debateai-preview.target debateai-preview.target.d ) || { echo "TA1_NOT_DONE: the copy of the systemd files failed (the boot target or its drop-in folder is missing?): ask"; exit 1; }
+( cd /etc/systemd/system && tar -czf "$S/systemd-before.tgz" debateai-preview-* debateai-preview.target debateai-preview.target.d ) || { echo "TA1_NOT_DONE: the copy of the systemd files failed (the boot target or its drop-in folder is missing?): ask (the names file and S exist: move them aside before running TA1 again)"; exit 1; }
 psqlq "SELECT count(*)||'|'||max(name) FROM public.debateai_schema_migration" > "$S/ledger-before"
 psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1" > "$S/register-before"
 mv "$P" "$S/preflight"
@@ -3175,8 +3177,7 @@ standing order: latest dev first, push, PR to dev, fix CI, merge), fill in the t
 NN=rNN; REV='<the 40-character commit of T, the release that is now live>'; LABEL='<its label, from the names file>'
 git fetch origin dev && git switch -c "chore/n1-baseline-$NN" origin/dev
 jq --arg c "$REV" --arg r "$LABEL" '.commit = $c | .reason = $r' dialectical-engine/tests/n1-baseline.json > "$TMPDIR/n1-baseline.json" && mv "$TMPDIR/n1-baseline.json" dialectical-engine/tests/n1-baseline.json
-[ "$(node dialectical-engine/tools/n1-baseline.mjs commit)" = "$REV" ] && git diff --stat
-git add dialectical-engine/tests/n1-baseline.json && git commit -m "chore(n1): the N-1 baseline names $LABEL ($NN)"
+[ "$(node dialectical-engine/tools/n1-baseline.mjs commit)" = "$REV" ] && git diff --stat && git add dialectical-engine/tests/n1-baseline.json && git commit -m "chore(n1): the N-1 baseline names $LABEL ($NN)"
 git push -u origin "chore/n1-baseline-$NN" && gh pr create --base dev --title "chore(n1): the N-1 baseline names $LABEL" --body "tests/n1-baseline.json names $REV, the release live on the test site, so the N-1 compatibility job checks that commit's database suites on every later schema."
 ```
 
@@ -3939,8 +3940,7 @@ standing order: latest dev first, push, PR to dev, fix CI, merge), fill in the t
 NN=rNN; REV='<the 40-character commit of the release that is now live>'; LABEL='<its label, from the names file>'
 git fetch origin dev && git switch -c "chore/n1-baseline-$NN" origin/dev
 jq --arg c "$REV" --arg r "$LABEL" '.commit = $c | .reason = $r' dialectical-engine/tests/n1-baseline.json > "$TMPDIR/n1-baseline.json" && mv "$TMPDIR/n1-baseline.json" dialectical-engine/tests/n1-baseline.json
-[ "$(node dialectical-engine/tools/n1-baseline.mjs commit)" = "$REV" ] && git diff --stat
-git add dialectical-engine/tests/n1-baseline.json && git commit -m "chore(n1): the N-1 baseline names $LABEL ($NN)"
+[ "$(node dialectical-engine/tools/n1-baseline.mjs commit)" = "$REV" ] && git diff --stat && git add dialectical-engine/tests/n1-baseline.json && git commit -m "chore(n1): the N-1 baseline names $LABEL ($NN)"
 git push -u origin "chore/n1-baseline-$NN" && gh pr create --base dev --title "chore(n1): the N-1 baseline names $LABEL" --body "tests/n1-baseline.json names $REV, the release live on the test site, so the N-1 compatibility job checks that commit's database suites on every later schema."
 ```
 

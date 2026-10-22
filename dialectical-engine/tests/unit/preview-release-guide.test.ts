@@ -224,6 +224,10 @@ describe('the preview release guide: transition T, side by side, the way back, t
       expect(section).toContain('git push -u origin "chore/n1-baseline-$NN" && gh pr create --base dev');
       // On the Mac: not a server script (no names file, no step guards).
       expect(section).not.toMatch(/_NOT_DONE|_DONE\b|rNN-names\.sh/);
+      // Integration M10: a failed read-back never commits (the commit is chained to it, never on a line of its own).
+      expect(section).toContain('[ "$(node dialectical-engine/tools/n1-baseline.mjs commit)" = "$REV" ] && git diff --stat'
+        + ' && git add dialectical-engine/tests/n1-baseline.json && git commit -m "chore(n1): the N-1 baseline names $LABEL ($NN)"');
+      expect(section.split('\n').filter(line => line.startsWith('git add '))).toEqual([]);
     }
     const sb4 = sectionOf(guide, sideBySide.split('\n').find(line => line.startsWith('### SB4. '))!);
     expect(sb4).toContain('`N1_BASELINE`');
@@ -413,13 +417,33 @@ describe('the boot target\'s drop-in folder is shared with the Anthropic gate (f
     const ta0 = scriptOf('TA0').lines;
     const rt = ta0.findIndex(line => line.includes('RT=$RAPI/dialectical-engine/deploy/preview-lifecycle/v1/systemd/debateai-preview.target'));
     const extra = ta0.findIndex(line => line.startsWith('XT=$(LC_ALL=C comm -13 <(unitlines "$RT") <(unitlines "$LT"))'));
-    const stop = ta0.findIndex(line => line.startsWith('[ -z "$XT" ] ||') && /TA0_NOT_DONE: .*ask"; exit 1; }$/.test(line));
+    const stop = ta0.findIndex(line => line.startsWith('[ -z "$XT" ] ||') && /TA0_NOT_DONE: .*ask \(\$P exists: move it aside\)"; exit 1; }$/.test(line));
     expect(ta0.findIndex(line => line.startsWith('RAPI=$(jq -r .services.api.sourceRoot "$LOCK")'))).toBeLessThan(rt);
     expect(rt).toBeLessThan(extra);
     expect(extra).toBeLessThan(stop);
     expect(ta0).toContain('cp -p "$LT" "$P/debateai-preview.target.live"');
     expect(scriptOf('TA1').lines.join('\n')).toContain('[ -s "$P/debateai-preview.target.live" ]');
     expect(scriptOf('TB0').lines.join('\n')).toContain('cmp -s /etc/systemd/system/debateai-preview.target "$S/preflight/debateai-preview.target.live" || { echo "TB0_NOT_DONE:');
+  });
+
+  it('TA0 stops, before its capture folder exists, on a drop-in folder the switch\'s writer would refuse (integration M8)', () => {
+    const ta0 = scriptOf('TA0').lines;
+    const folder = ta0.indexOf(`[ "$(stat -c '%F %U %a' ${TD})" = "directory root 755" ] && [ "$(realpath ${TD})" = ${TD} ]`
+      + ` || { echo "TA0_NOT_DONE: the boot target's drop-in folder is not root 0755 (the switch's writer refuses it): ask"; exit 1; }`);
+    expect(folder).toBeGreaterThan(-1);
+    expect(folder).toBeLessThan(ta0.indexOf('install -d -o root -g root -m 0700 "$P"'));
+  });
+
+  it('a stop after a folder was made says to move it aside before the step runs again (integration M9)', () => {
+    const ta0 = scriptOf('TA0').lines;
+    const made = ta0.indexOf('install -d -o root -g root -m 0700 "$P"');
+    for (const start of ['[ -f "$LT" ] && [ -f "$RT" ] ||', '[ -z "$XT" ] ||']) {
+      const at = ta0.findIndex(line => line.startsWith(start));
+      expect(at, start).toBeGreaterThan(made);
+      expect(ta0[at], start).toMatch(/TA0_NOT_DONE: [^"]*\(\$P exists: move it aside\)"; exit 1; }$/);
+    }
+    const tar = scriptOf('TA1').lines.find(line => line.includes('tar -czf "$S/systemd-before.tgz"'))!;
+    expect(tar).toContain('(the names file and S exist: move them aside before running TA1 again)"; exit 1; }');
   });
 
   it('rbB-T makes the folder in S before its move loop, reads the links list only when TB5 wrote it, and names the state at every failed move', () => {
