@@ -206,7 +206,7 @@ function answerWithTree(): Answer {
   };
 }
 
-function publicationHarness() {
+function publicationHarness(releases: ConstructorParameters<typeof PostgresPublicationApplication>[6] = null) {
   const createdAt = new Date("2026-08-24T00:00:00.000Z");
   const cipher = new PublicationCipher(
     new MemoryPublicationKeyStore(loadKek(Buffer.alloc(32, 0xd2)))
@@ -249,7 +249,11 @@ function publicationHarness() {
   const application = new PostgresPublicationApplication(
     repository,
     cipher,
-    () => createdAt
+    () => createdAt,
+    repository,
+    undefined,
+    undefined,
+    releases
   );
   return {
     application,
@@ -1218,14 +1222,84 @@ describe("S8 publication crypto and projection", () => {
 
   // Side-by-side spec §5, §6 (plan C14): a snapshot that decrypts, still names this publication and is still public, but
   // carries a member this release does not know, was made by a newer release — "open it on the current site", not a 404.
-  it("rejects a decrypted, revalidated snapshot with an unknown member as made by a newer release; list skips it", async () => {
-    const harness = publicationHarness();
-    const publicationRef = await harness.storeLegacy((ref) => ({ ...publicDebate(ref), future_member: { kind: "next" } }));
+  // Final fix wave P5: only when its run is stamped by a NEWER release, the owner reads' rule (madeByNewerRelease).
+  describe("an unparsable public snapshot (final fix wave P5: the owner reads' newer-release rule)", () => {
+    const OWN = ["r19", "a".repeat(12)].join("-");
+    const releasesWith = (runKey: string | null | (() => never)) => {
+      const asked: string[] = [];
+      return {
+        asked,
+        releases: Object.freeze({
+          ownReleaseKey: OWN,
+          readRunReleaseKey: async (runId: string) => {
+            asked.push(runId);
+            return typeof runKey === "function" ? runKey() : runKey;
+          }
+        })
+      };
+    };
+    const unknownMember = (ref: string) => ({ ...publicDebate(ref), future_member: { kind: "next" } });
+    const lines = (spy: { mock: { calls: unknown[][] } }) => spy.mock.calls.map(([line]) => String(line));
+    afterEach(() => { vi.restoreAllMocks(); });
 
-    await expect(harness.application.readPublicDebate(publicationRef)).rejects.toBeInstanceOf(MadeByNewerReleaseError);
-    const page = await harness.application.list(10, 0);
-    expect(page.items).toHaveLength(0);
-    expect(page.total).toBe(1);
+    it("a run stamped by a newer release (a higher site version, or the same one with another code): 409; list skips it", async () => {
+      for (const runKey of [["r20", "b".repeat(12)].join("-"), ["r19", "c".repeat(12)].join("-")]) {
+        const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        const { releases, asked } = releasesWith(runKey);
+        const harness = publicationHarness(releases);
+        const publicationRef = await harness.storeLegacy(unknownMember);
+
+        await expect(harness.application.readPublicDebate(publicationRef)).rejects.toBeInstanceOf(MadeByNewerReleaseError);
+        expect(asked).toEqual([PUBLICATION_RUN_ID]);
+        expect(lines(errors)).toEqual([JSON.stringify({
+          event: "api.debate.made_by_newer_release", route: "GET /v1/public/debates/{id}", id: publicationRef, releaseKey: runKey
+        })]);
+        const page = await harness.application.list(10, 0);
+        expect(page.items).toHaveLength(0);
+        expect(page.total).toBe(1);
+        vi.restoreAllMocks();
+      }
+    });
+
+    it("a run of this release, an older one or legacy: the old 404 (null), with one content-free line", async () => {
+      for (const runKey of [OWN, ["r18", "d".repeat(12)].join("-"), "legacy"]) {
+        const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        const harness = publicationHarness(releasesWith(runKey).releases);
+        const publicationRef = await harness.storeLegacy(unknownMember);
+
+        expect(await harness.application.readPublicDebate(publicationRef), runKey).toBeNull();
+        expect(lines(errors), runKey).toEqual([JSON.stringify({
+          event: "api.publication.snapshot_unreadable", id: publicationRef, releaseKey: runKey
+        })]);
+        vi.restoreAllMocks();
+      }
+    });
+
+    it("no key to compare (no run row, a failed key read, or no release wired): the old 404 (null), logged", async () => {
+      for (const releases of [
+        releasesWith(null).releases,
+        releasesWith(() => { throw new TypeError("KEY_READ_FAILED"); }).releases,
+        null
+      ]) {
+        const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        const harness = publicationHarness(releases);
+        const publicationRef = await harness.storeLegacy(unknownMember);
+
+        expect(await harness.application.readPublicDebate(publicationRef)).toBeNull();
+        expect(lines(errors)).toEqual([JSON.stringify({
+          event: "api.publication.snapshot_unreadable", id: publicationRef, releaseKey: null
+        })]);
+        vi.restoreAllMocks();
+      }
+    });
+
+    it("a snapshot this release reads never asks for the run's release", async () => {
+      const { releases, asked } = releasesWith(OWN);
+      const harness = publicationHarness(releases);
+      const publicationRef = await harness.storeLegacy();
+      expect(await harness.application.readPublicDebate(publicationRef)).not.toBeNull();
+      expect(asked).toEqual([]);
+    });
   });
 
   it("strictly rejects owner/internal fields at the anonymous boundary", () => {

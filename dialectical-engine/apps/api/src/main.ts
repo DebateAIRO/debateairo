@@ -1207,7 +1207,9 @@ const publications = publicationCipher === undefined
       undefined,
       new PostgresPublicationRepository(publicationCleanupPool,auditContextHasher),
       new RepositoryPublicationStoryReader(storyRepository),
-      mapViews
+      mapViews,
+      // Final fix wave P5: an unparsable public snapshot is a newer release's only when its run is stamped by one.
+      { ownReleaseKey: environment.RELEASE_KEY, readRunReleaseKey: (runId) => application.readRunReleaseKey(runId) }
     );
 // Side-by-side spec §4 (plan C3): the first read is awaited (a failure is recorded, never thrown), then it polls.
 await boot.run("release-watcher", () => releaseWatcher.start());
