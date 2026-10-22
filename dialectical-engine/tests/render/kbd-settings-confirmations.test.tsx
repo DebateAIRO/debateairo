@@ -124,4 +124,18 @@ describe("Export data", () => {
     expect(document.activeElement).not.toBe(document.body);
     expect(document.activeElement).toBe(document.querySelector("#export-heading"));
   });
+
+  // 2026-10-22 follow-up: with no step-up method, Export data is replaced by a link to Security settings.
+  it("with no step-up method, Export data's place goes to the Security link, which says why", async () => {
+    const api = client({ authMethods: vi.fn(async () => ({ ...methods, available_step_up_methods: [] })) });
+    await mount(<DataExportCard catalog={settings} locale="en" client={api as never}/>);
+    await press(settings["settings.export.request"]);
+    expect(document.querySelector(".authSecurityConfirmation")).toBeNull();
+    const link = document.querySelector<HTMLAnchorElement>('a[href="/settings/security"]')!;
+    expect(link.textContent).toBe(settings["settings.security.title"]);
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toBe(link);
+    const reason = document.getElementById(link.getAttribute("aria-describedby") ?? "");
+    expect(reason?.textContent, "the link is described by the reason").toBe(settings["settings.export.noMethod"]);
+  });
 });

@@ -140,3 +140,31 @@ describe("on the Settings page", () => {
     expect(document.activeElement).toBe(document.querySelector("#account-email-heading"));
   });
 });
+
+// 2026-10-22 follow-up: the mailed link's screen stands in for Settings, and its Go to Settings swaps the whole
+// screen out from under the pressed button.
+describe("the mailed link's screen", () => {
+  afterEach(() => { window.history.replaceState(null, "", "/"); });
+
+  it("Go to Settings lands on the Settings title", async () => {
+    api.client.confirmEmailChange = vi.fn().mockResolvedValue(undefined);
+    window.history.replaceState(null, "", `/settings#email-change=confirm&token=${"L".repeat(43)}`);
+    await mount(<SettingsPageClient/>);
+    expect(api.client.confirmEmailChange).toHaveBeenCalledTimes(1);
+    expect(document.querySelector("h1")?.textContent).toBe(settings["settings.emailLink.confirmedTitle"]);
+    await press(settings["settings.emailLink.continue"]);
+    const title = document.querySelector<HTMLHeadingElement>("h1.setTitle")!;
+    expect(title.textContent).toBe(settings["settings.account.title"]);
+    expect(title.getAttribute("tabindex")).toBe("-1");
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toBe(title);
+  });
+
+  it("Settings opened without a link keeps the browser's own starting point", async () => {
+    await mount(<SettingsPageClient/>);
+    const title = document.querySelector<HTMLHeadingElement>("h1.setTitle")!;
+    expect(title.textContent).toBe(settings["settings.account.title"]);
+    expect(title.hasAttribute("tabindex")).toBe(false);
+    expect(document.activeElement).toBe(document.body);
+  });
+});

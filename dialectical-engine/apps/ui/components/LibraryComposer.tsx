@@ -45,7 +45,8 @@ export function LibraryComposer({
   const [error, setError] = useState<string | null>(null);
   const [room, setRoom, refreshRoom] = useAskRoom(contractClient, COMPOSER_ROOM_QUERY);
   // Start is disabled while a press of it runs, which drops keyboard focus to the page. When the
-  // consent or crisis screen then closes, focus comes back to the question instead.
+  // consent or crisis screen then closes, or the press ends in an answer shown here (one question
+  // already waits, today's limit), focus comes back to the question instead.
   const claimField = useRef<HTMLTextAreaElement | null>(null);
   const claimRef = useCallback((field: HTMLTextAreaElement | null) => {
     claimField.current = field;
@@ -90,6 +91,7 @@ export function LibraryComposer({
         const fresh = await refreshRoom();
         if (fresh === null) setRoom(waitingRoomOf(exc));
         setBusy(false);
+        claimField.current?.focus();
         return;
       }
       // Task M8 (spec 2026-09-26 §14.4.7): today's limit for new debates is an
@@ -98,6 +100,7 @@ export function LibraryComposer({
       if (classifyRequestFailure("DEBATE_CREATE", exc).kind === "DAILY_LIMIT_REACHED") {
         setError(requestFailureMessage("DEBATE_CREATE", exc, newDebateCatalog));
         setBusy(false);
+        claimField.current?.focus();
         return;
       }
       // Anything else falls through to the authenticated /new flow.

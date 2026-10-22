@@ -76,3 +76,31 @@ it("a passkey-only second step, which has no code field, lands on its headline",
   expect(headline.textContent).toBe(auth["auth.login.twoStepVerification"]);
   expect(document.activeElement).toBe(headline);
 });
+
+// 2026-10-22 follow-up: "Didn't get the verification email?" replaces sign-in with its own screen, whose Back to sign
+// in swaps sign-in back; focus fell to <body>, or to the headline only when a step had changed before.
+const resendEntry = (host: HTMLElement) =>
+  [...host.querySelectorAll<HTMLButtonElement>("button")].find((candidate) => candidate.textContent === auth["auth.login.resendVerification"]);
+
+it("Back from Resend verification returns focus to the button that opened it", async () => {
+  const client = { beginLogin: vi.fn(), completeLogin: vi.fn(), beginPasskeyLogin: vi.fn(), completePasskeyLogin: vi.fn() };
+  const result = await mount(<LoginFlow client={client} onAuthenticated={vi.fn()} />);
+  mounted.push(result);
+  const { host } = result;
+  await press(host, auth["auth.login.resendVerification"]);
+  expect(document.activeElement).toBe(host.querySelector("#resend-email"));
+  await press(host, auth["auth.login.backToSignIn"]);
+  expect(host.querySelector("[name=password]")).not.toBeNull();
+  expect(document.activeElement).not.toBe(document.body);
+  expect(document.activeElement).toBe(resendEntry(host));
+});
+
+it("Back from Resend verification lands on the same button after an earlier step change", async () => {
+  const host = await toSecondStep(["totp"]);
+  await press(host, auth["auth.login.backToSignIn"]);
+  expect(document.activeElement).toBe(host.querySelector("#auth-title"));
+  await press(host, auth["auth.login.resendVerification"]);
+  expect(document.activeElement).toBe(host.querySelector("#resend-email"));
+  await press(host, auth["auth.login.backToSignIn"]);
+  expect(document.activeElement).toBe(resendEntry(host));
+});
