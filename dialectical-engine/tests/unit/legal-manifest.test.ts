@@ -85,7 +85,7 @@ describe("the legal document manifest (paid plans L2, spec §2.3.2)", () => {
         const entry = currentDocument(kind, code);
         expect(entry, `${code}/${kind}`).not.toBeNull();
         expect(entry!.sha256).toBe(createHash("sha256").update(draftBytes(code, kind)).digest("hex"));
-        expect(entry!.version).toBe(kind === "TERMS" ? "2.3" : "3.4");
+        expect(entry!.version).toBe(kind === "TERMS" ? "2.4" : "3.4");
       }
     }
     expect(legalManifestLocales("TERMS")).toEqual([...CODES].sort());
