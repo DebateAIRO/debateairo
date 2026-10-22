@@ -37,6 +37,9 @@ describe("the API root wires the server-decided ask from the room's composition"
     expect(main).toContain("      plans: askRoomComposition.billingPlans,");
     expect(main).toContain("        personAllowance: askRoomComposition.personAllowance,");
     expect(main).toContain("        estimator: askRoomComposition.estimator");
+    // Side-by-side spec §13 (S9): and the room's per-version estimator, from the same admission cache the room asks.
+    expect(main).toContain("        estimatorFor: async (version: number) => (await admissionCache.admissionSettingsFor(version)).estimator!");
+    expect(main).toContain("    estimatorFor: async (version) => (await admissionCache.admissionSettingsFor(version)).estimator!,");
   });
 
   it("builds askBilling only when the composition carries billing, and hands it to both consumers", () => {

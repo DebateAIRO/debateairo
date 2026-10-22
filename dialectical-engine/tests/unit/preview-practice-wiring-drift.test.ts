@@ -116,6 +116,10 @@ const DEBATE_MEMBERS_MODULE = read("apps/runner/src/run-debate-members.ts");
 /** The keys `runnerSettingsOfVersion` returns: the debate members both literals spread. */
 const DEBATE_MEMBERS_ANCHOR = "const { policy } = version;\n  return Object.freeze({";
 const DEBATE_MEMBERS_SPREAD = "...runnerSettingsOfVersion(siteVersionSettings),";
+/** Side-by-side spec §13 (S9): the API's one per-version admission loader both ask compositions boot through. */
+const ADMISSION = read("apps/api/src/admission-settings.ts");
+/** The keys `admissionSettingsOfVersion` returns: the version's members both ask literals spread. */
+const ADMISSION_MEMBERS_ANCHOR = "engineVersionPolicy, questionLanguage } = version;\n  return Object.freeze({";
 
 /**
  * The one setting the practice never passes: `billing` (hosted with billing on). The practice composes the hosted ask
@@ -144,7 +148,19 @@ describe("the practice runs the shipped composition (drift guard)", () => {
   it("hands PostgresAskApplication every preview setting apps/api/src/main.ts hands it", () => {
     const shipped = objectAfter(API_MAIN, "new PostgresAskApplication(pool, dispatcher, {");
     const practice = objectAfter(PRACTICE_ASK, "const runSettings: RunCreationSettings = {");
-    expect(shipped.has("previewBudgetGate")).toBe(true);
+    // Side-by-side spec §13 (S9): both literals take the site version's members from the one mapping, by the same
+    // spread (the practice's pins steer only the rotation's counts), so each hands the application its own keys plus
+    // the mapping's; and both hand S10's per-ask read the same mapping of each version.
+    expect(API_MAIN.split("...admissionSettingsOfVersion(siteAdmission),")).toHaveLength(2);
+    expect(PRACTICE_ASK.split("...practiceMembersOf(admissionSettingsOfVersion(siteAdmission)),")).toHaveLength(2);
+    expect(flat(API_MAIN)).toContain("admissionSettingsFor: async (version) => admissionSettingsOfVersion(await admissionCache.admissionSettingsFor(version))");
+    expect(flat(PRACTICE_ASK)).toContain("admissionSettingsFor: async (version: number) => practiceMembersOf(admissionSettingsOfVersion(await admissionCache.admissionSettingsFor(version)))");
+    const members = objectAfter(ADMISSION, ADMISSION_MEMBERS_ANCHOR);
+    expect([...members].sort()).toEqual(["assertDailyCostEnvelope", "debateShapePolicy", "engineVersionPolicy",
+      "lengthGuidancePolicy", "modelPicker", "previewBudgetGate", "previewProviderTestConfig", "questionLanguage",
+      "registerVersion", "resolveEnvelopeBasis", "resolveRisk", "roleRotation"]);
+    expect([...members].filter((key) => shipped.has(key))).toEqual([]);
+    expect(shipped.has("admissionSettings")).toBe(true);
     expect([...practice].sort()).toEqual([...shipped].filter((key) => !HOSTED_ONLY_ASK_KEYS.has(key)).sort());
   });
 
@@ -162,8 +178,11 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     }
     for (const source of [API_MAIN, PRACTICE_ASK]) {
       expect(source).toMatch(/probeControlsFor: previewProbeControls, fetchImplementation: previewFetch!?, previewRound: true/u);
-      expect(source).toContain("readPreviewBudgetGateSettings(pool,");
+      // Side-by-side spec §13 (S9): the gate terms are each version's, read by the one admission loader.
+      expect(source).not.toContain("readPreviewBudgetGateSettings(");
+      expect(source).toContain("loadAdmissionSettings(pool, environment.REGISTER_VERSION, admissionSite");
     }
+    expect(ADMISSION).toContain("readers.readPreviewBudgetGateSettings(pool, version, previewConfig,");
   });
 
   it("parallel AI calls: both build the call scheduler, the busy coordinator, the call subjects, the attempt counter and the keep-alive renewals", () => {
@@ -286,25 +305,53 @@ describe("the practice runs the shipped composition (drift guard)", () => {
   it("hosted (2026-10-14): the ask's money stages are main.ts's, and the room gets main.ts's options but the funding", () => {
     const shipped = flat(API_MAIN);
     const practice = flat(PRACTICE_ASK);
+    // Side-by-side spec §13 (S9): the site's money row and the room's boot questions before the admission loader; the
+    // per-version money (the run's ceiling, the story's reserve, the daily guard, the estimator) is the loader's; the
+    // room after it, over the site version's estimator and each version's own.
     for (const statement of [
       "assertHostedSupportAdmissionSealed(environment.DEPLOYMENT_MODE, admissionPolicy);",
-      "return Object.freeze({ runPolicy, guardPolicy: costEnvelopeGuardPolicy(runPolicy, storyPolicy) });",
-      "new CostEnvelopeGuard({ store: new PostgresModelSpendStore(pool), policy: costEnvelopeRows.guardPolicy })",
-      "policy: await readBillingPolicy(pool, environment.REGISTER_VERSION), plans: await readBillingPlans(pool, environment.REGISTER_VERSION), envelope: costEnvelopeRows.runPolicy",
-      "const band = costEnvelopeBand(costEnvelopeRows.runPolicy);",
+      "policy: await readBillingPolicy(pool, environment.REGISTER_VERSION), plans: await readBillingPlans(pool, environment.REGISTER_VERSION), envelope: siteCostEnvelopePolicy",
+      "const band = costEnvelopeBand(siteCostEnvelopePolicy);",
       "const stranded = await new RunWaitRepository(pool).countWaiting();",
-      "assertAskRoomAdmissionSealed({ envelope: costEnvelopeRows.runPolicy, admission: admissionPolicy });",
-      "maximumMicros: mostOneRunMaySpendMicros(costEnvelopeRows.guardPolicy)",
-      "dailyCeilingMicros: costEnvelopeRows.runPolicy.dailyCeilingMicros, closeBasisPoints: band.closeBasisPoints, waitingLinePerPerson: band.waitingLinePerPerson",
-      "perRunCeilingMicros: costEnvelopeRows?.guardPolicy.perRunCeilingMicros ?? null,",
-      "moneyPolicy: costEnvelopeRows?.guardPolicy ?? null,",
-      "...(askRoom !== undefined ? { room: askRoom, waitingLine: askRoom } : costEnvelopeGuard === undefined ? {} : { assertDailyCostEnvelope: () => costEnvelopeGuard.assertDailyEnvelopeAdmitsNewRun() }),",
-      "bodyCeilingMicros: costEnvelopeCeilings(costEnvelopeRows.runPolicy).bodyMicros,",
-      "ownRosterOnly: billingEnabled ? [\"free\"] : []"
+      "assertAskRoomAdmissionSealed({ envelope: siteCostEnvelopePolicy, admission: admissionPolicy });",
+      "estimatorFor: async (version) => (await admissionCache.admissionSettingsFor(version)).estimator!,",
+      "closeBasisPoints: band.closeBasisPoints, waitingLinePerPerson: band.waitingLinePerPerson",
+      "...(askRoom === undefined ? {} : { room: askRoom, waitingLine: askRoom }),",
+      "preview: previewGate === undefined ? undefined : { gate: previewGate, envLineUp: environment.PREVIEW_ENV_LINE_UP ?? null },",
+      "siteVersion: environment.REGISTER_VERSION,",
+      "prices: buildApiProviderPriceMap(declaredProviderTargets, environment.DEPLOYMENT_MODE),",
+      "const admissionCache = createAdmissionSettingsCache({ load: (version) => loadAdmissionSettings(pool, version, admissionSite), seed: siteAdmission });",
+      "createActiveSettingsVersionReader({ pool, siteVersion: environment.REGISTER_VERSION,",
+      "if (estimator === null) throw new TypeError(\"ASK_ROOM_ESTIMATOR_REQUIRED\");"
     ]) {
       expect(shipped, statement).toContain(statement);
       expect(practice, statement).toContain(statement);
     }
+    // The room's estimator is the site version's (the loader's), on both sides.
+    expect(shipped).toContain("const estimator = siteAdmission.estimator;");
+    expect(practice).toContain("estimator: siteAdmission.estimator,");
+    for (const gone of ["new CostEnvelopeGuard(", "costEnvelopeRows", "readStoryPolicyFromRegister(", "assertRunCeilingCoversOneCall(",
+      "mostOneRunMaySpendMicros(", "new RecentRunsCostEstimator("]) {
+      expect(shipped, gone).not.toContain(gone);
+      expect(practice, gone).not.toContain(gone);
+    }
+    const loader = flat(ADMISSION);
+    for (const statement of [
+      "const runPolicy = composeDebateCostEnvelope(siteEnvelope.runPolicy, await readers.readCostEnvelopePolicy(pool, version));",
+      "const guardPolicy = costEnvelopeGuardPolicy(runPolicy, storyPolicy);",
+      "dailyGuard: site.spend === null ? null : new CostEnvelopeGuard({ store: site.spend, policy: guardPolicy }),",
+      "maximumMicros: mostOneRunMaySpendMicros(guardPolicy)",
+      "perRunCeilingMicros: costEnvelope?.guardPolicy.perRunCeilingMicros ?? null,",
+      "moneyPolicy: costEnvelope?.guardPolicy ?? null,",
+      "bodyCeilingMicros: costEnvelopeCeilings(costEnvelope.runPolicy).bodyMicros,",
+      "ownRosterOnly: site.billingEnabled ? [\"free\"] : []"
+    ]) expect(loader, statement).toContain(statement);
+    // The two site contexts: the same keys, but the practice's forwarded "what is left" seam (the file's head says why).
+    const shippedSite = objectAfter(API_MAIN, "const admissionSite: AdmissionSiteContext = boot.runSync(\"admission-site\", () => Object.freeze(");
+    const practiceSite = objectAfter(PRACTICE_ASK, "const admissionSite: AdmissionSiteContext = Object.freeze(");
+    expect([...shippedSite].sort()).toEqual(["billingEnabled", "declaredProviderTargets", "deploymentMode", "log", "preview",
+      "prices", "questionLanguage", "recentRunUsage", "siteCostEnvelope", "siteVersion", "spend"]);
+    expect([...practiceSite].sort()).toEqual([...shippedSite, "previewRemaining"].sort());
     // Side-by-side spec §9 (C17): neither ask composition reads the funding selection at boot or refuses boot over it.
     // main.ts builds the funding source whenever billing is on; the practice keeps billing off, so it builds none.
     for (const gone of ["allowances.readPolicy()", "The configured funding selection is mismatched", "Internal funding requires hosted billing"]) {
@@ -317,12 +364,15 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     const shippedRoom = objectAfter(API_MAIN, "const room = new AskRoom({");
     const practiceRoom = objectAfter(PRACTICE_ASK, "const room = new AskRoom({");
     expect(shippedRoom.has("funding")).toBe(true);
+    expect(shippedRoom.has("estimatorFor")).toBe(true);
     expect([...practiceRoom].sort()).toEqual([...shippedRoom].filter((key) => key !== "funding").sort());
-    // Billing kept off: the room has no person allowance, no entitlements and no plans; the ask has no `billing`.
+    // Billing kept off: the room has no person allowance, no entitlements and no plans; the ask has no `billing`. The
+    // loader's picker and run ceiling read the register's own billing state, as main.ts's `billingEnabled`.
     expect(practice).toContain("const billingPlans = null;");
     expect(practice).toContain("const entitlements = null;");
     expect(practice).toContain("const personAllowance = NO_PERSON_ALLOWANCE;");
-    expect(practice).toContain("billingEnabled: false,");
+    expect(practice).toContain("billingEnabled: money?.registerBillingEnabled ?? false,");
+    expect(shipped).toContain("const billingEnabled = (askRoomReadiness?.billingPlans ?? null) !== null;");
     expect(objectAfter(PRACTICE_ASK, "const runSettings: RunCreationSettings = {").has("billing")).toBe(false);
   });
 
@@ -357,13 +407,21 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     expect(runnerMain.indexOf("const sharedWallTerms = costEnvelopePolicy === null")).toBeLessThan(runnerMain.indexOf(boot));
     const apiMain = flat(API_MAIN);
     const practiceAsk = flat(PRACTICE_ASK);
+    // Side-by-side spec §13 (S9): the shape, engine and question-language reads are the API's one admission loader's,
+    // for the version it loads; both ask compositions load through it and hand it their own question-language route.
+    const admission = flat(ADMISSION);
+    expect(admission).toContain("questionLanguageLocked: debateShapeInForcePolicy !== null");
+    // Engine redesign (R1d Task 6): the row in force for the ask side.
+    expect(admission).toContain("const engineInForcePolicy = engineInForce(engineVersionPolicy);");
+    expect(admission).toContain("const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);");
+    expect(admission).toContain("const questionLanguage = debateShapeInForcePolicy === null ? undefined : await run(\"question-language\"");
+    expect(admission).toContain("route: await site.questionLanguage.routeFor({ policy, dayCeilingMicros: costEnvelope?.guardPolicy.dailyCeilingMicros ?? null }),");
     for (const source of [apiMain, practiceAsk]) {
-      expect(source).toContain("questionLanguageLocked: debateShapeInForcePolicy !== null");
-      // Engine redesign (R1d Task 6): the row in force for the ask side, on both sides.
-      expect(source).toContain("const engineInForcePolicy = engineInForce(engineVersionPolicy);");
-      expect(source).toContain("const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);");
-      expect(source).toContain("const questionLanguage = debateShapeInForcePolicy === null ? undefined : await");
-      expect(source).toContain("route: questionLanguageRouteFor({");
+      expect(source).not.toContain("questionLanguageLocked");
+      expect(source).not.toContain("readDebateShapePolicy(");
+      expect(source).not.toContain("readEngineVersionPolicy(");
+      expect(source).toContain("questionLanguageRouteFor({");
+      expect(source).toContain("loadAdmissionSettings(pool, environment.REGISTER_VERSION, admissionSite");
     }
   });
 
@@ -390,7 +448,8 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     const trimmed = objectAfter(PRACTICE_RUNNER.replace("bodyCostFallback: envelopeBand !== null,", ""), anchor);
     expect(trimmed.has("bodyCostFallback")).toBe(false);
     expect(objectAfter(RUNNER_MAIN, anchor).has("bodyCostFallback")).toBe(true);
-    expect(objectAfter(API_MAIN, "new PostgresAskApplication(pool, dispatcher, {").has("resolveRisk")).toBe(true);
+    expect(objectAfter(API_MAIN, "new PostgresAskApplication(pool, dispatcher, {").has("resolveDiscoveredPanel")).toBe(true);
+    expect(objectAfter(ADMISSION, ADMISSION_MEMBERS_ANCHOR).has("resolveRisk")).toBe(true);
     expect(objectKeys("{ resolveRisk(a: string, b: string) { return { c: a }; } }")).toEqual(new Set(["resolveRisk"]));
   });
 });

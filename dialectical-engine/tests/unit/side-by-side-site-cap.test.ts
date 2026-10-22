@@ -274,6 +274,8 @@ describe("side-by-side final fix wave P7: a hosted API without the room says it 
     ].join("\n");
     expect(source).toContain(call);
     expect(source.indexOf(call)).toBeGreaterThan(source.indexOf("const askRoom = askRoomComposition?.room;"));
-    expect(source.indexOf(call)).toBeLessThan(source.indexOf("const billingEnabled ="));
+    // Side-by-side spec §13 (S9): billing on or off is now read before the admission loader, and the room is built
+    // after it; the line still follows the room at once, before the server-decided ask is composed over it.
+    expect(source.indexOf(call)).toBeLessThan(source.indexOf("const askBilling: AskBilling | undefined ="));
   });
 });

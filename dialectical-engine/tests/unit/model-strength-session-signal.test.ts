@@ -133,8 +133,10 @@ function buildApiCall(source: string, opener: string, closer: string): string {
 describe("A21.2 O4 · both compositions tell /new what their admission runs under", () => {
   it("the production API answers from the picker admission asks", async () => {
     const source = await readFile("apps/api/src/main.ts", "utf8");
+    // Side-by-side spec §13 (S9): the picker of the site version the admission loader loaded (the one admission asks
+    // while the activation pointer is empty; S10's admissionView answers the active version's).
     expect(buildApiCall(source, "const api = buildApi({", "\n});\n")).toContain(
-      '\n  modelScorecardInForce: modelPicker.scorecard.state === "VALID",\n'
+      '\n  modelScorecardInForce: siteAdmission.modelPicker.scorecard.state === "VALID",\n'
     );
   });
 

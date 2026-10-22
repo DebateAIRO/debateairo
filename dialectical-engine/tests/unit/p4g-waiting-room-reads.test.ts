@@ -297,13 +297,16 @@ describe("P4-G ruling C7: a version that seals the band must seal the room-read 
 
   it("is asked by the API's boot in the ask-room stage, of the admission row in force, once the band is read", async () => {
     const main = await readFile("apps/api/src/main.ts", "utf8");
-    const stage = main.slice(main.indexOf("await boot.run(\"ask-room\""), main.indexOf("const askRoom = askRoomComposition?.room;"));
+    // Side-by-side spec §13 (S9): the room's boot questions are asked of the site's money row before the admission
+    // loader; the room itself is built after it ("ask-room-composition").
+    const stage = main.slice(main.indexOf("await boot.run(\"ask-room\""), main.indexOf("const billingEnabled ="));
+    expect(stage.length).toBeGreaterThan(0);
     expect(stage).toMatch(
-      /assertAskRoomAdmissionSealed\(\{\s*envelope: costEnvelopeRows\.runPolicy,\s*admission: admissionPolicy\s*\}\);/u
+      /assertAskRoomAdmissionSealed\(\{\s*envelope: siteCostEnvelopePolicy,\s*admission: admissionPolicy\s*\}\);/u
     );
     // After the band's null exit, so a version without the band boots exactly as before.
     expect(stage.indexOf("assertAskRoomAdmissionSealed(")).toBeGreaterThan(stage.indexOf("if (band === null) {"));
-    expect(stage.indexOf("assertAskRoomAdmissionSealed(")).toBeLessThan(stage.indexOf("const room = new AskRoom({"));
+    expect(main.indexOf("await boot.run(\"ask-room\"")).toBeLessThan(main.indexOf("const room = new AskRoom({"));
   });
 
   it("is asked by the publish command's plan and its boot-readiness check", async () => {

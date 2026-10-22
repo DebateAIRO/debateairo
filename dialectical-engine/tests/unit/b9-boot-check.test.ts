@@ -256,35 +256,57 @@ describe("B9d · both hosted boots run the check, under the new settings only", 
   });
 
   it("the API, after its provider targets are read, over the policy row its boot already read, one group per plan", async () => {
+    // Side-by-side spec §13 (S9): the check is the API's one per-version admission loader's
+    // (apps/api/src/admission-settings.ts), over the version's own per-run ceiling and the site's day and band, and
+    // main.ts loads the site version through it after its provider targets and its site money row are read.
     const main = await readFile(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
-    const stage = main.indexOf("boot.run(\"run-ceiling-covers-one-call\"");
-    // Task 6 concern 4: each stage named below exists (an indexOf of -1 would pass every "after" check).
-    for (const marker of ["boot.run(\"run-ceiling-covers-one-call\"", "boot.runSync(\"provider-targets\"", "const costEnvelopeRows =",
-      "boot.run(\"length-guidance-policy\"", "const debateShapeInForcePolicy ="]) {
+    const loader = await readFile(new URL("../../apps/api/src/admission-settings.ts", import.meta.url), "utf8");
+    const load = main.indexOf("const siteAdmission = await loadAdmissionSettings(");
+    // Task 6 concern 4: each marker named below exists (an indexOf of -1 would pass every "after" check).
+    for (const marker of ["boot.runSync(\"provider-targets\"", "const siteCostEnvelopePolicy =", "const siteAdmission = await loadAdmissionSettings("]) {
       expect(main.indexOf(marker), marker).toBeGreaterThanOrEqual(0);
     }
-    expect(stage).toBeGreaterThan(main.indexOf("boot.runSync(\"provider-targets\""));
-    expect(stage).toBeGreaterThan(main.indexOf("const costEnvelopeRows ="));
-    expect(main).toContain("if (costEnvelopeRows === undefined || costEnvelopeBand(costEnvelopeRows.runPolicy) === null) return;");
-    expect(main).toContain("bodyCeilingMicros: costEnvelopeCeilings(costEnvelopeRows.runPolicy).bodyMicros,");
-    expect(main).toContain("firstCallsByRoster: firstCallsByPlanRoster({");
+    expect(load).toBeGreaterThan(main.indexOf("boot.runSync(\"provider-targets\""));
+    expect(load).toBeGreaterThan(main.indexOf("const siteCostEnvelopePolicy ="));
+    expect(main).not.toContain("assertRunCeilingCoversOneCall(");
+    const stage = loader.indexOf("await run(\"run-ceiling-covers-one-call\"");
+    for (const marker of ["await run(\"run-ceiling-covers-one-call\"", "await run(\"length-guidance-policy\"",
+      "const debateShapeInForcePolicy =", "const costEnvelope = money?.costEnvelope ?? null;"]) {
+      expect(loader.indexOf(marker), marker).toBeGreaterThanOrEqual(0);
+    }
+    expect(stage).toBeGreaterThan(loader.indexOf("const costEnvelope = money?.costEnvelope ?? null;"));
+    expect(loader).toContain("composeDebateCostEnvelope(siteEnvelope.runPolicy, await readers.readCostEnvelopePolicy(pool, version))");
+    expect(loader).toContain("if (costEnvelope === null || costEnvelopeBand(costEnvelope.runPolicy) === null) return;");
+    expect(loader).toContain("bodyCeilingMicros: costEnvelopeCeilings(costEnvelope.runPolicy).bodyMicros,");
+    expect(loader).toContain("firstCallsByRoster: firstCallsByPlanRoster({");
     // LG-C Task 6 (spec 2026-10-15 §3.3): the first call is checked at the largest guided opening allowance, over the
-    // length row the boot read before this stage.
-    expect(main).toContain(
-      "judgeTokenCeiling: lengthGuidedFirstCallCeiling(await readJudgeTokenCeiling(pool, environment.REGISTER_VERSION), lengthGuidancePolicy),");
-    expect(stage).toBeGreaterThan(main.indexOf("boot.run(\"length-guidance-policy\""));
-    expect(main).toContain("rosters: PLAN_TIER_ROSTERS");
+    // length row the loader read before this stage, at the version loaded.
+    expect(loader).toContain(
+      "judgeTokenCeiling: lengthGuidedFirstCallCeiling(await readers.readJudgeTokenCeiling(pool, version), lengthGuidancePolicy),");
+    expect(stage).toBeGreaterThan(loader.indexOf("await run(\"length-guidance-policy\""));
+    expect(loader).toContain("rosters: PLAN_TIER_ROSTERS");
     // PF-L38: the lock is priced only with the debate-shape row in force (read before this stage).
-    expect(main).toContain("questionLanguageLocked: debateShapeInForcePolicy !== null");
-    expect(stage).toBeGreaterThan(main.indexOf("const debateShapeInForcePolicy ="));
+    expect(loader).toContain("questionLanguageLocked: debateShapeInForcePolicy !== null");
+    expect(stage).toBeGreaterThan(loader.indexOf("const debateShapeInForcePolicy ="));
   });
 
-  // Task 12 review 1: the three first-call checks (API boot, hosted publish, practice runner) frame the lengthed variant
-  // exactly when they price the guided opening: one `lengthed:` line inside each one's firstPositionCallProjections call.
+  it("neither the API's main.ts nor the practice ask prices the first call itself: both load through the one loader (S9)", async () => {
+    for (const file of ["apps/api/src/main.ts", "tools/preview-practice/practice-ask-composition.ts"]) {
+      const source = await readFile(new URL(`../../${file}`, import.meta.url), "utf8");
+      expect(source, file).not.toContain("firstPositionCallProjections(");
+      expect(source, file).not.toContain("lengthed:");
+      expect(source, file).toContain("loadAdmissionSettings(pool, environment.REGISTER_VERSION, admissionSite");
+    }
+  });
+
+  // Task 12 review 1: the first-call checks (the API's admission loader, which the practice ask shares, and the hosted
+  // publish) frame the lengthed variant exactly when they price the guided opening: one `lengthed:` line inside each
+  // one's firstPositionCallProjections call.
   it.each([
-    ["apps/api/src/main.ts", "lengthed: lengthGuidancePolicy !== null"],
-    ["apps/runner/src/hosted-register-publish.ts", "lengthed: lengthGuidance !== null"],
-    ["tools/preview-practice/practice-ask-composition.ts", "lengthed: input.lengthGuidancePolicy !== null"]
+    // Side-by-side spec §13 (S9): the API's check (and so the practice ask's, which composes through the same loader)
+    // is the admission loader's.
+    ["apps/api/src/admission-settings.ts", "lengthed: lengthGuidancePolicy !== null"],
+    ["apps/runner/src/hosted-register-publish.ts", "lengthed: lengthGuidance !== null"]
   ])("%s frames the first call lengthed with the row", async (file, line) => {
     const source = await readFile(new URL(`../../${file}`, import.meta.url), "utf8");
     const start = source.indexOf("const firstCalls = firstPositionCallProjections({");

@@ -273,11 +273,18 @@ describe("M7 · both boots run the one check, on the rows they already read", ()
   });
 
   it("the API builds its guard from costEnvelopeGuardPolicy over both rows, inside the boot step", async () => {
+    // Side-by-side spec §13 (S9): one guard per settings version, built by the API's one admission loader
+    // (admission-settings.ts) inside its "cost-envelope-policy" stage, over the composed envelope (the version's per-run
+    // members, the site's day and band) and the version's own story policy. main.ts reads the site's money row only.
     const main = await readFile("apps/api/src/main.ts", "utf8");
-    expect(main.split("new CostEnvelopeGuard(")).toHaveLength(2);
-    const step = main.slice(main.indexOf('boot.run("cost-envelope-policy"'), main.indexOf('boot.run("product-role-policy"'));
-    expect(step).toContain("readCostEnvelopePolicy(pool, environment.REGISTER_VERSION)");
-    expect(step).toContain("readStoryPolicyFromRegister(pool, environment.REGISTER_VERSION)");
-    expect(step).toContain("costEnvelopeGuardPolicy(runPolicy, storyPolicy)");
+    const loader = await readFile("apps/api/src/admission-settings.ts", "utf8");
+    expect(main).not.toContain("new CostEnvelopeGuard(");
+    expect(main).toContain('boot.run("site-cost-envelope-policy", () => readCostEnvelopePolicy(pool, environment.REGISTER_VERSION))');
+    expect(loader.split("new CostEnvelopeGuard(")).toHaveLength(2);
+    const step = loader.slice(loader.indexOf('run("cost-envelope-policy"'), loader.indexOf('run("structural-ceilings"'));
+    expect(step).toContain("composeDebateCostEnvelope(siteEnvelope.runPolicy, await readers.readCostEnvelopePolicy(pool, version))");
+    expect(step).toContain("readers.readStoryPolicyFromRegister(pool, version)");
+    expect(step).toContain("const guardPolicy = costEnvelopeGuardPolicy(runPolicy, storyPolicy);");
+    expect(step).toContain("new CostEnvelopeGuard({ store: site.spend, policy: guardPolicy })");
   });
 });

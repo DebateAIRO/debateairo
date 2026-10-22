@@ -166,6 +166,11 @@ export type AskRoomOptions = Readonly<{
   spend: AskRoomSpend;
   line: AskRoomLine;
   estimator: CostEstimator;
+  /**
+   * Side-by-side spec §13 (S9 composes it; S10 reads it): the estimator of a settings version (its own per-run cap),
+   * for a question admitted on a version other than the site's. Until S10 every estimate is `estimator`'s.
+   */
+  estimatorFor?: (registerVersion: number) => Promise<CostEstimator>;
   personAllowance: PersonAllowanceSource;
   entitlements: AskRoomEntitlements | null;
   /**

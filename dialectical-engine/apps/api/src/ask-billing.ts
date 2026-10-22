@@ -34,6 +34,8 @@ export type AskBilling = Readonly<{
       readOwnerCountedHoldsMicros(ownerRef: string, funding?: FundingBasis): Promise<number>;
     }>;
     estimator: CostEstimator;
+    /** Side-by-side spec §13 (S9 composes it; S10 reads it): the room's per-version estimator (`AskRoomOptions.estimatorFor`). */
+    estimatorFor?: (registerVersion: number) => Promise<CostEstimator>;
   }>;
   funding?: Readonly<{resolveAskFunding(ownerRef:string,now:Date):Promise<FundingBasis>}>;
   clock: () => Date;

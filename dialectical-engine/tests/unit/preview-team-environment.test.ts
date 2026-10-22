@@ -152,7 +152,13 @@ describe("the API entrypoint hands the team list to both consumers of the previe
       ts.forEachChild(node, visit);
     };
     visit(ast);
-    // buildApi (the route gate) and PostgresAskApplication (the submit gate).
-    expect(carriers).toEqual(["environment.PREVIEW_TEAM_USER_IDS ?? []", "environment.PREVIEW_TEAM_USER_IDS ?? []"]);
+    // buildApi (the route gate) carries both in one literal. Side-by-side spec §13 (S9): PostgresAskApplication (the
+    // submit gate) takes the version's composed config from the one mapping and the team list right beside it, keyed on
+    // the env's gate part (ruling R25), which every accepted preview form carries.
+    expect(carriers).toEqual(["environment.PREVIEW_TEAM_USER_IDS ?? []"]);
+    expect(source).toContain("  ...admissionSettingsOfVersion(siteAdmission),\n"
+      + "  // Step 1: the preview's team; keyed on the env's gate part (ruling R25).\n"
+      + "  ...(previewGate === undefined ? {} : { previewTeamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [] }),");
+    expect(source).toContain("const previewGate = environment.PREVIEW_GATE_SETTINGS;");
   });
 });

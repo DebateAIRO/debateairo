@@ -125,9 +125,13 @@ describe("V-28 both shipped roots carry the envelopes", () => {
     const source = await readFile(
       new URL("../../apps/api/src/main.ts", import.meta.url), "utf8"
     );
-    expect(source).toContain("CostEnvelopeGuard");
+    // Side-by-side spec §13 (S9): main.ts reads the site's money row; the guard is each settings version's, built by the
+    // API's admission loader and handed to the ask application by the one mapping main.ts spreads.
+    const loader = await readFile(new URL("../../apps/api/src/admission-settings.ts", import.meta.url), "utf8");
     expect(source).toContain("readCostEnvelopePolicy");
-    expect(source).toContain("assertDailyCostEnvelope");
+    expect(source).toContain("...admissionSettingsOfVersion(siteAdmission),");
+    expect(loader).toContain("new CostEnvelopeGuard({");
+    expect(loader).toContain("assertDailyCostEnvelope: () => dailyGuard.assertDailyEnvelopeAdmitsNewRun()");
   });
 
   it("the API refuses to boot hosted without the three support admission scopes", async () => {

@@ -362,14 +362,24 @@ describe("a refusal naming the ceiling's figures tells the caller its code only 
 
 describe("the boot reads the optional row (note 8) and the practice runner resolves the shape (note 7, PF10; P2b Task 6)", () => {
   it("apps/api/src/main.ts reads the row once at its register version, before the ask application, and hands it on", () => {
+    // Side-by-side spec §13 (S9): the read is the API's one per-version admission loader's, at the version it loads
+    // (main.ts loads REGISTER_VERSION through it, under its boot ledger, before the ask application).
     const main = readFileSync(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
-    const read = 'boot.run("debate-shape-policy", () => readDebateShapePolicy(pool, environment.REGISTER_VERSION))';
-    expect(main.split(read)).toHaveLength(2);
-    expect(main.indexOf(read)).toBeLessThan(main.indexOf("new PostgresAskApplication("));
-    // Once into the ask application's settings, once into the room read's options; absent (or disabled) = neither key.
-    expect(main.split("...(debateShapeInForcePolicy === null ? {} : { debateShapePolicy: debateShapeInForcePolicy }),")).toHaveLength(3);
-    expect(main).toContain("const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);");
-    expect(main).toContain("...(input.shape === null ? {} : { shape: input.shape })");
+    const loader = readFileSync(new URL("../../apps/api/src/admission-settings.ts", import.meta.url), "utf8");
+    const read = 'run("debate-shape-policy", () => readers.readDebateShapePolicy(pool, version))';
+    expect(loader.split(read)).toHaveLength(2);
+    expect(main).not.toContain("readDebateShapePolicy(");
+    expect(main.indexOf("const siteAdmission = await loadAdmissionSettings(pool, environment.REGISTER_VERSION, admissionSite, (name, run) => boot.run("))
+      .toBeGreaterThan(-1);
+    expect(main.indexOf("const siteAdmission = await loadAdmissionSettings(")).toBeLessThan(main.indexOf("new PostgresAskApplication("));
+    // Once into the ask application's settings (the one mapping), once into the room read's options; absent (or
+    // disabled) = neither key.
+    expect(loader).toContain("const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);");
+    expect(loader).toContain("debateShapePolicy: debateShapeInForcePolicy,\n    lengthGuidancePolicy,\n    engineVersionPolicy: engineInForcePolicy,");
+    expect(loader).toContain("...(debateShapePolicy === null ? {} : { debateShapePolicy }),");
+    expect(main).toContain("...admissionSettingsOfVersion(siteAdmission),");
+    expect(main).toContain("...(siteAdmission.debateShapePolicy === null ? {} : { debateShapePolicy: siteAdmission.debateShapePolicy }),");
+    expect(loader).toContain("...(input.shape === null ? {} : { shape: input.shape })");
   });
 
   it("the API boot and the practice ask hand the IN-FORCE row on and carry no Phase-2a guard (P2b Task 6)", () => {
@@ -377,12 +387,18 @@ describe("the boot reads the optional row (note 8) and the practice runner resol
     expect(main).not.toContain("assertDebateShapeRunnerReady");
     const practice = readFileSync(new URL("../../tools/preview-practice/practice-ask-composition.ts", import.meta.url), "utf8");
     expect(practice).not.toContain("assertDebateShapeRunnerReady");
-    const practiceRead = "const debateShapePolicy = await readDebateShapePolicy(pool, version);";
+    const loader = readFileSync(new URL("../../apps/api/src/admission-settings.ts", import.meta.url), "utf8");
+    expect(loader).not.toContain("assertDebateShapeRunnerReady");
+    // Side-by-side spec §13 (S9): the practice reads the row through main.ts's own loader, before the ask application.
+    expect(practice).not.toContain("readDebateShapePolicy(");
+    const load = "const siteAdmission = await loadAdmissionSettings(pool, environment.REGISTER_VERSION, admissionSite);";
+    expect(practice.split(load)).toHaveLength(2);
+    expect(practice.indexOf(load)).toBeLessThan(practice.indexOf("new PostgresAskApplication("));
+    const loaderRead = "const debateShapePolicy = await run(\"debate-shape-policy\"";
     const inForce = "debateShapeInForce(debateShapePolicy)";
-    expect(practice.split(practiceRead)).toHaveLength(2);
-    expect(practice.split(inForce)).toHaveLength(2);
-    expect(practice.indexOf(practiceRead)).toBeLessThan(practice.indexOf(inForce));
-    expect(practice.indexOf(inForce)).toBeLessThan(practice.indexOf("new PostgresAskApplication("));
+    expect(loader.split(loaderRead)).toHaveLength(2);
+    expect(loader.split(inForce)).toHaveLength(2);
+    expect(loader.indexOf(loaderRead)).toBeLessThan(loader.indexOf(inForce));
   });
 
   /**

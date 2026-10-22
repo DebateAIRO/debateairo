@@ -262,6 +262,7 @@ import {
   type LengthGuidance,
   type LengthGuidancePolicy
 } from "@debateai/register";
+import type { AdmissionRunMembers } from "./admission-settings.js";
 import { debateShapeForPanel, normaliseAskForDebateShape, roomDepthParams } from "./debate-shape-ask.js";
 import { engineForAsk } from "./engine-ask.js";
 import { lengthAnswerWordsFor, lengthGuidanceForAsk } from "./length-guidance-ask.js";
@@ -4499,6 +4500,15 @@ export interface RunCreationSettings {
   readonly engineVersionPolicy?: EngineVersionPolicy;
   /** Question language (spec 2026-10-13): read only with `debateShapePolicy`; the first step of submit. */
   readonly questionLanguage?: QuestionLanguagePort;
+  /**
+   * Side-by-side spec §13 (S9 composes it in main.ts and the practice; S10 reads it per ask): the active settings version
+   * (the activation pointer, or the site version while it is empty) and that version's admission members
+   * (./admission-settings.ts). Until S10 the ask path reads the members spread beside it, which are the site version's.
+   */
+  readonly admissionSettings?: Readonly<{
+    activeSettingsVersion(): Promise<number>;
+    admissionSettingsFor(version: number): Promise<AdmissionRunMembers>;
+  }>;
 }
 
 /** One planned admission: the run's basis, panel and (with a VALID scorecard) its assignment. */
