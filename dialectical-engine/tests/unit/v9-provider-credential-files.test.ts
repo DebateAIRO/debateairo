@@ -596,8 +596,14 @@ describe("V-9 both roots resolve credentials AFTER the mode decision (task 10b)"
     const siteReads = await readFile(new URL("../../apps/runner/src/run-settings.ts", import.meta.url), "utf8");
     expect(siteReads).toContain("assertDeploymentProviderTargets(");
     expect(siteReads).not.toContain("resolveProviderTargetCredentials(");
+    // S14 (ruling R57): the API's declared targets are judged by its one decision (provider-discovery.ts), no credential.
+    const apiTargets = await readFile(new URL("../../apps/api/src/provider-discovery.ts", import.meta.url), "utf8");
+    const decision = apiTargets.slice(apiTargets.indexOf("export function parseDeclaredProviderTargets("),
+      apiTargets.indexOf("export type DiscoveredProviderPanel"));
+    expect(decision).toContain("assertDeploymentProviderTargets(");
+    expect(decision).not.toContain("resolveProviderTargetCredentials(");
     for (const [path, assertion] of [
-      ["../../apps/api/src/main.ts", "assertDeploymentProviderTargets("],
+      ["../../apps/api/src/main.ts", "parseDeclaredProviderTargets({"],
       ["../../apps/runner/src/main.ts", "await readRunnerSiteContext("]
     ] as const) {
       const source = await readFile(new URL(path, import.meta.url), "utf8");

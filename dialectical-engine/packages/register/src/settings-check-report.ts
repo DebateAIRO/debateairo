@@ -137,6 +137,16 @@ export async function readSettingsVersionFacts(pool: Pick<Pool, "query">, versio
   });
 }
 
+/**
+ * The activation's own rule (migration 0124, SETTINGS_VERSION_KIND_INVALID), asked by both halves first: only a sealed
+ * GENERAL version (a NULL kind is one published before kinds existed) can be checked; an unknown, unsealed or support
+ * version is refused by this code and the version's own steps are skipped (they would only fail to read it).
+ */
+export function settingsVersionKindRefusal(facts: SettingsVersionFacts | null): "SETTINGS_VERSION_KIND_INVALID" | null {
+  const general = facts !== null && facts.sealed && (facts.publicationKind === null || facts.publicationKind === "GENERAL");
+  return general ? null : "SETTINGS_VERSION_KIND_INVALID";
+}
+
 const POSITIVE_INTEGER_TEXT = /^[1-9][0-9]{0,15}$/u;
 
 /**

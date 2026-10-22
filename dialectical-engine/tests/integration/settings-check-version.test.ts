@@ -269,9 +269,13 @@ describe("check-version over a real database (side-by-side §13, S14)", () => {
     const ref = "development:never-declared-cli";
     const current = await siteRowValue("synthesizerRoleRef") as Record<string, unknown>;
     const version = await publishFromSite({ replace: { synthesizerRoleRef: { ...current, providerRef: ref } } });
-    const { runner } = await checkBoth(version, "local");
-    expect(runner.verdict).toBe("FAIL");
-    expect(runner.codes.join(" ")).toContain(`SETTINGS_NEEDS_ENV_CHANGE:ROLE_REF:${ref}`);
+    const { runner, api } = await checkBoth(version, "local");
+    // The runner names the env change (condition 3) beside its claim gate's own refusal (the synthesizer has no provider
+    // in this release); the API half seats no synthesizer off the preview, so its own boot has nothing to refuse.
+    expect({ runner: runner.codes, api: api.codes }).toEqual({
+      runner: [`SETTINGS_NEEDS_ENV_CHANGE:ROLE_REF:${ref}`, "SYNTHESIS_ROLE_PROVIDER_UNRESOLVED"],
+      api: []
+    });
   });
 
   it("several problems in one version are listed together; an unknown version is refused by kind", async () => {
@@ -282,9 +286,10 @@ describe("check-version over a real database (side-by-side §13, S14)", () => {
     const { runner, api } = await checkBoth(version, "local");
     expect(runner.codes).toEqual(["MAP_CONTRACT_HASH_MISMATCH", "SETTINGS_HASH_UNDECLARED:engineContractHash"]);
     expect(api.codes).toEqual(["SETTINGS_SITE_MEMBER_DIFFERS:sessionPolicy"]);
-    const unknown = await checkAdmissionSettingsVersion({ pool: apiPool, environment: apiEnvironment("local"), version: 999999 });
-    expect(unknown.verdict).toBe("FAIL");
-    expect(unknown.codes).toContain("SETTINGS_VERSION_KIND_INVALID");
-    expect(unknown.snapshotSha256).toBeNull();
+    // An unknown version is a finding of both halves (one code), never a failure to check it.
+    const unknown = await checkBoth(999999, "local");
+    for (const report of [unknown.runner, unknown.api]) {
+      expect(report).toMatchObject({ verdict: "FAIL", codes: ["SETTINGS_VERSION_KIND_INVALID"], snapshotSha256: null, version: 999999 });
+    }
   });
 });

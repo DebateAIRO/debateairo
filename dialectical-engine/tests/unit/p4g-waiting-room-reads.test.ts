@@ -299,13 +299,17 @@ describe("P4-G ruling C7: a version that seals the band must seal the room-read 
     const main = await readFile("apps/api/src/main.ts", "utf8");
     // Side-by-side spec §13 (S9): the room's boot questions are asked of the site's money row before the admission
     // loader; the room itself is built after it ("ask-room-composition").
-    const stage = main.slice(main.indexOf("await boot.run(\"ask-room\""), main.indexOf("const billingEnabled ="));
+    // Side-by-side spec §13 (S14, ruling R57): asked inside the stage's one decision (decideAskRoomReadiness,
+    // admission-settings.ts), of the site's money row and the admission row in force.
+    const stage = main.slice(main.indexOf("await boot.run(\"ask-room\""), main.indexOf("// V-30(1): the support chat's model is configuration"));
     expect(stage.length).toBeGreaterThan(0);
-    expect(stage).toMatch(
-      /assertAskRoomAdmissionSealed\(\{\s*envelope: siteCostEnvelopePolicy,\s*admission: admissionPolicy\s*\}\);/u
-    );
+    expect(stage).toMatch(/decideAskRoomReadiness\(\{\s*envelope: siteCostEnvelopePolicy,\s*admission: admissionPolicy,/u);
+    const loader = await readFile("apps/api/src/admission-settings.ts", "utf8");
+    const decision = loader.slice(loader.indexOf("export function decideAskRoomReadiness("), loader.indexOf("export function buildAdmissionSiteContext("));
+    expect(decision).toContain("assertAskRoomAdmissionSealed({ envelope: input.envelope, admission: input.admission });");
     // After the band's null exit, so a version without the band boots exactly as before.
-    expect(stage.indexOf("assertAskRoomAdmissionSealed(")).toBeGreaterThan(stage.indexOf("if (band === null) {"));
+    expect(decision.indexOf("assertAskRoomAdmissionSealed(")).toBeGreaterThan(decision.indexOf("if (band === null) return null;"));
+    expect(decision.indexOf("if (band === null) return null;")).toBeGreaterThan(-1);
     expect(main.indexOf("await boot.run(\"ask-room\"")).toBeLessThan(main.indexOf("const room = new AskRoom({"));
   });
 

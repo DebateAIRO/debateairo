@@ -414,8 +414,17 @@ describe("I6: the question-language wiring in the API's main.ts and the practice
 
   it("apps/api/src/main.ts: no hosted route on a preview, the guarded fetch and socket, one reference key, no composition of its own", async () => {
     const main = await readFile(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
-    expect(countOf(main, QL_HOSTED_ROUTE)).toBe(1);
-    const route = balancedCallLines(main, "questionLanguageRouteFor({");
+    // Side-by-side spec §13 (S14, ruling R57): the route decision is one function (questionLanguageSiteRoute, boot.ts),
+    // which main.ts calls with its guarded fetch and the env's gate part, and check-version with parts that cannot send.
+    const siteRoute = balancedCallLines(main, "questionLanguageSiteRoute({");
+    expect(siteRoute).toContain("previewGate,");
+    expect(siteRoute).toContain("previewFetch,");
+    expect(siteRoute).toContain("readCredential: () => supportAnthropicMessagesKey(supportModelTarget, readSupportCredentialOnce),");
+    expect(countOf(main, "questionLanguageRouteFor(")).toBe(0);
+    const boot = await readFile(new URL("../../apps/api/src/question-language/boot.ts", import.meta.url), "utf8");
+    const decision = boot.slice(boot.indexOf("export async function questionLanguageSiteRoute("), boot.indexOf("export async function composeQuestionLanguage("));
+    expect(countOf(decision, QL_HOSTED_ROUTE)).toBe(1);
+    const route = balancedCallLines(decision, "questionLanguageRouteFor({");
     expect(route).toContain("previewFetch,");
     expect(route).toContain(QL_PREVIEW_SOCKET);
     expect(route).toContain("previewConfigured: previewGate !== undefined,");

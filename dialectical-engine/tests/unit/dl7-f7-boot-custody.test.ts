@@ -216,9 +216,9 @@ describe("DL7-F7 a synchronous boot decision answers to the ledger too", () => {
 
     for (const decision of [
       "throw new TypeError(\"PROVIDER_DISCOVERY_TARGETS_REQUIRED\")",
-      "parseProviderDiscoveryTargets(",
-      "assertDeploymentProviderTargets(",
-      "assertPricedProviderTargets(",
+      // Side-by-side spec §13 (S14, ruling R57): the parse and both target judgements are one decision
+      // (provider-discovery.ts), called once, inside the "provider-targets" stage.
+      "parseDeclaredProviderTargets(",
       "resolveProviderTargetCredentials(",
       "parseSupportModelTargetJson(",
       // Model scorecard A20.4 / final review I5: the picker settings refuse a hosted

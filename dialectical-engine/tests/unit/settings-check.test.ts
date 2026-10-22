@@ -1,6 +1,7 @@
 // Side-by-side spec §13 "Activation is refused unless" (S14): check-version, the dry boot of a release against one
 // sealed settings version, in two halves (runner and API), each listing every refusal code in ONE report line. Injected
 // readers: no database, no AI call.
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import type { Pool } from "pg";
 import { TypedDomainError } from "@debateai/kernel";
@@ -42,7 +43,7 @@ import {
   type AdmissionCheckReaders,
   type ApiCheckEnvironment
 } from "../../apps/api/src/settings-check.js";
-import { buildAdmissionSiteContext, type AdmissionSiteContext } from "../../apps/api/src/admission-settings.js";
+import { buildAdmissionSiteContext, decideAskRoomReadiness, type AdmissionSiteContext } from "../../apps/api/src/admission-settings.js";
 import { registerFixtureRow } from "../support/registerFixtures.js";
 
 const POOL = {} as Pool;
@@ -129,7 +130,7 @@ describe("check-version, the runner half (side-by-side §13)", () => {
       checker: SETTINGS_CHECKER
     });
     expect(Object.isFrozen(report) && Object.isFrozen(report.codes)).toBe(true);
-    expect(calls).toEqual(["readSite", `loadVersion:${VERSION}`, "readRoleRefs", "contractHashRefusals", "readVersionFacts"]);
+    expect(calls).toEqual(["readSite", "readVersionFacts", `loadVersion:${VERSION}`, "readRoleRefs", "contractHashRefusals"]);
   });
 
   // Every refusal the boot's per-version loader (strict) can raise reaches the report as its own code.
@@ -219,9 +220,18 @@ describe("check-version, the runner half (side-by-side §13)", () => {
     }).readers)).rejects.toThrow("Cannot read properties of undefined");
   });
 
-  it("an unknown version has no snapshot (null)", async () => {
-    const { readers } = runnerReaders({ readVersionFacts: async () => null });
-    expect((await checkRunner(readers)).snapshotSha256).toBeNull();
+  it.each([
+    ["an unknown version", null],
+    ["an unsealed version", { sealed: false, publicationKind: null, snapshotSha256: null }],
+    ["a support publication", { sealed: true, publicationKind: "SUPPORT", snapshotSha256: SNAPSHOT }]
+  ])("%s is a finding, SETTINGS_VERSION_KIND_INVALID, and the version's own steps are skipped (never exit 2)", async (_name, facts) => {
+    const { readers, calls } = runnerReaders({
+      readVersionFacts: async () => facts,
+      loadVersion: async () => { throw new TypeError("the loader would fail to read an unknown version"); }
+    });
+    const report = await checkRunner(readers, runnerEnvironment({ PREVIEW_GATE_SETTINGS: PREVIEW_GATE }));
+    expect(report).toMatchObject({ verdict: "FAIL", codes: ["SETTINGS_VERSION_KIND_INVALID"], snapshotSha256: facts?.snapshotSha256 ?? null });
+    expect(calls).toEqual(["readSite"]);
   });
 });
 
@@ -249,7 +259,9 @@ describe("condition 5, the contract hashes (plan D5): both rows sealed and equal
     expect(await declaredContractHashRefusals(poolWith({ ...both, mapContractHash: "not-a-hash" }), VERSION))
       .toEqual(["MAP_CONTRACT_HASH_INVALID"]);
     await expect(assertDeclaredContractHashes(poolWith({ mapContractHash: both.mapContractHash }), VERSION))
-      .rejects.toMatchObject({ code: "SETTINGS_HASH_UNDECLARED:engineContractHash" });
+      .rejects.toMatchObject({ code: "SETTINGS_HASH_UNDECLARED", message: "SETTINGS_HASH_UNDECLARED:engineContractHash" });
+    await expect(assertDeclaredContractHashes(poolWith({ ...both, engineContractHash: "f".repeat(64) }), VERSION))
+      .rejects.toMatchObject({ code: "ENGINE_CONTRACT_HASH_MISMATCH" });
   });
 
   it("reads the version asked, never another", async () => {
@@ -306,16 +318,20 @@ describe("check-version, the API half (side-by-side §13)", () => {
     ]);
   });
 
-  it("several problems together, sorted and unique (the kind refusal from two steps is one code)", async () => {
-    const { readers } = apiReaders({
-      loadVersion: async () => { throw typed("RUN_CEILING_BELOW_ONE_CALL"); },
+  it("several problems together, sorted and unique", async () => {
+    const candidate = comparison(registerFixtureRow("sessionPolicy", { idle_minutes: 45 }, "fixture"), ENVELOPE(2000000, 900000));
+    const { readers } = apiReaders({ loadVersion: async () => { throw typed("RUN_CEILING_BELOW_ONE_CALL"); } }, candidate);
+    expect((await checkApi(readers)).codes).toEqual(["RUN_CEILING_BELOW_ONE_CALL", "SETTINGS_SITE_MEMBER_DIFFERS:sessionPolicy"]);
+  });
+
+  it("a version that is not sealed GENERAL skips the loader and condition 2 (one code, never exit 2)", async () => {
+    const { readers, calls } = apiReaders({
       readVersionFacts: async () => null,
-      readComparisonRows: async (_pool, version) => {
-        if (version === VERSION) throw typed("SETTINGS_VERSION_KIND_INVALID", "The register version 18 is not a sealed version");
-        return comparison(SESSION);
-      }
+      readComparisonRows: vi.fn(async () => { throw typed("SETTINGS_VERSION_KIND_INVALID", "The register version 18 is not a sealed version"); })
     });
-    expect((await checkApi(readers)).codes).toEqual(["RUN_CEILING_BELOW_ONE_CALL", "SETTINGS_VERSION_KIND_INVALID"]);
+    expect((await checkApi(readers)).codes).toEqual(["SETTINGS_VERSION_KIND_INVALID"]);
+    expect(calls).toEqual(["readSite"]);
+    expect(readers.readComparisonRows).not.toHaveBeenCalled();
   });
 
   it("FAIL on the site reads skips the loader; a database failure rejects", async () => {
@@ -352,7 +368,7 @@ describe("buildAdmissionSiteContext: the one way main.ts, the practice and the c
     finishBasisPoints: 11500, waitingLinePerPerson: 1 } as never;
   const build = (change: Partial<Parameters<typeof buildAdmissionSiteContext>[0]>) => buildAdmissionSiteContext({
     pool: POOL, environment: { REGISTER_VERSION: SITE_VERSION, DEPLOYMENT_MODE: "hosted", PREVIEW_GATE_SETTINGS: undefined },
-    declaredProviderTargets: reviewedTargets(), siteCostEnvelopePolicy: ENVELOPE_POLICY, askRoom: true, billingEnabled: false,
+    declaredProviderTargets: reviewedTargets(), siteCostEnvelopePolicy: ENVELOPE_POLICY, askRoomReadiness: { billingPlans: null },
     questionLanguage: checkQuestionLanguage({ DEPLOYMENT_MODE: "hosted", PREVIEW_GATE_SETTINGS: undefined }), log: () => undefined,
     ...change
   });
@@ -360,9 +376,13 @@ describe("buildAdmissionSiteContext: the one way main.ts, the practice and the c
   it("the room's recent runs or the daily guard's store, never both; local mode neither", () => {
     expect(build({})).toMatchObject({ spend: null, siteVersion: SITE_VERSION, deploymentMode: "hosted", preview: undefined });
     expect(build({}).recentRunUsage).not.toBeNull();
-    expect(build({ askRoom: false }).spend).not.toBeNull();
-    expect(build({ askRoom: false }).recentRunUsage).toBeNull();
-    const local = build({ siteCostEnvelopePolicy: null, askRoom: false,
+    expect(build({ askRoomReadiness: null }).spend).not.toBeNull();
+    expect(build({ askRoomReadiness: null }).recentRunUsage).toBeNull();
+    // Paid plans S2/S4b: billing is on exactly when the room's readiness answer carries the plans.
+    expect(build({}).billingEnabled).toBe(false);
+    expect(build({ askRoomReadiness: { billingPlans: {} as never } }).billingEnabled).toBe(true);
+    expect(build({ askRoomReadiness: null }).billingEnabled).toBe(false);
+    const local = build({ siteCostEnvelopePolicy: null, askRoomReadiness: null,
       environment: { REGISTER_VERSION: SITE_VERSION, DEPLOYMENT_MODE: "local", PREVIEW_GATE_SETTINGS: undefined } });
     expect([local.spend, local.recentRunUsage, local.siteCostEnvelope]).toEqual([null, null, null]);
   });
@@ -449,7 +469,7 @@ describe("the command: one argument, one line, exit 0 / 1 / 2", () => {
   it("could not check (an unreadable environment, an unreachable database) exits 2 with a content-free reason and no report line", async () => {
     for (const [error, reason] of [
       [new TypeError("RELEASE_KEY_REQUIRED"), "RELEASE_KEY_REQUIRED"],
-      [Object.assign(new Error("connect ECONNREFUSED postgres://user:secret@db/x"), { code: "ECONNREFUSED" }), "ECONNREFUSED"],
+      [Object.assign(new Error(`connect ECONNREFUSED ${["postgres:", "", "user:" + "pw" + "1@db", "x"].join("/")}`), { code: "ECONNREFUSED" }), "ECONNREFUSED"],
       [new TypedDomainError("DATABASE_POOL_FAILED", "PostgreSQL pool operation failed: password authentication failed"), "DATABASE_POOL_FAILED"],
       [new TypeError("prose with a secret in it"), "TYPEERROR"]
     ] as const) {
@@ -465,5 +485,103 @@ describe("the command: one argument, one line, exit 0 / 1 / 2", () => {
     expect(parseSettingsCheckArguments(["18"])).toBe(18);
     expect(parseSettingsCheckArguments(["1"])).toBe(1);
     expect(parseSettingsCheckArguments(["18", "--x"])).toBeNull();
+  });
+});
+
+describe("decideAskRoomReadiness: the room's boot questions, one decision (ruling R57)", () => {
+  const BANDED = { perRunCeilingMicros: 250000, dailyCeilingMicros: 2000000, closeBasisPoints: 9500,
+    finishBasisPoints: 11500, waitingLinePerPerson: 1 } as never;
+  const UNBANDED = { perRunCeilingMicros: 250000, dailyCeilingMicros: 2000000, closeBasisPoints: null,
+    finishBasisPoints: null, waitingLinePerPerson: null } as never;
+  const SEALED = { askRoomReads: { key: "owner", limit: 120, windowMs: 60000, capacity: 120 } } as never;
+  const UNSEALED = { askRoomReads: null } as never;
+  const PLANS = { plans: "fixture" } as never;
+  const decide = (change: Partial<Parameters<typeof decideAskRoomReadiness>[0]>) => decideAskRoomReadiness({
+    envelope: BANDED, admission: SEALED, policy: { enabled: false } as never, plans: null, ...change
+  });
+  const codeOf = (work: () => unknown): string | undefined => {
+    try { work(); return undefined; } catch (error) { return (error as { code?: string }).code; }
+  };
+
+  it("with the band: the room is built, its plans only when billing is on", () => {
+    expect(decide({})).toEqual({ band: { closeBasisPoints: 9500, finishBasisPoints: 11500, waitingLinePerPerson: 1 }, billingPlans: null });
+    expect(decide({ policy: { enabled: true } as never, plans: PLANS })?.billingPlans).toBe(PLANS);
+  });
+
+  it("without the band: no room (null), and the askRoomReads budget is not asked", () => {
+    expect(decide({ envelope: UNBANDED, admission: UNSEALED })).toBeNull();
+  });
+
+  it("refuses by name, in B4a's order: billing on without plans or without the band, then the unsealed room read", () => {
+    expect(codeOf(() => decide({ policy: { enabled: true } as never, plans: null, admission: UNSEALED }))).toBe("BILLING_PLANS_UNRESOLVED");
+    expect(codeOf(() => decide({ policy: { enabled: true } as never, plans: PLANS, envelope: UNBANDED }))).toBe("BILLING_REQUIRES_ENVELOPE_MEMBERS");
+    expect(codeOf(() => decide({ admission: UNSEALED }))).toBe("ASK_ROOM_ADMISSION_UNSEALED");
+  });
+});
+
+/**
+ * Ruling R57 — THE DRIFT GUARD between apps/api/src/main.ts and check-version's API half: the decisions are one copy
+ * each (`parseDeclaredProviderTargets`, `decideAskRoomReadiness`, `questionLanguageSiteRoute`,
+ * `buildAdmissionSiteContext`), and the few statements around them that stay in both files are pinned here, in
+ * main.ts's order, so a change to main.ts's pre-loader reads cannot leave the check passing a version main.ts refuses.
+ * The same for the runner: main.ts and the check share `readRunnerSiteContext` and `loadRunnerVersionSettings`.
+ */
+describe("drift guard: check-version's site reads are main.ts's (ruling R57)", () => {
+  const read = (relative: string) => readFileSync(new URL(`../../${relative}`, import.meta.url), "utf8");
+  const API_MAIN = read("apps/api/src/main.ts");
+  const API_CHECK = read("apps/api/src/settings-check.ts");
+  const RUNNER_MAIN = read("apps/runner/src/main.ts");
+  const RUNNER_CHECK = read("apps/runner/src/settings-check.ts");
+  const flat = (source: string) => source.replace(/\s+/gu, " ");
+
+  it("the API: the same reads and decisions, in main.ts's order", () => {
+    const shared = [
+      "readAdmissionPolicy(pool, environment.REGISTER_VERSION)",
+      "assertHostedSupportAdmissionSealed(environment.DEPLOYMENT_MODE, admissionPolicy)",
+      "environment.DEPLOYMENT_MODE === \"hosted\" ? await",
+      "readCostEnvelopePolicy(pool, environment.REGISTER_VERSION)",
+      "readDeploymentMakerCapability(pool, environment.REGISTER_VERSION)",
+      "if (environment.PROVIDER_DISCOVERY_TARGETS_JSON === undefined) { throw new TypeError(\"PROVIDER_DISCOVERY_TARGETS_REQUIRED\"); }",
+      "parseDeclaredProviderTargets({",
+      "configuredProviders: deploymentMakers.configuredProviders, mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV }",
+      "environment.DEPLOYMENT_MODE === \"hosted\" && siteCostEnvelopePolicy !== null",
+      "decideAskRoomReadiness({ envelope: siteCostEnvelopePolicy, admission: admissionPolicy, policy: await readBillingPolicy(pool, environment.REGISTER_VERSION), plans: await readBillingPlans(pool, environment.REGISTER_VERSION) })",
+      "buildAdmissionSiteContext({ pool, environment, declaredProviderTargets, siteCostEnvelopePolicy,"
+    ];
+    for (const [name, source] of [["main.ts", flat(API_MAIN)], ["settings-check.ts", flat(API_CHECK)]] as const) {
+      let at = -1;
+      for (const statement of shared) {
+        const next = source.indexOf(statement, at + 1);
+        expect(next, `${name}: ${statement}`).toBeGreaterThan(at);
+        at = next;
+      }
+      expect(source, name).toContain("questionLanguageSiteRoute({ mode: environment.DEPLOYMENT_MODE, policy, dayCeilingMicros, previewGate,");
+      // The boot's first refusal (main.ts: before the pool; the check: its first step).
+      expect(source, name).toContain("assertHostedCostEnvelopesSealed(environment.DEPLOYMENT_MODE)");
+      // The loader at the version asked (main.ts: the site version, under its boot ledger).
+      expect(source, name).toMatch(/loadAdmissionSettings\(pool, (?:environment\.REGISTER_VERSION|version), (?:admissionSite|site)/u);
+    }
+    // Only main.ts reads the live waiting line when the band is missing (live state, not a version's), and only the
+    // check hands the route parts that can neither send nor spend.
+    expect(API_MAIN).toContain("await new RunWaitRepository(pool).countWaiting()");
+    expect(API_CHECK).not.toContain("countWaiting");
+    expect(API_CHECK).toContain("previewFetch: previewGate === undefined ? undefined : CHECK_NEVER_SENDS,");
+    expect(API_CHECK).toContain("writerPresent: async () => false,");
+    expect(API_CHECK).toContain("readCredential: () => undefined,");
+    // No decision is re-implemented in the check.
+    for (const gone of ["parseProviderDiscoveryTargets(", "assertDeploymentProviderTargets(", "assertPricedProviderTargets(",
+      "assertBillingReady(", "assertAskRoomAdmissionSealed(", "costEnvelopeBand(", "hostedQuestionLanguageRoute(", "questionLanguageRouteFor("]) {
+      expect(API_CHECK, gone).not.toContain(gone);
+      expect(API_MAIN.slice(0, API_MAIN.indexOf("const siteAdmission = await loadAdmissionSettings(")), gone).not.toContain(gone);
+    }
+  });
+
+  it("the runner: the same site reads and the same loader, strict", () => {
+    expect(RUNNER_MAIN).toContain("await readRunnerSiteContext({ pool, environment, moneyInFlight });");
+    expect(RUNNER_CHECK).toContain("await readRunnerSiteContext({ pool, environment, moneyInFlight: createRunInFlight() })");
+    expect(RUNNER_MAIN).toContain("assertHostedCostEnvelopesSealed(environment.DEPLOYMENT_MODE);");
+    expect(RUNNER_CHECK).toContain("assertHostedCostEnvelopesSealed(environment.DEPLOYMENT_MODE);");
+    expect(RUNNER_MAIN).toContain("load: (version) => loadRunnerVersionSettings(pool, version, runnerSite)");
+    expect(RUNNER_CHECK).toContain("loadRunnerVersionSettings(pool, version, site, { strict: true })");
   });
 });

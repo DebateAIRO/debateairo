@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
  */
 const main = await readFile(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
 const api = await readFile(new URL("../../apps/api/src/index.ts", import.meta.url), "utf8");
+const admissionLoader = await readFile(new URL("../../apps/api/src/admission-settings.ts", import.meta.url), "utf8");
 const runbook = await readFile(new URL("../../deploy/vps/README.md", import.meta.url), "utf8");
 
 describe("the setup step B8 adds, beside B6b's and B7b's (budget spec §2.9)", () => {
@@ -52,6 +53,10 @@ describe("the API root wires the server-decided ask from the room's composition"
   it("adds no boot step of its own: the readiness check stays in B6b's ask-room step", () => {
     expect(main).not.toContain('boot.run("billing-ask"');
     const askRoomStep = main.slice(main.indexOf('boot.run("ask-room"'), main.indexOf("const askRoom = askRoomComposition?.room;"));
-    expect(askRoomStep).toContain("assertBillingReady(");
+    // Side-by-side spec §13 (S14, ruling R57): the stage asks it through its one decision (admission-settings.ts).
+    expect(askRoomStep).toContain("decideAskRoomReadiness(");
+    const loader = admissionLoader;
+    expect(loader.slice(loader.indexOf("export function decideAskRoomReadiness("), loader.indexOf("export function buildAdmissionSiteContext(")))
+      .toContain("assertBillingReady(");
   });
 });

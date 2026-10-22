@@ -5,6 +5,7 @@ import {
   readStoryPolicyFromRegister,
   runSettingsCheckSteps,
   settingsCheckReport,
+  settingsVersionKindRefusal,
   type SettingsCheckReport,
   type SettingsCheckStep,
   type SettingsVersionFacts
@@ -41,8 +42,11 @@ import {
  *    (`declaredContractHashRefusals`);
  *  - condition 6, the code copy, on the preview only (addition D26 replaces plan D6; SA10 adds the whole seatable set):
  *    each role ref's model is a reviewed row (`previewModelRowForRef`), else SETTINGS_GATE_UNREVIEWED:<ref>.
- * The CLI codes (SETTINGS_NEEDS_ENV_CHANGE:…, SETTINGS_GATE_UNREVIEWED:…, SETTINGS_HASH_UNDECLARED:…) are REPORT codes:
- * no runtime path of the runner throws them, so they are not in its KNOWN_DOMAIN_CODES.
+ *  - first of the version's own steps, the activation's rule (0124): a sealed GENERAL version, else
+ *    SETTINGS_VERSION_KIND_INVALID and the version's steps are skipped (an unknown version is a finding, not exit 2).
+ * The role-ref and gate codes are REPORT codes (returned, never thrown); the two typed codes this check's modules can
+ * throw (SETTINGS_HASH_UNDECLARED from `assertDeclaredContractHashes`, SETTINGS_CHECK_NO_AI_CALL from the API half's
+ * fetch) are in both KNOWN_DOMAIN_CODES lists (ruling R57b), though only the CLI meets them today.
  */
 
 /** The runner env keys the check reads: the site reads' and the release key (a full `loadRunnerEnvironment()` fits). */
@@ -82,8 +86,8 @@ export const RUNNER_CHECK_READERS: RunnerCheckReaders = Object.freeze({
 
 /**
  * The runner half's steps, in order. SA10 (addition D19-D20) adds its target, socket, thinking-level and ceiling checks
- * as further steps of this list. A step needing the site reads is skipped (no code of its own) when they refused: their
- * code already fails the half.
+ * as further steps of this list. A step needing the site reads is skipped (no code of its own) when they refused, and
+ * the version's own steps when it is not a sealed GENERAL version: the code already found fails the half.
  */
 export function runnerSettingsCheckSteps(input: Readonly<{
   pool: Pool;
@@ -95,6 +99,7 @@ export function runnerSettingsCheckSteps(input: Readonly<{
 }>): readonly SettingsCheckStep[] {
   const { pool, environment, version, readers } = input;
   let site: RunnerSiteContext | undefined;
+  let checkable = false;
   let roleRefs: Promise<readonly string[]> | undefined;
   const refs = (): Promise<readonly string[]> => (roleRefs ??= readers.readRoleRefs(pool, version));
   return Object.freeze([
@@ -107,9 +112,21 @@ export function runnerSettingsCheckSteps(input: Readonly<{
       run: async () => { site = await readers.readSite(pool, environment); return []; }
     },
     {
+      // The activation's own rule (0124: a sealed GENERAL version), first: an unknown, unsealed or support version is
+      // a finding (SETTINGS_VERSION_KIND_INVALID) and the version's own steps are skipped, never a failure to read it.
+      name: "version-kind",
+      run: async () => {
+        const facts = await readers.readVersionFacts(pool, version);
+        input.onSnapshot(facts?.snapshotSha256 ?? null);
+        const refusal = settingsVersionKindRefusal(facts);
+        checkable = refusal === null;
+        return refusal === null ? [] : [refusal];
+      }
+    },
+    {
       name: "version-settings",
       run: async () => {
-        if (site !== undefined) await readers.loadVersion(pool, version, site);
+        if (site !== undefined && checkable) await readers.loadVersion(pool, version, site);
         return [];
       }
     },
@@ -117,25 +134,21 @@ export function runnerSettingsCheckSteps(input: Readonly<{
       // Condition 3: a role on a ref this release does not declare could never be called: the env must change.
       name: "role-refs-declared",
       run: async () => {
-        if (site === undefined) return [];
+        if (site === undefined || !checkable) return [];
         const declared = new Set(site.declaredProviderTargets.map((target) => target.providerRef));
         return (await refs()).filter((ref) => !declared.has(ref)).map((ref) => `SETTINGS_NEEDS_ENV_CHANGE:ROLE_REF:${ref}`);
       }
     },
     {
       name: "contract-hashes-declared",
-      run: () => readers.contractHashRefusals(pool, version)
+      run: async () => (checkable ? readers.contractHashRefusals(pool, version) : [])
     },
     {
       // Condition 6 (the code copy): on the preview, every role's model is a row the gates' helper reviewed.
       name: "gate-models-reviewed",
-      run: async () => environment.PREVIEW_GATE_SETTINGS === undefined
+      run: async () => environment.PREVIEW_GATE_SETTINGS === undefined || !checkable
         ? []
         : (await refs()).filter((ref) => previewModelRowForRef(ref) === undefined).map((ref) => `SETTINGS_GATE_UNREVIEWED:${ref}`)
-    },
-    {
-      name: "version-snapshot",
-      run: async () => { input.onSnapshot((await readers.readVersionFacts(pool, version))?.snapshotSha256 ?? null); return []; }
     }
   ]);
 }

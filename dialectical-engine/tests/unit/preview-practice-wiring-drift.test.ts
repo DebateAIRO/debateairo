@@ -342,10 +342,10 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     // room after it, over the site version's estimator and each version's own.
     for (const statement of [
       "assertHostedSupportAdmissionSealed(environment.DEPLOYMENT_MODE, admissionPolicy);",
-      "policy: await readBillingPolicy(pool, environment.REGISTER_VERSION), plans: await readBillingPlans(pool, environment.REGISTER_VERSION), envelope: siteCostEnvelopePolicy",
-      "const band = costEnvelopeBand(siteCostEnvelopePolicy);",
-      "const stranded = await new RunWaitRepository(pool).countWaiting();",
-      "assertAskRoomAdmissionSealed({ envelope: siteCostEnvelopePolicy, admission: admissionPolicy });",
+      // S14 (ruling R57): the room's boot questions are one decision (decideAskRoomReadiness), asked by both of the same
+      // rows; a missing band (null) checks the waiting line on both.
+      "decideAskRoomReadiness({ envelope: siteCostEnvelopePolicy, admission: admissionPolicy, policy: await readBillingPolicy(pool, environment.REGISTER_VERSION), plans: await readBillingPlans(pool, environment.REGISTER_VERSION) });",
+      "if (readiness === null) { const stranded = await new RunWaitRepository(pool).countWaiting();",
       "estimatorFor: async (version) => (await admissionCache.admissionSettingsFor(version)).estimator!,",
       "closeBasisPoints: band.closeBasisPoints, waitingLinePerPerson: band.waitingLinePerPerson",
       "...(askRoom === undefined ? {} : { room: askRoom, waitingLine: askRoom }),",
@@ -372,6 +372,8 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       "preview: previewGate === undefined ? undefined : { gate: previewGate, envLineUp: environment.PREVIEW_ENV_LINE_UP ?? null },",
       "siteVersion: environment.REGISTER_VERSION,",
       "prices: buildApiProviderPriceMap(declaredProviderTargets, environment.DEPLOYMENT_MODE),",
+      "billingEnabled: (input.askRoomReadiness?.billingPlans ?? null) !== null,",
+      "const billingPlans = assertBillingReady({ policy: input.policy, plans: input.plans, envelope: input.envelope }); const band = costEnvelopeBand(input.envelope); if (band === null) return null; assertAskRoomAdmissionSealed({ envelope: input.envelope, admission: input.admission });",
       "const runPolicy = composeDebateCostEnvelope(siteEnvelope.runPolicy, await readers.readCostEnvelopePolicy(pool, version));",
       "const guardPolicy = costEnvelopeGuardPolicy(runPolicy, storyPolicy);",
       "dailyGuard: site.spend === null ? null : new CostEnvelopeGuard({ store: site.spend, policy: guardPolicy }),",
@@ -385,7 +387,7 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     // seam (the file's head says why); the builder's own literal names every member of the context.
     const shippedSite = objectAfter(API_MAIN, "const admissionSite: AdmissionSiteContext = boot.runSync(\"admission-site\", () => buildAdmissionSiteContext(");
     const practiceSite = objectAfter(PRACTICE_ASK, "const admissionSite: AdmissionSiteContext = buildAdmissionSiteContext(");
-    expect([...shippedSite].sort()).toEqual(["askRoom", "billingEnabled", "declaredProviderTargets", "environment", "log", "pool",
+    expect([...shippedSite].sort()).toEqual(["askRoomReadiness", "declaredProviderTargets", "environment", "log", "pool",
       "questionLanguage", "siteCostEnvelopePolicy"]);
     expect([...practiceSite].sort()).toEqual([...shippedSite, "previewRemaining"].sort());
     const builtSite = objectAfter(ADMISSION, "  const previewGate = environment.PREVIEW_GATE_SETTINGS;\n  return Object.freeze(");
@@ -406,12 +408,13 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     expect(shippedRoom.has("estimatorFor")).toBe(true);
     expect([...practiceRoom].sort()).toEqual([...shippedRoom].filter((key) => key !== "funding").sort());
     // Billing kept off: the room has no person allowance, no entitlements and no plans; the ask has no `billing`. The
-    // loader's picker and run ceiling read the register's own billing state, as main.ts's `billingEnabled`.
+    // loader's picker and run ceiling read the register's own billing state through the room's readiness answer, as
+    // main.ts's (S14: the site builder derives the switch from it).
     expect(practice).toContain("const billingPlans = null;");
     expect(practice).toContain("const entitlements = null;");
     expect(practice).toContain("const personAllowance = NO_PERSON_ALLOWANCE;");
-    expect(practice).toContain("billingEnabled: money?.registerBillingEnabled ?? false,");
-    expect(shipped).toContain("const billingEnabled = (askRoomReadiness?.billingPlans ?? null) !== null;");
+    expect(practice).toContain("askRoomReadiness: money === null ? null : money.readiness,");
+    expect(shipped).toContain("askRoomReadiness: askRoomReadiness ?? null,");
     expect(objectAfter(PRACTICE_ASK, "const runSettings: RunCreationSettings = {").has("billing")).toBe(false);
   });
 
@@ -460,9 +463,12 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       expect(source).not.toContain("questionLanguageLocked");
       expect(source).not.toContain("readDebateShapePolicy(");
       expect(source).not.toContain("readEngineVersionPolicy(");
-      expect(source).toContain("questionLanguageRouteFor({");
       expect(source).toContain("loadAdmissionSettings(pool, environment.REGISTER_VERSION, admissionSite");
     }
+    // Each hands the loader its own route: the practice its forwarded socket; main.ts the site's one route decision
+    // (S14, ruling R57: questionLanguageSiteRoute, which check-version's API half calls too).
+    expect(practiceAsk).toContain("questionLanguageRouteFor({");
+    expect(apiMain).toContain("questionLanguageSiteRoute({");
   });
 
   it("one release key (side-by-side §1, §3): the practice's runner runs as, and its ask stamps runs with, settings.runner.RELEASE_KEY", () => {

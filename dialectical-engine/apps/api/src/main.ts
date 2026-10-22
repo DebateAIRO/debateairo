@@ -1,10 +1,10 @@
-import { createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS, previewProviderSocket, providerCompaniesOfTargets } from "@debateai/providers";
-import { questionLanguagePolicyStartValues, type QuestionLanguagePolicy } from "@debateai/register";
-import { hostedQuestionLanguageRoute, questionLanguageRouteFor } from "./question-language/boot.js";
+import { createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS, providerCompaniesOfTargets } from "@debateai/providers";
+import { type QuestionLanguagePolicy } from "@debateai/register";
+import { questionLanguageSiteRoute } from "./question-language/boot.js";
 import { questionLanguageReferenceKeyFrom } from "./question-language/reference.js";
 // Side-by-side spec §13: the per-version admission settings (loader and cache) and the activation pointer's one reader.
 import {
-  admissionSettingsOfVersion, buildAdmissionSiteContext, createAdmissionSettingsCache, createAdmissionView, loadAdmissionSettings, type AdmissionSiteContext
+  admissionSettingsOfVersion, buildAdmissionSiteContext, createAdmissionSettingsCache, decideAskRoomReadiness, createAdmissionView, loadAdmissionSettings, type AdmissionSiteContext
 } from "./admission-settings.js";
 import { createActiveSettingsVersionReader } from "./active-settings-version.js";
 import { PasswordResetService } from "./password-reset.js";
@@ -66,11 +66,9 @@ import { WorkItemRepository } from "@debateai/battery";
 import { TypedDomainError } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
-  assertAskRoomAdmissionSealed,
   assertBillingReady,
   assertHostedCostEnvelopesSealed,
   assertHostedSupportAdmissionSealed,
-  costEnvelopeBand,
   readBillingPlans,
   readBillingPolicy,
   readBillingEnvironmentGroup,
@@ -167,10 +165,8 @@ import { gatedInterval, gatedTrigger } from "./release-loops.js";
 import { PostgresEvaluatorDevMenuRepository } from "@debateai/evaluator";
 import { RecoveryStartService } from "./recovery.js";
 import {
-  assertDeploymentProviderTargets,
-  assertPricedProviderTargets,
   createProviderDiscoveryResolver,
-  parseProviderDiscoveryTargets,
+  parseDeclaredProviderTargets,
   resolveProviderTargetCredentials
 } from "./provider-discovery.js";
 import { riskSignalFailureIdentity } from "./risk-signal-identity.js";
@@ -466,22 +462,13 @@ const providerTargetsJson = boot.runSync("provider-discovery-targets", () => {
   return environment.PROVIDER_DISCOVERY_TARGETS_JSON;
 });
 const probes = new ProviderProbeRepository(pool);
-const declaredProviderTargets = boot.runSync("provider-targets", () => {
-  const declared = parseProviderDiscoveryTargets(
-    providerTargetsJson, deploymentMakers.configuredProviders
-  );
-  // V-9(c): the same mode decision the runner takes, over the same target set,
-  // and taken on the DECLARED targets — before any credential file is resolved.
-  assertDeploymentProviderTargets(declared, {
-    mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV
-  });
-  // V-28: and a hosted DEBATE target must carry its price, or its calls cannot
-  // be billed against the per-run and daily envelopes. Separate from the rule
-  // above because the support chat's target shares that one and keeps its own
-  // accounting.
-  assertPricedProviderTargets(declared, environment.DEPLOYMENT_MODE);
-  return declared;
-});
+// V-9(c) and V-28, the one decision (parseDeclaredProviderTargets, provider-discovery.ts; side-by-side §13, S14, shared
+// with the practice and check-version): the register's configured set, the runner's mode decision over the DECLARED
+// targets (before any credential file is resolved), and a hosted debate target's price.
+const declaredProviderTargets = boot.runSync("provider-targets", () => parseDeclaredProviderTargets({
+  targetsJson: providerTargetsJson, configuredProviders: deploymentMakers.configuredProviders,
+  mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV
+}));
 // Side-by-side spec §13, addition D24 (owner 2026-10-22: providers only, not the models, listed automatically): the
 // companies these declared targets reach, once, for GET /v1/public/ai-providers (the "AI providers" legal page).
 const aiProviderCompanies = providerCompaniesOfTargets(declaredProviderTargets);
@@ -504,13 +491,16 @@ const previewFetch = previewGate === undefined ? undefined : createPreviewGuarde
  */
 const askRoomReadiness = environment.DEPLOYMENT_MODE === "hosted" && siteCostEnvelopePolicy !== null
   ? await boot.run("ask-room", async () => {
-      const billingPlans = assertBillingReady({
+      // Side-by-side spec §13 (S14, ruling R57): the one decision check-version and the practice ask too
+      // (admission-settings.ts): billing ready, the band, then (with the band) the sealed askRoomReads budget (paid plans
+      // P4-G, ruling C7, go-live row 31: ASK_ROOM_ADMISSION_UNSEALED; the hosted publish asks the same question).
+      const readiness = decideAskRoomReadiness({
+        envelope: siteCostEnvelopePolicy,
+        admission: admissionPolicy,
         policy: await readBillingPolicy(pool, environment.REGISTER_VERSION),
-        plans: await readBillingPlans(pool, environment.REGISTER_VERSION),
-        envelope: siteCostEnvelopePolicy
+        plans: await readBillingPlans(pool, environment.REGISTER_VERSION)
       });
-      const band = costEnvelopeBand(siteCostEnvelopePolicy);
-      if (band === null) {
+      if (readiness === null) {
         const stranded = await new RunWaitRepository(pool).countWaiting();
         if (stranded > 0) {
           throw new TypedDomainError(
@@ -520,10 +510,7 @@ const askRoomReadiness = environment.DEPLOYMENT_MODE === "hosted" && siteCostEnv
         }
         return undefined;
       }
-      // Paid plans P4-G, ruling C7 (go-live row 31): with the band the room read is a real computation on
-      // every call, so the version in force must seal its askRoomReads budget (ASK_ROOM_ADMISSION_UNSEALED).
-      // The hosted publish asks the same question in its plan and in verifyHostedRegisterBootReadiness.
-      assertAskRoomAdmissionSealed({ envelope: siteCostEnvelopePolicy, admission: admissionPolicy });
+      const { band, billingPlans } = readiness;
       const spend = new PostgresModelSpendStore(pool);
       const entitlements = billingPlans === null ? null : new EntitlementRepository(pool);
       // Side-by-side spec §9 (C17), the runner's rule (B14): no funding read and no funding refusal at boot. The selection
@@ -541,9 +528,6 @@ const askRoomReadiness = environment.DEPLOYMENT_MODE === "hosted" && siteCostEnv
       return Object.freeze({ runPolicy: siteCostEnvelopePolicy, band, spend, entitlements, fundedAllowance, personAllowance, billingPlans });
     })
   : undefined;
-// Paid plans S2/S4b: billing is on exactly when the room's readiness answer carries the plans (a site member the
-// admission loader's picker and run-ceiling stages read).
-const billingEnabled = (askRoomReadiness?.billingPlans ?? null) !== null;
 // V-30(1): the support chat's model is configuration, on the SAME mode decision
 // the debate targets take above. Hosted refuses a relay target here exactly as
 // it refuses one there; local keeps today's relay path. Parsed HERE, above the
@@ -578,9 +562,9 @@ const admissionSite: AdmissionSiteContext = boot.runSync("admission-site", () =>
   environment,
   declaredProviderTargets,
   siteCostEnvelopePolicy,
-  // B6b: the room is built exactly when its readiness answered (hosted, the site's row carries the band).
-  askRoom: askRoomReadiness !== undefined,
-  billingEnabled,
+  // B6b: the room is built exactly when its readiness answered (hosted, the site's row carries the band); paid plans
+  // S2/S4b: billing is on exactly when that answer carries the plans (the loader's picker and run ceiling read it).
+  askRoomReadiness: askRoomReadiness ?? null,
   questionLanguage: Object.freeze({
     /**
      * Question language (spec 2026-10-13), Task 19: with no preview configured the hosted side decides. It probes for
@@ -590,33 +574,21 @@ const admissionSite: AdmissionSiteContext = boot.runSync("admission-site", () =>
      * a configured preview is PREVIEW (the guarded fetch with the Anthropic gate socket) or NONE, never HOSTED (no
      * onUsage there: the gate settles preview money).
      */
-    routeFor: async ({ policy, dayCeilingMicros }: Readonly<{ policy: QuestionLanguagePolicy | null; dayCeilingMicros: number | null }>) => {
-      const hostedRoute = previewGate !== undefined ? undefined : await hostedQuestionLanguageRoute({
-        mode: environment.DEPLOYMENT_MODE,
-        fastCheck: (policy ?? questionLanguagePolicyStartValues()).fastCheck,
-        readCredential: () => supportAnthropicMessagesKey(supportModelTarget, readSupportCredentialOnce),
-        spend: {
-          writerPresent: () => languageCheckSpendWriterPresent(pool),
-          record: (entry) => recordLanguageCheckSpend(pool, entry)
-        },
-        // Ruling L-POT: the day ceiling the ask admission uses (costEnvelopeGuardPolicy), against the day's whole site pot.
-        dayPot: dayCeilingMicros === null ? null : {
-          ceilingMicros: dayCeilingMicros,
-          spentMicros: (day) => new PostgresModelSpendStore(pool).readDaySpentMicros(day)
-        },
-        clock: () => new Date(),
-        report: (line) => console.error(JSON.stringify(line))
-      });
-      return questionLanguageRouteFor({
-        previewConfigured: previewGate !== undefined,
-        previewFetch,
-        anthropicSocket: previewGate === undefined ? undefined : previewProviderSocket(previewGate, "anthropic"),
-        hosted: () => {
-          if (hostedRoute === undefined) throw new TypeError("QUESTION_LANGUAGE_HOSTED_ROUTE_ON_PREVIEW");
-          return hostedRoute;
-        }
-      });
-    },
+    // Side-by-side spec §13 (S14, ruling R57): the one route decision (question-language/boot.ts), check-version's too.
+    routeFor: async ({ policy, dayCeilingMicros }: Readonly<{ policy: QuestionLanguagePolicy | null; dayCeilingMicros: number | null }>) => questionLanguageSiteRoute({
+      mode: environment.DEPLOYMENT_MODE,
+      policy,
+      dayCeilingMicros,
+      previewGate,
+      previewFetch,
+      readCredential: () => supportAnthropicMessagesKey(supportModelTarget, readSupportCredentialOnce),
+      spend: {
+        writerPresent: () => languageCheckSpendWriterPresent(pool),
+        record: (entry) => recordLanguageCheckSpend(pool, entry)
+      },
+      daySpentMicros: (day) => new PostgresModelSpendStore(pool).readDaySpentMicros(day),
+      report: (line) => console.error(JSON.stringify(line))
+    }),
     // CR-5: one key for every API process of this deployment, derived from the blind-index key loaded above.
     referenceKey: questionLanguageReferenceKeyFrom(blindIndexKey)
   }),

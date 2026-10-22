@@ -26,7 +26,11 @@ describe("production provider discovery", () => {
   it("wires the active resolver into the real API entrypoint", async () => {
     const source = await readFile("apps/api/src/main.ts", "utf8");
     expect(source).toContain("createProviderDiscoveryResolver");
-    expect(source).toContain("parseProviderDiscoveryTargets");
+    // Side-by-side spec §13 (S14, ruling R57): the parse and its two judgements are one decision, shared with the practice
+    // and check-version (provider-discovery.ts), which main.ts calls.
+    expect(source).toContain("parseDeclaredProviderTargets({");
+    expect(await readFile("apps/api/src/provider-discovery.ts", "utf8"))
+      .toContain("const declared = parseProviderDiscoveryTargets(input.targetsJson, input.configuredProviders);");
     expect(source).toContain("environment.PROVIDER_DISCOVERY_TARGETS_JSON");
     expect(source).not.toContain("now - record.probedAt.getTime() <= discoveryPolicy.probeFreshnessMs");
   });

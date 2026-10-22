@@ -16,12 +16,20 @@ describe("B6b the API root composes the room", () => {
     // BEFORE the admission loader (billing on or off is a site member the loader's picker and run ceiling read); the
     // room itself is built after the loader, over the site version's estimator.
     expect(main).toMatch(/const askRoomReadiness = environment\.DEPLOYMENT_MODE === "hosted" && siteCostEnvelopePolicy !== null/u);
-    const step = main.slice(main.indexOf('boot.run("ask-room"'), main.indexOf("const billingEnabled ="));
-    expect(step.length).toBeGreaterThan(0);
-    const ready = step.indexOf("const billingPlans = assertBillingReady({");
-    const bandless = step.indexOf("if (band === null) {");
+    const stepEnd = main.indexOf("// V-30(1): the support chat's model is configuration");
+    const step = main.slice(main.indexOf('boot.run("ask-room"'), stepEnd);
+    expect(stepEnd).toBeGreaterThan(main.indexOf('boot.run("ask-room"'));
+    // Side-by-side spec §13 (S14, ruling R57): B4a's readiness, the band and the room-read budget are one decision
+    // (decideAskRoomReadiness, admission-settings.ts) shared with the practice and check-version; null = no band.
+    const ready = step.indexOf("const readiness = decideAskRoomReadiness({");
+    const bandless = step.indexOf("if (readiness === null) {");
     expect(ready).toBeGreaterThan(-1);
     expect(bandless).toBeGreaterThan(ready);
+    const decision = loader.slice(loader.indexOf("export function decideAskRoomReadiness("), loader.indexOf("export function buildAdmissionSiteContext("));
+    expect(decision.indexOf("const billingPlans = assertBillingReady({")).toBeGreaterThan(-1);
+    expect(decision.indexOf("if (band === null) return null;")).toBeGreaterThan(decision.indexOf("const billingPlans = assertBillingReady({"));
+    expect(decision).toContain("envelope: input.envelope");
+    expect(decision).not.toContain("BILLING_PLANS_UNRESOLVED");
     // No band and a non-empty line: the boot is refused by name, before anything is built.
     const stranded = step.slice(bandless, step.indexOf("return undefined;", bandless));
     expect(stranded).toContain("await new RunWaitRepository(pool).countWaiting()");
@@ -47,9 +55,10 @@ describe("B6b the API root composes the room", () => {
     // that version may spend; the room is handed the site version's and every version's by `estimatorFor`.
     // Side-by-side spec §13 (S14): the site context is built by the one builder main.ts, the practice and check-version
     // share (buildAdmissionSiteContext); main.ts tells it the room is built exactly when the room's readiness answered.
-    expect(main).toContain("askRoom: askRoomReadiness !== undefined,");
+    expect(main).toContain("askRoomReadiness: askRoomReadiness ?? null,");
+    expect(loader).toContain("const askRoom = input.askRoomReadiness !== null;");
     expect(loader).toContain("prices: buildApiProviderPriceMap(declaredProviderTargets, environment.DEPLOYMENT_MODE),");
-    expect(loader).toContain("recentRunUsage: input.askRoom ? new PostgresRecentRunUsageSource(pool) : null,");
+    expect(loader).toContain("recentRunUsage: askRoom ? new PostgresRecentRunUsageSource(pool) : null,");
     expect(composition).toContain("estimatorFor: async (version) => (await admissionCache.admissionSettingsFor(version)).estimator!,");
     expect(loader).toContain("maximumMicros: mostOneRunMaySpendMicros(guardPolicy)");
   });
@@ -68,8 +77,8 @@ describe("B6b the API root composes the room", () => {
     // Side-by-side spec §13 (S9): the daily guard is the version's (the one mapping hands it), built only when the site
     // context gives it a store, which main.ts does only without the room (S14: by the one site builder, told whether the
     // room is built).
-    expect(main).toContain("askRoom: askRoomReadiness !== undefined,");
-    expect(loader).toContain("spend: siteCostEnvelopePolicy === null || input.askRoom ? null : new PostgresModelSpendStore(pool),");
+    expect(main).toContain("askRoomReadiness: askRoomReadiness ?? null,");
+    expect(loader).toContain("spend: siteCostEnvelopePolicy === null || askRoom ? null : new PostgresModelSpendStore(pool),");
     expect(loader).toContain("dailyGuard: site.spend === null ? null : new CostEnvelopeGuard({ store: site.spend, policy: guardPolicy }),");
     expect(loader).toContain("...(dailyGuard === null ? {} : { assertDailyCostEnvelope: () => dailyGuard.assertDailyEnvelopeAdmitsNewRun() }),");
   });

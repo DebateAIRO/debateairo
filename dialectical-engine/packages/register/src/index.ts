@@ -1480,6 +1480,7 @@ export {
   runSettingsCheckCommand,
   runSettingsCheckSteps,
   settingsCheckUnavailableReason,
+  settingsVersionKindRefusal,
   settingsCheckLine,
   settingsCheckRefusalCode,
   settingsCheckReport,

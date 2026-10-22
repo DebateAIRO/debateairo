@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import { costEnvelopeDay, languageCheckChargeMicros, type LanguageCheckSpendEntry } from "@debateai/budget";
 import { TypedDomainError } from "@debateai/kernel";
 import {
-  ANTHROPIC_MESSAGES_BASE_URL, ANTHROPIC_MESSAGES_PATH, PREVIEW_ANTHROPIC_MESSAGES_URL, previewModelRow, promptTextHasReservedToken, type PreviewModelRow
+  ANTHROPIC_MESSAGES_BASE_URL, ANTHROPIC_MESSAGES_PATH, PREVIEW_ANTHROPIC_MESSAGES_URL, previewModelRow, previewProviderSocket,
+  promptTextHasReservedToken, type PreviewGateSettings, type PreviewModelRow
 } from "@debateai/providers";
 import {
   questionLanguagePolicyStartValues, type DeploymentMode, type QuestionLanguageFastCheck, type QuestionLanguagePolicy
@@ -198,6 +199,48 @@ export async function hostedQuestionLanguageRoute(input: Readonly<{
     }
   };
   return Object.freeze({ kind: "HOSTED", credential, recordSpend, beforeSend });
+}
+
+/**
+ * Side-by-side spec §13 (S14, ruling R57) — THE SITE's ROUTE, ONE DECISION, for apps/api/src/main.ts's
+ * `questionLanguage.routeFor` and check-version's API half (which hands it a fetch that refuses and a spend writer that
+ * is absent, so it can never send or spend). Task 19 and ruling L-ROUTE: with no preview configured the hosted side
+ * decides (`hostedQuestionLanguageRoute`: the price-table and day-pot boot refusals, then 0118's writer, then the support
+ * target's key, read only through `readCredential`); a configured preview is PREVIEW (the guarded fetch with the
+ * Anthropic gate socket) or NONE, never HOSTED. Asked per settings version with its policy and the day ceiling its
+ * admission uses (ruling L-POT).
+ */
+export async function questionLanguageSiteRoute(input: Readonly<{
+  mode: DeploymentMode;
+  policy: QuestionLanguagePolicy | null;
+  dayCeilingMicros: number | null;
+  previewGate: PreviewGateSettings | undefined;
+  previewFetch: typeof fetch | undefined;
+  readCredential: () => string | undefined;
+  spend: Readonly<{ writerPresent: () => Promise<boolean>; record: (entry: LanguageCheckSpendEntry) => Promise<void> }>;
+  daySpentMicros: (day: string) => Promise<number>;
+  report: (line: QuestionLanguageSpendReport) => void;
+}>): Promise<QuestionLanguagePaidRoute> {
+  const { previewGate, previewFetch, policy, dayCeilingMicros } = input;
+  const hostedRoute = previewGate !== undefined ? undefined : await hostedQuestionLanguageRoute({
+    mode: input.mode,
+    fastCheck: (policy ?? questionLanguagePolicyStartValues()).fastCheck,
+    readCredential: input.readCredential,
+    spend: input.spend,
+    // Ruling L-POT: the day ceiling the ask admission uses (costEnvelopeGuardPolicy), against the day's whole site pot.
+    dayPot: dayCeilingMicros === null ? null : { ceilingMicros: dayCeilingMicros, spentMicros: input.daySpentMicros },
+    clock: () => new Date(),
+    report: input.report
+  });
+  return questionLanguageRouteFor({
+    previewConfigured: previewGate !== undefined,
+    previewFetch,
+    anthropicSocket: previewGate === undefined ? undefined : previewProviderSocket(previewGate, "anthropic"),
+    hosted: () => {
+      if (hostedRoute === undefined) throw new TypeError("QUESTION_LANGUAGE_HOSTED_ROUTE_ON_PREVIEW");
+      return hostedRoute;
+    }
+  });
 }
 
 /**

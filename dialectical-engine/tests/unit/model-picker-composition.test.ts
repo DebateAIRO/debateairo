@@ -33,8 +33,10 @@ describe("A20 · the picker is composed where runs are created", () => {
     // Paid plans S4c (final review P3-M4): the picker's money terms are the version's guard policy, and billing is on
     // exactly when the room's readiness answer carries the plans (a site member). Dropped, the picker would silently
     // fall back to the bare per-run ceiling, and a scorecard capping Free above ECONOMY would boot with billing on.
-    expect(main).toContain("const billingEnabled = (askRoomReadiness?.billingPlans ?? null) !== null;\n");
-    expect(main).toContain("  billingEnabled,\n");
+    // Side-by-side spec §13 (S14, ruling R57): main.ts hands the room's readiness answer to the one site builder
+    // (buildAdmissionSiteContext), which derives the switch from it for main.ts, the practice and check-version.
+    expect(main).toContain("  askRoomReadiness: askRoomReadiness ?? null,\n");
+    expect(source).toContain("    billingEnabled: (input.askRoomReadiness?.billingPlans ?? null) !== null,\n");
     // Debate shape (P2b Task 6, pre-flight PF-B22): the row in force reaches the Free answer-job check.
     expect(source).toContain(
       "    callTokenCeilings,\n    moneyPolicy: costEnvelope?.guardPolicy ?? null,\n    billingEnabled: site.billingEnabled,\n"
@@ -44,7 +46,8 @@ describe("A20 · the picker is composed where runs are created", () => {
     // LG-C Task 6 (spec 2026-10-15 §3.10): the length row, read by its own earlier stage, reaches the same check.
     expect(source.indexOf('run("length-guidance-policy"')).toBeGreaterThan(-1);
     expect(source.indexOf('run("length-guidance-policy"')).toBeLessThan(source.indexOf("await readers.composeAskModelPicker({"));
-    expect(main.indexOf("const billingEnabled = ")).toBeLessThan(main.indexOf("const siteAdmission = await loadAdmissionSettings("));
+    expect(main.indexOf("  askRoomReadiness: askRoomReadiness ?? null,")).toBeGreaterThan(-1);
+    expect(main.indexOf("  askRoomReadiness: askRoomReadiness ?? null,")).toBeLessThan(main.indexOf("const siteAdmission = await loadAdmissionSettings("));
     expect(source.indexOf('run("call-token-ceilings"')).toBeLessThan(source.indexOf("await readers.composeAskModelPicker({"));
     expect(main).toMatch(/\n {2}\.\.\.admissionSettingsOfVersion\(siteAdmission\),\n/u);
     expect(source).toContain("    modelPicker: version.modelPicker,\n");

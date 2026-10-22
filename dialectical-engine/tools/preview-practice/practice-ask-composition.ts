@@ -51,11 +51,8 @@ import {
   type CostEstimator
 } from "@debateai/budget";
 import {
-  assertDeploymentProviderTargets,
-  assertPricedProviderTargets,
   createPreviewGuardedFetch,
   createPreviewRemainingRpcPort,
-  parseProviderDiscoveryTargets,
   PREVIEW_GLM_DEADLINE_MS,
   previewProbeControls,
   resolveProviderTargetCredentials,
@@ -63,11 +60,8 @@ import {
   type PreviewGateRemaining
 } from "@debateai/providers";
 import {
-  assertAskRoomAdmissionSealed,
-  assertBillingReady,
   assertHostedCostEnvelopesSealed,
   assertHostedSupportAdmissionSealed,
-  costEnvelopeBand,
   readAdmissionPolicy,
   readBillingPlans,
   readBillingPolicy,
@@ -78,11 +72,12 @@ import {
 } from "@debateai/register";
 import { AskRoom } from "../../apps/api/src/ask-room.js";
 import { PostgresAskAdmissionGate } from "../../apps/api/src/release-state.js";
-import { createProviderDiscoveryResolver } from "../../apps/api/src/provider-discovery.js";
+import { createProviderDiscoveryResolver, parseDeclaredProviderTargets } from "../../apps/api/src/provider-discovery.js";
 import {
   admissionSettingsOfVersion,
   buildAdmissionSiteContext,
   createAdmissionSettingsCache,
+  decideAskRoomReadiness,
   loadAdmissionSettings,
   type AdmissionRunMembers,
   type AdmissionSiteContext
@@ -128,13 +123,14 @@ export async function composePracticeAskMoney(input: Readonly<{
   // main.ts's "ask-room" stage: the readiness question with the register's OWN billingPolicy (refuses exactly as the
   // hosted API's boot does). Its answer (the plans when billing is on) is kept for the report and, as main.ts's
   // `billingEnabled`, for the loader's picker and run-ceiling stages: the practice's room is built with billing off.
-  const registerBillingPlans = assertBillingReady({
+  // Side-by-side spec §13 (S14, ruling R57): main.ts's one decision (admission-settings.ts), check-version's too.
+  const readiness = decideAskRoomReadiness({
+    envelope: siteCostEnvelopePolicy,
+    admission: admissionPolicy,
     policy: await readBillingPolicy(pool, environment.REGISTER_VERSION),
-    plans: await readBillingPlans(pool, environment.REGISTER_VERSION),
-    envelope: siteCostEnvelopePolicy
+    plans: await readBillingPlans(pool, environment.REGISTER_VERSION)
   });
-  const band = costEnvelopeBand(siteCostEnvelopePolicy);
-  if (band === null) {
+  if (readiness === null) {
     const stranded = await new RunWaitRepository(pool).countWaiting();
     if (stranded > 0) {
       throw new TypedDomainError(
@@ -142,15 +138,16 @@ export async function composePracticeAskMoney(input: Readonly<{
         "Questions are waiting in line, and a register version without the band has no waker to start them"
       );
     }
-  } else {
-    assertAskRoomAdmissionSealed({ envelope: siteCostEnvelopePolicy, admission: admissionPolicy });
   }
+  // Billing on needs the band (B4a refuses it otherwise), so no answer means billing off.
+  const registerBillingPlans = readiness?.billingPlans ?? null;
+  const band = readiness?.band ?? null;
   return Object.freeze({
     siteCostEnvelopePolicy, band,
+    /** The room's readiness answer, as main.ts's (null when no room is built): the site context's billing switch. */
+    readiness,
     /** What the register says (the practice runs billing off either way). */
-    billingInRegister: registerBillingPlans === null ? "off" as const : "on" as const,
-    /** main.ts's `billingEnabled`: the loader's picker and run ceiling read the register's own billing state. */
-    registerBillingEnabled: registerBillingPlans !== null
+    billingInRegister: registerBillingPlans === null ? "off" as const : "on" as const
   });
 }
 
@@ -233,10 +230,11 @@ export async function composePracticeAsk(input: Readonly<{
   const deploymentMakers = await readDeploymentMakerCapability(pool, environment.REGISTER_VERSION);
   const discoveryPolicy = await readPanelDiscoveryPolicy(pool, environment.REGISTER_VERSION);
   const probes = new ProviderProbeRepository(pool);
-  const declaredProviderTargets = parseProviderDiscoveryTargets(
-    environment.PROVIDER_DISCOVERY_TARGETS_JSON, deploymentMakers.configuredProviders);
-  assertDeploymentProviderTargets(declaredProviderTargets, { mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV });
-  assertPricedProviderTargets(declaredProviderTargets, environment.DEPLOYMENT_MODE);
+  // As main.ts (S14, ruling R57): the one decision over the declared targets (provider-discovery.ts).
+  const declaredProviderTargets = parseDeclaredProviderTargets({
+    targetsJson: environment.PROVIDER_DISCOVERY_TARGETS_JSON, configuredProviders: deploymentMakers.configuredProviders,
+    mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV
+  });
   const previewFetch = createPreviewGuardedFetch(input.budgetPorts);
   const providerDiscoveryTargets = resolveProviderTargetCredentials(declaredProviderTargets, () => {
     throw new TypeError("PRACTICE_TARGET_DECLARES_A_CREDENTIAL");
@@ -263,9 +261,8 @@ export async function composePracticeAsk(input: Readonly<{
     environment,
     declaredProviderTargets,
     siteCostEnvelopePolicy: money === null ? null : money.siteCostEnvelopePolicy,
-    // As main.ts: the room is built exactly when the site's row carries the band (hosted).
-    askRoom: money !== null && money.band !== null,
-    billingEnabled: money?.registerBillingEnabled ?? false,
+    // As main.ts: the room's readiness answer (present exactly when the room is built; its plans say billing is on).
+    askRoomReadiness: money === null ? null : money.readiness,
     questionLanguage: Object.freeze({
       routeFor: async () => questionLanguageRouteFor({
         previewConfigured: true,

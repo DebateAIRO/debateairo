@@ -3,6 +3,8 @@ import { readRoleRotationCounts, settingsRefusalCode } from "@debateai/db";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes, type AskRequest } from "@debateai/contract";
 import {
+  assertAskRoomAdmissionSealed,
+  assertBillingReady,
   composeDebateCostEnvelope,
   computeStructuralCeilingBasis,
   costEnvelopeBand,
@@ -26,6 +28,9 @@ import {
   readStoryPolicyFromRegister,
   readStructuralCeilingPolicyInputs,
   resolveEffectiveRiskTier,
+  type AdmissionPolicy,
+  type BillingPlans,
+  type BillingPolicy,
   type CostEnvelopeBand,
   type CostEnvelopePolicy,
   type DebateShapePolicy,
@@ -129,6 +134,29 @@ export type AdmissionSiteContext = Readonly<{
 }>;
 
 /**
+ * Budget spec 2026-09-28 §2.4-§2.7, paid-plans spec §2.4 (B6b, B4a, P4-G) and side-by-side spec §13 (S14, ruling R57) —
+ * THE ROOM'S BOOT QUESTIONS, ONE DECISION, asked of the site's money row by main.ts's "ask-room" stage, the preview
+ * practice's ask and check-version's API half alike. In order: B4a's one readiness check (R-5: billing switched on
+ * without a billingPlans row, or without the band, refuses by name, BILLING_PLANS_UNRESOLVED /
+ * BILLING_REQUIRES_ENVELOPE_MEMBERS, A22; it answers the plans when billing is on and null when off); then the band
+ * (none: no room is built, null — the caller decides about a waiting line, which is live state); then, with the band,
+ * the sealed askRoomReads budget (ASK_ROOM_ADMISSION_UNSEALED: with the band the room read is a real computation on
+ * every call, go-live row 31). Pure: the caller reads the rows.
+ */
+export function decideAskRoomReadiness(input: Readonly<{
+  envelope: CostEnvelopePolicy;
+  admission: AdmissionPolicy;
+  policy: BillingPolicy | null;
+  plans: BillingPlans | null;
+}>): Readonly<{ band: CostEnvelopeBand; billingPlans: BillingPlans | null }> | null {
+  const billingPlans = assertBillingReady({ policy: input.policy, plans: input.plans, envelope: input.envelope });
+  const band = costEnvelopeBand(input.envelope);
+  if (band === null) return null;
+  assertAskRoomAdmissionSealed({ envelope: input.envelope, admission: input.admission });
+  return Object.freeze({ band, billingPlans });
+}
+
+/**
  * Side-by-side spec §13 (S14) — THE SITE CONTEXT, BUILT ONE WAY. apps/api/src/main.ts (inside its "admission-site" boot
  * stage), the preview practice's ask (tools/preview-practice/practice-ask-composition.ts) and `check-version`'s API half
  * (./settings-check.ts) all build `AdmissionSiteContext` here, from the site facts each read the same way (the declared
@@ -151,14 +179,17 @@ export function buildAdmissionSiteContext(input: Readonly<{
   declaredProviderTargets: readonly ProviderDiscoveryTarget[];
   /** Hosted only (null in local mode): the site version's costEnvelopePolicy row. */
   siteCostEnvelopePolicy: CostEnvelopePolicy | null;
-  /** B6b: the room is built (hosted, the site's row carries the band). */
-  askRoom: boolean;
-  billingEnabled: boolean;
+  /**
+   * The room's readiness answer (`decideAskRoomReadiness`): present exactly when the room is built (hosted, the site's
+   * row carries the band); its plans are non-null exactly when billing is on (paid plans S2/S4b: the picker and B9 read it).
+   */
+  askRoomReadiness: Readonly<{ billingPlans: BillingPlans | null }> | null;
   questionLanguage: AdmissionSiteContext["questionLanguage"];
   previewRemaining?: AdmissionSiteContext["previewRemaining"];
   log: (line: string) => void;
 }>): AdmissionSiteContext {
   const { pool, environment, declaredProviderTargets, siteCostEnvelopePolicy } = input;
+  const askRoom = input.askRoomReadiness !== null;
   // Addition D14 / ruling R25: "is this the preview?" keys on the env's gate part, present for every accepted form.
   const previewGate = environment.PREVIEW_GATE_SETTINGS;
   return Object.freeze({
@@ -168,10 +199,11 @@ export function buildAdmissionSiteContext(input: Readonly<{
     declaredProviderTargets,
     siteCostEnvelope: siteCostEnvelopePolicy === null ? null
       : { runPolicy: siteCostEnvelopePolicy, band: costEnvelopeBand(siteCostEnvelopePolicy) },
-    billingEnabled: input.billingEnabled,
+    // Paid plans S2/S4b: billing is on exactly when the room's readiness answer carries the plans.
+    billingEnabled: (input.askRoomReadiness?.billingPlans ?? null) !== null,
     // V-28(2): the daily guard's store only without the room (hosted); with it the room decides instead, never both.
-    spend: siteCostEnvelopePolicy === null || input.askRoom ? null : new PostgresModelSpendStore(pool),
-    recentRunUsage: input.askRoom ? new PostgresRecentRunUsageSource(pool) : null,
+    spend: siteCostEnvelopePolicy === null || askRoom ? null : new PostgresModelSpendStore(pool),
+    recentRunUsage: askRoom ? new PostgresRecentRunUsageSource(pool) : null,
     prices: buildApiProviderPriceMap(declaredProviderTargets, environment.DEPLOYMENT_MODE),
     questionLanguage: input.questionLanguage,
     ...(input.previewRemaining === undefined ? {} : { previewRemaining: input.previewRemaining }),

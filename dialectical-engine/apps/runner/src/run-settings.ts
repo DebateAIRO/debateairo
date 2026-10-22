@@ -288,12 +288,13 @@ export async function declaredContractHashRefusals(pool: Pick<Pool, "query">, ve
 }
 
 /**
- * D5, as one assertion (the plan's interface): throws TypedDomainError with the first of
- * `declaredContractHashRefusals` as its code (and message), e.g. `SETTINGS_HASH_UNDECLARED:engineContractHash`.
+ * D5, as one assertion (the plan's interface): throws the first of `declaredContractHashRefusals` as a TypedDomainError
+ * in the house form, the bare code and the whole refusal as the message (`SETTINGS_HASH_UNDECLARED` /
+ * `SETTINGS_HASH_UNDECLARED:engineContractHash`; check-version's report keeps the detail).
  */
 export async function assertDeclaredContractHashes(pool: Pick<Pool, "query">, version: number): Promise<void> {
   const [first] = await declaredContractHashRefusals(pool, version);
-  if (first !== undefined) throw new TypedDomainError(first, first);
+  if (first !== undefined) throw new TypedDomainError(first.split(":")[0]!, first);
 }
 
 /** One sealed version, as this runner runs it. Kept forever: sealed versions never change. */
