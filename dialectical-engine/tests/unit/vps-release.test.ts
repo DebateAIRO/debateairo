@@ -11,6 +11,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import * as runtimeEnvironment from "../../packages/register/src/runtime-environment.js";
 
 const release = await import("../../deploy/" + "vps/release.mjs");
+const environment = await import("../../deploy/" + "preview-auth-dev/v1/environment.mjs");
 const common = await import("../../deploy/" + "preview-lifecycle/v1/common.mjs");
 const table = await import("../../deploy/" + "preview-lifecycle/v1/release-table.mjs");
 const VPS = common.VPS_LAYOUT;
@@ -54,12 +55,38 @@ describe("the public server's per-release overlays (side-by-side spec §10)", ()
     expect(ui.sort()).toEqual(["DIALECTICAL_API_BASE", "PORT", "RELEASE_KEY"]);
   });
 
-  it("each overlay names its file, its owner and the base file it overrides", () => {
+  it("each overlay example is only KEY=value lines, as the overlay reader takes it, and README §5 names its file, owner and base file (final fix wave S6)", () => {
+    const readme = read("deploy/vps/README.md");
     for (const service of ["api", "runner", "ui"]) {
       const text = read(`deploy/vps/env/releases/${service}.env.example`);
-      expect(text, service).toContain(`/etc/debateai/releases/<label>/${service}.env (0640 root:debateai-${service})`);
-      expect(text, service).toContain(`/etc/debateai/${service}.env`);
+      // No comment and no blank line: a copied example, its placeholders filled, is an overlay release.mjs can read.
+      for (const line of text.split("\n").slice(0, -1)) expect(line, service).toMatch(/^[A-Z][A-Z0-9_]*=\S+$/u);
+      const filled = text.replaceAll("<register-version>", "20").replaceAll("<release-key>", NEW_KEY);
+      expect(Object.keys(environment.parseEnvironmentText(filled)), service).toEqual(exampleKeys(`deploy/vps/env/releases/${service}.env.example`));
+      expect(readme, service).toContain(`| \`/etc/debateai/releases/<label>/${service}.env\` | \`0640 root:debateai-${service}\` | \`/etc/debateai/${service}.env\` |`);
     }
+    // The reader refuses a comment line: why the examples carry none.
+    expect(() => environment.parseEnvironmentText(`# a comment\nRELEASE_KEY=${NEW_KEY}\n`)).toThrow();
+  });
+
+  it("the public server's docs name the instance units and the checks side by side needs (final fix wave S6)", () => {
+    const readme = read("deploy/vps/README.md"), register = read("deploy/vps/register/README.md"), setup = read("deploy/vps/billing-setup.sh");
+    // The fixed units are gone: every restart names an instance.
+    for (const [name, text] of [["register", register], ["billing-setup", setup]] as const) {
+      expect(text, name).not.toMatch(/systemctl restart debateai-(api|ui|runner)(?!@)/u);
+    }
+    expect(setup).toContain("systemctl restart debateai-api@<label>");
+    expect(register).toContain("(`debateai-api@<label>`, `debateai-runner@<label>`)");
+    expect(register).toContain("do a side-by-side upgrade whose key carries `N`");
+    // Step 14 checks the release's two retirement timers before its folder moves.
+    expect(readme).toContain("! systemctl is-active --quiet debateai-runner-retire@$old.timer debateai-runner-retire-check@$old.timer && ! systemctl is-enabled --quiet debateai-runner-retire@$old.timer debateai-runner-retire-check@$old.timer && echo \"to archive: $old\"");
+    // The automatic reboot's pending flag, against the release check's NO_MAINTENANCE.
+    expect(readme).toContain("`/run/reboot-required`");
+    expect(readme).toContain("(`NO_MAINTENANCE: reboot required`)");
+    // §6: what only a running Caddy shows (the preview's TB7): the edge secret filled into health_headers, and /readyz refused.
+    const caddy = readme.slice(readme.indexOf("## 6. Caddy"), readme.indexOf("## 7. Mail"));
+    expect(caddy).toContain("curl -s -m 15 -o /dev/null -D - http://127.0.0.1:3090/readyz | tr -d '\\r' | grep -i '^x-debateai-release:'");
+    expect(caddy).toContain(`curl -s -o /dev/null -w '%{http_code}\\n' "https://$DEBATEAI_PUBLIC_HOSTNAME/readyz"`);
   });
 
   it("hatchet's compose file is no longer in any release or the operator checkout", () => {

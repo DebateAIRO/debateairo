@@ -924,6 +924,13 @@ The rules, whatever the release:
 - **One release drains at a time.** The release check refuses a new upgrade while an older
   release is still draining, and refuses infrastructure maintenance (PostgreSQL, Hatchet, Caddy)
   then too.
+- **A pending reboot waits for the upgrade, and the other way round.** The automatic security
+  reboot (§2: `Automatic-Reboot "true"`, at 04:30) leaves `/run/reboot-required` until it runs;
+  while that file exists the release check answers `NOT_READY` (`NO_MAINTENANCE: reboot required`).
+  Upgrade after the reboot, or reboot by hand first while no release drains. A reboot that comes
+  during a drain is safe on this server: the draining release's runner instance stays enabled until
+  it retires, so it starts again at boot and finishes its debates (from its own folder, database
+  ahead), and its backstop timer is persistent (a time the reboot skipped fires at boot).
 - **A release whose migrations are not all additive** (each step marked `n1: expand`) cannot go
   side by side; the release check says so (`DRAINED_PATH`), and that release needs a drained
   upgrade ("A drained upgrade" below): every debate finished, the older release stopped, then the
@@ -994,6 +1001,22 @@ printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && printf 
   chgrp debateai-ui "/etc/debateai/releases/$new/ui.env" && ls -l "/etc/debateai/releases/$new"
 ```
 
+The three files have exactly the shape of `env/releases/*.env.example`: one `KEY=value` per line
+and no comment line. `release.mjs` reads the API overlay with the release tools' strict env reader,
+which refuses a comment, an empty value or a quote; systemd reads all three after the base file,
+and the later file wins.
+
+| Overlay | Owner and mode | Over the base file | What it holds |
+|---|---|---|---|
+| `/etc/debateai/releases/<label>/api.env` | `0640 root:debateai-api` | `/etc/debateai/api.env` | `REGISTER_VERSION` (the number in the key), `RELEASE_KEY`, `API_PORT` |
+| `/etc/debateai/releases/<label>/runner.env` | `0640 root:debateai-runner` | `/etc/debateai/runner.env` | `REGISTER_VERSION`, `RELEASE_KEY`, `RUNNER_WORKER_ID` and `HATCHET_WORKER_NAME` (the base names followed by the key: two runners never share a worker identity) |
+| `/etc/debateai/releases/<label>/ui.env` | `0640 root:debateai-ui` | `/etc/debateai/ui.env` | `RELEASE_KEY`, `PORT`, `DIALECTICAL_API_BASE` (its own slot's API) |
+
+The examples show slot A; slot B uses `API_PORT=8791`, `PORT=3002` and
+`DIALECTICAL_API_BASE=http://127.0.0.1:8791`. Nothing in them is secret: every credential and path
+stays in the base files, shared by both releases. Root writes them once, before the release first
+starts, and never edits them while that release runs.
+
 **4. The release check** (read-only): `release.mjs check --label $new`. It compares the new
 release's folder with the current one's and answers whether every migration is additive, whether the previous older release has
 retired, whether there is enough connection, disk and memory headroom, whether Hatchet is healthy
@@ -1059,11 +1082,13 @@ running 7.5 hours after the switch. `release.mjs status` shows each release's st
 open work: the older release `RETIRED`, with its three instances stopped, is the receipt of the upgrade.
 
 **14. The archive**, later and on the owner's yes: move the retired release's folder and overlays
-aside. Name it first (the line refuses the current release and a release with a running unit, and forgets a
-name it refuses):
+aside. `release.mjs status` must name it `RETIRED` first. Name it (the line refuses the current
+release, a release with a running unit, and a release whose backstop or check timer is still
+active or enabled: a timer that fires after the move would run against an overlay that is gone;
+it forgets a name it refuses):
 
 ```sh
-read -r old && printf '%s\n' "$old" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && test "$old" != "$label" && ! systemctl is-active --quiet debateai-api@$old debateai-ui@$old debateai-runner@$old && echo "to archive: $old" || unset old
+read -r old && printf '%s\n' "$old" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && test "$old" != "$label" && ! systemctl is-active --quiet debateai-api@$old debateai-ui@$old debateai-runner@$old && ! systemctl is-active --quiet debateai-runner-retire@$old.timer debateai-runner-retire-check@$old.timer && ! systemctl is-enabled --quiet debateai-runner-retire@$old.timer debateai-runner-retire-check@$old.timer && echo "to archive: $old" || unset old
 ```
 
 ```sh
@@ -1677,6 +1702,17 @@ journalctl -u debateai-geoip-refresh.service --since '15 minutes ago' --no-pager
 install -m 0644 deploy/vps/Caddyfile /etc/caddy/Caddyfile
 (set -a && . /etc/default/caddy && caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile)
 systemctl restart caddy
+```
+
+Then check what only a running Caddy shows (as the preview's TB7): that it filled the edge secret
+into `health_headers` (`{file.…}` is read at run time: without it every health check fails, no
+slot is ever healthy, and the check site answers Caddy's own error with no release header), and
+that the public site refuses `/readyz`. The first line prints the current release's key within
+30 s; the second prints `404`:
+
+```sh
+H=; for i in $(seq 1 30); do H=$(curl -s -m 15 -o /dev/null -D - http://127.0.0.1:3090/readyz | tr -d '\r' | grep -i '^x-debateai-release:' || true); [ -n "$H" ] && break; sleep 1; done; echo "${H:-NO SLOT HEALTHY: Caddy did not fill the file value into health_headers, or no website is ready}"
+(set -a && . /etc/default/caddy && curl -s -o /dev/null -w '%{http_code}\n' "https://$DEBATEAI_PUBLIC_HOSTNAME/readyz")
 ```
 
 **Restart, never reload.** The Caddyfile sets `admin off`, so Caddy has no admin endpoint and

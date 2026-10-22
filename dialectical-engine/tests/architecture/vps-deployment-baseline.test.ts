@@ -373,9 +373,10 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
     expect(ui.get("PORT")).toBe("3001");
     expect(api.get("API_PORT")).toBe("8790");
     expect(ui.get("DIALECTICAL_API_BASE")).toBe(`http://127.0.0.1:${api.get("API_PORT")}`);
-    for (const [file, needle] of [["ui", "PORT=3002"], ["ui", "DIALECTICAL_API_BASE=http://127.0.0.1:8791"], ["api", "API_PORT=8791"]] as const) {
-      expect(read(`deploy/vps/env/releases/${file}.env.example`), needle).toContain(`# slot B: ${needle}`);
-    }
+    // The examples are comment-free (the overlay reader refuses comments, final fix wave S6): README §5 step 3 says
+    // what slot B uses.
+    expect(read("deploy/vps/README.md")).toContain("The examples show slot A; slot B uses `API_PORT=8791`, `PORT=3002` and\n`DIALECTICAL_API_BASE=http://127.0.0.1:8791`.");
+    for (const file of ["ui", "api", "runner"]) expect(read(`deploy/vps/env/releases/${file}.env.example`), file).not.toMatch(/^\s*#/mu);
   });
 
   it("compose.prod.yaml: hatchet-lite only, loopback published, TLS on, no insecure flags, secrets from env_file (L7-F2, L7-F3)", () => {
