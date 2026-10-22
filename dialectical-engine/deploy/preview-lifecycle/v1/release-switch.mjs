@@ -71,8 +71,14 @@ export const edgeUrlOf = layout => (layout.edge ? `${layout.edge}/readyz` : EDGE
 /** Caddy's copy of the edge secret (its health_headers send it); the website's /readyz answers only a request carrying it. */
 export const EDGE_SECRET_PATH = '/etc/debateai-v3-preview/ui-edge.caddy.secret';
 const edgeSecretPathOf = layout => layout.edgeSecretPath ?? EDGE_SECRET_PATH;
-/** The line a service prints once it is up and names its release (`<kind> {json}`): the layout's (common.mjs startedLines). */
+/**
+ * The line a service prints once it is up and names its release (`<kind> {json}`): the layout's (common.mjs startedLines).
+ * startedLines and gates have no default (a wrong one would be read on the wrong server): withDefaults refuses a layout
+ * without them, LAYOUT_REFUSED, before any command reads or writes anything (D16b review).
+ */
 const startedLineOf = (layout, service) => layout.startedLines[service];
+const layoutComplete = layout => Array.isArray(layout.gates) && layout.startedLines !== null && typeof layout.startedLines === 'object'
+  && typeof layout.startedLines.runner === 'string' && typeof layout.startedLines.api === 'string';
 /** The command the operator re-runs, named in a `next` hint: this file on the preview, release.mjs on the public server. */
 const toolOf = layout => layout.toolName ?? 'release-switch.mjs';
 /** Where the layout keeps the current release's pair at boot: 'target' (a drop-in, the preview) or 'enable' (instances). */
@@ -203,6 +209,7 @@ export async function gateFilesDigest(gates = LAYOUT.gates) {
 
 /** The dependencies with the server's defaults; tests replace them. */
 function withDefaults(layout, deps) {
+  if (!layoutComplete(layout)) refuse('LAYOUT_REFUSED');
   const run = deps.run ?? runBounded;
   const uid = layout.ownerUid ?? 0, gid = layout.ownerGid ?? 0;
   return {
@@ -844,7 +851,9 @@ async function lockHolder(path) {
  * function that lets go: it removes the file only while it still holds this pid (if the operator moved it aside, the
  * file now there is another command's). RELEASE_SWITCH_BUSY when the file exists; RELEASE_SWITCH_LOCK_FAILED otherwise.
  * A file whose holder is gone (an ssh drop skips the release, often right when the operator needs `switch --finish`)
- * is still refused, with `next`: how to clear it (D10 re-review).
+ * is still refused, with `next`: how to clear it (D10 re-review). A file with no pid yet is another command between
+ * creating it and writing its pid: its `next` says to re-run in a few seconds, and to move it aside only if that keeps
+ * failing with no command running (D10 parked minor).
  */
 export async function acquireSwitchLock(path, tool = 'release-switch.mjs') {
   let handle;
@@ -853,8 +862,11 @@ export async function acquireSwitchLock(path, tool = 'release-switch.mjs') {
   } catch (error) {
     if (error?.code === 'EEXIST') {
       const holder = await lockHolder(path);
-      refuse('RELEASE_SWITCH_BUSY', holder.holderAlive ? holder
-        : { ...holder, next: `no ${tool} is running (check: pgrep -f ${tool}); move ${path} aside, then re-run` });
+      if (holder.holderAlive) refuse('RELEASE_SWITCH_BUSY', holder);
+      refuse('RELEASE_SWITCH_BUSY', { ...holder, next: holder.holderPid !== null
+        ? `no ${tool} is running (check: pgrep -f ${tool}); move ${path} aside, then re-run`
+        : `re-run in a few seconds (another ${tool} is taking the lock); only if it is still refused and none is running `
+          + `(check: pgrep -f ${tool}), move ${path} aside` });
     }
     refuse('RELEASE_SWITCH_LOCK_FAILED');
   }

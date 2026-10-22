@@ -238,7 +238,9 @@ async function runnerRetiredCleanly(unit, releaseKey, layout, io) {
  *   release (crash restart) and a STAGED one (stopped before the switch) are ignored.
  * - runner: RETIRED only for a DRAINING release whose invocation exited 0 and printed its retirement lines. Where the
  *   layout starts the current release by enabled instances (bootMode 'enable', the public server), its runner instance
- *   is then disabled, so a retired runner never starts at boot again (its may-start would refuse it).
+ *   is then disabled, so a retired runner never starts at boot again (its may-start would refuse it). A stop of a runner
+ *   already RETIRED disables it again there (safe to repeat), so a disable that failed when RETIRED was recorded is
+ *   retried at its next stop (a boot start its may-start refuses ends in this recorder too).
  * A failed read or write rejects: the CLI exits 1 (PREVIEW_RELEASE_STOP_RECORD_FAILED) and OnFailure emails.
  */
 export async function recordStop({ service, label, layout = LAYOUT, deps = {} }) {
@@ -257,6 +259,8 @@ export async function recordStop({ service, label, layout = LAYOUT, deps = {} })
       recorded = 'RETIRED';
       if (layout.bootMode === 'enable' && !await systemctl(['disable', unit], layout, io)) refuse('RUNNER_DISABLE_FAILED');
     }
+  } else if (state === 'RETIRED' && service === 'runner' && layout.bootMode === 'enable') {
+    if (!await systemctl(['disable', unit], layout, io)) refuse('RUNNER_DISABLE_FAILED');
   }
   return Object.freeze({ event: recorded ? 'PREVIEW_RELEASE_STOP_RECORDED' : 'PREVIEW_RELEASE_STOP_IGNORED', service, label, releaseKey, recorded, state });
 }
@@ -327,7 +331,9 @@ async function activateGate(gate, io) {
  * nothing stopped. Runner still running: only once 25 minutes have passed since the latest RETIRE_REQUESTED row (a
  * manual or mis-armed run never stops a busy runner early), read both gates, stop that one unit, wait 5 s, read them
  * again, re-open only a gate that was active before and is halted after, email the owner. A gate whose state could
- * not be read on either side of the stop (and that might be halted) is listed in gatesUnknown for the owner.
+ * not be read on either side of the stop (and that might be halted) is listed in gatesUnknown for the owner. Where the
+ * layout starts releases by enabled instances (bootMode 'enable', the public server; no gates there), the stopped
+ * runner's instance is disabled too, or it would start again at the next boot (a DRAINING release's runner may start).
  */
 export async function checkRetire({ label, layout = LAYOUT, deps = {} }) {
   const io = withDefaults(layout, deps);
@@ -358,6 +364,7 @@ export async function checkRetire({ label, layout = LAYOUT, deps = {} }) {
   const before = [];
   for (const gate of gates) before.push(await gateState(gate, io));
   if (!await systemctl(['stop', unit], layout, io)) refuse('RUNNER_STOP_FAILED');
+  if (layout.bootMode === 'enable' && !await systemctl(['disable', unit], layout, io)) refuse('RUNNER_DISABLE_FAILED');
   await io.sleep(GATE_SETTLE_MS);
   const after = [];
   for (const gate of gates) after.push(await gateState(gate, io));

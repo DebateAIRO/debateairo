@@ -65,8 +65,10 @@ export async function releaseInfos({ layout = LAYOUT, deps = {} } = {}) {
   try { names = await readdir(layout.releaseOverlayRoot); } catch (error) { return error?.code === 'ENOENT' ? Object.freeze({}) : refuse('RELEASE_OVERLAY_UNREADABLE'); }
   const releases = {};
   for (const name of names.sort()) {
+    // The name first: an entry that is not a release label is never looked at.
+    if (!isLabel(name)) refuse('RELEASE_OVERLAY_REFUSED');
     const stat = await lstat(`${layout.releaseOverlayRoot}/${name}`).catch(() => refuse('RELEASE_OVERLAY_UNREADABLE'));
-    if (!isLabel(name) || !stat.isDirectory() || stat.isSymbolicLink()) refuse('RELEASE_OVERLAY_REFUSED');
+    if (!stat.isDirectory() || stat.isSymbolicLink()) refuse('RELEASE_OVERLAY_REFUSED');
     releases[name] = await readOverlay(name, layout);
   }
   return Object.freeze(releases);

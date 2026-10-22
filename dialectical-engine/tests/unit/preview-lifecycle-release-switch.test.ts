@@ -906,6 +906,14 @@ describe('release-switch.mjs (root CLI)', () => {
         next: `no release-switch.mjs is running (check: pgrep -f release-switch.mjs); move ${lockPath} aside, then re-run`
       });
       expect(readFileSync(lockPath, 'utf8')).toBe('2147483646\n');
+      // An empty file: another command has just created it and not yet written its pid. Never "move it aside" first.
+      writeFileSync(lockPath, '');
+      expect(JSON.parse((await cli(['stage', '--label', 'new-v1'], deps, {}, { ...layout, lockRoot: root })).stderr).fields).toEqual({
+        holderPid: null, holderAlive: false,
+        next: `re-run in a few seconds (another release-switch.mjs is taking the lock); only if it is still refused and none is `
+          + `running (check: pgrep -f release-switch.mjs), move ${lockPath} aside`
+      });
+      expect(readFileSync(lockPath, 'utf8')).toBe('');
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 
@@ -922,5 +930,21 @@ describe('release-switch.mjs (root CLI)', () => {
       expect(JSON.parse((await cli(['stage', '--label', 'new-v1'], h.deps, actor)).stderr).reason).toBe('ACTOR_REFUSED');
     }
     expect(h.log).toEqual([]);
+  });
+
+  // D16b review: a layout's start lines and gate list are required (VPS_LAYOUT has `gates: []`); without them every
+  // command refuses before it reads or writes anything, never a TypeError after the database write.
+  it('refuses a layout without its start lines or its gate list, before touching anything', async () => {
+    const { startedLines: _lines, ...noLines } = layout;
+    const { gates: _gates, ...noGates } = layout;
+    const broken = [noLines, noGates, { ...layout, startedLines: { api: 'PREVIEW_API_STARTED' } }, { ...layout, gates: null }];
+    for (const bad of broken) {
+      const h = host();
+      expect((await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', layout: bad, deps: h.deps }))).code).toBe('LAYOUT_REFUSED');
+      expect((await refusal(stageRelease({ label: 'new-v1', layout: bad, deps: h.deps }))).code).toBe('LAYOUT_REFUSED');
+      expect((await refusal(rollbackRelease({ to: 'old-v1', from: 'new-v1', layout: bad, deps: h.deps }))).code).toBe('LAYOUT_REFUSED');
+      expect(h.log).toEqual([]);
+      expect(h.switchCalls()).toEqual([]);
+    }
   });
 });

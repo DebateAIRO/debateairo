@@ -919,8 +919,8 @@ The rules, whatever the release:
 - **Never `systemctl stop` a busy `debateai-runner@`.** An older runner stops by itself when its
   last debate ends. If it is still running 7.5 hours after the switch, the backstop asks it to
   retire (`RETIRE_REQUESTED`): it lets its calls settle and exits. Only if it still runs 25 minutes
-  after that request does root's check stop it. That check is the only planned stop of a runner
-  that may still have work.
+  after that request does root's check stop it (and disable its instance, so it does not start
+  again at boot). That check is the only planned stop of a runner that may still have work.
 - **One release drains at a time.** The release check refuses a new upgrade while an older
   release is still draining, and refuses infrastructure maintenance (PostgreSQL, Hatchet, Caddy)
   then too.

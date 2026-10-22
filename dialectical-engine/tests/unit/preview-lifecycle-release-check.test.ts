@@ -533,6 +533,18 @@ describe('status, maintenance and the retirement receipt (side-by-side spec §4)
     expect(readdirSync(folder).sort()).toEqual(['dangling.json', 'fresh.json', 'retirement-receipt.json']);
   });
 
+  it('a written receipt stays written when the folder cannot be opened for its fsync (best effort after the link)', async () => {
+    // A write-and-search-only folder (0300): the link succeeds, opening the folder itself to fsync it does not.
+    const folder = rootOnlyFolder();
+    const out = join(folder, 'retirement-receipt.json');
+    chmodSync(folder, 0o300);
+    try {
+      await check.writeNewFile(out, Buffer.from('new'), { mode: 0o600, uid, gid });
+    } finally { chmodSync(folder, 0o700); }
+    expect(readFileSync(out, 'utf8')).toBe('new');
+    expect(readdirSync(folder)).toEqual(['retirement-receipt.json']);
+  });
+
   it('writes the receipt only as a new file in a folder only its owner can read', async () => {
     const open = join(rootOnlyFolder(0o755), 'retirement-receipt.json');
     await expect(writeRetirementReceipt({ label: OLD, out: open, layout: ownLayout, deps: retiredHost().deps })).rejects.toMatchObject({ code: 'RECEIPT_OUTPUT_REFUSED' });

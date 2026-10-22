@@ -418,6 +418,16 @@ describe("release.mjs: the preview's release tools with the public server's layo
     expect((await cli(["status"], version.layout, host([OLD]).deps)).err).toMatchObject({ reason: "RELEASE_OVERLAY_REFUSED" });
   });
 
+  it("an overlay folder entry that is not a release label is refused by its name, before anything about it is read", async () => {
+    const { layout } = serverFiles([OLD]);
+    writeFileSync(join(layout.releaseOverlayRoot as string, "Not_A_Label"), "");
+    // Listable but not searchable: nothing in the folder can be looked at (lstat), so only the name can refuse it.
+    chmodSync(layout.releaseOverlayRoot as string, 0o400);
+    try {
+      expect((await cli(["status"], layout, host([OLD]).deps)).err).toMatchObject({ reason: "RELEASE_OVERLAY_REFUSED" });
+    } finally { chmodSync(layout.releaseOverlayRoot as string, 0o755); }
+  });
+
   it("the stop recorder needs only the runner's own retirement line here, and then disables its instance", async () => {
     const { layout } = serverFiles([OLD, NEW]);
     const h = host([OLD, NEW], { history: AFTER_SWITCH, units: { [U("runner", "old-v1")]: "inactive" } });
@@ -431,6 +441,32 @@ describe("release.mjs: the preview's release tools with the public server's layo
     expect(h.verbs()).toEqual(["disable debateai-runner@old-v1.service"]);
   });
 
+  /** The host, with every `systemctl disable` refused (as a failed disable would be). */
+  const refusingDisable = (h: ReturnType<typeof host>) => {
+    const run = h.deps.run as (argv: string[], opts: { env: Record<string, string> }) => Promise<ReturnType<typeof result>>;
+    h.deps.run = async (argv: string[], opts: { env: Record<string, string> }) =>
+      (argv[0] === VPS.systemctl && argv[1] === "disable" ? result("", 1) : run(argv, opts));
+    return h;
+  };
+
+  it("a stop of a runner already RETIRED disables its instance again, so a disable that failed before is retried", async () => {
+    const { layout } = serverFiles([OLD, NEW]);
+    const retired: [string, string, string?][] = [...AFTER_SWITCH, [OLD_KEY, "RETIRED", "RUNNER_RETIRED"]];
+    const h = host([OLD, NEW], { history: retired, units: { [U("runner", "old-v1")]: "inactive" } });
+    const stopped = await cli(["stopped", "--service", "runner", "--label", "old-v1"], layout, h.deps);
+    expect([stopped.code, stopped.out]).toEqual([0, { event: "PREVIEW_RELEASE_STOP_IGNORED", service: "runner", label: "old-v1", releaseKey: OLD_KEY, recorded: null, state: "RETIRED" }]);
+    expect(h.verbs()).toEqual(["disable debateai-runner@old-v1.service"]);
+    expect(h.eventLog().at(-1)).toBe("old-v1 RETIRED RUNNER_RETIRED");
+    // Only the runner: an API stop of a retired release disables nothing.
+    const api = host([OLD, NEW], { history: retired });
+    expect((await cli(["stopped", "--service", "api", "--label", "old-v1"], layout, api.deps)).code).toBe(0);
+    expect(api.verbs()).toEqual([]);
+    // A disable that fails again is still loud (exit 1, OnFailure emails).
+    const failing = refusingDisable(host([OLD, NEW], { history: retired, units: { [U("runner", "old-v1")]: "inactive" } }));
+    const refused = await cli(["stopped", "--service", "runner", "--label", "old-v1"], layout, failing.deps);
+    expect([refused.code, refused.err]).toMatchObject([1, { event: "PREVIEW_RELEASE_STOP_RECORD_FAILED", reason: "RUNNER_DISABLE_FAILED" }]);
+  });
+
   it("the backstop and the 25-minute check run without gates or a notice unit", async () => {
     const { layout } = serverFiles([OLD, NEW]);
     const h = host([OLD, NEW], { history: AFTER_SWITCH });
@@ -441,8 +477,12 @@ describe("release.mjs: the preview's release tools with the public server's layo
     const late = host([OLD, NEW], { history: [...AFTER_SWITCH, [OLD_KEY, "RETIRE_REQUESTED", "BACKSTOP"]], minutesSinceRequest: 26 });
     const checked = await cli(["retire-check", "--label", "old-v1"], layout, late.deps);
     expect([checked.code, checked.out]).toEqual([0, { event: "PREVIEW_RELEASE_FORCED_STOP", label: "old-v1", releaseKey: OLD_KEY, openWork: 0, gatesReactivated: [], gatesReactivationFailed: [], gatesUnknown: [], notice: "NO_NOTICE_UNIT" }]);
-    // That one runner, and nothing else: no gate to read or re-open, no notice to start.
-    expect(late.verbs()).toEqual(["stop debateai-runner@old-v1.service"]);
+    // That one runner, and nothing else: no gate to read or re-open, no notice to start. Its instance is disabled too,
+    // or it would start again at the next boot (a DRAINING release's runner may start).
+    expect(late.verbs()).toEqual(["stop debateai-runner@old-v1.service", "disable debateai-runner@old-v1.service"]);
+    const failing = refusingDisable(host([OLD, NEW], { history: [...AFTER_SWITCH, [OLD_KEY, "RETIRE_REQUESTED", "BACKSTOP"]], minutesSinceRequest: 26 }));
+    const refused = await cli(["retire-check", "--label", "old-v1"], layout, failing.deps);
+    expect([refused.code, refused.err]).toMatchObject([1, { event: "PREVIEW_RELEASE_RETIRE_CHECK_FAILED", reason: "RUNNER_DISABLE_FAILED" }]);
   });
 
   it("the release check reads both release folders and this server's own units and slots", async () => {

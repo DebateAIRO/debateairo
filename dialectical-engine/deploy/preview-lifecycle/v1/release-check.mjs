@@ -185,8 +185,9 @@ export async function writeNewFile(path, bytes, { mode, uid, gid }) {
     await handle.sync();
     await handle.close(); handle = undefined;
     await link(temporary, path).catch(error => (error?.code === 'EEXIST' ? refuse('RECEIPT_OUTPUT_EXISTS') : Promise.reject(error)));
-    const folder = await open(dirname(path), constants.O_RDONLY);
-    try { await folder.sync(); } catch { /* Some platforms refuse fsync on a directory; the link itself is already atomic. */ } finally { await folder.close(); }
+    // The receipt is written once linked: the folder's fsync after it is best effort (some platforms refuse fsync on a
+    // directory, and a folder that cannot be opened for it must not turn a written receipt into a failure).
+    await syncFolder(dirname(path));
   } catch (error) {
     if (error instanceof CheckRefusal) throw error;
     refuse('RECEIPT_WRITE_FAILED');
@@ -194,6 +195,15 @@ export async function writeNewFile(path, bytes, { mode, uid, gid }) {
     await handle?.close().catch(() => undefined);
     if (created) await unlink(temporary).catch(() => undefined);
   }
+}
+
+/** fsync a folder, best effort: never throws. */
+async function syncFolder(folderPath) {
+  let folder;
+  try {
+    folder = await open(folderPath, constants.O_RDONLY);
+    await folder.sync();
+  } catch { /* best effort */ } finally { await folder?.close().catch(() => undefined); }
 }
 
 /** `systemctl show <unit> --property=<a,b,…>` as key/value pairs; each asked property exactly once. */
@@ -297,7 +307,8 @@ export async function releaseCheck({ label, olderManifest, newerManifest, gateRo
   const bodies = {
     N1_HEADERS: async () => (withoutN1.length ? miss(withoutN1.join(', ')) : pass(added.length ? `new: ${added.map(step => step.name).join(', ')}` : 'no new migrations')),
     // The current release is pinned, and the older manifest is its own: the lock holds its API source manifest's digest
-    // (preview); on the public server the manifest names the current release's own folder.
+    // (preview); on the public server the manifest names the current release's own folder. There release.mjs builds the
+    // older manifest from that same folder, so the check reduces to "the current key has exactly one overlay".
     CURRENT_PINNED: async () => {
       const { releases, label: older } = await currentLabel();
       if (older === label) return miss('LABEL_IS_CURRENT');
