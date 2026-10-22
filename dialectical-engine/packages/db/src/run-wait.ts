@@ -37,6 +37,11 @@ export type WaitingRunCursor = Readonly<{ waitingSince: Date; runId: string }>;
 export type WaitingRun = Readonly<{
   runId: string;
   waitingSince: Date;
+  /**
+   * Side-by-side spec §1, §4 (plan C task C10): the release that admitted the run (`core.run.release_key`, `legacy`
+   * before 0123). A waker of another release re-admits it under its own release instead of starting it (C11, O3).
+   */
+  releaseKey: string;
   /** Exactly one of these is non-null: the owner for an account's run, the legacy asker id otherwise. */
   ownerRef: string | null;
   legacyAskerId: string | null;
@@ -60,6 +65,7 @@ export type WaitingRun = Readonly<{
 type WaitingRow = {
   run_id: string;
   waiting_since: Date;
+  release_key: string;
   owner_ref: string | null;
   legacy_asker_id: string | null;
   plan_tier: "free" | "premium" | null;
@@ -77,12 +83,14 @@ const WAITING_COLUMNS = `run_id, waiting_since, owner_ref::text AS owner_ref, le
   (SELECT CASE WHEN shape_run.depth_params ? 'depthMode' THEN jsonb_build_object(
       'depthMode', shape_run.depth_params->'depthMode', 'scrutiny', shape_run.depth_params->'scrutiny',
       'answerLength', shape_run.depth_params->'answerLength', 'plan', shape_run.envelope_basis->'shape'->'plan') END
-   FROM core.run AS shape_run WHERE shape_run.run_id = line.run_id) AS shape_settings`;
+   FROM core.run AS shape_run WHERE shape_run.run_id = line.run_id) AS shape_settings,
+  (SELECT key_run.release_key FROM core.run AS key_run WHERE key_run.run_id = line.run_id) AS release_key`;
 
 function waitingRun(row: WaitingRow): WaitingRun {
   return Object.freeze({
     runId: row.run_id,
     waitingSince: row.waiting_since,
+    releaseKey: row.release_key,
     ownerRef: row.owner_ref,
     legacyAskerId: row.legacy_asker_id,
     planTier: row.plan_tier,

@@ -1604,9 +1604,69 @@ export interface StartRunInput {
   readonly releaseKey?: string;
 }
 
+/**
+ * Side-by-side uploads spec 2026-10-21 §4, O3 (plan C task C10) — A WAITING DEBATE'S ASK, AS IT WAS STORED: the
+ * columns its run row was written with and its decrypted content (`questionLine`, `askContract`). The API rebuilds the
+ * ask from it and re-evaluates it under the current release (apps/api/src/readmission.ts); C11 starts the re-admitted
+ * run from the plan. `askerRiskTier`, `tierSource` and `tierProvenanceRef` are the columns as written (the asker's risk
+ * tier, the admitted tier source and provenance); `contentEncrypted` says the question and contract came from the
+ * run's envelope, so the new run must be encrypted too. Content: only `questionLine` and `askContract` carry any.
+ */
+export type StoredAsk = Readonly<{
+  runId: string;
+  releaseKey: string;
+  registerVersion: number;
+  questionLine: string;
+  askContract: Readonly<Record<string, unknown>>;
+  askerId: string;
+  sessionId: string;
+  callerScope: "ASKER" | "OPERATOR";
+  asOf: Date;
+  askerRiskTier: RiskTier;
+  tierSource: TierSource;
+  tierProvenanceRef: string;
+  compositionBudgetTier: CompositionBudgetTier;
+  planTier: "free" | "premium" | null;
+  depthParams: Readonly<Record<string, unknown>>;
+  argumentLanguageTag: string;
+  argumentLanguageName: string;
+  contentEncrypted: boolean;
+}>;
+
 export type RunCreationPrincipal =
   | Readonly<{ readonly kind: "server"; readonly userId: string; readonly ownerRef: string }>
   | Readonly<{ readonly kind: "legacy"; readonly legacyAskerId: string }>;
+
+/**
+ * Side-by-side spec §4, O3 (plan C task C11): whose NEW run a re-admission writes. An owner's run is encrypted and its
+ * key is provisioned from the OLD run's identity binding (0123's core.prepare_readmitted_run_key_provision: the same
+ * user and identity session, no live session needed); a legacy asker's run copies the old row's asker id, session and
+ * caller scope (core.run_supersession's guard refuses an edge between two people).
+ */
+export type ReadmissionPrincipal =
+  | Readonly<{ kind: "readmitted-owner"; ownerRef: string }>
+  | Readonly<{ kind: "legacy"; legacyAskerId: string }>;
+
+export type StartReadmittedRunInput = Omit<StartRunInput, "principal" | "sessionId" | "callerScope"> &
+  Readonly<{ fromRunId: string; principal: ReadmissionPrincipal }>;
+
+/** The codes 0123's re-admission key provision refuses with (55000, MESSAGE = code), surfaced typed. */
+const READMISSION_REFUSALS: ReadonlySet<string> = new Set([
+  "RUN_READMISSION_INVALID", "RUN_READMISSION_OWNER_GONE", "RUN_READMISSION_TAKEN"
+]);
+
+/**
+ * Who a new run row belongs to, decided before anything is written. `plain`: a legacy asker's run in the clear.
+ * `encrypted`: an owner's run, whose key provision `prepare` opens on the executor it is given and answers the
+ * execution ref and the user the content key is provisioned for (without a configured cipher such a run is refused
+ * RUN_CONTENT_ENCRYPTION_REQUIRED, inside the transaction, as before).
+ */
+type RunRowIdentity =
+  | Readonly<{ kind: "plain"; askerId: string; sessionId: string; callerScope: "ASKER" | "OPERATOR" }>
+  | Readonly<{
+      kind: "encrypted"; ownerRef: string; callerScope: "ASKER" | "OPERATOR";
+      prepare(executor: Pick<Pool, "query"> | PoolClient, runId: string): Promise<Readonly<{ executionRef: string; userId: string }>>;
+    }>;
 
 export interface RunOwnershipAccess {
   readonly ownerRef: string | null;
@@ -2025,6 +2085,98 @@ export class RunRepository {
     input: StartRunInput,
     admissionClient?: PoolClient
   ): Promise<string> {
+    const principal = input.principal;
+    const identity: RunRowIdentity = principal.kind === "legacy"
+      ? Object.freeze({ kind: "plain", askerId: principal.legacyAskerId, sessionId: input.sessionId, callerScope: input.callerScope })
+      : Object.freeze({
+          kind: "encrypted", ownerRef: principal.ownerRef, callerScope: input.callerScope,
+          prepare: async (executor: Pick<Pool, "query"> | PoolClient, runId: string) => {
+            if (!UUID_V4.test(input.sessionId)) {
+              throw new TypedDomainError(
+                "RUN_OWNER_INVALID",
+                "The authenticated session must be an opaque UUID"
+              );
+            }
+            const intent = await executor.query<{ execution_ref: string | null }>(
+              "SELECT core.prepare_run_key_provision($1,$2,$3,$4) AS execution_ref",
+              [runId,principal.userId,principal.ownerRef,input.sessionId]
+            );
+            if (!UUID_V4.test(intent.rows[0]?.execution_ref ?? "")) {
+              throw new TypedDomainError(
+                "RUN_OWNER_INVALID",
+                "The authenticated owner mapping is no longer active"
+              );
+            }
+            return Object.freeze({ executionRef: intent.rows[0]!.execution_ref!, userId: principal.userId });
+          }
+        });
+    return this.#insertRun(input, identity, admissionClient);
+  }
+
+  /**
+   * Side-by-side spec §4, O3 (plan C task C11) — THE NEW RUN OF A RE-ADMISSION. A waiting debate another release
+   * admitted is re-admitted under the current release as a NEW run, written exactly as `startRun` writes one (stamped
+   * with `input.releaseKey`, the current release), from the plan the API made of the old run's stored ask. Its identity
+   * is the old run's: an owner's run calls 0123's core.prepare_readmitted_run_key_provision(old, new) on the
+   * content-provision executor (the old run's binding copied — same user and identity session — and the intent marked
+   * as this re-admission, so no live session is needed), provisions the new run's key for that user and writes the
+   * content re-encrypted under the new run id (core.create_encrypted_run); a legacy asker's run copies the old row's
+   * session id, asker id and caller scope into the plain insert. The old row is never touched. 0123 allows one live
+   * re-admission per old run: RUN_READMISSION_TAKEN while an earlier one is pending or alive (a FAILED one frees it),
+   * RUN_READMISSION_INVALID when the old run no longer waits (or is not the principal's kind of run),
+   * RUN_READMISSION_OWNER_GONE when its owner's account is gone or no longer active; all typed, nothing written.
+   */
+  async startReadmittedRun(input: StartReadmittedRunInput, admissionClient?: PoolClient): Promise<string> {
+    const { fromRunId, principal, ...rest } = input;
+    const old = (await this.pool.query<{
+      asker_id: string; session_id: string; caller_scope: "ASKER" | "OPERATOR"; encrypted: boolean;
+    }>(
+      `SELECT asker_id, session_id, caller_scope, content_encryption_version IS NOT DISTINCT FROM 1 AS encrypted
+       FROM core.run WHERE run_id = $1`,
+      [fromRunId]
+    )).rows[0];
+    const ownRun = old !== undefined && (principal.kind === "legacy"
+      ? !old.encrypted && old.asker_id === principal.legacyAskerId
+      : old.encrypted && old.asker_id === `owner:${principal.ownerRef}`);
+    if (old === undefined || !ownRun) {
+      throw new TypedDomainError("RUN_READMISSION_INVALID", "The run to re-admit is not this principal's waiting run");
+    }
+    const identity: RunRowIdentity = principal.kind === "legacy"
+      ? Object.freeze({ kind: "plain", askerId: old.asker_id, sessionId: old.session_id, callerScope: old.caller_scope })
+      : Object.freeze({
+          kind: "encrypted", ownerRef: principal.ownerRef, callerScope: old.caller_scope,
+          prepare: async (executor: Pick<Pool, "query"> | PoolClient, runId: string) => {
+            let rows: ReadonlyArray<{ execution_ref: string | null; user_id: string | null }>;
+            try {
+              rows = (await executor.query<{ execution_ref: string | null; user_id: string | null }>(
+                "SELECT execution_ref::text AS execution_ref, user_id::text AS user_id FROM core.prepare_readmitted_run_key_provision($1,$2)",
+                [fromRunId, runId]
+              )).rows;
+            } catch (error) {
+              const code = error instanceof Error ? error.message : undefined;
+              if (code !== undefined && READMISSION_REFUSALS.has(code)) throw new TypedDomainError(code, code);
+              throw error;
+            }
+            const executionRef = rows[0]?.execution_ref ?? "";
+            const userId = rows[0]?.user_id ?? "";
+            if (!UUID_V4.test(executionRef) || !UUID_V4.test(userId)) {
+              throw new TypedDomainError("RUN_OWNER_INVALID", "The re-admitted run's key provision answered no binding");
+            }
+            return Object.freeze({ executionRef, userId });
+          }
+        });
+    return this.#insertRun(rest, identity, admissionClient);
+  }
+
+  /**
+   * One new run row and its opening rows, for `startRun` and `startReadmittedRun` alike: `identity` says whose it is
+   * (`RunRowIdentity`); everything else is the run input. Byte for byte what `startRun` always wrote.
+   */
+  async #insertRun(
+    input: Omit<StartRunInput, "principal" | "sessionId" | "callerScope">,
+    identity: RunRowIdentity,
+    admissionClient?: PoolClient
+  ): Promise<string> {
     // Side-by-side spec §1: the stamp is checked before anything is written (no intent, no key, no row).
     const releaseKey = input.releaseKey === undefined ? undefined : parseReleaseKey(input.releaseKey).releaseKey;
     const runId = randomUUID();
@@ -2034,10 +2186,10 @@ export class RunRepository {
     let transactionStarted = false;
     let client: PoolClient | undefined;
     let ownsClient = false;
-    const askerId = input.principal.kind === "server"
-      ? `owner:${input.principal.ownerRef}`
-      : input.principal.legacyAskerId;
-    if (input.principal.kind === "legacy") {
+    const askerId = identity.kind === "encrypted"
+      ? `owner:${identity.ownerRef}`
+      : identity.askerId;
+    if (identity.kind === "plain") {
       if (RAW_USER_ASKER.test(askerId)) {
         throw new TypedDomainError("RUN_OWNER_RAW_ID_FORBIDDEN", "Raw user identifiers cannot enter immutable run rows");
       }
@@ -2046,12 +2198,12 @@ export class RunRepository {
       } catch {
         throw new TypedDomainError("RUN_LEGACY_ASKER_INVALID", "Legacy runs cannot use a reserved identity scope");
       }
-    } else if (!UUID_V4.test(input.principal.ownerRef)) {
+    } else if (!UUID_V4.test(identity.ownerRef)) {
       throw new TypedDomainError("RUN_OWNER_REF_INVALID", "The run scope must carry the authenticated opaque owner reference");
     }
-    const planTierColumnApplied = input.principal.kind === "legacy"
+    const planTierColumnApplied = identity.kind === "plain"
       && await planTierColumnIsApplied(this.pool);
-    const argumentLanguageColumnsApplied = input.principal.kind === "legacy"
+    const argumentLanguageColumnsApplied = identity.kind === "plain"
       && await argumentLanguageColumnsAreApplied(this.pool);
     const argumentLanguageTag = input.argumentLanguageTag ?? "und";
     const argumentLanguageName = input.argumentLanguageName ?? "the same language as the question";
@@ -2061,30 +2213,17 @@ export class RunRepository {
     let contentEnvelope: CryptoEnvelope | null = null;
     let contentAttestation: Buffer | null = null;
     let contentAttestationSecret: Buffer | null = null;
-    let runExecutionRef = input.sessionId;
+    let runExecutionRef = identity.kind === "plain" ? identity.sessionId : "";
+    let contentUserId = "";
     try {
-      if (input.principal.kind === "server" && cipher !== undefined) {
-        if (!UUID_V4.test(input.sessionId)) {
-          throw new TypedDomainError(
-            "RUN_OWNER_INVALID",
-            "The authenticated session must be an opaque UUID"
-          );
-        }
+      if (identity.kind === "encrypted" && cipher !== undefined) {
         const provisionExecutor=admissionClient ?? this.provisionPool;
-        const intent = await provisionExecutor.query<{ execution_ref: string | null }>(
-          "SELECT core.prepare_run_key_provision($1,$2,$3,$4) AS execution_ref",
-          [runId,input.principal.userId,input.principal.ownerRef,input.sessionId]
-        );
-        if (!UUID_V4.test(intent.rows[0]?.execution_ref ?? "")) {
-          throw new TypedDomainError(
-            "RUN_OWNER_INVALID",
-            "The authenticated owner mapping is no longer active"
-          );
-        }
-        runExecutionRef = intent.rows[0]!.execution_ref!;
+        const intent = await identity.prepare(provisionExecutor, runId);
+        runExecutionRef = intent.executionRef;
+        contentUserId = intent.userId;
         await cipher.provisionRun(runId, {
-          userId: input.principal.userId,
-          ownerRef: input.principal.ownerRef
+          userId: contentUserId,
+          ownerRef: identity.ownerRef
         });
         contentKeyProvisioned = true;
         const prepared = await cipher.prepareRun(runId);
@@ -2104,7 +2243,7 @@ export class RunRepository {
         storedAskContract = CONTENT_JSON_SENTINEL;
       }
       if (contentEnvelope !== null) {
-        if (input.principal.kind !== "server") {
+        if (identity.kind !== "encrypted") {
           throw new TypedDomainError(
             "RUN_CONTENT_ENCRYPTION_REQUIRED",
             "Encrypted runs require an authenticated owner"
@@ -2149,7 +2288,7 @@ export class RunRepository {
             questionLine: storedQuestionLine,
             askerId,
             executionRef: runExecutionRef,
-            callerScope: input.callerScope,
+            callerScope: identity.callerScope,
             asOf: input.asOf.toISOString(),
             askerRiskTier: input.askerRiskTier,
             riskTier: input.effectiveRiskTier,
@@ -2170,7 +2309,7 @@ export class RunRepository {
             contentAttestation: contentAttestation!.toString("base64"),
             contentAttestationSecret: contentAttestationSecret!.toString("base64"),
             ...(releaseKey === undefined ? {} : { releaseKey })
-          }),input.principal.userId,input.principal.ownerRef,
+          }),contentUserId,identity.ownerRef,
           JSON.stringify(input.batteryRows.map((row)=>({
             batteryRowId:row.batteryRowId,
             predicateRef:row.predicateRef,
@@ -2206,7 +2345,7 @@ export class RunRepository {
       ownsClient = admissionClient === undefined;
       await client.query("BEGIN");
       transactionStarted = true;
-      if (input.principal.kind === "server" && contentEnvelope === null) {
+      if (identity.kind === "encrypted" && contentEnvelope === null) {
         throw new TypedDomainError(
           "RUN_CONTENT_ENCRYPTION_REQUIRED",
           "Server-owned runs require the encrypted content capability"
@@ -2214,7 +2353,7 @@ export class RunRepository {
       }
       const createdAtSeq = await allocateSequence(client);
       const baseRunValues = [
-        runId, storedQuestionLine, askerId, runExecutionRef, input.callerScope, input.asOf,
+        runId, storedQuestionLine, askerId, runExecutionRef, identity.callerScope, input.asOf,
         input.askerRiskTier, input.effectiveRiskTier, input.tierSource, input.tierProvenanceRef,
         input.compositionBudgetTier,
         ...(planTierColumnApplied ? [input.planTier ?? null] : []),
@@ -2585,6 +2724,79 @@ export class RunRepository {
       strangerSampleRate: Number(row.stranger_sample_rate),
       envelopeBasis: Object.freeze({ ...row.envelope_basis })
     };
+    });
+  }
+
+  /**
+   * Side-by-side spec §4, O3 (plan C task C10): the run's ask as it was stored (`StoredAsk`), null when no such run.
+   * Like `readFrozenHead`, under the run's content lease, and the question and contract are decrypted from the run's
+   * envelope (an encrypted run with no cipher configured refuses CONTENT_CIPHER_UNAVAILABLE); a run written in the
+   * clear is read as stored. It reads 0123's release stamp, so it is for a database at 0123 or later. The run's
+   * existence is read first: the lease itself refuses an id with no run (PRIVATE_CONTENT_ERASED), which is not "none".
+   */
+  async readStoredAsk(runId: string): Promise<StoredAsk | null> {
+    const exists = await this.pool.query("SELECT 1 FROM core.run WHERE run_id = $1", [runId]);
+    if (exists.rowCount === 0) return null;
+    return withRunContentLease(this.pool, [runId], async () => {
+      const result = await this.pool.query<{
+        run_id: string;
+        release_key: string;
+        register_version: number | string;
+        question_line: string;
+        ask_contract: Record<string, unknown>;
+        asker_id: string;
+        session_id: string;
+        caller_scope: "ASKER" | "OPERATOR";
+        as_of: Date;
+        asker_risk_tier: RiskTier;
+        tier_source: TierSource;
+        tier_provenance_ref: string;
+        composition_budget_tier: CompositionBudgetTier;
+        plan_tier: "free" | "premium" | null;
+        depth_params: Record<string, unknown>;
+        argument_language_tag: string;
+        argument_language_name: string;
+        content_encryption_version: number | null;
+        content_ciphertext: CryptoEnvelope | null;
+      }>(
+        `SELECT run_id, release_key, register_version, question_line, ask_contract, asker_id, session_id,
+                caller_scope, as_of, asker_risk_tier, tier_source, tier_provenance_ref, composition_budget_tier, plan_tier,
+                depth_params, argument_language_tag, argument_language_name, content_encryption_version, content_ciphertext
+         FROM core.run WHERE run_id = $1`,
+        [runId]
+      );
+      const row = result.rows[0];
+      if (row === undefined) return null;
+      if (row.content_encryption_version === 1 && contentCipherFor(this.pool) === undefined) {
+        throw new TypedDomainError(
+          "CONTENT_CIPHER_UNAVAILABLE",
+          "Encrypted content cannot be read without the external key store"
+        );
+      }
+      const content = await decryptContentForRun<{ questionLine: string; askContract: Record<string, unknown> }>(
+        this.pool, row.run_id, "core.run", row.run_id, row.content_ciphertext,
+        { questionLine: row.question_line, askContract: row.ask_contract }
+      );
+      return Object.freeze({
+        runId: row.run_id,
+        releaseKey: row.release_key,
+        registerVersion: Number(row.register_version),
+        questionLine: content.questionLine,
+        askContract: Object.freeze({ ...content.askContract }),
+        askerId: row.asker_id,
+        sessionId: row.session_id,
+        callerScope: row.caller_scope,
+        asOf: row.as_of,
+        askerRiskTier: row.asker_risk_tier,
+        tierSource: row.tier_source,
+        tierProvenanceRef: row.tier_provenance_ref,
+        compositionBudgetTier: row.composition_budget_tier,
+        planTier: row.plan_tier,
+        depthParams: Object.freeze({ ...row.depth_params }),
+        argumentLanguageTag: row.argument_language_tag,
+        argumentLanguageName: row.argument_language_name,
+        contentEncrypted: row.content_ciphertext !== null
+      });
     });
   }
 }

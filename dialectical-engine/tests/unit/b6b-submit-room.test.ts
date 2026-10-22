@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Pool, PoolClient, QueryResult } from "pg";
-import { AskAlreadyWaitingRefusal, AskRefusal, PostgresAskApplication, type RunCreationSettings } from "@debateai/api";
+import { AskAlreadyWaitingRefusal, AskRefusal, PostgresAskApplication, ReleaseNotServedError, type RunCreationSettings } from "@debateai/api";
 import { WorkItemRepository } from "@debateai/battery";
 import { PLAN_TIER_ROSTERS, type AskRequest, type Session } from "@debateai/contract";
 import { RunRepository } from "@debateai/db";
@@ -84,6 +84,8 @@ function arrange(input: {
   readonly precheck?: () => Promise<void>;
   readonly withoutRoom?: Partial<RunCreationSettings>;
   readonly extra?: Partial<RunCreationSettings>;
+  /** Side-by-side C4: what the dispatcher throws after its step (the routed dispatcher's RELEASE_NOT_SERVED refusal). */
+  readonly dispatchError?: Error;
 } = {}) {
   const order: string[] = [];
   const recorded: unknown[] = [];
@@ -157,7 +159,10 @@ function arrange(input: {
   const logged = vi.spyOn(console, "info").mockImplementation(() => undefined);
   const application = new PostgresAskApplication(
     stubPool(),
-    { dispatch: vi.fn(async () => { step("dispatch"); }) },
+    { dispatch: vi.fn(async () => {
+      step("dispatch");
+      if (input.dispatchError !== undefined) throw input.dispatchError;
+    }) },
     settings,
     { read: async () => [] },
     stubPool(),
@@ -261,6 +266,24 @@ describe("B6b an ask with a room", () => {
     const { submit, failure, recorded } = arrange({ failAt, decision });
     await expect(submit()).rejects.toBe(failure);
     expect(recorded).toEqual([recordFor(reason)]);
+  });
+
+  // Side-by-side C4: the routed dispatcher already closed the first job FAILED (RUN_SETUP_FAILED:RELEASE_NOT_SERVED) and
+  // wrote the waiver; the asker reads QUEUED (the debate page then says it did not start) and no DISPATCH failure is
+  // recorded over it.
+  it("answers QUEUED and records no DISPATCH failure when the run's release no longer serves it", async () => {
+    const { submit, recorded } = arrange({ dispatchError: new ReleaseNotServedError(RUN_ID, "r16-0123456789ab", true) });
+    await expect(submit()).resolves.toEqual({ run_ref: RUN_ID, status: "QUEUED" });
+    expect(recorded).toEqual([]);
+  });
+
+  it("without a room, too: QUEUED, and no DISPATCH failure over the closed job", async () => {
+    const { submit, recorded, enqueueApart } = arrange({
+      withoutRoom: {}, dispatchError: new ReleaseNotServedError(RUN_ID, "r16-0123456789ab", false)
+    });
+    enqueueApart.mockImplementation(async () => WORK_ITEM_ID);
+    await expect(submit()).resolves.toEqual({ run_ref: RUN_ID, status: "QUEUED" });
+    expect(recorded).toEqual([]);
   });
 
   it("queues no job when the hold fails: the first job is the decision's last write", async () => {

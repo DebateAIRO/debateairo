@@ -151,9 +151,11 @@ apps/api/src/question-language/eld.ts
 apps/api/src/question-language/fast-check.ts
 apps/api/src/question-language/reference.ts
 apps/api/src/question-language/transport.ts
+apps/api/src/readmission.ts
 apps/api/src/recovery-email.ts
 apps/api/src/recovery.ts
 apps/api/src/registration.ts
+apps/api/src/release-loops.ts
 apps/api/src/release-state.ts
 apps/api/src/retention-purge.ts
 apps/api/src/risk-signal-identity.ts

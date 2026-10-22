@@ -2,7 +2,7 @@ import { validatePreviewProviderTestConfig, previewPlanTierRosters, previewTeamA
 import { registerPasswordResetRoutes, passwordResetPolicyInventory } from "./password-reset-routes.js";
 import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-routes.js";
 import type { PasswordResetApplication } from "./password-reset.js";
-import type { ReleaseWatcher } from "./release-state.js";
+import type { ReleaseLifecycleState, ReleaseState, ReleaseWatcher } from "./release-state.js";
 import type { BackupEmailApplication, MfaRecoveryApplication } from "./email-mfa-recovery.js";
 import type { SocialStepUpApplication } from './social-step-up.js';
 import { SocialAuthError, SOCIAL_BROWSER_COOKIE, SOCIAL_FLOW_COOKIE, SOCIAL_APPLE_FLOW_COOKIE, type SocialAuthApplication } from './social-auth.js';
@@ -110,6 +110,7 @@ import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository 
 import type { SpendScope, WaitsFor } from "@debateai/budget";
 import {
   MAX_OWNER_PRIVATE_HISTORY_SCAN,
+  RELEASE_LIFECYCLE_STATES,
   RunCostSubstitutionRepository,
   RunRepository,
   decryptLeasedContentForRun,
@@ -123,7 +124,11 @@ import {
   withRunContentLease,
   type CryptoEnvelope,
   type DiscoveredPanelMember,
+  type OwnerAskAdmissionLease,
+  type ReadmissionPrincipal,
   type RunOwnershipAccess,
+  type StoredAsk,
+  type WaitingRun,
   type WaitingRunCursor
 } from "@debateai/db";
 import { ServeRepository, type MemoryQuestionRegistration } from "@debateai/serve";
@@ -206,6 +211,7 @@ import {
   MIN_AGE,
   parseDeclaredRegion,
   parseReleaseKey,
+  releaseTaskName,
   TypedDomainError,
   type DeclaredRegion,
   type RiskTier,
@@ -226,6 +232,7 @@ import {
 import type { AdmissionDecision, AdmissionLimiter, AdmissionScope } from "./admission.js";
 import {
   AskAlreadyWaitingError,
+  accessOfWaitingRun,
   nextWholeMinute,
   runSettingsClassOfAsk,
   type AskRoomAnswer,
@@ -234,6 +241,7 @@ import {
   type AskWaitingLinePort,
   type WaitingStart
 } from "./ask-room.js";
+import { planReadmission, readmittedArgumentLanguage, readmittedAskContract, type ReadmissionPlan } from "./readmission.js";
 import {
   ASK_SIGN_IN_REQUIRED,
   appliedAskOf,
@@ -251,7 +259,8 @@ import {
   type EngineSettings,
   type EngineVersionPolicy,
   type LengthGuidance,
-  type LengthGuidancePolicy
+  type LengthGuidancePolicy,
+  type PlanId
 } from "@debateai/register";
 import { debateShapeForPanel, normaliseAskForDebateShape, roomDepthParams } from "./debate-shape-ask.js";
 import { engineForAsk } from "./engine-ask.js";
@@ -1660,9 +1669,10 @@ export interface AskApplication {
   eventMark?(runId: string, session: Session, ownership: RunOwnershipAccess, signal?: AbortSignal): Promise<RunEventMark | null>;
   /**
    * Side-by-side uploads spec 2026-10-21 §4 (plan C task C9): the newest run of a re-admitted debate
-   * (`core.resolve_run_ref`), or the id itself when it was never superseded. Every run-id route and the
-   * step-up target follow it, so an old link, an open page or a grant asked on the old id names the run
-   * that actually runs. Absent: ids pass through unchanged.
+   * (`core.resolve_run_ref`), or the id itself when it was never superseded. Every run-id route follows it,
+   * so an old link or an open page names the run that actually runs. A step-up grant does NOT (controller
+   * ruling (h) on the C9 review): it stays bound to the id the page sent, which the debate page takes from
+   * the run projection's own run_ref. Absent: ids pass through unchanged.
    */
   resolveRunRef?(runId: string): Promise<string>;
   /**
@@ -1681,20 +1691,6 @@ async function resolvedRunId(options: Pick<ApiOptions, "application">, id: strin
   return options.application.resolveRunRef === undefined ? id : options.application.resolveRunRef(id);
 }
 
-/**
- * Side-by-side C9: a step-up body whose `authorization.target_run_id` is a run id, with that id followed to its newest run
- * BEFORE the service sees it, so the grant it mints and the path it is spent on name the same run. Any other body (no
- * run target, a malformed one) is returned as sent, for the service's own parse to judge.
- */
-async function withResolvedStepUpTarget(options: Pick<ApiOptions, "application">, body: unknown): Promise<unknown> {
-  if (typeof body !== "object" || body === null) return body;
-  const authorization = (body as Record<string, unknown>).authorization;
-  if (typeof authorization !== "object" || authorization === null) return body;
-  const target = ResourceIdSchema.safeParse((authorization as Record<string, unknown>).target_run_id);
-  if (!target.success) return body;
-  const resolved = await resolvedRunId(options, target.data);
-  return resolved === target.data ? body : { ...body, authorization: { ...authorization, target_run_id: resolved } };
-}
 
 export type AskPrincipal =
   | Readonly<{ readonly kind: "server"; readonly userId: string; readonly ownerRef: string }>
@@ -2863,7 +2859,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   });
   api.post<{Params:{provider:string}}>('/v1/account/social/:provider/step-up/begin',credentialRoutePolicy('POST /v1/account/social/{provider}/step-up/begin'),async(request,reply)=>{
     const provider=SocialProviderSchema.safeParse(request.params.provider);if(!provider.success)throw new SocialAuthError('SOCIAL_PROOF_INVALID');if(!options.socialAuth)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');
-    const result=await options.socialAuth.beginStepUp(provider.data,await withResolvedStepUpTarget(options,request.body),sourceFor(request),request.authenticatedSession!);reply.header('set-cookie',socialCookie(provider.data==='apple'?SOCIAL_APPLE_FLOW_COOKIE:SOCIAL_FLOW_COOKIE,result.flowCookie,result.expiresAt,provider.data==='apple'?'None':'Lax'));return reply.send({authorization_url:result.authorization_url});
+    const result=await options.socialAuth.beginStepUp(provider.data,request.body,sourceFor(request),request.authenticatedSession!);reply.header('set-cookie',socialCookie(provider.data==='apple'?SOCIAL_APPLE_FLOW_COOKIE:SOCIAL_FLOW_COOKIE,result.flowCookie,result.expiresAt,provider.data==='apple'?'None':'Lax'));return reply.send({authorization_url:result.authorization_url});
   });
   api.post('/v1/account/social/step-up/status',credentialRoutePolicy('POST /v1/account/social/step-up/status'),async(request,reply)=>{if(!options.socialStepUp)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');return reply.send(await options.socialStepUp.status(request.body,request.authenticatedSession!,sourceFor(request)));});
   api.post('/v1/account/social/step-up/passkey-options',credentialRoutePolicy('POST /v1/account/social/step-up/passkey-options'),async(request,reply)=>{if(!options.socialStepUp)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');return reply.send(await options.socialStepUp.beginPasskey(request.body,request.authenticatedSession!,sourceFor(request)));});
@@ -2892,7 +2888,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     api.get('/v1/account/mfa-recovery',routePolicy('GET /v1/account/mfa-recovery'),async(request,reply)=>{if(!admitOrRefuse(reply,'publicReads','GET /v1/account/mfa-recovery',sourceFor(request).ip))return reply;return reply.send(await security.pendingMfaRecovery(request.authenticatedSession!));});
     api.post('/v1/account/mfa-recovery/cancel',credentialRoutePolicy('POST /v1/account/mfa-recovery/cancel'),async(request,reply)=>reply.send(await security.cancelPendingMfaRecovery(request.body,request.authenticatedSession!,sourceFor(request))));
     api.post('/v1/account/recovery-codes/regenerate',credentialRoutePolicy('POST /v1/account/recovery-codes/regenerate'),async(request,reply)=>reply.send(await security.regenerateRecoveryCodes(request.body,request.authenticatedSession!,sourceFor(request))));
-    api.post('/v1/auth/passkeys/step-up/options',credentialRoutePolicy('POST /v1/auth/passkeys/step-up/options'),async(request,reply)=>reply.send(await security.beginPasskeyStepUp(await withResolvedStepUpTarget(options,request.body),request.authenticatedSession!,sourceFor(request))));
+    api.post('/v1/auth/passkeys/step-up/options',credentialRoutePolicy('POST /v1/auth/passkeys/step-up/options'),async(request,reply)=>reply.send(await security.beginPasskeyStepUp(request.body,request.authenticatedSession!,sourceFor(request))));
     api.post('/v1/auth/passkeys/step-up/complete',{...credentialRoutePolicy('POST /v1/auth/passkeys/step-up/complete'),bodyLimit:32768},async(request,reply)=>{
       const result=await security.completePasskeyStepUp(request.body,request.authenticatedSession!,sourceFor(request));
       reply.header('set-cookie',[sessionCookie(result.sessionToken,SESSION_IDLE_MAX_AGE_SECONDS),csrfCookie(result.response.csrf_token,SESSION_IDLE_MAX_AGE_SECONDS)]);
@@ -3033,14 +3029,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       if (!passwordWithinRequestBound(body)) {
         return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
       }
-      const requested = body.authorization === undefined
+      // Side-by-side C9, controller ruling (h): a run target is NOT followed to its newest run. The grant stays bound to
+      // the id the page sent and is echoed back exactly (no successor disclosed); the page acts on the run projection's
+      // own run_ref, so after a re-admission it sends the newest run here and on the path alike.
+      const authorization = body.authorization === undefined
         ? undefined
         : parseRequest(StepUpAuthorizationRequestSchema, body.authorization);
-      // Side-by-side C9: a run target is followed to its newest run before the grant is minted, so the grant, the
-      // target it echoes and the path it is spent on (which resolves the same way) all name one run.
-      const authorization = requested !== undefined && "target_run_id" in requested
-        ? { ...requested, target_run_id: await resolvedRunId(options, requested.target_run_id) }
-        : requested;
       const rotated = await options.sessions!.stepUp({
         session: authenticated,
         password: typeof body.password === "string" ? body.password : "",
@@ -4220,25 +4214,173 @@ export interface Dispatcher {
   dispatch(input: { readonly runId: string; readonly workItemId: string }): Promise<void>;
 }
 
-export class HatchetDispatcher implements Dispatcher {
-  constructor(
-    private readonly client: Pick<Hatchet, "runNoWait">,
-    private readonly workflowName: string
-  ) {
-    if (workflowName.trim().length === 0) throw new TypeError("Hatchet workflow name must be a register value");
+/**
+ * Side-by-side spec §2, §4 (plan C task C4) — A SEND THE RUN'S RELEASE NO LONGER SERVES. The routed dispatcher has
+ * already closed the run's never-claimed first job FAILED (`RUN_SETUP_FAILED:RELEASE_NOT_SERVED`) and written its waiver
+ * when `closed`; `closed` is false when a runner claimed the job meanwhile (that debate is under way) or it was settled.
+ * Every send site handles it: the asker reads QUEUED (the debate page says it did not start), the waker counts it
+ * failed, the stalled-start re-send logs it, and none records a DISPATCH failure over it.
+ */
+export class ReleaseNotServedError extends TypedDomainError {
+  constructor(readonly runId: string, readonly releaseKey: string, readonly closed: boolean) {
+    super("RELEASE_NOT_SERVED", "The run's release no longer serves it");
+  }
+}
+
+/** A run's own release (`core.run.release_key`), that release's state (null: never recorded, or `legacy`), and whether any release is current. */
+export interface RunReleaseLookup {
+  lookup(runId: string): Promise<Readonly<{ releaseKey: string; state: ReleaseState | null; anyCurrent: boolean }> | null>;
+}
+
+/**
+ * The lookup over 0123 (A-x2: the API's runtime login reads `core.run.release_key` and executes both definer readers),
+ * one statement per send on the runtime pool; null when there is no such run. Results are frozen.
+ */
+export class PostgresRunReleaseLookup implements RunReleaseLookup {
+  constructor(private readonly pool: Pick<Pool, "query">) {}
+
+  async lookup(runId: string): Promise<Readonly<{ releaseKey: string; state: ReleaseState | null; anyCurrent: boolean }> | null> {
+    const result = await this.pool.query<{
+      release_key: string; state: string | null; front_pair_stopped: boolean | null; retire_requested: boolean | null; any_current: boolean;
+    }>(
+      `SELECT run.release_key, state.state, state.front_pair_stopped, state.retire_requested,
+              EXISTS (SELECT 1 FROM core.read_current_release()) AS any_current
+       FROM core.run AS run
+       LEFT JOIN LATERAL core.read_release_state(run.release_key) AS state ON true
+       WHERE run.run_id = $1`,
+      [runId]
+    );
+    const row = result.rows[0];
+    if (row === undefined) return null;
+    if (row.state !== null && !RELEASE_LIFECYCLE_STATES.has(row.state)) throw new TypeError("RELEASE_STATE_ROW_INVALID");
+    return Object.freeze({
+      releaseKey: row.release_key,
+      state: row.state === null ? null : Object.freeze({
+        state: row.state as ReleaseLifecycleState,
+        frontPairStopped: row.front_pair_stopped === true,
+        retireRequested: row.retire_requested === true
+      }),
+      anyCurrent: row.any_current === true
+    });
+  }
+}
+
+/**
+ * Side-by-side spec §4: a release serves its runs while it is CURRENT, and while it DRAINS until root asks it to retire
+ * (its runner still claims and finishes its own debates). With no release recorded anywhere a local deployment is
+ * today's single-release world, and every run is served; a hosted one fails closed (plan C's area constraint).
+ */
+export function releaseServes(input: Readonly<{ state: ReleaseState | null; anyCurrent: boolean; hosted: boolean }>): boolean {
+  if (input.state?.state === "CURRENT") return true;
+  if (input.state?.state === "DRAINING" && !input.state.retireRequested) return true;
+  return !input.anyCurrent && !input.hosted;
+}
+
+/** Spec §4 / plan D: one owner mail per release key per half hour at most, so a burst of refused sends is one line. */
+const RELEASE_NOT_SERVED_ALERT_WINDOW_MS = 1_800_000;
+
+/**
+ * Side-by-side spec §4 (plan C task C4) — THE OWNER HEARS OF A REFUSED SEND. The API emails nobody about releases: it
+ * prints `DEBATEAI_RELEASE_NOT_SERVED {"releaseKey":…,"state":…|null}` on stderr, at most once per release key per
+ * `windowMs` in this process, and plan D's root-side watcher mails the owner from it. Content-free: a key we mint and a
+ * lifecycle word.
+ */
+export function createReleaseNotServedAlert(options: Readonly<{
+  clock?: () => number; windowMs?: number; write?: (line: string) => void;
+}> = {}): Readonly<{ note(releaseKey: string, state: ReleaseLifecycleState | null): void }> {
+  const clock = options.clock ?? Date.now;
+  const windowMs = options.windowMs ?? RELEASE_NOT_SERVED_ALERT_WINDOW_MS;
+  const write = options.write ?? ((line: string) => { process.stderr.write(`${line}\n`); });
+  const lastAt = new Map<string, number>();
+  return Object.freeze({
+    note(releaseKey: string, state: ReleaseLifecycleState | null): void {
+      const now = clock();
+      const last = lastAt.get(releaseKey);
+      if (last !== undefined && now - last < windowMs) return;
+      lastAt.set(releaseKey, now);
+      write(`DEBATEAI_RELEASE_NOT_SERVED ${JSON.stringify({ releaseKey, state })}`);
+    }
+  });
+}
+
+/** The failure reason a refused send closes the run's first job with (plain failure sentences read it NOT_STARTED). */
+const RELEASE_NOT_SERVED_SETUP_FAILURE = "RUN_SETUP_FAILED:RELEASE_NOT_SERVED";
+
+/**
+ * Side-by-side spec §2, §3, §4 (plan C task C4) — EVERY SEND IS ROUTED BY THE RUN'S OWN RELEASE. Two releases live at
+ * once never share a Hatchet task, so each send reads the run's `release_key` and that release's state and sends to
+ * `releaseTaskName(base, release_key)` (`legacy` keeps the bare base name) while that release serves the run
+ * (`releaseServes`). Otherwise nothing is sent (O1: a debate is never touched by another release's code), and the send
+ * is refused loudly and harmlessly: the never-claimed first job is closed FAILED as RUN_SETUP_FAILED:RELEASE_NOT_SERVED
+ * (`recordSetupFailure` closes a READY job only, and is not fenced by release, so the API's legacy-fenced repository
+ * closes another release's job without widening any claim fence), the run's waiver is written when that closed it
+ * (spec §9: never the person's quota), one content-free journal line, the owner alert, and ReleaseNotServedError. A run
+ * that does not exist is RUN_NOT_FOUND, and nothing is sent or closed. This is the API's only sender (the unrouted
+ * dispatcher it replaces is deleted), so no path bypasses the routing.
+ */
+export class ReleaseRoutedDispatcher implements Dispatcher {
+  readonly #client: Pick<Hatchet, "runNoWait">;
+  readonly #workflowName: string;
+  readonly #hosted: boolean;
+  readonly #lookup: RunReleaseLookup;
+  readonly #work: Pick<WorkItemRepository, "recordSetupFailure">;
+  readonly #waive: (runId: string) => Promise<void>;
+  readonly #alert: ReturnType<typeof createReleaseNotServedAlert>;
+
+  constructor(options: Readonly<{
+    client: Pick<Hatchet, "runNoWait">; workflowName: string; hosted: boolean;
+    lookup: RunReleaseLookup; work: Pick<WorkItemRepository, "recordSetupFailure">;
+    waive: (runId: string) => Promise<void>; alert: ReturnType<typeof createReleaseNotServedAlert>;
+  }>) {
+    if (options.workflowName.trim().length === 0) throw new TypeError("Hatchet workflow name must be a register value");
+    this.#client = options.client;
+    this.#workflowName = options.workflowName;
+    this.#hosted = options.hosted;
+    this.#lookup = options.lookup;
+    this.#work = options.work;
+    this.#waive = options.waive;
+    this.#alert = options.alert;
   }
 
   async dispatch(input: { readonly runId: string; readonly workItemId: string }): Promise<void> {
-    await this.client.runNoWait(this.workflowName, {
-      runId: input.runId,
-      workItemId: input.workItemId
-    }, {
-      additionalMetadata: {
-        v3RunId: input.runId,
-        v3WorkItemId: input.workItemId,
-        sourceOfRecord: "core.work_item"
-      }
+    const release = await this.#lookup.lookup(input.runId);
+    if (release === null) throw new TypedDomainError("RUN_NOT_FOUND", "The run to send does not exist");
+    if (releaseServes({ state: release.state, anyCurrent: release.anyCurrent, hosted: this.#hosted })) {
+      await this.#client.runNoWait(releaseTaskName(this.#workflowName, release.releaseKey), {
+        runId: input.runId,
+        workItemId: input.workItemId
+      }, {
+        additionalMetadata: {
+          v3RunId: input.runId,
+          v3WorkItemId: input.workItemId,
+          sourceOfRecord: "core.work_item"
+        }
+      });
+      return;
+    }
+    const closed = await this.#work.recordSetupFailure({
+      runId: input.runId, ...firstRunJob(input.runId), reason: RELEASE_NOT_SERVED_SETUP_FAILURE
     });
+    if (closed) {
+      // C4 ruling: the job is closed and never claimed, so it holds no spend and a missing waiver costs the person
+      // nothing; a failed waiver write must not escape untyped. One content-free line lets the owner see it, the
+      // alert and the typed refusal below still follow.
+      try {
+        await this.#waive(input.runId);
+      } catch (error) {
+        const code = typeof error === "object" && error !== null ? (error as { code?: unknown }).code : undefined;
+        console.error(JSON.stringify(Object.freeze({
+          event: "api.dispatch.release_not_served_waiver_failed", runId: input.runId, releaseKey: release.releaseKey,
+          sqlstate: typeof code === "string" ? code : null
+        })));
+      }
+    }
+    const state = release.state?.state ?? null;
+    console.error(JSON.stringify(Object.freeze({
+      event: "api.dispatch.release_not_served", runId: input.runId, releaseKey: release.releaseKey, state, closed
+    })));
+    this.#alert.note(release.releaseKey, state);
+    throw new ReleaseNotServedError(input.runId, release.releaseKey, closed);
   }
 }
 
@@ -4865,8 +5007,11 @@ type RunSetupStep =
  */
 type AskEvaluation = Awaited<ReturnType<typeof evaluateAskAdmission>>;
 
-/** An ask's admission with its refusal kept as a value, not thrown (B8); any other failure still throws. */
-async function evaluationOrRefusal(
+/**
+ * An ask's admission with its refusal kept as a value, not thrown (B8); any other failure still throws. Side-by-side C10:
+ * exported as the re-admission plan's `evaluate` (apps/api/src/readmission.ts), which the waker passes in C11.
+ */
+export async function evaluationOrRefusal(
   settings: RunCreationSettings,
   ask: AskRequest,
   personRoom: PersonRoomInput | null = null,
@@ -4892,6 +5037,28 @@ type RoomOutcome =
  */
 function firstRunJob(runId: string): Readonly<{ batteryRowId: "Q1"; commandKey: string }> {
   return Object.freeze({ batteryRowId: "Q1", commandKey: `S00:${runId}:Q1` });
+}
+
+/** Side-by-side C4: the waker's line for a start or re-send its run's release no longer serves (ids we mint only). */
+function logReleaseNotServed(error: ReleaseNotServedError): void {
+  console.error(JSON.stringify(Object.freeze({
+    event: "api.wait.release_not_served", runId: error.runId, releaseKey: error.releaseKey, closed: error.closed
+  })));
+}
+
+/** Side-by-side C11: the typed refusals that leave a waiting run as it was, for the waker to skip (named in its line). */
+const READMISSION_SKIPS: ReadonlySet<string> = new Set([
+  "RUN_READMISSION_TAKEN", "RUN_READMISSION_INVALID", "RUN_READMISSION_OWNER_GONE", "RUN_SUPERSEDED"
+]);
+
+/**
+ * Side-by-side C11: whose new run a re-admission writes — the owner's, encrypted (content-provision pool), when the old
+ * run's content was; otherwise the legacy asker's, in the clear, under the old run's own asker id.
+ */
+function readmissionPrincipalOf(run: WaitingRun, stored: StoredAsk): ReadmissionPrincipal {
+  if (!stored.contentEncrypted) return Object.freeze({ kind: "legacy" as const, legacyAskerId: stored.askerId });
+  if (run.ownerRef === null) throw new TypeError("READMISSION_OWNER_MISSING");
+  return Object.freeze({ kind: "readmitted-owner" as const, ownerRef: run.ownerRef });
 }
 
 /** B7b: what one tick of the waiting line did — counts only, for the operator's log. */
@@ -5197,7 +5364,13 @@ export class PostgresAskApplication implements AskApplication {
       // The job is READY: the next ask's estimate holds this debate from here on.
       await previewAdmissionLock?.release();
       setupStep = "DISPATCH";
-      await this.dispatcher.dispatch({ runId, workItemId });
+      try {
+        await this.dispatcher.dispatch({ runId, workItemId });
+      } catch (error) {
+        // Side-by-side C4: the routed dispatcher already closed the job (RELEASE_NOT_SERVED) and wrote the waiver; the
+        // asker reads QUEUED, the debate page says it did not start, and no DISPATCH failure is recorded over it.
+        if (!(error instanceof ReleaseNotServedError)) throw error;
+      }
     } catch (error) {
       await this.#recordRunSetupFailure(runId, setupStep);
       throw error;
@@ -5221,7 +5394,9 @@ export class PostgresAskApplication implements AskApplication {
    * most likely the same outage — the run keeps reading QUEUED, so the one
    * line that names it goes to the operator's log (ids and codes only).
    */
-  async #recordRunSetupFailure(runId: string, step: RunSetupStep | "FUNDING_ENDED" | typeof PREVIEW_TEAM_ONLY): Promise<void> {
+  async #recordRunSetupFailure(
+    runId: string, step: RunSetupStep | "FUNDING_ENDED" | "CHOICE_UNAVAILABLE" | "READMISSION" | typeof PREVIEW_TEAM_ONLY
+  ): Promise<void> {
     const reason = `RUN_SETUP_FAILED:${step}`;
     try {
       await this.#work.recordSetupFailure({ runId, ...firstRunJob(runId), reason });
@@ -5492,8 +5667,11 @@ export class PostgresAskApplication implements AskApplication {
     try {
       await this.dispatcher.dispatch({ runId: outcome.runId, workItemId: outcome.workItemId });
     } catch (error) {
-      await this.#recordRunSetupFailure(outcome.runId, "DISPATCH");
-      throw error;
+      // Side-by-side C4: a send the run's release no longer serves already closed the job and wrote the waiver: QUEUED.
+      if (!(error instanceof ReleaseNotServedError)) {
+        await this.#recordRunSetupFailure(outcome.runId, "DISPATCH");
+        throw error;
+      }
     }
     // A5: nothing fitted the person's room at any strength, and it started on the cheapest choice (content-free: ids only).
     if (pinned.personRoomTight === true) {
@@ -5521,6 +5699,12 @@ export class PostgresAskApplication implements AskApplication {
    * (`#previewTeamRuns`): an outsider's is recorded FAILED
    * (`RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY`) and counted failed; with no team listed
    * nothing is started, handed over or failed. Ids and counts only.
+   * Side-by-side spec §4, O3 (plan C task C11): a run another release admitted is never started on its own row. The
+   * room answers NEEDS_READMISSION, writing nothing; `#startReadmitted` plans it under this release and asks again
+   * under the owner's lease, and a START writes a NEW run that supersedes it (dispatched as `outcome.runId`). A plan
+   * that is NOT_NOW, or made for a billing plan no longer in force, skips it (it keeps its place); a choice this release
+   * no longer offers records it FAILED (`RUN_SETUP_FAILED:CHOICE_UNAVAILABLE`: "please ask again"); a START that fails
+   * after the new row committed records the new run FAILED (`RUN_SETUP_FAILED:READMISSION`) and the old run waits on.
    */
   async wakeWaitingRuns(): Promise<WaitingLineTick> {
     const line = this.settings.waitingLine;
@@ -5558,12 +5742,42 @@ export class PostgresAskApplication implements AskApplication {
           continue;
         }
         persons.add(person);
+        // Side-by-side C11: the first job of the run that starts — the waiting run, or the new run re-admitting it.
+        const enqueue = (tx: PoolClient, runId: string) => this.#work.enqueueOn(tx, { runId, ...firstRunJob(runId), nodeSet: [] });
+        // Set the moment a re-admission's new row commits: the START can still fail after that (the orphan path).
+        const readmitted: { runId?: string } = {};
         let outcome: WaitingStart<string>;
         try {
-          outcome = await line.startWaiting(run, (tx) => this.#work.enqueueOn(tx, {
-            runId: run.runId, ...firstRunJob(run.runId), nodeSet: []
-          }));
+          outcome = await line.startWaiting(run, enqueue);
+          if (outcome.kind === "NEEDS_READMISSION") {
+            const second = await this.#startReadmitted(run, outcome.planId, line, enqueue, readmitted);
+            // NOT_NOW, or a plan made for another billing plan than the one now in force: the run keeps its place.
+            if (second === null || second.kind === "NEEDS_READMISSION") {
+              skipped += 1;
+              continue;
+            }
+            outcome = second;
+          }
         } catch (error) {
+          if (readmitted.runId !== undefined) {
+            // Side-by-side C11, the orphan path: the new row committed and the START did not. It never runs (FAILED;
+            // 0123 frees the old run for the next tick), and the old run, untouched, keeps its place in line.
+            failed += 1;
+            await this.#recordRunSetupFailure(readmitted.runId, "READMISSION");
+            console.error(JSON.stringify(Object.freeze({
+              event: "api.wait.readmission_failed", runId: run.runId, newRunId: readmitted.runId,
+              diagnostic: apiOperationalErrorDiagnostic(error)
+            })));
+            continue;
+          }
+          // Side-by-side C11: 0123 refused the re-admission before anything was written — another one of this run is
+          // pending or alive (TAKEN), the run no longer waits (INVALID), its owner's account is no longer active
+          // (OWNER_GONE) — or the run was superseded while this start waited for its lock. Not this tick's to start.
+          if (error instanceof TypedDomainError && READMISSION_SKIPS.has(error.code)) {
+            skipped += 1;
+            console.info(JSON.stringify(Object.freeze({ event: "api.wait.readmission_skipped", runId: run.runId, code: error.code })));
+            continue;
+          }
           failed += 1;
           console.error(JSON.stringify(Object.freeze({
             event: "api.wait.start_failed", runId: run.runId, diagnostic: apiOperationalErrorDiagnostic(error)
@@ -5584,17 +5798,32 @@ export class PostgresAskApplication implements AskApplication {
           await this.#recordRunSetupFailure(run.runId, "PLAN_CHANGED");
           continue;
         }
+        // Side-by-side C11: one of its choices is no longer offered. It never started and used none of the person's
+        // allowance; the debate page says so and asks them to ask again (CHOICE_GONE).
+        if (outcome.kind === "ASK_AGAIN") {
+          failed += 1;
+          await this.#recordRunSetupFailure(run.runId, "CHOICE_UNAVAILABLE");
+          continue;
+        }
         if (outcome.kind !== "STARTED") {
           skipped += 1;
           continue;
         }
+        if (outcome.runId !== run.runId) {
+          console.info(JSON.stringify(Object.freeze({ event: "api.wait.readmitted", runId: run.runId, newRunId: outcome.runId })));
+        }
         try {
-          await this.dispatcher.dispatch({ runId: run.runId, workItemId: outcome.value });
+          await this.dispatcher.dispatch({ runId: outcome.runId, workItemId: outcome.value });
           started += 1;
-          console.info(JSON.stringify(Object.freeze({ event: "api.wait.started", runId: run.runId })));
-        } catch {
+          console.info(JSON.stringify(Object.freeze({ event: "api.wait.started", runId: outcome.runId })));
+        } catch (error) {
           failed += 1;
-          await this.#recordRunSetupFailure(run.runId, "DISPATCH");
+          // Side-by-side C4: the job already carries RELEASE_NOT_SERVED (and the run its waiver); no DISPATCH over it.
+          if (error instanceof ReleaseNotServedError) {
+            logReleaseNotServed(error);
+            continue;
+          }
+          await this.#recordRunSetupFailure(outcome.runId, "DISPATCH");
         }
       }
     }
@@ -5603,6 +5832,106 @@ export class PostgresAskApplication implements AskApplication {
     const tick: WaitingLineTick = Object.freeze({ waiting, started, skipped, failed, stopped, redispatched });
     if (waiting > 0 || redispatched > 0) console.info(JSON.stringify(Object.freeze({ event: "api.wait.tick", ...tick })));
     return tick;
+  }
+
+  /**
+   * Side-by-side spec §4, O3 (Q1 → a; plan C task C11) — PHASE TWO OF A RE-ADMISSION, for a run another release admitted
+   * that the room would start (`NEEDS_READMISSION`, nothing written). Outside every lock, the old run's stored ask is
+   * read and planned under this release (`planReadmission`; its evaluation is the only place a probe may run, and only
+   * here, after the room said START). NOT_NOW, or a run with no stored ask any more, answers null: the run keeps its
+   * place. Otherwise the owner's lease is taken FIRST, as `#submitWithRoom` takes it (then the room's spend lock), and
+   * the room is asked again with the plan; `#readmit` writes the new run only if the room still says START.
+   */
+  async #startReadmitted(
+    run: WaitingRun,
+    planId: PlanId | null,
+    line: AskWaitingLinePort,
+    enqueue: (tx: PoolClient, runId: string) => Promise<string>,
+    readmitted: { runId?: string }
+  ): Promise<WaitingStart<string> | null> {
+    const stored = await this.#runs.readStoredAsk(run.runId);
+    if (stored === null) return null;
+    const plan = await planReadmission({
+      stored, planId, settings: this.settings,
+      evaluate: (ask, shapePlan) => evaluationOrRefusal(this.settings, ask, null, shapePlan)
+    });
+    if (plan.kind === "NOT_NOW") {
+      console.info(JSON.stringify(Object.freeze({ event: "api.wait.readmission_not_now", runId: run.runId, code: plan.code })));
+      return null;
+    }
+    const principal = readmissionPrincipalOf(run, stored);
+    const admissionPool = principal.kind === "readmitted-owner" ? this.#serverAskAdmissionPool : this.#legacyAskAdmissionPool;
+    return withOwnerAskAdmissionLease(admissionPool, accessOfWaitingRun(run), (lease) => line.startWaiting(run, enqueue, {
+      plan,
+      // The room never asks an ASK_AGAIN plan for a run.
+      createRun: plan.kind === "READMIT"
+        ? () => this.#readmit(run, plan, principal, lease, readmitted)
+        : () => Promise.reject(new TypeError("ASK_ROOM_READMISSION_WITHOUT_PLAN"))
+    }));
+  }
+
+  /**
+   * Side-by-side C11 — THE NEW RUN of a re-admission, written as `#submitWithRoom` writes a new run, on the same pools:
+   * the row under this release (`startReadmittedRun` on the owner's lease client: the content-provision login for an
+   * owner's encrypted run), then the model assignment and the role rotation the plan's evaluation pinned, then the
+   * memory question under the old run's asker and caller scope. No liveness query is recorded: this is not a new ask.
+   * `readmitted.runId` is set the moment the row commits, so a failure after it — a failed pin included — records the
+   * new run FAILED (RUN_SETUP_FAILED:READMISSION) in the waker's catch, and the error is rethrown.
+   */
+  async #readmit(
+    run: WaitingRun,
+    plan: Extract<ReadmissionPlan, { kind: "READMIT" }>,
+    principal: ReadmissionPrincipal,
+    lease: OwnerAskAdmissionLease,
+    readmitted: { runId?: string }
+  ): Promise<string> {
+    const evaluation = plan.evaluation;
+    const language = readmittedArgumentLanguage(plan);
+    const runId = await this.#runs.startReadmittedRun({
+      fromRunId: run.runId,
+      principal,
+      questionLine: plan.ask.question_line,
+      argumentLanguageTag: language.tag,
+      argumentLanguageName: language.nameEn,
+      asOf: new Date(plan.ask.as_of),
+      askerRiskTier: plan.ask.risk_tier,
+      effectiveRiskTier: evaluation.risk.effectiveRiskTier,
+      tierSource: evaluation.risk.tierSource,
+      tierProvenanceRef: evaluation.risk.tierProvenanceRef,
+      compositionBudgetTier: plan.ask.composition_budget_tier,
+      planTier: plan.ask.plan_tier,
+      depthParams: plan.ask.depth_params,
+      discoveredPanel: evaluation.discoveredPanel,
+      strangerSampleRate: this.settings.strangerSampleRate,
+      envelopeBasis: evaluation.envelopeBasis,
+      registerVersion: this.settings.registerVersion,
+      releaseKey: this.settings.releaseKey,
+      batteryVersion: this.settings.batteryVersion,
+      askContract: readmittedAskContract(plan),
+      batteryRows: createInitialBatteryRows({ settlementWatchHandle: this.settings.settlementWatchHandle })
+    }, lease.client);
+    readmitted.runId = runId;
+    if (evaluation.modelAssignment !== undefined) {
+      await insertRunRoleAssignment(this.pool, {
+        runId,
+        assignment: { ...evaluation.modelAssignment.assignment },
+        strength: evaluation.modelAssignment.appliedStrength,
+        steppedDown: evaluation.modelAssignment.steppedDown
+      });
+    }
+    if (evaluation.roleRotation !== undefined) {
+      await insertRunRoleRotation(this.pool, { runId, ...rotationPinFields(evaluation.roleRotation) });
+    }
+    await this.#serve.recordMemoryQuestion({
+      runId,
+      questionLine: plan.ask.question_line,
+      callerScope: plan.stored.callerScope,
+      askerScope: plan.stored.askerId,
+      asOf: plan.ask.as_of,
+      policyVersion: this.settings.registerVersion,
+      ...(this.settings.memoryPullPolicy === undefined ? {} : { pullPolicy: this.settings.memoryPullPolicy })
+    }, accessOfWaitingRun(run));
+    return runId;
   }
 
   /**
@@ -5644,6 +5973,11 @@ export class PostgresAskApplication implements AskApplication {
       try {
         await this.dispatcher.dispatch({ runId: job.runId, workItemId: job.workItemId });
       } catch (error) {
+        // Side-by-side C4: the run's release no longer serves it; the dispatcher closed what it could. Counted nowhere.
+        if (error instanceof ReleaseNotServedError) {
+          logReleaseNotServed(error);
+          continue;
+        }
         console.error(JSON.stringify(Object.freeze({
           event: "api.wait.redispatch_failed", runId: job.runId, diagnostic: apiOperationalErrorDiagnostic(error)
         })));

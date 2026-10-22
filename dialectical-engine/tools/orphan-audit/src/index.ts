@@ -667,7 +667,12 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // migrate() is byte-identical.
 // Side-by-side releases A5 (2026-10-22, spec 2026-10-21 §9, C10): the reviewed module after it re-exported
 // ./spend-waiver.js (SPEND_WAIVER_REASONS, recordSpendWaiver, SpendWaiverReason). migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "944ddd9e6e966d227068f55c34bbc7d22b13a8d108b79255c0aef603dc595a4b";
+// Side-by-side releases C10 (2026-10-22, spec 2026-10-21 §4, O3): the reviewed module after it gained StoredAsk and
+// RunRepository.readStoredAsk (the re-admission plan's read). migrate() is byte-identical.
+// Side-by-side releases C11 (2026-10-22, spec 2026-10-21 §4, O3): the reviewed module after startRun's insert moved into
+// a private helper shared with the new RunRepository.startReadmittedRun (ReadmissionPrincipal, StartReadmittedRunInput).
+// migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "9c34af4be45b2484277a6155161ac694a4e3a9e23b25182b9806f57db82fb655";
 const NATIVE_ONCE_SOURCES = new Set([
   "0104_password_only_reset.sql", "0105_backup_email_verification.sql",
   "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"

@@ -200,9 +200,9 @@ function lineDouble(order: string[]): AskWaitingLinePort {
       handedOver = true;
       return [Object.freeze({ runId: RUN_ID, waitingSince: NOW, ownerRef: OWNER_REF, legacyAskerId: null })] as never;
     },
-    startWaiting: async (_run, enqueue) => {
+    startWaiting: async (run, enqueue) => {
       order.push("startWaiting");
-      return { kind: "STARTED", value: await enqueue(TX) } as never;
+      return { kind: "STARTED", runId: run.runId, value: await enqueue(TX, run.runId) } as never;
     }
   };
 }
