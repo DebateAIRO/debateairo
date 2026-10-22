@@ -137,7 +137,9 @@ export const run = core.table("run", {
   questionBlindIndexVersion: integer("question_blind_index_version").notNull(),
   questionBlindIndex: bytea("question_blind_index"),
   contentCiphertext: jsonb("content_ciphertext"),
-  contentAttestation: bytea("content_attestation")
+  contentAttestation: bytea("content_attestation"),
+  // Side-by-side spec §1 (migration 0123): the release that runs the debate, written once at insert.
+  releaseKey: text("release_key").notNull().default("legacy")
 });
 
 // V-6 (0069): the run's progress stream. Only honesty.investigation_gap_opened

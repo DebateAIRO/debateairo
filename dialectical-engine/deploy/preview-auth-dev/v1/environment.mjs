@@ -115,7 +115,26 @@ export function installHostedEgress(deploymentMode,setProxy=setGlobalProxyFromEn
  if(deploymentMode!=='hosted')refuse('PREVIEW_ENVIRONMENT_REFUSED');
  return setProxy({...PREVIEW_HOSTED_PROXY_ENVIRONMENT});
 }
-const UI=['NODE_ENV','PUBLIC_APP_URL','PORT','DIALECTICAL_UI_HOST','DIALECTICAL_API_BASE','DIALECTICAL_UI_TRUSTED_PROXIES','DIALECTICAL_UI_EDGE_SECRET_PATH','NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON','TURNSTILE_SITE_KEY'];
+/** A release key (side-by-side INTERFACE): `r<site version>-<12 hex of the code revision>`. Root's release-table.mjs keeps the same text; a test pins the two equal. */
+export const RELEASE_KEY_PATTERN=/^r[1-9][0-9]*-[0-9a-f]{12}$/;
+/** The one release key a reviewed plan may run under: its register version and the first 12 hex of its source revision (side-by-side INTERFACE). */
+export function expectedReleaseKey(publication,sourceRevision) {
+ return `r${publication.registerVersion}-${sourceRevision.slice(0,12)}`;
+}
+// RELEASE_KEY: the website refuses to start without its release key (side-by-side spec §1, §7; apps/ui/release-edge.mjs).
+const UI=['NODE_ENV','PUBLIC_APP_URL','PORT','DIALECTICAL_UI_HOST','DIALECTICAL_API_BASE','DIALECTICAL_UI_TRUSTED_PROXIES','DIALECTICAL_UI_EDGE_SECRET_PATH','NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON','TURNSTILE_SITE_KEY','RELEASE_KEY'];
+/**
+ * Side-by-side spec §1 (O1): a preview process starts only as its plan's release. Its RELEASE_KEY must be exactly
+ * r<plan register pin>-<first 12 hex of the plan's source revision>, so an env file of another release (another
+ * revision, another register version) never starts this one's code; the parsers only check the key's form and number.
+ * A runner's worker id and Hatchet worker name end with that key (plan D, release-env.mjs), so two releases' runners
+ * never share a worker identity.
+ */
+function assertReleaseKey(service,configured,publication,approved) {
+ if(typeof approved?.sourceRevision!=='string'||!/^[0-9a-f]{40}$/.test(approved.sourceRevision)||typeof publication?.registerVersion!=='string'
+  ||!RELEASE_KEY_PATTERN.test(configured.RELEASE_KEY??'')||configured.RELEASE_KEY!==expectedReleaseKey(publication,approved.sourceRevision))refuse();
+ if(service==='runner'&&['RUNNER_WORKER_ID','HATCHET_WORKER_NAME'].some(key=>typeof configured[key]!=='string'||!configured[key].endsWith(`-${configured.RELEASE_KEY}`)))refuse();
+}
 export function parseEnvironmentText(text) {
  try{
   if(typeof text!=='string'||Buffer.byteLength(text)>32768||/[\0\r]/.test(text))refuse();const out={};
@@ -124,7 +143,10 @@ export function parseEnvironmentText(text) {
   return out;
  }catch{refuse('PREVIEW_ENVIRONMENT_REFUSED');}
 }
-/** For service ui, `runtime` is `{builtModelRosterFlag}`: the model list the website was built with (ui-build.mjs builtModelRosterFlag). */
+/**
+ * For service ui, `runtime` is `{builtModelRosterFlag}`: the model list the website was built with (ui-build.mjs builtModelRosterFlag).
+ * Every service needs the reviewed plan's publication and source revision for its release key (assertReleaseKey).
+ */
 export function narrowEnvironment(service,configured,runtime,publication,approved) {
  try{
   if(!configured||Object.getPrototypeOf(configured)!==Object.prototype)refuse();
@@ -132,6 +154,7 @@ export function narrowEnvironment(service,configured,runtime,publication,approve
   const keys=service==='ui'?UI:inventory?[...inventory.required,...inventory.optional,...(service==='api'?STAFF:[])]:[];
   if(!keys.length||Object.entries(configured).some(([key,value])=>!keys.includes(key)||typeof value!=='string'||/[\0\r\n]/.test(value)))refuse();
   if(configured.NODE_ENV!=='production')refuse();
+  assertReleaseKey(service,configured,publication,approved);
   const environment={...configured,PATH:'/usr/local/bin:/usr/bin:/bin'};
   if(service==='ui'){
    if(configured.PUBLIC_APP_URL!==PREVIEW_ORIGIN||configured.PORT!==approved.uiPort||configured.DIALECTICAL_UI_HOST!=='127.0.0.1'

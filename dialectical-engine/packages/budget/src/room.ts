@@ -13,10 +13,10 @@ import type { SpendScope } from "./person-allowance.js";
  *  - The ROOM for one scope: FULL once used reaches the limit; CLOSE from the
  *    close edge, or when this question's estimate would take it past the limit;
  *    FITS otherwise. Only FULL makes a question wait (A5).
- *  - The ADMISSION over every scope: wait when a scope is FULL or when the line
- *    holds a run waiting for the site (a new question never jumps the line); a
- *    person who already has their waiting questions is refused instead; START
- *    otherwise.
+ *  - The ADMISSION over every scope: wait when a scope is FULL, when the line
+ *    holds a run waiting for the site (a new question never jumps the line), or
+ *    when the site holds every question back (`AdmissionHold`); a person who
+ *    already has their waiting questions is refused instead; START otherwise.
  *  - The WALL for a running debate: real spend plus the next call's projection
  *    against the finish edge. Holds are not counted here.
  */
@@ -35,9 +35,20 @@ export type WaitsFor = "OWN_DEBATES";
  * spend alone. Only a FULL person window may carry it.
  */
 export type ScopeRoom = Readonly<{ scope: SpendScope; room: Room; resetsAt: Date; fullOnOwnHolds?: boolean }>;
+/**
+ * Side-by-side uploads spec 2026-10-21 §9, §13 (plan C task C8): what holds every new question back whatever its rooms
+ * say. SITE_BUSY: the site already runs as many debates as its runners take (`SITE_CONCURRENT_DEBATES`, across
+ * releases). SWITCHING: this release is not the current one, so a release switch is under way. Either waits for the
+ * waker's next tick; both live only in the database (`core.run_wait_reason.waits_for`), never on the wire.
+ */
+export type AdmissionHold = "SITE_BUSY" | "SWITCHING";
+/**
+ * A WAIT's `cause` names the hold only when it is the ONE reason to wait: no scope is FULL and the line holds nobody
+ * back. A wait the rooms or the line decide is recorded as before, whatever the hold.
+ */
 export type Admission =
   | Readonly<{ kind: "START"; worst: Room; worstScope: SpendScope | null }>
-  | Readonly<{ kind: "WAIT"; waitsUntil: Date; worstScope: SpendScope; waitsFor?: WaitsFor }>
+  | Readonly<{ kind: "WAIT"; waitsUntil: Date; worstScope: SpendScope; waitsFor?: WaitsFor; cause?: AdmissionHold }>
   | Readonly<{ kind: "REFUSE_ALREADY_WAITING" }>;
 export type Wall = "WITHIN" | "WOULD_CROSS";
 
@@ -182,6 +193,8 @@ export function decideAdmission(input: Readonly<{
   personWaitingCount: number;
   waitingLinePerPerson: number;
   nextTickAt: Date;
+  /** Side-by-side C8: absent or null is today's admission, unchanged. */
+  hold?: AdmissionHold | null;
 }>): Admission {
   const rooms = checkedRooms(input?.rooms);
   if (typeof input.siteLineBlocking !== "boolean") throw new TypeError("BUDGET_ADMISSION_LINE_INVALID");
@@ -192,7 +205,10 @@ export function decideAdmission(input: Readonly<{
     throw new TypeError("BUDGET_ADMISSION_PER_PERSON_INVALID");
   }
   const nextTickAt = validDate(input.nextTickAt, "BUDGET_ADMISSION_TICK_INVALID");
-  const mustWait = input.siteLineBlocking || rooms.some((entry) => entry.room === "FULL");
+  const hold = input.hold ?? null;
+  if (hold !== null && hold !== "SITE_BUSY" && hold !== "SWITCHING") throw new TypeError("BUDGET_ADMISSION_HOLD_INVALID");
+  const anyFull = rooms.some((entry) => entry.room === "FULL");
+  const mustWait = input.siteLineBlocking || anyFull || hold !== null;
   if (mustWait) {
     if (input.personWaitingCount >= input.waitingLinePerPerson) {
       return Object.freeze({ kind: "REFUSE_ALREADY_WAITING" as const });
@@ -202,7 +218,8 @@ export function decideAdmission(input: Readonly<{
       kind: "WAIT" as const,
       waitsUntil: until.waitsUntil,
       worstScope: until.worstScope,
-      ...(until.waitsFor === undefined ? {} : { waitsFor: until.waitsFor })
+      ...(until.waitsFor === undefined ? {} : { waitsFor: until.waitsFor }),
+      ...(hold === null || anyFull || input.siteLineBlocking ? {} : { cause: hold })
     });
   }
   let worst: ScopeRoom | null = null;

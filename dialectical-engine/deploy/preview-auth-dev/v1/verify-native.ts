@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import pg,{type Pool} from 'pg';
-import { migrate } from '@debateai/db';
-import { loadMigrationPlan,type MigrationPlan } from '../../../packages/db/src/migration-lineage.js';
+import { DATABASE_AHEAD_NOT_ACCEPTED,migrate,verifyDatabaseAhead,type ForwardStepDeclaration } from '@debateai/db';
+import { TypedDomainError } from '@debateai/kernel';
+import { loadMigrationPlan,splitLedger,type MigrationPlan } from '../../../packages/db/src/migration-lineage.js';
 import { PostgresPasswordResetRepository } from '../../../packages/db/src/password-reset.js';
 import { PostgresBackupEmailRepository,PostgresMfaRecoveryRepository } from '../../../packages/db/src/email-mfa-recovery.js';
 import type { AuditContextHasher } from '@debateai/crypto';
@@ -39,14 +40,61 @@ export async function refusePendingForwardSteps(pool:Pool,plan?:MigrationPlan):P
  const pending=pendingForwardSteps(source,applied);
  if(pending.length>0)throw new NativeVerifyPendingForwardStepError(pending);
 }
-export async function verifyNativeState(pool:Pool,binding:Readonly<{sourceRevision:string;sourceTree:string;nativeSourceSha256:string;publication:RegisterPublicationReceipt}>) {
+/**
+ * Side-by-side spec 2026-10-21 §5 ("database ahead"): the database holds steps a newer release added after this source's
+ * last one, and no database-ahead file was handed to verify. Only root pinning the newer release's file
+ * (`prestart.mjs accept-ahead`) lets this release start beside that database.
+ */
+export class NativeVerifyDatabaseAheadError extends Error {
+ readonly code='PREVIEW_NATIVE_VERIFY_DATABASE_AHEAD';
+ readonly extra:readonly string[];
+ constructor(extra:readonly string[]){
+  super(`PREVIEW_NATIVE_VERIFY_DATABASE_AHEAD: the database has steps this release does not know: ${extra.join(', ')}. Pin the newer release's database-ahead file with prestart.mjs accept-ahead first.`);
+  this.name='NativeVerifyDatabaseAheadError';this.extra=Object.freeze([...extra]);
+ }
+}
+/**
+ * The root-pinned database-ahead file as the native operator read and checked it (database-ahead.mjs, native-operator.mjs
+ * readDatabaseAhead): its sha256, the newer release's label, the steps it adds (ascending) and its whole chain.
+ */
+export type NativeDatabaseAhead=Readonly<{fileSha256:string;newerLabel:string;accepted:readonly Readonly<{name:string;sha256:string}>[];newerChain:readonly ForwardStepDeclaration[]}>;
+export type VerifyNativeOptions=Readonly<{databaseAhead?:NativeDatabaseAhead|null;verifyDatabaseAhead?:typeof verifyDatabaseAhead}>;
+/** What the proof says about a database ahead: null, or the pinned file and the extra steps verify accepted. */
+export type NativeDatabaseAheadProof=Readonly<{fileSha256:string;newerLabel:string;extraSteps:readonly string[]}>|null;
+const sameSteps=(a:readonly string[],b:readonly string[])=>a.length===b.length&&a.every((name,index)=>name===b[index]);
+/**
+ * Side-by-side spec §5 ("database ahead"), plan D task D5, before anything can write: the extra steps (the ledger's
+ * names after this source's last step that it does not know, packages/db/src/migration-lineage.ts splitLedger) need a
+ * pinned database-ahead file (else NativeVerifyDatabaseAheadError), must be the first steps of its list, in order (else
+ * DATABASE_AHEAD_NOT_ACCEPTED NOT_PINNED <name>), and plan A's read-only verifyDatabaseAhead must accept them with the
+ * newer release's whole chain (receipts, chain, verifier, n1 declarations, one newer release, chain prefix) and report
+ * exactly those steps. Returns the pinned file; the full replay with the same chain follows.
+ */
+async function checkDatabaseAhead(pool:Pool,extra:readonly string[],options:VerifyNativeOptions):Promise<NativeDatabaseAhead>{
+ const pinned=options.databaseAhead??null;
+ if(pinned===null)throw new NativeVerifyDatabaseAheadError(extra);
+ const unpinned=extra.find((name,index)=>pinned.accepted[index]?.name!==name);
+ if(unpinned!==undefined)throw new TypedDomainError(DATABASE_AHEAD_NOT_ACCEPTED,`${DATABASE_AHEAD_NOT_ACCEPTED} NOT_PINNED ${unpinned}`);
+ const report=await (options.verifyDatabaseAhead??verifyDatabaseAhead)(pool,{newerChain:pinned.newerChain});
+ if(!sameSteps(report.extraSteps,extra))fail();
+ return pinned;
+}
+export async function verifyNativeState(pool:Pool,binding:Readonly<{sourceRevision:string;sourceTree:string;nativeSourceSha256:string;publication:RegisterPublicationReceipt}>,options:VerifyNativeOptions={}) {
  // Verification is replay-only: a pending step (any numbered migration of the source) is refused before migrate runs. Applying pending SQL is the
  // separately explicit native operator operation apply-and-plan, with the owner's yes.
  const installed=(await pool.query("SELECT name FROM public.debateai_schema_migration WHERE name='0108_preview_recovery_verified_bindings.sql'")).rows;
  if(installed.length!==1)fail();
  const plan=await loadMigrationPlan();
  await refusePendingForwardSteps(pool,plan);
- await migrate(pool); // Authoritative current source: complete table/column/membership/owner/provenance checks.
+ // Side-by-side §5: every step of this source is applied (above); steps a newer release added after them are `extra`.
+ const {extra}=splitLedger(plan,(await pool.query<{name:string}>('SELECT name FROM public.debateai_schema_migration ORDER BY name')).rows.map(row=>row.name));
+ const ahead=extra.length===0?null:await checkDatabaseAhead(pool,extra,options);
+ // Authoritative current source, ahead or not: complete table/column/membership/owner/provenance checks. On a database
+ // ahead, plan A's migrate replays this source's own steps, applies nothing and accepts the extra steps only against the
+ // pinned newer chain (assertDatabaseAheadAccepted); verify never applies a step either way.
+ const replayed=await migrate(pool,ahead===null?{}:{newerChain:ahead.newerChain});
+ if(replayed.appliedSteps.length!==0||!sameSteps(replayed.extraSteps,extra))fail();
+ const databaseAhead:NativeDatabaseAheadProof=ahead===null?null:Object.freeze({fileSha256:ahead.fileSha256,newerLabel:ahead.newerLabel,extraSteps:Object.freeze([...extra])});
  const client=await pool.connect();let transaction=false,released=false;
  const release=()=>{if(!released){released=true;client.release();}};
  try{
@@ -74,7 +122,7 @@ export async function verifyNativeState(pool:Pool,binding:Readonly<{sourceRevisi
   return {schema:'preview-auth-dev-native-v1',...binding,verifiedAt:new Date().toISOString(),postgresMajor:identity.major,executorRole:identity.role,executorOid:identity.oid,
    ledgerOwnerOid:identity.ledger_owner,billingOwnerOid:identity.billing_owner,defaultOwnerCount,ledgerCount:ledger.length,resolutionCount:resolutions.length,forwardCount:forward.length,
    catalogSha256:hash(catalog),ledgerSha256:hash(ledger),resolutionSha256:hash(resolutions),forwardSha256:hash(forward),cohortCount:cohort,
-   capabilityCounts:Object.fromEntries(capabilities.map(row=>[row.rolname,row.count])),currentContractVerified:true};
+   capabilityCounts:Object.fromEntries(capabilities.map(row=>[row.rolname,row.count])),currentContractVerified:true,databaseAhead};
  }catch(error){if(transaction)await client.query('ROLLBACK').catch(()=>{});throw error;}finally{release();}
 }
 

@@ -44,6 +44,7 @@ import { scriptedAnswers } from "../support/scripted-answers.js";
 import { importHistoricalRegisterFixture, publishRegisterFixture, registerFixtureRow } from "../support/registerFixtures.js";
 import { copyDatabase, dropDatabase, savedDebate, type SavedDebate } from "../support/saved-debate.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { testReleaseKey } from "../support/releaseKey.js";
 
 let database: TestDatabase;
 let admin: Pool;
@@ -219,7 +220,7 @@ describe("a run admitted without a shape is today's run (spec §3.1, plan Task 1
     const admitOn = async (version: number) => {
       const inForce = debateShapeInForce(await readDebateShapePolicy(database.pool, version));
       const settings: RunCreationSettings = {
-        strangerSampleRate: 0, registerVersion: version, batteryVersion: "task-16", settlementWatchHandle: "task-16",
+        strangerSampleRate: 0, releaseKey: testReleaseKey(version), registerVersion: version, batteryVersion: "task-16", settlementWatchHandle: "task-16",
         resolveDiscoveredPanel: async () => panel,
         resolveEnvelopeBasis: async ({ depthParams, panelSize, backupSequencesProvisioned, shape }) => computeStructuralCeilingBasis({
           ...CEILING_TERMS, panelSize, depth: Number(depthParams.depth), backupSequencesProvisioned, ...(shape === null ? {} : { shape })

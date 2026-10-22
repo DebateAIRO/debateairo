@@ -1,7 +1,7 @@
 # deploy/vps/Caddyfile
 # The only process on the VPS that listens on a public interface (PLAN §8 C3, R2).
 # Caddy terminates TLS (automatic ACME, HTTP->HTTPS redirect is implicit) and proxies to the
-# Next front door on loopback. Everything else — API 127.0.0.1:8790, Postgres unix socket,
+# Next front door on loopback. Everything else — APIs 127.0.0.1:8790/8791, Postgres unix socket,
 # Hatchet 127.0.0.1:7077/8888 — is unreachable from outside the box.
 #
 # Deliberately absent (audit L7 "C2/C3 validation", gap 2): no proxy-trust directive. Caddy >= 2.5
@@ -14,10 +14,49 @@
 # may appear here even in a comment.
 #
 # Set DEBATEAI_PUBLIC_HOSTNAME and DEBATEAI_ACME_EMAIL in /etc/default/caddy (see README §3).
+#
+# Two slots (side-by-side spec §6, §10): each release's website listens on its slot's port, A = 127.0.0.1:3001 and
+# B = 127.0.0.1:3002 (its API on 8790 / 8791), and this one fixed config proxies to both. An active health check
+# asks each website's /readyz every 2 s; a website is ready only while its own API's release is current and the
+# release table's "take traffic from" time has passed, so at most one slot is ever healthy. At a switch the old pair
+# turns not-ready at once and the new pair a few seconds later (break-before-make); a request that arrives in between
+# waits up to 12 s (lb_try_duration) instead of failing. Caddy runs with `admin off`, so this file only takes effect
+# through `systemctl restart caddy`, never a reload (README §6).
 
 {
 	email {$DEBATEAI_ACME_EMAIL}
 	admin off
+}
+
+# The one proxy, imported by the public site and by the loopback check site below.
+(debateai_slots) {
+	reverse_proxy 127.0.0.1:3001 127.0.0.1:3002 {
+		# The first healthy upstream takes every request; with none healthy, hold and retry every 250 ms for 12 s.
+		lb_policy first
+		lb_try_duration 12s
+		lb_try_interval 250ms
+		health_uri /readyz
+		health_status 200
+		health_interval 2s
+		health_timeout 1s
+		health_passes 1
+		health_fails 1
+		# server.mjs answers /readyz to a trusted peer only, so the check carries the edge secret. It asks each slot's port
+		# directly; the public site below refuses /readyz itself and root reads it through the loopback site (:3090).
+		health_headers {
+			X-Debateai-Edge-Secret {file./etc/debateai/ui-edge.caddy.secret}
+		}
+		# {remote_host} is the socket peer Caddy observed — never a caller-supplied header.
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto https
+		# C2b: the UI honours the hop above only when this secret matches (timingSafeEqual in
+		# apps/ui/trusted-client-ip.mjs). Without it any local process able to open
+		# 127.0.0.1:3001 or :3002 could forge a client address and evade the per-IP admission limits.
+		# Caddy's own copy of the secret: 0640 root:caddy, >= 43 base64url characters, the same
+		# bytes as the UI's 0400 debateai-ui copy at /etc/debateai/ui-edge.secret, which the UI
+		# refuses to share with any group (README §3 "The key-file contract").
+		header_up X-Debateai-Edge-Secret {file./etc/debateai/ui-edge.caddy.secret}
+	}
 }
 
 {$DEBATEAI_PUBLIC_HOSTNAME} {
@@ -46,16 +85,23 @@
 	@compressible not path /api/*
 	encode @compressible gzip
 
-	reverse_proxy 127.0.0.1:3001 {
-		# {remote_host} is the socket peer Caddy observed — never a caller-supplied header.
-		header_up X-Forwarded-For {remote_host}
-		header_up X-Forwarded-Proto https
-		# C2b: the UI honours the hop above only when this secret matches (timingSafeEqual in
-		# apps/ui/trusted-client-ip.mjs). Without it any local process able to open
-		# 127.0.0.1:3001 could forge a client address and evade the per-IP admission limits.
-		# Caddy's own copy of the secret: 0640 root:caddy, >= 43 base64url characters, the same
-		# bytes as the UI's 0400 debateai-ui copy at /etc/debateai/ui-edge.secret, which the UI
-		# refuses to share with any group (README §3 "The key-file contract").
-		header_up X-Debateai-Edge-Secret {file./etc/debateai/ui-edge.caddy.secret}
+	# Readiness is never read through the public name (final fix wave W2): every proxied request carries the edge
+	# secret, so the website would answer a visitor's /readyz as it answers Caddy. Caddy orders respond before
+	# reverse_proxy: /readyz gets Caddy's own 404 here; the health checks ask the slots directly, root asks :3090.
+	respond /readyz 404
+
+	import debateai_slots
+}
+
+# The same front on loopback only, for root's switch checks (side-by-side plan D: the edge http://127.0.0.1:3090):
+# "does Caddy send traffic to the new pair yet" is asked here, through the same health-checked proxy, without leaving
+# the box. A site with no host name gets no certificate and serves plain HTTP; `bind` keeps it off every public
+# address. A local process reaching it is seen as 127.0.0.1, exactly as when it opens a website port directly: the
+# X-Forwarded-For Caddy sends is the peer it observed, so no client address can be forged through it.
+:3090 {
+	bind 127.0.0.1
+	request_body {
+		max_size 1MB
 	}
+	import debateai_slots
 }

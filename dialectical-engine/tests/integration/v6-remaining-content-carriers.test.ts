@@ -46,6 +46,7 @@ import {
   startTestDatabase,
   type TestDatabase
 } from "../support/testDatabase.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 // V-6 (owner ruling 2026-09-22, scope ruled 2026-09-25): the remaining places
 // where debate text sat readable become AEAD carriers by 0063's mechanism —
@@ -361,7 +362,7 @@ function memoryKey(runId: string, question: string) {
 
 function askApplication(): PostgresAskApplication {
   return new PostgresAskApplication(
-    database.pool, {} as never, {} as never, undefined, database.pool,
+    database.pool, {} as never, { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, undefined, database.pool,
     createTestAskAdmissionPoolFacades(database.pool)
   );
 }

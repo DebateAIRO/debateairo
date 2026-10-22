@@ -4,7 +4,9 @@
  * mid-run receives the events appended after it opened, in order, without
  * reconnecting; it sends heartbeats while idle; it ends on the terminal
  * event; a client abort stops its polling; and one stream is charged to the
- * `publicReads` admission budget once, however many events it carries.
+ * `publicReads` admission budget once, however many events it carries; and a
+ * process that begins its drain ends the open stream with a clean close at its
+ * next poll (side-by-side spec §6, plan C6).
  *
  * Before the fix the route answered a snapshot and ended, and the debate page
  * reconnected about once a second until the budget ran out (design:
@@ -17,6 +19,7 @@ import { WorkItemRepository } from "@debateai/battery";
 import { RunRepository, migrate } from "@debateai/db";
 import { ADMISSION_POLICY_REGISTER_ROW, admissionPolicyFromValue } from "@debateai/register";
 import { AdmissionLimiter } from "../../apps/api/src/admission.js";
+import { ReleaseWatcher, type ReleaseStateReader } from "../../apps/api/src/release-state.js";
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import {
   TEST_APP_ORIGIN,
@@ -26,6 +29,7 @@ import {
   type TestHttpIdentity
 } from "../support/httpSession.js";
 import { createTestAskAdmissionPoolFacades, startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const POLL_MS = 25;
 const HEARTBEAT_MS = 150;
@@ -86,7 +90,7 @@ async function appendProgress(runId: string, kind: "node.retrying" | "TERMINAL",
 
 function countingApplication() {
   const application = new PostgresAskApplication(
-    database.pool, {} as never, {} as never, undefined, database.pool,
+    database.pool, {} as never, { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, undefined, database.pool,
     createTestAskAdmissionPoolFacades(database.pool)
   );
   const calls = { snapshot: 0, mark: 0 };
@@ -103,7 +107,7 @@ function countingApplication() {
   return { application, calls, streamSignal };
 }
 
-async function startApi(identity: TestHttpIdentity) {
+async function startApi(identity: TestHttpIdentity, readiness?: ReleaseWatcher) {
   const { application, calls, streamSignal } = countingApplication();
   const limiter = new AdmissionLimiter(admissionPolicyFromValue(
     ADMISSION_POLICY_REGISTER_ROW.value, ADMISSION_POLICY_REGISTER_ROW.sourceRef
@@ -114,7 +118,8 @@ async function startApi(identity: TestHttpIdentity) {
     sessions: testSessionApplication([identity]),
     allowedOrigin: TEST_APP_ORIGIN,
     admission: limiter,
-    runEventTail: { pollMs: POLL_MS, heartbeatMs: HEARTBEAT_MS, maxLifeMs: 60_000 }
+    runEventTail: { pollMs: POLL_MS, heartbeatMs: HEARTBEAT_MS, maxLifeMs: 60_000 },
+    ...(readiness === undefined ? {} : { readiness })
   });
   const base = await api.listen({ port: 0, host: "127.0.0.1" });
   const publicReadCharges = () => decide.mock.calls.filter(([scope]) => scope === "publicReads").length;
@@ -245,6 +250,30 @@ describe("live run events: one long-lived stream per page open", () => {
       const body = await response.text();
       expect(body).toContain("event: run.running");
       expect(heartbeats(body)).toBe(0);
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("a drain that begins while the stream is open ends it with a clean close at its next poll", async () => {
+    const identity = testHttpIdentity(`live-run-events-${randomUUID()}`);
+    const runId = await ownedRunningRun(identity, "drain");
+    // The real watcher, never started: no release recorded and not hosted, so it is not draining until beginDrain().
+    const reader: ReleaseStateReader = { readCurrent: async () => null, readState: async () => null };
+    const watcher = new ReleaseWatcher({ releaseKey: TEST_RELEASE_KEY, hosted: false, reader, log: () => {} });
+    const { api, base, calls } = await startApi(identity, watcher);
+    try {
+      const response = await fetch(`${base}/v1/runs/${runId}/events`, { headers: testSessionHeaders(identity) });
+      const stream = streamReader(response);
+      await stream.until((text) => text.includes("event: run.running"));
+      await vi.waitFor(() => expect(calls.mark).toBeGreaterThan(1), { timeout: 5_000, interval: POLL_MS });
+      watcher.beginDrain();
+      const marksAtDrain = calls.mark;
+      await stream.until((_text, done) => done, 5_000);
+      // A clean close: no new event type on the wire, at most the one poll already under way.
+      expect(stream.text).not.toContain("event: run.terminal");
+      expect([...stream.text.matchAll(/^event: (.+)$/gmu)].map((match) => match[1])).toEqual(["run.running"]);
+      expect(calls.mark - marksAtDrain).toBeLessThanOrEqual(1);
     } finally {
       await api.close();
     }

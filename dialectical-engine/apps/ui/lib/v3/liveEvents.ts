@@ -2,6 +2,7 @@ import { ContractHttpError, InvestigationGapSchema, type EventType, type Investi
 import type { DebateNode, Generation } from "../types.js";
 import composeEnglish from "../../messages/en/compose.json" with { type: "json" };
 import { t, type MessageCatalog } from "../i18n/translate.js";
+import { announceNewerVersion } from "./releaseWatch.js";
 
 /**
  * UI-01: V3's run-event stream translated onto V2's live-debate vocabulary.
@@ -123,12 +124,18 @@ export function liveReconnectDelay(attempt: number, failure: unknown): number {
   return Math.min(LIVE_STREAM_RECONNECT.capMs, Math.max(backoff, floor));
 }
 
-export type LiveStreamStatus = Readonly<{ status: "connecting" | "live" | "reconnecting"; retryInMs?: number }>;
+/**
+ * The live stream's state for the page. "offline": the stream stopped for good because this page cannot read the answers
+ * of the release now serving (INVALID_RESPONSE); the reload note speaks, and the page hides its stream line (final fix
+ * wave W3), so it never says live, connecting or reconnecting under the note.
+ */
+export type LiveStreamStatus = Readonly<{ status: "connecting" | "live" | "reconnecting" | "offline"; retryInMs?: number }>;
 
 /**
  * The debate page's live-stream loop (the page wires it; tests drive it with fake timers):
  * open one stream, apply only NEW events (a new event resets the back-off), re-read the
  * page once when a stream closes, stop on a terminal run, reconnect with back-off otherwise.
+ * An unreadable answer (INVALID_RESPONSE) stops it with the reload note (side-by-side C13) and an "offline" status.
  * Returns the stop function.
  */
 export function startLiveEventStream(input: Readonly<{
@@ -188,6 +195,14 @@ export function startLiveEventStream(input: Readonly<{
     }, (failure: unknown) => {
       if (stopped || controller.signal.aborted) return;
       if (input.onFatal(failure)) return;
+      // Side-by-side spec §7 (plan C13): an event this page cannot read comes from a newer release, and the same event
+      // would fail again on every reconnect. The page shows the reload note and stops: no re-read, no retry.
+      // Final fix wave W3: one last "offline" status, so the page never keeps saying live (or connecting) under the note.
+      if (failure instanceof ContractHttpError && failure.code === "INVALID_RESPONSE") {
+        announceNewerVersion("NEWER_BUILD");
+        input.onStatus({ status: "offline" });
+        return;
+      }
       input.refresh();
       scheduleReconnect(failure);
     });

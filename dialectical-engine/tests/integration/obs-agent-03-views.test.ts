@@ -24,7 +24,7 @@ function pool(): TestDatabase["pool"] {
 
 describe("OBS-03 safe observation views", () => {
   it("replays the migration runner without duplicating or widening migration 0058", async () => {
-    await expect(migrate(pool())).resolves.toBeUndefined();
+    await expect(migrate(pool())).resolves.toEqual({ appliedSteps: [], extraSteps: [] });
     const applied = await pool().query<{ applied: string }>(`
       SELECT count(*)::text AS applied
       FROM public.debateai_schema_migration

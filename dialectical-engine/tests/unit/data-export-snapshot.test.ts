@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { TypedDomainError } from "@debateai/kernel";
 import { readFileSync } from "node:fs";
 import { collectSnapshot, RAW_SECTIONS, type RawExportRows } from "../../apps/api/src/data-export/snapshot.js";
 
@@ -25,6 +26,7 @@ function harness() {
     readStory: vi.fn(async () => ({ text: "story" })),
     readDisclosure: vi.fn(async () => ({ text: "disclosure" })),
     readNode: vi.fn(async (_owner: string, _answer: string, _node: string) => ({ text: "node" })),
+    resolveRunRef: vi.fn(async (run: string) => run),
   };
   const decrypt = {
     openUserField: vi.fn(async (_user: string, field: string) => `PLAIN:${field}`),
@@ -101,6 +103,38 @@ describe("data-export snapshot", () => {
     h.raw.erasure_tombstones = [{ run_id: "run-1", completed_at: "2026-10-04T00:00:00.000Z" }];
     const entry = (await h.collect()).debates.debates[0];
     expect(entry).toEqual({ reference: "run-1", content_status: "UNRECOVERABLE", created_at: "2026-10-03T00:00:00.000Z", deleted_at: "2026-10-04T00:00:00.000Z", tier: "STANDARD", depth: { depth: 2 }, plan_tier: "BASIC", state: null, visibility_history: [{ state: "PRIVATE", at: "2026-10-03T00:00:00.000Z" }], role_rotation: RAW_ROTATION });
+    expect(h.ownerView.readRun).not.toHaveBeenCalled();
+  });
+
+  it("side-by-side C9 skips a run a re-admission superseded: its newest run is exported in its place", async () => {
+    const h = harness();
+    h.ownerView.resolveRunRef.mockImplementation(async (run: string) => run === "run-1" ? "run-2" : run);
+    expect((await h.collect()).debates.debates).toEqual([]);
+    expect(h.ownerView.resolveRunRef).toHaveBeenCalledWith("run-1");
+    expect(h.ownerView.runKeyPresent).not.toHaveBeenCalled();
+    expect(h.ownerView.readRun).not.toHaveBeenCalled();
+  });
+
+  it("side-by-side C9 review: a bad re-admission chain exports the run as itself and prints one content-free line", async () => {
+    const h = harness();
+    h.ownerView.resolveRunRef.mockRejectedValue(new TypedDomainError("RUN_SUPERSESSION_CHAIN_INVALID", "RUN_SUPERSESSION_CHAIN_INVALID"));
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      const debates = (await h.collect()).debates.debates;
+      expect(debates.map((debate) => debate.reference)).toEqual(["run-1"]);
+      expect(h.ownerView.readRun).toHaveBeenCalledWith("owner-1", "run-1");
+      expect(error.mock.calls).toEqual([[JSON.stringify({ event: "api.data_export.run_ref_chain_invalid", code: "RUN_SUPERSESSION_CHAIN_INVALID" })]]);
+    } finally {
+      error.mockRestore();
+    }
+  });
+
+  it("side-by-side C9 review: any other resolve failure still fails the export", async () => {
+    const h = harness();
+    h.ownerView.resolveRunRef.mockRejectedValue(new TypedDomainError("RUN_SUPERSESSION_INVALID", "RUN_SUPERSESSION_INVALID"));
+    await expect(h.collect()).rejects.toMatchObject({ code: "DATA_EXPORT_DECRYPT_FAILED", cause: { code: "RUN_SUPERSESSION_INVALID" } });
+    h.ownerView.resolveRunRef.mockRejectedValue(new Error("RUN_SUPERSESSION_CHAIN_INVALID"));
+    await expect(h.collect()).rejects.toMatchObject({ code: "DATA_EXPORT_DECRYPT_FAILED" });
     expect(h.ownerView.readRun).not.toHaveBeenCalled();
   });
 

@@ -31,6 +31,7 @@ import {
   loadRunnerEnvironment
 } from "../../packages/register/src/runtime-environment.js";
 import { encryptContentForRun, type Pool } from "../../packages/db/src/index.js";
+import { fixtureReleaseKey } from "../support/apiEnvironmentFixture.js";
 
 class MemoryUserDekStore implements ReadableUserDekStore {
   readonly #keys = new Map<string, Buffer>();
@@ -163,6 +164,7 @@ function stubApiEnvironment(): void {
     API_PORT: "3000",
     STRANGER_SAMPLE_RATE: "0.1",
     REGISTER_VERSION: "1",
+    RELEASE_KEY: fixtureReleaseKey("1"),
     BATTERY_VERSION: "s6",
     SETTLEMENT_WATCH_HANDLE: "s6",
     HATCHET_CLIENT_TOKEN: "s6",
@@ -180,6 +182,7 @@ function stubRunnerEnvironment(): void {
     DATABASE_URL: "postgresql://user:pass@127.0.0.1:5432/debateai",
     RUNNER_WORKER_ID: "s6",
     REGISTER_VERSION: "1",
+    RELEASE_KEY: fixtureReleaseKey("1"),
     CLAIM_MS: "1000",
     CLAIM_MARGIN_MS: "100",
     JUDGE_MAX_ATTEMPTS: "2",

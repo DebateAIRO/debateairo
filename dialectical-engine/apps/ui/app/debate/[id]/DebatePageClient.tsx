@@ -46,6 +46,7 @@ import {
 } from "@/lib/debateHeaderOverflow";
 import { classifyTokenUnlockFailure } from "@/lib/v3/tokenUnlock";
 import { requestFailureMessage } from "@/lib/v3/requestFailure";
+import { announceNewerVersion, newerVersionReasonOf } from "@/lib/v3/releaseWatch";
 import { runFailureMessage } from "@/lib/v3/runFailure";
 import {
   applyRunEvent,
@@ -218,7 +219,8 @@ export function createDebatePageRunEventConsumer(input: DebatePageRunEventConsum
 }
 
 type StreamState = {
-  status: "connecting" | "live" | "reconnecting";
+  /** "offline": stopped for good under the reload note (lib/v3/liveEvents.ts LiveStreamStatus, final fix wave W3). */
+  status: "connecting" | "live" | "reconnecting" | "offline";
   retryInMs?: number;
 };
 
@@ -722,6 +724,11 @@ export default function DebatePageClient({
   // each reconnect replays the run's history, and history is applied once.
   const liveGateRef = useRef(createLiveEventGate());
   const answerRef = useRef<Answer | null>(initialAnswer);
+  // Side-by-side C9 (controller ruling (h)): the run_ref of the run projection the page last read. After a re-admission
+  // GET /v1/runs/<old id> answers with the NEW run's projection, so a page opened from an old link learns the newest run
+  // here; everything that acts on the debate (the stream, publication, deletion and their step-up target) names it.
+  // Kept with the id it was read for, so a page reused for another debate never acts on the previous one's run.
+  const [projectionRunRef, setProjectionRunRef] = useState<Readonly<{ forId: string; runRef: string }> | null>(null);
   const [synthesisDraft, setSynthesisDraft] = useState<SynthesisDraft | null>(() =>
     activeSynthesisDraft(initialDebate)
   );
@@ -780,6 +787,7 @@ export default function DebatePageClient({
         locale
       });
       if (privateDeletionRef.current!==null) return;
+      if (bundle.run !== null) setProjectionRunRef(Object.freeze({ forId: id, runRef: bundle.run.run_ref }));
       setReadQuestionLocale(questionLocaleOf(bundle.questionLanguage?.tag, locale));
       if (bundle.kind === "served") {
         // The floor is read with the answer (spec §14.4.4). A read that failed
@@ -817,6 +825,14 @@ export default function DebatePageClient({
         : null);
     } catch (exc) {
       if (privateDeletionRef.current!==null) return;
+      // Side-by-side spec §7 (final fix wave W1): an answer this build cannot read (INVALID_RESPONSE) or one a newer
+      // release made (MADE_BY_NEWER_RELEASE) is the reload note's to tell: no DEBATE_READ banner beside it, and the
+      // page keeps what it already shows. Announced here too, so the note shows whichever client made the read.
+      const newerVersion = newerVersionReasonOf(exc);
+      if (newerVersion !== null) {
+        announceNewerVersion(newerVersion);
+        return;
+      }
       // Existing in-flight runs resolve through the loading bundle above.
       // A remaining NOT_FOUND therefore means neither a visible run nor a
       // visible answer exists, and must remain an honest fatal result.
@@ -848,6 +864,8 @@ export default function DebatePageClient({
   const debateTerminal = debate
     ? isComplete(debate.status) || (debate.status || "").toLowerCase() === "failed"
     : false;
+  // Side-by-side C9 (ruling h): the run every action names — the served answer's, else the projection's, else the URL's.
+  const actingRunRef = answer?.run_ref ?? (projectionRunRef?.forId === id ? projectionRunRef.runRef : null) ?? id;
 
   useEffect(() => {
     if (publicMode) return;
@@ -938,7 +956,7 @@ export default function DebatePageClient({
   useEffect(() => {
     if (publicMode) return;
     if (privateDeletionStatus!==null) return;
-    const runRef = answerRef.current?.run_ref ?? id;
+    const runRef = actingRunRef;
 
     const consume = createDebatePageRunEventConsumer({
       runRef,
@@ -972,6 +990,12 @@ export default function DebatePageClient({
         })
         .catch((failure) => {
           if (!active) return;
+          // Final fix wave W1: the reload note tells this one; no "replay unavailable: INVALID_RESPONSE" line.
+          const newerVersion = newerVersionReasonOf(failure);
+          if (newerVersion !== null) {
+            announceNewerVersion(newerVersion);
+            return;
+          }
           setHonestyActionState(
             failure instanceof ContractHttpError
               ? t(debateChromeCatalog, "debateChrome.error.recordedReplayUnavailableWithCode", {
@@ -1007,7 +1031,7 @@ export default function DebatePageClient({
       },
       gate: liveGateRef.current
     });
-  }, [answer?.run_ref,composeCatalog,debateChromeCatalog,debateTerminal,id,privateDeletionStatus,refresh]);
+  }, [actingRunRef,answer?.run_ref,composeCatalog,debateChromeCatalog,debateTerminal,privateDeletionStatus,refresh]);
 
   // Honesty surfaces: the execution-ledger digest rides every settled answer.
   useEffect(() => {
@@ -1487,14 +1511,17 @@ export default function DebatePageClient({
     );
   }
   if (!debate) {
+    // Final fix wave W3: once the stream is offline for good, the reload note speaks; no progress line stays under it.
     return (
       <div className="screen scroll">
         <div className="screenInner narrow">
-          <p className="muted" role="status">
-            {initialPending
-              ? localizedPendingProgressCopy(live, streamState, debateChromeCatalog, locale)
-              : t(debateChromeCatalog, "debateChrome.loading")}
-          </p>
+          {streamState.status === "offline" ? null : (
+            <p className="muted" role="status">
+              {initialPending
+                ? localizedPendingProgressCopy(live, streamState, debateChromeCatalog, locale)
+                : t(debateChromeCatalog, "debateChrome.loading")}
+            </p>
+          )}
         </div>
       </div>
     );
@@ -2036,7 +2063,7 @@ export default function DebatePageClient({
       ) : null}
 
       {debate && !publicMode ? <PublicationControl
-        runId={answer?.run_ref ?? id}
+        runId={actingRunRef}
         onPrivateDeletion={purgePrivateDebate}
         catalog={publicCatalog}
       /> : null}

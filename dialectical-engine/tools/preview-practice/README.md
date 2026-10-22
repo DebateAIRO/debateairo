@@ -863,7 +863,10 @@ wc -c /root/practice/register-export.json
 
 ### S-2, server, root: export the allowed settings (no secret is copied)
 
-Only these keys are copied; `grep` prints nothing on screen.
+Only these keys are copied; `grep` prints nothing on screen. `RELEASE_KEY` is not copied on purpose: the practice
+names its release from the Mac checkout it runs (`r<REGISTER_VERSION>-<first 12 hex of git HEAD>`), and its runner and
+its ask both use that one key (side-by-side spec §1, §3). A settings line `RELEASE_KEY=…` would win if one were added;
+a hosted practice with neither a line nor a readable git HEAD refuses (`PRACTICE_SETTINGS_VALUE_INVALID: RELEASE_KEY`).
 
 ```sh
 grep -E '^(PREVIEW_PROVIDER_TEST_CONFIG_JSON|PROVIDER_DISCOVERY_TARGETS_JSON|REGISTER_VERSION|DEBATEAI_DEPLOYMENT_MODE|NODE_ENV|CLAIM_MS|CLAIM_MARGIN_MS|MAX_RECOMPOSE|JUDGEMENT_NUMBER_KIND|JUDGEMENT_PRODUCER|PROPAGATION_NUMBER_KIND|PROPAGATION_PRODUCER|PROVIDER_PROBE_TIMEOUT_MS|PROVIDER_REF|VLLM_BASE_URL|VLLM_MODEL|VLLM_MAKER)=' /etc/debateai-v3-preview/auth-dev-v1/runner.env > /root/practice/settings.env

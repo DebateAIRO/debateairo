@@ -134,8 +134,11 @@ describe("verdict story — wired into the shipped runner, after settle, never i
     // Parallel AI calls (spec 2026-10-12 §3.6): the one other pool serves only claim renewals, never the story.
     expect(main.match(/createPool\(/gu)).toHaveLength(2);
     expect(main).toContain("const keepAlivePool = createPool(environment.DATABASE_URL, RUNNER_DATABASE_POOLS.keepAlive);");
-    expect(main.match(/\bkeepAlivePool\b/gu)).toHaveLength(2);
-    expect(main).toContain("renewals: new WorkItemRepository(keepAlivePool),");
+    // R4 (final review): its third and last mention ends it, with the runtime pool, once a retired worker has stopped.
+    expect(main.match(/\bkeepAlivePool\b/gu)).toHaveLength(3);
+    expect(main).toContain("await Promise.allSettled([pool.end(), keepAlivePool.end()]);");
+    // Side-by-side spec §3 (B6): the renewals are fenced by this release and worker, like every work repository.
+    expect(main).toContain("renewals: new WorkItemRepository(keepAlivePool, workFence),");
     expect(main).toContain("buildStoryCostEnvelopeSeam: (runId: string) => costEnvelopeGuard.storySeam({");
     expect(main).not.toContain(["process", "env"].join("."));
     // Any boot failure to load the pack — a broken rule, an unresolvable

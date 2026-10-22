@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { WorkItemRepository } from "@debateai/battery";
 import { RunRepository, insertRunRoleRotation, migrate } from "@debateai/db";
 import { LedgerRepository } from "@debateai/ledger";
-import { createPreviewAdmissionLock, PREVIEW_UNFINISHED_RUNS_SQL } from "../../apps/api/src/preview-budget-estimate.js";
+import { createPreviewAdmissionLock, PREVIEW_UNFINISHED_RUNS_SQL, previewUnfinishedRunFrom } from "../../apps/api/src/preview-budget-estimate.js";
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import { persistTerminalRun } from "../support/settledRun.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
@@ -30,7 +30,7 @@ beforeAll(async () => {
 }, 600_000);
 afterAll(async () => database?.stop());
 
-async function createRun(label: string): Promise<string> {
+async function createRun(label: string, registerVersion = 1): Promise<string> {
   return new RunRepository(database.pool).startRun({
     questionLine: `Is the ${label} debate still spending?`,
     principal: { kind: "legacy", legacyAskerId: `asker:${label}` },
@@ -38,7 +38,7 @@ async function createRun(label: string): Promise<string> {
     asOf: new Date("2026-10-10T00:00:00.000Z"), askerRiskTier: "casual", effectiveRiskTier: "casual",
     tierSource: "ASKER", tierProvenanceRef: `asker:${label}`, compositionBudgetTier: "low",
     depthParams: { depth: 1 }, discoveredPanel: fixtureDiscoveredPanel(2), strangerSampleRate: 0,
-    envelopeBasis: { source: label }, registerVersion: 1, batteryVersion: "preview-estimate", batteryRows: []
+    envelopeBasis: { source: label }, registerVersion, batteryVersion: "preview-estimate", batteryRows: []
   });
 }
 const readyJob = (runId: string) => new WorkItemRepository(database.pool).enqueue({
@@ -114,6 +114,17 @@ describe("the unfinished debates the estimate holds", () => {
     const rotated = new Map(result.rows.map((row) => [row.envelope_basis.source, row.rotated]));
     expect(rotated.get("rotated-debating")).toBe(true);
     expect(rotated.get("plain-debating")).toBe(false);
+  });
+
+  it("reads each debate with its own register version, whatever version the API runs (side-by-side C16)", async () => {
+    // Admitted under version 16 by an older release; the API now runs 17. The read names 16, so the estimate holds the
+    // debate at version 16's terms.
+    await readyJob(await createRun("older-version-debating", 16));
+    const result = await database.pool.query<{ envelope_basis: { source: string }; discovered_panel: unknown; phase: unknown;
+      composition_budget_tier: unknown; rotated: unknown; register_version: unknown }>(PREVIEW_UNFINISHED_RUNS_SQL, [true, WINDOW_SECONDS]);
+    const row = result.rows.find((candidate) => candidate.envelope_basis.source === "older-version-debating");
+    expect(row?.register_version).toBe(16);
+    expect(previewUnfinishedRunFrom(row!)).toMatchObject({ registerVersion: 16, phase: "DEBATE" });
   });
 });
 

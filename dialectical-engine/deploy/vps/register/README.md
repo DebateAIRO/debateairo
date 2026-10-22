@@ -197,11 +197,11 @@ sudo -u postgres psql -d debateai -c "SELECT register_version, row_key, value_js
 
 One row comes back, and it shows `callConcurrencyPolicy`.
 
-7. Copy the printed `REGISTER_VERSION=N` line into both `/etc/debateai/api.env` and `/etc/debateai/runner.env`.
-8. Restart the API first, then the runner. The runner restarts only if the API restart worked:
+7. On this server a new register version is a new release (`deploy/vps/README.md` §5, "A new register version is a new release"): the API and the runner are instance units, one per release (`debateai-api@<label>`, `debateai-runner@<label>`), and each release's overlays carry its version and its key `r<N>-…`. So do a side-by-side upgrade whose key carries `N` (its steps 3 and 9 to 12): a restart of a running release changes nothing.
+8. After that upgrade's switch, copy the printed `REGISTER_VERSION=N` line into both base files `/etc/debateai/api.env` and `/etc/debateai/runner.env` too (only the operator commands that load a base file alone read it there). Then check that the current release runs version `N`: its `releaseKey` starts with `rN-`.
 
 ```sh
-systemctl restart debateai-api && systemctl restart debateai-runner
+/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /usr/bin/node /opt/debateai/dialectical-engine/deploy/vps/release.mjs status
 ```
 
 To turn it off on the hosted server:

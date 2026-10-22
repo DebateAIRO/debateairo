@@ -65,7 +65,7 @@ export async function runStage(){
  const receipts={};
  for(const artifact of ['candidate','fallback']){
   const {api,ui}=prepared[artifact];
-  receipts[artifact]=await exerciseStageRuntime({apiRoot:join(api.sourceRoot,'dialectical-engine'),uiRoot:join(ui.sourceRoot,'dialectical-engine'),stateRoot:join(root,artifact),environment:fixture.environment,publication:fixture.publication,uiPort:STAGE.uiPort,...(full?{fullFixture:fixture,artifact}:{})});
+  receipts[artifact]=await exerciseStageRuntime({apiRoot:join(api.sourceRoot,'dialectical-engine'),uiRoot:join(ui.sourceRoot,'dialectical-engine'),stateRoot:join(root,artifact),sourceRevision:stage.sourceRevision,environment:fixture.environment,publication:fixture.publication,uiPort:STAGE.uiPort,...(full?{fullFixture:fixture,artifact}:{})});
  }
  if(full){
   const proofs={};

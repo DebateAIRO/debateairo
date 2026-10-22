@@ -58,7 +58,8 @@ import {
 } from "@debateai/crypto";
 import { AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
 // Role rotation (spec 2026-10-11): the per-role, per-model counts admission reads when the row is ON.
-import { readRoleRotationCounts } from "@debateai/db";
+import { readRoleRotationCounts, recordSpendWaiver } from "@debateai/db";
+import { WorkItemRepository } from "@debateai/battery";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes, type AskRequest } from "@debateai/contract";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
@@ -126,9 +127,11 @@ import { SELLER_COMPANY } from "@debateai/billing-core";
 import { createHelpCorpusSnapshotLookup,loadHelpCorpus } from "@debateai/support-kb";
 import {
   buildApi,
-  HatchetDispatcher,
+  createReleaseNotServedAlert,
   installPublicationJudgeSwitchSignal,
   PostgresAskApplication,
+  PostgresRunReleaseLookup,
+  ReleaseRoutedDispatcher,
   preserveSubmittedTierSource
 } from "./index.js";
 import { InProcessAuthRateLimiter, RegistrationService } from "./registration.js";
@@ -182,6 +185,8 @@ import {
 } from "./account-erasure.js";
 import { installBootCustody } from "./boot-custody.js";
 import { installStartupResourceOwner } from "./startup-resource-owner.js";
+import { PostgresAskAdmissionGate, PostgresReleaseStateReader, ReleaseWatcher, siteCapBootLine } from "./release-state.js";
+import { gatedInterval, gatedTrigger } from "./release-loops.js";
 import { PostgresEvaluatorDevMenuRepository } from "@debateai/evaluator";
 import { RecoveryStartService } from "./recovery.js";
 import {
@@ -343,6 +348,18 @@ await boot.run("ask-admission-pools", async () => {
 });
 const erasurePool = boot.hold(createPool(environment.ERASURE_DATABASE_URL, API_DATABASE_POOLS.erasure));
 const dataExportPool = environment.DATA_EXPORT_STORE_PATH === undefined ? undefined : boot.hold(createPool(environment.DATA_EXPORT_DATABASE_URL!, API_DATABASE_POOLS.dataExport));
+// Side-by-side spec §4, §6 (plan C3): which release is current, read every second (debateai_runtime holds EXECUTE on
+// 0123's readers). With no release recorded a local API is current, as before; a hosted one is not.
+// Held from here so a failed boot stops it; started before the boot's first background pass; stopped first at close.
+// Final fix wave P1: on a pool of its own (the runtime principal's URL), so a burst of page reads queued on the runtime
+// pool never holds its read past the 5 s stale bound (/readyz DATABASE_UNREACHABLE, the front pair marked down).
+const releaseWatchPool = boot.hold(createPool(environment.DATABASE_URL, API_DATABASE_POOLS.releaseWatch));
+const releaseWatcher = new ReleaseWatcher({
+  releaseKey: environment.RELEASE_KEY,
+  hosted: environment.DEPLOYMENT_MODE === "hosted",
+  reader: new PostgresReleaseStateReader(releaseWatchPool)
+});
+boot.hold({ end: async () => { releaseWatcher.stop(); } });
 // DL7-F7: the hand-rolled pool cleanup this stage carried is the ledger's job
 // now, and it covers the KEKs the old one never reached.
 await boot.run("database-roles", () => Promise.all([
@@ -467,7 +484,18 @@ const hatchet = new Hatchet({
   api_url: environment.HATCHET_API_URL, tenant_id: environment.HATCHET_TENANT_ID,
   tls_config: { tls_strategy: environment.HATCHET_TLS_STRATEGY }
 });
-const dispatcher = new HatchetDispatcher(hatchet, environment.HATCHET_WORKFLOW_NAME);
+// Side-by-side spec §2, §4 (plan C task C4): every send goes to the run's OWN release's task, read per send; a release
+// that no longer serves the run is never sent to (its never-claimed job closed FAILED, its waiver written, one owner
+// line per key per half hour). recordSetupFailure is not fenced by release, so the default repository can close it.
+const dispatcher = new ReleaseRoutedDispatcher({
+  client: hatchet,
+  workflowName: environment.HATCHET_WORKFLOW_NAME,
+  hosted: environment.DEPLOYMENT_MODE === "hosted",
+  lookup: new PostgresRunReleaseLookup(pool),
+  work: new WorkItemRepository(pool),
+  waive: async (runId) => { await recordSpendWaiver(pool, runId, "RELEASE_NOT_SERVED"); },
+  alert: createReleaseNotServedAlert()
+});
 const deploymentMakers = await boot.run("deployment-makers", () => readDeploymentMakerCapability(pool, environment.REGISTER_VERSION));
 const discoveryPolicy = await boot.run("discovery-policy", () => readPanelDiscoveryPolicy(pool, environment.REGISTER_VERSION));
 /**
@@ -580,13 +608,15 @@ const askRoomComposition = environment.DEPLOYMENT_MODE === "hosted" && costEnvel
       assertAskRoomAdmissionSealed({ envelope: costEnvelopeRows.runPolicy, admission: admissionPolicy });
       const spend = new PostgresModelSpendStore(pool);
       const entitlements = billingPlans === null ? null : new EntitlementRepository(pool);
-      const allowances = new PostgresInternalAllowanceRepository(pool,{registerVersion:environment.REGISTER_VERSION});
-      const selectedFunding = await allowances.readPolicy();
-      const configuredFunding = environment.STAFF_ACCESS.policyVersion === 2 ? environment.STAFF_ACCESS.internalAllowancePolicy : undefined;
-      if ((selectedFunding === null) !== (configuredFunding === undefined)) throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","The configured funding selection is mismatched");
-      const fundedAllowance = selectedFunding === null ? undefined : entitlements === null || billingPlans === null
-        ? (()=>{throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","Internal funding requires hosted billing");})()
-        : new FundingAwarePersonAllowanceSource({allowances,entitlements,plans:billingPlans,registerVersion:environment.REGISTER_VERSION,closeBasisPoints:band.closeBasisPoints});
+      // Side-by-side spec §9 (C17), the runner's rule (B14): no funding read and no funding refusal at boot. The selection
+      // is shared by every live release and moved by the newest; a grant is checked against the policy of the version it
+      // was issued with, never the pointer, and a new ask reads the pointer only to know whether funding is switched on.
+      // So a selection made by another release (another version or content, switched on or off) needs no restart here.
+      // The team's funding tools are the staff runtime's (createStaffRuntime: one api.funding.selection_differs line).
+      const fundedAllowance = entitlements === null || billingPlans === null ? undefined
+        : new FundingAwarePersonAllowanceSource({allowances:new PostgresInternalAllowanceRepository(pool),entitlements,plans:billingPlans,closeBasisPoints:band.closeBasisPoints});
+      // Since C17 the `?? new BillingPersonAllowanceSource(...)` fallback is unreachable (billing on → always
+      // funding-aware); kept until its wiring pins are retired with it.
       const personAllowance = entitlements === null || billingPlans === null
         ? NO_PERSON_ALLOWANCE
         : fundedAllowance ?? new BillingPersonAllowanceSource({ entitlements, plans: billingPlans, closeBasisPoints: band.closeBasisPoints });
@@ -606,7 +636,10 @@ const askRoomComposition = environment.DEPLOYMENT_MODE === "hosted" && costEnvel
         ...(fundedAllowance === undefined ? {} : {funding:fundedAllowance}),
         dailyCeilingMicros: costEnvelopeRows.runPolicy.dailyCeilingMicros,
         closeBasisPoints: band.closeBasisPoints,
-        waitingLinePerPerson: band.waitingLinePerPerson
+        waitingLinePerPerson: band.waitingLinePerPerson,
+        // Side-by-side spec §9, §13 (plan C8): at most SITE_CONCURRENT_DEBATES debates across releases, and an ask
+        // admitted while this release is not current waits in line; both read inside the room's spend-decision lock.
+        gate: new PostgresAskAdmissionGate({ releaseKey: environment.RELEASE_KEY, hosted: environment.DEPLOYMENT_MODE === "hosted" })
       });
       // B7a (the usage read) and B8 (the server-decided ask and its coarse fit)
       // reuse these same instances and this one readiness answer.
@@ -614,6 +647,12 @@ const askRoomComposition = environment.DEPLOYMENT_MODE === "hosted" && costEnvel
     })
   : undefined;
 const askRoom = askRoomComposition?.room;
+// Side-by-side final fix wave P7: hosted without the room, the site's cap of 8 debates and the SWITCHING hold (both read
+// in the room's decision) do not hold. One content-free boot line on stderr; never a refusal.
+const noSiteCapLine = siteCapBootLine({
+  hosted: environment.DEPLOYMENT_MODE === "hosted", roomComposed: askRoom !== undefined
+});
+if (noSiteCapLine !== null) console.warn(noSiteCapLine);
 /**
  * A20 — THE MODEL SCORECARD IN FORCE and the per-role model picker, read and
  * built once, as the boot stages "model-scorecard" and "model-picker" under this
@@ -779,6 +818,8 @@ await boot.run("run-ceiling-covers-one-call", async () => {
  * plans (B6b's `ask-room` step asked `assertBillingReady`). The coarse fit reads
  * the room's own person windows, spend store and estimator.
  */
+// Since C17 the `instanceof FundingAwarePersonAllowanceSource` guard below is always true when billing is on (billing on →
+// always funding-aware); its false branch is unreachable, kept for now.
 const askBilling: AskBilling | undefined = askRoomComposition === undefined
   || askRoomComposition.entitlements === null || askRoomComposition.billingPlans === null
   ? undefined
@@ -1080,6 +1121,8 @@ const application = new PostgresAskApplication(pool, dispatcher, {
   ...(previewBudgetGate === undefined ? {} : { previewBudgetGate }),
   strangerSampleRate: environment.STRANGER_SAMPLE_RATE,
   registerVersion: environment.REGISTER_VERSION,
+  // Side-by-side spec §1: every run this API admits carries its own checked release key.
+  releaseKey: environment.RELEASE_KEY,
   batteryVersion: environment.BATTERY_VERSION,
   settlementWatchHandle: environment.SETTLEMENT_WATCH_HANDLE,
   // V-28(2): asked FIRST of every new ask, before the panel is discovered —
@@ -1164,8 +1207,12 @@ const publications = publicationCipher === undefined
       undefined,
       new PostgresPublicationRepository(publicationCleanupPool,auditContextHasher),
       new RepositoryPublicationStoryReader(storyRepository),
-      mapViews
+      mapViews,
+      // Final fix wave P5: an unparsable public snapshot is a newer release's only when its run is stamped by one.
+      { ownReleaseKey: environment.RELEASE_KEY, readRunReleaseKey: (runId) => application.readRunReleaseKey(runId) }
     );
+// Side-by-side spec §4 (plan C3): the first read is awaited (a failure is recorded, never thrown), then it polls.
+await boot.run("release-watcher", () => releaseWatcher.start());
 let publicationCleanupTimer: ReturnType<typeof setInterval> | undefined;
 if (publications !== undefined) {
   // Crash-orphan publication keys are claimed and removed before the process
@@ -1177,17 +1224,21 @@ if (publications !== undefined) {
   // awaits outside the ledger — indented inside this block, which is exactly
   // what the old line-based scan could not see. A publication pool that refuses
   // here used to leave every key live and print no `api.boot.failed` line.
-  await boot.run("publication-key-cleanup", async () => {
-    await publications.reconcileKeyProvisionCleanup();
-    await publications.reconcileKeyCleanup();
-  });
-  publicationCleanupTimer = setInterval(() => {
+  //
+  // Side-by-side spec §4 (plan C7): the boot pass runs only when the watcher's first read (awaited above) says this
+  // release is current, and the 30-second pass is gated, so a release that becomes current later cleans within a tick.
+  if (releaseWatcher.ownIsCurrent()) {
+    await boot.run("publication-key-cleanup", async () => {
+      await publications.reconcileKeyProvisionCleanup();
+      await publications.reconcileKeyCleanup();
+    });
+  }
+  publicationCleanupTimer = gatedInterval(releaseWatcher, () => {
     void Promise.all([
       publications.reconcileKeyProvisionCleanup(),
       publications.reconcileKeyCleanup()
     ]).catch(() => console.error("[PUBLICATION_KEY_CLEANUP_PENDING]"));
   },30_000);
-  publicationCleanupTimer.unref();
 }
 const accountErasureRepository = new PostgresAccountErasureRepository(
   erasurePool,auditContextHasher,contentProvisionPool
@@ -1226,40 +1277,44 @@ const triggerErasureReconciliation=createSingleFlightErasureReconciler(
   reconcileErasure,
   ()=>console.error("[ACCOUNT_ERASURE_RECONCILIATION_PENDING]")
 );
-const erasureReconcileTimer=setInterval(triggerErasureReconciliation,30_000);
-erasureReconcileTimer.unref();
+// Side-by-side spec §4 (plan C7): this timer and every background timer below run their work only while this release
+// is current (gatedInterval, unref'd); the post-listen one-shots run each time it becomes current (end of this file).
+const erasureReconcileTimer=gatedInterval(releaseWatcher,triggerErasureReconciliation,30_000);
 const triggerAuthenticationRiskCleanup=createSingleFlightErasureReconciler(
   async ()=>{
     await authenticationRiskSignals.purgeExpired(recoveryPolicy.riskSignals.cleanupBatchMax);
   },
   ()=>console.error("[AUTHENTICATION_RISK_SIGNAL_CLEANUP_PENDING]")
 );
-const authenticationRiskCleanupTimer=setInterval(
-  triggerAuthenticationRiskCleanup,60_000
+const authenticationRiskCleanupTimer=gatedInterval(
+  releaseWatcher,triggerAuthenticationRiskCleanup,60_000
 );
-authenticationRiskCleanupTimer.unref();
 // A15 (P16c): the retention purge runs wherever the API runs, whatever DEPLOYMENT_MODE and billingPolicy say —
-// acceptance records exist in every mode (A14). Asked once right after listen (below), so a service restarted more
-// often than daily still reaches a check (P2-M42), then daily; it purges once per UTC year, from 2 January.
+// acceptance records exist in every mode (A14). Asked once each time this release becomes current after listen (below;
+// side-by-side C7), so a service restarted more often than daily still reaches a check (P2-M42), then daily (gated);
+// it purges once per UTC year, from 2 January.
 const retentionPurge = createRetentionPurge({ pool, clock: () => new Date(), log: (line) => console.error(line) });
 const triggerRetentionPurge=createSingleFlightErasureReconciler(
   async ()=>{ await retentionPurge.runIfDue(); },
   ()=>console.error("[RETENTION_PURGE_PENDING]")
 );
-const retentionPurgeTimer=setInterval(triggerRetentionPurge,86_400_000);
-retentionPurgeTimer.unref();
+const retentionPurgeTimer=gatedInterval(releaseWatcher,triggerRetentionPurge,86_400_000);
 /**
  * Budget spec 2026-09-28 §2.7 (B7b) — THE WAKER. Single-flight like every timer
  * here; once right after listen (a raised site limit arrives as a restart, and
  * the line must not sleep through it), then on every whole minute — the very
  * instants `nextWholeMinute` tells a waiting question — unref'd and stopped on
- * close. Only when the room is composed; nothing can wait otherwise.
+ * close. Only when the room is composed; nothing can wait otherwise. Side-by-side
+ * C7: the "once" runs each time this release becomes current, and a minute's
+ * tick asks the waker only while it is current.
  */
 const triggerAskWake = createSingleFlightErasureReconciler(
   async () => { await application.wakeWaitingRuns(); },
   () => console.error("[ASK_WAITING_LINE_WAKE_PENDING]")
 );
 let askWaker: Readonly<{ stop(): void }> | undefined;
+/** Side-by-side (plan C7): the post-listen one-shots' subscription to the watcher, ended with the API. */
+let endBecameCurrent: (() => void) | undefined;
 const evaluatorDevMenuPool = environment.EVALUATOR_DEV_MENU_ENABLED === "true"
   ? boot.hold(createPool(environment.EVALUATOR_DEV_MENU_DATABASE_URL!, API_DATABASE_POOLS.evaluatorDevMenu))
   : undefined;
@@ -1543,6 +1598,8 @@ const billingRuntime = billingConnectors === null
  * billing runtime's routes; later billing tasks add their members to
  * `billingRuntime.routes`. Absent, every billing route answers 404.
  */
+// Since C17 the `instanceof FundingAwarePersonAllowanceSource` guard below is always true here (billing on → always
+// funding-aware); its false branch is unreachable, kept for now.
 const billingUsageReader = askRoomComposition === undefined || askRoomComposition.entitlements === null
   ? undefined
   : new PersonUsageReader({
@@ -1610,8 +1667,7 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
   const app = dataExport;
   triggerDataExportWork = createSingleFlightErasureReconciler(
     () => app.runOnce(), () => console.error("[DATA_EXPORT_WORK_PENDING]"));
-  dataExportTimer = setInterval(triggerDataExportWork, DATA_EXPORT_TICK_MS);
-  dataExportTimer.unref();
+  dataExportTimer = gatedInterval(releaseWatcher, triggerDataExportWork, DATA_EXPORT_TICK_MS);
 }
 const api = buildApi({
   ...(previewConfig === undefined ? {} : { previewProviderTestConfig: previewConfig, previewTeamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [] }),
@@ -1651,6 +1707,9 @@ const api = buildApi({
   emailChange,
   accountProfile,
   recoveryEmail,
+  // Side-by-side spec §6 (plan C5): the release header on every answer, and /readyz from the watcher's last read.
+  releaseKey: environment.RELEASE_KEY,
+  readiness: releaseWatcher,
   // B10: the sealed admission budgets are always composed in production.
   admission: new AdmissionLimiter(admissionPolicy),
   // B7a: the room read and, while billing is on, the usage read. Absent, the
@@ -1705,6 +1764,10 @@ const api = buildApi({
     evaluatorDevMenuRegisterVersion: environment.REGISTER_VERSION
   })
 });
+// Side-by-side spec §4 (plan C7 review): the release listener unsubscribes FIRST on close. Fastify runs onClose hooks
+// last-in-first-out, so an onClose here would run after every stop below; preClose runs before all of them, so no
+// one-shot pass can start a runtime the hooks below have already stopped.
+api.addHook("preClose",async () => endBecameCurrent?.());
 if (publicationCleanupTimer !== undefined) {
   api.addHook("onClose",async () => clearInterval(publicationCleanupTimer));
 }
@@ -1724,10 +1787,15 @@ api.addHook("onClose",async()=>{
 });
 const startup = installStartupResourceOwner({
   api,
+  // Side-by-side spec §6 (plan C6): SIGTERM drains first, so live run-event streams close cleanly before api.close().
+  drain: { begin: () => releaseWatcher.beginDrain() },
   registration,
   auditContextHasher,
   argon2Pool,
   databasePools: [
+    // Side-by-side (plan C3): the release watcher stops before its own pool (final fix wave P1) closes.
+    { end: async () => { releaseWatcher.stop(); } },
+    releaseWatchPool,
     pool,
     ...(authorizationPool === pool ? [] : [authorizationPool]),
     ...(publicationCleanupPool === pool || publicationCleanupPool === authorizationPool
@@ -1789,38 +1857,50 @@ await startup.run("support-attestation", async () => {
 await startup.run("listen", async () => {
   await api.listen({ host: environment.API_HOST, port: environment.API_PORT });
 });
-// Queue draining is deliberately background-only. A bounded sendmail timeout
-// can never hold readiness hostage, while the SQL ACK gate still prevents any
-// user-key destruction before completion delivery succeeds.
-triggerErasureReconciliation();
-triggerDataExportWork();
-triggerAuthenticationRiskCleanup();
-triggerRetentionPurge();
-billingRuntime?.start();
-providerOnlyJobs?.start();
-// N9 (spec 2026-10-05 §2.7.4 step 2): the trusted keys were read at this start, so every quarantined NETOPIA message is
-// verified again with them, and one that now verifies is stored as if it had just arrived. In the background: a slow
-// database never holds the listening API; a failure is one content-free line, and the next start tries again.
-const netopiaIntake = billingRuntime?.netopiaNotices ?? providerOnlyIntake;
-if (netopiaIntake !== undefined) {
-  void netopiaIntake.recheckQuarantine(new Date()).catch(() => {
-    consoleBillingAudit("billing.notice.recheck", { code: "BILLING_NOTICE_RECHECK_FAILED" });
-  });
-  // B3a: the spool's kept messages are verified again and stored the same way; the 10-minute tick replays them after.
-  if (billingNoticeSpool === undefined) {
-    consoleBillingAudit("billing.notice.spool_off", {});
-  } else {
-    void netopiaIntake.replaySpool(new Date()).catch(() => {
-      consoleBillingAudit("billing.notice.spool_replay", { code: "BILLING_NOTICE_SPOOL_REPLAY_FAILED" });
+// Side-by-side spec §1; INTERFACE "Journal lines": once listening, the API names the release it is (checked at boot by
+// assertReleaseKeyForRegister), exactly once, so a launcher or operator reads which release answered on which port.
+console.info(`DEBATEAI_API_READY ${JSON.stringify({ releaseKey: environment.RELEASE_KEY, port: environment.API_PORT })}`);
+// Side-by-side spec §4 (plan C7): the timers started here, like every timer above, run their work only while this
+// release is current; the ask waker's whole-minute tick (with its stalled-start re-send) is gated the same way.
+if (askRoom !== undefined) askWaker = everyWholeMinute(gatedTrigger(releaseWatcher, triggerAskWake));
+if(triggerPasswordResetReconciliation)passwordResetTimer=gatedInterval(releaseWatcher,triggerPasswordResetReconciliation,30_000);
+if(triggerEmailRecoveryReconciliation)emailRecoveryTimer=gatedInterval(releaseWatcher,triggerEmailRecoveryReconciliation,30_000);
+// Side-by-side spec §4 (plan C7): the post-listen one-shots, in their order, run each time this release BECOMES current
+// (at once when it already is, as on a single-release host; at the switch for a staged release; again after a database
+// outage made the watcher's read stale), never on a release beside the current one. Each is single-flight and claims
+// its rows in SQL, so a repeat is a restart's pass. The three runtimes' start() is idempotent and gates every one of
+// their ticks on the same watcher, so a release that is never current starts no billing, card or staff-alert work.
+endBecameCurrent = releaseWatcher.onBecameCurrent(() => {
+  // Queue draining is deliberately background-only. A bounded sendmail timeout
+  // can never hold readiness hostage, while the SQL ACK gate still prevents any
+  // user-key destruction before completion delivery succeeds.
+  triggerErasureReconciliation();
+  triggerDataExportWork();
+  triggerAuthenticationRiskCleanup();
+  triggerRetentionPurge();
+  billingRuntime?.start({ when: () => releaseWatcher.ownIsCurrent() });
+  providerOnlyJobs?.start({ when: () => releaseWatcher.ownIsCurrent() });
+  // N9 (spec 2026-10-05 §2.7.4 step 2): the trusted keys were read at this start, so every quarantined NETOPIA message
+  // is verified again with them, and one that now verifies is stored as if it had just arrived. In the background: a
+  // slow database never holds the listening API; a failure is one content-free line, and the next start tries again.
+  const netopiaIntake = billingRuntime?.netopiaNotices ?? providerOnlyIntake;
+  if (netopiaIntake !== undefined) {
+    void netopiaIntake.recheckQuarantine(new Date()).catch(() => {
+      consoleBillingAudit("billing.notice.recheck", { code: "BILLING_NOTICE_RECHECK_FAILED" });
     });
+    // B3a: the spool's kept messages are verified again and stored the same way; the 10-minute tick replays them after.
+    if (billingNoticeSpool === undefined) {
+      consoleBillingAudit("billing.notice.spool_off", {});
+    } else {
+      void netopiaIntake.replaySpool(new Date()).catch(() => {
+        consoleBillingAudit("billing.notice.spool_replay", { code: "BILLING_NOTICE_SPOOL_REPLAY_FAILED" });
+      });
+    }
   }
-}
-if (askRoom !== undefined) {
-  triggerAskWake();
-  askWaker = everyWholeMinute(triggerAskWake);
-}
-
-staffAlerts?.start();
-
-if(triggerPasswordResetReconciliation){passwordResetTimer=setInterval(triggerPasswordResetReconciliation,30_000);passwordResetTimer.unref();triggerPasswordResetReconciliation();}
-if(triggerEmailRecoveryReconciliation){emailRecoveryTimer=setInterval(triggerEmailRecoveryReconciliation,30_000);emailRecoveryTimer.unref();triggerEmailRecoveryReconciliation();}
+  if (askRoom !== undefined) triggerAskWake();
+  staffAlerts?.start({ when: () => releaseWatcher.ownIsCurrent() });
+  triggerPasswordResetReconciliation?.();
+  triggerEmailRecoveryReconciliation?.();
+});
+// Side-by-side spec §6 (plan C3): boot finished, so BOOTING is no longer a readiness reason.
+releaseWatcher.markBooted();

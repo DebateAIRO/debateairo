@@ -494,6 +494,11 @@ debate starts.
 Before a debate that uses Haiku starts, the app asks this gate how much is left today
 (`/remaining`) and refuses the debate if the pot cannot carry it, instead of stopping half way.
 The gate refuses any model the GO does not switch on, whatever the app asks for.
+Since the side-by-side uploads change (2026-10-21) that refusal is named `MODEL_NOT_ALLOWED`, and a
+reservation at a price this GO does not use is named `RESERVATION_MISMATCH`: both are refused before
+any reservation (this model or this price is not served by this GO), and the app makes Haiku sit out
+that debate, never reading it as money (README.md, "What the app sees when a call is refused"). The
+gate's file hash changes; a new GO is written at install (the side-by-side transition installs it).
 
 ## Length guidance LG-B (2026-10-15): installing this change
 

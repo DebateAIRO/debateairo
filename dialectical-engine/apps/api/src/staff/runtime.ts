@@ -7,7 +7,7 @@ import type { ReadableUserDekStore } from '@debateai/crypto';
 import { PostgresInternalAllowanceRepository, PostgresStaffAlertRepository, PostgresStaffRepository, type Pool, type StaffAlertReadinessBinding } from '@debateai/db';
 import type { StaffAccessEnvironment } from '@debateai/kernel';
 import { readStaffAccessPolicy, type BillingPlans } from '@debateai/register';
-import { StaffInternalFundingReadiness } from './internal-allowances.js';
+import { fundingSelectionDifference, StaffInternalFundingReadiness } from './internal-allowances.js';
 import { RootStaffAlertConfiguration, RootConfiguredStaffAlertTransport, StaffAlertDispatcher, StaffAlertIntentProducer, StaffIndependentAlertReadiness, VerifiedStaffTargetInvitationTransport, type StaffAlertAcknowledgementAdapter, type StaffAlertConfigFiles, type StaffAlertFileStat, type StaffInvitationChannelDelivery } from './alerts.js';
 export type StaffAlertOperatorAdapters = Readonly<{
     schema: 'staff-alert-operator-v1';
@@ -143,8 +143,10 @@ export async function createStaffRuntime(input: Readonly<{
     operatorFiles?: StaffAlertConfigFiles;
     configurationFiles?: StaffAlertConfigFiles;
     log?: (code: string) => void;
-    /** Secret-free JSON lines: api.staff.tools_locked once per boot when Team tools start locked, and
-     * api.staff.alerts_waiting once per lock while queued alerts wait for readiness. Defaults to stderr. */
+    /** Secret-free JSON lines: api.staff.tools_locked once per boot when Team tools start locked,
+     * api.funding.selection_differs once per boot when the shared funding selection differs from this release's
+     * settings (side-by-side C17), and api.staff.alerts_waiting once per lock while queued alerts wait for readiness.
+     * Defaults to stderr. */
     logEvent?: (line: string) => void;
     deploymentMode?: "hosted" | "local";
     billingPlans?: BillingPlans | null;
@@ -153,15 +155,14 @@ export async function createStaffRuntime(input: Readonly<{
     const operator = await loadStaffAlertOperator({ path: input.environment.operatorModulePath, sha256: input.environment.operatorModuleSha256, ...(input.operatorFiles ? { files: input.operatorFiles } : {}) });
     try {
         await readStaffAccessPolicy(input.pool, input.registerVersion, input.environment.internalAllowancePolicy === undefined ? undefined : 1);
-        const allowances = new PostgresInternalAllowanceRepository(input.pool, { registerVersion: input.registerVersion });
-        const selectedFunding = await allowances.readPolicy();
-        if ((input.environment.internalAllowancePolicy === undefined) !== (selectedFunding === null)) throw unavailable();
+        const allowances = new PostgresInternalAllowanceRepository(input.pool);
         const repository = new PostgresStaffAlertRepository(input.pool), staffRepository = new PostgresStaffRepository(input.pool);
         const configuration = new RootStaffAlertConfiguration({ path: input.environment.independentAlertConfigPath, acknowledgements: operator.acknowledgements, ...(input.configurationFiles ? { files: input.configurationFiles } : {}) });
         const custodied = await configuration.custodyBinding();
         if (custodied === null)
             throw unavailable();
         const readiness = new StaffIndependentAlertReadiness(configuration, repository);
+        // This release's own settings decide whether the team's funding tools are built (and their static facts checked).
         const funding = input.environment.internalAllowancePolicy === undefined ? undefined : new StaffInternalFundingReadiness(allowances, {
             expectedPolicy: input.environment.internalAllowancePolicy, deploymentMode: input.deploymentMode ?? 'local', billingPlans: input.billingPlans ?? null,
             providerTargets: input.providerTargets ?? [], independentReadiness: readiness
@@ -171,6 +172,13 @@ export async function createStaffRuntime(input: Readonly<{
         if (installation === null || installation.outcome !== 'COMPLETED')
             throw unavailable();
         const emit = input.logEvent ?? (line => console.warn(line));
+        // Side-by-side spec §9 (C17): the funding selection is shared by every live release and moved by the newest, so
+        // neither process refuses boot over it. A difference from this release's settings is one content-free line; a
+        // new grant needs this release's env policy to equal the sealed policy of the version it is issued under
+        // (StaffInternalFundingReadiness.requireNewGrantPolicy): the action is refused, never the boot.
+        const fundingDifference = await fundingSelectionDifference(allowances, input.environment.internalAllowancePolicy);
+        if (fundingDifference !== null)
+            emit(JSON.stringify({ event: 'api.funding.selection_differs', reason: fundingDifference }));
         // Not cached: the lock reason is logged once; actions consult `readiness` on every request.
         const locked = await toolsLockedReason(configuration, custodied, repository, emit);
         if (locked !== null)
@@ -184,14 +192,18 @@ export async function createStaffRuntime(input: Readonly<{
             running = dispatcher.drain({ limit: operator.dispatch.batchSize }).catch(() => { input.log?.('TRANSPORT_UNAVAILABLE'); }).finally(() => { running = undefined; });
         };
         return Object.freeze({ readiness, funding, targetInvitationTransport, intents: new StaffAlertIntentProducer({ keys: input.keys, mappings: repository, readiness }),
-            start() {
+            // Side-by-side spec §4 (plan C7): every dispatch tick and the first drain ask `when` (main.ts: the release
+            // watcher's ownIsCurrent), so a release that is not current claims no alert row.
+            start(options?: Readonly<{ when?: () => boolean }>) {
                 if (closed)
                     throw unavailable();
                 if (timer !== undefined)
                     return;
-                timer = setInterval(trigger, operator.dispatch.intervalMs);
+                const when = options?.when ?? (() => true);
+                const gated = (work: () => void) => (): void => { if (when()) work(); };
+                timer = setInterval(gated(trigger), operator.dispatch.intervalMs);
                 timer.unref();
-                trigger();
+                gated(trigger)();
             },
             async close() {
                 if (closed)

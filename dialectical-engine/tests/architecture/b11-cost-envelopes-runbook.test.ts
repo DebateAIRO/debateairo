@@ -85,6 +85,11 @@ describe("the runbook's cost envelopes (B11b)", () => {
     for (const event of ["api.wait.start_failed", "api.wait.redispatch_failed", "api.run.setup_failure_unrecorded"]) {
       expect(signals, event).toContain(`| \`"event":"${event}"\``);
     }
+    // Side-by-side final fix wave P7: the API's release lines (release-state.ts) are swept too, and each has its row.
+    const releaseSource = await read("apps/api/src/release-state.ts");
+    const release = [...new Set([...releaseSource.matchAll(/event: "(api\.release\.[a-z_]+)"/gu)].map((match) => match[1]!))];
+    expect(release).toEqual(expect.arrayContaining(["api.release.no_site_cap"]));
+    for (const event of release) expect(signals, event).toContain(`| \`"event":"${event}"\``);
     expect(await read("apps/api/src/main.ts")).toContain('console.error("[ASK_WAITING_LINE_WAKE_PENDING]")');
     expect(signals).toContain("| `[ASK_WAITING_LINE_WAKE_PENDING]`");
     expect(await read("apps/runner/src/index.ts")).toContain('log("RUN_COST_SUBSTITUTION_WRITE_FAILED", {');

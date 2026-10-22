@@ -1049,6 +1049,8 @@ export {
   readOperatorCommandEnvironment,
   readSealedCostEnvelopeStatus,
   resolveDeploymentMode,
+  // Side-by-side spec §1: the one check of a configured release key (the practice's settings reuse it).
+  assertReleaseKeyForRegister,
   CostEnvelopesNotSealedError,
   DeploymentModeInvalidError,
   DeploymentModeUnresolvedError,

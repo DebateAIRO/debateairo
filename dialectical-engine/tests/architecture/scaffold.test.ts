@@ -6,6 +6,7 @@ import {
   auditArchitecture,
   auditEdgeManifest,
   auditMigrationReplaySafety,
+  auditNativeMigratorControls,
   auditNumericSourceLiteralExports,
   auditOrphans,
   auditSurfaceAttachmentLiterals,
@@ -15,47 +16,107 @@ import {
   surfaceReachabilityTarget
 } from "../../tools/orphan-audit/src/index.js";
 
+/** The reviewed migrator: migrate()'s module and its per-step transaction module (side-by-side spec 2026-10-21 §5). */
+async function nativeMigrator(): Promise<Readonly<{ migrateSource: string; transactionSource: string }>> {
+  return {
+    migrateSource: await readFile(new URL("../../packages/db/src/index.ts", import.meta.url), "utf8"),
+    transactionSource: await readFile(new URL("../../packages/db/src/migration-transaction.ts", import.meta.url), "utf8")
+  };
+}
+
+/**
+ * The reviewed migrator's controls, as a re-seal checklist (side-by-side §5: A6, A7 and A6's review): the fragments the
+ * audit's ordered control check must find in migrate()'s slice and in the per-step transaction module. Removing any
+ * one changes the bytes, so the module hash refuses it first; the control check is therefore also tested on the
+ * altered text directly (auditNativeMigratorControls), so a re-seal can never pass a module that lost a control.
+ */
+const MIGRATE_SIGNATURE = "export async function migrate(pool: Pool, options: MigrateOptions = {}): Promise<MigrateReport> {";
+// Every control auditNativeMigratorControls checks in migrate()'s slice, in its order (A7 review: all of them, so
+// dropping any one from the audit fails the case below that removes it from the text).
+const MIGRATE_CONTROL_FRAGMENTS = [
+  "const plan = await loadMigrationPlan();", "const client = await pool.connect();",
+  "pg_advisory_lock(hashtextextended('debateai:schema-migrations', 0))", 'await withMigrationStepTransaction(client, "PROLOGUE"',
+  "const { known: applied, extra } = splitLedger(plan, ledger);",
+  "const lineage = identifyLineage(plan, applied, resolutions.map", "const appliedSet = new Set(applied);",
+  "const resolvedSet = new Set(resolutions.map", "for (const name of plan.manifest.order)",
+  "if (appliedSet.has(name) || resolvedSet.has(name)) continue;", "await client.query(plan.sources.get(name)!.sql);",
+  "INSERT INTO public.debateai_schema_migration (name, applied_at)", "[name]",
+  "await client.query(plan.effectiveCapabilityVerifierSql);", "await applyForward108(client,plan,lineage,",
+  "await applyForward110(client,plan,lineage,", "await replayForwardChain(client,plan,", "await assertDatabaseAheadAccepted(client,plan,",
+  "for (const step of pending)", "await withMigrationStepTransaction(client, step.name",
+  "await applyForwardStep(client,plan,step,", "[compatEvidenceAfterStep,compat.logicalName]", "} finally {",
+  "pg_advisory_unlock(hashtextextended('debateai:schema-migrations', 0))", "client.release();"
+] as const;
+const TRANSACTION_CONTROL_FRAGMENTS = [
+  'await client.query("BEGIN");', "await client.query(\"SET LOCAL lock_timeout = '2s'\");", 'await client.query("COMMIT");',
+  'await client.query("ROLLBACK");', "throw error;", '?.code !== "55P03"'
+] as const;
+/** `source` with the first `fragment` at or after `from` replaced (it must be there). */
+function withoutFragment(source: string, fragment: string, from: number): string {
+  const at = source.indexOf(fragment, from);
+  expect(at, fragment).toBeGreaterThanOrEqual(from);
+  expect(at, fragment).toBeGreaterThanOrEqual(0);
+  return source.slice(0, at) + "REMOVED_NATIVE_CONTROL" + source.slice(at + fragment.length);
+}
+const withoutMigrateControl = (source: string, fragment: string): string => withoutFragment(source, fragment, source.indexOf(MIGRATE_SIGNATURE) + 1);
+
 describe("P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law", () => {
   it("classifies only the four checksum-bound native once-per-ledger sources", async () => {
     const plan = await loadMigrationPlan();
-    const migrateSource = await readFile(new URL("../../packages/db/src/index.ts", import.meta.url), "utf8");
+    const { migrateSource, transactionSource } = await nativeMigrator();
     for (const name of ["0104_password_only_reset.sql", "0105_backup_email_verification.sql", "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"]) {
       const sql = plan.sources.get(name)!.sql;
       expect(auditMigrationReplaySafety(`migrations/${name}`, sql).length).toBeGreaterThan(0);
-      expect(auditMigrationReplaySafety(`migrations/${name}`, sql, { plan, migrateSource })).toEqual([]);
+      expect(auditMigrationReplaySafety(`migrations/${name}`, sql, { plan, migrateSource, transactionSource })).toEqual([]);
     }
   });
 
   it("refuses native classification on changed bytes, recipe, order or ledger ownership", async () => {
     const plan = await loadMigrationPlan();
-    const migrateSource = await readFile(new URL("../../packages/db/src/index.ts", import.meta.url), "utf8");
+    const { migrateSource, transactionSource } = await nativeMigrator();
     const name = "0104_password_only_reset.sql";
     const sql = plan.sources.get(name)!.sql;
     for (const [caseIndex, broken] of [
-      { plan: { ...plan, recipeSha256: "0".repeat(64) }, migrateSource },
-      { plan: { ...plan, manifest: { ...plan.manifest, order: [...plan.manifest.order].reverse() } }, migrateSource },
-      { plan: { ...plan, sources: new Map([...plan.sources].map(([key, value]) => [key, key === name ? { ...value, sha256: "0".repeat(64) } : value])) }, migrateSource },
-      ...["if (appliedSet.has(name) || resolvedSet.has(name)) continue;", "INSERT INTO public.debateai_schema_migration (name, applied_at)", "[compatEvidenceAfterChain,compat.logicalName]", 'await client.query("ROLLBACK")', "client.release()"].map((fragment) => {
-        const at = migrateSource.indexOf(fragment, migrateSource.indexOf("export async function migrate("));
-        expect(at).toBeGreaterThan(0);
-        return { plan, migrateSource: migrateSource.slice(0, at) + "REMOVED_NATIVE_CONTROL" + migrateSource.slice(at + fragment.length) };
-      })
+      { plan: { ...plan, recipeSha256: "0".repeat(64) }, migrateSource, transactionSource },
+      { plan: { ...plan, manifest: { ...plan.manifest, order: [...plan.manifest.order].reverse() } }, migrateSource, transactionSource },
+      { plan: { ...plan, sources: new Map([...plan.sources].map(([key, value]) => [key, key === name ? { ...value, sha256: "0".repeat(64) } : value])) }, migrateSource, transactionSource },
+      // Side-by-side §5 (A6, A7): migrate()'s per-step shape, each control removed in turn, and a migrate() with A6's
+      // signature (the begin marker no longer found).
+      ...MIGRATE_CONTROL_FRAGMENTS.map((fragment) => ({ plan, migrateSource: withoutMigrateControl(migrateSource, fragment), transactionSource })),
+      { plan, migrateSource: migrateSource.replace(MIGRATE_SIGNATURE, "export async function migrate(pool: Pool): Promise<void> {"), transactionSource },
+      // ... and the transaction module's: its bytes changed at all, then each of its ordered controls removed.
+      { plan, migrateSource, transactionSource: `${transactionSource} ` },
+      ...TRANSACTION_CONTROL_FRAGMENTS.map((fragment) => ({ plan, migrateSource, transactionSource: withoutFragment(transactionSource, fragment, 0) }))
     ].entries()) expect(() => auditMigrationReplaySafety(`migrations/${name}`, sql, broken), `native control case ${caseIndex}`).toThrow("MIGRATION_NATIVE_AUDIT_BINDING_REFUSED");
-    expect(() => auditMigrationReplaySafety(`migrations/${name}`, sql + "\nCREATE FUNCTION unsafe() RETURNS void AS '';", { plan, migrateSource })).toThrow("MIGRATION_NATIVE_AUDIT_BINDING_REFUSED");
-    expect(() => auditMigrationReplaySafety(`migrations/${name}`, sql + "\nCREATE TABLE identity.unclassified(value text);", { plan, migrateSource })).toThrow("MIGRATION_NATIVE_AUDIT_BINDING_REFUSED");
-    expect(auditMigrationReplaySafety("migrations/new-unclassified.sql", "CREATE FUNCTION unsafe() RETURNS void AS ''; CREATE INDEX unsafe ON core.test(id);", { plan, migrateSource })).toHaveLength(2);
+    expect(() => auditMigrationReplaySafety(`migrations/${name}`, sql + "\nCREATE FUNCTION unsafe() RETURNS void AS '';", { plan, migrateSource, transactionSource })).toThrow("MIGRATION_NATIVE_AUDIT_BINDING_REFUSED");
+    expect(() => auditMigrationReplaySafety(`migrations/${name}`, sql + "\nCREATE TABLE identity.unclassified(value text);", { plan, migrateSource, transactionSource })).toThrow("MIGRATION_NATIVE_AUDIT_BINDING_REFUSED");
+    expect(auditMigrationReplaySafety("migrations/new-unclassified.sql", "CREATE FUNCTION unsafe() RETURNS void AS ''; CREATE INDEX unsafe ON core.test(id);", { plan, migrateSource, transactionSource })).toHaveLength(2);
     const integration = plan.sources.get("0107_auth_dev_integration.sql")!.sql;
-    expect(() => auditMigrationReplaySafety("migrations/0107_auth_dev_integration.sql", integration.replace("DROP CONSTRAINT step_up_grant_action_check", "DROP CONSTRAINT wrong_constraint"), { plan, migrateSource })).toThrow("MIGRATION_NATIVE_AUDIT_BINDING_REFUSED");
+    expect(() => auditMigrationReplaySafety("migrations/0107_auth_dev_integration.sql", integration.replace("DROP CONSTRAINT step_up_grant_action_check", "DROP CONSTRAINT wrong_constraint"), { plan, migrateSource, transactionSource })).toThrow("MIGRATION_NATIVE_AUDIT_BINDING_REFUSED");
+  });
+
+  it("checks every reviewed control on the text itself, not only through the module hash (A6 review)", async () => {
+    const { migrateSource, transactionSource } = await nativeMigrator();
+    expect(migrateSource).toContain(MIGRATE_SIGNATURE);
+    expect(() => auditNativeMigratorControls(migrateSource, transactionSource)).not.toThrow();
+    for (const fragment of MIGRATE_CONTROL_FRAGMENTS) {
+      expect(() => auditNativeMigratorControls(withoutMigrateControl(migrateSource, fragment), transactionSource), fragment).toThrow("MIGRATION_NATIVE_AUDIT_BINDING_REFUSED");
+    }
+    expect(() => auditNativeMigratorControls(migrateSource.replace(MIGRATE_SIGNATURE, "export async function migrate(pool: Pool): Promise<void> {"), transactionSource))
+      .toThrow("MIGRATION_NATIVE_AUDIT_BINDING_REFUSED");
+    for (const fragment of TRANSACTION_CONTROL_FRAGMENTS) {
+      expect(() => auditNativeMigratorControls(migrateSource, withoutFragment(transactionSource, fragment, 0)), fragment).toThrow("MIGRATION_NATIVE_AUDIT_BINDING_REFUSED");
+    }
   });
 
   it.each(["comment", "string", "dead-code"])("cannot substitute a %s for the executable native ledger guard", async (kind) => {
     const plan=await loadMigrationPlan();
-    const migrateSource=await readFile(new URL("../../packages/db/src/index.ts",import.meta.url),"utf8");
+    const {migrateSource,transactionSource}=await nativeMigrator();
     const guard="if (appliedSet.has(name) || resolvedSet.has(name)) continue;";
     expect(migrateSource.split(guard)).toHaveLength(2);
     const replacement=kind==="comment" ? `// ${guard}` : kind==="string" ? `void ${JSON.stringify(guard)};` : `if (false) { ${guard} }`;
     const altered=migrateSource.replace(guard,replacement);
-    expect(()=>auditMigrationReplaySafety("migrations/0104_password_only_reset.sql",plan.sources.get("0104_password_only_reset.sql")!.sql,{plan,migrateSource:altered})).toThrow("MIGRATION_NATIVE_AUDIT_BINDING_REFUSED");
+    expect(()=>auditMigrationReplaySafety("migrations/0104_password_only_reset.sql",plan.sources.get("0104_password_only_reset.sql")!.sql,{plan,migrateSource:altered,transactionSource})).toThrow("MIGRATION_NATIVE_AUDIT_BINDING_REFUSED");
   });
 
   it("BUG-01 T14 keeps the ruled ledger outcome vocabulary unchanged", () => {

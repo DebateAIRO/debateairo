@@ -19,7 +19,7 @@ afterAll(async () => database?.stop());
 describe("OBS-06 safe throughput views", () => {
   it("creates the exact security-barrier provider and run projections", async () => {
     expect(existsSync(migrationPath)).toBe(true);
-    await expect(migrate(database!.pool)).resolves.toBeUndefined();
+    await expect(migrate(database!.pool)).resolves.toEqual({ appliedSteps: [], extraSteps: [] });
     await expect(database!.pool.query(`
       SELECT count(*)::text AS applied
       FROM public.debateai_schema_migration

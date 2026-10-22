@@ -147,6 +147,9 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
             allowanceState = await application!.funding.allowances.readSelfCommand(authentication.context,
                 authentication.baseSession.tokenHash, intent.action === 'ALLOWANCE_REVOKE' ? intent.grant_id : null);
             if (authentication.context.designation !== 'OWNER' || allowanceState.ownerRef !== authentication.baseSession.ownerRef) refuse();
+            // Side-by-side C17 review: a new grant needs this release's env policy to equal the sealed policy of the
+            // version it is issued under (the one bound into the proof); a revoke names its grant's version and narrows.
+            if (intent.action === 'ALLOWANCE_CONFIGURE') await application!.funding.requireNewGrantPolicy(allowanceState.policyRegisterVersion);
             binding = canonicalInternalAllowanceActionBinding(intent, allowanceState);
         } else binding = canonicalStaffActionBinding(intent, authentication);
         await application!.access.assertCurrent(authentication);

@@ -20,6 +20,7 @@ import { recordFloorLabelReceipt } from "../support/floorReceipt.js";
 import {
   createTestAskAdmissionPoolFacades, startTestDatabase, type TestDatabase
 } from "../support/testDatabase.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 /**
  * Verdict story, Task 10 — spec §11: "The owner API returns the story and a
@@ -185,7 +186,7 @@ beforeAll(async () => {
   } as unknown as SessionApplication;
   api = buildApi({
     application: new PostgresAskApplication(
-      database.pool, {} as never, {} as never, undefined, database.pool,
+      database.pool, {} as never, { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, undefined, database.pool,
       createTestAskAdmissionPoolFacades(database.pool)
     ),
     sessions,
