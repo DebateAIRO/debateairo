@@ -8,7 +8,7 @@ if (!policy.enabled) throw Error("Enabled synthetic policy required");
 const plans = billingPlansFromValue(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value, "test:billing-ready");
 const target = { providerRef: "fixture-provider", maker: "fixture-maker", baseUrl: "https://provider.example.test/v1", model: "fixture-model",
   inputPriceMicrosPerMillionTokens: 1, outputPriceMicrosPerMillionTokens: 1 };
-const ready = { deploymentMode: "hosted" as const, billingPlans: plans, providerTargets: [target],
+const ready = { expectedPolicy: policy, deploymentMode: "hosted" as const, billingPlans: plans, providerTargets: [target],
   independentReadiness: { readIndependentAlertReadiness: async () => "READY" as const } };
 /** The selection (`selected`) and the publication at a version (`at`, default: the selection's when the version is its). */
 const port = (selected: unknown = { registerVersion: 2, policy }, at?: (version: number) => unknown) => {
@@ -34,15 +34,22 @@ describe("funding activation consumes actual finite prerequisites", () => {
     // Funding switched off: no funded action.
     await expect(new StaffInternalFundingReadiness(port(null), ready).requireReady()).rejects.toThrow("STAFF_UNAVAILABLE");
   });
-  it("side-by-side C17: a funded action reads the selection by its own version, whatever this release's settings say", async () => {
-    // Spec §9: a newer release selected version 18 with another day cap; this release's settings still name the old one.
+  it("side-by-side C17: readiness needs a selection but not its content; a new grant needs the env policy to equal its version's", async () => {
+    // Spec §9: a newer release selected version 18 with another day cap; this release's env policy still names the old one.
     const moved = port({ registerVersion: 18, policy: { ...policy, maximumDayMicros: 99999 } });
-    await expect(new StaffInternalFundingReadiness(moved, ready).requireReady()).resolves.toBeUndefined();
+    const readiness = new StaffInternalFundingReadiness(moved, ready);
+    await expect(readiness.requireReady()).resolves.toBeUndefined();
+    expect(moved.reads).toEqual(["pointer"]);
+    // C17 review (two parties): a configure issued under version 18 is refused, the env and the sealed v18 policy differ.
+    await expect(readiness.requireNewGrantPolicy(18)).rejects.toThrow("STAFF_UNAVAILABLE");
     expect(moved.reads).toEqual(["pointer", 18]);
-    // The selection's version is no funding publication, or reads otherwise than the selection: refused.
-    await expect(new StaffInternalFundingReadiness(port({ registerVersion: 18, policy }, () => null), ready).requireReady()).rejects.toThrow("STAFF_UNAVAILABLE");
-    await expect(new StaffInternalFundingReadiness(port({ registerVersion: 18, policy }, (version) => ({ registerVersion: version, policy: { ...policy, maximumWeekMicros: 400000 } })), ready)
-      .requireReady()).rejects.toThrow("STAFF_UNAVAILABLE");
+    // The version bound into the proof is judged, not the selection: equal there passes, absent there refuses.
+    const equal = port({ registerVersion: 18, policy: { ...policy, maximumDayMicros: 99999 } }, (version) => version === 17 ? { registerVersion: 17, policy } : null);
+    await expect(new StaffInternalFundingReadiness(equal, ready).requireNewGrantPolicy(17)).resolves.toBeUndefined();
+    await expect(new StaffInternalFundingReadiness(equal, ready).requireNewGrantPolicy(18)).rejects.toThrow("STAFF_UNAVAILABLE");
+    expect(equal.reads).toEqual([17, 18]);
+    // The ordinary case: the env policy equals the selected version's.
+    await expect(new StaffInternalFundingReadiness(port(), ready).requireNewGrantPolicy(2)).resolves.toBeUndefined();
   });
   it("boot checks only static funding configuration, never the shared selection; stale evidence locks each action with the typed alert refusal", async () => {
     const stale = { ...ready, independentReadiness: { readIndependentAlertReadiness: async () => "UNAVAILABLE" as const } };

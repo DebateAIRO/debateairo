@@ -598,6 +598,8 @@ const askRoomComposition = environment.DEPLOYMENT_MODE === "hosted" && costEnvel
       // The team's funding tools are the staff runtime's (createStaffRuntime: one api.funding.selection_differs line).
       const fundedAllowance = entitlements === null || billingPlans === null ? undefined
         : new FundingAwarePersonAllowanceSource({allowances:new PostgresInternalAllowanceRepository(pool),entitlements,plans:billingPlans,closeBasisPoints:band.closeBasisPoints});
+      // Since C17 the `?? new BillingPersonAllowanceSource(...)` fallback is unreachable (billing on → always
+      // funding-aware); kept until its wiring pins are retired with it.
       const personAllowance = entitlements === null || billingPlans === null
         ? NO_PERSON_ALLOWANCE
         : fundedAllowance ?? new BillingPersonAllowanceSource({ entitlements, plans: billingPlans, closeBasisPoints: band.closeBasisPoints });
@@ -793,6 +795,8 @@ await boot.run("run-ceiling-covers-one-call", async () => {
  * plans (B6b's `ask-room` step asked `assertBillingReady`). The coarse fit reads
  * the room's own person windows, spend store and estimator.
  */
+// Since C17 the `instanceof FundingAwarePersonAllowanceSource` guard below is always true when billing is on (billing on →
+// always funding-aware); its false branch is unreachable, kept for now.
 const askBilling: AskBilling | undefined = askRoomComposition === undefined
   || askRoomComposition.entitlements === null || askRoomComposition.billingPlans === null
   ? undefined
@@ -1569,6 +1573,8 @@ const billingRuntime = billingConnectors === null
  * billing runtime's routes; later billing tasks add their members to
  * `billingRuntime.routes`. Absent, every billing route answers 404.
  */
+// Since C17 the `instanceof FundingAwarePersonAllowanceSource` guard below is always true here (billing on → always
+// funding-aware); its false branch is unreachable, kept for now.
 const billingUsageReader = askRoomComposition === undefined || askRoomComposition.entitlements === null
   ? undefined
   : new PersonUsageReader({

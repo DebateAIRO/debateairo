@@ -207,7 +207,7 @@ describe("staff runtime boot without fresh alert readiness", () => {
     expect(local.lines).toEqual([]);
   });
 
-  it("side-by-side C17: a selection another release moved (other content, other version) never refuses boot; one line says so", async () => {
+  it("side-by-side C17: a selection another release moved (other content, other version) never refuses boot; one line says so; a new grant is refused", async () => {
     // Spec §9: neither process refuses boot over funding. The newer release selected version 3 with another day cap.
     const differs = await fixture();
     differs.state.selection = { registerVersion: 3, policy: { ...fundingValue, maximum_day_micros: 90000 }, sourceRef: fundingPolicy.sourceRef };
@@ -216,8 +216,10 @@ describe("staff runtime boot without fresh alert readiness", () => {
       expect(differs.lines).toEqual([JSON.stringify({ event: "api.funding.selection_differs", reason: "DIFFERENT" }), lockedLine("ACK_EVIDENCE_STALE")]);
       await differs.unlock();
       differs.state.fundingReads.length = 0;
-      // A staff action reads the selection, then the policy at the selection's own version (3), never this API's (2).
+      // Funded actions need a selection, not its content; a new grant under version 3 needs the env policy to equal
+      // version 3's sealed policy (C17 review, two parties), so it is refused: the action, never the boot.
       await expect(runtime.funding!.requireReady()).resolves.toBeUndefined();
+      await expect(runtime.funding!.requireNewGrantPolicy(3)).rejects.toThrow("STAFF_UNAVAILABLE");
       expect(differs.state.fundingReads).toEqual([{ at: false, params: [] }, { at: true, params: [3] }]);
     } finally { await runtime.close(); }
   });
@@ -301,8 +303,11 @@ describe("staff runtime boot without fresh alert readiness", () => {
 });
 
 const targetUser = "44444444-4444-4444-8444-444444444444", targetStaff = "55555555-5555-4555-8555-555555555555", actorStaff = "66666666-6666-4666-8666-666666666666";
-async function lockedHttp(options: Readonly<{ funded?: boolean }> = {}) {
+/** `selection`: the shared funding selection (another release's); `configureVersion`/`revokeVersion`: the version the
+ * guarded reader names for a configure (the selection's) and a revoke (the grant's own). */
+async function lockedHttp(options: Readonly<{ funded?: boolean; selection?: unknown; configureVersion?: number; revokeVersion?: number }> = {}) {
   const f = await fixture();
+  if (options.selection !== undefined) f.state.selection = options.selection;
   const runtime = await createStaffRuntime(options.funded ? fundedActivation(f, "hosted") : f.activation);
   const account = testHttpIdentity("staff-boot-locked"), staffToken = Buffer.alloc(32, 1).toString("base64url"), csrf = Buffer.alloc(32, 2).toString("base64url");
   const context: StaffContext = { staffId: actorStaff, userId: account.authenticated.userId, ordinarySessionId: account.authenticated.session.session_id,
@@ -339,8 +344,10 @@ async function lockedHttp(options: Readonly<{ funded?: boolean }> = {}) {
     accept: async (input: { operationId: string; alertIntent: { event: string } }) => { writes.push({ kind: "accept", operationId: input.operationId, event: input.alertIntent.event }); return receipt(input.operationId); }
   };
   // Real readiness (runtime.funding) in front of fake allowance writes.
-  const funding = options.funded ? { requireReady: () => runtime.funding!.requireReady(), allowances: {
-    readSelfCommand: async () => ({ ownerRef: account.authenticated.ownerRef, expectedRevision: 0, policyRegisterVersion: 2 }),
+  const funding = options.funded ? { requireReady: () => runtime.funding!.requireReady(),
+    requireNewGrantPolicy: (version: number) => runtime.funding!.requireNewGrantPolicy(version), allowances: {
+    readSelfCommand: async (_context: unknown, _token: unknown, grantId: string | null) => ({ ownerRef: account.authenticated.ownerRef, expectedRevision: 0,
+      policyRegisterVersion: grantId === null ? options.configureVersion ?? 2 : options.revokeVersion ?? 2 }),
     configure: async (input: { operationId: string; alertIntent: { event: string } }) => { writes.push({ kind: "allowance-configure", operationId: input.operationId, event: input.alertIntent.event }); return receipt(input.operationId); },
     revoke: async (input: { operationId: string; alertIntent: { event: string } }) => { writes.push({ kind: "allowance-revoke", operationId: input.operationId, event: input.alertIntent.event }); return receipt(input.operationId); }
   } } : undefined;
@@ -520,6 +527,28 @@ describe("locked Team tools at request time", () => {
       const configured = await h.post("/v1/admin/internal-allowances", { ...configure, proof_handle: "b".repeat(43) });
       expect(configured.statusCode).toBe(200);
       expect(h.writes).toEqual([{ kind: "allowance-configure", operationId: configure.operation_id, event: "ALLOWANCE_CONFIGURED" }]);
+    } finally { await h.close(); }
+  });
+
+  it("side-by-side C17 review: a new grant under a version whose policy differs from this release's env is refused; a revoke of an older grant is not", async () => {
+    // Another release selected version 3 with another day cap: boot went on; the configure (issued under 3) is refused
+    // before any ceremony or write, while a revoke of a grant issued under version 1 still narrows funding.
+    const h = await lockedHttp({ funded: true, configureVersion: 3, revokeVersion: 1,
+      selection: { registerVersion: 3, policy: { ...fundingValue, maximum_day_micros: 90000 }, sourceRef: fundingPolicy.sourceRef } });
+    try {
+      await h.f.unlock();
+      const configure = { amount_micros: 1000000, day_micros: 90000, week_micros: 500000, starts_at: "2026-10-03T09:00:00.000Z",
+        expires_at: "2026-10-10T09:00:00.000Z", funding_approval_ref: "SYNTHETIC-APPROVAL", operation_id: randomUUID(), reason: { code: "FUNDING_APPROVAL" } };
+      for (const response of [await h.actionOptions({ action: "ALLOWANCE_CONFIGURE", ...configure }),
+        await h.post("/v1/admin/internal-allowances", { ...configure, proof_handle: "b".repeat(43) })]) {
+        expect(response.statusCode).toBe(503);
+        expect(response.json()).toEqual({ error: "STAFF_UNAVAILABLE" });
+      }
+      expect(h.ceremonies).toEqual([]);
+      const grantId = randomUUID(), operationId = randomUUID();
+      const revoked = await h.post(`/v1/admin/internal-allowances/${grantId}`, { operation_id: operationId, reason: { code: "FUNDING_APPROVAL" }, proof_handle: "b".repeat(43) }, "DELETE");
+      expect(revoked.statusCode).toBe(200);
+      expect(h.writes).toEqual([{ kind: "allowance-revoke", operationId, event: "ALLOWANCE_REVOKED" }]);
     } finally { await h.close(); }
   });
 });

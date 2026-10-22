@@ -164,7 +164,7 @@ export async function createStaffRuntime(input: Readonly<{
         const readiness = new StaffIndependentAlertReadiness(configuration, repository);
         // This release's own settings decide whether the team's funding tools are built (and their static facts checked).
         const funding = input.environment.internalAllowancePolicy === undefined ? undefined : new StaffInternalFundingReadiness(allowances, {
-            deploymentMode: input.deploymentMode ?? 'local', billingPlans: input.billingPlans ?? null,
+            expectedPolicy: input.environment.internalAllowancePolicy, deploymentMode: input.deploymentMode ?? 'local', billingPlans: input.billingPlans ?? null,
             providerTargets: input.providerTargets ?? [], independentReadiness: readiness
         });
         if (funding !== undefined) await funding.requireConfigured();
@@ -173,8 +173,9 @@ export async function createStaffRuntime(input: Readonly<{
             throw unavailable();
         const emit = input.logEvent ?? (line => console.warn(line));
         // Side-by-side spec §9 (C17): the funding selection is shared by every live release and moved by the newest, so
-        // neither process refuses boot over it. A difference from this release's settings is one content-free line; each
-        // funded action reads the selection by its own version at use time (StaffInternalFundingReadiness.requireReady).
+        // neither process refuses boot over it. A difference from this release's settings is one content-free line; a
+        // new grant needs this release's env policy to equal the sealed policy of the version it is issued under
+        // (StaffInternalFundingReadiness.requireNewGrantPolicy): the action is refused, never the boot.
         const fundingDifference = await fundingSelectionDifference(allowances, input.environment.internalAllowancePolicy);
         if (fundingDifference !== null)
             emit(JSON.stringify({ event: 'api.funding.selection_differs', reason: fundingDifference }));
