@@ -368,6 +368,30 @@ export class WorkItemRepository {
   }
 
   /**
+   * Side-by-side spec §13 (S6, D2): the settings version of a work item's run, read BEFORE the claim by the work item id:
+   * `core.work_item.run_id` joined to `core.run.register_version` and `release_key`, all insert-only, so the read is
+   * race-free and gives the version the claim would. No content, no lease, no write. Null when there is no such item or
+   * it has no run. The runner resolves the version only for its own release's run; another release's is refused by the
+   * fenced claim (NO_WORK), as Phase 1 rules.
+   */
+  async peekRunSettingsVersion(workItemId: string): Promise<Readonly<{
+    runId: string; registerVersion: number; releaseKey: string;
+  }> | null> {
+    const result = await this.pool.query<{ run_id: string; register_version: number; release_key: string }>(
+      // The bigint version is cast by the database (an out-of-range one refuses), never coerced in JavaScript.
+      `SELECT run.run_id, run.register_version::integer AS register_version, run.release_key
+       FROM core.work_item AS item
+       JOIN core.run AS run ON run.run_id = item.run_id
+       WHERE item.work_item_id = $1`,
+      [workItemId]
+    );
+    const row = result.rows[0];
+    return row === undefined ? null : Object.freeze({
+      runId: row.run_id, registerVersion: row.register_version, releaseKey: row.release_key
+    });
+  }
+
+  /**
    * Spec §3 (plan B D4): this release's CLAIMED items whose claim has lapsed — a copy that died mid-debate — oldest
    * first. The periodic re-send hands only these to Hatchet again; READY items stay with the API's stalled-start
    * re-send, so a queued job is never sent twice.

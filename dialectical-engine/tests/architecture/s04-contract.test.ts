@@ -48,7 +48,9 @@ describe("S04 DDL and runtime attachment contract", () => {
     // Side-by-side spec §13: the loader call and the row's mapping now sit in the one per-version settings loader
     // (run-settings.ts), which main.ts boots its site version through and whose debate members it spreads.
     expect(runnerSettings).toContain("readDevelopmentRunnerPolicy");
-    expect(runnerSettings).toContain("compositionRow: policy.compositionRow");
+    // S6: the debate members' one mapping is its own module, re-exported by the loader.
+    expect(await readFile(new URL("../../apps/runner/src/run-debate-members.ts", import.meta.url), "utf8"))
+      .toContain("compositionRow: policy.compositionRow");
     expect(runnerMain).toContain("loadRunnerVersionSettings");
     expect(runnerMain).toContain("...runnerSettingsOfVersion(siteVersionSettings),");
   });

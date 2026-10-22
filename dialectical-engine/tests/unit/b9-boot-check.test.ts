@@ -233,9 +233,11 @@ describe("B9d · both hosted boots run the check, under the new settings only", 
     // site's money row and band, which it reads first.
     const main = await readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8");
     const loader = await readFile(new URL("../../apps/runner/src/run-settings.ts", import.meta.url), "utf8");
-    expect(loader).toContain("if (siteCostEnvelopePolicy !== null && envelopeBand !== null) {");
+    // S6: the version's envelope is composed once (hosted), for this check and the version's money guard; the check
+    // still runs only with the site's band.
+    expect(loader).toContain("if (debateEnvelope !== null && envelopeBand !== null) {");
     expect(loader).toContain("assertRunCeilingCoversOneCall({");
-    expect(loader).toContain("const debateEnvelope = composeDebateCostEnvelope(siteCostEnvelopePolicy, await readCostEnvelopePolicy(pool, version));");
+    expect(loader).toContain("const debateEnvelope = siteCostEnvelopePolicy === null\n    ? null\n    : composeDebateCostEnvelope(siteCostEnvelopePolicy, await readCostEnvelopePolicy(pool, version));");
     expect(loader).toContain("bodyCeilingMicros: costEnvelopeCeilings(debateEnvelope).bodyMicros,");
     expect(loader).toContain("firstCallsByRoster: firstCallsByPlanRoster({");
     expect(loader).toContain("judgeTokenCeiling: policy.bounds.JUDGE.tokenCeiling,");

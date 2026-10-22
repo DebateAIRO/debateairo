@@ -105,11 +105,18 @@ describe("B9b · the shipped runner builds the wall from exactly what A20 allows
 
   it("hands the guard the wall it built, so a hosted run is walled mid-run and not only by its own ceiling", async () => {
     const main = await readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8");
-    // One guard, and this slice is its construction (the same cut tests/unit/m7-story-margin.test.ts makes).
-    expect(main.split("new CostEnvelopeGuard(")).toHaveLength(2);
-    const guard = main.slice(main.indexOf("new CostEnvelopeGuard({"), main.indexOf("const providerTopology"));
-    expect(guard).toContain("store: modelSpendStore,");
-    expect(guard).toContain("...(sharedWallTerms === null ? {} : { sharedWall: sharedWallTerms })");
+    // Side-by-side spec §13 (S6): main.ts hands its one store and its one wall to every version's guard through the
+    // site's money; the loader builds each guard over them (the same cut tests/unit/m7-story-margin.test.ts makes).
+    expect(main).not.toContain("new CostEnvelopeGuard(");
+    const money = main.slice(main.indexOf("money: costEnvelopePolicy === null ? null : Object.freeze({"), main.indexOf("const runnerSettings = "));
+    expect(money).toContain("store: modelSpendStore,");
+    expect(money).toContain("...(sharedWallTerms === null ? {} : { sharedWall: sharedWallTerms })");
+    const loader = await readFile(new URL("../../apps/runner/src/run-settings.ts", import.meta.url), "utf8");
+    expect(loader.split("new CostEnvelopeGuard(")).toHaveLength(2);
+    const guard = loader.slice(loader.indexOf("new CostEnvelopeGuard({"), loader.indexOf("const loaded: RunnerVersionSettings"));
+    expect(guard).toContain("store: money.store,");
+    expect(guard).toContain("...(money.sharedWall === undefined ? {} : { sharedWall: money.sharedWall })");
+    expect(guard).toContain("inFlight: money.inFlight");
     // The wall is built whenever hosted: its switch is the policy row, never the band.
     expect(main).toContain("const sharedWallTerms = costEnvelopePolicy === null");
     expect(main).not.toContain("const sharedWallTerms = envelopeBand === null");

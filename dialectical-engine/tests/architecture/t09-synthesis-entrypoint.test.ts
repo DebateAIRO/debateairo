@@ -48,12 +48,17 @@ describe("T9 production entry point wiring", () => {
     // runnerSettingsOfVersion (run-settings.ts), after the read; main.ts loads its site version before it constructs
     // the runner and spreads the mapping into the runner's settings.
     const loader = await readFile(new URL("../../apps/runner/src/run-settings.ts", import.meta.url), "utf8");
+    // S6: the mapping lives in its own module (run-debate-members.ts, so index.ts maps a debate's version without
+    // loading the loader); the loader re-exports it.
+    const mapping = await readFile(new URL("../../apps/runner/src/run-debate-members.ts", import.meta.url), "utf8");
     const policyIndex = loader.indexOf("await readDevelopmentRunnerPolicy(pool");
-    const mappingIndex = loader.indexOf("export function runnerSettingsOfVersion(");
-    const wiringIndex = loader.indexOf("synthesisRolePolicy: policy.synthesisRolePolicy");
+    const mappingIndex = mapping.indexOf("export function runnerSettingsOfVersion(");
+    const wiringIndex = mapping.indexOf("synthesisRolePolicy: policy.synthesisRolePolicy");
     expect(policyIndex).toBeGreaterThan(-1);
-    expect(mappingIndex).toBeGreaterThan(policyIndex);
+    expect(mappingIndex).toBeGreaterThan(-1);
     expect(wiringIndex).toBeGreaterThan(mappingIndex);
+    expect(loader).toContain('export { runnerSettingsOfVersion, type RunnerDebateMembers } from "./run-debate-members.js";');
+    expect(loader.indexOf("runnerSettingsOfVersion(loaded)")).toBeGreaterThan(policyIndex);
 
     const loadIndex = source.indexOf("const siteVersionSettings = await runnerSettings.requireSettings(environment.REGISTER_VERSION);");
     const constructionIndex = source.indexOf("new WalkingSkeletonRunner");
@@ -64,6 +69,7 @@ describe("T9 production entry point wiring", () => {
     // Never assembled at the call site out of parts this file chose.
     expect(source).not.toMatch(/synthesisRolePolicy:\s*\{/u);
     expect(loader).not.toMatch(/synthesisRolePolicy:\s*\{/u);
+    expect(mapping).not.toMatch(/synthesisRolePolicy:\s*\{/u);
   });
 
   /**
@@ -144,7 +150,7 @@ describe("T9 production entry point wiring", () => {
     const claim = source.indexOf("const claimed = workItemId === undefined");
     const read = source.indexOf("rotationPin = await readRunRoleRotation(this.pool, run.runId);");
     const assignment = source.indexOf("const pinnedRoleAssignment = await readRunRoleAssignment(this.pool, run.runId);");
-    const firstProbe = source.indexOf("const probe = await this.settings.claimTimeProbe(member);");
+    const firstProbe = source.indexOf("const probe = await settings.claimTimeProbe(member);");
     expect(claim).toBeGreaterThan(-1);
     expect(read).toBeGreaterThan(assignment);
     expect(assignment).toBeGreaterThan(claim);
@@ -159,16 +165,25 @@ describe("T9 production entry point wiring", () => {
     // The per-claim policy: the boot policy with the two answer refs replaced (by the pin's, or by a role's
     // stand-in), nothing else.
     expect(source).toContain(
-      "const synthesisRolePolicy = this.settings.synthesisRolePolicy === undefined || rotationPin === null || rotationStandIns === null"
+      "const synthesisRolePolicy = settings.synthesisRolePolicy === undefined || rotationPin === null || rotationStandIns === null"
     );
     expect(source).toContain("synthesizerRoleRef: rotationStandIns.writerRef ?? rotationPin.answerWriter.providerRef,");
     expect(source).toContain("evaluatorRoleRef: rotationStandIns.checkerRef ?? rotationPin.answerChecker.providerRef");
     // The serve chain reads the per-claim policy, never the boot one.
     expect(source).toContain("const synthesisRoles = synthesisRolePolicy;");
-    expect(source).not.toContain("const synthesisRoles = this.settings.synthesisRolePolicy;");
-    // The pre-claim J24 (2) check still names the sealed refs.
-    expect(source).toContain("? this.settings.synthesisRolePolicy.synthesizerRoleRef");
-    expect(source).toContain(": this.settings.synthesisRolePolicy.evaluatorRoleRef;");
+    expect(source).not.toContain("const synthesisRoles = settings.synthesisRolePolicy;");
+    // The pre-claim J24 (2) check still names the sealed refs: the debate's own version's (side-by-side spec §13, S6),
+    // inside assertRunnerSettingsGates, which execute() calls before claimById.
+    const gates = source.slice(source.indexOf("export function assertRunnerSettingsGates("),
+      source.indexOf("export function mergeRunnerSettings("));
+    expect(gates).toContain("? settings.synthesisRolePolicy.synthesizerRoleRef");
+    expect(gates).toContain(": settings.synthesisRolePolicy.evaluatorRoleRef;");
+    expect(gates).toContain('"SYNTHESIS_ROLE_PROVIDER_UNRESOLVED"');
+    expect(gates).toContain('"SYNTHESIS_ROLE_CONTROLS_UNRESOLVED"');
+    const execute = source.slice(source.indexOf("  private async execute("));
+    const gated = execute.indexOf("= assertRunnerSettingsGates({");
+    expect(gated).toBeGreaterThan(-1);
+    expect(execute.indexOf("await this.#work.claimById({ ...claimInput, workItemId })")).toBeGreaterThan(gated);
   });
 
   /**
@@ -180,7 +195,7 @@ describe("T9 production entry point wiring", () => {
   it("lets the sealed answer role stand in for an unavailable pinned member, before today's probe and J24 (Task 11)", async () => {
     const source = await readFile(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
     const standIn = source.indexOf("const standInFor = (pinnedRef: string, sealedRef: string): string | null =>");
-    const policy = source.indexOf("const synthesisRolePolicy = this.settings.synthesisRolePolicy === undefined");
+    const policy = source.indexOf("const synthesisRolePolicy = settings.synthesisRolePolicy === undefined");
     const probe = source.indexOf("const sealedRefRoles = SYNTHESIS_ROLES.filter((role) => {");
     const refusal = source.indexOf("reason: `SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:${role}`");
     expect(standIn).toBeGreaterThan(-1);
@@ -193,10 +208,10 @@ describe("T9 production entry point wiring", () => {
     expect(rule).toContain("configuredMakers.some((maker) => maker.providerRef === pinnedRef) || sealedRef === pinnedRef");
     expect(rule).toContain("|| !run.discoveredPanel.some((member) => member.provider_ref === sealedRef)");
     expect(rule.indexOf("|| !run.discoveredPanel.some((member) => member.provider_ref === sealedRef)"))
-      .toBeLessThan(rule.indexOf("this.settings.answerRoleFallbackCovered?.("));
-    expect(rule).toContain("|| !(this.settings.answerRoleFallbackCovered?.({ roleRef: sealedRef, panel: run.discoveredPanel }) ?? true)");
-    expect(rule).toContain("standInFor(rotationPin.answerWriter.providerRef, this.settings.synthesisRolePolicy.synthesizerRoleRef)");
-    expect(rule).toContain("standInFor(rotationPin.answerChecker.providerRef, this.settings.synthesisRolePolicy.evaluatorRoleRef)");
+      .toBeLessThan(rule.indexOf("settings.answerRoleFallbackCovered?.("));
+    expect(rule).toContain("|| !(settings.answerRoleFallbackCovered?.({ roleRef: sealedRef, panel: run.discoveredPanel }) ?? true)");
+    expect(rule).toContain("standInFor(rotationPin.answerWriter.providerRef, settings.synthesisRolePolicy.synthesizerRoleRef)");
+    expect(rule).toContain("standInFor(rotationPin.answerChecker.providerRef, settings.synthesisRolePolicy.evaluatorRoleRef)");
     // The disclosure plans the pin's refs and is told the stand-ins.
     expect(source).toContain(": { writerRef: rotationPin.answerWriter.providerRef, checkerRef: rotationPin.answerChecker.providerRef },");
     expect(source).toContain("...(rotationStandIns === null ? {} : { standIns: rotationStandIns })");

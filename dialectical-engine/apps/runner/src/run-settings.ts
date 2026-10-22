@@ -17,7 +17,14 @@ import {
   type ModelScorecardReadResult,
   type StoryPolicy
 } from "@debateai/register";
-import { assertRunCeilingCoversOneCall } from "@debateai/budget";
+import {
+  CostEnvelopeGuard,
+  assertRunCeilingCoversOneCall,
+  costEnvelopeGuardPolicy,
+  type PostgresModelSpendStore,
+  type SharedWallInput
+} from "@debateai/budget";
+import type { FundingAwarePersonAllowanceSource } from "@debateai/billing-core";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes } from "@debateai/contract";
 import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
 import { firstCallPlanModels } from "@debateai/scorecard";
@@ -31,7 +38,9 @@ import {
   type PreviewProviderTestConfig,
   type ProviderDiscoveryTarget
 } from "@debateai/providers";
-import { assertRegisterPromptContractHashes, type WalkingSkeletonSettings } from "./index.js";
+import { assertRegisterPromptContractHashes, assertRunnerSettingsGates, type WalkingSkeletonSettings } from "./index.js";
+import type { RunInFlight } from "./run-in-flight.js";
+import { runnerSettingsOfVersion } from "./run-debate-members.js";
 import { readDebateShapeRunnerSettings, type DebateShapeRunnerSettings } from "./debate-shape-boot.js";
 import { readEngineRunnerSettings, type EngineRunnerSettings } from "./engine-boot.js";
 import { readDevelopmentRunnerPolicy, type DevelopmentRunnerPolicy } from "./dev-runner-policy.js";
@@ -44,8 +53,8 @@ import { readDevelopmentRunnerPolicy, type DevelopmentRunnerPolicy } from "./dev
  * fingerprints, the story's rows, the preview's AI line-up, the debate shape, the engine, the debate's call lanes) is
  * read here, by one function, for the version asked, and kept for the life of the process: a sealed version never
  * changes. apps/runner/src/main.ts and the preview practice (tools/preview-practice/practice-runner-composition.ts) both
- * boot through it, so the two cannot read a version differently. Today the runner still runs one version, its site
- * version (REGISTER_VERSION); task S6 hands every debate its own.
+ * boot through it, so the two cannot read a version differently. The boot loads the site version (REGISTER_VERSION);
+ * every debate then runs on its own stamped version (S6: `WalkingSkeletonSettings.settingsForVersion`).
  *
  * The SITE members (what follows the release, not the debate: the deployment mode, the declared provider targets, the
  * day's money ceiling and its band, the gate part of the preview configuration) are read once at boot, outside this
@@ -65,6 +74,25 @@ export type RunnerSiteContext = Readonly<{
   /** Hosted only (null in local mode): the site version's costEnvelopePolicy row. Its day and its band are site members. */
   siteCostEnvelopePolicy: CostEnvelopePolicy | null;
   envelopeBand: CostEnvelopeBand | null;
+  /**
+   * Side-by-side spec §13 (S6): the claim time and its margin (env CLAIM_MS, CLAIM_MARGIN_MS) and this runner's makers'
+   * provider refs (`runnerConfiguredMakerRefs`), so the loader runs the claim-time gates (`assertRunnerSettingsGates`)
+   * over each version it loads: a version that fails one is UNSUPPORTED at load, never a debate refused at claim.
+   */
+  claim: Readonly<{ claimMs: number; claimMarginMs: number }>;
+  configuredMakerRefs: readonly string[];
+  /**
+   * Side-by-side spec §13 runner point 4 (S6), hosted only (null in local mode): the money this process shares across
+   * every version's guard — ONE spend store, ONE in-flight counter (the money guard's, never the gateway's) and ONE
+   * shared wall (the site's day at the band's finish edge, every person's windows) with the funding admission. Each
+   * version's guard adds only its own per-run ceilings and story ceiling.
+   */
+  money: Readonly<{
+    store: PostgresModelSpendStore;
+    inFlight: RunInFlight;
+    sharedWall?: SharedWallInput;
+    fundingAdmission?: FundingAwarePersonAllowanceSource;
+  }> | null;
 }>;
 
 /** One sealed version, as this runner runs it. Kept forever: sealed versions never change. */
@@ -78,6 +106,13 @@ export type RunnerVersionSettings = Readonly<{
   debateShape: DebateShapeRunnerSettings | null;
   engine: EngineRunnerSettings | null;
   callLaneLimits: Readonly<{ perDebate: number; perModelPerDebate: number }>;
+  /**
+   * Side-by-side spec §13 runner point 4 (S6), hosted only (null in local mode): the version's money envelope (its
+   * per-run ceilings over the site's day and band, `composeDebateCostEnvelope`) and its guard over the site's one store,
+   * in-flight counter and shared wall (`RunnerSiteContext.money`). Every money seam of a run reads its own version's
+   * guard by run id (`runCostEnvelopeGuardOf`).
+   */
+  costEnvelope: Readonly<{ policy: CostEnvelopePolicy; guard: CostEnvelopeGuard }> | null;
 }>;
 
 /** Every register read the loader makes, each handed the version it loads (unit tests inject them; no database). */
@@ -234,8 +269,12 @@ export async function loadRunnerVersionSettings(pool: Pool, version: number, sit
    * all-models groups; the API's boot and the hosted publish, which know billing,
    * price Free on its own roster (`ownRosterOnly`).
    */
-  if (siteCostEnvelopePolicy !== null && envelopeBand !== null) {
-    const debateEnvelope = composeDebateCostEnvelope(siteCostEnvelopePolicy, await readCostEnvelopePolicy(pool, version));
+  // Side-by-side spec §13: the version's money envelope, read once (hosted: the site's money row is non-null) — its
+  // per-run members over the site's day and band. B9 below and the version's guard both use it.
+  const debateEnvelope = siteCostEnvelopePolicy === null
+    ? null
+    : composeDebateCostEnvelope(siteCostEnvelopePolicy, await readCostEnvelopePolicy(pool, version));
+  if (debateEnvelope !== null && envelopeBand !== null) {
     const firstCalls = firstPositionCallProjections({
       targets: declaredProviderTargets,
       judgeTokenCeiling: policy.bounds.JUDGE.tokenCeiling,
@@ -260,69 +299,61 @@ export async function loadRunnerVersionSettings(pool: Pool, version: number, sit
   // Parallel AI calls (spec 2026-10-12 §3.1; side-by-side spec §13): the debate's own lane limits, from its version's
   // callConcurrencyPolicy row (absent: one call at a time). The runner-wide limit (perModelPerRunner) is a site member.
   const callLaneLimits = debateCallLaneLimits(await readCallConcurrencyPolicy(pool, version));
-  return Object.freeze({ registerVersion: version, policy, storyPolicy, previewConfig, debateShape, engine, callLaneLimits });
-}
-
-/**
- * The debate members of WalkingSkeletonSettings: every setting a debate's run reads from its settings version. The
- * process members (the worker, the claim times, the provider topology, the scheduler, the money seams, the story
- * writer, the probes) are the process's and stay in main.ts's literal; the release's site members never come from here.
- */
-export type RunnerDebateMembers = Pick<WalkingSkeletonSettings, "judgeBound" | "composerBound" | "conformanceBound" |
-  "judgeContractHash" | "composerContractHash" | "conformanceContractHash" | "propagationContractHash" |
-  "serveContractHash" | "factBundleVersion" | "compositionRow" | "servePolicy" | "judgementPolicy" | "scoringOperator" |
-  "runDeathPolicy" | "hiddenNodeScoreThreshold" | "verdictLabelPolicy" | "panelPolicy" | "stoppingPolicy" |
-  "synthesisRolePolicy" | "debateShape" | "engine" | "storyPolicy" | "callLaneLimits">;
-
-/**
- * Side-by-side spec §13 runner point 7 — THE DEBATE MEMBERS OF ONE VERSION, written ONCE (main.ts, the practice runner
- * and, from S6, the per-debate cache spread it). `factBundleVersion` is the version itself, so a debate's facts are
- * stamped with the version its settings came from. The preview line-up is not a member: the runner's engine never reads
- * the rosters (admission froze the panel) and only the gateways read the thinking table (addition SA5).
- */
-export function runnerSettingsOfVersion(version: RunnerVersionSettings): RunnerDebateMembers {
-  const { policy } = version;
-  return Object.freeze({
-    judgeBound: policy.bounds.JUDGE,
-    composerBound: policy.bounds.COMPOSER,
-    conformanceBound: policy.bounds.CONFORMANCE,
-    judgeContractHash: policy.hashes.judge,
-    composerContractHash: policy.hashes.composer,
-    conformanceContractHash: policy.hashes.conformance,
-    propagationContractHash: policy.hashes.propagation,
-    serveContractHash: policy.hashes.serve,
-    factBundleVersion: version.registerVersion,
-    compositionRow: policy.compositionRow,
-    servePolicy: {
-      compositionBudgets: policy.compositionBudgets,
-      candidateConfidenceBand: policy.candidateConfidenceBand,
-      bandCeiling: policy.bandCeiling
-    },
-    judgementPolicy: policy.judgementPolicy,
-    scoringOperator: policy.scoringOperator,
-    runDeathPolicy: policy.runDeathPolicy,
-    hiddenNodeScoreThreshold: policy.hiddenNodeScoreThreshold,
-    verdictLabelPolicy: policy.verdictLabelPolicy,
-    panelPolicy: policy.panelPolicy,
-    stoppingPolicy: policy.stoppingPolicy,
-    // S6-2 / T9 (board F33 class): the SHIPPED entry point must LOAD and PASS
-    // every register family the run reads. Without this line the claim-time
-    // gate refuses every work item and no statement is ever synthesized.
-    synthesisRolePolicy: policy.synthesisRolePolicy,
-    // Debate shape (spec 2026-10-12 §3): null without the row (today's runner).
-    debateShape: version.debateShape,
-    // Engine redesign (R1d): null without the engine row (engine 1, today's runner).
-    engine: version.engine,
-    // Side-by-side spec §13 (S6 reads them): the version's story policy and its debate call lanes.
-    storyPolicy: version.storyPolicy,
-    callLaneLimits: version.callLaneLimits
+  /**
+   * V-28 / B9 / Task M7 (side-by-side spec §13 runner point 4): THIS VERSION'S MONEY GUARD, hosted only. One store, one
+   * in-flight counter and one shared wall for every version (the site's); this version's per-run ceilings and its story
+   * ceiling. Engine money rule, Task M7: built by the one check over BOTH money rows, which refuses the version
+   * (STORY_DAILY_CEILING_INSUFFICIENT) when the site's day cannot hold one full run plus its story (the site version's
+   * refusal refuses the boot, as before; another version's makes it unsupported).
+   */
+  const money = site.money;
+  const costEnvelope = money === null || debateEnvelope === null
+    ? null
+    : Object.freeze({
+        policy: debateEnvelope,
+        guard: new CostEnvelopeGuard({
+          store: money.store,
+          policy: costEnvelopeGuardPolicy(debateEnvelope, storyPolicy),
+          ...(money.sharedWall === undefined ? {} : { sharedWall: money.sharedWall }),
+          ...(money.fundingAdmission === undefined ? {} : { fundingAdmission: money.fundingAdmission }),
+          inFlight: money.inFlight
+        })
+      });
+  const loaded: RunnerVersionSettings = Object.freeze({
+    registerVersion: version, policy, storyPolicy, previewConfig, debateShape, engine, callLaneLimits, costEnvelope
   });
+  // Side-by-side spec §13 (S6): last, the claim-time gates every debate of this version would meet, so a version that
+  // fails one is refused here (UNSUPPORTED; the site version's refusal refuses the boot) with the gate's own code.
+  try {
+    assertRunnerSettingsGates({
+      settings: { ...runnerSettingsOfVersion(loaded), claimMs: site.claim.claimMs, claimMarginMs: site.claim.claimMarginMs },
+      configuredMakerRefs: site.configuredMakerRefs
+    });
+  } catch (error) {
+    // The claim guard's refusal is the battery's TypeError in prose ("CLAIM_BOUND_MISMATCH: why"); the cache keeps only
+    // a code-shaped refusal, so it is handed on typed, by its code, as the version's settings refusal it is.
+    if (error instanceof TypeError && error.message.startsWith(`${CLAIM_BOUND_MISMATCH}:`)) {
+      throw new TypedDomainError(CLAIM_BOUND_MISMATCH, error.message);
+    }
+    throw error;
+  }
+  return loaded;
 }
+
+/**
+ * The debate members of one version and their one mapping live in ./run-debate-members.ts (side-by-side spec §13,
+ * S6), so WalkingSkeletonRunner (index.ts) can map a debate's version without importing this loader: this module reaches
+ * index.ts back through the runner policy's readers, and that cycle would hand an importer of index.ts a half-loaded
+ * module. Re-exported here for main.ts and the practice runner, which boot through this loader.
+ */
+export { runnerSettingsOfVersion, type RunnerDebateMembers } from "./run-debate-members.js";
 
 export type RunnerSettingsResolution =
   | Readonly<{ kind: "SETTINGS"; version: RunnerVersionSettings }>
   | Readonly<{ kind: "UNSUPPORTED"; code: string }>;
 
+/** The claim guard's refusal code (packages/battery assertClaimCoversCall). */
+const CLAIM_BOUND_MISMATCH = "CLAIM_BOUND_MISMATCH";
 /** A code-shaped refusal message (`CODE` or `CODE:detail`, the house TypeError form); prose is never a code. */
 const REFUSAL_CODE = /^[A-Z][A-Z0-9_]{2,}(?::[A-Za-z0-9_.:/-]+)?$/u;
 /**
@@ -420,4 +451,60 @@ export function createRunnerSettingsCache(input: Readonly<{
         .map(([version, entry]) => Object.freeze({ version, kind: entry.kind })));
     }
   });
+}
+
+/** Side-by-side spec §13 (S6): the per-version cache, by name (the money seams and, addition D17, the thinking table). */
+export type RunnerSettingsCache = ReturnType<typeof createRunnerSettingsCache>;
+
+/**
+ * Side-by-side spec §13 (S6) — THE RUN → VERSION MAP, for the life of the process (a few bytes per run; a runner lives
+ * one release). `execute()` sets it right after the claim, before any call; the money seams and (addition D17) the
+ * preview's thinking table read it by run id, synchronously. A run's version is never re-pointed: a second, different
+ * value refuses RUN_SETTINGS_VERSION_DRIFT (the same value again — a re-claim — is fine).
+ */
+export type RunSettingsVersions = Readonly<{
+  set(runId: string, version: number): void;
+  versionOf(runId: string): number | undefined;
+}>;
+
+export function createRunSettingsVersions(): RunSettingsVersions {
+  const versions = new Map<string, number>();
+  return Object.freeze({
+    set(runId: string, version: number): void {
+      const known = versions.get(runId);
+      if (known !== undefined && known !== version) {
+        throw new TypedDomainError(
+          "RUN_SETTINGS_VERSION_DRIFT",
+          `RUN_SETTINGS_VERSION_DRIFT:${String(known)}:${String(version)}`
+        );
+      }
+      versions.set(runId, version);
+    },
+    versionOf(runId: string): number | undefined {
+      return versions.get(runId);
+    }
+  });
+}
+
+/**
+ * Side-by-side spec §13 runner point 4 (S6): the money guard of a run's own version, by run id (main.ts's and the
+ * practice's seams: `runCostEnvelopeGuard(runId).providerSeam(…)` / `.storySeam(…)`). Synchronous: the claim loaded the
+ * version before any call. An unmapped run, a version not loaded or a version without a guard (local mode builds no
+ * seam at all) refuses RUN_SETTINGS_VERSION_UNKNOWN: a call is never charged to another version's envelope.
+ */
+export function runCostEnvelopeGuardOf(
+  cache: Pick<RunnerSettingsCache, "loaded">,
+  versions: Pick<RunSettingsVersions, "versionOf">
+): (runId: string) => CostEnvelopeGuard {
+  return (runId: string): CostEnvelopeGuard => {
+    const version = versions.versionOf(runId);
+    if (version === undefined) {
+      throw new TypedDomainError("RUN_SETTINGS_VERSION_UNKNOWN", "RUN_SETTINGS_VERSION_UNKNOWN:UNMAPPED");
+    }
+    const guard = cache.loaded(version)?.costEnvelope?.guard;
+    if (guard === undefined) {
+      throw new TypedDomainError("RUN_SETTINGS_VERSION_UNKNOWN", `RUN_SETTINGS_VERSION_UNKNOWN:${String(version)}`);
+    }
+    return guard;
+  };
 }

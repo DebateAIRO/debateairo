@@ -258,13 +258,18 @@ describe("M7 · ONE check over both money rows: the day must hold one full run p
 
 describe("M7 · both boots run the one check, on the rows they already read", () => {
   it("the runner builds its guard from costEnvelopeGuardPolicy over both rows", async () => {
+    // Side-by-side spec §13 (S6): one guard per settings version, built by the one loader (run-settings.ts) both runner
+    // compositions boot through, over the composed envelope (the version's per-run members, the site's day and band)
+    // and the version's own story policy. main.ts still reads the site's money row and builds no guard itself.
     const main = await readFile("apps/runner/src/main.ts", "utf8");
-    expect(main).toContain("policy: costEnvelopeGuardPolicy(");
+    const loader = await readFile("apps/runner/src/run-settings.ts", "utf8");
     expect(main).toContain("await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION)");
-    expect(main.split("new CostEnvelopeGuard(")).toHaveLength(2);
-    const guard = main.slice(main.indexOf("new CostEnvelopeGuard("), main.indexOf("const providerTopology"));
-    expect(guard).toContain("costEnvelopeGuardPolicy(");
-    expect(guard).toContain("storyPolicy");
+    expect(main).not.toContain("new CostEnvelopeGuard(");
+    expect(loader.split("new CostEnvelopeGuard(")).toHaveLength(2);
+    const guard = loader.slice(loader.indexOf("new CostEnvelopeGuard("), loader.indexOf("const loaded: RunnerVersionSettings"));
+    expect(guard).toContain("policy: costEnvelopeGuardPolicy(debateEnvelope, storyPolicy),");
+    expect(loader).toContain("composeDebateCostEnvelope(siteCostEnvelopePolicy, await readCostEnvelopePolicy(pool, version))");
+    expect(loader).toContain("const storyPolicy = await readStoryPolicyFromRegister(pool, version)");
   });
 
   it("the API builds its guard from costEnvelopeGuardPolicy over both rows, inside the boot step", async () => {

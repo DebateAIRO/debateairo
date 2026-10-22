@@ -414,6 +414,9 @@ const EXPECTED_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUN_PRINCIPAL_SESSION_MISMATCH",
   "RUN_ROLE_ASSIGNMENT_INVALID",
   "RUN_ROLE_ROTATION_INVALID",
+  // Side-by-side spec §13 (S6): a run's settings version re-pointed (never happens) or unmapped at a money seam.
+  "RUN_SETTINGS_VERSION_DRIFT",
+  "RUN_SETTINGS_VERSION_UNKNOWN",
   "SCALAR_DECISION_CANNOT_SPAWN",
   "SCORECARD_INTERVAL_INVALID",
   "SCORECARD_TASK_CLASS_AMBIGUOUS",
@@ -446,6 +449,8 @@ const EXPECTED_DOMAIN_CODES: readonly string[] = Object.freeze([
   "SERVE_STATUS_UNKNOWN",
   "SESSION_POLICY_INVALID",
   "SESSION_POLICY_UNRESOLVED",
+  // Side-by-side spec §13 (S6; S7 writes its plain path): a settings version this release cannot run.
+  "SETTINGS_VERSION_UNSUPPORTED",
   "SETTLEMENT_FIELD_REQUIRED",
   "SETTLEMENT_IDENTITY_INVALID",
   "SETTLEMENT_NUMBER_INVALID",

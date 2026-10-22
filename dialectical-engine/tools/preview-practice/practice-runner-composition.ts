@@ -50,13 +50,10 @@ import {
   type CallConcurrencyPolicy,
   type CostEnvelopeBand,
   type CostEnvelopePolicy,
-  type DeploymentMode,
-  type StoryPolicy
+  type DeploymentMode
 } from "@debateai/register";
 import {
-  CostEnvelopeGuard,
   PostgresModelSpendStore,
-  costEnvelopeGuardPolicy,
   type CostEnvelopePhase,
   type SharedWallApplication
 } from "@debateai/budget";
@@ -99,12 +96,13 @@ import {
   plansUnresolvedPersonAllowance,
   WalkingSkeletonRunner
 } from "@debateai/runner";
-import { assertRunnerPrimaryProviderConfiguration, createRunnerProviderTopology } from "../../apps/runner/src/provider-topology.js";
+import { assertRunnerPrimaryProviderConfiguration, createRunnerProviderTopology, runnerConfiguredMakerRefs } from "../../apps/runner/src/provider-topology.js";
 import { createCallScheduler, type CallSubject } from "../../apps/runner/src/call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateNames, structureRepairThroughLane } from "../../apps/runner/src/call-lane-gateway.js";
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import {
-  createRunnerSettingsCache, loadRunnerVersionSettings, runnerSettingsOfVersion, type RunnerSiteContext
+  createRunnerSettingsCache, createRunSettingsVersions, loadRunnerVersionSettings, runCostEnvelopeGuardOf, runnerSettingsOfVersion,
+  type RunnerSiteContext
 } from "../../apps/runner/src/run-settings.js";
 import { createRunnerRetirementSignal } from "../../apps/runner/src/runner-retirement.js";
 import { PracticeCallStats } from "./practice-parallel.js";
@@ -144,10 +142,11 @@ export type PracticeRunnerSettings = Readonly<{
 export type PracticeRunnerComposition = Awaited<ReturnType<typeof composePracticeRunner>>;
 
 /**
- * HOSTED only: main.ts's money wiring, line for line (its V-28 per-run envelope, B9 shared wall, internal-funding
- * refusal and the guard over both money rows), on the throwaway database. B9's run-ceiling-below-one-call refusal is
- * the settings loader's (run-settings.ts), as in main.ts. Returns null in local mode, where main.ts builds none of it.
- * tests/unit/preview-practice-wiring-drift.test.ts pins the statements below against main.ts's.
+ * HOSTED only: main.ts's money wiring, line for line (its V-28 spend store and money in-flight counter, the B9 shared
+ * wall and the funding admission: the money every version's guard shares, `RunnerSiteContext.money`), on the throwaway
+ * database. Side-by-side spec §13 (S6), as main.ts: each version's guard over both money rows, and B9's
+ * run-ceiling-below-one-call refusal, are the settings loader's (run-settings.ts). Returns null in local mode, where
+ * main.ts builds none of it. tests/unit/preview-practice-wiring-drift.test.ts pins the statements below against main.ts's.
  */
 export async function composePracticeRunnerMoney(input: Readonly<{
   pool: Pool;
@@ -155,11 +154,9 @@ export async function composePracticeRunnerMoney(input: Readonly<{
   /** The site's money row and its band, read as main.ts reads them before its settings loader (null in local mode). */
   costEnvelopePolicy: CostEnvelopePolicy | null;
   envelopeBand: CostEnvelopeBand | null;
-  /** The site version's story policy, from the settings loader. */
-  storyPolicy: StoryPolicy | null;
   log?: (line: string) => void;
 }>) {
-  const { pool, environment, costEnvelopePolicy, envelopeBand, storyPolicy } = input;
+  const { pool, environment, costEnvelopePolicy, envelopeBand } = input;
   if (environment.DEPLOYMENT_MODE !== "hosted") return null;
   const modelSpendStore = new PostgresModelSpendStore(pool);
   const moneyInFlight = createRunInFlight();
@@ -188,27 +185,15 @@ export async function composePracticeRunnerMoney(input: Readonly<{
             }),
         owners: modelSpendStore
       });
-  const costEnvelopeGuard = costEnvelopePolicy === null
-    ? undefined
-    : new CostEnvelopeGuard({
-        store: modelSpendStore,
-        policy: costEnvelopeGuardPolicy(costEnvelopePolicy, storyPolicy),
-        ...(sharedWallTerms === null ? {} : { sharedWall: sharedWallTerms }),
-        ...(fundingAllowance === undefined ? {} : {fundingAdmission:fundingAllowance}),
-        inFlight: moneyInFlight
-      });
   return Object.freeze({
-    costEnvelopeGuard: costEnvelopeGuard!,
-    envelopeBand,
-    storyCeilingMicros: storyPolicy?.perStoryCeilingMicros ?? null,
-    /** For the report: the ceilings the practice's run is held to (micro-dollars). */
-    summary: Object.freeze({
-      perRunCeilingMicros: costEnvelopePolicy!.perRunCeilingMicros,
-      dailyCeilingMicros: costEnvelopePolicy!.dailyCeilingMicros,
-      perStoryCeilingMicros: storyPolicy?.perStoryCeilingMicros ?? null,
-      band: envelopeBand !== null,
-      billingPlansSealed: billingPlans !== null
-    })
+    /** `RunnerSiteContext.money`, as main.ts's literal. */
+    site: Object.freeze({
+      store: modelSpendStore,
+      inFlight: moneyInFlight,
+      ...(sharedWallTerms === null ? {} : { sharedWall: sharedWallTerms }),
+      ...(fundingAllowance === undefined ? {} : { fundingAdmission: fundingAllowance })
+    }),
+    billingPlansSealed: billingPlans !== null
   });
 }
 
@@ -269,6 +254,10 @@ export async function composePracticeRunner(input: Readonly<{
     ? await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION)
     : null;
   const envelopeBand = costEnvelopePolicy === null ? null : costEnvelopeBand(costEnvelopePolicy);
+  // Hosted only (null in local mode), as main.ts: the spend store, the money in-flight counter and the shared wall
+  // every version's guard shares (RunnerSiteContext.money), built before the settings loader.
+  const money = await composePracticeRunnerMoney({ pool, environment, costEnvelopePolicy, envelopeBand,
+    log: (line) => { console.warn(line); } });
   /**
    * Side-by-side spec §13, as main.ts: every per-version read (the runner policy and its prompt fingerprints, the story's
    * rows, the preview line-up, the debate shape, the engine, the preview's roster, role and scorecard checks, the run
@@ -280,7 +269,10 @@ export async function composePracticeRunner(input: Readonly<{
     preview: previewGate === undefined ? undefined : { gate: previewGate, envLineUp: environment.PREVIEW_ENV_LINE_UP ?? null },
     declaredProviderTargets,
     siteCostEnvelopePolicy: costEnvelopePolicy,
-    envelopeBand
+    envelopeBand,
+    claim: { claimMs: environment.CLAIM_MS, claimMarginMs: environment.CLAIM_MARGIN_MS },
+    configuredMakerRefs: runnerConfiguredMakerRefs(declaredProviderTargets),
+    money: money === null ? null : money.site
   });
   const runnerSettings = createRunnerSettingsCache({
     // The practice's story lines go to its own story log (main.ts's go to standard error).
@@ -291,11 +283,9 @@ export async function composePracticeRunner(input: Readonly<{
   });
   const siteVersionSettings = await runnerSettings.requireSettings(environment.REGISTER_VERSION);
   const { policy, storyPolicy } = siteVersionSettings;
-  // Hosted only (null in local mode): main.ts's per-run and daily envelopes, the story's money row and the shared wall.
-  const money = await composePracticeRunnerMoney({ pool, environment, costEnvelopePolicy, envelopeBand, storyPolicy,
-    log: (line) => { console.warn(line); } });
-  const costEnvelopeGuard = money?.costEnvelopeGuard;
-  const storyCeilingMicros = money?.storyCeilingMicros ?? null;
+  // Side-by-side spec §13 (S6), as main.ts: each claimed run's version by run id, and each call's own version's guard.
+  const runSettingsVersions = createRunSettingsVersions();
+  const runCostEnvelopeGuard = runCostEnvelopeGuardOf(runnerSettings, runSettingsVersions);
   // Parallel AI calls (spec 2026-10-12 §3.2-§3.5), as main.ts composes them on the preview.
   const gatewayInFlight = createRunInFlight();
   const callStats = new PracticeCallStats();
@@ -319,7 +309,7 @@ export async function composePracticeRunner(input: Readonly<{
   });
   function targetGateway(target: (typeof providerTargets)[number]): ProviderGateway {
     const price = providerTargetPrice(target);
-    if (costEnvelopeGuard !== undefined && price === null) {
+    if (runnerSite.money !== null && price === null) {
       throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`);
     }
     const gateway = createPostgresProviderGateway(pool, {
@@ -331,15 +321,10 @@ export async function composePracticeRunner(input: Readonly<{
       ...previewTargetGatewayControls(previewGate, target),
       inFlight: gatewayInFlight,
       // Hosted only, as main.ts: each call charged to the run's envelope (and the story's calls to the story's own).
-      ...(costEnvelopeGuard === undefined || price === null ? {} : {
-        buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => costEnvelopeGuard.providerSeam({
-          runId, price, requireReportedUsage: true, phase, sharedWall
-        }),
-        ...(storyCeilingMicros === null ? {} : {
-          buildStoryCostEnvelopeSeam: (runId: string) => costEnvelopeGuard.storySeam({
-            runId, price, requireReportedUsage: true
-          })
-        })
+      // Side-by-side spec §13 (S6), as main.ts: each call charged to its own run's version's guard.
+      ...(runnerSite.money === null || price === null ? {} : {
+        buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => runCostEnvelopeGuard(runId).providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }),
+        buildStoryCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).storySeam({ runId, price, requireReportedUsage: true })
       })
     });
     // Spec §3.4, as main.ts: the gate is marked unhealthy on its FIRST unsent refusal, before the resend wait.
@@ -374,7 +359,7 @@ export async function composePracticeRunner(input: Readonly<{
   const storyWriter = new StoryWriter({
     pool,
     pack: storyPack,
-    policy: storyPolicy,
+    // Side-by-side spec §13 (ruling R36), as main.ts: no boot policy; every write carries its debate's version's own.
     hosted: environment.DEPLOYMENT_MODE === "hosted",
     resolveProvider: (roleRef) => {
       const member = [
@@ -406,6 +391,9 @@ export async function composePracticeRunner(input: Readonly<{
     retirement: createRunnerRetirementSignal(),
     // Side-by-side spec §13 runner point 7, as main.ts: every debate member of the site version, written once.
     ...runnerSettingsOfVersion(siteVersionSettings),
+    // Side-by-side spec §13 (S6), as main.ts: every debate on its own stamped version, with the run → version map.
+    settingsForVersion: (version) => runnerSettings.settingsFor(version),
+    runSettingsVersions,
     providerRef: providerTopology.primary.providerRef, maker: providerTopology.primary.maker,
     ...(providerTopology.critique === undefined
       ? {} : { critique: providerTopology.critique }),
@@ -476,7 +464,14 @@ export async function composePracticeRunner(input: Readonly<{
   });
   return Object.freeze({ runner, providerTopology, providerTargets, declaredProviderTargets, policy, storyPolicy, previewFetch,
     configuredProviders: deploymentMakers.configuredProviders, callScheduler: runnerCallScheduler, callStats,
-    money: money === null ? null : money.summary,
+    // For the report: the ceilings the practice's run is held to (micro-dollars): the site version's.
+    money: money === null || costEnvelopePolicy === null ? null : Object.freeze({
+      perRunCeilingMicros: costEnvelopePolicy.perRunCeilingMicros,
+      dailyCeilingMicros: costEnvelopePolicy.dailyCeilingMicros,
+      perStoryCeilingMicros: storyPolicy?.perStoryCeilingMicros ?? null,
+      band: envelopeBand !== null,
+      billingPlansSealed: money.billingPlansSealed
+    }),
     // Refused-repair salvage: the run had a structure-repair route (its ceiling is set), so a STRUCTURE reply's follow-up is B.
     structureRouted: previewStructureRepairCeiling(structureRepairRoute) !== null });
 }

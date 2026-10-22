@@ -109,11 +109,15 @@ describe("V-28 both shipped roots carry the envelopes", () => {
     const source = await readFile(
       new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8"
     );
-    expect(source).toContain("CostEnvelopeGuard");
-    expect(source).toContain("PostgresModelSpendStore");
+    // Side-by-side spec §13 (S6): each settings version's guard is built by the one loader over main.ts's spend store;
+    // main.ts charges every call to its own run's version's guard.
+    const loader = await readFile(new URL("../../apps/runner/src/run-settings.ts", import.meta.url), "utf8");
+    expect(loader).toContain("new CostEnvelopeGuard({");
+    expect(source).toContain("const runCostEnvelopeGuard = runCostEnvelopeGuardOf(runnerSettings, runSettingsVersions);");
+    expect(source).toContain("new PostgresModelSpendStore(pool)");
     expect(source).toContain("readCostEnvelopePolicy");
     // Wired per target, because the price is the target's.
-    expect(source).toContain("providerSeam(");
+    expect(source).toContain("runCostEnvelopeGuard(runId).providerSeam(");
     expect(source).toContain("providerTargetPrice(");
   });
 

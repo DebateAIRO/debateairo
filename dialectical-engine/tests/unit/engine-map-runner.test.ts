@@ -295,7 +295,7 @@ describe("the run body's engine-2 wiring (pinned in the source; A0-3: the run bo
     // R3 final wave P14: the guard reads the one pure rule (`engineMapCheckUnbudgeted`, its behaviour pinned above).
     expect(RUNNER).toContain("if (engineMapCheckUnbudgeted(engine, shapeRun !== null)) {");
     const map = between("const runMap = async ()", "shapeMapResult = resolved.result;");
-    expect(map).toContain("...(engineMap ? { engineContractHash: this.settings.engine!.engineContractHash } : {})");
+    expect(map).toContain("...(engineMap ? { engineContractHash: settings.engine!.engineContractHash } : {})");
     expect(map).toContain("...(engineMap && engine.engine === 2 ? { engine: { answerCheckCandidates: engine.answerCheck.candidates } } : {})");
     expect(map).toContain("unchosenAnswers: engineMap");
     expect(RUNNER).toContain("pointsPerAnswer: shapeRun.shape.pointsPerAnswer, ring: engine.engine === 2, engineMap });");

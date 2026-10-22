@@ -2741,6 +2741,11 @@ export class RunRepository {
     readonly compositionBudgetTier: CompositionBudgetTier;
     readonly strangerSampleRate: number;
     readonly envelopeBasis: Readonly<Record<string, unknown>>;
+    /**
+     * Side-by-side spec §13 (S6): the settings version the run was admitted under (`core.run.register_version`,
+     * insert-only). The runner checks it against the version it resolved before the claim (RUN_SETTINGS_VERSION_DRIFT).
+     */
+    readonly registerVersion: number;
   }> {
     return withRunContentLease(this.pool,[runId],async () => {
     const encryptionSchemaApplied = await contentEncryptionSchemaIsApplied(this.pool);
@@ -2762,10 +2767,13 @@ export class RunRepository {
       composition_budget_tier: CompositionBudgetTier;
       stranger_sample_rate: number;
       envelope_basis: Readonly<Record<string, unknown>>;
+      register_version: number;
     }>(
+      // The bigint version is cast by the database (an out-of-range one refuses), never coerced in JavaScript.
       `SELECT run_id, question_line${contentCiphertextProjection}${argumentLanguageProjection},
               agent_count, discovered_panel, depth_params,
-              composition_budget_tier, stranger_sample_rate, envelope_basis
+              composition_budget_tier, stranger_sample_rate, envelope_basis,
+              register_version::integer AS register_version
        FROM core.run WHERE run_id = $1`,
       [runId]
     );
@@ -2791,9 +2799,26 @@ export class RunRepository {
       depthParams: Object.freeze({ ...row.depth_params }),
       compositionBudgetTier: row.composition_budget_tier,
       strangerSampleRate: Number(row.stranger_sample_rate),
-      envelopeBasis: Object.freeze({ ...row.envelope_basis })
+      envelopeBasis: Object.freeze({ ...row.envelope_basis }),
+      registerVersion: row.register_version
     };
     });
+  }
+
+  /**
+   * Side-by-side spec §13 (S6, D2): the settings version a run was admitted under, by run id — no content, no lease
+   * (`core.run.register_version` is insert-only). The runner's `claimNext` path reads it right after its claim, since it
+   * cannot know its run before. RUN_NOT_FOUND when there is no such run.
+   */
+  async readRunRegisterVersion(runId: string): Promise<number> {
+    const result = await this.pool.query<{ register_version: number }>(
+      // The bigint version is cast by the database (an out-of-range one refuses), never coerced in JavaScript.
+      "SELECT register_version::integer AS register_version FROM core.run WHERE run_id = $1",
+      [runId]
+    );
+    const row = result.rows[0];
+    if (row === undefined) throw new TypedDomainError("RUN_NOT_FOUND", `Run ${runId} does not exist`);
+    return row.register_version;
   }
 
   /**

@@ -36,6 +36,8 @@ import {
 } from "@debateai/providers";
 import { PLAN_TIER_ROSTERS } from "@debateai/contract";
 import { codePromptContractHashes } from "../../apps/runner/src/index.js";
+import { CostEnvelopeGuard } from "@debateai/budget";
+import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import type { DevelopmentRunnerPolicy } from "../../apps/runner/src/dev-runner-policy.js";
 import {
   assertPreviewVersionTargets,
@@ -146,11 +148,15 @@ function readers(expected: number, change: Partial<RunnerVersionReaders> = {}) {
   return { readers: Object.freeze({ ...base, ...wrapped }) as RunnerVersionReaders, calls, names: () => calls.map(([name]) => name) };
 }
 
+/** The fixture policy's synthesizer and evaluator refs (fakePolicy): the makers every fixture site configures. */
+const FIXTURE_ROLE_REFS = Object.freeze(["preview:fixture-a", "preview:deepseek-v4-1-flash"]);
 /** A site: local or hosted (with the site's band), with or without the preview's env part. */
 function site(change: Partial<RunnerSiteContext> = {}): RunnerSiteContext {
   return Object.freeze({
     siteVersion: SITE_VERSION, deploymentMode: "local", preview: undefined, declaredProviderTargets: reviewedTargets(),
-    siteCostEnvelopePolicy: null, envelopeBand: null, ...change
+    siteCostEnvelopePolicy: null, envelopeBand: null,
+    // Side-by-side spec §13 (S6): the claim time the gates price, and makers carrying the fixture policy's two roles.
+    claim: { claimMs: 7200000, claimMarginMs: 1000 }, configuredMakerRefs: FIXTURE_ROLE_REFS, money: null, ...change
   });
 }
 const hostedPreviewSite = (change: Partial<RunnerSiteContext> = {}) => {
@@ -264,6 +270,61 @@ describe("loadRunnerVersionSettings: one version, read as itself (side-by-side s
     await expect(load(VERSION, site(), story().readers, { strict: true, log: (line) => { strictLines.push(line); } }))
       .rejects.toMatchObject({ code: "STORY_POLICY_INCOMPLETE" });
     expect(strictLines).toEqual([]);
+  });
+});
+
+describe("the loader's last check and its money (side-by-side spec §13, S6)", () => {
+  it("runs the claim-time gates last: a version that fails one is refused with the gate's own code, and the cache keeps it UNSUPPORTED", async () => {
+    const refusals = [
+      [fakePolicy({ judgementPolicy: undefined }), site(), "JUDGEMENT_POLICY_UNRESOLVED"],
+      [fakePolicy({ panelPolicy: undefined }), site(), "PANEL_WEIGHTING_UNRESOLVED"],
+      // A sealed role ref no maker of this runner carries (J24), and a claim too short for the version's deadlines.
+      [fakePolicy(), site({ configuredMakerRefs: ["preview:fixture-a"] }), "SYNTHESIS_ROLE_PROVIDER_UNRESOLVED"],
+      [fakePolicy(), site({ claim: { claimMs: 1000, claimMarginMs: 1000 } }), "CLAIM_BOUND_MISMATCH"]
+    ] as const;
+    for (const [policy, at, code] of refusals) {
+      const recorded = readers(VERSION, { readDevelopmentRunnerPolicy: async () => policy });
+      const refused = load(VERSION, at, recorded.readers);
+      // Every one typed, by its code (the claim guard's TypeError included), so the cache can keep it.
+      await expect(refused, code).rejects.toMatchObject({ code });
+      await expect(refused, code).rejects.toBeInstanceOf(TypedDomainError);
+      // Last: every read was made first.
+      expect(recorded.names().at(-1), code).toBe("readCallConcurrencyPolicy");
+      const cache = createRunnerSettingsCache({ load: (version) => load(version, at, readers(VERSION, {
+        readDevelopmentRunnerPolicy: async () => policy }).readers), log: () => undefined });
+      await expect(cache.settingsFor(VERSION), code).resolves.toEqual({ kind: "UNSUPPORTED", code });
+    }
+    // Control: the same version with every family and a long enough claim passes.
+    await expect(load(VERSION, site(), readers(VERSION).readers)).resolves.toMatchObject({ registerVersion: VERSION });
+  });
+
+  it("hosted: the version's guard is built over the site's one store and in-flight counter, with the version's per-run ceiling", async () => {
+    const store = { sentinel: "store" } as never;
+    const inFlight = createRunInFlight();
+    const siteEnvelope = envelope(250000, "site-row");
+    const hosted = site({ ...hostedSite(siteEnvelope), money: { store, inFlight } });
+    const version = await load(VERSION, hosted, readers(VERSION, {
+      readCostEnvelopePolicy: async () => envelope(200000, "version-row") }).readers);
+    expect(version.costEnvelope).not.toBeNull();
+    expect(version.costEnvelope!.guard).toBeInstanceOf(CostEnvelopeGuard);
+    // The version's per-run member over the site's day.
+    expect(version.costEnvelope!.policy.perRunCeilingMicros).toBe(200000);
+    expect(version.costEnvelope!.policy.dailyCeilingMicros).toBe(siteEnvelope.dailyCeilingMicros);
+    // Local mode (no money) builds none, and reads no money row.
+    const local = readers(VERSION);
+    expect((await load(VERSION, site(), local.readers)).costEnvelope).toBeNull();
+    expect(local.names()).not.toContain("readCostEnvelopePolicy");
+    // Hosted without the site's money (a fixture that forgot it) builds none either: never a guard over no store.
+    expect((await load(VERSION, hostedSite(siteEnvelope), readers(VERSION).readers)).costEnvelope).toBeNull();
+  });
+
+  it("hosted: a version whose story the site's day cannot hold beside one full run is refused (STORY_DAILY_CEILING_INSUFFICIENT)", async () => {
+    const siteEnvelope = envelope(250000, "site-row");
+    const hosted = site({ ...hostedSite(siteEnvelope), money: { store: {} as never, inFlight: createRunInFlight() } });
+    const story = Object.freeze({ perStoryCeilingMicros: siteEnvelope.dailyCeilingMicros, perStoryOverrunBasisPoints: 0,
+      storytellerRoleRef: "preview:fixture-a", storyCheckerRoleRef: "preview:deepseek-v4-1-flash" }) as never;
+    await expect(load(VERSION, hosted, readers(VERSION, { readStoryPolicyFromRegister: async () => story }).readers))
+      .rejects.toMatchObject({ code: "STORY_DAILY_CEILING_INSUFFICIENT" });
   });
 });
 

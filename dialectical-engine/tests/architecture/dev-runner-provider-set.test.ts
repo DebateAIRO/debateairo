@@ -71,7 +71,8 @@ describe("production runner provider topology", () => {
       // every multi-maker work item. Same class as the two entries above, so it is
       // pinned the same way rather than left to the next merge to rediscover.
       "stoppingPolicy: policy.stoppingPolicy"
-    ]) expect(loader).toContain(setting);
+      // S6: the mapping is its own module (run-debate-members.ts), re-exported by the loader.
+    ]) expect(await readFile("apps/runner/src/run-debate-members.ts", "utf8")).toContain(setting);
     for (const setting of [
       // T3C / F34 (J20): DR-182 VROW-5's claim-time re-probe. Its absence is not a
       // stop — both consumers are guarded by `!== undefined` — so a shipped
@@ -137,7 +138,8 @@ describe("production runner provider topology", () => {
   it("composes every optional WalkingSkeletonSettings member, or declares it intentionally absent", async () => {
     const runnerSource = await readFile("apps/runner/src/index.ts", "utf8");
     const mainSource = await readFile("apps/runner/src/main.ts", "utf8");
-    const mappingSource = await readFile("apps/runner/src/run-settings.ts", "utf8");
+    // S6: the debate members' one mapping is its own module, re-exported by run-settings.ts.
+    const mappingSource = await readFile("apps/runner/src/run-debate-members.ts", "utf8");
 
     /**
      * Blanks comments and string/template literals in place (length-preserving), so a

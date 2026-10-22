@@ -130,7 +130,8 @@ describe("S2 · both hosted boots hand the check the picker's lists", () => {
     // Side-by-side spec §13: the runner's check is the per-version loader's, at the version it loads (main.ts's boot
     // loads its site version through it).
     const loader = await readFile(new URL("../../apps/runner/src/run-settings.ts", import.meta.url), "utf8");
-    const block = loader.indexOf("if (siteCostEnvelopePolicy !== null && envelopeBand !== null) {");
+    // S6: the block keys on the version's composed envelope (non-null exactly when hosted) and the site's band.
+    const block = loader.indexOf("if (debateEnvelope !== null && envelopeBand !== null) {");
     expect(block).toBeGreaterThan(-1);
     expect(loader.indexOf(
       "scorecardInForce: (await readModelScorecard(pool, version, await readEngineVersion())).state === \"VALID\","

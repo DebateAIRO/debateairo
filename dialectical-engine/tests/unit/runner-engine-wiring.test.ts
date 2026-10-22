@@ -23,7 +23,7 @@ describe("the runner reads the engine from the receipt only", () => {
     expect(shapeAt).toBeGreaterThan(0);
     expect(engineAt).toBeGreaterThan(shapeAt);
     expect(engineAt).toBeLessThan(RUNNER.indexOf("const shapeSettings = shapeShape === null ? null : debateShapeSettingsOf(run.depthParams);"));
-    expect(RUNNER).toContain("if (engine.engine === 2 && this.settings.engine == null) {");
+    expect(RUNNER).toContain("if (engine.engine === 2 && settings.engine == null) {");
     expect(RUNNER).toContain("throw new TypedDomainError(\"ENGINE_RUNNER_UNCONFIGURED\",");
   });
 
@@ -52,7 +52,8 @@ describe("the runner reads the engine from the receipt only", () => {
     const shapeAt = loader.indexOf("const debateShape = await readDebateShapeRunnerSettings(pool, version);");
     expect(shapeAt).toBeGreaterThan(-1);
     expect(loader.indexOf(engineRead)).toBeGreaterThan(shapeAt);
-    expect(loader).toContain("engine: version.engine,");
+    // S6: the mapping is its own module (run-debate-members.ts), re-exported by the loader.
+    expect(read("apps/runner/src/run-debate-members.ts")).toContain("engine: version.engine,");
     expect(loader).not.toContain("resolveEngineRunnerSettings(");
     for (const file of ["apps/runner/src/main.ts", "tools/preview-practice/practice-runner-composition.ts"]) {
       const text = read(file);

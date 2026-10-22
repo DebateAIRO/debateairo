@@ -23,9 +23,7 @@ import {
   readCallConcurrencyPolicy
 } from "@debateai/register";
 import {
-  CostEnvelopeGuard,
   PostgresModelSpendStore,
-  costEnvelopeGuardPolicy,
   type CostEnvelopePhase,
   type SharedWallApplication
 } from "@debateai/budget";
@@ -45,10 +43,11 @@ import { buildProviderPriceMap, createPostgresProviderGateway, declareHatchetWal
 import { createCallScheduler, type CallSubject } from "./call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateRemainingReaders, structureRepairThroughLane, targetCallSubjects } from "./call-lane-gateway.js";
 import { createRunInFlight } from "./run-in-flight.js";
-import { createRunnerSettingsCache, loadRunnerVersionSettings, runnerSettingsOfVersion, type RunnerSiteContext } from "./run-settings.js";
+import { createRunnerSettingsCache, createRunSettingsVersions, loadRunnerVersionSettings, runCostEnvelopeGuardOf, runnerSettingsOfVersion, type RunnerSiteContext } from "./run-settings.js";
 import {
   assertRunnerPrimaryProviderConfiguration,
-  createRunnerProviderTopology
+  createRunnerProviderTopology,
+  runnerConfiguredMakerRefs
 } from "./provider-topology.js";
 import { reconcileRunnerStartupWork } from "./runner-startup-reconciliation.js";
 import { startLapsedClaimResend } from "./runner-lapsed-resend.js";
@@ -244,34 +243,6 @@ const billingPlans = costEnvelopePolicy === null ? null : await readBillingPlans
 if (costEnvelopePolicy !== null && billingPlans === null) {
   console.warn(JSON.stringify({ kind: "DEBATEAI_PERSON_WALL", event: "PLANS_UNRESOLVED" }));
 }
-/**
- * Side-by-side spec §13 (runner points 1, 2, 7) — ONE PER-VERSION SETTINGS LOADER. Every read of this boot that belongs
- * to a settings version (the runner policy and its prompt fingerprints, the story's rows, the preview line-up, the
- * debate shape, the engine, the preview's roster, role and scorecard checks, the run ceiling against one call, the
- * debate's call lanes) is made by `loadRunnerVersionSettings` (run-settings.ts), for the version asked, and kept in one
- * cache for the life of this process. The release's site members are read here, once, and handed in. This runner still
- * runs one version, its site version: the boot loads it and refuses with the loader's own typed code, as before.
- */
-const runnerSite: RunnerSiteContext = Object.freeze({
-  siteVersion: environment.REGISTER_VERSION,
-  deploymentMode: environment.DEPLOYMENT_MODE,
-  preview: previewGate === undefined ? undefined : { gate: previewGate, envLineUp: environment.PREVIEW_ENV_LINE_UP ?? null },
-  declaredProviderTargets,
-  siteCostEnvelopePolicy: costEnvelopePolicy,
-  envelopeBand
-});
-const runnerSettings = createRunnerSettingsCache({
-  load: (version) => loadRunnerVersionSettings(pool, version, runnerSite),
-  log: (line) => { console.warn(JSON.stringify(line)); }
-});
-const siteVersionSettings = await runnerSettings.requireSettings(environment.REGISTER_VERSION);
-const { storyPolicy } = siteVersionSettings;
-const storyCeilingMicros = storyPolicy?.perStoryCeilingMicros ?? null;
-// V-9(2): each vendor's credential file, read once under the custody contract: after the settings checks above, so a
-// boot they refuse (the preview's scorecard conflict among them) never reads a credential.
-const providerTargets = resolveProviderTargetCredentials(
-  declaredProviderTargets, readCustodyAuthorizationHeader
-);
 const fundingEntitlements = new EntitlementRepository(pool);
 const allowances = new PostgresInternalAllowanceRepository(pool);
 // Side-by-side spec §9: no funding read and no funding refusal at boot. A grant is checked against the policy of the
@@ -293,19 +264,53 @@ const sharedWallTerms = costEnvelopePolicy === null
           }),
       owners: modelSpendStore
     });
-const costEnvelopeGuard = costEnvelopePolicy === null
-  ? undefined
-  : new CostEnvelopeGuard({
-      store: modelSpendStore,
-      // Verdict story: the story's OWN ceiling and overrun, when the register
-      // sealed them. Engine money rule, Task M7: built by the one check over
-      // BOTH money rows, which refuses this boot (STORY_DAILY_CEILING_INSUFFICIENT)
-      // when the day cannot hold one full run plus its story.
-      policy: costEnvelopeGuardPolicy(costEnvelopePolicy, storyPolicy),
-      ...(sharedWallTerms === null ? {} : { sharedWall: sharedWallTerms }),
-      ...(fundingAllowance === undefined ? {} : {fundingAdmission:fundingAllowance}),
-      inFlight: moneyInFlight
-    });
+/**
+ * Side-by-side spec §13 (runner points 1, 2, 7) — ONE PER-VERSION SETTINGS LOADER. Every read of this boot that belongs
+ * to a settings version (the runner policy and its prompt fingerprints, the story's rows, the preview line-up, the
+ * debate shape, the engine, the preview's roster, role and scorecard checks, the run ceiling against one call, the
+ * debate's call lanes) is made by `loadRunnerVersionSettings` (run-settings.ts), for the version asked, and kept in one
+ * cache for the life of this process. The release's site members are read here, once, and handed in. The boot loads
+ * the site version and refuses with the loader's own typed code, as before; from S6 every debate then runs on its own
+ * stamped version through the same cache (`settingsForVersion` in the runner's settings below).
+ */
+const runnerSite: RunnerSiteContext = Object.freeze({
+  siteVersion: environment.REGISTER_VERSION,
+  deploymentMode: environment.DEPLOYMENT_MODE,
+  preview: previewGate === undefined ? undefined : { gate: previewGate, envLineUp: environment.PREVIEW_ENV_LINE_UP ?? null },
+  declaredProviderTargets,
+  siteCostEnvelopePolicy: costEnvelopePolicy,
+  envelopeBand,
+  claim: { claimMs: environment.CLAIM_MS, claimMarginMs: environment.CLAIM_MARGIN_MS },
+  configuredMakerRefs: runnerConfiguredMakerRefs(declaredProviderTargets),
+  /**
+   * V-28 / B9 (side-by-side spec §13 runner point 4): hosted only, the money every version's guard shares — this
+   * process's one spend store, the money guard's one in-flight counter (never the gateway's) and the one shared wall
+   * with the funding admission. Each version's guard (the loader's) adds its own per-run and story ceilings, built by
+   * the one check over both money rows (STORY_DAILY_CEILING_INSUFFICIENT refuses the site version's at boot, as before).
+   */
+  money: costEnvelopePolicy === null ? null : Object.freeze({
+    store: modelSpendStore,
+    inFlight: moneyInFlight,
+    ...(sharedWallTerms === null ? {} : { sharedWall: sharedWallTerms }),
+    ...(fundingAllowance === undefined ? {} : { fundingAdmission: fundingAllowance })
+  })
+});
+const runnerSettings = createRunnerSettingsCache({
+  load: (version) => loadRunnerVersionSettings(pool, version, runnerSite),
+  log: (line) => { console.warn(JSON.stringify(line)); }
+});
+const siteVersionSettings = await runnerSettings.requireSettings(environment.REGISTER_VERSION);
+/**
+ * Side-by-side spec §13 (S6): each claimed run's version, by run id, set by the runner right after the claim; every
+ * money seam below charges a call to its own run's version's guard through it (RUN_SETTINGS_VERSION_UNKNOWN otherwise).
+ */
+const runSettingsVersions = createRunSettingsVersions();
+const runCostEnvelopeGuard = runCostEnvelopeGuardOf(runnerSettings, runSettingsVersions);
+// V-9(2): each vendor's credential file, read once under the custody contract: after the settings checks above, so a
+// boot they refuse (the preview's scorecard conflict among them) never reads a credential.
+const providerTargets = resolveProviderTargetCredentials(
+  declaredProviderTargets, readCustodyAuthorizationHeader
+);
 /**
  * Parallel AI calls (spec 2026-10-12 §3.2-§3.4) — THE RUNNER'S CALL SCHEDULER. One for this process: every debate opens
  * a lane in it, and every model call waits there for a slot under the register's `callConcurrencyPolicy` row (absent:
@@ -336,7 +341,7 @@ const previewFinalWriterTierUnread = (event: PreviewFinalWriterTierUnread): void
 const previewBusy = createPreviewBusyCoordinator();
 function targetGateway(target: (typeof providerTargets)[number]): ProviderGateway {
   const price = providerTargetPrice(target);
-  if (costEnvelopeGuard !== undefined && price === null) {
+  if (runnerSite.money !== null && price === null) {
     throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`);
   }
   const gateway = createPostgresProviderGateway(pool, {
@@ -352,24 +357,19 @@ function targetGateway(target: (typeof providerTargets)[number]): ProviderGatewa
       ? {} : { authorizationHeader: target.authorizationHeader }),
     // Spec §3.5: this process's calls in flight count toward each run's attempt ceiling.
     inFlight: gatewayInFlight,
-    ...(costEnvelopeGuard === undefined || price === null ? {} : {
+    ...(runnerSite.money === null || price === null ? {} : {
       // The run is not known until a work item is claimed, so the seam is built
       // per call from the run the gateway was handed. Hosted requires the vendor
       // to report usage: a call that cannot be billed cannot be bounded.
       // Task M1: the gateway also names the call's phase, so an answer-writing
       // call is held to the answer's ceiling and every other call to the body's.
       // B9: and whether the call is walled (`providerCallSharedWall`).
-      buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => costEnvelopeGuard.providerSeam({
-        runId, price, requireReportedUsage: true, phase, sharedWall
-      }),
-      // Verdict story (spec §8): the story's calls spend its OWN envelope. With
-      // no sealed story ceiling there is no story seam, and the gateway refuses
-      // a metered story call (STORY_ENVELOPE_MISSING) rather than run it unbounded.
-      ...(storyCeilingMicros === null ? {} : {
-        buildStoryCostEnvelopeSeam: (runId: string) => costEnvelopeGuard.storySeam({
-          runId, price, requireReportedUsage: true
-        })
-      })
+      // Side-by-side spec §13 (S6): every call is charged to its OWN run's version's guard (`runCostEnvelopeGuard`).
+      buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => runCostEnvelopeGuard(runId).providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }),
+      // Verdict story (spec §8): the story's calls spend its OWN envelope, its run's version's story ceiling. A
+      // version that sealed no story ceiling refuses inside the guard (STORY_ENVELOPE_MISSING), the code the gateway
+      // used to raise without a seam; the story writer refuses before that anyway (no story rows, no story).
+      buildStoryCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).storySeam({ runId, price, requireReportedUsage: true })
     })
   });
   // Spec §3.4: the policy marks the gate unhealthy on its FIRST unsent refusal, before the minute's resend wait.
@@ -419,7 +419,8 @@ assertRunnerPrimaryProviderConfiguration({
 const storyWriter = new StoryWriter({
   pool,
   pack: storyPack,
-  policy: storyPolicy,
+  // Side-by-side spec §13 (ruling R36): no boot policy. Every write carries its own debate's version's story policy
+  // (WalkingSkeletonRunner's `settings.storyPolicy`, null included).
   hosted: environment.DEPLOYMENT_MODE === "hosted",
   resolveProvider: (roleRef) => {
     const member = [
@@ -463,6 +464,10 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   retirement: retirementSignal,
   // Side-by-side spec §13 runner point 7: every debate member of the site version, written once (run-settings.ts).
   ...runnerSettingsOfVersion(siteVersionSettings),
+  // Side-by-side spec §13 (S6): and every debate runs on its OWN stamped version, through the loader's cache, with
+  // its run → version map (the money seams above read it).
+  settingsForVersion: (version) => runnerSettings.settingsFor(version),
+  runSettingsVersions,
   providerRef: providerTopology.primary.providerRef, maker: providerTopology.primary.maker,
   ...(providerTopology.critique === undefined
     ? {} : { critique: providerTopology.critique }),

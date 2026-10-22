@@ -586,7 +586,9 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // (the register law bans JavaScript version coercion). migrate() is byte-identical.
 // Side-by-side integration round 2 (2026-10-22): the merged module after lane C's C11 review above
 // (listUnstartedReadmissions) joined the integration branch's module. migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "eb61b605427f7bc16bf9147eed029b6b790b8088093acc9a804fa6cd893d6546";
+// Side-by-side Phase 2, S6 (2026-10-22, spec §13): readFrozenHead returns registerVersion and RunRepository gains
+// readRunRegisterVersion (both cast register_version in SQL). migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "c63ce7bd0c8c56b3a5e481502c50296ccc11a0098ef1663a9fe6fe0c06a64c1d";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each

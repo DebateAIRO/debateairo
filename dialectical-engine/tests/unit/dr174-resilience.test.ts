@@ -67,7 +67,7 @@ describe("RESIL-01 / DR-174 lifecycle mutation ledger", () => {
     // Debate shape (plan Task 13): one chain per ROOT — the shape's P, or today's one per maker (`rootCount`).
     expect(source).toMatch(/for \(let rootIndex = 1; rootIndex < rootCount; rootIndex \+= 1\) \{\s*chains\.push\(runChain\(\(stage\) => rootChain\(rootIndex, stage\)/);
     expect(source).toMatch(/const childAttempt = await cooldownAttempt\(\{[\s\S]*?failureScope: input\.parentNodeId === null \? "MAKER_POSITION" : "EXPANSION"/);
-    expect(source).toContain("maxAttempts: this.settings.judgeBound.maxAttempts + (this.settings.runDeathPolicy?.finalRetryAttempts ?? 0)");
+    expect(source).toContain("maxAttempts: settings.judgeBound.maxAttempts + (settings.runDeathPolicy?.finalRetryAttempts ?? 0)");
   });
 
   it("T10 computes exactly one wrapper attempt after three consumed attempts", () => {

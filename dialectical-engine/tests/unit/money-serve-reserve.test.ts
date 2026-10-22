@@ -556,6 +556,7 @@ describe("M1 the runner's hosted composition passes the phase to the guard", () 
   it("builds the per-call run seam from the run id, the phase and the wall (B9)", async () => {
     const source = await readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8");
     expect(source).toContain("buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) =>");
-    expect(source).toMatch(/providerSeam\(\{\s*runId, price, requireReportedUsage: true, phase, sharedWall\s*\}\)/u);
+    // Side-by-side spec §13 (S6): on the run's own version's guard.
+    expect(source).toMatch(/runCostEnvelopeGuard\(runId\)\.providerSeam\(\{\s*runId, price, requireReportedUsage: true, phase, sharedWall\s*\}\)/u);
   });
 });

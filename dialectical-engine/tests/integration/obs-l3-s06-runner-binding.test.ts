@@ -547,8 +547,9 @@ export async function resolve(specifier, context, nextResolve) {
       "@debateai/register": "export function loadRunnerEnvironment() {} export function assertHostedCostEnvelopesSealed() {} export function readCostEnvelopePolicy() {} export function costEnvelopeBand() {} export function readBillingPlans() {} export function readCallConcurrencyPolicy() {} export function effectiveCallConcurrency() {}",
       "./index.js": "export function createPostgresProviderGateway() {} export function declareHatchetWalkingSkeletonTask() {} export class WalkingSkeletonRunner {}",
       // Side-by-side spec §13 moved the per-version reads (policy, story, shape, engine, scorecard) behind the one
-      // settings loader: main.ts imports these three from it.
-      "./run-settings.js": "export function createRunnerSettingsCache() {} export function loadRunnerVersionSettings() {} export function runnerSettingsOfVersion() {}",
+      // settings loader: main.ts imports these three from it, and (S6) the run → version map and each run's own
+      // version's money guard.
+      "./run-settings.js": "export function createRunnerSettingsCache() {} export function loadRunnerVersionSettings() {} export function runnerSettingsOfVersion() {} export function createRunSettingsVersions() {} export function runCostEnvelopeGuardOf() {}",
     };
     if (Object.hasOwn(stubs, specifier)) {
       return { url: "data:text/javascript," + encodeURIComponent(stubs[specifier]), shortCircuit: true };

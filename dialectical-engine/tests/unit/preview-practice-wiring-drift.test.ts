@@ -111,6 +111,8 @@ const API_MAIN = read("apps/api/src/main.ts");
 const PRACTICE_ASK = read("tools/preview-practice/practice-ask-composition.ts");
 /** Side-by-side spec §13: the one per-version settings loader both runner compositions boot through. */
 const RUN_SETTINGS = read("apps/runner/src/run-settings.ts");
+/** S6: the debate members' one mapping, its own module (re-exported by run-settings.ts). */
+const DEBATE_MEMBERS_MODULE = read("apps/runner/src/run-debate-members.ts");
 /** The keys `runnerSettingsOfVersion` returns: the debate members both literals spread. */
 const DEBATE_MEMBERS_ANCHOR = "const { policy } = version;\n  return Object.freeze({";
 const DEBATE_MEMBERS_SPREAD = "...runnerSettingsOfVersion(siteVersionSettings),";
@@ -132,7 +134,7 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     // Side-by-side spec §13: both literals take the version's debate members from the one mapping, by the same spread,
     // so the settings each hands the runner are its own keys plus the mapping's.
     for (const source of [RUNNER_MAIN, PRACTICE_RUNNER]) expect(source.split(DEBATE_MEMBERS_SPREAD)).toHaveLength(2);
-    const debateMembers = objectAfter(RUN_SETTINGS, DEBATE_MEMBERS_ANCHOR);
+    const debateMembers = objectAfter(DEBATE_MEMBERS_MODULE, DEBATE_MEMBERS_ANCHOR);
     expect(debateMembers.has("factBundleVersion")).toBe(true);
     expect([...debateMembers].filter((key) => shipped.has(key))).toEqual([]);
     expect(shipped.size + debateMembers.size).toBeGreaterThan(30);
@@ -206,14 +208,17 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     const preview = "preview: previewGate === undefined ? undefined : { gate: previewGate, envLineUp: environment.PREVIEW_ENV_LINE_UP ?? null },";
     const shipped = objectAfter(RUNNER_MAIN, "const runnerSite: RunnerSiteContext = Object.freeze(");
     const practice = objectAfter(PRACTICE_RUNNER, "const runnerSite: RunnerSiteContext = Object.freeze(");
-    expect([...shipped].sort()).toEqual(["declaredProviderTargets", "deploymentMode", "envelopeBand", "preview",
-      "siteCostEnvelopePolicy", "siteVersion"]);
+    // Side-by-side spec §13 (S6): and the claim time, the makers' refs and the money every version's guard shares.
+    expect([...shipped].sort()).toEqual(["claim", "configuredMakerRefs", "declaredProviderTargets", "deploymentMode",
+      "envelopeBand", "money", "preview", "siteCostEnvelopePolicy", "siteVersion"]);
     expect([...practice].sort()).toEqual([...shipped].sort());
     for (const source of [RUNNER_MAIN, PRACTICE_RUNNER]) {
       const code = flat(source);
       expect(code).toContain(preview);
       expect(code).toContain("siteVersion: environment.REGISTER_VERSION,");
       expect(code).toContain("siteCostEnvelopePolicy: costEnvelopePolicy,");
+      expect(code).toContain("claim: { claimMs: environment.CLAIM_MS, claimMarginMs: environment.CLAIM_MARGIN_MS },");
+      expect(code).toContain("configuredMakerRefs: runnerConfiguredMakerRefs(declaredProviderTargets),");
       expect(code).toContain("const siteVersionSettings = await runnerSettings.requireSettings(environment.REGISTER_VERSION);");
     }
     const practiceCode = withoutComments(PRACTICE_RUNNER);
@@ -236,10 +241,15 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       // Side-by-side spec §9: no funding read and no funding refusal at boot; the funding source is built whenever plans are.
       "const fundingAllowance = billingPlans === null ? undefined : new FundingAwarePersonAllowanceSource({ allowances,entitlements:{...fundingEntitlements.readOnlyPort(),readRunFundingBasis:(runId)=>fundingEntitlements.readRunFundingBasis(runId)}, plans:billingPlans,closeBasisPoints:envelopeBand?.closeBasisPoints ?? 10000 });",
       "finishBasisPoints: envelopeBand === null ? null : envelopeBand.finishBasisPoints, persons: billingPlans === null ? plansUnresolvedPersonAllowance() : fundingAllowance ?? new BillingPersonAllowanceSource({ entitlements: new EntitlementRepository(pool).readOnlyPort(), plans: billingPlans, closeBasisPoints: envelopeBand === null ? 10_000 : envelopeBand.closeBasisPoints }), owners: modelSpendStore",
-      "store: modelSpendStore, policy: costEnvelopeGuardPolicy(costEnvelopePolicy, storyPolicy), ...(sharedWallTerms === null ? {} : { sharedWall: sharedWallTerms }), ...(fundingAllowance === undefined ? {} : {fundingAdmission:fundingAllowance}), inFlight: moneyInFlight",
-      "if (costEnvelopeGuard !== undefined && price === null) { throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`); }",
-      "buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => costEnvelopeGuard.providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }),",
-      "...(storyCeilingMicros === null ? {} : { buildStoryCostEnvelopeSeam: (runId: string) => costEnvelopeGuard.storySeam({ runId, price, requireReportedUsage: true }) })",
+      // Side-by-side spec §13 (S6): the money every version's guard shares (RunnerSiteContext.money), the run → version
+      // map, and each call's own run's version's guard; a story seam whenever hosted (a version without a story
+      // ceiling refuses inside its guard, STORY_ENVELOPE_MISSING).
+      "store: modelSpendStore, inFlight: moneyInFlight, ...(sharedWallTerms === null ? {} : { sharedWall: sharedWallTerms }), ...(fundingAllowance === undefined ? {} : { fundingAdmission: fundingAllowance })",
+      "const runSettingsVersions = createRunSettingsVersions();",
+      "const runCostEnvelopeGuard = runCostEnvelopeGuardOf(runnerSettings, runSettingsVersions);",
+      "if (runnerSite.money !== null && price === null) { throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`); }",
+      "...(runnerSite.money === null || price === null ? {} : { buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => runCostEnvelopeGuard(runId).providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }), buildStoryCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).storySeam({ runId, price, requireReportedUsage: true }) })",
+      "settingsForVersion: (version) => runnerSettings.settingsFor(version),",
       "hosted: environment.DEPLOYMENT_MODE === \"hosted\",",
       "providerPrices: buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE),",
       "structureRepairCeiling: previewStructureRepairCeiling(structureRepairRoute),",
@@ -248,7 +258,8 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       expect(shipped, statement).toContain(statement);
       expect(practice, statement).toContain(statement);
     }
-    for (const gone of ["allowances.readPolicy()", "\"INTERNAL_FUNDING_UNAVAILABLE\""]) {
+    for (const gone of ["allowances.readPolicy()", "\"INTERNAL_FUNDING_UNAVAILABLE\"", "new CostEnvelopeGuard(", "storyCeilingMicros",
+      "costEnvelopeGuard."]) {
       expect(shipped, gone).not.toContain(gone);
       expect(practice, gone).not.toContain(gone);
     }
@@ -260,8 +271,10 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     }
     const loader = flat(RUN_SETTINGS);
     for (const statement of [
-      "if (siteCostEnvelopePolicy !== null && envelopeBand !== null) { const debateEnvelope = composeDebateCostEnvelope(siteCostEnvelopePolicy, await readCostEnvelopePolicy(pool, version)); const firstCalls = firstPositionCallProjections({ targets: declaredProviderTargets,",
-      "bodyCeilingMicros: costEnvelopeCeilings(debateEnvelope).bodyMicros,"
+      "const debateEnvelope = siteCostEnvelopePolicy === null ? null : composeDebateCostEnvelope(siteCostEnvelopePolicy, await readCostEnvelopePolicy(pool, version)); if (debateEnvelope !== null && envelopeBand !== null) { const firstCalls = firstPositionCallProjections({ targets: declaredProviderTargets,",
+      "bodyCeilingMicros: costEnvelopeCeilings(debateEnvelope).bodyMicros,",
+      // Side-by-side spec §13 (S6): each version's guard, over the site's one store, counter and wall.
+      "store: money.store, policy: costEnvelopeGuardPolicy(debateEnvelope, storyPolicy), ...(money.sharedWall === undefined ? {} : { sharedWall: money.sharedWall }), ...(money.fundingAdmission === undefined ? {} : { fundingAdmission: money.fundingAdmission }), inFlight: money.inFlight"
     ]) expect(loader, statement).toContain(statement);
     // The local-only refusal is gone; local mode builds no guard (composePracticeRunnerMoney returns null there).
     expect(practice).not.toContain("PRACTICE_REQUIRES_LOCAL_MODE");
@@ -334,9 +347,12 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       expect(source).toContain("load: (version) => loadRunnerVersionSettings(pool, version, runnerSite");
       expect(source).toContain(boot);
     }
-    // The practice's money takes the site rows and the loader's story policy; the loader runs before the money wiring.
-    expect(practiceRunner).toContain("composePracticeRunnerMoney({ pool, environment, costEnvelopePolicy, envelopeBand, storyPolicy, log:");
-    expect(practiceRunner.indexOf(boot)).toBeLessThan(practiceRunner.indexOf("const money = await composePracticeRunnerMoney("));
+    // Side-by-side spec §13 (S6): the practice's money takes the site rows only and runs BEFORE the loader (as main.ts
+    // builds its wall before its site context): the loader builds each version's guard over it.
+    expect(practiceRunner).toContain("composePracticeRunnerMoney({ pool, environment, costEnvelopePolicy, envelopeBand, log:");
+    expect(practiceRunner.indexOf("const money = await composePracticeRunnerMoney(")).toBeLessThan(practiceRunner.indexOf(boot));
+    expect(practiceRunner).toContain("money: money === null ? null : money.site");
+    expect(runnerMain.indexOf("const sharedWallTerms = costEnvelopePolicy === null")).toBeLessThan(runnerMain.indexOf(boot));
     const apiMain = flat(API_MAIN);
     const practiceAsk = flat(PRACTICE_ASK);
     for (const source of [apiMain, practiceAsk]) {
