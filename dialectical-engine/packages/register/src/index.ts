@@ -829,6 +829,11 @@ const bootstrapKeys = [
 ] as const;
 
 export type BootstrapKey = typeof bootstrapKeys[number];
+/**
+ * Side-by-side spec §13: the toolchain rows `register.bootstrap.json` resolves, by name, so the settings
+ * classification (settings-classification.ts) is proved to give each a kind. They are SITE rows: they follow the release.
+ */
+export const BOOTSTRAP_REGISTER_ROW_KEYS: readonly BootstrapKey[] = Object.freeze([...bootstrapKeys]);
 
 const bootstrapSchema = z.object({
   registerVersion: z.literal(1),
@@ -1123,6 +1128,7 @@ export {
 export {
   COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW,
   COST_ENVELOPE_POLICY_ROW_KEY,
+  COST_ENVELOPE_POLICY_MEMBERS,
   costEnvelopeCeilings,
   costEnvelopeBand,
   costEnvelopePolicyFromValue,
@@ -1155,6 +1161,7 @@ export {
 export {
   BILLING_PLANS_DEPLOYMENT_REGISTER_ROW,
   BILLING_PLANS_ROW_KEY,
+  BILLING_PLANS_MEMBERS,
   PLAN_IDS,
   billingPlansFromValue,
   planById,
@@ -1234,6 +1241,7 @@ export {
 export {
   CALL_CONCURRENCY_LIMITS,
   CALL_CONCURRENCY_POLICY_ROW_KEY,
+  CALL_CONCURRENCY_POLICY_MEMBERS,
   callConcurrencyPolicyFromValue,
   callConcurrencyPolicyRow,
   effectiveCallConcurrency,
@@ -1451,3 +1459,16 @@ export * from "./consumer-recovery-policy.js";
 
 export * from "./password-reset-policy.js";
 export * from "./email-mfa-policy.js";
+export {
+  MIXED_SETTINGS_ROW_MEMBERS,
+  SETTINGS_ROW_KINDS,
+  compareSiteSettings,
+  composeDebateCostEnvelope,
+  debateCallLaneLimits,
+  readSettingsComparisonRows,
+  settingsRowKind,
+  type MixedSettingsRowKey,
+  type SettingsComparisonRow,
+  type SettingsRowKind,
+  type SiteSettingsDifference
+} from "./settings-classification.js";

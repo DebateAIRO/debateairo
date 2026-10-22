@@ -94,6 +94,12 @@ const runnerRowsSchema = z.object({
   serveContractHash: z.string().regex(/^[a-f0-9]{64}$/u)
 }).strict();
 
+/**
+ * Side-by-side spec §13: the register rows the development runner reads, by name, so the settings classification
+ * (`@debateai/register` settings-classification.ts) is proved to give each a kind.
+ */
+export const DEVELOPMENT_RUNNER_ROW_KEYS: readonly string[] = Object.freeze(Object.keys(runnerRowsSchema.shape));
+
 export interface DevelopmentRunnerPolicy {
   readonly compositionRow: CompositionMapRegisterRow;
   readonly bounds: z.infer<typeof runnerRowsSchema>["acceptanceOrganCostBounds"]["organs"];

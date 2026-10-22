@@ -1114,6 +1114,7 @@ packages/register/src/recovery-policy.ts
 packages/register/src/register-publication.ts
 packages/register/src/runtime-environment.ts
 packages/register/src/session-policy.ts
+packages/register/src/settings-classification.ts
 packages/register/src/staff-access-policy.ts
 packages/register/src/story-policy.ts
 packages/register/src/support-config.ts
