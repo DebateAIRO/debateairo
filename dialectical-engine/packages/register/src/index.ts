@@ -1473,6 +1473,22 @@ export {
   type SiteSettingsDifference
 } from "./settings-classification.js";
 export {
+  SETTINGS_CHECK_LINE_KIND,
+  SETTINGS_CHECKER,
+  parseSettingsCheckArguments,
+  readSettingsVersionFacts,
+  runSettingsCheckCommand,
+  runSettingsCheckSteps,
+  settingsCheckUnavailableReason,
+  settingsCheckLine,
+  settingsCheckRefusalCode,
+  settingsCheckReport,
+  type SettingsCheckHalf,
+  type SettingsCheckReport,
+  type SettingsCheckStep,
+  type SettingsVersionFacts
+} from "./settings-check-report.js";
+export {
   PREVIEW_LINE_UP_POLICY_ROW_KEY,
   previewLineUpPolicyFromValue,
   previewLineUpPolicyRow,

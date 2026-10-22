@@ -65,10 +65,16 @@ describe("the runner registers and re-sends under its release's own task name (s
   it("main.ts never refuses boot over funding: no pointer read, the funding source built whenever plans are (spec §9)", async () => {
     // Side-by-side spec §9: a grant is checked against the policy of the version it was issued with, so the runner
     // needs no funding selection at boot, and a selection made after boot works without a restart.
+    // Side-by-side spec §13 (S14): the funding source is built by main.ts's site reads (readRunnerSiteContext,
+    // run-settings.ts, shared with the practice and check-version), which main.ts calls.
     const main = await readFile(RUNNER_MAIN, "utf8");
-    expect(main).not.toContain("allowances.readPolicy()");
-    expect(main).not.toContain('"INTERNAL_FUNDING_UNAVAILABLE"');
-    expect(main).toContain(
+    const siteReads = await readFile(RUNNER_MAIN.replace(/main\.ts$/u, "run-settings.ts"), "utf8");
+    expect(main).toContain("await readRunnerSiteContext({ pool, environment, moneyInFlight })");
+    for (const source of [main, siteReads]) {
+      expect(source).not.toContain("allowances.readPolicy()");
+      expect(source).not.toContain('"INTERNAL_FUNDING_UNAVAILABLE"');
+    }
+    expect(siteReads).toContain(
       "const fundingAllowance = billingPlans === null ? undefined : new FundingAwarePersonAllowanceSource({"
     );
   });

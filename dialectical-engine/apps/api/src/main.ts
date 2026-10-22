@@ -4,7 +4,7 @@ import { hostedQuestionLanguageRoute, questionLanguageRouteFor } from "./questio
 import { questionLanguageReferenceKeyFrom } from "./question-language/reference.js";
 // Side-by-side spec §13: the per-version admission settings (loader and cache) and the activation pointer's one reader.
 import {
-  admissionSettingsOfVersion, createAdmissionSettingsCache, createAdmissionView, loadAdmissionSettings, type AdmissionSiteContext
+  admissionSettingsOfVersion, buildAdmissionSiteContext, createAdmissionSettingsCache, createAdmissionView, loadAdmissionSettings, type AdmissionSiteContext
 } from "./admission-settings.js";
 import { createActiveSettingsVersionReader } from "./active-settings-version.js";
 import { PasswordResetService } from "./password-reset.js";
@@ -96,7 +96,6 @@ import {
 import {
   NO_PERSON_ALLOWANCE,
   PostgresModelSpendStore,
-  PostgresRecentRunUsageSource,
   languageCheckSpendWriterPresent,
   recordLanguageCheckSpend
 } from "@debateai/budget";
@@ -170,7 +169,6 @@ import { RecoveryStartService } from "./recovery.js";
 import {
   assertDeploymentProviderTargets,
   assertPricedProviderTargets,
-  buildApiProviderPriceMap,
   createProviderDiscoveryResolver,
   parseProviderDiscoveryTargets,
   resolveProviderTargetCredentials
@@ -575,18 +573,14 @@ const readSupportCredentialOnce = (path: string): string => {
  * and their prices, the preview's gate part and the env's line-up, the site's money row and band, billing, the stores,
  * the question-language route and its reference key). Read once, here; every version is loaded over it.
  */
-const admissionSite: AdmissionSiteContext = boot.runSync("admission-site", () => Object.freeze({
-  siteVersion: environment.REGISTER_VERSION,
-  deploymentMode: environment.DEPLOYMENT_MODE,
-  preview: previewGate === undefined ? undefined : { gate: previewGate, envLineUp: environment.PREVIEW_ENV_LINE_UP ?? null },
+const admissionSite: AdmissionSiteContext = boot.runSync("admission-site", () => buildAdmissionSiteContext({
+  pool,
+  environment,
   declaredProviderTargets,
-  siteCostEnvelope: siteCostEnvelopePolicy === null ? null
-    : { runPolicy: siteCostEnvelopePolicy, band: costEnvelopeBand(siteCostEnvelopePolicy) },
+  siteCostEnvelopePolicy,
+  // B6b: the room is built exactly when its readiness answered (hosted, the site's row carries the band).
+  askRoom: askRoomReadiness !== undefined,
   billingEnabled,
-  // V-28(2): the daily guard's store only without the room (hosted); with it the room decides instead, never both.
-  spend: siteCostEnvelopePolicy === null || askRoomReadiness !== undefined ? null : new PostgresModelSpendStore(pool),
-  recentRunUsage: askRoomReadiness === undefined ? null : new PostgresRecentRunUsageSource(pool),
-  prices: buildApiProviderPriceMap(declaredProviderTargets, environment.DEPLOYMENT_MODE),
   questionLanguage: Object.freeze({
     /**
      * Question language (spec 2026-10-13), Task 19: with no preview configured the hosted side decides. It probes for

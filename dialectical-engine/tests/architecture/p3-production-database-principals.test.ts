@@ -486,6 +486,10 @@ describe("P3-01 production database-principal manifest", () => {
         // NETOPIA spec 2026-10-05 §2.17.3 (N21): the owner's check command (`pnpm billing:check`) runs as the API under
         // systemd-run on a READ-ONLY one-connection pool and reads only the register's billing rows; it writes nothing.
         { component: "apps/api:billing-check-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_CHECK_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:check" },
+        // Side-by-side spec §13 (S14): check-version's API half (`pnpm settings:check-api <v>`) runs as the API, with that
+        // release's own api.env, on a two-connection pool, and only reads (the register's rows, the site's money row,
+        // billing's register rows); it writes nothing, so no privilege is added.
+        { component: "apps/api:settings-check-cli", environmentKey: "DATABASE_URL", purpose: "SETTINGS_CHECK_OPERATOR_COMMAND", binding: "WIRED", condition: "package script settings:check-api" },
         // B1 part 2 (NETOPIA answers 2026-10-21, Q22): the owner's resume command (`pnpm billing:renewal-resume`) runs as
         // the API under systemd-run and appends only billing.charge_event rows (REQUESTED CHARGE_RESUMED), which that
         // principal already writes; no privilege is added.
@@ -514,6 +518,10 @@ describe("P3-01 production database-principal manifest", () => {
         // writes (serve.serve_disclosure, serve.synthesis_round, ledger.raw_artifact);
         // no privilege is added.
         { component: "apps/runner:serve-disclosure-cli", environmentKey: "DATABASE_URL", purpose: "SERVE_DISCLOSURE_OPERATOR_REPORT", binding: "WIRED", condition: "package script ops:serve-disclosure" },
+        // Side-by-side spec §13 (S14): check-version's runner half (`pnpm settings:check-runner <v>`) runs as the runner,
+        // with that release's own runner.env, on a two-connection pool, and only reads (the register's rows); it writes
+        // nothing, so no privilege is added.
+        { component: "apps/runner:settings-check-cli", environmentKey: "DATABASE_URL", purpose: "SETTINGS_CHECK_OPERATOR_COMMAND", binding: "WIRED", condition: "package script settings:check-runner" },
         { component: "apps/scheduler:replay-self-test", environmentKey: "REPLAY_SELF_TEST_DATABASE_URL", purpose: "REPLAY_SELF_TEST", binding: "WIRED" },
         { component: "apps/scheduler:liveness", environmentKey: "LIVENESS_DATABASE_URL", purpose: "LIVENESS_SWEEP", binding: "WIRED" },
         { component: "apps/scheduler:settlement", environmentKey: "SETTLEMENT_DATABASE_URL", purpose: "SETTLEMENT_WATCH", binding: "WIRED" },

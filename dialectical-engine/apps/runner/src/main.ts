@@ -8,30 +8,23 @@ import {
   loadKekRing,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { configureContentEncryption, createPool, EntitlementRepository, PostgresInternalAllowanceRepository, RUNNER_CAPACITY, RUNNER_DATABASE_POOLS, RunRepository } from "@debateai/db";
-import { BillingPersonAllowanceSource } from "@debateai/billing-core";
-import { FundingAwarePersonAllowanceSource } from "@debateai/billing-core";
+import { configureContentEncryption, createPool, RUNNER_CAPACITY, RUNNER_DATABASE_POOLS, RunRepository } from "@debateai/db";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
 import { releaseTaskName, TypedDomainError } from "@debateai/kernel";
 import {
   assertHostedCostEnvelopesSealed,
-  costEnvelopeBand,
   loadRunnerEnvironment,
-  readBillingPlans,
-  readCostEnvelopePolicy,
   effectiveCallConcurrency,
   readCallConcurrencyPolicy
 } from "@debateai/register";
 import {
-  PostgresModelSpendStore,
   type CostEnvelopePhase,
   type SharedWallApplication
 } from "@debateai/budget";
-import { readDeploymentMakerCapability } from "@debateai/critique";
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
 // any local name (codex r2 B1). A multi-line import hides the specifiers from that pin.
-import { assertPreviewTargetSet, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, createPreviewBusyCoordinator, previewRunResilience, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, assertDeploymentProviderTargets, assertPricedProviderTargets, observeClaimTimeTarget, parseProviderDiscoveryTargets, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials, previewStructureRepairRoute, previewStructureRepairCeiling, withStructureRepair, previewFinalWriterTierUnreadLine, type PreviewFinalWriterTierUnread, type ProviderGateway } from "@debateai/providers";
+import { createPreviewGuardedFetch, createPreviewBudgetRpcPorts, createPreviewBusyCoordinator, previewRunResilience, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, observeClaimTimeTarget, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials, previewStructureRepairRoute, previewStructureRepairCeiling, withStructureRepair, previewFinalWriterTierUnreadLine, type PreviewFinalWriterTierUnread, type ProviderGateway } from "@debateai/providers";
 import {
   STORY_SHAPES_DIR_ENV_KEY,
   StoryWriter,
@@ -39,15 +32,14 @@ import {
   resolveStoryPackDir,
   type StoryPack
 } from "@debateai/story";
-import { buildProviderPriceMap, createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, logBodyCostFallback, logServeDisclosure, plansUnresolvedPersonAllowance, WalkingSkeletonRunner } from "./index.js";
+import { buildProviderPriceMap, createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, logBodyCostFallback, logServeDisclosure, WalkingSkeletonRunner } from "./index.js";
 import { createCallScheduler, type CallSubject } from "./call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateRemainingReaders, structureRepairThroughLane, targetCallSubjects } from "./call-lane-gateway.js";
 import { createRunInFlight } from "./run-in-flight.js";
-import { createRunnerSettingsCache, createRunSettingsVersions, loadRunnerVersionSettings, preloadRunnerSettings, runCostEnvelopeGuardOf, runnerSettingsLine, runnerSettingsOfVersion, runPreviewThinkingLevelsOf, type RunnerSiteContext } from "./run-settings.js";
+import { createRunnerSettingsCache, createRunSettingsVersions, loadRunnerVersionSettings, preloadRunnerSettings, readRunnerSiteContext, runCostEnvelopeGuardOf, runnerSettingsLine, runnerSettingsOfVersion, runPreviewThinkingLevelsOf } from "./run-settings.js";
 import {
   assertRunnerPrimaryProviderConfiguration,
-  createRunnerProviderTopology,
-  runnerConfiguredMakerRefs
+  createRunnerProviderTopology
 } from "./provider-topology.js";
 import { reconcileRunnerStartupWork } from "./runner-startup-reconciliation.js";
 import { startLapsedClaimResend } from "./runner-lapsed-resend.js";
@@ -144,50 +136,6 @@ try {
   });
   storyLog("STORY_PACK_INVALID", { reason: storyPack.error });
 }
-const deploymentMakers = await readDeploymentMakerCapability(pool, environment.REGISTER_VERSION);
-if (environment.PROVIDER_DISCOVERY_TARGETS_JSON === undefined) {
-  throw new TypeError("PROVIDER_DISCOVERY_TARGETS_REQUIRED");
-}
-const declaredProviderTargets = parseProviderDiscoveryTargets(
-  environment.PROVIDER_DISCOVERY_TARGETS_JSON,
-  deploymentMakers.configuredProviders
-);
-// The mode decision is taken on what the operator DECLARED, before any credential
-// is resolved: that is what makes an inline `authorization_header` refusable in
-// hosted mode even though a resolved target legitimately carries a header.
-assertDeploymentProviderTargets(declaredProviderTargets, {
-  mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV
-});
-// V-28: and a hosted DEBATE target must carry its price, or its calls cannot be
-// billed against the per-run and daily envelopes. Separate from the rule above
-// because the support chat's target shares that one and keeps its own accounting.
-assertPricedProviderTargets(declaredProviderTargets, environment.DEPLOYMENT_MODE);
-// Addition D16: on the preview the declared targets must be one of the reviewed provider sets, each equal to its row.
-// That half needs no line-up, so it runs once, here; the rosters, roles and scorecard are each version's (the loader).
-if (previewGate !== undefined) {
-  assertPreviewTargetSet(declaredProviderTargets);
-}
-const previewFetch = previewGate === undefined ? fetch : createPreviewGuardedFetch(createPreviewBudgetRpcPorts(previewGate));
-const hatchet = new Hatchet({
-  token: environment.HATCHET_CLIENT_TOKEN, host_port: environment.HATCHET_HOST_PORT,
-  api_url: environment.HATCHET_API_URL, tenant_id: environment.HATCHET_TENANT_ID,
-  tls_config: { tls_strategy: environment.HATCHET_TLS_STRATEGY }
-});
-/**
- * V-28 (DL4-F2) — THE PER-RUN MONEY ENVELOPE, wired per target.
- *
- * HOSTED only, and the mode decides it once here rather than at every call:
- * local mode is the relays and loopback model servers, which report no usage and
- * cost no money, and V-28(3) leaves it untouched with the attempt ceiling it has
- * always had. In hosted mode `assertPricedProviderTargets` above has already
- * refused any target with no declared price, so `providerTargetPrice` below
- * cannot be null there — the refusal is kept anyway, because a control that
- * depends on another control having run is one edit away from being none.
- */
-const costEnvelopePolicy = environment.DEPLOYMENT_MODE === "hosted"
-  ? await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION)
-  : null;
-const modelSpendStore = new PostgresModelSpendStore(pool);
 /**
  * Parallel AI calls (spec 2026-10-12 §3.5; ruling R15) — the calls in flight, TWO counters, never one shared: the
  * counting gateway's (each call's attempt, for the run-wide attempt ceiling) and the money guard's (each call's
@@ -203,67 +151,22 @@ const moneyInFlight = createRunInFlight();
  */
 const modelCalls = createModelCallCounter();
 /**
- * B9 (budget spec §2.9, paid-plans spec §2.4.1–2.4.2) — THE SHARED WALL WHILE
- * ARGUING, in two independent halves, built whenever hosted.
- *
- *  · THE SITE'S DAY, only with the costEnvelopePolicy row's three band members,
- *    read by their one reader (`costEnvelopeBand`, task B1), at the band's
- *    finish edge (115%). Without the band there is no site-day wall and no body
- *    fallback (budget spec §2.4): `finishBasisPoints` is null.
- *  · THE PERSON, for every run with a charge scope (ruling R-19: the person wall
- *    applies iff the row exists), band or no band: each of the run owner's
- *    windows at its own finish edge (110%, from the plan). The owner is the one
- *    billing pinned on the run at admission (`billing.run_charge_scope`, read by
- *    the spend store); the windows come from `BillingPersonAllowanceSource`
- *    (billing-core) over the READ-ONLY entitlement port —
- *    `billing.person_windows_v`, never the lazy Free append (ruling R-12). The
- *    wall reads each window's finish edge and never its close edge, so without
- *    the band the source is built with a close edge of 10 000 (inside the range
- *    it accepts). B6 writes a charge scope only while billing is on, so under
- *    old settings the only change is one read by primary key per walled BODY
- *    call, and it finds no owner.
- *
- * Amendment A20: those two relations, the billingPlans and costEnvelopePolicy
- * rows and the pure billing-core are all this process reads of billing — never
- * billingPolicy — and a paid plan past its paid-through time already reads as
- * FREE inside the view (A8).
- *
- * A missing band or missing plans at the runner, on a run with a charge scope,
- * means the API and the runner are on different register versions (billing on
- * needs both at the API's version, A22; the runbook pins the same
- * REGISTER_VERSION in both units; a mismatch or a staggered restart breaks
- * that). The walls fail closed: without the band the person half still stands;
- * without `billingPlans` it refuses (`plansUnresolvedPersonAllowance`) every
- * walled call of such a run as the person's month, the arguing stops and the
- * answer is still written. A run with no charge scope is untouched. The boot
- * says the plans are missing once, in one content-free line.
+ * Side-by-side spec §13 (S14) — THE SITE READS, read once by `readRunnerSiteContext` (run-settings.ts), the one
+ * function this boot, the preview practice and `check-version`'s runner half share: the declared provider targets with
+ * the mode decision (V-9(c)), a hosted target's price (V-28) and, on the preview, the reviewed provider set (addition
+ * D16), all taken on what the operator DECLARED, before any credential file is read; and, hosted only, the site's money
+ * row and band, the billingPlans row (one PLANS_UNRESOLVED line when it is missing) and the money every version's guard
+ * shares — one spend store, the money counter above and the B9 shared wall with the funding admission (never
+ * billingPolicy, amendment A20). The release's site members, handed to the per-version loader below.
  */
-const envelopeBand = costEnvelopePolicy === null ? null : costEnvelopeBand(costEnvelopePolicy);
-const billingPlans = costEnvelopePolicy === null ? null : await readBillingPlans(pool, environment.REGISTER_VERSION);
-if (costEnvelopePolicy !== null && billingPlans === null) {
-  console.warn(JSON.stringify({ kind: "DEBATEAI_PERSON_WALL", event: "PLANS_UNRESOLVED" }));
-}
-const fundingEntitlements = new EntitlementRepository(pool);
-const allowances = new PostgresInternalAllowanceRepository(pool);
-// Side-by-side spec §9: no funding read and no funding refusal at boot. A grant is checked against the policy of the
-// version it was issued with, never the pointer, so a funding selection made after boot works without a restart.
-const fundingAllowance = billingPlans === null ? undefined : new FundingAwarePersonAllowanceSource({
-  allowances,entitlements:{...fundingEntitlements.readOnlyPort(),readRunFundingBasis:(runId)=>fundingEntitlements.readRunFundingBasis(runId)},
-  plans:billingPlans,closeBasisPoints:envelopeBand?.closeBasisPoints ?? 10000
+const { site: runnerSite } = await readRunnerSiteContext({ pool, environment, moneyInFlight });
+const { declaredProviderTargets, envelopeBand } = runnerSite;
+const previewFetch = previewGate === undefined ? fetch : createPreviewGuardedFetch(createPreviewBudgetRpcPorts(previewGate));
+const hatchet = new Hatchet({
+  token: environment.HATCHET_CLIENT_TOKEN, host_port: environment.HATCHET_HOST_PORT,
+  api_url: environment.HATCHET_API_URL, tenant_id: environment.HATCHET_TENANT_ID,
+  tls_config: { tls_strategy: environment.HATCHET_TLS_STRATEGY }
 });
-const sharedWallTerms = costEnvelopePolicy === null
-  ? null
-  : Object.freeze({
-      finishBasisPoints: envelopeBand === null ? null : envelopeBand.finishBasisPoints,
-      persons: billingPlans === null
-        ? plansUnresolvedPersonAllowance()
-        : fundingAllowance ?? new BillingPersonAllowanceSource({
-            entitlements: new EntitlementRepository(pool).readOnlyPort(),
-            plans: billingPlans,
-            closeBasisPoints: envelopeBand === null ? 10_000 : envelopeBand.closeBasisPoints
-          }),
-      owners: modelSpendStore
-    });
 /**
  * Side-by-side spec §13 (runner points 1, 2, 7) — ONE PER-VERSION SETTINGS LOADER. Every read of this boot that belongs
  * to a settings version (the runner policy and its prompt fingerprints, the story's rows, the preview line-up, the
@@ -273,28 +176,6 @@ const sharedWallTerms = costEnvelopePolicy === null
  * the site version and refuses with the loader's own typed code, as before; from S6 every debate then runs on its own
  * stamped version through the same cache (`settingsForVersion` in the runner's settings below).
  */
-const runnerSite: RunnerSiteContext = Object.freeze({
-  siteVersion: environment.REGISTER_VERSION,
-  deploymentMode: environment.DEPLOYMENT_MODE,
-  preview: previewGate === undefined ? undefined : { gate: previewGate, envLineUp: environment.PREVIEW_ENV_LINE_UP ?? null },
-  declaredProviderTargets,
-  siteCostEnvelopePolicy: costEnvelopePolicy,
-  envelopeBand,
-  claim: { claimMs: environment.CLAIM_MS, claimMarginMs: environment.CLAIM_MARGIN_MS },
-  configuredMakerRefs: runnerConfiguredMakerRefs(declaredProviderTargets),
-  /**
-   * V-28 / B9 (side-by-side spec §13 runner point 4): hosted only, the money every version's guard shares — this
-   * process's one spend store, the money guard's one in-flight counter (never the gateway's) and the one shared wall
-   * with the funding admission. Each version's guard (the loader's) adds its own per-run and story ceilings, built by
-   * the one check over both money rows (STORY_DAILY_CEILING_INSUFFICIENT refuses the site version's at boot, as before).
-   */
-  money: costEnvelopePolicy === null ? null : Object.freeze({
-    store: modelSpendStore,
-    inFlight: moneyInFlight,
-    ...(sharedWallTerms === null ? {} : { sharedWall: sharedWallTerms }),
-    ...(fundingAllowance === undefined ? {} : { fundingAdmission: fundingAllowance })
-  })
-});
 const runnerSettings = createRunnerSettingsCache({
   load: (version) => loadRunnerVersionSettings(pool, version, runnerSite),
   log: (line) => { console.warn(JSON.stringify(line)); }
@@ -339,6 +220,15 @@ const previewFinalWriterTierUnread = (event: PreviewFinalWriterTierUnread): void
 };
 /** Spec §3.3 (owner ruling O4): ONE busy coordinator for every preview call of this runner, so one call probes a busy model. */
 const previewBusy = createPreviewBusyCoordinator();
+/**
+ * V-28 (DL4-F2) — THE PER-RUN MONEY ENVELOPE, wired per target.
+ *
+ * HOSTED only, and the mode decided it once, in the site reads (`runnerSite.money` is null in local mode): local mode
+ * is the relays and loopback model servers, which report no usage and cost no money, and V-28(3) leaves it untouched
+ * with the attempt ceiling it has always had. In hosted mode `assertPricedProviderTargets` (the site reads) has already
+ * refused any target with no declared price, so `providerTargetPrice` below cannot be null there — the refusal is kept
+ * anyway, because a control that depends on another control having run is one edit away from being none.
+ */
 function targetGateway(target: (typeof providerTargets)[number]): ProviderGateway {
   const price = providerTargetPrice(target);
   if (runnerSite.money !== null && price === null) {

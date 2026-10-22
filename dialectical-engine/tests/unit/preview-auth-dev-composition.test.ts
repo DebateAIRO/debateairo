@@ -47,9 +47,15 @@ describe('actual entrypoint opt-in preview composition',()=>{
  // version before credential resolution too, so a VALID scorecard still refuses the boot before any credential is read.
  it('runner executes its shipped target-set guard, loads its site version and refuses VALID before credential resolution',async()=>{
   const source=await readFile(new URL('../../apps/runner/src/main.ts',import.meta.url),'utf8');
-  const ast=ts.createSourceFile('main.ts',source,ts.ScriptTarget.Latest,true);
-  const guard=ast.statements.find(statement=>ts.isIfStatement(statement)&&statement.expression.getText(ast)==='previewGate !== undefined'&&statement.getText(ast).includes('assertPreviewTargetSet(declaredProviderTargets)'));
-  expect(guard,'real entrypoint must contain a pre-credential preview target guard').toBeDefined();
+  // Side-by-side spec §13 (S14): the guard is one of the runner's site reads (readRunnerSiteContext, run-settings.ts),
+  // the function main.ts, the practice and check-version share; main.ts calls it before credential resolution.
+  const siteSource=await readFile(new URL('../../apps/runner/src/run-settings.ts',import.meta.url),'utf8');
+  const ast=ts.createSourceFile('run-settings.ts',siteSource,ts.ScriptTarget.Latest,true);
+  const siteReads=ast.statements.find((statement):statement is ts.FunctionDeclaration=>ts.isFunctionDeclaration(statement)&&statement.name?.getText(ast)==='readRunnerSiteContext');
+  expect(siteReads?.body,'the site reads must be one exported function').toBeDefined();
+  if(!siteReads?.body)return;
+  const guard=siteReads.body.statements.find(statement=>ts.isIfStatement(statement)&&statement.expression.getText(ast)==='previewGate !== undefined'&&statement.getText(ast).includes('assertPreviewTargetSet(declaredProviderTargets)'));
+  expect(guard,'the site reads must contain the preview target guard').toBeDefined();
   if(!guard)return;
   const code=guard.getText(ast);let targetChecks=0;
   const AsyncFunction=Object.getPrototypeOf(async()=>{}).constructor;
@@ -57,8 +63,11 @@ describe('actual entrypoint opt-in preview composition',()=>{
   await run(config,[],()=>{targetChecks++;});expect(targetChecks).toBe(1);
   targetChecks=0;await run(undefined,[],()=>{targetChecks++;});expect(targetChecks).toBe(0);
   const credentials=source.indexOf('const providerTargets =');
-  expect(source.indexOf(code)).toBeGreaterThan(-1);
-  expect(source.indexOf(code)).toBeLessThan(credentials);
+  expect(siteSource.indexOf(code)).toBeGreaterThan(-1);
+  expect(siteSource).not.toContain('resolveProviderTargetCredentials(');
+  const siteRead=source.indexOf('const { site: runnerSite } = await readRunnerSiteContext({ pool, environment, moneyInFlight });');
+  expect(siteRead).toBeGreaterThan(-1);
+  expect(siteRead).toBeLessThan(credentials);
   const boot=source.indexOf('const siteVersionSettings = await runnerSettings.requireSettings(environment.REGISTER_VERSION);');
   expect(boot).toBeGreaterThan(-1);expect(boot).toBeLessThan(credentials);
   // The version's half, executed: the same two seats on the sealed two-GLM targets; VALID refuses, ABSENT passes.

@@ -48,7 +48,6 @@ import { TypedDomainError } from "@debateai/kernel";
 import {
   NO_PERSON_ALLOWANCE,
   PostgresModelSpendStore,
-  PostgresRecentRunUsageSource,
   type CostEstimator
 } from "@debateai/budget";
 import {
@@ -79,9 +78,10 @@ import {
 } from "@debateai/register";
 import { AskRoom } from "../../apps/api/src/ask-room.js";
 import { PostgresAskAdmissionGate } from "../../apps/api/src/release-state.js";
-import { buildApiProviderPriceMap, createProviderDiscoveryResolver } from "../../apps/api/src/provider-discovery.js";
+import { createProviderDiscoveryResolver } from "../../apps/api/src/provider-discovery.js";
 import {
   admissionSettingsOfVersion,
+  buildAdmissionSiteContext,
   createAdmissionSettingsCache,
   loadAdmissionSettings,
   type AdmissionRunMembers,
@@ -258,17 +258,14 @@ export async function composePracticeAsk(input: Readonly<{
    * process (one process, no blind-index key). The same in hosted mode: the hosted preview still has its preview
    * configuration, so main.ts takes this preview route there too (never its hosted route, L-ROUTE).
    */
-  const admissionSite: AdmissionSiteContext = Object.freeze({
-    siteVersion: environment.REGISTER_VERSION,
-    deploymentMode: environment.DEPLOYMENT_MODE,
-    preview: previewGate === undefined ? undefined : { gate: previewGate, envLineUp: environment.PREVIEW_ENV_LINE_UP ?? null },
+  const admissionSite: AdmissionSiteContext = buildAdmissionSiteContext({
+    pool,
+    environment,
     declaredProviderTargets,
-    siteCostEnvelope: money === null ? null : { runPolicy: money.siteCostEnvelopePolicy, band: money.band },
+    siteCostEnvelopePolicy: money === null ? null : money.siteCostEnvelopePolicy,
+    // As main.ts: the room is built exactly when the site's row carries the band (hosted).
+    askRoom: money !== null && money.band !== null,
     billingEnabled: money?.registerBillingEnabled ?? false,
-    // V-28(2), as main.ts: the daily guard's store only without the room (hosted); with it the room decides instead.
-    spend: money === null || money.band !== null ? null : new PostgresModelSpendStore(pool),
-    recentRunUsage: money === null || money.band === null ? null : new PostgresRecentRunUsageSource(pool),
-    prices: buildApiProviderPriceMap(declaredProviderTargets, environment.DEPLOYMENT_MODE),
     questionLanguage: Object.freeze({
       routeFor: async () => questionLanguageRouteFor({
         previewConfigured: true,

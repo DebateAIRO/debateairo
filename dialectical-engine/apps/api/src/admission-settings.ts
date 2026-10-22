@@ -5,6 +5,7 @@ import { PLAN_TIER_ROSTERS, askQuestionMaxBytes, type AskRequest } from "@debate
 import {
   composeDebateCostEnvelope,
   computeStructuralCeilingBasis,
+  costEnvelopeBand,
   costEnvelopeCeilings,
   debateShapeInForce,
   engineInForce,
@@ -28,18 +29,20 @@ import {
   type CostEnvelopeBand,
   type CostEnvelopePolicy,
   type DebateShapePolicy,
+  type DeploymentMode,
   type EngineVersionPolicy,
   type LengthGuidancePolicy,
   type QuestionLanguagePolicy
 } from "@debateai/register";
 import {
   CostEnvelopeGuard,
+  PostgresModelSpendStore,
+  PostgresRecentRunUsageSource,
   RecentRunsCostEstimator,
   assertRunCeilingCoversOneCall,
   costEnvelopeGuardPolicy,
   mostOneRunMaySpendMicros,
   type CostEnvelopeGuardInput,
-  type PostgresModelSpendStore,
   type ProviderTargetPrice,
   type RecentRunUsageSource
 } from "@debateai/budget";
@@ -61,6 +64,7 @@ import { composeQuestionLanguage, type QuestionLanguagePaidRoute } from "./quest
 import type { QuestionLanguageChoiceNeeded, QuestionLanguageLock, QuestionLanguagePort } from "./question-language/decider.js";
 import type { QuestionLanguageReferenceKey } from "./question-language/reference.js";
 import { preserveSubmittedTierSource, type AdmissionView, type RunCreationSettings } from "./index.js";
+import { buildApiProviderPriceMap } from "./provider-discovery.js";
 
 /**
  * Side-by-side spec §13 (settings changes without an upload), API points 1-3, and addition D16: THE API's ONE
@@ -123,6 +127,57 @@ export type AdmissionSiteContext = Readonly<{
   /** One content-free line (the picker's MODEL_SCORECARD line, the story's STORY_POLICY_UNREADABLE line). */
   log: (line: string) => void;
 }>;
+
+/**
+ * Side-by-side spec §13 (S14) — THE SITE CONTEXT, BUILT ONE WAY. apps/api/src/main.ts (inside its "admission-site" boot
+ * stage), the preview practice's ask (tools/preview-practice/practice-ask-composition.ts) and `check-version`'s API half
+ * (./settings-check.ts) all build `AdmissionSiteContext` here, from the site facts each read the same way (the declared
+ * targets, the site's costEnvelopePolicy row, billing on or off, whether the room is built) and the parts each reaches
+ * differently (the question-language route: main.ts's guarded fetch or hosted route, the practice's forwarded socket,
+ * the check's route that can never call; the practice's forwarded "what is left" answer). What it derives is derived
+ * here only: the preview's gate part and the env's line-up (addition D14-D16), the band of the site's row (budget spec
+ * §2.4), the targets' prices, and which store the version's money uses — V-28(2)'s daily guard store only WITHOUT the
+ * room (hosted), B6b's recent runs only WITH it: the room decides an ask instead of the guard, never both. Nothing here
+ * reads or writes: the two stores only hold the pool.
+ */
+export function buildAdmissionSiteContext(input: Readonly<{
+  pool: Pool;
+  environment: Readonly<{
+    REGISTER_VERSION: number;
+    DEPLOYMENT_MODE: DeploymentMode;
+    PREVIEW_GATE_SETTINGS: PreviewGateSettings | undefined;
+    PREVIEW_ENV_LINE_UP?: PreviewLineUp | null | undefined;
+  }>;
+  declaredProviderTargets: readonly ProviderDiscoveryTarget[];
+  /** Hosted only (null in local mode): the site version's costEnvelopePolicy row. */
+  siteCostEnvelopePolicy: CostEnvelopePolicy | null;
+  /** B6b: the room is built (hosted, the site's row carries the band). */
+  askRoom: boolean;
+  billingEnabled: boolean;
+  questionLanguage: AdmissionSiteContext["questionLanguage"];
+  previewRemaining?: AdmissionSiteContext["previewRemaining"];
+  log: (line: string) => void;
+}>): AdmissionSiteContext {
+  const { pool, environment, declaredProviderTargets, siteCostEnvelopePolicy } = input;
+  // Addition D14 / ruling R25: "is this the preview?" keys on the env's gate part, present for every accepted form.
+  const previewGate = environment.PREVIEW_GATE_SETTINGS;
+  return Object.freeze({
+    siteVersion: environment.REGISTER_VERSION,
+    deploymentMode: environment.DEPLOYMENT_MODE,
+    preview: previewGate === undefined ? undefined : { gate: previewGate, envLineUp: environment.PREVIEW_ENV_LINE_UP ?? null },
+    declaredProviderTargets,
+    siteCostEnvelope: siteCostEnvelopePolicy === null ? null
+      : { runPolicy: siteCostEnvelopePolicy, band: costEnvelopeBand(siteCostEnvelopePolicy) },
+    billingEnabled: input.billingEnabled,
+    // V-28(2): the daily guard's store only without the room (hosted); with it the room decides instead, never both.
+    spend: siteCostEnvelopePolicy === null || input.askRoom ? null : new PostgresModelSpendStore(pool),
+    recentRunUsage: input.askRoom ? new PostgresRecentRunUsageSource(pool) : null,
+    prices: buildApiProviderPriceMap(declaredProviderTargets, environment.DEPLOYMENT_MODE),
+    questionLanguage: input.questionLanguage,
+    ...(input.previewRemaining === undefined ? {} : { previewRemaining: input.previewRemaining }),
+    log: input.log
+  });
+}
 
 /** The members of `RunCreationSettings` a settings version decides (side-by-side spec §13; addition D16). */
 export type AdmissionRunMembers = Pick<RunCreationSettings, "registerVersion" | "previewProviderTestConfig" | "previewBudgetGate"

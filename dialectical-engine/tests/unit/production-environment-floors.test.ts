@@ -233,7 +233,11 @@ describe("production provider targets refuse cleartext off-box (L4-F7)", () => {
    * hosted arm (`assertHostedProviderTargets`) adds its own stricter refusals.
    */
   it("is applied where both process roots parse their targets, through the mode", async () => {
-    for (const path of ["../../apps/api/src/main.ts", "../../apps/runner/src/main.ts"]) {
+    // Side-by-side spec §13 (S14): the runner root parses its targets through its site reads (readRunnerSiteContext in
+    // run-settings.ts, shared with the practice and check-version), which main.ts calls.
+    expect(await readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8"))
+      .toContain("await readRunnerSiteContext({ pool, environment, moneyInFlight })");
+    for (const path of ["../../apps/api/src/main.ts", "../../apps/runner/src/run-settings.ts"]) {
       const source = await readFile(new URL(path, import.meta.url), "utf8");
       expect(source).toContain("assertDeploymentProviderTargets(");
       expect(source).toContain("environment.NODE_ENV");

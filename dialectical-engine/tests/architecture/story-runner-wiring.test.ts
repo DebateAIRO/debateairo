@@ -154,7 +154,9 @@ describe("verdict story — wired into the shipped runner, after settle, never i
     // Any boot failure to load the pack — a broken rule, an unresolvable
     // directory, a raw file-system or URL error — becomes a refusal value, never
     // a thrown boot error: the story can never stop the runner from starting.
-    const load = main.slice(main.indexOf("let storyPack:"), main.indexOf("const deploymentMakers"));
+    // Side-by-side spec §13 (S14): the pack's block is followed by the two in-flight counters (the site reads moved out).
+    const load = main.slice(main.indexOf("let storyPack:"), main.indexOf("const gatewayInFlight = createRunInFlight();"));
+    expect(load.length).toBeGreaterThan(0);
     expect(load).toMatch(/try \{\s*storyPack = loadStoryPack\(resolveStoryPackDir\(\{/u);
     expect(load).toContain("} catch (error) {");
     expect(load).not.toMatch(/\bthrow\b/u);

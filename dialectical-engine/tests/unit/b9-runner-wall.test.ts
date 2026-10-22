@@ -88,27 +88,49 @@ describe("B9b · which calls the shared wall measures", () => {
 });
 
 describe("B9b · the shipped runner builds the wall from exactly what A20 allows it to read", () => {
+  /**
+   * Side-by-side spec §13 (S14): the wall is built by the runner's site reads (`readRunnerSiteContext`,
+   * apps/runner/src/run-settings.ts), the one function main.ts, the preview practice and check-version's runner half
+   * share; main.ts calls it with its money in-flight counter. The pins below read that function's body.
+   */
+  const siteReads = async (): Promise<string> => {
+    const loader = await readFile(new URL("../../apps/runner/src/run-settings.ts", import.meta.url), "utf8");
+    const start = loader.indexOf("export async function readRunnerSiteContext(");
+    const end = loader.indexOf("export async function declaredContractHashRefusals(");
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    return loader.slice(start, end);
+  };
+  const mainSource = () => readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8");
+
   it("reads the costEnvelopePolicy band and the billingPlans row and the owner's windows, never billingPolicy", async () => {
-    const main = await readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8");
+    const main = await mainSource();
+    const site = await siteReads();
+    expect(main).toContain("const { site: runnerSite } = await readRunnerSiteContext({ pool, environment, moneyInFlight });");
     // The band's one reader (B1), never the members re-derived here. The band switches only the site-day half.
-    expect(main).toContain("const envelopeBand = costEnvelopePolicy === null ? null : costEnvelopeBand(costEnvelopePolicy);");
-    expect(main).toContain("finishBasisPoints: envelopeBand === null ? null : envelopeBand.finishBasisPoints");
-    expect(main).toContain("closeBasisPoints: envelopeBand === null ? 10_000 : envelopeBand.closeBasisPoints");
+    expect(site).toContain("const envelopeBand = costEnvelopePolicy === null ? null : costEnvelopeBand(costEnvelopePolicy);");
+    expect(site).toContain("finishBasisPoints: envelopeBand === null ? null : envelopeBand.finishBasisPoints");
+    expect(site).toContain("closeBasisPoints: envelopeBand === null ? 10_000 : envelopeBand.closeBasisPoints");
     // The plans are read whenever hosted, band or no band, so the person half never depends on the band (R-19).
-    expect(main).toContain("const billingPlans = costEnvelopePolicy === null ? null : await readBillingPlans(pool, environment.REGISTER_VERSION)");
-    expect(main).toContain("owners: modelSpendStore");
-    expect(main).not.toContain("readBillingPolicy");
-    expect(main).not.toContain("assertBillingReady");
-    // No SQL of its own over billing's schema: the owner comes through the spend store.
-    expect(main).not.toMatch(/(?:FROM|JOIN|INTO|UPDATE)\s+billing\./iu);
+    expect(site).toContain("const billingPlans = costEnvelopePolicy === null ? null : await readBillingPlans(pool, environment.REGISTER_VERSION)");
+    expect(site).toContain("owners: modelSpendStore");
+    for (const source of [main, site]) {
+      expect(source).not.toContain("readBillingPolicy");
+      expect(source).not.toContain("assertBillingReady");
+      // No SQL of its own over billing's schema: the owner comes through the spend store.
+      expect(source).not.toMatch(/(?:FROM|JOIN|INTO|UPDATE)\s+billing\./iu);
+    }
   });
 
   it("hands the guard the wall it built, so a hosted run is walled mid-run and not only by its own ceiling", async () => {
-    const main = await readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8");
-    // Side-by-side spec §13 (S6): main.ts hands its one store and its one wall to every version's guard through the
-    // site's money; the loader builds each guard over them (the same cut tests/unit/m7-story-margin.test.ts makes).
+    const main = await mainSource();
+    const site = await siteReads();
+    // Side-by-side spec §13 (S6): the site's money hands its one store and its one wall to every version's guard; the
+    // loader builds each guard over them (the same cut tests/unit/m7-story-margin.test.ts makes). S14: that money is
+    // built by the site reads, never by main.ts itself.
     expect(main).not.toContain("new CostEnvelopeGuard(");
-    const money = main.slice(main.indexOf("money: costEnvelopePolicy === null ? null : Object.freeze({"), main.indexOf("const runnerSettings = "));
+    expect(main).not.toContain("new PostgresModelSpendStore(");
+    const money = site.slice(site.indexOf("money: costEnvelopePolicy === null ? null : Object.freeze({"), site.indexOf("return Object.freeze({\n    site: runnerSite,"));
     expect(money).toContain("store: modelSpendStore,");
     expect(money).toContain("...(sharedWallTerms === null ? {} : { sharedWall: sharedWallTerms })");
     const loader = await readFile(new URL("../../apps/runner/src/run-settings.ts", import.meta.url), "utf8");
@@ -118,27 +140,31 @@ describe("B9b · the shipped runner builds the wall from exactly what A20 allows
     expect(guard).toContain("...(money.sharedWall === undefined ? {} : { sharedWall: money.sharedWall })");
     expect(guard).toContain("inFlight: money.inFlight");
     // The wall is built whenever hosted: its switch is the policy row, never the band.
-    expect(main).toContain("const sharedWallTerms = costEnvelopePolicy === null");
-    expect(main).not.toContain("const sharedWallTerms = envelopeBand === null");
+    expect(site).toContain("const sharedWallTerms = costEnvelopePolicy === null");
+    expect(site).not.toContain("const sharedWallTerms = envelopeBand === null");
   });
 
   it("fails the person wall closed when the register version sealed no billingPlans, and says so once at boot", async () => {
-    const main = await readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8");
-    expect(main).toContain("? plansUnresolvedPersonAllowance()");
-    expect(main).toContain("if (costEnvelopePolicy !== null && billingPlans === null) {");
-    expect(main).toContain('console.warn(JSON.stringify({ kind: "DEBATEAI_PERSON_WALL", event: "PLANS_UNRESOLVED" }));');
+    const site = await siteReads();
+    expect(site).toContain("? plansUnresolvedPersonAllowance()");
+    expect(site).toContain("if (costEnvelopePolicy !== null && billingPlans === null) {");
+    expect(site).toContain('console.warn(JSON.stringify({ kind: "DEBATEAI_PERSON_WALL", event: "PLANS_UNRESOLVED" }));');
     // The open source (no person windows at all) is never what a missing plans row falls back to.
-    expect(main).not.toContain("NO_PERSON_ALLOWANCE");
+    expect(site).not.toContain("NO_PERSON_ALLOWANCE");
+    expect(await mainSource()).not.toContain("NO_PERSON_ALLOWANCE");
   });
 
   it("takes the allowance source from billing-core, over the read-only port that never writes (R-1, R-12)", async () => {
-    const main = await readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8");
-    expect(main).toContain('import { BillingPersonAllowanceSource } from "@debateai/billing-core";');
-    expect(main).toContain("new BillingPersonAllowanceSource({");
-    expect(main).toContain("entitlements: new EntitlementRepository(pool).readOnlyPort(),");
+    const loader = await readFile(new URL("../../apps/runner/src/run-settings.ts", import.meta.url), "utf8");
+    const site = await siteReads();
+    expect(loader).toContain('import { BillingPersonAllowanceSource, FundingAwarePersonAllowanceSource } from "@debateai/billing-core";');
+    expect(site).toContain("new BillingPersonAllowanceSource({");
+    expect(site).toContain("entitlements: new EntitlementRepository(pool).readOnlyPort(),");
     // The full repository (whose `current` lazily appends a Free sign-up) is never handed to the runner's source.
-    expect(main).not.toMatch(/entitlements:\s*new EntitlementRepository\(pool\)\s*[,}]/u);
-    expect(main).not.toMatch(/import\s*\{[^}]*BillingPersonAllowanceSource[^}]*\}\s*from\s*"@debateai\/db"/u);
+    expect(site).not.toMatch(/entitlements:\s*new EntitlementRepository\(pool\)\s*[,}]/u);
+    for (const source of [loader, await mainSource()]) {
+      expect(source).not.toMatch(/import\s*\{[^}]*BillingPersonAllowanceSource[^}]*\}\s*from\s*"@debateai\/db"/u);
+    }
     const manifest = JSON.parse(await readFile(new URL("../../apps/runner/package.json", import.meta.url), "utf8")) as {
       dependencies: Record<string, string>;
     };

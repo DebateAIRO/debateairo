@@ -591,9 +591,15 @@ describe("the runner's wiring (source pins)", () => {
     // Ruling R31: on the preview only, every lane call waits on the busy coordinator before it asks for a slot.
     expect(MAIN).toContain("...(previewGate === undefined ? {} : { callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model) }),");
     expect(MAIN).toContain("inFlight: gatewayInFlight");
-    // Side-by-side spec §13 (S6): the money counter is the one every version's guard shares, in the site's money.
-    expect(MAIN).toContain("money: costEnvelopePolicy === null ? null : Object.freeze({\n    store: modelSpendStore,\n    inFlight: moneyInFlight,");
-    expect(MAIN.match(/inFlight: moneyInFlight/gu) ?? []).toHaveLength(1);
+    // Side-by-side spec §13 (S6): the money counter is the one every version's guard shares, in the site's money. S14:
+    // main.ts creates it and hands it to the site reads it shares with the practice and check-version
+    // (readRunnerSiteContext), which put it in the site's money, once; the gateway's counter never goes there.
+    expect(MAIN).toContain("const { site: runnerSite } = await readRunnerSiteContext({ pool, environment, moneyInFlight });");
+    expect(MAIN.match(/\bmoneyInFlight\b/gu) ?? []).toHaveLength(2);
+    const SITE_READS = read("apps/runner/src/run-settings.ts");
+    expect(SITE_READS).toContain("money: costEnvelopePolicy === null ? null : Object.freeze({\n      store: modelSpendStore,\n      inFlight: moneyInFlight,");
+    expect(SITE_READS.match(/inFlight: moneyInFlight/gu) ?? []).toHaveLength(1);
+    expect(SITE_READS).not.toContain("gatewayInFlight");
     expect(MAIN).toContain("createPool(environment.DATABASE_URL, RUNNER_DATABASE_POOLS.keepAlive)");
   });
 });

@@ -542,14 +542,16 @@ export async function resolve(specifier, context, nextResolve) {
       // Debate shape (2026-10-12, Phase 2a Task 9) added \`readDebateShapePolicy\` and the runner's boot guard on the optional row;
       // Phase 2b replaced the guard with \`readMapContractHash\` (the boot resolves the shape settings, apps/runner/src/debate-shape-boot.ts).
       // Side-by-side spec §13 moved every per-version read (the story rows, the scorecard and engine version, the run
-      // ceiling's \`costEnvelopeCeilings\`, the shape) into apps/runner/src/run-settings.ts, stubbed below, so this stub
-      // carries exactly the seven names main.ts still imports from @debateai/register.
-      "@debateai/register": "export function loadRunnerEnvironment() {} export function assertHostedCostEnvelopesSealed() {} export function readCostEnvelopePolicy() {} export function costEnvelopeBand() {} export function readBillingPlans() {} export function readCallConcurrencyPolicy() {} export function effectiveCallConcurrency() {}",
-      "./index.js": "export function createPostgresProviderGateway() {} export function declareHatchetWalkingSkeletonTask() {} export class WalkingSkeletonRunner {}",
+      // ceiling's \`costEnvelopeCeilings\`, the shape) into apps/runner/src/run-settings.ts, stubbed below; and S14 moved
+      // the site reads (the site's money row, its band, billingPlans) there too, so this stub carries exactly the four
+      // names main.ts still imports from @debateai/register.
+      "@debateai/register": "export function loadRunnerEnvironment() {} export function assertHostedCostEnvelopesSealed() {} export function readCallConcurrencyPolicy() {} export function effectiveCallConcurrency() {}",
+      // main.ts's ./index.js line (the money rule's price map and its two content-free log lines included).
+      "./index.js": "export function buildProviderPriceMap() {} export function createPostgresProviderGateway() {} export function declareHatchetWalkingSkeletonTask() {} export function logBodyCostFallback() {} export function logServeDisclosure() {} export class WalkingSkeletonRunner {}",
       // Side-by-side spec §13 moved the per-version reads (policy, story, shape, engine, scorecard) behind the one
       // settings loader: main.ts imports these three from it, and (S6) the run → version map and each run's own
-      // version's money guard.
-      "./run-settings.js": "export function createRunnerSettingsCache() {} export function loadRunnerVersionSettings() {} export function runnerSettingsOfVersion() {} export function createRunSettingsVersions() {} export function runCostEnvelopeGuardOf() {}",
+      // version's money guard; S8 the boot preload and its line; SA5 the per-run thinking table; S14 the site reads.
+      "./run-settings.js": "export function createRunnerSettingsCache() {} export function loadRunnerVersionSettings() {} export function runnerSettingsOfVersion() {} export function createRunSettingsVersions() {} export function runCostEnvelopeGuardOf() {} export function preloadRunnerSettings() {} export function runnerSettingsLine() {} export function runPreviewThinkingLevelsOf() {} export function readRunnerSiteContext() {}",
     };
     if (Object.hasOwn(stubs, specifier)) {
       return { url: "data:text/javascript," + encodeURIComponent(stubs[specifier]), shortCircuit: true };

@@ -660,6 +660,14 @@
           "condition": "package script billing:check"
         },
         {
+          "component": "apps/api:settings-check-cli",
+          "sourceFile": "apps/api/src/settings-check-cli.ts",
+          "environmentKey": "DATABASE_URL",
+          "purpose": "SETTINGS_CHECK_OPERATOR_COMMAND",
+          "binding": "WIRED",
+          "condition": "package script settings:check-api"
+        },
+        {
           "component": "apps/api:billing-renewal-resume-cli",
           "sourceFile": "apps/api/src/billing/renewal-resume-cli.ts",
           "environmentKey": "DATABASE_URL",
@@ -1083,6 +1091,14 @@
           "purpose": "SERVE_DISCLOSURE_OPERATOR_REPORT",
           "binding": "WIRED",
           "condition": "package script ops:serve-disclosure"
+        },
+        {
+          "component": "apps/runner:settings-check-cli",
+          "sourceFile": "apps/runner/src/settings-check-cli.ts",
+          "environmentKey": "DATABASE_URL",
+          "purpose": "SETTINGS_CHECK_OPERATOR_COMMAND",
+          "binding": "WIRED",
+          "condition": "package script settings:check-runner"
         }
       ]
     },

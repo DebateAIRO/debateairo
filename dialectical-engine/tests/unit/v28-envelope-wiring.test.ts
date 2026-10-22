@@ -114,8 +114,11 @@ describe("V-28 both shipped roots carry the envelopes", () => {
     const loader = await readFile(new URL("../../apps/runner/src/run-settings.ts", import.meta.url), "utf8");
     expect(loader).toContain("new CostEnvelopeGuard({");
     expect(source).toContain("const runCostEnvelopeGuard = runCostEnvelopeGuardOf(runnerSettings, runSettingsVersions);");
-    expect(source).toContain("new PostgresModelSpendStore(pool)");
-    expect(source).toContain("readCostEnvelopePolicy");
+    // S14: the spend store and the site's money row are main.ts's site reads (readRunnerSiteContext), which it calls.
+    expect(source).toContain("await readRunnerSiteContext({ pool, environment, moneyInFlight })");
+    const siteReads = loader.slice(loader.indexOf("export async function readRunnerSiteContext("), loader.indexOf("export async function declaredContractHashRefusals("));
+    expect(siteReads).toContain("new PostgresModelSpendStore(pool)");
+    expect(siteReads).toContain("readCostEnvelopePolicy");
     // Wired per target, because the price is the target's.
     expect(source).toContain("runCostEnvelopeGuard(runId).providerSeam(");
     expect(source).toContain("providerTargetPrice(");

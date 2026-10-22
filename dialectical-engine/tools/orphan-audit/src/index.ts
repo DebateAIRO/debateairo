@@ -917,6 +917,9 @@ export async function auditOrphans(): Promise<{
       "apps/api:GET /v1/session",
       "apps/api:GET /v1/runs/:id/events",
       "apps/runner:Hatchet walking-skeleton task",
+      // Side-by-side spec §13 (S14): check-version's two halves, operator commands run from a release's own folders.
+      "apps/runner:settings:check-runner (check-version, the runner half)",
+      "apps/api:settings:check-api (check-version, the API half)",
       "apps/scheduler:job:replay-self-test",
       "apps/scheduler:job:liveness-sweep",
       "apps/scheduler:job:reaper (stub; invocation throws SCAFFOLD_ONLY)",

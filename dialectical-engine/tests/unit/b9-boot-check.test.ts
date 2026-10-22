@@ -248,11 +248,17 @@ describe("B9d · both hosted boots run the check, under the new settings only", 
     expect(loader).toContain("questionLanguageLocked: debateShape !== null");
     expect(loader.indexOf("questionLanguageLocked: debateShape !== null")).toBeGreaterThan(loader.indexOf("const debateShape = await readDebateShapeRunnerSettings("));
     expect(loader.indexOf("const debateShape = await readDebateShapeRunnerSettings(")).toBeGreaterThan(-1);
-    // main.ts hands the loader the site's row and band (read before it), and no longer runs the check inline.
-    expect(main).toContain("siteCostEnvelopePolicy: costEnvelopePolicy,");
+    // main.ts hands the loader the site's row and band, read before it by the site reads main.ts shares with the
+    // practice and check-version (side-by-side spec §13, S14: readRunnerSiteContext), and no longer runs the check inline.
+    expect(loader).toContain("siteCostEnvelopePolicy: costEnvelopePolicy,");
+    const siteReads = loader.indexOf("const envelopeBand = costEnvelopePolicy === null ? null : costEnvelopeBand(costEnvelopePolicy);");
+    expect(siteReads).toBeGreaterThan(loader.indexOf("export async function readRunnerSiteContext("));
+    expect(siteReads).toBeLessThan(loader.indexOf("const runnerSite: RunnerSiteContext = Object.freeze({"));
     expect(main).not.toContain("assertRunCeilingCoversOneCall(");
+    const siteRead = main.indexOf("const { site: runnerSite } = await readRunnerSiteContext({ pool, environment, moneyInFlight });");
+    expect(siteRead).toBeGreaterThan(-1);
     expect(main.indexOf("const siteVersionSettings = await runnerSettings.requireSettings(environment.REGISTER_VERSION);"))
-      .toBeGreaterThan(main.indexOf("const envelopeBand = costEnvelopePolicy === null ? null : costEnvelopeBand(costEnvelopePolicy);"));
+      .toBeGreaterThan(siteRead);
   });
 
   it("the API, after its provider targets are read, over the policy row its boot already read, one group per plan", async () => {

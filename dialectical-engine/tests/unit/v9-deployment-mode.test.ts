@@ -472,7 +472,11 @@ describe("V-28 seam: hosted refuses unless the cost envelopes are sealed (task 1
 
 describe("V-9 both shipped roots take the mode decision (task 10a)", () => {
   it("runs the mode-aware target assertion in the API and the runner", async () => {
-    for (const path of ["../../apps/api/src/main.ts", "../../apps/runner/src/main.ts"]) {
+    // Side-by-side spec §13 (S14): the runner's is in its site reads (readRunnerSiteContext, run-settings.ts), which
+    // main.ts calls.
+    expect(await readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8"))
+      .toContain("await readRunnerSiteContext({ pool, environment, moneyInFlight })");
+    for (const path of ["../../apps/api/src/main.ts", "../../apps/runner/src/run-settings.ts"]) {
       const source = await readFile(new URL(path, import.meta.url), "utf8");
       expect(source).toContain("assertDeploymentProviderTargets(");
       expect(source).toContain("environment.DEPLOYMENT_MODE");

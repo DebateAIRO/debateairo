@@ -591,11 +591,20 @@ describe("V-9 the header-line rule cannot drift between its two homes", () => {
 
 describe("V-9 both roots resolve credentials AFTER the mode decision (task 10b)", () => {
   it("asserts the declared targets first, then resolves their files under custody", async () => {
-    for (const path of ["../../apps/api/src/main.ts", "../../apps/runner/src/main.ts"]) {
+    // Side-by-side spec §13 (S14): the runner asserts its declared targets in its site reads (readRunnerSiteContext,
+    // run-settings.ts, which resolves no credential), called by main.ts before it resolves the files.
+    const siteReads = await readFile(new URL("../../apps/runner/src/run-settings.ts", import.meta.url), "utf8");
+    expect(siteReads).toContain("assertDeploymentProviderTargets(");
+    expect(siteReads).not.toContain("resolveProviderTargetCredentials(");
+    for (const [path, assertion] of [
+      ["../../apps/api/src/main.ts", "assertDeploymentProviderTargets("],
+      ["../../apps/runner/src/main.ts", "await readRunnerSiteContext("]
+    ] as const) {
       const source = await readFile(new URL(path, import.meta.url), "utf8");
       expect(source).toContain("resolveProviderTargetCredentials(");
       expect(source).toContain("readCustodyAuthorizationHeader");
-      expect(source.indexOf("assertDeploymentProviderTargets("))
+      expect(source.indexOf(assertion), path).toBeGreaterThan(-1);
+      expect(source.indexOf(assertion))
         .toBeLessThan(source.indexOf("resolveProviderTargetCredentials("));
     }
   });

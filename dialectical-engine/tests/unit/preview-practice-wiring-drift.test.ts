@@ -237,19 +237,24 @@ describe("the practice runs the shipped composition (drift guard)", () => {
 
   it("both compositions hand the loader the same site context (addition D14-D16), and the practice keys on the gate part", () => {
     const preview = "preview: previewGate === undefined ? undefined : { gate: previewGate, envLineUp: environment.PREVIEW_ENV_LINE_UP ?? null },";
-    const shipped = objectAfter(RUNNER_MAIN, "const runnerSite: RunnerSiteContext = Object.freeze(");
-    const practice = objectAfter(PRACTICE_RUNNER, "const runnerSite: RunnerSiteContext = Object.freeze(");
+    // Side-by-side spec §13 (S14): both read their site through the ONE function check-version's runner half reads it
+    // with (readRunnerSiteContext, run-settings.ts), each handing it its own money in-flight counter; the literal lives
+    // there once, so the two cannot drift apart.
+    const siteLiteral = objectAfter(RUN_SETTINGS, "const runnerSite: RunnerSiteContext = Object.freeze(");
     // Side-by-side spec §13 (S6): and the claim time, the makers' refs and the money every version's guard shares.
-    expect([...shipped].sort()).toEqual(["claim", "configuredMakerRefs", "declaredProviderTargets", "deploymentMode",
+    expect([...siteLiteral].sort()).toEqual(["claim", "configuredMakerRefs", "declaredProviderTargets", "deploymentMode",
       "envelopeBand", "money", "preview", "siteCostEnvelopePolicy", "siteVersion"]);
-    expect([...practice].sort()).toEqual([...shipped].sort());
+    const site = flat(RUN_SETTINGS);
+    expect(site).toContain("const previewGate = environment.PREVIEW_GATE_SETTINGS;");
+    expect(site).toContain(preview);
+    expect(site).toContain("siteVersion: environment.REGISTER_VERSION,");
+    expect(site).toContain("siteCostEnvelopePolicy: costEnvelopePolicy,");
+    expect(site).toContain("claim: { claimMs: environment.CLAIM_MS, claimMarginMs: environment.CLAIM_MARGIN_MS },");
+    expect(site).toContain("configuredMakerRefs: runnerConfiguredMakerRefs(declaredProviderTargets),");
     for (const source of [RUNNER_MAIN, PRACTICE_RUNNER]) {
       const code = flat(source);
-      expect(code).toContain(preview);
-      expect(code).toContain("siteVersion: environment.REGISTER_VERSION,");
-      expect(code).toContain("siteCostEnvelopePolicy: costEnvelopePolicy,");
-      expect(code).toContain("claim: { claimMs: environment.CLAIM_MS, claimMarginMs: environment.CLAIM_MARGIN_MS },");
-      expect(code).toContain("configuredMakerRefs: runnerConfiguredMakerRefs(declaredProviderTargets),");
+      expect(code).toMatch(/const \{ site: runnerSite(?:, configuredProviders, billingPlansSealed)? \} = await readRunnerSiteContext\(\{ pool, environment, moneyInFlight \}\);/u);
+      expect(code).not.toContain("const runnerSite: RunnerSiteContext = Object.freeze(");
       expect(code).toContain("const siteVersionSettings = await runnerSettings.requireSettings(environment.REGISTER_VERSION);");
     }
     const practiceCode = withoutComments(PRACTICE_RUNNER);
@@ -261,10 +266,14 @@ describe("the practice runs the shipped composition (drift guard)", () => {
   it("hosted (2026-10-14): the runner's money wiring is main.ts's, statement for statement", () => {
     const shipped = flat(RUNNER_MAIN);
     const practice = flat(PRACTICE_RUNNER);
+    // Side-by-side spec §13 (S14): the site's money (its row, band, plans, funding, wall and the money every version's
+    // guard shares) is built by the ONE site-reads function both compositions call (readRunnerSiteContext), never by
+    // either of them; each creates its two in-flight counters and hands it the money one.
+    const siteReads = flat(RUN_SETTINGS.slice(RUN_SETTINGS.indexOf("export async function readRunnerSiteContext("),
+      RUN_SETTINGS.indexOf("export async function declaredContractHashRefusals(")));
     for (const statement of [
-      "assertHostedCostEnvelopesSealed(environment.DEPLOYMENT_MODE);",
       "const costEnvelopePolicy = environment.DEPLOYMENT_MODE === \"hosted\" ? await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION) : null;",
-      "const moneyInFlight = createRunInFlight();",
+      "const modelSpendStore = new PostgresModelSpendStore(pool);",
       "const envelopeBand = costEnvelopePolicy === null ? null : costEnvelopeBand(costEnvelopePolicy);",
       "const billingPlans = costEnvelopePolicy === null ? null : await readBillingPlans(pool, environment.REGISTER_VERSION);",
       // Side-by-side spec §9: the funding repository holds no register version (a grant lives under its own).
@@ -272,10 +281,20 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       // Side-by-side spec §9: no funding read and no funding refusal at boot; the funding source is built whenever plans are.
       "const fundingAllowance = billingPlans === null ? undefined : new FundingAwarePersonAllowanceSource({ allowances,entitlements:{...fundingEntitlements.readOnlyPort(),readRunFundingBasis:(runId)=>fundingEntitlements.readRunFundingBasis(runId)}, plans:billingPlans,closeBasisPoints:envelopeBand?.closeBasisPoints ?? 10000 });",
       "finishBasisPoints: envelopeBand === null ? null : envelopeBand.finishBasisPoints, persons: billingPlans === null ? plansUnresolvedPersonAllowance() : fundingAllowance ?? new BillingPersonAllowanceSource({ entitlements: new EntitlementRepository(pool).readOnlyPort(), plans: billingPlans, closeBasisPoints: envelopeBand === null ? 10_000 : envelopeBand.closeBasisPoints }), owners: modelSpendStore",
-      // Side-by-side spec §13 (S6): the money every version's guard shares (RunnerSiteContext.money), the run → version
-      // map, and each call's own run's version's guard; a story seam whenever hosted (a version without a story
-      // ceiling refuses inside its guard, STORY_ENVELOPE_MISSING).
-      "store: modelSpendStore, inFlight: moneyInFlight, ...(sharedWallTerms === null ? {} : { sharedWall: sharedWallTerms }), ...(fundingAllowance === undefined ? {} : { fundingAdmission: fundingAllowance })",
+      // Side-by-side spec §13 (S6): the money every version's guard shares (RunnerSiteContext.money): local mode none.
+      "money: costEnvelopePolicy === null ? null : Object.freeze({ store: modelSpendStore, inFlight: moneyInFlight, ...(sharedWallTerms === null ? {} : { sharedWall: sharedWallTerms }), ...(fundingAllowance === undefined ? {} : { fundingAdmission: fundingAllowance }) })"
+    ]) {
+      expect(siteReads, statement).toContain(statement);
+      expect(shipped, statement).not.toContain(statement);
+      expect(practice, statement).not.toContain(statement);
+    }
+    for (const statement of [
+      "assertHostedCostEnvelopesSealed(environment.DEPLOYMENT_MODE);",
+      "const gatewayInFlight = createRunInFlight();",
+      "const moneyInFlight = createRunInFlight();",
+      "await readRunnerSiteContext({ pool, environment, moneyInFlight });",
+      // Side-by-side spec §13 (S6): the run → version map, and each call's own run's version's guard; a story seam
+      // whenever hosted (a version without a story ceiling refuses inside its guard, STORY_ENVELOPE_MISSING).
       "const runSettingsVersions = createRunSettingsVersions();",
       "const runCostEnvelopeGuard = runCostEnvelopeGuardOf(runnerSettings, runSettingsVersions);",
       "if (runnerSite.money !== null && price === null) { throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`); }",
@@ -293,6 +312,7 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       "costEnvelopeGuard."]) {
       expect(shipped, gone).not.toContain(gone);
       expect(practice, gone).not.toContain(gone);
+      expect(siteReads, gone).not.toContain(gone);
     }
     // Side-by-side spec §13: B9's run ceiling against one call is the version's, checked by the one loader both
     // compositions boot through (over the version's per-run ceiling and the site's day and band), never inline.
@@ -307,9 +327,11 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       // Side-by-side spec §13 (S6): each version's guard, over the site's one store, counter and wall.
       "store: money.store, policy: costEnvelopeGuardPolicy(debateEnvelope, storyPolicy), ...(money.sharedWall === undefined ? {} : { sharedWall: money.sharedWall }), ...(money.fundingAdmission === undefined ? {} : { fundingAdmission: money.fundingAdmission }), inFlight: money.inFlight"
     ]) expect(loader, statement).toContain(statement);
-    // The local-only refusal is gone; local mode builds no guard (composePracticeRunnerMoney returns null there).
+    // The local-only refusal is gone; local mode builds no guard: the site reads give it no money (S14: the practice's
+    // own money composition is gone, it reads the site as main.ts does).
     expect(practice).not.toContain("PRACTICE_REQUIRES_LOCAL_MODE");
-    expect(practice).toContain("if (environment.DEPLOYMENT_MODE !== \"hosted\") return null;");
+    expect(practice).not.toContain("composePracticeRunnerMoney");
+    expect(siteReads).toContain("const costEnvelopePolicy = environment.DEPLOYMENT_MODE === \"hosted\"");
   });
 
   it("hosted (2026-10-14): the ask's money stages are main.ts's, and the room gets main.ts's options but the funding", () => {
@@ -327,9 +349,8 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       "estimatorFor: async (version) => (await admissionCache.admissionSettingsFor(version)).estimator!,",
       "closeBasisPoints: band.closeBasisPoints, waitingLinePerPerson: band.waitingLinePerPerson",
       "...(askRoom === undefined ? {} : { room: askRoom, waitingLine: askRoom }),",
-      "preview: previewGate === undefined ? undefined : { gate: previewGate, envLineUp: environment.PREVIEW_ENV_LINE_UP ?? null },",
-      "siteVersion: environment.REGISTER_VERSION,",
-      "prices: buildApiProviderPriceMap(declaredProviderTargets, environment.DEPLOYMENT_MODE),",
+      // Side-by-side spec §13 (S14): both build the site context with the one builder check-version's API half uses.
+      "buildAdmissionSiteContext({ pool, environment, declaredProviderTargets,",
       "const admissionCache = createAdmissionSettingsCache({ load: (version) => loadAdmissionSettings(pool, version, admissionSite), seed: siteAdmission });",
       "createActiveSettingsVersionReader({ pool, siteVersion: environment.REGISTER_VERSION,",
       "if (estimator === null) throw new TypeError(\"ASK_ROOM_ESTIMATOR_REQUIRED\");"
@@ -347,6 +368,10 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     }
     const loader = flat(ADMISSION);
     for (const statement of [
+      // S14: what the site builder derives, once, for main.ts, the practice and the check.
+      "preview: previewGate === undefined ? undefined : { gate: previewGate, envLineUp: environment.PREVIEW_ENV_LINE_UP ?? null },",
+      "siteVersion: environment.REGISTER_VERSION,",
+      "prices: buildApiProviderPriceMap(declaredProviderTargets, environment.DEPLOYMENT_MODE),",
       "const runPolicy = composeDebateCostEnvelope(siteEnvelope.runPolicy, await readers.readCostEnvelopePolicy(pool, version));",
       "const guardPolicy = costEnvelopeGuardPolicy(runPolicy, storyPolicy);",
       "dailyGuard: site.spend === null ? null : new CostEnvelopeGuard({ store: site.spend, policy: guardPolicy }),",
@@ -356,12 +381,16 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       "bodyCeilingMicros: costEnvelopeCeilings(costEnvelope.runPolicy).bodyMicros,",
       "ownRosterOnly: site.billingEnabled ? [\"free\"] : []"
     ]) expect(loader, statement).toContain(statement);
-    // The two site contexts: the same keys, but the practice's forwarded "what is left" seam (the file's head says why).
-    const shippedSite = objectAfter(API_MAIN, "const admissionSite: AdmissionSiteContext = boot.runSync(\"admission-site\", () => Object.freeze(");
-    const practiceSite = objectAfter(PRACTICE_ASK, "const admissionSite: AdmissionSiteContext = Object.freeze(");
-    expect([...shippedSite].sort()).toEqual(["billingEnabled", "declaredProviderTargets", "deploymentMode", "log", "preview",
-      "prices", "questionLanguage", "recentRunUsage", "siteCostEnvelope", "siteVersion", "spend"]);
+    // The two site contexts, built by the one builder (S14): the same inputs, but the practice's forwarded "what is left"
+    // seam (the file's head says why); the builder's own literal names every member of the context.
+    const shippedSite = objectAfter(API_MAIN, "const admissionSite: AdmissionSiteContext = boot.runSync(\"admission-site\", () => buildAdmissionSiteContext(");
+    const practiceSite = objectAfter(PRACTICE_ASK, "const admissionSite: AdmissionSiteContext = buildAdmissionSiteContext(");
+    expect([...shippedSite].sort()).toEqual(["askRoom", "billingEnabled", "declaredProviderTargets", "environment", "log", "pool",
+      "questionLanguage", "siteCostEnvelopePolicy"]);
     expect([...practiceSite].sort()).toEqual([...shippedSite, "previewRemaining"].sort());
+    const builtSite = objectAfter(ADMISSION, "  const previewGate = environment.PREVIEW_GATE_SETTINGS;\n  return Object.freeze(");
+    expect([...builtSite].sort()).toEqual(["billingEnabled", "declaredProviderTargets", "deploymentMode", "log", "preview",
+      "previewRemaining", "prices", "questionLanguage", "recentRunUsage", "siteCostEnvelope", "siteVersion", "spend"]);
     // Side-by-side spec §9 (C17): neither ask composition reads the funding selection at boot or refuses boot over it.
     // main.ts builds the funding source whenever billing is on; the practice keeps billing off, so it builds none.
     for (const gone of ["allowances.readPolicy()", "The configured funding selection is mismatched", "Internal funding requires hosted billing"]) {
@@ -409,12 +438,13 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       expect(source).toContain("load: (version) => loadRunnerVersionSettings(pool, version, runnerSite");
       expect(source).toContain(boot);
     }
-    // Side-by-side spec §13 (S6): the practice's money takes the site rows only and runs BEFORE the loader (as main.ts
-    // builds its wall before its site context): the loader builds each version's guard over it.
-    expect(practiceRunner).toContain("composePracticeRunnerMoney({ pool, environment, costEnvelopePolicy, envelopeBand, log:");
-    expect(practiceRunner.indexOf("const money = await composePracticeRunnerMoney(")).toBeLessThan(practiceRunner.indexOf(boot));
-    expect(practiceRunner).toContain("money: money === null ? null : money.site");
-    expect(runnerMain.indexOf("const sharedWallTerms = costEnvelopePolicy === null")).toBeLessThan(runnerMain.indexOf(boot));
+    // Side-by-side spec §13 (S6, S14): the site's money (the site rows only) is read BEFORE the loader by the one site
+    // reads both compositions call: the loader builds each version's guard over it.
+    for (const source of [runnerMain, practiceRunner]) {
+      const siteRead = source.indexOf("await readRunnerSiteContext({ pool, environment, moneyInFlight });");
+      expect(siteRead).toBeGreaterThan(-1);
+      expect(siteRead).toBeLessThan(source.indexOf(boot));
+    }
     const apiMain = flat(API_MAIN);
     const practiceAsk = flat(PRACTICE_ASK);
     // Side-by-side spec §13 (S9): the shape, engine and question-language reads are the API's one admission loader's,

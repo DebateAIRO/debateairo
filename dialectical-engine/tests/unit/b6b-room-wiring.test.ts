@@ -45,8 +45,11 @@ describe("B6b the API root composes the room", () => {
     expect(composition).toContain("const estimator = siteAdmission.estimator;");
     // The estimator is each version's (the loader's), over the site's prices and recent runs, capped at what one run of
     // that version may spend; the room is handed the site version's and every version's by `estimatorFor`.
-    expect(main).toContain("prices: buildApiProviderPriceMap(declaredProviderTargets, environment.DEPLOYMENT_MODE),");
-    expect(main).toContain("recentRunUsage: askRoomReadiness === undefined ? null : new PostgresRecentRunUsageSource(pool),");
+    // Side-by-side spec §13 (S14): the site context is built by the one builder main.ts, the practice and check-version
+    // share (buildAdmissionSiteContext); main.ts tells it the room is built exactly when the room's readiness answered.
+    expect(main).toContain("askRoom: askRoomReadiness !== undefined,");
+    expect(loader).toContain("prices: buildApiProviderPriceMap(declaredProviderTargets, environment.DEPLOYMENT_MODE),");
+    expect(loader).toContain("recentRunUsage: input.askRoom ? new PostgresRecentRunUsageSource(pool) : null,");
     expect(composition).toContain("estimatorFor: async (version) => (await admissionCache.admissionSettingsFor(version)).estimator!,");
     expect(loader).toContain("maximumMicros: mostOneRunMaySpendMicros(guardPolicy)");
   });
@@ -63,8 +66,10 @@ describe("B6b the API root composes the room", () => {
     const loader = await readFile("apps/api/src/admission-settings.ts", "utf8");
     expect(main).toContain("...(askRoom === undefined ? {} : { room: askRoom, waitingLine: askRoom }),");
     // Side-by-side spec §13 (S9): the daily guard is the version's (the one mapping hands it), built only when the site
-    // context gives it a store, which main.ts does only without the room.
-    expect(main).toContain("spend: siteCostEnvelopePolicy === null || askRoomReadiness !== undefined ? null : new PostgresModelSpendStore(pool),");
+    // context gives it a store, which main.ts does only without the room (S14: by the one site builder, told whether the
+    // room is built).
+    expect(main).toContain("askRoom: askRoomReadiness !== undefined,");
+    expect(loader).toContain("spend: siteCostEnvelopePolicy === null || input.askRoom ? null : new PostgresModelSpendStore(pool),");
     expect(loader).toContain("dailyGuard: site.spend === null ? null : new CostEnvelopeGuard({ store: site.spend, policy: guardPolicy }),");
     expect(loader).toContain("...(dailyGuard === null ? {} : { assertDailyCostEnvelope: () => dailyGuard.assertDailyEnvelopeAdmitsNewRun() }),");
   });

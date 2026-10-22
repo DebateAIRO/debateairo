@@ -164,6 +164,8 @@ apps/api/src/retention-purge.ts
 apps/api/src/risk-signal-identity.ts
 apps/api/src/run-event-tail.ts
 apps/api/src/sessions.ts
+apps/api/src/settings-check-cli.ts
+apps/api/src/settings-check.ts
 apps/api/src/social-auth.ts
 apps/api/src/social-providers/hashes.ts
 apps/api/src/social-providers/oidc.ts
@@ -388,6 +390,8 @@ apps/runner/src/runner-ready.ts
 apps/runner/src/runner-retirement.ts
 apps/runner/src/runner-startup-reconciliation.ts
 apps/runner/src/serve-disclosure-cli.ts
+apps/runner/src/settings-check-cli.ts
+apps/runner/src/settings-check.ts
 apps/runner/src/shape-plan.ts
 apps/runner/src/shape-seats.ts
 apps/runner/src/shape-select.ts
@@ -1122,6 +1126,7 @@ packages/register/src/recovery-policy.ts
 packages/register/src/register-publication.ts
 packages/register/src/runtime-environment.ts
 packages/register/src/session-policy.ts
+packages/register/src/settings-check-report.ts
 packages/register/src/settings-classification.ts
 packages/register/src/staff-access-policy.ts
 packages/register/src/story-policy.ts

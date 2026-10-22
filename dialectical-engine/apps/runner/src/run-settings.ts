@@ -1,36 +1,47 @@
 import type { Pool } from "pg";
-import { settingsRefusalCode } from "@debateai/db";
+import { EntitlementRepository, PostgresInternalAllowanceRepository, settingsRefusalCode } from "@debateai/db";
 import { LEGACY_RELEASE_KEY, TypedDomainError } from "@debateai/kernel";
 import {
   composeDebateCostEnvelope,
+  costEnvelopeBand,
   costEnvelopeCeilings,
   debateCallLaneLimits,
+  readBillingPlans,
   readCallConcurrencyPolicy,
   readCostEnvelopePolicy,
+  readEngineContractHash,
   readEngineVersion,
+  readMapContractHash,
   readModelScorecard,
   readPreviewLineUpPolicy,
   readStoryPolicyFromRegister,
   type CallConcurrencyPolicyState,
   type CostEnvelopeBand,
   type CostEnvelopePolicy,
+  type DeploymentMode,
   type ModelScorecardReadResult,
   type StoryPolicy
 } from "@debateai/register";
 import {
   CostEnvelopeGuard,
+  PostgresModelSpendStore,
   assertRunCeilingCoversOneCall,
   costEnvelopeGuardPolicy,
-  type PostgresModelSpendStore,
   type SharedWallInput
 } from "@debateai/budget";
-import type { FundingAwarePersonAllowanceSource } from "@debateai/billing-core";
+import { BillingPersonAllowanceSource, FundingAwarePersonAllowanceSource } from "@debateai/billing-core";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes } from "@debateai/contract";
+import { readDeploymentMakerCapability } from "@debateai/critique";
 import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
+import { mapPromptContractHash } from "@debateai/map";
 import { firstCallPlanModels } from "@debateai/scorecard";
 import {
+  assertDeploymentProviderTargets,
   assertPreviewRoleTargets,
   assertPreviewRostersServed,
+  assertPreviewTargetSet,
+  assertPricedProviderTargets,
+  parseProviderDiscoveryTargets,
   previewRunnerPolicy,
   resolvePreviewLineUp,
   type PreviewGateSettings,
@@ -39,7 +50,9 @@ import {
   type PreviewThinkingLevels,
   type ProviderDiscoveryTarget
 } from "@debateai/providers";
-import { assertRegisterPromptContractHashes, assertRunnerSettingsGates, type WalkingSkeletonSettings } from "./index.js";
+import { assertRegisterPromptContractHashes, assertRunnerSettingsGates, plansUnresolvedPersonAllowance, type WalkingSkeletonSettings } from "./index.js";
+import { engineContractHash } from "./engine-contracts.js";
+import { runnerConfiguredMakerRefs } from "./provider-topology.js";
 import type { RunInFlight } from "./run-in-flight.js";
 import { runnerSettingsOfVersion } from "./run-debate-members.js";
 import { readDebateShapeRunnerSettings, type DebateShapeRunnerSettings } from "./debate-shape-boot.js";
@@ -58,8 +71,10 @@ import { readDevelopmentRunnerPolicy, type DevelopmentRunnerPolicy } from "./dev
  * every debate then runs on its own stamped version (S6: `WalkingSkeletonSettings.settingsForVersion`).
  *
  * The SITE members (what follows the release, not the debate: the deployment mode, the declared provider targets, the
- * day's money ceiling and its band, the gate part of the preview configuration) are read once at boot, outside this
- * loader, and handed in as `RunnerSiteContext`. The loader never reads them from a version.
+ * day's money ceiling and its band, the gate part of the preview configuration, the money every version's guard shares)
+ * are read once at boot by `readRunnerSiteContext` (below; S14: main.ts, the practice and check-version's runner half
+ * all read them through it), outside the loader, and handed in as `RunnerSiteContext`. The loader never reads them
+ * from a version.
  */
 
 /** Side-by-side spec §13: what the runner knows of its release, read once at boot from the site version and env. */
@@ -95,6 +110,191 @@ export type RunnerSiteContext = Readonly<{
     fundingAdmission?: FundingAwarePersonAllowanceSource;
   }> | null;
 }>;
+
+/**
+ * Side-by-side spec §13 (S14): the environment keys the runner's site reads use. A full runner environment
+ * (`loadRunnerEnvironment()`) and the practice's runner settings (tools/preview-practice) both fit it.
+ */
+export type RunnerSiteEnvironment = Readonly<{
+  REGISTER_VERSION: number;
+  DEPLOYMENT_MODE: DeploymentMode;
+  NODE_ENV?: string | undefined;
+  PROVIDER_DISCOVERY_TARGETS_JSON?: string | undefined;
+  /** Addition D14-D16: the preview configuration's gate part; undefined off the preview. */
+  PREVIEW_GATE_SETTINGS: PreviewGateSettings | undefined;
+  /** Addition D14: the old env forms' line-up (null for the sockets-only form; absent off the preview). */
+  PREVIEW_ENV_LINE_UP?: PreviewLineUp | null | undefined;
+  CLAIM_MS: number;
+  CLAIM_MARGIN_MS: number;
+}>;
+
+/** What `readRunnerSiteContext` read: the site context, and the two facts the practice's report also states. */
+export type RunnerSiteReads = Readonly<{
+  site: RunnerSiteContext;
+  /** The register's configured providers at the site version (`readDeploymentMakerCapability`). */
+  configuredProviders: Awaited<ReturnType<typeof readDeploymentMakerCapability>>["configuredProviders"];
+  /** Hosted: the site version sealed a billingPlans row (else the person wall fails closed, PLANS_UNRESOLVED). */
+  billingPlansSealed: boolean;
+}>;
+
+/**
+ * Side-by-side spec §13 (S14) — THE RUNNER'S SITE READS, ONCE, IN ONE PLACE. Everything main.ts read at boot that follows
+ * the release and not a debate, moved here so apps/runner/src/main.ts, the preview practice
+ * (tools/preview-practice/practice-runner-composition.ts) and `check-version`'s runner half (./settings-check.ts) build
+ * the context the same way, statement for statement:
+ *  - the declared provider targets (PROVIDER_DISCOVERY_TARGETS_JSON over the register's configured providers), with the
+ *    mode decision taken on what the operator DECLARED (V-9(c): `assertDeploymentProviderTargets`), a hosted debate
+ *    target's price (V-28: `assertPricedProviderTargets`) and, on the preview, the reviewed provider set (addition D16:
+ *    `assertPreviewTargetSet`; the rosters, roles and scorecard are each version's, the loader's). No credential file
+ *    is read here: credentials are resolved by main.ts after the site version has loaded;
+ *  - hosted only: the site's costEnvelopePolicy row and its band, the billingPlans row (B9b, amendment A20: never
+ *    billingPolicy), and THE MONEY every version's guard shares (`RunnerSiteContext.money`): one spend store, the money
+ *    guard's in-flight counter (`moneyInFlight`, created by the caller beside the gateway's own: two counters, never
+ *    one, ruling R15) and the B9 shared wall with the funding admission (side-by-side spec §9: no funding read and no
+ *    funding refusal at boot).
+ * Nothing here writes: every constructor below only holds the pool. A refusal propagates with its own code, so a boot
+ * refuses as before and the check records the code.
+ */
+export async function readRunnerSiteContext(input: Readonly<{
+  pool: Pool;
+  environment: RunnerSiteEnvironment;
+  moneyInFlight: RunInFlight;
+}>): Promise<RunnerSiteReads> {
+  const { pool, environment, moneyInFlight } = input;
+  // Addition D14 / ruling R25: "is this the preview?" keys on the env's gate part, present for every accepted form.
+  const previewGate = environment.PREVIEW_GATE_SETTINGS;
+  const deploymentMakers = await readDeploymentMakerCapability(pool, environment.REGISTER_VERSION);
+  if (environment.PROVIDER_DISCOVERY_TARGETS_JSON === undefined) {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGETS_REQUIRED");
+  }
+  const declaredProviderTargets = parseProviderDiscoveryTargets(
+    environment.PROVIDER_DISCOVERY_TARGETS_JSON,
+    deploymentMakers.configuredProviders
+  );
+  // The mode decision is taken on what the operator DECLARED, before any credential
+  // is resolved: that is what makes an inline `authorization_header` refusable in
+  // hosted mode even though a resolved target legitimately carries a header.
+  assertDeploymentProviderTargets(declaredProviderTargets, {
+    mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV
+  });
+  // V-28: and a hosted DEBATE target must carry its price, or its calls cannot be
+  // billed against the per-run and daily envelopes. Separate from the rule above
+  // because the support chat's target shares that one and keeps its own accounting.
+  assertPricedProviderTargets(declaredProviderTargets, environment.DEPLOYMENT_MODE);
+  // Addition D16: on the preview the declared targets must be one of the reviewed provider sets, each equal to its row.
+  // That half needs no line-up, so it runs once, here; the rosters, roles and scorecard are each version's (the loader).
+  if (previewGate !== undefined) {
+    assertPreviewTargetSet(declaredProviderTargets);
+  }
+  /**
+   * V-28 (DL4-F2): the site's money row, HOSTED only (local mode is the relays and loopback model servers, which cost
+   * no money). Its day and its band are site members; each version's per-run members are the loader's.
+   */
+  const costEnvelopePolicy = environment.DEPLOYMENT_MODE === "hosted"
+    ? await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION)
+    : null;
+  const modelSpendStore = new PostgresModelSpendStore(pool);
+  /**
+   * B9 (budget spec §2.9, paid-plans spec §2.4.1-2.4.2) — THE SHARED WALL WHILE ARGUING, in two independent halves,
+   * built whenever hosted: the site's day (only with the band's three members, at its finish edge) and the person (each
+   * of the run owner's windows at its finish edge, from billingPlans over the READ-ONLY entitlement port, never the lazy
+   * Free append, ruling R-12). A missing billingPlans row fails the person wall closed (`plansUnresolvedPersonAllowance`)
+   * and is said once, in one content-free line on standard error (main.ts's boot and the check alike).
+   */
+  const envelopeBand = costEnvelopePolicy === null ? null : costEnvelopeBand(costEnvelopePolicy);
+  const billingPlans = costEnvelopePolicy === null ? null : await readBillingPlans(pool, environment.REGISTER_VERSION);
+  if (costEnvelopePolicy !== null && billingPlans === null) {
+    console.warn(JSON.stringify({ kind: "DEBATEAI_PERSON_WALL", event: "PLANS_UNRESOLVED" }));
+  }
+  const fundingEntitlements = new EntitlementRepository(pool);
+  const allowances = new PostgresInternalAllowanceRepository(pool);
+  // Side-by-side spec §9: no funding read and no funding refusal at boot. A grant is checked against the policy of the
+  // version it was issued with, never the pointer, so a funding selection made after boot works without a restart.
+  const fundingAllowance = billingPlans === null ? undefined : new FundingAwarePersonAllowanceSource({
+    allowances,entitlements:{...fundingEntitlements.readOnlyPort(),readRunFundingBasis:(runId)=>fundingEntitlements.readRunFundingBasis(runId)},
+    plans:billingPlans,closeBasisPoints:envelopeBand?.closeBasisPoints ?? 10000
+  });
+  const sharedWallTerms = costEnvelopePolicy === null
+    ? null
+    : Object.freeze({
+        finishBasisPoints: envelopeBand === null ? null : envelopeBand.finishBasisPoints,
+        persons: billingPlans === null
+          ? plansUnresolvedPersonAllowance()
+          : fundingAllowance ?? new BillingPersonAllowanceSource({
+              entitlements: new EntitlementRepository(pool).readOnlyPort(),
+              plans: billingPlans,
+              closeBasisPoints: envelopeBand === null ? 10_000 : envelopeBand.closeBasisPoints
+            }),
+        owners: modelSpendStore
+      });
+  const runnerSite: RunnerSiteContext = Object.freeze({
+    siteVersion: environment.REGISTER_VERSION,
+    deploymentMode: environment.DEPLOYMENT_MODE,
+    preview: previewGate === undefined ? undefined : { gate: previewGate, envLineUp: environment.PREVIEW_ENV_LINE_UP ?? null },
+    declaredProviderTargets,
+    siteCostEnvelopePolicy: costEnvelopePolicy,
+    envelopeBand,
+    claim: { claimMs: environment.CLAIM_MS, claimMarginMs: environment.CLAIM_MARGIN_MS },
+    configuredMakerRefs: runnerConfiguredMakerRefs(declaredProviderTargets),
+    /**
+     * V-28 / B9 (side-by-side spec §13 runner point 4): hosted only, the money every version's guard shares — this
+     * process's one spend store, the money guard's one in-flight counter (never the gateway's) and the one shared wall
+     * with the funding admission. Each version's guard (the loader's) adds its own per-run and story ceilings, built by
+     * the one check over both money rows (STORY_DAILY_CEILING_INSUFFICIENT refuses the site version's at boot, as before).
+     */
+    money: costEnvelopePolicy === null ? null : Object.freeze({
+      store: modelSpendStore,
+      inFlight: moneyInFlight,
+      ...(sharedWallTerms === null ? {} : { sharedWall: sharedWallTerms }),
+      ...(fundingAllowance === undefined ? {} : { fundingAdmission: fundingAllowance })
+    })
+  });
+  return Object.freeze({
+    site: runnerSite,
+    configuredProviders: deploymentMakers.configuredProviders,
+    billingPlansSealed: billingPlans !== null
+  });
+}
+
+/**
+ * Side-by-side spec §13 condition 5 (plan D5): "the prompt fingerprints are always declared". The boot readers stay byte
+ * for byte (no shape row: no map hash read; no engine row: no engine hash read), so this is `check-version`'s alone: a
+ * version must seal BOTH `mapContractHash` and `engineContractHash` rows, each equal to this code's fingerprint
+ * (`mapPromptContractHash()`, `engineContractHash()`), whether or not the policy rows exist, so no activated version can
+ * hide a stale hash. Every problem, map row first: SETTINGS_HASH_UNDECLARED:<row> (absent), MAP_CONTRACT_HASH_MISMATCH /
+ * ENGINE_CONTRACT_HASH_MISMATCH (the boot readers' own codes), or a malformed row's reader code
+ * (MAP_CONTRACT_HASH_INVALID / ENGINE_CONTRACT_HASH_INVALID). A database failure propagates. Read-only.
+ */
+export async function declaredContractHashRefusals(pool: Pick<Pool, "query">, version: number): Promise<readonly string[]> {
+  const refusals: string[] = [];
+  const rows = [
+    { rowKey: "mapContractHash", read: readMapContractHash, code: () => mapPromptContractHash(), mismatch: "MAP_CONTRACT_HASH_MISMATCH" },
+    { rowKey: "engineContractHash", read: readEngineContractHash, code: () => engineContractHash(), mismatch: "ENGINE_CONTRACT_HASH_MISMATCH" }
+  ] as const;
+  for (const row of rows) {
+    let sealed: string | null;
+    try {
+      sealed = await row.read(pool, version);
+    } catch (error) {
+      const code = settingsRefusalCode(error);
+      if (code === null) throw error;
+      refusals.push(code);
+      continue;
+    }
+    if (sealed === null) refusals.push(`SETTINGS_HASH_UNDECLARED:${row.rowKey}`);
+    else if (sealed !== row.code()) refusals.push(row.mismatch);
+  }
+  return Object.freeze(refusals);
+}
+
+/**
+ * D5, as one assertion (the plan's interface): throws TypedDomainError with the first of
+ * `declaredContractHashRefusals` as its code (and message), e.g. `SETTINGS_HASH_UNDECLARED:engineContractHash`.
+ */
+export async function assertDeclaredContractHashes(pool: Pick<Pool, "query">, version: number): Promise<void> {
+  const [first] = await declaredContractHashRefusals(pool, version);
+  if (first !== undefined) throw new TypedDomainError(first, first);
+}
 
 /** One sealed version, as this runner runs it. Kept forever: sealed versions never change. */
 export type RunnerVersionSettings = Readonly<{

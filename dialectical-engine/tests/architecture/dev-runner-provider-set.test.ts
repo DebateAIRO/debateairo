@@ -32,8 +32,12 @@ describe("production runner provider topology", () => {
 
   it("uses the exact sealed configured-provider set at the real runner entrypoint", async () => {
     const source = await readFile("apps/runner/src/main.ts", "utf8");
-    expect(source).toContain("readDeploymentMakerCapability");
-    expect(source).toContain("parseProviderDiscoveryTargets");
+    // Side-by-side spec §13 (S14): the configured set and the declared targets are main.ts's site reads
+    // (readRunnerSiteContext, run-settings.ts, shared with the practice and check-version), which it calls.
+    const siteReads = await readFile("apps/runner/src/run-settings.ts", "utf8");
+    expect(source).toContain("await readRunnerSiteContext({ pool, environment, moneyInFlight })");
+    expect(siteReads).toContain("const deploymentMakers = await readDeploymentMakerCapability(pool, environment.REGISTER_VERSION);");
+    expect(siteReads).toContain("parseProviderDiscoveryTargets(");
     expect(source).toContain("createRunnerProviderTopology");
     expect(source).toContain("critique: providerTopology.critique");
     expect(source).toContain("additionalMakers: providerTopology.additionalMakers");

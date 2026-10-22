@@ -9,10 +9,11 @@
  *
  * Both deployment modes (owner rulings 2026-10-13: the preview switches to hosted mode). In LOCAL mode nothing below
  * is built that main.ts does not build in local mode: no money guard, no shared wall, no billing read. In HOSTED mode the
- * runner gets main.ts's hosted money wiring, mirrored in `composePracticeRunnerMoney` below: the sealed per-run and
- * daily envelopes (costEnvelopePolicy), the story's own money row (storyCostEnvelopePolicy) through the one check over
- * both, the shared wall (the site's day at the band's finish edge, and each person's windows from the billingPlans row
- * over the read-only entitlement view), main.ts's refusal of a run ceiling below one call, every target's price on its
+ * runner gets main.ts's hosted money wiring, through the SAME function main.ts reads its site with
+ * (`readRunnerSiteContext`, apps/runner/src/run-settings.ts; side-by-side spec §13, S14): the sealed per-run and daily
+ * envelopes (costEnvelopePolicy), the story's own money row (storyCostEnvelopePolicy) through the one check over both,
+ * the shared wall (the site's day at the band's finish edge, and each person's windows from the billingPlans row over
+ * the read-only entitlement view), main.ts's refusal of a run ceiling below one call, every target's price on its
  * gateway, the story writer in hosted mode and the body cost fallback with the band. None of it reads billingPolicy
  * (amendment A20, as main.ts) or touches NETOPIA, Quaderno, SmartBill or mail: the runner never does.
  *
@@ -20,8 +21,8 @@
  *  - The two gate ports are passed in (the forwarded sockets, wrapped by the practice's gate watcher) instead of being
  *    built from the configuration's server socket paths; so are the gates' read-only `/remaining` readers, which set
  *    the call scheduler's gate slots, and the keep-alive pool the claim renewals use (the throwaway database's).
- *  - Local mode has no money guard, so of main.ts's two in-flight counters only the gateway's (attempts) exists there;
- *    hosted mode has both, as main.ts.
+ *  - As main.ts, both in-flight counters exist in both modes; local mode builds no money guard, so the money one is never
+ *    read there (main.ts's local mode alike).
  *  - Hosted: the money ledger is the throwaway database's, so the site's day counts only this practice's own spend (the
  *    gates' daily pots, which the practice shares with the site, are the real limit). The person wall is built as on
  *    the server but holds nothing: billing is kept off in the practice's ask (practice-ask-composition.ts), so the
@@ -36,36 +37,24 @@
  *    the integration test only; the real practice waits for real.
  */
 import type { Pool } from "pg";
-import { EntitlementRepository, PostgresInternalAllowanceRepository, RunRepository } from "@debateai/db";
-import { BillingPersonAllowanceSource, FundingAwarePersonAllowanceSource } from "@debateai/billing-core";
+import { RunRepository } from "@debateai/db";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
 import { TypedDomainError } from "@debateai/kernel";
 import {
   assertHostedCostEnvelopesSealed,
-  costEnvelopeBand,
   effectiveCallConcurrency,
-  readBillingPlans,
   readCallConcurrencyPolicy,
-  readCostEnvelopePolicy,
   type CallConcurrencyPolicy,
-  type CostEnvelopeBand,
-  type CostEnvelopePolicy,
   type DeploymentMode
 } from "@debateai/register";
 import {
-  PostgresModelSpendStore,
   type CostEnvelopePhase,
   type SharedWallApplication
 } from "@debateai/budget";
-import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
-  assertDeploymentProviderTargets,
-  assertPreviewTargetSet,
-  assertPricedProviderTargets,
   createPreviewBusyCoordinator,
   createPreviewGuardedFetch,
   observeClaimTimeTarget,
-  parseProviderDiscoveryTargets,
   PREVIEW_GLM_DEADLINE_MS,
   previewFinalWriterTierUnreadLine,
   previewProbeControls,
@@ -93,17 +82,15 @@ import {
   createPostgresProviderGateway,
   logBodyCostFallback,
   logServeDisclosure,
-  plansUnresolvedPersonAllowance,
   WalkingSkeletonRunner
 } from "@debateai/runner";
-import { assertRunnerPrimaryProviderConfiguration, createRunnerProviderTopology, runnerConfiguredMakerRefs } from "../../apps/runner/src/provider-topology.js";
+import { assertRunnerPrimaryProviderConfiguration, createRunnerProviderTopology } from "../../apps/runner/src/provider-topology.js";
 import { createCallScheduler, type CallSubject } from "../../apps/runner/src/call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateNames, structureRepairThroughLane } from "../../apps/runner/src/call-lane-gateway.js";
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import {
-  createRunnerSettingsCache, createRunSettingsVersions, loadRunnerVersionSettings, preloadRunnerSettings, runCostEnvelopeGuardOf,
-  runnerSettingsOfVersion, runnerSettingsSummary, runPreviewThinkingLevelsOf,
-  type RunnerSiteContext
+  createRunnerSettingsCache, createRunSettingsVersions, loadRunnerVersionSettings, preloadRunnerSettings, readRunnerSiteContext,
+  runCostEnvelopeGuardOf, runnerSettingsOfVersion, runnerSettingsSummary, runPreviewThinkingLevelsOf
 } from "../../apps/runner/src/run-settings.js";
 import { createRunnerRetirementSignal } from "../../apps/runner/src/runner-retirement.js";
 import { PracticeCallStats } from "./practice-parallel.js";
@@ -141,62 +128,6 @@ export type PracticeRunnerSettings = Readonly<{
 }>;
 
 export type PracticeRunnerComposition = Awaited<ReturnType<typeof composePracticeRunner>>;
-
-/**
- * HOSTED only: main.ts's money wiring, line for line (its V-28 spend store and money in-flight counter, the B9 shared
- * wall and the funding admission: the money every version's guard shares, `RunnerSiteContext.money`), on the throwaway
- * database. Side-by-side spec §13 (S6), as main.ts: each version's guard over both money rows, and B9's
- * run-ceiling-below-one-call refusal, are the settings loader's (run-settings.ts). Returns null in local mode, where
- * main.ts builds none of it. tests/unit/preview-practice-wiring-drift.test.ts pins the statements below against main.ts's.
- */
-export async function composePracticeRunnerMoney(input: Readonly<{
-  pool: Pool;
-  environment: PracticeRunnerSettings;
-  /** The site's money row and its band, read as main.ts reads them before its settings loader (null in local mode). */
-  costEnvelopePolicy: CostEnvelopePolicy | null;
-  envelopeBand: CostEnvelopeBand | null;
-  log?: (line: string) => void;
-}>) {
-  const { pool, environment, costEnvelopePolicy, envelopeBand } = input;
-  if (environment.DEPLOYMENT_MODE !== "hosted") return null;
-  const modelSpendStore = new PostgresModelSpendStore(pool);
-  const moneyInFlight = createRunInFlight();
-  const billingPlans = costEnvelopePolicy === null ? null : await readBillingPlans(pool, environment.REGISTER_VERSION);
-  if (costEnvelopePolicy !== null && billingPlans === null) {
-    (input.log ?? console.warn)(JSON.stringify({ kind: "DEBATEAI_PERSON_WALL", event: "PLANS_UNRESOLVED" }));
-  }
-  const fundingEntitlements = new EntitlementRepository(pool);
-  const allowances = new PostgresInternalAllowanceRepository(pool);
-  // Side-by-side spec §9: no funding read and no funding refusal at boot. A grant is checked against the policy of the
-  // version it was issued with, never the pointer, so a funding selection made after boot works without a restart.
-  const fundingAllowance = billingPlans === null ? undefined : new FundingAwarePersonAllowanceSource({
-    allowances,entitlements:{...fundingEntitlements.readOnlyPort(),readRunFundingBasis:(runId)=>fundingEntitlements.readRunFundingBasis(runId)},
-    plans:billingPlans,closeBasisPoints:envelopeBand?.closeBasisPoints ?? 10000
-  });
-  const sharedWallTerms = costEnvelopePolicy === null
-    ? null
-    : Object.freeze({
-        finishBasisPoints: envelopeBand === null ? null : envelopeBand.finishBasisPoints,
-        persons: billingPlans === null
-          ? plansUnresolvedPersonAllowance()
-          : fundingAllowance ?? new BillingPersonAllowanceSource({
-              entitlements: new EntitlementRepository(pool).readOnlyPort(),
-              plans: billingPlans,
-              closeBasisPoints: envelopeBand === null ? 10_000 : envelopeBand.closeBasisPoints
-            }),
-        owners: modelSpendStore
-      });
-  return Object.freeze({
-    /** `RunnerSiteContext.money`, as main.ts's literal. */
-    site: Object.freeze({
-      store: modelSpendStore,
-      inFlight: moneyInFlight,
-      ...(sharedWallTerms === null ? {} : { sharedWall: sharedWallTerms }),
-      ...(fundingAllowance === undefined ? {} : { fundingAdmission: fundingAllowance })
-    }),
-    billingPlansSealed: billingPlans !== null
-  });
-}
 
 export async function composePracticeRunner(input: Readonly<{
   pool: Pool;
@@ -237,45 +168,18 @@ export async function composePracticeRunner(input: Readonly<{
     });
     storyLog("STORY_PACK_INVALID", { reason: storyPack.error });
   }
-  const deploymentMakers = await readDeploymentMakerCapability(pool, environment.REGISTER_VERSION);
-  const declaredProviderTargets = parseProviderDiscoveryTargets(
-    environment.PROVIDER_DISCOVERY_TARGETS_JSON,
-    deploymentMakers.configuredProviders
-  );
-  assertDeploymentProviderTargets(declaredProviderTargets, {
-    mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV
-  });
-  assertPricedProviderTargets(declaredProviderTargets, environment.DEPLOYMENT_MODE);
-  // Addition D16, as main.ts: the reviewed provider set once; the rosters, roles and scorecard per version (the loader).
-  if (previewGate !== undefined) {
-    assertPreviewTargetSet(declaredProviderTargets);
-  }
-  const previewFetch = createPreviewGuardedFetch(input.budgetPorts);
-  // Hosted only (null in local mode), as main.ts: the site's money row and its band, read before the settings loader.
-  const costEnvelopePolicy = environment.DEPLOYMENT_MODE === "hosted"
-    ? await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION)
-    : null;
-  const envelopeBand = costEnvelopePolicy === null ? null : costEnvelopeBand(costEnvelopePolicy);
-  // Hosted only (null in local mode), as main.ts: the spend store, the money in-flight counter and the shared wall
-  // every version's guard shares (RunnerSiteContext.money), built before the settings loader.
-  const money = await composePracticeRunnerMoney({ pool, environment, costEnvelopePolicy, envelopeBand,
-    log: (line) => { console.warn(line); } });
+  // As main.ts (side-by-side spec §13, S14): both in-flight counters, the gateway's (attempts) and the money guard's.
+  const gatewayInFlight = createRunInFlight();
+  const moneyInFlight = createRunInFlight();
   /**
-   * Side-by-side spec §13, as main.ts: every per-version read (the runner policy and its prompt fingerprints, the story's
-   * rows, the preview line-up, the debate shape, the engine, the preview's roster, role and scorecard checks, the run
-   * ceiling against one call, the call lanes) through the ONE loader (apps/runner/src/run-settings.ts), in both modes.
+   * As main.ts: the site reads, by the SAME function (`readRunnerSiteContext`, apps/runner/src/run-settings.ts): the
+   * declared targets with the mode decision, the price and the reviewed provider set; hosted only, the site's money row
+   * and band, the billingPlans row and the money every version's guard shares (one spend store, the money counter above,
+   * the shared wall and the funding admission), on the throwaway database.
    */
-  const runnerSite: RunnerSiteContext = Object.freeze({
-    siteVersion: environment.REGISTER_VERSION,
-    deploymentMode: environment.DEPLOYMENT_MODE,
-    preview: previewGate === undefined ? undefined : { gate: previewGate, envLineUp: environment.PREVIEW_ENV_LINE_UP ?? null },
-    declaredProviderTargets,
-    siteCostEnvelopePolicy: costEnvelopePolicy,
-    envelopeBand,
-    claim: { claimMs: environment.CLAIM_MS, claimMarginMs: environment.CLAIM_MARGIN_MS },
-    configuredMakerRefs: runnerConfiguredMakerRefs(declaredProviderTargets),
-    money: money === null ? null : money.site
-  });
+  const { site: runnerSite, configuredProviders, billingPlansSealed } = await readRunnerSiteContext({ pool, environment, moneyInFlight });
+  const { declaredProviderTargets, envelopeBand, siteCostEnvelopePolicy: costEnvelopePolicy } = runnerSite;
+  const previewFetch = createPreviewGuardedFetch(input.budgetPorts);
   const settingsLog = input.settingsLog ?? (() => undefined);
   const runnerSettings = createRunnerSettingsCache({
     // The practice's story lines go to its own story log (main.ts's go to standard error).
@@ -298,7 +202,6 @@ export async function composePracticeRunner(input: Readonly<{
   const runSettingsVersions = createRunSettingsVersions();
   const runCostEnvelopeGuard = runCostEnvelopeGuardOf(runnerSettings, runSettingsVersions);
   // Parallel AI calls (spec 2026-10-12 §3.2-§3.5), as main.ts composes them on the preview.
-  const gatewayInFlight = createRunInFlight();
   const callStats = new PracticeCallStats();
   const callPolicy = input.callConcurrency
     ?? effectiveCallConcurrency(await readCallConcurrencyPolicy(pool, environment.REGISTER_VERSION).then(callStats.noteRegisterRow));
@@ -476,14 +379,14 @@ export async function composePracticeRunner(input: Readonly<{
     }
   });
   return Object.freeze({ runner, providerTopology, providerTargets, declaredProviderTargets, policy, storyPolicy, previewFetch,
-    configuredProviders: deploymentMakers.configuredProviders, callScheduler: runnerCallScheduler, callStats,
+    configuredProviders, callScheduler: runnerCallScheduler, callStats,
     // For the report: the ceilings the practice's run is held to (micro-dollars): the site version's.
-    money: money === null || costEnvelopePolicy === null ? null : Object.freeze({
+    money: runnerSite.money === null || costEnvelopePolicy === null ? null : Object.freeze({
       perRunCeilingMicros: costEnvelopePolicy.perRunCeilingMicros,
       dailyCeilingMicros: costEnvelopePolicy.dailyCeilingMicros,
       perStoryCeilingMicros: storyPolicy?.perStoryCeilingMicros ?? null,
       band: envelopeBand !== null,
-      billingPlansSealed: money.billingPlansSealed
+      billingPlansSealed
     }),
     // Refused-repair salvage: the run had a structure-repair route (its ceiling is set), so a STRUCTURE reply's follow-up is B.
     structureRouted: previewStructureRepairCeiling(structureRepairRoute) !== null });
