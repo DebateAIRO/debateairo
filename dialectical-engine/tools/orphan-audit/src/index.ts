@@ -687,7 +687,9 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // (assertDatabaseAheadAccepted, migration-ahead.ts); it re-exports the database-ahead readers. Two controls bind the split
 // and the acceptance.
 // Side-by-side integration (2026-10-22): the merged module of lane C (C10, C11) and lane 1 (A6, A7) above, pinned once.
-const NATIVE_MIGRATE_MODULE_SHA256 = "260ae877079e25a117d561fdbaddf72fc6535f06883e3b2dd74302f2200045b5";
+// Side-by-side integration fix (2026-10-22): readStoredAsk casts register_version in SQL (::integer) instead of Number()
+// (the register law bans JavaScript version coercion). migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "40831ac9288a4a5532f76855dfaf2dd464a933477d83b0176fd53e9dba25e25f";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each

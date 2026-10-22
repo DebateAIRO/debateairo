@@ -151,28 +151,6 @@ describe("side-by-side §9: a funding grant stays valid under the version it was
     await expect(repository.readPolicyAt(0)).rejects.toMatchObject({ code: "INTERNAL_ALLOWANCE_UNAVAILABLE" });
   });
 
-  it("readPolicyAt refuses an unsealed version (the sealed check, not only the shape)", async () => {
-    await fixture.fundedActor();
-    // core's CHECK (sealed) and the publication guard make an unsealed version impossible to write, so this case drops
-    // the CHECK and the triggers inside one transaction, writes v2's rows as an unsealed v4096, reads, and rolls back.
-    const client = await database.pool.connect();
-    try {
-      await client.query("BEGIN");
-      const check = (await client.query<{ name: string }>(`SELECT conname AS name FROM pg_constraint
-        WHERE conrelid='register.register_version'::regclass AND contype='c' AND strpos(pg_get_constraintdef(oid),'sealed')>0`)).rows[0]!.name;
-      await client.query(`ALTER TABLE register.register_version DROP CONSTRAINT ${JSON.stringify(check)}`);
-      await client.query("SET LOCAL session_replication_role = replica");
-      await client.query("INSERT INTO register.register_version(register_version,row_count,sealed) SELECT 4096,row_count,false FROM register.register_version WHERE register_version=2");
-      await client.query("INSERT INTO register.register_row(register_version,row_key,value_json,source_ref) SELECT 4096,row_key,value_json,source_ref FROM register.register_row WHERE register_version=2");
-      const read = async () => (await client.query("SELECT staff.read_internal_funding_policy_at(4096) AS value")).rows[0].value;
-      expect(await read()).toBeNull();
-      // The same rows, sealed: the publication reads, so the null above was the seal's.
-      await client.query("UPDATE register.register_version SET sealed=true WHERE register_version=4096");
-      expect(await read()).toMatchObject({ registerVersion: 4096, sourceRef: "test:synthetic-funding" });
-    } finally {
-      await client.query("ROLLBACK");
-      client.release();
-    }
-    expect(await new PostgresInternalAllowanceRepository(runtime).readPolicyAt(4096)).toBeNull();
-  });
+  // "readPolicyAt refuses an unsealed version" forges register rows, so it lives in the register law's closed write
+  // surface, tests/integration/register-support-publication.test.ts (tests/architecture/register-support-publication).
 });

@@ -2794,7 +2794,7 @@ export class RunRepository {
       const result = await this.pool.query<{
         run_id: string;
         release_key: string;
-        register_version: number | string;
+        register_version: number;
         question_line: string;
         ask_contract: Record<string, unknown>;
         asker_id: string;
@@ -2812,9 +2812,11 @@ export class RunRepository {
         content_encryption_version: number | null;
         content_ciphertext: CryptoEnvelope | null;
       }>(
-        `SELECT run_id, release_key, register_version, question_line, ask_contract, asker_id, session_id,
-                caller_scope, as_of, asker_risk_tier, tier_source, tier_provenance_ref, composition_budget_tier, plan_tier,
-                depth_params, argument_language_tag, argument_language_name, content_encryption_version, content_ciphertext
+        // The bigint version is cast by the database (an out-of-range one refuses), never coerced in JavaScript.
+        `SELECT run_id, release_key, register_version::integer AS register_version, question_line, ask_contract,
+                asker_id, session_id, caller_scope, as_of, asker_risk_tier, tier_source, tier_provenance_ref,
+                composition_budget_tier, plan_tier, depth_params, argument_language_tag, argument_language_name,
+                content_encryption_version, content_ciphertext
          FROM core.run WHERE run_id = $1`,
         [runId]
       );
@@ -2833,7 +2835,7 @@ export class RunRepository {
       return Object.freeze({
         runId: row.run_id,
         releaseKey: row.release_key,
-        registerVersion: Number(row.register_version),
+        registerVersion: row.register_version,
         questionLine: content.questionLine,
         askContract: Object.freeze({ ...content.askContract }),
         askerId: row.asker_id,

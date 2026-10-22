@@ -5,7 +5,7 @@ import { readFile, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 import type { Pool, PoolClient } from "pg";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createPool, migrate } from "../../packages/db/src/index.js";
+import { PostgresInternalAllowanceRepository, createPool, migrate } from "../../packages/db/src/index.js";
 import {
   buildBootstrapRegisterPublicationRows,
   computeRegisterSnapshotSha256,
@@ -27,6 +27,7 @@ import {
 } from "../support/registerFixtures.js";
 import { replayMigrationRolledBack, retiredUpgradeReason } from "../support/migrationReplay.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { internalFundingFixture } from "../support/internalFundingFixture.js";
 
 let database: TestDatabase;
 
@@ -1779,5 +1780,38 @@ describe("REGISTER-SUPPORT-PUBLICATION database contract", () => {
     });
     expect(BigInt(committed.register_version as string)).toBeGreaterThan(rolledBack[0]!);
     expect(BigInt(committed.register_version as string)).toBeGreaterThan(rolledBack[1]!);
+  });
+});
+
+/*
+ * Side-by-side spec 2026-10-21 §9 (C15, migration 0123 §6): a funding grant is checked against the sealed funding
+ * publication of its own version. This case forges register rows (an unsealed version cannot be written otherwise), so
+ * it lives here, the register law's closed write surface, not in internal-funding-decoupled.test.ts.
+ */
+describe("side-by-side §9: the funding publication of a grant's own version", () => {
+  it("staff.read_internal_funding_policy_at refuses an unsealed version (the sealed check, not only the shape)", async () => {
+    // Funding v2: a sealed publication carrying the enabled synthetic policy.
+    await internalFundingFixture(database.pool, database.pool).selectFunding();
+    // core's CHECK (sealed) and the publication guard make an unsealed version impossible to write, so this case drops
+    // the CHECK and the triggers inside one transaction, writes v2's rows as an unsealed v4096, reads, and rolls back.
+    const client = await database.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const check = (await client.query<{ name: string }>(`SELECT conname AS name FROM pg_constraint
+        WHERE conrelid='register.register_version'::regclass AND contype='c' AND strpos(pg_get_constraintdef(oid),'sealed')>0`)).rows[0]!.name;
+      await client.query(`ALTER TABLE register.register_version DROP CONSTRAINT ${JSON.stringify(check)}`);
+      await client.query("SET LOCAL session_replication_role = replica");
+      await client.query("INSERT INTO register.register_version(register_version,row_count,sealed) SELECT 4096,row_count,false FROM register.register_version WHERE register_version=2");
+      await client.query("INSERT INTO register.register_row(register_version,row_key,value_json,source_ref) SELECT 4096,row_key,value_json,source_ref FROM register.register_row WHERE register_version=2");
+      const read = async () => (await client.query("SELECT staff.read_internal_funding_policy_at(4096) AS value")).rows[0].value;
+      expect(await read()).toBeNull();
+      // The same rows, sealed: the publication reads, so the null above was the seal's.
+      await client.query("UPDATE register.register_version SET sealed=true WHERE register_version=4096");
+      expect(await read()).toMatchObject({ registerVersion: 4096, sourceRef: "test:synthetic-funding" });
+    } finally {
+      await client.query("ROLLBACK");
+      client.release();
+    }
+    expect(await new PostgresInternalAllowanceRepository(database.pool).readPolicyAt(4096)).toBeNull();
   });
 });
