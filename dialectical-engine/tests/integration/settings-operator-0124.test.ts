@@ -148,7 +148,7 @@ describe("S15: the settings operator on migration 0124", () => {
       expect((off as SettingsOperatorRefusal).codes).toEqual(["SETTINGS_GATE_MODEL_DISABLED:deepinfra:zai-org/GLM-5.3-Flash"]);
       const done = await activateSettingsVersion(client, { version: G1, activatedBy: "owner", reason: "new lengths", gateEnabledModels: GATES }, READERS);
       expect([done.previous, done.releaseKey, Number(done.activationSeq) > 0]).toEqual([4, A, true]);
-      const unchanged = await refusal(activateSettingsVersion(client, { version: G1, activatedBy: "owner", reason: "again" }, READERS));
+      const unchanged = await refusal(activateSettingsVersion(client, { version: G1, activatedBy: "owner", reason: "again", gateEnabledModels: GATES }, READERS));
       expect((unchanged as SettingsOperatorRefusal).code).toBe("SETTINGS_ACTIVATION_UNCHANGED");
       expect(await readSettingsStatus(client)).toEqual({ currentRelease: A, pointer: G1, effectiveActive: G1, passed: [4, G1] });
       expect((await client.query("SELECT activated_by, reason FROM register.settings_activation ORDER BY activation_seq DESC LIMIT 1")).rows)

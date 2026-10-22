@@ -439,13 +439,13 @@ async function settingsPlan(io, { newKey, labels, activate, next }) {
  * The revert's settings (spec §11): it expects what the switch left (the version it activated, else the pointer it saw)
  * and, when the switch activated one, activates again what was active before — or, when nothing was ever activated
  * before, the old release's own site version (the pointer never goes back to empty; the old release passes its own, D1).
+ * When that version IS the one the switch activated (a code-only upload: both releases on one site version), nothing is
+ * activated (0124 would refuse SETTINGS_ACTIVATION_UNCHANGED): the old release has passed it already.
  */
 function revertSettings(settings, fromKey) {
   if (settings.activate === null) return settings;
-  return Object.freeze({
-    expectedActiveSettings: settings.activate,
-    activate: settings.expectedActiveSettings ?? Number(/^r([1-9][0-9]*)-/.exec(fromKey)[1])
-  });
+  const back = settings.expectedActiveSettings ?? Number(/^r([1-9][0-9]*)-/.exec(fromKey)[1]);
+  return Object.freeze({ expectedActiveSettings: settings.activate, activate: back === settings.activate ? null : back });
 }
 
 /** True when the release's latest DRAINING has no later RETIRED (the database's own "still drains"). */

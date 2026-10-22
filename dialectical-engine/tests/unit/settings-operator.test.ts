@@ -60,6 +60,9 @@ describe("the verdict (spec §13: PASS only when both halves PASS)", () => {
     const failing = report("api", ["SETTINGS_SITE_MEMBER_DIFFERS:costEnvelopePolicy.daily_ceiling_micros", "SETTINGS_GATE_UNREVIEWED:preview:x"]);
     expect(parseSettingsCheckLine(settingsCheckLine(failing).trimEnd())).toEqual(failing);
     expect(parseSettingsCheckLine(settingsCheckLine(report("runner", [], { snapshotSha256: null })))).toMatchObject({ snapshotSha256: null });
+    // S14's own code rule (isSettingsCheckCode): a long detail is a code; a character outside its alphabet is not.
+    const long = report("api", [`SETTINGS_GATE_UNREVIEWED:${"x".repeat(300)}`]);
+    expect(parseSettingsCheckLine(settingsCheckLine(long))).toEqual(long);
     const json = JSON.parse(settingsCheckLine(runner).slice("DEBATEAI_SETTINGS_CHECK ".length));
     const variants: string[] = [
       `DEBATEAI_SETTINGS_VERDICT ${JSON.stringify(json)}`,
@@ -76,6 +79,7 @@ describe("the verdict (spec §13: PASS only when both halves PASS)", () => {
       `DEBATEAI_SETTINGS_CHECK ${JSON.stringify({ ...json, verdict: "FAIL", codes: ["SETTINGS_B", "SETTINGS_A"] })}`,
       `DEBATEAI_SETTINGS_CHECK ${JSON.stringify({ ...json, verdict: "FAIL", codes: ["SETTINGS_A", "SETTINGS_A"] })}`,
       `DEBATEAI_SETTINGS_CHECK ${JSON.stringify({ ...json, verdict: "FAIL", codes: ["settings lower case"] })}`,
+      `DEBATEAI_SETTINGS_CHECK ${JSON.stringify({ ...json, verdict: "FAIL", codes: ["SETTINGS_X:a+b"] })}`,
       `DEBATEAI_SETTINGS_CHECK ${JSON.stringify({ ...json, snapshotSha256: "C".repeat(64) })}`,
       `DEBATEAI_SETTINGS_CHECK ${JSON.stringify({ ...json, checker: "check-version-v0" })}`,
       "DEBATEAI_SETTINGS_CHECK {not json",
@@ -176,7 +180,7 @@ describe("the activation (spec §13 activate <v>)", () => {
     expect(db.queries[4]!.params).toEqual([18, 17, KEY, "owner", "new lengths"]);
     // Never activated: the expected previous is NULL.
     const first = activationDatabase({ pointer: null });
-    expect((await activateSettingsVersion(first.client, { version: 18, activatedBy: "owner", reason: "first" }, readersOf(SEATS))).previous).toBeNull();
+    expect((await activateSettingsVersion(first.client, { version: 18, activatedBy: "owner", reason: "first", gateEnabledModels: BOTH_GATES }, readersOf(SEATS))).previous).toBeNull();
     expect(first.queries.find(({ sql }) => sql.includes("activate_settings_version"))!.params[1]).toBeNull();
   });
 
@@ -186,7 +190,7 @@ describe("the activation (spec §13 activate <v>)", () => {
     expect([error.code, error.passed]).toEqual(["SETTINGS_VERSION_NOT_PASSED", [17]]);
     expect(db.sqls().some((sql) => sql.includes("BEGIN") || sql.includes("activate_settings_version"))).toBe(false);
     const none = activationDatabase({ current: null });
-    expect((await refusal(activateSettingsVersion(none.client, { version: 18, activatedBy: "owner", reason: "x" }, readersOf(SEATS)))).code).toBe("SETTINGS_ACTIVATION_CONFLICT");
+    expect((await refusal(activateSettingsVersion(none.client, { version: 18, activatedBy: "owner", reason: "x", gateEnabledModels: BOTH_GATES }, readersOf(SEATS)))).code).toBe("SETTINGS_ACTIVATION_CONFLICT");
   });
 
   it("condition 6 live: every seat's model on at its gate; a missing gate answer or an unreviewed ref refuses, all codes together, nothing written", async () => {
@@ -214,22 +218,22 @@ describe("the activation (spec §13 activate <v>)", () => {
     ];
     for (const [error, code] of cases) {
       const db = activationDatabase({ activate: () => error });
-      expect((await refusal(activateSettingsVersion(db.client, { version: 18, activatedBy: "owner", reason: "x" }, readersOf(SEATS)))).code).toBe(code);
+      expect((await refusal(activateSettingsVersion(db.client, { version: 18, activatedBy: "owner", reason: "x", gateEnabledModels: BOTH_GATES }, readersOf(SEATS)))).code).toBe(code);
       expect(db.sqls().at(-1)).toBe("ROLLBACK");
     }
     // The deferred check fails at COMMIT: the same mapping.
     const atCommit = activationDatabase({ commit: () => pgError("55000", "SETTINGS_VERSION_NOT_PASSED") });
-    expect((await refusal(activateSettingsVersion(atCommit.client, { version: 18, activatedBy: "owner", reason: "x" }, readersOf(SEATS)))).code).toBe("SETTINGS_VERSION_NOT_PASSED");
+    expect((await refusal(activateSettingsVersion(atCommit.client, { version: 18, activatedBy: "owner", reason: "x", gateEnabledModels: BOTH_GATES }, readersOf(SEATS)))).code).toBe("SETTINGS_VERSION_NOT_PASSED");
     // An unmapped error passes through untouched.
     const broken = activationDatabase({ activate: () => pgError("57014", "canceling statement due to statement timeout") });
-    await expect(activateSettingsVersion(broken.client, { version: 18, activatedBy: "owner", reason: "x" }, readersOf(SEATS))).rejects.toMatchObject({ code: "57014" });
+    await expect(activateSettingsVersion(broken.client, { version: 18, activatedBy: "owner", reason: "x", gateEnabledModels: BOTH_GATES }, readersOf(SEATS))).rejects.toMatchObject({ code: "57014" });
   });
 
   it("--by matches the table's CHECK (no colon) and --reason is one line, both before any read", async () => {
     expect(ACTIVATED_BY_PATTERN.source).toBe("^[A-Za-z0-9][A-Za-z0-9 ._@-]{0,127}$");
     for (const [activatedBy, reason] of [["root:owner", "x"], ["", "x"], [" owner", "x"], ["a".repeat(129), "x"], ["owner", ""], ["owner", "two\nlines"], ["owner", "x".repeat(513)]]) {
       const db = activationDatabase();
-      expect((await refusal(activateSettingsVersion(db.client, { version: 18, activatedBy: activatedBy!, reason: reason! }, readersOf(SEATS)))).code).toBe("SETTINGS_OPERATOR_USAGE");
+      expect((await refusal(activateSettingsVersion(db.client, { version: 18, activatedBy: activatedBy!, reason: reason!, gateEnabledModels: BOTH_GATES }, readersOf(SEATS)))).code).toBe("SETTINGS_OPERATOR_USAGE");
       expect(db.queries).toEqual([]);
     }
   });
@@ -312,17 +316,20 @@ describe("cli.ts (one line per command, the exit codes of its header)", () => {
     expect(bad.queries).toEqual([]);
   });
 
+  const GATE_ANSWER = (models: string[]) => JSON.stringify({ enabled_models: models, largest_reservation_usd: "0.01", max_concurrent_calls: 4, remaining_calls: 100, remaining_usd: "1.5", state: "active", window_open: true });
+  const GATE_FILES = { "/g/di.json": GATE_ANSWER(["zai-org/GLM-5.3-Flash"]), "/g/an.json": GATE_ANSWER(["claude-haiku-5-5"]) };
+  const WITH_GATES = ["--gate-remaining", "deepinfra=/g/di.json", "--gate-remaining", "anthropic=/g/an.json"];
   it("activate: the receipt line; unchanged exits 0; conflict 3; not passed 4 (with what passed); usage 2 before any read", async () => {
     const o = output();
-    expect(await runSettingsCli(["activate", "18", "--by", "owner", "--reason", "new lengths"], o.io, depsOf(activationDatabase().client))).toBe(0);
+    expect(await runSettingsCli(["activate", "18", "--by", "owner", "--reason", "new lengths", ...WITH_GATES], o.io, depsOf(activationDatabase().client, GATE_FILES))).toBe(0);
     expect(o.out).toEqual([`DEBATEAI_SETTINGS_ACTIVATED {"version":"18","previous":"17","releaseKey":"${KEY}","activationSeq":"3"}\n`]);
     const same = output();
-    expect(await runSettingsCli(["activate", "17", "--by", "owner", "--reason", "x"], same.io,
-      depsOf(activationDatabase({ activate: () => pgError("22023", "SETTINGS_ACTIVATION_UNCHANGED") }).client))).toBe(0);
+    expect(await runSettingsCli(["activate", "17", "--by", "owner", "--reason", "x", ...WITH_GATES], same.io,
+      depsOf(activationDatabase({ activate: () => pgError("22023", "SETTINGS_ACTIVATION_UNCHANGED") }).client, GATE_FILES))).toBe(0);
     expect(same.out).toEqual(['SETTINGS_ACTIVATION_UNCHANGED {"version":"17"}\n']);
     const conflict = output();
-    expect(await runSettingsCli(["activate", "18", "--by", "owner", "--reason", "x"], conflict.io,
-      depsOf(activationDatabase({ activate: () => pgError("40001", "SETTINGS_ACTIVATION_CONFLICT") }).client))).toBe(3);
+    expect(await runSettingsCli(["activate", "18", "--by", "owner", "--reason", "x", ...WITH_GATES], conflict.io,
+      depsOf(activationDatabase({ activate: () => pgError("40001", "SETTINGS_ACTIVATION_CONFLICT") }).client, GATE_FILES))).toBe(3);
     const notPassed = output();
     expect(await runSettingsCli(["activate", "19", "--by", "owner", "--reason", "x"], notPassed.io,
       depsOf(activationDatabase({ passed: false, passedList: ["17"] }).client))).toBe(4);
@@ -334,6 +341,19 @@ describe("cli.ts (one line per command, the exit codes of its header)", () => {
       expect(await runSettingsCli(args, u.io, { ...depsOf(db.client), connect: async () => { connected += 1; return { client: db.client, close: async () => undefined }; } })).toBe(2);
       expect(connected).toBe(0);
     }
+  });
+
+  it("activate with no gate answer at all (both gates silent, or a direct pnpm settings:activate) is refused: condition 6 always runs (ruling R59)", async () => {
+    const db = activationDatabase();
+    const silent = output();
+    expect(await runSettingsCli(["activate", "18", "--by", "owner", "--reason", "x"], silent.io, depsOf(db.client))).toBe(1);
+    expect(silent.err).toEqual(['DEBATEAI_SETTINGS_REFUSED {"command":"activate","code":"SETTINGS_GATE_LIVE_CHECK_FAILED","codes":["SETTINGS_GATE_UNANSWERED:anthropic","SETTINGS_GATE_UNANSWERED:deepinfra"]}\n']);
+    expect(db.sqls().some((sql) => sql.includes("BEGIN") || sql.includes("activate_settings_version"))).toBe(false);
+    // Both answer files unreadable: the same refusal.
+    const unreadable = activationDatabase();
+    const both = output();
+    expect(await runSettingsCli(["activate", "18", "--by", "owner", "--reason", "x", "--gate-remaining", "deepinfra=/g/none.json", "--gate-remaining", "anthropic=/g/none2.json"], both.io, depsOf(unreadable.client))).toBe(1);
+    expect(unreadable.sqls().some((sql) => sql.includes("activate_settings_version"))).toBe(false);
   });
 
   it("activate --gate-remaining: each gate's raw /remaining answer; an unreadable or invalid answer is no answer (condition 6 refuses, exit 1)", async () => {

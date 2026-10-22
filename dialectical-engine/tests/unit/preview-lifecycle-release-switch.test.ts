@@ -640,6 +640,11 @@ describe('the switch\'s settings step (side-by-side spec §13, §11; S15, ruling
     const later = host({ edgeAfter: [[site(OLD_KEY, 503, ['DRAINING'])]], settings: { [NEW_KEY]: { expectedActiveSettings: 18, activate: 21 } } });
     await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', activate: 21, layout, deps: later.deps }));
     expect(later.writes().filter(entry => entry.startsWith('recordReleaseSwitch'))[1]).toBe('recordReleaseSwitch(old→, expect new, 8s, settings 21 → activate 18 by root release-switch (switch reverted to old))');
+    // A code-only upload (both releases on the same site version): the first switch activated that version, which the
+    // old release's own site version is too, so the revert has nothing to activate (0124 would refuse UNCHANGED).
+    const same = host({ edgeAfter: [[site(OLD_KEY, 503, ['DRAINING'])]], settings: { [NEW_KEY]: { expectedActiveSettings: null, activate: 19 } } });
+    expect((await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: same.deps }))).code).toBe('SWITCH_REVERTED');
+    expect(same.writes().filter(entry => entry.startsWith('recordReleaseSwitch'))[1]).toBe('recordReleaseSwitch(old→, expect new, 8s, settings 19)');
     const plain = host({ edgeAfter: [[site(OLD_KEY, 503, ['DRAINING'])]], settings: { [NEW_KEY]: { expectedActiveSettings: 19, activate: null } } });
     await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: plain.deps }));
     expect(plain.writes().filter(entry => entry.startsWith('recordReleaseSwitch'))[1]).toBe('recordReleaseSwitch(old→, expect new, 8s, settings 19)');

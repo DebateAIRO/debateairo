@@ -21,10 +21,13 @@
 // `cli.ts switch-plan`, ruling R12).
 //
 // The operator commands run as the release writers' principal: root as `postgres` through the server's own socket (the
-// same principal release-table.mjs's psql uses), from a release's API folder (where tools/settings-version lives), with
-// PATH, locale, TZ and libpq's PGHOST/PGPORT/PGDATABASE/PGUSER only. The halves run with the lock's pinned identity of
-// their unit (serviceUid/serviceGid, the identity the launcher itself asserts, launch-plan.mjs) through setpriv, and their
-// env file's values reach them only as the child's environment, never on a command line.
+// same principal release-table.mjs's psql uses), from a release's API folder (the lock's services.api.sourceRoot, where
+// tools/settings-version lives), with PATH, locale, TZ and libpq's PGHOST/PGPORT/PGDATABASE/PGUSER only. The halves run
+// with the lock's pinned identity of their unit (serviceUid/serviceGid, the identity the launcher itself asserts,
+// launch-plan.mjs) through setpriv with no new privileges, and their env file's values reach them only as the child's
+// environment, never on a command line. Before ANY of that code runs, release-guard.mjs's source check passes for its
+// release (the launchers' own check: the pinned manifest, byte for byte, and every file it loads root-only up to `/`),
+// else RELEASE_UNVERIFIED and nothing runs (the rule jit-creator-actor.mjs follows).
 //
 // One JSON line per run on stdout (or the operator command's own line), one refusal line on stderr. Exit codes: check 0
 // PASS, 2 FAIL, 1 refused (nothing recorded); activate and status: the operator command's own (0 done, 1 refused by
@@ -35,7 +38,8 @@ import { dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { readEnvironmentFile } from '../../preview-auth-dev/v1/environment.mjs';
 import { LAYOUT, RELEASE_LABEL, atomicWrite, currentDirFor, envPathFor, logLine, runBounded } from './common.mjs';
-import { RELEASES_ROOT, readLock } from './prestart.mjs';
+import { loadPinnedRelease, readLock } from './prestart.mjs';
+import { verifyReleaseForImport } from './release-guard.mjs';
 import { RELEASE_KEY_PATTERN, readCurrentRelease } from './release-table.mjs';
 
 /** The operator module's command file, inside a release's engine folder. */
@@ -44,6 +48,8 @@ export const OPERATOR_ENTRY = 'tools/settings-version/cli.ts';
 export const HALF_ENTRIES = Object.freeze({ runner: 'apps/runner/src/settings-check-cli.ts', api: 'apps/api/src/settings-check-cli.ts' });
 /** tsx's loader inside a release's engine folder (as jit-creator-actor.mjs loads tsx from the release itself). */
 export const TSX_LOADER = 'node_modules/tsx/dist/loader.mjs';
+/** What the operator command loads first from the release (the guard checks each is root-only; the manifest covers the rest). */
+export const OPERATOR_IMPORTS = Object.freeze([TSX_LOADER, OPERATOR_ENTRY, 'tools/settings-version/settings-operator.ts']);
 /** Each half's dry boot reads the register and the site; it makes no AI call. The operator commands are small reads. */
 export const HALF_TIMEOUT_MS = 300000, OPERATOR_TIMEOUT_MS = 60000, REMAINING_TIMEOUT_MS = 10000;
 export const RECEIPT_SCHEMA = 'preview-settings-check-receipt-v1';
@@ -90,16 +96,6 @@ const reasonOk = value => typeof value === 'string' && value.length >= 1 && valu
 const utcStamp = ms => new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
 
 /**
- * Where a release's operator module lives: its API folder on the preview (prestart.mjs's native source root,
- * `<releases>/auth-dev-candidate-<label>-api`). The public server (release-info 'overlay') has no settings operator
- * until Phase 3 adopts these commands (plan D11): null there.
- */
-export function operatorEngineFor(layout, label) {
-  requireLabel(label);
-  return layout.releaseSource === 'overlay' ? null : `${RELEASES_ROOT}/auth-dev-candidate-${label}-api/dialectical-engine`;
-}
-
-/**
  * runuser -u postgres -- /usr/bin/env -i PATH=<node>:/usr/local/bin:/usr/bin:/bin LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC
  *   TSX_DISABLE_CACHE=1 PGHOST=<sock> PGPORT=<port> PGDATABASE=<db> PGUSER=postgres PGCONNECT_TIMEOUT=3
  *   <node> --import=<engine>/node_modules/tsx/dist/loader.mjs <engine>/tools/settings-version/cli.ts <args…>
@@ -114,12 +110,14 @@ export function operatorArgv({ layout, nodePath, engine, args }) {
 }
 
 /**
- * setpriv --reuid=<uid> --regid=<gid> --init-groups --inh-caps=-all -- <node> --import=<tsx loader> <engine>/<half entry> <v>
- * The unit's pinned identity; its env file's values come as the child's environment (checkHalfEnvironment).
+ * setpriv --reuid=<uid> --regid=<gid> --init-groups --inh-caps=-all --no-new-privs -- <node> --import=<tsx loader> <engine>/<half entry> <v>
+ * The unit's pinned identity; its env file's values come as the child's environment (checkHalfEnvironment). The lock pins
+ * no supplementary groups (prestart.mjs ENTRY_KEYS), so the user's own groups (--init-groups) stand in for them: a half
+ * reads what its unit's user may read (its env file's group, the database CA), nothing more.
  */
 export function checkHalfArgv({ layout, nodePath, engine, identity, half, version }) {
   if (!Object.hasOwn(HALF_ENTRIES, half) || !Number.isSafeInteger(identity?.uid) || identity.uid < 1 || !Number.isSafeInteger(identity?.gid) || identity.gid < 1) refuse('ARGUMENTS_REFUSED');
-  return [layout.setpriv, `--reuid=${identity.uid}`, `--regid=${identity.gid}`, '--init-groups', '--inh-caps=-all', '--',
+  return [layout.setpriv, `--reuid=${identity.uid}`, `--regid=${identity.gid}`, '--init-groups', '--inh-caps=-all', '--no-new-privs', '--',
     nodePath, `--import=${pathToFileURL(`${engine}/${TSX_LOADER}`).href}`, `${engine}/${HALF_ENTRIES[half]}`, String(requireVersion(version))];
 }
 /** The half's environment: its env file's values, then PATH, locale, TZ and tsx's no-cache (these win). */
@@ -139,6 +137,9 @@ function withDefaults(layout, deps) {
     now: deps.now ?? Date.now,
     nodePath: deps.nodePath ?? process.execPath,
     readLock: deps.readLock ?? (() => readLock(layout)),
+    // A pinned release's lock entry and its reviewed launch plan (prestart.mjs), what the guard verifies against.
+    loadPinned: deps.loadPinned ?? (({ service, label }) => loadPinnedRelease({ service, label, layout })),
+    guard: deps.guard ?? verifyReleaseForImport,
     readCurrentRelease: deps.readCurrentRelease ?? (() => readCurrentRelease({ layout, run })),
     // A per-release env file: root-owned 0640 with the service's group (deploy/preview-auth-dev/v1/README.md).
     readEnvironment: deps.readEnvironment ?? ((path, serviceGid) => readEnvironmentFile(path, { root: layout.nativePlanRoot, uid, gid: serviceGid, mode: 0o640 })),
@@ -155,6 +156,20 @@ async function runOperator(io, layout, engine, args) {
   if (!finished(result)) refuse('SETTINGS_OPERATOR_UNAVAILABLE');
   return { code: result.code, stdout: outputLines(result.stdout), stderr: outputLines(result.stderr) };
 }
+/**
+ * The release guard before any release code runs (release-guard.mjs): the release's pinned manifest and plan, each listed
+ * file root-only. Any failure is RELEASE_UNVERIFIED (its own code in `cause`). Resolves the engine folder.
+ */
+async function verified(io, { entry, plan }, role, relativePaths) {
+  const engine = `${entry.sourceRoot}/dialectical-engine`;
+  try {
+    await io.guard({ plan, role, importPaths: relativePaths.map(path => `${engine}/${path}`) });
+  } catch (error) { refuse('RELEASE_UNVERIFIED', { cause: codeOf(error) }); }
+  return engine;
+}
+/** A pinned release's API folder (the lock's services.api.sourceRoot): where its operator module lives. */
+const apiEngineOf = pinned => `${pinned.entry.sourceRoot}/dialectical-engine`;
+
 /** The one `<kind> <json>` line of an output, parsed; null when there is not exactly one. */
 function oneLine(lines, kind) {
   const found = lines.filter(line => line.startsWith(`${kind} `));
@@ -177,13 +192,16 @@ const versionOrNull = value => (value === null ? null : typeof value === 'string
 export async function planSettingsForSwitch({ newKey, labels, activate = null, layout = LAYOUT, deps = {} }) {
   if (typeof newKey !== 'string' || !RELEASE_KEY_PATTERN.test(newKey) || !Array.isArray(labels) || labels.length < 1) refuse('ARGUMENTS_REFUSED');
   if (activate !== null && activate !== 'latest-passed') requireVersion(activate);
+  // The public server (release-info 'overlay') has no settings operator until Phase 3 adopts these commands (plan D11).
+  if (layout.releaseSource === 'overlay') return Object.freeze({ expectedActiveSettings: null, activate: null, planned: false });
   const io = withDefaults(layout, deps);
-  let engine = null;
+  let pinned = null;
   for (const label of labels) {
-    const candidate = operatorEngineFor(layout, label);
-    if (candidate !== null && await io.pathExists(`${candidate}/${OPERATOR_ENTRY}`)) { engine = candidate; break; }
+    const candidate = await io.loadPinned({ service: 'api', label: requireLabel(label) });
+    if (await io.pathExists(`${apiEngineOf(candidate)}/${OPERATOR_ENTRY}`)) { pinned = candidate; break; }
   }
-  if (engine === null) return Object.freeze({ expectedActiveSettings: null, activate: null, planned: false });
+  if (pinned === null) return Object.freeze({ expectedActiveSettings: null, activate: null, planned: false });
+  const engine = await verified(io, pinned, 'api', OPERATOR_IMPORTS);
   const mode = activate === null ? [] : activate === 'latest-passed' ? ['--latest-passed'] : ['--activate', String(activate)];
   const out = await runOperator(io, layout, engine, ['switch-plan', newKey, ...mode]);
   if (out.code === 4) {
@@ -197,14 +215,15 @@ export async function planSettingsForSwitch({ newKey, labels, activate = null, l
 }
 
 /**
- * The settings line of the release check: `cli.ts status` from `engine` (null on the public server or when the folder
- * carries no operator module). Resolves { pointer, effectiveActive, passed } or null when nothing could be asked.
+ * The settings line of the release check: `cli.ts status` from release `label`'s API folder (null on the public server
+ * or when the folder carries no operator module). Resolves { pointer, effectiveActive, passed } or null when nothing could be asked.
  */
 export async function readSettingsStatus({ label, layout = LAYOUT, deps = {} }) {
+  if (layout.releaseSource === 'overlay') return null;
   const io = withDefaults(layout, deps);
-  const engine = operatorEngineFor(layout, label);
-  if (engine === null || !await io.pathExists(`${engine}/${OPERATOR_ENTRY}`)) return null;
-  const out = await runOperator(io, layout, engine, ['status']);
+  const pinned = await io.loadPinned({ service: 'api', label: requireLabel(label) });
+  if (!await io.pathExists(`${apiEngineOf(pinned)}/${OPERATOR_ENTRY}`)) return null;
+  const out = await runOperator(io, layout, await verified(io, pinned, 'api', OPERATOR_IMPORTS), ['status']);
   const status = out.code === 0 ? oneLine(out.stdout, 'DEBATEAI_SETTINGS_STATUS') : null;
   if (status === null) refuse('SETTINGS_OPERATOR_UNAVAILABLE');
   return Object.freeze({ pointer: versionOrNull(status.pointer), effectiveActive: versionOrNull(status.effectiveActive), currentRelease: status.currentRelease ?? null });
@@ -228,15 +247,16 @@ export function readRemaining(socketPath, scopeId) {
   });
 }
 
-/** The pinned release of `label` (root's lock): its key and its runner and API entries. */
+/** The pinned release of `label` (prestart.mjs loadPinnedRelease): its key, and its runner and API entries with their plans. */
 async function pinnedRelease(io, label) {
-  const { lock } = await io.readLock();
-  const release = own(lock?.releases, label) ?? refuse('RELEASE_LOCK_RELEASE_MISSING');
+  const halves = {};
   for (const half of ['runner', 'api']) {
-    const entry = own(release.services, half);
+    const pinned = await io.loadPinned({ service: half, label });
+    const entry = pinned?.entry;
     if (typeof entry?.sourceRoot !== 'string' || !Number.isSafeInteger(entry.serviceUid) || !Number.isSafeInteger(entry.serviceGid)) refuse('RELEASE_LOCK_RELEASE_MISSING');
+    halves[half] = pinned;
   }
-  return release;
+  return { releaseKey: halves.api.release?.releaseKey, services: { runner: halves.runner.entry, api: halves.api.entry }, pinned: halves };
 }
 /** The current release's label (the release table names its key; root's lock pins exactly one label for it). */
 async function currentRelease(io) {
@@ -245,7 +265,7 @@ async function currentRelease(io) {
   const { lock } = await io.readLock();
   const labels = Object.keys(lock?.releases ?? {}).filter(name => lock.releases[name]?.releaseKey === current.releaseKey);
   if (labels.length !== 1) refuse('CURRENT_NOT_PINNED');
-  return { label: labels[0], releaseKey: current.releaseKey, release: await pinnedRelease(io, labels[0]) };
+  return { label: labels[0], releaseKey: current.releaseKey, api: await io.loadPinned({ service: 'api', label: labels[0] }) };
 }
 
 /** One half: run it, keep its DEBATEAI_SETTINGS_CHECK lines; `unavailable` names why it could not report (content-free). */
@@ -261,7 +281,7 @@ async function runHalf(io, layout, label, release, half, version) {
   // Exit 2 is the half's "could not check" (SETTINGS_CHECK_USAGE / SETTINGS_CHECK_UNAVAILABLE:<reason> on stderr).
   const reason = /^SETTINGS_CHECK_UNAVAILABLE:([A-Z][A-Z0-9_]{0,63})$/.exec(outputLines(result.stderr).find(line => line.startsWith('SETTINGS_CHECK_')) ?? '');
   if (result.code !== 0 && result.code !== 1) return { half, exitCode: result.code, lines, unavailable: reason ? reason[1] : 'CHECK_UNAVAILABLE' };
-  if (lines.length !== 1) return { half, exitCode: result.code, lines, unavailable: 'REPORT_LINE_MISSING' };
+  if (lines.length !== 1) return { half, exitCode: result.code, lines, unavailable: lines.length === 0 ? 'REPORT_LINE_MISSING' : 'REPORT_LINE_COUNT' };
   return { half, exitCode: result.code, lines, unavailable: null };
 }
 
@@ -274,6 +294,9 @@ export async function checkSettingsVersion({ label, version, layout = LAYOUT, de
   const v = requireVersion(version);
   const io = withDefaults(layout, deps);
   const release = await pinnedRelease(io, label);
+  // The guard for both folders before anything runs: the runner half's files, and the API folder's half and operator.
+  await verified(io, release.pinned.runner, 'runner', [TSX_LOADER, HALF_ENTRIES.runner]);
+  await verified(io, release.pinned.api, 'api', [TSX_LOADER, HALF_ENTRIES.api, ...OPERATOR_IMPORTS.slice(1)]);
   const runner = await runHalf(io, layout, label, release, 'runner', v);
   const api = await runHalf(io, layout, label, release, 'api', v);
   const folder = currentDirFor(layout, label);
@@ -320,9 +343,9 @@ export async function activateSettings({ version, by, reason, layout = LAYOUT, d
   const v = requireVersion(version);
   if (typeof by !== 'string' || !ACTIVATED_BY.test(by) || !reasonOk(reason)) refuse('ARGUMENTS_REFUSED');
   const io = withDefaults(layout, deps);
-  const { label, release } = await currentRelease(io);
-  const api = release.services.api;
-  const environment = await io.readEnvironment(envPathFor(layout, 'api', label), api.serviceGid).catch(() => refuse('ENVIRONMENT_UNREADABLE'));
+  const { label, api: pinned } = await currentRelease(io);
+  const engine = await verified(io, pinned, 'api', OPERATOR_IMPORTS);
+  const environment = await io.readEnvironment(envPathFor(layout, 'api', label), pinned.entry.serviceGid).catch(() => refuse('ENVIRONMENT_UNREADABLE'));
   const { scopeId, sockets } = gateSockets(own(environment, 'PREVIEW_PROVIDER_TEST_CONFIG_JSON'), layout.gates);
   // SA10 (addition D21): the gate-code fingerprint check over layout.gates runs here, before any answer is read.
   const stamp = utcStamp(io.now());
@@ -335,14 +358,14 @@ export async function activateSettings({ version, by, reason, layout = LAYOUT, d
     await io.writeFile(path, answer);
     args.push('--gate-remaining', `${gate.name}=${path}`);
   }
-  return runOperator(io, layout, `${api.sourceRoot}/dialectical-engine`, args);
+  return runOperator(io, layout, engine, args);
 }
 
 /** `status`: the operator command from the current release's API folder. */
 export async function settingsStatus({ layout = LAYOUT, deps = {} }) {
   const io = withDefaults(layout, deps);
-  const { release } = await currentRelease(io);
-  return runOperator(io, layout, `${release.services.api.sourceRoot}/dialectical-engine`, ['status']);
+  const { api } = await currentRelease(io);
+  return runOperator(io, layout, await verified(io, api, 'api', OPERATOR_IMPORTS), ['status']);
 }
 
 /** Exact argv shapes only; anything else refuses before a file, a unit or the database is touched. */

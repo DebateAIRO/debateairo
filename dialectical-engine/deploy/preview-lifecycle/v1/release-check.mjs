@@ -480,6 +480,8 @@ export async function releaseCheck({ label, olderManifest, newerManifest, gateRo
       if (pinned) {
         try {
           const plan = await io.planSettings({ newKey: pinned.releaseKey, labels: [label, older], activate });
+          // An --activate no operator module can plan: the switch refuses it (SETTINGS_OPERATOR_MISSING), so the check does too.
+          if (!plan.planned && activate !== null) return miss(`SETTINGS_OPERATOR_MISSING: neither release carries the settings operator, so --activate ${activate} cannot be planned`);
           if (!plan.planned) return pass('no settings pointer in these releases\' code: each release on its own site version');
           return pass(`expects ${plan.expectedActiveSettings ?? 'none'}; the switch activates ${plan.activate ?? 'nothing'}`);
         } catch (error) {

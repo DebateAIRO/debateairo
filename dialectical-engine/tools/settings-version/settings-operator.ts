@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { RELEASE_KEY_PATTERN, TypedDomainError, parseReleaseKey } from "@debateai/kernel";
 import { previewModelRowForRef } from "@debateai/providers";
-import { SETTINGS_CHECKER, SETTINGS_CHECK_LINE_KIND, type SettingsCheckReport } from "@debateai/register";
+import { SETTINGS_CHECKER, SETTINGS_CHECK_LINE_KIND, isSettingsCheckCode, type SettingsCheckReport } from "@debateai/register";
 import { readRunnerRoleRefs } from "../../apps/runner/src/settings-check.js";
 
 /**
@@ -94,8 +94,6 @@ const reportInvalid = (): SettingsOperatorRefusal =>
 // --- The verdict -----------------------------------------------------------------------------------------------------
 
 const REPORT_KEYS = Object.freeze(["half", "releaseKey", "version", "verdict", "codes", "snapshotSha256", "checker"]);
-/** A report code: S14's shape (`CODE` or `CODE:<detail>`), printable ASCII, no space. */
-const REPORT_CODE = /^[A-Z][A-Z0-9_]{2,}(?::[!-~]{1,240})?$/u;
 const SHA256_HEX = /^[0-9a-f]{64}$/u;
 
 /**
@@ -122,7 +120,7 @@ export function parseSettingsCheckLine(line: string): SettingsCheckReport {
   if (typeof releaseKey !== "string" || !RELEASE_KEY_PATTERN.test(releaseKey)) throw reportInvalid();
   if (typeof version !== "number" || !Number.isSafeInteger(version) || version < 1) throw reportInvalid();
   if (verdict !== "PASS" && verdict !== "FAIL") throw reportInvalid();
-  if (!Array.isArray(codes) || codes.some((code) => typeof code !== "string" || !REPORT_CODE.test(code))) throw reportInvalid();
+  if (!Array.isArray(codes) || codes.some((code) => !isSettingsCheckCode(code))) throw reportInvalid();
   const sorted = [...new Set(codes as string[])].sort();
   if (sorted.length !== codes.length || sorted.some((code, index) => code !== codes[index])) throw reportInvalid();
   if ((verdict === "PASS") !== (codes.length === 0)) throw reportInvalid();
@@ -359,7 +357,10 @@ async function assertGatesServe(client: SettingsOperatorClient, version: number,
  *   2. the current release (core.read_current_release) and the pointer; no current release: SETTINGS_ACTIVATION_CONFLICT;
  *   3. an early plain refusal when the current release has not passed `v` (register.settings_version_passed; the
  *      database refuses again anyway): SETTINGS_VERSION_NOT_PASSED, naming what it passed;
- *   4. condition 6 live, when gate answers are given (the preview: every gate's `/remaining`);
+ *   4. condition 6 live, ALWAYS (ruling R59): every gate's `/remaining` answer that was read; a gate with no answer
+ *      refuses the models it serves (no answers at all = everything refused, never "skip the check"). The public server,
+ *      which has no preview gates, has no settings operator until Phase 3 (R58): that phase decides its exemption from
+ *      the release's deployment; this module has no opt-out;
  *   5. `SELECT register.activate_settings_version($1,$2,$3,$4,$5)` inside `BEGIN ISOLATION LEVEL READ COMMITTED` … `COMMIT`
  *      (0124 requires READ COMMITTED), with the pointer and the release read in step 2 as the expected values.
  * The database's refusals keep their codes (by SQLSTATE and code): SETTINGS_ACTIVATION_CONFLICT (40001),
@@ -368,7 +369,7 @@ async function assertGatesServe(client: SettingsOperatorClient, version: number,
  */
 export async function activateSettingsVersion(
   client: SettingsOperatorClient,
-  input: Readonly<{ version: number; activatedBy: string; reason: string; gateEnabledModels?: GateEnabledModels }>,
+  input: Readonly<{ version: number; activatedBy: string; reason: string; gateEnabledModels: GateEnabledModels }>,
   readers: ActivationReaders = ACTIVATION_READERS
 ): Promise<Readonly<{ activationSeq: string; previous: number | null; releaseKey: string }>> {
   if (!Number.isSafeInteger(input.version) || input.version < 1) throw usage("activate takes one positive settings version");
@@ -384,7 +385,7 @@ export async function activateSettingsVersion(
     throw new SettingsOperatorRefusal("SETTINGS_VERSION_NOT_PASSED",
       "The current release has not passed this version: run the check first", { passed: await readPassed(client, currentRelease) });
   }
-  if (input.gateEnabledModels !== undefined) await assertGatesServe(client, input.version, input.gateEnabledModels, readers);
+  await assertGatesServe(client, input.version, input.gateEnabledModels, readers);
   await client.query("BEGIN ISOLATION LEVEL READ COMMITTED");
   let activationSeq: string;
   try {

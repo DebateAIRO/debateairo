@@ -451,6 +451,9 @@ describe('the settings line (side-by-side spec §13, S15)', () => {
     expect(named(await run({}, { ...PINNED, settingsPlan: { expectedActiveSettings: null, activate: null, planned: false } }), 'SETTINGS'))
       .toMatchObject({ ok: true, detail: 'no settings pointer in these releases\' code: each release on its own site version' });
     await expect(releaseCheck(input({ activate: 0 }).args)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED' });
+    // --activate that no operator module can plan: the switch would refuse it (SETTINGS_OPERATOR_MISSING), so it is a miss.
+    expect(named(await run({ activate: 21 }, { ...PINNED, settingsPlan: { expectedActiveSettings: null, activate: null, planned: false } }), 'SETTINGS'))
+      .toMatchObject({ ok: false, detail: expect.stringMatching(/^SETTINGS_OPERATOR_MISSING: /u) });
   });
 });
 

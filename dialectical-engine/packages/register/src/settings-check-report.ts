@@ -43,6 +43,13 @@ export type SettingsCheckReport = Readonly<{
 export type SettingsCheckStep = Readonly<{ name: string; run: () => Promise<readonly string[]> }>;
 
 const CODE_WITH_DETAIL = /^[A-Z][A-Z0-9_]{2,}:[A-Za-z0-9_.:/-]+$/u;
+/** A report code: `CODE` or `CODE:<detail>`, the settings caches' own alphabet (`settingsRefusalCode`) and CODE_WITH_DETAIL's. */
+const SETTINGS_CHECK_CODE = /^[A-Z][A-Z0-9_]{2,}(?::[A-Za-z0-9_.:/-]+)?$/u;
+
+/** Whether `code` is a code a half's report may carry (S15's verdict reads the line with this same rule). */
+export function isSettingsCheckCode(code: unknown): boolean {
+  return typeof code === "string" && SETTINGS_CHECK_CODE.test(code);
+}
 
 /**
  * The code a check records for one refusal: the settings caches' own rule (`settingsRefusalCode`, ruling R31: a

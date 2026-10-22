@@ -5,8 +5,8 @@ import { pathToFileURL } from 'node:url';
 const settings = await import('../../deploy/' + 'preview-lifecycle/v1/settings-version.mjs');
 const common = await import('../../deploy/' + 'preview-lifecycle/v1/common.mjs');
 
-const { CHECK_HINTS, HALF_ENTRIES, OPERATOR_ENTRY, RECEIPT_SCHEMA, activateSettings, checkHalfArgv, checkSettingsVersion, gateSockets, hintFor,
-  main, operatorArgv, operatorEngineFor, planSettingsForSwitch, settingsStatus } = settings;
+const { CHECK_HINTS, HALF_ENTRIES, OPERATOR_ENTRY, OPERATOR_IMPORTS, RECEIPT_SCHEMA, activateSettings, checkHalfArgv, checkSettingsVersion, gateSockets, hintFor,
+  main, operatorArgv, planSettingsForSwitch, settingsStatus } = settings;
 const LAYOUT = common.LAYOUT;
 const NODE = '/usr/local/lib/nodejs/bin/node';
 // Keys are built from pieces (the secret scanner reads r<n>-<12 hex> as a key).
@@ -38,6 +38,10 @@ type Options = Partial<{
   remaining: Record<string, string | null>;
   envFails: string[];
   existing: string[];
+  // Fix round 1: the release guard (release-guard.mjs verifyReleaseForImport) refuses these source roots.
+  guardFails: string[];
+  // Fix round 1: the lock's API source root for a label (the operator's folder comes from the lock).
+  apiRoots: Record<string, string>;
 }>;
 
 /** A fake preview host: the lock (two releases), the release table, the env files, the gates, the files root writes, and one runner for every command. */
@@ -48,9 +52,14 @@ function host(options: Options = {}) {
       ? result(`DEBATEAI_SETTINGS_VERDICT ${JSON.stringify({ releaseKey: NEW_KEY, version: '21', verdict: 'PASS', digest: 'd'.repeat(64), codes: [] })}\n`, 0)
       : result(`DEBATEAI_SETTINGS_STATUS {"currentRelease":"${OLD_KEY}","pointer":"19","effectiveActive":"19","passed":["19"]}\n`)),
     current: OLD_KEY as string | null, remaining: { deepinfra: '{"enabled_models":[]}', anthropic: '{"enabled_models":["claude-haiku-5-5"]}' } as Record<string, string | null>,
-    envFails: [] as string[], existing: [] as string[], ...options
+    envFails: [] as string[], existing: [] as string[], guardFails: [] as string[], apiRoots: {} as Record<string, string>, ...options
   };
   const calls: Call[] = [], log: string[] = [], files: Record<string, string> = {};
+  const lockOf = () => {
+    const release = (label: string, key: string) => ({ releaseKey: key, slot: label === OLD ? 'A' : 'B', databaseAhead: null, services: Object.fromEntries(['api', 'runner', 'ui'].map(service =>
+      [service, { sourceRoot: service === 'api' ? o.apiRoots[label] ?? root(label, service) : root(label, service), serviceUid: IDS[service]?.uid ?? 1401, serviceGid: IDS[service]?.gid ?? 1402 }])) });
+    return { schema: 'preview-lifecycle-release-lock-v2', releases: { [OLD]: release(OLD, OLD_KEY), [NEW]: release(NEW, NEW_KEY) } };
+  };
   const deps = {
     nodePath: NODE,
     now: () => Date.parse('2026-10-23T01:46:00.123Z'),
@@ -68,10 +77,18 @@ function host(options: Options = {}) {
       }
       throw new Error(`unexpected ${argv.join(' ')}`);
     },
-    readLock: async () => {
-      const release = (label: string, key: string) => ({ releaseKey: key, slot: label === OLD ? 'A' : 'B', databaseAhead: null, services: Object.fromEntries(['api', 'runner', 'ui'].map(service =>
-        [service, { sourceRoot: root(label, service), serviceUid: IDS[service]?.uid ?? 1401, serviceGid: IDS[service]?.gid ?? 1402 }])) });
-      return { lock: { schema: 'preview-lifecycle-release-lock-v2', releases: { [OLD]: release(OLD, OLD_KEY), [NEW]: release(NEW, NEW_KEY) } }, lockSha256: 'f'.repeat(64) };
+    readLock: async () => ({ lock: lockOf(), lockSha256: 'f'.repeat(64) }),
+    // prestart.mjs loadPinnedRelease: the lock entry and the release's reviewed launch plan.
+    loadPinned: async ({ service, label }: { service: string; label: string }) => {
+      const release = lockOf().releases[label as keyof ReturnType<typeof lockOf>['releases']];
+      if (!release) throw Object.assign(new Error('missing'), { code: 'RELEASE_LOCK_RELEASE_MISSING' });
+      const entry = (release.services as Record<string, { sourceRoot: string; serviceUid: number; serviceGid: number }>)[service]!;
+      return { release, entry, plan: { service, sourceRoot: entry.sourceRoot, sourceManifest: { path: `${entry.sourceRoot}.manifest.json` } } };
+    },
+    guard: async ({ plan, importPaths, role }: { plan: { sourceRoot: string }; importPaths: string[]; role?: string }) => {
+      log.push(`guard ${plan.sourceRoot} ${role ?? 'api'} ${importPaths.map(path => path.slice(plan.sourceRoot.length + 1)).join(' ')}`);
+      if (o.guardFails.includes(plan.sourceRoot)) throw Object.assign(new Error('guard'), { code: 'RELEASE_PATH_NOT_ROOT_ONLY' });
+      return {};
     },
     readCurrentRelease: async () => (o.current === null ? null : { releaseKey: o.current, takeTrafficFrom: '2026-10-22T03:15:05.000Z' }),
     readEnvironment: async (path: string, gid: number) => {
@@ -107,16 +124,13 @@ describe('the command lines (side-by-side spec §13, S15)', () => {
 
   it('runs a half with its unit\'s pinned identity, from its own folder, the version its one argument', () => {
     expect(checkHalfArgv({ layout: LAYOUT, nodePath: NODE, engine: engine(NEW, 'runner'), identity: IDS.runner, half: 'runner', version: 21 })).toEqual([
-      '/usr/bin/setpriv', '--reuid=1201', '--regid=1202', '--init-groups', '--inh-caps=-all', '--',
+      '/usr/bin/setpriv', '--reuid=1201', '--regid=1202', '--init-groups', '--inh-caps=-all', '--no-new-privs', '--',
       NODE, loader(NEW, 'runner'), `${engine(NEW, 'runner')}/apps/runner/src/settings-check-cli.ts`, '21'
     ]);
     expect(HALF_ENTRIES).toEqual({ runner: 'apps/runner/src/settings-check-cli.ts', api: 'apps/api/src/settings-check-cli.ts' });
     for (const bad of [{ half: 'ui' }, { identity: { uid: 0, gid: 1 } }, { version: '021' }]) {
       expect(() => checkHalfArgv({ layout: LAYOUT, nodePath: NODE, engine: engine(NEW, 'runner'), identity: IDS.runner, half: 'runner', version: 21, ...bad })).toThrow();
     }
-    // The operator module lives in the API folder on the preview; the public server has none until Phase 3.
-    expect(operatorEngineFor(LAYOUT, NEW)).toBe(engine(NEW, 'api'));
-    expect(operatorEngineFor(common.VPS_LAYOUT, NEW)).toBeNull();
   });
 });
 
@@ -147,7 +161,11 @@ describe('check <label> <version>', () => {
     expect(verdict!.argv.slice(-5)).toEqual(['verdict', '--runner', `${CURRENT_NEW}/settings-check-21-${STAMP}-runner.txt`, '--api', `${CURRENT_NEW}/settings-check-21-${STAMP}-api.txt`]);
     expect(verdict!.argv.slice(0, 4)).toEqual(['/usr/sbin/runuser', '-u', 'postgres', '--']);
     expect([verdict!.opts.cwd, verdict!.opts.env]).toEqual([engine(NEW, 'api'), {}]);
+    const LOADER = 'dialectical-engine/node_modules/tsx/dist/loader.mjs';
     expect(h.log).toEqual([
+      // The release guard first, for both folders, before any half or operator run (release-guard.mjs rule).
+      `guard ${root(NEW, 'runner')} runner ${LOADER} dialectical-engine/apps/runner/src/settings-check-cli.ts`,
+      `guard ${root(NEW, 'api')} api ${LOADER} dialectical-engine/apps/api/src/settings-check-cli.ts dialectical-engine/tools/settings-version/cli.ts dialectical-engine/tools/settings-version/settings-operator.ts`,
       `env /etc/debateai-v3-preview/auth-dev-v1/runner-${NEW}.env gid 1202`, 'half runner', `env /etc/debateai-v3-preview/auth-dev-v1/api-${NEW}.env gid 1302`, 'half api',
       `write ${r.receipt}`, `write ${CURRENT_NEW}/settings-check-21-${STAMP}-runner.txt`, `write ${CURRENT_NEW}/settings-check-21-${STAMP}-api.txt`, 'operator verdict'
     ]);
@@ -174,7 +192,7 @@ describe('check <label> <version>', () => {
     const cases: [Options, Record<string, string>][] = [
       [{ halves: { runner: result('', 2, 'SETTINGS_CHECK_UNAVAILABLE:ECONNREFUSED\n'), api: result(`${checkLine('api')}\n`) } }, { runner: 'ECONNREFUSED' }],
       [{ halves: { runner: result(`${checkLine('runner')}\n`), api: result('', null, '', { timedOut: true }) } }, { api: 'TIMEOUT' }],
-      [{ halves: { runner: result('nothing\n', 0), api: result(`${checkLine('api')}\n${checkLine('api')}\n`, 0) } }, { runner: 'REPORT_LINE_MISSING', api: 'REPORT_LINE_MISSING' }],
+      [{ halves: { runner: result('nothing\n', 0), api: result(`${checkLine('api')}\n${checkLine('api')}\n`, 0) } }, { runner: 'REPORT_LINE_MISSING', api: 'REPORT_LINE_COUNT' }],
       [{ envFails: ['api'] }, { api: 'ENVIRONMENT_UNREADABLE' }]
     ];
     for (const [options, halves] of cases) {
@@ -202,6 +220,7 @@ describe('activate and status', () => {
     expect(out.stdout).toEqual([`DEBATEAI_SETTINGS_ACTIVATED {"version":"21","previous":"19","releaseKey":"${OLD_KEY}","activationSeq":"4"}`]);
     const folder = `/opt/debateai-v3-preview/artifacts/lifecycle-current-${OLD}`;
     expect(h.log).toEqual([
+      `guard ${root(OLD, 'api')} api dialectical-engine/node_modules/tsx/dist/loader.mjs dialectical-engine/tools/settings-version/cli.ts dialectical-engine/tools/settings-version/settings-operator.ts`,
       `env /etc/debateai-v3-preview/auth-dev-v1/api-${OLD}.env gid 1302`,
       'remaining deepinfra preview-team', `write ${folder}/settings-activate-${STAMP}-deepinfra-remaining.json`,
       'remaining anthropic preview-team', `write ${folder}/settings-activate-${STAMP}-anthropic-remaining.json`,
@@ -274,6 +293,58 @@ describe('the switch\'s settings plan (ruling R12)', () => {
     }
     const timedOut = host({ existing, operator: () => result('', null, '', { timedOut: true }) });
     expect((await refusal(planSettingsForSwitch({ newKey: NEW_KEY, labels: [NEW], layout: LAYOUT, deps: timedOut.deps }))).code).toBe('SETTINGS_OPERATOR_UNAVAILABLE');
+  });
+});
+
+describe('the release guard and the lock (fix round 1)', () => {
+  it('a release that fails the source check runs nothing: no half, no operator, no write (RELEASE_UNVERIFIED)', async () => {
+    for (const failing of [root(NEW, 'runner'), root(NEW, 'api')]) {
+      const h = host({ guardFails: [failing] });
+      expect(await refusal(checkSettingsVersion({ label: NEW, version: 21, layout: LAYOUT, deps: h.deps }))).toMatchObject({ code: 'RELEASE_UNVERIFIED', fields: { cause: 'RELEASE_PATH_NOT_ROOT_ONLY' } });
+      expect([h.calls, h.files]).toEqual([[], {}]);
+    }
+    const activate = host({ guardFails: [root(OLD, 'api')] });
+    expect((await refusal(activateSettings({ version: 21, by: 'owner', reason: 'x', layout: LAYOUT, deps: activate.deps }))).code).toBe('RELEASE_UNVERIFIED');
+    expect([activate.calls, activate.log.filter(line => line.startsWith('remaining'))]).toEqual([[], []]);
+    const status = host({ guardFails: [root(OLD, 'api')] });
+    expect((await refusal(settingsStatus({ layout: LAYOUT, deps: status.deps }))).code).toBe('RELEASE_UNVERIFIED');
+    expect(status.calls).toEqual([]);
+    const plan = host({ guardFails: [root(NEW, 'api')], existing: [`${engine(NEW, 'api')}/${OPERATOR_ENTRY}`] });
+    expect((await refusal(planSettingsForSwitch({ newKey: NEW_KEY, labels: [NEW, OLD], layout: LAYOUT, deps: plan.deps }))).code).toBe('RELEASE_UNVERIFIED');
+    expect(plan.calls).toEqual([]);
+  });
+
+  it('the operator\'s folder is the lock\'s API source root, and the guard covers the files it loads', async () => {
+    const fallback = '/opt/debateai-v3-preview/releases/auth-dev-fallback-new-v1-api';
+    const h = host({ apiRoots: { [NEW]: fallback }, existing: [`${fallback}/dialectical-engine/${OPERATOR_ENTRY}`],
+      operator: () => result(`DEBATEAI_SETTINGS_SWITCH_PLAN {"releaseKey":"${NEW_KEY}","expectedActiveSettings":"19","activate":null}\n`) });
+    await planSettingsForSwitch({ newKey: NEW_KEY, labels: [NEW, OLD], layout: LAYOUT, deps: h.deps });
+    expect(operatorCalls(h.calls)[0]!.opts.cwd).toBe(`${fallback}/dialectical-engine`);
+    expect(h.log[0]).toBe(`guard ${fallback} api ${OPERATOR_IMPORTS.map((path: string) => `dialectical-engine/${path}`).join(' ')}`);
+    expect(OPERATOR_IMPORTS).toEqual(['node_modules/tsx/dist/loader.mjs', 'tools/settings-version/cli.ts', 'tools/settings-version/settings-operator.ts']);
+  });
+
+  it('release-guard.mjs verifies a runner release as role runner (its launcher\'s own check); any other role refuses first', async () => {
+    const guard = await import('../../deploy/' + 'preview-lifecycle/v1/release-guard.mjs');
+    const roles: string[] = [];
+    let reads = 0;
+    const readArtifact = async () => { reads += 1; return { uid: 0 }; };
+    const verifyManifest = async (_source: unknown, expected: { role: string }) => { roles.push(expected.role); throw new Error('stop'); };
+    const plan = { sourceManifest: { sha256: 'a'.repeat(64) }, sourceRevision: 'b'.repeat(40), sourceTree: 'c'.repeat(40), sourceRoot: root(NEW, 'runner') };
+    for (const role of ['runner', undefined]) {
+      await expect(guard.verifyReleaseForImport({ plan, importPaths: ['/x'], ...(role ? { role } : {}), readArtifact, verifyManifest })).rejects.toMatchObject({ code: 'RELEASE_UNVERIFIED' });
+    }
+    expect(roles).toEqual(['runner', 'api']);
+    await expect(guard.verifyReleaseForImport({ plan, importPaths: ['/x'], role: 'ui', readArtifact, verifyManifest })).rejects.toMatchObject({ code: 'RELEASE_UNVERIFIED' });
+    expect(reads).toBe(2);
+  });
+
+  it('activate with both gates silent still asks the operator, with no answer at all: its condition 6 refuses (ruling R59)', async () => {
+    const h = host({ remaining: { deepinfra: null, anthropic: null },
+      operator: () => result('', 1, 'DEBATEAI_SETTINGS_REFUSED {"command":"activate","code":"SETTINGS_GATE_LIVE_CHECK_FAILED","codes":["SETTINGS_GATE_UNANSWERED:anthropic","SETTINGS_GATE_UNANSWERED:deepinfra"]}\n') });
+    const out = await activateSettings({ version: 21, by: 'owner', reason: 'x', layout: LAYOUT, deps: h.deps });
+    expect(out.code).toBe(1);
+    expect(operatorCalls(h.calls)[0]!.argv.filter(part => part === '--gate-remaining')).toEqual([]);
   });
 });
 

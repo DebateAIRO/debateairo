@@ -124,7 +124,11 @@ export async function readCurrentRelease({ layout = LAYOUT, run = runBounded }) 
 /** `activated_by`'s CHECK in migration 0124 (no colon): the switch's activation names its root tool in this form. */
 export const ACTIVATED_BY = /^[A-Za-z0-9][A-Za-z0-9 ._@-]{0,127}$/;
 const SETTINGS_VERSION = /^[1-9][0-9]{0,15}$/;
-/** The database's refusals of the switch transaction, each kept by name (0123's and 0124's codes). */
+/**
+ * The database's refusals of the switch transaction, each kept by name (0123's and 0124's codes). 0124's
+ * READ_COMMITTED_REQUIRED (DETAIL of SETTINGS_ACTIVATION_CONFLICT) cannot occur: releaseSwitchSql fixes
+ * BEGIN ISOLATION LEVEL READ COMMITTED.
+ */
 const SWITCH_REFUSALS = Object.freeze({
   RELEASE_SWITCH_CONFLICT: 'RELEASE_SWITCH_CONFLICT', RELEASE_EVENT_INVALID: 'RELEASE_EVENT_REFUSED',
   SETTINGS_ACTIVATION_CONFLICT: 'SETTINGS_ACTIVATION_CONFLICT', SETTINGS_VERSION_NOT_PASSED: 'SETTINGS_VERSION_NOT_PASSED',

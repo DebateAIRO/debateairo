@@ -1475,6 +1475,7 @@ export {
 export {
   SETTINGS_CHECK_LINE_KIND,
   SETTINGS_CHECKER,
+  isSettingsCheckCode,
   parseSettingsCheckArguments,
   readSettingsVersionFacts,
   runSettingsCheckCommand,

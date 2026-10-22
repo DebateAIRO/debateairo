@@ -2,7 +2,8 @@
  * Side-by-side spec §13, §11 (S15) — THE SETTINGS OPERATOR COMMANDS.
  *
  *   cli.ts verdict --runner <file> --api <file>          record check-version's verdict (both halves' lines)
- *   cli.ts activate <v> --by <name> --reason <text> [--gate-remaining <gate>=<file>]…
+ *   cli.ts activate <v> --by <name> --reason <text> [--gate-remaining <gate>=<file>]…   (condition 6 always runs: a gate
+ *                                                        with no answer refuses the models it serves, ruling R59)
  *   cli.ts status                                        the current release, the pointer, what new asks use, what passed
  *   cli.ts latest-passed <releaseKey>                    the version a rollback to that release activates
  *   cli.ts switch-plan <releaseKey> [--activate <v> | --latest-passed]   the release switch's settings step (read-only)
@@ -110,11 +111,13 @@ async function withConnection<T>(deps: SettingsCliDeps, work: (client: SettingsO
   try { return await work(connection.client); } finally { await connection.close(); }
 }
 
-/** `--gate-remaining <gate>=<file>`: each file is one gate's raw `/remaining` answer; an unreadable or invalid one is no answer. */
-async function gateAnswers(values: readonly string[] | undefined, deps: SettingsCliDeps): Promise<GateEnabledModels | undefined> {
-  if (values === undefined) return undefined;
+/**
+ * `--gate-remaining <gate>=<file>`: each file is one gate's raw `/remaining` answer; an unreadable or invalid one is no
+ * answer, and no flag at all is no answer from any gate (ruling R59: condition 6 always runs and refuses then).
+ */
+async function gateAnswers(values: readonly string[] | undefined, deps: SettingsCliDeps): Promise<GateEnabledModels> {
   const answers: Record<string, readonly string[]> = {};
-  for (const value of values) {
+  for (const value of values ?? []) {
     const at = value.indexOf("=");
     const gate = value.slice(0, at), path = value.slice(at + 1);
     if (at < 1 || !GATE_NAME.test(gate) || path.length === 0 || Object.hasOwn(answers, gate)) throw usage("--gate-remaining is <gate>=<file>, once per gate");
@@ -152,7 +155,7 @@ const COMMANDS: Readonly<Record<string, Command>> = Object.freeze({
     const gateEnabledModels = await gateAnswers(found.get("--gate-remaining"), deps);
     try {
       const done = await withConnection(deps, (client) => activateSettingsVersion(client, {
-        version, activatedBy, reason, ...(gateEnabledModels === undefined ? {} : { gateEnabledModels })
+        version, activatedBy, reason, gateEnabledModels
       }, deps.activationReaders));
       output.stdout(line("DEBATEAI_SETTINGS_ACTIVATED", {
         version: String(version), previous: versionText(done.previous), releaseKey: done.releaseKey, activationSeq: done.activationSeq
