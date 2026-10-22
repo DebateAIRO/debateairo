@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import { WorkItemRepository, type WorkItemFence } from "@debateai/battery";
 import { readReleaseState, type ReleaseLifecycleState } from "@debateai/db";
+import type { ProviderCallRequest, ProviderCallResult, ProviderGateway } from "@debateai/providers";
 
 /**
  * Side-by-side spec §4 (D1): how a release retires inside its own process. A retiring release "stops claiming; it lets
@@ -24,10 +25,18 @@ export interface TaskExecutionCounter {
   enter(): () => void;
   /** The tasks running now. */
   count(): number;
+  /**
+   * R2 (final review): a counted task names the work item it runs, once its dispatch is valid; the returned function
+   * forgets it (calling it more than once forgets once). Two copies of one item are named twice.
+   */
+  workingOn(workItemId: string): () => void;
+  /** True while a task of this process runs `workItemId`: the five-minute re-send never hands it back here. */
+  isWorkingOn(workItemId: string): boolean;
 }
 
 export function createTaskExecutionCounter(): TaskExecutionCounter {
   let running = 0;
+  const items = new Map<string, number>();
   return Object.freeze({
     enter() {
       running += 1;
@@ -38,7 +47,63 @@ export function createTaskExecutionCounter(): TaskExecutionCounter {
         running -= 1;
       };
     },
-    count: () => running
+    count: () => running,
+    workingOn(workItemId: string) {
+      items.set(workItemId, (items.get(workItemId) ?? 0) + 1);
+      let forgotten = false;
+      return () => {
+        if (forgotten) return;
+        forgotten = true;
+        const left = (items.get(workItemId) ?? 0) - 1;
+        if (left > 0) items.set(workItemId, left);
+        else items.delete(workItemId);
+      };
+    },
+    isWorkingOn: (workItemId: string) => items.has(workItemId)
+  });
+}
+
+/**
+ * R1 (final review): this process's model calls in flight, every one of them: the debate's, the verdict story's, a
+ * structure repair, a claim-time probe. A call is counted from the moment its gateway is asked until its promise
+ * settles, answered or failed, so on the preview the one 60-second unbilled resend inside the call is counted too. The
+ * backstop reads it after its settle: a preview call may take 1,260 s plus that resend, longer than the 1,200 s settle,
+ * and a process that ends under a call the gate still holds open halts the gate both releases share.
+ */
+export interface ModelCallCounter {
+  /** A call started; the returned `leave` ends it. Calling `leave` more than once counts once. */
+  enter(): () => void;
+  /** The calls in flight now. */
+  count(): number;
+}
+
+export function createModelCallCounter(): ModelCallCounter {
+  let inFlight = 0;
+  return Object.freeze({
+    enter() {
+      inFlight += 1;
+      let left = false;
+      return () => {
+        if (left) return;
+        left = true;
+        inFlight -= 1;
+      };
+    },
+    count: () => inFlight
+  });
+}
+
+/** R1: `gateway`, each of its calls counted in `calls` from the ask until it settles (main.ts wraps them all). */
+export function countModelCalls(gateway: ProviderGateway, calls: Pick<ModelCallCounter, "enter">): ProviderGateway {
+  return Object.freeze({
+    async call(request: ProviderCallRequest): Promise<ProviderCallResult> {
+      const leave = calls.enter();
+      try {
+        return await gateway.call(request);
+      } finally {
+        leave();
+      }
+    }
   });
 }
 
@@ -80,14 +145,19 @@ export function createRunnerRetirementSignal(): RunnerRetirementSignal {
  *
  * Part 3, spec §4 "the backstop is a request, not a kill": root records "retire now" for a DRAINING release (switch
  * plus 7.5 hours), and the runner honours it at the next read, a request standing since before this process started
- * included, whether or not its front pair is recorded stopped yet (root stops the old pair anyway):
+ * included (X2: main.ts reads that one once before its worker starts, `honourStandingRetireRequest`, so both stops are
+ * on before the first claim), whether or not its front pair is recorded stopped yet (root stops the old pair anyway):
  *   1. it stops claiming and stops new model calls (BACKSTOP_STARTED);
  *   2. it lets the calls in flight settle: every 5 s it reads the task counter, until no task runs or 1,200 s have
  *      passed (the gate's call deadline; BACKSTOP_SETTLE_EXPIRED). A call in flight is never killed;
  *   3. it records what is left FAILED as RUN_SET_ASIDE:BACKSTOP with each run's waiver in the same transaction
  *      (spec §9: no quota use; the site day keeps counting real spend), retried every 5 s on failure, never skipped
  *      (BACKSTOP_SET_ASIDE_FAILED, then BACKSTOP_SET_ASIDE with the count);
- *   4. it retires as above (announce, emit, then stop the worker) and `retired` resolves "BACKSTOP".
+ *   4. it retires as above (announce, emit, then stop the worker) and `retired` resolves "BACKSTOP" — unless a model
+ *      call of this process is still in flight (R1, the model-call counter, never the task counter): then it says
+ *      RUNNER_BACKSTOP_CALL_IN_FLIGHT, does not retire, and leaves the end to root's forced stop. So when it does
+ *      retire after BACKSTOP_SETTLE_EXPIRED, what still runs is a task's non-call wait, which the launcher's 30 s
+ *      bound may cut.
  * A pass that throws is logged (BACKSTOP_FAILED) and runs again at the next read; every step is safe to repeat.
  * `stop()` ends a backstop between steps: the process is ending on its own signal.
  *
@@ -180,6 +250,29 @@ export function postgresRunnerRetirementStore(
   });
 }
 
+/**
+ * X2 (final review): the one read main.ts makes BEFORE its worker starts. A runner (re)started under a standing retire
+ * request (a reboot or a crash mid-drain, then `systemctl start`) would otherwise re-send and run its lapsed and READY
+ * work, paid calls included, until its first retirement read 60 s later, and the backstop would then set those debates
+ * aside. Under a request on a DRAINING release both stops go on before the first claim, so every claim answers NO_WORK
+ * and the backstop's pass finds nothing executing; true tells main to skip the start-up re-send (it would only hand the
+ * runner work to refuse). Any other state (a request on a release that is not DRAINING is ignored, D5) changes nothing.
+ * A read that fails is thrown: the boot fails like every other boot read, loud, with nothing stopped.
+ */
+export async function honourStandingRetireRequest(input: Readonly<{
+  releaseKey: string;
+  store: Pick<RunnerRetirementStore, "readFacts">;
+  signal: RunnerRetirementSignal;
+  log(line: Readonly<Record<string, string | number>>): void;
+}>): Promise<boolean> {
+  const facts = await input.store.readFacts(input.releaseKey);
+  if (facts.state !== "DRAINING" || !facts.retireRequested) return false;
+  input.signal.stopClaims();
+  input.signal.stopCalls();
+  input.log(Object.freeze({ kind: KIND, event: "RETIRE_REQUEST_STANDING", openWork: facts.openWork }));
+  return true;
+}
+
 type RetirementClock = Readonly<{
   now(): number;
   setTimeout(callback: () => void, ms: number): unknown;
@@ -208,6 +301,8 @@ export function startRunnerRetirement(input: Readonly<{
   releaseKey: string;
   store: RunnerRetirementStore;
   executions: Pick<TaskExecutionCounter, "count">;
+  /** R1: this process's model calls in flight (main.ts: every gateway and claim probe, `countModelCalls`). */
+  calls: Pick<ModelCallCounter, "count">;
   signal: RunnerRetirementSignal;
   stopWorker(): Promise<void>;
   log(line: Readonly<Record<string, string | number>>): void;
@@ -303,6 +398,16 @@ export function startRunnerRetirement(input: Readonly<{
     }
     input.log(Object.freeze({ kind: KIND, event: "BACKSTOP_SET_ASIDE", count }));
     if (stopped) return;
+    // R1 (final review): read AFTER the set-aside, the latest word. A model call still in flight (only possible after
+    // BACKSTOP_SETTLE_EXPIRED: a preview call may take 1,260 s plus its 60 s unbilled resend) is never cut by this
+    // release ending itself: the launcher would end the process under it and halt the gate both releases share. The
+    // debates are set aside with their waivers all the same; `retiring` stays set, so no further read, and the end is
+    // root's 25-minute forced stop (which re-opens a gate it halted). A call that settled meanwhile retires as below.
+    const callsInFlight = input.calls.count();
+    if (callsInFlight > 0) {
+      input.log(Object.freeze({ kind: KIND, event: "RUNNER_BACKSTOP_CALL_IN_FLIGHT", calls: callsInFlight }));
+      return;
+    }
     await retire("BACKSTOP");
   };
 

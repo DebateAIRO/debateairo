@@ -287,7 +287,53 @@ describe('the real readiness seam', () => {
     expect(announce).toBeGreaterThan(0);
     expect(announce).toBeLessThan(resend); expect(resend).toBeLessThan(retire); expect(retire).toBeLessThan(ended);
     expect(source.slice(ended)).toContain('lapsedResend.stop();\nretirement.stop();');
-    expect(source).toContain('stopWorker: async () => { lapsedResend.stop(); await worker.stop(); }');
+    expect(source).toContain('stopWorker: async () => {\n    lapsedResend.stop();\n    await worker.stop();\n');
+  });
+
+  // R4 (final review): a retired runner's process ends by itself (the public server has no launcher to exit it). The
+  // pools end only once worker.stop() resolved, when Hatchet has waited for every task; never after `await started`,
+  // which Hatchet resolves before its running tasks finish (and a planned stop leaves the exit to Hatchet itself).
+  it('runner main ends both pools once the retired worker has stopped, and never at its tail', async () => {
+    const source = await readFile(resolve('apps/runner/src/main.ts'), 'utf8');
+    expect(source).toContain('stopWorker: async () => {\n    lapsedResend.stop();\n    await worker.stop();\n    await Promise.allSettled([pool.end(), keepAlivePool.end()]);\n  },');
+    expect(source.match(/\.end\(\)/g)).toHaveLength(2);
+    expect(source.slice(source.indexOf('await started;'))).not.toContain('.end()');
+  });
+
+  // X2 (final review): a standing retire request is read once BEFORE the worker starts; under it both stops are on before
+  // the first claim and the start-up re-send is skipped (it would only hand the runner work to refuse).
+  it('runner main honours a standing retire request before the worker starts, and then skips the start-up re-send', async () => {
+    const source = await readFile(resolve('apps/runner/src/main.ts'), 'utf8');
+    const store = source.indexOf('const retirementStore = postgresRunnerRetirementStore(pool, workFence);'),
+      standing = source.indexOf('const retireRequestStanding = await honourStandingRetireRequest({'),
+      start = source.indexOf('worker.start()'), reconcile = source.indexOf('await reconcileRunnerStartupWork(');
+    expect(store).toBeGreaterThan(0);
+    expect(store).toBeLessThan(standing); expect(standing).toBeLessThan(start); expect(start).toBeLessThan(reconcile);
+    expect(source.slice(standing, start)).toContain('store: retirementStore,');
+    expect(source.slice(standing, start)).toContain('signal: retirementSignal,');
+    expect(source).toContain('const startupReconciliation = retireRequestStanding\n  ? Object.freeze({ dispatched: 0 })\n  : await reconcileRunnerStartupWork({');
+    expect(source.slice(source.indexOf('startRunnerRetirement({'))).toContain('store: retirementStore,');
+    expect(source.match(/postgresRunnerRetirementStore\(/g)).toHaveLength(1);
+  });
+
+  // R2 (final review): the five-minute re-send skips an item a task of this process still runs.
+  it('runner main hands the lapsed re-send the task counter\'s work items', async () => {
+    const source = await readFile(resolve('apps/runner/src/main.ts'), 'utf8');
+    const resend = source.slice(source.indexOf('startLapsedClaimResend({'), source.indexOf('startRunnerRetirement({'));
+    expect(resend).toContain('running: (workItemId) => executions.isWorkingOn(workItemId),');
+  });
+
+  // R1 (final review): the backstop reads the runner's own model-call accounting before this release ends itself. Every
+  // call the runner and the story make goes through a provider member, and a claim probe is a call through the gate too.
+  it('runner main counts every model call (each provider member, each claim probe) and hands the count to the backstop', async () => {
+    const source = await readFile(resolve('apps/runner/src/main.ts'), 'utf8');
+    expect(source).toContain('const modelCalls = createModelCallCounter();');
+    expect(source.match(/createRunnerProviderTopology\(/g)).toHaveLength(1);
+    expect(source).toContain('(target) => countModelCalls(\n    withStructureRepair(targetGateways.get(target.providerRef)!, structureRepairRoute), modelCalls));');
+    const probe = source.slice(source.indexOf('function observeClaimTarget('), source.indexOf('const workFence ='));
+    expect(probe).toContain('const leave = modelCalls.enter();');
+    expect(probe).toContain('}).finally(leave);');
+    expect(source.slice(source.indexOf('startRunnerRetirement({'))).toContain('calls: modelCalls,');
   });
 });
 

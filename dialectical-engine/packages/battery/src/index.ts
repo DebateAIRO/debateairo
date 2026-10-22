@@ -588,14 +588,23 @@ export class WorkItemRepository {
     });
   }
 
+  /**
+   * Records the work item DONE with its settled attempt and artifact. R3 (final review), spec §3/§4: a repository that
+   * names its worker settles only that worker's own claim (`state = 'CLAIMED' AND claimed_by = worker`), so a task
+   * finishing after the backstop set its debate aside FAILED (RUN_SET_ASIDE, with the waiver) never writes DONE over
+   * it, and never settles another worker's claim. One told no worker id (test fixtures) settles a READY or CLAIMED
+   * item, and never a FAILED one either. True when this call wrote it.
+   */
   async settle(input: { readonly workItemId: string; readonly attemptId: string; readonly artifactRef: string }): Promise<boolean> {
     return withWriteTransaction(this.pool, async (client) => {
       const result = await client.query(
         `UPDATE core.work_item
          SET state = 'DONE', claimed_by = NULL, claim_deadline = NULL,
              settled_attempt_id = $2, settled_artifact_ref = $3
-         WHERE work_item_id = $1 AND settled_attempt_id IS NULL`,
-        [input.workItemId, input.attemptId, input.artifactRef]
+         WHERE work_item_id = $1 AND settled_attempt_id IS NULL
+           AND state IN ('READY','CLAIMED')
+           AND ($4::text IS NULL OR (state = 'CLAIMED' AND claimed_by = $4::text))`,
+        [input.workItemId, input.attemptId, input.artifactRef, this.#fence.workerId]
       );
       return result.rowCount === 1;
     });
@@ -663,14 +672,26 @@ export class WorkItemRepository {
    * Records a run's work item FAILED with `reason`. Spec §3: only an item of this fence's release, and never one under
    * another worker's live claim — that copy is still running the debate (D2). An item of its own release already
    * FAILED is re-written with the new reason, as before (D2). True when the item now reads FAILED with `reason`.
+   *
+   * R7 (final review): `heldUntil` is the failing copy's own word about the claim, for two copies of one item in one
+   * process under the same worker id (a Hatchet retry, a second dispatch). `null`: this copy never claimed the item, so
+   * it writes over no live claim at all, its sibling's included. A deadline: the one this copy last set, and a live
+   * claim is written only when it still carries that deadline (±1 ms, the driver's millisecond Date of the microsecond
+   * column, exactly as `renewClaim`'s fence), so a stale copy never fails the claim a later copy took. Absent: today's
+   * fence (this worker's live claim is written).
    */
   async recordTerminalFailure(input: {
     readonly runId: string;
     readonly workItemId: string;
     readonly reason: string;
+    readonly heldUntil?: Date | null;
   }): Promise<boolean> {
     if (input.reason.trim().length === 0) {
       throw new TypeError("Terminal failure reason must be a typed non-empty value");
+    }
+    if (input.heldUntil !== undefined && input.heldUntil !== null
+      && !(input.heldUntil instanceof Date && Number.isFinite(input.heldUntil.getTime()))) {
+      throw new TypeError("TERMINAL_FAILURE_HELD_UNTIL_INVALID");
     }
     return withWriteTransaction(this.pool, async (client) => {
       const failed = await client.query(
@@ -682,8 +703,12 @@ export class WorkItemRepository {
            AND item.state <> 'DONE' AND item.settled_attempt_id IS NULL
            AND run.run_id = item.run_id AND run.release_key = $4
            AND NOT (item.state = 'CLAIMED' AND item.claim_deadline > clock_timestamp()
-                    AND item.claimed_by IS DISTINCT FROM $5::text)`,
-        [input.workItemId, input.runId, input.reason, this.#fence.releaseKey, this.#fence.workerId]
+                    AND (item.claimed_by IS DISTINCT FROM $5::text
+                         OR ($6::boolean AND ($7::timestamptz IS NULL
+                             OR item.claim_deadline NOT BETWEEN $7::timestamptz - interval '1 millisecond'
+                                                            AND $7::timestamptz + interval '1 millisecond'))))`,
+        [input.workItemId, input.runId, input.reason, this.#fence.releaseKey, this.#fence.workerId,
+          input.heldUntil !== undefined, input.heldUntil ?? null]
       );
       return failed.rowCount === 1;
     });

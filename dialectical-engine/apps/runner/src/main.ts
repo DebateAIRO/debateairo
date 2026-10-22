@@ -65,8 +65,11 @@ import { startLapsedClaimResend } from "./runner-lapsed-resend.js";
 import { postgresRunnerPreviewTeamGateStore, refusePreviewOutsiderWork } from "./runner-preview-team-gate.js";
 import { announceRunnerReady } from "./runner-ready.js";
 import {
+  countModelCalls,
+  createModelCallCounter,
   createRunnerRetirementSignal,
   createTaskExecutionCounter,
+  honourStandingRetireRequest,
   postgresRunnerRetirementStore,
   RUNNER_RETIRED_PROCESS_EVENT,
   startRunnerRetirement
@@ -246,6 +249,12 @@ const modelSpendStore = new PostgresModelSpendStore(pool);
  */
 const gatewayInFlight = createRunInFlight();
 const moneyInFlight = createRunInFlight();
+/**
+ * R1 (final review): EVERY model call of this process in flight — the debate's, the story's, a structure repair, a
+ * claim-time probe — from the ask until it settles (`countModelCalls`). The two counters above see only the calls
+ * their check binds (the story's calls are under neither), so the backstop reads this one before this release ends.
+ */
+const modelCalls = createModelCallCounter();
 /**
  * B9 (budget spec §2.9, paid-plans spec §2.4.1–2.4.2) — THE SHARED WALL WHILE
  * ARGUING, in two independent halves, built whenever hosted.
@@ -443,8 +452,12 @@ function targetGateway(target: (typeof providerTargets)[number]): ProviderGatewa
 const targetGateways = new Map(providerTargets.map((target) => [target.providerRef, targetGateway(target)] as const));
 const structureRepairRoute = previewConfig === undefined ? null : structureRepairThroughLane(
   previewStructureRepairRoute(providerTargets, (providerRef) => targetGateways.get(providerRef)), previewCallSubjects(previewConfig));
+// R1: every model call the runner and the story make goes through one of these members, so each is counted here, from
+// the ask until it settles: the preview's one 60-second unbilled resend and a structure repair's call (the route's
+// gateway is only ever called inside the call it repairs) included.
 const providerTopology = createRunnerProviderTopology(providerTargets,
-  (target) => withStructureRepair(targetGateways.get(target.providerRef)!, structureRepairRoute));
+  (target) => countModelCalls(
+    withStructureRepair(targetGateways.get(target.providerRef)!, structureRepairRoute), modelCalls));
 const runRepository = new RunRepository(pool);
 // V-20: taken on the DECLARED targets, because the three optional keys describe
 // what the operator wrote, credential included — a credential resolved from a
@@ -483,6 +496,8 @@ const storyWriter = new StoryWriter({
  * keeps the LAST observation (the runner records it). Off the preview: one probe, exactly as before.
  */
 function observeClaimTarget(target: (typeof providerTargets)[number]) {
+  // R1: a probe is a model call through the gate too (its 60-second resend included): counted until it settles.
+  const leave = modelCalls.enter();
   return observeClaimTimeTarget({
     preview: previewConfig !== undefined,
     target,
@@ -490,7 +505,7 @@ function observeClaimTarget(target: (typeof providerTargets)[number]) {
     ...(previewConfig === undefined ? {} : previewProbeControls(target)),
     fetchImplementation: previewFetch,
     clock: () => new Date()
-  });
+  }).finally(leave);
 }
 // Side-by-side spec §3: every work repository this process builds serves only this release's work items (claims,
 // renewals, the start-up re-send, failure writes), and its failure writes land only under this worker's live claim.
@@ -670,23 +685,35 @@ await refusePreviewOutsiderWork({
 // (packages/db/src/pool-budget.ts). Unset, Hatchet hands one worker 100.
 const worker = await hatchet.worker(environment.HATCHET_WORKER_NAME, { slots: RUNNER_CAPACITY.concurrentRuns });
 await worker.registerWorkflows([task]);
+const retirementStore = postgresRunnerRetirementStore(pool, workFence);
+// X2 (final review): one read of this release's facts BEFORE the worker starts. Under a standing retire request on a
+// DRAINING release (a restart mid-drain) both stops are on before the first claim, so nothing is claimed or paid for
+// before the backstop's first pass, and the start-up re-send is skipped (it would only hand back work to refuse).
+const retireRequestStanding = await honourStandingRetireRequest({
+  releaseKey: environment.RELEASE_KEY,
+  store: retirementStore,
+  signal: retirementSignal,
+  log: (line) => console.warn(JSON.stringify(line))
+});
 const started = worker.start();
 await worker.waitUntilReady(30_000);
-const startupReconciliation = await reconcileRunnerStartupWork({
-  work: new WorkItemRepository(pool, workFence),
-  dispatcher: {
-    dispatch: async ({ runId, workItemId }) => {
-      await hatchet.runNoWait(taskName, { runId, workItemId }, {
-        additionalMetadata: {
-          v3RunId: runId,
-          v3WorkItemId: workItemId,
-          sourceOfRecord: "core.work_item",
-          dispatchSource: "runner-startup-reconciliation"
-        }
-      });
+const startupReconciliation = retireRequestStanding
+  ? Object.freeze({ dispatched: 0 })
+  : await reconcileRunnerStartupWork({
+    work: new WorkItemRepository(pool, workFence),
+    dispatcher: {
+      dispatch: async ({ runId, workItemId }) => {
+        await hatchet.runNoWait(taskName, { runId, workItemId }, {
+          additionalMetadata: {
+            v3RunId: runId,
+            v3WorkItemId: workItemId,
+            sourceOfRecord: "core.work_item",
+            dispatchSource: "runner-startup-reconciliation"
+          }
+        });
+      }
     }
-  }
-});
+  });
 announceRunnerReady({
   kind: "DEBATEAI_RUNNER_READY",
   worker: environment.HATCHET_WORKER_NAME,
@@ -710,6 +737,8 @@ const lapsedResend = startLapsedClaimResend({
     });
   },
   paused: () => retirementSignal.claimsStopped(),
+  // R2 (final review): never an item a task of this process still runs (it would come back here as a second copy).
+  running: (workItemId) => executions.isWorkingOn(workItemId),
   log: (line) => console.warn(JSON.stringify(line))
 });
 // Side-by-side spec §4: every 60 s this runner reads its release's facts in one snapshot; once it is DRAINING, its
@@ -717,10 +746,22 @@ const lapsedResend = startLapsedClaimResend({
 // (stdout and the in-process event the preview launcher hears) BEFORE it stops the worker, so main ends as asked.
 const retirement = startRunnerRetirement({
   releaseKey: environment.RELEASE_KEY,
-  store: postgresRunnerRetirementStore(pool, workFence),
+  store: retirementStore,
   executions,
+  // R1: the backstop never retires under a model call still in flight.
+  calls: modelCalls,
   signal: retirementSignal,
-  stopWorker: async () => { lapsedResend.stop(); await worker.stop(); },
+  // R4 (final review): worker.stop() resolves once Hatchet has waited for every task, so both pools end then and no
+  // database connection keeps a retired runner's process up: on the public server, which has no launcher, it exits by
+  // itself, without process.exit. Never after `await started` below: Hatchet ends that listener BEFORE its running
+  // tasks finish, and a planned stop (SIGTERM) leaves the exit to Hatchet itself once they have. allSettled: a pool
+  // that fails to end never turns a clean retirement into RETIREMENT_STOP_FAILED. The Hatchet client's own connections
+  // are the SDK's; a live-handle check needs Hatchet and Postgres running, so the unit test pins this wiring instead.
+  stopWorker: async () => {
+    lapsedResend.stop();
+    await worker.stop();
+    await Promise.allSettled([pool.end(), keepAlivePool.end()]);
+  },
   log: (line) => console.warn(JSON.stringify(line)),
   announce: (line) => process.stdout.write(line),
   emit: (payload) => (process as NodeJS.EventEmitter).emit(RUNNER_RETIRED_PROCESS_EVENT, payload)

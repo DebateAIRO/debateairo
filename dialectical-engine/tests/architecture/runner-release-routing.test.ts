@@ -56,8 +56,10 @@ describe("the runner registers and re-sends under its release's own task name (s
     expect(main).not.toContain("new WorkItemRepository(keepAlivePool)");
     // Every repository, each with the fence as its second argument (the retirement store below also takes it).
     expect(main.match(/new WorkItemRepository\(\w+, workFence\)/gu)?.length).toBe(occurrences(main, "new WorkItemRepository("));
-    // Side-by-side spec §4: the retirement store is built with the same fence (plan B Task B11's set-aside writes under it).
-    expect(main).toContain("store: postgresRunnerRetirementStore(pool, workFence),");
+    // Side-by-side spec §4: the retirement store is built with the same fence (plan B Task B11's set-aside writes under it),
+    // once (X2: the boot read before the worker starts and the monitor share it).
+    expect(main).toContain("const retirementStore = postgresRunnerRetirementStore(pool, workFence);");
+    expect(occurrences(main, "postgresRunnerRetirementStore(")).toBe(1);
   });
 
   it("main.ts never refuses boot over funding: no pointer read, the funding source built whenever plans are (spec §9)", async () => {

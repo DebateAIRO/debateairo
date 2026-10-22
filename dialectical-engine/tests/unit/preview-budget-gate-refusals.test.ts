@@ -328,6 +328,32 @@ describe("the preview spending gate's 409 refusal body", () => {
       expect(other).toEqual([]);
     });
 
+    // R5 (final review), side-by-side §9 (D6): a model or price the shared gate no longer serves is not busy and will not
+    // come back within the minute, so the call ends at once: the runner's sit-out book drops that model for the run.
+    it("a model the gate no longer serves sits out at once: no 60-second wait, no resend, never made the busy probe", async () => {
+      for (const gateCode of ["MODEL_NOT_ALLOWED", "RESERVATION_MISMATCH"] as const) {
+        for (const busy of [undefined, createPreviewBusyCoordinator()]) {
+          const slept: number[] = [];
+          const ledger: ProviderLedgerInput[] = [];
+          const { sent, port } = scripted([new PreviewModelNotServed(gateCode), answer]);
+          const refusal = await gatewayFor(port, slept, ledger, busy === undefined ? {} : { busy }).call(request)
+            .then(() => null, (error: unknown) => error);
+          expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED", cause: expect.any(PreviewModelNotServed) });
+          expect(providerCallEndedVendorRefusedUnbilled(refusal)).toBe(true);
+          expect(sent).toHaveLength(1);
+          expect(slept).toEqual([]);
+          expect(ledger.map((entry) => entry.outcome)).toEqual(["REFUSED"]);
+          if (busy !== undefined) {
+            // The coordinator never parked the model behind a probe: its next call is sent at once.
+            const next = scripted([answer]);
+            await expect(gatewayFor(next.port, slept, [], { busy }).call(request)).resolves.toBeDefined();
+            expect(next.sent).toHaveLength(1);
+            expect(slept).toEqual([]);
+          }
+        }
+      }
+    });
+
     /**
      * Parallel calls §3.3 (owner ruling O4): three calls of one model in flight, all refused busy by the vendor. With a
      * busy coordinator exactly ONE of them (the probe) waits and resends; the other two wait for its outcome.

@@ -197,6 +197,77 @@ describe("work items are fenced by release (side-by-side §3)", () => {
     expect(await jobRow(ready.workItemId)).toMatchObject({ state: "FAILED", terminal_reason: "TEST_LAYER:REWRITTEN" });
   });
 
+  it("recordTerminalFailure fenced on the copy's own claim: a copy that never claimed, or a stale copy, fails no live claim (R7)", async () => {
+    const fail = (job: { runId: string; workItemId: string }, reason: string, heldUntil: Date | null) =>
+      fenceA().recordTerminalFailure({ ...job, reason, heldUntil });
+
+    // The copy that claims, through the real claim (the driver's millisecond Date of the microsecond column).
+    const live = await runWithJob(KEY_A);
+    const claimed = await fenceA().claimById({ workItemId: live.workItemId, workerId: "worker:a", claimSeconds });
+    expect(claimed).not.toBeNull();
+
+    // A duplicate task of this same worker that threw before its own claim: the live claim is its sibling's.
+    expect(await fail(live, "TEST_LAYER:NEVER_CLAIMED", null)).toBe(false);
+    // A stale copy of this same worker (its claim lapsed and a later copy claimed again): an older deadline.
+    expect(await fail(live, "TEST_LAYER:STALE_COPY", new Date(claimed!.claimDeadline.getTime() - 60_000))).toBe(false);
+    expect(await jobRow(live.workItemId)).toEqual({ state: "CLAIMED", terminal_reason: null, claimed_by: "worker:a" });
+
+    // The copy that holds the claim, with the deadline it last set: written.
+    expect(await fail(live, "TEST_LAYER:HOLDER", claimed!.claimDeadline)).toBe(true);
+    expect(await jobRow(live.workItemId)).toEqual({ state: "FAILED", terminal_reason: "TEST_LAYER:HOLDER", claimed_by: null });
+
+    // A copy that never claimed still fails an item nobody holds: READY, or a lapsed claim; never another release's.
+    const ready = await runWithJob(KEY_A), lapsed = await runWithJob(KEY_A), other = await runWithJob(KEY_B);
+    await claim(lapsed, "worker:a", false);
+    expect(await fail(ready, "TEST_LAYER:READY", null)).toBe(true);
+    expect(await fail(lapsed, "TEST_LAYER:LAPSED", null)).toBe(true);
+    expect(await fail(other, "TEST_LAYER:OTHER_RELEASE", null)).toBe(false);
+    expect(await jobRow(ready.workItemId)).toMatchObject({ state: "FAILED", terminal_reason: "TEST_LAYER:READY" });
+    expect(await jobRow(lapsed.workItemId)).toMatchObject({ state: "FAILED", terminal_reason: "TEST_LAYER:LAPSED" });
+    expect(await jobRow(other.workItemId)).toEqual({ state: "READY", terminal_reason: null, claimed_by: null });
+
+    // Another worker's live claim stays refused whatever the copy says.
+    const othersLive = await runWithJob(KEY_A);
+    const theirs = await new WorkItemRepository(runtime, { releaseKey: KEY_A, workerId: "worker:other" })
+      .claimById({ workItemId: othersLive.workItemId, workerId: "worker:other", claimSeconds });
+    expect(await fail(othersLive, "TEST_LAYER:OTHERS", theirs!.claimDeadline)).toBe(false);
+    expect(await jobRow(othersLive.workItemId)).toEqual({ state: "CLAIMED", terminal_reason: null, claimed_by: "worker:other" });
+  });
+
+  it("settle writes DONE only under this worker's own claim, never over a set-aside FAILED item (R3)", async () => {
+    const settle = (repository: WorkItemRepository, job: Job) =>
+      repository.settle({ workItemId: job.workItemId, attemptId: randomUUID(), artifactRef: randomUUID() });
+
+    const mine = await runWithJob(KEY_A);
+    await claim(mine, "worker:a", true);
+    expect(await settle(fenceA(), mine)).toBe(true);
+    expect(await jobRow(mine.workItemId)).toEqual({ state: "DONE", terminal_reason: null, claimed_by: null });
+
+    const othersLive = await runWithJob(KEY_A);
+    await claim(othersLive, "worker:other", true);
+    expect(await settle(fenceA(), othersLive)).toBe(false);
+    expect(await jobRow(othersLive.workItemId)).toEqual({ state: "CLAIMED", terminal_reason: null, claimed_by: "worker:other" });
+
+    // The backstop set the debate aside while this worker's last task still ran: that task's settle writes nothing.
+    const setAside = await runWithJob(KEY_A);
+    await claim(setAside, "worker:a", true);
+    expect(await fenceA().setAsideWorkItem({ ...setAside, reason: "BACKSTOP", readyOnly: false })).toBe(true);
+    expect(await settle(fenceA(), setAside)).toBe(false);
+    expect(await jobRow(setAside.workItemId)).toEqual({ state: "FAILED", terminal_reason: "RUN_SET_ASIDE:BACKSTOP", claimed_by: null });
+
+    // A runner settles only what it claimed: never a READY item.
+    const ready = await runWithJob(KEY_A);
+    expect(await settle(fenceA(), ready)).toBe(false);
+    expect(await jobRow(ready.workItemId)).toEqual({ state: "READY", terminal_reason: null, claimed_by: null });
+
+    // A repository told no worker id (the test fixtures') still settles an open item, and never a FAILED one.
+    const unnamed = new WorkItemRepository(runtime, { releaseKey: KEY_A });
+    expect(await settle(unnamed, ready)).toBe(true);
+    expect(await jobRow(ready.workItemId)).toMatchObject({ state: "DONE" });
+    expect(await settle(unnamed, setAside)).toBe(false);
+    expect(await jobRow(setAside.workItemId)).toEqual({ state: "FAILED", terminal_reason: "RUN_SET_ASIDE:BACKSTOP", claimed_by: null });
+  });
+
   it("refuses a malformed fence key; legacy and a well-formed key are accepted", () => {
     for (const releaseKey of ["r1-0123456789AB", "r01-aaaaaaaaaaaa", "", "LEGACY"]) {
       expect(() => new WorkItemRepository(runtime, { releaseKey })).toThrow(expect.objectContaining({ code: "RELEASE_KEY_INVALID" }));

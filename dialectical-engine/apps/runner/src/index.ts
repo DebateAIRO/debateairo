@@ -5365,6 +5365,10 @@ export class WalkingSkeletonRunner {
       ? await this.#work.claimNext(claimInput)
       : await this.#work.claimById({ ...claimInput, workItemId });
     if (claimed === null) return { kind: "NO_WORK" };
+    // R7 (final review): from here on this copy holds the claim, so a failure the task records is fenced on the
+    // deadline it last set: the claim's own, then the keep-alive's (renewals move it) once that starts below.
+    let claimHeldUntil = (): Date => claimed.claimDeadline;
+    task?.claimed?.(() => claimHeldUntil());
     if (claimed.runId === null) throw new TypedDomainError("WORK_ITEM_WITHOUT_RUN", claimed.workItemId);
     const claimedRunId = claimed.runId;
     /**
@@ -5382,6 +5386,7 @@ export class WalkingSkeletonRunner {
       // Side-by-side spec §4: once this release retires, the debate's next model call is refused (RUNNER_RETIRING).
       stopCalls: () => this.settings.retirement?.callsStopped() === true
     });
+    claimHeldUntil = () => keepAlive.heldUntil();
     /**
      * Parallel AI calls (spec 2026-10-12 §3.2): this debate's lane of the runner's call scheduler, opened once the
      * debate is claimed and closed in the `finally` below, after the story: a call still waiting then is refused
@@ -11544,6 +11549,11 @@ export interface RunnerFailureRecorder {
     readonly runId: string;
     readonly workItemId: string;
     readonly reason: string;
+    /**
+     * R7 (final review): the failing copy's claim — null when it never claimed the item, else the deadline it last set
+     * (`RunnerTaskControl.claimed`), so a duplicate copy under the same worker id never fails its sibling's live claim.
+     */
+    readonly heldUntil?: Date | null;
   }): Promise<boolean>;
 }
 
@@ -12663,7 +12673,7 @@ export function declareHatchetWalkingSkeletonTask(input: {
    * Side-by-side spec §4 (D1): counts this task while its handler runs, the verdict story included (it runs inside the
    * task after the work item is DONE), so a retiring release knows when none of its tasks is left.
    */
-  readonly executions?: Pick<TaskExecutionCounter, "enter">;
+  readonly executions?: Pick<TaskExecutionCounter, "enter" | "workingOn">;
 }): TaskWorkflowDeclaration<{ runId: string; workItemId: string }, { kind: string; answerId?: string }> {
   if(input.previewExecutionTimeout!==undefined&&input.previewExecutionTimeout!=="3600s")throw new TypeError("PREVIEW_EXECUTION_TIMEOUT_INVALID");
   if (!Number.isInteger(input.engineRetries) || input.engineRetries < 0) {
@@ -12693,6 +12703,10 @@ export function declareHatchetWalkingSkeletonTask(input: {
     ) => {
       // Side-by-side spec §4 (D1): the task is counted for its whole handler, the story included, failure or not.
       const leave = input.executions?.enter();
+      // R2 (final review): and, once its dispatch is valid, it names its work item, so the lapsed re-send skips it.
+      let forget: (() => void) | undefined;
+      // R7 (final review): the claim this copy holds, once the debate says so; null until then (never claimed).
+      const claim: { heldUntil: (() => Date) | null } = { heldUntil: null };
       try {
         // L4-F6: BEFORE the runner, before the repository, before anything reads
         // a field — and, at INT2 (SYNC2 into integration), before the S06 capture
@@ -12706,6 +12720,7 @@ export function declareHatchetWalkingSkeletonTask(input: {
           );
         }
         const dispatch = parsed.data;
+        forget = input.executions?.workingOn(dispatch.workItemId);
         const capture = await import("@debateai/obs-capture").catch(() => undefined);
         // Read the SDK accessor inside a guard: a throwing retryCount() must not
         // reject the task before executeWorkItem has run (s06-rework-1.md §4).
@@ -12735,6 +12750,7 @@ export function declareHatchetWalkingSkeletonTask(input: {
           : undefined;
         const task: RunnerTaskControl = Object.freeze({
           executionLimitMs,
+          claimed: (heldUntil: () => Date) => { claim.heldUntil = heldUntil; },
           ...(signal === undefined ? {} : { signal }),
           ...(refreshTimeout === undefined ? {} : { refreshTimeout })
         });
@@ -12767,7 +12783,9 @@ export function declareHatchetWalkingSkeletonTask(input: {
             const recorded = await input.failures.recordTerminalFailure({
               runId: dispatch.runId,
               workItemId: dispatch.workItemId,
-              reason: runnerTerminalFailureReason(error)
+              reason: runnerTerminalFailureReason(error),
+              // R7: a copy that threw before its own claim fails no live claim; one that claimed, only its own.
+              heldUntil: claim.heldUntil === null ? null : claim.heldUntil()
             });
             if (!recorded) {
               // OBS-R064: a handler that cannot record the failure must still
@@ -12801,6 +12819,7 @@ export function declareHatchetWalkingSkeletonTask(input: {
           work_item_ref: Object.freeze({ kind: "work_item", value: dispatch.workItemId })
         }), execute);
       } finally {
+        forget?.();
         leave?.();
       }
     }

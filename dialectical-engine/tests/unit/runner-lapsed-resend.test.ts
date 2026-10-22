@@ -55,6 +55,7 @@ function harness(options: Readonly<{
   list?: () => Promise<readonly DispatchableWorkItem[]>;
   dispatch?: (entry: DispatchableWorkItem) => Promise<void>;
   paused?: () => boolean;
+  running?: (workItemId: string) => boolean;
 }> = {}) {
   const time = fakeClock();
   const listCalls: Array<Readonly<{ limit: number; at: number }>> = [];
@@ -72,6 +73,7 @@ function harness(options: Readonly<{
       if (options.dispatch !== undefined) await options.dispatch(entry);
     },
     paused: options.paused ?? (() => false),
+    running: options.running ?? (() => false),
     log: (line) => { lines.push(line); },
     clock: time.clock
   });
@@ -112,6 +114,21 @@ describe("lapsed claims are re-sent by their own release every five minutes (sid
     expect(dispatched).toEqual(lapsed.slice(0, 100).map((entry) => entry.workItemId));
     expect(lines).toContainEqual({ kind: "DEBATEAI_RUNNER_RESEND", event: "LAPSED_RESEND_SATURATED", listed: 101 });
     expect(lines).toContainEqual({ kind: "DEBATEAI_RUNNER_RESEND", event: "LAPSED_RESENT", count: 100 });
+  });
+
+  // R2 (final review): a CLAIMED item whose claim lapsed while a task of THIS process still runs it (its renewals
+  // failing) would come back to this same process: a second copy under the same worker id, paying for the debate again.
+  it("never re-sends an item a task of this process is still running; the others go, and the skip is counted (R2)", async () => {
+    const { time, dispatched, lines } = harness({
+      list: async () => [item(1), item(2), item(3)],
+      running: (workItemId) => workItemId === "work-2"
+    });
+    await time.advance(300_000);
+    expect(dispatched).toEqual(["work-1", "work-3"]);
+    expect(lines).toEqual([
+      { kind: "DEBATEAI_RUNNER_RESEND", event: "LAPSED_RESEND_SKIPPED_RUNNING", count: 1 },
+      { kind: "DEBATEAI_RUNNER_RESEND", event: "LAPSED_RESENT", count: 2 }
+    ]);
   });
 
   it("a re-send that fails is logged by its work item, and the next items are still sent", async () => {
@@ -175,6 +192,7 @@ describe("lapsed claims are re-sent by their own release every five minutes (sid
       },
       dispatch: async () => undefined,
       paused: () => false,
+      running: () => false,
       log: () => undefined,
       clock: time.clock
     });
