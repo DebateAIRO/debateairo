@@ -171,8 +171,15 @@ describe("finite reviewed grants and exact action binding", () => {
   });
 
   it("rejects non-Owner, foreign-grant, held ordinary subject and direct delegated funding", async () => {
+    // A4 review: another owner's real grant (configured while that owner was the designated Owner; owner() moves the
+    // designation to the next fixture) is never read as this owner's revoke target.
+    const other = await fundedActor(), theirs = configureCommand(other);
+    await configure(other, theirs);
     const actor = await fundedActor(), command = configureCommand(actor), proof = await boundProof(actor, command);
-    await expect(runtime.query("SELECT staff.read_self_allowance_command($1::jsonb,$2,$3) AS state", [actor.context, hash(actor.sessionId), randomUUID()])).rejects.toThrow();
+    const readCommand = (grantId: string) => runtime.query("SELECT staff.read_self_allowance_command($1::jsonb,$2,$3) AS state",
+      [actor.context, hash(actor.sessionId), grantId]);
+    await expect(readCommand(randomUUID())).rejects.toThrow("INTERNAL_ALLOWANCE_TARGET_INVALID");
+    await expect(readCommand(theirs.operationId)).rejects.toThrow("INTERNAL_ALLOWANCE_TARGET_INVALID");
     await database.pool.query("UPDATE staff.owner_designation SET active=false WHERE staff_id=$1", [actor.staffId]);
     await expect(configure(actor, command, proof)).rejects.toThrow();
     await expect(database.pool.query("UPDATE staff.subject SET capabilities=ARRAY['ALLOWANCE_WRITE'] WHERE staff_id=$1", [actor.staffId])).rejects.toMatchObject({ code: "23514" });
