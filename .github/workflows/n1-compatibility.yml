@@ -5,7 +5,10 @@
 # release guide each time a release goes live) beside HEAD, and runs that OLD commit's database suites (`suites`) with
 # DEBATEAI_TEST_SCHEMA_FROM pointing at HEAD's dialectical-engine folder: every test database is first migrated by HEAD's
 # migrate-cli, then the old suite's own migrate() meets a database migrated ahead (the database-ahead path, A7). The old
-# commit's own tools/ci-known-red.mjs and tests/ci-known-red.txt judge its own tests.
+# commit's own tools/ci-known-red.mjs and tests/ci-known-red.txt judge its own tests. Those old files can never change,
+# so the baseline's `setAside` and `knownRed` test names (each with its reason; see tools/n1-baseline.mjs) are appended
+# to that old list in this job's checkout only: every other failure stays new, and a listed test that has started to
+# pass is still named stale (V-4).
 #   - Until a release is fenced, `commit` is null: the job prints N1_BASELINE_NONE and stops green.
 #   - pnpm and node are called directly: an old checkout's tools/source-map-hotfix.mjs allow-list cannot learn a new label.
 #   - It runs on a pull request into dev or main only when a path that can change the schema or the baseline changes,
@@ -85,6 +88,8 @@ jobs:
         run: |
           # Read once on its own first: a failing reader inside $(…) would leave an empty list, never a green gate.
           node "$GITHUB_WORKSPACE/head/dialectical-engine/tools/n1-baseline.mjs" suites
+          # HEAD's set-aside and known-red test names join the old list in this checkout only (a failing reader stops here).
+          { echo; node "$GITHUB_WORKSPACE/head/dialectical-engine/tools/n1-baseline.mjs" known-red; } >> tests/ci-known-red.txt
           node tools/ci-known-red.mjs $(node "$GITHUB_WORKSPACE/head/dialectical-engine/tools/n1-baseline.mjs" suites)
       - name: How to read a red run
         if: always() && steps.old_suites.outcome == 'failure'

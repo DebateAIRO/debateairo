@@ -220,7 +220,7 @@ describe('the preview release guide: transition T, side by side, the way back, t
       expect(at, heading).toBeGreaterThan(newSections.indexOf(`\n${before}`));
       expect(at, heading).toBeLessThan(newSections.indexOf(`\n${after}`));
       const section = sectionOf(guide, guide.split('\n').find(line => line.startsWith(heading))!);
-      expect(section).toContain(`jq --arg c "$REV" --arg r "$LABEL" '.commit = $c | .reason = $r' dialectical-engine/tests/n1-baseline.json`);
+      expect(section).toContain(`jq --arg c "$REV" --arg r "$LABEL" '.commit = $c | .reason = $r | .knownRed = []' dialectical-engine/tests/n1-baseline.json`);
       expect(section).toContain('[ "$(node dialectical-engine/tools/n1-baseline.mjs commit)" = "$REV" ]');
       expect(section).toContain('git push -u origin "chore/n1-baseline-$NN" && gh pr create --base dev');
       // On the Mac: not a server script (no names file, no step guards).
