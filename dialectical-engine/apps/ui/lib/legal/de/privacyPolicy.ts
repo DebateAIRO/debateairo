@@ -56,7 +56,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Debatteninhalte — Die von Ihnen eingegebene Frage; die von Ihnen festgelegten Steuerungsanmerkungen; die Behauptungen, Kritiken, Evidenzverweise, Bewertungen und Urteile, die das System erzeugt; eine wortgetreue Aufzeichnung der Antworten jedes KI-Anbieters; Suchabfragen und Quellenverweise. All dies wird mit einem kontospezifischen Schlüssel verschlüsselt gespeichert — Sie und die KI-Modelle, die Ihre Frage bearbeiten",
         "Support — Nachrichten, die Sie mit dem Support-Assistenten oder einer Person austauschen, verschlüsselt gespeichert; die verwendete Sprache; ob Sie dem Assistenten erlaubt haben, den Status (niemals den Inhalt) Ihrer Debatten einzusehen; von Ihnen abgegebene Bewertungen. Löst eine Nachricht Maßnahmen zur Missbrauchskontrolle aus, speichern wir einen Hash der Nachricht und einen Hash der IP-Adresse, von der sie stammt — Sie",
         "Nachweise über Annahme und Einwilligung — Version und Inhalts-Hash der von Ihnen angenommenen Nutzungsbedingungen und der Ihnen angezeigten Datenschutzerklärung; Zeitpunkt; verwendeter Bildschirm und Mechanismus; Ihre Sprache; Ihre IP-Adresse und Ihr User-Agent zu diesem Zeitpunkt; jede von Ihnen erteilte oder widerrufene Einwilligung sowie der jeweilige Zeitpunkt — Ihr Browser, bei der Registrierung und bei jeder Änderung einer Auswahl",
-        "Zahlungen (sobald kostenpflichtige Tarife starten) — Tarif, Preis, Abrechnungszeitraum, Transaktionsreferenzen, Nachweise zum Steuerstandort. Kartendaten werden von unserem Zahlungsanbieter gespeichert, niemals von uns — Sie und der Zahlungsanbieter",
+        "Zahlungen (sobald kostenpflichtige Tarife starten) — Tarif, Preis, Abrechnungszeitraum, Transaktionsreferenzen, Nachweise zum Steuerstandort. Die Rechnungsdaten, die Sie beim Bezahlen angeben: Ihr Name, Ihre Telefonnummer und Ihre Rechnungsadresse sowie, wenn Sie als Unternehmen kaufen, dessen Name, Umsatzsteuer-Identifikationsnummer und Anschrift; außerdem die IP-Adresse, von der aus Sie bezahlen. Ihre Kartendaten geben Sie auf der Seite unseres Zahlungsanbieters ein, sodass Ihre vollständige Kartennummer und Ihr Sicherheitscode uns nie erreichen. Von Ihrer Karte speichern wir die letzten vier Ziffern, Monat und Jahr des Ablaufs sowie das Land, in dem sie ausgegeben wurde – um zu erkennen, mit welcher Karte eine Zahlung geleistet wurde, um Sie vor dem Ablauf der Karte zu erinnern und um die Regeln dieses Landes anzuwenden –, sowie, verschlüsselt gespeichert, einen Code des Zahlungsanbieters, mit dem dieser bei jeder Verlängerung dieselbe Karte belasten kann. Außerdem speichern wir 14 Tage lang verschlüsselt jede Nachricht, die uns der Zahlungsanbieter zu einer Zahlung sendet, genau so, wie sie eingegangen ist; sie zeigt auch die ersten Ziffern der Kartennummer, an denen sich die Bank erkennen lässt, die die Karte ausgegeben hat, sowie den Namen dieser Bank — Sie und der Zahlungsanbieter",
         "Personen, die unseren Dienst nicht nutzen — Personenbezogene Daten über andere Personen, die Sie in eine Frage aufnehmen oder die das System bei deren Beantwortung erzeugt. Wir bitten Sie, dies nicht zu tun; Abschnitt 11 erläutert, was wir unternehmen, wenn es dennoch geschieht — Sie, mittelbar"
         ]
       },
@@ -150,6 +150,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Support-Gespräche und -fälle — Bis zum Abschluss zuzüglich 12 Monaten — Schlüssel vernichtet",
         "Nachweise über Annahme und Einwilligung — Lebensdauer des Kontos zuzüglich 6 Jahren – die längste für uns geltende Verjährungsfrist — Gelöscht",
         "Zahlungsunterlagen (sobald kostenpflichtige Tarife starten) — 10 Jahre, wie nach rumänischem Rechnungslegungsrecht vorgeschrieben — Gelöscht",
+        "Gespeicherte Karte: der Code des Zahlungsanbieters mit den letzten vier Ziffern, dem Ablaufdatum und dem Land der Karte — Bis einen Tag, nachdem die Karte keinen aktiven Tarif mehr bezahlt – wenn der Tarif endet, Sie die Karte ersetzen oder Ihr Konto schließen — Gelöscht; die letzten vier Ziffern, das Ablaufdatum und das Land bleiben außerdem in den Zahlungsunterlagen jeder mit dieser Karte geleisteten Zahlung erhalten",
+        "Die Nachrichten des Zahlungsanbieters zu Zahlungen, so wie sie eingegangen sind — 14 Tage — Gelöscht",
         "Sicherungen — Bis zu 8 Wochen nach Löschung der aktiven Kopie — Überschrieben"
         ]
       },
@@ -258,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Wenn wir diese Datenschutzerklärung ändern, veröffentlichen wir die neue Fassung mit einer Zusammenfassung der Änderungen und einem neuen Gültigkeitsdatum und bewahren die früheren Fassungen unter dezbatere.ro/privacy/versions auf. Bei einer Änderung, durch die ein neuer Zweck oder ein neuer Empfänger hinzukommt, informieren wir Sie vor Beginn der neuen Verarbeitung per E-Mail und im Produkt und geben Ihnen Zeit zum Widerspruch. Hängt ein neuer Zweck von Ihrer Einwilligung ab – etwa wenn wir Inhalte jemals zur Verbesserung von Modellen nutzen wollten –, holen wir diese Einwilligung gesondert und ausdrücklich ein; die Annahme aktualisierter Nutzungsbedingungen behandeln wir niemals als Einwilligung in eine neue Verarbeitung. Bei Klarstellungen, die nichts an unserem Vorgehen ändern, veröffentlichen wir lediglich die neue Fassung." },
-      { kind: "p", text: "Diese Datenschutzerklärung wurde zuletzt am 12. Oktober 2026 aktualisiert. Version 3.4 ersetzte Version 3.3: Abschnitt 13 nennt nun, dass das Cookie debateai.locale auch die Sprache festlegt, in der wir die E-Mails schreiben, die wir Ihnen senden, und ein Absatz ergänzt, dass jede E-Mail, die wir für Sie in die Warteschlange stellen, die Sprache behält, die Sie ausgewählt hatten, bis wir sie senden." }
+      { kind: "p", text: "Diese Datenschutzerklärung wurde zuletzt am 12. Oktober 2026 aktualisiert. Version 3.5 ersetzte Version 3.4: Abschnitt 2 nennt nun, welche Rechnungs- und Kartendaten wir speichern und dass Ihre vollständige Kartennummer uns nie erreicht, und Abschnitt 7 nennt, wie lange wir eine gespeicherte Karte und die Nachrichten des Zahlungsanbieters zu Zahlungen aufbewahren." }
     ]
   },
   {
@@ -330,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.4",
-  sha256: "9e48b8c89beec47b7f84a7641379df234344de7b8976712f9abe3c639d504b10",
-  eyebrow: "DATENSCHUTZERKLÄRUNG · v3.4 · GÜLTIG AB 12. OKTOBER 2026",
+  version: "3.5",
+  sha256: "761e6bbb89973bdc6245c33ddfaea4aef1b59cab69b40cf90b0a636469b0fff4",
+  eyebrow: "DATENSCHUTZERKLÄRUNG · v3.5 · GÜLTIG AB 12. OKTOBER 2026",
   title: "Was wir speichern und warum",
   lede: "DSGVO – GDPR (EU) 2016/679: Ihre Rechte und unsere Pflichten, verständlich formuliert. Vierzehn Abschnitte und Anhang B – scrollen Sie bis zum Ende.",
-  endMarker: "ENDE DER DATENSCHUTZERKLÄRUNG · DSGVO – GDPR (EU) 2016/679 · v3.4",
+  endMarker: "ENDE DER DATENSCHUTZERKLÄRUNG · DSGVO – GDPR (EU) 2016/679 · v3.5",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Text der Datenschutzerklärung",
   sectionIdPrefix: "policy-section-",

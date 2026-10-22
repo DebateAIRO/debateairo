@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Röviden
-eyebrow: ADATVÉDELMI SZABÁLYZAT · v3.4 · HATÁLYOS 2026. OKTÓBER 12.
+eyebrow: ADATVÉDELMI SZABÁLYZAT · v3.5 · HATÁLYOS 2026. OKTÓBER 12.
 title: Mit tárolunk és miért
 lede: Az Ön jogai és a GDPR (EU) 2016/679 szerinti kötelezettségeink közérthetően. Tizennégy szakasz és a B. melléklet — görgessen a végéig.
-endMarker: A SZABÁLYZAT VÉGE · GDPR (EU) 2016/679 · v3.4
+endMarker: A SZABÁLYZAT VÉGE · GDPR (EU) 2016/679 · v3.5
 bodyLabel: Az Adatvédelmi szabályzat szövege
 annexTitle: B. melléklet — Regionális adatvédelmi feltételek
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 SÜTIK
 -->
 
-**Version 3.4 · Effective 2026. október 12. · Korábbi változatok: dezbatere.ro/privacy/versions · Adatkezelő: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.5 · Effective 2026. október 12. · Korábbi változatok: dezbatere.ro/privacy/versions · Adatkezelő: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** A fiók működéséhez szükséges és az Ön által megadni választott adatokat gyűjtjük. Kérdéseit a Nyilvántartásunkban felsorolt MI-szolgáltatókhoz továbbítjuk; azokat nem használják modellek betanítására. Tárhelyszolgáltatónk az Ön fiókját és vitáit Londonban, az Egyesült Királyságban tárolja; hogy adatai még hová jutnak, azt az 5. szakasz mondja el. A viták mindaddig magánjellegűek, amíg Ön közzé nem teszi őket. Fiókja törlése megsemmisíti magánjellegű adatainak kulcsait; a törlés ütemezésekor Ön dönt arról, hogy közzétett vitáit is eltávolítsuk-e, vagy azok visszavont álneve alatt nyilvánosak maradjanak. A privacy@dezbatere.ro címen érhet el bennünket, és a vitában megnevezett személyek fiók nélkül is kérhetik az eltávolítást.
 
@@ -43,7 +43,7 @@ Csak a fiók működéséhez szükséges, az Ön által önként megadott, valam
 | **A vita tartalma** | Az Ön által beírt kérdés; az Ön által megadott irányító megjegyzések; a motor által létrehozott állítások, kritikák, bizonyítékhivatkozások, pontszámok és döntések; az egyes MI-szolgáltatók válaszainak szó szerinti nyilvántartása; visszakeresési lekérdezések és forráshivatkozások. Mindezt az Ön fiókjához tartozó egyedi kulccsal titkosítva tároljuk | Öntől és a kérdésén dolgozó MI-modellektől |
 | **Támogatás** | A támogatási asszisztenssel vagy egy személlyel váltott üzenetei, titkosítva tárolva; a használt nyelv; engedélyezte-e az asszisztensnek, hogy lássa vitái állapotát (a tartalmukat soha); az Ön értékelései. Ha egy üzenet visszaélés elleni ellenőrzést vált ki, megőrizzük az üzenet kivonatát és annak az IP-címnek a kivonatát, amelyről az érkezett | Öntől |
 | **Elfogadási és hozzájárulási nyilvántartások** | Az Ön által elfogadott Feltételek verziója és tartalmi kivonata, valamint az Önnek megjelenített szabályzat; az időpont; a használt képernyő és mechanizmus; az Ön nyelve; az adott pillanatbeli IP-címe és user-agent adata; minden megadott vagy visszavont hozzájárulás és annak időpontja | Az Ön böngészőjéből, a regisztrációkor és valahányszor megváltoztat egy választást |
-| **Fizetések** (a fizetős csomagok indulásától) | Csomag, ár, számlázási időszak, tranzakciós hivatkozások, adóügyi helyszín igazolása. A kártyaadatokat fizetési szolgáltatónk kezeli, mi soha | Öntől és a fizetési szolgáltatótól |
+| **Fizetések** (a fizetős csomagok indulásától) | Csomag, ár, számlázási időszak, tranzakciós hivatkozások, adóügyi helyszín igazolása. A fizetéskor megadott számlázási adatok: az Ön neve, telefonszáma és számlázási címe, valamint ha cégként vásárol, a cég neve, héaazonosító száma és címe; továbbá az IP-cím, amelyről fizet. A kártyaadatait fizetési szolgáltatónk oldalán adja meg, így az Ön teljes kártyaszáma és a biztonsági kód soha nem jut el hozzánk. A kártyája adatai közül megőrizzük az utolsó négy számjegyét, a lejárat hónapját és évét, valamint a kibocsátás országát — hogy tudjuk, melyik kártyával történt egy fizetés, hogy a kártya lejárta előtt emlékeztethessük Önt, és hogy alkalmazhassuk az adott ország szabályait —, továbbá titkosítva tárolva egy, a fizetési szolgáltatótól kapott kódot, amellyel a szolgáltató minden megújításkor ugyanazt a kártyát terhelheti meg. 14 napig titkosítva megőrizzük továbbá a fizetési szolgáltató által egy-egy fizetésről nekünk küldött minden üzenetet, pontosan úgy, ahogy megérkezett; az üzenet tartalmazza a kártyaszám első számjegyeit is, amelyek a kártyát kibocsátó bankot azonosítják, valamint e bank nevét | Öntől és a fizetési szolgáltatótól |
 | **Személyek, akik nem felhasználóink** | Más személyek személyes adatai, amelyeket Ön egy kérdésben megad, vagy amelyeket a motor a válaszadás során létrehoz. Kérjük, hogy ne tegyen ilyet; a 11. szakasz ismerteti, mit teszünk, ha ez mégis megtörténik | Közvetve Öntől |
 
 Regisztrációnál ellenőrizzük az IP-cím országát és az életkort. A születési dátumot kizárólag ellenőrzésre küldi el; nem tároljuk. Az IP-ellenőrzés helyben történik, harmadik félhez nem kerül a cím. Minden új vita előtt is helyben ellenőrizzük az IP-cím országát; a mindig tiltott országokból induló vitát elutasítjuk.
@@ -126,6 +126,8 @@ Amikor ütemezi fiókja törlését, Ön választja meg, mi történjen a közz�
 | Támogatási beszélgetések és ügyek | A lezárásig plusz 12 hónap | A kulcsokat megsemmisítjük |
 | Elfogadási és hozzájárulási nyilvántartások | A fiók élettartama plusz 6 év — a ránk alkalmazandó leghosszabb elévülési idő | Töröljük |
 | Fizetési nyilvántartások (a fizetős csomagok indulásától) | 10 évig, a román számviteli jogszabályok előírása szerint | Töröljük |
+| Mentett kártya: a fizetési szolgáltató kódja a kártya utolsó négy számjegyével, lejáratával és országával | Amíg a kártya aktív csomagot fizet — vagyis a csomag végéig, a kártya lecseréléséig vagy a fiók megszüntetéséig —, plusz egy nap | Töröljük; az utolsó négy számjegy, a lejárat és az ország az adott kártyával teljesített minden fizetés nyilvántartásában is megmarad |
+| A fizetési szolgáltató fizetésekről szóló üzenetei, ahogy megérkeztek | 14 napig | Töröljük |
 | Biztonsági mentések | Az élő példány törlése után legfeljebb 8 hétig | Felülírjuk |
 
 **Mit tesz valójában a törlés.** Magánjellegű vitáit és fiókadatait a fiókjára és minden egyes vitára jellemző kulcsokkal titkosítjuk. Fiókja törlése megsemmisíti ezeket a kulcsokat, ami után a titkosított rekordokat sem mi, sem más nem tudja elolvasni, továbbá töröljük fiókrekordját. A közzétett vita nyilvános másolatának kulcsa a törléskor csak akkor semmisül meg, ha bejelölte a „Töröljék a nyilvános vitáimat is” lehetőséget (6. szakasz). Ezt azért nevezzük törlésnek, mert ez a hatása, és ezt dokumentált értékeléssel támasztjuk alá; ha többet szeretne tudni, kérdezzen bennünket. Három dolgot fontos tudni: a biztonsági auditnapló csak hozzáfűzhető és nem törlődik, de nem tartalmaz Önről olvasható azonosítókat; néhány régebbi vita a jelenlegi titkosítási rendszerünk előtti időből származik, és ha ez az Ön fiókjára vonatkozik, közöljük, hogy a megszüntetés mit eredményez náluk; továbbá a már MI-szolgáltatónak küldött adatmásolatokra az adott szolgáltató Nyilvántartásban szereplő megőrzési feltételei vonatkoznak, nem a mi törlésünk.
@@ -213,7 +215,7 @@ Ha el szeretné utasítani ezeket az elemeket, böngészője beállításaiban t
 
 Amikor módosítjuk ezt a szabályzatot, közzétesszük az új változatot a változások összefoglalásával és új hatálybalépési dátummal, a korábbi változatokat pedig a dezbatere.ro/privacy/versions címen őrizzük meg. Új célt vagy új címzettet bevezető változásról az új adatkezelés megkezdése előtt e-mailben és a termékben tájékoztatjuk Önt, és időt biztosítunk a tiltakozásra. Ha egy új cél az Ön hozzájárulásától függ — például ha valaha tartalmat kívánnánk használni modellek fejlesztésére —, ezt a hozzájárulást külön és kifejezetten kérjük; a frissített Feltételek elfogadását soha nem tekintjük új adatkezeléshez való hozzájárulásnak. Az olyan pontosítások esetében, amelyek semmit nem változtatnak tevékenységünkön, egyszerűen közzétesszük az új változatot.
 
-Ezt a szabályzatot legutóbb 2026. október 12. napján frissítettük. A 3.4-es verzió a 3.3-as verzió helyébe lépett: a 13. szakasz most úgy rendelkezik, hogy a debateai.locale süti az Önnek küldött e-mailek nyelvét is beállítja, és új bekezdést tartalmaz, amely szerint minden Önnek sorba állított e-mail megőrzi az Ön által kiválasztott nyelvet, amíg el nem küldjük.
+Ezt a szabályzatot legutóbb 2026. október 12. napján frissítettük. A 3.5-ös verzió a 3.4-es verzió helyébe lépett: a 2. szakasz most már leírja, mely számlázási és kártyaadatokat őrizzük meg, és hogy az Ön teljes kártyaszáma soha nem jut el hozzánk, a 7. szakasz pedig azt, hogy mennyi ideig őrizzük meg a mentett kártyát és a fizetési szolgáltató fizetésekről szóló üzeneteit.
 
 ## Annex B — Regionális adatvédelmi feltételek
 

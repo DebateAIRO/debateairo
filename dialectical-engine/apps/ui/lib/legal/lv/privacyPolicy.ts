@@ -56,7 +56,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Debašu saturs — Jūsu ievadītais jautājums; jūsu iestatītās vadības piezīmes; dzinēja ģenerētie apgalvojumi, kritika, pierādījumu atsauces, vērtējumi un spriedumi; katra MI pakalpojumu sniedzēja atbildes precīzs ieraksts; izguves vaicājumi un avotu atsauces. Tas viss tiek glabāts šifrētā veidā, izmantojot tieši jūsu kontam paredzētu atslēgu — Jūs un MI modeļi, kas apstrādā jūsu jautājumu",
         "Atbalsts — Ziņojumi, ar kuriem apmaināties ar atbalsta asistentu vai personu un kuri tiek glabāti šifrētā veidā; izmantotā valoda; tas, vai atļāvāt asistentam redzēt savu debašu statusu (nekad to saturu); jūsu sniegtie vērtējumi. Ja ziņojums iedarbina ļaunprātīgas izmantošanas kontroles mehānismus, mēs saglabājam ziņojuma jaucējvērtību un tās IP adreses jaucējvērtību, no kuras tas nosūtīts — Jūs",
         "Piekrišanas un akceptēšanas ieraksti — Jūsu akceptēto Noteikumu un jums parādītās politikas versija un satura jaucējvērtība; laiks; izmantotais ekrāns un mehānisms; jūsu valoda; jūsu IP adrese un user-agent tajā brīdī; katra jūsu sniegtā vai atsauktā piekrišana un tās laiks — Jūsu pārlūkprogramma reģistrācijas laikā un ikreiz, kad maināt izvēli",
-        "Maksājumi (pēc maksas plānu ieviešanas) — Plāns, cena, norēķinu periods, darījumu atsauces, pircēja atrašanās vietas pierādījumi nodokļu vajadzībām. Kartes datus glabā mūsu maksājumu pakalpojumu sniedzējs, bet mēs tos nekad neglabājam — Jūs un maksājumu pakalpojumu sniedzējs",
+        "Maksājumi (pēc maksas plānu ieviešanas) — Plāns, cena, norēķinu periods, darījumu atsauces, pircēja atrašanās vietas pierādījumi nodokļu vajadzībām. Norēķinu dati, ko norādāt, veicot maksājumu: jūsu vārds un uzvārds, tālruņa numurs un norēķinu adrese un, ja pērkat kā uzņēmums, tā nosaukums, PVN maksātāja reģistrācijas numurs un adrese; kā arī IP adrese, no kuras maksājat. Kartes datus jūs ievadāt mūsu maksājumu pakalpojumu sniedzēja lapā, tāpēc jūsu pilnais kartes numurs un drošības kods nekad nenonāk pie mums. No jūsu kartes datiem mēs glabājam kartes pēdējos četrus ciparus, derīguma termiņa mēnesi un gadu un valsti, kurā karte izdota, — lai zinātu, ar kuru karti veikts maksājums, lai atgādinātu jums pirms kartes derīguma termiņa beigām un lai piemērotu attiecīgās valsts noteikumus, — kā arī no maksājumu pakalpojumu sniedzēja saņemtu kodu, ko glabājam šifrētā veidā un ar kura palīdzību maksājumu pakalpojumu sniedzējs katrā atjaunošanas reizē var iekasēt maksu no tās pašas kartes. 14 dienas mēs šifrētā veidā glabājam arī katru ziņojumu, ko maksājumu pakalpojumu sniedzējs mums nosūta par maksājumu, tieši tādā veidā, kādā tas saņemts; tajā redzami arī kartes numura pirmie cipari, pēc kuriem var noteikt karti izdevušo banku, un šīs bankas nosaukums — Jūs un maksājumu pakalpojumu sniedzējs",
         "Personas, kuras nav mūsu lietotāji — Personas dati par citām personām, kurus iekļaujat jautājumā vai kurus dzinējs ģenerē, uz to atbildot. Mēs lūdzam jūs tā nerīkoties; 11. sadaļā ir paskaidrots, ko mēs darām, ja tas tomēr notiek — Jūs, netieši"
         ]
       },
@@ -150,6 +150,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Atbalsta sarunas un lietas — Līdz slēgšanai plus 12 mēneši — Atslēgas tiek iznīcinātas",
         "Piekrišanas un akceptēšanas ieraksti — Konta darbības laiks plus 6 gadi — ilgākais mums piemērojamais noilguma termiņš — Tiek dzēsti",
         "Maksājumu ieraksti (pēc maksas plānu ieviešanas) — 10 gadu, kā to prasa Rumānijas grāmatvedības tiesību akti — Tiek dzēsti",
+        "Saglabātā karte: maksājumu pakalpojumu sniedzēja kods ar kartes pēdējiem četriem cipariem, derīguma termiņu un valsti — Līdz vienai dienai pēc tam, kad ar karti vairs netiek apmaksāts aktīvs plāns, — kad plāns beidzas, jūs nomaināt karti vai slēdzat kontu — Tiek dzēsti; pēdējie četri cipari, derīguma termiņš un valsts saglabājas arī katra ar šo karti veiktā maksājuma ierakstā",
+        "Maksājumu pakalpojumu sniedzēja ziņojumi par maksājumiem tādā veidā, kādā tie saņemti — 14 dienas — Tiek dzēsti",
         "Dublējumkopijas — Līdz 8 nedēļām pēc aktīvās kopijas dzēšanas — Tiek pārrakstītas"
         ]
       },
@@ -258,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Mainot šo politiku, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un jaunu spēkā stāšanās datumu un saglabājam iepriekšējās versijas vietnē dezbatere.ro/privacy/versions. Par izmaiņām, ar kurām tiek pievienots jauns nolūks vai jauns saņēmējs, mēs jūs informējam pa e-pastu un produktā pirms jaunās apstrādes sākšanas un dodam laiku iebilst. Ja jauns nolūks ir atkarīgs no jūsu piekrišanas — piemēram, ja mēs kādreiz vēlētos izmantot saturu modeļu uzlabošanai —, mēs šādu piekrišanu lūdzam atsevišķi un konkrēti; atjaunināto Noteikumu akceptēšanu mēs nekad neuzskatām par piekrišanu jaunai apstrādei. Ja precizējumi neko nemaina mūsu darbībās, mēs vienkārši publicējam jauno versiju." },
-      { kind: "p", text: "Šī politika pēdējo reizi atjaunināta 2026. gada 12. oktobrī. Versija 3.4 aizstāja versiju 3.3: 13. sadaļā tagad norādīts, ka sīkdatne debateai.locale nosaka arī valodu, kādā mēs jums sūtām e-pasta ziņojumus, un pievienota rindkopa, ka katrs jums sagatavotais e-pasta ziņojums saglabā valodu, kuru izvēlējāties, līdz to nosūtām." }
+      { kind: "p", text: "Šī politika pēdējo reizi atjaunināta 2026. gada 12. oktobrī. Versija 3.5 aizstāja versiju 3.4: 2. sadaļā tagad norādīts, kādus norēķinu un kartes datus mēs glabājam un ka jūsu pilnais kartes numurs nekad nenonāk pie mums, un 7. sadaļā norādīts, cik ilgi mēs glabājam saglabātu karti un maksājumu pakalpojumu sniedzēja ziņojumus par maksājumiem." }
     ]
   },
   {
@@ -330,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.4",
-  sha256: "9a61bf8e9753c79c2dc214f63a9e8fdfbf9cb00fea6c0e098816fb4b48f3929b",
-  eyebrow: "PRIVĀTUMA POLITIKA · v3.4 · SPĒKĀ NO 2026. GADA 12. OKTOBRA",
+  version: "3.5",
+  sha256: "15ec7fa8897b565b206ab776cb04d7389602aa6aea4ef148dd4be58331250eaf",
+  eyebrow: "PRIVĀTUMA POLITIKA · v3.5 · SPĒKĀ NO 2026. GADA 12. OKTOBRA",
   title: "Ko mēs glabājam un kāpēc",
   lede: "Jūsu tiesības un mūsu pienākumi saskaņā ar GDPR (EU) 2016/679, izklāstīti vienkāršā valodā. Četrpadsmit sadaļas un B pielikums — ritiniet līdz beigām.",
-  endMarker: "POLITIKAS BEIGAS · GDPR (EU) 2016/679 · v3.4",
+  endMarker: "POLITIKAS BEIGAS · GDPR (EU) 2016/679 · v3.5",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privātuma politikas teksts",
   sectionIdPrefix: "policy-section-",

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lühidalt
-eyebrow: PRIVAATSUSPOLIITIKA · v3.4 · KEHTIB ALATES 12. OKTOOBRIST 2026
+eyebrow: PRIVAATSUSPOLIITIKA · v3.5 · KEHTIB ALATES 12. OKTOOBRIST 2026
 title: Mida ja miks me talletame
 lede: Teie õigused ja meie kohustused GDPR (EU) 2016/679 alusel lihtsas keeles. Neliteist jaotist ja lisa B — kerige lõpuni.
-endMarker: POLIITIKA LÕPP · GDPR (EU) 2016/679 · v3.4
+endMarker: POLIITIKA LÕPP · GDPR (EU) 2016/679 · v3.5
 bodyLabel: Privaatsuspoliitika tekst
 annexTitle: Lisa B — Piirkondlikud privaatsustingimused
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 KÜPSISED
 -->
 
-**Version 3.4 · Effective 12. oktoober 2026 · Varasemad versioonid aadressil dezbatere.ro/privacy/versions · Vastutav töötleja: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.5 · Effective 12. oktoober 2026 · Varasemad versioonid aadressil dezbatere.ro/privacy/versions · Vastutav töötleja: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Kogume seda, mida konto vajab, ja seda, mida otsustate sisestada. Teie küsimused saadetakse meie registris loetletud tehisintellekti pakkujatele; neid ei kasutata mudelite treenimiseks. Meie majutusteenuse pakkuja säilitab teie konto ja väitlused Londonis Ühendkuningriigis; jaotises 5 on öeldud, kuhu mujale teie andmed jõuavad. Väitlused on privaatsed, kui te neid ei avalda. Konto kustutamisel hävitatakse teie privaatsete andmete võtmed; kustutamist ajastades valite, kas ka teie avaldatud väitlused eemaldatakse või jäävad teie kasutuselt kõrvaldatud pseudonüümi all avalikuks. Meiega saab ühendust aadressil privacy@dezbatere.ro ning väitluses nimetatud isikud võivad taotleda eemaldamist ilma kontota.
 
@@ -43,7 +43,7 @@ Kogume ainult seda, mida konto toimimiseks vajab, mida otsustate meile anda ja m
 | **Väitluse sisu** | Teie sisestatud küsimus; teie määratud suunavad annotatsioonid; mootori loodud väited, kriitika, tõendiviited, hinded ja otsused; iga tehisintellekti pakkuja vastuse sõnasõnaline kirje; otsingupäringud ja allikaviited. Kõike seda säilitatakse krüpteeritult teie kontole omase võtmega | Teie ja teie küsimust töötlevad tehisintellektimudelid |
 | **Kasutajatugi** | Sõnumid, mida vahetate kasutajatoe assistendi või inimesega ja mida säilitatakse krüpteeritult; kasutatud keel; kas lubasite assistendil näha oma väitluste olekut (mitte kunagi nende sisu); teie antud hinnangud. Kui sõnum käivitab kuritarvitamise kontrollimehhanismid, säilitame sõnumi räsi ja selle saatmise IP-aadressi räsi | Teie |
 | **Nõustumise ja nõusoleku kirjed** | Tingimuste, millega nõustusite, ja teile näidatud poliitika versioon ning sisu räsi; aeg; kasutatud kuva ja mehhanism; teie keel; teie IP-aadress ja user-agent sellel hetkel; iga teie antud või tagasivõetud nõusolek ja selle aeg | Teie brauser registreerumisel ja iga kord, kui valikut muudate |
-| **Maksed** (kui tasulised paketid algavad) | Pakett, hind, arveldusperiood, tehinguviited, maksuresidentsuse tõendid. Kaardiandmeid hoiab meie makseteenuse pakkuja, mitte kunagi meie | Teie ja makseteenuse pakkuja |
+| **Maksed** (kui tasulised paketid algavad) | Pakett, hind, arveldusperiood, tehinguviited, maksuresidentsuse tõendid. Arveldusandmed, mille esitate maksmisel: teie nimi, telefoninumber ja arveldusaadress ning, kui ostate ettevõttena, ettevõtte nimi, käibemaksukohustuslase registreerimisnumber ja aadress; samuti IP-aadress, millelt maksate. Kaardiandmed sisestate meie makseteenuse pakkuja lehel, nii et teie kaardi täisnumber ja turvakood ei jõua kunagi meieni. Teie kaardist säilitame selle neli viimast numbrit, aegumiskuu ja -aasta ning riigi, kus kaart on välja antud — et teada, millise kaardiga makse tehti, teile enne kaardi aegumist meelde tuletada ja kohaldada selle riigi reegleid — ning krüpteeritult säilitatava makseteenuse pakkujalt saadud koodi, mille abil pakkuja saab igal uuendamisel samalt kaardilt tasu võtta. Samuti säilitame 14 päeva jooksul krüpteeritult iga sõnumi, mille makseteenuse pakkuja meile makse kohta saadab, täpselt sellisena, nagu see saabus; selles on näha ka kaardinumbri esimesed numbrid, mille järgi saab tuvastada kaardi välja andnud panga, ning selle panga nimi | Teie ja makseteenuse pakkuja |
 | **Inimesed, kes ei ole meie kasutajad** | Teiste inimeste isikuandmed, mille lisate küsimusse või mille mootor vastust koostades loob. Palume teil seda mitte teha; jaotis 11 selgitab, mida teeme, kui see siiski juhtub | Kaudselt teie kaudu |
 
 Registreerumisel kontrollime IP-aadressi riiki kohapeal ning keeldume registreerimisest riikidest, kus teenus pole saadaval, Tori väljumisaadressidelt ja teadmata riigiga aadressidelt. Selleks kontrolliks me IP-aadressi kolmandale osapoolele ei saada. Sünnikuupäeva kasutame vanuse kontrollimiseks seda talletamata; märgite ka oma elukohariigi ja vajaduse korral USA osariigi. Iga uue väitluse alustamisel kontrollime ka IP-aadressi riiki kohapeal ja võime väitluse tagasi lükata, kui riik on püsivalt blokeeritud; Tori või teadmata riigi tõttu keeldumine puudutab registreerumist.
@@ -126,6 +126,8 @@ Kui kavandate oma konto kustutamise, valite, mis saab teie avaldatud väitlustes
 | Kasutajatoe vestlused ja juhtumid | Kuni sulgemiseni ja 12 kuud | Võtmed hävitatakse |
 | Nõustumise ja nõusoleku kirjed | Konto kasutusaeg ja 6 aastat — pikim meile kohalduv aegumistähtaeg | Kustutatakse |
 | Makseandmed (kui tasulised paketid algavad) | 10 aastat, nagu nõuab Rumeenia raamatupidamisõigus | Kustutatakse |
+| Salvestatud kaart: makseteenuse pakkuja kood koos kaardi nelja viimase numbri, aegumisaja ja riigiga | Kuni ühe päeva möödumiseni sellest, kui kaardiga enam aktiivse paketi eest ei maksta — kui pakett lõpeb, vahetate kaardi välja või sulgete konto | Kustutatakse; neli viimast numbrit, aegumisaeg ja riik säilivad ka iga selle kaardiga tehtud makse makseandmetes |
+| Makseteenuse pakkuja sõnumid maksete kohta sellistena, nagu need saabusid | 14 päeva | Kustutatakse |
 | Varukoopiad | Kuni 8 nädalat pärast aktiivse koopia kustutamist | Kirjutatakse üle |
 
 **Mida kustutamine tegelikult teeb.** Teie privaatsed väitlused ja kontoandmed on krüpteeritud teie kontole ja igale väitlusele omaste võtmetega. Konto kustutamisel hävitatakse need võtmed, mille järel ei saa meie ega keegi teine krüpteeritud kirjeid lugeda, ning kustutame teie kontokirje. Avaldatud väitluse avaliku koopia võti hävitatakse konto kustutamisel ainult siis, kui märkisite valiku „Kustuta ka minu avalikud väitlused“ (jaotis 6). Nimetame seda kustutamiseks, sest selline on selle toime, ja meil on selle kohta dokumenteeritud hinnang; kui soovite rohkem teada, küsige. Teadma peab kolme asja: turbeauditilogi on ainult lisatav ja seda ei kustutata, kuid see ei sisalda loetaval kujul tunnuseid, mis teid tuvastaksid; väike arv vanemaid väitlusi pärineb meie praegusele krüpteerimisskeemile eelnevast ajast ning kui see puudutab teie kontot, selgitame, mida sulgemine nende suhtes teeb; ja juba tehisintellekti pakkujale saadetud andmekoopiatele kehtivad registris esitatud pakkuja säilitamistingimused, mitte meiepoolne kustutamine.
@@ -213,7 +215,7 @@ Nende üksuste keelamiseks blokeerige või kustutage selle saidi küpsised ja sa
 
 Kui muudame seda poliitikat, avaldame uue versiooni koos muudatuste kokkuvõtte ja uue jõustumiskuupäevaga ning säilitame varasemad versioonid aadressil dezbatere.ro/privacy/versions. Uue eesmärgi või vastuvõtja lisamisel teavitame teid enne uue töötlemise algust e-posti teel ja tootes ning anname teile aega vastuväite esitamiseks. Kui uus eesmärk sõltub teie nõusolekust — näiteks kui sooviksime kunagi kasutada sisu mudelite täiustamiseks — küsime selleks eraldi ja konkreetset nõusolekut; me ei käsita uuendatud Tingimustega nõustumist kunagi nõusolekuna uueks töötlemiseks. Selgituste korral, mis ei muuda meie tegevust, avaldame lihtsalt uue versiooni.
 
-Seda poliitikat ajakohastati viimati 12. oktoobril 2026. Versioon 3.4 asendas versiooni 3.3: jaotis 13 ütleb nüüd, et küpsis debateai.locale määrab ka keele, milles kirjutame teile saadetavad e-kirjad, ning lisandub lõik, mille kohaselt iga järjekorda pandud e-kiri säilitab keele, mille olete valinud, kuni me selle saadame.
+Seda poliitikat ajakohastati viimati 12. oktoobril 2026. Versioon 3.5 asendas versiooni 3.4: jaotis 2 ütleb nüüd, milliseid arveldus- ja kaardiandmeid me säilitame ning et teie kaardi täisnumber ei jõua kunagi meieni, ja jaotis 7 ütleb, kui kaua säilitame salvestatud kaarti ja makseteenuse pakkuja sõnumeid maksete kohta.
 
 ## Annex B — Piirkondlikud privaatsustingimused
 

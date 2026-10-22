@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Go hachomair
-eyebrow: BEARTAS PRÍOBHÁIDEACHAIS · v3.4 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026
+eyebrow: BEARTAS PRÍOBHÁIDEACHAIS · v3.5 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026
 title: An méid a stórálaimid, agus an fáth
 lede: Do chearta agus ár n-oibleagáidí faoin GDPR (EU) 2016/679, i bhfriotal soiléir. Ceithre rannán déag agus Iarscríbhinn B — scrollaigh go dtí an deireadh.
-endMarker: DEIREADH AN BHEARTAIS · GDPR (EU) 2016/679 · v3.4
+endMarker: DEIREADH AN BHEARTAIS · GDPR (EU) 2016/679 · v3.5
 bodyLabel: Téacs an Bheartais Príobháideachais
 annexTitle: Iarscríbhinn B — Téarmaí príobháideachais réigiúnacha
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 FIANÁIN
 -->
 
-**Version 3.4 · Effective 12 Deireadh Fómhair 2026 · Leaganacha roimhe seo ag dezbatere.ro/privacy/versions · Rialaitheoir: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.5 · Effective 12 Deireadh Fómhair 2026 · Leaganacha roimhe seo ag dezbatere.ro/privacy/versions · Rialaitheoir: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Bailímid an méid atá de dhíth ar chuntas agus an méid a roghnaíonn tú a chlóscríobh. Seoltar do cheisteanna chuig soláthraithe IS atá liostaithe inár gClár; ní úsáidtear iad chun samhlacha a oiliúint. Stórálann ár soláthraí óstála do chuntas agus do dhíospóireachtaí i Londain, sa Ríocht Aontaithe; insíonn rannán 5 cá háit eile a dtéann do shonraí. Bíonn díospóireachtaí príobháideach mura bhfoilsíonn tú iad. Scriosann scriosadh do chuntais na heochracha do do shonraí príobháideacha; nuair a sceidealaíonn tú é, roghnaíonn tú an mbainfear anuas do dhíospóireachtaí foilsithe freisin nó an bhfanfaidh siad poiblí faoi d'ainm cleite scortha. Is féidir teagmháil a dhéanamh linn ag privacy@dezbatere.ro, agus is féidir le daoine a ainmnítear i ndíospóireacht a iarraidh go mbainfí í gan cuntas a bheith acu.
 
@@ -43,7 +43,7 @@ Ní bhailímid ach an méid atá de dhíth chun go bhfeidhmeoidh cuntas, an méi
 | **Ábhar díospóireachta** | An cheist a chlóscríobhann tú; na nótaí stiúrtha a shocraíonn tú; na maímh, na cáintí, na tagairtí fianaise, na scóir agus na breithiúnais a ghineann an t-inneall; taifead focal ar fhocal den mhéid a thug gach soláthraí IS ar ais; iarratais aisghabhála agus tagairtí foinse. Stóráiltear é seo ar fad criptithe faoi eochair a bhaineann go sonrach le do chuntas | Tusa, agus na samhlacha IS a oibríonn ar do cheist |
 | **Tacaíocht** | Teachtaireachtaí a mhalartaíonn tú leis an gcúntóir tacaíochta nó le duine, stóráilte agus criptithe; an teanga a úsáideadh; ar cheadaigh tú don chúntóir stádas do dhíospóireachtaí a fheiceáil (ach ní a n-ábhar riamh); rátálacha a thugann tú. Má chuireann teachtaireacht rialuithe mí-úsáide i ngníomh, coinnímid hais den teachtaireacht agus hais den tseoladh IP ónar tháinig sí | Tusa |
 | **Taifid ghlactha agus toilithe** | Leagan agus hais inneachair na dTéarmaí ar ghlac tú leo agus an bheartais a taispeánadh duit; an t-am; an scáileán agus an sásra a úsáideadh; do theanga; do sheoladh IP agus do ghníomhaire úsáideora ag an nóiméad sin; gach toiliú a thug tú nó a tharraing tú siar agus cathain | Do bhrabhsálaí, tráth sínithe suas agus aon uair a athraíonn tú rogha |
-| **Íocaíochtaí** (nuair a thosóidh pleananna íoctha) | Plean, praghas, tréimhse bhilleála, tagairtí idirbhirt, fianaise ar shuíomh cánach. Is é ár soláthraí íocaíochta, agus ní sinne riamh, a choinníonn sonraí cárta | Tusa, agus an soláthraí íocaíochta |
+| **Íocaíochtaí** (nuair a thosóidh pleananna íoctha) | Plean, praghas, tréimhse bhilleála, tagairtí idirbhirt, fianaise ar shuíomh cánach. Na sonraí billeála a thugann tú agus tú ag íoc: d'ainm, d'uimhir theileafóin agus do sheoladh billeála agus, má cheannaíonn tú mar chuideachta, ainm, uimhir CBL agus seoladh na cuideachta; agus an seoladh IP óna n-íocann tú. Cuireann tú sonraí do chárta isteach ar leathanach ár soláthraí íocaíochta, agus dá bhrí sin ní shroicheann uimhir iomlán do chárta ná do chód slándála sinn riamh. Maidir le do chárta, coinnímid na ceithre dhigit dheireanacha, mí agus bliain a dháta éaga agus an tír inar eisíodh é — chun a aithint cén cárta lenar rinneadh íocaíocht, chun meabhrú duit sula rachaidh an cárta in éag agus chun rialacha na tíre sin a chur i bhfeidhm — agus, stóráilte agus criptithe, cód ón soláthraí íocaíochta a ligeann dó muirear a ghearradh ar an gcárta céanna ag gach athnuachan. Ar feadh 14 lá coinnímid freisin, criptithe, gach teachtaireacht a sheolann an soláthraí íocaíochta chugainn faoi íocaíocht, díreach mar a tháinig sí; taispeánann sí freisin na chéad digití d'uimhir an chárta, a shainaithníonn an banc a d'eisigh an cárta, agus ainm an bhainc sin | Tusa, agus an soláthraí íocaíochta |
 | **Daoine nach úsáideoirí dár gcuid iad** | Sonraí pearsanta faoi dhaoine eile a chuireann tú i do cheist, nó a ghineann an t-inneall agus é ag freagairt na ceiste. Iarraimid ort gan é seo a dhéanamh; mínítear i rannán 11 cad a dhéanaimid nuair a tharlaíonn sé mar sin féin | Tusa, go hindíreach |
 
 Tráth clárúcháin seiceálaimid tír do sheolta IP go háitiúil agus diúltaímid do chlárú ó thíortha nach bhfreastalaímid orthu, ó sheoltaí imeachta Tor agus ó sheoltaí nach eol a dtír. Ní sheolaimid an seoladh IP chuig tríú páirtí don tseiceáil seo. Úsáidimid do dháta breithe chun d’aois a sheiceáil gan é a stóráil; dearbhaíonn tú freisin do thír chónaithe agus, más sna Stáit Aontaithe atá tú, do stát. Ag tús gach díospóireachta nua seiceálaimid tír an tseolta IP go háitiúil freisin agus féadfaimid í a dhiúltú má tá an tír toirmiscthe go buan; is le clárú amháin a bhaineann diúltú mar gheall ar Tor nó tír anaithnid.
@@ -126,6 +126,8 @@ Nuair a sceidealaíonn tú scriosadh do chuntais, roghnaíonn tú cad a tharlói
 | Comhráite agus cásanna tacaíochta | Go dtí go ndúnfar é, móide 12 mhí | Scriostar na heochracha |
 | Taifid ghlactha agus toilithe | Saolré an chuntais móide 6 bliana — an tréimhse theorann is faide a bhfuil feidhm aici maidir linn | Scriostar iad |
 | Taifid íocaíochta (nuair a thosóidh pleananna íoctha) | 10 mbliana, mar a cheanglaíonn dlí cuntasaíochta na Rómáine | Scriostar iad |
+| Cárta sábháilte: cód an tsoláthraí íocaíochta, mar aon le ceithre dhigit dheireanacha, dáta éaga agus tír an chárta | Go dtí lá amháin tar éis don chárta scor d'íoc as plean gníomhach — nuair a chríochnaíonn an plean, nuair a chuireann tú cárta eile ina áit nó nuair a dhúnann tú do chuntas | Scriostar iad; fanann na ceithre dhigit dheireanacha, an dáta éaga agus an tír freisin sa taifead íocaíochta do gach íocaíocht a rinneadh leis an gcárta sin |
+| Teachtaireachtaí an tsoláthraí íocaíochta faoi íocaíochtaí, mar a tháinig siad | 14 lá | Scriostar iad |
 | Cúltacaí | Suas le 8 seachtaine tar éis don chóip bheo a bheith scriosta | Forscríobhtar iad |
 
 **An méid a dhéanann scriosadh i ndáiríre.** Criptítear do dhíospóireachtaí príobháideacha agus sonraí do chuntais faoi eochracha a bhaineann go sonrach le do chuntas agus le gach díospóireacht. Má scriostar do chuntas, scriostar na heochracha sin, agus ina dhiaidh sin ní féidir linne ná le haon duine eile na taifid chriptithe a léamh, agus scriosaimid taifead do chuntais. Ní scriostar eochair na cóipe poiblí de dhíospóireacht fhoilsithe tráth scriosta ach amháin má chuir tú tic le "Scrios mo dhíospóireachtaí poiblí freisin" (alt 6). Tugaimid scriosadh air seo toisc gurb é sin a éifeacht, agus tá measúnú doiciméadaithe againn a thacaíonn leis; más mian leat tuilleadh eolais a fháil, cuir ceist orainn. Tá trí rud le tabhairt faoi deara: ní féidir ach cur leis an rian iniúchóireachta slándála agus ní scriostar é, ach níl aon aitheantóir inléite fút ann; tá líon beag díospóireachtaí níos sine ann a tháinig roimh ár scéim chriptithe reatha, agus má bhaineann sé sin le do chuntas insímid duit cad a dhéanann an dúnadh dóibh; agus tá cóipeanna sonraí a seoladh cheana chuig soláthraí IS faoi réir théarmaí coinneála an tsoláthraí sin sa Chlár, seachas faoinár scriosadh.
@@ -213,7 +215,7 @@ Chun na míreanna seo a dhiúltú, cuir bac ar fhianáin agus ar shonraí suímh
 
 Nuair a athraímid an beartas seo, cuirimid an leagan nua ar fáil mar aon le hachoimre ar an méid a d'athraigh agus dáta nua teachta i bhfeidhm, agus coinnímid na leaganacha roimhe seo ag dezbatere.ro/privacy/versions. I gcás athraithe lena gcuirtear cuspóir nua nó faighteoir nua leis, insímid duit sula dtosaíonn an phróiseáil nua, trí ríomhphost agus sa táirge, agus tugaimid am duit agóid a dhéanamh. Sa chás ina mbraitheann cuspóir nua ar do thoiliú — mar shampla, dá mba mhian linn riamh ábhar a úsáid chun samhlacha a fheabhsú — iarraimid an toiliú sin ar leithligh agus go sonrach; ní chaithimid riamh le glacadh le Téarmaí nuashonraithe mar thoiliú le próiseáil nua. I gcás soiléirithe nach n-athraíonn aon ní faoin méid a dhéanaimid, ní dhéanaimid ach an leagan nua a fhoilsiú.
 
-Nuashonraíodh an beartas seo an uair dheireanach ar 12 Deireadh Fómhair 2026. Tháinig Leagan 3.4 in ionad leagan 3.3: deir rannán 13 anois go socraíonn an fianán debateai.locale freisin an teanga ina scríobhaimid na ríomhphost a sheolaimid chugat, agus cuireann sé paragraf leis a deir go gcoinníonn gach ríomhphost a chuirimid i scuaine duit an teanga a roghnaigh tú go dtí go seoltar é.
+Nuashonraíodh an beartas seo an uair dheireanach ar 12 Deireadh Fómhair 2026. Tháinig Leagan 3.5 in ionad leagan 3.4: deir rannán 2 anois cé na sonraí billeála agus cárta a choinnímid agus nach sroicheann uimhir iomlán do chárta sinn riamh, agus deir rannán 7 cá fhad a choinnímid cárta sábháilte agus teachtaireachtaí an tsoláthraí íocaíochta faoi íocaíochtaí.
 
 ## Annex B — Téarmaí príobháideachais réigiúnacha
 
