@@ -3806,8 +3806,12 @@ echo SB12_DONE
 
 `release-switch.mjs switch` checks everything first (the new release STAGED with its three units up, its runner's start
 line on its key with nothing re-sent, its website waiting, the edge on the old key, both gates active, no maintenance
-flag). Then one database write makes the new release current (take traffic from the database clock + 5 s), the edge
-must show the new key three times in a row, one more health interval passes, and only then the old website and API stop.
+flag). Then one database write makes the new release current (take traffic from the database clock + 8 s: the old API's
+5 s stale read bound, one 2 s health interval and 1 s more), the edge must show the new key three times in a row, one more
+health interval passes, and only then the old website and API stop. While the edge does not show the new key yet, the new
+website's own `/readyz` is read too: a reason that waiting cannot clear (anything but `BOOTING`, `NOT_CURRENT` or
+`BEFORE_TAKE_TRAFFIC_FROM`) switches back at once, `SWITCH_REVERTED` with reason `WEBSITE_NOT_READY` and the website's
+reasons, instead of after the whole 30 seconds.
 It arms the old release's backstop (switch + 27,000 s, an absolute UTC time) and points the boot target at the new pair.
 The old runner is never stopped: it finishes its debates and retires by itself.
 
@@ -3931,7 +3935,7 @@ the upload stopped:
 | before SB10's stage | nothing of the new release runs: stop here. Migrations already applied stay (each is expand-only, and the old release runs beside them with its database-ahead pin). |
 | SB10 (staged) to SB12, or SB13 refused before its write (`SWITCH_PRECONDITION_FAILED`, `RELEASE_SWITCH_CONFLICT`) | WB1: the new release goes away |
 | after SB13 (the new release is current) | WB2: the old release serves again |
-| SB13 said `SWITCH_REVERTED` | read the new website's `/readyz` reasons, fix, then WB3 (retry) |
+| SB13 said `SWITCH_REVERTED` | read the new website's `/readyz` reasons (with reason `WEBSITE_NOT_READY` the line names them in `websiteReasons`), fix, then WB3 (retry) |
 | SB13 said `SWITCH_OUTCOME_UNKNOWN`, or `bad` names `BACKSTOP` or `TARGET` | WB4 (finish) |
 | SB13 said `SWITCH_REVERT_FAILED` or `SWITCH_REVERT_UNCONFIRMED` | stop and ask: read `release-check.mjs status` first |
 
@@ -3980,7 +3984,8 @@ echo "started again: $(jq -r '.started | join(" ")' <<<"$RB")"
 echo WB2_DONE
 ```
 
-**WB3: after `SWITCH_REVERTED`.** The edge never showed the new release, so the tool switched back by itself: the old
+**WB3: after `SWITCH_REVERTED`.** The edge never showed the new release (or the new website said it would not become
+ready), so the tool switched back by itself: the old
 release serves, the new one is DRAINING with its three units still running (nothing was stopped) and its backstop armed.
 First read why the new website was not ready (the `reasons` WB3 prints), fix that, then WB3 retries: the database switches
 only to a STAGED release, so the retry is `rollback --to <new> --from <old>`, which disarms that backstop, stages the new

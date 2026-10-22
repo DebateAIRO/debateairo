@@ -5,9 +5,11 @@
 //   - stage   records a new release as STAGED, before its runner, API and website start (prestart starts nothing else);
 //   - seed    the transition only: the first current release, when the table has none yet (no edge, no stops);
 //   - switch  one database write makes the new release current and the old one draining (break-before-make: the old
-//             pair is not-ready at once, the new pair ready from take-traffic-from = the DATABASE clock + 5 s; Caddy holds
+//             pair is not-ready at once, the new pair ready from take-traffic-from = the DATABASE clock + 8 s; Caddy holds
 //             the requests in between); then the edge must show the new release three times in a row, one more health
-//             interval passes, and only then the old website and API stop. The old runner is never stopped: it finishes
+//             interval passes, and only then the old website and API stop. While the edge does not show it yet, the new
+//             website's own /readyz is read too: a reason that never passes by waiting (anything but BOOTING,
+//             NOT_CURRENT or BEFORE_TAKE_TRAFFIC_FROM) switches back at once instead of after the whole 30 s. The old runner is never stopped: it finishes
 //             its own debates and retires by itself (spec §4). The backstop (switch + 27,000 s, an absolute UTC time
 //             that survives a reboot) and the boot target are written last;
 //   - switch --finish: the database write of a switch landed but the command did not get to the end (a crash or a lost
@@ -58,8 +60,13 @@ import { releaseInfos, slotsOf } from './release-info.mjs';
 import { disarmTimers as disarmRetireTimers, gateState } from './release-retire.mjs';
 import { RELEASE_KEY_PATTERN, countOpenWork, readCurrentRelease, readReleaseEvents, readReleaseState, recordReleaseEvent, recordReleaseSwitch } from './release-table.mjs';
 
-/** Caddy's health_interval, the switch's take-traffic delay (two intervals + 1 s), the edge budget and the backstop. */
-export const HEALTH_INTERVAL_S = 2, TAKE_TRAFFIC_AFTER_S = 5, EDGE_WAIT_MS = 30_000, EDGE_CONFIRMATIONS = 3, BACKSTOP_S = 27_000;
+/**
+ * Caddy's health_interval, the switch's take-traffic delay, the edge budget and the backstop. TAKE_TRAFFIC_AFTER_S (final
+ * fix wave P6): the old API may serve on a release read up to 5 s old (its watcher's stale bound, apps/api
+ * release-state.ts) before it reads NOT_CURRENT, and Caddy then needs one health interval (2 s) to take the old pair out;
+ * one more second of margin: 5 + 2 + 1 = 8 s, so the new pair never takes traffic while the old one still does.
+ */
+export const HEALTH_INTERVAL_S = 2, TAKE_TRAFFIC_AFTER_S = 8, EDGE_WAIT_MS = 30_000, EDGE_CONFIRMATIONS = 3, BACKSTOP_S = 27_000;
 /** One edge request every 500 ms (after the previous one answered), each allowed 12 s: longer than lb_try_duration 10 s. */
 export const EDGE_POLL_MS = 500, EDGE_REQUEST_TIMEOUT_MS = 12_000;
 /** A release notice code is the label with `_` for `-`, at most 64 characters (alert.mjs, D6): longer labels never stage. */
@@ -100,6 +107,8 @@ export const gateFilesPathFor = (layout, releaseKey) => `${layout.stateDir}/rele
 const RECORDED_BY = 'root:release-switch';
 const ROLLBACK_BY = 'root:rollback';
 const WAITING_REASONS = Object.freeze(['NOT_CURRENT', 'BEFORE_TAKE_TRAFFIC_FROM']);
+/** The new website's reasons that pass by waiting during the switch; any other one is definitive (final fix wave X4). */
+export const SWITCH_WAITING_REASONS = Object.freeze(['BOOTING', 'NOT_CURRENT', 'BEFORE_TAKE_TRAFFIC_FROM']);
 const STOPPED = Object.freeze(['inactive', 'failed']);
 const UNIT_STATES = Object.freeze(['active', 'reloading', 'inactive', 'failed', 'activating', 'deactivating', 'maintenance', 'refreshing']);
 const INVOCATION_ID = /^[0-9a-f]{32}$/;
@@ -317,16 +326,34 @@ const waitingWebsite = (answer, key, allowed) => answer !== null && answer.statu
   && answer.reasons.length > 0 && answer.reasons.every(reason => allowed.includes(reason));
 
 /**
- * Poll the edge until EDGE_CONFIRMATIONS answers in a row are 200 from `key`'s website; null after EDGE_WAIT_MS. Every
- * edge failure on the way is counted in `tally` (controller ruling Q1).
+ * The website's own answer says it will not become ready by waiting (final fix wave X4): another release answers on its
+ * slot, or a reason other than BOOTING, NOT_CURRENT and BEFORE_TAKE_TRAFFIC_FROM (DRAINING, DATABASE_UNREACHABLE, …).
+ * No answer, or a 200, is not definitive: the edge decides those.
  */
-async function confirmEdge(key, tally, layout, io) {
+const definitiveRefusal = (answer, key) => answer !== null && answer.status !== 200
+  && (answer.releaseKey !== key || answer.reasons.some(reason => !SWITCH_WAITING_REASONS.includes(reason)));
+
+/**
+ * Poll the edge until EDGE_CONFIRMATIONS answers in a row are 200 from `key`'s website; null after EDGE_WAIT_MS. Every
+ * edge failure on the way is counted in `tally` (controller ruling Q1). `watch` (the switch only: `{ slot, secret }` of
+ * `key`'s release): while the edge does not show `key`, that website's own /readyz is read too, and a definitive refusal
+ * ends the wait at once (null, its reasons in `tally.websiteReasons`) instead of after the whole EDGE_WAIT_MS.
+ */
+async function confirmEdge(key, tally, layout, io, watch = null) {
   const startedAt = io.now();
   for (let inARow = 0; ;) {
     const answer = await readEdge(layout, io);
     if (answer.failed) tally.edgeFailures += 1;
-    inARow = !answer.failed && answer.status === 200 && answer.release === key ? inARow + 1 : 0;
+    const confirmed = !answer.failed && answer.status === 200 && answer.release === key;
+    inARow = confirmed ? inARow + 1 : 0;
     if (inARow >= EDGE_CONFIRMATIONS) return io.now() - startedAt;
+    if (!confirmed && watch !== null) {
+      const website = await readWebsite(watch.slot, watch.secret, layout, io);
+      if (definitiveRefusal(website, key)) {
+        tally.websiteReasons = Object.freeze(website.releaseKey === key ? [...website.reasons] : ['RELEASE_KEY_MISMATCH']);
+        return null;
+      }
+    }
     if (io.now() - startedAt >= EDGE_WAIT_MS) return null;
     await io.sleep(EDGE_POLL_MS);
   }
@@ -458,11 +485,12 @@ async function preconditions({ to, from, oldPairStopped, rollback, layout, io })
   if (!gatesActive) fields.push('gates');
   if (await io.pathExists(`${layout.lockRoot}/${MAINTENANCE_PENDING_NAME}`)) fields.push('maintenance');
   if (fields.length) refuse('SWITCH_PRECONDITION_FAILED', fields);
-  return { toKey, fromKey };
+  return { toKey, fromKey, watch: Object.freeze({ slot: toRelease.slot, secret }) };
 }
 
 /**
- * The edge never showed the new release (controller ruling D10 Q2): the old release takes traffic again. The database
+ * The edge never showed the new release (controller ruling D10 Q2), or the new website said it never will (X4): the old
+ * release takes traffic again. The database
  * switches only to a STAGED release, so the old one is staged again (reason SWITCH_REVERTED) and then switched to. The
  * new release stays DRAINING with its website, API and runner running: nothing is stopped, and anything it admitted in
  * the meantime finishes on it (O1). Like every draining release it gets its backstop (from the switch back's own
@@ -481,7 +509,10 @@ async function revert({ to, toKey, fromKey, recordedBy, tally, layout, io }) {
     if (current?.releaseKey === fromKey) backstopAt = await armBackstop(to, Date.parse(current.takeTrafficFrom) - TAKE_TRAFFIC_AFTER_S * 1000 + BACKSTOP_S * 1000, layout, io);
   } catch { /* reported as backstopAt null */ }
   if (await confirmEdge(fromKey, tally, layout, io) === null) refuse('SWITCH_REVERT_UNCONFIRMED', { edgeFailures: tally.edgeFailures, backstopAt });
-  refuse('SWITCH_REVERTED', { reason: 'EDGE_NOT_CONFIRMED', edgeFailures: tally.edgeFailures, backstopAt });
+  // WEBSITE_NOT_READY: the new website itself said it will not become ready (X4), so the switch went back without waiting.
+  refuse('SWITCH_REVERTED', tally.websiteReasons
+    ? { reason: 'WEBSITE_NOT_READY', websiteReasons: tally.websiteReasons, edgeFailures: tally.edgeFailures, backstopAt }
+    : { reason: 'EDGE_NOT_CONFIRMED', edgeFailures: tally.edgeFailures, backstopAt });
 }
 
 /**
@@ -509,7 +540,7 @@ async function afterWrite({ to, from, toKey, fromKey, recordedBy, tally, keepGat
     if (fromState === 'RETIRED') return true;
     const current = await io.readCurrentRelease();
     if (current?.releaseKey !== toKey) return false;
-    // The database clock: take-traffic-from is the switch's own clock_timestamp() + 5 s.
+    // The database clock: take-traffic-from is the switch's own clock_timestamp() + TAKE_TRAFFIC_AFTER_S.
     backstopAt = await armBackstop(from, Date.parse(current.takeTrafficFrom) - TAKE_TRAFFIC_AFTER_S * 1000 + BACKSTOP_S * 1000, layout, io);
     return true;
   });
@@ -547,7 +578,7 @@ async function runSwitch({ to, from, oldPairStopped, rollback, layout, io }) {
   requireLabel(to); requireLabel(from);
   if (to === from) refuse('SWITCH_PRECONDITION_FAILED', ['labels']);
   const recordedBy = rollback ? ROLLBACK_BY : RECORDED_BY;
-  const { toKey, fromKey } = await preconditions({ to, from, oldPairStopped, rollback, layout, io });
+  const { toKey, fromKey, watch } = await preconditions({ to, from, oldPairStopped, rollback, layout, io });
   const tally = { edgeFailures: 0 };
   try {
     await recordSwitch(io, { newKey: toKey, expectedCurrentKey: fromKey, seconds: TAKE_TRAFFIC_AFTER_S, recordedBy });
@@ -556,7 +587,7 @@ async function runSwitch({ to, from, oldPairStopped, rollback, layout, io }) {
     throw error;
   }
   const switchedAt = new Date(io.now()).toISOString();
-  const edgeConfirmedMs = await confirmEdge(toKey, tally, layout, io);
+  const edgeConfirmedMs = await confirmEdge(toKey, tally, layout, io, watch);
   if (edgeConfirmedMs === null) await revert({ to, toKey, fromKey, recordedBy, tally, layout, io });
   const { backstopAt, bad } = await afterWrite({ to, from, toKey, fromKey, recordedBy, tally, keepGateFiles: false, oldPairStopped, layout, io });
   return Object.freeze({ event: 'PREVIEW_RELEASE_SWITCHED', to, from, toKey, fromKey, switchedAt, edgeConfirmedMs, edgeFailures: tally.edgeFailures, backstopAt, bad });
@@ -604,7 +635,7 @@ export async function switchRelease({ to, from, oldPairStopped = false, layout =
  * (SWITCH_PRECONDITION_FAILED names each one): no current release yet; `to` STAGED; its runner, API and website active;
  * its runner's start line names its key with nothing re-sent; its website up but not ready only because it is not
  * current; no gate off; no maintenance pending. Then the one database write (no expected current; traffic from the
- * database clock + 5 s), then the edge must show `to` three times in a row, then its three instances are enabled.
+ * database clock + 8 s), then the edge must show `to` three times in a row, then its three instances are enabled.
  * Caddy answers by itself until the new pair is ready (nothing served before), so those answers are counted in
  * `edgeFailures` but are not a fault here; an edge that never shows `to` is EDGE_NOT_CONFIRMED in `bad`, and every
  * later step still runs (there is nothing to revert to). Run again after a write whose outcome was unknown, or after a

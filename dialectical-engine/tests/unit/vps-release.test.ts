@@ -144,7 +144,7 @@ function host(releases: Release[], options: Options = {}) {
   const base = START - DAY;
   for (const [key, kind, reason] of o.history) {
     const at = kind === "RETIRE_REQUESTED" ? START - o.minutesSinceRequest * 60_000 : base + events.length * 1000;
-    events.push({ key, kind, reason: reason ?? null, at, ttf: kind === "CURRENT" ? at + 5000 : null });
+    events.push({ key, kind, reason: reason ?? null, at, ttf: kind === "CURRENT" ? at + 8000 : null });
   }
   const latest = (key: string, kinds: string[]) => { for (let i = events.length - 1; i >= 0; i--) if (events[i]!.key === key && kinds.includes(events[i]!.kind)) return i; return -1; };
   const stateOf = (key: string) => {
@@ -373,7 +373,7 @@ describe("release.mjs: the preview's release tools with the public server's layo
     expect([first.code, first.err]).toEqual([0, null]);
     expect(first.out).toMatchObject({ event: "PREVIEW_RELEASE_FIRST_SWITCHED", to: "first-v1", toKey: FIRST_KEY, recorded: true, bad: [] });
     expect(first.out.edgeConfirmedMs).toBeGreaterThan(0);
-    expect(h.log.filter((entry) => entry.startsWith("recordReleaseSwitch"))).toEqual([`recordReleaseSwitch(${FIRST_KEY}, expect null, 5s)`]);
+    expect(h.log.filter((entry) => entry.startsWith("recordReleaseSwitch"))).toEqual([`recordReleaseSwitch(${FIRST_KEY}, expect null, 8s)`]);
     expect(h.verbs()).toEqual(["enable debateai-api@first-v1.service debateai-ui@first-v1.service debateai-runner@first-v1.service"]);
     expect(h.unitFiles).toEqual({});
     expect(h.stateOf(FIRST_KEY).state).toBe("CURRENT");

@@ -241,6 +241,15 @@ describe('the preview release guide: transition T, side by side, the way back, t
     expect(tb6.findIndex(line => line.includes('lc release-switch.mjs seed --label "$LABEL"'))).toBeLessThan(tb6.findIndex(line => line.includes('systemctl start "debateai-preview-api@$LABEL"')));
   });
 
+  it('names the switch\'s take-traffic delay as the tool sets it (final fix wave P6), and its early way back (X4)', async () => {
+    const { TAKE_TRAFFIC_AFTER_S } = await import('../../deploy/' + 'preview-lifecycle/v1/release-switch.mjs');
+    expect(TAKE_TRAFFIC_AFTER_S).toBe(8);
+    const sb13 = sectionOf(guide, sideBySide.split('\n').find(line => line.startsWith('### SB13. '))!);
+    expect(sb13).toContain(`take traffic from the database clock + ${TAKE_TRAFFIC_AFTER_S} s`);
+    expect(guide).not.toMatch(/database clock \+ 5 s/);
+    expect(sb13).toContain('`SWITCH_REVERTED` with reason `WEBSITE_NOT_READY`');
+  });
+
   it('names both owner-yes points and what each yes must say', () => {
     const t = sectionOf(guide, TRANSITION);
     // The gate redeploy (TB0g) runs right before the downtime on the same yes (final fix wave S4).
