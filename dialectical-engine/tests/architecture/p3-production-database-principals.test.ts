@@ -150,6 +150,12 @@ const externalRecoveryRoles = [
 // not a SCRAM principal of the P3-01 provisioner manifest.
 const peerReadinessRoles = ["debateai_staff_readiness_writer"] as const;
 
+// Side-by-side releases (migration 0123 §3, spec 2026-10-21 §4, §6): the release table's NOLOGIN NOINHERIT function owner
+// and its writers' NOLOGIN NOINHERIT operator group. Phase 1 provisions no login in either (the preview runs the writers
+// as postgres through root), so neither is yet a P3-01 provisioner role; the public server's operator login (Phase 3)
+// brings them into the manifest.
+const sideBySideReleaseRoles = ["debateai_release_operator", "debateai_release_owner"] as const;
+
 // V-29 removed the one exception (the observation agent's pg_monitor login): no
 // principal may hold any predefined pg_* role.
 function exactForbidden(effectiveMemberships: readonly string[]): readonly string[] {
@@ -685,6 +691,44 @@ describe("P3-01 production database-principal manifest", () => {
   "grants": [
     "EXECUTE ON FUNCTION ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)"
   ]
+},
+// Side-by-side spec §4, §9 (migration 0123 §3-§7), in source order: the release readers (§3); the redefined waiting
+// view's re-asserted SELECT (§4); the funding functions redefined in place re-assert 0092/0093's runtime grants (§7's
+// funded spend reader among them), and the new funding reader at a version is the one new runtime EXECUTE (§6); the
+// append-only spend waiver (§7). The API's role alone records and resolves supersessions and lists a waiting run's
+// re-admissions whose START never committed (§4, C11 review); the funding owner reads the waiver (§7).
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0123_side_by_side_releases.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION core.read_current_release()",
+    "EXECUTE ON FUNCTION core.read_release_state(text)",
+    "SELECT ON core.run_waiting_v",
+    "EXECUTE ON FUNCTION billing.reserve_internal_provider_call(uuid,uuid,bigint,text,text)",
+    "EXECUTE ON FUNCTION billing.read_internal_run_state(uuid)",
+    "EXECUTE ON FUNCTION billing.read_internal_allowance(uuid,timestamptz)",
+    "EXECUTE ON FUNCTION staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION staff.read_self_allowance_command(jsonb,text,uuid)",
+    "EXECUTE ON FUNCTION staff.read_internal_funding_policy_at(bigint)",
+    "SELECT, INSERT ON ledger.model_spend_waiver",
+    "EXECUTE ON FUNCTION billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)"
+  ]
+},
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0123_side_by_side_releases.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION core.resolve_run_ref(uuid)",
+    "SELECT, INSERT ON core.run_supersession",
+    "EXECUTE ON FUNCTION core.list_unstarted_readmissions(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_staff_security_owner",
+  "source": "migrations/0123_side_by_side_releases.sql",
+  "grants": [
+    "SELECT ON ledger.model_spend_waiver"
+  ]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))
@@ -766,7 +810,7 @@ describe("P3-01 production database-principal manifest", () => {
         .map(({ roleName }) => roleName)
         .filter((roleName) => /^(?:debateai_obs_(?:writer|listener|watchdog|human)|debateai_observation_agent|debateai_observation_threshold_operator|debateai_prod_staff_recovery)$/u.test(roleName))
     ].sort();
-    expect(sourceCreatedRoles).toEqual([...manifestMigrationRoles,...externalRecoveryRoles,...peerReadinessRoles].sort());
+    expect(sourceCreatedRoles).toEqual([...manifestMigrationRoles,...externalRecoveryRoles,...peerReadinessRoles,...sideBySideReleaseRoles].sort());
     expect(manifest.retiredCapabilityRoles).toEqual([{roleName:"debateai_password_recovery_runtime",login:false,inherit:false,directMemberships:[],status:"RETIRED_BY_0104",reason:expect.any(String)}]);
 
     const sourceDatabaseKeys = [...new Set([
@@ -953,4 +997,25 @@ it("discloses exactly the reviewed additive funding grants without other princip
     .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
   expect(actual).toEqual(declared);
   expect(declared.some(grant => /(?:INSERT|UPDATE|DELETE).*funding_policy_selection/u.test(grant))).toBe(false);
+});
+
+it("discloses exactly 0123's grants to the runtime, the API's billing role and the funding owner (side-by-side §4, §9)", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0123_side_by_side_releases.sql", "utf8");
+  const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime";
+  // Every GRANT line of 0123 naming one of the three roles, as the 0092 test scans 0092: a grant naming one of them
+  // beside another grantee would escape the exact pattern, so none may.
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
+    .filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+      && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = [...sql.matchAll(new RegExp(`^GRANT [^\\n]+ TO (?:${disclosed});$`, "gm"))]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0123_side_by_side_releases.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  // §3 two release readers, §4 the waiting view and the API's three re-admission grants (record and resolve
+  // supersessions, list the unstarted re-admissions: C11 review), §6-§7 seven funding EXECUTEs, §7 the waiver's two
+  // table grants. The append-only tables are never writable beyond INSERT.
+  expect(declared).toHaveLength(15);
+  expect(declared.some(grant => /\b(?:UPDATE|DELETE|TRUNCATE)\b/u.test(grant))).toBe(false);
 });

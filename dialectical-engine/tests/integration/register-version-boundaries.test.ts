@@ -7,6 +7,8 @@ import { readTerminalRecordedFacts } from "../../packages/battery/src/terminal.j
 import { MemoryRepository } from "../../packages/memory/src/index.js";
 import { parseApiEnvironment } from "../../packages/register/src/index.js";
 import { SettlementRepository } from "../../packages/settlement/src/index.js";
+import { fixtureReleaseKey } from "../support/apiEnvironmentFixture.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const UNSAFE_VERSION = "9007199254740993" as const;
 
@@ -148,6 +150,8 @@ describe("unsafe register versions fail inside every legacy-number family", () =
       API_PORT: "3000",
       STRANGER_SAMPLE_RATE: "0.1",
       REGISTER_VERSION: UNSAFE_VERSION,
+      // Side-by-side §1: the key that matches this version; the version itself is refused first.
+      RELEASE_KEY: fixtureReleaseKey(UNSAFE_VERSION),
       BATTERY_VERSION: "test",
       SETTLEMENT_WATCH_HANDLE: "test",
       HATCHET_CLIENT_TOKEN: "test",
@@ -162,12 +166,15 @@ describe("unsafe register versions fail inside every legacy-number family", () =
 
     const query = vi.fn(async () => result([]));
     const pool = { query } as unknown as Pool;
-    const application = new PostgresAskApplication(
+    // Side-by-side §1: no release key carries an unsafe number, so an application with an unsafe register version is
+    // refused at construction (RELEASE_KEY_REGISTER_MISMATCH), before readDeployment's own guard could be reached.
+    expect(() => new PostgresAskApplication(
       pool,
       {} as never,
       {
         strangerSampleRate: 0,
         registerVersion: Number(UNSAFE_VERSION),
+        releaseKey: TEST_RELEASE_KEY,
         batteryVersion: "test",
         settlementWatchHandle: "test",
         resolveDiscoveredPanel: async () => [],
@@ -177,9 +184,7 @@ describe("unsafe register versions fail inside every legacy-number family", () =
       undefined,
       {} as Pool,
       { server: {} as Pool, legacy: {} as Pool }
-    );
-    await expect(application.readDeployment({ session_id: "session:test" } as never))
-      .rejects.toThrow("No sealed V3 deployment register exists");
+    )).toThrowError(expect.objectContaining({ code: "RELEASE_KEY_REGISTER_MISMATCH" }));
     expect(query).not.toHaveBeenCalled();
   });
 });

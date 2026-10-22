@@ -130,7 +130,10 @@ describe("PF6: admission prices a new and an unfinished debate, each with ITS OW
     remainingCalls: 10_000_000, maxConcurrentCalls: 0, largestReservationNanoUsd: 0n, enabledModels: [GLM, MIMO] });
   const gate = (unfinished: readonly PreviewUnfinishedRun[]): PreviewBudgetGateSettings => Object.freeze({
     remaining: { deepinfra: async () => remaining() }, roleModels: ROLES, roleProviderRefs: [], storyRounds: 0,
-    callOutputTokens: OUTPUT, askProbeModelIds: [], maxCooldownHoldsPerRun: 2, readUnfinishedRuns: async () => unfinished
+    callOutputTokens: OUTPUT, askProbeModelIds: [], maxCooldownHoldsPerRun: 2, readUnfinishedRuns: async () => unfinished,
+    // The unfinished debate was admitted under the API's own version (side-by-side C16).
+    termsForVersion: async () => Object.freeze({ roleModels: ROLES, roleProviderRefs: [], storyRounds: 0, callOutputTokens: OUTPUT,
+      maxCooldownHoldsPerRun: 2 })
   });
   /** The gate refuses (no money left); its refusal names what the unfinished debates hold and what the new one needs. */
   const figures = async (settings: PreviewBudgetGateSettings, basis: Readonly<Record<string, unknown>>) => {
@@ -159,14 +162,14 @@ describe("PF6: admission prices a new and an unfinished debate, each with ITS OW
   const withinMargin = (more: bigint): boolean => 100n * more >= 115n * added - 100n && 100n * more <= 115n * added + 100n;
 
   it("a new shaped debate and an unfinished shaped one are both charged the map step bounds (the writer at its row's maximum, LG-B)", async () => {
-    const run: PreviewUnfinishedRun = { basis: shaped, panel: PANEL, phase: "DEBATE" };
+    const run: PreviewUnfinishedRun = { basis: shaped, panel: PANEL, phase: "DEBATE", registerVersion: 17 };
     const { held, needs } = await figures(gate([run]), shaped);
     expect(needs).toBe(held);
     expect(needs).toBeGreaterThan(shapeBlind(shaped));
     expect(withinMargin(needs - shapeBlind(shaped))).toBe(true);
   });
   it("a new debate of today's shape is priced exactly as today while the unfinished shaped one keeps its own bounds", async () => {
-    const run: PreviewUnfinishedRun = { basis: shaped, panel: PANEL, phase: "DEBATE" };
+    const run: PreviewUnfinishedRun = { basis: shaped, panel: PANEL, phase: "DEBATE", registerVersion: 17 };
     const { held, needs } = await figures(gate([run]), legacy);
     expect(needs).toBe(shapeBlind(legacy));
     expect(withinMargin(held - shapeBlind(shaped))).toBe(true);

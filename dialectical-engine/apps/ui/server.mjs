@@ -2,6 +2,14 @@ import { createServer } from "node:http";
 import next from "next";
 import { FALLBACK_CONTENT_SECURITY_POLICY } from "./content-security-policy.mjs";
 import { acceptsUpgrade } from "./edge-upgrade.mjs";
+import {
+  assertBuildMatchesRelease,
+  createReadinessResponder,
+  installGracefulClose,
+  noteUnusableApiBase,
+  parseWebsiteReleaseKey,
+  releaseHeaderFor
+} from "./release-edge.mjs";
 import { hardenIncomingProxyHeaders, parseTrustedProxies, readEdgeSecret } from "./trusted-client-ip.mjs";
 
 function refuse(code) {
@@ -34,6 +42,24 @@ for (const key of ["XMONEY_SDK_ORIGIN"]) {
 // front door is in front of it. A bare `next start` never sets the marker, so a
 // client-supplied `x-debateai-client-ip` is dropped there instead of being forwarded.
 process.env.DIALECTICAL_UI_EDGE = "server.mjs";
+// Side-by-side spec §1 (plan C12): the release this website is, required outside --dev; a production start serves
+// only a build stamped for the same release (`next build && node release-edge.mjs --stamp`), so a person is never
+// served another release's pages (O1). Checked after the edge settings above so their refusals keep their codes.
+const releaseKey = parseWebsiteReleaseKey(process.env.RELEASE_KEY, { development });
+const distDir = process.env.NEXT_DIST_DIR || ".next";
+if (!development) assertBuildMatchesRelease(distDir, releaseKey);
+// Spec §6: /readyz stays BOOTING without a usable API base; outside --dev the boot names that cause (C12 review).
+const apiBase = process.env.DIALECTICAL_API_BASE?.trim();
+noteUnusableApiBase(apiBase, { development });
+// Spec §6: SIGTERM turns /readyz to DRAINING as the server stops accepting; no new probe sees it (Caddy meets a refused
+// connection, the same effect — release-edge.mjs installGracefulClose, final fix wave W5).
+let draining = false;
+const readiness = createReadinessResponder({
+  apiBase,
+  releaseKey,
+  fetch: globalThis.fetch,
+  draining: () => draining
+});
 
 const app = next({ dev: development, hostname, port });
 await app.prepare();
@@ -45,6 +71,12 @@ const server = createServer((request, response) => {
   // replaces it on every route it matches; anything it does not match —
   // static chunks, a skipped middleware — still carries this one.
   response.setHeader("content-security-policy", FALLBACK_CONTENT_SECURITY_POLICY);
+  // Spec §7: every website answer names its release; a proxied /api answer carries only its API's own (the same key
+  // when the pair is healthy, which /readyz checks), so a headerless API shows as missing (C12 review).
+  const ownRelease = releaseHeaderFor(releaseKey, request.url);
+  if (ownRelease !== null) response.setHeader("x-debateai-release", ownRelease);
+  // Spec §6: the health check Caddy polls (with or without the edge secret) is answered here, never by Next.
+  if (readiness(request, response)) return;
   void handle(request, response).catch((error) => {
     console.error("[UI_REQUEST_FAILED]", error);
     if (!response.headersSent) response.statusCode = 500;
@@ -68,3 +100,5 @@ server.on("upgrade", (request, socket, head) => {
 server.headersTimeout = 60_000;
 server.requestTimeout = 300_000;
 server.listen(port, hostname);
+// Spec §6: a planned stop stops accepting at once, closes, and exits 0 within 20 s.
+installGracefulClose({ server, process, onDrain: () => { draining = true; } });

@@ -38,7 +38,7 @@ describe("P22 the Billing runbook", () => {
       "apps/ui/public/payment-marks/visa.svg",
       // P2-M34 (W16 fix): the website reads the marks folder only at start, so copying the marks in needs a restart.
       "the list of files in that folder only when it starts, so after copying the files in, restart it with",
-      "`systemctl restart debateai-ui`. Until then the footer shows them as broken images. No rebuild is needed.",
+      "`systemctl restart debateai-ui@$label`. Until then the footer shows them as broken images. No rebuild is needed.",
       "apps/ui/lib/legal/pages.ts", "COMPANY", "[RO…]",
       "packages/billing-core/src/company.ts", "SELLER_COMPANY", "BILLING_COMPANY_FACTS_UNVERIFIED",
       "The company's tax codes are not `api.env` settings", "as digits only, never with `RO`",
@@ -636,7 +636,7 @@ describe("P22 the Billing runbook", () => {
     expect(paragraph).not.toContain("until you restart them, the services keep the version they run");
     // The facts behind those words: the units read the pinned files and restart on failure by themselves.
     for (const unit of ["api", "runner"]) {
-      const service = read(`deploy/vps/systemd/debateai-${unit}.service`);
+      const service = read(`deploy/vps/systemd/debateai-${unit}@.service`);
       expect(service).toContain(`EnvironmentFile=/etc/debateai/${unit}.env`);
       expect(service).toContain("Restart=on-failure");
     }
@@ -1030,7 +1030,7 @@ describe("P22 the Billing runbook", () => {
       "its usage bars and a withdrawal's credit-used share", "the fake stack in step 6 proves the bars and the share",
       "so do not run them on this host while the line is set",
       "**Before step 1: read the journal of the first start with billing on.**",
-      "_SYSTEMD_INVOCATION_ID=\"$(systemctl show --property=InvocationID --value debateai-api)\"",
+      "_SYSTEMD_INVOCATION_ID=\"$(systemctl show --property=InvocationID --value debateai-api@$label)\"",
       "run the journal command from **Before step 1** again; it should print nothing",
       // F6a fix round 1: each check run posts one unsigned message, so both journal reads name that one line as
       // expected; the filters themselves are unchanged, so a NETOPIA message that lost its header still shows.
@@ -1205,7 +1205,7 @@ describe("CF1 (Part C's final review): the runbook speaks the charge's currency 
       "5. **Close the window** (§4 step 5).",
       "6. **Publish the v2 `billingPlans`**",
       "7. **Pin it**: copy the printed `REGISTER_VERSION=` line into both `api.env` and `runner.env`.",
-      "8. **Restart both**: `systemctl restart debateai-api debateai-runner`."
+      "8. **Restart both**, with `unfinished` at 0: `systemctl restart debateai-api@$label debateai-runner@$label`."
     ];
     let previous = -1;
     for (const step of steps) {

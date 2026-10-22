@@ -115,6 +115,7 @@ import {
   argumentLanguageDirective,
   DEBATE_ROLES,
   debateRoleFromCallSiteKey,
+  LEGACY_RELEASE_KEY,
   TypedDomainError,
   type DebateRole,
   type ServedRootRuleHistory
@@ -143,6 +144,7 @@ import {
   publishReplacementRegisterFixture,
   registerFixtureRow
 } from "../support/registerFixtures.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 let database: TestDatabase;
 const batteryRows = createInitialBatteryRows({ settlementWatchHandle: "settlement-watch:test-layer" });
@@ -855,6 +857,7 @@ describe("S-LANG argument language persistence", () => {
     const settings: RunCreationSettings = {
       strangerSampleRate: 0,
       registerVersion: 1,
+      releaseKey: TEST_RELEASE_KEY,
       batteryVersion: "slang-test",
       settlementWatchHandle: "slang-test",
       resolveDiscoveredPanel: async () => panel,
@@ -1189,7 +1192,7 @@ describe("LOAD-01 run projection ownership boundary", () => {
     });
 
     const application = new PostgresAskApplication(
-      database.pool,{} as never,{} as never,undefined,database.pool,
+      database.pool,{} as never,{ releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never,undefined,database.pool,
       createTestAskAdmissionPoolFacades(database.pool)
     );
     const api = buildApi({
@@ -1918,9 +1921,10 @@ describe("L4-F9 / ADR-0017 §3(c) — a running debate keeps its claim", () => {
   );
 
   it("renews only the claim it holds, and says when the job is already settled", async () => {
-    const work = new WorkItemRepository(database.pool);
-    const { runId, workItemId } = await createRunnerWork(`l4f9-renew-${digitsOnlyId()}`);
     const workerId = "worker:l4f9";
+    // Side-by-side D2: the failure below is written under this worker's own live claim, so the repository knows it.
+    const work = new WorkItemRepository(database.pool, { releaseKey: LEGACY_RELEASE_KEY, workerId });
+    const { runId, workItemId } = await createRunnerWork(`l4f9-renew-${digitsOnlyId()}`);
     const claimed = await work.claimById({ workItemId, workerId, claimSeconds: 30 });
     if (claimed === null) throw new Error("TEST_EXPECTED_CLAIM");
 

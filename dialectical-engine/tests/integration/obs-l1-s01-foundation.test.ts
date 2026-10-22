@@ -419,7 +419,7 @@ describe("S01 obs store foundation on real PostgreSQL", () => {
       `);
       expect(cryptoFunctions.rows).toEqual([{ bytes: null, uuid: "gen_random_uuid()" }]);
 
-      await expect(migrate(fresh.pool)).resolves.toBeUndefined();
+      await expect(migrate(fresh.pool)).resolves.toMatchObject({ extraSteps: [] });
 
       const roles = await fresh.pool.query<{ rolname: string; rolpassword: string | null }>(`
         SELECT rolname, rolpassword
@@ -449,7 +449,7 @@ describe("S01 obs store foundation on real PostgreSQL", () => {
         `);
       }
       await configureRolePasswords(fresh.pool);
-      await expect(migrate(fresh.pool)).resolves.toBeUndefined();
+      await expect(migrate(fresh.pool)).resolves.toMatchObject({ extraSteps: [] });
 
       const roles = await fresh.pool.query<{ rolname: string; rolpassword: string | null }>(`
         SELECT rolname, rolpassword
@@ -982,8 +982,8 @@ describe("S01 obs store foundation on real PostgreSQL", () => {
     try {
       await configureRolePasswords(second);
       await expect(Promise.all([migrate(database.pool), migrate(second)]))
-        .resolves.toEqual([undefined, undefined]);
-      await expect(migrate(second)).resolves.toBeUndefined();
+        .resolves.toMatchObject([{ extraSteps: [] }, { extraSteps: [] }]);
+      await expect(migrate(second)).resolves.toEqual({ appliedSteps: [], extraSteps: [] });
     } finally {
       await second.end();
     }

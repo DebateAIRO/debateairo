@@ -1,7 +1,10 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
+import { ContractHttpError } from "@debateai/contract";
 import { createServerContractClient, readTrustedClientIp } from "@/lib/serverApi";
+import { MADE_BY_NEWER_RELEASE } from "@/lib/v3/releaseWatch";
+import { MadeByNewerRelease } from "./MadeByNewerRelease";
 import { PublicDebatePageClient } from "./PublicDebatePageClient";
 import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
 import { questionLocale } from "@/lib/i18n/questionLocale";
@@ -27,7 +30,13 @@ export default async function PublicDebatePage({ params }: { params: Promise<{ i
     // DL3-F1: the public-read budget is per visitor; without the stamped address every
     // server-rendered read would count against one bucket shared by all visitors.
     debate = await createServerContractClient(fetch, undefined, undefined, readTrustedClientIp(await headers())).readPublicDebate(id);
-  } catch {
+  } catch (failure) {
+    // Side-by-side spec §7 (plan C13): a debate a newer version made (the server says so, or its answer does not
+    // parse here) is told so plainly; every other refusal stays "not found".
+    if (failure instanceof ContractHttpError
+      && (failure.serverCode === MADE_BY_NEWER_RELEASE || failure.code === "INVALID_RESPONSE")) {
+      return <MadeByNewerRelease catalog={await loadNamespace(locale, "chrome")} />;
+    }
     notFound();
   }
   // The language the debate was argued in, as the snapshot recorded it (spec

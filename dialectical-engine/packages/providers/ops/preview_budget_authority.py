@@ -149,8 +149,11 @@ PROVIDER_REFUSED_UNBILLED and PROVIDER_ERROR_UNBILLED (nothing billed, hold rele
 says the model is busy), MODEL_COOLING (nothing reserved or sent), PROVIDER_CHARGE_BOOKED_MAX (sent,
 then the connection failed, the vendor answered a server error without a bill, or its charge went unreported;
 booked at the reservation; the gate stays active),
-and AUTHORITY_HALTED: the gate was already halted (or halted at that moment on an interrupted probe)
-when this call was checked, before anything was reserved. Every other refusal, among them every
+AUTHORITY_HALTED: the gate was already halted (or halted at that moment on an interrupted probe)
+when this call was checked, before anything was reserved, and (side-by-side spec §9) MODEL_NOT_ALLOWED and
+RESERVATION_MISMATCH: refused before any reservation: this model or this price is not served by this GO (during
+an upload an older release's debate may still ask for a row or a price the new GO no longer carries; the app
+reads either as that model sitting out, never as money). Every other refusal, among them every
 failure after a reservation, is the opaque PREVIEW_TEST_AUTHORITY_STOPPED.
 
 Team total (owner, 2026-10-10; raised by owner answer M1, 2026-10-15): one GO's daily_budget_usd is at most
@@ -261,9 +264,12 @@ STOPPED = 'PREVIEW_TEST_AUTHORITY_STOPPED'
 # PROVIDER_CHARGE_BOOKED_MAX (owner ruling 2026-10-12; owner answer M3): this call was sent and its charge cannot be
 # known (the connection failed or timed out, a server error without a bill, or an unreported charge); its full
 # reservation is booked as its charge; the gate stays active.
+# MODEL_NOT_ALLOWED and RESERVATION_MISMATCH (side-by-side spec §9, both raised in validate_request): refused before
+# any reservation: this model or this price is not served by this GO; nothing was reserved or sent.
 PUBLIC_REFUSALS = frozenset({'TEAM_DAILY_BUDGET_REACHED', 'DAILY_CALL_LIMIT_REACHED', 'CONCURRENCY_LIMIT_REACHED',
                              'PROVIDER_NOT_REACHED', 'PROVIDER_REFUSED_UNBILLED', 'PROVIDER_ERROR_UNBILLED',
-                             'MODEL_COOLING', 'AUTHORITY_HALTED', 'PROVIDER_CHARGE_BOOKED_MAX'})
+                             'MODEL_COOLING', 'AUTHORITY_HALTED', 'PROVIDER_CHARGE_BOOKED_MAX',
+                             'MODEL_NOT_ALLOWED', 'RESERVATION_MISMATCH'})
 GO_REQUIRED = frozenset({'schema', 'allow_paid_calls', 'bridge_sha256', 'helper_sha256', 'provider', 'enabled_models',
                          'scope_id', 'target_host', 'allowed_peer_uids', 'daily_budget_usd', 'max_paid_posts_per_day',
                          'max_concurrent_calls', 'open_days'})

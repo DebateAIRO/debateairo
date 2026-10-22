@@ -67,8 +67,12 @@ const VULNERABLE: Record<string, (version: string) => boolean> = {
   // 2026-10-21: GHSA-587h-7wmj-h5pm / GHSA-698v-4r3x-3vcv / GHSA-r825-w8mm-5pxw (vite >=8.2.0 <=8.2.3, its
   // launch-editor), test tooling only (vitest); 8.2.4 was published 2026-10-06.
   vite: (v) => v.startsWith("8.2.") && compare(v, "8.2.4") < 0,
-  // @vitest/mocker ships in lockstep with vitest, so the vitest floor covers it.
-  vitest: (v) => compare(v, "4.1.11") < 0
+  vitest: (v) => compare(v, "4.1.11") < 0,
+  // 2026-10-22: GHSA-qxg6-89mg-rqv8 / GHSA-xp26-3454-mjgp (@vitest/mocker >=5.0.0-beta.1 <5.0.3), test
+  // tooling only; reached through the direct dev dependency vitest, so the fix is the vitest PIN (5.0.3),
+  // not an override. @vitest/mocker ships in lockstep with vitest but gets its own floor so the lockfile
+  // is checked where the advisory points. vitest and @vitest/mocker 5.0.3 were published 2026-09-30.
+  "@vitest/mocker": (v) => v.startsWith("5.") && compare(v, "5.0.3") < 0
 };
 
 describe("dependency floors (F-02)", () => {

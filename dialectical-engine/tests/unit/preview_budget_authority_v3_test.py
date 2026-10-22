@@ -315,8 +315,9 @@ class ModelCallTests(GateTest):
             bridge.execute_request(None, None, envelope(body(model=DEEPSEEK)), peer_uid=PEER, slots=bridge.CallSlots(4),
                                    dispatch=no_network, key_loader=no_network, host=HOST, platform='linux')
         store.assert_not_called()
+        # Side-by-side spec §9: refused before any reservation, so the caller is told this model is not served by this GO.
         self.assertEqual(json.loads(bridge.refusal_body(SafetyError('MODEL_NOT_ALLOWED'))),
-                         {'error': 'PREVIEW_TEST_AUTHORITY_STOPPED'})
+                         {'error': 'MODEL_NOT_ALLOWED'})
 
     def test_each_call_reserves_and_settles_at_its_own_row_and_the_entry_records_it(self):
         gate = self.gate(enabled_models=ALL).ready()
@@ -1138,8 +1139,11 @@ class ProfileApiTests(GateTest):
                      'DAILY_CALL_LIMIT_REACHED', 'CONCURRENCY_LIMIT_REACHED', 'AUTHORITY_HALTED', 'MODEL_COOLING'):
             self.assertEqual(json.loads(bridge.refusal_body(bridge.CallNotSent(code))), {'error': code})
         self.assertEqual(json.loads(bridge.refusal_body(bridge.ModelCooling(42))), {'error': 'MODEL_COOLING', 'retry_after': 42})
+        # Side-by-side spec §9: refused before any reservation, this model or this price is not served by this GO.
+        self.assertEqual(json.loads(bridge.refusal_body(SafetyError('MODEL_NOT_ALLOWED'))), {'error': 'MODEL_NOT_ALLOWED'})
+        self.assertEqual(json.loads(bridge.refusal_body(SafetyError('RESERVATION_MISMATCH'))), {'error': 'RESERVATION_MISMATCH'})
         # SETTLED_INTO_HALT: a call that was reserved and sent, then halted the gate, stays opaque.
-        for code in ('MODEL_NOT_ALLOWED', 'NEW_CHARGE_UNCERTAIN', 'SETTLED_INTO_HALT', 'AUTHORITY_STOPPED', 'RESERVATION_MISMATCH',
+        for code in ('NEW_CHARGE_UNCERTAIN', 'SETTLED_INTO_HALT', 'AUTHORITY_STOPPED',
                      'AUTHORITY_EXPIRED', 'REMAINING_REQUEST_INVALID', 'PROBE_RUNNING', 'SETTLEMENT_FAILED', 'provider_not_reached'):
             self.assertEqual(json.loads(bridge.refusal_body(SafetyError(code))), {'error': 'PREVIEW_TEST_AUTHORITY_STOPPED'})
         self.assertEqual(json.loads(bridge.refusal_body(ValueError('PROVIDER_NOT_REACHED'))),

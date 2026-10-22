@@ -33,7 +33,7 @@ class FakeProcess extends EventEmitter {
 
 function harness(
   overrides: Partial<GracefulShutdownRegistration> = {},
-  bounds: Readonly<{ deadlineMs?: number; escalationGraceMs?: number }> = {}
+  bounds: Readonly<{ deadlineMs?: number; escalationGraceMs?: number; drain?: Readonly<{ begin(): void }> }> = {}
 ) {
   const order: string[] = [];
   const api = Fastify({ logger: false });
@@ -80,6 +80,15 @@ function harness(
     logger,
     shutdown
   };
+}
+
+/** Records every api.close() call in the flow's order, so a step can be ordered before the lifecycle reaches Fastify. */
+function recordApiClose(flow: ReturnType<typeof harness>): void {
+  const fastifyClose = flow.api.close.bind(flow.api);
+  flow.api.close = ((...args: Parameters<typeof fastifyClose>) => {
+    flow.order.push("api.close");
+    return fastifyClose(...args);
+  }) as typeof flow.api.close;
 }
 
 describe("T3 graceful shutdown", () => {
@@ -339,5 +348,50 @@ describe("T3 graceful shutdown", () => {
     await expect(flow.shutdown.close("api.close")).rejects.toBeInstanceOf(GracefulShutdownError);
     expect(flow.evaluatorDatabase.end).toHaveBeenCalledTimes(1);
     expect(flow.order).toContain("evaluator-database");
+  });
+
+  // Side-by-side spec §6 (plan C6): SIGTERM begins the drain before Fastify closes, so every live run-event stream ends
+  // with a clean close at its next poll and Fastify finishes inside its 20 s deadline.
+  it("SIGTERM begins the drain before api.close, once only, even across a second signal", async () => {
+    const mail = deferred();
+    const begin = vi.fn();
+    const flow = harness({}, { drain: { begin: () => { begin(); flow.order.push("drain.begin"); } } });
+    recordApiClose(flow);
+    flow.registration.drainMailDispatches = vi.fn(async () => {
+      flow.order.push("mail");
+      await mail.promise;
+    });
+
+    flow.process.emit("SIGTERM", "SIGTERM");
+    await vi.waitFor(() => expect(flow.order).toEqual(["drain.begin", "api.close", "admissions", "mail"]));
+    flow.process.emit("SIGTERM", "SIGTERM");
+    expect(begin).toHaveBeenCalledTimes(1);
+
+    mail.resolve();
+    await vi.waitFor(() => { expect(flow.order).toContain("evaluator-database"); });
+    expect(begin).toHaveBeenCalledTimes(1);
+    expect(flow.process.exitCalls).toEqual([]);
+    expect(flow.logger.error).not.toHaveBeenCalled();
+  });
+
+  it("the controller close begins the drain before api.close too", async () => {
+    const flow = harness({}, { drain: { begin: () => { flow.order.push("drain.begin"); } } });
+    recordApiClose(flow);
+
+    await flow.shutdown.close("api.close");
+    expect(flow.order.slice(0, 3)).toEqual(["drain.begin", "api.close", "admissions"]);
+    expect(flow.order).toContain("evaluator-database");
+  });
+
+  it("a drain whose begin throws never blocks the shutdown", async () => {
+    const flow = harness({}, { drain: { begin: () => { throw new Error("drain begin failed"); } } });
+    recordApiClose(flow);
+
+    flow.process.emit("SIGTERM", "SIGTERM");
+    await vi.waitFor(() => { expect(flow.order).toContain("evaluator-database"); });
+    expect(flow.order[0]).toBe("api.close");
+    expect(flow.process.exitCalls).toEqual([]);
+    expect(flow.process.exitCode).toBeUndefined();
+    expect(flow.process.listenerCount("SIGTERM")).toBe(0);
   });
 });

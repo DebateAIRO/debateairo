@@ -8,6 +8,7 @@ import { getDebateServer, questionLanguageTagOf } from "../../apps/ui/lib/server
 import { languageOfferLocale, localeDirection, questionLocale } from "../../apps/ui/lib/i18n/questionLocale.js";
 import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 /**
  * R2 (spec 2026-09-26 §14.3): the question's language reaches the UI on its
@@ -94,13 +95,13 @@ describe("the run read carries the question's language", () => {
     const { pool } = fakePool(true);
     const other = () => ({ query: async () => ({ rows: [] }) }) as unknown as Pool;
     const application = new PostgresAskApplication(
-      pool, {} as never, {} as never, { read: async () => null } as never, other(), { server: other(), legacy: other() }
+      pool, {} as never, { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, { read: async () => null } as never, other(), { server: other(), legacy: other() }
     );
     const run = await application.readRun("run:settled", {} as never, LEGACY_OWNER);
     expect(run).toEqual({ ...RUN, argument_language: { tag: "ro", name: "Romanian" } });
     const { pool: legacyPool } = fakePool(false);
     const legacy = new PostgresAskApplication(
-      legacyPool, {} as never, {} as never, { read: async () => null } as never, other(), { server: other(), legacy: other() }
+      legacyPool, {} as never, { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, { read: async () => null } as never, other(), { server: other(), legacy: other() }
     );
     expect((await legacy.readRun("run:settled", {} as never, LEGACY_OWNER))?.argument_language).toBeNull();
   });

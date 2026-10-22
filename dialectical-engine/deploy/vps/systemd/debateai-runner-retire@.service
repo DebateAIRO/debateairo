@@ -1,0 +1,21 @@
+# deploy/vps/systemd/debateai-runner-retire@.service -> /etc/systemd/system/ (started by its .timer)
+# Root asks release %i to retire now (side-by-side spec §4): a draining release gets RETIRE_REQUESTED (reason
+# BACKSTOP) once, and debateai-runner-retire-check@%i.timer is armed only after that row is written, at the absolute
+# UTC time 1,500 s after it (its 50-at.conf drop-in). The runner sees the request, lets its calls settle and retires
+# by itself. An already retired release only turns its backstop and check timers off. It never stops a service.
+# A refusal fails the unit: `systemctl --failed` shows it (this host has no failure mail, README §9).
+[Unit]
+Description=DebateAI: ask release %i to retire now (backstop)
+Documentation=file:///opt/debateai/dialectical-engine/deploy/vps/README.md
+After=postgresql.service
+
+[Service]
+Type=oneshot
+# Root runs node through `env -i` with PATH only: nothing from the service manager's environment (NODE_OPTIONS,
+# NODE_PATH, ...) reaches it. release.mjs lives in the operator checkout, never in a release folder (plan D16b).
+ExecStart=/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /usr/bin/node /opt/debateai/dialectical-engine/deploy/vps/release.mjs retire-request --label %i
+TimeoutStartSec=120
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true

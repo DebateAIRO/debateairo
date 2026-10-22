@@ -26,7 +26,8 @@ export type ProviderOnlyJobsDeps = Readonly<{
 export type ProviderOnlyJobs = Readonly<{
   /** One run of the daily job (the timer's work; tests drive it directly). */
   schedule(): Promise<number>;
-  start(): void;
+  /** Side-by-side spec §4 (plan C7): `when` gates every timer callback and the first pass (absent: always). */
+  start(options?: Readonly<{ when?: () => boolean }>): void;
   stop(): void;
 }>;
 
@@ -54,13 +55,17 @@ export function createProviderOnlyJobs(deps: ProviderOnlyJobsDeps): ProviderOnly
   let spoolTimer: ReturnType<typeof setInterval> | undefined;
   return Object.freeze({
     schedule: () => owner.schedule(),
-    start() {
+    start(options?: Readonly<{ when?: () => boolean }>) {
       if (timer !== undefined) return;
-      timer = setInterval(schedule, 86_400_000);
+      // Side-by-side spec §4 (plan C7): every tick and the first pass ask `when` (main.ts: the release watcher's
+      // ownIsCurrent), as the billing runtime's do.
+      const when = options?.when ?? (() => true);
+      const gated = (work: () => void) => (): void => { if (when()) work(); };
+      timer = setInterval(gated(schedule), 86_400_000);
       timer.unref();
-      schedule();
+      gated(schedule)();
       if (replaySpool !== undefined) {
-        spoolTimer = setInterval(replaySpool, 600_000);
+        spoolTimer = setInterval(gated(replaySpool), 600_000);
         spoolTimer.unref();
       }
     },

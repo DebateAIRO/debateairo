@@ -26,6 +26,8 @@
   "runFailure.RUN_LIMIT_REACHED": "Tato debata dosáhla svého limitu dříve, než mohla přinést odpověď.",
   "runFailure.STOPPED": "Tato debata se kvůli problému na naší straně zastavila v polovině. Položte prosím svou otázku znovu.",
   "runFailure.PLAN_ENDED": "Váš placený plán skončil nebo byl pozastaven, zatímco tato otázka čekala, a proto debata nezačala. Můžete ji položit znovu.",
+  "runFailure.CHOICE_GONE": "Web byl aktualizován, zatímco vaše otázka čekala, a jedna z možností, které jste zvolili, se už nenabízí. Zeptejte se prosím znovu. Váš limit tím nebyl nijak využit.",
+  "runFailure.SET_ASIDE": "Tuto debatu se nepodařilo dokončit kvůli aktualizaci webu z naší strany. Nepočítá se do vašeho limitu. Položte prosím svou otázku znovu.",
   "home.status.waiting": "Čeká na spuštění. Vaše debata se spustí sama v {time}.",
   "home.status.waitingOwnDebates": "Vaše ostatní debaty zatím využívají zbytek vašeho limitu. Tato debata se spustí sama, jakmile některá z nich skončí.",
   "home.noPublishedDebates": "Dosud nebyly zveřejněny žádné debaty.",

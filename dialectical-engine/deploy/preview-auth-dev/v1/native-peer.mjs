@@ -44,14 +44,18 @@ export async function assertNativeConnection(client, target, auth106Names) {
   }
   return Object.freeze({ roleOid:row.role_oid, ledgerOwnerOid:row.ledger_owner, billingOwnerOid:row.billing_owner, defaultOwnerCount:FUNCTIONS.length-missing, postgresMajor:row.major });
 }
-/** Active operator only: caller cannot supply a database, role, arbitrary pool option, or environment. */
-export async function withActiveNativePool({ publicPeerModule, auth106Names }, operation) {
+/**
+ * Active operator only: caller cannot supply a database, role, arbitrary pool option, or environment. `peerArguments`
+ * (default: this process's own arguments) is what the fixed peer module's actor check sees; native-operator.mjs passes
+ * the credential pair after its own exact argument check, which also admits `--database-ahead` (side-by-side spec §5).
+ */
+export async function withActiveNativePool({ publicPeerModule, auth106Names, peerArguments = process.argv.slice(2) }, operation) {
   if (process.platform !== 'linux' || process.getuid?.() === 0 || Object.keys(process.env).some(key=>!['PATH','LANG','LC_ALL','TZ'].includes(key))) refuse('PREVIEW_NATIVE_ACTOR_REFUSED');
   const fixed='/opt/debateai-v3-preview/operator/recovery106-v1/native-common106.mjs';
   if (publicPeerModule !== fixed) refuse('PREVIEW_NATIVE_SOURCE_REFUSED');
   await withPrivateBytes(fixed,{root:'/opt/debateai-v3-preview/operator/recovery106-v1',uid:0,mode:[0o644,0o755],maxBytes:262144},bytes=>{if(sha256(bytes)!=='b91079782dd7da3710cc5afced0c5452da8179be97059c6aef6321acd95eea8a')refuse('PREVIEW_NATIVE_SOURCE_REFUSED');});
   const peer = await import(pathToFileURL(fixed).href);
-  peer.assertPeerActor106(process.argv.slice(2), process.env);
+  peer.assertPeerActor106(peerArguments, process.env);
   const descriptor = peer.readPeerDescriptor106(3);
   if (typeof descriptor !== 'string') refuse('PREVIEW_NATIVE_DESCRIPTOR_REFUSED');
   // The old parser already rejects every alternate endpoint; select the original creator at startup.

@@ -214,6 +214,11 @@ export type PreviewPanelMember = Readonly<{ provider_ref: string; model_id: stri
  */
 export type PreviewUnfinishedRun = Readonly<{
   basis: Readonly<Record<string, unknown>>; panel: readonly PreviewPanelMember[]; phase?: "DEBATE" | "STORY";
+  /**
+   * Side-by-side spec §4 (plan C16): the register version the debate was admitted under (`core.run.register_version`);
+   * its roles, story and bounds price its hold (`PreviewBudgetGateSettings.termsForVersion`), never the API's.
+   */
+  registerVersion: number;
   /** Its ask's story size; absent: held at the largest. */
   storyTier?: PreviewStoryTier;
   /** Spec 2026-10-11: admitted with a rotation pin (its four roles are panel members). */
@@ -247,6 +252,24 @@ function roleModelList(roles: PreviewRoleModels): readonly string[] {
   return [roles.answerWriter, roles.answerChecker,
     ...(roles.storyteller === null ? [] : [roles.storyteller]), ...(roles.storyChecker === null ? [] : [roles.storyChecker])];
 }
+
+/**
+ * Side-by-side spec §4 (plan C16): what ONE register version prices a debate with: its roles (as model ids and as the
+ * provider refs the runner health-checks off the panel), its story rounds, its calls' max_tokens and its cooldown hold
+ * cap. Two releases can run debates side by side, each under its own version; an unfinished debate is held at its own
+ * version's terms, the new debate at the API's.
+ */
+export type PreviewVersionTerms = Readonly<{
+  roleModels: PreviewRoleModels;
+  /**
+   * The same roles as provider refs. Not in the plan's shape: a debate's off-panel health checks follow its own roles,
+   * so pricing them from another version's refs would put one version's checks on the other's models.
+   */
+  roleProviderRefs: readonly string[];
+  storyRounds: number;
+  callOutputTokens: PreviewCallOutputTokens;
+  maxCooldownHoldsPerRun: number;
+}>;
 
 /**
  * The kinds of call one debate makes, as the estimate prices them. UNBILLED_RETRY is owner ruling 5's
@@ -298,6 +321,13 @@ export type PreviewBudgetGateSettings = Readonly<{
   maxCooldownHoldsPerRun: number;
   /** Earlier preview debates that have not finished (see PREVIEW_UNFINISHED_RUNS_SQL). */
   readUnfinishedRuns: () => Promise<readonly PreviewUnfinishedRun[]>;
+  /**
+   * Side-by-side spec §4 (plan C16): one register version's terms, for an unfinished debate admitted under it. Sealed
+   * versions never change, so each is read once and kept (the API's own is the fields above). A version that cannot be
+   * read rejects, and is not kept; the estimate then prices that one debate at the API's own terms (C16 review,
+   * `versionTermsFallback`), so one unreadable version never refuses every preview ask.
+   */
+  termsForVersion: (version: number) => Promise<PreviewVersionTerms>;
   /** The app's recorded usage of recent preview calls (see PREVIEW_MEASURED_USAGE_SQL); absent: the defaults. */
   readMeasuredCallUsage?: () => Promise<PreviewMeasuredCallUsage>;
   /**
@@ -977,6 +1007,23 @@ export function previewGateRefusalReason(need: PreviewGateNeed, remaining: Previ
   return previewGateRefusal(need, remaining, held)?.reason ?? null;
 }
 
+/** The versions this process has already said it priced at the API's own terms (one line per version per process). */
+const VERSION_TERMS_FALLBACK_SAID = new Set<number>();
+/**
+ * Side-by-side C16 review (controller ruling): an unfinished debate whose register version's terms cannot be read is
+ * priced at the API's own terms, as every debate was before C16, rather than refusing every preview ask while it is
+ * unfinished. Nothing is kept as that version's terms (the next ask reads it again); the operator line is content-free
+ * (the version number only) and printed once per version per process.
+ */
+function versionTermsFallback(gate: PreviewBudgetGateSettings, version: number): PreviewVersionTerms {
+  if (!VERSION_TERMS_FALLBACK_SAID.has(version)) {
+    VERSION_TERMS_FALLBACK_SAID.add(version);
+    console.error(JSON.stringify({ event: "api.preview_estimate.version_terms_fallback", version }));
+  }
+  return Object.freeze({ roleModels: gate.roleModels, roleProviderRefs: gate.roleProviderRefs, storyRounds: gate.storyRounds,
+    callOutputTokens: gate.callOutputTokens, maxCooldownHoldsPerRun: gate.maxCooldownHoldsPerRun });
+}
+
 function logRefusal(kind: "unavailable" | "shortfall", reason: string): void {
   // Operator-only and content-free: a fixed event, the kind and the internal reason (gate state,
   // model ids, counts). Never the question, the asker or a key.
@@ -1124,17 +1171,25 @@ export async function assertPreviewBudgetAdmits(
     // one are counted alike.
     const measured = previewModeReadsMeasuredUsage() ? await gate!.readMeasuredCallUsage?.() ?? [] : [];
     // Debate shape: each debate, new or unfinished, is priced at ITS OWN receipt's writer and map step bounds.
-    const pricerFor = (storyTier: PreviewStoryTier | undefined, basis: Readonly<Record<string, unknown>>) =>
-      previewEstimatePricer({ measured, callOutputTokens: previewOutputTokensForBasis(gate!.callOutputTokens, basis),
+    const pricerFor = (storyTier: PreviewStoryTier | undefined, basis: Readonly<Record<string, unknown>>,
+      callOutputTokens: PreviewCallOutputTokens) =>
+      previewEstimatePricer({ measured, callOutputTokens: previewOutputTokensForBasis(callOutputTokens, basis),
         storyTier: storyTier ?? PREVIEW_STORY_TIER_FALLBACK });
     const debateCallCount = previewDebateCallCount();
-    needs = estimatePreviewGateNeeds({ basis: input.basis, panel: input.panel, ...gate!, pricer: pricerFor(input.storyTier, input.basis), debateCallCount,
+    needs = estimatePreviewGateNeeds({ basis: input.basis, panel: input.panel, ...gate!,
+      pricer: pricerFor(input.storyTier, input.basis, gate!.callOutputTokens), debateCallCount,
       ...(input.rotated === true ? { rotated: true } : {}) });
     const unfinished = await gate!.readUnfinishedRuns();
     if (unfinished.length > PREVIEW_UNFINISHED_RUNS_MAX) throw new TypeError("PREVIEW_UNFINISHED_RUNS_TOO_MANY");
     held = new Map();
     for (const run of unfinished) {
-      for (const hold of estimateUnfinishedRunHolds(run, gate!, pricerFor(run.storyTier, run.basis), debateCallCount)) {
+      // Side-by-side spec §4 (plan C16): an unfinished debate is held at ITS OWN register version's roles, story and
+      // bounds (another release may have admitted it); the new debate above keeps the API's. A version whose terms
+      // cannot be read is held at the API's own (C16 review), never a refusal of every ask.
+      const terms = await gate!.termsForVersion(run.registerVersion)
+        .catch(() => versionTermsFallback(gate!, run.registerVersion));
+      for (const hold of estimateUnfinishedRunHolds(run, { ...gate!, ...terms },
+        pricerFor(run.storyTier, run.basis, terms.callOutputTokens), debateCallCount)) {
         const sum = held.get(hold.gate) ?? { calls: 0, nanoUsd: 0n };
         held.set(hold.gate, { calls: sum.calls + hold.callsWithMargin, nanoUsd: sum.nanoUsd + hold.callsNanoUsd });
       }
@@ -1160,13 +1215,16 @@ export async function assertPreviewBudgetAdmits(
  * The unfinished preview debates, for the estimate, whatever day each was admitted (a debate that
  * crosses midnight spends from the new day's pot), none with a FAILED job:
  * - DEBATE: a job still READY or CLAIMED;
- * - STORY ($1, true when the register has a story): no live job, an answer served, no story row
- *   yet, and a model call finished within the last $2 seconds (the story runs after the job is DONE).
+ * - STORY ($1): no live job, an answer served, no story row yet, and a model call finished within
+ *   the last $2 seconds (the story runs after the job is DONE). Side-by-side spec §4 (plan C16): the
+ *   API passes true, so each debate's OWN register version decides whether it has a story (a version
+ *   without one holds no story calls); `register_version` names it.
  * A debate between its start and its first job is never seen here: the admission lock is held until
  * that job is queued. `rotated` (spec 2026-10-11): the run has a role rotation pin. Plain columns only;
  * never content.
  */
 export const PREVIEW_UNFINISHED_RUNS_SQL = `SELECT run.envelope_basis, run.discovered_panel, run.composition_budget_tier,
+              run.register_version::integer AS register_version,
               EXISTS (SELECT 1 FROM core.run_role_rotation AS rotation WHERE rotation.run_id = run.run_id) AS rotated,
               CASE WHEN EXISTS (SELECT 1 FROM core.work_item AS work
                                 WHERE work.run_id = run.run_id AND work.state IN ('READY', 'CLAIMED'))
@@ -1184,8 +1242,10 @@ export const PREVIEW_UNFINISHED_RUNS_SQL = `SELECT run.envelope_basis, run.disco
                                 AND entry.finished_at > clock_timestamp() - make_interval(secs => $2::integer))))
        LIMIT ${String(PREVIEW_UNFINISHED_RUNS_MAX + 1)}` as const;
 
-function unfinishedRunFrom(row: Readonly<{
+/** One row of PREVIEW_UNFINISHED_RUNS_SQL as the estimate reads it; a malformed row refuses (PREVIEW_UNFINISHED_RUN_UNREADABLE). */
+export function previewUnfinishedRunFrom(row: Readonly<{
   envelope_basis: unknown; discovered_panel: unknown; phase?: unknown; composition_budget_tier?: unknown; rotated?: unknown;
+  register_version: unknown;
 }>): PreviewUnfinishedRun {
   const basis = row.envelope_basis;
   const panel = row.discovered_panel;
@@ -1194,7 +1254,8 @@ function unfinishedRunFrom(row: Readonly<{
       || typeof (member as Record<string, unknown>).provider_ref !== "string"
       || typeof (member as Record<string, unknown>).model_id !== "string")
     || (row.phase !== "DEBATE" && row.phase !== "STORY")
-    || (row.rotated !== undefined && typeof row.rotated !== "boolean")) {
+    || (row.rotated !== undefined && typeof row.rotated !== "boolean")
+    || !positiveInteger(row.register_version)) {
     throw new TypeError("PREVIEW_UNFINISHED_RUN_UNREADABLE");
   }
   return Object.freeze({
@@ -1202,6 +1263,7 @@ function unfinishedRunFrom(row: Readonly<{
     panel: Object.freeze((panel as Array<Record<string, string>>).map((member) =>
       Object.freeze({ provider_ref: member.provider_ref!, model_id: member.model_id! }))),
     phase: row.phase,
+    registerVersion: row.register_version,
     storyTier: previewStoryTierOf(row.composition_budget_tier),
     rotated: row.rotated === true
   });
@@ -1362,11 +1424,43 @@ export function previewRemainingPorts(
 }
 
 /**
- * Boot: the admission settings for the preview, from its config and the register version in force.
- * The role refs are the register's sealed provider refs; one the preview does not review is kept as
- * an unknown id, so every ask is refused (fail closed) rather than the boot guessing a price. The
- * story rows are optional (absent reads as no story); a malformed story family refuses the boot.
- * `askProbeModelIds` are the models of the declared targets the API health-checks at ask time.
+ * One register version's terms (PreviewVersionTerms). The role refs are the version's sealed provider refs; one the
+ * preview does not review is kept as an unknown id, so pricing refuses (fail closed) rather than guessing a price. The
+ * story rows are optional (absent reads as no story); a malformed story family refuses.
+ */
+async function readPreviewVersionTerms(pool: Pool, registerVersion: number, config: PreviewProviderTestConfig): Promise<PreviewVersionTerms> {
+  const roles = await readSynthesisRoleControls(pool, registerVersion);
+  const story = await readStoryPolicyFromRegister(pool, registerVersion);
+  const structural = await readStructuralCeilingPolicyInputs(pool, registerVersion);
+  const organCeilings = await readOrganTokenCeilings(pool, registerVersion);
+  const refs = [roles.synthesizerRoleRef, roles.evaluatorRoleRef,
+    ...(story === null ? [] : [story.storytellerRoleRef, story.storyCheckerRoleRef])];
+  const modelOfRef = (ref: string): string => previewModelRowForRef(ref)?.model ?? `unreviewed-ref:${ref}`;
+  return Object.freeze({
+    roleModels: Object.freeze({
+      answerWriter: modelOfRef(roles.synthesizerRoleRef), answerChecker: modelOfRef(roles.evaluatorRoleRef),
+      storyteller: story === null ? null : modelOfRef(story.storytellerRoleRef),
+      storyChecker: story === null ? null : modelOfRef(story.storyCheckerRoleRef)
+    }),
+    roleProviderRefs: Object.freeze([...new Set(refs)]),
+    storyRounds: story === null ? 0 : story.loopMaxRounds,
+    callOutputTokens: previewCallOutputTokens(config, {
+      debate: [...organCeilings, roles.synthesizerBound.tokenCeiling, roles.evaluatorBound.tokenCeiling],
+      story: story === null ? null : { storyteller: story.storytellerBound.tokenCeiling, checker: story.checkerBound.tokenCeiling }
+    }),
+    maxCooldownHoldsPerRun: structural.maxCooldownHoldsPerRun
+  });
+}
+
+/**
+ * Boot: the admission settings for the preview, from its config and the register version in force (its terms, read by
+ * `readPreviewVersionTerms`; a version the boot cannot read refuses the boot). `askProbeModelIds` are the models of the
+ * declared targets the API health-checks at ask time.
+ *
+ * Side-by-side spec §4 (plan C16): `termsForVersion` reads another version's terms for an unfinished debate admitted
+ * under it, once per version: a sealed version never changes, so the kept terms need no expiry (at most
+ * PREVIEW_UNFINISHED_RUNS_MAX versions can be asked for per estimate). A read that fails is not kept, so the next ask
+ * reads it again. The API's own version is kept from the boot.
  */
 export async function readPreviewBudgetGateSettings(
   pool: Pool,
@@ -1377,34 +1471,27 @@ export async function readPreviewBudgetGateSettings(
   if (!Array.isArray(askProbeModelIds) || askProbeModelIds.some((model) => typeof model !== "string")) {
     throw new TypeError("PREVIEW_ASK_PROBE_TARGETS_INVALID");
   }
-  const roles = await readSynthesisRoleControls(pool, registerVersion);
-  const story = await readStoryPolicyFromRegister(pool, registerVersion);
-  const structural = await readStructuralCeilingPolicyInputs(pool, registerVersion);
-  const organCeilings = await readOrganTokenCeilings(pool, registerVersion);
-  const refs = [roles.synthesizerRoleRef, roles.evaluatorRoleRef,
-    ...(story === null ? [] : [story.storytellerRoleRef, story.storyCheckerRoleRef])];
-  const storyRounds = story === null ? 0 : story.loopMaxRounds;
-  const modelOfRef = (ref: string): string => previewModelRowForRef(ref)?.model ?? `unreviewed-ref:${ref}`;
+  const own = await readPreviewVersionTerms(pool, registerVersion, config);
+  const kept = new Map<number, Promise<PreviewVersionTerms>>([[registerVersion, Promise.resolve(own)]]);
   return Object.freeze({
     remaining: previewRemainingPorts(config),
-    roleModels: Object.freeze({
-      answerWriter: modelOfRef(roles.synthesizerRoleRef), answerChecker: modelOfRef(roles.evaluatorRoleRef),
-      storyteller: story === null ? null : modelOfRef(story.storytellerRoleRef),
-      storyChecker: story === null ? null : modelOfRef(story.storyCheckerRoleRef)
-    }),
-    roleProviderRefs: Object.freeze([...new Set(refs)]),
-    storyRounds,
-    callOutputTokens: previewCallOutputTokens(config, {
-      debate: [...organCeilings, roles.synthesizerBound.tokenCeiling, roles.evaluatorBound.tokenCeiling],
-      story: story === null ? null : { storyteller: story.storytellerBound.tokenCeiling, checker: story.checkerBound.tokenCeiling }
-    }),
+    ...own,
     askProbeModelIds: Object.freeze([...askProbeModelIds]),
     structureRepairModel: askProbeModelIds.includes(PREVIEW_STRUCTURE_REPAIR_MODEL) ? PREVIEW_STRUCTURE_REPAIR_MODEL : null,
-    maxCooldownHoldsPerRun: structural.maxCooldownHoldsPerRun,
     readUnfinishedRuns: async () => {
-      const result = await pool.query<{ envelope_basis: unknown; discovered_panel: unknown; phase: unknown; composition_budget_tier: unknown; rotated: unknown }>(
-        PREVIEW_UNFINISHED_RUNS_SQL, [storyRounds > 0, PREVIEW_STORY_HOLD_WINDOW_SECONDS]);
-      return Object.freeze(result.rows.map(unfinishedRunFrom));
+      const result = await pool.query<{ envelope_basis: unknown; discovered_panel: unknown; phase: unknown; composition_budget_tier: unknown;
+        rotated: unknown; register_version: unknown }>(
+        PREVIEW_UNFINISHED_RUNS_SQL, [true, PREVIEW_STORY_HOLD_WINDOW_SECONDS]);
+      return Object.freeze(result.rows.map(previewUnfinishedRunFrom));
+    },
+    termsForVersion: (version: number) => {
+      if (!positiveInteger(version)) return Promise.reject(new TypeError("PREVIEW_REGISTER_VERSION_INVALID"));
+      const known = kept.get(version);
+      if (known !== undefined) return known;
+      const read = readPreviewVersionTerms(pool, version, config);
+      kept.set(version, read);
+      read.catch(() => { if (kept.get(version) === read) kept.delete(version); });
+      return read;
     },
     readMeasuredCallUsage: async () => {
       const result = await pool.query<{ provider_ref: unknown; spend_source: unknown; calls: unknown; input_tokens: unknown; output_tokens: unknown }>(

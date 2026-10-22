@@ -259,14 +259,17 @@ export function practiceWireUsage(model: string, wire: readonly PracticeWireEven
 export type PracticeWaitBudget = { usedMs: number; waits: number; inARow: number };
 
 /**
- * The next wait of a model whose job just ended busy, or null when its budget (`budgetMs`) is spent. The reason and the
- * gate's own retry_after are read from the job's last busy event (`wire`); the wait is `practiceBusyWaitMs`, cut to what
- * is left of the budget. The budget is updated (time used, waits, waits in a row).
+ * The next wait of a model whose job just ended busy, or null when its budget (`budgetMs`) is spent or the gate does not
+ * serve the model (its last busy-kind event is NOT_SERVED: waiting cannot change that, so it sits out at once, the budget
+ * untouched). The reason and the gate's own retry_after are read from the job's last busy event (`wire`); the wait is
+ * `practiceBusyWaitMs`, cut to what is left of the budget. The budget is updated (time used, waits, waits in a row).
  */
 export function practiceNextBusyWait(budget: PracticeWaitBudget, budgetMs: number, wire: readonly PracticeWireEvent[],
   random?: () => number): Readonly<{ waitMs: number; reason: "VENDOR_REFUSED" | "MODEL_COOLING"; retryAfterSeconds: number | null }> | null {
   if (budget.usedMs >= budgetMs) return null;
-  const busyEvent = [...wire].reverse().find((event) => event.unbilledKind === "VENDOR_REFUSED" || event.unbilledKind === "MODEL_COOLING");
+  const busyEvent = [...wire].reverse().find((event) => event.unbilledKind === "VENDOR_REFUSED"
+    || event.unbilledKind === "MODEL_COOLING" || event.unbilledKind === "NOT_SERVED");
+  if (busyEvent?.unbilledKind === "NOT_SERVED") return null;
   const reason = busyEvent?.unbilledKind === "MODEL_COOLING" ? "MODEL_COOLING" : "VENDOR_REFUSED";
   const retryAfterSeconds = reason === "MODEL_COOLING" ? busyEvent?.retryAfterSeconds ?? null : null;
   const waitMs = Math.min(budgetMs - budget.usedMs,

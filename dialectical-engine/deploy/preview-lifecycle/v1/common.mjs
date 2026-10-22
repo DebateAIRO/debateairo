@@ -9,6 +9,8 @@ import { basename, dirname, isAbsolute, join, normalize } from 'node:path';
 /**
  * Server layout of the private preview host. These are the fixed locations the reviewed
  * preview operator already uses on that server; nothing here names a contributor machine.
+ * Fields the release tools fall back on when a layout leaves them out (the slots, the edge, Caddy's copy of the edge
+ * secret, Hatchet's units, the operator folders) keep their preview values in the module that reads them.
  */
 export const LAYOUT = Object.freeze({
   lockRoot: '/etc/debateai-v3-preview/lifecycle',
@@ -17,13 +19,20 @@ export const LAYOUT = Object.freeze({
   // The alert's own owner list: SHA-256 fingerprints of the owner addresses the alert may reach.
   // Root-only server data, built on the server by `alert.mjs --install-owner-list`.
   ownerAlertDigestsPath: '/etc/debateai-v3-preview/lifecycle/owner-alert-digests.json',
+  // Per-release files live in these roots (side-by-side spec §10): native-plan-<label>.json,
+  // database-ahead-<label>.json and <service>-<label>.env here; see nativePlanPathFor and friends.
   nativePlanRoot: '/etc/debateai-v3-preview/auth-dev-v1',
-  nativePlanPath: '/etc/debateai-v3-preview/auth-dev-v1/native-plan.json',
-  // The reviewed launchers accept a plan only below /opt/debateai-v3-preview/artifacts/<id>/,
-  // so the regenerated plan and fresh attestation live in this one fixed artifact folder.
-  currentDir: '/opt/debateai-v3-preview/artifacts/lifecycle-current',
+  // The reviewed launchers accept a plan only below /opt/debateai-v3-preview/artifacts/<id>/, so each
+  // release's regenerated plan and fresh attestation live in its own lifecycle-current-<label> folder.
+  artifactsRoot: '/opt/debateai-v3-preview/artifacts',
+  // Template units: debateai-preview-<service>@<label>.service (instance names keep their dashes, %i).
+  unitPrefix: 'debateai-preview-',
   stateDir: '/var/lib/debateai-v3-preview/lifecycle',
   backupDir: '/var/backups/debateai-v3-preview',
+  // A retired release is moved aside, never deleted (side-by-side spec §10, release-archive.mjs): its folders below
+  // archiveRoot (same disk as the releases), its /etc files and unit drop-ins below configArchiveRoot (same disk as /etc).
+  archiveRoot: '/opt/debateai-v3-preview/archive',
+  configArchiveRoot: '/root/preview-archive',
   postgresCa: '/etc/debateai-v3-preview/postgres-tls/ca.crt',
   peerModule: '/opt/debateai-v3-preview/operator/recovery106-v1/native-common106.mjs',
   pgBin: '/usr/lib/postgresql/18/bin',
@@ -41,11 +50,86 @@ export const LAYOUT = Object.freeze({
   id: '/usr/bin/id',
   // Exactly the packet the reviewed root actors hand to the postgres-peer channel on FD3.
   peerPacket: '{"peerUrl":"postgresql://postgres@localhost/debateai?host=/run/debateai-v3-preview/postgresql&port=5434"}',
-  mailFrom: 'noreply@dezbatere.ro'
+  mailFrom: 'noreply@dezbatere.ro',
+  // What the release tools read per layout (side-by-side plan D16b; VPS_LAYOUT below is the public server's):
+  // where a release's key and slot come from (release-info.mjs: root's lock here), how the current release's pair
+  // starts at boot (the target's drop-in, release-switch.mjs), the two spending gates (deploy/preview-gate/v3, named
+  // and placed exactly as alert.mjs's re-open commands), the unit template that emails the owner a release notice
+  // (`<template><kind>-<code>.service`, alert.mjs), the journal lines that prove a runner retired (the runner's own
+  // keyed line and the launcher's), and the start lines root reads after a start (the launchers print them).
+  releaseSource: 'lock',
+  bootMode: 'target',
+  gates: Object.freeze([
+    Object.freeze({ name: 'deepinfra', folder: '/opt/debateai-v3-preview/operator/deepinfra-budget-v3', privateDir: '/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3', go: '/etc/debateai-v3-preview/provider-deepinfra-go-v3.json' }),
+    Object.freeze({ name: 'anthropic', folder: '/opt/debateai-v3-preview/operator/anthropic-budget-v1', privateDir: '/var/lib/debateai-v3-preview/provider-anthropic-authority-v1', go: '/etc/debateai-v3-preview/provider-anthropic-go-v1.json' })
+  ]),
+  noticeTemplate: 'debateai-preview-notice@',
+  retiredLines: Object.freeze(['DEBATEAI_RUNNER_RETIRED', 'PREVIEW_RUNNER_RETIRED']),
+  startedLines: Object.freeze({ runner: 'PREVIEW_RUNNER_STARTED', api: 'PREVIEW_API_STARTED' })
+});
+
+/**
+ * Side-by-side spec §10, Phase 3 (plan D16b): the public server's layout, for deploy/vps/release.mjs. The same release
+ * tools as the preview, with this server's units (`debateai-<service>@<label>`), PostgreSQL socket and port, slots,
+ * edge listener and Caddy's copy of the edge secret (deploy/vps/Caddyfile). A release's key and slot come from its own
+ * overlay, /etc/debateai/releases/<label>/api.env (RELEASE_KEY, API_PORT: release-info.mjs); its code is
+ * /opt/debateai/releases/<label>. No spending gates and no notice unit on this server. The switch enables the new
+ * release's three instances and disables the old API and website; the old runner stays enabled until its stop
+ * recorder sees it retired and disables it. The runner runs without a launcher here: its own keyed retirement line
+ * proves it retired, and its own ready line (DEBATEAI_RUNNER_READY) and the API's (DEBATEAI_API_READY) are its start lines.
+ * The release tools' lock and maintenance flag live in lockRoot (root's, 0700; release.mjs creates it).
+ */
+export const VPS_LAYOUT = Object.freeze({
+  releaseSource: 'overlay',
+  releaseOverlayRoot: '/etc/debateai/releases',
+  releasesRoot: '/opt/debateai/releases',
+  lockRoot: '/etc/debateai/lifecycle',
+  stateDir: '/var/lib/debateai/lifecycle',
+  unitPrefix: 'debateai-',
+  bootMode: 'enable',
+  pgBin: '/usr/lib/postgresql/18/bin',
+  pgSocketDir: '/var/run/postgresql',
+  pgPort: 5432,
+  database: 'debateai',
+  gates: Object.freeze([]),
+  edge: 'http://127.0.0.1:3090',
+  edgeSecretPath: '/etc/debateai/ui-edge.caddy.secret',
+  slots: Object.freeze({ A: Object.freeze({ uiPort: '3001', apiPort: '8790' }), B: Object.freeze({ uiPort: '3002', apiPort: '8791' }) }),
+  retiredLines: Object.freeze(['DEBATEAI_RUNNER_RETIRED']),
+  startedLines: Object.freeze({ runner: 'DEBATEAI_RUNNER_READY', api: 'DEBATEAI_API_READY' }),
+  hatchetUnits: Object.freeze(['debateai-hatchet.service']),
+  // The release tools run from the operator checkout here, never from a release folder (README §5).
+  lifecycleFolders: Object.freeze([]),
+  toolName: 'release.mjs',
+  sh: '/bin/sh',
+  env: '/usr/bin/env',
+  runuser: '/usr/sbin/runuser',
+  journalctl: '/usr/bin/journalctl',
+  systemctl: '/usr/bin/systemctl'
 });
 
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 export const fail = code => { throw Object.assign(new Error(code), { code }); };
+
+/**
+ * Side-by-side spec §10: a release label names unit instances, /etc files and folders. Same text as
+ * `RELEASE_LABEL` in deploy/preview-auth-dev/v1/launch-plan.mjs (kept here so this file stays
+ * built-ins only); tests/unit/preview-lifecycle-prestart.test.ts pins the two equal.
+ */
+export const RELEASE_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,70}[a-z0-9])?$/;
+const LIFECYCLE_SERVICES = Object.freeze(['api', 'ui', 'runner']);
+const label = value => (typeof value === 'string' && RELEASE_LABEL.test(value) ? value : fail('LIFECYCLE_LABEL_REFUSED'));
+const service = value => (LIFECYCLE_SERVICES.includes(value) ? value : fail('LIFECYCLE_SERVICE_REFUSED'));
+/** The release's verify-only database-check plan (one per release; side-by-side spec §10). */
+export const nativePlanPathFor = (layout, release) => `${layout.nativePlanRoot}/native-plan-${label(release)}.json`;
+/** The release's own folder for the regenerated launch plan and fresh proof. */
+export const currentDirFor = (layout, release) => `${layout.artifactsRoot}/lifecycle-current-${label(release)}`;
+/** The newer release's list of database steps this (older) release may start beside (side-by-side spec §5). */
+export const databaseAheadPathFor = (layout, release) => `${layout.nativePlanRoot}/database-ahead-${label(release)}.json`;
+/** The release's env file for one service (launch-plan.mjs previewEnvironmentPath names the same file). */
+export const envPathFor = (layout, name, release) => `${layout.nativePlanRoot}/${service(name)}-${label(release)}.env`;
+/** The release's unit instance for one service. */
+export const unitNameFor = (layout, name, release) => `${layout.unitPrefix}${service(name)}@${label(release)}.service`;
 
 /** Sorted-key JSON: equal values always compare equal, whatever order they were written in. */
 export function canonicalJson(value) {

@@ -70,5 +70,8 @@
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
-  "chrome.footer.consumerProtection": "Ochrana spotrebiteľa"
+  "chrome.footer.consumerProtection": "Ochrana spotrebiteľa",
+  "chrome.release.newerVersion": "Web bol aktualizovaný. Znova načítajte stránku.",
+  "chrome.release.reload": "Znova načítať",
+  "chrome.release.madeByNewer": "Túto debatu vytvorila novšia verzia webu. Znova načítajte stránku alebo to skúste znova o niekoľko minút."
 }

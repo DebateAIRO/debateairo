@@ -14,6 +14,7 @@ import { RunRepository, type StartRunInput } from "@debateai/db";
 import { LivenessRepository } from "@debateai/liveness";
 import { ServeRepository } from "@debateai/serve";
 import type { Pool, PoolClient, QueryResult } from "pg";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const RUN_ID = "11111111-1111-4111-8111-111111111111";
 const WORK_ITEM_ID = "22222222-2222-4222-8222-222222222222";
@@ -74,6 +75,7 @@ function settingsFor(tier: PlanTier): RunCreationSettings {
   return {
     strangerSampleRate: 0,
     registerVersion: 1,
+    releaseKey: TEST_RELEASE_KEY,
     batteryVersion: "tiers-s02-wire",
     settlementWatchHandle: "tiers-s02-wire",
     resolveDiscoveredPanel: async () => rosterPanel(tier),

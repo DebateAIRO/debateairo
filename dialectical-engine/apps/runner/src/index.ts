@@ -219,6 +219,7 @@ import {
   SERVED_ROOT_SELECTION_RULE_JUDGES,
   TypedDomainError,
   exhaustive,
+  LEGACY_RELEASE_KEY,
   type CompositionBudgetTier,
   type ServedRootRule,
   type WayOfKnowing
@@ -271,6 +272,7 @@ import {
   shapeDistinctMakers, shapeHandOverRoot, shapeMakerBar, shapeRootMakerBar, shapeSeatOrder, shapeWriterSeat
 } from "./shape-seats.js";
 import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
+import type { RunnerRetirementSignal, TaskExecutionCounter } from "./runner-retirement.js";
 import { EMPTY_REPLAY_BOOK, readReplayBook, replayingGateway, type ReplayBook } from "./run-replay.js";
 import type { RunInFlight } from "./run-in-flight.js";
 import type { DebateShapeRunnerSettings } from "./debate-shape-boot.js";
@@ -527,6 +529,7 @@ const REVIEW_RETHROWN_CODES: readonly string[] = Object.freeze([
   "PRODUCER_GRADING_FORBIDDEN",
   "RUNNER_CLAIM_LOST",
   "RUNNER_TIME_LIMIT_REACHED",
+  "RUNNER_RETIRING",
   CALL_LANE_STOPPED,
   CALL_LANE_HELD_BACK
 ]);
@@ -536,9 +539,13 @@ function callHeldBack(error: unknown): boolean {
   return error instanceof TypedDomainError && error.code === CALL_LANE_HELD_BACK;
 }
 
-/** L4-F9: the keep-alive's refusal — the debate must make no further model call (its claim taken, or its time up). */
+/**
+ * L4-F9: the keep-alive's refusal — the debate must make no further model call (its claim taken, or its time up; and,
+ * side-by-side spec §4, its release retiring).
+ */
 function keepAliveStop(error: unknown): boolean {
-  return error instanceof TypedDomainError && (error.code === "RUNNER_CLAIM_LOST" || error.code === "RUNNER_TIME_LIMIT_REACHED");
+  return error instanceof TypedDomainError && (error.code === "RUNNER_CLAIM_LOST" || error.code === "RUNNER_TIME_LIMIT_REACHED"
+    || error.code === "RUNNER_RETIRING");
 }
 
 export function reviewFailureOutcome(error: unknown): ReviewFailureOutcome {
@@ -2495,6 +2502,20 @@ export function createPostgresReviewCatchUpDependencies(input: {
 
 export interface WalkingSkeletonSettings {
   readonly workerId: string;
+  /**
+   * Side-by-side spec §3: the release this runner runs as (RELEASE_KEY). It claims, renews, sweeps and fails only work
+   * items of runs stamped with this key; another release's item is NO_WORK (RUNNER_RELEASE_MISMATCH). Absent means
+   * `legacy` (runs written before 0123 or without a key); every shipped composition sets it.
+   */
+  readonly releaseKey?: string;
+  /**
+   * Side-by-side spec §4 (D1): a retiring release "stops claiming; it lets calls in flight settle". Once claims are
+   * stopped `execute` answers NO_WORK before anything else (one RUNNER_RETIRING line); once calls are stopped every
+   * running debate's next model call is refused unsent (RUNNER_RETIRING). Either way the work item is left as is for
+   * this release's backstop, which sets it aside FAILED with the waiver (spec §4 step 3); the §3 fence keeps every
+   * other release off it. Absent: the runner never retires (today's runner).
+   */
+  readonly retirement?: Pick<RunnerRetirementSignal, "claimsStopped" | "callsStopped">;
   readonly claimMs: number;
   readonly claimMarginMs: number;
   readonly judgeBound: CallBound;
@@ -4942,6 +4963,8 @@ async function runnerStage<T>(code: string, operation: () => Promise<T>): Promis
 export class WalkingSkeletonRunner {
   readonly #runs: RunRepository;
   readonly #work: WorkItemRepository;
+  /** Side-by-side spec §3: this runner's ONE release key, fixed at construction (absent = legacy); fence and check share it. */
+  readonly #releaseKey: string;
   readonly #graph: GraphRepository;
   readonly #judge: Judge;
   readonly #judgements: JudgementRepository;
@@ -4968,7 +4991,13 @@ export class WalkingSkeletonRunner {
     private readonly settings: WalkingSkeletonSettings
   ) {
     this.#runs = new RunRepository(pool);
-    this.#work = new WorkItemRepository(pool);
+    // Side-by-side spec §3 (plan B D2): the runner claims and fails only its own release's work items, and its own
+    // failure writes land under its own live claim, so its repository knows both its release and its worker id.
+    this.#releaseKey = settings.releaseKey ?? LEGACY_RELEASE_KEY;
+    this.#work = new WorkItemRepository(pool, {
+      releaseKey: this.#releaseKey,
+      workerId: settings.workerId
+    });
     this.#graph = new GraphRepository(pool);
     // L4-F9 repair: every model call the runner makes goes through the keep-alive
     // of the debate making it, refused once that debate must stop.
@@ -5159,6 +5188,26 @@ export class WalkingSkeletonRunner {
   }
 
   private async execute(workItemId?: string, task?: RunnerTaskControl): Promise<RunnerExecutionResult> {
+    // Side-by-side spec §4 (D1): a retiring release stops claiming. The very first check, so nothing of this release
+    // touches the item: no release read, no claim, no probe, no call. It is left as is for this release's backstop,
+    // which sets it aside FAILED with the waiver (spec §4 step 3); the §3 fence keeps every other release off it.
+    if (this.settings.retirement?.claimsStopped() === true) {
+      console.warn(JSON.stringify({ kind: "DEBATEAI_RUNNER_CLAIM", event: "RUNNER_RETIRING", workItemId }));
+      return { kind: "NO_WORK" };
+    }
+    // Side-by-side spec §3: another release's debate is that release's alone. Asked for one (a job sent to the wrong
+    // task, an old retry, a hand dispatch), this runner answers NO_WORK with one content-free line BEFORE every gate
+    // below, so a foreign item meets no claim check, no probe and no call, and is left READY for its own runner.
+    if (workItemId !== undefined) {
+      const releaseKey = this.#releaseKey;
+      const runReleaseKey = await this.#work.releaseKeyOf(workItemId);
+      if (runReleaseKey !== null && runReleaseKey !== releaseKey) {
+        console.warn(JSON.stringify({
+          kind: "DEBATEAI_RUNNER_CLAIM", event: "RUNNER_RELEASE_MISMATCH", workItemId, runReleaseKey, releaseKey
+        }));
+        return { kind: "NO_WORK" };
+      }
+    }
     // W10/3: the claim must cover the LONGEST call this execution can make, and
     // since the synthesis legs now spend their own sealed bounds those two
     // deadlines belong in the max. The composer/conformance pair STAYS: both are
@@ -5329,7 +5378,9 @@ export class WalkingSkeletonRunner {
       claimDeadline: claimed.claimDeadline,
       renewEveryMs: this.settings.claimMs / 3,
       renew: (heldUntil) => (this.settings.renewals ?? this.#work).renewClaim({ ...claimInput, workItemId: claimed.workItemId, heldUntil }),
-      ...(task === undefined ? {} : { task })
+      ...(task === undefined ? {} : { task }),
+      // Side-by-side spec §4: once this release retires, the debate's next model call is refused (RUNNER_RETIRING).
+      stopCalls: () => this.settings.retirement?.callsStopped() === true
     });
     /**
      * Parallel AI calls (spec 2026-10-12 §3.2): this debate's lane of the runner's call scheduler, opened once the
@@ -12591,6 +12642,16 @@ export const RUNNER_QUEUE_WAIT_LIMIT = "30m" as const;
  */
 export const RUNNER_EXECUTION_LIMIT = "3600s" as const;
 
+/**
+ * The stops after which the task's catch records nothing: the work item is another runner's to settle. A claim
+ * another copy took (L4-F9), and a debate of another release (side-by-side spec §3; `execute` answers NO_WORK for one
+ * before anything runs, so this is the defence for a mismatch raised anywhere later). Neither becomes a
+ * `terminal_reason`. Side-by-side spec §4: nor a debate stopped because its release is retiring (RUNNER_RETIRING): the
+ * item is left as is for this release's backstop, which sets it aside FAILED with the waiver (spec §4 step 3); the §3
+ * fence keeps every other release off it.
+ */
+const LEAVES_WORK_ITEM_ALONE: ReadonlySet<string> = new Set(["RUNNER_CLAIM_LOST", "RUNNER_RELEASE_MISMATCH", "RUNNER_RETIRING"]);
+
 export function declareHatchetWalkingSkeletonTask(input: {
   readonly client: Pick<Hatchet, "task">;
   readonly runner: WalkingSkeletonRunner;
@@ -12598,6 +12659,11 @@ export function declareHatchetWalkingSkeletonTask(input: {
   readonly workflowName: string;
   readonly engineRetries: number;
   readonly previewExecutionTimeout?: "3600s";
+  /**
+   * Side-by-side spec §4 (D1): counts this task while its handler runs, the verdict story included (it runs inside the
+   * task after the work item is DONE), so a retiring release knows when none of its tasks is left.
+   */
+  readonly executions?: Pick<TaskExecutionCounter, "enter" | "workingOn">;
 }): TaskWorkflowDeclaration<{ runId: string; workItemId: string }, { kind: string; answerId?: string }> {
   if(input.previewExecutionTimeout!==undefined&&input.previewExecutionTimeout!=="3600s")throw new TypeError("PREVIEW_EXECUTION_TIMEOUT_INVALID");
   if (!Number.isInteger(input.engineRetries) || input.engineRetries < 0) {
@@ -12625,110 +12691,122 @@ export function declareHatchetWalkingSkeletonTask(input: {
         refreshTimeout?(incrementBy: `${number}s`): Promise<void>;
       }
     ) => {
-      // L4-F6: BEFORE the runner, before the repository, before anything reads
-      // a field — and, at INT2 (SYNC2 into integration), before the S06 capture
-      // binding too, so an unvalidated dispatch string can never become an obs
-      // context ref. A malformed dispatch is a typed refusal that names no value.
-      const parsed = walkingSkeletonDispatchSchema.safeParse(rawDispatch);
-      if (!parsed.success) {
-        throw new TypedDomainError(
-          "RUNNER_WORKFLOW_INPUT_INVALID",
-          "RUNNER_WORKFLOW_INPUT_INVALID"
-        );
-      }
-      const dispatch = parsed.data;
-      const capture = await import("@debateai/obs-capture").catch(() => undefined);
-      // Read the SDK accessor inside a guard: a throwing retryCount() must not
-      // reject the task before executeWorkItem has run (s06-rework-1.md §4).
-      let observedRetryCount: unknown;
+      // Side-by-side spec §4 (D1): the task is counted for its whole handler, the story included, failure or not.
+      const leave = input.executions?.enter();
+      // R2 (final review): and, once its dispatch is valid, it names its work item, so the lapsed re-send skips it.
+      let forget: (() => void) | undefined;
       try {
-        observedRetryCount = hatchetContext?.retryCount?.();
-      } catch {
-        observedRetryCount = undefined;
-      }
-      const attemptIndex = typeof observedRetryCount === "number"
-        && Number.isSafeInteger(observedRetryCount)
-        && observedRetryCount >= 0
-        ? observedRetryCount
-        : 0;
-      // L4-F9 repair: the debate hears Hatchet — its stop signal, its "still
-      // working" call and its limit. Read inside a guard like retryCount: a
-      // throwing accessor never stops the debate from starting; without the
-      // signal the debate still stops at the limit on its own clock.
-      let signal: AbortSignal | undefined;
-      try {
-        signal = hatchetContext?.abortController?.signal;
-      } catch {
-        signal = undefined;
-      }
-      const refreshTimeout = typeof hatchetContext?.refreshTimeout === "function"
-        ? (incrementBy: `${number}s`) => hatchetContext.refreshTimeout!(incrementBy)
-        : undefined;
-      const task: RunnerTaskControl = Object.freeze({
-        executionLimitMs,
-        ...(signal === undefined ? {} : { signal }),
-        ...(refreshTimeout === undefined ? {} : { refreshTimeout })
-      });
-      const execute = async () => {
+        // L4-F6: BEFORE the runner, before the repository, before anything reads
+        // a field — and, at INT2 (SYNC2 into integration), before the S06 capture
+        // binding too, so an unvalidated dispatch string can never become an obs
+        // context ref. A malformed dispatch is a typed refusal that names no value.
+        const parsed = walkingSkeletonDispatchSchema.safeParse(rawDispatch);
+        if (!parsed.success) {
+          throw new TypedDomainError(
+            "RUNNER_WORKFLOW_INPUT_INVALID",
+            "RUNNER_WORKFLOW_INPUT_INVALID"
+          );
+        }
+        const dispatch = parsed.data;
+        forget = input.executions?.workingOn(dispatch.workItemId);
+        const capture = await import("@debateai/obs-capture").catch(() => undefined);
+        // Read the SDK accessor inside a guard: a throwing retryCount() must not
+        // reject the task before executeWorkItem has run (s06-rework-1.md §4).
+        let observedRetryCount: unknown;
         try {
-          const result = await input.runner.executeWorkItem(dispatch.workItemId, task);
-          return result.kind === "COMPLETED"
-            ? { kind: result.kind, answerId: result.answerId }
-            : { kind: result.kind };
-        } catch (error) {
-          // AMENDMENT 2026-09-22, routed at INT2: the envelope carries the
-          // failure's CODE and its bounded diagnostic PATH. The error object
-          // itself — whose message can hold model output — never enters the
-          // second sink.
-          capture?.emit(captureFailureEnvelope({
-            error,
-            taxonomyClass: "JOB_FAILURE",
-            capturePoint: "job",
-            disposition: "THROWN",
-            source: "hatchet",
-            attemptIndex
-          }));
-          // L4-F9 repair: a copy whose claim another copy took leaves the work
-          // item to that copy. Recording FAILED here would end a debate that is
-          // still running, under the asker's eyes.
-          if (error instanceof TypedDomainError && error.code === "RUNNER_CLAIM_LOST") {
-            throw scrubbedTaskFailure(error);
-          }
-          const recorded = await input.failures.recordTerminalFailure({
-            runId: dispatch.runId,
-            workItemId: dispatch.workItemId,
-            reason: runnerTerminalFailureReason(error)
-          });
-          if (!recorded) {
-            // OBS-R064: a handler that cannot record the failure must still
-            // propagate the ORIGINAL error. The unrecorded state is an alarm
-            // alongside it, never a replacement for it.
-            const recordingFailure = new TypedDomainError(
-              "RUNNER_FAILURE_STATE_NOT_RECORDED",
-              dispatch.workItemId
-            );
+          observedRetryCount = hatchetContext?.retryCount?.();
+        } catch {
+          observedRetryCount = undefined;
+        }
+        const attemptIndex = typeof observedRetryCount === "number"
+          && Number.isSafeInteger(observedRetryCount)
+          && observedRetryCount >= 0
+          ? observedRetryCount
+          : 0;
+        // L4-F9 repair: the debate hears Hatchet — its stop signal, its "still
+        // working" call and its limit. Read inside a guard like retryCount: a
+        // throwing accessor never stops the debate from starting; without the
+        // signal the debate still stops at the limit on its own clock.
+        let signal: AbortSignal | undefined;
+        try {
+          signal = hatchetContext?.abortController?.signal;
+        } catch {
+          signal = undefined;
+        }
+        const refreshTimeout = typeof hatchetContext?.refreshTimeout === "function"
+          ? (incrementBy: `${number}s`) => hatchetContext.refreshTimeout!(incrementBy)
+          : undefined;
+        const task: RunnerTaskControl = Object.freeze({
+          executionLimitMs,
+          ...(signal === undefined ? {} : { signal }),
+          ...(refreshTimeout === undefined ? {} : { refreshTimeout })
+        });
+        const execute = async () => {
+          try {
+            const result = await input.runner.executeWorkItem(dispatch.workItemId, task);
+            return result.kind === "COMPLETED"
+              ? { kind: result.kind, answerId: result.answerId }
+              : { kind: result.kind };
+          } catch (error) {
+            // AMENDMENT 2026-09-22, routed at INT2: the envelope carries the
+            // failure's CODE and its bounded diagnostic PATH. The error object
+            // itself — whose message can hold model output — never enters the
+            // second sink.
             capture?.emit(captureFailureEnvelope({
-              error: recordingFailure,
+              error,
               taxonomyClass: "JOB_FAILURE",
               capturePoint: "job",
-              disposition: "HANDLED",
+              disposition: "THROWN",
               source: "hatchet",
               attemptIndex
             }));
+            // L4-F9 repair: a copy whose claim another copy took leaves the work
+            // item to that copy. Recording FAILED here would end a debate that is
+            // still running, under the asker's eyes. Side-by-side spec §3: the same
+            // for another release's debate — that release finishes or fails it.
+            if (error instanceof TypedDomainError && LEAVES_WORK_ITEM_ALONE.has(error.code)) {
+              throw scrubbedTaskFailure(error);
+            }
+            const recorded = await input.failures.recordTerminalFailure({
+              runId: dispatch.runId,
+              workItemId: dispatch.workItemId,
+              reason: runnerTerminalFailureReason(error)
+            });
+            if (!recorded) {
+              // OBS-R064: a handler that cannot record the failure must still
+              // propagate the ORIGINAL error. The unrecorded state is an alarm
+              // alongside it, never a replacement for it.
+              const recordingFailure = new TypedDomainError(
+                "RUNNER_FAILURE_STATE_NOT_RECORDED",
+                dispatch.workItemId
+              );
+              capture?.emit(captureFailureEnvelope({
+                error: recordingFailure,
+                taxonomyClass: "JOB_FAILURE",
+                capturePoint: "job",
+                disposition: "HANDLED",
+                source: "hatchet",
+                attemptIndex
+              }));
+            }
+            // DL4-F1 re-seated inside the restored S06 binding (DEV-SYNC 2026-09-22): the
+            // error that leaves this task still IS the one that would have escaped without
+            // any of the capture work — same code, same terminal vocabulary, same whether
+            // recording succeeded or not (OBS-R064) — but its text and stack are scrubbed
+            // before the Hatchet SDK writes them outside the AEAD boundary.
+            throw scrubbedTaskFailure(error);
           }
-          // DL4-F1 re-seated inside the restored S06 binding (DEV-SYNC 2026-09-22): the
-          // error that leaves this task still IS the one that would have escaped without
-          // any of the capture work — same code, same terminal vocabulary, same whether
-          // recording succeeded or not (OBS-R064) — but its text and stack are scrubbed
-          // before the Hatchet SDK writes them outside the AEAD boundary.
-          throw scrubbedTaskFailure(error);
-        }
-      };
-      if (capture === undefined) return execute();
-      return capture.runWithObsContext(Object.freeze({
-        run_ref: Object.freeze({ kind: "run", value: dispatch.runId }),
-        work_item_ref: Object.freeze({ kind: "work_item", value: dispatch.workItemId })
-      }), execute);
+        };
+        // Awaited, so the `finally` below counts the task out only once it has ended.
+        if (capture === undefined) return await execute();
+        return await capture.runWithObsContext(Object.freeze({
+          run_ref: Object.freeze({ kind: "run", value: dispatch.runId }),
+          work_item_ref: Object.freeze({ kind: "work_item", value: dispatch.workItemId })
+        }), execute);
+      } finally {
+        forget?.();
+        leave?.();
+      }
     }
   });
 }
