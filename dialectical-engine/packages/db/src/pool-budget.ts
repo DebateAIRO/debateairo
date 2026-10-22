@@ -16,7 +16,11 @@
  * to 2 × (79 + 34) = 226; with Hatchet's 50, the migrator's 3 and the operator's
  * about 10 that is 289, which leaves 28 spare (317 = 320 less 3). The raise takes
  * effect only at a Postgres restart (deploy/postgres/postgresql.hardening.conf).
- * The pool sizes below did not change.
+ * The pool sizes below did not change. One pool was added (final fix wave P1):
+ * the API's release watcher reads on its own pool of 1 (`releaseWatch`), so a
+ * burst of page reads on the runtime pool can never make /readyz
+ * DATABASE_UNREACHABLE. One API is 80 at most; two releases 2 × (80 + 34) = 228,
+ * 291 in all, so 26 spare. max_connections stays 320.
  *
  * The plan, the per-pool audit and the arithmetic:
  * docs/operations/2026-10-10-database-connection-budget.md; the guard that keeps
@@ -68,7 +72,12 @@ export const API_DATABASE_POOLS = Object.freeze({
   // The data export worker (mission data-export S01; opened only when DATA_EXPORT_STORE_PATH is set): one build at a
   // time (single-flight timer) on one connection (V-43). Its 15 s lease renewal queues behind the snapshot read and
   // waits the full 15 s, so a read of up to ~30 s keeps its lease.
-  dataExport: budget("api:data-export", 1, 15_000)
+  dataExport: budget("api:data-export", 1, 15_000),
+  // Side-by-side spec §6 (final fix wave P1): the release watcher's read of the current release, once a second. On the
+  // runtime pool a burst of page reads could hold it past the 5 s stale bound, making /readyz DATABASE_UNREACHABLE and
+  // the front pair look down. Its reads chain (never two at once), so one connection; a read that cannot get it within
+  // 1 s fails and the next poll tries again.
+  releaseWatch: budget("api:release-watch", 1, 1_000)
 });
 
 /** The support settings reader (API and the support commands): it gives up after 200 ms by design. */

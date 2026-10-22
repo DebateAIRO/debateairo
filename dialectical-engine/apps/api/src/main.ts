@@ -348,13 +348,16 @@ await boot.run("ask-admission-pools", async () => {
 });
 const erasurePool = boot.hold(createPool(environment.ERASURE_DATABASE_URL, API_DATABASE_POOLS.erasure));
 const dataExportPool = environment.DATA_EXPORT_STORE_PATH === undefined ? undefined : boot.hold(createPool(environment.DATA_EXPORT_DATABASE_URL!, API_DATABASE_POOLS.dataExport));
-// Side-by-side spec §4, §6 (plan C3): which release is current, read every second on the runtime pool (debateai_runtime
-// holds EXECUTE on 0123's readers). With no release recorded a local API is current, as before; a hosted one is not.
+// Side-by-side spec §4, §6 (plan C3): which release is current, read every second (debateai_runtime holds EXECUTE on
+// 0123's readers). With no release recorded a local API is current, as before; a hosted one is not.
 // Held from here so a failed boot stops it; started before the boot's first background pass; stopped first at close.
+// Final fix wave P1: on a pool of its own (the runtime principal's URL), so a burst of page reads queued on the runtime
+// pool never holds its read past the 5 s stale bound (/readyz DATABASE_UNREACHABLE, the front pair marked down).
+const releaseWatchPool = boot.hold(createPool(environment.DATABASE_URL, API_DATABASE_POOLS.releaseWatch));
 const releaseWatcher = new ReleaseWatcher({
   releaseKey: environment.RELEASE_KEY,
   hosted: environment.DEPLOYMENT_MODE === "hosted",
-  reader: new PostgresReleaseStateReader(pool)
+  reader: new PostgresReleaseStateReader(releaseWatchPool)
 });
 boot.hold({ end: async () => { releaseWatcher.stop(); } });
 // DL7-F7: the hand-rolled pool cleanup this stage carried is the ledger's job
@@ -1782,8 +1785,9 @@ const startup = installStartupResourceOwner({
   auditContextHasher,
   argon2Pool,
   databasePools: [
-    // Side-by-side (plan C3): the release watcher stops before the runtime pool it reads on closes.
+    // Side-by-side (plan C3): the release watcher stops before its own pool (final fix wave P1) closes.
     { end: async () => { releaseWatcher.stop(); } },
+    releaseWatchPool,
     pool,
     ...(authorizationPool === pool ? [] : [authorizationPool]),
     ...(publicationCleanupPool === pool || publicationCleanupPool === authorizationPool

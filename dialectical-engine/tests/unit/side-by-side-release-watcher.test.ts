@@ -450,9 +450,15 @@ describe("side-by-side C3: the API's release watcher", () => {
     w.stop();
   });
 
-  it("main.ts builds it on the runtime pool, starts it before the first background pass, stops it first and marks boot last", () => {
+  it("main.ts builds it on its own pool, starts it before the first background pass, stops it first and marks boot last", () => {
     const source = readFileSync(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
-    expect(source).toContain("reader: new PostgresReleaseStateReader(pool)");
+    // Final fix wave P1: its own pool (the runtime principal's URL: debateai_runtime holds EXECUTE on 0123's readers), so a
+    // burst of page reads on the runtime pool never makes /readyz DATABASE_UNREACHABLE.
+    expect(source).toContain(
+      "const releaseWatchPool = boot.hold(createPool(environment.DATABASE_URL, API_DATABASE_POOLS.releaseWatch));"
+    );
+    expect(source).toContain("reader: new PostgresReleaseStateReader(releaseWatchPool)");
+    expect(source).not.toContain("new PostgresReleaseStateReader(pool)");
     expect(source).toContain('hosted: environment.DEPLOYMENT_MODE === "hosted"');
     expect(source).toContain("releaseKey: environment.RELEASE_KEY,");
     const start = source.indexOf('await boot.run("release-watcher", () => releaseWatcher.start());');
@@ -462,6 +468,8 @@ describe("side-by-side C3: the API's release watcher", () => {
     const stop = source.indexOf("{ end: async () => { releaseWatcher.stop(); } },", pools);
     expect(stop).toBeGreaterThan(pools);
     expect(stop).toBeLessThan(source.indexOf("    pool,", pools));
+    // Its pool closes after the watcher stopped, with the others.
+    expect(source.indexOf("    releaseWatchPool,", pools)).toBeGreaterThan(stop);
     expect(source.trimEnd().endsWith("releaseWatcher.markBooted();")).toBe(true);
     expect(source.indexOf("releaseWatcher.markBooted();")).toBeGreaterThan(source.indexOf("triggerEmailRecoveryReconciliation?.();"));
   });
