@@ -50,6 +50,20 @@ describe('the release key in the narrowed environment',()=>{
    expect(()=>env.narrowEnvironment('ui',ui(bad),built,pin,plan),String(bad)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
   expect(()=>env.narrowEnvironment('ui',ui(KEY),built,null,plan)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
  });
+ // README §14.7: the website's payment marks list. A typo never stops the website (it ignores unknown names); the strict form is release-env's check.
+ it('admits PAYMENT_MARKS_AVAILABLE on the website, whatever its form, and on no other service',()=>{
+  const ui=(marks:string)=>({NODE_ENV:'production',PUBLIC_APP_URL:'https://v3-preview.dezbatere.ro',PORT:'3100',DIALECTICAL_UI_HOST:'127.0.0.1',DIALECTICAL_API_BASE:'http://127.0.0.1:3101',NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON:env.PREVIEW_FREE_MODEL_IDS_JSON,RELEASE_KEY:KEY,PAYMENT_MARKS_AVAILABLE:marks});
+  const built={builtModelRosterFlag:env.PREVIEW_FREE_MODEL_IDS_JSON};
+  expect(env.narrowEnvironment('ui',ui('visa,mastercard'),built,pin,plan).environment.PAYMENT_MARKS_AVAILABLE).toBe('visa,mastercard');
+  expect(env.narrowEnvironment('ui',ui('Visa, amex'),built,pin,plan).environment.PAYMENT_MARKS_AVAILABLE).toBe('Visa, amex');
+  expect(()=>env.narrowEnvironment('api',{...api(KEY),PAYMENT_MARKS_AVAILABLE:'visa,mastercard'},runtime,pin,plan)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
+ });
+ it('isPaymentMarksList takes only the strict form',()=>{
+  expect(env.PAYMENT_MARK_NAMES).toEqual(['netopia','visa','mastercard']);
+  expect(Object.isFrozen(env.PAYMENT_MARK_NAMES)).toBe(true);
+  for(const value of ['visa','netopia,visa,mastercard','mastercard,netopia'])expect(env.isPaymentMarksList(value),value).toBe(true);
+  for(const value of ['','Visa','visa, mastercard','visa,',',visa','visa,visa','amex','visa,mastercard,netopia,visa',undefined,7])expect(env.isPaymentMarksList(value),String(value)).toBe(false);
+ });
  it('RELEASE_KEY_PATTERN agrees with the kernel\'s parser',async()=>{
   const { parseReleaseKey, RELEASE_KEY_PATTERN } = await import('../../packages/kernel/src/release-key.js');
   expect(env.RELEASE_KEY_PATTERN.source).toBe(RELEASE_KEY_PATTERN.source);

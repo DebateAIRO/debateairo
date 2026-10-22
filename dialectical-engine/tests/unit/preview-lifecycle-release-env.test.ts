@@ -176,6 +176,21 @@ describe('sameChecks', () => {
     expect(bad(sameChecks([{ ...one, api: apiWithoutKey, runner: runnerWithoutKey }]))).toEqual(['SAME_API_RUNNER_RELEASE_KEY:t', 'SAME_UI_API_RELEASE_KEY:t']);
   });
 
+  it('checks each release\'s payment marks list: absent or the strict form', () => {
+    const older = release('old-v1', 'A', OLD_KEY), newer = release('new-v1', 'B', NEW_KEY);
+    const results = sameChecks([older, newer]);
+    expect(bad(results)).toEqual([]);
+    expect(results.map(result => result.check)).toEqual(expect.arrayContaining(['UI_PAYMENT_MARKS_AVAILABLE:old-v1', 'UI_PAYMENT_MARKS_AVAILABLE:new-v1']));
+    // Right after the release's slot checks.
+    const checks = results.map(result => result.check);
+    expect(checks.indexOf('UI_PAYMENT_MARKS_AVAILABLE:old-v1')).toBe(checks.indexOf('SLOT_DIALECTICAL_API_BASE:old-v1') + 1);
+    // A release may add (or change) the list on purpose: no cross-release check.
+    const marks = (value: string) => ({ ...newer, ui: { ...newer.ui, PAYMENT_MARKS_AVAILABLE: value } });
+    expect(bad(sameChecks([older, marks('visa,mastercard')]))).toEqual([]);
+    expect(bad(sameChecks([older, marks('Visa')]))).toEqual(['UI_PAYMENT_MARKS_AVAILABLE:new-v1']);
+    expect(bad(sameChecks([older, marks('visa, mastercard')]))).toEqual(['UI_PAYMENT_MARKS_AVAILABLE:new-v1']);
+  });
+
   it('a config it cannot read is never the same as anything', () => {
     const older = release('old-v1', 'A', OLD_KEY), newer = release('new-v1', 'B', NEW_KEY);
     const broken = { ...newer, api: { ...newer.api, PREVIEW_PROVIDER_TEST_CONFIG_JSON: '{' }, runner: { ...newer.runner, PREVIEW_PROVIDER_TEST_CONFIG_JSON: '{' } };

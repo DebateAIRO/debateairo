@@ -32,4 +32,9 @@ describe("P21, N25b NETOPIA's, Visa's and Mastercard's marks appear only when th
     expect(Object.isFrozen(PAYMENT_MARK_NAMES)).toBe(true);
     expect(PAYMENT_MARKS_SETTING).toBe("PAYMENT_MARKS_AVAILABLE");
   });
+
+  it("the website and the test site's tools know the same three marks", async () => {
+    const environment = await import("../../deploy/" + "preview-auth-dev/v1/environment.mjs");
+    expect(environment.PAYMENT_MARK_NAMES).toEqual(PAYMENT_MARK_NAMES);
+  });
 });
