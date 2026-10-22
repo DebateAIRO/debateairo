@@ -306,6 +306,13 @@ describe('the real readiness seam', () => {
     expect(source.match(/postgresRunnerRetirementStore\(/g)).toHaveLength(1);
   });
 
+  // R2 (final review): the five-minute re-send skips an item a task of this process still runs.
+  it('runner main hands the lapsed re-send the task counter\'s work items', async () => {
+    const source = await readFile(resolve('apps/runner/src/main.ts'), 'utf8');
+    const resend = source.slice(source.indexOf('startLapsedClaimResend({'), source.indexOf('startRunnerRetirement({'));
+    expect(resend).toContain('running: (workItemId) => executions.isWorkingOn(workItemId),');
+  });
+
   // R1 (final review): the backstop reads the runner's own model-call accounting before this release ends itself. Every
   // call the runner and the story make goes through a provider member, and a claim probe is a call through the gate too.
   it('runner main counts every model call (each provider member, each claim probe) and hands the count to the backstop', async () => {

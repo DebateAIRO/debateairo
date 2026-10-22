@@ -12663,7 +12663,7 @@ export function declareHatchetWalkingSkeletonTask(input: {
    * Side-by-side spec §4 (D1): counts this task while its handler runs, the verdict story included (it runs inside the
    * task after the work item is DONE), so a retiring release knows when none of its tasks is left.
    */
-  readonly executions?: Pick<TaskExecutionCounter, "enter">;
+  readonly executions?: Pick<TaskExecutionCounter, "enter" | "workingOn">;
 }): TaskWorkflowDeclaration<{ runId: string; workItemId: string }, { kind: string; answerId?: string }> {
   if(input.previewExecutionTimeout!==undefined&&input.previewExecutionTimeout!=="3600s")throw new TypeError("PREVIEW_EXECUTION_TIMEOUT_INVALID");
   if (!Number.isInteger(input.engineRetries) || input.engineRetries < 0) {
@@ -12693,6 +12693,8 @@ export function declareHatchetWalkingSkeletonTask(input: {
     ) => {
       // Side-by-side spec §4 (D1): the task is counted for its whole handler, the story included, failure or not.
       const leave = input.executions?.enter();
+      // R2 (final review): and, once its dispatch is valid, it names its work item, so the lapsed re-send skips it.
+      let forget: (() => void) | undefined;
       try {
         // L4-F6: BEFORE the runner, before the repository, before anything reads
         // a field — and, at INT2 (SYNC2 into integration), before the S06 capture
@@ -12706,6 +12708,7 @@ export function declareHatchetWalkingSkeletonTask(input: {
           );
         }
         const dispatch = parsed.data;
+        forget = input.executions?.workingOn(dispatch.workItemId);
         const capture = await import("@debateai/obs-capture").catch(() => undefined);
         // Read the SDK accessor inside a guard: a throwing retryCount() must not
         // reject the task before executeWorkItem has run (s06-rework-1.md §4).
@@ -12801,6 +12804,7 @@ export function declareHatchetWalkingSkeletonTask(input: {
           work_item_ref: Object.freeze({ kind: "work_item", value: dispatch.workItemId })
         }), execute);
       } finally {
+        forget?.();
         leave?.();
       }
     }

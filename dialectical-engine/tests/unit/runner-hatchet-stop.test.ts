@@ -187,6 +187,43 @@ describe("side-by-side spec §4: the task counter covers the whole task", () => 
   });
 });
 
+describe("R2: the task names its work item while it runs", () => {
+  it("is working on the dispatched item from the valid dispatch until the task ends or fails, never on a malformed one", async () => {
+    const executions = createTaskExecutionCounter();
+    let finish!: (result: { kind: string; answerId?: string }) => void;
+    let started!: () => void;
+    const running = new Promise<void>((resolve) => { started = resolve; });
+    const task = taskOver({
+      executions,
+      execute: () => {
+        started();
+        return new Promise((resolve) => { finish = resolve; });
+      }
+    });
+    const ended = task({ runId: RUN_ID, workItemId: WORK_ITEM_ID }, { abortController: new AbortController() });
+    await running;
+    expect(executions.isWorkingOn(WORK_ITEM_ID)).toBe(true);
+    finish({ kind: "NO_WORK" });
+    await ended;
+    expect(executions.isWorkingOn(WORK_ITEM_ID)).toBe(false);
+
+    const failing = taskOver({
+      executions,
+      execute: async () => {
+        expect(executions.isWorkingOn(WORK_ITEM_ID)).toBe(true);
+        throw new TypedDomainError("RUNNER_TIME_LIMIT_REACHED", "the debate ran out of time");
+      }
+    });
+    await expect(failing({ runId: RUN_ID, workItemId: WORK_ITEM_ID }, { abortController: new AbortController() }))
+      .rejects.toMatchObject({ code: "RUNNER_TIME_LIMIT_REACHED" });
+    expect(executions.isWorkingOn(WORK_ITEM_ID)).toBe(false);
+
+    await expect(failing({ runId: RUN_ID, workItemId: "not-a-uuid" })).rejects.toMatchObject({ code: "RUNNER_WORKFLOW_INPUT_INVALID" });
+    expect(executions.isWorkingOn("not-a-uuid")).toBe(false);
+    expect(executions.count()).toBe(0);
+  });
+});
+
 describe("a stop is never mistaken for one unavailable review", () => {
   it.each(["RUNNER_CLAIM_LOST", "RUNNER_TIME_LIMIT_REACHED", "RUNNER_RETIRING"])("rethrows %s from the review catch", (code) => {
     expect(reviewFailureOutcome(new TypedDomainError(code, code))).toEqual({ kind: "RETHROW" });

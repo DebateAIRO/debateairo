@@ -20,7 +20,10 @@ import type { DispatchableWorkItem } from "@debateai/battery";
  *    never stalls the chain, so later passes still run (the item is lapsed again and listed by a later pass);
  *  · while this release retires (claims stopped, spec §4) a pass lists nothing: its runner would answer NO_WORK, and
  *    the backstop sets those debates aside. A pass under way when it starts to retire, or when `stop()` is called,
- *    sends no further item.
+ *    sends no further item;
+ *  · R2 (final review): an item a task of THIS process still runs (its claim lapsed while its renewals failed) is never
+ *    sent: it would come back to this same process as a second copy under the same worker id and pay for the debate
+ *    again. The skip is counted (LAPSED_RESEND_SKIPPED_RUNNING); once that task ends, a later pass sends it.
  *
  * Lines are content-free (`kind: "DEBATEAI_RUNNER_RESEND"`): an event, counts, a work item id we mint, a SQLSTATE.
  */
@@ -61,6 +64,8 @@ export function startLapsedClaimResend(input: Readonly<{
   work: Readonly<{ listLapsedClaimed(limit: number): Promise<readonly DispatchableWorkItem[]> }>;
   dispatch(item: DispatchableWorkItem): Promise<void>;
   paused(): boolean;
+  /** R2: true while a task of this process runs the work item (main.ts: the task counter's `isWorkingOn`). */
+  running(workItemId: string): boolean;
   log(line: Readonly<Record<string, string | number>>): void;
   clock?: ResendClock;
 }>): Readonly<{ stop(): void }> {
@@ -81,9 +86,14 @@ export function startLapsedClaimResend(input: Readonly<{
       input.log(Object.freeze({ kind: KIND, event: "LAPSED_RESEND_SATURATED", listed: listed.length }));
     }
     let count = 0;
+    let skipped = 0;
     for (const item of listed.slice(0, LAPSED_RESEND.limit)) {
       // stop() or this release starting to retire takes effect mid-pass: no further item of it is sent.
       if (stopped || input.paused()) break;
+      if (input.running(item.workItemId)) {
+        skipped += 1;
+        continue;
+      }
       let sent = false;
       try {
         sent = await sentWithin(input.dispatch(item), clock, LAPSED_RESEND.everyMs) === "SENT";
@@ -93,6 +103,7 @@ export function startLapsedClaimResend(input: Readonly<{
       if (sent) count += 1;
       else input.log(Object.freeze({ kind: KIND, event: "LAPSED_RESEND_FAILED", workItemId: item.workItemId }));
     }
+    if (skipped > 0) input.log(Object.freeze({ kind: KIND, event: "LAPSED_RESEND_SKIPPED_RUNNING", count: skipped }));
     if (count > 0) input.log(Object.freeze({ kind: KIND, event: "LAPSED_RESENT", count }));
   };
 

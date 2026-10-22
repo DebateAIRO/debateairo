@@ -25,10 +25,18 @@ export interface TaskExecutionCounter {
   enter(): () => void;
   /** The tasks running now. */
   count(): number;
+  /**
+   * R2 (final review): a counted task names the work item it runs, once its dispatch is valid; the returned function
+   * forgets it (calling it more than once forgets once). Two copies of one item are named twice.
+   */
+  workingOn(workItemId: string): () => void;
+  /** True while a task of this process runs `workItemId`: the five-minute re-send never hands it back to this process. */
+  isWorkingOn(workItemId: string): boolean;
 }
 
 export function createTaskExecutionCounter(): TaskExecutionCounter {
   let running = 0;
+  const items = new Map<string, number>();
   return Object.freeze({
     enter() {
       running += 1;
@@ -39,7 +47,19 @@ export function createTaskExecutionCounter(): TaskExecutionCounter {
         running -= 1;
       };
     },
-    count: () => running
+    count: () => running,
+    workingOn(workItemId: string) {
+      items.set(workItemId, (items.get(workItemId) ?? 0) + 1);
+      let forgotten = false;
+      return () => {
+        if (forgotten) return;
+        forgotten = true;
+        const left = (items.get(workItemId) ?? 0) - 1;
+        if (left > 0) items.set(workItemId, left);
+        else items.delete(workItemId);
+      };
+    },
+    isWorkingOn: (workItemId: string) => items.has(workItemId)
   });
 }
 

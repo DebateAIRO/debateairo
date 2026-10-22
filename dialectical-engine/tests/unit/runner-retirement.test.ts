@@ -31,6 +31,23 @@ describe("the task counter and the retirement signal (side-by-side §4)", () => 
     expect(executions.count()).toBe(1);
   });
 
+  it("knows which work items its tasks run: two copies of one item count twice, and each forgets once (R2)", () => {
+    const executions = createTaskExecutionCounter();
+    expect(executions.isWorkingOn("work-1")).toBe(false);
+    const forgetFirst = executions.workingOn("work-1");
+    const forgetSecond = executions.workingOn("work-1");
+    executions.workingOn("work-2");
+    expect(executions.isWorkingOn("work-1")).toBe(true);
+    forgetFirst();
+    forgetFirst();
+    expect(executions.isWorkingOn("work-1")).toBe(true);
+    forgetSecond();
+    expect(executions.isWorkingOn("work-1")).toBe(false);
+    expect(executions.isWorkingOn("work-2")).toBe(true);
+    // Naming a work item is not a second task: the count is the tasks entered.
+    expect(executions.count()).toBe(0);
+  });
+
   it("counts each model call from the ask until it settles, answered, failed or thrown at once (R1)", async () => {
     const calls = createModelCallCounter();
     const settlers: Array<Readonly<{ answer(): void; fail(error: Error): void }>> = [];

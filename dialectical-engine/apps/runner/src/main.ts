@@ -737,6 +737,8 @@ const lapsedResend = startLapsedClaimResend({
     });
   },
   paused: () => retirementSignal.claimsStopped(),
+  // R2 (final review): never an item a task of this process still runs (it would come back here as a second copy).
+  running: (workItemId) => executions.isWorkingOn(workItemId),
   log: (line) => console.warn(JSON.stringify(line))
 });
 // Side-by-side spec §4: every 60 s this runner reads its release's facts in one snapshot; once it is DRAINING, its
