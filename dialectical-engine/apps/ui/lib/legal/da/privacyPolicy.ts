@@ -56,7 +56,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Debatindhold — Det spørgsmål, du skriver; de styrende annotationer, du angiver; påstande, kritik, evidenshenvisninger, bedømmelser og konklusioner, som systemet genererer; en ordret registrering af, hvad hver AI-udbyder returnerede; søgeforespørgsler og kildehenvisninger. Alt dette opbevares krypteret under en nøgle, der er specifik for din konto — Dig og de AI-modeller, der arbejder med dit spørgsmål",
         "Support — Beskeder, som du udveksler med supportassistenten eller en person, opbevaret krypteret; det anvendte sprog; om du gav assistenten tilladelse til at se status (aldrig indholdet) for dine debatter; bedømmelser, du giver. Hvis en besked udløser vores kontrol mod misbrug, opbevarer vi en hash af beskeden og en hash af den IP-adresse, den kom fra — Dig",
         "Registreringer af accept og samtykke — Versionen og indholdshashen for de Vilkår, du accepterede, og den politik, du fik vist; tidspunktet; den anvendte skærm og mekanisme; dit sprog; din IP-adresse og user-agent på det pågældende tidspunkt; hvert samtykke, du gav eller trak tilbage, og hvornår — Din browser ved tilmelding, og hver gang du ændrer et valg",
-        "Betalinger (når betalte abonnementer starter) — Abonnement, pris, faktureringsperiode, transaktionsreferencer og dokumentation for skattemæssigt hjemsted. Kortoplysninger opbevares af vores betalingsudbyder, aldrig af os — Dig og betalingsudbyderen",
+        "Betalinger (når betalte abonnementer starter) — Abonnement, pris, faktureringsperiode, transaktionsreferencer og dokumentation for skattemæssigt hjemsted. De faktureringsoplysninger, du angiver ved betalingen: dit navn, telefonnummer og din faktureringsadresse og, hvis du køber som virksomhed, virksomhedens navn, momsnummer og adresse; samt den IP-adresse, du betaler fra. Du indtaster dine kortoplysninger på vores betalingsudbyders side, så dit fulde kortnummer og din sikkerhedskode aldrig når frem til os. Af dit kort opbevarer vi de sidste fire cifre, udløbsmåned og -år og det land, hvor kortet er udstedt — for at kunne se, hvilket kort en betaling blev foretaget med, for at påminde dig, før kortet udløber, og for at anvende reglerne for det pågældende land — samt, opbevaret krypteret, en kode fra betalingsudbyderen, som gør det muligt for den at debitere det samme kort ved hver fornyelse. I 14 dage opbevarer vi også, krypteret, hver meddelelse, som betalingsudbyderen sender os om en betaling, nøjagtigt som den blev modtaget; den viser også de første cifre i kortnummeret, som identificerer den bank, der har udstedt kortet, og bankens navn — Dig og betalingsudbyderen",
         "Personer, der ikke er vores brugere — Personoplysninger om andre personer, som du medtager i et spørgsmål, eller som systemet genererer som svar. Vi beder dig om ikke at gøre dette; afsnit 11 forklarer, hvad vi gør, når det alligevel sker — Dig, indirekte"
         ]
       },
@@ -150,6 +150,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Supportsamtaler og -sager — Indtil sagen er lukket plus 12 måneder — Nøgler destrueres",
         "Registreringer af accept og samtykke — Kontoens levetid plus 6 år — den længste forældelsesfrist, der gælder for os — Slettes",
         "Betalingsregistreringer (når betalte abonnementer starter) — 10 år, som krævet efter rumænsk regnskabslovgivning — Slettes",
+        "Gemt kort: betalingsudbyderens kode med kortets sidste fire cifre, udløbsdato og land — Indtil én dag efter, at kortet ikke længere bruges til at betale for et aktivt abonnement — når abonnementet ophører, du udskifter kortet, eller du lukker din konto — Slettes; de sidste fire cifre, udløbsdato og land forbliver også i betalingsregistreringen for hver betaling, der er foretaget med det pågældende kort",
+        "Betalingsudbyderens meddelelser om betalinger, som de blev modtaget — 14 dage — Slettes",
         "Sikkerhedskopier — Op til 8 uger efter at den aktive kopi er slettet — Overskrives"
         ]
       },
@@ -258,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Når vi ændrer denne politik, offentliggør vi den nye version med en oversigt over ændringerne og en ny ikrafttrædelsesdato og beholder de tidligere versioner på dezbatere.ro/privacy/versions. Ved en ændring, der tilføjer et nyt formål eller en ny modtager, underretter vi dig via e-mail og i produktet, før den nye behandling begynder, og giver dig tid til at gøre indsigelse. Hvor et nyt formål afhænger af dit samtykke — eksempelvis hvis vi nogensinde ønskede at bruge indhold til at forbedre modeller — beder vi særskilt og specifikt om dette samtykke; vi behandler aldrig accept af opdaterede Vilkår som samtykke til ny behandling. Ved præciseringer, der ikke ændrer noget ved det, vi gør, offentliggør vi blot den nye version." },
-      { kind: "p", text: "Denne politik blev senest opdateret den 12. oktober 2026. Version 3.4 erstattede version 3.3: afsnit 13 fastslår nu, at cookien debateai.locale også bestemmer, på hvilket sprog vi skriver de e-mails, vi sender dig, og der er tilføjet et afsnit om, at hver e-mail, vi sætter i kø til dig, bevarer det sprog, du havde valgt, indtil vi sender den." }
+      { kind: "p", text: "Denne politik blev senest opdateret den 12. oktober 2026. Version 3.5 erstattede version 3.4: afsnit 2 oplyser nu, hvilke fakturerings- og kortoplysninger vi opbevarer, og at dit fulde kortnummer aldrig når frem til os, og afsnit 7 oplyser, hvor længe vi opbevarer et gemt kort og betalingsudbyderens meddelelser om betalinger." }
     ]
   },
   {
@@ -330,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.4",
-  sha256: "74275839f936c280f6a670b3619294b1bb37a5b3e432b96a115d19eea19fa8cc",
-  eyebrow: "PRIVATLIVSPOLITIK · v3.4 · GÆLDENDE FRA 12. OKTOBER 2026",
+  version: "3.5",
+  sha256: "bee541dcf1138d47642c782dd7c048cbc1c6ee940229542f264a536dcfec9f57",
+  eyebrow: "PRIVATLIVSPOLITIK · v3.5 · GÆLDENDE FRA 12. OKTOBER 2026",
   title: "Hvad vi opbevarer, og hvorfor",
   lede: "Dine rettigheder og vores forpligtelser i henhold til GDPR (EU) 2016/679 forklaret i et klart sprog. Fjorten afsnit og bilag B — rul helt ned.",
-  endMarker: "SLUT PÅ POLITIKKEN · GDPR (EU) 2016/679 · v3.4",
+  endMarker: "SLUT PÅ POLITIKKEN · GDPR (EU) 2016/679 · v3.5",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privatlivspolitikkens tekst",
   sectionIdPrefix: "policy-section-",

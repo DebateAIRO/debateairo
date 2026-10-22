@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Fil-qosor
-eyebrow: POLITIKA DWAR IL-PRIVATEZZA · v3.4 · EFFETTIVA 12 TA’ OTTUBRU 2026
+eyebrow: POLITIKA DWAR IL-PRIVATEZZA · v3.5 · EFFETTIVA 12 TA’ OTTUBRU 2026
 title: X’naħżnu, u għaliex
 lede: Id-drittijiet tiegħek u l-obbligi tagħna skont il-GDPR (EU) 2016/679, b’lingwaġġ ċar. Erbatax-il taqsima u l-Anness B — niżżel sal-aħħar.
-endMarker: TMIEM IL-POLITIKA · GDPR (EU) 2016/679 · v3.4
+endMarker: TMIEM IL-POLITIKA · GDPR (EU) 2016/679 · v3.5
 bodyLabel: Test tal-Politika dwar il-Privatezza
 annexTitle: Anness B — Termini reġjonali dwar il-privatezza
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 3.4 · Effective 12 ta’ Ottubru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/privacy/versions · Kontrollur: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.5 · Effective 12 ta’ Ottubru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/privacy/versions · Kontrollur: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Niġbru dak li jeħtieġ kont u dak li tagħżel li tittajpja. Il-mistoqsijiet tiegħek jintbagħtu lill-fornituri tal-IA elenkati fir-Reġistru tagħna; ma jintużawx għat-taħriġ tal-mudelli. Il-fornitur tal-ospitar tagħna jaħżen il-kont tiegħek u d-dibattiti tiegħek f’Londra, fir-Renju Unit; it-taqsima 5 tispjega fejn oħra tmur id-data tiegħek. Id-dibattiti huma privati sakemm ma tippubblikahomx. It-tħassir tal-kont tiegħek jeqred iċ-ċwievet tad-data privata tiegħek; meta tiskedah, tagħżel jekk id-dibattiti ppubblikati tiegħek jitneħħewx ukoll jew jibqgħux pubbliċi taħt il-psewdonimu rtirat tiegħek. Tista’ tikkuntattjana fuq privacy@dezbatere.ro, u persuni msemmija f’dibattitu jistgħu jitolbu t-tneħħija mingħajr kont.
 
@@ -43,7 +43,7 @@ Niġbru biss dak li jeħtieġ kont biex jaħdem, dak li tagħżel li tagħtina, 
 | **Kontenut tad-dibattitu** | Il-mistoqsija li tittajpja; l-annotazzjonijiet ta’ direzzjoni li tagħti; il-pretensjonijiet, il-kritiki, ir-referenzi għall-evidenza, il-punteġġi u l-verdettijiet li tiġġenera l-magna; rekord kelma b’kelma ta’ dak li rritorna kull fornitur tal-IA; mistoqsijiet għat-tiftix tal-evidenza u referenzi għas-sorsi. Dan kollu jinħażen kriptat taħt ċavetta speċifika għall-kont tiegħek | Int, u l-mudelli tal-IA li jaħdmu fuq il-mistoqsija tiegħek |
 | **Appoġġ** | Messaġġi li tiskambja mal-assistent tal-appoġġ jew ma’ persuna, maħżuna kriptati; il-lingwa użata; jekk ħallejtx lill-assistent jara l-istatus (qatt il-kontenut) tad-dibattiti tiegħek; il-valutazzjonijiet li tagħti. Jekk messaġġ jattiva l-kontrolli kontra l-abbuż, inżommu hash tal-messaġġ u hash tal-indirizz IP li minnu ntbagħat | Int |
 | **Rekords tal-aċċettazzjoni u tal-kunsens** | Il-verżjoni u l-hash tal-kontenut tat-Termini li aċċettajt u tal-politika li rajt; il-ħin; l-iskrin u l-mekkaniżmu użati; il-lingwa tiegħek; l-indirizz IP u l-aġent tal-utent tiegħek f’dak il-mument; kull kunsens li tajt jew irtirajt u meta | Il-browser tiegħek, waqt ir-reġistrazzjoni u kull darba li tibdel għażla |
-| **Pagamenti** (ladarba jibdew il-pjanijiet bi ħlas) | Pjan, prezz, perjodu tal-kontijiet, referenzi tat-tranżazzjonijiet, evidenza tal-post tat-taxxa. Id-dettalji tal-karta jinżammu mill-fornitur tal-pagamenti tagħna, qatt minna | Int, u l-fornitur tal-pagamenti |
+| **Pagamenti** (ladarba jibdew il-pjanijiet bi ħlas) | Pjan, prezz, perjodu tal-kontijiet, referenzi tat-tranżazzjonijiet, evidenza tal-post tat-taxxa. Id-dettalji tal-kontijiet li tagħti meta tħallas: ismek, in-numru tat-telefon u l-indirizz tal-kontijiet tiegħek u, jekk tixtri bħala kumpanija, l-isem, in-numru tal-VAT u l-indirizz tagħha; u l-indirizz IP minn fejn tħallas. Id-dettalji tal-karta tiegħek iddaħħalhom fuq il-paġna tal-fornitur tal-pagamenti tagħna, għalhekk in-numru sħiħ tal-karta u l-kodiċi tas-sigurtà tiegħek qatt ma jaslu għandna. Mill-karta tiegħek inżommu l-aħħar erba’ ċifri, ix-xahar u s-sena tal-iskadenza u l-pajjiż fejn inħarġet — biex inkunu nafu b’liema karta sar ħlas, biex infakkruk qabel ma tiskadi l-karta u biex napplikaw ir-regoli ta’ dak il-pajjiż — u, maħżun kriptat, kodiċi mill-fornitur tal-pagamenti li bih dan jista’ jiddebita l-istess karta f’kull tiġdid. Għal 14-il jum inżommu wkoll, kriptat, kull messaġġ li l-fornitur tal-pagamenti jibagħtilna dwar ħlas, eżattament kif wasal; dan juri wkoll l-ewwel ċifri tan-numru tal-karta, li jidentifikaw il-bank li ħareġ il-karta, u l-isem ta’ dak il-bank | Int, u l-fornitur tal-pagamenti |
 | **Persuni li mhumiex utenti tagħna** | Data personali dwar persuni oħra li tinkludi f’mistoqsija jew li tiġġenera l-magna fit-tweġiba tagħha. Nitolbuk ma tagħmilx dan; it-taqsima 11 tispjega x’nagħmlu meta jiġri xorta waħda | Int, indirettament |
 
 Waqt ir-reġistrazzjoni nivverifikaw il-pajjiż tal-IP u l-età. Id-data tat-twelid tintbagħat għall-verifika biss u ma tinħażinx. Il-verifika tal-IP issir lokalment mingħajr ma jintbagħat l-indirizz lil terzi. Qabel kull dibattitu ġdid nivverifikaw ukoll lokalment il-pajjiż tal-IP; id-dibattitu jiġi rrifjutat jekk il-pajjiż ikun dejjem imblukkat.
@@ -126,6 +126,8 @@ Meta tippjana t-tħassir tal-kont tiegħek, tagħżel x’jiġri mid-dibattiti l
 | Konverżazzjonijiet u każijiet tal-appoġġ | Sakemm jingħalqu, flimkien ma’ 12-il xahar | Jinqerdu ċ-ċwievet |
 | Rekords tal-aċċettazzjoni u tal-kunsens | Il-ħajja tal-kont flimkien ma’ 6 snin — l-itwal perjodu ta’ preskrizzjoni li japplika għalina | Jitħassru |
 | Rekords tal-pagamenti (ladarba jibdew il-pjanijiet bi ħlas) | 10 snin, kif titlob il-liġi Rumena dwar il-kontabbiltà | Jitħassru |
+| Karta maħżuna: il-kodiċi tal-fornitur tal-pagamenti, flimkien mal-aħħar erba’ ċifri, l-iskadenza u l-pajjiż tal-karta | Sa jum wara li l-karta ma tibqax tħallas għal pjan attiv — meta l-pjan jintemm, meta tibdel il-karta jew meta tagħlaq il-kont tiegħek | Jitħassru; l-aħħar erba’ ċifri, l-iskadenza u l-pajjiż jibqgħu wkoll fir-rekord tal-pagament ta’ kull ħlas li jsir b’dik il-karta |
+| Il-messaġġi tal-fornitur tal-pagamenti dwar il-pagamenti, kif waslu | 14-il jum | Jitħassru |
 | Kopji ta’ riżerva | Sa 8 ġimgħat wara li titħassar il-kopja attiva | Jinkitbu fuqhom |
 
 **X’jagħmel fil-fatt it-tħassir.** Id-dibattiti privati u d-data tal-kont tiegħek huma kriptati taħt ċwievet speċifiċi għall-kont tiegħek u għal kull dibattitu. Meta tħassar il-kont tiegħek jinqerdu dawk iċ-ċwievet, u wara dan ir-rekords kriptati ma jistgħux jinqraw minna jew minn ħaddieħor, u nħassru r-rekord tal-kont tiegħek. Iċ-ċavetta tal-kopja pubblika ta’ dibattitu ppubblikat tinqered waqt it-tħassir biss jekk immarkajt "Ħassar ukoll id-dibattiti pubbliċi tiegħi" (taqsima 6). Niddeskrivu dan bħala tħassir għax dak huwa l-effett tiegħu, u għandna valutazzjoni dokumentata li ssostnih; jekk trid tkun taf aktar, staqsina. Hemm tliet affarijiet li għandek tkun taf: ir-reġistru tal-awditjar tas-sigurtà huwa wieħed li miegħu jiżdied biss u ma jitħassarx, iżda ma fih ebda identifikatur tiegħek li jista’ jinqara; għadd żgħir ta’ dibattiti antiki ġew qabel l-iskema ta’ kriptaġġ attwali tagħna, u jekk dan japplika għall-kont tiegħek ngħidulek x’jikseb għalihom l-għeluq; u l-kopji tad-data li jkunu diġà ntbagħtu lil fornitur tal-IA huma rregolati mit-termini taż-żamma ta’ dak il-fornitur fir-Reġistru, mhux mit-tħassir tagħna.
@@ -213,7 +215,7 @@ Biex tirrifjuta dawn l-elementi, imblokka jew ħassar il-cookies u d-data tas-si
 
 Meta nibdlu din il-politika nippubblikaw il-verżjoni l-ġdida b’sommarju ta’ dak li nbidel u data effettiva ġdida, u nżommu l-verżjonijiet preċedenti fuq dezbatere.ro/privacy/versions. Għal bidla li żżid skop ġdid jew riċevitur ġdid, ngħarrfuk qabel jibda l-ipproċessar il-ġdid, bil-posta elettronika u fil-prodott, u nagħtuk żmien biex toġġezzjona. Fejn skop ġdid jiddependi mill-kunsens tiegħek — pereżempju jekk xi darba nkunu rridu nużaw il-kontenut biex intejbu l-mudelli — nitolbu dak il-kunsens separatament u b’mod speċifiku; qatt ma nqisu l-aċċettazzjoni ta’ Termini aġġornati bħala kunsens għal ipproċessar ġdid. Għal kjarifiki li ma jbiddlu xejn dwar dak li nagħmlu, sempliċement nippubblikaw il-verżjoni l-ġdida.
 
-Din il-politika ġiet aġġornata l-aħħar fit-12 ta’ Ottubru 2026. Il-Verżjoni 3.4 issostitwiet il-verżjoni 3.3: it-taqsima 13 issa tgħid li l-cookie debateai.locale jiddetermina wkoll il-lingwa li biha nikitbu l-emails li nibagħtulek, u żżid paragrafu li jgħid li kull email li nqiegħdu fil-kju għalik iżżomm il-lingwa li kont għażilt sakemm nibagħtuha.
+Din il-politika ġiet aġġornata l-aħħar fit-12 ta’ Ottubru 2026. Il-Verżjoni 3.5 issostitwiet il-verżjoni 3.4: it-taqsima 2 issa tgħid liema dettalji tal-kontijiet u tal-karta nżommu u li n-numru sħiħ tal-karta tiegħek qatt ma jasal għandna, u t-taqsima 7 tgħid għal kemm żmien inżommu karta maħżuna u l-messaġġi tal-fornitur tal-pagamenti dwar il-pagamenti.
 
 ## Annex B — Termini reġjonali dwar il-privatezza
 

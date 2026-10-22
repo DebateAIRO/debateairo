@@ -56,7 +56,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Ábhar díospóireachta — An cheist a chlóscríobhann tú; na nótaí stiúrtha a shocraíonn tú; na maímh, na cáintí, na tagairtí fianaise, na scóir agus na breithiúnais a ghineann an t-inneall; taifead focal ar fhocal den mhéid a thug gach soláthraí IS ar ais; iarratais aisghabhála agus tagairtí foinse. Stóráiltear é seo ar fad criptithe faoi eochair a bhaineann go sonrach le do chuntas — Tusa, agus na samhlacha IS a oibríonn ar do cheist",
         "Tacaíocht — Teachtaireachtaí a mhalartaíonn tú leis an gcúntóir tacaíochta nó le duine, stóráilte agus criptithe; an teanga a úsáideadh; ar cheadaigh tú don chúntóir stádas do dhíospóireachtaí a fheiceáil (ach ní a n-ábhar riamh); rátálacha a thugann tú. Má chuireann teachtaireacht rialuithe mí-úsáide i ngníomh, coinnímid hais den teachtaireacht agus hais den tseoladh IP ónar tháinig sí — Tusa",
         "Taifid ghlactha agus toilithe — Leagan agus hais inneachair na dTéarmaí ar ghlac tú leo agus an bheartais a taispeánadh duit; an t-am; an scáileán agus an sásra a úsáideadh; do theanga; do sheoladh IP agus do ghníomhaire úsáideora ag an nóiméad sin; gach toiliú a thug tú nó a tharraing tú siar agus cathain — Do bhrabhsálaí, tráth sínithe suas agus aon uair a athraíonn tú rogha",
-        "Íocaíochtaí (nuair a thosóidh pleananna íoctha) — Plean, praghas, tréimhse bhilleála, tagairtí idirbhirt, fianaise ar shuíomh cánach. Is é ár soláthraí íocaíochta, agus ní sinne riamh, a choinníonn sonraí cárta — Tusa, agus an soláthraí íocaíochta",
+        "Íocaíochtaí (nuair a thosóidh pleananna íoctha) — Plean, praghas, tréimhse bhilleála, tagairtí idirbhirt, fianaise ar shuíomh cánach. Na sonraí billeála a thugann tú agus tú ag íoc: d'ainm, d'uimhir theileafóin agus do sheoladh billeála agus, má cheannaíonn tú mar chuideachta, ainm, uimhir CBL agus seoladh na cuideachta; agus an seoladh IP óna n-íocann tú. Cuireann tú sonraí do chárta isteach ar leathanach ár soláthraí íocaíochta, agus dá bhrí sin ní shroicheann uimhir iomlán do chárta ná do chód slándála sinn riamh. Maidir le do chárta, coinnímid na ceithre dhigit dheireanacha, mí agus bliain a dháta éaga agus an tír inar eisíodh é — chun a aithint cén cárta lenar rinneadh íocaíocht, chun meabhrú duit sula rachaidh an cárta in éag agus chun rialacha na tíre sin a chur i bhfeidhm — agus, stóráilte agus criptithe, cód ón soláthraí íocaíochta a ligeann dó muirear a ghearradh ar an gcárta céanna ag gach athnuachan. Ar feadh 14 lá coinnímid freisin, criptithe, gach teachtaireacht a sheolann an soláthraí íocaíochta chugainn faoi íocaíocht, díreach mar a tháinig sí; taispeánann sí freisin na chéad digití d'uimhir an chárta, a shainaithníonn an banc a d'eisigh an cárta, agus ainm an bhainc sin — Tusa, agus an soláthraí íocaíochta",
         "Daoine nach úsáideoirí dár gcuid iad — Sonraí pearsanta faoi dhaoine eile a chuireann tú i do cheist, nó a ghineann an t-inneall agus é ag freagairt na ceiste. Iarraimid ort gan é seo a dhéanamh; mínítear i rannán 11 cad a dhéanaimid nuair a tharlaíonn sé mar sin féin — Tusa, go hindíreach"
         ]
       },
@@ -150,6 +150,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Comhráite agus cásanna tacaíochta — Go dtí go ndúnfar é, móide 12 mhí — Scriostar na heochracha",
         "Taifid ghlactha agus toilithe — Saolré an chuntais móide 6 bliana — an tréimhse theorann is faide a bhfuil feidhm aici maidir linn — Scriostar iad",
         "Taifid íocaíochta (nuair a thosóidh pleananna íoctha) — 10 mbliana, mar a cheanglaíonn dlí cuntasaíochta na Rómáine — Scriostar iad",
+        "Cárta sábháilte: cód an tsoláthraí íocaíochta, mar aon le ceithre dhigit dheireanacha, dáta éaga agus tír an chárta — Go dtí lá amháin tar éis don chárta scor d'íoc as plean gníomhach — nuair a chríochnaíonn an plean, nuair a chuireann tú cárta eile ina áit nó nuair a dhúnann tú do chuntas — Scriostar iad; fanann na ceithre dhigit dheireanacha, an dáta éaga agus an tír freisin sa taifead íocaíochta do gach íocaíocht a rinneadh leis an gcárta sin",
+        "Teachtaireachtaí an tsoláthraí íocaíochta faoi íocaíochtaí, mar a tháinig siad — 14 lá — Scriostar iad",
         "Cúltacaí — Suas le 8 seachtaine tar éis don chóip bheo a bheith scriosta — Forscríobhtar iad"
         ]
       },
@@ -258,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Nuair a athraímid an beartas seo, cuirimid an leagan nua ar fáil mar aon le hachoimre ar an méid a d'athraigh agus dáta nua teachta i bhfeidhm, agus coinnímid na leaganacha roimhe seo ag dezbatere.ro/privacy/versions. I gcás athraithe lena gcuirtear cuspóir nua nó faighteoir nua leis, insímid duit sula dtosaíonn an phróiseáil nua, trí ríomhphost agus sa táirge, agus tugaimid am duit agóid a dhéanamh. Sa chás ina mbraitheann cuspóir nua ar do thoiliú — mar shampla, dá mba mhian linn riamh ábhar a úsáid chun samhlacha a fheabhsú — iarraimid an toiliú sin ar leithligh agus go sonrach; ní chaithimid riamh le glacadh le Téarmaí nuashonraithe mar thoiliú le próiseáil nua. I gcás soiléirithe nach n-athraíonn aon ní faoin méid a dhéanaimid, ní dhéanaimid ach an leagan nua a fhoilsiú." },
-      { kind: "p", text: "Nuashonraíodh an beartas seo an uair dheireanach ar 12 Deireadh Fómhair 2026. Tháinig Leagan 3.4 in ionad leagan 3.3: deir rannán 13 anois go socraíonn an fianán debateai.locale freisin an teanga ina scríobhaimid na ríomhphost a sheolaimid chugat, agus cuireann sé paragraf leis a deir go gcoinníonn gach ríomhphost a chuirimid i scuaine duit an teanga a roghnaigh tú go dtí go seoltar é." }
+      { kind: "p", text: "Nuashonraíodh an beartas seo an uair dheireanach ar 12 Deireadh Fómhair 2026. Tháinig Leagan 3.5 in ionad leagan 3.4: deir rannán 2 anois cé na sonraí billeála agus cárta a choinnímid agus nach sroicheann uimhir iomlán do chárta sinn riamh, agus deir rannán 7 cá fhad a choinnímid cárta sábháilte agus teachtaireachtaí an tsoláthraí íocaíochta faoi íocaíochtaí." }
     ]
   },
   {
@@ -330,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.4",
-  sha256: "eef4f7f442c4558a24b3cbf7b2fefa0abe3c3ced2711b9e2bb1146dff511d18e",
-  eyebrow: "BEARTAS PRÍOBHÁIDEACHAIS · v3.4 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026",
+  version: "3.5",
+  sha256: "5a022913f96c97bface61fd618a2ebccadd1a4d3d15d7cfe31f45a5f59b4f556",
+  eyebrow: "BEARTAS PRÍOBHÁIDEACHAIS · v3.5 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026",
   title: "An méid a stórálaimid, agus an fáth",
   lede: "Do chearta agus ár n-oibleagáidí faoin GDPR (EU) 2016/679, i bhfriotal soiléir. Ceithre rannán déag agus Iarscríbhinn B — scrollaigh go dtí an deireadh.",
-  endMarker: "DEIREADH AN BHEARTAIS · GDPR (EU) 2016/679 · v3.4",
+  endMarker: "DEIREADH AN BHEARTAIS · GDPR (EU) 2016/679 · v3.5",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Téacs an Bheartais Príobháideachais",
   sectionIdPrefix: "policy-section-",

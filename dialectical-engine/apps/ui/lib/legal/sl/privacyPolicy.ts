@@ -56,7 +56,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Vsebina razprave — Vprašanje, ki ga vnesete; usmerjevalne opombe, ki jih nastavite; trditve, kritike, sklici na dokaze, ocene in razsodbe, ki jih ustvari sistem; dobesedni zapis odgovora vsakega ponudnika umetne inteligence; iskalne poizvedbe in sklici na vire. Vse to je shranjeno šifrirano s ključem, ki je poseben za vaš račun — Vi in modeli umetne inteligence, ki obravnavajo vaše vprašanje",
         "Podpora — Sporočila, ki jih izmenjate s pomočnikom za podporo ali osebo, shranjena šifrirano; uporabljeni jezik; ali ste pomočniku dovolili vpogled v stanje (nikoli v vsebino) svojih razprav; vaše ocene. Če sporočilo sproži ukrepe proti zlorabi, hranimo zgoščeno vrednost sporočila in zgoščeno vrednost naslova IP, s katerega je bilo poslano — Vi",
         "Evidence sprejetja in privolitev — Različica in zgoščena vrednost vsebine Pogojev, ki ste jih sprejeli, ter pravilnika, ki vam je bil prikazan; čas; uporabljeni zaslon in mehanizem; vaš jezik; vaš naslov IP in user-agent v tistem trenutku; vsaka privolitev, ki ste jo dali ali preklicali, in čas dogodka — Vaš brskalnik ob registraciji in ob vsaki spremembi izbire",
-        "Plačila (ko bodo na voljo plačljivi paketi) — Paket, cena, obračunsko obdobje, sklici transakcij, dokazila o davčni lokaciji. Podatke o kartici hrani naš ponudnik plačilnih storitev, mi pa nikoli — Vi in ponudnik plačilnih storitev",
+        "Plačila (ko bodo na voljo plačljivi paketi) — Paket, cena, obračunsko obdobje, sklici transakcij, dokazila o davčni lokaciji. Podatki za obračun, ki jih vnesete pri plačilu: vaše ime, telefonska številka in naslov za obračun ter, če kupujete kot podjetje, njegovo ime, identifikacijska številka za DDV in naslov; ter naslov IP, s katerega plačujete. Podatke o kartici vnesete na strani našega ponudnika plačilnih storitev, zato vaša celotna številka kartice in varnostna koda nikoli ne prideta do nas. Od podatkov o vaši kartici hranimo njene zadnje štiri števke, mesec in leto poteka veljavnosti ter državo, v kateri je bila izdana — da vemo, s katero kartico je bilo opravljeno plačilo, da vas opomnimo, preden kartica poteče, in da uporabimo pravila za to državo — ter šifrirano shranjeno kodo ponudnika plačilnih storitev, s katero lahko ta pri vsakem podaljšanju bremeni isto kartico. Poleg tega 14 dni hranimo, šifrirano, vsako sporočilo, ki nam ga ponudnik plačilnih storitev pošlje o plačilu, natanko takšno, kot je prispelo; vsebuje tudi prve števke številke kartice, ki identificirajo banko, ki je kartico izdala, in ime te banke — Vi in ponudnik plačilnih storitev",
         "Osebe, ki niso naši uporabniki — Osebni podatki o drugih osebah, ki jih vključite v vprašanje ali jih sistem ustvari pri odgovarjanju. Prosimo vas, da tega ne počnete; razdelek 11 pojasnjuje, kako ravnamo, če se to kljub temu zgodi — Vi, posredno"
         ]
       },
@@ -150,6 +150,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Pogovori in primeri podpore — Do zaprtja in še 12 mesecev — Ključi se uničijo",
         "Evidence sprejetja in privolitev — Življenjska doba računa in še 6 let — najdaljši zastaralni rok, ki velja za nas — Izbrišejo se",
         "Evidence plačil (ko bodo na voljo plačljivi paketi) — 10 let, kot zahteva romunska računovodska zakonodaja — Izbrišejo se",
+        "Shranjena kartica: koda ponudnika plačilnih storitev z zadnjimi štirimi števkami, datumom poteka veljavnosti in državo kartice — Do enega dne po tem, ko kartica preneha plačevati aktivni paket — ko se paket konča, ko kartico zamenjate ali ko zaprete račun — Izbrišejo se; zadnje štiri števke, datum poteka veljavnosti in država ostanejo tudi v evidenci vsakega plačila, opravljenega s to kartico",
+        "Sporočila ponudnika plačilnih storitev o plačilih, takšna, kot so prispela — 14 dni — Izbrišejo se",
         "Varnostne kopije — Do 8 tednov po izbrisu žive kopije — Prepišejo se"
         ]
       },
@@ -258,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Ko ta pravilnik spremenimo, objavimo novo različico s povzetkom sprememb in novim datumom začetka veljavnosti, prejšnje različice pa ohranimo na dezbatere.ro/privacy/versions. O spremembi, ki dodaja nov namen ali novega prejemnika, vas obvestimo po e-pošti in v izdelku pred začetkom nove obdelave ter vam damo čas za ugovor. Kadar je nov namen odvisen od vaše privolitve — na primer, če bi kadar koli želeli uporabiti vsebino za izboljševanje modelov — vas za to privolitev zaprosimo ločeno in posebej; sprejetja posodobljenih Pogojev nikoli ne obravnavamo kot privolitev za novo obdelavo. Pri pojasnilih, ki ničesar ne spremenijo glede našega ravnanja, preprosto objavimo novo različico." },
-      { kind: "p", text: "Ta pravilnik je bil nazadnje posodobljen 12. oktobra 2026. Različica 3.4 je nadomestila različico 3.3: razdelek 13 zdaj navaja, da piškotek debateai.locale poleg jezika vmesnika nastavlja tudi jezik e-poštnih sporočil, ki vam jih pošiljamo, in dodaja odstavek, da vsako e-poštno sporočilo, ki ga za vas postavimo v čakalno vrsto, ohrani jezik, ki ste ga izbrali, dokler ga ne pošljemo." }
+      { kind: "p", text: "Ta pravilnik je bil nazadnje posodobljen 12. oktobra 2026. Različica 3.5 je nadomestila različico 3.4: razdelek 2 zdaj navaja, katere podatke za obračun in katere podatke o kartici hranimo ter da vaša celotna številka kartice nikoli ne pride do nas, razdelek 7 pa navaja, kako dolgo hranimo shranjeno kartico in sporočila ponudnika plačilnih storitev o plačilih." }
     ]
   },
   {
@@ -330,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.4",
-  sha256: "18bfacf65269b27eac8a83af5d760cdf1c219f4f2fe4fa04c3874c459e7bd2cc",
-  eyebrow: "PRAVILNIK O ZASEBNOSTI · v3.4 · VELJA OD 12. OKTOBRA 2026",
+  version: "3.5",
+  sha256: "0a6607bf81ed5aa91c66f265f67420372ac2daf898491ef7013389d01fad1733",
+  eyebrow: "PRAVILNIK O ZASEBNOSTI · v3.5 · VELJA OD 12. OKTOBRA 2026",
   title: "Kaj hranimo in zakaj",
   lede: "Vaše pravice in naše obveznosti po GDPR (EU) 2016/679 v razumljivem jeziku. Štirinajst razdelkov in Priloga B — pomaknite se do konca.",
-  endMarker: "KONEC PRAVILNIKA · GDPR (EU) 2016/679 · v3.4",
+  endMarker: "KONEC PRAVILNIKA · GDPR (EU) 2016/679 · v3.5",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Besedilo pravilnika o zasebnosti",
   sectionIdPrefix: "policy-section-",

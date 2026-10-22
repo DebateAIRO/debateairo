@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: W skrócie
-eyebrow: POLITYKA PRYWATNOŚCI · v3.4 · OBOWIĄZUJE OD 12 PAŹDZIERNIKA 2026
+eyebrow: POLITYKA PRYWATNOŚCI · v3.5 · OBOWIĄZUJE OD 12 PAŹDZIERNIKA 2026
 title: Co przechowujemy i dlaczego
 lede: Twoje prawa i nasze obowiązki wynikające z RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679), wyjaśnione prostym językiem. Czternaście sekcji i załącznik B — przewiń do końca.
-endMarker: KONIEC POLITYKI · RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679) · v3.4
+endMarker: KONIEC POLITYKI · RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679) · v3.5
 bodyLabel: Tekst Polityki prywatności
 annexTitle: Załącznik B — Regionalne warunki prywatności
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 PLIKI COOKIE
 -->
 
-**Version 3.4 · Effective 12 października 2026 · Poprzednie wersje na dezbatere.ro/privacy/versions · Administrator: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.5 · Effective 12 października 2026 · Poprzednie wersje na dezbatere.ro/privacy/versions · Administrator: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Gromadzimy dane potrzebne do działania konta oraz treści, które zdecydujesz się wpisać. Twoje pytania trafiają do dostawców AI wymienionych w naszym Rejestrze; nie są wykorzystywane do trenowania modeli. Nasz dostawca hostingu przechowuje Twoje konto i Twoje debaty w Londynie, w Zjednoczonym Królestwie; sekcja 5 wskazuje, dokąd jeszcze trafiają Twoje dane. Debaty są prywatne, chyba że je opublikujesz. Usunięcie konta niszczy klucze do Twoich prywatnych danych; planując usunięcie, wybierasz, czy opublikowane debaty również zostaną wycofane, czy pozostaną publiczne pod Twoim wycofanym pseudonimem. Możesz skontaktować się z nami pod adresem privacy@dezbatere.ro, a osoby wymienione w debacie mogą zażądać jej usunięcia bez posiadania konta.
 
@@ -43,7 +43,7 @@ Gromadzimy wyłącznie dane potrzebne do działania konta, dane, które zdecyduj
 | **Treść debaty** | Wpisane przez Ciebie pytanie; ustawione przez Ciebie adnotacje sterujące; twierdzenia, krytyki, odwołania do dowodów, wyniki i werdykty generowane przez silnik; dosłowny zapis odpowiedzi każdego dostawcy AI; zapytania wyszukiwania i odwołania do źródeł. Wszystko to jest przechowywane w postaci zaszyfrowanej przy użyciu klucza właściwego dla Twojego konta | Ty oraz modele AI pracujące nad Twoim pytaniem |
 | **Wsparcie** | Wiadomości wymieniane z asystentem wsparcia lub człowiekiem, przechowywane w postaci zaszyfrowanej; używany język; informacja, czy zezwolono asystentowi na wgląd w status (nigdy w treść) Twoich debat; wystawione przez Ciebie oceny. Jeśli wiadomość uruchomi mechanizmy kontroli nadużyć, zachowujemy skrót wiadomości oraz skrót adresu IP, z którego ją wysłano | Ty |
 | **Rejestry akceptacji i zgód** | Wersja i skrót treści zaakceptowanych Warunków świadczenia usług oraz polityki, którą Ci przedstawiono; czas; użyty ekran i mechanizm; Twój język; Twój adres IP i user-agent w tej chwili; każda udzielona lub wycofana zgoda oraz chwila jej udzielenia lub wycofania | Twoja przeglądarka, podczas rejestracji i przy każdej zmianie wyboru |
-| **Płatności** (po uruchomieniu planów płatnych) | Plan, cena, okres rozliczeniowy, odwołania do transakcji, dowody lokalizacji podatkowej. Dane karty przechowuje nasz dostawca płatności, nigdy my | Ty i dostawca płatności |
+| **Płatności** (po uruchomieniu planów płatnych) | Plan, cena, okres rozliczeniowy, odwołania do transakcji, dowody lokalizacji podatkowej. Dane rozliczeniowe, które podajesz podczas płatności: Twoje imię i nazwisko, numer telefonu i adres rozliczeniowy, a jeśli kupujesz jako firma, jej nazwa, numer VAT i adres; a także adres IP, z którego płacisz. Dane karty wpisujesz na stronie naszego dostawcy płatności, więc pełny numer Twojej karty i kod zabezpieczający nigdy do nas nie trafiają. Z danych Twojej karty przechowujemy jej cztery ostatnie cyfry, miesiąc i rok ważności oraz kraj, w którym została wydana — aby wiedzieć, którą kartą dokonano płatności, przypomnieć Ci o tym, zanim karta straci ważność, i stosować przepisy właściwe dla tego kraju — a także przechowywany w postaci zaszyfrowanej kod od dostawcy płatności, który pozwala mu obciążać tę samą kartę przy każdym odnowieniu. Przez 14 dni przechowujemy też, w postaci zaszyfrowanej, każdą wiadomość, którą dostawca płatności przesyła nam w sprawie płatności, dokładnie w takiej postaci, w jakiej do nas dotarła; widać w niej również pierwsze cyfry numeru karty, pozwalające ustalić bank, który wydał kartę, oraz nazwę tego banku | Ty i dostawca płatności |
 | **Osoby, które nie są naszymi użytkownikami** | Dane osobowe innych osób zamieszczone przez Ciebie w pytaniu lub wygenerowane przez silnik w odpowiedzi. Prosimy, aby tego nie robić; sekcja 11 wyjaśnia, co robimy, gdy mimo to do tego dojdzie | Ty, pośrednio |
 
 Podczas rejestracji sprawdzamy kraj adresu IP lokalnie za pomocą DB-IP Lite i listy adresów wyjściowych Tor; nie wysyłamy adresu do zewnętrznego dostawcy. Odmawiamy rejestracji z krajów, w których usługa jest niedostępna, z Tor i z adresów o nieznanym kraju. Przed rozpoczęciem każdej nowej debaty sprawdzamy też lokalnie kraj adresu IP i możemy odmówić, jeśli znajduje się on na liście krajów zawsze blokowanych. Podajesz datę urodzenia wyłącznie do sprawdzenia wieku: nie zapisujemy jej. Zapis wieku przy pomyślnej rejestracji oznacza „pozytywny”; w przypadku istniejących kont może też oznaczać „negatywny”. Wybierasz kraj zamieszkania, a w USA również stan, abyśmy mogli stosować właściwe przepisy konsumenckie, dotyczące prywatności i podatków.
@@ -126,6 +126,8 @@ Gdy planujesz usunięcie konta, wybierasz, co stanie się z opublikowanymi przez
 | Rozmowy i sprawy dotyczące wsparcia | Do zamknięcia sprawy plus 12 miesięcy | Klucze zostają zniszczone |
 | Rejestry akceptacji i zgód | Przez okres istnienia konta oraz 6 lat — najdłuższy mający do nas zastosowanie termin przedawnienia | Zostają usunięte |
 | Rejestry płatności (po uruchomieniu planów płatnych) | 10 lat, zgodnie z wymogami rumuńskiego prawa rachunkowego | Zostają usunięte |
+| Zapisana karta: kod dostawcy płatności wraz z czterema ostatnimi cyframi karty, datą ważności i krajem | Do upływu jednego dnia od chwili, gdy karta przestanie służyć do opłacania aktywnego planu — gdy plan się zakończy, wymienisz kartę lub zamkniesz konto | Zostają usunięte; cztery ostatnie cyfry, data ważności i kraj pozostają również w rejestrze każdej płatności dokonanej tą kartą |
+| Wiadomości dostawcy płatności dotyczące płatności, w postaci, w jakiej dotarły | 14 dni | Zostają usunięte |
 | Kopie zapasowe | Do 8 tygodni od usunięcia kopii aktywnej | Zostają nadpisane |
 
 **Co faktycznie powoduje usunięcie.** Twoje prywatne debaty i dane konta są szyfrowane przy użyciu kluczy właściwych dla Twojego konta i każdej debaty. Usunięcie konta niszczy te klucze, po czym zaszyfrowane rekordy nie mogą zostać odczytane przez nas ani nikogo innego, a my usuwamy rekord Twojego konta. Klucz publicznej kopii opublikowanej debaty zostaje zniszczony podczas usuwania konta tylko wtedy, gdy zaznaczysz „Usuń również moje publiczne debaty” (punkt 6). Opisujemy to jako usunięcie, ponieważ taki jest jego skutek, i dysponujemy udokumentowaną oceną uzasadniającą to określenie; jeśli chcesz dowiedzieć się więcej, zapytaj. Należy wiedzieć o trzech rzeczach: dziennik audytu bezpieczeństwa pozwala wyłącznie na dopisywanie i nie jest usuwany, lecz nie zawiera czytelnych identyfikatorów dotyczących Ciebie; niewielka liczba starszych debat powstała przed wprowadzeniem obecnego schematu szyfrowania, a jeśli dotyczy to Twojego konta, informujemy Cię, jaki skutek ma dla nich jego zamknięcie; kopie danych już wysłanych dostawcy AI podlegają natomiast warunkom przechowywania tego dostawcy podanym w Rejestrze, a nie naszemu procesowi usuwania.
@@ -213,7 +215,7 @@ Aby odmówić tych elementów, zablokuj lub usuń pliki cookie i dane witryny dl
 
 Gdy zmieniamy niniejszą politykę, publikujemy nową wersję wraz z podsumowaniem zmian i nową datą wejścia w życie, a poprzednie wersje zachowujemy pod adresem dezbatere.ro/privacy/versions. O zmianie wprowadzającej nowy cel lub nowego odbiorcę informujemy Cię przed rozpoczęciem nowego przetwarzania, pocztą elektroniczną i w produkcie, oraz zapewniamy czas na wniesienie sprzeciwu. Jeżeli nowy cel zależy od Twojej zgody — na przykład gdybyśmy kiedykolwiek chcieli wykorzystać treści do ulepszania modeli — prosimy o tę zgodę osobno i w sposób konkretny; nigdy nie traktujemy akceptacji zaktualizowanych Warunków świadczenia usług jako zgody na nowe przetwarzanie. W przypadku wyjaśnień, które nie zmieniają naszych działań, po prostu publikujemy nową wersję.
 
-Niniejsza polityka została ostatnio zaktualizowana 12 października 2026. Wersja 3.4 zastąpiła wersję 3.3: sekcja 13 mówi teraz, że plik cookie debateai.locale ustawia także język, w którym piszemy wiadomości e-mail, które wysyłamy, oraz zawiera akapit o tym, że każda wiadomość e-mail, którą dla Ciebie umieszczamy w kolejce, zachowuje język wybrany wcześniej przez Ciebie, aż do chwili jej wysłania.
+Niniejsza polityka została ostatnio zaktualizowana 12 października 2026. Wersja 3.5 zastąpiła wersję 3.4: sekcja 2 mówi teraz, jakie dane rozliczeniowe i dane karty przechowujemy oraz że pełny numer Twojej karty nigdy do nas nie trafia, a sekcja 7 mówi, jak długo przechowujemy zapisaną kartę i wiadomości dostawcy płatności dotyczące płatności.
 
 ## Annex B — Regionalne warunki prywatności
 

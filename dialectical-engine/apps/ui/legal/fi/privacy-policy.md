@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lyhyesti
-eyebrow: TIETOSUOJAKÄYTÄNTÖ · v3.4 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN
+eyebrow: TIETOSUOJAKÄYTÄNTÖ · v3.5 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN
 title: Mitä säilytämme ja miksi
 lede: Oikeutesi ja velvollisuutemme GDPR (EU) 2016/679 -asetuksen nojalla selkeällä kielellä. Neljätoista osiota ja liite B — vieritä loppuun asti.
-endMarker: TIETOSUOJAKÄYTÄNNÖN LOPPU · GDPR (EU) 2016/679 · v3.4
+endMarker: TIETOSUOJAKÄYTÄNNÖN LOPPU · GDPR (EU) 2016/679 · v3.5
 bodyLabel: Tietosuojakäytännön teksti
 annexTitle: Liite B — Alueelliset tietosuojaehdot
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 EVÄSTEET
 -->
 
-**Version 3.4 · Effective 12. lokakuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/privacy/versions · Rekisterinpitäjä: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.5 · Effective 12. lokakuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/privacy/versions · Rekisterinpitäjä: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Keräämme tilin toimintaan tarvittavat tiedot sekä sen, mitä itse päätät kirjoittaa. Kysymyksesi lähetetään Rekisterissämme luetelluille tekoälypalveluntarjoajille; niitä ei käytetä mallien kouluttamiseen. Säilytyspalveluntarjoajamme säilyttää tilisi ja väittelysi Lontoossa, Yhdistyneessä kuningaskunnassa; osiossa 5 kerrotaan, minne tietosi muuten päätyvät. Väittelyt ovat yksityisiä, ellet julkaise niitä. Tilisi poistaminen tuhoaa yksityisten tietojesi avaimet; kun ajastat poiston, valitset, poistetaanko myös julkaistut väittelysi näkyvistä vai pysyvätkö ne julkisina käytöstä poistetulla salanimelläsi. Voit ottaa meihin yhteyttä osoitteessa privacy@dezbatere.ro, ja väittelyssä nimetyt henkilöt voivat pyytää sisällön poistamista ilman tiliä.
 
@@ -43,7 +43,7 @@ Keräämme vain tilin toimintaan tarvittavat tiedot, tiedot, jotka päätät ant
 | **Väittelyn sisältö** | Kirjoittamasi kysymys; asettamasi ohjaavat huomautukset; väitteet, kritiikit, todistusaineistoviitteet, pisteet ja ratkaisut, jotka järjestelmä tuottaa; sanatarkka tallenne kunkin tekoälypalveluntarjoajan vastauksesta; hakukyselyt ja lähdeviitteet. Kaikki nämä säilytetään salattuina tilillesi ominaisella avaimella | Sinulta ja kysymystäsi käsitteleviltä tekoälymalleilta |
 | **Tuki** | Tukiohjelmiston tai henkilön kanssa vaihtamasi viestit, jotka säilytetään salattuina; käytetty kieli; annoitko tukiohjelmistolle luvan nähdä väittelyjesi tilan (ei koskaan niiden sisältöä); antamasi arviot. Jos viesti laukaisee väärinkäytön torjunnan, säilytämme viestin tiivisteen ja sen lähettämiseen käytetyn IP-osoitteen tiivisteen | Sinulta |
 | **Hyväksyntä- ja suostumustiedot** | Hyväksymiesi Ehtojen versio ja sisällön tiiviste sekä sinulle näytetty käytäntö; ajankohta; käytetty näkymä ja menetelmä; kielesi; kyseisen hetken IP-osoitteesi ja user-agent; jokainen antamasi tai peruuttamasi suostumus ja sen ajankohta | Selaimeltasi rekisteröitymisen yhteydessä ja aina, kun muutat valintaa |
-| **Maksut** (kun maksulliset tilaukset alkavat) | Tilaus, hinta, laskutuskausi, maksutapahtumaviitteet, näyttö verotuksellisesta sijainnista. Korttitiedot ovat maksupalveluntarjoajamme hallussa, eivät koskaan meidän | Sinulta ja maksupalveluntarjoajalta |
+| **Maksut** (kun maksulliset tilaukset alkavat) | Tilaus, hinta, laskutuskausi, maksutapahtumaviitteet, näyttö verotuksellisesta sijainnista. Kassalla antamasi laskutustiedot: nimesi, puhelinnumerosi ja laskutusosoitteesi sekä, jos ostat yrityksenä, yrityksen nimi, ALV-numero ja osoite; sekä IP-osoite, josta maksat. Syötät korttitietosi maksupalveluntarjoajamme sivulla, joten korttisi koko numero ja turvakoodi eivät koskaan päädy meille. Kortistasi säilytämme sen neljä viimeistä numeroa, voimassaolon päättymiskuukauden ja -vuoden sekä maan, jossa kortti on myönnetty — jotta tiedämme, millä kortilla maksu on suoritettu, voimme muistuttaa sinua ennen kortin vanhenemista ja voimme soveltaa kyseisen maan sääntöjä — sekä salattuna säilytettävän maksupalveluntarjoajalta saadun koodin, jonka avulla se voi veloittaa samaa korttia jokaisen uusimisen yhteydessä. Säilytämme lisäksi 14 päivän ajan salattuna jokaisen viestin, jonka maksupalveluntarjoaja lähettää meille maksusta, täsmälleen sellaisena kuin se saapui; siinä näkyvät myös kortin numeron ensimmäiset numerot, jotka yksilöivät kortin myöntäneen pankin, sekä tämän pankin nimi | Sinulta ja maksupalveluntarjoajalta |
 | **Henkilöt, jotka eivät ole käyttäjiämme** | Muita henkilöitä koskevat henkilötiedot, jotka sisällytät kysymykseen tai jotka järjestelmä tuottaa siihen vastatessaan. Pyydämme, ettet tee näin; osiossa 11 selitetään, mitä teemme, jos näin kuitenkin tapahtuu | Sinulta välillisesti |
 
 Rekisteröityessä tarkistamme IP-osoitteesi maan paikallisesti ja hylkäämme rekisteröinnit maista, joissa palvelua ei tarjota, Tor-poistumisosoitteista sekä osoitteista, joiden maata ei tunneta. Emme lähetä IP-osoitetta kolmannelle osapuolelle tätä tarkistusta varten. Käytämme syntymäaikaasi iän tarkistamiseen tallentamatta sitä; ilmoitat myös asuinmaasi ja tarvittaessa Yhdysvaltain osavaltiosi. Jokaisen uuden väittelyn alkaessa tarkistamme myös IP-osoitteen maan paikallisesti ja voimme estää väittelyn, jos maa on pysyvästi estetty; Tor-osoitteiden ja tuntemattomien maiden torjunta koskee rekisteröitymistä.
@@ -126,6 +126,8 @@ Kun ajoitat tilisi poistamisen, valitset, mitä julkaisemillesi väittelyille ta
 | Tukikeskustelut ja -tapaukset | Sulkemiseen asti sekä 12 kuukautta | Avaimet tuhotaan |
 | Hyväksyntä- ja suostumustiedot | Tilin elinkaari sekä 6 vuotta — pisin meihin sovellettava vanhentumisaika | Poistetaan |
 | Maksutiedot (kun maksulliset tilaukset alkavat) | 10 vuotta Romanian kirjanpitolainsäädännön edellyttämällä tavalla | Poistetaan |
+| Tallennettu kortti: maksupalveluntarjoajan koodi sekä kortin neljä viimeistä numeroa, voimassaolon päättymisaika ja maa | Kunnes on kulunut yksi päivä siitä, kun kortilla ei enää makseta voimassa olevaa tilausta — kun tilaus päättyy, vaihdat kortin tai suljet tilisi | Poistetaan; neljä viimeistä numeroa, voimassaolon päättymisaika ja maa säilyvät myös jokaisen kyseisellä kortilla suoritetun maksun maksutiedoissa |
+| Maksupalveluntarjoajan maksuja koskevat viestit sellaisina kuin ne saapuivat | 14 päivää | Poistetaan |
 | Varmuuskopiot | Enintään 8 viikkoa aktiivisen kopion poistamisen jälkeen | Korvataan uusilla tiedoilla |
 
 **Mitä poistaminen tosiasiassa tekee.** Yksityiset väittelysi ja tilitietosi salataan tilillesi ja kullekin väittelylle ominaisilla avaimilla. Tilisi poistaminen tuhoaa nämä avaimet, minkä jälkeen me tai kukaan muukaan ei voi lukea salattuja tietueita, ja poistamme tilitietueesi. Julkaistun väittelyn julkisen kopion avain tuhotaan tilin poiston yhteydessä vain, jos valitsit kohdan "Poista myös julkiset väittelyni" (kohta 6). Kutsumme tätä poistamiseksi, koska sen vaikutus on tämä, ja meillä on sen tueksi dokumentoitu arviointi; jos haluat lisätietoja, kysy meiltä. Kolme huomioitavaa asiaa: turvallisuuden kirjausketju on vain lisäyksiä salliva eikä sitä poisteta, mutta se ei sisällä luettavia tunnistetietojasi; pieni määrä vanhempia väittelyjä edeltää nykyistä salausjärjestelmäämme, ja jos tämä koskee tiliäsi, kerromme, mitä tilin sulkeminen niiden osalta saa aikaan; ja tekoälypalveluntarjoajalle jo lähetettyihin tietokopioihin sovelletaan kyseisen palveluntarjoajan Rekisterissä ilmoitettuja säilytysehtoja, ei meidän tekemäämme poistamista.
@@ -213,7 +215,7 @@ Voit kieltäytyä näistä kohteista estämällä tai poistamalla tämän sivust
 
 Kun muutamme tätä käytäntöä, julkaisemme uuden version, yhteenvedon muutoksista ja uuden voimaantulopäivän sekä säilytämme aiemmat versiot osoitteessa dezbatere.ro/privacy/versions. Jos muutos lisää uuden tarkoituksen tai uuden vastaanottajan, ilmoitamme sinulle sähköpostitse ja tuotteessa ennen uuden käsittelyn aloittamista ja annamme aikaa vastustaa sitä. Jos uusi tarkoitus perustuu suostumukseesi — esimerkiksi jos joskus haluaisimme käyttää sisältöä mallien parantamiseen — pyydämme suostumuksen erikseen ja yksilöidysti; emme koskaan pidä päivitettyjen Ehtojen hyväksymistä suostumuksena uuteen käsittelyyn. Jos selvennykset eivät muuta toimintaamme, julkaisemme vain uuden version.
 
-Tämä käytäntö päivitettiin viimeksi 12. lokakuuta 2026. Versio 3.4 korvasi version 3.3: osiossa 13 kerrotaan nyt, että eväste debateai.locale määrää myös sen kielen, jolla kirjoitamme lähettämämme sähköpostit, ja siihen on lisätty kappale, jonka mukaan jokainen sinulle jonoon asetettu sähköposti säilyttää valitsemasi kielen, kunnes lähetämme sen.
+Tämä käytäntö päivitettiin viimeksi 12. lokakuuta 2026. Versio 3.5 korvasi version 3.4: osiossa 2 kerrotaan nyt, mitä laskutus- ja korttitietoja säilytämme ja että korttisi koko numero ei koskaan päädy meille, ja osiossa 7 kerrotaan, kuinka kauan säilytämme tallennetun kortin ja maksupalveluntarjoajan maksuja koskevat viestit.
 
 ## Annex B — Alueelliset tietosuojaehdot
 

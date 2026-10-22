@@ -56,7 +56,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Conținutul dezbaterii — Întrebarea introdusă; indicațiile de orientare stabilite; susținerile, criticile, trimiterile la dovezi, punctajele și verdictele generate de motor; o înregistrare textuală exactă a răspunsului fiecărui furnizor de IA; interogările de regăsire și referințele la surse. Toate acestea sunt stocate criptat cu o cheie specifică contului dumneavoastră — Dumneavoastră și modelele de IA care lucrează la întrebarea dumneavoastră",
         "Asistență — Mesajele schimbate cu asistentul de suport sau cu o persoană, stocate criptat; limba folosită; dacă ați permis asistentului să vadă starea (niciodată conținutul) dezbaterilor; evaluările acordate. Dacă un mesaj declanșează controalele împotriva abuzurilor, păstrăm un hash al mesajului și un hash al adresei IP de la care a provenit — Dumneavoastră",
         "Evidențe privind acceptarea și consimțământul — Versiunea și hash-ul conținutului Termenilor acceptați și al politicii care v-a fost prezentată; momentul; ecranul și mecanismul utilizate; limba dumneavoastră; adresa IP și user-agent-ul din acel moment; fiecare consimțământ acordat sau retras și data acestuia — Browserul dumneavoastră, la înregistrare și ori de câte ori modificați o opțiune",
-        "Plăți (odată ce încep planurile cu plată) — Planul, prețul, perioada de facturare, referințele tranzacției, dovezile privind localizarea fiscală. Datele cardului sunt deținute de furnizorul nostru de plăți, niciodată de noi — Dumneavoastră și furnizorul de plăți",
+        "Plăți (odată ce încep planurile cu plată) — Planul, prețul, perioada de facturare, referințele tranzacției, dovezile privind localizarea fiscală. Datele de facturare pe care le introduceți la plată: numele, numărul de telefon și adresa de facturare, iar dacă cumpărați în numele unei firme, denumirea, codul de TVA și adresa acesteia; adresa IP de la care plătiți. Datele cardului le introduceți pe pagina furnizorului nostru de plăți, așa că numărul complet al cardului și codul de securitate nu ajung niciodată la noi. Din datele cardului păstrăm ultimele patru cifre, luna și anul expirării și țara în care a fost emis — pentru a ști cu ce card s-a făcut o plată, pentru a vă anunța înainte să expire cardul și pentru a aplica regulile acelei țări — precum și, criptat, un cod primit de la furnizorul de plăți, cu care acesta poate debita același card la fiecare reînnoire. Timp de 14 zile păstrăm, tot criptat, fiecare mesaj pe care furnizorul de plăți ni-l trimite despre o plată, exact așa cum a sosit; mesajul conține și primele cifre ale numărului cardului, care identifică banca emitentă, precum și numele acestei bănci — Dumneavoastră și furnizorul de plăți",
         "Persoane care nu sunt utilizatorii noștri — Date cu caracter personal despre alte persoane pe care le includeți într-o întrebare sau pe care motorul le generează atunci când răspunde. Vă solicităm să nu faceți acest lucru; secțiunea 11 explică ce facem dacă totuși se întâmplă — Dumneavoastră, indirect"
         ]
       },
@@ -150,6 +150,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Conversații și cazuri de asistență — Până la închidere, plus 12 luni — Cheile sunt distruse",
         "Evidențe privind acceptarea și consimțământul — Durata de viață a contului plus 6 ani — cel mai lung termen de prescripție care ni se aplică — Șterse",
         "Evidențe de plată (odată ce încep planurile cu plată) — 10 ani, conform cerințelor legislației contabile române — Șterse",
+        "Cardul salvat: codul furnizorului de plăți, cu ultimele patru cifre, data expirării și țara cardului — Până la o zi după ce cardul nu mai plătește un plan activ — când planul se încheie, înlocuiți cardul sau vă închideți contul — Șterse; ultimele patru cifre, data expirării și țara rămân și în evidența fiecărei plăți făcute cu acel card",
+        "Mesajele furnizorului de plăți despre plăți, așa cum au sosit — 14 zile — Șterse",
         "Copii de siguranță — Până la 8 săptămâni după ștergerea copiei active — Suprascrise"
         ]
       },
@@ -258,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Când modificăm această politică, publicăm noua versiune împreună cu un rezumat al modificărilor și o nouă dată de intrare în vigoare și păstrăm versiunile anterioare la dezbatere.ro/privacy/versions. Pentru o modificare care adaugă un scop sau un destinatar nou, vă informăm prin e-mail și în produs înainte de începerea noii prelucrări și vă acordăm timp pentru a vă opune. Dacă un scop nou depinde de consimțământul dumneavoastră — de exemplu, dacă am dori vreodată să folosim conținutul pentru îmbunătățirea modelelor — solicităm consimțământul separat și specific; nu considerăm niciodată acceptarea Termenilor actualizați drept consimțământ pentru o prelucrare nouă. Pentru clarificări care nu schimbă nimic din ceea ce facem, publicăm pur și simplu noua versiune." },
-      { kind: "p", text: "Această politică a fost actualizată ultima dată la 12 octombrie 2026. Versiunea 3.4 a înlocuit versiunea 3.3: secțiunea 13 spune acum că modulul cookie debateai.locale stabilește și limba în care vă trimitem e-mailurile, iar un paragraf nou arată că fiecare e-mail pus în coadă pentru dumneavoastră păstrează limba selectată până la trimitere." }
+      { kind: "p", text: "Această politică a fost actualizată ultima dată la 12 octombrie 2026. Versiunea 3.5 a înlocuit versiunea 3.4: secțiunea 2 spune acum ce date de facturare și ce date ale cardului păstrăm și că numărul complet al cardului nu ajunge niciodată la noi, iar secțiunea 7 spune cât timp păstrăm un card salvat și mesajele furnizorului de plăți despre plăți." }
     ]
   },
   {
@@ -330,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.4",
-  sha256: "a56e4146475064a6e6c6d62208ffba6400023c6eaae233261569bd6739ead811",
-  eyebrow: "POLITICA DE CONFIDENȚIALITATE · v3.4 · ÎN VIGOARE DE LA 12 OCTOMBRIE 2026",
+  version: "3.5",
+  sha256: "999d5660c2f2cb684b618c357d50bc1405ebdcf6f1753905628d576fde474cd3",
+  eyebrow: "POLITICA DE CONFIDENȚIALITATE · v3.5 · ÎN VIGOARE DE LA 12 OCTOMBRIE 2026",
   title: "Ce stocăm și de ce",
   lede: "Drepturile dumneavoastră și obligațiile noastre în temeiul GDPR (EU) 2016/679, într-un limbaj clar. Paisprezece secțiuni și Anexa B — derulați până la final.",
-  endMarker: "SFÂRȘITUL POLITICII · GDPR (EU) 2016/679 · v3.4",
+  endMarker: "SFÂRȘITUL POLITICII · GDPR (EU) 2016/679 · v3.5",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Textul Politicii de confidențialitate",
   sectionIdPrefix: "policy-section-",

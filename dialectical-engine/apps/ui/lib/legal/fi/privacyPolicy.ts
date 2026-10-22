@@ -56,7 +56,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Väittelyn sisältö — Kirjoittamasi kysymys; asettamasi ohjaavat huomautukset; väitteet, kritiikit, todistusaineistoviitteet, pisteet ja ratkaisut, jotka järjestelmä tuottaa; sanatarkka tallenne kunkin tekoälypalveluntarjoajan vastauksesta; hakukyselyt ja lähdeviitteet. Kaikki nämä säilytetään salattuina tilillesi ominaisella avaimella — Sinulta ja kysymystäsi käsitteleviltä tekoälymalleilta",
         "Tuki — Tukiohjelmiston tai henkilön kanssa vaihtamasi viestit, jotka säilytetään salattuina; käytetty kieli; annoitko tukiohjelmistolle luvan nähdä väittelyjesi tilan (ei koskaan niiden sisältöä); antamasi arviot. Jos viesti laukaisee väärinkäytön torjunnan, säilytämme viestin tiivisteen ja sen lähettämiseen käytetyn IP-osoitteen tiivisteen — Sinulta",
         "Hyväksyntä- ja suostumustiedot — Hyväksymiesi Ehtojen versio ja sisällön tiiviste sekä sinulle näytetty käytäntö; ajankohta; käytetty näkymä ja menetelmä; kielesi; kyseisen hetken IP-osoitteesi ja user-agent; jokainen antamasi tai peruuttamasi suostumus ja sen ajankohta — Selaimeltasi rekisteröitymisen yhteydessä ja aina, kun muutat valintaa",
-        "Maksut (kun maksulliset tilaukset alkavat) — Tilaus, hinta, laskutuskausi, maksutapahtumaviitteet, näyttö verotuksellisesta sijainnista. Korttitiedot ovat maksupalveluntarjoajamme hallussa, eivät koskaan meidän — Sinulta ja maksupalveluntarjoajalta",
+        "Maksut (kun maksulliset tilaukset alkavat) — Tilaus, hinta, laskutuskausi, maksutapahtumaviitteet, näyttö verotuksellisesta sijainnista. Kassalla antamasi laskutustiedot: nimesi, puhelinnumerosi ja laskutusosoitteesi sekä, jos ostat yrityksenä, yrityksen nimi, ALV-numero ja osoite; sekä IP-osoite, josta maksat. Syötät korttitietosi maksupalveluntarjoajamme sivulla, joten korttisi koko numero ja turvakoodi eivät koskaan päädy meille. Kortistasi säilytämme sen neljä viimeistä numeroa, voimassaolon päättymiskuukauden ja -vuoden sekä maan, jossa kortti on myönnetty — jotta tiedämme, millä kortilla maksu on suoritettu, voimme muistuttaa sinua ennen kortin vanhenemista ja voimme soveltaa kyseisen maan sääntöjä — sekä salattuna säilytettävän maksupalveluntarjoajalta saadun koodin, jonka avulla se voi veloittaa samaa korttia jokaisen uusimisen yhteydessä. Säilytämme lisäksi 14 päivän ajan salattuna jokaisen viestin, jonka maksupalveluntarjoaja lähettää meille maksusta, täsmälleen sellaisena kuin se saapui; siinä näkyvät myös kortin numeron ensimmäiset numerot, jotka yksilöivät kortin myöntäneen pankin, sekä tämän pankin nimi — Sinulta ja maksupalveluntarjoajalta",
         "Henkilöt, jotka eivät ole käyttäjiämme — Muita henkilöitä koskevat henkilötiedot, jotka sisällytät kysymykseen tai jotka järjestelmä tuottaa siihen vastatessaan. Pyydämme, ettet tee näin; osiossa 11 selitetään, mitä teemme, jos näin kuitenkin tapahtuu — Sinulta välillisesti"
         ]
       },
@@ -150,6 +150,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Tukikeskustelut ja -tapaukset — Sulkemiseen asti sekä 12 kuukautta — Avaimet tuhotaan",
         "Hyväksyntä- ja suostumustiedot — Tilin elinkaari sekä 6 vuotta — pisin meihin sovellettava vanhentumisaika — Poistetaan",
         "Maksutiedot (kun maksulliset tilaukset alkavat) — 10 vuotta Romanian kirjanpitolainsäädännön edellyttämällä tavalla — Poistetaan",
+        "Tallennettu kortti: maksupalveluntarjoajan koodi sekä kortin neljä viimeistä numeroa, voimassaolon päättymisaika ja maa — Kunnes on kulunut yksi päivä siitä, kun kortilla ei enää makseta voimassa olevaa tilausta — kun tilaus päättyy, vaihdat kortin tai suljet tilisi — Poistetaan; neljä viimeistä numeroa, voimassaolon päättymisaika ja maa säilyvät myös jokaisen kyseisellä kortilla suoritetun maksun maksutiedoissa",
+        "Maksupalveluntarjoajan maksuja koskevat viestit sellaisina kuin ne saapuivat — 14 päivää — Poistetaan",
         "Varmuuskopiot — Enintään 8 viikkoa aktiivisen kopion poistamisen jälkeen — Korvataan uusilla tiedoilla"
         ]
       },
@@ -258,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Kun muutamme tätä käytäntöä, julkaisemme uuden version, yhteenvedon muutoksista ja uuden voimaantulopäivän sekä säilytämme aiemmat versiot osoitteessa dezbatere.ro/privacy/versions. Jos muutos lisää uuden tarkoituksen tai uuden vastaanottajan, ilmoitamme sinulle sähköpostitse ja tuotteessa ennen uuden käsittelyn aloittamista ja annamme aikaa vastustaa sitä. Jos uusi tarkoitus perustuu suostumukseesi — esimerkiksi jos joskus haluaisimme käyttää sisältöä mallien parantamiseen — pyydämme suostumuksen erikseen ja yksilöidysti; emme koskaan pidä päivitettyjen Ehtojen hyväksymistä suostumuksena uuteen käsittelyyn. Jos selvennykset eivät muuta toimintaamme, julkaisemme vain uuden version." },
-      { kind: "p", text: "Tämä käytäntö päivitettiin viimeksi 12. lokakuuta 2026. Versio 3.4 korvasi version 3.3: osiossa 13 kerrotaan nyt, että eväste debateai.locale määrää myös sen kielen, jolla kirjoitamme lähettämämme sähköpostit, ja siihen on lisätty kappale, jonka mukaan jokainen sinulle jonoon asetettu sähköposti säilyttää valitsemasi kielen, kunnes lähetämme sen." }
+      { kind: "p", text: "Tämä käytäntö päivitettiin viimeksi 12. lokakuuta 2026. Versio 3.5 korvasi version 3.4: osiossa 2 kerrotaan nyt, mitä laskutus- ja korttitietoja säilytämme ja että korttisi koko numero ei koskaan päädy meille, ja osiossa 7 kerrotaan, kuinka kauan säilytämme tallennetun kortin ja maksupalveluntarjoajan maksuja koskevat viestit." }
     ]
   },
   {
@@ -330,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.4",
-  sha256: "4a0ef9970edb58dc0a0aa76f68bf733bf3da3568e42cb5437547792de2f02fe9",
-  eyebrow: "TIETOSUOJAKÄYTÄNTÖ · v3.4 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN",
+  version: "3.5",
+  sha256: "f47d382a18d3b09844f9e2272a01c6dce17bc6396b81c252c65ea06172a68f0c",
+  eyebrow: "TIETOSUOJAKÄYTÄNTÖ · v3.5 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN",
   title: "Mitä säilytämme ja miksi",
   lede: "Oikeutesi ja velvollisuutemme GDPR (EU) 2016/679 -asetuksen nojalla selkeällä kielellä. Neljätoista osiota ja liite B — vieritä loppuun asti.",
-  endMarker: "TIETOSUOJAKÄYTÄNNÖN LOPPU · GDPR (EU) 2016/679 · v3.4",
+  endMarker: "TIETOSUOJAKÄYTÄNNÖN LOPPU · GDPR (EU) 2016/679 · v3.5",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Tietosuojakäytännön teksti",
   sectionIdPrefix: "policy-section-",

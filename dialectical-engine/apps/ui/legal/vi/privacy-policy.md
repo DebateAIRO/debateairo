@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Tóm tắt
-eyebrow: CHÍNH SÁCH QUYỀN RIÊNG TƯ · v3.4 · CÓ HIỆU LỰC 12 THÁNG 10 NĂM 2026
+eyebrow: CHÍNH SÁCH QUYỀN RIÊNG TƯ · v3.5 · CÓ HIỆU LỰC 12 THÁNG 10 NĂM 2026
 title: Dữ liệu chúng tôi lưu trữ và lý do
 lede: Các quyền của bạn và nghĩa vụ của chúng tôi theo GDPR (EU) 2016/679, được trình bày bằng ngôn ngữ dễ hiểu. Mười bốn mục và Phụ lục B — cuộn đến cuối.
-endMarker: HẾT CHÍNH SÁCH · GDPR (EU) 2016/679 · v3.4
+endMarker: HẾT CHÍNH SÁCH · GDPR (EU) 2016/679 · v3.5
 bodyLabel: Nội dung Chính sách quyền riêng tư
 annexTitle: Phụ lục B — Điều khoản quyền riêng tư theo khu vực
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIE
 -->
 
-**Version 3.4 · Effective 12 tháng 10 năm 2026 · Các phiên bản trước tại dezbatere.ro/privacy/versions · Bên kiểm soát: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.5 · Effective 12 tháng 10 năm 2026 · Các phiên bản trước tại dezbatere.ro/privacy/versions · Bên kiểm soát: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Chúng tôi thu thập những gì cần thiết để tài khoản hoạt động và những gì bạn lựa chọn nhập. Câu hỏi của bạn được gửi đến các nhà cung cấp AI nêu trong Sổ đăng ký của chúng tôi; chúng không được dùng để huấn luyện mô hình. Nhà cung cấp dịch vụ lưu trữ của chúng tôi lưu trữ tài khoản và các cuộc tranh luận của bạn tại London, Vương quốc Anh; mục 5 cho biết dữ liệu của bạn còn được chuyển đến đâu nữa. Các cuộc tranh luận là riêng tư trừ khi bạn công khai chúng. Việc xóa tài khoản sẽ hủy khóa của dữ liệu riêng tư; khi lên lịch xóa, bạn chọn gỡ cả các cuộc tranh luận đã công khai hoặc để chúng tiếp tục công khai dưới bút danh đã ngừng sử dụng. Bạn có thể liên hệ với chúng tôi tại privacy@dezbatere.ro, và người được nêu tên trong một cuộc tranh luận có thể yêu cầu gỡ bỏ mà không cần tài khoản.
 
@@ -43,7 +43,7 @@ Chúng tôi chỉ thu thập những gì cần thiết để tài khoản hoạt
 | **Nội dung tranh luận** | Câu hỏi bạn nhập; các chú thích định hướng bạn thiết lập; các luận điểm, phản biện, tham chiếu bằng chứng, điểm số và phán quyết do công cụ tạo ra; bản ghi nguyên văn nội dung từng nhà cung cấp AI trả về; truy vấn truy xuất và tham chiếu nguồn. Toàn bộ dữ liệu này được lưu trữ dưới dạng mã hóa bằng một khóa dành riêng cho tài khoản của bạn | Bạn và các mô hình AI xử lý câu hỏi của bạn |
 | **Hỗ trợ** | Tin nhắn bạn trao đổi với trợ lý hỗ trợ hoặc một người, được lưu trữ dưới dạng mã hóa; ngôn ngữ được sử dụng; việc bạn có cho phép trợ lý xem trạng thái (không bao giờ là nội dung) của các cuộc tranh luận hay không; các đánh giá bạn đưa ra. Nếu một tin nhắn kích hoạt cơ chế kiểm soát lạm dụng, chúng tôi lưu hàm băm của tin nhắn và hàm băm của địa chỉ IP gửi tin nhắn đó | Bạn |
 | **Hồ sơ chấp nhận và đồng ý** | Phiên bản và hàm băm nội dung của Điều khoản bạn đã chấp nhận và chính sách đã được hiển thị cho bạn; thời điểm; màn hình và cơ chế được sử dụng; ngôn ngữ của bạn; địa chỉ IP và tác nhân người dùng tại thời điểm đó; từng sự đồng ý bạn đã đưa ra hoặc rút lại và thời điểm tương ứng | Trình duyệt của bạn, khi đăng ký và mỗi khi bạn thay đổi một lựa chọn |
-| **Thanh toán** (khi các gói trả phí bắt đầu) | Gói dịch vụ, giá, kỳ thanh toán, tham chiếu giao dịch, bằng chứng về địa điểm chịu thuế. Thông tin thẻ do nhà cung cấp dịch vụ thanh toán của chúng tôi nắm giữ, không bao giờ do chúng tôi nắm giữ | Bạn và nhà cung cấp dịch vụ thanh toán |
+| **Thanh toán** (khi các gói trả phí bắt đầu) | Gói dịch vụ, giá, kỳ thanh toán, tham chiếu giao dịch, bằng chứng về địa điểm chịu thuế. Thông tin lập hóa đơn bạn cung cấp khi thanh toán: tên, số điện thoại và địa chỉ lập hóa đơn của bạn và, nếu bạn mua với tư cách công ty, tên, mã số VAT và địa chỉ của công ty đó; cùng với địa chỉ IP mà bạn dùng để thanh toán. Bạn nhập thông tin thẻ trên trang của nhà cung cấp dịch vụ thanh toán của chúng tôi, vì vậy số thẻ đầy đủ và mã bảo mật của bạn không bao giờ đến được với chúng tôi. Về thẻ của bạn, chúng tôi lưu bốn chữ số cuối, tháng và năm hết hạn và quốc gia phát hành thẻ — để biết một khoản thanh toán đã được thực hiện bằng thẻ nào, để nhắc bạn trước khi thẻ hết hạn và để áp dụng các quy định của quốc gia đó — cùng với một mã do nhà cung cấp dịch vụ thanh toán cấp, được lưu trữ dưới dạng mã hóa, cho phép nhà cung cấp này trừ tiền vào chính thẻ đó mỗi lần gia hạn. Trong 14 ngày, chúng tôi cũng lưu, dưới dạng mã hóa, từng thông báo mà nhà cung cấp dịch vụ thanh toán gửi cho chúng tôi về một khoản thanh toán, đúng như khi nhận được; thông báo này cũng cho thấy các chữ số đầu của số thẻ, vốn xác định ngân hàng đã phát hành thẻ, và tên của ngân hàng đó | Bạn và nhà cung cấp dịch vụ thanh toán |
 | **Những người không phải người dùng của chúng tôi** | Dữ liệu cá nhân về người khác mà bạn đưa vào câu hỏi hoặc công cụ tạo ra khi trả lời câu hỏi. Chúng tôi yêu cầu bạn không làm điều này; mục 11 giải thích cách chúng tôi xử lý khi việc đó vẫn xảy ra | Gián tiếp từ bạn |
 
 Khi đăng ký, chúng tôi kiểm tra quốc gia của địa chỉ IP ngay trên hệ thống bằng DB-IP Lite và danh sách địa chỉ thoát Tor, không gửi địa chỉ cho bên thứ ba. Chúng tôi từ chối đăng ký từ quốc gia chưa cung cấp dịch vụ, từ địa chỉ thoát Tor và từ địa chỉ không xác định được quốc gia. Trước mỗi cuộc tranh luận mới, chúng tôi cũng kiểm tra quốc gia của IP ngay trên hệ thống và có thể từ chối nếu quốc gia thuộc danh sách luôn bị chặn. Bạn nhập ngày sinh chỉ để kiểm tra độ tuổi; chúng tôi không lưu ngày sinh. Đăng ký thành công chỉ lưu kết quả “đạt”; với tài khoản đã tồn tại, kết quả có thể là “đạt” hoặc “không đạt”. Bạn cũng chọn quốc gia cư trú và, nếu ở Hoa Kỳ, tiểu bang để chúng tôi áp dụng quy định về người tiêu dùng, quyền riêng tư và thuế phù hợp.
@@ -126,6 +126,8 @@ Khi lên lịch xóa tài khoản, bạn chọn điều gì xảy ra với các 
 | Cuộc trò chuyện và vụ việc hỗ trợ | Đến 12 tháng sau khi đóng vụ việc | Khóa bị hủy |
 | Hồ sơ chấp nhận và đồng ý | Vòng đời tài khoản cộng 6 năm — thời hiệu dài nhất áp dụng cho chúng tôi | Bị xóa |
 | Hồ sơ thanh toán (khi các gói trả phí bắt đầu) | 10 năm, theo yêu cầu của pháp luật kế toán Romania | Bị xóa |
+| Thẻ đã lưu: mã của nhà cung cấp dịch vụ thanh toán, cùng bốn chữ số cuối, ngày hết hạn và quốc gia của thẻ | Cho đến một ngày sau khi thẻ không còn thanh toán cho một gói đang hoạt động — khi gói kết thúc, khi bạn thay thẻ hoặc khi bạn đóng tài khoản | Bị xóa; bốn chữ số cuối, ngày hết hạn và quốc gia cũng được giữ lại trong hồ sơ của từng khoản thanh toán thực hiện bằng thẻ đó |
+| Các thông báo của nhà cung cấp dịch vụ thanh toán về các khoản thanh toán, đúng như khi nhận được | 14 ngày | Bị xóa |
 | Bản sao lưu | Tối đa 8 tuần sau khi bản đang hoạt động bị xóa | Bị ghi đè |
 
 **Việc xóa thực sự có tác dụng gì.** Các cuộc tranh luận riêng tư và dữ liệu tài khoản của bạn được mã hóa bằng các khóa dành riêng cho tài khoản và từng cuộc tranh luận. Việc xóa tài khoản sẽ hủy các khóa đó, sau đó chúng tôi và bất kỳ ai khác đều không thể đọc được các hồ sơ đã mã hóa, đồng thời chúng tôi xóa hồ sơ tài khoản của bạn. Khóa của bản sao công khai một cuộc tranh luận đã công khai chỉ bị hủy khi xóa tài khoản nếu bạn chọn "Xóa cả các cuộc tranh luận công khai của tôi" (mục 6). Chúng tôi gọi đây là xóa vì đó chính là tác dụng của việc này và chúng tôi lưu giữ bản đánh giá được lập thành văn bản làm căn cứ; nếu bạn muốn biết thêm, hãy hỏi. Có ba điều cần biết: dấu vết kiểm toán bảo mật chỉ được phép ghi nối tiếp và không bị xóa, nhưng không chứa mã định danh nào của bạn có thể đọc được; một số ít cuộc tranh luận cũ có trước cơ chế mã hóa hiện tại của chúng tôi, và nếu điều đó áp dụng cho tài khoản của bạn, chúng tôi sẽ cho bạn biết việc đóng tài khoản có tác dụng gì đối với chúng; và các bản sao dữ liệu đã được gửi đến nhà cung cấp AI chịu sự điều chỉnh của điều khoản lưu giữ của nhà cung cấp đó trong Sổ đăng ký, chứ không phải việc xóa của chúng tôi.
@@ -213,7 +215,7 @@ Trình duyệt có thể gửi tín hiệu “Do Not Track” hoặc một tín 
 
 Khi thay đổi chính sách này, chúng tôi đăng phiên bản mới kèm bản tóm tắt những thay đổi và ngày hiệu lực mới, đồng thời lưu các phiên bản trước tại dezbatere.ro/privacy/versions. Đối với thay đổi bổ sung mục đích mới hoặc bên nhận mới, chúng tôi thông báo cho bạn trước khi hoạt động xử lý mới bắt đầu, qua email và trong sản phẩm, đồng thời dành cho bạn thời gian phản đối. Khi mục đích mới phụ thuộc vào sự đồng ý của bạn — ví dụ nếu sau này chúng tôi muốn sử dụng nội dung để cải thiện mô hình — chúng tôi sẽ xin sự đồng ý đó một cách riêng biệt và cụ thể; chúng tôi không bao giờ coi việc chấp nhận Điều khoản cập nhật là sự đồng ý cho hoạt động xử lý mới. Đối với các nội dung làm rõ không làm thay đổi cách chúng tôi hành động, chúng tôi chỉ đăng phiên bản mới.
 
-Chính sách này được cập nhật lần cuối vào ngày 12 tháng 10 năm 2026. Phiên bản 3.4 thay thế phiên bản 3.3: mục 13 nay nêu rõ cookie debateai.locale cũng đặt ngôn ngữ mà chúng tôi dùng để viết các email gửi cho bạn, và bổ sung một đoạn cho biết mỗi email chúng tôi lưu lại để gửi cho bạn giữ nguyên ngôn ngữ bạn đã chọn cho đến khi chúng tôi gửi email đó.
+Chính sách này được cập nhật lần cuối vào ngày 12 tháng 10 năm 2026. Phiên bản 3.5 thay thế phiên bản 3.4: mục 2 nay nêu rõ chúng tôi lưu những thông tin lập hóa đơn và thông tin thẻ nào và số thẻ đầy đủ của bạn không bao giờ đến được với chúng tôi, và mục 7 nêu rõ chúng tôi giữ thẻ đã lưu và các thông báo của nhà cung cấp dịch vụ thanh toán về các khoản thanh toán trong bao lâu.
 
 ## Annex B — Điều khoản quyền riêng tư theo khu vực
 

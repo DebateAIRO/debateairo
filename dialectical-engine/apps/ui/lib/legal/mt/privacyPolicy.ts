@@ -56,7 +56,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Kontenut tad-dibattitu — Il-mistoqsija li tittajpja; l-annotazzjonijiet ta’ direzzjoni li tagħti; il-pretensjonijiet, il-kritiki, ir-referenzi għall-evidenza, il-punteġġi u l-verdettijiet li tiġġenera l-magna; rekord kelma b’kelma ta’ dak li rritorna kull fornitur tal-IA; mistoqsijiet għat-tiftix tal-evidenza u referenzi għas-sorsi. Dan kollu jinħażen kriptat taħt ċavetta speċifika għall-kont tiegħek — Int, u l-mudelli tal-IA li jaħdmu fuq il-mistoqsija tiegħek",
         "Appoġġ — Messaġġi li tiskambja mal-assistent tal-appoġġ jew ma’ persuna, maħżuna kriptati; il-lingwa użata; jekk ħallejtx lill-assistent jara l-istatus (qatt il-kontenut) tad-dibattiti tiegħek; il-valutazzjonijiet li tagħti. Jekk messaġġ jattiva l-kontrolli kontra l-abbuż, inżommu hash tal-messaġġ u hash tal-indirizz IP li minnu ntbagħat — Int",
         "Rekords tal-aċċettazzjoni u tal-kunsens — Il-verżjoni u l-hash tal-kontenut tat-Termini li aċċettajt u tal-politika li rajt; il-ħin; l-iskrin u l-mekkaniżmu użati; il-lingwa tiegħek; l-indirizz IP u l-aġent tal-utent tiegħek f’dak il-mument; kull kunsens li tajt jew irtirajt u meta — Il-browser tiegħek, waqt ir-reġistrazzjoni u kull darba li tibdel għażla",
-        "Pagamenti (ladarba jibdew il-pjanijiet bi ħlas) — Pjan, prezz, perjodu tal-kontijiet, referenzi tat-tranżazzjonijiet, evidenza tal-post tat-taxxa. Id-dettalji tal-karta jinżammu mill-fornitur tal-pagamenti tagħna, qatt minna — Int, u l-fornitur tal-pagamenti",
+        "Pagamenti (ladarba jibdew il-pjanijiet bi ħlas) — Pjan, prezz, perjodu tal-kontijiet, referenzi tat-tranżazzjonijiet, evidenza tal-post tat-taxxa. Id-dettalji tal-kontijiet li tagħti meta tħallas: ismek, in-numru tat-telefon u l-indirizz tal-kontijiet tiegħek u, jekk tixtri bħala kumpanija, l-isem, in-numru tal-VAT u l-indirizz tagħha; u l-indirizz IP minn fejn tħallas. Id-dettalji tal-karta tiegħek iddaħħalhom fuq il-paġna tal-fornitur tal-pagamenti tagħna, għalhekk in-numru sħiħ tal-karta u l-kodiċi tas-sigurtà tiegħek qatt ma jaslu għandna. Mill-karta tiegħek inżommu l-aħħar erba’ ċifri, ix-xahar u s-sena tal-iskadenza u l-pajjiż fejn inħarġet — biex inkunu nafu b’liema karta sar ħlas, biex infakkruk qabel ma tiskadi l-karta u biex napplikaw ir-regoli ta’ dak il-pajjiż — u, maħżun kriptat, kodiċi mill-fornitur tal-pagamenti li bih dan jista’ jiddebita l-istess karta f’kull tiġdid. Għal 14-il jum inżommu wkoll, kriptat, kull messaġġ li l-fornitur tal-pagamenti jibagħtilna dwar ħlas, eżattament kif wasal; dan juri wkoll l-ewwel ċifri tan-numru tal-karta, li jidentifikaw il-bank li ħareġ il-karta, u l-isem ta’ dak il-bank — Int, u l-fornitur tal-pagamenti",
         "Persuni li mhumiex utenti tagħna — Data personali dwar persuni oħra li tinkludi f’mistoqsija jew li tiġġenera l-magna fit-tweġiba tagħha. Nitolbuk ma tagħmilx dan; it-taqsima 11 tispjega x’nagħmlu meta jiġri xorta waħda — Int, indirettament"
         ]
       },
@@ -150,6 +150,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Konverżazzjonijiet u każijiet tal-appoġġ — Sakemm jingħalqu, flimkien ma’ 12-il xahar — Jinqerdu ċ-ċwievet",
         "Rekords tal-aċċettazzjoni u tal-kunsens — Il-ħajja tal-kont flimkien ma’ 6 snin — l-itwal perjodu ta’ preskrizzjoni li japplika għalina — Jitħassru",
         "Rekords tal-pagamenti (ladarba jibdew il-pjanijiet bi ħlas) — 10 snin, kif titlob il-liġi Rumena dwar il-kontabbiltà — Jitħassru",
+        "Karta maħżuna: il-kodiċi tal-fornitur tal-pagamenti, flimkien mal-aħħar erba’ ċifri, l-iskadenza u l-pajjiż tal-karta — Sa jum wara li l-karta ma tibqax tħallas għal pjan attiv — meta l-pjan jintemm, meta tibdel il-karta jew meta tagħlaq il-kont tiegħek — Jitħassru; l-aħħar erba’ ċifri, l-iskadenza u l-pajjiż jibqgħu wkoll fir-rekord tal-pagament ta’ kull ħlas li jsir b’dik il-karta",
+        "Il-messaġġi tal-fornitur tal-pagamenti dwar il-pagamenti, kif waslu — 14-il jum — Jitħassru",
         "Kopji ta’ riżerva — Sa 8 ġimgħat wara li titħassar il-kopja attiva — Jinkitbu fuqhom"
         ]
       },
@@ -258,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Meta nibdlu din il-politika nippubblikaw il-verżjoni l-ġdida b’sommarju ta’ dak li nbidel u data effettiva ġdida, u nżommu l-verżjonijiet preċedenti fuq dezbatere.ro/privacy/versions. Għal bidla li żżid skop ġdid jew riċevitur ġdid, ngħarrfuk qabel jibda l-ipproċessar il-ġdid, bil-posta elettronika u fil-prodott, u nagħtuk żmien biex toġġezzjona. Fejn skop ġdid jiddependi mill-kunsens tiegħek — pereżempju jekk xi darba nkunu rridu nużaw il-kontenut biex intejbu l-mudelli — nitolbu dak il-kunsens separatament u b’mod speċifiku; qatt ma nqisu l-aċċettazzjoni ta’ Termini aġġornati bħala kunsens għal ipproċessar ġdid. Għal kjarifiki li ma jbiddlu xejn dwar dak li nagħmlu, sempliċement nippubblikaw il-verżjoni l-ġdida." },
-      { kind: "p", text: "Din il-politika ġiet aġġornata l-aħħar fit-12 ta’ Ottubru 2026. Il-Verżjoni 3.4 issostitwiet il-verżjoni 3.3: it-taqsima 13 issa tgħid li l-cookie debateai.locale jiddetermina wkoll il-lingwa li biha nikitbu l-emails li nibagħtulek, u żżid paragrafu li jgħid li kull email li nqiegħdu fil-kju għalik iżżomm il-lingwa li kont għażilt sakemm nibagħtuha." }
+      { kind: "p", text: "Din il-politika ġiet aġġornata l-aħħar fit-12 ta’ Ottubru 2026. Il-Verżjoni 3.5 issostitwiet il-verżjoni 3.4: it-taqsima 2 issa tgħid liema dettalji tal-kontijiet u tal-karta nżommu u li n-numru sħiħ tal-karta tiegħek qatt ma jasal għandna, u t-taqsima 7 tgħid għal kemm żmien inżommu karta maħżuna u l-messaġġi tal-fornitur tal-pagamenti dwar il-pagamenti." }
     ]
   },
   {
@@ -330,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.4",
-  sha256: "7c59ea7cd23e8364464f548fdda9d6c9543520160bd7cc1a913fb19b38d0ddfe",
-  eyebrow: "POLITIKA DWAR IL-PRIVATEZZA · v3.4 · EFFETTIVA 12 TA’ OTTUBRU 2026",
+  version: "3.5",
+  sha256: "13f644a6537f93e03a29e3d5bb93e54b4b00b0cab2f53a07f29b690b28a254f0",
+  eyebrow: "POLITIKA DWAR IL-PRIVATEZZA · v3.5 · EFFETTIVA 12 TA’ OTTUBRU 2026",
   title: "X’naħżnu, u għaliex",
   lede: "Id-drittijiet tiegħek u l-obbligi tagħna skont il-GDPR (EU) 2016/679, b’lingwaġġ ċar. Erbatax-il taqsima u l-Anness B — niżżel sal-aħħar.",
-  endMarker: "TMIEM IL-POLITIKA · GDPR (EU) 2016/679 · v3.4",
+  endMarker: "TMIEM IL-POLITIKA · GDPR (EU) 2016/679 · v3.5",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Test tal-Politika dwar il-Privatezza",
   sectionIdPrefix: "policy-section-",

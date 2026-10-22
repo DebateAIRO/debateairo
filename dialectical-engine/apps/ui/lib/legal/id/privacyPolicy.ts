@@ -56,7 +56,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Konten debat — Pertanyaan yang Anda ketik; anotasi pengarahan yang Anda tetapkan; klaim, kritik, referensi bukti, skor, dan putusan yang dihasilkan mesin; catatan verbatim tentang apa yang dikembalikan setiap penyedia AI; kueri pengambilan dan referensi sumber. Semua ini disimpan secara terenkripsi di bawah kunci khusus untuk akun Anda — Anda, dan model AI yang mengerjakan pertanyaan Anda",
         "Dukungan — Pesan yang Anda pertukarkan dengan asisten dukungan atau seseorang, disimpan secara terenkripsi; bahasa yang digunakan; apakah Anda mengizinkan asisten melihat status (tidak pernah konten) debat Anda; penilaian yang Anda berikan. Jika pesan memicu pengendalian penyalahgunaan, kami menyimpan hash pesan dan hash alamat IP asalnya — Anda",
         "Catatan penerimaan dan persetujuan — Versi dan hash konten Ketentuan yang Anda terima dan kebijakan yang ditampilkan kepada Anda; waktu; layar dan mekanisme yang digunakan; bahasa Anda; alamat IP dan agen pengguna Anda pada saat itu; setiap persetujuan yang Anda berikan atau tarik beserta waktunya — Peramban Anda, saat pendaftaran dan setiap kali Anda mengubah pilihan",
-        "Pembayaran (setelah paket berbayar dimulai) — Paket, harga, periode penagihan, referensi transaksi, bukti lokasi pajak. Detail kartu disimpan oleh penyedia pembayaran kami, tidak pernah oleh kami — Anda, dan penyedia pembayaran",
+        "Pembayaran (setelah paket berbayar dimulai) — Paket, harga, periode penagihan, referensi transaksi, bukti lokasi pajak. Detail penagihan yang Anda berikan saat melakukan pembayaran: nama, nomor telepon, dan alamat penagihan Anda serta, jika Anda membeli sebagai perusahaan, nama, nomor PPN, dan alamat perusahaan tersebut; dan alamat IP yang Anda gunakan untuk membayar. Anda mengetikkan detail kartu Anda di halaman penyedia pembayaran kami, sehingga nomor kartu lengkap dan kode keamanan Anda tidak pernah sampai kepada kami. Dari kartu Anda, kami menyimpan empat digit terakhirnya, bulan dan tahun kedaluwarsanya, serta negara penerbitnya — untuk mengetahui kartu mana yang digunakan untuk suatu pembayaran, untuk mengingatkan Anda sebelum kartu kedaluwarsa, dan untuk menerapkan aturan negara tersebut — serta, disimpan secara terenkripsi, sebuah kode dari penyedia pembayaran yang memungkinkannya menagih kartu yang sama pada setiap perpanjangan. Selama 14 hari kami juga menyimpan, secara terenkripsi, setiap pesan yang dikirim penyedia pembayaran kepada kami tentang suatu pembayaran, persis seperti saat diterima; pesan itu juga menampilkan digit-digit awal nomor kartu, yang mengidentifikasi bank penerbit kartu, serta nama bank tersebut — Anda, dan penyedia pembayaran",
         "Orang yang bukan pengguna kami — Data pribadi tentang orang lain yang Anda sertakan dalam pertanyaan atau yang dihasilkan mesin saat menjawabnya. Kami meminta Anda untuk tidak melakukan ini; bagian 11 menjelaskan tindakan kami jika hal itu tetap terjadi — Anda, secara tidak langsung"
         ]
       },
@@ -150,6 +150,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Percakapan dan kasus dukungan — Hingga ditutup ditambah 12 bulan — Kunci dimusnahkan",
         "Catatan penerimaan dan persetujuan — Masa berlaku akun ditambah 6 tahun — periode pembatasan terpanjang yang berlaku bagi kami — Dihapus",
         "Catatan pembayaran (setelah paket berbayar dimulai) — 10 tahun, sebagaimana diwajibkan hukum akuntansi Rumania — Dihapus",
+        "Kartu tersimpan: kode penyedia pembayaran, beserta empat digit terakhir, tanggal kedaluwarsa, dan negara kartu — Hingga satu hari setelah kartu tidak lagi membayar paket yang aktif — saat paket berakhir, saat Anda mengganti kartu, atau saat Anda menutup akun Anda — Dihapus; empat digit terakhir, tanggal kedaluwarsa, dan negara juga tetap ada dalam catatan setiap pembayaran yang dilakukan dengan kartu tersebut",
+        "Pesan penyedia pembayaran tentang pembayaran, persis seperti saat diterima — 14 hari — Dihapus",
         "Cadangan — Hingga 8 minggu setelah salinan aktif dihapus — Ditimpa"
         ]
       },
@@ -258,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Ketika mengubah kebijakan ini, kami menerbitkan versi baru beserta ringkasan perubahan dan tanggal berlaku baru, serta menyimpan versi sebelumnya di dezbatere.ro/privacy/versions. Untuk perubahan yang menambahkan tujuan atau penerima baru, kami memberi tahu Anda sebelum pemrosesan baru dimulai, melalui email dan di dalam produk, serta memberi waktu untuk mengajukan keberatan. Jika tujuan baru bergantung pada persetujuan Anda — misalnya jika kami suatu saat ingin menggunakan konten untuk meningkatkan model — kami meminta persetujuan tersebut secara terpisah dan spesifik; kami tidak pernah menganggap penerimaan Ketentuan yang diperbarui sebagai persetujuan atas pemrosesan baru. Untuk klarifikasi yang tidak mengubah apa pun tentang tindakan kami, kami hanya menerbitkan versi baru." },
-      { kind: "p", text: "Kebijakan ini terakhir diperbarui pada 12 Oktober 2026. Versi 3.4 menggantikan versi 3.3: bagian 13 kini menyatakan bahwa kuki debateai.locale juga menentukan bahasa tempat kami menulis email yang kami kirimkan kepada Anda, dan menambahkan paragraf yang menyatakan bahwa setiap email yang kami masukkan ke antrean untuk Anda tetap menggunakan bahasa yang sudah Anda pilih hingga kami mengirimkannya." }
+      { kind: "p", text: "Kebijakan ini terakhir diperbarui pada 12 Oktober 2026. Versi 3.5 menggantikan versi 3.4: bagian 2 kini menyatakan detail penagihan dan detail kartu mana yang kami simpan dan bahwa nomor kartu lengkap Anda tidak pernah sampai kepada kami, dan bagian 7 menyatakan berapa lama kami menyimpan kartu tersimpan dan pesan penyedia pembayaran tentang pembayaran." }
     ]
   },
   {
@@ -330,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.4",
-  sha256: "8396b136efbd40732eed90f435273a184954b41ba524e11c708b28ff895493ab",
-  eyebrow: "KEBIJAKAN PRIVASI · v3.4 · BERLAKU 12 OKTOBER 2026",
+  version: "3.5",
+  sha256: "7a3d6de330e4782cb631fe448161e472123ee6bca0c1bf0220b4248140c47301",
+  eyebrow: "KEBIJAKAN PRIVASI · v3.5 · BERLAKU 12 OKTOBER 2026",
   title: "Apa yang kami simpan, dan alasannya",
   lede: "Hak Anda dan kewajiban kami berdasarkan GDPR (EU) 2016/679, dalam bahasa yang mudah dipahami. Empat belas bagian dan Lampiran B — gulir hingga akhir.",
-  endMarker: "AKHIR KEBIJAKAN · GDPR (EU) 2016/679 · v3.4",
+  endMarker: "AKHIR KEBIJAKAN · GDPR (EU) 2016/679 · v3.5",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Teks Kebijakan Privasi",
   sectionIdPrefix: "policy-section-",

@@ -56,7 +56,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Conteúdo do debate — A pergunta que escreve; as anotações de orientação que define; as alegações, críticas, referências de prova, pontuações e vereditos que o motor gera; um registo literal do que cada fornecedor de IA devolveu; consultas de pesquisa e referências das fontes. Tudo isto é armazenado de forma cifrada com uma chave específica da sua conta — O utilizador e os modelos de IA que trabalham na sua pergunta",
         "Apoio — Mensagens que troca com o assistente de apoio ou com uma pessoa, armazenadas de forma cifrada; o idioma utilizado; se autorizou o assistente a ver o estado (nunca o conteúdo) dos seus debates; as classificações que atribui. Se uma mensagem acionar os controlos de abuso, conservamos um hash da mensagem e um hash do endereço IP de onde foi enviada — O utilizador",
         "Registos de aceitação e consentimento — A versão e o hash do conteúdo dos Termos que aceitou e da política que lhe foi apresentada; o momento; o ecrã e o mecanismo utilizados; o seu idioma; o seu endereço IP e user-agent nesse momento; cada consentimento que deu ou retirou e quando — O seu navegador, no registo e sempre que altera uma escolha",
-        "Pagamentos (quando os planos pagos tiverem início) — Plano, preço, período de faturação, referências das transações, elementos comprovativos da localização fiscal. Os dados do cartão são detidos pelo nosso prestador de serviços de pagamento, nunca por nós — O utilizador e o prestador de serviços de pagamento",
+        "Pagamentos (quando os planos pagos tiverem início) — Plano, preço, período de faturação, referências das transações, elementos comprovativos da localização fiscal. Os dados de faturação que indica no pagamento: o seu nome, número de telefone e endereço de faturação e, se comprar enquanto empresa, a denominação, o número de IVA e o endereço desta; e o endereço IP a partir do qual paga. Introduz os dados do seu cartão na página do nosso prestador de serviços de pagamento, pelo que o número completo do seu cartão e o código de segurança nunca chegam até nós. Do seu cartão, conservamos os últimos quatro dígitos, o mês e o ano de expiração e o país em que foi emitido — para saber com que cartão foi efetuado um pagamento, para o avisar antes de o cartão expirar e para aplicar as regras desse país — e, armazenado de forma cifrada, um código do prestador de serviços de pagamento que lhe permite debitar o mesmo cartão em cada renovação. Durante 14 dias, conservamos também, de forma cifrada, cada mensagem que o prestador de serviços de pagamento nos envia sobre um pagamento, exatamente como chegou; essa mensagem indica também os primeiros dígitos do número do cartão, que identificam o banco que o emitiu, e o nome desse banco — O utilizador e o prestador de serviços de pagamento",
         "Pessoas que não são nossos utilizadores — Dados pessoais de outras pessoas que inclua numa pergunta ou que o motor gere ao responder-lhe. Pedimos que não o faça; a secção 11 explica o que fazemos quando, ainda assim, isso acontece — O utilizador, indiretamente"
         ]
       },
@@ -150,6 +150,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Conversas e casos de apoio — Até ao encerramento, acrescido de 12 meses — As chaves são destruídas",
         "Registos de aceitação e consentimento — Vida útil da conta acrescida de 6 anos — o prazo de prescrição mais longo que nos é aplicável — São eliminados",
         "Registos de pagamento (quando os planos pagos tiverem início) — 10 anos, conforme exigido pela legislação contabilística romena — São eliminados",
+        "Cartão guardado: o código do prestador de serviços de pagamento, com os últimos quatro dígitos, a data de expiração e o país do cartão — Até um dia depois de o cartão deixar de pagar um plano ativo — quando o plano termina, substitui o cartão ou encerra a sua conta — São eliminados; os últimos quatro dígitos, a data de expiração e o país ficam também no registo de pagamento de cada pagamento efetuado com esse cartão",
+        "As mensagens do prestador de serviços de pagamento sobre pagamentos, tal como chegaram — 14 dias — São eliminadas",
         "Cópias de segurança — Até 8 semanas após a eliminação da cópia ativa — São substituídas"
         ]
       },
@@ -258,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Quando alteramos esta política, publicamos a nova versão com um resumo das alterações e uma nova data de produção de efeitos, e mantemos as versões anteriores em dezbatere.ro/privacy/versions. Se uma alteração acrescentar uma nova finalidade ou um novo destinatário, informamo-lo antes do início do novo tratamento, por correio eletrónico e no produto, e damos-lhe tempo para se opor. Quando uma nova finalidade depender do seu consentimento — por exemplo, se alguma vez pretendêssemos utilizar conteúdo para melhorar modelos — pedimos esse consentimento de forma separada e específica; nunca tratamos a aceitação de Termos atualizados como consentimento para novo tratamento. Para esclarecimentos que nada alterem no que fazemos, limitamo-nos a publicar a nova versão." },
-      { kind: "p", text: "Esta política foi atualizada pela última vez em 12 de outubro de 2026. A versão 3.4 substituiu a versão 3.3: a secção 13 passa a indicar que o cookie debateai.locale também define o idioma em que lhe escrevemos os e-mails que enviamos, e acrescenta um parágrafo segundo o qual cada e-mail que colocamos em fila para si mantém o idioma que tinha escolhido até o enviarmos." }
+      { kind: "p", text: "Esta política foi atualizada pela última vez em 12 de outubro de 2026. A versão 3.5 substituiu a versão 3.4: a secção 2 passa a indicar que dados de faturação e do cartão conservamos e que o número completo do seu cartão nunca chega até nós, e a secção 7 indica durante quanto tempo conservamos um cartão guardado e as mensagens do prestador de serviços de pagamento sobre pagamentos." }
     ]
   },
   {
@@ -330,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.4",
-  sha256: "6ec5ce133523241f306995c57424fb52be0ea80107ea555f2b5256581b7a8d31",
-  eyebrow: "POLÍTICA DE PRIVACIDADE · v3.4 · EM VIGOR DESDE 12 DE OUTUBRO DE 2026",
+  version: "3.5",
+  sha256: "0a6fb0e789ec0b77a06d00f028343fcd902c7f34bfdb26fda12067e57900c363",
+  eyebrow: "POLÍTICA DE PRIVACIDADE · v3.5 · EM VIGOR DESDE 12 DE OUTUBRO DE 2026",
   title: "O que armazenamos e porquê",
   lede: "Os seus direitos e as nossas obrigações ao abrigo do GDPR (EU) 2016/679, em linguagem clara. Catorze secções e o Anexo B — desloque-se até ao fim.",
-  endMarker: "FIM DA POLÍTICA · GDPR (EU) 2016/679 · v3.4",
+  endMarker: "FIM DA POLÍTICA · GDPR (EU) 2016/679 · v3.5",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Texto da Política de Privacidade",
   sectionIdPrefix: "policy-section-",

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In het kort
-eyebrow: PRIVACYBELEID · v3.4 · VAN KRACHT OP 12 OKTOBER 2026
+eyebrow: PRIVACYBELEID · v3.5 · VAN KRACHT OP 12 OKTOBER 2026
 title: Wat wij opslaan en waarom
 lede: Uw rechten en onze verplichtingen krachtens de GDPR (EU) 2016/679, in begrijpelijke taal. Veertien hoofdstukken en Bijlage B — scrol tot het einde.
-endMarker: EINDE VAN HET BELEID · GDPR (EU) 2016/679 · v3.4
+endMarker: EINDE VAN HET BELEID · GDPR (EU) 2016/679 · v3.5
 bodyLabel: Tekst van het privacybeleid
 annexTitle: Bijlage B — Regionale privacybepalingen
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 3.4 · Effective 12 oktober 2026 · Eerdere versies op dezbatere.ro/privacy/versions · Verwerkingsverantwoordelijke: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.5 · Effective 12 oktober 2026 · Eerdere versies op dezbatere.ro/privacy/versions · Verwerkingsverantwoordelijke: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Wij verzamelen wat nodig is voor een account en wat u zelf invoert. Uw vragen gaan naar de AI-aanbieders die in ons Register staan en worden niet gebruikt om modellen te trainen. Onze hostingprovider bewaart uw account en uw debatten in Londen, in het Verenigd Koninkrijk; hoofdstuk 5 zegt waar uw gegevens verder naartoe gaan. Debatten zijn privé, tenzij u ze publiceert. Wanneer u uw account verwijdert, worden de sleutels tot uw privégegevens vernietigd; bij het plannen kiest u of ook uw gepubliceerde debatten worden verwijderd of openbaar blijven onder uw uitgefaseerde pseudoniem. U kunt ons bereiken via privacy@dezbatere.ro, en personen die in een debat worden genoemd, kunnen zonder account om verwijdering verzoeken.
 
@@ -43,7 +43,7 @@ Wij verzamelen uitsluitend wat nodig is om een account te laten functioneren, wa
 | **Debatinhoud** | De vraag die u invoert; de sturende annotaties die u instelt; de stellingen, kritieken, bewijsverwijzingen, scores en oordelen die de engine genereert; een woordelijk verslag van wat elke AI-aanbieder heeft teruggestuurd; zoekopdrachten en bronverwijzingen. Dit alles wordt versleuteld opgeslagen onder een sleutel die specifiek is voor uw account | U en de AI-modellen die uw vraag verwerken |
 | **Ondersteuning** | Berichten die u uitwisselt met de ondersteuningsassistent of een persoon, versleuteld opgeslagen; de gebruikte taal; of u de assistent toestemming gaf om de status (nooit de inhoud) van uw debatten te zien; beoordelingen die u geeft. Als een bericht misbruikcontroles activeert, bewaren wij een hash van het bericht en een hash van het IP-adres waarvan het afkomstig is | U |
 | **Vastleggingen van aanvaarding en toestemming** | De versie en inhoudshash van de Voorwaarden die u aanvaardde en van het beleid dat aan u werd getoond; het tijdstip; het gebruikte scherm en mechanisme; uw taal; uw IP-adres en user-agent op dat moment; elke toestemming die u gaf of introk en het tijdstip daarvan | Uw browser, bij registratie en telkens wanneer u een keuze wijzigt |
-| **Betalingen** (zodra betaalde abonnementen van start gaan) | Abonnement, prijs, factureringsperiode, transactiereferenties en bewijs van fiscale locatie. Kaartgegevens worden door onze betalingsaanbieder bewaard, nooit door ons | U en de betalingsaanbieder |
+| **Betalingen** (zodra betaalde abonnementen van start gaan) | Abonnement, prijs, factureringsperiode, transactiereferenties en bewijs van fiscale locatie. De factuurgegevens die u bij het afrekenen opgeeft: uw naam, telefoonnummer en factuuradres en, als u als bedrijf koopt, de naam, het BTW-nummer en het adres van dat bedrijf; en het IP-adres van waaruit u betaalt. U voert uw kaartgegevens in op de pagina van onze betalingsaanbieder, zodat uw volledige kaartnummer en beveiligingscode ons nooit bereiken. Van uw kaart bewaren wij de laatste vier cijfers, de maand en het jaar waarin de kaart verloopt en het land waarin de kaart is uitgegeven — om te weten met welke kaart een betaling is gedaan, om u eraan te herinneren voordat de kaart verloopt en om de regels van dat land toe te passen — en, versleuteld opgeslagen, een code van de betalingsaanbieder waarmee die bij elke verlenging dezelfde kaart kan belasten. Gedurende 14 dagen bewaren wij ook, versleuteld, elk bericht dat de betalingsaanbieder ons over een betaling stuurt, precies zoals het binnenkwam; daarin staan ook de eerste cijfers van het kaartnummer, waaruit blijkt welke bank de kaart heeft uitgegeven, en de naam van die bank | U en de betalingsaanbieder |
 | **Personen die geen gebruiker van ons zijn** | Persoonsgegevens over andere personen die u in een vraag opneemt of die de engine bij de beantwoording genereert. Wij vragen u dit niet te doen; hoofdstuk 11 legt uit wat wij doen als het toch gebeurt | Indirect, via u |
 
 Bij registratie controleren wij het IP-land en uw leeftijd. De geboortedatum wordt alleen voor de controle verzonden en niet opgeslagen. De IP-controle gebeurt lokaal, zonder het adres aan derden te verstrekken. Vóór elk nieuw debat controleren wij ook lokaal het IP-land; het debat wordt geweigerd als het land altijd geblokkeerd is.
@@ -126,6 +126,8 @@ Wanneer u de verwijdering van uw account plant, kiest u wat er met uw gepublicee
 | Ondersteuningsgesprekken en ondersteuningsverzoeken | Tot de afsluiting plus 12 maanden | Sleutels vernietigd |
 | Vastleggingen van aanvaarding en toestemming | Levensduur van het account plus 6 jaar — de langste verjaringstermijn die op ons van toepassing is | Verwijderd |
 | Betalingsgegevens (zodra betaalde abonnementen van start gaan) | 10 jaar, zoals de Roemeense boekhoudwetgeving voorschrijft | Verwijderd |
+| Opgeslagen kaart: de code van de betalingsaanbieder, met de laatste vier cijfers, de vervaldatum en het land van de kaart | Tot één dag nadat de kaart niet langer voor een actief abonnement betaalt — wanneer het abonnement afloopt, u de kaart vervangt of u uw account sluit | Verwijderd; de laatste vier cijfers, de vervaldatum en het land blijven ook bewaard in de betalingsgegevens van elke betaling die met die kaart is gedaan |
+| De berichten van de betalingsaanbieder over betalingen, zoals zij binnenkwamen | 14 dagen | Verwijderd |
 | Back-ups | Tot 8 weken nadat de actuele kopie is verwijderd | Overschreven |
 
 **Wat verwijdering daadwerkelijk doet.** Uw privédebatten en accountgegevens zijn versleuteld met sleutels die specifiek zijn voor uw account en elk debat. Wanneer u uw account verwijdert, worden die sleutels vernietigd, waarna de versleutelde gegevens niet meer door ons of anderen kunnen worden gelezen, en verwijderen wij de vastlegging van uw account. De sleutel van de openbare kopie van een gepubliceerd debat wordt bij verwijdering alleen vernietigd als u „Ook mijn openbare debatten verwijderen” hebt aangevinkt (paragraaf 6). Wij omschrijven dit als verwijdering omdat dit het effect ervan is, en wij beschikken over een gedocumenteerde beoordeling die dit onderbouwt; vraag het ons als u meer wilt weten. Drie zaken die u moet weten: het beveiligingsauditlogboek is uitsluitend voor toevoegingen bestemd en wordt niet verwijderd, maar bevat geen leesbare identificatoren van u; een klein aantal oudere debatten dateert van vóór ons huidige versleutelingsschema, en als dit voor uw account geldt, vertellen wij u wat sluiting voor die debatten bewerkstelligt; en kopieën van gegevens die reeds naar een AI-aanbieder zijn gestuurd, vallen onder de bewaarbepalingen van die aanbieder in het Register, niet onder onze verwijdering.
@@ -213,7 +215,7 @@ Om deze items te weigeren, blokkeert of verwijdert u cookies en sitegegevens voo
 
 Wanneer wij dit beleid wijzigen, publiceren wij de nieuwe versie met een samenvatting van de wijzigingen en een nieuwe ingangsdatum, en bewaren wij eerdere versies op dezbatere.ro/privacy/versions. Bij een wijziging die een nieuw doel of een nieuwe ontvanger toevoegt, informeren wij u per e-mail en in het product voordat de nieuwe verwerking begint en geven wij u tijd om bezwaar te maken. Wanneer een nieuw doel afhankelijk is van uw toestemming — bijvoorbeeld als wij ooit inhoud zouden willen gebruiken om modellen te verbeteren — vragen wij die toestemming afzonderlijk en specifiek; wij beschouwen aanvaarding van bijgewerkte Voorwaarden nooit als toestemming voor nieuwe verwerking. Bij verduidelijkingen die niets veranderen aan wat wij doen, publiceren wij eenvoudigweg de nieuwe versie.
 
-Dit beleid is voor het laatst bijgewerkt op 12 oktober 2026. Versie 3.4 verving versie 3.3: hoofdstuk 13 zegt nu dat het cookie debateai.locale ook de taal bepaalt waarin wij de e-mails schrijven die wij u sturen, en voegt een alinea toe die zegt dat elke e-mail die wij voor u in de wachtrij zetten de taal behoudt die u had gekozen totdat wij hem verzenden.
+Dit beleid is voor het laatst bijgewerkt op 12 oktober 2026. Versie 3.5 verving versie 3.4: hoofdstuk 2 zegt nu welke factuur- en kaartgegevens wij bewaren en dat uw volledige kaartnummer ons nooit bereikt, en hoofdstuk 7 zegt hoe lang wij een opgeslagen kaart en de berichten van de betalingsaanbieder over betalingen bewaren.
 
 ## Annex B — Regionale privacybepalingen
 

@@ -56,7 +56,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Debattinnehåll — Frågan du skriver; de styranteckningar du anger; påståenden, kritik, hänvisningar till belägg, poäng och utslag som motorn genererar; en ordagrann registrering av vad varje AI-leverantör returnerade; sökfrågor och källreferenser. Allt detta lagras krypterat med en nyckel som är specifik för ditt konto — Du och AI-modellerna som bearbetar din fråga",
         "Support — Meddelanden som du utbyter med supportassistenten eller en person, lagrade krypterade; vilket språk som används; om du gav assistenten tillåtelse att se statusen — aldrig innehållet — för dina debatter; betyg som du lämnar. Om ett meddelande utlöser missbrukskontroller behåller vi ett hashvärde av meddelandet och ett hashvärde av den IP-adress som det kom från — Du",
         "Uppgifter om godkännanden och samtycken — Version och innehållshash för de villkor du godkände och den policy som visades för dig; tidpunkten; den skärm och mekanism som användes; ditt språk; din IP-adress och user-agent vid den tidpunkten; varje samtycke som du lämnade eller återkallade och när — Din webbläsare, vid registreringen och varje gång du ändrar ett val",
-        "Betalningar (när betalabonnemang börjar erbjudas) — Abonnemang, pris, faktureringsperiod, transaktionsreferenser och bevis på skatterättslig hemvist. Kortuppgifter innehas av vår betalningsleverantör, aldrig av oss — Du och betalningsleverantören",
+        "Betalningar (när betalabonnemang börjar erbjudas) — Abonnemang, pris, faktureringsperiod, transaktionsreferenser och bevis på skatterättslig hemvist. De faktureringsuppgifter du lämnar i kassan: ditt namn, telefonnummer och din faktureringsadress och, om du köper som företag, företagets namn, momsregistreringsnummer och adress; samt den IP-adress du betalar från. Du anger dina kortuppgifter på vår betalningsleverantörs sida, och därför når ditt fullständiga kortnummer och din säkerhetskod aldrig oss. Av ditt kort lagrar vi de fyra sista siffrorna, utgångsmånad och utgångsår samt det land där kortet har utfärdats — för att kunna se vilket kort en betalning gjordes med, för att påminna dig innan kortet går ut och för att tillämpa reglerna för det landet — samt en krypterat lagrad kod från betalningsleverantören som gör det möjligt för den att debitera samma kort vid varje förnyelse. I 14 dagar lagrar vi också, krypterat, varje meddelande som betalningsleverantören skickar oss om en betalning, exakt så som det kom in; det visar också de första siffrorna i kortnumret, som identifierar den bank som har utfärdat kortet, och bankens namn — Du och betalningsleverantören",
         "Personer som inte är våra användare — Personuppgifter om andra personer som du tar med i en fråga eller som motorn genererar när den besvarar frågan. Vi ber dig att inte göra detta; avsnitt 11 förklarar vad vi gör när det ändå händer — Du, indirekt"
         ]
       },
@@ -150,6 +150,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Supportsamtal och ärenden — Tills ärendet avslutas plus 12 månader — Nycklar förstörs",
         "Uppgifter om godkännanden och samtycken — Kontots livstid plus 6 år — den längsta preskriptionstid som gäller för oss — Raderas",
         "Betalningsuppgifter (när betalabonnemang börjar erbjudas) — 10 år, i enlighet med rumänsk bokföringslagstiftning — Raderas",
+        "Sparat kort: betalningsleverantörens kod, med kortets fyra sista siffror, utgångsdatum och land — Fram till en dag efter att kortet inte längre betalar för ett aktivt abonnemang — när abonnemanget upphör, du byter kort eller du avslutar ditt konto — Raderas; de fyra sista siffrorna, utgångsdatumet och landet finns också kvar i betalningsuppgifterna för varje betalning som har gjorts med det kortet",
+        "Betalningsleverantörens meddelanden om betalningar, så som de kom in — 14 dagar — Raderas",
         "Säkerhetskopior — Upp till 8 veckor efter att den aktiva kopian har raderats — Skrivs över"
         ]
       },
@@ -258,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "När vi ändrar denna policy publicerar vi den nya versionen med en sammanfattning av vad som har ändrats och ett nytt ikraftträdandedatum, och vi behåller tidigare versioner på dezbatere.ro/privacy/versions. Om en ändring lägger till ett nytt ändamål eller en ny mottagare informerar vi dig via e-post och i produkten innan den nya behandlingen börjar och ger dig tid att invända. Om ett nytt ändamål är beroende av ditt samtycke — exempelvis om vi någon gång skulle vilja använda innehåll för att förbättra modeller — ber vi separat och specifikt om det samtycket; vi behandlar aldrig godkännande av uppdaterade villkor som samtycke till ny behandling. Vid förtydliganden som inte ändrar något i det vi gör publicerar vi helt enkelt den nya versionen." },
-      { kind: "p", text: "Denna policy uppdaterades senast den 12 oktober 2026. Version 3.4 ersatte version 3.3: avsnitt 13 anger nu att kakan debateai.locale också anger på vilket språk vi skriver de e-postmeddelanden vi skickar dig, och ett nytt stycke anger att varje e-postmeddelande vi köar åt dig behåller det språk du hade valt tills vi skickar det." }
+      { kind: "p", text: "Denna policy uppdaterades senast den 12 oktober 2026. Version 3.5 ersatte version 3.4: avsnitt 2 anger nu vilka fakturerings- och kortuppgifter vi lagrar och att ditt fullständiga kortnummer aldrig når oss, och avsnitt 7 anger hur länge vi lagrar ett sparat kort och betalningsleverantörens meddelanden om betalningar." }
     ]
   },
   {
@@ -330,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.4",
-  sha256: "dc7e3dbc672644b2398888b4b5bbf766075eac7095bbedf4d70e5f9a847ad126",
-  eyebrow: "INTEGRITETSPOLICY · v3.4 · GÄLLER FRÅN 12 OKTOBER 2026",
+  version: "3.5",
+  sha256: "455daa2eac244e8ccf7a43e5f478b99aa8e8284d32d7ebdb52104b70e1d8d0a1",
+  eyebrow: "INTEGRITETSPOLICY · v3.5 · GÄLLER FRÅN 12 OKTOBER 2026",
   title: "Vad vi lagrar och varför",
   lede: "Dina rättigheter och våra skyldigheter enligt GDPR (EU) 2016/679, på ett lättbegripligt språk. Fjorton avsnitt och bilaga B — rulla till slutet.",
-  endMarker: "SLUT PÅ POLICYN · GDPR (EU) 2016/679 · v3.4",
+  endMarker: "SLUT PÅ POLICYN · GDPR (EU) 2016/679 · v3.5",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Integritetspolicyns text",
   sectionIdPrefix: "policy-section-",

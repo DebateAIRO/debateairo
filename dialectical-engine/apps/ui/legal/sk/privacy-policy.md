@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručne
-eyebrow: ZÁSADY OCHRANY OSOBNÝCH ÚDAJOV · v3.4 · ÚČINNÉ OD 12. OKTÓBRA 2026
+eyebrow: ZÁSADY OCHRANY OSOBNÝCH ÚDAJOV · v3.5 · ÚČINNÉ OD 12. OKTÓBRA 2026
 title: Čo uchovávame a prečo
 lede: Vaše práva a naše povinnosti podľa GDPR (EU) 2016/679 zrozumiteľne. Štrnásť častí a príloha B — prejdite až na koniec.
-endMarker: KONIEC ZÁSAD · GDPR (EU) 2016/679 · v3.4
+endMarker: KONIEC ZÁSAD · GDPR (EU) 2016/679 · v3.5
 bodyLabel: Text zásad ochrany osobných údajov
 annexTitle: Príloha B — Regionálne podmienky ochrany osobných údajov
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 SÚBORY COOKIE
 -->
 
-**Version 3.4 · Effective 12. októbra 2026 · Predchádzajúce verzie na dezbatere.ro/privacy/versions · Prevádzkovateľ: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.5 · Effective 12. októbra 2026 · Predchádzajúce verzie na dezbatere.ro/privacy/versions · Prevádzkovateľ: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Zhromažďujeme údaje potrebné pre účet a to, čo sa rozhodnete napísať. Vaše otázky sa odosielajú poskytovateľom umelej inteligencie uvedeným v našom registri; nepoužívajú sa na trénovanie modelov. Náš poskytovateľ hostingu uchováva váš účet a vaše debaty v Londýne vo Spojenom kráľovstve; časť 5 uvádza, kam ďalej putujú vaše údaje. Debaty sú súkromné, pokiaľ ich nezverejníte. Odstránením účtu sa zničia kľúče k vašim súkromným údajom; pri plánovaní odstránenia si zvolíte, či sa odstránia aj vaše zverejnené debaty, alebo zostanú verejné pod vaším vyradeným pseudonymom. Môžete nás kontaktovať na privacy@dezbatere.ro a osoby uvedené v debate môžu požiadať o odstránenie aj bez účtu.
 
@@ -43,7 +43,7 @@ Zhromažďujeme iba údaje potrebné na fungovanie účtu, údaje, ktoré sa ná
 | **Obsah debaty** | Otázka, ktorú napíšete; vami nastavené usmerňujúce poznámky; tvrdenia, kritiky, odkazy na dôkazy, hodnotenia a verdikty vytvorené systémom; doslovný záznam odpovede každého poskytovateľa umelej inteligencie; vyhľadávacie dopyty a odkazy na zdroje. Všetko sa uchováva šifrovane pomocou kľúča určeného pre váš účet | Vy a modely umelej inteligencie pracujúce na vašej otázke |
 | **Podpora** | Správy, ktoré si vymieňate s asistentom podpory alebo s osobou, uložené šifrovane; použitý jazyk; či ste asistentovi dovolili vidieť stav (nikdy nie obsah) vašich debát; vaše hodnotenia. Ak správa aktivuje opatrenia proti zneužitiu, uchováme haš správy a haš IP adresy, z ktorej prišla | Vy |
 | **Záznamy o prijatí a súhlase** | Verzia a haš obsahu podmienok, ktoré ste prijali, a zásad, ktoré vám boli zobrazené; čas; použitá obrazovka a mechanizmus; váš jazyk; vaša IP adresa a user-agent v danom okamihu; každý súhlas, ktorý ste udelili alebo odvolali, a čas tejto udalosti | Váš prehliadač pri registrácii a pri každej zmene voľby |
-| **Platby** (po spustení platených programov) | Program, cena, fakturačné obdobie, referencie transakcií, doklady o mieste zdanenia. Údaje o karte uchováva náš poskytovateľ platobných služieb, nikdy nie my | Vy a poskytovateľ platobných služieb |
+| **Platby** (po spustení platených programov) | Program, cena, fakturačné obdobie, referencie transakcií, doklady o mieste zdanenia. Fakturačné údaje, ktoré zadáte pri platbe: vaše meno, telefónne číslo a fakturačná adresa, a ak nakupujete ako firma, jej názov, IČ DPH a adresa; a tiež IP adresa, z ktorej platíte. Údaje o karte zadávate na stránke nášho poskytovateľa platobných služieb, takže celé číslo vašej karty a bezpečnostný kód sa k nám nikdy nedostanú. Z vašej karty uchovávame jej posledné štyri číslice, mesiac a rok skončenia platnosti a krajinu, v ktorej bola vydaná — aby sme vedeli, ktorou kartou bola platba vykonaná, aby sme vás mohli upozorniť pred skončením platnosti karty a aby sme uplatnili pravidlá danej krajiny — a tiež šifrovane uložený kód od poskytovateľa platobných služieb, ktorý mu umožňuje strhávať platby z tej istej karty pri každom obnovení. Počas 14 dní tiež šifrovane uchovávame každú správu, ktorú nám poskytovateľ platobných služieb pošle o platbe, presne v podobe, v akej prišla; sú v nej uvedené aj prvé číslice čísla karty, podľa ktorých možno určiť banku, ktorá kartu vydala, a názov tejto banky | Vy a poskytovateľ platobných služieb |
 | **Osoby, ktoré nie sú našimi používateľmi** | Osobné údaje o iných osobách, ktoré uvediete v otázke alebo ktoré systém vytvorí pri odpovedi. Žiadame vás, aby ste to nerobili; časť 11 vysvetľuje, čo urobíme, ak sa tak napriek tomu stane | Vy, nepriamo |
 
 Pri registrácii zisťujeme krajinu IP adresy lokálne pomocou DB-IP Lite a osobitne kontrolujeme zoznam výstupných uzlov Tor; adresu neposielame tretej strane. Odmietneme registráciu z krajín, v ktorých službu neponúkame, z výstupných uzlov Tor a z adries s neznámou krajinou. Pred každou novou debatou tiež lokálne kontrolujeme krajinu IP adresy a môžeme ju odmietnuť, ak je krajina na zozname trvalo blokovaných. Dátum narodenia zadáte iba na overenie veku; neukladáme ho. Pri úspešnej registrácii sa uloží výsledok „úspešný“; pri existujúcich účtoch môže byť aj „zamietnutý“. Vyberiete tiež krajinu pobytu a v USA štát, aby sme uplatnili príslušné pravidlá ochrany spotrebiteľa, ochrany osobných údajov a daňové pravidlá.
@@ -126,6 +126,8 @@ Keď naplánujete vymazanie účtu, vyberiete si, čo sa stane s debatami, ktor�
 | Konverzácie a prípady podpory | Do uzavretia a ďalších 12 mesiacov | Kľúče sa zničia |
 | Záznamy o prijatí a súhlase | Počas existencie účtu a ďalších 6 rokov — najdlhšia premlčacia lehota, ktorá sa na nás vzťahuje | Vymažú sa |
 | Záznamy o platbách (po spustení platených programov) | 10 rokov podľa rumunských účtovných predpisov | Vymažú sa |
+| Uložená karta: kód poskytovateľa platobných služieb s poslednými štyrmi číslicami karty, dátumom skončenia platnosti a krajinou | Do jedného dňa po tom, ako karta prestane slúžiť na platenie aktívneho programu — keď sa program skončí, kartu vymeníte alebo zrušíte účet | Vymažú sa; posledné štyri číslice, dátum skončenia platnosti a krajina zostávajú aj v zázname o každej platbe vykonanej touto kartou |
+| Správy poskytovateľa platobných služieb o platbách v podobe, v akej prišli | 14 dní | Vymažú sa |
 | Zálohy | Najviac 8 týždňov po vymazaní živej kópie | Prepíšu sa |
 
 **Čo vymazanie skutočne spôsobí.** Vaše súkromné debaty a údaje účtu sú šifrované pomocou kľúčov určených pre váš účet a jednotlivé debaty. Odstránením účtu sa tieto kľúče zničia, takže my ani nikto iný už nedokáže šifrované záznamy prečítať, a záznam vášho účtu vymažeme. Kľúč verejnej kópie zverejnenej debaty sa pri odstránení účtu zničí len vtedy, ak ste zaškrtli „Odstrániť aj moje verejné debaty“ (časť 6). Označujeme to ako vymazanie, pretože taký je jeho účinok, a máme preň zdokumentované posúdenie; ak chcete vedieť viac, opýtajte sa. Mali by ste vedieť tri veci: bezpečnostný auditný záznam je nemenný a nevymazáva sa, neobsahuje však žiadne vaše čitateľné identifikátory; malý počet starších debát vznikol pred našou súčasnou schémou šifrovania, a ak sa to týka vášho účtu, oznámime vám, čo odstránenie účtu znamená pre tieto debaty; a kópie údajov, ktoré už boli odoslané poskytovateľovi umelej inteligencie, sa riadia podmienkami uchovávania daného poskytovateľa uvedenými v registri, nie naším vymazaním.
@@ -213,7 +215,7 @@ Ak chcete tieto položky odmietnuť, zablokujte alebo vymažte súbory cookie a 
 
 Keď tieto zásady zmeníme, zverejníme novú verziu so zhrnutím zmien a novým dátumom účinnosti a predchádzajúce verzie ponecháme na dezbatere.ro/privacy/versions. O zmene, ktorá pridáva nový účel alebo nového príjemcu, vás informujeme e-mailom aj v produkte pred začatím nového spracúvania a poskytneme vám čas na vznesenie námietky. Ak nový účel závisí od vášho súhlasu — napríklad ak by sme niekedy chceli obsah používať na zlepšovanie modelov — požiadame vás o tento súhlas samostatne a konkrétne; prijatie aktualizovaných podmienok nikdy nepovažujeme za súhlas s novým spracúvaním. Pri spresneniach, ktoré nemenia naše postupy, jednoducho zverejníme novú verziu.
 
-Tieto zásady boli naposledy aktualizované 12. októbra 2026. Verzia 3.4 nahradila verziu 3.3: časť 13 teraz uvádza, že súbor cookie debateai.locale okrem jazyka rozhrania určuje aj jazyk, v ktorom vám píšeme e-maily, a pridáva odsek, podľa ktorého každý e-mail, ktorý pre vás čaká na odoslanie, si zachová jazyk, ktorý ste zvolili, kým ho neodošleme.
+Tieto zásady boli naposledy aktualizované 12. októbra 2026. Verzia 3.5 nahradila verziu 3.4: časť 2 teraz uvádza, ktoré fakturačné údaje a údaje o karte uchovávame a že celé číslo vašej karty sa k nám nikdy nedostane, a časť 7 uvádza, ako dlho uchovávame uloženú kartu a správy poskytovateľa platobných služieb o platbách.
 
 ## Annex B — Regionálne podmienky ochrany osobných údajov
 

@@ -56,7 +56,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Debatų turinys — Jūsų įvestas klausimas; jūsų nustatytos valdymo pastabos; variklio sugeneruoti teiginiai, kritika, įrodymų nuorodos, įverčiai ir verdiktai; pažodinis kiekvieno DI paslaugų teikėjo atsakymo įrašas; paieškos užklausos ir šaltinių nuorodos. Visa tai saugoma užšifruota jūsų paskyrai būdingu raktu — Jūs ir su jūsų klausimu dirbantys DI modeliai",
         "Pagalba — Žinutės, kuriomis keičiatės su pagalbos asistentu ar asmeniu, saugomos užšifruotos; vartota kalba; ar leidote asistentui matyti jūsų debatų būseną (niekada ne turinį); jūsų įvertinimai. Jei žinutė suaktyvina piktnaudžiavimo kontrolę, saugome žinutės maišą ir IP adreso, iš kurio ji gauta, maišą — Jūs",
         "Sutikimo su sąlygomis ir kitų sutikimų įrašai — Sąlygų, su kuriomis sutikote, versija ir turinio maiša bei jums parodyta politika; laikas; naudotas ekranas ir būdas; jūsų kalba; tuo metu naudotas IP adresas ir naudotojo agentas; kiekvienas jūsų duotas ar atšauktas sutikimas ir jo laikas — Jūsų naršyklė registruojantis ir kaskart pakeitus pasirinkimą",
-        "Mokėjimai (pradėjus taikyti mokamus planus) — Planas, kaina, atsiskaitymo laikotarpis, operacijų nuorodos, mokesčių vietos įrodymai. Kortelės duomenis saugo mūsų mokėjimo paslaugų teikėjas, o ne mes — Jūs ir mokėjimo paslaugų teikėjas",
+        "Mokėjimai (pradėjus taikyti mokamus planus) — Planas, kaina, atsiskaitymo laikotarpis, operacijų nuorodos, mokesčių vietos įrodymai. Atsiskaitymo duomenys, kuriuos pateikiate apmokėdami: jūsų vardas, pavardė, telefono numeris ir atsiskaitymo adresas, o jei perkate kaip įmonė, jos pavadinimas, PVM mokėtojo kodas ir adresas; taip pat IP adresas, iš kurio mokate. Kortelės duomenis įvedate mūsų mokėjimo paslaugų teikėjo puslapyje, todėl visas jūsų kortelės numeris ir saugos kodas niekada mūsų nepasiekia. Iš jūsų kortelės duomenų saugome paskutinius keturis jos skaitmenis, galiojimo pabaigos mėnesį ir metus bei šalį, kurioje kortelė išduota — kad žinotume, kokia kortele atliktas mokėjimas, galėtume jums priminti prieš baigiantis kortelės galiojimui ir taikytume tos šalies taisykles — taip pat užšifruotą iš mokėjimo paslaugų teikėjo gautą kodą, kuriuo šis teikėjas kiekvieno atnaujinimo metu gali nuskaičiuoti lėšas iš tos pačios kortelės. Be to, 14 dienų užšifruotą saugome kiekvieną pranešimą, kurį mokėjimo paslaugų teikėjas mums siunčia apie mokėjimą, tiksliai tokį, kokį jį gavome; jame matyti ir pirmieji kortelės numerio skaitmenys, pagal kuriuos nustatomas kortelę išdavęs bankas, ir to banko pavadinimas — Jūs ir mokėjimo paslaugų teikėjas",
         "Asmenys, kurie nėra mūsų naudotojai — Kitų asmenų duomenys, kuriuos įtraukiate į klausimą arba kuriuos variklis sugeneruoja į jį atsakydamas. Prašome to nedaryti; 11 skyriuje paaiškinta, ką darome, jei taip vis dėlto nutinka — Netiesiogiai iš jūsų"
         ]
       },
@@ -150,6 +150,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Pagalbos pokalbiai ir atvejai — Iki uždarymo ir dar 12 mėnesių — Raktai sunaikinami",
         "Sutikimo su sąlygomis ir kitų sutikimų įrašai — Paskyros gyvavimo laiką ir dar 6 metus — ilgiausią mums taikomą senaties terminą — Ištrinami",
         "Mokėjimų įrašai (pradėjus taikyti mokamus planus) — 10 metų, kaip reikalauja Rumunijos apskaitos teisė — Ištrinami",
+        "Išsaugota kortelė: mokėjimo paslaugų teikėjo kodas su paskutiniais keturiais kortelės skaitmenimis, galiojimo pabaigos data ir šalimi — Iki vienos dienos po to, kai kortele nebemokama už aktyvų planą — kai planas baigiasi, pakeičiate kortelę arba uždarote paskyrą — Ištrinami; paskutiniai keturi skaitmenys, galiojimo pabaigos data ir šalis taip pat lieka kiekvieno ta kortele atlikto mokėjimo įraše",
+        "Mokėjimo paslaugų teikėjo pranešimai apie mokėjimus, tokie, kokie buvo gauti — 14 dienų — Ištrinami",
         "Atsarginės kopijos — Iki 8 savaičių po to, kai aktyvioji kopija ištrinama — Perrašomos"
         ]
       },
@@ -258,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Pakeitę šią politiką paskelbiame naują versiją kartu su pakeitimų santrauka ir nauja įsigaliojimo data, o ankstesnes versijas saugome adresu dezbatere.ro/privacy/versions. Jei pakeitimu pridedamas naujas tikslas ar naujas gavėjas, prieš pradėdami naują tvarkymą informuojame jus el. paštu ir produkte bei suteikiame laiko nesutikti. Jei naujas tikslas priklauso nuo jūsų sutikimo — pavyzdžiui, jei kada nors norėtume naudoti turinį modeliams tobulinti — tokio sutikimo prašome atskirai ir konkrečiai; atnaujintų Sąlygų priėmimo niekada nelaikome sutikimu su nauju duomenų tvarkymu. Jei paaiškinimai nieko nekeičia mūsų veikloje, tiesiog paskelbiame naują versiją." },
-      { kind: "p", text: "Ši politika paskutinį kartą atnaujinta 2026 m. spalio 12 d. 3.4 versija pakeitė 3.3 versiją: 13 skyriuje dabar nurodyta, kad slapukas debateai.locale taip pat nustato kalbą, kuria rašome jums siunčiamus el. laiškus, ir pridėta pastraipa, kad kiekvienas jums eilėje laukiantis el. laiškas išlaiko kalbą, kurią buvote pasirinkę, kol jį išsiųsime." }
+      { kind: "p", text: "Ši politika paskutinį kartą atnaujinta 2026 m. spalio 12 d. 3.5 versija pakeitė 3.4 versiją: 2 skyriuje dabar nurodyta, kokius atsiskaitymo ir kortelės duomenis saugome ir kad visas jūsų kortelės numeris niekada mūsų nepasiekia, o 7 skyriuje nurodyta, kiek laiko saugome išsaugotą kortelę ir mokėjimo paslaugų teikėjo pranešimus apie mokėjimus." }
     ]
   },
   {
@@ -330,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.4",
-  sha256: "52dcdcea88636800bfad33107969efeda6deede9f337f04861a9fb8ca65bd09e",
-  eyebrow: "PRIVATUMO POLITIKA · v3.4 · ĮSIGALIOJA 2026 M. SPALIO 12 D.",
+  version: "3.5",
+  sha256: "58bb5cc200307518a58ac1d1831f929625554178def835930efe0ddded7b9779",
+  eyebrow: "PRIVATUMO POLITIKA · v3.5 · ĮSIGALIOJA 2026 M. SPALIO 12 D.",
   title: "Ką saugome ir kodėl",
   lede: "Jūsų teisės ir mūsų pareigos pagal GDPR (EU) 2016/679, paaiškintos paprastai. Keturiolika skyrių ir B priedas — slinkite iki pabaigos.",
-  endMarker: "POLITIKOS PABAIGA · GDPR (EU) 2016/679 · v3.4",
+  endMarker: "POLITIKOS PABAIGA · GDPR (EU) 2016/679 · v3.5",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privatumo politikos tekstas",
   sectionIdPrefix: "policy-section-",

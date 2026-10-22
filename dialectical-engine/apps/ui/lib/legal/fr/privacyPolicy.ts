@@ -56,7 +56,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Contenu des débats — La question que vous saisissez ; les annotations d'orientation que vous définissez ; les affirmations, critiques, références aux éléments probants, scores et verdicts produits par le moteur ; un enregistrement mot pour mot de ce que chaque fournisseur d'IA a renvoyé ; les requêtes de recherche et les références aux sources. L'ensemble est conservé sous forme chiffrée au moyen d'une clé propre à votre compte — Vous et les modèles d'IA travaillant sur votre question",
         "Assistance — Les messages que vous échangez avec l'assistant d'aide ou avec une personne, conservés sous forme chiffrée ; la langue utilisée ; le fait que vous ayez ou non autorisé l'assistant d'aide à voir l'état (jamais le contenu) de vos débats ; les évaluations que vous donnez. Si un message déclenche les mécanismes de lutte contre les abus, nous conservons un hachage du message et un hachage de l'adresse IP depuis laquelle il a été envoyé — Vous",
         "Preuves d'acceptation et de consentement — La version et le hachage du contenu des Conditions que vous avez acceptées et de la politique qui vous a été présentée ; l'heure ; l'écran et le mécanisme utilisés ; votre langue ; votre adresse IP et votre user-agent à ce moment-là ; chaque consentement que vous avez donné ou retiré et la date correspondante — Votre navigateur, lors de l'inscription et chaque fois que vous modifiez un choix",
-        "Paiements (à partir du lancement des formules payantes) — Formule, prix, période de facturation, références des transactions, justificatifs de localisation fiscale. Les données de carte sont détenues par notre prestataire de paiement, jamais par nous — Vous et le prestataire de paiement",
+        "Paiements (à partir du lancement des formules payantes) — Formule, prix, période de facturation, références des transactions, justificatifs de localisation fiscale. Les données de facturation que vous fournissez lors du paiement : votre nom, votre numéro de téléphone et votre adresse de facturation et, si vous achetez en tant qu'entreprise, sa dénomination, son numéro de TVA et son adresse ; ainsi que l'adresse IP depuis laquelle vous payez. Vous saisissez les données de votre carte sur la page de notre prestataire de paiement, de sorte que le numéro complet de votre carte et son code de sécurité ne nous parviennent jamais. De votre carte, nous conservons les quatre derniers chiffres, le mois et l'année d'expiration et le pays où elle a été émise — pour savoir avec quelle carte un paiement a été effectué, pour vous prévenir avant l'expiration de la carte et pour appliquer les règles propres à ce pays — ainsi que, sous forme chiffrée, un code fourni par le prestataire de paiement qui lui permet de débiter la même carte à chaque renouvellement. Pendant 14 jours, nous conservons également, sous forme chiffrée, chaque message que le prestataire de paiement nous envoie au sujet d'un paiement, exactement tel qu'il nous est parvenu ; ce message indique aussi les premiers chiffres du numéro de la carte, qui identifient la banque qui l'a émise, ainsi que le nom de cette banque — Vous et le prestataire de paiement",
         "Personnes qui ne sont pas nos utilisateurs — Les données à caractère personnel concernant d'autres personnes que vous incluez dans une question ou que le moteur produit en y répondant. Nous vous demandons de ne pas le faire ; la section 11 explique ce que nous faisons lorsque cela se produit malgré tout — Vous, indirectement"
         ]
       },
@@ -150,6 +150,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Conversations et dossiers d'assistance — Jusqu'à la clôture plus 12 mois — Clés détruites",
         "Preuves d'acceptation et de consentement — Durée de vie du compte plus 6 ans — le délai de prescription le plus long qui nous est applicable — Supprimées",
         "Preuves de paiement (à partir du lancement des formules payantes) — 10 ans, conformément à la législation comptable roumaine — Supprimées",
+        "Carte enregistrée : le code du prestataire de paiement, avec les quatre derniers chiffres, la date d'expiration et le pays de la carte — Jusqu'à un jour après que la carte cesse de servir au paiement d'une formule active — lorsque la formule prend fin, que vous remplacez la carte ou que vous clôturez votre compte — Supprimés ; les quatre derniers chiffres, la date d'expiration et le pays restent également dans les preuves de paiement de chaque paiement effectué avec cette carte",
+        "Les messages du prestataire de paiement au sujet des paiements, tels qu'ils nous sont parvenus — 14 jours — Supprimés",
         "Sauvegardes — Jusqu'à 8 semaines après la suppression de la copie active — Écrasées"
         ]
       },
@@ -258,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Lorsque nous modifions la présente politique, nous publions la nouvelle version avec un résumé des modifications et une nouvelle date d'entrée en vigueur, et conservons les versions antérieures à l'adresse dezbatere.ro/privacy/versions. Si une modification ajoute une nouvelle finalité ou un nouveau destinataire, nous vous en informons par e-mail et dans le produit avant le début du nouveau traitement, et vous laissons le temps de vous y opposer. Lorsqu'une nouvelle finalité dépend de votre consentement — par exemple, si nous souhaitions un jour utiliser du contenu pour améliorer des modèles — nous sollicitons ce consentement séparément et spécifiquement ; nous ne considérons jamais l'acceptation de Conditions mises à jour comme un consentement à un nouveau traitement. Pour les clarifications qui ne modifient en rien nos pratiques, nous publions simplement la nouvelle version." },
-      { kind: "p", text: "La présente politique a été mise à jour pour la dernière fois le 12 octobre 2026. La version 3.4 a remplacé la version 3.3 : la section 13 indique désormais que le cookie debateai.locale règle aussi la langue dans laquelle nous rédigeons les e-mails que nous vous envoyons, et elle ajoute un paragraphe précisant que chaque e-mail que nous mettons en file d’attente pour vous conserve la langue que vous aviez sélectionnée jusqu’à son envoi." }
+      { kind: "p", text: "La présente politique a été mise à jour pour la dernière fois le 12 octobre 2026. La version 3.5 a remplacé la version 3.4 : la section 2 indique désormais quelles données de facturation et de carte nous conservons et que le numéro complet de votre carte ne nous parvient jamais, et la section 7 indique combien de temps nous conservons une carte enregistrée et les messages du prestataire de paiement au sujet des paiements." }
     ]
   },
   {
@@ -330,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.4",
-  sha256: "0c49d7e346435e3affd99bfa41f9b739f9ad337faa58f48c9f508c5eb30fe98b",
-  eyebrow: "POLITIQUE DE CONFIDENTIALITÉ · v3.4 · EN VIGUEUR LE 12 OCTOBRE 2026",
+  version: "3.5",
+  sha256: "7588ced887bec405da3d9aba5ca5c76090bd3b97d9577b078782fd628fc28c1b",
+  eyebrow: "POLITIQUE DE CONFIDENTIALITÉ · v3.5 · EN VIGUEUR LE 12 OCTOBRE 2026",
   title: "Ce que nous conservons, et pourquoi",
   lede: "Vos droits et nos obligations au titre du GDPR (EU) 2016/679, en termes clairs. Quatorze sections et l'annexe B — faites défiler jusqu'à la fin.",
-  endMarker: "FIN DE LA POLITIQUE · GDPR (EU) 2016/679 · v3.4",
+  endMarker: "FIN DE LA POLITIQUE · GDPR (EU) 2016/679 · v3.5",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Texte de la Politique de confidentialité",
   sectionIdPrefix: "policy-section-",

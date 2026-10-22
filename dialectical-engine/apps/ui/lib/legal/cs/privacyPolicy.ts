@@ -56,7 +56,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Obsah debaty — Otázka, kterou zadáte; řídicí anotace, které nastavíte; tvrzení, kritiky, odkazy na důkazy, hodnocení a závěry vytvořené systémem; doslovný záznam odpovědí jednotlivých poskytovatelů AI; vyhledávací dotazy a odkazy na zdroje. Vše je uloženo šifrovaně pod klíčem určeným konkrétně pro váš účet — Vy a modely AI pracující na vaší otázce",
         "Podpora — Zprávy, které si vyměníte s asistentem podpory nebo osobou, uložené šifrovaně; použitý jazyk; zda jste asistentovi dovolili zobrazit stav (nikoli obsah) vašich debat; vámi udělená hodnocení. Pokud zpráva aktivuje kontrolní mechanismy proti zneužití, uchováme hash zprávy a hash IP adresy, ze které pochází — Vy",
         "Záznamy o přijetí a souhlasech — Verze a hash obsahu Podmínek, které jste přijali, a zásad, jež vám byly zobrazeny; čas; použitá obrazovka a mechanismus; váš jazyk; vaše IP adresa a user-agent v daném okamžiku; každý udělený či odvolaný souhlas a okamžik tohoto úkonu — Váš prohlížeč při registraci a při každé změně volby",
-        "Platby (od spuštění placených tarifů) — Tarif, cena, fakturační období, odkazy na transakce a doklady o místě zdanění. Údaje o kartě uchovává náš poskytovatel platebních služeb, nikoli my — Vy a poskytovatel platebních služeb",
+        "Platby (od spuštění placených tarifů) — Tarif, cena, fakturační období, odkazy na transakce a doklady o místě zdanění. Fakturační údaje, které zadáte při platbě: vaše jméno, telefonní číslo a fakturační adresa, a pokud nakupujete jako firma, její název, DIČ a adresa; a také IP adresa, ze které platíte. Údaje o kartě zadáváte na stránce našeho poskytovatele platebních služeb, takže celé číslo vaší karty a bezpečnostní kód se k nám nikdy nedostanou. Z vaší karty uchováváme její poslední čtyři číslice, měsíc a rok konce platnosti a zemi, ve které byla vydána — abychom poznali, kterou kartou byla platba provedena, abychom vás mohli upozornit před skončením platnosti karty a abychom uplatnili pravidla dané země — a dále šifrovaně uložený kód od poskytovatele platebních služeb, který mu umožňuje strhávat platby ze stejné karty při každém obnovení. Po dobu 14 dnů také šifrovaně uchováváme každou zprávu, kterou nám poskytovatel platebních služeb pošle o platbě, přesně v podobě, v jaké dorazila; jsou v ní uvedeny i první číslice čísla karty, podle kterých lze určit banku, jež kartu vydala, a název této banky — Vy a poskytovatel platebních služeb",
         "Osoby, které nejsou našimi uživateli — Osobní údaje o jiných osobách, které uvedete v otázce nebo které systém vytvoří při odpovědi. Žádáme vás, abyste tak nečinili; oddíl 11 vysvětluje, jak postupujeme, pokud k tomu přesto dojde — Vy, nepřímo"
         ]
       },
@@ -150,6 +150,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Konverzace a případy podpory — Do uzavření a dalších 12 měsíců — Klíče jsou zničeny",
         "Záznamy o přijetí a souhlasech — Po dobu existence účtu a dalších 6 let — nejdelší promlčecí lhůta, která se na nás vztahuje — Vymazány",
         "Záznamy o platbách (od spuštění placených tarifů) — 10 let, jak vyžadují rumunské účetní předpisy — Vymazány",
+        "Uložená karta: kód poskytovatele platebních služeb s posledními čtyřmi číslicemi karty, datem konce platnosti a zemí — Do jednoho dne poté, co karta přestane sloužit k placení aktivního tarifu — když tarif skončí, kartu vyměníte nebo uzavřete účet — Vymazány; poslední čtyři číslice, datum konce platnosti a země zůstávají také v záznamu o každé platbě provedené touto kartou",
+        "Zprávy poskytovatele platebních služeb o platbách v podobě, v jaké dorazily — 14 dnů — Vymazány",
         "Zálohy — Až 8 týdnů po vymazání aktivní kopie — Přepsány"
         ]
       },
@@ -258,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Při změně těchto zásad zveřejníme novou verzi se shrnutím změn a novým datem účinnosti a předchozí verze ponecháme na dezbatere.ro/privacy/versions. O změně, která přidává nový účel nebo nového příjemce, vás informujeme e-mailem a v produktu před zahájením nového zpracování a poskytneme vám čas vznést námitku. Pokud nový účel závisí na vašem souhlasu — například kdybychom někdy chtěli používat obsah ke zlepšování modelů — požádáme o tento souhlas samostatně a konkrétně; přijetí aktualizovaných Podmínek nikdy nepovažujeme za souhlas s novým zpracováním. Upřesnění, která nic nemění na našem postupu, pouze zveřejníme v nové verzi." },
-      { kind: "p", text: "Tyto zásady byly naposledy aktualizovány dne 12. října 2026. Verze 3.4 nahradila verzi 3.3: oddíl 13 nyní uvádí, že soubor cookie debateai.locale nastavuje také jazyk, ve kterém vám píšeme e-maily, a přidává odstavec, podle něhož každý e-mail, který pro vás zařazujeme do fronty, zůstává v jazyce, který jste zvolili, dokud jej neodešleme." }
+      { kind: "p", text: "Tyto zásady byly naposledy aktualizovány dne 12. října 2026. Verze 3.5 nahradila verzi 3.4: oddíl 2 nyní uvádí, jaké fakturační údaje a údaje o kartě uchováváme a že celé číslo vaší karty se k nám nikdy nedostane, a oddíl 7 uvádí, jak dlouho uchováváme uloženou kartu a zprávy poskytovatele platebních služeb o platbách." }
     ]
   },
   {
@@ -330,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.4",
-  sha256: "09e6ecc70fb94b868c6c28394e93c49ef50a659caa9c63c3987e5395c1ff52d6",
-  eyebrow: "ZÁSADY OCHRANY OSOBNÍCH ÚDAJŮ · v3.4 · ÚČINNÉ OD 12. ŘÍJNA 2026",
+  version: "3.5",
+  sha256: "3bdeb99ea1f4db6364c9b6328f729b31cc3246d3e5cbbcf67b77cb1088b6f0d8",
+  eyebrow: "ZÁSADY OCHRANY OSOBNÍCH ÚDAJŮ · v3.5 · ÚČINNÉ OD 12. ŘÍJNA 2026",
   title: "Co uchováváme a proč",
   lede: "Vaše práva a naše povinnosti podle GDPR (EU) 2016/679 srozumitelným jazykem. Čtrnáct oddílů a příloha B — přejděte až na konec.",
-  endMarker: "KONEC ZÁSAD · GDPR (EU) 2016/679 · v3.4",
+  endMarker: "KONEC ZÁSAD · GDPR (EU) 2016/679 · v3.5",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Text zásad ochrany osobních údajů",
   sectionIdPrefix: "policy-section-",

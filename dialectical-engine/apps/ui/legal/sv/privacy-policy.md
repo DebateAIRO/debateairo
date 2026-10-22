@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort sagt
-eyebrow: INTEGRITETSPOLICY · v3.4 · GÄLLER FRÅN 12 OKTOBER 2026
+eyebrow: INTEGRITETSPOLICY · v3.5 · GÄLLER FRÅN 12 OKTOBER 2026
 title: Vad vi lagrar och varför
 lede: Dina rättigheter och våra skyldigheter enligt GDPR (EU) 2016/679, på ett lättbegripligt språk. Fjorton avsnitt och bilaga B — rulla till slutet.
-endMarker: SLUT PÅ POLICYN · GDPR (EU) 2016/679 · v3.4
+endMarker: SLUT PÅ POLICYN · GDPR (EU) 2016/679 · v3.5
 bodyLabel: Integritetspolicyns text
 annexTitle: Bilaga B — Regionala integritetsvillkor
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 3.4 · Effective 12 oktober 2026 · Tidigare versioner på dezbatere.ro/privacy/versions · Personuppgiftsansvarig: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.5 · Effective 12 oktober 2026 · Tidigare versioner på dezbatere.ro/privacy/versions · Personuppgiftsansvarig: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Vi samlar in det som behövs för ett konto och det du väljer att skriva. Dina frågor skickas till de AI-leverantörer som anges i vårt register; de används inte för att träna modeller. Vår värdleverantör lagrar ditt konto och dina debatter i London i Storbritannien; avsnitt 5 anger vart dina uppgifter i övrigt skickas. Debatter är privata om du inte publicerar dem. När du raderar ditt konto förstörs nycklarna till dina privata uppgifter; när du schemalägger raderingen väljer du om dina publicerade debatter också ska tas bort eller förbli offentliga under din avvecklade pseudonym. Du kan nå oss på privacy@dezbatere.ro, och personer som nämns i en debatt kan begära borttagning utan att ha ett konto.
 
@@ -43,7 +43,7 @@ Vi samlar endast in det som behövs för att ett konto ska fungera, det du välj
 | **Debattinnehåll** | Frågan du skriver; de styranteckningar du anger; påståenden, kritik, hänvisningar till belägg, poäng och utslag som motorn genererar; en ordagrann registrering av vad varje AI-leverantör returnerade; sökfrågor och källreferenser. Allt detta lagras krypterat med en nyckel som är specifik för ditt konto | Du och AI-modellerna som bearbetar din fråga |
 | **Support** | Meddelanden som du utbyter med supportassistenten eller en person, lagrade krypterade; vilket språk som används; om du gav assistenten tillåtelse att se statusen — aldrig innehållet — för dina debatter; betyg som du lämnar. Om ett meddelande utlöser missbrukskontroller behåller vi ett hashvärde av meddelandet och ett hashvärde av den IP-adress som det kom från | Du |
 | **Uppgifter om godkännanden och samtycken** | Version och innehållshash för de villkor du godkände och den policy som visades för dig; tidpunkten; den skärm och mekanism som användes; ditt språk; din IP-adress och user-agent vid den tidpunkten; varje samtycke som du lämnade eller återkallade och när | Din webbläsare, vid registreringen och varje gång du ändrar ett val |
-| **Betalningar** (när betalabonnemang börjar erbjudas) | Abonnemang, pris, faktureringsperiod, transaktionsreferenser och bevis på skatterättslig hemvist. Kortuppgifter innehas av vår betalningsleverantör, aldrig av oss | Du och betalningsleverantören |
+| **Betalningar** (när betalabonnemang börjar erbjudas) | Abonnemang, pris, faktureringsperiod, transaktionsreferenser och bevis på skatterättslig hemvist. De faktureringsuppgifter du lämnar i kassan: ditt namn, telefonnummer och din faktureringsadress och, om du köper som företag, företagets namn, momsregistreringsnummer och adress; samt den IP-adress du betalar från. Du anger dina kortuppgifter på vår betalningsleverantörs sida, och därför når ditt fullständiga kortnummer och din säkerhetskod aldrig oss. Av ditt kort lagrar vi de fyra sista siffrorna, utgångsmånad och utgångsår samt det land där kortet har utfärdats — för att kunna se vilket kort en betalning gjordes med, för att påminna dig innan kortet går ut och för att tillämpa reglerna för det landet — samt en krypterat lagrad kod från betalningsleverantören som gör det möjligt för den att debitera samma kort vid varje förnyelse. I 14 dagar lagrar vi också, krypterat, varje meddelande som betalningsleverantören skickar oss om en betalning, exakt så som det kom in; det visar också de första siffrorna i kortnumret, som identifierar den bank som har utfärdat kortet, och bankens namn | Du och betalningsleverantören |
 | **Personer som inte är våra användare** | Personuppgifter om andra personer som du tar med i en fråga eller som motorn genererar när den besvarar frågan. Vi ber dig att inte göra detta; avsnitt 11 förklarar vad vi gör när det ändå händer | Du, indirekt |
 
 Vid registrering kontrollerar vi IP-adressens land lokalt med DB-IP Lite och listan över Tor-utgångar, utan att skicka adressen till tredje part. Vi nekar registrering från länder där tjänsten inte erbjuds, från Tor-utgångar och från adresser vars land inte kan fastställas. Inför varje ny debatt kontrollerar vi också IP-adressens land lokalt och kan neka debatten om landet finns på listan över länder som alltid blockeras. Du anger födelsedatum enbart för ålderskontrollen; det lagras inte. En lyckad registrering sparar resultatet ”godkänt”; för befintliga konton kan resultatet vara ”godkänt” eller ”underkänt”. Du anger också bosättningsland och, i USA, delstat så att vi kan tillämpa rätt regler för konsumentskydd, integritet och skatt.
@@ -126,6 +126,8 @@ När du schemalägger att ditt konto ska raderas väljer du vad som händer med 
 | Supportsamtal och ärenden | Tills ärendet avslutas plus 12 månader | Nycklar förstörs |
 | Uppgifter om godkännanden och samtycken | Kontots livstid plus 6 år — den längsta preskriptionstid som gäller för oss | Raderas |
 | Betalningsuppgifter (när betalabonnemang börjar erbjudas) | 10 år, i enlighet med rumänsk bokföringslagstiftning | Raderas |
+| Sparat kort: betalningsleverantörens kod, med kortets fyra sista siffror, utgångsdatum och land | Fram till en dag efter att kortet inte längre betalar för ett aktivt abonnemang — när abonnemanget upphör, du byter kort eller du avslutar ditt konto | Raderas; de fyra sista siffrorna, utgångsdatumet och landet finns också kvar i betalningsuppgifterna för varje betalning som har gjorts med det kortet |
+| Betalningsleverantörens meddelanden om betalningar, så som de kom in | 14 dagar | Raderas |
 | Säkerhetskopior | Upp till 8 veckor efter att den aktiva kopian har raderats | Skrivs över |
 
 **Vad radering faktiskt innebär.** Dina privata debatter och kontouppgifter är krypterade med nycklar som är specifika för ditt konto och för varje debatt. När du raderar ditt konto förstörs dessa nycklar, varefter de krypterade posterna inte kan läsas av oss eller någon annan, och vi raderar din kontopost. Nyckeln till en publicerad debatts offentliga kopia förstörs vid radering endast om du har markerat ”Radera även mina offentliga debatter” (avsnitt 6). Vi beskriver detta som radering eftersom det är den faktiska effekten, och vi har en dokumenterad bedömning som styrker detta; fråga oss om du vill veta mer. Du bör känna till tre saker: säkerhetsloggen kan endast utökas och raderas inte, men innehåller inga läsbara identifierare för dig; ett litet antal äldre debatter skapades före vårt nuvarande krypteringssystem, och om detta gäller ditt konto förklarar vi vad ett avslutande innebär för dem; och kopior av uppgifter som redan har skickats till en AI-leverantör omfattas av den leverantörens lagringsvillkor i registret, inte av vår radering.
@@ -213,7 +215,7 @@ För att vägra dessa objekt blockerar eller raderar du cookies och webbplatsdat
 
 När vi ändrar denna policy publicerar vi den nya versionen med en sammanfattning av vad som har ändrats och ett nytt ikraftträdandedatum, och vi behåller tidigare versioner på dezbatere.ro/privacy/versions. Om en ändring lägger till ett nytt ändamål eller en ny mottagare informerar vi dig via e-post och i produkten innan den nya behandlingen börjar och ger dig tid att invända. Om ett nytt ändamål är beroende av ditt samtycke — exempelvis om vi någon gång skulle vilja använda innehåll för att förbättra modeller — ber vi separat och specifikt om det samtycket; vi behandlar aldrig godkännande av uppdaterade villkor som samtycke till ny behandling. Vid förtydliganden som inte ändrar något i det vi gör publicerar vi helt enkelt den nya versionen.
 
-Denna policy uppdaterades senast den 12 oktober 2026. Version 3.4 ersatte version 3.3: avsnitt 13 anger nu att kakan debateai.locale också anger på vilket språk vi skriver de e-postmeddelanden vi skickar dig, och ett nytt stycke anger att varje e-postmeddelande vi köar åt dig behåller det språk du hade valt tills vi skickar det.
+Denna policy uppdaterades senast den 12 oktober 2026. Version 3.5 ersatte version 3.4: avsnitt 2 anger nu vilka fakturerings- och kortuppgifter vi lagrar och att ditt fullständiga kortnummer aldrig når oss, och avsnitt 7 anger hur länge vi lagrar ett sparat kort och betalningsleverantörens meddelanden om betalningar.
 
 ## Annex B — Regionala integritetsvillkor
 
