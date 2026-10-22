@@ -99,7 +99,8 @@ export async function startRunner(argv,launch=launchRunner,{retiredSettleMs=RETI
  process.once(RUNNER_RETIRED_PROCESS_EVENT,()=>{retired=true;settleTimer=setTimeout(retiredEnd,retiredSettleMs);});
  // A long-running worker that ends unasked (returned) or fails (even during an asked stop) is
  // reported, never a silent exit 0. Main settling first clears the bound: one end, never two.
- await started.running.finally(()=>clearTimeout(settleTimer)).then(()=>retired?retiredEnd():asked?stopped():stop(),stop);
+ await started.running.finally(()=>clearTimeout(settleTimer))
+  .then(()=>retired?retiredEnd():asked?stopped():stop(),stop);
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  const argv=process.argv.slice(2);

@@ -167,6 +167,14 @@ describe("side-by-side §9: a grant stays valid under the funding version it was
     expect(await source(null, null, grant, {}, { entitlement: null, selection: null }).read(ownerRef, now)).toEqual([]);
   });
 
+  it("a new ask with funding on, no grant and no windows row reads [] exactly as the plain source does", async () => {
+    const plain = new billingCore.BillingPersonAllowanceSource({ plans, closeBasisPoints: 9500,
+      entitlements: { current: async () => null } });
+    const expected = await plain.read(ownerRef, now);
+    expect(expected).toEqual([]);
+    expect(await source(null, null, grant, {}, { entitlement: null }).read(ownerRef, now)).toEqual(expected);
+  });
+
   it("a new ask with no grant and no windows row is still refused at resolveAskFunding", async () => {
     await expect(source(null, null, grant, {}, { entitlement: null }).resolveAskFunding(ownerRef, now))
       .rejects.toMatchObject({ code: "INTERNAL_FUNDING_UNAVAILABLE" });

@@ -27,8 +27,10 @@ import {
 } from "@debateai/providers";
 import { loadStoryPack, resolveStoryPackDir } from "@debateai/story";
 import { DEVELOPMENT_ORGAN_COST_BOUNDS } from "../../apps/runner/src/dev-deployment-register.js";
-import { PracticeGateObserver, PRACTICE_GATE_STOPPED, practiceStopIsPause, vendorUsage } from "../../tools/preview-practice/practice-gate-observer.js";
-import { onePerModel, practiceBusyWaitMs, practiceTurnOrder, runPracticeFormats, type PracticeSample } from "../../tools/preview-practice/practice-formats.js";
+import { PracticeGateObserver, PRACTICE_GATE_STOPPED, practiceStopIsPause, vendorUsage, type PracticeWireEvent }
+  from "../../tools/preview-practice/practice-gate-observer.js";
+import { onePerModel, practiceBusyWaitMs, practiceNextBusyWait, practiceTurnOrder, runPracticeFormats, type PracticeSample,
+  type PracticeWaitBudget } from "../../tools/preview-practice/practice-formats.js";
 import { jitteredGap, limitPort, PracticeSemaphore, runModelQueues } from "../../tools/preview-practice/practice-concurrency.js";
 import { practiceInterruptGate, takeOverSignals } from "../../tools/preview-practice/practice-interrupt.js";
 import { EventEmitter } from "node:events";
@@ -968,6 +970,25 @@ describe("practice formats: a busy model waits out its cool-off and retries the 
     expect(practiceBusyWaitMs({ retryAfterSeconds: null, waitsInARow: 0, random: () => 1 })).toBe(75_000);
     expect(practiceBusyWaitMs({ retryAfterSeconds: null, waitsInARow: 3, random: () => 1 })).toBe(600_000);
     expect(practiceBusyWaitMs({ retryAfterSeconds: null, waitsInARow: 9, random: () => 1 })).toBe(600_000);
+  });
+
+  it("a model the gate does not serve gets no wait: its last refusal NOT_SERVED ends the budget's use at once", () => {
+    const event = (seq: number, unbilledKind: PracticeWireEvent["unbilledKind"]): PracticeWireEvent => ({ seq, gate: "deepinfra",
+      model: "glm", startedAt: "2026-10-16T00:00:00.000Z", latencyMs: 1, outcome: "UNBILLED", vendorStatus: null,
+      refusalCode: "PROVIDER_CALL_FAILED", concurrencyLimit: false, unbilledKind, inputTokens: null, outputTokens: null,
+      reasoningTokens: null });
+    const fresh = (): PracticeWaitBudget => ({ usedMs: 0, waits: 0, inARow: 0 });
+    // Not served, even after a busy refusal before it: waiting cannot make the gate serve the model.
+    for (const wire of [[event(1, "NOT_SERVED")], [event(1, "VENDOR_REFUSED"), event(2, "NOT_SERVED")]]) {
+      const budget = fresh();
+      expect(practiceNextBusyWait(budget, 600_000, wire, () => 0)).toBeNull();
+      expect(budget).toEqual(fresh());
+    }
+    // A busy refusal after it is a wait as before.
+    const budget = fresh();
+    expect(practiceNextBusyWait(budget, 600_000, [event(1, "NOT_SERVED"), event(2, "VENDOR_REFUSED")], () => 0))
+      .toEqual({ waitMs: 60_000, reason: "VENDOR_REFUSED", retryAfterSeconds: null });
+    expect(budget).toEqual({ usedMs: 60_000, waits: 1, inARow: 1 });
   });
 
   it("parallel: only the busy model is parked; the others finish their jobs while it waits; then the SAME job is retried", async () => {

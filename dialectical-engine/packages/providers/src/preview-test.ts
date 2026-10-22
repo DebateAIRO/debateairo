@@ -940,7 +940,9 @@ const PREVIEW_DAILY_REFUSALS: ReadonlySet<string> = new Set(["TEAM_DAILY_BUDGET_
  * on a gate that is also halted, an older release's debate now gets a money stop where STOPPED plus `/remaining` gave
  * it a sit-out (gate unavailable). Both codes are refused before any reservation, so nothing is charged either way.
  */
-const PREVIEW_NOT_SERVED_REFUSALS: ReadonlySet<string> = new Set<PreviewNotServedRefusal>(["MODEL_NOT_ALLOWED", "RESERVATION_MISMATCH"]);
+const PREVIEW_NOT_SERVED_REFUSALS: ReadonlySet<string> = new Set<PreviewNotServedRefusal>([
+  "MODEL_NOT_ALLOWED", "RESERVATION_MISMATCH"
+]);
 const PREVIEW_TRANSIENT_REFUSALS: ReadonlySet<string> = new Set(["CONCURRENCY_LIMIT_REACHED", "PROVIDER_NOT_REACHED", "PROVIDER_REFUSED_UNBILLED", "PROVIDER_ERROR_UNBILLED", "MODEL_COOLING"]);
 function previewAuthorityRefusal(status: number | undefined, row: unknown): TypedDomainError {
   const code = status === 409 && typeof row === "object" && row !== null && !Array.isArray(row)
@@ -961,7 +963,9 @@ function previewAuthorityRefusal(status: number | undefined, row: unknown): Type
     return new PreviewUnbilledRefusal("Private preview gate is at its limit of calls in flight");
   }
   // Side-by-side §9: this model or this price is not served by this GO (refused before any reservation): it sits out.
-  if (typeof code === "string" && PREVIEW_NOT_SERVED_REFUSALS.has(code)) return new PreviewModelNotServed(code as PreviewNotServedRefusal);
+  if (typeof code === "string" && PREVIEW_NOT_SERVED_REFUSALS.has(code)) {
+    return new PreviewModelNotServed(code as PreviewNotServedRefusal);
+  }
   // Gate v4: the gate says outright that it was already halted when the call arrived, before reserving anything.
   if (code === "AUTHORITY_HALTED") return new PreviewGateUnavailable();
   // Slow answer (2026-10-12): the call was sent and failed or ran out of time at the vendor; the gate booked its whole

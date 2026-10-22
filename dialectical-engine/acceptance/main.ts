@@ -53,7 +53,9 @@ import {
 import { startGrokRelay, type GrokRelayHandle } from "./grok-relay.js";
 import type { CommandSpec } from "./relay-core.js";
 import { assertRelayRuntime } from "./relay-deployment-guard.js";
-import { ACCEPTANCE_REGISTER_SOURCE_REF, ACCEPTANCE_REGISTER_VERSION, ACCEPTANCE_RELEASE_KEY } from "./seed-register.js";
+import {
+  ACCEPTANCE_REGISTER_SOURCE_REF, ACCEPTANCE_REGISTER_VERSION, ACCEPTANCE_RELEASE_KEY
+} from "./seed-register.js";
 import {
   computeAcceptanceStructuralCeiling,
   readAcceptanceRuntimePolicy,
