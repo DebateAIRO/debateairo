@@ -16,7 +16,9 @@
 --       without that comparison, staff.read_self_allowance_command naming a revoke's grant's own version, and
 --       staff.read_internal_funding_policy_at, the funding publication at a version (A4);
 --   §7  ledger.model_spend_waiver, the append-only spend waiver of a set-aside debate, and
---       billing.read_internal_grant_spent redefined in place so a funded person's window leaves waived runs out (A5).
+--       billing.read_internal_grant_spent redefined in place so a funded person's window leaves waived runs out (A5);
+--   §8  core.private_erasure_run_chain, and the per-debate private erasure (prepare, resume, finalize) redefined in
+--       place so deleting a debate erases every run of its re-admission chain (addendum A-x3).
 --
 -- n1 (spec §5, the database rule):
 -- n1: drained
@@ -1240,6 +1242,613 @@ ALTER FUNCTION billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,time
 REVOKE ALL ON FUNCTION billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean) FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
 GRANT EXECUTE ON FUNCTION billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean) TO debateai_runtime;
 
+-- §8. Deleting a debate erases every run of it (spec §4; plan A addendum A-x3) ------------------------------------------
+-- A re-admitted debate is a chain of runs (§4): the old run keeps its question (ciphertext under its own still-live run
+-- key) while the person's list, the export and every route show only the newest. Deleting the debate (DELETE
+-- /v1/debates/:id: the id resolved to the newest run, then 0040's per-debate private erasure of that run) left the old
+-- runs readable until the whole account was erased. A person who deletes a debate expects it gone, so the three erasure
+-- functions now act on the debate's chain: core.private_erasure_run_chain(run) is the run's re-admission chain, newest
+-- first (core.resolve_run_ref's walk forward to the newest run, at most 16 hops, then back through every superseded
+-- run, at most 16; RUN_SUPERSESSION_CHAIN_INVALID beyond, as resolve_run_ref refuses), and
+--   · prepare consumes the step-up grant when it is bound to ANY run of that chain (controller ruling (h) on C9: the
+--     grant stays bound to the id the page sent, which may be the old or the new one; the old id alone could not
+--     delete anything before), and in its one transaction marks every run of the chain that the person owns (first and
+--     latest ownership event p_owner_ref, as for the run named) and that is not erased yet: one audit binding and one
+--     key-cleanup intent per run, its attestation secret deleted. A run of the chain someone else owns is never read,
+--     locked or touched (0123's guard keeps a chain within one person; an edge written past the guard changes nothing).
+--     Any run of the person's chain still plaintext (legacy) answers LEGACY_PLAINTEXT_RETAINED and any PUBLISHED one
+--     PUBLISHED, before anything is marked, as the run named alone always did; it answers ERASED only when every run
+--     is already erased or marked. It returns the first marked run's erasure id; the API's coordinator then completes
+--     each marked run (its key destroyed, then finalize), asking resume for the next until none is left.
+--   · resume returns one marked run of the chain still pending under that grant (the oldest binding first), so a
+--     request cut short part-way, or a repeated request with the same grant, completes the rest (and 0040's
+--     reconciler completes any intent no request comes back for);
+--   · finalize accepts that grant for each run of the chain.
+-- The chain is read again after the run lock and the account lock, under a try of the supersession guard's own
+-- advisory lock ('debateai:run-supersession'): no edge is written while prepare holds it, and an edge written after it
+-- commits is refused (the old run no longer waits, final review P3), so no new copy can join a deleted debate; busy is
+-- CONTENDED, as every other lock here. The other runs' private-content leases (0040's 'debateai:run-content-lease:v1:'
+-- namespace, which the API takes only for the run named) are tried here too: a reader still holding one is CONTENDED,
+-- never a wait, so no lock order can deadlock. A run never re-admitted has a chain of one, and every function acts
+-- exactly as 0099 left it. Bodies: 0085's (2171-2355, 2358-2472, 2475-2600) with 0099's session clamp, as applied.
+--
+-- 0063's rule ("never CREATE OR REPLACE a function another migration defines") is broken for these three, as §6 breaks
+-- it, because T is drained: no debate waits or runs while it is applied, and the old release never runs beside it. Same
+-- signatures, owner, definer, path and grants (0040:6247-6268, 6435-6445: EXECUTE for debateai_erasure_runtime only),
+-- re-asserted below; checked by the closing block and by tests, not digested, so a later drained step may redefine
+-- them again. The chain reader is new and digested; a STABLE definer with the pinned path that returns ids only,
+-- callable by no role (only these definers, as its owner, call it).
+CREATE OR REPLACE FUNCTION core.private_erasure_run_chain(p_run_id uuid)
+RETURNS uuid[]
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $$
+DECLARE
+  v_newest uuid := p_run_id;
+  v_next uuid;
+  v_chain uuid[];
+  v_hops integer := 0;
+BEGIN
+  IF p_run_id IS NULL THEN
+    RETURN ARRAY[]::uuid[];
+  END IF;
+  LOOP
+    SELECT edge.new_run_id INTO v_next FROM core.run_supersession AS edge WHERE edge.old_run_id = v_newest;
+    EXIT WHEN NOT FOUND;
+    v_hops := v_hops + 1;
+    IF v_hops > 16 THEN
+      RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'RUN_SUPERSESSION_CHAIN_INVALID';
+    END IF;
+    v_newest := v_next;
+  END LOOP;
+  v_chain := ARRAY[v_newest];
+  v_hops := 0;
+  LOOP
+    SELECT edge.old_run_id INTO v_next FROM core.run_supersession AS edge
+    WHERE edge.new_run_id = v_chain[cardinality(v_chain)];
+    EXIT WHEN NOT FOUND;
+    v_hops := v_hops + 1;
+    IF v_hops > 16 THEN
+      RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'RUN_SUPERSESSION_CHAIN_INVALID';
+    END IF;
+    v_chain := v_chain || v_next;
+  END LOOP;
+  RETURN v_chain;
+END;
+$$;
+REVOKE ALL ON FUNCTION core.private_erasure_run_chain(uuid)
+  FROM PUBLIC,debateai_runtime,debateai_authorization_runtime,debateai_erasure_runtime,
+    debateai_replay,debateai_publication_cleanup,debateai_content_provision;
+
+CREATE OR REPLACE FUNCTION core.prepare_private_run_erasure(
+  p_run_id uuid,
+  p_user_id uuid,
+  p_owner_ref uuid,
+  p_session_id uuid,
+  p_grant_token_hash text
+)
+RETURNS TABLE(outcome text,erasure_id uuid)
+LANGUAGE plpgsql
+VOLATILE
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $$
+DECLARE
+  v_now timestamptz := clock_timestamp();
+  v_account record;
+  v_content_encryption_version integer;
+  v_first_owner uuid;
+  v_latest_owner uuid;
+  v_latest_visibility text;
+  v_grant_id uuid;
+  v_audit_token uuid;
+  v_request_ref uuid;
+  v_audit_id uuid;
+  v_audit_actor_ref uuid;
+  v_audit_target_ref uuid;
+  v_cleanup_publication_refs uuid[];
+  v_attempt integer := 0;
+  v_chain uuid[];
+  v_members uuid[];
+  v_pending uuid[];
+  v_member uuid;
+  v_first_request_ref uuid;
+BEGIN
+  BEGIN
+    -- Side-by-side A-x3: the debate's re-admission chain; the grant may be bound to any run of it.
+    v_chain := core.private_erasure_run_chain(p_run_id);
+    -- Opaque, nonlocking preauthorization happens before the NOWAIT run lock.
+    -- It may reject a stale/racing request, but it cannot reveal whether a
+    -- guessed foreign run exists or is currently locked. Every predicate is
+    -- repeated after the canonical run-first lock before mutation.
+    IF NOT EXISTS (
+      SELECT 1
+      FROM identity."user" AS account
+      JOIN identity.session AS session
+        ON session.user_id=account.user_id
+       AND session.session_id=p_session_id
+      JOIN identity.step_up_grant AS step_grant
+        ON step_grant.user_id=account.user_id
+       AND step_grant.session_id=session.session_id
+      WHERE account.user_id=p_user_id
+        AND account.owner_ref=p_owner_ref
+        AND account.state='active'
+        AND session.revoked_at IS NULL
+        AND session.idle_expires_at>v_now
+        AND LEAST(session.absolute_expires_at,session.created_at+interval '720 hours')>GREATEST(v_now,clock_timestamp())
+        AND step_grant.token_hash=p_grant_token_hash
+        AND step_grant.action='DELETE_PRIVATE_DEBATE'
+        AND step_grant.target_run_id=ANY(v_chain)
+        AND step_grant.target_account_id IS NULL
+        AND step_grant.consumed_at IS NULL
+        AND step_grant.issued_at<=v_now
+        AND step_grant.expires_at>v_now
+        AND p_owner_ref=(
+          SELECT ownership.owner_ref FROM core.run_ownership_event AS ownership
+          WHERE ownership.run_id=p_run_id ORDER BY ownership.at_seq ASC LIMIT 1
+        )
+        AND p_owner_ref=(
+          SELECT ownership.owner_ref FROM core.run_ownership_event AS ownership
+          WHERE ownership.run_id=p_run_id ORDER BY ownership.at_seq DESC LIMIT 1
+        )
+    ) THEN
+      RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN;
+    END IF;
+    IF NOT pg_try_advisory_xact_lock(hashtextextended('identity:security-subject:'||p_user_id::text,0)) THEN RETURN QUERY SELECT 'CONTENDED'::text,NULL::uuid; RETURN; END IF;
+    SELECT run.content_encryption_version INTO v_content_encryption_version
+    FROM core.run AS run WHERE run.run_id=p_run_id FOR UPDATE NOWAIT;
+    IF NOT FOUND THEN RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN; END IF;
+    PERFORM pg_advisory_xact_lock(hashtextextended('identity:account:'||p_user_id::text,0));
+    SELECT * INTO v_account FROM identity.lock_account_t9_internal(p_user_id,true);
+    IF v_account.owner_ref IS DISTINCT FROM p_owner_ref THEN
+      RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN;
+    END IF;
+    v_audit_token := v_account.audit_token;
+    -- Side-by-side A-x3: no re-admission edge is written while the supersession guard's lock is held here, so the
+    -- chain read now is the whole debate until this transaction commits (and an edge out of a run it marks is refused
+    -- afterwards: that run no longer waits).
+    IF NOT pg_try_advisory_xact_lock(hashtextextended('debateai:run-supersession',0)) THEN
+      RETURN QUERY SELECT 'CONTENDED'::text,NULL::uuid; RETURN;
+    END IF;
+    v_chain := core.private_erasure_run_chain(p_run_id);
+
+    -- Authorization is deliberately completed before revealing whether the
+    -- locked run is legacy, published, already erased, or owned by another
+    -- account. All unauthenticated cases are the same opaque NOT_FOUND.
+    PERFORM 1 FROM identity.session AS session
+    WHERE session.session_id=p_session_id AND session.user_id=p_user_id
+      AND session.revoked_at IS NULL AND session.idle_expires_at>v_now
+      AND LEAST(session.absolute_expires_at,session.created_at+interval '720 hours')>GREATEST(v_now,clock_timestamp()) FOR KEY SHARE NOWAIT;
+    IF NOT FOUND THEN RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN; END IF;
+    SELECT step_grant.step_up_grant_id INTO v_grant_id
+    FROM identity.step_up_grant AS step_grant
+    WHERE step_grant.token_hash=p_grant_token_hash
+      AND step_grant.session_id=p_session_id AND step_grant.user_id=p_user_id
+      AND step_grant.action='DELETE_PRIVATE_DEBATE'
+      AND step_grant.target_run_id=ANY(v_chain) AND step_grant.target_account_id IS NULL
+      AND step_grant.consumed_at IS NULL AND step_grant.issued_at<=v_now
+      AND step_grant.expires_at>v_now FOR UPDATE NOWAIT;
+    IF NOT FOUND THEN RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN; END IF;
+    SELECT event.owner_ref INTO v_first_owner FROM core.run_ownership_event AS event
+    WHERE event.run_id=p_run_id ORDER BY event.at_seq ASC LIMIT 1;
+    SELECT event.owner_ref INTO v_latest_owner FROM core.run_ownership_event AS event
+    WHERE event.run_id=p_run_id ORDER BY event.at_seq DESC LIMIT 1;
+    IF v_first_owner IS DISTINCT FROM p_owner_ref OR v_latest_owner IS DISTINCT FROM p_owner_ref THEN
+      RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN;
+    END IF;
+    -- Side-by-side A-x3: the person's other runs of the chain (first and latest ownership event p_owner_ref), locked
+    -- in UUID order and read again under the lock; another person's run is never locked. Their content leases are
+    -- tried, never waited for.
+    v_members := ARRAY(
+      SELECT chain.run_id FROM unnest(v_chain) AS chain(run_id)
+      WHERE chain.run_id<>p_run_id
+        AND p_owner_ref=(SELECT event.owner_ref FROM core.run_ownership_event AS event
+          WHERE event.run_id=chain.run_id ORDER BY event.at_seq ASC LIMIT 1)
+        AND p_owner_ref=(SELECT event.owner_ref FROM core.run_ownership_event AS event
+          WHERE event.run_id=chain.run_id ORDER BY event.at_seq DESC LIMIT 1)
+      ORDER BY chain.run_id
+    );
+    PERFORM 1 FROM core.run AS run WHERE run.run_id=ANY(v_members) ORDER BY run.run_id FOR UPDATE NOWAIT;
+    v_members := ARRAY(
+      SELECT member.run_id FROM unnest(v_members) AS member(run_id)
+      WHERE p_owner_ref=(SELECT event.owner_ref FROM core.run_ownership_event AS event
+          WHERE event.run_id=member.run_id ORDER BY event.at_seq ASC LIMIT 1)
+        AND p_owner_ref=(SELECT event.owner_ref FROM core.run_ownership_event AS event
+          WHERE event.run_id=member.run_id ORDER BY event.at_seq DESC LIMIT 1)
+      ORDER BY member.run_id
+    );
+    FOREACH v_member IN ARRAY v_members LOOP
+      IF NOT pg_try_advisory_xact_lock(hashtextextended('debateai:run-content-lease:v1:'||v_member::text,0)) THEN
+        RETURN QUERY SELECT 'CONTENDED'::text,NULL::uuid; RETURN;
+      END IF;
+    END LOOP;
+    PERFORM 1 FROM serve.publication_key_provision_intent AS provision
+    WHERE provision.run_id=p_run_id OR provision.run_id=ANY(v_members) FOR UPDATE NOWAIT;
+    IF FOUND THEN RETURN QUERY SELECT 'CONTENDED'::text,NULL::uuid; RETURN; END IF;
+    UPDATE identity.step_up_grant SET consumed_at=v_now
+    WHERE step_up_grant_id=v_grant_id AND consumed_at IS NULL;
+    IF NOT FOUND THEN RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN; END IF;
+
+    IF v_content_encryption_version IS DISTINCT FROM 1 OR EXISTS (
+      SELECT 1 FROM core.run AS run
+      WHERE run.run_id=ANY(v_members) AND run.content_encryption_version IS DISTINCT FROM 1
+    ) THEN
+      RETURN QUERY SELECT 'LEGACY_PLAINTEXT_RETAINED'::text,NULL::uuid; RETURN;
+    END IF;
+    SELECT event.state INTO v_latest_visibility FROM core.run_visibility_event AS event
+    WHERE event.run_id=p_run_id ORDER BY event.at_seq DESC LIMIT 1;
+    IF v_latest_visibility='PUBLISHED' OR EXISTS (
+      SELECT 1 FROM unnest(v_members) AS member(run_id)
+      WHERE (SELECT event.state FROM core.run_visibility_event AS event
+        WHERE event.run_id=member.run_id ORDER BY event.at_seq DESC LIMIT 1)='PUBLISHED'
+    ) THEN
+      RETURN QUERY SELECT 'PUBLISHED'::text,NULL::uuid; RETURN;
+    END IF;
+    -- The runs still to erase, the run named first: neither erased nor already marked.
+    v_pending := ARRAY(
+      SELECT candidate.run_id FROM unnest(ARRAY[p_run_id]||v_members) WITH ORDINALITY AS candidate(run_id,position)
+      WHERE NOT EXISTS (SELECT 1 FROM serve.private_run_erasure_tombstone WHERE run_id=candidate.run_id)
+        AND NOT EXISTS (SELECT 1 FROM serve.private_run_key_cleanup_intent WHERE run_id=candidate.run_id)
+      ORDER BY candidate.position
+    );
+    IF cardinality(v_pending)=0 THEN
+      RETURN QUERY SELECT 'ERASED'::text,NULL::uuid; RETURN;
+    END IF;
+    -- Every run's publication copies must be gone before any run is marked.
+    IF EXISTS (
+      SELECT 1 FROM serve.publication_snapshot AS snapshot
+      LEFT JOIN serve.publication_key_cleanup_intent AS cleanup
+        ON cleanup.publication_ref=snapshot.publication_ref
+          AND cleanup.completed_at IS NOT NULL
+      WHERE snapshot.run_id=ANY(v_pending) AND cleanup.publication_ref IS NULL
+    ) THEN
+      RETURN QUERY SELECT 'CONTENDED'::text,NULL::uuid; RETURN;
+    END IF;
+
+    FOREACH v_member IN ARRAY v_pending LOOP
+      SELECT COALESCE(array_agg(snapshot.publication_ref ORDER BY snapshot.publication_ref),
+        ARRAY[]::uuid[])
+      INTO v_cleanup_publication_refs
+      FROM serve.publication_snapshot AS snapshot WHERE snapshot.run_id=v_member;
+      v_attempt := 0;
+      LOOP
+        v_attempt := v_attempt+1;
+        v_request_ref := gen_random_uuid();
+        v_audit_id := gen_random_uuid();
+        v_audit_actor_ref := gen_random_uuid();
+        v_audit_target_ref := gen_random_uuid();
+        CONTINUE WHEN (SELECT count(DISTINCT value) FROM unnest(ARRAY[
+          v_request_ref,v_audit_id,v_audit_actor_ref,v_audit_target_ref
+        ]) AS value)<>4 OR ARRAY[
+          v_request_ref,v_audit_id,v_audit_actor_ref,v_audit_target_ref
+        ] && (ARRAY[
+          p_run_id,p_user_id,p_owner_ref,p_session_id,v_grant_id,v_audit_token
+        ]||v_chain);
+        BEGIN
+          INSERT INTO core.publication_ref_tombstone(ref,ref_kind,created_at) VALUES
+            (v_request_ref,'private_erasure_request',v_now),
+            (v_audit_id,'private_erasure_audit_id',v_now),
+            (v_audit_actor_ref,'private_erasure_audit_actor',v_now),
+            (v_audit_target_ref,'private_erasure_audit_target',v_now);
+          INSERT INTO identity.private_erasure_audit_binding(
+            request_ref,user_id,session_id,run_id,grant_id,audit_id,
+            audit_actor_ref,audit_target_ref,created_at
+          ) VALUES (
+            v_request_ref,p_user_id,p_session_id,v_member,v_grant_id,v_audit_id,
+            v_audit_actor_ref,v_audit_target_ref,v_now
+          );
+          INSERT INTO serve.private_run_key_cleanup_intent(
+            request_ref,user_id,run_id,requested_at,cleanup_publication_refs
+          ) VALUES (v_request_ref,p_user_id,v_member,v_now,v_cleanup_publication_refs);
+          DELETE FROM core.run_content_attestation_secret WHERE run_id=v_member;
+          IF NOT FOUND THEN
+            RAISE EXCEPTION USING ERRCODE='55000', MESSAGE='CONTENT_ATTESTATION_SECRET_UNRESOLVED';
+          END IF;
+          v_first_request_ref := COALESCE(v_first_request_ref,v_request_ref);
+          EXIT;
+        EXCEPTION WHEN unique_violation THEN
+          IF v_attempt>=8 THEN
+            RETURN QUERY SELECT 'INVALID_EVIDENCE'::text,NULL::uuid; RETURN;
+          END IF;
+        END;
+      END LOOP;
+    END LOOP;
+    RETURN QUERY SELECT 'PREPARED'::text,v_first_request_ref;
+    RETURN;
+  EXCEPTION WHEN lock_not_available THEN
+    RETURN QUERY SELECT 'CONTENDED'::text,NULL::uuid;
+  END;
+END;
+$$;
+REVOKE ALL ON FUNCTION core.prepare_private_run_erasure(uuid,uuid,uuid,uuid,text)
+  FROM PUBLIC,debateai_runtime,debateai_authorization_runtime,debateai_replay,
+    debateai_publication_cleanup,debateai_content_provision;
+GRANT EXECUTE ON FUNCTION core.prepare_private_run_erasure(uuid,uuid,uuid,uuid,text) TO debateai_erasure_runtime;
+
+CREATE OR REPLACE FUNCTION core.resume_private_run_erasure(
+  p_run_id uuid,p_user_id uuid,p_owner_ref uuid,p_session_id uuid,
+  p_grant_token_hash text
+)
+RETURNS TABLE(outcome text,erasure_id uuid)
+LANGUAGE plpgsql
+VOLATILE
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $$
+DECLARE
+  v_now timestamptz := clock_timestamp();
+  v_request_ref uuid;
+  v_account record;
+  v_grant_id uuid;
+  v_first_owner uuid;
+  v_latest_owner uuid;
+  v_chain uuid[];
+  v_run_id uuid;
+BEGIN
+  BEGIN
+  -- Side-by-side A-x3: the debate's re-admission chain; the request may have marked any run of it.
+  v_chain := core.private_erasure_run_chain(p_run_id);
+  -- A fresh route request always probes resume first. Keep that probe opaque:
+  -- only an already-consumed, account-bound request owned by this caller may
+  -- reach the NOWAIT run lock. Full predicates are revalidated after locking.
+  IF NOT EXISTS (
+    SELECT 1
+    FROM identity."user" AS account
+    JOIN identity.session AS session
+      ON session.user_id=account.user_id
+     AND session.session_id=p_session_id
+    JOIN identity.step_up_grant AS step_grant
+      ON step_grant.user_id=account.user_id
+     AND step_grant.session_id=session.session_id
+    JOIN identity.private_erasure_audit_binding AS binding
+      ON binding.user_id=account.user_id
+     AND binding.session_id=session.session_id
+     AND binding.grant_id=step_grant.step_up_grant_id
+     AND binding.run_id=ANY(v_chain)
+     AND binding.consumed_at IS NULL
+    JOIN serve.private_run_key_cleanup_intent AS intent
+      ON intent.request_ref=binding.request_ref
+     AND intent.run_id=binding.run_id
+     AND intent.user_id=binding.user_id
+    WHERE account.user_id=p_user_id
+      AND account.owner_ref=p_owner_ref
+      AND account.state='active'
+      AND session.revoked_at IS NULL
+      AND session.idle_expires_at>v_now
+      AND LEAST(session.absolute_expires_at,session.created_at+interval '720 hours')>GREATEST(v_now,clock_timestamp())
+      AND step_grant.token_hash=p_grant_token_hash
+      AND step_grant.action='DELETE_PRIVATE_DEBATE'
+      AND step_grant.target_run_id=ANY(v_chain)
+      AND step_grant.target_account_id IS NULL
+      AND step_grant.consumed_at IS NOT NULL
+      AND p_owner_ref=(
+        SELECT ownership.owner_ref FROM core.run_ownership_event AS ownership
+        WHERE ownership.run_id=p_run_id ORDER BY ownership.at_seq ASC LIMIT 1
+      )
+      AND p_owner_ref=(
+        SELECT ownership.owner_ref FROM core.run_ownership_event AS ownership
+        WHERE ownership.run_id=p_run_id ORDER BY ownership.at_seq DESC LIMIT 1
+      )
+  ) THEN
+    RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN;
+  END IF;
+  IF NOT pg_try_advisory_xact_lock(hashtextextended('identity:security-subject:'||p_user_id::text,0)) THEN RETURN QUERY SELECT 'CONTENDED'::text,NULL::uuid; RETURN; END IF;
+  -- Side-by-side A-x3: the run this resumes is the oldest still-pending binding of this grant in the chain (the run
+  -- named itself for a run never re-admitted).
+  SELECT binding.run_id INTO v_run_id
+  FROM identity.private_erasure_audit_binding AS binding
+  JOIN identity.step_up_grant AS step_grant ON step_grant.step_up_grant_id=binding.grant_id
+  JOIN serve.private_run_key_cleanup_intent AS intent
+    ON intent.request_ref=binding.request_ref AND intent.run_id=binding.run_id AND intent.user_id=binding.user_id
+  WHERE binding.user_id=p_user_id AND binding.session_id=p_session_id
+    AND binding.run_id=ANY(v_chain) AND binding.consumed_at IS NULL
+    AND step_grant.token_hash=p_grant_token_hash AND step_grant.session_id=p_session_id
+    AND step_grant.user_id=p_user_id AND step_grant.action='DELETE_PRIVATE_DEBATE'
+    AND step_grant.target_run_id=ANY(v_chain) AND step_grant.target_account_id IS NULL
+    AND step_grant.consumed_at IS NOT NULL
+  ORDER BY binding.created_at,binding.request_ref
+  LIMIT 1;
+  IF NOT FOUND THEN RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN; END IF;
+  PERFORM 1 FROM core.run AS run
+  WHERE run.run_id=v_run_id
+  FOR UPDATE NOWAIT;
+  IF NOT FOUND THEN RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN; END IF;
+  PERFORM pg_advisory_xact_lock(hashtextextended('identity:account:'||p_user_id::text,0));
+  SELECT * INTO v_account FROM identity.lock_account_t9_internal(p_user_id,true);
+  IF v_account.owner_ref IS DISTINCT FROM p_owner_ref THEN
+    RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN;
+  END IF;
+  PERFORM 1 FROM identity.session AS session
+  WHERE session.session_id=p_session_id AND session.user_id=p_user_id
+    AND session.revoked_at IS NULL AND session.idle_expires_at>v_now
+    AND LEAST(session.absolute_expires_at,session.created_at+interval '720 hours')>GREATEST(v_now,clock_timestamp())
+  FOR KEY SHARE;
+  IF NOT FOUND THEN RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN; END IF;
+  SELECT step_grant.step_up_grant_id INTO v_grant_id
+  FROM identity.step_up_grant AS step_grant
+  WHERE step_grant.token_hash=p_grant_token_hash
+    AND step_grant.session_id=p_session_id
+    AND step_grant.user_id=p_user_id
+    AND step_grant.action='DELETE_PRIVATE_DEBATE'
+    AND step_grant.target_run_id=ANY(v_chain)
+    AND step_grant.target_account_id IS NULL
+    AND step_grant.consumed_at IS NOT NULL
+  FOR KEY SHARE;
+  IF NOT FOUND THEN RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN; END IF;
+  -- The run named and the run resumed are both the person's, first and last.
+  SELECT event.owner_ref INTO v_first_owner FROM core.run_ownership_event AS event
+  WHERE event.run_id=p_run_id ORDER BY event.at_seq ASC LIMIT 1;
+  SELECT event.owner_ref INTO v_latest_owner FROM core.run_ownership_event AS event
+  WHERE event.run_id=p_run_id ORDER BY event.at_seq DESC LIMIT 1;
+  IF v_first_owner IS DISTINCT FROM p_owner_ref OR v_latest_owner IS DISTINCT FROM p_owner_ref THEN
+    RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN;
+  END IF;
+  SELECT event.owner_ref INTO v_first_owner FROM core.run_ownership_event AS event
+  WHERE event.run_id=v_run_id ORDER BY event.at_seq ASC LIMIT 1;
+  SELECT event.owner_ref INTO v_latest_owner FROM core.run_ownership_event AS event
+  WHERE event.run_id=v_run_id ORDER BY event.at_seq DESC LIMIT 1;
+  IF v_first_owner IS DISTINCT FROM p_owner_ref OR v_latest_owner IS DISTINCT FROM p_owner_ref THEN
+    RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN;
+  END IF;
+  SELECT binding.request_ref INTO v_request_ref
+  FROM identity.private_erasure_audit_binding AS binding
+  WHERE binding.run_id=v_run_id AND binding.user_id=p_user_id
+    AND binding.session_id=p_session_id AND binding.grant_id=v_grant_id
+    AND binding.consumed_at IS NULL
+  FOR UPDATE;
+  IF NOT FOUND THEN RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN; END IF;
+  PERFORM 1 FROM serve.private_run_key_cleanup_intent AS intent
+  WHERE intent.request_ref=v_request_ref AND intent.run_id=v_run_id
+    AND intent.user_id=p_user_id
+  FOR UPDATE;
+  IF NOT FOUND THEN RETURN QUERY SELECT 'NOT_FOUND'::text,NULL::uuid; RETURN; END IF;
+  RETURN QUERY SELECT 'PREPARED'::text,v_request_ref;
+  EXCEPTION WHEN lock_not_available THEN
+    RETURN QUERY SELECT 'CONTENDED'::text,NULL::uuid;
+  END;
+END;
+$$;
+REVOKE ALL ON FUNCTION core.resume_private_run_erasure(uuid,uuid,uuid,uuid,text)
+  FROM PUBLIC,debateai_runtime,debateai_authorization_runtime,debateai_replay,
+    debateai_publication_cleanup,debateai_content_provision;
+GRANT EXECUTE ON FUNCTION core.resume_private_run_erasure(uuid,uuid,uuid,uuid,text) TO debateai_erasure_runtime;
+
+CREATE OR REPLACE FUNCTION core.finalize_private_run_erasure(
+  p_erasure_id uuid,
+  p_key_cleanup_completed_at timestamptz,
+  p_occurred_at timestamptz,
+  p_destroyed_key_count integer,
+  p_already_absent_key_count integer
+)
+RETURNS text
+LANGUAGE plpgsql
+VOLATILE
+SECURITY DEFINER
+SET search_path = pg_catalog
+AS $$
+DECLARE
+  v_run_id uuid;
+  v_requested_at timestamptz;
+  v_owner_ref uuid;
+  v_user_id uuid;
+  v_audit_id uuid;
+  v_audit_actor_ref uuid;
+  v_audit_target_ref uuid;
+  v_session_id uuid;
+  v_grant_id uuid;
+  v_account record;
+  v_prepared_cleanup_publication_refs uuid[];
+  v_actual_cleanup_publication_refs uuid[];
+  v_chain uuid[];
+BEGIN
+  SELECT intent.run_id,intent.requested_at,first_owner.owner_ref,intent.user_id,
+    binding.audit_id,binding.audit_actor_ref,binding.audit_target_ref,
+    binding.session_id,binding.grant_id,intent.cleanup_publication_refs
+  INTO v_run_id,v_requested_at,v_owner_ref,v_user_id,
+    v_audit_id,v_audit_actor_ref,v_audit_target_ref,
+    v_session_id,v_grant_id,v_prepared_cleanup_publication_refs
+  FROM serve.private_run_key_cleanup_intent AS intent
+  JOIN LATERAL (
+    SELECT event.owner_ref FROM core.run_ownership_event AS event
+    WHERE event.run_id=intent.run_id ORDER BY event.at_seq ASC LIMIT 1
+  ) AS first_owner ON true
+  JOIN identity.private_erasure_audit_binding AS binding
+    ON binding.request_ref=intent.request_ref AND binding.run_id=intent.run_id
+      AND binding.user_id=intent.user_id AND binding.consumed_at IS NULL
+  WHERE intent.request_ref=p_erasure_id;
+  IF NOT FOUND THEN RETURN 'NOT_FOUND'; END IF;
+  IF p_key_cleanup_completed_at IS NULL OR p_key_cleanup_completed_at<v_requested_at
+    OR p_occurred_at<p_key_cleanup_completed_at
+    OR p_occurred_at>clock_timestamp()+interval '5 minutes'
+    OR p_destroyed_key_count NOT IN (0,1)
+    OR p_already_absent_key_count NOT IN (0,1)
+    OR p_destroyed_key_count+p_already_absent_key_count<>1 THEN
+    RETURN 'INVALID_EVIDENCE';
+  END IF;
+  -- Side-by-side A-x3: the grant that marked this run may be bound to any run of its re-admission chain.
+  v_chain := core.private_erasure_run_chain(v_run_id);
+  BEGIN
+    IF NOT pg_try_advisory_xact_lock(hashtextextended('identity:security-subject:'||v_user_id::text,0)) THEN RETURN 'CONTENDED'; END IF;
+    PERFORM 1 FROM core.run AS run WHERE run.run_id=v_run_id FOR UPDATE NOWAIT;
+    IF NOT pg_try_advisory_xact_lock(
+      hashtextextended('identity:account:'||v_user_id::text,0)
+    ) THEN RETURN 'CONTENDED'; END IF;
+    SELECT * INTO v_account FROM identity.lock_account_t9_internal(v_user_id,true);
+    IF v_account.owner_ref IS DISTINCT FROM v_owner_ref THEN RETURN 'NOT_FOUND'; END IF;
+    PERFORM 1 FROM identity.session AS session
+    WHERE session.session_id=v_session_id AND session.user_id=v_user_id
+    FOR KEY SHARE NOWAIT;
+    IF NOT FOUND THEN RETURN 'NOT_FOUND'; END IF;
+    PERFORM 1 FROM identity.step_up_grant AS step_grant
+    WHERE step_grant.step_up_grant_id=v_grant_id
+      AND step_grant.user_id=v_user_id
+      AND step_grant.session_id=v_session_id
+      AND step_grant.action='DELETE_PRIVATE_DEBATE'
+      AND step_grant.target_run_id=ANY(v_chain)
+      AND step_grant.target_account_id IS NULL
+      AND step_grant.consumed_at IS NOT NULL
+    FOR KEY SHARE NOWAIT;
+    IF NOT FOUND THEN RETURN 'NOT_FOUND'; END IF;
+    PERFORM 1 FROM identity.private_erasure_audit_binding AS binding
+    WHERE binding.request_ref=p_erasure_id AND binding.user_id=v_user_id
+      AND binding.run_id=v_run_id AND binding.session_id=v_session_id
+      AND binding.grant_id=v_grant_id AND binding.audit_id=v_audit_id
+      AND binding.audit_actor_ref=v_audit_actor_ref
+      AND binding.audit_target_ref=v_audit_target_ref
+      AND binding.consumed_at IS NULL
+    FOR UPDATE NOWAIT;
+    IF NOT FOUND THEN RETURN 'NOT_FOUND'; END IF;
+    PERFORM 1 FROM serve.private_run_key_cleanup_intent AS intent
+    WHERE intent.request_ref=p_erasure_id AND intent.run_id=v_run_id
+      AND intent.user_id=v_user_id
+      AND intent.requested_at=v_requested_at
+      AND intent.cleanup_publication_refs=v_prepared_cleanup_publication_refs
+    FOR UPDATE NOWAIT;
+    IF NOT FOUND THEN RETURN 'NOT_FOUND'; END IF;
+    SELECT COALESCE(array_agg(snapshot.publication_ref ORDER BY snapshot.publication_ref),
+      ARRAY[]::uuid[])
+    INTO v_actual_cleanup_publication_refs
+    FROM serve.publication_snapshot AS snapshot WHERE snapshot.run_id=v_run_id;
+    IF v_actual_cleanup_publication_refs IS DISTINCT FROM v_prepared_cleanup_publication_refs THEN
+      RETURN 'INVALID_EVIDENCE';
+    END IF;
+    IF EXISTS (
+      SELECT 1 FROM unnest(v_actual_cleanup_publication_refs) AS candidate(publication_ref)
+      LEFT JOIN serve.publication_key_cleanup_intent AS cleanup
+        ON cleanup.publication_ref=candidate.publication_ref
+          AND cleanup.completed_at IS NOT NULL
+      WHERE cleanup.publication_ref IS NULL
+    ) THEN
+      RETURN 'CONTENDED';
+    END IF;
+    PERFORM identity.append_audit_event_internal(
+      v_audit_id,v_audit_actor_ref::text,'debate.private.erased',
+      'debate.private_erasure',v_audit_target_ref::text,p_occurred_at,
+      '{"schema":"s10-private-erasure-v1"}'::jsonb,'ALLOW',true,
+      CASE WHEN p_destroyed_key_count=1 THEN 'RUN_KEY_DURABLY_DESTROYED'
+        ELSE 'RUN_KEY_DURABLY_CONFIRMED_ABSENT' END
+    );
+    INSERT INTO serve.private_run_erasure_tombstone(
+      run_id,completed_at,destroyed_key_count,already_absent_key_count
+    ) VALUES (
+      v_run_id,p_key_cleanup_completed_at,p_destroyed_key_count,p_already_absent_key_count
+    );
+    DELETE FROM serve.private_run_key_cleanup_intent WHERE request_ref=p_erasure_id;
+    UPDATE identity.private_erasure_audit_binding
+    SET consumed_at=p_key_cleanup_completed_at
+    WHERE request_ref=p_erasure_id AND consumed_at IS NULL;
+    RETURN 'COMMITTED';
+  EXCEPTION WHEN lock_not_available THEN RETURN 'CONTENDED';
+  END;
+END;
+$$;
+REVOKE ALL ON FUNCTION core.finalize_private_run_erasure(uuid,timestamptz,timestamptz,integer,integer)
+  FROM PUBLIC,debateai_runtime,debateai_authorization_runtime,debateai_replay,
+    debateai_publication_cleanup,debateai_content_provision;
+GRANT EXECUTE ON FUNCTION core.finalize_private_run_erasure(uuid,timestamptz,timestamptz,integer,integer) TO debateai_erasure_runtime;
+
 -- THE CONTRACT THIS FILE CLAIMS, checked rather than assumed (0122's closing shape). Each section adds its own checks.
 DO $side_by_side_releases_contract$
 DECLARE
@@ -1264,6 +1873,11 @@ DECLARE
     to_regprocedure('staff.read_internal_funding_policy_at(bigint)'),
     to_regprocedure('staff.read_self_allowance_command(jsonb,text,uuid)')];
   v_spent regprocedure := to_regprocedure('billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)');
+  v_chain regprocedure := to_regprocedure('core.private_erasure_run_chain(uuid)');
+  v_erasure regprocedure[] := ARRAY[
+    to_regprocedure('core.prepare_private_run_erasure(uuid,uuid,uuid,uuid,text)'),
+    to_regprocedure('core.resume_private_run_erasure(uuid,uuid,uuid,uuid,text)'),
+    to_regprocedure('core.finalize_private_run_erasure(uuid,timestamptz,timestamptz,integer,integer)')];
 BEGIN
   -- §1: the stamp column, its default, and its validated shape CHECK.
   IF NOT EXISTS (
@@ -1496,6 +2110,37 @@ BEGIN
     OR strpos(pg_get_functiondef('billing.read_internal_grant_commitments(uuid,uuid,uuid,uuid)'::regprocedure),
          'model_spend_waiver') > 0 THEN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'SIDE_BY_SIDE_SPEND_WAIVER_CONTRACT_INCOMPLETE';
+  END IF;
+  -- §8: the chain reader a STABLE definer with the pinned path, callable by no role; the three erasure functions
+  -- VOLATILE definers with the pinned path, owned by the reader's owner, each reading the chain and binding the grant to
+  -- it (no grant bound to the run named alone is left), with EXECUTE for the erasure runtime alone; prepare taking the
+  -- supersession guard's lock and trying the other runs' content leases; prepare and resume keeping 0099's session clamp.
+  IF v_chain IS NULL OR array_position(v_erasure, NULL) IS NOT NULL
+    OR NOT EXISTS (
+      SELECT 1 FROM pg_proc AS p
+      WHERE p.oid = v_chain AND p.prosecdef AND p.proconfig = ARRAY['search_path=pg_catalog'] AND p.provolatile = 's')
+    OR ARRAY(SELECT coalesce(pg_get_userbyid(nullif(a.grantee, 0)), 'PUBLIC') || ':' || a.privilege_type
+             FROM pg_proc AS p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) AS a
+             WHERE p.oid = v_chain AND a.grantee <> p.proowner ORDER BY 1) <> ARRAY[]::text[]
+    OR (SELECT count(*) FROM pg_proc AS p
+        WHERE p.oid = ANY(v_erasure) AND p.prosecdef AND p.proconfig = ARRAY['search_path=pg_catalog']
+          AND p.provolatile = 'v' AND p.proowner = (SELECT chain.proowner FROM pg_proc AS chain WHERE chain.oid = v_chain)
+          AND strpos(pg_get_functiondef(p.oid), 'core.private_erasure_run_chain(') > 0
+          AND strpos(pg_get_functiondef(p.oid), 'step_grant.target_run_id=ANY(v_chain)') > 0
+          AND strpos(pg_get_functiondef(p.oid), 'step_grant.target_run_id=p_run_id') = 0
+          AND strpos(pg_get_functiondef(p.oid), 'step_grant.target_run_id=v_run_id') = 0) <> 3
+    OR EXISTS (SELECT 1 FROM unnest(v_erasure) AS f(oid)
+               WHERE ARRAY(SELECT coalesce(pg_get_userbyid(nullif(a.grantee, 0)), 'PUBLIC') || ':' || a.privilege_type
+                           FROM pg_proc AS p, aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) AS a
+                           WHERE p.oid = f.oid AND a.grantee <> p.proowner ORDER BY 1)
+                     IS DISTINCT FROM ARRAY['debateai_erasure_runtime:EXECUTE'])
+    OR strpos(pg_get_functiondef(v_erasure[1]), 'pg_try_advisory_xact_lock(hashtextextended(''debateai:run-supersession'',0))') = 0
+    OR strpos(pg_get_functiondef(v_erasure[1]), 'hashtextextended(''debateai:run-content-lease:v1:''||v_member::text,0)') = 0
+    OR EXISTS (SELECT 1 FROM unnest(v_erasure[1:2]) AS f(oid)
+               WHERE strpos(pg_get_functiondef(f.oid),
+                 'LEAST(session.absolute_expires_at,session.created_at+interval ''720 hours'')>GREATEST(v_now,clock_timestamp())') = 0
+                 OR strpos(pg_get_functiondef(f.oid), 'AND session.absolute_expires_at>') > 0) THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'SIDE_BY_SIDE_ERASURE_CHAIN_CONTRACT_INCOMPLETE';
   END IF;
 END
 $side_by_side_releases_contract$;

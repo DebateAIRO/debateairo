@@ -20,9 +20,11 @@ import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-cha
  * reserve_internal_provider_call, read_internal_run_state, read_internal_allowance and guard_internal_charge_scope, and
  * staff.revoke_internal_allowance), and staff.read_self_allowance_command so a revoke names its grant's own version,
  * and adds staff.read_internal_funding_policy_at(bigint); §7 adds the append-only spend waiver ledger.model_spend_waiver
- * and redefines billing.read_internal_grant_spent in place so a waived run leaves a funded person's window. The view,
- * that CHECK, the two indexes on the marker and the seven redefinitions of §6 and §7 are checked by the closing block
- * and by tests, not digested, so a later drained step may widen or redefine them again (as 0121's CHECKs are handled).
+ * and redefines billing.read_internal_grant_spent in place so a waived run leaves a funded person's window; §8 adds the
+ * chain reader core.private_erasure_run_chain(uuid) and redefines the per-debate private erasure (prepare, resume,
+ * finalize) in place so deleting a debate erases every run of its re-admission chain (addendum A-x3). The view, that
+ * CHECK, the two indexes on the marker and the ten redefinitions of §6, §7 and §8 are checked by the closing block and
+ * by tests, not digested, so a later drained step may widen or redefine them again (as 0121's CHECKs are handled).
  * It adds no billing relation and no billing function, so the effective verifier in force (0111's) stays in force and
  * is named as its own. Its checks are its postcondition (below), compared on every later migrate(); it has no
  * supplemental verifier, so no replayVerifierSql. Each later section appends its objects to the lists below.
@@ -38,12 +40,13 @@ const COLUMNS=['core.run.release_key','core.run_key_provision_intent.readmitted_
 /** §1: the CHECKs 0123 adds, as table.constraint. */
 const CONSTRAINTS=['core.run.run_release_key_shape'] as const;
 /**
- * §2: the function 0123 redefines in place, §3: the four it adds, §4: the six it adds, §6: the one it adds (whole:
- * owner, definer, path, volatility, definition, ACL).
+ * §2: the function 0123 redefines in place, §3: the four it adds, §4: the six it adds, §6: the one it adds, §8: the
+ * one it adds (whole: owner, definer, path, volatility, definition, ACL).
  */
 const FUNCTIONS=['core.create_encrypted_run(jsonb,uuid,uuid,jsonb)','core.guard_run_supersession()',
  'core.list_unstarted_readmissions(uuid)','core.lock_readmitted_run_key_provision_for_commit(uuid,uuid,uuid,uuid)',
- 'core.prepare_readmitted_run_key_provision(uuid,uuid)','core.read_current_release()','core.read_release_state(text)',
+ 'core.prepare_readmitted_run_key_provision(uuid,uuid)','core.private_erasure_run_chain(uuid)',
+ 'core.read_current_release()','core.read_release_state(text)',
  'core.record_release_event(text,text,text,text)','core.record_release_switch(text,text,timestamptz,text,bigint)',
  'core.refuse_starting_superseded_run()','core.resolve_run_ref(uuid)','staff.read_internal_funding_policy_at(bigint)'] as const;
 /** §3, §4, §7: the tables 0123 adds, whole (owner, ACL, columns, constraints, indexes, triggers, rules), as 0122 does. */

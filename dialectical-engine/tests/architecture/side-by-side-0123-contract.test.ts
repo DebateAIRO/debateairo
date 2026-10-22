@@ -301,6 +301,76 @@ describe("0123: the side-by-side releases step", () => {
     expect(loader).not.toContain(`'${signature}'`);
   });
 
+  it("§8 redefines the per-debate private erasure on the debate's re-admission chain, with 0099's clamp, owner and grants kept, and adds the chain reader", () => {
+    const section = sql.slice(sql.indexOf("-- §8. Deleting a debate erases every run of it"), sql.indexOf("-- THE CONTRACT THIS FILE CLAIMS"));
+    expect(section.length).toBeGreaterThan(0);
+    const body = (head: string): string => {
+      const start = section.indexOf(`CREATE OR REPLACE FUNCTION ${head}`);
+      expect(start, head).toBeGreaterThanOrEqual(0);
+      return section.slice(start, section.indexOf("$$;", start));
+    };
+    // The chain reader: the newest run first, then every superseded run, 16 hops each way at most; ids only, no role.
+    const chain = body("core.private_erasure_run_chain(p_run_id uuid)");
+    for (const line of ["RETURNS uuid[]", "STABLE", "SECURITY DEFINER", "SET search_path = pg_catalog",
+      "SELECT edge.new_run_id INTO v_next FROM core.run_supersession AS edge WHERE edge.old_run_id = v_newest;",
+      "WHERE edge.new_run_id = v_chain[cardinality(v_chain)];"]) expect(chain).toContain(line);
+    expect(chain.split("MESSAGE = 'RUN_SUPERSESSION_CHAIN_INVALID'")).toHaveLength(3);
+    expect(section).not.toMatch(/GRANT [^;]*core\.private_erasure_run_chain/u);
+    expect(section).toMatch(/REVOKE ALL ON FUNCTION core\.private_erasure_run_chain\(uuid\)\s+FROM PUBLIC,debateai_runtime,[^;]*debateai_erasure_runtime,[^;]*;/u);
+    // The three erasure functions: the grant bound to any run of the chain, never to the run named alone.
+    const prepare = body("core.prepare_private_run_erasure(");
+    const resume = body("core.resume_private_run_erasure(");
+    const finalize = body("core.finalize_private_run_erasure(");
+    for (const [name, text] of [["prepare", prepare], ["resume", resume], ["finalize", finalize]] as const) {
+      expect(text, name).toContain("SECURITY DEFINER");
+      expect(text, name).toContain("SET search_path = pg_catalog");
+      expect(text, name).toContain("core.private_erasure_run_chain(");
+      expect(text, name).toContain("step_grant.target_run_id=ANY(v_chain)");
+      expect(text, name).not.toContain("step_grant.target_run_id=p_run_id");
+      expect(text, name).not.toContain("step_grant.target_run_id=v_run_id");
+    }
+    // 0099's session clamp as applied (two each in prepare and resume), never the unclamped expiry.
+    const clamp = "LEAST(session.absolute_expires_at,session.created_at+interval '720 hours')>GREATEST(v_now,clock_timestamp())";
+    expect(prepare.split(clamp)).toHaveLength(3);
+    expect(resume.split(clamp)).toHaveLength(3);
+    for (const text of [prepare, resume, finalize]) expect(text).not.toContain("AND session.absolute_expires_at>");
+    // Prepare: the chain read again under the supersession guard's lock, after the account lock; the other runs owned
+    // first and last by the person, locked, their content leases tried; the grant consumed once; legacy, published and
+    // erased judged over the person's runs; publication copies checked before any run is marked; the first id returned.
+    const supersessionLock = "IF NOT pg_try_advisory_xact_lock(hashtextextended('debateai:run-supersession',0)) THEN";
+    expect(prepare.indexOf(supersessionLock)).toBeGreaterThan(prepare.indexOf("SELECT * INTO v_account FROM identity.lock_account_t9_internal(p_user_id,true);"));
+    expect(prepare.indexOf("v_chain := core.private_erasure_run_chain(p_run_id);", prepare.indexOf(supersessionLock)))
+      .toBeGreaterThan(prepare.indexOf(supersessionLock));
+    expect(prepare).toContain("PERFORM 1 FROM core.run AS run WHERE run.run_id=ANY(v_members) ORDER BY run.run_id FOR UPDATE NOWAIT;");
+    expect(prepare).toContain("IF NOT pg_try_advisory_xact_lock(hashtextextended('debateai:run-content-lease:v1:'||v_member::text,0)) THEN");
+    expect(prepare.split("UPDATE identity.step_up_grant SET consumed_at=v_now")).toHaveLength(2);
+    expect(prepare.indexOf("RETURN QUERY SELECT 'CONTENDED'::text,NULL::uuid; RETURN;\n      END IF;\n    END LOOP;"))
+      .toBeLessThan(prepare.indexOf("UPDATE identity.step_up_grant SET consumed_at=v_now"));
+    expect(prepare).toContain("WHERE run.run_id=ANY(v_members) AND run.content_encryption_version IS DISTINCT FROM 1");
+    expect(prepare).toContain("WHERE snapshot.run_id=ANY(v_pending) AND cleanup.publication_ref IS NULL");
+    expect(prepare.indexOf("WHERE snapshot.run_id=ANY(v_pending) AND cleanup.publication_ref IS NULL"))
+      .toBeLessThan(prepare.indexOf("FOREACH v_member IN ARRAY v_pending LOOP"));
+    expect(prepare).toContain("RETURN QUERY SELECT 'PREPARED'::text,v_first_request_ref;");
+    // Resume: the oldest still-pending binding of this grant in the chain, its own run locked and owned.
+    expect(resume).toContain("ORDER BY binding.created_at,binding.request_ref");
+    expect(resume).toContain("WHERE run.run_id=v_run_id\n  FOR UPDATE NOWAIT;");
+    // Owner and grants re-asserted as 0040 left them: EXECUTE for the erasure runtime alone.
+    for (const signature of ["core.prepare_private_run_erasure(uuid,uuid,uuid,uuid,text)", "core.resume_private_run_erasure(uuid,uuid,uuid,uuid,text)",
+      "core.finalize_private_run_erasure(uuid,timestamptz,timestamptz,integer,integer)"]) {
+      expect(section).toMatch(new RegExp(`REVOKE ALL ON FUNCTION ${signature.replace(/[().]/gu, "\\$&")}\\s+FROM PUBLIC,debateai_runtime,debateai_authorization_runtime,debateai_replay,\\s+debateai_publication_cleanup,debateai_content_provision;`, "u"));
+      expect(section).toContain(`GRANT EXECUTE ON FUNCTION ${signature} TO debateai_erasure_runtime;`);
+      expect(section).not.toContain(`ALTER FUNCTION ${signature} OWNER`);
+    }
+    expect(sql).toContain("SIDE_BY_SIDE_ERASURE_CHAIN_CONTRACT_INCOMPLETE");
+    // The loader digests the new reader; the three redefinitions are checked by the closing block and these tests.
+    const loader = read("packages/db/src/migration-forward0123.ts");
+    expect(loader).toContain("'core.private_erasure_run_chain(uuid)'");
+    expect(loader).not.toContain("'core.prepare_private_run_erasure(");
+    // The coordinator completes every marked run, asking resume for the next until none is left.
+    const coordinator = read("packages/db/src/account-erasure.ts");
+    expect(coordinator).toContain("const next = await this.repository.resume(input);");
+  });
+
   it("§2's closing check covers every role 0040's REVOKE names, not only PUBLIC and the runtime", () => {
     for (const role of ["debateai_runtime", "debateai_authorization_runtime", "debateai_erasure_runtime", "debateai_replay", "debateai_publication_cleanup"]) {
       expect(sql).toContain(`OR has_function_privilege('${role}', v_function, 'EXECUTE')`);
