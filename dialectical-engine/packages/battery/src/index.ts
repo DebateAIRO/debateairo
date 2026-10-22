@@ -591,9 +591,9 @@ export class WorkItemRepository {
   /**
    * Records the work item DONE with its settled attempt and artifact. R3 (final review), spec §3/§4: a repository that
    * names its worker settles only that worker's own claim (`state = 'CLAIMED' AND claimed_by = worker`), so a task
-   * finishing after the backstop set its debate aside FAILED (RUN_SET_ASIDE, with the waiver) never writes DONE over it,
-   * and never settles another worker's claim. One told no worker id (test fixtures) settles a READY or CLAIMED item, and
-   * never a FAILED one either. True when this call wrote it.
+   * finishing after the backstop set its debate aside FAILED (RUN_SET_ASIDE, with the waiver) never writes DONE over
+   * it, and never settles another worker's claim. One told no worker id (test fixtures) settles a READY or CLAIMED
+   * item, and never a FAILED one either. True when this call wrote it.
    */
   async settle(input: { readonly workItemId: string; readonly attemptId: string; readonly artifactRef: string }): Promise<boolean> {
     return withWriteTransaction(this.pool, async (client) => {

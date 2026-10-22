@@ -688,7 +688,7 @@ await worker.registerWorkflows([task]);
 const retirementStore = postgresRunnerRetirementStore(pool, workFence);
 // X2 (final review): one read of this release's facts BEFORE the worker starts. Under a standing retire request on a
 // DRAINING release (a restart mid-drain) both stops are on before the first claim, so nothing is claimed or paid for
-// before the backstop's first pass, and the start-up re-send is skipped (it would only hand this runner work to refuse).
+// before the backstop's first pass, and the start-up re-send is skipped (it would only hand back work to refuse).
 const retireRequestStanding = await honourStandingRetireRequest({
   releaseKey: environment.RELEASE_KEY,
   store: retirementStore,
