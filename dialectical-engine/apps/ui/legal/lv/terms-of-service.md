@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Īsumā
-eyebrow: PAKALPOJUMA NOTEIKUMI · v2.3 · SPĒKĀ NO 2026. GADA 12. OKTOBRA
+eyebrow: PAKALPOJUMA NOTEIKUMI · v2.4 · SPĒKĀ NO 2026. GADA 12. OKTOBRA
 title: Kam jūs piekrītat
 lede: Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.
-endMarker: NOTEIKUMU BEIGAS · v2.3
+endMarker: NOTEIKUMU BEIGAS · v2.4
 bodyLabel: Pakalpojuma noteikumu teksts
 annexTitle: A pielikums — Reģionālie noteikumi
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PIEMĒROJAMIE TIESĪBU AKTI
 -->
 
-**Version 2.3 · Effective 2026. gada 12. oktobris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
+**Version 2.4 · Effective 2026. gada 12. oktobris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
 
 **In short.** Jums jābūt vismaz 18 gadus vecam. Dialectical Engine veido argumentus ar MI modeļiem, un viss, ko tas ģenerē, var būt nepareizs — tā nav konsultācija. Jūsu debates ir privātas, ja vien tās nepublicējat; ja tās publicējat, ikviens tās var lasīt. Jūsu iesniegtais teksts tiek nosūtīts mūsu Pakalpojumu sniedzēju reģistrā norādītajiem MI pakalpojumu sniedzējiem un netiek izmantots modeļu apmācīšanai. Par nelikumīgu saturu ziņojiet uz support@dezbatere.ro neatkarīgi no tā, vai jums ir konts. Piemēro Rumānijas tiesību aktus, taču jums joprojām ir vietējā patērētāju aizsardzība.
 
@@ -195,7 +195,11 @@ Dialectical Engine piedāvā bezmaksas plānu. Būs pieejams maksas **Premium** 
 
 **Neizdevušies maksājumi.** Ja maksājums neizdodas, mēs atkārtojam mēģinājumus 7 dienas un pirms jūsu konta pazemināšanas uz bezmaksas plānu brīdinām jūs pa e-pastu. Mēs nedzēšam jūsu debates neizdevušās apmaksas dēļ.
 
-**Nodokļi un maksājuma saņēmējs.** Cenās ir iekļauts PVN, GST vai tirdzniecības nodoklis atkarībā no jūsu dzīvesvietas, un tas tiek parādīts pirms maksājuma veikšanas. Kartes maksājumus apstrādā NETOPIA Payments (netopia-payments.com). Pārdevējs ir DMS Merchandise Shop S.R.L., kas izsniedz jūsu rēķinu un paliek atbildīgs par pašu pakalpojumu un šiem Noteikumiem.
+**Nodokļi un maksājuma saņēmējs.** Cenās ir iekļauts PVN, GST vai tirdzniecības nodoklis atkarībā no jūsu dzīvesvietas, un tas tiek parādīts pirms maksājuma veikšanas. Pārdevējs ir DMS Merchandise Shop S.R.L., kas izsniedz jūsu rēķinu un paliek atbildīgs par pašu pakalpojumu un šiem Noteikumiem.
+
+**Maksājumu veidi.** Jūs maksājat ar karti. Mēs pieņemam Visa un Mastercard kartes; American Express kartes mēs nepieņemam. Kartes maksājumus apstrādā NETOPIA Payments (netopia-payments.com), un pilns jūsu kartes numurs nekad nenonāk pie mums.
+
+**Piegāde.** Dialectical Engine ir tiešsaistes pakalpojums, tāpēc jums nekas netiek nosūtīts. Jūsu maksas plāna funkcijas jūsu kontā ir pieejamas, tiklīdz maksājums ir apstiprināts.
 
 **Maksājumu apstrīdēšana.** Ja apstrīdat maksājumu pie savas kartes izdevēja, mēs varam apturēt maksas funkcijas, kamēr strīds tiek atrisināts. Par to mēs neiekasējam maksu.
 

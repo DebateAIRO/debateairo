@@ -201,7 +201,9 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Anularea. Anulați oricând din Setări → Abonament, printr-un singur clic de confirmare, sau prin pagina de anulare de la dezbatere.ro/cancel, care nu vă impune să vă autentificați. Anularea produce efecte la sfârșitul perioadei curente de facturare, iar până atunci vă păstrați accesul. Nu vom face anularea mai dificilă decât a fost abonarea." },
       { kind: "p", text: "Modificările de preț produc efecte numai la o reînnoire. Vă notificăm prin e-mail cu cel puțin 30 de zile înainte, comunicând noul preț și un link de anulare. Atunci când legislația țării dumneavoastră impune consimțământul expres pentru o modificare de preț, vi-l solicităm; în caz contrar, dacă nu luați nicio măsură, noul preț se aplică de la următoarea reînnoire. Anexa A menționează normele regionale." },
       { kind: "p", text: "Plăți nereușite. Dacă o plată eșuează, reîncercăm timp de 7 zile și vă avertizăm prin e-mail înainte de a trece contul la planul gratuit. Nu vă ștergem dezbaterile din cauza unei plăți nereușite." },
-      { kind: "p", text: "Taxe și beneficiarul plății. Prețurile includ TVA, GST sau taxa pe vânzări, în funcție de locul în care locuiți, iar acest lucru este afișat înainte de plată. Plățile cu cardul sunt procesate de NETOPIA Payments (netopia-payments.com). Vânzătorul este DMS Merchandise Shop S.R.L., care emite factura dumneavoastră și rămâne responsabil pentru serviciul în sine și pentru acești Termeni." },
+      { kind: "p", text: "Taxe și beneficiarul plății. Prețurile includ TVA, GST sau taxa pe vânzări, în funcție de locul în care locuiți, iar acest lucru este afișat înainte de plată. Vânzătorul este DMS Merchandise Shop S.R.L., care emite factura dumneavoastră și rămâne responsabil pentru serviciul în sine și pentru acești Termeni." },
+      { kind: "p", text: "Modalități de plată. Plătiți cu cardul. Acceptăm Visa și Mastercard; nu acceptăm American Express. Plățile cu cardul sunt procesate de NETOPIA Payments (netopia-payments.com), iar numărul complet al cardului dumneavoastră nu ajunge niciodată la noi." },
+      { kind: "p", text: "Livrare. Dialectical Engine este un serviciu online, așa că nu vă expediem nimic. Funcțiile planului cu plată devin disponibile în contul dumneavoastră imediat ce plata este confirmată." },
       { kind: "p", text: "Refuzuri la plată. Dacă contestați o plată la emitentul cardului, putem suspenda funcțiile cu plată până la soluționarea contestației. Nu percepem comisioane pentru aceasta." },
       { kind: "p", text: "Drepturile legale au prioritate. Atunci când serviciul nu corespunde celor promise, aveți dreptul la aducerea sa în conformitate sau la o reducere proporțională a prețului ori la rambursare, astfel cum prevede legea. În plus, dacă anulați un plan cu plată în cursul unei perioade de facturare, vă rambursăm partea din prețul perioadei respective pe care nu ați folosit-o, măsurată după utilizarea planului, indiferent câte zile au trecut: dacă ați folosit 30% din plan, vă rambursăm 70%; dacă nu ați folosit nimic din el, vă rambursăm prețul integral. Solicitați rambursarea la support@dezbatere.ro; odată ce am rambursat, planul încetează. Dacă se aplică și dreptul de retragere din secțiunea 13, primiți rambursarea mai mare dintre cele două. Limitele de utilizare pentru fiecare plan sunt publicate în produs; vă notificăm înainte de a le restrânge într-un mod care vă afectează în mod semnificativ." }
     ]
@@ -351,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.3",
-  sha256: "6a1da3a230ffdffdbd856b89416a1212a6864a80251f8c2be4e32cd0afcd7fc3",
-  eyebrow: "TERMENII SERVICIULUI · v2.3 · ÎN VIGOARE DE LA 12 OCTOMBRIE 2026",
+  version: "2.4",
+  sha256: "92ef6fe3905f81a9113abb28c7a106fde84686f9fe89c5ff23bb949b3ef3ebf7",
+  eyebrow: "TERMENII SERVICIULUI · v2.4 · ÎN VIGOARE DE LA 12 OCTOMBRIE 2026",
   title: "Ce acceptați",
   lede: "Contractul dintre dumneavoastră și DMS Merchandise Shop S.R.L., într-un limbaj clar. Nouăsprezece secțiuni și Anexa A — derulați până la final.",
-  endMarker: "SFÂRȘITUL TERMENILOR · v2.3",
+  endMarker: "SFÂRȘITUL TERMENILOR · v2.4",
   contact: "support@dezbatere.ro",
   bodyLabel: "Textul Termenilor serviciului",
   sectionIdPrefix: "terms-section-",

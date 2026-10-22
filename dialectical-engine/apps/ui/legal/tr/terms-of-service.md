@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kısaca
-eyebrow: HİZMET KOŞULLARI · v2.3 · YÜRÜRLÜK TARİHİ 12 EKİM 2026
+eyebrow: HİZMET KOŞULLARI · v2.4 · YÜRÜRLÜK TARİHİ 12 EKİM 2026
 title: Kabul ettiğiniz hükümler
 lede: Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.
-endMarker: KOŞULLARIN SONU · v2.3
+endMarker: KOŞULLARIN SONU · v2.4
 bodyLabel: Hizmet Koşulları metni
 annexTitle: Ek A — Bölgesel koşullar
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 UYGULANACAK HUKUK
 -->
 
-**Version 2.3 · Effective 12 Ekim 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
+**Version 2.4 · Effective 12 Ekim 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
 
 **In short.** En az 18 yaşında olmalısınız. Dialectical Engine, yapay zekâ modelleriyle argümanlar oluşturur ve ürettiği her şey yanlış olabilir — bunlar tavsiye değildir. Tartışmalarınız, siz yayımlamadıkça özeldir; yayımlarsanız herkes okuyabilir. Gönderdiğiniz metin, Sağlayıcı Sicilimizde belirtilen yapay zekâ sağlayıcılarına iletilir ve modelleri eğitmek için kullanılmaz. Hesabınız olsun veya olmasın, hukuka aykırı içerikleri support@dezbatere.ro adresine bildirin. Romanya hukuku uygulanır; ancak yerel tüketici korumalarınız saklıdır.
 
@@ -195,7 +195,11 @@ Dialectical Engine ücretsiz bir plan sunar. Model listesinin tamamının kilidi
 
 **Başarısız ödemeler.** Ödeme başarısız olursa 7 gün boyunca yeniden dener ve hesabınızı ücretsiz plana düşürmeden önce sizi e-postayla uyarırız. Ödeme başarısız olduğu için tartışmalarınızı silmeyiz.
 
-**Vergiler ve ödemeyi kime yaptığınız.** Fiyatlara, yaşadığınız yere bağlı olan ve ödeme öncesinde gösterilen KDV, GST veya satış vergisi dahildir. Kart ödemeleri NETOPIA Payments (netopia-payments.com) tarafından işlenir. Satıcı, faturanızı düzenleyen ve hizmetin kendisinden ve bu Koşullardan sorumlu olmaya devam eden DMS Merchandise Shop S.R.L.'dir.
+**Vergiler ve ödemeyi kime yaptığınız.** Fiyatlara, yaşadığınız yere bağlı olan ve ödeme öncesinde gösterilen KDV, GST veya satış vergisi dahildir. Satıcı, faturanızı düzenleyen ve hizmetin kendisinden ve bu Koşullardan sorumlu olmaya devam eden DMS Merchandise Shop S.R.L.'dir.
+
+**Ödeme yöntemleri.** Ödemeyi kartla yaparsınız. Visa ve Mastercard kabul ediyoruz; American Express kabul etmiyoruz. Kart ödemeleri NETOPIA Payments (netopia-payments.com) tarafından işlenir ve kartınızın tam numarası hiçbir zaman bize ulaşmaz.
+
+**Teslimat.** Dialectical Engine çevrimiçi bir hizmettir; bu nedenle size hiçbir şey gönderilmez. Ücretli planınızın özellikleri, ödemeniz onaylanır onaylanmaz hesabınızda kullanıma açılır.
 
 **Ters ibrazlar.** Kartı düzenleyen kuruluş nezdinde bir tahsilata itiraz ederseniz uyuşmazlık çözülene kadar ücretli özellikleri askıya alabiliriz. Bunun için ücret almayız.
 

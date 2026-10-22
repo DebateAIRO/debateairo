@@ -201,7 +201,9 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "İptal. İstediğiniz zaman Ayarlar → Abonelik bölümünden tek bir teyit tıklamasıyla veya oturum açmanızı gerektirmeyen dezbatere.ro/cancel adresindeki iptal sayfasından iptal edebilirsiniz. İptal, mevcut faturalandırma döneminin sonunda hüküm doğurur ve o zamana kadar erişiminiz sürer. İptal işlemini abone olmaktan daha zor hâle getirmeyiz." },
       { kind: "p", text: "Fiyat değişiklikleri yalnızca yenilemede hüküm doğurur. Yeni fiyatı ve bir iptal bağlantısını içeren e-postayı en az 30 gün önceden göndeririz. Ülkenizin hukuku bir fiyat değişikliği için açık rızanızı gerektiriyorsa bunu isteriz; aksi takdirde hiçbir şey yapmazsanız yeni fiyat bir sonraki yenilemeden itibaren uygulanır. Bölgesel kurallar Ek A'da belirtilmiştir." },
       { kind: "p", text: "Başarısız ödemeler. Ödeme başarısız olursa 7 gün boyunca yeniden dener ve hesabınızı ücretsiz plana düşürmeden önce sizi e-postayla uyarırız. Ödeme başarısız olduğu için tartışmalarınızı silmeyiz." },
-      { kind: "p", text: "Vergiler ve ödemeyi kime yaptığınız. Fiyatlara, yaşadığınız yere bağlı olan ve ödeme öncesinde gösterilen KDV, GST veya satış vergisi dahildir. Kart ödemeleri NETOPIA Payments (netopia-payments.com) tarafından işlenir. Satıcı, faturanızı düzenleyen ve hizmetin kendisinden ve bu Koşullardan sorumlu olmaya devam eden DMS Merchandise Shop S.R.L.'dir." },
+      { kind: "p", text: "Vergiler ve ödemeyi kime yaptığınız. Fiyatlara, yaşadığınız yere bağlı olan ve ödeme öncesinde gösterilen KDV, GST veya satış vergisi dahildir. Satıcı, faturanızı düzenleyen ve hizmetin kendisinden ve bu Koşullardan sorumlu olmaya devam eden DMS Merchandise Shop S.R.L.'dir." },
+      { kind: "p", text: "Ödeme yöntemleri. Ödemeyi kartla yaparsınız. Visa ve Mastercard kabul ediyoruz; American Express kabul etmiyoruz. Kart ödemeleri NETOPIA Payments (netopia-payments.com) tarafından işlenir ve kartınızın tam numarası hiçbir zaman bize ulaşmaz." },
+      { kind: "p", text: "Teslimat. Dialectical Engine çevrimiçi bir hizmettir; bu nedenle size hiçbir şey gönderilmez. Ücretli planınızın özellikleri, ödemeniz onaylanır onaylanmaz hesabınızda kullanıma açılır." },
       { kind: "p", text: "Ters ibrazlar. Kartı düzenleyen kuruluş nezdinde bir tahsilata itiraz ederseniz uyuşmazlık çözülene kadar ücretli özellikleri askıya alabiliriz. Bunun için ücret almayız." },
       { kind: "p", text: "Öncelik kanuni haklardadır. Hizmet taahhüt ettiğimiz niteliklere uygun değilse hukukun öngördüğü şekilde uygunluğun sağlanmasını veya orantılı bir fiyat indirimi ya da geri ödeme talep etme hakkına sahipsiniz. Bunun ötesinde, ücretli bir planı bir faturalandırma dönemi içinde iptal ederseniz, o dönemin ücretinden planı kullanmadığınız oranda, kullanıma göre ölçerek ve kaç gün geçmiş olursa olsun, geri ödeme yaparız: planı %30 oranında kullandıysanız ücretin %70'ini, hiç kullanmadıysanız ücretin tamamını geri öderiz. Talebinizi support@dezbatere.ro adresine iletin; geri ödeme yaptığımızda plan sona erer. Bölüm 13'teki cayma hakkı da uygulanıyorsa, iki geri ödemeden hangisi daha yüksekse onu alırsınız. Her iki planın kullanım sınırları da üründe yayımlanır; sizi esaslı biçimde etkileyen bir sıkılaştırmadan önce bildirimde bulunuruz." }
     ]
@@ -351,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.3",
-  sha256: "64256e5e5669535d24e5b70e28643f137db340996536c167f44929b9eaea5869",
-  eyebrow: "HİZMET KOŞULLARI · v2.3 · YÜRÜRLÜK TARİHİ 12 EKİM 2026",
+  version: "2.4",
+  sha256: "6fe06d9517e58942de71fc82049b8b245a1a033524ea475a3e30b752c59add25",
+  eyebrow: "HİZMET KOŞULLARI · v2.4 · YÜRÜRLÜK TARİHİ 12 EKİM 2026",
   title: "Kabul ettiğiniz hükümler",
   lede: "Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.",
-  endMarker: "KOŞULLARIN SONU · v2.3",
+  endMarker: "KOŞULLARIN SONU · v2.4",
   contact: "support@dezbatere.ro",
   bodyLabel: "Hizmet Koşulları metni",
   sectionIdPrefix: "terms-section-",

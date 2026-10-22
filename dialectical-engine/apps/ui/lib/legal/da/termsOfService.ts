@@ -201,7 +201,9 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Opsigelse. Du kan til enhver tid opsige under Indstillinger → Abonnement med ét bekræftelsesklik eller via opsigelsessiden på dezbatere.ro/cancel, som ikke kræver, at du logger ind. Opsigelsen får virkning ved udløbet af den igangværende faktureringsperiode, og du bevarer adgangen indtil da. Vi gør ikke opsigelsen vanskeligere, end det var at abonnere." },
       { kind: "p", text: "Prisændringer får først virkning ved en fornyelse. Vi giver mindst 30 dages varsel pr. e-mail med den nye pris og et link til opsigelse. Hvis lovgivningen i dit land kræver dit udtrykkelige samtykke til en prisændring, anmoder vi om det; ellers gælder den nye pris fra næste fornyelse, hvis du ikke foretager dig noget. Bilag A angiver regionale regler." },
       { kind: "p", text: "Mislykkede betalinger. Hvis en betaling mislykkes, forsøger vi igen i 7 dage og advarer dig pr. e-mail, før vi nedgraderer din konto til det gratis abonnement. Vi sletter ikke dine debatter, fordi en betaling mislykkedes." },
-      { kind: "p", text: "Afgifter og betalingsmodtager. Priserne er inklusive moms, GST eller omsætningsafgift, hvilket afhænger af, hvor du bor, og vises, før du betaler. Kortbetalinger behandles af NETOPIA Payments (netopia-payments.com). Sælgeren er DMS Merchandise Shop S.R.L., som udsteder din faktura og forbliver ansvarlig for selve tjenesten og for disse vilkår." },
+      { kind: "p", text: "Afgifter og betalingsmodtager. Priserne er inklusive moms, GST eller omsætningsafgift, hvilket afhænger af, hvor du bor, og vises, før du betaler. Sælgeren er DMS Merchandise Shop S.R.L., som udsteder din faktura og forbliver ansvarlig for selve tjenesten og for disse vilkår." },
+      { kind: "p", text: "Betalingsmetoder. Du betaler med kort. Vi accepterer Visa og Mastercard; vi accepterer ikke American Express. Kortbetalinger behandles af NETOPIA Payments (netopia-payments.com), og dit fulde kortnummer når aldrig frem til os." },
+      { kind: "p", text: "Levering. Dialectical Engine er en onlinetjeneste, så intet sendes til dig. Funktionerne i dit betalte abonnement er tilgængelige på din konto, så snart din betaling er bekræftet." },
       { kind: "p", text: "Tilbageførsler. Hvis du bestrider en debitering hos din kortudsteder, kan vi suspendere betalingsfunktionerne, mens tvisten behandles. Vi opkræver ikke gebyrer herfor." },
       { kind: "p", text: "Lovbestemte rettigheder først. Hvis tjenesten ikke er i overensstemmelse med det, vi har lovet, har du ret til at få den bragt i overensstemmelse eller til et forholdsmæssigt afslag eller en tilbagebetaling i henhold til lovgivningen. Derudover gælder det, at hvis du opsiger et betalt abonnement i løbet af en faktureringsperiode, refunderer vi den andel af periodens pris, som du ikke har brugt, målt efter abonnementets forbrug, uanset hvor mange dage der er gået: Har du brugt 30 %, refunderer vi 70 %; har du ikke brugt noget, refunderer vi hele prisen. Bed om det på support@dezbatere.ro; når vi har refunderet, ophører abonnementet. Gælder fortrydelsesretten i afsnit 13 også, får du den refusion, der er størst. Brugsgrænserne for begge abonnementer offentliggøres i produktet; vi giver meddelelse, før vi skærper dem på en måde, der påvirker dig væsentligt." }
     ]
@@ -351,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.3",
-  sha256: "7219d701b475fd957db873c9bf2ede40f048c3ec8ca50b1426ea169b0abe0496",
-  eyebrow: "TJENESTEVILKÅR · v2.3 · GÆLDENDE FRA 12. OKTOBER 2026",
+  version: "2.4",
+  sha256: "8b88a6ed998cc8e9ffd5b9ecb931531236b29ffd9ba545272734efa087b1a625",
+  eyebrow: "TJENESTEVILKÅR · v2.4 · GÆLDENDE FRA 12. OKTOBER 2026",
   title: "Det, du accepterer",
   lede: "Aftalen mellem dig og DMS Merchandise Shop S.R.L. i et klart sprog. Nitten afsnit og bilag A — rul ned til slutningen.",
-  endMarker: "SLUT PÅ VILKÅRENE · v2.3",
+  endMarker: "SLUT PÅ VILKÅRENE · v2.4",
   contact: "support@dezbatere.ro",
   bodyLabel: "Tjenestevilkårenes tekst",
   sectionIdPrefix: "terms-section-",

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručne
-eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.3 · ÚČINNÉ OD 12. OKTÓBRA 2026
+eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.4 · ÚČINNÉ OD 12. OKTÓBRA 2026
 title: S čím súhlasíte
 lede: Zmluva medzi vami a DMS Merchandise Shop S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.
-endMarker: KONIEC PODMIENOK · v2.3
+endMarker: KONIEC PODMIENOK · v2.4
 bodyLabel: Text Podmienok poskytovania služby
 annexTitle: Príloha A — Regionálne podmienky
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ROZHODNÉ PRÁVO
 -->
 
-**Version 2.3 · Effective 12. októbra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
+**Version 2.4 · Effective 12. októbra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
 
 **In short.** Musíte mať aspoň 18 rokov. Dialectical Engine vytvára argumenty pomocou modelov umelej inteligencie a všetko, čo vygeneruje, môže byť nesprávne — nejde o poradenstvo. Vaše debaty sú súkromné, pokiaľ ich nezverejníte; ak ich zverejníte, môže ich čítať ktokoľvek. Text, ktorý zadáte, sa odosiela poskytovateľom umelej inteligencie uvedeným v našom Registri poskytovateľov a nepoužíva sa na trénovanie modelov. Nezákonný obsah nahláste na support@dezbatere.ro bez ohľadu na to, či máte účet. Rozhodným právom je rumunské právo, vaše miestne práva na ochranu spotrebiteľa vám však zostávajú zachované.
 
@@ -195,7 +195,11 @@ Dialectical Engine ponúka bezplatný program. Bude k dispozícii platený progr
 
 **Neúspešné platby.** Ak platba zlyhá, budeme ju opakovať počas 7 dní a pred prevedením účtu na bezplatný program vás upozorníme e-mailom. Pre neúspešnú platbu vaše debaty nemažeme.
 
-**Dane a komu platíte.** Ceny zahŕňajú DPH, GST alebo daň z predaja v závislosti od miesta vášho bydliska, čo sa zobrazí pred zaplatením. Platby kartou spracúva NETOPIA Payments (netopia-payments.com). Predávajúcim je DMS Merchandise Shop S.R.L., ktorá vystavuje vašu faktúru a zostáva zodpovedná za samotnú službu a za tieto Podmienky.
+**Dane a komu platíte.** Ceny zahŕňajú DPH, GST alebo daň z predaja v závislosti od miesta vášho bydliska, čo sa zobrazí pred zaplatením. Predávajúcim je DMS Merchandise Shop S.R.L., ktorá vystavuje vašu faktúru a zostáva zodpovedná za samotnú službu a za tieto Podmienky.
+
+**Platobné metódy.** Platíte kartou. Prijímame karty Visa a Mastercard; karty American Express neprijímame. Platby kartou spracúva NETOPIA Payments (netopia-payments.com) a celé číslo vašej karty sa k nám nikdy nedostane.
+
+**Dodanie.** Dialectical Engine je online služba, preto vám nič nezasielame. Funkcie vášho plateného programu sú vo vašom účte k dispozícii hneď, ako je platba potvrdená.
 
 **Spätné zúčtovanie.** Ak platbu napadnete u vydavateľa karty, môžeme platené funkcie počas riešenia sporu pozastaviť. Neúčtujeme za to žiadne poplatky.
 

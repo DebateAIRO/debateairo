@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Go hachomair
-eyebrow: TÉARMAÍ SEIRBHÍSE · v2.3 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026
+eyebrow: TÉARMAÍ SEIRBHÍSE · v2.4 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026
 title: An méid lena n-aontaíonn tú
 lede: An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.
-endMarker: DEIREADH NA dTÉARMAÍ · v2.3
+endMarker: DEIREADH NA dTÉARMAÍ · v2.4
 bodyLabel: Téacs na dTéarmaí Seirbhíse
 annexTitle: Iarscríbhinn A — Téarmaí réigiúnacha
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 AN DLÍ RIALAITHE
 -->
 
-**Version 2.3 · Effective 12 Deireadh Fómhair 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
+**Version 2.4 · Effective 12 Deireadh Fómhair 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
 
 **In short.** Ní mór duit a bheith 18 mbliana d'aois nó os a chionn. Tógann Dialectical Engine argóintí le samhlacha IS agus d'fhéadfadh gach rud a ghineann sé a bheith mícheart — ní comhairle é. Bíonn do dhíospóireachtaí príobháideach mura bhfoilsíonn tú iad; má fhoilsíonn tú iad, is féidir le duine ar bith iad a léamh. Seoltar téacs a chuireann tú isteach chuig soláthraithe IS atá liostaithe inár gClár Soláthraithe, agus ní úsáidtear é chun samhlacha a oiliúint. Tuairiscigh ábhar neamhdhleathach ag support@dezbatere.ro cibé acu atá cuntas agat nó nach bhfuil. Is é dlí na Rómáine an dlí rialaithe, ach coimeádann tú do chosaintí áitiúla tomhaltóra.
 
@@ -195,7 +195,11 @@ Ní thagann **athruithe praghais** i bhfeidhm ach tráth athnuachana. Tugaimid f
 
 **Íocaíochtaí teipthe.** Má theipeann ar íocaíocht, bainimid triail eile as ar feadh 7 lá agus tugaimid rabhadh duit ar ríomhphost sula n-íosghrádaímid do chuntas go dtí an plean saor in aisce. Ní scriosaimid do dhíospóireachtaí toisc gur theip ar íocaíocht.
 
-**Cánacha, agus cé leis a n-íocann tú.** Áirítear CBL, GST nó cáin díolacháin sna praghsanna, rud a bhraitheann ar an áit ina bhfuil cónaí ort agus a thaispeántar sula n-íocann tú. Próiseálann NETOPIA Payments (netopia-payments.com) íocaíochtaí cárta. Is é DMS Merchandise Shop S.R.L. an díoltóir, a eisíonn do shonrasc agus a fhanann freagrach as an tseirbhís féin agus as na Téarmaí seo.
+**Cánacha, agus cé leis a n-íocann tú.** Áirítear CBL, GST nó cáin díolacháin sna praghsanna, rud a bhraitheann ar an áit ina bhfuil cónaí ort agus a thaispeántar sula n-íocann tú. Is é DMS Merchandise Shop S.R.L. an díoltóir, a eisíonn do shonrasc agus a fhanann freagrach as an tseirbhís féin agus as na Téarmaí seo.
+
+**Modhanna íocaíochta.** Íocann tú le cárta. Glacaimid le Visa agus Mastercard; ní ghlacaimid le American Express. Próiseálann NETOPIA Payments (netopia-payments.com) íocaíochtaí cárta, agus ní shroicheann uimhir iomlán do chárta muid riamh.
+
+**Seachadadh.** Is seirbhís ar líne é Dialectical Engine, mar sin ní sheoltar aon rud chugat. Bíonn gnéithe do phlean íoctha ar fáil i do chuntas a luaithe a dheimhnítear d'íocaíocht.
 
 **Aisghairmeacha íocaíochta.** Má dhéanann tú agóid i gcoinne muirir le d'eisitheoir cárta, féadfaimid gnéithe íoctha a chur ar fionraí fad a réitítear an díospóid. Ní ghearraimid táillí as seo.
 

@@ -201,7 +201,9 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Atšaukimas. Galite bet kada atšaukti pasirinkę Nustatymai → Prenumerata ir vienu spustelėjimu patvirtinę arba naudodamiesi atšaukimo puslapiu adresu dezbatere.ro/cancel, prie kurio prisijungti nereikia. Atšaukimas įsigalioja einamojo atsiskaitymo laikotarpio pabaigoje, o iki tol prieiga išlieka. Atšaukimo nepadarysime sudėtingesnio, nei buvo prenumerata." },
       { kind: "p", text: "Kainos pakeitimai įsigalioja tik atnaujinus planą. Apie naują kainą ir atšaukimo nuorodą pranešame el. paštu bent prieš 30 dienų. Kai pagal jūsų šalies teisę kainai pakeisti būtinas aiškus jūsų sutikimas, jo paprašome; kitais atvejais, jei nieko nedarote, nauja kaina taikoma nuo kito atnaujinimo. Regioninės taisyklės nurodytos A priede." },
       { kind: "p", text: "Nepavykę mokėjimai. Jei mokėjimas nepavyksta, 7 dienas bandome dar kartą ir prieš pakeisdami paskyrą į nemokamą planą įspėjame jus el. paštu. Debatų dėl nepavykusio mokėjimo neištriname." },
-      { kind: "p", text: "Mokesčiai ir kam mokate. Į kainas įskaičiuotas PVM, GST ar pardavimo mokestis, priklausantis nuo jūsų gyvenamosios vietos ir parodomas prieš jums mokant. Mokėjimus kortele tvarko NETOPIA Payments (netopia-payments.com). Pardavėjas yra DMS Merchandise Shop S.R.L., kuris išrašo jūsų sąskaitą faktūrą ir išlieka atsakingas už pačią paslaugą bei šias Sąlygas." },
+      { kind: "p", text: "Mokesčiai ir kam mokate. Į kainas įskaičiuotas PVM, GST ar pardavimo mokestis, priklausantis nuo jūsų gyvenamosios vietos ir parodomas prieš jums mokant. Pardavėjas yra DMS Merchandise Shop S.R.L., kuris išrašo jūsų sąskaitą faktūrą ir išlieka atsakingas už pačią paslaugą bei šias Sąlygas." },
+      { kind: "p", text: "Mokėjimo būdai. Mokate kortele. Priimame Visa ir Mastercard korteles; American Express kortelių nepriimame. Mokėjimus kortele tvarko NETOPIA Payments (netopia-payments.com), o visas jūsų kortelės numeris niekada nepasiekia mūsų." },
+      { kind: "p", text: "Pristatymas. Dialectical Engine yra internetinė paslauga, todėl jums nieko nesiunčiame. Jūsų mokamo plano funkcijos jūsų paskyroje tampa prieinamos iškart, kai mokėjimas patvirtinamas." },
       { kind: "p", text: "Mokėjimo grąžinimo ginčai. Jei mokėjimą užginčijate savo kortelės išdavėjui, kol ginčas sprendžiamas, galime sustabdyti mokamas funkcijas. Už tai mokesčių netaikome." },
       { kind: "p", text: "Pirmiausia — įstatymų nustatytos teisės. Kai paslauga neatitinka mūsų pažadų, turite teisę reikalauti, kad ji būtų suderinta su sutartimi, proporcingai sumažinti kainą arba susigrąžinti pinigus, kaip nustatyta įstatymuose. Be to, jei mokamą planą nutraukiate atsiskaitymo laikotarpiu, grąžiname tą laikotarpio kainos dalį, kurios nepanaudojote, matuojamą pagal plano naudojimą, nepaisant to, kiek dienų praėjo: jei panaudojote 30 %, grąžiname 70 %; jei nepanaudojote nieko, grąžiname visą kainą. Prašymą teikite adresu support@dezbatere.ro; kai grąžiname pinigus, planas baigiasi. Jei taikoma ir 13 skyriuje nustatyta atsisakymo teisė, gaunate didesnę iš šių grąžinamų sumų. Abiejų planų naudojimo ribos skelbiamos produkte; prieš jas sugriežtindami taip, kad tai turėtų jums reikšmingą poveikį, apie tai pranešame." }
     ]
@@ -351,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.3",
-  sha256: "b58308359c2a67c88631876051e817b96c2829f41d4d83cac83e3954378476a0",
-  eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.3 · ĮSIGALIOJA 2026 M. SPALIO 12 D.",
+  version: "2.4",
+  sha256: "027a45be6cd4d8a68cd1402bda2093dbc8360f6f0f6506b7754acc5010b7664b",
+  eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.4 · ĮSIGALIOJA 2026 M. SPALIO 12 D.",
   title: "Su kuo sutinkate",
   lede: "Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.",
-  endMarker: "SĄLYGŲ PABAIGA · v2.3",
+  endMarker: "SĄLYGŲ PABAIGA · v2.4",
   contact: "support@dezbatere.ro",
   bodyLabel: "Paslaugų teikimo sąlygų tekstas",
   sectionIdPrefix: "terms-section-",

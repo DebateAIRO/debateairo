@@ -201,7 +201,9 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Zrušení. Tarif můžete kdykoli zrušit v nabídce Nastavení → Předplatné jedním potvrzovacím kliknutím nebo prostřednictvím stránky pro zrušení na adrese dezbatere.ro/cancel, která nevyžaduje přihlášení. Zrušení nabývá účinku na konci aktuálního fakturačního období a do té doby vám přístup zůstává. Zrušení neučiníme obtížnějším, než bylo sjednání předplatného." },
       { kind: "p", text: "Změny cen nabývají účinku až při obnovení. Nejméně 30 dnů předem vás upozorníme e-mailem, který obsahuje novou cenu a odkaz ke zrušení. Pokud právo vaší země vyžaduje váš výslovný souhlas se změnou ceny, požádáme vás o něj; jinak se v případě vaší nečinnosti nová cena použije od příštího obnovení. Regionální pravidla uvádí příloha A." },
       { kind: "p", text: "Neúspěšné platby. Pokud platba selže, budeme její provedení opakovat po dobu 7 dnů a před převedením účtu na bezplatný tarif vás upozorníme e-mailem. Kvůli neúspěšné platbě vaše debaty nemažeme." },
-      { kind: "p", text: "Daně a komu platíte. Ceny zahrnují DPH, GST nebo daň z prodeje v závislosti na místě vašeho bydliště, což se zobrazí před zaplacením. Platby kartou zpracovává NETOPIA Payments (netopia-payments.com). Prodejcem je DMS Merchandise Shop S.R.L., která vystavuje vaši fakturu a zůstává odpovědná za samotnou službu a za tyto Podmínky." },
+      { kind: "p", text: "Daně a komu platíte. Ceny zahrnují DPH, GST nebo daň z prodeje v závislosti na místě vašeho bydliště, což se zobrazí před zaplacením. Prodejcem je DMS Merchandise Shop S.R.L., která vystavuje vaši fakturu a zůstává odpovědná za samotnou službu a za tyto Podmínky." },
+      { kind: "p", text: "Platební metody. Platíte kartou. Přijímáme karty Visa a Mastercard; karty American Express nepřijímáme. Platby kartou zpracovává NETOPIA Payments (netopia-payments.com) a celé číslo vaší karty se k nám nikdy nedostane." },
+      { kind: "p", text: "Dodání. Dialectical Engine je online služba, takže vám nic nezasíláme. Funkce vašeho placeného tarifu jsou ve vašem účtu k dispozici, jakmile je platba potvrzena." },
       { kind: "p", text: "Reklamace platby. Pokud platbu zpochybníte u vydavatele karty, můžeme placené funkce po dobu řešení sporu pozastavit. Neúčtujeme za to žádné poplatky." },
       { kind: "p", text: "Zákonná práva mají přednost. Pokud služba neodpovídá tomu, co jsme slíbili, máte právo na uvedení do souladu nebo na přiměřené snížení ceny či vrácení peněz podle zákona. Nad tento rámec, pokud placený tarif zrušíte během fakturačního období, vrátíme vám tu část ceny tohoto období, kterou jste nevyužili, měřenou podle využití tarifu, bez ohledu na to, kolik dní uplynulo: pokud jste využili 30 %, vrátíme vám 70 %; pokud jste nevyužili nic, vrátíme vám celou cenu. Požádejte o to na adrese support@dezbatere.ro; jakmile peníze vrátíme, tarif skončí. Platí-li zároveň právo na odstoupení podle oddílu 13, získáte vyšší z obou vrácených částek. Limity používání jednotlivých tarifů jsou zveřejněny v produktu; před jejich zpřísněním způsobem, který vás podstatně ovlivní, vás upozorníme." }
     ]
@@ -351,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.3",
-  sha256: "4cec4eba3c4b0331c2bfb15b755db8e68ba65c637c0a5a45344c9e7dc89e5e9f",
-  eyebrow: "PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.3 · ÚČINNÉ OD 12. ŘÍJNA 2026",
+  version: "2.4",
+  sha256: "73d34dd6d22c7b5c1ad9a51046825633e87b70343b36a82e9b63c3dd8fa17a56",
+  eyebrow: "PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.4 · ÚČINNÉ OD 12. ŘÍJNA 2026",
   title: "S čím souhlasíte",
   lede: "Smlouva mezi vámi a DMS Merchandise Shop S.R.L. srozumitelným jazykem. Devatenáct oddílů a příloha A — přejděte až na konec.",
-  endMarker: "KONEC PODMÍNEK · v2.3",
+  endMarker: "KONEC PODMÍNEK · v2.4",
   contact: "support@dezbatere.ro",
   bodyLabel: "Text Podmínek poskytování služby",
   sectionIdPrefix: "terms-section-",

@@ -201,7 +201,9 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Uppsägning. Säg upp när som helst under Inställningar → Abonnemang med ett enda bekräftelseklick eller via uppsägningssidan på dezbatere.ro/cancel, som inte kräver att du loggar in. Uppsägningen träder i kraft vid slutet av den pågående faktureringsperioden, och du behåller åtkomsten fram till dess. Vi kommer inte att göra det svårare att säga upp än det var att teckna abonnemanget." },
       { kind: "p", text: "Prisändringar träder i kraft först vid en förnyelse. Vi underrättar dig minst 30 dagar i förväg via e-post och anger det nya priset samt en länk för uppsägning. Om lagen i ditt land kräver ditt uttryckliga samtycke till en prisändring begär vi det; i annat fall gäller det nya priset från nästa förnyelse om du inte gör något. Regionala regler anges i bilaga A." },
       { kind: "p", text: "Misslyckade betalningar. Om en betalning misslyckas försöker vi igen under 7 dagar och varnar dig via e-post innan vi nedgraderar ditt konto till det kostnadsfria abonnemanget. Vi raderar inte dina debatter på grund av en misslyckad betalning." },
-      { kind: "p", text: "Skatter och vem du betalar till. Priserna inkluderar moms, GST eller omsättningsskatt, vilket beror på var du bor och visas innan du betalar. Kortbetalningar hanteras av NETOPIA Payments (netopia-payments.com). Säljaren är DMS Merchandise Shop S.R.L., som utfärdar din faktura och förblir ansvarig för tjänsten i sig och för dessa villkor." },
+      { kind: "p", text: "Skatter och vem du betalar till. Priserna inkluderar moms, GST eller omsättningsskatt, vilket beror på var du bor och visas innan du betalar. Säljaren är DMS Merchandise Shop S.R.L., som utfärdar din faktura och förblir ansvarig för tjänsten i sig och för dessa villkor." },
+      { kind: "p", text: "Betalningssätt. Du betalar med kort. Vi tar emot Visa och Mastercard; vi tar inte emot American Express. Kortbetalningar hanteras av NETOPIA Payments (netopia-payments.com), och ditt fullständiga kortnummer når aldrig fram till oss." },
+      { kind: "p", text: "Leverans. Dialectical Engine är en onlinetjänst, så inget skickas till dig. Funktionerna i ditt avgiftsbelagda abonnemang är tillgängliga i ditt konto så snart din betalning har bekräftats." },
       { kind: "p", text: "Kortreklamationer. Om du bestrider en debitering hos din kortutgivare kan vi stänga av avgiftsbelagda funktioner medan tvisten handläggs. Vi tar inte ut någon avgift för detta." },
       { kind: "p", text: "Lagstadgade rättigheter först. Om tjänsten inte överensstämmer med vad vi har utlovat har du rätt att få den återställd till avtalsenligt skick eller till ett proportionellt prisavdrag eller en återbetalning, i enlighet med lagen. Därutöver, om du säger upp ett betalabonnemang under en faktureringsperiod, återbetalar vi den andel av periodens pris som du inte har använt, mätt efter abonnemangets användning, oavsett hur många dagar som har gått: har du använt 30 % av det återbetalar vi 70 %; har du inte använt något av det återbetalar vi hela priset. Fråga på support@dezbatere.ro; när vi har återbetalat upphör abonnemanget. Om ångerrätten i avsnitt 13 också gäller får du den återbetalning som är störst. Användningsgränserna för båda abonnemangen offentliggörs i produkten; vi underrättar dig innan de skärps på ett sätt som väsentligt påverkar dig." }
     ]
@@ -351,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.3",
-  sha256: "aa432ed87f9ea9c28b2dbcb3028e3dd9ab22de714e1f1b203ff7c274ab68edb9",
-  eyebrow: "ANVÄNDARVILLKOR · v2.3 · GÄLLER FRÅN 12 OKTOBER 2026",
+  version: "2.4",
+  sha256: "b78e28ca35281d91298a15e87c66d7dfd1a7528d45eb69cea6378a1660e3081e",
+  eyebrow: "ANVÄNDARVILLKOR · v2.4 · GÄLLER FRÅN 12 OKTOBER 2026",
   title: "Vad du godkänner",
   lede: "Avtalet mellan dig och DMS Merchandise Shop S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.",
-  endMarker: "SLUT PÅ VILLKOREN · v2.3",
+  endMarker: "SLUT PÅ VILLKOREN · v2.4",
   contact: "support@dezbatere.ro",
   bodyLabel: "Användarvillkorens text",
   sectionIdPrefix: "terms-section-",

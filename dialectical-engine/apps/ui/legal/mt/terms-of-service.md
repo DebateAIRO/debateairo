@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Fil-qosor
-eyebrow: TERMINI TAS-SERVIZZ · v2.3 · EFFETTIVI 12 TA’ OTTUBRU 2026
+eyebrow: TERMINI TAS-SERVIZZ · v2.4 · EFFETTIVI 12 TA’ OTTUBRU 2026
 title: Dak li taqbel miegħu
 lede: Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.
-endMarker: TMIEM IT-TERMINI · v2.3
+endMarker: TMIEM IT-TERMINI · v2.4
 bodyLabel: Test tat-Termini tas-Servizz
 annexTitle: Anness A — Termini reġjonali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LIĠI APPLIKABBLI
 -->
 
-**Version 2.3 · Effective 12 ta’ Ottubru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
+**Version 2.4 · Effective 12 ta’ Ottubru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
 
 **In short.** Irid ikollok 18-il sena jew aktar. Dialectical Engine tibni argumenti b’mudelli tal-IA u dak kollu li tiġġenera jista’ jkun żbaljat — mhuwiex parir. Id-dibattiti tiegħek huma privati sakemm ma tippubblikahomx; jekk tippubblikahom, kulħadd jista’ jaqrahom. It-test li tissottometti jintbagħat lill-fornituri tal-IA elenkati fir-Reġistru tal-Fornituri tagħna, u ma jintużax għat-taħriġ tal-mudelli. Irrapporta kontenut illegali fuq support@dezbatere.ro kemm jekk għandek kont kif ukoll jekk le. Tapplika l-liġi Rumena, iżda l-protezzjonijiet lokali tiegħek bħala konsumatur jibqgħu japplikaw għalik.
 
@@ -195,7 +195,11 @@ Dialectical Engine toffri pjan bla ħlas. Pjan **Premium** bi ħlas se jkun disp
 
 **Ħlasijiet li jfallu.** Jekk ħlas ifalli nerġgħu nippruvaw għal 7 ijiem u nwissuk bil-posta elettronika qabel inniżżlu l-kont tiegħek għall-pjan bla ħlas. Ma nħassrux id-dibattiti tiegħek għax ħlas ikun falla.
 
-**Taxxi, u lil min tħallas.** Il-prezzijiet jinkludu l-VAT, il-GST jew it-taxxa fuq il-bejgħ, li tiddependi minn fejn tgħix u tintwera qabel ma tħallas. Il-ħlasijiet bil-karta jiġu pproċessati minn NETOPIA Payments (netopia-payments.com). Il-bejjiegħ huwa DMS Merchandise Shop S.R.L., li joħroġlok il-fattura u jibqa’ responsabbli għas-servizz innifsu u għal dawn it-Termini.
+**Taxxi, u lil min tħallas.** Il-prezzijiet jinkludu l-VAT, il-GST jew it-taxxa fuq il-bejgħ, li tiddependi minn fejn tgħix u tintwera qabel ma tħallas. Il-bejjiegħ huwa DMS Merchandise Shop S.R.L., li joħroġlok il-fattura u jibqa’ responsabbli għas-servizz innifsu u għal dawn it-Termini.
+
+**Metodi ta’ ħlas.** Tħallas bil-karta. Naċċettaw Visa u Mastercard; ma naċċettawx American Express. Il-ħlasijiet bil-karta jiġu pproċessati minn NETOPIA Payments (netopia-payments.com), u n-numru sħiħ tal-karta tiegħek qatt ma jasal għandna.
+
+**Kunsinna.** Dialectical Engine huwa servizz online, għalhekk xejn ma jintbagħatlek. Il-funzjonalitajiet tal-pjan bi ħlas tiegħek ikunu disponibbli fil-kont tiegħek hekk kif il-ħlas tiegħek jiġi kkonfermat.
 
 **Treġġigħ lura ta’ ħlasijiet.** Jekk tikkontesta ħlas mal-emittent tal-karta tiegħek, nistgħu nissospendu l-funzjonalitajiet bi ħlas sakemm tissolva t-tilwima. Ma nitolbux tariffi għal dan.
 

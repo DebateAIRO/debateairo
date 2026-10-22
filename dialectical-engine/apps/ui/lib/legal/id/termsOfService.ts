@@ -201,7 +201,9 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Pembatalan. Batalkan kapan saja dari Pengaturan → Langganan dengan satu kali klik konfirmasi, atau melalui halaman pembatalan di dezbatere.ro/cancel, yang tidak mengharuskan Anda masuk. Pembatalan berlaku pada akhir periode penagihan berjalan, dan Anda tetap memiliki akses hingga saat itu. Kami tidak akan mempersulit pembatalan dibandingkan proses berlangganan." },
       { kind: "p", text: "Perubahan harga hanya berlaku pada saat perpanjangan. Kami memberikan pemberitahuan sekurang-kurangnya 30 hari sebelumnya melalui email yang mencantumkan harga baru dan tautan pembatalan. Jika hukum negara Anda mewajibkan persetujuan tegas atas perubahan harga, kami memintanya; jika tidak, apabila Anda tidak melakukan apa pun, harga baru berlaku sejak perpanjangan berikutnya. Lampiran A mencantumkan aturan regional." },
       { kind: "p", text: "Pembayaran gagal. Jika pembayaran gagal, kami mencoba kembali selama 7 hari dan memperingatkan Anda melalui email sebelum menurunkan akun Anda ke paket gratis. Kami tidak menghapus debat Anda karena pembayaran gagal." },
-      { kind: "p", text: "Pajak, dan pihak yang Anda bayar. Harga mencakup PPN, GST, atau pajak penjualan, yang bergantung pada tempat tinggal Anda dan ditampilkan sebelum Anda membayar. Pembayaran kartu diproses oleh NETOPIA Payments (netopia-payments.com). Penjualnya adalah DMS Merchandise Shop S.R.L., yang menerbitkan faktur Anda dan tetap bertanggung jawab atas layanan itu sendiri serta Ketentuan ini." },
+      { kind: "p", text: "Pajak, dan pihak yang Anda bayar. Harga mencakup PPN, GST, atau pajak penjualan, yang bergantung pada tempat tinggal Anda dan ditampilkan sebelum Anda membayar. Penjualnya adalah DMS Merchandise Shop S.R.L., yang menerbitkan faktur Anda dan tetap bertanggung jawab atas layanan itu sendiri serta Ketentuan ini." },
+      { kind: "p", text: "Metode pembayaran. Anda membayar dengan kartu. Kami menerima Visa dan Mastercard; kami tidak menerima American Express. Pembayaran kartu diproses oleh NETOPIA Payments (netopia-payments.com), dan nomor kartu Anda yang lengkap tidak pernah sampai kepada kami." },
+      { kind: "p", text: "Pengiriman. Dialectical Engine adalah layanan daring, jadi tidak ada yang dikirimkan kepada Anda. Fitur paket berbayar Anda tersedia di akun Anda segera setelah pembayaran Anda dikonfirmasi." },
       { kind: "p", text: "Sanggahan transaksi. Jika Anda menyanggah suatu tagihan kepada penerbit kartu, kami dapat menangguhkan fitur berbayar selama sengketa diselesaikan. Kami tidak mengenakan biaya untuk hal ini." },
       { kind: "p", text: "Hak berdasarkan undang-undang didahulukan. Jika layanan tidak sesuai dengan yang kami janjikan, Anda berhak agar layanan dibuat sesuai, atau menerima pengurangan harga maupun pengembalian dana yang proporsional, sebagaimana ditentukan hukum. Di luar itu, jika Anda membatalkan paket berbayar selama periode penagihan, kami mengembalikan dana sebesar bagian harga periode itu yang belum Anda gunakan, diukur dari penggunaan paket, berapa pun hari yang telah berlalu: jika Anda telah menggunakan 30%, kami mengembalikan 70%; jika Anda belum menggunakan sama sekali, kami mengembalikan harga penuh. Ajukan permintaan ke support@dezbatere.ro; begitu kami mengembalikan dana, paket berakhir. Jika hak penarikan diri dalam bagian 13 juga berlaku, Anda menerima pengembalian dana yang lebih besar di antara keduanya. Batas penggunaan untuk kedua paket dipublikasikan dalam produk; kami memberi tahu Anda sebelum memperketat batas tersebut dengan cara yang berdampak material bagi Anda." }
     ]
@@ -351,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.3",
-  sha256: "622bcda8b4fadfa2d7003dc3829ae65f636ee1b42a8f08d97cc926cb571c8295",
-  eyebrow: "KETENTUAN LAYANAN · v2.3 · BERLAKU 12 OKTOBER 2026",
+  version: "2.4",
+  sha256: "a63685de0aef0265eee785f98172768a23c6fd672b73021336ddc301f8d9b44e",
+  eyebrow: "KETENTUAN LAYANAN · v2.4 · BERLAKU 12 OKTOBER 2026",
   title: "Hal yang Anda setujui",
   lede: "Kontrak antara Anda dan DMS Merchandise Shop S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.",
-  endMarker: "AKHIR KETENTUAN · v2.3",
+  endMarker: "AKHIR KETENTUAN · v2.4",
   contact: "support@dezbatere.ro",
   bodyLabel: "Teks Ketentuan Layanan",
   sectionIdPrefix: "terms-section-",

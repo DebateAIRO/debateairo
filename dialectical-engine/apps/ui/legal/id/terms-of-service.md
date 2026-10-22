@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ringkasnya
-eyebrow: KETENTUAN LAYANAN · v2.3 · BERLAKU 12 OKTOBER 2026
+eyebrow: KETENTUAN LAYANAN · v2.4 · BERLAKU 12 OKTOBER 2026
 title: Hal yang Anda setujui
 lede: Kontrak antara Anda dan DMS Merchandise Shop S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.
-endMarker: AKHIR KETENTUAN · v2.3
+endMarker: AKHIR KETENTUAN · v2.4
 bodyLabel: Teks Ketentuan Layanan
 annexTitle: Lampiran A — Ketentuan regional
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 HUKUM YANG BERLAKU
 -->
 
-**Version 2.3 · Effective 12 Oktober 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
+**Version 2.4 · Effective 12 Oktober 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
 
 **In short.** Anda harus berusia 18 tahun atau lebih. Dialectical Engine menyusun argumen dengan model AI dan segala sesuatu yang dihasilkannya mungkin salah — ini bukan nasihat. Debat Anda bersifat privat kecuali Anda memublikasikannya; jika Anda memublikasikannya, siapa pun dapat membacanya. Teks yang Anda kirim diteruskan kepada penyedia AI yang tercantum dalam Daftar Penyedia kami, dan tidak digunakan untuk melatih model. Laporkan konten ilegal ke support@dezbatere.ro, baik Anda memiliki akun maupun tidak. Hukum Rumania berlaku, tetapi perlindungan konsumen setempat Anda tetap berlaku bagi Anda.
 
@@ -195,7 +195,11 @@ Dialectical Engine menawarkan paket gratis. Paket **Premium** berbayar akan ters
 
 **Pembayaran gagal.** Jika pembayaran gagal, kami mencoba kembali selama 7 hari dan memperingatkan Anda melalui email sebelum menurunkan akun Anda ke paket gratis. Kami tidak menghapus debat Anda karena pembayaran gagal.
 
-**Pajak, dan pihak yang Anda bayar.** Harga mencakup PPN, GST, atau pajak penjualan, yang bergantung pada tempat tinggal Anda dan ditampilkan sebelum Anda membayar. Pembayaran kartu diproses oleh NETOPIA Payments (netopia-payments.com). Penjualnya adalah DMS Merchandise Shop S.R.L., yang menerbitkan faktur Anda dan tetap bertanggung jawab atas layanan itu sendiri serta Ketentuan ini.
+**Pajak, dan pihak yang Anda bayar.** Harga mencakup PPN, GST, atau pajak penjualan, yang bergantung pada tempat tinggal Anda dan ditampilkan sebelum Anda membayar. Penjualnya adalah DMS Merchandise Shop S.R.L., yang menerbitkan faktur Anda dan tetap bertanggung jawab atas layanan itu sendiri serta Ketentuan ini.
+
+**Metode pembayaran.** Anda membayar dengan kartu. Kami menerima Visa dan Mastercard; kami tidak menerima American Express. Pembayaran kartu diproses oleh NETOPIA Payments (netopia-payments.com), dan nomor kartu Anda yang lengkap tidak pernah sampai kepada kami.
+
+**Pengiriman.** Dialectical Engine adalah layanan daring, jadi tidak ada yang dikirimkan kepada Anda. Fitur paket berbayar Anda tersedia di akun Anda segera setelah pembayaran Anda dikonfirmasi.
 
 **Sanggahan transaksi.** Jika Anda menyanggah suatu tagihan kepada penerbit kartu, kami dapat menangguhkan fitur berbayar selama sengketa diselesaikan. Kami tidak mengenakan biaya untuk hal ini.
 
