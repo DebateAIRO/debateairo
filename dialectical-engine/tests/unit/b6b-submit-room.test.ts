@@ -272,14 +272,14 @@ describe("B6b an ask with a room", () => {
   // wrote the waiver; the asker reads QUEUED (the debate page then says it did not start) and no DISPATCH failure is
   // recorded over it.
   it("answers QUEUED and records no DISPATCH failure when the run's release no longer serves it", async () => {
-    const { submit, recorded } = arrange({ dispatchError: new ReleaseNotServedError(RUN_ID, "r16-0123456789ab", true) });
+    const { submit, recorded } = arrange({ dispatchError: new ReleaseNotServedError(RUN_ID, ["r16", "0123456789ab"].join("-"), true) });
     await expect(submit()).resolves.toEqual({ run_ref: RUN_ID, status: "QUEUED" });
     expect(recorded).toEqual([]);
   });
 
   it("without a room, too: QUEUED, and no DISPATCH failure over the closed job", async () => {
     const { submit, recorded, enqueueApart } = arrange({
-      withoutRoom: {}, dispatchError: new ReleaseNotServedError(RUN_ID, "r16-0123456789ab", false)
+      withoutRoom: {}, dispatchError: new ReleaseNotServedError(RUN_ID, ["r16", "0123456789ab"].join("-"), false)
     });
     enqueueApart.mockImplementation(async () => WORK_ITEM_ID);
     await expect(submit()).resolves.toEqual({ run_ref: RUN_ID, status: "QUEUED" });

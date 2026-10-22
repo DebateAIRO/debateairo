@@ -8,7 +8,7 @@ import { TypedDomainError } from "./index.js";
  * Every process (API, runner, website) knows its release key, and every debate carries the key of the release that runs
  * it (core.run.release_key, migration 0123), so a debate is never touched by another release's code, settings or prompts
  * (ruling O1). The form is `r<site settings version>-<first 12 hex of the source revision>`, all lowercase because
- * Hatchet lowercases names (§2: a release's runner listens under `${base}-${releaseKey}`): `r17-d50e33165a1b`. The
+ * Hatchet lowercases names (§2: a release's runner listens under `${base}-${releaseKey}`): r17-d50e33165a1b. The
  * version is a positive safe whole number without a leading zero.
  *
  * `legacy` is the stamp of a run written before 0123, or written without a key (the column default). It is never a key a

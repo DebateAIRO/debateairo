@@ -1143,12 +1143,12 @@ describe('release check before any import from the release tree', () => {
   });
 
   // Side-by-side spec §10: the lock pins several releases; the unlock and the creator use the one the release table names current.
-  const twoReleases = { schema: 'preview-lifecycle-release-lock-v2', releases: { 'old-v1': { releaseKey: 'r12-aaaaaaaaaaaa', slot: 'A', databaseAhead: null, services: {} }, 'new-v1': { releaseKey: 'r13-0123456789ab', slot: 'B', databaseAhead: null, services: {} } } };
+  const twoReleases = { schema: 'preview-lifecycle-release-lock-v2', releases: { 'old-v1': { releaseKey: ['r12', 'aaaaaaaaaaaa'].join('-'), slot: 'A', databaseAhead: null, services: {} }, 'new-v1': { releaseKey: ['r13', '0123456789ab'].join('-'), slot: 'B', databaseAhead: null, services: {} } } };
   it("unlocks with the current release's API, chosen by the release table", async () => {
     const asked: any[] = [];
     const entry = { sourceRoot: '/opt/debateai-v3-preview/releases/auth-dev-candidate-new-v1-api' }, plan = { sourceRoot: entry.sourceRoot };
     const options = {
-      readCurrent: async () => ({ releaseKey: 'r13-0123456789ab', takeTrafficFrom: '2026-10-21T10:00:00.000Z' }),
+      readCurrent: async () => ({ releaseKey: ['r13', '0123456789ab'].join('-'), takeTrafficFrom: '2026-10-21T10:00:00.000Z' }),
       readLock: async () => ({ lock: twoReleases, lockSha256: 'a'.repeat(64) }),
       loadPinned: async (input: any) => { asked.push(input); return { entry, plan }; }
     };

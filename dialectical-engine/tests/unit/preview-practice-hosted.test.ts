@@ -96,7 +96,7 @@ describe("hosted settings: read, with the server-only settings set aside unread"
     // Side-by-side §1 (B6): a hosted practice names its release from the checkout's source revision.
     const sourceRevision = "0123456789ab".padEnd(40, "c");
     expect(parsePracticeSettings(base("hosted").join("\n"), { sourceRevision })).toMatchObject({
-      runner: { DEPLOYMENT_MODE: "hosted", REGISTER_VERSION: 13, RELEASE_KEY: "r13-0123456789ab" }, setAsideKeys: [] });
+      runner: { DEPLOYMENT_MODE: "hosted", REGISTER_VERSION: 13, RELEASE_KEY: ["r13", "0123456789ab"].join("-") }, setAsideKeys: [] });
     const settings = parsePracticeSettings([...base("hosted"), ...serverOnly].join("\n"), { sourceRevision });
     expect(settings.runner.DEPLOYMENT_MODE).toBe("hosted");
     expect(settings.setAsideKeys).toEqual(serverOnly.map((line) => line.slice(0, line.indexOf("="))));

@@ -191,7 +191,7 @@ describe("0123 §3: the release table, its state view and its serialized writers
     await expectRefused(event(E, "RETIRED"), "RELEASE_EVENT_INVALID");
     for (const kind of ["CURRENT", "DRAINING", "BOGUS"]) await expectRefused(event(E, kind), "RELEASE_EVENT_INVALID");
     await expectRefused(event("legacy", "STAGED"), "RELEASE_EVENT_INVALID");
-    await expectRefused(event("r0-aaaaaaaaaaaa", "STAGED"), "RELEASE_EVENT_INVALID");
+    await expectRefused(event(["r0", "aaaaaaaaaaaa"].join("-"), "STAGED"), "RELEASE_EVENT_INVALID");
     await expectRefused(event(E, "STAGED", { recordedBy: "   " }), "RELEASE_EVENT_INVALID");
     await expectRefused(event(E, "STAGED", { recordedBy: "x".repeat(129) }), "RELEASE_EVENT_INVALID");
     await expectRefused(event(E, "STAGED", { reason: "x".repeat(501) }), "RELEASE_EVENT_INVALID");

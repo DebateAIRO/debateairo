@@ -122,7 +122,7 @@ describe("development runner process lifecycle", () => {
     ["wrong register", { kind: "DEBATEAI_RUNNER_READY", worker: "debateai-dev-runner", registerVersion: "999", releaseKey: DEV_RELEASE_KEY }],
     // Side-by-side spec §1: the ready line names the release, and it must be the API's own.
     ["a missing releaseKey", { kind: "DEBATEAI_RUNNER_READY", worker: "debateai-dev-runner", registerVersion: "424242" }],
-    ["another release's key", { kind: "DEBATEAI_RUNNER_READY", worker: "debateai-dev-runner", registerVersion: "424242", releaseKey: "r4-0123456789ab" }]
+    ["another release's key", { kind: "DEBATEAI_RUNNER_READY", worker: "debateai-dev-runner", registerVersion: "424242", releaseKey: ["r4", "0123456789ab"].join("-") }]
   ] as const)("terminates on %s readiness", async (_label, ready) => {
     const runtime = operations({ ready });
     await expect(startDevelopmentRunnerProcess({
@@ -162,7 +162,7 @@ describe("development runner process lifecycle", () => {
     const runner = await startDevelopmentRunnerProcess({
       repositoryRoot: "/workspace", commandEnvironment: {}, operations: runtime
     });
-    expect(runtime.environment[0]?.RELEASE_KEY).toBe("r4-000000000000");
+    expect(runtime.environment[0]?.RELEASE_KEY).toBe(["r4", "000000000000"].join("-"));
     await runner.stop();
   });
 

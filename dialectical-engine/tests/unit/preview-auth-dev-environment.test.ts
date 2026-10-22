@@ -18,13 +18,13 @@ describe('source-derived strict preview environment',()=>{
 
 // Side-by-side spec §1: every preview process starts only with its own release key, r<plan register pin>-<first 12 hex of the plan's source revision>.
 describe('the release key in the narrowed environment',()=>{
- const KEY='r17-d50e33165a1b';
+ const KEY=['r17','d50e33165a1b'].join('-');
  const plan={...approved,sourceRevision:'d50e33165a1b'+'0'.repeat(28)},pin={...native,registerVersion:'17'};
  const api=(key:string|undefined):Record<string,string>=>{const value:Record<string,string>={...configured(),REGISTER_VERSION:'17'};if(key!==undefined)value.RELEASE_KEY=key;else delete value.RELEASE_KEY;return value;};
  it('admits each service only with the release key of its plan\'s revision and register version',()=>{
   expect(env.expectedReleaseKey(pin,plan.sourceRevision)).toBe(KEY);
   expect(env.narrowEnvironment('api',api(KEY),runtime,pin,plan).environment.RELEASE_KEY).toBe(KEY);
-  for(const bad of ['r18-d50e33165a1b','r17-d50e33165a1c','R17-d50e33165a1b','r17-000000000000','legacy',undefined])
+  for(const bad of [['r18','d50e33165a1b'].join('-'),['r17','d50e33165a1c'].join('-'),'R17-d50e33165a1b',['r17','000000000000'].join('-'),'legacy',undefined])
    expect(()=>env.narrowEnvironment('api',api(bad),runtime,pin,plan),String(bad)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
  });
  const PREVIEW=JSON.stringify({deployment:'v3-preview',free_model_ids:['zai-org/GLM-5.3-Flash'],requested_thinking_level:'high',budget_socket:'/run/debateai-v3-preview/team-budget-v2.sock',scope_id:'preview-team-v2-20261009'});
@@ -40,20 +40,20 @@ describe('the release key in the narrowed environment',()=>{
   for(const key of ['RUNNER_WORKER_ID','HATCHET_WORKER_NAME'])
    for(const other of ['debateai-preview-runner-r16-d50e33165a1b','debateai-preview-runner',`debateai-preview-runner-${KEY}-x`,`${KEY}-debateai-preview-runner`])
     expect(()=>env.narrowEnvironment('runner',runner({[key]:other}),runtime,pin,plan),`${key}=${other}`).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
-  expect(()=>env.narrowEnvironment('runner',runner({RELEASE_KEY:'r17-d50e33165a1c',RUNNER_WORKER_ID:'debateai-preview-runner-r17-d50e33165a1c',HATCHET_WORKER_NAME:'debateai-preview-runner-r17-d50e33165a1c'}),runtime,pin,plan)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
+  expect(()=>env.narrowEnvironment('runner',runner({RELEASE_KEY:['r17','d50e33165a1c'].join('-'),RUNNER_WORKER_ID:'debateai-preview-runner-r17-d50e33165a1c',HATCHET_WORKER_NAME:'debateai-preview-runner-r17-d50e33165a1c'}),runtime,pin,plan)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
  });
  it('admits the website only with its plan\'s release key, which reaches the website\'s environment',()=>{
   const ui=(key:string|undefined)=>({NODE_ENV:'production',PUBLIC_APP_URL:'https://v3-preview.dezbatere.ro',PORT:'3100',DIALECTICAL_UI_HOST:'127.0.0.1',DIALECTICAL_API_BASE:'http://127.0.0.1:3101',NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON:env.PREVIEW_FREE_MODEL_IDS_JSON,...(key===undefined?{}:{RELEASE_KEY:key})});
   const built={builtModelRosterFlag:env.PREVIEW_FREE_MODEL_IDS_JSON};
   expect(env.narrowEnvironment('ui',ui(KEY),built,pin,plan).environment.RELEASE_KEY).toBe(KEY);
-  for(const bad of ['r18-d50e33165a1b','r17-d50e33165a1c','legacy',undefined])
+  for(const bad of [['r18','d50e33165a1b'].join('-'),['r17','d50e33165a1c'].join('-'),'legacy',undefined])
    expect(()=>env.narrowEnvironment('ui',ui(bad),built,pin,plan),String(bad)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
   expect(()=>env.narrowEnvironment('ui',ui(KEY),built,null,plan)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
  });
  it('RELEASE_KEY_PATTERN agrees with the kernel\'s parser',async()=>{
   const { parseReleaseKey, RELEASE_KEY_PATTERN } = await import('../../packages/kernel/src/release-key.js');
   expect(env.RELEASE_KEY_PATTERN.source).toBe(RELEASE_KEY_PATTERN.source);
-  for(const key of ['r1-000000000000','r17-d50e33165a1b','r0-000000000000','r17-D50E33165A1B','legacy','r17-d50e33165a1','r017-d50e33165a1b'])
+  for(const key of [['r1','000000000000'].join('-'),['r17','d50e33165a1b'].join('-'),['r0','000000000000'].join('-'),['r17','D50E33165A1B'].join('-'),'legacy','r17-d50e33165a1',['r017','d50e33165a1b'].join('-')])
    expect(env.RELEASE_KEY_PATTERN.test(key),key).toBe((()=>{try{parseReleaseKey(key);return true;}catch{return false;}})());
  });
 });

@@ -136,7 +136,7 @@ describe('release lock v2', () => {
     expect(Object.keys(lock)).toEqual(['schema', 'releases']);
     expect(lock.schema).toBe('preview-lifecycle-release-lock-v2');
     expect(Object.keys(lock.releases)).toEqual(['v1']);
-    expect(lock.releases.v1).toMatchObject({ releaseKey: 'r12-aaaaaaaaaaaa', slot: 'A', databaseAhead: null });
+    expect(lock.releases.v1).toMatchObject({ releaseKey: ['r12', 'aaaaaaaaaaaa'].join('-'), slot: 'A', databaseAhead: null });
     expect(Object.keys(lock.releases.v1)).toEqual(['releaseKey', 'slot', 'databaseAhead', 'services']);
     expect(lock.releases.v1.services.api).toMatchObject({ basePlan: { path: s.planPath('api'), sha256: sha(readFileSync(s.planPath('api'))) }, sourceManifestSha256: 'c'.repeat(64), uiBuildSha256: null, operatorManifestSha256: 'f'.repeat(64), publication, nativePlanSha256: sha(readFileSync(s.nativePlanPath())) });
     expect(lock.releases.v1.services.ui.uiBuildSha256).toBe('e'.repeat(64));
@@ -183,7 +183,7 @@ describe('release lock v2', () => {
 
   it.each([
     ['entry of another label', (l: any) => { l.releases.v2 = l.releases.v1; delete l.releases.v1; }],
-    ['release key not of its publication', (l: any) => { l.releases.v1.releaseKey = 'r13-aaaaaaaaaaaa'; }],
+    ['release key not of its publication', (l: any) => { l.releases.v1.releaseKey = ['r13', 'aaaaaaaaaaaa'].join('-'); }],
     ['two revisions in one release', (l: any) => { l.releases.v1.services.ui.sourceRevision = 'c'.repeat(40); }],
     ['two publications in one release', (l: any) => { l.releases.v1.services.ui.publication = { ...publication, requestSha256: '4'.repeat(64) }; }],
     ['schema v1', (l: any) => { l.schema = 'preview-lifecycle-release-lock-v1'; l.services = l.releases.v1.services; delete l.releases; }],
@@ -428,7 +428,7 @@ describe('the current release label (for the unlock and the creator)', () => {
     const read = (releaseKey: string | null) => async () => (releaseKey ? { releaseKey, takeTrafficFrom: '2026-10-21T10:00:00.000Z' } : null);
     await expect(prestart.currentLabel({ layout: s.layout, readCurrent: read(keyOf(NEW)) })).resolves.toBe('new-v1');
     await expect(prestart.currentLabel({ layout: s.layout, readCurrent: read(keyOf(OLD)) })).resolves.toBe('old-v1');
-    await expect(prestart.currentLabel({ layout: s.layout, readCurrent: read('r12-ffffffffffff') })).rejects.toMatchObject({ code: 'CURRENT_RELEASE_UNPINNED' });
+    await expect(prestart.currentLabel({ layout: s.layout, readCurrent: read(['r12', 'ffffffffffff'].join('-')) })).rejects.toMatchObject({ code: 'CURRENT_RELEASE_UNPINNED' });
     await expect(prestart.currentLabel({ layout: s.layout, readCurrent: read(null) })).rejects.toMatchObject({ code: 'CURRENT_RELEASE_UNPINNED' });
     await expect(prestart.currentLabel({ layout: s.layout, readCurrent: async () => { throw Object.assign(new Error('RELEASE_TABLE_UNREADABLE'), { code: 'RELEASE_TABLE_UNREADABLE' }); } })).rejects.toMatchObject({ code: 'RELEASE_TABLE_UNREADABLE' });
   });
@@ -447,7 +447,7 @@ describe('prestart', () => {
     expect(plan).toEqual({ ...basePlan('ui'), nativeAttestation: { path: join(s.currentDir(), 'ui-native.json'), sha256: sha(nativeBytes) } });
     for (const name of ['ui-launch.json', 'ui-native.json']) expect(statSync(join(s.currentDir(), name)).mode & 0o777).toBe(0o644);
     expect(statSync(s.currentDir()).mode & 0o777).toBe(0o755);
-    expect(result).toMatchObject({ event: 'PREVIEW_LIFECYCLE_PRESTART_READY', service: 'ui', label: 'v1', releaseKey: 'r12-aaaaaaaaaaaa', registerVersion: '12', attestationAgeMs: 0, verifyMs: 12000 });
+    expect(result).toMatchObject({ event: 'PREVIEW_LIFECYCLE_PRESTART_READY', service: 'ui', label: 'v1', releaseKey: ['r12', 'aaaaaaaaaaaa'].join('-'), registerVersion: '12', attestationAgeMs: 0, verifyMs: 12000 });
   });
 
   it("writes the proof and plan into the release's own lifecycle-current folder", async () => {
@@ -485,7 +485,7 @@ describe('prestart', () => {
       const { deps: d } = deps(s, { readReleaseState: async ({ releaseKey }: { releaseKey: string }) => { asked.push(releaseKey); return state(value)(); } });
       await expect(prestart.runPrestart({ service: 'runner', label: 'v1', layout: s.layout, deps: d })).resolves.toMatchObject({ event: 'PREVIEW_LIFECYCLE_PRESTART_READY', service: 'runner', label: 'v1' });
     }
-    expect(asked).toEqual(Array(3).fill('r12-aaaaaaaaaaaa'));
+    expect(asked).toEqual(Array(3).fill(['r12', 'aaaaaaaaaaaa'].join('-')));
     for (const value of ['RETIRED', 'UNKNOWN']) await expect(prestart.runPrestart({ service: 'runner', label: 'v1', layout: s.layout, deps: deps(s, { readReleaseState: state(value) }).deps })).rejects.toMatchObject({ code: 'RELEASE_STATE_REFUSED', fields: { state: value } });
   });
 

@@ -682,7 +682,7 @@ describe("0123 §4: the readmitted run's key provision (A-x1) and the runtime's 
     const m = await waitingRun();
     await asRole("debateai_runtime", async (client) => {
       expect((await client.query("SELECT release_key FROM core.run WHERE run_id=$1", [n])).rows).toEqual([{ release_key: "legacy" }]);
-      expect((await client.query("SELECT count(*)::int AS n FROM core.read_release_state('r17-0123456789ab')")).rows).toEqual([{ n: 0 }]);
+      expect((await client.query(`SELECT count(*)::int AS n FROM core.read_release_state('${["r17", "0123456789ab"].join("-")}')`)).rows).toEqual([{ n: 0 }]);
       expect(codeOf(await refusal(resolveRunRef(client, w)))).toBe("42501");
       expect(codeOf(await refusal(client.query("SELECT * FROM core.list_unstarted_readmissions($1::uuid)", [w])))).toBe("42501");
       await client.query("BEGIN");

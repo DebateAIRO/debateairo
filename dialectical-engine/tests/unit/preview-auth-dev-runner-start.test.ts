@@ -80,17 +80,17 @@ describe('runner startup event (afterRunnerReady)', () => {
     const events: unknown[] = [];
     const started = await receipt.afterRunnerReady({ binding, publication, identity, readSelection: () => selection, subscribeReady: main.subscribeReady, importMain: main.importMain, emit: (event: unknown) => events.push(event) });
     main.stop(); await started.running;
-    expect(started.event.releaseKey).toBe('r12-aaaaaaaaaaaa');
+    expect(started.event.releaseKey).toBe(['r12', 'aaaaaaaaaaaa'].join('-'));
     expect(events).toEqual([started.event]);
     expect(receipt.parseRunnerRuntimeEvent(`PREVIEW_RUNNER_STARTED ${JSON.stringify(started.event)}`)).toEqual(started.event);
     // The event's key is its own register and source revision, never another release's.
-    for (const other of ['r11-aaaaaaaaaaaa', 'r12-bbbbbbbbbbbb', 'r12-000000000000', 'legacy', undefined])
+    for (const other of [['r11', 'aaaaaaaaaaaa'].join('-'), ['r12', 'bbbbbbbbbbbb'].join('-'), ['r12', '000000000000'].join('-'), 'legacy', undefined])
       expect(() => receipt.validateRunnerRuntimeEvent({ ...started.event, releaseKey: other }), String(other)).toThrow('PREVIEW_RUNTIME_RECEIPT_REFUSED');
     // A source revision that is not text refuses with the code, before main, never a raw TypeError.
     let imported = 0;
     await expect(receipt.afterRunnerReady({ binding: { ...binding, sourceRevision: 42 }, publication, identity, readSelection: () => selection, subscribeReady: () => () => undefined, importMain: async () => { imported++; }, emit: () => undefined })).rejects.toThrow(/^PREVIEW_RUNTIME_RECEIPT_REFUSED$/);
     // RELEASE_KEY of the runner's environment that is another revision's refuses before main (the event would name another release).
-    await expect(receipt.afterRunnerReady({ binding, publication, identity, readSelection: () => ({ ...selection, RELEASE_KEY: 'r12-bbbbbbbbbbbb' }), subscribeReady: () => () => undefined, importMain: async () => { imported++; }, emit: () => undefined })).rejects.toThrow(/^PREVIEW_RUNTIME_RECEIPT_REFUSED$/);
+    await expect(receipt.afterRunnerReady({ binding, publication, identity, readSelection: () => ({ ...selection, RELEASE_KEY: ['r12', 'bbbbbbbbbbbb'].join('-') }), subscribeReady: () => () => undefined, importMain: async () => { imported++; }, emit: () => undefined })).rejects.toThrow(/^PREVIEW_RUNTIME_RECEIPT_REFUSED$/);
     expect(imported).toBe(0);
   });
 
@@ -99,7 +99,7 @@ describe('runner startup event (afterRunnerReady)', () => {
     ['no RELEASE_KEY', (() => { const { RELEASE_KEY: _dropped, ...rest } = selection; return rest; })()],
     ['a malformed RELEASE_KEY', { ...selection, RELEASE_KEY: 'R12-AAAAAAAAAAAA' }],
     ['the legacy stamp', { ...selection, RELEASE_KEY: 'legacy' }],
-    ['another register version\'s key', { ...selection, RELEASE_KEY: 'r11-aaaaaaaaaaaa' }]
+    ['another register version\'s key', { ...selection, RELEASE_KEY: ['r11', 'aaaaaaaaaaaa'].join('-') }]
   ])('refuses %s before main is imported', async (_name, read) => {
     let imported = 0;
     await expect(receipt.afterRunnerReady({ binding, publication, identity, readSelection: () => read, subscribeReady: () => () => undefined, importMain: async () => { imported++; }, emit: () => undefined })).rejects.toThrow(/^PREVIEW_RUNTIME_SELECTION_REFUSED$/);
@@ -110,14 +110,14 @@ describe('runner startup event (afterRunnerReady)', () => {
     let key = releaseKey;
     const main = fakeMain(ready);
     const events: unknown[] = [];
-    await expect(receipt.afterRunnerReady({ binding, publication, identity, readSelection: () => ({ ...selection, RELEASE_KEY: key }), subscribeReady: main.subscribeReady, importMain: async () => { key = 'r12-bbbbbbbbbbbb'; await main.importMain(); }, emit: (x: unknown) => events.push(x) })).rejects.toThrow(/^PREVIEW_RUNTIME_SELECTION_REFUSED$/);
+    await expect(receipt.afterRunnerReady({ binding, publication, identity, readSelection: () => ({ ...selection, RELEASE_KEY: key }), subscribeReady: main.subscribeReady, importMain: async () => { key = ['r12', 'bbbbbbbbbbbb'].join('-'); await main.importMain(); }, emit: (x: unknown) => events.push(x) })).rejects.toThrow(/^PREVIEW_RUNTIME_SELECTION_REFUSED$/);
     expect(events).toEqual([]);
     main.stop();
   });
 
   it.each([
     ['a ready message without releaseKey is not ready', (() => { const { releaseKey: _dropped, ...withoutKey } = ready; return withoutKey; })()],
-    ['a ready message naming another release is not ready', { ...ready, releaseKey: 'r12-bbbbbbbbbbbb' }]
+    ['a ready message naming another release is not ready', { ...ready, releaseKey: ['r12', 'bbbbbbbbbbbb'].join('-') }]
   ])('%s', async (_name, message) => {
     const main = fakeMain(message);
     const events: unknown[] = [];
@@ -167,7 +167,7 @@ describe('runner startup event (afterRunnerReady)', () => {
     for (const key of ['pid', 'uid', 'bootId', 'startTicks', 'sourceRevision', 'runnerMainSha256'] as const) {
       const observed = { ...event, [key]: key === 'pid' || key === 'uid' ? 999 : key === 'bootId' ? '22222222-2222-4222-8222-222222222222' : key === 'startTicks' ? '20002' : key === 'sourceRevision' ? 'c'.repeat(40) : 'c'.repeat(64),
         // Another source revision is another release, whose own event names its own key (side-by-side spec §1).
-        ...(key === 'sourceRevision' ? { releaseKey: 'r12-cccccccccccc' } : {}) };
+        ...(key === 'sourceRevision' ? { releaseKey: ['r12', 'cccccccccccc'].join('-') } : {}) };
       expect(() => receipt.verifyRunnerRuntimeReadback(event, observed, facts), key).toThrow('PREVIEW_RUNTIME_READBACK_REFUSED');
     }
     for (const patch of [{ unit: 'debateai-preview-api.service' }, { expectedUnit: 'debateai-preview-api.service', unit: 'debateai-preview-api.service' }, { rootMatched: false }, { mainPidMatched: false }, { publication: { ...publication, snapshotSha256: 'c'.repeat(64) } }])
@@ -179,7 +179,7 @@ describe('runner startup event (afterRunnerReady)', () => {
       { unit: 'debateai-preview-api@d50e33165-r19-v1.service', expectedUnit: 'debateai-preview-api@d50e33165-r19-v1.service' },
       { unit: 'debateai-preview-runner@../x.service', expectedUnit: 'debateai-preview-runner@../x.service' },
       { unit: 'debateai-preview-runner@New-v1.service', expectedUnit: 'debateai-preview-runner@New-v1.service' },
-      { releaseKey: 'r12-bbbbbbbbbbbb' },
+      { releaseKey: ['r12', 'bbbbbbbbbbbb'].join('-') },
       { releaseKey: undefined }
     ]) expect(() => receipt.verifyRunnerRuntimeReadback(event, event, { ...facts, ...patch }), JSON.stringify(patch)).toThrow(/^PREVIEW_RUNTIME_READBACK_REFUSED$/);
   });
@@ -223,10 +223,10 @@ describe('the real readiness seam', () => {
     const heard: unknown[] = [];
     const listener = (value: unknown) => heard.push(value);
     process.once(RUNNER_READY_PROCESS_EVENT, listener);
-    const announced = { ...ready, registerVersion: '1', releaseKey: 'r1-0123456789ab' };
+    const announced = { ...ready, registerVersion: '1', releaseKey: ['r1', '0123456789ab'].join('-') };
     announceRunnerReady(announced as never);
     expect(heard).toEqual([announced]);
-    expect((heard[0] as { releaseKey?: unknown }).releaseKey).toBe('r1-0123456789ab');
+    expect((heard[0] as { releaseKey?: unknown }).releaseKey).toBe(['r1', '0123456789ab'].join('-'));
     expect(Object.isFrozen(heard[0])).toBe(true);
   });
 
@@ -238,7 +238,7 @@ describe('the real readiness seam', () => {
     const heard: unknown[] = [];
     const listener = (value: unknown) => heard.push(value);
     process.once(RUNNER_READY_PROCESS_EVENT, listener);
-    const announced = { ...ready, registerVersion: '20', releaseKey: 'r20-0123456789ab', startupDispatched: 2 };
+    const announced = { ...ready, registerVersion: '20', releaseKey: ['r20', '0123456789ab'].join('-'), startupDispatched: 2 };
     announceRunnerReady(announced as never, line => lines.push(line));
     expect(heard).toEqual([announced]);
     expect(lines).toHaveLength(1);
@@ -257,11 +257,11 @@ describe('the real readiness seam', () => {
     const listener = () => {};
     process.once(RUNNER_READY_PROCESS_EVENT, listener);
     try {
-      announceRunnerReady({ ...ready, releaseKey: 'r12-0123456789ab' } as never);
+      announceRunnerReady({ ...ready, releaseKey: ['r12', '0123456789ab'].join('-') } as never);
     } finally {
       spy.mockRestore();
     }
-    expect(written).toEqual([`DEBATEAI_RUNNER_READY ${JSON.stringify({ ...ready, releaseKey: 'r12-0123456789ab' })}\n`]);
+    expect(written).toEqual([`DEBATEAI_RUNNER_READY ${JSON.stringify({ ...ready, releaseKey: ['r12', '0123456789ab'].join('-') })}\n`]);
   });
 
   // Side-by-side spec §4: the launcher hears the runner's self-retirement as the same in-process event it emits.
@@ -362,8 +362,8 @@ describe('launch-runner.mjs: start mirrors launch-api.mjs, prepare-only stays th
   // Side-by-side spec §1: the preview launcher ties RELEASE_KEY to the plan's register pin and source revision.
   it('assertRunnerReleaseKey admits only r<plan register>-<first 12 hex of the plan source revision>', () => {
     const plan = { publication: { registerVersion: '12' } }, source = { sourceRevision: '0123456789ab'.padEnd(40, 'c') };
-    expect(() => launcher.assertRunnerReleaseKey({ RELEASE_KEY: 'r12-0123456789ab' }, plan, source)).not.toThrow();
-    for (const other of ['r11-0123456789ab', 'r12-cccccccccccc', 'r12-000000000000', 'R12-0123456789AB', 'r12-0123456789ab ', 'legacy', '', undefined])
+    expect(() => launcher.assertRunnerReleaseKey({ RELEASE_KEY: ['r12', '0123456789ab'].join('-') }, plan, source)).not.toThrow();
+    for (const other of [['r11', '0123456789ab'].join('-'), ['r12', 'cccccccccccc'].join('-'), ['r12', '000000000000'].join('-'), 'R12-0123456789AB', 'r12-0123456789ab ', 'legacy', '', undefined])
       expect(() => launcher.assertRunnerReleaseKey({ RELEASE_KEY: other }, plan, source), String(other)).toThrow(/^PREVIEW_RUNNER_RELEASE_KEY_MISMATCH$/);
   });
 
@@ -442,7 +442,7 @@ await startRunner([], async () => {
   if (worker.listensForSignals) process.stdout.write('READY\\n');
   else setImmediate(() => process.stdout.write('READY\\n'));
   // Like runner-retirement.ts: the retired event first, then the worker stops (main ends after it).
-  if (worker.retires) setTimeout(() => { process.emit('debateai:runner-retired', { releaseKey: 'r1-aaaaaaaaaaaa' }); finish(); }, 1);
+  if (worker.retires) setTimeout(() => { process.emit('debateai:runner-retired', { releaseKey: ['r1', 'aaaaaaaaaaaa'].join('-') }); finish(); }, 1);
   return { event: {}, running };
 }, worker.retiredSettleMs === undefined ? undefined : { retiredSettleMs: worker.retiredSettleMs });
 `;

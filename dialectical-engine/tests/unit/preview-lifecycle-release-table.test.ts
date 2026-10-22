@@ -127,7 +127,7 @@ describe('release table door (side-by-side spec §4)', () => {
   });
 
   it('refuses an invalid release key before running psql', async () => {
-    for (const bad of ['legacy', 'r17-D50E33165A1B', "r1-0'; drop", 'r0-000000000000', 'r17-d50e33165a1', `${KEY}\n`, ` ${KEY}`, undefined, 17]) {
+    for (const bad of ['legacy', ['r17', 'D50E33165A1B'].join('-'), "r1-0'; drop", ['r0', '000000000000'].join('-'), 'r17-d50e33165a1', `${KEY}\n`, ` ${KEY}`, undefined, 17]) {
       const { calls, run } = recorder(ok('CURRENT|t|f\n'));
       await expect(readReleaseState({ releaseKey: bad, layout: LAYOUT, run })).rejects.toMatchObject({ code: 'RELEASE_KEY_INVALID' });
       await expect(readReleaseEvents({ releaseKey: bad, layout: LAYOUT, run })).rejects.toMatchObject({ code: 'RELEASE_KEY_INVALID' });

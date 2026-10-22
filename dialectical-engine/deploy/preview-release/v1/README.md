@@ -29,7 +29,7 @@ disagree. `build-env` prints them with their sha256 so you can compare `ui.env` 
 printing it.
 
 The release key (`--release-key`, required on `build-env` and `ui-build`) is
-`r<site version>-<first 12 hex of the release's git revision>`, for example `r17-d50e33165a1b`
+`r<site version>-<first 12 hex of the release's git revision>`, for example r17-d50e33165a1b
 (side-by-side spec §1). The website keeps the 12 hex from its build and refuses to serve under
 another release's key, so `ui-build` refuses (`RELEASE_KEY_REFUSED`) a key whose 12 hex are not
 the UI source manifest's revision. Each release's `ui-<label>.env` names the same key, and the

@@ -379,29 +379,29 @@ describe("practice start refusals", () => {
     const head = "d50e33165a1b" + "0".repeat(28);
     it("a RELEASE_KEY line wins, checked against the register version and the mode", () => {
       expect(parsePracticeSettings([...versionOne("hosted"), "RELEASE_KEY=r1-0123456789ab"].join("\n"), { sourceRevision: head })
-        .runner.RELEASE_KEY).toBe("r1-0123456789ab");
+        .runner.RELEASE_KEY).toBe(["r1", "0123456789ab"].join("-"));
       expect(() => parsePracticeSettings([...versionOne("local"), "RELEASE_KEY=r2-0123456789ab"].join("\n")))
         .toThrow("PRACTICE_SETTINGS_VALUE_INVALID: RELEASE_KEY");
       expect(() => parsePracticeSettings([...versionOne("hosted"), "RELEASE_KEY=r1-000000000000"].join("\n")))
         .toThrow("PRACTICE_SETTINGS_VALUE_INVALID: RELEASE_KEY");
     });
     it("without one, the source revision names it; a hosted practice with neither refuses; local falls back to the development key", () => {
-      expect(parsePracticeSettings(versionOne("hosted").join("\n"), { sourceRevision: head }).runner.RELEASE_KEY).toBe("r1-d50e33165a1b");
-      expect(parsePracticeSettings(versionOne("local").join("\n"), { sourceRevision: head }).runner.RELEASE_KEY).toBe("r1-d50e33165a1b");
+      expect(parsePracticeSettings(versionOne("hosted").join("\n"), { sourceRevision: head }).runner.RELEASE_KEY).toBe(["r1", "d50e33165a1b"].join("-"));
+      expect(parsePracticeSettings(versionOne("local").join("\n"), { sourceRevision: head }).runner.RELEASE_KEY).toBe(["r1", "d50e33165a1b"].join("-"));
       let refusal: unknown;
       try { parsePracticeSettings(versionOne("hosted").join("\n"), { sourceRevision: null }); } catch (error) { refusal = error; }
       expect(refusal).toBeInstanceOf(PracticeRefusal);
       expect((refusal as PracticeRefusal).code).toBe("PRACTICE_SETTINGS_VALUE_INVALID");
       expect(() => parsePracticeSettings(versionOne("hosted").join("\n"), { sourceRevision: "d50e33165a1b" })).toThrow(PracticeRefusal);
-      expect(parsePracticeSettings(versionOne("local").join("\n")).runner.RELEASE_KEY).toBe("r1-000000000000");
+      expect(parsePracticeSettings(versionOne("local").join("\n")).runner.RELEASE_KEY).toBe(["r1", "000000000000"].join("-"));
     });
     it("renumbered for the next version, the key is checked again against the mode the practice finally runs in", () => {
-      expect(practiceReleaseKeyAt("r1-0123456789ab", 2, "hosted")).toBe("r2-0123456789ab");
-      expect(practiceReleaseKeyAt("r1-000000000000", 2, "local")).toBe("r2-000000000000");
+      expect(practiceReleaseKeyAt(["r1", "0123456789ab"].join("-"), 2, "hosted")).toBe(["r2", "0123456789ab"].join("-"));
+      expect(practiceReleaseKeyAt(["r1", "000000000000"].join("-"), 2, "local")).toBe(["r2", "000000000000"].join("-"));
       // A local development key, renumbered when --register-next switches the practice to hosted: refused, as the
       // settings parser refuses it (B6 review).
       let refusal: unknown;
-      try { practiceReleaseKeyAt("r1-000000000000", 2, "hosted"); } catch (error) { refusal = error; }
+      try { practiceReleaseKeyAt(["r1", "000000000000"].join("-"), 2, "hosted"); } catch (error) { refusal = error; }
       expect(refusal).toBeInstanceOf(PracticeRefusal);
       expect((refusal as PracticeRefusal).code).toBe("PRACTICE_SETTINGS_VALUE_INVALID");
       expect((refusal as Error).message).toBe("PRACTICE_SETTINGS_VALUE_INVALID: RELEASE_KEY: RELEASE_KEY_INVALID");

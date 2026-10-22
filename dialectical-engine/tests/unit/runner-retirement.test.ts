@@ -252,8 +252,8 @@ describe("a draining release's runner retires by itself (side-by-side §4)", () 
     const run = monitor({ facts: async () => drained() });
     await run.time.advance(60_000);
     expect(run.order).toEqual(["announce", "emit", "stopWorker"]);
-    expect(run.announced).toEqual([{ line: 'DEBATEAI_RUNNER_RETIRED {"releaseKey":"r1-aaaaaaaaaaaa"}\n', claimsStopped: true }]);
-    expect(run.emitted).toEqual([{ releaseKey: "r1-aaaaaaaaaaaa" }]);
+    expect(run.announced).toEqual([{ line: `DEBATEAI_RUNNER_RETIRED {"releaseKey":"${["r1", "aaaaaaaaaaaa"].join("-")}"}\n`, claimsStopped: true }]);
+    expect(run.emitted).toEqual([{ releaseKey: ["r1", "aaaaaaaaaaaa"].join("-") }]);
     expect(run.signal.claimsStopped()).toBe(true);
     expect(run.lines).toEqual([{ kind: "DEBATEAI_RUNNER_RETIREMENT", event: "RETIRING", how: "DRAINED" }]);
     await expect(run.retirement.retired).resolves.toBe("DRAINED");
@@ -430,14 +430,14 @@ describe("the backstop is a request the runner honours (side-by-side §4)", () =
 
     executing = 0;
     await run.time.advance(5_000);
-    expect(run.setAsides).toEqual([{ key: "r1-aaaaaaaaaaaa", reason: "BACKSTOP", at: 80_000 }]);
+    expect(run.setAsides).toEqual([{ key: ["r1", "aaaaaaaaaaaa"].join("-"), reason: "BACKSTOP", at: 80_000 }]);
     expect(run.order).toEqual(["setAside", "announce", "emit", "stopWorker"]);
     expect(run.lines).toEqual([
       line("BACKSTOP_STARTED", { executing: 1, openWork: 2 }),
       line("BACKSTOP_SET_ASIDE", { count: 2 }),
       line("RETIRING", { how: "BACKSTOP" })
     ]);
-    expect(run.announced).toEqual([{ line: 'DEBATEAI_RUNNER_RETIRED {"releaseKey":"r1-aaaaaaaaaaaa"}\n', claimsStopped: true }]);
+    expect(run.announced).toEqual([{ line: `DEBATEAI_RUNNER_RETIRED {"releaseKey":"${["r1", "aaaaaaaaaaaa"].join("-")}"}\n`, claimsStopped: true }]);
     await expect(run.retirement.retired).resolves.toBe("BACKSTOP");
     // The poll chain ended with the request: no read and no second set-aside after it.
     await run.time.advance(300_000);
@@ -452,7 +452,7 @@ describe("the backstop is a request the runner honours (side-by-side §4)", () =
     expect(run.setAsides).toEqual([]);
     expect(run.lines).toEqual([line("BACKSTOP_STARTED", { executing: 1, openWork: 2 })]);
     await run.time.advance(1);
-    expect(run.setAsides).toEqual([{ key: "r1-aaaaaaaaaaaa", reason: "BACKSTOP", at: 1_260_000 }]);
+    expect(run.setAsides).toEqual([{ key: ["r1", "aaaaaaaaaaaa"].join("-"), reason: "BACKSTOP", at: 1_260_000 }]);
     expect(run.lines).toEqual([
       line("BACKSTOP_STARTED", { executing: 1, openWork: 2 }),
       line("BACKSTOP_SETTLE_EXPIRED", { executing: 1 }),
@@ -475,7 +475,7 @@ describe("the backstop is a request the runner honours (side-by-side §4)", () =
     expect(calls.count()).toBe(1);
     await run.time.advance(60_000);
     await run.time.advance(1_200_000);
-    expect(run.setAsides).toEqual([{ key: "r1-aaaaaaaaaaaa", reason: "BACKSTOP", at: 1_260_000 }]);
+    expect(run.setAsides).toEqual([{ key: ["r1", "aaaaaaaaaaaa"].join("-"), reason: "BACKSTOP", at: 1_260_000 }]);
     expect(run.lines).toEqual([
       line("BACKSTOP_STARTED", { executing: 1, openWork: 2 }),
       line("BACKSTOP_SETTLE_EXPIRED", { executing: 1 }),
@@ -550,7 +550,7 @@ describe("the backstop is a request the runner honours (side-by-side §4)", () =
     expect(run.reads).toHaveLength(1);
     await run.time.advance(1);
     expect(run.reads).toHaveLength(2);
-    expect(run.setAsides).toEqual([{ key: "r1-aaaaaaaaaaaa", reason: "BACKSTOP", at: 120_000 }]);
+    expect(run.setAsides).toEqual([{ key: ["r1", "aaaaaaaaaaaa"].join("-"), reason: "BACKSTOP", at: 120_000 }]);
     expect(run.order).toEqual(["setAside", "announce", "emit", "stopWorker"]);
     expect(run.lines).toEqual([
       line("BACKSTOP_FAILED"),

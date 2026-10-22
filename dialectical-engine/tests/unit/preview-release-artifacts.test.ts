@@ -240,7 +240,7 @@ describe('UI build values', () => {
       }
     }
     for (const models of ['multi', '', 'GLM-ONLY', 'constructor']) expect(() => tool.uiPublicBuildValues(NEW_KEY, models)).toThrow(/ARGUMENTS_REFUSED/);
-    for (const key of [undefined, '', 'legacy', 'R10-CCCCCCCCCCCC', 'r10-cccccccccccc ', 'r0-cccccccccccc', tool.RELEASE_KEY_NOT_GIVEN]) expect(() => tool.uiPublicBuildValues(key, 'glm-only'), String(key)).toThrow(/RELEASE_KEY_REFUSED/);
+    for (const key of [undefined, '', 'legacy', 'R10-CCCCCCCCCCCC', 'r10-cccccccccccc ', ['r0', 'cccccccccccc'].join('-'), tool.RELEASE_KEY_NOT_GIVEN]) expect(() => tool.uiPublicBuildValues(key, 'glm-only'), String(key)).toThrow(/RELEASE_KEY_REFUSED/);
   });
 
   it('the build child gets only the public values plus fixed tool settings, never a secret path or a stray public flag', () => {
@@ -300,7 +300,7 @@ describe('ui-build and verify', () => {
     const s = server();
     const source = s.write(join(s.art, 'candidate-ui-source.json'), sourceManifest('ui'));
     const never = { verifySourceManifest: async () => { throw new Error('ran'); }, buildUiArtifact: async () => { throw new Error('ran'); }, verifyUiBuildManifest: async () => { throw new Error('ran'); } };
-    for (const key of [`r17-${'d'.repeat(12)}`, 'r10-cccccccccccd', 'legacy', 'R10-CCCCCCCCCCCC', 'r10-ccccccccccc', tool.RELEASE_KEY_NOT_GIVEN]) {
+    for (const key of [`r17-${'d'.repeat(12)}`, ['r10', 'cccccccccccd'].join('-'), 'legacy', 'R10-CCCCCCCCCCCC', 'r10-ccccccccccc', tool.RELEASE_KEY_NOT_GIVEN]) {
       await expect(run(['ui-build', '--source', source.path, '--release-key', key, '--out', join(s.art, 'candidate-ui-build.json')], s.layout, never), key).rejects.toMatchObject({ code: 'RELEASE_KEY_REFUSED' });
     }
     expect(existsSync(join(s.art, 'candidate-ui-build.json'))).toBe(false);

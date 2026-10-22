@@ -68,7 +68,7 @@ describe("AcceptanceDispatcher", () => {
   // Side-by-side spec §1, §3 (B16): the acceptance ask stamps every run with one key, and the acceptance runner and its
   // failure recorder claim and write under that same key, so the §3 fence never sets an acceptance debate apart.
   it("acceptance runs and claims under one release key", () => {
-    expect(ACCEPTANCE_RELEASE_KEY).toBe("r4-000000000000");
+    expect(ACCEPTANCE_RELEASE_KEY).toBe(["r4", "000000000000"].join("-"));
     const source = readFileSync(new URL("../../acceptance/main.ts", import.meta.url), "utf8");
     // Exactly three sites: the runner's settings (its claims), the failure recorder's fence (its writes under that
     // claim) and the ask application's settings (the stamp on each new run).

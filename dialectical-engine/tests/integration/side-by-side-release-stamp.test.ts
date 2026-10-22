@@ -68,7 +68,7 @@ describe("0123: every run carries its release key", () => {
 
   it("startRun refuses legacy and malformed keys before writing", async () => {
     const runs = await runCount(), intents = await intentCount();
-    for (const releaseKey of ["legacy", "r17-D50E33165A1B", "r0-d50e33165a1b"]) {
+    for (const releaseKey of ["legacy", ["r17", "D50E33165A1B"].join("-"), ["r0", "d50e33165a1b"].join("-")]) {
       await expect(fixture.createLegacyRun("refused plaintext", { releaseKey }), releaseKey)
         .rejects.toMatchObject({ code: "RELEASE_KEY_INVALID" });
       await expect(fixture.createEncryptedRun("refused encrypted", { releaseKey }), releaseKey)

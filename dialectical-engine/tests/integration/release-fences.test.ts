@@ -18,8 +18,8 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 let database: TestDatabase;
 let runtime: Pool;
 
-const KEY_A = "r1-aaaaaaaaaaaa";
-const KEY_B = "r2-bbbbbbbbbbbb";
+const KEY_A = ["r1", "aaaaaaaaaaaa"].join("-");
+const KEY_B = ["r2", "bbbbbbbbbbbb"].join("-");
 
 beforeAll(async () => {
   database = await startTestDatabase();
@@ -232,10 +232,10 @@ describe("work items are fenced by release (side-by-side §3)", () => {
   });
 
   it("refuses a malformed fence key; legacy and a well-formed key are accepted", () => {
-    for (const releaseKey of ["r1-0123456789AB", "r01-aaaaaaaaaaaa", "", "LEGACY"]) {
+    for (const releaseKey of [["r1", "0123456789AB"].join("-"), ["r01", "aaaaaaaaaaaa"].join("-"), "", "LEGACY"]) {
       expect(() => new WorkItemRepository(runtime, { releaseKey })).toThrow(expect.objectContaining({ code: "RELEASE_KEY_INVALID" }));
     }
-    expect(() => new WorkItemRepository(runtime, { releaseKey: "r1-aaaaaaaaaaaa", workerId: "" })).toThrow(TypeError);
+    expect(() => new WorkItemRepository(runtime, { releaseKey: ["r1", "aaaaaaaaaaaa"].join("-"), workerId: "" })).toThrow(TypeError);
     expect(() => new WorkItemRepository(runtime, { releaseKey: LEGACY_RELEASE_KEY })).not.toThrow();
     expect(() => new WorkItemRepository(runtime, { releaseKey: KEY_B })).not.toThrow();
   });

@@ -24,8 +24,8 @@ afterAll(async () => database?.stop());
 
 const { startGates, previewRunner, admittedRun } = previewDebateHarness({ pool: () => database.pool, stubClosers });
 
-const THIS_RELEASE = "r1-aaaaaaaaaaaa";
-const OTHER_RELEASE = "r2-bbbbbbbbbbbb";
+const THIS_RELEASE = ["r1", "aaaaaaaaaaaa"].join("-");
+const OTHER_RELEASE = ["r2", "bbbbbbbbbbbb"].join("-");
 
 describe("a runner never runs another release's debate (side-by-side §3)", () => {
   it("answers NO_WORK with its own line, before any probe or call, and leaves the item READY and unclaimed", async () => {

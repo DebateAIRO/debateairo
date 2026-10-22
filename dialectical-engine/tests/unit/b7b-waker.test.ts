@@ -196,7 +196,7 @@ function arrange(input: {
     stubPool(),
     { dispatch: vi.fn(async ({ runId, workItemId }) => {
       if (input.dispatchFails?.has(runId) === true) throw new Error("test: the job system refused");
-      if (input.notServed?.has(runId) === true) throw new ReleaseNotServedError(runId, "r16-0123456789ab", true);
+      if (input.notServed?.has(runId) === true) throw new ReleaseNotServedError(runId, ["r16", "0123456789ab"].join("-"), true);
       if (workItemId !== `job:${runId}`) throw new Error("test: dispatched a job the tick did not queue");
       dispatched.push(runId);
     }) },
@@ -287,7 +287,7 @@ describe("B7b one tick of the waiting line (budget spec §2.7)", () => {
     await expect(application.wakeWaitingRuns()).resolves.toEqual({ waiting: 2, started: 1, skipped: 0, failed: 1, stopped: false, redispatched: 0 });
     expect(recorded).toEqual([]);
     expect(dispatched).toEqual([b.runId]);
-    expect(lines()).toContainEqual({ event: "api.wait.release_not_served", runId: a.runId, releaseKey: "r16-0123456789ab", closed: true });
+    expect(lines()).toContainEqual({ event: "api.wait.release_not_served", runId: a.runId, releaseKey: ["r16", "0123456789ab"].join("-"), closed: true });
     expect(lines().some((line) => line.event === "api.wait.started" && line.runId === a.runId)).toBe(false);
   });
 
@@ -635,7 +635,7 @@ describe("side-by-side C4: a stalled start whose release no longer serves it", (
     await expect(application.wakeWaitingRuns()).resolves.toEqual({ waiting: 0, started: 0, skipped: 0, failed: 0, stopped: false, redispatched: 0 });
     expect(recorded).toEqual([]);
     expect(dispatched).toEqual([]);
-    expect(lines()).toEqual([{ event: "api.wait.release_not_served", runId: stalled, releaseKey: "r16-0123456789ab", closed: true }]);
+    expect(lines()).toEqual([{ event: "api.wait.release_not_served", runId: stalled, releaseKey: ["r16", "0123456789ab"].join("-"), closed: true }]);
   });
 });
 

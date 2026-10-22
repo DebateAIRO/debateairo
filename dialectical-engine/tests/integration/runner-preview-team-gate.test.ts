@@ -48,7 +48,7 @@ async function activeUser(): Promise<Readonly<{ userId: string; ownerRef: string
 }
 
 /** A run of `releaseKey` with its first job READY; owned by `ownerRef`, or a legacy asker's run when null. */
-async function runWithJob(ownerRef: string | null, releaseKey = "r1-aaaaaaaaaaaa"): Promise<Readonly<{ runId: string; workItemId: string }>> {
+async function runWithJob(ownerRef: string | null, releaseKey = ["r1", "aaaaaaaaaaaa"].join("-")): Promise<Readonly<{ runId: string; workItemId: string }>> {
   const runId = await new RunRepository(database.pool).startRun({
     questionLine: "Does the runner refuse an outsider's queued debate on the preview?",
     principal: { kind: "legacy", legacyAskerId: `gate:${randomUUID()}` },
@@ -72,7 +72,7 @@ async function jobRow(workItemId: string) {
   )).rows[0];
 }
 
-function gate(teamUserIds: readonly string[], lines: unknown[], releaseKey = "r1-aaaaaaaaaaaa") {
+function gate(teamUserIds: readonly string[], lines: unknown[], releaseKey = ["r1", "aaaaaaaaaaaa"].join("-")) {
   return refusePreviewOutsiderWork({
     previewConfigured: true, teamUserIds, ...postgresRunnerPreviewTeamGateStore(runner, releaseKey), log: (line) => lines.push(line)
   });
@@ -119,7 +119,7 @@ describe("the runner's start-up team gate, as the runner principal", () => {
     expect(JSON.stringify(lines)).not.toMatch(/question|asker|owner/i);
 
     // What the start-up re-dispatch then hands over: only the team's job.
-    const dispatchable = await new WorkItemRepository(runner, { releaseKey: "r1-aaaaaaaaaaaa" }).listDispatchable(1_000);
+    const dispatchable = await new WorkItemRepository(runner, { releaseKey: ["r1", "aaaaaaaaaaaa"].join("-") }).listDispatchable(1_000);
     expect(dispatchable.map((item) => item.workItemId)).toEqual([teamJob.workItemId]);
 
     // A second start finds nothing more to refuse.
@@ -132,55 +132,55 @@ describe("the runner's start-up team gate, as the runner principal", () => {
     await database.pool.query(
       "UPDATE core.work_item SET state='FAILED', terminal_reason='RUN_SETUP_FAILED:DISPATCH' WHERE work_item_id=$1", [job.workItemId]
     );
-    const store = postgresRunnerPreviewTeamGateStore(runner, "r1-aaaaaaaaaaaa");
+    const store = postgresRunnerPreviewTeamGateStore(runner, ["r1", "aaaaaaaaaaaa"].join("-"));
     expect(await store.work.failClaimable({ ...job, reason: "RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY" })).toBe(false);
     expect(await jobRow(job.workItemId)).toMatchObject({ state: "FAILED", terminal_reason: "RUN_SETUP_FAILED:DISPATCH" });
   });
 
   it("an outsider's live claim on another release does not refuse this release's start", async () => {
     const team = await activeUser(), outsider = await activeUser();
-    const other = await runWithJob(outsider.ownerRef, "r2-bbbbbbbbbbbb");
+    const other = await runWithJob(outsider.ownerRef, ["r2", "bbbbbbbbbbbb"].join("-"));
     await database.pool.query(
       "UPDATE core.work_item SET state='CLAIMED', claimed_by='worker:b', claim_deadline=clock_timestamp()+interval '10 minutes' WHERE work_item_id=$1",
       [other.workItemId]
     );
     const lines: unknown[] = [];
-    expect(await gate([team.userId], lines, "r1-aaaaaaaaaaaa")).toEqual({ checked: 0, refused: 0 });
+    expect(await gate([team.userId], lines, ["r1", "aaaaaaaaaaaa"].join("-"))).toEqual({ checked: 0, refused: 0 });
     expect(await jobRow(other.workItemId)).toMatchObject({ state: "CLAIMED", claimed_by: "worker:b" });
     expect(lines).toEqual([]);
     // Not vacuous: that release's own start is refused by the same claim.
-    await expect(gate([team.userId], [], "r2-bbbbbbbbbbbb")).rejects.toMatchObject({ code: "RUNNER_PREVIEW_OUTSIDER_CLAIM_LIVE" });
+    await expect(gate([team.userId], [], ["r2", "bbbbbbbbbbbb"].join("-"))).rejects.toMatchObject({ code: "RUNNER_PREVIEW_OUTSIDER_CLAIM_LIVE" });
   });
 
   it("an outsider's claimable job on another release is left to that release's runner", async () => {
     const team = await activeUser(), outsider = await activeUser();
-    const other = await runWithJob(outsider.ownerRef, "r2-bbbbbbbbbbbb");
-    expect(await gate([team.userId], [], "r1-aaaaaaaaaaaa")).toEqual({ checked: 0, refused: 0 });
+    const other = await runWithJob(outsider.ownerRef, ["r2", "bbbbbbbbbbbb"].join("-"));
+    expect(await gate([team.userId], [], ["r1", "aaaaaaaaaaaa"].join("-"))).toEqual({ checked: 0, refused: 0 });
     expect(await jobRow(other.workItemId)).toMatchObject({ state: "READY", terminal_reason: null });
-    expect(await gate([team.userId], [], "r2-bbbbbbbbbbbb")).toEqual({ checked: 1, refused: 1 });
+    expect(await gate([team.userId], [], ["r2", "bbbbbbbbbbbb"].join("-"))).toEqual({ checked: 1, refused: 1 });
     expect(await jobRow(other.workItemId)).toMatchObject({ state: "FAILED", terminal_reason: "RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY" });
   });
 
   it("the 100-job cap counts this release's jobs only", async () => {
     const team = await activeUser();
-    const other = await runWithJob(team.ownerRef, "r2-bbbbbbbbbbbb");
+    const other = await runWithJob(team.ownerRef, ["r2", "bbbbbbbbbbbb"].join("-"));
     const work = new WorkItemRepository(database.pool);
     for (let i = 1; i <= 100; i += 1) {
       await work.enqueue({ runId: other.runId, batteryRowId: "Q1", nodeSet: [], commandKey: `S00:${other.runId}:Q1:${i}` });
     }
-    expect(await gate([team.userId], [], "r1-aaaaaaaaaaaa")).toEqual({ checked: 0, refused: 0 });
+    expect(await gate([team.userId], [], ["r1", "aaaaaaaaaaaa"].join("-"))).toEqual({ checked: 0, refused: 0 });
     // Not vacuous: those 101 READY jobs saturate their own release's start.
-    await expect(gate([team.userId], [], "r2-bbbbbbbbbbbb")).rejects.toMatchObject({ code: "RUNNER_STARTUP_BACKLOG_SATURATED" });
+    await expect(gate([team.userId], [], ["r2", "bbbbbbbbbbbb"].join("-"))).rejects.toMatchObject({ code: "RUNNER_STARTUP_BACKLOG_SATURATED" });
   });
 
   it("failClaimable never fails another release's job", async () => {
     const outsider = await activeUser();
-    const other = await runWithJob(outsider.ownerRef, "r2-bbbbbbbbbbbb");
-    const store = postgresRunnerPreviewTeamGateStore(runner, "r1-aaaaaaaaaaaa");
+    const other = await runWithJob(outsider.ownerRef, ["r2", "bbbbbbbbbbbb"].join("-"));
+    const store = postgresRunnerPreviewTeamGateStore(runner, ["r1", "aaaaaaaaaaaa"].join("-"));
     expect(await store.work.failClaimable({ runId: other.runId, workItemId: other.workItemId, reason: "X" })).toBe(false);
     expect(await jobRow(other.workItemId)).toMatchObject({ state: "READY", terminal_reason: null });
     // Not vacuous: that release's own store fails the same job.
-    const own = postgresRunnerPreviewTeamGateStore(runner, "r2-bbbbbbbbbbbb");
+    const own = postgresRunnerPreviewTeamGateStore(runner, ["r2", "bbbbbbbbbbbb"].join("-"));
     expect(await own.work.failClaimable({ runId: other.runId, workItemId: other.workItemId, reason: "X" })).toBe(true);
     expect(await jobRow(other.workItemId)).toMatchObject({ state: "FAILED" });
   });

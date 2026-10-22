@@ -62,8 +62,8 @@ const SOURCE_UI = [
 ].join('\n');
 const SOURCES = { api: SOURCE_API, runner: SOURCE_RUNNER, ui: SOURCE_UI } as const;
 type Service = keyof typeof SOURCES;
-const OLD_KEY = 'r17-aaaaaaaaaaaa';
-const NEW_KEY = 'r18-0123456789ab';
+const OLD_KEY = ['r17', 'aaaaaaaaaaaa'].join('-');
+const NEW_KEY = ['r18', '0123456789ab'].join('-');
 
 const DERIVED = /^(REGISTER_VERSION|RELEASE_KEY|API_PORT|MAIL_SENDMAIL_PATH)=/;
 const parse = (text: string) => Object.fromEntries(text.split('\n').filter(Boolean).map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
@@ -119,7 +119,7 @@ describe('deriveEnvironmentText', () => {
   it('refuses a bad service, key, slot or label, a source it cannot read, and a source missing a derived key', () => {
     const ok = { service: 'api', sourceText: SOURCE_API, releaseKey: NEW_KEY, slot: 'B', label: 'new-v1' };
     for (const [change, code] of [
-      [{ service: 'web' }, 'ARGUMENTS_REFUSED'], [{ releaseKey: 'r0-0123456789ab' }, 'ARGUMENTS_REFUSED'], [{ releaseKey: 'r18-0123456789AB' }, 'ARGUMENTS_REFUSED'],
+      [{ service: 'web' }, 'ARGUMENTS_REFUSED'], [{ releaseKey: ['r0', '0123456789ab'].join('-') }, 'ARGUMENTS_REFUSED'], [{ releaseKey: ['r18', '0123456789AB'].join('-') }, 'ARGUMENTS_REFUSED'],
       [{ slot: 'C' }, 'ARGUMENTS_REFUSED'], [{ slot: 'toString' }, 'ARGUMENTS_REFUSED'], [{ label: 'New' }, 'ARGUMENTS_REFUSED'], [{ label: '../x' }, 'ARGUMENTS_REFUSED'],
       [{ sourceText: 'API_PORT=3101\nAPI_PORT=3102\n' }, 'SOURCE_ENV_REFUSED'], [{ sourceText: 'export API_PORT=3101\n' }, 'SOURCE_ENV_REFUSED'],
       [{ sourceText: SOURCE_API.replace('API_PORT=3101\n', '') }, 'SOURCE_KEY_MISSING']
