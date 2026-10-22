@@ -921,7 +921,7 @@ export default function DebatePageClient({
     if (removedByCheck || (!held && (debate === null || debateTerminal))) return;
     // A settled run can enter the check without a new visible event while the
     // existing stream stays open. A bounded owner read discovers that hold.
-    const timer = setInterval(() => { void refresh(true); }, held ? 5_000 : 15_000);
+    const timer = setInterval(() => { void refresh(false); }, held ? 5_000 : 15_000);
     return () => clearInterval(timer);
   }, [debate, debateTerminal, held, removedByCheck, refresh]);
 
@@ -1560,6 +1560,8 @@ export default function DebatePageClient({
       <div className="debateAiDisclosure">
         <AiNotice catalog={{ ...homeCatalog, ...chromeCatalog }} body={t(debateChromeCatalog, "debateChrome.aiNotice")} />
       </div>
+      {removedByCheck ? null : <p className="heldMobileQuestion" lang={readQuestionLocale ?? storyLocale}
+        dir={localeDirection(readQuestionLocale ?? storyLocale)}>{debate?.topic}</p>}
       {removedByCheck
         ? <CheckRemovalNotice catalog={homeCatalog} locale={locale} countryHint={crisisCountryHint} onClose={() => window.location.assign("/?tab=yours")} />
         : <p role="status" className="checkingNotice">{t(publicCatalog, "public.publication.checkingDebate")}</p>}

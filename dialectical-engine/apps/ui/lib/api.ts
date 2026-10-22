@@ -197,7 +197,11 @@ export async function getDebateBundle(
     if (!isNotFound(failure)) throw failure;
   }
   if (run !== null) {
-    if (run.state === "SETTLED" || options.answerExpected) {
+    if (run.synthesis_check === "CHECKING") {
+      return { kind: "loading", answer: null, detail: debateDetailFromRunProjection(run, catalog, options.locale),
+        run, questionLanguage: run.argument_language ?? null };
+    }
+    if (run.state === "SETTLED") {
       try {
         return await servedDebateBundle(await client.readRunAnswer(id), catalog, run, client);
       } catch (failure) {

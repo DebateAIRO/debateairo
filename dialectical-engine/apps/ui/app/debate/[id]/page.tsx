@@ -8,6 +8,8 @@ import { createServerContractClient } from "@/lib/serverApi";
 import { readCrisisCountryHint } from "@/lib/crisisLines";
 import { CheckRemovalNotice, CrisisCountryHintProvider } from "@/components/CheckRemovalNotice";
 import { AiNotice } from "@/components/AiNotice";
+import { SupportWidget } from "@/components/support/SupportWidget";
+import { t } from "@/lib/i18n/translate";
 import { BrandMark } from "@/components/TopBar";
 import { AccountMenu } from "@/components/AccountMenu";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -142,8 +144,10 @@ export default async function DebatePage({
               <div className="debateTopIdentityRow"><BrandMark /><span className="debateTopDivider" aria-hidden /></div>
               <div className="debateTopControlRow"><AccountMenu catalog={chromeCatalog} /><LanguageSwitcher /><ModeToggle compact /></div>
             </header>
-            <div className="debateAiDisclosure"><AiNotice catalog={{ ...homeCatalog, ...chromeCatalog }} /></div>
+            <div className="debateAiDisclosure"><AiNotice catalog={{ ...homeCatalog, ...chromeCatalog }}
+              body={t(debateChromeCatalog, "debateChrome.aiNotice")} /></div>
             <CheckRemovalNotice catalog={homeCatalog} locale={locale} countryHint={countryHint} />
+            <SupportWidget />
           </div>;
         }
       } catch {

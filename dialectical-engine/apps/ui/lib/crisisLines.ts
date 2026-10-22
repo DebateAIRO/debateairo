@@ -1,4 +1,5 @@
 import { CRISIS_LINE_DIRECTORY } from "./crisisLineDirectory.js";
+import { CRISIS_COUNTRY_NAMES, CRISIS_WEEKDAY_NAMES } from "./crisisNames.generated.js";
 
 /**
  * Helplines the crisis screen offers (V, 2026-09-30). Every number was confirmed on the
@@ -90,21 +91,14 @@ export function resolveCrisisCountry(input: Readonly<{
 
 /** The countries with a checked entry, named in the reader's language and sorted by that name. */
 export function crisisCountryOptions(locale: string): readonly Readonly<{ code: string; name: string }>[] {
-  let names: Intl.DisplayNames | null = null;
-  try {
-    names = new Intl.DisplayNames([locale, "en"], { type: "region" });
-  } catch {
-    names = null;
-  }
-  const collator = new Intl.Collator(locale);
-  return Object.keys(CRISIS_LINES)
-    .map((code) => ({ code, name: names?.of(code) ?? code }))
-    .sort((left, right) => collator.compare(left.name, right.name));
+  const language = locale.toLowerCase().split("-")[0] ?? "en";
+  const fixed = CRISIS_COUNTRY_NAMES[language];
+  return fixed === undefined ? STABLE_CRISIS_COUNTRY_OPTIONS
+    : fixed.map(([code, name]) => ({ code, name }));
 }
 
-// Server markup and the browser's first hydration render must use the same
-// names and order. ICU region labels differ across Node and browser releases
-// (notably HK); localized labels replace these after hydration.
+// English fallback for unknown locales. Shipped locales use the fixed localized
+// table above on both the server and the first browser render.
 export const STABLE_CRISIS_COUNTRY_OPTIONS: readonly Readonly<{ code: string; name: string }>[] = Object.freeze(([
   ["AR", "Argentina"], ["AU", "Australia"], ["AT", "Austria"], ["BE", "Belgium"],
   ["BR", "Brazil"], ["BG", "Bulgaria"], ["CA", "Canada"], ["CL", "Chile"],
@@ -134,19 +128,14 @@ export function readCrisisCountryHint(headers: Readonly<{ get(name: string): str
 }
 
 /**
- * Opening hours in the reader's language: weekday names from the browser (`Intl`), times as
- * published. "Fri, Sat, Sun 19:00–07:00" in English, "vin., sâm., dum. 19:00–07:00" in Romanian.
+ * Opening hours in the reader's language: weekday names from fixed CLDR data, times as
+ * published. The fixed labels keep server rendering and hydration identical across ICU builds.
  */
 export function formatCrisisHours(hours: readonly CrisisHours[], locale: string): string {
-  let weekday: Intl.DateTimeFormat;
-  try {
-    weekday = new Intl.DateTimeFormat([locale, "en"], { weekday: "short", timeZone: "UTC" });
-  } catch {
-    weekday = new Intl.DateTimeFormat("en", { weekday: "short", timeZone: "UTC" });
-  }
-  // 2024-01-01 was a Monday.
+  const language = locale.toLowerCase().split("-")[0] ?? "en";
+  const weekday = CRISIS_WEEKDAY_NAMES[language] ?? CRISIS_WEEKDAY_NAMES.en ?? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const dayName = (day: CrisisWeekday): string =>
-    weekday.format(new Date(Date.UTC(2024, 0, 1 + WEEKDAY_ORDER.indexOf(day))));
+    weekday[WEEKDAY_ORDER.indexOf(day)] ?? day;
   return hours.map((range) => {
     const days = range.days === undefined ? "" : `${range.days.map(dayName).join(", ")} `;
     return `${days}${range.from}–${range.to}`;

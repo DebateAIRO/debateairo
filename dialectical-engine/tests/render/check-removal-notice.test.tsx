@@ -5,10 +5,10 @@ import { isValidElement } from "react";
 import { createRoot, hydrateRoot } from "react-dom/client";
 import { renderToStaticMarkup, renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { CrisisSupportDialog } from "../../apps/ui/components/CrisisSupport";
+import { CrisisHelpNumbers, CrisisSupportDialog } from "../../apps/ui/components/CrisisSupport";
 import { CheckRemovalNotice, RemovalNoticeLatch } from "../../apps/ui/components/CheckRemovalNotice";
 import { ModeToggle } from "../../apps/ui/components/ModeToggle";
-import { CRISIS_LINES, STABLE_CRISIS_COUNTRY_OPTIONS } from "../../apps/ui/lib/crisisLines";
+import { CRISIS_LINES, STABLE_CRISIS_COUNTRY_OPTIONS, crisisCountryOptions, formatCrisisHours } from "../../apps/ui/lib/crisisLines";
 import HomePage from "../../apps/ui/app/page";
 import home from "../../apps/ui/messages/en/home.json";
 
@@ -45,6 +45,34 @@ describe("S01 removal notice", () => {
     expect(html).toContain('class="crisisSupportLines"');
   });
 
+  it("prints localized country names in the server markup", () => {
+    for (const [locale, code, name] of [["ro", "RO", "România"], ["de", "DE", "Deutschland"], ["ja", "JP", "日本"]]) {
+      const html = renderToStaticMarkup(<CheckRemovalNotice catalog={home} locale={locale} countryHint={code} />);
+      expect(html).toContain(`<option value="${code}" selected="">${name}</option>`);
+      expect(crisisCountryOptions(locale).find((option) => option.code === code)?.name).toBe(name);
+    }
+  });
+
+  it("keeps first-render names and weekday hours identical when browser Intl data differs", async () => {
+    const page = <CheckRemovalNotice catalog={home} locale="mt" countryHint="MT" />;
+    const markup = renderToString(page);
+    const hours = [{ days: ["mon"], from: "09:00", to: "17:00" }] as const;
+    const initialHours = formatCrisisHours(hours, "mt");
+    expect(initialHours).not.toContain("Mon 09:00");
+    const node = document.createElement("div"); node.innerHTML = markup; document.body.append(node);
+    const original = Intl.DateTimeFormat;
+    vi.stubGlobal("Intl", Object.assign(Object.create(Intl), { DateTimeFormat: class extends original {
+      format(date: Date) { return "Mon"; }
+    } }));
+    const recovered: unknown[] = [];
+    let root: ReturnType<typeof hydrateRoot> | undefined;
+    try {
+      await act(async () => { root = hydrateRoot(node, page, { onRecoverableError: (error) => recovered.push(error) }); });
+      expect(recovered).toEqual([]);
+      expect(formatCrisisHours(hours, "mt")).toBe(initialHours);
+    } finally { await act(async () => { root?.unmount(); }); vi.unstubAllGlobals(); node.remove(); }
+  });
+
   it("hydrates the notice when browser country and ICU names differ from the server", async () => {
     const page = <div><header className="debateTopBar"><ModeToggle compact /></header>
       <CheckRemovalNotice catalog={home} locale="en" countryHint={null} onClose={() => {}} /></div>;
@@ -73,6 +101,42 @@ describe("S01 removal notice", () => {
       else delete (navigator as { languages?: readonly string[] }).languages;
       node.remove();
     }
+  });
+
+  it("first renders the locale country before using a different browser country", async () => {
+    const page = <CrisisHelpNumbers catalog={home} locale="ro" countryHint={null} />;
+    const markup = renderToString(page);
+    expect(markup).toMatch(/<option value="RO" selected="">/);
+    const node = document.createElement("div"); node.innerHTML = markup; document.body.append(node);
+    const prior = Object.getOwnPropertyDescriptor(navigator, "languages");
+    Object.defineProperty(navigator, "languages", { configurable: true, value: ["en-US"] });
+    const recovered: unknown[] = [];
+    let root: ReturnType<typeof hydrateRoot> | undefined;
+    try {
+      await act(async () => { root = hydrateRoot(node, page, { onRecoverableError: (error) => recovered.push(error) }); });
+      expect(recovered).toEqual([]);
+      expect(node.querySelector<HTMLSelectElement>("select")?.value).toBe("US");
+    } finally {
+      await act(async () => { root?.unmount(); });
+      if (prior) Object.defineProperty(navigator, "languages", prior);
+      else delete (navigator as { languages?: readonly string[] }).languages;
+      node.remove();
+    }
+  });
+
+  it("retains a visitor-selected crisis country across locale changes", async () => {
+    const node = document.createElement("div"); document.body.append(node);
+    const root = createRoot(node);
+    await act(async () => { root.render(<CrisisHelpNumbers catalog={home} locale="en" countryHint="US" />); });
+    const select = () => node.querySelector<HTMLSelectElement>("select")!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(select(), "RO");
+      select().dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(select().value).toBe("RO");
+    await act(async () => { root.render(<CrisisHelpNumbers catalog={home} locale="ro" countryHint="US" />); });
+    expect(select().value).toBe("RO");
+    act(() => root.unmount()); node.remove();
   });
 
   it("orders the title, explanation, help numbers, five reasons and Close", () => {

@@ -7,7 +7,6 @@ import { useHideOutside } from "@/components/dialogSurface";
 import {
   CRISIS_LINES,
   FIND_A_HELPLINE_URL,
-  STABLE_CRISIS_COUNTRY_OPTIONS,
   crisisCountryOptions,
   formatCrisisHours,
   resolveCrisisCountry,
@@ -121,17 +120,17 @@ export function CrisisHelpNumbers({ catalog, locale, countryHint }: Readonly<{
 }>): React.ReactElement {
   const [country, setCountry] = React.useState<string>(() =>
     resolveCrisisCountry({ hint: countryHint, locale }) ?? "");
-  const [hydrated, setHydrated] = React.useState(false);
+  const visitorChoseCountry = React.useRef(false);
   React.useEffect(() => {
-    setHydrated(true);
-    setCountry(resolveCrisisCountry({ hint: countryHint, browserLanguages: browserLanguages(), locale }) ?? "");
+    if (!visitorChoseCountry.current)
+      setCountry(resolveCrisisCountry({ hint: countryHint, browserLanguages: browserLanguages(), locale }) ?? "");
   }, [countryHint, locale]);
-  const options = hydrated ? crisisCountryOptions(locale) : STABLE_CRISIS_COUNTRY_OPTIONS;
+  const options = crisisCountryOptions(locale);
   const entry = country === "" ? undefined : CRISIS_LINES[country];
   return <>
     <label className="crisisSupportCountry">
       <span>{t(catalog, "home.crisisSupport.countryLabel")}</span>
-      <select value={country} onChange={(event) => setCountry(event.target.value)}>
+      <select value={country} onChange={(event) => { visitorChoseCountry.current = true; setCountry(event.target.value); }}>
         {country === "" ? <option value="">—</option> : null}
         {options.map((option) => (
           <option key={option.code} value={option.code}>{option.name}</option>

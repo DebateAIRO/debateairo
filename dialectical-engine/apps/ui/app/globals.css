@@ -7648,6 +7648,21 @@ a:focus-visible {
   font-size: 13.5px;
   line-height: 1.45;
 }
+.heldMobileQuestion { display: none; }
+@media (max-width: 920px) {
+  .heldMobileQuestion {
+    display: block;
+    margin: 0;
+    padding: 8px 12px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-family: var(--font-serif);
+    font-size: 13.5px;
+    font-style: italic;
+    color: var(--muted);
+  }
+}
 @media (max-width: 600px) { .checkingNotice { padding: 8px 12px; } }
 .removalNoticeReasons { margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--line); }
 .removalNoticeReasons p { margin: 0 0 8px; font-size: 12px; line-height: 1.5; color: var(--text-2); }
