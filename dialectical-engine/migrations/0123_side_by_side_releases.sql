@@ -478,7 +478,8 @@ GRANT EXECUTE ON FUNCTION core.record_release_event(text,text,text,text) TO deba
 -- C, START): the old row is never touched (core.run is never updated), so its re-admission is a record.
 -- core.run_supersession is that record, append-only: old_run_id → new_run_id, reason READMITTED. Its guard refuses an
 -- edge unless the old run still waits (a core.run_wait row and no core.run_wait_start row: a started debate is never
--- re-admitted, ruling O1, plan A review focus 4) and the new run has no edge of its own, so a cycle cannot form (an
+-- re-admitted, ruling O1, plan A review focus 4; and still in core.run_waiting_v, below: not FAILED, its content not
+-- erased, its account active, final review P3) and the new run has no edge of its own, so a cycle cannot form (an
 -- edge X → Y needs Y without an outgoing edge). The new run must also be live (no FAILED work item) and, when its
 -- execution binding marks it as a re-admission (readmitted_from_run_id, below), the re-admission of this old run (A3
 -- review). The guard takes ONE advisory lock, so two edges written at once are checked one after the other, and it
@@ -518,6 +519,10 @@ BEGIN
   PERFORM 1 FROM core.run_wait AS wait WHERE wait.run_id = NEW.old_run_id FOR UPDATE;
   IF NOT FOUND
     OR EXISTS (SELECT 1 FROM core.run_wait_start AS started WHERE started.run_id = NEW.old_run_id)
+    -- The old run still waits as the line reads it (final review P3): START writes the edge after createRun committed
+    -- the new run on its own connection, so an erasure (or a set-aside) committed in between is read here, after the
+    -- lock, and a deleted question never restarts under a new id.
+    OR NOT EXISTS (SELECT 1 FROM core.run_waiting_v AS line WHERE line.run_id = NEW.old_run_id)
     OR EXISTS (SELECT 1 FROM core.run_supersession AS onward WHERE onward.old_run_id = NEW.new_run_id)
     -- The edge points only at the live re-admission of that same run (A3 review): never at a run recorded FAILED (it
     -- never runs, so the old run must keep its place), never at a run whose binding marks it as another run's.
@@ -1314,11 +1319,12 @@ BEGIN
   -- §4: the supersession table with its keys, its two CHECKs and its three triggers (append-only statement trigger,
   -- truncate guard, the BEFORE INSERT row guard, a pinned-path definer); its ACL exactly SELECT, INSERT for the API's
   -- role debateai_billing_runtime and SELECT for debateai_release_owner; core.resolve_run_ref owned by that role, a
-  -- STABLE definer with the pinned path, callable by the API's role and not by the runtime (the runner); the start guard
-  -- on core.run_wait_start; the line excluding superseded runs, readable by the runtime; the readmitted provision
-  -- callable by the content-provision role alone, its commit lock by nobody, §2's commit taking it, and the intent's
-  -- marker column; the unstarted re-admissions reader a STABLE definer with the pinned path, callable by the API's
-  -- role alone (C11 review); and the runtime reaching the stamp and the two release readers (addendum A-x2).
+  -- STABLE definer with the pinned path, callable by the API's role and not by the runtime (the runner); the edge guard
+  -- reading the line itself (final review P3); the start guard on core.run_wait_start; the line excluding superseded
+  -- runs, readable by the runtime; the readmitted provision callable by the content-provision role alone, its commit
+  -- lock by nobody, §2's commit taking it, and the intent's marker column; the unstarted re-admissions reader a STABLE
+  -- definer with the pinned path, callable by the API's role alone (C11 review); and the runtime reaching the stamp and
+  -- the two release readers (addendum A-x2).
   IF to_regclass('core.run_supersession') IS NULL
     OR (SELECT count(*) FROM pg_constraint
         WHERE conrelid = to_regclass('core.run_supersession')
@@ -1354,6 +1360,7 @@ BEGIN
     OR has_function_privilege('debateai_runtime', v_resolve, 'EXECUTE')
     OR NOT has_function_privilege('debateai_billing_runtime', v_resolve, 'EXECUTE')
     OR has_function_privilege('public', v_guard, 'EXECUTE')
+    OR strpos(pg_get_functiondef(v_guard), 'NOT EXISTS (SELECT 1 FROM core.run_waiting_v AS line WHERE line.run_id = NEW.old_run_id)') = 0
     OR strpos(pg_get_viewdef('core.run_waiting_v'::regclass), 'run_supersession') = 0
     OR NOT has_table_privilege('debateai_runtime', 'core.run_waiting_v', 'SELECT')
     OR NOT has_function_privilege('debateai_content_provision', v_readmit, 'EXECUTE')

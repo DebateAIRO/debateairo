@@ -10,8 +10,9 @@ import { startContentRunFixture, type ContentRunFixture } from "../support/conte
 /**
  * Re-admission records (side-by-side uploads spec 2026-10-21 §4, §9, §13; migration 0123 §4-§5). A waiting debate
  * re-admitted under the current release gets a NEW run; core.run_supersession records old → new, append-only, and its
- * guard refuses an edge unless the old run is still waiting (a wait row, no start row) and the new run has no edge of
- * its own, so a started debate is never re-admitted (plan A review focus 4) and no cycle can form. core.resolve_run_ref
+ * guard refuses an edge unless the old run is still waiting (a wait row, no start row, and still in the line: final
+ * review P3) and the new run has no edge of its own, so a started or deleted debate is never re-admitted (plan A review
+ * focus 4) and no cycle can form. core.resolve_run_ref
  * follows the chain (at most 16 hops); core.run_waiting_v no longer lists a superseded run. The wait reasons widen with
  * SITE_BUSY and SWITCHING. A superseded run's start is refused RUN_SUPERSEDED. An owner's encrypted waiting run gets
  * its new run's key provision without a live session, once per old run while that re-admission lives (A-x1); an edge
@@ -148,8 +149,18 @@ describe("0123 §4: a superseded run leaves the line, and its chain resolves", (
     await supersede(a, b);
     // b → a would close a cycle: a already has its own edge.
     expect(codeOf(await refusal(supersede(b, a)))).toBe("RUN_SUPERSESSION_INVALID");
-    // a → c: a second edge out of a is the primary key's refusal.
-    expect(codeOf(await refusal(supersede(a, c)))).toBe("23505");
+    // a → c: a is superseded, so it no longer waits, and the guard refuses first (final review P3: it reads the line).
+    expect(codeOf(await refusal(supersede(a, c)))).toBe("RUN_SUPERSESSION_INVALID");
+    // Under the guard, a second edge out of a is still the primary key's refusal (the guard bypassed, as the chain case
+    // below seeds).
+    const pool = fixture.database.pool;
+    await pool.query("ALTER TABLE core.run_supersession DISABLE TRIGGER guard_run_supersession");
+    try {
+      expect(codeOf(await refusal(pool.query(
+        "INSERT INTO core.run_supersession (old_run_id, new_run_id, reason) VALUES ($1, $2, 'READMITTED')", [a, c])))).toBe("23505");
+    } finally {
+      await pool.query("ALTER TABLE core.run_supersession ENABLE TRIGGER guard_run_supersession");
+    }
     // c → b: b is already some run's new run (UNIQUE new_run_id).
     expect(codeOf(await refusal(supersede(c, b)))).toBe("23505");
     // A run superseded by itself is the CHECK's refusal.
@@ -530,6 +541,44 @@ describe("0123 §4: the readmitted run's key provision (A-x1) and the runtime's 
       await pool.query(`UPDATE identity."user" SET state = 'active' WHERE user_id = $1`, [fixture.userId]);
     }
     expect(await intents()).toBe(before);
+  });
+
+  /**
+   * Final review P3: START writes the edge after createRun committed the new run on its own connection, so the old run
+   * can stop waiting in between (its person deleted the question, it was set aside). The guard reads the line itself,
+   * after its lock, so a deleted question never restarts under a new id.
+   */
+  it("an edge is refused when the old run stopped waiting after its new run was written (final review P3)", async () => {
+    const pool = fixture.database.pool;
+    for (const erasure of ["cleanup intent", "tombstone"] as const) {
+      const old = await waitingEncryptedRun();
+      const fresh = randomUUID();
+      const prepared = (await prepareReadmitted(pool, old, fresh)).rows[0]!;
+      expect(await createDirectly(pool, await encryptedRunDocument(fresh, prepared.execution_ref))).toBe(true);
+      // The person deletes the waiting question now: per-debate erasure's first mark, or its finished tombstone.
+      if (erasure === "cleanup intent") {
+        await pool.query(`INSERT INTO serve.private_run_key_cleanup_intent (request_ref, user_id, run_id, requested_at,
+          cleanup_publication_refs) VALUES ($1, $2, $3, now(), '{}'::uuid[])`, [randomUUID(), fixture.userId, old]);
+      } else {
+        await pool.query(`INSERT INTO serve.private_run_erasure_tombstone (run_id, completed_at, destroyed_key_count,
+          already_absent_key_count) VALUES ($1, now(), 1, 0)`, [old]);
+      }
+      expect(await waits().isWaiting(pool, old), erasure).toBe(false);
+      const edgesBefore = await edges();
+      const error = await refusal(supersede(old, fresh));
+      expect(codeOf(error), erasure).toBe("RUN_SUPERSESSION_INVALID");
+      expect((error as Error).message, erasure).toBe("RUN_SUPERSESSION_INVALID");
+      expect(await edges(), erasure).toBe(edgesBefore);
+      expect(await resolveRunRef(pool, old), erasure).toBe(old);
+    }
+    // A legacy run set aside (FAILED) in between no longer waits either.
+    const setAside = await waitingRun(), next = await legacyRun();
+    await new WorkItemRepository(pool).recordSetupFailure({
+      runId: setAside, batteryRowId: "Q1", commandKey: `S00:${setAside}:Q1`, reason: "RUN_SETUP_FAILED:WAITING_LINE"
+    });
+    const edgesBefore = await edges();
+    expect(codeOf(await refusal(supersede(setAside, next)))).toBe("RUN_SUPERSESSION_INVALID");
+    expect(await edges()).toBe(edgesBefore);
   });
 
   /**

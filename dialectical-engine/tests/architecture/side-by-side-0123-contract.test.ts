@@ -135,6 +135,13 @@ describe("0123: the side-by-side releases step", () => {
     const guard = sql.slice(sql.indexOf("CREATE OR REPLACE FUNCTION core.guard_run_supersession()"));
     expect(guard.slice(0, guard.indexOf("$$;"))).toContain(
       "PERFORM 1 FROM core.run_wait AS wait WHERE wait.run_id = NEW.old_run_id FOR UPDATE;");
+    // Final review P3: the old run must still be in the line as core.run_waiting_v reads it, read after the lock (an
+    // erasure or a set-aside committed between createRun and START refuses), and the closing block binds it.
+    const guardBody = guard.slice(0, guard.indexOf("$$;"));
+    expect(guardBody).toContain("OR NOT EXISTS (SELECT 1 FROM core.run_waiting_v AS line WHERE line.run_id = NEW.old_run_id)");
+    expect(guardBody.indexOf("core.run_waiting_v")).toBeGreaterThan(guardBody.indexOf("FOR UPDATE;"));
+    expect(sql).toContain(
+      "OR strpos(pg_get_functiondef(v_guard), 'NOT EXISTS (SELECT 1 FROM core.run_waiting_v AS line WHERE line.run_id = NEW.old_run_id)') = 0");
     expect(sql).toContain("RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'RUN_SUPERSESSION_INVALID';");
     expect(sql).toContain("RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'RUN_SUPERSESSION_CHAIN_INVALID';");
     expect(sql).toContain("ALTER FUNCTION core.resolve_run_ref(uuid) OWNER TO debateai_release_owner;");

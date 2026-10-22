@@ -250,8 +250,10 @@ body, plus `releaseKey` in its closed key list and the stamp in its INSERT), re-
 `core.record_release_event` (EXECUTE for `debateai_release_operator`, serialized on the `debateai:release-switch`
 advisory lock), all four owned by the new NOLOGIN NOINHERIT role `debateai_release_owner`; §4 adds the re-admission
 record `core.run_supersession` (append-only; its row guard `core.guard_run_supersession()` refuses
-`RUN_SUPERSESSION_INVALID` unless the old run still waits, the new run has no edge of its own, no FAILED work item and
-no re-admission marker naming another run, and both are the same person's; SELECT, INSERT for the API's role
+`RUN_SUPERSESSION_INVALID` unless the old run still waits, also as `core.run_waiting_v` reads it after the guard's lock
+(not FAILED, its content not erased, its account active: an erasure committed between the new run's write and START
+refuses; final review P3), the new run has no edge of its own, no FAILED work item and no re-admission marker naming
+another run, and both are the same person's; SELECT, INSERT for the API's role
 `debateai_billing_runtime` only), the start guard `core.refuse_starting_superseded_run()` (a trigger on
 `core.run_wait_start` refusing `RUN_SUPERSEDED`), `core.resolve_run_ref(uuid)` (owned by `debateai_release_owner`,
 EXECUTE for `debateai_billing_runtime`, at most 16 hops), the readmitted run's key provision
