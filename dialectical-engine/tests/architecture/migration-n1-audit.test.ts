@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -272,12 +272,33 @@ describe("side-by-side §5: the N-1 audit", () => {
     expect(parser).toContain('"-- n1: keeps-verifier"');
   });
 
-  it.skipIf(!existsSync(repository("deploy/preview-lifecycle/v1/migration-steps.mjs")))(
-    "the server's release check reads the same two header lines",
-    () => {
-      const server = readFileSync(repository("deploy/preview-lifecycle/v1/migration-steps.mjs"), "utf8");
-      expect(server).toContain("-- n1: expand");
-      expect(server).toContain("-- n1: keeps-verifier");
+  // Integration (checklist item 8): the server's release check (deploy/preview-lifecycle/v1/migration-steps.mjs
+  // n1Headers) reads expand and keeps-verifier exactly as the loader's parseN1Header does, on every header the loader
+  // admits, the repository's own steps after the grandfathered line included. No skip: both files are on this branch.
+  it("the server's release check reads the same two header lines", async () => {
+    const { n1Headers } = await import("../../deploy/" + "preview-lifecycle/v1/migration-steps.mjs") as {
+      n1Headers(sql: string): Readonly<{ expand: boolean; keepsVerifier: boolean }>;
+    };
+    const step = "9999_cross_check.sql";
+    const body = "CREATE TABLE IF NOT EXISTS core.cross_check (id uuid PRIMARY KEY);\n";
+    const headers = [
+      ["-- n1: expand"], ["-- n1: expand", "-- n1: keeps-verifier"], ["-- n1: keeps-verifier", "-- n1: expand"],
+      ["-- n1: drained"], ["-- n1: drained", "-- n1: keeps-verifier"],
+      ["-- A step's own comment first.", "-- n1: expand", "-- n1: reviewed a reason the audit reads",
+        "-- n1: keeps-verifier"]
+    ];
+    const samples: [string, string][] = headers.flatMap((lines) => [
+      [step, `${lines.join("\n")}\n${body}`], [step, `${lines.join("\r\n")}\r\n${body}`],
+      [step, `\n${lines.join("\n")}\n\n${body}`]
+    ]);
+    const steps = (await readdir(repository("migrations"))).filter((name) => /^\d{4}_[a-z0-9_]+\.sql$/u.test(name)
+      && name > N1_GRANDFATHERED_THROUGH);
+    expect(steps.length).toBeGreaterThan(0);
+    for (const name of steps) samples.push([name, readFileSync(repository(`migrations/${name}`), "utf8")]);
+    for (const [name, sql] of samples) {
+      const loader = parseN1Header(name, sql);
+      expect(n1Headers(sql), `${name}: ${JSON.stringify(sql.slice(0, 80))}`)
+        .toEqual({ expand: loader.expand, keepsVerifier: loader.keepsVerifier });
     }
-  );
+  });
 });
