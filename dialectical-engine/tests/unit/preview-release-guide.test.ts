@@ -18,6 +18,7 @@ const SIDE_BY_SIDE = '## Side-by-side release (from T+1)';
 const WAY_BACK = '### The way back, side by side';
 const DRAINED = '### Drained upload on the template layout';
 const MAINTENANCE = '### Infrastructure maintenance';
+const PAYMENT_MARKS = '### Payment marks: the files and Caddy\'s rule';
 const NAMES_LINE = '. /root/preview-archive/rNN-names.sh';
 
 type Block = Readonly<{ lines: readonly string[]; heading: string; start: number }>;
@@ -71,15 +72,15 @@ const code = (line: string) => !line.trimStart().startsWith('#');
 /** The steps, in the order the guide runs them. */
 const STEPS = Object.freeze([
   'TA0', 'TA1', 'TA8', 'TA_UNITS', 'TA_CADDY', 'TA_ENV', 'TA_OP', 'TB0', 'TB1', 'TB2', 'TB3', 'TB4', 'TB5', 'TB6', 'TB7', 'TB8', 'TB9', 'RBA_T', 'RBB_T',
-  'SB1', 'SB1B', 'SB3', 'SB4', 'SB5', 'SB7', 'SB8', 'SB9', 'SB10', 'SB11', 'SB12', 'SB13', 'SB13B', 'SB14', 'SB14B', 'SB15',
-  'WB1', 'WB2', 'WB3', 'WB4', 'DR1', 'DR2', 'DR3', 'DR4', 'DR5', 'DR6', 'RBD_A', 'RBD_B', 'MT1', 'MT2'
+  'SB1', 'SB1B', 'SB3', 'SB4', 'SB5', 'SB5B', 'SB7', 'SB8', 'SB9', 'SB10', 'SB11', 'SB12', 'SB13', 'SB13B', 'SB14', 'SB14B', 'SB15',
+  'WB1', 'WB2', 'WB3', 'WB4', 'DR1', 'DR2', 'DR3', 'DR4', 'DR5', 'DR6', 'RBD_A', 'RBD_B', 'MT1', 'MT2', 'PM1', 'PM2'
 ]);
 /** The scripts that make the names file (they cannot read it yet). */
 const MAKES_NAMES = Object.freeze(['TA0', 'TA1', 'SB1']);
 
 describe('the preview release guide: transition T, side by side, the way back, the drained path (side-by-side spec §11, §12)', () => {
   it('the guide has the transition, side-by-side, way-back and drained-on-templates sections', () => {
-    for (const heading of [TRANSITION, SIDE_BY_SIDE, WAY_BACK, DRAINED, MAINTENANCE]) expect(guide.split('\n'), heading).toContain(heading);
+    for (const heading of [TRANSITION, SIDE_BY_SIDE, WAY_BACK, DRAINED, MAINTENANCE, PAYMENT_MARKS]) expect(guide.split('\n'), heading).toContain(heading);
     // The new sections come after the R19 recipe's way back, and its intro points to them.
     expect(guide.indexOf(TRANSITION)).toBeGreaterThan(guide.indexOf('### The way back\n'));
     const old = sectionOf(guide, '## A normal release on a hosted base (since R19, 21 October 2026)');
@@ -306,6 +307,151 @@ describe('the preview release guide: transition T, side by side, the way back, t
       expect(line, line).not.toContain('_NOT_DONE');
       if (/\] \|\||cmp -s [^|]*\|\|/.test(line)) expect(line, line).toMatch(/\|\| back /);
     }
+  });
+
+  it('the payment marks: PM2 runs the marks command inside the maintenance flag and restores the old file on a failed check', async () => {
+    const { PAYMENT_MARKS: MARKS } = await import('../../deploy/' + 'preview-release/v1/caddy-slots.mjs');
+    // SB1's names file defines cslots exactly as TA1's does: the new release's own tool (it knows add-payment-marks).
+    const cslots = 'cslots() { /usr/bin/env -i PATH=/usr/local/bin:/usr/bin:/bin TZ=UTC /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$CAPI/dialectical-engine/deploy/preview-release/v1/caddy-slots.mjs" "$@"; }';
+    for (const step of ['TA1', 'SB1']) expect(scriptOf(step).lines, step).toContain(cslots);
+    expect(read('deploy/preview-release/v1/caddy-slots.mjs')).toContain('add-payment-marks');
+    // The section comes right after the maintenance scripts, and PM1 and PM2 use the folder the tool's rule serves.
+    expect(guide.indexOf(`\n${PAYMENT_MARKS}\n`)).toBeGreaterThan(guide.indexOf(`\n${MAINTENANCE}\n`));
+    for (const step of ['PM1', 'PM2']) expect(scriptOf(step).lines, step).toContain(`PMD=${MARKS.folder}`);
+    const pm2 = scriptOf('PM2').lines;
+    const flag = pm2.findIndex(line => line.startsWith('[ -e /etc/debateai-v3-preview/lifecycle/maintenance-pending ] ||') && line.includes('PM2_NOT_DONE'));
+    const knows = pm2.findIndex(line => line.startsWith('grep -q \'add-payment-marks\' "$CAPI/dialectical-engine/deploy/preview-release/v1/caddy-slots.mjs" ||') && line.includes('PM2_NOT_DONE'));
+    const run = pm2.findIndex(line => line.startsWith('TR=$(cslots add-payment-marks --in "$C" --out "$S/Caddyfile.payment-marks" 2>&1) || {'));
+    expect(flag).toBeGreaterThan(-1);
+    expect(knows).toBeGreaterThan(flag);
+    expect(run).toBeGreaterThan(knows);
+    // Before anything changes, the site answers 200 at the edge.
+    const healthy = pm2.findIndex(line => line.startsWith('[ "${EK%% *}" = 200 ] || {') && line.includes('PM2_NOT_DONE: the site is not healthy before PM2'));
+    expect(pm2[healthy - 1]).toMatch(/^EK=\$\(edgekey\); /);
+    expect(healthy).toBeGreaterThan(knows);
+    // The copy of the live file is taken before the tool reads it, after the guard that no earlier copy exists.
+    const fresh = pm2.findIndex(line => line.startsWith('[ ! -e "$S/Caddyfile.payment-marks" ] && [ ! -e "$S/Caddyfile.before-payment-marks" ] ||'));
+    const copy = pm2.findIndex(line => line.startsWith('cp -p "$C" "$S/Caddyfile.before-payment-marks"'));
+    expect(healthy).toBeLessThan(fresh);
+    expect(fresh).toBeLessThan(copy);
+    expect(copy).toBeLessThan(run);
+    // The refusal never claims the rule is in place: the live file merely mentions payment-marks.
+    expect(pm2[run]).toContain('CADDY_ALREADY_PAYMENT_MARKS: the live file mentions payment-marks already');
+    // The handler order leaves out exactly the marks route, with TA-caddy's filter; one route serves the three paths.
+    const text = pm2.join('\n');
+    expect(text).toContain(`PMJ='${JSON.stringify(MARKS.files.map((file: string) => `/payment-marks/${file}`))}'`);
+    expect(text).toContain('select([.match[]?.path[]?] != $m)');
+    const restoreLine = 'install -o root -g root -m 0644 "$S/Caddyfile.before-payment-marks" "$C.new"';
+    const back = pm2.findIndex(line => line.startsWith('back() {'));
+    expect(back).toBeGreaterThan(-1);
+    // The one way out after the new file is in: the old file back, Caddy restarted, and only then the stop line.
+    expect(pm2[back]!.indexOf(restoreLine)).toBeGreaterThan(-1);
+    expect(pm2[back]!.indexOf(restoreLine)).toBeLessThan(pm2[back]!.indexOf('systemctl restart caddy'));
+    expect(pm2[back]!.indexOf('systemctl restart caddy')).toBeLessThan(pm2[back]!.indexOf('PM2_NOT_DONE'));
+    const install = pm2.findIndex(line => line.startsWith('install -o root -g root -m 0644 "$S/Caddyfile.payment-marks" "$C.new"'));
+    expect(copy).toBeLessThan(install);
+    expect(run).toBeLessThan(install);
+    // Right before the install: the live file is still the copy back() restores, or nothing is installed.
+    expect(pm2[install - 1]).toBe('cmp -s "$C" "$S/Caddyfile.before-payment-marks" || { echo "PM2_NOT_DONE: the live Caddyfile changed during PM2 (nothing changed): ask"; exit 1; }');
+    expect(back).toBeLessThan(install);
+    const afterInstall = pm2.slice(install, -1);
+    expect(afterInstall.filter(line => / \|\| back /.test(line)).length).toBeGreaterThanOrEqual(7);
+    for (const line of afterInstall) {
+      expect(line, line).not.toContain('_NOT_DONE');
+      if (/\] \|\||cmp -s [^|]*\|\|/.test(line)) expect(line, line).toMatch(/\|\| back /);
+    }
+    // The marks sit behind the password: without it, visa.svg answers 401 like the site.
+    const vc = pm2.findIndex(line => line.startsWith("VC=$(curl -s -o /dev/null -m 15 -w '%{http_code}' https://v3-preview.dezbatere.ro/payment-marks/visa.svg"));
+    expect(vc).toBeGreaterThan(install);
+    expect(pm2[vc + 1]).toMatch(/^\[ "\$VC" = 401 \] \|\| back /);
+    // The owner's yes names PM2, and the first time runs it between MT1 and MT2.
+    expect(sectionOf(guide, sideBySide.split('\n').find(line => line.startsWith('### SB6. '))!)).toContain('- the Caddy payment-marks rule (PM2), when this upload adds it.');
+    expect(sectionOf(guide, PAYMENT_MARKS)).toMatch(/MT1, PM2, MT2/);
+    // The order table has the marks window after the yes, and a stopped PM2 never lets the list reach SB7.
+    const row = '| MT1, PM2, MT2 | only the first upload that lists the marks: Caddy\'s rule (see "Payment marks: the files and Caddy\'s rule") | up (one Caddy restart, about a second) | PM2 puts the old Caddyfile back itself |';
+    const table = sideBySide.split('\n');
+    expect(table.indexOf(row)).toBe(table.findIndex(line => line.startsWith('| SB6 |')) + 1);
+    expect(sectionOf(guide, PAYMENT_MARKS).replace(/\s+/g, ' ')).toContain('If PM2 stops, do not go on to SB7 (or DR2) with the list in place: run PM2 again once the cause is fixed');
+    expect(sectionOf(guide, PAYMENT_MARKS).replace(/\s+/g, ' ')).toContain('If it does not show, stop here, before SB7 (or DR2), and ask.');
+  });
+
+  it('SB10 and DR5 make no launch plan while the ui file names marks that Caddy does not serve', async () => {
+    const { PAYMENT_MARKS: MARKS } = await import('../../deploy/' + 'preview-release/v1/caddy-slots.mjs');
+    const matcher = `@paymentMarks path ${MARKS.files.map((file: string) => `/payment-marks/${file}`).join(' ')}`;
+    expect(read('deploy/preview-release/v1/caddy-slots.mjs')).toContain('`@paymentMarks path ${');
+    for (const step of ['SB10', 'DR5']) {
+      const lines = scriptOf(step).lines;
+      const guard = `if grep -q '^PAYMENT_MARKS_AVAILABLE=' "$E/ui-$LABEL.env"; then grep -qF '${matcher}' "$C" || { echo "${step}_NOT_DONE: ui-$LABEL.env names payment marks but Caddy does not serve them (PM2 first, or put $S/ui-$LABEL.env.before-marks back); nothing changed"; exit 1; }; fi`;
+      const at = lines.indexOf(guard);
+      expect(at, step).toBeGreaterThan(-1);
+      const firstPlan = lines.findIndex(line => line.startsWith('rel launch-plan '));
+      expect(firstPlan, step).toBeGreaterThan(at);
+      // Before anything changes: no put, publish, pin or stage comes before it.
+      for (const line of lines.slice(0, at).filter(code)) expect(line, `${step}: ${line}`).not.toMatch(/^(rel |put |OUT=|PIN=|SG=)/);
+    }
+    // The guard reads the line through bash: a ui file with the list and a Caddyfile without the rule stops, and
+    // either a Caddyfile with the rule or a ui file without the list goes on.
+    const guard = scriptOf('SB10').lines.find(line => line.startsWith("if grep -q '^PAYMENT_MARKS_AVAILABLE='"))!;
+    const dir = mkdtempSync(join(tmpdir(), 'guide-marks-guard-'));
+    try {
+      const run = (ui: string, caddy: string) => {
+        writeFileSync(join(dir, 'ui-rX.env'), ui); writeFileSync(join(dir, 'Caddyfile'), caddy);
+        try { return execFileSync('bash', ['-c', ['set -euo pipefail', `E='${dir}'; C='${dir}/Caddyfile'; S='${dir}'; LABEL=rX`, guard, 'echo GUARD_OK'].join('\n')], { encoding: 'utf8' }).trim(); } catch (error) { return String((error as { stdout?: string }).stdout ?? '').trim(); }
+      };
+      expect(run('PORT=3200\nPAYMENT_MARKS_AVAILABLE=visa\n', 'v3-preview.dezbatere.ro {\n}\n')).toMatch(/^SB10_NOT_DONE: /);
+      expect(run('PORT=3200\nPAYMENT_MARKS_AVAILABLE=visa\n', `v3-preview.dezbatere.ro {\n\t${matcher}\n}\n`)).toBe('GUARD_OK');
+      expect(run('PORT=3200\n', 'v3-preview.dezbatere.ro {\n}\n')).toBe('GUARD_OK');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('PM1 copies only an SVG with no script in it, and its marks list is built without ending the script', () => {
+    const pm1 = scriptOf('PM1').lines;
+    const unsafe = pm1.find(line => line.trimStart().startsWith("if grep -qiE '<script|javascript:|<foreignObject|[[:space:]]on[a-z]+[[:space:]]*=' \"$F\"; then echo \"PM1_NOT_DONE: "))!;
+    expect(unsafe).toBeDefined();
+    // `[ … ] && printf` inside $(…) ends a set -e script when the test is false: the list is built with an if.
+    for (const line of pm1.filter(code)) expect(line, line).not.toMatch(/\$\([^)]*\] && printf/);
+    expect(pm1.join('\n')).toContain('524288');
+    const dir = mkdtempSync(join(tmpdir(), 'guide-pm1-'));
+    try {
+      const check = (svg: string) => {
+        writeFileSync(join(dir, 'mark.svg'), svg);
+        try { return execFileSync('bash', ['-c', ['set -euo pipefail', `F='${join(dir, 'mark.svg')}'`, unsafe.trim(), 'echo SVG_OK'].join('\n')], { encoding: 'utf8' }).trim(); } catch (error) { return String((error as { stdout?: string }).stdout ?? '').trim(); }
+      };
+      expect(check('<svg xmlns="http://www.w3.org/2000/svg"/>')).toBe('SVG_OK');
+      for (const bad of ['<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>', '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>',
+        // XML allows spaces around `=`: the handler is still refused.
+        '<svg xmlns="http://www.w3.org/2000/svg" onload = "alert(1)"/>',
+        '<svg xmlns="http://www.w3.org/2000/svg"><a href="JavaScript:alert(1)"/></svg>', '<svg xmlns="http://www.w3.org/2000/svg"><foreignObject/></svg>']) expect(check(bad), bad).toMatch(/^PM1_NOT_DONE: /);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('SB5b adds the list only to a release whose website knows it, before its launch plans, with the files in place', () => {
+    const sb5b = scriptOf('SB5B').lines;
+    expect(sideBySide.indexOf('\n### SB5b. ')).toBeGreaterThan(sideBySide.indexOf('\n### SB5. '));
+    expect(sideBySide.indexOf('\n### SB5b. ')).toBeLessThan(sideBySide.indexOf('\n### SB6. '));
+    const at = (needle: string) => { const found = sb5b.findIndex(line => line.includes(needle) && line.includes('SB5B_NOT_DONE')); expect(found, needle).toBeGreaterThan(-1); return found; };
+    // The website of a release starts from its own UI folder: that folder's environment.mjs must admit the setting.
+    const knows = at('grep -q "\'PAYMENT_MARKS_AVAILABLE\'" "$CUI/dialectical-engine/deploy/preview-auth-dev/v1/environment.mjs"');
+    expect(read('deploy/preview-auth-dev/v1/environment.mjs')).toContain("'PAYMENT_MARKS_AVAILABLE'");
+    const plans = at('[ ! -e "$ART/ui-launch.json" ]');
+    const files = at('[ -f "$PMD/$M.svg" ]');
+    const form = at("grep -qxE '(netopia|visa|mastercard)(,(netopia|visa|mastercard)){0,2}'");
+    const repeat = at('uniq -d');
+    const edit = sb5b.findIndex(line => line.startsWith('cp -p "$U" "$S/ui-$LABEL.env.before-marks"'));
+    const moved = sb5b.findIndex(line => line.startsWith('mv "$U.new" "$U"'));
+    const same = sb5b.findIndex(line => line.startsWith('lc release-env.mjs same --labels "$OLABEL,$LABEL" --slots "$OSLOT,$SLOT" ||'));
+    for (const guard of [knows, plans, files, form, repeat]) expect(guard).toBeLessThan(edit);
+    expect(edit).toBeLessThan(moved);
+    expect(moved).toBeLessThan(same);
+    // The list's form, run by bash: what the test site's check (UI_PAYMENT_MARKS_AVAILABLE) calls OK, and nothing else.
+    const marks = (value: string) => {
+      try { return execFileSync('bash', ['-c', ['set -euo pipefail', `MARKS='${value}'`, sb5b[form], sb5b[repeat], 'echo MARKS_OK'].join('\n')], { encoding: 'utf8' }).trim(); } catch (error) { return String((error as { stdout?: string }).stdout ?? '').trim(); }
+    };
+    for (const good of ['visa', 'visa,mastercard', 'mastercard,netopia,visa']) expect(marks(good), good).toBe('MARKS_OK');
+    for (const bad of ['', 'visa,visa', 'amex', 'visa,', 'Visa', 'visa, mastercard', 'netopia,visa,mastercard,visa']) expect(marks(bad), bad).toMatch(/^SB5B_NOT_DONE: /);
+    // An empty value is refused by the settings reader: no marks means no line. The drained path edits after DR1.
+    expect(sectionOf(guide, sideBySide.split('\n').find(line => line.startsWith('### SB5b. '))!)).toMatch(/leave the\s+line out/);
+    expect(drained).toContain('To change the payment marks on this path, run SB5b right after DR1.');
   });
 
   it('no script stops a runner instance outside the drained and before-switch blocks', () => {

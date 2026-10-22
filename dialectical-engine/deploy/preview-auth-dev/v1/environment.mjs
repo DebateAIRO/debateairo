@@ -121,8 +121,21 @@ export const RELEASE_KEY_PATTERN=/^r[1-9][0-9]*-[0-9a-f]{12}$/;
 export function expectedReleaseKey(publication,sourceRevision) {
  return `r${publication.registerVersion}-${sourceRevision.slice(0,12)}`;
 }
+/** The payment marks the website knows (apps/ui/lib/billing/paymentMarks.ts PAYMENT_MARK_NAMES; a unit test pins the two lists equal). */
+export const PAYMENT_MARK_NAMES=Object.freeze(['netopia','visa','mastercard']);
+/**
+ * The strict form of the website's payment marks list, for the test site's tools (release-env.mjs `same`): one to three of
+ * those names, lower-case, joined by single commas, no spaces, each at most once. The website itself is lenient and ignores
+ * unknown names, so narrowEnvironment never checks this form (a typo must never stop a website from starting).
+ */
+export function isPaymentMarksList(value) {
+ if(typeof value!=='string')return false;
+ const names=value.split(',');
+ return names.every(name=>PAYMENT_MARK_NAMES.includes(name))&&new Set(names).size===names.length;
+}
 // RELEASE_KEY: the website refuses to start without its release key (side-by-side spec §1, §7; apps/ui/release-edge.mjs).
-const UI=['NODE_ENV','PUBLIC_APP_URL','PORT','DIALECTICAL_UI_HOST','DIALECTICAL_API_BASE','DIALECTICAL_UI_TRUSTED_PROXIES','DIALECTICAL_UI_EDGE_SECRET_PATH','NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON','TURNSTILE_SITE_KEY','RELEASE_KEY'];
+// PAYMENT_MARKS_AVAILABLE: the website's payment marks list (deploy/vps/README.md §14.7); a release before T+1 refuses it, so it goes only into the ui file of a release that lists it here.
+const UI=['NODE_ENV','PUBLIC_APP_URL','PORT','DIALECTICAL_UI_HOST','DIALECTICAL_API_BASE','DIALECTICAL_UI_TRUSTED_PROXIES','DIALECTICAL_UI_EDGE_SECRET_PATH','NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON','TURNSTILE_SITE_KEY','RELEASE_KEY','PAYMENT_MARKS_AVAILABLE'];
 /**
  * Side-by-side spec §1 (O1): a preview process starts only as its plan's release. Its RELEASE_KEY must be exactly
  * r<plan register pin>-<first 12 hex of the plan's source revision>, so an env file of another release (another

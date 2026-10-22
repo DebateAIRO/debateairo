@@ -35,10 +35,9 @@ describe("P22 the Billing runbook", () => {
       "BILLING_CONFIGURATION_INCOMPLETE", "BILLING_REQUIRES_ENVELOPE_MEMBERS",
       // §14.2 and §14.7 (ruling R3-4, D5's R3-A): one source of the company facts, COMPANY, and its one mirror for
       // the API and the emails, SELLER_COMPANY; the CUI as digits only; the refusals while a tax code is bracketed.
-      "apps/ui/public/payment-marks/visa.svg",
-      // P2-M34 (W16 fix): the website reads the marks folder only at start, so copying the marks in needs a restart.
-      "the list of files in that folder only when it starts, so after copying the files in, restart it with",
-      "`systemctl restart debateai-ui@$label`. Until then the footer shows them as broken images. No rebuild is needed.",
+      // P2-M34, as of 2026-10-22: the marks live in root's folder outside the repository; the website shows the ones
+      // its PAYMENT_MARKS_AVAILABLE setting names, read when it starts.
+      "/etc/debateai/payment-marks/", "PAYMENT_MARKS_AVAILABLE", "`systemctl restart debateai-ui@$label`",
       "apps/ui/lib/legal/pages.ts", "COMPANY", "[RO…]",
       "packages/billing-core/src/company.ts", "SELLER_COMPANY", "BILLING_COMPANY_FACTS_UNVERIFIED",
       "The company's tax codes are not `api.env` settings", "as digits only, never with `RO`",
@@ -78,8 +77,8 @@ describe("P22 the Billing runbook", () => {
       "(the site refuses a refund, invoice, credit note or payment check of another payment system)",
       // §14.8: sandbox records stay but are never sales (P1b's quarter summary reads live charges only).
       "they never count as sales", "the quarterly tax summary and its email read only live charges",
-      // §14.5 (N25): the notify address's answers; the card marks' sentence holds "No rebuild is needed".
-      "What the address answers", "`429`", "`503`", "No rebuild is needed",
+      // §14.5 (N25): the notify address's answers.
+      "What the address answers", "`429`", "`503`",
       // §14.8 (ruling Q-9, D6b P14c): a withdrawal sent by email, carried out by the owner's command.
       "A withdrawal sent by email or on the model form", "pnpm billing:withdraw --owner", "--received", "--refund",
       "WITHDRAWAL_BY_OWNER", "identity_owner_ref",
@@ -823,8 +822,8 @@ describe("P22 the Billing runbook", () => {
       "`billing.checkout.refundedBeforeStart`",
       // Spec 2026-10-05 §2.18 and N20's note: row 36's reader reads the card-saving agreement first.
       "`billing.consent.renewal` first",
-      // W16 (P2-M34): the card marks are copied before the website's last start.
-      "restart `debateai-ui`",
+      // W16 (P2-M34), as of 2026-10-22: the marks are in root's folder outside the repository, named by the setting.
+      "/etc/debateai/payment-marks/", "PAYMENT_MARKS_AVAILABLE",
       // Part 3's final review (2026-10-03): billing stays off until every item of Part 3's final review is closed.
       "PART3-FINAL-REVIEW-OPEN-ITEMS.md"
     ]) {
@@ -1107,7 +1106,7 @@ describe("P22 the Billing runbook", () => {
       "`{\"errorType\":0,\"errorCode\":0,\"errorMessage\":\"OK\"}`", "kept for 14 days",
       "checked again at every start of the API", "O4",
       // §14.7: what NETOPIA checks on the site before it approves the shop.
-      "apps/ui/public/payment-marks/netopia.svg", "ANPC",
+      "/etc/debateai/payment-marks/netopia.svg", "ANPC",
       // §14.8: refunds in the owner mode, the one command, and the reminders.
       "**A refund handed to you.**", "O2_REFUND_DUE", "O2_REFUND_REMINDER",
       "refund exactly the amount the email names, on that payment, in one refund",
@@ -1147,6 +1146,40 @@ describe("P22 the Billing runbook", () => {
       .flatMap((path) => read(path).match(/BILLING_REFUND_DONE_[A-Z_]+/gu) ?? []);
     expect(new Set(refundDone).size).toBeGreaterThanOrEqual(7);
     for (const code of new Set(refundDone)) expect(flat, code).toContain(`\`${code}\``);
+  });
+
+  it("§14.7 and go-live row 17: the payment marks live in root's folder outside the repository and every release", () => {
+    const start = readme.indexOf("### 14.7 ");
+    const section = readme.slice(start, readme.indexOf("### 14.8 ", start));
+    const flat = section.replace(/\s+/gu, " ");
+    for (const needle of [
+      // Why: the repository is public, the brands' terms forbid redistributing their artwork, a release equals git.
+      "never in the repository", "public", "redistribut", "exactly",
+      // The public server: root's folder and modes, Caddy serves at once, the setting names the marks, the restart.
+      "/etc/debateai/payment-marks/", "`install -d -m 0755 -o root -g root /etc/debateai/payment-marks`",
+      "`install -m 0644 -o root -g root", "/etc/debateai/payment-marks/visa.svg`",
+      "PAYMENT_MARKS_AVAILABLE", "/etc/debateai/ui.env", "`systemctl restart debateai-ui@$label`", "(§6)",
+      // A name without its file shows a broken image; NETOPIA's mark comes first; its name joins once its file is in.
+      "broken image", "NETOPIA's mark first",
+      // The test site: the preview release guide's steps, and never before T+1.
+      "deploy/preview-release/v1/README.md", "PM1", "PM2", "SB5b", "T+1"
+    ]) {
+      expect(flat, needle).toContain(needle);
+    }
+    expect(section).not.toContain("apps/ui/public/payment-marks");
+    expect(section).not.toContain("No rebuild is needed");
+    // NETOPIA's checklist keeps its first bullet, now naming the folder outside the repository.
+    expect(flat).toContain("What NETOPIA checks on the site before it approves the shop.");
+    const checklist = read("docs/missions/2026-09-01-security-hardening/GO-LIVE-CHECKLIST.md");
+    const row17 = checklist.split("\n").find((line) => line.startsWith("| 17 |")) ?? "";
+    for (const needle of [
+      "/etc/debateai/payment-marks/", "/etc/debateai-v3-preview/public/payment-marks/", "PAYMENT_MARKS_AVAILABLE",
+      "`netopia.svg`, `visa.svg` and `mastercard.svg`", "NETOPIA's mark first", "Caddy", "README §14.7"
+    ]) {
+      expect(row17, needle).toContain(needle);
+    }
+    expect(row17).not.toContain("apps/ui/public/payment-marks");
+    expect(row17).not.toContain("restart `debateai-ui`, because the website serves that folder");
   });
 
   it("N25 fix round 1: every owner email §14 quotes as (O…, \"…\") is quoted by its template's English subject", () => {

@@ -61,7 +61,7 @@ export function CheckoutFlow({
   client?: CheckoutClient;
   navigate?: (href: string) => void;
   goToPayment?: (url: string) => void;
-  /** Spec §2.18 (N25b): the marks whose artwork the owner supplied, read on the server by the page; none by default. */
+  /** Spec §2.18 (N25b): the marks the PAYMENT_MARKS_AVAILABLE setting names, read on the server by the page; none by default. */
   paymentMarks?: PaymentMarks;
 }>) {
   // Empty until the first quote answers the connection's country (spec §1.3: pre-filled from the address).

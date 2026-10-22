@@ -470,7 +470,7 @@ describe("N25b the payment marks under Continue (spec §2.18)", () => {
     expect(group.previousElementSibling?.contains(button("billing.checkout.continueToCard")!)).toBe(true);
   });
 
-  it("shows only the marks whose files are there, and no group when none is given or none is there", async () => {
+  it("shows only the marks it is given, and no group when none is given or none is on", async () => {
     client.createBillingQuote.mockResolvedValue(quote());
     await renderWithMarks({ netopia: true, visa: false, mastercard: false });
     expect(marksImages()).toEqual([["/payment-marks/netopia.svg", "NETOPIA Payments"]]);
