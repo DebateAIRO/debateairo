@@ -397,6 +397,21 @@ describe("0124 publication review database boundary", () => {
     )).rows).toEqual([{ action: 'LIST', review_ref: null }]);
   });
 
+  it("staff list accepts one overflow probe row but rejects a larger page", async () => {
+    const owner = await ownerRun();
+    const reviewRef = await requestFor(owner);
+    const reviewer = await staffActor();
+    const query = 'SELECT staff.list_publication_reviews($1::jsonb,$2,$3) value';
+    const args = [reviewer.context, reviewer.tokenHash];
+
+    const list = (await asRole<{ value: { items: Array<{ reviewRef: string }> } }>(
+      'debateai_runtime', query, [...args, 101]
+    ))[0]!.value;
+    expect(list.items.map((item) => item.reviewRef)).toContain(reviewRef);
+    await expect(asRole('debateai_runtime', query, [...args, 102]))
+      .rejects.toThrow('STAFF_PAGE_INVALID');
+  });
+
   it("a secret deletion fired as debateai_runtime severs requests, decisions and copies but keeps audit events", async () => {
     const owner = await ownerRun();
     const reviewRef = await requestFor(owner);

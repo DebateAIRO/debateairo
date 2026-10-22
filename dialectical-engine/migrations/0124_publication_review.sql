@@ -705,7 +705,7 @@ RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_ca
 DECLARE v_items jsonb;
 BEGIN
   PERFORM staff.require_http_authority(p_context,p_token,'PUBLICATION_REVIEW');
-  IF p_limit IS NULL OR p_limit<1 OR p_limit>100 THEN RAISE EXCEPTION 'STAFF_PAGE_INVALID'; END IF;
+  IF p_limit IS NULL OR p_limit<1 OR p_limit>101 THEN RAISE EXCEPTION 'STAFF_PAGE_INVALID'; END IF;
   SELECT COALESCE(jsonb_agg(jsonb_build_object(
     'reviewRef',row.review_ref,'runId',row.run_id,'answerId',row.answer_id,
     'originVersion',row.synthesis_origin_version,'ownerRef',row.owner_ref,
