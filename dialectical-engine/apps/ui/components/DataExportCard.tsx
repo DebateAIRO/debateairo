@@ -44,15 +44,18 @@ export function DataExportCard({ catalog, locale, client = contractClient }: {
   const cardRef = useRef<HTMLElement>(null);
   const focusFromLink = useRef(false);
   // Cancel on the security check, or the request it confirmed, unmounts the focused control: focus goes back to
-  // Export data, or to the card's heading while that button is disabled or gone (keyboard check 2026-10-22).
+  // Export data, or to the card's heading while that button is disabled or gone (keyboard check 2026-10-22). With
+  // no step-up method, Export data is replaced by the link to Security settings, and focus goes to that link.
   const heading = useRef<HTMLHeadingElement>(null);
   const requestButton = useRef<HTMLButtonElement>(null);
+  const securityLink = useRef<HTMLAnchorElement>(null);
   const returnFocus = useRef(false);
   useEffect(() => {
     if (!returnFocus.current) return;
     returnFocus.current = false;
     const back = requestButton.current;
     if (back && back.isConnected && !back.disabled) back.focus();
+    else if (securityLink.current) securityLink.current.focus();
     else heading.current?.focus();
   });
 
@@ -74,6 +77,7 @@ export function DataExportCard({ catalog, locale, client = contractClient }: {
       const methods = await client.authMethods();
       if (methods.available_step_up_methods.length === 0) {
         focusFromLink.current = false;
+        returnFocus.current = !fromLink;
         setNoMethod(true);
         setConfirming(false);
       } else {
@@ -145,7 +149,7 @@ export function DataExportCard({ catalog, locale, client = contractClient }: {
         expires: formatDate(locale, status.expires_at, { dateStyle: "medium", timeStyle: "short" })
       })}</p> : null}
       {!statusUnavailable && status?.status === "FAILED" ? <p className="setStatus" role="status">{t(catalog, "settings.export.failed")}</p> : null}
-      {noMethod && !statusUnavailable ? <><p className="setStatus" role="status">{t(catalog, "settings.export.noMethod")}</p><div className="setCardRow"><a className="setBtn" href="/settings/security">{t(catalog, "settings.security.title")}</a></div></> : null}
+      {noMethod && !statusUnavailable ? <><p className="setStatus" role="status" id="export-no-method">{t(catalog, "settings.export.noMethod")}</p><div className="setCardRow"><a className="setBtn" href="/settings/security" ref={securityLink} aria-describedby="export-no-method">{t(catalog, "settings.security.title")}</a></div></> : null}
       {status !== null && !statusUnavailable && (status.status === "NONE" || status.status === "FAILED" || status.status === "SENT") && !noMethod ? (
         <div className="setCardRow">
           <button className="setBtn" type="button" ref={requestButton} disabled={requesting} onClick={() => { if (!confirming) void beginConfirmation(); }}>

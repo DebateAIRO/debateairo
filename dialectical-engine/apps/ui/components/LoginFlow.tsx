@@ -61,6 +61,15 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
     // Each step swaps out the control that was pressed (Continue, Back to sign in, the authenticator/recovery-code
     // switch): focus lands on the step's code field, or on the headline when it has none, never on <body>.
     const moved = useStepFocus(continuation ? `code:${method}` : 'credentials', () => codeField.current);
+    // Back from "Didn't get the verification email?" swaps sign-in back in: focus returns to the button that opened it.
+    const resendEntry = useRef<HTMLButtonElement>(null);
+    const backFromResend = useRef(false);
+    useEffect(() => {
+        if (resending || !backFromResend.current)
+            return;
+        backFromResend.current = false;
+        resendEntry.current?.focus();
+    }, [resending]);
     function cancelConditional() {
         sequence.current++;
         conditional.current?.abort();
@@ -279,7 +288,10 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
     }
     const offered = continuation?.available_methods ?? [];
     if (resending)
-        return <VerificationResend catalog={catalog} client={client} turnstile={turnstile} onBack={() => setResending(false)}/>;
+        return <VerificationResend catalog={catalog} client={client} turnstile={turnstile} onBack={() => {
+                backFromResend.current = true;
+                setResending(false);
+            }}/>;
     return <AuthShell eyebrow={t(catalog, "auth.login.welcomeBack")} title={continuation ? t(catalog, "auth.login.twoStepVerification") : t(catalog, "auth.login.backToGraph")} description={t(catalog, "auth.login.securityPolicy")} focusTitle={moved} footer={!dispatched.current ? <>
  {/* One way in for every recovery route, each with one plain sentence (auth UI repair, 2026-10-09). */}
  <details className="authHelp">
@@ -382,7 +394,7 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
  <button type="submit" className="authPrimary" disabled={busy}>{busy ? t(catalog, "auth.login.checking") : t(catalog, "auth.continue")}</button>
  {credentialsAnnouncer.region}
  </form>
- <p className="authResendEntry"><button type="button" className="authTextButton" disabled={busy} onClick={() => {
+ <p className="authResendEntry"><button type="button" className="authTextButton" ref={resendEntry} disabled={busy} onClick={() => {
                 cancelConditional();
                 setError(null);
                 setResending(true);
