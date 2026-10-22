@@ -5,8 +5,13 @@
 // down that the old release went away cleanly:
 //   - check        the verdict: SIDE_BY_SIDE (every check passes), DRAINED_PATH (a new database step does not say both
 //                  `-- n1: expand` and `-- n1: keeps-verifier`: the upload takes the drained path, spec §5's escape
-//                  hatch) or NOT_READY (anything else failed: stop and ask). Each check is named, with a plain detail;
-//   - status       every pinned release: its state in the release table, its three units and its open work;
+//                  hatch) or NOT_READY (anything else failed: stop and ask). Each check is named, with a plain detail.
+//                  N1_BASELINE: the new release's own tests/n1-baseline.json (read from its verified folder, by the
+//                  newer manifest's digest) names the current release's pinned commit, so the N-1 CI job checked the
+//                  live code on the new schema (final fix wave A2);
+//   - status       every pinned release: its state in the release table, its three units and its open work, and in
+//                  `bad` every draining release whose runner is stopped while it still has open work (a reboot or a
+//                  runner crash in a drain), with the command that starts that runner again;
 //   - receipt      the release retired by itself (spec §4, G4): its RETIRED row, its runner's clean exit and retirement
 //                  lines (from systemd, or from the journal once systemd has unloaded the stopped instance), and no
 //                  failure email for that runner since the switch, written as a NEW root-only JSON file;
@@ -20,7 +25,8 @@
 //
 // The two manifests are the candidate API source manifests (root-owned 0644, release-artifacts.mjs source-manifest) of
 // the current release and of the new one. Read-only: the one file this tool writes is the receipt it is asked for.
-// Exit 0 for SIDE_BY_SIDE and for the other commands; 2 for a DRAINED_PATH or NOT_READY verdict; 1 on a refusal.
+// Exit 0 for SIDE_BY_SIDE and for the other commands; 2 for a DRAINED_PATH or NOT_READY verdict, and for a status whose
+// `bad` is not empty; 1 on a refusal.
 // One JSON line per run: codes, labels, keys, counts, file paths of the source tree and digests only.
 import { randomBytes } from 'node:crypto';
 import { constants, link, lstat, open, readFile, realpath, statfs, unlink } from 'node:fs/promises';
@@ -37,7 +43,7 @@ import { GATE_FILES_SCHEMA, MAINTENANCE_PENDING_NAME, MAX_LABEL_LENGTH, gateFile
 import { countOpenWork, psqlArgv, readCurrentRelease, readReleaseEvents, readReleaseState } from './release-table.mjs';
 
 /** The checks, in the order the verdict lists them (side-by-side plan D, Task D11). */
-export const CHECK_NAMES = Object.freeze(['N1_HEADERS', 'CURRENT_PINNED', 'PREVIOUS_RETIRED', 'GATES_ACTIVE', 'GATE_ROWS_N1', 'CONNECTIONS', 'DISK', 'MEMORY', 'HATCHET', 'NO_MAINTENANCE', 'SLOT_FREE', 'LIFECYCLE_FILES']);
+export const CHECK_NAMES = Object.freeze(['N1_HEADERS', 'N1_BASELINE', 'CURRENT_PINNED', 'PREVIOUS_RETIRED', 'GATES_ACTIVE', 'GATE_ROWS_N1', 'CONNECTIONS', 'DISK', 'MEMORY', 'HATCHET', 'NO_MAINTENANCE', 'SLOT_FREE', 'LIFECYCLE_FILES']);
 /** Two of everything (plan D, connection budget): the server allows 320 connections and at least 120 are free. */
 export const MIN_MAX_CONNECTIONS = 320, MIN_FREE_CONNECTIONS = 120;
 /** At least 15 GB free on `/` and 4 GiB of MemAvailable before a second release starts beside the first. */
@@ -52,6 +58,14 @@ export const LIFECYCLE_FOLDERS = Object.freeze(['dialectical-engine/deploy/previ
 /** The preview's two Hatchet units; a layout names its own (`hatchetUnits`: the public server runs one). */
 export const HATCHET_UNITS = Object.freeze(['hatchet.service', 'hatchet-gateway.service']);
 export const RECEIPT_SCHEMA = 'preview-release-retirement-receipt-v1';
+/**
+ * The N-1 baseline in a release's source (tools/n1-baseline.mjs is its full reader; the operator folder does not hold
+ * tools/, so the two fields this check needs are read here by the same rules: the schema, and `commit` null or 40 hex).
+ */
+export const N1_BASELINE_PATH = 'dialectical-engine/tests/n1-baseline.json';
+const N1_BASELINE_SCHEMA = 'debateai-n1-baseline-v1';
+const GIT_COMMIT = /^[0-9a-f]{40}$/;
+const MAX_BASELINE_BYTES = 64 * 1024;
 const HASH = /^[a-f0-9]{64}$/;
 const UNIT_STATES = Object.freeze(['active', 'reloading', 'inactive', 'failed', 'activating', 'deactivating', 'maintenance', 'refreshing']);
 const STOPPED = Object.freeze(['inactive', 'failed']);
@@ -251,6 +265,23 @@ function lifecycleRows(manifest, folders) {
   return rows;
 }
 
+/**
+ * The newer release's N-1 baseline commit (null: none set yet), read from its own folder and checked against the newer
+ * manifest's digest; N1_BASELINE_UNREADABLE when the file is missing, differs or is not a baseline.
+ */
+async function baselineCommit(newerManifest, io) {
+  const row = newerManifest.files.find(file => file?.path === N1_BASELINE_PATH);
+  if (!row || typeof row.sha256 !== 'string') refuse('N1_BASELINE_UNREADABLE');
+  let value;
+  try {
+    const bytes = await io.readSourceFile({ root: newerManifest.sourceRoot, path: N1_BASELINE_PATH, uid: newerManifest.uid, mode: row.mode });
+    if (!Buffer.isBuffer(bytes) || bytes.length > MAX_BASELINE_BYTES || sha256(bytes) !== row.sha256) throw new Error('bytes');
+    value = JSON.parse(new TextDecoder('utf8', { fatal: true }).decode(bytes));
+  } catch { refuse('N1_BASELINE_UNREADABLE'); }
+  if (value === null || typeof value !== 'object' || value.schema !== N1_BASELINE_SCHEMA || (value.commit !== null && !(typeof value.commit === 'string' && GIT_COMMIT.test(value.commit)))) refuse('N1_BASELINE_UNREADABLE');
+  return value.commit;
+}
+
 const listed = paths => (paths.length > MAX_LISTED_PATHS ? `${paths.slice(0, MAX_LISTED_PATHS).join(', ')} and ${paths.length - MAX_LISTED_PATHS} more` : paths.join(', '));
 const pass = detail => ({ ok: true, detail });
 const miss = detail => ({ ok: false, detail });
@@ -306,6 +337,19 @@ export async function releaseCheck({ label, olderManifest, newerManifest, gateRo
 
   const bodies = {
     N1_HEADERS: async () => (withoutN1.length ? miss(withoutN1.join(', ')) : pass(added.length ? `new: ${added.map(step => step.name).join(', ')}` : 'no new migrations')),
+    // The N-1 CI job (.github/workflows/n1-compatibility.yml) runs the commit tests/n1-baseline.json names against the
+    // new schema; null there means it checked nothing (final fix wave A2). The new release's own file must name the
+    // current release's pinned commit (the guide sets it after each release goes live). The public server pins no
+    // commit (its overlays hold the key only), and the baseline names the preview's live release: not compared there.
+    N1_BASELINE: async () => {
+      if (layout.releaseSource === 'overlay') return pass('not compared on this server (the baseline names the preview\'s live release)');
+      const commit = await baselineCommit(newerManifest, io);
+      if (commit === null) return miss('set the N-1 baseline first: tests/n1-baseline.json names no commit');
+      const { releases, label: older } = await currentLabel();
+      const pinned = releases[older].sourceRevision;
+      if (typeof pinned !== 'string' || !GIT_COMMIT.test(pinned)) return miss('CURRENT_REVISION_UNKNOWN');
+      return commit === pinned ? pass(`names the current release's commit ${pinned}`) : miss(`names ${commit}, not the current release's ${pinned}: set the N-1 baseline first`);
+    },
     // The current release is pinned, and the older manifest is its own: the lock holds its API source manifest's digest
     // (preview); on the public server the manifest names the current release's own folder. There release.mjs builds the
     // older manifest from that same folder, so the check reduces to "the current key has exactly one overlay".
@@ -442,6 +486,20 @@ export async function releaseStatus({ layout = LAYOUT, deps = {} }) {
   return Object.freeze(rows);
 }
 
+/**
+ * The status rows that need the operator now (final fix wave X1): a DRAINING release with open work whose runner is
+ * stopped (inactive or failed). A runner instance has no [Install] and the boot target starts only the current
+ * release's website and API, so after a reboot (or a runner crash) nobody re-sends that release's CLAIMED work and
+ * nobody honours its backstop; 25 minutes after the backstop root would only email STRANDED. `next` is the one command
+ * that fixes it: the runner starts again (prestart runs it in database-ahead mode when the database is newer), finishes
+ * or sets aside its own debates, and retires by itself. The guide: "After a reboot or a runner crash during a drain".
+ */
+export function statusBad(rows, layout = LAYOUT) {
+  return Object.freeze(rows.filter(row => row.state === 'DRAINING' && row.openWork > 0 && STOPPED.includes(row.units.runner))
+    .map(row => Object.freeze({ code: 'DRAINING_RUNNER_STOPPED', label: row.label, openWork: row.openWork, runner: row.units.runner,
+      next: `systemctl start ${unitNameFor(layout, 'runner', row.label).replace(/\.service$/, '')}` })));
+}
+
 /** release-retire.mjs's own line when, at ExecStopPost, it read ExecMainStatus=0 and both lines and recorded RETIRED. */
 function recordedRetired(message, label, releaseKey) {
   let line;
@@ -572,7 +630,7 @@ function parseArguments(argv) {
 }
 const FAILED_EVENT = Object.freeze({ check: 'PREVIEW_RELEASE_CHECK_REFUSED', status: 'PREVIEW_RELEASE_STATUS_REFUSED', receipt: 'PREVIEW_RELEASE_RECEIPT_REFUSED', maintenance: 'PREVIEW_MAINTENANCE_REFUSED' });
 
-/** One JSON line per run: the result on stdout (exit 0, or 2 for a verdict other than SIDE_BY_SIDE), or one refusal on stderr (exit 1). */
+/** One JSON line per run: the result on stdout (exit 0, or 2 for a verdict other than SIDE_BY_SIDE or a status with `bad`), or one refusal on stderr (exit 1). */
 export async function main(argv, { platform = process.platform, uid = process.getuid?.(), layout = LAYOUT, deps = {}, stdout = process.stdout, stderr = process.stderr } = {}) {
   let args = null;
   try {
@@ -586,9 +644,14 @@ export async function main(argv, { platform = process.platform, uid = process.ge
       logLine(stdout, result);
       return result.verdict === 'SIDE_BY_SIDE' ? 0 : 2;
     }
-    const result = args.command === 'status' ? Object.freeze({ event: 'PREVIEW_RELEASE_STATUS', releases: await releaseStatus({ layout, deps }) })
-      : args.command === 'receipt' ? await writeRetirementReceipt({ label: args.label, out: args.out, layout, deps })
-        : await maintenanceAllowed({ layout, deps });
+    if (args.command === 'status') {
+      const releases = await releaseStatus({ layout, deps });
+      const bad = statusBad(releases, layout);
+      logLine(stdout, Object.freeze({ event: 'PREVIEW_RELEASE_STATUS', releases, bad }));
+      return bad.length ? 2 : 0;
+    }
+    const result = args.command === 'receipt' ? await writeRetirementReceipt({ label: args.label, out: args.out, layout, deps })
+      : await maintenanceAllowed({ layout, deps });
     logLine(stdout, result);
     return 0;
   } catch (error) {

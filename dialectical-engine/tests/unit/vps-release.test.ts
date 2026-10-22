@@ -11,6 +11,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import * as runtimeEnvironment from "../../packages/register/src/runtime-environment.js";
 
 const release = await import("../../deploy/" + "vps/release.mjs");
+const environment = await import("../../deploy/" + "preview-auth-dev/v1/environment.mjs");
 const common = await import("../../deploy/" + "preview-lifecycle/v1/common.mjs");
 const table = await import("../../deploy/" + "preview-lifecycle/v1/release-table.mjs");
 const VPS = common.VPS_LAYOUT;
@@ -54,12 +55,38 @@ describe("the public server's per-release overlays (side-by-side spec §10)", ()
     expect(ui.sort()).toEqual(["DIALECTICAL_API_BASE", "PORT", "RELEASE_KEY"]);
   });
 
-  it("each overlay names its file, its owner and the base file it overrides", () => {
+  it("each overlay example is only KEY=value lines, as the overlay reader takes it, and README §5 names its file, owner and base file (final fix wave S6)", () => {
+    const readme = read("deploy/vps/README.md");
     for (const service of ["api", "runner", "ui"]) {
       const text = read(`deploy/vps/env/releases/${service}.env.example`);
-      expect(text, service).toContain(`/etc/debateai/releases/<label>/${service}.env (0640 root:debateai-${service})`);
-      expect(text, service).toContain(`/etc/debateai/${service}.env`);
+      // No comment and no blank line: a copied example, its placeholders filled, is an overlay release.mjs can read.
+      for (const line of text.split("\n").slice(0, -1)) expect(line, service).toMatch(/^[A-Z][A-Z0-9_]*=\S+$/u);
+      const filled = text.replaceAll("<register-version>", "20").replaceAll("<release-key>", NEW_KEY);
+      expect(Object.keys(environment.parseEnvironmentText(filled)), service).toEqual(exampleKeys(`deploy/vps/env/releases/${service}.env.example`));
+      expect(readme, service).toContain(`| \`/etc/debateai/releases/<label>/${service}.env\` | \`0640 root:debateai-${service}\` | \`/etc/debateai/${service}.env\` |`);
     }
+    // The reader refuses a comment line: why the examples carry none.
+    expect(() => environment.parseEnvironmentText(`# a comment\nRELEASE_KEY=${NEW_KEY}\n`)).toThrow();
+  });
+
+  it("the public server's docs name the instance units and the checks side by side needs (final fix wave S6)", () => {
+    const readme = read("deploy/vps/README.md"), register = read("deploy/vps/register/README.md"), setup = read("deploy/vps/billing-setup.sh");
+    // The fixed units are gone: every restart names an instance.
+    for (const [name, text] of [["register", register], ["billing-setup", setup]] as const) {
+      expect(text, name).not.toMatch(/systemctl restart debateai-(api|ui|runner)(?!@)/u);
+    }
+    expect(setup).toContain("systemctl restart debateai-api@<label>");
+    expect(register).toContain("(`debateai-api@<label>`, `debateai-runner@<label>`)");
+    expect(register).toContain("do a side-by-side upgrade whose key carries `N`");
+    // Step 14 checks the release's two retirement timers before its folder moves.
+    expect(readme).toContain("! systemctl is-active --quiet debateai-runner-retire@$old.timer debateai-runner-retire-check@$old.timer && ! systemctl is-enabled --quiet debateai-runner-retire@$old.timer debateai-runner-retire-check@$old.timer && echo \"to archive: $old\"");
+    // The automatic reboot's pending flag, against the release check's NO_MAINTENANCE.
+    expect(readme).toContain("`/run/reboot-required`");
+    expect(readme).toContain("(`NO_MAINTENANCE: reboot required`)");
+    // §6: what only a running Caddy shows (the preview's TB7): the edge secret filled into health_headers, and /readyz refused.
+    const caddy = readme.slice(readme.indexOf("## 6. Caddy"), readme.indexOf("## 7. Mail"));
+    expect(caddy).toContain("curl -s -m 15 -o /dev/null -D - http://127.0.0.1:3090/readyz | tr -d '\\r' | grep -i '^x-debateai-release:'");
+    expect(caddy).toContain(`curl -s -o /dev/null -w '%{http_code}\\n' "https://$DEBATEAI_PUBLIC_HOSTNAME/readyz"`);
   });
 
   it("hatchet's compose file is no longer in any release or the operator checkout", () => {
@@ -144,7 +171,7 @@ function host(releases: Release[], options: Options = {}) {
   const base = START - DAY;
   for (const [key, kind, reason] of o.history) {
     const at = kind === "RETIRE_REQUESTED" ? START - o.minutesSinceRequest * 60_000 : base + events.length * 1000;
-    events.push({ key, kind, reason: reason ?? null, at, ttf: kind === "CURRENT" ? at + 5000 : null });
+    events.push({ key, kind, reason: reason ?? null, at, ttf: kind === "CURRENT" ? at + 8000 : null });
   }
   const latest = (key: string, kinds: string[]) => { for (let i = events.length - 1; i >= 0; i--) if (events[i]!.key === key && kinds.includes(events[i]!.kind)) return i; return -1; };
   const stateOf = (key: string) => {
@@ -373,7 +400,7 @@ describe("release.mjs: the preview's release tools with the public server's layo
     expect([first.code, first.err]).toEqual([0, null]);
     expect(first.out).toMatchObject({ event: "PREVIEW_RELEASE_FIRST_SWITCHED", to: "first-v1", toKey: FIRST_KEY, recorded: true, bad: [] });
     expect(first.out.edgeConfirmedMs).toBeGreaterThan(0);
-    expect(h.log.filter((entry) => entry.startsWith("recordReleaseSwitch"))).toEqual([`recordReleaseSwitch(${FIRST_KEY}, expect null, 5s)`]);
+    expect(h.log.filter((entry) => entry.startsWith("recordReleaseSwitch"))).toEqual([`recordReleaseSwitch(${FIRST_KEY}, expect null, 8s)`]);
     expect(h.verbs()).toEqual(["enable debateai-api@first-v1.service debateai-ui@first-v1.service debateai-runner@first-v1.service"]);
     expect(h.unitFiles).toEqual({});
     expect(h.stateOf(FIRST_KEY).state).toBe("CURRENT");
@@ -408,7 +435,7 @@ describe("release.mjs: the preview's release tools with the public server's layo
     expect(status.out).toEqual({ event: "PREVIEW_RELEASE_STATUS", releases: [
       { label: "new-v1", releaseKey: NEW_KEY, slot: "B", state: "CURRENT", frontPairStopped: false, retireRequested: false, units: { api: "active", ui: "active", runner: "active" }, openWork: 0 },
       { label: "old-v1", releaseKey: OLD_KEY, slot: "A", state: "DRAINING", frontPairStopped: true, retireRequested: false, units: { api: "inactive", ui: "inactive", runner: "active" }, openWork: 0 }
-    ] });
+    ], bad: [] });
     // An overlay that sets a value no release may change, or names no slot's API port, is refused, never guessed.
     const extra = serverFiles([OLD], (entry) => `REGISTER_VERSION=19\nRELEASE_KEY=${entry.key}\nAPI_PORT=8790\nDATABASE_URL=elsewhere\n`);
     expect((await cli(["status"], extra.layout, host([OLD]).deps)).err).toMatchObject({ reason: "RELEASE_OVERLAY_REFUSED" });
@@ -492,7 +519,8 @@ describe("release.mjs: the preview's release tools with the public server's layo
     expect([check.code, check.err]).toEqual([0, null]);
     expect(check.out.verdict).toBe("SIDE_BY_SIDE");
     expect(Object.fromEntries(check.out.checks.map((entry: { name: string; detail: string }) => [entry.name, entry.detail]))).toEqual({
-      N1_HEADERS: "new: 0002_b.sql", CURRENT_PINNED: "old-v1", PREVIOUS_RETIRED: "all retired", GATES_ACTIVE: "no gates on this server",
+      // The N-1 baseline names the preview's live release; the public server pins no commit to compare it with (A2).
+      N1_HEADERS: "new: 0002_b.sql", N1_BASELINE: "not compared on this server (the baseline names the preview's live release)", CURRENT_PINNED: "old-v1", PREVIOUS_RETIRED: "all retired", GATES_ACTIVE: "no gates on this server",
       GATE_ROWS_N1: "no gates on this server", CONNECTIONS: "max 320, free 307", DISK: "40.0 GB free", MEMORY: "7812 MiB available",
       HATCHET: "active", NO_MAINTENANCE: "none", SLOT_FREE: "slot B", LIFECYCLE_FILES: "the release tools run from the operator checkout"
     });
@@ -522,10 +550,53 @@ describe("release.mjs: the preview's release tools with the public server's layo
     expect(h.urls).toContain("http://127.0.0.1:3001/readyz");
   });
 
+  it("a drained upgrade: the older pair and runner stopped with nothing open, the switch with --old-pair-stopped, then mark-retired (final fix wave S2)", async () => {
+    const { layout } = serverFiles([OLD, NEW]);
+    const stopped = { [U("runner", "old-v1")]: "inactive", [U("api", "old-v1")]: "inactive", [U("ui", "old-v1")]: "inactive" };
+    const h = host([OLD, NEW], { history: [[OLD_KEY, "STAGED"], [OLD_KEY, "CURRENT"], [NEW_KEY, "STAGED"]], units: stopped });
+    const switched = await cli(["switch", "--to", "new-v1", "--from", "old-v1", "--old-pair-stopped"], layout, h.deps);
+    expect([switched.code, switched.out.event, switched.out.bad]).toEqual([0, "PREVIEW_RELEASE_SWITCHED", []]);
+    const before = h.verbs().length;
+    const retired = await cli(["mark-retired", "--label", "old-v1"], layout, h.deps);
+    expect([retired.code, retired.out]).toEqual([0, { event: "PREVIEW_RELEASE_DRAINED_RETIRED", label: "old-v1", releaseKey: OLD_KEY, openWork: 0 }]);
+    expect(h.eventLog().at(-1)).toBe("old-v1 RETIRED DRAINED");
+    // Its backstop and check timers off, and its runner instance disabled: the switch disabled only the old API and
+    // website, and a retired runner must not start at the next boot.
+    expect(h.verbs().slice(before)).toEqual(["disable --now debateai-runner-retire@old-v1.timer", "disable --now debateai-runner-retire-check@old-v1.timer", "disable debateai-runner@old-v1.service"]);
+    // Run again: already retired, the same three are repeated (a disable that failed before is retried); a failing
+    // disable is loud.
+    const again = await cli(["mark-retired", "--label", "old-v1"], layout, h.deps);
+    expect([again.code, again.out.event]).toEqual([0, "PREVIEW_RELEASE_RETIRE_NOT_NEEDED"]);
+    const failing = refusingDisable(host([OLD, NEW], { history: [...AFTER_SWITCH, [OLD_KEY, "RETIRED", "DRAINED"]], units: stopped }));
+    expect((await cli(["mark-retired", "--label", "old-v1"], layout, failing.deps)).err).toMatchObject({ event: "PREVIEW_RELEASE_RETIRE_REFUSED", reason: "RETIRE_TIMER_STOP_FAILED" });
+    // A runner still running, or open work, refuses before anything is written.
+    const busy = host([OLD, NEW], { history: [[OLD_KEY, "STAGED"], [OLD_KEY, "CURRENT"], [NEW_KEY, "CURRENT"], [OLD_KEY, "DRAINING"]] });
+    expect((await cli(["mark-retired", "--label", "old-v1"], layout, busy.deps)).err).toMatchObject({ reason: "RELEASE_RUNNER_ACTIVE" });
+    expect(busy.verbs()).toEqual([]);
+  });
+
+  it("README §5 runs only commands release.mjs has, and gives the drained upgrade in the order the tools need (final fix wave S2)", () => {
+    const readme = read("deploy/vps/README.md");
+    const named = [...readme.matchAll(/release\.mjs ([a-z][a-z-]*)/g)].map((match) => match[1]!);
+    expect(named.filter((command) => !Object.hasOwn(release.COMMANDS, command))).toEqual([]);
+    expect(named).toContain("mark-retired");
+    const drained = readme.slice(readme.indexOf("**A drained upgrade**"), readme.indexOf("### Upgrading to the verdict-story release"));
+    const at = (needle: string) => { const index = drained.indexOf(needle); expect(index, needle).toBeGreaterThan(-1); return index; };
+    // The pair first, the runner only with nothing open or waiting, then the switch with the pair stopped, then mark-retired.
+    const pair = at("systemctl stop debateai-ui@$label debateai-api@$label");
+    const runner = at("= 0 && systemctl stop debateai-runner@$label");
+    const sw = at("`release.mjs switch --to $new --from $label --old-pair-stopped`");
+    const retired = at("release.mjs mark-retired --label $label");
+    expect([pair < runner, runner < sw, sw < retired]).toEqual([true, true, true]);
+    expect(drained).toContain("(SELECT count(*) FROM core.run_waiting_v)");
+    expect(drained).toContain("release.mjs switch --finish --to $new --from $label --old-pair-stopped");
+  });
+
   it("runs only the commands this server has, as root on Linux, and keeps one switch at a time in its own lock folder", async () => {
     const { layout } = serverFiles([OLD, NEW]);
     const h = host([OLD, NEW], { history: AFTER_SWITCH });
-    for (const argv of [[], ["seed", "--label", "new-v1"], ["mark-retired", "--label", "old-v1"], ["receipt", "--label", "old-v1", "--out", "/root/r.json"], ["maintenance"],
+    // mark-retired is this server's too since the drained upgrade (final fix wave S2): see the test below.
+    for (const argv of [[], ["seed", "--label", "new-v1"], ["mark-retired", "--label", "Old_v1"], ["receipt", "--label", "old-v1", "--out", "/root/r.json"], ["maintenance"],
       ["check"], ["check", "--label", "../x"], ["status", "--all"], ["switch", "--to", "New"], ["stopped", "--service", "ui", "--label", "old-v1"]]) {
       const refused = await cli(argv, layout, h.deps);
       expect([argv, refused.code, refused.err.reason]).toEqual([argv, 1, "ARGUMENTS_REFUSED"]);

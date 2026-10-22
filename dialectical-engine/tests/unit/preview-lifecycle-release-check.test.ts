@@ -11,7 +11,7 @@ const check = await import('../../deploy/' + 'preview-lifecycle/v1/release-check
 const common = await import('../../deploy/' + 'preview-lifecycle/v1/common.mjs');
 const releaseSwitch = await import('../../deploy/' + 'preview-lifecycle/v1/release-switch.mjs');
 
-const { releaseCheck, releaseStatus, writeRetirementReceipt, maintenanceAllowed, portRefuses, CHECK_NAMES, RECEIPT_SCHEMA, main } = check;
+const { releaseCheck, releaseStatus, statusBad, writeRetirementReceipt, maintenanceAllowed, portRefuses, CHECK_NAMES, RECEIPT_SCHEMA, N1_BASELINE_PATH, main } = check;
 const LAYOUT = common.LAYOUT;
 const { gateFilesPathFor, GATE_FILES_SCHEMA } = releaseSwitch;
 
@@ -25,6 +25,12 @@ const SWITCHED_AT = '2026-10-22T03:15:05.000Z';
 const RETIRED_AT = '2026-10-22T05:40:12.345Z';
 const invocation = 'c'.repeat(32);
 
+/** A release's pinned commit in the fake lock: its key's 12 hex, padded to 40 (the lock's services.api.sourceRevision). */
+const revisionOf = (key: string) => `${key.slice(key.indexOf('-') + 1)}${'0'.repeat(28)}`;
+const OLD_REV = revisionOf(OLD_KEY);
+/** tests/n1-baseline.json as the release guide sets it once a release is live (final fix wave A2). */
+const baselineText = (commit: string | null, schema = 'debateai-n1-baseline-v1') => `${JSON.stringify({ schema, commit, reason: commit ? 'the live release' : 'no fenced release yet', suites: ['tests/integration/b3-holds-waiting-line.test.ts'] }, null, 2)}\n`;
+
 // Two candidate API source manifests (repository paths, as source-manifest.mjs writes them).
 const apiRoot = (label: string) => `/opt/debateai-v3-preview/releases/auth-dev-candidate-${label}-api`;
 const row = (path: string, text: string) => ({ path, sha256: sha(text), mode: 0o644 });
@@ -33,6 +39,7 @@ const BASE_FILES = [
   row('dialectical-engine/deploy/preview-lifecycle/v1/prestart.mjs', 'prestart'),
   row('dialectical-engine/migrations/0123_side_by_side_releases.sql', '-- n1: drained\nSELECT 1;\n'),
   row('dialectical-engine/packages/db/src/index.ts', 'db'),
+  row('dialectical-engine/tests/n1-baseline.json', baselineText(OLD_REV)),
   row('package.json', '{}')
 ];
 const manifestOf = (label: string, files: { path: string }[]) => ({
@@ -41,7 +48,7 @@ const manifestOf = (label: string, files: { path: string }[]) => ({
 });
 const OLDER = manifestOf(OLD, BASE_FILES);
 /** Bytes on the newer release's disk, by absolute path (what the check reads for each added migration). */
-const disk: Record<string, string> = {};
+const disk: Record<string, string> = { [`${apiRoot(NEW)}/dialectical-engine/tests/n1-baseline.json`]: baselineText(OLD_REV) };
 function withFiles(files: { path: string; sha256?: string; text?: string }[], base: { path: string }[] = BASE_FILES) {
   const added = files.map(file => {
     if (file.text !== undefined) disk[`${apiRoot(NEW)}/${file.path}`] = file.text;
@@ -58,7 +65,7 @@ const ANTHROPIC = Object.freeze({ name: 'anthropic', goSha256: sha('go-an'), fol
 const DIGESTS = Object.freeze([DEEPINFRA, ANTHROPIC]);
 const canonical = (value: unknown): string => common.canonicalJson(value);
 
-type Release = { key: string; slot: string; state: string; frontPairStopped?: boolean; retireRequested?: boolean; manifest?: object };
+type Release = { key: string; slot: string; state: string; frontPairStopped?: boolean; retireRequested?: boolean; manifest?: object; revision?: string };
 type Options = Partial<{
   releases: Record<string, Release>;
   current: string | null;
@@ -130,7 +137,7 @@ function host(options: Options = {}) {
       if (o.lockFails) throw fail('RELEASE_LOCK_UNREADABLE');
       const releases: Record<string, object> = {};
       for (const [label, release] of Object.entries(o.releases)) {
-        releases[label] = { releaseKey: release.key, slot: release.slot, databaseAhead: null, services: { api: { sourceManifestSha256: sha(JSON.stringify(release.manifest ?? { label })) } } };
+        releases[label] = { releaseKey: release.key, slot: release.slot, databaseAhead: null, services: { api: { sourceManifestSha256: sha(JSON.stringify(release.manifest ?? { label })), sourceRevision: release.revision ?? revisionOf(release.key) } } };
       }
       return { lock: { schema: 'preview-lifecycle-release-lock-v2', releases }, lockSha256: sha('lock') };
     },
@@ -180,9 +187,10 @@ describe('the release check (side-by-side spec §12 step 4)', () => {
     expect(r.label).toBe(NEW);
     expect(r.verdict).toBe('SIDE_BY_SIDE');
     expect(r.checks.map((entry: { name: string }) => entry.name)).toEqual(CHECK_NAMES);
-    expect(CHECK_NAMES).toEqual(['N1_HEADERS', 'CURRENT_PINNED', 'PREVIOUS_RETIRED', 'GATES_ACTIVE', 'GATE_ROWS_N1', 'CONNECTIONS', 'DISK', 'MEMORY', 'HATCHET', 'NO_MAINTENANCE', 'SLOT_FREE', 'LIFECYCLE_FILES']);
+    expect(CHECK_NAMES).toEqual(['N1_HEADERS', 'N1_BASELINE', 'CURRENT_PINNED', 'PREVIOUS_RETIRED', 'GATES_ACTIVE', 'GATE_ROWS_N1', 'CONNECTIONS', 'DISK', 'MEMORY', 'HATCHET', 'NO_MAINTENANCE', 'SLOT_FREE', 'LIFECYCLE_FILES']);
     expect(failing(r)).toEqual([]);
     expect(named(r, 'N1_HEADERS')).toEqual({ name: 'N1_HEADERS', ok: true, detail: 'new: 0124_side_next.sql' });
+    expect(named(r, 'N1_BASELINE')).toEqual({ name: 'N1_BASELINE', ok: true, detail: `names the current release's commit ${OLD_REV}` });
     expect(named(r, 'SLOT_FREE')).toMatchObject({ ok: true, detail: 'slot B' });
     expect(Object.isFrozen(r)).toBe(true);
     expect(Object.isFrozen(r.checks)).toBe(true);
@@ -241,6 +249,43 @@ describe('the release check (side-by-side spec §12 step 4)', () => {
     await expect(run({ label: 'a'.repeat(65) })).rejects.toMatchObject({ code: 'RELEASE_LABEL_TOO_LONG' });
     await expect(run({ gateRowsReviewed: 'abc' })).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED' });
     await expect(run({ lifecycleReviewed: 'yes' })).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED' });
+  });
+
+  it('N1_BASELINE: the new release\'s own tests/n1-baseline.json must name the current release\'s pinned commit (final fix wave A2)', async () => {
+    expect(N1_BASELINE_PATH).toBe('dialectical-engine/tests/n1-baseline.json');
+    const withBaseline = (text: string, sha256?: string) => {
+      disk[`${apiRoot(NEW)}/${N1_BASELINE_PATH}`] = text;
+      return withFiles([{ path: N1_BASELINE_PATH, sha256: sha256 ?? sha(text) }], NEWER.files);
+    };
+    try {
+      // null: the N-1 CI job checked nothing yet.
+      const unset = await run({ newerManifest: withBaseline(baselineText(null)) });
+      expect([unset.verdict, failing(unset)]).toEqual(['NOT_READY', ['N1_BASELINE']]);
+      expect(named(unset, 'N1_BASELINE')).toMatchObject({ ok: false, detail: 'set the N-1 baseline first: tests/n1-baseline.json names no commit' });
+      // Another commit (an older release's, or one never released).
+      const other = 'ab'.repeat(20);
+      const stale = await run({ newerManifest: withBaseline(baselineText(other)) });
+      expect(named(stale, 'N1_BASELINE')).toMatchObject({ ok: false, detail: `names ${other}, not the current release's ${OLD_REV}: set the N-1 baseline first` });
+      // Bytes on disk that are not the manifest's, a file the manifest does not list, or a file that is no baseline.
+      expect(named(await run({ newerManifest: withBaseline(baselineText(OLD_REV), sha('other bytes')) }), 'N1_BASELINE')).toMatchObject({ ok: false, detail: 'N1_BASELINE_UNREADABLE' });
+      expect(named(await run({ newerManifest: withBaseline(baselineText(OLD_REV, 'debateai-n1-baseline-v2')) }), 'N1_BASELINE')).toMatchObject({ ok: false, detail: 'N1_BASELINE_UNREADABLE' });
+      expect(named(await run({ newerManifest: withBaseline(baselineText(OLD_REV.toUpperCase())) }), 'N1_BASELINE')).toMatchObject({ ok: false, detail: 'N1_BASELINE_UNREADABLE' });
+      const listless = { ...NEWER, files: NEWER.files.filter(file => file.path !== N1_BASELINE_PATH) };
+      expect(named(await run({ newerManifest: listless }), 'N1_BASELINE')).toMatchObject({ ok: false, detail: 'N1_BASELINE_UNREADABLE' });
+      // The lock pins no commit for the current release: never guessed.
+      disk[`${apiRoot(NEW)}/${N1_BASELINE_PATH}`] = baselineText(OLD_REV);
+      const noRevision = await run({}, { releases: { [PREV]: { key: PREV_KEY, slot: 'B', state: 'RETIRED' }, [OLD]: { key: OLD_KEY, slot: 'A', state: 'CURRENT', manifest: OLDER, revision: 'not-a-commit' } } });
+      expect(named(noRevision, 'N1_BASELINE')).toMatchObject({ ok: false, detail: 'CURRENT_REVISION_UNKNOWN' });
+      // A migration without both n1 lines still sends the upload to the drained path first.
+      const drained = await run({ newerManifest: withFiles([{ path: 'dialectical-engine/migrations/0124_drop.sql', text: 'DROP TABLE x;' }, { path: N1_BASELINE_PATH, text: baselineText(null) }]) });
+      expect([drained.verdict, failing(drained)]).toEqual(['DRAINED_PATH', ['N1_HEADERS', 'N1_BASELINE']]);
+    } finally {
+      disk[`${apiRoot(NEW)}/${N1_BASELINE_PATH}`] = baselineText(OLD_REV);
+    }
+    // The repository's own file is a baseline this check reads the same way as tools/n1-baseline.mjs (its commit or null).
+    const repo = JSON.parse(readFileSync(join(import.meta.dirname, '../n1-baseline.json'), 'utf8'));
+    expect(repo.schema).toBe('debateai-n1-baseline-v1');
+    expect(repo.commit === null || /^[0-9a-f]{40}$/.test(repo.commit)).toBe(true);
   });
 
   it('NOT_READY when CURRENT_PINNED fails: no current release, a current release nobody pinned, or an older manifest that is not its own', async () => {
@@ -587,6 +632,7 @@ describe('the command line', () => {
     const status = await cli(['status']);
     expect(status.code).toBe(0);
     expect(status.out[0].event).toBe('PREVIEW_RELEASE_STATUS');
+    expect(status.out[0].bad).toEqual([]);
     expect(status.out[0].releases.map((release: { label: string }) => release.label)).toEqual([PREV, OLD]);
     expect((await cli(['maintenance'])).code).toBe(0);
     const refused = await cli(['maintenance'], { releases: { [OLD]: { key: OLD_KEY, slot: 'A', state: 'DRAINING' } } });
@@ -595,6 +641,34 @@ describe('the command line', () => {
     const receipt = await cli(['receipt', '--label', OLD, '--out', '/root/preview-archive/x/retirement-receipt.json'], { releases: { [OLD]: { key: OLD_KEY, slot: 'A', state: 'DRAINING' } } });
     expect(receipt.code).toBe(1);
     expect(receipt.err[0]).toEqual({ event: 'PREVIEW_RELEASE_RECEIPT_REFUSED', label: OLD, reason: 'RECEIPT_NOT_RETIRED', fields: { state: 'DRAINING' } });
+  });
+
+  it('status names a draining release whose runner is stopped with open work, with the command that starts it again, and exits 2 (final fix wave X1)', async () => {
+    const base: Options = { releases: { [OLD]: { key: OLD_KEY, slot: 'A', state: 'DRAINING', frontPairStopped: true }, [NEW]: { key: NEW_KEY, slot: 'B', state: 'CURRENT' } }, current: NEW_KEY };
+    // After a reboot: a runner instance has no [Install] and the boot target starts only the current pair, so the
+    // draining release's runner is inactive while 3 of its items are still open.
+    const rebooted = await cli(['status'], { ...base, openWork: { [OLD_KEY]: 3 } });
+    expect(rebooted.code).toBe(2);
+    expect(rebooted.out[0].releases.map((release: { label: string }) => release.label)).toEqual([OLD, NEW]);
+    expect(rebooted.out[0].bad).toEqual([{ code: 'DRAINING_RUNNER_STOPPED', label: OLD, openWork: 3, runner: 'inactive', next: 'systemctl start debateai-preview-runner@old-v1' }]);
+    // A crashed runner (failed) is the same case.
+    const crashed = await cli(['status'], { ...base, openWork: { [OLD_KEY]: 1 }, units: { [U('runner', OLD)]: 'failed' } });
+    expect([crashed.code, crashed.out[0].bad.map((entry: { runner: string }) => entry.runner)]).toEqual([2, ['failed']]);
+    // Not this case: the draining runner runs; nothing of it is open; it retired; or the CURRENT release's runner is the
+    // stopped one (the transition's TB6 to TB8 and a drained upload's DR2 to DR6 stop it on purpose).
+    for (const options of [
+      { ...base, openWork: { [OLD_KEY]: 3 }, units: { [U('runner', OLD)]: 'active' } },
+      { ...base, openWork: {} },
+      { ...base, releases: { [OLD]: { key: OLD_KEY, slot: 'A', state: 'RETIRED' }, [NEW]: { key: NEW_KEY, slot: 'B', state: 'CURRENT' } }, openWork: { [OLD_KEY]: 2 } },
+      { ...base, openWork: { [NEW_KEY]: 2 }, units: { [U('runner', NEW)]: 'inactive' } }
+    ] as Options[]) {
+      const ok = await cli(['status'], options);
+      expect([ok.code, ok.out[0].bad]).toEqual([0, []]);
+    }
+    // The public server's units: the same command with its own unit name.
+    const rows = [{ label: OLD, releaseKey: OLD_KEY, slot: 'A', state: 'DRAINING', frontPairStopped: true, retireRequested: true, units: { api: 'inactive', ui: 'inactive', runner: 'inactive' }, openWork: 4 }];
+    expect(statusBad(rows, common.VPS_LAYOUT)).toEqual([{ code: 'DRAINING_RUNNER_STOPPED', label: OLD, openWork: 4, runner: 'inactive', next: 'systemctl start debateai-runner@old-v1' }]);
+    expect(Object.isFrozen(statusBad(rows))).toBe(true);
   });
 
   it('refuses any other argument shape, and anyone but root on Linux, before reading anything', async () => {

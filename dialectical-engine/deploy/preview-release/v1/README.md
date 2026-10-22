@@ -2240,10 +2240,11 @@ And four more, new with T:
 | TA-units | the API and website templates rendered from R19's live units, into `$S/templates` | up | nothing to undo |
 | TA-caddy | the two-slot Caddyfile, into `$S`, checked, not installed | up | nothing to undo |
 | TA-env | T's three env files derived from R19's live files | up | nothing to undo (the live files untouched) |
+| TA-op | T's operator folder built beside the installed one, compared with T's checked API folder | up | nothing to undo (unused until TB5) |
 | Practice | on the Mac (owner rule) | up | none |
 | TB0 | preflight again, right before the downtime | up | – |
+| TB0g | only when TA10 listed a gate file: the gate redeploy, right after TB0 at the same quiet moment | up | the gate's own (rbA-T and rbB-T keep the new gate: see TB0g) |
 | TB1 | stop R19's runner, backup timer, website, API (the drain guard also counts waiting debates) | **down** | rbA-T |
-| TB1g | only when TA10 listed a gate file: the gate redeploy | down | rbA-T (the gate change stays: see TB1g) |
 | TB2 | cold copy; `max_connections` 320 | down | rbA-T |
 | TB3 | migrations, with T's own native plan | down | **only the cold copy: rbB-T** |
 | TB4 | publish; verify plan, first proof, three launch plans for slot A | down | rbB-T |
@@ -2252,8 +2253,10 @@ And four more, new with T:
 | TB7 | Caddy with two slots (about one second) | up | TB7 puts the old Caddyfile back by itself; then rbB-T if needed |
 | TB8 | T's runner, by hand | up | rbB-T |
 | TB9 | checks (read-only) | up | rbB-T |
+| TB10 | on the Mac: the PR that makes `tests/n1-baseline.json` name T | up | – (T+1 needs it) |
 
-**The owner's yes, fresh in the live chat right before TB1** (TB1 to TB9 run on it). It names:
+**The owner's yes, fresh in the live chat right before TB0g (or TB1 when TA10 listed no gate file)** (TB0g to TB9 run
+on it). It names:
 - the downtime;
 - the cold copy;
 - `max_connections` 320 (a PostgreSQL restart);
@@ -2319,7 +2322,9 @@ HARD=$(grep -rlE '^(Requires|BindsTo|Requisite|PartOf|Upholds)=.*debateai-previe
 case "$(stat -c '%a %U' "$EDGE")" in "600 root"|"640 root") ;; *) echo "TA0_NOT_DONE: the edge secret is not root-owned 0600 or 0640"; exit 1;; esac
 [ "$(stat -c '%a %U:%G' /root/preview-archive)" = "700 root:root" ] || { echo "TA0_NOT_DONE: /root/preview-archive is not root-only 0700 (the receipt and every copy live there)"; exit 1; }
 [ -z "$(ss -ltnH '( sport = :3090 or sport = :3200 or sport = :3201 )')" ] || { echo "TA0_NOT_DONE: something listens on 3090, 3200 or 3201"; exit 1; }
-[ ! -e /etc/systemd/system/debateai-preview.target.d ] || { echo "TA0_NOT_DONE: debateai-preview.target.d exists already (look first)"; exit 1; }
+# The boot target's drop-in folder is shared: the Anthropic gate's 50-anthropic-gate.conf lives there (README-anthropic.md,
+# "Switch it on"). Only the switch's own file must not exist yet; the folder and the gate's file stay as they are.
+[ ! -e /etc/systemd/system/debateai-preview.target.d/60-current-release.conf ] || { echo "TA0_NOT_DONE: debateai-preview.target.d/60-current-release.conf exists already (look first)"; exit 1; }
 CF=$(psqlq "SHOW config_file") || { echo "TA0_NOT_DONE: SHOW config_file is unreadable (nothing written yet)"; exit 1; }
 case "$CF" in /etc/debateai-v3-preview/postgresql/*) ;; *) echo "TA0_NOT_DONE: the PostgreSQL config is not under /etc/debateai-v3-preview/postgresql (the cold copy would not hold it): ask"; exit 1;; esac
 [ "$(psqlq "SHOW max_connections")" = 200 ] && [ "$(psqlq "SELECT sourcefile FROM pg_settings WHERE name = 'max_connections'")" = "$CF" ] && [ "$(grep -cE '^[[:space:]]*max_connections[[:space:]]*=' "$CF")" = 1 ] && [ "$(grep -cE '^max_connections = 200([^0-9]|$)' "$CF")" = 1 ] || { echo "TA0_NOT_DONE: max_connections is not set by exactly one line 'max_connections = 200' of $CF (TB2 changes that one line): ask"; exit 1; }
@@ -2347,6 +2352,16 @@ echo "systemd-analyze verify of R19's three units: OK"
 # it up to its release folder is root's, not group- or world-writable and no link: read that path in R19's API folder.
 RAPI=$(jq -r .services.api.sourceRoot "$LOCK")
 [ "$(realpath "$RAPI")" = "$RAPI" ] || { echo "TA0_NOT_DONE: R19's API folder is reached through a link (the migration reader refuses that): ask"; exit 1; }
+# The boot target: TB5 replaces the file with T's copy (no fixed API or website). A line of the live file that R19's own
+# copy does not have (a Wants= added by hand) would be lost there: ask first. The drop-ins in debateai-preview.target.d stay.
+LT=/etc/systemd/system/debateai-preview.target; RT=$RAPI/dialectical-engine/deploy/preview-lifecycle/v1/systemd/debateai-preview.target
+[ -f "$LT" ] && [ -f "$RT" ] || { echo "TA0_NOT_DONE: the live debateai-preview.target or R19's copy of it is missing: ask"; exit 1; }
+unitlines() { grep -vE '^[[:space:]]*(#|$)' "$1" | LC_ALL=C sort -u; }
+XT=$(LC_ALL=C comm -13 <(unitlines "$RT") <(unitlines "$LT"))
+[ -z "$XT" ] || { echo "$XT"; echo "TA0_NOT_DONE: the live debateai-preview.target has a line R19's copy does not (above); TB5 replaces the file with T's and would lose it: ask"; exit 1; }
+echo "lines of R19's boot target the live one lacks (T's copy has them, except the fixed API and website): $(LC_ALL=C comm -23 <(unitlines "$RT") <(unitlines "$LT") | tr '\n' ';')"
+cp -p "$LT" "$P/debateai-preview.target.live"
+echo "boot target drop-ins (they stay): $(find /etc/systemd/system/debateai-preview.target.d -maxdepth 1 -name '*.conf' -printf '%f ' 2>/dev/null || true)" | tee "$P/target-dropins"
 RM=$(find "$RAPI/dialectical-engine/migrations" -maxdepth 1 -type f -name '*.sql' | LC_ALL=C sort | tail -n 1)
 [ -n "$RM" ] || { echo "TA0_NOT_DONE: no migration file in R19's API folder"; exit 1; }
 D=$(dirname "$RM"); while :; do SM=$(stat -c '%F %U %a' "$D"); echo "reader path: $D $SM" | tee -a "$P/reader-path"; case "$SM" in "directory root "*) ;; *) echo "TA0_NOT_DONE: $D is not a root-owned folder (the migration reader refuses it): ask"; exit 1;; esac; [ $(( 8#${SM##* } & 8#022 )) = 0 ] || { echo "TA0_NOT_DONE: $D is group- or world-writable (the migration reader refuses it): ask"; exit 1; }; [ "$D" = "$RAPI" ] && break; [ "$D" != / ] || { echo "TA0_NOT_DONE: the migration is not inside R19's API folder: ask"; exit 1; }; D=$(dirname "$D"); done
@@ -2385,6 +2400,9 @@ How to read what it printed:
 - The two lists under `/etc/systemd/system` name every file and link that still mentions a fixed unit. TB5 moves the
   links aside with the units; an `After=` or `Wants=` of a unit that is gone is harmless (the hard dependencies were
   refused above).
+- `boot target drop-ins (they stay)` lists what already lives in `debateai-preview.target.d` (on the live preview the
+  Anthropic gate's `50-anthropic-gate.conf`). T adds only `60-current-release.conf` there (TB6's seed); TB5 replaces only
+  the file `debateai-preview.target`, and rbB-T moves only those two of T's back out.
 - PID 1's line must show `pid` `"1"`, the backup unit and `invocation` `true` (the receipt's journal evidence); the start
   line count must be at least 1 (the switch reads start lines the same way). If either is missing, tell the owner
   before TB1.
@@ -2393,7 +2411,8 @@ How to read what it printed:
   database-ahead tool. The `nobody` line proves the database-ahead child can run there (it never runs as root).
 - `STAMP_AT_START yes`: a reboot that skips a backstop time still fires it at the next boot. `no`: that catch-up is not
   proven on this systemd; after a reboot during a drain, run `systemctl start debateai-preview-runner-retire@<label>.service`
-  by hand once the backstop time has passed (`release-check.mjs status` shows which release drains).
+  by hand once the backstop time has passed (`release-check.mjs status` shows which release drains). Either way, after
+  a reboot during a drain no runner runs until SB14b starts them.
 
 ### TA1. Names, the archive `$S` and the copies the way back needs
 
@@ -2410,7 +2429,7 @@ LOCK=/etc/debateai-v3-preview/lifecycle/release-lock.json; E=/etc/debateai-v3-pr
 NAMES=/root/preview-archive/$NN-names.sh; SP=/root/preview-archive/$NN-S.txt; P=/root/preview-archive/$NN-preflight
 psqlq() { runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d debateai -XAt -c "$1"; }
 [ ! -e "$NAMES" ] && [ ! -e "$SP" ] || { echo "TA1_NOT_DONE: $NAMES or $SP exists (look first)"; exit 1; }
-[ -s "$P/api.show" ] && [ -s "$P/ui.show" ] && [ -s "$P/runner.show" ] && [ -s "$P/Caddyfile.live" ] && [ -s "$P/pg-config-file" ] || { echo "TA1_NOT_DONE: TA0's captures are missing (TA0 first)"; exit 1; }
+[ -s "$P/api.show" ] && [ -s "$P/ui.show" ] && [ -s "$P/runner.show" ] && [ -s "$P/Caddyfile.live" ] && [ -s "$P/pg-config-file" ] && [ -s "$P/debateai-preview.target.live" ] || { echo "TA1_NOT_DONE: TA0's captures are missing (TA0 first)"; exit 1; }
 printf '%s\n' "$NN" | grep -qxE 'r[0-9]+' && printf '%s\n' "$REV" | grep -qxE '[0-9a-f]{40}' || { echo "TA1_NOT_DONE: NN or REV is not filled in"; exit 1; }
 [ -d "$OSTORE/v11" ] || { echo "TA1_NOT_DONE: OSTORE is not a pnpm store"; exit 1; }
 [ "$(jq -r '.schema // "none"' "$LOCK")" != preview-lifecycle-release-lock-v2 ] || { echo "TA1_NOT_DONE: the lock is already v2: T is done"; exit 1; }
@@ -2482,7 +2501,8 @@ chmod 0600 "$S/api.env.before" "$S/runner.env.before" "$S/ui.env.before"
 cp -p "$LOCK" "$S/release-lock.before.json"
 cp -a "$ONP" "$S/native-plan.before.json"
 jq -r '.services.api.basePlan.path, .services.ui.basePlan.path, .services.runner.basePlan.path' "$LOCK" > "$S/old-plans.txt"
-( cd /etc/systemd/system && tar -czf "$S/systemd-before.tgz" debateai-preview-* )
+# The debateai-preview-* glob does not match debateai-preview.target: the boot target and its drop-in folder (the gate's) are named.
+( cd /etc/systemd/system && tar -czf "$S/systemd-before.tgz" debateai-preview-* debateai-preview.target debateai-preview.target.d ) || { echo "TA1_NOT_DONE: the copy of the systemd files failed (the boot target or its drop-in folder is missing?): ask"; exit 1; }
 psqlq "SELECT count(*)||'|'||max(name) FROM public.debateai_schema_migration" > "$S/ledger-before"
 psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1" > "$S/register-before"
 mv "$P" "$S/preflight"
@@ -2533,8 +2553,8 @@ A9, unchanged. The owner's yes before TB1 names the printed `deltaSha256`.
 
 A10, unchanged. If A2 listed a changed gate file (T carries B13's change of `preview_budget_authority.py`: the gate
 names two more refusals, so its file hash changes and each gate's GO is written again at install), the gate is
-redeployed inside the downtime, as TB1g. R19 reads the two new refusals exactly as it reads a stop today, so the new gate
-is safe for R19 and for rbA-T.
+redeployed right before the downtime, as TB0g (after TB0, at the same quiet moment, so the downtime does not hold it).
+R19 reads the two new refusals exactly as it reads a stop today, so the new gate is safe for R19 and for rbA-T.
 
 ### TA-units. The API and website templates
 
@@ -2555,6 +2575,15 @@ UD=/etc/systemd/system
 noinst() { awk '{ t = $0; sub(/^[ \t\r]+/, "", t); sub(/[ \t\r]+$/, "", t) } t ~ /^\[/ { inst = (t == "[Install]") } !inst'; }
 for SVC in api ui; do [ ! -e "$S/templates/$SVC" ] || { echo "TA_UNITS_NOT_DONE: $S/templates/$SVC exists (look first)"; exit 1; }; done
 for SVC in api ui; do cmp -s <(systemctl cat "debateai-preview-$SVC.service") "$S/preflight/$SVC.cat" || { echo "TA_UNITS_NOT_DONE: the live $SVC unit changed since TA0: ask"; exit 1; }; done
+# systemctl show prints EnvironmentFiles, BindPaths, BindReadOnlyPaths, TemporaryFileSystem and DeviceAllow once per entry
+# (unit-templates.mjs reads them as lists). Any other property TB6's compare reads, printed twice, would stop TB6 inside
+# the downtime: it stops here instead. ONE is that list (the guide test holds it to unit-templates.mjs).
+ONE='Id LoadState User Group SupplementaryGroups ProtectSystem ProtectHome PrivateTmp PrivateDevices ProtectProc ProcSubset NoNewPrivileges RestrictAddressFamilies IPAddressAllow IPAddressDeny ReadWritePaths ReadOnlyPaths InaccessiblePaths CapabilityBoundingSet AmbientCapabilities SystemCallFilter SystemCallArchitectures RestrictNamespaces RestrictSUIDSGID LockPersonality MemoryDenyWriteExecute UMask LimitNOFILE LimitCORE TasksMax Environment UnsetEnvironment PassEnvironment KillMode TimeoutStopUSec Restart RestartUSec StartLimitBurst StartLimitIntervalUSec ProtectKernelTunables ProtectKernelModules ProtectKernelLogs ProtectControlGroups ProtectClock ProtectHostname RestrictRealtime StateDirectory RuntimeDirectory PrivateNetwork PrivateUsers DevicePolicy RestrictFileSystems NoExecPaths ExecPaths SocketBindAllow SocketBindDeny LogsDirectory'
+for SVC in api ui; do
+  echo "$SVC.show, one line per entry: $(for K in EnvironmentFiles BindPaths BindReadOnlyPaths TemporaryFileSystem DeviceAllow; do printf '%s %s, ' "$K" "$(grep -c "^$K=" "$S/preflight/$SVC.show" || true)"; done)"
+  DUP=$(cut -d= -f1 "$S/preflight/$SVC.show" | LC_ALL=C sort | uniq -d | grep -xF -f <(tr ' ' '\n' <<<"$ONE") || true)
+  [ -z "$DUP" ] || { echo "$DUP"; echo "TA_UNITS_NOT_DONE: $SVC.show holds a one-value property twice (above): TB6's compare would refuse it: ask"; exit 1; }
+done
 install -d -o root -g root -m 0700 "$S/templates" "$S/templates/api" "$S/templates/ui"
 for SVC in api ui; do
   RT=$(tl unit-templates.mjs render --service "$SVC" --cat "$S/preflight/$SVC.cat" --out "$S/templates/$SVC" 2>&1) || { echo "$RT"; echo "TA_UNITS_NOT_DONE: the $SVC template was refused (the line above names the file and line): ask"; exit 1; }
@@ -2588,7 +2617,9 @@ line naming `…/<service>.env` (the `EnvironmentFile=` lines, and others such a
 
 `caddy-slots.mjs transform` writes the changed copy into `$S` (never the live file): every
 `reverse_proxy 127.0.0.1:3100 {` (the notify handle's and the main route's) becomes a two-slot proxy importing the
-shared health rules, and the loopback listener 127.0.0.1:3090 is appended (GET `/readyz` only, everything else 404).
+shared health rules, the main route's block starts with `respond /readyz 404` (the public route never answers readiness:
+every request it proxies carries the edge secret), and the loopback listener 127.0.0.1:3090 is appended (GET `/readyz`
+only, everything else 404). The handler order check leaves out that one `/readyz` route and checks it on its own.
 
 ```sh
 set -euo pipefail
@@ -2600,7 +2631,7 @@ TR=$(cslots transform --in "$C" --out "$S/Caddyfile.two-slot" 2>&1) || { echo "$
 echo "$TR"
 [ "$(jq -r '[.event, .edgeListener] | map(tostring) | join(" ")' <<<"$TR")" = "PREVIEW_CADDY_TWO_SLOTS 3090" ] || { echo "TA_CADDY_NOT_DONE: the transform did not report the two slots"; exit 1; }
 cad validate --config "$S/Caddyfile.two-slot" --adapter caddyfile >/dev/null 2>&1 || { echo "TA_CADDY_NOT_DONE: Caddy's validation refused the two-slot file (an older Caddy without health_passes or health_fails?): ask"; exit 1; }
-order() { cad adapt --config "$1" --adapter caddyfile 2>/dev/null | jq -r '[.apps.http.servers[].routes[] | select(.match[0].host[0]=="v3-preview.dezbatere.ro") | .handle[] | .. | objects | select(has("handler")) | .handler] | join(" > ")'; }
+order() { cad adapt --config "$1" --adapter caddyfile 2>/dev/null | jq -r 'walk(if type == "object" and has("routes") then .routes |= map(select([.match[]?.path[]?] != ["/readyz"])) else . end) | [.apps.http.servers[].routes[] | select(.match[0].host[0]=="v3-preview.dezbatere.ro") | .handle[] | .. | objects | select(has("handler")) | .handler] | join(" > ")'; }
 O1=$(order "$C"); O2=$(order "$S/Caddyfile.two-slot")
 echo "handlers, live:     $O1"; echo "handlers, two slots: $O2"
 [ -n "$O2" ] && [ "$O1" = "$O2" ] || { echo "TA_CADDY_NOT_DONE: the main route's handler order changed: ask"; exit 1; }
@@ -2609,11 +2640,13 @@ UP=$(jq -r '[.. | objects | select(.handler? == "reverse_proxy") | [.upstreams[]
 RW=$(jq -r '[.. | objects | select(.handler? == "rewrite") | .uri] | unique | join(",")' <<<"$AD")
 HC=$(jq -r '[.. | objects | select(has("health_checks")) | .health_checks.active | "\(.uri) passes \(.passes) fails \(.fails) secret \((.headers // {} | keys | map(ascii_downcase) | index("x-debateai-edge-secret")) != null)"] | unique | join(",")' <<<"$AD")
 LI=$(jq -r '[.apps.http.servers[] | .listen[]? | select(test(":3090$"))] | join(",")' <<<"$AD")
-echo "upstreams: $UP; listener rewrite: $RW; health check: $HC; listener: $LI"
+PR=$(jq -r '[.apps.http.servers[].routes[] | select(.match[0].host[0]=="v3-preview.dezbatere.ro") | .. | objects | select(has("handle") and [.match[]?.path[]?] == ["/readyz"]) | [.handle[] | "\(.handler) \(.status_code)"] | join(",")] | join(";")' <<<"$AD")
+echo "upstreams: $UP; listener rewrite: $RW; health check: $HC; listener: $LI; public /readyz: $PR"
 [ "$UP" = "127.0.0.1:3100 127.0.0.1:3200" ] || { echo "TA_CADDY_NOT_DONE: the proxies' upstreams are not the two slots' websites"; exit 1; }
 [ "$RW" = "/readyz?" ] || { echo "TA_CADDY_NOT_DONE: the listener's rewrite is not /readyz? (the bare ? clears the query): ask"; exit 1; }
 [ "$HC" = "/readyz passes 1 fails 1 secret true" ] || { echo "TA_CADDY_NOT_DONE: the health check is not /readyz, 1 pass, 1 fail, with the edge secret header: ask"; exit 1; }
 [ "$LI" = "127.0.0.1:3090" ] || { echo "TA_CADDY_NOT_DONE: the readiness listener is not 127.0.0.1:3090 only: ask"; exit 1; }
+[ "$PR" = "static_response 404" ] || { echo "TA_CADDY_NOT_DONE: the public route does not refuse /readyz with exactly one 404 of its own: ask"; exit 1; }
 echo TA_CADDY_DONE
 ```
 
@@ -2653,6 +2686,28 @@ Each `derive` line lists the keys it changed: for the API `REGISTER_VERSION`, `R
 (`API_PORT` stays 3101: slot A is today's port), for the runner `REGISTER_VERSION`, `RELEASE_KEY`, `RUNNER_WORKER_ID` and
 `HATCHET_WORKER_NAME`, for the website `RELEASE_KEY`.
 
+### TA-op. T's operator folder, beside the installed one
+
+The three deploy folders of T's reference clone, unpacked into `/opt/debateai-v3-preview/operator/lifecycle-v1.<label>`
+and compared byte for byte with T's checked API folder, outside the downtime. Nothing uses that folder until TB5 swaps
+it in (TB5 compares it once more first); the installed folder stays R19's.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# TA-op: T's operator folder built beside the installed one and compared with T's checked API folder. Nothing is installed (TB5 swaps it in).
+NEWOP=/opt/debateai-v3-preview/operator/lifecycle-v1.$LABEL
+[ ! -e "$NEWOP" ] || { echo "TA_OP_NOT_DONE: $NEWOP exists (a refused run's folder stays: move it aside first)"; exit 1; }
+[ -d "$CAPI/dialectical-engine/deploy/preview-lifecycle" ] && [ -d "$ART/source-reference" ] || { echo "TA_OP_NOT_DONE: T's checked API folder or its reference clone is missing (TA2-TA7 first)"; exit 1; }
+install -d -o root -g root -m 0755 "$NEWOP"
+git -C "$ART/source-reference" archive --format=tar "$REV" dialectical-engine/deploy/preview-lifecycle dialectical-engine/deploy/preview-auth-dev dialectical-engine/deploy/preview-release | tar -x -C "$NEWOP" --no-same-owner || { echo "TA_OP_NOT_DONE: the deploy folders did not unpack into $NEWOP (it stays for a look; nothing installed)"; exit 1; }
+chown -R root:root "$NEWOP"; find "$NEWOP" -type d -exec chmod 0755 {} +; find "$NEWOP" -type f -exec chmod 0644 {} +
+for D in preview-lifecycle preview-auth-dev preview-release; do diff -r "$NEWOP/dialectical-engine/deploy/$D" "$CAPI/dialectical-engine/deploy/$D" >/dev/null || { echo "TA_OP_NOT_DONE: the new operator folder's $D differs from T's checked API folder ($NEWOP stays for a look; nothing installed)"; exit 1; }; done
+[ -f "$NEWOP/dialectical-engine/deploy/preview-lifecycle/v1/release-switch.mjs" ] && [ -f "$NEWOP/dialectical-engine/deploy/preview-lifecycle/v1/prestart.mjs" ] || { echo "TA_OP_NOT_DONE: the new operator folder lacks T's tools"; exit 1; }
+echo "T's operator folder: $NEWOP ($(find "$NEWOP" -type f | wc -l) files, equal to T's checked API folder); the installed one is still R19's"
+echo TA_OP_DONE
+```
+
 ### The practice (on the Mac; owner rule: before every upload)
 
 As "The practice" of the hosted-base recipe, on exactly `REV`, at a quiet hour. Its changed rows must equal TA8's
@@ -2674,7 +2729,8 @@ sha256sum -c --quiet "$S/plan-proposal.sha256" && cmp -s "$ART/native-plan-plan.
 for KIND in candidate fallback; do for ROLE in api ui runner; do [ -s "$ART/$KIND-$ROLE-source.json" ] && [ -d "$RELS/auth-dev-$KIND-$LABEL-$ROLE/dialectical-engine" ] || { echo "TB0_NOT_DONE: $KIND $ROLE is not staged"; exit 1; }; done; [ -s "$ART/$KIND-ui-build.json" ] || { echo "TB0_NOT_DONE: the $KIND website build is missing"; exit 1; }; done
 for F in native-plan-apply-and-plan.json native-plan-publish.json register-published.json native-plan-verify.json native-first-verify.json api-launch.json ui-launch.json runner-launch.json; do [ ! -e "$ART/$F" ] || { echo "TB0_NOT_DONE: $F already exists (look first)"; exit 1; }; done
 [ ! -e "$S/pg18-cold.sha256" ] && [ ! -e "$S/operator-lifecycle-v1.before" ] && [ ! -e "$S/systemd-T.list" ] && [ ! -e "$S/release-lock.v1.json" ] || { echo "TB0_NOT_DONE: a file of phase B exists in S (look first)"; exit 1; }
-[ ! -e /etc/systemd/system/debateai-preview-api@.service ] && [ ! -e /etc/systemd/system/debateai-preview-runner@.service ] && [ ! -e /etc/systemd/system/debateai-preview.target.d ] || { echo "TB0_NOT_DONE: a template unit is installed already (look first)"; exit 1; }
+[ ! -e /etc/systemd/system/debateai-preview-api@.service ] && [ ! -e /etc/systemd/system/debateai-preview-runner@.service ] && [ ! -e /etc/systemd/system/debateai-preview.target.d/60-current-release.conf ] || { echo "TB0_NOT_DONE: a template unit or the switch's boot target drop-in is installed already (look first)"; exit 1; }
+cmp -s /etc/systemd/system/debateai-preview.target "$S/preflight/debateai-preview.target.live" || { echo "TB0_NOT_DONE: the live debateai-preview.target changed since TA0 (TB5 replaces it): ask"; exit 1; }
 [ "$(sed -n 1p "$S/old-plans.txt")" = "$(jq -r .services.api.basePlan.path "$LOCK")" ] && [ "$(sed -n 2p "$S/old-plans.txt")" = "$(jq -r .services.ui.basePlan.path "$LOCK")" ] && [ "$(sed -n 3p "$S/old-plans.txt")" = "$(jq -r .services.runner.basePlan.path "$LOCK")" ] || { echo "TB0_NOT_DONE: old-plans.txt is not the lock's three plans"; exit 1; }
 for F in $(cat "$S/old-plans.txt"); do [ -s "$F" ] && [ "$(jq -r .publication.registerVersion "$F")" = "$REG0" ] || { echo "TB0_NOT_DONE: the old plan $F is missing or not on $REG0"; exit 1; }; done
 for D in "$OCAPI" "$OCUI" "$OCRUN"; do [ -d "$D/dialectical-engine" ] || { echo "TB0_NOT_DONE: the old release's folder $D is missing"; exit 1; }; done
@@ -2684,6 +2740,8 @@ for U in api ui runner; do cmp -s <(systemctl cat "debateai-preview-$U.service")
 cmp -s "$C" "$S/preflight/Caddyfile.live" || { echo "TB0_NOT_DONE: the live Caddyfile changed since TA0"; exit 1; }
 for SVC in api ui runner; do [ "$(grep -c "^RELEASE_KEY=$KEY\$" "$E/$SVC-$LABEL.env")" = 1 ] || { echo "TB0_NOT_DONE: $SVC-$LABEL.env is missing or not T's (TA-env first)"; exit 1; }; done
 [ ! -e "$L/release-check.mjs" ] || { echo "TB0_NOT_DONE: the installed operator folder already has the new tools (look first)"; exit 1; }
+NEWOP=/opt/debateai-v3-preview/operator/lifecycle-v1.$LABEL
+for D in preview-lifecycle preview-auth-dev preview-release; do diff -r "$NEWOP/dialectical-engine/deploy/$D" "$CAPI/dialectical-engine/deploy/$D" >/dev/null || { echo "TB0_NOT_DONE: T's operator folder ($NEWOP, TA-op) is missing or its $D differs from T's checked API folder"; exit 1; }; done
 [ "$(grep -cE '^max_connections = 200([^0-9]|$)' "$CF")" = 1 ] || { echo "TB0_NOT_DONE: $CF no longer holds the one max_connections = 200 line"; exit 1; }
 [ -z "$(ss -ltnH '( sport = :3090 or sport = :3200 or sport = :3201 )')" ] || { echo "TB0_NOT_DONE: something listens on 3090, 3200 or 3201"; exit 1; }
 CID=$(docker ps -q --no-trunc --filter label=com.docker.compose.project=debateai-v3-preview --filter label=com.docker.compose.service=hatchet-lite || true)
@@ -2694,6 +2752,16 @@ ALLOW=$(systemctl show -p IPAddressAllow --value debateai-preview-hatchet-gatewa
 echo "new migrations: $(tr '\n' ' ' < "$S/new-migrations.txt"); disk free $(df --output=avail -BG / | tail -1 | tr -dc 0-9) GB"
 echo TB0_DONE
 ```
+
+### TB0g. The gate redeploy (only when TA10 listed a gate file)
+
+Right after TB0, at the same quiet moment (nothing queued, running or waiting), before the downtime starts: follow
+`deploy/preview-gate/v3/README.md`, "Redeploy (2026-10-12): calls on their way together count once", steps 1 to 6, for
+both gates (the DeepInfra gate, then the Anthropic gate with its README's names), with the gate files of T's reference
+clone and the owner's yes for T (it names the gate redeploy). Each gate's GO changes only its two hashes. R19 reads the
+two new refusals as it reads a stop today, so R19 keeps serving meanwhile; a debate someone starts in those minutes makes
+TB1 refuse (wait for it, or ask). Both gates must be `active` again before TB1 (TB8's runner reads each gate's capacity
+once, at its start). Its way back is that section's own; rbA-T and rbB-T leave the new gate files in place.
 
 ### TB1. The downtime starts
 
@@ -2709,6 +2777,7 @@ set -euo pipefail
 cmp -s "$S/native-plan.before.json" "$ONP" && cmp -s "$S/release-lock.before.json" "$LOCK" || { echo "TB1_NOT_DONE: native-plan.json or the lock moved (nothing was stopped)"; exit 1; }
 for F in api.env runner.env ui.env; do cmp -s "$S/$F.before" "$E/$F" || { echo "TB1_NOT_DONE: $F moved (nothing was stopped)"; exit 1; }; done
 [ "$(gs "$GD" "$PD" | jq -r .in_flight)" = 0 ] && [ "$(gs "$GAN" "$PAN" | jq -r .in_flight)" = 0 ] || { echo "TB1_NOT_DONE: a gate has a call in flight (nothing was stopped)"; exit 1; }
+[ "$(gs "$GD" "$PD" | jq -r .state)" = active ] && [ "$(gs "$GAN" "$PAN" | jq -r .state)" = active ] || { echo "TB1_NOT_DONE: a gate is not active (TB0g not finished?; nothing was stopped)"; exit 1; }
 date -u +%s >> "$S/downtime-start-epoch"; echo "DOWNTIME START $(date -u)"
 systemctl stop debateai-preview-runner || { echo "TB1_NOT_DONE: systemctl stop of R19's runner failed"; exit 1; }
 for U in debateai-preview-backup.timer debateai-preview-ui debateai-preview-api; do systemctl stop "$U" || { echo "TB1_NOT_DONE: systemctl stop $U failed"; exit 1; }; done
@@ -2721,15 +2790,6 @@ CC=x; for i in $(seq 1 15); do CC=$(psqlq "SELECT count(*) FROM pg_stat_activity
 [ "$CC" = 0 ] || { echo "TB1_NOT_DONE: $CC database client(s) still connected"; exit 1; }
 echo TB1_DONE
 ```
-
-### TB1g. The gate redeploy (only when TA10 listed a gate file)
-
-Follow `deploy/preview-gate/v3/README.md`, "Redeploy (2026-10-12): calls on their way together count once", steps 1 to
-6, for both gates (the DeepInfra gate, then the Anthropic gate with its README's names), with the gate files of T's
-reference clone and the owner's yes that TB1's yes already carries. Each gate's GO changes only its two hashes. Both
-gates must be `active` again before TB8 (the runner reads each gate's capacity once, at its start). Its way back is that
-section's own; rbA-T and rbB-T leave the new gate files in place, because R19 reads the two new refusals as it reads a
-stop today.
 
 ### TB2. The cold copy, and `max_connections` 320
 
@@ -2870,8 +2930,8 @@ rbB-T.
 
 ### TB5. The one-time layout
 
-The installed operator folder becomes T's (the three deploy folders of T's reference clone, compared byte for byte with
-T's checked API folder), R19's fixed units and their drop-in folders move into `$S/systemd-old/`, and the template
+The installed operator folder becomes T's (TA-op built it beside the installed one from the three deploy folders of T's
+reference clone; TB5 compares it byte for byte with T's checked API folder once more and swaps it in), R19's fixed units and their drop-in folders move into `$S/systemd-old/`, and the template
 units, the retire units, the team unlock (it no longer orders itself after a fixed API) and the target (no fixed API or
 website) are installed. Every file put aside is listed in `$S/systemd-old.txt` and every installed name in
 `$S/systemd-T.list`: rbB-T reads both. Nothing starts.
@@ -2888,13 +2948,11 @@ set -euo pipefail
 UD=/etc/systemd/system; OP=/opt/debateai-v3-preview/operator/lifecycle-v1; NEWOP=/opt/debateai-v3-preview/operator/lifecycle-v1.$LABEL
 for U in runner ui api; do case "$(systemctl is-active debateai-preview-$U || true)" in inactive|failed) ;; *) echo "TB5_NOT_DONE: R19's $U is running"; exit 1;; esac; done
 cmp -s "$ART/native-plan-verify.json" "$NP" && [ -s "$ART/api-launch.json" ] && [ -s "$ART/ui-launch.json" ] && [ -s "$ART/runner-launch.json" ] || { echo "TB5_NOT_DONE: TB4 is not done"; exit 1; }
-[ ! -e "$S/operator-lifecycle-v1.before" ] && [ ! -e "$NEWOP" ] && [ ! -e "$S/systemd-old" ] && [ ! -e "$S/systemd-T.list" ] || { echo "TB5_NOT_DONE: TB5 ran before (look first)"; exit 1; }
-for N in debateai-preview-api@.service debateai-preview-ui@.service debateai-preview-runner@.service debateai-preview-api@.service.d debateai-preview-ui@.service.d debateai-preview.target.d; do [ ! -e "$UD/$N" ] || { echo "TB5_NOT_DONE: $UD/$N exists (look first)"; exit 1; }; done
+[ ! -e "$S/operator-lifecycle-v1.before" ] && [ ! -e "$S/systemd-old" ] && [ ! -e "$S/systemd-T.list" ] || { echo "TB5_NOT_DONE: TB5 ran before (look first)"; exit 1; }
+[ -d "$NEWOP/dialectical-engine/deploy" ] || { echo "TB5_NOT_DONE: T's operator folder $NEWOP is missing (TA-op builds it, outside the downtime)"; exit 1; }
+for N in debateai-preview-api@.service debateai-preview-ui@.service debateai-preview-runner@.service debateai-preview-api@.service.d debateai-preview-ui@.service.d debateai-preview.target.d/60-current-release.conf; do [ ! -e "$UD/$N" ] || { echo "TB5_NOT_DONE: $UD/$N exists (look first)"; exit 1; }; done
 [ -s "$S/templates/api/debateai-preview-api@.service" ] && [ -s "$S/templates/ui/debateai-preview-ui@.service" ] || { echo "TB5_NOT_DONE: the rendered templates are missing (TA-units)"; exit 1; }
-install -d -o root -g root -m 0755 "$NEWOP"
-git -C "$ART/source-reference" archive --format=tar "$REV" dialectical-engine/deploy/preview-lifecycle dialectical-engine/deploy/preview-auth-dev dialectical-engine/deploy/preview-release | tar -x -C "$NEWOP" --no-same-owner
-chown -R root:root "$NEWOP"; find "$NEWOP" -type d -exec chmod 0755 {} +; find "$NEWOP" -type f -exec chmod 0644 {} +
-for D in preview-lifecycle preview-auth-dev preview-release; do diff -r "$NEWOP/dialectical-engine/deploy/$D" "$CAPI/dialectical-engine/deploy/$D" >/dev/null || { echo "TB5_NOT_DONE: the new operator folder's $D differs from T's checked API folder (nothing installed; $NEWOP stays for a look)"; exit 1; }; done
+for D in preview-lifecycle preview-auth-dev preview-release; do diff -r "$NEWOP/dialectical-engine/deploy/$D" "$CAPI/dialectical-engine/deploy/$D" >/dev/null || { echo "TB5_NOT_DONE: T's operator folder's $D differs from T's checked API folder since TA-op (nothing installed; $NEWOP stays for a look)"; exit 1; }; done
 mv "$OP" "$S/operator-lifecycle-v1.before" || { echo "TB5_NOT_DONE: R19's operator folder did not move aside (nothing installed; T's folder stays in $NEWOP)"; exit 1; }
 mv "$NEWOP" "$OP" || { echo "TB5_NOT_DONE: T's operator folder did not move in: NO operator folder is installed (R19's is $S/operator-lifecycle-v1.before, T's is $NEWOP): move R19's back by hand, then ask"; exit 1; }
 [ -f "$L/release-switch.mjs" ] && [ -f "$L/prestart.mjs" ] || { echo "TB5_NOT_DONE: the installed operator folder is not T's (way back: rbB-T)"; exit 1; }
@@ -2965,7 +3023,8 @@ for SVC in api ui runner; do
   chmod 0644 "$DD/zzzzzzzzzz-lifecycle-release.conf.new"; mv "$DD/zzzzzzzzzz-lifecycle-release.conf.new" "$DD/zzzzzzzzzz-lifecycle-release.conf"
   [ "$(grep -c -- "--label $LABEL" "$DD/zzzzzzzzzz-lifecycle-release.conf")" -ge 1 ] || { echo "TB6_NOT_DONE: the $SVC drop-in does not name T; nothing was started (way back: rbB-T)"; exit 1; }
 done
-printf '%s\n' debateai-preview.target.d >> "$S/systemd-T.list"
+# The seed writes only this one file into the shared folder (the gate's 50-anthropic-gate.conf stays): list the file, never the folder.
+printf '%s\n' debateai-preview.target.d/60-current-release.conf >> "$S/systemd-T.list"
 systemctl daemon-reload
 for SVC in api ui runner; do systemd-analyze verify "$UD/debateai-preview-$SVC@$LABEL.service" > "$S/verify-$SVC.txt" 2>&1 || { cut -c1-300 "$S/verify-$SVC.txt"; echo "TB6_NOT_DONE: systemd-analyze verify found an error in the $SVC instance (above); nothing was started (way back: rbB-T)"; exit 1; }; done
 for SVC in api ui; do
@@ -3023,6 +3082,8 @@ echo "edge 127.0.0.1:3090/readyz: $EK"
 [ "$EK" = "200 $KEY" ] || back "the edge did not answer 200 with x-debateai-release $KEY within 30 s (no slot healthy: is the edge secret filled in inside health_headers?)"
 PC=$(curl -s -o /dev/null -m 15 -w '%{http_code}' https://v3-preview.dezbatere.ro/ || true); echo "public / without the password: $PC"
 [ "$PC" = 401 ] || back "the public site does not answer 401 without the password (got $PC)"
+RP=$(curl -s -o /dev/null -m 15 -w '%{http_code}' https://v3-preview.dezbatere.ro/readyz || true); echo "public /readyz without the password: $RP"
+[ "$RP" = 404 ] || back "the public route does not refuse /readyz with its own 404 before the password (got $RP)"
 NC=$(curl -s -o /dev/null -m 15 -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{}' https://v3-preview.dezbatere.ro/api/v1/billing/netopia/notify || true); echo "notify POST: $NC"
 [ "$NC" = 503 ] || back "NETOPIA's notify POST does not reach T's API (got $NC, expected 503)"
 for PTH in / /login /livez /readyz/; do XC=$(curl -s -o /dev/null -m 15 -w '%{http_code}' "http://127.0.0.1:3090$PTH" || true); echo "listener GET $PTH: $XC"; [ "$XC" = 404 ] || back "the listener answered GET $PTH with $XC, not 404"; done
@@ -3050,7 +3111,7 @@ case "$(systemctl is-active "$RU" || true)" in inactive|failed) ;; *) echo "TB8_
 [ "$(jq -r --arg l "$LABEL" '.releases[$l].services.runner.sourceRevision' "$LOCK")" = "$REV" ] && [ "$(jq -r --arg l "$LABEL" '.releases[$l].services.runner.publication.registerVersion' "$LOCK")" = "$V" ] || { echo "TB8_NOT_DONE: the runner's pin is not T on $V"; exit 1; }
 [ "$(grep -c "^REGISTER_VERSION=$V\$" "$E/runner-$LABEL.env")" = 1 ] && [ "$(grep -c "^RELEASE_KEY=$KEY\$" "$E/runner-$LABEL.env")" = 1 ] || { echo "TB8_NOT_DONE: runner-$LABEL.env is not T's on $V"; exit 1; }
 [ "$(psqlq "SELECT count(*) FROM core.work_item WHERE run_id IS NOT NULL AND (state = 'READY' OR (state = 'CLAIMED' AND claim_deadline <= clock_timestamp()))")" = 0 ] || { echo "TB8_NOT_DONE: something is claimable; the runner is not started (ask)"; exit 1; }
-[ "$(gs "$GD" "$PD" | jq -r .state)" = active ] && [ "$(gs "$GAN" "$PAN" | jq -r .state)" = active ] || { echo "TB8_NOT_DONE: a spending gate is not active (TB1g?); the runner is not started"; exit 1; }
+[ "$(gs "$GD" "$PD" | jq -r .state)" = active ] && [ "$(gs "$GAN" "$PAN" | jq -r .state)" = active ] || { echo "TB8_NOT_DONE: a spending gate is not active (TB0g?); the runner is not started"; exit 1; }
 T0=$(date +%s)
 systemctl start "$RU" || echo "systemctl start of T's runner returned non-zero"
 for i in $(seq 1 80); do [ "$(journalctl -u "$RU" --since "@$T0" -o cat --no-pager | grep -cE 'PREVIEW_RUNNER_(STARTED|STARTUP_REFUSED|STOPPED_ON_FAILURE)|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" -gt 0 ] && break; sleep 3; done
@@ -3102,6 +3163,26 @@ echo TB9_DONE
 
 Then the release's own checks, and the owner starts one short real debate on the site: it must finish, on T's runner.
 
+### TB10. The N-1 baseline names the live release (on the Mac)
+
+After TB9 the live release is `REV` (`LABEL`, in the names file). The N-1 compatibility job
+(`.github/workflows/n1-compatibility.yml`) runs the database suites of the commit `tests/n1-baseline.json` names against
+every later schema, so that file must name `REV` before the next upload: the next upload's SB4 (`N1_BASELINE`) refuses
+until a `REV` that contains this change. On the Mac, in the repository checkout, with the owner's yes for the PR (the
+standing order: latest dev first, push, PR to dev, fix CI, merge), fill in the three values and run:
+
+```sh
+NN=rNN; REV='<the 40-character commit of T, the release that is now live>'; LABEL='<its label, from the names file>'
+git fetch origin dev && git switch -c "chore/n1-baseline-$NN" origin/dev
+jq --arg c "$REV" --arg r "$LABEL" '.commit = $c | .reason = $r' dialectical-engine/tests/n1-baseline.json > "$TMPDIR/n1-baseline.json" && mv "$TMPDIR/n1-baseline.json" dialectical-engine/tests/n1-baseline.json
+[ "$(node dialectical-engine/tools/n1-baseline.mjs commit)" = "$REV" ] && git diff --stat
+git add dialectical-engine/tests/n1-baseline.json && git commit -m "chore(n1): the N-1 baseline names $LABEL ($NN)"
+git push -u origin "chore/n1-baseline-$NN" && gh pr create --base dev --title "chore(n1): the N-1 baseline names $LABEL" --body "tests/n1-baseline.json names $REV, the release live on the test site, so the N-1 compatibility job checks that commit's database suites on every later schema."
+```
+
+The diff must change exactly the two lines `commit` and `reason`. Once CI is green, merge it (the job itself runs on this
+PR: it checks `REV`'s suites against dev's schema).
+
 ### The way back from T
 
 **rbA-T: before TB3** (no migration ran, nothing published, the layout unchanged). R19's rbA on T's names: it starts R19
@@ -3145,8 +3226,9 @@ order:
 1. T's website and API stop (the downtime starts again); T's runner stops only once no work is READY or CLAIMED (a
    busy runner is never stopped: after 10 minutes it gives up and asks);
 2. the old Caddyfile goes back (when TB7 installed the new one) and Caddy restarts;
-3. T's units, instance drop-ins and target move into `$S/systemd-T/`, and R19's units, drop-in folders and links come
-   back from `$S/systemd-old/` (when TB5 ran);
+3. T's units, instance drop-ins and target move into `$S/systemd-T/` (of the shared `debateai-preview.target.d` only
+   T's `60-current-release.conf`: the Anthropic gate's `50-anthropic-gate.conf` stays), and R19's units, drop-in folders
+   and links come back from `$S/systemd-old/` (when TB5 ran);
 4. R19's operator folder comes back (T's moves to `$S/operator-lifecycle-v1.T`) and the v1 lock comes back (lock v2
    moves to `$S/release-lock.v2-T.json`);
 5. the cold copy's data **and** config folders come back (the current ones are moved aside as
@@ -3187,17 +3269,27 @@ case "$(systemctl is-active "debateai-preview-runner@$LABEL" || true)" in
 esac
 case "$(systemctl is-active "debateai-preview-runner@$LABEL" || true)" in inactive|failed) ;; *) echo "RBB_T_NOT_DONE: T's runner is still running"; exit 1;; esac
 if [ -e "$S/Caddyfile.before-two-slot" ] && ! cmp -s "$S/Caddyfile.before-two-slot" "$C"; then
-  install -o root -g root -m 0644 "$S/Caddyfile.before-two-slot" "$C.new"; mv "$C.new" "$C"
+  install -o root -g root -m 0644 "$S/Caddyfile.before-two-slot" "$C.new" && mv "$C.new" "$C" || { echo "RBB_T_NOT_DONE: the old Caddyfile did not go in (T's two-slot file is still live; the app services are stopped): ask"; exit 1; }
   cmp -s "$S/Caddyfile.before-two-slot" "$C" && systemctl restart caddy || { echo "RBB_T_NOT_DONE: the old Caddyfile did not go back, or Caddy did not restart on it"; exit 1; }
 fi
 if [ -e "$S/systemd-T.list" ]; then
-  install -d -o root -g root -m 0700 "$S/systemd-T"
-  while read -r NM; do if [ -e "$UD/$NM" ] || [ -L "$UD/$NM" ]; then mv "$UD/$NM" "$S/systemd-T/$NM"; fi; done < "$S/systemd-T.list"
-  while read -r NM; do mv "$S/systemd-old/$NM" "$UD/$NM"; done < "$S/systemd-old.txt"
-  while read -r F; do mv "$S/systemd-old-wants/$F" "$UD/$F"; done < "$S/systemd-old-wants.txt"
+  # T's boot target drop-in is one file of the shared debateai-preview.target.d (the gate's drop-in stays in place).
+  install -d -o root -g root -m 0700 "$S/systemd-T" "$S/systemd-T/debateai-preview.target.d"
+  while read -r NM; do if [ -e "$UD/$NM" ] || [ -L "$UD/$NM" ]; then mv "$UD/$NM" "$S/systemd-T/$NM" || { echo "RBB_T_NOT_DONE: T's $NM did not move into $S/systemd-T (the names before it in $S/systemd-T.list are there, R19's units are still in $S/systemd-old; the app services are stopped): ask"; exit 1; }; fi; done < "$S/systemd-T.list"
+  while read -r NM; do mv "$S/systemd-old/$NM" "$UD/$NM" || { echo "RBB_T_NOT_DONE: R19's $NM did not come back from $S/systemd-old (T's units are in $S/systemd-T, the names before it in $S/systemd-old.txt are back; the app services are stopped): ask"; exit 1; }; done < "$S/systemd-old.txt"
+  # TB5 lists the links only after the unit files moved: a TB5 that stopped before that moved no link.
+  if [ -e "$S/systemd-old-wants.txt" ]; then
+    while read -r F; do mv "$S/systemd-old-wants/$F" "$UD/$F" || { echo "RBB_T_NOT_DONE: the link $F did not come back from $S/systemd-old-wants (R19's units are back, the links before it in $S/systemd-old-wants.txt too; the app services are stopped): ask"; exit 1; }; done < "$S/systemd-old-wants.txt"
+  fi
 fi
-if [ -e "$S/operator-lifecycle-v1.before" ]; then mv "$OP" "$S/operator-lifecycle-v1.T"; mv "$S/operator-lifecycle-v1.before" "$OP"; fi
-if [ -e "$S/release-lock.v1.json" ]; then if [ -e "$LOCK" ]; then mv "$LOCK" "$S/release-lock.v2-T.json"; fi; mv "$S/release-lock.v1.json" "$LOCK"; fi
+if [ -e "$S/operator-lifecycle-v1.before" ]; then
+  mv "$OP" "$S/operator-lifecycle-v1.T" || { echo "RBB_T_NOT_DONE: T's operator folder did not move to $S/operator-lifecycle-v1.T (R19's units are back; R19's operator folder is still $S/operator-lifecycle-v1.before): ask"; exit 1; }
+  mv "$S/operator-lifecycle-v1.before" "$OP" || { echo "RBB_T_NOT_DONE: R19's operator folder did not come back: NO operator folder is installed (R19's is $S/operator-lifecycle-v1.before, T's $S/operator-lifecycle-v1.T): ask"; exit 1; }
+fi
+if [ -e "$S/release-lock.v1.json" ]; then
+  if [ -e "$LOCK" ]; then mv "$LOCK" "$S/release-lock.v2-T.json" || { echo "RBB_T_NOT_DONE: lock v2 did not move to $S/release-lock.v2-T.json (R19's units and operator folder are back): ask"; exit 1; }; fi
+  mv "$S/release-lock.v1.json" "$LOCK" || { echo "RBB_T_NOT_DONE: R19's v1 lock did not come back: NO lock is installed (R19's is $S/release-lock.v1.json, T's $S/release-lock.v2-T.json): ask"; exit 1; }
+fi
 cmp -s "$S/release-lock.before.json" "$LOCK" || { echo "RBB_T_NOT_DONE: the lock is not R19's v1 lock; the app services are stopped"; exit 1; }
 systemctl daemon-reload
 for U in api ui runner; do [ "$(grep -cF "$OLABEL" "$UD/debateai-preview-$U.service.d/zzzzzzzzzz-lifecycle-release.conf" || true)" -ge 1 ] || { echo "RBB_T_NOT_DONE: R19's $U unit is not back; the app services are stopped"; exit 1; }; done
@@ -3288,7 +3380,10 @@ release's prestart verifies with `--database-ahead` and its proof names the file
 | SB11 | the new runner | up | WB1 |
 | SB12 | the new API and website, not ready | up | WB1 |
 | SB13 | the switch | up | WB2 |
+| SB13b | the team member's test debate runs on the new release (read-only) | up | WB2 |
+| SB13c | on the Mac: the PR that makes `tests/n1-baseline.json` name the new release | up | – (the next upload needs it) |
 | SB14 | later: the old release retired; its receipt | up | WB2 (its runner restarts in database-ahead mode) |
+| SB14b | only after a reboot or a runner crash during the drain: the runners start again | up | – |
 | SB15 | later, on the owner's yes: the release before the old one, archived | up | move its folders back |
 
 After SB8 the online backup is a last resort only (spec §11): going back is the switch the other way, never a restore.
@@ -3313,7 +3408,7 @@ lc() { /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchai
 printf '%s\n' "$NN" | grep -qxE 'r[0-9]+' && printf '%s\n' "$REV" | grep -qxE '[0-9a-f]{40}' || { echo "SB1_NOT_DONE: NN or REV is not filled in"; exit 1; }
 [ -d "$OSTORE/v11" ] || { echo "SB1_NOT_DONE: OSTORE is not a pnpm store"; exit 1; }
 [ "$(jq -r '.schema // "none"' "$LOCK")" = preview-lifecycle-release-lock-v2 ] || { echo "SB1_NOT_DONE: the lock is not v2: the transition (T) comes first"; exit 1; }
-ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB1_NOT_DONE: release-check.mjs status refused (above)"; exit 1; }
+ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB1_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (above: run its next command, then this step again)"; exit 1; }
 jq -r '.releases[] | "\(.label) \(.releaseKey) slot \(.slot) \(.state) units \(.units.api)/\(.units.ui)/\(.units.runner) open work \(.openWork)"' <<<"$ST"
 OLABEL=$(jq -r '[.releases[] | select(.state == "CURRENT") | .label] | if length == 1 then .[0] else "" end' <<<"$ST")
 [ -n "$OLABEL" ] || { echo "SB1_NOT_DONE: the release table does not name exactly one current release"; exit 1; }
@@ -3461,8 +3556,12 @@ before SB4, as the gate README says; one that narrows waits until the old releas
 
 `release-check.mjs check` gives the verdict: `SIDE_BY_SIDE` (every check passes), `DRAINED_PATH` (a new migration lacks
 `-- n1: expand` or `-- n1: keeps-verifier`) or `NOT_READY` (anything else). It checks, by name: `N1_HEADERS`,
-`CURRENT_PINNED`, `PREVIOUS_RETIRED`, `GATES_ACTIVE`, `GATE_ROWS_N1`, `CONNECTIONS` (320, at least 120 free), `DISK`
+`N1_BASELINE` (the new release's own `tests/n1-baseline.json`, read from its checked folder, names the live release's
+commit: the N-1 job then ran the live code on the new schema), `CURRENT_PINNED`, `PREVIOUS_RETIRED`, `GATES_ACTIVE`, `GATE_ROWS_N1`, `CONNECTIONS` (320, at least 120 free), `DISK`
 (15 GB), `MEMORY` (4 GiB available), `HATCHET`, `NO_MAINTENANCE`, `SLOT_FREE`, `LIFECYCLE_FILES`.
+
+`N1_BASELINE` fails with `set the N-1 baseline first` when the PR of the last upload's N-1 step (TB10 after T, SB13c
+after a side-by-side upload) is not in `REV`: merge it into dev, take a `REV` after it, and start again from SB1.
 
 Two checks may need the owner first, and then a second run with their answer filled in at the top:
 - `GATE_ROWS_N1` fails with `no snapshot of the switch: review <sha256>` (the first upload after T: T was seeded, never
@@ -3563,7 +3662,9 @@ echo SB7_DONE
 
 The old release keeps serving throughout. First its database-ahead file is installed and pinned on it (so any restart
 of the old release from now on verifies in database-ahead mode), then `apply-and-plan` runs through the new release's own
-native-plan file. A release without new migrations skips this step (`SB8_SKIPPED`).
+native-plan file. A release without new migrations skips this step (`SB8_SKIPPED`). The ledger must then be the old one
+plus exactly the database-ahead file's steps it did not hold yet: after an upload that applied a step and was rolled
+back, a fix release that keeps that step adds only its own new ones (the kept step is already in the ledger).
 
 ```sh
 set -euo pipefail
@@ -3573,7 +3674,7 @@ LEDGER0=$(cat "$S/ledger-before"); REG0=$(cat "$S/register-before")
 OB=$(cat "$S/online-backup-folder")
 ( cd "$OB" && sha256sum -c --quiet online.sha256 ) || { echo "SB8_NOT_DONE: no checked online backup (SB7 first)"; exit 1; }
 [ -s "$S/new-migrations.txt" ] || { echo "SB8_SKIPPED: this release adds no migration"; exit 0; }
-ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB8_NOT_DONE: release-check.mjs status refused"; exit 1; }
+ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB8_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (run its next command, then this step again)"; exit 1; }
 [ "$(jq -r --arg o "$OLABEL" '.releases[] | select(.label == $o) | "\(.state) \(.units.api) \(.units.ui)"' <<<"$ST")" = "CURRENT active active" ] || { echo "SB8_NOT_DONE: the old release is not current with its API and website up"; exit 1; }
 cmp -s "$S/native-plan.before.json" "$ONP" && cmp -s "$ART/native-plan-plan.json" "$NP" || { echo "SB8_NOT_DONE: the old verify plan moved, or this release's native-plan file is not SB3's plan"; exit 1; }
 [ "$(psqlq "SELECT count(*)||'|'||max(name) FROM public.debateai_schema_migration")" = "$LEDGER0" ] && [ "$(psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1")" = "$REG0" ] || { echo "SB8_NOT_DONE: the ledger or the register moved since SB1"; exit 1; }
@@ -3589,6 +3690,10 @@ for M in $(jq -r '.steps[] | "\(.name)=\(.sha256)"' "$DA"); do [ "$(jq -r --arg 
 AH=$(pre accept-ahead --label "$OLABEL" --from "$E/database-ahead-$OLABEL.json" 2>&1) || { echo "$AH"; echo "SB8_NOT_DONE: the pin was refused (nothing applied)"; exit 1; }
 echo "$AH"
 [ "$(jq -r '[.event, .label, .newerLabel] | map(tostring) | join(" ")' <<<"$AH")" = "PREVIEW_LIFECYCLE_DATABASE_AHEAD_PINNED $OLABEL $LABEL" ] && [ "$(jq -r --arg o "$OLABEL" '.releases[$o].databaseAhead.newerLabel' "$LOCK")" = "$LABEL" ] || { echo "SB8_NOT_DONE: the lock does not pin the database-ahead file on the old release (nothing applied)"; exit 1; }
+# The steps the ledger must gain: the database-ahead file's steps it does not hold yet. A step an aborted earlier upload
+# already applied, and this fix release keeps, is in the ledger and in the file alike (final fix wave A1).
+NEWSTEPS=$(for M in $(jq -r '.steps[].name' "$DA"); do [ "$(psqlq "SELECT count(*) FROM public.debateai_schema_migration WHERE name = '$M'")" = 1 ] || echo "$M"; done)
+echo "steps the ledger gains: $(printf '%s ' $NEWSTEPS)"
 rel native-plan --operation apply-and-plan --from "$S/native-plan.before.json" --source-manifest "$ART/candidate-api-source.json" --out "$ART/native-plan-apply-and-plan.json" || { echo "SB8_NOT_DONE: the release tool refused the plan (nothing applied)"; exit 1; }
 [ "$(jq -r .operation "$ART/native-plan-apply-and-plan.json")" = apply-and-plan ] && [ "$(jq -r .sourceRevision "$ART/native-plan-apply-and-plan.json")" = "$REV" ] && [ "$(jq -r '.hostedBilling.billing // "none"' "$ART/native-plan-apply-and-plan.json")" = on ] || { echo "SB8_NOT_DONE: the plan is not this release's billing-on apply-and-plan (nothing applied)"; exit 1; }
 put "$ART/native-plan-apply-and-plan.json" || { echo "SB8_NOT_DONE: put failed (nothing applied)"; exit 1; }
@@ -3596,7 +3701,8 @@ OUT=$(nat "$ART/native-apply-and-plan.json"); echo "nat: $OUT"
 LEDGER=$(psqlq "SELECT count(*)||'|'||max(name) FROM public.debateai_schema_migration"); echo "ledger $LEDGER"
 [ "$OUT" = "exit 0" ] || { head -c 1200 "$ART/native-apply-and-plan.json"; echo; echo "SB8_NOT_DONE: the native operator refused (the old release still serves; ask)"; exit 1; }
 for M in $(cat "$S/new-migrations.txt"); do [ "$(psqlq "SELECT count(*) FROM public.debateai_schema_migration WHERE name = '$M'")" = 1 ] || { echo "SB8_NOT_DONE: $M is not in the ledger"; exit 1; }; done
-[ "$LEDGER" = "$(( ${LEDGER0%%|*} + $(grep -c . "$S/new-migrations.txt") ))|$(LC_ALL=C sort "$S/new-migrations.txt" | tail -n 1)" ] || { echo "SB8_NOT_DONE: the ledger is not the old one plus exactly this release's migrations"; exit 1; }
+TOP=$( { printf '%s\n' "${LEDGER0#*|}"; jq -r '.steps[].name' "$DA"; } | LC_ALL=C sort | tail -n 1)
+[ "$LEDGER" = "$(( ${LEDGER0%%|*} + $(printf '%s\n' "$NEWSTEPS" | grep -c . || true) ))|$TOP" ] || { echo "SB8_NOT_DONE: the ledger is not the old one plus exactly the database-ahead file's steps it did not hold yet"; exit 1; }
 [ "$(psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1")" = "$REG0" ] && cmp -s "$S/native-plan.before.json" "$ONP" || { echo "SB8_NOT_DONE: the newest register or the old verify plan moved"; exit 1; }
 [ "$(edgekey)" = "200 $OKEY" ] || { echo "SB8_NOT_DONE: the site does not answer from the old release any more: ask"; exit 1; }
 echo SB8_DONE
@@ -3706,7 +3812,7 @@ set -euo pipefail
 # SB11: start the new release's runner by hand. Refuses on any start-up, register, engine, capacity or login refusal line.
 V=$(cat "$S/new-register-version"); RU=debateai-preview-runner@$LABEL
 case "$(systemctl is-active "$RU" || true)" in inactive|failed) ;; *) echo "SB11_NOT_DONE: the new runner is already running"; exit 1;; esac
-ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB11_NOT_DONE: release-check.mjs status refused"; exit 1; }
+ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB11_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (run its next command, then this step again)"; exit 1; }
 [ "$(jq -r --arg l "$LABEL" '.releases[] | select(.label == $l) | .state' <<<"$ST")" = STAGED ] && [ "$(jq -r --arg o "$OLABEL" '.releases[] | select(.label == $o) | .state' <<<"$ST")" = CURRENT ] || { echo "SB11_NOT_DONE: this release is not STAGED, or the old one is not CURRENT"; exit 1; }
 [ "$(grep -c "^REGISTER_VERSION=$V\$" "$E/runner-$LABEL.env")" = 1 ] && [ "$(grep -c "^RELEASE_KEY=$KEY\$" "$E/runner-$LABEL.env")" = 1 ] || { echo "SB11_NOT_DONE: runner-$LABEL.env is not this release's on $V"; exit 1; }
 [ "$(gs "$GD" "$PD" | jq -r .state)" = active ] && [ "$(gs "$GAN" "$PAN" | jq -r .state)" = active ] || { echo "SB11_NOT_DONE: a spending gate is not active; the runner is not started"; exit 1; }
@@ -3751,8 +3857,12 @@ echo SB12_DONE
 
 `release-switch.mjs switch` checks everything first (the new release STAGED with its three units up, its runner's start
 line on its key with nothing re-sent, its website waiting, the edge on the old key, both gates active, no maintenance
-flag). Then one database write makes the new release current (take traffic from the database clock + 5 s), the edge
-must show the new key three times in a row, one more health interval passes, and only then the old website and API stop.
+flag). Then one database write makes the new release current (take traffic from the database clock + 8 s: the old API's
+5 s stale read bound, one 2 s health interval and 1 s more), the edge must show the new key three times in a row, one more
+health interval passes, and only then the old website and API stop. While the edge does not show the new key yet, the new
+website's own `/readyz` is read too: a reason that waiting cannot clear (anything but `BOOTING`, `NOT_CURRENT` or
+`BEFORE_TAKE_TRAFFIC_FROM`) switches back at once, `SWITCH_REVERTED` with reason `WEBSITE_NOT_READY` and the website's
+reasons, instead of after the whole 30 seconds.
 It arms the old release's backstop (switch + 27,000 s, an absolute UTC time) and points the boot target at the new pair.
 The old runner is never stopped: it finishes its debates and retires by itself.
 
@@ -3787,7 +3897,7 @@ case "$SC" in
 esac
 [ "$(jq -r '[.event, .toKey, .fromKey, (.bad | length), .edgeFailures] | map(tostring) | join(" ")' <<<"$SW")" = "PREVIEW_RELEASE_SWITCHED $KEY $OKEY 0 0" ] || { echo "SB13_NOT_DONE: the switch line is not this switch with nothing bad"; exit 1; }
 echo "backstop for $OLABEL at $(jq -r .backstopAt <<<"$SW")"
-ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB13_NOT_DONE: release-check.mjs status refused"; exit 1; }
+ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB13_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (run its next command, then this step again)"; exit 1; }
 jq -r '.releases[] | "\(.label) \(.state) units \(.units.api)/\(.units.ui)/\(.units.runner) open work \(.openWork)"' <<<"$ST"
 [ "$(jq -r --arg l "$LABEL" '.releases[] | select(.label == $l) | .state' <<<"$ST")" = CURRENT ] || { echo "SB13_NOT_DONE: the release table does not name this release current"; exit 1; }
 case "$(jq -r --arg o "$OLABEL" '.releases[] | select(.label == $o) | "\(.state) \(.units.api) \(.units.ui)"' <<<"$ST")" in "DRAINING inactive inactive"|"RETIRED inactive inactive") ;; *) echo "SB13_NOT_DONE: the old release is not draining with its pair stopped"; exit 1;; esac
@@ -3817,6 +3927,26 @@ else echo "the old runner has stopped (retired, or check SB14)"; fi
 echo SB13B_DONE
 ```
 
+### SB13c. The N-1 baseline names the live release (on the Mac)
+
+After SB13b the live release is `REV` (`LABEL`, in the names file). The N-1 compatibility job
+(`.github/workflows/n1-compatibility.yml`) runs the database suites of the commit `tests/n1-baseline.json` names against
+every later schema, so that file must name `REV` before the next upload: the next upload's SB4 (`N1_BASELINE`) refuses
+until a `REV` that contains this change. On the Mac, in the repository checkout, with the owner's yes for the PR (the
+standing order: latest dev first, push, PR to dev, fix CI, merge), fill in the three values and run:
+
+```sh
+NN=rNN; REV='<the 40-character commit of the release that is now live>'; LABEL='<its label, from the names file>'
+git fetch origin dev && git switch -c "chore/n1-baseline-$NN" origin/dev
+jq --arg c "$REV" --arg r "$LABEL" '.commit = $c | .reason = $r' dialectical-engine/tests/n1-baseline.json > "$TMPDIR/n1-baseline.json" && mv "$TMPDIR/n1-baseline.json" dialectical-engine/tests/n1-baseline.json
+[ "$(node dialectical-engine/tools/n1-baseline.mjs commit)" = "$REV" ] && git diff --stat
+git add dialectical-engine/tests/n1-baseline.json && git commit -m "chore(n1): the N-1 baseline names $LABEL ($NN)"
+git push -u origin "chore/n1-baseline-$NN" && gh pr create --base dev --title "chore(n1): the N-1 baseline names $LABEL" --body "tests/n1-baseline.json names $REV, the release live on the test site, so the N-1 compatibility job checks that commit's database suites on every later schema."
+```
+
+The diff must change exactly the two lines `commit` and `reason`. Once CI is green, merge it (the job itself runs on this
+PR: it checks `REV`'s suites against dev's schema).
+
 ### SB14. Later: the old release retired, and its receipt
 
 The old runner retires by itself once its pair is stopped, none of its work is READY or CLAIMED and no debate task runs
@@ -3827,7 +3957,7 @@ root stops it and emails the owner. Run SB14 now and then; it writes the receipt
 set -euo pipefail
 . /root/preview-archive/rNN-names.sh
 # SB14: read the release table; once the old release is RETIRED, write its retirement receipt (a new root-only file).
-ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB14_NOT_DONE: release-check.mjs status refused"; exit 1; }
+ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB14_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (run its next command, then this step again)"; exit 1; }
 jq -r '.releases[] | "\(.label) \(.state) retire requested \(.retireRequested) runner \(.units.runner) open work \(.openWork)"' <<<"$ST"
 OS=$(jq -r --arg o "$OLABEL" '.releases[] | select(.label == $o) | .state' <<<"$ST")
 [ "$OS" = RETIRED ] || { echo "SB14_NOT_DONE: $OLABEL is still $OS: run SB14 again later"; exit 1; }
@@ -3842,6 +3972,52 @@ A refusal names what is missing: `RECEIPT_RUNNER_NOT_CLEAN` (the runner did not 
 (no retirement lines), `RECEIPT_ALERT_SENT` (a failure email for that runner since the switch). `retiredReason` is
 `RUNNER_RETIRED` for a runner that retired by itself.
 
+### SB14b. After a reboot or a runner crash during a drain
+
+**In plain words.** No runner starts by itself: a runner instance has no `[Install]` section, and the boot target starts
+only the current release's website and API. So after a server restart (or when a runner crashed) during a drain, the
+draining release's runner is down: its claimed work is never handed out again, its backstop finds no runner to ask, and
+25 minutes later root only emails "stranded". The current release's runner is down too after a restart, so new debates
+wait. `release-check.mjs status` says so: its `bad` list names each draining release whose runner is stopped while it
+still has open work, with the command that starts it (`next`), and it exits 2; the stranded email names the same command.
+
+SB14b, with the latest upload's names file (the current release is `LABEL`, the draining one `OLABEL`): both spending
+gates must be active (a gate a crash left halted is re-opened first, its README's "Re-open after a halt", with the
+owner's yes), then the draining release's runner starts, then the current one's. The draining runner starts in
+database-ahead mode when the database is newer (its prestart, from its lock pin), finishes or sets aside its own debates
+(with no quota use) and retires by itself, as it would have without the restart. A release that is neither current nor
+draining is left as it is. Nothing is stopped.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# SB14B: after a reboot or a runner crash during a drain. Both gates active, then the draining release's runner, then the current one's.
+SX=0; ST=$(lc release-check.mjs status 2>&1) || SX=$?
+[ "$SX" = 0 ] || [ "$SX" = 2 ] || { echo "$ST"; echo "SB14B_NOT_DONE: release-check.mjs status refused"; exit 1; }
+jq -r '.releases[] | "\(.label) \(.state) runner \(.units.runner) open work \(.openWork)"' <<<"$ST"
+jq -r '.bad[] | "BAD \(.code) \(.label): \(.next)"' <<<"$ST"
+[ "$(jq -r --arg l "$LABEL" '.releases[] | select(.label == $l) | .state' <<<"$ST")" = CURRENT ] || { echo "SB14B_NOT_DONE: $LABEL is not the current release (use the latest upload's names file): ask"; exit 1; }
+[ "$(gs "$GD" "$PD" | jq -r .state)" = active ] && [ "$(gs "$GAN" "$PAN" | jq -r .state)" = active ] || { echo "SB14B_NOT_DONE: a spending gate is not active (re-open it first, with the owner's yes); no runner was started"; exit 1; }
+for RL in "$OLABEL" "$LABEL"; do
+  RU=debateai-preview-runner@$RL
+  RS=$(jq -r --arg r "$RL" '.releases[] | select(.label == $r) | .state' <<<"$ST")
+  case "$RS" in CURRENT|DRAINING) ;; *) echo "$RL is ${RS:-not pinned}: its runner is left as it is"; continue;; esac
+  case "$(systemctl is-active "$RU" || true)" in inactive|failed) ;; *) echo "$RU is already running"; continue;; esac
+  T0=$(date +%s)
+  systemctl start "$RU" || echo "systemctl start $RU returned non-zero"
+  for i in $(seq 1 80); do [ "$(journalctl -u "$RU" --since "@$T0" -o cat --no-pager | grep -cE 'PREVIEW_RUNNER_(STARTED|STARTUP_REFUSED|STOPPED_ON_FAILURE|RETIRED)|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" -gt 0 ] && break; sleep 3; done
+  BADL=$(journalctl -u "$RU" --since "@$T0" -o cat --no-pager | grep -E 'GATE_CAPACITY_UNREAD|UNAUTHENTICATED|STARTUP_REFUSED|PRESTART_REFUSED|STOPPED_ON_FAILURE' || true)
+  [ -z "$BADL" ] || { echo "$BADL" | cut -c1-300; echo "SB14B_NOT_DONE: $RU refused to start (above): ask"; exit 1; }
+  echo "$RU: $(journalctl -u "$RU" --since "@$T0" -o cat --no-pager | grep -oE '^PREVIEW_RUNNER_(STARTED|RETIRED)' | tr '\n' ' ')"
+done
+SX=0; ST=$(lc release-check.mjs status 2>&1) || SX=$?
+[ "$SX" = 0 ] || { echo "$ST"; echo "SB14B_NOT_DONE: release-check.mjs status still names a stopped draining runner, or refused (above): ask"; exit 1; }
+echo SB14B_DONE
+```
+
+A draining runner with nothing left to do prints `PREVIEW_RUNNER_RETIRED` at once and stops (its stop recorder writes
+RETIRED); one with open work prints `PREVIEW_RUNNER_STARTED` and keeps running until it retires. Then SB14 as usual.
+
 ### SB15. Later, on the owner's yes: the archive
 
 `release-archive.mjs archive` moves a RETIRED release's folders, `/etc` files and unit drop-ins into two root-only
@@ -3855,7 +4031,7 @@ set -euo pipefail
 # SB15: archive the release that retired before OLABEL (owner's yes). Nothing is deleted.
 PREV='<the label of the release that was current before OLABEL>'
 printf '%s\n' "$PREV" | grep -qxE '[a-z0-9][a-z0-9-]{0,62}[a-z0-9]' && [ "$PREV" != "$OLABEL" ] && [ "$PREV" != "$LABEL" ] || { echo "SB15_NOT_DONE: PREV is not filled in, or is the old or the new release"; exit 1; }
-ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB15_NOT_DONE: release-check.mjs status refused"; exit 1; }
+ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SB15_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (run its next command, then this step again)"; exit 1; }
 [ "$(jq -r --arg p "$PREV" '.releases[] | select(.label == $p) | .state' <<<"$ST")" = RETIRED ] || { echo "SB15_NOT_DONE: $PREV is not a RETIRED release of the lock"; exit 1; }
 AR=$(lc release-archive.mjs archive --label "$PREV" 2>&1) || { echo "$AR"; echo "SB15_NOT_DONE: the archive refused (DAEMON_RELOAD_FAILED: the label is already unpinned; run systemctl daemon-reload by hand)"; exit 1; }
 echo "$AR"
@@ -3876,7 +4052,7 @@ the upload stopped:
 | before SB10's stage | nothing of the new release runs: stop here. Migrations already applied stay (each is expand-only, and the old release runs beside them with its database-ahead pin). |
 | SB10 (staged) to SB12, or SB13 refused before its write (`SWITCH_PRECONDITION_FAILED`, `RELEASE_SWITCH_CONFLICT`) | WB1: the new release goes away |
 | after SB13 (the new release is current) | WB2: the old release serves again |
-| SB13 said `SWITCH_REVERTED` | read the new website's `/readyz` reasons, fix, then WB3 (retry) |
+| SB13 said `SWITCH_REVERTED` | read the new website's `/readyz` reasons (with reason `WEBSITE_NOT_READY` the line names them in `websiteReasons`), fix, then WB3 (retry) |
 | SB13 said `SWITCH_OUTCOME_UNKNOWN`, or `bad` names `BACKSTOP` or `TARGET` | WB4 (finish) |
 | SB13 said `SWITCH_REVERT_FAILED` or `SWITCH_REVERT_UNCONFIRMED` | stop and ask: read `release-check.mjs status` first |
 
@@ -3894,7 +4070,7 @@ untouched and its backstop armed again.
 set -euo pipefail
 . /root/preview-archive/rNN-names.sh
 # WB1: the new release goes away before the switch. Nothing user-facing changes.
-ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "WB1_NOT_DONE: release-check.mjs status refused"; exit 1; }
+ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "WB1_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (run its next command, then this step again)"; exit 1; }
 [ "$(jq -r --arg o "$OLABEL" '.releases[] | select(.label == $o) | .state' <<<"$ST")" = CURRENT ] || { echo "WB1_NOT_DONE: $OLABEL is not current: the switch happened (WB2)"; exit 1; }
 [ "$(jq -r --arg l "$LABEL" '.releases[] | select(.label == $l) | .state' <<<"$ST")" = STAGED ] || { echo "WB1_NOT_DONE: $LABEL is not STAGED (before SB10's stage nothing runs: stop here)"; exit 1; }
 RB=$(lc release-switch.mjs rollback --before-switch --label "$LABEL" 2>&1) || { echo "$RB"; echo "WB1_NOT_DONE: the rollback refused (openWork: the new release already holds work: ask)"; exit 1; }
@@ -3914,7 +4090,8 @@ it already started (O1); it retires by itself like any old release.
 set -euo pipefail
 . /root/preview-archive/rNN-names.sh
 # WB2: the old release serves again, by the switch the other way. Exit 0 or 2 (read bad), 1 = refused.
-ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "WB2_NOT_DONE: release-check.mjs status refused"; exit 1; }
+SX=0; ST=$(lc release-check.mjs status 2>&1) || SX=$?
+[ "$SX" = 0 ] || { [ "$SX" = 2 ] && [ "$(jq -r '[.bad[].label] | unique | join(" ")' <<<"$ST" 2>/dev/null)" = "$OLABEL" ]; } || { echo "$ST"; echo "WB2_NOT_DONE: release-check.mjs status refused, or its bad list names another release than $OLABEL (whose runner the rollback starts first)"; exit 1; }
 [ "$(jq -r --arg l "$LABEL" '.releases[] | select(.label == $l) | .state' <<<"$ST")" = CURRENT ] || { echo "WB2_NOT_DONE: $LABEL is not current (before the switch: WB1)"; exit 1; }
 RC=0; RB=$(lc release-switch.mjs rollback --to "$OLABEL" --from "$LABEL" 2>&1) || RC=$?
 echo "$RB"
@@ -3925,7 +4102,8 @@ echo "started again: $(jq -r '.started | join(" ")' <<<"$RB")"
 echo WB2_DONE
 ```
 
-**WB3: after `SWITCH_REVERTED`.** The edge never showed the new release, so the tool switched back by itself: the old
+**WB3: after `SWITCH_REVERTED`.** The edge never showed the new release (or the new website said it would not become
+ready), so the tool switched back by itself: the old
 release serves, the new one is DRAINING with its three units still running (nothing was stopped) and its backstop armed.
 First read why the new website was not ready (the `reasons` WB3 prints), fix that, then WB3 retries: the database switches
 only to a STAGED release, so the retry is `rollback --to <new> --from <old>`, which disarms that backstop, stages the new
@@ -3937,7 +4115,8 @@ set -euo pipefail
 . /root/preview-archive/rNN-names.sh
 # WB3: after SWITCH_REVERTED, once the reason is fixed: the switch again, through the rollback command (it stages the new release again).
 RZ=$(readyz "$UIP"); echo "new website /readyz on $UIP: ${RZ##*$'\n'} $(jq -c '{releaseKey, reasons}' <<<"${RZ%$'\n'*}" 2>/dev/null || echo '(no JSON)')"
-ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "WB3_NOT_DONE: release-check.mjs status refused"; exit 1; }
+SX=0; ST=$(lc release-check.mjs status 2>&1) || SX=$?
+[ "$SX" = 0 ] || { [ "$SX" = 2 ] && [ "$(jq -r '[.bad[].label] | unique | join(" ")' <<<"$ST" 2>/dev/null)" = "$LABEL" ]; } || { echo "$ST"; echo "WB3_NOT_DONE: release-check.mjs status refused, or its bad list names another release than $LABEL (whose runner the rollback starts first)"; exit 1; }
 [ "$(jq -r --arg o "$OLABEL" '.releases[] | select(.label == $o) | .state' <<<"$ST")" = CURRENT ] && [ "$(jq -r --arg l "$LABEL" '.releases[] | select(.label == $l) | .state' <<<"$ST")" = DRAINING ] || { echo "WB3_NOT_DONE: this is not the state SWITCH_REVERTED leaves (old CURRENT, new DRAINING): ask"; exit 1; }
 RC=0; RB=$(lc release-switch.mjs rollback --to "$LABEL" --from "$OLABEL" 2>&1) || RC=$?
 echo "$RB"
@@ -3961,7 +4140,7 @@ set -euo pipefail
 # WB4: finish a switch whose database write landed. Never writes the switch itself. After DR6: bash -s -- drained.
 DRAINED=${1:-}
 [ -z "$DRAINED" ] || [ "$DRAINED" = drained ] || { echo "WB4_NOT_DONE: the one argument is drained (after DR6's switch), or none"; exit 1; }
-ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "WB4_NOT_DONE: release-check.mjs status refused"; exit 1; }
+ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "WB4_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (run its next command, then this step again)"; exit 1; }
 [ "$(jq -r --arg l "$LABEL" '.releases[] | select(.label == $l) | .state' <<<"$ST")" = CURRENT ] || { echo "WB4_NOT_DONE: the release table does not name $LABEL current: the write did not land (run SB13, or DR6's switch, again after reading its refusal)"; exit 1; }
 RC=0; FN=$(lc release-switch.mjs switch --finish --to "$LABEL" --from "$OLABEL" ${DRAINED:+--old-pair-stopped} 2>&1) || RC=$?
 echo "$FN"
@@ -3972,11 +4151,13 @@ echo WB4_DONE
 ```
 
 A `release-switch.mjs` command that refuses `RELEASE_SWITCH_BUSY` with `holderAlive` false left its lock behind (an ssh
-drop). When no switch runs (`pgrep -f release-switch.mjs` prints nothing), move the lock aside and run the command
-again:
+drop). When no switch runs (`pgrep -f '[r]elease-switch.mjs'` prints nothing), move the lock aside and run the command
+again. The brackets keep the pattern from matching the shell that runs the line itself (run through `bash -c` or ssh,
+that shell's own command line holds the plain name, so a plain `pgrep -f release-switch.mjs` always finds a process and
+the lock would never move):
 
 ```sh
-pgrep -f release-switch.mjs || mv /etc/debateai-v3-preview/lifecycle/release-switch.lock "/root/preview-archive/release-switch.lock.stale-$(date -u +%Y%m%dT%H%M%SZ)"
+pgrep -f '[r]elease-switch.mjs' || mv /etc/debateai-v3-preview/lifecycle/release-switch.lock "/root/preview-archive/release-switch.lock.stale-$(date -u +%Y%m%dT%H%M%SZ)"
 ```
 
 ### Drained upload on the template layout
@@ -4320,7 +4501,7 @@ set -euo pipefail
 MF=/etc/debateai-v3-preview/lifecycle/maintenance-pending
 [ -e "$MF" ] || { echo "MT2_NOT_DONE: there is no maintenance flag"; exit 1; }
 mv "$MF" "$S/maintenance-pending.done-$(date -u +%Y%m%dT%H%M%SZ)"
-ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "MT2_NOT_DONE: release-check.mjs status refused (the flag is already moved)"; exit 1; }
+ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "MT2_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (run its next command, then this step again; the flag is already moved)"; exit 1; }
 jq -r '.releases[] | "\(.label) \(.state) units \(.units.api)/\(.units.ui)/\(.units.runner)"' <<<"$ST"
 echo MT2_DONE
 ```

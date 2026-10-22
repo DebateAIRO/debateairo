@@ -1,7 +1,7 @@
 // Side-by-side spec §6 (the break-before-make switch) and §11 (the way back). The switch is one database write, then
 // the edge must show the new release before anything stops; the old runner is never stopped by it.
 import { afterAll, describe, expect, it } from 'vitest';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const releaseSwitch = await import('../../deploy/' + 'preview-lifecycle/v1/release-switch.mjs');
@@ -37,6 +37,8 @@ type Options = Partial<{
   units: Record<string, string>;
   started: Record<string, Record<string, unknown> | null>;
   website: Answer;
+  // The new website's answer once the switch write landed (final fix wave X4); before it, `website` or the default.
+  websiteAfter: Answer;
   edgeBefore: Answer;
   edgeAfter: Answer[][];
   gates: Record<string, string>;
@@ -72,7 +74,7 @@ function host(options: Options = {}) {
   const log: string[] = [], switchCalls: (string | null)[][] = [], timeouts: [string, number][] = [];
   const events: { key: string; kind: string; reason: string | null; at: number; ttf: number | null }[] = [];
   const base = o.historyAt ?? START - DAY;
-  for (const [key, kind, reason] of o.history) events.push({ key, kind, reason: reason ?? null, at: base + events.length * 1000, ttf: kind === 'CURRENT' ? base + events.length * 1000 + 5000 : null });
+  for (const [key, kind, reason] of o.history) events.push({ key, kind, reason: reason ?? null, at: base + events.length * 1000, ttf: kind === 'CURRENT' ? base + events.length * 1000 + TAKE_TRAFFIC_AFTER_S * 1000 : null });
   const latest = (key: string, kinds: string[]) => { for (let i = events.length - 1; i >= 0; i--) if (events[i]!.key === key && kinds.includes(events[i]!.kind)) return i; return -1; };
   const stateOf = (key: string) => {
     const at = latest(key, ['STAGED', 'CURRENT', 'DRAINING', 'RETIRED']);
@@ -105,6 +107,7 @@ function host(options: Options = {}) {
   const labelAtPort = (port: string) => ['old-v1', 'new-v1'].find(label => portOf[o.slots[label]!] === port)!;
 
   const websiteAnswer = (label: string): Answer => {
+    if (label === 'new-v1' && o.websiteAfter && switchCount > 0) return o.websiteAfter;
     if (label === 'new-v1' && o.website) return o.website;
     if (units[U('ui', label)] !== 'active') return 'refused';
     const key = KEYS[label]!;
@@ -288,7 +291,7 @@ describe('the switch (side-by-side spec §6)', () => {
     const r = await switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps });
     expect(h.order()).toEqual([
       'preconditions',
-      'recordReleaseSwitch(new→, expect old, 5s)',
+      'recordReleaseSwitch(new→, expect old, 8s)',
       `edge×${EDGE_CONFIRMATIONS} new`,
       'sleep 2500',
       'systemctl stop debateai-preview-ui@old-v1.service debateai-preview-api@old-v1.service',
@@ -319,8 +322,9 @@ describe('the switch (side-by-side spec §6)', () => {
     expect(gateFilesPathFor(layout, NEW_KEY)).toBe(GATE_FILES);
   });
 
-  it('takes traffic from the database clock + 5 s and waits one more health interval after three confirmations', async () => {
-    expect([HEALTH_INTERVAL_S, TAKE_TRAFFIC_AFTER_S, EDGE_WAIT_MS, EDGE_CONFIRMATIONS, BACKSTOP_S, EDGE_REQUEST_TIMEOUT_MS]).toEqual([2, 5, 30_000, 3, 27_000, 12_000]);
+  it('takes traffic from the database clock + 8 s and waits one more health interval after three confirmations', async () => {
+    // 8 s = the API watcher's 5 s stale bound + one health interval + 1 s (final fix wave P6).
+    expect([HEALTH_INTERVAL_S, TAKE_TRAFFIC_AFTER_S, EDGE_WAIT_MS, EDGE_CONFIRMATIONS, BACKSTOP_S, EDGE_REQUEST_TIMEOUT_MS]).toEqual([2, 8, 30_000, 3, 27_000, 12_000]);
     expect(EDGE_URL).toBe('http://127.0.0.1:3090/readyz');
     const h = host();
     await switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps });
@@ -332,11 +336,42 @@ describe('the switch (side-by-side spec §6)', () => {
   it('counts only what the edge itself failed: a website 503 in the gap is an answer, a Caddy 502 or a timeout is not', async () => {
     const h = host({ edgeAfter: [[site(OLD_KEY, 503, ['NOT_CURRENT']), caddy(502), 'timeout', site(NEW_KEY)]] });
     const r = await switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps });
-    expect(h.order().slice(1, 6)).toEqual(['recordReleaseSwitch(new→, expect old, 5s)', 'edge×1 old 503', 'edge×1 caddy 502', 'edge×1 timeout', 'edge×3 new']);
+    // While the edge does not show new, new's own /readyz is read too (X4); it is waiting (BEFORE_TAKE_TRAFFIC_FROM, then ready), never a failure.
+    expect(h.order().slice(1, 9)).toEqual(['recordReleaseSwitch(new→, expect old, 8s)', 'edge×1 old 503', 'read:website(new-v1)', 'edge×1 caddy 502', 'read:website(new-v1)',
+      'edge×1 timeout', 'read:website(new-v1)', 'edge×3 new']);
     expect(r).toMatchObject({ event: 'PREVIEW_RELEASE_SWITCHED', edgeFailures: 2, bad: ['EDGE_FAILURES'] });
     // A failed check never undoes the switch: the old pair is stopped and the backstop armed.
     expect(h.stops()).toHaveLength(1);
     expect(h.files[BACKSTOP_DROPIN]).toBeDefined();
+  });
+
+  it.each([
+    ['DRAINING', site(NEW_KEY, 503, ['DRAINING']), ['DRAINING']],
+    ['DATABASE_UNREACHABLE', site(NEW_KEY, 503, ['NOT_CURRENT', 'DATABASE_UNREACHABLE']), ['NOT_CURRENT', 'DATABASE_UNREACHABLE']],
+    ['another release on its slot', site(OLD_KEY, 503, ['NOT_CURRENT']), ['RELEASE_KEY_MISMATCH']]
+  ] as [string, Site, string[]][])('switches back at once when the new website says it will not become ready (%s), without waiting the 30 s (X4)', async (_case, websiteAfter, reasons) => {
+    const h = host({ edgeAfter: [[caddy(502)]], websiteAfter });
+    const error = await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps }));
+    expect(error).toMatchObject({ code: 'SWITCH_REVERTED', fields: { reason: 'WEBSITE_NOT_READY', websiteReasons: reasons, edgeFailures: 1 } });
+    // One edge read, one website read, then the way back (old staged again and switched to, confirmed by the edge).
+    expect(h.order().slice(1, 5)).toEqual(['recordReleaseSwitch(new→, expect old, 8s)', 'edge×1 caddy 502', 'read:website(new-v1)', 'event(old STAGED SWITCH_REVERTED)']);
+    expect(h.switchCalls()).toEqual([[NEW_KEY, OLD_KEY], [OLD_KEY, NEW_KEY]]);
+    expect(h.clock() - START).toBeLessThan(EDGE_WAIT_MS / 2);
+    expect(h.stops()).toEqual([]);
+  });
+
+  it.each([['BOOTING'], ['NOT_CURRENT'], ['BEFORE_TAKE_TRAFFIC_FROM']])('keeps waiting while the new website only says %s (X4)', async reason => {
+    const h = host({ edgeAfter: [[caddy(502), caddy(502), site(NEW_KEY)]], websiteAfter: site(NEW_KEY, 503, [reason]) });
+    const r = await switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps });
+    expect(r).toMatchObject({ event: 'PREVIEW_RELEASE_SWITCHED', edgeFailures: 2, bad: ['EDGE_FAILURES'] });
+    expect(h.log.filter(entry => entry === 'read:website(new-v1)')).toHaveLength(1 + 2);
+  });
+
+  it('a website that does not answer is no reason to switch back early: the edge decides (X4)', async () => {
+    const h = host({ edgeAfter: [[site(OLD_KEY, 503, ['DRAINING'])]], websiteAfter: 'refused' });
+    const error = await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps }));
+    expect(error).toMatchObject({ code: 'SWITCH_REVERTED', fields: { reason: 'EDGE_NOT_CONFIRMED' } });
+    expect(h.clock() - START).toBeGreaterThanOrEqual(EDGE_WAIT_MS);
   });
 
   const PRECONDITION_CASES: [string, Options, string][] = [
@@ -412,14 +447,14 @@ describe('the switch (side-by-side spec §6)', () => {
     const error = await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps }));
     const back = h.events.at(-2)!;
     expect(back).toMatchObject({ key: OLD_KEY, kind: 'CURRENT' });
-    expect(error).toMatchObject({ code: 'SWITCH_REVERTED', fields: { reason: 'EDGE_NOT_CONFIRMED', edgeFailures: 0, backstopAt: iso(Math.ceil((back.ttf! - 5000 + BACKSTOP_S * 1000) / 1000) * 1000) } });
+    expect(error).toMatchObject({ code: 'SWITCH_REVERTED', fields: { reason: 'EDGE_NOT_CONFIRMED', edgeFailures: 0, backstopAt: iso(Math.ceil((back.ttf! - TAKE_TRAFFIC_AFTER_S * 1000 + BACKSTOP_S * 1000) / 1000) * 1000) } });
     expect(h.switchCalls()).toEqual([[NEW_KEY, OLD_KEY], [OLD_KEY, NEW_KEY]]);
     expect(h.stops()).toEqual([]);
     // The database takes a switch only to a STAGED release: old is staged again (with the reason), then switched back.
     // New stays DRAINING with its pair and runner running: anything it admitted finishes on it (controller ruling Q2);
     // like any draining release it gets its backstop.
     expect(h.eventLog().slice(3)).toEqual(['new CURRENT', 'old DRAINING', 'old STAGED SWITCH_REVERTED', 'old CURRENT', 'new DRAINING']);
-    expect(h.writes()).toEqual(['recordReleaseSwitch(new→, expect old, 5s)', 'event(old STAGED SWITCH_REVERTED)', 'recordReleaseSwitch(old→, expect new, 5s)',
+    expect(h.writes()).toEqual(['recordReleaseSwitch(new→, expect old, 8s)', 'event(old STAGED SWITCH_REVERTED)', 'recordReleaseSwitch(old→, expect new, 8s)',
       `unitfile ${NEW_BACKSTOP_DROPIN}`, 'systemctl daemon-reload', 'systemctl enable debateai-preview-runner-retire@new-v1.timer', 'systemctl restart debateai-preview-runner-retire@new-v1.timer']);
     expect(h.clock() - START).toBeGreaterThanOrEqual(EDGE_WAIT_MS);
     expect(Object.values(h.units).every(state => state === 'active')).toBe(true);
@@ -448,14 +483,14 @@ describe('the switch (side-by-side spec §6)', () => {
   it('stops nothing when the database refuses the switch', async () => {
     const h = host({ switchFails: 'CONFLICT' });
     expect((await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps }))).code).toBe('RELEASE_SWITCH_CONFLICT');
-    expect(h.writes()).toEqual(['recordReleaseSwitch(new→, expect old, 5s)']);
+    expect(h.writes()).toEqual(['recordReleaseSwitch(new→, expect old, 8s)']);
     expect(h.log.filter(entry => entry.startsWith('edge:'))).toHaveLength(1);
   });
 
   it('reads the current release again after an unreadable answer before deciding (D3 review)', async () => {
     const lost = host({ switchFails: 'UNREADABLE' });
     expect((await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: lost.deps }))).code).toBe('RELEASE_TABLE_UNREADABLE');
-    expect(lost.writes()).toEqual(['recordReleaseSwitch(new→, expect old, 5s)']);
+    expect(lost.writes()).toEqual(['recordReleaseSwitch(new→, expect old, 8s)']);
     expect(lost.log.at(-1)).toBe('read:current');
     const committed = host({ switchFails: 'UNREADABLE_BUT_COMMITTED' });
     expect((await switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: committed.deps })).bad).toEqual([]);
@@ -489,11 +524,11 @@ describe('the switch (side-by-side spec §6)', () => {
     expect((renderTargetDropin('new-v1') as string).split('\n').filter(line => !line.startsWith('#'))).toEqual(['[Unit]', 'Wants=debateai-preview-api@new-v1.service debateai-preview-ui@new-v1.service', '']);
   });
 
-  it('times the backstop from the database clock: take-traffic-from − 5 s + 27,000 s', async () => {
+  it('times the backstop from the database clock: take-traffic-from − 8 s + 27,000 s', async () => {
     const h = host();
     const r = await switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps });
     const ttf = h.events.find(event => event.key === NEW_KEY && event.kind === 'CURRENT')!.ttf!;
-    expect(r.backstopAt).toBe(iso(Math.ceil((ttf - 5000 + 27_000_000) / 1000) * 1000));
+    expect(r.backstopAt).toBe(iso(Math.ceil((ttf - 8000 + 27_000_000) / 1000) * 1000));
   });
 
   it('reports every failed step after the switch in bad, and goes on with the others', async () => {
@@ -559,7 +594,7 @@ describe('finishing a switch whose database write landed (D10 review)', () => {
     expect(h.log[stopAt - 1]).toBe('sleep 2500');
     const ttf = h.events.find(event => event.key === NEW_KEY && event.kind === 'CURRENT')!.ttf!;
     expect(r).toEqual({ event: 'PREVIEW_RELEASE_SWITCH_FINISHED', to: 'new-v1', from: 'old-v1', toKey: NEW_KEY, fromKey: OLD_KEY, edgeConfirmedMs: r.edgeConfirmedMs,
-      edgeFailures: 0, backstopAt: iso(Math.ceil((ttf - 5000 + BACKSTOP_S * 1000) / 1000) * 1000), bad: [] });
+      edgeFailures: 0, backstopAt: iso(Math.ceil((ttf - TAKE_TRAFFIC_AFTER_S * 1000 + BACKSTOP_S * 1000) / 1000) * 1000), bad: [] });
     expect(h.stateOf(OLD_KEY)).toEqual({ state: 'DRAINING', frontPairStopped: true, retireRequested: false });
     expect(h.switchCalls()).toEqual([]);
   });
@@ -640,6 +675,29 @@ describe('stage and seed', () => {
     // Nothing is started, stopped or asked of the edge: seed runs before T's website and API start.
     expect(h.log.some(entry => entry.startsWith('edge:') || entry.startsWith('systemctl st'))).toBe(false);
   });
+
+  it('the boot target writer touches only 60-current-release.conf: the Anthropic gate\'s drop-in beside it stays (final fix wave S1)', async () => {
+    // The live preview already has debateai-preview.target.d with 50-anthropic-gate.conf (README-anthropic.md "Switch it on").
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'release-switch-target-')));
+    try {
+      const folder = join(root, 'debateai-preview.target.d');
+      mkdirSync(folder); chmodSync(folder, 0o755);
+      const gate = '[Unit]\nWants=debateai-preview-anthropic-budget.service\nWants=debateai-preview-anthropic-halt-watch.timer debateai-preview-anthropic-addresses.timer\n';
+      writeFileSync(join(folder, '50-anthropic-gate.conf'), gate, { mode: 0o644 });
+      const before = statSync(join(folder, '50-anthropic-gate.conf'));
+      // The server's own writer (no writeUnitFile stand-in): ensureDirectory + atomicWrite into the layout's unit folder.
+      const local = { ...layout, systemdUnitDir: root, ownerUid: process.getuid!(), ownerGid: process.getgid!() };
+      const h = host({ history: [] });
+      delete h.deps.writeUnitFile;
+      expect((await seedRelease({ label: 'new-v1', layout: local, deps: h.deps })).bad).toEqual([]);
+      expect(readdirSync(folder).sort()).toEqual(['50-anthropic-gate.conf', '60-current-release.conf']);
+      expect(readFileSync(join(folder, '60-current-release.conf'), 'utf8')).toBe(renderTargetDropin('new-v1'));
+      expect(readFileSync(join(folder, '50-anthropic-gate.conf'), 'utf8')).toBe(gate);
+      const after = statSync(join(folder, '50-anthropic-gate.conf'));
+      expect([after.ino, after.mode, after.mtimeMs]).toEqual([before.ino, before.mode, before.mtimeMs]);
+      expect(statSync(folder).mode & 0o777).toBe(0o755);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
 });
 
 describe('the way back (side-by-side spec §11)', () => {
@@ -656,7 +714,7 @@ describe('the way back (side-by-side spec §11)', () => {
       'systemctl start --no-block debateai-preview-runner@old-v1.service',
       'systemctl start --no-block debateai-preview-api@old-v1.service',
       'systemctl start --no-block debateai-preview-ui@old-v1.service',
-      'recordReleaseSwitch(old→, expect new, 5s)',
+      'recordReleaseSwitch(old→, expect new, 8s)',
       'systemctl stop debateai-preview-ui@new-v1.service debateai-preview-api@new-v1.service',
       `unitfile ${NEW_BACKSTOP_DROPIN}`, 'systemctl daemon-reload',
       'systemctl enable debateai-preview-runner-retire@new-v1.timer', 'systemctl restart debateai-preview-runner-retire@new-v1.timer',
@@ -671,7 +729,7 @@ describe('the way back (side-by-side spec §11)', () => {
     const at = (entry: string) => h.log.indexOf(entry);
     expect(at(`read:journal(${U('runner', 'old-v1')})`)).toBeLessThan(at(`systemctl start --no-block ${U('api', 'old-v1')}`));
     expect(at(`read:journal(${U('api', 'old-v1')})`)).toBeLessThan(at(`systemctl start --no-block ${U('ui', 'old-v1')}`));
-    expect(at('read:website(old-v1)')).toBeLessThan(at('recordReleaseSwitch(old→, expect new, 5s)'));
+    expect(at('read:website(old-v1)')).toBeLessThan(at('recordReleaseSwitch(old→, expect new, 8s)'));
   });
 
   it('starts only what is not running, and a half-done rollback can be run again', async () => {
@@ -948,7 +1006,7 @@ describe('release-switch.mjs (root CLI)', () => {
       writeFileSync(lockPath, '2147483646\n');
       expect(JSON.parse((await cli(['stage', '--label', 'new-v1'], deps, {}, { ...layout, lockRoot: root })).stderr).fields).toEqual({
         holderPid: 2147483646, holderAlive: false,
-        next: `no release-switch.mjs is running (check: pgrep -f release-switch.mjs); move ${lockPath} aside, then re-run`
+        next: `no release-switch.mjs is running (check: pgrep -f '[r]elease-switch.mjs'); move ${lockPath} aside, then re-run`
       });
       expect(readFileSync(lockPath, 'utf8')).toBe('2147483646\n');
       // An empty file: another command has just created it and not yet written its pid. Never "move it aside" first.
@@ -956,7 +1014,7 @@ describe('release-switch.mjs (root CLI)', () => {
       expect(JSON.parse((await cli(['stage', '--label', 'new-v1'], deps, {}, { ...layout, lockRoot: root })).stderr).fields).toEqual({
         holderPid: null, holderAlive: false,
         next: `re-run in a few seconds (another release-switch.mjs is taking the lock); only if it is still refused and none is `
-          + `running (check: pgrep -f release-switch.mjs), move ${lockPath} aside`
+          + `running (check: pgrep -f '[r]elease-switch.mjs'), move ${lockPath} aside`
       });
       expect(readFileSync(lockPath, 'utf8')).toBe('');
     } finally { rmSync(root, { recursive: true, force: true }); }

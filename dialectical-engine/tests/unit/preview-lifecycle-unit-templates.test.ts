@@ -7,7 +7,7 @@ import { join, resolve } from 'node:path';
 const templates = await import('../../deploy/' + 'preview-lifecycle/v1/unit-templates.mjs');
 const common = await import('../../deploy/' + 'preview-lifecycle/v1/common.mjs');
 
-const { splitSystemctlCat, renderTemplate, compareEffective, COMPARED_PROPERTIES, main } = templates;
+const { splitSystemctlCat, renderTemplate, compareEffective, parseShow, COMPARED_PROPERTIES, MULTI_VALUED_PROPERTIES, main } = templates;
 const me = { uid: process.getuid!(), gid: process.getgid!() };
 const layout = { ...common.LAYOUT, ownerUid: me.uid, ownerGid: me.gid };
 const DIR = '/etc/systemd/system';
@@ -353,6 +353,33 @@ describe('unit-templates.mjs CLI', () => {
   ])('compare refuses %s', async (_name, before, after, reason) => {
     const result = await run(['compare', '--service', 'api', '--label', 'new-v1', '--before', savedShow(before)], { deps: { run: systemd(after).run } });
     expect(result).toEqual({ code: 1, stdout: [], stderr: [{ event: 'PREVIEW_UNIT_TEMPLATE_REFUSED', service: 'api', label: 'new-v1', reason }] });
+  });
+
+  it('compare reads the properties systemctl show prints once per entry as ordered lists (final fix wave S5)', async () => {
+    expect(MULTI_VALUED_PROPERTIES).toEqual(['EnvironmentFiles', 'BindPaths', 'BindReadOnlyPaths', 'TemporaryFileSystem', 'DeviceAllow']);
+    for (const name of MULTI_VALUED_PROPERTIES) expect(COMPARED_PROPERTIES, name).toContain(name);
+    // A unit with two EnvironmentFile= lines and two DeviceAllow= rules: systemd prints each one on its own line.
+    const multi = (env: string) => [`EnvironmentFiles=${ENV}/${env} (ignore_errors=no)`, `EnvironmentFiles=${ENV}/hosted-egress.env (ignore_errors=yes)`, 'DeviceAllow=/dev/null rw', 'DeviceAllow=/dev/urandom r'];
+    const same = await run(['compare', '--service', 'api', '--label', 'new-v1', '--before', savedShow([...OLD, ...multi('api.env')])], { deps: { run: systemd([...NEW, ...multi('api-new-v1.env')]).run } });
+    expect(same).toEqual({ code: 0, stderr: [], stdout: [{ event: 'PREVIEW_UNIT_TEMPLATE_SAME', service: 'api', label: 'new-v1', differs: [] }] });
+    // A lost entry, a changed one, or the same entries in another order is a difference (order is what systemd applies).
+    const lost = multi('api-new-v1.env').filter(line => line !== 'DeviceAllow=/dev/urandom r');
+    const swapped = [...multi('api-new-v1.env').slice(0, 2), 'DeviceAllow=/dev/urandom r', 'DeviceAllow=/dev/null rw'];
+    const reordered = [multi('api-new-v1.env')[1]!, multi('api-new-v1.env')[0]!, ...multi('api-new-v1.env').slice(2)];
+    for (const [after, differs] of [[lost, ['DeviceAllow']], [swapped, ['DeviceAllow']], [reordered, ['EnvironmentFiles']]] as const) {
+      const result = await run(['compare', '--service', 'api', '--label', 'new-v1', '--before', savedShow([...OLD, ...multi('api.env')])], { deps: { run: systemd([...NEW, ...after]).run } });
+      expect(result.stderr).toEqual([{ event: 'PREVIEW_UNIT_TEMPLATE_DIFFERS', service: 'api', label: 'new-v1', differs }]);
+    }
+    // parseShow itself: lists for the five, one value for the others, and a repeated single value still refuses.
+    const parsed = parseShow([...NEW, ...multi('api-new-v1.env'), 'ExecStartPre={ path=/x }', 'ExecStartPre={ path=/y }'].join('\n'), ['Id', 'User', ...MULTI_VALUED_PROPERTIES], 'X');
+    expect(parsed.EnvironmentFiles).toEqual([`${ENV}/api-new-v1.env (ignore_errors=no)`, `${ENV}/hosted-egress.env (ignore_errors=yes)`]);
+    expect(Object.isFrozen(parsed.EnvironmentFiles)).toBe(true);
+    expect([parsed.User, parsed.BindPaths]).toEqual(['debateai-preview-api', undefined]);
+    expect(() => parseShow('User=a\nUser=b\n', ['User'], 'TWICE')).toThrow(expect.objectContaining({ code: 'TWICE' }));
+    // compareEffective takes a multi-valued property as its list (the env path moves in every entry).
+    const record = (bind: string[], env: string) => ({ User: 'debateai-preview-api', BindPaths: bind, EnvironmentFiles: [`${ENV}/${env}`, `${ENV}/other.env`] });
+    expect(compareEffective({ service: 'api', label: 'new-v1', before: record(['/a', '/b'], 'api.env'), after: record(['/a', '/b'], 'api-new-v1.env') })).toEqual([]);
+    expect(compareEffective({ service: 'api', label: 'new-v1', before: record(['/a', '/b'], 'api.env'), after: record(['/a'], 'api-new-v1.env') })).toEqual(['BindPaths']);
   });
 
   it('compare refuses when systemd does not answer', async () => {

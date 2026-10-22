@@ -14,6 +14,7 @@
 //   release.mjs stopped --service api|runner --label <label>        ExecStopPost=+ of api@ and runner@ (release-retire.mjs)
 //   release.mjs retire-request --label <label>                      debateai-runner-retire@<label>.service (release-retire.mjs)
 //   release.mjs retire-check --label <label>                        debateai-runner-retire-check@<label>.service (release-retire.mjs)
+//   release.mjs mark-retired --label <old>                          the drained upgrade only, after its switch (release-retire.mjs)
 //   release.mjs stage --label <new>                                 (release-switch.mjs)
 //   release.mjs switch --to <new> --from <current> [--old-pair-stopped]   (release-switch.mjs)
 //   release.mjs switch --finish --to <new> --from <old>             (release-switch.mjs)
@@ -25,8 +26,10 @@
 //
 // `check` compares the two release folders' own migrations: the current release's (the release table names its key,
 // its overlay its label) and the new one's, /opt/debateai/releases/<label>/dialectical-engine/migrations, each file
-// read as root holds it (root-owned 0644, no link). The preview's other commands (seed, mark-retired, receipt,
-// maintenance) are not this server's and are refused. One JSON line per run, exit codes as the called tool's: 0 done;
+// read as root holds it (root-owned 0644, no link). `mark-retired` (final fix wave S2) ends a drained upgrade
+// (README §5 "A drained upgrade"): the older runner was stopped with nothing open, the switch ran with
+// --old-pair-stopped, and the older release is marked RETIRED (reason DRAINED), its timers turned off and its runner
+// instance disabled. The preview's other commands (seed, receipt, maintenance) are not this server's and are refused. One JSON line per run, exit codes as the called tool's: 0 done;
 // 2 a check verdict other than SIDE_BY_SIDE, or a switch whose later step failed (`bad`); 1 a refusal.
 import { lstat, readdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -41,7 +44,7 @@ import { readCurrentRelease } from '../preview-lifecycle/v1/release-table.mjs';
 
 /** Which preview tool runs each of this server's commands; any other first word is refused. */
 export const COMMANDS = Object.freeze({
-  'may-start': 'retire', stopped: 'retire', 'retire-request': 'retire', 'retire-check': 'retire',
+  'may-start': 'retire', stopped: 'retire', 'retire-request': 'retire', 'retire-check': 'retire', 'mark-retired': 'retire',
   stage: 'switch', switch: 'switch', rollback: 'switch',
   check: 'check', status: 'check'
 });

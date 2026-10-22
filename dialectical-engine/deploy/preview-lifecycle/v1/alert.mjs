@@ -186,7 +186,7 @@ const RELEASE_NOTICES = Object.freeze({
     const label = releaseOf(code);
     return {
       subject: `Preview: release ${label}'s runner stopped before it retired`,
-      ...restartRunner(label, `Release ${label} was asked to retire, but 25 minutes later its runner was no longer running and had not reported that it retired (for example after a crash or a server restart).`)
+      ...restartRunner(label, `Release ${label} was asked to retire, but 25 minutes later its runner was no longer running and had not reported that it retired (for example after a crash or a server restart). After a server restart the current release's runner is stopped too (no runner starts at boot): start it the same way, debateai-preview-runner@ followed by its label (the release guide, "After a reboot or a runner crash during a drain").`)
     };
   }
 });

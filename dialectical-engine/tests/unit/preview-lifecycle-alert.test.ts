@@ -769,6 +769,8 @@ describe('release notices', () => {
       expect(mail).toContain('  systemctl start debateai-preview-runner@old-v1');
       expect(mail).toContain('it closes its unfinished debates with a plain sentence and no quota use');
       if (kind === 'release-forced') expect(mail).toContain('re-opened when possible; if not, or if a gate\'s state could not be read, you get a separate failure email');
+      // After a reboot no runner starts by itself, the current release's neither (final fix wave X1).
+      if (kind === 'release-stranded') expect(mail).toContain('After a server restart the current release\'s runner is stopped too (no runner starts at boot): start it the same way');
       expect(mail).toContain('systemctl status debateai-preview-runner@old-v1.service');
       expect(mail).not.toMatch(/\$|usd/i);
     }

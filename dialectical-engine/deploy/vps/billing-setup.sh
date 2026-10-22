@@ -581,7 +581,7 @@ if [ "$TEST_MODE" = 1 ]; then
   say "Test root: the check command is not run."
   exit 0
 fi
-say "Restart the API to use the new settings: systemctl restart debateai-api"
+say "Restart the current release's API to use the new settings: systemctl restart debateai-api@<label> (README section 5, \"The current release\", sets label)"
 say ""
 say "Checking everything (pnpm billing:check, run as the API):"
 PNPM="$(command -v pnpm)" || refuse "BILLING_SETUP_CHECK_SKIPPED: pnpm is not on PATH; run pnpm billing:check as the runbook shows"

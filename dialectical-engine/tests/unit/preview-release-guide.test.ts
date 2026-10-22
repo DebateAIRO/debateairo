@@ -5,8 +5,10 @@
 // parser (with the platform refused, so nothing runs): a flag or a subcommand the tool does not know fails here, not on
 // the server. Only the new sections are read; the R19 recipe above them stays as it ran.
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 
 const read = (path: string) => readFileSync(resolve(import.meta.dirname, '../..', path), 'utf8');
 const guide = read('deploy/preview-release/v1/README.md');
@@ -68,8 +70,8 @@ const code = (line: string) => !line.trimStart().startsWith('#');
 
 /** The steps, in the order the guide runs them. */
 const STEPS = Object.freeze([
-  'TA0', 'TA1', 'TA8', 'TA_UNITS', 'TA_CADDY', 'TA_ENV', 'TB0', 'TB1', 'TB2', 'TB3', 'TB4', 'TB5', 'TB6', 'TB7', 'TB8', 'TB9', 'RBA_T', 'RBB_T',
-  'SB1', 'SB1B', 'SB3', 'SB4', 'SB5', 'SB7', 'SB8', 'SB9', 'SB10', 'SB11', 'SB12', 'SB13', 'SB13B', 'SB14', 'SB15',
+  'TA0', 'TA1', 'TA8', 'TA_UNITS', 'TA_CADDY', 'TA_ENV', 'TA_OP', 'TB0', 'TB1', 'TB2', 'TB3', 'TB4', 'TB5', 'TB6', 'TB7', 'TB8', 'TB9', 'RBA_T', 'RBB_T',
+  'SB1', 'SB1B', 'SB3', 'SB4', 'SB5', 'SB7', 'SB8', 'SB9', 'SB10', 'SB11', 'SB12', 'SB13', 'SB13B', 'SB14', 'SB14B', 'SB15',
   'WB1', 'WB2', 'WB3', 'WB4', 'DR1', 'DR2', 'DR3', 'DR4', 'DR5', 'DR6', 'RBD_A', 'RBD_B', 'MT1', 'MT2'
 ]);
 /** The scripts that make the names file (they cannot read it yet). */
@@ -158,6 +160,114 @@ describe('the preview release guide: transition T, side by side, the way back, t
     expect(validations).toBeGreaterThanOrEqual(2);
   });
 
+  it('the public route refuses /readyz: TA-caddy checks the adapted route and TB7 the live answer (final fix wave W2)', () => {
+    const ta = scriptOf('TA_CADDY').lines.join('\n'), tb7 = scriptOf('TB7').lines;
+    expect(ta).toContain('[ "$PR" = "static_response 404" ] || { echo "TA_CADDY_NOT_DONE:');
+    // The handler order check leaves out only that one route; everything else must still match the live file.
+    expect(ta).toContain('select([.match[]?.path[]?] != ["/readyz"])');
+    const rp = tb7.findIndex(line => line.startsWith("RP=$(curl -s -o /dev/null -m 15 -w '%{http_code}' https://v3-preview.dezbatere.ro/readyz"));
+    expect(rp).toBeGreaterThan(-1);
+    expect(tb7[rp + 1]).toMatch(/^\[ "\$RP" = 404 \] \|\| back /);
+  });
+
+  it('after a reboot or a runner crash during a drain: status stops the steps, and SB14b starts the draining runner, then the current one (final fix wave X1)', () => {
+    const sb14b = scriptOf('SB14B').lines;
+    const gates = sb14b.findIndex(line => line.includes('jq -r .state)" = active ]') && line.includes('SB14B_NOT_DONE'));
+    const loop = sb14b.indexOf('for RL in "$OLABEL" "$LABEL"; do');
+    expect(gates).toBeGreaterThan(-1);
+    expect(gates).toBeLessThan(loop);
+    expect(sb14b).toContain('  systemctl start "$RU" || echo "systemctl start $RU returned non-zero"');
+    expect(sb14b.join('\n')).not.toContain('systemctl stop');
+    expect(sb14b.at(-2)).toMatch(/^\[ "\$SX" = 0 \] \|\| \{ echo "\$ST"; echo "SB14B_NOT_DONE: /);
+    expect(sideBySide).toContain('\n### SB14b. After a reboot or a runner crash during a drain\n');
+    // Every status read stops on a bad list (exit 2), except the two rollbacks that start that very runner first, SB14b
+    // itself, and TB9 and DR2 (which only read a field and go on).
+    const allowed = new Map([['WB2', '"$OLABEL"'], ['WB3', '"$LABEL"']]);
+    for (const block of scripts) {
+      const step = stepOf(block)!;
+      for (const line of block.lines.filter(code)) {
+        if (!line.includes('lc release-check.mjs status')) continue;
+        if (step === 'TB9' || step === 'DR2') continue;
+        if (allowed.has(step) || step === 'SB14B') {
+          expect(line, step).toBe('SX=0; ST=$(lc release-check.mjs status 2>&1) || SX=$?');
+          if (allowed.has(step)) expect(block.lines.join('\n'), step).toContain(`[.bad[].label] | unique | join(" ")' <<<"$ST" 2>/dev/null)" = ${allowed.get(step)} ]; }`);
+          continue;
+        }
+        expect(line.startsWith(`ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "${step}_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work`), `${step}: ${line}`).toBe(true);
+      }
+    }
+  });
+
+  it('the N-1 baseline names the live release after TB9 and after SB13b, and SB4 checks it (final fix wave A2)', () => {
+    for (const [heading, before, after] of [['### TB10. ', '### TB9. ', '### The way back from T'], ['### SB13c. ', '### SB13b. ', '### SB14. ']] as const) {
+      const at = newSections.indexOf(`\n${heading}`);
+      expect(at, heading).toBeGreaterThan(newSections.indexOf(`\n${before}`));
+      expect(at, heading).toBeLessThan(newSections.indexOf(`\n${after}`));
+      const section = sectionOf(guide, guide.split('\n').find(line => line.startsWith(heading))!);
+      expect(section).toContain(`jq --arg c "$REV" --arg r "$LABEL" '.commit = $c | .reason = $r' dialectical-engine/tests/n1-baseline.json`);
+      expect(section).toContain('[ "$(node dialectical-engine/tools/n1-baseline.mjs commit)" = "$REV" ]');
+      expect(section).toContain('git push -u origin "chore/n1-baseline-$NN" && gh pr create --base dev');
+      // On the Mac: not a server script (no names file, no step guards).
+      expect(section).not.toMatch(/_NOT_DONE|_DONE\b|rNN-names\.sh/);
+    }
+    const sb4 = sectionOf(guide, sideBySide.split('\n').find(line => line.startsWith('### SB4. '))!);
+    expect(sb4).toContain('`N1_BASELINE`');
+    expect(sb4).toContain('`N1_BASELINE` fails with `set the N-1 baseline first`');
+  });
+
+  it('SB8 accepts the old ledger plus the database-ahead file\'s steps it did not hold yet: the abort-then-fix sequence (final fix wave A1)', () => {
+    const sb8 = scriptOf('SB8').lines;
+    const pick = (prefix: string) => { const found = sb8.filter(line => line.startsWith(prefix)); expect(found, prefix).toHaveLength(1); return found[0]!; };
+    const steps = pick('NEWSTEPS=$(for M in $(jq -r \'.steps[].name\' "$DA")'), top = pick('TOP=$('), check = pick('[ "$LEDGER" = "$(( ${LEDGER0%%|*} + ');
+    expect(sb8.indexOf(steps)).toBeLessThan(sb8.findIndex(line => line.startsWith('OUT=$(nat ')));
+    expect(sb8.join('\n')).not.toContain('grep -c . "$S/new-migrations.txt"');
+    // The three lines, run by bash with the database as a list of names (psqlq answers the one count they ask).
+    const dir = mkdtempSync(join(tmpdir(), 'guide-sb8-'));
+    try {
+      const ledger = (before: string[], newer: string[], after: string[]) => {
+        writeFileSync(join(dir, 'before'), `${before.join('\n')}\n`);
+        writeFileSync(join(dir, 'da.json'), JSON.stringify({ steps: newer.map(name => ({ name })) }));
+        const summary = (names: string[]) => `${names.length}|${[...names].sort().at(-1)}`;
+        const script = ['set -euo pipefail', `D='${dir}'; DA="$D/da.json"; LEDGER0='${summary(before)}'; LEDGER='${summary(after)}'`,
+          `psqlq() { N=$(printf '%s' "$1" | sed -n "s/.*name = '\\(.*\\)'.*/\\1/p"); if grep -qxF "$N" "$D/before"; then echo 1; else echo 0; fi; }`,
+          steps, top, check, 'echo LEDGER_OK'].join('\n');
+        try { return execFileSync('bash', ['-c', script], { encoding: 'utf8' }).trim(); } catch (error) { return String((error as { stdout?: string }).stdout ?? '').trim(); }
+      };
+      const OLD = ['0121_engine_verdict.sql', '0122_engine_map_check.sql', '0123_side_by_side_releases.sql'];
+      // A plain upload: one new step.
+      expect(ledger(OLD, ['0124_a.sql'], [...OLD, '0124_a.sql'])).toBe('LEDGER_OK');
+      // T+1 applied 0124 and was rolled back; the fix release keeps 0124 and adds 0125: only 0125 is new to the ledger.
+      expect(ledger([...OLD, '0124_a.sql'], ['0124_a.sql', '0125_b.sql'], [...OLD, '0124_a.sql', '0125_b.sql'])).toBe('LEDGER_OK');
+      // A step that did not land, or one the file does not name, still stops SB8.
+      expect(ledger(OLD, ['0124_a.sql', '0125_b.sql'], [...OLD, '0124_a.sql'])).toMatch(/^SB8_NOT_DONE: the ledger is not the old one plus exactly/);
+      expect(ledger(OLD, ['0124_a.sql'], [...OLD, '0124_a.sql', '0125_b.sql'])).toMatch(/^SB8_NOT_DONE: /);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('TA-units counts the multi-valued properties and stops on a one-value property printed twice, before the downtime (final fix wave S5)', async () => {
+    const templates = await import('../../deploy/' + 'preview-lifecycle/v1/unit-templates.mjs');
+    const lines = scriptOf('TA_UNITS').lines;
+    const one = /^ONE='([A-Za-z ]+)'$/.exec(lines.find(line => line.startsWith('ONE=')) ?? '')?.[1]?.split(' ');
+    // Exactly what compare reads with one value each: Id, LoadState and the compared properties minus the five lists.
+    expect(one).toEqual(['Id', 'LoadState', ...templates.COMPARED_PROPERTIES.filter((name: string) => !templates.MULTI_VALUED_PROPERTIES.includes(name))]);
+    expect(lines.join('\n')).toContain(`for K in ${templates.MULTI_VALUED_PROPERTIES.join(' ')}; do`);
+    const guard = lines.findIndex(line => line.includes('TA_UNITS_NOT_DONE: $SVC.show holds a one-value property twice'));
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(lines.findIndex(line => line.startsWith('install -d -o root -g root -m 0700 "$S/templates"')));
+  });
+
+  it('the stale-lock line\'s pgrep cannot match its own shell (final fix wave S7)', () => {
+    const lines = allBlocks.flatMap(block => block.lines).filter(line => code(line) && line.includes('pgrep'));
+    expect(lines).toEqual(["pgrep -f '[r]elease-switch.mjs' || mv /etc/debateai-v3-preview/lifecycle/release-switch.lock \"/root/preview-archive/release-switch.lock.stale-$(date -u +%Y%m%dT%H%M%SZ)\""]);
+    // pgrep -f matches its pattern (an extended regex) against every process's whole command line: the bracket form
+    // finds a running switch, but not the shell that runs this line (`bash -c "<line>"`); the plain name found both.
+    const switchProcess = '/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/release-switch.mjs switch --finish --to a-v1 --from b-v1';
+    const pattern = /^pgrep -f '([^']+)'/.exec(lines[0]!)![1]!;
+    expect(new RegExp(pattern).test(switchProcess)).toBe(true);
+    expect(new RegExp(pattern).test(`bash -c ${lines[0]}`)).toBe(false);
+    expect(new RegExp('release-switch.mjs').test('bash -c pgrep -f release-switch.mjs || mv …')).toBe(true);
+  });
+
   it('the caddy step restores the old file on a failed check', () => {
     const tb7 = scriptOf('TB7').lines;
     const restoreLine = 'install -o root -g root -m 0644 "$S/Caddyfile.before-two-slot" "$C.new"';
@@ -241,12 +351,92 @@ describe('the preview release guide: transition T, side by side, the way back, t
     expect(tb6.findIndex(line => line.includes('lc release-switch.mjs seed --label "$LABEL"'))).toBeLessThan(tb6.findIndex(line => line.includes('systemctl start "debateai-preview-api@$LABEL"')));
   });
 
+  it('names the switch\'s take-traffic delay as the tool sets it (final fix wave P6), and its early way back (X4)', async () => {
+    const { TAKE_TRAFFIC_AFTER_S } = await import('../../deploy/' + 'preview-lifecycle/v1/release-switch.mjs');
+    expect(TAKE_TRAFFIC_AFTER_S).toBe(8);
+    const sb13 = sectionOf(guide, sideBySide.split('\n').find(line => line.startsWith('### SB13. '))!);
+    expect(sb13).toContain(`take traffic from the database clock + ${TAKE_TRAFFIC_AFTER_S} s`);
+    expect(guide).not.toMatch(/database clock \+ 5 s/);
+    expect(sb13).toContain('`SWITCH_REVERTED` with reason `WEBSITE_NOT_READY`');
+  });
+
   it('names both owner-yes points and what each yes must say', () => {
     const t = sectionOf(guide, TRANSITION);
-    expect(t).toMatch(/fresh in the live chat right before TB1/);
+    // The gate redeploy (TB0g) runs right before the downtime on the same yes (final fix wave S4).
+    expect(t).toMatch(/fresh in the live chat right before TB0g \(or TB1 when TA10 listed no gate file\)/);
     for (const word of ['downtime', 'cold copy', 'max_connections', 'migrations', 'delta', 'release key', 'layout']) expect(t, word).toContain(word);
     const sb6 = sectionOf(guide, sideBySide.split('\n').find(line => line.startsWith('### SB6. '))!);
     for (const word of ['side by side', 'online backup', 'migrations', 'delta', 'release key', 'switch']) expect(sb6, word).toContain(word);
+  });
+});
+
+describe('the boot target\'s drop-in folder is shared with the Anthropic gate (final fix wave S1, S3, S4)', () => {
+  const TD = '/etc/systemd/system/debateai-preview.target.d';
+  const FILE = 'debateai-preview.target.d/60-current-release.conf';
+
+  it('no script stops on the folder, lists it for the way back, or moves it whole: only the switch\'s own file', () => {
+    for (const block of allBlocks) {
+      for (const line of block.lines.filter(code)) {
+        // The live preview already has the folder (README-anthropic.md "Switch it on": 50-anthropic-gate.conf).
+        expect(line, line).not.toMatch(/\[ ! -e [^\]]*debateai-preview\.target\.d \]/);
+        expect(line, line).not.toMatch(/debateai-preview\.target\.d >> "\$S\/systemd-T\.list"/);
+        expect(line, line).not.toMatch(/\bmv [^|]*debateai-preview\.target\.d["\s]/);
+      }
+    }
+    expect(scriptOf('TA0').lines).toContain(`[ ! -e ${TD}/60-current-release.conf ] || { echo "TA0_NOT_DONE: debateai-preview.target.d/60-current-release.conf exists already (look first)"; exit 1; }`);
+    expect(scriptOf('TB0').lines.join('\n')).toContain(`[ ! -e ${TD}/60-current-release.conf ]`);
+    expect(scriptOf('TB5').lines.find(line => line.startsWith('for N in debateai-preview-api@.service '))).toContain(` ${FILE}; do [ ! -e "$UD/$N" ]`);
+    // TB6 lists the file it lets the seed write, never the folder; the seed comes after the listing.
+    const tb6 = scriptOf('TB6').lines;
+    const listed = tb6.indexOf(`printf '%s\\n' ${FILE} >> "$S/systemd-T.list"`);
+    expect(listed).toBeGreaterThan(-1);
+    expect(listed).toBeLessThan(tb6.findIndex(line => line.includes('lc release-switch.mjs seed --label "$LABEL"')));
+  });
+
+  it('TA1 copies the boot target and its folder; TA0 stops on a live boot target line R19\'s copy lacks, and TB0 on any change since', () => {
+    expect(scriptOf('TA1').lines.join('\n')).toContain('tar -czf "$S/systemd-before.tgz" debateai-preview-* debateai-preview.target debateai-preview.target.d ) || { echo "TA1_NOT_DONE:');
+    const ta0 = scriptOf('TA0').lines;
+    const rt = ta0.findIndex(line => line.includes('RT=$RAPI/dialectical-engine/deploy/preview-lifecycle/v1/systemd/debateai-preview.target'));
+    const extra = ta0.findIndex(line => line.startsWith('XT=$(LC_ALL=C comm -13 <(unitlines "$RT") <(unitlines "$LT"))'));
+    const stop = ta0.findIndex(line => line.startsWith('[ -z "$XT" ] ||') && /TA0_NOT_DONE: .*ask"; exit 1; }$/.test(line));
+    expect(ta0.findIndex(line => line.startsWith('RAPI=$(jq -r .services.api.sourceRoot "$LOCK")'))).toBeLessThan(rt);
+    expect(rt).toBeLessThan(extra);
+    expect(extra).toBeLessThan(stop);
+    expect(ta0).toContain('cp -p "$LT" "$P/debateai-preview.target.live"');
+    expect(scriptOf('TA1').lines.join('\n')).toContain('[ -s "$P/debateai-preview.target.live" ]');
+    expect(scriptOf('TB0').lines.join('\n')).toContain('cmp -s /etc/systemd/system/debateai-preview.target "$S/preflight/debateai-preview.target.live" || { echo "TB0_NOT_DONE:');
+  });
+
+  it('rbB-T makes the folder in S before its move loop, reads the links list only when TB5 wrote it, and names the state at every failed move', () => {
+    const rbb = scriptOf('RBB_T').lines;
+    const made = rbb.indexOf('  install -d -o root -g root -m 0700 "$S/systemd-T" "$S/systemd-T/debateai-preview.target.d"');
+    const loop = rbb.findIndex(line => line.includes('done < "$S/systemd-T.list"'));
+    expect(made).toBeGreaterThan(-1);
+    expect(made).toBeLessThan(loop);
+    const wants = rbb.findIndex(line => line.includes('done < "$S/systemd-old-wants.txt"'));
+    expect(rbb[wants - 1]).toBe('  if [ -e "$S/systemd-old-wants.txt" ]; then');
+    // Every mv in rbB-T has its own stop line (set -e alone would end the script without saying what is left where).
+    for (const line of rbb.filter(code)) {
+      const moves = line.match(/(^|[\s;&|])mv /g)?.length ?? 0;
+      if (moves) expect(line.match(/\|\| \{ echo "RBB_T_NOT_DONE: /g)?.length ?? 0, line).toBeGreaterThanOrEqual(moves);
+    }
+  });
+
+  it('T\'s operator folder is built and compared before the downtime; the gate redeploy runs right before it (S4)', () => {
+    const op = scriptOf('TA_OP').lines.join('\n'), tb5 = scriptOf('TB5').lines.join('\n');
+    expect(op).toContain('git -C "$ART/source-reference" archive --format=tar "$REV" dialectical-engine/deploy/preview-lifecycle dialectical-engine/deploy/preview-auth-dev dialectical-engine/deploy/preview-release | tar -x -C "$NEWOP"');
+    expect(op).toContain('diff -r "$NEWOP/dialectical-engine/deploy/$D" "$CAPI/dialectical-engine/deploy/$D"');
+    // TB5 (inside the downtime) builds nothing: it compares again and swaps.
+    expect(tb5).not.toContain('git -C "$ART/source-reference" archive');
+    expect(tb5).toContain('diff -r "$NEWOP/dialectical-engine/deploy/$D" "$CAPI/dialectical-engine/deploy/$D"');
+    expect(tb5.indexOf('diff -r "$NEWOP')).toBeLessThan(tb5.indexOf('mv "$OP" "$S/operator-lifecycle-v1.before"'));
+    expect(scriptOf('TB0').lines.join('\n')).toContain('diff -r "$NEWOP/dialectical-engine/deploy/$D"');
+    const t = sectionOf(guide, TRANSITION);
+    expect(t.indexOf('\n### TA-op. ')).toBeLessThan(t.indexOf('\n### TB0. '));
+    expect(t.indexOf('\n### TB0. ')).toBeLessThan(t.indexOf('\n### TB0g. '));
+    expect(t.indexOf('\n### TB0g. ')).toBeLessThan(t.indexOf('\n### TB1. '));
+    expect(t).not.toContain('TB1g');
+    expect(scriptOf('TB1').lines.join('\n')).toContain('jq -r .state)" = active ]');
   });
 });
 
