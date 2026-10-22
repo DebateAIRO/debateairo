@@ -751,7 +751,17 @@ const retirement = startRunnerRetirement({
   // R1: the backstop never retires under a model call still in flight.
   calls: modelCalls,
   signal: retirementSignal,
-  stopWorker: async () => { lapsedResend.stop(); await worker.stop(); },
+  // R4 (final review): worker.stop() resolves once Hatchet has waited for every task, so both pools end then and no
+  // database connection keeps a retired runner's process up: on the public server, which has no launcher, it exits by
+  // itself, without process.exit. Never after `await started` below: Hatchet ends that listener BEFORE its running
+  // tasks finish, and a planned stop (SIGTERM) leaves the exit to Hatchet itself once they have. allSettled: a pool
+  // that fails to end never turns a clean retirement into RETIREMENT_STOP_FAILED. The Hatchet client's own connections
+  // are the SDK's; a live-handle check needs Hatchet and Postgres running, so the unit test pins this wiring instead.
+  stopWorker: async () => {
+    lapsedResend.stop();
+    await worker.stop();
+    await Promise.allSettled([pool.end(), keepAlivePool.end()]);
+  },
   log: (line) => console.warn(JSON.stringify(line)),
   announce: (line) => process.stdout.write(line),
   emit: (payload) => (process as NodeJS.EventEmitter).emit(RUNNER_RETIRED_PROCESS_EVENT, payload)
