@@ -16,6 +16,7 @@ import {
   releaseHeaderFor,
   resolveBuildReleaseCode
 } from "../../apps/ui/release-edge.mjs";
+import { EDGE_SECRET_HEADER, hardenIncomingProxyHeaders } from "../../apps/ui/trusted-client-ip.mjs";
 
 /**
  * Side-by-side uploads spec 2026-10-21 §1, §6, §7 (plan C12): the website edge (apps/ui/server.mjs) knows its release
@@ -232,6 +233,22 @@ describe("createReadinessResponder", () => {
   it("reads /readyz with a query string as /readyz", async () => {
     const answer = await ask(responder(json(200, { ready: true, releaseKey: OWN, reasons: [] })).respond, "/readyz?probe=1");
     expect(answer.status).toBe(200);
+  });
+
+  // Caddy's active health check (deploy/vps/Caddyfile, health_uri /readyz) sends the upstream's address as its Host,
+  // 127.0.0.1:3100, not the site's name: the answer never depends on Host. server.mjs runs only the header hardening
+  // before the responder (and Next, the only place a Host rule could live, after it).
+  it("answers Caddy's probe, whose Host is the upstream address 127.0.0.1:3100, as it answers the site's own name", async () => {
+    const body = { ready: true, releaseKey: OWN, reasons: [] };
+    const { respond } = responder(json(200, body));
+    for (const host of ["127.0.0.1:3100", "127.0.0.1:3101", "dezbatere.example"]) {
+      const headers: Record<string, string> = { host, [EDGE_SECRET_HEADER]: "s".repeat(48) };
+      hardenIncomingProxyHeaders(headers, "127.0.0.1", ["127.0.0.1"], null);
+      expect(headers.host).toBe(host);
+      const { res, done } = fakeResponse();
+      expect(respond({ method: "GET", url: "/readyz", headers } as never, res as never)).toBe(true);
+      expect(await done).toMatchObject({ status: 200, body });
+    }
   });
 });
 
