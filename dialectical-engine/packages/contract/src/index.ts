@@ -843,6 +843,16 @@ export type LegalAcceptRequest = z.infer<typeof LegalAcceptRequestSchema>;
 /** Paid plans G3a: booleans only — never the country the server saw. `service`: sign-in and the support assistant are open here. */
 export const GeoAvailabilityResponseSchema = z.object({ signup: z.boolean(), pay: z.boolean(), service: z.boolean() }).strict();
 export type GeoAvailabilityResponse = z.infer<typeof GeoAvailabilityResponseSchema>;
+/**
+ * Side-by-side spec §13, addition D24 (owner's answer to Q-L6, 2026-10-22: providers only, not the models, listed
+ * automatically): `GET /v1/public/ai-providers`, the companies the API's declared provider targets reach, for the
+ * "AI providers" legal page. Strict, so a model id, a URL or a price can never ride along; at most 32 entries (the
+ * declared-target limit), each a company key (`anthropic`, `deepinfra`) or `host:<hostname>` (1-260 characters).
+ */
+export const PublicAiProvidersResponseSchema = z.object({
+  companies: z.array(z.string().min(1).max(260)).max(32)
+}).strict();
+export type PublicAiProvidersResponse = z.infer<typeof PublicAiProvidersResponseSchema>;
 
 /**
  * Sensitive-data consent (V's ruling of 2026-09-29). Before the first debate an account
@@ -1688,6 +1698,8 @@ export const contractInventory = Object.freeze({
     "DELETE /v1/debates/{id}",
     "GET /v1/public/debates",
     "GET /v1/public/debates/{id}",
+    // Addition D24: the companies the declared provider targets reach, for the "AI providers" page.
+    "GET /v1/public/ai-providers",
     "GET /v1/geo/availability",
     "POST /v1/support/sessions",
     "GET /v1/support/sessions/{id}",
@@ -1755,7 +1767,7 @@ export const contractInventory = Object.freeze({
     BillingUsageResponseSchema, RunProjectionSchema, SessionSchema, SessionSummarySchema,
     SessionListSchema, RevokeAllSessionsSchema, VisibilityGrantActionSchema,
     AgeCheckRequestSchema, AgeCheckResultSchema, AgeConfirmationStatusSchema, RegisterLegalDocumentsSchema,
-    LegalStatusResponseSchema, LegalAcceptRequestSchema, GeoAvailabilityResponseSchema,
+    LegalStatusResponseSchema, LegalAcceptRequestSchema, GeoAvailabilityResponseSchema, PublicAiProvidersResponseSchema,
     SensitiveDataConsentRequestSchema, SensitiveDataConsentStatusSchema,
     RunTargetedGrantActionSchema,
     BeginSocialStepUpRequestSchema,SocialStepUpStatusRequestSchema,SocialStepUpStatusResponseSchema,CompleteSocialStepUpRequestSchema,StepUpAuthorizationRequestSchema, StepUpResponseSchema, BeginPasskeyStepUpRequestSchema, CompletePasskeyStepUpRequestSchema, AuthMethodsResponseSchema, RemoveAuthMethodRequestSchema, RegenerateRecoveryCodesRequestSchema, RecoveryCodesResponseSchema, MfaRecoveryPendingResponseSchema, MfaRecoveryPendingCancelRequestSchema, MfaRecoveryPendingCancelledSchema,

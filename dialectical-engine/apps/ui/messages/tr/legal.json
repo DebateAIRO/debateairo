@@ -113,7 +113,6 @@
   "legal.providers.title": "Model sağlayıcıları",
   "legal.providers.meta": "Metninizi kimin, neden, nerede, ne kadar süreyle ve hangi dayanakla aldığı",
   "legal.providers.intro": "Bu Sicil, Gizlilik Politikamızın bir parçasıdır ve nerede yaşarsanız yaşayın her kullanıcı için geçerlidir. Bir tartışmayı yürütmek için metnini aşağıdaki yapay zekâ sağlayıcılarına göndeririz; destek sohbetine yazdıklarınız ise destek sohbetinin modeline gider. Bu sağlayıcılar e-posta adresinizi, hesabınızı, IP adresinizi veya ödeme bilgilerinizi hiçbir zaman almaz. Onları yalnızca, içeriğinizle kendi modellerini eğitmelerine izin vermeyen koşullar altında kullanırız; aşağıdaki her kayıt bunu doğrulayıp doğrulamadığımızı gösterir. Yeni bir sağlayıcı herhangi bir veri almadan önce sizi bilgilendiririz. Köşeli parantezler, henüz teyit etmediğimiz bilgileri gösterir.",
-  "legal.providers.colModels": "Modeller",
   "legal.providers.colEntity": "Şirket",
   "legal.providers.colCountry": "Merkez ülkesi",
   "legal.providers.colPurpose": "Neyi alır ve neden",

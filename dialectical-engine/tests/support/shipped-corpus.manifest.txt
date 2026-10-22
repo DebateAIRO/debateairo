@@ -705,6 +705,7 @@ apps/ui/lib/legal/pageCatalogs.ts
 apps/ui/lib/legal/pages.ts
 apps/ui/lib/legal/pl/privacyPolicy.ts
 apps/ui/lib/legal/pl/termsOfService.ts
+apps/ui/lib/legal/providerCompanies.ts
 apps/ui/lib/legal/pt/privacyPolicy.ts
 apps/ui/lib/legal/pt/termsOfService.ts
 apps/ui/lib/legal/ro/privacyPolicy.ts
@@ -1079,6 +1080,7 @@ packages/providers/src/preview-test.ts
 packages/providers/src/preview-thinking.ts
 packages/providers/src/prompt-frame.ts
 packages/providers/src/prompt-tripwire.ts
+packages/providers/src/provider-companies.ts
 packages/providers/src/provider-probe.ts
 packages/providers/src/reply-fixer.ts
 packages/providers/src/reply-words.ts

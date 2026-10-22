@@ -113,7 +113,6 @@
   "legal.providers.title": "Ponudniki modelov",
   "legal.providers.meta": "Kdo prejme vaše besedilo, zakaj, kje, kako dolgo in na kakšni podlagi",
   "legal.providers.intro": "Ta Register je del našega pravilnika o zasebnosti in velja za vsakega uporabnika, ne glede na to, kje živite. Za izvedbo razprave pošljemo njeno besedilo spodaj navedenim ponudnikom umetne inteligence, kar vnesete v klepet s podporo, pa prejme model klepeta s podporo. Nikoli ne prejmejo vašega e-poštnega naslova, podatkov o vašem računu, naslova IP ali podatkov o plačilu. Uporabljamo jih samo pod pogoji, ki jim ne dovoljujejo učenja njihovih modelov z vašo vsebino; vsak vnos spodaj kaže, ali smo to potrdili. Preden nov ponudnik prejme kakršne koli podatke, vas o tem obvestimo. Oglati oklepaji označujejo dejstva, ki jih še nismo potrdili.",
-  "legal.providers.colModels": "Modeli",
   "legal.providers.colEntity": "Družba",
   "legal.providers.colCountry": "Država sedeža",
   "legal.providers.colPurpose": "Kaj prejme in zakaj",

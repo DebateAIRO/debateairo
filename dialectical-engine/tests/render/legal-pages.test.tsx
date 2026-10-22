@@ -4,7 +4,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import chromeEnglish from "../../apps/ui/messages/en/chrome.json" with { type: "json" };
 import legalEnglish from "../../apps/ui/messages/en/legal.json" with { type: "json" };
 import { CONSENT_KEY, subscribeToPreferenceRequests } from "../../apps/ui/lib/consent.js";
@@ -18,7 +18,7 @@ import {
   LEGAL_INVENTORY,
   LEGAL_PAGES,
   MODEL_PROVIDERS,
-  PROVIDER_REGISTER,
+  providerRegister,
   TERMS_VERSIONS
 } from "../../apps/ui/lib/legal/pages.js";
 import { PRIVACY_POLICY } from "../../apps/ui/lib/privacyPolicy.js";
@@ -474,7 +474,12 @@ describe("the cookie policy describes the cookies the product really sets", () =
   });
 });
 
-describe("the model providers page lists the model families the product runs", () => {
+describe("the model providers page lists the companies the API's targets reach (addition D24)", () => {
+  /** With no answer from the API the page lists the whole reviewed catalogue (owner 2026-10-22: providers, not models). */
+  const PROVIDER_REGISTER = providerRegister(null);
+  /** A register with an unchecked row (ruling R20: a host no catalogue row knows yet). */
+  const WITH_UNCHECKED = providerRegister(["deepinfra", "host:api.acme.example"]);
+
   it("has one row per family the model registry knows", () => {
     const registry = source("apps/ui/lib/models.ts");
     const families = [...(registry.match(/const NAMES[^}]+}/)?.[0] ?? "").matchAll(/^\s+(\w+):/gm)].map((match) => match[1]);
@@ -482,9 +487,8 @@ describe("the model providers page lists the model families the product runs", (
   });
 
   it("renders one register entry per provider, the support chat's model last", () => {
-    // This suite's build has no preview flag, as the real site's has none: it lists the five models the product runs
-    // (owner, 12 October 2026), Anthropic's Haiku and DeepInfra's four, not the hosted cloud rows.
-    const view = render(<LegalProvidersBody legalCatalog={legalEnglish} />);
+    // No answer from the API: every reviewed company (Anthropic and DeepInfra), not the hosted cloud rows.
+    const view = render(<LegalProvidersBody legalCatalog={legalEnglish} entries={PROVIDER_REGISTER} />);
     const headings = texts(view.querySelectorAll(".legalProviderEntry h2"));
     expect(headings).toEqual(["Anthropic", "DeepInfra", "Support chat model"]);
     expect(PROVIDER_REGISTER.at(-1)?.key).toBe("support");
@@ -492,14 +496,14 @@ describe("the model providers page lists the model families the product runs", (
 
   it("names Claude Haiku 5.5 as the support chat's model, with Anthropic's checked facts and no brackets", () => {
     // Owner, 12 October 2026: the support chat runs on Claude Haiku 5.5 on Anthropic's API.
-    const view = render(<LegalProvidersBody legalCatalog={legalEnglish} />);
+    const view = render(<LegalProvidersBody legalCatalog={legalEnglish} entries={PROVIDER_REGISTER} />);
     const support = [...view.querySelectorAll(".legalProviderEntry")].at(-1);
     expect(support?.querySelector("h2")?.textContent).toBe("Support chat model");
     const cells = Object.fromEntries([...(support?.querySelectorAll("tbody tr") ?? [])].map((row) => [
       row.querySelector("th")?.textContent, row.querySelector("td")?.textContent?.trim()
     ]));
+    // Addition D24: no models line; the support chat's model is named by its row heading's job, not a model name.
     expect(cells).toEqual({
-      "Models": "Claude Haiku 5.5",
       "Company": "Anthropic Ireland, Limited",
       "Home country": "Ireland",
       "What it receives, and why": "What you type in the support chat — to answer you",
@@ -514,28 +518,20 @@ describe("the model providers page lists the model families the product runs", (
     expect(support?.textContent).not.toMatch(/\[/u);
   });
 
-  it("on the private preview's GLM build, lists DeepInfra just before the support chat's model, and no hosted cloud row", async () => {
-    vi.stubEnv("NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON", "[\"zai-org/GLM-5.3-Flash\"]");
-    vi.resetModules();
-    try {
-      const preview = await import("../../apps/ui/components/legal/LegalBodies.js");
-      const view = render(<preview.LegalProvidersBody legalCatalog={legalEnglish} />);
-      const headings = texts(view.querySelectorAll(".legalProviderEntry h2"));
-      // Owner, 10 October 2026: a preview names only the companies that receive text on it.
-      expect(headings).toEqual(["Qwen", "DeepInfra", "Support chat model"]);
-    } finally {
-      vi.unstubAllEnvs();
-      vi.resetModules();
-    }
+  it("when the API's targets reach DeepInfra alone (the GLM-only set), lists DeepInfra just before the support chat's model, and no hosted cloud row", () => {
+    const view = render(<LegalProvidersBody legalCatalog={legalEnglish} entries={providerRegister(["deepinfra"])} />);
+    const headings = texts(view.querySelectorAll(".legalProviderEntry h2"));
+    // Owner, 10 October 2026: the page names only the companies that receive text; addition D24: no own-servers Qwen row.
+    expect(headings).toEqual(["DeepInfra", "Support chat model"]);
   });
 
   it("states the Privacy Policy's Register facts for every provider (PP §5, Japan and Korea)", () => {
-    const view = render(<LegalProvidersBody legalCatalog={legalEnglish} />);
+    const view = render(<LegalProvidersBody legalCatalog={legalEnglish} entries={WITH_UNCHECKED} />);
     const entries = [...view.querySelectorAll(".legalProviderEntry")];
-    expect(entries).toHaveLength(PROVIDER_REGISTER.length);
+    expect(entries).toHaveLength(WITH_UNCHECKED.length);
     for (const entry of entries) {
+      // Addition D24 (owner 2026-10-22): providers only, so no models line.
       expect(texts(entry.querySelectorAll("tbody th"))).toEqual([
-        "Models",
         "Company",
         "Home country",
         "What it receives, and why",
@@ -552,7 +548,7 @@ describe("the model providers page lists the model families the product runs", (
   });
 
   it("names the four jobs a provider can be given, and brackets every job nobody has confirmed", () => {
-    const view = render(<LegalProvidersBody legalCatalog={legalEnglish} />);
+    const view = render(<LegalProvidersBody legalCatalog={legalEnglish} entries={WITH_UNCHECKED} />);
     const jobs = new Set(texts(view.querySelectorAll(".legalProviderPurposes li")));
     expect([...jobs].sort()).toEqual(
       [
@@ -562,15 +558,17 @@ describe("the model providers page lists the model families the product runs", (
         "What you type in the support chat — to answer you"
       ].sort()
     );
-    PROVIDER_REGISTER.forEach((entry, index) => {
+    WITH_UNCHECKED.forEach((entry, index) => {
       const note = view.querySelectorAll(".legalProviderEntry")[index]?.querySelector(".legalProviderPurposes .legalFactNote");
       expect(note === null).toBe(entry.purposesConfirmed);
     });
+    expect(WITH_UNCHECKED.some((entry) => !entry.purposesConfirmed)).toBe(true);
   });
 
   it("claims nothing unverified: a cloud provider's contract facts stay bracketed until someone checks the row", () => {
-    for (const entry of PROVIDER_REGISTER.filter(({ checkedOn }) => checkedOn === null)) {
-      if (entry.key === "qwen") continue;
+    const uncheckedRows = WITH_UNCHECKED.filter(({ checkedOn }) => checkedOn === null);
+    expect(uncheckedRows.map(({ key }) => key)).toEqual(["host:api.acme.example"]);
+    for (const entry of uncheckedRows) {
       expect(isUnverified(entry.entity)).toBe(true);
       expect(isUnverified(entry.contact)).toBe(true);
       expect(entry.training).toBe("unconfirmed");
@@ -578,10 +576,13 @@ describe("the model providers page lists the model families the product runs", (
       expect(entry.retentionKey).toBe("legal.providers.unconfirmed");
       expect(entry.locationKey).toBe("legal.providers.unconfirmed");
     }
-    // Every unchecked row says so; once every row the build shows is checked, none does.
-    const view = render(<LegalProvidersBody legalCatalog={legalEnglish} />);
-    const unchecked = PROVIDER_REGISTER.some(({ checkedOn }) => checkedOn === null);
-    expect(view.textContent.includes("[not checked yet]")).toBe(unchecked);
+    // Every unchecked row says so; once every row the page shows is checked, none does.
+    for (const register of [PROVIDER_REGISTER, WITH_UNCHECKED]) {
+      const view = render(<LegalProvidersBody legalCatalog={legalEnglish} entries={register} />);
+      const unchecked = register.some(({ checkedOn }) => checkedOn === null);
+      expect(view.textContent.includes("[not checked yet]")).toBe(unchecked);
+    }
+    expect(PROVIDER_REGISTER.some(({ checkedOn }) => checkedOn === null)).toBe(false);
   });
 
   it("shows every register label in every locale's catalogue", () => {

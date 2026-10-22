@@ -11,7 +11,6 @@ import {
   LEGAL_COOKIES,
   LEGAL_INVENTORY,
   LEGAL_PAGES,
-  PROVIDER_REGISTER,
   TERMS_VERSIONS,
   type LegalInventoryItem,
   type LegalPageKey,
@@ -405,16 +404,21 @@ const FLAG_KEYS: Readonly<Record<ProviderRegisterEntry["zeroRetention"] | Provid
 /**
  * The AI Provider Register (`/providers`), which Privacy Policy §5 makes part of the policy: one
  * label/value table per provider with every fact §5 promises, so it stays readable on a phone.
- * Facts come from `PROVIDER_REGISTER`; the catalogues carry only labels and the words around them.
+ * It renders exactly the `entries` it is given (the page passes `providerRegister` of the API's
+ * companies); the catalogues carry only labels and the words around them. Addition D24 (owner
+ * 2026-10-22: providers only, not the models): no row names a model, so a model change never
+ * changes the page.
  */
-export function LegalProvidersBody({ legalCatalog }: { legalCatalog: MessageCatalog }) {
+export function LegalProvidersBody({ legalCatalog, entries }: {
+  legalCatalog: MessageCatalog;
+  entries: readonly ProviderRegisterEntry[];
+}) {
   return (
     <>
       <p className="legalIntro">{t(legalCatalog, "legal.providers.intro")}</p>
-      {PROVIDER_REGISTER.map((entry) => {
+      {entries.map((entry) => {
         const name = entry.nameKey === null ? entry.provider : t(legalCatalog, entry.nameKey);
         const rows: ReadonlyArray<readonly [string, ReactNode]> = [
-          ["legal.providers.colModels", entry.modelsKey === null ? <bdi>{entry.models}</bdi> : `${entry.models} · ${t(legalCatalog, entry.modelsKey)}`],
           ["legal.providers.colEntity", <bdi>{entry.entity}</bdi>],
           ["legal.providers.colCountry", t(legalCatalog, entry.homeCountryKey)],
           [

@@ -3148,6 +3148,9 @@ export {
 export * from "./preview-test.js";
 // Side-by-side spec §13, addition D12-D20 (owner 2026-10-22): the preview line-up as a settings value, the env's gate part.
 export * from "./preview-line-up.js";
+// Side-by-side spec §13, addition D24 (owner 2026-10-22: providers only, not the models, listed automatically): the
+// companies the declared targets reach, for the "AI providers" legal page.
+export { PROVIDER_COMPANY_HOSTS, providerCompaniesOfTargets } from "./provider-companies.js";
 // Parallel calls §3.3 (owner ruling O4): one probe for a busy preview model.
 export * from "./preview-busy.js";
 

@@ -99,6 +99,7 @@ import {
   LegalAcceptRequestSchema,
   LegalStatusResponseSchema,
   GeoAvailabilityResponseSchema,
+  PublicAiProvidersResponseSchema,
   AskRoomQuerySchema,
   AskRoomResponseSchema,
   QUESTION_LANGUAGE_CHOICE_NEEDED,
@@ -1431,6 +1432,8 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "DELETE /v1/debates/{id}", auth: "user", resource: "run-owner", action: "erase-private" },
   { route: "GET /v1/public/debates", auth: "public", resource: "public-debate", action: "list" },
   { route: "GET /v1/public/debates/{id}", auth: "public", resource: "public-debate", action: "read" },
+  // Addition D24 (owner 2026-10-22): the companies the declared provider targets reach, for the "AI providers" page.
+  { route: "GET /v1/public/ai-providers", auth: "public", resource: "deployment", action: "read-ai-providers" },
   { route: "GET /v1/geo/availability", auth: "public", resource: "geo", action: "read-availability" },
   // DL1-F7: every mutating support route requires the exact first-party Origin,
   // for anonymous callers too. Without it a page on any site could drive every
@@ -1860,6 +1863,13 @@ export interface ApiOptions {
    * (apps/api/src/main.ts, acceptance/main.ts). Absent means no.
    */
   readonly modelScorecardInForce?: boolean;
+  /**
+   * Side-by-side spec §13, addition D24 (owner's answer to Q-L6, 2026-10-22: providers only, not the models, listed
+   * automatically): the companies the declared provider targets reach (`providerCompaniesOfTargets`, computed once at
+   * boot in apps/api/src/main.ts), answered on GET /v1/public/ai-providers for the "AI providers" legal page. Absent
+   * = an empty list, which the page reads as "every reviewed company".
+   */
+  readonly aiProviderCompanies?: readonly string[];
 }
 
 /**
@@ -3440,6 +3450,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         : reply.send(PublicDebateSchema.parse(debate));
     }
   );
+  // Addition D24: the same answer for every caller (company keys only, no model, URL or price), charged to the
+  // per-source public-read budget by the caller's network (DL5-F3: an IPv6 address is its /64), as GET /v1/billing/plans.
+  api.get("/v1/public/ai-providers", routePolicy("GET /v1/public/ai-providers"), async (request, reply) => {
+    if (!admitOrRefuse(reply, "publicReads", "GET /v1/public/ai-providers", clientIpNetworkScope(sourceFor(request).ip))) {
+      return reply;
+    }
+    return reply.send(PublicAiProvidersResponseSchema.parse({ companies: [...(options.aiProviderCompanies ?? [])] }));
+  });
   if (options.registration !== undefined) {
     api.post("/v1/auth/register", credentialRoutePolicy("POST /v1/auth/register"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null

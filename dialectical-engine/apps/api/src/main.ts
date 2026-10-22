@@ -1,4 +1,4 @@
-import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS, previewProviderSocket } from "@debateai/providers";
+import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS, previewProviderSocket, providerCompaniesOfTargets } from "@debateai/providers";
 import { readModelScorecard, readEngineVersion, questionLanguagePolicyStartValues, readQuestionLanguagePolicy } from "@debateai/register";
 import { composeQuestionLanguage, hostedQuestionLanguageRoute, questionLanguageRouteFor } from "./question-language/boot.js";
 import { questionLanguageReferenceKeyFrom } from "./question-language/reference.js";
@@ -538,6 +538,9 @@ const declaredProviderTargets = boot.runSync("provider-targets", () => {
   assertPricedProviderTargets(declared, environment.DEPLOYMENT_MODE);
   return declared;
 });
+// Side-by-side spec §13, addition D24 (owner 2026-10-22: providers only, not the models, listed automatically): the
+// companies these declared targets reach, once, for GET /v1/public/ai-providers (the "AI providers" legal page).
+const aiProviderCompanies = providerCompaniesOfTargets(declaredProviderTargets);
 // V-9(2): the ask-time health probe needs the same credential the runner uses, so
 // it resolves each vendor's file through the same custody-checked seam.
 if (previewConfig !== undefined) {
@@ -1681,6 +1684,7 @@ const api = buildApi({
   // A21 (owner decision O4): /new's yes/no, from the very picker admission asks — the
   // same test `evaluateAskAdmission` makes before it lets the scorecard choose.
   modelScorecardInForce: modelPicker.scorecard.state === "VALID",
+  aiProviderCompanies,
   accountErasure:erasureApplication,
   registration,
   socialAuth,

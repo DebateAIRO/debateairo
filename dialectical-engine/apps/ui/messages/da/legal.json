@@ -113,7 +113,6 @@
   "legal.providers.title": "Modeludbydere",
   "legal.providers.meta": "Hvem der modtager din tekst, hvorfor, hvor, hvor længe og på hvilket grundlag",
   "legal.providers.intro": "Dette Register er en del af vores privatlivspolitik og gælder for alle brugere, uanset hvor du bor. For at gennemføre en debat sender vi dens tekst til nedenstående AI-udbydere, og det, du skriver i supportsamtalen, går til supportsamtalens model. De modtager aldrig din e-mailadresse, dine kontooplysninger, din IP-adresse eller dine betalingsoplysninger. Vi bruger dem kun på vilkår, der ikke tillader dem at træne deres modeller på dit indhold; hver post nedenfor viser, om vi har bekræftet dette. Vi giver dig besked, før en ny udbyder modtager data. Firkantede parenteser markerer oplysninger, som vi endnu ikke har bekræftet.",
-  "legal.providers.colModels": "Modeller",
   "legal.providers.colEntity": "Virksomhed",
   "legal.providers.colCountry": "Etableringsland",
   "legal.providers.colPurpose": "Hvad den modtager, og hvorfor",

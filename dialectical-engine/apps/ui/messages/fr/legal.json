@@ -113,7 +113,6 @@
   "legal.providers.title": "Fournisseurs de modèles",
   "legal.providers.meta": "Qui reçoit votre texte, pourquoi, où, pendant combien de temps et sur quel fondement",
   "legal.providers.intro": "Ce Registre fait partie de notre Politique de confidentialité et s’applique à tous les utilisateurs, où que vous résidiez. Pour exécuter un débat, nous en transmettons le texte aux fournisseurs d’IA ci-dessous, et ce que vous saisissez dans le chat d’assistance est transmis au modèle du chat d’assistance. Ils ne reçoivent jamais votre adresse e-mail, les données de votre compte, votre adresse IP ni vos informations de paiement. Nous ne les utilisons qu’à des conditions qui ne leur permettent pas d’entraîner leurs modèles sur votre contenu ; chaque entrée ci-dessous indique si nous l’avons confirmé. Nous vous informons avant qu’un nouveau fournisseur ne reçoive la moindre donnée. Les crochets signalent les informations que nous n’avons pas encore confirmées.",
-  "legal.providers.colModels": "Modèles",
   "legal.providers.colEntity": "Société",
   "legal.providers.colCountry": "Pays d’établissement",
   "legal.providers.colPurpose": "Ce qu’il reçoit, et pourquoi",
