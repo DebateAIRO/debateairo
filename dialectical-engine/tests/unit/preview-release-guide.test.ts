@@ -68,7 +68,7 @@ const code = (line: string) => !line.trimStart().startsWith('#');
 
 /** The steps, in the order the guide runs them. */
 const STEPS = Object.freeze([
-  'TA0', 'TA1', 'TA8', 'TA_UNITS', 'TA_CADDY', 'TA_ENV', 'TB0', 'TB1', 'TB2', 'TB3', 'TB4', 'TB5', 'TB6', 'TB7', 'TB8', 'TB9', 'RBA_T', 'RBB_T',
+  'TA0', 'TA1', 'TA8', 'TA_UNITS', 'TA_CADDY', 'TA_ENV', 'TA_OP', 'TB0', 'TB1', 'TB2', 'TB3', 'TB4', 'TB5', 'TB6', 'TB7', 'TB8', 'TB9', 'RBA_T', 'RBB_T',
   'SB1', 'SB1B', 'SB3', 'SB4', 'SB5', 'SB7', 'SB8', 'SB9', 'SB10', 'SB11', 'SB12', 'SB13', 'SB13B', 'SB14', 'SB15',
   'WB1', 'WB2', 'WB3', 'WB4', 'DR1', 'DR2', 'DR3', 'DR4', 'DR5', 'DR6', 'RBD_A', 'RBD_B', 'MT1', 'MT2'
 ]);
@@ -243,10 +243,81 @@ describe('the preview release guide: transition T, side by side, the way back, t
 
   it('names both owner-yes points and what each yes must say', () => {
     const t = sectionOf(guide, TRANSITION);
-    expect(t).toMatch(/fresh in the live chat right before TB1/);
+    // The gate redeploy (TB0g) runs right before the downtime on the same yes (final fix wave S4).
+    expect(t).toMatch(/fresh in the live chat right before TB0g \(or TB1 when TA10 listed no gate file\)/);
     for (const word of ['downtime', 'cold copy', 'max_connections', 'migrations', 'delta', 'release key', 'layout']) expect(t, word).toContain(word);
     const sb6 = sectionOf(guide, sideBySide.split('\n').find(line => line.startsWith('### SB6. '))!);
     for (const word of ['side by side', 'online backup', 'migrations', 'delta', 'release key', 'switch']) expect(sb6, word).toContain(word);
+  });
+});
+
+describe('the boot target\'s drop-in folder is shared with the Anthropic gate (final fix wave S1, S3, S4)', () => {
+  const TD = '/etc/systemd/system/debateai-preview.target.d';
+  const FILE = 'debateai-preview.target.d/60-current-release.conf';
+
+  it('no script stops on the folder, lists it for the way back, or moves it whole: only the switch\'s own file', () => {
+    for (const block of allBlocks) {
+      for (const line of block.lines.filter(code)) {
+        // The live preview already has the folder (README-anthropic.md "Switch it on": 50-anthropic-gate.conf).
+        expect(line, line).not.toMatch(/\[ ! -e [^\]]*debateai-preview\.target\.d \]/);
+        expect(line, line).not.toMatch(/debateai-preview\.target\.d >> "\$S\/systemd-T\.list"/);
+        expect(line, line).not.toMatch(/\bmv [^|]*debateai-preview\.target\.d["\s]/);
+      }
+    }
+    expect(scriptOf('TA0').lines).toContain(`[ ! -e ${TD}/60-current-release.conf ] || { echo "TA0_NOT_DONE: debateai-preview.target.d/60-current-release.conf exists already (look first)"; exit 1; }`);
+    expect(scriptOf('TB0').lines.join('\n')).toContain(`[ ! -e ${TD}/60-current-release.conf ]`);
+    expect(scriptOf('TB5').lines.find(line => line.startsWith('for N in debateai-preview-api@.service '))).toContain(` ${FILE}; do [ ! -e "$UD/$N" ]`);
+    // TB6 lists the file it lets the seed write, never the folder; the seed comes after the listing.
+    const tb6 = scriptOf('TB6').lines;
+    const listed = tb6.indexOf(`printf '%s\\n' ${FILE} >> "$S/systemd-T.list"`);
+    expect(listed).toBeGreaterThan(-1);
+    expect(listed).toBeLessThan(tb6.findIndex(line => line.includes('lc release-switch.mjs seed --label "$LABEL"')));
+  });
+
+  it('TA1 copies the boot target and its folder; TA0 stops on a live boot target line R19\'s copy lacks, and TB0 on any change since', () => {
+    expect(scriptOf('TA1').lines.join('\n')).toContain('tar -czf "$S/systemd-before.tgz" debateai-preview-* debateai-preview.target debateai-preview.target.d ) || { echo "TA1_NOT_DONE:');
+    const ta0 = scriptOf('TA0').lines;
+    const rt = ta0.findIndex(line => line.includes('RT=$RAPI/dialectical-engine/deploy/preview-lifecycle/v1/systemd/debateai-preview.target'));
+    const extra = ta0.findIndex(line => line.startsWith('XT=$(LC_ALL=C comm -13 <(unitlines "$RT") <(unitlines "$LT"))'));
+    const stop = ta0.findIndex(line => line.startsWith('[ -z "$XT" ] ||') && /TA0_NOT_DONE: .*ask"; exit 1; }$/.test(line));
+    expect(ta0.findIndex(line => line.startsWith('RAPI=$(jq -r .services.api.sourceRoot "$LOCK")'))).toBeLessThan(rt);
+    expect(rt).toBeLessThan(extra);
+    expect(extra).toBeLessThan(stop);
+    expect(ta0).toContain('cp -p "$LT" "$P/debateai-preview.target.live"');
+    expect(scriptOf('TA1').lines.join('\n')).toContain('[ -s "$P/debateai-preview.target.live" ]');
+    expect(scriptOf('TB0').lines.join('\n')).toContain('cmp -s /etc/systemd/system/debateai-preview.target "$S/preflight/debateai-preview.target.live" || { echo "TB0_NOT_DONE:');
+  });
+
+  it('rbB-T makes the folder in S before its move loop, reads the links list only when TB5 wrote it, and names the state at every failed move', () => {
+    const rbb = scriptOf('RBB_T').lines;
+    const made = rbb.indexOf('  install -d -o root -g root -m 0700 "$S/systemd-T" "$S/systemd-T/debateai-preview.target.d"');
+    const loop = rbb.findIndex(line => line.includes('done < "$S/systemd-T.list"'));
+    expect(made).toBeGreaterThan(-1);
+    expect(made).toBeLessThan(loop);
+    const wants = rbb.findIndex(line => line.includes('done < "$S/systemd-old-wants.txt"'));
+    expect(rbb[wants - 1]).toBe('  if [ -e "$S/systemd-old-wants.txt" ]; then');
+    // Every mv in rbB-T has its own stop line (set -e alone would end the script without saying what is left where).
+    for (const line of rbb.filter(code)) {
+      const moves = line.match(/(^|[\s;&|])mv /g)?.length ?? 0;
+      if (moves) expect(line.match(/\|\| \{ echo "RBB_T_NOT_DONE: /g)?.length ?? 0, line).toBeGreaterThanOrEqual(moves);
+    }
+  });
+
+  it('T\'s operator folder is built and compared before the downtime; the gate redeploy runs right before it (S4)', () => {
+    const op = scriptOf('TA_OP').lines.join('\n'), tb5 = scriptOf('TB5').lines.join('\n');
+    expect(op).toContain('git -C "$ART/source-reference" archive --format=tar "$REV" dialectical-engine/deploy/preview-lifecycle dialectical-engine/deploy/preview-auth-dev dialectical-engine/deploy/preview-release | tar -x -C "$NEWOP"');
+    expect(op).toContain('diff -r "$NEWOP/dialectical-engine/deploy/$D" "$CAPI/dialectical-engine/deploy/$D"');
+    // TB5 (inside the downtime) builds nothing: it compares again and swaps.
+    expect(tb5).not.toContain('git -C "$ART/source-reference" archive');
+    expect(tb5).toContain('diff -r "$NEWOP/dialectical-engine/deploy/$D" "$CAPI/dialectical-engine/deploy/$D"');
+    expect(tb5.indexOf('diff -r "$NEWOP')).toBeLessThan(tb5.indexOf('mv "$OP" "$S/operator-lifecycle-v1.before"'));
+    expect(scriptOf('TB0').lines.join('\n')).toContain('diff -r "$NEWOP/dialectical-engine/deploy/$D"');
+    const t = sectionOf(guide, TRANSITION);
+    expect(t.indexOf('\n### TA-op. ')).toBeLessThan(t.indexOf('\n### TB0. '));
+    expect(t.indexOf('\n### TB0. ')).toBeLessThan(t.indexOf('\n### TB0g. '));
+    expect(t.indexOf('\n### TB0g. ')).toBeLessThan(t.indexOf('\n### TB1. '));
+    expect(t).not.toContain('TB1g');
+    expect(scriptOf('TB1').lines.join('\n')).toContain('jq -r .state)" = active ]');
   });
 });
 

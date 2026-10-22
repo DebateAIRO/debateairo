@@ -1,7 +1,7 @@
 // Side-by-side spec §6 (the break-before-make switch) and §11 (the way back). The switch is one database write, then
 // the edge must show the new release before anything stops; the old runner is never stopped by it.
 import { afterAll, describe, expect, it } from 'vitest';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const releaseSwitch = await import('../../deploy/' + 'preview-lifecycle/v1/release-switch.mjs');
@@ -639,6 +639,29 @@ describe('stage and seed', () => {
     expect(h.files[TARGET_DROPIN]).toBe(renderTargetDropin('new-v1'));
     // Nothing is started, stopped or asked of the edge: seed runs before T's website and API start.
     expect(h.log.some(entry => entry.startsWith('edge:') || entry.startsWith('systemctl st'))).toBe(false);
+  });
+
+  it('the boot target writer touches only 60-current-release.conf: the Anthropic gate\'s drop-in beside it stays (final fix wave S1)', async () => {
+    // The live preview already has debateai-preview.target.d with 50-anthropic-gate.conf (README-anthropic.md "Switch it on").
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'release-switch-target-')));
+    try {
+      const folder = join(root, 'debateai-preview.target.d');
+      mkdirSync(folder); chmodSync(folder, 0o755);
+      const gate = '[Unit]\nWants=debateai-preview-anthropic-budget.service\nWants=debateai-preview-anthropic-halt-watch.timer debateai-preview-anthropic-addresses.timer\n';
+      writeFileSync(join(folder, '50-anthropic-gate.conf'), gate, { mode: 0o644 });
+      const before = statSync(join(folder, '50-anthropic-gate.conf'));
+      // The server's own writer (no writeUnitFile stand-in): ensureDirectory + atomicWrite into the layout's unit folder.
+      const local = { ...layout, systemdUnitDir: root, ownerUid: process.getuid!(), ownerGid: process.getgid!() };
+      const h = host({ history: [] });
+      delete h.deps.writeUnitFile;
+      expect((await seedRelease({ label: 'new-v1', layout: local, deps: h.deps })).bad).toEqual([]);
+      expect(readdirSync(folder).sort()).toEqual(['50-anthropic-gate.conf', '60-current-release.conf']);
+      expect(readFileSync(join(folder, '60-current-release.conf'), 'utf8')).toBe(renderTargetDropin('new-v1'));
+      expect(readFileSync(join(folder, '50-anthropic-gate.conf'), 'utf8')).toBe(gate);
+      const after = statSync(join(folder, '50-anthropic-gate.conf'));
+      expect([after.ino, after.mode, after.mtimeMs]).toEqual([before.ino, before.mode, before.mtimeMs]);
+      expect(statSync(folder).mode & 0o777).toBe(0o755);
+    } finally { rmSync(root, { recursive: true, force: true }); }
   });
 });
 
