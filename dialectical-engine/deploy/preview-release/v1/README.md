@@ -3373,6 +3373,7 @@ release's prestart verifies with `--database-ahead` and its proof names the file
 | SB3 | register plan and proposal, in the new release's own native-plan file | up | nothing to undo |
 | SB4 | the release check (read-only) | up | nothing to undo |
 | SB5 | the three env files; the database-ahead file | up | nothing to undo (unused files) |
+| SB5b | only when the payment marks list changes: the list in the new release's ui file | up | nothing to undo (an unused file; the one before is in `$S`) |
 | SB6 | the owner's fresh yes | up | – |
 | SB7 | the online backup | up | nothing to undo |
 | SB8 | the database-ahead pin, then the migrations (the old release keeps serving) | up | the old release serves on; WB1 once SB10 staged the new one |
@@ -3467,6 +3468,7 @@ put() { install -o root -g root -m 0644 "$1" "$NP.new" && mv "$NP.new" "$NP" && 
 psqlq() { runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d debateai -XAt -c "$1"; }
 pre() { /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$L/prestart.mjs" "$@"; }
 lc() { /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$L/$1" "${@:2}"; }
+cslots() { /usr/bin/env -i PATH=/usr/local/bin:/usr/bin:/bin TZ=UTC /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$CAPI/dialectical-engine/deploy/preview-release/v1/caddy-slots.mjs" "$@"; }
 cad() { systemd-run --quiet --pipe --wait --collect -p EnvironmentFile=/etc/debateai-v3-preview/public/caddy.env /usr/bin/caddy "$@"; }
 readyz() { printf 'X-Debateai-Edge-Secret: %s\n' "$(cat "$EDGE")" | curl -s -m 5 -H @- -w '\n%{http_code}' "http://127.0.0.1:$1/readyz" || true; }
 edgekey() { { curl -s -m 15 -o /dev/null -D - http://127.0.0.1:3090/readyz || true; } | tr -d '\r' | awk 'NR == 1 { s = $2 } tolower($1) == "x-debateai-release:" { k = $2 } END { print (s == "" ? "000" : s) " " (k == "" ? "none" : k) }'; }
@@ -3624,6 +3626,49 @@ grep -E '^(REGISTER_VERSION|RELEASE_KEY|API_PORT|PORT)=' "$E/api-$LABEL.env" "$E
 echo SB5_DONE
 ```
 
+### SB5b. The payment marks list, in the new release's ui file (only when the list changes)
+
+The website shows the payment marks its setting `PAYMENT_MARKS_AVAILABLE` names: `netopia`, `visa` and `mastercard`,
+joined by commas (`deploy/vps/README.md` §14.7; NETOPIA's mark always comes first on the page, whatever the order
+here). Each release has its own `ui-<label>.env`, derived from the old release's file in SB5, so once a release's file
+holds the line every later release carries it: SB5b runs only when the list changes, the first time at T+1 ("Payment
+marks: the files and Caddy's rule" below has the order). A release before T+1 refuses the name (its website starter
+lets through only the settings it lists, and stops with `PREVIEW_UI_STARTUP_REFUSED`), so the line never goes into an
+older release's file; that matters on the way back too, which starts the old release from its own file as it is.
+
+PM1 comes first: every listed mark's file must be in `/etc/debateai-v3-preview/public/payment-marks/` (a listed mark
+without its file shows a broken image). An empty value is refused by the test site's settings reader (every
+`<name>=` line needs a value): to show no marks, leave the line out and skip this step. SB5b runs after SB5 and before
+SB10, whose launch plans start the website from this file; it stops once `ui-launch.json` exists. At T+1 `lc` is still
+T's installed tools, whose SAME checks do not know the list yet, so the script checks the list's form itself: one to
+three of the names, lower-case, no spaces, each once.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# SB5b: PAYMENT_MARKS_AVAILABLE in the new release's own ui file (only when the list changes; never a release before T+1).
+MARKS='<the list PM1 printed, e.g. visa,mastercard>'
+PMD=/etc/debateai-v3-preview/public/payment-marks
+U=$E/ui-$LABEL.env
+printf '%s\n' "$MARKS" | grep -qxE '(netopia|visa|mastercard)(,(netopia|visa|mastercard)){0,2}' || { echo "SB5B_NOT_DONE: MARKS is not one to three of netopia, visa, mastercard joined by commas (lower-case, no spaces; for no marks, skip this step)"; exit 1; }
+[ -z "$(tr ',' '\n' <<<"$MARKS" | sort | uniq -d)" ] || { echo "SB5B_NOT_DONE: MARKS names a mark twice"; exit 1; }
+for M in ${MARKS//,/ }; do [ -f "$PMD/$M.svg" ] || { echo "SB5B_NOT_DONE: $PMD/$M.svg is missing (PM1 first; nothing changed)"; exit 1; }; done
+[ -f "$U" ] && [ "$(stat -c '%a %U' "$U")" = "640 root" ] || { echo "SB5B_NOT_DONE: $U is not root's 0640 file (SB5 first)"; exit 1; }
+[ ! -e "$ART/ui-launch.json" ] || { echo "SB5B_NOT_DONE: $ART/ui-launch.json exists: SB10 made the launch plans already (nothing changed): ask"; exit 1; }
+grep -q "'PAYMENT_MARKS_AVAILABLE'" "$CUI/dialectical-engine/deploy/preview-auth-dev/v1/environment.mjs" || { echo "SB5B_NOT_DONE: this release's website does not know PAYMENT_MARKS_AVAILABLE (a release before T+1 would refuse to start; nothing changed)"; exit 1; }
+[ ! -e "$S/ui-$LABEL.env.before-marks" ] || { echo "SB5B_NOT_DONE: $S/ui-$LABEL.env.before-marks exists: SB5b ran for this release before (look first)"; exit 1; }
+cp -p "$U" "$S/ui-$LABEL.env.before-marks"
+( umask 077; awk '!/^PAYMENT_MARKS_AVAILABLE=/' "$U" > "$U.new"; printf 'PAYMENT_MARKS_AVAILABLE=%s\n' "$MARKS" >> "$U.new" )
+chown --reference="$U" "$U.new"
+chmod --reference="$U" "$U.new"
+mv "$U.new" "$U"
+[ "$(grep -c '^PAYMENT_MARKS_AVAILABLE=' "$U")" = 1 ] && grep -qxF "PAYMENT_MARKS_AVAILABLE=$MARKS" "$U" || { echo "SB5B_NOT_DONE: the line is not in $U exactly once (the file before is $S/ui-$LABEL.env.before-marks): ask"; exit 1; }
+diff <(awk '!/^PAYMENT_MARKS_AVAILABLE=/' "$S/ui-$LABEL.env.before-marks") <(awk '!/^PAYMENT_MARKS_AVAILABLE=/' "$U") >/dev/null && [ "$(stat -c '%a %U:%G' "$U")" = "$(stat -c '%a %U:%G' "$S/ui-$LABEL.env.before-marks")" ] || { echo "SB5B_NOT_DONE: another line, the mode or the owner of $U changed (the file before is $S/ui-$LABEL.env.before-marks): ask"; exit 1; }
+lc release-env.mjs same --labels "$OLABEL,$LABEL" --slots "$OSLOT,$SLOT" || { echo "SB5B_NOT_DONE: a SAME check is BAD (above; the file before is $S/ui-$LABEL.env.before-marks)"; exit 1; }
+echo "ui-$LABEL.env: PAYMENT_MARKS_AVAILABLE=$MARKS"
+echo SB5B_DONE
+```
+
 ### SB6. The owner's fresh yes
 
 Right before SB7, fresh in the live chat; SB7 to SB13 run on it. It names:
@@ -3632,7 +3677,8 @@ Right before SB7, fresh in the live chat; SB7 to SB13 run on it. It names:
 - the migrations by number (or "no migrations");
 - the publish of register V with its delta hash;
 - the new commit and its release key;
-- the switch.
+- the switch;
+- the Caddy payment-marks rule (PM2), when this upload adds it.
 
 For example: "Yes, upload r21 to the test site side by side: take the online backup, apply migrations 0126 and 0127,
 publish register 19 with delta 3c4d…, start `<commit>` as `r19-<12 hex>` in slot B and switch to it."
@@ -4179,7 +4225,7 @@ pgrep -f '[r]elease-switch.mjs' || mv /etc/debateai-v3-preview/lifecycle/release
 could not run beside the new database (spec §5's escape hatch). Then the upload goes the old way once more, on the
 template layout: a quiet moment, the old release stopped with nothing open, a cold copy, the migrations, and a switch
 with the old pair already stopped. SB1 to SB4 stand as they are (the names, the staging, the practice, the plan); SB5's
-database-ahead file is not made.
+database-ahead file is not made. To change the payment marks on this path, run SB5b right after DR1.
 
 **The owner's yes, fresh in the live chat right before DR2.** It names the downtime, the cold copy, the migrations by
 number (and which one is not expand-only), the publish with its delta hash, and the new commit with its release key.
@@ -4518,3 +4564,129 @@ ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "MT2_NOT_DONE: rele
 jq -r '.releases[] | "\(.label) \(.state) units \(.units.api)/\(.units.ui)/\(.units.runner)"' <<<"$ST"
 echo MT2_DONE
 ```
+
+### Payment marks: the files and Caddy's rule
+
+**In plain words.** The website's footer and checkout show the NETOPIA, Visa and Mastercard marks at
+`/payment-marks/netopia.svg`, `/payment-marks/visa.svg` and `/payment-marks/mastercard.svg` (`deploy/vps/README.md`
+§14.7). Their official files are never in the repository or a release folder: the repository is public, the brands'
+terms forbid redistributing their artwork, and a release folder must equal git exactly. Root keeps them in
+`/etc/debateai-v3-preview/public/payment-marks/` (a root-owned 0755 folder, each file root-owned 0644), outside every
+release, and Caddy serves exactly those three names from there, behind the test-site password. The website shows the
+marks its setting `PAYMENT_MARKS_AVAILABLE` names, in its release's own ui file. Three steps:
+- PM1 copies the files in. It runs any time after SB1, and again whenever a file changes (for example when NETOPIA's
+  logo arrives). It never removes a file. Caddy serves a new file at once, with no restart.
+- PM2 adds Caddy's rule, once, inside a maintenance window (MT1 before it, MT2 after it), on the owner's yes.
+- SB5b ("Side-by-side release" above) writes the list into the new release's ui file. The website reads it when it
+  starts, so the footer changes with the switch.
+
+**The first time (T+1).** PM1 (any time after SB1) → SB5b → SB6 (the owner's yes names PM2) → MT1, PM2, MT2 → SB7 …
+SB13. All of them run with T+1's names file (SB1's): its `cslots` is T+1's own tool, which knows `add-payment-marks`
+(T's does not; MT1 and MT2 only need its `lc` and `$S`). T's website never shows the marks; T+1's shows them from the
+switch on. **Later**, the rule stays: a change of the list is PM1 and SB5b only, in the next upload.
+
+#### PM1. The files
+
+From the Mac, copy the official files with `scp` into a folder of your own on the server (for example
+`payment-marks-in` in your home folder there). The files on the Mac are in `DebateAIRO/docs/business/payment-marks/`
+(never in the repository). Only `netopia.svg`, `visa.svg` and `mastercard.svg` are read; PM1 stops on a file that is
+not a plain SVG of at most 512 KiB, or that holds a script, a `javascript:` link, a `foreignObject` or an `on…=`
+handler. It prints the list of the marks now in the folder: that is the value for SB5b. Run it with the names file of
+the newest release (its `$S` keeps every file PM1 replaces).
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# PM1: the payment marks' files into root's own folder outside every release. Caddy, the releases and their env files are not touched.
+IN='<the folder you copied the files to>'
+PMD=/etc/debateai-v3-preview/public/payment-marks
+[ -d "$IN" ] || { echo "PM1_NOT_DONE: IN is not the folder you copied the files to"; exit 1; }
+FOUND=''
+for M in netopia visa mastercard; do
+  F=$IN/$M.svg
+  if [ ! -e "$F" ] && [ ! -L "$F" ]; then continue; fi
+  [ "$(stat -c '%F %h' "$F")" = "regular file 1" ] || { echo "PM1_NOT_DONE: $F is not a regular file with one link"; exit 1; }
+  [ "$(stat -c '%s' "$F")" -le 524288 ] || { echo "PM1_NOT_DONE: $F is larger than 512 KiB"; exit 1; }
+  grep -q '<svg' <(head -c 2048 "$F") || { echo "PM1_NOT_DONE: $F has no <svg in its first 2048 bytes"; exit 1; }
+  if grep -qiE '<script|javascript:|<foreignObject|[[:space:]]on[a-z]+=' "$F"; then echo "PM1_NOT_DONE: $F holds a script, a javascript: link, a foreignObject or an on...= handler (ask for a clean file)"; exit 1; fi
+  FOUND="$FOUND $M"
+done
+[ -n "$FOUND" ] || { echo "PM1_NOT_DONE: none of netopia.svg, visa.svg, mastercard.svg is in $IN"; exit 1; }
+if [ ! -e "$PMD" ] && [ ! -L "$PMD" ]; then install -d -m 0755 -o root -g root "$PMD"; fi
+[ "$(stat -c '%F %U %G %a' "$PMD")" = "directory root root 755" ] && [ "$(realpath "$PMD")" = "$PMD" ] || { echo "PM1_NOT_DONE: $PMD is not root's own 0755 folder (look first)"; exit 1; }
+TS=$(date -u +%Y%m%dT%H%M%SZ)
+for M in $FOUND; do
+  F=$IN/$M.svg; T=$PMD/$M.svg
+  if [ -e "$T" ] && cmp -s "$F" "$T"; then echo "$M.svg: unchanged ($(stat -c '%s' "$T") bytes, sha256 $(sha256sum "$T" | cut -c1-16))"; continue; fi
+  if [ -e "$T" ]; then cp -p "$T" "$S/payment-mark-$M.svg.before-$TS"; echo "$M.svg: the one it replaces is in $S/payment-mark-$M.svg.before-$TS"; fi
+  install -o root -g root -m 0644 "$F" "$T.new"
+  mv "$T.new" "$T"
+  cmp -s "$F" "$T" || { echo "PM1_NOT_DONE: $T is not the copied file: ask"; exit 1; }
+  echo "$M.svg: copied ($(stat -c '%s' "$T") bytes, sha256 $(sha256sum "$T" | cut -c1-16))"
+done
+LIST=''
+for M in netopia visa mastercard; do if [ -f "$PMD/$M.svg" ]; then LIST=${LIST:+$LIST,}$M; fi; done
+echo "the marks in $PMD, the value for SB5b: $LIST"
+echo PM1_DONE
+```
+
+#### PM2. Caddy's rule (once)
+
+The first time only, between MT1 and MT2, after the owner's fresh yes names it (SB6). `caddy-slots.mjs
+add-payment-marks` writes a copy of the live two-slot file into `$S` with only the marks rule added: the three names,
+from root's folder, right before the public route's main proxy (after the readiness refusal and the password). As in
+TB7, the new file goes in with a restart (about one second), never a reload; on any miss the old file goes back and
+Caddy restarts again: the site runs on as before, without the rule.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# PM2: Caddy's payment-marks rule in place, inside the maintenance window, restart; then the edge, the password and /readyz.
+T0=$(date +%s)
+PMD=/etc/debateai-v3-preview/public/payment-marks
+PMJ='["/payment-marks/netopia.svg","/payment-marks/visa.svg","/payment-marks/mastercard.svg"]'
+[ -e /etc/debateai-v3-preview/lifecycle/maintenance-pending ] || { echo "PM2_NOT_DONE: there is no maintenance flag (MT1 first; nothing changed)"; exit 1; }
+grep -q 'add-payment-marks' "$CAPI/dialectical-engine/deploy/preview-release/v1/caddy-slots.mjs" || { echo "PM2_NOT_DONE: this names file's caddy-slots.mjs has no add-payment-marks: use the names file of a release from T+1 on (nothing changed)"; exit 1; }
+[ "$(stat -c '%F %U %G %a' "$PMD")" = "directory root root 755" ] && [ "$(realpath "$PMD")" = "$PMD" ] || { echo "PM2_NOT_DONE: $PMD is not root's own 0755 folder (PM1 first; nothing changed)"; exit 1; }
+[ ! -e "$S/Caddyfile.payment-marks" ] && [ ! -e "$S/Caddyfile.before-payment-marks" ] || { echo "PM2_NOT_DONE: $S/Caddyfile.payment-marks or $S/Caddyfile.before-payment-marks exists (PM2 ran before, or a refused run's file stays: look first)"; exit 1; }
+[ "$(stat -c '%a %U' "$C")" = "644 root" ] || { echo "PM2_NOT_DONE: the Caddyfile is not root-owned 0644 (nothing changed)"; exit 1; }
+TR=$(cslots add-payment-marks --in "$C" --out "$S/Caddyfile.payment-marks" 2>&1) || { echo "$TR"; echo "PM2_NOT_DONE: the tool refused (reason above; CADDY_ALREADY_PAYMENT_MARKS: the live file mentions payment-marks already, look at it first; nothing changed)"; exit 1; }
+echo "$TR"
+[ "$(jq -r '[.event, .folder, (.files | join(","))] | map(tostring) | join(" ")' <<<"$TR")" = "PREVIEW_CADDY_PAYMENT_MARKS $PMD netopia.svg,visa.svg,mastercard.svg" ] || { echo "PM2_NOT_DONE: the tool did not report the marks rule for $PMD (nothing changed)"; exit 1; }
+cad validate --config "$S/Caddyfile.payment-marks" --adapter caddyfile >/dev/null 2>&1 || { echo "PM2_NOT_DONE: Caddy's validation refused the new file (nothing changed): ask"; exit 1; }
+order() { cad adapt --config "$1" --adapter caddyfile 2>/dev/null | jq -r --argjson m "$PMJ" 'walk(if type == "object" and has("routes") then .routes |= map(select([.match[]?.path[]?] != $m)) else . end) | [.apps.http.servers[].routes[] | select(.match[0].host[0]=="v3-preview.dezbatere.ro") | .handle[] | .. | objects | select(has("handler")) | .handler] | join(" > ")'; }
+O1=$(order "$C"); O2=$(order "$S/Caddyfile.payment-marks")
+echo "handlers, live:       $O1"; echo "handlers, with marks: $O2 (the marks route left out)"
+[ -n "$O2" ] && [ "$O1" = "$O2" ] || { echo "PM2_NOT_DONE: the main route's handler order changed beyond the marks route (nothing changed): ask"; exit 1; }
+AD=$(cad adapt --config "$S/Caddyfile.payment-marks" --adapter caddyfile 2>/dev/null)
+FS=$(jq -r '[.. | objects | select(.handler? == "file_server")] | length' <<<"$AD")
+VR=$(jq -r '[.. | objects | select(.handler? == "vars" and has("root")) | .root] | unique | join(",")' <<<"$AD")
+MR=$(jq -r --argjson m "$PMJ" '[.. | objects | select(has("routes")) | .routes[]? | [.match[]?.path[]?] | select(any(.[]; startswith("/payment-marks")))] == [$m]' <<<"$AD")
+echo "file servers: $FS; roots: $VR; one route for exactly the three marks: $MR"
+[ "$FS" = 1 ] || { echo "PM2_NOT_DONE: the new file has $FS file servers, not exactly one (nothing changed): ask"; exit 1; }
+[ "$VR" = "$PMD" ] || { echo "PM2_NOT_DONE: the new file serves files from $VR, not only $PMD (nothing changed): ask"; exit 1; }
+[ "$MR" = true ] || { echo "PM2_NOT_DONE: not exactly one route matches exactly the three marks' paths (nothing changed): ask"; exit 1; }
+cp -p "$C" "$S/Caddyfile.before-payment-marks"
+back() { R="is back"; install -o root -g root -m 0644 "$S/Caddyfile.before-payment-marks" "$C.new" && mv "$C.new" "$C" && cmp -s "$S/Caddyfile.before-payment-marks" "$C" || R="did NOT go back (the live file may still be the one with the marks rule)"; systemctl restart caddy || true; CA=$(systemctl is-active caddy || true); echo "PM2_NOT_DONE: $1; the old Caddyfile $R; after its restart Caddy is $CA (active: the site runs as before, without the marks rule; anything else: the site is DOWN, look at caddy now) (ask)"; exit 1; }
+install -o root -g root -m 0644 "$S/Caddyfile.payment-marks" "$C.new"
+mv "$C.new" "$C"
+systemctl restart caddy || back "caddy did not restart on the new file"
+cmp -s "$S/Caddyfile.payment-marks" "$C" || back "the new file is not the live file"
+[ "$(systemctl is-active caddy || true)" = active ] || back "caddy is not active on the new file"
+EK="000 none"; for i in $(seq 1 30); do EK=$(edgekey); [ "${EK%% *}" = 200 ] && [ "${EK#* }" != none ] && break; sleep 1; done
+echo "edge 127.0.0.1:3090/readyz: $EK"
+[ "${EK%% *}" = 200 ] && [ "${EK#* }" != none ] || back "the edge did not answer 200 with a release key within 30 s"
+PC=$(curl -s -o /dev/null -m 15 -w '%{http_code}' https://v3-preview.dezbatere.ro/ || true); echo "public / without the password: $PC"
+[ "$PC" = 401 ] || back "the public site does not answer 401 without the password (got $PC)"
+VC=$(curl -s -o /dev/null -m 15 -w '%{http_code}' https://v3-preview.dezbatere.ro/payment-marks/visa.svg || true); echo "public /payment-marks/visa.svg without the password: $VC"
+[ "$VC" = 401 ] || back "the marks are not behind the password (visa.svg without it answered $VC, not 401)"
+RP=$(curl -s -o /dev/null -m 15 -w '%{http_code}' https://v3-preview.dezbatere.ro/readyz || true); echo "public /readyz without the password: $RP"
+[ "$RP" = 404 ] || back "the public route does not refuse /readyz with its own 404 before the password (got $RP)"
+echo "Caddy restarted with the payment-marks rule, checked $(( $(date +%s) - T0 )) s after this step began"
+echo PM2_DONE
+```
+
+Then MT2. In the browser, with the test-site password, open `https://v3-preview.dezbatere.ro/payment-marks/visa.svg`:
+the mark shows (one PM1 copied in). `https://v3-preview.dezbatere.ro/payment-marks/amex.svg` answers 404 from the
+website: any other path under `/payment-marks/` goes on to the website as before. The footer shows the marks only
+from the switch to a release whose ui file names them (SB5b).
