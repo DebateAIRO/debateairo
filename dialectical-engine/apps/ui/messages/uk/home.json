@@ -132,8 +132,8 @@
   "home.removal.ground": "Підстава: наші Умови надання послуг, розділ 9 (дебати, які видаляє наша перевірка).",
   "home.removal.complain": "Щоб подати скаргу, напишіть на office@dezbatere.ro протягом шести місяців. Скарга не може повернути дебати.",
   "home.removal.close": "Закрити",
-  "home.flag.underReview": "ПОМІЧЕНО · НА ПЕРЕГЛЯДІ",
-  "home.flag.approved": "ЗАТВЕРДЖЕНО",
-  "home.flag.refused": "НЕ ЗАТВЕРДЖЕНО",
+  "home.flag.underReview": "ПОЗНАЧЕНО · НА РОЗГЛЯДІ",
+  "home.flag.approved": "СХВАЛЕНО",
+  "home.flag.refused": "НЕ СХВАЛЕНО",
   "home.takeDown.button": "Прибрати"
 }

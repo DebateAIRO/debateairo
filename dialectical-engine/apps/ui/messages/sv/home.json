@@ -130,8 +130,8 @@
   "home.removal.ground": "Grund: våra Användarvillkor, avsnitt 9 (debatter som vår kontroll raderar).",
   "home.removal.complain": "För att klaga, skriv till office@dezbatere.ro inom sex månader. Ett klagomål kan inte återställa debatten.",
   "home.removal.close": "Stäng",
-  "home.flag.underReview": "FLAGGAD · UNDER GRANSKNING",
-  "home.flag.approved": "GODKÄNT",
+  "home.flag.underReview": "MARKERAD · UNDER GRANSKNING",
+  "home.flag.approved": "GODKÄND",
   "home.flag.refused": "EJ GODKÄND",
   "home.takeDown.button": "Ta ned"
 }

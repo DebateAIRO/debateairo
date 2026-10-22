@@ -134,8 +134,8 @@
   "home.removal.ground": "الأساس: شروط الخدمة لدينا، القسم 9 (المناظرات التي يحذفها فحصنا).",
   "home.removal.complain": "لتقديم شكوى، اكتب إلى office@dezbatere.ro خلال ستة أشهر. لا يمكن للشكوى أن تعيد المناظرة.",
   "home.removal.close": "إغلاق",
-  "home.flag.underReview": "تم وضع علامة عليها · قيد المراجعة",
-  "home.flag.approved": "تمت الموافقة عليه",
+  "home.flag.underReview": "مُعلَّم · قيد المراجعة",
+  "home.flag.approved": "معتمد",
   "home.flag.refused": "غير معتمد",
   "home.takeDown.button": "إزالة"
 }

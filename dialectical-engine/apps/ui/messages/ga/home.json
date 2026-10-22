@@ -133,8 +133,8 @@
   "home.removal.ground": "Bunús: ár dTéarmaí Seirbhíse, alt 9 (díospóireachtaí a scriosann ár seiceáil).",
   "home.removal.complain": "Chun gearán a dhéanamh, scríobh chuig office@dezbatere.ro laistigh de shé mhí. Ní féidir leis an ngearán an díospóireacht a thabhairt ar ais.",
   "home.removal.close": "Dún",
-  "home.flag.underReview": "FLAGGED · FAOI ATHBHREITHNIÚ",
-  "home.flag.approved": "CEADAITHE",
-  "home.flag.refused": "NACH BHFUIL CEADAITHE",
+  "home.flag.underReview": "MARCÁILTE · FAOI ATHBHREITHNIÚ",
+  "home.flag.approved": "FORMHEASTA",
+  "home.flag.refused": "GAN FORMHEAS",
   "home.takeDown.button": "Bain anuas"
 }

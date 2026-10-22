@@ -130,8 +130,8 @@
   "home.removal.ground": "Βάση: οι Όροι παροχής υπηρεσιών μας, ενότητα 9 (αντιπαραθέσεις που διαγράφει ο έλεγχός μας).",
   "home.removal.complain": "Για να υποβάλετε καταγγελία, γράψτε στο office@dezbatere.ro εντός έξι μηνών. Μια καταγγελία δεν μπορεί να επαναφέρει την αντιπαράθεση.",
   "home.removal.close": "Κλείσιμο",
-  "home.flag.underReview": "ΕΠΙΣΗΜΑΝΣΗ · ΥΠΟ ΕΞΕΤΑΣΗ",
-  "home.flag.approved": "ΕΓΚΕΚΡΙΜΕΝΟ",
-  "home.flag.refused": "ΔΕΝ ΕΓΚΡΙΘΗΚΕ",
+  "home.flag.underReview": "ΕΠΙΣΗΜΑΣΜΕΝΗ · ΥΠΟ ΕΞΕΤΑΣΗ",
+  "home.flag.approved": "ΕΓΚΕΚΡΙΜΕΝΗ",
+  "home.flag.refused": "ΜΗ ΕΓΚΕΚΡΙΜΕΝΗ",
   "home.takeDown.button": "Απόσυρση"
 }

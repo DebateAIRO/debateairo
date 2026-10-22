@@ -130,8 +130,8 @@
   "home.removal.ground": "आधार: हमारी सेवा की शर्तें, खंड 9 (हमारी जाँच जिन वाद-विवादों को हटाती है)।",
   "home.removal.complain": "शिकायत करने के लिए छह महीने के भीतर office@dezbatere.ro पर लिखें। शिकायत से वाद-विवाद वापस नहीं लाया जा सकता।",
   "home.removal.close": "बंद करें",
-  "home.flag.underReview": "ध्वजांकित · समीक्षाधीन",
-  "home.flag.approved": "स्वीकृत",
-  "home.flag.refused": "स्वीकृत नहीं",
+  "home.flag.underReview": "चिह्नित · समीक्षाधीन",
+  "home.flag.approved": "अनुमोदित",
+  "home.flag.refused": "अनुमोदित नहीं",
   "home.takeDown.button": "हटाएँ"
 }

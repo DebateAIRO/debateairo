@@ -131,8 +131,8 @@
   "home.removal.ground": "Motivo: le nostre Condizioni di servizio, sezione 9 (dibattiti che la nostra verifica cancella).",
   "home.removal.complain": "Per presentare un reclamo, scrivi a office@dezbatere.ro entro sei mesi. Un reclamo non può riportare indietro il dibattito.",
   "home.removal.close": "Chiudi",
-  "home.flag.underReview": "BANDIERATO · IN CORSO DI REVISIONE",
+  "home.flag.underReview": "CONTRASSEGNATO · IN REVISIONE",
   "home.flag.approved": "APPROVATO",
-  "home.flag.refused": "NON OMOLOGATO",
+  "home.flag.refused": "NON APPROVATO",
   "home.takeDown.button": "Rimuovi"
 }

@@ -132,8 +132,8 @@
   "home.removal.ground": "Pagrindas: mūsų Paslaugų teikimo sąlygos, 9 skyrius (debatai, kuriuos ištrina mūsų patikra).",
   "home.removal.complain": "Norėdami pateikti skundą, per šešis mėnesius parašykite adresu office@dezbatere.ro. Skundas negali sugrąžinti debatų.",
   "home.removal.close": "Uždaryti",
-  "home.flag.underReview": "PAŽYMĖTA · PERŽIŪRA",
-  "home.flag.approved": "PATVIRTINTA",
-  "home.flag.refused": "NEPATVIRTINTA",
+  "home.flag.underReview": "PAŽYMĖTA · PERŽIŪRIMA",
+  "home.flag.approved": "PRITARTA",
+  "home.flag.refused": "NEPRITARTA",
   "home.takeDown.button": "Nuimti"
 }

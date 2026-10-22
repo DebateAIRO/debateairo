@@ -133,7 +133,7 @@
   "home.removal.complain": "Чтобы подать жалобу, напишите на office@dezbatere.ro в течение шести месяцев. Жалоба не может восстановить дебаты.",
   "home.removal.close": "Закрыть",
   "home.flag.underReview": "ПОМЕЧЕНО · НА РАССМОТРЕНИИ",
-  "home.flag.approved": "УТВЕРЖДЕНО",
-  "home.flag.refused": "НЕ УТВЕРЖДЕНО",
+  "home.flag.approved": "ОДОБРЕНО",
+  "home.flag.refused": "НЕ ОДОБРЕНО",
   "home.takeDown.button": "Убрать"
 }

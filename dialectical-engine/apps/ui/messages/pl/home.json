@@ -132,8 +132,8 @@
   "home.removal.ground": "Podstawa: nasze Warunki świadczenia usług, punkt 9 (debaty, które usuwa nasza kontrola).",
   "home.removal.complain": "Aby złożyć skargę, napisz na office@dezbatere.ro w ciągu sześciu miesięcy. Skarga nie może przywrócić debaty.",
   "home.removal.close": "Zamknij",
-  "home.flag.underReview": "OZNACZONY · W TRAKCIE PRZEGLĄDU",
-  "home.flag.approved": "ZATWIERDZONE",
-  "home.flag.refused": "NIE ZATWIERDZONO",
+  "home.flag.underReview": "OZNACZONA · W TRAKCIE PRZEGLĄDU",
+  "home.flag.approved": "ZATWIERDZONA",
+  "home.flag.refused": "NIEZATWIERDZONA",
   "home.takeDown.button": "Wycofaj"
 }
