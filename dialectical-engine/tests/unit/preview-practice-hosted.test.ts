@@ -14,8 +14,10 @@ import {
   canonicalRegisterJson,
   computeRegisterSnapshotSha256,
   loadBootstrapRegister,
-  parseCanonicalRegisterJson
+  parseCanonicalRegisterJson,
+  PREVIEW_LINE_UP_POLICY_ROW_KEY
 } from "@debateai/register";
+import { parsePreviewLineUp } from "@debateai/providers";
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from "../../packages/register/src/staff-access-policy.js";
 import { buildPreviewSourceRowsV2 } from "../../deploy/preview-auth-dev/v1/publish-register-v2.js";
 import {
@@ -28,10 +30,11 @@ import {
   composePracticeNextRegisterVersion,
   parsePracticeNextRegisterInputs,
   practiceBaseIsHosted,
+  practiceRowsLineUp,
   PRACTICE_REGISTER_EXPORT_SCHEMA,
   type PracticeRegisterExport
 } from "../../tools/preview-practice/practice-register-import.js";
-import { parsePracticeSettings, PRACTICE_HOSTED_SET_ASIDE_KEYS } from "../../tools/preview-practice/practice-settings.js";
+import { parsePracticeSettings, PRACTICE_HOSTED_SET_ASIDE_KEYS, practiceSettingsWithLineUp } from "../../tools/preview-practice/practice-settings.js";
 import { runPractice } from "../../tools/preview-practice/practice.js";
 
 type Row = { rowKey: string; valueJsonText: string; sourceRef: string };
@@ -103,6 +106,19 @@ describe("hosted settings: read, with the server-only settings set aside unread"
     // No value of theirs is kept anywhere in what the practice holds.
     const held = JSON.stringify(settings);
     for (const line of serverOnly) expect(held).not.toContain(line.slice(line.indexOf("=") + 1));
+  });
+
+  it("the hosted T+1 env form (sockets only, R25): read, its server-only settings set aside, its line-up the version's", () => {
+    const { free_model_ids: _free, premium_model_ids: _premium, ...gateOnly } = JSON.parse(config) as Record<string, unknown>;
+    const lines = base("hosted").map((line) => line.startsWith("PREVIEW_PROVIDER_TEST_CONFIG_JSON=")
+      ? `PREVIEW_PROVIDER_TEST_CONFIG_JSON=${JSON.stringify(gateOnly)}` : line);
+    const settings = parsePracticeSettings([...lines, ...serverOnly].join("\n"), { sourceRevision: "0123456789ab".padEnd(40, "c") });
+    expect(settings).toMatchObject({ previewConfig: null, runner: { DEPLOYMENT_MODE: "hosted", PREVIEW_ENV_LINE_UP: null } });
+    expect(settings.setAsideKeys).toHaveLength(serverOnly.length);
+    const lineUp = parsePreviewLineUp({ free_model_ids: ["zai-org/GLM-5.3-Flash", "claude-haiku-5-5"],
+      premium_model_ids: ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash", "claude-haiku-5-5"], thinking_levels: null });
+    expect(practiceSettingsWithLineUp(settings, lineUp, { trial: false }).previewConfig).toMatchObject({
+      scope_id: "preview-practice-hosted", free_model_ids: lineUp.free_model_ids, premium_model_ids: lineUp.premium_model_ids });
   });
 
   it("a local export still refuses each of them at its own line, exactly as any key outside the allow-list", () => {
@@ -186,6 +202,31 @@ describe("--register-next on the hosted preview: publish kit v3, as the server's
     const next = await composePracticeHostedNextRegisterVersion(exportOf(base), OFF, { callConcurrency: policy });
     expect(next.addedKeys).toContain("callConcurrencyPolicy");
     expect(value(next.rows as readonly Row[], "callConcurrencyPolicy")).toMatchObject(policy);
+  });
+
+  it("--register-next --line-up (addition D23): the row goes into the code's next version itself, kit v2 or kit v3, as the plan's --line-up", async () => {
+    const lineUp = parsePreviewLineUp({ free_model_ids: ["zai-org/GLM-5.3-Flash", "claude-haiku-5-5"],
+      premium_model_ids: ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash", "XiaomiMiMo/MiMo-V2.6-Pro", "claude-haiku-5-5"],
+      thinking_levels: { "deepseek-ai/DeepSeek-V4.1-Flash": { level: "low" } } });
+    expect((await parsePracticeNextRegisterInputs({ lineUp })).choices).toEqual({ lineUp });
+    expect((await parsePracticeNextRegisterInputs({ lineUp: null })).choices).toEqual({});
+    const base = await local12();
+    // Kit v2: the base is the code's own rows, so the line-up row is the only change (nothing else is practised).
+    const local = await composePracticeNextRegisterVersion(exportOf(base), undefined, { lineUp });
+    expect([local.addedKeys, local.changedKeys]).toEqual([[PREVIEW_LINE_UP_POLICY_ROW_KEY], []]);
+    expect(practiceRowsLineUp(local.rows)).toEqual(lineUp);
+    // Kit v3: byte for byte the server's proposal with the same --line-up.
+    const hosted = await composePracticeHostedNextRegisterVersion(exportOf(base), OFF, { lineUp });
+    const serverRows = await buildPreviewSourceRowsV3(await loadBootstrapRegister(), runtime, OFF, undefined, "on", null, null, null, null, null, lineUp);
+    const server = composePreviewSnapshotV3({ sourceRows: serverRows, baseRows: base as never, baseRegisterVersion: "12",
+      baseSnapshotSha256: computeRegisterSnapshotSha256(base as never) });
+    expect([hosted.snapshotSha256, hosted.deltaSha256]).toEqual([server.snapshotSha256, server.deltaSha256]);
+    expect(hosted.addedKeys).toContain(PREVIEW_LINE_UP_POLICY_ROW_KEY);
+    expect(practiceRowsLineUp(hosted.rows)).toEqual(lineUp);
+    // Without --line-up a base's own row is carried unchanged (R19): no line-up change in the next version.
+    const carried = await composePracticeHostedNextRegisterVersion(exportOf(sorted([...local.rows] as Row[])), OFF);
+    expect([...carried.addedKeys, ...carried.changedKeys]).not.toContain(PREVIEW_LINE_UP_POLICY_ROW_KEY);
+    expect(practiceRowsLineUp(carried.rows)).toEqual(lineUp);
   });
 
   it("kit v2 refuses a hosted base (the server's HOSTED_BILLING_REQUIRED), and keeps reading a local base as before", async () => {

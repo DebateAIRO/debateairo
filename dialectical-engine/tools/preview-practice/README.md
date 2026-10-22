@@ -603,6 +603,51 @@ echo "exit: $?"
   sat out cannot be picked, and a cost fallback or a backup storyteller serving instead is not the pinned model: either
   way the verdict is NOT_PROVEN with `PRACTICE_PIN_NOT_HELD:<ROLE>`.
 
+### Trying a new line-up before an activation (`--line-up`)
+
+The line-up is which AIs debate on Free and on Premium, and how hard each one thinks (the thinking levels). Since the
+Phase 2 addition it is a settings value: the `previewLineUpPolicy` row of a sealed settings version, so a change is an
+activation, not an upload. The practice always runs the line-up of the settings version it runs on, read the way the
+runner and the API read it:
+
+- the version's own `previewLineUpPolicy` row, when it has one;
+- otherwise the line-up in the settings file (`PREVIEW_PROVIDER_TEST_CONFIG_JSON` with its two lists of AIs and its
+  optional thinking table: today's server setting);
+- a settings file in the sockets-only form (the server setting from the first Phase 2 upload on: the gate sockets, the
+  scope and nothing else) and a version without the row: refused before anything is spent (`PREVIEW_LINE_UP_REQUIRED`);
+- a version with the row beside a settings file that still lists AIs: refused (`PREVIEW_LINE_UP_ENV_CONFLICT`), as the
+  live server refuses to start the same way.
+
+The progress line `line-up of version N: …` says where the line-up came from, both lists and whether a thinking table is
+set.
+
+**The trial (optional).** No practice is needed before an activation (the six checks are). When you want to see a new
+line-up debate first:
+
+1. Write the planned line-up to a file. Either the bare three members, for example
+   `{"free_model_ids":["zai-org/GLM-5.3-Flash","claude-haiku-5-5"],"premium_model_ids":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro","claude-haiku-5-5"],"thinking_levels":{"deepseek-ai/DeepSeek-V4.1-Flash":{"level":"low"}}}`,
+   or what `check-thinking-levels.ts --print-line-up` prints (`{"lineUp":{…}}`). It is the same file the release tool's
+   `native-plan --line-up` takes, so the line-up you try is the line-up you then publish.
+2. Run S-6's debate command plus `--line-up FILE`. The row goes into the practice's own throwaway database only, in the
+   same one throwaway version as `--shape-policy`, `--length-policy` and `--engine-policy` (live version + 1; with
+   `--register-next`, into the code's next version, as the plan's `--line-up` would carry it). The live register is
+   never written.
+3. The settings file's own lists, if it still has them, are set aside for the trial, as on a server whose settings
+   version carries the row. So the trial works with today's settings file and with the sockets-only one.
+
+The file is checked before anything is spent, by the same checks the publish kit runs (every AI a reviewed one, each
+once, at least two makers on each plan when the line-up has more than one, each thinking level on that AI's reviewed menu): a refusal names why
+(`PRACTICE_LINE_UP_INVALID <code>:<detail>`, for example `PREVIEW_LINE_UP_POLICY_INVALID:maker_rule`), or
+`PRACTICE_LINE_UP_UNREADABLE`. Every AI of the line-up must be switched on at its gate: a debate AI the gate does not
+serve sits out, and the verdict is not PASS. If the row is not in the version the debate runs on, the debate is refused
+before any AI is asked (`PRACTICE_LINE_UP_NOT_PUBLISHED`).
+
+formats, openings, language and judge-order take `--line-up FILE` too: they run no settings version, so they ask with
+the file's line-up (formats' `--models` must be on its Premium list); without it they ask with the settings file's, and
+with a sockets-only settings file they need it (`PREVIEW_LINE_UP_REQUIRED` otherwise). report and rescore refuse it.
+
+Example (S-6's debate command plus): `--line-up "$P/line-up.json"`.
+
 ### The question language (language mode, and debate's `--site-language`)
 
 With the new shape on, the site fixes the language of each question before the debate starts (P2L):
@@ -867,6 +912,9 @@ Only these keys are copied; `grep` prints nothing on screen. `RELEASE_KEY` is no
 names its release from the Mac checkout it runs (`r<REGISTER_VERSION>-<first 12 hex of git HEAD>`), and its runner and
 its ask both use that one key (side-by-side spec §1, §3). A settings line `RELEASE_KEY=…` would win if one were added;
 a hosted practice with neither a line nor a readable git HEAD refuses (`PRACTICE_SETTINGS_VALUE_INVALID: RELEASE_KEY`).
+From the first Phase 2 upload on, `PREVIEW_PROVIDER_TEST_CONFIG_JSON` is the sockets-only form (no lists of AIs): the
+practice then takes the line-up from the settings version (or `--line-up`, see "Trying a new line-up before an
+activation").
 
 ```sh
 grep -E '^(PREVIEW_PROVIDER_TEST_CONFIG_JSON|PROVIDER_DISCOVERY_TARGETS_JSON|REGISTER_VERSION|DEBATEAI_DEPLOYMENT_MODE|NODE_ENV|CLAIM_MS|CLAIM_MARGIN_MS|MAX_RECOMPOSE|JUDGEMENT_NUMBER_KIND|JUDGEMENT_PRODUCER|PROPAGATION_NUMBER_KIND|PROPAGATION_PRODUCER|PROVIDER_PROBE_TIMEOUT_MS|PROVIDER_REF|VLLM_BASE_URL|VLLM_MODEL|VLLM_MAKER)=' /etc/debateai-v3-preview/auth-dev-v1/runner.env > /root/practice/settings.env
@@ -994,7 +1042,8 @@ Optional flags:
   across the runner for that vendor, 1 to 1000, `default` required; for example `12/3/default=50,deepinfra=150,anthropic=50`;
   formats, openings and report refuse it), `--transcript` (also write `transcript.json`: every prompt and every answer, see "The whole
   debate, word for word" above), `--shape-policy FILE`, `--depth-mode fixed|adaptive`, `--scrutiny standard|deep|exhaustive`
-  and `--answer-length short|standard|detailed` (see "The new debate shape"; debate only). The register is copied only
+  and `--answer-length short|standard|detailed` (see "The new debate shape"; debate only), `--line-up FILE` (see "Trying a
+  new line-up before an activation"; every mode that reads the settings). The register is copied only
   through the register's own publication paths; an export holding a support-configuration version refuses
   (`PRACTICE_REGISTER_PATH_UNSUPPORTED`).
   `--register-next` practises a release that needs a NEW register version (new sealed prompts) before it is uploaded:
@@ -1355,8 +1404,8 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 - `practice-gate-observer.ts` (the watch and the brake), `practice-verdict.ts`, `practice-report.ts`,
   `practice-samples-log.ts` (samples.jsonl and the report rebuilt from it), `practice-concurrency.ts` (formats: models at once,
   the per-gate and overall limits), `practice-parallel.ts` (debate: `--call-concurrency` and the report's
-  "Calls at once"), `practice-interrupt.ts` (Ctrl-C), `practice-redaction.ts`, `practice-settings.ts`,
-  `practice-questions.ts`.
+  "Calls at once"), `practice-interrupt.ts` (Ctrl-C), `practice-redaction.ts`, `practice-settings.ts` (also the line-up:
+  `--line-up` and the version's own, by the runner's and the API's one rule), `practice-questions.ts`.
 - `practice-tokens.ts`: the tokens and words per AI and step (length guidance LG-B, information only).
 - `practice-openings.ts` (the openings run), `practice-openings-questions.ts` (the 12 fixed questions),
   `practice-openings-log.ts` (openings.jsonl and its report), `practice-openings-dry.ts` (`--dry`'s scripted gates).

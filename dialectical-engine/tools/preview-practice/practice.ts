@@ -19,6 +19,8 @@
  *             (practice-transcript.ts).
  *             --shape-policy FILE runs it in the new debate shape, in the throwaway register only (practice-shape.ts).
  *             --length-policy FILE runs it with the length row, in the throwaway register only (practice-length.ts).
+ *             --line-up FILE runs it with that line-up, in the throwaway register only (practice-settings.ts); every mode
+ *             that reads the settings takes it (formats, openings, language and judge-order then ask with that line-up).
  *             --site-language and --language-choice set the site language and answer the one-language offer (default keep).
  *  - openings: the debate-shape comparison (spec 2026-10-12 §2): today's opening (T) and three map openings (A snowball,
  *             B blind lists, C the angle map) on 12 fixed questions; every finished call goes to <out>/openings.jsonl at
@@ -95,7 +97,9 @@ import {
   composePracticeNextRegisterVersion,
   parsePracticeNextRegisterInputs,
   parsePracticeRegisterExport,
-  PracticeRegisterError
+  PracticeRegisterError,
+  practiceRowsLineUp,
+  practiceVersionRows
 } from "./practice-register-import.js";
 import {
   abortedReport,
@@ -123,6 +127,8 @@ import { writeSideBySideFile } from "./practice-side-by-side.js";
 import {
   assertGateStatusAllowsPractice,
   PracticeRefusal,
+  practiceLineUpFromArgs,
+  practiceSettingsWithLineUp,
   practiceSocketsFromEnvironment,
   readGateStatus,
   readPracticeSettings
@@ -166,7 +172,7 @@ const VALUE_FLAGS = new Set(["--settings", "--register-export", "--gate-status-d
   "--samples", "--gap-ms", "--models", "--lanes", "--depth", "--question", "--max-in-flight", "--busy-wait-minutes", "--levels",
   "--side-by-side", "--questions", "--arms", "--call-concurrency", "--shape-policy", "--depth-mode", "--scrutiny",
   "--answer-length", "--site-language", "--language-choice", "--transcripts", "--length-policy", "--engine-policy",
-  "--answer-writer-model", "--storyteller-model",
+  "--answer-writer-model", "--storyteller-model", "--line-up",
   ...REGISTER_NEXT_INPUT_FLAGS]);
 const SWITCHES = new Set<string>(["--sequential", "--transcript", "--dry", "--register-next", "--story-length", "--control"]);
 
@@ -175,17 +181,19 @@ const SWITCHES = new Set<string>(["--sequential", "--transcript", "--dry", "--re
  * the full paid comparison. A dry run reads no settings and no gate status, so those are refused with --dry.
  */
 const OPENINGS_FLAGS: ReadonlySet<string> = new Set(["--out", "--questions", "--arms", "--busy-wait-minutes", "--max-in-flight", "--dry",
-  "--settings", "--gate-status-deepinfra", "--gate-status-anthropic"]);
-const OPENINGS_REAL_RUN_ONLY: ReadonlySet<string> = new Set(["--settings", "--gate-status-deepinfra", "--gate-status-anthropic"]);
+  "--settings", "--gate-status-deepinfra", "--gate-status-anthropic", "--line-up"]);
+const OPENINGS_REAL_RUN_ONLY: ReadonlySet<string> = new Set(["--settings", "--gate-status-deepinfra", "--gate-status-anthropic", "--line-up"]);
 /** The flags language reads (practice-language.ts); every other flag is refused there. A dry run reads no settings, gate status or export. */
-const LANGUAGE_FLAGS: ReadonlySet<string> = new Set(["--out", "--settings", "--gate-status-deepinfra", "--gate-status-anthropic", "--register-export", "--dry"]);
-const LANGUAGE_REAL_RUN_ONLY: ReadonlySet<string> = new Set(["--settings", "--gate-status-deepinfra", "--gate-status-anthropic", "--register-export"]);
+const LANGUAGE_FLAGS: ReadonlySet<string> = new Set(["--out", "--settings", "--gate-status-deepinfra", "--gate-status-anthropic", "--register-export", "--dry",
+  "--line-up"]);
+const LANGUAGE_REAL_RUN_ONLY: ReadonlySet<string> = new Set(["--settings", "--gate-status-deepinfra", "--gate-status-anthropic", "--register-export",
+  "--line-up"]);
 /** The flags rescore reads (practice-rescore.ts); every other flag is refused there. It reads no settings, gate or socket. */
 const RESCORE_FLAGS: ReadonlySet<string> = new Set(["--transcripts", "--out", "--engine-policy"]);
 /** The flags judge-order reads (practice-judge-order.ts); every other flag is refused there. A dry run reads no settings or gate status. */
 const JUDGE_ORDER_FLAGS: ReadonlySet<string> = new Set(["--transcripts", "--out", "--settings", "--gate-status-deepinfra",
-  "--gate-status-anthropic", "--dry", "--control"]);
-const JUDGE_ORDER_REAL_RUN_ONLY: ReadonlySet<string> = new Set(["--settings", "--gate-status-deepinfra", "--gate-status-anthropic"]);
+  "--gate-status-anthropic", "--dry", "--control", "--line-up"]);
+const JUDGE_ORDER_REAL_RUN_ONLY: ReadonlySet<string> = new Set(["--settings", "--gate-status-deepinfra", "--gate-status-anthropic", "--line-up"]);
 
 /** What the interrupt messages say the report is written from: openings' finished calls, the other modes' samples. */
 export function practiceFinishedUnit(mode: string | undefined): "calls" | "samples" {
@@ -491,6 +499,10 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     if (args.switches.has("--control") && args.mode !== "judge-order") {
       throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--control (judge-order mode only)");
     }
+    // The line-up to try (addition D23; S plan Q-S1): read and checked here, before any socket, settings file or gate is
+    // touched, so a line-up the providers' parser refuses never starts a paid run (report mode refuses the flag; the --dry runs
+    // above refuse it as a real run's flag).
+    const lineUpOverride = practiceLineUpFromArgs(args.mode, args.flags);
     // Only fixed ids are accepted, each checked with its seat rotation before anything else (ruling T11-m6); the text of
     // a refused value is never repeated (practice-openings-questions.ts).
     const openingsQuestions = args.mode === "openings" ? openingsQuestionsFromFlag(args.flags.get("--questions")) : [];
@@ -601,6 +613,11 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     directory = assertOutsideRepository(args.flags.get("--out") ?? defaultReportDirectory(mode, startedAt), repositoryRoot());
     const sockets = practiceSocketsFromEnvironment(env);
     const settings = readPracticeSettings(required(args, "--settings"), sourceRevision());
+    // Addition D14-D16 (owner 2026-10-22, R25): the line-up the practice asks with. The modes that run no settings version
+    // (formats, openings, language, judge-order): the --line-up file's, else the settings' env line-up (a sockets-only file
+    // refuses PREVIEW_LINE_UP_REQUIRED here, before any gate is asked). A debate's is resolved once its register is read
+    // (`lined` below).
+    const asked = mode === "debate" ? null : practiceSettingsWithLineUp(settings, lineUpOverride, { trial: lineUpOverride !== null });
     if (settings.runner.DEPLOYMENT_MODE === "hosted") {
       log(mode === "debate"
         ? "settings: hosted mode (the hosted runner and ask path, their ceilings and the story's money row; billing kept off in "
@@ -611,9 +628,10 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       log(`settings: server-only settings set aside unread (never opened, never sent): ${settings.setAsideKeys.join(", ")}`);
     }
     // Formats: the models of this run, and (spec 2026-10-12 §4.8) the --levels plan, checked before any gate is asked.
+    const askedRoster = asked?.previewConfig.premium_model_ids ?? [];
     const wanted = args.flags.get("--models")?.split(",").map((model) => model.trim()).filter((model) => model !== "")
-      ?? [...settings.previewConfig.premium_model_ids];
-    if (mode === "formats" && wanted.some((model) => !settings.previewConfig.premium_model_ids.includes(model))) {
+      ?? [...askedRoster];
+    if (mode === "formats" && wanted.some((model) => !askedRoster.includes(model))) {
       throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--models (not in the preview's roster)");
     }
     const levelsText = args.flags.get("--levels");
@@ -638,9 +656,6 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     // before any socket or gate is touched. Engine 2 needs the length row: from --length-policy, or the export's own.
     const engineOverride = practiceEngineOverrideFromArgs(args.mode, args.flags, undefined,
       lengthOverride !== null || (register !== null && practiceRegisterHasLengthRow(register)));
-    // Pinned final writers (R1d, INTERFACE §15.2): each must be one of the preview's premium models; checked here, before
-    // any gate is asked. Role rotation off in the practice register is refused by the ask composition, before any AI call.
-    const pins = practiceWriterPinsFromArgs(args.mode, args.flags, settings.previewConfig.premium_model_ids);
     // --register-next: the code's next register version, composed before anything is spent (a refusal costs nothing).
     if (args.switches.has("--register-next") && mode !== "debate") throw new PracticeRefusal("PRACTICE_FLAG_UNKNOWN", "--register-next (debate only)");
     // Debate shape with --register-next (controller ruling D-REGNEXT): the --shape-policy policy goes into the code's
@@ -652,7 +667,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       hostedBilling: args.flags.get("--hosted-billing"), checker: args.flags.get("--checker"),
       deepseekEnabledOnGate: args.flags.get("--deepseek-enabled-on-gate"), roleRotation: args.flags.get("--role-rotation"),
       callConcurrency: args.flags.get("--register-call-concurrency"), debateShape: nextShape, lengthGuidance: lengthOverride,
-      engineVersion: engineOverride
+      engineVersion: engineOverride, lineUp: lineUpOverride
     }) : null;
     // As the server's plan: a hosted preview's next version needs the hosted inputs (HOSTED_BILLING_REQUIRED there).
     if (nextInputs?.kit === "v2" && settings.runner.DEPLOYMENT_MODE === "hosted") {
@@ -668,6 +683,17 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
         + "the practice runs it in hosted mode, with billing kept off");
       for (const note of registerNext.notes ?? []) log(`register-next: ${note}`);
     }
+    // A debate's line-up, checked against the version it will run on: the --line-up file's, else that version's row (the
+    // code's next version with --register-next, else the export's newest), else the settings' env line-up. So its pins
+    // are checked against that roster before anything is spent; runPracticeDebate reads the version's row again from the
+    // throwaway database once the version is chosen, by the same rule.
+    const lined = asked ?? practiceSettingsWithLineUp(settings, lineUpOverride ?? practiceRowsLineUp(registerNext?.rows
+      ?? practiceVersionRows(register!, register!.versions[register!.versions.length - 1]!.register_version)),
+    { trial: lineUpOverride !== null });
+    // Pinned final writers (R1d, INTERFACE §15.2): each must be one of the preview's premium models (the debate's
+    // version's roster); checked here, before any gate is asked. Role rotation off in the practice register is refused by
+    // the ask composition, before any AI call.
+    const pins = practiceWriterPinsFromArgs(args.mode, args.flags, lined.previewConfig.premium_model_ids);
     // The brake counts connection failures in a row, from root's streak at the start (practice-gate-observer.ts).
     observer = new PracticeGateObserver({ unsentStreakAtStart });
     options.onObserver?.(observer, stop);
@@ -675,8 +701,8 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     // forwarded socket's read-only /remaining: after a STOPPED refusal the port asks it, and a halted gate is then
     // PROVIDER_GATE_UNAVAILABLE (run resilience fix (c)), never a money stop.
     const budgetPorts = Object.freeze({
-      deepinfra: observer.wrap("deepinfra", createPreviewBudgetRpcPort(settings.previewConfig, sockets.deepinfra)),
-      anthropic: observer.wrap("anthropic", createPreviewBudgetRpcPort(settings.previewConfig, sockets.anthropic))
+      deepinfra: observer.wrap("deepinfra", createPreviewBudgetRpcPort(settings.runner.PREVIEW_GATE_SETTINGS, sockets.deepinfra)),
+      anthropic: observer.wrap("anthropic", createPreviewBudgetRpcPort(settings.runner.PREVIEW_GATE_SETTINGS, sockets.anthropic))
     });
     // The gates' own read-only answer: both must be open before anything paid is sent.
     const remainingPorts = practiceRemainingPorts(settings, sockets);
@@ -689,30 +715,30 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     }
     if (args.mode === "judge-order") {
       // R2b (D3): any preview AI may have judged; each must be enabled at its gate before anything paid is sent.
-      const models = [...settings.previewConfig.premium_model_ids];
+      const models = [...lined.previewConfig.premium_model_ids];
       assertEnabledAtGates(models, before);
-      return finish(await runPracticeJudgeOrderMode({ config: settings.previewConfig,
+      return finish(await runPracticeJudgeOrderMode({ config: lined.previewConfig,
         targets: onePerModel(practiceDeclaredTargets(settings.runner.PROVIDER_DISCOVERY_TARGETS_JSON), models),
-        ports: budgetPorts, observer, bound: practiceRunnerPolicy(settings.previewConfig).bounds.JUDGE,
+        ports: budgetPorts, observer, bound: practiceRunnerPolicy(lined.previewConfig).bounds.JUDGE,
         transcripts: required(args, "--transcripts"), control: args.switches.has("--control"), folder: directory, dry: false,
         startedAt, ...(options.sleep === undefined ? {} : { sleep: options.sleep }), progress: log, shouldStop: () => stopRequested }));
     }
     if (args.mode === "language") {
       // Question language (P2L): the fast check's model and every preview AI (the planners take turns) must be enabled.
       const chosen = practiceLanguagePolicy(register);
-      const models = [...settings.previewConfig.premium_model_ids];
+      const models = [...lined.previewConfig.premium_model_ids];
       assertEnabledAtGates([...models, chosen.policy.fastCheck!.model], before);
-      return finish(await runPracticeLanguageMode({ config: settings.previewConfig,
+      return finish(await runPracticeLanguageMode({ config: lined.previewConfig,
         targets: onePerModel(practiceDeclaredTargets(settings.runner.PROVIDER_DISCOVERY_TARGETS_JSON), models),
         ports: budgetPorts, observer, policy: chosen.policy, policySource: chosen.source,
-        bound: practiceRunnerPolicy(settings.previewConfig).bounds.JUDGE, folder: directory, dry: false, startedAt,
+        bound: practiceRunnerPolicy(lined.previewConfig).bounds.JUDGE, folder: directory, dry: false, startedAt,
         ...(options.sleep === undefined ? {} : { sleep: options.sleep }), progress: log, shouldStop: () => stopRequested }));
     }
     if (args.mode === "openings") {
       // All the preview's AIs (spec §2: "all five preview AIs"); each must be enabled at its gate.
-      const models = [...settings.previewConfig.premium_model_ids];
+      const models = [...lined.previewConfig.premium_model_ids];
       assertEnabledAtGates(models, before);
-      return await runOpeningsMode({ watched: observer, config: settings.previewConfig,
+      return await runOpeningsMode({ watched: observer, config: lined.previewConfig,
         targets: onePerModel(practiceDeclaredTargets(settings.runner.PROVIDER_DISCOVERY_TARGETS_JSON), models),
         ports: budgetPorts, dry: false, folder: directory, unsentStreakAtStart, gateLimits, before, remainingPorts,
         questions: openingsQuestions, arms: openingsArms,
@@ -723,7 +749,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       const lanes = lanesOf(args) ?? [...PRACTICE_LANES];
       assertEnabledAtGates(wanted, before);
       const declared = practiceDeclaredTargets(settings.runner.PROVIDER_DISCOVERY_TARGETS_JSON);
-      const policy = practiceRunnerPolicy(settings.previewConfig);
+      const policy = practiceRunnerPolicy(lined.previewConfig);
       const parallel = !args.switches.has("--sequential");
       const samples = wholeNumber(args, "--samples", 2, 1, 10);
       const maxInFlight = wholeNumber(args, "--max-in-flight", PRACTICE_FORMATS_DEFAULTS.maxInFlight, 1, 20);
@@ -754,7 +780,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       }
       if (storyLength !== null) log("formats: the story jobs are asked as engine 2's story (v4), with the owners' start values (--story-length)");
       await runPracticeFormats({
-        config: settings.previewConfig,
+        config: lined.previewConfig,
         targets,
         ports: budgetPorts,
         gateRemaining: remainingPorts,
@@ -796,7 +822,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       return finish(practiceReportFromLog(readPracticeSampleLog(directory)));
     }
     const result = await runPracticeDebate({
-      settings, sockets, register: register!, registerNext,
+      settings: lined, sockets, register: register!, registerNext,
       budgetPorts, observer, depth: wholeNumber(args, "--depth", 1, 1, 2),
       questionId: debateQuestionId,
       ...(shapeOverride === null ? {} : { shape: shapeOverride }),
@@ -804,6 +830,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       ...(engineOverride === null ? {} : { engine: engineOverride }),
       ...(practicePinsGiven(pins) ? { pins } : {}),
       ...(debateLanguage === null ? {} : { language: debateLanguage }),
+      ...(lineUpOverride === null ? {} : { lineUp: lineUpOverride }),
       ...(callConcurrency === undefined ? {} : { callConcurrency }),
       ...(options.wait === undefined ? {} : { wait: options.wait }),
       ...(options.sleep === undefined ? {} : { sleep: options.sleep }),

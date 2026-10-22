@@ -23,13 +23,14 @@ import {
   readDebateShapePolicy,
   readEngineVersionPolicy,
   readLengthGuidancePolicy,
+  readPreviewLineUpPolicy,
   type CallConcurrencyPolicy,
   type EngineVersionPolicy,
   type LengthGuidancePolicy
 } from "@debateai/register";
 import {
   PREVIEW_PROVIDER_REF_MODELS, previewModelRow, STRUCTURE_SALVAGE_REPAIRS, structureRepairOriginalKey, type PreviewBudgetPorts,
-  type PreviewGateRemaining
+  type PreviewGateRemaining, type PreviewLineUp
 } from "@debateai/providers";
 import { ServeRepository } from "@debateai/serve";
 import { StoryRepository } from "@debateai/story";
@@ -86,7 +87,9 @@ import {
   type PracticeRegisterImportReceipt
 } from "./practice-register-import.js";
 import { composePracticeRunner } from "./practice-runner-composition.js";
-import { PracticeRefusal, practiceReleaseKeyAt, type PracticeSettings, type PracticeSockets } from "./practice-settings.js";
+import {
+  PracticeRefusal, practiceReleaseKeyAt, practiceSettingsWithLineUp, type PracticeSettings, type PracticeSockets
+} from "./practice-settings.js";
 import {
   practiceCheckEmptyReasons,
   practiceMapReaders,
@@ -712,6 +715,12 @@ export async function runPracticeDebate(input: Readonly<{
   pins?: PracticeWriterPins;
   /** Question language (`--site-language`, `--language-choice`; P2L): absent: the question's own language, an offer answered KEEP_MINE. */
   language?: PracticeDebateLanguage;
+  /**
+   * `--line-up` (side-by-side spec §13, addition D23; S plan Q-S1, the owner's optional trial before an activation): put
+   * into the throwaway register only, in the practice's own version (or carried by --register-next's version). Absent:
+   * the line-up of the version the debate runs on (its previewLineUpPolicy row, else the settings' env line-up).
+   */
+  lineUp?: PreviewLineUp;
 }>): Promise<PracticeDebateResult> {
   const progress = input.progress ?? (() => undefined);
   const remainingPorts = practiceRemainingPorts(input.settings, input.sockets);
@@ -759,10 +768,13 @@ export async function runPracticeDebate(input: Readonly<{
     // R1d: the engine row joins the same ONE throwaway version (never a second version on top). `engine` is passed
     // only when given, so a run without --engine-policy hands over exactly LG-C's `{ shape, length }`.
     const enginePolicy = input.engine ?? null;
+    // Addition D23: the --line-up row joins that same ONE version too, passed only when given (the same rule).
+    const lineUpPolicy = input.lineUp ?? null;
     const overrideVersion: PracticeOverrideVersion | null =
-      (shapePolicy === null && lengthPolicy === null && enginePolicy === null) || receipt.codeNext !== undefined ? null
+      (shapePolicy === null && lengthPolicy === null && enginePolicy === null && lineUpPolicy === null) || receipt.codeNext !== undefined ? null
         : await publishPracticeOverrideVersion(pool, input.register, receipt,
-          { shape: shapePolicy, length: lengthPolicy, ...(enginePolicy === null ? {} : { engine: enginePolicy }) });
+          { shape: shapePolicy, length: lengthPolicy, ...(enginePolicy === null ? {} : { engine: enginePolicy }),
+            ...(lineUpPolicy === null ? {} : { lineUp: lineUpPolicy }) });
     // A next version composed by publish kit v3 is a hosted one: the server runs it in hosted mode (runbook H6 step 5
     // switches both units to hosted with it), so the practice runs it in hosted mode too, whatever the settings said.
     // The practice's own override version (no --register-next) keeps the settings' mode.
@@ -770,26 +782,40 @@ export async function runPracticeDebate(input: Readonly<{
     // the FINAL mode (practiceReleaseKeyAt), so a local development key never runs a practice switched to hosted.
     const nextReleaseKey = (mode: PracticeSettings["runner"]["DEPLOYMENT_MODE"]) =>
       practiceReleaseKeyAt(input.settings.runner.RELEASE_KEY, nextVersion, mode);
-    const settings: PracticeSettings = receipt.codeNext !== undefined
+    const versionSettings: PracticeSettings = receipt.codeNext !== undefined
       ? Object.freeze({ ...input.settings, runner: Object.freeze({ ...input.settings.runner, REGISTER_VERSION: nextVersion,
         RELEASE_KEY: nextReleaseKey(receipt.codeNext.composer === undefined ? input.settings.runner.DEPLOYMENT_MODE : "hosted"),
         ...(receipt.codeNext.composer === undefined ? {} : { DEPLOYMENT_MODE: "hosted" as const }) }) })
       : overrideVersion === null ? input.settings
         : Object.freeze({ ...input.settings, runner: Object.freeze({ ...input.settings.runner, REGISTER_VERSION: nextVersion,
           RELEASE_KEY: nextReleaseKey(input.settings.runner.DEPLOYMENT_MODE) }) });
-    const hosted = settings.runner.DEPLOYMENT_MODE === "hosted";
+    const hosted = versionSettings.runner.DEPLOYMENT_MODE === "hosted";
     progress(receipt.codeNext === undefined ? `register imported up to version ${receipt.registerVersion}`
       : `register imported up to live version ${liveVersion}; practising on this code's next version ${receipt.registerVersion}`
         + ` (changed: ${receipt.codeNext.changedKeys.join(", ") || "none"}; added: ${receipt.codeNext.addedKeys.join(", ") || "none"})`);
     if (overrideVersion !== null) {
-      for (const [name, change] of [["debate-shape", overrideVersion.shapeRow], ["length", overrideVersion.lengthRow], ["engine", overrideVersion.engineRow]] as const) {
+      for (const [name, change] of [["debate-shape", overrideVersion.shapeRow], ["length", overrideVersion.lengthRow], ["engine", overrideVersion.engineRow],
+        ["line-up", overrideVersion.lineUpRow]] as const) {
         // `!= null`: a row the version did not touch is null (Task 20 review 2: a caller's double may leave it out).
         if (change != null) progress(`the ${name} row ${change === "ADDED" ? "added" : "replaced"} in this throwaway copy as version `
           + `${overrideVersion.registerVersion}, with this code's contract hashes`);
       }
     }
     // The version both compositions read: the live one, the code's next one, or the practice's own.
-    const registerVersion = String(settings.runner.REGISTER_VERSION);
+    const registerVersion = String(versionSettings.runner.REGISTER_VERSION);
+    // Addition D14-D16 (owner 2026-10-22): the line-up that version carries, read as the runner's and the API's loaders read
+    // it, composed by their one rule (practiceSettingsWithLineUp over resolvePreviewLineUp): its row, else the settings'
+    // env line-up; a sockets-only settings file with a row-less version refuses (PREVIEW_LINE_UP_REQUIRED) before any AI
+    // is asked. Every roster read below (the sat-out list) is the debate's own version's. A --line-up whose row is not in
+    // that version would silently run another line-up: refused, as the other flags are.
+    const versionLineUp = await readPreviewLineUpPolicy(pool, versionSettings.runner.REGISTER_VERSION);
+    if (lineUpPolicy !== null && versionLineUp === null) {
+      throw new PracticeRefusal("PRACTICE_LINE_UP_NOT_PUBLISHED", "the code's next version was composed without --line-up");
+    }
+    const settings = practiceSettingsWithLineUp(versionSettings, versionLineUp, { trial: lineUpPolicy !== null });
+    progress(`line-up of version ${registerVersion}: ${lineUpPolicy !== null ? "the --line-up file's" : versionLineUp !== null
+      ? "the version's own row" : "the settings' (the version carries none)"}; free ${settings.previewConfig.free_model_ids.join(", ")};`
+      + ` premium ${settings.previewConfig.premium_model_ids.join(", ")}; thinking table ${settings.previewConfig.thinking_levels === undefined ? "none" : "set"}`);
     // report.json's register block names that same version (final review M-2): on the practice's own version the
     // import's receipt names the export's newest, which is kept beside it under its own name. Else the receipt as it is.
     const reportedRegister: PracticeRegisterImportReceipt = overrideVersion === null ? receipt
@@ -931,7 +957,7 @@ export async function runPracticeDebate(input: Readonly<{
     }
     const admissionSeconds = (performance.now() - admissionStarted) / 1000;
     const job = dispatched[0];
-    const premium = input.settings.previewConfig.premium_model_ids;
+    const premium = settings.previewConfig.premium_model_ids;
     const probeRows = (await pool.query<{ provider_ref: string; state: string; failure_code: string | null; n: number }>(
       `SELECT provider_ref, state, failure_code, count(*)::int AS n FROM core.provider_probe
         GROUP BY provider_ref, state, failure_code ORDER BY provider_ref, state`)).rows;

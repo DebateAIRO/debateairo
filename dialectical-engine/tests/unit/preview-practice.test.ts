@@ -45,7 +45,14 @@ import {
 import { stubVendorReply } from "../support/preview-gate-stubs.js";
 import { issueListFromParseError, recheckReply, replyContentOf, callFamilyOf } from "../../tools/preview-practice/practice-lanes.js";
 import { capReplyText, redactKeyShapes, reportableReplyText } from "../../tools/preview-practice/practice-redaction.js";
-import { parsePracticeRegisterExport } from "../../tools/preview-practice/practice-register-import.js";
+import {
+  parsePracticeRegisterExport, practiceOverrideVersionRows, practiceRowsLineUp, practiceVersionRows, PRACTICE_REGISTER_EXPORT_SCHEMA,
+  type PracticeRegisterExport
+} from "../../tools/preview-practice/practice-register-import.js";
+import { PRACTICE_DATABASE_POOL } from "../../tools/preview-practice/practice-throwaway-db.js";
+import { PREVIEW_LINE_UP_POLICY_ROW_KEY, previewLineUpPolicyRow } from "@debateai/register";
+import { composePreviewProviderTestConfig, parsePreviewEnvironmentConfig, parsePreviewLineUp, type PreviewLineUp } from "@debateai/providers";
+import { createServer as createSocketServer, type Server as SocketServer } from "node:net";
 import { assertOutsideRepository, debateReport, reportMarkdown } from "../../tools/preview-practice/practice-report.js";
 import type { PracticeDebateResult } from "../../tools/preview-practice/practice-debate.js";
 import {
@@ -61,8 +68,12 @@ import {
   assertGateStatusAllowsPractice,
   PracticeRefusal,
   parseGateStatus,
+  parsePracticeLineUpText,
   parsePracticeSettings,
+  PRACTICE_LINE_UP_SOURCE_REF,
+  practiceLineUpFromArgs,
   practiceReleaseKeyAt,
+  practiceSettingsWithLineUp,
   practiceSocketsFromEnvironment
 } from "../../tools/preview-practice/practice-settings.js";
 import { latencySummary, percentile, practiceVerdict, type PracticeVerdictInput } from "../../tools/preview-practice/practice-verdict.js";
@@ -370,7 +381,7 @@ describe("practice start refusals", () => {
   it("reads the allowed settings", () => {
     const settings = parsePracticeSettings(lines.join("\n"));
     expect(settings.runner).toMatchObject({ REGISTER_VERSION: 11, DEPLOYMENT_MODE: "local", CLAIM_MS: 3_000_000 });
-    expect(settings.previewConfig.scope_id).toBe("preview-practice-unit");
+    expect(settings.previewConfig?.scope_id).toBe("preview-practice-unit");
   });
   describe("the practice's release key: one key for its ask and its runner (side-by-side §1, §3)", () => {
     // Version 1, so the keys below (r1-…) match the settings' REGISTER_VERSION as assertReleaseKeyForRegister requires.
@@ -452,6 +463,199 @@ describe("practice start refusals", () => {
   it("never writes its report inside the repository", () => {
     expect(() => assertOutsideRepository("/repo/root/out", "/repo/root")).toThrow("PRACTICE_REPORT_INSIDE_REPOSITORY");
     expect(assertOutsideRepository("/elsewhere/out", "/repo/root")).toBe("/elsewhere/out");
+  });
+});
+
+// Side-by-side spec §13, ADDITION D14-D16, D23 (owner 2026-10-22; Task SA8): the practice reads the preview line-up from the
+// version it runs on, by the runner's and the API's one rule, and can try a new line-up with `--line-up <file>` in its own
+// throwaway version. A sockets-only settings file (R25: the T+1 env form) works: its line-up comes from the version's row
+// or from `--line-up`.
+describe("practice line-up (addition D14-D16, D23)", () => {
+  const GLM = "zai-org/GLM-5.3-Flash";
+  const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
+  const MIMO = "XiaomiMiMo/MiMo-V2.6-Pro";
+  const QWEN = "Qwen/Qwen3.8-Flash";
+  const HAIKU = "claude-haiku-5-5";
+  const gate = { deployment: "v3-preview", requested_thinking_level: "high", budget_socket: "/run/debateai-v3-preview/deepinfra-budget-v3.sock",
+    anthropic_budget_socket: "/run/debateai-v3-preview/anthropic-budget-v1.sock", scope_id: "preview-practice-unit" };
+  const oldForm = { ...gate, free_model_ids: [GLM, DEEPSEEK], premium_model_ids: [GLM, DEEPSEEK, MIMO, QWEN, HAIKU] };
+  const settingsWith = (config: unknown) => ["PREVIEW_PROVIDER_TEST_CONFIG_JSON=" + JSON.stringify(config), "PROVIDER_DISCOVERY_TARGETS_JSON=[]",
+    "REGISTER_VERSION=11", "DEBATEAI_DEPLOYMENT_MODE=local", "NODE_ENV=production", "CLAIM_MS=3000000", "CLAIM_MARGIN_MS=60000",
+    "MAX_RECOMPOSE=1", "JUDGEMENT_NUMBER_KIND=k", "JUDGEMENT_PRODUCER=p", "PROPAGATION_NUMBER_KIND=k", "PROPAGATION_PRODUCER=p",
+    "PROVIDER_REF=preview:fixture-a", "STRANGER_SAMPLE_RATE=0", "BATTERY_VERSION=s00", "SETTLEMENT_WATCH_HANDLE=h"].join("\n");
+  /** A new line-up to try: Qwen off Premium, Haiku on Free, Qwen's level for one step. */
+  const TRIAL: PreviewLineUp = parsePreviewLineUp({ free_model_ids: [GLM, HAIKU], premium_model_ids: [GLM, DEEPSEEK, MIMO, HAIKU],
+    thinking_levels: { [DEEPSEEK]: { level: "low" } } });
+  const trialJson = { free_model_ids: [GLM, HAIKU], premium_model_ids: [GLM, DEEPSEEK, MIMO, HAIKU], thinking_levels: { [DEEPSEEK]: { level: "low" } } };
+  /** An export whose newest version (11) carries `rows`. */
+  const exportWith = (rows: readonly { rowKey: string; valueJsonText: string; sourceRef: string }[]): PracticeRegisterExport =>
+    parsePracticeRegisterExport(JSON.stringify({ schema: PRACTICE_REGISTER_EXPORT_SCHEMA,
+      versions: [{ register_version: "11", row_count: rows.length, base_register_version: "10", publication_id: null, request_sha256: null,
+        snapshot_sha256: null, publication_kind: "GENERAL", recorded_at: null }],
+      rows: rows.map((row) => ({ register_version: "11", row_key: row.rowKey, value_json: row.valueJsonText, source_ref: row.sourceRef })) }));
+  const alpha = { rowKey: "alpha", valueJsonText: "1", sourceRef: "live" };
+  const newestLineUp = (document: PracticeRegisterExport) => practiceRowsLineUp(practiceVersionRows(document, "11"));
+  const refusal = (run: () => unknown): PracticeRefusal => {
+    try { run(); } catch (error) { if (error instanceof PracticeRefusal) return error; throw error; }
+    throw new Error("expected a PracticeRefusal");
+  };
+
+  it("a sockets-only settings file (R25) is read: the gate part and no line-up, no config yet; it still needs the Anthropic gate", () => {
+    const settings = parsePracticeSettings(settingsWith(gate));
+    expect(settings.previewConfig).toBeNull();
+    expect(settings.runner.PREVIEW_GATE_SETTINGS).toEqual(parsePreviewEnvironmentConfig(JSON.stringify(gate))!.gate);
+    expect(settings.runner.PREVIEW_ENV_LINE_UP).toBeNull();
+    const { anthropic_budget_socket: _dropped, ...deepinfraOnly } = gate;
+    expect(() => parsePracticeSettings(settingsWith(deepinfraOnly))).toThrow("PRACTICE_SETTINGS_VALUE_INVALID: PREVIEW_PROVIDER_TEST_CONFIG_JSON names no Anthropic gate");
+    // A table without rosters is no form at all (the env parser's own refusal).
+    expect(() => parsePracticeSettings(settingsWith({ ...gate, thinking_levels: { [GLM]: { level: "low" } } })))
+      .toThrow("PRACTICE_SETTINGS_VALUE_INVALID: PREVIEW_PROVIDER_TEST_CONFIG_JSON: PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
+  });
+
+  it("(1) sockets-only settings and an imported version carrying the row: the practice's config is the row's composition", () => {
+    const settings = parsePracticeSettings(settingsWith(gate));
+    const document = exportWith([alpha, previewLineUpPolicyRow(TRIAL, "kit")]);
+    expect(newestLineUp(document)).toEqual(TRIAL);
+    const lined = practiceSettingsWithLineUp(settings, newestLineUp(document), { trial: false });
+    expect(lined.previewConfig).toEqual(composePreviewProviderTestConfig(settings.runner.PREVIEW_GATE_SETTINGS, TRIAL));
+    expect(lined.previewConfig.premium_model_ids).toEqual([GLM, DEEPSEEK, MIMO, HAIKU]);
+    expect(lined.runner).toBe(settings.runner);
+    // ... and without the row the sockets-only file has no line-up: refused with the live boot's own code, before any gate.
+    const required = refusal(() => practiceSettingsWithLineUp(settings, newestLineUp(exportWith([alpha])), { trial: false }));
+    expect(required.code).toBe("PREVIEW_LINE_UP_REQUIRED");
+    expect(required.message).toContain("give --line-up <file>");
+  });
+
+  it("(2) old-form settings and a row-less version: today's config, byte for byte (the env line-up is the fallback)", () => {
+    const settings = parsePracticeSettings(settingsWith(oldForm));
+    const today = parsePreviewProviderTestConfig(JSON.stringify(oldForm))!;
+    expect(settings.previewConfig).toEqual(today);
+    expect(JSON.stringify(settings.previewConfig)).toBe(JSON.stringify(today));
+    const lined = practiceSettingsWithLineUp(settings, newestLineUp(exportWith([alpha])), { trial: false });
+    expect(JSON.stringify(lined.previewConfig)).toBe(JSON.stringify(today));
+    // A version carrying the row beside an env line-up is the live boot's D15 refusal, never a silent pick.
+    expect(refusal(() => practiceSettingsWithLineUp(settings, TRIAL, { trial: false })).code).toBe("PREVIEW_LINE_UP_ENV_CONFLICT");
+  });
+
+  it("a --line-up trial over old-form settings sets the env line-up aside (as a release whose site version carries the row)", () => {
+    const settings = parsePracticeSettings(settingsWith(oldForm));
+    const lined = practiceSettingsWithLineUp(settings, TRIAL, { trial: true });
+    expect(lined.runner.PREVIEW_ENV_LINE_UP).toBeNull();
+    expect(lined.runner.PREVIEW_GATE_SETTINGS).toBe(settings.runner.PREVIEW_GATE_SETTINGS);
+    expect(lined.previewConfig).toEqual(composePreviewProviderTestConfig(settings.runner.PREVIEW_GATE_SETTINGS, TRIAL));
+    expect(lined.previewConfig.thinking_levels).toEqual({ [DEEPSEEK]: { level: "low" } });
+    expect(Object.isFrozen(lined) && Object.isFrozen(lined.runner)).toBe(true);
+  });
+
+  it("(3) --line-up adds the row to the practice's ONE throwaway version (added, or replacing the export's), beside the other rows", () => {
+    const codeHashes = [{ rowKey: "judgeContractHash", valueJsonText: "\"x\"", sourceRef: "code" }] as never;
+    const added = practiceOverrideVersionRows(exportWith([alpha]), { shape: null, length: null, lineUp: TRIAL }, codeHashes);
+    expect(added.rows.map((row) => row.rowKey)).toEqual(["alpha", "judgeContractHash", PREVIEW_LINE_UP_POLICY_ROW_KEY]);
+    expect([added.shapeRow, added.lengthRow, added.engineRow, added.lineUpRow]).toEqual([null, null, null, "ADDED"]);
+    expect(added.rows.find((row) => row.rowKey === PREVIEW_LINE_UP_POLICY_ROW_KEY)!.sourceRef).toBe(PRACTICE_LINE_UP_SOURCE_REF);
+    // The row the throwaway version seals reads back, by the row's own reader, as the line-up tried.
+    expect(practiceRowsLineUp(added.rows)).toEqual(TRIAL);
+    const live = parsePreviewLineUp({ free_model_ids: oldForm.free_model_ids, premium_model_ids: oldForm.premium_model_ids, thinking_levels: null });
+    const replaced = practiceOverrideVersionRows(exportWith([alpha, previewLineUpPolicyRow(live, "kit")]), { shape: null, length: null, lineUp: TRIAL }, codeHashes);
+    expect(replaced.lineUpRow).toBe("REPLACED");
+    expect(replaced.rows.filter((row) => row.rowKey === PREVIEW_LINE_UP_POLICY_ROW_KEY)).toHaveLength(1);
+    expect(practiceRowsLineUp(replaced.rows)).toEqual(TRIAL);
+    // Without the flag the export's own row is carried as it is, and no line-up change is named.
+    const kept = practiceOverrideVersionRows(exportWith([alpha, previewLineUpPolicyRow(live, "kit")]), { shape: null, length: null }, codeHashes);
+    expect(kept.lineUpRow).toBeNull();
+    expect(practiceRowsLineUp(kept.rows)).toEqual(live);
+  });
+
+  it("(3) the file: the --print-line-up member form or the bare line-up; anything the line-up parser refuses is refused, naming why", () => {
+    expect(parsePracticeLineUpText(JSON.stringify({ lineUp: trialJson }))).toEqual(TRIAL);
+    expect(parsePracticeLineUpText(JSON.stringify(trialJson))).toEqual(TRIAL);
+    expect(parsePracticeLineUpText(JSON.stringify({ ...trialJson, thinking_levels: null })).thinking_levels).toBeNull();
+    const refused = (value: unknown) => refusal(() => parsePracticeLineUpText(typeof value === "string" ? value : JSON.stringify(value)));
+    expect(refused("{").message).toBe("PRACTICE_LINE_UP_INVALID: $");
+    expect(refused({ ...trialJson, premium_model_ids: [GLM, "some/unreviewed-model"] }).message)
+      .toBe("PRACTICE_LINE_UP_INVALID: PREVIEW_LINE_UP_POLICY_INVALID:premium_model_ids:unreviewed");
+    expect(refused({ ...trialJson, free_model_ids: [GLM] }).message).toBe("PRACTICE_LINE_UP_INVALID: PREVIEW_LINE_UP_POLICY_INVALID:maker_rule");
+    expect(refused({ ...trialJson, premium_model_ids: [GLM, GLM, HAIKU] }).message)
+      .toBe("PRACTICE_LINE_UP_INVALID: PREVIEW_LINE_UP_POLICY_INVALID:premium_model_ids:duplicate");
+    expect(refused({ lineUp: trialJson, extra: 1 }).message).toBe("PRACTICE_LINE_UP_INVALID: PREVIEW_LINE_UP_POLICY_INVALID:members");
+    // GLM has no "medium" on its reviewed menu: the thinking parser's own refusal, kept.
+    expect(refused({ ...trialJson, thinking_levels: { [GLM]: { level: "medium" } } }).message)
+      .toMatch(/^PRACTICE_LINE_UP_INVALID: PREVIEW_THINKING_LEVELS_INVALID:/u);
+    // An empty table is what the row's own reader refuses (its stricter schema): never sealed into the throwaway version.
+    expect(refused({ ...trialJson, thinking_levels: {} }).message).toMatch(/^PRACTICE_LINE_UP_INVALID: PREVIEW_(LINE_UP_POLICY|THINKING_LEVELS)_INVALID:/u);
+  });
+
+  it("the flag: every mode that reads the settings, never report; an unreadable file refuses", () => {
+    const flags = (path?: string) => new Map(path === undefined ? [] : [["--line-up", path]]);
+    for (const mode of ["formats", "debate", "openings", "language", "judge-order"]) {
+      expect(practiceLineUpFromArgs(mode, flags("x"), () => JSON.stringify(trialJson))).toEqual(TRIAL);
+      expect(practiceLineUpFromArgs(mode, flags())).toBeNull();
+    }
+    expect(refusal(() => practiceLineUpFromArgs("report", flags("x"), () => "{}")).message).toBe("PRACTICE_FLAG_VALUE_INVALID: --line-up (not read by report)");
+    expect(refusal(() => practiceLineUpFromArgs("debate", flags("x"), () => { throw new Error("ENOENT"); })).code).toBe("PRACTICE_LINE_UP_UNREADABLE");
+  });
+
+  describe("the command", () => {
+    let socketFolder: string;
+    const servers: SocketServer[] = [];
+    afterEach(async () => {
+      await Promise.all(servers.splice(0).map((server) => new Promise((resolve) => server.close(resolve))));
+      if (socketFolder !== undefined) rmSync(socketFolder, { recursive: true, force: true });
+    });
+    const listen = (path: string) => new Promise<void>((resolve, reject) => {
+      const server = createSocketServer();
+      servers.push(server);
+      server.once("error", reject);
+      server.listen(path, () => resolve());
+    });
+
+    it("refuses a value the line-up parser refuses before anything is read or sent (no acknowledgement, socket or settings asked)", async () => {
+      socketFolder = mkdtempSync(join(tmpdir(), "practice-line-up-"));
+      const bad = join(socketFolder, "line-up.json");
+      writeFileSync(bad, JSON.stringify({ lineUp: { ...trialJson, free_model_ids: [GLM] } }));
+      for (const mode of ["debate", "formats"]) {
+        const logged: string[] = [];
+        const outcome = await runPractice([mode, "--line-up", bad, "--out", join(socketFolder, `out-${mode}`)], {}, { log: (line) => logged.push(line) });
+        expect(outcome.report).toMatchObject({ reasons: ["HARNESS_ERROR:PRACTICE_LINE_UP_INVALID"] });
+        expect(logged).toContain("practice could not run: PRACTICE_LINE_UP_INVALID: PREVIEW_LINE_UP_POLICY_INVALID:maker_rule");
+      }
+      // A dry run reads no settings, so the flag is a real run's only (refused before the file is read).
+      const dry = await runPractice(["openings", "--dry", "--line-up", join(socketFolder, "absent.json")], {}, { log: () => undefined });
+      expect(dry.report).toMatchObject({ reasons: ["HARNESS_ERROR:PRACTICE_FLAG_VALUE_INVALID"] });
+    });
+
+    it("formats on a sockets-only settings file: without --line-up refused PREVIEW_LINE_UP_REQUIRED before any gate status is read", async () => {
+      socketFolder = mkdtempSync(join(tmpdir(), "practice-line-up-"));
+      await listen(join(socketFolder, "di.sock"));
+      await listen(join(socketFolder, "an.sock"));
+      writeFileSync(join(socketFolder, "settings.env"), settingsWith(gate));
+      const env = { PRACTICE_ACK: "spends-real-money", PRACTICE_DEEPINFRA_SOCKET: join(socketFolder, "di.sock"),
+        PRACTICE_ANTHROPIC_SOCKET: join(socketFolder, "an.sock") };
+      const logged: string[] = [];
+      // No --gate-status-* given: a refusal past the line-up would be PRACTICE_FLAG_REQUIRED instead.
+      const outcome = await runPractice(["formats", "--settings", join(socketFolder, "settings.env"), "--out", join(socketFolder, "out")], env,
+        { log: (line) => logged.push(line) });
+      expect(outcome.report).toMatchObject({ reasons: ["HARNESS_ERROR:PREVIEW_LINE_UP_REQUIRED"] });
+      // With --line-up the same file passes the line-up and goes on to the gate checks (here: the missing status flag).
+      writeFileSync(join(socketFolder, "line-up.json"), JSON.stringify({ lineUp: trialJson }));
+      const tried = await runPractice(["formats", "--settings", join(socketFolder, "settings.env"), "--line-up", join(socketFolder, "line-up.json"),
+        "--models", QWEN, "--out", join(socketFolder, "out-2")], env, { log: () => undefined });
+      // Qwen is off the tried line-up's Premium: refused as off the preview's roster, so the roster read is the trial's.
+      expect(tried.report).toMatchObject({ reasons: ["HARNESS_ERROR:PRACTICE_FLAG_VALUE_INVALID"] });
+      const next = await runPractice(["formats", "--settings", join(socketFolder, "settings.env"), "--line-up", join(socketFolder, "line-up.json"),
+        "--models", HAIKU, "--out", join(socketFolder, "out-3")], env, { log: () => undefined });
+      expect(next.report).toMatchObject({ reasons: ["HARNESS_ERROR:PRACTICE_FLAG_REQUIRED"] });
+    });
+  });
+
+  it("FINAL-FIX 10: every throwaway pool waits a bounded time for a connection (the pointer reader can never wedge)", () => {
+    expect(Number.isSafeInteger(PRACTICE_DATABASE_POOL.connectionTimeoutMillis)).toBe(true);
+    expect(PRACTICE_DATABASE_POOL.connectionTimeoutMillis).toBeGreaterThan(0);
+    expect(PRACTICE_DATABASE_POOL.connectionTimeoutMillis).toBeLessThanOrEqual(60 * 1000);
+    const source = readFileSync(new URL("../../tools/preview-practice/practice-throwaway-db.ts", import.meta.url), "utf8");
+    // One pool constructor in the file, and it is given the bound (the main pool and every extra pool are built by it).
+    expect(source.split("createPool(")).toHaveLength(2);
+    expect(source).toContain("createPool(url, { connectionTimeoutMillis: PRACTICE_DATABASE_POOL.connectionTimeoutMillis })");
   });
 });
 

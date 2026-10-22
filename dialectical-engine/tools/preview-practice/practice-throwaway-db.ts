@@ -14,6 +14,17 @@ import { randomBytes } from "node:crypto";
 import EmbeddedPostgres from "embedded-postgres";
 import { createPool, type Pool } from "@debateai/db";
 
+/**
+ * Every throwaway pool's bound on the wait for a connection (the wait for a free one and the opening of a new one): past
+ * it the caller gets the pool's busy failure instead of waiting for ever. Side-by-side spec §13 (S9 review, FINAL-FIX 10):
+ * the API's activation-pointer reader the practice's ask builds on the main pool (practice-ask-composition.ts) releases a
+ * read only when the driver settles it, so without a bound one connection that never comes would wedge it for good; with
+ * it a read settles within this bound plus the reader's query timeout. The live pools wait 5 s
+ * (packages/db/src/pool-budget.ts); the practice's pools are smaller (pg's default of 10) and shared by its runner and its
+ * ask, so a burst of a debate's parallel writes is given more room before it counts as wedged.
+ */
+export const PRACTICE_DATABASE_POOL = Object.freeze({ connectionTimeoutMillis: 30 * 1000 });
+
 export type PracticeDatabase = Readonly<{
   pool: Pool;
   /** The database's own name (debateai_practice_ and 8 random hex digits). */
@@ -58,7 +69,11 @@ export async function startPracticeDatabase(log: (line: string) => void = () => 
     await embedded.start();
     await embedded.createDatabase(databaseName);
     const url = `postgresql://practice:${encodeURIComponent(password)}@127.0.0.1:${String(port)}/${databaseName}`;
-    const open = (): Pool => { const pool = createPool(url); pools.push(pool); return pool; };
+    const open = (): Pool => {
+      const pool = createPool(url, { connectionTimeoutMillis: PRACTICE_DATABASE_POOL.connectionTimeoutMillis });
+      pools.push(pool);
+      return pool;
+    };
     const pool = open();
     await pool.query("SELECT 1");
     return Object.freeze({
