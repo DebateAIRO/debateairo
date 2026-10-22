@@ -1202,9 +1202,16 @@ describe("VPS baseline: side-by-side upgrades on the public server (side-by-side
     expect(section).toContain("Never `systemctl stop` a busy `debateai-runner@`");
     expect(section).toMatch(/25 minutes/u);
     expect(section).toContain("7.5 hours");
-    for (const block of shBlocks(section)) {
+    // The one exception is the drained upgrade's D2 (final fix wave S2): a runner with nothing open or waiting, the
+    // zero-work test on the same line, before the stop (as the preview guide's DR2). Nowhere else, and never restart/kill.
+    const drained = section.slice(section.indexOf("**A drained upgrade**"));
+    expect(drained.length).toBeLessThan(section.length);
+    for (const block of shBlocks(section.slice(0, section.indexOf("**A drained upgrade**")))) {
       expect(block, block).not.toMatch(/systemctl (stop|restart|kill)[^\n]*debateai-runner/u);
     }
+    const stops = shBlocks(drained).flatMap((block) => block.split("\n")).filter((line) => /systemctl (stop|restart|kill)[^\n]*debateai-runner/u.test(line));
+    expect(stops).toHaveLength(1);
+    expect(stops[0]).toMatch(/test "\$\(sudo -u postgres psql -d debateai -XAt -c "SELECT \(SELECT count\(\*\) FROM core\.work_item WHERE state IN \('READY', 'CLAIMED'\)\) \+ \(SELECT count\(\*\) FROM core\.run_waiting_v\)"\)" = 0 && systemctl stop debateai-runner@\$label /u);
   });
 
   it("every per-release upgrade section points to the side-by-side order in its first line", () => {

@@ -523,10 +523,53 @@ describe("release.mjs: the preview's release tools with the public server's layo
     expect(h.urls).toContain("http://127.0.0.1:3001/readyz");
   });
 
+  it("a drained upgrade: the older pair and runner stopped with nothing open, the switch with --old-pair-stopped, then mark-retired (final fix wave S2)", async () => {
+    const { layout } = serverFiles([OLD, NEW]);
+    const stopped = { [U("runner", "old-v1")]: "inactive", [U("api", "old-v1")]: "inactive", [U("ui", "old-v1")]: "inactive" };
+    const h = host([OLD, NEW], { history: [[OLD_KEY, "STAGED"], [OLD_KEY, "CURRENT"], [NEW_KEY, "STAGED"]], units: stopped });
+    const switched = await cli(["switch", "--to", "new-v1", "--from", "old-v1", "--old-pair-stopped"], layout, h.deps);
+    expect([switched.code, switched.out.event, switched.out.bad]).toEqual([0, "PREVIEW_RELEASE_SWITCHED", []]);
+    const before = h.verbs().length;
+    const retired = await cli(["mark-retired", "--label", "old-v1"], layout, h.deps);
+    expect([retired.code, retired.out]).toEqual([0, { event: "PREVIEW_RELEASE_DRAINED_RETIRED", label: "old-v1", releaseKey: OLD_KEY, openWork: 0 }]);
+    expect(h.eventLog().at(-1)).toBe("old-v1 RETIRED DRAINED");
+    // Its backstop and check timers off, and its runner instance disabled: the switch disabled only the old API and
+    // website, and a retired runner must not start at the next boot.
+    expect(h.verbs().slice(before)).toEqual(["disable --now debateai-runner-retire@old-v1.timer", "disable --now debateai-runner-retire-check@old-v1.timer", "disable debateai-runner@old-v1.service"]);
+    // Run again: already retired, the same three are repeated (a disable that failed before is retried); a failing
+    // disable is loud.
+    const again = await cli(["mark-retired", "--label", "old-v1"], layout, h.deps);
+    expect([again.code, again.out.event]).toEqual([0, "PREVIEW_RELEASE_RETIRE_NOT_NEEDED"]);
+    const failing = refusingDisable(host([OLD, NEW], { history: [...AFTER_SWITCH, [OLD_KEY, "RETIRED", "DRAINED"]], units: stopped }));
+    expect((await cli(["mark-retired", "--label", "old-v1"], layout, failing.deps)).err).toMatchObject({ event: "PREVIEW_RELEASE_RETIRE_REFUSED", reason: "RETIRE_TIMER_STOP_FAILED" });
+    // A runner still running, or open work, refuses before anything is written.
+    const busy = host([OLD, NEW], { history: [[OLD_KEY, "STAGED"], [OLD_KEY, "CURRENT"], [NEW_KEY, "CURRENT"], [OLD_KEY, "DRAINING"]] });
+    expect((await cli(["mark-retired", "--label", "old-v1"], layout, busy.deps)).err).toMatchObject({ reason: "RELEASE_RUNNER_ACTIVE" });
+    expect(busy.verbs()).toEqual([]);
+  });
+
+  it("README §5 runs only commands release.mjs has, and gives the drained upgrade in the order the tools need (final fix wave S2)", () => {
+    const readme = read("deploy/vps/README.md");
+    const named = [...readme.matchAll(/release\.mjs ([a-z][a-z-]*)/g)].map((match) => match[1]!);
+    expect(named.filter((command) => !Object.hasOwn(release.COMMANDS, command))).toEqual([]);
+    expect(named).toContain("mark-retired");
+    const drained = readme.slice(readme.indexOf("**A drained upgrade**"), readme.indexOf("### Upgrading to the verdict-story release"));
+    const at = (needle: string) => { const index = drained.indexOf(needle); expect(index, needle).toBeGreaterThan(-1); return index; };
+    // The pair first, the runner only with nothing open or waiting, then the switch with the pair stopped, then mark-retired.
+    const pair = at("systemctl stop debateai-ui@$label debateai-api@$label");
+    const runner = at("= 0 && systemctl stop debateai-runner@$label");
+    const sw = at("`release.mjs switch --to $new --from $label --old-pair-stopped`");
+    const retired = at("release.mjs mark-retired --label $label");
+    expect([pair < runner, runner < sw, sw < retired]).toEqual([true, true, true]);
+    expect(drained).toContain("(SELECT count(*) FROM core.run_waiting_v)");
+    expect(drained).toContain("release.mjs switch --finish --to $new --from $label --old-pair-stopped");
+  });
+
   it("runs only the commands this server has, as root on Linux, and keeps one switch at a time in its own lock folder", async () => {
     const { layout } = serverFiles([OLD, NEW]);
     const h = host([OLD, NEW], { history: AFTER_SWITCH });
-    for (const argv of [[], ["seed", "--label", "new-v1"], ["mark-retired", "--label", "old-v1"], ["receipt", "--label", "old-v1", "--out", "/root/r.json"], ["maintenance"],
+    // mark-retired is this server's too since the drained upgrade (final fix wave S2): see the test below.
+    for (const argv of [[], ["seed", "--label", "new-v1"], ["mark-retired", "--label", "Old_v1"], ["receipt", "--label", "old-v1", "--out", "/root/r.json"], ["maintenance"],
       ["check"], ["check", "--label", "../x"], ["status", "--all"], ["switch", "--to", "New"], ["stopped", "--service", "ui", "--label", "old-v1"]]) {
       const refused = await cli(argv, layout, h.deps);
       expect([argv, refused.code, refused.err.reason]).toEqual([argv, 1, "ARGUMENTS_REFUSED"]);

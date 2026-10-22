@@ -811,7 +811,7 @@ release's instances are enabled, so only they start at boot.
 Before each start, root's release tool checks that the release may start, and after each API and
 runner stop it writes down what it saw (`ExecStartPre=` and `ExecStopPost=`, running
 `deploy/vps/release.mjs` from the operator checkout). The same tool has the commands this section
-names (`check`, `stage`, `switch`, `rollback`, `retire-request`, `retire-check`, `status`); it runs
+names (`check`, `stage`, `switch`, `rollback`, `retire-request`, `retire-check`, `mark-retired`, `status`); it runs
 the preview's own release tools with this server's units, slots and database, and reads each
 release's key and slot from its own overlay (`/etc/debateai/releases/<label>/api.env`). Run it as
 root: `release.mjs <command>` below is short for
@@ -925,8 +925,9 @@ The rules, whatever the release:
   release is still draining, and refuses infrastructure maintenance (PostgreSQL, Hatchet, Caddy)
   then too.
 - **A release whose migrations are not all additive** (each step marked `n1: expand`) cannot go
-  side by side; the release check says so, and that release needs a drained upgrade: every debate
-  finished, the services stopped, then the per-release section's own order.
+  side by side; the release check says so (`DRAINED_PATH`), and that release needs a drained
+  upgrade ("A drained upgrade" below): every debate finished, the older release stopped, then the
+  migrations and the switch with the older pair already stopped.
 
 **Hatchet's compose file, once.** It is installed from a reviewed release (the operator checkout
 at that commit) to `/etc/debateai/hatchet/compose.prod.yaml`, outside every release and the
@@ -1076,6 +1077,50 @@ release check does not wait for it; nothing user-facing changed. After the switc
 again first if it has retired, starts the older pair in the spare slot if it was stopped, and
 switches back; the new runner keeps finishing the debates it started. Restoring the online backup
 is a last resort only.
+
+**A drained upgrade** (step 4 answered `DRAINED_PATH`: a new migration is not `n1: expand`, so the
+older release cannot run beside the new database). The site is down from D1 to D4. Steps 1 to 3 as
+above; the owner's fresh yes (step 5) names the downtime. `$label` is still the older release until
+D5 ends.
+
+**D1. The older website and API stop** (no new debate can be admitted from here), then read what is
+still open or waiting:
+
+```sh
+printf '%s\n' "$label" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && systemctl stop debateai-ui@$label debateai-api@$label
+sudo -u postgres psql -d debateai -c "SELECT (SELECT count(*) FROM core.work_item WHERE state IN ('READY', 'CLAIMED')) AS unfinished, (SELECT count(*) FROM core.run_waiting_v) AS waiting"
+```
+
+**D2. The older runner stops, only with nothing open.** Run the read again until `unfinished` and
+`waiting` are both 0 (the older runner finishes what it started), then stop it: this is the one
+planned stop of a runner, and it has nothing to do. The line stops nothing while anything is open:
+
+```sh
+printf '%s\n' "$label" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && test "$(sudo -u postgres psql -d debateai -XAt -c "SELECT (SELECT count(*) FROM core.work_item WHERE state IN ('READY', 'CLAIMED')) + (SELECT count(*) FROM core.run_waiting_v)")" = 0 && systemctl stop debateai-runner@$label && echo "older runner stopped"
+```
+
+**D3. The backup, the migrations, the version, the new release.** Steps 6 to 11 as above: the
+online backup (now of a quiet database), the migrations, the publish,
+`release.mjs stage --label $new`, the new runner, then the new API and website (not ready: no
+release takes traffic yet, the site answers Caddy's own error).
+
+**D4. The switch with the older pair stopped:**
+`release.mjs switch --to $new --from $label --old-pair-stopped`. It skips the older edge check and
+accepts the older runner stopped; the downtime ends when it returns 0 (the edge answers from the
+new release). If it exits 2, read `bad`; after `SWITCH_OUTCOME_UNKNOWN`, once `release.mjs status`
+names `$new` current: `release.mjs switch --finish --to $new --from $label --old-pair-stopped`.
+
+**D5. The older release marked retired**: `release.mjs mark-retired --label $label`. It records the
+older release `RETIRED` (reason `DRAINED`: its runner was stopped with nothing open, so it never
+printed its own retirement line), turns its backstop and check timers off and disables its runner
+instance (the switch disabled only its API and website), so nothing of it starts at the next boot.
+It refuses while that runner runs or has open work. Then run the "current release" line again
+(`$label` is now the new release) and set `REGISTER_VERSION` in both base files, as after step 12.
+
+Going back: before D3's migrations, start the older release again
+(`systemctl start debateai-runner@$label debateai-api@$label debateai-ui@$label`; it is still the
+current one); after them, the older release cannot run on the new database: restore D3's online
+backup (§9) and ask the owner.
 
 ### Upgrading to the verdict-story release, and rolling it back
 

@@ -378,25 +378,31 @@ export async function checkRetire({ label, layout = LAYOUT, deps = {} }) {
 }
 
 /**
- * The drained upload path only (D15 guide): the old release's runner is stopped and none of its work is READY or
- * CLAIMED, so it is RETIRED with reason DRAINED. Its runner never printed the retirement lines (it was stopped with
- * nothing to do), so the stop recorder could not have written it.
+ * The drained upload path only (D15 guide; the public server's README §5 "A drained upgrade", final fix wave S2): the
+ * old release's runner is stopped and none of its work is READY or CLAIMED, so it is RETIRED with reason DRAINED. Its
+ * runner never printed the retirement lines (it was stopped with nothing to do), so the stop recorder could not have
+ * written it. Where the layout starts releases by enabled instances (bootMode 'enable'), the stopped runner's instance
+ * is disabled too (the switch disables only the old API and website), or the next boot would start a retired runner.
  */
 export async function markDrainedRetired({ label, layout = LAYOUT, deps = {} }) {
   const io = withDefaults(layout, deps);
   const releaseKey = await releaseKeyOf(label, layout, io);
+  const unit = unitNameFor(layout, 'runner', label);
+  const disable = async () => { if (layout.bootMode === 'enable' && !await systemctl(['disable', unit], layout, io)) refuse('RUNNER_DISABLE_FAILED'); };
   const { state } = await io.readReleaseState({ releaseKey });
   if (state === 'RETIRED') {
-    // Already retired: turn the timers off again, so a disarm that failed on an earlier run is retried.
+    // Already retired: turn the timers off (and the instance's boot start) again, so one that failed before is retried.
     await disarmWith(label, layout, io);
+    await disable();
     return Object.freeze({ event: 'PREVIEW_RELEASE_RETIRE_NOT_NEEDED', label, releaseKey });
   }
   if (state !== 'DRAINING') refuse('RETIRE_STATE_REFUSED', { state });
-  if (await unitIsActive(unitNameFor(layout, 'runner', label), layout, io)) refuse('RELEASE_RUNNER_ACTIVE');
+  if (await unitIsActive(unit, layout, io)) refuse('RELEASE_RUNNER_ACTIVE');
   const openWork = await io.countOpenWork({ releaseKey });
   if (openWork !== 0) refuse('RELEASE_OPEN_WORK', { openWork });
   await recordEvent({ releaseKey, kind: 'RETIRED', reason: 'DRAINED', written: after => after.state === 'RETIRED', io });
   await disarmWith(label, layout, io);
+  await disable();
   return Object.freeze({ event: 'PREVIEW_RELEASE_DRAINED_RETIRED', label, releaseKey, openWork });
 }
 
