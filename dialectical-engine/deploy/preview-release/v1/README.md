@@ -3186,13 +3186,17 @@ standing order: latest dev first, push, PR to dev, fix CI, merge), fill in the t
 ```sh
 NN=rNN; REV='<the 40-character commit of T, the release that is now live>'; LABEL='<its label, from the names file>'
 git fetch origin dev && git switch -c "chore/n1-baseline-$NN" origin/dev
-jq --arg c "$REV" --arg r "$LABEL" '.commit = $c | .reason = $r' dialectical-engine/tests/n1-baseline.json > "$TMPDIR/n1-baseline.json" && mv "$TMPDIR/n1-baseline.json" dialectical-engine/tests/n1-baseline.json
+jq --arg c "$REV" --arg r "$LABEL" '.commit = $c | .reason = $r | .knownRed = []' dialectical-engine/tests/n1-baseline.json > "$TMPDIR/n1-baseline.json" && mv "$TMPDIR/n1-baseline.json" dialectical-engine/tests/n1-baseline.json
 [ "$(node dialectical-engine/tools/n1-baseline.mjs commit)" = "$REV" ] && git diff --stat && git add dialectical-engine/tests/n1-baseline.json && git commit -m "chore(n1): the N-1 baseline names $LABEL ($NN)"
 git push -u origin "chore/n1-baseline-$NN" && gh pr create --base dev --title "chore(n1): the N-1 baseline names $LABEL" --body "tests/n1-baseline.json names $REV, the release live on the test site, so the N-1 compatibility job checks that commit's database suites on every later schema."
 ```
 
-The diff must change exactly the two lines `commit` and `reason`. Once CI is green, merge it (the job itself runs on this
-PR: it checks `REV`'s suites against dev's schema).
+The diff must change exactly the two lines `commit` and `reason`, and empty `knownRed` (the previous release's own stale
+tests; `setAside` stays). Once CI is green, merge it (the job itself runs on this PR: it checks `REV`'s suites against
+dev's schema). If it is red only on a test of `REV` that is red on `REV`'s own schema too (run that file at `REV`
+without `DEBATEAI_TEST_SCHEMA_FROM` to tell), fix the test on dev in this PR and add its full name to `knownRed` with
+the reason; a test that tests the migration chain itself goes to `setAside` instead (tools/n1-baseline.mjs). Never list
+a failure that only the schema migrated ahead causes: that is the incompatibility the job exists to catch.
 
 ### The way back from T
 
@@ -4002,13 +4006,17 @@ standing order: latest dev first, push, PR to dev, fix CI, merge), fill in the t
 ```sh
 NN=rNN; REV='<the 40-character commit of the release that is now live>'; LABEL='<its label, from the names file>'
 git fetch origin dev && git switch -c "chore/n1-baseline-$NN" origin/dev
-jq --arg c "$REV" --arg r "$LABEL" '.commit = $c | .reason = $r' dialectical-engine/tests/n1-baseline.json > "$TMPDIR/n1-baseline.json" && mv "$TMPDIR/n1-baseline.json" dialectical-engine/tests/n1-baseline.json
+jq --arg c "$REV" --arg r "$LABEL" '.commit = $c | .reason = $r | .knownRed = []' dialectical-engine/tests/n1-baseline.json > "$TMPDIR/n1-baseline.json" && mv "$TMPDIR/n1-baseline.json" dialectical-engine/tests/n1-baseline.json
 [ "$(node dialectical-engine/tools/n1-baseline.mjs commit)" = "$REV" ] && git diff --stat && git add dialectical-engine/tests/n1-baseline.json && git commit -m "chore(n1): the N-1 baseline names $LABEL ($NN)"
 git push -u origin "chore/n1-baseline-$NN" && gh pr create --base dev --title "chore(n1): the N-1 baseline names $LABEL" --body "tests/n1-baseline.json names $REV, the release live on the test site, so the N-1 compatibility job checks that commit's database suites on every later schema."
 ```
 
-The diff must change exactly the two lines `commit` and `reason`. Once CI is green, merge it (the job itself runs on this
-PR: it checks `REV`'s suites against dev's schema).
+The diff must change exactly the two lines `commit` and `reason`, and empty `knownRed` (the previous release's own stale
+tests; `setAside` stays). Once CI is green, merge it (the job itself runs on this PR: it checks `REV`'s suites against
+dev's schema). If it is red only on a test of `REV` that is red on `REV`'s own schema too (run that file at `REV`
+without `DEBATEAI_TEST_SCHEMA_FROM` to tell), fix the test on dev in this PR and add its full name to `knownRed` with
+the reason; a test that tests the migration chain itself goes to `setAside` instead (tools/n1-baseline.mjs). Never list
+a failure that only the schema migrated ahead causes: that is the incompatibility the job exists to catch.
 
 ### SB14. Later: the old release retired, and its receipt
 
