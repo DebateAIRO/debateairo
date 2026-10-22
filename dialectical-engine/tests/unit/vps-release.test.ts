@@ -592,6 +592,13 @@ describe("release.mjs: the preview's release tools with the public server's layo
     expect(drained).toContain("release.mjs switch --finish --to $new --from $label --old-pair-stopped");
   });
 
+  it("README §5's backstop rule says a model call still in flight waits for root's 25-minute check (side-by-side integration M4)", () => {
+    const readme = read("deploy/vps/README.md");
+    const rule = readme.slice(readme.indexOf("- **Never `systemctl stop` a busy `debateai-runner@`.**"), readme.indexOf("- **One release drains at a time.**"));
+    expect(rule).toContain("`RUNNER_BACKSTOP_CALL_IN_FLIGHT`");
+    expect(rule).not.toContain("it lets its calls settle and exits.");
+  });
+
   it("runs only the commands this server has, as root on Linux, and keeps one switch at a time in its own lock folder", async () => {
     const { layout } = serverFiles([OLD, NEW]);
     const h = host([OLD, NEW], { history: AFTER_SWITCH });

@@ -198,6 +198,21 @@ describe('the preview release guide: transition T, side by side, the way back, t
     }
   });
 
+  it('the drain names the runner lines: a call in flight waits for the forced stop, a standing request claims nothing (integration M4)', () => {
+    const paragraphOf = (text: string, needle: string) => text.split('\n\n').find(paragraph => paragraph.includes(needle)) ?? '';
+    const sb14 = sectionOf(guide, '### SB14. Later: the old release retired, and its receipt');
+    const sb14b = sectionOf(guide, '### SB14b. After a reboot or a runner crash during a drain');
+    // R1: after the 20-minute settle a model call may still run; the runner then does not retire, and root's forced stop
+    // (25 minutes after the backstop's request) ends it and re-opens a gate it halted.
+    for (const [name, section] of [['SB14', sb14], ['SB14b', sb14b]] as const) {
+      const inFlight = paragraphOf(section, '`RUNNER_BACKSTOP_CALL_IN_FLIGHT`');
+      expect(inFlight, name).toMatch(/25\s+minutes/);
+      expect(inFlight, name).toMatch(/forced\s+stop/);
+    }
+    // X2: a runner started under a standing retire request claims nothing and goes straight to the backstop.
+    expect(paragraphOf(sb14b, '`RETIRE_REQUEST_STANDING`')).toMatch(/claims\s+nothing/);
+  });
+
   it('the N-1 baseline names the live release after TB9 and after SB13b, and SB4 checks it (final fix wave A2)', () => {
     for (const [heading, before, after] of [['### TB10. ', '### TB9. ', '### The way back from T'], ['### SB13c. ', '### SB13b. ', '### SB14. ']] as const) {
       const at = newSections.indexOf(`\n${heading}`);

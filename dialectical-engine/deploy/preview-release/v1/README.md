@@ -3953,6 +3953,12 @@ The old runner retires by itself once its pair is stopped, none of its work is R
 (exit 0, no email). At the latest, 7.5 hours after the switch the backstop asks it to retire, and 25 minutes after that
 root stops it and emails the owner. Run SB14 now and then; it writes the receipt once the release is RETIRED.
 
+The backstop never cuts a model call. It stops new claims and calls, waits up to 20 minutes for the calls in flight, and
+sets the debates still open aside (no quota use). If a model call still runs after that, the runner prints
+`RUNNER_BACKSTOP_CALL_IN_FLIGHT` (with `calls`, how many) and does not retire by itself: ending its process would cut
+the call and halt the spending gate both releases share. Root's forced stop ends it 25 minutes after the backstop's
+request, re-opens a gate the stop halted, and emails the owner. Nothing to do by hand.
+
 ```sh
 set -euo pipefail
 . /root/preview-archive/rNN-names.sh
@@ -3987,6 +3993,13 @@ owner's yes), then the draining release's runner starts, then the current one's.
 database-ahead mode when the database is newer (its prestart, from its lock pin), finishes or sets aside its own debates
 (with no quota use) and retires by itself, as it would have without the restart. A release that is neither current nor
 draining is left as it is. Nothing is stopped.
+
+When the restart comes after the backstop's time (7.5 hours after the switch), the request to retire already stands: the
+draining runner prints `RETIRE_REQUEST_STANDING` (with `openWork`) as it starts, claims nothing, sets its open debates
+aside at its first check about a minute later (no quota use) and retires. A draining runner whose journal says
+`RUNNER_BACKSTOP_CALL_IN_FLIGHT` did not crash: the backstop set its debates aside while a model call was still running,
+so it waits on purpose (see SB14). Root's forced stop ends it 25 minutes after the backstop's request; SB14b leaves it
+running ("already running").
 
 ```sh
 set -euo pipefail
