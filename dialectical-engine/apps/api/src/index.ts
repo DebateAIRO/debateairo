@@ -2061,8 +2061,8 @@ async function withNewerReleaseFallback<T>(
     // failure.
     const releaseKey = await Promise.resolve().then(releaseKeyOf).catch(() => null);
     if (releaseKey === null || !madeByNewerRelease(releaseKey, ownReleaseKey)) throw error;
-    // C14 review: one operator line, content-free (the route, the id asked for, the debate's release key), and the
-    // parse failure kept as the error's cause.
+    // C14 review: one operator line, content-free (the route, the resolved run id (C9) or the answer id, the debate's
+    // release key), and the parse failure kept as the error's cause.
     console.error(JSON.stringify({ event: "api.debate.made_by_newer_release", route: debate.route, id: debate.id, releaseKey }));
     throw new MadeByNewerReleaseError(error);
   }

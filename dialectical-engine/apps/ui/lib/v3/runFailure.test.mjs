@@ -82,7 +82,8 @@ test("every code family lands in its group, whether or not the runner wrapped it
     ["RUN_SETUP_FAILED:CHOICE_UNAVAILABLE:EXTRA", "NOT_STARTED"],
     // Side-by-side uploads (plan B15, D7): a debate set aside because of an upload, with any waiver reason (the
     // runner's backstop, a release no runner serves, the owner's stop, a settings version this release cannot run),
-    // written as is or wrapped by the runner's catch. It never used the person's quota (the waiver).
+    // as written; a wrapped RUNNER_EXECUTION_FAILED:RUN_SET_ASIDE:<reason> would read the same (the runner writes none
+    // today). It never used the person's quota (the waiver).
     ["RUN_SET_ASIDE:BACKSTOP", "SET_ASIDE"],
     ["RUNNER_EXECUTION_FAILED:RUN_SET_ASIDE:BACKSTOP", "SET_ASIDE"],
     ["RUN_SET_ASIDE:RELEASE_NOT_SERVED", "SET_ASIDE"],

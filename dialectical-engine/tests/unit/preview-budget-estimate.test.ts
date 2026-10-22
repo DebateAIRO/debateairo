@@ -1347,22 +1347,24 @@ describe("each unfinished debate is held at its own register version's terms (si
   it("a version whose terms cannot be read prices that run at the API's own terms, and says so once (C16 review)", async () => {
     // Controller ruling: one unreadable version must not refuse every preview ask. Its unfinished run is held exactly as
     // if it ran under the API's own terms (the behaviour before C16), and one content-free line names the version.
+    // Version 916 is this test's alone: the line is said once per version per PROCESS, so no other test may have said it.
+    const runs = Object.freeze([runAt(916), runAt(17)]);
     const asked: number[] = [];
     const gate: PreviewBudgetGateSettings = Object.freeze({
-      ...gateWith({ probes: 0, remaining: 0 }, async () => remainingWith(), RUNS), ...V17,
+      ...gateWith({ probes: 0, remaining: 0 }, async () => remainingWith(), runs), ...V17,
       termsForVersion: async (version: number) => {
         asked.push(version);
-        if (version === 16) throw new TypeError("STORY_POLICY_INVALID");
+        if (version === 916) throw new TypeError("STORY_POLICY_INVALID");
         return V17;
       }
     });
     const { held, needs, lines } = await refusalsOf(gate);
-    expect(held).toEqual(sumOf([[RUNS[0]!, V17], [RUNS[1]!, V17]]));
+    expect(held).toEqual(sumOf([[runs[0]!, V17], [runs[1]!, V17]]));
     expect(needs).toEqual(needsAt(V17));
-    // Not kept as terms: every ask asks for version 16 again (a version that later reads fine is priced at its own).
-    expect(asked).toEqual([16, 17, 16, 17]);
+    // Not kept as terms: every ask asks for version 916 again (a version that later reads fine is priced at its own).
+    expect(asked).toEqual([916, 17, 916, 17]);
     expect(lines.filter((line) => line.event === "api.preview_estimate.version_terms_fallback"))
-      .toEqual([{ event: "api.preview_estimate.version_terms_fallback", version: 16 }]);
+      .toEqual([{ event: "api.preview_estimate.version_terms_fallback", version: 916 }]);
     // With room on the gate the ask is admitted, and the line is not printed again.
     const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
     try {

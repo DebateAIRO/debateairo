@@ -109,7 +109,9 @@ export const RUN_FAILURE_CODES: Readonly<Record<string, RunFailureKind>> = Objec
   RUN_CEILING_BELOW_FIRST_CALL: "RUN_LIMIT_REACHED",
   /**
    * Side-by-side uploads (plan B5's `runSetAsideReason`, D7): every set-aside
-   * reason, whatever its suffix, written as is or wrapped by the runner's catch.
+   * reason, whatever its suffix, as written. A wrapped
+   * `RUNNER_EXECUTION_FAILED:RUN_SET_ASIDE:<reason>` would read the same; the
+   * runner writes none today.
    */
   RUN_SET_ASIDE: "SET_ASIDE"
 });
