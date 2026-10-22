@@ -201,7 +201,9 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Anulowanie. Możesz anulować w dowolnym momencie w sekcji Ustawienia → Subskrypcja jednym kliknięciem potwierdzającym albo na stronie anulowania pod adresem dezbatere.ro/cancel, która nie wymaga logowania. Anulowanie staje się skuteczne z końcem bieżącego okresu rozliczeniowego, a do tego czasu zachowujesz dostęp. Nie utrudniamy anulowania bardziej niż wykupienia subskrypcji." },
       { kind: "p", text: "Zmiany cen stają się skuteczne wyłącznie przy odnowieniu. Powiadomimy Cię pocztą elektroniczną o nowej cenie co najmniej 30 dni wcześniej, dołączając link do anulowania. Jeżeli prawo Twojego państwa wymaga wyraźnej zgody na zmianę ceny, poprosimy Cię o jej udzielenie; w przeciwnym razie, jeżeli nie podejmiesz żadnego działania, nowa cena będzie obowiązywać od kolejnego odnowienia. Załącznik A zawiera informacje o zasadach regionalnych." },
       { kind: "p", text: "Nieudane płatności. Jeżeli płatność nie powiedzie się, ponawiamy próbę przez 7 dni i przed obniżeniem planu Twojego konta do planu bezpłatnego wysyłamy ostrzeżenie pocztą elektroniczną. Nie usuwamy debat z powodu nieudanej płatności." },
-      { kind: "p", text: "Podatki i odbiorca płatności. Ceny obejmują VAT, GST lub podatek od sprzedaży, zależnie od miejsca zamieszkania, co zostaje wskazane przed dokonaniem płatności. Płatności kartą obsługuje NETOPIA Payments (netopia-payments.com). Sprzedawcą jest DMS Merchandise Shop S.R.L., który wystawia fakturę i pozostaje odpowiedzialny za samą usługę oraz za niniejsze Warunki." },
+      { kind: "p", text: "Podatki i odbiorca płatności. Ceny obejmują VAT, GST lub podatek od sprzedaży, zależnie od miejsca zamieszkania, co zostaje wskazane przed dokonaniem płatności. Sprzedawcą jest DMS Merchandise Shop S.R.L., który wystawia fakturę i pozostaje odpowiedzialny za samą usługę oraz za niniejsze Warunki." },
+      { kind: "p", text: "Metody płatności. Płacisz kartą. Akceptujemy karty Visa i Mastercard; nie akceptujemy kart American Express. Płatności kartą obsługuje NETOPIA Payments (netopia-payments.com), a pełny numer Twojej karty nigdy do nas nie trafia." },
+      { kind: "p", text: "Dostawa. Dialectical Engine to usługa online, więc nic nie jest do Ciebie wysyłane. Funkcje Twojego płatnego planu są dostępne na Twoim koncie, gdy tylko płatność zostanie potwierdzona." },
       { kind: "p", text: "Obciążenia zwrotne. Jeżeli zakwestionujesz obciążenie u wystawcy karty, możemy zawiesić funkcje płatne do czasu rozstrzygnięcia sporu. Nie pobieramy z tego tytułu opłat." },
       { kind: "p", text: "Pierwszeństwo praw ustawowych. Jeżeli usługa nie jest zgodna z tym, co obiecaliśmy, przysługuje Ci prawo do doprowadzenia jej do zgodności albo do proporcjonalnego obniżenia ceny lub zwrotu, zgodnie z prawem. Ponadto, jeżeli zrezygnujesz z planu płatnego w trakcie okresu rozliczeniowego, zwrócimy Ci tę część ceny za ten okres, która nie została wykorzystana, mierzoną zużyciem planu, niezależnie od tego, ile dni minęło: jeżeli wykorzystano 30%, zwrócimy 70%; jeżeli nic nie wykorzystano, zwrócimy całą cenę. Wniosek o zwrot wyślij na support@dezbatere.ro; po dokonaniu zwrotu plan wygasa. Jeżeli ma zastosowanie także prawo odstąpienia opisane w sekcji 13, otrzymasz wyższy z dwóch zwrotów. Limity korzystania w obu planach są publikowane w produkcie; poinformujemy Cię przed zaostrzeniem ich w sposób, który wywiera na Ciebie istotny wpływ." }
     ]
@@ -351,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.3",
-  sha256: "15044191029ca5601691b0022d8efc13c736bb61625ec4ed171faa970762d604",
-  eyebrow: "WARUNKI ŚWIADCZENIA USŁUG · v2.3 · OBOWIĄZUJĄ OD 12 PAŹDZIERNIKA 2026",
+  version: "2.4",
+  sha256: "c82ec4d1f487a791819bcc14df21eb86df585af768146f9427cc9792358eb20b",
+  eyebrow: "WARUNKI ŚWIADCZENIA USŁUG · v2.4 · OBOWIĄZUJĄ OD 12 PAŹDZIERNIKA 2026",
   title: "Na co wyrażasz zgodę",
   lede: "Umowa między Tobą a DMS Merchandise Shop S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.",
-  endMarker: "KONIEC WARUNKÓW · v2.3",
+  endMarker: "KONIEC WARUNKÓW · v2.4",
   contact: "support@dezbatere.ro",
   bodyLabel: "Treść Warunków świadczenia usług",
   sectionIdPrefix: "terms-section-",

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In het kort
-eyebrow: SERVICEVOORWAARDEN · v2.3 · VAN KRACHT OP 12 OKTOBER 2026
+eyebrow: SERVICEVOORWAARDEN · v2.4 · VAN KRACHT OP 12 OKTOBER 2026
 title: Waarmee u instemt
 lede: De overeenkomst tussen u en DMS Merchandise Shop S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.
-endMarker: EINDE VAN DE VOORWAARDEN · v2.3
+endMarker: EINDE VAN DE VOORWAARDEN · v2.4
 bodyLabel: Tekst van de Servicevoorwaarden
 annexTitle: Bijlage A — Regionale voorwaarden
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TOEPASSELIJK RECHT
 -->
 
-**Version 2.3 · Effective 12 oktober 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
+**Version 2.4 · Effective 12 oktober 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
 
 **In short.** U moet 18 jaar of ouder zijn. Dialectical Engine stelt met AI-modellen argumenten op en alles wat het genereert kan onjuist zijn — het is geen advies. Uw debatten zijn privé, tenzij u ze publiceert; als u ze publiceert, kan iedereen ze lezen. Tekst die u indient, wordt verzonden naar de AI-aanbieders in ons Register van aanbieders en wordt niet gebruikt om modellen te trainen. Meld illegale inhoud via support@dezbatere.ro, ongeacht of u een account hebt. Het Roemeense recht is van toepassing, maar uw lokale consumentenbescherming blijft voor u gelden.
 
@@ -195,7 +195,11 @@ Dialectical Engine biedt een gratis abonnement. Een betaald **Premium**-abonneme
 
 **Mislukte betalingen.** Als een betaling mislukt, proberen wij deze gedurende 7 dagen opnieuw uit te voeren en waarschuwen wij u per e-mail voordat wij uw account naar het gratis abonnement terugzetten. Wij verwijderen uw debatten niet omdat een betaling is mislukt.
 
-**Belastingen en aan wie u betaalt.** Prijzen zijn inclusief BTW, GST of omzetbelasting, afhankelijk van waar u woont; dit wordt getoond voordat u betaalt. Kaartbetalingen worden verwerkt door NETOPIA Payments (netopia-payments.com). De verkoper is DMS Merchandise Shop S.R.L., die uw factuur uitreikt en verantwoordelijk blijft voor de dienst zelf en voor deze Voorwaarden.
+**Belastingen en aan wie u betaalt.** Prijzen zijn inclusief BTW, GST of omzetbelasting, afhankelijk van waar u woont; dit wordt getoond voordat u betaalt. De verkoper is DMS Merchandise Shop S.R.L., die uw factuur uitreikt en verantwoordelijk blijft voor de dienst zelf en voor deze Voorwaarden.
+
+**Betaalmethoden.** U betaalt met een kaart. Wij accepteren Visa en Mastercard; American Express accepteren wij niet. Kaartbetalingen worden verwerkt door NETOPIA Payments (netopia-payments.com), en uw volledige kaartnummer bereikt ons nooit.
+
+**Levering.** Dialectical Engine is een onlinedienst, dus er wordt niets naar u verzonden. De functies van uw betaalde abonnement zijn in uw account beschikbaar zodra uw betaling is bevestigd.
 
 **Terugboeking.** Als u een afschrijving bij uw kaartuitgever betwist, kunnen wij betaalde functies opschorten terwijl het geschil wordt opgelost. Wij brengen hiervoor geen kosten in rekening.
 

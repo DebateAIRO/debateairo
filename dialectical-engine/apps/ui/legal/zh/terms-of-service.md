@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: 简要说明
-eyebrow: 服务条款 · v2.3 · 生效日期 2026 年 10 月 12 日
+eyebrow: 服务条款 · v2.4 · 生效日期 2026 年 10 月 12 日
 title: 您同意的内容
 lede: 以通俗语言说明您与 DMS Merchandise Shop S.R.L. 之间的合同。共十九节及附件 A — 请滚动至末尾。
-endMarker: 服务条款结束 · v2.3
+endMarker: 服务条款结束 · v2.4
 bodyLabel: 服务条款正文
 annexTitle: 附件 A — 区域条款
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 适用法律
 -->
 
-**Version 2.3 · Effective 2026 年 10 月 12 日 · 历史版本见 dezbatere.ro/terms/versions · 语言：中文。**
+**Version 2.4 · Effective 2026 年 10 月 12 日 · 历史版本见 dezbatere.ro/terms/versions · 语言：中文。**
 
 **In short.** 您必须年满 18 周岁。Dialectical Engine 使用人工智能模型构建论证，其生成的一切内容均可能有误 — 这些内容并非建议。除非您主动发布，否则您的辩论均为私密；一经发布，任何人均可阅读。您提交的文本会发送给《AI 提供商名录》中列明的 AI 提供商，且不会用于训练模型。无论您是否拥有账户，均可通过 support@dezbatere.ro 举报违法内容。适用罗马尼亚法律，但您所在地的消费者保护仍对您有效。
 
@@ -195,7 +195,11 @@ Dialectical Engine 提供免费方案。付费 **Premium** 方案将会推出，
 
 **付款失败。** 如果付款失败，我们会在 7 天内重试，并在将您的账户降级为免费方案前通过电子邮件发出警告。我们不会因付款失败而删除您的辩论。
 
-**税费及收款方。** 价格包含增值税、商品及服务税或销售税，具体取决于您的居住地，并会在付款前显示。银行卡付款由 NETOPIA Payments（netopia-payments.com）处理。卖方为 DMS Merchandise Shop S.R.L.，由其开具发票，并继续对服务本身及本条款负责。
+**税费及收款方。** 价格包含增值税、商品及服务税或销售税，具体取决于您的居住地，并会在付款前显示。卖方为 DMS Merchandise Shop S.R.L.，由其开具发票，并继续对服务本身及本条款负责。
+
+**付款方式。** 您以银行卡付款。我们接受 Visa 和 Mastercard；不接受 American Express。银行卡付款由 NETOPIA Payments（netopia-payments.com）处理，您的完整卡号绝不会传到我们这里。
+
+**交付。** Dialectical Engine 是在线服务，因此不会向您寄送任何物品。付款一经确认，您付费方案的功能即可在您的账户中使用。
 
 **拒付。** 如果您向发卡机构提出交易争议，我们可以在争议解决期间暂停付费功能。我们不会为此收取费用。
 

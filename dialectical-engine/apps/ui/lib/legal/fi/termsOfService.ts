@@ -201,7 +201,9 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Peruuttaminen. Peruuta milloin tahansa kohdassa Asetukset → Tilaus yhdellä vahvistusnapsautuksella tai osoitteessa dezbatere.ro/cancel olevalla peruutussivulla, joka ei edellytä kirjautumista. Peruutus tulee voimaan kuluvan laskutuskauden lopussa, ja käyttöoikeutesi säilyy siihen asti. Emme tee peruuttamisesta tilaamista vaikeampaa." },
       { kind: "p", text: "Hinnanmuutokset tulevat voimaan vain tilauksen uusiutuessa. Ilmoitamme uudesta hinnasta sähköpostitse vähintään 30 päivää etukäteen ja liitämme mukaan peruutuslinkin. Jos maasi laki edellyttää nimenomaista suostumustasi hinnanmuutokseen, pyydämme sitä; muussa tapauksessa uusi hinta tulee seuraavasta uusimisesta alkaen sovellettavaksi, jos et ryhdy toimiin. Alueelliset säännöt kuvataan liitteessä A." },
       { kind: "p", text: "Epäonnistuneet maksut. Jos maksu epäonnistuu, yritämme sitä uudelleen 7 päivän ajan ja varoitamme sinua sähköpostitse ennen tilisi muuttamista maksuttomaksi tilaukseksi. Emme poista väittelyitäsi epäonnistuneen maksun vuoksi." },
-      { kind: "p", text: "Verot ja maksunsaaja. Hinnat sisältävät arvonlisäveron, GST-veron tai myyntiveron, mikä riippuu asuinpaikastasi ja näytetään ennen maksamista. Korttimaksut käsittelee NETOPIA Payments (netopia-payments.com). Myyjä on DMS Merchandise Shop S.R.L., joka laatii laskusi ja vastaa edelleen itse palvelusta ja näistä käyttöehdoista." },
+      { kind: "p", text: "Verot ja maksunsaaja. Hinnat sisältävät arvonlisäveron, GST-veron tai myyntiveron, mikä riippuu asuinpaikastasi ja näytetään ennen maksamista. Myyjä on DMS Merchandise Shop S.R.L., joka laatii laskusi ja vastaa edelleen itse palvelusta ja näistä käyttöehdoista." },
+      { kind: "p", text: "Maksutavat. Maksat kortilla. Hyväksymme Visa- ja Mastercard-kortit; American Express -kortteja emme hyväksy. Korttimaksut käsittelee NETOPIA Payments (netopia-payments.com), eikä korttisi koko numero koskaan päädy meille." },
+      { kind: "p", text: "Toimitus. Dialectical Engine on verkkopalvelu, joten sinulle ei lähetetä mitään. Maksullisen tilauksesi ominaisuudet ovat käytettävissä tililläsi heti, kun maksusi on vahvistettu." },
       { kind: "p", text: "Takaisinveloitukset. Jos riitautat veloituksen kortinmyöntäjän kanssa, voimme keskeyttää maksulliset ominaisuudet riidan ratkaisemisen ajaksi. Emme peri tästä maksuja." },
       { kind: "p", text: "Lakisääteiset oikeudet ensisijaisesti. Jos palvelu ei vastaa lupaamaamme, sinulla on lain mukaisesti oikeus saada se saatetuksi vaatimusten mukaiseksi taikka oikeus hinnan suhteelliseen alentamiseen tai palautukseen. Tämän lisäksi, jos peruutat maksullisen tilauksen laskutuskauden aikana, palautamme sen osan kauden hinnasta, jota et ole käyttänyt, mitattuna tilauksen käytön mukaan, riippumatta siitä, kuinka monta päivää on kulunut: jos olet käyttänyt 30 %, palautamme 70 %; jos et ole käyttänyt mitään, palautamme koko hinnan. Pyydä palautusta kirjoittamalla osoitteeseen support@dezbatere.ro; kun olemme palauttaneet maksun, tilaus päättyy. Jos myös osion 13 peruuttamisoikeus soveltuu, saat suuremman palautuksen. Kummankin tilauksen käyttörajat julkaistaan tuotteessa; ilmoitamme ennen niiden tiukentamista tavalla, joka vaikuttaa sinuun olennaisesti." }
     ]
@@ -351,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.3",
-  sha256: "9e390c87bb4ef647898455a8e44826df44eadea29ec82c43aeefab5e04e6f7ed",
-  eyebrow: "KÄYTTÖEHDOT · v2.3 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN",
+  version: "2.4",
+  sha256: "3b3011716e6f3587f86008ab3d9f25e4e975e54d657cf5888dccb9ce1c8f0201",
+  eyebrow: "KÄYTTÖEHDOT · v2.4 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN",
   title: "Mihin sitoudut",
   lede: "Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.",
-  endMarker: "KÄYTTÖEHTOJEN LOPPU · v2.3",
+  endMarker: "KÄYTTÖEHTOJEN LOPPU · v2.4",
   contact: "support@dezbatere.ro",
   bodyLabel: "Käyttöehtojen teksti",
   sectionIdPrefix: "terms-section-",

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In breve
-eyebrow: CONDIZIONI DI SERVIZIO · v2.3 · IN VIGORE DAL 12 OTTOBRE 2026
+eyebrow: CONDIZIONI DI SERVIZIO · v2.4 · IN VIGORE DAL 12 OTTOBRE 2026
 title: Ciò che accetti
 lede: Il contratto tra te e DMS Merchandise Shop S.R.L., in un linguaggio chiaro. Diciannove sezioni e Allegato A — scorri fino alla fine.
-endMarker: FINE DELLE CONDIZIONI · v2.3
+endMarker: FINE DELLE CONDIZIONI · v2.4
 bodyLabel: Testo delle Condizioni di servizio
 annexTitle: Allegato A — Condizioni regionali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEGGE APPLICABILE
 -->
 
-**Version 2.3 · Effective 12 ottobre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
+**Version 2.4 · Effective 12 ottobre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
 
 **In short.** Devi avere almeno 18 anni. Dialectical Engine costruisce argomentazioni con modelli di IA e tutto ciò che genera può essere errato — non costituisce consulenza. I tuoi dibattiti sono privati, salvo che tu non li pubblichi; se li pubblichi, chiunque può leggerli. Il testo che invii viene trasmesso ai fornitori di IA elencati nel nostro Registro dei fornitori e non viene utilizzato per addestrare i modelli. Segnala i contenuti illegali a support@dezbatere.ro, indipendentemente dal fatto che tu abbia un account. Si applica la legge rumena, ma le tutele locali dei consumatori restano impregiudicate.
 
@@ -195,7 +195,11 @@ Dialectical Engine offre un piano gratuito. Sarà disponibile un piano **Premium
 
 **Pagamenti non riusciti.** Se un pagamento non va a buon fine, riproviamo per 7 giorni e ti avvertiamo tramite email prima di riportare il tuo account al piano gratuito. Non cancelliamo i tuoi dibattiti a causa di un pagamento non riuscito.
 
-**Imposte e soggetto a cui effettui il pagamento.** I prezzi includono IVA, GST o imposta sulle vendite, a seconda del luogo in cui vivi, e ciò viene indicato prima del pagamento. I pagamenti con carta sono elaborati da NETOPIA Payments (netopia-payments.com). Il venditore è DMS Merchandise Shop S.R.L., che emette la tua fattura e resta responsabile del servizio stesso e delle presenti Condizioni.
+**Imposte e soggetto a cui effettui il pagamento.** I prezzi includono IVA, GST o imposta sulle vendite, a seconda del luogo in cui vivi, e ciò viene indicato prima del pagamento. Il venditore è DMS Merchandise Shop S.R.L., che emette la tua fattura e resta responsabile del servizio stesso e delle presenti Condizioni.
+
+**Metodi di pagamento.** Paghi con carta. Accettiamo Visa e Mastercard; non accettiamo American Express. I pagamenti con carta sono elaborati da NETOPIA Payments (netopia-payments.com) e il numero completo della tua carta non arriva mai a noi.
+
+**Consegna.** Dialectical Engine è un servizio online, quindi non ti viene spedito nulla. Le funzionalità del tuo piano a pagamento sono disponibili nel tuo account non appena il pagamento è confermato.
 
 **Storni.** Se contesti un addebito presso l'emittente della tua carta, possiamo sospendere le funzionalità a pagamento mentre la controversia viene risolta. Non addebitiamo commissioni a tale titolo.
 

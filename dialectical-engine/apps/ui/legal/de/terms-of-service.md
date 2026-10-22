@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kurz gesagt
-eyebrow: NUTZUNGSBEDINGUNGEN · v2.3 · GÜLTIG AB 12. OKTOBER 2026
+eyebrow: NUTZUNGSBEDINGUNGEN · v2.4 · GÜLTIG AB 12. OKTOBER 2026
 title: Womit Sie sich einverstanden erklären
 lede: Der Vertrag zwischen Ihnen und DMS Merchandise Shop S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.
-endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.3
+endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.4
 bodyLabel: Text der Nutzungsbedingungen
 annexTitle: Anhang A – Regionale Bestimmungen
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ANWENDBARES RECHT
 -->
 
-**Version 2.3 · Effective 12. Oktober 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
+**Version 2.4 · Effective 12. Oktober 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
 
 **In short.** Sie müssen mindestens 18 Jahre alt sein. Dialectical Engine erstellt Argumente mithilfe von KI-Modellen, und alles, was es erzeugt, kann falsch sein – es handelt sich nicht um Beratung. Ihre Debatten sind privat, sofern Sie sie nicht veröffentlichen; wenn Sie sie veröffentlichen, kann jede Person sie lesen. Von Ihnen übermittelter Text wird an die in unserem Verzeichnis aufgeführten KI-Anbieter gesendet und nicht zum Trainieren von Modellen verwendet. Melden Sie rechtswidrige Inhalte unter support@dezbatere.ro, unabhängig davon, ob Sie ein Konto haben. Es gilt rumänisches Recht, Ihre örtlichen Verbraucherschutzrechte bleiben Ihnen jedoch erhalten.
 
@@ -195,7 +195,11 @@ Dialectical Engine bietet einen kostenlosen Tarif an. Ein kostenpflichtiger **Pr
 
 **Fehlgeschlagene Zahlungen.** Wenn eine Zahlung fehlschlägt, versuchen wir sie 7 Tage lang erneut und warnen Sie per E-Mail, bevor wir Ihr Konto auf den kostenlosen Tarif herabstufen. Wir löschen Ihre Debatten nicht wegen einer fehlgeschlagenen Zahlung.
 
-**Steuern und Zahlungsempfänger.** Die Preise enthalten Mehrwertsteuer, GST oder Umsatzsteuer; dies hängt von Ihrem Wohnort ab und wird vor der Zahlung angezeigt. Kartenzahlungen werden von NETOPIA Payments (netopia-payments.com) abgewickelt. Verkäuferin ist die DMS Merchandise Shop S.R.L., die Ihre Rechnung ausstellt und weiterhin für den Dienst selbst und für diese Nutzungsbedingungen verantwortlich bleibt.
+**Steuern und Zahlungsempfänger.** Die Preise enthalten Mehrwertsteuer, GST oder Umsatzsteuer; dies hängt von Ihrem Wohnort ab und wird vor der Zahlung angezeigt. Verkäuferin ist die DMS Merchandise Shop S.R.L., die Ihre Rechnung ausstellt und weiterhin für den Dienst selbst und für diese Nutzungsbedingungen verantwortlich bleibt.
+
+**Zahlungsarten.** Sie bezahlen per Karte. Wir akzeptieren Visa und Mastercard; American Express akzeptieren wir nicht. Kartenzahlungen werden von NETOPIA Payments (netopia-payments.com) abgewickelt, und Ihre vollständige Kartennummer erreicht uns nie.
+
+**Lieferung.** Dialectical Engine ist ein Online-Dienst; Ihnen wird also nichts zugesandt. Die Funktionen Ihres kostenpflichtigen Tarifs stehen in Ihrem Konto zur Verfügung, sobald Ihre Zahlung bestätigt ist.
 
 **Rückbuchungen.** Wenn Sie eine Belastung bei Ihrem Kartenaussteller beanstanden, können wir kostenpflichtige Funktionen aussetzen, solange die Streitigkeit geklärt wird. Hierfür erheben wir keine Gebühren.
 

@@ -201,7 +201,9 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Preklic. Naročnino lahko kadar koli prekličete v meniju Nastavitve → Naročnina z enim potrditvenim klikom ali na strani za preklic na dezbatere.ro/cancel, za katero se vam ni treba prijaviti. Preklic začne učinkovati ob koncu tekočega obračunskega obdobja, dostop pa obdržite do takrat. Preklica ne bomo otežili bolj, kot je bila otežena sklenitev naročnine." },
       { kind: "p", text: "Spremembe cen začnejo učinkovati šele ob podaljšanju. Po e-pošti vas obvestimo najmanj 30 dni vnaprej ter vključimo novo ceno in povezavo za preklic. Kadar pravo vaše države zahteva izrecno soglasje k spremembi cene, ga zahtevamo; sicer se nova cena, če ne storite ničesar, uporablja od naslednjega podaljšanja. Regionalna pravila so navedena v Prilogi A." },
       { kind: "p", text: "Neuspela plačila. Če plačilo ne uspe, ga ponovno poskušamo izvesti 7 dni in vas po e-pošti opozorimo, preden vaš račun prestavimo na brezplačni paket. Vaših razprav zaradi neuspelega plačila ne izbrišemo." },
-      { kind: "p", text: "Davki in prejemnik plačila. Cene vključujejo DDV, GST ali prometni davek, kar je odvisno od kraja, kjer živite, in je prikazano pred plačilom. Plačila s kartico obdeluje NETOPIA Payments (netopia-payments.com). Prodajalec je DMS Merchandise Shop S.R.L., ki vam izda račun in ostaja odgovoren za samo storitev in za te Pogoje." },
+      { kind: "p", text: "Davki in prejemnik plačila. Cene vključujejo DDV, GST ali prometni davek, kar je odvisno od kraja, kjer živite, in je prikazano pred plačilom. Prodajalec je DMS Merchandise Shop S.R.L., ki vam izda račun in ostaja odgovoren za samo storitev in za te Pogoje." },
+      { kind: "p", text: "Načini plačila. Plačate s kartico. Sprejemamo kartice Visa in Mastercard; kartic American Express ne sprejemamo. Plačila s kartico obdeluje NETOPIA Payments (netopia-payments.com), celotna številka vaše kartice pa nikoli ne pride do nas." },
+      { kind: "p", text: "Dostava. Dialectical Engine je spletna storitev, zato vam ničesar ne pošiljamo. Funkcije vašega plačljivega paketa so v vašem računu na voljo takoj, ko je plačilo potrjeno." },
       { kind: "p", text: "Povratne bremenitve. Če bremenitev izpodbijate pri izdajatelju kartice, lahko plačljive funkcije začasno onemogočimo, dokler spor ni rešen. Za to ne zaračunavamo pristojbin." },
       { kind: "p", text: "Najprej zakonske pravice. Če storitev ni skladna z našimi obljubami, imate pravico zahtevati vzpostavitev skladnosti ali sorazmerno znižanje cene oziroma vračilo, kot določa zakon. Poleg tega, če plačljivi paket med obračunskim obdobjem prekličete, vam vrnemo del cene tega obdobja, ki ga niste porabili, merjen z uporabo paketa, ne glede na to, koliko dni je minilo: če ste porabili 30 % paketa, vam vrnemo 70 %; če niste porabili ničesar, vam vrnemo celotno ceno. Zahtevajte vračilo na support@dezbatere.ro; ko vračilo izvedemo, se paket konča. Če velja tudi pravica do odstopa iz razdelka 13, prejmete tisto vračilo, ki je večje. Omejitve uporabe za oba paketa so objavljene v izdelku; preden jih zaostrimo tako, da bi to bistveno vplivalo na vas, vas obvestimo." }
     ]
@@ -351,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.3",
-  sha256: "953383155770dc8526f96f455be9d946e29987b57b8d9763018d4fe0890392f6",
-  eyebrow: "POGOJI UPORABE · v2.3 · VELJAVNI OD 12. OKTOBRA 2026",
+  version: "2.4",
+  sha256: "6fa70fc80e693110e08159e16028e0ed24a06f689e9d85dccb08c543233aa662",
+  eyebrow: "POGOJI UPORABE · v2.4 · VELJAVNI OD 12. OKTOBRA 2026",
   title: "S čim soglašate",
   lede: "Pogodba med vami in družbo DMS Merchandise Shop S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.",
-  endMarker: "KONEC POGOJEV · v2.3",
+  endMarker: "KONEC POGOJEV · v2.4",
   contact: "support@dezbatere.ro",
   bodyLabel: "Besedilo Pogojev uporabe",
   sectionIdPrefix: "terms-section-",

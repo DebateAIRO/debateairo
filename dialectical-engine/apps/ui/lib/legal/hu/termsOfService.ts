@@ -201,7 +201,9 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Lemondás. Bármikor lemondhatja előfizetését a Beállítások → Előfizetés menüpontban egyetlen megerősítő kattintással, vagy a dezbatere.ro/cancel címen elérhető lemondási oldalon, amelyhez nem kell bejelentkeznie. A lemondás az aktuális számlázási időszak végén lép hatályba, addig pedig megmarad a hozzáférése. A lemondást nem tesszük nehezebbé az előfizetésnél." },
       { kind: "p", text: "Az árváltozások kizárólag megújításkor lépnek hatályba. Legalább 30 nappal korábban e-mailben értesítjük Önt az új árról, és lemondási hivatkozást biztosítunk. Ha az Ön országának joga kifejezett hozzájárulását követeli meg egy árváltozáshoz, azt kérjük Öntől; egyébként, ha nem tesz semmit, az új ár a következő megújítástól alkalmazandó. A regionális szabályokat az A. melléklet ismerteti." },
       { kind: "p", text: "Sikertelen fizetések. Ha egy fizetés sikertelen, 7 napig újra megkíséreljük, és e-mailben figyelmeztetjük Önt, mielőtt fiókját ingyenes csomagra állítanánk vissza. Sikertelen fizetés miatt nem töröljük vitáit." },
-      { kind: "p", text: "Adók és a fizetés kedvezményezettje. Az árak tartalmazzák a héát, az áruk és szolgáltatások adóját vagy a forgalmi adót; ez az Ön lakóhelyétől függ, és a fizetés előtt megjelenik. A kártyás fizetéseket a NETOPIA Payments (netopia-payments.com) dolgozza fel. Az eladó a DMS Merchandise Shop S.R.L., amely kiállítja az Ön számláját, és felelős marad magáért a szolgáltatásért, valamint e Feltételekért." },
+      { kind: "p", text: "Adók és a fizetés kedvezményezettje. Az árak tartalmazzák a héát, az áruk és szolgáltatások adóját vagy a forgalmi adót; ez az Ön lakóhelyétől függ, és a fizetés előtt megjelenik. Az eladó a DMS Merchandise Shop S.R.L., amely kiállítja az Ön számláját, és felelős marad magáért a szolgáltatásért, valamint e Feltételekért." },
+      { kind: "p", text: "Fizetési módok. Ön bankkártyával fizet. Visa és Mastercard kártyát fogadunk el; American Express kártyát nem fogadunk el. A kártyás fizetéseket a NETOPIA Payments (netopia-payments.com) dolgozza fel, és az Ön teljes kártyaszáma soha nem jut el hozzánk." },
+      { kind: "p", text: "Szállítás. A Dialectical Engine online szolgáltatás, így semmit sem szállítunk ki Önnek. Fizetős csomagjának funkciói a fizetés megerősítése után azonnal elérhetők a fiókjában." },
       { kind: "p", text: "Visszaterhelések. Ha Ön vitat egy terhelést a kártyakibocsátójánál, a vita rendezéséig felfüggeszthetjük a fizetős funkciókat. Ezért nem számítunk fel díjat." },
       { kind: "p", text: "A törvényes jogok elsőbbsége. Ha a szolgáltatás nem felel meg vállalásainknak, Ön jogosult a szerződésszerű állapot helyreállítására, illetve a jogszabályban meghatározott arányos árleszállításra vagy visszatérítésre. Ezen túlmenően, ha a számlázási időszak közben lemondja a fizetős csomagot, visszatérítjük az időszak díjának azt a részét, amelyet Ön nem használt fel, a csomag használata alapján mérve, függetlenül attól, hogy hány nap telt el: ha a díj 30%-át használta fel, 70%-át térítjük vissza; ha semmit nem használt fel, a teljes díjat visszatérítjük. Kérje a support@dezbatere.ro címen; amint visszatérítjük a díjat, a csomag megszűnik. Ha a 13. szakasz szerinti elállási jog is alkalmazandó, a kettő közül a nagyobb visszatérítést kapja. Mindkét csomag használati korlátait közzétesszük a termékben; előzetesen értesítjük Önt, mielőtt az Ön számára lényeges módon szigorítanánk azokat." }
     ]
@@ -351,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.3",
-  sha256: "10cf75751d2bea1a28c4081ab5e95c09192d07b746b0fafc617f2eaed6ee13a5",
-  eyebrow: "SZOLGÁLTATÁSI FELTÉTELEK · v2.3 · HATÁLYOS 2026. OKTÓBER 12.",
+  version: "2.4",
+  sha256: "c8a35ff08d78c963928d109ce697823d9c9971a48ebf09f416a2e61aedc9eead",
+  eyebrow: "SZOLGÁLTATÁSI FELTÉTELEK · v2.4 · HATÁLYOS 2026. OKTÓBER 12.",
   title: "Amit Ön elfogad",
   lede: "Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.",
-  endMarker: "A FELTÉTELEK VÉGE · v2.3",
+  endMarker: "A FELTÉTELEK VÉGE · v2.4",
   contact: "support@dezbatere.ro",
   bodyLabel: "A Szolgáltatási feltételek szövege",
   sectionIdPrefix: "terms-section-",
