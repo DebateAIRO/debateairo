@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 import type { Pool } from "pg";
 import { decideAdmission, type ScopeRoom } from "@debateai/budget";
 import { RUNNER_CAPACITY, SITE_CONCURRENT_DEBATES, type WaitingRun } from "@debateai/db";
+import { readFileSync } from "node:fs";
 import { AskRoom, type AskAdmissionGate, type AskRoomLine, type AskRoomSpend } from "../../apps/api/src/ask-room.js";
+import { siteCapBootLine } from "../../apps/api/src/release-state.js";
 
 /**
  * Side-by-side uploads spec 2026-10-21 §9, §13 (plan C task C8) — AT MOST 8 DEBATES ACROSS RELEASES, AND AN ASK CAUGHT
@@ -248,5 +250,30 @@ describe("side-by-side C8 the waker's start asks the gate too", () => {
     expect(await room.startWaiting(run, enqueue)).toEqual({ kind: "STARTED", runId: run.runId, value: "work-item" });
     expect(asked).toEqual(["current:tx", "isWaiting", SITE_LOCK, "active:tx"]);
     expect([holds, started]).toEqual([[run.runId], [run.runId]]);
+  });
+});
+
+describe("side-by-side final fix wave P7: a hosted API without the room says it has no site cap, once at boot", () => {
+  it("hosted without the room: one content-free line, api.release.no_site_cap (the cap of 8 and SWITCHING need the room)", () => {
+    expect(siteCapBootLine({ hosted: true, roomComposed: false })).toBe(JSON.stringify({ event: "api.release.no_site_cap" }));
+  });
+
+  it("no line with the room, and none in local mode (one release, no cap to lose)", () => {
+    expect(siteCapBootLine({ hosted: true, roomComposed: true })).toBeNull();
+    expect(siteCapBootLine({ hosted: false, roomComposed: false })).toBeNull();
+    expect(siteCapBootLine({ hosted: false, roomComposed: true })).toBeNull();
+  });
+
+  it("main.ts prints it right after the room is composed, on stderr, and the boot goes on (no refusal)", () => {
+    const source = readFileSync(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
+    const call = [
+      "const noSiteCapLine = siteCapBootLine({",
+      "  hosted: environment.DEPLOYMENT_MODE === \"hosted\", roomComposed: askRoom !== undefined",
+      "});",
+      "if (noSiteCapLine !== null) console.warn(noSiteCapLine);"
+    ].join("\n");
+    expect(source).toContain(call);
+    expect(source.indexOf(call)).toBeGreaterThan(source.indexOf("const askRoom = askRoomComposition?.room;"));
+    expect(source.indexOf(call)).toBeLessThan(source.indexOf("const billingEnabled ="));
   });
 });

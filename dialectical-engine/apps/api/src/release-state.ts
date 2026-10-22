@@ -318,6 +318,17 @@ export class ReleaseWatcher {
 }
 
 /**
+ * Side-by-side final fix wave P7 — the boot line of a hosted API that composed no ask room (no costEnvelopePolicy row in
+ * force, or one without the band). The site's cap of debates across releases (SITE_CONCURRENT_DEBATES) and the SWITCHING
+ * hold are read inside the room's spend decision (PostgresAskAdmissionGate below), so without the room neither holds and
+ * asks start as they did before it. Not a refusal: one content-free line for the operator's journal. A local API runs
+ * one release, so it has no cap to lose and prints nothing.
+ */
+export function siteCapBootLine(input: Readonly<{ hosted: boolean; roomComposed: boolean }>): string | null {
+  return input.hosted && !input.roomComposed ? JSON.stringify({ event: "api.release.no_site_cap" }) : null;
+}
+
+/**
  * Side-by-side uploads spec 2026-10-21 §9, §13 (plan C task C8) — THE ASK ROOM'S GATE, read on the spend decision's own
  * transaction (inside its day lock), never from the watcher's last poll: an ask admitted the instant a switch moves the
  * traffic away must see the switch.

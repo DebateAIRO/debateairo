@@ -185,7 +185,7 @@ import {
 } from "./account-erasure.js";
 import { installBootCustody } from "./boot-custody.js";
 import { installStartupResourceOwner } from "./startup-resource-owner.js";
-import { PostgresAskAdmissionGate, PostgresReleaseStateReader, ReleaseWatcher } from "./release-state.js";
+import { PostgresAskAdmissionGate, PostgresReleaseStateReader, ReleaseWatcher, siteCapBootLine } from "./release-state.js";
 import { gatedInterval, gatedTrigger } from "./release-loops.js";
 import { PostgresEvaluatorDevMenuRepository } from "@debateai/evaluator";
 import { RecoveryStartService } from "./recovery.js";
@@ -647,6 +647,12 @@ const askRoomComposition = environment.DEPLOYMENT_MODE === "hosted" && costEnvel
     })
   : undefined;
 const askRoom = askRoomComposition?.room;
+// Side-by-side final fix wave P7: hosted without the room, the site's cap of 8 debates and the SWITCHING hold (both read
+// in the room's decision) do not hold. One content-free boot line on stderr; never a refusal.
+const noSiteCapLine = siteCapBootLine({
+  hosted: environment.DEPLOYMENT_MODE === "hosted", roomComposed: askRoom !== undefined
+});
+if (noSiteCapLine !== null) console.warn(noSiteCapLine);
 /**
  * A20 — THE MODEL SCORECARD IN FORCE and the per-role model picker, read and
  * built once, as the boot stages "model-scorecard" and "model-picker" under this
