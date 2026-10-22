@@ -343,9 +343,12 @@ The smallest pot that passes with all four switched on is $1.43; with a final wr
     release's debate may still ask for a model the new GO no longer switches on, or reserve at a price
     it no longer uses. Nothing was set aside or sent; the app makes that model sit out the debate, as
     for a busy model, and never reads it as the money running out. Before 2026-10-21 both were the
-    opaque `PREVIEW_TEST_AUTHORITY_STOPPED`; an older app reads the new codes the same way it read
-    that one. The gate's file hash changes; a new GO is written at install (the side-by-side
-    transition installs it).
+    opaque `PREVIEW_TEST_AUTHORITY_STOPPED`. An older app does not know the new codes and reads them
+    as the money running out, without the `/remaining` check it makes for
+    `PREVIEW_TEST_AUTHORITY_STOPPED`. So on a gate that is also halted, an older release's debate
+    now stops as if its money ran out, where before it would have been told the gate is
+    unavailable and let that model sit out. Nothing is charged either way. The gate's file hash
+    changes; a new GO is written at install (the side-by-side transition installs it).
   - `PREVIEW_TEST_AUTHORITY_STOPPED`: any other refusal, for example a call that was already sent
     when the gate halted. The app is not told why.
 - **The model check script has no custody check of its own.** Like the address script, it is

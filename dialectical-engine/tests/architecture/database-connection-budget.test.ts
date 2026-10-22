@@ -25,8 +25,10 @@ import {
 const API_MAIN = "apps/api/src/main.ts";
 const RUNNER_MAIN = "apps/runner/src/main.ts";
 
-// The server, as measured on 2026-10-10 and provisioned by deploy/postgres.
-const POSTGRES_MAX_CONNECTIONS = 200;
+// The server's limit as provisioned by deploy/postgres: 320 for the side-by-side transition (spec §9). The raise takes
+// effect only at a Postgres restart, in the drained window of the side-by-side transition (spec §9, "The transition");
+// it was 200 before.
+const POSTGRES_MAX_CONNECTIONS = 320;
 const SUPERUSER_RESERVED = 3; // PostgreSQL's default; backups (pg_dump as postgres) use these
 const HATCHET_ROLE_LIMIT = 50; // deploy/postgres/bootstrap.sql: debateai_prod_hatchet CONNECTION LIMIT 50
 const MIGRATOR_ROLE_LIMIT = 3; // deploy/postgres/bootstrap.sql: debateai_prod_migrator CONNECTION LIMIT 3
@@ -36,8 +38,13 @@ const OPERATOR_COMMANDS = 10; // billing, support and owner commands, run by han
 // and the owner needs room to log in during an incident. 25 until 2026-10-12;
 // parallel AI calls (spec 2026-10-12-parallel-calls-design.md §3.6) gave the
 // runner 14 more (20 -> 34), and the data export worker (mission data-export
-// S01) took 1 on the API, which leaves 21.
-const SPARE = 21;
+// S01) took 1 on the API, which left 21. Side by side (spec §9) two live releases each run one API and one runner:
+// 2 × (79 + 34) = 226 at most. With Hatchet, the migrator and the operator's commands that is 289 of the 317 the server
+// allows (320 less the superuser's 3), so 28 stay free.
+const SPARE = 28;
+// Two releases live at once during the side-by-side transition (spec §9): the old one keeps its drained debates while
+// the new one takes new work, and each release has its own API and its own runner.
+const LIVE_RELEASES = 2;
 
 function poolCalls(source: string): readonly string[] {
   return [...source.matchAll(/createPool\([^)]*\)/gu)].map((match) => match[0]);
@@ -184,12 +191,19 @@ describe("the whole server stays under Postgres's limit", () => {
     );
   });
 
-  it("fits one API, the runner, Hatchet, the migrator and the operator with room to spare", () => {
+  it("fits two live releases, Hatchet, the migrator and the operator with room to spare", () => {
     const api = sum(API_DATABASE_POOLS, ["evaluatorDevMenu"]) + SUPPORT_CONTROL_PLANE_POOL.max;
     const runner = sum(RUNNER_DATABASE_POOLS);
     expect(api).toBeLessThanOrEqual(80);
     expect(runner).toBe(34);
-    const ceiling = api + runner + HATCHET_ROLE_LIMIT + MIGRATOR_ROLE_LIMIT + OPERATOR_COMMANDS;
+    const ceiling = LIVE_RELEASES * (api + runner) + HATCHET_ROLE_LIMIT + MIGRATOR_ROLE_LIMIT + OPERATOR_COMMANDS;
     expect(ceiling + SPARE).toBeLessThanOrEqual(POSTGRES_MAX_CONNECTIONS - SUPERUSER_RESERVED);
+  });
+
+  it("the server config allows the budget", async () => {
+    // The limit the budget is checked against must be the one the server's config file sets, and the file sets it once.
+    const conf = await readFile("deploy/postgres/postgresql.hardening.conf", "utf8");
+    expect(conf).toMatch(new RegExp(`^max_connections = ${POSTGRES_MAX_CONNECTIONS}$`, "mu"));
+    expect(conf.match(/^max_connections = /gmu)).toHaveLength(1);
   });
 });

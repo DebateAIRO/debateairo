@@ -23,9 +23,17 @@ command to run, so earlier releases were staged with throwaway scripts and hand-
   environment (`env -i`). On a Mac it refuses.
 
 The website is built with a fixed list of public values (the site address, the Turnstile site key,
-the model list, `NODE_ENV=production`). They are the same constants the reviewed start-up
-check demands from `ui.env`, so the build and the running site cannot disagree. `build-env`
-prints them with their sha256 so you can compare `ui.env` by hash, without printing it.
+the model list, `NODE_ENV=production`) and the release key it is built for. They are the same
+values the reviewed start-up check demands from `ui.env`, so the build and the running site cannot
+disagree. `build-env` prints them with their sha256 so you can compare `ui.env` by hash, without
+printing it.
+
+The release key (`--release-key`, required on `build-env` and `ui-build`) is
+`r<site version>-<first 12 hex of the release's git revision>`, for example `r17-d50e33165a1b`
+(side-by-side spec §1). The website keeps the 12 hex from its build and refuses to serve under
+another release's key, so `ui-build` refuses (`RELEASE_KEY_REFUSED`) a key whose 12 hex are not
+the UI source manifest's revision. Each release's `ui-<label>.env` names the same key, and the
+UI start-up check refuses any key but its launch plan's.
 
 The model list is one of three reviewed lists, picked by name with `--models` (on `build-env` and
 `ui-build`): `glm-only` (the default: GLM only), `multi-model` (Free: GLM and DeepSeek; Premium: GLM,
@@ -65,8 +73,8 @@ writing, so they take a few minutes each. `ui-build` refuses a folder that alrea
 | Command | What it does |
 |---|---|
 | `source-manifest --repository <clean git clone> --root <release root> --role api\|ui\|runner --out <file>` | runs `generateSourceManifest` with uid 0 and writes it; prints `{path,sha256,bytes}` |
-| `build-env [--models glm-only\|multi-model\|all-models]` | prints the fixed public UI build values (for that model list; default `glm-only`) and their sha256; reads no file |
-| `ui-build --source <ui source manifest> [--models glm-only\|multi-model\|all-models] --out <file>` | checks the UI root against its manifest, builds with the fixed values and that model list (default `glm-only`), records the list in the build, re-checks that the build changed no inventoried source byte, checks the build, writes the build manifest |
+| `build-env --release-key <key> [--models glm-only\|multi-model\|all-models]` | prints the fixed public UI build values (for that model list, default `glm-only`, and that release key) and their sha256; reads no file |
+| `ui-build --source <ui source manifest> --release-key <key> [--models glm-only\|multi-model\|all-models] --out <file>` | refuses a key of another revision (`RELEASE_KEY_REFUSED`), checks the UI root against its manifest, builds with the fixed values, that model list (default `glm-only`) and that release key, records the list in the build, re-checks that the build changed no inventoried source byte, checks the build, writes the build manifest |
 | `verify --source <file> [--ui-build <file>]` | re-runs `verifySourceManifest` (and `verifyUiBuildManifest`) against the exact file bytes |
 | `operator-digest --source <file>` | prints `operatorManifestSha256` (the shared function the launchers use) and the operator file count |
 | `launch-plan --service api\|ui\|runner --from <existing plan> --root <release root> --source-manifest <file> [--ui-build <file>] --native-attestation <file> --out <dir>/<service>-launch.json` | new launch plan: release fields from the manifests, everything else from `--from`; for `--service runner` the API plan may be `--from` (identity from the runner OS account, runner.env custody); `validateLaunchPlan` before writing |
@@ -121,20 +129,29 @@ then the same keys from `ui.env` (this prints hashes, never the file):
 Give `build-env` the same `--models` you will give `ui-build` in step 4 (none means `glm-only`). The preview's
 `ui.env` names `all-models`.
 
+`$KEY` is this release's key: `r<register version this release runs with>-<first 12 hex of its source revision>`
+(set `REGV` to that register version; the source revision is read from the UI source manifest of step 2). Give the
+same `--release-key "$KEY"` to `build-env` here and to both `ui-build`s in step 4.
+
 ```sh
-rel build-env
+REGV=17   # change: the register version this release runs with
+KEY="r$REGV-$(jq -r .sourceRevision "$ART/candidate-ui-source.json" | cut -c1-12)"
+rel build-env --release-key "$KEY"
 for K in NODE_ENV PUBLIC_APP_URL NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON TURNSTILE_SITE_KEY; do printf '%s ' "$K"; sed -n "s/^$K=//p" /etc/debateai-v3-preview/auth-dev-v1/ui.env | tr -d '\n' | sha256sum | cut -d' ' -f1; done
 ```
 
 Each hash must equal the `sha256` that `build-env` printed for that key. A hash starting
-`e3b0c442` means the key is missing from `ui.env`: stop and ask.
+`e3b0c442` means the key is missing from `ui.env`: stop and ask. `RELEASE_KEY` is not in this loop: the shared
+`ui.env` holds the live release's key, not the new one. Check instead that `build-env` printed `$KEY` as
+`RELEASE_KEY`'s `value`; the release's own `ui-<label>.env` gets the same key when it is derived
+(`release-env.mjs derive … --release-key "$KEY"`).
 
 **4. Build the website** in the candidate and the fallback UI folders (about 10 minutes each).
 The build log goes to a file; the last line is the result:
 
 ```sh
 for KIND in candidate fallback; do
-  rel ui-build --source "$ART/$KIND-ui-source.json" --out "$ART/$KIND-ui-build.json" > "$ART/$KIND-ui-build.log" 2>&1; echo "$KIND exit $?"; tail -n 1 "$ART/$KIND-ui-build.log"
+  rel ui-build --source "$ART/$KIND-ui-source.json" --release-key "$KEY" --out "$ART/$KIND-ui-build.json" > "$ART/$KIND-ui-build.log" 2>&1; echo "$KIND exit $?"; tail -n 1 "$ART/$KIND-ui-build.log"
 done
 ```
 
@@ -1606,23 +1623,27 @@ echo A3_DONE
 
 These are steps 2 to 5 of "Operator sequence for one release" above, pasted into a root shell after
 `. /root/preview-archive/rNN-names.sh`. Each `--out` goes to `$ART`. One thing differs: **the model list is `all-models`**, so give `--models all-models` to `build-env` and to
-both `ui-build`s. Check the build values against `ui.env` by hash:
+both `ui-build`s. Both also take `--release-key "$KEY"`, where `KEY` is `r<the register version this release will
+publish, one above A1's>-<first 12 hex of REV>`. Check the build values against `ui.env` by hash:
 
 ```sh
 set -euo pipefail
 . /root/preview-archive/rNN-names.sh
 # A5: the public build values of the all-models list against ui.env, by hash only.
 [ ! -e "$S/build-env-all-models.json" ] || { echo "A5_NOT_DONE: an earlier build-env output exists"; exit 1; }
-rel build-env --models all-models > "$S/build-env-all-models.json"
+KEY="r$(( $(cat "$S/register-before") + 1 ))-${REV:0:12}"
+rel build-env --models all-models --release-key "$KEY" > "$S/build-env-all-models.json"
 for K in NODE_ENV PUBLIC_APP_URL NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON TURNSTILE_SITE_KEY; do
   T=$(jq -r --arg k "$K" '.values[$k].sha256' "$S/build-env-all-models.json"); U=$(sed -n "s/^$K=//p" "$E/ui.env" | tr -d '\n' | sha256sum | cut -d' ' -f1)
   echo "$K tool ${T:0:16} ui.env ${U:0:16}"; [ "$T" = "$U" ] || { echo "A5_NOT_DONE: $K differs from ui.env"; exit 1; }
 done
+# RELEASE_KEY: the new release's key, not the shared ui.env's (that is the live release's); its own ui-<label>.env gets it when derived.
+[ "$(jq -r '.values.RELEASE_KEY.value' "$S/build-env-all-models.json")" = "$KEY" ] || { echo "A5_NOT_DONE: build-env did not print this release's key"; exit 1; }
 echo A5_DONE
 ```
 
-- A6, the builds: `rel ui-build --source "$ART/$KIND-ui-source.json" --models all-models --out "$ART/$KIND-ui-build.json"`,
-  for the candidate and the fallback.
+- A6, the builds: `rel ui-build --source "$ART/$KIND-ui-source.json" --models all-models --release-key "$KEY" --out "$ART/$KIND-ui-build.json"`,
+  for the candidate and the fallback, after setting `KEY` exactly as A5 does.
 - A7 must print six `PREVIEW_RELEASE_VERIFIED` lines naming `REV`, and the operator digest.
   - The digest changes whenever a file in `deploy/preview-auth-dev/v1` changed.
   - `nativeSha256` changes with new migrations.

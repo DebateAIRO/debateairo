@@ -15,7 +15,7 @@ import { seedInstalledAuth106 } from '../../../tests/support/auth106.js';
 import { createPreviewRecoveryApiFixture } from '../../../tests/support/previewRecoveryPrincipal.js';
 import { provisionDevelopmentDatabasePrincipals } from '../../../apps/runner/src/dev-database-principals.js';
 import { API_ENVIRONMENT_KEYS } from '../../../packages/register/src/runtime-environment.js';
-import { fixtureReleaseKey,validApiEnvironmentFixture } from '../../../tests/support/apiEnvironmentFixture.js';
+import { validApiEnvironmentFixture } from '../../../tests/support/apiEnvironmentFixture.js';
 import { PREVIEW_GLM_TARGET,PREVIEW_GLM_PROVIDER_REFS } from '../../../packages/providers/src/preview-test.js';
 export async function createSyntheticSourceFixture(input:Readonly<{admin:Pool;provisionAdmin:Pool;adminUrl:string;stateRoot:string;sourceRoot:string;apiPort:number;runtimeObservation:RuntimeObservation;profile?:"full"}>) {
  const {admin,stateRoot}=input;
@@ -48,7 +48,7 @@ export async function createSyntheticSourceFixture(input:Readonly<{admin:Pool;pr
  await provisionDevelopmentDatabasePrincipals({adminPool:input.provisionAdmin,adminDatabaseUrl:input.adminUrl,credentialFilePath:credentials});
  const urls=Object.fromEntries((await readFile(credentials,'utf8')).trim().split('\n').map(line=>{const i=line.indexOf('=');return[line.slice(0,i),line.slice(i+1)];}));
  urls.DATABASE_URL=await createPreviewRecoveryApiFixture(admin,urls.DATABASE_URL!);
- const environment:Record<string,string>={...validApiEnvironmentFixture(),...urls,NODE_ENV:'production',REGISTER_VERSION:publication.registerVersion,RELEASE_KEY:fixtureReleaseKey(publication.registerVersion),API_PORT:String(input.apiPort),PUBLIC_APP_URL:'https://v3-preview.dezbatere.ro',MAIL_FROM:'noreply@dezbatere.ro',
+ const environment:Record<string,string>={...validApiEnvironmentFixture(),...urls,NODE_ENV:'production',REGISTER_VERSION:publication.registerVersion,RELEASE_KEY:`r${publication.registerVersion}-${input.runtimeObservation.sourceRevision.slice(0,12)}`,API_PORT:String(input.apiPort),PUBLIC_APP_URL:'https://v3-preview.dezbatere.ro',MAIL_FROM:'noreply@dezbatere.ro',
   MAIL_SENDMAIL_PATH:join(input.sourceRoot,'deploy/dev-auth/sendmail-capture.mjs'),DEBATEAI_DEV_MAIL_CAPTURE_DIR:join(stateRoot,'mail'),
   PROVIDER_DISCOVERY_TARGETS_JSON:JSON.stringify(PREVIEW_GLM_PROVIDER_REFS.map(provider_ref=>({...PREVIEW_GLM_TARGET,provider_ref}))),
   PREVIEW_PROVIDER_TEST_CONFIG_JSON:JSON.stringify({deployment:'v3-preview',free_model_ids:[PREVIEW_GLM_TARGET.model],requested_thinking_level:'high',budget_socket:'/run/debateai-v3-preview/stage-refused.sock',scope_id:'synthetic-no-provider-call'}),

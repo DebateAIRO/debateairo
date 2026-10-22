@@ -17,13 +17,20 @@ export const LAYOUT = Object.freeze({
   // The alert's own owner list: SHA-256 fingerprints of the owner addresses the alert may reach.
   // Root-only server data, built on the server by `alert.mjs --install-owner-list`.
   ownerAlertDigestsPath: '/etc/debateai-v3-preview/lifecycle/owner-alert-digests.json',
+  // Per-release files live in these roots (side-by-side spec §10): native-plan-<label>.json,
+  // database-ahead-<label>.json and <service>-<label>.env here; see nativePlanPathFor and friends.
   nativePlanRoot: '/etc/debateai-v3-preview/auth-dev-v1',
-  nativePlanPath: '/etc/debateai-v3-preview/auth-dev-v1/native-plan.json',
-  // The reviewed launchers accept a plan only below /opt/debateai-v3-preview/artifacts/<id>/,
-  // so the regenerated plan and fresh attestation live in this one fixed artifact folder.
-  currentDir: '/opt/debateai-v3-preview/artifacts/lifecycle-current',
+  // The reviewed launchers accept a plan only below /opt/debateai-v3-preview/artifacts/<id>/, so each
+  // release's regenerated plan and fresh attestation live in its own lifecycle-current-<label> folder.
+  artifactsRoot: '/opt/debateai-v3-preview/artifacts',
+  // Template units: debateai-preview-<service>@<label>.service (instance names keep their dashes, %i).
+  unitPrefix: 'debateai-preview-',
   stateDir: '/var/lib/debateai-v3-preview/lifecycle',
   backupDir: '/var/backups/debateai-v3-preview',
+  // A retired release is moved aside, never deleted (side-by-side spec §10, release-archive.mjs): its folders below
+  // archiveRoot (same disk as the releases), its /etc files and unit drop-ins below configArchiveRoot (same disk as /etc).
+  archiveRoot: '/opt/debateai-v3-preview/archive',
+  configArchiveRoot: '/root/preview-archive',
   postgresCa: '/etc/debateai-v3-preview/postgres-tls/ca.crt',
   peerModule: '/opt/debateai-v3-preview/operator/recovery106-v1/native-common106.mjs',
   pgBin: '/usr/lib/postgresql/18/bin',
@@ -46,6 +53,26 @@ export const LAYOUT = Object.freeze({
 
 export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 export const fail = code => { throw Object.assign(new Error(code), { code }); };
+
+/**
+ * Side-by-side spec §10: a release label names unit instances, /etc files and folders. Same text as
+ * `RELEASE_LABEL` in deploy/preview-auth-dev/v1/launch-plan.mjs (kept here so this file stays
+ * built-ins only); tests/unit/preview-lifecycle-prestart.test.ts pins the two equal.
+ */
+export const RELEASE_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,70}[a-z0-9])?$/;
+const LIFECYCLE_SERVICES = Object.freeze(['api', 'ui', 'runner']);
+const label = value => (typeof value === 'string' && RELEASE_LABEL.test(value) ? value : fail('LIFECYCLE_LABEL_REFUSED'));
+const service = value => (LIFECYCLE_SERVICES.includes(value) ? value : fail('LIFECYCLE_SERVICE_REFUSED'));
+/** The release's verify-only database-check plan (one per release; side-by-side spec §10). */
+export const nativePlanPathFor = (layout, release) => `${layout.nativePlanRoot}/native-plan-${label(release)}.json`;
+/** The release's own folder for the regenerated launch plan and fresh proof. */
+export const currentDirFor = (layout, release) => `${layout.artifactsRoot}/lifecycle-current-${label(release)}`;
+/** The newer release's list of database steps this (older) release may start beside (side-by-side spec §5). */
+export const databaseAheadPathFor = (layout, release) => `${layout.nativePlanRoot}/database-ahead-${label(release)}.json`;
+/** The release's env file for one service (launch-plan.mjs previewEnvironmentPath names the same file). */
+export const envPathFor = (layout, name, release) => `${layout.nativePlanRoot}/${service(name)}-${label(release)}.env`;
+/** The release's unit instance for one service. */
+export const unitNameFor = (layout, name, release) => `${layout.unitPrefix}${service(name)}@${label(release)}.service`;
 
 /** Sorted-key JSON: equal values always compare equal, whatever order they were written in. */
 export function canonicalJson(value) {

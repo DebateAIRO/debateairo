@@ -19,9 +19,9 @@ const hash = 'a'.repeat(64);
 const publication = { publicationId: '11111111-1111-4111-8111-111111111111', publicationKind: 'GENERAL', baseRegisterVersion: '8', registerVersion: '12', requestSha256: hash, snapshotSha256: 'b'.repeat(64), rowCount: 68, recordedAt: '2026-10-06T12:00:00.000Z', outcome: 'CREATED' };
 const binding = { sourceRevision: 'a'.repeat(40), sourceTree: 'b'.repeat(40), sourceManifestSha256: hash, operatorManifestSha256: hash, contractSha256: hash, runnerMainSha256: hash };
 const identity = { pid: 123, uid: 992, bootId: '11111111-1111-4111-8111-111111111111', startTicks: '10001' };
-const selection = { REGISTER_VERSION: '12', DEBATEAI_DEPLOYMENT_MODE: 'local' };
 // Side-by-side spec §1: the release this runner is, r<register>-<first 12 hex of the plan's source revision>.
 const releaseKey = `r${publication.registerVersion}-${binding.sourceRevision.slice(0, 12)}`;
+const selection = { REGISTER_VERSION: '12', DEBATEAI_DEPLOYMENT_MODE: 'local', RELEASE_KEY: releaseKey };
 const ready = { kind: 'DEBATEAI_RUNNER_READY', worker: 'preview-runner', registerVersion: '12', releaseKey, startupDispatched: 0 };
 
 /** A fake main: announces `message` (or nothing) after a tick, then keeps running until `stop`. */
@@ -52,7 +52,7 @@ describe('runner startup event (afterRunnerReady)', () => {
     const started = await receipt.afterRunnerReady({ binding, publication, identity, readSelection: () => selection, subscribeReady: main.subscribeReady, importMain: main.importMain, emit: (event: unknown) => { main.order.push('emit'); events.push(event); } });
     expect(main.order).toEqual(['subscribe', 'import', 'unsubscribe', 'emit']);
     expect(events).toEqual([started.event]);
-    expect(started.event).toMatchObject({ ...binding, ...identity, schemaVersion: 'preview-auth-dev-runner-startup-v1', service: 'runner', selectedRegisterVersion: '12', deploymentMode: 'local', nativeRequestSha256: publication.requestSha256, nativeSnapshotSha256: publication.snapshotSha256, startupDispatched: 2 });
+    expect(started.event).toMatchObject({ ...binding, ...identity, schemaVersion: 'preview-auth-dev-runner-startup-v2', service: 'runner', selectedRegisterVersion: '12', releaseKey, deploymentMode: 'local', nativeRequestSha256: publication.requestSha256, nativeSnapshotSha256: publication.snapshotSha256, startupDispatched: 2 });
     // The worker name (an environment value) and anything path- or secret-like never enter the event.
     expect(JSON.stringify(events)).not.toMatch(/preview-runner"|worker|path|secret|recipient|environment|DATABASE|postgres/i);
     let settled = false; started.running.then(() => { settled = true; });
@@ -89,7 +89,30 @@ describe('runner startup event (afterRunnerReady)', () => {
     // A source revision that is not text refuses with the code, before main, never a raw TypeError.
     let imported = 0;
     await expect(receipt.afterRunnerReady({ binding: { ...binding, sourceRevision: 42 }, publication, identity, readSelection: () => selection, subscribeReady: () => () => undefined, importMain: async () => { imported++; }, emit: () => undefined })).rejects.toThrow(/^PREVIEW_RUNTIME_RECEIPT_REFUSED$/);
+    // RELEASE_KEY of the runner's environment that is another revision's refuses before main (the event would name another release).
+    await expect(receipt.afterRunnerReady({ binding, publication, identity, readSelection: () => ({ ...selection, RELEASE_KEY: 'r12-bbbbbbbbbbbb' }), subscribeReady: () => () => undefined, importMain: async () => { imported++; }, emit: () => undefined })).rejects.toThrow(/^PREVIEW_RUNTIME_RECEIPT_REFUSED$/);
     expect(imported).toBe(0);
+  });
+
+  // Side-by-side spec §1: the selection the launcher reads includes RELEASE_KEY, of the plan's register version.
+  it.each([
+    ['no RELEASE_KEY', (() => { const { RELEASE_KEY: _dropped, ...rest } = selection; return rest; })()],
+    ['a malformed RELEASE_KEY', { ...selection, RELEASE_KEY: 'R12-AAAAAAAAAAAA' }],
+    ['the legacy stamp', { ...selection, RELEASE_KEY: 'legacy' }],
+    ['another register version\'s key', { ...selection, RELEASE_KEY: 'r11-aaaaaaaaaaaa' }]
+  ])('refuses %s before main is imported', async (_name, read) => {
+    let imported = 0;
+    await expect(receipt.afterRunnerReady({ binding, publication, identity, readSelection: () => read, subscribeReady: () => () => undefined, importMain: async () => { imported++; }, emit: () => undefined })).rejects.toThrow(/^PREVIEW_RUNTIME_SELECTION_REFUSED$/);
+    expect(imported).toBe(0);
+  });
+
+  it('emits nothing when RELEASE_KEY changes during main', async () => {
+    let key = releaseKey;
+    const main = fakeMain(ready);
+    const events: unknown[] = [];
+    await expect(receipt.afterRunnerReady({ binding, publication, identity, readSelection: () => ({ ...selection, RELEASE_KEY: key }), subscribeReady: main.subscribeReady, importMain: async () => { key = 'r12-bbbbbbbbbbbb'; await main.importMain(); }, emit: (x: unknown) => events.push(x) })).rejects.toThrow(/^PREVIEW_RUNTIME_SELECTION_REFUSED$/);
+    expect(events).toEqual([]);
+    main.stop();
   });
 
   it.each([
@@ -138,7 +161,8 @@ describe('runner startup event (afterRunnerReady)', () => {
     const main = fakeMain(ready);
     const { event } = await receipt.afterRunnerReady({ binding, publication, identity, readSelection: () => selection, subscribeReady: main.subscribeReady, importMain: main.importMain, emit: () => undefined });
     main.stop();
-    const facts = { unit: 'debateai-preview-runner.service', expectedUnit: 'debateai-preview-runner.service', rootMatched: true, mainPidMatched: true, publication };
+    // Side-by-side spec §10: the live unit is this release's instance, debateai-preview-runner@<label>.service.
+    const facts = { unit: 'debateai-preview-runner@d50e33165-r19-v1.service', expectedUnit: 'debateai-preview-runner@d50e33165-r19-v1.service', releaseKey, rootMatched: true, mainPidMatched: true, publication };
     expect(receipt.verifyRunnerRuntimeReadback(event, event, facts)).toEqual({ selectionVerified: true, service: 'runner', registerVersion: '12', pid: 123 });
     for (const key of ['pid', 'uid', 'bootId', 'startTicks', 'sourceRevision', 'runnerMainSha256'] as const) {
       const observed = { ...event, [key]: key === 'pid' || key === 'uid' ? 999 : key === 'bootId' ? '22222222-2222-4222-8222-222222222222' : key === 'startTicks' ? '20002' : key === 'sourceRevision' ? 'c'.repeat(40) : 'c'.repeat(64),
@@ -148,6 +172,16 @@ describe('runner startup event (afterRunnerReady)', () => {
     }
     for (const patch of [{ unit: 'debateai-preview-api.service' }, { expectedUnit: 'debateai-preview-api.service', unit: 'debateai-preview-api.service' }, { rootMatched: false }, { mainPidMatched: false }, { publication: { ...publication, snapshotSha256: 'c'.repeat(64) } }])
       expect(() => receipt.verifyRunnerRuntimeReadback(event, event, { ...facts, ...patch })).toThrow();
+    // The single (pre-side-by-side) unit, another instance, a label that is not a release label, or another release's key all refuse.
+    for (const patch of [
+      { unit: 'debateai-preview-runner.service', expectedUnit: 'debateai-preview-runner.service' },
+      { unit: 'debateai-preview-runner@d50e33165-r18-v1.service' },
+      { unit: 'debateai-preview-api@d50e33165-r19-v1.service', expectedUnit: 'debateai-preview-api@d50e33165-r19-v1.service' },
+      { unit: 'debateai-preview-runner@../x.service', expectedUnit: 'debateai-preview-runner@../x.service' },
+      { unit: 'debateai-preview-runner@New-v1.service', expectedUnit: 'debateai-preview-runner@New-v1.service' },
+      { releaseKey: 'r12-bbbbbbbbbbbb' },
+      { releaseKey: undefined }
+    ]) expect(() => receipt.verifyRunnerRuntimeReadback(event, event, { ...facts, ...patch }), JSON.stringify(patch)).toThrow(/^PREVIEW_RUNTIME_READBACK_REFUSED$/);
   });
 
   it('emits nothing when the register selection changes during main', async () => {
@@ -173,11 +207,13 @@ describe('runner startup event (afterRunnerReady)', () => {
   });
 
   it('keeps the API event schema separate from the runner one', () => {
-    const event = { schemaVersion: 'preview-auth-dev-runner-startup-v1', service: 'runner', ...binding, ...identity, selectedRegisterVersion: '12', releaseKey, nativeRequestSha256: hash, nativeSnapshotSha256: hash, deploymentMode: 'local', startupDispatched: 0 };
+    const event = { schemaVersion: 'preview-auth-dev-runner-startup-v2', service: 'runner', ...binding, ...identity, selectedRegisterVersion: '12', releaseKey, nativeRequestSha256: hash, nativeSnapshotSha256: hash, deploymentMode: 'local', startupDispatched: 0 };
     expect(receipt.validateRunnerRuntimeEvent(event)).toEqual(event);
     expect(() => receipt.validateRuntimeEvent(event)).toThrow();
     expect(() => receipt.parseRunnerRuntimeEvent(`PREVIEW_API_STARTED ${JSON.stringify(event)}`)).toThrow();
     expect(() => receipt.validateRunnerRuntimeEvent({ ...event, service: 'api' })).toThrow();
+    // The v1 event (before the release key reached the API's event too) is no longer admitted.
+    expect(() => receipt.validateRunnerRuntimeEvent({ ...event, schemaVersion: 'preview-auth-dev-runner-startup-v1' })).toThrow('PREVIEW_RUNTIME_RECEIPT_REFUSED');
   });
 });
 
@@ -231,6 +267,8 @@ describe('launch-runner.mjs: start mirrors launch-api.mjs, prepare-only stays th
     expect(at.every(index => index > 0)).toBe(true);
     expect([...at].sort((a, b) => a - b)).toEqual(at);
     expect(start).toContain("file.path==='dialectical-engine/apps/runner/src/main.ts'");
+    // Side-by-side spec §1: the selection checked before and after main includes the runner's own RELEASE_KEY.
+    expect(start).toContain('readSelection:()=>({REGISTER_VERSION:process.env.REGISTER_VERSION,DEBATEAI_DEPLOYMENT_MODE:process.env.DEBATEAI_DEPLOYMENT_MODE,RELEASE_KEY:process.env.RELEASE_KEY})');
     expect(code).toContain("if(argv[0]==='--start')");
     // The prepare-only function starts nothing.
     const prepare = code.slice(code.indexOf('export async function prepareRunner'), code.indexOf('export async function launchRunner'));
@@ -386,7 +424,7 @@ describe('how a started runner ends (startRunner, real process and signals)', ()
     expect(result).toEqual({ code: 0, signal: null, stdout: 'READY\nPREVIEW_RUNNER_RETIRED\n', stderr: '' });
     expect(Date.now() - began).toBeGreaterThanOrEqual(bound);
   });
-  it('production waits RETIRED_SETTLE_MS (30 s) for main to end after retirement; only tests shorten it', async () => {
+  it('production passes no settle override: the executable uses RETIRED_SETTLE_MS (30 s)', async () => {
     expect(launcher.RETIRED_SETTLE_MS).toBe(30_000);
     const code = await readFile(resolve(OPERATOR, 'launch-runner.mjs'), 'utf8');
     expect(code).toContain('{retiredSettleMs=RETIRED_SETTLE_MS}={}');
@@ -395,11 +433,13 @@ describe('how a started runner ends (startRunner, real process and signals)', ()
 });
 
 describe('runner environment narrowing', () => {
-  const approved = { apiPort: '3101', uiPort: '3100', mailExecutable: '/opt/release/mail-handoff.mjs', mailFrom: 'noreply@dezbatere.ro' };
+  // The plan's source revision starts with the fixture key's 12 hex (side-by-side spec §1), so fixtureReleaseKey('12') is its key.
+  const approved = { apiPort: '3101', uiPort: '3100', mailExecutable: '/opt/release/mail-handoff.mjs', mailFrom: 'noreply@dezbatere.ro', sourceRevision: '0123456789ab'.padEnd(40, 'c') };
   const preview = JSON.stringify({ deployment: 'v3-preview', free_model_ids: ['zai-org/GLM-5.3-Flash'], requested_thinking_level: 'high', budget_socket: '/run/debateai-v3-preview/team-budget-v2.sock', scope_id: 'preview-team-v2-20261009' });
   const configured = (): Record<string, string> => {
     const { VLLM_BASE_URL: _a, VLLM_MODEL: _b, VLLM_MAKER: _c, ...rest } = validRunnerEnvironmentFixture();
-    return { ...rest, NODE_ENV: 'production', REGISTER_VERSION: '12', RELEASE_KEY: fixtureReleaseKey('12'), DEBATEAI_DEPLOYMENT_MODE: 'local', PREVIEW_PROVIDER_TEST_CONFIG_JSON: preview, PREVIEW_TEAM_USER_IDS_JSON: '["0b7c6f1e-2d3a-4b5c-8d9e-0f1a2b3c4d5e"]' };
+    const worker = `debateai-preview-runner-${fixtureReleaseKey('12')}`;
+    return { ...rest, NODE_ENV: 'production', REGISTER_VERSION: '12', RELEASE_KEY: fixtureReleaseKey('12'), RUNNER_WORKER_ID: worker, HATCHET_WORKER_NAME: worker, DEBATEAI_DEPLOYMENT_MODE: 'local', PREVIEW_PROVIDER_TEST_CONFIG_JSON: preview, PREVIEW_TEAM_USER_IDS_JSON: '["0b7c6f1e-2d3a-4b5c-8d9e-0f1a2b3c4d5e"]' };
   };
   it('keeps the team list and only source runner keys, with the fixed PATH', () => {
     const result = env.narrowEnvironment('runner', configured(), runtime, { registerVersion: '12' }, approved);
@@ -433,10 +473,11 @@ function parseUnit(text: string) {
   return out;
 }
 
-describe('debateai-preview-runner.service template', () => {
-  it('is the confined runner identity with soft ordering on the four supporting units and no fixtures', async () => {
-    const unit = parseUnit(await readFile(resolve(OPERATOR, 'debateai-preview-runner.service'), 'utf8'));
-    const supporting = ['debateai-preview-postgresql.service', 'debateai-preview-hatchet.service', 'debateai-preview-hatchet-gateway.service', 'debateai-preview-provider-budget.service'];
+// Side-by-side spec §10: one runner instance per release, debateai-preview-runner@<label>.service.
+describe('debateai-preview-runner@.service template', () => {
+  it('is the confined runner identity with soft ordering on the five supporting units (both spending gates) and no fixtures', async () => {
+    const unit = parseUnit(await readFile(resolve(OPERATOR, 'debateai-preview-runner@.service'), 'utf8'));
+    const supporting = ['debateai-preview-postgresql.service', 'debateai-preview-hatchet.service', 'debateai-preview-hatchet-gateway.service', 'debateai-preview-provider-budget.service', 'debateai-preview-anthropic-budget.service'];
     expect(unit['[Unit]Wants']!.join(' ').split(' ').sort()).toEqual([...supporting].sort());
     expect(unit['[Unit]After']!.join(' ').split(' ').sort()).toEqual([...supporting].sort());
     expect(Object.keys(unit).filter(key => /Requires|BindsTo|Requisite|PartOf|ExecStart|\[Install\]/.test(key))).toEqual([]);
@@ -448,7 +489,7 @@ describe('debateai-preview-runner.service template', () => {
   });
 
   it('loads no environment file, unsets loader variables and sets only PATH, NODE_ENV and the Hatchet CA', async () => {
-    const unit = parseUnit(await readFile(resolve(OPERATOR, 'debateai-preview-runner.service'), 'utf8'));
+    const unit = parseUnit(await readFile(resolve(OPERATOR, 'debateai-preview-runner@.service'), 'utf8'));
     expect(unit['[Service]EnvironmentFile']).toEqual(['']);
     expect(unit['[Service]PassEnvironment']).toEqual(['']);
     expect(unit['[Service]UnsetEnvironment']).toEqual(['', 'LD_LIBRARY_PATH LD_PRELOAD NODE_OPTIONS NODE_PATH']);
@@ -456,7 +497,7 @@ describe('debateai-preview-runner.service template', () => {
   });
 
   it('keeps the API base unit hardening, loopback-only IP and the three deliberate differences', async () => {
-    const unit = parseUnit(await readFile(resolve(OPERATOR, 'debateai-preview-runner.service'), 'utf8'));
+    const unit = parseUnit(await readFile(resolve(OPERATOR, 'debateai-preview-runner@.service'), 'utf8'));
     const api: Record<string, string> = { ProtectSystem: 'strict', ProtectHome: 'true', PrivateTmp: 'true', UMask: '0077', NoNewPrivileges: 'true', ProtectProc: 'invisible',
       ProtectKernelTunables: 'true', ProtectKernelModules: 'true', ProtectKernelLogs: 'true', ProtectControlGroups: 'true', ProtectClock: 'true', RestrictNamespaces: 'true',
       RestrictRealtime: 'true', RestrictSUIDSGID: 'true', LockPersonality: 'true', CapabilityBoundingSet: '', AmbientCapabilities: '', SystemCallArchitectures: 'native',
@@ -468,5 +509,11 @@ describe('debateai-preview-runner.service template', () => {
     expect(JSON.stringify(unit)).not.toMatch(/fchown|RestrictSUIDSGID":\["false/);
     const denied = unit['[Service]InaccessiblePaths']!.join(' ');
     for (const path of ['/etc/debateai-v3-preview/api', '/var/lib/debateai-v3-preview/api/audit-keys', '/var/lib/debateai-v3-preview/provider-team-authority-v2', '/var/lib/debateai-v3-preview/provider-test-authority']) expect(denied).toContain(path);
+  });
+
+  it("reads only its own release's env file", async () => {
+    const unit = parseUnit(await readFile(resolve(OPERATOR, 'debateai-preview-runner@.service'), 'utf8'));
+    const readable = unit['[Service]ReadOnlyPaths']!.join(' ').split(' ');
+    expect(readable.filter(path => path.includes('.env'))).toEqual(['/etc/debateai-v3-preview/auth-dev-v1/runner-%i.env']);
   });
 });

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type { Pool } from "pg";
+import { developmentReleaseKey } from "@debateai/kernel";
 import { EVALUATOR_CONTRACTS_FINGERPRINT_TEXT } from "@debateai/runner";
 import { JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT } from "@debateai/judgement";
 import { SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT } from "@debateai/serve";
@@ -63,6 +64,13 @@ import {
  * this seeder does not carry) the same way, with the same consequence for a standing ceremony database.
  */
 export const ACCEPTANCE_REGISTER_VERSION = 4 as const;
+/**
+ * Side-by-side spec §1, §3 (B16): the one release key of an acceptance debate. The acceptance environment carries no
+ * RELEASE_KEY (its runner runs in the same process as its ask), so the ask stamps every run with the development key of
+ * the acceptance register's version, and the runner claims and its failure recorder writes under that same key; the §3
+ * fence then never sets an acceptance debate apart as another release's.
+ */
+export const ACCEPTANCE_RELEASE_KEY = developmentReleaseKey(ACCEPTANCE_REGISTER_VERSION);
 /**
  * The version that predates the T16 lane — the one a ceremony database created
  * before it holds. It names that fact, not "the version below the pin", so the

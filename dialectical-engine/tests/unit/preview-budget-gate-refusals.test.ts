@@ -747,7 +747,8 @@ describe("side-by-side §9: a model or price this release's gate no longer serve
     expect(refusal).toBeInstanceOf(PreviewVendorRefusedUnbilled);
     expect(refusal).toBeInstanceOf(PreviewUnbilledRefusal);
     expect(refusal).toBeInstanceOf(ProviderUnbilledRefusal);
-    expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED" });
+    // The gate's own word is kept beside the engine code, so a journal or the practice can say which refusal it was.
+    expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED", gateCode: code });
     expect(isRunLevelSpendStop(refusal)).toBe(false);
     expect(PROVIDER_COST_ENVELOPE_REFUSAL_CODES as readonly string[]).not.toContain((refusal as { code: string }).code);
     expect(providerCallGateUnavailable(refusal)).toBe(false);

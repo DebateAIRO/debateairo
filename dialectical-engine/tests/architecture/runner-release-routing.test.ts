@@ -72,7 +72,8 @@ describe("the runner registers and re-sends under its release's own task name (s
   });
 
   it("sends to Hatchet only from main.ts, where the release's task name lives", async () => {
-    const files = (await readdir(RUNNER_SOURCE)).filter((name) => name.endsWith(".ts"));
+    // Every file under the runner's source, subfolders included: a sender added in a new folder is caught too.
+    const files = (await readdir(RUNNER_SOURCE, { recursive: true })).filter((name) => name.endsWith(".ts")).sort();
     const senders: string[] = [];
     for (const name of files) {
       if ((await readFile(join(RUNNER_SOURCE, name), "utf8")).includes("runNoWait(")) senders.push(name);

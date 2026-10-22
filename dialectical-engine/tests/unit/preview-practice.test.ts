@@ -15,6 +15,7 @@ import {
   PreviewChargeBookedMax,
   PreviewGateUnavailable,
   PreviewModelCooling,
+  PreviewModelNotServed,
   PreviewUnbilledRefusal,
   PreviewVendorRefusedUnbilled,
   parsePreviewProviderTestConfig,
@@ -166,7 +167,7 @@ describe("practice redaction", () => {
 describe("practice gate brake", () => {
   const body = (model: string) => JSON.stringify({ model, max_tokens: 1, messages: [] });
   const execution = (model: string) => ({ operationId: "op", requestBody: body(model), requestSha256: "0".repeat(64), reservedUsd: "0.1" });
-  type Step = "OK" | "UNBILLED" | "COOLING" | "NOTREACHED" | "INFLIGHT" | "DAILY" | "HALTED";
+  type Step = "OK" | "UNBILLED" | "COOLING" | "NOTSERVED" | "NOTREACHED" | "INFLIGHT" | "DAILY" | "HALTED";
   function scriptedPort(steps: Step[]) {
     let sent = 0;
     const port: PreviewBudgetPort = {
@@ -177,6 +178,8 @@ describe("practice gate brake", () => {
         if (step === "UNBILLED") throw new PreviewVendorRefusedUnbilled();
         // Gate v4's MODEL_COOLING: this one model cools off; nothing was reserved or sent.
         if (step === "COOLING") throw new PreviewModelCooling(60);
+        // Side-by-side §9: the gate's MODEL_NOT_ALLOWED (this GO no longer serves the model), refused before anything.
+        if (step === "NOTSERVED") throw new PreviewModelNotServed("MODEL_NOT_ALLOWED");
         // The gate's PROVIDER_NOT_REACHED (the connection failed before a byte was written), as previewAuthorityRefusal maps it.
         if (step === "NOTREACHED") throw new PreviewUnbilledRefusal();
         // The gate's own CONCURRENCY_LIMIT_REACHED, as previewAuthorityRefusal maps it.
@@ -219,6 +222,23 @@ describe("practice gate brake", () => {
     await expect(watched.execute(execution("qwen"))).resolves.toMatchObject({ status: 200 });
     expect(observer.stopped("deepinfra")).toBeNull();
     expect(observer.summary("deepinfra")).toMatchObject({ unbilled: 5, modelCooling: 5, notReached: 0, longestNotReachedRun: 0, stop: null });
+    expect(observer.modelsEndingBusy()).toEqual(["glm"]);
+  });
+  it("a model the gate no longer serves is labelled NOT_SERVED, never the vendor's busy refusal, and never stops the gate", async () => {
+    const observer = new PracticeGateObserver();
+    const gate = scriptedPort(["NOTREACHED", "NOTSERVED", "NOTREACHED", "OK"]);
+    const watched = observer.wrap("deepinfra", gate.port);
+    await expect(watched.execute(execution("m"))).rejects.toBeInstanceOf(PreviewUnbilledRefusal);
+    await expect(watched.execute(execution("glm"))).rejects.toBeInstanceOf(PreviewModelNotServed);
+    await expect(watched.execute(execution("m"))).rejects.toBeInstanceOf(PreviewUnbilledRefusal);
+    await expect(watched.execute(execution("qwen"))).resolves.toMatchObject({ status: 200 });
+    expect(observer.events.filter((event) => event.model === "glm").map((event) => event.unbilledKind)).toEqual(["NOT_SERVED"]);
+    expect(observer.stopped("deepinfra")).toBeNull();
+    // Refused before anything was reserved: it neither adds to nor resets the connection-failure run.
+    expect(observer.summary("deepinfra")).toMatchObject({ unbilled: 3, notServed: 1, vendorRefused: 0, modelCooling: 0,
+      notReached: 2, longestNotReachedRun: 2, stop: null });
+    // The runner makes it sit out as it does a busy model (the sit-out book reads the same refusal), so it was not
+    // exercised to the end.
     expect(observer.modelsEndingBusy()).toEqual(["glm"]);
   });
   it("a vendor refusal or a cool-off in between neither adds to nor resets the connection-failure run (the gate's own rule)", async () => {

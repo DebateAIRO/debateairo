@@ -2511,9 +2511,9 @@ export interface WalkingSkeletonSettings {
   /**
    * Side-by-side spec §4 (D1): a retiring release "stops claiming; it lets calls in flight settle". Once claims are
    * stopped `execute` answers NO_WORK before anything else (one RUNNER_RETIRING line); once calls are stopped every
-   * running debate's next model call is refused unsent (RUNNER_RETIRING). Either way the work item is left as is for this
-   * release's backstop, which sets it aside FAILED with the waiver (spec §4 step 3); the §3 fence keeps every other
-   * release off it. Absent: the runner never retires (today's runner).
+   * running debate's next model call is refused unsent (RUNNER_RETIRING). Either way the work item is left as is for
+   * this release's backstop, which sets it aside FAILED with the waiver (spec §4 step 3); the §3 fence keeps every
+   * other release off it. Absent: the runner never retires (today's runner).
    */
   readonly retirement?: Pick<RunnerRetirementSignal, "claimsStopped" | "callsStopped">;
   readonly claimMs: number;
@@ -5189,8 +5189,8 @@ export class WalkingSkeletonRunner {
 
   private async execute(workItemId?: string, task?: RunnerTaskControl): Promise<RunnerExecutionResult> {
     // Side-by-side spec §4 (D1): a retiring release stops claiming. The very first check, so nothing of this release
-    // touches the item: no release read, no claim, no probe, no call. It is left as is for this release's backstop, which
-    // sets it aside FAILED with the waiver (spec §4 step 3); the §3 fence keeps every other release off it.
+    // touches the item: no release read, no claim, no probe, no call. It is left as is for this release's backstop,
+    // which sets it aside FAILED with the waiver (spec §4 step 3); the §3 fence keeps every other release off it.
     if (this.settings.retirement?.claimsStopped() === true) {
       console.warn(JSON.stringify({ kind: "DEBATEAI_RUNNER_CLAIM", event: "RUNNER_RETIRING", workItemId }));
       return { kind: "NO_WORK" };

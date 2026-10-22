@@ -1846,7 +1846,7 @@ await startup.run("listen", async () => {
   await api.listen({ host: environment.API_HOST, port: environment.API_PORT });
 });
 // Side-by-side spec §1; INTERFACE "Journal lines": once listening, the API names the release it is (checked at boot by
-// checkedReleaseKey), exactly once, so a launcher or operator reads which release answered on which port.
+// assertReleaseKeyForRegister), exactly once, so a launcher or operator reads which release answered on which port.
 console.info(`DEBATEAI_API_READY ${JSON.stringify({ releaseKey: environment.RELEASE_KEY, port: environment.API_PORT })}`);
 // Side-by-side spec §4 (plan C7): the timers started here, like every timer above, run their work only while this
 // release is current; the ask waker's whole-minute tick (with its stalled-start re-send) is gated the same way.

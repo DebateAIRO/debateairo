@@ -725,3 +725,52 @@ describe('spending-gate notices', () => {
     });
   });
 });
+
+// Side-by-side spec §4: root's retirement tools (release-retire.mjs) email the owner through the same notice path.
+describe('release notices', () => {
+  const notMe = { readUnitState: async () => { throw new Error('a notice never asks systemd for a unit state'); }, readJournal: async () => { throw new Error('a release notice reads no journal'); } };
+
+  it('takes the three release notices with a lowercase underscore code', () => {
+    for (const kind of ['release-retire', 'release-forced', 'release-stranded']) {
+      const unitName = `debateai-preview-notice@${kind}-old_v1.service`;
+      expect(alert.parseNotice(`${kind}-old_v1`)).toEqual({ kind, code: 'old_v1', unit: unitName });
+      expect(alert.parseAlertArgs(['--notice', `${kind}-old_v1`])).toEqual({ unit: unitName, test: false, notice: { kind, code: 'old_v1', unit: unitName } });
+    }
+    // The code must read back as a release label: no leading or trailing dash once `_` becomes `-`.
+    for (const name of ['release-retire-_x', 'release-forced-x_', 'release-stranded-_', 'release-retire-old-v1', 'release-retire-Old_v1', 'release-retire-', `release-retire-${'a'.repeat(65)}`, 'release-other-old_v1', 'release-forced-old_v1.service'])
+      expect(alert.parseNotice(name), name).toBeNull();
+  });
+
+  it('accepts an instance unit name for a failure alert', () => {
+    expect(alert.parseAlertArgs(['--unit', 'debateai-preview-runner@old-v1.service'])).toEqual({ unit: 'debateai-preview-runner@old-v1.service', test: false });
+    expect(alert.parseAlertArgs(['--unit', 'debateai-preview-runner-retire-check@old-v1.service'])).toEqual({ unit: 'debateai-preview-runner-retire-check@old-v1.service', test: false });
+  });
+
+  it('the retire notice names the release and how to watch its runner, with no amounts', async () => {
+    const layout = server();
+    const h = harness(layout, notMe);
+    await expect(alert.runAlert({ ...alert.parseAlertArgs(['--notice', 'release-retire-old_v1']), layout, deps: h.deps })).resolves.toEqual({ event: 'PREVIEW_LIFECYCLE_ALERT_SENT', unit: 'debateai-preview-notice@release-retire-old_v1.service' });
+    const mail = h.sent[0]!;
+    expect(mail).toContain('Subject: Preview: release old-v1 was asked to retire');
+    expect(mail).toContain('no quota use');
+    expect(mail).toContain('  journalctl -u debateai-preview-runner@old-v1 -n 50 --no-pager');
+    expect(mail).toContain('systemctl status debateai-preview-runner@old-v1.service');
+    expect(mail).not.toContain('journal lines');
+    expect(mail).not.toMatch(/\$|usd|systemctl start/i);
+  });
+
+  it('the forced and stranded notices give the one command that starts the runner again', async () => {
+    for (const [kind, subject] of [['release-forced', "Subject: Preview: release old-v1's runner was stopped 25 minutes after the retire request"], ['release-stranded', "Subject: Preview: release old-v1's runner stopped before it retired"]] as const) {
+      const layout = server();
+      const h = harness(layout, notMe);
+      await alert.runAlert({ ...alert.parseAlertArgs(['--notice', `${kind}-old_v1`]), layout, deps: h.deps });
+      const mail = h.sent[0]!;
+      expect(mail, kind).toContain(subject);
+      expect(mail).toContain('  systemctl start debateai-preview-runner@old-v1');
+      expect(mail).toContain('it closes its unfinished debates with a plain sentence and no quota use');
+      if (kind === 'release-forced') expect(mail).toContain('re-opened when possible; if not, or if a gate\'s state could not be read, you get a separate failure email');
+      expect(mail).toContain('systemctl status debateai-preview-runner@old-v1.service');
+      expect(mail).not.toMatch(/\$|usd/i);
+    }
+  });
+});
