@@ -57,11 +57,31 @@ describe("side-by-side §5: DEBATEAI_TEST_SCHEMA_FROM", () => {
       `#!/bin/sh\nprintf '%s|%s|%s' "$(pwd -P)" "$1" "$MIGRATION_DATABASE_URL" > "${seen}"\nexit "$STAND_IN_EXIT"\n`, { mode: 0o755 });
     const url = ["postgresql://debateai", "127.0.0.1:5999/debateai_s00"].join("@");
     const base = { DEBATEAI_TEST_SCHEMA_FROM: folder, PATH: process.env.PATH };
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
     await expect(applyTestSchemaFrom(url, { ...base, STAND_IN_EXIT: "0" })).resolves.toBeUndefined();
+    // The job log says the database was migrated by HEAD (content-free: no folder, no address).
+    expect(info).toHaveBeenCalledWith("[S00 DB] DEBATEAI_TEST_SCHEMA_FROM: database migrated by HEAD migrate-cli");
+    info.mockRestore();
     expect(await readFile(seen, "utf8")).toBe(`${await realpath(folder)}|apps/runner/src/migrate-cli.ts|${url}`);
     await expect(applyTestSchemaFrom(url, { ...base, STAND_IN_EXIT: "3" }))
       .rejects.toMatchObject({ code: "TEST_SCHEMA_FROM_INVALID", message: "TEST_SCHEMA_FROM_INVALID: HEAD migrate-cli exited 3" });
   });
+
+  // A10 review: the early check above passes for a well-shaped folder, so only this row proves startTestDatabase()
+  // really runs the hook after createDatabase: its stand-in tsx exits 3 against the fresh cluster.
+  it("makes startTestDatabase() run the folder's migrate-cli on the new database and refuse its non-zero exit", async () => {
+    const folder = await temporaryFolder();
+    await mkdir(join(folder, "node_modules/.bin"), { recursive: true });
+    await mkdir(join(folder, "apps/runner/src"), { recursive: true });
+    await writeFile(join(folder, "apps/runner/src/migrate-cli.ts"), "");
+    await writeFile(join(folder, "node_modules/.bin/tsx"), "#!/bin/sh\nexit 3\n", { mode: 0o755 });
+    vi.stubEnv("DEBATEAI_TEST_SCHEMA_FROM", folder);
+    const outcome = await startTestDatabase().then(async (database) => {
+      await database.stop();
+      return "STARTED_WITHOUT_THE_HOOK";
+    }, (error: unknown) => error);
+    expect(outcome).toMatchObject({ code: "TEST_SCHEMA_FROM_INVALID", message: "TEST_SCHEMA_FROM_INVALID: HEAD migrate-cli exited 3" });
+  }, 120_000);
 
   it("makes startTestDatabase() reject before any migrate when the variable names an empty folder", async () => {
     vi.stubEnv("DEBATEAI_TEST_SCHEMA_FROM", await temporaryFolder());

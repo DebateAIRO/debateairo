@@ -23,14 +23,14 @@ on:
       - ".github/workflows/n1-compatibility.yml"
   workflow_dispatch:
 permissions: { contents: read }
-# L6-F7 (B24e): every action is pinned to a full commit SHA; the trailing comment is the release tag (same pins as
-# security.yml; Dependabot keeps both current).
 concurrency: { group: "n1-compatibility-${{ github.ref }}", cancel-in-progress: true }
 jobs:
   old-code-on-new-schema:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
+      # L6-F7 (B24e): every action is pinned to a full commit SHA; the trailing comment is the release tag (same pins as
+      # security.yml; Dependabot keeps both current).
       # Full history, so the released commit can be checked out beside HEAD as a second worktree.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with: { path: head, fetch-depth: 0 }
@@ -55,8 +55,10 @@ jobs:
         run: |
           git -C head worktree add ../old "$N1_COMMIT"
           # A released commit older than the DEBATEAI_TEST_SCHEMA_FROM hook would run its suites on its OWN schema and
-          # pass without testing anything; refuse instead.
-          if ! grep -q DEBATEAI_TEST_SCHEMA_FROM old/dialectical-engine/tests/support/testDatabase.ts; then
+          # pass without testing anything; refuse instead. Both the variable and the call that runs HEAD's migrate-cli
+          # on each new test database must be there.
+          if ! grep -q DEBATEAI_TEST_SCHEMA_FROM old/dialectical-engine/tests/support/testDatabase.ts \
+            || ! grep -qF 'applyTestSchemaFrom(connectionString)' old/dialectical-engine/tests/support/testDatabase.ts; then
             echo "N1_BASELINE_HARNESS_MISSING: $N1_COMMIT predates the DEBATEAI_TEST_SCHEMA_FROM test hook"
             exit 1
           fi

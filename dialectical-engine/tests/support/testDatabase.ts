@@ -134,6 +134,7 @@ export async function applyTestSchemaFrom(
     child.once("close", (code, signal) => resolveExit(code ?? signal ?? "no exit code"));
   });
   if (exit !== 0) throw testSchemaFromInvalid(`HEAD migrate-cli exited ${String(exit)}`);
+  console.info(`[S00 DB] ${TEST_SCHEMA_FROM_ENV}: database migrated by HEAD migrate-cli`);
 }
 
 async function startWithEmbedded(postgresMajor: string): Promise<TestDatabase> {
