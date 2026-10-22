@@ -31,13 +31,21 @@ async function nativeMigrator(): Promise<Readonly<{ migrateSource: string; trans
  * altered text directly (auditNativeMigratorControls), so a re-seal can never pass a module that lost a control.
  */
 const MIGRATE_SIGNATURE = "export async function migrate(pool: Pool, options: MigrateOptions = {}): Promise<MigrateReport> {";
+// Every control auditNativeMigratorControls checks in migrate()'s slice, in its order (A7 review: all of them, so
+// dropping any one from the audit fails the case below that removes it from the text).
 const MIGRATE_CONTROL_FRAGMENTS = [
+  "const plan = await loadMigrationPlan();", "const client = await pool.connect();",
   "pg_advisory_lock(hashtextextended('debateai:schema-migrations', 0))", 'await withMigrationStepTransaction(client, "PROLOGUE"',
-  "const { known: applied, extra } = splitLedger(plan, ledger);", "if (appliedSet.has(name) || resolvedSet.has(name)) continue;",
-  "INSERT INTO public.debateai_schema_migration (name, applied_at)", "await replayForwardChain(client,plan,",
-  "await assertDatabaseAheadAccepted(client,plan,", "await withMigrationStepTransaction(client, step.name",
+  "const { known: applied, extra } = splitLedger(plan, ledger);",
+  "const lineage = identifyLineage(plan, applied, resolutions.map", "const appliedSet = new Set(applied);",
+  "const resolvedSet = new Set(resolutions.map", "for (const name of plan.manifest.order)",
+  "if (appliedSet.has(name) || resolvedSet.has(name)) continue;", "await client.query(plan.sources.get(name)!.sql);",
+  "INSERT INTO public.debateai_schema_migration (name, applied_at)", "[name]",
+  "await client.query(plan.effectiveCapabilityVerifierSql);", "await applyForward108(client,plan,lineage,",
+  "await applyForward110(client,plan,lineage,", "await replayForwardChain(client,plan,", "await assertDatabaseAheadAccepted(client,plan,",
+  "for (const step of pending)", "await withMigrationStepTransaction(client, step.name",
   "await applyForwardStep(client,plan,step,", "[compatEvidenceAfterStep,compat.logicalName]", "} finally {",
-  "pg_advisory_unlock(hashtextextended('debateai:schema-migrations', 0))", "client.release()"
+  "pg_advisory_unlock(hashtextextended('debateai:schema-migrations', 0))", "client.release();"
 ] as const;
 const TRANSACTION_CONTROL_FRAGMENTS = [
   'await client.query("BEGIN");', "await client.query(\"SET LOCAL lock_timeout = '2s'\");", 'await client.query("COMMIT");',
