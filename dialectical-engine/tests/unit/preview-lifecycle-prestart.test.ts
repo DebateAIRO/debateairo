@@ -268,10 +268,24 @@ describe('release lock v2', () => {
 });
 
 describe('database ahead and unpinning', () => {
+  const MANIFEST = { path: '/opt/debateai-v3-preview/artifacts/new-v1/source.json', sha256: 'c'.repeat(64) };
   const ahead = (patch: Record<string, unknown> = {}) => ({ schema: 'preview-database-ahead-v1', olderLabel: 'v1', olderSourceRevision: revision, newerLabel: 'new-v1', newerSourceRevision: NEW_REV,
-    newerSourceManifest: { path: '/opt/debateai-v3-preview/artifacts/new-v1/source.json', sha256: 'c'.repeat(64) }, steps: [{ name: '0124_side_next.sql', sha256: digest }],
+    newerSourceManifest: MANIFEST, steps: [{ name: '0124_side_next.sql', sha256: digest }],
     newerChain: [{ name: '0123_side_by_side_releases.sql', manifestSha256: digest, sourceSha256: digest, verifierSha256: digest, n1Expand: true, keepsVerifier: true, outsideTransaction: false },
       { name: '0124_side_next.sql', manifestSha256: digest, sourceSha256: digest, verifierSha256: digest, n1Expand: true, keepsVerifier: true, outsideTransaction: false }], ...patch });
+  /** The newer release's candidate API source manifest, as readPublicArtifact returns it. */
+  const newerManifest = (patch: Record<string, unknown> = {}) => ({ schema: 'preview-auth-dev-source-v3', uid: 0, role: 'api', sourceRoot: rootOf('api', 'new-v1'), sourceRevision: NEW_REV,
+    files: [{ path: 'dialectical-engine/migrations/0124_side_next.sql', sha256: digest }], ...patch });
+  /**
+   * readPublicArtifact on the server: the root-owned bytes at MANIFEST.path hash to MANIFEST.sha256, so any other
+   * {path, sha256} pair is refused, as the real reader refuses it (D15 review: accept-ahead verifies the manifest itself).
+   */
+  const reads = (value: unknown = newerManifest()) => ({
+    readSourceManifest: async (file: { path: string; sha256: string }) => {
+      if (file.path !== MANIFEST.path || file.sha256 !== MANIFEST.sha256) throw new TypeError('PREVIEW_CUSTODY_REFUSED');
+      return value;
+    }
+  });
 
   it("records the newer release's database-ahead file on the older release", async () => {
     const s = server([V1, NEW]);
@@ -279,11 +293,57 @@ describe('database ahead and unpinning', () => {
     await pinned(s, NEW);
     const path = common.databaseAheadPathFor(s.layout, 'v1');
     const fileSha = s.write(path, ahead());
-    const result = await prestart.acceptAhead({ label: 'v1', fromPath: path, layout: s.layout });
+    const result = await prestart.acceptAhead({ label: 'v1', fromPath: path, layout: s.layout, deps: reads() });
     const lock = s.readLock();
     expect(lock.releases.v1.databaseAhead).toEqual({ path, sha256: fileSha, newerLabel: 'new-v1' });
     expect(prestart.validateReleaseLock(lock, s.layout)).toEqual(lock);
     expect(result).toMatchObject({ event: 'PREVIEW_LIFECYCLE_DATABASE_AHEAD_PINNED', label: 'v1', newerLabel: 'new-v1', databaseAheadSha256: fileSha });
+  });
+
+  it('accepts a newer release that is not pinned yet, against its own source manifest (spec §5 order: accept-ahead, migrations, then the pins)', async () => {
+    const s = server([V1, NEW]);
+    await pinned(s);
+    const path = common.databaseAheadPathFor(s.layout, 'v1');
+    const fileSha = s.write(path, ahead());
+    const result = await prestart.acceptAhead({ label: 'v1', fromPath: path, layout: s.layout, deps: reads() });
+    const lock = s.readLock();
+    expect(Object.keys(lock.releases)).toEqual(['v1']);
+    expect(lock.releases.v1.databaseAhead).toEqual({ path, sha256: fileSha, newerLabel: 'new-v1' });
+    expect(prestart.validateReleaseLock(lock, s.layout)).toEqual(lock);
+    expect(result).toMatchObject({ event: 'PREVIEW_LIFECYCLE_DATABASE_AHEAD_PINNED', label: 'v1', newerLabel: 'new-v1', databaseAheadSha256: fileSha });
+    // The newer release is pinned later (SB10), and the older release's record stays as it was.
+    await pinned(s, NEW);
+    expect(s.readLock().releases.v1.databaseAhead).toEqual({ path, sha256: fileSha, newerLabel: 'new-v1' });
+  });
+
+  it.each([
+    ['a manifest whose bytes are not the sha256 the file names', { newerSourceManifest: { ...MANIFEST, sha256: 'd'.repeat(64) } }, {}],
+    ['a manifest elsewhere than the file names', { newerSourceManifest: { ...MANIFEST, path: '/opt/debateai-v3-preview/artifacts/other-v1/source.json' } }, {}],
+    ['a manifest of another revision than the file names', {}, { sourceRevision: 'f'.repeat(40) }],
+    ['a manifest of another release than the file names', {}, { sourceRoot: rootOf('api', 'other-v1') }],
+    ['a manifest that is not an API manifest', {}, { role: 'ui', sourceRoot: rootOf('ui', 'new-v1') }],
+    ['a manifest that root does not own', {}, { uid: 1000 }],
+    ['a manifest that does not list a step at its bytes', {}, { files: [{ path: 'dialectical-engine/migrations/0124_side_next.sql', sha256: 'e'.repeat(64) }] }]
+  ] as const)('refuses a newer release that is not pinned yet with %s', async (_name, filePatch, manifestPatch) => {
+    const s = server([V1, NEW]);
+    await pinned(s);
+    const path = common.databaseAheadPathFor(s.layout, 'v1');
+    s.write(path, ahead(filePatch));
+    const bytes = readFileSync(s.layout.lockPath);
+    await expect(prestart.acceptAhead({ label: 'v1', fromPath: path, layout: s.layout, deps: reads(newerManifest(manifestPatch)) })).rejects.toMatchObject({ code: 'DATABASE_AHEAD_REFUSED' });
+    expect(readFileSync(s.layout.lockPath)).toEqual(bytes);
+  });
+
+  it("reads the newer manifest with the server's own reader: bytes that are not root's are refused", async () => {
+    const s = server([V1, NEW]);
+    await pinned(s);
+    const path = common.databaseAheadPathFor(s.layout, 'v1');
+    const own = join(s.layout.artifactsRoot, 'release-new-v1', 'candidate-api-source.json');
+    const manifestSha = s.write(own, newerManifest());
+    s.write(path, ahead({ newerSourceManifest: { path: own, sha256: manifestSha } }));
+    const bytes = readFileSync(s.layout.lockPath);
+    await expect(prestart.acceptAhead({ label: 'v1', fromPath: path, layout: s.layout })).rejects.toMatchObject({ code: 'DATABASE_AHEAD_REFUSED' });
+    expect(readFileSync(s.layout.lockPath)).toEqual(bytes);
   });
 
   it.each([
@@ -296,8 +356,8 @@ describe('database ahead and unpinning', () => {
     ['a file without the newer chain', 'own', { newerChain: undefined }, 'DATABASE_AHEAD_REFUSED'],
     ['a step that is not the newer chain\'s last', 'own', { steps: [{ name: '0125_more.sql', sha256: digest }] }, 'DATABASE_AHEAD_REFUSED'],
     ['a group-writable file', 'writable', {}, 'DATABASE_AHEAD_UNREADABLE'],
-    // D5 review: the newer release the file names must be pinned, at the revision the file names.
-    ['a newer release the lock does not pin', 'own', { newerLabel: 'other-v1' }, 'DATABASE_AHEAD_REFUSED'],
+    // D5 review, kept (D15 review): a newer release that is pinned already must be pinned at the revision the file
+    // names; its manifest says that revision too, so only the pin refuses here.
     ['a newer release pinned at another revision', 'own', { newerSourceRevision: 'c'.repeat(40) }, 'DATABASE_AHEAD_REFUSED']
   ] as const)('refuses %s', async (_name, where, patch, code) => {
     const s = server([V1, NEW]);
@@ -307,7 +367,8 @@ describe('database ahead and unpinning', () => {
     const path = where === 'elsewhere' ? join(s.layout.nativePlanRoot, 'database-ahead-other.json') : own;
     s.write(path, ahead(patch), where === 'writable' ? 0o664 : 0o644);
     const bytes = readFileSync(s.layout.lockPath);
-    await expect(prestart.acceptAhead({ label: 'v1', fromPath: path, layout: s.layout })).rejects.toMatchObject({ code });
+    const manifest = newerManifest('newerSourceRevision' in patch ? { sourceRevision: patch.newerSourceRevision } : {});
+    await expect(prestart.acceptAhead({ label: 'v1', fromPath: path, layout: s.layout, deps: reads(manifest) })).rejects.toMatchObject({ code });
     expect(readFileSync(s.layout.lockPath)).toEqual(bytes);
   });
 
@@ -330,7 +391,7 @@ describe('database ahead and unpinning', () => {
     expect(outcome.seen).toEqual([{ sourceRoot: root, databaseAhead: false }]);
     expect(outcome.result).toMatchObject({ event: 'PREVIEW_LIFECYCLE_PRESTART_READY' });
     expect((await start(proofOf(fileSha))).result).toMatchObject({ code: 'NATIVE_ATTESTATION_INVALID' });
-    await prestart.acceptAhead({ label: 'v1', fromPath: path, layout: s.layout });
+    await prestart.acceptAhead({ label: 'v1', fromPath: path, layout: s.layout, deps: reads() });
     outcome = await start(proofOf(fileSha));
     expect(outcome.seen).toEqual([{ sourceRoot: root, databaseAhead: true }]);
     expect(outcome.result).toMatchObject({ event: 'PREVIEW_LIFECYCLE_PRESTART_READY' });

@@ -453,8 +453,11 @@ async function revert({ to, toKey, fromKey, recordedBy, tally, layout, io }) {
  * one); the old pair's stop and its record; the backstop (none for an old release that already RETIRED); the boot
  * target; the gate files (a finish keeps the ones the switch wrote); the final checks. Every step repeats safely, and
  * each one runs even when an earlier one failed: a failed step is named in `bad`, never a reason to leave the rest undone.
+ * `oldPairStopped` (the drained path only, D15 review): the operator stopped the old runner on purpose with nothing
+ * open, and marks the old release RETIRED only after the switch (release-retire.mjs mark-retired), so a stopped old
+ * runner is fine there; everywhere else it must still run or its release must have RETIRED.
  */
-async function afterWrite({ to, from, toKey, fromKey, recordedBy, tally, keepGateFiles, layout, io }) {
+async function afterWrite({ to, from, toKey, fromKey, recordedBy, tally, keepGateFiles, oldPairStopped = false, layout, io }) {
   await io.sleep(HEALTH_INTERVAL_S * 1000 + 500);
   const bad = [];
   const step = async (code, body) => { try { if (await body() === false) bad.push(code); } catch { bad.push(code); } };
@@ -480,8 +483,11 @@ async function afterWrite({ to, from, toKey, fromKey, recordedBy, tally, keepGat
     await io.writeStateFile(path, `${JSON.stringify({ schema: GATE_FILES_SCHEMA, releaseKey: toKey, label: to, recordedAt: new Date(io.now()).toISOString(), gates })}\n`);
   });
   // Final checks (spec §12 step 13.6). The old runner may already have retired (no open work left): that is fine.
-  await step('RUNNER_FROM', async () => await unitState(unitNameFor(layout, 'runner', from), layout, io) === 'active'
-    || (await io.readReleaseState({ releaseKey: fromKey })).state === 'RETIRED');
+  await step('RUNNER_FROM', async () => {
+    const runnerFrom = await unitState(unitNameFor(layout, 'runner', from), layout, io);
+    return runnerFrom === 'active' || (oldPairStopped && STOPPED.includes(runnerFrom))
+      || (await io.readReleaseState({ releaseKey: fromKey })).state === 'RETIRED';
+  });
   await step('RUNNER_TO', async () => await unitState(unitNameFor(layout, 'runner', to), layout, io) === 'active');
   for (const gate of GATES) await step(`GATE_${gate.name.toUpperCase()}`, async () => await io.gateState(gate) === 'active');
   await step('EDGE_AFTER_STOP', async () => {
@@ -512,7 +518,7 @@ async function runSwitch({ to, from, oldPairStopped, rollback, layout, io }) {
   const switchedAt = new Date(io.now()).toISOString();
   const edgeConfirmedMs = await confirmEdge(toKey, tally, io);
   if (edgeConfirmedMs === null) await revert({ to, toKey, fromKey, recordedBy, tally, layout, io });
-  const { backstopAt, bad } = await afterWrite({ to, from, toKey, fromKey, recordedBy, tally, keepGateFiles: false, layout, io });
+  const { backstopAt, bad } = await afterWrite({ to, from, toKey, fromKey, recordedBy, tally, keepGateFiles: false, oldPairStopped, layout, io });
   return Object.freeze({ event: 'PREVIEW_RELEASE_SWITCHED', to, from, toKey, fromKey, switchedAt, edgeConfirmedMs, edgeFailures: tally.edgeFailures, backstopAt, bad });
 }
 

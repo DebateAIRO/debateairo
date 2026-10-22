@@ -20,7 +20,7 @@ import { exactKeys, strictJson, withPrivateBytes } from '../../preview-auth-dev/
 import { RELEASE_KEY_PATTERN, expectedReleaseKey } from '../../preview-auth-dev/v1/environment.mjs';
 import { RELEASE_LABEL, labelOfSourceRoot, readPublicArtifact, slotOfPorts, validateLaunchPlan as reviewedValidateLaunchPlan } from '../../preview-auth-dev/v1/launch-plan.mjs';
 import { validateNativeAttestation } from '../../preview-auth-dev/v1/native-attestation.mjs';
-import { DATABASE_AHEAD_MAX_BYTES, DATABASE_AHEAD_SCHEMA, validateDatabaseAheadFile } from '../../preview-auth-dev/v1/database-ahead.mjs';
+import { DATABASE_AHEAD_MAX_BYTES, DATABASE_AHEAD_SCHEMA, newerManifestMatches, validateDatabaseAheadFile } from '../../preview-auth-dev/v1/database-ahead.mjs';
 import { validatePublication } from '../../preview-auth-dev/v1/runtime-receipt.mjs';
 import { LAYOUT, atomicWrite, canonicalJson, currentDirFor, databaseAheadPathFor, ensureDirectory, logLine, nativePlanPathFor, peerShimArgv, runBounded, sha256, unitNameFor } from './common.mjs';
 import { readCurrentRelease, readReleaseState } from './release-table.mjs';
@@ -422,12 +422,16 @@ export async function pinRelease({ planPath, layout = LAYOUT, deps = {}, now = D
 
 /**
  * Side-by-side spec §5: the older release may (re)start beside a newer database only with the newer
- * release's root-owned list of extra steps. Checks the whole file (database-ahead.mjs), that the newer release it
- * names is pinned in the lock at the revision it names, and records its path
- * and hash on the older release; the native verify (D5) re-reads it, checks the steps against the newer
- * release's source manifest and the database, and its proof must name this hash.
+ * release's root-owned list of extra steps. Checks the whole file (database-ahead.mjs) and the newer release's own
+ * source manifest it names (read through readPublicArtifact, as the native operator reads it: root-owned bytes with the
+ * file's sha256, an API manifest of the file's newer label and revision listing each step's bytes), and, when the newer
+ * release is pinned already, that the lock pins it at that revision; then records the file's path and hash on the
+ * older release. The newer release need not be pinned yet (D15 review): accept-ahead runs before the migrations, so
+ * the older release can restart meanwhile, and the newer release is pinned only after them (spec §5 order). The native
+ * verify (D5) re-reads the file, checks it against the same manifest and the database, and its proof must name this
+ * hash. `deps.readSourceManifest` replaces readPublicArtifact in unit tests.
  */
-export async function acceptAhead({ label, fromPath, layout = LAYOUT }) {
+export async function acceptAhead({ label, fromPath, layout = LAYOUT, deps = {} }) {
   if (!isLabel(label)) refuse('ARGUMENTS_REFUSED');
   if (fromPath !== databaseAheadPathFor(layout, label)) refuse('DATABASE_AHEAD_REFUSED');
   const { lock } = await readLock(layout);
@@ -437,9 +441,12 @@ export async function acceptAhead({ label, fromPath, layout = LAYOUT }) {
   const revision = Object.values(release.services)[0].sourceRevision;
   try { validateDatabaseAheadFile(ahead); } catch { refuse('DATABASE_AHEAD_REFUSED'); }
   if (ahead.olderLabel !== label || ahead.olderSourceRevision !== revision || ahead.newerLabel === label) refuse('DATABASE_AHEAD_REFUSED');
-  // The newer release is one root pinned, at the revision the file names (D5 review).
+  let manifest;
+  try { manifest = await (deps.readSourceManifest ?? (file => readPublicArtifact(file, 'source')))(ahead.newerSourceManifest); } catch { refuse('DATABASE_AHEAD_REFUSED'); }
+  if (!newerManifestMatches(ahead, manifest)) refuse('DATABASE_AHEAD_REFUSED');
+  // A newer release root pinned already is pinned at the revision the file names (D5 review).
   const newer = own(lock.releases, ahead.newerLabel);
-  if (!newer || Object.values(newer.services)[0].sourceRevision !== ahead.newerSourceRevision) refuse('DATABASE_AHEAD_REFUSED');
+  if (newer && Object.values(newer.services)[0].sourceRevision !== ahead.newerSourceRevision) refuse('DATABASE_AHEAD_REFUSED');
   const databaseAhead = { path: fromPath, sha256: file.sha256, newerLabel: ahead.newerLabel };
   const lockSha256 = await writeLock({ ...lock, releases: { ...lock.releases, [label]: { ...release, databaseAhead } } }, layout);
   return { event: 'PREVIEW_LIFECYCLE_DATABASE_AHEAD_PINNED', label, releaseKey: release.releaseKey, newerLabel: ahead.newerLabel, databaseAheadSha256: file.sha256, lockSha256 };
