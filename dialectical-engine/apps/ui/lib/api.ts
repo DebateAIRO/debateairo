@@ -201,7 +201,10 @@ export async function getDebateBundle(
       return { kind: "loading", answer: null, detail: debateDetailFromRunProjection(run, catalog, options.locale),
         run, questionLanguage: run.argument_language ?? null };
     }
-    if (run.state === "SETTLED") {
+    // A terminal stream signal may arrive before the run projection catches up.
+    // Background polls pass answerExpected=false; an explicit CHECKING projection
+    // is held above even when a terminal signal has arrived.
+    if (run.state === "SETTLED" || options.answerExpected) {
       try {
         return await servedDebateBundle(await client.readRunAnswer(id), catalog, run, client);
       } catch (failure) {

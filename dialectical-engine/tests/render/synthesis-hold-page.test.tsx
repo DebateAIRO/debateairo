@@ -70,7 +70,7 @@ describe("S01 held debate page", () => {
     expect(readRunAnswer).not.toHaveBeenCalled();
     act(() => root.unmount()); node.remove();
   });
-  it("never asks for an answer while the run is running or synthesis checking", async () => {
+  it("skips the answer on a background RUNNING read and on every CHECKING read", async () => {
     const readRunAnswer = vi.fn().mockRejectedValue(Object.assign(Object.create(ContractHttpError.prototype),
       { code: "NOT_FOUND", serverCode: "RUN_ANSWER_NOT_FOUND", status: 404 }));
     const projection = { run_ref: "run-1", question_line: "A question?", state: "RUNNING", hold_until: null,
@@ -79,7 +79,7 @@ describe("S01 held debate page", () => {
       .mockResolvedValueOnce(projection)
       .mockResolvedValue({ ...projection, state: "SETTLED", synthesis_check: "CHECKING" }),
       readRunAnswer };
-    const first = await api.getDebateBundle("run-1", "test-token", client as never, { answerExpected: true });
+    const first = await api.getDebateBundle("run-1", "test-token", client as never, { answerExpected: false });
     const second = await api.getDebateBundle("run-1", "test-token", client as never, { answerExpected: true });
     const third = await api.getDebateBundle("run-1", "test-token", client as never,
       { answerExpected: true, currentAnswer: { answer_id: "stale-draft" } as never });
