@@ -126,6 +126,10 @@ function installLines(lines) {
  * `lifecycle-current` or a fixed `debateai-preview-(api|ui|runner).service`, and any instance specifier (%i %I %n %N
  * %j %J) other than in `OnFailure=debateai-preview-alert@%n.service`, refuses TEMPLATE_LINE_REFUSED { file, line }: the
  * template would otherwise point every release at one release's file, port, plan or unit (O1), or change a name.
+ * One exception, in the website template only: a line that is exactly `After=`, `Requires=`, `Wants=` or `BindsTo=`
+ * with the fixed `debateai-preview-api.service` as its only value is left out (not rewritten), because the repo's
+ * ui@ 50-lifecycle.conf already binds each website instance to its own release's API (seen live on R20, 2026-10-22).
+ * The same line in the API template, or one naming the fixed API together with another unit, still refuses.
  */
 export function renderTemplate({ service, files, layout = LAYOUT }) {
   if (!SERVICES.includes(service) || !Array.isArray(files) || files.length === 0) refuse('ARGUMENTS_REFUSED');
@@ -140,6 +144,8 @@ export function renderTemplate({ service, files, layout = LAYOUT }) {
   // Slot A's ports as whole numbers (`:3101`, `PORT=3100`); a release's port comes from its slot and its plan.
   const fixedPort = /(?<![0-9])310[01](?![0-9])/;
   const fixedUnit = new RegExp(`${escape(layout.unitPrefix)}(api|ui|runner)\\.service`);
+  // The website's own tie to the fixed API (After=/Requires=/Wants=/BindsTo= with that one value): the repo drop-in replaces it.
+  const fixedApiDependency = service === 'ui' ? new RegExp(`^\\s*(?:After|Requires|Wants|BindsTo)\\s*=\\s*${escape(`${layout.unitPrefix}api.service`)}\\s*$`) : null;
   // Instance specifiers mean the old unit's name in its file, but each instance's in a template (`%%` is a literal `%`).
   const specifier = /(?<!%)(?:%%)*%[iInNjJ]/;
   const out = [];
@@ -165,6 +171,7 @@ export function renderTemplate({ service, files, layout = LAYOUT }) {
     for (const [at, line] of lines.entries()) {
       if (skipped.has(at)) continue;
       if (isComment(line)) { rendered.push(line); continue; }
+      if (fixedApiDependency?.test(line)) continue;
       // The one specifier line that means the same in a template: the alert names the failed instance.
       if (specifier.test(line) && line.trim() !== ALERT_HOOK) refuse('TEMPLATE_LINE_REFUSED', { file: path, line: at + 1 });
       const moved = line.replace(envToken, (_whole, before, dash) => `${before}${dash}${envRoot}/${service}-%i.env`);
