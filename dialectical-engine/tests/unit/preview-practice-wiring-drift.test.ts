@@ -150,8 +150,10 @@ describe("the practice runs the shipped composition (drift guard)", () => {
 
   it("the gateway is wrapped by the preview call policy on both sides, over the guarded fetch", () => {
     for (const source of [RUNNER_MAIN, PRACTICE_RUNNER]) {
-      // Addition D16-D17: the call policy takes the site version's composed config (its thinking table) until SA5.
+      // Addition D16-D18 (SA5): the call policy takes the site version's composed config (its gate part) and reads each
+      // call's thinking table from the call's own run's version, with the same option text on both sides.
       expect(source).toContain("withPreviewProviderCallPolicy(gateway, siteVersionSettings.previewConfig!, target");
+      expect(source).toContain("thinkingLevelsOf: runPreviewThinkingLevelsOf(runnerSettings, runSettingsVersions, environment.REGISTER_VERSION)");
       expect(source).toContain("...previewTargetGatewayControls(previewGate, target)");
       expect(source).toContain("...providerTargetGatewayControls(target)");
       expect(source).toContain("createPreviewGuardedFetch(");

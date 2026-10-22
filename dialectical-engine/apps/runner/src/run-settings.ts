@@ -36,6 +36,7 @@ import {
   type PreviewGateSettings,
   type PreviewLineUp,
   type PreviewProviderTestConfig,
+  type PreviewThinkingLevels,
   type ProviderDiscoveryTarget
 } from "@debateai/providers";
 import { assertRegisterPromptContractHashes, assertRunnerSettingsGates, type WalkingSkeletonSettings } from "./index.js";
@@ -506,5 +507,37 @@ export function runCostEnvelopeGuardOf(
       throw new TypedDomainError("RUN_SETTINGS_VERSION_UNKNOWN", `RUN_SETTINGS_VERSION_UNKNOWN:${String(version)}`);
     }
     return guard;
+  };
+}
+
+/**
+ * Addition D17-D18 (owner 2026-10-22; Task SA5): the preview's thinking table of a call's OWN debate, by its run id, for
+ * `withPreviewProviderCallPolicy`'s `thinkingLevelsOf`. A run id → its stamped version (`versions.versionOf`, set by
+ * `execute()` right after the claim and again, same value, on every re-claim) → that loaded version's composed preview
+ * configuration's `thinking_levels`; `runId === null` (a call of no debate) → the site version's table. So a debate keeps
+ * its levels for its whole life (O1): through re-claims after an activation and through its verdict story after DONE
+ * (the story's calls carry the run id). Undefined = the version has no table (every row's default, as today).
+ *
+ * An unmapped run, or a version not loaded (never happens: the claim loads the version before any call), refuses
+ * RUN_SETTINGS_VERSION_UNKNOWN, exactly as the money seams (`runCostEnvelopeGuardOf`): a call never runs at another
+ * version's levels, and the call policy ends the call before anything is sent. Synchronous and closure-captured over
+ * the cache and the map: no AsyncLocalStorage and no process-wide "current run" (S6's O1 reason: the call scheduler's
+ * pump starts debate B's waiting call from inside debate A's async context).
+ */
+export function runPreviewThinkingLevelsOf(
+  cache: Pick<RunnerSettingsCache, "loaded">,
+  versions: Pick<RunSettingsVersions, "versionOf">,
+  siteVersion: number
+): (runId: string | null) => PreviewThinkingLevels | undefined {
+  return (runId: string | null): PreviewThinkingLevels | undefined => {
+    const version = runId === null ? siteVersion : versions.versionOf(runId);
+    if (version === undefined) {
+      throw new TypedDomainError("RUN_SETTINGS_VERSION_UNKNOWN", "RUN_SETTINGS_VERSION_UNKNOWN:UNMAPPED");
+    }
+    const settings = cache.loaded(version);
+    if (settings === undefined) {
+      throw new TypedDomainError("RUN_SETTINGS_VERSION_UNKNOWN", `RUN_SETTINGS_VERSION_UNKNOWN:${String(version)}`);
+    }
+    return settings.previewConfig?.thinking_levels;
   };
 }

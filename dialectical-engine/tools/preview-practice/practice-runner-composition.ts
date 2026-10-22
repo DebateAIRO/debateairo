@@ -102,6 +102,7 @@ import { applyPreviewGateCapacities, previewCallSubjects, previewGateNames, stru
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import {
   createRunnerSettingsCache, createRunSettingsVersions, loadRunnerVersionSettings, runCostEnvelopeGuardOf, runnerSettingsOfVersion,
+  runPreviewThinkingLevelsOf,
   type RunnerSiteContext
 } from "../../apps/runner/src/run-settings.js";
 import { createRunnerRetirementSignal } from "../../apps/runner/src/runner-retirement.js";
@@ -328,13 +329,15 @@ export async function composePracticeRunner(input: Readonly<{
       })
     });
     // Spec §3.4, as main.ts: the gate is marked unhealthy on its FIRST unsent refusal, before the resend wait.
-    // Addition D16-D17, as main.ts: the site version's thinking table until each call reads its own run's (SA5). Its
-    // composed config exists whenever the gate part does: the loader refuses a preview version it cannot compose.
+    // Addition D16-D18 (SA5), as main.ts: each call runs at its OWN debate's thinking table, by its run id through the
+    // run → version map (a call of no debate: the site version's); the site version's composed config gives only the
+    // gate part. The formats run (`--levels`, practice-formats.ts) keeps its own per-level config and passes no resolver.
     return withPreviewProviderCallPolicy(gateway, siteVersionSettings.previewConfig!, target, {
       busy: previewBusy,
       onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); },
       gateRemaining: input.remaining,
       onFinalWriterTierUnread: finalWriterTierUnread,
+      thinkingLevelsOf: runPreviewThinkingLevelsOf(runnerSettings, runSettingsVersions, environment.REGISTER_VERSION),
       ...(input.sleep === undefined ? {} : { sleep: input.sleep })
     });
   }

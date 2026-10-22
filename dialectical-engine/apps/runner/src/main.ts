@@ -43,7 +43,7 @@ import { buildProviderPriceMap, createPostgresProviderGateway, declareHatchetWal
 import { createCallScheduler, type CallSubject } from "./call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateRemainingReaders, structureRepairThroughLane, targetCallSubjects } from "./call-lane-gateway.js";
 import { createRunInFlight } from "./run-in-flight.js";
-import { createRunnerSettingsCache, createRunSettingsVersions, loadRunnerVersionSettings, runCostEnvelopeGuardOf, runnerSettingsOfVersion, type RunnerSiteContext } from "./run-settings.js";
+import { createRunnerSettingsCache, createRunSettingsVersions, loadRunnerVersionSettings, runCostEnvelopeGuardOf, runnerSettingsOfVersion, runPreviewThinkingLevelsOf, type RunnerSiteContext } from "./run-settings.js";
 import {
   assertRunnerPrimaryProviderConfiguration,
   createRunnerProviderTopology,
@@ -373,13 +373,17 @@ function targetGateway(target: (typeof providerTargets)[number]): ProviderGatewa
     })
   });
   // Spec §3.4: the policy marks the gate unhealthy on its FIRST unsent refusal, before the minute's resend wait.
-  // Addition D16-D17: the thinking table is the site version's until each call reads its own run's version (SA5). Its
-  // composed config exists whenever the gate part does: the loader refuses a preview version it cannot compose.
+  // Addition D16-D18 (SA5): each call runs at its OWN debate's thinking table, read per call by its run id through the
+  // run → version map (`runPreviewThinkingLevelsOf`; a call of no debate: the site version's), so a debate keeps its
+  // levels through re-claims and its story (O1). The site version's composed config gives only the gate part here (its
+  // table is replaced by the resolver's); it exists whenever the gate part does: the loader refuses a preview version it
+  // cannot compose.
   return previewGate === undefined ? gateway : withPreviewProviderCallPolicy(gateway, siteVersionSettings.previewConfig!, target, {
     busy: previewBusy,
     onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); },
     gateRemaining: previewGateRemaining,
-    onFinalWriterTierUnread: previewFinalWriterTierUnread
+    onFinalWriterTierUnread: previewFinalWriterTierUnread,
+    thinkingLevelsOf: runPreviewThinkingLevelsOf(runnerSettings, runSettingsVersions, environment.REGISTER_VERSION)
   });
 }
 /**

@@ -11,6 +11,10 @@
  *  and, through `executeWorkItem` over a scripted pool: the version is resolved before the claim, the gates run against
  *  the debate's settings, the run → version map is set, the lane opens with the version's limits, an UNSUPPORTED
  *  version never runs (the S7 hook), and an untyped resolver failure leaves the item unclaimed (ruling R37).
+ *
+ * Addition D17-D18 (Task SA5): each preview call runs at its OWN debate's thinking levels, by run id through the same
+ * run → version map (`runPreviewThinkingLevelsOf`): the resolver's rules, the shipped wiring (main.ts and the practice),
+ * and two debates on two versions at once through the real call policy, a re-claim and the story after DONE included.
  */
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -20,6 +24,13 @@ import { TypedDomainError } from "@debateai/kernel";
 import { CostEnvelopeGuard } from "@debateai/budget";
 import { effectiveCallConcurrency } from "@debateai/register";
 import {
+  parsePreviewProviderTestConfig,
+  withPreviewProviderCallPolicy,
+  type PreviewThinkingLevels,
+  type ProviderCallRequest,
+  type ProviderCallResult
+} from "@debateai/providers";
+import {
   assertRunnerSettingsGates,
   mergeRunnerSettings,
   WalkingSkeletonRunner,
@@ -27,13 +38,16 @@ import {
   type WalkingSkeletonSettings
 } from "../../apps/runner/src/index.js";
 import {
+  createRunnerSettingsCache,
   createRunSettingsVersions,
   runCostEnvelopeGuardOf,
+  runPreviewThinkingLevelsOf,
   runnerSettingsOfVersion,
   type RunnerSettingsResolution,
   type RunnerVersionSettings
 } from "../../apps/runner/src/run-settings.js";
 import { createCallScheduler, type CallScheduler } from "../../apps/runner/src/call-scheduler.js";
+import { framedFixturePacket } from "../support/framed-packet.js";
 
 const read = (relative: string) => readFileSync(new URL(`../../${relative}`, import.meta.url), "utf8");
 
@@ -245,6 +259,153 @@ describe("runCostEnvelopeGuardOf: each call charged to its own run's version", (
     expect(codeOf(() => guardOf("run-unmapped"))).toBe("RUN_SETTINGS_VERSION_UNKNOWN");
     expect(codeOf(() => guardOf("run-c"))).toBe("RUN_SETTINGS_VERSION_UNKNOWN");
     expect(codeOf(() => guardOf("run-d"))).toBe("RUN_SETTINGS_VERSION_UNKNOWN");
+  });
+});
+
+/**
+ * Addition D17 (Task SA5): the owner's thinking tables on two sealed versions. Version 17 (the site's) runs Qwen at
+ * `medium` everywhere; version 18 (activated while debate A runs) runs Qwen's pros and cons at `low` and every other
+ * step at `none`, so a story call on the wrong version would show too.
+ */
+const QWEN = "Qwen/Qwen3.8-Flash";
+const TABLE_17: PreviewThinkingLevels = Object.freeze({ [QWEN]: Object.freeze({ level: "medium" }) }) as PreviewThinkingLevels;
+const TABLE_18: PreviewThinkingLevels = Object.freeze({
+  [QWEN]: Object.freeze({ level: "none", steps: Object.freeze({ pros_cons: "low" }) })
+}) as PreviewThinkingLevels;
+const previewConfigWith = (table: PreviewThinkingLevels) => parsePreviewProviderTestConfig(JSON.stringify({
+  deployment: "v3-preview", free_model_ids: ["zai-org/GLM-5.3-Flash", QWEN], premium_model_ids: ["zai-org/GLM-5.3-Flash", QWEN],
+  requested_thinking_level: "high",
+  budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "runner-per-version-thinking-fixture",
+  thinking_levels: table
+}))!;
+/** The site version and the activated one, as the loader returns them (each with its own composed preview config). */
+function previewVersion(version: number, table: PreviewThinkingLevels): RunnerVersionSettings {
+  return Object.freeze({ ...versionSettings(version), previewConfig: previewConfigWith(table) }) as RunnerVersionSettings;
+}
+
+describe("runPreviewThinkingLevelsOf: each call's table is its own run's version's (addition D17)", () => {
+  async function loadedCache() {
+    const cache = createRunnerSettingsCache({
+      load: async (version) => version === 17 ? previewVersion(17, TABLE_17)
+        : version === 18 ? previewVersion(18, TABLE_18)
+        : Object.freeze({ ...versionSettings(version), previewConfig: undefined }) as RunnerVersionSettings,
+      log: () => undefined
+    });
+    await cache.requireSettings(17);
+    await cache.requireSettings(18);
+    await cache.requireSettings(19);
+    return cache;
+  }
+
+  it("two runs on versions 17 and 18 get each their own table; no run gets the site's (17)", async () => {
+    const cache = await loadedCache();
+    const versions = createRunSettingsVersions();
+    versions.set("run-a", 17);
+    versions.set("run-b", 18);
+    const levelsOf = runPreviewThinkingLevelsOf(cache, versions, 17);
+    expect(levelsOf("run-a")).toEqual(TABLE_17);
+    expect(levelsOf("run-b")).toEqual(TABLE_18);
+    expect(levelsOf(null)).toEqual(TABLE_17);
+    // The site version is the boot's own, whatever it is: a runner booted on 18 answers 18's for no run.
+    expect(runPreviewThinkingLevelsOf(cache, versions, 18)(null)).toEqual(TABLE_18);
+    // A version loaded without a preview configuration has no table: every row's default.
+    versions.set("run-c", 19);
+    expect(levelsOf("run-c")).toBeUndefined();
+  });
+
+  it("an unmapped run, and a mapped run whose version is not loaded, refuse RUN_SETTINGS_VERSION_UNKNOWN", async () => {
+    const cache = await loadedCache();
+    const versions = createRunSettingsVersions();
+    versions.set("run-d", 20);
+    const levelsOf = runPreviewThinkingLevelsOf(cache, versions, 17);
+    expect(codeOf(() => levelsOf("run-unmapped"))).toBe("RUN_SETTINGS_VERSION_UNKNOWN");
+    expect(codeOf(() => levelsOf("run-d"))).toBe("RUN_SETTINGS_VERSION_UNKNOWN");
+    // The site version itself not loaded (never happens: the boot requires it first) refuses the same.
+    expect(codeOf(() => runPreviewThinkingLevelsOf(cache, versions, 21)(null))).toBe("RUN_SETTINGS_VERSION_UNKNOWN");
+  });
+});
+
+describe("the shipped wiring hands every preview call policy its run's own table (addition D17)", () => {
+  const RESOLVER = "thinkingLevelsOf: runPreviewThinkingLevelsOf(runnerSettings, runSettingsVersions, environment.REGISTER_VERSION)";
+  for (const file of ["apps/runner/src/main.ts", "tools/preview-practice/practice-runner-composition.ts"]) {
+    it(`${file}: the one withPreviewProviderCallPolicy( call takes thinkingLevelsOf: runPreviewThinkingLevelsOf(`, () => {
+      const text = read(file);
+      const calls = [...text.matchAll(/withPreviewProviderCallPolicy\(gateway, /gu)].map((match) => match.index);
+      expect(calls).toHaveLength(1);
+      const options = text.slice(calls[0], text.indexOf("});", calls[0]));
+      expect(options).toContain(RESOLVER);
+      // Built over the same cache and the same run → version map the money seams read.
+      expect(text).toContain("const runSettingsVersions = createRunSettingsVersions();");
+      expect(text).toContain("const runCostEnvelopeGuard = runCostEnvelopeGuardOf(runnerSettings, runSettingsVersions);");
+    });
+  }
+});
+
+describe("two debates on two versions at once, through the real call policy (addition D17-D18, O1)", () => {
+  const RESULT: ProviderCallResult = { content: "{}", rawArtifactRef: "artifact:fixture", ledgerEntryRef: "ledger:fixture",
+    provider: "openai-compatible-http", model: QWEN, maker: "Alibaba", modelVersion: QWEN };
+  const PACKET = framedFixturePacket("Synthetic school policy; no personal data.");
+  const prosCons = (runId: string): ProviderCallRequest => ({ runId, subjectItemId: "node:synthetic",
+    callSiteKey: "JUDGE:defender:P1", lane: "served", role: "JUDGE", bound: { maxAttempts: 1, tokenCeiling: 2048, deadlineMs: 5000 },
+    contractHash: "contract:synthetic", providerRef: "preview:qwen", packet: PACKET });
+  const story = (runId: string): ProviderCallRequest => ({ runId, subjectItemId: "story:synthetic",
+    callSiteKey: "STORY:STORYTELLER:1", lane: "story", role: "SYNTHESIZER", bound: { maxAttempts: 1, tokenCeiling: 2048, deadlineMs: 5000 },
+    contractHash: "contract:synthetic", providerRef: "preview:qwen", packet: PACKET });
+
+  it("B's pros and cons run at 18's low while A's run at 17's medium; A's re-claim and A's story keep 17's", async () => {
+    const cache = createRunnerSettingsCache({
+      load: async (version) => version === 17 ? previewVersion(17, TABLE_17) : previewVersion(18, TABLE_18),
+      log: () => undefined
+    });
+    // The boot: the site version (17), as main.ts's `siteVersionSettings`.
+    const site = await cache.requireSettings(17);
+    const versions = createRunSettingsVersions();
+    // ONE Qwen gateway for the whole runner, as main.ts's `targetGateway(target)`: every debate's calls go through it.
+    const sent: { runId: string | null; level: string | undefined }[] = [];
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    const gateway = withPreviewProviderCallPolicy({ call: async (effective) => {
+      sent.push({ runId: effective.runId, level: effective.thinkingLevel });
+      await held;
+      return RESULT;
+    } }, site.previewConfig!, { model: QWEN }, {
+      sleep: async () => undefined,
+      thinkingLevelsOf: runPreviewThinkingLevelsOf(cache, versions, 17)
+    });
+
+    // Debate A is claimed on 17; the owner activates 18; debate B is claimed on 18 (each claim loads, then maps).
+    versions.set("run-a", (await cache.requireSettings(17)).registerVersion);
+    versions.set("run-b", (await cache.requireSettings(18)).registerVersion);
+    // Both debates' pros-and-cons calls in flight at the same time, interleaved.
+    const inFlight = [gateway.call(prosCons("run-a")), gateway.call(prosCons("run-b")), gateway.call(prosCons("run-a"))];
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    expect(sent).toEqual([
+      { runId: "run-a", level: "medium" }, { runId: "run-b", level: "low" }, { runId: "run-a", level: "medium" }
+    ]);
+    release();
+    await Promise.all(inFlight);
+
+    // A re-claim of A after the activation: the same stamped version again (S6), the same levels.
+    versions.set("run-a", 17);
+    await gateway.call(prosCons("run-a"));
+    // A's and B's stories after DONE carry their run ids: 17's medium for A, 18's none for B.
+    await gateway.call(story("run-a"));
+    await gateway.call(story("run-b"));
+    expect(sent.slice(3)).toEqual([
+      { runId: "run-a", level: "medium" }, { runId: "run-a", level: "medium" }, { runId: "run-b", level: "none" }
+    ]);
+    // Control: the policy's own config is the site's (17), so without the resolver B would have run at medium.
+    expect(site.previewConfig?.thinking_levels).toEqual(TABLE_17);
+  });
+
+  it("an unmapped run's call ends before anything is sent", async () => {
+    const cache = createRunnerSettingsCache({ load: async () => previewVersion(17, TABLE_17), log: () => undefined });
+    const site = await cache.requireSettings(17);
+    let calls = 0;
+    const gateway = withPreviewProviderCallPolicy({ call: async () => { calls += 1; return RESULT; } }, site.previewConfig!,
+      { model: QWEN }, { thinkingLevelsOf: runPreviewThinkingLevelsOf(cache, createRunSettingsVersions(), 17) });
+    expect(codeOf(() => gateway.call(prosCons("run-unmapped")))).toBe("RUN_SETTINGS_VERSION_UNKNOWN");
+    expect(calls).toBe(0);
   });
 });
 
