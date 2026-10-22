@@ -60,7 +60,8 @@ const MIXED_ROW_KEYS = Object.freeze(["costEnvelopePolicy", "billingPlans", "cal
  * DEBATE rows (spec §13: "debate settings follow the debate"). Everything the engine reads while it argues,
  * judges, writes the answer and tells its story: the algorithm rows, role refs and call bounds, the seven story
  * rows, the development runner rows, the scorecard, rotation, shape, language, length and engine choices, the
- * convergence controls, the operator variants and the evaluator rows.
+ * convergence controls, the operator variants, the evaluator rows and the preview's line-up (addition D12: which AIs
+ * debate on Free and Premium and how hard each thinks).
  */
 const DEBATE_ROW_KEYS = Object.freeze([
   "riskTier", "acceptanceOrganCostBounds", "runDeathPolicy", "globalStopDelta", "branchFreezeEpsilon",
@@ -74,7 +75,7 @@ const DEBATE_ROW_KEYS = Object.freeze([
   "modelScorecard", "answerRoleRotationPolicy", "debateShapePolicy", "questionLanguagePolicy",
   "lengthGuidancePolicy", "engineVersionPolicy", "convergenceEpsilon", "convergenceStopDefaults",
   "approvedOperatorVariants", "evaluatorDispatchBinding", "evaluatorProviderFamily", "evaluatorJudgeAddonPolicy",
-  "evaluatorSeatSharePolicy"
+  "evaluatorSeatSharePolicy", "previewLineUpPolicy"
 ] as const);
 
 /**

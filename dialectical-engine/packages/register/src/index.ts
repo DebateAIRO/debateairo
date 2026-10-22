@@ -1472,3 +1472,9 @@ export {
   type SettingsRowKind,
   type SiteSettingsDifference
 } from "./settings-classification.js";
+export {
+  PREVIEW_LINE_UP_POLICY_ROW_KEY,
+  previewLineUpPolicyFromValue,
+  previewLineUpPolicyRow,
+  readPreviewLineUpPolicy
+} from "./preview-line-up-policy.js";

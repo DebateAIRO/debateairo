@@ -1108,6 +1108,7 @@ packages/register/src/map-contract-hash.ts
 packages/register/src/mfa-policy.ts
 packages/register/src/model-scorecard-policy.ts
 packages/register/src/password-reset-policy.ts
+packages/register/src/preview-line-up-policy.ts
 packages/register/src/product-role-policy.ts
 packages/register/src/publication-check-policy.ts
 packages/register/src/question-language-policy.ts
