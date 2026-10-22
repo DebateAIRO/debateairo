@@ -392,6 +392,28 @@ export class WorkItemRepository {
   }
 
   /**
+   * Side-by-side spec §13 runner point 3 (S8): the distinct settings versions of this release's OPEN debates — every run
+   * with a READY or CLAIMED work item, by its stamped `core.run.register_version` — read once at boot so the runner
+   * loads them before it claims anything. `releaseKey` must be this repository's own fence (spec §3: a runner reads
+   * only its own release's work; WORK_ITEM_FENCE_RELEASE_MISMATCH otherwise). `legacy` lists nothing, without a query:
+   * a legacy run (written before 0123, development and tests) is never preloaded. Ascending; no content, no write.
+   */
+  async listOpenRunSettingsVersions(releaseKey: string): Promise<readonly number[]> {
+    if (releaseKey !== this.#fence.releaseKey) throw new TypeError("WORK_ITEM_FENCE_RELEASE_MISMATCH");
+    if (releaseKey === LEGACY_RELEASE_KEY) return Object.freeze([]);
+    const result = await this.pool.query<{ register_version: number }>(
+      // The bigint version is cast by the database (an out-of-range one refuses), never coerced in JavaScript.
+      `SELECT DISTINCT run.register_version::integer AS register_version
+       FROM core.work_item AS item
+       JOIN core.run AS run ON run.run_id = item.run_id
+       WHERE item.state IN ('READY','CLAIMED') AND run.release_key = $1
+       ORDER BY register_version`,
+      [releaseKey]
+    );
+    return Object.freeze(result.rows.map((row) => row.register_version));
+  }
+
+  /**
    * Spec §3 (plan B D4): this release's CLAIMED items whose claim has lapsed — a copy that died mid-debate — oldest
    * first. The periodic re-send hands only these to Hatchet again; READY items stay with the API's stalled-start
    * re-send, so a queued job is never sent twice.

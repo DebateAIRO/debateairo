@@ -1,6 +1,6 @@
 import type { Pool } from "pg";
 import { settingsRefusalCode } from "@debateai/db";
-import { TypedDomainError } from "@debateai/kernel";
+import { LEGACY_RELEASE_KEY, TypedDomainError } from "@debateai/kernel";
 import {
   composeDebateCostEnvelope,
   costEnvelopeCeilings,
@@ -426,6 +426,102 @@ export function createRunnerSettingsCache(input: Readonly<{
 
 /** Side-by-side spec §13 (S6): the per-version cache, by name (the money seams and, addition D17, the thinking table). */
 export type RunnerSettingsCache = ReturnType<typeof createRunnerSettingsCache>;
+
+/** Side-by-side spec §13 runner point 3 (S8): where the boot's preload list comes from (unit tests inject fakes). */
+export type RunnerSettingsPreloadSources = Readonly<{
+  pool: Pick<Pool, "query">;
+  /** The battery's WorkItemRepository, fenced to `releaseKey`. */
+  work: Readonly<{ listOpenRunSettingsVersions(releaseKey: string): Promise<readonly number[]> }>;
+  releaseKey: string;
+  siteVersion: number;
+}>;
+
+/**
+ * Side-by-side spec §13 runner point 3 (S8) — WHAT THE BOOT PRELOADS. The sorted, distinct union of the site version,
+ * the versions of this release's open debates (READY or CLAIMED work, `listOpenRunSettingsVersions`) and every version
+ * this release has a PASS verdict for (`register.read_passed_settings_versions`, which also names the key's own number).
+ * Never the activation pointer: the runner runs what it was stamped with or has passed, and the pointer is the API's
+ * alone (S16 pins that no runner file names its reader). A `legacy` process (development and tests: no release key
+ * is ever legacy on a server) preloads its site version only, asking neither source — legacy runs are never listed
+ * and a legacy key has no verdicts. A database failure propagates: the boot refuses (the S8 ruling: at boot the
+ * database must work). Two reads, one after the other: the open debates', then the verdicts'.
+ */
+export async function listRunnerSettingsPreload(input: RunnerSettingsPreloadSources): Promise<readonly number[]> {
+  const { pool, work, releaseKey, siteVersion } = input;
+  const versions = new Set<number>([siteVersion]);
+  if (releaseKey !== LEGACY_RELEASE_KEY) {
+    for (const version of await work.listOpenRunSettingsVersions(releaseKey)) versions.add(version);
+    const passed = await pool.query<{ register_version: number }>(
+      // The bigint version is cast by the database (an out-of-range one refuses), never coerced in JavaScript.
+      "SELECT passed::integer AS register_version FROM register.read_passed_settings_versions($1) AS passed",
+      [releaseKey]
+    );
+    for (const row of passed.rows) versions.add(row.register_version);
+  }
+  return Object.freeze([...versions].sort((a, b) => a - b));
+}
+
+/** Side-by-side spec §13 runner point 3 (S8): what the boot's preload found, versions ascending. */
+export type RunnerSettingsPreload = Readonly<{
+  releaseKey: string;
+  siteVersion: number;
+  loaded: readonly number[];
+  unsupported: readonly Readonly<{ version: number; code: string }>[];
+}>;
+
+/**
+ * Side-by-side spec §13 runner point 3 (S8) — THE BOOT PRELOAD: "a bad version still fails loudly at start". Every
+ * version `listRunnerSettingsPreload` names is loaded through the cache, one after another, so a debate's first claim
+ * never waits on a load and a bad version is seen before the first claim. A version the release cannot run is
+ * UNSUPPORTED: the cache prints its one loud DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED line (ruling R41) and the boot goes
+ * on — its debates fail plainly at claim (S7: set aside, no quota use). Only the site version refuses the boot, and it
+ * was already required (`requireSettings`) before this runs. A database failure is never a settings refusal (ruling
+ * R31: not cached) and propagates: the boot refuses rather than start with a version it could not read.
+ */
+export async function preloadRunnerSettings(input: RunnerSettingsPreloadSources & Readonly<{
+  cache: Pick<RunnerSettingsCache, "settingsFor">;
+}>): Promise<RunnerSettingsPreload> {
+  const versions = await listRunnerSettingsPreload(input);
+  const loaded: number[] = [];
+  const unsupported: Readonly<{ version: number; code: string }>[] = [];
+  for (const version of versions) {
+    const resolution = await input.cache.settingsFor(version);
+    if (resolution.kind === "SETTINGS") loaded.push(version);
+    else unsupported.push(Object.freeze({ version, code: resolution.code }));
+  }
+  return Object.freeze({
+    releaseKey: input.releaseKey, siteVersion: input.siteVersion,
+    loaded: Object.freeze(loaded), unsupported: Object.freeze(unsupported)
+  });
+}
+
+/**
+ * Side-by-side spec §13 runner point 3 (S8): the boot preload, content-free: versions as strings, codes only (each
+ * unsupported version with the code the cache's UNSUPPORTED line printed). The practice logs it as one settings line.
+ */
+export function runnerSettingsSummary(preload: RunnerSettingsPreload): Readonly<{
+  releaseKey: string;
+  siteVersion: string;
+  loaded: readonly string[];
+  unsupported: readonly Readonly<{ version: string; code: string }>[];
+}> {
+  return Object.freeze({
+    releaseKey: preload.releaseKey,
+    siteVersion: String(preload.siteVersion),
+    loaded: Object.freeze(preload.loaded.map(String)),
+    unsupported: Object.freeze(preload.unsupported.map(({ version, code }) => Object.freeze({ version: String(version), code })))
+  });
+}
+
+/**
+ * Side-by-side spec §13 runner point 3 (S8): the boot's one content-free journal line, printed right after
+ * DEBATEAI_RUNNER_READY (which is unchanged: the preview's handshake reads it):
+ * `DEBATEAI_RUNNER_SETTINGS {"releaseKey":…,"siteVersion":"17","loaded":["17","18"],"unsupported":[]}`, each unsupported
+ * version as `{"version":"19","code":"…"}`.
+ */
+export function runnerSettingsLine(preload: RunnerSettingsPreload): string {
+  return `DEBATEAI_RUNNER_SETTINGS ${JSON.stringify(runnerSettingsSummary(preload))}\n`;
+}
 
 /**
  * Side-by-side spec §13 (S6) — THE RUN → VERSION MAP, for the life of the process (a few bytes per run; a runner lives

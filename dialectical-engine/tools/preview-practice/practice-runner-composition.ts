@@ -101,8 +101,8 @@ import { createCallScheduler, type CallSubject } from "../../apps/runner/src/cal
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateNames, structureRepairThroughLane } from "../../apps/runner/src/call-lane-gateway.js";
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import {
-  createRunnerSettingsCache, createRunSettingsVersions, loadRunnerVersionSettings, runCostEnvelopeGuardOf, runnerSettingsOfVersion,
-  runPreviewThinkingLevelsOf,
+  createRunnerSettingsCache, createRunSettingsVersions, loadRunnerVersionSettings, preloadRunnerSettings, runCostEnvelopeGuardOf,
+  runnerSettingsOfVersion, runnerSettingsSummary, runPreviewThinkingLevelsOf,
   type RunnerSiteContext
 } from "../../apps/runner/src/run-settings.js";
 import { createRunnerRetirementSignal } from "../../apps/runner/src/runner-retirement.js";
@@ -216,8 +216,9 @@ export async function composePracticeRunner(input: Readonly<{
   /** Content-free story log lines (codes and ids only). */
   storyLog?: (event: string, detail: Record<string, unknown>) => void;
   /**
-   * Content-free settings-cache lines (DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED: a version and a code). Default: none, as the
-   * story log: the practice loads only its site version, whose refusal is rethrown with its own code anyway.
+   * Content-free settings lines: the cache's DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED (a version and a code) and, as main.ts
+   * prints after its ready line, the boot preload's DEBATEAI_RUNNER_SETTINGS (versions and codes; S8). Default: none, as
+   * the story log (the site version's refusal is rethrown with its own code anyway).
    */
   settingsLog?: (line: Readonly<Record<string, unknown>>) => void;
 }>) {
@@ -275,14 +276,23 @@ export async function composePracticeRunner(input: Readonly<{
     configuredMakerRefs: runnerConfiguredMakerRefs(declaredProviderTargets),
     money: money === null ? null : money.site
   });
+  const settingsLog = input.settingsLog ?? (() => undefined);
   const runnerSettings = createRunnerSettingsCache({
     // The practice's story lines go to its own story log (main.ts's go to standard error).
     load: (version) => loadRunnerVersionSettings(pool, version, runnerSite, {
       log: ({ event, ...detail }) => { storyLog(String(event), detail); }
     }),
-    log: input.settingsLog ?? (() => undefined)
+    log: settingsLog
   });
   const siteVersionSettings = await runnerSettings.requireSettings(environment.REGISTER_VERSION);
+  // Side-by-side spec §13 runner point 3 (S8), as main.ts: the release's open debates' and passed versions, through the
+  // same cache, never the activation pointer; an unsupported one is one line and the practice goes on; a database
+  // failure refuses. The practice has no ready line: its summary goes to the settings log.
+  const runnerSettingsPreload = await preloadRunnerSettings({
+    cache: runnerSettings, pool, work: new WorkItemRepository(pool, { releaseKey: environment.RELEASE_KEY }),
+    releaseKey: environment.RELEASE_KEY, siteVersion: environment.REGISTER_VERSION
+  });
+  settingsLog({ kind: "DEBATEAI_RUNNER_SETTINGS", ...runnerSettingsSummary(runnerSettingsPreload) });
   const { policy, storyPolicy } = siteVersionSettings;
   // Side-by-side spec §13 (S6), as main.ts: each claimed run's version by run id, and each call's own version's guard.
   const runSettingsVersions = createRunSettingsVersions();

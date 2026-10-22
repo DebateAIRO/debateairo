@@ -43,7 +43,7 @@ import { buildProviderPriceMap, createPostgresProviderGateway, declareHatchetWal
 import { createCallScheduler, type CallSubject } from "./call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateRemainingReaders, structureRepairThroughLane, targetCallSubjects } from "./call-lane-gateway.js";
 import { createRunInFlight } from "./run-in-flight.js";
-import { createRunnerSettingsCache, createRunSettingsVersions, loadRunnerVersionSettings, runCostEnvelopeGuardOf, runnerSettingsOfVersion, runPreviewThinkingLevelsOf, type RunnerSiteContext } from "./run-settings.js";
+import { createRunnerSettingsCache, createRunSettingsVersions, loadRunnerVersionSettings, preloadRunnerSettings, runCostEnvelopeGuardOf, runnerSettingsLine, runnerSettingsOfVersion, runPreviewThinkingLevelsOf, type RunnerSiteContext } from "./run-settings.js";
 import {
   assertRunnerPrimaryProviderConfiguration,
   createRunnerProviderTopology,
@@ -456,6 +456,19 @@ function observeClaimTarget(target: (typeof providerTargets)[number]) {
 // Side-by-side spec §3: every work repository this process builds serves only this release's work items (claims,
 // renewals, the start-up re-send, failure writes), and its failure writes land only under this worker's live claim.
 const workFence = Object.freeze({ releaseKey: environment.RELEASE_KEY, workerId: environment.RUNNER_WORKER_ID });
+/**
+ * Side-by-side spec §13 runner point 3 (S8) — THE BOOT PRELOAD: "a bad version still fails loudly at start". After the
+ * site version (whose refusal refuses the boot, above), every version this release may meet is loaded through the same
+ * cache before anything is claimed: its open debates' versions and every version it has a PASS verdict for — never the
+ * activation pointer, which is the API's alone. Another version this release cannot run prints its one loud
+ * DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED line and the boot goes on (its debates are set aside at claim, S7). A database
+ * failure refuses the boot (S8 ruling: at boot the database must work). Before the team gate and the worker: nothing is
+ * claimed until it has run. Summed up after the ready line (DEBATEAI_RUNNER_SETTINGS).
+ */
+const runnerSettingsPreload = await preloadRunnerSettings({
+  cache: runnerSettings, pool, work: new WorkItemRepository(pool, workFence),
+  releaseKey: environment.RELEASE_KEY, siteVersion: environment.REGISTER_VERSION
+});
 // Side-by-side spec §4 (D1): this process's running tasks (each whole task, the verdict story included) and its two
 // retirement stops (claims, then new model calls), both off until this release retires.
 const executions = createTaskExecutionCounter();
@@ -645,6 +658,8 @@ announceRunnerReady({
   releaseKey: environment.RELEASE_KEY,
   startupDispatched: startupReconciliation.dispatched
 });
+// Side-by-side spec §13 runner point 3 (S8): what the boot preloaded, content-free, right after the unchanged ready line.
+process.stdout.write(runnerSettingsLine(runnerSettingsPreload));
 // Side-by-side spec §2 (plan B D4): every five minutes this release re-sends its own lapsed CLAIMED items (a copy that
 // died mid-debate) under its own task name, not only at a fresh start; none while it retires (claims stopped, §4).
 const lapsedResend = startLapsedClaimResend({

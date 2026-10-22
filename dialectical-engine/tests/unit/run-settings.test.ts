@@ -9,13 +9,19 @@
  *   `requireSettings` rethrows the loader's own refusal;
  * - each version resolves its own preview line-up (the row, or the env's for a version without it), and the D15
  *   refusals; the version's rosters, seats and scorecard are checked against the declared targets;
- * - `runnerSettingsOfVersion` maps one version's debate members, written once.
+ * - `runnerSettingsOfVersion` maps one version's debate members, written once;
+ * - S8 (spec §13 runner point 3): the boot preload is the sorted, distinct union of the site version, the release's open
+ *   debates' versions and its passed versions, never the activation pointer; a legacy process preloads its site version
+ *   only; an unsupported version is one loud line and the boot goes on; a database failure refuses the boot; one
+ *   content-free DEBATEAI_RUNNER_SETTINGS line after the ready line, in main.ts and (as a log line) in the practice.
  */
+import { readFileSync } from "node:fs";
 import { createServer, type Server, type Socket } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Pool } from "pg";
 import { createPool, isDatabasePoolBusy } from "@debateai/db";
-import { TypedDomainError } from "@debateai/kernel";
+import { LEGACY_RELEASE_KEY, TypedDomainError } from "@debateai/kernel";
+import { WorkItemRepository } from "@debateai/battery";
 import {
   COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW,
   costEnvelopeBand,
@@ -42,9 +48,13 @@ import type { DevelopmentRunnerPolicy } from "../../apps/runner/src/dev-runner-p
 import {
   assertPreviewVersionTargets,
   createRunnerSettingsCache,
+  listRunnerSettingsPreload,
   loadRunnerVersionSettings,
+  preloadRunnerSettings,
   resolvePreviewVersionConfig,
+  runnerSettingsLine,
   runnerSettingsOfVersion,
+  runnerSettingsSummary,
   type RunnerSiteContext,
   type RunnerVersionReaders,
   type RunnerVersionSettings
@@ -628,5 +638,148 @@ describe("runnerSettingsOfVersion: the debate members of one version, written on
     expect(preview.previewConfig).toBeDefined();
     expect(Object.keys(runnerSettingsOfVersion(preview))).toEqual(Object.keys(members));
     expect(Object.keys(members)).not.toContain("previewConfig");
+  });
+});
+
+describe("the boot preload: open debates' and passed versions, never the pointer (side-by-side spec §13 runner point 3, S8)", () => {
+  const KEY = ["r17", "0123456789ab"].join("-");
+  const PASSED_SQL = "SELECT passed::integer AS register_version FROM register.read_passed_settings_versions($1) AS passed";
+  const settingsOf = (version: number) => ({ registerVersion: version }) as unknown as RunnerVersionSettings;
+  function sources(open: readonly number[], passed: readonly number[], releaseKey = KEY) {
+    const asked: unknown[][] = [];
+    const listed: string[] = [];
+    const pool = { query: vi.fn(async (sql: string, values: unknown[]) => {
+      asked.push([sql, values]);
+      return { rows: passed.map((version) => ({ register_version: version })) };
+    }) } as unknown as Pool;
+    const work = { listOpenRunSettingsVersions: async (key: string) => { listed.push(key); return open; } };
+    return { pool, work, releaseKey, siteVersion: SITE_VERSION, asked, listed };
+  }
+
+  it("is the sorted, distinct union of the site version, the open debates' versions and the passed versions", async () => {
+    const input = sources([19, 17, 18, 19], [21, 17, 18]);
+    const versions = await listRunnerSettingsPreload(input);
+    expect(versions).toEqual([17, 18, 19, 21]);
+    expect(Object.isFrozen(versions)).toBe(true);
+    expect(input.listed).toEqual([KEY]);
+    expect(input.asked).toEqual([[PASSED_SQL, [KEY]]]);
+    // Nothing open and nothing passed: the site version alone.
+    expect(await listRunnerSettingsPreload(sources([], []))).toEqual([SITE_VERSION]);
+  });
+
+  it("a legacy process preloads its site version only, asking neither source (legacy runs are never listed)", async () => {
+    const input = sources([18], [19], LEGACY_RELEASE_KEY);
+    expect(await listRunnerSettingsPreload(input)).toEqual([SITE_VERSION]);
+    expect(input.listed).toEqual([]);
+    expect(input.asked).toEqual([]);
+  });
+
+  it("the battery lists the fenced release's READY and CLAIMED runs' versions; legacy without a query; never another release's", async () => {
+    const queries: unknown[][] = [];
+    const pool = { query: vi.fn(async (sql: string, values: unknown[]) => {
+      queries.push([sql, values]);
+      return { rows: [{ register_version: 17 }, { register_version: 18 }] };
+    }) } as unknown as Pool;
+    expect(await new WorkItemRepository(pool, { releaseKey: KEY }).listOpenRunSettingsVersions(KEY)).toEqual([17, 18]);
+    expect(queries).toHaveLength(1);
+    const [sql, values] = queries[0] as [string, unknown[]];
+    expect(values).toEqual([KEY]);
+    const flatSql = sql.replace(/\s+/gu, " ");
+    expect(flatSql).toContain("SELECT DISTINCT run.register_version::integer AS register_version FROM core.work_item AS item JOIN core.run AS run ON run.run_id = item.run_id");
+    expect(flatSql).toContain("WHERE item.state IN ('READY','CLAIMED') AND run.release_key = $1");
+    // Legacy: nothing, and no query.
+    expect(await new WorkItemRepository(pool).listOpenRunSettingsVersions(LEGACY_RELEASE_KEY)).toEqual([]);
+    expect(queries).toHaveLength(1);
+    // Spec §3: a fenced repository reads only its own release's work.
+    const other = ["r18", "0123456789ab"].join("-");
+    await expect(new WorkItemRepository(pool, { releaseKey: KEY }).listOpenRunSettingsVersions(other))
+      .rejects.toThrow("WORK_ITEM_FENCE_RELEASE_MISMATCH");
+    await expect(new WorkItemRepository(pool).listOpenRunSettingsVersions(KEY)).rejects.toThrow("WORK_ITEM_FENCE_RELEASE_MISMATCH");
+    expect(queries).toHaveLength(1);
+  });
+
+  it("loads every listed version through the cache: an unsupported one is one loud line and the boot goes on", async () => {
+    const lines: Readonly<Record<string, unknown>>[] = [];
+    const loads: number[] = [];
+    const cache = createRunnerSettingsCache({
+      load: async (version) => {
+        loads.push(version);
+        if (version === 19) throw new TypedDomainError("ENGINE_CONTRACT_HASH_MISMATCH", "fixture");
+        return settingsOf(version);
+      },
+      log: (line) => { lines.push(line); }
+    });
+    await cache.settingsFor(SITE_VERSION);
+    const preload = await preloadRunnerSettings({ ...sources([19, 18], [18, 17]), cache });
+    expect(preload).toEqual({ releaseKey: KEY, siteVersion: SITE_VERSION, loaded: [17, 18],
+      unsupported: [{ version: 19, code: "ENGINE_CONTRACT_HASH_MISMATCH" }] });
+    expect(Object.isFrozen(preload)).toBe(true);
+    // The site version was already loaded (the boot's requireSettings): each version once, in order.
+    expect(loads).toEqual([17, 18, 19]);
+    expect(cache.loaded(18)).toEqual(settingsOf(18));
+    expect(lines).toEqual([{ kind: "DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED", version: "19", code: "ENGINE_CONTRACT_HASH_MISMATCH" }]);
+    expect(runnerSettingsLine(preload)).toBe(`DEBATEAI_RUNNER_SETTINGS {"releaseKey":"${KEY}","siteVersion":"17",`
+      + `"loaded":["17","18"],"unsupported":[{"version":"19","code":"ENGINE_CONTRACT_HASH_MISMATCH"}]}\n`);
+    expect(runnerSettingsSummary(preload)).toEqual({ releaseKey: KEY, siteVersion: "17", loaded: ["17", "18"],
+      unsupported: [{ version: "19", code: "ENGINE_CONTRACT_HASH_MISMATCH" }] });
+    expect(runnerSettingsLine({ releaseKey: KEY, siteVersion: 17, loaded: [17, 18], unsupported: [] }))
+      .toBe(`DEBATEAI_RUNNER_SETTINGS {"releaseKey":"${KEY}","siteVersion":"17","loaded":["17","18"],"unsupported":[]}\n`);
+  });
+
+  it("a database failure refuses the boot: in either listing, or in a version's load (never kept, ruling R31)", async () => {
+    const connection = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:5432"), { code: "ECONNREFUSED" });
+    const cacheOf = (load: (version: number) => Promise<RunnerVersionSettings>) => createRunnerSettingsCache({ load, log: () => undefined });
+    const fine = cacheOf(async (version) => settingsOf(version));
+    const listing = sources([18], []);
+    await expect(preloadRunnerSettings({ ...listing, work: { listOpenRunSettingsVersions: async () => { throw connection; } }, cache: fine }))
+      .rejects.toBe(connection);
+    const passing = sources([18], []);
+    (passing.pool.query as unknown as ReturnType<typeof vi.fn>).mockRejectedValueOnce(connection);
+    await expect(preloadRunnerSettings({ ...passing, cache: fine })).rejects.toBe(connection);
+    let fail = true;
+    const flaky = cacheOf(async (version) => { if (version === 18 && fail) throw connection; return settingsOf(version); });
+    await expect(preloadRunnerSettings({ ...sources([18], []), cache: flaky })).rejects.toBe(connection);
+    expect(flaky.versions()).toEqual([{ version: 17, kind: "SETTINGS" }]);
+    fail = false;
+    expect((await preloadRunnerSettings({ ...sources([18], []), cache: flaky })).loaded).toEqual([17, 18]);
+  });
+
+  it("neither run-settings.ts nor main.ts names the activation pointer or its table (S16 pins every runner file)", () => {
+    for (const file of ["apps/runner/src/run-settings.ts", "apps/runner/src/main.ts"]) {
+      const source = readFileSync(new URL(`../../${file}`, import.meta.url), "utf8");
+      expect(source, file).not.toContain("read_active_settings_version");
+      expect(source, file).not.toContain("settings_activation");
+      expect(source, file).not.toMatch(/activeSettingsVersion|readActiveSettings/u);
+    }
+  });
+
+  it("main.ts preloads after the site version, under its release fence, before the team gate; the settings line follows the unchanged ready line", () => {
+    const main = readFileSync(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8");
+    const site = main.indexOf("const siteVersionSettings = await runnerSettings.requireSettings(environment.REGISTER_VERSION);");
+    const preload = main.indexOf("const runnerSettingsPreload = await preloadRunnerSettings({");
+    const fence = main.indexOf("const workFence = Object.freeze(");
+    const gate = main.indexOf("await refusePreviewOutsiderWork(");
+    const ready = main.indexOf("announceRunnerReady({");
+    const line = main.indexOf("process.stdout.write(runnerSettingsLine(runnerSettingsPreload));");
+    const resend = main.indexOf("startLapsedClaimResend({");
+    expect(site).toBeGreaterThan(0);
+    expect(site).toBeLessThan(fence); expect(fence).toBeLessThan(preload); expect(preload).toBeLessThan(gate);
+    expect(gate).toBeLessThan(ready); expect(ready).toBeLessThan(line); expect(line).toBeLessThan(resend);
+    expect(main.split("preloadRunnerSettings(")).toHaveLength(2);
+    expect(main.slice(preload, gate).replace(/\s+/gu, " ")).toContain("cache: runnerSettings, pool, work: new WorkItemRepository(pool, workFence), releaseKey: environment.RELEASE_KEY, siteVersion: environment.REGISTER_VERSION");
+    // DEBATEAI_RUNNER_READY is unchanged (the preview's handshake reads it): the same five members.
+    expect(main.slice(ready, line).replace(/\s+/gu, " ")).toContain("announceRunnerReady({ kind: \"DEBATEAI_RUNNER_READY\", worker: environment.HATCHET_WORKER_NAME, registerVersion: String(environment.REGISTER_VERSION),");
+  });
+
+  it("the practice runner preloads exactly as main.ts, right after its site version, and logs the settings line", () => {
+    const practice = readFileSync(new URL("../../tools/preview-practice/practice-runner-composition.ts", import.meta.url), "utf8");
+    const site = practice.indexOf("const siteVersionSettings = await runnerSettings.requireSettings(environment.REGISTER_VERSION);");
+    const preload = practice.indexOf("const runnerSettingsPreload = await preloadRunnerSettings({");
+    expect(site).toBeGreaterThan(0);
+    expect(site).toBeLessThan(preload);
+    expect(practice.split("preloadRunnerSettings(")).toHaveLength(2);
+    const flatPractice = practice.replace(/\s+/gu, " ");
+    expect(flatPractice).toContain("cache: runnerSettings, pool, work: new WorkItemRepository(pool, { releaseKey: environment.RELEASE_KEY }), releaseKey: environment.RELEASE_KEY, siteVersion: environment.REGISTER_VERSION");
+    expect(flatPractice).toContain("settingsLog({ kind: \"DEBATEAI_RUNNER_SETTINGS\", ...runnerSettingsSummary(runnerSettingsPreload) });");
   });
 });
