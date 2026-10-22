@@ -256,6 +256,18 @@ describe('the preview release guide: transition T, side by side, the way back, t
     expect(guard).toBeLessThan(lines.findIndex(line => line.startsWith('install -d -o root -g root -m 0700 "$S/templates"')));
   });
 
+  it('the stale-lock line\'s pgrep cannot match its own shell (final fix wave S7)', () => {
+    const lines = allBlocks.flatMap(block => block.lines).filter(line => code(line) && line.includes('pgrep'));
+    expect(lines).toEqual(["pgrep -f '[r]elease-switch.mjs' || mv /etc/debateai-v3-preview/lifecycle/release-switch.lock \"/root/preview-archive/release-switch.lock.stale-$(date -u +%Y%m%dT%H%M%SZ)\""]);
+    // pgrep -f matches its pattern (an extended regex) against every process's whole command line: the bracket form
+    // finds a running switch, but not the shell that runs this line (`bash -c "<line>"`); the plain name found both.
+    const switchProcess = '/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/release-switch.mjs switch --finish --to a-v1 --from b-v1';
+    const pattern = /^pgrep -f '([^']+)'/.exec(lines[0]!)![1]!;
+    expect(new RegExp(pattern).test(switchProcess)).toBe(true);
+    expect(new RegExp(pattern).test(`bash -c ${lines[0]}`)).toBe(false);
+    expect(new RegExp('release-switch.mjs').test('bash -c pgrep -f release-switch.mjs || mv …')).toBe(true);
+  });
+
   it('the caddy step restores the old file on a failed check', () => {
     const tb7 = scriptOf('TB7').lines;
     const restoreLine = 'install -o root -g root -m 0644 "$S/Caddyfile.before-two-slot" "$C.new"';

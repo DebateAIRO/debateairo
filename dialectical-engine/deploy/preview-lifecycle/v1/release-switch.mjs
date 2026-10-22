@@ -902,6 +902,9 @@ async function lockHolder(path) {
  * failing with no command running (D10 parked minor).
  */
 export async function acquireSwitchLock(path, tool = 'release-switch.mjs') {
+  // `[r]elease-switch.mjs`: a pattern that cannot match the shell running the check itself (`bash -c "pgrep -f …"`
+  // holds the plain name on its own command line, so `pgrep -f release-switch.mjs` always finds one; final fix wave S7).
+  const check = `pgrep -f '[${tool[0]}]${tool.slice(1)}'`;
   let handle;
   try {
     handle = await open(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
@@ -910,9 +913,9 @@ export async function acquireSwitchLock(path, tool = 'release-switch.mjs') {
       const holder = await lockHolder(path);
       if (holder.holderAlive) refuse('RELEASE_SWITCH_BUSY', holder);
       refuse('RELEASE_SWITCH_BUSY', { ...holder, next: holder.holderPid !== null
-        ? `no ${tool} is running (check: pgrep -f ${tool}); move ${path} aside, then re-run`
+        ? `no ${tool} is running (check: ${check}); move ${path} aside, then re-run`
         : `re-run in a few seconds (another ${tool} is taking the lock); only if it is still refused and none is running `
-          + `(check: pgrep -f ${tool}), move ${path} aside` });
+          + `(check: ${check}), move ${path} aside` });
     }
     refuse('RELEASE_SWITCH_LOCK_FAILED');
   }

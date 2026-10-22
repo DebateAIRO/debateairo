@@ -1006,7 +1006,7 @@ describe('release-switch.mjs (root CLI)', () => {
       writeFileSync(lockPath, '2147483646\n');
       expect(JSON.parse((await cli(['stage', '--label', 'new-v1'], deps, {}, { ...layout, lockRoot: root })).stderr).fields).toEqual({
         holderPid: 2147483646, holderAlive: false,
-        next: `no release-switch.mjs is running (check: pgrep -f release-switch.mjs); move ${lockPath} aside, then re-run`
+        next: `no release-switch.mjs is running (check: pgrep -f '[r]elease-switch.mjs'); move ${lockPath} aside, then re-run`
       });
       expect(readFileSync(lockPath, 'utf8')).toBe('2147483646\n');
       // An empty file: another command has just created it and not yet written its pid. Never "move it aside" first.
@@ -1014,7 +1014,7 @@ describe('release-switch.mjs (root CLI)', () => {
       expect(JSON.parse((await cli(['stage', '--label', 'new-v1'], deps, {}, { ...layout, lockRoot: root })).stderr).fields).toEqual({
         holderPid: null, holderAlive: false,
         next: `re-run in a few seconds (another release-switch.mjs is taking the lock); only if it is still refused and none is `
-          + `running (check: pgrep -f release-switch.mjs), move ${lockPath} aside`
+          + `running (check: pgrep -f '[r]elease-switch.mjs'), move ${lockPath} aside`
       });
       expect(readFileSync(lockPath, 'utf8')).toBe('');
     } finally { rmSync(root, { recursive: true, force: true }); }

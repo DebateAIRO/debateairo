@@ -4151,11 +4151,13 @@ echo WB4_DONE
 ```
 
 A `release-switch.mjs` command that refuses `RELEASE_SWITCH_BUSY` with `holderAlive` false left its lock behind (an ssh
-drop). When no switch runs (`pgrep -f release-switch.mjs` prints nothing), move the lock aside and run the command
-again:
+drop). When no switch runs (`pgrep -f '[r]elease-switch.mjs'` prints nothing), move the lock aside and run the command
+again. The brackets keep the pattern from matching the shell that runs the line itself (run through `bash -c` or ssh,
+that shell's own command line holds the plain name, so a plain `pgrep -f release-switch.mjs` always finds a process and
+the lock would never move):
 
 ```sh
-pgrep -f release-switch.mjs || mv /etc/debateai-v3-preview/lifecycle/release-switch.lock "/root/preview-archive/release-switch.lock.stale-$(date -u +%Y%m%dT%H%M%SZ)"
+pgrep -f '[r]elease-switch.mjs' || mv /etc/debateai-v3-preview/lifecycle/release-switch.lock "/root/preview-archive/release-switch.lock.stale-$(date -u +%Y%m%dT%H%M%SZ)"
 ```
 
 ### Drained upload on the template layout
