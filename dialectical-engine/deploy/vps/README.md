@@ -810,10 +810,13 @@ release's instances are enabled, so only they start at boot.
 
 Before each start, root's release tool checks that the release may start, and after each API and
 runner stop it writes down what it saw (`ExecStartPre=` and `ExecStopPost=`, running
-`deploy/vps/release.mjs` from the operator checkout). That tool, with the commands this section
-names (`check`, `stage`, `switch`, `rollback`, `retire-request`, `retire-check`, `status`), is
-**built in the follow-up task D16b**, after the preview's switch and check tools. Until it is
-installed the application units refuse to start, and no step below that names it can be done.
+`deploy/vps/release.mjs` from the operator checkout). The same tool has the commands this section
+names (`check`, `stage`, `switch`, `rollback`, `retire-request`, `retire-check`, `status`); it runs
+the preview's own release tools with this server's units, slots and database, and reads each
+release's key and slot from its own overlay (`/etc/debateai/releases/<label>/api.env`). Run it as
+root: `release.mjs <command>` below is short for
+`/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /usr/bin/node /opt/debateai/dialectical-engine/deploy/vps/release.mjs <command>`.
+It prints one line: exit 0 done, 2 done but a later step (or the check's verdict) needs a look, 1 refused.
 
 The operator checkout serves every release (its `release.mjs`, `backup.sh`, `restore-drill.sh` and the billing
 tools), so move the operator checkout forward (`git -C /opt/debateai/dialectical-engine checkout` of a fetched
@@ -856,8 +859,8 @@ commands read the version the site runs.
 Install Hatchet's compose file first ("Side-by-side upgrades" below, "Hatchet's compose file").
 Then prepare the first release's folder and its overlays exactly as steps 1 to 3 of "Side-by-side
 upgrades" below say, with slot A (`ui=3001 api=8790`), run `label=$new` in your shell, and record
-it in the release table as staged with the release tool's `stage` (built in the follow-up task
-D16b), so its instances may start. Then install the units and start the first release:
+it in the release table as staged, so its instances may start: `release.mjs stage --label $label`.
+Then install the units and start the first release:
 
 ```sh
 install -m 0644 deploy/vps/systemd/*.service deploy/vps/systemd/*.timer /etc/systemd/system/
@@ -867,9 +870,10 @@ test -n "$label" && systemctl enable --now debateai-hatchet debateai-api@$label 
   debateai-backup.timer debateai-geoip-refresh.timer
 ```
 
-Then make it the current release with the release tool's `switch` (built in the follow-up task
-D16b; the first release has no older release, so no `--from`). The switch waits until Caddy sends
-traffic to the new pair, so it comes after the start, never before.
+Then make it the current release: `release.mjs switch --to $label` (the first release has no older
+release, so no `--from`). The switch waits until Caddy sends traffic to the new pair, so it comes
+after the start, never before; it then enables the release's three instances. If it exits 2, read
+its `bad` and run it again: a release the table already names current repeats only what follows.
 
 `debateai-observation-agent.service` is installed by the first line and deliberately **not**
 enabled by the fourth (§12). The first line also installs the root timers each release's
@@ -884,7 +888,9 @@ Floor shared by the three application units: `NoNewPrivileges=true`, `ProtectSys
 `ProtectHome=true`, `PrivateTmp=true`, `ProtectProc=invisible` + `ProcSubset=pid` (so the
 recipient address on the sendmail argv is not readable by other local uids — audit L7-F7),
 `CapabilityBoundingSet=`, `UMask=0077`, `RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6`,
-`SystemCallFilter=@system-service`, `TimeoutStopSec=30`, `Restart=on-failure`.
+`SystemCallFilter=@system-service`, `TimeoutStopSec=30`, `Restart=on-failure`. Two releases run at
+once during a drain, so each instance has its own memory ceiling, the preview's values:
+`MemoryMax=2G` for the API, `1G` for the website, `3G` for the runner.
 `MemoryDenyWriteExecute` is deliberately **not** set: it breaks the V8 JIT. `Restart=on-failure`
 is safe with two releases: a restarted API or runner starts again on its own release, from its own
 folder ("database ahead" start mode, side-by-side spec §4).
@@ -987,8 +993,8 @@ printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && printf 
   chgrp debateai-ui "/etc/debateai/releases/$new/ui.env" && ls -l "/etc/debateai/releases/$new"
 ```
 
-**4. The release check** (read-only): `release.mjs check --label $new` (built in the follow-up
-task D16b). It answers whether every migration is additive, whether the previous older release has
+**4. The release check** (read-only): `release.mjs check --label $new`. It compares the new
+release's folder with the current one's and answers whether every migration is additive, whether the previous older release has
 retired, whether there is enough connection, disk and memory headroom, whether Hatchet is healthy
 and whether any infrastructure maintenance is pending. Any no: stop here; nothing has changed.
 
@@ -1018,7 +1024,7 @@ carry it, so nothing is pinned in the base files before the switch (step 12). If
 and name the release again (a new label and key, step 1). Then close the window (§4 step 5).
 Running processes ignore the new version: each reads its own at start.
 
-**9. Stage it**: `release.mjs stage --label $new` (built in the follow-up task D16b) records the
+**9. Stage it**: `release.mjs stage --label $new` records the
 new release as staged, so its instances may start.
 
 **10. Start the new runner**, then check that its ready line names the new key:
@@ -1036,8 +1042,7 @@ printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && systemc
 test -n "$api" && curl -s "http://127.0.0.1:$api/readyz"
 ```
 
-**12. The switch**: `release.mjs switch --to $new --from $label` (built in the follow-up task
-D16b). In one database transaction it marks the new release current, with a "take traffic from"
+**12. The switch**: `release.mjs switch --to $new --from $label`. In one database transaction it marks the new release current, with a "take traffic from"
 time a few seconds ahead, and the older release draining, so the older pair turns not-ready at
 once and the new pair a few seconds later. It waits until Caddy sends traffic to the new pair
 (asked through `127.0.0.1:3090`, §6), stops the older API and website and records that, enables
@@ -1049,8 +1054,8 @@ the "current release" line above again: `$label` is now the new release, then se
 **13. Retirement and the receipt.** The older runner finishes its debates and retires by itself:
 it exits 0, root records the release `RETIRED` and disables its runner, and the backstop timer is
 turned off. The backstop (`RETIRE_REQUESTED`) and the 25-minute check run only if it is still
-running 7.5 hours after the switch. `release.mjs status` (built in the follow-up task D16b) shows
-each release's state and writes the receipt of the upgrade.
+running 7.5 hours after the switch. `release.mjs status` shows each release's state, units and
+open work: the older release `RETIRED`, with its three instances stopped, is the receipt of the upgrade.
 
 **14. The archive**, later and on the owner's yes: move the retired release's folder and overlays
 aside. Name it first (the line refuses the current release and a release with a running unit, and forgets a
@@ -1064,9 +1069,10 @@ read -r old && printf '%s\n' "$old" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9
 printf '%s\n' "$old" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && printf '%s\n' "$label" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && test "$old" != "$label" && install -d -m 0700 -o root -g root /opt/debateai/archive /opt/debateai/archive/etc && test ! -e "/opt/debateai/archive/$old" && test ! -e "/opt/debateai/archive/etc/$old" && mv /opt/debateai/releases/$old /opt/debateai/archive/ && mv /etc/debateai/releases/$old /opt/debateai/archive/etc/
 ```
 
-**Going back.** Before the switch: stop the new API and website, and the new runner (it has no
-debate yet); nothing user-facing changed. After the switch: `release.mjs rollback` (built in the
-follow-up task D16b) runs the same switch in the other direction. It starts the older runner
+**Going back.** Before the switch: `release.mjs rollback --before-switch --label $new` stops the
+new runner (it has no debate yet), API and website and records the new release retired, so the next
+release check does not wait for it; nothing user-facing changed. After the switch:
+`release.mjs rollback --to <older label> --from $label` runs the same switch in the other direction. It starts the older runner
 again first if it has retired, starts the older pair in the spare slot if it was stopped, and
 switches back; the new runner keeps finishing the debates it started. Restoring the online backup
 is a last resort only.

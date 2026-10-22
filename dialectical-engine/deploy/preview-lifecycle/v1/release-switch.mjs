@@ -22,6 +22,12 @@
 //   release-switch.mjs switch --finish --to <new> --from <old>
 //   release-switch.mjs rollback --to <older> --from <newer>
 //   release-switch.mjs rollback --before-switch --label <new>
+//   switch --to <first>      the public server's first release only (deploy/vps/release.mjs, bootMode 'enable')
+//
+// The same functions serve the public server (side-by-side plan D16b): deploy/vps/release.mjs calls them with
+// common.mjs's VPS_LAYOUT. Everything that differs between the two servers comes from the layout: where a release's
+// key and slot are read (release-info.mjs), the slots, the edge listener and Caddy's copy of the edge secret, the gates
+// (none there), the start lines, and what starts at boot (the preview's target drop-in, or enabled instances).
 //
 // One command at a time (D10 review): each takes ${lockRoot}/release-switch.lock (created exclusively, holding its pid,
 // removed when it ends); another command meanwhile refuses RELEASE_SWITCH_BUSY. A file left by a process that is gone
@@ -45,11 +51,10 @@ import { lstat, open, readFile, readdir, readlink, unlink } from 'node:fs/promis
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { withPrivateBytes } from '../../preview-auth-dev/v1/custody.mjs';
-import { PREVIEW_SLOTS } from '../../preview-auth-dev/v1/launch-plan.mjs';
 import { EDGE_LISTENER } from '../../preview-release/v1/caddy-slots.mjs';
 import { LAYOUT, RELEASE_LABEL, atomicWrite, ensureDirectory, logLine, runBounded, sha256, unitNameFor } from './common.mjs';
-import { readLock } from './prestart.mjs';
-import { GATES, disarmTimers as disarmRetireTimers, gateState } from './release-retire.mjs';
+import { releaseInfos, slotsOf } from './release-info.mjs';
+import { disarmTimers as disarmRetireTimers, gateState } from './release-retire.mjs';
 import { RELEASE_KEY_PATTERN, countOpenWork, readCurrentRelease, readReleaseEvents, readReleaseState, recordReleaseEvent, recordReleaseSwitch } from './release-table.mjs';
 
 /** Caddy's health_interval, the switch's take-traffic delay (two intervals + 1 s), the edge budget and the backstop. */
@@ -61,8 +66,18 @@ export const MAX_LABEL_LENGTH = 64;
 /** The rollback's waits: a runner's ready line (its prestart verifies first), then an API's (TimeoutStartSec=300 + 30 s). */
 export const RUNNER_START_WAIT_MS = 240_000, FRONT_START_WAIT_MS = 330_000;
 export const EDGE_URL = `http://${EDGE_LISTENER.bind}:${EDGE_LISTENER.port}/readyz`;
+/** The layout's edge readiness URL: its `edge` listener's /readyz, or the preview's (side-by-side plan D16b). */
+export const edgeUrlOf = layout => (layout.edge ? `${layout.edge}/readyz` : EDGE_URL);
 /** Caddy's copy of the edge secret (its health_headers send it); the website's /readyz answers only a request carrying it. */
 export const EDGE_SECRET_PATH = '/etc/debateai-v3-preview/ui-edge.caddy.secret';
+const edgeSecretPathOf = layout => layout.edgeSecretPath ?? EDGE_SECRET_PATH;
+/** The line a service prints once it is up and names its release (`<kind> {json}`): the layout's (common.mjs startedLines). */
+const startedLineOf = (layout, service) => layout.startedLines[service];
+/** The command the operator re-runs, named in a `next` hint: this file on the preview, release.mjs on the public server. */
+const toolOf = layout => layout.toolName ?? 'release-switch.mjs';
+/** Where the layout keeps the current release's pair at boot: 'target' (a drop-in, the preview) or 'enable' (instances). */
+const enablesUnits = layout => layout.bootMode === 'enable';
+const bootStepCode = layout => (enablesUnits(layout) ? 'BOOT' : 'TARGET');
 /** Written by the release check's maintenance gate (D11); while it exists no switch starts. */
 export const MAINTENANCE_PENDING_NAME = 'maintenance-pending';
 export const GATE_FILES_SCHEMA = 'preview-release-gate-files-v1';
@@ -137,10 +152,10 @@ export async function httpGet(url, { headers = {}, timeoutMs }) {
 }
 
 /** Caddy's copy of the edge secret: root-owned, 0600 or 0640 (group caddy), the website's own grammar. Never printed. */
-async function readEdgeSecret(uid) {
+async function readEdgeSecret(uid, path) {
   let text;
   try {
-    text = await withPrivateBytes(EDGE_SECRET_PATH, { root: dirname(EDGE_SECRET_PATH), uid, mode: [0o600, 0o640], maxBytes: 4096 }, raw => new TextDecoder('utf8', { fatal: true }).decode(raw).trim());
+    text = await withPrivateBytes(path, { root: dirname(path), uid, mode: [0o600, 0o640], maxBytes: 4096 }, raw => new TextDecoder('utf8', { fatal: true }).decode(raw).trim());
   } catch { refuse('EDGE_SECRET_UNREADABLE'); }
   return EDGE_SECRET_GRAMMAR.test(text) ? text : refuse('EDGE_SECRET_UNREADABLE');
 }
@@ -175,10 +190,10 @@ async function folderDigest(root) {
 }
 
 /**
- * Each gate's GO file and operator folder (file list and bytes) as sha256 digests, in GATES order. The switch saves them
- * (gateFilesPathFor) and the release check (D11) recomputes them with this same function. GATE_FILES_UNREADABLE otherwise.
+ * Each gate's GO file and operator folder (file list and bytes) as sha256 digests, in the layout's gate order. The switch
+ * saves them (gateFilesPathFor) and the release check (D11) recomputes them with this same function. GATE_FILES_UNREADABLE otherwise.
  */
-export async function gateFilesDigest(gates = GATES) {
+export async function gateFilesDigest(gates = LAYOUT.gates) {
   const digests = [];
   try {
     for (const gate of gates) digests.push(Object.freeze({ name: gate.name, goSha256: await fileDigest(gate.go), folderSha256: await folderDigest(gate.folder) }));
@@ -195,7 +210,8 @@ function withDefaults(layout, deps) {
     now: deps.now ?? Date.now,
     sleep: deps.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms))),
     httpGet: deps.httpGet ?? httpGet,
-    readLock: deps.readLock ?? readLock,
+    // Every release's key and slot (release-info.mjs: the lock on the preview, `deps.readLock` in tests; the overlays on the public server).
+    releases: () => releaseInfos({ layout, deps }),
     readCurrentRelease: deps.readCurrentRelease ?? (() => readCurrentRelease({ layout, run })),
     readReleaseState: deps.readReleaseState ?? (input => readReleaseState({ ...input, layout, run })),
     readReleaseEvents: deps.readReleaseEvents ?? (input => readReleaseEvents({ ...input, layout, run })),
@@ -203,9 +219,9 @@ function withDefaults(layout, deps) {
     recordReleaseSwitch: deps.recordReleaseSwitch ?? (input => recordReleaseSwitch({ ...input, layout, run })),
     recordReleaseEvent: deps.recordReleaseEvent ?? (input => recordReleaseEvent({ ...input, layout, run })),
     gateState: gate => gateState(gate, { run }),
-    gateFilesDigest: deps.gateFilesDigest ?? (() => gateFilesDigest(GATES)),
+    gateFilesDigest: deps.gateFilesDigest ?? (() => gateFilesDigest(layout.gates)),
     disarmTimers: ({ label }) => disarmRetireTimers({ label, layout, deps: { run } }),
-    readEdgeSecret: deps.readEdgeSecret ?? (() => readEdgeSecret(uid)),
+    readEdgeSecret: deps.readEdgeSecret ?? (() => readEdgeSecret(uid, edgeSecretPathOf(layout))),
     pathExists: deps.pathExists ?? pathExists,
     // A root-owned unit drop-in (0644) in a root-owned 0755 folder, replaced atomically (as release-retire.mjs writes them).
     writeUnitFile: deps.writeUnitFile ?? (async (path, text) => {
@@ -248,8 +264,9 @@ async function systemctl(args, layout, io) {
 }
 
 /**
- * The first `<kind> {json}` line of the unit's CURRENT invocation (PREVIEW_RUNNER_STARTED, PREVIEW_API_STARTED: the
- * launchers print it once, after readiness), or null. Oldest lines first and capped at 1 MiB: a long invocation's read
+ * The first `<kind> {json}` line of the unit's CURRENT invocation (the layout's startedLines: on the preview the
+ * launchers' PREVIEW_RUNNER_STARTED and PREVIEW_API_STARTED, printed once after readiness; on the public server the
+ * runner's own DEBATEAI_RUNNER_READY and the API's DEBATEAI_API_READY), or null. Oldest lines first and capped at 1 MiB: a long invocation's read
  * overflows the cap but still holds its start line, which comes within its first minutes.
  */
 async function startedEvent(unit, kind, layout, io) {
@@ -270,18 +287,18 @@ async function startedEvent(unit, kind, layout, io) {
 }
 
 /** One read of the edge listener. `failed`: Caddy answered itself (no website release header), or nothing answered. */
-async function readEdge(io) {
+async function readEdge(layout, io) {
   try {
-    const { status, release } = await io.httpGet(EDGE_URL, { headers: {}, timeoutMs: EDGE_REQUEST_TIMEOUT_MS });
+    const { status, release } = await io.httpGet(edgeUrlOf(layout), { headers: {}, timeoutMs: EDGE_REQUEST_TIMEOUT_MS });
     const named = typeof release === 'string' && RELEASE_KEY_PATTERN.test(release) ? release : null;
     return { failed: named === null, status, release: named };
   } catch { return { failed: true, status: null, release: null }; }
 }
 
 /** A slot's website /readyz, asked directly with the edge secret: { status, releaseKey, reasons } or null. */
-async function readWebsite(slot, secret, io) {
+async function readWebsite(slot, secret, layout, io) {
   try {
-    const { status, body } = await io.httpGet(`http://127.0.0.1:${PREVIEW_SLOTS[slot].uiPort}/readyz`, { headers: { 'x-debateai-edge-secret': secret }, timeoutMs: WEBSITE_TIMEOUT_MS });
+    const { status, body } = await io.httpGet(`http://127.0.0.1:${slotsOf(layout)[slot].uiPort}/readyz`, { headers: { 'x-debateai-edge-secret': secret }, timeoutMs: WEBSITE_TIMEOUT_MS });
     const parsed = JSON.parse(body);
     if (parsed === null || typeof parsed !== 'object' || typeof parsed.releaseKey !== 'string' || !Array.isArray(parsed.reasons) || !parsed.reasons.every(reason => typeof reason === 'string')) return null;
     return { status, releaseKey: parsed.releaseKey, reasons: parsed.reasons };
@@ -295,10 +312,10 @@ const waitingWebsite = (answer, key, allowed) => answer !== null && answer.statu
  * Poll the edge until EDGE_CONFIRMATIONS answers in a row are 200 from `key`'s website; null after EDGE_WAIT_MS. Every
  * edge failure on the way is counted in `tally` (controller ruling Q1).
  */
-async function confirmEdge(key, tally, io) {
+async function confirmEdge(key, tally, layout, io) {
   const startedAt = io.now();
   for (let inARow = 0; ;) {
-    const answer = await readEdge(io);
+    const answer = await readEdge(layout, io);
     if (answer.failed) tally.edgeFailures += 1;
     inARow = !answer.failed && answer.status === 200 && answer.release === key ? inARow + 1 : 0;
     if (inARow >= EDGE_CONFIRMATIONS) return io.now() - startedAt;
@@ -363,6 +380,18 @@ async function writeTarget(label, layout, io) {
   if (!await systemctl(['daemon-reload'], layout, io)) refuse('TARGET_FAILED');
 }
 
+/**
+ * What starts at boot from now on (side-by-side spec §10). The preview: the target's drop-in names `to`'s pair. The
+ * public server (bootMode 'enable'): `to`'s API, website and runner are enabled, and `from`'s API and website disabled;
+ * `from`'s runner stays enabled until its stop recorder sees it retired (release-retire.mjs). `from` null: nothing to
+ * disable (the first release). Both repeat safely.
+ */
+async function bootStep(to, from, layout, io) {
+  if (!enablesUnits(layout)) return writeTarget(to, layout, io);
+  if (!await systemctl(['enable', ...['api', 'ui', 'runner'].map(service => unitNameFor(layout, service, to))], layout, io)) refuse('BOOT_FAILED');
+  if (from !== null && !await systemctl(['disable', ...['api', 'ui'].map(service => unitNameFor(layout, service, from))], layout, io)) refuse('BOOT_FAILED');
+}
+
 /** Stop a release's website and API in one call; true when both read stopped afterwards. */
 async function stopPair(label, layout, io) {
   const units = [unitNameFor(layout, 'ui', label), unitNameFor(layout, 'api', label)];
@@ -380,8 +409,8 @@ async function recordPairStopped(releaseKey, recordedBy, io) {
 
 /** Every read-only condition of the switch (spec §6); SWITCH_PRECONDITION_FAILED names each one that fails. */
 async function preconditions({ to, from, oldPairStopped, rollback, layout, io }) {
-  const { lock } = await io.readLock(layout);
-  const toRelease = own(lock.releases, to), fromRelease = own(lock.releases, from);
+  const releases = await io.releases();
+  const toRelease = own(releases, to), fromRelease = own(releases, from);
   const fields = [];
   if (!toRelease) fields.push('to');
   if (!fromRelease) fields.push('from');
@@ -392,8 +421,8 @@ async function preconditions({ to, from, oldPairStopped, rollback, layout, io })
   if ((await io.readReleaseState({ releaseKey: toKey })).state !== 'STAGED') fields.push('state');
   // At most two releases are live (0123): another pinned release that still drains (DRAINING, or staged again while it
   // still drains) would make the database refuse RELEASE_SWITCH_CONFLICT; name it here instead (D10 review).
-  for (const other of Object.keys(lock.releases).filter(label => label !== to && label !== from)) {
-    const otherKey = lock.releases[other].releaseKey;
+  for (const other of Object.keys(releases).filter(label => label !== to && label !== from)) {
+    const otherKey = releases[other].releaseKey;
     const { state } = await io.readReleaseState({ releaseKey: otherKey });
     if (state === 'DRAINING' || (state === 'STAGED' && stillDrains(await io.readReleaseEvents({ releaseKey: otherKey })))) { fields.push('otherDraining'); break; }
   }
@@ -405,19 +434,19 @@ async function preconditions({ to, from, oldPairStopped, rollback, layout, io })
   if (runnerActive) {
     // A new release's runner re-sends nothing at its start (no work carries its key yet). In a rollback the older
     // runner may have restarted in database-ahead mode and re-sent its own lapsed work: any count is fine there.
-    const started = await startedEvent(unitNameFor(layout, 'runner', to), 'PREVIEW_RUNNER_STARTED', layout, io);
+    const started = await startedEvent(unitNameFor(layout, 'runner', to), startedLineOf(layout, 'runner'), layout, io);
     const dispatched = started?.startupDispatched;
     if (started?.releaseKey !== toKey || !Number.isSafeInteger(dispatched) || (rollback ? dispatched < 0 : dispatched !== 0)) fields.push('runnerStarted');
   }
   let secret = null;
   try { secret = await io.readEdgeSecret(); } catch { fields.push('edgeSecret'); }
-  if (secret !== null && !waitingWebsite(await readWebsite(toRelease.slot, secret, io), toKey, WAITING_REASONS)) fields.push('website');
+  if (secret !== null && !waitingWebsite(await readWebsite(toRelease.slot, secret, layout, io), toKey, WAITING_REASONS)) fields.push('website');
   if (!oldPairStopped) {
-    const edge = await readEdge(io);
+    const edge = await readEdge(layout, io);
     if (edge.failed || edge.status !== 200 || edge.release !== fromKey) fields.push('edge');
   }
   let gatesActive = true;
-  for (const gate of GATES) if (await io.gateState(gate) !== 'active') gatesActive = false;
+  for (const gate of layout.gates) if (await io.gateState(gate) !== 'active') gatesActive = false;
   if (!gatesActive) fields.push('gates');
   if (await io.pathExists(`${layout.lockRoot}/${MAINTENANCE_PENDING_NAME}`)) fields.push('maintenance');
   if (fields.length) refuse('SWITCH_PRECONDITION_FAILED', fields);
@@ -443,7 +472,7 @@ async function revert({ to, toKey, fromKey, recordedBy, tally, layout, io }) {
     const current = await io.readCurrentRelease();
     if (current?.releaseKey === fromKey) backstopAt = await armBackstop(to, Date.parse(current.takeTrafficFrom) - TAKE_TRAFFIC_AFTER_S * 1000 + BACKSTOP_S * 1000, layout, io);
   } catch { /* reported as backstopAt null */ }
-  if (await confirmEdge(fromKey, tally, io) === null) refuse('SWITCH_REVERT_UNCONFIRMED', { edgeFailures: tally.edgeFailures, backstopAt });
+  if (await confirmEdge(fromKey, tally, layout, io) === null) refuse('SWITCH_REVERT_UNCONFIRMED', { edgeFailures: tally.edgeFailures, backstopAt });
   refuse('SWITCH_REVERTED', { reason: 'EDGE_NOT_CONFIRMED', edgeFailures: tally.edgeFailures, backstopAt });
 }
 
@@ -472,8 +501,10 @@ async function afterWrite({ to, from, toKey, fromKey, recordedBy, tally, keepGat
     backstopAt = await armBackstop(from, Date.parse(current.takeTrafficFrom) - TAKE_TRAFFIC_AFTER_S * 1000 + BACKSTOP_S * 1000, layout, io);
     return true;
   });
-  await step('TARGET', () => writeTarget(to, layout, io));
+  await step(bootStepCode(layout), () => bootStep(to, from, layout, io));
   await step('GATE_FILES', async () => {
+    // No gates (the public server): nothing to keep for the release check, which then has none to compare either.
+    if (layout.gates.length === 0) return;
     const path = gateFilesPathFor(layout, toKey);
     if (keepGateFiles && await io.pathExists(path)) return;
     const gates = await io.gateFilesDigest();
@@ -483,9 +514,9 @@ async function afterWrite({ to, from, toKey, fromKey, recordedBy, tally, keepGat
   await step('RUNNER_FROM', async () => await unitState(unitNameFor(layout, 'runner', from), layout, io) === 'active'
     || (await io.readReleaseState({ releaseKey: fromKey })).state === 'RETIRED');
   await step('RUNNER_TO', async () => await unitState(unitNameFor(layout, 'runner', to), layout, io) === 'active');
-  for (const gate of GATES) await step(`GATE_${gate.name.toUpperCase()}`, async () => await io.gateState(gate) === 'active');
+  for (const gate of layout.gates) await step(`GATE_${gate.name.toUpperCase()}`, async () => await io.gateState(gate) === 'active');
   await step('EDGE_AFTER_STOP', async () => {
-    const answer = await readEdge(io);
+    const answer = await readEdge(layout, io);
     if (answer.failed) tally.edgeFailures += 1;
     return !answer.failed && answer.status === 200 && answer.release === toKey;
   });
@@ -506,11 +537,11 @@ async function runSwitch({ to, from, oldPairStopped, rollback, layout, io }) {
   try {
     await recordSwitch(io, { newKey: toKey, expectedCurrentKey: fromKey, seconds: TAKE_TRAFFIC_AFTER_S, recordedBy });
   } catch (error) {
-    if (error?.code === 'SWITCH_OUTCOME_UNKNOWN') refuse('SWITCH_OUTCOME_UNKNOWN', { next: `if the release table names ${toKey} current: release-switch.mjs switch --finish --to ${to} --from ${from}` });
+    if (error?.code === 'SWITCH_OUTCOME_UNKNOWN') refuse('SWITCH_OUTCOME_UNKNOWN', { next: `if the release table names ${toKey} current: ${toolOf(layout)} switch --finish --to ${to} --from ${from}` });
     throw error;
   }
   const switchedAt = new Date(io.now()).toISOString();
-  const edgeConfirmedMs = await confirmEdge(toKey, tally, io);
+  const edgeConfirmedMs = await confirmEdge(toKey, tally, layout, io);
   if (edgeConfirmedMs === null) await revert({ to, toKey, fromKey, recordedBy, tally, layout, io });
   const { backstopAt, bad } = await afterWrite({ to, from, toKey, fromKey, recordedBy, tally, keepGateFiles: false, layout, io });
   return Object.freeze({ event: 'PREVIEW_RELEASE_SWITCHED', to, from, toKey, fromKey, switchedAt, edgeConfirmedMs, edgeFailures: tally.edgeFailures, backstopAt, bad });
@@ -526,8 +557,8 @@ export async function finishSwitch({ to, from, layout = LAYOUT, deps = {} }) {
   requireLabel(to); requireLabel(from);
   if (to === from) refuse('FINISH_PRECONDITION_FAILED', ['labels']);
   const io = withDefaults(layout, deps);
-  const { lock } = await io.readLock(layout);
-  const toRelease = own(lock.releases, to), fromRelease = own(lock.releases, from);
+  const releases = await io.releases();
+  const toRelease = own(releases, to), fromRelease = own(releases, from);
   const fields = [];
   if (!toRelease) fields.push('to');
   if (!fromRelease) fields.push('from');
@@ -539,7 +570,7 @@ export async function finishSwitch({ to, from, layout = LAYOUT, deps = {} }) {
   if (state !== 'DRAINING' && state !== 'RETIRED') fields.push('state');
   if (fields.length) refuse('FINISH_PRECONDITION_FAILED', fields);
   const tally = { edgeFailures: 0 };
-  const edgeConfirmedMs = await confirmEdge(toKey, tally, io);
+  const edgeConfirmedMs = await confirmEdge(toKey, tally, layout, io);
   if (edgeConfirmedMs === null) refuse('FINISH_EDGE_UNCONFIRMED', { edgeFailures: tally.edgeFailures });
   const { backstopAt, bad } = await afterWrite({ to, from, toKey, fromKey, recordedBy: RECORDED_BY, tally, keepGateFiles: true, layout, io });
   return Object.freeze({ event: 'PREVIEW_RELEASE_SWITCH_FINISHED', to, from, toKey, fromKey, edgeConfirmedMs, edgeFailures: tally.edgeFailures, backstopAt, bad });
@@ -550,11 +581,72 @@ export async function switchRelease({ to, from, oldPairStopped = false, layout =
   return runSwitch({ to, from, oldPairStopped: oldPairStopped === true, rollback: false, layout, io: withDefaults(layout, deps) });
 }
 
-/** The pinned release of a label, from root's lock. */
+/**
+ * The first release of a server that starts the current release by enabled instances (bootMode 'enable', the public
+ * server; deploy/vps/README.md §5 "The first release": stage, then install and `enable --now` its units, then this).
+ * There is no older release: nothing is stopped, nothing drains, no backstop. Read-only preconditions first
+ * (SWITCH_PRECONDITION_FAILED names each one): no current release yet; `to` STAGED; its runner, API and website active;
+ * its runner's start line names its key with nothing re-sent; its website up but not ready only because it is not
+ * current; no gate off; no maintenance pending. Then the one database write (no expected current; traffic from the
+ * database clock + 5 s), then the edge must show `to` three times in a row, then its three instances are enabled.
+ * Caddy answers by itself until the new pair is ready (nothing served before), so those answers are counted in
+ * `edgeFailures` but are not a fault here; an edge that never shows `to` is EDGE_NOT_CONFIRMED in `bad`, and every
+ * later step still runs (there is nothing to revert to). Run again after a write whose outcome was unknown, or after a
+ * `bad`: a release the table already names current skips the write and repeats the steps after it.
+ */
+export async function firstSwitchRelease({ to, layout = LAYOUT, deps = {} }) {
+  requireLabel(to);
+  if (!enablesUnits(layout)) refuse('ARGUMENTS_REFUSED');
+  const io = withDefaults(layout, deps);
+  const toRelease = own(await io.releases(), to) ?? refuse('SWITCH_PRECONDITION_FAILED', ['to']);
+  const toKey = toRelease.releaseKey;
+  const current = await io.readCurrentRelease();
+  const again = current?.releaseKey === toKey;
+  const fields = [];
+  if (current !== null && !again) fields.push('current');
+  if (!again && (await io.readReleaseState({ releaseKey: toKey })).state !== 'STAGED') fields.push('state');
+  const runnerActive = await unitState(unitNameFor(layout, 'runner', to), layout, io) === 'active';
+  if (!runnerActive) fields.push('runner');
+  for (const service of ['api', 'ui']) if (await unitState(unitNameFor(layout, service, to), layout, io) !== 'active') fields.push(service);
+  if (runnerActive) {
+    // A runner restarted after the write may have re-sent work admitted since: any count is fine on a run again.
+    const started = await startedEvent(unitNameFor(layout, 'runner', to), startedLineOf(layout, 'runner'), layout, io);
+    const dispatched = started?.startupDispatched;
+    if (started?.releaseKey !== toKey || !Number.isSafeInteger(dispatched) || (again ? dispatched < 0 : dispatched !== 0)) fields.push('runnerStarted');
+  }
+  if (!again) {
+    let secret = null;
+    try { secret = await io.readEdgeSecret(); } catch { fields.push('edgeSecret'); }
+    if (secret !== null && !waitingWebsite(await readWebsite(toRelease.slot, secret, layout, io), toKey, WAITING_REASONS)) fields.push('website');
+  }
+  let gatesActive = true;
+  for (const gate of layout.gates) if (await io.gateState(gate) !== 'active') gatesActive = false;
+  if (!gatesActive) fields.push('gates');
+  if (await io.pathExists(`${layout.lockRoot}/${MAINTENANCE_PENDING_NAME}`)) fields.push('maintenance');
+  if (fields.length) refuse('SWITCH_PRECONDITION_FAILED', fields);
+  if (!again) {
+    try {
+      await recordSwitch(io, { newKey: toKey, expectedCurrentKey: null, seconds: TAKE_TRAFFIC_AFTER_S, recordedBy: RECORDED_BY });
+    } catch (error) {
+      if (error?.code === 'SWITCH_OUTCOME_UNKNOWN') refuse('SWITCH_OUTCOME_UNKNOWN', { next: `if the release table names ${toKey} current: ${toolOf(layout)} switch --to ${to} (again)` });
+      throw error;
+    }
+  }
+  const tally = { edgeFailures: 0 };
+  const edgeConfirmedMs = await confirmEdge(toKey, tally, layout, io);
+  const bad = [];
+  if (edgeConfirmedMs === null) bad.push('EDGE_NOT_CONFIRMED');
+  const step = async (code, body) => { try { if (await body() === false) bad.push(code); } catch { bad.push(code); } };
+  await step(bootStepCode(layout), () => bootStep(to, null, layout, io));
+  await step('RUNNER_TO', async () => await unitState(unitNameFor(layout, 'runner', to), layout, io) === 'active');
+  for (const gate of layout.gates) await step(`GATE_${gate.name.toUpperCase()}`, async () => await io.gateState(gate) === 'active');
+  return Object.freeze({ event: 'PREVIEW_RELEASE_FIRST_SWITCHED', to, toKey, recorded: !again, edgeConfirmedMs, edgeFailures: tally.edgeFailures, bad: Object.freeze(bad) });
+}
+
+/** The release of a label (release-info.mjs): RELEASE_LOCK_RELEASE_MISSING when the server does not know it. */
 async function pinned(label, layout, io) {
   requireLabel(label);
-  const { lock } = await io.readLock(layout);
-  return own(lock.releases, label) ?? refuse('RELEASE_LOCK_RELEASE_MISSING');
+  return own(await io.releases(), label) ?? refuse('RELEASE_LOCK_RELEASE_MISSING');
 }
 
 /** Record a new release as STAGED (before its units start: prestart starts only a STAGED or CURRENT release). Once only. */
@@ -585,7 +677,7 @@ export async function seedRelease({ label, layout = LAYOUT, deps = {} }) {
   else if (state !== 'STAGED') refuse('SEED_REFUSED', ['state']);
   await recordSwitch(io, { newKey: releaseKey, expectedCurrentKey: null, seconds: 0, recordedBy: RECORDED_BY });
   const bad = [];
-  try { await writeTarget(label, layout, io); } catch { bad.push('TARGET'); }
+  try { await bootStep(label, null, layout, io); } catch { bad.push(bootStepCode(layout)); }
   const current = await io.readCurrentRelease().catch(() => null);
   return Object.freeze({ event: 'PREVIEW_RELEASE_SEEDED', label, releaseKey, takeTrafficFrom: current?.releaseKey === releaseKey ? current.takeTrafficFrom : null, bad: Object.freeze(bad) });
 }
@@ -614,8 +706,8 @@ async function waitUntilReady({ unit, ready, waitMs, code, layout, io }) {
 async function rollbackAfterSwitch({ to, from, layout, io }) {
   requireLabel(to); requireLabel(from);
   if (to === from) refuse('ROLLBACK_PRECONDITION_FAILED', ['labels']);
-  const { lock } = await io.readLock(layout);
-  const toRelease = own(lock.releases, to), fromRelease = own(lock.releases, from);
+  const releases = await io.releases();
+  const toRelease = own(releases, to), fromRelease = own(releases, from);
   const fields = [];
   if (!toRelease) fields.push('to');
   if (!fromRelease) fields.push('from');
@@ -628,7 +720,7 @@ async function rollbackAfterSwitch({ to, from, layout, io }) {
   const restaged = state === 'STAGED' && (await io.readReleaseEvents({ releaseKey: toKey })).some(event => event.kind === 'DRAINING');
   if (state !== 'DRAINING' && state !== 'RETIRED' && !restaged) fields.push('state');
   let gatesActive = true;
-  for (const gate of GATES) if (await io.gateState(gate) !== 'active') gatesActive = false;
+  for (const gate of layout.gates) if (await io.gateState(gate) !== 'active') gatesActive = false;
   if (!gatesActive) fields.push('gates');
   if (await io.pathExists(`${layout.lockRoot}/${MAINTENANCE_PENDING_NAME}`)) fields.push('maintenance');
   if (fields.length) refuse('ROLLBACK_PRECONDITION_FAILED', fields);
@@ -647,12 +739,12 @@ async function rollbackAfterSwitch({ to, from, layout, io }) {
     started.push(service);
   };
   const announced = (service, kind) => async () => (await startedEvent(unit(service), kind, layout, io))?.releaseKey === toKey;
-  await start('runner', announced('runner', 'PREVIEW_RUNNER_STARTED'), RUNNER_START_WAIT_MS, 'ROLLBACK_RUNNER_NOT_STARTED');
-  await start('api', announced('api', 'PREVIEW_API_STARTED'), FRONT_START_WAIT_MS, 'ROLLBACK_API_NOT_STARTED');
+  await start('runner', announced('runner', startedLineOf(layout, 'runner')), RUNNER_START_WAIT_MS, 'ROLLBACK_RUNNER_NOT_STARTED');
+  await start('api', announced('api', startedLineOf(layout, 'api')), FRONT_START_WAIT_MS, 'ROLLBACK_API_NOT_STARTED');
   await start('ui', async () => {
     let secret;
     try { secret = await io.readEdgeSecret(); } catch { return false; }
-    return waitingWebsite(await readWebsite(toRelease.slot, secret, io), toKey, ['NOT_CURRENT']);
+    return waitingWebsite(await readWebsite(toRelease.slot, secret, layout, io), toKey, ['NOT_CURRENT']);
   }, FRONT_START_WAIT_MS, 'ROLLBACK_UI_NOT_READY');
   const result = await runSwitch({ to, from, oldPairStopped: false, rollback: true, layout, io });
   return Object.freeze({ ...result, event: 'PREVIEW_RELEASE_ROLLED_BACK', started: Object.freeze(started) });
@@ -692,7 +784,9 @@ async function rollbackBeforeSwitch({ label, layout, io }) {
   if (!await systemctl(['stop', ...units], layout, io)) refuse('ROLLBACK_STOP_FAILED');
   for (const unit of units) if (!STOPPED.includes(await unitState(unit, layout, io))) refuse('ROLLBACK_STOP_FAILED');
   await recordEvent(io, { releaseKey, kind: 'RETIRED', recordedBy: ROLLBACK_BY, reason: 'NOT_SWITCHED', written: after => after.state === 'RETIRED' });
-  return Object.freeze({ event: 'PREVIEW_RELEASE_ROLLED_BACK', beforeSwitch: true, label, releaseKey, outcome: 'RETIRED', backstopAt: null, bad: Object.freeze([]) });
+  // A retired release never starts at boot (bootMode 'enable': a first release's instances were enabled before its switch).
+  const bad = enablesUnits(layout) && !await systemctl(['disable', ...units], layout, io) ? ['BOOT'] : [];
+  return Object.freeze({ event: 'PREVIEW_RELEASE_ROLLED_BACK', beforeSwitch: true, label, releaseKey, outcome: 'RETIRED', backstopAt: null, bad: Object.freeze(bad) });
 }
 
 /**
@@ -709,12 +803,17 @@ export async function rollbackRelease({ to, from, beforeSwitch = false, layout =
   return rollbackAfterSwitch({ to, from, layout, io });
 }
 
-/** Exact argv shapes only; anything that is not a release label refuses before a path, unit or row is touched. */
-function parseArguments(argv) {
+/**
+ * Exact argv shapes only; anything that is not a release label refuses before a path, unit or row is touched. The
+ * first release's `switch --to <label>` (no `--from`) is a shape only where the layout enables instances (the public
+ * server); the preview's first release is its transition's `seed`.
+ */
+function parseArguments(argv, layout) {
   const [a, b, c, d, e, f] = argv;
   const n = argv.length;
   const isLabel = value => typeof value === 'string' && RELEASE_LABEL.test(value);
   if (n === 3 && (a === 'stage' || a === 'seed') && b === '--label' && isLabel(c)) return { command: a, label: c };
+  if (n === 3 && a === 'switch' && b === '--to' && isLabel(c) && enablesUnits(layout)) return { command: 'switch', to: c, first: true };
   if ((n === 5 || (n === 6 && f === '--old-pair-stopped')) && a === 'switch' && b === '--to' && isLabel(c) && d === '--from' && isLabel(e)) return { command: 'switch', to: c, from: e, oldPairStopped: n === 6 };
   if (n === 6 && a === 'switch' && b === '--finish' && c === '--to' && isLabel(d) && e === '--from' && isLabel(f)) return { command: 'switch', to: d, from: f, finish: true };
   if (n === 5 && a === 'rollback' && b === '--to' && isLabel(c) && d === '--from' && isLabel(e)) return { command: 'rollback', to: c, from: e };
@@ -724,7 +823,8 @@ function parseArguments(argv) {
 const COMMANDS = Object.freeze({
   stage: (args, layout, deps) => stageRelease({ label: args.label, layout, deps }),
   seed: (args, layout, deps) => seedRelease({ label: args.label, layout, deps }),
-  switch: (args, layout, deps) => (args.finish ? finishSwitch({ to: args.to, from: args.from, layout, deps }) : switchRelease({ to: args.to, from: args.from, oldPairStopped: args.oldPairStopped, layout, deps })),
+  switch: (args, layout, deps) => (args.first ? firstSwitchRelease({ to: args.to, layout, deps })
+    : args.finish ? finishSwitch({ to: args.to, from: args.from, layout, deps }) : switchRelease({ to: args.to, from: args.from, oldPairStopped: args.oldPairStopped, layout, deps })),
   rollback: (args, layout, deps) => (args.beforeSwitch ? rollbackRelease({ from: args.label, beforeSwitch: true, layout, deps }) : rollbackRelease({ to: args.to, from: args.from, layout, deps }))
 });
 const FAILED_EVENT = Object.freeze({ stage: 'PREVIEW_RELEASE_STAGE_REFUSED', seed: 'PREVIEW_RELEASE_SEED_REFUSED', switch: 'PREVIEW_RELEASE_SWITCH_REFUSED', rollback: 'PREVIEW_RELEASE_ROLLBACK_REFUSED' });
@@ -746,7 +846,7 @@ async function lockHolder(path) {
  * A file whose holder is gone (an ssh drop skips the release, often right when the operator needs `switch --finish`)
  * is still refused, with `next`: how to clear it (D10 re-review).
  */
-export async function acquireSwitchLock(path) {
+export async function acquireSwitchLock(path, tool = 'release-switch.mjs') {
   let handle;
   try {
     handle = await open(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
@@ -754,7 +854,7 @@ export async function acquireSwitchLock(path) {
     if (error?.code === 'EEXIST') {
       const holder = await lockHolder(path);
       refuse('RELEASE_SWITCH_BUSY', holder.holderAlive ? holder
-        : { ...holder, next: `no release-switch.mjs is running (check: pgrep -f release-switch.mjs); move ${path} aside, then re-run` });
+        : { ...holder, next: `no ${tool} is running (check: pgrep -f ${tool}); move ${path} aside, then re-run` });
     }
     refuse('RELEASE_SWITCH_LOCK_FAILED');
   }
@@ -775,9 +875,9 @@ export async function acquireSwitchLock(path) {
 export async function main(argv, { platform = process.platform, uid = process.getuid?.(), layout = LAYOUT, deps = {}, stdout = process.stdout, stderr = process.stderr } = {}) {
   let args = null;
   try {
-    args = parseArguments(argv);
+    args = parseArguments(argv, layout);
     if (platform !== 'linux' || uid !== 0) refuse('ACTOR_REFUSED');
-    const release = await (deps.acquireLock ?? acquireSwitchLock)(`${layout.lockRoot}/${SWITCH_LOCK_NAME}`);
+    const release = await (deps.acquireLock ?? acquireSwitchLock)(`${layout.lockRoot}/${SWITCH_LOCK_NAME}`, toolOf(layout));
     let result;
     try { result = await COMMANDS[args.command](args, layout, deps); } finally { await release(); }
     logLine(stdout, result);

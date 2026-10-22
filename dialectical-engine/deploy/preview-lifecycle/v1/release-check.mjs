@@ -28,11 +28,11 @@ import { connect } from 'node:net';
 import { basename, dirname, isAbsolute, join, normalize } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { strictJson, withPrivateBytes } from '../../preview-auth-dev/v1/custody.mjs';
-import { PREVIEW_SLOTS, labelOfSourceRoot, parsePublicArtifactBytes } from '../../preview-auth-dev/v1/launch-plan.mjs';
+import { labelOfSourceRoot, parsePublicArtifactBytes } from '../../preview-auth-dev/v1/launch-plan.mjs';
 import { LAYOUT, RELEASE_LABEL, canonicalJson, logLine, runBounded, sha256, unitNameFor } from './common.mjs';
 import { addedMigrations, n1Headers } from './migration-steps.mjs';
-import { readLock } from './prestart.mjs';
-import { GATES, gateState, retiredLinesFound } from './release-retire.mjs';
+import { releaseInfo, releaseInfos, slotsOf } from './release-info.mjs';
+import { gateState, retiredLinesFound } from './release-retire.mjs';
 import { GATE_FILES_SCHEMA, MAINTENANCE_PENDING_NAME, MAX_LABEL_LENGTH, gateFilesDigest, gateFilesPathFor } from './release-switch.mjs';
 import { countOpenWork, psqlArgv, readCurrentRelease, readReleaseEvents, readReleaseState } from './release-table.mjs';
 
@@ -49,6 +49,8 @@ export const REBOOT_REQUIRED_PATH = '/run/reboot-required';
  * preview-release/ too: release-switch.mjs imports caddy-slots.mjs from it (controller ruling on D11).
  */
 export const LIFECYCLE_FOLDERS = Object.freeze(['dialectical-engine/deploy/preview-lifecycle/', 'dialectical-engine/deploy/preview-auth-dev/', 'dialectical-engine/deploy/preview-release/']);
+/** The preview's two Hatchet units; a layout names its own (`hatchetUnits`: the public server runs one). */
+export const HATCHET_UNITS = Object.freeze(['hatchet.service', 'hatchet-gateway.service']);
 export const RECEIPT_SCHEMA = 'preview-release-retirement-receipt-v1';
 const HASH = /^[a-f0-9]{64}$/;
 const UNIT_STATES = Object.freeze(['active', 'reloading', 'inactive', 'failed', 'activating', 'deactivating', 'maintenance', 'refreshing']);
@@ -123,13 +125,15 @@ function withDefaults(layout, deps) {
   return {
     run, uid, gid,
     now: deps.now ?? Date.now,
-    readLock: deps.readLock ?? readLock,
+    // Every release's key and slot, and one release's (release-info.mjs: the lock on the preview, `deps.readLock` in tests).
+    releases: () => releaseInfos({ layout, deps }),
+    releaseInfo: label => releaseInfo({ label, layout, deps }),
     readCurrentRelease: deps.readCurrentRelease ?? (() => readCurrentRelease({ layout, run })),
     readReleaseState: deps.readReleaseState ?? (input => readReleaseState({ ...input, layout, run })),
     readReleaseEvents: deps.readReleaseEvents ?? (input => readReleaseEvents({ ...input, layout, run })),
     countOpenWork: deps.countOpenWork ?? (input => countOpenWork({ ...input, layout, run })),
     gateState: deps.gateState ?? (gate => gateState(gate, { run })),
-    gateFilesDigest: deps.gateFilesDigest ?? (() => gateFilesDigest(GATES)),
+    gateFilesDigest: deps.gateFilesDigest ?? (() => gateFilesDigest(layout.gates)),
     // The switch's own copy (0600 in root's 0700 state folder); none yet before the first switch on this layout.
     readGateSnapshot: deps.readGateSnapshot ?? (async path => {
       if (!await pathExists(path)) return null;
@@ -213,17 +217,26 @@ async function unitState(unit, layout, io) {
   return UNIT_STATES.includes(state) ? state : refuse('UNIT_STATE_UNREADABLE');
 }
 
-/** A candidate API source manifest: the files list and the API folder of one release; its label. */
-function manifestLabel(manifest, code) {
+/**
+ * A source manifest: the files list and the folder of one release; its label. The preview's is a candidate API source
+ * manifest (its API folder names the label); the public server's names the release folder itself,
+ * `<layout.releasesRoot>/<label>` (deploy/vps/release.mjs builds it from that folder).
+ */
+function manifestLabel(manifest, code, layout) {
   if (manifest === null || typeof manifest !== 'object' || !Array.isArray(manifest.files)) refuse(code);
+  if (layout.releaseSource === 'overlay') {
+    const prefix = `${layout.releasesRoot}/`;
+    const label = typeof manifest.sourceRoot === 'string' && manifest.sourceRoot.startsWith(prefix) ? manifest.sourceRoot.slice(prefix.length) : '';
+    return isLabel(label) ? label : refuse(code);
+  }
   try { return labelOfSourceRoot(manifest.sourceRoot, 'api'); } catch { return refuse(code); }
 }
 
 /** Every file row under the operator folders, by path, as comparable text. */
-function lifecycleRows(manifest) {
+function lifecycleRows(manifest, folders) {
   const rows = new Map();
   for (const row of manifest.files) {
-    if (row !== null && typeof row === 'object' && typeof row.path === 'string' && LIFECYCLE_FOLDERS.some(folder => row.path.startsWith(folder))) rows.set(row.path, canonicalJson(row));
+    if (row !== null && typeof row === 'object' && typeof row.path === 'string' && folders.some(folder => row.path.startsWith(folder))) rows.set(row.path, canonicalJson(row));
   }
   return rows;
 }
@@ -264,51 +277,57 @@ async function stepsWithoutN1(added, newerManifest, io) {
 export async function releaseCheck({ label, olderManifest, newerManifest, gateRowsReviewed = null, lifecycleReviewed = false, layout = LAYOUT, deps = {} }) {
   requireLabel(label);
   if ((gateRowsReviewed !== null && (typeof gateRowsReviewed !== 'string' || !HASH.test(gateRowsReviewed))) || typeof lifecycleReviewed !== 'boolean') refuse('ARGUMENTS_REFUSED');
-  if (manifestLabel(newerManifest, 'NEWER_MANIFEST_REFUSED') !== label) refuse('NEWER_MANIFEST_REFUSED');
-  if (manifestLabel(olderManifest, 'OLDER_MANIFEST_REFUSED') === label) refuse('OLDER_MANIFEST_REFUSED');
+  if (manifestLabel(newerManifest, 'NEWER_MANIFEST_REFUSED', layout) !== label) refuse('NEWER_MANIFEST_REFUSED');
+  if (manifestLabel(olderManifest, 'OLDER_MANIFEST_REFUSED', layout) === label) refuse('OLDER_MANIFEST_REFUSED');
   const io = withDefaults(layout, deps);
   const added = addedMigrations(olderManifest, newerManifest);
   const withoutN1 = await stepsWithoutN1(added, newerManifest, io);
 
   // Shared reads: each check that needs one fails with its code when it cannot be read.
-  const lockRead = io.readLock(layout).then(({ lock }) => lock);
+  const releasesRead = io.releases();
   const currentRead = io.readCurrentRelease();
-  lockRead.catch(() => undefined); currentRead.catch(() => undefined);
+  releasesRead.catch(() => undefined); currentRead.catch(() => undefined);
   const currentLabel = async () => {
-    const [lock, current] = [await lockRead, await currentRead];
+    const [releases, current] = [await releasesRead, await currentRead];
     if (current === null) refuse('NO_CURRENT_RELEASE');
-    const labels = Object.keys(lock.releases).filter(name => lock.releases[name].releaseKey === current.releaseKey);
-    return labels.length === 1 ? { lock, current, label: labels[0] } : refuse('CURRENT_NOT_PINNED');
+    const labels = Object.keys(releases).filter(name => releases[name].releaseKey === current.releaseKey);
+    return labels.length === 1 ? { releases, current, label: labels[0] } : refuse('CURRENT_NOT_PINNED');
   };
 
   const bodies = {
     N1_HEADERS: async () => (withoutN1.length ? miss(withoutN1.join(', ')) : pass(added.length ? `new: ${added.map(step => step.name).join(', ')}` : 'no new migrations')),
-    // The current release is pinned, and the older manifest is its own API source manifest (the lock holds that digest).
+    // The current release is pinned, and the older manifest is its own: the lock holds its API source manifest's digest
+    // (preview); on the public server the manifest names the current release's own folder.
     CURRENT_PINNED: async () => {
-      const { lock, label: older } = await currentLabel();
+      const { releases, label: older } = await currentLabel();
       if (older === label) return miss('LABEL_IS_CURRENT');
-      return own(lock.releases[older].services, 'api')?.sourceManifestSha256 === sha256(JSON.stringify(olderManifest)) ? pass(older) : miss('OLDER_MANIFEST_NOT_CURRENT');
+      const pinned = releases[older];
+      const matches = typeof pinned.sourceRoot === 'string' ? olderManifest.sourceRoot === pinned.sourceRoot : pinned.apiManifestSha256 === sha256(JSON.stringify(olderManifest));
+      return matches ? pass(older) : miss('OLDER_MANIFEST_NOT_CURRENT');
     },
     // Every other pinned release (not the current one, not the new one) is RETIRED: at most two releases run at once.
     PREVIOUS_RETIRED: async () => {
-      const { lock, label: older } = await currentLabel();
+      const { releases, label: older } = await currentLabel();
       const notRetired = [];
-      for (const [name, release] of Object.entries(lock.releases)) {
+      for (const [name, release] of Object.entries(releases)) {
         if (name === older || name === label) continue;
         const { state } = await io.readReleaseState({ releaseKey: release.releaseKey });
         if (state !== 'RETIRED') notRetired.push(`${name}: ${state}`);
       }
       return notRetired.length ? miss(notRetired.join(', ')) : pass('all retired');
     },
+    // A server without spending gates (the public server) has none to be off, and no gate files to review.
     GATES_ACTIVE: async () => {
+      if (layout.gates.length === 0) return pass('no gates on this server');
       const states = [];
-      for (const gate of GATES) states.push([gate.name, await io.gateState(gate)]);
+      for (const gate of layout.gates) states.push([gate.name, await io.gateState(gate)]);
       const off = states.filter(([, state]) => state !== 'active');
       return off.length ? miss(off.map(([name, state]) => `${name}: ${state}`).join(', ')) : pass('both active');
     },
     // The gates' GO files and operator folders are the bytes the last switch recorded, or the owner reviewed exactly
     // these bytes (the digest printed here is what --gate-rows-reviewed must repeat).
     GATE_ROWS_N1: async () => {
+      if (layout.gates.length === 0) return pass('no gates on this server');
       const digests = await io.gateFilesDigest();
       const reviewable = sha256(canonicalJson(digests));
       let snapshot = null;
@@ -345,12 +364,13 @@ export async function releaseCheck({ label, olderManifest, newerManifest, gateRo
       return available >= MIN_MEM_AVAILABLE_BYTES ? pass(detail) : miss(detail);
     },
     HATCHET: async () => {
+      const units = layout.hatchetUnits ?? HATCHET_UNITS.map(name => `${layout.unitPrefix}${name}`);
       const off = [];
-      for (const unit of [`${layout.unitPrefix}hatchet.service`, `${layout.unitPrefix}hatchet-gateway.service`]) {
+      for (const unit of units) {
         const state = await unitState(unit, layout, io);
         if (state !== 'active') off.push(`${unit} ${state}`);
       }
-      return off.length ? miss(off.join(', ')) : pass('both active');
+      return off.length ? miss(off.join(', ')) : pass(units.length === 2 ? 'both active' : 'active');
     },
     NO_MAINTENANCE: async () => {
       const pending = [];
@@ -360,12 +380,13 @@ export async function releaseCheck({ label, olderManifest, newerManifest, gateRo
     },
     // The slot the current release does not use: nothing listens on its two ports and no unit of `label` runs.
     SLOT_FREE: async () => {
-      const { lock, label: older } = await currentLabel();
-      const spare = lock.releases[older].slot === 'A' ? 'B' : 'A';
+      const { releases, label: older } = await currentLabel();
+      const spare = releases[older].slot === 'A' ? 'B' : 'A';
       const busy = [];
-      const pinned = own(lock.releases, label);
+      const pinned = own(releases, label);
       if (pinned && pinned.slot !== spare) busy.push(`${label} pinned in slot ${pinned.slot}`);
-      for (const port of [PREVIEW_SLOTS[spare].uiPort, PREVIEW_SLOTS[spare].apiPort]) if (!await io.portRefuses(Number(port))) busy.push(`port ${port} answers`);
+      const slots = slotsOf(layout);
+      for (const port of [slots[spare].uiPort, slots[spare].apiPort]) if (!await io.portRefuses(Number(port))) busy.push(`port ${port} answers`);
       for (const service of ['api', 'ui', 'runner']) {
         const unit = unitNameFor(layout, service, label);
         const state = await unitState(unit, layout, io);
@@ -374,8 +395,11 @@ export async function releaseCheck({ label, olderManifest, newerManifest, gateRo
       return busy.length ? miss(busy.join(', ')) : pass(`slot ${spare}`);
     },
     // The server runs one shared copy of these folders: a change needs the owner's review (and the folder swap, D15).
+    // The public server runs its release tools from the operator checkout, never from a release folder (README §5).
     LIFECYCLE_FILES: async () => {
-      const older = lifecycleRows(olderManifest), newer = lifecycleRows(newerManifest);
+      const folders = layout.lifecycleFolders ?? LIFECYCLE_FOLDERS;
+      if (folders.length === 0) return pass('the release tools run from the operator checkout');
+      const older = lifecycleRows(olderManifest, folders), newer = lifecycleRows(newerManifest, folders);
       const changed = [...new Set([...older.keys(), ...newer.keys()])].filter(path => older.get(path) !== newer.get(path)).sort();
       if (changed.length === 0) return pass('unchanged');
       return lifecycleReviewed ? pass(`changed (reviewed): ${changed.length} files`) : miss(`changed: ${listed(changed)}`);
@@ -392,12 +416,12 @@ export async function releaseCheck({ label, olderManifest, newerManifest, gateRo
   return Object.freeze({ event: 'PREVIEW_RELEASE_CHECK', label, verdict, checks: Object.freeze(checks) });
 }
 
-/** Every pinned release, in the lock's order: its key, slot, release-table state, three units and open work. */
+/** Every release the server knows (the lock's order, or the overlays' by label): its key, slot, release-table state, three units and open work. */
 export async function releaseStatus({ layout = LAYOUT, deps = {} }) {
   const io = withDefaults(layout, deps);
-  const { lock } = await io.readLock(layout);
+  const releases = await io.releases();
   const rows = [];
-  for (const [label, release] of Object.entries(lock.releases)) {
+  for (const [label, release] of Object.entries(releases)) {
     const { state, frontPairStopped, retireRequested } = await io.readReleaseState({ releaseKey: release.releaseKey });
     const units = {};
     for (const service of ['api', 'ui', 'runner']) units[service] = await unitState(unitNameFor(layout, service, label), layout, io);
@@ -449,7 +473,7 @@ async function journalEvidence(unit, label, releaseKey, layout, io) {
     || (text(entry, 'MESSAGE_ID') === UNIT_PROCESS_EXIT_MESSAGE_ID && (text(entry, 'EXIT_CODE') !== 'exited' || text(entry, 'EXIT_STATUS') !== '0')));
   if (failed) refuse('RECEIPT_RUNNER_NOT_CLEAN', { source: 'journal', messageId: text(failed, 'MESSAGE_ID') });
   if (!lifecycle.some(entry => text(entry, 'MESSAGE_ID') === UNIT_SUCCESS_MESSAGE_ID)) refuse('RECEIPT_RUNNER_NOT_CLEAN', { source: 'journal', missing: 'UNIT_SUCCESS' });
-  if (!retiredLinesFound(output.map(entry => text(entry, 'MESSAGE')).filter(message => message !== undefined).join('\n'), releaseKey)) refuse('RECEIPT_RETIRED_LINES_MISSING');
+  if (!retiredLinesFound(output.map(entry => text(entry, 'MESSAGE')).filter(message => message !== undefined).join('\n'), releaseKey, layout.retiredLines)) refuse('RECEIPT_RETIRED_LINES_MISSING');
   if (!output.some(entry => text(entry, '_UID') === '0' && recordedRetired(text(entry, 'MESSAGE'), label, releaseKey))) refuse('RECEIPT_RUNNER_NOT_CLEAN', { source: 'journal', missing: 'STOP_RECORDED' });
   return invocationId;
 }
@@ -464,9 +488,7 @@ async function journalEvidence(unit, label, releaseKey, layout, io) {
 export async function writeRetirementReceipt({ label, out, layout = LAYOUT, deps = {} }) {
   if (!isLabel(label)) refuse('ARGUMENTS_REFUSED');
   const io = withDefaults(layout, deps);
-  const { lock } = await io.readLock(layout);
-  const release = own(lock.releases, label) ?? refuse('RELEASE_LOCK_RELEASE_MISSING');
-  const releaseKey = release.releaseKey;
+  const releaseKey = (await io.releaseInfo(label)).releaseKey;
   const { state } = await io.readReleaseState({ releaseKey });
   if (state !== 'RETIRED') refuse('RECEIPT_NOT_RETIRED', { state });
   const events = await io.readReleaseEvents({ releaseKey });
@@ -489,7 +511,7 @@ export async function writeRetirementReceipt({ label, out, layout = LAYOUT, deps
   } else {
     const journal = await io.run([layout.journalctl, '-u', unit, `_SYSTEMD_INVOCATION_ID=${invocationId}`, '-n', '500', '-o', 'cat', '--no-pager'], { env: {}, timeoutMs: 10_000, maxOutputBytes: 1024 * 1024 });
     if (!journal || journal.error || journal.timedOut || journal.overflow || journal.code !== 0) refuse('RECEIPT_JOURNAL_UNREADABLE');
-    if (!retiredLinesFound(String(journal.stdout), releaseKey)) refuse('RECEIPT_RETIRED_LINES_MISSING');
+    if (!retiredLinesFound(String(journal.stdout), releaseKey, layout.retiredLines)) refuse('RECEIPT_RETIRED_LINES_MISSING');
   }
   // OnFailure=debateai-preview-alert@%n.service: any journal line of that instance since the switch is a run of it.
   const alertUnit = `${layout.unitPrefix}alert@${unit}.service`;
@@ -510,9 +532,8 @@ export async function writeRetirementReceipt({ label, out, layout = LAYOUT, deps
 /** Side-by-side spec §4: Hatchet, Postgres and the gates are shared, so no infrastructure maintenance while a release drains. */
 export async function maintenanceAllowed({ layout = LAYOUT, deps = {} }) {
   const io = withDefaults(layout, deps);
-  const { lock } = await io.readLock(layout);
   const releases = [];
-  for (const [label, release] of Object.entries(lock.releases)) releases.push(Object.freeze({ label, state: (await io.readReleaseState({ releaseKey: release.releaseKey })).state }));
+  for (const [label, release] of Object.entries(await io.releases())) releases.push(Object.freeze({ label, state: (await io.readReleaseState({ releaseKey: release.releaseKey })).state }));
   const draining = releases.filter(release => release.state === 'DRAINING').map(release => release.label);
   if (draining.length) refuse('MAINTENANCE_REFUSED_DRAINING', { labels: draining });
   return Object.freeze({ event: 'PREVIEW_MAINTENANCE_ALLOWED', releases: Object.freeze(releases) });

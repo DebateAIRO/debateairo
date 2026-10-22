@@ -451,6 +451,22 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
     expect(unit).toMatch(/^\[Install\]\nWantedBy=multi-user\.target$/m);
   });
 
+  /**
+   * Side-by-side plan D (area constants) and D16b: two releases run at once during a drain, so each instance has its
+   * own memory ceiling, the preview's values: runner 3G (deploy/preview-auth-dev/v1/debateai-preview-runner@.service),
+   * API 2G and website 1G (deploy/preview-lifecycle/v1/systemd/debateai-preview-<service>@.service.d/50-lifecycle.conf).
+   */
+  it.each([["api", "2G"], ["ui", "1G"], ["runner", "3G"]] as const)("debateai-%s@.service: its own memory ceiling, the preview's %s", (service, size) => {
+    const unit = read(`deploy/vps/systemd/debateai-${service}@.service`);
+    const serviceSection = unit.slice(unit.indexOf("\n[Service]\n"), unit.indexOf("\n[Install]\n"));
+    expect(configLines(unit).filter((line) => line.startsWith("MemoryMax="))).toEqual([`MemoryMax=${size}`]);
+    expect(configLines(serviceSection)).toContain(`MemoryMax=${size}`);
+    const preview = service === "runner"
+      ? read("deploy/preview-auth-dev/v1/debateai-preview-runner@.service")
+      : read(`deploy/preview-lifecycle/v1/systemd/debateai-preview-${service}@.service.d/50-lifecycle.conf`);
+    expect(configLines(preview).filter((line) => line.startsWith("MemoryMax="))).toEqual([`MemoryMax=${size}`]);
+  });
+
   it("the website of a slot is bound to its own release's API and takes its port from the release overlay", () => {
     const ui = read("deploy/vps/systemd/debateai-ui@.service");
     expect(ui).toMatch(/^BindsTo=debateai-api@%i\.service$/m);
@@ -1167,8 +1183,8 @@ describe("VPS baseline: side-by-side upgrades on the public server (side-by-side
     }
     expect(readme.indexOf("### Side-by-side upgrades")).toBeGreaterThan(readme.indexOf("## 5. Application units"));
     expect(readme.indexOf("### Side-by-side upgrades")).toBeLessThan(readme.indexOf("### Upgrading to"));
-    // The release tool's commands that are not built yet say so (side-by-side plan D16b).
-    expect(section).toContain("built in the follow-up task D16b");
+    // The release tool is built (side-by-side plan D16b): no step says it is still to come.
+    expect(readme).not.toContain("follow-up task D16b");
     // The release folder is root's and never edited in place; the archive is a move, never a delete.
     expect(section).toContain("never edited in place");
     for (const block of shBlocks(section)) expect(block, block).not.toMatch(/\brm\s|\bunlink\b|shred/u);
@@ -1254,9 +1270,11 @@ describe("VPS baseline: side-by-side upgrades on the public server (side-by-side
 
   it("the first release is staged, started and only then switched (the switch waits for Caddy to route to it)", () => {
     const first = between("### The first release", "### Side-by-side upgrades");
-    const stage = first.indexOf("`stage`");
+    // release.mjs's own shapes (side-by-side plan D16b): the first switch names no --from.
+    const stage = first.indexOf("release.mjs stage --label $label");
     const enable = first.indexOf("systemctl enable --now");
-    const switched = first.lastIndexOf("`switch`");
+    const switched = first.lastIndexOf("release.mjs switch --to $label");
+    expect(first).not.toMatch(/release\.mjs switch --to \$label --from/u);
     expect(stage).toBeGreaterThan(-1);
     expect(enable).toBeGreaterThan(stage);
     expect(switched).toBeGreaterThan(enable);

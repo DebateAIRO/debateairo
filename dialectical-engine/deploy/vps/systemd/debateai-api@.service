@@ -93,6 +93,9 @@ RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 # MemoryDenyWriteExecute is NOT set: it breaks the V8 JIT.
 
 LimitNOFILE=65536
+# Two releases run at once during a drain (side-by-side spec §4), so each instance has its own memory ceiling: the
+# preview's value for this service (deploy/preview-lifecycle/v1/systemd/debateai-preview-api@.service.d/50-lifecycle.conf).
+MemoryMax=2G
 
 [Install]
 WantedBy=multi-user.target
