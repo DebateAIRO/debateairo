@@ -70,8 +70,12 @@ export function subscribeNewerVersion(listener: (reason: NewerVersionReason) => 
   return () => { listeners.delete(listener); };
 }
 
-/** The reason a refused call tells, or null for every other refusal. */
-function reasonOf(failure: unknown): NewerVersionReason | null {
+/**
+ * The reason a refused call tells, or null for every other refusal. A page that catches such a refusal leaves the
+ * telling to the note (final fix wave W1): no error banner and no raw code beside it (DebatePageClient's re-read and
+ * recorded-event replay).
+ */
+export function newerVersionReasonOf(failure: unknown): NewerVersionReason | null {
   if (!(failure instanceof ContractHttpError)) return null;
   if (failure.code === "INVALID_RESPONSE") return "NEWER_BUILD";
   if (failure.serverCode === MADE_BY_NEWER_RELEASE) return "MADE_BY_NEWER";
@@ -97,7 +101,7 @@ export function withNewerVersionWatch<T extends object>(client: T): T {
         const result: unknown = Reflect.apply(member, client, args);
         if (!(result instanceof Promise)) return result;
         return result.catch((failure: unknown) => {
-          const told = reasonOf(failure);
+          const told = newerVersionReasonOf(failure);
           if (told !== null) announceNewerVersion(told);
           throw failure;
         });

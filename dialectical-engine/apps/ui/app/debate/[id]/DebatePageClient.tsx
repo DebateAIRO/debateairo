@@ -46,6 +46,7 @@ import {
 } from "@/lib/debateHeaderOverflow";
 import { classifyTokenUnlockFailure } from "@/lib/v3/tokenUnlock";
 import { requestFailureMessage } from "@/lib/v3/requestFailure";
+import { announceNewerVersion, newerVersionReasonOf } from "@/lib/v3/releaseWatch";
 import { runFailureMessage } from "@/lib/v3/runFailure";
 import {
   applyRunEvent,
@@ -823,6 +824,14 @@ export default function DebatePageClient({
         : null);
     } catch (exc) {
       if (privateDeletionRef.current!==null) return;
+      // Side-by-side spec §7 (final fix wave W1): an answer this build cannot read (INVALID_RESPONSE) or one a newer
+      // release made (MADE_BY_NEWER_RELEASE) is the reload note's to tell: no DEBATE_READ banner beside it, and the
+      // page keeps what it already shows. Announced here too, so the note shows whichever client made the read.
+      const newerVersion = newerVersionReasonOf(exc);
+      if (newerVersion !== null) {
+        announceNewerVersion(newerVersion);
+        return;
+      }
       // Existing in-flight runs resolve through the loading bundle above.
       // A remaining NOT_FOUND therefore means neither a visible run nor a
       // visible answer exists, and must remain an honest fatal result.
@@ -980,6 +989,12 @@ export default function DebatePageClient({
         })
         .catch((failure) => {
           if (!active) return;
+          // Final fix wave W1: the reload note tells this one; no "replay unavailable: INVALID_RESPONSE" line.
+          const newerVersion = newerVersionReasonOf(failure);
+          if (newerVersion !== null) {
+            announceNewerVersion(newerVersion);
+            return;
+          }
           setHonestyActionState(
             failure instanceof ContractHttpError
               ? t(debateChromeCatalog, "debateChrome.error.recordedReplayUnavailableWithCode", {
