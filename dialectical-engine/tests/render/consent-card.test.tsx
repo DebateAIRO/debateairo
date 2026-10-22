@@ -356,4 +356,25 @@ describe("S01 the cookie card (10b): a read-only list of the twenty items", () =
       expect(["14 days", "30 days", "1 year", "8 hours", "15 minutes", "30 minutes", "299 seconds", "5 minutes"], `duration ${match[0]}`).toContain(match[0]);
     }
   });
+
+  it("lets the keyboard reach and scroll the item list: a named region that is a Tab stop", () => {
+    // The list scrolls under the 92vh cap and holds only text, so without a Tab stop of its own
+    // a keyboard user could never scroll to the items below the fold (2026-10-22 keyboard audit).
+    const card = mountCard();
+    const list = card.querySelector<HTMLElement>(".consentCatList")!;
+    expect(list.getAttribute("role")).toBe("region");
+    expect(list.tabIndex).toBe(0);
+    expect(document.getElementById(list.getAttribute("aria-labelledby")!)?.textContent).toBe(TITLE);
+
+    // Close holds the initial focus and is the last control, so Tab wraps to the list first.
+    expect(document.activeElement?.textContent?.trim()).toBe("Close");
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }));
+    });
+    expect(document.activeElement).toBe(list);
+
+    expectDeclarations(unconditional(withoutComments(s01Block())), ".consentCatList:focus-visible", [
+      "outline: 2px solid var(--focus)"
+    ]);
+  });
 });

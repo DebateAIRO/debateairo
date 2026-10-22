@@ -56,17 +56,33 @@ export function EmailSettingsCard({
   client = contractClient,
   catalog = settingsEnglish,
   onChange,
-  notice = null
+  notice = null,
+  restoreFocus = false
 }: Readonly<{
   client?: EmailCardClient;
   catalog?: MessageCatalog;
   onChange: (currentEmail: string) => void;
   notice?: string | null;
+  /** Settings came back from the change form (Back, or its request sent), whose focused control is gone. */
+  restoreFocus?: boolean;
 }>) {
   const [account, setAccount] = useState<AccountEmail | null>(null);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(notice);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const change = useRef<HTMLButtonElement>(null);
+  const restore = useRef(restoreFocus);
+
+  // Coming back, focus lands here instead of on <body>: on the heading while the address loads, then on Change
+  // email (the heading again when a change is pending). It is left alone once the person has moved on.
+  useEffect(() => {
+    if (!restore.current) return;
+    const focused = document.activeElement;
+    if (focused !== null && focused !== document.body && focused !== heading.current) { restore.current = false; return; }
+    (change.current ?? heading.current)?.focus();
+    if (account !== null || failed) restore.current = false;
+  }, [account, failed]);
 
   useEffect(() => {
     let active = true;
@@ -112,7 +128,7 @@ export function EmailSettingsCard({
   if (account === null) {
     return (
       <section className="setCard emlCard" aria-labelledby="account-email-heading">
-        <h2 className="emlCardTitle" id="account-email-heading">{t(catalog, "settings.email.title")}</h2>
+        <h2 className="emlCardTitle" id="account-email-heading" ref={heading} tabIndex={-1}>{t(catalog, "settings.email.title")}</h2>
         <p className="setStatus" role="status">
           {failed ? t(catalog, "settings.email.unavailable") : t(catalog, "settings.email.loading")}
         </p>
@@ -131,7 +147,7 @@ export function EmailSettingsCard({
         <div className="emlCardRow">
           <div className="emlCardMain">
             <div className="emlCardHead">
-              <h2 className="emlCardTitle" id="account-email-heading">{t(catalog, "settings.email.title")}</h2>
+              <h2 className="emlCardTitle" id="account-email-heading" ref={heading} tabIndex={-1}>{t(catalog, "settings.email.title")}</h2>
               <span className="emlVerified">{t(catalog, "settings.email.verified")}</span>
             </div>
             <p className="emlAddress">{account.email}</p>
@@ -139,7 +155,7 @@ export function EmailSettingsCard({
               <p className="emlRecovery">{t(catalog, "settings.email.recovery", { email: account.recovery_email })}</p>
             )}
           </div>
-          <button type="button" className="emlPill" onClick={() => onChange(account.email)}>
+          <button type="button" className="emlPill" ref={change} onClick={() => onChange(account.email)}>
             {t(catalog, "settings.email.change")}
           </button>
         </div>
@@ -147,7 +163,7 @@ export function EmailSettingsCard({
         <>
           <span className="emlPendingTab" aria-hidden="true" />
           <div className="emlCardHead">
-            <h2 className="emlCardTitle" id="account-email-heading">{t(catalog, "settings.email.title")}</h2>
+            <h2 className="emlCardTitle" id="account-email-heading" ref={heading} tabIndex={-1}>{t(catalog, "settings.email.title")}</h2>
             <span className="emlPendingBadge">{t(catalog, "settings.email.pendingBadge")}</span>
           </div>
           <dl className="emlPendingGrid">
@@ -194,6 +210,20 @@ export function ChangeEmailScreen({
   const [confirming,setConfirming]=useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const title = useRef<HTMLHeadingElement>(null);
+  const opener = useRef<HTMLElement | null>(null);
+  const returnFocus = useRef(false);
+  // The form replaces the Settings body, so focus starts on its title rather than on <body>.
+  useEffect(() => { title.current?.focus(); }, []);
+  // Cancel on the security check gives focus back to what opened it (the send button, or the field Enter was
+  // pressed in, enabled again), else to the title.
+  useEffect(() => {
+    if (!returnFocus.current) return;
+    returnFocus.current = false;
+    const back = opener.current;
+    if (back && back !== document.body && back.isConnected && !back.matches(":disabled")) back.focus();
+    else title.current?.focus();
+  });
 
   const normalized = normalizedAddress(newEmail);
   const newCheck: FieldCheck = newEmail.trim() === ""
@@ -209,6 +239,8 @@ export function ChangeEmailScreen({
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (!ready || busy) return;
+    const focused = document.activeElement;
+    opener.current = focused instanceof HTMLElement ? focused : null;
     setConfirming(true);
   }
   async function changeConfirmed(result:ConfirmedSecurityAction):Promise<void> {
@@ -249,7 +281,7 @@ export function ChangeEmailScreen({
         <div className="emlScreenInner">
           <button type="button" className="emlBack" onClick={onBack}>{t(catalog, "settings.emailChange.back")}</button>
           <p className="emlEyebrow">{t(catalog, "settings.emailChange.eyebrow")}</p>
-          <h1 className="emlTitle">{t(catalog, "settings.emailChange.title")}</h1>
+          <h1 className="emlTitle" ref={title} tabIndex={-1}>{t(catalog, "settings.emailChange.title")}</h1>
           <p className="emlLede">{t(catalog, "settings.emailChange.lede")}</p>
           <form className="emlShell" onSubmit={(event) => { void submit(event); }} noValidate>
             <div className="emlCore">
@@ -307,7 +339,7 @@ export function ChangeEmailScreen({
               {message ? <p className="setError" role="alert">{message}</p> : null}
             </div>
           </form>
-          {confirming?<SecurityConfirmation catalog={authCatalog} client={client} authorization={{action:'CHANGE_EMAIL'}} onError={failure=>setMessage(failure instanceof ContractHttpError&&failure.code==="RATE_LIMITED"?t(catalog,"settings.emailChange.rateLimited"):t(catalog,"settings.emailChange.credentialsInvalid"))} onConfirmed={changeConfirmed} onCancel={()=>setConfirming(false)}/>:null}
+          {confirming?<SecurityConfirmation catalog={authCatalog} client={client} authorization={{action:'CHANGE_EMAIL'}} onError={failure=>setMessage(failure instanceof ContractHttpError&&failure.code==="RATE_LIMITED"?t(catalog,"settings.emailChange.rateLimited"):t(catalog,"settings.emailChange.credentialsInvalid"))} onConfirmed={changeConfirmed} onCancel={()=>{returnFocus.current=true;setConfirming(false);}}/>:null}
         </div>
       </div>
     </div>

@@ -6776,6 +6776,8 @@ a:focus-visible {
   resize: none;
 }
 .ndTopic:focus { outline: none; }
+/* The field draws no ring of its own, so the bezel around it shows where the keyboard is. */
+.ndTopicBezel:has(.ndTopic:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
 .ndTopic::placeholder { color: var(--muted); }
 
 .ndCard {
@@ -7509,6 +7511,8 @@ a:focus-visible {
   resize: none;
 }
 .libComposerInput:focus { outline: none; }
+/* The field draws no ring of its own, so the bezel around it shows where the keyboard is. */
+.libComposer:has(.libComposerInput:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
 .libComposerInput::placeholder { font-style: italic; color: var(--muted); }
 
 .libComposerFoot { display: flex; align-items: center; margin-top: 22px; }
@@ -8239,6 +8243,9 @@ a:focus-visible {
 .debateScoringDot { width: 7px; height: 7px; }
 
 .canvasZoomCluster { display: none; }
+/* With the zoom cluster hidden (V, 2026-10-22), the canvas itself is the keyboard's Tab stop:
+   the arrow keys pan it and + - 0 1 zoom it (CanvasViewport). Inset, because it scrolls. */
+.canvas:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .canvasStickyControl > span { display: none; }
 .canvasStickyToggle {
   top: 14px;
@@ -10429,6 +10436,12 @@ a:focus-visible {
   overflow-y: auto;
 }
 
+/* The list is a Tab stop so the keyboard can scroll it; inset, because it scrolls. */
+.consentCatList:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
 .consentCatRow {
   align-items: flex-start;
   border-bottom: 1px solid var(--line);
@@ -10773,10 +10786,17 @@ a:focus-visible {
 }
 
 
-/* Split moves focus to the claim it now shows; a heading is not a control, so no ring. */
+/* Split moves focus to the claim it now shows; a heading is not a control, so no control ring —
+   but a keyboard reader still needs to see where focus landed, so a faint one. */
 .splitFocusClaim:focus,
 .splitFocusRootClaim:focus {
   outline: none;
+}
+.splitFocusClaim:focus-visible,
+.splitFocusRootClaim:focus-visible {
+  outline: 1px dashed var(--focus);
+  outline-offset: 4px;
+  border-radius: 4px;
 }
 
 /* Map segments are keyboard buttons; the focused one is drawn with a heavy ink edge. */

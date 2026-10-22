@@ -8,6 +8,7 @@ import { AuthShell } from '@/components/AuthShell';
 import { SocialProviderButtons } from '@/components/auth/SocialProviderButtons';
 import { InlineFieldMessage, useFormAnnouncer } from '@/components/auth/InlineFieldMessage';
 import { VerificationResend } from '@/components/auth/VerificationResend';
+import { useStepFocus } from '@/components/auth/timedStep';
 import type { TurnstilePublicConfig } from '@/lib/turnstile';
 import { ageConfirmationHref, ageConfirmationRequired } from '@/lib/ageConfirmation';
 import { contractClient } from '@/lib/api';
@@ -57,6 +58,9 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
     // One live region per form: says the first error of a failed submit (review fix, 2026-10-09).
     const credentialsAnnouncer = useFormAnnouncer();
     const codeAnnouncer = useFormAnnouncer();
+    // Each step swaps out the control that was pressed (Continue, Back to sign in, the authenticator/recovery-code
+    // switch): focus lands on the step's code field, or on the headline when it has none, never on <body>.
+    const moved = useStepFocus(continuation ? `code:${method}` : 'credentials', () => codeField.current);
     function cancelConditional() {
         sequence.current++;
         conditional.current?.abort();
@@ -276,7 +280,7 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
     const offered = continuation?.available_methods ?? [];
     if (resending)
         return <VerificationResend catalog={catalog} client={client} turnstile={turnstile} onBack={() => setResending(false)}/>;
-    return <AuthShell eyebrow={t(catalog, "auth.login.welcomeBack")} title={continuation ? t(catalog, "auth.login.twoStepVerification") : t(catalog, "auth.login.backToGraph")} description={t(catalog, "auth.login.securityPolicy")} footer={!dispatched.current ? <>
+    return <AuthShell eyebrow={t(catalog, "auth.login.welcomeBack")} title={continuation ? t(catalog, "auth.login.twoStepVerification") : t(catalog, "auth.login.backToGraph")} description={t(catalog, "auth.login.securityPolicy")} focusTitle={moved} footer={!dispatched.current ? <>
  {/* One way in for every recovery route, each with one plain sentence (auth UI repair, 2026-10-09). */}
  <details className="authHelp">
  <summary>{t(catalog, "auth.login.cantSignIn")}</summary>

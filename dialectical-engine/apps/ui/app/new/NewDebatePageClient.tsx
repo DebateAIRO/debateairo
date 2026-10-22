@@ -199,12 +199,14 @@ function NewDebateForm({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const submitFlight = useRef(false);
-  const consent = useSensitiveDataConsent({ catalog: homeCatalog, locale });
-  const crisis = useCrisisSupport({ catalog: homeCatalog, locale, countryHint: crisisCountryHint });
+  // Start is disabled while a press of it runs, which drops keyboard focus to the page. When the
+  // consent or crisis screen then closes, focus comes back to the question instead.
+  const topicField = useRef<HTMLTextAreaElement | null>(null);
+  const consent = useSensitiveDataConsent({ catalog: homeCatalog, locale, returnFocusRef: topicField });
+  const crisis = useCrisisSupport({ catalog: homeCatalog, locale, countryHint: crisisCountryHint, returnFocusRef: topicField });
   // Question language (spec 2026-10-13): the page's language goes with the question (PF-L56: `locale` is a string).
   const pageLocale: LocaleCode = isLocale(locale) ? locale : "en";
   const languageChoice = useQuestionLanguageChoice({ catalog, locale: pageLocale });
-  const topicField = useRef<HTMLTextAreaElement | null>(null);
   const topicRef = useCallback((field: HTMLTextAreaElement | null) => {
     topicField.current = field;
     grow(field);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { contractClient, validateSession } from "@/lib/api";
 import { RoomNotice } from "@/components/billing/RoomNotice";
 import { useAskRoom, waitingRoomOf, type AskRoomQuery } from "@/lib/billing/room";
@@ -44,8 +44,15 @@ export function LibraryComposer({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [room, setRoom, refreshRoom] = useAskRoom(contractClient, COMPOSER_ROOM_QUERY);
-  const consent = useSensitiveDataConsent({ catalog, locale });
-  const crisis = useCrisisSupport({ catalog, locale, countryHint: crisisCountryHint });
+  // Start is disabled while a press of it runs, which drops keyboard focus to the page. When the
+  // consent or crisis screen then closes, focus comes back to the question instead.
+  const claimField = useRef<HTMLTextAreaElement | null>(null);
+  const claimRef = useCallback((field: HTMLTextAreaElement | null) => {
+    claimField.current = field;
+    grow(field);
+  }, []);
+  const consent = useSensitiveDataConsent({ catalog, locale, returnFocusRef: claimField });
+  const crisis = useCrisisSupport({ catalog, locale, countryHint: crisisCountryHint, returnFocusRef: claimField });
 
   // A question too short to debate still reaches the crisis check ("我想死" is three letters).
   const ready = topic.trim().length > 6 || crisis.flags(topic);
@@ -106,7 +113,7 @@ export function LibraryComposer({
           id="library-claim"
           className="libComposerInput"
           aria-label={t(catalog, "home.debateClaim")}
-          ref={grow}
+          ref={claimRef}
           rows={1}
           value={topic}
           onChange={(event) => {
