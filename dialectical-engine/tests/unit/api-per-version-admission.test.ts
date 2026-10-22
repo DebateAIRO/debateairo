@@ -27,6 +27,17 @@ vi.mock("@debateai/db", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@debateai/db")>()),
   insertRunRoleAssignment: async (_executor: unknown, input: unknown) => { pinning.calls.push(input); }
 }));
+/**
+ * Task SA6 (addition D16): the preview's start-of-debate gate pricing is recorded, never priced — which gate settings it
+ * was handed and the frozen panel it would price (tests/unit/preview-budget-estimate.test.ts prices it).
+ */
+const gatePricing = vi.hoisted(() => ({ calls: [] as Array<Readonly<{ gate: unknown; panel: readonly string[] }>> }));
+vi.mock("../../apps/api/src/preview-budget-estimate.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../apps/api/src/preview-budget-estimate.js")>()),
+  assertPreviewBudgetAdmits: async (gate: unknown, input: Readonly<{ panel: ReadonlyArray<Readonly<{ model_id: string }>> }>) => {
+    gatePricing.calls.push(Object.freeze({ gate, panel: Object.freeze(input.panel.map((entry) => entry.model_id)) }));
+  }
+}));
 
 import {
   PostgresAskApplication, buildApi, type AskApplication, type AskModelPickerSettings, type RunCreationSettings
@@ -39,7 +50,13 @@ import {
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import { LivenessRepository } from "@debateai/liveness";
-import { computeStructuralCeilingBasis, debateShapePolicyStartValues, lengthGuidancePolicyStartValues } from "@debateai/register";
+import {
+  composePreviewProviderTestConfig, parsePreviewEnvironmentConfig, parsePreviewLineUp, previewModelRow, type PreviewProviderTestConfig
+} from "@debateai/providers";
+import {
+  BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, computeStructuralCeilingBasis, debateShapePolicyStartValues,
+  lengthGuidancePolicyStartValues
+} from "@debateai/register";
 import { ServeRepository } from "@debateai/serve";
 import type { Pool, PoolClient, QueryResult } from "pg";
 import type { AdmissionRunMembers, AdmissionVersionSettings } from "../../apps/api/src/admission-settings.js";
@@ -664,5 +681,169 @@ describe("(2, source) the ask path reads its settings only through the one per-v
     expect(readmission.split("this.settings")).toHaveLength(2);
     expect(readmission).toContain(binding);
     expect(readmission).toContain("this.#readmit(settings, run, plan, principal, lease, readmitted)");
+  });
+});
+
+/**
+ * Task SA6 (addition D16, D18): ON THE PREVIEW, EACH ASK IS ADMITTED ON ITS VERSION'S LINE-UP. The site version (17) and
+ * the active one (18) compose different rosters over the same env gate part. Everything an ask decides from the line-up
+ * — the panel frozen on its run (the roster filter), its settings class (`makerCount`), the billing coarse fit's premium
+ * count and the gate's start-of-debate pricing (`assertPreviewBudgetAdmits`, handed the frozen panel) — is 18's, and the
+ * room read answers with the active version's composed config (`admissionView()`). Without `admissionSettings`, the
+ * site's line-up, as today.
+ */
+describe("(SA6) on the preview an ask is admitted on its version's line-up (addition D16, D18)", () => {
+  const GLM = "zai-org/GLM-5.3-Flash";
+  const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
+  const MIMO = "XiaomiMiMo/MiMo-V2.6-Pro";
+  const QWEN = "Qwen/Qwen3.8-Flash";
+  const HAIKU = "claude-haiku-5-5";
+  const GATE = parsePreviewEnvironmentConfig(JSON.stringify({
+    budget_socket: "/run/debateai-v3-preview/deepinfra-budget-v3.sock", deployment: "v3-preview",
+    requested_thinking_level: "high", scope_id: "sa6-fixture",
+    anthropic_budget_socket: "/run/debateai-v3-preview/anthropic-budget-v1.sock"
+  }))!.gate;
+  /** The site version's line-up (the env's fallback, or its row): free GLM + DeepSeek, five premium models. */
+  const SITE_CONFIG: PreviewProviderTestConfig = composePreviewProviderTestConfig(GATE, parsePreviewLineUp({
+    free_model_ids: [GLM, DEEPSEEK], premium_model_ids: [GLM, DEEPSEEK, MIMO, QWEN, HAIKU], thinking_levels: null }));
+  /** Version 18's own row: free GLM + Haiku, three premium models. */
+  const ACTIVE_CONFIG: PreviewProviderTestConfig = composePreviewProviderTestConfig(GATE, parsePreviewLineUp({
+    free_model_ids: [GLM, HAIKU], premium_model_ids: [GLM, QWEN, HAIKU], thinking_levels: null }));
+  /** Each version's gate settings, told apart by identity (the pricing double records which one it was handed). */
+  const SITE_GATE = Object.freeze({ gateOf: SITE }) as unknown as PreviewBudgetGateSettings;
+  const ACTIVE_GATE = Object.freeze({ gateOf: ACTIVE }) as unknown as PreviewBudgetGateSettings;
+  /** Every preview model answered discovery, each under its reviewed maker. */
+  const PREVIEW_PANEL = Object.freeze([GLM, DEEPSEEK, MIMO, QWEN, HAIKU]
+    .map((modelId, index) => member(`preview:${String(index)}`, previewModelRow(modelId)!.maker, modelId)));
+
+  function previewArrange(input: Readonly<{ noReader?: boolean; room?: AskRoomPort; billing?: AskBilling }> = {}): Arranged {
+    gatePricing.calls.length = 0;
+    return arrange({
+      panel: PREVIEW_PANEL,
+      ...(input.noReader === true ? { noReader: true } : {}),
+      ...(input.room === undefined ? {} : { room: input.room }),
+      ...(input.billing === undefined ? {} : { billing: input.billing }),
+      // The site's (process) members: its own composed config and gate, and the team (a process member, ruling R25).
+      site: () => ({ previewProviderTestConfig: SITE_CONFIG, previewBudgetGate: SITE_GATE, previewTeamUserIds: [principal.userId] }),
+      members: (version, into) => versionMembers(version, into, version === ACTIVE
+        ? { previewProviderTestConfig: ACTIVE_CONFIG, previewBudgetGate: ACTIVE_GATE } : {})
+    });
+  }
+
+  /** Billing on, a PLUS person with room to spare; the coarse fit's estimate records the class it is asked for. */
+  function plusBilling(asked: Array<Readonly<{ version: number | null; makerCount: number }>>): AskBilling {
+    const recording = (version: number | null): CostEstimator => ({
+      estimateMicros: async (settingsClass) => { asked.push(Object.freeze({ version, makerCount: settingsClass.makerCount })); return 1_000; }
+    });
+    return Object.freeze({
+      plans: billingPlansFromValue(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value, BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.sourceRef),
+      entitlements: { current: async () => ({ planId: "PLUS" as const, eventId: "55555555-5555-4555-8555-555555555555" }) },
+      coarseFit: Object.freeze({
+        personAllowance: { read: async () => [{ scope: "PERSON_DAY" as const, limitMicros: 1_000_000,
+          periodStart: new Date("2026-10-22T00:00:00.000Z"), resetsAt: new Date("2026-10-23T00:00:00.000Z"),
+          finishBasisPoints: 11_000, closeBasisPoints: 9_500 }] },
+        spend: { readOwnerSpentMicros: async () => 0, readOwnerCountedHoldsMicros: async () => 0 },
+        estimator: recording(null),
+        estimatorFor: async (version: number) => recording(version)
+      }),
+      clock: () => NOW
+    });
+  }
+
+  it("a Free ask's panel is filtered by 18's roster, and the gate prices exactly that frozen panel with 18's gate", async () => {
+    const { application, started } = previewArrange();
+    await application.submit(ask({ plan_tier: "free" }), session, principal);
+    expect(started[0]!.registerVersion).toBe(ACTIVE);
+    expect(started[0]!.discoveredPanel.map((entry) => entry.model_id)).toEqual([GLM, HAIKU]);
+    expect(gatePricing.calls).toEqual([{ gate: ACTIVE_GATE, panel: [GLM, HAIKU] }]);
+  });
+
+  it("its settings class counts 18's roster (the room's precheck and locked decision)", async () => {
+    const { room, questions } = recordingRoom();
+    const { application, started } = previewArrange({ room });
+    await application.submit(ask({ plan_tier: "premium" }), session, principal);
+    expect(questions.map((question) => [question.registerVersion, question.settingsClass.makerCount]))
+      .toEqual([[ACTIVE, 3], [ACTIVE, 3]]);
+    expect(started[0]!.discoveredPanel.map((entry) => entry.model_id)).toEqual([GLM, QWEN, HAIKU]);
+    expect(gatePricing.calls).toEqual([{ gate: ACTIVE_GATE, panel: [GLM, QWEN, HAIKU] }]);
+  });
+
+  it("with billing on, the coarse fit counts 18's premium roster, with 18's estimator", async () => {
+    const asked: Array<Readonly<{ version: number | null; makerCount: number }>> = [];
+    const { application, started } = previewArrange({ billing: plusBilling(asked) });
+    await application.submit(ask({ plan_tier: "premium" }), session, principal);
+    expect(asked).toEqual([{ version: ACTIVE, makerCount: 3 }]);
+    expect(started[0]).toMatchObject({ planTier: "premium", registerVersion: ACTIVE });
+    expect(started[0]!.discoveredPanel.map((entry) => entry.model_id)).toEqual([GLM, QWEN, HAIKU]);
+  });
+
+  it("(control) without the reader, the site's line-up decides all four, as today", async () => {
+    const { room, questions } = recordingRoom();
+    const roomed = previewArrange({ noReader: true, room });
+    await roomed.application.submit(ask({ plan_tier: "premium" }), session, principal);
+    expect(questions.map((question) => question.settingsClass.makerCount)).toEqual([5, 5]);
+    expect(roomed.started[0]!.registerVersion).toBe(SITE);
+    expect(gatePricing.calls).toEqual([{ gate: SITE_GATE, panel: [GLM, DEEPSEEK, MIMO, QWEN, HAIKU] }]);
+    const free = previewArrange({ noReader: true });
+    await free.application.submit(ask({ plan_tier: "free" }), session, principal);
+    expect(free.started[0]!.discoveredPanel.map((entry) => entry.model_id)).toEqual([GLM, DEEPSEEK]);
+    expect(gatePricing.calls).toEqual([{ gate: SITE_GATE, panel: [GLM, DEEPSEEK] }]);
+    const asked: Array<Readonly<{ version: number | null; makerCount: number }>> = [];
+    const billed = previewArrange({ noReader: true, billing: plusBilling(asked) });
+    await billed.application.submit(ask({ plan_tier: "premium" }), session, principal);
+    expect(asked).toEqual([{ version: SITE, makerCount: 5 }]);
+  });
+
+  async function roomRead(view: (() => Promise<unknown>) | undefined): Promise<RoomQuestion[]> {
+    const identity = testHttpIdentity("sa6-room-read");
+    const read: RoomQuestion[] = [];
+    const askRoom: AskRoomReader = {
+      readRoom: async (question) => {
+        read.push(question);
+        return { room: "FITS", scope: null, resetsAt: null, waitingRunRef: null, planId: null };
+      }
+    };
+    // The static member is the site version's composed config (main.ts's default); the view is the active version's.
+    const api = buildApi({ application: fixtureApplication(), sessions: testSessionApplication([identity]),
+      allowedOrigin: TEST_APP_ORIGIN, askRoom, previewProviderTestConfig: SITE_CONFIG,
+      previewTeamUserIds: [identity.authenticated.userId], ...(view === undefined ? {} : { admissionView: view as never }) });
+    try {
+      const response = await api.inject({ method: "GET", headers: testSessionHeaders(identity),
+        url: "/v1/asks/room?plan_tier=premium&composition_budget_tier=high&depth=3" });
+      expect(response.statusCode).toBe(200);
+    } finally {
+      await api.close();
+    }
+    return read;
+  }
+
+  it("the room read's class counts the active version's roster, from admissionView()'s composed config", async () => {
+    const view = vi.fn(async () => Object.freeze({ registerVersion: ACTIVE, modelScorecardInForce: false,
+      previewProviderTestConfig: ACTIVE_CONFIG }));
+    const read = await roomRead(view);
+    expect(read.map((question) => [question.registerVersion, question.settingsClass.makerCount])).toEqual([[ACTIVE, 3]]);
+    expect(view).toHaveBeenCalledTimes(1);
+  });
+
+  it("main.ts's view carries each version's composed config: the active one's, and the site's when it falls back", async () => {
+    const loaded = (version: number, previewConfig: PreviewProviderTestConfig) => Object.freeze({ registerVersion: version,
+      debateShapePolicy: null, lengthGuidancePolicy: null, modelPicker: { scorecard: { state: "ABSENT" } }, previewConfig
+    }) as unknown as AdmissionVersionSettings;
+    let refuse = false;
+    const view = createAdmissionView({ activeSettingsVersion: async () => (refuse ? 19 : ACTIVE),
+      admissionSettingsFor: async (version) => {
+        if (refuse) throw new TypedDomainError("PREVIEW_LINE_UP_REQUIRED", "PREVIEW_LINE_UP_REQUIRED");
+        return loaded(version, ACTIVE_CONFIG);
+      },
+      fallback: loaded(SITE, SITE_CONFIG), log: () => undefined });
+    expect((await view()).previewProviderTestConfig).toBe(ACTIVE_CONFIG);
+    refuse = true;
+    expect(await view()).toMatchObject({ registerVersion: SITE, previewProviderTestConfig: SITE_CONFIG });
+  });
+
+  it("(control) without the view, the room read counts the static (site) config's roster, as today", async () => {
+    const read = await roomRead(undefined);
+    expect(read.map((question) => question.settingsClass.makerCount)).toEqual([5]);
+    expect(read[0]).not.toHaveProperty("registerVersion");
   });
 });

@@ -1524,7 +1524,7 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
 }
 const api = buildApi({
   // Addition D16 / ruling R25: keyed on the env's gate part; the configuration is the site version's composed one (its
-  // line-up over the gate part). `admissionView` below also carries the active version's; SA6 hands it to the room read.
+  // line-up over the gate part). `admissionView` below carries the active version's: the room read's class counts it (SA6).
   ...(previewGate === undefined ? {} : { previewProviderTestConfig: siteAdmission.previewConfig!, previewTeamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [] }),
   application,
   stories: ownerStories,

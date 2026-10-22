@@ -1875,7 +1875,9 @@ export interface ApiOptions {
    * GET /v1/asks/room (its shape and length rows, and the version the room estimates with) and GET /v1/session (whether
    * it scores its models). main.ts composes it over the activation pointer and the per-version admission cache. Absent
    * (test compositions, acceptance): both read `debateShapePolicy`, `lengthGuidancePolicy` and `modelScorecardInForce`
-   * above, as before. Present, it replaces those three for both routes.
+   * above, and the room read's class counts `previewProviderTestConfig`'s roster, as before. Present, it replaces those
+   * four for both routes (addition D16, Task SA6: the class counts the view's composed configuration); the team rule
+   * still tests the static configuration's presence only.
    */
   readonly admissionView?: () => Promise<AdmissionView>;
   /**
@@ -1890,8 +1892,9 @@ export interface ApiOptions {
 /**
  * Side-by-side spec §13 (Task S10) — THE ACTIVE VERSION, AS THE PAGES READ IT (`ApiOptions.admissionView`): its number
  * (the room read's question names it, so the room estimates with that version's estimator), its shape and length rows
- * in force (absent: none), and whether it scores its models (GET /v1/session's one yes/no). Addition D16: it may also
- * carry the version's composed preview configuration, for the room read's settings class (SA6 reads it there).
+ * in force (absent: none), and whether it scores its models (GET /v1/session's one yes/no). Addition D16 (Task SA6): on
+ * the preview it carries the version's composed preview configuration, and the room read's settings class counts that
+ * version's roster (`makerCount`); absent off the preview.
  */
 export type AdmissionView = Readonly<{
   registerVersion: number;
@@ -2297,7 +2300,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   const staticView: Omit<AdmissionView, "registerVersion"> = Object.freeze({
     ...(options.debateShapePolicy === undefined ? {} : { debateShapePolicy: options.debateShapePolicy }),
     ...(options.lengthGuidancePolicy === undefined ? {} : { lengthGuidancePolicy: options.lengthGuidancePolicy }),
-    modelScorecardInForce: options.modelScorecardInForce === true
+    modelScorecardInForce: options.modelScorecardInForce === true,
+    // Addition D16 (Task SA6): without the view, the room read's class counts the static (site) configuration's roster.
+    ...(previewConfig === undefined ? {} : { previewProviderTestConfig: previewConfig })
   });
   const admissionView = async (): Promise<Omit<AdmissionView, "registerVersion"> & Readonly<{ registerVersion?: number }>> =>
     options.admissionView === undefined ? staticView : options.admissionView();
@@ -3805,8 +3810,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
             }, access.ownerRef, options.askBilling);
             const roomPlan = debateShapePlanKeyOf(decided.planId, decided.settings.plan_tier);
             roomPlanKey = roomPlan;
+            // Addition D16 (Task SA6): the class counts the roster of the version the view names (its composed preview
+            // configuration), the one the next ask is admitted on; the team rule above tests presence only.
             return runSettingsClassOfAsk(normaliseAskForDebateShape(decided.settings, view.debateShapePolicy ?? null, roomPlan,
-              view.lengthGuidancePolicy ?? null), previewConfig, roomPlan);
+              view.lengthGuidancePolicy ?? null), view.previewProviderTestConfig, roomPlan);
           })()
         });
     return reply.send(AskRoomResponseSchema.parse({
