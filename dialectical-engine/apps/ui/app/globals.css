@@ -8570,6 +8570,15 @@ a:focus-visible {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 5;
 }
+/* Split moves focus to the claim it now shows (DebateSplit). A heading is not a control, so the
+   consent S02 block drops the control ring on `:focus`; a keyboard reader still needs to see where
+   focus landed, so a faint one on `:focus-visible`. The `.split` prefix outranks that later rule. */
+.split .splitFocusClaim:focus-visible,
+.split .splitFocusRootClaim:focus-visible {
+  outline: 1px dashed var(--focus);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
 .splitFocusBody { font-size: 13.5px; line-height: 1.55; }
 .splitMeter { gap: 14px; max-width: none; margin: 0 0 4px; }
 .splitMeterSide { flex: 0 0 auto; }
@@ -10786,17 +10795,10 @@ a:focus-visible {
 }
 
 
-/* Split moves focus to the claim it now shows; a heading is not a control, so no control ring —
-   but a keyboard reader still needs to see where focus landed, so a faint one. */
+/* Split moves focus to the claim it now shows; a heading is not a control, so no ring. */
 .splitFocusClaim:focus,
 .splitFocusRootClaim:focus {
   outline: none;
-}
-.splitFocusClaim:focus-visible,
-.splitFocusRootClaim:focus-visible {
-  outline: 1px dashed var(--focus);
-  outline-offset: 4px;
-  border-radius: 4px;
 }
 
 /* Map segments are keyboard buttons; the focused one is drawn with a heavy ink edge. */

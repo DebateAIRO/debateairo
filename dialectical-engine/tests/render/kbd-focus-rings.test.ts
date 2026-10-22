@@ -22,8 +22,9 @@ describe("focus rings for controls that draw none of their own", () => {
   });
 
   it("gives the Split heading focus moves to a faint ring, only for the keyboard", () => {
-    expect(declarations(".splitFocusClaim:focus-visible")).toContain("outline: 1px dashed var(--focus)");
-    expect(declarations(".splitFocusRootClaim:focus-visible")).toContain("outline: 1px dashed var(--focus)");
+    // Prefixed: the consent S02 block, later in the file, sets `outline: none` on their `:focus`.
+    expect(declarations(".split .splitFocusClaim:focus-visible")).toContain("outline: 1px dashed var(--focus)");
+    expect(declarations(".split .splitFocusRootClaim:focus-visible")).toContain("outline: 1px dashed var(--focus)");
   });
 
   it("rings the Tree canvas and the cookie card's item list, both Tab stops that scroll", () => {
