@@ -25,7 +25,7 @@ const GIT_ROOT = execFileSync("git", ["rev-parse", "--show-toplevel"], {
   cwd: REPOSITORY_ROOT,
   encoding: "utf8"
 }).trim();
-const TRACKED = execFileSync("git", ["ls-files", "-z"], { cwd: GIT_ROOT, encoding: "utf8" })
+const TRACKED = execFileSync("git", ["ls-files", "-z"], { cwd: GIT_ROOT, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 })
   .split("\0")
   .filter(Boolean);
 
