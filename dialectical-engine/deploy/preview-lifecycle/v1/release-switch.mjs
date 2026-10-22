@@ -76,7 +76,12 @@ export const RUNNER_START_WAIT_MS = 240_000, FRONT_START_WAIT_MS = 330_000;
 export const EDGE_URL = `http://${EDGE_LISTENER.bind}:${EDGE_LISTENER.port}/readyz`;
 /** The layout's edge readiness URL: its `edge` listener's /readyz, or the preview's (side-by-side plan D16b). */
 export const edgeUrlOf = layout => (layout.edge ? `${layout.edge}/readyz` : EDGE_URL);
-/** Caddy's copy of the edge secret (its health_headers send it); the website's /readyz answers only a request carrying it. */
+/**
+ * Caddy's copy of the edge secret (its health_headers send it); the website's /readyz answers only a request carrying it.
+ * That alone does not keep visitors out (every request the public route proxies carries it too): the public route
+ * refuses /readyz itself (`respond /readyz 404`, final fix wave W2), and root reads it through the loopback listener or,
+ * as here, straight at a slot's port.
+ */
 export const EDGE_SECRET_PATH = '/etc/debateai-v3-preview/ui-edge.caddy.secret';
 const edgeSecretPathOf = layout => layout.edgeSecretPath ?? EDGE_SECRET_PATH;
 /**

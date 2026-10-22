@@ -2606,7 +2606,9 @@ line naming `…/<service>.env` (the `EnvironmentFile=` lines, and others such a
 
 `caddy-slots.mjs transform` writes the changed copy into `$S` (never the live file): every
 `reverse_proxy 127.0.0.1:3100 {` (the notify handle's and the main route's) becomes a two-slot proxy importing the
-shared health rules, and the loopback listener 127.0.0.1:3090 is appended (GET `/readyz` only, everything else 404).
+shared health rules, the main route's block starts with `respond /readyz 404` (the public route never answers readiness:
+every request it proxies carries the edge secret), and the loopback listener 127.0.0.1:3090 is appended (GET `/readyz`
+only, everything else 404). The handler order check leaves out that one `/readyz` route and checks it on its own.
 
 ```sh
 set -euo pipefail
@@ -2618,7 +2620,7 @@ TR=$(cslots transform --in "$C" --out "$S/Caddyfile.two-slot" 2>&1) || { echo "$
 echo "$TR"
 [ "$(jq -r '[.event, .edgeListener] | map(tostring) | join(" ")' <<<"$TR")" = "PREVIEW_CADDY_TWO_SLOTS 3090" ] || { echo "TA_CADDY_NOT_DONE: the transform did not report the two slots"; exit 1; }
 cad validate --config "$S/Caddyfile.two-slot" --adapter caddyfile >/dev/null 2>&1 || { echo "TA_CADDY_NOT_DONE: Caddy's validation refused the two-slot file (an older Caddy without health_passes or health_fails?): ask"; exit 1; }
-order() { cad adapt --config "$1" --adapter caddyfile 2>/dev/null | jq -r '[.apps.http.servers[].routes[] | select(.match[0].host[0]=="v3-preview.dezbatere.ro") | .handle[] | .. | objects | select(has("handler")) | .handler] | join(" > ")'; }
+order() { cad adapt --config "$1" --adapter caddyfile 2>/dev/null | jq -r 'walk(if type == "object" and has("routes") then .routes |= map(select([.match[]?.path[]?] != ["/readyz"])) else . end) | [.apps.http.servers[].routes[] | select(.match[0].host[0]=="v3-preview.dezbatere.ro") | .handle[] | .. | objects | select(has("handler")) | .handler] | join(" > ")'; }
 O1=$(order "$C"); O2=$(order "$S/Caddyfile.two-slot")
 echo "handlers, live:     $O1"; echo "handlers, two slots: $O2"
 [ -n "$O2" ] && [ "$O1" = "$O2" ] || { echo "TA_CADDY_NOT_DONE: the main route's handler order changed: ask"; exit 1; }
@@ -2627,11 +2629,13 @@ UP=$(jq -r '[.. | objects | select(.handler? == "reverse_proxy") | [.upstreams[]
 RW=$(jq -r '[.. | objects | select(.handler? == "rewrite") | .uri] | unique | join(",")' <<<"$AD")
 HC=$(jq -r '[.. | objects | select(has("health_checks")) | .health_checks.active | "\(.uri) passes \(.passes) fails \(.fails) secret \((.headers // {} | keys | map(ascii_downcase) | index("x-debateai-edge-secret")) != null)"] | unique | join(",")' <<<"$AD")
 LI=$(jq -r '[.apps.http.servers[] | .listen[]? | select(test(":3090$"))] | join(",")' <<<"$AD")
-echo "upstreams: $UP; listener rewrite: $RW; health check: $HC; listener: $LI"
+PR=$(jq -r '[.apps.http.servers[].routes[] | select(.match[0].host[0]=="v3-preview.dezbatere.ro") | .. | objects | select(has("handle") and [.match[]?.path[]?] == ["/readyz"]) | [.handle[] | "\(.handler) \(.status_code)"] | join(",")] | join(";")' <<<"$AD")
+echo "upstreams: $UP; listener rewrite: $RW; health check: $HC; listener: $LI; public /readyz: $PR"
 [ "$UP" = "127.0.0.1:3100 127.0.0.1:3200" ] || { echo "TA_CADDY_NOT_DONE: the proxies' upstreams are not the two slots' websites"; exit 1; }
 [ "$RW" = "/readyz?" ] || { echo "TA_CADDY_NOT_DONE: the listener's rewrite is not /readyz? (the bare ? clears the query): ask"; exit 1; }
 [ "$HC" = "/readyz passes 1 fails 1 secret true" ] || { echo "TA_CADDY_NOT_DONE: the health check is not /readyz, 1 pass, 1 fail, with the edge secret header: ask"; exit 1; }
 [ "$LI" = "127.0.0.1:3090" ] || { echo "TA_CADDY_NOT_DONE: the readiness listener is not 127.0.0.1:3090 only: ask"; exit 1; }
+[ "$PR" = "static_response 404" ] || { echo "TA_CADDY_NOT_DONE: the public route does not refuse /readyz with exactly one 404 of its own: ask"; exit 1; }
 echo TA_CADDY_DONE
 ```
 
@@ -3067,6 +3071,8 @@ echo "edge 127.0.0.1:3090/readyz: $EK"
 [ "$EK" = "200 $KEY" ] || back "the edge did not answer 200 with x-debateai-release $KEY within 30 s (no slot healthy: is the edge secret filled in inside health_headers?)"
 PC=$(curl -s -o /dev/null -m 15 -w '%{http_code}' https://v3-preview.dezbatere.ro/ || true); echo "public / without the password: $PC"
 [ "$PC" = 401 ] || back "the public site does not answer 401 without the password (got $PC)"
+RP=$(curl -s -o /dev/null -m 15 -w '%{http_code}' https://v3-preview.dezbatere.ro/readyz || true); echo "public /readyz without the password: $RP"
+[ "$RP" = 404 ] || back "the public route does not refuse /readyz with its own 404 before the password (got $RP)"
 NC=$(curl -s -o /dev/null -m 15 -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{}' https://v3-preview.dezbatere.ro/api/v1/billing/netopia/notify || true); echo "notify POST: $NC"
 [ "$NC" = 503 ] || back "NETOPIA's notify POST does not reach T's API (got $NC, expected 503)"
 for PTH in / /login /livez /readyz/; do XC=$(curl -s -o /dev/null -m 15 -w '%{http_code}' "http://127.0.0.1:3090$PTH" || true); echo "listener GET $PTH: $XC"; [ "$XC" = 404 ] || back "the listener answered GET $PTH with $XC, not 404"; done

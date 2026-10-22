@@ -41,7 +41,8 @@
 		health_timeout 1s
 		health_passes 1
 		health_fails 1
-		# server.mjs answers /readyz to a trusted peer only, so the check carries the same edge secret as a request.
+		# server.mjs answers /readyz to a trusted peer only, so the check carries the edge secret. It asks each slot's port
+		# directly; the public site below refuses /readyz itself and root reads it through the loopback site (:3090).
 		health_headers {
 			X-Debateai-Edge-Secret {file./etc/debateai/ui-edge.caddy.secret}
 		}
@@ -83,6 +84,11 @@
 	# the API under that prefix), so it is excluded and static assets keep compression.
 	@compressible not path /api/*
 	encode @compressible gzip
+
+	# Readiness is never read through the public name (final fix wave W2): every proxied request carries the edge
+	# secret, so the website would answer a visitor's /readyz as it answers Caddy. Caddy orders respond before
+	# reverse_proxy: /readyz gets Caddy's own 404 here; the health checks ask the slots directly, root asks :3090.
+	respond /readyz 404
 
 	import debateai_slots
 }

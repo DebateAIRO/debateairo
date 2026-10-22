@@ -9,7 +9,7 @@ import { join, posix, resolve } from 'node:path';
 const caddySlots = await import('../../deploy/' + 'preview-release/v1/caddy-slots.mjs');
 const plans = await import('../../deploy/' + 'preview-auth-dev/v1/launch-plan.mjs');
 
-const { EDGE_LISTENER, SLOT_UPSTREAMS, main } = caddySlots;
+const { EDGE_LISTENER, SLOT_UPSTREAMS, PUBLIC_READYZ_REFUSAL, main } = caddySlots;
 const transformCaddyfile = caddySlots.transformCaddyfile as (liveText: unknown) => string;
 const PREVIEW_SLOTS = plans.PREVIEW_SLOTS as Readonly<Record<'A' | 'B', Readonly<{ uiPort: string; apiPort: string }>>>;
 const me = { uid: process.getuid!(), gid: process.getgid!() };
@@ -124,6 +124,8 @@ const LISTENER_LINES = [
   '\t}',
   '}'
 ];
+/** The public route's refusal of /readyz (final fix wave W2), first in the main route's block, with its comment. */
+const PUBLIC_READYZ_LINES = ['\t\t# Readiness is never read through the public name: Caddy checks the slots directly, root asks 127.0.0.1:3090.', '\t\trespond /readyz 404'] as const;
 /** The lines of the block that opens at `lines[open]`, its opening and closing lines included. */
 function blockAt(lines: readonly string[], open: number) {
   let depth = 0;
@@ -227,11 +229,38 @@ describe('transformCaddyfile', () => {
     }
   });
 
+  it('the public route refuses /readyz itself, first in the main route, before the password and the proxy (final fix wave W2)', () => {
+    expect(PUBLIC_READYZ_REFUSAL).toBe('respond /readyz 404');
+    const out = transformCaddyfile(LIVE_PREVIEW), lines = out.split('\n');
+    // Exactly once in the whole file: never in the notify handle, never in the loopback listener (which serves /readyz).
+    expect(lines.filter(line => line.includes('/readyz 404'))).toEqual([PUBLIC_READYZ_LINES[1]]);
+    const site = blockAt(lines, lines.indexOf('v3-preview.dezbatere.ro {'));
+    const route = blockAt(site, site.indexOf('\troute {'));
+    // In a `route`, Caddy runs the directives as written: the refusal comes before the wrong-host check, the password
+    // (basic_auth) and every reverse_proxy, so a visitor gets Caddy's own 404, with or without the password.
+    expect(route.slice(0, 3)).toEqual(['\troute {', ...PUBLIC_READYZ_LINES]);
+    const at = (needle: string) => route.findIndex(line => line.includes(needle));
+    expect(at(PUBLIC_READYZ_REFUSAL)).toBeLessThan(at('basic_auth {'));
+    expect(at(PUBLIC_READYZ_REFUSAL)).toBeLessThan(at('reverse_proxy '));
+    const listener = blockAt(lines, lines.indexOf(':3090 {'));
+    expect(listener.join('\n')).not.toContain(PUBLIC_READYZ_REFUSAL);
+  });
+
+  it('a main proxy at the site level gets the refusal as the site block\'s first line (Caddy orders respond before reverse_proxy)', () => {
+    const flat = ['{', '\tadmin off', '}', '', 'v3-preview.dezbatere.ro {', '\theader -Server', '\treverse_proxy 127.0.0.1:3100 {', `\t\t${EDGE_SECRET}`, '\t}', '}', ''].join('\n');
+    const lines = transformCaddyfile(flat).split('\n');
+    const site = blockAt(lines, lines.indexOf('v3-preview.dezbatere.ro {'));
+    expect(site.slice(0, 3)).toEqual(['v3-preview.dezbatere.ro {', '\t# Readiness is never read through the public name: Caddy checks the slots directly, root asks 127.0.0.1:3090.', `\t${PUBLIC_READYZ_REFUSAL}`]);
+    // A proxy outside any site block (directly after the global options) is not a shape this change was written for.
+    expect(() => transformCaddyfile(['{', '\tadmin off', '}', 'reverse_proxy 127.0.0.1:3100 {', `\t${EDGE_SECRET}`, '}', ''].join('\n'))).toThrow('CADDY_SHAPE_REFUSED');
+  });
+
   it('changes nothing else: every other line stays, and the only new lines are the snippet, the imports and the listener', () => {
     const out = transformCaddyfile(LIVE_PREVIEW);
     const { removed, added } = diffLines(LIVE_PREVIEW, out);
     expect(removed).toHaveLength(2);
     const expected = ['', ...SNIPPET_LINES,
+      PUBLIC_READYZ_LINES[0], PUBLIC_READYZ_LINES[1],
       '\t\t\treverse_proxy 127.0.0.1:3100 127.0.0.1:3200 {', '\t\t\t\timport debateai_slots',
       '\t\treverse_proxy 127.0.0.1:3100 127.0.0.1:3200 {', '\t\t\timport debateai_slots',
       ...LISTENER_LINES, ''];

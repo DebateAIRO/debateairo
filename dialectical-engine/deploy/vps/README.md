@@ -1643,9 +1643,12 @@ refuses would leave the site down after the restart.
 
 - **Two slots, one front (side-by-side spec §6).** One `reverse_proxy` lists both slots' websites,
   `127.0.0.1:3001` (slot A) and `127.0.0.1:3002` (slot B), with `lb_policy first`. An active
-  health check asks each website's `/readyz` every 2 s with the edge secret header (otherwise the
-  website treats the check as an untrusted peer); a website is ready only while its release is
-  the current one, so one slot takes the traffic. A request that arrives while no slot is ready,
+  health check asks each website's `/readyz` every 2 s, straight at the slot's port, with the edge
+  secret header (otherwise the website treats the check as an untrusted peer); a website is ready
+  only while its release is the current one, so one slot takes the traffic. The public site
+  refuses `/readyz` itself (`respond /readyz 404`): every request it proxies carries the edge
+  secret, so the website would trust a visitor's `/readyz` too. Readiness is read only by those
+  health checks and through the loopback check site below. A request that arrives while no slot is ready,
   for the few seconds of a switch, is held and retried for up to 10 s (`lb_try_duration`) instead
   of failing.
 - **The loopback check site `127.0.0.1:3090`** is the same front without TLS, bound to loopback

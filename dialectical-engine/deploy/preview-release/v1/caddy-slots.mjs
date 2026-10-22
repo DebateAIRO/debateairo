@@ -2,8 +2,9 @@
 //
 // Plain words: today Caddy sends every request to one website port (slot A, 3100). For two releases to run side by
 // side, both slots' website ports (3100 and 3200) must be its upstreams. Caddy then asks each website's /readyz every
-// 2 s (with the edge secret, or the website treats the check as an untrusted peer) and sends each request to the first
-// ready slot. A request that arrives while neither slot is ready, during a switch, waits up to 10 s instead of failing.
+// 2 s, straight at the slot's port (with the edge secret, or the website treats the check as an untrusted peer), and
+// sends each request to the first ready slot. The public route itself refuses /readyz (Caddy's own 404, before the
+// password: every proxied request carries the edge secret, so the website would trust a visitor's /readyz too). A request that arrives while neither slot is ready, during a switch, waits up to 10 s instead of failing.
 // The preview's Caddy runs with `admin off`, so this is a file change and a restart, done once in the transition
 // window (side-by-side plan D15), never a reload. A loopback-only listener (127.0.0.1:3090, no password) lets root
 // poll /readyz through Caddy itself: it proxies GET /readyz and nothing else (every other request is a plain 404).
@@ -42,6 +43,9 @@ const SLOT_A_PROXY = new RegExp(`^([ \\t]*)reverse_proxy ${escape(SLOT_A)} \\{$`
 const ANY_PROXY = /^[ \t]*reverse_proxy(?:[ \t]|$)/;
 const EDGE_SECRET_LINE = /^[ \t]*header_up X-Debateai-Edge-Secret \{file\.[^}\s]+\}$/;
 const MAX_CADDYFILE_BYTES = 65_536;
+/** The public route's own answer to /readyz (final fix wave W2), with the line that says why. */
+export const PUBLIC_READYZ_REFUSAL = 'respond /readyz 404';
+const PUBLIC_READYZ_COMMENT = '# Readiness is never read through the public name: Caddy checks the slots directly, root asks 127.0.0.1:3090.';
 
 class CaddySlotsRefusal extends Error { constructor(code) { super(code); this.name = 'CaddySlotsRefusal'; this.code = code; } }
 const refuse = code => { throw new CaddySlotsRefusal(code); };
@@ -66,6 +70,16 @@ function globalBlock(lines) {
       const first = lines.slice(start + 1, index).map(indentOf).find(indent => indent !== '') ?? '\t';
       return { close: index, unit: first.startsWith('\t') ? '\t' : /^ +/.exec(first)[0] };
     }
+  }
+  return refuse('CADDY_SHAPE_REFUSED');
+}
+
+/** The line opening the block that holds line `index` (scanning up, the first line whose braces leave that block). */
+function enclosingOpen(lines, index) {
+  let depth = 0;
+  for (let at = index - 1; at >= 0; at -= 1) {
+    depth += depthChange(lines[at]);
+    if (depth > 0) return at;
   }
   return refuse('CADDY_SHAPE_REFUSED');
 }
@@ -96,6 +110,13 @@ function transform(liveText) {
   const main = blockBody(lines, proxies.at(-1));
   if (!main.some(line => EDGE_SECRET_LINE.test(line))) refuse('CADDY_SHAPE_REFUSED');
   const headers = main.filter(line => /^[ \t]*header_up /.test(line)).map(line => line.trim());
+  // The public route refuses /readyz first thing in the block holding the main proxy (final fix wave W2): in a `route`
+  // it runs before everything written after it (the wrong-host check, the password), and in a site or `handle` block
+  // Caddy orders `respond` before `reverse_proxy` anyway. Only Caddy's health checks (straight at the slot ports) and
+  // the loopback listener below reach a website's /readyz.
+  const publicOpen = enclosingOpen(lines, proxies.at(-1));
+  if (publicOpen <= close) refuse('CADDY_SHAPE_REFUSED');
+  const publicIndent = indentOf(lines[proxies.at(-1)]);
   const reindent = text => text.replace(/^\t+/, tabs => unit.repeat(tabs.length));
   const snippet = SLOTS_SNIPPET.replace(/\n$/, '').split('\n').map(reindent);
   const out = [];
@@ -104,6 +125,7 @@ function transform(liveText) {
     if (match) out.push(`${match[1]}reverse_proxy ${SLOT_UPSTREAMS} {`, `${match[1]}${unit}import ${SNIPPET_NAME}`);
     else out.push(line);
     if (index === close) out.push('', ...snippet);
+    if (index === publicOpen) out.push(`${publicIndent}${PUBLIC_READYZ_COMMENT}`, `${publicIndent}${PUBLIC_READYZ_REFUSAL}`);
   }
   // The listener is for readiness only (controller ruling, D9): exactly GET /readyz is proxied, always asking the
   // website for /readyz itself (Caddy's path matcher compares the cleaned path, so /readyz/../api does not match, and
@@ -121,7 +143,8 @@ function transform(liveText) {
 
 /**
  * Side-by-side spec §6, the one-time change. Inserts the shared rules right after the global options block, turns
- * every `reverse_proxy 127.0.0.1:3100 {` into a two-slot proxy that imports them, and appends the loopback listener:
+ * every `reverse_proxy 127.0.0.1:3100 {` into a two-slot proxy that imports them, makes `respond /readyz 404` the first
+ * line of the block holding the main proxy (the public route never answers readiness, W2), and appends the loopback listener:
  * GET /readyz only, proxied with the main route's header_up lines (so the website sees the same host, forwarding and
  * edge secret), and 404 for everything else. Every other
  * line stays byte for byte; new lines follow the file's own indentation. Refuses CADDY_ALREADY_TWO_SLOTS (the rules,

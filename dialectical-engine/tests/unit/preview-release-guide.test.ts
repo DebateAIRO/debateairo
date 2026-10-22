@@ -158,6 +158,16 @@ describe('the preview release guide: transition T, side by side, the way back, t
     expect(validations).toBeGreaterThanOrEqual(2);
   });
 
+  it('the public route refuses /readyz: TA-caddy checks the adapted route and TB7 the live answer (final fix wave W2)', () => {
+    const ta = scriptOf('TA_CADDY').lines.join('\n'), tb7 = scriptOf('TB7').lines;
+    expect(ta).toContain('[ "$PR" = "static_response 404" ] || { echo "TA_CADDY_NOT_DONE:');
+    // The handler order check leaves out only that one route; everything else must still match the live file.
+    expect(ta).toContain('select([.match[]?.path[]?] != ["/readyz"])');
+    const rp = tb7.findIndex(line => line.startsWith("RP=$(curl -s -o /dev/null -m 15 -w '%{http_code}' https://v3-preview.dezbatere.ro/readyz"));
+    expect(rp).toBeGreaterThan(-1);
+    expect(tb7[rp + 1]).toMatch(/^\[ "\$RP" = 404 \] \|\| back /);
+  });
+
   it('the caddy step restores the old file on a failed check', () => {
     const tb7 = scriptOf('TB7').lines;
     const restoreLine = 'install -o root -g root -m 0644 "$S/Caddyfile.before-two-slot" "$C.new"';

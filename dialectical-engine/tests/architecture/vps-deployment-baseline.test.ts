@@ -353,6 +353,13 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
     expect(loopback).toMatch(/^\s*bind 127\.0\.0\.1$/m);
     expect(loopback).toMatch(/^\s*import debateai_slots$/m);
     expect(loopback).toMatch(/request_body\s*\{\s*max_size 1MB\s*\}/);
+    // The public site refuses /readyz itself (final fix wave W2: every request it proxies carries the edge secret);
+    // the health checks ask the slots directly and root asks the loopback site, which still serves it.
+    const site = /^\{\$DEBATEAI_PUBLIC_HOSTNAME\} \{\n([\s\S]*?)^\}$/m.exec(caddy)?.[1] ?? "";
+    expect(site).toMatch(/^\s*respond \/readyz 404$/m);
+    expect(site.search(/^\s*respond \/readyz 404$/m)).toBeLessThan(site.search(/^\s*import debateai_slots$/m));
+    expect(caddy.match(/^\s*respond \/readyz\b.*$/gm)).toHaveLength(1);
+    expect(loopback).not.toMatch(/respond/);
   });
 
   it("the Caddy upstreams are exactly the two slots' website ports, and each slot's website talks to its own API", () => {
