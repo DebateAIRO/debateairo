@@ -5365,6 +5365,10 @@ export class WalkingSkeletonRunner {
       ? await this.#work.claimNext(claimInput)
       : await this.#work.claimById({ ...claimInput, workItemId });
     if (claimed === null) return { kind: "NO_WORK" };
+    // R7 (final review): from here on this copy holds the claim, so a failure the task records is fenced on the
+    // deadline it last set: the claim's own, then the keep-alive's (renewals move it) once that starts below.
+    let claimHeldUntil = (): Date => claimed.claimDeadline;
+    task?.claimed?.(() => claimHeldUntil());
     if (claimed.runId === null) throw new TypedDomainError("WORK_ITEM_WITHOUT_RUN", claimed.workItemId);
     const claimedRunId = claimed.runId;
     /**
@@ -5382,8 +5386,7 @@ export class WalkingSkeletonRunner {
       // Side-by-side spec §4: once this release retires, the debate's next model call is refused (RUNNER_RETIRING).
       stopCalls: () => this.settings.retirement?.callsStopped() === true
     });
-    // R7 (final review): from here on this copy holds the claim; a failure the task records is fenced on its deadline.
-    task?.claimed?.(() => keepAlive.heldUntil());
+    claimHeldUntil = () => keepAlive.heldUntil();
     /**
      * Parallel AI calls (spec 2026-10-12 §3.2): this debate's lane of the runner's call scheduler, opened once the
      * debate is claimed and closed in the `finally` below, after the story: a call still waiting then is refused

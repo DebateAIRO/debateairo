@@ -194,13 +194,19 @@ describe("R7: the task's failure write is fenced on the copy's own claim", () =>
     }]);
   });
 
-  it("the runner tells the task its claim right after the keep-alive starts, with the keep-alive's own deadline", () => {
+  it("the runner tells the task its claim as soon as it holds it, then reads the keep-alive's deadline once that starts", () => {
     const source = readFileSync(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
+    const nothing = source.indexOf('if (claimed === null) return { kind: "NO_WORK" };');
+    const told = source.indexOf("task?.claimed?.(() => claimHeldUntil());");
     const keepAlive = source.indexOf("const keepAlive = startRunKeepAlive({");
-    const told = source.indexOf("task?.claimed?.(() => keepAlive.heldUntil());");
-    expect(keepAlive).toBeGreaterThan(0);
-    expect(told).toBeGreaterThan(keepAlive);
-    expect(source.slice(keepAlive, told)).not.toContain("await ");
+    const moved = source.indexOf("claimHeldUntil = () => keepAlive.heldUntil();");
+    expect(nothing).toBeGreaterThan(0);
+    expect(source.slice(nothing, told)).toContain("let claimHeldUntil = (): Date => claimed.claimDeadline;");
+    expect(told).toBeLessThan(keepAlive);
+    expect(moved).toBeGreaterThan(keepAlive);
+    // No await between the claim and the first word, nor between the keep-alive and the second.
+    expect(source.slice(nothing, told)).not.toContain("await ");
+    expect(source.slice(keepAlive, moved)).not.toContain("await ");
     expect(source.split("task?.claimed?.(").length - 1).toBe(1);
   });
 });
