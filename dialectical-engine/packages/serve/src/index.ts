@@ -2000,6 +2000,35 @@ function serveAnswerContentRef(answerId: string, answerVersion: number): string 
   return `${answerId}:${answerVersion}`;
 }
 
+/**
+ * Final fix wave P4 (readAnswerIndex): the re-admission copies of the person's runs still waiting in line whose START
+ * never committed — no supersession edge, no work item (0123's core.list_unstarted_readmissions, called once per such
+ * waiting run, never per listed run). The waiting runs are chosen first (MATERIALIZED), so the definer function runs
+ * only for the asker's own open waits: a run in line that has not started (core.run_wait_start) and that no re-admission
+ * superseded. `$1`/`$2` are the asker's owner ref and legacy asker id, as in the queries that use it.
+ */
+const READMISSION_ORPHANS = `waiting_in_line AS MATERIALIZED (
+           SELECT wait.run_id FROM core.run_wait AS wait
+           WHERE core.run_is_owned_by(wait.run_id,$1,$2)
+             AND NOT EXISTS (SELECT 1 FROM core.run_wait_start AS started WHERE started.run_id = wait.run_id)
+             AND NOT EXISTS (SELECT 1 FROM core.run_supersession AS s WHERE s.old_run_id = wait.run_id)
+         ), unstarted_readmission AS (
+           SELECT listed.run_id
+           FROM waiting_in_line
+           CROSS JOIN LATERAL core.list_unstarted_readmissions(waiting_in_line.run_id) AS listed(run_id)
+         )`;
+
+/**
+ * Final fix wave P4: the listed run is no re-admission orphan — not a copy recorded FAILED with
+ * RUN_SETUP_FAILED:READMISSION (the waker's record, packages/battery recordSetupFailure), and not one of
+ * READMISSION_ORPHANS. A clause on `run`, for the open-run list and the count (an orphan never has an answer).
+ */
+const NOT_A_READMISSION_ORPHAN = `AND NOT EXISTS (
+               SELECT 1 FROM core.work_item AS failed
+               WHERE failed.run_id = run.run_id AND failed.state = 'FAILED'
+                 AND failed.terminal_reason = 'RUN_SETUP_FAILED:READMISSION')
+             AND NOT EXISTS (SELECT 1 FROM unstarted_readmission AS orphan WHERE orphan.run_id = run.run_id)`;
+
 export class ServeRepository {
   readonly #liveness: LivenessRepository;
   readonly #memory: MemoryRepository;
@@ -3184,6 +3213,13 @@ export class ServeRepository {
    * The person's debates, newest first. Side-by-side C9 (spec 2026-10-21 §4): a run a re-admission superseded
    * (`core.run_supersession`, 0123) is left out of both lists and the count, so a question re-admitted from the
    * waiting line shows once, as its newest run.
+   *
+   * Final fix wave P4: a re-admission copy that never became the debate is left out the same way, so the person never
+   * sees an orphan next to the real debate — one recorded FAILED with RUN_SETUP_FAILED:READMISSION (its START failed,
+   * or a later tick closed it), and one whose START never committed and whose FAILED record has not landed yet
+   * (`READMISSION_ORPHANS`: 0123's core.list_unstarted_readmissions over the person's runs still waiting in line). Only
+   * what the API's runtime login already reads (core.work_item, core.run_wait, core.run_wait_start, core.run_supersession)
+   * and calls (core.list_unstarted_readmissions, EXECUTE for debateai_billing_runtime); no migration.
    */
   async readAnswerIndex(ownership: RunOwnershipInput, limit: number, offset: number): Promise<AnswerIndex> {
     const access = normalizeRunOwnership(ownership);
@@ -3202,7 +3238,7 @@ export class ServeRepository {
         question_line: string;
         created_at_sequence: string;
       }>(
-        `WITH served AS (
+        `WITH ${READMISSION_ORPHANS}, served AS (
            SELECT DISTINCT ON (run.run_id)
              'ANSWER'::text AS kind,
              answer.answer_id,
@@ -3229,6 +3265,7 @@ export class ServeRepository {
                OR core.run_private_content_is_live(run.run_id))
              AND NOT EXISTS (SELECT 1 FROM serve.answer AS answer WHERE answer.run_id = run.run_id)
              AND NOT EXISTS (SELECT 1 FROM core.run_supersession AS s WHERE s.old_run_id = run.run_id)
+             ${NOT_A_READMISSION_ORPHAN}
          )
          SELECT kind, answer_id, run_ref, question_line, created_at_sequence
          FROM (SELECT * FROM served UNION ALL SELECT * FROM open_run) AS debate
@@ -3236,11 +3273,13 @@ export class ServeRepository {
          LIMIT $3 OFFSET $4`, [access.ownerRef, access.legacyAskerId, limit, offset]
       ),
       this.pool.query<{ count: string }>(
-        `SELECT count(*)::text AS count FROM core.run AS run
+        `WITH ${READMISSION_ORPHANS}
+         SELECT count(*)::text AS count FROM core.run AS run
          WHERE core.run_is_owned_by(run.run_id,$1,$2)
            AND (run.content_encryption_version IS DISTINCT FROM 1
              OR core.run_private_content_is_live(run.run_id))
-           AND NOT EXISTS (SELECT 1 FROM core.run_supersession AS s WHERE s.old_run_id = run.run_id)`,
+           AND NOT EXISTS (SELECT 1 FROM core.run_supersession AS s WHERE s.old_run_id = run.run_id)
+           ${NOT_A_READMISSION_ORPHAN}`,
         [access.ownerRef, access.legacyAskerId]
       )
     ]);
