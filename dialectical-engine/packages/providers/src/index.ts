@@ -3146,6 +3146,8 @@ export {
   structureReplayReaders
 } from "./structure-repair.js";
 export * from "./preview-test.js";
+// Side-by-side spec §13, addition D12-D20 (owner 2026-10-22): the preview line-up as a settings value, the env's gate part.
+export * from "./preview-line-up.js";
 // Parallel calls §3.3 (owner ruling O4): one probe for a busy preview model.
 export * from "./preview-busy.js";
 

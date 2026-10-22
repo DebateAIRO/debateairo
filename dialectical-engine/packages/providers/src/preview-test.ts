@@ -21,6 +21,7 @@ import {
   parsePreviewThinkingLevels, previewSlipFixLevel, previewThinkingLevelBelow, previewThinkingLevelFor, previewThinkingLevelOnRequest,
   previewThinkingStepOf, type PreviewThinkingLevels
 } from "./preview-thinking.js";
+import type { PreviewGateSettings } from "./preview-line-up.js";
 
 export const PREVIEW_GLM_MODEL = "zai-org/GLM-5.3-Flash" as const;
 export const PREVIEW_GLM_PROVIDER_REF = "preview:fixture-a" as const;
@@ -78,8 +79,11 @@ export interface PreviewProviderTestConfig {
 export const PREVIEW_PROVIDER_SOCKET_KEYS: Readonly<Record<Exclude<PreviewProviderName, "deepinfra">, "anthropic_budget_socket">> =
   Object.freeze({ anthropic: "anthropic_budget_socket" });
 const PREVIEW_SOCKET_PATTERN = /^\/run\/debateai-v3-preview\/[a-z0-9-]+\.sock$/u;
-/** The gate socket a provider's calls go through under this config, or undefined when it has none. */
-export function previewProviderSocket(config: PreviewProviderTestConfig, provider: PreviewProviderName): string | undefined {
+/**
+ * The gate socket a provider's calls go through under this config, or undefined when it has none. Addition D16: only the
+ * gate part is read, so the env's sockets-only form (PreviewGateSettings) fits as well as a whole config.
+ */
+export function previewProviderSocket(config: PreviewGateSettings, provider: PreviewProviderName): string | undefined {
   return provider === "deepinfra" ? config.budget_socket : config[PREVIEW_PROVIDER_SOCKET_KEYS[provider]];
 }
 /** What the target check needs; the legacy five-key literal (v1 publish kit) still fits it. */
@@ -87,30 +91,47 @@ export type PreviewTargetRosters = Readonly<Partial<PreviewProviderTestConfig> &
 function refused(): never { throw new TypeError("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID"); }
 const LEGACY_CONFIG_KEYS = ["budget_socket", "deployment", "free_model_ids", "requested_thinking_level", "scope_id"];
 const CONFIG_KEYS = [...LEGACY_CONFIG_KEYS, "premium_model_ids"].sort();
+/** Addition D14 (owner 2026-10-22): the sockets-only form, the five keys less the roster (plus optional provider sockets). */
+const SOCKETS_ONLY_CONFIG_KEYS = LEGACY_CONFIG_KEYS.filter(key => key !== "free_model_ids");
 const OPTIONAL_SOCKET_KEYS: readonly string[] = Object.values(PREVIEW_PROVIDER_SOCKET_KEYS);
 function reviewedRoster(value: unknown): readonly string[] {
   if (!Array.isArray(value) || value.length < 1 || value.length > PREVIEW_MODEL_ROWS.length
     || value.some(id => previewModelRow(id) === undefined) || new Set(value).size !== value.length) return refused();
   return Object.freeze([...value as string[]]);
 }
-export function parsePreviewProviderTestConfig(source: string | undefined): PreviewProviderTestConfig | undefined {
-  if (source === undefined) return undefined;
+/**
+ * Addition D14-D15 (owner 2026-10-22) — THE ONE KEY CHECK BEHIND BOTH ENV PARSERS. `parsePreviewProviderTestConfig`
+ * (today's exact behaviour) and `parsePreviewEnvironmentConfig` (preview-line-up.ts, the three forms) both read the env
+ * text through this function, so the two can never drift. Internal to the providers package: no other caller.
+ *
+ * Returns the gate part (deployment, the fixed wire word, every gate socket, the scope) and, for the two forms that carry
+ * rosters (the legacy five keys, the six keys), today's whole config; `config: null` for the sockets-only form (D14),
+ * which may carry no table (a table without rosters is never meant). Throws PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID,
+ * or the thinking parser's own PREVIEW_THINKING_LEVELS_INVALID, exactly where today's parser did.
+ */
+export function readPreviewEnvironmentSource(source: string): Readonly<{ gate: PreviewGateSettings; config: PreviewProviderTestConfig | null }> {
   let value: unknown; try { value = JSON.parse(source); } catch { return refused(); }
   if (typeof value !== "object" || value === null || Array.isArray(value)) return refused();
   const row = value as Record<string, unknown>;
-  // Spec 2026-10-12 §4.2: `thinking_levels` is an optional key on both forms, so the key checks look past it.
+  // Spec 2026-10-12 §4.2: `thinking_levels` is an optional key on both roster forms, so the key checks look past it.
   const own = Object.keys(row).filter(key => key !== "thinking_levels");
   const keys = [...own].sort().join(",");
   const legacy = keys === LEGACY_CONFIG_KEYS.join(",");
   const socketKeys = own.filter(key => OPTIONAL_SOCKET_KEYS.includes(key));
   const baseKeys = own.filter(key => !OPTIONAL_SOCKET_KEYS.includes(key)).sort().join(",");
-  if ((!legacy && baseKeys !== CONFIG_KEYS.join(",")) || row.deployment !== "v3-preview" || row.requested_thinking_level !== "high"
+  const socketsOnly = baseKeys === SOCKETS_ONLY_CONFIG_KEYS.join(",");
+  if ((!legacy && !socketsOnly && baseKeys !== CONFIG_KEYS.join(",")) || row.deployment !== "v3-preview" || row.requested_thinking_level !== "high"
     || typeof row.budget_socket !== "string" || !PREVIEW_SOCKET_PATTERN.test(row.budget_socket)
     || typeof row.scope_id !== "string" || !/^[a-z0-9][a-z0-9-]{0,95}$/u.test(row.scope_id)) return refused();
   // Each provider's own socket: the same folder and pattern, and never another gate's socket.
   const sockets = [row.budget_socket, ...socketKeys.map(key => row[key])];
   if (socketKeys.some(key => typeof row[key] !== "string" || !PREVIEW_SOCKET_PATTERN.test(row[key] as string))
     || new Set(sockets).size !== sockets.length) return refused();
+  const providerSockets = Object.fromEntries(socketKeys.sort().map(key => [key, row[key] as string]));
+  const gate: PreviewGateSettings = Object.freeze({ deployment: "v3-preview", requested_thinking_level: "high",
+    budget_socket: row.budget_socket, scope_id: row.scope_id, ...providerSockets });
+  // Addition D14: the sockets-only form names no line-up, so it may carry no table either.
+  if (socketsOnly) return Object.hasOwn(row, "thinking_levels") ? refused() : Object.freeze({ gate, config: null });
   if (legacy && (!Array.isArray(row.free_model_ids) || row.free_model_ids.length !== 1 || row.free_model_ids[0] !== PREVIEW_GLM_MODEL)) return refused();
   const free = reviewedRoster(row.free_model_ids);
   const premium = legacy ? free : reviewedRoster(row.premium_model_ids);
@@ -118,11 +139,19 @@ export function parsePreviewProviderTestConfig(source: string | undefined): Prev
   // Spec 2026-10-12 §4.2: a bad table throws PREVIEW_THINKING_LEVELS_INVALID from the parser, unwrapped, so the boot error names it.
   const config: PreviewProviderTestConfig = Object.freeze({ deployment: "v3-preview", free_model_ids: free, premium_model_ids: premium,
     requested_thinking_level: "high", budget_socket: row.budget_socket, scope_id: row.scope_id,
-    ...Object.fromEntries(socketKeys.sort().map(key => [key, row[key] as string])),
+    ...providerSockets,
     ...(row.thinking_levels === undefined ? {} : { thinking_levels: parsePreviewThinkingLevels(row.thinking_levels) }) });
   // A roster model whose provider has no gate socket here could never be called: refuse to boot.
   if ([...free, ...premium].some(id => previewProviderSocket(config, previewModelRow(id)!.provider) === undefined)) return refused();
-  return config;
+  return Object.freeze({ gate, config });
+}
+/**
+ * Today's parser, unchanged in behaviour (the kit, tests and tools): the two roster forms only. The sockets-only form is
+ * refused here; parsePreviewEnvironmentConfig (preview-line-up.ts, addition D14) is the parser that accepts it.
+ */
+export function parsePreviewProviderTestConfig(source: string | undefined): PreviewProviderTestConfig | undefined {
+  if (source === undefined) return undefined;
+  return readPreviewEnvironmentSource(source).config ?? refused();
 }
 export function validatePreviewProviderTestConfig(value: unknown): PreviewProviderTestConfig | undefined {
  if(value===undefined)return undefined;
@@ -192,6 +221,15 @@ export function previewPlanTierRosters<T extends Readonly<{ free: readonly strin
  */
 export function assertPreviewProviderTargets(config: PreviewTargetRosters | undefined, targets: readonly ProviderDiscoveryTarget[]): void {
   if (config === undefined) return;
+  assertPreviewTargetSet(targets);
+  assertPreviewRostersServed(config, targets);
+}
+/**
+ * Addition D16 (owner 2026-10-22): the target check's first half, which needs no line-up: the declared targets are one of
+ * the two reviewed provider sets and each equals its ref's reviewed row field for field, with no credential. The runner
+ * and the API run it once at boot; the rosters half runs per settings version.
+ */
+export function assertPreviewTargetSet(targets: readonly ProviderDiscoveryTarget[]): void {
   const refs = targets.map(target => target.providerRef);
   if (refs.join("\0") !== PREVIEW_GLM_PROVIDER_REFS.join("\0") && !previewRefsAreReviewedSet(refs)) refused();
   for (const target of targets) {
@@ -207,6 +245,13 @@ export function assertPreviewProviderTargets(config: PreviewTargetRosters | unde
       || target.contextWindowTokens !== reviewed.contextWindowTokens
       || target.authorizationHeader !== undefined || target.authorizationFile !== undefined) refused();
   }
+}
+/**
+ * Addition D16, D19 (owner 2026-10-22): the target check's second half: every model the rosters name has a declared
+ * target. Per settings version, since the rosters are the version's (a roster model no target serves is
+ * SETTINGS_NEEDS_ENV_CHANGE:TARGET at check-version).
+ */
+export function assertPreviewRostersServed(config: PreviewTargetRosters, targets: readonly ProviderDiscoveryTarget[]): void {
   const served = new Set(targets.map(target => target.model));
   if ([...config.free_model_ids, ...(config.premium_model_ids ?? [])].some(model => !served.has(model))) refused();
 }
@@ -252,7 +297,7 @@ export function previewProbeControls(target: Readonly<{ model: string }>): Reado
  * providerTargetGatewayControls, so this menu replaces the target file's. Off the preview nothing is added.
  */
 export function previewTargetGatewayControls(
-  config: PreviewProviderTestConfig | undefined, target: Readonly<{ model: string }>
+  config: PreviewGateSettings | undefined, target: Readonly<{ model: string }>
 ): Readonly<{ maxOutputTokens?: number; cacheFirstUserTurn?: true; thinking?: Readonly<{ parameter: "reasoning_effort"; levels: readonly string[] }> }> {
   if (config === undefined) return Object.freeze({});
   const reviewed = previewModelRow(target.model) ?? refused();
@@ -268,10 +313,10 @@ export function previewTargetGatewayControls(
  * refusal, and the runner's own final retry after a cooldown, meet a spent step (CALL_BUDGET_EXHAUSTED);
  * the preview's one POST per call is `maxAttemptsThisCall` (withPreviewProviderCallPolicy) instead.
  */
-export function previewCallBound(bound: CallBound, config: PreviewProviderTestConfig | undefined): CallBound {
+export function previewCallBound(bound: CallBound, config: PreviewGateSettings | undefined): CallBound {
   return config === undefined ? bound : Object.freeze({ maxAttempts: bound.maxAttempts, tokenCeiling: Math.max(bound.tokenCeiling, PREVIEW_GLM_GENERATION_TOKEN_FLOOR), deadlineMs: PREVIEW_GLM_DEADLINE_MS });
 }
-export function previewRunnerPolicy<T extends { bounds: Readonly<Record<"JUDGE" | "COMPOSER" | "CONFORMANCE", CallBound>>; synthesisRolePolicy: { synthesizerBound: CallBound; evaluatorBound: CallBound } }>(policy: T, config: PreviewProviderTestConfig | undefined): T {
+export function previewRunnerPolicy<T extends { bounds: Readonly<Record<"JUDGE" | "COMPOSER" | "CONFORMANCE", CallBound>>; synthesisRolePolicy: { synthesizerBound: CallBound; evaluatorBound: CallBound } }>(policy: T, config: PreviewGateSettings | undefined): T {
   if (config === undefined) return policy;
   return { ...policy, bounds: { JUDGE: previewCallBound(policy.bounds.JUDGE, config), COMPOSER: previewCallBound(policy.bounds.COMPOSER, config), CONFORMANCE: previewCallBound(policy.bounds.CONFORMANCE, config) }, synthesisRolePolicy: { ...policy.synthesisRolePolicy, synthesizerBound: previewCallBound(policy.synthesisRolePolicy.synthesizerBound, config), evaluatorBound: previewCallBound(policy.synthesisRolePolicy.evaluatorBound, config) } };
 }
@@ -545,9 +590,14 @@ export function previewLengthRetryOf(request: Readonly<{ callSiteKey: string; la
  * proved unsent (`PreviewGateUnsent`: PROVIDER_NOT_REACHED, PROVIDER_ERROR_UNBILLED), BEFORE the 60-second resend wait,
  * so the runner's scheduler lets one call in flight through that gate during that minute (main.ts wires it to
  * `markGateUnhealthy`; the lane still marks it again when a call finally fails). A hook that throws changes nothing.
+ *
+ * Addition D17 (owner 2026-10-22): `options.thinkingLevelsOf`, when given, is the table each call runs at, asked once per
+ * call with the call's own `runId` (the run's stamped settings version's table; null = no debate): it replaces
+ * `config.thinking_levels` for the step level and for `slip_fix`. A resolver that throws ends the call before anything is
+ * sent. Absent, the config's own table, as today. `config` needs only the gate part plus that optional table.
  */
 export function withPreviewProviderCallPolicy(
-  gateway: ProviderGateway, config: PreviewProviderTestConfig, target: Readonly<{ model: string }>,
+  gateway: ProviderGateway, config: PreviewGateSettings & Readonly<{ thinking_levels?: PreviewThinkingLevels }>, target: Readonly<{ model: string }>,
   options: Readonly<{
     sleep?: (milliseconds: number) => Promise<void>;
     busy?: PreviewBusyCoordinator;
@@ -566,6 +616,12 @@ export function withPreviewProviderCallPolicy(
      * offered. A hook that throws changes nothing.
      */
     onFinalWriterTierUnread?: (event: PreviewFinalWriterTierUnread) => void;
+    /**
+     * Addition D17 (owner 2026-10-22): the thinking table of the call's run (its stamped settings version), by
+     * `request.runId`; undefined = no table (every row's default). Synchronous and closure-captured (no
+     * AsyncLocalStorage: the scheduler's pump starts one debate's call inside another's context).
+     */
+    thinkingLevelsOf?: (runId: string | null) => PreviewThinkingLevels | undefined;
   }> = {}
 ): ProviderGateway {
   const reviewed = previewModelRow(target.model) ?? refused();
@@ -648,10 +704,13 @@ export function withPreviewProviderCallPolicy(
     // level when the owner set one; absent, every POST runs at the call's level, as today.
     // Run resilience (spec 2026-10-12, fix (b)): the step's allowance is this maker's own (`attemptScope`), so a
     // fallback that moves a call to another maker never finds the step spent by the makers it moved away from.
-    const effort = previewThinkingLevelFor(config.thinking_levels, reviewed, previewThinkingStepOf(request));
+    // Addition D17: the run's own table when the runner resolves one per run (asked once, so every POST of the call and
+    // its resend agree), else the config's.
+    const levels = options.thinkingLevelsOf === undefined ? config.thinking_levels : options.thinkingLevelsOf(request.runId);
+    const effort = previewThinkingLevelFor(levels, reviewed, previewThinkingStepOf(request));
     const level = previewThinkingLevelOnRequest(effort);
     const lengthRetry = previewLengthRetryOf(request, reviewed, effort);
-    const slipFix = previewSlipFixLevel(config.thinking_levels, reviewed);
+    const slipFix = previewSlipFixLevel(levels, reviewed);
     const repairLevel = slipFix === undefined || (!storyRepair && !formatRepair) ? undefined : previewThinkingLevelOnRequest(slipFix);
     const send = async () => {
       const tier = await finalWriterCall();
@@ -1027,7 +1086,7 @@ function previewAuthorityStopped(status: number | undefined, row: unknown): bool
  * on the preview — the gate its calls go through and the model it serves. Undefined off the preview, where the
  * runner builds no book (hosted and local unchanged).
  */
-export function previewRunResilience(config: PreviewProviderTestConfig | undefined): Readonly<{
+export function previewRunResilience(config: PreviewGateSettings | undefined): Readonly<{
   gateOf: (providerRef: string) => string | undefined;
   modelOf: (providerRef: string) => string | undefined;
 }> | undefined {
@@ -1039,7 +1098,7 @@ export function previewRunResilience(config: PreviewProviderTestConfig | undefin
 }
 /** Local IPC only: application principals never receive the provider credential or ledger write access. */
 export function createPreviewBudgetRpcPort(
-  config: PreviewProviderTestConfig, socketPath: string = config.budget_socket,
+  config: PreviewGateSettings, socketPath: string = config.budget_socket,
   // Fix (c): the same gate's read-only `/remaining`, asked only after a STOPPED refusal.
   remaining: PreviewRemainingPort = createPreviewRemainingRpcPort({ budget_socket: socketPath, scope_id: config.scope_id })
 ): PreviewBudgetPort {
@@ -1089,7 +1148,7 @@ export function createPreviewBudgetRpcPort(
  * PR B: one RPC port per gate this config names (DeepInfra on `budget_socket`, Anthropic on
  * `anthropic_budget_socket` when set). The guarded fetch routes each call to its own provider's port.
  */
-export function createPreviewBudgetRpcPorts(config: PreviewProviderTestConfig): PreviewBudgetPorts {
+export function createPreviewBudgetRpcPorts(config: PreviewGateSettings): PreviewBudgetPorts {
   const ports: Partial<Record<PreviewProviderName, PreviewBudgetPort>> = {};
   for (const provider of ["deepinfra", ...Object.keys(PREVIEW_PROVIDER_SOCKET_KEYS)] as PreviewProviderName[]) {
     const socket = previewProviderSocket(config, provider);

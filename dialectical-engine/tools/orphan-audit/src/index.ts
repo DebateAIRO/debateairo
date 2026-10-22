@@ -731,9 +731,12 @@ export function auditNumericSourceLiteralExports(name: string, source: string): 
 }
 
 /** The deployed preview-test module is a finite production budget/config boundary.
- * Only its reviewed direct runtime imports are exceptional; mixed fixture imports still block. */
+ * Only its reviewed direct runtime imports are exceptional; mixed fixture imports still block.
+ * Side-by-side addition D14-D16 (owner 2026-10-22): preview-line-up.ts, the env's gate part and the line-up composed back
+ * into that module's config shape, is one more reviewed direct caller (it reuses the one env key check there). */
 export function auditProductionFixtureImports(where:string,source:string):readonly string[]{
- const runtimeCaller=where==="packages/providers/src/index.ts"||where==="packages/providers/src/provider-probe.ts";
+ const runtimeCaller=where==="packages/providers/src/index.ts"||where==="packages/providers/src/provider-probe.ts"
+  ||where==="packages/providers/src/preview-line-up.ts";
  for(const match of source.matchAll(/from\s+["']([^"']+)["']/g)){
   const specifier=match[1]!;
   if(!/(?:tests?|fixtures?)/.test(specifier))continue;

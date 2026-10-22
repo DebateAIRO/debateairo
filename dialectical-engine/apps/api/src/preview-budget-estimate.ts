@@ -54,6 +54,7 @@ import {
   previewTierOutputBound,
   type PreviewCallTier,
   type PreviewGateRemaining,
+  type PreviewGateSettings,
   type PreviewModelRow,
   type PreviewProviderName,
   type PreviewProviderTestConfig
@@ -1409,9 +1410,9 @@ export function previewOutputTokensForBasis(output: PreviewCallOutputTokens, bas
       .map((step) => lengthGuidanceAllowanceTokens(length, step, shaped.debate)), ...mapTokens) });
 }
 
-/** One read-only /remaining port per gate the config names: DeepInfra's always, Anthropic's when set. */
+/** One read-only /remaining port per gate the config names: DeepInfra's always, Anthropic's when set (addition D16: the gate part only). */
 export function previewRemainingPorts(
-  config: PreviewProviderTestConfig
+  config: PreviewGateSettings
 ): PreviewBudgetGateSettings["remaining"] {
   const remaining: Partial<Record<PreviewGateKey, (signal?: AbortSignal) => Promise<PreviewGateRemaining>>> = {};
   for (const provider of PREVIEW_PROVIDER_NAMES) {
