@@ -32,7 +32,9 @@ describe("LOAD-01 production Hatchet terminal recording", () => {
     expect(recordTerminalFailure).toHaveBeenCalledWith({
       runId: "11111111-1111-4111-8111-111111111111",
       workItemId: "22222222-2222-4222-8222-222222222222",
-      reason: "RUNNER_EXECUTION_FAILED:NODE_REVIEW_UNAVAILABLE"
+      reason: "RUNNER_EXECUTION_FAILED:NODE_REVIEW_UNAVAILABLE",
+      // R7 (final review): this runner double never told the task it claimed the item.
+      heldUntil: null
     });
   });
 });

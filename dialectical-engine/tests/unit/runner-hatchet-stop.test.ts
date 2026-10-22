@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { TypedDomainError } from "@debateai/kernel";
 import {
@@ -33,7 +34,7 @@ type TaskContext = Readonly<{
 
 function taskOver(input: {
   readonly execute: (workItemId: string, control?: RunnerTaskControl) => Promise<{ kind: string; answerId?: string }>;
-  readonly recorded?: { runId: string; workItemId: string; reason: string }[];
+  readonly recorded?: { runId: string; workItemId: string; reason: string; heldUntil?: Date | null }[];
   readonly previewExecutionTimeout?: "3600s";
   readonly executions?: TaskExecutionCounter;
 }) {
@@ -45,7 +46,7 @@ function taskOver(input: {
     } } as never,
     runner: { executeWorkItem: input.execute } as unknown as WalkingSkeletonRunner,
     failures: {
-      recordTerminalFailure: async (entry: { runId: string; workItemId: string; reason: string }) => {
+      recordTerminalFailure: async (entry: { runId: string; workItemId: string; reason: string; heldUntil?: Date | null }) => {
         input.recorded?.push(entry);
         return true;
       }
@@ -106,7 +107,7 @@ describe("the debate hears Hatchet", () => {
 
 describe("the task's catch tells the two stops apart", () => {
   it("leaves the work item alone when another copy holds the claim", async () => {
-    const recorded: { runId: string; workItemId: string; reason: string }[] = [];
+    const recorded: { runId: string; workItemId: string; reason: string; heldUntil?: Date | null }[] = [];
     const task = taskOver({
       recorded,
       execute: async () => { throw new TypedDomainError("RUNNER_CLAIM_LOST", "another copy holds the claim"); }
@@ -118,7 +119,7 @@ describe("the task's catch tells the two stops apart", () => {
 
   it("leaves the work item alone when it belongs to another release", async () => {
     // Side-by-side spec §3: another release's debate is that release's to finish or fail, never this runner's.
-    const recorded: { runId: string; workItemId: string; reason: string }[] = [];
+    const recorded: { runId: string; workItemId: string; reason: string; heldUntil?: Date | null }[] = [];
     const task = taskOver({
       recorded,
       execute: async () => { throw new TypedDomainError("RUNNER_RELEASE_MISMATCH", "the debate belongs to another release"); }
@@ -131,7 +132,7 @@ describe("the task's catch tells the two stops apart", () => {
   it("leaves the work item alone when its release is retiring", async () => {
     // Side-by-side spec §4: the retiring release stops; the item is left as is for this release's backstop, which sets
     // it aside FAILED with the waiver (spec §4 step 3); the §3 fence keeps every other release off it.
-    const recorded: { runId: string; workItemId: string; reason: string }[] = [];
+    const recorded: { runId: string; workItemId: string; reason: string; heldUntil?: Date | null }[] = [];
     const task = taskOver({
       recorded,
       execute: async () => { throw new TypedDomainError("RUNNER_RETIRING", "this release is retiring"); }
@@ -142,7 +143,7 @@ describe("the task's catch tells the two stops apart", () => {
   });
 
   it("records a debate stopped at the limit as failed, under its own code", async () => {
-    const recorded: { runId: string; workItemId: string; reason: string }[] = [];
+    const recorded: { runId: string; workItemId: string; reason: string; heldUntil?: Date | null }[] = [];
     const task = taskOver({
       recorded,
       execute: async () => { throw new TypedDomainError("RUNNER_TIME_LIMIT_REACHED", "the debate ran out of time"); }
@@ -152,8 +153,55 @@ describe("the task's catch tells the two stops apart", () => {
     expect(recorded).toEqual([{
       runId: RUN_ID,
       workItemId: WORK_ITEM_ID,
-      reason: "RUNNER_EXECUTION_FAILED:RUNNER_TIME_LIMIT_REACHED"
+      reason: "RUNNER_EXECUTION_FAILED:RUNNER_TIME_LIMIT_REACHED",
+      // R7: this debate never told the task it claimed the item.
+      heldUntil: null
     }]);
+  });
+});
+
+/**
+ * R7 (final review): two copies of one item can run in one process under the same worker id (a Hatchet retry, a second
+ * dispatch). One that throws before its own claim must not FAIL the claim its sibling holds; so the task's failure
+ * write names the copy's claim: none (null) when the debate never claimed, else the deadline this copy last set, read
+ * when it fails (renewals move it), and battery fences on it as renewClaim does.
+ */
+describe("R7: the task's failure write is fenced on the copy's own claim", () => {
+  it("names no claim when the debate threw before claiming, and its latest deadline once it claimed", async () => {
+    const recorded: { runId: string; workItemId: string; reason: string; heldUntil?: Date | null }[] = [];
+    const beforeClaim = taskOver({
+      recorded,
+      execute: async () => { throw new TypedDomainError("SCORING_OPERATOR_UNRESOLVED", "no scoring operator row"); }
+    });
+    await expect(beforeClaim({ runId: RUN_ID, workItemId: WORK_ITEM_ID })).rejects.toMatchObject({ code: "SCORING_OPERATOR_UNRESOLVED" });
+    expect(recorded).toEqual([{ runId: RUN_ID, workItemId: WORK_ITEM_ID, reason: expect.any(String), heldUntil: null }]);
+
+    recorded.length = 0;
+    let deadline = new Date("2026-10-22T10:00:00.000Z");
+    const renewed = new Date("2026-10-22T10:00:40.000Z");
+    const afterClaim = taskOver({
+      recorded,
+      execute: async (_workItemId, control) => {
+        control?.claimed?.(() => deadline);
+        // A renewal after the claim: the write reads the deadline at failure time.
+        deadline = renewed;
+        throw new TypedDomainError("RUNNER_TIME_LIMIT_REACHED", "the debate ran out of time");
+      }
+    });
+    await expect(afterClaim({ runId: RUN_ID, workItemId: WORK_ITEM_ID })).rejects.toMatchObject({ code: "RUNNER_TIME_LIMIT_REACHED" });
+    expect(recorded).toEqual([{
+      runId: RUN_ID, workItemId: WORK_ITEM_ID, reason: "RUNNER_EXECUTION_FAILED:RUNNER_TIME_LIMIT_REACHED", heldUntil: renewed
+    }]);
+  });
+
+  it("the runner tells the task its claim right after the keep-alive starts, with the keep-alive's own deadline", () => {
+    const source = readFileSync(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8");
+    const keepAlive = source.indexOf("const keepAlive = startRunKeepAlive({");
+    const told = source.indexOf("task?.claimed?.(() => keepAlive.heldUntil());");
+    expect(keepAlive).toBeGreaterThan(0);
+    expect(told).toBeGreaterThan(keepAlive);
+    expect(source.slice(keepAlive, told)).not.toContain("await ");
+    expect(source.split("task?.claimed?.(").length - 1).toBe(1);
   });
 });
 
