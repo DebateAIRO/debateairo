@@ -14,8 +14,9 @@ import { pathToFileURL } from "node:url";
  *   and the boot compares it with the key (O1: a person is never served another release's pages).
  * - GET /readyz is answered ahead of Next from its own API's /readyz (spec §6): ready only when that API is ready under
  *   the SAME key, so Caddy never sends traffic to a website whose API is another release.
- * - SIGTERM drains: /readyz says DRAINING, the server stops accepting, and the process exits 0 once closed or at a
- *   20 s deadline (spec §6: a planned stop is never a failure).
+ * - SIGTERM drains: the server stops accepting at once, and the process exits 0 once closed or at a 20 s deadline
+ *   (spec §6: a planned stop is never a failure). /readyz would say DRAINING, but in practice no probe sees it (see
+ *   installGracefulClose): Caddy's next health check meets a refused connection, which marks the website down the same.
  *
  * Refusals are content-free: they name a code, never the value they were given.
  */
@@ -180,7 +181,8 @@ function writeJson(res, status, body) {
  * GET /readyz ahead of Next (spec §6). The answer is the API's own body (200) when that API is ready under the same
  * key; otherwise 503 `{ready:false, releaseKey, reasons}` with the API's reasons, BOOTING when the API is unreachable,
  * late (`timeoutMs`), not JSON or not a readiness answer, RELEASE_KEY_MISMATCH when it is another release (its reasons
- * are about that release, so they are not passed on), and DRAINING added once `draining()` is true (after SIGTERM).
+ * are about that release, so they are not passed on), and DRAINING added once `draining()` is true (after SIGTERM; not
+ * observable in practice, see installGracefulClose).
  * Under `--dev` without a key (`releaseKey` null) the key comparison is skipped. Returns whether it handled the request.
  */
 export function createReadinessResponder({ apiBase, releaseKey, fetch: fetchImpl, timeoutMs = 1000, draining }) {
@@ -214,9 +216,14 @@ export function createReadinessResponder({ apiBase, releaseKey, fetch: fetchImpl
 }
 
 /**
- * SIGTERM, once (spec §6; Caddy stops routing on DRAINING): `onDrain()`, then `server.close()` (no new connections)
- * and `closeIdleConnections()`; exit 0 when the close completes or, at `deadlineMs`, after `closeAllConnections()` (an
- * open event stream must not hold a planned stop). A planned stop exits 0, never a failure. Later SIGTERMs do nothing.
+ * SIGTERM, once (spec §6): `onDrain()`, then `server.close()` (no new connections) and `closeIdleConnections()`; exit 0
+ * when the close completes or, at `deadlineMs`, after `closeAllConnections()` (an open event stream must not hold a
+ * planned stop). A planned stop exits 0, never a failure. Later SIGTERMs do nothing.
+ *
+ * DRAINING is not observable (final fix wave W5): `server.close()` follows `onDrain()` in the same tick, so no new
+ * connection — and so no new /readyz probe — is accepted once `draining()` is true, and idle kept-alive connections are
+ * closed with it. Caddy's next health check meets a refused connection instead of a 503 DRAINING: the same effect (the
+ * website is marked down and gets no new requests). The DRAINING reason stays for a probe already on an open connection.
  */
 export function installGracefulClose({ server, process: proc, deadlineMs = 20_000, onDrain }) {
   let closing = false;

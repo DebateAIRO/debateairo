@@ -51,7 +51,8 @@ if (!development) assertBuildMatchesRelease(distDir, releaseKey);
 // Spec §6: /readyz stays BOOTING without a usable API base; outside --dev the boot names that cause (C12 review).
 const apiBase = process.env.DIALECTICAL_API_BASE?.trim();
 noteUnusableApiBase(apiBase, { development });
-// Spec §6: SIGTERM turns /readyz to DRAINING before the server stops accepting.
+// Spec §6: SIGTERM turns /readyz to DRAINING as the server stops accepting; no new probe sees it (Caddy meets a refused
+// connection, the same effect — release-edge.mjs installGracefulClose, final fix wave W5).
 let draining = false;
 const readiness = createReadinessResponder({
   apiBase,
@@ -99,5 +100,5 @@ server.on("upgrade", (request, socket, head) => {
 server.headersTimeout = 60_000;
 server.requestTimeout = 300_000;
 server.listen(port, hostname);
-// Spec §6: a planned stop drains (/readyz DRAINING), closes, and exits 0 within 20 s.
+// Spec §6: a planned stop stops accepting at once, closes, and exits 0 within 20 s.
 installGracefulClose({ server, process, onDrain: () => { draining = true; } });
