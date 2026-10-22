@@ -37,7 +37,9 @@ jobs:
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
         with: { version: 11.20.0 }
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with: { node-version: 26.8.2, cache: pnpm, cache-dependency-path: head/dialectical-engine/pnpm-lock.yaml }
+        # No pnpm cache: while tests/n1-baseline.json names no commit the job stops before any install, and
+        # setup-node's post step would then fail saving a store path that was never created.
+        with: { node-version: 26.8.2 }
       # A broken baseline file refuses N1_BASELINE_INVALID here (bash -e), so it can never stop green.
       - name: Read the released commit
         id: baseline

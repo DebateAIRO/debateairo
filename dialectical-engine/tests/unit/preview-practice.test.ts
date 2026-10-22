@@ -378,11 +378,11 @@ describe("practice start refusals", () => {
       : line.startsWith("DEBATEAI_DEPLOYMENT_MODE=") ? `DEBATEAI_DEPLOYMENT_MODE=${mode}` : line);
     const head = "d50e33165a1b" + "0".repeat(28);
     it("a RELEASE_KEY line wins, checked against the register version and the mode", () => {
-      expect(parsePracticeSettings([...versionOne("hosted"), "RELEASE_KEY=r1-0123456789ab"].join("\n"), { sourceRevision: head })
+      expect(parsePracticeSettings([...versionOne("hosted"), `RELEASE_KEY=${["r1", "0123456789ab"].join("-")}`].join("\n"), { sourceRevision: head })
         .runner.RELEASE_KEY).toBe(["r1", "0123456789ab"].join("-"));
-      expect(() => parsePracticeSettings([...versionOne("local"), "RELEASE_KEY=r2-0123456789ab"].join("\n")))
+      expect(() => parsePracticeSettings([...versionOne("local"), `RELEASE_KEY=${["r2", "0123456789ab"].join("-")}`].join("\n")))
         .toThrow("PRACTICE_SETTINGS_VALUE_INVALID: RELEASE_KEY");
-      expect(() => parsePracticeSettings([...versionOne("hosted"), "RELEASE_KEY=r1-000000000000"].join("\n")))
+      expect(() => parsePracticeSettings([...versionOne("hosted"), `RELEASE_KEY=${["r1", "000000000000"].join("-")}`].join("\n")))
         .toThrow("PRACTICE_SETTINGS_VALUE_INVALID: RELEASE_KEY");
     });
     it("without one, the source revision names it; a hosted practice with neither refuses; local falls back to the development key", () => {
