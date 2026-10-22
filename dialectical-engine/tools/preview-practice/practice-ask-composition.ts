@@ -84,6 +84,7 @@ import {
   readBillingPolicy,
   readCallTokenCeilings,
   readCostEnvelopePolicy,
+  readCostEstimateStartPolicy,
   readDebateShapePolicy,
   readDeploymentRiskTier,
   readEngineVersion,
@@ -183,10 +184,14 @@ export async function composePracticeAskMoney(input: Readonly<{
     // Side-by-side spec §9 (C17), as main.ts: no funding read and no funding refusal at boot. main.ts builds the funding
     // source only with billing on; billing is kept off here, so there is none (the room gets no `funding`).
     const personAllowance = NO_PERSON_ALLOWANCE;
+    // main.ts's "cost-estimate-start-policy" stage (fresh-site estimate, owner rulings 2026-10-22): the sealed starting
+    // figures at the version in force; null at a version without the row (today's estimate).
+    const costEstimateStartPolicy = await readCostEstimateStartPolicy(pool, environment.REGISTER_VERSION);
     const estimator = new RecentRunsCostEstimator({
       source: new PostgresRecentRunUsageSource(pool),
       prices: buildApiProviderPriceMap(input.declaredProviderTargets, environment.DEPLOYMENT_MODE),
-      maximumMicros: mostOneRunMaySpendMicros(costEnvelopeRows.guardPolicy)
+      maximumMicros: mostOneRunMaySpendMicros(costEnvelopeRows.guardPolicy),
+      start: costEstimateStartPolicy
     });
     if (input.roomDecisionPool === undefined) throw new TypeError("PRACTICE_ROOM_POOL_REQUIRED");
     const room = new AskRoom({

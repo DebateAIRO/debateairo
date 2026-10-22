@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, BILLING_POLICY_DEPLOYMENT_REGISTER_ROW, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyStartValues, LENGTH_GUIDANCE_POLICY_ROW_KEY, lengthGuidancePolicyStartValues, ENGINE_CONTRACT_HASH_ROW_KEY, ENGINE_VERSION_POLICY_ROW_KEY, engineVersionPolicyStartValues } from '@debateai/register';
+import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, BILLING_POLICY_DEPLOYMENT_REGISTER_ROW, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyStartValues, LENGTH_GUIDANCE_POLICY_ROW_KEY, lengthGuidancePolicyStartValues, ENGINE_CONTRACT_HASH_ROW_KEY, ENGINE_VERSION_POLICY_ROW_KEY, engineVersionPolicyStartValues, COST_ESTIMATE_START_POLICY_ROW_KEY, COST_ESTIMATE_START_POLICY_DEPLOYMENT_REGISTER_ROW } from '@debateai/register';
 import { engineContractHash } from '../../apps/runner/src/engine-contracts.js';
 import { mapPromptContractHash } from '@debateai/map';
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
@@ -22,6 +22,8 @@ const sorted = (rows: Row[]) => [...rows].sort((a, b) => a.rowKey.localeCompare(
 const ON = { billing: 'on', perRunCeilingMicros: 3_000_000, dailyCeilingMicros: 10_000_000, askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 } } as const;
 const OFF = { ...ON, billing: 'off' } as const;
 const OWNER_KEYS = ['admissionPolicy', 'billingPolicy', 'costEnvelopePolicy'];
+/** The two code-owned rows only a hosted build seals: the estimate's starting figures (2026-10-22) and the story's money row. */
+const HOSTED_ADDED = [COST_ESTIMATE_START_POLICY_ROW_KEY, STORY_COST_ENVELOPE_POLICY_ROW_KEY];
 /** A register refusal is a TypedDomainError (its code on `.code`) or a TypeError whose message is the code. */
 const refusal = (run: () => unknown) => { try { run(); } catch (error: any) { return `${error?.code ?? ''} ${error?.message ?? ''}`; } return 'no refusal'; };
 const value = (rows: readonly Row[], key: string) => JSON.parse(rows.find(row => row.rowKey === key)!.valueJsonText);
@@ -36,14 +38,14 @@ async function fixture() {
 const compose = (source: readonly Row[], base: Row[], version = '12') => composePreviewSnapshotV3({ sourceRows: source as any, baseRows: base as any, baseRegisterVersion: version, baseSnapshotSha256: computeRegisterSnapshotSha256(base as any) });
 
 describe('publish kit v3: the hosted source', () => {
-  it('is v2\'s source with the story money row added and only the three owner rows changed', async () => {
+  it('is v2\'s source with the two hosted rows added and only the three owner rows changed', async () => {
     const f = await fixture();
     for (const choice of [ON, OFF]) {
       const rows = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, choice)] as Row[];
       expect(rows.map(row => row.rowKey).sort()).toEqual([...PREVIEW_SOURCE_ROW_KEYS_V3].sort());
-      expect(PREVIEW_SOURCE_ROW_KEYS_V3).toEqual([...PREVIEW_SOURCE_ROW_KEYS_V2, STORY_COST_ENVELOPE_POLICY_ROW_KEY].sort());
+      expect(PREVIEW_SOURCE_ROW_KEYS_V3).toEqual([...PREVIEW_SOURCE_ROW_KEYS_V2, ...HOSTED_ADDED].sort());
       const differing = rows.filter(row => JSON.stringify(row) !== JSON.stringify(f.v2.find(old => old.rowKey === row.rowKey))).map(row => row.rowKey).sort();
-      expect(differing).toEqual(choice.billing === 'on' ? [...OWNER_KEYS, STORY_COST_ENVELOPE_POLICY_ROW_KEY] : ['admissionPolicy', 'costEnvelopePolicy', STORY_COST_ENVELOPE_POLICY_ROW_KEY]);
+      expect(differing).toEqual(choice.billing === 'on' ? [...OWNER_KEYS, ...HOSTED_ADDED].sort() : ['admissionPolicy', 'costEnvelopePolicy', ...HOSTED_ADDED].sort());
     }
   });
 
@@ -108,14 +110,14 @@ describe('publish kit v3: the hosted source', () => {
 });
 
 describe('publish kit v3: composing from the current version', () => {
-  it('from the live register 12 shape: the story money row is added and the three owner rows change, each shown with its old and new value', async () => {
+  it('from the live register 12 shape: the two hosted rows are added and the three owner rows change, each shown with its old and new value', async () => {
     const f = await fixture();
     const before = structuredClone(f.v12);
     const plan = compose([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[], f.v12);
     expect(plan.composer).toBe('preview-register-composer-v3');
-    expect(plan.addedKeys).toEqual([STORY_COST_ENVELOPE_POLICY_ROW_KEY]);
+    expect(plan.addedKeys).toEqual(HOSTED_ADDED);
     expect(plan.changedKeys).toEqual(OWNER_KEYS);
-    expect(plan.rows).toHaveLength(f.v12.length + 1);
+    expect(plan.rows).toHaveLength(f.v12.length + 2);
     for (const key of OWNER_KEYS) {
       const entry = plan.delta.find(row => row.rowKey === key)!;
       expect(entry).toMatchObject({ change: 'changed', reason: 'owner-hosted-billing-input', oldValueJsonText: f.v12.find(row => row.rowKey === key)!.valueJsonText });
@@ -128,7 +130,7 @@ describe('publish kit v3: composing from the current version', () => {
   it('a first provider-only publication (billing off) changes only the ceilings and the room-read budget', async () => {
     const f = await fixture();
     const plan = compose([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, OFF)] as Row[], f.v12);
-    expect(plan.addedKeys).toEqual([STORY_COST_ENVELOPE_POLICY_ROW_KEY]);
+    expect(plan.addedKeys).toEqual(HOSTED_ADDED);
     expect(plan.changedKeys).toEqual(['admissionPolicy', 'costEnvelopePolicy']);
   });
 
@@ -252,7 +254,7 @@ describe('publish kit v3: the optional debateShapePolicy row and the sealed map 
     const plan = compose(await v3(), base);
     expect(shapeRow([...plan.rows] as Row[])).toEqual(shapeRow(base));
     expect(plan.delta.map(entry => entry.rowKey)).not.toContain(DEBATE_SHAPE_POLICY_ROW_KEY);
-    expect(plan.addedKeys).toEqual([STORY_COST_ENVELOPE_POLICY_ROW_KEY]);
+    expect(plan.addedKeys).toEqual(HOSTED_ADDED);
     const broken = base.map(row => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY ? { ...row, valueJsonText: row.valueJsonText.replace('"DEBATE_SHAPE_POLICY"', '"X"') } : row);
     const source = await v3();
     expect(refusal(() => compose(source, broken))).toContain('DEBATE_SHAPE_POLICY_INVALID');
@@ -424,5 +426,53 @@ describe('publish kit v3: the optional engineVersionPolicy row and the engine se
     // No engine row = engine 1: the seal is never read.
     const today = [...compose(await v3(null), f.v12).rows] as Row[];
     expect(() => assertHostedPreviewBootRows(edit(today, ENGINE_CONTRACT_HASH_ROW_KEY, () => 'e'.repeat(64)) as any)).not.toThrow();
+  });
+});
+
+describe('publish kit v3: the estimate\'s starting figures (owner rulings 2026-10-22, fresh-site estimate)', () => {
+  const EXPECTED = {
+    kind: 'COST_ESTIMATE_START_POLICY', currency: 'USD', minor_units_per_unit: 1_000_000, min_samples: 5,
+    start_micros_by_depth: { '1': 300_000, '2': 600_000, '3': 1_000_000 }
+  };
+  const setValue = (rows: Row[], key: string, change: (value: any) => void) =>
+    rows.map(row => row.rowKey === key ? { ...row, valueJsonText: canonical((v => (change(v), v))(JSON.parse(row.valueJsonText))) } : row);
+
+  it('seals the code-owned row with the owner\'s values in every hosted source, billing on or off', async () => {
+    const f = await fixture();
+    for (const choice of [ON, OFF]) {
+      const rows = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, choice)] as Row[];
+      expect(rows.find(row => row.rowKey === COST_ESTIMATE_START_POLICY_ROW_KEY)).toEqual({
+        rowKey: COST_ESTIMATE_START_POLICY_ROW_KEY,
+        valueJsonText: canonical(COST_ESTIMATE_START_POLICY_DEPLOYMENT_REGISTER_ROW.value),
+        sourceRef: COST_ESTIMATE_START_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef
+      });
+      expect(value(rows, COST_ESTIMATE_START_POLICY_ROW_KEY)).toEqual(EXPECTED);
+    }
+    // Kit v2 (the local-mode kit) never builds it: only a hosted API estimates.
+    expect(f.v2.map(row => row.rowKey)).not.toContain(COST_ESTIMATE_START_POLICY_ROW_KEY);
+  });
+
+  it('on a hosted base this kit published before the row (the live register 18 shape), it is the one added row', async () => {
+    const f = await fixture();
+    const source = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, OFF)] as Row[];
+    const live = ([...compose(source, f.v12).rows] as Row[]).filter(row => row.rowKey !== COST_ESTIMATE_START_POLICY_ROW_KEY);
+    const next = compose(source, live, '18');
+    expect(next.addedKeys).toEqual([COST_ESTIMATE_START_POLICY_ROW_KEY]);
+    expect(next.changedKeys).toEqual([]);
+    expect(next.delta).toHaveLength(1);
+    expect(next.delta[0]).toMatchObject({ change: 'added', reason: 'added-source-key', oldValueJsonText: null });
+    expect(JSON.parse(next.delta[0]!.newValueJsonText)).toEqual(EXPECTED);
+  });
+
+  it('refuses a source without the row, and a version whose row the API\'s boot would refuse', async () => {
+    const f = await fixture();
+    const source = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[];
+    expect(() => compose(source.filter(row => row.rowKey !== COST_ESTIMATE_START_POLICY_ROW_KEY), f.v12)).toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED: source-key-list');
+    const malformed = setValue(source, COST_ESTIMATE_START_POLICY_ROW_KEY, v => { v.min_samples = 21; });
+    expect(refusal(() => compose(malformed, f.v12))).toContain('COST_ESTIMATE_START_POLICY_INVALID');
+    const rows: Row[] = [...source, ...owned()];
+    expect(() => assertHostedPreviewBootRows(rows as any)).not.toThrow();
+    expect(refusal(() => assertHostedPreviewBootRows(setValue(rows, COST_ESTIMATE_START_POLICY_ROW_KEY, v => { v.start_micros_by_depth['1'] = 0; }) as any)))
+      .toContain('COST_ESTIMATE_START_POLICY_INVALID');
   });
 });

@@ -36,6 +36,13 @@ describe("B6b the API root composes the room", () => {
     expect(step).toContain("        personAllowance,\n        entitlements,\n");
     expect(step).toContain("buildApiProviderPriceMap(declaredProviderTargets, environment.DEPLOYMENT_MODE)");
     expect(step).toContain("mostOneRunMaySpendMicros(costEnvelopeRows.guardPolicy)");
+    // Fresh-site estimate (owner rulings 2026-10-22): the estimator gets the sealed starting figures, read in their own
+    // boot stage at the version in force (null at a version without the row: today's estimate).
+    expect(step).toContain("start: costEstimateStartPolicy");
+    expect(main).toContain('const costEstimateStartPolicy = environment.DEPLOYMENT_MODE === "hosted"\n'
+      + '  ? await boot.run("cost-estimate-start-policy", () => readCostEstimateStartPolicy(pool, environment.REGISTER_VERSION))\n'
+      + "  : null;");
+    expect(main.indexOf('boot.run("cost-estimate-start-policy"')).toBeLessThan(main.indexOf('boot.run("ask-room"'));
   });
 
   it("imports the allowance source from billing-core and the repository from db (R-1)", async () => {

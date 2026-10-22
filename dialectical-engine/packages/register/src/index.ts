@@ -1199,6 +1199,15 @@ export {
   type PublicationCheckPolicy,
   type PublicationCheckPolicyValue
 } from "./publication-check-policy.js";
+// Fresh-site estimate (owner rulings 2026-10-22): the estimate's trusted minimum and per-depth starting figures, code-owned.
+export {
+  COST_ESTIMATE_START_POLICY_DEPLOYMENT_REGISTER_ROW,
+  COST_ESTIMATE_START_POLICY_ROW_KEY,
+  costEstimateStartPolicyFromValue,
+  readCostEstimateStartPolicy,
+  type CostEstimateStartPolicy,
+  type CostEstimateStartPolicyValue
+} from "./cost-estimate-start-policy.js";
 // Verdict story (spec 2026-09-26 §9): the OPTIONAL story rows and their readers.
 export {
   STORY_COST_RULING_REF,

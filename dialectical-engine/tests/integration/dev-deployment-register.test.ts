@@ -27,6 +27,7 @@ import {
   readPanelDiscoveryPolicy,
   readProductRolePolicy,
   readPublicationCheckPolicy,
+  readCostEstimateStartPolicy,
   readRecoveryPolicy,
   readSessionPolicy,
   readStructuralCeilingPolicyInputs,
@@ -460,6 +461,8 @@ describe("DEV-05 complete development deployment register", () => {
     ]);
     expect(callTokenCeilings).toEqual({ judge: 2048, synthesizer: 2048, evaluator: 2048 });
     expect(publicationCheck).toEqual({ deadlineMs: 60_000 });
+    // Fresh-site estimate (owner rulings 2026-10-22): a hosted-only row (only a hosted API estimates); the local seed has none.
+    await expect(readCostEstimateStartPolicy(database.pool, registerVersion)).resolves.toBeNull();
     expect(auth.channel.structuralMaximumConcurrentRegistrations).toBe(103);
     expect(auth.verification).toMatchObject({ resendCooldownMs: 60_000, outboundSendWindowMs: 3_600_000,
       outboundSendMax: 3, outboundSendMechanism: "atomic_rolling_reservation_ledger" });
