@@ -134,6 +134,7 @@
   "staff.reviews.link": "Publication reviews",
   "staff.reviews.heading": "Publication reviews",
   "staff.reviews.empty": "No requests are waiting for review.",
+  "staff.reviews.moreWaiting": "More requests are waiting",
   "staff.reviews.askedAt": "Asked {date}",
   "staff.reviews.secondRequest": "Second request",
   "staff.reviews.category.TERRORISM": "Terrorist content",

@@ -25,7 +25,9 @@ function setup(publishRun: () => Promise<unknown>, onRemovedByCheck = vi.fn(),
   const node = document.createElement("div");
   document.body.append(node);
   const root = createRoot(node);
-  const client = { readRunVisibility, publishRun,
+  const client = { readRunVisibility, readPublicationReview: async () => ({
+    flagged: false, state: "NONE", categories: [], asks_used: 0, may_ask: false, refusal: null
+  }), publishRun,
     unpublishRun: async () => ({ state: "PRIVATE", public_ref: null }), deletePrivateDebate: async () => ({ status: "CLEANED" }) };
   return { node, root, client, onRemovedByCheck, cleanup: () => { act(() => root.unmount()); node.remove(); } };
 }
@@ -58,7 +60,7 @@ describe("S01 publication refusal", () => {
       expires_at: new Date(Date.now() + 600_000).toISOString() } };
     await act(async () => { root.render(<SecurityActionResume catalog={{}} settingsCatalog={{}}
       publicCatalog={publicCatalog} locale="en" takeProof={() => proof as never}
-      client={{ publishRun: async () => { throw refusal(409, "PUBLICATION_APPROVAL_REQUIRED"); } } as never} />); });
+      client={{ readPublicationReview: async () => ({ flagged: false, state: "NONE", categories: [], asks_used: 0, may_ask: false, refusal: null }), publishRun: async () => { throw refusal(409, "PUBLICATION_APPROVAL_REQUIRED"); } } as never} />); });
     act(() => { node.querySelector<HTMLInputElement>('input[type="checkbox"]')?.click(); });
     await act(async () => { node.querySelector<HTMLButtonElement>("[data-confirm]")?.click(); });
     expect(node.textContent).toContain("This debate needs our approval before it can be published.");
@@ -75,7 +77,7 @@ describe("S01 publication refusal", () => {
     await act(async () => { root.render(<SecurityActionResume catalog={{}} settingsCatalog={{}}
       publicCatalog={publicCatalog} locale="en" takeProof={() => proof as never}
       onRemovedByCheck={onRemovedByCheck}
-      client={{ publishRun: async () => { throw refusal(410, "DEBATE_REMOVED_BY_CHECK"); } } as never} />); });
+      client={{ readPublicationReview: async () => ({ flagged: false, state: "NONE", categories: [], asks_used: 0, may_ask: false, refusal: null }), publishRun: async () => { throw refusal(410, "DEBATE_REMOVED_BY_CHECK"); } } as never} />); });
     act(() => { node.querySelector<HTMLInputElement>('input[type="checkbox"]')?.click(); });
     await act(async () => { node.querySelector<HTMLButtonElement>("[data-confirm]")?.click(); });
     expect(onRemovedByCheck).toHaveBeenCalledWith("run-1");

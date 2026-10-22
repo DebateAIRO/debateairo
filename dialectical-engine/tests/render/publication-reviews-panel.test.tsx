@@ -7,6 +7,7 @@ import { ContractHttpError } from "@debateai/contract";
 import { StaffAccessPanel } from "../../apps/ui/components/StaffAccessPanel.js";
 import { PublicDebateOverview } from "../../apps/ui/components/PublicDebateOverview.js";
 import { createStaffApiClient, type StaffApiClient } from "../../apps/ui/lib/staffApi.js";
+import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
 import enStaff from "../../apps/ui/messages/en/staff.json";
 import roStaff from "../../apps/ui/messages/ro/staff.json";
 import enPublic from "../../apps/ui/messages/en/public.json";
@@ -99,6 +100,7 @@ describe("publication reviews staff surface", () => {
       const host = await mount(createElement(StaffAccessPanel, { client: accessClient(capabilities) }));
       await click(button(host, enStaff["staff.elevate"]));
       expect(host.querySelector('a[href="/admin/reviews"]')?.textContent).toBe("Publication reviews");
+      expect(host.querySelector('a[href="/admin/reviews"]')?.closest(".staffActions")).not.toBeNull();
     }
   });
 
@@ -114,8 +116,20 @@ describe("publication reviews staff surface", () => {
     expect(host.textContent?.indexOf(enStaff["staff.reviews.category.HATE_SPEECH"])).toBeLessThan(host.textContent!.indexOf(enStaff["staff.reviews.category.WEAPONS_OR_DRUGS"]));
     expect(host.textContent).toContain(enStaff["staff.reviews.secondRequest"]);
     expect(host.querySelectorAll("time")).toHaveLength(2);
+    expect(host.querySelector(".setCard .staffSectionTitle")?.textContent).toBe(enStaff["staff.reviews.heading"]);
+    expect(host.querySelectorAll(".rvQueue > li")).toHaveLength(2);
+    expect(host.querySelector(".staffBadge")?.textContent).toBe(enStaff["staff.reviews.secondRequest"]);
+    expect(host.querySelector(".rvQueue button")?.classList.contains("setBtnQuiet")).toBe(false);
     const empty = await reviews(panelClient({ publicationReviews: async () => ({ items: [], order: "ASKED_AT_ASC" }) }));
     expect(empty.textContent).toContain(enStaff["staff.reviews.empty"]);
+    expect(empty.querySelector(".setCard .staffSectionTitle")?.textContent).toBe(enStaff["staff.reviews.heading"]);
+  });
+
+  it("shows the more-requests line only when the queue reports an overflow", async () => {
+    const full = await reviews(panelClient({ publicationReviews: async () => ({ items: [older], order: "ASKED_AT_ASC", has_more: false }) }));
+    expect(full.textContent).not.toContain("More requests are waiting");
+    const overflow = await reviews(panelClient({ publicationReviews: async () => ({ items: [older], order: "ASKED_AT_ASC", has_more: true }) }));
+    expect(overflow.textContent).toContain("More requests are waiting");
   });
 
   it("an open item renders through PublicDebateOverview without the public note and with no owner identity; Back returns to the queue and posts nothing", async () => {
@@ -123,13 +137,31 @@ describe("publication reviews staff surface", () => {
     const host = await reviews(panelClient({ approvePublicationReview: post, refusePublicationReview: post }));
     await click(button(host, enStaff["staff.reviews.open"]));
     expect(host.textContent).toContain(snapshot.question);
+    expect(host.querySelector("h1.setTitle")?.textContent).toBe(snapshot.question);
     expect(host.textContent).toContain("The synthesis to review.");
     expect(host.querySelector(".publicUnlockNote")).toBeNull();
     expect(host.textContent).not.toContain("author_pseudonym");
+    expect([...host.querySelectorAll(".rvActions button")].map(item => item.textContent)).toEqual([
+      enStaff["staff.reviews.approve"], enStaff["staff.reviews.refuse"], enStaff["staff.reviews.back"]
+    ]);
     await click(button(host, enStaff["staff.reviews.back"]));
     expect(host.textContent).not.toContain(snapshot.question);
     expect(routerReplace).toHaveBeenCalledWith("/admin/reviews");
     expect(post).not.toHaveBeenCalled();
+  });
+
+  it("Details and Read open review-local content from the pending snapshot", async () => {
+    const fair = buildFairShapedAnswer({ answer_id: reviewRef, run_ref: newer.review_ref,
+      question_line: snapshot.question, verdict_state: "CONTESTED" });
+    const readable = { ...snapshot, answer: { ...snapshot.answer, nodes: fair.nodes ?? [], edges: fair.edges ?? [] } };
+    const host = await reviews(panelClient({ publicationReview: async () => readable }));
+    await click(button(host, enStaff["staff.reviews.open"]));
+    expect(host.querySelector("[role=dialog]")).toBeNull();
+    await click(host.querySelector(".publicDetailsAction"));
+    expect(host.querySelector('[role=dialog][data-review-detail="verdict"]')?.textContent).toContain("The synthesis to review.");
+    await click(button(host, enPublic["public.honesty.close"]));
+    await click(host.querySelector(".publicReadAction"));
+    expect(host.querySelector('[role=dialog][data-review-detail="argument"]')?.textContent).toContain("The defeater claim attacking the position.");
   });
 
   it("Refuse needs 1..500 trimmed characters before the ceremony starts", async () => {
@@ -139,6 +171,10 @@ describe("publication reviews staff surface", () => {
     await click(button(host, enStaff["staff.reviews.open"]));
     await click(button(host, enStaff["staff.reviews.refuse"]));
     const reason = host.querySelector("textarea") as HTMLTextAreaElement;
+    expect(host.querySelectorAll(".rvActions button")).toHaveLength(2);
+    expect(button(host, enStaff["staff.reviews.approve"])).toBeNull();
+    expect(reason.closest(".rvReason")).not.toBeNull();
+    expect(host.querySelector(".rvCount")?.textContent).toContain("0");
     expect(reason.maxLength).toBe(500);
     expect(reason.labels?.[0]?.textContent).toContain(enStaff["staff.reviews.reasonLabel"]);
     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(reason, "   ");
@@ -164,6 +200,7 @@ describe("publication reviews staff surface", () => {
     expect(order).toEqual(["PUBLICATION_REVIEW_APPROVE", "POST"]);
     expect(host.textContent).not.toContain(snapshot.question);
     expect(host.textContent).toContain(enStaff["staff.reviews.approved"]);
+    expect(host.querySelector(".setCard .staffNotice[role=status]")?.textContent).toBe(enStaff["staff.reviews.approved"]);
     expect(routerReplace).toHaveBeenCalledWith("/admin/reviews");
     const fetchCalls: Array<{ method: string; path: string; body: unknown }> = [];
     const api = createStaffApiClient({ fetchImplementation: (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -200,15 +237,22 @@ describe("publication reviews staff surface", () => {
       await click(button(host, enStaff["staff.reviews.open"]));
       expect(host.textContent).toContain(enStaff[message]);
       expect(host.textContent).not.toContain(snapshot.question);
+      expect(host.querySelector(".setCard [role=status]")?.textContent).toBe(enStaff[message]);
+      expect(button(host, enStaff["staff.reviews.back"])).not.toBeNull();
+      expect(host.querySelector(".rvQueue")).toBeNull();
     }
     const locked = await reviews(panelClient({ proveAction: async () => { throw new ContractHttpError("SERVER_FAILURE", 503, "STAFF_REQUEST_FAILED", "STAFF_ALERT_UNAVAILABLE"); } }));
     await click(button(locked, enStaff["staff.reviews.open"]));
     await click(button(locked, enStaff["staff.reviews.approve"]));
     expect(locked.textContent).toContain(enStaff["staff.reviews.error.locked"]);
     expect(locked.textContent).not.toContain(snapshot.question);
+    expect(button(locked, enStaff["staff.reviews.back"])).not.toBeNull();
     const denied = await reviews(panelClient({ publicationReviews: async () => { throw new ContractHttpError("FORBIDDEN", 403, "STAFF_REQUEST_FAILED"); } }));
-    expect(denied.textContent).toContain(enStaff["staff.reviews.notElevated"]);
+    expect(denied.textContent).toContain(enStaff["staff.failed"]);
     expect(denied.querySelector('a[href="/admin/team"]')).not.toBeNull();
+    const signedOut = await reviews(panelClient({ publicationReviews: async () => { throw new ContractHttpError("SESSION_REQUIRED", 401, "STAFF_REQUEST_FAILED"); } }));
+    expect(signedOut.textContent).toContain(enStaff["staff.reviews.notElevated"]);
+    expect(signedOut.textContent).not.toContain(enStaff["staff.failed"]);
   });
 
   it("the audit list renders review events without a delivery state", async () => {
@@ -233,11 +277,12 @@ describe("publication reviews staff surface", () => {
     const english = renderToStaticMarkup(englishPage);
     expect(english).toContain(enStaff["staff.reviews.heading"]);
     expect((englishPage as any).props.children.props.children.props.publicCatalog).toBe(enPublic);
+    expect((englishPage as any).props.children.props.children.props.locale).toBe("fr");
   });
 
   it("staff.json en and ro hold the same keys", () => {
     expect(Object.keys(roStaff).sort()).toEqual(Object.keys(enStaff).sort());
-    expect(Object.keys(enStaff).filter(key => key.startsWith("staff.reviews."))).toHaveLength(23);
+    expect(Object.keys(enStaff).filter(key => key.startsWith("staff.reviews."))).toHaveLength(24);
     expect(enStaff["staff.reviews.category.TERRORISM"]).not.toBe(roStaff["staff.reviews.category.TERRORISM"]);
   });
 

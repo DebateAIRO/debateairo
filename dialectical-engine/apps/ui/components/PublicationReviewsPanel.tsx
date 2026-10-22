@@ -23,7 +23,8 @@ function reviewError(failure: unknown): string {
   if (failure.status === 403 && failure.serverCode === "PUBLICATION_REVIEW_SAME_REVIEWER") return "staff.reviews.error.sameReviewer";
   if (failure.status === 409 && failure.serverCode === "PUBLICATION_REVIEW_DECIDED") return "staff.reviews.error.decided";
   if (failure.status === 503 && failure.serverCode === "STAFF_ALERT_UNAVAILABLE") return "staff.reviews.error.locked";
-  if (failure.status === 401 || failure.status === 403) return "staff.reviews.notElevated";
+  if (failure.status === 401) return "staff.reviews.notElevated";
+  if (failure.status === 403) return "staff.failed";
   if (failure.status === 503) return "staff.unavailable";
   return "staff.failed";
 }
@@ -44,6 +45,8 @@ export function PublicationReviewsPanel({ client, catalog = staffEnglish, public
   const [busy, setBusy] = useState(false);
   const [reasonVisible, setReasonVisible] = useState(false);
   const [reason, setReason] = useState("");
+  const [requestError, setRequestError] = useState(false);
+  const [detail, setDetail] = useState<{ kind: "verdict" } | { kind: "argument"; nodeId: string } | null>(null);
 
   useEffect(() => {
     const epoch = ++generation.current;
@@ -63,7 +66,9 @@ export function PublicationReviewsPanel({ client, catalog = staffEnglish, public
     const epoch = generation.current;
     setBusy(true);
     setStatus(null);
+    setRequestError(false);
     setSnapshot(null);
+    setDetail(null);
     setReasonVisible(false);
     setReason("");
     try {
@@ -74,6 +79,7 @@ export function PublicationReviewsPanel({ client, catalog = staffEnglish, public
         const key = reviewError(failure);
         if (key === "staff.reviews.notElevated") setNotElevated(true);
         setStatus(key);
+        setRequestError(true);
       }
     } finally {
       if (generation.current === epoch) setBusy(false);
@@ -85,6 +91,8 @@ export function PublicationReviewsPanel({ client, catalog = staffEnglish, public
     setReasonVisible(false);
     setReason("");
     setStatus(null);
+    setRequestError(false);
+    setDetail(null);
     router.replace("/admin/reviews");
   }
 
@@ -110,16 +118,20 @@ export function PublicationReviewsPanel({ client, catalog = staffEnglish, public
       }
       if (generation.current !== epoch) return;
       setSnapshot(null);
+      setDetail(null);
       setReasonVisible(false);
       setReason("");
+      setRequestError(false);
       setQueue(current => current === null ? current : { ...current, items: current.items.filter(item => item.review_ref !== ref) });
       setStatus(outcome === "APPROVE" ? "staff.reviews.approved" : "staff.reviews.refused");
       router.replace("/admin/reviews");
     } catch (failure) {
       if (generation.current !== epoch) return;
       setSnapshot(null);
+      setDetail(null);
       setReasonVisible(false);
       setReason("");
+      setRequestError(true);
       const key = reviewError(failure);
       if (key === "staff.reviews.notElevated") setNotElevated(true);
       setStatus(key);
@@ -128,38 +140,59 @@ export function PublicationReviewsPanel({ client, catalog = staffEnglish, public
     }
   }
 
-  const categories = (values: readonly string[]) => <ul className="staffPermissions">{values.map(category =>
+  const categories = (values: readonly string[], className = "staffPermissions") => <ul className={className}>{values.map(category =>
     <li key={category}>{t(catalog, `staff.reviews.category.${category}`)}</li>)}</ul>;
   const entries = queue?.items.slice().sort((a, b) => a.asked_at.localeCompare(b.asked_at)) ?? [];
+  const selectedNode = detail?.kind === "argument"
+    ? snapshot?.answer.nodes?.find(node => node.node_id === detail.nodeId) : null;
 
-  return <div className="setInner staffAccess" aria-busy={busy || queue === null && !notElevated}>
-    <header className="staffHeading"><h1 className="setTitle">{t(catalog, "staff.reviews.heading")}</h1></header>
+  return <div className={`setInner staffAccess${snapshot !== null ? " rvReadScreen" : ""}`} aria-busy={busy || queue === null && !notElevated}>
     {notElevated ? <section className="setCard"><p className="setCardHint">{t(catalog, "staff.reviews.notElevated")}</p><a className="setBtn setBtnQuiet" href="/admin/team">{t(catalog, "staff.teamLink")}</a></section> : null}
-    {status !== null && !notElevated ? <p className="setCardHint" role="status">{t(catalog, status)}</p> : null}
-    {!notElevated && snapshot !== null ? <section className="setCard">
-      <div className="staffSectionHead"><h2 className="staffSectionTitle">{snapshot.question}</h2></div>
-      <p className="setCardHint">{t(catalog, "staff.reviews.askedAt", { date: formatDate(locale, snapshot.asked_at, { dateStyle: "medium", timeStyle: "short" }) })}</p>
-      {categories(snapshot.categories)}
-      <PublicDebateOverview debate={snapshot as unknown as PublicDebate} catalog={publicCatalog} storyCatalog={publicCatalog} storyLocale={locale} composeCatalog={locale === "ro" ? composeRomanian : composeEnglish} viewingNote="NONE" onDetails={() => {}} onRead={() => {}} />
-      <div className="staffActions">
-        <button className="setBtn setBtnQuiet" type="button" disabled={busy} onClick={leave}>{t(catalog, "staff.reviews.back")}</button>
+    {!notElevated && snapshot !== null ? <><header className="staffHeading"><h1 className="setTitle rvQuestion">{snapshot.question}</h1></header><section className="rvReview">
+      {categories(snapshot.categories, "staffPermissions rvChips")}
+      <PublicDebateOverview debate={snapshot as unknown as PublicDebate} catalog={publicCatalog} storyCatalog={publicCatalog} storyLocale={locale} composeCatalog={locale === "ro" ? composeRomanian : composeEnglish} viewingNote="NONE" onDetails={() => setDetail({ kind: "verdict" })} onRead={(nodeId) => setDetail({ kind: "argument", nodeId })} />
+      {detail !== null ? <div role="dialog" aria-label={t(publicCatalog, detail.kind === "verdict" ? "public.overview.details" : "public.overview.read")} data-review-detail={detail.kind} className="rvDetail">
+        <h2>{t(publicCatalog, detail.kind === "verdict" ? "public.overview.details" : "public.overview.read")}</h2>
+        {detail.kind === "verdict" ? <>
+          {snapshot.answer.summary_segments.map((segment, index) => <p key={index}>{segment.text}</p>)}
+          <p>{t(publicCatalog, "public.honesty.verdict")}: {snapshot.answer.verdict ?? t(publicCatalog, "public.honesty.verdictUnavailable")}</p>
+          {snapshot.answer.reversal_point ? <p>{snapshot.answer.reversal_point}</p> : null}
+        </> : selectedNode !== null && selectedNode !== undefined ? <>
+          <p>{selectedNode.claim}</p>
+          {selectedNode.review?.reasons.map((reason, index) => <p key={index}>{reason}</p>)}
+        </> : null}
+        <button className="setBtn" type="button" onClick={() => setDetail(null)}>{t(publicCatalog, "public.honesty.close")}</button>
+      </div> : null}
+      {!reasonVisible ? <div className="staffActions rvActions">
         <button className="setBtn" type="button" disabled={busy} onClick={() => { void decide("APPROVE"); }}>{t(catalog, "staff.reviews.approve")}</button>
-        {!reasonVisible ? <button className="setBtn" type="button" disabled={busy} onClick={() => setReasonVisible(true)}>{t(catalog, "staff.reviews.refuse")}</button> : null}
-      </div>
-      {reasonVisible ? <div className="staffField">
+        <button className="setBtn" type="button" disabled={busy} onClick={() => setReasonVisible(true)}>{t(catalog, "staff.reviews.refuse")}</button>
+        <button className="setBtn setBtnQuiet" type="button" disabled={busy} onClick={leave}>{t(catalog, "staff.reviews.back")}</button>
+      </div> : null}
+      {reasonVisible ? <div className="staffField rvReason">
         <label htmlFor="publication-review-reason">{t(catalog, "staff.reviews.reasonLabel")}</label>
         <textarea id="publication-review-reason" maxLength={500} value={reason} onChange={event => setReason(event.currentTarget.value)} />
-        <p className="setCardHint">{t(catalog, "staff.reviews.reasonCount", { count: reason.length })}</p>
-        <button className="setBtn" type="button" disabled={busy || reason.trim().length < 1 || reason.trim().length > 500} onClick={() => { void decide("REFUSE"); }}>{t(catalog, "staff.reviews.refuse")}</button>
+        <p className="rvCount">{t(catalog, "staff.reviews.reasonCount", { count: reason.length })}</p>
+        <div className="staffActions rvActions"><button className="setBtn" type="button" disabled={busy || reason.trim().length < 1 || reason.trim().length > 500} onClick={() => { void decide("REFUSE"); }}>{t(catalog, "staff.reviews.refuse")}</button>
+          <button className="setBtn setBtnQuiet" type="button" disabled={busy} onClick={leave}>{t(catalog, "staff.reviews.back")}</button></div>
       </div> : null}
+    </section></> : null}
+    {!notElevated && snapshot === null && requestError ? <section className="setCard"><h2 className="staffSectionTitle">{t(catalog, "staff.reviews.heading")}</h2>
+      {status !== null ? <p role="status" className="setError">{t(catalog, status)}</p> : null}
+      <div className="staffActions"><button className="setBtn" type="button" onClick={leave}>{t(catalog, "staff.reviews.back")}</button></div>
     </section> : null}
-    {!notElevated && snapshot === null && queue !== null ? <section className="setCard">
-      {entries.length === 0 ? <p className="setCardHint">{t(catalog, "staff.reviews.empty")}</p> : <ul className="staffAuditList">{entries.map(item => <li key={item.review_ref}>
-        <time dateTime={item.asked_at}>{t(catalog, "staff.reviews.askedAt", { date: formatDate(locale, item.asked_at, { dateStyle: "medium", timeStyle: "short" }) })}</time>
-        {item.ask_ordinal === 2 ? <strong>{t(catalog, "staff.reviews.secondRequest")}</strong> : null}
-        {categories(item.categories)}
-        <button className="setBtn setBtnQuiet" type="button" disabled={busy} onClick={() => { void open(item.review_ref); }}>{t(catalog, "staff.reviews.open")}</button>
+    {!notElevated && snapshot === null && !requestError && queue !== null ? <section className="setCard">
+      <div className="staffSectionHead"><h2 className="staffSectionTitle">{t(catalog, "staff.reviews.heading")}</h2></div>
+      {status !== null ? <p className="staffNotice" role="status">{t(catalog, status)}</p> : null}
+      {entries.length === 0 ? <p className="setCardHint">{t(catalog, "staff.reviews.empty")}</p> : <ul className="rvQueue">{entries.map(item => <li key={item.review_ref}>
+        <div className="rvRowBody"><div className="rvRowHead"><time dateTime={item.asked_at}>{t(catalog, "staff.reviews.askedAt", { date: formatDate(locale, item.asked_at, { dateStyle: "medium", timeStyle: "short" }) })}</time>
+          {item.ask_ordinal === 2 ? <span className="staffBadge">{t(catalog, "staff.reviews.secondRequest")}</span> : null}</div>
+          {categories(item.categories, "staffPermissions rvCats")}</div>
+        <button className="setBtn" type="button" disabled={busy} onClick={() => { void open(item.review_ref); }}>{t(catalog, "staff.reviews.open")}</button>
       </li>)}</ul>}
+      {queue.has_more ? <p className="setCardHint" role="status">{t(catalog, "staff.reviews.moreWaiting")}</p> : null}
+    </section> : null}
+    {!notElevated && snapshot === null && !requestError && queue === null ? <section className="setCard"><h2 className="staffSectionTitle">{t(catalog, "staff.reviews.heading")}</h2>
+      {status !== null ? <><p role="status" className="setError">{t(catalog, status)}</p><a className="setBtn" href="/admin/team">{t(catalog, "staff.teamLink")}</a></> : null}
     </section> : null}
   </div>;
 }

@@ -95,6 +95,8 @@ it("a failed take-down keeps the card and shows the debate page's unpublish fail
     const code = host.querySelector<HTMLInputElement>('[name="security-code"]')!;
     await act(async () => { password.value = "correct horse battery staple"; code.value = "123456"; password.form!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
     expect(host.querySelector(".libRow")).not.toBeNull();
+    expect(host.querySelector(".tdPanel")).toBeNull();
+    expect(button(host, "Take down")).not.toBeNull();
     expect(host.textContent).toContain(pub["public.publication.changeUnauthorized"]);
     expect(mocks.refresh).not.toHaveBeenCalled();
   } finally { await unmount(root, host); }

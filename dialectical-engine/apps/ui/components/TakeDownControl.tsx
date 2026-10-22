@@ -43,7 +43,9 @@ export function TakeDownControl({ runRef, homeCatalog, publicCatalog, client = c
       cancel();
       router.refresh();
     } catch (failure) {
+      setOpen(false);
       setConfirming(false);
+      setAcknowledged(false);
       setMessage(t(publicCatalog, failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500
         ? "public.publication.changeUnauthorized" : "public.publication.statusUnavailable"));
     } finally {
@@ -61,10 +63,10 @@ export function TakeDownControl({ runRef, homeCatalog, publicCatalog, client = c
       <div className="tdPanel">
         <p>{t(publicCatalog, "public.publication.unpublishWarning")}</p>
         <form noValidate onSubmit={submit}>
-          <label><input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />{t(publicCatalog, "public.publication.acknowledgeUnpublish")}</label>
-          <div className="tdActions"><button disabled={!acknowledged || busy}>{t(publicCatalog, "public.publication.unpublish")}</button><button type="button" onClick={cancel}>{t(publicCatalog, "public.publication.cancel")}</button></div>
+          <label className="authCheck"><input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />{t(publicCatalog, "public.publication.acknowledgeUnpublish")}</label>
+          <div className="tdActions"><button className="setBtn setBtnPrimary" disabled={!acknowledged || busy}>{t(publicCatalog, "public.publication.unpublish")}</button><button type="button" className="setBtn" onClick={cancel}>{t(publicCatalog, "public.publication.cancel")}</button></div>
         </form>
-        {confirming ? <SecurityConfirmation catalog={authCatalog} client={client} authorization={{ action: "UNPUBLISH", target_run_id: runRef }} disabled={!acknowledged || busy} onConfirmed={confirmed} onCancel={() => setConfirming(false)} onError={(failure) => setMessage(t(publicCatalog, failure instanceof ContractHttpError && failure.status < 500 ? "public.publication.changeUnauthorized" : "public.publication.statusUnavailable"))} /> : null}
+        {confirming ? <SecurityConfirmation catalog={authCatalog} client={client} authorization={{ action: "UNPUBLISH", target_run_id: runRef }} disabled={!acknowledged || busy} onConfirmed={confirmed} onCancel={() => setConfirming(false)} onError={(failure) => { setOpen(false); setConfirming(false); setAcknowledged(false); setMessage(t(publicCatalog, failure instanceof ContractHttpError && failure.status < 500 ? "public.publication.changeUnauthorized" : "public.publication.statusUnavailable")); }} /> : null}
       </div>}
     {message ? <p role="status" className="tdStatus">{message}</p> : null}
   </div>;

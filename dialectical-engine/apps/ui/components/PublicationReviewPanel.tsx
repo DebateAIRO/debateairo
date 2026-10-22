@@ -47,6 +47,7 @@ export function PublicationReviewPanel({ runId, state, client, catalog, onAsked 
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [answerOnly, setAnswerOnly] = useState(false);
 
   function close() { setOpen(false); setConfirming(false); setAcknowledged(false); }
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -62,7 +63,10 @@ export function PublicationReviewPanel({ runId, state, client, catalog, onAsked 
       onAsked();
       setMessage(t(catalog, "public.publicationReview.asked"));
     } catch (failure) {
-      setConfirming(false);
+      close();
+      const finalAnswer = failure instanceof ContractHttpError &&
+        (failure.serverCode === "PUBLICATION_REVIEW_PENDING" || failure.serverCode === "PUBLICATION_REVIEW_NOT_ALLOWED");
+      setAnswerOnly(finalAnswer);
       const key = failure instanceof ContractHttpError && failure.serverCode === "PUBLICATION_REVIEW_PENDING"
         ? "public.publicationReview.pendingError"
         : failure instanceof ContractHttpError && failure.serverCode === "PUBLICATION_REVIEW_NOT_ALLOWED"
@@ -75,16 +79,18 @@ export function PublicationReviewPanel({ runId, state, client, catalog, onAsked 
   }
 
   return <div className="publicationReviewPanel">
+    {!answerOnly ? <>
     {state.state === "NONE" ? <><p>{t(catalog, "public.publication.approvalRequired")}</p><p>{t(catalog, "public.publicationReview.flaggedLine")}</p><ul>{categoryLines(state, catalog)}</ul></> : null}
-    {state.state === "UNDER_REVIEW" ? <p>{t(catalog, "public.publicationReview.underReview")}</p> : null}
+    {state.state === "UNDER_REVIEW" && message === null ? <p>{t(catalog, "public.publicationReview.underReview")}</p> : null}
     {state.state === "REFUSED" ? <PublicationReviewStatement state={state} catalog={catalog} /> : null}
     {state.may_ask && state.state !== "UNDER_REVIEW" && !open ? <button type="button" className="button" onClick={() => { setOpen(true); setAcknowledged(false); setMessage(null); }}>{t(catalog, "public.publicationReview.askButton")}</button> : null}
     {open ? <form noValidate onSubmit={submit}>
-      <p>{t(catalog, "public.publicationReview.askWarning")}</p>
+      <p><strong>{t(catalog, "public.publicationReview.askWarning")}</strong></p>
       <label><input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />{t(catalog, "public.publicationReview.askAcknowledge")}</label>
       <div><button className="button" disabled={!acknowledged || busy}>{t(catalog, "public.publicationReview.askSubmit")}</button><button type="button" className="button" onClick={close}>{t(catalog, "public.publication.cancel")}</button></div>
     </form> : null}
-    {confirming ? <SecurityConfirmation catalog={authCatalog} client={client} authorization={{ action: "PUBLISH", target_run_id: runId }} disabled={!acknowledged || busy} onConfirmed={confirmed} onCancel={() => setConfirming(false)} onError={() => setMessage(t(catalog, "public.publication.statusUnavailable"))} /> : null}
+    {confirming ? <SecurityConfirmation catalog={authCatalog} client={client} authorization={{ action: "PUBLISH", target_run_id: runId }} disabled={!acknowledged || busy} onConfirmed={confirmed} onCancel={() => setConfirming(false)} onError={() => { close(); setMessage(t(catalog, "public.publication.statusUnavailable")); }} /> : null}
+    </> : null}
     {message ? <p role="status">{message}</p> : null}
   </div>;
 }

@@ -97,12 +97,22 @@ it("CLEAR offers today's Publish control and no Ask; failed review read also off
 });
 it("Ask opens the team-read confirmation; Cancel calls nothing", async () => {
   const { host, root, api } = await mounted();
-  try { await click(host, "Ask for approval"); expect(host.textContent).toContain(reviewWords["public.publicationReview.askWarning"]); await click(host, "Cancel"); expect(api.requestPublicationReview).not.toHaveBeenCalled(); }
+  try { await click(host, "Ask for approval"); expect(host.querySelector(".publicationReviewPanel form strong")?.textContent).toBe(reviewWords["public.publicationReview.askWarning"]); await click(host, "Cancel"); expect(api.requestPublicationReview).not.toHaveBeenCalled(); }
   finally { await unmount(root, host); }
 });
 it("ticked Ask confirms PUBLISH for the run, requests review once, and never publishes", async () => {
   const { host, root, api } = await mounted();
-  try { await proof(host); expect(api.requestPublicationReview).toHaveBeenCalledWith(run, "g".repeat(43)); expect(api.publishRun).not.toHaveBeenCalled(); expect(host.textContent).toContain(reviewWords["public.publicationReview.asked"]); }
+  try {
+    await click(host, "Ask for approval");
+    await act(async () => check(host).click());
+    await click(host, reviewWords["public.publicationReview.askSubmit"]!);
+    expect(host.querySelector("[data-auth]")?.getAttribute("data-auth")).toBe(`PUBLISH:${run}`);
+    await click(host, "Complete proof");
+    expect(api.requestPublicationReview).toHaveBeenCalledWith(run, "g".repeat(43));
+    expect(api.publishRun).not.toHaveBeenCalled();
+    expect(host.textContent).toContain(reviewWords["public.publicationReview.asked"]);
+    expect(host.textContent?.match(/under review/gi)).toHaveLength(1);
+  }
   finally { await unmount(root, host); }
 });
 it("UNDER_REVIEW displays its line and neither Publish nor Ask", async () => {
@@ -134,7 +144,13 @@ it("Ask refusals map pending, not allowed, unauthorized and unavailable to their
   for (const [status, code, message] of [[409, "PUBLICATION_REVIEW_PENDING", reviewWords["public.publicationReview.pendingError"]], [409, "PUBLICATION_REVIEW_NOT_ALLOWED", reviewWords["public.publicationReview.notAllowed"]], [404, "RUN_NOT_FOUND", pub["public.publication.changeUnauthorized"]], [503, "PUBLICATION_REVIEW_UNAVAILABLE", pub["public.publication.statusUnavailable"]]] as const) {
     const { host, root, api } = await mounted();
     api.requestPublicationReview.mockRejectedValue(new ContractHttpError(code, status, code, code));
-    try { await proof(host); expect(host.textContent).toContain(message); }
+    try {
+      await proof(host);
+      expect(host.textContent).toContain(message);
+      const panel = host.querySelector(".publicationReviewPanel")!;
+      expect(panel.querySelector("form")).toBeNull();
+      expect([...panel.querySelectorAll("button")].filter(button => button.textContent === "Ask for approval")).toHaveLength(status === 409 ? 0 : 1);
+    }
     finally { await unmount(root, host); }
   }
 });

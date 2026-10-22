@@ -217,6 +217,30 @@ async function binding(a:Actor,d:Debate,action:"PUBLICATION_REVIEW_APPROVE"|"PUB
   return {intent,binding:canonicalPublicationReviewBinding(intent,opened.reasonSalt)};
 }
 
+it("keeps the oldest 100 pending reviews and reports whether more are waiting", async () => {
+  const reviewRef = (index: number) => `00000000-0000-4000-8000-${index.toString(16).padStart(12, "0")}`;
+  const rows = Array.from({ length: 101 }, (_, index) => ({
+    reviewRef: reviewRef(index), askedAt: new Date(Date.UTC(2026, 9, 20, 0, index)), askOrdinal: 1,
+    runId: reviewRef(index + 200), answerId: reviewRef(index + 400), originVersion: 1
+  }));
+  for (const count of [100, 101]) {
+    let requestedLimit = 0;
+    const service = createPublicationReviewStaffService({
+      repository: {
+        listPending: async ({ limit }: { limit: number }) => { requestedLimit = limit; return rows.slice(0, count).slice(0, limit); }
+      } as never,
+      readVerdictCategories: async () => ["HATE_SPEECH"],
+      readReviewBody: async () => { throw new Error("not read by the queue"); }
+    });
+    const result = await service.list({ context: {}, baseSession: { tokenHash: "fixture" } } as never);
+    expect(requestedLimit).toBe(101);
+    expect(result.items).toHaveLength(100);
+    expect(result.items[0]?.review_ref).toBe(reviewRef(0));
+    expect(result.items[99]?.review_ref).toBe(reviewRef(99));
+    expect((result as { has_more?: boolean }).has_more).toBe(count > 100);
+  }
+});
+
 describe("staff publication review HTTP over the migrated database", () => {
   it("each route refuses a staff member without PUBLICATION_REVIEW and queue answers an authorized reviewer", async () => {
     expect((await runtime.query<{current_user:string}>("SELECT current_user")).rows[0]?.current_user).toBe("debateai_runtime");

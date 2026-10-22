@@ -39,15 +39,15 @@ export function createPublicationReviewStaffService(deps: Deps) {
   const staff = (auth: StaffAuthentication) => ({ context: auth.context, tokenHash: auth.baseSession.tokenHash });
   return Object.freeze({
     async list(auth: StaffAuthentication) {
-      const pending = await deps.repository.listPending({ ...staff(auth), limit: 100 });
+      const pending = await deps.repository.listPending({ ...staff(auth), limit: 101 });
       const items = [];
-      for (const item of pending) {
+      for (const item of pending.slice(0, 100)) {
         items.push({
           review_ref: item.reviewRef, asked_at: item.askedAt.toISOString(), ask_ordinal: item.askOrdinal,
           categories: await deps.readVerdictCategories({ runId: item.runId, answerId: item.answerId, originVersion: item.originVersion })
         });
       }
-      return PublicationReviewQueuePageSchema.parse({ items, order: "ASKED_AT_ASC" });
+      return PublicationReviewQueuePageSchema.parse({ items, order: "ASKED_AT_ASC", has_more: pending.length > 100 });
     },
     async read(auth: StaffAuthentication, reviewRef: string) {
       const opened = await deps.repository.open({ ...staff(auth), reviewRef, purpose: "READ" });

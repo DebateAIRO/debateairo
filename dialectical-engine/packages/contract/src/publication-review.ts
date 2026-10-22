@@ -47,7 +47,8 @@ export const PublicationReviewQueueItemSchema = z.object({
 }).strict();
 export const PublicationReviewQueuePageSchema = z.object({
   items: z.array(PublicationReviewQueueItemSchema).max(100),
-  order: z.literal("ASKED_AT_ASC")
+  order: z.literal("ASKED_AT_ASC"),
+  has_more: z.boolean().optional()
 }).strict();
 
 // Defer the index dependency until parse time: the public schema is declared by index.ts.
