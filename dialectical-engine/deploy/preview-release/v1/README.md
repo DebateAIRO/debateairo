@@ -2566,7 +2566,8 @@ env file path to the instance's own file (`…/<service>-%i.env`), on every line
 any other, such as `ReadOnlyPaths=`), and leaving out the base unit's `[Install]`, the old `50-lifecycle.conf` (the
 repo's `@.service.d/50-lifecycle.conf` replaces it) and the old release drop-in (each instance gets its own). It refuses
 any line that still names something of one release: another service's env file, port 3100 or 3101,
-`lifecycle-current`, a fixed unit name, or an instance specifier. The script then makes the same two changes to each
+`lifecycle-current`, a fixed unit name (except the website's own lines on the fixed API: see the note below), or an
+instance specifier. The script then makes the same two changes to each
 live file itself (the path, and the base unit's `[Install]` left out) and requires the result to equal the template
 byte for byte. The owner reads the file list and the changed lines it prints.
 
@@ -2608,6 +2609,14 @@ for SVC in api ui; do
 done
 echo TA_UNITS_DONE
 ```
+
+Note (R20, 2026-10-22): the live website unit carried `After=debateai-preview-api.service` and
+`Requires=debateai-preview-api.service`. The older tool refused them as a fixed unit name, and the owner approved
+rendering from a copy without those two lines. The tool now leaves such a website line out itself (an `After=`,
+`Requires=`, `Wants=` or `BindsTo=` line whose only value is the fixed API), because the repo's
+`debateai-preview-ui@.service.d/50-lifecycle.conf` binds each website to its own release's API. The script's
+byte-for-byte check above still counts those left-out lines as a difference, so on a live website unit that has them it
+stops with `TA_UNITS_NOT_DONE`: the owner reads the two lines in the printed diff and decides, as on R20.
 
 Expect two `PREVIEW_UNIT_TEMPLATE_RENDERED` lines, each listing `debateai-preview-<service>@.service` and the copied
 drop-ins (for the API: the hosted egress drop-in, the old nine-z drop-in and, from H9, the billing notice spool
