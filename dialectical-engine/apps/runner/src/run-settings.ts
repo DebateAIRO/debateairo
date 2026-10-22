@@ -1,4 +1,5 @@
 import type { Pool } from "pg";
+import { isDatabasePoolBusy } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import {
   composeDebateCostEnvelope,
@@ -180,15 +181,13 @@ export async function loadRunnerVersionSettings(pool: Pool, version: number, sit
    * malformed family is logged by code and treated the same way: the story can
    * never stop this runner from claiming a debate.
    */
+  // Ruling R32: only a typed refusal of the story's ROWS is "no story"; a database failure (the pool's typed
+  // DATABASE_POOL_FAILED included) or an untyped error propagates, so the cache never keeps a passing blip as no story.
   const storyPolicy = await readStoryPolicyFromRegister(pool, version)
     .catch((error: unknown) => {
-      if (options?.strict === true) throw error;
-      log({
-        kind: "DEBATEAI_STORY",
-        event: "STORY_POLICY_UNREADABLE",
-        code: error instanceof TypedDomainError ? error.code : "UNTYPED",
-        version: String(version)
-      });
+      const code = settingsRefusalCode(error);
+      if (options?.strict === true || code === null) throw error;
+      log({ kind: "DEBATEAI_STORY", event: "STORY_POLICY_UNREADABLE", code, version: String(version) });
       return null;
     });
   // Addition D14-D16: the version's own line-up (rosters and thinking levels), or the env's for a version without it.
@@ -326,13 +325,33 @@ export type RunnerSettingsResolution =
 
 /** A code-shaped refusal message (`CODE` or `CODE:detail`, the house TypeError form); prose is never a code. */
 const REFUSAL_CODE = /^[A-Z][A-Z0-9_]{2,}(?::[A-Za-z0-9_.:/-]+)?$/u;
+/**
+ * Ruling R31: the house pool's own typed failure (packages/db createPool: a lost or refused connection, a server
+ * restart, a busy pool or a full server all become TypedDomainError DATABASE_POOL_FAILED). It says nothing about the
+ * version, so it is never a settings refusal. Statement timeouts and serialization failures reach here as the driver's
+ * raw errors, which are untyped already.
+ */
+const DATABASE_POOL_FAILED = "DATABASE_POOL_FAILED";
+
+/** True when this failure, or one it wraps as `cause`, is the database's, not the version's. */
+function isDatabaseFailure(error: unknown): boolean {
+  if (isDatabasePoolBusy(error)) return true;
+  let current: unknown = error;
+  for (let depth = 0; depth < 8 && current instanceof Error; depth += 1) {
+    if (current instanceof TypedDomainError && current.code === DATABASE_POOL_FAILED) return true;
+    current = current.cause;
+  }
+  return false;
+}
 
 /**
- * The code of a TYPED refusal: a TypedDomainError's code, or a TypeError/Error whose whole message is a code (the house
- * form the register readers refuse with, e.g. CALL_CONCURRENCY_POLICY_INVALID). Anything else (a database connection
- * error, a runtime TypeError in prose) is null: untyped, so never cached.
+ * The code of a REAL settings refusal: a TypedDomainError's code, or a TypeError/Error whose whole message is a code
+ * (the house form the register readers refuse with, e.g. CALL_CONCURRENCY_POLICY_INVALID). The database's own failures
+ * (ruling R31) and anything else (a driver error, a runtime TypeError in prose) are null: untyped for caching, so the
+ * ask is rejected and the next one loads again.
  */
-function typedRefusalCode(error: unknown): string | null {
+function settingsRefusalCode(error: unknown): string | null {
+  if (isDatabaseFailure(error)) return null;
   if (error instanceof TypedDomainError) return error.code;
   return error instanceof Error && REFUSAL_CODE.test(error.message) ? error.message : null;
 }
@@ -343,9 +362,9 @@ type CacheEntry =
 
 /**
  * Side-by-side spec §13 runner point 2 — THE PER-VERSION CACHE, for the life of the process. A sealed version never
- * changes, so each is loaded once: concurrent asks share one load; a typed refusal is kept as UNSUPPORTED with its code
- * (one content-free DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED line) and never loaded again; an untyped failure (the database
- * unreachable) is not kept, so the next ask loads again. `requireSettings` is the boot's: it rethrows the loader's own
+ * changes, so each is loaded once: concurrent asks share one load; a settings refusal is kept as UNSUPPORTED with its
+ * code (one content-free DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED line) and never loaded again; a database failure (the
+ * pool's DATABASE_POOL_FAILED, busy or lost, ruling R31) or an untyped error is not kept, so the next ask loads again. `requireSettings` is the boot's: it rethrows the loader's own
  * typed refusal, so the site version refuses the boot with today's codes. `loaded` is synchronous, for the money seams.
  */
 export function createRunnerSettingsCache(input: Readonly<{
@@ -371,7 +390,7 @@ export function createRunnerSettingsCache(input: Readonly<{
         return entry;
       },
       (error: unknown): CacheEntry => {
-        const code = typedRefusalCode(error);
+        const code = settingsRefusalCode(error);
         if (code === null) throw error;
         const entry = Object.freeze({ kind: "UNSUPPORTED" as const, code, error });
         settled.set(version, entry);

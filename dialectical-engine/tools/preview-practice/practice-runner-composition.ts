@@ -229,6 +229,11 @@ export async function composePracticeRunner(input: Readonly<{
   sleep?: (milliseconds: number) => Promise<void>;
   /** Content-free story log lines (codes and ids only). */
   storyLog?: (event: string, detail: Record<string, unknown>) => void;
+  /**
+   * Content-free settings-cache lines (DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED: a version and a code). Default: none, as the
+   * story log: the practice loads only its site version, whose refusal is rethrown with its own code anyway.
+   */
+  settingsLog?: (line: Readonly<Record<string, unknown>>) => void;
 }>) {
   const { pool, environment } = input;
   // Addition D14-D16, as main.ts: the gate part is the process's; the line-up is each settings version's own.
@@ -282,7 +287,7 @@ export async function composePracticeRunner(input: Readonly<{
     load: (version) => loadRunnerVersionSettings(pool, version, runnerSite, {
       log: ({ event, ...detail }) => { storyLog(String(event), detail); }
     }),
-    log: (line) => { console.warn(JSON.stringify(line)); }
+    log: input.settingsLog ?? (() => undefined)
   });
   const siteVersionSettings = await runnerSettings.requireSettings(environment.REGISTER_VERSION);
   const { policy, storyPolicy } = siteVersionSettings;

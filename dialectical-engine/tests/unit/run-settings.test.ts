@@ -11,8 +11,10 @@
  *   refusals; the version's rosters, seats and scorecard are checked against the declared targets;
  * - `runnerSettingsOfVersion` maps one version's debate members, written once.
  */
-import { describe, expect, it } from "vitest";
+import { createServer, type Server, type Socket } from "node:net";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Pool } from "pg";
+import { createPool, isDatabasePoolBusy } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import {
   COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW,
@@ -279,7 +281,7 @@ describe("resolvePreviewVersionConfig: each version's own line-up (addition D14-
       expect(parsed.PREVIEW_PROVIDER_TEST_CONFIG).toBeDefined();
       for (const isSiteVersion of [true, false]) {
         expect(resolvePreviewVersionConfig({ preview: siteOf(parsed), row: null, isSiteVersion }))
-          .toEqual(parsed.PREVIEW_PROVIDER_TEST_CONFIG);
+          .toStrictEqual(parsed.PREVIEW_PROVIDER_TEST_CONFIG);
       }
     }
   });
@@ -421,6 +423,109 @@ describe("createRunnerSettingsCache: each version once, for the life of the proc
     const conflict = lineUpCache(OLD_ENV, ROW);
     await expect(conflict.requireSettings(SITE_VERSION)).rejects.toMatchObject({ code: "PREVIEW_LINE_UP_ENV_CONFLICT" });
     expect(await conflict.settingsFor(VERSION)).toMatchObject({ kind: "SETTINGS" });
+  });
+});
+
+describe("a database failure is never a settings refusal (rulings R31, R32)", () => {
+  const servers: Server[] = [];
+  const sockets: Socket[] = [];
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    for (const socket of sockets.splice(0)) socket.destroy();
+    await Promise.all(servers.splice(0).map((server) => new Promise((resolve) => server.close(resolve))));
+  });
+  /** A port that refuses (a database that is down), or a server that accepts and never answers (a busy pool). */
+  async function databaseUrl(kind: "refused" | "silent"): Promise<string> {
+    const server = createServer((socket) => { sockets.push(socket); });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (address === null || typeof address === "string") throw new TypeError("TEST_SERVER_ADDRESS");
+    if (kind === "refused") await new Promise((resolve) => server.close(resolve));
+    else servers.push(server);
+    return `postgresql://nobody@127.0.0.1:${address.port}/none`;
+  }
+  /** A cache over the REAL readers on the house pool (createPool), counting its loads. */
+  function poolCache(pool: Pool) {
+    let loads = 0;
+    const lines: unknown[] = [];
+    const cache = createRunnerSettingsCache({ log: (line) => { lines.push(line); },
+      load: (version) => { loads += 1; return loadRunnerVersionSettings(pool, version, site()); } });
+    return { cache, lines, loads: () => loads };
+  }
+
+  it("a refused connection (the pool's typed DATABASE_POOL_FAILED) is not kept: the next ask loads again", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const pool = createPool(await databaseUrl("refused"), { max: 1, connectionTimeoutMillis: 1000, name: "test:refused" });
+    try {
+      const { cache, lines, loads } = poolCache(pool);
+      await expect(cache.settingsFor(VERSION)).rejects.toMatchObject({ code: "DATABASE_POOL_FAILED" });
+      await expect(cache.requireSettings(VERSION)).rejects.toMatchObject({ code: "DATABASE_POOL_FAILED" });
+      expect(loads()).toBe(2);
+      expect(cache.versions()).toEqual([]);
+      expect(lines).toEqual([]);
+    } finally {
+      await pool.end().catch(() => undefined);
+    }
+  });
+
+  it("a busy pool (marked busy at its origin) is not kept either", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const pool = createPool(await databaseUrl("silent"), { max: 1, connectionTimeoutMillis: 150, name: "test:busy" });
+    try {
+      const { cache, loads } = poolCache(pool);
+      const failure = await cache.settingsFor(VERSION).then(() => undefined, (error: unknown) => error);
+      expect(isDatabasePoolBusy(failure)).toBe(true);
+      await expect(cache.settingsFor(VERSION)).rejects.toMatchObject({ code: "DATABASE_POOL_FAILED" });
+      expect(loads()).toBe(2);
+      expect(cache.versions()).toEqual([]);
+    } finally {
+      await pool.end().catch(() => undefined);
+    }
+  });
+
+  it("the pool's code by itself or as a cause is not kept; a real settings code beside it still is", async () => {
+    const pooled = new TypedDomainError("DATABASE_POOL_FAILED", "PostgreSQL pool operation failed: connection terminated");
+    const wrapped = Object.assign(new TypedDomainError("RUN_READ_FAILED", "fixture"), { cause: pooled });
+    for (const failure of [pooled, wrapped]) {
+      let loads = 0;
+      const cache = createRunnerSettingsCache({ log: () => undefined, load: async () => { loads += 1; throw failure; } });
+      await expect(cache.settingsFor(3)).rejects.toBe(failure);
+      await expect(cache.settingsFor(3)).rejects.toBe(failure);
+      expect(loads).toBe(2);
+      expect(cache.versions()).toEqual([]);
+    }
+    let loads = 0;
+    const refusal = createRunnerSettingsCache({ log: () => undefined, load: async () => {
+      loads += 1; throw new TypedDomainError("DEBATE_SHAPE_MAP_HASH_UNSEALED", "fixture"); } });
+    expect(await refusal.settingsFor(3)).toEqual({ kind: "UNSUPPORTED", code: "DEBATE_SHAPE_MAP_HASH_UNSEALED" });
+    expect(await refusal.settingsFor(3)).toEqual({ kind: "UNSUPPORTED", code: "DEBATE_SHAPE_MAP_HASH_UNSEALED" });
+    expect(loads).toBe(1);
+  });
+
+  it("a story read that fails on the database propagates (never `no story`, never kept); a typed story refusal is still no story", async () => {
+    const pooled = new TypedDomainError("DATABASE_POOL_FAILED", "PostgreSQL pool operation failed: connection terminated");
+    const lines: unknown[] = [];
+    for (const failure of [pooled, new Error("connection terminated unexpectedly")]) {
+      const blip = readers(VERSION, { readStoryPolicyFromRegister: async () => { throw failure; } });
+      await expect(load(VERSION, site(), blip.readers, { log: (line) => { lines.push(line); } })).rejects.toBe(failure);
+      expect(blip.names()).not.toContain("readPreviewLineUpPolicy");
+    }
+    expect(lines).toEqual([]);
+    let fail = true;
+    let loads = 0;
+    const cache = createRunnerSettingsCache({ log: () => undefined, load: (version) => { loads += 1;
+      return load(version, site(), readers(version, { readStoryPolicyFromRegister: async () => {
+        if (fail) throw pooled; return null; } }).readers); } });
+    await expect(cache.settingsFor(VERSION)).rejects.toBe(pooled);
+    fail = false;
+    expect(await cache.settingsFor(VERSION)).toMatchObject({ kind: "SETTINGS" });
+    expect(loads).toBe(2);
+    // A typed refusal of the story's rows keeps today's behaviour, a code-shaped TypeError included.
+    const typed = readers(VERSION, { readStoryPolicyFromRegister: async () => { throw new TypeError("STORY_POLICY_REGISTER_VERSION_INVALID"); } });
+    const typedLines: Readonly<Record<string, unknown>>[] = [];
+    expect((await load(VERSION, site(), typed.readers, { log: (line) => { typedLines.push(line); } })).storyPolicy).toBeNull();
+    expect(typedLines).toEqual([{ kind: "DEBATEAI_STORY", event: "STORY_POLICY_UNREADABLE",
+      code: "STORY_POLICY_REGISTER_VERSION_INVALID", version: String(VERSION) }]);
   });
 });
 

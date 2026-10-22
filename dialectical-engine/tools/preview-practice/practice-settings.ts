@@ -188,7 +188,14 @@ export function parsePracticeSettings(text: string, context?: Readonly<{ sourceR
     return parsed;
   };
   let previewConfig: PreviewProviderTestConfig | undefined;
-  try { previewConfig = parsePreviewProviderTestConfig(get("PREVIEW_PROVIDER_TEST_CONFIG_JSON")); } catch (error) {
+  // Addition D14-D16: the runner's two preview keys too, exactly as the runner's environment parses the same value (one
+  // key check behind both parsers: its gate part and its line-up), inside the same refusal so a disagreement is a
+  // PracticeRefusal, never a raw error.
+  let previewEnvironment: ReturnType<typeof parsePreviewEnvironmentConfig>;
+  try {
+    previewConfig = parsePreviewProviderTestConfig(get("PREVIEW_PROVIDER_TEST_CONFIG_JSON"));
+    previewEnvironment = parsePreviewEnvironmentConfig(get("PREVIEW_PROVIDER_TEST_CONFIG_JSON"));
+  } catch (error) {
     // Spec 2026-10-12 §4.2: the parser's own code is kept, and a bad table's detail with it, so a practice on a bad table
     // says why. The detail can repeat an unreviewed table key or step word verbatim, and the key-shape screen above skips
     // the long-run rules, so every key shape (a bare long token too) is blanked before it is shown.
@@ -197,12 +204,9 @@ export function parsePracticeSettings(text: string, context?: Readonly<{ sourceR
       : "PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID";
     throw new PracticeRefusal("PRACTICE_SETTINGS_VALUE_INVALID", `PREVIEW_PROVIDER_TEST_CONFIG_JSON: ${parserSays}`);
   }
-  if (previewConfig === undefined || previewConfig.anthropic_budget_socket === undefined) {
+  if (previewConfig === undefined || previewEnvironment === undefined || previewConfig.anthropic_budget_socket === undefined) {
     throw new PracticeRefusal("PRACTICE_SETTINGS_VALUE_INVALID", "PREVIEW_PROVIDER_TEST_CONFIG_JSON names no Anthropic gate");
   }
-  // Addition D14-D16: the runner's two preview keys, exactly as the runner's environment parses the same value (one key
-  // check behind both parsers): its gate part and its line-up, the fallback for a settings version without the row.
-  const previewEnvironment = parsePreviewEnvironmentConfig(get("PREVIEW_PROVIDER_TEST_CONFIG_JSON"))!;
   // The preview declares no credential: a target with an inline header or a credential file is refused.
   let targets: unknown;
   try { targets = JSON.parse(get("PROVIDER_DISCOVERY_TARGETS_JSON")); } catch {

@@ -541,7 +541,10 @@ export async function resolve(specifier, context, nextResolve) {
       // \`effectiveCallConcurrency\`, the call scheduler's boot read of the optional row.
       // Debate shape (2026-10-12, Phase 2a Task 9) added \`readDebateShapePolicy\` and the runner's boot guard on the optional row;
       // Phase 2b replaced the guard with \`readMapContractHash\` (the boot resolves the shape settings, apps/runner/src/debate-shape-boot.ts).
-      "@debateai/register": "export function loadRunnerEnvironment() {} export function assertHostedCostEnvelopesSealed() {} export function readCostEnvelopePolicy() {} export function readStoryPolicyFromRegister() {} export function readEngineVersion() {} export function readModelScorecard() {} export function costEnvelopeBand() {} export function costEnvelopeCeilings() {} export function readBillingPlans() {} export function readCallConcurrencyPolicy() {} export function effectiveCallConcurrency() {} export function readDebateShapePolicy() {} export function readMapContractHash() {}",
+      // Side-by-side spec §13 moved every per-version read (the story rows, the scorecard and engine version, the run
+      // ceiling's \`costEnvelopeCeilings\`, the shape) into apps/runner/src/run-settings.ts, stubbed below, so this stub
+      // carries exactly the seven names main.ts still imports from @debateai/register.
+      "@debateai/register": "export function loadRunnerEnvironment() {} export function assertHostedCostEnvelopesSealed() {} export function readCostEnvelopePolicy() {} export function costEnvelopeBand() {} export function readBillingPlans() {} export function readCallConcurrencyPolicy() {} export function effectiveCallConcurrency() {}",
       "./index.js": "export function createPostgresProviderGateway() {} export function declareHatchetWalkingSkeletonTask() {} export class WalkingSkeletonRunner {}",
       // Side-by-side spec §13 moved the per-version reads (policy, story, shape, engine, scorecard) behind the one
       // settings loader: main.ts imports these three from it.
