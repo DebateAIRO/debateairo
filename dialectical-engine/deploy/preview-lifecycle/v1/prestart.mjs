@@ -20,12 +20,13 @@ import { exactKeys, strictJson, withPrivateBytes } from '../../preview-auth-dev/
 import { RELEASE_KEY_PATTERN, expectedReleaseKey } from '../../preview-auth-dev/v1/environment.mjs';
 import { RELEASE_LABEL, labelOfSourceRoot, readPublicArtifact, slotOfPorts, validateLaunchPlan as reviewedValidateLaunchPlan } from '../../preview-auth-dev/v1/launch-plan.mjs';
 import { validateNativeAttestation } from '../../preview-auth-dev/v1/native-attestation.mjs';
+import { DATABASE_AHEAD_MAX_BYTES, DATABASE_AHEAD_SCHEMA, validateDatabaseAheadFile } from '../../preview-auth-dev/v1/database-ahead.mjs';
 import { validatePublication } from '../../preview-auth-dev/v1/runtime-receipt.mjs';
 import { LAYOUT, atomicWrite, canonicalJson, currentDirFor, databaseAheadPathFor, ensureDirectory, logLine, nativePlanPathFor, peerShimArgv, runBounded, sha256, unitNameFor } from './common.mjs';
 import { readCurrentRelease, readReleaseState } from './release-table.mjs';
 
 export const LOCK_SCHEMA = 'preview-lifecycle-release-lock-v2';
-export const DATABASE_AHEAD_SCHEMA = 'preview-database-ahead-v1';
+export { DATABASE_AHEAD_SCHEMA };
 export const RELEASE_DROPIN_NAME = 'zzzzzzzzzz-lifecycle-release.conf';
 const SERVICES = ['api', 'ui', 'runner'];
 const FRONT = ['api', 'ui'];
@@ -170,21 +171,35 @@ async function writeLock(lock, layout) {
 /** The one line native-operator.mjs prints when verify finds a forward step the database lacks (verify-native.ts). */
 const PENDING_FORWARD_STEP_LINE = /^PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: (\d{4}_[a-z0-9_]+\.sql(?:, \d{4}_[a-z0-9_]+\.sql){0,63})\. Verify never applies a migration; run the native operator with operation apply-and-plan first\.\n$/;
 
-/** Exact argv of the canonical verifier: release native-operator, as postgres, peer packet on FD3. */
-export function nativeVerifyArgv({ layout, nodePath, sourceRoot }) {
+/**
+ * The one line native-operator.mjs prints when verify finds steps a newer release added and no database-ahead file was
+ * handed to it (verify-native.ts NativeVerifyDatabaseAheadError, side-by-side spec §5).
+ */
+const DATABASE_AHEAD_LINE = /^PREVIEW_NATIVE_VERIFY_DATABASE_AHEAD: the database has steps this release does not know: (\d{4}_[a-z0-9_]+\.sql(?:, \d{4}_[a-z0-9_]+\.sql){0,63})\. Pin the newer release's database-ahead file with prestart\.mjs accept-ahead first\.\n$/;
+
+/**
+ * Exact argv of the canonical verifier: release native-operator, as postgres, peer packet on FD3. `databaseAhead`
+ * (side-by-side spec §5) adds `--database-ahead`: the operator then reads this release's pinned database-ahead file.
+ */
+export function nativeVerifyArgv({ layout, nodePath, sourceRoot, databaseAhead = false }) {
   const entry = `${sourceRoot}/dialectical-engine/deploy/preview-auth-dev/v1/native-operator.mjs`;
   return peerShimArgv({ sh: layout.sh, packet: layout.peerPacket, command: [layout.runuser, '-u', 'postgres', '--', layout.env, '-i',
-    `PATH=${dirname(nodePath)}:/usr/local/bin:/usr/bin:/bin`, 'LANG=C.UTF-8', 'LC_ALL=C.UTF-8', 'TZ=UTC', nodePath, entry, '--credential-fd', '3'] });
+    `PATH=${dirname(nodePath)}:/usr/local/bin:/usr/bin:/bin`, 'LANG=C.UTF-8', 'LC_ALL=C.UTF-8', 'TZ=UTC', nodePath, entry, '--credential-fd', '3', ...(databaseAhead ? ['--database-ahead'] : [])] });
 }
 
-export async function runNativeVerify({ layout, nodePath, sourceRoot, run = runBounded, timeoutMs = NATIVE_VERIFY_TIMEOUT_MS }) {
-  if (!/^\/opt\/debateai-v3-preview\/releases\/auth-dev-candidate-[a-z0-9-]+$/.test(sourceRoot)) refuse('NATIVE_VERIFY_REFUSED');
-  const result = await run(nativeVerifyArgv({ layout, nodePath, sourceRoot }), { cwd: `${sourceRoot}/dialectical-engine`, env: {}, timeoutMs, maxOutputBytes: 262144 });
+export async function runNativeVerify({ layout, nodePath, sourceRoot, databaseAhead = false, run = runBounded, timeoutMs = NATIVE_VERIFY_TIMEOUT_MS }) {
+  if (!/^\/opt\/debateai-v3-preview\/releases\/auth-dev-candidate-[a-z0-9-]+$/.test(sourceRoot) || typeof databaseAhead !== 'boolean') refuse('NATIVE_VERIFY_REFUSED');
+  const result = await run(nativeVerifyArgv({ layout, nodePath, sourceRoot, databaseAhead }), { cwd: `${sourceRoot}/dialectical-engine`, env: {}, timeoutMs, maxOutputBytes: 262144 });
   if (result.timedOut) refuse('NATIVE_VERIFY_TIMEOUT');
   // Verify never applies a migration (verify-native.ts). A release whose forward step is not applied yet is refused
   // with its own reason, so the journal says what to do: the operator runs the native operator's apply-and-plan.
-  const pending = !result.overflow && !result.error && result.code !== 0 ? PENDING_FORWARD_STEP_LINE.exec(String(result.stderr)) : null;
+  const refused = !result.overflow && !result.error && result.code !== 0;
+  const pending = refused ? PENDING_FORWARD_STEP_LINE.exec(String(result.stderr)) : null;
   if (pending) refuse('NATIVE_VERIFY_PENDING_FORWARD_STEP', { next: 'apply-and-plan', pending: pending[1].split(', ') });
+  // Side-by-side spec §5: a database a newer release moved forward, with no database-ahead file pinned on this release:
+  // the operator pins the newer release's file (prestart.mjs accept-ahead), then the restart verifies again.
+  const ahead = refused ? DATABASE_AHEAD_LINE.exec(String(result.stderr)) : null;
+  if (ahead) refuse('NATIVE_VERIFY_DATABASE_AHEAD', { next: 'accept-ahead', extra: ahead[1].split(', ') });
   if (result.overflow || result.error || result.code !== 0 || result.stderr.length > 0) refuse('NATIVE_VERIFY_REFUSED');
   try { return strictJson(result.stdout); } catch { return refuse('NATIVE_VERIFY_REFUSED'); }
 }
@@ -329,13 +344,15 @@ export async function runPrestart({ service, label, layout = LAYOUT, deps = {} }
   }
 
   const verifyStartedAt = now();
-  const proof = await (deps.verifyNative ?? (input => runNativeVerify({ layout, nodePath: process.execPath, ...input })))({ sourceRoot: nativePlan.value.sourceRoot });
+  // Side-by-side spec §5: database-ahead mode exactly when the lock pins a database-ahead file on this release.
+  const proof = await (deps.verifyNative ?? (input => runNativeVerify({ layout, nodePath: process.execPath, ...input })))({ sourceRoot: nativePlan.value.sourceRoot, databaseAhead: release.databaseAhead !== null });
   const verifiedAt = now();
   // The verifier re-reads the native plan itself; the proof only counts if it read the bytes checked above.
   const nativePlanAfter = await readNativePlan(layout, label).catch(() => refuse('NATIVE_PLAN_CHANGED'));
   if (nativePlanAfter.sha256 !== nativePlan.sha256) refuse('NATIVE_PLAN_CHANGED');
   try {
-    validateNativeAttestation(proof, { sourceRevision: entry.sourceRevision, sourceTree: entry.sourceTree, nativeSourceSha256, publication: entry.publication }, verifiedAt);
+    // A proof made beside a newer database must name exactly the file the lock pinned (none pinned: it must not name one).
+    validateNativeAttestation(proof, { sourceRevision: entry.sourceRevision, sourceTree: entry.sourceTree, nativeSourceSha256, publication: entry.publication, databaseAheadSha256: release.databaseAhead?.sha256 ?? null }, verifiedAt);
   } catch { refuse('NATIVE_ATTESTATION_INVALID'); }
 
   const { uid, gid } = layoutOwner(layout);
@@ -405,18 +422,20 @@ export async function pinRelease({ planPath, layout = LAYOUT, deps = {}, now = D
 
 /**
  * Side-by-side spec §5: the older release may (re)start beside a newer database only with the newer
- * release's root-owned list of extra steps. Records that file's path and hash on the older release;
- * the preview proof (D5) re-reads and checks the steps themselves.
+ * release's root-owned list of extra steps. Checks the whole file (database-ahead.mjs) and records its path
+ * and hash on the older release; the native verify (D5) re-reads it, checks the steps against the newer
+ * release's source manifest and the database, and its proof must name this hash.
  */
 export async function acceptAhead({ label, fromPath, layout = LAYOUT }) {
   if (!isLabel(label)) refuse('ARGUMENTS_REFUSED');
   if (fromPath !== databaseAheadPathFor(layout, label)) refuse('DATABASE_AHEAD_REFUSED');
   const { lock } = await readLock(layout);
   const release = own(lock.releases, label) ?? refuse('RELEASE_LOCK_RELEASE_MISSING');
-  const file = await readProtectedJson(fromPath, { root: layout.nativePlanRoot, mode: 0o644, maxBytes: 32768, layout, code: 'DATABASE_AHEAD_UNREADABLE' });
+  const file = await readProtectedJson(fromPath, { root: layout.nativePlanRoot, mode: 0o644, maxBytes: DATABASE_AHEAD_MAX_BYTES, layout, code: 'DATABASE_AHEAD_UNREADABLE' });
   const ahead = file.value;
   const revision = Object.values(release.services)[0].sourceRevision;
-  if (ahead?.schema !== DATABASE_AHEAD_SCHEMA || ahead.olderLabel !== label || ahead.olderSourceRevision !== revision || !isLabel(ahead.newerLabel) || ahead.newerLabel === label) refuse('DATABASE_AHEAD_REFUSED');
+  try { validateDatabaseAheadFile(ahead); } catch { refuse('DATABASE_AHEAD_REFUSED'); }
+  if (ahead.olderLabel !== label || ahead.olderSourceRevision !== revision || ahead.newerLabel === label) refuse('DATABASE_AHEAD_REFUSED');
   const databaseAhead = { path: fromPath, sha256: file.sha256, newerLabel: ahead.newerLabel };
   const lockSha256 = await writeLock({ ...lock, releases: { ...lock.releases, [label]: { ...release, databaseAhead } } }, layout);
   return { event: 'PREVIEW_LIFECYCLE_DATABASE_AHEAD_PINNED', label, releaseKey: release.releaseKey, newerLabel: ahead.newerLabel, databaseAheadSha256: file.sha256, lockSha256 };

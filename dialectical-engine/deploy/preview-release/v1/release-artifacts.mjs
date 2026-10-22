@@ -36,6 +36,11 @@
 //        policy switches the fast language check off)
 //       (--length-guidance only with --operation plan; publish carries the plan's choice; default: the base's length-guidance row
 //        kept as it is, or none)
+//   release-artifacts.mjs database-ahead --older-source-manifest <old candidate api manifest> --newer-source-manifest <new candidate api manifest>
+//       --out <artifacts folder>/database-ahead-<older label>.json
+//       (side-by-side spec §5: the database steps the newer release adds, each with both n1 header lines, and the newer
+//        release's own chain; root installs it as /etc/debateai-v3-preview/auth-dev-v1/database-ahead-<older label>.json and
+//        pins it with prestart.mjs accept-ahead, so the older release can restart beside the newer database)
 //
 // It reads only root-owned 0644 JSON files (so never an env file or a secret: those are 0640/0600)
 // and writes only new root-owned 0644 compact JSON files below the fixed artifacts folder.
@@ -53,6 +58,8 @@ import { validatePublication } from '../../preview-auth-dev/v1/runtime-receipt.m
 import { PREVIEW_ORIGIN, PREVIEW_SITE_KEY } from '../../preview-auth-dev/v1/turnstile-custody.mjs';
 import { PREVIEW_MODEL_ROSTER_FLAGS, RELEASE_KEY_PATTERN } from '../../preview-auth-dev/v1/environment.mjs';
 import { runBounded } from '../../preview-lifecycle/v1/common.mjs';
+import { addedMigrations, n1Headers } from '../../preview-lifecycle/v1/migration-steps.mjs';
+import { DATABASE_AHEAD_MAX_BYTES, DATABASE_AHEAD_MAX_STEPS, DATABASE_AHEAD_SCHEMA, validateDatabaseAheadFile } from '../../preview-auth-dev/v1/database-ahead.mjs';
 
 /** The fixed server folders the reviewed launchers already require (launch-plan.mjs: ROOT, the artifact file pattern, prepareLaunch's plan path). */
 export const LAYOUT = Object.freeze({
@@ -111,7 +118,8 @@ const COMMANDS = Object.freeze({
   verify: { required: ['--source'], optional: ['--ui-build'] },
   'operator-digest': { required: ['--source'], optional: [] },
   'launch-plan': { required: ['--service', '--slot', '--from', '--root', '--source-manifest', '--native-attestation', '--out'], optional: ['--ui-build', '--publication'] },
-  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication', '--checker', '--deepseek-enabled-on-gate', '--role-rotation', '--call-concurrency', '--debate-shape', '--question-language', '--length-guidance', '--hosted-billing'] }
+  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication', '--checker', '--deepseek-enabled-on-gate', '--role-rotation', '--call-concurrency', '--debate-shape', '--question-language', '--length-guidance', '--hosted-billing'] },
+  'database-ahead': { required: ['--older-source-manifest', '--newer-source-manifest', '--out'], optional: [] }
 });
 
 export class Refusal extends Error {
@@ -603,6 +611,68 @@ async function nativePlanCommand(options, { layout, deps }) {
   return operation === 'publish' ? { ...written, publicationId, approval } : written;
 }
 
+/** One migration's bytes, as the release folder holds them (root-owned 0644, no link, bounded). */
+async function readMigration(sourceRoot, name, layout) {
+  const path = join(sourceRoot, 'dialectical-engine/migrations', name);
+  try { return await withPrivateBytes(path, { root: dirname(path), uid: layout.ownerUid, mode: 0o644, maxBytes: MAX_PUBLIC_ARTIFACT_BYTES }, raw => Buffer.from(raw)); } catch { return refuse('MIGRATION_UNREADABLE', [name]); }
+}
+
+/**
+ * The newer release's whole forward chain, as its own code describes it (packages/db/src/migration-ahead.ts
+ * describeForwardSteps): loaded from its verified folder through its own tsx, exactly as the native operator loads its
+ * release's code. Side-by-side spec §5: the older release's native verify binds the extra steps to this list.
+ */
+async function describeForwardSteps(sourceRoot) {
+  const engine = join(sourceRoot, 'dialectical-engine');
+  const { tsImport } = await import(pathToFileURL(join(engine, 'node_modules/tsx/dist/esm/api/index.mjs')).href);
+  const ahead = await tsImport(join(engine, 'packages/db/src/migration-ahead.ts'), import.meta.url);
+  return ahead.describeForwardSteps();
+}
+
+/**
+ * Side-by-side spec §5 ("database ahead"; plan D task D5): the file the older release's native verify reads to accept a
+ * database the newer release moved forward (database-ahead.mjs). Both manifests are candidate API manifests of two
+ * releases; the steps are the migrations the newer adds (migration-steps.mjs addedMigrations: never a dropped or edited
+ * one); each step's bytes come from the verified newer folder, must hash to the manifest's sha256 and must carry both
+ * `-- n1: expand` and `-- n1: keeps-verifier` in their leading comment block (else MIGRATION_NOT_N1_EXPAND naming every
+ * such step: that upload takes the drained path). No added step: DATABASE_AHEAD_NOT_NEEDED, nothing written.
+ */
+async function databaseAheadCommand(options, { layout, deps }) {
+  const older = await readSource(options['--older-source-manifest'], { layout, flag: '--older-source-manifest' });
+  const newer = await readSource(options['--newer-source-manifest'], { layout, flag: '--newer-source-manifest' });
+  if (older.value.role !== 'api' || newer.value.role !== 'api') refuse('SOURCE_ROLE_REFUSED');
+  // The native operator and prestart run only from a candidate API folder (native-operator.mjs, prestart.mjs checkNativePlan).
+  if ([older, newer].some(file => releasePattern(layout).exec(file.value.sourceRoot)?.[1] !== 'candidate')) refuse('NATIVE_ROOT_NOT_CANDIDATE');
+  let olderLabel, newerLabel;
+  try { olderLabel = labelOfSourceRoot(older.value.sourceRoot, 'api'); newerLabel = labelOfSourceRoot(newer.value.sourceRoot, 'api'); } catch { refuse('RELEASE_ROOT_REFUSED'); }
+  if (olderLabel === newerLabel) refuse('DATABASE_AHEAD_LABELS_REFUSED');
+  await assertOutputFree(options['--out'], { layout, name: `database-ahead-${olderLabel}.json` });
+  let steps;
+  try { steps = addedMigrations(older.value, newer.value); } catch (error) { refuse(['DATABASE_AHEAD_NOT_A_SUPERSET', 'MIGRATION_MANIFEST_REFUSED'].includes(error?.code) ? error.code : 'DATABASE_AHEAD_REFUSED'); }
+  if (steps.length === 0) refuse('DATABASE_AHEAD_NOT_NEEDED');
+  if (steps.length > DATABASE_AHEAD_MAX_STEPS) refuse('DATABASE_AHEAD_TOO_MANY_STEPS');
+  // The newer folder is exactly what its manifest inventoried before anything is read from it, or loaded.
+  await (deps.verifySourceManifest ?? verifySourceManifest)(newer.value, sourceBinding(newer));
+  const read = deps.readMigration ?? ((root, name) => readMigration(root, name, layout));
+  const undeclared = [];
+  for (const step of steps) {
+    const bytes = await read(newer.value.sourceRoot, step.name);
+    if (sha256(bytes) !== step.sha256) refuse('MIGRATION_BYTES_MISMATCH', [step.name]);
+    const header = n1Headers(bytes.toString('utf8'));
+    if (!header.expand || !header.keepsVerifier) undeclared.push(step.name);
+  }
+  if (undeclared.length) refuse('MIGRATION_NOT_N1_EXPAND', undeclared);
+  const newerChain = await (deps.describeForwardSteps ?? describeForwardSteps)(newer.value.sourceRoot);
+  const file = {
+    schema: DATABASE_AHEAD_SCHEMA, olderLabel, olderSourceRevision: older.value.sourceRevision, newerLabel, newerSourceRevision: newer.value.sourceRevision,
+    newerSourceManifest: { path: newer.path, sha256: newer.sha256 }, steps: steps.map(({ name, sha256: digest }) => ({ name, sha256: digest })),
+    newerChain: Array.isArray(newerChain) ? newerChain.map(entry => ({ ...entry })) : null
+  };
+  // The newer chain's last steps must be exactly these, declared expand and keeps-verifier (PREVIEW_DATABASE_AHEAD_REFUSED).
+  validateDatabaseAheadFile(file);
+  return writeArtifact(options['--out'], file, { layout, maxBytes: DATABASE_AHEAD_MAX_BYTES, name: `database-ahead-${olderLabel}.json` });
+}
+
 /** Parse, then run one subcommand. `layout`/`deps` exist for the unit tests' throwaway roots. */
 export async function runCommand(argv, { layout = LAYOUT, deps = {} } = {}) {
   const { command, options } = parseArguments(argv);
@@ -614,6 +684,7 @@ export async function runCommand(argv, { layout = LAYOUT, deps = {} } = {}) {
     case 'verify': return verifyCommand(options, context);
     case 'operator-digest': return operatorDigestCommand(options, context);
     case 'launch-plan': return launchPlanCommand(options, context);
+    case 'database-ahead': return databaseAheadCommand(options, context);
     default: return nativePlanCommand(options, context);
   }
 }

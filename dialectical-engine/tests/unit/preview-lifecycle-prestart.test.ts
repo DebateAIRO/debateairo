@@ -49,7 +49,7 @@ const attestation = (verifiedAt: string, patch: Record<string, unknown> = {}) =>
   schema: 'preview-auth-dev-native-v1', sourceRevision: revision, sourceTree: tree, nativeSourceSha256: '9'.repeat(64), verifiedAt, postgresMajor: 18,
   executorRole: 'debateai_prod_migrator', executorOid: 16388, ledgerOwnerOid: 16388, billingOwnerOid: 16388, defaultOwnerCount: 6, ledgerCount: 128,
   resolutionCount: 1, forwardCount: 1, catalogSha256: digest, ledgerSha256: digest, resolutionSha256: digest, forwardSha256: digest, cohortCount: 0,
-  capabilityCounts: { debateai_runtime: 10 }, currentContractVerified: true, publication, ...patch
+  capabilityCounts: { debateai_runtime: 10 }, currentContractVerified: true, publication, databaseAhead: null, ...patch
 });
 
 /** A throwaway copy of the server layout, owned by the test user instead of root; `releases` get their plans and native plan. */
@@ -269,7 +269,9 @@ describe('release lock v2', () => {
 
 describe('database ahead and unpinning', () => {
   const ahead = (patch: Record<string, unknown> = {}) => ({ schema: 'preview-database-ahead-v1', olderLabel: 'v1', olderSourceRevision: revision, newerLabel: 'new-v1', newerSourceRevision: NEW_REV,
-    newerSourceManifest: { path: '/opt/debateai-v3-preview/artifacts/new-v1/source.json', sha256: 'c'.repeat(64) }, steps: [{ name: '0123_release_table.sql', sha256: digest }], ...patch });
+    newerSourceManifest: { path: '/opt/debateai-v3-preview/artifacts/new-v1/source.json', sha256: 'c'.repeat(64) }, steps: [{ name: '0124_side_next.sql', sha256: digest }],
+    newerChain: [{ name: '0123_side_by_side_releases.sql', manifestSha256: digest, sourceSha256: digest, verifierSha256: digest, n1Expand: true, keepsVerifier: true, outsideTransaction: false },
+      { name: '0124_side_next.sql', manifestSha256: digest, sourceSha256: digest, verifierSha256: digest, n1Expand: true, keepsVerifier: true, outsideTransaction: false }], ...patch });
 
   it("records the newer release's database-ahead file on the older release", async () => {
     const s = server();
@@ -289,6 +291,9 @@ describe('database ahead and unpinning', () => {
     ['another older label', 'own', { olderLabel: 'old-v1' }, 'DATABASE_AHEAD_REFUSED'],
     ["another older revision", 'own', { olderSourceRevision: NEW_REV }, 'DATABASE_AHEAD_REFUSED'],
     ['a newer label that is the release itself', 'own', { newerLabel: 'v1' }, 'DATABASE_AHEAD_REFUSED'],
+    // Side-by-side spec §5 (D5): the whole file is checked here too, so a bad file is refused before any restart needs it.
+    ['a file without the newer chain', 'own', { newerChain: undefined }, 'DATABASE_AHEAD_REFUSED'],
+    ['a step that is not the newer chain\'s last', 'own', { steps: [{ name: '0125_more.sql', sha256: digest }] }, 'DATABASE_AHEAD_REFUSED'],
     ['a group-writable file', 'writable', {}, 'DATABASE_AHEAD_UNREADABLE']
   ] as const)('refuses %s', async (_name, where, patch, code) => {
     const s = server();
@@ -299,6 +304,33 @@ describe('database ahead and unpinning', () => {
     const bytes = readFileSync(s.layout.lockPath);
     await expect(prestart.acceptAhead({ label: 'v1', fromPath: path, layout: s.layout })).rejects.toMatchObject({ code });
     expect(readFileSync(s.layout.lockPath)).toEqual(bytes);
+  });
+
+  it('verifies in database-ahead mode exactly when the lock pins a database-ahead file, and binds the proof to that file', async () => {
+    const s = server();
+    await pinned(s, V1, ['api', 'ui', 'runner']);
+    const at = Date.parse('2026-10-09T10:00:12Z');
+    const start = async (databaseAhead: unknown) => {
+      const seen: unknown[] = [];
+      const { deps: d } = deps(s, { now: () => at, verifyNative: async (input: unknown) => { seen.push(input); return attestation(new Date(at).toISOString(), { databaseAhead }); } });
+      const result = await prestart.runPrestart({ service: 'runner', label: 'v1', layout: s.layout, deps: d }).catch((error: unknown) => error);
+      return { seen, result };
+    };
+    const proofOf = (fileSha256: string) => ({ fileSha256, newerLabel: 'new-v1', extraSteps: ['0124_side_next.sql'] });
+    const path = common.databaseAheadPathFor(s.layout, 'v1');
+    const fileSha = s.write(path, ahead());
+    // Not pinned yet: the plain verify, and a proof that claims a database-ahead file is refused.
+    let outcome = await start(null);
+    expect(outcome.seen).toEqual([{ sourceRoot: root, databaseAhead: false }]);
+    expect(outcome.result).toMatchObject({ event: 'PREVIEW_LIFECYCLE_PRESTART_READY' });
+    expect((await start(proofOf(fileSha))).result).toMatchObject({ code: 'NATIVE_ATTESTATION_INVALID' });
+    await prestart.acceptAhead({ label: 'v1', fromPath: path, layout: s.layout });
+    outcome = await start(proofOf(fileSha));
+    expect(outcome.seen).toEqual([{ sourceRoot: root, databaseAhead: true }]);
+    expect(outcome.result).toMatchObject({ event: 'PREVIEW_LIFECYCLE_PRESTART_READY' });
+    expect((await start(proofOf('f'.repeat(64)))).result).toMatchObject({ code: 'NATIVE_ATTESTATION_INVALID' });
+    // Pinned, but the newer release has not moved the database yet: the proof says so and the start goes on.
+    expect((await start(null)).result).toMatchObject({ event: 'PREVIEW_LIFECYCLE_PRESTART_READY' });
   });
 
   it('unpins only a retired release and leaves the other release untouched', async () => {
@@ -609,6 +641,29 @@ describe('canonical native verifier invocation', () => {
   ])('refuses %s', async (_name, outcome, code) => {
     const run = async () => ({ timedOut: false, overflow: false, ...outcome });
     await expect(prestart.runNativeVerify({ layout: common.LAYOUT, nodePath: '/opt/node/bin/node', sourceRoot: root, run, timeoutMs: 1000 })).rejects.toMatchObject({ code });
+  });
+
+  it('adds --database-ahead to the canonical argv exactly when asked', async () => {
+    const argv = prestart.nativeVerifyArgv({ layout: common.LAYOUT, nodePath: '/opt/node/bin/node', sourceRoot: root, databaseAhead: true });
+    expect(argv.slice(-4)).toEqual([`${root}/dialectical-engine/deploy/preview-auth-dev/v1/native-operator.mjs`, '--credential-fd', '3', '--database-ahead']);
+    expect(prestart.nativeVerifyArgv({ layout: common.LAYOUT, nodePath: '/opt/node/bin/node', sourceRoot: root }).slice(-2)).toEqual(['--credential-fd', '3']);
+    const seen: string[][] = [];
+    const run = async (command: string[]) => { seen.push(command); return { code: 0, timedOut: false, overflow: false, stdout: Buffer.from('{"ok":true}\n'), stderr: Buffer.alloc(0) }; };
+    await prestart.runNativeVerify({ layout: common.LAYOUT, nodePath: '/opt/node/bin/node', sourceRoot: root, databaseAhead: true, run, timeoutMs: 1000 });
+    expect(seen[0]!.slice(-3)).toEqual(['--credential-fd', '3', '--database-ahead']);
+    for (const databaseAhead of ['yes', 1, null]) {
+      await expect(prestart.runNativeVerify({ layout: common.LAYOUT, nodePath: '/opt/node/bin/node', sourceRoot: root, databaseAhead, run: async () => { throw new Error('ran'); }, timeoutMs: 1000 })).rejects.toMatchObject({ code: 'NATIVE_VERIFY_REFUSED' });
+    }
+  });
+
+  it('names a database ahead of the release: the operator pins the newer release\'s database-ahead file first', async () => {
+    const line = "PREVIEW_NATIVE_VERIFY_DATABASE_AHEAD: the database has steps this release does not know: 0124_side_next.sql, 0125_more.sql. Pin the newer release's database-ahead file with prestart.mjs accept-ahead first.\n";
+    const run = (code: number, stderr: string) => async () => ({ code, timedOut: false, overflow: false, stdout: Buffer.alloc(0), stderr: Buffer.from(stderr) });
+    await expect(prestart.runNativeVerify({ layout: common.LAYOUT, nodePath: '/opt/node/bin/node', sourceRoot: root, run: run(1, line), timeoutMs: 1000 }))
+      .rejects.toMatchObject({ code: 'NATIVE_VERIFY_DATABASE_AHEAD', fields: { next: 'accept-ahead', extra: ['0124_side_next.sql', '0125_more.sql'] } });
+    for (const [code, stderr] of [[0, line], [1, `${line}more\n`], [1, line.replace('0124_side_next.sql', '0124 side next.sql')]] as const) {
+      await expect(prestart.runNativeVerify({ layout: common.LAYOUT, nodePath: '/opt/node/bin/node', sourceRoot: root, run: run(code, stderr), timeoutMs: 1000 })).rejects.toMatchObject({ code: 'NATIVE_VERIFY_REFUSED' });
+    }
   });
 
   it('names a pending forward step: verify never applies one, the operator runs apply-and-plan', async () => {
