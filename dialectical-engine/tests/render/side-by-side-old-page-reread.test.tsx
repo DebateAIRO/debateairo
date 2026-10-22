@@ -15,7 +15,9 @@ import publicEnglish from "../../apps/ui/messages/en/public.json" with { type: "
  * page's own re-read, or its recorded-event replay, is refused with an answer this build cannot read (INVALID_RESPONSE)
  * or one a newer release made (MADE_BY_NEWER_RELEASE), the page shows only the reload note: no "Loading this debate did
  * not complete" banner and no "Recorded event replay unavailable: INVALID_RESPONSE" line with a raw code in it. Every
- * other refusal keeps its banner. The browser client is wrapped by withNewerVersionWatch, as lib/api.ts wraps it.
+ * other refusal keeps its banner. A page still waiting for its debate whose live stream meets such an answer hides its
+ * stream line (W3): the stream is offline for good, and the note speaks. The browser client is wrapped by
+ * withNewerVersionWatch, as lib/api.ts wraps it.
  */
 const mocks = vi.hoisted(() => ({
   readRun: vi.fn(),
@@ -76,6 +78,7 @@ const DEBATE_READ_BANNER = debateChromeEnglish["requestFailure.subject.DEBATE_RE
 const REPLAY_UNAVAILABLE = "Recorded event replay unavailable";
 const NOTE = chromeEnglish["chrome.release.newerVersion"];
 const MADE_BY_NEWER = chromeEnglish["chrome.release.madeByNewer"];
+const CONNECTING = debateChromeEnglish["debateChrome.progress.connecting"];
 
 let root: Root | null = null;
 
@@ -91,14 +94,19 @@ async function settle(): Promise<void> {
  * A fresh page (the note's reason is page-wide state, held once per page load): the page and the note share one copy of
  * lib/v3/releaseWatch, and `failure` is built from the same copy of the contract the page checks with instanceof.
  */
-async function openOldPage(failure: (contract: Contract) => unknown, refused: "reread" | "replay"): Promise<HTMLElement> {
+async function openOldPage(
+  failure: (contract: Contract) => unknown,
+  refused: "reread" | "replay" | "pending"
+): Promise<HTMLElement> {
   vi.resetModules();
   vi.doMock("@/lib/api", mockApi);
   const contract = await import("@debateai/contract");
   const { default: DebatePageClient } = await import("../../apps/ui/app/debate/[id]/DebatePageClient.js");
   const { NewVersionNote } = await import("../../apps/ui/components/NewVersionNote.js");
-  if (refused === "reread") mocks.readRun.mockRejectedValue(failure(contract));
-  else mocks.readEvents.mockRejectedValue(failure(contract));
+  if (refused === "replay") mocks.readEvents.mockRejectedValue(failure(contract));
+  else mocks.readRun.mockRejectedValue(failure(contract));
+  // "pending": a page whose first server read did not answer, so it holds no debate yet; its live stream is refused too.
+  if (refused === "pending") mocks.streamEvents.mockRejectedValue(failure(contract));
   const container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
@@ -106,13 +114,24 @@ async function openOldPage(failure: (contract: Contract) => unknown, refused: "r
     root!.render(
       <>
         <NewVersionNote />
-        <DebatePageClient
-          id={answer.run_ref}
-          initialDebate={debateDetailFromAnswer(answer)}
-          initialAnswer={answer}
-          storyLocale="en"
-          storyCatalog={publicEnglish}
-        />
+        {refused === "pending" ? (
+          <DebatePageClient
+            id={answer.run_ref}
+            initialDebate={null}
+            initialAnswer={null}
+            initialPending
+            storyLocale="en"
+            storyCatalog={publicEnglish}
+          />
+        ) : (
+          <DebatePageClient
+            id={answer.run_ref}
+            initialDebate={debateDetailFromAnswer(answer)}
+            initialAnswer={answer}
+            storyLocale="en"
+            storyCatalog={publicEnglish}
+          />
+        )}
       </>
     );
   });
@@ -188,6 +207,16 @@ describe("side-by-side W1: an old open page lets the reload note speak", () => {
     const text = page.textContent ?? "";
     expect(text).toContain(NOTE);
     expect(text).not.toContain(REPLAY_UNAVAILABLE);
+    expect(text).not.toContain("INVALID_RESPONSE");
+  });
+
+  it("a page still waiting for its debate hides its stream line under the note: no 'Connecting…' left behind (W3)", async () => {
+    const page = await openOldPage(({ ContractHttpError }) => new ContractHttpError("INVALID_RESPONSE", 200, "x"), "pending");
+    expect(mocks.streamEvents).toHaveBeenCalledTimes(1);
+    const text = page.textContent ?? "";
+    expect(text).toContain(NOTE);
+    expect(text).not.toContain(CONNECTING);
+    expect(text).not.toContain(DEBATE_READ_BANNER);
     expect(text).not.toContain("INVALID_RESPONSE");
   });
 

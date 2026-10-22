@@ -219,7 +219,8 @@ export function createDebatePageRunEventConsumer(input: DebatePageRunEventConsum
 }
 
 type StreamState = {
-  status: "connecting" | "live" | "reconnecting";
+  /** "offline": stopped for good under the reload note (lib/v3/liveEvents.ts LiveStreamStatus, final fix wave W3). */
+  status: "connecting" | "live" | "reconnecting" | "offline";
   retryInMs?: number;
 };
 
@@ -1510,14 +1511,17 @@ export default function DebatePageClient({
     );
   }
   if (!debate) {
+    // Final fix wave W3: once the stream is offline for good, the reload note speaks; no progress line stays under it.
     return (
       <div className="screen scroll">
         <div className="screenInner narrow">
-          <p className="muted" role="status">
-            {initialPending
-              ? localizedPendingProgressCopy(live, streamState, debateChromeCatalog, locale)
-              : t(debateChromeCatalog, "debateChrome.loading")}
-          </p>
+          {streamState.status === "offline" ? null : (
+            <p className="muted" role="status">
+              {initialPending
+                ? localizedPendingProgressCopy(live, streamState, debateChromeCatalog, locale)
+                : t(debateChromeCatalog, "debateChrome.loading")}
+            </p>
+          )}
         </div>
       </div>
     );

@@ -274,6 +274,20 @@ describe("live stream loop (one open stream, honest back-off)", () => {
     expect(run.refreshes).toEqual([]);
     expect(run.statuses.some((status) => status.status === "reconnecting")).toBe(false);
     expect(newerVersionReason()).toBe("NEWER_BUILD");
+    // Final fix wave W3: the stream is offline for good under the note, not left "connecting".
+    expect(run.statuses.at(-1)).toEqual({ status: "offline" });
+    run.stop();
+  });
+
+  it("a stream that was live and then meets an event this page cannot read goes offline, never stays 'live' (W3)", async () => {
+    vi.useFakeTimers({ now: 0 });
+    const run = harness([async (emit) => {
+      emit(streamEvent(1, "run.running"));
+      throw new ContractHttpError("INVALID_RESPONSE", 200, "x");
+    }]);
+    await vi.advanceTimersByTimeAsync(LIVE_STREAM_RECONNECT.maxGapMs * 3);
+    expect(run.opened).toEqual([0]);
+    expect(run.statuses).toEqual([{ status: "connecting" }, { status: "live" }, { status: "offline" }]);
     run.stop();
   });
 
