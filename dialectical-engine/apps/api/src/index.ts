@@ -4264,14 +4264,15 @@ export function releaseServes(input: Readonly<{ state: ReleaseState | null; anyC
   return !input.anyCurrent && !input.hosted;
 }
 
-/** Spec §4 / plan D: one owner mail per release key per half hour at most, so a burst of refused sends is one line. */
+/** Spec §4: one journal line per release key per half hour at most, so a burst of refused sends is one line. */
 const RELEASE_NOT_SERVED_ALERT_WINDOW_MS = 1_800_000;
 
 /**
- * Side-by-side spec §4 (plan C task C4) — THE OWNER HEARS OF A REFUSED SEND. The API emails nobody about releases: it
- * prints `DEBATEAI_RELEASE_NOT_SERVED {"releaseKey":…,"state":…|null}` on stderr, at most once per release key per
- * `windowMs` in this process, and plan D's root-side watcher mails the owner from it. Content-free: a key we mint and a
- * lifecycle word.
+ * Side-by-side spec §4 (plan C task C4) — A REFUSED SEND IS JOURNALED. The API emails nobody about releases: it prints
+ * `DEBATEAI_RELEASE_NOT_SERVED {"releaseKey":…,"state":…|null}` on stderr, at most once per release key per `windowMs` in
+ * this process. That journal line is all there is: no deploy watcher mails it (final fix wave X5), so the owner sees it
+ * in the API's journal (deploy/vps/README.md lists it with the waker's api.wait.release_not_served row). Content-free: a
+ * key we mint and a lifecycle word.
  */
 export function createReleaseNotServedAlert(options: Readonly<{
   clock?: () => number; windowMs?: number; write?: (line: string) => void;
