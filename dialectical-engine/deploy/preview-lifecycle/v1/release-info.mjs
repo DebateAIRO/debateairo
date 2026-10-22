@@ -51,14 +51,16 @@ async function readOverlay(label, layout) {
 /**
  * Every release the server knows, label → { releaseKey, slot, … }, in the lock's order (preview) or by label (public
  * server). The preview's entries also carry the lock's API source manifest digest (`apiManifestSha256`, null without
- * one), the public server's their folder (`sourceRoot`): what the release check (D11) compares the older manifest with.
+ * one) and its pinned commit (`sourceRevision`, the N-1 baseline check), the public server's their folder
+ * (`sourceRoot`): what the release check (D11) compares the older manifest with.
  * `deps.readLock` replaces the lock reader (tests); a missing overlay root is a server with no release yet.
  */
 export async function releaseInfos({ layout = LAYOUT, deps = {} } = {}) {
   if (!fromOverlays(layout)) {
     const { lock } = await (deps.readLock ?? readLock)(layout);
     return Object.freeze(Object.fromEntries(Object.entries(lock.releases).map(([label, release]) => [label, Object.freeze({
-      releaseKey: release.releaseKey, slot: release.slot, apiManifestSha256: release.services?.api?.sourceManifestSha256 ?? null
+      releaseKey: release.releaseKey, slot: release.slot, apiManifestSha256: release.services?.api?.sourceManifestSha256 ?? null,
+      sourceRevision: release.services?.api?.sourceRevision ?? null
     })])));
   }
   let names;

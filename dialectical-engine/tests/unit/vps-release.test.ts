@@ -492,7 +492,8 @@ describe("release.mjs: the preview's release tools with the public server's layo
     expect([check.code, check.err]).toEqual([0, null]);
     expect(check.out.verdict).toBe("SIDE_BY_SIDE");
     expect(Object.fromEntries(check.out.checks.map((entry: { name: string; detail: string }) => [entry.name, entry.detail]))).toEqual({
-      N1_HEADERS: "new: 0002_b.sql", CURRENT_PINNED: "old-v1", PREVIOUS_RETIRED: "all retired", GATES_ACTIVE: "no gates on this server",
+      // The N-1 baseline names the preview's live release; the public server pins no commit to compare it with (A2).
+      N1_HEADERS: "new: 0002_b.sql", N1_BASELINE: "not compared on this server (the baseline names the preview's live release)", CURRENT_PINNED: "old-v1", PREVIOUS_RETIRED: "all retired", GATES_ACTIVE: "no gates on this server",
       GATE_ROWS_N1: "no gates on this server", CONNECTIONS: "max 320, free 307", DISK: "40.0 GB free", MEMORY: "7812 MiB available",
       HATCHET: "active", NO_MAINTENANCE: "none", SLOT_FREE: "slot B", LIFECYCLE_FILES: "the release tools run from the operator checkout"
     });

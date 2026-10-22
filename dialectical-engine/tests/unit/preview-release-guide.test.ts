@@ -5,8 +5,10 @@
 // parser (with the platform refused, so nothing runs): a flag or a subcommand the tool does not know fails here, not on
 // the server. Only the new sections are read; the R19 recipe above them stays as it ran.
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 
 const read = (path: string) => readFileSync(resolve(import.meta.dirname, '../..', path), 'utf8');
 const guide = read('deploy/preview-release/v1/README.md');
@@ -194,6 +196,52 @@ describe('the preview release guide: transition T, side by side, the way back, t
         expect(line.startsWith(`ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "${step}_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work`), `${step}: ${line}`).toBe(true);
       }
     }
+  });
+
+  it('the N-1 baseline names the live release after TB9 and after SB13b, and SB4 checks it (final fix wave A2)', () => {
+    for (const [heading, before, after] of [['### TB10. ', '### TB9. ', '### The way back from T'], ['### SB13c. ', '### SB13b. ', '### SB14. ']] as const) {
+      const at = newSections.indexOf(`\n${heading}`);
+      expect(at, heading).toBeGreaterThan(newSections.indexOf(`\n${before}`));
+      expect(at, heading).toBeLessThan(newSections.indexOf(`\n${after}`));
+      const section = sectionOf(guide, guide.split('\n').find(line => line.startsWith(heading))!);
+      expect(section).toContain(`jq --arg c "$REV" --arg r "$LABEL" '.commit = $c | .reason = $r' dialectical-engine/tests/n1-baseline.json`);
+      expect(section).toContain('[ "$(node dialectical-engine/tools/n1-baseline.mjs commit)" = "$REV" ]');
+      expect(section).toContain('git push -u origin "chore/n1-baseline-$NN" && gh pr create --base dev');
+      // On the Mac: not a server script (no names file, no step guards).
+      expect(section).not.toMatch(/_NOT_DONE|_DONE\b|rNN-names\.sh/);
+    }
+    const sb4 = sectionOf(guide, sideBySide.split('\n').find(line => line.startsWith('### SB4. '))!);
+    expect(sb4).toContain('`N1_BASELINE`');
+    expect(sb4).toContain('`N1_BASELINE` fails with `set the N-1 baseline first`');
+  });
+
+  it('SB8 accepts the old ledger plus the database-ahead file\'s steps it did not hold yet: the abort-then-fix sequence (final fix wave A1)', () => {
+    const sb8 = scriptOf('SB8').lines;
+    const pick = (prefix: string) => { const found = sb8.filter(line => line.startsWith(prefix)); expect(found, prefix).toHaveLength(1); return found[0]!; };
+    const steps = pick('NEWSTEPS=$(for M in $(jq -r \'.steps[].name\' "$DA")'), top = pick('TOP=$('), check = pick('[ "$LEDGER" = "$(( ${LEDGER0%%|*} + ');
+    expect(sb8.indexOf(steps)).toBeLessThan(sb8.findIndex(line => line.startsWith('OUT=$(nat ')));
+    expect(sb8.join('\n')).not.toContain('grep -c . "$S/new-migrations.txt"');
+    // The three lines, run by bash with the database as a list of names (psqlq answers the one count they ask).
+    const dir = mkdtempSync(join(tmpdir(), 'guide-sb8-'));
+    try {
+      const ledger = (before: string[], newer: string[], after: string[]) => {
+        writeFileSync(join(dir, 'before'), `${before.join('\n')}\n`);
+        writeFileSync(join(dir, 'da.json'), JSON.stringify({ steps: newer.map(name => ({ name })) }));
+        const summary = (names: string[]) => `${names.length}|${[...names].sort().at(-1)}`;
+        const script = ['set -euo pipefail', `D='${dir}'; DA="$D/da.json"; LEDGER0='${summary(before)}'; LEDGER='${summary(after)}'`,
+          `psqlq() { N=$(printf '%s' "$1" | sed -n "s/.*name = '\\(.*\\)'.*/\\1/p"); if grep -qxF "$N" "$D/before"; then echo 1; else echo 0; fi; }`,
+          steps, top, check, 'echo LEDGER_OK'].join('\n');
+        try { return execFileSync('bash', ['-c', script], { encoding: 'utf8' }).trim(); } catch (error) { return String((error as { stdout?: string }).stdout ?? '').trim(); }
+      };
+      const OLD = ['0121_engine_verdict.sql', '0122_engine_map_check.sql', '0123_side_by_side_releases.sql'];
+      // A plain upload: one new step.
+      expect(ledger(OLD, ['0124_a.sql'], [...OLD, '0124_a.sql'])).toBe('LEDGER_OK');
+      // T+1 applied 0124 and was rolled back; the fix release keeps 0124 and adds 0125: only 0125 is new to the ledger.
+      expect(ledger([...OLD, '0124_a.sql'], ['0124_a.sql', '0125_b.sql'], [...OLD, '0124_a.sql', '0125_b.sql'])).toBe('LEDGER_OK');
+      // A step that did not land, or one the file does not name, still stops SB8.
+      expect(ledger(OLD, ['0124_a.sql', '0125_b.sql'], [...OLD, '0124_a.sql'])).toMatch(/^SB8_NOT_DONE: the ledger is not the old one plus exactly/);
+      expect(ledger(OLD, ['0124_a.sql'], [...OLD, '0124_a.sql', '0125_b.sql'])).toMatch(/^SB8_NOT_DONE: /);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
   it('the caddy step restores the old file on a failed check', () => {

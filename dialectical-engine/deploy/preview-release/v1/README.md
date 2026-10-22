@@ -2253,6 +2253,7 @@ And four more, new with T:
 | TB7 | Caddy with two slots (about one second) | up | TB7 puts the old Caddyfile back by itself; then rbB-T if needed |
 | TB8 | T's runner, by hand | up | rbB-T |
 | TB9 | checks (read-only) | up | rbB-T |
+| TB10 | on the Mac: the PR that makes `tests/n1-baseline.json` name T | up | – (T+1 needs it) |
 
 **The owner's yes, fresh in the live chat right before TB0g (or TB1 when TA10 listed no gate file)** (TB0g to TB9 run
 on it). It names:
@@ -3153,6 +3154,26 @@ echo TB9_DONE
 
 Then the release's own checks, and the owner starts one short real debate on the site: it must finish, on T's runner.
 
+### TB10. The N-1 baseline names the live release (on the Mac)
+
+After TB9 the live release is `REV` (`LABEL`, in the names file). The N-1 compatibility job
+(`.github/workflows/n1-compatibility.yml`) runs the database suites of the commit `tests/n1-baseline.json` names against
+every later schema, so that file must name `REV` before the next upload: the next upload's SB4 (`N1_BASELINE`) refuses
+until a `REV` that contains this change. On the Mac, in the repository checkout, with the owner's yes for the PR (the
+standing order: latest dev first, push, PR to dev, fix CI, merge), fill in the three values and run:
+
+```sh
+NN=rNN; REV='<the 40-character commit of T, the release that is now live>'; LABEL='<its label, from the names file>'
+git fetch origin dev && git switch -c "chore/n1-baseline-$NN" origin/dev
+jq --arg c "$REV" --arg r "$LABEL" '.commit = $c | .reason = $r' dialectical-engine/tests/n1-baseline.json > "$TMPDIR/n1-baseline.json" && mv "$TMPDIR/n1-baseline.json" dialectical-engine/tests/n1-baseline.json
+[ "$(node dialectical-engine/tools/n1-baseline.mjs commit)" = "$REV" ] && git diff --stat
+git add dialectical-engine/tests/n1-baseline.json && git commit -m "chore(n1): the N-1 baseline names $LABEL ($NN)"
+git push -u origin "chore/n1-baseline-$NN" && gh pr create --base dev --title "chore(n1): the N-1 baseline names $LABEL" --body "tests/n1-baseline.json names $REV, the release live on the test site, so the N-1 compatibility job checks that commit's database suites on every later schema."
+```
+
+The diff must change exactly the two lines `commit` and `reason`. Once CI is green, merge it (the job itself runs on this
+PR: it checks `REV`'s suites against dev's schema).
+
 ### The way back from T
 
 **rbA-T: before TB3** (no migration ran, nothing published, the layout unchanged). R19's rbA on T's names: it starts R19
@@ -3350,7 +3371,10 @@ release's prestart verifies with `--database-ahead` and its proof names the file
 | SB11 | the new runner | up | WB1 |
 | SB12 | the new API and website, not ready | up | WB1 |
 | SB13 | the switch | up | WB2 |
+| SB13b | the team member's test debate runs on the new release (read-only) | up | WB2 |
+| SB13c | on the Mac: the PR that makes `tests/n1-baseline.json` name the new release | up | – (the next upload needs it) |
 | SB14 | later: the old release retired; its receipt | up | WB2 (its runner restarts in database-ahead mode) |
+| SB14b | only after a reboot or a runner crash during the drain: the runners start again | up | – |
 | SB15 | later, on the owner's yes: the release before the old one, archived | up | move its folders back |
 
 After SB8 the online backup is a last resort only (spec §11): going back is the switch the other way, never a restore.
@@ -3523,8 +3547,12 @@ before SB4, as the gate README says; one that narrows waits until the old releas
 
 `release-check.mjs check` gives the verdict: `SIDE_BY_SIDE` (every check passes), `DRAINED_PATH` (a new migration lacks
 `-- n1: expand` or `-- n1: keeps-verifier`) or `NOT_READY` (anything else). It checks, by name: `N1_HEADERS`,
-`CURRENT_PINNED`, `PREVIOUS_RETIRED`, `GATES_ACTIVE`, `GATE_ROWS_N1`, `CONNECTIONS` (320, at least 120 free), `DISK`
+`N1_BASELINE` (the new release's own `tests/n1-baseline.json`, read from its checked folder, names the live release's
+commit: the N-1 job then ran the live code on the new schema), `CURRENT_PINNED`, `PREVIOUS_RETIRED`, `GATES_ACTIVE`, `GATE_ROWS_N1`, `CONNECTIONS` (320, at least 120 free), `DISK`
 (15 GB), `MEMORY` (4 GiB available), `HATCHET`, `NO_MAINTENANCE`, `SLOT_FREE`, `LIFECYCLE_FILES`.
+
+`N1_BASELINE` fails with `set the N-1 baseline first` when the PR of the last upload's N-1 step (TB10 after T, SB13c
+after a side-by-side upload) is not in `REV`: merge it into dev, take a `REV` after it, and start again from SB1.
 
 Two checks may need the owner first, and then a second run with their answer filled in at the top:
 - `GATE_ROWS_N1` fails with `no snapshot of the switch: review <sha256>` (the first upload after T: T was seeded, never
@@ -3625,7 +3653,9 @@ echo SB7_DONE
 
 The old release keeps serving throughout. First its database-ahead file is installed and pinned on it (so any restart
 of the old release from now on verifies in database-ahead mode), then `apply-and-plan` runs through the new release's own
-native-plan file. A release without new migrations skips this step (`SB8_SKIPPED`).
+native-plan file. A release without new migrations skips this step (`SB8_SKIPPED`). The ledger must then be the old one
+plus exactly the database-ahead file's steps it did not hold yet: after an upload that applied a step and was rolled
+back, a fix release that keeps that step adds only its own new ones (the kept step is already in the ledger).
 
 ```sh
 set -euo pipefail
@@ -3651,6 +3681,10 @@ for M in $(jq -r '.steps[] | "\(.name)=\(.sha256)"' "$DA"); do [ "$(jq -r --arg 
 AH=$(pre accept-ahead --label "$OLABEL" --from "$E/database-ahead-$OLABEL.json" 2>&1) || { echo "$AH"; echo "SB8_NOT_DONE: the pin was refused (nothing applied)"; exit 1; }
 echo "$AH"
 [ "$(jq -r '[.event, .label, .newerLabel] | map(tostring) | join(" ")' <<<"$AH")" = "PREVIEW_LIFECYCLE_DATABASE_AHEAD_PINNED $OLABEL $LABEL" ] && [ "$(jq -r --arg o "$OLABEL" '.releases[$o].databaseAhead.newerLabel' "$LOCK")" = "$LABEL" ] || { echo "SB8_NOT_DONE: the lock does not pin the database-ahead file on the old release (nothing applied)"; exit 1; }
+# The steps the ledger must gain: the database-ahead file's steps it does not hold yet. A step an aborted earlier upload
+# already applied, and this fix release keeps, is in the ledger and in the file alike (final fix wave A1).
+NEWSTEPS=$(for M in $(jq -r '.steps[].name' "$DA"); do [ "$(psqlq "SELECT count(*) FROM public.debateai_schema_migration WHERE name = '$M'")" = 1 ] || echo "$M"; done)
+echo "steps the ledger gains: $(printf '%s ' $NEWSTEPS)"
 rel native-plan --operation apply-and-plan --from "$S/native-plan.before.json" --source-manifest "$ART/candidate-api-source.json" --out "$ART/native-plan-apply-and-plan.json" || { echo "SB8_NOT_DONE: the release tool refused the plan (nothing applied)"; exit 1; }
 [ "$(jq -r .operation "$ART/native-plan-apply-and-plan.json")" = apply-and-plan ] && [ "$(jq -r .sourceRevision "$ART/native-plan-apply-and-plan.json")" = "$REV" ] && [ "$(jq -r '.hostedBilling.billing // "none"' "$ART/native-plan-apply-and-plan.json")" = on ] || { echo "SB8_NOT_DONE: the plan is not this release's billing-on apply-and-plan (nothing applied)"; exit 1; }
 put "$ART/native-plan-apply-and-plan.json" || { echo "SB8_NOT_DONE: put failed (nothing applied)"; exit 1; }
@@ -3658,7 +3692,8 @@ OUT=$(nat "$ART/native-apply-and-plan.json"); echo "nat: $OUT"
 LEDGER=$(psqlq "SELECT count(*)||'|'||max(name) FROM public.debateai_schema_migration"); echo "ledger $LEDGER"
 [ "$OUT" = "exit 0" ] || { head -c 1200 "$ART/native-apply-and-plan.json"; echo; echo "SB8_NOT_DONE: the native operator refused (the old release still serves; ask)"; exit 1; }
 for M in $(cat "$S/new-migrations.txt"); do [ "$(psqlq "SELECT count(*) FROM public.debateai_schema_migration WHERE name = '$M'")" = 1 ] || { echo "SB8_NOT_DONE: $M is not in the ledger"; exit 1; }; done
-[ "$LEDGER" = "$(( ${LEDGER0%%|*} + $(grep -c . "$S/new-migrations.txt") ))|$(LC_ALL=C sort "$S/new-migrations.txt" | tail -n 1)" ] || { echo "SB8_NOT_DONE: the ledger is not the old one plus exactly this release's migrations"; exit 1; }
+TOP=$( { printf '%s\n' "${LEDGER0#*|}"; jq -r '.steps[].name' "$DA"; } | LC_ALL=C sort | tail -n 1)
+[ "$LEDGER" = "$(( ${LEDGER0%%|*} + $(printf '%s\n' "$NEWSTEPS" | grep -c . || true) ))|$TOP" ] || { echo "SB8_NOT_DONE: the ledger is not the old one plus exactly the database-ahead file's steps it did not hold yet"; exit 1; }
 [ "$(psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1")" = "$REG0" ] && cmp -s "$S/native-plan.before.json" "$ONP" || { echo "SB8_NOT_DONE: the newest register or the old verify plan moved"; exit 1; }
 [ "$(edgekey)" = "200 $OKEY" ] || { echo "SB8_NOT_DONE: the site does not answer from the old release any more: ask"; exit 1; }
 echo SB8_DONE
@@ -3882,6 +3917,26 @@ else echo "the old runner has stopped (retired, or check SB14)"; fi
 [ "$(gs "$GD" "$PD" | jq -r .state)" = active ] && [ "$(gs "$GAN" "$PAN" | jq -r .state)" = active ] || { echo "SB13B_NOT_DONE: a spending gate is not active"; exit 1; }
 echo SB13B_DONE
 ```
+
+### SB13c. The N-1 baseline names the live release (on the Mac)
+
+After SB13b the live release is `REV` (`LABEL`, in the names file). The N-1 compatibility job
+(`.github/workflows/n1-compatibility.yml`) runs the database suites of the commit `tests/n1-baseline.json` names against
+every later schema, so that file must name `REV` before the next upload: the next upload's SB4 (`N1_BASELINE`) refuses
+until a `REV` that contains this change. On the Mac, in the repository checkout, with the owner's yes for the PR (the
+standing order: latest dev first, push, PR to dev, fix CI, merge), fill in the three values and run:
+
+```sh
+NN=rNN; REV='<the 40-character commit of the release that is now live>'; LABEL='<its label, from the names file>'
+git fetch origin dev && git switch -c "chore/n1-baseline-$NN" origin/dev
+jq --arg c "$REV" --arg r "$LABEL" '.commit = $c | .reason = $r' dialectical-engine/tests/n1-baseline.json > "$TMPDIR/n1-baseline.json" && mv "$TMPDIR/n1-baseline.json" dialectical-engine/tests/n1-baseline.json
+[ "$(node dialectical-engine/tools/n1-baseline.mjs commit)" = "$REV" ] && git diff --stat
+git add dialectical-engine/tests/n1-baseline.json && git commit -m "chore(n1): the N-1 baseline names $LABEL ($NN)"
+git push -u origin "chore/n1-baseline-$NN" && gh pr create --base dev --title "chore(n1): the N-1 baseline names $LABEL" --body "tests/n1-baseline.json names $REV, the release live on the test site, so the N-1 compatibility job checks that commit's database suites on every later schema."
+```
+
+The diff must change exactly the two lines `commit` and `reason`. Once CI is green, merge it (the job itself runs on this
+PR: it checks `REV`'s suites against dev's schema).
 
 ### SB14. Later: the old release retired, and its receipt
 
