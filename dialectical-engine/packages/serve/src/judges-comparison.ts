@@ -1,7 +1,7 @@
 import type { Answer, JudgesComparison } from "@debateai/contract";
 import {
-  ENGINE_ANSWER_LETTERS, ENGINE_QUESTION_KINDS, STRUCTURE_REPAIR_CALL_SITE_PREFIX, TypedDomainError,
-  type EngineAnswerLetter, type EngineQuestionKind
+  ENGINE_ANSWER_LETTERS, ENGINE_QUESTION_KINDS, SERVED_ROOT_SELECTION_RULE_JUDGES, STRUCTURE_REPAIR_CALL_SITE_PREFIX,
+  TypedDomainError, type EngineAnswerLetter, type EngineQuestionKind
 } from "@debateai/kernel";
 import { deriveJudgesVerdict, type ComparingJudgeVote } from "./engine-verdict.js";
 import { seatBaseCallSiteKey } from "./synthesis.js";
@@ -230,6 +230,30 @@ export function servedPositionOf(nodes: Answer["nodes"], edges: Answer["edges"],
   const sources = new Set(sourceRefs);
   const named = [...new Set(positionsOf(nodes, edges).filter((node) => sources.has(node.provenance_ref)).map((node) => node.node_id))];
   return named.length === 1 ? named[0]! : null;
+}
+
+/**
+ * Side-by-side spec §5 (plan C15): two releases read one database, and the recount below is THIS code counting a
+ * debate's stored votes again. It is shown only when this code implements the rule that decided the debate:
+ *   - no release is named (`ownReleaseKey` undefined: the runner, the practice report, tests): today's behaviour;
+ *   - the debate is this release's own (`runReleaseKey === ownReleaseKey`);
+ *   - the debate's propagation receipt names the comparing judges' rule (`SERVED_ROOT_SELECTION_RULE_JUDGES`): the
+ *     `rule` of `ledger.propagation_run.served_root_selection` (migration 0055) that chose the served answer.
+ * Otherwise the section is left out, the same "no section rather than numbers that differ from the served verdict" rule
+ * as `lettersOf`.
+ *
+ * The rule's NAME is the rule's version: a change to `deriveJudgesVerdict`'s counting must take a new rule name. The
+ * receipt is jsonb with no database CHECK of its own; the guards a reviewer sees are the kernel's `ServedRootRule` type
+ * (what the runner may record) and 0121's declared rule history (`condition_mark_served_root_rule_rule_check`), which
+ * mirrors it, so a new name is a kernel change (and a 0121 migration when a condition mark carries it), and an older
+ * release never shows a recount of a rule it does not implement. Pure.
+ */
+export function judgesRecountApplies(input: Readonly<{
+  runReleaseKey: string; ownReleaseKey: string | undefined; servedRootRule: string | null;
+}>): boolean {
+  return input.ownReleaseKey === undefined
+    || input.runReleaseKey === input.ownReleaseKey
+    || input.servedRootRule === SERVED_ROOT_SELECTION_RULE_JUDGES;
 }
 
 export function judgesComparisonOf(

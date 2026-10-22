@@ -10,6 +10,7 @@ import {
   createTestAskAdmissionPoolFacades, startTestDatabase, type TestDatabase
 } from "../support/testDatabase.js";
 import { fixtureStructuralCeiling } from "../support/discoveredPanel.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 /**
  * `submit` writes the run row first and then, outside that write, records the
@@ -37,6 +38,7 @@ afterAll(async () => {
 const settings: RunCreationSettings = {
   strangerSampleRate: 0,
   registerVersion: 1,
+  releaseKey: TEST_RELEASE_KEY,
   batteryVersion: "run-setup-failure-test",
   settlementWatchHandle: "run-setup-failure-test",
   resolveDiscoveredPanel: async () => PLAN_TIER_ROSTERS.free.map((modelId, index) => Object.freeze({

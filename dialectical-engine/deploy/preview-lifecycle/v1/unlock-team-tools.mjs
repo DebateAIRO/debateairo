@@ -34,8 +34,8 @@ import { basename, dirname, isAbsolute, join, normalize } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { exactKeys, strictJson, withPrivateBytes } from '../../preview-auth-dev/v1/custody.mjs';
 import { readEnvironmentFile } from '../../preview-auth-dev/v1/environment.mjs';
-import { LAYOUT, atomicWrite, ensureDirectory, logLine, peerShimArgv, runBounded } from './common.mjs';
-import { loadPinnedRelease, readLock } from './prestart.mjs';
+import { LAYOUT, atomicWrite, ensureDirectory, logLine, peerShimArgv, runBounded, unitNameFor } from './common.mjs';
+import { currentLabel, loadPinnedRelease, readLock } from './prestart.mjs';
 import { READINESS_OS_USER, READINESS_RESULT_SCHEMA, READINESS_WRITER_ROLE } from './readiness-writer-actor.mjs';
 import { verifyReleaseForImport } from './release-guard.mjs';
 
@@ -492,12 +492,12 @@ export function creatorRunner({ engine, nodePath, run = runBounded }) {
   };
 }
 
-/** The API service identity: its uid/gid plus the user's groups and the unit's SupplementaryGroups. */
-async function apiIdentity(plan) {
+/** The API service identity: its uid/gid plus the user's groups and its unit instance's SupplementaryGroups. */
+async function apiIdentity(plan, label) {
   const text = async argv => { const r = await runBounded(argv, { env: {}, timeoutMs: 5000, maxOutputBytes: 16384 }); if (r.code !== 0) refuse('API_IDENTITY_REFUSED'); return r.stdout.toString('utf8').trim(); };
   const name = (await text([LAYOUT.getent, 'passwd', String(plan.serviceUid)])).split(':')[0];
   const groups = new Set((await text([LAYOUT.id, '-G', name])).split(/\s+/).map(Number));
-  for (const group of (await text([LAYOUT.systemctl, 'show', '--value', '-p', 'SupplementaryGroups', 'debateai-preview-api.service'])).split(/\s+/).filter(Boolean)) {
+  for (const group of (await text([LAYOUT.systemctl, 'show', '--value', '-p', 'SupplementaryGroups', unitNameFor(LAYOUT, 'api', label)])).split(/\s+/).filter(Boolean)) {
     groups.add(Number((await text([LAYOUT.getent, 'group', group])).split(':')[2]));
   }
   groups.add(plan.serviceGid);
@@ -509,21 +509,31 @@ async function readCa() {
   return withPrivateBytes(LAYOUT.postgresCa, { root: dirname(LAYOUT.postgresCa), uid: 0, mode: 0o644, maxBytes: 65536 }, raw => Buffer.from(raw).toString('utf8'));
 }
 
+/**
+ * Side-by-side spec §10: the lock pins several releases; the team tools always run with the API release
+ * the release table names current (CURRENT_RELEASE_UNPINNED when the lock does not pin it).
+ */
+export async function loadCurrentApiRelease({ layout = LAYOUT, readCurrent, readLock: read, loadPinned = loadPinnedRelease } = {}) {
+  const label = await currentLabel({ layout, readCurrent, readLock: read });
+  const { entry, plan } = await loadPinned({ service: 'api', label });
+  return { label, entry, plan };
+}
+
 async function serverDeps() {
-  const { entry, plan } = await loadPinnedRelease({ service: 'api' });
+  const { label, entry, plan } = await loadCurrentApiRelease();
   if (!SOURCE_ROOT.test(entry.sourceRoot)) refuse('RELEASE_REFUSED');
   const engine = `${entry.sourceRoot}/dialectical-engine`, nodePath = process.execPath;
   const configured = await readEnvironmentFile(plan.environment.path, plan.environment);
   const staff = { configPath: configured.STAFF_INDEPENDENT_ALERT_CONFIG_PATH, operatorPath: configured.STAFF_ALERT_OPERATOR_MODULE_PATH, operatorSha256: configured.STAFF_ALERT_OPERATOR_MODULE_SHA256 };
   for (const key of Object.keys(configured)) configured[key] = '';
   if (![staff.configPath, staff.operatorPath].every(path => typeof path === 'string' && isAbsolute(path) && normalize(path) === path) || !HASH.test(staff.operatorSha256 ?? '')) refuse('STAFF_CONFIGURATION_REQUIRED');
-  return { entry, plan, engine, nodePath, staff };
+  return { label, entry, plan, engine, nodePath, staff };
 }
 
 async function runServer() {
   // The writer choice and host are checked before the release is loaded: a typo fails at once.
   resolveStaffWriterKind(process.env.PREVIEW_LIFECYCLE_STAFF_WRITER);
-  const { plan, engine, nodePath, staff } = await serverDeps();
+  const { label, plan, engine, nodePath, staff } = await serverDeps();
   const { db, alerts, runtime, pg, pgPath } = await loadReleaseModules({ plan, engine });
   const operator = await runtime.loadStaffAlertOperator({ path: staff.operatorPath, sha256: staff.operatorSha256 });
   try {
@@ -539,7 +549,7 @@ async function runServer() {
       lookupReadinessUser: () => lookupReadinessUser(),
       readinessRunner: ({ user, host }) => readinessActorRunner({ user, host, engine, pgPath, nodePath })
     });
-    const identity = await apiIdentity(plan);
+    const identity = await apiIdentity(plan, label);
     const evidence = createSelfCaptureEvidence({
       readWrapperText: () => withPrivateBytes(staff.operatorPath, { root: dirname(staff.operatorPath), uid: 0, mode: [0o644, 0o640, 0o600, 0o755, 0o750], maxBytes: 65536 }, raw => Buffer.from(raw).toString('utf8')),
       runSelfCapture: async () => {
@@ -564,9 +574,11 @@ async function runServer() {
 async function resetServer() {
   // Always the recovery login, whichever writer the window used: idempotent, needs no password,
   // and it also closes a login an earlier fallback run left open by crashing.
-  // Needs only the pinned API release root (for the reviewed peer channel); no plan, no staff config.
+  // Needs only the current release's pinned API root (for the reviewed peer channel); no plan, no staff config.
   const { lock } = await readLock(LAYOUT);
-  const sourceRoot = lock.services.api?.sourceRoot ?? refuse('RELEASE_LOCK_SERVICE_MISSING');
+  const label = await currentLabel({ layout: LAYOUT, readLock: async () => ({ lock }) });
+  const { services } = lock.releases[label];
+  const sourceRoot = (Object.hasOwn(services, 'api') ? services.api.sourceRoot : undefined) ?? refuse('RELEASE_LOCK_SERVICE_MISSING');
   if (!SOURCE_ROOT.test(sourceRoot)) refuse('RELEASE_REFUSED');
   return runReset({ writer: createInterimLoginWriter({ runCreator: creatorRunner({ engine: `${sourceRoot}/dialectical-engine`, nodePath: process.execPath }), createPool: () => refuse('RESET_ONLY'), createPublisher: () => refuse('RESET_ONLY') }) });
 }

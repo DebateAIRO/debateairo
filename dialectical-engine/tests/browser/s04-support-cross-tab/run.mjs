@@ -63,7 +63,9 @@ const pidDir = process.env.S04_PID_DIR ? path.resolve(process.env.S04_PID_DIR) :
 function broken(reason) { out(`BROKEN ${reason}`); out("BROKEN"); process.exit(1); }
 if (!argv.includes("--no-build")) broken("--no-build is required: the harness never builds (c4.sh ensure_build does, B3)");
 if (!uiRoot || !fs.existsSync(path.join(uiRoot, "server.mjs"))) broken(`--ui-root must be an apps/ui dir holding server.mjs (got ${uiRoot})`);
-if (!fs.existsSync(path.join(uiRoot, ".next", "BUILD_ID"))) broken(`no build at ${uiRoot}/.next (run through c4.sh, which builds)`);
+// The build folder, as next.config.mjs, server.mjs and release-edge.mjs read it.
+const distDir = process.env.NEXT_DIST_DIR || ".next";
+if (!fs.existsSync(path.join(uiRoot, distDir, "BUILD_ID"))) broken(`no build at ${uiRoot}/${distDir} (run through c4.sh, which builds)`);
 if (!process.env.S04_PID_DIR) broken("S04_PID_DIR is unset (c4.sh sets it to this run's <log>.pids/, N2)");
 fs.mkdirSync(pidDir, { recursive: true });
 
@@ -104,7 +106,19 @@ process.on("exit", teardown);
 for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => { teardown(); process.exit(130); });
 
 startChild("fake-api", ["--import", "tsx", path.join(HERE, "fake-api.mjs"), "--port", String(API_PORT)], lane, childEnv);
-startChild("ui-server", ["server.mjs"], uiRoot, { ...childEnv, PORT: String(UI_PORT), DIALECTICAL_API_BASE: `http://127.0.0.1:${API_PORT}`, NODE_ENV: "production" });
+// Side-by-side C12: outside --dev server.mjs needs RELEASE_KEY and serves only a build stamped for it; the harness
+// stamps the build c4.sh made for a test key (built from pieces: no key name beside a literal, gitleaks). C13: the
+// page compares that key's code part with the code the build baked in, so the key carries the build's own code
+// (recorded by `next build` from next.config.mjs `env`), and no page shows a false "newer version" note.
+let bakedCode;
+try {
+  bakedCode = JSON.parse(fs.readFileSync(path.join(uiRoot, distDir, "required-server-files.json"), "utf8"))?.config?.env?.NEXT_PUBLIC_DEBATEAI_RELEASE_CODE;
+} catch { bakedCode = undefined; }
+if (!/^[0-9a-f]{12}$/u.test(String(bakedCode))) broken("BUILD the build records no release code (rebuild with the current next.config.mjs)");
+const releaseKey = ["r17", bakedCode].join("-");
+const stamped = spawnSync(process.execPath, ["release-edge.mjs", "--stamp"], { cwd: uiRoot, env: { ...childEnv, RELEASE_KEY: releaseKey }, encoding: "utf8" });
+if (stamped.status !== 0) broken(`STAMP release-edge.mjs --stamp failed: ${(stamped.stdout + stamped.stderr).slice(-600)}`);
+startChild("ui-server", ["server.mjs"], uiRoot, { ...childEnv, PORT: String(UI_PORT), DIALECTICAL_API_BASE: `http://127.0.0.1:${API_PORT}`, NODE_ENV: "production", RELEASE_KEY: releaseKey });
 async function waitHttp(url, ms) {
   const end = Date.now() + ms;
   while (Date.now() < end) {

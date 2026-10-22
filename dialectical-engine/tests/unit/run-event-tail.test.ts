@@ -2,7 +2,7 @@
  * Live run events (2026-10-11): the tail behind `GET /v1/runs/:id/events`
  * replays the stored events, then follows the run on the same stream — one
  * change-mark read per poll, a snapshot read only when the mark moved, a
- * heartbeat while idle — and stops on terminal, settled, gone, abort or
+ * heartbeat while idle — and stops on terminal, settled, gone, abort, drain or
  * its life cap. The clock here is a fake: time moves only when the tail sleeps.
  */
 import { describe, expect, it } from "vitest";
@@ -191,5 +191,43 @@ describe("run event tail (live stream behind GET /v1/runs/:id/events)", () => {
       timing: { pollMs: 100, heartbeatMs: 10_000 }, clock: fakeClock()
     }));
     expect(ids(items)).toEqual(["event:1", "event:2", "event:3"]);
+  });
+
+  // Side-by-side spec §6 (plan C6): a draining process ends every live stream with a clean close; the page reconnects
+  // after 5 s and replays (apps/ui/lib/v3/liveEvents.ts), landing on the release that now takes the traffic.
+  it("a process already draining sends the replay, then closes without a poll or a heartbeat", async () => {
+    const run = fakeRun([event(1, "run.running"), event(2)]);
+    const clock = fakeClock();
+    const items = await collect(tailRunEvents({
+      snapshot: run.snapshot, mark: run.mark, signal: new AbortController().signal,
+      timing: { pollMs: 100, heartbeatMs: 10_000 }, clock, draining: () => true
+    }));
+    expect(ids(items)).toEqual(["event:1", "event:2"]);
+    expect(run.calls.mark).toBe(1);
+    expect(run.calls.snapshot).toBe(1);
+    expect(clock.sleeps).toEqual([]);
+  });
+
+  it("a drain that begins after a poll closes the stream at the next poll, before its mark or snapshot read", async () => {
+    const run = fakeRun([event(1, "run.running")]);
+    let draining = false;
+    const mark = async (signal: AbortSignal) => {
+      const read = await run.mark(signal);
+      if (run.calls.mark === 2) {
+        // The first poll has read its mark: SIGTERM arrives, and an event lands that a following tail would send.
+        draining = true;
+        run.append(event(2));
+      }
+      return read;
+    };
+    const clock = fakeClock();
+    const items = await collect(tailRunEvents({
+      snapshot: run.snapshot, mark, signal: new AbortController().signal,
+      timing: { pollMs: 100, heartbeatMs: 10_000 }, clock, draining: () => draining
+    }));
+    expect(ids(items)).toEqual(["event:1"]);
+    expect(clock.sleeps).toEqual([100, 100]);
+    expect(run.calls.mark).toBe(2);
+    expect(run.calls.snapshot).toBe(1);
   });
 });

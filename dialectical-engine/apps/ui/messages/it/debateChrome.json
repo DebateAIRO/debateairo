@@ -309,6 +309,8 @@
   "runFailure.RUN_LIMIT_REACHED": "Questo dibattito ha raggiunto il suo limite prima di poter dare una risposta.",
   "runFailure.STOPPED": "Questo dibattito si è interrotto a metà per un problema da parte nostra. La preghiamo di porre di nuovo la Sua domanda.",
   "runFailure.PLAN_ENDED": "Il Suo piano a pagamento è terminato o è stato sospeso mentre questa domanda era in attesa, quindi il dibattito non è iniziato. Può porla di nuovo.",
+  "runFailure.CHOICE_GONE": "Il sito è stato aggiornato mentre la Sua domanda era in attesa, e una delle opzioni scelte non è più offerta. La preghiamo di porre di nuovo la domanda. Non è stato usato nulla della Sua disponibilità.",
+  "runFailure.SET_ASIDE": "Non siamo riusciti a concludere questo dibattito a causa di un aggiornamento da parte nostra. Per questo dibattito non è stato usato nulla della Sua disponibilità. La preghiamo di porre di nuovo la Sua domanda.",
   "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Questo dibattito costerebbe più di quanto questo sito consenta per un singolo dibattito.",
   "requestFailure.kind.MODEL_UNAVAILABLE": "Il coordinatore ha rifiutato la richiesta: per uno dei compiti del dibattito non è raggiungibile al momento alcun modello di IA. Riprova più tardi.",
   "debateChrome.condition.backupModelUsed": "Dove non è stato possibile usare un modello di IA previsto, ne è subentrato un altro"

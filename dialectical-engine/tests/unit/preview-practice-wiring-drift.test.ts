@@ -196,8 +196,10 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       "const moneyInFlight = createRunInFlight();",
       "const envelopeBand = costEnvelopePolicy === null ? null : costEnvelopeBand(costEnvelopePolicy);",
       "const billingPlans = costEnvelopePolicy === null ? null : await readBillingPlans(pool, environment.REGISTER_VERSION);",
-      "const selectedFunding = await allowances.readPolicy();",
-      "if (selectedFunding !== null && (environment.DEPLOYMENT_MODE !== \"hosted\" || envelopeBand === null || billingPlans === null)) throw new TypedDomainError(\"INTERNAL_FUNDING_UNAVAILABLE\",",
+      // Side-by-side spec §9: the funding repository holds no register version (a grant lives under its own).
+      "const allowances = new PostgresInternalAllowanceRepository(pool);",
+      // Side-by-side spec §9: no funding read and no funding refusal at boot; the funding source is built whenever plans are.
+      "const fundingAllowance = billingPlans === null ? undefined : new FundingAwarePersonAllowanceSource({ allowances,entitlements:{...fundingEntitlements.readOnlyPort(),readRunFundingBasis:(runId)=>fundingEntitlements.readRunFundingBasis(runId)}, plans:billingPlans,closeBasisPoints:envelopeBand?.closeBasisPoints ?? 10000 });",
       "finishBasisPoints: envelopeBand === null ? null : envelopeBand.finishBasisPoints, persons: billingPlans === null ? plansUnresolvedPersonAllowance() : fundingAllowance ?? new BillingPersonAllowanceSource({ entitlements: new EntitlementRepository(pool).readOnlyPort(), plans: billingPlans, closeBasisPoints: envelopeBand === null ? 10_000 : envelopeBand.closeBasisPoints }), owners: modelSpendStore",
       "store: modelSpendStore, policy: costEnvelopeGuardPolicy(costEnvelopePolicy, storyPolicy), ...(sharedWallTerms === null ? {} : { sharedWall: sharedWallTerms }), ...(fundingAllowance === undefined ? {} : {fundingAdmission:fundingAllowance}), inFlight: moneyInFlight",
       "if (costEnvelopePolicy !== null && envelopeBand !== null) { const firstCalls = firstPositionCallProjections({ targets: declaredProviderTargets,",
@@ -212,6 +214,10 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     ]) {
       expect(shipped, statement).toContain(statement);
       expect(practice, statement).toContain(statement);
+    }
+    for (const gone of ["allowances.readPolicy()", "\"INTERNAL_FUNDING_UNAVAILABLE\""]) {
+      expect(shipped, gone).not.toContain(gone);
+      expect(practice, gone).not.toContain(gone);
     }
     // The local-only refusal is gone; local mode builds no guard (composePracticeRunnerMoney returns null there).
     expect(practice).not.toContain("PRACTICE_REQUIRES_LOCAL_MODE");
@@ -240,6 +246,15 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       expect(shipped, statement).toContain(statement);
       expect(practice, statement).toContain(statement);
     }
+    // Side-by-side spec §9 (C17): neither ask composition reads the funding selection at boot or refuses boot over it.
+    // main.ts builds the funding source whenever billing is on; the practice keeps billing off, so it builds none.
+    for (const gone of ["allowances.readPolicy()", "The configured funding selection is mismatched", "Internal funding requires hosted billing"]) {
+      expect(shipped, gone).not.toContain(gone);
+      expect(practice, gone).not.toContain(gone);
+    }
+    expect(shipped).toContain("const fundedAllowance = entitlements === null || billingPlans === null ? undefined : new FundingAwarePersonAllowanceSource({allowances:new PostgresInternalAllowanceRepository(pool),entitlements,plans:billingPlans,closeBasisPoints:band.closeBasisPoints});");
+    expect(practice).not.toContain("PostgresInternalAllowanceRepository");
+    expect(practice).not.toContain("FundingAwarePersonAllowanceSource");
     const shippedRoom = objectAfter(API_MAIN, "const room = new AskRoom({");
     const practiceRoom = objectAfter(PRACTICE_ASK, "const room = new AskRoom({");
     expect(shippedRoom.has("funding")).toBe(true);
@@ -279,6 +294,21 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       expect(source).toContain("const questionLanguage = debateShapeInForcePolicy === null ? undefined : await");
       expect(source).toContain("route: questionLanguageRouteFor({");
     }
+  });
+
+  it("one release key (side-by-side §1, §3): the practice's runner runs as, and its ask stamps runs with, settings.runner.RELEASE_KEY", () => {
+    // The practice composes its runner in this process, so no RELEASE_KEY is booted: parsePracticeSettings derives the
+    // one key (a RELEASE_KEY line, else the checkout's revision, else locally the development key). A runner fenced by
+    // one key never claims a run stamped with another (NO_WORK), so the ask may read no other derivation.
+    const runner = withoutComments(PRACTICE_RUNNER);
+    expect(runner).toContain("releaseKey: environment.RELEASE_KEY,");
+    expect(runner).toContain("renewals: new WorkItemRepository(input.keepAlivePool, { releaseKey: environment.RELEASE_KEY, workerId: environment.RUNNER_WORKER_ID })");
+    const ask = withoutComments(PRACTICE_ASK);
+    expect(ask).not.toContain("developmentReleaseKey(");
+    // Two stamps, so the loop below cannot pass on none: the admission gate's key and the run's stamp.
+    const stamps = ask.match(/\breleaseKey:[^,\n}]*/gu) ?? [];
+    expect(stamps).toHaveLength(2);
+    for (const stamp of stamps) expect(stamp).toBe("releaseKey: settings.runner.RELEASE_KEY");
   });
 
   it("control: the reader sees a key that is missing", () => {

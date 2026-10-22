@@ -1,0 +1,22 @@
+# Install as /etc/systemd/system/debateai-preview-runner-retire-check@.service (started by its .timer).
+# 25 minutes after release %i was asked to retire (side-by-side spec §4): RETIRED is honoured; a runner
+# already gone without retiring is reported as stranded (nothing is stopped); a runner still running is
+# the ONE unit this stops (debateai-preview-runner@%i.service), after which root re-opens a spending gate
+# the stop halted and emails the owner. A refusal, or a gate it could not re-open or read, fails the unit
+# and OnFailure= emails the owner.
+[Unit]
+Description=DebateAI preview: stop release %i's runner if it still runs 25 minutes after the request
+After=debateai-preview-postgresql.service
+OnFailure=debateai-preview-alert@%n.service
+
+[Service]
+Type=oneshot
+# Root runs node through `env -i` with PATH only, as the request does.
+ExecStart=/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/release-retire.mjs retire-check --label %i
+# The runner stop (systemctl waits up to 90 s: its TimeoutStopSec=30 plus its stop recorder), the 5 s
+# settle, and up to six 30 s gate calls (two reads before, two after, two re-opens).
+TimeoutStartSec=300
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true

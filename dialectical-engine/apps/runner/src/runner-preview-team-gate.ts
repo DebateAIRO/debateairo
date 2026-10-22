@@ -24,6 +24,11 @@ import { PREVIEW_TEAM_ONLY, PREVIEW_TEAM_RUNS_SQL } from "@debateai/providers";
  * runner refuses to start: the API then starts nothing for anyone, so the runner has no work it
  * may do, and refusing fails nothing (the API's own rule for an empty team). A refusal it
  * cannot record also refuses the start. Ids and codes only in every line.
+ *
+ * Side-by-side spec §3: the gate is per release. Its store is built with this runner's RELEASE_KEY and reads, fails,
+ * refuses on and counts only jobs of runs stamped with that key. Another release's jobs are that release's runner's
+ * business: an outsider's live claim there never refuses this start, its claimable job is never failed here (its own
+ * runner's gate fails it), and its backlog never fills this release's 100-job cap.
  */
 export const PREVIEW_TEAM_ONLY_REASON = `RUN_SETUP_FAILED:${PREVIEW_TEAM_ONLY}` as const;
 /** The same bound as the start-up re-dispatch (`runner-startup-reconciliation.ts`). */
@@ -79,32 +84,36 @@ export async function refusePreviewOutsiderWork(
   return Object.freeze({ checked: open.length, refused });
 }
 
-/** The gate's two reads and one write on the runner's own pool. */
-export function postgresRunnerPreviewTeamGateStore(pool: Pool): Pick<RunnerPreviewTeamGateInput, "work" | "teamRuns"> {
+/** The gate's two reads and one write on the runner's own pool, over `releaseKey`'s runs only (spec §3). */
+export function postgresRunnerPreviewTeamGateStore(
+  pool: Pool, releaseKey: string
+): Pick<RunnerPreviewTeamGateInput, "work" | "teamRuns"> {
   return Object.freeze({
     work: Object.freeze({
       async listOpenRunWork(limit: number): Promise<readonly OpenRunWork[]> {
         const result = await pool.query<{ work_item_id: string; run_id: string; claim_live: boolean }>(
-          `SELECT work_item_id, run_id,
-                  (state = 'CLAIMED' AND claim_deadline > clock_timestamp()) AS claim_live
-           FROM core.work_item
-           WHERE run_id IS NOT NULL AND state IN ('READY', 'CLAIMED')
-           ORDER BY created_at_seq, work_item_id
+          `SELECT item.work_item_id, item.run_id,
+                  (item.state = 'CLAIMED' AND item.claim_deadline > clock_timestamp()) AS claim_live
+           FROM core.work_item AS item
+           JOIN core.run AS run ON run.run_id = item.run_id AND run.release_key = $2
+           WHERE item.run_id IS NOT NULL AND item.state IN ('READY', 'CLAIMED')
+           ORDER BY item.created_at_seq, item.work_item_id
            LIMIT $1`,
-          [limit]
+          [limit, releaseKey]
         );
         return Object.freeze(result.rows.map((row) => Object.freeze({
           runId: row.run_id, workItemId: row.work_item_id, claimLive: row.claim_live === true
         })));
       },
       async failClaimable(failure: Readonly<{ runId: string; workItemId: string; reason: string }>): Promise<boolean> {
-        // `recordTerminalFailure`'s write, narrowed to exactly what `claimById` could still take.
+        // `recordTerminalFailure`'s write, narrowed to exactly what `claimById` could still take, of this release only.
         const result = await withWriteTransaction(pool, (client) => client.query(
           `UPDATE core.work_item
            SET state = 'FAILED', claimed_by = NULL, claim_deadline = NULL, terminal_reason = $3
            WHERE work_item_id = $1 AND run_id = $2 AND settled_attempt_id IS NULL
-             AND (state = 'READY' OR (state = 'CLAIMED' AND claim_deadline <= clock_timestamp()))`,
-          [failure.workItemId, failure.runId, failure.reason]
+             AND (state = 'READY' OR (state = 'CLAIMED' AND claim_deadline <= clock_timestamp()))
+             AND EXISTS (SELECT 1 FROM core.run r WHERE r.run_id = $2 AND r.release_key = $4)`,
+          [failure.workItemId, failure.runId, failure.reason, releaseKey]
         ));
         return result.rowCount === 1;
       }

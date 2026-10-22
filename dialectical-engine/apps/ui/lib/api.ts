@@ -26,6 +26,7 @@ import type {
 import { readAnswerFloor, type AnswerFloorRead } from "./v3/floorAnswer.js";
 import { QuestionLanguageChoiceNeededError } from "./v3/requestFailure.js";
 import { readAnswerMapView, type AnswerMapViewRead } from "./v3/mapView.js";
+import { noteReleaseHeader, withNewerVersionWatch } from "./v3/releaseWatch.js";
 import { isModelStrength } from "./modelStrength.js";
 import {
   adaptiveDepthUnavailable,
@@ -85,6 +86,8 @@ function normalizeSameOriginApiPath(apiBase: string): string {
  * Rewrites contract-client URLs onto the same-origin proxy path. Rev-3
  * advisory A4: a Request input would silently drop method, headers, and body
  * under rewriting, so it is refused loudly instead of forwarded wrong.
+ * Side-by-side spec §7 (plan C13): every answer's x-debateai-release is read,
+ * so a page built by an older release learns that a newer one is out.
  */
 export function createSameOriginFetch(
   apiBase: string,
@@ -98,7 +101,11 @@ export function createSameOriginFetch(
       );
     }
     const contractUrl = new URL(String(input));
-    return fetchImplementation(`${sameOriginApiPath}${contractUrl.pathname}${contractUrl.search}`, init);
+    return fetchImplementation(`${sameOriginApiPath}${contractUrl.pathname}${contractUrl.search}`, init)
+      .then((response) => {
+        noteReleaseHeader(response.headers.get("x-debateai-release"));
+        return response;
+      });
   }) as typeof fetch;
 }
 
@@ -107,11 +114,12 @@ export function createBrowserContractClient(
   apiBase: string = API_BASE
 ): ContractClient {
   const contractOrigin = typeof window === "undefined" ? "http://localhost" : window.location.origin;
-  return createContractClient(
+  // Side-by-side spec §7 (plan C13): an answer this page cannot read, or one a newer release made, also shows the note.
+  return withNewerVersionWatch(createContractClient(
     contractOrigin,
     createSameOriginFetch(apiBase, fetchImplementation),
     { mode: "cookie" }
-  );
+  ));
 }
 
 export const contractClient: ContractClient = createBrowserContractClient();

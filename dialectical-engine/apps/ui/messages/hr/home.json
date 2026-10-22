@@ -26,6 +26,8 @@
   "runFailure.RUN_LIMIT_REACHED": "Ova je rasprava dosegnula svoje ograničenje prije nego što je mogla dati odgovor.",
   "runFailure.STOPPED": "Ova je rasprava prekinuta na pola puta zbog problema na našoj strani. Molimo, ponovno postavite svoje pitanje.",
   "runFailure.PLAN_ENDED": "Vaš plaćeni plan je istekao ili je pauziran dok je ovo pitanje čekalo, pa rasprava nije počela. Možete ga ponovno postaviti.",
+  "runFailure.CHOICE_GONE": "Web-stranica je ažurirana dok je vaše pitanje čekalo, pa jedna od opcija koje ste odabrali više nije dostupna. Molimo, ponovno postavite pitanje. Time niste iskoristili nimalo vaše kvote.",
+  "runFailure.SET_ASIDE": "Ovu raspravu nismo mogli dovršiti zbog ažuriranja web-stranice na našoj strani. Ona se nije uračunala u vašu kvotu. Molimo, ponovno postavite svoje pitanje.",
   "home.status.waiting": "Čeka na početak. Vaša će rasprava započeti sama u {time}.",
   "home.status.waitingOwnDebates": "Vaše ostale rasprave zasad koriste ostatak vašeg ograničenja. Ova će rasprava započeti sama čim jedna od njih završi.",
   "home.noPublishedDebates": "Nijedna rasprava još nije objavljena.",

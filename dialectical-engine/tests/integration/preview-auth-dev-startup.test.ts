@@ -12,7 +12,7 @@ describe('real current API main startup on isolated synthetic forward schema',()
   try{
    const apiPort=await port(),sourceRoot=resolve('.');const f=await createSyntheticSourceFixture({admin:db.pool,provisionAdmin:db.pool,runtimeObservation:{nodeVersion:process.version,pnpmVersion:'11.20.0',sourceRevision:'a'.repeat(40),sourceTree:'b'.repeat(40),operatorSha256:'c'.repeat(64),observedAt:new Date().toISOString()},adminUrl:db.connectionString,stateRoot:root,sourceRoot,apiPort});
    const stage=await import('../../deploy/'+'preview-auth-dev/v1/stage-runtime.mjs');
-   const receipt=await stage.exerciseStageRuntime({apiRoot:sourceRoot,uiRoot:sourceRoot,stateRoot:join(root,'runtime'),environment:f.environment,publication:f.publication,uiPort:await port()});
+   const receipt=await stage.exerciseStageRuntime({apiRoot:sourceRoot,uiRoot:sourceRoot,stateRoot:join(root,'runtime'),sourceRevision:'a'.repeat(40),environment:f.environment,publication:f.publication,uiPort:await port()});
    expect(receipt).toMatchObject({platform:process.platform,registerVersion:f.publication.registerVersion,proxyStatus:401,runnerStarted:false});
    expect(Object.keys(receipt.pages)).toHaveLength(11);
    console.log(JSON.stringify({phase:'smoke-owned-exits',api:receipt.apiExit,ui:receipt.uiExit}));
@@ -33,7 +33,7 @@ describe('full real main stage profile',()=>{
    expect((await db.pool.query('SELECT count(*)::int n FROM identity.mfa_recovery_legacy_cohort')).rows[0].n).toBe(4);
    const stage=await import('../../deploy/'+'preview-auth-dev/v1/stage-runtime.mjs');
    for(const artifact of ['candidate','fallback']){
-    const receipt=await stage.exerciseStageRuntime({apiRoot:sourceRoot,uiRoot:sourceRoot,stateRoot:join(root,artifact),environment:f.environment,publication:f.publication,uiPort:await port(),fullFixture:f,artifact});
+    const receipt=await stage.exerciseStageRuntime({apiRoot:sourceRoot,uiRoot:sourceRoot,stateRoot:join(root,artifact),sourceRevision:'a'.repeat(40),environment:f.environment,publication:f.publication,uiPort:await port(),fullFixture:f,artifact});
     expect(receipt.fullAccountMatrixAccepted).toBe(true);expect(receipt.installedCustodyAccepted).toBe(false);
     const required=await import('../../deploy/'+'preview-auth-dev/v1/stage-plan.mjs');
     expect(Object.keys(receipt.behaviorProofs).sort()).toEqual(required.STAGE_REQUIRED_PROOFS.filter((name:string)=>!name.endsWith('-listen')).sort());

@@ -70,5 +70,8 @@
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
-  "chrome.footer.consumerProtection": "Perlindungan konsumen"
+  "chrome.footer.consumerProtection": "Perlindungan konsumen",
+  "chrome.release.newerVersion": "Situs ini telah diperbarui. Muat ulang halaman.",
+  "chrome.release.reload": "Muat ulang",
+  "chrome.release.madeByNewer": "Debat ini dibuat oleh versi situs yang lebih baru. Muat ulang halaman, atau coba lagi dalam beberapa menit."
 }

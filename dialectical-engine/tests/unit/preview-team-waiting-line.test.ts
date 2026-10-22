@@ -13,6 +13,7 @@ import { WorkItemRepository } from "@debateai/battery";
 import type { WaitingRun } from "@debateai/db";
 import { parsePreviewProviderTestConfig } from "@debateai/providers";
 import type { AskWaitingLinePort, WaitingStart } from "../../apps/api/src/ask-room.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const PREVIEW = parsePreviewProviderTestConfig(JSON.stringify({
   deployment: "v3-preview", free_model_ids: ["zai-org/GLM-5.3-Flash"], requested_thinking_level: "high",
@@ -27,7 +28,7 @@ const TX = Object.freeze({ marker: "the start's own transaction" }) as unknown a
 
 function waitingRun(person: Readonly<{ ownerRef?: string; legacyAskerId?: string }>): WaitingRun {
   return Object.freeze({
-    runId: randomUUID(), waitingSince: new Date("2026-10-07T12:00:00.000Z"),
+    runId: randomUUID(), waitingSince: new Date("2026-10-07T12:00:00.000Z"), releaseKey: TEST_RELEASE_KEY,
     ownerRef: person.ownerRef ?? null, legacyAskerId: person.ownerRef === undefined ? (person.legacyAskerId ?? "legacy:x") : null,
     planTier: "free", compositionBudgetTier: "low", depth: 1, makerCount: 1,
     waitsFor: "SITE", personRecheckAt: null, reasonAt: new Date("2026-10-07T12:00:00.000Z")
@@ -86,14 +87,14 @@ function arrange(input: Readonly<{
   });
   const waitingLine: AskWaitingLinePort = {
     wakeCandidates: async ({ after }) => (after === null ? input.line : []),
-    startWaiting: async <T,>(run: WaitingRun, enqueue: (tx: PoolClient) => Promise<T>): Promise<WaitingStart<T>> => {
+    startWaiting: async <T,>(run: WaitingRun, enqueue: (tx: PoolClient, runId: string) => Promise<T>): Promise<WaitingStart<T>> => {
       tried.push(run.runId);
-      return { kind: "STARTED", value: await enqueue(TX) };
+      return { kind: "STARTED", runId: run.runId, value: await enqueue(TX, run.runId) };
     }
   };
   const settings: RunCreationSettings = {
     ...(input.preview ? { previewProviderTestConfig: PREVIEW, previewTeamUserIds: input.team ?? [] } : {}),
-    strangerSampleRate: 0, registerVersion: 1, batteryVersion: "preview-team", settlementWatchHandle: "preview-team",
+    strangerSampleRate: 0, releaseKey: TEST_RELEASE_KEY, registerVersion: 1, batteryVersion: "preview-team", settlementWatchHandle: "preview-team",
     resolveDiscoveredPanel: async () => [], resolveEnvelopeBasis: async () => ({}),
     resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({ effectiveRiskTier, tierSource: tierSource as never, tierProvenanceRef }),
     waitingLine

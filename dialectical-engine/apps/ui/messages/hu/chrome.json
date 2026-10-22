@@ -70,5 +70,8 @@
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
-  "chrome.footer.consumerProtection": "Fogyasztóvédelem"
+  "chrome.footer.consumerProtection": "Fogyasztóvédelem",
+  "chrome.release.newerVersion": "A weboldal frissült. Töltse be újra az oldalt.",
+  "chrome.release.reload": "Újratöltés",
+  "chrome.release.madeByNewer": "Ezt a vitát a weboldal újabb verziója készítette. Töltse be újra az oldalt, vagy próbálja újra néhány perc múlva."
 }

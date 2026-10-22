@@ -120,6 +120,7 @@ apps/api/src/index.ts
 apps/api/src/legacy-claim.ts
 apps/api/src/legal.ts
 apps/api/src/length-guidance-ask.ts
+apps/api/src/made-by-newer-release.ts
 apps/api/src/mail-attachments.ts
 apps/api/src/mail-channel.ts
 apps/api/src/mail-domain-check.ts
@@ -151,9 +152,12 @@ apps/api/src/question-language/eld.ts
 apps/api/src/question-language/fast-check.ts
 apps/api/src/question-language/reference.ts
 apps/api/src/question-language/transport.ts
+apps/api/src/readmission.ts
 apps/api/src/recovery-email.ts
 apps/api/src/recovery.ts
 apps/api/src/registration.ts
+apps/api/src/release-loops.ts
+apps/api/src/release-state.ts
 apps/api/src/retention-purge.ts
 apps/api/src/risk-signal-identity.ts
 apps/api/src/run-event-tail.ts
@@ -374,8 +378,10 @@ apps/runner/src/run-keep-alive.ts
 apps/runner/src/run-replay.ts
 apps/runner/src/run-seats.ts
 apps/runner/src/run-sit-out.ts
+apps/runner/src/runner-lapsed-resend.ts
 apps/runner/src/runner-preview-team-gate.ts
 apps/runner/src/runner-ready.ts
+apps/runner/src/runner-retirement.ts
 apps/runner/src/runner-startup-reconciliation.ts
 apps/runner/src/serve-disclosure-cli.ts
 apps/runner/src/shape-plan.ts
@@ -424,6 +430,7 @@ apps/ui/app/privacy/us-health-data/page.tsx
 apps/ui/app/privacy/versions/[sha256]/page.tsx
 apps/ui/app/privacy/versions/page.tsx
 apps/ui/app/providers/page.tsx
+apps/ui/app/public/debate/[id]/MadeByNewerRelease.tsx
 apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx
 apps/ui/app/public/debate/[id]/page.tsx
 apps/ui/app/recover-authenticator/page.tsx
@@ -483,6 +490,7 @@ apps/ui/components/MfaRecoveryCatalog.tsx
 apps/ui/components/MfaRecoveryFlow.tsx
 apps/ui/components/ModeToggle.tsx
 apps/ui/components/ModelPresentation.tsx
+apps/ui/components/NewVersionNote.tsx
 apps/ui/components/NodeDetailDrawer.tsx
 apps/ui/components/OwnerPossessionPanel.tsx
 apps/ui/components/PasswordResetFlow.tsx
@@ -777,6 +785,7 @@ apps/ui/lib/v3/liveEvents.ts
 apps/ui/lib/v3/mapView.ts
 apps/ui/lib/v3/missingCapabilities.ts
 apps/ui/lib/v3/publicAnswerExport.ts
+apps/ui/lib/v3/releaseWatch.ts
 apps/ui/lib/v3/requestFailure.ts
 apps/ui/lib/v3/runFailure.test.mjs
 apps/ui/lib/v3/runFailure.ts
@@ -790,6 +799,8 @@ apps/ui/lib/v3/useStoryLocaleReady.ts
 apps/ui/middleware.ts
 apps/ui/next-env.d.ts
 apps/ui/next.config.mjs
+apps/ui/release-edge.d.mts
+apps/ui/release-edge.mjs
 apps/ui/scripts/assert-production-auth-routes.mjs
 apps/ui/scripts/generate-legal-data.d.mts
 apps/ui/scripts/generate-legal-data.mjs
@@ -911,6 +922,7 @@ packages/db/src/internal-allowance.ts
 packages/db/src/legacy-claim.ts
 packages/db/src/legal-acceptance.ts
 packages/db/src/mail-locale.ts
+packages/db/src/migration-ahead.ts
 packages/db/src/migration-forward-auth-db-batch.ts
 packages/db/src/migration-forward-chain.ts
 packages/db/src/migration-forward0113.ts
@@ -922,11 +934,14 @@ packages/db/src/migration-forward0119.ts
 packages/db/src/migration-forward0120.ts
 packages/db/src/migration-forward0121.ts
 packages/db/src/migration-forward0122.ts
+packages/db/src/migration-forward0123.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
 packages/db/src/migration-forward111.ts
 packages/db/src/migration-forward115.ts
 packages/db/src/migration-lineage.ts
+packages/db/src/migration-n1.ts
+packages/db/src/migration-transaction.ts
 packages/db/src/obs-schema.ts
 packages/db/src/onboarding-evidence.ts
 packages/db/src/owner-recovery.ts
@@ -939,12 +954,15 @@ packages/db/src/publication.ts
 packages/db/src/recovery-candidate.ts
 packages/db/src/recovery-email.ts
 packages/db/src/recovery.ts
+packages/db/src/release-state.ts
 packages/db/src/run-cost-substitution.ts
+packages/db/src/run-supersession.ts
 packages/db/src/run-wait.ts
 packages/db/src/schema.ts
 packages/db/src/serve-disclosure.ts
 packages/db/src/sessions.ts
 packages/db/src/social-identity.ts
+packages/db/src/spend-waiver.ts
 packages/db/src/staff-access.ts
 packages/db/src/support.ts
 packages/evaluator/src/blind-sample.ts
@@ -982,6 +1000,7 @@ packages/kernel/src/payment-regions.ts
 packages/kernel/src/provider-funding.ts
 packages/kernel/src/question-language.ts
 packages/kernel/src/region.ts
+packages/kernel/src/release-key.ts
 packages/kernel/src/reply-language.ts
 packages/kernel/src/staff-access.ts
 packages/kernel/src/support-credentials.ts

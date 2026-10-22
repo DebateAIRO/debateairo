@@ -12,7 +12,7 @@ import { configureContentEncryption, createPool, EntitlementRepository, Postgres
 import { BillingPersonAllowanceSource } from "@debateai/billing-core";
 import { FundingAwarePersonAllowanceSource } from "@debateai/billing-core";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
-import { TypedDomainError } from "@debateai/kernel";
+import { releaseTaskName, TypedDomainError } from "@debateai/kernel";
 import {
   assertHostedCostEnvelopesSealed,
   costEnvelopeBand,
@@ -61,8 +61,19 @@ import {
 } from "./provider-topology.js";
 import { readDevelopmentRunnerPolicy } from "./dev-runner-policy.js";
 import { reconcileRunnerStartupWork } from "./runner-startup-reconciliation.js";
+import { startLapsedClaimResend } from "./runner-lapsed-resend.js";
 import { postgresRunnerPreviewTeamGateStore, refusePreviewOutsiderWork } from "./runner-preview-team-gate.js";
 import { announceRunnerReady } from "./runner-ready.js";
+import {
+  countModelCalls,
+  createModelCallCounter,
+  createRunnerRetirementSignal,
+  createTaskExecutionCounter,
+  honourStandingRetireRequest,
+  postgresRunnerRetirementStore,
+  RUNNER_RETIRED_PROCESS_EVENT,
+  startRunnerRetirement
+} from "./runner-retirement.js";
 
 const environment = loadRunnerEnvironment();
 const previewConfig = environment.PREVIEW_PROVIDER_TEST_CONFIG;
@@ -239,6 +250,12 @@ const modelSpendStore = new PostgresModelSpendStore(pool);
 const gatewayInFlight = createRunInFlight();
 const moneyInFlight = createRunInFlight();
 /**
+ * R1 (final review): EVERY model call of this process in flight — the debate's, the story's, a structure repair, a
+ * claim-time probe — from the ask until it settles (`countModelCalls`). The two counters above see only the calls
+ * their check binds (the story's calls are under neither), so the backstop reads this one before this release ends.
+ */
+const modelCalls = createModelCallCounter();
+/**
  * B9 (budget spec §2.9, paid-plans spec §2.4.1–2.4.2) — THE SHARED WALL WHILE
  * ARGUING, in two independent halves, built whenever hosted.
  *
@@ -280,13 +297,12 @@ if (costEnvelopePolicy !== null && billingPlans === null) {
   console.warn(JSON.stringify({ kind: "DEBATEAI_PERSON_WALL", event: "PLANS_UNRESOLVED" }));
 }
 const fundingEntitlements = new EntitlementRepository(pool);
-const allowances = new PostgresInternalAllowanceRepository(pool,{registerVersion:environment.REGISTER_VERSION});
-const selectedFunding = await allowances.readPolicy();
-if (selectedFunding !== null && (environment.DEPLOYMENT_MODE !== "hosted" || envelopeBand === null || billingPlans === null))
-  throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","Internal funding requires hosted billing and finite envelope members");
-const fundingAllowance = selectedFunding === null || billingPlans === null ? undefined : new FundingAwarePersonAllowanceSource({
+const allowances = new PostgresInternalAllowanceRepository(pool);
+// Side-by-side spec §9: no funding read and no funding refusal at boot. A grant is checked against the policy of the
+// version it was issued with, never the pointer, so a funding selection made after boot works without a restart.
+const fundingAllowance = billingPlans === null ? undefined : new FundingAwarePersonAllowanceSource({
   allowances,entitlements:{...fundingEntitlements.readOnlyPort(),readRunFundingBasis:(runId)=>fundingEntitlements.readRunFundingBasis(runId)},
-  plans:billingPlans,registerVersion:environment.REGISTER_VERSION,closeBasisPoints:envelopeBand?.closeBasisPoints ?? 10000
+  plans:billingPlans,closeBasisPoints:envelopeBand?.closeBasisPoints ?? 10000
 });
 const sharedWallTerms = costEnvelopePolicy === null
   ? null
@@ -436,8 +452,12 @@ function targetGateway(target: (typeof providerTargets)[number]): ProviderGatewa
 const targetGateways = new Map(providerTargets.map((target) => [target.providerRef, targetGateway(target)] as const));
 const structureRepairRoute = previewConfig === undefined ? null : structureRepairThroughLane(
   previewStructureRepairRoute(providerTargets, (providerRef) => targetGateways.get(providerRef)), previewCallSubjects(previewConfig));
+// R1: every model call the runner and the story make goes through one of these members, so each is counted here, from
+// the ask until it settles: the preview's one 60-second unbilled resend and a structure repair's call (the route's
+// gateway is only ever called inside the call it repairs) included.
 const providerTopology = createRunnerProviderTopology(providerTargets,
-  (target) => withStructureRepair(targetGateways.get(target.providerRef)!, structureRepairRoute));
+  (target) => countModelCalls(
+    withStructureRepair(targetGateways.get(target.providerRef)!, structureRepairRoute), modelCalls));
 const runRepository = new RunRepository(pool);
 // V-20: taken on the DECLARED targets, because the three optional keys describe
 // what the operator wrote, credential included — a credential resolved from a
@@ -476,6 +496,8 @@ const storyWriter = new StoryWriter({
  * keeps the LAST observation (the runner records it). Off the preview: one probe, exactly as before.
  */
 function observeClaimTarget(target: (typeof providerTargets)[number]) {
+  // R1: a probe is a model call through the gate too (its 60-second resend included): counted until it settles.
+  const leave = modelCalls.enter();
   return observeClaimTimeTarget({
     preview: previewConfig !== undefined,
     target,
@@ -483,10 +505,21 @@ function observeClaimTarget(target: (typeof providerTargets)[number]) {
     ...(previewConfig === undefined ? {} : previewProbeControls(target)),
     fetchImplementation: previewFetch,
     clock: () => new Date()
-  });
+  }).finally(leave);
 }
+// Side-by-side spec §3: every work repository this process builds serves only this release's work items (claims,
+// renewals, the start-up re-send, failure writes), and its failure writes land only under this worker's live claim.
+const workFence = Object.freeze({ releaseKey: environment.RELEASE_KEY, workerId: environment.RUNNER_WORKER_ID });
+// Side-by-side spec §4 (D1): this process's running tasks (each whole task, the verdict story included) and its two
+// retirement stops (claims, then new model calls), both off until this release retires.
+const executions = createTaskExecutionCounter();
+const retirementSignal = createRunnerRetirementSignal();
 const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider, {
   workerId: environment.RUNNER_WORKER_ID, claimMs: environment.CLAIM_MS, claimMarginMs: environment.CLAIM_MARGIN_MS,
+  // Side-by-side spec §3: the runner runs only this release's debates; another release's is NO_WORK.
+  releaseKey: environment.RELEASE_KEY,
+  // Side-by-side spec §4: a retiring release stops claiming and starts no new model call (RUNNER_RETIRING).
+  retirement: retirementSignal,
   judgeBound: policy.bounds.JUDGE,
   composerBound: policy.bounds.COMPOSER,
   conformanceBound: policy.bounds.CONFORMANCE,
@@ -602,7 +635,7 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   callSubjects: previewConfig === undefined ? targetCallSubjects(providerTargets) : previewCallSubjects(previewConfig),
   // Ruling R31 (preview only): a call to a busy model waits on the busy coordinator BEFORE it takes any slot.
   ...(previewConfig === undefined ? {} : { callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model) }),
-  renewals: new WorkItemRepository(keepAlivePool),
+  renewals: new WorkItemRepository(keepAlivePool, workFence),
   ...(previewConfig === undefined ? {} : {
     answerRoleFallbackCovered: ({ roleRef, panel }: Readonly<{ roleRef: string; panel: readonly Readonly<{ provider_ref: string; model_id: string }>[] }>) =>
       previewSealedRoleFallbackCovered(roleRef, panel)
@@ -626,17 +659,25 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
     wait: (cooldownMs) => new Promise((resolve) => setTimeout(resolve, cooldownMs))
   }
 });
+// Side-by-side spec §2: each release listens, and re-sends its own open work, under its own Hatchet task
+// (`<base>-<release key>`). One shared name would let two live releases take each other's debates and flip each
+// other's retries between two codes; the `legacy` key keeps the bare base name (today's single task).
+const taskName = releaseTaskName(environment.HATCHET_WORKFLOW_NAME, environment.RELEASE_KEY);
 const task = declareHatchetWalkingSkeletonTask({ client: hatchet, runner,
   ...(previewConfig === undefined ? {} : { previewExecutionTimeout: "3600s" as const }),
-  failures: new WorkItemRepository(pool),
-  workflowName: environment.HATCHET_WORKFLOW_NAME, engineRetries: environment.HATCHET_ENGINE_RETRIES });
+  // Side-by-side spec §3: a failed task records FAILED only on this release's item, under this worker's own live claim.
+  failures: new WorkItemRepository(pool, workFence),
+  // Side-by-side spec §4: every task counted while it runs, the story included.
+  executions,
+  workflowName: taskName, engineRetries: environment.HATCHET_ENGINE_RETRIES });
 // Step 1 (GAP-RUNNER): on the private preview, every open job no team member owns is recorded
 // FAILED (RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY) BEFORE this worker exists, so neither the start-up
 // re-dispatch below nor an older job-system dispatch can run it. Off the preview: no read.
 await refusePreviewOutsiderWork({
   previewConfigured: previewConfig !== undefined,
   teamUserIds: environment.PREVIEW_TEAM_USER_IDS,
-  ...postgresRunnerPreviewTeamGateStore(pool),
+  // Side-by-side spec §3: this release's jobs only (its live-outsider refusal and its 100 cap included).
+  ...postgresRunnerPreviewTeamGateStore(pool, environment.RELEASE_KEY),
   log: (line) => console.warn(JSON.stringify(line))
 });
 // Connection budget (2026-10-10, owner ruling): at most 8 debates at once, each
@@ -644,27 +685,88 @@ await refusePreviewOutsiderWork({
 // (packages/db/src/pool-budget.ts). Unset, Hatchet hands one worker 100.
 const worker = await hatchet.worker(environment.HATCHET_WORKER_NAME, { slots: RUNNER_CAPACITY.concurrentRuns });
 await worker.registerWorkflows([task]);
+const retirementStore = postgresRunnerRetirementStore(pool, workFence);
+// X2 (final review): one read of this release's facts BEFORE the worker starts. Under a standing retire request on a
+// DRAINING release (a restart mid-drain) both stops are on before the first claim, so nothing is claimed or paid for
+// before the backstop's first pass, and the start-up re-send is skipped (it would only hand back work to refuse).
+const retireRequestStanding = await honourStandingRetireRequest({
+  releaseKey: environment.RELEASE_KEY,
+  store: retirementStore,
+  signal: retirementSignal,
+  log: (line) => console.warn(JSON.stringify(line))
+});
 const started = worker.start();
 await worker.waitUntilReady(30_000);
-const startupReconciliation = await reconcileRunnerStartupWork({
-  work: new WorkItemRepository(pool),
-  dispatcher: {
-    dispatch: async ({ runId, workItemId }) => {
-      await hatchet.runNoWait(environment.HATCHET_WORKFLOW_NAME, { runId, workItemId }, {
-        additionalMetadata: {
-          v3RunId: runId,
-          v3WorkItemId: workItemId,
-          sourceOfRecord: "core.work_item",
-          dispatchSource: "runner-startup-reconciliation"
-        }
-      });
+const startupReconciliation = retireRequestStanding
+  ? Object.freeze({ dispatched: 0 })
+  : await reconcileRunnerStartupWork({
+    work: new WorkItemRepository(pool, workFence),
+    dispatcher: {
+      dispatch: async ({ runId, workItemId }) => {
+        await hatchet.runNoWait(taskName, { runId, workItemId }, {
+          additionalMetadata: {
+            v3RunId: runId,
+            v3WorkItemId: workItemId,
+            sourceOfRecord: "core.work_item",
+            dispatchSource: "runner-startup-reconciliation"
+          }
+        });
+      }
     }
-  }
-});
+  });
 announceRunnerReady({
   kind: "DEBATEAI_RUNNER_READY",
   worker: environment.HATCHET_WORKER_NAME,
   registerVersion: String(environment.REGISTER_VERSION),
+  // Side-by-side spec §1: the ready line names the release this runner runs as.
+  releaseKey: environment.RELEASE_KEY,
   startupDispatched: startupReconciliation.dispatched
 });
+// Side-by-side spec §2 (plan B D4): every five minutes this release re-sends its own lapsed CLAIMED items (a copy that
+// died mid-debate) under its own task name, not only at a fresh start; none while it retires (claims stopped, §4).
+const lapsedResend = startLapsedClaimResend({
+  work: new WorkItemRepository(pool, workFence),
+  dispatch: async ({ runId, workItemId }) => {
+    await hatchet.runNoWait(taskName, { runId, workItemId }, {
+      additionalMetadata: {
+        v3RunId: runId,
+        v3WorkItemId: workItemId,
+        sourceOfRecord: "core.work_item",
+        dispatchSource: "runner-lapsed-resend"
+      }
+    });
+  },
+  paused: () => retirementSignal.claimsStopped(),
+  // R2 (final review): never an item a task of this process still runs (it would come back here as a second copy).
+  running: (workItemId) => executions.isWorkingOn(workItemId),
+  log: (line) => console.warn(JSON.stringify(line))
+});
+// Side-by-side spec §4: every 60 s this runner reads its release's facts in one snapshot; once it is DRAINING, its
+// front pair stopped, none of its work is READY or CLAIMED and no task of it runs, it says DEBATEAI_RUNNER_RETIRED
+// (stdout and the in-process event the preview launcher hears) BEFORE it stops the worker, so main ends as asked.
+const retirement = startRunnerRetirement({
+  releaseKey: environment.RELEASE_KEY,
+  store: retirementStore,
+  executions,
+  // R1: the backstop never retires under a model call still in flight.
+  calls: modelCalls,
+  signal: retirementSignal,
+  // R4 (final review): worker.stop() resolves once Hatchet has waited for every task, so both pools end then and no
+  // database connection keeps a retired runner's process up: on the public server, which has no launcher, it exits by
+  // itself, without process.exit. Never after `await started` below: Hatchet ends that listener BEFORE its running
+  // tasks finish, and a planned stop (SIGTERM) leaves the exit to Hatchet itself once they have. allSettled: a pool
+  // that fails to end never turns a clean retirement into RETIREMENT_STOP_FAILED. The Hatchet client's own connections
+  // are the SDK's; a live-handle check needs Hatchet and Postgres running, so the unit test pins this wiring instead.
+  stopWorker: async () => {
+    lapsedResend.stop();
+    await worker.stop();
+    await Promise.allSettled([pool.end(), keepAlivePool.end()]);
+  },
+  log: (line) => console.warn(JSON.stringify(line)),
+  announce: (line) => process.stdout.write(line),
+  emit: (payload) => (process as NodeJS.EventEmitter).emit(RUNNER_RETIRED_PROCESS_EVENT, payload)
+});
 await started;
+// The worker ended (retired, or stopped by a signal): no further re-send pass or retirement read.
+lapsedResend.stop();
+retirement.stop();

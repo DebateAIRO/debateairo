@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { Fraunces, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import { SiteFooter } from "@/components/SiteFooter";
 import { TopBar } from "@/components/TopBar";
+import { NewVersionNote } from "@/components/NewVersionNote";
 import { CookieConsent } from "@/components/consent/CookieConsent";
 import { LegalDocumentsProvider } from "@/components/consent/LegalDocumentsProvider";
 import { SupportConversationGuard } from "@/components/support/SupportConversationGuard";
@@ -121,6 +122,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   {t(chrome, "chrome.skipToContent")}
                 </a>
                 <TopBar />
+                {/* Side-by-side C13: an old open page learns a newer version is out; one quiet line, never a block. */}
+                <NewVersionNote />
                 {/* The one main landmark for every page; pages render divs inside it. */}
                 <main id="main-content" tabIndex={-1} className="appMain">
                   <AuthCatalogProvider catalog={auth}>{children}</AuthCatalogProvider>

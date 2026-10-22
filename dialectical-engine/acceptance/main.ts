@@ -53,7 +53,9 @@ import {
 import { startGrokRelay, type GrokRelayHandle } from "./grok-relay.js";
 import type { CommandSpec } from "./relay-core.js";
 import { assertRelayRuntime } from "./relay-deployment-guard.js";
-import { ACCEPTANCE_REGISTER_SOURCE_REF, ACCEPTANCE_REGISTER_VERSION } from "./seed-register.js";
+import {
+  ACCEPTANCE_REGISTER_SOURCE_REF, ACCEPTANCE_REGISTER_VERSION, ACCEPTANCE_RELEASE_KEY
+} from "./seed-register.js";
 import {
   computeAcceptanceStructuralCeiling,
   readAcceptanceRuntimePolicy,
@@ -113,6 +115,18 @@ function acceptanceFailureReason(error: unknown): string {
   return error instanceof TypedDomainError
     ? `ACCEPTANCE_EXECUTION_FAILED:${error.code}`
     : "ACCEPTANCE_EXECUTION_FAILED:UNEXPECTED_ERROR";
+}
+
+/** The acceptance runner's worker id: the runner claims under it, and its failure recorder writes under that claim. */
+export const ACCEPTANCE_WORKER_ID = "acceptance:walking-skeleton";
+
+/**
+ * Side-by-side spec §3 (plan B D2): the acceptance runner's failures are recorded while it still holds its own live
+ * claim, so the recorder's repository is told the runner's worker id, and the release key the runner claims under and
+ * the ask stamps every acceptance run with (ACCEPTANCE_RELEASE_KEY, B16).
+ */
+export function acceptanceFailureRecorder(pool: Pool): AcceptanceFailureRecorder {
+  return new WorkItemRepository(pool, { releaseKey: ACCEPTANCE_RELEASE_KEY, workerId: ACCEPTANCE_WORKER_ID });
 }
 
 export class AcceptanceDispatcher implements Dispatcher {
@@ -459,7 +473,9 @@ export async function createAcceptanceRuntime(input: {
     .max_model_attempts;
   const probes = new ProviderProbeRepository(input.pool);
   const runner = new WalkingSkeletonRunner(input.pool, provider, {
-    workerId: "acceptance:walking-skeleton",
+    workerId: ACCEPTANCE_WORKER_ID,
+    // Side-by-side spec §3 (B16): it claims only runs stamped with the key the ask below stamps them with.
+    releaseKey: ACCEPTANCE_RELEASE_KEY,
     claimMs: longestDeadline * maximumRunAttempts
       + policy.runDeathPolicy.cooldownMs * policy.runDeathPolicy.maxCooldownHoldsPerRun,
     claimMarginMs: 0,
@@ -568,7 +584,7 @@ export async function createAcceptanceRuntime(input: {
     // (resolveAcceptanceTerminalActivations) remains the outermost fallback.
     resolveTerminalActivations: input.testOnlyTerminalEvaluator ?? createTerminalActivationEvaluator(input.pool)
   });
-  const dispatcher = new AcceptanceDispatcher(runner, new WorkItemRepository(input.pool));
+  const dispatcher = new AcceptanceDispatcher(runner, acceptanceFailureRecorder(input.pool));
   for (const { configured, relay } of discoveredProviders) {
     await probes.record({
       probeEvidenceRef: randomUUID(),
@@ -607,6 +623,8 @@ export async function createAcceptanceRuntime(input: {
   const application = new PostgresAskApplication(input.pool, dispatcher, {
     strangerSampleRate: input.environment.STRANGER_SAMPLE_RATE,
     registerVersion: ACCEPTANCE_REGISTER_VERSION,
+    // Side-by-side spec §1: every run is stamped, with the one acceptance key its runner above claims under (B16).
+    releaseKey: ACCEPTANCE_RELEASE_KEY,
     batteryVersion: input.environment.BATTERY_VERSION,
     settlementWatchHandle: input.environment.SETTLEMENT_WATCH_HANDLE,
     // A20: the same picker as the local API. The acceptance relays declare no

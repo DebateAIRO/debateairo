@@ -10,6 +10,7 @@
 import { EventEmitter } from "node:events";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PickerOutcome, RoleAssignment, RoleSeat, Scorecard, SeatCandidate } from "@debateai/scorecard";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const picker = vi.hoisted(() => ({ outcome: null as unknown, rotationPicks: 0 }));
 const pinning = vi.hoisted(() => ({
@@ -156,6 +157,7 @@ function settingsWith(input: Readonly<{ rotation: boolean; picker: AskModelPicke
   return {
     strangerSampleRate: 0,
     registerVersion: 1,
+    releaseKey: TEST_RELEASE_KEY,
     batteryVersion: "battery:rotation",
     settlementWatchHandle: "watch:rotation",
     resolveDiscoveredPanel: async () => PANEL,
@@ -198,9 +200,9 @@ function lineDouble(order: string[]): AskWaitingLinePort {
       handedOver = true;
       return [Object.freeze({ runId: RUN_ID, waitingSince: NOW, ownerRef: OWNER_REF, legacyAskerId: null })] as never;
     },
-    startWaiting: async (_run, enqueue) => {
+    startWaiting: async (run, enqueue) => {
       order.push("startWaiting");
-      return { kind: "STARTED", value: await enqueue(TX) } as never;
+      return { kind: "STARTED", runId: run.runId, value: await enqueue(TX, run.runId) } as never;
     }
   };
 }

@@ -1,4 +1,12 @@
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { API_CONTENT_SECURITY_POLICY } from "./content-security-policy.mjs";
+import { readGitHead, resolveBuildReleaseCode } from "./release-edge.mjs";
+
+// Side-by-side spec §7 (plan C12): the release code this build is, the same one `release-edge.mjs --stamp` writes
+// beside it, inlined for the browser's comparison with x-debateai-release. Git is read only when neither RELEASE_KEY nor
+// DEBATEAI_SOURCE_REVISION names the release (C12 review).
+const gitHead = () => readGitHead(dirname(fileURLToPath(import.meta.url)));
 
 /**
  * Security headers that do not vary per request. The document CSP is NOT
@@ -11,6 +19,7 @@ import { API_CONTENT_SECURITY_POLICY } from "./content-security-policy.mjs";
 const nextConfig = {
   transpilePackages: ["@debateai/contract", "@debateai/kernel", "@debateai/legal-manifest"],
   distDir: process.env.NEXT_DIST_DIR || ".next",
+  env: { NEXT_PUBLIC_DEBATEAI_RELEASE_CODE: resolveBuildReleaseCode(process.env, gitHead) },
   // L3-F9: no framework fingerprint on responses.
   poweredByHeader: false,
   // L3-F4: the UI never uses next/image. With the optimizer off, /_next/image

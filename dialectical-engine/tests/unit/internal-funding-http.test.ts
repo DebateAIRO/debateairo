@@ -88,7 +88,7 @@ function fundingHttpFixture(enabled = true) {
         if (JSON.stringify(binding) !== JSON.stringify(challenge)) throw Error("STALE");
         proof = { proofId: operation, context, binding, credentialId: "aA", verifiedAt: new Date(), expiresAt: new Date(Date.now() + 60000) };
         return { proofHandle: "b".repeat(43), proof };
-      } }, ...(enabled ? { funding: { requireReady: async () => {}, allowances: {
+      } }, ...(enabled ? { funding: { requireReady: async () => {}, requireNewGrantPolicy: async () => {}, allowances: {
         readSelfCommand: async (input: unknown, token: unknown, grantId: unknown) => { resolved.push({ input, token, grantId }); return { ...state }; },
         configure: async (input: { operationId: string }) => { configured.push(input); state.expectedRevision++; return { operationId: input.operationId, outcome: "COMPLETED", recordedAt: new Date() }; },
         revoke: async (input: { operationId: string }) => { revoked.push(input); state.expectedRevision++; return { operationId: input.operationId, outcome: "COMPLETED", recordedAt: new Date() }; }

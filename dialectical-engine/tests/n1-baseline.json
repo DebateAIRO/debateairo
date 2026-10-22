@@ -1,0 +1,19 @@
+{
+  "schema": "debateai-n1-baseline-v1",
+  "commit": null,
+  "reason": "no fenced release yet",
+  "suites": [
+    "tests/integration/b3-holds-waiting-line.test.ts",
+    "tests/integration/b7b-waiting-line.test.ts",
+    "tests/integration/v28-model-spend.test.ts",
+    "tests/integration/story-budget.test.ts",
+    "tests/integration/reclaim-resume-database.test.ts",
+    "tests/integration/run-setup-failure.test.ts",
+    "tests/integration/runner-preview-team-gate.test.ts",
+    "tests/integration/live-run-events.test.ts",
+    "tests/integration/identity-database.test.ts",
+    "tests/integration/session-database.test.ts",
+    "tests/integration/staff-access-database.test.ts",
+    "tests/integration/internal-allowance-database.test.ts"
+  ]
+}
