@@ -276,7 +276,8 @@ describe("B9d · both hosted boots run the check, under the new settings only", 
     }
     expect(stage).toBeGreaterThan(loader.indexOf("const costEnvelope = money?.costEnvelope ?? null;"));
     expect(loader).toContain("composeDebateCostEnvelope(siteEnvelope.runPolicy, await readers.readCostEnvelopePolicy(pool, version))");
-    expect(loader).toContain("if (costEnvelope === null || costEnvelopeBand(costEnvelope.runPolicy) === null) return;");
+    expect(loader).toContain("const siteBand = siteEnvelope?.band ?? null;");
+    expect(loader).toContain("if (costEnvelope === null || siteBand === null) return;");
     expect(loader).toContain("bodyCeilingMicros: costEnvelopeCeilings(costEnvelope.runPolicy).bodyMicros,");
     expect(loader).toContain("firstCallsByRoster: firstCallsByPlanRoster({");
     // LG-C Task 6 (spec 2026-10-15 §3.3): the first call is checked at the largest guided opening allowance, over the

@@ -1,5 +1,5 @@
 import type { Pool } from "pg";
-import { isDatabasePoolBusy } from "@debateai/db";
+import { settingsRefusalCode } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import {
   composeDebateCostEnvelope,
@@ -355,39 +355,9 @@ export type RunnerSettingsResolution =
 
 /** The claim guard's refusal code (packages/battery assertClaimCoversCall). */
 const CLAIM_BOUND_MISMATCH = "CLAIM_BOUND_MISMATCH";
-/** A code-shaped refusal message (`CODE` or `CODE:detail`, the house TypeError form); prose is never a code. */
-const REFUSAL_CODE = /^[A-Z][A-Z0-9_]{2,}(?::[A-Za-z0-9_.:/-]+)?$/u;
-/**
- * Ruling R31: the house pool's own typed failure (packages/db createPool: a lost or refused connection, a server
- * restart, a busy pool or a full server all become TypedDomainError DATABASE_POOL_FAILED). It says nothing about the
- * version, so it is never a settings refusal. Statement timeouts and serialization failures reach here as the driver's
- * raw errors, which are untyped already.
- */
-const DATABASE_POOL_FAILED = "DATABASE_POOL_FAILED";
 
-/** True when this failure, or one it wraps as `cause`, is the database's, not the version's. */
-function isDatabaseFailure(error: unknown): boolean {
-  if (isDatabasePoolBusy(error)) return true;
-  let current: unknown = error;
-  for (let depth = 0; depth < 8 && current instanceof Error; depth += 1) {
-    if (current instanceof TypedDomainError && current.code === DATABASE_POOL_FAILED) return true;
-    current = current.cause;
-  }
-  return false;
-}
-
-/**
- * The code of a REAL settings refusal: a TypedDomainError's code, or a TypeError/Error whose whole message is a code
- * (the house form the register readers refuse with, e.g. CALL_CONCURRENCY_POLICY_INVALID). The database's own failures
- * (ruling R31) and anything else (a driver error, a runtime TypeError in prose) are null: untyped for caching, so the
- * ask is rejected and the next one loads again.
- */
-function settingsRefusalCode(error: unknown): string | null {
-  if (isDatabaseFailure(error)) return null;
-  if (error instanceof TypedDomainError) return error.code;
-  return error instanceof Error && REFUSAL_CODE.test(error.message) ? error.message : null;
-}
-
+/** Ruling R31: a settings refusal is `settingsRefusalCode` (@debateai/db, the API's cache's too); a database failure
+ * never is. */
 type CacheEntry =
   | Readonly<{ kind: "SETTINGS"; version: RunnerVersionSettings }>
   | Readonly<{ kind: "UNSUPPORTED"; code: string; error: unknown }>;

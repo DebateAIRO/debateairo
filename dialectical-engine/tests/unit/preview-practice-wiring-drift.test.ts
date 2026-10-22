@@ -225,6 +225,16 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     expect(code).not.toMatch(/^\s*runResilience: previewRunResilience\(previewGate\)!,/mu);
   });
 
+  it("the API's main.ts and the practice ask key the preview on the gate part (addition D14 / ruling R25), never the full config", () => {
+    // A sockets-only env leaves PREVIEW_PROVIDER_TEST_CONFIG undefined, which would switch the preview's rules off.
+    for (const source of [API_MAIN, PRACTICE_ASK]) {
+      const code = withoutComments(source);
+      expect(code).not.toContain("PREVIEW_PROVIDER_TEST_CONFIG");
+      expect(code).toContain("const previewGate = environment.PREVIEW_GATE_SETTINGS;");
+    }
+    expect(withoutComments(API_MAIN)).toContain("if (previewGate !== undefined && environment.PUBLIC_APP_URL !== \"https://v3-preview.dezbatere.ro\") {");
+  });
+
   it("both compositions hand the loader the same site context (addition D14-D16), and the practice keys on the gate part", () => {
     const preview = "preview: previewGate === undefined ? undefined : { gate: previewGate, envLineUp: environment.PREVIEW_ENV_LINE_UP ?? null },";
     const shipped = objectAfter(RUNNER_MAIN, "const runnerSite: RunnerSiteContext = Object.freeze(");

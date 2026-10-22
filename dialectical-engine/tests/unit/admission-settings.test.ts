@@ -11,7 +11,9 @@
  * - the cache: one load per version, kept forever, the seed never loaded, settings refusals kept, database failures and
  *   untyped errors never kept.
  */
-import { describe, expect, it, vi } from "vitest";
+import { createServer, type Server, type Socket } from "node:net";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createPool, isDatabasePoolBusy } from "@debateai/db";
 import type { Pool } from "pg";
 import { TypedDomainError } from "@debateai/kernel";
 import {
@@ -256,6 +258,18 @@ describe("the version's money (V-28, B6b, Task M7) over the site's day and band"
       .rejects.toThrow("connection reset by peer");
   });
 
+  it("without the site's band, the run-ceiling check reads nothing (B9 is asked only with the site's band)", async () => {
+    const fake = readers(VERSION);
+    const { names, stage } = recorder();
+    await loadAdmissionSettings(POOL, VERSION, site({ siteCostEnvelope: { runPolicy: SITE_ROW, band: null } }), stage,
+      { readers: fake.readers });
+    expect(names).toContain("run-ceiling-covers-one-call");
+    expect(fake.calls.map(([name]) => name)).not.toContain("readJudgeTokenCeiling");
+    const banded = readers(VERSION);
+    await loadAdmissionSettings(POOL, VERSION, site(), undefined, { readers: banded.readers });
+    expect(banded.calls.map(([name]) => name)).toContain("readJudgeTokenCeiling");
+  });
+
   it("hands the picker this version's per-run money and the site's billing switch", async () => {
     const fake = readers(VERSION);
     const loaded = await loadAdmissionSettings(POOL, VERSION, site({ billingEnabled: true }), undefined, { readers: fake.readers });
@@ -303,6 +317,10 @@ describe("addition D14-D16: each version's preview line-up, and the preview stag
       .rejects.toMatchObject({ code: "PREVIEW_LINE_UP_REQUIRED" });
     const fake = readers(VERSION);
     await expect(loadAdmissionSettings(POOL, VERSION, site({ preview: undefined }), undefined, { readers: fake.readers }))
+      .rejects.toMatchObject({ code: "PREVIEW_LINE_UP_WITHOUT_PREVIEW" });
+    // D15: the same at the site version (a row on a deployment without the preview configuration refuses the boot).
+    const siteRow = readers(SITE_VERSION);
+    await expect(loadAdmissionSettings(POOL, SITE_VERSION, site({ preview: undefined }), undefined, { readers: siteRow.readers }))
       .rejects.toMatchObject({ code: "PREVIEW_LINE_UP_WITHOUT_PREVIEW" });
     // The sockets-only env with the row: the row is the line-up (the site version too: nothing to conflict with).
     const row = readers(SITE_VERSION);
@@ -370,6 +388,9 @@ describe("createAdmissionSettingsCache: one load per version, for the life of th
     let attempt = 0;
     const failures = [
       new TypedDomainError("DATABASE_POOL_FAILED", "DATABASE_POOL_FAILED"),
+      // The pool's code as the cause of another typed error is still the database's.
+      Object.assign(new TypedDomainError("RUN_READ_FAILED", "fixture"), {
+        cause: new TypedDomainError("DATABASE_POOL_FAILED", "DATABASE_POOL_FAILED") }),
       new Error("Connection terminated unexpectedly")
     ];
     const load = vi.fn(async (version: number) => {
@@ -381,7 +402,40 @@ describe("createAdmissionSettingsCache: one load per version, for the life of th
     const cache = createAdmissionSettingsCache({ load, seed: settings(SITE_VERSION) });
     await expect(cache.admissionSettingsFor(VERSION)).rejects.toBe(failures[0]);
     await expect(cache.admissionSettingsFor(VERSION)).rejects.toBe(failures[1]);
+    await expect(cache.admissionSettingsFor(VERSION)).rejects.toBe(failures[2]);
     expect((await cache.admissionSettingsFor(VERSION)).registerVersion).toBe(VERSION);
-    expect(load).toHaveBeenCalledTimes(3);
+    expect(load).toHaveBeenCalledTimes(4);
+  });
+});
+
+describe("createAdmissionSettingsCache over the house pool: a busy pool is never kept (R31)", () => {
+  const servers: Server[] = [];
+  const sockets: Socket[] = [];
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    for (const socket of sockets.splice(0)) socket.destroy();
+    await Promise.all(servers.splice(0).map((server) => new Promise((resolve) => server.close(resolve))));
+  });
+
+  it("a load that fails with the pool's busy failure (marked at its origin) is refused and loaded again", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    // A server that accepts and never answers: the pool's wait times out, and createPool marks the failure busy.
+    const server = createServer((socket) => { sockets.push(socket); });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    servers.push(server);
+    const address = server.address();
+    if (address === null || typeof address === "string") throw new TypeError("TEST_SERVER_ADDRESS");
+    const pool = createPool(`postgresql://nobody@127.0.0.1:${address.port}/none`, { max: 1, connectionTimeoutMillis: 150, name: "test:busy" });
+    try {
+      let loads = 0;
+      const seed = Object.freeze({ registerVersion: SITE_VERSION }) as unknown as AdmissionVersionSettings;
+      const cache = createAdmissionSettingsCache({ seed, load: async () => { loads += 1; await pool.query("SELECT 1"); return seed; } });
+      const failure = await cache.admissionSettingsFor(VERSION).then(() => undefined, (error: unknown) => error);
+      expect(isDatabasePoolBusy(failure)).toBe(true);
+      await expect(cache.admissionSettingsFor(VERSION)).rejects.toMatchObject({ code: "DATABASE_POOL_FAILED" });
+      expect(loads).toBe(2);
+    } finally {
+      await pool.end().catch(() => undefined);
+    }
   });
 });

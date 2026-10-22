@@ -145,6 +145,47 @@ describe("the activation pointer's one reader (side-by-side spec §13)", () => {
     expect(lines).toEqual([{ kind: "DEBATEAI_ACTIVE_SETTINGS", code: "ACTIVE_SETTINGS_READ_FAILED", cause: "ACTIVE_SETTINGS_READ_DEADLINE" }]);
   });
 
+  it("while an abandoned read is still open, no second query starts (one main-pool connection at most)", async () => {
+    vi.useFakeTimers();
+    const time = clock();
+    const lines: Readonly<Record<string, unknown>>[] = [];
+    let answer!: (value: unknown) => void;
+    const hanging = () => new Promise<unknown>((resolve) => { answer = resolve; });
+    const { pool, query } = fakePool(18, hanging, 20);
+    const reader = createActiveSettingsVersionReader({ pool, siteVersion: SITE_VERSION, clock: time.read,
+      log: (line) => lines.push(line) });
+    expect(await reader.current()).toBe(18);
+    time.advance(1000);
+    const late = reader.current();
+    await vi.advanceTimersByTimeAsync(ACTIVE_SETTINGS_VERSION_CACHE.refreshDeadlineMs);
+    expect(await late).toBe(18);
+    expect(query).toHaveBeenCalledTimes(2);
+    // The database still has not answered: every later refresh keeps the last good value and sends nothing.
+    for (let second = 0; second < 5; second += 1) {
+      time.advance(1000);
+      expect(await reader.current()).toBe(18);
+    }
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(lines.every((line) => line.code === "ACTIVE_SETTINGS_READ_FAILED" && line.cause === "ACTIVE_SETTINGS_READ_DEADLINE")).toBe(true);
+    // Once the abandoned read settles (its late answer is dropped), the next refresh queries again.
+    answer(19);
+    await vi.advanceTimersByTimeAsync(0);
+    time.advance(1000);
+    expect(await reader.current()).toBe(20);
+    expect(query).toHaveBeenCalledTimes(3);
+  });
+
+  it("its two refusal codes are in both KNOWN_DOMAIN_CODES lists, sorted (so the error sweeps see them)", async () => {
+    for (const file of ["apps/api/src/index.ts", "apps/runner/src/index.ts"]) {
+      const source = await readFile(new URL(`../../${file}`, import.meta.url), "utf8");
+      const declaration = source.slice(source.indexOf("const KNOWN_DOMAIN_CODES"));
+      const codes = [...declaration.slice(declaration.indexOf("["), declaration.indexOf("]);")).matchAll(/"([A-Z][A-Z0-9_]*)"/gu)]
+        .map((match) => match[1]!);
+      expect(codes, file).toEqual(expect.arrayContaining(["ACTIVE_SETTINGS_READ_DEADLINE", "ACTIVE_SETTINGS_VERSION_INVALID"]));
+      expect(codes, file).toEqual([...codes].sort());
+    }
+  });
+
   it("a clock that goes backwards makes the value stale (read again), never fresh", async () => {
     const time = clock(5000);
     const { pool, query } = fakePool(18, 19);

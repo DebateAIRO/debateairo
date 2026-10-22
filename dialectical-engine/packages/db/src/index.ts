@@ -880,6 +880,38 @@ export function isDatabasePoolBusy(error: unknown): boolean {
   return false;
 }
 
+/** A code-shaped refusal message (`CODE` or `CODE:detail`, the house TypeError form); prose is never a code. */
+const SETTINGS_REFUSAL_CODE = /^[A-Z][A-Z0-9_]{2,}(?::[A-Za-z0-9_.:/-]+)?$/u;
+
+/**
+ * Ruling R31 (side-by-side spec §13): true when this failure, or one it wraps as `cause`, is the database's, not a
+ * settings version's: the house pool's own typed failure (createPool: a lost or refused connection, a server restart,
+ * a busy pool or a full server all become TypedDomainError DATABASE_POOL_FAILED), busy or not. Statement timeouts and
+ * serialization failures reach callers as the driver's raw errors, which are untyped already.
+ */
+export function isDatabaseFailure(error: unknown): boolean {
+  if (isDatabasePoolBusy(error)) return true;
+  let current: unknown = error;
+  for (let depth = 0; depth < 8 && current instanceof Error; depth += 1) {
+    if (current instanceof TypedDomainError && current.code === DATABASE_POOL_FAILED) return true;
+    current = current.cause;
+  }
+  return false;
+}
+
+/**
+ * Ruling R31 (side-by-side spec §13): the code of a REAL settings refusal, the one rule both settings caches keep a
+ * version's refusal by (the runner's, apps/runner/src/run-settings.ts; the API's, apps/api/src/admission-settings.ts):
+ * a TypedDomainError's code, or an Error whose whole message is a code (the house form the register readers refuse
+ * with, e.g. CALL_CONCURRENCY_POLICY_INVALID). The database's own failures (`isDatabaseFailure`) and anything else (a
+ * driver error, a runtime TypeError in prose) are null: untyped, so a cache keeps nothing and the next ask loads again.
+ */
+export function settingsRefusalCode(error: unknown): string | null {
+  if (isDatabaseFailure(error)) return null;
+  if (error instanceof TypedDomainError) return error.code;
+  return error instanceof Error && SETTINGS_REFUSAL_CODE.test(error.message) ? error.message : null;
+}
+
 function typedPoolFailure(error: unknown): TypedDomainError {
   if (error instanceof TypedDomainError && error.code === DATABASE_POOL_FAILED) return error;
   const detail = error instanceof Error ? error.message : String(error);

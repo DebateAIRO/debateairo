@@ -1,11 +1,10 @@
 import type { Pool } from "pg";
-import { isDatabasePoolBusy, readRoleRotationCounts } from "@debateai/db";
+import { readRoleRotationCounts, settingsRefusalCode } from "@debateai/db";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes, type AskRequest } from "@debateai/contract";
 import {
   composeDebateCostEnvelope,
   computeStructuralCeilingBasis,
-  costEnvelopeBand,
   costEnvelopeCeilings,
   debateShapeInForce,
   engineInForce,
@@ -249,6 +248,8 @@ export async function loadAdmissionSettings(pool: Pool, version: number, site: A
     });
   });
   const costEnvelope = money?.costEnvelope ?? null;
+  // Budget spec §2.4: the band is the site's (its finish edge is one wall for every debate), never a version's.
+  const siteBand = siteEnvelope?.band ?? null;
   const structuralInputs = await run("structural-ceilings", () => readers.readStructuralCeilingPolicyInputs(pool, version));
   /** T17: the sealed `envelopeFormulaInputs` row (T16); a version that never sealed it is refused. */
   const envelopeFormulaInputs = await run("envelope-formula-inputs", () => readers.readEnvelopeFormulaInputs(pool, version));
@@ -336,7 +337,7 @@ export async function loadAdmissionSettings(pool: Pool, version: number, site: A
    * is on (paid plans S4b), which is priced on its own roster.
    */
   await run("run-ceiling-covers-one-call", async () => {
-    if (costEnvelope === null || costEnvelopeBand(costEnvelope.runPolicy) === null) return;
+    if (costEnvelope === null || siteBand === null) return;
     const firstCalls = firstPositionCallProjections({
       targets: declaredProviderTargets,
       // Length guidance (spec 2026-10-15 §3.3): a first position may ask up to the largest guided opening allowance.
@@ -441,37 +442,8 @@ export function admissionSettingsOfVersion(version: AdmissionVersionSettings): A
   });
 }
 
-/**
- * Ruling R31 (the runner's settings cache, apps/runner/src/run-settings.ts, the same rule): the house pool's own typed
- * failure (DATABASE_POOL_FAILED: a lost or refused connection, a restart, a busy pool) says nothing about the version,
- * so it is never a settings refusal. The API keeps its own copy of the rule: apps/ never import each other.
- */
-const DATABASE_POOL_FAILED = "DATABASE_POOL_FAILED";
-/** A code-shaped refusal message (`CODE` or `CODE:detail`, the house TypeError form); prose is never a code. */
-const REFUSAL_CODE = /^[A-Z][A-Z0-9_]{2,}(?::[A-Za-z0-9_.:/-]+)?$/u;
-
-/** True when this failure, or one it wraps as `cause`, is the database's, not the version's. */
-function isDatabaseFailure(error: unknown): boolean {
-  if (isDatabasePoolBusy(error)) return true;
-  let current: unknown = error;
-  for (let depth = 0; depth < 8 && current instanceof Error; depth += 1) {
-    if (current instanceof TypedDomainError && current.code === DATABASE_POOL_FAILED) return true;
-    current = current.cause;
-  }
-  return false;
-}
-
-/**
- * The code of a REAL settings refusal: a TypedDomainError's code, or an Error whose whole message is a code (the house
- * form the register readers refuse with). The database's own failures and anything else are null: untyped, so the
- * cache keeps nothing and the next ask loads again.
- */
-function settingsRefusalCode(error: unknown): string | null {
-  if (isDatabaseFailure(error)) return null;
-  if (error instanceof TypedDomainError) return error.code;
-  return error instanceof Error && REFUSAL_CODE.test(error.message) ? error.message : null;
-}
-
+/** Ruling R31: a settings refusal is `settingsRefusalCode` (@debateai/db, the runner's cache's too); a database failure
+ * never is. */
 type CacheEntry =
   | Readonly<{ kind: "SETTINGS"; version: AdmissionVersionSettings }>
   | Readonly<{ kind: "UNSUPPORTED"; error: unknown }>;

@@ -62,8 +62,9 @@ function failureCodeOf(error: unknown): string {
  * Side-by-side spec §13 — THE POINTER, CACHED FOR ONE SECOND.
  *  - A value read less than `maxAgeMs` ago is answered without a read; concurrent callers share one read.
  *  - A read that fails, or takes longer than `refreshDeadlineMs`, keeps the last good value and is retried no sooner
- *    than `maxAgeMs` later (one query a second at most), with one ACTIVE_SETTINGS_READ_FAILED line at most once a
- *    minute (codes only). The FIRST read has no good value to keep, so its failure rejects: the boot refuses.
+ *    than `maxAgeMs` later (one query a second at most, and none while a read past its deadline is still unanswered),
+ *    with one ACTIVE_SETTINGS_READ_FAILED line at most once a minute (codes only). The FIRST read has no good value to
+ *    keep, so its failure rejects: the boot refuses.
  *  - The clock is monotonic (`performance.now()` by default); one that goes backwards makes the value stale (it is
  *    read again), never fresh.
  */
@@ -84,11 +85,29 @@ export function createActiveSettingsVersionReader(input: Readonly<{
   let settledAt: number | null = null;
   let lastLoggedAt: number | null = null;
   let reading: Promise<number> | null = null;
+  /**
+   * The query a read past its deadline left behind, until the database answers it. While it is open no new query is
+   * sent (the refresh counts as failed, ACTIVE_SETTINGS_READ_DEADLINE), so a hanging database holds at most one of the
+   * main pool's connections for this reader, never one more a second.
+   */
+  let openQuery: Promise<unknown> | null = null;
 
   const fresh = (now: number): boolean =>
     settledAt !== null && now >= settledAt && now - settledAt < ACTIVE_SETTINGS_VERSION_CACHE.maxAgeMs;
 
   async function readOnce(): Promise<number> {
+    if (openQuery !== null) {
+      throw new TypedDomainError(ACTIVE_SETTINGS_READ_DEADLINE, ACTIVE_SETTINGS_READ_DEADLINE);
+    }
+    let query: Promise<{ rows: readonly { version: unknown }[] }>;
+    try {
+      query = pool.query<{ version: unknown }>(ACTIVE_SETTINGS_VERSION_SQL);
+    } catch (error) {
+      query = Promise.reject(error);
+    }
+    openQuery = query;
+    const settle = (): void => { if (openQuery === query) openQuery = null; };
+    query.then(settle, settle);
     let timer: ReturnType<typeof setTimeout> | undefined;
     const deadline = new Promise<never>((_resolve, reject) => {
       timer = setTimeout(() => {
@@ -97,7 +116,7 @@ export function createActiveSettingsVersionReader(input: Readonly<{
       timer.unref?.();
     });
     try {
-      const result = await Promise.race([pool.query<{ version: unknown }>(ACTIVE_SETTINGS_VERSION_SQL), deadline]);
+      const result = await Promise.race([query, deadline]);
       return versionOfRow(result.rows[0]?.version ?? null, siteVersion);
     } finally {
       if (timer !== undefined) clearTimeout(timer);
