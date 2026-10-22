@@ -56,11 +56,11 @@ import {
 } from "@debateai/providers";
 import { composeAskModelPicker, type AskModelPickerBoot, type AskModelPickerSettings, type CallTokenCeilings } from "./ask-model-picker.js";
 import { assertEngineHasLengthPolicy } from "./engine-ask.js";
-import { readPreviewBudgetGateSettings, type PreviewBudgetGateSettings } from "./preview-budget-estimate.js";
+import { previewVersionTermsOf, readPreviewBudgetGateSettings, type PreviewBudgetGateSettings, type PreviewVersionTerms } from "./preview-budget-estimate.js";
 import { composeQuestionLanguage, type QuestionLanguagePaidRoute } from "./question-language/boot.js";
 import type { QuestionLanguageChoiceNeeded, QuestionLanguageLock, QuestionLanguagePort } from "./question-language/decider.js";
 import type { QuestionLanguageReferenceKey } from "./question-language/reference.js";
-import { preserveSubmittedTierSource, type RunCreationSettings } from "./index.js";
+import { preserveSubmittedTierSource, type AdmissionView, type RunCreationSettings } from "./index.js";
 
 /**
  * Side-by-side spec §13 (settings changes without an upload), API points 1-3, and addition D16: THE API's ONE
@@ -73,7 +73,8 @@ import { preserveSubmittedTierSource, type RunCreationSettings } from "./index.j
  * always used. apps/api/src/main.ts and the preview practice (tools/preview-practice/practice-ask-composition.ts) both
  * compose the ask through it. The boot loads the site version (REGISTER_VERSION) and refuses with the loader's own
  * typed codes, as before; a sealed version never changes, so each loaded version is kept for the life of the process.
- * Until S10 every ask is admitted on the site version, which is also the active one while the pointer is empty (D1).
+ * Since S10 every ask is admitted on the ACTIVE version (`askSettingsOf` in ./index.ts), which is the site
+ * version while the pointer is empty (D1); the pages read the same version through `createAdmissionView`.
  *
  * The SITE members (what follows the release, not the debate: the deployment mode, the declared provider targets and
  * their prices, the gate part of the preview configuration, the day's money row and its band, billing, the spend and
@@ -454,16 +455,34 @@ type CacheEntry =
  * forever. A settings refusal (typed, or a code-shaped message) is kept too, and every later ask for that version gets
  * the same refusal without a load. A database failure (ruling R31) or an untyped error is not kept: that ask is
  * refused and the next one loads again.
+ * Spec §8 and plan C16 (S10): on the preview, an unfinished debate admitted on another version is priced at that
+ * version's own terms. Each version's gate settings ask THIS cache for them (`termsForVersion` → that version's loaded
+ * gate settings, `previewVersionTermsOf`), so a version is read once per process, with every other member of it, and
+ * its terms come from its own line-up (addition D16). A version the cache refuses rejects there, and the estimate prices
+ * that debate at the asking version's own terms with its one line (`versionTermsFallback`): never a refused ask.
  */
 export function createAdmissionSettingsCache(input: Readonly<{
   load: (version: number) => Promise<AdmissionVersionSettings>;
   seed: AdmissionVersionSettings;
 }>): Readonly<{ admissionSettingsFor(version: number): Promise<AdmissionVersionSettings> }> {
+  const termsFor = (version: number): Promise<PreviewVersionTerms> => {
+    if (!Number.isSafeInteger(version) || version < 1) return Promise.reject(new TypeError("PREVIEW_REGISTER_VERSION_INVALID"));
+    return cache.admissionSettingsFor(version).then((settings) => {
+      if (settings.previewBudgetGate === undefined) throw new TypeError("PREVIEW_VERSION_TERMS_UNAVAILABLE");
+      return previewVersionTermsOf(settings.previewBudgetGate);
+    });
+  };
+  /** A version as kept: its preview gate settings (when it has them) read other versions' terms through the cache. */
+  const routed = (version: AdmissionVersionSettings): AdmissionVersionSettings => {
+    const gate = version.previewBudgetGate;
+    if (gate === undefined) return version;
+    return Object.freeze({ ...version, previewBudgetGate: Object.freeze({ ...gate, termsForVersion: termsFor }) });
+  };
   const settled = new Map<number, CacheEntry>([
-    [input.seed.registerVersion, Object.freeze({ kind: "SETTINGS" as const, version: input.seed })]
+    [input.seed.registerVersion, Object.freeze({ kind: "SETTINGS" as const, version: routed(input.seed) })]
   ]);
   const pending = new Map<number, Promise<AdmissionVersionSettings>>();
-  return Object.freeze({
+  const cache = Object.freeze({
     admissionSettingsFor(version: number): Promise<AdmissionVersionSettings> {
       const done = settled.get(version);
       if (done !== undefined) {
@@ -472,7 +491,8 @@ export function createAdmissionSettingsCache(input: Readonly<{
       const inFlight = pending.get(version);
       if (inFlight !== undefined) return inFlight;
       const loading = input.load(version).then(
-        (settings) => {
+        (loaded) => {
+          const settings = routed(loaded);
           settled.set(version, Object.freeze({ kind: "SETTINGS" as const, version: settings }));
           return settings;
         },
@@ -485,4 +505,59 @@ export function createAdmissionSettingsCache(input: Readonly<{
       return loading;
     }
   });
+  return cache;
+}
+
+/**
+ * Side-by-side spec §13 (Task S10): what one version says to the pages (`AdmissionView`, buildApi's `admissionView`):
+ * its number, its shape and length rows in force, whether its picker's scorecard is VALID, and (addition D16) its
+ * composed preview configuration.
+ */
+export function admissionViewOf(version: AdmissionVersionSettings): AdmissionView {
+  return Object.freeze({
+    registerVersion: version.registerVersion,
+    ...(version.debateShapePolicy === null ? {} : { debateShapePolicy: version.debateShapePolicy }),
+    ...(version.lengthGuidancePolicy === null ? {} : { lengthGuidancePolicy: version.lengthGuidancePolicy }),
+    modelScorecardInForce: version.modelPicker.scorecard.state === "VALID",
+    ...(version.previewConfig === undefined ? {} : { previewProviderTestConfig: version.previewConfig })
+  });
+}
+
+/**
+ * Side-by-side spec §13 (Task S10) — THE ACTIVE VERSION, AS THE PAGES READ IT: GET /v1/asks/room and GET /v1/session ask
+ * this once per request (the pointer's one-second cache, then the per-version cache), so /new advises on the version
+ * the next ask is admitted on. Their answers only advise (the ask is authoritative and refuses on its own), so a version
+ * the cache refuses with a settings code (never in practice: activation needs a PASS of the same loader) is answered
+ * from `fallback` (the site version) with one ADMISSION_SETTINGS_UNSUPPORTED line per version; a database failure
+ * propagates, as any route's.
+ */
+export function createAdmissionView(input: Readonly<{
+  activeSettingsVersion: () => Promise<number>;
+  admissionSettingsFor: (version: number) => Promise<AdmissionVersionSettings>;
+  fallback: AdmissionVersionSettings;
+  log: (line: string) => void;
+}>): () => Promise<AdmissionView> {
+  const views = new Map<number, AdmissionView>();
+  const said = new Set<number>();
+  const fallbackView = admissionViewOf(input.fallback);
+  return async () => {
+    const version = await input.activeSettingsVersion();
+    const kept = views.get(version);
+    if (kept !== undefined) return kept;
+    let loaded: AdmissionVersionSettings;
+    try {
+      loaded = await input.admissionSettingsFor(version);
+    } catch (error) {
+      const code = settingsRefusalCode(error);
+      if (code === null) throw error;
+      if (!said.has(version)) {
+        said.add(version);
+        input.log(JSON.stringify({ kind: "DEBATEAI_ADMISSION_SETTINGS", code: "ADMISSION_SETTINGS_UNSUPPORTED", version, cause: code }));
+      }
+      return fallbackView;
+    }
+    const view = admissionViewOf(loaded);
+    views.set(version, view);
+    return view;
+  };
 }

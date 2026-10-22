@@ -34,7 +34,10 @@ export type AskBilling = Readonly<{
       readOwnerCountedHoldsMicros(ownerRef: string, funding?: FundingBasis): Promise<number>;
     }>;
     estimator: CostEstimator;
-    /** Side-by-side spec §13 (S9 composes it; S10 reads it): the room's per-version estimator (`AskRoomOptions.estimatorFor`). */
+    /**
+     * Side-by-side spec §13 (S9 composes it; S10 reads it): the room's per-version estimator (`AskRoomOptions.estimatorFor`),
+     * asked for the version the ask is admitted on (`coarseFitFor`'s `registerVersion`).
+     */
     estimatorFor?: (registerVersion: number) => Promise<CostEstimator>;
   }>;
   funding?: Readonly<{resolveAskFunding(ownerRef:string,now:Date):Promise<FundingBasis>}>;
@@ -225,10 +228,12 @@ export function decideCoarseFit(input: Readonly<{
  * admits. A race can at worst choose the other roster for one ask that STARTs;
  * an ask the locked decision makes WAIT is created on its plan's roster
  * whatever this chose (`#submitWithRoom`).
+ * Side-by-side spec §13 (S10): `registerVersion` is the settings version the ask is admitted on; its estimate is that
+ * version's (`estimatorFor`), as the room's decision will be. Without one (or without `estimatorFor`): `estimator`'s.
  */
 export async function coarseFitFor(
   ask: AskRequest, ownerRef: string, billing: AskBilling, now: Date, previewConfig?: PreviewProviderTestConfig,
-  shapePlan?: DebateShapePlanKey
+  shapePlan?: DebateShapePlanKey, registerVersion?: number
 ): Promise<CoarseFit> {
   if (ask.plan_tier !== "premium") return "AS_ASKED";
   const windows = await billing.coarseFit.personAllowance.read(ownerRef, now);
@@ -236,9 +241,12 @@ export async function coarseFitFor(
   // Debate shape: the class's optional shape member, built before the class so no conditional sits beside the roster pick.
   const coarseShape = runShapeClassOf(ask.depth_params, shapePlan ?? "premium");
   const coarseShapeMember = coarseShape === null ? {} : { shape: coarseShape };
+  const estimatorFor = billing.coarseFit.estimatorFor;
+  const estimator = registerVersion === undefined || estimatorFor === undefined
+    ? billing.coarseFit.estimator : await estimatorFor(registerVersion);
   const [holdsMicros, estimateMicros, spent] = await Promise.all([
     billing.coarseFit.spend.readOwnerCountedHoldsMicros(ownerRef,windows[0]?.funding),
-    billing.coarseFit.estimator.estimateMicros({
+    estimator.estimateMicros({
       planTier: "premium",
       compositionBudgetTier: ask.composition_budget_tier,
       // Step 1: the roster this deployment really runs (one GLM on the private preview).

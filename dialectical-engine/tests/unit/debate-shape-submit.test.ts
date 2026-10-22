@@ -372,13 +372,14 @@ describe("the boot reads the optional row (note 8) and the practice runner resol
     expect(main.indexOf("const siteAdmission = await loadAdmissionSettings(pool, environment.REGISTER_VERSION, admissionSite, (name, run) => boot.run("))
       .toBeGreaterThan(-1);
     expect(main.indexOf("const siteAdmission = await loadAdmissionSettings(")).toBeLessThan(main.indexOf("new PostgresAskApplication("));
-    // Once into the ask application's settings (the one mapping), once into the room read's options; absent (or
-    // disabled) = neither key.
+    // Once into the ask application's settings (the one mapping), once into the room read's view (side-by-side spec §13,
+    // S10: the ACTIVE version's row, `admissionViewOf`, through main.ts's `admissionView`); absent (or disabled) = neither key.
     expect(loader).toContain("const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);");
     expect(loader).toContain("debateShapePolicy: debateShapeInForcePolicy,\n    lengthGuidancePolicy,\n    engineVersionPolicy: engineInForcePolicy,");
     expect(loader).toContain("...(debateShapePolicy === null ? {} : { debateShapePolicy }),");
     expect(main).toContain("...admissionSettingsOfVersion(siteAdmission),");
-    expect(main).toContain("...(siteAdmission.debateShapePolicy === null ? {} : { debateShapePolicy: siteAdmission.debateShapePolicy }),");
+    expect(loader).toContain("...(version.debateShapePolicy === null ? {} : { debateShapePolicy: version.debateShapePolicy }),");
+    expect(main).toContain("  admissionView: createAdmissionView({");
     expect(loader).toContain("...(input.shape === null ? {} : { shape: input.shape })");
   });
 

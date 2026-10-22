@@ -19,7 +19,7 @@ import {
   type WaitsFor,
   waitingShapeClassOf
 } from "@debateai/budget";
-import { recordRunSupersession, type RunOwnershipAccess, type WaitReason, type WaitingRun, type WaitingRunCursor, type WaitingRunRef } from "@debateai/db";
+import { recordRunSupersession, settingsRefusalCode, type RunOwnershipAccess, type WaitReason, type WaitingRun, type WaitingRunCursor, type WaitingRunRef } from "@debateai/db";
 import { debateShapePlanKeyOf, planById, type BillingPlans, type DebateShapePlanKey, type PlanId } from "@debateai/register";
 import { runShapeClassOf } from "./debate-shape-ask.js";
 import type { ReadmissionPlan } from "./readmission.js";
@@ -56,7 +56,14 @@ export class AskAlreadyWaitingError extends TypedDomainError {
   }
 }
 
-export type RoomQuestion = Readonly<{ access: RunOwnershipAccess; settingsClass: RunSettingsClass; fundingBasis?: FundingBasis }>;
+/**
+ * A question the room is asked. `registerVersion` (side-by-side spec §13, S10): the settings version the ask is admitted
+ * on; the room estimates it with that version's estimator (`AskRoomOptions.estimatorFor`). Absent (a composition before
+ * S10): the room's own estimator.
+ */
+export type RoomQuestion = Readonly<{
+  access: RunOwnershipAccess; settingsClass: RunSettingsClass; fundingBasis?: FundingBasis; registerVersion?: number;
+}>;
 export type RoomDecision = Extract<Admission, { kind: "START" | "WAIT" }>;
 export type RoomDecisionContext = Readonly<{
   admission: RoomDecision;
@@ -167,8 +174,11 @@ export type AskRoomOptions = Readonly<{
   line: AskRoomLine;
   estimator: CostEstimator;
   /**
-   * Side-by-side spec §13 (S9 composes it; S10 reads it): the estimator of a settings version (its own per-run cap),
-   * for a question admitted on a version other than the site's. Until S10 every estimate is `estimator`'s.
+   * Side-by-side spec §13 (S9 composes it; S10 reads it): the estimator of a settings version (its own per-run cap). A
+   * question that names its version (`RoomQuestion.registerVersion`) and a waiting run stamped with one
+   * (`WaitingRun.registerVersion`) are estimated with it; absent, or for a question or run without a version, the
+   * estimate is `estimator`'s. A version whose estimator cannot be had is estimated with `estimator` (one
+   * ADMISSION_ESTIMATOR_FALLBACK line per version): an estimate never refuses an ask or strands a waiting run.
    */
   estimatorFor?: (registerVersion: number) => Promise<CostEstimator>;
   personAllowance: PersonAllowanceSource;
@@ -422,6 +432,8 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
   /** Why the decision on each open transaction would make its question wait; set and cleared by `decide`. */
   readonly #waitReasons = new WeakMap<PoolClient, WaitReason>();
   readonly #fundingDecisions = new WeakMap<PoolClient, Readonly<{ownerRef: string; basis: FundingBasis}>>();
+  /** Side-by-side spec §13 (S10): the versions whose estimator fell back, each said once (content-free). */
+  readonly #estimatorFallbacksSaid = new Set<number>();
 
   constructor(options: AskRoomOptions) {
     for (const value of [options.dailyCeilingMicros, options.closeBasisPoints, options.waitingLinePerPerson]) {
@@ -549,7 +561,8 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
   async #computeExpectedStart(runId: string, now: Date): Promise<ExpectedStart | null> {
     const run = await this.#options.line.readWaiting(runId);
     if (run === null) return null;
-    const estimateMicros = await this.#options.estimator.estimateMicros(settingsClassOfWaitingRun(run));
+    // Side-by-side spec §13 (S10): at the version the run was stamped with.
+    const estimateMicros = await (await this.#estimatorFor(run.registerVersion)).estimateMicros(settingsClassOfWaitingRun(run));
     const { rooms } = await this.#measure(accessOfWaitingRun(run), estimateMicros, now, run.runId);
     const until = waitingUntil({ rooms, nextTickAt: nextWholeMinute(now) });
     return Object.freeze({ waitsUntil: until.waitsUntil, scope: until.worstScope, ...waitsForOf(until) });
@@ -673,9 +686,11 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
       if (readmit !== null && planId !== readmit.planId) return Object.freeze({ kind: "NEEDS_READMISSION" as const, planId });
       // RULINGS-R2 Q-11: the hold is B2's estimate for the run's settings class; the
       // waker never re-picks the run's models (a known limit, bounded by B9's wall).
-      // Side-by-side C11: a re-admission is a new admission, measured with its plan's own hold (step 4).
+      // Side-by-side spec §13 (S10): at the version the run was stamped with (its own per-run cap).
+      // Side-by-side C11: a re-admission is a new admission, measured with its plan's own hold (step 4); its estimate
+      // stays the room's own until S13 re-admits onto the active version with that version's estimator.
       const estimateMicros = readmit === null
-        ? await this.#options.estimator.estimateMicros(settingsClassOfWaitingRun(run))
+        ? await (await this.#estimatorFor(run.registerVersion)).estimateMicros(settingsClassOfWaitingRun(run))
         : readmit.holdMicros ?? await this.#options.estimator.estimateMicros(readmit.settingsClass);
       const { rooms, personUses, waitReason } = await this.#measure(access, estimateMicros, now, run.runId);
       const admission = decideAdmission({
@@ -807,8 +822,31 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
     return await gate.activeDebates(tx) >= gate.siteConcurrentDebates;
   }
 
+  /**
+   * Side-by-side spec §13 (S10): the estimator of a settings version — `estimatorFor`'s, or the room's own without a
+   * version or without `estimatorFor`. A version whose estimator cannot be had (a version this release cannot load:
+   * another release's waiting run) is estimated with the room's own, said once per version (the loader's settings code,
+   * or UNTYPED for a database or untyped failure; ruling R31's rule): an estimate never refuses an ask or strands a run.
+   */
+  async #estimatorFor(version: number | undefined): Promise<CostEstimator> {
+    const estimatorFor = this.#options.estimatorFor;
+    if (version === undefined || estimatorFor === undefined) return this.#options.estimator;
+    try {
+      return await estimatorFor(version);
+    } catch (error) {
+      if (!this.#estimatorFallbacksSaid.has(version)) {
+        this.#estimatorFallbacksSaid.add(version);
+        console.error(JSON.stringify({
+          kind: "DEBATEAI_ADMISSION_SETTINGS", code: "ADMISSION_ESTIMATOR_FALLBACK", version, cause: settingsRefusalCode(error) ?? "UNTYPED"
+        }));
+      }
+      return this.#options.estimator;
+    }
+  }
+
   async #evaluate(question: RoomQuestion, now: Date, hold: AdmissionHold | null): Promise<RoomEvaluation> {
-    const estimateMicros = await this.#options.estimator.estimateMicros(question.settingsClass);
+    // Side-by-side spec §13 (S10): the question's own version's estimate (precheck, the locked decision, the room read).
+    const estimateMicros = await (await this.#estimatorFor(question.registerVersion)).estimateMicros(question.settingsClass);
     const { rooms, personUses, waitReason } = await this.#measure(question.access, estimateMicros, now);
     const waiting = await this.#waitingOf(question.access);
     const nextTickAt = nextWholeMinute(now);

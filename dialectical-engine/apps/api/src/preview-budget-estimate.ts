@@ -327,6 +327,9 @@ export type PreviewBudgetGateSettings = Readonly<{
    * versions never change, so each is read once and kept (the API's own is the fields above). A version that cannot be
    * read rejects, and is not kept; the estimate then prices that one debate at the API's own terms (C16 review,
    * `versionTermsFallback`), so one unreadable version never refuses every preview ask.
+   * Side-by-side spec §13 (S10): in the API the admission cache replaces it (`createAdmissionSettingsCache`): another
+   * version's terms are that version's own loaded gate settings (`previewVersionTermsOf`), read once per process with
+   * every other member of that version, so no second per-version cache is kept beside it.
    */
   termsForVersion: (version: number) => Promise<PreviewVersionTerms>;
   /** The app's recorded usage of recent preview calls (see PREVIEW_MEASURED_USAGE_SQL); absent: the defaults. */
@@ -1021,6 +1024,15 @@ function versionTermsFallback(gate: PreviewBudgetGateSettings, version: number):
     VERSION_TERMS_FALLBACK_SAID.add(version);
     console.error(JSON.stringify({ event: "api.preview_estimate.version_terms_fallback", version }));
   }
+  return previewVersionTermsOf(gate);
+}
+
+/**
+ * Side-by-side spec §4 (plan C16) and §13 (S10): the terms a version's gate settings price a debate with — its own
+ * fields (`readPreviewVersionTerms`'s, spread in by `readPreviewBudgetGateSettings`). The admission cache answers another
+ * version's terms with this, over that version's own loaded gate settings.
+ */
+export function previewVersionTermsOf(gate: PreviewBudgetGateSettings): PreviewVersionTerms {
   return Object.freeze({ roleModels: gate.roleModels, roleProviderRefs: gate.roleProviderRefs, storyRounds: gate.storyRounds,
     callOutputTokens: gate.callOutputTokens, maxCooldownHoldsPerRun: gate.maxCooldownHoldsPerRun });
 }

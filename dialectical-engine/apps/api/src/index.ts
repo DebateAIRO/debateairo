@@ -121,6 +121,7 @@ import {
   prepareLeasedContentEncryptionForRun,
   queryPrivateStream,
   resolveRunRef,
+  settingsRefusalCode,
   withOwnerAskAdmissionLease,
   withRunContentLease,
   type CryptoEnvelope,
@@ -1870,6 +1871,14 @@ export interface ApiOptions {
    */
   readonly modelScorecardInForce?: boolean;
   /**
+   * Side-by-side spec §13 (Task S10): what the ACTIVE settings version says to the pages, asked once per request by
+   * GET /v1/asks/room (its shape and length rows, and the version the room estimates with) and GET /v1/session (whether
+   * it scores its models). main.ts composes it over the activation pointer and the per-version admission cache. Absent
+   * (test compositions, acceptance): both read `debateShapePolicy`, `lengthGuidancePolicy` and `modelScorecardInForce`
+   * above, as before. Present, it replaces those three for both routes.
+   */
+  readonly admissionView?: () => Promise<AdmissionView>;
+  /**
    * Side-by-side spec §13, addition D24 (owner's answer to Q-L6, 2026-10-22: providers only, not the models, listed
    * automatically): the companies the declared provider targets reach (`providerCompaniesOfTargets`, computed once at
    * boot in apps/api/src/main.ts), answered on GET /v1/public/ai-providers for the "AI providers" legal page. Absent
@@ -1877,6 +1886,20 @@ export interface ApiOptions {
    */
   readonly aiProviderCompanies?: readonly string[];
 }
+
+/**
+ * Side-by-side spec §13 (Task S10) — THE ACTIVE VERSION, AS THE PAGES READ IT (`ApiOptions.admissionView`): its number
+ * (the room read's question names it, so the room estimates with that version's estimator), its shape and length rows
+ * in force (absent: none), and whether it scores its models (GET /v1/session's one yes/no). Addition D16: it may also
+ * carry the version's composed preview configuration, for the room read's settings class (SA6 reads it there).
+ */
+export type AdmissionView = Readonly<{
+  registerVersion: number;
+  debateShapePolicy?: DebateShapePolicy;
+  lengthGuidancePolicy?: LengthGuidancePolicy;
+  modelScorecardInForce: boolean;
+  previewProviderTestConfig?: PreviewProviderTestConfig;
+}>;
 
 /**
  * The check a route composed without `publicationContentCheck` runs: no judge,
@@ -2267,6 +2290,17 @@ const ONBOARDING_SIGN_IN_ROUTES: ReadonlySet<string> = new Set([
 
 export function buildApi(options: ApiOptions): FastifyInstance {
   const previewConfig=validatePreviewProviderTestConfig(options.previewProviderTestConfig);
+  /**
+   * Side-by-side spec §13 (Task S10): the version the pages are answered from, asked once per request — the active one
+   * when main.ts composes `admissionView`, else the static members (no version named: the room estimates as before).
+   */
+  const staticView: Omit<AdmissionView, "registerVersion"> = Object.freeze({
+    ...(options.debateShapePolicy === undefined ? {} : { debateShapePolicy: options.debateShapePolicy }),
+    ...(options.lengthGuidancePolicy === undefined ? {} : { lengthGuidancePolicy: options.lengthGuidancePolicy }),
+    modelScorecardInForce: options.modelScorecardInForce === true
+  });
+  const admissionView = async (): Promise<Omit<AdmissionView, "registerVersion"> & Readonly<{ registerVersion?: number }>> =>
+    options.admissionView === undefined ? staticView : options.admissionView();
   // Crisis check: compile its patterns now, not on the first question (about a second, once).
   warmCrisisCheck();
   const allowedOrigin = options.allowedOrigin === undefined
@@ -3622,8 +3656,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
 
   api.get("/v1/session", routePolicy("GET /v1/session"), async (request, reply) => {
     // A21 (owner decision O4): the one deployment fact /new reads with the session — a strict
-    // boolean, so nothing but yes or no can leave here, whatever a composition passed in.
-    return reply.send({ ...request.session, model_scorecard_in_force: options.modelScorecardInForce === true });
+    // boolean, so nothing but yes or no can leave here, whatever a composition passed in. Side-by-side spec §13 (S10):
+    // the active settings version's scorecard (`admissionView`), the one the next ask is admitted on.
+    return reply.send({ ...request.session, model_scorecard_in_force: (await admissionView()).modelScorecardInForce === true });
   });
 
   api.get("/v1/deployment", routePolicy("GET /v1/deployment"), async (request, reply) => {
@@ -3748,6 +3783,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const query = AskRoomQuerySchema.safeParse(request.query);
     if (!query.success) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     const access = ownershipFor(request);
+    // Side-by-side spec §13 (S10): the active version's rows, read once for this request; the room estimates with it.
+    const view = await admissionView();
+    const versionMember = view.registerVersion === undefined ? {} : { registerVersion: view.registerVersion };
     // Length guidance (spec 2026-10-15 §3.8): the plan key the room's settings were decided for, which names the answer
     // words; without a room reader, the query's own tier.
     let roomPlanKey: DebateShapePlanKey = "free";
@@ -3756,6 +3794,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       ? Object.freeze({ room: "FITS" as const, scope: null, resetsAt: null, waitingRunRef: null, planId: null })
       : await options.askRoom.readRoom({
           access,
+          ...versionMember,
           settingsClass: await (async () => {
             // B8 (R-28): with billing on, the room is read for the ask the server would run. Debate shape (spec
             // 2026-10-12 §3.2): with the query's shape settings, normalised under the plan key submit would use.
@@ -3766,8 +3805,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
             }, access.ownerRef, options.askBilling);
             const roomPlan = debateShapePlanKeyOf(decided.planId, decided.settings.plan_tier);
             roomPlanKey = roomPlan;
-            return runSettingsClassOfAsk(normaliseAskForDebateShape(decided.settings, options.debateShapePolicy ?? null, roomPlan,
-              options.lengthGuidancePolicy ?? null), previewConfig, roomPlan);
+            return runSettingsClassOfAsk(normaliseAskForDebateShape(decided.settings, view.debateShapePolicy ?? null, roomPlan,
+              view.lengthGuidancePolicy ?? null), previewConfig, roomPlan);
           })()
         });
     return reply.send(AskRoomResponseSchema.parse({
@@ -3781,14 +3820,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       // Debate shape P2c (Contract deviation 7): the same row the normalisation above reads. After P2b, main.ts hands
       // the API only an in-force row (`debateShapeInForce`); without one the member is never written, so the body is
       // today's byte for byte, and the page offers none of the three settings it would drop.
-      ...(options.debateShapePolicy === undefined ? {} : { shape_settings: true as const }),
+      ...(view.debateShapePolicy === undefined ? {} : { shape_settings: true as const }),
       // Length guidance (spec 2026-10-15 §3.8; ruling Q9): the plan's answer words and the length switch. Without either
       // row neither member is written: today's body, byte for byte.
       ...((): Record<string, unknown> => {
-        const words = lengthAnswerWordsFor(options.lengthGuidancePolicy, options.debateShapePolicy, roomPlanKey);
+        const words = lengthAnswerWordsFor(view.lengthGuidancePolicy, view.debateShapePolicy, roomPlanKey);
         return words === null ? {} : { answer_words: { short: words.short, standard: words.standard, detailed: words.detailed } };
       })(),
-      ...(options.lengthGuidancePolicy === undefined ? {} : { length_settings: true as const })
+      ...(view.lengthGuidancePolicy === undefined ? {} : { length_settings: true as const })
     }));
   });
 
@@ -4505,12 +4544,95 @@ export interface RunCreationSettings {
   /**
    * Side-by-side spec §13 (S9 composes it in main.ts and the practice; S10 reads it per ask): the active settings version
    * (the activation pointer, or the site version while it is empty) and that version's admission members
-   * (./admission-settings.ts). Until S10 the ask path reads the members spread beside it, which are the site version's.
+   * (./admission-settings.ts). Present, every ask reads the pointer ONCE, first, and is admitted and stamped on that
+   * version's members over the process members here (`askSettingsOf`); the version members spread beside it are only
+   * the site version's defaults. Absent (test compositions, acceptance): every ask is admitted on the members here.
    */
   readonly admissionSettings?: Readonly<{
     activeSettingsVersion(): Promise<number>;
     admissionSettingsFor(version: number): Promise<AdmissionRunMembers>;
   }>;
+}
+
+/**
+ * Side-by-side spec §13 (Task S10): every member a settings version decides (`AdmissionRunMembers`), named once. The
+ * record's type makes the compiler refuse a member missing here or one the version does not decide.
+ */
+const ADMISSION_RUN_MEMBER_KEYS: readonly (keyof AdmissionRunMembers)[] = Object.freeze(Object.keys({
+  registerVersion: true, previewProviderTestConfig: true, previewBudgetGate: true, assertDailyCostEnvelope: true,
+  resolveEnvelopeBasis: true, resolveRisk: true, modelPicker: true, roleRotation: true, debateShapePolicy: true,
+  lengthGuidancePolicy: true, engineVersionPolicy: true, questionLanguage: true
+} satisfies Record<keyof AdmissionRunMembers, true>) as (keyof AdmissionRunMembers)[]);
+
+/**
+ * Side-by-side spec §13 (Task S10) — ONE VERSION'S SETTINGS FOR AN ASK: the process members (the release, the pools'
+ * ports, the room, billing, the team) with EVERY version member replaced by `members`'. A member the version does not
+ * have is absent, never the site version's (the site's shape row must not shape an ask admitted on a version without
+ * one). Frozen; `registerVersion` is the version's, so the run and its memory question are stamped with it.
+ */
+function settingsOfVersion(process: RunCreationSettings, members: AdmissionRunMembers): RunCreationSettings {
+  const base: Record<string, unknown> = { ...process };
+  for (const key of ADMISSION_RUN_MEMBER_KEYS) delete base[key];
+  return Object.freeze({ ...(base as Omit<RunCreationSettings, keyof AdmissionRunMembers>), ...members });
+}
+
+/** The one content-free line of a version this API cannot admit on (Task S10): the version and the loader's code. */
+const ADMISSION_SETTINGS_UNSUPPORTED = "ADMISSION_SETTINGS_UNSUPPORTED";
+
+/** How long the "please try again in a minute" answer of an ask on an unsupported version asks the caller to wait. */
+const ADMISSION_SETTINGS_RETRY_MS = 60000;
+
+/** Side-by-side spec §13 (S10): each application's settings per version, by its process settings (built once a version). */
+const VERSION_SETTINGS = new WeakMap<RunCreationSettings, Map<number, RunCreationSettings>>();
+
+/**
+ * Side-by-side spec §13 (settings changes without an upload), API points 1-3 — THE SETTINGS ONE ASK IS ADMITTED ON.
+ * Plain words: the owners can switch the settings version new debates use without an upload; each ask asks which
+ * version is active ONCE, before anything is decided, and everything frozen at its admission (the receipt, the seats,
+ * the risk tier, the memory question, the estimate) comes from that one version, so a switch while it is admitted
+ * changes nothing of it. The version's members (`admissionSettingsFor`, loaded once and kept: ./admission-settings.ts)
+ * replace every version member of the application's settings (`settingsOfVersion`); the result is kept per version
+ * (sealed versions never change). Without `admissionSettings` (test compositions, acceptance) every ask is admitted on
+ * the application's settings. A version the cache refuses with a settings code never reaches an ask in practice
+ * (activation needs a PASS that ran the same loader): `unsupportedAdmissionVersion` is its seam. A database failure is
+ * not a settings refusal: it propagates. A module function over the settings alone (not a private member), so submit's
+ * pre-admission refusals stay callable on a bare `{ settings }` (preview-team-only-asks, preview-budget-estimate).
+ */
+async function askSettingsOf(process: RunCreationSettings): Promise<RunCreationSettings> {
+  const source = process.admissionSettings;
+  if (source === undefined) return process;
+  const version = await source.activeSettingsVersion();
+  let versions = VERSION_SETTINGS.get(process);
+  const kept = versions?.get(version);
+  if (kept !== undefined) return kept;
+  let members: AdmissionRunMembers;
+  try {
+    members = await source.admissionSettingsFor(version);
+  } catch (error) {
+    const code = settingsRefusalCode(error);
+    if (code === null) throw error;
+    return unsupportedAdmissionVersion(version, code);
+  }
+  if (members.registerVersion !== version) throw new TypeError("ADMISSION_SETTINGS_VERSION_MISMATCH");
+  const settings = settingsOfVersion(process, members);
+  if (versions === undefined) {
+    versions = new Map();
+    VERSION_SETTINGS.set(process, versions);
+  }
+  versions.set(version, settings);
+  return settings;
+}
+
+/**
+ * Side-by-side spec §13 (S10) — THE SEAM FOR AN ACTIVE VERSION THIS API CANNOT ADMIT ON. One content-free line
+ * (ADMISSION_SETTINGS_UNSUPPORTED: the version and the loader's code), and the ask is not started: nothing is written
+ * or charged, and the person reads the plain "cannot be reached right now, please try again in a minute" refusal with
+ * its retry instant. S11 builds the full re-check of (release, version) and replaces this answer with its SWITCHING
+ * outcome (the ask waits in line, plan C's reason) — here, at this one seam.
+ */
+function unsupportedAdmissionVersion(version: number, code: string): never {
+  console.error(JSON.stringify({ kind: "DEBATEAI_ADMISSION_SETTINGS", code: ADMISSION_SETTINGS_UNSUPPORTED, version, cause: code }));
+  return markAskRefusal(new PreviewGateUnavailableRefusal(new Date(Date.now() + ADMISSION_SETTINGS_RETRY_MS)));
 }
 
 /** One planned admission: the run's basis, panel and (with a VALID scorecard) its assignment. */
@@ -5172,6 +5294,9 @@ export class PostgresAskApplication implements AskApplication {
     session: Session,
     principal: AskPrincipal
   ): Promise<AskAccepted> {
+    // Side-by-side spec §13 (S10): the active settings version, read ONCE, first, before anything is decided; every
+    // step of this ask, and everything frozen at its admission, reads `settings` (that version over the process members).
+    const settings = await askSettingsOf(this.settings);
     if (principal.kind === "server") {
       if (session.ownership_provenance !== "server_session" || session.asker_id !== `owner:${principal.ownerRef}`) {
         throw new TypedDomainError("RUN_PRINCIPAL_SESSION_MISMATCH", "The server session and opaque run owner must match");
@@ -5181,8 +5306,8 @@ export class PostgresAskApplication implements AskApplication {
     }
     // Step 1, defense in depth: the route refuses a person outside the preview's team first;
     // any other caller of submit is refused here, before billing, admission or any probe.
-    if (!previewTeamAdmits(validatePreviewProviderTestConfig(this.settings.previewProviderTestConfig),
-      this.settings.previewTeamUserIds, principal.kind === "server" ? principal.userId : undefined)) {
+    if (!previewTeamAdmits(validatePreviewProviderTestConfig(settings.previewProviderTestConfig),
+      settings.previewTeamUserIds, principal.kind === "server" ? principal.userId : undefined)) {
       markAskRefusal(new TypedDomainError(PREVIEW_TEAM_ONLY, PREVIEW_TEAM_ONLY));
     }
     // Paid plans (spec 2026-09-29 §2.3.4, §2.6 item 7; R1 A5; ruling R-28).
@@ -5194,8 +5319,8 @@ export class PostgresAskApplication implements AskApplication {
     // Debate shape (spec 2026-10-12 §3.2): every ask is normalised for its plan key before anything reads it, so the
     // stored depth_params is `{ depth }` exactly (no row), `{ depth, answerLength }` (the length row alone, spec
     // 2026-10-15 §3.1) or all four settings (the shape row), never anything in between.
-    const shapePolicy = this.settings.debateShapePolicy ?? null;
-    const lengthPolicy = this.settings.lengthGuidancePolicy ?? null;
+    const shapePolicy = settings.debateShapePolicy ?? null;
+    const lengthPolicy = settings.lengthGuidancePolicy ?? null;
     // Question language (spec 2026-10-13, ruling L8): with the shape row, the language is decided first — after the
     // route's crisis, consent, team, admission and country checks, before billing, admission and any lock. A refusal
     // of the person's choice is a 409 the page answers by checking again; an offer ends the request with a 409.
@@ -5205,11 +5330,11 @@ export class PostgresAskApplication implements AskApplication {
     // start: today's typed check refuses it further on (`#submitWithRoom`'s first line, or `evaluateAskAdmission`
     // after the daily guard), in today's order. So the decider is not asked for it (no fast call, no offer). With
     // billing on the server decides the tier from the person's plan, so the decider is asked as for any ask.
-    const tierRefusedLater = this.settings.billing === undefined && !Object.hasOwn(PLAN_TIER_ROSTERS, requestedAsk.plan_tier as string);
-    const questionLanguageLock: QuestionLanguageLock | null = shapePolicy === null || this.settings.questionLanguage === undefined
+    const tierRefusedLater = settings.billing === undefined && !Object.hasOwn(PLAN_TIER_ROSTERS, requestedAsk.plan_tier as string);
+    const questionLanguageLock: QuestionLanguageLock | null = shapePolicy === null || settings.questionLanguage === undefined
       || tierRefusedLater
       ? null
-      : await this.settings.questionLanguage.decide({ ask: requestedAsk, ownerScope: ownerScopeOf(principal),
+      : await settings.questionLanguage.decide({ ask: requestedAsk, ownerScope: ownerScopeOf(principal),
         fastCheckAllowed: principal.kind === "server" })
         .catch((error: unknown) => {
           if (error instanceof TypedDomainError) markAskRefusal(error);
@@ -5226,7 +5351,7 @@ export class PostgresAskApplication implements AskApplication {
     let applied: AskApplied | null = null;
     let substitutedAt: Date | null = null;
     let fundingBasis: FundingBasis | undefined;
-    const billing = this.settings.billing;
+    const billing = settings.billing;
     if (billing !== undefined) {
       if (principal.kind !== "server") {
         markAskRefusal(new TypedDomainError(ASK_SIGN_IN_REQUIRED, "Sign in to ask a question"));
@@ -5243,8 +5368,8 @@ export class PostgresAskApplication implements AskApplication {
       // model scorecard the picker plans inside the person's room (the third argument
       // of `evaluateAskAdmission`), so the interim roster swap — which would also put a
       // paid person under the Free cap — never runs on the picker path.
-      const pickerPlans = this.settings.modelPicker?.scorecard.state === "VALID";
-      if (!pickerPlans && await coarseFitFor(ask, principal.ownerRef, billing, now, this.settings.previewProviderTestConfig, shapePlan) === "FREE_ROSTER") {
+      const pickerPlans = settings.modelPicker?.scorecard.state === "VALID";
+      if (!pickerPlans && await coarseFitFor(ask, principal.ownerRef, billing, now, settings.previewProviderTestConfig, shapePlan, settings.registerVersion) === "FREE_ROSTER") {
         ask = Object.freeze({ ...ask, plan_tier: "free" as const });
         substitutedAt = now;
       }
@@ -5257,19 +5382,19 @@ export class PostgresAskApplication implements AskApplication {
     // room creates the run from `ask` on a START, recording the interim swap
     // inside its decision (`substitutedAt`), and from `plannedAsk` on a WAIT;
     // the reply carries what the server applied (QUEUED or WAITING).
-    if (this.settings.room !== undefined) {
+    if (settings.room !== undefined) {
       const accepted = await this.#submitWithRoom(
-        ask, plannedAsk, session, principal, ownership, this.settings.room, substitutedAt, shapePlan, questionLanguageLock, fundingBasis
+        settings, ask, plannedAsk, session, principal, ownership, settings.room, substitutedAt, shapePlan, questionLanguageLock, fundingBasis
       );
       return Object.freeze({ ...accepted, ...appliedField });
     }
     // Review finding 2 (preview only): one ask at a time is estimated and started. The lock is taken
     // inside admission just before the estimate, and released once this debate's first job is queued
     // (or on any refusal or failure), so the next ask's estimate already holds this debate.
-    const previewAdmissionLock = validatePreviewProviderTestConfig(this.settings.previewProviderTestConfig) === undefined
-      ? undefined : this.settings.previewBudgetGate?.openAdmissionLock?.();
+    const previewAdmissionLock = validatePreviewProviderTestConfig(settings.previewProviderTestConfig) === undefined
+      ? undefined : settings.previewBudgetGate?.openAdmissionLock?.();
     try {
-    const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap, modelAssignment, roleRotation } = await evaluateAskAdmission(this.settings, ask, null, previewAdmissionLock, shapePlan);
+    const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap, modelAssignment, roleRotation } = await evaluateAskAdmission(settings, ask, null, previewAdmissionLock, shapePlan);
     // Ruling L-SHAPED-ONLY (final review I2): the lock is the run's only when admission minted a shape receipt, the
     // receipt the runner locks by. A run with no shape (one maker) stores today's guess and today's ask contract.
     const storedLanguageLock = (envelopeBasis.shape ?? null) === null ? null : questionLanguageLock;
@@ -5301,11 +5426,11 @@ export class PostgresAskApplication implements AskApplication {
           planTier: ask.plan_tier,
           depthParams: ask.depth_params,
           discoveredPanel,
-          strangerSampleRate: this.settings.strangerSampleRate,
+          strangerSampleRate: settings.strangerSampleRate,
           envelopeBasis,
-          registerVersion: this.settings.registerVersion,
-          releaseKey: this.settings.releaseKey,
-          batteryVersion: this.settings.batteryVersion,
+          registerVersion: settings.registerVersion,
+          releaseKey: settings.releaseKey,
+          batteryVersion: settings.batteryVersion,
           askContract: {
             decision_scope: ask.decision_scope,
             steering_presets: ask.steering_presets,
@@ -5313,7 +5438,7 @@ export class PostgresAskApplication implements AskApplication {
             critic_unavailable_cap: criticUnavailableCap,
             ...questionLanguageAskContractMember(storedLanguageLock)
           },
-          batteryRows: createInitialBatteryRows({ settlementWatchHandle: this.settings.settlementWatchHandle })
+          batteryRows: createInitialBatteryRows({ settlementWatchHandle: settings.settlementWatchHandle })
         },lease.client);
         return createdRunId;
       });
@@ -5376,8 +5501,8 @@ export class PostgresAskApplication implements AskApplication {
         callerScope: session.caller_scope,
         askerScope: session.asker_id,
         asOf: ask.as_of,
-        policyVersion: this.settings.registerVersion,
-        ...(this.settings.memoryPullPolicy === undefined ? {} : { pullPolicy: this.settings.memoryPullPolicy })
+        policyVersion: settings.registerVersion,
+        ...(settings.memoryPullPolicy === undefined ? {} : { pullPolicy: settings.memoryPullPolicy })
       }, ownership);
       setupStep = "WORK_QUEUE";
       const workItemId=await this.#work.enqueue({
@@ -5473,6 +5598,8 @@ export class PostgresAskApplication implements AskApplication {
    *     it), so the job commits with what counts it or not at all.
    * The run input is the one `submit` builds, kept apart so today's path stays
    * byte-for-byte what it is for every composition without a room.
+   * Side-by-side spec §13 (S10): `settings` is the ask's own (`submit` read the active version once; this method never
+   * reads it again), so the room's question, both evaluations and the run all come from that one version.
    * B8 (spec 2026-09-29 §2.3.4, §2.6 item 7; A5): `ask` may carry the interim
    * cheaper roster (`substitutedAt` set), and `plannedAsk` is the plan's own
    * ask. Only a START runs on the swapped roster, with its owner record in the
@@ -5493,6 +5620,7 @@ export class PostgresAskApplication implements AskApplication {
    * plan's figure.
    */
   async #submitWithRoom(
+    settings: RunCreationSettings,
     ask: AskRequest,
     plannedAsk: AskRequest,
     session: Session,
@@ -5507,7 +5635,8 @@ export class PostgresAskApplication implements AskApplication {
     if (!Object.hasOwn(PLAN_TIER_ROSTERS, ask.plan_tier as string)) {
       throw new AskRefusal(new TypedDomainError("ASK_PLAN_TIER_INVALID", "The plan tier must be free or premium"));
     }
-    const question = Object.freeze({ access: ownership, settingsClass: runSettingsClassOfAsk(ask,this.settings.previewProviderTestConfig,shapePlan), ...(fundingBasis === undefined ? {} : {fundingBasis}) });
+    // Side-by-side spec §13 (S10): the room estimates the question with its version's estimator (`estimatorFor`).
+    const question = Object.freeze({ access: ownership, registerVersion: settings.registerVersion, settingsClass: runSettingsClassOfAsk(ask,settings.previewProviderTestConfig,shapePlan), ...(fundingBasis === undefined ? {} : {fundingBasis}) });
     const admissionPool = principal.kind === "server"
       ? this.#serverAskAdmissionPool : this.#legacyAskAdmissionPool;
     let createdRunId: string | undefined;
@@ -5535,16 +5664,16 @@ export class PostgresAskApplication implements AskApplication {
         let startAsk = ask;
         let swappedAt = substitutedAt;
         let decisionQuestion = question;
-        let swappedEvaluation = await evaluationOrRefusal(this.settings, ask, personRoomOf(preview), shapePlan);
+        let swappedEvaluation = await evaluationOrRefusal(settings, ask, personRoomOf(preview), shapePlan);
         const plannedEvaluation = substitutedAt === null
           ? swappedEvaluation
-          : await evaluationOrRefusal(this.settings, plannedAsk, null, shapePlan);
+          : await evaluationOrRefusal(settings, plannedAsk, null, shapePlan);
         if (swappedAt !== null && swappedEvaluation instanceof AskRefusal && !(plannedEvaluation instanceof AskRefusal)) {
           // Important 2: the cheaper roster cannot run, the plan's own can. Drop the swap.
           startAsk = plannedAsk;
           swappedAt = null;
           swappedEvaluation = plannedEvaluation;
-          decisionQuestion = Object.freeze({ access: ownership, settingsClass: runSettingsClassOfAsk(plannedAsk,this.settings.previewProviderTestConfig,shapePlan), ...(fundingBasis === undefined ? {} : {fundingBasis}) });
+          decisionQuestion = Object.freeze({ access: ownership, registerVersion: settings.registerVersion, settingsClass: runSettingsClassOfAsk(plannedAsk,settings.previewProviderTestConfig,shapePlan), ...(fundingBasis === undefined ? {} : {fundingBasis}) });
           await room.precheck(decisionQuestion);
         }
         if (swappedEvaluation instanceof AskRefusal) throw swappedEvaluation;
@@ -5584,11 +5713,11 @@ export class PostgresAskApplication implements AskApplication {
             planTier: runAsk.plan_tier,
             depthParams: runAsk.depth_params,
             discoveredPanel: evaluated.discoveredPanel,
-            strangerSampleRate: this.settings.strangerSampleRate,
+            strangerSampleRate: settings.strangerSampleRate,
             envelopeBasis: evaluated.envelopeBasis,
-            registerVersion: this.settings.registerVersion,
-            releaseKey: this.settings.releaseKey,
-            batteryVersion: this.settings.batteryVersion,
+            registerVersion: settings.registerVersion,
+            releaseKey: settings.releaseKey,
+            batteryVersion: settings.batteryVersion,
             askContract: {
               decision_scope: runAsk.decision_scope,
               steering_presets: runAsk.steering_presets,
@@ -5596,7 +5725,7 @@ export class PostgresAskApplication implements AskApplication {
               critic_unavailable_cap: evaluated.criticUnavailableCap,
               ...questionLanguageAskContractMember(storedLanguageLock)
             },
-            batteryRows: createInitialBatteryRows({ settlementWatchHandle: this.settings.settlementWatchHandle })
+            batteryRows: createInitialBatteryRows({ settlementWatchHandle: settings.settlementWatchHandle })
           }, lease.client);
           createdRunId = runId;
           if (swappedAt !== null && admission.kind === "START") {
@@ -5640,8 +5769,8 @@ export class PostgresAskApplication implements AskApplication {
             callerScope: session.caller_scope,
             askerScope: session.asker_id,
             asOf: ask.as_of,
-            policyVersion: this.settings.registerVersion,
-            ...(this.settings.memoryPullPolicy === undefined ? {} : { pullPolicy: this.settings.memoryPullPolicy })
+            policyVersion: settings.registerVersion,
+            ...(settings.memoryPullPolicy === undefined ? {} : { pullPolicy: settings.memoryPullPolicy })
           }, ownership);
           if (admission.kind === "WAIT") {
             setupStep = "WAITING_LINE";
@@ -5899,9 +6028,14 @@ export class PostgresAskApplication implements AskApplication {
     const stored = await this.#runs.readStoredAsk(run.runId);
     if (stored === null) return null;
     const personRoom = first.preview === undefined ? null : personRoomOf(first.preview);
+    // Side-by-side spec §13 (S10/S13 boundary): a re-admission is planned, and its new run stamped, on the settings of
+    // ONE version read through the ask's own per-version path (`askSettingsOf`), the version `#readmit` stamps. While the
+    // pointer is empty that is this release's site version: today's re-admission, byte for byte. S13 owns re-admitting a
+    // run onto the active version (the pointer read on the START transaction, and the room's estimate at that version).
+    const settings = await askSettingsOf(this.settings);
     const plan = await planReadmission({
-      stored, planId: first.planId, settings: this.settings,
-      evaluate: (ask, shapePlan) => evaluationOrRefusal(this.settings, ask, personRoom, shapePlan)
+      stored, planId: first.planId, settings,
+      evaluate: (ask, shapePlan) => evaluationOrRefusal(settings, ask, personRoom, shapePlan)
     });
     if (plan.kind === "NOT_NOW") {
       console.info(JSON.stringify(Object.freeze({ event: "api.wait.readmission_not_now", runId: run.runId, code: plan.code })));
@@ -5916,7 +6050,7 @@ export class PostgresAskApplication implements AskApplication {
           plan,
           // The room never asks an ASK_AGAIN plan for a run.
           createRun: plan.kind === "READMIT"
-            ? () => this.#readmit(run, plan, principal, lease, readmitted)
+            ? () => this.#readmit(settings, run, plan, principal, lease, readmitted)
             : () => Promise.reject(new TypeError("ASK_ROOM_READMISSION_WITHOUT_PLAN"))
         });
         // The START committed (edge, hold, first job): from here only the lease's release can throw.
@@ -5964,8 +6098,11 @@ export class PostgresAskApplication implements AskApplication {
    * memory question under the old run's asker and caller scope. No liveness query is recorded: this is not a new ask.
    * `readmitted.runId` is set the moment the row commits, so a failure after it — a failed pin included — records the
    * new run FAILED (RUN_SETUP_FAILED:READMISSION) in the waker's catch, and the error is rethrown.
+   * Side-by-side spec §13 (S10): `settings` is the one version `#startReadmitted` planned on; the row's register version
+   * and the memory question's policy version are that version's.
    */
   async #readmit(
+    settings: RunCreationSettings,
     run: WaitingRun,
     plan: Extract<ReadmissionPlan, { kind: "READMIT" }>,
     principal: ReadmissionPrincipal,
@@ -5989,13 +6126,13 @@ export class PostgresAskApplication implements AskApplication {
       planTier: plan.ask.plan_tier,
       depthParams: plan.ask.depth_params,
       discoveredPanel: evaluation.discoveredPanel,
-      strangerSampleRate: this.settings.strangerSampleRate,
+      strangerSampleRate: settings.strangerSampleRate,
       envelopeBasis: evaluation.envelopeBasis,
-      registerVersion: this.settings.registerVersion,
-      releaseKey: this.settings.releaseKey,
-      batteryVersion: this.settings.batteryVersion,
+      registerVersion: settings.registerVersion,
+      releaseKey: settings.releaseKey,
+      batteryVersion: settings.batteryVersion,
       askContract: readmittedAskContract(plan),
-      batteryRows: createInitialBatteryRows({ settlementWatchHandle: this.settings.settlementWatchHandle })
+      batteryRows: createInitialBatteryRows({ settlementWatchHandle: settings.settlementWatchHandle })
     }, lease.client);
     readmitted.runId = runId;
     if (evaluation.modelAssignment !== undefined) {
@@ -6015,8 +6152,8 @@ export class PostgresAskApplication implements AskApplication {
       callerScope: plan.stored.callerScope,
       askerScope: plan.stored.askerId,
       asOf: plan.ask.as_of,
-      policyVersion: this.settings.registerVersion,
-      ...(this.settings.memoryPullPolicy === undefined ? {} : { pullPolicy: this.settings.memoryPullPolicy })
+      policyVersion: settings.registerVersion,
+      ...(settings.memoryPullPolicy === undefined ? {} : { pullPolicy: settings.memoryPullPolicy })
     }, accessOfWaitingRun(run));
     return runId;
   }

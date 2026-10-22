@@ -257,8 +257,10 @@ describe("B3 the waiting line (budget spec §2.7)", () => {
       { runId: first, waitingSince: since },
       { runId: second, waitingSince: new Date(since.getTime() + 1_000) }
     ]);
+    // Side-by-side spec §1 (C10) and §13 (S10): the run's release (no key at start: `legacy`) and the settings version it
+    // was admitted on (its register version) come with it.
     expect(await waits.readWaiting(first)).toEqual({
-      runId: first, waitingSince: since, ownerRef: null, legacyAskerId: askerId,
+      runId: first, waitingSince: since, releaseKey: "legacy", registerVersion: 1, ownerRef: null, legacyAskerId: askerId,
       planTier: "free", compositionBudgetTier: "low", depth: 1, makerCount: 2,
       waitsFor: null, personRecheckAt: null, reasonAt: null
     });

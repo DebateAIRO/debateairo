@@ -42,6 +42,12 @@ export type WaitingRun = Readonly<{
    * before 0123). A waker of another release re-admits it under its own release instead of starting it (C11, O3).
    */
   releaseKey: string;
+  /**
+   * Side-by-side spec §13 (S10): the settings version the run was admitted on (`core.run.register_version`). The room
+   * estimates it, and holds it when it starts, with that version's estimator. Always read by this repository; optional
+   * in the type only so a hand-built run (tests) keeps the room's own estimator.
+   */
+  registerVersion?: number;
   /** Exactly one of these is non-null: the owner for an account's run, the legacy asker id otherwise. */
   ownerRef: string | null;
   legacyAskerId: string | null;
@@ -66,6 +72,7 @@ type WaitingRow = {
   run_id: string;
   waiting_since: Date;
   release_key: string;
+  register_version: number;
   owner_ref: string | null;
   legacy_asker_id: string | null;
   plan_tier: "free" | "premium" | null;
@@ -84,13 +91,16 @@ const WAITING_COLUMNS = `run_id, waiting_since, owner_ref::text AS owner_ref, le
       'depthMode', shape_run.depth_params->'depthMode', 'scrutiny', shape_run.depth_params->'scrutiny',
       'answerLength', shape_run.depth_params->'answerLength', 'plan', shape_run.envelope_basis->'shape'->'plan') END
    FROM core.run AS shape_run WHERE shape_run.run_id = line.run_id) AS shape_settings,
-  (SELECT key_run.release_key FROM core.run AS key_run WHERE key_run.run_id = line.run_id) AS release_key`;
+  (SELECT key_run.release_key FROM core.run AS key_run WHERE key_run.run_id = line.run_id) AS release_key,
+  (SELECT settings_run.register_version FROM core.run AS settings_run WHERE settings_run.run_id = line.run_id)::integer
+    AS register_version`;
 
 function waitingRun(row: WaitingRow): WaitingRun {
   return Object.freeze({
     runId: row.run_id,
     waitingSince: row.waiting_since,
     releaseKey: row.release_key,
+    registerVersion: row.register_version,
     ownerRef: row.owner_ref,
     legacyAskerId: row.legacy_asker_id,
     planTier: row.plan_tier,

@@ -3,7 +3,9 @@ import { questionLanguagePolicyStartValues, type QuestionLanguagePolicy } from "
 import { hostedQuestionLanguageRoute, questionLanguageRouteFor } from "./question-language/boot.js";
 import { questionLanguageReferenceKeyFrom } from "./question-language/reference.js";
 // Side-by-side spec §13: the per-version admission settings (loader and cache) and the activation pointer's one reader.
-import { admissionSettingsOfVersion, createAdmissionSettingsCache, loadAdmissionSettings, type AdmissionSiteContext } from "./admission-settings.js";
+import {
+  admissionSettingsOfVersion, createAdmissionSettingsCache, createAdmissionView, loadAdmissionSettings, type AdmissionSiteContext
+} from "./admission-settings.js";
 import { createActiveSettingsVersionReader } from "./active-settings-version.js";
 import { PasswordResetService } from "./password-reset.js";
 import { PasswordResetNotificationWorker, SendmailPasswordResetSender } from "./password-reset-mail.js";
@@ -1522,7 +1524,7 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
 }
 const api = buildApi({
   // Addition D16 / ruling R25: keyed on the env's gate part; the configuration is the site version's composed one (its
-  // line-up over the gate part) until S10's admissionView hands the room read the active version's.
+  // line-up over the gate part). `admissionView` below also carries the active version's; SA6 hands it to the room read.
   ...(previewGate === undefined ? {} : { previewProviderTestConfig: siteAdmission.previewConfig!, previewTeamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [] }),
   application,
   stories: ownerStories,
@@ -1531,9 +1533,18 @@ const api = buildApi({
   disclosures: ownerDisclosures,
   mapViews,
   ...(dataExport === undefined ? {} : { dataExport }),
-  // A21 (owner decision O4): /new's yes/no, from the very picker admission asks — the
-  // same test `evaluateAskAdmission` makes before it lets the scorecard choose.
-  modelScorecardInForce: siteAdmission.modelPicker.scorecard.state === "VALID",
+  /**
+   * Side-by-side spec §13 (S10): what the ACTIVE settings version says to the pages, per request — the room read's shape
+   * and length rows and the version it estimates with, and A21's yes/no on GET /v1/session (owner decision O4: from the
+   * very picker admission asks, the same test `evaluateAskAdmission` makes before it lets the scorecard choose). It
+   * replaces the static shape, length and scorecard members, so /new advises on the version the next ask is admitted on.
+   */
+  admissionView: createAdmissionView({
+    activeSettingsVersion: () => activeSettings.current(),
+    admissionSettingsFor: (version) => admissionCache.admissionSettingsFor(version),
+    fallback: siteAdmission,
+    log: (line) => { console.error(line); }
+  }),
   aiProviderCompanies,
   accountErasure:erasureApplication,
   registration,
@@ -1570,10 +1581,6 @@ const api = buildApi({
   // room answers FITS and the usage route 404.
   ...(askRoom === undefined ? {} : { askRoom }),
   ...(askBilling === undefined ? {} : { askBilling }),
-  // Debate shape: the room read normalises its query under the same row as submit.
-  ...(siteAdmission.debateShapePolicy === null ? {} : { debateShapePolicy: siteAdmission.debateShapePolicy }),
-  // Length guidance: the room read normalises under the same row as submit and names the plan's answer words.
-  ...(siteAdmission.lengthGuidancePolicy === null ? {} : { lengthGuidancePolicy: siteAdmission.lengthGuidancePolicy }),
   ...(billingRouteOptions === undefined ? {} : { billing: billingRouteOptions }),
   // P15, W7: scheduling an account erasure stops the owner's renewal at once (the reconciler's sweep repeats it, and
   // ends the plan once the erasure commits).

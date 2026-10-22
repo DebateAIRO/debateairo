@@ -440,6 +440,32 @@ describe("side-by-side C11: the waker re-admits a run another release admitted",
     expect(lines()).toContainEqual({ event: "api.wait.readmission_orphan", runId: a.runId, newRunId: "orphan-1" });
   });
 
+  it("side-by-side §13 (S10): a re-admission is planned and stamped on one version read through the per-version path", async () => {
+    // S10/S13 boundary: the plan's evaluation, the new row's register version and its memory question's policy version all
+    // come from the settings `askSettingsOf` hands it (here the pointer names 2 over the site version 1); S13 owns the
+    // re-admission condition and the pointer read on the START transaction.
+    const a = waitingRun({ legacyAskerId: "legacy:a" }, { releaseKey: OLD_RELEASE });
+    const pointer = vi.fn(async () => 2);
+    const versionTwo: Pick<RunCreationSettings, "registerVersion" | "resolveEnvelopeBasis" | "resolveRisk"> = {
+      registerVersion: 2,
+      resolveEnvelopeBasis: async ({ panelSize }) => ({ ...fixtureStructuralCeiling(12, panelSize, 1), version_mark: 2 }),
+      resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) =>
+        ({ effectiveRiskTier, tierSource: tierSource as never, tierProvenanceRef: `${tierProvenanceRef}:v2` })
+    };
+    const { application, dispatched } = arrange({
+      pages: [[a]], steps: { [a.runId]: ["NEEDS_READMISSION", { startAs: "unused" }] },
+      extra: { ...readmittable(), admissionSettings: { activeSettingsVersion: pointer, admissionSettingsFor: async () => versionTwo } },
+      stored: (runId) => storedAsk(runId)
+    });
+    await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ started: 1, failed: 0 });
+    expect(dispatched).toEqual([`new:${a.runId}`]);
+    const row = vi.mocked(RunRepository.prototype.startReadmittedRun).mock.calls[0]![0];
+    expect(row).toMatchObject({ fromRunId: a.runId, registerVersion: 2, tierProvenanceRef: "asker:b7b:v2", releaseKey: TEST_RELEASE_KEY });
+    expect(row.envelopeBasis).toMatchObject({ version_mark: 2 });
+    expect(vi.mocked(ServeRepository.prototype.recordMemoryQuestion).mock.calls[0]![0]).toMatchObject({ policyVersion: 2 });
+    expect(pointer).toHaveBeenCalledTimes(1);
+  });
+
   it("a START that committed is never recorded FAILED when the lease's release then fails: its job is handed over later", async () => {
     // C11 review, Minor 3: the new run supersedes the old one (edge, hold and READY job committed); FAILED would end the
     // debate. #redispatchStalledStarts hands its READY job over once it has stalled.
