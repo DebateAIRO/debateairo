@@ -3949,8 +3949,8 @@ PR: it checks `REV`'s suites against dev's schema).
 
 ### SB14. Later: the old release retired, and its receipt
 
-The old runner retires by itself once its pair is stopped, none of its work is READY or CLAIMED and no debate task runs
-(exit 0, no email). At the latest, 7.5 hours after the switch the backstop asks it to retire, and 25 minutes after that
+The old runner retires by itself once its pair is stopped, none of its work is READY or CLAIMED and no debate task or
+model call runs (exit 0, no email). At the latest, 7.5 hours after the switch the backstop asks it to retire, and 25 minutes after that
 root stops it and emails the owner. Run SB14 now and then; it writes the receipt once the release is RETIRED.
 
 The backstop never cuts a model call. It stops new claims and calls, waits up to 20 minutes for the calls in flight, and

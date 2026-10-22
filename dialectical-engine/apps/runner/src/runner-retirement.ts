@@ -132,10 +132,11 @@ export function createRunnerRetirementSignal(): RunnerRetirementSignal {
 /**
  * Part 2, spec §4 "Retirement (drained)": a release retires when, "in one database transaction", its state is
  * DRAINING, its front pair has stopped and no READY or CLAIMED work item of its runs is left, and, "in the process: no
- * debate task is still executing" (the task counter above, the verdict story included). Then the runner stops
- * claiming, says so on stdout (`DEBATEAI_RUNNER_RETIRED {"releaseKey":…}`) and as the in-process event the preview
- * launcher listens for, and only THEN stops its worker: the launcher must know before main returns, or it would read
- * the end as a failure and email the owner.
+ * debate task is still executing" (the task counter above, the verdict story included) and no model call of this
+ * process is in flight (R1's call counter: integration M6, a keep-alive stop can end a task under its call). Then the
+ * runner stops claiming, says so on stdout (`DEBATEAI_RUNNER_RETIRED {"releaseKey":…}`) and as the in-process event
+ * the preview launcher listens for, and only THEN stops its worker: the launcher must know before main returns, or it
+ * would read the end as a failure and email the owner.
  *
  *  · one read every `pollMs` (INTERFACE: 60 s), a `setTimeout` chain re-armed only after the read finished (never
  *    `setInterval`), so two reads never overlap however slow the database is; the timer never keeps the process alive;
@@ -440,7 +441,10 @@ export function startRunnerRetirement(input: Readonly<{
       return;
     }
     const drained = facts.state === "DRAINING" && facts.frontPairStopped && facts.openWork === 0;
-    if (drained && input.executions.count() === 0) {
+    // Integration M6: no model call in flight either (R1's counter). A keep-alive stop can end a task while its call
+    // (a preview call takes up to 1,260 s) is still open; retiring under it would let the launcher's 30 s bound cut the
+    // call and halt the gate both releases share. The next read retires once it settled.
+    if (drained && input.executions.count() === 0 && input.calls.count() === 0) {
       await retire("DRAINED");
     }
   };

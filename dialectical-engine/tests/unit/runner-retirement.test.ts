@@ -231,6 +231,23 @@ describe("a draining release's runner retires by itself (side-by-side §4)", () 
     expect(run.outcome()).toBe("DRAINED");
   });
 
+  // Integration M6 (app-code re-review): a keep-alive stop can end the task while its preview call (up to 1,260 s) is
+  // still open; retiring then would let the launcher's 30 s bound cut that call and halt the gate both releases share.
+  it("waits for a model call still in flight with no task left: calls 1, then 0 at the next tick", async () => {
+    let inFlight = 1;
+    const run = monitor({ facts: async () => drained(), calls: { count: () => inFlight } });
+    await run.time.advance(60_000);
+    expect(run.order).toEqual([]);
+    expect(run.signal.claimsStopped()).toBe(false);
+    expect(run.outcome()).toBeUndefined();
+    await run.time.advance(60_000);
+    expect(run.order).toEqual([]);
+    inFlight = 0;
+    await run.time.advance(60_000);
+    expect(run.order).toEqual(["announce", "emit", "stopWorker"]);
+    expect(run.outcome()).toBe("DRAINED");
+  });
+
   it("on retiring: stops claims, prints the line, emits the event, and only then stops the worker; no tick after", async () => {
     const run = monitor({ facts: async () => drained() });
     await run.time.advance(60_000);
