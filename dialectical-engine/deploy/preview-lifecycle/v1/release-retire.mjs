@@ -21,14 +21,12 @@
 import { dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { LAYOUT, RELEASE_LABEL, atomicWrite, ensureDirectory, logLine, runBounded, unitNameFor } from './common.mjs';
-import { STARTABLE, readLock, unitIsActive as prestartUnitIsActive } from './prestart.mjs';
+import { STARTABLE, unitIsActive as prestartUnitIsActive } from './prestart.mjs';
+import { releaseInfo } from './release-info.mjs';
 import { countOpenWork, readReleaseEvents, readReleaseState, recordReleaseEvent } from './release-table.mjs';
 
-/** The two spending gates (deploy/preview-gate/v3), named and placed exactly as alert.mjs's re-open commands. */
-export const GATES = Object.freeze([
-  Object.freeze({ name: 'deepinfra', folder: '/opt/debateai-v3-preview/operator/deepinfra-budget-v3', privateDir: '/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3', go: '/etc/debateai-v3-preview/provider-deepinfra-go-v3.json' }),
-  Object.freeze({ name: 'anthropic', folder: '/opt/debateai-v3-preview/operator/anthropic-budget-v1', privateDir: '/var/lib/debateai-v3-preview/provider-anthropic-authority-v1', go: '/etc/debateai-v3-preview/provider-anthropic-go-v1.json' })
-]);
+/** The preview's two spending gates (common.mjs LAYOUT.gates); every tool reads the gates of its own layout (`layout.gates`). */
+export const GATES = LAYOUT.gates;
 const PYTHON = '/usr/bin/python3';
 const RECORDED_BY = 'root:release-retire';
 /** Side-by-side plan D: the check runs 25 minutes (1,500 s) after the request; the stopped runner's last calls settle in 5 s. */
@@ -62,13 +60,14 @@ const checkTimerOf = (layout, label) => `${layout.unitPrefix}runner-retire-check
 const utcCalendar = ms => new Date(Math.ceil(ms / 1000) * 1000).toISOString().replace('T', ' ').replace(/\.000Z$/, ' UTC');
 
 /**
- * Both retirement lines, each a whole line of the journal text: the runner's own
- * `DEBATEAI_RUNNER_RETIRED {"releaseKey":"<key>"}` for THIS release, and the launcher's `PREVIEW_RUNNER_RETIRED`.
+ * Every retirement line of the layout (`kinds`, layout.retiredLines), each a whole line of the journal text: the
+ * runner's own `DEBATEAI_RUNNER_RETIRED {"releaseKey":"<key>"}` for THIS release, always, and on the preview the
+ * launcher's `PREVIEW_RUNNER_RETIRED` too. The public server runs the runner without a launcher: its own line alone.
  */
-export function retiredLinesFound(journalText, releaseKey) {
-  if (typeof journalText !== 'string' || typeof releaseKey !== 'string') return false;
+export function retiredLinesFound(journalText, releaseKey, kinds = LAYOUT.retiredLines) {
+  if (typeof journalText !== 'string' || typeof releaseKey !== 'string' || !Array.isArray(kinds) || !kinds.includes('DEBATEAI_RUNNER_RETIRED')) return false;
   const lines = journalText.split('\n');
-  return lines.includes(`DEBATEAI_RUNNER_RETIRED ${JSON.stringify({ releaseKey })}`) && lines.includes('PREVIEW_RUNNER_RETIRED');
+  return kinds.every(kind => lines.includes(kind === 'DEBATEAI_RUNNER_RETIRED' ? `${kind} ${JSON.stringify({ releaseKey })}` : kind));
 }
 
 /** `<code>` of a release notice: the label with `-` as `_`, which alert.mjs accepts only up to 64 characters. */
@@ -97,7 +96,7 @@ function withDefaults(layout, deps, deadline = null) {
       await ensureDirectory(dirname(path), { mode: 0o755, uid });
       await atomicWrite(path, Buffer.from(text, 'utf8'), { mode: 0o644, uid, gid });
     }),
-    readLock: deps.readLock ?? readLock,
+    releaseInfo: guarded(input => releaseInfo({ ...input, layout, deps })),
     readReleaseState: guarded(deps.readReleaseState ?? (input => readReleaseState({ ...input, layout, run }))),
     recordReleaseEvent: guarded(deps.recordReleaseEvent ?? (input => recordReleaseEvent({ ...input, layout, run }))),
     readReleaseEvents: deps.readReleaseEvents ?? (input => readReleaseEvents({ ...input, layout, run })),
@@ -105,12 +104,10 @@ function withDefaults(layout, deps, deadline = null) {
   };
 }
 
-/** The pinned release key of a label (the lock is root's record of what each label runs). */
+/** The release key of a label (release-info.mjs: root's lock on the preview, the release's overlay on the public server). */
 async function releaseKeyOf(label, layout, io) {
   if (!isLabel(label)) refuse('ARGUMENTS_REFUSED');
-  const { lock } = await io.readLock(layout);
-  const release = Object.hasOwn(lock.releases, label) ? lock.releases[label] : refuse('RELEASE_LOCK_RELEASE_MISSING');
-  return release.releaseKey;
+  return (await io.releaseInfo({ label })).releaseKey;
 }
 
 /**
@@ -162,7 +159,16 @@ async function systemctl(args, layout, io) {
   return Boolean(result) && !result.timedOut && !result.overflow && !result.error && result.code === 0;
 }
 
-const noticeUnit = (layout, kind, code) => `${layout.unitPrefix}notice@${kind}-${code}.service`;
+/**
+ * Email the owner a release notice: start the layout's notice unit (`<noticeTemplate><kind>-<code>.service`). True when
+ * systemd accepted it; null when the layout has no notice unit (the public server: no failure mail, README §9), which
+ * the result says in its content-free `notice` field.
+ */
+async function startNotice(kind, code, layout, io) {
+  if (typeof layout.noticeTemplate !== 'string') return null;
+  return systemctl(['start', '--no-block', `${layout.noticeTemplate}${kind}-${code}.service`], layout, io);
+}
+const NOTICE_SKIPPED = Object.freeze({ notice: 'NO_NOTICE_UNIT' });
 
 /** The time of the latest RETIRE_REQUESTED row (ms since the epoch); none is a state this tool refuses. */
 async function latestRequestAt(releaseKey, io) {
@@ -217,7 +223,7 @@ async function runnerRetiredCleanly(unit, releaseKey, layout, io) {
     const result = await io.run([layout.journalctl, '-u', unit, `_SYSTEMD_INVOCATION_ID=${shown.InvocationID}`, '-n', JOURNAL_LINES, '-o', 'cat', '--no-pager'],
       { env: {}, timeoutMs: 10_000, maxOutputBytes: 1024 * 1024 });
     readable = Boolean(result) && !result.timedOut && !result.overflow && !result.error && result.code === 0;
-    if (readable && retiredLinesFound(String(result.stdout), releaseKey)) return true;
+    if (readable && retiredLinesFound(String(result.stdout), releaseKey, layout.retiredLines)) return true;
     // Past the deadline the next read refuses STOP_RECORD_DEADLINE (loud), never a silent "not retired".
     if (attempt < JOURNAL_TRIES) await io.sleep(JOURNAL_PAUSE_MS);
   }
@@ -230,7 +236,9 @@ async function runnerRetiredCleanly(unit, releaseKey, layout, io) {
  * ExecStopPost of api@<label> and runner@<label>.
  * - api: FRONT_PAIR_STOPPED only for a DRAINING release whose API process is gone and not yet recorded; a CURRENT
  *   release (crash restart) and a STAGED one (stopped before the switch) are ignored.
- * - runner: RETIRED only for a DRAINING release whose invocation exited 0 and printed both retirement lines.
+ * - runner: RETIRED only for a DRAINING release whose invocation exited 0 and printed its retirement lines. Where the
+ *   layout starts the current release by enabled instances (bootMode 'enable', the public server), its runner instance
+ *   is then disabled, so a retired runner never starts at boot again (its may-start would refuse it).
  * A failed read or write rejects: the CLI exits 1 (PREVIEW_RELEASE_STOP_RECORD_FAILED) and OnFailure emails.
  */
 export async function recordStop({ service, label, layout = LAYOUT, deps = {} }) {
@@ -247,6 +255,7 @@ export async function recordStop({ service, label, layout = LAYOUT, deps = {} })
     } else if (service === 'runner' && await runnerRetiredCleanly(unit, releaseKey, layout, io)) {
       await recordEvent({ releaseKey, kind: 'RETIRED', reason: 'RUNNER_RETIRED', written: after => after.state === 'RETIRED', io });
       recorded = 'RETIRED';
+      if (layout.bootMode === 'enable' && !await systemctl(['disable', unit], layout, io)) refuse('RUNNER_DISABLE_FAILED');
     }
   }
   return Object.freeze({ event: recorded ? 'PREVIEW_RELEASE_STOP_RECORDED' : 'PREVIEW_RELEASE_STOP_IGNORED', service, label, releaseKey, recorded, state });
@@ -279,10 +288,10 @@ export async function requestRetire({ label, layout = LAYOUT, deps = {} }) {
   if (!retireRequested) await recordEvent({ releaseKey, kind: 'RETIRE_REQUESTED', reason: 'BACKSTOP', written: after => after.retireRequested, io });
   // The check is timed from the row itself (a re-run arms the same time), so it is never earlier than the check allows.
   const requestedAt = await latestRequestAt(releaseKey, io);
-  const noticed = await systemctl(['start', '--no-block', noticeUnit(layout, 'release-retire', code)], layout, io);
+  const noticed = await startNotice('release-retire', code, layout, io);
   await armCheck(label, requestedAt, layout, io);
-  if (!noticed) refuse('NOTICE_START_FAILED');
-  return Object.freeze({ event: 'PREVIEW_RELEASE_RETIRE_REQUESTED', label, releaseKey });
+  if (noticed === false) refuse('NOTICE_START_FAILED');
+  return Object.freeze({ event: 'PREVIEW_RELEASE_RETIRE_REQUESTED', label, releaseKey, ...(noticed === null ? NOTICE_SKIPPED : {}) });
 }
 
 /** Disable and stop both retirement timers of one release label (the rollback's call, D10); typed refusals as above. */
@@ -327,12 +336,13 @@ export async function checkRetire({ label, layout = LAYOUT, deps = {} }) {
   const { state, retireRequested } = await io.readReleaseState({ releaseKey });
   const unit = unitNameFor(layout, 'runner', label);
   const finish = async (event, kind, gates = null) => {
-    const noticed = kind === null || await systemctl(['start', '--no-block', noticeUnit(layout, kind, code)], layout, io);
+    const noticed = kind === null || await startNotice(kind, code, layout, io);
     const openWork = await io.countOpenWork({ releaseKey });
-    if (!noticed) refuse('NOTICE_START_FAILED', { event, openWork });
+    if (noticed === false) refuse('NOTICE_START_FAILED', { event, openWork });
     return Object.freeze({
       event, label, releaseKey, openWork, gatesReactivated: Object.freeze(gates?.reactivated ?? []),
-      ...(gates ? { gatesReactivationFailed: Object.freeze(gates.failed), gatesUnknown: Object.freeze(gates.unknown) } : {})
+      ...(gates ? { gatesReactivationFailed: Object.freeze(gates.failed), gatesUnknown: Object.freeze(gates.unknown) } : {}),
+      ...(noticed === null ? NOTICE_SKIPPED : {})
     });
   };
   if (state === 'RETIRED') {
@@ -343,14 +353,16 @@ export async function checkRetire({ label, layout = LAYOUT, deps = {} }) {
   if (!await unitIsActive(unit, layout, io)) return finish('PREVIEW_RELEASE_STRANDED', 'release-stranded');
   const requestedAt = await latestRequestAt(releaseKey, io);
   if (io.now() - requestedAt < RETIRE_CHECK_AFTER_MS) refuse('RETIRE_CHECK_TOO_EARLY');
+  // The layout's own gates (none on the public server): only those can have been halted by the stop.
+  const gates = layout.gates;
   const before = [];
-  for (const gate of GATES) before.push(await gateState(gate, io));
+  for (const gate of gates) before.push(await gateState(gate, io));
   if (!await systemctl(['stop', unit], layout, io)) refuse('RUNNER_STOP_FAILED');
   await io.sleep(GATE_SETTLE_MS);
   const after = [];
-  for (const gate of GATES) after.push(await gateState(gate, io));
+  for (const gate of gates) after.push(await gateState(gate, io));
   const reactivated = [], failed = [], unknown = [];
-  for (const [index, gate] of GATES.entries()) {
+  for (const [index, gate] of gates.entries()) {
     if (before[index] === 'active' && after[index] === 'halted') (await activateGate(gate, io) ? reactivated : failed).push(gate.name);
     // Active before and unreadable after, or unreadable before and halted after: the stop may have halted it.
     else if ((before[index] === 'active' && after[index] === 'unknown') || (before[index] === 'unknown' && after[index] === 'halted')) unknown.push(gate.name);
