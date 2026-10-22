@@ -5382,8 +5382,6 @@ export class WalkingSkeletonRunner {
       // Side-by-side spec §4: once this release retires, the debate's next model call is refused (RUNNER_RETIRING).
       stopCalls: () => this.settings.retirement?.callsStopped() === true
     });
-    // R7 (final review): from here on this copy holds the claim; a failure the task records is fenced on its deadline.
-    task?.claimed?.(() => keepAlive.heldUntil());
     /**
      * Parallel AI calls (spec 2026-10-12 §3.2): this debate's lane of the runner's call scheduler, opened once the
      * debate is claimed and closed in the `finally` below, after the story: a call still waiting then is refused
@@ -11546,11 +11544,6 @@ export interface RunnerFailureRecorder {
     readonly runId: string;
     readonly workItemId: string;
     readonly reason: string;
-    /**
-     * R7 (final review): the failing copy's claim — null when it never claimed the item, else the deadline it last set
-     * (`RunnerTaskControl.claimed`), so a duplicate copy under the same worker id never fails its sibling's live claim.
-     */
-    readonly heldUntil?: Date | null;
   }): Promise<boolean>;
 }
 
@@ -12702,8 +12695,6 @@ export function declareHatchetWalkingSkeletonTask(input: {
       const leave = input.executions?.enter();
       // R2 (final review): and, once its dispatch is valid, it names its work item, so the lapsed re-send skips it.
       let forget: (() => void) | undefined;
-      // R7 (final review): the claim this copy holds, once the debate says so; null until then (never claimed).
-      const claim: { heldUntil: (() => Date) | null } = { heldUntil: null };
       try {
         // L4-F6: BEFORE the runner, before the repository, before anything reads
         // a field — and, at INT2 (SYNC2 into integration), before the S06 capture
@@ -12747,7 +12738,6 @@ export function declareHatchetWalkingSkeletonTask(input: {
           : undefined;
         const task: RunnerTaskControl = Object.freeze({
           executionLimitMs,
-          claimed: (heldUntil: () => Date) => { claim.heldUntil = heldUntil; },
           ...(signal === undefined ? {} : { signal }),
           ...(refreshTimeout === undefined ? {} : { refreshTimeout })
         });
@@ -12780,9 +12770,7 @@ export function declareHatchetWalkingSkeletonTask(input: {
             const recorded = await input.failures.recordTerminalFailure({
               runId: dispatch.runId,
               workItemId: dispatch.workItemId,
-              reason: runnerTerminalFailureReason(error),
-              // R7: a copy that threw before its own claim fails no live claim; one that claimed, only its own.
-              heldUntil: claim.heldUntil === null ? null : claim.heldUntil()
+              reason: runnerTerminalFailureReason(error)
             });
             if (!recorded) {
               // OBS-R064: a handler that cannot record the failure must still

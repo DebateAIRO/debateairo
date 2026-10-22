@@ -42,11 +42,6 @@ export type RunnerTaskControl = Readonly<{
   signal?: AbortSignal;
   /** Hatchet's own timeout extension: ADDS the increment to the task's deadline. */
   refreshTimeout?(incrementBy: `${number}s`): Promise<void>;
-  /**
-   * R7 (final review): told once the debate holds the work item's claim, with a reader of the deadline it last set (the
-   * keep-alive's `heldUntil`), so the task's failure write is fenced on this copy's own claim.
-   */
-  claimed?(heldUntil: () => Date): void;
 }>;
 
 export interface RunKeepAlive {
