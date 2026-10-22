@@ -287,6 +287,14 @@ export function isAskSettingsChanged(error: unknown): boolean {
     && error.serverCode === SETTINGS_CHANGED_SERVER_CODE;
 }
 
+/**
+ * The same sentence when /new sees the switch itself (ruling R51): a room read names a settings version other than the
+ * one the page's choices were offered under, before any ask was refused.
+ */
+export function settingsChangedMessage(catalog?: MessageCatalog): string {
+  return catalog === undefined ? SETTINGS_CHANGED_ENGLISH : t(catalog, SETTINGS_CHANGED_KEY);
+}
+
 /** The user-facing line for a banner. Never a sentence a server wrote. */
 export function requestFailureMessage(
   subject: RequestFailureSubject,
@@ -302,9 +310,7 @@ export function requestFailureMessage(
   if (subject === "DEBATE_CREATE" && isAccountPhoneRequired(error)) {
     return catalog === undefined ? PHONE_REQUIRED_ENGLISH : t(catalog, PHONE_REQUIRED_KEY);
   }
-  if (subject === "DEBATE_CREATE" && isAskSettingsChanged(error)) {
-    return catalog === undefined ? SETTINGS_CHANGED_ENGLISH : t(catalog, SETTINGS_CHANGED_KEY);
-  }
+  if (subject === "DEBATE_CREATE" && isAskSettingsChanged(error)) return settingsChangedMessage(catalog);
   const classified = classifyRequestFailure(subject,error);
   if (catalog === undefined) return classified.message;
   return `${t(catalog,`requestFailure.subject.${classified.subject}`)} ${

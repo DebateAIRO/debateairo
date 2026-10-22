@@ -1178,6 +1178,15 @@ describe("(S12) an ask whose choices the active version no longer offers is aske
     refusedUntouched(arranged);
   });
 
+  it("the common case: 17 and 18 share their shape and length rows (18 changed something else): all four choices admitted", async () => {
+    const rows = () => ({ debateShapePolicy: debateShapePolicyStartValues(), lengthGuidancePolicy: lengthGuidancePolicyStartValues() });
+    const { application, started } = arrange({ site: rows, members: (version, into) => versionMembers(version, into, rows()) });
+    await expect(application.submit(ask({ depth_params: SHAPED, settings_version: SITE }), session, principal))
+      .resolves.toMatchObject({ run_ref: RUN_ID, status: "QUEUED" });
+    expect(started[0]!.registerVersion).toBe(ACTIVE);
+    expect(started[0]!.depthParams).toEqual(SHAPED);
+  });
+
   it("the same version's choices all still offered under 18: admitted on 18 as usual (a new default is kept)", async () => {
     // 17 had no rows; 18 has the shape row, which adds its defaults to the person's `{ depth }`.
     const { application, started } = arrange({ members: (version, into) => versionMembers(version, into,

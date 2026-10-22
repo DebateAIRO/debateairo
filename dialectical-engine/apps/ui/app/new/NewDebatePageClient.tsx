@@ -13,7 +13,8 @@ import {
   isAskSettingsChanged,
   isQuestionLanguageCheckStale,
   QuestionLanguageChoiceNeededError,
-  requestFailureMessage
+  requestFailureMessage,
+  settingsChangedMessage
 } from "@/lib/v3/requestFailure";
 import { AuthGate } from "@/components/AuthGate";
 import { RoomNotice } from "@/components/billing/RoomNotice";
@@ -238,16 +239,45 @@ function NewDebateForm({
       : lengthSettings ? { answer_length: answerLength } : {})
   };
   const [room, setRoom] = useAskRoom(contractClient, roomQuery);
-  // Side-by-side spec §13 (Task S12): the settings version the last room read that named one was read from; the ask
-  // sends it back, so a version switched under the page asks the person to choose again instead of silently changing
-  // their choices. Kept across a later failed read, like the flags above (the choices on screen are still that version's).
-  const [settingsVersion, setSettingsVersion] = useState<number | undefined>(undefined);
+  // Side-by-side spec §13 (Task S12): the settings version the page's choices are offered under — the one the last room
+  // read that named a version was read from. The ask sends it back, so a version switched under the page asks the person
+  // to choose again instead of silently changing their choices. Kept across a later failed read, like the flags above
+  // (the choices on screen are still that version's). A ref: nothing renders it, and the room effect compares with it.
+  const settingsVersion = useRef<number | undefined>(undefined);
+  // Ruling R50: after a 409 whose room re-read failed, the version is forgotten and the next read naming one is adopted
+  // as a switch (its switches apply as they are), without saying the sentence a second time.
+  const adoptNextVersion = useRef(false);
+  /**
+   * Ruling R51 — A READ FROM ANOTHER VERSION IS AUTHORITATIVE: its shape and length switches apply as they are (they may
+   * turn off, the one case they do), and the model-strength lock is read again from GET /v1/session (locked while that
+   * read is pending or failed), so the next ask sends only what that version offers.
+   */
+  const adoptSettingsRead = useCallback((read: AskRoom) => {
+    setShapeSettings(read.shape_settings === true);
+    setLengthSettings(read.length_settings === true);
+    setModelScorecard("PENDING");
+    void contractClient.readSession().then(
+      (session) => { setModelScorecard(session.model_scorecard_in_force === true ? "IN_FORCE" : "NOT_IN_FORCE"); },
+      () => { setModelScorecard("READ_FAILED"); }
+    );
+  }, []);
   useEffect(() => {
-    if (room?.shape_settings === true) setShapeSettings(true);
-    if (room?.length_settings === true) setLengthSettings(true);
-    if (room?.answer_words !== undefined) setAnswerWords(room.answer_words);
-    if (room?.settings_version !== undefined) setSettingsVersion(room.settings_version);
-  }, [room]);
+    if (room === null) return;
+    const named = room.settings_version;
+    const switched = named !== undefined && settingsVersion.current !== undefined && named !== settingsVersion.current;
+    if (switched || (named !== undefined && adoptNextVersion.current)) {
+      // Ruling R51: the choices for new debates changed while the page was open (a control moved, the room was read
+      // again, and it names another version): the page offers what the new version offers and says so, as on the 409.
+      adoptSettingsRead(room);
+      if (switched) setError(settingsChangedMessage(catalog));
+      adoptNextVersion.current = false;
+    } else {
+      if (room.shape_settings === true) setShapeSettings(true);
+      if (room.length_settings === true) setLengthSettings(true);
+    }
+    if (room.answer_words !== undefined) setAnswerWords(room.answer_words);
+    if (named !== undefined) settingsVersion.current = named;
+  }, [room, catalog, adoptSettingsRead]);
   // Paid plans (spec 2026-09-29 §2.3.4; ruling Q-8): the plan the SERVER decided
   // for this person (B8), as the room read (and B10c's usage read) names it. It
   // is remembered once known: a later failed or plan-less read never clears it,
@@ -354,7 +384,7 @@ function NewDebateForm({
         // A21 O4: a locked control sends nothing, so the deployment's own default applies.
         modelStrength: strengthControl.locked ? null : modelStrength,
         // Side-by-side spec §13 (Task S12): the version the choices above were offered under, when a room read named one.
-        ...(settingsVersion === undefined ? {} : { settingsVersion })
+        ...(settingsVersion.current === undefined ? {} : { settingsVersion: settingsVersion.current })
       }, submitTime, catalog);
       // Question language (spec 2026-10-13; ruling CR-5, D1 order). Every ask carries the page's
       // language — but only once the room read has said the shape row is in force (ruling
@@ -432,10 +462,14 @@ function NewDebateForm({
       // than the same refusal again.
       if (isAskSettingsChanged(exc)) {
         const fresh = await readAskRoom(contractClient, roomQuery);
-        if (fresh?.settings_version === undefined) setSettingsVersion(undefined);
-        else {
-          setShapeSettings(fresh.shape_settings === true);
-          setLengthSettings(fresh.length_settings === true);
+        if (fresh?.settings_version === undefined) {
+          settingsVersion.current = undefined;
+          adoptNextVersion.current = true;
+        } else {
+          // Adopted here (R50), and remembered before the room effect sees the read, so it is not adopted twice.
+          adoptSettingsRead(fresh);
+          settingsVersion.current = fresh.settings_version;
+          adoptNextVersion.current = false;
         }
         if (fresh !== null) setRoom(fresh);
         setError(requestFailureMessage("DEBATE_CREATE", exc, catalog));
