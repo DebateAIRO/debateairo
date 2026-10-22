@@ -1758,8 +1758,9 @@ refuses would leave the site down after the restart.
   a `Content-Security-Policy` that runs nothing and `nosniff`) before any request reaches the
   website. Any other path under `/payment-marks/` goes on to the website as before; the loopback
   check site has no such rule. A missing file is Caddy's own `404`. The website shows only the marks
-  its `PAYMENT_MARKS_AVAILABLE` setting names (§14.7). The check below prints `200 image/svg+xml`
-  once `visa.svg` is in the folder and `404` before:
+  its `PAYMENT_MARKS_AVAILABLE` setting names (§14.7). The check below prints two fields: the first
+  is `200` (with `image/svg+xml`) once `visa.svg` is in the folder, and `404` before (the second field
+  may still say `image/svg+xml`, since the rule sets that header on every answer):
 
 ```sh
 (set -a && . /etc/default/caddy && curl -s -o /dev/null -w '%{http_code} %{content_type}\n' "https://$DEBATEAI_PUBLIC_HOSTNAME/payment-marks/visa.svg")
@@ -3256,8 +3257,9 @@ On the public server, as root, create the folder once with
 `install -d -m 0755 -o root -g root /etc/debateai/payment-marks`. Then copy each official file in, for example
 `install -m 0644 -o root -g root <file> /etc/debateai/payment-marks/visa.svg`, where `<file>` is the official file
 you received. Do the same for `/etc/debateai/payment-marks/mastercard.svg` and
-`/etc/debateai/payment-marks/netopia.svg`. Caddy serves a file as soon as it is there, with no restart; §6's check
-prints `200 image/svg+xml` for it.
+`/etc/debateai/payment-marks/netopia.svg`. Once §6's rule is live, Caddy serves a file as soon as it is there, with
+no restart. Run §6's check for each file (with its own name in place of `visa.svg`), and add a name to
+`PAYMENT_MARKS_AVAILABLE` below only once its check prints `200` as the first field.
 
 Then tell the website which marks to show: add one line to `/etc/debateai/ui.env` that names the marks whose files are
 in the folder, separated by commas, for example `PAYMENT_MARKS_AVAILABLE=visa,mastercard`. The website reads this line

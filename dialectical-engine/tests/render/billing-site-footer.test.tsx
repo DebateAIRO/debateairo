@@ -53,7 +53,7 @@ describe("P21 the site footer, extended for paid plans (R3-4; the card processor
     }
   });
 
-  it("shows exactly the card marks whose files the owner supplied", () => {
+  it("shows exactly the card marks that the setting names", () => {
     expect(full(on(false, false)).querySelectorAll(".siteFooterMarks img")).toHaveLength(0);
     expect([...full(on(true, false)).querySelectorAll(".siteFooterMarks img")].map((image) => image.getAttribute("src"))).toEqual(["/payment-marks/visa.svg"]);
     const both = full(on(true, true));

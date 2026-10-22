@@ -25,8 +25,8 @@
 //       release, behind the password, right before the public route's main proxy. Same custody, new-file write, read-back
 //       and root-only rules as `transform`; prints one JSON line
 //       {"event":"PREVIEW_CADDY_PAYMENT_MARKS","folder":<the marks folder>,"files":[<the three names>]}. A one-slot file
-//       (CADDY_NOT_TWO_SLOTS), a file that already mentions the marks (CADDY_ALREADY_PAYMENT_MARKS) or one without exactly
-//       one readiness refusal (CADDY_SHAPE_REFUSED) is refused and nothing is written. The release guide's PM2 runs it
+//       (CADDY_NOT_TWO_SLOTS), a file that already mentions the marks (CADDY_ALREADY_PAYMENT_MARKS) or a file of another
+//       shape (CADDY_SHAPE_REFUSED) is refused and nothing is written. The release guide's PM2 runs it
 //       inside a maintenance window (MT1/MT2), then validates with caddy, installs, restarts and checks.
 //
 // Every refusal is one JSON line {"event":"PREVIEW_CADDY_REFUSED","reason":<code>} on stderr and exit 1. Nothing read
