@@ -242,7 +242,9 @@ describe("B9d · both hosted boots run the check, under the new settings only", 
     expect(loader).toContain("firstCallsByRoster: firstCallsByPlanRoster({");
     expect(loader).toContain("judgeTokenCeiling: policy.bounds.JUDGE.tokenCeiling,");
     expect(loader).toContain("questionMaxBytes: askQuestionMaxBytes()");
-    expect(loader).toContain("rosters: PLAN_TIER_ROSTERS");
+    // Final fix wave F9 (ruling R79): every version but the site version at boot, and every version in check-version
+    // (strict), is grouped by its own preview rosters; the site version's boot keeps the code's PLAN_TIER_ROSTERS.
+    expect(loader).toContain("rosters: options?.strict === true || version !== site.siteVersion\n            ? previewPlanTierRosters(previewConfig, PLAN_TIER_ROSTERS)\n            : PLAN_TIER_ROSTERS,");
     // Ruling L-B9R (P2L Task 17): the runner prices the longest lock whenever ANY debateShapePolicy row is present
     // (`debateShape`, read raw before this check: enabled false too); no row, today's price.
     expect(loader).toContain("questionLanguageLocked: debateShape !== null");

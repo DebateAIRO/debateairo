@@ -35,6 +35,7 @@ import { readActiveSettingsVersionOn } from "../../apps/api/src/active-settings-
 import type { AdmissionRunMembers } from "../../apps/api/src/admission-settings.js";
 import { AskRoom } from "../../apps/api/src/ask-room.js";
 import { PostgresAskAdmissionGate } from "../../apps/api/src/release-state.js";
+import type { ActiveVersionAlarm } from "../../apps/api/src/admission-alarm.js";
 import {
   SettingsOperatorRefusal,
   activateSettingsVersion,
@@ -525,7 +526,7 @@ describe("cases 6, 7 and the S13 extra (side-by-side §13 \"The API re-checks at
   });
 
   /** A room as main.ts builds it: the gate with the release's site version (the START reads the pointer on its own transaction). */
-  function roomOf(releaseKey: string, ceiling: number): AskRoom {
+  function roomOf(releaseKey: string, ceiling: number, alarm?: ActiveVersionAlarm): AskRoom {
     return new AskRoom({
       lockPool: dev.pool,
       spend: new PostgresModelSpendStore(dev.pool),
@@ -537,7 +538,9 @@ describe("cases 6, 7 and the S13 extra (side-by-side §13 \"The API re-checks at
       closeBasisPoints: 9500,
       waitingLinePerPerson: 1,
       clock: () => now,
-      gate: new PostgresAskAdmissionGate({ releaseKey, hosted: false, siteVersion: siteVersionOfRelease(releaseKey)! })
+      gate: new PostgresAskAdmissionGate({
+        releaseKey, hosted: false, siteVersion: siteVersionOfRelease(releaseKey)!, ...(alarm === undefined ? {} : { alarm })
+      })
     });
   }
 
@@ -737,9 +740,16 @@ describe("cases 6, 7 and the S13 extra (side-by-side §13 \"The API re-checks at
     await fail(dev, release, active);
     now = new Date(`${day}T10:01:00.000Z`);
     const dispatched: string[] = [];
-    const open = applicationOf(release, roomOf(release, RAISED_DAY), { dispatched });
+    // Final fix wave F2b (ruling R77): the gate's hold also says the once-a-minute alarm, content-free.
+    const alarms: string[] = [];
+    const alarm: ActiveVersionAlarm = (version, reason) => { alarms.push(`${String(version)}:${reason}`); return true; };
+    const open = applicationOf(release, roomOf(release, RAISED_DAY, alarm), { dispatched });
     // The first START answers SWITCHING and the tick stops there (R11): one run examined, nothing started.
     await expect(open.wakeWaitingRuns()).resolves.toMatchObject({ waiting: 1, started: 0, stopped: true });
+    // Final fix wave S8c: the stop is the SWITCHING hold, not a full or busy site (which stop a tick the same way and
+    // write no reason row either): the gate's not-passed hold for exactly this (release, version) pair said its alarm
+    // once, and the site's day (RAISED_DAY) and its cap leave room.
+    expect(alarms).toEqual([`${String(active)}:NOT_PASSED`]);
     for (const runId of placed) {
       expect(await waitingIds()).toContain(runId);
       expect([await holdOf(runId), await chargesOf(runId), await jobsOf(runId)]).toEqual([null, 0, []]);
