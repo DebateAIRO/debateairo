@@ -494,8 +494,9 @@ describe('publish kit v3: the optional previewLineUpPolicy row and the answer se
 
 /**
  * Side-by-side spec §13 (Task S18): kit v3 composes from the ACTIVE settings version — the pointer, else the current
- * release's own site version, else (no release yet) the old currency rule. The pool answers the settings operator's
- * three status reads (readSettingsStatus) and the old rule's read, and records every statement.
+ * release's own site version, else (no release yet) the old currency rule. The pool answers the kit's light read of what
+ * new asks use (readEffectiveActiveSettings, ruling R69: the catalog query, the current release, the pointer) and the
+ * old rule's read, and records every statement.
  */
 describe('publish kit v3: composing from the active settings version', () => {
   // Release keys are built from pieces (the secret scanner reads r<n>-<12 hex> as a key).
