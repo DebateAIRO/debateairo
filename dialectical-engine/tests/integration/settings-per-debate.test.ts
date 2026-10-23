@@ -625,26 +625,36 @@ describe("each debate runs on its own settings version (side-by-side spec §13 T
     expect((await store.readDaySpentMicros(today)) - dayBefore).toBe(1000);
   }, 900_000);
 
-  it("8. the boot preload: an open run on S+1 and a PASS for S+2 load S, S+1 and S+2 at boot, and the pointer is never read", async () => {
-    const open = await harness.admittedRun("preload-open", { panelRefs: (await admissionRoster(S1, "premium")).map(refOf), registerVersion: S1, releaseKey: RELEASE, depth: 2 });
-    expect((await database.pool.query("SELECT state FROM core.work_item WHERE work_item_id=$1", [open.workItemId])).rows).toEqual([{ state: "READY" }]);
-    const queries: string[] = [];
-    const pool = queryLoggingPool(database.pool, queries);
-    // main.ts's boot over the logging pool: the site reads, the cache, the site version first, then the preload.
-    const { site } = await readRunnerSiteContext({ pool, environment: runnerEnvironment(), moneyInFlight: createRunInFlight() });
-    const cache = createRunnerSettingsCache({ load: (version) => loadRunnerVersionSettings(pool, version, site, { log: () => undefined }), log: () => undefined });
-    await cache.requireSettings(S);
-    const preload = await preloadRunnerSettings({
-      cache, pool, work: new WorkItemRepository(pool, Object.freeze({ releaseKey: RELEASE, workerId: "runner:s19-preload" })),
-      releaseKey: RELEASE, siteVersion: S
-    });
-    expect(preload).toEqual({ releaseKey: RELEASE, siteVersion: S, loaded: [S, S1, S2], unsupported: [] });
-    expect(cache.versions()).toEqual([{ version: S, kind: "SETTINGS" }, { version: S1, kind: "SETTINGS" }, { version: S2, kind: "SETTINGS" }]);
-    // The log saw the preload's own two sources (the control) and never the activation pointer's reader.
-    expect(queries.some((text) => text.includes("register.read_passed_settings_versions"))).toBe(true);
-    expect(queries.some((text) => /core\.work_item/u.test(text))).toBe(true);
-    expect(queries.filter((text) => /read_active_settings_version|settings_activation/iu.test(text))).toEqual([]);
-    await database.pool.query("UPDATE core.work_item SET state='DONE', claimed_by=NULL, claim_deadline=NULL WHERE work_item_id=$1", [open.workItemId]);
+  it("8. the boot preload: an open run on a version with no verdict and a PASS for S+1 and S+2 load all four at boot, and the pointer is never read", async () => {
+    // Final fix wave S8d: the open run is stamped with a version that has NO verdict (S+1 with S's two story rounds), so
+    // only the open-run source can name it: the passed list (S+1, S+2) cannot hide a preload that skipped open runs.
+    const unverdicted = await publishFrom(S1, { replace: { storyLoopMaxRounds: { kind: "STORY_LOOP_MAX_ROUNDS", maxRounds: 2 } } });
+    expect((await database.pool.query("SELECT count(*)::int AS n FROM register.settings_verdict WHERE register_version=$1", [unverdicted])).rows)
+      .toEqual([{ n: 0 }]);
+    const open = await harness.admittedRun("preload-open", { panelRefs: (await admissionRoster(S1, "premium")).map(refOf), registerVersion: unverdicted, releaseKey: RELEASE, depth: 2 });
+    try {
+      expect((await database.pool.query("SELECT state FROM core.work_item WHERE work_item_id=$1", [open.workItemId])).rows).toEqual([{ state: "READY" }]);
+      const queries: string[] = [];
+      const pool = queryLoggingPool(database.pool, queries);
+      // main.ts's boot over the logging pool: the site reads, the cache, the site version first, then the preload.
+      const { site } = await readRunnerSiteContext({ pool, environment: runnerEnvironment(), moneyInFlight: createRunInFlight() });
+      const cache = createRunnerSettingsCache({ load: (version) => loadRunnerVersionSettings(pool, version, site, { log: () => undefined }), log: () => undefined });
+      await cache.requireSettings(S);
+      const preload = await preloadRunnerSettings({
+        cache, pool, work: new WorkItemRepository(pool, Object.freeze({ releaseKey: RELEASE, workerId: "runner:s19-preload" })),
+        releaseKey: RELEASE, siteVersion: S
+      });
+      expect(preload).toEqual({ releaseKey: RELEASE, siteVersion: S, loaded: [S, S1, S2, unverdicted], unsupported: [] });
+      expect(cache.versions()).toEqual([{ version: S, kind: "SETTINGS" }, { version: S1, kind: "SETTINGS" }, { version: S2, kind: "SETTINGS" },
+        { version: unverdicted, kind: "SETTINGS" }]);
+      // The log saw the preload's own two sources (the control) and never the activation pointer's reader.
+      expect(queries.some((text) => text.includes("register.read_passed_settings_versions"))).toBe(true);
+      expect(queries.some((text) => /core\.work_item/u.test(text))).toBe(true);
+      expect(queries.filter((text) => /read_active_settings_version|settings_activation/iu.test(text))).toEqual([]);
+    } finally {
+      // Cleaned up whatever the case's assertions said, so no later case's preload or tick meets this open run.
+      await database.pool.query("UPDATE core.work_item SET state='DONE', claimed_by=NULL, claim_deadline=NULL WHERE work_item_id=$1", [open.workItemId]);
+    }
   }, 900_000);
 
   it("9. funding across versions: a debate admitted on S+1, funded by a grant of the funding publication S, runs and charges its grant", async () => {
@@ -679,19 +689,29 @@ describe("each debate runs on its own settings version (side-by-side spec §13 T
     expect(await admissionRoster(S, "free")).toEqual([GLM, DEEPSEEK]);
     expect(await admissionRoster(S1, "free")).toEqual([GLM, HAIKU]);
     expect(await admissionRoster(S1, "premium")).toEqual([GLM, QWEN, HAIKU]);
-    const lose = losing();
-    const gates = await harness.startGates({}, { unbilled: [] }, lose.override, held);
+    // Final fix wave S8a: BOTH debates are lost partway and re-claimed by the same runner. B (on S+1, a NON-site version)
+    // is re-claimed after S+2 is activated, so its second claim reads its version again (the runner's
+    // RUN_SETTINGS_VERSION_DRIFT guard path) and must keep S+1's table, never the newly active S+2's.
+    const loseB = losing();
+    const loseA = losing();
+    const gates = await harness.startGates({}, { unbilled: [] }, (request, chat) => {
+      loseB.override(request, chat);
+      return loseA.override(request, chat);
+    }, held);
     const composed = await perVersionRunner(gates);
     const b = await admit("ten-b", S1, "premium");
     const a = await admit("ten-a", S, "premium");
-    lose.state.question = a.question;
-    const resultB = await harness.completedRun(composed, b, gates);
-    expect(resultB.kind).toBe("COMPLETED");
-    // B runs alone, to its end (story included), before A is claimed: every request the gates got so far is B's, the rest A's.
-    const bRequests = gates.requests.length;
-    const { lostAt } = await loseThenReclaim(composed, a, gates, lose.state.abort, async () => {
+    loseB.state.question = b.question;
+    loseA.state.question = a.question;
+    const { result: resultB, lostAt: lostAtB } = await loseThenReclaim(composed, b, gates, loseB.state.abort, async () => {
       expect(await activate(S2, "S19 case 10")).toMatchObject({ previous: S1, releaseKey: RELEASE });
     });
+    expect(resultB.kind).toBe("COMPLETED");
+    expect(lostAtB).toBeGreaterThan(0);
+    // B runs alone, to its end (story included), before A is claimed: every request the gates got so far is B's, the rest A's.
+    const bRequests = gates.requests.length;
+    // A (on S, the site version) is lost and re-claimed with S+2 already active.
+    const { lostAt } = await loseThenReclaim(composed, a, gates, loseA.state.abort, async () => undefined);
     expect([composed.versions.versionOf(a.runId), composed.versions.versionOf(b.runId)]).toEqual([S, S1]);
     // B's panel is S+1's roster: every model its calls reached is on it, Qwen included; A's are S's.
     const requestsOfRun = (debate: AdmittedRun) => (debate === b ? gates.requests.slice(0, bRequests) : gates.requests.slice(bRequests))
@@ -707,6 +727,13 @@ describe("each debate runs on its own settings version (side-by-side spec §13 T
     expect(callsB.map((call) => call.thinking_level)).toEqual(callsB.map((call) => expectedQwenLevel(NEXT_THINKING, call.call_site_key)));
     expect(callsA.map((call) => call.thinking_level)).toEqual(callsA.map((call) => expectedQwenLevel(undefined, call.call_site_key)));
     expect(callsB.filter((call) => /^JUDGE:(?:defender|critic):/u.test(call.call_site_key) && call.thinking_level === "low").length).toBeGreaterThan(0);
+    // S8a: B's Qwen calls after its re-claim (S+2 active by then) still carry S+1's table, step for step. S+2 puts Qwen at
+    // "medium" on EVERY step, so a re-claim that took the newly active version would show "medium" on each of them; B's
+    // pros-and-cons "low" (asserted above) all ran before its first review call, where its first copy was lost.
+    const afterReclaimB = callsB.filter((call) => Number(call.sequence) > lostAtB);
+    expect(afterReclaimB.length).toBeGreaterThan(0);
+    expect(afterReclaimB.map((call) => call.thinking_level)).toEqual(afterReclaimB.map((call) => expectedQwenLevel(NEXT_THINKING, call.call_site_key)));
+    expect(callsB.some((call) => call.thinking_level === "medium")).toBe(false);
     expect(callsA.filter((call) => Number(call.sequence) > lostAt).length).toBeGreaterThan(0);
     expect(callsA.some((call) => call.thinking_level === "medium")).toBe(false);
     // The scripted gate's record of each call's effort matches: its reasoning_effort per level, for each debate (every
