@@ -5,7 +5,6 @@ import { createSupportAnswerService } from "../../apps/api/src/support/answer.js
 import { createAdvisorySummaryService } from "../../apps/api/src/support/cases.js";
 import type { SupportModelPort } from "../../apps/api/src/support/model.js";
 import { createSupportModelReferenceFactory } from "../../apps/api/src/support/model-references.js";
-import type { SupportMessageCipherPort } from "../../apps/api/src/support/session.js";
 import {
   createHelpCorpusSnapshotLookup,loadHelpCorpus,type LoadedHelpCorpus
 } from "../../packages/support-kb/src/index.js";
@@ -51,28 +50,20 @@ function reviewedCorpus(): LoadedHelpCorpus {
   });
 }
 
-const messages = Object.freeze({
-  write: vi.fn(async (input) => Object.freeze({ ...input,redacted: false })),
-  writeAndTransit: vi.fn(async (input,transit) => {
-    await transit(input.text);
-    return Object.freeze({ ...input,redacted: false });
-  }),read: vi.fn(async () => null),listSession: vi.fn(async () => [])
-}) as unknown as SupportMessageCipherPort;
-
 async function structuredAnswerPacket(language: "en" | "ro",text: string): Promise<PromptPacket> {
   const snapshot = reviewedCorpus();
   const complete = vi.fn<SupportModelPort["complete"]>(async () => Object.freeze({
     text: JSON.stringify({ kind: "answer",text: "Reviewed guidance.",sourceIds: [SOURCE_REFERENCE],actionIds: [],offTopic:"none",crisis:false,threat:false })
   }));
   const service = createSupportAnswerService({
-    entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,
+    entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),
     requireStructuredDraft: true,
     modelReferenceFactory: () => createSupportModelReferenceFactory("10000000-0000-4000-8000-000000000001"),
     modelFor: () => Object.freeze({ complete }) as never,
     clock: (() => { let at = Date.parse("2026-09-23T10:00:00.000Z"); return () => new Date(++at); })()
   });
   await service.respond({
-    sessionId: "10000000-0000-4000-8000-000000000001",text,language,
+    text,language,
     detectedLanguage: language,overrideLanguage: null,modelRef: "support-fixture",
     kbVersion: snapshot.kbVersion,snapshot,signedIn: false,
     receivedAt: new Date("2026-09-23T10:00:00.000Z")

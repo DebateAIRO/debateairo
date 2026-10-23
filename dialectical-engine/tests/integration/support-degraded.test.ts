@@ -4,21 +4,9 @@ import { SupportDegradedState } from "../../apps/api/src/support/degraded.js";
 import { SupportModelError } from "../../apps/api/src/support/model.js";
 import { SUPPORT_LIMIT_DEFAULTS } from "../../apps/api/src/support/limits.js";
 import { SupportRelayQueue } from "../../apps/api/src/support/queue.js";
-import { formatRelayState } from "../../apps/runner/src/support-status-cli.js";
 import {
   createHelpCorpusSnapshotLookup,type LoadedHelpCorpus
 } from "../../packages/support-kb/src/index.js";
-
-function messages() {
-  return {
-    write: vi.fn(async (input) => ({ ...input,redacted: false })),
-    writeAndTransit: vi.fn(async (input,transit) => {
-      await transit(input.text);
-      return { ...input,redacted: false };
-    }),
-    read: vi.fn(async () => null),listSession: vi.fn(async () => [])
-  } as never;
-}
 
 const ENTRY = Object.freeze({
   id: "getting-started-debate",lang: "en" as const,title: "Start a debate",
@@ -33,14 +21,12 @@ describe("SUP-06 automatic degraded state", () => {
     const degraded = new SupportDegradedState();
     const base = Date.parse("2026-09-08T12:00:00.000Z");
     degraded.markUnavailable(new Date(base),"relay");
-    const stored = messages();
     const snapshot = Object.freeze({
       entries: Object.freeze([ENTRY]),kbVersion: "a".repeat(64)
     }) as unknown as LoadedHelpCorpus;
     const answer = createSupportAnswerService({
       entries: [ENTRY],
       snapshots: createHelpCorpusSnapshotLookup(snapshot),
-      messages: stored,
       degraded,
       modelFor: () => ({ complete: async () => ({
         text: JSON.stringify({
@@ -52,33 +38,24 @@ describe("SUP-06 automatic degraded state", () => {
     });
 
     await expect(answer.respond({
-      sessionId: "screened",text: "How do I start my first debate?",language: "en",
+      text: "How do I start my first debate?",language: "en",
       detectedLanguage: "en",overrideLanguage: null,modelRef: "relay",
       kbVersion: snapshot.kbVersion,signedIn: false,receivedAt: new Date(base + 1_001)
-    })).resolves.toMatchObject({
-      outcome: "REFUSE_SAFETY",
-      usage: { input_tokens: 3,output_tokens: 4,cost_usd: 0.001 }
-    });
+    })).resolves.toMatchObject({ outcome: "REFUSE_SAFETY" });
     expect(degraded.isDegraded()).toEqual({ degraded: false });
-    expect((stored as unknown as { write: ReturnType<typeof vi.fn> }).write)
-      .toHaveBeenLastCalledWith(expect.objectContaining({
-        role: "assistant",outcome: "REFUSE_SAFETY",modelCalled: true,
-        inputTokens: 3,outputTokens: 4,costUsd: 0.001
-      }));
   });
 
   it("returns the exact deterministic DISABLED notice without degrading when the final gate observes OFF", async () => {
     const degraded = new SupportDegradedState();
-    const stored = messages();
     const answer = createSupportAnswerService({
-      entries: [ENTRY],messages: stored,degraded,
+      entries: [ENTRY],degraded,
       modelFor: () => ({
         complete: async () => { throw new SupportModelError("SUPPORT_DISABLED"); }
       })
     });
 
     const result = await answer.respond({
-      sessionId: "session-off",text: "How do I start my first debate?",language: "en",
+      text: "How do I start my first debate?",language: "en",
       detectedLanguage: "en",overrideLanguage: null,modelRef: "relay",
       receivedAt: new Date("2026-09-08T12:00:00.000Z")
     });
@@ -87,10 +64,6 @@ describe("SUP-06 automatic degraded state", () => {
       outcome: "DISABLED",text: "The support assistant is switched off at the moment."
     });
     expect(degraded.isDegraded()).toEqual({ degraded: false });
-    expect((stored as unknown as { write: ReturnType<typeof vi.fn> }).write)
-      .toHaveBeenCalledWith(expect.objectContaining({
-      role: "assistant",outcome: "DISABLED",modelCalled: false
-      }));
   });
 
   it("short-circuits while unavailable and clears only after a controlled half-open success", async () => {
@@ -102,12 +75,12 @@ describe("SUP-06 automatic degraded state", () => {
     });
     let nowMs = Date.parse("2026-09-07T12:00:00.000Z");
     const answer = createSupportAnswerService({
-      entries: [ENTRY],messages: messages(),degraded,
+      entries: [ENTRY],degraded,
       modelFor: () => ({ complete }),
       clock: () => new Date(++nowMs)
     });
     const request = {
-      sessionId: "session",text: "How do I start my first debate?",language: "en" as const,
+      text: "How do I start my first debate?",language: "en" as const,
       detectedLanguage: "en" as const,overrideLanguage: null,modelRef: "relay",
       receivedAt: new Date("2026-09-07T12:00:00.000Z")
     };
@@ -115,9 +88,6 @@ describe("SUP-06 automatic degraded state", () => {
     expect(degraded.isDegraded()).toEqual({
       degraded: true,reason: "relay",since: new Date("2026-09-07T12:00:00.001Z")
     });
-    expect(formatRelayState({
-      relayState: "UNAVAILABLE",relayUnavailableSince: new Date("2026-09-07T12:00:00.001Z")
-    })).toBe("relay: unavailable since 2026-09-07T12:00:00.001Z");
     available = true;
     await expect(answer.respond({
       ...request,receivedAt: new Date("2026-09-07T12:00:00.500Z")
@@ -128,7 +98,6 @@ describe("SUP-06 automatic degraded state", () => {
     })).resolves.toMatchObject({ outcome: "ANSWER_GROUNDED" });
     expect(complete).toHaveBeenCalledTimes(2);
     expect(degraded.isDegraded()).toEqual({ degraded: false });
-    expect(formatRelayState({ relayState: "AVAILABLE" })).toBe("relay: available");
   });
 
   it("admits only one concurrent half-open probe", () => {
@@ -166,7 +135,7 @@ describe("SUP-06 automatic degraded state", () => {
     const base = Date.parse("2026-09-07T12:00:00.000Z");
     let clockMs = base;
     const answer = createSupportAnswerService({
-      entries: [ENTRY],messages: messages(),degraded,queue,
+      entries: [ENTRY],degraded,queue,
       modelFor: () => ({ complete: async (input) => {
         calls += 1;
         if (calls === 1) throw new SupportModelError("SUPPORT_MODEL_UNAVAILABLE");
@@ -175,7 +144,7 @@ describe("SUP-06 automatic degraded state", () => {
       } }),clock: () => new Date(++clockMs)
     });
     const request = {
-      sessionId: "session",text: "How do I start my first debate?",language: "en" as const,
+      text: "How do I start my first debate?",language: "en" as const,
       detectedLanguage: "en" as const,overrideLanguage: null,modelRef: "relay",
       receivedAt: new Date(base)
     };
@@ -219,12 +188,12 @@ describe("SUP-06 automatic degraded state", () => {
       });
       let clockMs = base;
       const answer = createSupportAnswerService({
-        entries: [ENTRY],messages: messages(),degraded,queue,
+        entries: [ENTRY],degraded,queue,
         modelFor: () => ({ complete }),clock: () => new Date(++clockMs)
       });
       const started = performance.now();
       const result = await answer.respond({
-        sessionId: "session",text: "How do I start my first debate?",language: "en",
+        text: "How do I start my first debate?",language: "en",
         detectedLanguage: "en",overrideLanguage: null,modelRef: "relay",
         receivedAt: new Date(base + 1_001)
       });

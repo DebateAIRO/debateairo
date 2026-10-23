@@ -1,9 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createSupportAnswerService } from "../../apps/api/src/support/answer.js";
 import { createSupportModelReferenceFactory } from "../../apps/api/src/support/model-references.js";
-import { redactSupportMessage } from "../../apps/api/src/support/session.js";
 import { supportTemplate } from "../../apps/api/src/support/templates.js";
-import type { SupportMessageCipherPort } from "../../apps/api/src/support/session.js";
 import type { SupportModelPort } from "../../apps/api/src/support/model.js";
 import type { LoadedHelpCorpus } from "../../packages/support-kb/src/index.js";
 import { readPromptFrame } from "@debateai/providers";
@@ -23,29 +21,15 @@ const modelText = "how do I publish a debate?";
 
 function harness(opts: Readonly<{
   output?: string; complete?: SupportModelPort["complete"]; noSourceCheck?: Readonly<{ timeoutMs: number }>;
-  degraded?: { isDegraded: () => { degraded: boolean } }; redacting?: boolean;
+  degraded?: { isDegraded: () => { degraded: boolean } };
 }> = {}) {
-  const rows: Array<Record<string, unknown>> = [];
   const packets: Array<Parameters<SupportModelPort["complete"]>[0]["packet"]> = [];
-  const messages = {
-    write: vi.fn(async (input: Record<string, unknown>) => {
-      rows.push(input);
-      return Object.freeze({ ...input, redacted: false });
-    }),
-    writeAndTransit: vi.fn(async (input: Record<string, unknown>, transit: (safeText: string) => Promise<void>) => {
-      rows.push(input);
-      const safeText = opts.redacting ? redactSupportMessage(String(input.text)).text : String(input.text);
-      await transit(safeText);
-      return Object.freeze({ ...input, text: safeText, redacted: opts.redacting === true });
-    }),
-    read: vi.fn(async () => null), listSession: vi.fn(async () => [])
-  } as unknown as SupportMessageCipherPort;
   const complete = vi.fn<SupportModelPort["complete"]>(async (input) => {
     packets.push(input.packet);
     return opts.complete ? opts.complete(input) : Object.freeze({ text: opts.output ?? '{"judgement":"off_topic"}', usage: USAGE });
   });
   const service = createSupportAnswerService({
-    entries: SNAPSHOT.entries, messages, requireStructuredDraft: true,
+    entries: SNAPSHOT.entries, requireStructuredDraft: true,
     noSourceCheck: opts.noSourceCheck ?? { timeoutMs: 15_000 },
     modelReferenceFactory: () => createSupportModelReferenceFactory(ID),
     modelFor: () => Object.freeze({ complete }) as SupportModelPort,
@@ -53,10 +37,10 @@ function harness(opts: Readonly<{
     clock: (() => { let at = Date.parse("2026-10-20T10:00:00.000Z"); return () => new Date(++at); })()
   });
   const respond = (text: string) => service.respond({
-    sessionId: ID, text, language: "en", detectedLanguage: "en", overrideLanguage: null,
+    text, language: "en", detectedLanguage: "en", overrideLanguage: null,
     modelRef: "fixture", snapshot: SNAPSHOT, receivedAt: new Date("2026-10-20T10:00:00.000Z")
   });
-  return { rows, packets, messages, complete, respond };
+  return { packets, complete, respond };
 }
 
 function draft(marks: Readonly<{ offTopic?: "none" | "part" | "all"; crisis?: boolean; threat?: boolean }> = {}, text = "ANSWER-TEXT") {
@@ -96,8 +80,8 @@ describe("S05 answer service", () => {
     expect(h.complete).not.toHaveBeenCalled();
   });
 
-  it("B6 frames the redacted stored text, never the raw key", async () => {
-    const h = harness({ redacting: true });
+  it("B6 frames the masked text, never the raw key", async () => {
+    const h = harness();
     await h.respond("write me a poem with my key sk-test1234567890");
     expect(readPromptFrame(h.packets[0]!).contractId).toBe("support.no-source-judgement.v1");
     const packet = JSON.stringify(h.packets[0]);
@@ -105,23 +89,20 @@ describe("S05 answer service", () => {
     expect(packet).not.toContain("sk-test1234567890");
   });
 
-  it("B7 stores user and assistant outcomes with model usage", async () => {
+  it("B7 keeps no message identifier or model usage in its result", async () => {
     const h = harness();
-    await h.respond(noSourceText);
-    expect(h.rows).toEqual([
-      expect.objectContaining({ role: "user", outcome: "NO_SOURCE" }),
-      expect.objectContaining({ role: "assistant", outcome: "OFF_TOPIC", modelCalled: true,
-        inputTokens: 3, outputTokens: 4, costUsd: 0.001 })
-    ]);
+    const result = await h.respond(noSourceText);
+    expect("messageId" in result).toBe(false);
+    expect(["usage", "inputTokens", "outputTokens", "costUsd"].filter((key) => key in result)).toEqual([]);
   });
 
   it("B8 retains no-call NO_SOURCE without noSourceCheck", async () => {
     const h = harness();
     const service = createSupportAnswerService({
-      entries: SNAPSHOT.entries, messages: h.messages, requireStructuredDraft: true,
+      entries: SNAPSHOT.entries, requireStructuredDraft: true,
       modelFor: () => Object.freeze({ complete: h.complete }) as SupportModelPort
     });
-    const result = await service.respond({ sessionId: ID, text: noSourceText,
+    const result = await service.respond({ text: noSourceText,
       language: "en", detectedLanguage: "en", overrideLanguage: null, modelRef: "fixture",
       snapshot: SNAPSHOT, receivedAt: new Date("2026-10-20T10:00:00.000Z") });
     expect(result.outcome).toBe("NO_SOURCE");
@@ -150,11 +131,11 @@ describe("S05 answer service", () => {
     expect(await h.respond(modelText)).toMatchObject({ outcome: "CRISIS" });
   });
 
-  it("B14 stores a marked model reply and its usage", async () => {
+  it("B14 a marked model reply carries the reply kind and no usage", async () => {
     const h = harness({ output: draft({ threat: true }) });
-    await h.respond(modelText);
-    expect(h.rows.at(-1)).toMatchObject({ role: "assistant", outcome: "THREAT", modelCalled: true,
-      inputTokens: 3, outputTokens: 4, costUsd: 0.001 });
+    const result = await h.respond(modelText);
+    expect(result).toMatchObject({ outcome: "THREAT" });
+    expect(["usage", "inputTokens", "outputTokens", "costUsd"].filter((key) => key in result)).toEqual([]);
   });
 
   it("B15 does not append the part sentence to rejected draft text", async () => {
@@ -172,6 +153,5 @@ describe("S05 answer service", () => {
     const result = await h.respond(modelText);
     expect(result.outcome).toBe(outcome);
     expect(result.text).not.toContain("POEM-MARKER");
-    expect(h.rows.at(-1)?.text).not.toContain("POEM-MARKER");
   });
 });
