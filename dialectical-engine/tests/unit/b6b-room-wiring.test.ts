@@ -61,6 +61,16 @@ describe("B6b the API root composes the room", () => {
     expect(loader).toContain("recentRunUsage: askRoom ? new PostgresRecentRunUsageSource(pool) : null,");
     expect(composition).toContain("estimatorFor: async (version) => (await admissionCache.admissionSettingsFor(version)).estimator!,");
     expect(loader).toContain("maximumMicros: mostOneRunMaySpendMicros(guardPolicy)");
+    // Fresh-site estimate (owner rulings 2026-10-22, merge of PR #212): the estimator gets the sealed starting figures,
+    // read in their own boot stage from the SITE version (a SITE row, settings-classification.ts) and handed to every
+    // version's estimator through the site context (null at a version without the row: today's estimate).
+    expect(loader).toContain("start: site.costEstimateStart");
+    expect(loader).toContain("costEstimateStart: input.costEstimateStartPolicy,");
+    expect(main).toContain('const costEstimateStartPolicy = environment.DEPLOYMENT_MODE === "hosted"\n'
+      + '  ? await boot.run("cost-estimate-start-policy", () => readCostEstimateStartPolicy(pool, environment.REGISTER_VERSION))\n'
+      + "  : null;");
+    expect(main.indexOf('boot.run("cost-estimate-start-policy"')).toBeLessThan(main.indexOf('boot.run("ask-room"'));
+    expect(main.indexOf('boot.run("cost-estimate-start-policy"')).toBeLessThan(main.indexOf('boot.runSync("admission-site"'));
   });
 
   it("imports the allowance source from billing-core and the repository from db (R-1)", async () => {

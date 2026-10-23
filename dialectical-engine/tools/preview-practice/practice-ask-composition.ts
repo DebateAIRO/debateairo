@@ -66,8 +66,10 @@ import {
   readBillingPlans,
   readBillingPolicy,
   readCostEnvelopePolicy,
+  readCostEstimateStartPolicy,
   readPanelDiscoveryPolicy,
   type CostEnvelopePolicy,
+  type CostEstimateStartPolicy,
   type DeploymentMode
 } from "@debateai/register";
 import { AskRoom } from "../../apps/api/src/ask-room.js";
@@ -139,11 +141,15 @@ export async function composePracticeAskMoney(input: Readonly<{
       );
     }
   }
+  // main.ts's "cost-estimate-start-policy" stage (fresh-site estimate, owner rulings 2026-10-22): the sealed starting
+  // figures, a SITE row read from the site version (null without the row: today's estimate); every version's estimator
+  // starts from it through the site context.
+  const costEstimateStartPolicy: CostEstimateStartPolicy | null = await readCostEstimateStartPolicy(pool, environment.REGISTER_VERSION);
   // Billing on needs the band (B4a refuses it otherwise), so no answer means billing off.
   const registerBillingPlans = readiness?.billingPlans ?? null;
   const band = readiness?.band ?? null;
   return Object.freeze({
-    siteCostEnvelopePolicy, band,
+    siteCostEnvelopePolicy, costEstimateStartPolicy, band,
     /** The room's readiness answer, as main.ts's (null when no room is built): the site context's billing switch. */
     readiness,
     /** What the register says (the practice runs billing off either way). */
@@ -261,6 +267,8 @@ export async function composePracticeAsk(input: Readonly<{
     environment,
     declaredProviderTargets,
     siteCostEnvelopePolicy: money === null ? null : money.siteCostEnvelopePolicy,
+    // As main.ts: the site's costEstimateStartPolicy row (hosted; null without it), every estimator's start.
+    costEstimateStartPolicy: money === null ? null : money.costEstimateStartPolicy,
     // As main.ts: the room's readiness answer (present exactly when the room is built; its plans say billing is on).
     askRoomReadiness: money === null ? null : money.readiness,
     questionLanguage: Object.freeze({

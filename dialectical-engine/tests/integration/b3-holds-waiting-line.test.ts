@@ -5,6 +5,7 @@ import type { PoolClient } from "pg";
 import { WorkItemRepository } from "@debateai/battery";
 import { PostgresModelSpendStore, costEnvelopeDay, withSpendDecisionLock } from "@debateai/budget";
 import { RunRepository, RunWaitRepository, migrate } from "@debateai/db";
+import { LEGACY_RELEASE_KEY } from "@debateai/kernel";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
@@ -260,7 +261,8 @@ describe("B3 the waiting line (budget spec §2.7)", () => {
     // Side-by-side spec §1 (C10) and §13 (S10): the run's release (no key at start: `legacy`) and the settings version it
     // was admitted on (its register version) come with it.
     expect(await waits.readWaiting(first)).toEqual({
-      runId: first, waitingSince: since, releaseKey: "legacy", registerVersion: 1, ownerRef: null, legacyAskerId: askerId,
+      // Side-by-side (plan C task C10): the release that admitted the run; legacyRun() stamps no key of its own.
+      runId: first, waitingSince: since, releaseKey: LEGACY_RELEASE_KEY, registerVersion: 1, ownerRef: null, legacyAskerId: askerId,
       planTier: "free", compositionBudgetTier: "low", depth: 1, makerCount: 2,
       waitsFor: null, personRecheckAt: null, reasonAt: null
     });

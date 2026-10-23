@@ -547,7 +547,8 @@ describe("buildAdmissionSiteContext: the one way main.ts, the practice and the c
     finishBasisPoints: 11500, waitingLinePerPerson: 1 } as never;
   const build = (change: Partial<Parameters<typeof buildAdmissionSiteContext>[0]>) => buildAdmissionSiteContext({
     pool: POOL, environment: { REGISTER_VERSION: SITE_VERSION, DEPLOYMENT_MODE: "hosted", PREVIEW_GATE_SETTINGS: undefined },
-    declaredProviderTargets: reviewedTargets(), siteCostEnvelopePolicy: ENVELOPE_POLICY, askRoomReadiness: { billingPlans: null },
+    declaredProviderTargets: reviewedTargets(), siteCostEnvelopePolicy: ENVELOPE_POLICY, costEstimateStartPolicy: null,
+    askRoomReadiness: { billingPlans: null },
     questionLanguage: checkQuestionLanguage({ DEPLOYMENT_MODE: "hosted", PREVIEW_GATE_SETTINGS: undefined }), log: () => undefined,
     ...change
   });
@@ -564,12 +565,16 @@ describe("buildAdmissionSiteContext: the one way main.ts, the practice and the c
     const local = build({ siteCostEnvelopePolicy: null, askRoomReadiness: null,
       environment: { REGISTER_VERSION: SITE_VERSION, DEPLOYMENT_MODE: "local", PREVIEW_GATE_SETTINGS: undefined } });
     expect([local.spend, local.recentRunUsage, local.siteCostEnvelope]).toEqual([null, null, null]);
+    // Fresh-site estimate (merge of PR #212): the site's costEstimateStartPolicy row is handed through as it was read.
+    const start = {} as never;
+    expect(build({ costEstimateStartPolicy: start }).costEstimateStart).toBe(start);
+    expect(build({}).costEstimateStart).toBeNull();
   });
 
   it("the preview's gate part and the env's line-up (null for the sockets-only form); the practice's forwarded seam only when given", () => {
     const site = build({ environment: { REGISTER_VERSION: SITE_VERSION, DEPLOYMENT_MODE: "hosted", PREVIEW_GATE_SETTINGS: PREVIEW_GATE } });
     expect(site.preview).toEqual({ gate: PREVIEW_GATE, envLineUp: null });
-    expect(Object.keys(site).sort()).toEqual(["billingEnabled", "declaredProviderTargets", "deploymentMode", "log", "preview",
+    expect(Object.keys(site).sort()).toEqual(["billingEnabled", "costEstimateStart", "declaredProviderTargets", "deploymentMode", "log", "preview",
       "prices", "questionLanguage", "recentRunUsage", "siteCostEnvelope", "siteVersion", "spend"]);
     const remaining = {} as never;
     expect(build({ previewRemaining: remaining }).previewRemaining).toBe(remaining);
@@ -730,9 +735,12 @@ describe("drift guard: check-version's site reads are main.ts's (ruling R57)", (
       "if (environment.PROVIDER_DISCOVERY_TARGETS_JSON === undefined) { throw new TypeError(\"PROVIDER_DISCOVERY_TARGETS_REQUIRED\"); }",
       "parseDeclaredProviderTargets({",
       "configuredProviders: deploymentMakers.configuredProviders, mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV }",
+      // Fresh-site estimate (merge of PR #212): the SITE row costEstimateStartPolicy, read from the site version.
+      "readCostEstimateStartPolicy(pool, environment.REGISTER_VERSION)",
       "environment.DEPLOYMENT_MODE === \"hosted\" && siteCostEnvelopePolicy !== null",
       "decideAskRoomReadiness({ envelope: siteCostEnvelopePolicy, admission: admissionPolicy, policy: await readBillingPolicy(pool, environment.REGISTER_VERSION), plans: await readBillingPlans(pool, environment.REGISTER_VERSION) })",
-      "buildAdmissionSiteContext({ pool, environment, declaredProviderTargets, siteCostEnvelopePolicy,"
+      "buildAdmissionSiteContext({ pool, environment, declaredProviderTargets, siteCostEnvelopePolicy,",
+      "costEstimateStartPolicy,"
     ];
     for (const [name, source] of [["main.ts", flat(API_MAIN)], ["settings-check.ts", flat(API_CHECK)]] as const) {
       let at = -1;

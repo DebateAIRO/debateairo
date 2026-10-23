@@ -362,6 +362,55 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
     expect(loopback).not.toMatch(/respond/);
   });
 
+  /**
+   * The payment marks (README §14.7): the brands' artwork may not be redistributed, so it is never in the repository
+   * or a release folder. Root keeps the files in /etc/debateai/payment-marks/ and the public site serves exactly the
+   * three names from there before any request reaches the website; anything else under /payment-marks/ goes on to
+   * the website as before. Only the public site has the rule, never the loopback :3090.
+   */
+  it("Caddyfile: the payment marks come from root's folder, exactly three names, before the website", () => {
+    const caddy = read("deploy/vps/Caddyfile");
+    const site = /^\{\$DEBATEAI_PUBLIC_HOSTNAME\} \{\n([\s\S]*?)^\}$/m.exec(caddy)?.[1] ?? "";
+    const matchers = site.match(/^\s*@paymentMarks\b.*$/gm) ?? [];
+    expect(matchers).toHaveLength(1);
+    const [name, kind, ...paths] = (matchers[0] ?? "").trim().split(/\s+/);
+    expect([name, kind]).toEqual(["@paymentMarks", "path"]);
+    expect(paths).toEqual(["/payment-marks/netopia.svg", "/payment-marks/visa.svg", "/payment-marks/mastercard.svg"]);
+    const rule = /^\thandle @paymentMarks \{\n([\s\S]*?)^\t\}$/m.exec(site)?.[1] ?? "";
+    expect(rule.split("\n").map((line) => line.trim()).filter((line) => line !== "")).toEqual([
+      "root * /etc/debateai/payment-marks",
+      "uri strip_prefix /payment-marks",
+      "header Content-Type image/svg+xml",
+      `header Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; sandbox"`,
+      "header X-Content-Type-Options nosniff",
+      "file_server"
+    ]);
+    // One file_server in the whole file, never a folder listing.
+    expect(caddy.match(/^\s*file_server\b.*$/gm)).toEqual(["\t\tfile_server"]);
+    expect(caddy).not.toMatch(/\bbrowse\b/);
+    // Written before the website's proxy and the /readyz refusal; the proxy and the imports stay as they were.
+    expect(site.search(/^\s*handle @paymentMarks \{$/m)).toBeGreaterThan(-1);
+    expect(site.search(/^\s*handle @paymentMarks \{$/m)).toBeLessThan(site.search(/^\s*respond \/readyz 404$/m));
+    expect(site.search(/^\s*handle @paymentMarks \{$/m)).toBeLessThan(site.search(/^\s*import debateai_slots$/m));
+    expect(caddy.match(/^\s*reverse_proxy\b/gm)).toHaveLength(1);
+    expect(caddy.match(/^\s*import debateai_slots$/gm)).toHaveLength(2);
+    const loopback = /^:3090 \{\n([\s\S]*?)^\}$/m.exec(caddy)?.[1] ?? "";
+    expect(loopback).not.toBe("");
+    expect(loopback).not.toContain("payment-marks");
+    const snippet = /^\(debateai_slots\) \{\n([\s\S]*?)^\}$/m.exec(caddy)?.[1] ?? "";
+    expect(snippet).not.toContain("payment-marks");
+  });
+
+  it("README: the payment marks folder in §3 and the check in §6", () => {
+    const readme = read("deploy/vps/README.md");
+    const layout = readme.slice(readme.indexOf("## 3. `/etc/debateai` layout"), readme.indexOf("### The database principals each file names"));
+    expect(layout).toMatch(/^\| `\/etc\/debateai\/payment-marks\/` \| `0755` \| `root:root` \|[^\n]*`netopia\.svg`, `visa\.svg`, `mastercard\.svg`[^\n]*`0644`[^\n]*§14\.7[^\n]*never in the repository[^\n]*\|$/mu);
+    const caddySection = readme.slice(readme.indexOf("## 6. Caddy"), readme.indexOf("## 7. Mail"));
+    expect(caddySection).toContain("/payment-marks/visa.svg");
+    expect(caddySection).toContain("(set -a && . /etc/default/caddy && curl -s -o /dev/null -w '%{http_code} %{content_type}\\n' \"https://$DEBATEAI_PUBLIC_HOSTNAME/payment-marks/visa.svg\")");
+    expect(caddySection).toMatch(/^- \*\*Payment marks/mu);
+  });
+
   it("the Caddy upstreams are exactly the two slots' website ports, and each slot's website talks to its own API", () => {
     const caddy = read("deploy/vps/Caddyfile");
     const upstreams = /reverse_proxy ((?:127\.0\.0\.1:\d+ ?)+)\{/.exec(caddy)?.[1]?.trim().split(" ") ?? [];
@@ -909,6 +958,9 @@ describe("VPS baseline: runbook and environment templates", () => {
     expect(ui.get("DIALECTICAL_API_BASE")).toBe("http://127.0.0.1:8790");
     expect(ui.get("NEXT_PUBLIC_API_BASE")).toBe("/api");
     for (const [key] of ui) expect(key).not.toMatch(/KEK|DATABASE_URL|HATCHET|SECRET$/);
+    // The payment marks list is shown, commented out, until root has put each file in /etc/debateai/payment-marks/.
+    expect(read("deploy/vps/env/ui.env.example")).toMatch(/^# PAYMENT_MARKS_AVAILABLE=netopia,visa,mastercard$/m);
+    expect(ui.has("PAYMENT_MARKS_AVAILABLE")).toBe(false);
   });
 
   /**

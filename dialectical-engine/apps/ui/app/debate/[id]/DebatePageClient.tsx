@@ -341,6 +341,18 @@ function findNode(root: DebateNode | null, id: string | null): DebateNode | null
   return null;
 }
 
+/**
+ * The control that stands for `nodeId` in whichever view is showing: its Details button in Tree
+ * or Thread, else the first control on its Tree card. The argument drawer returns focus here when
+ * the button that opened it has left the page — "Open target" switches the view under the drawer.
+ */
+function nodeFocusTarget(nodeId: string): HTMLElement | null {
+  const details = document.getElementById(`canvas-details-${nodeId}`) ?? document.getElementById(`thread-details-${nodeId}`);
+  if (details !== null) return details;
+  const card = document.querySelector(`[data-node-id="${nodeId.replace(/["\\]/g, "\\$&")}"]`);
+  return card?.querySelector<HTMLElement>("button:not([disabled]), a[href]") ?? null;
+}
+
 function hasHighPriorityScoringIssue(scoring: NodeScoringPayload): boolean {
   const highImpact = scoring.scores.impact >= 0.7;
   return (
@@ -766,6 +778,7 @@ export default function DebatePageClient({
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<number | null>(null);
   const canvasElRef = useRef<HTMLDivElement | null>(null);
+  const drawerReturnFocusRef = useRef<HTMLElement | null>(null);
   const debateHeaderRef = useRef<HTMLElement | null>(null);
   const debateHeaderIdentityRef = useRef<HTMLDivElement | null>(null);
   const debateHeaderClaimRef = useRef<HTMLDivElement | null>(null);
@@ -1703,9 +1716,12 @@ export default function DebatePageClient({
       {/* ---- also raised, not debated (owner; the public page shows it in its overview) ---- */}
       {publicMode ? null : <AlsoRaisedList view={storyLocaleReady ? mapView : null} catalog={storyCatalog} locale={storyLocale} />}
 
+      {/* The reference design clips this panel to one pixel (globals.css
+          `.debateView > .scoringInsightsPanel`), so nobody can see it; `inert` keeps its summary
+          and buttons from being invisible Tab stops. Un-clip it and drop `inert` together. */}
       <ScoringErrorBoundary catalog={miscCatalog}>
         {scoringInsightsExpandable ? (
-          <details className="scoringInsightsPanel">
+          <details className="scoringInsightsPanel" inert>
             <summary className="scoringInsightsSummary">
               <span className="progressLabel">{t(debateChromeCatalog, "debateChrome.scoring.insights")}</span>
               <span className="progressCount">{scoringVisibility.title}</span>
@@ -1754,6 +1770,7 @@ export default function DebatePageClient({
           </details>
         ) : (
           <section
+            inert
             className="scoringInsightsPanel scoringInsightsPanelCompact"
             aria-label={t(debateChromeCatalog, "debateChrome.scoring.insights")}
             data-scoring-insights-compact="true"
@@ -1958,7 +1975,11 @@ export default function DebatePageClient({
           currentUserFeedback={currentUserFeedbackByNodeId.get(detailNode.id)}
           lifecycleDecision={lifecycleDecisionByNodeId.get(detailNode.id)}
           token={publicMode ? null : actionToken}
-          onClose={() => setDetailNodeId(null)}
+          onClose={() => {
+            drawerReturnFocusRef.current = nodeFocusTarget(detailNode.id);
+            setDetailNodeId(null);
+          }}
+          returnFocusRef={drawerReturnFocusRef}
           {...(publicMode
             ? {}
             : { onChallenge: (anchor: HTMLElement, text: string) => openChallenge(detailNode, anchor, text) })}

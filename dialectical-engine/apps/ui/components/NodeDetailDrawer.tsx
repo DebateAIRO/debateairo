@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import type { MouseEvent, ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { MouseEvent, ReactNode, RefObject } from "react";
 import { nodeGenerations } from "@/lib/api";
 import type {
   CurrentUserFeedbackVote,
@@ -116,7 +116,8 @@ export function NodeDetailDrawer({
   miscCatalog = miscEnglish,
   debateChromeCatalog = debateChromeEnglish,
   composeCatalog = composeEnglish,
-  conditionRecords = []
+  conditionRecords = [],
+  returnFocusRef
 }: {
   node: DebateNode;
   /**
@@ -153,8 +154,25 @@ export function NodeDetailDrawer({
    * was. Empty on the public page, whose snapshot carries no records.
    */
   conditionRecords?: readonly Pick<Answer["condition_mark_records"][number], "mark" | "reason">[];
+  /**
+   * Where focus goes on close when the control that opened the drawer has left the page —
+   * "Open target" switches the view underneath, which unmounts it.
+   */
+  returnFocusRef?: RefObject<HTMLElement | null>;
 }) {
-  const dialogRef = useDialogSurface<HTMLElement>(onClose);
+  const dialogRef = useDialogSurface<HTMLElement>(onClose, returnFocusRef);
+  // "Open target" swaps the argument under the open drawer and can unmount the button that was
+  // pressed, so focus goes back to the top of the drawer, as when it opened, and it reads the new
+  // argument from the start. Not on mount: the dialog helper puts initial focus there itself.
+  const shownNodeId = useRef(node.id);
+  useEffect(() => {
+    if (shownNodeId.current === node.id) return;
+    shownNodeId.current = node.id;
+    const dialog = dialogRef.current;
+    if (dialog === null) return;
+    dialog.scrollTop = 0;
+    dialog.focus();
+  }, [node.id, dialogRef]);
   const { locale } = useChromeI18n();
   const textLang = useDebateTextLang();
   const role = roleOf(node);

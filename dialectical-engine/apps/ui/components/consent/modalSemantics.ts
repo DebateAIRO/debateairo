@@ -83,22 +83,42 @@ const surfaceStack: StackEntry[] = [];
 /** Exactly one `document` keydown listener exists while the stack is non-empty. */
 let listenerAttached = false;
 
+// `details > summary:first-of-type` is the disclosure's own toggle (a `<summary>` is a Tab stop
+// with no tabindex of its own); without it the trap stepped over every "N more" disclosure in a
+// drawer, so a keyboard user could never open one.
 const FOCUSABLE_SELECTOR =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), details > summary:first-of-type, [tabindex]:not([tabindex="-1"])';
 
 /**
- * `FOCUSABLE_SELECTOR` is an ATTRIBUTE match, and focusability is not an attribute. Two members
+ * `FOCUSABLE_SELECTOR` is an ATTRIBUTE match, and focusability is not an attribute. Three members
  * of that gap are filtered here: `tabindex="-1"` on any element (the selector's
  * `:not([tabindex="-1"])` guard sits on its `[tabindex]` arm ALONE, so `button`, `input`,
- * `select`, `textarea` and `a[href]` re-admit it), and `input[type=hidden]`. The visibility
- * member (`display:none` / `visibility:hidden` / `[hidden]` / `inert`) is NOT filtered by
- * attribute: jsdom's `focus()` lands on all of those, so no test here can discriminate it —
- * `trapTab` covers it instead by advancing past any candidate `focus()` did not land on, which
- * is what a real browser reports. Positive-`tabindex` ORDERING stays out of scope.
+ * `select`, `textarea` and `a[href]` re-admit it), `input[type=hidden]`, and a control inside a
+ * CLOSED `<details>` other than that disclosure's own summary (the browser does not render it,
+ * and jsdom would focus it). The rest of the visibility member (`display:none` /
+ * `visibility:hidden` / `[hidden]` / `inert`) is NOT filtered by attribute: jsdom's `focus()`
+ * lands on all of those, so no test here can discriminate it — `trapTab` covers it instead by
+ * advancing past any candidate `focus()` did not land on, which is what a real browser reports.
+ * Positive-`tabindex` ORDERING stays out of scope.
  */
 function isFocusCandidate(element: HTMLElement): boolean {
   if (element.getAttribute("tabindex") === "-1") return false;
-  return !(element.nodeName === "INPUT" && (element as HTMLInputElement).type === "hidden");
+  if (element.nodeName === "INPUT" && (element as HTMLInputElement).type === "hidden") return false;
+  return !hiddenByClosedDetails(element);
+}
+
+/** True when a closed `<details>` above `element` hides it; a disclosure's own summary stays visible. */
+function hiddenByClosedDetails(element: HTMLElement): boolean {
+  for (
+    let details = element.parentElement?.closest("details") ?? null;
+    details !== null;
+    details = details.parentElement?.closest("details") ?? null
+  ) {
+    if (details.open) continue;
+    if (element.parentElement === details && details.querySelector(":scope > summary") === element) continue;
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -273,7 +293,12 @@ export function useModalSurface(open: boolean, surface: ModalSurface): void {
       // from Settings with nothing stored brings the bar back underneath it, and the bar's
       // control would take a focus that belongs to the Settings opener (S01-R18 names both
       // directions). Surviving-first satisfies both; named-first satisfies one.
-      const survived = opener !== null && opener !== document.body && opener.isConnected;
+      //
+      // A DISABLED opener did not survive either: `focus()` on it is a no-op, so focus would stay
+      // on the page. The consent and crisis dialogs open from a Start button that stays disabled
+      // until they are answered (2026-10-22 keyboard audit).
+      const survived =
+        opener !== null && opener !== document.body && opener.isConnected && !opener.matches(":disabled");
       const named = surfaceRef.current.returnFocusRef?.current ?? null;
       if (survived) {
         focusElement(opener);

@@ -40,6 +40,8 @@ export function LanguageSwitcher() {
   const filtered = useMemo(() => filterLocales(query), [query]);
   const filteredCodes = useMemo(() => filtered.map(({ code }) => code as LocaleCode), [filtered]);
   const [highlightedCode, setHighlightedCode] = useState<LocaleCode>(locale);
+  // A pointer press is under way: the blur it causes is the person's own click, never a focus loss to repair.
+  const pressed = useRef(false);
 
   const close = useCallback((returnFocus = false): void => {
     setOpen(false);
@@ -58,12 +60,15 @@ export function LanguageSwitcher() {
     };
     place(); window.addEventListener("resize", place); window.addEventListener("scroll", place, true);
     searchRef.current?.focus();
+    pressed.current = false;
     const onPointerDown = (event: PointerEvent) => {
+      pressed.current = true;
       if (rootRef.current?.contains(event.target as Node) || panelRef.current?.contains(event.target as Node)) return;
       close(false);
     };
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => { document.removeEventListener("pointerdown", onPointerDown); window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
+    const release = () => { pressed.current = false; };
+    document.addEventListener("pointerdown", onPointerDown); document.addEventListener("pointerup", release); document.addEventListener("pointercancel", release);
+    return () => { document.removeEventListener("pointerdown", onPointerDown); document.removeEventListener("pointerup", release); document.removeEventListener("pointercancel", release); window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
   }, [close, open]);
 
   useEffect(() => {
@@ -73,11 +78,20 @@ export function LanguageSwitcher() {
 
   function select(code: LocaleCode): void {
     writeLocaleCookie(code);
-    close(false);
+    // The chosen row (or the search field) unmounts before the reload lands: focus waits on the trigger, not <body>.
+    close(true);
     window.location.reload();
   }
 
   function onKeyDown(event: KeyboardEvent): void {
+    if (event.key === "Tab" && panelRef.current?.contains(event.target as Node)) {
+      // The panel sits at the end of <body>, so Tab out of it would leave the page: it closes and the step starts
+      // from the trigger instead (Tab then moves on past it; Shift+Tab stays on it, the panel's place in the order).
+      close(false);
+      buttonRef.current?.focus();
+      if (event.shiftKey) event.preventDefault();
+      return;
+    }
     const currentIndex = highlightedLocaleIndex(filteredCodes, highlightedCode);
     const result = handleLanguageSwitcherKey(event.key, currentIndex, filtered.length);
     if (!["ArrowDown", "ArrowUp", "Home", "End", "Enter", "Escape"].includes(event.key)) return;
@@ -101,7 +115,11 @@ export function LanguageSwitcher() {
       ref={rootRef}
       onKeyDown={open ? onKeyDown : undefined}
       onBlur={(event) => {
-        if (!rootRef.current?.contains(event.relatedTarget as Node | null) && !panelRef.current?.contains(event.relatedTarget as Node | null)) close(false);
+        const next = event.relatedTarget as Node | null;
+        if (rootRef.current?.contains(next) || panelRef.current?.contains(next)) return;
+        // Focus that left for nowhere (no relatedTarget, no press: it would land on <body>) goes back to the
+        // trigger; a Tab or click to another control keeps the person's own focus.
+        close(open && next === null && !pressed.current);
       }}
     >
       <button

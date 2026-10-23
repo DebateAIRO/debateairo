@@ -9,17 +9,20 @@ import { useModalSurface } from "@/components/consent/modalSemantics";
  *
  * It reuses the shared modal helper unchanged: focus moves onto the dialog itself, so a screen
  * reader announces its name and starts reading at its top. Tab stays inside, Escape closes the
- * topmost surface only, and closing returns focus to the control that opened it.
+ * topmost surface only, and closing returns focus to the control that opened it — or to
+ * `returnFocusRef` when that control has left the page by then (the helper's own rule).
  */
 export function useDialogSurface<T extends HTMLElement = HTMLElement>(
-  onClose: () => void
+  onClose: () => void,
+  returnFocusRef?: React.RefObject<HTMLElement | null>
 ): React.RefObject<T | null> {
   const containerRef = React.useRef<T | null>(null);
   useHideOutside(containerRef);
   useModalSurface(true, {
     containerRef: containerRef as React.RefObject<HTMLElement | null>,
     initialFocusRef: containerRef as React.RefObject<HTMLElement | null>,
-    onClose
+    onClose,
+    returnFocusRef
   });
   return containerRef;
 }

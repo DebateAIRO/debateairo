@@ -18,6 +18,17 @@
 //       A partial or unequal <out> (OUTPUT_WRITE_FAILED, OUTPUT_READBACK_REFUSED) is kept where it is, never unlinked
 //       here: the operator moves it aside before a rerun (until then a rerun refuses OUTPUT_EXISTS).
 //
+//   caddy-slots.mjs add-payment-marks --in <live Caddyfile> --out <new file>
+//       After the transition upload T the live file already has two slots, so `transform` refuses it (CADDY_ALREADY_TWO_SLOTS).
+//       This command takes that two-slot file and adds only Caddy's rule for the payment marks (NETOPIA, Visa,
+//       Mastercard at /payment-marks/<name>.svg): the three named files, served from root's own folder outside every
+//       release, behind the password, right before the public route's main proxy. Same custody, new-file write, read-back
+//       and root-only rules as `transform`; prints one JSON line
+//       {"event":"PREVIEW_CADDY_PAYMENT_MARKS","folder":<the marks folder>,"files":[<the three names>]}. A one-slot file
+//       (CADDY_NOT_TWO_SLOTS), a file that already mentions the marks (CADDY_ALREADY_PAYMENT_MARKS) or a file of another
+//       shape (CADDY_SHAPE_REFUSED) is refused and nothing is written. The release guide's PM2 runs it
+//       inside a maintenance window (MT1/MT2), then validates with caddy, installs, restarts and checks.
+//
 // Every refusal is one JSON line {"event":"PREVIEW_CADDY_REFUSED","reason":<code>} on stderr and exit 1. Nothing read
 // from the Caddyfile is printed (its password lines are placeholders, but the file is the server's).
 import { constants, readFileSync } from 'node:fs';
@@ -46,6 +57,24 @@ const MAX_CADDYFILE_BYTES = 65_536;
 /** The public route's own answer to /readyz (final fix wave W2), with the line that says why. */
 export const PUBLIC_READYZ_REFUSAL = 'respond /readyz 404';
 const PUBLIC_READYZ_COMMENT = '# Readiness is never read through the public name: Caddy checks the slots directly, root asks 127.0.0.1:3090.';
+
+/** README §14.7: the payment marks are root's own files (0644 in a 0755 folder), outside every release; Caddy serves exactly these. */
+export const PAYMENT_MARKS = Object.freeze({ folder: '/etc/debateai-v3-preview/public/payment-marks', files: Object.freeze(['netopia.svg', 'visa.svg', 'mastercard.svg']) });
+/** The URL prefix the website's footer asks for (`/payment-marks/<name>.svg`), stripped before the folder lookup. */
+const PAYMENT_MARKS_PREFIX = '/payment-marks';
+/** The rule, tab-indented relative to the main proxy line (reindented to the file's own unit like the snippet). */
+const PAYMENT_MARKS_RULE = Object.freeze([
+  '# The payment marks (NETOPIA, Visa, Mastercard; README §14.7): root\'s own files, outside every release, served by Caddy behind the password.',
+  `@paymentMarks path ${PAYMENT_MARKS.files.map(file => `${PAYMENT_MARKS_PREFIX}/${file}`).join(' ')}`,
+  'handle @paymentMarks {',
+  `\troot * ${PAYMENT_MARKS.folder}`,
+  `\turi strip_prefix ${PAYMENT_MARKS_PREFIX}`,
+  '\theader Content-Type image/svg+xml',
+  '\theader Content-Security-Policy "default-src \'none\'; style-src \'unsafe-inline\'; sandbox"',
+  '\theader X-Content-Type-Options nosniff',
+  '\tfile_server',
+  '}'
+]);
 
 class CaddySlotsRefusal extends Error { constructor(code) { super(code); this.name = 'CaddySlotsRefusal'; this.code = code; } }
 const refuse = code => { throw new CaddySlotsRefusal(code); };
@@ -155,19 +184,68 @@ export function transformCaddyfile(liveText) {
   return transform(liveText).text;
 }
 
+/**
+ * README §14.7, after T: adds Caddy's payment marks rule to the live two-slot file, and nothing else. The rule goes
+ * immediately before the main proxy (`reverse_proxy <both slots> {` at the own top level of the block that holds the
+ * one `respond /readyz 404`, i.e. the public route), at that line's indentation in the file's own unit: after the
+ * readiness refusal and the password, never inside the notify handle or the loopback listener (their proxies sit
+ * deeper or in another block). Refuses CADDY_NOT_TWO_SLOTS (no `import debateai_slots` line or no slot-B upstream),
+ * CADDY_ALREADY_PAYMENT_MARKS (the text already mentions payment-marks) and CADDY_SHAPE_REFUSED (no global block with
+ * `admin off`, not exactly one readiness refusal, not exactly one proxy at that block's top level, or no `basic_auth`
+ * before it there).
+ */
+export function addPaymentMarks(liveText) {
+  if (typeof liveText !== 'string') refuse('CADDY_SHAPE_REFUSED');
+  if (!new RegExp(`^[ \\t]*import ${SNIPPET_NAME}$`, 'm').test(liveText)
+    || !new RegExp(`${escape(`127.0.0.1:${PREVIEW_SLOTS.B.uiPort}`)}(?![0-9])`).test(liveText)) refuse('CADDY_NOT_TWO_SLOTS');
+  if (liveText.includes('payment-marks')) refuse('CADDY_ALREADY_PAYMENT_MARKS');
+  const lines = liveText.split('\n');
+  if (lines.at(-1) === '') lines.pop();
+  const { close, unit } = globalBlock(lines);
+  const refusals = lines.flatMap((line, index) => (line.trim() === PUBLIC_READYZ_REFUSAL ? [index] : []));
+  if (refusals.length !== 1) refuse('CADDY_SHAPE_REFUSED');
+  const publicOpen = enclosingOpen(lines, refusals[0]);
+  if (publicOpen <= close) refuse('CADDY_SHAPE_REFUSED');
+  // The lines at the public block's own top level (depth 0 inside it), up to its closing brace.
+  const top = [];
+  for (let index = publicOpen + 1, depth = 0; ; index += 1) {
+    if (index >= lines.length) refuse('CADDY_SHAPE_REFUSED');
+    if (depth === 0 && lines[index].trim() !== '}') top.push(index);
+    depth += depthChange(lines[index]);
+    if (depth < 0) break;
+  }
+  const proxies = top.filter(index => ANY_PROXY.test(lines[index]));
+  const proxy = proxies[0];
+  if (proxies.length !== 1 || lines[proxy].trim() !== `reverse_proxy ${SLOT_UPSTREAMS} {`) refuse('CADDY_SHAPE_REFUSED');
+  // In a `route` Caddy runs the directives as written: the marks are served only behind the password.
+  if (!top.some(index => index < proxy && /^[ \t]*basic_auth(?:[ \t]|$)/.test(lines[index]))) refuse('CADDY_SHAPE_REFUSED');
+  const indent = indentOf(lines[proxy]);
+  const rule = PAYMENT_MARKS_RULE.map(line => `${indent}${line.replace(/^\t+/, tabs => unit.repeat(tabs.length))}`);
+  return `${[...lines.slice(0, proxy), ...rule, ...lines.slice(proxy)].join('\n')}\n`;
+}
+
 const absolute = path => typeof path === 'string' && isAbsolute(path) && normalize(path) === path && !path.endsWith('/') && !/[\0-\x1f\x7f]/.test(path);
 
-/** Exactly `transform --in <abs> --out <abs>`, each once. */
+/** The two commands: the text change and the event line it prints (a fresh object, keys in this order). */
+const COMMANDS = Object.freeze({
+  transform: liveText => {
+    const { text, proxiesChanged } = transform(liveText);
+    return { text, event: { event: 'PREVIEW_CADDY_TWO_SLOTS', proxiesChanged, edgeListener: EDGE_LISTENER.port } };
+  },
+  'add-payment-marks': liveText => ({ text: addPaymentMarks(liveText), event: { event: 'PREVIEW_CADDY_PAYMENT_MARKS', folder: PAYMENT_MARKS.folder, files: [...PAYMENT_MARKS.files] } })
+});
+
+/** Exactly `transform|add-payment-marks --in <abs> --out <abs>`, each once. */
 function parseArguments(argv) {
   const [command, ...rest] = argv;
-  if (command !== 'transform' || rest.length !== 4) refuse('ARGUMENTS_REFUSED');
+  if (!Object.hasOwn(COMMANDS, command ?? '') || rest.length !== 4) refuse('ARGUMENTS_REFUSED');
   const options = {};
   for (let index = 0; index < rest.length; index += 2) {
     const [flag, value] = [rest[index], rest[index + 1]];
     if (!['--in', '--out'].includes(flag) || Object.hasOwn(options, flag) || !absolute(value)) refuse('ARGUMENTS_REFUSED');
     options[flag] = value;
   }
-  return { input: options['--in'], output: options['--out'] };
+  return { command, input: options['--in'], output: options['--out'] };
 }
 
 /** Create `path` new (O_EXCL, no symlink followed), 0644, write every byte and fsync. The output is never replaced. */
@@ -183,7 +261,8 @@ async function writeNewFile(path, bytes) {
   } catch { refuse('OUTPUT_WRITE_FAILED'); } finally { await handle.close().catch(() => undefined); }
 }
 
-async function transformCommand({ input, output }, layout, deps = {}) {
+/** Both commands: custody-read the live file, change its text, write the copy new and read it back (header). */
+async function writeCommand({ command, input, output }, layout, deps = {}) {
   const owner = layout.ownerUid ?? 0;
   // The output's folder is root's alone, and nothing is at the output yet: checked before the live file is read.
   try { await protectedPath(output, { root: dirname(output), uid: owner }); } catch { refuse('OUTPUT_PATH_REFUSED'); }
@@ -193,7 +272,7 @@ async function transformCommand({ input, output }, layout, deps = {}) {
   try {
     liveText = await withPrivateBytes(input, { root: dirname(input), uid: owner, mode: 0o644, maxBytes: MAX_CADDYFILE_BYTES }, raw => new TextDecoder('utf8', { fatal: true }).decode(raw));
   } catch { refuse('INPUT_REFUSED'); }
-  const { text, proxiesChanged } = transform(liveText);
+  const { text, event } = COMMANDS[command](liveText);
   const bytes = Buffer.from(text, 'utf8');
   try { await (deps.write ?? writeNewFile)(output, bytes); } catch (error) { refuse(error instanceof CaddySlotsRefusal ? error.code : 'OUTPUT_WRITE_FAILED'); }
   // What is on disk is what the runbook validates and installs: read it back (root-owned, 0644, one link, no more bytes
@@ -203,7 +282,7 @@ async function transformCommand({ input, output }, layout, deps = {}) {
     equal = await withPrivateBytes(output, { root: dirname(output), uid: owner, mode: 0o644, maxBytes: bytes.length }, raw => Buffer.compare(raw, bytes) === 0);
   } catch { refuse('OUTPUT_READBACK_REFUSED'); }
   if (!equal) refuse('OUTPUT_READBACK_REFUSED');
-  return Object.freeze({ event: 'PREVIEW_CADDY_TWO_SLOTS', proxiesChanged, edgeListener: EDGE_LISTENER.port });
+  return Object.freeze(event);
 }
 
 const CODE = /^[A-Z][A-Z0-9_]{0,63}$/;
@@ -213,7 +292,7 @@ export async function main(argv, { actor = {}, layout = {}, deps = {}, stdout = 
   try {
     const args = parseArguments(argv);
     try { assertActor(actor); } catch { refuse('ACTOR_REFUSED'); }
-    stdout.write(`${JSON.stringify(await transformCommand(args, layout, deps))}\n`);
+    stdout.write(`${JSON.stringify(await writeCommand(args, layout, deps))}\n`);
     return 0;
   } catch (error) {
     stderr.write(`${JSON.stringify({ event: 'PREVIEW_CADDY_REFUSED', reason: error instanceof CaddySlotsRefusal && CODE.test(error.code) ? error.code : 'UNEXPECTED' })}\n`);

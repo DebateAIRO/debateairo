@@ -27,6 +27,8 @@ export function AccountMenu({ authenticated, catalog: provided, client = contrac
     const panel = useRef<HTMLDivElement>(null);
     const [position, setPosition] = useState({ top: 0, left: 12, width: 240 });
     const trigger = useRef<HTMLButtonElement>(null);
+    // A pointer press is under way: the blur it causes is the person's own click, never a focus loss to repair.
+    const pressed = useRef(false);
     const id = useId();
     useEffect(() => {
         let active = true;
@@ -43,12 +45,17 @@ export function AccountMenu({ authenticated, catalog: provided, client = contrac
     function close(restore = true) { setOpen(false); if (restore) queueMicrotask(() => trigger.current?.focus()); }
     useEffect(() => {
         if (!open) return;
-        const outside = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node) && !panel.current?.contains(event.target as Node)) close(false); };
+        pressed.current = false;
+        const outside = (event: PointerEvent) => { pressed.current = true; if (!root.current?.contains(event.target as Node) && !panel.current?.contains(event.target as Node)) close(false); };
+        const release = () => { pressed.current = false; };
+        // Focus fell to <body> with the menu open (a press on the panel's padding, the logout button disabling
+        // itself): the key no longer reaches the menu, so Escape is caught here and still closes it onto the trigger.
+        const escape = (event: KeyboardEvent) => { if (event.key === 'Escape' && event.target === document.body) { event.preventDefault(); close(); } };
         const place = () => { const rect = trigger.current?.getBoundingClientRect(); if (!rect) return; const width = Math.min(240, window.innerWidth - 24); const height = panel.current?.offsetHeight ?? 160; setPosition({ top: Math.max(12, Math.min(rect.bottom + 8, window.innerHeight - height - 12)), left: Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12)), width }); };
         place(); window.addEventListener('resize', place); window.addEventListener('scroll', place, true);
-        document.addEventListener('pointerdown', outside);
+        document.addEventListener('pointerdown', outside); document.addEventListener('pointerup', release); document.addEventListener('pointercancel', release); document.addEventListener('keydown', escape);
         panel.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
-        return () => { document.removeEventListener('pointerdown', outside); window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true); };
+        return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('pointerup', release); document.removeEventListener('pointercancel', release); document.removeEventListener('keydown', escape); window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true); };
     }, [open]);
     async function logout() {
         if (flight.current) return;
@@ -58,8 +65,24 @@ export function AccountMenu({ authenticated, catalog: provided, client = contrac
         finally { flight.current = false; setBusy(false); }
     }
     if (signedIn !== true) return signedIn === false && signInHref ? <a className={signInClassName} href={signInHref}>{t(catalog, 'chrome.logIn')}</a> : null;
-    return <div className="accountMenu" ref={root} onBlur={event => { if (open && event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node) && !panel.current?.contains(event.relatedTarget as Node)) close(false); }} onKeyDown={event => {
+    // Focus that leaves for another control closes the menu and stays there; focus that leaves for nowhere (no
+    // relatedTarget: it would land on <body>) closes it onto the trigger, unless a press or the logout in flight caused it.
+    return <div className="accountMenu" ref={root} onBlur={event => {
+        if (!open) return;
+        const next = event.relatedTarget as Node | null;
+        if (next === null) { if (!pressed.current && !flight.current) close(); }
+        else if (!event.currentTarget.contains(next) && !panel.current?.contains(next)) close(false);
+    }} onKeyDown={event => {
         if (event.key === 'Escape') { event.preventDefault(); close(); return; }
+        if (event.key === 'Tab' && open) {
+            // The panel sits at the end of <body>, so Tab past its last item (Shift+Tab before its first) would leave
+            // the page: the menu closes and the step starts from the trigger instead (Tab then moves on past it).
+            const items = Array.from(panel.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []).filter(item => !item.matches(':disabled'));
+            if (document.activeElement !== (event.shiftKey ? items[0] : items.at(-1))) return;
+            close(false); trigger.current?.focus();
+            if (event.shiftKey) event.preventDefault();
+            return;
+        }
         if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
         event.preventDefault();
         if (!open) { setOpen(true); return; }

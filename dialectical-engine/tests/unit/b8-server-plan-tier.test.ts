@@ -369,8 +369,12 @@ describe("submit through B6b's room hands it the decided ask (R-28)", () => {
   it("records the interim swap in the room decision's own transaction, and the room sees the Free roster's class", async () => {
     const { billing } = billingFor("PLUS", { spent: 900_000, limit: 1_000_000 }, 300_000);
     const { room, questions } = recordingRoom();
-    const { application, started, substitutions } = arrange(billing, room);
+    const { application, started, substitutions, memory } = arrange(billing, room);
     const accepted = await application.submit(ask(), serverSession, serverPrincipal);
+    // Preview incident 2026-10-22: the record holds the new run's row on `tx` until the decision commits, and the
+    // memory question locks that row FOR UPDATE on another connection, so the record comes AFTER it.
+    expect(memory).toHaveBeenCalledTimes(1);
+    expect(memory.mock.invocationCallOrder[0]!).toBeLessThan(substitutions.mock.invocationCallOrder[0]!);
     expect(questions[0]!.settingsClass).toEqual({
       planTier: "free", compositionBudgetTier: "medium", makerCount: PLAN_TIER_ROSTERS.free.length, depth: 3
     });
@@ -391,7 +395,8 @@ describe("submit through B6b's room hands it the decided ask (R-28)", () => {
     substitutions.mockRejectedValue(failure);
     await expect(application.submit(ask(), serverSession, serverPrincipal)).rejects.toBe(failure);
     expect(setupFailures).toHaveBeenCalledWith(setupFailureFor("RUN_SETUP_FAILED:COST_RECORD"));
-    expect(memory).not.toHaveBeenCalled();
+    // On the room path the memory question comes first (preview incident 2026-10-22); the decision then rolls back.
+    expect(memory).toHaveBeenCalledTimes(1);
     // On the room path the first job would be queued with `enqueueOn(tx, …)`: neither form ran.
     expect(enqueuedOnRoom).not.toHaveBeenCalled();
     expect(enqueued).not.toHaveBeenCalled();

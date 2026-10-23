@@ -12,6 +12,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   canonicalRegisterJson,
+  COST_ESTIMATE_START_POLICY_ROW_KEY,
   computeRegisterSnapshotSha256,
   loadBootstrapRegister,
   parseCanonicalRegisterJson,
@@ -161,7 +162,7 @@ describe("--register-next on the hosted preview: publish kit v3, as the server's
     expect(next.snapshotSha256).toBe(server.snapshotSha256);
     expect(next.deltaSha256).toBe(server.deltaSha256);
     expect(next).toMatchObject({ composer: "preview-register-composer-v3", checker: "glm", roleRotation: "on", hostedBilling: OFF, notes: [],
-      addedKeys: [STORY_COST_ENVELOPE_POLICY_ROW_KEY], changedKeys: ["admissionPolicy", "costEnvelopePolicy"] });
+      addedKeys: [COST_ESTIMATE_START_POLICY_ROW_KEY, STORY_COST_ENVELOPE_POLICY_ROW_KEY], changedKeys: ["admissionPolicy", "costEnvelopePolicy"] });
     expect(value(next.rows as readonly Row[], "costEnvelopePolicy")).toMatchObject({ per_run_ceiling_micros: 3_000_000, daily_ceiling_micros: 10_000_000 });
     expect(value(next.rows as readonly Row[], "billingPolicy").enabled).toBe(false);
   });

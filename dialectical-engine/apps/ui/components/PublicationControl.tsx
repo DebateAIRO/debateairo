@@ -44,6 +44,33 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
   // scrolls (globals.css, D-S02-24), and the owner scrolled it down to reach the button that produced the answer.
   const [answered, setAnswered] = useState(0);
   const cardRef = useRef<HTMLElement>(null);
+  // Every control here swaps itself out (Publish… → its form → Unpublish…, Delete… → its form, the security check's
+  // Cancel): after the swap, focus moves to what `focusNext` names, else to the card's heading — never to <body>.
+  const heading = useRef<HTMLHeadingElement>(null);
+  const toggle = useRef<HTMLButtonElement>(null);
+  const acknowledge = useRef<HTMLInputElement>(null);
+  const deleteToggle = useRef<HTMLButtonElement>(null);
+  const deleteAcknowledge = useRef<HTMLInputElement>(null);
+  const opener = useRef<HTMLElement | null>(null);
+  const focusNext = useRef<(() => HTMLElement | null) | null>(null);
+  // The heading turns into a focus target (tabIndex -1) only once focus has to land on it, as AuthShell's
+  // focusTitle does, so the card's first render stays as it was.
+  const [headingFocus, setHeadingFocus] = useState(0);
+  useEffect(() => {
+    const pick = focusNext.current;
+    if (!pick || busy) return;
+    focusNext.current = null;
+    const target = pick();
+    if (target && target !== document.body && target.isConnected && !target.matches(":disabled")) target.focus();
+    else setHeadingFocus((count) => count + 1);
+  });
+  useEffect(() => {
+    if (headingFocus) heading.current?.focus();
+  }, [headingFocus]);
+  function rememberOpener(): void {
+    const focused = document.activeElement;
+    opener.current = focused instanceof HTMLElement ? focused : null;
+  }
 
   useLayoutEffect(() => {
     const card = cardRef.current;
@@ -67,6 +94,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (action === null || !acknowledged || busy) return;
+    rememberOpener();
     setConfirming('publication');
   }
   async function publishConfirmed(result:ConfirmedSecurityAction):Promise<void> {
@@ -81,6 +109,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
       setAction(null);
       setConfirming(null);
       setAcknowledged(false);
+      focusNext.current = () => toggle.current;
       setMessage(action === "PUBLISH"
         ? t(catalog, "public.publication.publishedSuccess")
         : t(catalog, "public.publication.unpublishedSuccess"));
@@ -105,6 +134,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
   async function deletePrivate(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (!deleteAcknowledged || busy || visibility?.state !== "PRIVATE") return;
+    rememberOpener();
     setConfirming('delete');
   }
   async function deleteConfirmed(result:ConfirmedSecurityAction):Promise<void> {
@@ -116,6 +146,8 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
       setConfirming(null);
       setDeleteAcknowledged(false);
       setDeleteOpen(false);
+      // Deleted: the tombstone's heading; pending: the disabled "Deletion pending" falls back to the card's heading.
+      focusNext.current = () => deleteToggle.current;
       setDeleted(status === "CLEANED");
       setDeletePending(status === "PENDING");
       onPrivateDeletion?.(status);
@@ -151,7 +183,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
   if (deleted) {
     return (
       <section className="card" aria-label={t(catalog, "public.publication.deletedAria")}>
-        <h2>{t(catalog, "public.publication.privateDeletedHeading")}</h2>
+        <h2 ref={heading} tabIndex={headingFocus ? -1 : undefined}>{t(catalog, "public.publication.privateDeletedHeading")}</h2>
         <p role="status">{t(catalog, "public.publication.tombstone")}</p>
       </section>
     );
@@ -159,7 +191,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
 
   return (
     <section ref={cardRef} className="card publicationControl" data-support-primary-control aria-label={t(catalog, "public.publication.controlsAria")}>
-      <h2>{t(catalog, "public.publication.visibility")}</h2>
+      <h2 ref={heading} tabIndex={headingFocus ? -1 : undefined}>{t(catalog, "public.publication.visibility")}</h2>
       <p>
         {visibility === null
           ? t(catalog, "public.publication.checking")
@@ -177,6 +209,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
       ) : message ? <p role="status">{message}</p> : null}
       {action === null ? (
         <button
+          ref={toggle}
           type="button"
           className="button"
           disabled={visibility === null}
@@ -185,6 +218,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
             setDeleteOpen(false);
             setConfirming(null);
             setAction(visibility?.state === "PUBLISHED" ? "UNPUBLISH" : "PUBLISH");
+            focusNext.current = () => acknowledge.current;
           }}
         >
           {visibility?.state === "PUBLISHED"
@@ -196,6 +230,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
           <p><strong>{warning}</strong></p>
           <label>
             <input
+              ref={acknowledge}
               type="checkbox"
               checked={acknowledged}
               onChange={(event) => setAcknowledged(event.target.checked)}
@@ -213,7 +248,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
                   ? t(catalog, "public.publication.publishPublicly")
                   : t(catalog, "public.publication.unpublish")}
             </button>
-            <button type="button" className="button" disabled={busy} onClick={() => { setStatement(null); setAction(null); setConfirming(null); }}>{t(catalog, "public.publication.cancel")}</button>
+            <button type="button" className="button" disabled={busy} onClick={() => { setStatement(null); setAction(null); setConfirming(null); focusNext.current = () => toggle.current; }}>{t(catalog, "public.publication.cancel")}</button>
           </div>
         </form>
       )}
@@ -225,10 +260,11 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
           </p>
           {!deleteOpen ? (
             <button
+              ref={deleteToggle}
               type="button"
               className="button"
               disabled={busy || deletePending}
-              onClick={() => { setStatement(null); setAction(null); setConfirming(null); setDeleteOpen(true); }}
+              onClick={() => { setStatement(null); setAction(null); setConfirming(null); setDeleteOpen(true); focusNext.current = () => deleteAcknowledge.current; }}
             >
               {deletePending
                 ? t(catalog, "public.publication.deletionPendingShort")
@@ -238,6 +274,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
             <form noValidate onSubmit={(event) => void deletePrivate(event)}>
               <label>
                 <input
+                  ref={deleteAcknowledge}
                   type="checkbox"
                   checked={deleteAcknowledged}
                   onChange={(event) => setDeleteAcknowledged(event.target.checked)}
@@ -251,7 +288,7 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
                     ? t(catalog, "public.publication.authorizing")
                     : t(catalog, "public.publication.permanentlyDelete")}
                 </button>
-                <button type="button" className="button" disabled={busy} onClick={() => {setDeleteOpen(false);setConfirming(null);}}>
+                <button type="button" className="button" disabled={busy} onClick={() => {setDeleteOpen(false);setConfirming(null);focusNext.current = () => deleteToggle.current;}}>
                   {t(catalog, "public.publication.cancel")}
                 </button>
               </div>
@@ -259,8 +296,8 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
           )}
         </div>
       ) : null}
-      {confirming==='publication'&&action?<SecurityConfirmation catalog={authCatalog} client={client} authorization={{action,target_run_id:runId}} disabled={!acknowledged} onError={proofFailure} onConfirmed={publishConfirmed} onCancel={()=>setConfirming(null)}/>:null}
-      {confirming==='delete'?<SecurityConfirmation catalog={authCatalog} client={client} authorization={{action:'DELETE_PRIVATE_DEBATE',target_run_id:runId}} disabled={!deleteAcknowledged} onError={proofFailure} onConfirmed={deleteConfirmed} onCancel={()=>setConfirming(null)}/>:null}
+      {confirming==='publication'&&action?<SecurityConfirmation catalog={authCatalog} client={client} authorization={{action,target_run_id:runId}} disabled={!acknowledged} onError={proofFailure} onConfirmed={publishConfirmed} onCancel={()=>{focusNext.current=()=>opener.current;setConfirming(null);}}/>:null}
+      {confirming==='delete'?<SecurityConfirmation catalog={authCatalog} client={client} authorization={{action:'DELETE_PRIVATE_DEBATE',target_run_id:runId}} disabled={!deleteAcknowledged} onError={proofFailure} onConfirmed={deleteConfirmed} onCancel={()=>{focusNext.current=()=>opener.current;setConfirming(null);}}/>:null}
     </section>
   );
 }

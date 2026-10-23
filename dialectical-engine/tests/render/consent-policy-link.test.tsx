@@ -294,7 +294,8 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
     // PROPERTY (S01-R18, R20, D-31): initial focus lands on the card's Close button — the card
     // has nothing to operate but its three footer controls — and Tab cycles within the card.
     // Neither is implemented here: the card hands the helper a container and an initial-focus
-    // target and the helper does the rest.
+    // target and the helper does the rest. The scrolling item list is a Tab stop too, so the
+    // keyboard can scroll it (2026-10-22 keyboard audit); it comes first, in document order.
     mountBar();
     activate(barOpener());
 
@@ -307,8 +308,8 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
     ];
     expect(
       focusable.map((element) => element.textContent?.trim()),
-      "the card's focusable set: Privacy notice, the /cookies link, Close"
-    ).toEqual(["Privacy notice", COOKIE_POLICY, EN["consent.policy.close"]]);
+      "the card's focusable set: the item list, Privacy notice, the /cookies link, Close"
+    ).toEqual([card()!.querySelector(".consentCatList")!.textContent?.trim(), "Privacy notice", COOKIE_POLICY, EN["consent.policy.close"]]);
 
     act(() => focusable[focusable.length - 1]!.focus());
     press("Tab");

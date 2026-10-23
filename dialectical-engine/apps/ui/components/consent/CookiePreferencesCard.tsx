@@ -88,7 +88,9 @@ export function CookiePreferencesCard({
             {t(catalog, "consent.preferences.title")}
           </div>
           <div className="consentLede">{t(catalog, "consent.preferences.lede")}</div>
-          <div className="consentCatList">
+          {/* The list scrolls and holds only text, so it is a Tab stop of its own: without one
+              a keyboard user could never scroll to the items below the fold. */}
+          <div className="consentCatList" tabIndex={0} role="region" aria-labelledby={titleId}>
             {LEGAL_INVENTORY.map((item) => (
               <div className="consentCatRow" key={item.name}>
                 <div className="consentCatMain">

@@ -1104,6 +1104,7 @@ packages/register/src/compose-env.ts
 packages/register/src/configured-provider-set.ts
 packages/register/src/consumer-recovery-policy.ts
 packages/register/src/cost-envelope-policy.ts
+packages/register/src/cost-estimate-start-policy.ts
 packages/register/src/country-policy.ts
 packages/register/src/debate-shape-ceiling.ts
 packages/register/src/debate-shape-policy.ts

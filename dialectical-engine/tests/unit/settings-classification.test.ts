@@ -40,6 +40,7 @@ import {
   PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2,
   PREVIEW_SOURCE_ROW_KEYS_V2
 } from "../../deploy/preview-auth-dev/v1/publish-register-v2.js";
+import { PREVIEW_SOURCE_ROW_KEYS_V3 } from "../../deploy/preview-auth-dev/v1/publish-register-v3.js";
 
 /** Row keys an exported module value names: `*_ROW_KEY` strings, `*_ROW_KEYS` lists, `*_REGISTER_ROW(S)` rows. */
 function rowKeysExportedBy(moduleExports: Readonly<Record<string, unknown>>): string[] {
@@ -72,6 +73,8 @@ function rowKeysKnownToCode(): Readonly<Record<string, readonly string[]>> {
     developmentRunner: DEVELOPMENT_RUNNER_ROW_KEYS,
     previewSource: PREVIEW_SOURCE_ROW_KEYS_V2,
     previewOptional: PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2,
+    // Kit v3 (hosted): v2's keys plus the story's money row and, since PR #212, costEstimateStartPolicy (SITE).
+    previewSourceV3: PREVIEW_SOURCE_ROW_KEYS_V3,
     previewBaseOwned: PREVIEW_BASE_OWNED_KEYS,
     // approvedOperatorVariants is sealed and read only in SQL (migrations 0049, 0120): no TypeScript constant.
     sqlOnly: ["approvedOperatorVariants"]
@@ -115,6 +118,8 @@ describe("settings row classification (side-by-side spec §13)", () => {
     }
     expect(settingsRowKind("costEnvelopePolicy")).toBe("MIXED");
     expect(settingsRowKind("rateLimitPolicy")).toBe("SITE");
+    // Fresh-site estimate (merge of PR #212): the room estimate's starting figures follow the release.
+    expect(settingsRowKind("costEstimateStartPolicy")).toBe("SITE");
     expect(settingsRowKind("verdictHighCut")).toBe("DEBATE");
     expect(settingsRowKind("engineContractHash")).toBe("CODE_BOUND");
     expect(Object.isFrozen(SETTINGS_ROW_KINDS)).toBe(true);

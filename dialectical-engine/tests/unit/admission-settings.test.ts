@@ -148,6 +148,7 @@ function site(change: Partial<AdmissionSiteContext> = {}): AdmissionSiteContext 
     spend: null,
     recentRunUsage: { readRecentRunUsage: async () => [] },
     prices: new Map(),
+    costEstimateStart: null,
     questionLanguage: { routeFor: async () => ({ kind: "NONE", reason: "NO_GATE" }), referenceKey: newQuestionLanguageReferenceKey() },
     log: () => undefined,
     ...change
@@ -226,6 +227,22 @@ describe("the version's money (V-28, B6b, Task M7) over the site's day and band"
     // With the room composed (the site context gives the guard no store), no daily guard and no assertDailyCostEnvelope.
     expect(loaded.dailyGuard).toBeNull();
     expect("assertDailyCostEnvelope" in admissionSettingsOfVersion(loaded)).toBe(false);
+  });
+
+  it("the estimator starts from the SITE's costEstimateStartPolicy row (fresh-site estimate, merge of PR #212)", async () => {
+    const fake = readers(VERSION);
+    const ask = { planTier: "free", compositionBudgetTier: "low", makerCount: 2, depth: 1 } as const;
+    // A price to price with (the starting figure is used only then); no recent runs, so the sample is short.
+    const prices = new Map([["provider/model", {} as never]]);
+    const start = Object.freeze({ minSamples: 5, startMicrosByDepth: new Map([[1, 7]]) }) as never;
+    const started = await loadAdmissionSettings(POOL, VERSION, site({ prices, costEstimateStart: start }), undefined,
+      { readers: fake.readers });
+    expect(await started.estimator!.estimateMicros(ask)).toBe(7);
+    // Without the site's row: today's estimate, the cap while the sample is short.
+    const today = await loadAdmissionSettings(POOL, VERSION, site({ prices }), undefined, { readers: readers(VERSION).readers });
+    expect(await today.estimator!.estimateMicros(ask)).toBe(mostOneRunMaySpendMicros(today.costEnvelope!.guardPolicy));
+    // A SITE row: no reader of it is handed the version (the loader never reads it per version).
+    expect(fake.calls.some(([name]) => /CostEstimateStart/u.test(name))).toBe(false);
   });
 
   it("without the room: the daily guard over the site's store and the version's guard policy, and no estimator", async () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getSettingsView } from "@/lib/api";
 import { AuthGate } from "@/components/AuthGate";
 import { AccountErasureControls } from "@/components/AccountErasureControls";
@@ -49,33 +49,51 @@ export function SettingsPageClient({
     const link = takeEmailChangeLink(window);
     if (link !== null) setEmailLink(link);
   }, []);
+  // Its Go to Settings swaps the whole screen out from under the pressed button: Settings' title takes focus.
+  const [linkDone, setLinkDone] = useState(false);
   if (emailLink !== null) {
-    return <EmailChangeLinkScreen catalog={catalog} link={emailLink} onDone={() => setEmailLink(null)} />;
+    return <EmailChangeLinkScreen catalog={catalog} link={emailLink} onDone={() => { setLinkDone(true); setEmailLink(null); }} />;
   }
   return (
     <AuthGate catalog={newDebateCatalog} legalGate={false}>
       {() => (
-        <AccountSettingsScreen catalog={catalog} locale={locale} billingCatalog={billingCatalog} renewalConsent={renewalConsent} />
+        <AccountSettingsScreen catalog={catalog} locale={locale} billingCatalog={billingCatalog} renewalConsent={renewalConsent}
+          focusTitle={linkDone} />
       )}
     </AuthGate>
   );
 }
 
-function AccountSettingsScreen({ catalog, locale, billingCatalog, renewalConsent }: Required<SettingsI18nProps> & {
+function AccountSettingsScreen({ catalog, locale, billingCatalog, renewalConsent, focusTitle }: Required<SettingsI18nProps> & {
   billingCatalog: MessageCatalog;
   renewalConsent: Readonly<{ version: string; sha256: string }> | null;
+  /** Settings replaced a screen whose focused control is gone (the mailed link's Go to Settings). */
+  focusTitle: boolean;
 }) {
   const [changingFrom, setChangingFrom] = useState<string | null>(null);
   const [emailNotice, setEmailNotice] = useState<string | null>(null);
+  // Back from the change form (or its request sent) unmounts the focused control: the Email card takes focus.
+  const [returned, setReturned] = useState(false);
+  // The title takes focus once, unless the person moved on while the session was checked.
+  const title = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (!focusTitle) return;
+    const focused = document.activeElement;
+    if (focused === null || focused === document.body) title.current?.focus();
+  }, [focusTitle]);
 
   if (changingFrom !== null) {
     return (
       <ChangeEmailScreen
         catalog={catalog}
         currentEmail={changingFrom}
-        onBack={() => setChangingFrom(null)}
+        onBack={() => {
+          setReturned(true);
+          setChangingFrom(null);
+        }}
         onRequested={() => {
           setEmailNotice(t(catalog, "settings.email.requested"));
+          setReturned(true);
           setChangingFrom(null);
         }}
       />
@@ -86,7 +104,7 @@ function AccountSettingsScreen({ catalog, locale, billingCatalog, renewalConsent
     <div className="screen scroll setScreen">
       <div className="setBody">
         <div className="setInner">
-          <h1 className="setTitle">{t(catalog, "settings.account.title")}</h1>
+          <h1 className="setTitle" ref={title} tabIndex={focusTitle ? -1 : undefined}>{t(catalog, "settings.account.title")}</h1>
           <a className="setBtn" href="/settings/security">{t(catalog, "settings.security.title")}</a>
           <SubscriptionControls catalog={billingCatalog} locale={locale} renewalConsent={renewalConsent} />
           <UsageBars catalog={billingCatalog} locale={locale} />
@@ -94,6 +112,7 @@ function AccountSettingsScreen({ catalog, locale, billingCatalog, renewalConsent
           <EmailSettingsCard
             catalog={catalog}
             notice={emailNotice}
+            restoreFocus={returned}
             onChange={(currentEmail) => {
               setEmailNotice(null);
               setChangingFrom(currentEmail);

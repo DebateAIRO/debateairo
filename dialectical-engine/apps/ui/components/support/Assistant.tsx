@@ -950,7 +950,18 @@ export function Assistant({
     event.preventDefault();
     const field = event.currentTarget.elements.namedItem("support-message");
     if (!(field instanceof HTMLInputElement)) return;
+    // Send is disabled until the answer arrives, which would drop its keyboard focus to the page (2026-10-22).
+    field.focus();
     await sendRequest(field.value,() => { field.value = ""; });
+  }
+
+  /**
+   * Both "talk to a person" buttons are disabled while the case opens, which would drop the pressed one's keyboard
+   * focus to the page (2026-10-22): focus goes to the message field, as a suggestion's does.
+   */
+  function escalateFromButton(): void {
+    inputRef.current?.focus();
+    void escalate();
   }
 
   async function escalate(): Promise<void> {
@@ -1091,7 +1102,7 @@ export function Assistant({
         type="button"
         className="supportEscalateCompact"
         disabled={inert}
-        onClick={() => void escalate()}
+        onClick={escalateFromButton}
       >{PERSON_MARK}<span>{t(chromeCatalog,"support.talkToHuman")}</span></button>
       {composer}
     </section>
@@ -1193,7 +1204,13 @@ export function Assistant({
           <div className="supportSuggestions" aria-label={t(chromeCatalog,"support.suggestions")}>
             {HELP_SUGGESTIONS.map((suggestionKey) => <button
               type="button" key={suggestionKey} disabled={inert}
-              onClick={() => void sendRequest(t(chromeCatalog,suggestionKey))}
+              onClick={() => {
+                // Sending disables every suggestion until the answer arrives, which would drop the
+                // pressed one's keyboard focus to the page. The conversation goes on in the composer,
+                // where a topic already puts focus; the disabled suggestions and Send still say it is busy.
+                inputRef.current?.focus();
+                void sendRequest(t(chromeCatalog,suggestionKey));
+              }}
             >{t(chromeCatalog,suggestionKey)}</button>)}
           </div>
         </div>
@@ -1217,7 +1234,7 @@ export function Assistant({
           <span className="supportEscalationTab" aria-hidden />
           <h2>{t(chromeCatalog,"support.needPerson")}</h2>
           <p>{t(chromeCatalog,"support.escalateBody")}</p>
-          <button type="button" disabled={inert} onClick={() => void escalate()}>
+          <button type="button" disabled={inert} onClick={escalateFromButton}>
             {t(chromeCatalog,"support.escalate")}
           </button>
           <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>

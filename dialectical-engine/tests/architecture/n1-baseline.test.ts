@@ -23,9 +23,17 @@ const INITIAL_SUITES = Object.freeze([
   "staff-access-database", "internal-allowance-database"
 ].map((name) => `tests/integration/${name}.test.ts`));
 
-type Baseline = Readonly<{ schema: string; commit: string | null; reason: string; suites: readonly string[] }>;
-const { parseN1Baseline } = await import(pathToFileURL(resolve(productRoot, "tools/n1-baseline.mjs")).href) as {
+type Entry = Readonly<{ name: string; reason: string }>;
+type Baseline = Readonly<{
+  schema: string; commit: string | null; reason: string; suites: readonly string[];
+  setAside: readonly Entry[]; knownRed: readonly Entry[];
+}>;
+const { parseN1Baseline, knownRedLines } = await import(pathToFileURL(resolve(productRoot, "tools/n1-baseline.mjs")).href) as {
   parseN1Baseline: (text: string) => Baseline;
+  knownRedLines: (baseline: Baseline) => readonly string[];
+};
+const { parseAllowlist } = await import(pathToFileURL(resolve(productRoot, "tools/ci-known-red.mjs")).href) as {
+  parseAllowlist: (text: string) => { entries: string[]; invalid: string[] };
 };
 const baselineText = (): string => readFileSync(resolve(productRoot, BASELINE_PATH), "utf8");
 const tool = (...args: string[]): string => execFileSync(process.execPath, ["tools/n1-baseline.mjs", ...args], {
@@ -34,9 +42,10 @@ const tool = (...args: string[]): string => execFileSync(process.execPath, ["too
 const workflow = (): string => readFileSync(resolve(gitRoot, WORKFLOW_PATH), "utf8");
 
 describe("side-by-side §5: the N-1 baseline file", () => {
-  it("has exactly schema, commit, reason and suites; a null commit carries its reason", () => {
+  it("has exactly schema, commit, reason and suites (and optionally setAside, knownRed); a null commit carries its reason", () => {
     const raw = JSON.parse(baselineText()) as Record<string, unknown>;
-    expect(Object.keys(raw).sort()).toEqual(["commit", "reason", "schema", "suites"]);
+    expect(Object.keys(raw).filter((key) => !["knownRed", "setAside"].includes(key)).sort())
+      .toEqual(["commit", "reason", "schema", "suites"]);
     expect(raw.schema).toBe("debateai-n1-baseline-v1");
     expect(raw.commit === null || (typeof raw.commit === "string" && /^[0-9a-f]{40}$/u.test(raw.commit))).toBe(true);
     if (raw.commit === null) expect(typeof raw.reason === "string" && raw.reason.trim() !== "").toBe(true);
@@ -52,12 +61,37 @@ describe("side-by-side §5: the N-1 baseline file", () => {
       expect(existsSync(resolve(productRoot, suite)), suite).toBe(true);
       expect(EXCLUDED_SUITE.test(suite), suite).toBe(false);
     }
-    // The first twelve stay on the list: the list may grow, never shrink in silence.
-    for (const suite of INITIAL_SUITES) expect(suites, suite).toContain(suite);
+    // The first twelve stay on the list: the list may grow, never shrink in silence. A suite leaves it only into
+    // `setAside`, with its reason (r20: staff-access-database builds a historical migration lineage itself).
+    const setAsideSuites = parseN1Baseline(baselineText()).setAside.map((entry) => entry.name);
+    for (const suite of INITIAL_SUITES) expect([...suites, ...setAsideSuites], suite).toContain(suite);
+  });
+
+  it("names each set-aside or known-red test once, in a listed suite, with a one-line reason the old gate can read", () => {
+    const baseline = parseN1Baseline(baselineText());
+    const names = [...baseline.setAside, ...baseline.knownRed].map((entry) => entry.name);
+    expect(new Set(names).size).toBe(names.length);
+    for (const entry of [...baseline.setAside, ...baseline.knownRed]) {
+      expect(entry.reason.trim(), entry.name).not.toBe("");
+      if (/^tests\/integration\/[\w.-]+\.test\.ts$/u.test(entry.name)) {
+        expect(baseline.setAside, entry.name).toContain(entry);
+        expect(baseline.suites, entry.name).not.toContain(entry.name);
+        expect(existsSync(resolve(productRoot, entry.name)), entry.name).toBe(true);
+      } else {
+        expect(baseline.suites, entry.name).toContain(entry.name.split(" > ")[0]);
+      }
+    }
+    // The lines the job appends parse as the old tools/ci-known-red.mjs reads its list: test names only, each once.
+    const lines = knownRedLines(baseline);
+    const parsed = parseAllowlist(`${lines.join("\n")}\n`);
+    expect(parsed.invalid).toEqual([]);
+    expect(parsed.entries).toEqual(names.filter((name) => name.includes(" > ")));
+    for (const line of lines) expect(line === "" || line.startsWith("#") || parsed.entries.includes(line), line).toBe(true);
   });
 
   it("refuses N1_BASELINE_INVALID on any shape error", () => {
     const good = JSON.parse(baselineText()) as Record<string, unknown>;
+    const suite0 = (good.suites as string[])[0]!;
     const variants: readonly unknown[] = [
       "not json",
       [],
@@ -75,7 +109,22 @@ describe("side-by-side §5: the N-1 baseline file", () => {
       { ...good, suites: ["tests/integration/../unit/x.test.ts"] },
       { ...good, suites: ["tests/integration/migration-per-step.test.ts"] },
       { ...good, suites: ["tests/integration/side-by-side-releases-forward0123.test.ts"] },
-      { ...good, suites: ["tests/integration/preview-auth-stack.test.ts"] }
+      { ...good, suites: ["tests/integration/preview-auth-stack.test.ts"] },
+      { ...good, setAside: "x" },
+      { ...good, knownRed: {} },
+      { ...good, knownRed: [null] },
+      { ...good, knownRed: [{ name: `${suite0} > d > t` }] },
+      { ...good, knownRed: [{ name: `${suite0} > d > t`, reason: "r", extra: 1 }] },
+      { ...good, knownRed: [{ name: `${suite0} > d > t`, reason: " " }] },
+      { ...good, knownRed: [{ name: `${suite0} > d > t`, reason: "two\nlines" }] },
+      { ...good, knownRed: [{ name: `${suite0} > d > t\nx`, reason: "r" }] },
+      { ...good, knownRed: [{ name: `${suite0} > t`, reason: "r" }] },
+      { ...good, knownRed: [{ name: `${suite0} >  > t`, reason: "r" }] },
+      { ...good, knownRed: [{ name: suite0, reason: "a whole suite is set aside, never known red" }] },
+      { ...good, knownRed: [{ name: "tests/integration/not-listed.test.ts > d > t", reason: "r" }] },
+      { ...good, knownRed: [{ name: `# ${suite0} > d > t`, reason: "r" }] },
+      { ...good, setAside: [{ name: suite0, reason: "a listed suite cannot be set aside" }] },
+      { ...good, setAside: [{ name: `${suite0} > d > t`, reason: "r" }], knownRed: [{ name: `${suite0} > d > t`, reason: "r" }] }
     ];
     for (const variant of variants) {
       const text = typeof variant === "string" ? variant : JSON.stringify(variant);
@@ -83,13 +132,18 @@ describe("side-by-side §5: the N-1 baseline file", () => {
     }
     expect(parseN1Baseline(JSON.stringify({ ...good, commit: "0123456789abcdef0123456789abcdef01234567", reason: "" })).commit)
       .toBe("0123456789abcdef0123456789abcdef01234567");
+    // Both lists are optional (the release guide empties knownRed when it moves the commit on).
+    const bare = (({ setAside: _s, knownRed: _k, ...rest }) => rest)(good);
+    expect(parseN1Baseline(JSON.stringify(bare)).knownRed).toEqual([]);
+    expect(parseN1Baseline(JSON.stringify({ ...good, knownRed: [] })).knownRed).toEqual([]);
   });
 
   it("the reader prints the commit (or none) and the suites one per line, and refuses anything else", () => {
     const baseline = parseN1Baseline(baselineText());
     expect(tool("commit")).toBe(`${baseline.commit ?? "none"}\n`);
     expect(tool("suites")).toBe(`${baseline.suites.join("\n")}\n`);
-    for (const args of [[], ["release"], ["commit", "extra"]]) {
+    expect(tool("known-red")).toBe(`${knownRedLines(baseline).join("\n")}\n`);
+    for (const args of [[], ["release"], ["commit", "extra"], ["known-red", "extra"]]) {
       expect(() => tool(...args), args.join(" ")).toThrow(/N1_BASELINE_INVALID/u);
     }
   });
@@ -108,6 +162,10 @@ describe("side-by-side §5: the N-1 compatibility workflow", () => {
     expect(text).toContain("N1_BASELINE_NONE");
     expect(text).toContain("DEBATEAI_TEST_SCHEMA_FROM: ${{ github.workspace }}/head/dialectical-engine");
     expect(text).toContain("node tools/ci-known-red.mjs $(node \"$GITHUB_WORKSPACE/head/dialectical-engine/tools/n1-baseline.mjs\" suites)");
+    // HEAD's set-aside and known-red test names join the OLD checkout's list, before that old gate runs.
+    const append = "{ echo; node \"$GITHUB_WORKSPACE/head/dialectical-engine/tools/n1-baseline.mjs\" known-red; } >> tests/ci-known-red.txt";
+    expect(text).toContain(append);
+    expect(text.indexOf(append)).toBeLessThan(text.indexOf("node tools/ci-known-red.mjs $("));
     // An old checkout's source-map-hotfix allow-list cannot learn a new label, so pnpm and node are called directly.
     expect(text).not.toContain("node tools/source-map-hotfix.mjs");
     for (const folder of ["head", "old"]) {

@@ -7,7 +7,7 @@ import { join, resolve } from 'node:path';
 const templates = await import('../../deploy/' + 'preview-lifecycle/v1/unit-templates.mjs');
 const common = await import('../../deploy/' + 'preview-lifecycle/v1/common.mjs');
 
-const { splitSystemctlCat, renderTemplate, compareEffective, parseShow, COMPARED_PROPERTIES, MULTI_VALUED_PROPERTIES, main } = templates;
+const { splitSystemctlCat, renderTemplate, compareEffective, parseShow, COMPARED_PROPERTIES, MULTI_VALUED_PROPERTIES, EMPTY_DENY_LIST_PROPERTIES, main } = templates;
 const me = { uid: process.getuid!(), gid: process.getgid!() };
 const layout = { ...common.LAYOUT, ownerUid: me.uid, ownerGid: me.gid };
 const DIR = '/etc/systemd/system';
@@ -124,6 +124,65 @@ describe('renderTemplate', () => {
     ]);
   });
 
+  // R20 (2026-10-22): the live website base unit ties itself to the fixed API. The repo's ui@ 50-lifecycle.conf binds
+  // each website instance to its own release's API instead, so those lines are left out of the website template.
+  const UI_BASE = [
+    '# The preview website (base unit, written by hand on the server).',
+    '[Unit]',
+    'Description=DebateAI V3 private preview website',
+    'After=network-online.target',
+    'After=debateai-preview-api.service',
+    'Requires=debateai-preview-api.service',
+    '',
+    '[Service]',
+    'Type=simple',
+    'User=debateai-preview-ui',
+    `EnvironmentFile=${ENV}/ui.env`,
+    'ProtectSystem=strict',
+    '',
+    '[Install]',
+    'WantedBy=debateai-preview.target',
+    ''
+  ].join('\n');
+  const uiFiles = (base = UI_BASE): (readonly [string, string])[] => [[`${DIR}/debateai-preview-ui.service`, base]];
+
+  it("leaves the website's After=/Requires= lines on the fixed API out of its template, copying everything else byte for byte", () => {
+    const rendered = render(uiFiles(), 'ui');
+    const expected = UI_BASE
+      .replace('After=debateai-preview-api.service\nRequires=debateai-preview-api.service\n', '')
+      .replace('[Install]\nWantedBy=debateai-preview.target\n', '')
+      .replace(`${ENV}/ui.env`, `${ENV}/ui-%i.env`);
+    expect(rendered).toEqual([{ name: 'debateai-preview-ui@.service', body: expected }]);
+  });
+
+  it.each([
+    'Wants=debateai-preview-api.service',
+    'BindsTo=debateai-preview-api.service',
+    '  After = debateai-preview-api.service  '
+  ])('leaves the website line %j out too', line => {
+    const base = UI_BASE.replace('After=network-online.target\n', `After=network-online.target\n${line}\n`);
+    expect(bodyOf(render(uiFiles(base), 'ui'), 'debateai-preview-ui@.service')).not.toContain('debateai-preview-api.service');
+  });
+
+  it.each([
+    ['the fixed API together with another unit', 'After=debateai-preview-api.service debateai-preview-postgresql.service'],
+    ['the fixed runner', 'After=debateai-preview-runner.service'],
+    ['the fixed runner as a requirement', 'Requires=debateai-preview-runner.service'],
+    ['the fixed API under another directive', 'PartOf=debateai-preview-api.service'],
+    ['the fixed API with a leading dash', 'Requires=-debateai-preview-api.service']
+  ])('still refuses a website line naming %s', (_name, line) => {
+    const base = UI_BASE.replace('After=network-online.target\n', `After=network-online.target\n${line}\n`);
+    expect(() => render(uiFiles(base), 'ui')).toThrow(expect.objectContaining({ code: 'TEMPLATE_LINE_REFUSED', fields: { file: `${DIR}/debateai-preview-ui.service`, line: 5 } }));
+  });
+
+  it('still refuses the same line in the API template (only the website template leaves it out)', () => {
+    for (const line of ['After=debateai-preview-api.service', 'Requires=debateai-preview-api.service']) {
+      expect(() => render(apiFiles({ '60-hosted-egress.conf': `${EGRESS}${line}\n` }))).toThrow(expect.objectContaining({
+        code: 'TEMPLATE_LINE_REFUSED', fields: { file: `${DIR}/debateai-preview-api.service.d/60-hosted-egress.conf`, line: 4 }
+      }));
+    }
+  });
+
   it("refuses a website line naming the API's env file (a hidden-file line that would keep naming the old fixed file)", () => {
     const files = [
       [`${DIR}/debateai-preview-ui.service`, `[Service]\nUser=debateai-preview-ui\nEnvironmentFile=${ENV}/ui.env\nInaccessiblePaths=-${ENV}/api.env\n`]
@@ -226,6 +285,25 @@ describe('compareEffective', () => {
     // A property neither side shows (systemctl omits empty ones without --all) and an empty one are the same.
     const { Restart: _gone, ...noRestart } = shown();
     expect(compareEffective({ service: 'api', label: 'new-v1', before: { ...noRestart, ReadOnlyPaths: '' }, after: { ...noRestart, ReadOnlyPaths: '', Restart: '' } })).toEqual([]);
+  });
+  it('reads a bare ~ (an empty deny list) as empty, but compares a real deny or allow list strictly (R20 TB6, 2026-10-22)', () => {
+    // A full `systemctl show` leaves an empty deny list out; `systemctl show -p` prints it as a bare `~`.
+    expect(EMPTY_DENY_LIST_PROPERTIES).toEqual(['RestrictAddressFamilies', 'SystemCallFilter', 'RestrictFileSystems']);
+    for (const name of EMPTY_DENY_LIST_PROPERTIES) expect(COMPARED_PROPERTIES, name).toContain(name);
+    const compare = (before: Record<string, string>, after: Record<string, string>) => compareEffective({ service: 'api', label: 'new-v1', before: shown(before), after: shown({ ReadOnlyPaths: `${ENV}/api-new-v1.env -/etc/debateai-v3-preview/api`, ...after }) });
+    for (const name of ['RestrictFileSystems', 'RestrictAddressFamilies', 'SystemCallFilter']) {
+      expect(compare({}, { [name]: '~' })).toEqual([]);
+      expect(compare({ [name]: '~' }, {})).toEqual([]);
+    }
+    expect(compare({ RestrictFileSystems: '~ext4' }, {})).toEqual(['RestrictFileSystems']);
+    expect(compare({}, { RestrictFileSystems: '~ext4 tmpfs' })).toEqual(['RestrictFileSystems']);
+    expect(compare({ RestrictFileSystems: '~ext4' }, { RestrictFileSystems: '~' })).toEqual(['RestrictFileSystems']);
+    expect(compare({ RestrictFileSystems: '~ext4' }, { RestrictFileSystems: '~ext4' })).toEqual([]);
+    expect(compare({ RestrictFileSystems: 'ext4' }, {})).toEqual(['RestrictFileSystems']);
+    expect(compare({ RestrictFileSystems: 'ext4' }, { RestrictFileSystems: '~ext4' })).toEqual(['RestrictFileSystems']);
+    // Only the deny-list properties: a bare `~` anywhere else stays a value of its own.
+    expect(compare({}, { SystemCallArchitectures: '~' })).toEqual(['SystemCallArchitectures']);
+    expect(compare({}, { SocketBindDeny: '~' })).toEqual(['SocketBindDeny']);
   });
   it('compares exactly the confinement, identity, environment and restart properties the plan names', () => {
     expect(COMPARED_PROPERTIES).toEqual(('User Group SupplementaryGroups ProtectSystem ProtectHome PrivateTmp PrivateDevices ProtectProc ProcSubset NoNewPrivileges RestrictAddressFamilies '
@@ -334,6 +412,12 @@ describe('unit-templates.mjs CLI', () => {
     const s = systemd(NEW);
     const result = await run(['compare', '--service', 'api', '--label', 'new-v1', '--before', savedShow(OLD)], { deps: { run: s.run } });
     expect(s.calls).toEqual([{ argv: showArgv, env: {} }]);
+    expect(result).toEqual({ code: 0, stderr: [], stdout: [{ event: 'PREVIEW_UNIT_TEMPLATE_SAME', service: 'api', label: 'new-v1', differs: [] }] });
+  });
+
+  it('compare exits 0 when the saved full show leaves out an empty deny list that systemctl show -p prints as ~ (R20 TB6)', async () => {
+    const s = systemd([...NEW, 'RestrictFileSystems=~', 'RestrictAddressFamilies=~', 'SystemCallFilter=~']);
+    const result = await run(['compare', '--service', 'api', '--label', 'new-v1', '--before', savedShow(OLD)], { deps: { run: s.run } });
     expect(result).toEqual({ code: 0, stderr: [], stdout: [{ event: 'PREVIEW_UNIT_TEMPLATE_SAME', service: 'api', label: 'new-v1', differs: [] }] });
   });
 

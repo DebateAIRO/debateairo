@@ -353,7 +353,10 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       "buildAdmissionSiteContext({ pool, environment, declaredProviderTargets,",
       "const admissionCache = createAdmissionSettingsCache({ load: (version) => loadAdmissionSettings(pool, version, admissionSite), seed: siteAdmission });",
       "createActiveSettingsVersionReader({ pool, siteVersion: environment.REGISTER_VERSION,",
-      "if (estimator === null) throw new TypeError(\"ASK_ROOM_ESTIMATOR_REQUIRED\");"
+      "if (estimator === null) throw new TypeError(\"ASK_ROOM_ESTIMATOR_REQUIRED\");",
+      // Fresh-site estimate (owner rulings 2026-10-22, merge of PR #212): the sealed starting figures, a SITE row read
+      // from the site version and handed to the loader in the site context (every version's estimator starts from it).
+      "readCostEstimateStartPolicy(pool, environment.REGISTER_VERSION)"
     ]) {
       expect(shipped, statement).toContain(statement);
       expect(practice, statement).toContain(statement);
@@ -378,6 +381,8 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       "const guardPolicy = costEnvelopeGuardPolicy(runPolicy, storyPolicy);",
       "dailyGuard: site.spend === null ? null : new CostEnvelopeGuard({ store: site.spend, policy: guardPolicy }),",
       "maximumMicros: mostOneRunMaySpendMicros(guardPolicy)",
+      // Fresh-site estimate (merge of PR #212): every version's estimator starts from the SITE's row.
+      "start: site.costEstimateStart",
       "perRunCeilingMicros: costEnvelope?.guardPolicy.perRunCeilingMicros ?? null,",
       "moneyPolicy: costEnvelope?.guardPolicy ?? null,",
       "bodyCeilingMicros: costEnvelopeCeilings(costEnvelope.runPolicy).bodyMicros,",
@@ -387,11 +392,11 @@ describe("the practice runs the shipped composition (drift guard)", () => {
     // seam (the file's head says why); the builder's own literal names every member of the context.
     const shippedSite = objectAfter(API_MAIN, "const admissionSite: AdmissionSiteContext = boot.runSync(\"admission-site\", () => buildAdmissionSiteContext(");
     const practiceSite = objectAfter(PRACTICE_ASK, "const admissionSite: AdmissionSiteContext = buildAdmissionSiteContext(");
-    expect([...shippedSite].sort()).toEqual(["askRoomReadiness", "declaredProviderTargets", "environment", "log", "pool",
-      "questionLanguage", "siteCostEnvelopePolicy"]);
+    expect([...shippedSite].sort()).toEqual(["askRoomReadiness", "costEstimateStartPolicy", "declaredProviderTargets", "environment",
+      "log", "pool", "questionLanguage", "siteCostEnvelopePolicy"]);
     expect([...practiceSite].sort()).toEqual([...shippedSite, "previewRemaining"].sort());
     const builtSite = objectAfter(ADMISSION, "  const previewGate = environment.PREVIEW_GATE_SETTINGS;\n  return Object.freeze(");
-    expect([...builtSite].sort()).toEqual(["billingEnabled", "declaredProviderTargets", "deploymentMode", "log", "preview",
+    expect([...builtSite].sort()).toEqual(["billingEnabled", "costEstimateStart", "declaredProviderTargets", "deploymentMode", "log", "preview",
       "previewRemaining", "prices", "questionLanguage", "recentRunUsage", "siteCostEnvelope", "siteVersion", "spend"]);
     // Side-by-side spec §9 (C17): neither ask composition reads the funding selection at boot or refuses boot over it.
     // main.ts builds the funding source whenever billing is on; the practice keeps billing off, so it builds none.

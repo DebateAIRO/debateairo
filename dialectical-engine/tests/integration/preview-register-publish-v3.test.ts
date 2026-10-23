@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { migrate } from '@debateai/db';
 import {
   loadBootstrapRegister, createPostgresRegisterPublicationPort, canonicalRegisterJson, parseRegisterVersionText,
-  readBillingPolicy, readCostEnvelopePolicy, readAdmissionPolicy, readStoryPolicyFromRegister, costEnvelopeBand
+  readBillingPolicy, readCostEnvelopePolicy, readAdmissionPolicy, readStoryPolicyFromRegister, readCostEstimateStartPolicy, costEnvelopeBand
 } from '@debateai/register';
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
 import { PREVIEW_REVIEWED_PROVIDER_REFS, previewTargetJsonRow } from '../../packages/providers/src/preview-models.js';
@@ -37,10 +37,10 @@ describe('publish kit v3 on PostgreSQL 18 (source evidence, not the Linux operat
 
       // 1. Provider-only: hosted rows, billing off.
       const first = composePreviewSnapshotV3({ sourceRows: await buildPreviewSourceRowsV3(bootstrap, observation, OFF), baseRows: v4.rows, baseRegisterVersion: '4', baseSnapshotSha256: v4.snapshotSha256 });
-      expect(first.addedKeys).toEqual(['storyCostEnvelopePolicy']);
+      expect(first.addedKeys).toEqual(['costEstimateStartPolicy', 'storyCostEnvelopePolicy']);
       const firstInput = { publicationId: randomUUID(), sourceRef: 'publish kit v3 fixture', snapshot: first, approval: approvalOf(first) };
       const v5 = await publishPreviewRegisterV3(pool, firstInput);
-      expect(v5).toMatchObject({ registerVersion: '5', baseRegisterVersion: '4', rowCount: v4.rows.length + 1, snapshotSha256: first.snapshotSha256 });
+      expect(v5).toMatchObject({ registerVersion: '5', baseRegisterVersion: '4', rowCount: v4.rows.length + 2, snapshotSha256: first.snapshotSha256 });
       expect(await publishPreviewRegisterV3(pool, firstInput)).toEqual(v5);
       await verifyHostedRegisterBootReadiness(pool, parseRegisterVersionText('5'), TARGETS);
       expect((await readBillingPolicy(pool, 5))?.enabled).toBe(false);
@@ -49,6 +49,8 @@ describe('publish kit v3 on PostgreSQL 18 (source evidence, not the Linux operat
       expect(costEnvelopeBand(envelope)).not.toBeNull();
       expect((await readAdmissionPolicy(pool, 5)).askRoomReads).toEqual({ key: 'owner', limit: 60, windowMs: 60_000, capacity: 65_536 });
       expect((await readStoryPolicyFromRegister(pool, 5))?.perStoryCeilingMicros).toBe(50_000);
+      // Fresh-site estimate (owner rulings 2026-10-22): the API's cost-estimate-start-policy stage reads the sealed figures.
+      expect((await readCostEstimateStartPolicy(pool, 5))?.minSamples).toBe(5);
 
       // 2. Billing on, over the provider-only version: the billing row alone changes.
       const current = await readSealedSnapshot(pool, '5');

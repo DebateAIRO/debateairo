@@ -22,6 +22,8 @@
 # turns not-ready at once and the new pair a few seconds later (break-before-make); a request that arrives in between
 # waits up to 12 s (lb_try_duration) instead of failing. Caddy runs with `admin off`, so this file only takes effect
 # through `systemctl restart caddy`, never a reload (README §6).
+# The payment marks (/payment-marks/<name>.svg) never reach the website: Caddy serves exactly three named files from
+# root's folder /etc/debateai/payment-marks/ (README §3, §14.7).
 
 {
 	email {$DEBATEAI_ACME_EMAIL}
@@ -84,6 +86,21 @@
 	# the API under that prefix), so it is excluded and static assets keep compression.
 	@compressible not path /api/*
 	encode @compressible gzip
+
+	# The payment marks (README §14.7). The brands' artwork may not be redistributed, so it is never in the repository
+	# or a release folder: root keeps the official files in /etc/debateai/payment-marks/, and Caddy serves exactly these
+	# three names from there before any request reaches the website. Caddy orders handle before respond and
+	# reverse_proxy, and file_server ends the request, so a mark never reaches the website; a missing file is Caddy's
+	# own 404. Any other path under /payment-marks/ is not matched and goes on to the website as before.
+	@paymentMarks path /payment-marks/netopia.svg /payment-marks/visa.svg /payment-marks/mastercard.svg
+	handle @paymentMarks {
+		root * /etc/debateai/payment-marks
+		uri strip_prefix /payment-marks
+		header Content-Type image/svg+xml
+		header Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; sandbox"
+		header X-Content-Type-Options nosniff
+		file_server
+	}
 
 	# Readiness is never read through the public name (final fix wave W2): every proxied request carries the edge
 	# secret, so the website would answer a visitor's /readyz as it answers Caddy. Caddy orders respond before

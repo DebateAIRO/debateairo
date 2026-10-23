@@ -10,6 +10,7 @@ import {
   readBillingPlans,
   readBillingPolicy,
   readCostEnvelopePolicy,
+  readCostEstimateStartPolicy,
   readSealedPreviewLineUp,
   readSettingsComparisonRows,
   readSettingsSeatRefs,
@@ -136,6 +137,11 @@ export async function readAdmissionCheckSite(pool: Pool, environment: ApiCheckEn
     targetsJson: environment.PROVIDER_DISCOVERY_TARGETS_JSON, configuredProviders: deploymentMakers.configuredProviders,
     mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV
   });
+  // Fresh-site estimate (owner rulings 2026-10-22): main.ts's "cost-estimate-start-policy" stage — a SITE row, read from
+  // the site version (a malformed row refuses the boot, so it fails the check too: COST_ESTIMATE_START_POLICY_INVALID).
+  const costEstimateStartPolicy = environment.DEPLOYMENT_MODE === "hosted"
+    ? await readCostEstimateStartPolicy(pool, environment.REGISTER_VERSION)
+    : null;
   const askRoomReadiness = environment.DEPLOYMENT_MODE === "hosted" && siteCostEnvelopePolicy !== null
     ? decideAskRoomReadiness({
         envelope: siteCostEnvelopePolicy,
@@ -149,6 +155,7 @@ export async function readAdmissionCheckSite(pool: Pool, environment: ApiCheckEn
     environment,
     declaredProviderTargets,
     siteCostEnvelopePolicy,
+    costEstimateStartPolicy,
     askRoomReadiness,
     questionLanguage: checkQuestionLanguage(environment),
     log: (line: string) => { console.error(line); }

@@ -14,7 +14,7 @@ export type ArchivedLegalText = Readonly<{ version: string; sha256: string; loca
  * language first, then any: a hash names one text wherever the link was copied from) and read from the repository
  * file L2 wrote. `entry.path` is relative to dialectical-engine/; the UI runs from apps/ui (debateai-ui.service's
  * WorkingDirectory) and the root tests from the repository, so the file is looked for relative to both, like
- * availablePaymentMarks. The bytes must still hash to the name (the check P17's resolver makes). Anything else is
+ * resolveReportFontDirectory. The bytes must still hash to the name (the check P17's resolver makes). Anything else is
  * null, and the page answers "not found". Server components only: this reads the disk.
  */
 export function archivedLegalText(

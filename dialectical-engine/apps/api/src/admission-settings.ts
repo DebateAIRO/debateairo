@@ -33,6 +33,7 @@ import {
   type BillingPolicy,
   type CostEnvelopeBand,
   type CostEnvelopePolicy,
+  type CostEstimateStartPolicy,
   type DebateShapePolicy,
   type DeploymentMode,
   type EngineVersionPolicy,
@@ -115,6 +116,12 @@ export type AdmissionSiteContext = Readonly<{
   /** The declared targets' prices (`buildApiProviderPriceMap`), for the estimator. */
   prices: ReadonlyMap<string, ProviderTargetPrice>;
   /**
+   * Fresh-site estimate (owner rulings 2026-10-22): the site version's optional `costEstimateStartPolicy` row (the
+   * estimate's trusted minimum and per-depth starting figures; null without it = today's estimate). A SITE row
+   * (settings-classification.ts: it follows the release), so every version's estimator starts from this one.
+   */
+  costEstimateStart: CostEstimateStartPolicy | null;
+  /**
    * Question language (spec 2026-10-13): how this process reaches the fast check (main.ts: the preview's guarded fetch,
    * else the hosted route; the practice: its forwarded gate socket), asked per version with the version's policy and
    * the day ceiling its admission uses (ruling L-POT), and the reference key every API process of the site shares.
@@ -179,6 +186,8 @@ export function buildAdmissionSiteContext(input: Readonly<{
   declaredProviderTargets: readonly ProviderDiscoveryTarget[];
   /** Hosted only (null in local mode): the site version's costEnvelopePolicy row. */
   siteCostEnvelopePolicy: CostEnvelopePolicy | null;
+  /** Hosted only (null in local mode, or without the row): the site version's costEstimateStartPolicy row. */
+  costEstimateStartPolicy: CostEstimateStartPolicy | null;
   /**
    * The room's readiness answer (`decideAskRoomReadiness`): present exactly when the room is built (hosted, the site's
    * row carries the band); its plans are non-null exactly when billing is on (paid plans S2/S4b: the picker and B9 read it).
@@ -205,6 +214,7 @@ export function buildAdmissionSiteContext(input: Readonly<{
     spend: siteCostEnvelopePolicy === null || askRoom ? null : new PostgresModelSpendStore(pool),
     recentRunUsage: askRoom ? new PostgresRecentRunUsageSource(pool) : null,
     prices: buildApiProviderPriceMap(declaredProviderTargets, environment.DEPLOYMENT_MODE),
+    costEstimateStart: input.costEstimateStartPolicy,
     questionLanguage: input.questionLanguage,
     ...(input.previewRemaining === undefined ? {} : { previewRemaining: input.previewRemaining }),
     log: input.log
@@ -331,7 +341,9 @@ export async function loadAdmissionSettings(pool: Pool, version: number, site: A
       estimator: site.recentRunUsage === null ? null : new RecentRunsCostEstimator({
         source: site.recentRunUsage,
         prices: site.prices,
-        maximumMicros: mostOneRunMaySpendMicros(guardPolicy)
+        maximumMicros: mostOneRunMaySpendMicros(guardPolicy),
+        // Fresh-site estimate: the site's starting figures (a SITE row, read once from the site version).
+        start: site.costEstimateStart
       })
     });
   });

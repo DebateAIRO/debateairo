@@ -33,8 +33,10 @@ export type SettingsRowKind = "DEBATE" | "SITE" | "MIXED" | "CODE_BOUND";
 /**
  * SITE rows (spec §13: "site rules follow the release"). The toolchain the bootstrap file resolves; every login,
  * recovery, staff and rate rule; countries, billing and tax; the publication check; the provider set and panel
- * discovery. The sixteen support keys and `supportActivation` live in SUPPORT_CONFIGURATION versions, which an
- * activation refuses; they are listed so a stray one is never unclassified.
+ * discovery; the room estimate's starting figures (`costEstimateStartPolicy`, fresh-site estimate 2026-10-22: hosted
+ * only, sealed with each release's kit, read once from the site version for every version's estimator). The sixteen
+ * support keys and `supportActivation` live in SUPPORT_CONFIGURATION versions, which an activation refuses; they are
+ * listed so a stray one is never unclassified.
  */
 const SITE_ROW_KEYS = Object.freeze([
   "nodeRuntimeVersion", "pnpmVersion", "postgresMajorVersion", "typescriptVersion", "vllmImageDigest",
@@ -42,7 +44,7 @@ const SITE_ROW_KEYS = Object.freeze([
   "mfaPolicy", "sessionPolicy", "admissionPolicy", "passwordResetPolicy", "backupEmailVerificationPolicy",
   "mfaRecoveryPolicy", "recoveryPolicy", "consumerRecoveryPolicy", "productRolePolicy", "staffAccessPolicy",
   "internalAllowancePolicy", "countryPolicy", "billingPolicy", "taxAuthorities", "publicationCheckPolicy",
-  "configuredProviderSet", "panelDiscoveryPolicy",
+  "configuredProviderSet", "panelDiscoveryPolicy", "costEstimateStartPolicy",
   "support_enabled", "support_model_ref", "support_relay_concurrency", "support_daily_call_cap",
   "support_limit_anon_msgs_10m", "support_limit_anon_msgs_24h", "support_limit_anon_sessions_1h",
   "support_limit_session_msgs", "support_limit_msg_chars", "support_limit_account_msgs_10m",

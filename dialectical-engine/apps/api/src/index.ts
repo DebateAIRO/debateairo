@@ -5839,20 +5839,17 @@ export class PostgresAskApplication implements AskApplication {
             batteryRows: createInitialBatteryRows({ settlementWatchHandle: settings.settlementWatchHandle })
           }, lease.client);
           createdRunId = runId;
-          if (swappedAt !== null && admission.kind === "START") {
-            // B8 (budget spec §2.9): the interim swap's owner record, in the room
-            // decision's own transaction. It commits with the run's hold (START),
-            // or not at all; a failure rolls the decision back and records the
-            // run FAILED (RUN_SETUP_FAILED:COST_RECORD). A WAIT, or a swap
-            // dropped because the cheaper roster cannot run, swapped nothing.
-            setupStep = "COST_RECORD";
-            await this.#recordRosterSubstitution(runId, swappedAt, tx);
-          }
+          // Preview incident 2026-10-22 — NO WRITE ON `tx` THAT NAMES THE NEW RUN BEFORE THE MEMORY QUESTION. Any
+          // row on `tx` referencing core.run (a foreign key) holds the new run's row FOR KEY SHARE until the decision
+          // commits, and the memory question below runs in its OWN transaction on another connection, locking that
+          // row FOR UPDATE (core.lock_owned_live_runs). Written in the other order, the request waits for itself until
+          // statement_timeout cancels it (RUN_SETUP_FAILED:MEMORY_QUESTION). So every `tx` write about the run — B8's
+          // swap record, the place in line, the hold, the charge scope, the first job — comes after it.
           // A20 x PR #33 (S1a): the pin is a setup step here too, for START and WAIT
           // alike and before the first job, so no runner can claim or wake a
           // scorecard-admitted run without its assignment, and a failed pin records
           // MODEL_ASSIGNMENT. B8's swap record (COST_RECORD, on `tx`, START only) comes
-          // first. The assignment is `evaluated`'s, the admission the run was created
+          // after the memory question (see above). The assignment is `evaluated`'s, the admission the run was created
           // from: after an interim swap a WAIT keeps the plan's own (B8, A5), so a
           // waiting question keeps its plan's roster, settings and models together.
           if (evaluated.modelAssignment !== undefined) {
@@ -5890,6 +5887,16 @@ export class PostgresAskApplication implements AskApplication {
               kind: "WAIT" as const, runId, waitsUntil: admission.waitsUntil, scope: admission.worstScope,
               waitsFor: admission.waitsFor ?? null
             });
+          }
+          if (swappedAt !== null) {
+            // B8 (budget spec §2.9): the interim swap's owner record, in the room
+            // decision's own transaction, after the memory question (preview
+            // incident 2026-10-22, above). It commits with the run's hold (START),
+            // or not at all; a failure rolls the decision back and records the
+            // run FAILED (RUN_SETUP_FAILED:COST_RECORD). A WAIT, or a swap
+            // dropped because the cheaper roster cannot run, swapped nothing.
+            setupStep = "COST_RECORD";
+            await this.#recordRosterSubstitution(runId, swappedAt, tx);
           }
           setupStep = "ROOM_HOLD";
           // S2: the chosen plan's figure when the picker planned the run (its estimate, or

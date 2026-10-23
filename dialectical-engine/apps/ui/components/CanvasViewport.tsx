@@ -3,9 +3,11 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
+  type KeyboardEvent,
   type ReactNode
 } from "react";
 import {
@@ -92,6 +94,7 @@ export function CanvasViewport({
   canvasRef
 }: CanvasViewportProps) {
   const { catalog } = useChromeI18n();
+  const zoomKeysId = useId();
   const surfaceRef = useRef<HTMLDivElement | null>(null);
   const fitStateRef = useRef<FitPolicyState>({
     mode: "column-auto",
@@ -110,6 +113,7 @@ export function CanvasViewport({
   const pendingScrollRef = useRef<{ left: number; top: number } | null>(null);
   const previousLayoutWidthRef = useRef(layoutWidth);
   const didInitialAnchorRef = useRef(false);
+  const [keyZoomNote, setKeyZoomNote] = useState("");
 
   const setSurface = useCallback(
     (element: HTMLDivElement | null) => {
@@ -499,7 +503,9 @@ export function CanvasViewport({
         return;
       }
 
-      if (fitStateRef.current.zoom >= READABLE_ZOOM || !(event.target instanceof Element)) {
+      // `detail` 0 is a click the keyboard made (Enter or Space on a card's button): it activates
+      // the button, never the zoom-to-card a pointer gets, or a fitted tree would eat every Enter.
+      if (fitStateRef.current.zoom >= READABLE_ZOOM || event.detail === 0 || !(event.target instanceof Element)) {
         return;
       }
       const card = event.target.closest<HTMLElement>(".nodeWrap");
@@ -576,11 +582,35 @@ export function CanvasViewport({
     queueScroll(0, 0);
   };
 
+  // The zoom cluster is hidden by design (V, 2026-10-22), so the keyboard zooms with keys instead:
+  // + zooms in, - zooms out, 0 fits the whole tree, 1 resets to 1:1. They work from the canvas and
+  // from any card control inside it, never while typing, and never with a modifier (Ctrl/Cmd + and
+  // - are the browser's page zoom). The new level is announced, as the hidden readout would be.
+  const handleZoomKey = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+    const current = fitStateRef.current.zoom;
+    if (event.key === "+" || event.key === "=") applyUserZoom(clampZoom(current + ZOOM_STEP));
+    else if (event.key === "-" || event.key === "_") applyUserZoom(clampZoom(current - ZOOM_STEP));
+    else if (event.key === "0") setOverviewFit();
+    else if (event.key === "1") applyUserZoom(1);
+    else return;
+    event.preventDefault();
+    setKeyZoomNote(`${Math.round(fitStateRef.current.zoom * 100)}%`);
+  };
+
   return (
     <div className="canvasViewport">
+      {/* A Tab stop of its own, so the arrow keys pan the canvas and the zoom keys have a home. */}
       <div
         className="canvas scroll"
         ref={setSurface}
+        tabIndex={0}
+        role="region"
+        aria-label={t(catalog, "chrome.tree")}
+        aria-keyshortcuts="Plus - 0 1"
+        aria-describedby={zoomKeysId}
+        onKeyDown={handleZoomKey}
         data-fit-policy={fitState.mode}
         data-gesture-owner="none"
         data-zoom={zoom.toFixed(4)}
@@ -607,6 +637,10 @@ export function CanvasViewport({
           </div>
         </div>
       </div>
+      <span className="srOnly" id={zoomKeysId}>
+        {`${t(catalog, "debateViews.zoomIn")} +, ${t(catalog, "debateViews.zoomOut")} −, ${t(catalog, "debateViews.fitWholeTree")} 0, ${t(catalog, "debateViews.resetZoom")} 1`}
+      </span>
+      <span className="srOnly" role="status">{keyZoomNote}</span>
 
       <div
         className="canvasZoomCluster"

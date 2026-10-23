@@ -80,6 +80,7 @@ import {
   readPanelDiscoveryPolicy,
   readAdmissionPolicy,
   readCostEnvelopePolicy,
+  readCostEstimateStartPolicy,
   readCountryPolicy,
   readAuthPolicy,
   readMfaPolicy,
@@ -476,6 +477,14 @@ const aiProviderCompanies = providerCompaniesOfTargets(declaredProviderTargets);
 // version's rosters, roles and gate terms are the admission loader's (its stages "preview-line-up",
 // "preview-scorecard-conflict" and "preview-budget-gate").
 const previewFetch = previewGate === undefined ? undefined : createPreviewGuardedFetch(createPreviewBudgetRpcPorts(previewGate));
+// Fresh-site estimate (owner rulings 2026-10-22): the estimate's trusted minimum and per-depth starting figures, sealed as
+// the optional costEstimateStartPolicy row. Hosted only (only the room estimates); absent = null = today's estimate (20
+// samples, the run's maximum while short); a malformed row refuses this boot (COST_ESTIMATE_START_POLICY_INVALID).
+// Side-by-side spec §13: a SITE row (settings-classification.ts), so it is read once from the site version and handed to
+// the admission loader in its site context (every version's estimator starts from it), never read per version.
+const costEstimateStartPolicy = environment.DEPLOYMENT_MODE === "hosted"
+  ? await boot.run("cost-estimate-start-policy", () => readCostEstimateStartPolicy(pool, environment.REGISTER_VERSION))
+  : null;
 /**
  * Budget spec 2026-09-28 §2.4–§2.7 and the paid-plans spec §2.4 (B6b): THE ROOM's boot questions and its site parts.
  * Hosted, and only once the site's costEnvelopePolicy row carries the band; without it the API answers exactly as
@@ -562,6 +571,8 @@ const admissionSite: AdmissionSiteContext = boot.runSync("admission-site", () =>
   environment,
   declaredProviderTargets,
   siteCostEnvelopePolicy,
+  // Fresh-site estimate: the site's costEstimateStartPolicy row (hosted; null without it), every estimator's start.
+  costEstimateStartPolicy,
   // B6b: the room is built exactly when its readiness answered (hosted, the site's row carries the band); paid plans
   // S2/S4b: billing is on exactly when that answer carries the plans (the loader's picker and run ceiling read it).
   askRoomReadiness: askRoomReadiness ?? null,
