@@ -50,6 +50,9 @@ describe("S01 owner library card", () => {
 
   it("keeps the exact unflagged markup for CLEAR, null and absent fields", () => {
     const original = ownerMarkup(row);
+    expect(original).not.toContain('data-flagged="true"');
+    expect(original).not.toContain('class="libFlagMark"');
+    expect(original).not.toContain('>FLAGGED<');
     expect(ownerMarkup({ ...row, synthesis_flag: { verdict: "CLEAR" } as never })).toBe(original);
     expect(ownerMarkup({ ...row, synthesis_flag: null })).toBe(original);
   });

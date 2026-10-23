@@ -6,8 +6,8 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { configureContentEncryption, contentCipherFor, createPool, migrate, RunRepository, type Pool } from "@debateai/db";
-import { RunProjectionSchema } from "@debateai/contract";
-import { ServeRepository, SynthesisCheckRepository } from "@debateai/serve";
+import { RunEventSchema, RunProjectionSchema } from "@debateai/contract";
+import { ServeRepository, SynthesisCheckRepository, synthesisTextOf } from "@debateai/serve";
 import { TypedDomainError } from "@debateai/kernel";
 import type { ApiOptions } from "../../apps/api/src/index.js";
 import { buildApi, CSRF_COOKIE_NAME, PostgresAskApplication } from "../../apps/api/src/index.js";
@@ -130,6 +130,39 @@ describe("REV-SF-S01-p1-product: the held card's own link", () => {
 });
 
 describe("S01 held route boundary", () => {
+  it("exports an inherited verdict for two versions of the same synthesis", async () => {
+    const runId = await createEncryptedStoryRun(database.pool, owner, `Inherited export ${randomUUID()}?`);
+    const { answerId } = await persistTerminalRun({ pool: database.pool, runId, fixtureKey: randomUUID(),
+      factBundle: { facts: [], residualObjections: [], badges: [], conditionMarks: ["DEFECT"],
+        reversalPoint: "No firm conclusion", buildsOnPrevious: { value: false, answerRef: null }, memoryDisclosure: null } });
+    const ownership = { ownerRef: owner.ownerRef, legacyAskerId: null };
+    const first = await new ServeRepository(runtime).readAnswerProjection(answerId, ownership);
+    expect(first).not.toBeNull();
+    const answerWithSynthesis = { ...first!, serve_state: "SERVED" as const,
+      composed_text: [{ text: "The same synthesis for both versions." }] };
+    expect(synthesisTextOf(answerWithSynthesis as never)).toBe("The same synthesis for both versions.");
+    const original = ServeRepository.prototype.readAnswerProjection;
+    const versionRead = vi.spyOn(ServeRepository.prototype, "readAnswerProjection")
+      .mockImplementation(function (this: ServeRepository, id, access, version) {
+        if (id === answerId) return Promise.resolve({ ...answerWithSynthesis, answer_version: version === 1 ? 1 : 2 } as never);
+        return original.call(this, id, access, version);
+      });
+    const records = vi.spyOn(SynthesisCheckRepository.prototype, "readRecords").mockResolvedValue([{
+      runId, answerId, answerVersion: 1, synthesisOriginVersion: 1,
+      outcome: { verdict: "FLAGGED", categories: ["PROTECTED_CLASS_HATE"] }, checkedAt: new Date("2026-10-20T12:00:00Z"),
+      final: true
+    }] as never);
+    try {
+      const application = new PostgresAskApplication(database.pool, {} as never, {} as never,
+        undefined, runtime, { server: {} as never, legacy: {} as never });
+      const exported = await application.readSynthesisChecks(answerId, {} as never, ownership);
+      expect(exported).toEqual([
+        { answer_version: 1, verdict: "FLAGGED", categories: ["PROTECTED_CLASS_HATE"], checked_at: "2026-10-20T12:00:00.000Z" },
+        { answer_version: 2, verdict: "FLAGGED", categories: ["PROTECTED_CLASS_HATE"], checked_at: "2026-10-20T12:00:00.000Z" }
+      ]);
+      expect(records).toHaveBeenCalledWith({ runId, answerId, maxVersion: 2 });
+    } finally { versionRead.mockRestore(); records.mockRestore(); }
+  }, 120_000);
   it("does not read synthesis records after the owner run was removed", async () => {
     const runId = await createEncryptedStoryRun(database.pool, owner, `Removed records ${randomUUID()}?`);
     const { answerId } = await persistTerminalRun({ pool: database.pool, runId, fixtureKey: randomUUID(),
@@ -187,7 +220,8 @@ describe("S01 held route boundary", () => {
       application: {
         readRun: async () => RunProjectionSchema.parse({ run_ref: runId, question_line: "A live question?",
           state: "RUNNING", terminal_reason: null, hold_until: null }),
-        events: async function* () { eventReads += 1; yield { event_id: randomUUID() }; }
+        events: async function* () { eventReads += 1; yield RunEventSchema.parse({ event_id: randomUUID(),
+          event_type: "run.running", at_sequence: 1, run_ref: runId, payload: { phase: "RUNNING" } }); }
       } as unknown as ApiOptions["application"],
       sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN,
       synthesisAnswerAccess: { stateOf: async () => ++accessReads === 1 ? "SHOW" : "HELD",

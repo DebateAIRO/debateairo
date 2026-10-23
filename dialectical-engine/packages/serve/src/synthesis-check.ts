@@ -100,10 +100,11 @@ export class SynthesisCheckRepository {
                'synthesis-check-request:' || $1::text,0)) AS acquired`, [candidate.request_id]
           );
           if (!lock.rows[0]?.acquired) continue;
-          await client.query(
-            `SELECT pg_advisory_xact_lock(hashtextextended('synthesis-check-hold:' || $1::text,0))`,
+          const holdLock = await client.query<{ acquired: boolean }>(
+            `SELECT pg_try_advisory_xact_lock(hashtextextended('synthesis-check-hold:' || $1::text,0)) AS acquired`,
             [candidate.run_id]
           );
+          if (!holdLock.rows[0]?.acquired) continue;
           const fresh = async (): Promise<boolean> => {
             const result = await client.query<{ fresh: boolean }>(
               `SELECT clock_timestamp() < requested_at
@@ -148,13 +149,19 @@ export class SynthesisCheckRepository {
   async startPublishAttempt(input: { runId: string; answerId: string; answerVersion: number }): Promise<{
     attemptId: string; startedAt: Date;
   }> {
-    const result = await this.pool.query<{ attempt_id: string; started_at: Date }>(
-      `INSERT INTO serve.synthesis_check_attempt(
-         attempt_id,run_id,answer_id,answer_version,origin
-       ) VALUES (gen_random_uuid(),$1,$2,$3,'PUBLISH') RETURNING attempt_id,started_at`,
-      [input.runId, input.answerId, input.answerVersion]
-    );
-    return { attemptId: result.rows[0]!.attempt_id, startedAt: result.rows[0]!.started_at };
+    return withWriteTransaction(this.pool, async (client) => {
+      await client.query(
+        `SELECT pg_advisory_xact_lock(hashtextextended('synthesis-check-hold:' || $1::text,0))`,
+        [input.runId]
+      );
+      const result = await client.query<{ attempt_id: string; started_at: Date }>(
+        `INSERT INTO serve.synthesis_check_attempt(
+           attempt_id,run_id,answer_id,answer_version,origin
+         ) VALUES (gen_random_uuid(),$1,$2,$3,'PUBLISH') RETURNING attempt_id,started_at`,
+        [input.runId, input.answerId, input.answerVersion]
+      );
+      return { attemptId: result.rows[0]!.attempt_id, startedAt: result.rows[0]!.started_at };
+    });
   }
 
   async readInFlightAttempts(input: { answerId: string; maxVersion: number; deadlineMs: number }): Promise<{

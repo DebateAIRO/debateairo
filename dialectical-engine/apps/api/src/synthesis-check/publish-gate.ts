@@ -64,12 +64,14 @@ export function createSynthesisPublishGate(input: Readonly<{
             answerId: target.answer.answer_id, maxVersion: target.answer.answer_version,
             deadlineMs: input.deadlineMs
           });
-          if (inFlight.length === 0) break;
+          if (!inFlight.some((attempt) => originVersionOf(texts, attempt.answerVersion) === synthesisOriginVersion)) break;
           waitedForCheck = true;
           await input.sleep(Math.min(SYNTHESIS_PUBLISH_POLL_MS, deadlineAt.getTime() - input.clock().getTime()));
           const observed = await readDecision();
           if (observed !== null) return observed;
         }
+        const afterWait = await readDecision();
+        if (afterWait !== null) return afterWait;
         if (waitedForCheck || input.clock().getTime() >= deadlineAt.getTime()) return "UNAVAILABLE";
         const attempt = await input.repository.startPublishAttempt({
           runId: target.runId, answerId: target.answer.answer_id,

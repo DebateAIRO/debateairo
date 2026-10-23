@@ -84,6 +84,26 @@ describe("S01 publication refusal", () => {
     act(() => root.unmount()); node.remove();
   });
 
+  it("redirects a resumed Publish removal without an injected callback", async () => {
+    const node = document.createElement("div"); document.body.append(node);
+    const root = createRoot(node);
+    const proof = { step_up_grant: { action: "PUBLISH", target_run_id: "run-1", token: "test-token",
+      expires_at: new Date(Date.now() + 600_000).toISOString() } };
+    await act(async () => { root.render(<SecurityActionResume catalog={{}} settingsCatalog={{}}
+      publicCatalog={publicCatalog} locale="en" takeProof={() => proof as never}
+      client={{ publishRun: async () => { throw refusal(410, "DEBATE_REMOVED_BY_CHECK"); } } as never} />); });
+    const assign = vi.fn();
+    const actualWindow = window;
+    vi.stubGlobal("window", new Proxy(actualWindow, { get(target, key) {
+      return key === "location" ? { assign } : Reflect.get(target, key);
+    } }));
+    try {
+      act(() => { node.querySelector<HTMLInputElement>('input[type="checkbox"]')?.click(); });
+      await act(async () => { node.querySelector<HTMLButtonElement>("[data-confirm]")?.click(); });
+      expect(assign).toHaveBeenCalledWith("/debate/run-1");
+    } finally { vi.unstubAllGlobals(); act(() => root.unmount()); node.remove(); }
+  });
+
   it("keeps the existing unavailable sentence for a 503", async () => {
     const flow = setup(async () => { throw refusal(503, "PUBLICATION_CHECK_UNAVAILABLE"); });
     await publish(flow);

@@ -622,6 +622,7 @@ apps/ui/lib/consumerWebAuthn.ts
 apps/ui/lib/contentSecurityPolicy.test.mjs
 apps/ui/lib/crisisLineDirectory.ts
 apps/ui/lib/crisisLines.ts
+apps/ui/lib/crisisNames.generated.ts
 apps/ui/lib/dataExportPending.ts
 apps/ui/lib/debateHeaderOverflow.ts
 apps/ui/lib/debatePresentation.ts

@@ -88,6 +88,23 @@ function resultInput(answer: Awaited<ReturnType<typeof fixture>>, attemptId: str
 }
 
 describe("synthesis check repository under debateai_runtime", () => {
+  it("refuses a second final for a copied synthesis even when the caller forges its origin version", async () => {
+    // Property: a caller-supplied origin cannot turn the same synthesis into a second final verdict.
+    const first = await fixture();
+    const firstAttempt = await publishAttempt(first);
+    expect(await repository.insertResult(resultInput(first, firstAttempt.attemptId))).toBe("INSERTED");
+    const second = await cloneVersion(first);
+    const forgedAttempt = await publishAttempt(second);
+    expect(await repository.insertResult({
+      ...resultInput(second, forgedAttempt.attemptId, flagged), synthesisOriginVersion: 2
+    })).toBe("ALREADY_FINAL");
+    expect(await repository.runRemovedByCheck(first.runId)).toBe(false);
+    const finals = await database.pool.query<{ answer_version: number }>(
+      `SELECT answer_version FROM serve.synthesis_check_result WHERE answer_id=$1 AND final`, [first.answerId]
+    );
+    expect(finals.rows).toEqual([{ answer_version: 1 }]);
+  });
+
   it("claims each request once: two claimers running at once insert one attempt per request", async () => {
     expect((await runtime.query<{ current_user: string }>("SELECT current_user")).rows[0]?.current_user)
       .toBe("debateai_runtime");

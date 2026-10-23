@@ -80,6 +80,14 @@ async function settle(answer: Answer): Promise<void> {
   })).toBe(true);
 }
 
+async function settleAndStartStory(
+  answer: Answer,
+  storyWriter: { writeAfterSettle(): Promise<void> }
+): Promise<{ storyCompletion: Promise<void> }> {
+  await settle(answer);
+  return { storyCompletion: storyWriter.writeAfterSettle() };
+}
+
 async function requestVersions(answerId: string): Promise<number[]> {
   const rows = await database.pool.query<{ answer_version: number }>(
     "SELECT answer_version FROM serve.synthesis_check_request WHERE answer_id=$1 ORDER BY answer_version",
@@ -208,13 +216,23 @@ describe("synthesis check request at settlement", () => {
 
   it("the worker stores a check while a post-settlement story callback remains pending", async () => {
     const answer = await persistAnswer("settlement");
-    await settle(answer);
+    let signalStoryStarted!: () => void;
+    const storyStarted = new Promise<void>((resolve) => { signalStoryStarted = resolve; });
+    let releaseStory!: () => void;
+    const storyPending = new Promise<void>((resolve) => { releaseStory = resolve; });
     let storyFinished = false;
-    const storyWriter = { writeAfterSettle: async () => {
-      await new Promise<void>(() => {});
+    const storyWriter = { writeAfterSettle: vi.fn(async () => {
+      const row = await database.pool.query<{ state: string }>(
+        "SELECT state FROM core.work_item WHERE work_item_id=$1", [answer.workItemId]
+      );
+      expect(row.rows[0]?.state).toBe("DONE");
+      signalStoryStarted();
+      await storyPending;
       storyFinished = true;
-    } };
-    void storyWriter.writeAfterSettle();
+    }) };
+    const { storyCompletion } = await settleAndStartStory(answer, storyWriter);
+    expect(storyWriter.writeAfterSettle).toHaveBeenCalledOnce();
+    await storyStarted;
     const repository = new SynthesisCheckRepository(database.pool);
     const serve = new ServeRepository(database.pool);
     const worker = new SynthesisCheckWorker({
@@ -231,5 +249,8 @@ describe("synthesis check request at settlement", () => {
     expect((await repository.readRecords({ ...answer, maxVersion: 1 }))[0]?.outcome)
       .toEqual({ verdict: "NO_SYNTHESIS", categories: [] });
     expect(storyFinished).toBe(false);
+    releaseStory();
+    await storyCompletion;
+    expect(storyFinished).toBe(true);
   });
 });
