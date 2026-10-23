@@ -2,9 +2,9 @@
   "DISCLOSURE": "Sveiki! Es esmu Dialectical Engine atbalsta asistents, mākslīgais intelekts. Varu izskaidrot produkta darbību un norādīt pareizo lapu. Nevaru jūs pierakstīt sistēmā, mainīt jūsu kontu vai kaut ko atiestatīt. Šīm darbībām izmantojiet manis norādītās saites vai lūdziet sarunu ar cilvēku.",
   "NO_SOURCE": "Man nav šīs informācijas avota, tāpēc neminēšu. Uzdodiet citu jautājumu par debašu darbību vai izvēlieties “Runāt ar cilvēku”.",
   "REFUSE_ZONE": "Es nevaru palīdzēt ar pierakstīšanos, parolēm, verifikācijas kodiem, divfaktoru autentifikāciju, konta atkopšanu, e-pasta adreses maiņu vai konta dzēšanu, pat ne ar to pārbaudi. Šīs darbības ir pieejamas tikai jūsu konta lapās: {link}. Ja šī lapa nedarbojas, izvēlieties “Runāt ar cilvēku”.",
-  "REFUSE_INJECTION": "Es ievēroju tikai paša produkta norādījumus, tāpēc šo pieprasījumu izlaidīšu. Jūsu ziņojums ir reģistrēts. Jautājiet par produktu vai izvēlieties “Runāt ar cilvēku”.",
-  "REFUSE_SAFETY": "Šeit ir vajadzīgs cilvēks, nevis asistents. Izvēlieties “Runāt ar cilvēku”, un cilvēks izlasīs jūsu ziņojumu.",
-  "DEGRADED": "Asistenta modelis pašlaik nav pieejams. Joprojām varat atstāt ziņojumu cilvēkam: izvēlieties “Runāt ar cilvēku”.",
+  "REFUSE_INJECTION": "Es ievēroju tikai paša produkta norādījumus, tāpēc šo pieprasījumu izlaidīšu. Jautājiet par produktu vai izvēlieties “Runāt ar cilvēku”.",
+  "REFUSE_SAFETY": "Šeit ir vajadzīgs cilvēks, nevis asistents. Izvēlieties “Runāt ar cilvēku” un rakstiet uz parādīto adresi; cilvēks izlasa uzrakstīto.",
+  "DEGRADED": "Asistenta modelis pašlaik nav pieejams. Lai sazinātos ar cilvēku, izvēlieties “Runāt ar cilvēku”.",
   "DISABLED": "Atbalsta asistents pašlaik ir izslēgts.",
   "RATE_LIMITED": "Īsā laikā esat nosūtījis daudz ziņojumu. Lūdzu, uzgaidiet dažas minūtes.",
   "RATING": "Vai šī atbilde sniedza vajadzīgo informāciju? Jā · Nē · Runāt ar cilvēku",
@@ -29,5 +29,6 @@
   "OFF_TOPIC": "Varu palīdzēt tikai ar Dialectical Engine: jūsu kontu, plāniem, debatēm, publicēšanu un mūsu politikām. Ar to nevaru jums palīdzēt.",
   "OFF_TOPIC_PART": "Varu palīdzēt tikai ar Dialectical Engine, tāpēc neesmu atbildējis uz pārējo jūsu ziņojuma daļu.",
   "CRISIS_SUPPORT": "Tas, ko uzrakstījāt, izklausās ļoti sāpīgi, un jums ar to nav jātiek galā vienatnē. Šeit varat jau tagad sazināties ar kādu.",
-  "THREAT_LINE": "Ar to nevaru jums palīdzēt. Ja kāds varētu ciest, lūdzu, nekavējoties meklējiet palīdzību."
+  "THREAT_LINE": "Ar to nevaru jums palīdzēt. Ja kāds varētu ciest, lūdzu, nekavējoties meklējiet palīdzību.",
+  "TOO_LONG": "Jūsu ziņojums ir pārāk garš šai tērzēšanai. Saīsiniet to un nosūtiet vēlreiz."
 }

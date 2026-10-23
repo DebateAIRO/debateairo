@@ -108,7 +108,7 @@
   "settings.transparency.downloadsTail": "đối tượng mô tả nội dung được tạo và việc không có biên tập viên con người đánh giá. Dữ liệu câu trả lời, nguồn gốc mô hình và hồ sơ vận hành đã ghi vẫn giữ nguyên giá trị ban đầu.",
   "settings.transparency.markingsLimit": "Các dấu hiệu này mô tả nội dung trong giao diện và tệp tải xuống của chúng tôi. Chúng không phải hình mờ hay chứng nhận xác thực; việc sao chép văn bản thuần có thể làm mất các dấu hiệu này.",
   "settings.transparency.supportTitle": "Hỗ trợ và trợ giúp từ con người",
-  "settings.transparency.supportLead": "Trợ lý hỗ trợ là một hệ thống AI. Dùng “Trao đổi với nhân viên” hoặc “Chuyển cho nhân viên” trong",
+  "settings.transparency.supportLead": "Trợ lý hỗ trợ là một hệ thống AI. Dùng “Trò chuyện với nhân viên hỗ trợ” trong",
   "settings.transparency.help": "Trợ giúp",
   "settings.transparency.supportTail": "để yêu cầu con người hỗ trợ.",
   "settings.transparency.back": "Quay lại {brand}",

@@ -129,16 +129,26 @@ describe("reviewed Support recovery components", () => {
     }
   });
 
-  it("keeps the bug-report composer primer distinct from human escalation and email", () => {
+  it("keeps the bug-report composer primer in the guide", () => {
     const document = JSON.parse(readFileSync(new URL(
       "../../packages/support-kb/recovery/components.json",import.meta.url
     ),"utf8")) as { components: Array<Readonly<{
       id:string;lang:string;modelProjection:string;fallback:string
     }>> };
-    const expectations = {
-      en:["Report a bug primes ordinary public-guide text","does not create a human case"],
-      ro:["„Raportați o eroare” completează text obișnuit pentru ghidul public","nu creează un caz uman"]
-    } as const;
+    const phrases = {
+  "app-navigation.en": [
+    "Report a bug primes ordinary public-guide text in the Support composer and sends nothing to a person"
+  ],
+  "app-navigation.ro": [
+    "„Raportați o eroare” completează text obișnuit pentru ghidul public în caseta Asistenței și nu trimite nimic unei persoane"
+  ],
+  "settings-help-menus.en": [
+    "Report a bug prepares ordinary public-guide text"
+  ],
+  "settings-help-menus.ro": [
+    "Raportează o eroare pregătește text obișnuit pentru ghidul public"
+  ]
+} as Record<string,string[]>;
     for (const id of ["app-navigation","settings-help-menus"] as const) {
       for (const lang of ["en","ro"] as const) {
         const article = readFileSync(new URL(
@@ -146,9 +156,7 @@ describe("reviewed Support recovery components", () => {
         ),"utf8");
         const component = document.components.find(({ id: candidate,lang: candidateLang }) =>
           candidate === id && candidateLang === lang)!;
-        const current=id==='settings-help-menus' ? (lang==='en'
-          ? ['Report a bug prepares ordinary public-guide text','Escalate to a human creates a separate human handoff','email support is a separate mail workflow']
-          : ['Raportează o eroare pregătește text obișnuit pentru ghidul public','Escaladează către o persoană creează un transfer separat','emailul de asistență este un flux separat de mail']) : expectations[lang];
+        const current = phrases[`${id}.${lang}`] ?? [];
         for (const phrase of current) {
           expect(article).toContain(phrase);
           expect(`${component.modelProjection} ${component.fallback}`).toContain(phrase);

@@ -2,9 +2,9 @@
   "DISCLOSURE": "Dobrý deň — som asistent podpory Dialectical Engine, AI. Môžem vysvetliť, ako produkt funguje, a nasmerovať vás na správnu stránku. Nemôžem vás prihlásiť, zmeniť váš účet ani nič obnoviť. Na tieto úkony použite odkazy, ktoré vám poskytnem, alebo požiadajte o človeka.",
   "NO_SOURCE": "Nemám na to zdroj, preto nebudem hádať. Opýtajte sa ma na niečo iné o fungovaní diskusií alebo vyberte „Porozprávať sa s človekom“.",
   "REFUSE_ZONE": "Nemôžem pomôcť s prihlásením, heslami, overovacími kódmi, dvojfaktorovým overením, obnovením účtu, zmenou e-mailu ani odstránením účtu — ani s ich kontrolou. Tieto možnosti sú dostupné iba na stránkach vášho účtu: {link}. Ak vám táto stránka nefunguje, vyberte „Porozprávať sa s človekom“.",
-  "REFUSE_INJECTION": "Riadim sa iba pokynmi samotného produktu, preto túto požiadavku preskočím. Vaša správa bola zaznamenaná. Opýtajte sa ma na produkt alebo vyberte „Porozprávať sa s človekom“.",
-  "REFUSE_SAFETY": "Toto musí riešiť človek, nie asistent. Vyberte „Porozprávať sa s človekom“ a človek si prečíta vašu správu.",
-  "DEGRADED": "Model asistenta momentálne nie je dostupný. Stále môžete nechať správu človeku: vyberte „Porozprávať sa s človekom“.",
+  "REFUSE_INJECTION": "Riadim sa iba pokynmi samotného produktu, preto túto požiadavku preskočím. Opýtajte sa ma na produkt alebo vyberte „Porozprávať sa s človekom“.",
+  "REFUSE_SAFETY": "Toto musí riešiť človek, nie asistent. Vyberte „Porozprávať sa s človekom“ a napíšte na adresu, ktorú zobrazí; človek si to prečíta.",
+  "DEGRADED": "Model asistenta momentálne nie je dostupný. Ak sa chcete spojiť s človekom, vyberte „Porozprávať sa s človekom“.",
   "DISABLED": "Asistent podpory je momentálne vypnutý.",
   "RATE_LIMITED": "Za krátky čas ste odoslali veľa správ. Počkajte niekoľko minút.",
   "RATING": "Dostali ste odpoveď na svoju otázku? Áno · Nie · Porozprávať sa s človekom",
@@ -29,5 +29,6 @@
   "OFF_TOPIC": "Môžem pomáhať iba s Dialectical Engine: vaším účtom, tarifami, diskusiami, publikovaním a našimi zásadami. Nemôžem vám s tým pomôcť.",
   "OFF_TOPIC_PART": "Môžem pomáhať iba s Dialectical Engine, preto zvyšok vašej správy zostal bez odpovede.",
   "CRISIS_SUPPORT": "To, čo píšete, znie veľmi bolestivo a nemusíte to zvládať bez pomoci. Tu sa môžete hneď teraz s niekým spojiť.",
-  "THREAT_LINE": "Nemôžem vám s tým pomôcť. Ak by sa niekomu mohlo ublížiť, ihneď prosím vyhľadajte pomoc."
+  "THREAT_LINE": "Nemôžem vám s tým pomôcť. Ak by sa niekomu mohlo ublížiť, ihneď prosím vyhľadajte pomoc.",
+  "TOO_LONG": "Vaša správa je na chat príliš dlhá. Skráťte ju a odošlite znova."
 }

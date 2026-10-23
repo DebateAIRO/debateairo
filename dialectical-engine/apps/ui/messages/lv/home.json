@@ -84,7 +84,7 @@
   "home.aiPill": "MI ģenerēts saturs. Argumentus, vērtējumus un spriedumus rada MI modeļi, nevis cilvēki.",
   "home.aiBlock": "Dialectical Engine ir MI sistēma. Argumentus, pārskatus, vērtējumus, spriedumus un atbalsta atbildes ģenerē MI modeļi, un tie var būt neprecīzi vai nepilnīgi. Visam ģenerētajam tekstam ir mašīnlasāms marķējums, kas to identificē kā MI ģenerētu, un publicētās debates tiek marķētas lasītājiem. Pirms publicēšanas cilvēks neveic redakcionālu pārbaudi, un neviena vārdā nosaukta persona neuzņemas redakcionālu atbildību par ģenerēto saturu.",
   "home.aiLandingBlock": "Dialectical Engine ir MI sistēma. Argumentus, pārskatus, vērtējumus, spriedumus un atbalsta atbildes ģenerē MI modeļi, un tie var būt neprecīzi vai nepilnīgi — uztveriet tos kā vērtējamu materiālu, nevis faktus. Visam ģenerētajam tekstam ir mašīnlasāms marķējums, kas to identificē kā MI ģenerētu, un publicētās debates tiek marķētas lasītājiem. Pirms publicēšanas cilvēks neveic redakcionālu pārbaudi, un neviena vārdā nosaukta persona neuzņemas redakcionālu atbildību par ģenerēto saturu.",
-  "home.aiBanner": "Atbildes ģenerē MI, tās ir mašīnlasāmi marķētas un var būt kļūdainas. Jebkurā brīdī varat lūgt cilvēka palīdzību.",
+  "home.aiBanner": "Atbildes ģenerē MI, tās ir mašīnlasāmi marķētas un var būt kļūdainas.",
   "home.aiDebate": "Visu šajās debatēs — argumentus, pārskatus, vērtējumus un spriedumu — ģenerē MI modeļi; saturs ir mašīnlasāmi marķēts un var būt neprecīzs.",
   "home.aiTransparency": "MI PĀRREDZAMĪBA",
   "home.aiDisclosure": "Informācija par MI",

@@ -2,9 +2,9 @@
   "DISCLOSURE": "Pozdrav — ja sam AI asistent podrške za Dialectical Engine. Mogu objasniti kako proizvod radi i uputiti Vas na odgovarajuću stranicu. Ne mogu Vas prijaviti u sustav, promijeniti Vaš račun niti išta ponovno postaviti. Za to upotrijebite poveznice koje Vam navedem ili zatražite osobu.",
   "NO_SOURCE": "Nemam izvor za to pa neću nagađati. Pitajte me nešto drugo o radu rasprava ili odaberite „Razgovor s osobom“.",
   "REFUSE_ZONE": "Ne mogu pomoći s prijavom, zaporkama, kodovima za provjeru, dvofaktorskom autentifikacijom, oporavkom računa, promjenom adrese e-pošte ili brisanjem računa — čak ni radi njihove provjere. To je dostupno samo na stranicama Vašeg računa: {link}. Ako Vam ta stranica ne radi, odaberite „Razgovor s osobom“.",
-  "REFUSE_INJECTION": "Slijedim samo upute samog proizvoda pa ću preskočiti taj zahtjev. Vaša je poruka zabilježena. Pitajte me o proizvodu ili odaberite „Razgovor s osobom“.",
-  "REFUSE_SAFETY": "Za ovo je potrebna osoba, a ne asistent. Odaberite „Razgovor s osobom“ i osoba će pročitati Vašu poruku.",
-  "DEGRADED": "Model asistenta trenutačno nije dostupan. I dalje možete ostaviti poruku osobi: odaberite „Razgovor s osobom“.",
+  "REFUSE_INJECTION": "Slijedim samo upute samog proizvoda pa ću preskočiti taj zahtjev. Pitajte me o proizvodu ili odaberite „Razgovor s osobom“.",
+  "REFUSE_SAFETY": "Za ovo je potrebna osoba, a ne asistent. Odaberite „Razgovor s osobom“ i napišite na adresu koju prikazuje; osoba čita ono što ondje napišete.",
+  "DEGRADED": "Model asistenta trenutačno nije dostupan. Da biste došli do osobe, odaberite „Razgovor s osobom“.",
   "DISABLED": "Asistent podrške trenutačno je isključen.",
   "RATE_LIMITED": "Poslali ste mnogo poruka u kratkom vremenu. Pričekajte nekoliko minuta.",
   "RATING": "Je li ovaj odgovor riješio Vaše pitanje? Da · Ne · Razgovor s osobom",
@@ -29,5 +29,6 @@
   "OFF_TOPIC": "Mogu Vam pomoći samo s Dialectical Engine: Vašim računom, planovima, raspravama, objavljivanjem i našim politikama. S tim Vam ne mogu pomoći.",
   "OFF_TOPIC_PART": "Mogu Vam pomoći samo s Dialectical Engine pa je ostatak Vaše poruke ostao bez odgovora.",
   "CRISIS_SUPPORT": "Ono što ste napisali zvuči vrlo bolno i ne morate se s time suočiti sami. Ovdje možete odmah stupiti u kontakt s nekim.",
-  "THREAT_LINE": "S tim vam ne mogu pomoći. Ako bi netko mogao biti povrijeđen, molim vas, odmah potražite pomoć."
+  "THREAT_LINE": "S tim vam ne mogu pomoći. Ako bi netko mogao biti povrijeđen, molim vas, odmah potražite pomoć.",
+  "TOO_LONG": "Vaša je poruka predugačka za chat. Skratite je i pošaljite ponovno."
 }

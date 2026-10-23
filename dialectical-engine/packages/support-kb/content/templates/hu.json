@@ -2,9 +2,9 @@
   "DISCLOSURE": "Üdvözlöm — a Dialectical Engine AI-alapú ügyfélszolgálati asszisztense vagyok. El tudom magyarázni a termék működését, és a megfelelő oldalra tudom irányítani. Nem tudom bejelentkeztetni Önt, módosítani a fiókját vagy bármit alaphelyzetbe állítani. Ezekhez használja az általam megadott hivatkozásokat, vagy kérje egy munkatárs segítségét.",
   "NO_SOURCE": "Nincs ehhez forrásom, ezért nem fogok találgatni. Kérdezzen mást a viták működéséről, vagy válassza a „Beszélgetés munkatárssal” lehetőséget.",
   "REFUSE_ZONE": "Nem tudok segíteni a bejelentkezéssel, jelszavakkal, ellenőrző kódokkal, kétfaktoros hitelesítéssel, fiók-helyreállítással, az e-mail-cím módosításával vagy a fiók törlésével kapcsolatban — még ezek ellenőrzésében sem. Ezeket csak a fiókja oldalain kezelheti: {link}. Ha ez az oldal nem működik, válassza a „Beszélgetés munkatárssal” lehetőséget.",
-  "REFUSE_INJECTION": "Csak a termék saját utasításait követem, ezért ezt a kérést kihagyom. Üzenetét rögzítettük. Kérdezzen a termékről, vagy válassza a „Beszélgetés munkatárssal” lehetőséget.",
-  "REFUSE_SAFETY": "Ehhez munkatársra, nem asszisztensre van szükség. Válassza a „Beszélgetés munkatárssal” lehetőséget, és egy munkatárs elolvassa az üzenetét.",
-  "DEGRADED": "Az asszisztens modellje jelenleg nem érhető el. Ettől függetlenül hagyhat üzenetet egy munkatársnak: válassza a „Beszélgetés munkatárssal” lehetőséget.",
+  "REFUSE_INJECTION": "Csak a termék saját utasításait követem, ezért ezt a kérést kihagyom. Kérdezzen a termékről, vagy válassza a „Beszélgetés munkatárssal” lehetőséget.",
+  "REFUSE_SAFETY": "Ehhez munkatársra, nem asszisztensre van szükség. Válassza a „Beszélgetés munkatárssal” lehetőséget, és írjon az általa megjelenített címre; azt egy munkatárs olvassa el.",
+  "DEGRADED": "Az asszisztens modellje jelenleg nem érhető el. Munkatárs eléréséhez válassza a „Beszélgetés munkatárssal” lehetőséget.",
   "DISABLED": "Az ügyfélszolgálati asszisztens jelenleg ki van kapcsolva.",
   "RATE_LIMITED": "Rövid idő alatt sok üzenetet küldött. Várjon néhány percet.",
   "RATING": "Megválaszolta ez a kérdését? Igen · Nem · Beszélgetés munkatárssal",
@@ -29,5 +29,6 @@
   "OFF_TOPIC": "Csak a Dialectical Engine témakörében tudok segíteni: az Ön fiókja, az előfizetési csomagok, a viták, a közzététel és az irányelveink. Ebben nem tudok segíteni.",
   "OFF_TOPIC_PART": "Csak a Dialectical Engine témakörében tudok segíteni, ezért az üzenetének többi részére nem válaszoltam.",
   "CRISIS_SUPPORT": "Amit írt, nagyon fájdalmasnak hangzik, és nem kell egyedül szembenéznie vele. Itt most elérhet valakit.",
-  "THREAT_LINE": "Ebben nem tudok segíteni. Ha valaki megsérülhet, kérem, azonnal kérjen segítséget."
+  "THREAT_LINE": "Ebben nem tudok segíteni. Ha valaki megsérülhet, kérem, azonnal kérjen segítséget.",
+  "TOO_LONG": "Az üzenete túl hosszú a csevegéshez. Rövidítse le, és küldje el újra."
 }

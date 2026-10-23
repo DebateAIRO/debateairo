@@ -85,7 +85,7 @@
   "home.aiPill": "Obsah generovaný umělou inteligencí. Argumenty, skóre a verdikty produkují modely umělé inteligence, nikoli lidé.",
   "home.aiBlock": "Dialectical Engine je systém umělé inteligence. Argumenty, recenze, skóre, verdikty a odpovědi podpory jsou generovány modely AI a mohou být nepřesné nebo neúplné. Veškerý vygenerovaný text nese strojově čitelné označení, které jej identifikuje jako generované AI, a publikované debaty jsou pro čtenáře označeny. Před publikováním se neprovádí redakční kontrola člověkem a žádná jmenovaná osoba nenese redakční odpovědnost za generovaný obsah.",
   "home.aiLandingBlock": "Dialectical Engine je systém umělé inteligence. Argumenty, recenze, skóre, verdikty a odpovědi podpory jsou generovány modely umělé inteligence a mohou být nepřesné nebo neúplné – považujte je za materiál k posouzení, nikoli za fakt. Veškerý vygenerovaný text nese strojově čitelné označení, které jej identifikuje jako generované AI, a publikované debaty jsou pro čtenáře označeny. Před publikováním se neprovádí redakční kontrola člověkem a žádná jmenovaná osoba nenese redakční odpovědnost za generovaný obsah.",
-  "home.aiBanner": "Odpovědi jsou generované AI, strojově čitelně označené a mohou být chybné. Požádejte o člověka kdykoli.",
+  "home.aiBanner": "Odpovědi jsou generované AI, strojově čitelně označené a mohou být chybné.",
   "home.aiDebate": "Vše v této debatě – argumenty, kontroly, skóre i verdikt – je generováno modely AI, strojově čitelně označeno a může být nepřesné.",
   "home.aiTransparency": "TRANSPARENTNOST AI",
   "home.aiDisclosure": "Upozornění na AI",

@@ -2,9 +2,9 @@
   "DISCLOSURE": "Hej — jag är Dialectical Engines supportassistent, en AI. Jag kan förklara hur produkten fungerar och hänvisa dig till rätt sida. Jag kan inte logga in åt dig, ändra ditt konto eller återställa något. Använd länkarna jag ger dig för detta eller be att få prata med en person.",
   "NO_SOURCE": "Jag har ingen källa för det och tänker därför inte gissa. Fråga mig om något annat som gäller hur debatter fungerar eller välj ”Prata med en person”.",
   "REFUSE_ZONE": "Jag kan inte hjälpa till med inloggning, lösenord, verifieringskoder, tvåfaktorsautentisering, kontoåterställning, ändring av e-postadress eller borttagning av konto — inte ens med att kontrollera dem. Detta hanteras endast på dina kontosidor: {link}. Om den sidan inte fungerar för dig väljer du ”Prata med en person”.",
-  "REFUSE_INJECTION": "Jag följer endast produktens egna instruktioner och hoppar därför över den begäran. Ditt meddelande har registrerats. Fråga mig om produkten eller välj ”Prata med en person”.",
-  "REFUSE_SAFETY": "Det här kräver en person, inte en assistent. Välj ”Prata med en person” så läser en person ditt meddelande.",
-  "DEGRADED": "Assistentens modell är inte tillgänglig just nu. Du kan fortfarande lämna ett meddelande till en person: välj ”Prata med en person”.",
+  "REFUSE_INJECTION": "Jag följer endast produktens egna instruktioner och hoppar därför över den begäran. Fråga mig om produkten eller välj ”Prata med en person”.",
+  "REFUSE_SAFETY": "Det här kräver en person, inte en assistent. Välj ”Prata med en person” och skriv till adressen som visas; en person läser det du skriver.",
+  "DEGRADED": "Assistentens modell är inte tillgänglig just nu. Välj ”Prata med en person” för att nå en person.",
   "DISABLED": "Supportassistenten är avstängd för tillfället.",
   "RATE_LIMITED": "Du har skickat många meddelanden på kort tid. Vänta några minuter.",
   "RATING": "Fick du svar på din fråga? Ja · Nej · Prata med en person",
@@ -29,5 +29,6 @@
   "OFF_TOPIC": "Jag kan bara hjälpa till med Dialectical Engine: ditt konto, abonnemang, debatter, publicering och våra policyer. Det kan jag inte hjälpa till med.",
   "OFF_TOPIC_PART": "Jag kan bara hjälpa till med Dialectical Engine, så jag har inte besvarat resten av ditt meddelande.",
   "CRISIS_SUPPORT": "Det du skrev låter väldigt smärtsamt, och du behöver inte klara det här ensam. Här kan du nå någon just nu.",
-  "THREAT_LINE": "Det kan jag inte hjälpa till med. Om någon kan komma till skada, var snäll och sök hjälp direkt."
+  "THREAT_LINE": "Det kan jag inte hjälpa till med. Om någon kan komma till skada, var snäll och sök hjälp direkt.",
+  "TOO_LONG": "Ditt meddelande är för långt för chatten. Korta ner det och skicka det igen."
 }

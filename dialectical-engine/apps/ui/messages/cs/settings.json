@@ -108,7 +108,7 @@
   "settings.transparency.downloadsTail": "objekt popisující generovaný obsah a nepřítomnost redakční kontroly člověkem. Zaznamenaná data odpovědí, původ modelu a provozní záznamy si zachovávají původní hodnoty.",
   "settings.transparency.markingsLimit": "Tato označení popisují obsah v našem uživatelském rozhraní a stažených souborech. Nejsou vodoznakem ani certifikátem pravosti; při kopírování prostého textu mohou být odstraněna.",
   "settings.transparency.supportTitle": "Podpora a pomoc člověka",
-  "settings.transparency.supportLead": "Asistent podpory je systém AI. Chcete-li požádat o pomoc člověka, použijte „Mluvit s člověkem“ nebo „Předat člověku“ v části",
+  "settings.transparency.supportLead": "Asistent podpory je systém AI. Chcete-li požádat o pomoc člověka, použijte „Promluvit si s člověkem“ v části",
   "settings.transparency.help": "Nápověda",
   "settings.transparency.supportTail": ".",
   "settings.transparency.back": "Zpět na {brand}",

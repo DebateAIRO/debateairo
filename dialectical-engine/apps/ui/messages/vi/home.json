@@ -82,7 +82,7 @@
   "home.aiPill": "Nội dung do AI tạo. Các lập luận, điểm số và phán quyết do mô hình AI tạo ra, không phải con người.",
   "home.aiBlock": "Dialectical Engine là một hệ thống AI. Các lập luận, đánh giá, điểm số, phán quyết và phản hồi hỗ trợ do mô hình AI tạo ra và có thể không chính xác hoặc không đầy đủ. Mọi văn bản được tạo đều mang dấu hiệu máy có thể đọc để xác định đó là nội dung do AI tạo, và các cuộc tranh luận đã xuất bản được gắn nhãn cho người đọc. Không có biên tập viên con người đánh giá trước khi xuất bản và không cá nhân nào có tên chịu trách nhiệm biên tập đối với nội dung được tạo.",
   "home.aiLandingBlock": "Dialectical Engine là một hệ thống AI. Các lập luận, đánh giá, điểm số, phán quyết và phản hồi hỗ trợ do mô hình AI tạo ra và có thể không chính xác hoặc không đầy đủ — hãy coi chúng là tài liệu để đánh giá, không phải sự thật. Mọi văn bản được tạo đều mang dấu hiệu máy có thể đọc để xác định đó là nội dung do AI tạo, và các cuộc tranh luận đã xuất bản được gắn nhãn cho người đọc. Không có biên tập viên con người đánh giá trước khi xuất bản và không cá nhân nào có tên chịu trách nhiệm biên tập đối với nội dung được tạo.",
-  "home.aiBanner": "Phản hồi do AI tạo, có dấu hiệu máy có thể đọc và có thể sai. Bạn có thể yêu cầu gặp người hỗ trợ bất cứ lúc nào.",
+  "home.aiBanner": "Phản hồi do AI tạo, có dấu hiệu máy có thể đọc và có thể sai.",
   "home.aiDebate": "Mọi nội dung trong cuộc tranh luận này — lập luận, đánh giá, điểm số và phán quyết — đều do các mô hình AI tạo ra, được đánh dấu để máy đọc và có thể không chính xác.",
   "home.aiTransparency": "MINH BẠCH VỀ AI",
   "home.aiDisclosure": "Thông báo về AI",

@@ -85,7 +85,7 @@
   "home.aiPill": "Obsah vytvorený AI. Argumenty, hodnotenia a verdikty vytvárajú modely AI, nie ľudia.",
   "home.aiBlock": "Dialectical Engine je systém AI. Argumenty, kontroly, hodnotenia, verdikty a odpovede podpory sú vytvorené modelmi AI a môžu byť nepresné alebo neúplné. Každý vytvorený text obsahuje strojovo čitateľné označenie, že ho vytvorila AI, a zverejnené debaty sú označené pre čitateľov. Pred zverejnením sa nevykonáva žiadna ľudská redakčná kontrola a žiadna menovite uvedená osoba nenesie redakčnú zodpovednosť za vytvorený obsah.",
   "home.aiLandingBlock": "Dialectical Engine je systém AI. Argumenty, kontroly, hodnotenia, verdikty a odpovede podpory sú vytvorené modelmi AI a môžu byť nepresné alebo neúplné — považujte ich za materiál na posúdenie, nie za fakty. Každý vytvorený text obsahuje strojovo čitateľné označenie, že ho vytvorila AI, a zverejnené debaty sú označené pre čitateľov. Pred zverejnením sa nevykonáva žiadna ľudská redakčná kontrola a žiadna menovite uvedená osoba nenesie redakčnú zodpovednosť za vytvorený obsah.",
-  "home.aiBanner": "Odpovede sú vytvorené AI, strojovo čitateľne označené a môžu byť nesprávne. Kedykoľvek môžete požiadať o pomoc človeka.",
+  "home.aiBanner": "Odpovede sú vytvorené AI, strojovo čitateľne označené a môžu byť nesprávne.",
   "home.aiDebate": "Všetko v tejto debate — argumenty, kontroly, hodnotenia a verdikt — je vytvorené modelmi AI, strojovo čitateľne označené a môže byť nepresné.",
   "home.aiTransparency": "TRANSPARENTNOSŤ AI",
   "home.aiDisclosure": "Informácie o AI",

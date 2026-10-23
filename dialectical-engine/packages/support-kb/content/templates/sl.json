@@ -2,9 +2,9 @@
   "DISCLOSURE": "Pozdravljeni — sem pomočnik za podporo Dialectical Engine, AI. Lahko pojasnim, kako izdelek deluje, in vas usmerim na pravo stran. Ne morem vas prijaviti, spremeniti vašega računa ali česar koli ponastaviti. Za to uporabite povezave, ki vam jih posredujem, ali zaprosite za osebo.",
   "NO_SOURCE": "Za to nimam vira, zato ugibanje ne pride v poštev. Vprašajte me kaj drugega o delovanju razprav ali izberite »Pogovori se z osebo«.",
   "REFUSE_ZONE": "Ne morem pomagati pri prijavi, geslih, potrditvenih kodah, dvofaktorskem preverjanju pristnosti, obnovitvi računa, spremembi e-poštnega naslova ali izbrisu računa — niti pri njihovem preverjanju. To je mogoče samo na straneh vašega računa: {link}. Če vam ta stran ne deluje, izberite »Pogovori se z osebo«.",
-  "REFUSE_INJECTION": "Upoštevam samo navodila samega izdelka, zato bo ta zahteva prezrta. Vaše sporočilo je bilo zabeleženo. Vprašajte me o izdelku ali izberite »Pogovori se z osebo«.",
-  "REFUSE_SAFETY": "To mora obravnavati oseba, ne pomočnik. Izberite »Pogovori se z osebo« in oseba bo prebrala vaše sporočilo.",
-  "DEGRADED": "Pomočnikov model trenutno ni na voljo. Še vedno lahko pustite sporočilo osebi: izberite »Pogovori se z osebo«.",
+  "REFUSE_INJECTION": "Upoštevam samo navodila samega izdelka, zato bo ta zahteva prezrta. Vprašajte me o izdelku ali izberite »Pogovori se z osebo«.",
+  "REFUSE_SAFETY": "To mora obravnavati oseba, ne pomočnik. Izberite »Pogovori se z osebo« in napišite na naslov, ki ga prikaže; oseba bo prebrala, kar boste napisali.",
+  "DEGRADED": "Pomočnikov model trenutno ni na voljo. Če želite doseči osebo, izberite »Pogovori se z osebo«.",
   "DISABLED": "Pomočnik za podporo je trenutno izklopljen.",
   "RATE_LIMITED": "V kratkem času ste poslali veliko sporočil. Počakajte nekaj minut.",
   "RATING": "Ste dobili odgovor na svoje vprašanje? Da · Ne · Pogovori se z osebo",
@@ -29,5 +29,6 @@
   "OFF_TOPIC": "Lahko pomagam samo pri Dialectical Engine: vašem računu, naročniških paketih, razpravah, objavljanju in naših politikah. Pri tem vam ne morem pomagati.",
   "OFF_TOPIC_PART": "Lahko pomagam samo pri Dialectical Engine, zato je preostanek vašega sporočila ostal brez odgovora.",
   "CRISIS_SUPPORT": "Tisto, kar ste napisali, zveni zelo boleče in s tem se vam ni treba soočati sami. Tukaj lahko takoj zdaj stopite v stik z nekom.",
-  "THREAT_LINE": "Pri tem vam ne morem pomagati. Če bi se kdo lahko poškodoval, prosim, takoj poiščite pomoč."
+  "THREAT_LINE": "Pri tem vam ne morem pomagati. Če bi se kdo lahko poškodoval, prosim, takoj poiščite pomoč.",
+  "TOO_LONG": "Vaše sporočilo je za klepet predolgo. Skrajšajte ga in ga pošljite znova."
 }

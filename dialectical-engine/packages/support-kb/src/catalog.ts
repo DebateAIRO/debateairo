@@ -175,7 +175,6 @@ export const SUPPORT_GUIDE_LABELS: readonly SupportGuideLabel[] = Object.freeze(
     ["Cum funcționează","Cum funcționează o dezbatere"]
   ),
   guideLabel("support-cases",null,["Report a bug","Email support"],["Raportează o eroare","Asistență prin email"]),
-  guideLabel("settings-help-menus",null,["Human support cases"],["Cazuri de asistență umană"]),
   guideLabel("account-access",null,["Verify email","Enroll MFA"],["Verifică emailul","Configurează MFA"]),
 ]);
 
@@ -252,13 +251,13 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "help-desk",
     route: "/help",
-    labels: labels("Support conversations and human cases", "Conversații de asistență și cazuri umane"),
+    labels: labels("Support conversations and the support email address", "Conversații de asistență și adresa de email de asistență"),
     audience: "any",
     availability: "public",
     disposition: "action",
     actionIds: ["help", "support-status"],
     articleIds: ["app-navigation", "settings-help-menus", "support-cases", "support-status-limits"],
-    searchTerms: terms(["help", "support", "case", "human", "status"], ["ajutor", "asistență", "caz", "persoană", "stare"]),
+    searchTerms: terms(["help", "support", "email", "human", "status"], ["ajutor", "asistență", "email", "persoană", "stare"]),
   }),
   capability({
     id: "ai-transparency",

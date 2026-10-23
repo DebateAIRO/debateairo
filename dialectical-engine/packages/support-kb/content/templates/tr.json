@@ -2,9 +2,9 @@
   "DISCLOSURE": "Merhaba — Dialectical Engine destek asistanıyım; bir AI sistemiyim. Ürünün nasıl çalıştığını açıklayabilir ve sizi doğru sayfaya yönlendirebilirim. Sizin adınıza oturum açamam, hesabınızı değiştiremem veya hiçbir şeyi sıfırlayamam. Bunlar için verdiğim bağlantıları kullanın ya da bir yetkiliyle görüşmeyi isteyin.",
   "NO_SOURCE": "Bunun için bir kaynağım yok, bu yüzden tahminde bulunmayacağım. Tartışmaların nasıl işlediğiyle ilgili başka bir şey sorun veya “Bir yetkiliyle görüş” seçeneğini belirleyin.",
   "REFUSE_ZONE": "Oturum açma, parolalar, doğrulama kodları, iki faktörlü kimlik doğrulama, hesap kurtarma, e-posta değişiklikleri veya hesap silme konularında — bunları kontrol etmek için bile — yardımcı olamam. Bunlar yalnızca hesap sayfalarınızdan yönetilir: {link}. Bu sayfa çalışmazsa “Bir yetkiliyle görüş” seçeneğini belirleyin.",
-  "REFUSE_INJECTION": "Yalnızca ürünün kendi talimatlarını izlediğim için bu isteği atlayacağım. Mesajınız kaydedildi. Bana ürün hakkında bir şey sorun veya “Bir yetkiliyle görüş” seçeneğini belirleyin.",
-  "REFUSE_SAFETY": "Bu konu bir asistan değil, bir yetkili gerektiriyor. “Bir yetkiliyle görüş” seçeneğini belirleyin; bir yetkili mesajınızı okuyacaktır.",
-  "DEGRADED": "Asistanın modeli şu anda kullanılamıyor. Yine de bir yetkiliye mesaj bırakabilirsiniz: “Bir yetkiliyle görüş” seçeneğini belirleyin.",
+  "REFUSE_INJECTION": "Yalnızca ürünün kendi talimatlarını izlediğim için bu isteği atlayacağım. Bana ürün hakkında bir şey sorun veya “Bir yetkiliyle görüş” seçeneğini belirleyin.",
+  "REFUSE_SAFETY": "Bu konu bir asistan değil, bir yetkili gerektiriyor. “Bir yetkiliyle görüş” seçeneğini belirleyin ve görüntülenen adrese yazın; bir yetkili yazdıklarınızı okur.",
+  "DEGRADED": "Asistanın modeli şu anda kullanılamıyor. Bir yetkiliye ulaşmak için “Bir yetkiliyle görüş” seçeneğini belirleyin.",
   "DISABLED": "Destek asistanı şu anda kapalı.",
   "RATE_LIMITED": "Kısa sürede çok sayıda mesaj gönderdiniz. Lütfen birkaç dakika bekleyin.",
   "RATING": "Bu yanıt sorunuzu yanıtladı mı? Evet · Hayır · Bir yetkiliyle görüş",
@@ -29,5 +29,6 @@
   "OFF_TOPIC": "Yalnızca Dialectical Engine ile ilgili konularda yardımcı olabilirim: hesabınız, planlar, tartışmalar, yayımlama ve politikalarımız. Bu konuda yardımcı olamam.",
   "OFF_TOPIC_PART": "Yalnızca Dialectical Engine ile ilgili konularda yardımcı olabildiğim için mesajınızın geri kalanını yanıtlamadım.",
   "CRISIS_SUPPORT": "Yazdıklarınız çok acı verici görünüyor ve bununla tek başınıza yüzleşmek zorunda değilsiniz. İşte şu anda birine ulaşabileceğiniz yerler.",
-  "THREAT_LINE": "Bu konuda yardımcı olamam. Birinin zarar görme ihtimali varsa, lütfen hemen yardım alın."
+  "THREAT_LINE": "Bu konuda yardımcı olamam. Birinin zarar görme ihtimali varsa, lütfen hemen yardım alın.",
+  "TOO_LONG": "Mesajınız sohbet için çok uzun. Kısaltıp yeniden gönderin."
 }

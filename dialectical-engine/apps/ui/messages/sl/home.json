@@ -85,7 +85,7 @@
   "home.aiPill": "Vsebina, ustvarjena z UI. Argumente, ocene in razsodbe ustvarjajo modeli UI, ne ljudje.",
   "home.aiBlock": "Dialectical Engine je sistem UI. Argumenti, pregledi, ocene, razsodbe in odgovori podpore so ustvarjeni z modeli UI in so lahko netočni ali nepopolni. Vse ustvarjeno besedilo ima strojno berljivo oznako, da je bilo ustvarjeno z UI, objavljene razprave pa so označene za bralce. Pred objavo ni človeškega uredniškega pregleda in nobena imenovana oseba ne nosi uredniške odgovornosti za ustvarjeno vsebino.",
   "home.aiLandingBlock": "Dialectical Engine je sistem UI. Argumenti, pregledi, ocene, razsodbe in odgovori podpore so ustvarjeni z modeli UI in so lahko netočni ali nepopolni — obravnavajte jih kot gradivo za presojo, ne kot dejstva. Vse ustvarjeno besedilo ima strojno berljivo oznako, da je bilo ustvarjeno z UI, objavljene razprave pa so označene za bralce. Pred objavo ni človeškega uredniškega pregleda in nobena imenovana oseba ne nosi uredniške odgovornosti za ustvarjeno vsebino.",
-  "home.aiBanner": "Odgovori so ustvarjeni z UI, strojno berljivo označeni in so lahko napačni. Kadar koli lahko zahtevate pomoč človeka.",
+  "home.aiBanner": "Odgovori so ustvarjeni z UI, strojno berljivo označeni in so lahko napačni.",
   "home.aiDebate": "Vse v tej razpravi — argumente, preglede, ocene in razsodbo — ustvarjajo modeli UI; vsebina je strojno berljivo označena in je lahko netočna.",
   "home.aiTransparency": "PREGLEDNOST UI",
   "home.aiDisclosure": "Razkritje o UI",

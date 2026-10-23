@@ -2,9 +2,9 @@
   "DISCLOSURE": "Hola: soy el asistente de soporte de Dialectical Engine, una AI. Puedo explicarle cómo funciona el producto y dirigirle a la página adecuada. No puedo iniciar sesión por usted, modificar su cuenta ni restablecer nada. Para ello, use los enlaces que le proporcione o pida hablar con una persona.",
   "NO_SOURCE": "No dispongo de una fuente para eso, así que no haré conjeturas. Pregúnteme otra cosa sobre el funcionamiento de los debates o elija «Hablar con una persona».",
   "REFUSE_ZONE": "No puedo ayudar con el inicio de sesión, las contraseñas, los códigos de verificación, la autenticación de dos factores, la recuperación de la cuenta, los cambios de correo electrónico ni la eliminación de la cuenta; ni siquiera puedo comprobarlos. Estas funciones solo están disponibles en las páginas de su cuenta: {link}. Si esa página no le funciona, elija «Hablar con una persona».",
-  "REFUSE_INJECTION": "Solo sigo las instrucciones del propio producto, así que omitiré esa solicitud. Su mensaje ha quedado registrado. Pregúnteme sobre el producto o elija «Hablar con una persona».",
-  "REFUSE_SAFETY": "Esto requiere una persona, no un asistente. Elija «Hablar con una persona» y una persona leerá su mensaje.",
-  "DEGRADED": "El modelo del asistente no está disponible en este momento. Aun así, puede dejar un mensaje para una persona: elija «Hablar con una persona».",
+  "REFUSE_INJECTION": "Solo sigo las instrucciones del propio producto, así que omitiré esa solicitud. Pregúnteme sobre el producto o elija «Hablar con una persona».",
+  "REFUSE_SAFETY": "Esto requiere una persona, no un asistente. Elija «Hablar con una persona» y escriba a la dirección que muestra; una persona lo lee.",
+  "DEGRADED": "El modelo del asistente no está disponible en este momento. Para ponerse en contacto con una persona, elija «Hablar con una persona».",
   "DISABLED": "El asistente de soporte está desactivado en este momento.",
   "RATE_LIMITED": "Ha enviado muchos mensajes en poco tiempo. Espere unos minutos.",
   "RATING": "¿Ha obtenido respuesta a su pregunta? Sí · No · Hablar con una persona",
@@ -29,5 +29,6 @@
   "OFF_TOPIC": "Solo puedo ayudarle con Dialectical Engine: su cuenta, los planes, los debates, la publicación y nuestras políticas. No puedo ayudarle con eso.",
   "OFF_TOPIC_PART": "Solo puedo ayudarle con Dialectical Engine, así que no he respondido al resto de su mensaje.",
   "CRISIS_SUPPORT": "Lo que ha escrito suena muy doloroso, y no tiene que afrontarlo a solas. Aquí puede ponerse en contacto con alguien ahora mismo.",
-  "THREAT_LINE": "No puedo ayudarle con eso. Si alguien pudiera resultar herido, por favor, pida ayuda de inmediato."
+  "THREAT_LINE": "No puedo ayudarle con eso. Si alguien pudiera resultar herido, por favor, pida ayuda de inmediato.",
+  "TOO_LONG": "Su mensaje es demasiado largo para el chat. Acórtelo y envíelo de nuevo."
 }

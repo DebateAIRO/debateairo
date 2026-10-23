@@ -108,7 +108,7 @@
   "settings.transparency.downloadsTail": "joka kuvaa luodun sisällön ja ihmisen tekemän toimituksellisen tarkastuksen puuttumisen. Tallennettujen vastausten tiedot, mallien alkuperätiedot ja toiminnalliset tietueet säilyttävät alkuperäiset arvonsa.",
   "settings.transparency.markingsLimit": "Nämä merkinnät kuvaavat käyttöliittymämme ja lataustemme sisältöä. Ne eivät ole vesileima tai aitoustodistus; pelkän tekstin kopiointi voi poistaa ne.",
   "settings.transparency.supportTitle": "Tuki ja ihmisen tarjoama apu",
-  "settings.transparency.supportLead": "Tukiavustaja on tekoälyjärjestelmä. Pyydä ihmisen apua valitsemalla ”Keskustele ihmisen kanssa” tai ”Siirrä ihmiselle” kohdassa",
+  "settings.transparency.supportLead": "Tukiavustaja on tekoälyjärjestelmä. Pyydä ihmisen apua valitsemalla ”Keskustele henkilön kanssa” kohdassa",
   "settings.transparency.help": "Ohje",
   "settings.transparency.supportTail": ".",
   "settings.transparency.back": "Takaisin palveluun {brand}",
