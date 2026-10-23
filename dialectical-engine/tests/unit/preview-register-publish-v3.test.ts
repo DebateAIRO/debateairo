@@ -11,6 +11,7 @@ import {
   buildPreviewSourceRowsV3, composePreviewSnapshotV3, publishPreviewRegisterV3, previewHostedBillingChoice, assertHostedPreviewBootRows,
   PREVIEW_SOURCE_ROW_KEYS_V3, PREVIEW_HOSTED_CEILING_BOUNDS, STORY_COST_ENVELOPE_POLICY_ROW_KEY
 } from '../../deploy/preview-auth-dev/v1/publish-register-v3.js';
+import { assertBaseIsActive, BASE_NOT_ACTIVE, PreviewRegisterBaseNotActiveError } from '../../deploy/preview-auth-dev/v1/publish-register-base.js';
 
 type Row = { rowKey: string; valueJsonText: string; sourceRef: string };
 const sha = (text: string) => createHash('sha256').update(text).digest('hex');
@@ -483,5 +484,86 @@ describe('publish kit v3: the optional previewLineUpPolicy row and the answer se
     expect(await v3(null, { writer: 'preview:fixture-a', checker: DEEPSEEK_REF })).toEqual(await v3(null, null, { checker: 'deepseek', deepseekEnabledOnGate: true }));
     await expect(v3(null, { writer: 'preview:other', checker: GLM_B })).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seat-unreviewed');
     await expect(v3(null, { writer: HAIKU_REF, checker: GLM_B }, { checker: 'glm' })).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seats-with-checker-choice');
+  });
+});
+
+/**
+ * Side-by-side spec §13 (Task S18): kit v3 composes from the ACTIVE settings version — the pointer, else the current
+ * release's own site version, else (no release yet) the old currency rule. The pool answers the settings operator's
+ * three status reads (readSettingsStatus) and the old rule's read, and records every statement.
+ */
+describe('publish kit v3: composing from the active settings version', () => {
+  // Release keys are built from pieces (the secret scanner reads r<n>-<12 hex> as a key).
+  const release = (site: number) => [`r${site}`, 'a'.repeat(12)].join('-');
+  const id = '11111111-1111-4111-8111-111111111111';
+  const statusPool = (state: { release: string | null; pointer: string | null; above?: { register_version: string; publication_id: string | null }[] }) => {
+    const statements: string[] = [];
+    const pool = { async query(sql: string) {
+      statements.push(sql);
+      if (/core\.read_current_release\(\)/.test(sql)) return { rows: state.release === null ? [] : [{ release_key: state.release }] };
+      if (/register\.read_active_settings_version\(\)/.test(sql)) return { rows: [{ pointer: state.pointer }] };
+      if (/register\.read_passed_settings_versions/.test(sql)) return { rows: [] };
+      if (/register_version>\$1/.test(sql)) return { rows: state.above ?? [] };
+      throw new Error('unexpected statement');
+    } } as any;
+    return { statements, pool };
+  };
+  const oldRule = (statements: string[]) => statements.some(sql => /register_version>\$1/.test(sql));
+
+  it('passes when the base is the pointer, with a never-activated candidate sealed above it', async () => {
+    const f = statusPool({ release: release(12), pointer: '13', above: [{ register_version: '14', publication_id: '22222222-2222-4222-8222-222222222222' }] });
+    await expect(assertBaseIsActive(f.pool, '13', id)).resolves.toBeUndefined();
+    expect(oldRule(f.statements)).toBe(false);
+  });
+  it.each([
+    ['an older version than the pointer', { release: release(12), pointer: '13' }, '12'],
+    ['a newer candidate than the pointer', { release: release(12), pointer: '13' }, '14'],
+    ['a version other than the release\'s site version while nothing was activated', { release: release(12), pointer: null }, '13']
+  ])('refuses %s', async (_name, state, base) => {
+    const f = statusPool(state);
+    await expect(assertBaseIsActive(f.pool, base, id)).rejects.toThrow(BASE_NOT_ACTIVE);
+    await expect(assertBaseIsActive(f.pool, base, id)).rejects.toBeInstanceOf(PreviewRegisterBaseNotActiveError);
+    expect(oldRule(f.statements)).toBe(false);
+  });
+  it('with the pointer empty, the current release\'s own site version is the active one (D1)', async () => {
+    const f = statusPool({ release: release(12), pointer: null, above: [{ register_version: '13', publication_id: null }] });
+    await expect(assertBaseIsActive(f.pool, '12', id)).resolves.toBeUndefined();
+    expect(oldRule(f.statements)).toBe(false);
+  });
+  it('with no release yet, the old rule decides: nothing above the base but this publication\'s replay', async () => {
+    await expect(assertBaseIsActive(statusPool({ release: null, pointer: null }).pool, '12', id)).resolves.toBeUndefined();
+    await expect(assertBaseIsActive(statusPool({ release: null, pointer: null, above: [{ register_version: '13', publication_id: id }] }).pool, '12', id)).resolves.toBeUndefined();
+    const stale = statusPool({ release: null, pointer: null, above: [{ register_version: '13', publication_id: null }] });
+    await expect(assertBaseIsActive(stale.pool, '12', id)).rejects.toThrow('PREVIEW_REGISTER_BASE_NOT_CURRENT');
+    expect(oldRule(stale.statements)).toBe(true);
+  });
+  it('kit v3 exports the active rule only; publish checks it before any publication statement', async () => {
+    const kit = await import('../../deploy/' + 'preview-auth-dev/v1/publish-register-v3.ts') as Record<string, unknown>;
+    expect(kit.assertBaseIsActive).toBe(assertBaseIsActive);
+    expect(kit.assertBaseIsCurrent).toBeUndefined();
+    const f = await fixture();
+    const snapshot = compose([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[], f.v12);
+    const approval = { baseRegisterVersion: snapshot.baseRegisterVersion, baseSnapshotSha256: snapshot.baseSnapshotSha256, snapshotSha256: snapshot.snapshotSha256, deltaSha256: snapshot.deltaSha256 };
+    const stale = statusPool({ release: release(12), pointer: '13' });
+    await expect(publishPreviewRegisterV3(stale.pool, { publicationId: id, sourceRef: 'x', snapshot, approval })).rejects.toThrow(BASE_NOT_ACTIVE);
+    expect(stale.statements).toHaveLength(3);
+    // Base 12 is active (the pointer) with a candidate above it: the check passes and the publication's own reads begin.
+    const active = statusPool({ release: release(12), pointer: '12', above: [{ register_version: '13', publication_id: null }] });
+    await expect(publishPreviewRegisterV3(active.pool, { publicationId: id, sourceRef: 'x', snapshot, approval })).rejects.toThrow('unexpected statement');
+    expect(active.statements).toHaveLength(4);
+    expect(oldRule(active.statements)).toBe(false);
+  });
+  it('the native operator checks the active rule for kit v3 (kit v2 keeps the current rule) and prints its refusal in words', async () => {
+    const operator = await import('../../deploy/' + 'preview-auth-dev/v1/native-operator.mjs');
+    expect(operator.BASE_NOT_ACTIVE_LINE).toBe(BASE_NOT_ACTIVE);
+    expect(operator.operatorRefusalLine(new PreviewRegisterBaseNotActiveError())).toBe(`${BASE_NOT_ACTIVE}\n`);
+    expect(operator.operatorRefusalLine(new TypeError(BASE_NOT_ACTIVE))).toBe('PREVIEW_NATIVE_OPERATION_REFUSED\n');
+    const text = readFileSync(resolve('deploy/preview-auth-dev/v1/native-operator.mjs'), 'utf8');
+    const body = text.slice(text.indexOf('export async function runNativeOperator('));
+    const active = body.indexOf("if(hosted&&(plan.operation==='plan'||plan.operation==='publish'))await publisher.assertBaseIsActive(pool,base.registerVersion,plan.publicationId);");
+    const current = body.indexOf("else if(plan.operation==='plan'||plan.operation==='publish')await publisher.assertBaseIsCurrent(pool,base.registerVersion,plan.publicationId);");
+    expect(active).toBeGreaterThan(-1);
+    expect(current).toBeGreaterThan(active);
+    expect(current).toBeLessThan(body.indexOf("if(plan.operation==='plan'||plan.operation==='apply-and-plan')return metadata;"));
   });
 });

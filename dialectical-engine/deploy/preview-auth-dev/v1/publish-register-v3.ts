@@ -18,10 +18,11 @@
 //   sandbox host, never on a live one.
 // The base may have billing on or off (a base this kit published). Every other v2 rule stays: canonical rows, the
 // base snapshot hash, no support or scorecard row, the credential-free reviewed provider set, the two base-owned
-// staff and internal-allowance policies carried over and parsed, the current-base check, the approval equal to the
-// recomposed snapshot. On top, v3 asks of the composed rows the questions a hosted API asks at boot that need no
-// database (cost envelope and band, the room read's and the support budgets, the country gate's scope, billing
-// readiness and its four admission scopes, the story family and one day holding one run plus its story).
+// staff and internal-allowance policies carried over and parsed, the approval equal to the recomposed snapshot; the
+// base check is the ACTIVE settings version since Phase 2 (publish-register-base.ts, side-by-side spec §13). On top,
+// v3 asks of the composed rows the questions a hosted API asks at boot that need no database (cost envelope and band,
+// the room read's and the support budgets, the country gate's scope, billing readiness and its four admission scopes,
+// the story family and one day holding one run plus its story).
 // Debate shape (ruling L-KIT): the operator's optional debateShapePolicy row passes through to v2's builder (v2's
 // optional key, so v3's closure admits it); the sealed mapContractHash (a required v2 key) is parsed; a carried
 // debateShapePolicy row is parsed like v2 does; and when the composed rows hold the shape, the hosted runner's own
@@ -65,12 +66,19 @@ import { staffAccessPolicyFromValue } from '../../../packages/register/src/staff
 import { internalAllowancePolicyFromValue } from '../../../packages/register/src/internal-allowance-policy.js';
 import { publishPreviewRegister, type RuntimeObservation, type PreviewSnapshot } from './publish-register.js';
 import {
-  buildPreviewSourceRowsV2, previewAnswerSeatRefs, previewStorySeatRows, previewDeltaSha256V2, assertBaseIsCurrent, assertPreviewEngineBootRows,
+  buildPreviewSourceRowsV2, previewAnswerSeatRefs, previewStorySeatRows, previewDeltaSha256V2, assertPreviewEngineBootRows,
   PREVIEW_SOURCE_ROW_KEYS_V2, PREVIEW_OPTIONAL_SOURCE_ROW_KEYS_V2, PREVIEW_BASE_OWNED_KEYS,
   type PreviewAnswerSeatsChoice, type PreviewCheckerChoice, type PreviewRoleRotationChoice, type SnapshotDeltaV2
 } from './publish-register-v2.js';
-/** The sealed-snapshot reader and the current-base check are v2's, unchanged; the native operator reads them through this module. */
-export { readSealedSnapshot, assertBaseIsCurrent, BASE_NOT_CURRENT, PreviewRegisterBaseNotCurrentError } from './publish-register-v2.js';
+import { assertBaseIsActive } from './publish-register-base.js';
+/** The sealed-snapshot reader is v2's, unchanged; the native operator reads it through this module. */
+export { readSealedSnapshot, BASE_NOT_CURRENT, PreviewRegisterBaseNotCurrentError } from './publish-register-v2.js';
+/**
+ * Side-by-side spec §13 (Task S18): v3's base check is the ACTIVE settings version (publish-register-base.ts), no longer
+ * v2's "nothing sealed above the base"; v2's check is deliberately not re-exported, so the native operator cannot reach
+ * it through kit v3. With no release yet the active rule falls back to v2's (which can still refuse BASE_NOT_CURRENT).
+ */
+export { assertBaseIsActive, BASE_NOT_ACTIVE, PreviewRegisterBaseNotActiveError } from './publish-register-base.js';
 
 const sha = (value:string) => createHash('sha256').update(value).digest('hex');
 const fail = (rule?:string):never => { throw new TypeError(rule?`PREVIEW_REGISTER_SNAPSHOT_REFUSED: ${rule}`:'PREVIEW_REGISTER_SNAPSHOT_REFUSED'); };
@@ -352,11 +360,15 @@ export function composePreviewSnapshotV3(input:Readonly<{sourceRows:readonly Reg
 }
 export type PreviewSnapshotV3 = ReturnType<typeof composePreviewSnapshotV3>;
 
-/** v2's publication path (the approval equal to the recomposed snapshot; base re-read; receipt re-read; currency checked before and after). */
+/**
+ * v2's publication path (the approval equal to the recomposed snapshot; base re-read; receipt re-read), with the base
+ * checked against the ACTIVE settings version before and after the write (side-by-side spec §13): a version sealed
+ * above the base no longer refuses; an activation that lands during the write is reported, not hidden.
+ */
 export async function publishPreviewRegisterV3(pool:Pool,input:Readonly<{publicationId:string;sourceRef:string;snapshot:PreviewSnapshotV3;approval:Readonly<{baseRegisterVersion:string;baseSnapshotSha256:string;snapshotSha256:string;deltaSha256:string}>}>) {
   if(input.snapshot?.composer!==COMPOSER)fail();
-  await assertBaseIsCurrent(pool,input.snapshot.baseRegisterVersion,input.publicationId);
+  await assertBaseIsActive(pool,input.snapshot.baseRegisterVersion,input.publicationId);
   const receipt=await publishPreviewRegister(pool,{...input,snapshot:input.snapshot as unknown as PreviewSnapshot});
-  await assertBaseIsCurrent(pool,input.snapshot.baseRegisterVersion,input.publicationId);
+  await assertBaseIsActive(pool,input.snapshot.baseRegisterVersion,input.publicationId);
   return receipt;
 }

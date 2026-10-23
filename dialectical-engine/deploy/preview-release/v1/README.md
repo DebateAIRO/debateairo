@@ -415,7 +415,10 @@ printed line. In a script, test it: `OUT=$(nat …); [ "$OUT" = "exit 0" ] || { 
    - start the old release unchanged;
    - read the refusal line.
    `PREVIEW_REGISTER_BASE_NOT_CURRENT: …` means a version newer than the plan's base exists: plan
-   again (step 1) from the verify plan that names the newest publication.
+   again (step 1) from the verify plan that names the newest publication. Kit v3 from the release that
+   carries Phase 2 on refuses instead with `PREVIEW_REGISTER_BASE_NOT_ACTIVE: …` when the base is not the
+   active settings version: plan again from the verify plan that names the active version ("Changing
+   debate settings without an upload", SV0).
 
 4. **Verify the new publication and make launch plans that carry it**, for the API, the website
    and the runner. The runner reads the register too (its call limits among other rows), so it
@@ -432,6 +435,13 @@ printed line. In a script, test it: `OUT=$(nat …); [ "$OUT" = "exit 0" ] || { 
    if [ "$OLDR" = null ]; then OLDR=$OLDA; fi
    rel launch-plan --service runner --from "$OLDR" --root "$CRUN" --source-manifest "$ART/candidate-runner-source.json" --native-attestation "$ART/native-first-verify.json" --publication "$ART/register-published.json" --out "$ART/runner-launch.json"
    ```
+
+> **From the release that carries Phase 2 on (side-by-side spec §13), steps 5 and 6 are not how a settings change
+> reaches the preview.** A change of debate settings only (models, thinking levels, lengths, shape, per-debate
+> budgets) is published and then ACTIVATED, with no `sed`, no re-pin and no restart: "Changing debate settings without
+> an upload (settings activation)" below. An upload's own site version is set through Plan D's per-release env files
+> (`release-env.mjs derive` writes `REGISTER_VERSION` and `RELEASE_KEY` into `<service>-<label>.env`, SB5), never by
+> editing a live file. Kit v3 then composes from the active version, not the newest one.
 
 5. **Point both environment files at the new version.** In `api.env` and in the runner's
    `runner.env` (`deploy/preview-auth-dev/v1/README.md` "runner.env recipe"), replace the
@@ -1936,6 +1946,12 @@ echo B4_DONE
 
 ### B5. The two env edits
 
+> **From the release that carries Phase 2 on (side-by-side spec §13), B5 to B7 are not how a settings change reaches
+> the preview.** A change of debate settings only (models, thinking levels, lengths, shape, per-debate budgets) is
+> published and then ACTIVATED, with no env edit, no re-pin and no restart: "Changing debate settings without an upload
+> (settings activation)" below. An upload's own site version is set through Plan D's per-release env files
+> (`release-env.mjs derive`, SB5 of "Side-by-side release (from T+1)"), never by editing a shared env file.
+
 ```sh
 set -euo pipefail
 . /root/preview-archive/rNN-names.sh
@@ -2175,6 +2191,360 @@ echo RBB_DONE
   until the next release is live: rbB needs them.
 - **Afterwards** (not part of the upload, with the owner's yes): move the practice's server copies (S-7) into `$S`.
   R19 also left `$ART/store-fill`; it is harmless and unused.
+
+## Changing debate settings without an upload (settings activation)
+
+**In plain words.** From the release that carries Phase 2 (side-by-side spec §13) on, a change to how debates run is no
+longer an upload, and no longer a re-pin of `REGISTER_VERSION` with a restart. The owner publishes a new settings
+version (a sealed register version, as always), the live release dry-boots it ("check"), and after the owner's fresh yes
+one command makes it the active version. The next question asked uses it; nothing restarts, nothing stops, and every
+debate already admitted finishes on the version it was admitted with. Going back is the same command with an older
+version: a new activation row, never an edit.
+
+**What can change this way (debate settings).** The models' role refs (the answer writer, the checker, the storyteller and
+its checker); the thinking levels and the token bounds sealed in the register; the length guidance; the debate shape;
+the question language settings; role rotation; the per-debate budgets (the per-debate ceiling of `costEnvelopePolicy`,
+which travels in the plan's `HB` JSON as `perRunCeilingMicros`); the per-debate lane limits of `callConcurrencyPolicy`
+(`perDebate`, `perModelPerDebate`); the line-up (`--line-up`, below); later, the prompts. The preview's site version
+already carries the call-concurrency row, so the per-debate lane limits can change by activation.
+
+**What cannot (site rules: an upload).** A settings-only change of a site rule (logins, rate limits, countries, plan
+prices, the daily budget, funding) is refused and needs an upload. So are billing on or off, the room-read budget, the
+band, the runner's per-model limit (`perModelPerRunner`), the provider set, and anything that would need an env change.
+The check refuses such a version (`SETTINGS_SITE_MEMBER_DIFFERS`, `SETTINGS_NEEDS_ENV_CHANGE`) even when nothing else
+changed: a site rule changes with a new site version in a new release (side by side, with its practice).
+
+**When.** Only on the template layout, once a release with Phase 2 is current (T+1 and later: `release-check.mjs status`
+works, and `settings-version.mjs status` answers). Before that, a register change is a publication plus the re-pin of
+"Publishing a new register version on the preview (publish kit v2)" or of the hosted-base recipe.
+
+**What the kit checks.** Kit v3 composes from the ACTIVE settings version (`publish-register-base.ts`
+`assertBaseIsActive`): the plan's base must be the pointer, or the current release's own site version while nothing was
+ever activated. A version sealed above the base is no reason to refuse any more: a published candidate that was never
+activated, or one activated and then rolled back, is not the version debates use. Any other base refuses, before
+anything is written:
+`PREVIEW_REGISTER_BASE_NOT_ACTIVE: the selected base is not the active settings version; plan again from the active version`.
+
+**The order.**
+
+| Step | What | The site | The way back |
+|---|---|---|---|
+| SV0 | names, the archive `$S`, the from-plan of the active version | up | nothing to undo |
+| SV1 | the plan and its proposal (a moment of the verify plan swapped, then put back) | up | nothing to undo |
+| – | the owner reads the delta and gives its `deltaSha256` | up | – |
+| SV2 | publish; the verify plan of the new version kept for the next plan | up | nothing to undo (the version stays sealed, unused) |
+| SV3 | the check: both dry-boot halves of the live release, the verdict | up | nothing to undo |
+| – | **the owner's fresh yes, in the live chat**, naming the version and the verdict | up | – |
+| SV4 | the activation | up | SV6 |
+| SV5 | the checks after it (read-only) | up | SV6 |
+| SV6 | going back: activate the version before (a new row) | up | – |
+
+Each step is one script, run on its own as root with `bash -s`, `set -euo pipefail` first and the change's names file
+second (SV0 makes it, `/root/preview-archive/settings-names.sh`; one settings change at a time). SV5 moves it into `$S`
+when the change is done.
+
+### SV0. Names, the archive and the from-plan
+
+The plan must start from the active version. While the active version is the current release's own site version, the
+from-plan is that release's verify plan (`native-plan-<label>.json`, copied into `$S`). After an activation of another
+version, it is that version's verify plan, which SV2 keeps as
+`/opt/debateai-v3-preview/artifacts/settings-v<version>/native-plan-verify.json` when it publishes the version.
+
+```sh
+set -euo pipefail
+# SV0: this change's names file, its archive folder S, the copy of the live verify plan, the from-plan. Nothing live changes.
+NAMES=/root/preview-archive/settings-names.sh
+E=/etc/debateai-v3-preview/auth-dev-v1; LOCK=/etc/debateai-v3-preview/lifecycle/release-lock.json
+L=/opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1
+lc() { /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$L/$1" "${@:2}"; }
+[ ! -e "$NAMES" ] || { echo "SV0_NOT_DONE: $NAMES exists: another settings change is open (finish it, or move the file into its S)"; exit 1; }
+ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "SV0_NOT_DONE: release-check.mjs status refused: ask"; exit 1; }
+LABEL=$(jq -r '[.releases[] | select(.state == "CURRENT") | .label] | if length == 1 then .[0] else "" end' <<<"$ST")
+[ -n "$LABEL" ] || { echo "SV0_NOT_DONE: the release table does not name exactly one current release"; exit 1; }
+KEY=$(jq -r --arg l "$LABEL" '.releases[$l].releaseKey' "$LOCK"); SITE=${KEY%%-*}; SITE=${SITE#r}
+SS=$(lc settings-version.mjs status 2>&1) || { echo "$SS"; echo "SV0_NOT_DONE: settings-version.mjs status refused (this release has no settings operator?): ask"; exit 1; }
+AV=$(sed -n 's/^DEBATEAI_SETTINGS_STATUS //p' <<<"$SS" | jq -r '.effectiveActive // empty')
+printf '%s\n' "$AV" | grep -qxE '[1-9][0-9]*' || { echo "$SS"; echo "SV0_NOT_DONE: no active version read"; exit 1; }
+NP=$E/native-plan-$LABEL.json
+[ "$(jq -r .operation "$NP")" = verify ] || { echo "SV0_NOT_DONE: $NP is not the current release's verify plan: ask"; exit 1; }
+if [ "$AV" = "$SITE" ]; then FROM=; else FROM=/opt/debateai-v3-preview/artifacts/settings-v$AV/native-plan-verify.json; fi
+[ -z "$FROM" ] || [ "$(jq -r '.approval.publication.registerVersion' "$FROM")" = "$AV" ] || { echo "SV0_NOT_DONE: no kept verify plan names the active version $AV ($FROM): ask"; exit 1; }
+TS=$(date -u +%Y%m%dT%H%M%SZ); S=/root/preview-archive/settings-$TS
+SART=/opt/debateai-v3-preview/artifacts/settings-$(printf '%s' "$TS" | tr 'TZ' 'tz')
+install -d -o root -g root -m 0700 "$S"; install -d -o root -g root -m 0755 "$SART"
+cp -a "$NP" "$S/native-plan.before.json"
+[ -n "$FROM" ] || FROM=$S/native-plan.before.json
+umask 077
+{ printf 'LABEL=%s\nKEY=%s\nSITE=%s\nAV=%s\nS=%s\nSART=%s\nFROM=%s\n' "$LABEL" "$KEY" "$SITE" "$AV" "$S" "$SART" "$FROM"
+  cat <<'EOF'
+umask 022
+E=/etc/debateai-v3-preview/auth-dev-v1
+NP=$E/native-plan-$LABEL.json
+CAPI=/opt/debateai-v3-preview/releases/auth-dev-candidate-$LABEL-api
+ART=/opt/debateai-v3-preview/artifacts/auth-dev-$LABEL
+L=/opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1
+HB_ON='{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+rel() { /usr/bin/env -i PATH=/usr/local/bin:/usr/bin:/bin TZ=UTC /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$CAPI/dialectical-engine/deploy/preview-release/v1/release-artifacts.mjs" "$@"; }
+nat() { ( cd "$CAPI/dialectical-engine" && /bin/sh -c 'exec 5<&0; p=$1; shift; printf %s "$p" 5<&- | "$@" 3<&0 0<&5 5<&-' sh '{"peerUrl":"postgresql://postgres@localhost/debateai?host=/run/debateai-v3-preview/postgresql&port=5434"}' /usr/sbin/runuser -u postgres -- /usr/bin/env -i PATH=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin:/usr/local/bin:/usr/bin:/bin LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$CAPI/dialectical-engine/deploy/preview-auth-dev/v1/native-operator.mjs" --credential-fd 3 < /dev/null > "$1" ); echo "exit $?"; }
+put() { install -o root -g root -m 0644 "$1" "$NP.new" && mv "$NP.new" "$NP" && cmp "$1" "$NP"; }
+psqlq() { runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d debateai -XAt -c "$1"; }
+lc() { /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$L/$1" "${@:2}"; }
+EOF
+} > "$NAMES"
+chmod 0600 "$NAMES"
+umask 022
+echo "current release $LABEL ($KEY, site version $SITE); active version $AV; from-plan $FROM; S=$S SART=$SART"
+echo SV0_DONE
+```
+
+### SV1. The plan and its proposal
+
+Fill in the owner's choices at the top; an empty choice keeps the base's row as it is. The live checker (`--checker
+deepseek --deepseek-enabled-on-gate yes`) and the hosted inputs (`HB`, billing on) are on every plan, exactly as in SB3:
+without them the plan would switch the checker back to GLM, or billing off. `HB` may change `perRunCeilingMicros` only;
+its `dailyCeilingMicros` and `askRoomReads` are site rules (the check refuses a change). The JSON options have the shape
+the kit's section above gives (`--call-concurrency`, `--length-guidance`, `--debate-shape`); `--question-language`,
+`--role-rotation` and `--answer-seats` are added the same way (`--answer-seats` replaces the `--checker` pair: one way
+to set the checker). For a new line-up, make its file first ("The line-up file" below). The native operator reads only
+this release's own plan file, so the plan is put in place for the one run and the verify plan goes back at once (a
+restart in between would refuse: prestart accepts only a verify plan).
+
+```sh
+set -euo pipefail
+. /root/preview-archive/settings-names.sh
+# SV1: the plan (the active version as base, the live checker, billing-on inputs, the owner's choices) and its proposal.
+HB=$HB_ON                                                  # the hosted inputs; only perRunCeilingMicros may differ from HB_ON
+LINEUP=''                                                  # a line-up file in $SART (see "The line-up file"), or empty
+CC=''                                                      # call-concurrency JSON, or empty
+LG=''                                                      # length-guidance JSON, or empty
+SHAPE=''                                                   # debate-shape JSON or off, or empty
+cmp -s "$S/native-plan.before.json" "$NP" || { echo "SV1_NOT_DONE: the live verify plan moved since SV0"; exit 1; }
+[ ! -e "$SART/native-plan-plan.json" ] && [ ! -e "$SART/register-proposal.json" ] || { echo "SV1_NOT_DONE: an earlier plan or proposal exists in $SART (look first)"; exit 1; }
+rel native-plan --operation plan --from "$FROM" --source-manifest "$ART/candidate-api-source.json" --checker deepseek --deepseek-enabled-on-gate yes --hosted-billing "$HB" ${LINEUP:+--line-up "$LINEUP"} ${CC:+--call-concurrency "$CC"} ${LG:+--length-guidance "$LG"} ${SHAPE:+--debate-shape "$SHAPE"} --out "$SART/native-plan-plan.json" || { echo "SV1_NOT_DONE: the release tool refused the plan"; exit 1; }
+put "$SART/native-plan-plan.json" || { put "$S/native-plan.before.json"; echo "SV1_NOT_DONE: put of the plan failed (the verify plan is back)"; exit 1; }
+OUT=$(nat "$SART/register-proposal.json"); echo "nat: $OUT"
+put "$S/native-plan.before.json" || { echo "SV1_NOT_DONE: PUT THE VERIFY PLAN BACK BY HAND: put \"$S/native-plan.before.json\""; exit 1; }
+[ "$OUT" = "exit 0" ] || { head -c 2000 "$SART/register-proposal.json"; echo; echo "SV1_NOT_DONE: the native operator refused the plan (the line above; BASE_NOT_ACTIVE: run SV0 again)"; exit 1; }
+[ "$(jq -r .baseRegisterVersion "$SART/register-proposal.json")" = "$AV" ] || { echo "SV1_NOT_DONE: the proposal is not based on the active version $AV"; exit 1; }
+sha256sum "$SART/native-plan-plan.json" "$SART/register-proposal.json" > "$S/plan-proposal.sha256"
+jq -r '.delta[] | "\(.change) \(.rowKey) (\(.reason))\n  old: \(.oldValueJsonText)\n  new: \(.newValueJsonText)"' "$SART/register-proposal.json"
+jq -c '{baseRegisterVersion,addedKeys,changedKeys,deltaSha256}' "$SART/register-proposal.json"
+echo SV1_DONE
+```
+
+The owner reads every delta entry, old value against new, and only the rows the change is about may differ
+(`nodeRuntimeVersion`'s source reference aside). The yes names the printed `deltaSha256`: SV2's `YES`.
+
+### SV2. Publish, and keep the new version's verify plan
+
+Publishing writes a new sealed version and nothing else: the running API and runner never read it until it is activated.
+A re-run of `nat` with the same publish plan after a crash replays the same version; never make a second publish plan
+for a run that may have committed.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/settings-names.sh
+# SV2: publish SV1's plan with the owner's yes; the verify plan of the new version, kept for the next plan from it.
+YES=''                                                     # the deltaSha256 the owner approved
+printf '%s\n' "$YES" | grep -qxE '[0-9a-f]{64}' || { echo "SV2_NOT_DONE: YES is not the approved deltaSha256"; exit 1; }
+sha256sum -c --quiet "$S/plan-proposal.sha256" || { echo "SV2_NOT_DONE: the plan or the proposal changed since SV1"; exit 1; }
+cmp -s "$S/native-plan.before.json" "$NP" || { echo "SV2_NOT_DONE: the live verify plan moved since SV0"; exit 1; }
+[ -e "$SART/native-plan-publish.json" ] || rel native-plan --operation publish --from "$SART/native-plan-plan.json" --proposal "$SART/register-proposal.json" --approved-delta-sha256 "$YES" --source-manifest "$ART/candidate-api-source.json" --out "$SART/native-plan-publish.json" || { echo "SV2_NOT_DONE: the release tool refused the publish plan (PROPOSAL_NOT_APPROVED: YES is not the proposal's hash)"; exit 1; }
+put "$SART/native-plan-publish.json" || { put "$S/native-plan.before.json"; echo "SV2_NOT_DONE: put of the publish plan failed (the verify plan is back)"; exit 1; }
+OUT=$(nat "$SART/register-published.json"); echo "nat: $OUT"
+put "$S/native-plan.before.json" || { echo "SV2_NOT_DONE: PUT THE VERIFY PLAN BACK BY HAND: put \"$S/native-plan.before.json\""; exit 1; }
+[ "$OUT" = "exit 0" ] || { head -c 2000 "$SART/register-published.json"; echo; echo "SV2_NOT_DONE: the native operator refused the publish (nothing was written unless the line above says otherwise): ask"; exit 1; }
+V=$(jq -r .publication.registerVersion "$SART/register-published.json")
+printf '%s\n' "$V" | grep -qxE '[1-9][0-9]*' || { echo "SV2_NOT_DONE: no published version read"; exit 1; }
+VART=/opt/debateai-v3-preview/artifacts/settings-v$V
+install -d -o root -g root -m 0755 "$VART"
+rel native-plan --operation verify --from "$SART/native-plan-publish.json" --publication "$SART/register-published.json" --source-manifest "$ART/candidate-api-source.json" --out "$VART/native-plan-verify.json" || { echo "SV2_NOT_DONE: the release tool refused the verify plan of $V"; exit 1; }
+printf '%s\n' "$V" > "$S/new-register-version"
+echo "published settings version $V (not active); its verify plan: $VART/native-plan-verify.json"
+echo SV2_DONE
+```
+
+### SV3. The check (the dry boot) and its verdict
+
+`settings-version.mjs check <label> <version>` runs both halves of the live release against the version, each from the
+release's own folder as its unit's user with its own env file (the runner half, then the API half; no AI call), keeps
+both lines as a receipt (`/opt/debateai-v3-preview/artifacts/lifecycle-current-<label>/settings-check-<version>-<UTC>.json`)
+and records the verdict. Exit 0 is PASS, 2 is FAIL (every code with one plain hint), 1 is refused (nothing recorded; a
+half that could not run says why).
+
+```sh
+set -euo pipefail
+. /root/preview-archive/settings-names.sh
+# SV3: the check of the published version against the live release; PASS goes on to the owner's yes.
+V=$(cat "$S/new-register-version")
+RC=0; OUT=$(lc settings-version.mjs check "$LABEL" "$V" 2>&1) || RC=$?
+printf '%s\n' "$OUT" > "$S/settings-check.json"
+jq -r 'if .event == "PREVIEW_SETTINGS_CHECKED" then "verdict \(.verdict) for version \(.version) on \(.releaseKey) (receipt \(.receipt))", (.hints[] | "  \(.code): \(.hint)") else tostring end' <<<"$OUT" 2>/dev/null || echo "$OUT"
+case "$RC" in
+  0) ;;
+  2) echo "SV3_NOT_DONE: FAIL (codes and hints above): the version cannot be activated; publish a corrected one (SV1)"; exit 1;;
+  *) echo "SV3_NOT_DONE: the check refused (the line above); nothing was recorded: ask"; exit 1;;
+esac
+echo SV3_DONE
+```
+
+**The owner's fresh yes.** An activation changes what every new question uses, so it needs the owner's yes **fresh in
+the live chat**, right before SV4, naming the version (`V`), the verdict PASS and what changes for new debates. A yes
+given earlier, or for another version, is not enough.
+
+### SV4. The activation
+
+`settings-version.mjs activate <version> --by <owner> --reason "<why>"` first proves that each spending gate runs this
+release's gate code (the gate-code fingerprint: each gate's two installed gate files and its GO record equal this
+release's own copies, else `SETTINGS_GATE_HELPER_DIFFERS`, nothing asked), then reads both gates' read-only `/remaining`
+and hands the answers to the operator, which refuses unless every model, thinking level and answer ceiling the version can
+seat is switched on at its gate (live condition 6). Both gates must answer: a gate that is down refuses
+(`SETTINGS_GATE_UNANSWERED:<gate>`). Only then is the pointer moved, in one transaction with the release switch's lock.
+`--by` is the owner's name as it should be recorded (letters, digits, space, `._@-`), `--reason` a short note.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/settings-names.sh
+# SV4: the activation, after the owner's fresh yes in the live chat. Exit 0 = active (or already active).
+BY=''                                                      # the owner's name, as recorded
+WHY=''                                                     # why, in a few words (no line breaks)
+V=$(cat "$S/new-register-version")
+[ -n "$BY" ] && [ -n "$WHY" ] || { echo "SV4_NOT_DONE: BY or WHY is empty"; exit 1; }
+RC=0; OUT=$(lc settings-version.mjs activate "$V" --by "$BY" --reason "$WHY" 2>&1) || RC=$?
+printf '%s\n' "$OUT" | tee "$S/settings-activate.txt"
+case "$RC" in
+  0) ;;
+  1) echo "SV4_NOT_DONE: refused by the live gate check or the version's kind (codes above): fix the gate, then run SV4 again"; exit 1;;
+  3) echo "SV4_NOT_DONE: SETTINGS_ACTIVATION_CONFLICT: the release or the pointer moved meanwhile (a switch?): read settings-version.mjs status, then ask"; exit 1;;
+  4) echo "SV4_NOT_DONE: SETTINGS_VERSION_NOT_PASSED: the current release has not passed $V (run SV3)"; exit 1;;
+  *) echo "SV4_NOT_DONE: refused (the line above): ask"; exit 1;;
+esac
+grep -qE "^(DEBATEAI_SETTINGS_ACTIVATED|SETTINGS_ACTIVATION_UNCHANGED) .*\"version\":\"$V\"" <<<"$OUT" || { echo "SV4_NOT_DONE: no activation receipt for $V"; exit 1; }
+echo SV4_DONE
+```
+
+The receipt is the line `DEBATEAI_SETTINGS_ACTIVATED {"version":"<V>","previous":"<the version before>","releaseKey":…,"activationSeq":…}`
+(or `SETTINGS_ACTIVATION_UNCHANGED {"version":"<V>"}` when `V` was active already).
+
+### SV5. The checks after the activation (read-only)
+
+A team member starts one short test debate on the site and gives its id (the last part of the debate page's address).
+The API reads the pointer for each new question with at most a 1 s cache, so the debate is stamped `V`; the debates that
+were already running keep the version they were admitted with.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/settings-names.sh
+# SV5: read-only. The pointer is V, the team member's new test debate is stamped V; then this change's names file moves into S.
+RID=''                                                     # the test debate's id
+V=$(cat "$S/new-register-version")
+printf '%s\n' "$RID" | grep -qxE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' || { echo "SV5_NOT_DONE: RID is not a debate id"; exit 1; }
+SS=$(lc settings-version.mjs status 2>&1) || { echo "$SS"; echo "SV5_NOT_DONE: settings-version.mjs status refused"; exit 1; }
+echo "$SS"
+[ "$(sed -n 's/^DEBATEAI_SETTINGS_STATUS //p' <<<"$SS" | jq -r .pointer)" = "$V" ] || { echo "SV5_NOT_DONE: the pointer is not $V"; exit 1; }
+[ "$(psqlq "SELECT register_version FROM core.run WHERE run_id = '$RID'")" = "$V" ] || { echo "SV5_NOT_DONE: the test debate is not stamped $V (asked before the activation? ask a new one)"; exit 1; }
+psqlq "SELECT r.register_version||' '||count(*) FROM core.run r JOIN core.work_item w ON w.run_id = r.run_id WHERE w.state IN ('READY', 'CLAIMED') GROUP BY r.register_version ORDER BY r.register_version" | sed 's/^/open debates on version: /'
+mv /root/preview-archive/settings-names.sh "$S/settings-names.sh"
+echo SV5_DONE
+```
+
+### SV6. Going back
+
+Going back is an activation of the version that was active before (the `previous` of SV4's receipt): a new row, never an
+edit. It is checked like any activation: the current release must have passed it (its own site version always passes),
+the owner's fresh yes, and the live gate check (both gates must answer; only a release switch's revert or rollback
+restores a version without asking the gates). Debates admitted on `V` finish on `V`.
+
+```sh
+set -euo pipefail
+# SV6: activate the version before, after the owner's fresh yes in the live chat (a new row; nothing is edited).
+L=/opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1
+lc() { /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$L/$1" "${@:2}"; }
+OLDV=''                                                    # the version to go back to (SV4's "previous")
+BY=''                                                      # the owner's name, as recorded
+WHY=''                                                     # why, in a few words
+printf '%s\n' "$OLDV" | grep -qxE '[1-9][0-9]*' && [ -n "$BY" ] && [ -n "$WHY" ] || { echo "SV6_NOT_DONE: OLDV, BY or WHY is not filled in"; exit 1; }
+RC=0; OUT=$(lc settings-version.mjs activate "$OLDV" --by "$BY" --reason "$WHY" 2>&1) || RC=$?
+echo "$OUT"
+[ "$RC" = 0 ] || { echo "SV6_NOT_DONE: refused (exit $RC, the line above): ask"; exit 1; }
+echo SV6_DONE
+```
+
+### The line-up file (`--line-up`)
+
+The release tool reads a line-up only from a root-owned 0644 JSON file in the artifacts folder, named in lower case
+(`<artifacts root>/<folder>/<name>.json`). To publish exactly the line-up the preview runs today (the first time, while
+the API's env file still carries it), print it from that env file with the release's own checker, as root, with umask
+022, straight into this change's `$SART`:
+
+```sh
+set -euo pipefail
+. /root/preview-archive/settings-names.sh
+# The line-up the API's env file carries, as the plan member {"lineUp":{…}}, into $SART/line-up.json (root 0644).
+[ ! -e "$SART/line-up.json" ] || { echo "LINEUP_NOT_DONE: $SART/line-up.json exists (look first)"; exit 1; }
+( umask 022; cd "$CAPI/dialectical-engine" && /usr/bin/env -i PATH=/usr/bin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node --import ./node_modules/tsx/dist/loader.mjs tools/preview-practice/check-thinking-levels.ts --print-line-up --settings "$E/api-$LABEL.env" > "$SART/line-up.json" ) || { echo "LINEUP_NOT_DONE: the checker refused the value (run it without the redirect to read why)"; exit 1; }
+jq -e '.lineUp.free_model_ids and .lineUp.premium_model_ids' "$SART/line-up.json" > /dev/null || { cat "$SART/line-up.json"; echo "LINEUP_NOT_DONE: no line-up printed (the env file has only the gate part: the line-up lives in the settings version)"; exit 1; }
+[ "$(stat -c '%U %a' "$SART/line-up.json")" = "root 644" ] || { echo "LINEUP_NOT_DONE: the file is not root 0644"; exit 1; }
+echo "line-up file: $SART/line-up.json (SV1's LINEUP)"
+```
+
+To change the line-up, edit a copy of that file (a new name in `$SART`, lower case), try it with the practice first
+(tools/preview-practice/README.md, "Trying a new line-up before an activation"), and give its path as SV1's `LINEUP`.
+
+### What the server writes about settings versions
+
+Content-free lines (codes, versions, ids), in each unit's journal (`journalctl -u 'debateai-preview-runner@*'`,
+`journalctl -u 'debateai-preview-api@*'`) or on the operator's screen:
+
+| Line | Where | What it means |
+|---|---|---|
+| `DEBATEAI_SETTINGS_CHECK {"half":…,"releaseKey":…,"version":…,"verdict":…,"codes":[…],…}` | each check half (kept in SV3's receipt) | one half's dry boot of the version: PASS, or FAIL with every refusal code |
+| `DEBATEAI_SETTINGS_VERDICT {"releaseKey":…,"version":…,"verdict":…,"digest":…,"codes":[…]}` | the operator, after both halves | the verdict recorded for (release, version); the latest one for the pair decides |
+| `DEBATEAI_SETTINGS_ACTIVATED {"version":…,"previous":…,"releaseKey":…,"activationSeq":…}` | SV4, SV6 | the activation receipt: new questions use `version` from now on |
+| `DEBATEAI_SETTINGS_REFUSED {"command":…,"code":…,"codes":[…],"passed":[…]}` | any operator command | a refusal: the code, the gate codes, or the versions the release has passed |
+| `DEBATEAI_RUNNER_SETTINGS {"releaseKey":…,"siteVersion":…,"loaded":[…],"unsupported":[…]}` | runner, once, right after its ready line | the settings versions the runner preloaded at boot (its open debates' and every version its release passed); `unsupported` lists a version it cannot run with its code |
+| `DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED {"version":…,"code":…}` | runner, once per version | a settings version this release's code cannot run, and the check that refused it; should never happen after a PASS: report it |
+| `DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED {"runId":…,"version":…,"code":…}` | runner, once per debate | a debate on such a version was set aside before any AI call, with its waiver: the asker reads the "update on our side" sentence and kept the allowance (the line above comes first for the first such debate) |
+| `{"kind":"DEBATEAI_ADMISSION_SETTINGS","code":"ADMISSION_SETTINGS_UNSUPPORTED","version":…,"cause":…}` | API, per version | the API cannot admit on the active version (`cause`: the loader's code): asks wait in line ("switching") or get the plain "try again in a minute"; report it |
+| `{"kind":"DEBATEAI_ADMISSION_SETTINGS","code":"ADMISSION_SETTINGS_NOT_PASSED","version":…}` | API, per refused ask | an ask without a waiting line met a version this release has not passed (a switch or an activation in between): refused plainly, nothing written or charged; the person asks again |
+| `{"kind":"DEBATEAI_ADMISSION_SETTINGS","code":"ADMISSION_ESTIMATOR_FALLBACK","version":…,"cause":…}` | API, once per version | the cost estimate for another debate's version could not be built; it was priced on the asking version's terms instead |
+
+**Two API processes.** Where more than one API process serves (hosted), each reads the pointer with its own 1 s cache, so
+for about a second after an activation two processes may disagree on the active version. A page that talks to both in
+that second may show the plain "the settings changed, please choose again" note (even twice); nothing is written or
+charged.
+
+### Running the operator commands by hand
+
+`settings-version.mjs` is the way: it checks the release's files first, runs each half as its unit's user, and hands the
+operator the gate answers and the release's line-up. Run `tools/settings-version/cli.ts` (`pnpm settings:verdict`,
+`settings:activate`, `settings:status`) directly only to read a refusal more closely, as `postgres` through the server's
+socket from the current release's API folder. Then `activate` needs `--seatable-env <file>` (the release's line-up and
+target models, the file `settings-version.mjs` writes as `lifecycle-current-<label>/settings-activate-<UTC>-seatable-env.json`)
+and one `--gate-remaining <gate>=<file>` per gate; without `--seatable-env` it refuses with a usage error, never a
+silent skip.
+
+### Settings and uploads
+
+- **The switch (SB13, DR6) passes `--activate`.** From the first T+1 switch on there is always an active version. A new
+  release passes only its own site version until someone checks another one with it, so a switch without `--activate`
+  refuses `SETTINGS_VERSION_NOT_PASSED` before anything is written. The first T+1 switch, with nothing ever activated,
+  activates the new release's own site version by itself (owner answer Q-S2). SB13 and DR6 therefore name
+  `--activate "$ACT"`, `ACT` being the new release's own site version (the number in `KEY`): the upload's version
+  becomes the active one in the switch's own transaction. To keep another version active instead, check it with the new
+  release first (`settings-version.mjs check <new label> <version>`, after SB10 pinned it), and set `ACT` to it; a
+  forward `--activate` of a version other than the new release's own runs the live gate check before the switch (both
+  gates must answer).
+- **The way back activates by itself.** A rollback (WB2, and WB3's retry) activates the target release's latest version
+  whose latest verdict is still PASS, else its own site version. A switch that reverts by itself (`SWITCH_REVERTED`)
+  puts back what was active before; after a switch between two releases on one site version it activates nothing.
+  Neither asks the gates: putting back a known state must work while a gate is down.
+- **An upload after an activation.** The upload's own plan (SB3) composes from the active version too (kit v3), but its
+  from-plan is still the old release's verify plan, which names the old release's site version. While the active
+  version is another one, SB3's native operator therefore refuses with `PREVIEW_REGISTER_BASE_NOT_ACTIVE` (nothing
+  written): stop and ask. SB3 does not plan from a kept `settings-v<version>` verify plan yet.
+
+<!-- Reserved for the line-up task (SA11): the line-up and thinking-level examples and the T+1 env migration are added here. -->
 
 ## Transition release T (one last drained upload)
 
@@ -3559,7 +3929,9 @@ before SB4, as the gate README says; one that narrows waits until the old releas
 `-- n1: expand` or `-- n1: keeps-verifier`) or `NOT_READY` (anything else). It checks, by name: `N1_HEADERS`,
 `N1_BASELINE` (the new release's own `tests/n1-baseline.json`, read from its checked folder, names the live release's
 commit: the N-1 job then ran the live code on the new schema), `CURRENT_PINNED`, `PREVIOUS_RETIRED`, `GATES_ACTIVE`, `GATE_ROWS_N1`, `CONNECTIONS` (320, at least 120 free), `DISK`
-(15 GB), `MEMORY` (4 GiB available), `HATCHET`, `NO_MAINTENANCE`, `SLOT_FREE`, `LIFECYCLE_FILES`.
+(15 GB), `MEMORY` (4 GiB available), `HATCHET`, `NO_MAINTENANCE`, `SLOT_FREE`, `LIFECYCLE_FILES`, `SETTINGS` (the
+switch's settings step, read-only: before SB10 pins the new release it only names the active version; SB13's
+`--activate` makes the new release's own site version active).
 
 `N1_BASELINE` fails with `set the N-1 baseline first` when the PR of the last upload's N-1 step (TB10 after T, SB13c
 after a side-by-side upload) is not in `REV`: merge it into dev, take a `REV` after it, and start again from SB1.
@@ -3867,6 +4239,17 @@ reasons, instead of after the whole 30 seconds.
 It arms the old release's backstop (switch + 27,000 s, an absolute UTC time) and points the boot target at the new pair.
 The old runner is never stopped: it finishes its debates and retires by itself.
 
+**The settings step (side-by-side spec §13).** The same database write passes the settings pointer the tool saw and
+activates `--activate <v>` in the same transaction. A new release has passed only its own site version (until a
+`settings-version.mjs check` passes another one with it), and from the first T+1 switch on there is always an active
+version, so without `--activate` the switch would refuse `SETTINGS_VERSION_NOT_PASSED` (naming what the new release
+passed) before anything is written. The script names `ACT`, the new release's own site version (the number in `KEY`):
+the upload's own version becomes active with the switch. The first T+1 switch, with nothing ever activated, would
+activate it even without the argument (owner answer Q-S2). Set `ACT` to another version only on the owner's word, after
+`settings-version.mjs check "$LABEL" <version>` passed it (SB10 must have pinned the new release first); such a forward
+`--activate` first runs the live gate check of an activation (both gates must answer). "Changing debate settings
+without an upload" has the whole settings flow.
+
 What a visitor sees during the switch is watched by the operator, with the owner's own password, from the Mac. Before
 SB13, in a second terminal, the owner puts the site's user and password in a private netrc file with an editor (one
 line `machine v3-preview.dezbatere.ro login <user> password <password>`; never on a command line):
@@ -3888,7 +4271,8 @@ set -euo pipefail
 . /root/preview-archive/rNN-names.sh
 # SB13: the switch. Exit 0 = done with nothing bad; 2 = done, but a check after the write failed (read bad); 1 = refused.
 [ ! -e /etc/debateai-v3-preview/lifecycle/maintenance-pending ] || { echo "SB13_NOT_DONE: infrastructure maintenance is pending (nothing changed)"; exit 1; }
-SC=0; SW=$(lc release-switch.mjs switch --to "$LABEL" --from "$OLABEL" 2>&1) || SC=$?
+ACT=${KEY%%-*}; ACT=${ACT#r}                              # the settings version the switch activates: this release's own site version
+SC=0; SW=$(lc release-switch.mjs switch --to "$LABEL" --from "$OLABEL" --activate "$ACT" 2>&1) || SC=$?
 echo "$SW"
 printf '%s\n' "$SW" > "$S/switch.json"
 case "$SC" in
@@ -4068,6 +4452,14 @@ the upload stopped:
 | SB13 said `SWITCH_REVERTED` | read the new website's `/readyz` reasons (with reason `WEBSITE_NOT_READY` the line names them in `websiteReasons`), fix, then WB3 (retry) |
 | SB13 said `SWITCH_OUTCOME_UNKNOWN`, or `bad` names `BACKSTOP` or `TARGET` | WB4 (finish) |
 | SB13 said `SWITCH_REVERT_FAILED` or `SWITCH_REVERT_UNCONFIRMED` | stop and ask: read `release-check.mjs status` first |
+
+**The settings each way back activates (side-by-side spec §11, §13).** Nothing to do by hand, and no gate is asked:
+putting back a known state must work while a gate is down. WB2's rollback activates the old release's latest settings
+version whose latest verdict is still PASS, else its own site version. WB3's retry is the same rollback command towards
+the new release, so it activates the new release's latest still-passing version, else its own site version. A switch
+that reverts by itself (`SWITCH_REVERTED`) puts back the version that was active before it; between two releases on one
+site version it activates nothing. WB1 and WB4 activate nothing (WB4 never writes the switch). Afterwards
+`lc settings-version.mjs status` prints the pointer.
 
 If SB10 swapped the operator folder, moving it back (`mv /opt/debateai-v3-preview/operator/lifecycle-v1
 "$S/operator-lifecycle-v1.<new label>"`, then `mv "$S/operator-lifecycle-v1.before" /opt/debateai-v3-preview/operator/lifecycle-v1`)
@@ -4367,7 +4759,8 @@ for i in $(seq 1 80); do [ "$(journalctl -u "debateai-preview-api@$LABEL" --sinc
 systemctl start "debateai-preview-ui@$LABEL" || echo "systemctl start of the new website returned non-zero"
 RC=000; for i in $(seq 1 60); do RZ=$(readyz "$UIP"); RC=${RZ##*$'\n'}; [ "$RC" = 503 ] && [ "$(jq -c '[.releaseKey, .reasons]' <<<"${RZ%$'\n'*}" 2>/dev/null)" = "[\"$KEY\",[\"NOT_CURRENT\"]]" ] && break; sleep 2; done
 [ "$RC" = 503 ] || { echo "DR6_NOT_DONE: the new website is not up and waiting (way back: rbD-B)"; exit 1; }
-SC=0; SW=$(lc release-switch.mjs switch --to "$LABEL" --from "$OLABEL" --old-pair-stopped 2>&1) || SC=$?
+ACT=${KEY%%-*}; ACT=${ACT#r}                              # the settings version the switch activates: this release's own site version (SB13)
+SC=0; SW=$(lc release-switch.mjs switch --to "$LABEL" --from "$OLABEL" --old-pair-stopped --activate "$ACT" 2>&1) || SC=$?
 echo "$SW"
 case "$SC" in
   0) ;;

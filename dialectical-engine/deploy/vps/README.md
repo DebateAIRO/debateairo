@@ -1510,6 +1510,25 @@ the API and the runner. No new environment key; nothing a debate does changes (e
 version carries the engine row). Rolling back the code needs no database step: the two tables stay, and the older code
 never reads them.
 
+### Upgrading to settings activation (migration 0124)
+
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
+
+This release adds one migration, `migrations/0124_settings_activation.sql` (after `0123_side_by_side_releases.sql`; both
+`n1: expand`, so §5's migration step applies it while the older release keeps serving). It is the database half of
+"Settings activation (Phase 3)" below: three append-only tables in the `register` schema, `settings_activation` (one row
+per activation; the newest row is the active settings version), `settings_verdict` (one row per check of a release
+against a version: PASS or FAIL and its digest) and `settings_switch_check` (one row per release switch, checked when it
+commits), and their functions: `register.settings_version_passed` and `register.read_passed_settings_versions` (a
+release always passes its own site version; the runner reads these at start-up), `register.read_active_settings_version`
+(the one reader of the active version: the API's admission path and the operator), `register.record_settings_verdict`
+and `register.activate_settings_version` (the only writers, compare-and-swap, under the release switch's lock), and the
+switch's hook and commit check. Everything is owned by `debateai_release_owner` (no login, no members); the operator
+commands act as `debateai_release_operator` (no login: the release writers' principal, `postgres` through the local
+socket here, never a runtime login); the API's runtime login may only read the active version, the runner's may only ask
+what passed. No new environment key. Until an activation exists, every release runs on its own site version, as before;
+on this server nothing activates anything before Phase 3.
+
 ### Upgrading an existing host (paid plans Part 1a)
 
 > Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
@@ -2386,6 +2405,8 @@ journalctl -u 'debateai-runner@*' --since today -o cat | grep -E 'DEBATEAI_SERVE
 | `{"kind":"DEBATEAI_PERSON_WALL","event":"PLANS_UNRESOLVED"}` (once, when the runner starts) | The pinned register version has a `costEnvelopePolicy` row but no `billingPlans` row, so the runner cannot read a person's windows. A debate pinned to a person (billing on at the API) would then have every walled arguing call refused as that person's month: the arguing stops and the answer is still written. A debate with no person pin, which is every debate while billing is off, is untouched. **This is expected on this host until the next hosted publish** (`pnpm register:publish-hosted`, below), which seals the engine's own billing rows (billing off). | While billing is off: nothing; it stops once you publish and pin the new version (a new release, §5 "A new register version is a new release"). After billing is switched on it means the API and the runner are on different register versions, which one release's overlays never allow: check that both overlays of the current release name the same `REGISTER_VERSION`. |
 | `"kind":"DEBATEAI_POINT_INVESTIGATION"`, `"event":"INVESTIGATION_UNAVAILABLE"`, with `runId`, `callSiteKey`, `code` (engine 2 only: never while no register version carries the engine row) | Written once per investigation that ended unavailable: one more AI was to look into a point a reviewer could not assess, and no usable answer came back (the call failed or was refused, the money stopped it, or `code` `INVESTIGATOR_SEAT_UNPLANNED`: no investigator was planned). `code` is the error's code or class name, never AI or vendor text. The point keeps its reduced "cannot assess" weight and the debate goes on; the investigation's record says unavailable. | A single one: nothing. Many in a day: read the vendor's status and the runner's other lines from the same minutes. |
 | `"kind":"DEBATEAI_COMPARING_JUDGE"`, `"event":"JUDGE_FAILED"`, with `runId`, `callSiteKey`, `code` (engine 2 only: never while no register version carries the engine row) | Written once per comparing judge whose call ended without a usable answer: one of the up to three AIs that compare the debate's answers side by side gave no vote (the call failed or was refused, or the money stopped it). `callSiteKey` names the judge's seat (`VERDICT:judge:<n>`, the judge's seat number). `code` is the error's code or class name, never AI or vendor text. The judge is recorded as failed and its vote is missing; the debate goes on and the other judges' votes decide. With no judge left, the answer is chosen by its honest strength and labelled at most "Close call". | A single one: nothing. Many in a day: read the vendor's status and the runner's other lines from the same minutes. |
+| `DEBATEAI_RUNNER_SETTINGS {"releaseKey":…,"siteVersion":…,"loaded":[…],"unsupported":[…]}` (once, right after the runner's ready line; side-by-side §13) | The settings versions the runner preloaded at start-up: its release's own site version, the versions of its open debates and every version its release has passed a check of. `unsupported` lists, as `{"version","code"}`, a version this code cannot run. It never reads which version is active: only the debates' own stamps. | Nothing while `unsupported` is empty. A listed version is a defect to report: its debates are set aside (next row). |
+| `DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED`, with `version` and `code` (once per version), then with `runId`, `version` and `code` (once per debate) | A debate's settings version is one this release's code cannot run (`code` names the check that refused it). The first line comes from the runner's per-version cache; the second says that debate was set aside at its claim, before any AI call, with its waiver: `RUN_SET_ASIDE:SETTINGS_VERSION_UNSUPPORTED` in the [table below](#what-the-asker-sees-when-a-debate-fails), and the asker kept the allowance. | Should never happen: a version is activated only after this release passed it. Keep both lines and report them; the asker asks again. |
 
 The API writes these related lines to its own journal (`journalctl -u 'debateai-api@*'`), again with
 ids and a bounded diagnostic only:
@@ -2405,6 +2426,9 @@ ids and a bounded diagnostic only:
 | `"event":"api.wait.readmission_orphans_unread"`, with `runId` and `diagnostic` | Side-by-side uploads. The waker looked for copies of a waiting question that were written but never started (to record them failed, so the question can be re-admitted) and could not read them, most likely the database. Nothing changed; a later tick looks again. | One: nothing. Every minute for the same `runId`: that question cannot be re-admitted; read the `diagnostic` and check the database. |
 | `"event":"api.release.no_site_cap"` (once, when the API starts; hosted only) | Side-by-side uploads. The pinned register version gives the API no room for new questions: no `costEnvelopePolicy` row, or one without the band (see [The band, holds and the waiting line](#the-band-holds-and-the-waiting-line-budget-rule-spec-2026-09-28)). Two side-by-side checks are made inside that room, so neither applies: the site's cap of 8 debates across both releases, and the hold that makes a new question wait (`SWITCHING`) while a switch moves the traffic away. New questions start as they did before the room. Nothing is refused. A local API never prints it. | Before an upgrade that runs two releases side by side, publish and pin a register version with the `costEnvelopePolicy` band, so the cap and the switch hold apply. Without the band, expect it at every start. |
 | `[ASK_WAITING_LINE_WAKE_PENDING]` (a bare marker, once a minute while it lasts) | A whole tick of the waker failed before it finished, most often because the database refused the line's own read. The marker carries no diagnostic. What the tick had already started stays started, and the next whole minute tries again. While it repeats, waiting questions may not start and stalled first jobs are not handed over again. | One: nothing. Every minute: the line has stopped draining. Check the database, and read the API's other lines from the same minutes. Once the database answers again, the next tick drains the line by itself. |
+| `{"kind":"DEBATEAI_ADMISSION_SETTINGS","code":"ADMISSION_SETTINGS_UNSUPPORTED"}`, with `version` and `cause` (side-by-side §13) | The API cannot admit questions on the active settings version (`cause`: the per-version loader's code). With a waiting line the question waits ("switching") and the waker starts it later; without one it gets the plain "try again in a minute" answer, nothing written or charged. | Should never happen after a passed check: report it. |
+| `{"kind":"DEBATEAI_ADMISSION_SETTINGS","code":"ADMISSION_SETTINGS_NOT_PASSED"}`, with `version` | A question without a waiting line met a settings version this release has not passed (a switch or an activation landed meanwhile): refused plainly, nothing written or charged. | Nothing: the person asks again. Many in a row: read `pnpm settings:status`. |
+| `{"kind":"DEBATEAI_ADMISSION_SETTINGS","code":"ADMISSION_ESTIMATOR_FALLBACK"}`, with `version` and `cause` (once per version) | The cost estimate for another debate's settings version could not be built, so it was priced on the asking version's terms. | Nothing unless it repeats for a version still in use: report it. |
 
 The story's other events carry codes only: `STORY_STORED` (every story, with its outcome),
 `STORY_LATER_ROUND_FAILED`, `STORY_MATERIAL_TOO_LARGE`, `STORY_SNAPSHOT_FAILED`,
@@ -2548,6 +2572,31 @@ sudo -u postgres psql -d debateai -c "SELECT register_version, row_key FROM regi
 ```
 
 Four rows is the pass. Then make that version a new release (§5 "A new register version is a new release").
+
+### Settings activation (Phase 3)
+
+**Not used on this host yet.** From Phase 3 on, this server changes debate settings the way the preview does
+(`deploy/preview-release/v1/README.md`, "Changing debate settings without an upload"): publish a new settings version,
+check it against the live release, and after the owner's fresh yes make it the active version, with no restart and no
+new release. Debate settings only (models' roles, thinking levels, lengths, shape, per-debate budgets); a site rule
+(logins, rate limits, countries, plan prices, the daily budget, funding) still changes with a new release. Until Phase 3,
+`release.mjs switch` passes no expected settings value and activates nothing, `release.mjs switch --activate` refuses
+(`SETTINGS_OPERATOR_MISSING`), and `release.mjs check` prints `SETTINGS` as not planned on this server.
+
+The five commands, in this order (each one prints one content-free line):
+
+| Step | Command | Run as, from | Prints |
+|---|---|---|---|
+| 1 | `pnpm settings:check-runner <version>` | the runner's user, in the current release's runner folder, with its env files | `DEBATEAI_SETTINGS_CHECK {…}`: the runner half's dry boot (no AI call); exit 0 PASS, 1 FAIL, 2 could not check |
+| 2 | `pnpm settings:check-api <version>` | the API's user, in the current release's API folder, with its env files | `DEBATEAI_SETTINGS_CHECK {…}`: the API half's |
+| 3 | `pnpm settings:verdict --runner <file> --api <file>` (the two lines above, saved) | the release writers' principal (`postgres` through the local socket: libpq's `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`), in the API folder | `DEBATEAI_SETTINGS_VERDICT {…}`: the verdict recorded; exit 0 PASS, 1 FAIL |
+| – | the owner's **fresh** yes in the live chat, naming the version and the PASS | | |
+| 4 | `pnpm settings:activate <version> --by <owner> --reason "<why>" --seatable-env <file>` | as step 3 | `DEBATEAI_SETTINGS_ACTIVATED {…}`; refusals as `DEBATEAI_SETTINGS_REFUSED {…}` (exit 3 conflict, 4 not passed) |
+| 5 | `pnpm settings:status` | as step 3 | `DEBATEAI_SETTINGS_STATUS {…}`: the current release, the active version, what passed |
+
+`--seatable-env` names the release's line-up and target models (a usage error without it, never a silent skip); this
+server has no spending gates, so the gate part of the check holds by itself. Going back is step 4 with the version
+before: a new row, never an edit.
 
 ### Upgrading to role rotation
 

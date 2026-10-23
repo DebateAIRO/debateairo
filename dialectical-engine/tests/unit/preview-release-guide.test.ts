@@ -495,7 +495,15 @@ const VARS: Readonly<Record<string, string>> = Object.freeze({
   CAPI: `${RELS}/auth-dev-candidate-${LABEL}-api`, CUI: `${RELS}/auth-dev-candidate-${LABEL}-ui`, CRUN: `${RELS}/auth-dev-candidate-${LABEL}-runner`,
   OLDA: `${OART}/api-launch.json`, OLDU: `${OART}/ui-launch.json`, OLDR: `${OART}/runner-launch.json`, PLAN: `${ART}/api-launch.json`,
   HB_ON: '{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}',
-  YES: 'ab'.repeat(32), GRR: '01'.repeat(32), LIFE: 'yes'
+  YES: 'ab'.repeat(32), GRR: '01'.repeat(32), LIFE: 'yes',
+  // Side-by-side spec §13 (Task S18): the switch's settings version, and the settings-activation section's names.
+  ACT: '18', V: '19', OLDV: '18', BY: 'Stefan Nour', WHY: 'shorter answers for the test team',
+  FROM: '/opt/debateai-v3-preview/artifacts/settings-v18/native-plan-verify.json',
+  SART: '/opt/debateai-v3-preview/artifacts/settings-20261023t120000z', VART: '/opt/debateai-v3-preview/artifacts/settings-v19',
+  HB: '{"billing":"on","perRunCeilingMicros":2500000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}',
+  LINEUP: '/opt/debateai-v3-preview/artifacts/settings-20261023t120000z/line-up.json',
+  CC: '{"perDebate":12,"perModelPerDebate":3,"perModelPerRunner":{"default":50}}',
+  LG: '{"kind":"LENGTH_GUIDANCE_POLICY"}', SHAPE: 'off'
 });
 
 type Invocation = Readonly<{ tool: string; script: string; argv: readonly string[]; line: string }>;
@@ -540,9 +548,9 @@ function commandWords(text: string, line: string): string[][] {
   return variants;
 }
 
-function invocations(): Invocation[] {
+function invocations(blocks: readonly Block[] = allBlocks): Invocation[] {
   const found: Invocation[] = [];
-  for (const block of allBlocks) {
+  for (const block of blocks) {
     const script = stepOf(block) ?? `block at line ${block.start + 1}`;
     for (const line of block.lines.filter(code)) {
       for (const match of line.matchAll(/(?:^|[\s;&|(`])(lc|tl|pre|rel|cslots) (?=\S)/g)) {
@@ -649,5 +657,98 @@ describe('the guide\'s commands are the tools\' real command lines (D1-D13)', ()
     expect(Math.max(timers, target)).toBeLessThan(reload);
     // SB1's copy holds the boot target and its drop-in (the debateai-preview-* glob does not match debateai-preview.target).
     expect(scriptOf('SB1').lines.join('\n')).toContain('tar -czf "$S/systemd-before.tgz" debateai-preview-* debateai-preview.target debateai-preview.target.d');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Side-by-side spec §13 (Task S18): settings activation replaces the re-pin and restart. Its section sits before the
+// transition (so the step order above is unchanged); its scripts follow the same rules and its calls the same parsers.
+
+const SETTINGS = '## Changing debate settings without an upload (settings activation)';
+const SETTINGS_STEPS = Object.freeze(['SV0', 'SV1', 'SV2', 'SV3', 'SV4', 'SV5', 'SV6']);
+
+describe('settings activation: the guide (side-by-side spec §13)', async () => {
+  const section = sectionOf(guide, SETTINGS);
+  const blocks = blocksOf(section);
+  const steps = blocks.filter(block => stepOf(block) !== null);
+  const { BASE_NOT_ACTIVE } = await import('../../deploy/' + 'preview-auth-dev/v1/publish-register-base.ts');
+
+  it('sits before the transition, after the hosted-base recipe, and its steps run in order with their own guards', () => {
+    expect(guide.indexOf(`\n${SETTINGS}\n`)).toBeGreaterThan(guide.indexOf('### The way back\n'));
+    expect(guide.indexOf(`\n${SETTINGS}\n`)).toBeLessThan(guide.indexOf(`\n${TRANSITION}\n`));
+    expect(steps.map(stepOf)).toEqual([...SETTINGS_STEPS]);
+    for (const block of steps) {
+      const step = stepOf(block)!;
+      expect(block.lines[0], step).toBe('set -euo pipefail');
+      if (step !== 'SV0' && step !== 'SV6') expect(block.lines[1], step).toBe('. /root/preview-archive/settings-names.sh');
+      for (const line of block.lines) {
+        for (const match of line.matchAll(/([A-Z][A-Z0-9_]*)_NOT_DONE/g)) expect(match[1], `${step}: ${line}`).toBe(step);
+        if (line.includes('_NOT_DONE')) expect(line, `${step}: ${line}`).toMatch(/exit 1/);
+      }
+    }
+  });
+
+  it('every settings-version.mjs, release-check.mjs and release-artifacts.mjs call passes its tool\'s own parser', async () => {
+    const calls = invocations(blocks);
+    expect(new Set(calls.map(call => call.tool))).toEqual(new Set(['release-check.mjs', 'settings-version.mjs', 'release-artifacts']));
+    const wrong: string[] = [];
+    for (const call of calls) {
+      const reason = await parserReason(call);
+      if (reason !== 'ACTOR_REFUSED') wrong.push(`${call.script}: ${reason}: ${call.line.trim()}`);
+    }
+    expect(wrong).toEqual([]);
+    const lines = blocks.flatMap(block => block.lines);
+    for (const command of ['lc settings-version.mjs check "$LABEL" "$V"', 'lc settings-version.mjs activate "$V" --by "$BY" --reason "$WHY"',
+      'lc settings-version.mjs activate "$OLDV" --by "$BY" --reason "$WHY"', 'lc settings-version.mjs status']) {
+      expect(lines.some(line => line.includes(command)), command).toBe(true);
+    }
+  });
+
+  it('plans from the active version, puts the verify plan back at once, and keeps each published version\'s verify plan', () => {
+    const sv0 = steps.find(block => stepOf(block) === 'SV0')!.lines.join('\n');
+    expect(sv0).toContain("jq -r '.effectiveActive // empty'");
+    expect(sv0).toContain('FROM=/opt/debateai-v3-preview/artifacts/settings-v$AV/native-plan-verify.json');
+    for (const step of ['SV1', 'SV2']) {
+      const lines = steps.find(block => stepOf(block) === step)!.lines;
+      const nat = lines.findIndex(line => line.startsWith('OUT=$(nat '));
+      // The very next line puts the release's own verify plan back, before the result is even read.
+      expect(lines[nat + 1], step).toMatch(/^put "\$S\/native-plan\.before\.json" \|\| /);
+    }
+    const sv2 = steps.find(block => stepOf(block) === 'SV2')!.lines.join('\n');
+    expect(sv2).toContain('VART=/opt/debateai-v3-preview/artifacts/settings-v$V');
+    expect(sv2).toContain('--out "$VART/native-plan-verify.json"');
+    expect(section).toContain(BASE_NOT_ACTIVE);
+  });
+
+  it('names the owner\'s fresh yes, what cannot change by activation, and every settings journal line', () => {
+    expect(section).toMatch(/fresh in\s+the live chat/);
+    // Prose may wrap anywhere: the owner's words are read with the line breaks folded.
+    const prose = section.replace(/\s+/g, ' ');
+    expect(prose).toContain('A settings-only change of a site rule (logins, rate limits, countries, plan prices, the daily budget, funding) is refused and needs an upload.');
+    expect(prose).toContain('already carries the call-concurrency row, so the per-debate lane limits can change by activation');
+    for (const line of ['DEBATEAI_SETTINGS_CHECK', 'DEBATEAI_SETTINGS_VERDICT', 'DEBATEAI_SETTINGS_ACTIVATED', 'DEBATEAI_RUNNER_SETTINGS {',
+      'DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED {"version"', 'DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED {"runId"', 'ADMISSION_SETTINGS_UNSUPPORTED',
+      'ADMISSION_ESTIMATOR_FALLBACK', 'ADMISSION_SETTINGS_NOT_PASSED', 'SETTINGS_GATE_UNANSWERED', '--seatable-env']) expect(section, line).toContain(line);
+    // The line-up file: root 0644 under umask 022, printed by the release's own checker into the artifacts folder.
+    expect(section).toContain('( umask 022; cd "$CAPI/dialectical-engine" && ');
+    expect(section).toContain('tools/preview-practice/check-thinking-levels.ts --print-line-up --settings "$E/api-$LABEL.env" > "$SART/line-up.json"');
+    // The line-up task (SA11) appends to this section.
+    expect(section).toContain('<!-- Reserved for the line-up task (SA11)');
+  });
+
+  it('the switch activates the new release\'s own site version (SB13, DR6), and the old re-pin sections point to the activation', () => {
+    for (const step of ['SB13', 'DR6']) {
+      const lines = scriptOf(step).lines;
+      const act = lines.indexOf(lines.find(line => line.startsWith('ACT=${KEY%%-*}; ACT=${ACT#r}'))!);
+      const sw = lines.findIndex(line => line.includes('lc release-switch.mjs switch --to "$LABEL" --from "$OLABEL"'));
+      expect(act, step).toBeGreaterThan(-1);
+      expect(sw, step).toBeGreaterThan(act);
+      expect(lines[sw], step).toContain('--activate "$ACT" 2>&1) || SC=$?');
+    }
+    const kitV2 = sectionOf(guide, '## Publishing a new register version on the preview (publish kit v2)');
+    expect(kitV2.indexOf('steps 5 and 6 are not how a settings change')).toBeLessThan(kitV2.indexOf('5. **Point both environment files at the new version.**'));
+    const b5 = sectionOf(guide, '### B5. The two env edits');
+    expect(b5.indexOf('B5 to B7 are not how a settings change')).toBeLessThan(b5.indexOf('```sh'));
+    expect(sectionOf(guide, WAY_BACK)).toContain('**The settings each way back activates (side-by-side spec §11, §13).**');
   });
 });

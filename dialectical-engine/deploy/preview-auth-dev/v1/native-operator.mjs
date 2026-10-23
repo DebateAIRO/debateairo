@@ -248,8 +248,11 @@ export async function runNativeOperator(argv=process.argv.slice(2)) {
   if(plan.operation==='apply-and-plan')await db.migrate(pool);
   const base=await publisher.readSealedSnapshot(pool,plan.selectedBaseRegisterVersion);
   if(base.snapshotSha256!==plan.selectedBaseSnapshotSha256)refuse('PREVIEW_SELECTED_BASE_DRIFT');
+  // Kit v3 (side-by-side spec §13, Task S18): plan and publish compose from the ACTIVE settings version (the pointer, else
+  // the current release's site version; no release yet = the rule below). Versions sealed above it are allowed.
   // Publish kit v2: plan and publish compose from the CURRENT published version (nothing sealed above the base but this publication's own replay).
-  if(plan.operation==='plan'||plan.operation==='publish')await publisher.assertBaseIsCurrent(pool,base.registerVersion,plan.publicationId);
+  if(hosted&&(plan.operation==='plan'||plan.operation==='publish'))await publisher.assertBaseIsActive(pool,base.registerVersion,plan.publicationId);
+  else if(plan.operation==='plan'||plan.operation==='publish')await publisher.assertBaseIsCurrent(pool,base.registerVersion,plan.publicationId);
   const runtimeObservedAt=plan.approval?.runtimeObservedAt??new Date().toISOString();
   const observation={nodeVersion:process.version,pnpmVersion:source.pnpmVersion,sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,operatorSha256:plan.operatorManifestSha256,observedAt:runtimeObservedAt};
   const rows=hosted?await publisher.buildPreviewSourceRowsV3(await register.loadBootstrapRegister(),observation,plan.hostedBilling,plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null,plan.debateShape??null,plan.questionLanguage??null,plan.lengthGuidance??null,null,plan.lineUp??null,plan.answerSeats??null)
@@ -272,15 +275,18 @@ export async function runNativeOperator(argv=process.argv.slice(2)) {
 const PENDING_FORWARD_STEP=/^PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: \d{4}_[a-z0-9_]+\.sql(?:, \d{4}_[a-z0-9_]+\.sql){0,63}\. Verify never applies a migration; run the native operator with operation apply-and-plan first\.$/;
 /** Fixed text of publish-register-v2.ts BASE_NOT_CURRENT, which v3 re-exports (both load lazily through tsx; a unit test pins the two equal). */
 export const BASE_NOT_CURRENT_LINE='PREVIEW_REGISTER_BASE_NOT_CURRENT: a sealed register version exists above the selected base; plan again from the newest publication';
+/** Fixed text of publish-register-base.ts BASE_NOT_ACTIVE, kit v3's base refusal (side-by-side spec §13; a unit test pins the two equal). */
+export const BASE_NOT_ACTIVE_LINE='PREVIEW_REGISTER_BASE_NOT_ACTIVE: the selected base is not the active settings version; plan again from the active version';
 /** The exact refusal verify-native.ts gives a database ahead of this source with no database-ahead file pinned (side-by-side spec §5). */
 const DATABASE_AHEAD=/^PREVIEW_NATIVE_VERIFY_DATABASE_AHEAD: the database has steps this release does not know: \d{4}_[a-z0-9_]+\.sql(?:, \d{4}_[a-z0-9_]+\.sql){0,63}\. Pin the newer release's database-ahead file with prestart\.mjs accept-ahead first\.$/;
 /**
  * Every failure stays opaque except a pending forward step (its line says to run apply-and-plan), a database ahead with
  * no pinned file (its line says to pin the newer release's database-ahead file) or a stale register base (its line says
- * to plan again).
+ * to plan again: from the newest publication for kit v2, from the active settings version for kit v3).
  */
 export function operatorRefusalLine(error){
  if(error?.code==='PREVIEW_REGISTER_BASE_NOT_CURRENT'&&error.message===BASE_NOT_CURRENT_LINE)return `${error.message}\n`;
+ if(error?.code==='PREVIEW_REGISTER_BASE_NOT_ACTIVE'&&error.message===BASE_NOT_ACTIVE_LINE)return `${error.message}\n`;
  if(error?.code==='PREVIEW_NATIVE_VERIFY_DATABASE_AHEAD'&&typeof error.message==='string'&&DATABASE_AHEAD.test(error.message))return `${error.message}\n`;
  return error?.code==='PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP'&&typeof error.message==='string'&&PENDING_FORWARD_STEP.test(error.message)?`${error.message}\n`:'PREVIEW_NATIVE_OPERATION_REFUSED\n';
 }

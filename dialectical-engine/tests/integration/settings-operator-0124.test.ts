@@ -18,6 +18,7 @@ import {
   settingsVerdictOf,
   type ActivationReaders
 } from "../../tools/settings-version/settings-operator.js";
+import { assertBaseIsActive, BASE_NOT_ACTIVE } from "../../deploy/preview-auth-dev/v1/publish-register-base.js";
 import { importHistoricalRegisterFixture, publishReplacementRegisterFixture, registerFixtureRow } from "../support/registerFixtures.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
@@ -200,5 +201,11 @@ describe("S15: the settings operator on migration 0124", () => {
     await withClient(async (client) => {
       expect(await readSettingsStatus(client)).toEqual({ currentRelease: A, pointer: G1, effectiveActive: G1, passed: [4, G1] });
     });
+  });
+
+  it("7. kit v3 composes from the active version (S18): G1 passes with G2 sealed above it; 4 and G2 are refused", async () => {
+    const publicationId = "11111111-1111-4111-8111-111111111111";
+    await expect(assertBaseIsActive(database.pool, String(G1), publicationId)).resolves.toBeUndefined();
+    for (const base of ["4", String(G2)]) await expect(assertBaseIsActive(database.pool, base, publicationId)).rejects.toThrow(BASE_NOT_ACTIVE);
   });
 });
