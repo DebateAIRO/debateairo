@@ -10,6 +10,10 @@ export type AdmissionScope = "asks" | "publicReads" | "recoveryStart"
   | "supportReads" | "supportSessions" | "supportModelCalls" | "geoAvailability" | "billingQuote"
   | "billingCheckout" | "billingNotify" | "billingCancelLink" | "askRoomReads";
 
+export const SUPPORT_SWEPT_SCOPES = Object.freeze([
+  "supportReads", "supportSessions", "supportModelCalls", "geoAvailability"
+] as const);
+
 export type AdmissionDecision =
   | Readonly<{ allowed: true }>
   | Readonly<{
@@ -172,6 +176,28 @@ export class AdmissionLimiter {
       allowed: false as const, reason: "LIMIT" as const,
       retryAfterMs: entry.blockedUntil - instant, windowMs: policy.windowMs
     });
+  }
+
+  sweep(now: Date, scopes: readonly AdmissionScope[]): number {
+    const instant = now.getTime();
+    let removed = 0;
+    for (const scope of scopes) {
+      const bucket = this.buckets.get(scope);
+      if (bucket === undefined) throw new TypeError(`ADMISSION_SCOPE_UNKNOWN:${String(scope)}`);
+      for (const [key, entry] of bucket.entries) {
+        if (expired(entry, bucket.policy.windowMs, instant)) {
+          bucket.entries.delete(key);
+          removed += 1;
+        }
+      }
+    }
+    return removed;
+  }
+
+  keys(scope: AdmissionScope): readonly string[] {
+    const bucket = this.buckets.get(scope);
+    if (bucket === undefined) throw new TypeError(`ADMISSION_SCOPE_UNKNOWN:${String(scope)}`);
+    return Object.freeze([...bucket.entries.keys()]);
   }
 
   size(scope: AdmissionScope): number {
