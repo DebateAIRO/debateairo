@@ -10,18 +10,19 @@ import {
 } from "@debateai/register";
 import {
   ACTIVATED_BY_PATTERN,
+  ACTIVE_PAIR_FAIL_LINE,
   SettingsOperatorRefusal,
   activateSettingsVersion,
   assertSettingsGatesServe,
   parseSeatableEnvironment,
   seatableGateModelsReader,
   canonicalSettingsJson,
-  latestPassedSettingsVersion,
   parseSettingsCheckLine,
   parseSettingsCheckOutput,
   readEffectiveActiveSettings,
   readSettingsStatus,
   recordSettingsVerdict,
+  rollbackSettingsVersion,
   settingsForSwitch,
   settingsVerdictOf,
   type ActivationReaders,
@@ -137,6 +138,50 @@ describe("the verdict (spec §13: PASS only when both halves PASS)", () => {
     // Another error with the same words but another SQLSTATE is not the refusal: it passes through untouched.
     const other = fakeClient([["record_settings_verdict", () => pgError("08006", "SETTINGS_VERDICT_INVALID")]]);
     await expect(recordSettingsVerdict(other.client, verdict)).rejects.toMatchObject({ code: "08006" });
+  });
+
+  it("ruling R77 (final fix wave F2a): a FAIL on the (current release, active version) pair is refused SETTINGS_VERDICT_ACTIVE_PAIR with the check's codes; nothing written", async () => {
+    const codes = ["SETTINGS_NEEDS_ENV_CHANGE:TARGET:zai-org/GLM-5.3-Flash"];
+    const failing = (version: number, key = KEY) => settingsVerdictOf(report("runner", codes, { version, releaseKey: key }), report("api", [], { version, releaseKey: key }));
+    const database = (pointer: string | null, current: string | null = KEY) => fakeClient([
+      ["BEGIN ISOLATION LEVEL READ COMMITTED", rows()],
+      ["pg_advisory_xact_lock", rows({ locked: "" })],
+      ["core.read_current_release()", () => (current === null ? [] : [{ release_key: current }])],
+      ["read_active_settings_version()", rows({ pointer })],
+      ["record_settings_verdict", rows()],
+      ["COMMIT", rows()],
+      ["ROLLBACK", rows()]
+    ]);
+    // The pointer is 18: a FAIL for (KEY, 18) is refused under the release switch's lock, and the transaction rolls back.
+    const active = database("18");
+    const error = await refusal(recordSettingsVerdict(active.client, failing(18), codes));
+    expect([error.code, error.codes]).toEqual(["SETTINGS_VERDICT_ACTIVE_PAIR", codes]);
+    expect(active.sqls()).toEqual([
+      "BEGIN ISOLATION LEVEL READ COMMITTED",
+      "SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('debateai:release-switch', 0))",
+      "SELECT c.release_key FROM core.read_current_release() AS c",
+      "SELECT register.read_active_settings_version()::text AS pointer",
+      "ROLLBACK"
+    ]);
+    // Never activated: the current release's own site version (17 for r17-…) is the active one, and is refused the same way.
+    expect((await refusal(recordSettingsVerdict(database(null).client, failing(17), codes))).code).toBe("SETTINGS_VERDICT_ACTIVE_PAIR");
+    // A FAIL for another version, or for another release, records inside the same locked transaction.
+    for (const [db, verdict] of [[database("18"), failing(19)], [database("18"), failing(18, NEXT)], [database(null, null), failing(17)]] as const) {
+      await recordSettingsVerdict(db.client, verdict, codes);
+      expect(db.sqls().filter((sql) => /record_settings_verdict|^COMMIT$|^ROLLBACK$/u.test(sql))).toEqual([
+        "SELECT register.record_settings_verdict($1::text, $2::bigint, $3::text, $4::text)", "COMMIT"
+      ]);
+    }
+    // A PASS on the active pair is a plain record: no lock, no read (re-checking the active version can only record PASS).
+    const passing = fakeClient([["record_settings_verdict", rows()]]);
+    await recordSettingsVerdict(passing.client, settingsVerdictOf(report("runner"), report("api")));
+    expect(passing.sqls()).toEqual(["SELECT register.record_settings_verdict($1::text, $2::bigint, $3::text, $4::text)"]);
+    // The database's own refusal of a FAIL keeps its code, after a ROLLBACK.
+    const bad = fakeClient([["BEGIN", rows()], ["pg_advisory_xact_lock", rows()], ["core.read_current_release()", rows({ release_key: KEY })],
+      ["read_active_settings_version()", rows({ pointer: "18" })], ["record_settings_verdict", () => pgError("22023", "SETTINGS_VERDICT_INVALID")], ["ROLLBACK", rows()]]);
+    expect((await refusal(recordSettingsVerdict(bad.client, failing(19), codes))).code).toBe("SETTINGS_VERDICT_INVALID");
+    expect(bad.sqls().at(-1)).toBe("ROLLBACK");
+    expect(ACTIVE_PAIR_FAIL_LINE).toBe("DEBATEAI_SETTINGS_ACTIVE_PAIR NOT RECORDED: this is the active version: activate another passed version first, then re-check");
   });
 });
 
@@ -345,14 +390,33 @@ describe("the status, the rollback's version and the switch's settings step", ()
     expect(before0123.queries).toHaveLength(1);
   });
 
-  it("latest passed: the most recent PASS still PASS (by checked_at), else the release's own site version (D1, T)", async () => {
-    const found = fakeClient([["register.settings_verdict", rows({ v: "19" })]]);
-    expect(await latestPassedSettingsVersion(found.client, NEXT)).toBe(19);
-    expect(found.queries[0]!.params).toEqual([NEXT]);
-    expect(found.queries[0]!.sql).toMatch(/DISTINCT ON \(verdict_row\.register_version\)[\s\S]*WHERE latest\.verdict = 'PASS'[\s\S]*ORDER BY latest\.checked_at DESC/u);
-    const none = fakeClient([["register.settings_verdict", rows()]]);
-    expect(await latestPassedSettingsVersion(none.client, NEXT)).toBe(18);
-    expect((await refusal(latestPassedSettingsVersion(none.client, "legacy"))).code).toBe("SETTINGS_OPERATOR_USAGE");
+  /** The reads of a rollback's choice (ruling R78): the pointer, what the target passed, its last activation row. */
+  const rollbackDatabase = (pointer: string | null, passed: string[], lastActive: string | null) => fakeClient([
+    ["read_active_settings_version()", rows({ pointer })],
+    ["read_passed_settings_versions", () => passed.map((v) => ({ v }))],
+    ["register.settings_activation", () => (lastActive === null ? [] : [{ v: lastActive }])]
+  ]);
+  it("ruling R78 (1): a rollback keeps the pointer when the target release has passed it (activate nothing)", async () => {
+    const db = rollbackDatabase("19", ["18", "19", "20"], "20");
+    expect(await rollbackSettingsVersion(db.client, NEXT)).toEqual({ version: 19, basis: "KEEP_POINTER" });
+    // The pointer kept: the activation row is never read; the switch plan then activates nothing.
+    expect(db.sqls().some((sql) => sql.includes("settings_activation"))).toBe(false);
+    expect(await settingsForSwitch(switchDatabase("19", ["18", "19", "20"]).client, { newRelease: NEXT, activate: 19 })).toEqual({ expectedActiveSettings: 19, activate: null });
+  });
+  it("ruling R78 (2): else the version active the last time the target was current (its latest activation row), never a candidate it only checked", async () => {
+    // The target passed 20 (checked, never activated) after 19 was last active on it: 19 is chosen, not the newest PASS.
+    const db = rollbackDatabase("21", ["18", "19", "20"], "19");
+    expect(await rollbackSettingsVersion(db.client, NEXT)).toEqual({ version: 19, basis: "LAST_ACTIVE_ON_RELEASE" });
+    const read = db.queries.find(({ sql }) => sql.includes("settings_activation"))!;
+    expect(read.params).toEqual([NEXT]);
+    expect(read.sql).toBe("SELECT a.register_version::text AS v FROM register.settings_activation AS a WHERE a.release_key = $1::text ORDER BY a.activation_seq DESC LIMIT 1");
+  });
+  it("ruling R78 (3): else the target's own site version (D1): no activation row, or a last active version it no longer passes", async () => {
+    expect(await rollbackSettingsVersion(rollbackDatabase("21", ["18", "20"], null).client, NEXT)).toEqual({ version: 18, basis: "SITE_VERSION" });
+    expect(await rollbackSettingsVersion(rollbackDatabase("21", ["18", "20"], "19").client, NEXT)).toEqual({ version: 18, basis: "SITE_VERSION" });
+    // Never activated at all (no pointer): the site version too.
+    expect(await rollbackSettingsVersion(rollbackDatabase(null, ["18"], null).client, NEXT)).toEqual({ version: 18, basis: "SITE_VERSION" });
+    expect((await refusal(rollbackSettingsVersion(rollbackDatabase(null, [], null).client, "legacy"))).code).toBe("SETTINGS_OPERATOR_USAGE");
   });
 
   it("switch: the pointer is the expected value; a pointer the new release passed needs no activation", async () => {
@@ -386,8 +450,11 @@ describe("cli.ts (one line per command, the exit codes of its header)", () => {
     };
   };
 
+  /** The verdict's database: a FAIL is recorded under the switch lock after the current release and the pointer are read. */
+  const verdictDatabase = (pointer: string) => fakeClient([["BEGIN", rows()], ["pg_advisory_xact_lock", rows()], ["core.read_current_release()", rows({ release_key: KEY })],
+    ["read_active_settings_version()", rows({ pointer })], ["record_settings_verdict", rows()], ["COMMIT", rows()], ["ROLLBACK", rows()]]);
   it("verdict: records PASS (exit 0) or FAIL (exit 1) with the codes; a bad report writes nothing (exit 2)", async () => {
-    const db = fakeClient([["record_settings_verdict", rows()]]);
+    const db = verdictDatabase("17");
     const files = { "/r": settingsCheckLine(report("runner")), "/a": settingsCheckLine(report("api", ["SETTINGS_HASH_UNDECLARED:mapContractHash"])) };
     const o = output();
     const deps = depsOf(db.client, files);
@@ -402,6 +469,19 @@ describe("cli.ts (one line per command, the exit codes of its header)", () => {
     expect(await runSettingsCli(["verdict", "--runner", "/r", "--api", "/r"], twice.io, depsOf(bad.client, files))).toBe(2);
     expect(JSON.parse(twice.err[0]!.slice("DEBATEAI_SETTINGS_REFUSED ".length))).toEqual({ command: "verdict", code: "SETTINGS_CHECK_REPORT_INVALID" });
     expect(bad.queries).toEqual([]);
+  });
+
+  it("verdict, ruling R77: a FAIL on the active pair prints the check's codes and the loud plain line, records nothing (exit 5)", async () => {
+    const db = verdictDatabase("18");
+    const files = { "/r": settingsCheckLine(report("runner")), "/a": settingsCheckLine(report("api", ["SETTINGS_HASH_UNDECLARED:mapContractHash"])) };
+    const o = output();
+    expect(await runSettingsCli(["verdict", "--runner", "/r", "--api", "/a"], o.io, depsOf(db.client, files))).toBe(5);
+    expect(o.out).toEqual([]);
+    expect(o.err).toEqual([
+      'DEBATEAI_SETTINGS_REFUSED {"command":"verdict","code":"SETTINGS_VERDICT_ACTIVE_PAIR","codes":["SETTINGS_HASH_UNDECLARED:mapContractHash"]}\n',
+      `${ACTIVE_PAIR_FAIL_LINE}\n`
+    ]);
+    expect(db.sqls().some((sql) => sql.includes("record_settings_verdict"))).toBe(false);
   });
 
   const GATE_ANSWER = (models: string[]) => JSON.stringify({ enabled_models: models, largest_reservation_usd: "0.01", max_concurrent_calls: 4, remaining_calls: 100, remaining_usd: "1.5", state: "active", window_open: true });
@@ -482,7 +562,7 @@ describe("cli.ts (one line per command, the exit codes of its header)", () => {
     expect(bad.err).toEqual(['DEBATEAI_SETTINGS_REFUSED {"command":"gate-check","code":"SETTINGS_SEATABLE_ENV_INVALID"}\n']);
   });
 
-  it("status, latest-passed and switch-plan print one line each; switch-plan's refusal names what passed (exit 4)", async () => {
+  it("status, rollback-version and switch-plan print one line each; switch-plan's refusal names what passed (exit 4)", async () => {
     const status = output();
     expect(await runSettingsCli(["status"], status.io, depsOf(fakeClient([
       ["core.read_current_release()", rows({ release_key: KEY })],
@@ -490,15 +570,17 @@ describe("cli.ts (one line per command, the exit codes of its header)", () => {
       ["read_passed_settings_versions", rows({ v: "17" })]
     ]).client))).toBe(0);
     expect(status.out).toEqual([`DEBATEAI_SETTINGS_STATUS {"currentRelease":"${KEY}","pointer":null,"effectiveActive":"17","passed":["17"]}\n`]);
-    const latest = output();
-    expect(await runSettingsCli(["latest-passed", NEXT], latest.io, depsOf(fakeClient([["register.settings_verdict", rows()]]).client))).toBe(0);
-    expect(latest.out).toEqual([`DEBATEAI_SETTINGS_LATEST_PASSED {"releaseKey":"${NEXT}","version":"18","siteVersion":"18"}\n`]);
+    const back = output();
+    expect(await runSettingsCli(["rollback-version", NEXT], back.io, depsOf(fakeClient([
+      ["read_active_settings_version()", rows({ pointer: "17" })], ["read_passed_settings_versions", rows({ v: "18" })], ["register.settings_activation", rows()]
+    ]).client))).toBe(0);
+    expect(back.out).toEqual([`DEBATEAI_SETTINGS_ROLLBACK_VERSION {"releaseKey":"${NEXT}","version":"18","basis":"SITE_VERSION","siteVersion":"18"}\n`]);
     const plan = output();
     expect(await runSettingsCli(["switch-plan", NEXT], plan.io, depsOf(switchDatabase(null, ["18"]).client))).toBe(0);
     expect(plan.out).toEqual([`DEBATEAI_SETTINGS_SWITCH_PLAN {"releaseKey":"${NEXT}","expectedActiveSettings":null,"activate":"18"}\n`]);
     const rollback = output();
-    expect(await runSettingsCli(["switch-plan", KEY, "--latest-passed"], rollback.io, depsOf(fakeClient([
-      ["register.settings_verdict", rows()],
+    expect(await runSettingsCli(["switch-plan", KEY, "--rollback"], rollback.io, depsOf(fakeClient([
+      ["register.settings_activation", rows()],
       ["read_active_settings_version()", rows({ pointer: "18" })],
       ["read_passed_settings_versions", rows({ v: "17" })]
     ]).client))).toBe(0);
@@ -506,7 +588,7 @@ describe("cli.ts (one line per command, the exit codes of its header)", () => {
     const refused = output();
     expect(await runSettingsCli(["switch-plan", NEXT], refused.io, depsOf(switchDatabase("17", ["18"]).client))).toBe(4);
     expect(refused.err).toEqual(['DEBATEAI_SETTINGS_REFUSED {"command":"switch-plan","code":"SETTINGS_VERSION_NOT_PASSED","passed":["18"]}\n']);
-    for (const args of [["switch-plan", "legacy"], ["switch-plan", NEXT, "--activate"], ["switch-plan", NEXT, "--latest-passed", "x"], ["status", "x"], ["nonsense"], []]) {
+    for (const args of [["switch-plan", "legacy"], ["switch-plan", NEXT, "--activate"], ["switch-plan", NEXT, "--rollback", "x"], ["switch-plan", NEXT, "--latest-passed"], ["latest-passed", NEXT], ["status", "x"], ["nonsense"], []]) {
       const u = output();
       expect(await runSettingsCli(args, u.io, depsOf(fakeClient([]).client)), args.join(" ")).toBe(2);
     }

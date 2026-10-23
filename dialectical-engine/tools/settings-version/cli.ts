@@ -8,8 +8,8 @@
  *   cli.ts gate-check <v> --seatable-env <file> [--gate-remaining <gate>=<file>]…   the same live condition 6 alone,
  *                                                        read-only (a forward release switch's --activate <v>, ruling R60)
  *   cli.ts status                                        the current release, the pointer, what new asks use, what passed
- *   cli.ts latest-passed <releaseKey>                    the version a rollback to that release activates
- *   cli.ts switch-plan <releaseKey> [--activate <v> | --latest-passed]   the release switch's settings step (read-only)
+ *   cli.ts rollback-version <releaseKey>                 the version a rollback to that release leaves active (ruling R78)
+ *   cli.ts switch-plan <releaseKey> [--activate <v> | --rollback]   the release switch's settings step (read-only)
  *
  * (`pnpm settings:verdict|settings:activate|settings:status …` run the same file.) Every decision lives in
  * ./settings-operator.ts; this file reads arguments and files, opens one database connection and prints one line.
@@ -19,12 +19,14 @@
  * (deploy/preview-lifecycle/v1/settings-version.mjs). No password, no URL on a command line.
  *
  * Output: one stdout line on success — `DEBATEAI_SETTINGS_VERDICT`, `DEBATEAI_SETTINGS_ACTIVATED`,
- * `SETTINGS_ACTIVATION_UNCHANGED`, `DEBATEAI_SETTINGS_STATUS`, `DEBATEAI_SETTINGS_LATEST_PASSED`,
+ * `SETTINGS_ACTIVATION_UNCHANGED`, `DEBATEAI_SETTINGS_STATUS`, `DEBATEAI_SETTINGS_ROLLBACK_VERSION`,
  * `DEBATEAI_SETTINGS_SWITCH_PLAN`, `DEBATEAI_SETTINGS_GATES_SERVE`, each `<kind> <json>` with versions as decimal strings — or one stderr line,
  * `DEBATEAI_SETTINGS_REFUSED <json>` ({command, code, codes?, passed?}). Content-free: codes, keys, versions, digests.
+ * A FAIL verdict for the (current release, active version) pair is never recorded (ruling R77): the refusal line
+ * (SETTINGS_VERDICT_ACTIVE_PAIR, with the check's codes) is followed by one loud plain line (ACTIVE_PAIR_FAIL_LINE).
  * Exit codes: 0 done (a PASS verdict, an activation, an unchanged activation, a read); 1 a FAIL verdict recorded, or an
  * activation (or a gate-check) refused by condition 6 or by the version's kind; 2 usage, a bad report, or the database could not be asked;
- * 3 SETTINGS_ACTIVATION_CONFLICT; 4 SETTINGS_VERSION_NOT_PASSED.
+ * 3 SETTINGS_ACTIVATION_CONFLICT; 4 SETTINGS_VERSION_NOT_PASSED; 5 SETTINGS_VERDICT_ACTIVE_PAIR (nothing recorded).
  */
 import { readFile, stat } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
@@ -33,15 +35,16 @@ import { TypedDomainError } from "@debateai/kernel";
 import { parsePreviewGateRemaining } from "@debateai/providers";
 import {
   ACTIVATION_READERS,
+  ACTIVE_PAIR_FAIL_LINE,
   SettingsOperatorRefusal,
   activateSettingsVersion,
   assertActivationLabels,
   assertSettingsGatesServe,
-  latestPassedSettingsVersion,
   parseSeatableEnvironment,
   parseSettingsCheckOutput,
   readSettingsStatus,
   recordSettingsVerdict,
+  rollbackSettingsVersion,
   settingsForSwitch,
   settingsVerdictCodes,
   settingsVerdictOf,
@@ -154,10 +157,10 @@ const COMMANDS: Readonly<Record<string, Command>> = Object.freeze({
     const runner = parseSettingsCheckOutput(await deps.readText(runnerPath));
     const api = parseSettingsCheckOutput(await deps.readText(apiPath));
     const verdict = settingsVerdictOf(runner, api);
-    await withConnection(deps, (client) => recordSettingsVerdict(client, verdict));
+    const codes = settingsVerdictCodes(runner, api);
+    await withConnection(deps, (client) => recordSettingsVerdict(client, verdict, codes));
     output.stdout(line("DEBATEAI_SETTINGS_VERDICT", {
-      releaseKey: verdict.releaseKey, version: String(verdict.version), verdict: verdict.verdict, digest: verdict.digest,
-      codes: settingsVerdictCodes(runner, api)
+      releaseKey: verdict.releaseKey, version: String(verdict.version), verdict: verdict.verdict, digest: verdict.digest, codes
     }));
     return verdict.verdict === "PASS" ? 0 : 1;
   },
@@ -204,23 +207,25 @@ const COMMANDS: Readonly<Record<string, Command>> = Object.freeze({
     }));
     return 0;
   },
-  "latest-passed": async (args, deps, output) => {
-    if (args.length !== 1) throw usage("latest-passed <releaseKey>");
+  "rollback-version": async (args, deps, output) => {
+    if (args.length !== 1) throw usage("rollback-version <releaseKey>");
     const key = releaseKey(args[0]);
-    const version = await withConnection(deps, (client) => latestPassedSettingsVersion(client, key));
-    output.stdout(line("DEBATEAI_SETTINGS_LATEST_PASSED", { releaseKey: key, version: String(version), siteVersion: String(siteVersionOfRelease(key)) }));
+    const choice = await withConnection(deps, (client) => rollbackSettingsVersion(client, key));
+    output.stdout(line("DEBATEAI_SETTINGS_ROLLBACK_VERSION", {
+      releaseKey: key, version: String(choice.version), basis: choice.basis, siteVersion: String(siteVersionOfRelease(key))
+    }));
     return 0;
   },
   "switch-plan": async (args, deps, output) => {
     const key = releaseKey(args[0]);
     const rest = args.slice(1);
-    let mode: "pointer" | "activate" | "latest" = "pointer";
+    let mode: "pointer" | "activate" | "rollback" = "pointer";
     let activate: number | undefined;
     if (rest.length === 2 && rest[0] === "--activate") { mode = "activate"; activate = positive(rest[1]); }
-    else if (rest.length === 1 && rest[0] === "--latest-passed") mode = "latest";
-    else if (rest.length !== 0) throw usage("switch-plan <releaseKey> [--activate <v> | --latest-passed]");
+    else if (rest.length === 1 && rest[0] === "--rollback") mode = "rollback";
+    else if (rest.length !== 0) throw usage("switch-plan <releaseKey> [--activate <v> | --rollback]");
     const plan = await withConnection(deps, async (client) => {
-      const chosen = mode === "latest" ? await latestPassedSettingsVersion(client, key) : activate;
+      const chosen = mode === "rollback" ? (await rollbackSettingsVersion(client, key)).version : activate;
       return settingsForSwitch(client, { newRelease: key, ...(chosen === undefined ? {} : { activate: chosen }) });
     });
     output.stdout(line("DEBATEAI_SETTINGS_SWITCH_PLAN", {
@@ -235,6 +240,7 @@ function exitOf(code: string): number {
   if (code === "SETTINGS_ACTIVATION_CONFLICT") return 3;
   if (code === "SETTINGS_VERSION_NOT_PASSED") return 4;
   if (code === "SETTINGS_GATE_LIVE_CHECK_FAILED" || code === "SETTINGS_VERSION_KIND_INVALID") return 1;
+  if (code === "SETTINGS_VERDICT_ACTIVE_PAIR") return 5;
   return 2;
 }
 const CODE = /^[A-Z][A-Z0-9_]{1,63}$/u;
@@ -244,7 +250,7 @@ export async function runSettingsCli(args: readonly string[], output: SettingsCl
   const name = args[0] ?? "";
   const command = Object.hasOwn(COMMANDS, name) ? COMMANDS[name] : undefined;
   try {
-    if (command === undefined) throw usage("commands: verdict, activate, gate-check, status, latest-passed, switch-plan");
+    if (command === undefined) throw usage("commands: verdict, activate, gate-check, status, rollback-version, switch-plan");
     return await command(args.slice(1), deps, output);
   } catch (error) {
     const typed = error instanceof TypedDomainError && CODE.test(error.code);
@@ -256,6 +262,8 @@ export async function runSettingsCli(args: readonly string[], output: SettingsCl
       ...(refusal !== undefined && refusal.codes.length > 0 ? { codes: refusal.codes } : {}),
       ...(refusal?.passed !== undefined ? { passed: refusal.passed.map(String) } : {})
     }));
+    // Ruling R77: the active pair's FAIL is not recorded, and the owner must read why in plain words.
+    if (code === "SETTINGS_VERDICT_ACTIVE_PAIR") output.stderr(`${ACTIVE_PAIR_FAIL_LINE}\n`);
     return exitOf(code);
   }
 }

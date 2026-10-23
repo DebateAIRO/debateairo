@@ -11,10 +11,10 @@ import {
 import {
   SettingsOperatorRefusal,
   activateSettingsVersion,
-  latestPassedSettingsVersion,
   readEffectiveActiveSettings,
   readSettingsStatus,
   recordSettingsVerdict,
+  rollbackSettingsVersion,
   settingsForSwitch,
   settingsVerdictOf,
   type ActivationReaders
@@ -25,16 +25,17 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 
 /**
  * Side-by-side spec §13, §11 (plan 2026-10-21-side-by-side-S-settings Task S15): the operator module on a real database
- * (migration 0124), in the order the owner uses it — verdict, activate, status, latest-passed — and the release switch's
+ * (migration 0124), in the order the owner uses it — verdict, activate, status, rollback-version — and the release switch's
  * multi-statement transaction text (deploy/preview-lifecycle/v1/release-table.mjs releaseSwitchSql, ruling R12).
  *
  * psql is not on this machine's PATH, so the switch's text runs through pg instead: the same fixed text, each psql
  * variable `:'name'` replaced by the driver's own quoted literal (what psql's `:'name'` produces), one simple-protocol
  * query, ROLLBACK after an error (psql's ON_ERROR_STOP=1 closes the session, which rolls back the same way).
  *
- * The register holds v4 (a historical import), and G1, G2 (GENERAL versions published from v4). Release A is r4-…
+ * The register holds v4 (a historical import), and G1, G2, G3 (GENERAL versions published from v4). Release A is r4-…
  * (site version 4), release B is r<G2>-… (site version G2). The cases run in order on one database. Embedded Postgres;
- * CI skips this directory, run it alone.
+ * CI skips this directory, run it alone. Final fix wave: a FAIL on the active pair is refused (ruling R77, case 4) and a
+ * rollback restores what last ran on its release, never a candidate it only checked (ruling R78, cases 4 and 6).
  */
 // Keys are built from pieces (the secret scanner reads r<n>-<12 hex> as a key).
 const A = ["r4", "a".repeat(12)].join("-");
@@ -57,6 +58,7 @@ const SEAT_ENV = Object.freeze({ envLineUp: null, declaredModels: Object.freeze(
 let database: TestDatabase;
 let G1 = 0;
 let G2 = 0;
+let G3 = 0;
 let B = "";
 const loadReleaseTable = async () => import("../../deploy/" + "preview-lifecycle/v1/release-table.mjs") as Promise<{
   releaseSwitchSql: (input: { activation: boolean }) => string;
@@ -115,6 +117,7 @@ describe("S15: the settings operator on migration 0124", () => {
       parseRegisterVersionText("4"), [registerFixtureRow("settingsOperatorProbe", marker, sourceRef)], `${sourceRef}:${marker}`)).registerVersion);
     G1 = await general("g1");
     G2 = await general("g2");
+    G3 = await general("g3");
     B = [`r${G2}`, "b".repeat(12)].join("-");
   }, 300_000);
   afterAll(async () => { await database?.stop(); });
@@ -160,14 +163,25 @@ describe("S15: the settings operator on migration 0124", () => {
     });
   });
 
-  it("4. latest passed: the most recent PASS still PASS, else the release's own site version (D1)", async () => {
+  it("4. ruling R77: a FAIL on the active pair is refused, nothing written; R78: the rollback choice keeps a passed pointer, else the target's site version", async () => {
+    const verdictRows = async (): Promise<number> => Number((await database.pool.query("SELECT count(*)::integer AS n FROM register.settings_verdict")).rows[0]!.n);
     await withClient(async (client) => {
-      expect(await latestPassedSettingsVersion(client, A)).toBe(G1);
-      expect(await latestPassedSettingsVersion(client, B)).toBe(G2);
-      await recordSettingsVerdict(client, verdictFor(A, G1, ["SETTINGS_SITE_MEMBER_DIFFERS:costEnvelopePolicy.kind"]));
-      expect(await latestPassedSettingsVersion(client, A)).toBe(4);
-      await recordSettingsVerdict(client, verdictFor(A, G1));
-      expect(await latestPassedSettingsVersion(client, A)).toBe(G1);
+      const before = await verdictRows();
+      const codes = ["SETTINGS_SITE_MEMBER_DIFFERS:costEnvelopePolicy.kind"];
+      const refused = await refusal(recordSettingsVerdict(client, verdictFor(A, G1, codes), codes));
+      expect(refused).toBeInstanceOf(SettingsOperatorRefusal);
+      expect([(refused as SettingsOperatorRefusal).code, (refused as SettingsOperatorRefusal).codes]).toEqual(["SETTINGS_VERDICT_ACTIVE_PAIR", codes]);
+      expect(await verdictRows()).toBe(before);
+      expect(await readSettingsStatus(client)).toEqual({ currentRelease: A, pointer: G1, effectiveActive: G1, passed: [4, G1] });
+      // The switch lock went with the refused transaction: another connection takes it at once.
+      expect((await database.pool.query("SELECT pg_catalog.pg_try_advisory_xact_lock(pg_catalog.hashtextextended('debateai:release-switch', 0)) AS free")).rows).toEqual([{ free: true }]);
+      // A FAIL for a version that is not the active one records (A checked G3: FAIL, so it has not passed it).
+      await recordSettingsVerdict(client, verdictFor(A, G3, codes), codes);
+      expect(await verdictRows()).toBe(before + 1);
+      expect((await readSettingsStatus(client)).passed).toEqual([4, G1]);
+      // R78 (1): A passed the pointer G1: a rollback to A keeps it. (2)/(3): B never ran and has not passed G1: its own site version.
+      expect(await rollbackSettingsVersion(client, A)).toEqual({ version: G1, basis: "KEEP_POINTER" });
+      expect(await rollbackSettingsVersion(client, B)).toEqual({ version: G2, basis: "SITE_VERSION" });
     });
   });
 
@@ -193,14 +207,21 @@ describe("S15: the settings operator on migration 0124", () => {
     });
   });
 
-  it("6. the rollback activates the older release's latest still-passing version (spec §11)", async () => {
+  it("6. ruling R78: the rollback re-activates what last ran on the older release, never a candidate it only checked (spec §11)", async () => {
+    // A (not current now) checks G3 again and passes it: the newest PASS of A is G3, a version A never ran.
+    await withClient((client) => recordSettingsVerdict(client, verdictFor(A, G3)));
     await stage(A);
-    const plan = await withClient(async (client) =>
-      settingsForSwitch(client, { newRelease: A, activate: await latestPassedSettingsVersion(client, A) }));
+    const plan = await withClient(async (client) => {
+      const choice = await rollbackSettingsVersion(client, A);
+      expect(choice).toEqual({ version: G1, basis: "LAST_ACTIVE_ON_RELEASE" });
+      return settingsForSwitch(client, { newRelease: A, activate: choice.version });
+    });
     expect(plan).toEqual({ expectedActiveSettings: G2, activate: G1 });
     expect(await runSwitchText(switchVariables(A, B, plan.expectedActiveSettings, plan.activate!), true)).toHaveLength(2);
     await withClient(async (client) => {
-      expect(await readSettingsStatus(client)).toEqual({ currentRelease: A, pointer: G1, effectiveActive: G1, passed: [4, G1] });
+      expect(await readSettingsStatus(client)).toEqual({ currentRelease: A, pointer: G1, effectiveActive: G1, passed: [4, G1, G3] });
+      // Back on A with the pointer A passed: a second rollback choice keeps it.
+      expect(await rollbackSettingsVersion(client, A)).toEqual({ version: G1, basis: "KEEP_POINTER" });
     });
   });
 

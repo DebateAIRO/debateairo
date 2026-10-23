@@ -20,7 +20,7 @@ import { readRunnerRoleRefs } from "../../apps/runner/src/settings-check.js";
  *
  * Plain words: the owner changes debate settings without an upload in three steps: check a sealed version against the
  * live release (S14's two dry-boot halves), record the verdict, activate it. This module is what the operator commands
- * (`tools/settings-version/cli.ts`: verdict, activate, status, latest-passed, switch-plan) and the release switch's
+ * (`tools/settings-version/cli.ts`: verdict, activate, status, rollback-version, switch-plan) and the release switch's
  * settings step decide with. It is the ONE operator module allowed to read the activation pointer
  * (`register.read_active_settings_version()`, plan D8; S16 pins it): the activation's compare-and-swap and the switch's
  * both need the value the operator saw. Every write is one of 0124's definer functions; nothing here edits a row.
@@ -259,16 +259,61 @@ const refusedAs = (error: unknown, sqlState: string, code: string): boolean => {
   return shape.code === sqlState && shape.message === code;
 };
 
-/** register.record_settings_verdict (0124, the verdict log's one writer); SETTINGS_VERDICT_INVALID (22023) stays typed. */
-export async function recordSettingsVerdict(client: SettingsOperatorClient, verdict: SettingsVerdict): Promise<void> {
+/**
+ * The plain line the operator prints (on stderr, after its refusal line) when it refuses to record a FAIL for the
+ * (current release, active version) pair (ruling R77, final fix wave F2a). Operator text, English, content-free.
+ * deploy/preview-lifecycle/v1/settings-version.mjs prints the same words (a unit test pins the two equal).
+ */
+export const ACTIVE_PAIR_FAIL_LINE =
+  "DEBATEAI_SETTINGS_ACTIVE_PAIR NOT RECORDED: this is the active version: activate another passed version first, then re-check";
+
+/**
+ * 0124's release switch lock (`pg_advisory_xact_lock(hashtextextended('debateai:release-switch', 0))`, taken by
+ * `register.activate_settings_version` and by the switch's settings hook): held while a FAIL is checked and recorded, so
+ * no activation or switch can land between the read of the active pair and the write.
+ */
+const RELEASE_SWITCH_LOCK_SQL = "SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('debateai:release-switch', 0))";
+const RECORD_VERDICT_SQL = "SELECT register.record_settings_verdict($1::text, $2::bigint, $3::text, $4::text)";
+
+/** 0124's SETTINGS_VERDICT_INVALID (22023) as the module's typed refusal; anything else passes through. */
+function verdictRefusal(error: unknown): unknown {
+  return refusedAs(error, "22023", "SETTINGS_VERDICT_INVALID")
+    ? new SettingsOperatorRefusal("SETTINGS_VERDICT_INVALID", "The database refused the verdict (key, version, word or digest)")
+    : error;
+}
+
+/**
+ * register.record_settings_verdict (0124, the verdict log's one writer); SETTINGS_VERDICT_INVALID (22023) stays typed.
+ *
+ * Ruling R77 (final fix wave F2a): a FAIL is never recorded for the (current release, effective active version) pair —
+ * the pointer, or the current release's own site version while nothing was ever activated (D1). Such a record would stop
+ * every new debate at once (the API waits asks SWITCHING and refuses the direct path while the current release has not
+ * passed the active version, ruling R11). So a FAIL is checked and written in one READ COMMITTED transaction under the
+ * release switch's lock: the active pair refuses SETTINGS_VERDICT_ACTIVE_PAIR, with `codes` = the check's codes, and
+ * nothing is written. The owner activates another passed version first (the release's own site version always passes),
+ * then re-checks. A PASS is recorded as it is (re-checking the active version can only record PASS). This module is the
+ * guard: 0124's writer stays as applied (a database-level guard would need a new migration, not part of this wave).
+ */
+export async function recordSettingsVerdict(client: SettingsOperatorClient, verdict: SettingsVerdict, codes: readonly string[] = []): Promise<void> {
+  const params = [verdict.releaseKey, verdict.version, verdict.verdict, verdict.digest];
+  if (verdict.verdict === "PASS") {
+    try { await client.query(RECORD_VERDICT_SQL, params); } catch (error) { throw verdictRefusal(error); }
+    return;
+  }
+  await client.query("BEGIN ISOLATION LEVEL READ COMMITTED");
   try {
-    await client.query("SELECT register.record_settings_verdict($1::text, $2::bigint, $3::text, $4::text)",
-      [verdict.releaseKey, verdict.version, verdict.verdict, verdict.digest]);
-  } catch (error) {
-    if (refusedAs(error, "22023", "SETTINGS_VERDICT_INVALID")) {
-      throw new SettingsOperatorRefusal("SETTINGS_VERDICT_INVALID", "The database refused the verdict (key, version, word or digest)");
+    await client.query(RELEASE_SWITCH_LOCK_SQL);
+    const currentRelease = await readCurrentRelease(client);
+    const active = currentRelease === null ? null : (await readPointer(client)) ?? siteVersionOfRelease(currentRelease);
+    if (currentRelease === verdict.releaseKey && active === verdict.version) {
+      throw new SettingsOperatorRefusal("SETTINGS_VERDICT_ACTIVE_PAIR",
+        "This is the active version: activate another passed version first, then re-check", { codes });
     }
-    throw error;
+    await client.query(RECORD_VERDICT_SQL, params);
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw verdictRefusal(error);
   }
 }
 
@@ -341,26 +386,39 @@ export async function readEffectiveActiveSettings(client: SettingsOperatorClient
   return Object.freeze({ currentRelease, pointer, effectiveActive: pointer ?? siteVersionOfRelease(currentRelease) });
 }
 
+/** Why a rollback chose its version (ruling R78): the order below, each one printed with the choice. */
+export type RollbackSettingsBasis = "KEEP_POINTER" | "LAST_ACTIVE_ON_RELEASE" | "SITE_VERSION";
+
 /**
- * Spec §11 (rollback): the version a rollback to `releaseKey` activates — that release's most recent PASS (by
- * `checked_at`) whose latest verdict is still PASS; with none, the release's own site version (D1: the case of T, which
- * has no check-version at all).
+ * The target release's activation history: the version of its latest `register.settings_activation` row, i.e. the
+ * version that was active the last time the target was current (every activation, the switch's included, records the
+ * release that was current then). This module is the operator's one reader of the pointer's table (plan D8).
  */
-export async function latestPassedSettingsVersion(client: SettingsOperatorClient, releaseKey: string): Promise<number> {
+const LAST_ACTIVE_ON_RELEASE_SQL =
+  "SELECT a.register_version::text AS v FROM register.settings_activation AS a WHERE a.release_key = $1::text ORDER BY a.activation_seq DESC LIMIT 1";
+
+/**
+ * Spec §11 (rollback), ruling R78 (final fix wave F7): the version a rollback to `releaseKey` leaves active, in order —
+ *   1. the pointer, when the target release has passed it: nothing to activate (KEEP_POINTER);
+ *   2. else the version that was active the last time the target was current (its latest activation row), while the
+ *      target still passes it (LAST_ACTIVE_ON_RELEASE);
+ *   3. else the target's own site version, which every release passes (SITE_VERSION, D1: the case of T).
+ * Never a version the target only checked and never ran: a "latest passed" candidate (spec §11's literal words) may be a
+ * version nobody saw live; restoring what last ran on that release is the safer reading (R78, owner-visible). The switch
+ * plan (`settingsForSwitch`) then activates it, or nothing when it is the pointer.
+ */
+export async function rollbackSettingsVersion(client: SettingsOperatorClient, releaseKey: string):
+  Promise<Readonly<{ version: number; basis: RollbackSettingsBasis }>> {
   const site = siteVersionOfRelease(releaseKey);
   if (site === null) throw new SettingsOperatorRefusal("SETTINGS_OPERATOR_USAGE", "A release key is r<site settings version>-<12 lowercase hex>");
-  const result = await client.query<{ v: string }>(
-    `SELECT latest.register_version::text AS v
-       FROM (SELECT DISTINCT ON (verdict_row.register_version) verdict_row.register_version, verdict_row.verdict, verdict_row.checked_at
-               FROM register.settings_verdict AS verdict_row
-              WHERE verdict_row.release_key = $1::text
-              ORDER BY verdict_row.register_version, verdict_row.checked_at DESC) AS latest
-      WHERE latest.verdict = 'PASS'
-      ORDER BY latest.checked_at DESC
-      LIMIT 1`,
-    [releaseKey]
-  );
-  return versionOf(result.rows[0]?.v ?? null) ?? site;
+  const pointer = await readPointer(client);
+  const passed = await readPassed(client, releaseKey);
+  if (pointer !== null && passed.includes(pointer)) return Object.freeze({ version: pointer, basis: "KEEP_POINTER" as const });
+  const last = await client.query<{ v: string }>(LAST_ACTIVE_ON_RELEASE_SQL, [releaseKey]);
+  if (last.rows.length > 1) throw new TypeError("SETTINGS_ACTIVATION_READ_INVALID");
+  const lastActive = versionOf(last.rows[0]?.v ?? null);
+  if (lastActive !== null && passed.includes(lastActive)) return Object.freeze({ version: lastActive, basis: "LAST_ACTIVE_ON_RELEASE" as const });
+  return Object.freeze({ version: site, basis: "SITE_VERSION" as const });
 }
 
 // --- The switch's settings step ----------------------------------------------------------------------------------------

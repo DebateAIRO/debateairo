@@ -82,6 +82,8 @@ import { createTestAskAdmissionPoolFacades, startTestDatabase, type TestDatabase
  *    activated; the first open tick re-admits it on S+1; one line row for the person throughout.
  *  - Extra (S13 review, ruling R11): a current release that has not passed the active version holds every START.
  *  - Extra (SA10 review, addition D21): the operator's production reader reads a candidate's own previewLineUpPolicy row.
+ *  - Final fix wave F2a (ruling R77): the operator refuses to record a FAIL for the (current release, active version)
+ *    pair; a FAIL of any other version records.
  *
  * Two embedded databases, because a release's site version is one register: the development register (local panel,
  * declared hosted) for conditions 1-5 and cases 5-7, and a register built the way the live preview's is (history v4,
@@ -184,8 +186,15 @@ const syntheticVerdict = (key: string, version: number, codes: string[] = []) =>
   settingsCheckReport({ half: "api", releaseKey: key, version, codes: [], snapshotSha256: SNAPSHOT })
 );
 const pass = (on: TestDatabase, key: string, version: number) => withClient(on, (client) => recordSettingsVerdict(client, syntheticVerdict(key, version)));
-const fail = (on: TestDatabase, key: string, version: number) =>
-  withClient(on, (client) => recordSettingsVerdict(client, syntheticVerdict(key, version, ["SETTINGS_SITE_MEMBER_DIFFERS:sessionPolicy"])));
+/**
+ * A FAIL verdict for (key, version), written straight through 0124's writer (`register.record_settings_verdict`), as a
+ * hand-run psql could. Ruling R77 (final fix wave F2a): the operator never records a FAIL for the (current release, active
+ * version) pair (the last case of this block); cases 6 and the S13 extra still prove how the API holds asks if that state
+ * exists anyway, so they write it beside the operator.
+ */
+const fail = (on: TestDatabase, key: string, version: number) => on.pool.query(
+  "SELECT register.record_settings_verdict($1::text, $2::bigint, 'FAIL', $3::text)",
+  [key, version, syntheticVerdict(key, version, ["SETTINGS_SITE_MEMBER_DIFFERS:sessionPolicy"]).digest]);
 /** The owner's activation off the preview (condition 6 trivially true there). */
 const activateOffPreview = (on: TestDatabase, version: number, client?: SettingsOperatorClient) => {
   const run = (target: SettingsOperatorClient) => activateSettingsVersion(target, {
@@ -757,6 +766,36 @@ describe("cases 6, 7 and the S13 extra (side-by-side §13 \"The API re-checks at
       expect(await supersessionOf(runId)).toEqual([]);
       expect(await waitingIds()).not.toContain(runId);
     }
+  });
+
+  it("final fix wave F2a (ruling R77): the operator refuses to record a FAIL for the (current release, active version) pair, with the check's codes; nothing is written and the pair still passes", async () => {
+    const release = keyOf(HOSTED_SITE, "c9");
+    await makeCurrent(dev, release);
+    const active = await probeVersion("f2a-active");
+    const other = await probeVersion("f2a-other");
+    await pass(dev, release, active);
+    await pass(dev, release, other);
+    await activateOffPreview(dev, active);
+    const verdicts = () => count("SELECT count(*)::integer AS n FROM register.settings_verdict WHERE release_key = $1", [release]);
+    const before = await verdicts();
+    const codes = ["SETTINGS_SITE_MEMBER_DIFFERS:sessionPolicy"];
+    const refused = await refusal(withClient(dev, (client) => recordSettingsVerdict(client, syntheticVerdict(release, active, codes), codes)));
+    expect(refused).toBeInstanceOf(SettingsOperatorRefusal);
+    expect([(refused as SettingsOperatorRefusal).code, (refused as SettingsOperatorRefusal).codes]).toEqual(["SETTINGS_VERDICT_ACTIVE_PAIR", codes]);
+    expect(await verdicts()).toBe(before);
+    const status = await statusOf(dev);
+    expect([status.currentRelease, status.pointer, status.passed.includes(active)]).toEqual([release, active, true]);
+    // What the API reads for new asks is untouched: the active version, still passed by the current release.
+    expect(await readActiveSettingsVersionOn(dev.pool, siteVersionOfRelease(release)!)).toBe(active);
+    // A FAIL for a passed version that is not the active one records (the operator's refusal is for the active pair only).
+    await withClient(dev, (client) => recordSettingsVerdict(client, syntheticVerdict(release, other, codes), codes));
+    expect(await verdicts()).toBe(before + 1);
+    expect((await statusOf(dev)).passed).not.toContain(other);
+    // Once another passed version is active, the old one may be re-checked to FAIL (the recovery the guide names).
+    await activateOffPreview(dev, siteVersionOfRelease(release)!);
+    await withClient(dev, (client) => recordSettingsVerdict(client, syntheticVerdict(release, active, codes), codes));
+    expect(await verdicts()).toBe(before + 2);
+    expect((await statusOf(dev)).passed).not.toContain(active);
   });
 });
 
