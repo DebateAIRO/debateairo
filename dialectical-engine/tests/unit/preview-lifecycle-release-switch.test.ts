@@ -658,11 +658,11 @@ describe('the switch\'s settings step (side-by-side spec §13, §11; S15, ruling
     expect(plain.writes().filter(entry => entry.startsWith('recordReleaseSwitch'))[1]).toBe('recordReleaseSwitch(old→, expect new, 8s, settings 19)');
   });
 
-  it('a rollback to a release that predates §13 activates that release\'s own site version (D1), planned before anything is touched', async () => {
+  it('a rollback asks the operator for its choice (ruling R78: keep, last active on that release, else its own site version), planned before anything is touched', async () => {
     const h = host({ history: AFTER_SWITCH, units: AFTER_SWITCH_UNITS, settings: { [OLD_KEY]: { expectedActiveSettings: 20, activate: 19 } } });
     await rollbackRelease({ to: 'old-v1', from: 'new-v1', layout, deps: h.deps });
-    expect(h.log).toContain('read:settings-plan(old from old-v1,new-v1 latest-passed)');
-    expect(h.log.indexOf('read:settings-plan(old from old-v1,new-v1 latest-passed)')).toBeLessThan(h.log.indexOf(h.writes()[0]!));
+    expect(h.log).toContain('read:settings-plan(old from old-v1,new-v1 rollback)');
+    expect(h.log.indexOf('read:settings-plan(old from old-v1,new-v1 rollback)')).toBeLessThan(h.log.indexOf(h.writes()[0]!));
     expect(h.writes().filter(entry => entry.startsWith('recordReleaseSwitch'))).toEqual(['recordReleaseSwitch(old→, expect new, 8s, settings 20 → activate 19 by root rollback (rollback to old))']);
     // A plan that cannot be made leaves everything as it was.
     const broken = host({ history: AFTER_SWITCH, units: AFTER_SWITCH_UNITS, settings: { [OLD_KEY]: 'SETTINGS_PLAN_UNAVAILABLE' } });
@@ -670,7 +670,7 @@ describe('the switch\'s settings step (side-by-side spec §13, §11; S15, ruling
     expect(broken.writes()).toEqual([]);
   });
 
-  it('ruling R60: a forward switch\'s --activate <v> (not the new release\'s own site version) runs the live condition 6 for the new release before the write', async () => {
+  it('rulings R60, R80: a forward switch\'s --activate <v> other than the active version runs the live condition 6 for the new release before the write', async () => {
     const h = host({ settings: { [NEW_KEY]: { expectedActiveSettings: 19, activate: 21 } } });
     await switchRelease({ to: 'new-v1', from: 'old-v1', activate: 21, layout, deps: h.deps });
     const at = h.log.indexOf('read:gates-live(new-v1 21)');
@@ -690,16 +690,35 @@ describe('the switch\'s settings step (side-by-side spec §13, §11; S15, ruling
     expect(broken.writes()).toEqual([]);
   });
 
-  it('ruling R60: the own site version (Q-S2, with or without --activate), an --activate that is already the pointer, a revert and a rollback skip the live check', async () => {
+  it('ruling R80 (amends R60): the new release\'s own site version runs the live check too whenever it differs from the active version (with or without --activate)', async () => {
+    // The pointer is 19; the switch activates the new release's own site version 20 (SB13's ACT): it may carry a new line-up.
     const own = host({ settings: { [NEW_KEY]: { expectedActiveSettings: 19, activate: 20 } } });
     await switchRelease({ to: 'new-v1', from: 'old-v1', activate: 20, layout, deps: own.deps });
+    // Nothing ever activated: the old release's own site version 19 is the active one, and the Q-S2 activation of 20 differs.
     const automatic = host({ settings: { [NEW_KEY]: { expectedActiveSettings: null, activate: 20 } } });
     await switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: automatic.deps });
+    for (const h of [own, automatic]) {
+      const at = h.log.indexOf('read:gates-live(new-v1 20)');
+      expect(at).toBeGreaterThan(-1);
+      expect(at).toBeLessThan(h.log.indexOf(h.writes()[0]!));
+    }
+    // Refused while a gate does not serve a model it seats: nothing written.
+    const off = host({ settings: { [NEW_KEY]: { expectedActiveSettings: 19, activate: 20 } }, gatesLive: 'SETTINGS_GATE_LIVE_CHECK_FAILED' });
+    expect((await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', activate: 20, layout, deps: off.deps }))).code).toBe('SETTINGS_GATE_LIVE_CHECK_FAILED');
+    expect(off.writes()).toEqual([]);
+  });
+
+  it('ruling R80: "activate nothing", a version equal to the active one (nothing ever activated, one site version), a revert and a rollback skip the live check', async () => {
     const pointer = host({ settings: { [NEW_KEY]: { expectedActiveSettings: 21, activate: null } } });
     await switchRelease({ to: 'new-v1', from: 'old-v1', activate: 21, layout, deps: pointer.deps });
+    const nothing = host({ settings: { [NEW_KEY]: { expectedActiveSettings: 19, activate: null } } });
+    await switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: nothing.deps });
+    // Nothing ever activated and the switch activates the old release's own site version (the version already in force).
+    const same = host({ settings: { [NEW_KEY]: { expectedActiveSettings: null, activate: 19 } } });
+    await switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: same.deps });
     const rollback = host({ history: AFTER_SWITCH, units: AFTER_SWITCH_UNITS, settings: { [OLD_KEY]: { expectedActiveSettings: 21, activate: 18 } } });
     await rollbackRelease({ to: 'old-v1', from: 'new-v1', layout, deps: rollback.deps });
-    for (const h of [own, automatic, pointer, rollback]) expect(h.log.filter(line => line.startsWith('read:gates-live'))).toEqual([]);
+    for (const h of [pointer, nothing, same, rollback]) expect(h.log.filter(line => line.startsWith('read:gates-live'))).toEqual([]);
     expect(rollback.writes().filter(entry => entry.startsWith('recordReleaseSwitch'))).toEqual(['recordReleaseSwitch(old→, expect new, 8s, settings 21 → activate 18 by root rollback (rollback to old))']);
     // The revert after a forward --activate re-activates what was active before without a second check.
     const reverted = host({ edgeAfter: [[site(OLD_KEY, 503, ['DRAINING'])]], settings: { [NEW_KEY]: { expectedActiveSettings: 18, activate: 21 } } });
@@ -714,6 +733,22 @@ describe('the switch\'s settings step (side-by-side spec §13, §11; S15, ruling
     expect(h.writes()[1]).toBe('recordReleaseSwitch(new→, expect null, 0s, settings none → activate 20 by root release-switch (seed new))');
   });
 
+  it('final fix wave S10: --expect-active <v> refuses the switch, before anything is written, when the active version is not v', async () => {
+    // The pointer moved to 21 after the guide read 19: refused, nothing written, no gate asked.
+    const moved = host({ settings: { [NEW_KEY]: { expectedActiveSettings: 21, activate: 20 } } });
+    expect(await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', activate: 20, expectActive: 19, layout, deps: moved.deps })))
+      .toMatchObject({ code: 'SETTINGS_ACTIVE_VERSION_MOVED', fields: { expected: 19, effectiveActive: 21 } });
+    expect([moved.writes(), moved.log.filter(line => line.startsWith('read:gates-live'))]).toEqual([[], []]);
+    // Equal: the switch goes on. Nothing ever activated: the old release's own site version is the active one.
+    const same = host({ settings: { [NEW_KEY]: { expectedActiveSettings: 19, activate: 20 } } });
+    expect((await switchRelease({ to: 'new-v1', from: 'old-v1', activate: 20, expectActive: 19, layout, deps: same.deps })).bad).toEqual([]);
+    const never = host({ settings: { [NEW_KEY]: { expectedActiveSettings: null, activate: 20 } } });
+    expect((await switchRelease({ to: 'new-v1', from: 'old-v1', expectActive: 19, layout, deps: never.deps })).bad).toEqual([]);
+    const neverMoved = host({ settings: { [NEW_KEY]: { expectedActiveSettings: null, activate: 20 } } });
+    expect((await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', expectActive: 20, layout, deps: neverMoved.deps }))).code).toBe('SETTINGS_ACTIVE_VERSION_MOVED');
+    expect((await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', expectActive: 0, layout, deps: host().deps }))).code).toBe('ARGUMENTS_REFUSED');
+  });
+
   it('--activate <v> is an argument of the plain switch only', async () => {
     const sink = () => { const lines: string[] = []; return { lines, stream: { write: (text: string) => { lines.push(text); return true; } } }; };
     const run = async (argv: string[], deps: Record<string, any>) => {
@@ -726,7 +761,9 @@ describe('the switch\'s settings step (side-by-side spec §13, §11; S15, ruling
     expect([out.code, JSON.parse(out.stdout).settings]).toEqual([0, { expectedActiveSettings: 19, activated: 21 }]);
     for (const argv of [['switch', '--to', 'new-v1', '--from', 'old-v1', '--activate', '021'], ['switch', '--to', 'new-v1', '--from', 'old-v1', '--activate'],
       ['switch', '--finish', '--to', 'new-v1', '--from', 'old-v1', '--activate', '21'], ['rollback', '--to', 'old-v1', '--from', 'new-v1', '--activate', '21'],
-      ['switch', '--to', 'new-v1', '--from', 'old-v1', '--activate', '21', '--old-pair-stopped']]) {
+      ['switch', '--to', 'new-v1', '--from', 'old-v1', '--activate', '21', '--old-pair-stopped'],
+      ['switch', '--to', 'new-v1', '--from', 'old-v1', '--expect-active', '019'], ['switch', '--to', 'new-v1', '--from', 'old-v1', '--activate', '21', '--activate', '21'],
+      ['switch', '--finish', '--to', 'new-v1', '--from', 'old-v1', '--expect-active', '19'], ['rollback', '--to', 'old-v1', '--from', 'new-v1', '--expect-active', '19']]) {
       const refused = host();
       const result = await run(argv, refused.deps);
       expect([result.code, JSON.parse(result.stderr).reason], argv.join(' ')).toEqual([1, 'ARGUMENTS_REFUSED']);
@@ -734,6 +771,16 @@ describe('the switch\'s settings step (side-by-side spec §13, §11; S15, ruling
     }
     const drained = host({ units: AFTER_SWITCH_UNITS, edgeBefore: caddy(502), settings: { [NEW_KEY]: { expectedActiveSettings: 19, activate: 21 } } });
     expect((await run(['switch', '--to', 'new-v1', '--from', 'old-v1', '--old-pair-stopped', '--activate', '21'], drained.deps)).code).toBe(0);
+    // S10: --expect-active <v> with --activate, in either order, on both switch shapes (SB13, DR6).
+    for (const tail of [['--activate', '21', '--expect-active', '19'], ['--expect-active', '19', '--activate', '21']]) {
+      const both = host({ settings: { [NEW_KEY]: { expectedActiveSettings: 19, activate: 21 } } });
+      expect((await run(['switch', '--to', 'new-v1', '--from', 'old-v1', ...tail], both.deps)).code, tail.join(' ')).toBe(0);
+      const stopped = host({ units: AFTER_SWITCH_UNITS, edgeBefore: caddy(502), settings: { [NEW_KEY]: { expectedActiveSettings: 19, activate: 21 } } });
+      expect((await run(['switch', '--to', 'new-v1', '--from', 'old-v1', '--old-pair-stopped', ...tail], stopped.deps)).code, tail.join(' ')).toBe(0);
+    }
+    const movedCli = host({ settings: { [NEW_KEY]: { expectedActiveSettings: 21, activate: null } } });
+    const refusedMove = await run(['switch', '--to', 'new-v1', '--from', 'old-v1', '--expect-active', '19'], movedCli.deps);
+    expect([refusedMove.code, JSON.parse(refusedMove.stderr).reason]).toEqual([1, 'SETTINGS_ACTIVE_VERSION_MOVED']);
   });
 });
 

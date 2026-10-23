@@ -11,7 +11,9 @@
 //                               folder with api-<label>.env. Each half prints one DEBATEAI_SETTINGS_CHECK line; both are kept
 //                               as a receipt, lifecycle-current-<label>/settings-check-<v>-<UTC>.json, and the operator
 //                               records the verdict (tools/settings-version/cli.ts verdict). A FAIL lists every code with one
-//                               plain hint. A half that could not run writes nothing to the database;
+//                               plain hint. A half that could not run writes nothing to the database; nor does a FAIL of the
+//                               current release's ACTIVE version (ruling R77): the operator refuses SETTINGS_VERDICT_ACTIVE_PAIR,
+//                               and this tool prints its codes with their hints, then one loud plain line;
 //   - activate <version> --by <owner> --reason <text>
 //                               first proves every spending gate runs this release's gate code (addition D21, SA10, R65b:
 //                               for preview_budget_helper.py and preview_budget_authority.py, the sha256 of each gate
@@ -24,8 +26,13 @@
 //                               the version's whole seatable set and moves the pointer; prints its line;
 //   - status                    `cli.ts status`: the current release, the pointer, what new asks use, what passed.
 // It also plans the release switch's settings step for release-switch.mjs and release-check.mjs (planSettingsForSwitch:
-// `cli.ts switch-plan`, ruling R12), and runs the same live condition 6 (fingerprint, then `cli.ts gate-check`) for a
-// forward switch's `--activate <v>` (checkSettingsGatesLive, ruling R60).
+// `cli.ts switch-plan`, ruling R12; a rollback's choice is the operator's, ruling R78), and runs the same live condition 6
+// (fingerprint, then `cli.ts gate-check`) for a forward switch that activates a version other than the active one
+// (checkSettingsGatesLive, rulings R60, R80).
+//
+// Every file this tool hands the operator (the halves' lines, the receipt, the seatable-env hand-over, the gate answers)
+// is root's, mode 0640, in the group the operator runs as (postgres's primary group, read through getent: final fix
+// wave S11), inside the release's root-owned 0755 lifecycle-current folder: the operator reads it, nobody else does.
 //
 // The operator commands run as the release writers' principal: root as `postgres` through the server's own socket (the
 // same principal release-table.mjs's psql uses), from a release's API folder (the lock's services.api.sourceRoot, where
@@ -36,9 +43,10 @@
 // release (the launchers' own check: the pinned manifest, byte for byte, and every file it loads root-only up to `/`),
 // else RELEASE_UNVERIFIED and nothing runs (the rule jit-creator-actor.mjs follows).
 //
-// One JSON line per run on stdout (or the operator command's own line), one refusal line on stderr. Exit codes: check 0
-// PASS, 2 FAIL, 1 refused (nothing recorded); activate and status: the operator command's own (0 done, 1 refused by
-// condition 6 or the version's kind, 2 usage or unavailable, 3 conflict, 4 not passed); 1 for a refusal here.
+// One JSON line per run on stdout (or the operator command's own line), one refusal line on stderr (a refused FAIL of the
+// active pair adds ACTIVE_PAIR_FAIL_LINE after it). Exit codes: check 0 PASS, 2 FAIL, 1 refused (nothing recorded);
+// activate and status: the operator command's own (0 done, 1 refused by condition 6 or the version's kind, 2 usage or
+// unavailable, 3 conflict, 4 not passed); 1 for a refusal here.
 import { request } from 'node:http';
 import { lstat, readFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
@@ -62,6 +70,16 @@ export const HALF_TIMEOUT_MS = 300000, OPERATOR_TIMEOUT_MS = 60000, REMAINING_TI
 export const RECEIPT_SCHEMA = 'preview-settings-check-receipt-v1';
 /** `activated_by`'s CHECK in migration 0124, exactly (no colon). */
 export const ACTIVATED_BY = /^[A-Za-z0-9][A-Za-z0-9 ._@-]{0,127}$/;
+/**
+ * Ruling R77 (final fix wave F2a): the operator never records a FAIL for the (current release, active version) pair; its
+ * refusal (SETTINGS_VERDICT_ACTIVE_PAIR) is followed by this line, word for word the operator module's
+ * ACTIVE_PAIR_FAIL_LINE (tools/settings-version/settings-operator.ts; this file loads no TypeScript: a unit test pins the two).
+ */
+export const ACTIVE_PAIR_FAIL_LINE = 'DEBATEAI_SETTINGS_ACTIVE_PAIR NOT RECORDED: this is the active version: activate another passed version first, then re-check';
+/** The OS account the operator commands run as (operatorArgv's `runuser -u`); its primary group reads what root hands over. */
+export const OPERATOR_ACCOUNT = 'postgres';
+/** Root's hand-over files: root's, 0640, the operator's group (S11). */
+export const HANDOVER_MODE = 0o640;
 /**
  * Addition D21 (SA10, owner answer Q-L3; ruling R65b): the gate code whose fingerprint proves the live gates hold this
  * release's reviewed rows (the helper's menus, bounds and prices; the authority's `efforts_reviewed`): each file in each
@@ -95,6 +113,11 @@ export const CHECK_HINTS = Object.freeze({
   SETTINGS_GATE_UNANSWERED: 'a spending gate did not answer: check it is running, then try again',
   SETTINGS_GATE_LIVE_CHECK_FAILED: 'an AI this version can use is not ready at its spending gate: read the codes listed with it, fix those, then try again',
   PREVIEW_LINE_UP_REQUIRED: 'the version names no list of AIs and the server setting has none either: publish the version with a line-up',
+  // Final fix wave S6: the line-up and thinking loaders' own codes, which the API half reports as they are.
+  PREVIEW_THINKING_LEVELS_INVALID: 'the version\'s thinking table names an AI, a step or a level this release does not know: publish it with a level from that AI\'s menu',
+  PREVIEW_LINE_UP_POLICY_INVALID: 'the version\'s list of AIs is not one this release accepts (an unreviewed AI, one maker only, or an AI named twice): publish a corrected line-up',
+  PREVIEW_LINE_UP_ENV_CONFLICT: 'the version names a list of AIs while the release\'s server setting still carries one: that setting must keep only its gate part (an upload, the release guide\'s T+1 steps)',
+  PREVIEW_SCORECARD_CONFLICT: 'the version turns the model scorecard on while the preview\'s list of AIs decides the models: the preview cannot use both, publish it without a valid scorecard',
   SETTINGS_CHECK_DETAIL_UNPRINTABLE: 'a value in the version has a character a receipt cannot carry: read the version\'s rows and ask',
   SETTINGS_ROW_UNCLASSIFIED: 'the version has a row this code does not know: the code must learn it first (an upload)',
   SETTINGS_VERSION_KIND_INVALID: 'only a sealed general settings version can be checked',
@@ -112,6 +135,7 @@ const CODE = /^[A-Z][A-Z0-9_]{0,63}$/;
 const SOCKET = /^\/[A-Za-z0-9._/-]{1,200}\.sock$/;
 const MAX_OUTPUT_BYTES = 256 * 1024;
 const MAX_REMAINING_BYTES = 64 * 1024;
+const GETENT_TIMEOUT_MS = 5000;
 
 class SettingsVersionRefusal extends Error { constructor(code, fields) { super(code); this.name = 'SettingsVersionRefusal'; this.code = code; if (fields) this.fields = fields; } }
 const refuse = (code, fields) => { throw new SettingsVersionRefusal(code, fields); };
@@ -159,10 +183,27 @@ export const checkHalfEnvironment = (values, nodePath) => Object.freeze({
 const outputLines = buffer => (Buffer.isBuffer(buffer) ? buffer.toString('utf8') : '').split('\n').filter(Boolean);
 const finished = result => Boolean(result) && !result.error && !result.timedOut && !result.overflow && Number.isInteger(result.code);
 
+/**
+ * Final fix wave S11: the group the operator commands run as — `getent passwd postgres`'s primary group (runuser -u sets
+ * the account's own groups). Root's hand-over files take it, so they are readable by the operator and by nobody else. A
+ * missing account, an unreadable line or group 0 (root's: the operator could not read the files) is
+ * OPERATOR_GROUP_UNKNOWN, before anything is written.
+ */
+export async function operatorGroupGid({ layout = LAYOUT, run = runBounded } = {}) {
+  const result = await run([layout.getent ?? '/usr/bin/getent', 'passwd', OPERATOR_ACCOUNT], { env: {}, timeoutMs: GETENT_TIMEOUT_MS, maxOutputBytes: 4096 });
+  const fields = finished(result) && result.code === 0 ? (outputLines(result.stdout)[0] ?? '').split(':') : [];
+  const gid = fields.length >= 4 && fields[0] === OPERATOR_ACCOUNT && /^[1-9][0-9]{0,9}$/.test(fields[3]) ? Number(fields[3]) : NaN;
+  return Number.isSafeInteger(gid) ? gid : refuse('OPERATOR_GROUP_UNKNOWN');
+}
+
 /** The dependencies with the server's defaults; tests replace them. */
 function withDefaults(layout, deps) {
   const run = deps.run ?? runBounded;
-  const uid = layout.ownerUid ?? 0, gid = layout.ownerGid ?? 0;
+  const uid = layout.ownerUid ?? 0;
+  const operatorGid = deps.operatorGid ?? (() => operatorGroupGid({ layout, run }));
+  let group = null;
+  // Read once per command, at the first file written (a command that writes nothing never asks).
+  const handOverGroup = () => (group ??= Promise.resolve(operatorGid()));
   return {
     run,
     now: deps.now ?? Date.now,
@@ -180,8 +221,9 @@ function withDefaults(layout, deps) {
     readBytes: deps.readBytes ?? (path => readFile(path)),
     // A release's lifecycle-current folder, as prestart.mjs makes it (root, 0755: the operator, postgres, reads what is saved there).
     ensureCurrentDir: deps.ensureCurrentDir ?? (path => ensureDirectory(path, { mode: 0o755, uid })),
-    // Root-owned 0644 in the release's 0755 lifecycle-current folder: the operator (postgres) reads the answers back.
-    writeFile: deps.writeFile ?? ((path, text) => atomicWrite(path, Buffer.from(text, 'utf8'), { mode: 0o644, uid, gid }))
+    // Root's, 0640, the operator's group (S11), in the release's 0755 lifecycle-current folder: the operator (postgres)
+    // reads the lines, the hand-over and the answers back; nobody else can.
+    writeFile: deps.writeFile ?? (async (path, text) => atomicWrite(path, Buffer.from(text, 'utf8'), { mode: HANDOVER_MODE, uid, gid: await handOverGroup() }))
   };
 }
 
@@ -217,16 +259,18 @@ function oneLine(lines, kind) {
 const versionOrNull = value => (value === null ? null : typeof value === 'string' && VERSION.test(value) ? Number(value) : refuse('SETTINGS_OPERATOR_UNAVAILABLE'));
 
 /**
- * The release switch's settings step (ruling R12): `cli.ts switch-plan <newKey> [--activate <v> | --latest-passed]`, from
+ * The release switch's settings step (ruling R12): `cli.ts switch-plan <newKey> [--activate <v> | --rollback]`, from
  * the first of `labels` whose folder carries the operator module (the new release's own, else the other one: a rollback
  * to a release that predates §13). Resolves { expectedActiveSettings, activate, planned }. Neither carries it, or the
  * public server: nothing to plan (the pointer cannot have been set by these releases' code), { null, null, false }: the
  * switch still passes NULL, and 0124's hook refuses SETTINGS_ACTIVATION_CONFLICT should a pointer exist after all.
  * SETTINGS_VERSION_NOT_PASSED (with `passed`) when the new release has not passed the pointer (or `activate`).
+ * `activate`: null, a version, or 'rollback' (ruling R78: the operator keeps the pointer when the target passed it, else
+ * the version last active on the target, else the target's own site version).
  */
 export async function planSettingsForSwitch({ newKey, labels, activate = null, layout = LAYOUT, deps = {} }) {
   if (typeof newKey !== 'string' || !RELEASE_KEY_PATTERN.test(newKey) || !Array.isArray(labels) || labels.length < 1) refuse('ARGUMENTS_REFUSED');
-  if (activate !== null && activate !== 'latest-passed') requireVersion(activate);
+  if (activate !== null && activate !== 'rollback') requireVersion(activate);
   // The public server (release-info 'overlay') has no settings operator until Phase 3 adopts these commands (plan D11).
   if (layout.releaseSource === 'overlay') return Object.freeze({ expectedActiveSettings: null, activate: null, planned: false });
   const io = withDefaults(layout, deps);
@@ -237,7 +281,7 @@ export async function planSettingsForSwitch({ newKey, labels, activate = null, l
   }
   if (pinned === null) return Object.freeze({ expectedActiveSettings: null, activate: null, planned: false });
   const engine = await verified(io, pinned, 'api', OPERATOR_IMPORTS);
-  const mode = activate === null ? [] : activate === 'latest-passed' ? ['--latest-passed'] : ['--activate', String(activate)];
+  const mode = activate === null ? [] : activate === 'rollback' ? ['--rollback'] : ['--activate', String(activate)];
   const out = await runOperator(io, layout, engine, ['switch-plan', newKey, ...mode]);
   if (out.code === 4) {
     const refused = oneLine(out.stderr, 'DEBATEAI_SETTINGS_REFUSED');
@@ -347,7 +391,13 @@ export async function checkSettingsVersion({ label, version, layout = LAYOUT, de
   const recorded = out.code === 0 || out.code === 1 ? oneLine(out.stdout, 'DEBATEAI_SETTINGS_VERDICT') : null;
   if (recorded === null) {
     const refused = oneLine(out.stderr, 'DEBATEAI_SETTINGS_REFUSED');
-    refuse(typeof refused?.code === 'string' && CODE.test(refused.code) ? refused.code : 'SETTINGS_OPERATOR_UNAVAILABLE', { receipt });
+    const code = typeof refused?.code === 'string' && CODE.test(refused.code) ? refused.code : 'SETTINGS_OPERATOR_UNAVAILABLE';
+    // Ruling R77: a FAIL of the active pair is not recorded; the owner reads every code the check found, with its hint.
+    if (code === 'SETTINGS_VERDICT_ACTIVE_PAIR') {
+      const codes = Array.isArray(refused.codes) ? refused.codes.filter(item => typeof item === 'string') : [];
+      refuse(code, { receipt, codes, hints: codes.map(item => Object.freeze({ code: item, hint: hintFor(item) })) });
+    }
+    refuse(code, { receipt });
   }
   const codes = Array.isArray(recorded.codes) ? recorded.codes.filter(code => typeof code === 'string') : [];
   return Object.freeze({
@@ -532,6 +582,8 @@ export async function main(argv, { platform = process.platform, uid = process.ge
     return out.code;
   } catch (error) {
     logLine(stderr, { event: args ? FAILED_EVENT[args.command] : 'PREVIEW_SETTINGS_REFUSED', ...(args?.label ? { label: args.label } : {}), reason: codeOf(error), ...(error instanceof SettingsVersionRefusal && error.fields ? { fields: error.fields } : {}) });
+    // Ruling R77: loud and plain, after the codes — nothing was recorded, and new debates still use this version.
+    if (codeOf(error) === 'SETTINGS_VERDICT_ACTIVE_PAIR') stderr.write(`${ACTIVE_PAIR_FAIL_LINE}\n`);
     return 1;
   }
 }

@@ -21,7 +21,7 @@
 //
 //   release-switch.mjs stage --label <new>
 //   release-switch.mjs seed --label <T>
-//   release-switch.mjs switch --to <new> --from <old> [--old-pair-stopped] [--activate <v>]
+//   release-switch.mjs switch --to <new> --from <old> [--old-pair-stopped] [--activate <v>] [--expect-active <v>]
 //   release-switch.mjs switch --finish --to <new> --from <old> [--old-pair-stopped]
 //   release-switch.mjs rollback --to <older> --from <newer>
 //   release-switch.mjs rollback --before-switch --label <new>
@@ -32,14 +32,18 @@
 // operator module (tools/settings-version/cli.ts switch-plan, through settings-version.mjs), and may activate a version in
 // the same transaction: the first switch to a release when nothing was ever activated activates that release's own site
 // version (owner answer Q-S2); `switch --activate <v>` activates a version the new release passed (when it has not
-// passed the active one); a rollback activates the older release's latest still-passing version, or its own site version
-// (D1); a revert puts back what the switch replaced. A new release that has not passed the active version, with no
+// passed the active one); a rollback keeps the pointer when the older release passed it, else re-activates the version
+// active the last time that release was current, else its own site version (ruling R78, the operator's choice); a revert
+// puts back what the switch replaced. A new release that has not passed the active version, with no
 // `--activate`, refuses SETTINGS_VERSION_NOT_PASSED before anything is written (`passed` names what it passed).
-// Ruling R60 (SA10): a forward switch whose `--activate <v>` activates a version other than the new release's own site
-// version first runs the activation's live condition 6 (settings-version.mjs checkSettingsGatesLive: the gate-code
-// fingerprint, then every model v can seat on at its gate, through the operator's one check), before anything is
-// written; the Q-S2 activation of the new release's own site version, a rollback's and a revert's re-activation skip it
-// (restoring a known state must work while a gate is down).
+// Ruling R80 (amends R60, SA10's R60): a FORWARD switch that activates a version other than the current effective active
+// version (the pointer, or the old release's own site version while nothing was ever activated) first runs the
+// activation's live condition 6 (settings-version.mjs checkSettingsGatesLive: the gate-code fingerprint, then every model
+// the version can seat on at its gate, through the operator's one check), before anything is written — the new release's
+// own site version included (SB3's LINEUP= can give it a new line-up). "Activate nothing", a rollback's and a revert's
+// re-activation skip it (restoring a known state must work while a gate is down).
+// Final fix wave S10: `--expect-active <v>` refuses SETTINGS_ACTIVE_VERSION_MOVED, before anything is written, when the
+// effective active version the switch plan read is not `v` (an activation landed after the guide's own read, SB13/DR6).
 //
 // The same functions serve the public server (side-by-side plan D16b): deploy/vps/release.mjs calls them with
 // common.mjs's VPS_LAYOUT. Everything that differs between the two servers comes from the layout: where a release's
@@ -426,7 +430,7 @@ async function recordSwitch(io, { newKey, expectedCurrentKey, seconds, recordedB
 /**
  * The switch's settings step (spec §13, §11): the pointer the write expects and the version it activates, if any. A
  * refusal (SETTINGS_VERSION_NOT_PASSED with `passed`, SETTINGS_PLAN_UNAVAILABLE) comes before anything is written.
- * `activate`: null, a version (`--activate <v>`), or 'latest-passed' (a rollback).
+ * `activate`: null, a version (`--activate <v>`), or 'rollback' (the operator's choice, ruling R78).
  */
 async function settingsPlan(io, { newKey, labels, activate, next }) {
   try {
@@ -445,16 +449,20 @@ async function settingsPlan(io, { newKey, labels, activate, next }) {
 /** A release key's own site version: the number after `r` (D1). */
 const siteVersionOfKey = key => Number(/^r([1-9][0-9]*)-/.exec(key)[1]);
 
+/** The version new asks use now, as the switch plan read it: the pointer, else the current (old) release's own site version (D1). */
+const effectiveActiveOf = (settings, fromKey) => settings.expectedActiveSettings ?? siteVersionOfKey(fromKey);
+
 /**
- * Ruling R60: before a FORWARD switch's write, when its explicit `--activate <v>` (`activate`, a number) plans an
- * activation of a version other than the new release's own site version, the activation's live condition 6 runs for the
- * new release (`io.checkGatesLive`: the gate-code fingerprint, then `cli.ts gate-check`). Its refusal
- * (SETTINGS_GATE_HELPER_DIFFERS, SETTINGS_GATE_LIVE_CHECK_FAILED with `codes`, or the operator's own) passes through:
- * nothing is written. No `--activate` (the Q-S2 activation of the own site version, or nothing), a rollback and a revert
- * never get here.
+ * Ruling R80 (amends R60): before a FORWARD switch's write, when its plan activates a version other than the current
+ * effective active version — an explicit `--activate <v>`, the new release's own site version (SB13's ACT, or the Q-S2
+ * activation with nothing ever activated) — the activation's live condition 6 runs for the new release
+ * (`io.checkGatesLive`: the gate-code fingerprint, then `cli.ts gate-check`): with SB3's `LINEUP=` the new site version
+ * may seat models the gates have not switched on. Its refusal (SETTINGS_GATE_HELPER_DIFFERS, SETTINGS_GATE_LIVE_CHECK_FAILED
+ * with `codes`, or the operator's own) passes through: nothing is written. "Activate nothing" and a version equal to the
+ * active one skip it; a rollback and a revert never get here.
  */
-async function forwardActivationGates(io, { to, toKey, activate, settings }) {
-  if (typeof activate !== 'number' || settings.activate === null || settings.activate === siteVersionOfKey(toKey)) return;
+async function forwardActivationGates(io, { to, fromKey, settings }) {
+  if (settings.activate === null || settings.activate === effectiveActiveOf(settings, fromKey)) return;
   try {
     await io.checkGatesLive({ label: to, version: settings.activate });
   } catch (error) {
@@ -659,14 +667,26 @@ async function afterWrite({ to, from, toKey, fromKey, recordedBy, tally, keepGat
  * The switch itself, in order: preconditions; the one database write; the edge (three confirmations, or the revert);
  * then afterWrite. A write whose outcome stays unknown names the finish command.
  */
-async function runSwitch({ to, from, oldPairStopped, rollback, activate = null, settings: planned = null, layout, io }) {
+/**
+ * Final fix wave S10: the guide reads the active version (SB13, DR6) and passes it as `--expect-active <v>`; an activation
+ * that landed after that read moves it, and the switch refuses SETTINGS_ACTIVE_VERSION_MOVED before anything is written
+ * (the switch would otherwise plan on, or undo, a version the guide never saw).
+ */
+function assertExpectedActive(settings, fromKey, expectActive) {
+  if (expectActive === null) return;
+  const effectiveActive = effectiveActiveOf(settings, fromKey);
+  if (effectiveActive !== expectActive) refuse('SETTINGS_ACTIVE_VERSION_MOVED', { expected: expectActive, effectiveActive });
+}
+
+async function runSwitch({ to, from, oldPairStopped, rollback, activate = null, expectActive = null, settings: planned = null, layout, io }) {
   requireLabel(to); requireLabel(from);
   if (to === from) refuse('SWITCH_PRECONDITION_FAILED', ['labels']);
   const recordedBy = rollback ? ROLLBACK_BY : RECORDED_BY;
   const { toKey, fromKey, watch } = await preconditions({ to, from, oldPairStopped, rollback, layout, io });
   const settings = planned ?? await settingsPlan(io, { newKey: toKey, labels: [to, from], activate,
     next: `${toolOf(layout)} switch --to ${to} --from ${from}${oldPairStopped ? ' --old-pair-stopped' : ''} --activate <a version it passed>` });
-  if (!rollback) await forwardActivationGates(io, { to, toKey, activate, settings });
+  assertExpectedActive(settings, fromKey, expectActive);
+  if (!rollback) await forwardActivationGates(io, { to, fromKey, settings });
   const tally = { edgeFailures: 0 };
   try {
     await recordSwitch(io, { newKey: toKey, expectedCurrentKey: fromKey, seconds: TAKE_TRAFFIC_AFTER_S, recordedBy, settings, reason: rollback ? 'rollback to' : 'release switch to' });
@@ -712,9 +732,9 @@ export async function finishSwitch({ to, from, oldPairStopped = false, layout = 
 }
 
 /** Side-by-side spec §6: switch the site from release `from` (current) to release `to` (STAGED, its three units up). */
-export async function switchRelease({ to, from, oldPairStopped = false, activate = null, layout = LAYOUT, deps = {} }) {
-  if (activate !== null && !(Number.isSafeInteger(activate) && SETTINGS_VERSION.test(String(activate)))) refuse('ARGUMENTS_REFUSED');
-  return runSwitch({ to, from, oldPairStopped: oldPairStopped === true, rollback: false, activate, layout, io: withDefaults(layout, deps) });
+export async function switchRelease({ to, from, oldPairStopped = false, activate = null, expectActive = null, layout = LAYOUT, deps = {} }) {
+  for (const value of [activate, expectActive]) if (value !== null && !(Number.isSafeInteger(value) && SETTINGS_VERSION.test(String(value)))) refuse('ARGUMENTS_REFUSED');
+  return runSwitch({ to, from, oldPairStopped: oldPairStopped === true, rollback: false, activate, expectActive, layout, io: withDefaults(layout, deps) });
 }
 
 /** What the switch line says about its settings step: the pointer it expected and the version it activated (or null). */
@@ -865,8 +885,9 @@ async function rollbackAfterSwitch({ to, from, layout, io }) {
   if (!gatesActive) fields.push('gates');
   if (await io.pathExists(`${layout.lockRoot}/${MAINTENANCE_PENDING_NAME}`)) fields.push('maintenance');
   if (fields.length) refuse('ROLLBACK_PRECONDITION_FAILED', fields);
-  // Spec §11: the older release's settings, planned before anything is touched (its latest still-passing version, D1).
-  const settings = await settingsPlan(io, { newKey: toKey, labels: [to, from], activate: 'latest-passed' });
+  // Spec §11, ruling R78: the older release's settings, planned before anything is touched (the operator keeps the pointer
+  // when it passed it, else re-activates what was last active on it, else its own site version, D1).
+  const settings = await settingsPlan(io, { newKey: toKey, labels: [to, from], activate: 'rollback' });
 
   await io.disarmTimers({ label: to });
   if (state !== 'STAGED') await recordEvent(io, { releaseKey: toKey, kind: 'STAGED', recordedBy: ROLLBACK_BY, written: after => after.state === 'STAGED' });
@@ -951,15 +972,22 @@ export async function rollbackRelease({ to, from, beforeSwitch = false, layout =
  * first release's `switch --to <label>` (no `--from`) is a shape only where the layout enables instances (the public
  * server); the preview's first release is its transition's `seed`.
  */
+/** The plain switch's trailing options (S15 `--activate <v>`, final fix wave S10 `--expect-active <v>`), each once. */
+const SWITCH_OPTIONS = Object.freeze({ '--activate': 'activate', '--expect-active': 'expectActive' });
 function parseArguments(input, layout) {
-  // `switch --to <new> --from <old> [--old-pair-stopped] --activate <v>` (S15): the pair comes last, then the shapes below.
-  const withActivate = input[0] === 'switch' && input.length >= 7 && input.at(-2) === '--activate';
-  if (withActivate && !SETTINGS_VERSION.test(input.at(-1) ?? '')) refuse('ARGUMENTS_REFUSED');
-  const activate = withActivate ? Number(input.at(-1)) : null;
-  const argv = withActivate ? input.slice(0, -2) : input;
+  // `switch --to <new> --from <old> [--old-pair-stopped] [--activate <v>] [--expect-active <v>]`: the pairs come last (in
+  // either order), then the shapes below.
+  const options = {};
+  let argv = input;
+  while (argv[0] === 'switch' && argv.length >= 7 && Object.hasOwn(SWITCH_OPTIONS, argv.at(-2))) {
+    const key = SWITCH_OPTIONS[argv.at(-2)];
+    if (Object.hasOwn(options, key) || !SETTINGS_VERSION.test(argv.at(-1) ?? '')) refuse('ARGUMENTS_REFUSED');
+    options[key] = Number(argv.at(-1));
+    argv = argv.slice(0, -2);
+  }
   const parsed = shapeOf(argv, layout);
-  if (activate !== null && (parsed.finish || parsed.first)) refuse('ARGUMENTS_REFUSED');
-  return activate === null ? parsed : { ...parsed, activate };
+  if (Object.keys(options).length > 0 && (parsed.finish || parsed.first)) refuse('ARGUMENTS_REFUSED');
+  return { ...parsed, ...options };
 }
 function shapeOf(argv, layout) {
   const [a, b, c, d, e, f, g] = argv;
@@ -978,7 +1006,7 @@ const COMMANDS = Object.freeze({
   seed: (args, layout, deps) => seedRelease({ label: args.label, layout, deps }),
   switch: (args, layout, deps) => (args.first ? firstSwitchRelease({ to: args.to, layout, deps })
     : args.finish ? finishSwitch({ to: args.to, from: args.from, oldPairStopped: args.oldPairStopped, layout, deps })
-      : switchRelease({ to: args.to, from: args.from, oldPairStopped: args.oldPairStopped, activate: args.activate ?? null, layout, deps })),
+      : switchRelease({ to: args.to, from: args.from, oldPairStopped: args.oldPairStopped, activate: args.activate ?? null, expectActive: args.expectActive ?? null, layout, deps })),
   rollback: (args, layout, deps) => (args.beforeSwitch ? rollbackRelease({ from: args.label, beforeSwitch: true, layout, deps }) : rollbackRelease({ to: args.to, from: args.from, layout, deps }))
 });
 const FAILED_EVENT = Object.freeze({ stage: 'PREVIEW_RELEASE_STAGE_REFUSED', seed: 'PREVIEW_RELEASE_SEED_REFUSED', switch: 'PREVIEW_RELEASE_SWITCH_REFUSED', rollback: 'PREVIEW_RELEASE_ROLLBACK_REFUSED' });

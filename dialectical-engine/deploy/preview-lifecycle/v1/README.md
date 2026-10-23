@@ -224,14 +224,21 @@ version in the same transaction. The first switch to a release while nothing was
 release's own site version. A new release that has not passed the active version refuses
 `SETTINGS_VERSION_NOT_PASSED` before anything is written, naming the versions it passed: run
 `settings-version.mjs check <label> <active version>`, or plan the switch with `switch --to <new> --from <old>
---activate <a version it passed>`. A rollback activates the older release's latest version that still passes, or its
-own site version; a revert puts back what the switch replaced. `release-check.mjs check` gains the line `SETTINGS`
-(and takes the same `--activate <v>`).
+--activate <a version it passed>`. A forward switch that activates a version other than the active one (the new
+release's own site version included) first runs the live gate check of an activation (ruling R80); `--expect-active <v>`
+refuses `SETTINGS_ACTIVE_VERSION_MOVED` before anything is written when the active version is not `v`. A rollback keeps
+the active version when the older release passed it, else re-activates the version last active while that release was
+current, else its own site version (ruling R78: never a version it only checked); a revert puts back what the switch
+replaced. `release-check.mjs check` gains the line `SETTINGS` (and takes the same `--activate <v>`).
 
 `settings-version.mjs` runs each check-version half from the release's own folder (`apps/runner/src/settings-check-cli.ts`
 and `apps/api/src/settings-check-cli.ts`, the files `pnpm settings:check-runner|settings:check-api` name) with the
 lock's pinned identity of its unit (`setpriv`) and that release's `<service>-<label>.env` values as its environment, and
-keeps both lines as `lifecycle-current-<label>/settings-check-<v>-<UTC>.json`. The operator commands
+keeps both lines as `lifecycle-current-<label>/settings-check-<v>-<UTC>.json`. Every file it hands the operator (the
+lines, the receipt, the line-up and target models, the gate answers) is root's, mode 0640, in the group the operator
+runs as (`postgres`'s primary group, read through `getent`). The operator never records a FAIL for the current
+release's active version (`SETTINGS_VERDICT_ACTIVE_PAIR`: the codes, then one plain line; activate another passed
+version first). The operator commands
 (`cli.ts verdict|activate|status`) run as `postgres` through the server's own socket (libpq's `PGHOST`/`PGPORT`/
 `PGDATABASE`/`PGUSER`), the principal `release-table.mjs` uses. `activate` first reads both gates' read-only
 `/remaining` (the sockets from the current release's API env file) and hands the answers to the operator, which refuses

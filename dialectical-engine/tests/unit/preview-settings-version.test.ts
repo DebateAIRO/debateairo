@@ -2,13 +2,17 @@
 // deploy/preview-lifecycle/v1/settings-version.mjs. Fake runners only: no server, no database, no gate, no AI call.
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
+import { mkdir, mkdtemp, stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 const settings = await import('../../deploy/' + 'preview-lifecycle/v1/settings-version.mjs');
 const common = await import('../../deploy/' + 'preview-lifecycle/v1/common.mjs');
 
-const { CHECK_HINTS, GATE_CODE_FILES, GATE_HELPER_FILE, HALF_ENTRIES, OPERATOR_ENTRY, OPERATOR_IMPORTS, RECEIPT_SCHEMA, RELEASE_GATE_HELPER, SEATABLE_ENV_SCHEMA, activateSettings,
-  checkHalfArgv, checkSettingsGatesLive, checkSettingsVersion, gateHelperDifferences, gateSockets, hintFor, main, operatorArgv, planSettingsForSwitch,
-  seatableEnvironmentText, settingsStatus } = settings;
+const { ACTIVE_PAIR_FAIL_LINE, CHECK_HINTS, GATE_CODE_FILES, GATE_HELPER_FILE, HALF_ENTRIES, OPERATOR_ENTRY, OPERATOR_IMPORTS, RECEIPT_SCHEMA, RELEASE_GATE_HELPER, SEATABLE_ENV_SCHEMA,
+  activateSettings, checkHalfArgv, checkSettingsGatesLive, checkSettingsVersion, gateHelperDifferences, gateSockets, hintFor, main, operatorArgv, operatorGroupGid,
+  planSettingsForSwitch, seatableEnvironmentText, settingsStatus } = settings;
+const operatorModule = await import('../../tools/settings-version/' + 'settings-operator.js');
 const LAYOUT = common.LAYOUT;
 const NODE = '/usr/local/lib/nodejs/bin/node';
 // Keys are built from pieces (the secret scanner reads r<n>-<12 hex> as a key).
@@ -227,6 +231,12 @@ describe('check <label> <version>', () => {
       expect(operatorCalls(h.calls)).toEqual([]);
       expect(Object.keys(h.files)).toEqual([`${CURRENT_NEW}/settings-check-21-${STAMP}.json`]);
     }
+    // Ruling R77: a FAIL on the active pair is refused by the operator (exit 5): its code, the check's codes with their hints.
+    const codes = ['SETTINGS_NEEDS_ENV_CHANGE:TARGET:claude-haiku-5-5'];
+    const activePair = host({ halves: { runner: result(`${checkLine('runner', codes)}\n`, 1), api: result(`${checkLine('api')}\n`, 0) },
+      operator: () => result('', 5, `DEBATEAI_SETTINGS_REFUSED {"command":"verdict","code":"SETTINGS_VERDICT_ACTIVE_PAIR","codes":${JSON.stringify(codes)}}\n${ACTIVE_PAIR_FAIL_LINE}\n`) });
+    expect(await refusal(checkSettingsVersion({ label: NEW, version: 21, layout: LAYOUT, deps: activePair.deps }))).toMatchObject({ code: 'SETTINGS_VERDICT_ACTIVE_PAIR',
+      fields: { receipt: `${CURRENT_NEW}/settings-check-21-${STAMP}.json`, codes, hints: [{ code: codes[0], hint: CHECK_HINTS.SETTINGS_NEEDS_ENV_CHANGE }] } });
     // A bad report (the operator refuses it): its code, nothing recorded.
     const bad = host({ operator: () => result('', 2, 'DEBATEAI_SETTINGS_REFUSED {"command":"verdict","code":"SETTINGS_CHECK_REPORT_INVALID"}\n') });
     expect((await refusal(checkSettingsVersion({ label: NEW, version: 21, layout: LAYOUT, deps: bad.deps }))).code).toBe('SETTINGS_CHECK_REPORT_INVALID');
@@ -383,7 +393,10 @@ describe('the gate-code fingerprint and the live check for a switch (addition D2
   it('one plain hint line per new code', () => {
     for (const code of ['SETTINGS_GATE_THINKING_UNREVIEWED:Qwen/Qwen3.8-Flash:high', 'SETTINGS_GATE_TOKEN_CEILING:synthesizerCallBound:zai-org/GLM-5.3-Flash',
       'SETTINGS_GATE_HELPER_DIFFERS:anthropic', 'PREVIEW_LINE_UP_REQUIRED', 'SETTINGS_CHECK_DETAIL_UNPRINTABLE',
-      'SETTINGS_GATE_MODEL_DISABLED:deepinfra:zai-org/GLM-5.3-Flash', 'SETTINGS_GATE_UNANSWERED:anthropic', 'SETTINGS_GATE_LIVE_CHECK_FAILED']) {
+      'SETTINGS_GATE_MODEL_DISABLED:deepinfra:zai-org/GLM-5.3-Flash', 'SETTINGS_GATE_UNANSWERED:anthropic', 'SETTINGS_GATE_LIVE_CHECK_FAILED',
+      // Final fix wave S6: the loaders' line-up and thinking codes the API half reports as they are.
+      'PREVIEW_THINKING_LEVELS_INVALID:level:Qwen/Qwen3.8-Flash', 'PREVIEW_LINE_UP_POLICY_INVALID:maker_rule', 'PREVIEW_LINE_UP_ENV_CONFLICT',
+      'PREVIEW_SCORECARD_CONFLICT']) {
       const hint = hintFor(code);
       expect(hint, code).not.toBe(CHECK_HINTS.DEFAULT);
       expect(hint, code).toMatch(/^[a-z][^\n]*[a-z)]$/u);
@@ -405,8 +418,10 @@ describe('the switch\'s settings plan (ruling R12)', () => {
     // A rollback to a release that predates §13: the newer release's operator plans it.
     const older = host({ existing: [`${engine(NEW, 'api')}/${OPERATOR_ENTRY}`],
       operator: plan(`DEBATEAI_SETTINGS_SWITCH_PLAN {"releaseKey":"${OLD_KEY}","expectedActiveSettings":"20","activate":"19"}\n`) });
-    expect(await planSettingsForSwitch({ newKey: OLD_KEY, labels: [OLD, NEW], activate: 'latest-passed', layout: LAYOUT, deps: older.deps })).toEqual({ expectedActiveSettings: 20, activate: 19, planned: true });
-    expect(operatorCalls(older.calls)[0]!.argv.slice(-3)).toEqual(['switch-plan', OLD_KEY, '--latest-passed']);
+    expect(await planSettingsForSwitch({ newKey: OLD_KEY, labels: [OLD, NEW], activate: 'rollback', layout: LAYOUT, deps: older.deps })).toEqual({ expectedActiveSettings: 20, activate: 19, planned: true });
+    // Ruling R78: the rollback's choice is the operator's (switch-plan --rollback: keep, last active on that release, site).
+    expect(operatorCalls(older.calls)[0]!.argv.slice(-3)).toEqual(['switch-plan', OLD_KEY, '--rollback']);
+    expect((await refusal(planSettingsForSwitch({ newKey: OLD_KEY, labels: [OLD, NEW], activate: 'latest-passed', layout: LAYOUT, deps: host().deps }))).code).toBe('ARGUMENTS_REFUSED');
     const pinned = host({ existing: [`${engine(NEW, 'api')}/${OPERATOR_ENTRY}`],
       operator: plan(`DEBATEAI_SETTINGS_SWITCH_PLAN {"releaseKey":"${NEW_KEY}","expectedActiveSettings":"19","activate":"21"}\n`) });
     await planSettingsForSwitch({ newKey: NEW_KEY, labels: [NEW, OLD], activate: 21, layout: LAYOUT, deps: pinned.deps });
@@ -515,6 +530,62 @@ describe('settings-version.mjs (root CLI)', () => {
       const h = host();
       expect(JSON.parse((await cli(['status'], h.deps, actor)).stderr).reason).toBe('ACTOR_REFUSED');
       expect(h.calls).toEqual([]);
+    }
+  });
+
+  it('ruling R77: a check whose FAIL would hit the active pair prints its refusal with the codes and hints, then the loud plain line; exit 1, nothing recorded', async () => {
+    const codes = ['SETTINGS_HASH_UNDECLARED:mapContractHash'];
+    const h = host({ halves: { runner: result(`${checkLine('runner', codes)}\n`, 1), api: result(`${checkLine('api')}\n`, 0) },
+      operator: () => result('', 5, `DEBATEAI_SETTINGS_REFUSED {"command":"verdict","code":"SETTINGS_VERDICT_ACTIVE_PAIR","codes":${JSON.stringify(codes)}}\n${ACTIVE_PAIR_FAIL_LINE}\n`) });
+    const out = await cli(['check', NEW, '21'], h.deps);
+    expect([out.code, out.stdout]).toEqual([1, '']);
+    const [refused, plain, ...rest] = out.stderr.split('\n');
+    expect(JSON.parse(refused!)).toEqual({ event: 'PREVIEW_SETTINGS_CHECK_REFUSED', label: NEW, reason: 'SETTINGS_VERDICT_ACTIVE_PAIR',
+      fields: { receipt: `${CURRENT_NEW}/settings-check-21-${STAMP}.json`, codes, hints: [{ code: codes[0], hint: CHECK_HINTS.SETTINGS_HASH_UNDECLARED }] } });
+    expect([plain, rest]).toEqual([ACTIVE_PAIR_FAIL_LINE, ['']]);
+    // The same plain words as the operator module's (one source of the sentence each side; pinned equal here).
+    expect(ACTIVE_PAIR_FAIL_LINE).toBe(operatorModule.ACTIVE_PAIR_FAIL_LINE);
+  });
+});
+
+describe('the files root hands the operator (final fix wave S11)', () => {
+  it('the operator\'s group is postgres\'s primary group, read through getent; anything else refuses OPERATOR_GROUP_UNKNOWN', async () => {
+    const runs: string[][] = [];
+    const run = (stdout: string, code = 0) => async (argv: string[]) => { runs.push(argv); return result(stdout, code); };
+    expect(await operatorGroupGid({ layout: LAYOUT, run: run('postgres:x:105:112:PostgreSQL administrator,,,:/var/lib/postgresql:/bin/bash\n') })).toBe(112);
+    expect(runs[0]).toEqual(['/usr/bin/getent', 'passwd', 'postgres']);
+    for (const [stdout, code] of [['', 2], ['postgres:x:105:0:root group:/var/lib/postgresql:/bin/bash\n', 0], ['other:x:105:112::/:/bin/sh\n', 0], ['postgres:x:105\n', 0],
+      ['postgres:x:105:abc::/:/bin/sh\n', 0]] as const) {
+      expect((await refusal(operatorGroupGid({ layout: LAYOUT, run: run(stdout, code) }))).code, stdout).toBe('OPERATOR_GROUP_UNKNOWN');
+    }
+  });
+
+  it('every file root writes for the operator is 0640, root\'s, in the group the operator runs as (never world-readable)', async () => {
+    const uid = process.getuid!(), gid = process.getgid!();
+    const artifactsRoot = await mkdtemp(join(tmpdir(), 'finalfix-ops-s11-'));
+    const layout = { ...LAYOUT, artifactsRoot, ownerUid: uid, ownerGid: gid };
+    const folder = join(artifactsRoot, `lifecycle-current-${NEW}`);
+    await mkdir(folder, { mode: 0o755 });
+    const h = host();
+    let asked = 0;
+    const deps: Record<string, unknown> = { ...h.deps, operatorGid: async () => { asked += 1; return gid; } };
+    delete deps.writeFile;
+    const r = await checkSettingsVersion({ label: NEW, version: 21, layout, deps });
+    const written = [r.receipt, `${folder}/settings-check-21-${STAMP}-runner.txt`, `${folder}/settings-check-21-${STAMP}-api.txt`];
+    for (const path of written) {
+      const info = await stat(path);
+      expect([info.mode & 0o777, info.uid, info.gid], path).toEqual([0o640, uid, gid]);
+    }
+    // The group is read once per command, before the first file.
+    expect(asked).toBe(1);
+    // The switch's live check: the hand-over and each gate answer the same way.
+    const live = host({ operator: () => result('DEBATEAI_SETTINGS_GATES_SERVE {"version":"21"}\n') });
+    const liveDeps: Record<string, unknown> = { ...live.deps, operatorGid: async () => gid };
+    delete liveDeps.writeFile;
+    await checkSettingsGatesLive({ label: NEW, version: 21, layout, deps: liveDeps });
+    for (const name of ['seatable-env', 'deepinfra-remaining', 'anthropic-remaining']) {
+      const info = await stat(`${folder}/settings-switch-${STAMP}-${name}.json`);
+      expect([info.mode & 0o777, info.gid], name).toEqual([0o640, gid]);
     }
   });
 });
