@@ -123,6 +123,39 @@ describe('the preview release guide: transition T, side by side, the way back, t
     expect(calls).toBeGreaterThanOrEqual(11);
   });
 
+  it('R21: SB4 and SB7 refuse, before anything is written, when the postgres administrator cannot reach the hatchet database; TA0 prints it', () => {
+    const admin = `runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d hatchet -XAt -c 'SELECT 1' >/dev/null`;
+    const fix = "'local postgres,debateai postgres peer map=preview_root' becomes 'local postgres,debateai,hatchet postgres peer map=preview_root'";
+    for (const step of ['SB4', 'SB7']) {
+      const lines = scriptOf(step).lines;
+      const count = lines.findIndex(line => line.startsWith('HC=$(psqlq "SELECT count(*) FROM pg_database WHERE datname = \'hatchet\'")') && line.includes(`${step}_NOT_DONE`));
+      const check = lines.findIndex(line => line.startsWith(`if [ "$HC" = 1 ]; then ${admin} || { echo "${step}_NOT_DONE: the postgres administrator cannot connect to the hatchet database`));
+      // The count, then the check on the next line (after the names line and the step's own settings).
+      expect(count, step).toBeGreaterThan(1);
+      expect(check, step).toBe(count + 1);
+      // The refusal names the pg_hba change R21 made, and the owner's yes it needs.
+      expect(lines[check], step).toContain(fix);
+      expect(lines[check], step).toContain('pg_hba_file_rules');
+      expect(lines[check], step).toContain("the owner's yes first");
+    }
+    // SB7 checks before it makes its folder; SB4 before the release check.
+    const sb7 = scriptOf('SB7').lines;
+    expect(sb7.findIndex(line => line.startsWith('if [ "$HC" = 1 ]'))).toBeLessThan(sb7.indexOf('install -d -o root -g root -m 0700 "$OB"'));
+    const sb4 = scriptOf('SB4').lines;
+    expect(sb4.findIndex(line => line.startsWith('if [ "$HC" = 1 ]'))).toBeLessThan(sb4.findIndex(line => line.includes('lc release-check.mjs check')));
+    // TA0 (read-only) prints whether the administrator gets in, right after where Hatchet's database lives.
+    const ta0 = scriptOf('TA0').lines;
+    const where = ta0.findIndex(line => line.includes('HATCHET_DATABASE_IN_THIS_CLUSTER yes'));
+    expect(ta0[where + 1]).toBe(`if grep -qx hatchet "$P/pg-databases"; then if ${admin} 2>&1; then echo "HATCHET_DATABASE_ADMIN_CONNECT yes"; else echo "HATCHET_DATABASE_ADMIN_CONNECT no"; fi; fi`);
+    expect(sectionOf(guide, '### TA0. Preflight and captures').replace(/\s+/g, ' ')).toContain('`HATCHET_DATABASE_ADMIN_CONNECT no` means');
+    // SB7 records what R21 needed: both server fixes, and that the tool now takes the empty postgres database.
+    const sb7Section = sectionOf(guide, '### SB7. The online backup').replace(/\s+/g, ' ');
+    expect(sb7Section).toContain('**What R21 needed (23 October 2026).**');
+    expect(sb7Section).toContain('`local postgres,debateai,hatchet postgres peer map=preview_root`');
+    expect(sb7Section).toContain('COMMENT ON SCHEMA public');
+    expect(sb7Section).toContain('`listingValid`');
+  });
+
   it('the transition\'s drain guard counts waiting debates', () => {
     const tb1 = scriptOf('TB1').lines;
     const guard = '[ "$(psqlq "SELECT count(*) FROM core.run_waiting_v")" = 0 ] || { echo "TB1_NOT_DONE: a debate is waiting in line (nothing was stopped): ask"; exit 1; }';

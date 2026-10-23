@@ -9,6 +9,17 @@ const common = await import('../../deploy/' + 'preview-lifecycle/v1/common.mjs')
 
 const me = { uid: process.getuid!(), gid: process.getgid!() };
 const listing = ';\n; Archive created at 2026-10-10 03:15:01 EEST\n;     dbname: debateai\n;\n215; 1259 16390 TABLE identity user_account debateai_prod_migrator\n4120; 0 16390 TABLE DATA identity user_account debateai_prod_migrator\n';
+/**
+ * What PostgreSQL 18's `pg_restore --list` prints for a database with no objects (R21's built-in `postgres` database,
+ * 2026-10-23: 15 lines, no entry). `TOC Entries` counts the archive's internal entries (encoding, search path), which
+ * the listing never shows, so it is not 0. `drop` leaves out the header lines that contain any of its texts.
+ */
+const emptyListing = (dbname: string, drop: string[] = []) => [
+  ';', '; Archive created at 2026-10-23 08:39:28 UTC', `;     dbname: ${dbname}`, ';     TOC Entries: 3', ';     Compression: gzip',
+  ';     Dump Version: 1.16-0', ';     Format: CUSTOM', ';     Integer: 4 bytes', ';     Offset: 8 bytes',
+  ';     Dumped from database version: 18.6 (Ubuntu 18.6-0ubuntu0.26.04.1)', ';     Dumped by pg_dump version: 18.6 (Ubuntu 18.6-0ubuntu0.26.04.1)',
+  ';', ';', '; Selected TOC Entries:', ';', ''
+].filter(line => !drop.some(text => line.includes(text))).join('\n');
 function server(existing: string[] = [], dirMode = 0o700) {
   const base = realpathSync(mkdtempSync(join(tmpdir(), 'lifecycle-backup-')));
   const layout = { ...common.LAYOUT, ownerUid: me.uid, ownerGid: me.gid, backupDir: join(base, 'backups') };
@@ -57,7 +68,9 @@ describe('nightly preview database backup', () => {
     ['the dump is empty', { dump: async () => ({ code: 0, timedOut: false, overflow: false, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) }) }, 'DUMP_FAILED'],
     ['pg_restore cannot list it', { list: async () => { throw new Error('pg_restore: error: input file does not appear to be a valid archive'); } }, 'VERIFY_FAILED'],
     ['the listing has no archive header', { list: async () => 'garbage\n' }, 'VERIFY_FAILED'],
-    ['the listing has no entries', { list: async () => ';\n; Archive created at 2026-10-10\n;\n' }, 'VERIFY_FAILED']
+    ['the listing has no entries', { list: async () => ';\n; Archive created at 2026-10-10\n;\n' }, 'VERIFY_FAILED'],
+    // Only the built-in `postgres` database may be empty: an empty archive of the preview database is refused.
+    ['the listing is a complete archive with no entries', { list: async () => emptyListing('debateai') }, 'VERIFY_FAILED']
   ])('keeps every earlier dump and leaves no partial file when %s', async (_name, overrides, code) => {
     const old = Array.from({ length: 7 }, (_, i) => `debateai-preview-2026100${i + 1}T001500Z.dump`);
     const layout = server(old);
@@ -139,7 +152,7 @@ describe('online backup before side-by-side migrations', () => {
    * The preview's commands behind `run`: psql lists the databases, pg_dump/pg_dumpall/tar write to the file they are
    * handed. `realTar` hands tar to this machine's real tar instead (the content must really be stored).
    */
-  function fakeServer(t: Tree, options: Partial<{ databases: string; restoreList: string; tarList: string; fail: string; realTar: boolean }> = {}) {
+  function fakeServer(t: Tree, options: Partial<{ databases: string; restoreList: string | ((stdin: string) => string); tarList: string; fail: string; realTar: boolean }> = {}) {
     const o = { databases: 'debateai\nhatchet\npostgres\n', restoreList: listing, tarList: '', fail: '', realTar: false, ...options };
     const calls: { argv: string[]; stdin?: string }[] = [];
     const run = async (argv: string[], opts: { env: Record<string, string>; stdin?: Buffer | number; stdoutFd?: number; timeoutMs: number; maxOutputBytes: number }) => {
@@ -151,7 +164,7 @@ describe('online backup before side-by-side migrations', () => {
       if (o.fail && program.endsWith(o.fail)) return done('', 1);
       if (program.endsWith('/psql')) return done(o.databases);
       if (program.endsWith('/pg_dump')) { writeSync(opts.stdoutFd!, `PGDMP-${argv.at(-1)!.slice('--dbname='.length)}`); return done(); }
-      if (program.endsWith('/pg_restore')) return done(o.restoreList);
+      if (program.endsWith('/pg_restore')) return done(typeof o.restoreList === 'function' ? o.restoreList(stdin ?? '') : o.restoreList);
       if (program.endsWith('/pg_dumpall')) { writeSync(opts.stdoutFd!, 'CREATE ROLE debateai_runtime;\n'); return done(); }
       if (program === '/usr/bin/tar' && argv.includes('-cf')) { writeSync(opts.stdoutFd!, 'TAR-synthetic'); return done(); }
       if (program === '/usr/bin/tar' && argv.includes('-tvf')) return done(o.tarList || verbose(t));
@@ -274,6 +287,34 @@ describe('online backup before side-by-side migrations', () => {
   });
 
   const DUMPS = ['online-debateai.dump', 'online-hatchet.dump', 'online-postgres.dump'];
+  /** Each database's listing: `PGDMP-<name>` is what the fake pg_dump wrote, and pg_restore reads it from its stdin. */
+  const listingFor = (special: Record<string, string>) => (stdin: string) => special[stdin.slice('PGDMP-'.length)] ?? listing;
+
+  it("R21: accepts the built-in postgres database's archive when it is complete but lists no entry (that database is empty)", async () => {
+    const t = outFolder();
+    const server = fakeServer(t, { restoreList: listingFor({ postgres: emptyListing('postgres') }) });
+    const event = await backup.runOnlineBackup({ out: t.out, envPaths: envs(t), layout: t.layout, deps: { run: server.run } });
+    expect(event.event).toBe('PREVIEW_ONLINE_BACKUP_OK');
+    expect(event.databases).toEqual(['debateai', 'hatchet', 'postgres']);
+    expect(readdirSync(t.out).sort()).toEqual([...DUMPS, 'online-globals.sql', 'online-keys.tar', 'online.sha256'].sort());
+  });
+
+  it.each([
+    ['an empty archive of a database that must hold objects (hatchet)', { hatchet: emptyListing('hatchet') }, ['online-debateai.dump', 'online-hatchet.dump']],
+    ['an empty postgres archive with no header at all', { postgres: 'garbage\n' }, DUMPS],
+    ['an empty postgres archive cut short before its "Selected TOC Entries" line', { postgres: emptyListing('postgres', ['Selected TOC Entries']) }, DUMPS],
+    ['an empty postgres archive with no format line', { postgres: emptyListing('postgres', ['Format:']) }, DUMPS],
+    ['an empty postgres archive with no pg_dump version line', { postgres: emptyListing('postgres', ['Dumped by']) }, DUMPS],
+    ['an empty postgres archive with no table-of-contents count', { postgres: emptyListing('postgres', ['TOC Entries: 3']) }, DUMPS],
+    ['an empty archive whose header names another database', { postgres: emptyListing('debateai') }, DUMPS],
+    ['an empty postgres archive in another format', { postgres: emptyListing('postgres').replace('Format: CUSTOM', 'Format: TAR') }, DUMPS]
+  ])('refuses %s (VERIFY_FAILED), keeps what it wrote and writes no sums', async (_name, special, left) => {
+    const t = outFolder();
+    const server = fakeServer(t, { restoreList: listingFor(special) });
+    await expect(backup.runOnlineBackup({ out: t.out, envPaths: envs(t), layout: t.layout, deps: { run: server.run } })).rejects.toMatchObject({ code: 'VERIFY_FAILED' });
+    expect(readdirSync(t.out).sort()).toEqual([...left].sort());
+  });
+
   it.each([
     ['a dump that pg_restore cannot list', () => ({ restoreList: 'garbage\n' }), 'VERIFY_FAILED', ['online-debateai.dump']],
     ['a key archive that lacks a key store', (t: Tree) => ({ tarList: `-rw------- root/root 9 2026-10-22 01:00 ${rel(t.keys.KEK_PATH)}\n` }), 'VERIFY_FAILED', [...DUMPS, 'online-globals.sql', 'online-keys.tar']],
