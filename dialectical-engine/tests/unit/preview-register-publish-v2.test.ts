@@ -801,8 +801,20 @@ describe('publish kit v2: the optional previewLineUpPolicy row and the answer se
       [{ ...LIVE, free_model_ids: [GLM] }, undefined, 'PREVIEW_LINE_UP_POLICY_INVALID:maker_rule'],
       [{ ...LIVE, premium_model_ids: [GLM, 'not/a-reviewed-model'] }, undefined, 'PREVIEW_LINE_UP_POLICY_INVALID:premium_model_ids:unreviewed'],
       [undefined, { writer: HAIKU_REF, checker: HAIKU_REF }, 'PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seats-writer-is-checker'],
-      [undefined, { writer: 'preview:not-reviewed', checker: HAIKU_REF }, 'PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seat-unreviewed']
+      [undefined, { writer: 'preview:not-reviewed', checker: HAIKU_REF }, 'PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seat-unreviewed'],
+      // Ruling R28 (final fix wave F3): the storyteller as its own story checker, printed like R27b's code.
+      [undefined, { writer: HAIKU_REF, checker: PREVIEW_EVALUATOR_ROLE_REF, storyteller: PREVIEW_DEEPSEEK_CHECKER_ROLE_REF, storyChecker: PREVIEW_DEEPSEEK_CHECKER_ROLE_REF },
+        'PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seats-storyteller-is-story-checker']
     ] as const) expect(op.operatorRefusalLine(await thrown(() => build(lineUp, seatsChoice)))).toBe(`${line}\n`);
+    // Final fix wave S14: a plain model id or step name the owner typed is printed whole (a 23-character run is not key-shaped)…
+    for (const plain of [`PREVIEW_THINKING_LEVELS_INVALID:model:${GLM}`, `PREVIEW_THINKING_LEVELS_INVALID:step:${QWEN}:cross_exchange`,
+      `PREVIEW_THINKING_LEVELS_INVALID:model:${'m'.repeat(23)}`, 'PREVIEW_THINKING_LEVELS_INVALID:model:meta-llama/Llama-3.3-70B-Instruct-Turbo'])
+      expect(op.operatorRefusalLine(new TypeError(plain))).toBe(`${plain}\n`);
+    // …while a key-shaped detail (a 24+ letter/digit run, a '//', a vendor sk- prefix) in a model or a step part is withheld.
+    const awsShaped = 'AKIA' + 'ABCDEFGHIJ' + '0123456789';
+    for (const keyShaped of [`model:${'k'.repeat(24)}`, `model:${awsShaped}`, 'model:unix//run/debateai/budget.sock', `step:${GLM}:${'s'.repeat(24)}`,
+      `step:${GLM}:a//b`, 'model:sk-proj-x', `level:${awsShaped}:low`])
+      expect(op.operatorRefusalLine(new TypeError(`PREVIEW_THINKING_LEVELS_INVALID:${keyShaped}`))).toBe('PREVIEW_NATIVE_OPERATION_REFUSED\n');
     // An unrelated failure, a code with a free-text tail, a key-shaped or overlong detail, or a non-error: opaque, as before.
     for (const other of [new TypeError('PREVIEW_REGISTER_SNAPSHOT_REFUSED: hosted-story-rows'), new TypeError('PREVIEW_LINE_UP_POLICY_INVALID:maker_rule and more'),
       new TypeError(`PREVIEW_THINKING_LEVELS_INVALID:model:${'k'.repeat(40)}`), new TypeError('PREVIEW_THINKING_LEVELS_INVALID:model:sk-ant-api03-x'),
@@ -860,7 +872,12 @@ describe('publish kit v2: the optional previewLineUpPolicy row and the answer se
     ['an array', [HAIKU_REF], 'answer-seats-choice'],
     // Ruling R27b: one AI must not check its own answer.
     ['the writer as its own checker', { writer: HAIKU_REF, checker: HAIKU_REF }, 'answer-seats-writer-is-checker'],
-    ['GLM\'s writer ref as its own checker, with story seats elsewhere', { writer: PREVIEW_SYNTHESIZER_ROLE_REF, checker: PREVIEW_SYNTHESIZER_ROLE_REF, storyteller: HAIKU_REF, storyChecker: PREVIEW_EVALUATOR_ROLE_REF }, 'answer-seats-writer-is-checker']
+    ['GLM\'s writer ref as its own checker, with story seats elsewhere', { writer: PREVIEW_SYNTHESIZER_ROLE_REF, checker: PREVIEW_SYNTHESIZER_ROLE_REF, storyteller: HAIKU_REF, storyChecker: PREVIEW_EVALUATOR_ROLE_REF }, 'answer-seats-writer-is-checker'],
+    // Ruling R28 (final fix wave F3): the storyteller never checks its own story; the effective seats count
+    // (storyteller ?? writer, storyChecker ?? checker).
+    ['the storyteller as its own story checker', { writer: HAIKU_REF, checker: PREVIEW_EVALUATOR_ROLE_REF, storyteller: PREVIEW_DEEPSEEK_CHECKER_ROLE_REF, storyChecker: PREVIEW_DEEPSEEK_CHECKER_ROLE_REF }, 'answer-seats-storyteller-is-story-checker'],
+    ['a storyteller seated on the checker, the story checker following the checker', { writer: HAIKU_REF, checker: PREVIEW_EVALUATOR_ROLE_REF, storyteller: PREVIEW_EVALUATOR_ROLE_REF }, 'answer-seats-storyteller-is-story-checker'],
+    ['a story checker seated on the writer, the storyteller following the writer', { writer: HAIKU_REF, checker: PREVIEW_EVALUATOR_ROLE_REF, storyChecker: HAIKU_REF }, 'answer-seats-storyteller-is-story-checker']
   ])('(4) refuses %s, by its own rule, before building any row', async (_name, choice, rule) => {
     await expect(build(null, choice)).rejects.toThrow(`PREVIEW_REGISTER_SNAPSHOT_REFUSED: ${rule}`);
     await expect(build(null, choice, undefined, { ...runtime, nodeVersion: 'v22.23.1' })).rejects.toThrow(`PREVIEW_REGISTER_SNAPSHOT_REFUSED: ${rule}`);
@@ -881,7 +898,11 @@ describe('publish kit v2: the optional previewLineUpPolicy row and the answer se
     expect(op.validateAnswerSeatsChoice(value)).toBe(value);
     expect(op.validateAnswerSeatsChoice({ writer: HAIKU_REF, checker: PREVIEW_EVALUATOR_ROLE_REF })).toBeTruthy();
     for (const bad of ['haiku', null, [], 7, { writer: HAIKU_REF }, { checker: HAIKU_REF }, { ...value, judge: HAIKU_REF }, { writer: HAIKU_REF, checker: '' }, { writer: HAIKU_REF, checker: 7 },
-      { writer: HAIKU_REF, checker: HAIKU_REF }]) // Ruling R27b: the writer never checks its own answer
+      { writer: HAIKU_REF, checker: HAIKU_REF }, // Ruling R27b: the writer never checks its own answer
+      // Ruling R28: nor the storyteller its own story, the effective seats counting (storyteller ?? writer, storyChecker ?? checker).
+      { ...value, storyteller: PREVIEW_DEEPSEEK_CHECKER_ROLE_REF, storyChecker: PREVIEW_DEEPSEEK_CHECKER_ROLE_REF },
+      { writer: HAIKU_REF, checker: PREVIEW_EVALUATOR_ROLE_REF, storyteller: PREVIEW_EVALUATOR_ROLE_REF },
+      { writer: HAIKU_REF, checker: PREVIEW_EVALUATOR_ROLE_REF, storyChecker: HAIKU_REF }])
       expect(() => op.validateAnswerSeatsChoice(bad)).toThrow('PREVIEW_NATIVE_PLAN_REFUSED');
     for (const operation of ['plan', 'publish']) expect(op.validateNativePlan({ ...plan, operation, answerSeats: value })).toBeTruthy();
     for (const operation of ['verify', 'apply-and-plan']) expect(() => op.validateNativePlan({ ...plan, operation, answerSeats: value })).toThrow('PREVIEW_NATIVE_PLAN_REFUSED');

@@ -486,6 +486,9 @@ describe('publish kit v3: the optional previewLineUpPolicy row and the answer se
     expect(await v3(null, { writer: 'preview:fixture-a', checker: DEEPSEEK_REF })).toEqual(await v3(null, null, { checker: 'deepseek', deepseekEnabledOnGate: true }));
     await expect(v3(null, { writer: 'preview:other', checker: GLM_B })).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seat-unreviewed');
     await expect(v3(null, { writer: HAIKU_REF, checker: GLM_B }, { checker: 'glm' })).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seats-with-checker-choice');
+    // Ruling R28 (final fix wave F3): the hosted kit refuses the storyteller as its own story checker too (effective seats).
+    for (const storyAlone of [{ writer: HAIKU_REF, checker: GLM_B, storyteller: DEEPSEEK_REF, storyChecker: DEEPSEEK_REF }, { writer: HAIKU_REF, checker: GLM_B, storyteller: GLM_B }])
+      await expect(v3(null, storyAlone)).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seats-storyteller-is-story-checker');
   });
 });
 

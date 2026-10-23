@@ -1074,6 +1074,9 @@ describe('native-plan: publish kit v2 (plan -> owner review -> publish -> verify
     ['an extra seat', ['--answer-seats', JSON.stringify({ ...SEATS, judge: SEATS.writer })]],
     // Ruling R27b: one AI must not check its own answer.
     ['the writer as its own checker', ['--answer-seats', JSON.stringify({ writer: SEATS.writer, checker: SEATS.writer })]],
+    // Ruling R28 (final fix wave F3): nor the storyteller its own story (storyteller ?? writer vs storyChecker ?? checker).
+    ['the storyteller as its own story checker', ['--answer-seats', JSON.stringify({ ...SEATS, storyteller: 'preview:deepseek-v4-1-flash', storyChecker: 'preview:deepseek-v4-1-flash' })]],
+    ['a storyteller seated on the checker', ['--answer-seats', JSON.stringify({ ...SEATS, storyteller: SEATS.checker })]],
     // One way to set the checker.
     ['beside --checker', ['--answer-seats', JSON.stringify(SEATS), '--checker', 'glm']],
     ['beside --checker deepseek', ['--answer-seats', JSON.stringify(SEATS), '--checker', 'deepseek', '--deepseek-enabled-on-gate', 'yes']]

@@ -90,7 +90,9 @@ export function validateLineUpChoice(value) {
 /**
  * The operator's optional four answer seats (addition D23; publish-register-v2.ts PreviewAnswerSeatsChoice): kit v2's eleventh
  * argument and kit v3's twelfth. `writer` and `checker` required, `storyteller` and `storyChecker` optional (they otherwise
- * follow the writer and the checker), each a non-empty text, the writer never its own checker (Ruling R27b). Shape only here: the kit refuses a ref outside the reviewed
+ * follow the writer and the checker), each a non-empty text, the writer never its own checker (Ruling R27b) and the
+ * storyteller never its own story checker (Ruling R28: `storyteller ?? writer` against `storyChecker ?? checker`; the
+ * release tool's --answer-seats runs this same check). Shape only here: the kit refuses a ref outside the reviewed
  * preview refs before any row is built. One way to set the checker: a plan may not carry both `answerSeats` and
  * `checkerChoice`. Like the checker choice, only plan and publish may carry it.
  */
@@ -100,6 +102,8 @@ export function validateAnswerSeatsChoice(value) {
  if(Object.values(value).some(ref=>typeof ref!=='string'||ref.length<1))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  // Ruling R27b (SA9 fix round 1): one AI must not check its own answer (the kit refuses it too, answer-seats-writer-is-checker).
  if(value.writer===value.checker)refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ // Ruling R28 (final fix wave F3): nor the storyteller its own story (the kit's answer-seats-storyteller-is-story-checker).
+ if((value.storyteller??value.writer)===(value.storyChecker??value.checker))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  return value;
 }
 /**
@@ -284,13 +288,17 @@ const DATABASE_AHEAD=/^PREVIEW_NATIVE_VERIFY_DATABASE_AHEAD: the database has st
  * seats, printed as its code so the owner learns why a plan stopped (nothing is sealed when it stops). Whole-message
  * matches only: the providers' and the register's line-up codes (`PREVIEW_LINE_UP_POLICY_INVALID:<member>[:list|unreviewed|duplicate]`,
  * `maker_rule`), the thinking parser's code-shaped detail (Ruling R65: `<what>[:<model>[:<step>]]`, each part at most 64
- * characters of the code alphabet) and the kit's `answer-seat…` rules. A thinking detail with a long unbroken run or a vendor
- * key prefix (what the practice's redaction blanks) is not printed: a model or step name the owner typed could be anything.
+ * characters of the code alphabet) and the kit's `answer-seat…` rules. A thinking detail is owner-typed (a model or step
+ * name could be anything, a pasted key or socket path included), so it follows the common rule of the final fix wave S14,
+ * shared with the practice's redaction and the runner's and API's journal `code` fields: printed whole only when every
+ * part is 1-64 characters of [A-Za-z0-9_./-] and the detail is not key-shaped (an unbroken run of 24 or more letters or
+ * digits, a '//', or a vendor `sk-` prefix); otherwise the line stays opaque.
  */
 const LINE_UP_REFUSAL=/^PREVIEW_LINE_UP_POLICY_INVALID:(?:value|members|maker_rule|kind|thinking_levels|(?:free_model_ids|premium_model_ids)(?::(?:list|unreviewed|duplicate))?)$/;
 const THINKING_REFUSAL=/^PREVIEW_THINKING_LEVELS_INVALID:(?:table|(?:model|entry|steps|level|step)(?::[A-Za-z0-9_./-]{1,64}){0,2})$/;
 const SEAT_REFUSAL=/^PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seat[a-z-]{0,48}$/;
-const KEY_SHAPED=/[A-Za-z0-9_-]{32,}|\bsk-/;
+/** Final fix wave S14: the common key-shaped rule (24+ letters/digits in one run, a '//', a vendor `sk-` prefix). */
+const KEY_SHAPED=/[A-Za-z0-9]{24,}|\/\/|\bsk-/;
 const isChoiceRefusal=message=>typeof message==='string'&&(LINE_UP_REFUSAL.test(message)||SEAT_REFUSAL.test(message)
  ||(THINKING_REFUSAL.test(message)&&!KEY_SHAPED.test(message.slice(message.indexOf(':')+1))));
 /**
