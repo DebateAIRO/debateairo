@@ -639,12 +639,14 @@ The file is checked before anything is spent, by the same checks the publish kit
 once, at least two makers on each plan when the line-up has more than one, each thinking level on that AI's reviewed menu): a refusal names why
 (`PRACTICE_LINE_UP_INVALID <code>:<detail>`, for example `PREVIEW_LINE_UP_POLICY_INVALID:maker_rule`), or
 `PRACTICE_LINE_UP_UNREADABLE`. Every AI of the line-up must be switched on at its gate: a debate AI the gate does not
-serve sits out, and the verdict is not PASS. If the row is not in the version the debate runs on, the debate is refused
-before any AI is asked (`PRACTICE_LINE_UP_NOT_PUBLISHED`).
+serve sits out, and the verdict is not PASS. If the version the debate runs on does not carry exactly the file's line-up
+(no row, or another one), the debate is refused before any AI is asked (`PRACTICE_LINE_UP_NOT_PUBLISHED`).
 
 formats, openings, language and judge-order take `--line-up FILE` too: they run no settings version, so they ask with
 the file's line-up (formats' `--models` must be on its Premium list); without it they ask with the settings file's, and
-with a sockets-only settings file they need it (`PREVIEW_LINE_UP_REQUIRED` otherwise). report and rescore refuse it.
+with a sockets-only settings file they need it (`PREVIEW_LINE_UP_REQUIRED` otherwise). language with `--register-export`
+reads the line-up as debate mode does: the file's, else the export's newest version's row, else the settings file's (a
+row beside a settings file that still lists AIs is refused, `PREVIEW_LINE_UP_ENV_CONFLICT`). report and rescore refuse it.
 
 Example (S-6's debate command plus): `--line-up "$P/line-up.json"`.
 
@@ -832,7 +834,8 @@ also-raised claims are sent whole (LG-C part 2, Task 15).
   instead of being refused by the gate. A gate whose number cannot be read at the start runs with 1 call at a time, and
   the report says so. Without `--call-concurrency` the practice uses the live register's own setting, and one call at
   a time when the register has none (today's preview). `--call-concurrency 12/3/default=50,deepinfra=150,anthropic=50`
-  sets it for this practice only; it is never written to any register. The relay must accept at least 3 more
+  sets it for this practice only, for every settings version its runner loads (each debate's own calls at once and
+  calls to one model take the flag's first two numbers); it is never written to any register. The relay must accept at least 3 more
   connections than the two gates' numbers added up: today 10 DeepInfra and 2 Anthropic calls at once, so at least 15
   (S-4 starts it with `--max-connections 20`); if a gate's `max_concurrent_calls` is raised, raise
   `--max-connections` with it.

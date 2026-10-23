@@ -616,8 +616,10 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     // Addition D14-D16 (owner 2026-10-22, R25): the line-up the practice asks with. The modes that run no settings version
     // (formats, openings, language, judge-order): the --line-up file's, else the settings' env line-up (a sockets-only file
     // refuses PREVIEW_LINE_UP_REQUIRED here, before any gate is asked). A debate's is resolved once its register is read
-    // (`lined` below).
-    const asked = mode === "debate" ? null : practiceSettingsWithLineUp(settings, lineUpOverride, { trial: lineUpOverride !== null });
+    // (`lined` below), and so is language mode's with --register-export (final fix wave S5): the export's newest version's
+    // row, by the same rule as debate mode.
+    const linedFromRegister = mode === "debate" || (mode === "language" && args.flags.has("--register-export"));
+    const asked = linedFromRegister ? null : practiceSettingsWithLineUp(settings, lineUpOverride, { trial: lineUpOverride !== null });
     if (settings.runner.DEPLOYMENT_MODE === "hosted") {
       log(mode === "debate"
         ? "settings: hosted mode (the hosted runner and ask path, their ceilings and the story's money row; billing kept off in "
@@ -644,7 +646,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       unsentStreakAtStart[gate] = status.unsentStreak;
       if (status.maxConcurrentCalls !== null) gateLimits[gate] = status.maxConcurrentCalls;
     }
-    const register = mode === "debate" || (mode === "language" && args.flags.has("--register-export")) ? (() => {
+    const register = linedFromRegister ? (() => {
       let text: string;
       try { text = readFileSync(required(args, "--register-export"), "utf8"); } catch (error) {
         if (error instanceof PracticeRefusal) throw error;

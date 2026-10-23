@@ -34,7 +34,7 @@ import {
   previewModelRow,
   type PreviewProviderTestConfig
 } from "@debateai/providers";
-import { redactKeyShapes } from "./practice-redaction.js";
+import { printableSettingsCode } from "./practice-redaction.js";
 import { settingsValueIsKeyShaped } from "./practice-settings.js";
 
 const KEY = "PREVIEW_PROVIDER_TEST_CONFIG_JSON";
@@ -90,8 +90,9 @@ function configOf(text: string): PreviewProviderTestConfig | ThinkingLevelsCheck
     config = parsePreviewProviderTestConfig(value);
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
-    // The detail names a model, step or level the owner wrote: blanked if key-shaped, and kept short.
-    const line = message.startsWith(`${PREVIEW_THINKING_LEVELS_INVALID}:`) ? redactKeyShapes(message).slice(0, 200) : CONFIG_INVALID;
+    // The detail names a model, step or level the owner wrote: printed whole only when plainly an id, else the bare code
+    // (final fix wave S14, the common rule, aligned with the native operator's pass-through).
+    const line = message.startsWith(`${PREVIEW_THINKING_LEVELS_INVALID}:`) ? printableSettingsCode(message) : CONFIG_INVALID;
     return Object.freeze({ exitCode: 1, lines: Object.freeze([line]) });
   }
   return config ?? Object.freeze({ exitCode: 1, lines: Object.freeze([CONFIG_INVALID]) });

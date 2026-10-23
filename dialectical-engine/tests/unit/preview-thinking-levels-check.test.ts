@@ -82,14 +82,31 @@ describe("check-thinking-levels: the offline table check (spec 2026-10-12 §4.2)
     expect(other.lines.join("\n")).not.toContain("JUDGEMENT_PRODUCER");
   });
 
-  it("a bare long token typed as a table key or step: named in the detail only blanked", () => {
+  // Final fix wave S14 (the common rule, aligned with the native operator): a detail is printed whole only when every part
+  // is a plain id (letters, digits, `_ . / -`, at most 64) and none is key-shaped (24+ letters and digits in a row, a `//`,
+  // a vendor `sk-` prefix); else the bare code, and nothing of the detail.
+  it("a bare long token typed as a table key or step: only the bare code, nothing of the detail", () => {
     const token = "q7".repeat(20); // a 40-character run, built at run time so the secret scanner sees no literal
     for (const table of [{ [token]: { level: "low" } }, { [GLM]: { steps: { [token]: "low" } } }]) {
       const result = checkThinkingLevels(line({ ...BASE, thinking_levels: table }));
-      expect(result.exitCode).toBe(1);
-      expect(result.lines.join("\n")).toContain("[REDACTED:long-run]");
+      expect(result).toEqual({ exitCode: 1, lines: ["PREVIEW_THINKING_LEVELS_INVALID"] });
       expect(result.lines.join("\n")).not.toContain(token);
     }
+  });
+
+  it("final fix wave S14: a 24-character run, a '//' or a vendor prefix in a model or step name prints only the bare code", () => {
+    const run24 = "q7".repeat(12); // under the old 32-character bar, a key shape under the common rule
+    const vendorish = ["sk", "x".repeat(6)].join("-");
+    for (const name of [run24, "unix//run/gate.sock", vendorish]) {
+      for (const table of [{ [name]: { level: "low" } }, { [GLM]: { steps: { [name]: "low" } } }]) {
+        const result = checkThinkingLevels(line({ ...BASE, thinking_levels: table }));
+        expect(result, name).toEqual({ exitCode: 1, lines: ["PREVIEW_THINKING_LEVELS_INVALID"] });
+      }
+    }
+    // Control: a 23-character name the parser refuses is still named (the operator sees what to fix).
+    const run23 = run24.slice(1);
+    expect(checkThinkingLevels(line({ ...BASE, thinking_levels: { [GLM]: { steps: { [run23]: "low" } } } })).lines)
+      .toEqual([`PREVIEW_THINKING_LEVELS_INVALID:step:${GLM}:${run23}`]);
   });
 
   // Addition D14 (owner 2026-10-22): the setting may carry only the gate part; the line-up and its table then live in the

@@ -9,6 +9,7 @@
  * says PASS or why not.
  */
 import { randomBytes, randomUUID } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 import type { Pool } from "pg";
 import { QuestionLanguageChoiceNeeded } from "@debateai/api";
 import type { AskRequest } from "@debateai/contract";
@@ -681,6 +682,22 @@ function codeOf(error: unknown): string {
   return error instanceof Error ? error.name : "UNKNOWN";
 }
 
+/**
+ * Final fix wave S5 (FINAL-FIX 18): a --line-up trial runs only on a version whose line-up row EQUALS the file. A version
+ * without the row, or with another line-up (another roster, another level, a table more or less), would silently run a
+ * line-up the operator did not ask for: refused PRACTICE_LINE_UP_NOT_PUBLISHED before any AI is asked. Compared as the
+ * parsed JSON values (member order and frozen-ness never matter). Without a trial (`lineUp` null) the version's own row,
+ * or none, is the debate's.
+ */
+export function assertPracticeLineUpPublished(lineUp: PreviewLineUp | null, versionLineUp: PreviewLineUp | null): void {
+  if (lineUp === null) return;
+  const asJson = (value: PreviewLineUp): unknown => JSON.parse(JSON.stringify(value));
+  if (versionLineUp === null || !isDeepStrictEqual(asJson(versionLineUp), asJson(lineUp))) {
+    throw new PracticeRefusal("PRACTICE_LINE_UP_NOT_PUBLISHED",
+      versionLineUp === null ? "the version carries no line-up row" : "the version's line-up row is not the --line-up file's");
+  }
+}
+
 export async function runPracticeDebate(input: Readonly<{
   settings: PracticeSettings;
   sockets: PracticeSockets;
@@ -809,9 +826,7 @@ export async function runPracticeDebate(input: Readonly<{
     // is asked. Every roster read below (the sat-out list) is the debate's own version's. A --line-up whose row is not in
     // that version would silently run another line-up: refused, as the other flags are.
     const versionLineUp = await readPreviewLineUpPolicy(pool, versionSettings.runner.REGISTER_VERSION);
-    if (lineUpPolicy !== null && versionLineUp === null) {
-      throw new PracticeRefusal("PRACTICE_LINE_UP_NOT_PUBLISHED", "the code's next version was composed without --line-up");
-    }
+    assertPracticeLineUpPublished(lineUpPolicy, versionLineUp);
     const settings = practiceSettingsWithLineUp(versionSettings, versionLineUp, { trial: lineUpPolicy !== null });
     progress(`line-up of version ${registerVersion}: ${lineUpPolicy !== null ? "the --line-up file's" : versionLineUp !== null
       ? "the version's own row" : "the settings' (the version carries none)"}; free ${settings.previewConfig.free_model_ids.join(", ")};`
