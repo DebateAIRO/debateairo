@@ -464,23 +464,42 @@ systemctl start debateai-preview-anthropic-halt-watch.service; journalctl -u deb
 systemctl start debateai-preview-anthropic-addresses.service; journalctl -u debateai-preview-anthropic-addresses -n 2 -o cat
 ```
 
-**2. The app.** These edits belong to the app's runbook (API and runner configuration, the UI
-build flag, the register); in short:
-- In the preview configuration of the API and the runner, add the key `anthropic_budget_socket`
-  with the value `/run/debateai-v3-preview/anthropic-budget-v1.sock`. The app's `scope_id` stays as
-  it is; this gate's GO carries that same value.
-- Add `claude-haiku-5-5` to the model rosters. Each roster must keep at least two makers.
+**2. The app.** Which way depends on the release the server runs. T+1 is the first side-by-side
+upload, the one that brings the line-up row (deploy/preview-release/v1/README.md, "The first upload
+with this change (T+1)").
+
+- **The socket, either way.** The preview configuration of the API and the runner must carry the
+  key `anthropic_budget_socket` with the value `/run/debateai-v3-preview/anthropic-budget-v1.sock`.
+  The app's `scope_id` stays as it is; this gate's GO carries that same value. If the key is not
+  there yet, adding it is an env change, so it comes with an upload.
+
+**Before T+1** (the server still runs T or an older release), these edits belong to the app's
+runbook (API and runner configuration, the UI build flag, the register); in short:
+- Add `claude-haiku-5-5` to the model rosters in that configuration. Each roster must keep at
+  least two makers.
 - Publish a new sealed register version that names the model (`preview:claude-haiku-5-5`), and
   give the API and runner its address in the same restart. A sealed version is never edited: a
   new version supersedes it.
 - Restart the API and the runner.
 
+**From T+1 on**, do not edit the rosters and do not restart: a roster written into the env makes
+both the API and the runner refuse to start (`PREVIEW_LINE_UP_ENV_CONFLICT`). Haiku joins the
+debates by a settings activation instead: a new line-up file with `claude-haiku-5-5` added (or a
+seat such as Haiku as the writer), then the plan, the publish, the check, the owner's fresh yes and
+the activation. Follow deploy/preview-release/v1/README.md, "The line-up, the thinking levels and
+the answer seats (side-by-side spec §13 addition)", its part "A model that is not switched on at its
+gate yet": step 1 there is this gate's work above (the probe and step 1 of this section), step 2
+is the activation. The activation refuses while the gate does not switch Haiku on.
+
 **The owner's first debate uses all five AIs** (owner's ruling, 2026-10-10). That needs, first:
 the DeepInfra gate's GO switches on all four DeepInfra models, each probed (DeepInfra README,
 "Switching on DeepSeek, MiMo and Qwen"); this gate's step-8 probe passed; and the register
-version above. Then the proposed configuration is free = premium = all five, in this order:
+version above (from T+1: the activated version that seats Haiku). Then the proposed configuration is
+free = premium = all five, in this order. Before T+1 it is the env value below; from T+1 the same two
+lists are the activated line-up file's `free_model_ids` and `premium_model_ids`, and the env keeps
+only its gate part:
 
-- The API's and runner's `PREVIEW_PROVIDER_TEST_CONFIG_JSON` (one line):
+- The API's and runner's `PREVIEW_PROVIDER_TEST_CONFIG_JSON` (one line, before T+1):
   `{"deployment":"v3-preview","requested_thinking_level":"high","budget_socket":"/run/debateai-v3-preview/deepinfra-budget-v3.sock","anthropic_budget_socket":"/run/debateai-v3-preview/anthropic-budget-v1.sock","scope_id":"preview-deepinfra-v3-20261010","free_model_ids":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro","Qwen/Qwen3.8-Flash","claude-haiku-5-5"],"premium_model_ids":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro","Qwen/Qwen3.8-Flash","claude-haiku-5-5"]}`
 - The website: build it with `--models all-models`, and set `ui.env` to the same list:
   `NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON={"free":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro","Qwen/Qwen3.8-Flash","claude-haiku-5-5"],"premium":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro","Qwen/Qwen3.8-Flash","claude-haiku-5-5"]}`
