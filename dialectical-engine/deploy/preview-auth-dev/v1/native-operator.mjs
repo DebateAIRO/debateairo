@@ -280,11 +280,27 @@ export const BASE_NOT_ACTIVE_LINE='PREVIEW_REGISTER_BASE_NOT_ACTIVE: the selecte
 /** The exact refusal verify-native.ts gives a database ahead of this source with no database-ahead file pinned (side-by-side spec §5). */
 const DATABASE_AHEAD=/^PREVIEW_NATIVE_VERIFY_DATABASE_AHEAD: the database has steps this release does not know: \d{4}_[a-z0-9_]+\.sql(?:, \d{4}_[a-z0-9_]+\.sql){0,63}\. Pin the newer release's database-ahead file with prestart\.mjs accept-ahead first\.$/;
 /**
+ * Ruling R72 (side-by-side spec §13 addition, SA11 fix round 1): the kit's refusal of the operator's line-up or answer
+ * seats, printed as its code so the owner learns why a plan stopped (nothing is sealed when it stops). Whole-message
+ * matches only: the providers' and the register's line-up codes (`PREVIEW_LINE_UP_POLICY_INVALID:<member>[:list|unreviewed|duplicate]`,
+ * `maker_rule`), the thinking parser's code-shaped detail (Ruling R65: `<what>[:<model>[:<step>]]`, each part at most 64
+ * characters of the code alphabet) and the kit's `answer-seat…` rules. A thinking detail with a long unbroken run or a vendor
+ * key prefix (what the practice's redaction blanks) is not printed: a model or step name the owner typed could be anything.
+ */
+const LINE_UP_REFUSAL=/^PREVIEW_LINE_UP_POLICY_INVALID:(?:value|members|maker_rule|kind|thinking_levels|(?:free_model_ids|premium_model_ids)(?::(?:list|unreviewed|duplicate))?)$/;
+const THINKING_REFUSAL=/^PREVIEW_THINKING_LEVELS_INVALID:(?:table|(?:model|entry|steps|level|step)(?::[A-Za-z0-9_./-]{1,64}){0,2})$/;
+const SEAT_REFUSAL=/^PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seat[a-z-]{0,48}$/;
+const KEY_SHAPED=/[A-Za-z0-9_-]{32,}|\bsk-/;
+const isChoiceRefusal=message=>typeof message==='string'&&(LINE_UP_REFUSAL.test(message)||SEAT_REFUSAL.test(message)
+ ||(THINKING_REFUSAL.test(message)&&!KEY_SHAPED.test(message.slice(message.indexOf(':')+1))));
+/**
  * Every failure stays opaque except a pending forward step (its line says to run apply-and-plan), a database ahead with
- * no pinned file (its line says to pin the newer release's database-ahead file) or a stale register base (its line says
- * to plan again: from the newest publication for kit v2, from the active settings version for kit v3).
+ * no pinned file (its line says to pin the newer release's database-ahead file), a stale register base (its line says
+ * to plan again: from the newest publication for kit v2, from the active settings version for kit v3) or a refused
+ * line-up or answer seats (its code, Ruling R72).
  */
 export function operatorRefusalLine(error){
+ if(error instanceof Error&&isChoiceRefusal(error.message))return `${error.message}\n`;
  if(error?.code==='PREVIEW_REGISTER_BASE_NOT_CURRENT'&&error.message===BASE_NOT_CURRENT_LINE)return `${error.message}\n`;
  if(error?.code==='PREVIEW_REGISTER_BASE_NOT_ACTIVE'&&error.message===BASE_NOT_ACTIVE_LINE)return `${error.message}\n`;
  if(error?.code==='PREVIEW_NATIVE_VERIFY_DATABASE_AHEAD'&&typeof error.message==='string'&&DATABASE_AHEAD.test(error.message))return `${error.message}\n`;

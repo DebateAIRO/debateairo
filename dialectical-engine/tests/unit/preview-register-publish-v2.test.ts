@@ -791,6 +791,26 @@ describe('publish kit v2: the optional previewLineUpPolicy row and the answer se
     await expect(build(op.validateNativePlan({ ...plan, lineUp: qwenHigh }).lineUp)).rejects.toThrow(`PREVIEW_THINKING_LEVELS_INVALID:level:${QWEN}`);
   });
 
+  it('(3) Ruling R72: the native operator prints a line-up or seat refusal\'s code (the owner learns why the plan stopped); anything else stays opaque', async () => {
+    const op = await operator();
+    const thrown = async (run: () => Promise<unknown>) => { try { await run(); } catch (error) { return error; } throw new Error('expected a refusal'); };
+    // The real refusals the builder throws, printed as they are.
+    for (const [lineUp, seatsChoice, line] of [
+      [{ ...LIVE, thinking_levels: { ...OWNER_LIVE_TABLE, [QWEN]: { level: 'high' } } }, undefined, `PREVIEW_THINKING_LEVELS_INVALID:level:${QWEN}`],
+      [{ ...LIVE, thinking_levels: { [GLM]: { steps: { cross_exchange: 'low', no_such_step: 'low' } } } }, undefined, `PREVIEW_THINKING_LEVELS_INVALID:step:${GLM}:no_such_step`],
+      [{ ...LIVE, free_model_ids: [GLM] }, undefined, 'PREVIEW_LINE_UP_POLICY_INVALID:maker_rule'],
+      [{ ...LIVE, premium_model_ids: [GLM, 'not/a-reviewed-model'] }, undefined, 'PREVIEW_LINE_UP_POLICY_INVALID:premium_model_ids:unreviewed'],
+      [undefined, { writer: HAIKU_REF, checker: HAIKU_REF }, 'PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seats-writer-is-checker'],
+      [undefined, { writer: 'preview:not-reviewed', checker: HAIKU_REF }, 'PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seat-unreviewed']
+    ] as const) expect(op.operatorRefusalLine(await thrown(() => build(lineUp, seatsChoice)))).toBe(`${line}\n`);
+    // An unrelated failure, a code with a free-text tail, a key-shaped or overlong detail, or a non-error: opaque, as before.
+    for (const other of [new TypeError('PREVIEW_REGISTER_SNAPSHOT_REFUSED: hosted-story-rows'), new TypeError('PREVIEW_LINE_UP_POLICY_INVALID:maker_rule and more'),
+      new TypeError(`PREVIEW_THINKING_LEVELS_INVALID:model:${'k'.repeat(40)}`), new TypeError('PREVIEW_THINKING_LEVELS_INVALID:model:sk-ant-api03-x'),
+      new TypeError(`PREVIEW_THINKING_LEVELS_INVALID:model:${'a/'.repeat(40)}`), new TypeError('PREVIEW_LINE_UP_POLICY_INVALID:x\nsecond line'),
+      new TypeError('PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seat unreviewed'), new TypeError('database password=hunter2'), 'PREVIEW_LINE_UP_POLICY_INVALID:value', undefined])
+      expect(op.operatorRefusalLine(other)).toBe('PREVIEW_NATIVE_OPERATION_REFUSED\n');
+  });
+
   it('(5) the --print-line-up member, merged into a plan, passes the plan check and the builder seals exactly that row', async () => {
     const env = { deployment: 'v3-preview', requested_thinking_level: 'high', budget_socket: '/run/debateai-v3-preview/deepinfra-budget-v3.sock',
       anthropic_budget_socket: '/run/debateai-v3-preview/anthropic-budget-v1.sock', scope_id: 'preview-kit-unit', ...LIVE };

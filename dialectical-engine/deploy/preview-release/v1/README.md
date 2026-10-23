@@ -44,7 +44,7 @@ into `.next/preview-model-roster.json` (covered by the build manifest), and the 
 refuses unless `ui.env` names the same list. Which list belongs at which moment is in
 `deploy/preview-gate/v3/README.md`, "One deploy session: from GLM only to all five AIs". Since the line-up became a
 settings value (side-by-side spec §13 addition D24), the list only sets the new-debate page's fallback list (an older
-API) and the ask proxy's time limit: the AIs a debate uses come from its settings version, and the "AI providers" page
+API), its maximum depth (set = the preview's shallower ceiling) and the ask proxy's time limit: the AIs a debate uses come from its settings version, and the "AI providers" page
 follows the API ("The providers page", in "Changing debate settings without an upload").
 
 Only the values above are set. Three other public flags are read only at build time and are left
@@ -2588,29 +2588,37 @@ SV6. Examples of what the owner can ask for this way:
   kept as it is.
 - `answerSeats`: `writer` and `checker`, optionally `storyteller` and `storyChecker` (which otherwise follow the writer
   and the checker), each a reviewed preview ref (`preview:fixture-a`, `preview:fixture-b`, `preview:deepseek-v4-1-flash`,
-  `preview:mimo-v2-6-pro`, `preview:qwen-3-8-flash`, `preview:claude-haiku-5-5`), from `--answer-seats '<JSON>'`. One
-  AI never checks its own work: the writer as its own checker is refused, and so is the storyteller as its own story
-  checker. Left out, the seats of the active version's publish plan are kept (SV1 reads them from `CP`).
+  `preview:mimo-v2-6-pro`, `preview:qwen-3-8-flash`, `preview:claude-haiku-5-5`), from `--answer-seats '<JSON>'`. The
+  same seat ref as writer and checker is refused, and so is the same ref as storyteller and story checker (refs, not
+  models: `preview:fixture-a` and `preview:fixture-b` are both GLM). Left out, the seats of the active version's publish plan are kept (SV1 reads them from `CP`).
 
 **The thinking menus.** Only a word on an AI's reviewed menu is accepted: GLM `high`, `low`; DeepSeek `high`, `low`,
 `none`; Qwen `default`, `low`, `medium`, `none`; MiMo `default`, `none`; Claude Haiku `high`, `medium`, `low`. The step
 names are those of `deploy/preview-auth-dev/v1/README.md` ("The optional `thinking_levels` table"). Any other word
-(`max`, `xhigh`, Qwen at `high`) is refused at SV1 (the native operator's line names it:
-`PREVIEW_THINKING_LEVELS_INVALID:<detail>`), and so is a list with one maker only (`maker_rule`). A new word needs a
+(`max`, `xhigh`, Qwen at `high`) is refused at SV1, and so is a list with one maker only or an AI that is not a reviewed
+row. The release tool checks only the file's shape; the native operator's run then stops before anything is sealed and
+prints the code (Ruling R72), for example `PREVIEW_THINKING_LEVELS_INVALID:level:Qwen/Qwen3.8-Flash`,
+`PREVIEW_LINE_UP_POLICY_INVALID:maker_rule`, `PREVIEW_LINE_UP_POLICY_INVALID:free_model_ids:unreviewed` or, for the seats,
+`PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seats-writer-is-checker`. To see a line-up debate before publishing it, use the
+practice's trial (tools/preview-practice/README.md, "Trying a new line-up before an activation"). A new word needs a
 reviewed gate change first (new gate code, root's restart of the gate): an upload, not an activation.
 
 **A model that is not switched on at its gate yet** (for example a model the gate's GO has never listed). Two steps,
 in this order:
 1. Root switches it on at its spending gate: its probe, then a new GO with the model added to `enabled_models`, then
    `stop` and `activate` (`deploy/preview-gate/v3/README.md`, "Switching on DeepSeek, MiMo and Qwen"; Claude Haiku:
-   `README-anthropic.md`, "Switch it on"). This stays root's step, and it comes first.
+   `README-anthropic.md`, install steps 5, 6 and 8 (its GO, `init` and `activate`, the probe) and "Switch it on" step 1;
+   that section's step 2, the env rosters and a restart, is replaced from T+1 by this activation: a roster in the env now
+   refuses the start). This stays root's step, and it comes first.
 2. Then the activation: SV1 (the plan with the new line-up or seat), SV2 (publish), SV3 (the check), the owner's fresh
    yes, SV4 (activate). SV4 refuses while any model the version can seat is off at its gate.
 
 Taking a model away goes the other way: first activate a version that no longer seats it, then (once the debates on the
-older version have finished) take it out of `enabled_models`. A model that is not a reviewed row, or that no declared
-target serves, or whose company has no gate socket in the env, is refused by the check (`SETTINGS_GATE_UNREVIEWED`,
-`SETTINGS_NEEDS_ENV_CHANGE:TARGET:<model>`, `SETTINGS_NEEDS_ENV_CHANGE:GATE_SOCKET:<provider>`): that is an upload.
+older version have finished) take it out of `enabled_models`. A model that no declared target serves, or whose company has no
+gate socket in the env, is refused by the check (`SETTINGS_NEEDS_ENV_CHANGE:TARGET:<model>`,
+`SETTINGS_NEEDS_ENV_CHANGE:GATE_SOCKET:<provider>`): that is an upload. (The check's `SETTINGS_GATE_UNREVIEWED` concerns
+an older sealed version whose code accepted a model or level the current code no longer reviews; a new plan with an
+unreviewed AI already stops at SV1.)
 
 **A new line-up file from the active one.** Once the active version carries the row (T+1 and later), its line-up is
 read from the database into this change's `$SART`, as root 0644; before T+1, "The line-up file" above prints it from the
@@ -2718,7 +2726,7 @@ echo "api-$LABEL.env and runner-$LABEL.env: sockets-only (the line-up lives in t
    seat is served by both processes' targets and has its gate socket (and so its company is on the providers page, which
    lists what the API reaches). A version without the row beside the sockets-only setting fails here
    (`PREVIEW_LINE_UP_REQUIRED`: SB3 ran without `LINEUP`); so does a model no target serves. On FAIL nothing has started:
-   WB1, then a corrected upload.
+   WB1 (drained path: rbD-B), then a corrected upload.
 
 ```sh
 set -euo pipefail
@@ -2728,7 +2736,7 @@ V=$(cat "$S/new-register-version")
 RC=0; OUT=$(lc settings-version.mjs check "$LABEL" "$V" 2>&1) || RC=$?
 printf '%s\n' "$OUT" > "$S/settings-check-site-$V.json"
 jq -r 'if .event == "PREVIEW_SETTINGS_CHECKED" then "verdict \(.verdict) for version \(.version) on \(.releaseKey) (receipt \(.receipt))", (.hints[] | "  \(.code): \(.hint)") else tostring end' <<<"$OUT" 2>/dev/null || echo "$OUT"
-[ "$RC" = 0 ] || { echo "SITECHECK_NOT_DONE: not PASS (exit $RC, the lines above): stop; WB1 takes the new release away"; exit 1; }
+[ "$RC" = 0 ] || { echo "SITECHECK_NOT_DONE: not PASS (exit $RC, the lines above): stop; WB1 takes the new release away (drained path: rbD-B)"; exit 1; }
 echo "the new release passes its own site version $V"
 ```
 
@@ -2737,7 +2745,7 @@ echo "the new release passes its own site version $V"
 - **It follows the API by itself.** The "AI providers" legal page (`/providers`) names the companies the API's declared
   targets (`PROVIDER_DISCOVERY_TARGETS_JSON`) reach, read from the API at request time (`GET /v1/public/ai-providers`),
   companies only, no models. Today: DeepInfra and Anthropic. When the API does not answer, the page shows its last good
-  answer (up to 60 s old), else every company of the reviewed catalogue: it never shows fewer.
+  answer, however old; if it never had one, every company of the reviewed catalogue: it never hides one.
 - **A line-up or model change never needs a website upload.** Activations change no page; nor does a new model of a
   company the page already names.
 - **Adding a company is an upload**, never an activation: its code, a reviewed spending gate, its targets in the env,
@@ -2754,8 +2762,9 @@ echo "the new release passes its own site version $V"
   hold the first half of the order: a release without the company's targets refuses a settings version that still seats
   one of its models (the check names `SETTINGS_NEEDS_ENV_CHANGE:TARGET:<model>`).
 - **The website build's model list** (`ui-build --models`, `NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON`) now only sets the
-  new-debate page's fallback list (shown when an older API sends no line-up with the room read) and the ask proxy's
-  time limit for the preview's ask (1,260 s); the providers page no longer reads it. The UI start-up check still demands that
+  new-debate page's fallback list (shown when an older API sends no line-up with the room read), the new-debate page's
+  maximum depth (a build with the flag set offers the preview's shallower ceiling) and the ask proxy's time limit for the
+  preview's ask (1,260 s); the providers page no longer reads it. The UI start-up check still demands that
   `ui.env` and the build name the same list.
 
 ## Transition release T (one last drained upload)
