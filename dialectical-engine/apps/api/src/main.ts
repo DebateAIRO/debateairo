@@ -1379,6 +1379,28 @@ const synthesisCheckDeps: SynthesisCheckDeps = {
 const readSynthesisAnswer = (runId: string, answerId: string, version: number, ownerRef: string) =>
   application.readAnswer(answerId, ownerSession(ownerRef, "00000000-0000-0000-0000-000000000000"),
     version, { ownerRef, legacyAskerId: null });
+const synthesisPublishGate = createSynthesisPublishGate({
+  repository: synthesisCheckRepository,
+  approvalCovers: input => publicationReviewRepository.approvalCovers(input),
+  readAnswerVersions: async (runId, answerId, maxVersion, ownerRef) => {
+    const texts = new Map<number, string | null>();
+    for (let version = 1; version <= maxVersion; version++) {
+      const answer = await readSynthesisAnswer(runId, answerId, version, ownerRef);
+      if (answer === null) throw new Error("SYNTHESIS_ANSWER_UNREADABLE");
+      texts.set(version, synthesisTextOf(answer));
+    }
+    return texts;
+  },
+  check: synthesisCheckDeps, deadlineMs: publicationCheckPolicy.deadlineMs,
+  clock: () => new Date(), sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+});
+const synthesisCheckWorker = new SynthesisCheckWorker({
+  repository: synthesisCheckRepository, erasure: synthesisCheckErasure,
+  withContentLease: (runId, use) => application.withContentLease(runId, use),
+  readAnswer: readSynthesisAnswer, check: synthesisCheckDeps,
+  deadlineMs: publicationCheckPolicy.deadlineMs,
+  log: (line) => console.error(`[${line}]`)
+});
 const publicationReviewStaff = createPublicationReviewStaffService({
   repository: publicationReviewRepository,
   readVerdictCategories: ({ runId, answerId, originVersion }) =>
@@ -1414,28 +1436,6 @@ const publicationReviewStaff = createPublicationReviewStaffService({
     }
     throw new PublicationReviewRefusal("PUBLICATION_REVIEW_NOT_FOUND");
   })
-});
-const synthesisPublishGate = createSynthesisPublishGate({
-  repository: synthesisCheckRepository,
-  approvalCovers: input => publicationReviewRepository.approvalCovers(input),
-  readAnswerVersions: async (runId, answerId, maxVersion, ownerRef) => {
-    const texts = new Map<number, string | null>();
-    for (let version = 1; version <= maxVersion; version++) {
-      const answer = await readSynthesisAnswer(runId, answerId, version, ownerRef);
-      if (answer === null) throw new Error("SYNTHESIS_ANSWER_UNREADABLE");
-      texts.set(version, synthesisTextOf(answer));
-    }
-    return texts;
-  },
-  check: synthesisCheckDeps, deadlineMs: publicationCheckPolicy.deadlineMs,
-  clock: () => new Date(), sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-});
-const synthesisCheckWorker = new SynthesisCheckWorker({
-  repository: synthesisCheckRepository, erasure: synthesisCheckErasure,
-  withContentLease: (runId, use) => application.withContentLease(runId, use),
-  readAnswer: readSynthesisAnswer, check: synthesisCheckDeps,
-  deadlineMs: publicationCheckPolicy.deadlineMs,
-  log: (line) => console.error(`[${line}]`)
 });
 const SYNTHESIS_CHECK_TICK_MS = 5_000;
 const triggerSynthesisCheckWork = createSingleFlightErasureReconciler(

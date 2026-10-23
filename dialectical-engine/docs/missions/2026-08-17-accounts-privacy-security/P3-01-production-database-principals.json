@@ -311,6 +311,7 @@
         "staff.owner_recovery_generation",
         "staff.owner_recovery_operation",
         "staff.funding_policy_selection",
+        "staff.publication_review_event",
         "billing.internal_grant",
         "billing.internal_grant_event",
         "billing.internal_provider_admission"
@@ -352,6 +353,10 @@
         "staff.read_enrollment",
         "staff.read_team_page",
         "staff.read_audit_page",
+        "staff.list_publication_reviews",
+        "staff.open_publication_review",
+        "staff.record_publication_review_copy",
+        "staff.decide_publication_review",
         "staff.read_invitation_proof",
         "staff.read_issued_invitation",
         "staff.read_mutation_target",
