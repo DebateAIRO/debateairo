@@ -921,13 +921,38 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     expect(t1Prose.indexOf('This is also the dry check')).toBeLessThan(t1Prose.indexOf('RC=0; OUT=$(lc settings-version.mjs check "$LABEL" "$V" 2>&1) || RC=$?'));
     // None of these blocks is a step of its own (the settings steps stay SV0-SV6, the upload's stay as STEPS).
     for (const block of t1Blocks) expect(stepOf(block)).toBeNull();
-    // The providers page: automatic, one release later to drop a company; no notice before adding one (owner 2026-10-23
-    // reworded the page's promise, superseding R21's manual advance-notice step).
+    // The providers page: automatic, one release later to drop a company; the page itself is never edited for a new
+    // company (owner 2026-10-23 reworded its promise, superseding R21).
     const providers = sectionOf(guide, '### The providers page').replace(/\s+/g, ' ');
     for (const text of ['A line-up or model change never needs a website upload.', 'Adding a company is an upload',
-      'No notice goes out first: the page says "This list is kept up to date automatically. It always shows the companies we currently send data to."',
+      'The page itself needs no edit for this: it lists the company by itself, from the new release\'s declared targets, once that release is current',
+      'its intro keeps saying "This list is kept up to date automatically. It always shows the companies we currently send data to." (owner, 2026-10-23)',
       'A company leaves the targets one release later.', 'never in that same upload', 'now only sets the new-debate page\'s fallback list']) expect(providers, text).toContain(text);
-    for (const gone of ['Advance notice first', 'We tell you before a new provider receives any data']) expect(guide.replace(/\s+/g, ' '), gone).not.toContain(gone);
+    // Owner 2026-10-23 (OA2): Privacy Policy 3.5 §14 and §5 stay, so an upload that adds a new AI company tells people
+    // first and notes the change in the Register, before its switch; every other upload skips the step.
+    for (const text of ['**A new AI company: tell people first, and note it in the Register (only an upload that adds one).**',
+      'The Privacy Policy (version 3.5) makes two promises the owner keeps (2026-10-23), so before that upload\'s switch:',
+      '**Privacy Policy §14: tell people before.** Before a new recipient starts receiving data, people are told by email and in the product, and given time to object.',
+      'the switch (SB13; on the drained path, the downtime at DR2) waits until the notice has gone out and that time has passed.',
+      'There is no tool for this in the release kit: the owner sends the notice.',
+      '**Privacy Policy §5: note the change in the Register.** The Register is the `/providers` page; its facts are the reviewed catalogue in `apps/ui/lib/legal/pages.ts`',
+      'with its facts checked by a person and its `checkedOn` date (the page shows it as "Last checked")', '`docs/missions/provider-register/FILL-IN.md` lists the fields.',
+      'The Register has no version number or change list of its own today, so that dated row is the note',
+      'No legal text changes for this step, and no Privacy Policy version.',
+      'An upload that adds no new company skips this step: so does every activation (a line-up or model change) and a new model of a company the page already names.'])
+      expect(providers, text).toContain(text);
+    // The step names no shell block of its own (STEPS unchanged) and sits right after the "adding a company" bullet.
+    expect(blocksOf(sectionOf(guide, '### The providers page'))).toHaveLength(0);
+    expect(providers.indexOf('Adding a company is an upload')).toBeLessThan(providers.indexOf('A new AI company: tell people first'));
+    expect(providers.indexOf('A new AI company: tell people first')).toBeLessThan(providers.indexOf('A company leaves the targets one release later.'));
+    // The owner's yes before the switch names it, on both paths (SB6; the drained path's yes before DR2).
+    const sb6 = sectionOf(guide, guide.split('\n').find(line => line.startsWith('### SB6. '))!).replace(/\s+/g, ' ');
+    expect(sb6).toContain('- only when this upload adds a new AI company: that the Privacy Policy §14 notice went out (by email and in the product, on which date) and its time to object has passed, and that the company\'s dated Register row (§5) is in this release ("The providers page");');
+    expect(sb6.indexOf('a new AI company')).toBeLessThan(sb6.indexOf('- the Caddy payment-marks rule (PM2), when this upload adds it.'));
+    expect(sectionOf(guide, DRAINED).replace(/\s+/g, ' ')).toContain('When this upload adds a new AI company, the yes before DR2 also names the Privacy Policy §14 notice and the dated Register row (§5), as in SB6.');
+    // The page's old promise and the step that said no notice goes out stay gone.
+    for (const gone of ['Advance notice first', 'We tell you before a new provider receives any data', 'No notice goes out first'])
+      expect(guide.replace(/\s+/g, ' '), gone).not.toContain(gone);
   });
 
   it('the switch activates the new release\'s own site version (SB13, DR6), and the old re-pin sections point to the activation', () => {

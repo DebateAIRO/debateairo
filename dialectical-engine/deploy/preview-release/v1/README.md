@@ -2788,8 +2788,27 @@ echo "the new release passes its own site version $V"
 - **Adding a company is an upload**, never an activation: its code, a reviewed spending gate, its targets in the env,
   and its legal facts checked by a person into the catalogue (`apps/ui/lib/legal/pages.ts`). The page lists it from that
   release on: the switch hands the website and the API to the new release together, before its runner takes a debate.
-  No notice goes out first: the page says "This list is kept up to date automatically. It always shows the companies we
-  currently send data to." (owner, 2026-10-23).
+  The page itself needs no edit for this: it lists the company by itself, from the new release's declared targets, once
+  that release is current, and its intro keeps saying "This list is kept up to date automatically. It always shows the
+  companies we currently send data to." (owner, 2026-10-23).
+- **A new AI company: tell people first, and note it in the Register (only an upload that adds one).** The Privacy
+  Policy (version 3.5) makes two promises the owner keeps (2026-10-23), so before that upload's switch:
+  1. **Privacy Policy §14: tell people before.** Before a new recipient starts receiving data, people are told by email
+     and in the product, and given time to object. So the owner tells the users which company is added and what it will
+     receive, by email and in the product, and the switch (SB13; on the drained path, the downtime at DR2) waits until
+     the notice has gone out and that time has passed. There is no tool for this in the release kit: the owner sends the
+     notice.
+  2. **Privacy Policy §5: note the change in the Register.** The Register is the `/providers` page; its facts are the
+     reviewed catalogue in `apps/ui/lib/legal/pages.ts` (one entry per company, listed in `REVIEWED_PROVIDER_COMPANIES`,
+     its host in `PROVIDER_COMPANY_HOSTS` in `packages/providers/src/provider-companies.ts`). The upload's code adds the
+     company's row there, with its facts checked by a person and its `checkedOn` date (the page shows it as "Last
+     checked"); `docs/missions/provider-register/FILL-IN.md` lists the fields. The Register has no version number or
+     change list of its own today, so that dated row is the note; a version line or change list on the page would be a
+     separate change, the owner's call.
+
+  No legal text changes for this step, and no Privacy Policy version. The yes before the switch names both (SB6; the
+  drained path's yes before DR2). An upload that adds no new company skips this step: so does every activation (a
+  line-up or model change) and a new model of a company the page already names.
 - **A company leaves the targets one release later.** The page shows only what the API it is served by can reach, but
   after a switch the old release's runner keeps finishing its own debates for up to 6 hours, still sending text to the
   companies it used. So take a company's targets out only in an upload after the release that stopped using it (by an
@@ -4353,6 +4372,9 @@ Right before SB7, fresh in the live chat; SB7 to SB13 run on it. It names:
 - the publish of register V with its delta hash;
 - the new commit and its release key;
 - the switch;
+- only when this upload adds a new AI company: that the Privacy Policy §14 notice went out (by email and in the
+  product, on which date) and its time to object has passed, and that the company's dated Register row (§5) is in this
+  release ("The providers page");
 - the Caddy payment-marks rule (PM2), when this upload adds it.
 
 For example: "Yes, upload r21 to the test site side by side: take the online backup, apply migrations 0126 and 0127,
@@ -4941,6 +4963,8 @@ the marks are listed, MT1, PM2 and MT2 ("Payment marks: the files and Caddy's ru
 **The owner's yes, fresh in the live chat right before DR2.** It names the downtime, the cold copy, the migrations by
 number (and which one is not expand-only), the publish with its delta hash, and the new commit with its release key.
 When this upload adds the Caddy payment-marks rule, the yes before DR2 names PM2 too, and comes before MT1.
+When this upload adds a new AI company, the yes before DR2 also names the Privacy Policy §14 notice and the dated
+Register row (§5), as in SB6.
 
 | Step | What | The site | The way back from here |
 |---|---|---|---|
