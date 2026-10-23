@@ -1011,6 +1011,8 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     expect(uploads).toContain('**If new debates wait ("switching") and do not start.**');
     expect(uploads).toContain('activate a passed version');
     expect(prose).toContain('ADMISSION_ACTIVE_VERSION_UNAVAILABLE');
+    // F1, F2c: the page read's fallback line and the boot look's unfinished line are documented beside the alarm.
+    for (const code of ['ADMISSION_ACTIVE_VERSION_UNCHECKED', 'ADMISSION_VIEW_FALLBACK']) expect(prose).toContain(code);
     // F7 (ruling R78): the rollback's order, in both places that describe it.
     for (const text of [uploads, sectionOf(guide, WAY_BACK).replace(/\s+/g, ' ')]) {
       expect(text).toContain('keeps the active version when');
