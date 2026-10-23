@@ -9,6 +9,7 @@ import { LegalProvidersBody } from "../../apps/ui/components/legal/LegalBodies.j
 import {
   ANTHROPIC_PREVIEW_PROVIDER,
   DEEPINFRA_PROVIDER,
+  GOOGLE_PREVIEW_PROVIDER,
   MODEL_PROVIDERS,
   SUPPORT_PROVIDER,
   providerRegister,
@@ -175,15 +176,58 @@ describe("the hosted site's cloud rows never show (owner, 10 October 2026; addit
   }
 
   it("the reviewed Anthropic row keeps its checked facts in every language", () => {
+    // S17 re-pin: the row's checked facts themselves (they were pinned before addition D24 removed the build flag), so
+    // they cannot drift unnoticed; the support chat's row repeats Anthropic's facts, so a page-wide match would not
+    // see a change to this row. Addition D24: no models line, so `models` is not one of them.
+    expect(ANTHROPIC_PREVIEW_PROVIDER).toMatchObject({
+      key: "claude",
+      provider: "Anthropic",
+      entity: "Anthropic Ireland, Limited",
+      homeCountryKey: "legal.providers.ireland",
+      purposesConfirmed: true,
+      locationKey: "legal.providers.locationAnthropic",
+      retentionKey: "legal.providers.retentionAnthropic",
+      zeroRetention: "no",
+      training: "no",
+      basisKey: "legal.providers.sccBasis",
+      contact: "privacy@anthropic.com",
+      checkedOn: "2026-10-10"
+    });
     for (const locale of ["en", "ro", "ja", "ko", "zh", "ga"]) {
       const catalog = catalogOf(locale);
       const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={catalog} entries={providerRegister(["anthropic", "deepinfra"])} />);
       expect(html.match(/id="legal-provider-deepinfra"/g), locale).toHaveLength(1);
       expect(html.match(/id="legal-provider-claude"/g), locale).toHaveLength(1);
-      expect(html, locale).toContain("Anthropic Ireland, Limited");
-      expect(html, locale).toContain('href="mailto:privacy@anthropic.com"');
-      expect(html, locale).toContain(escaped(catalog["legal.providers.retentionAnthropic"] ?? "missing"));
-      expect(html, locale).toContain(escaped(catalog["legal.providers.sccBasis"] ?? "missing"));
+      // The Anthropic row's own section (it comes before DeepInfra's), not the support chat's row after it.
+      const section = html.slice(html.indexOf('id="legal-provider-claude"'), html.indexOf('id="legal-provider-deepinfra"'));
+      expect(section.length, locale).toBeGreaterThan(0);
+      expect(section, locale).toContain("Anthropic Ireland, Limited");
+      expect(section, locale).toContain('href="mailto:privacy@anthropic.com"');
+      for (const key of ["legal.providers.ireland", "legal.providers.locationAnthropic", "legal.providers.retentionAnthropic", "legal.providers.sccBasis"]) {
+        expect(section, `${locale} ${key}`).toContain(escaped(catalog[key] ?? "missing"));
+      }
+    }
+  });
+
+  it("the kept-for-later Google row keeps its checked facts, and no company the API answers shows it", () => {
+    // S17 re-pin: these facts were pinned while a build flag could show the row; addition D24 maps no company to it, so
+    // it shows nowhere today (checked above), but its reviewed facts stay as they were checked on 10 October 2026.
+    expect(GOOGLE_PREVIEW_PROVIDER).toMatchObject({
+      key: "gemini",
+      provider: "Google",
+      entity: "Google Cloud EMEA Limited",
+      homeCountryKey: "legal.providers.ireland",
+      locationKey: "legal.providers.locationGoogle",
+      retentionKey: "legal.providers.retentionGoogle",
+      zeroRetention: "no",
+      training: "no",
+      // The EU–US Data Privacy Framework listing could not be read: the basis stays bracketed.
+      basisKey: "legal.providers.usBasis",
+      contact: "legal-notices@google.com",
+      checkedOn: "2026-10-10"
+    });
+    for (const company of [...new Set(Object.values(PROVIDER_COMPANY_HOSTS)), "google", "gemini"]) {
+      expect(providerRegister([company]), company).not.toContain(GOOGLE_PREVIEW_PROVIDER);
     }
   });
 });

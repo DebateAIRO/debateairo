@@ -36,6 +36,12 @@ describe('actual entrypoint opt-in preview composition',()=>{
   let closed=0;const pool={end:async()=>{closed++;}},boot=installBootCustody({logger:{error:()=>undefined}});boot.hold(pool);
   await expect(loadAdmissionSettings({} as never,12,site(environmentConfig),(name,run)=>boot.run(name,async()=>run()),{readers})).rejects.toMatchObject({code:'PREVIEW_SCORECARD_CONFLICT'});
   expect({reads,gateReads,closed}).toEqual({reads:1,gateReads:0,closed:1});
+  // S17 re-pin (the guard ran the roster's target check once, before the scorecard read): a declared target set the
+  // roster does not match refuses in the same stage, before the scorecard or the gate terms are read.
+  reads=0;const narrowBoot=installBootCustody({logger:{error:()=>undefined}});
+  const narrowSite=({...(site(environmentConfig) as object),declaredProviderTargets:targets.slice(0,1)}) as never;
+  await expect(loadAdmissionSettings({} as never,12,narrowSite,(name,run)=>narrowBoot.run(name,async()=>run()),{readers})).rejects.toThrow('PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID');
+  expect({reads,gateReads}).toEqual({reads:0,gateReads:0});
   // Off the preview: no roster, no scorecard read, no gate read.
   reads=0;const absentBoot=installBootCustody({logger:{error:()=>undefined}});
   await expect(loadAdmissionSettings({} as never,12,site(undefined),(name,run)=>absentBoot.run(name,async()=>run()),{readers})).resolves.toMatchObject({previewConfig:undefined,previewBudgetGate:undefined});
