@@ -174,8 +174,8 @@ function functionsReaching(root:ts.SourceFile,constant:string):ReadonlySet<strin
 }
 /**
  * R2 + R15, file by file: the migration as written; the API's reader (the SQL text exactly ONCE, as one top-level module
- * constant both its readers reach: the cached reader and `readActiveSettingsVersionOn`); the operator (exactly once,
- * the reader's call, never the table); files under tests/; the Drizzle table and 0124's postcondition evidence (no SQL
+ * constant both its readers reach: the cached reader and `readActiveSettingsVersionOn`); the operator (the reader's
+ * call exactly once, plus at most one table read: the rollback's history, R78); files under tests/; the Drizzle table and 0124's postcondition evidence (no SQL
  * reading the table; the reader's name only as an entry of the evidence FUNCTIONS list). Anything else fails.
  */
 function pointerFileClassification(file:string,source:string) {
@@ -199,8 +199,19 @@ function pointerFileClassification(file:string,source:string) {
       ?'API_POINTER_READER':'LIVE_OR_UNVERIFIED_POINTER_READER';
   }
   if(file===ACTIVATION_POINTER_OPERATOR_FILE){
-    return tokens.length===1&&ts.isStringLiteralLike(tokens[0]!)&&POINTER_READER_CALL.test(tokenText(tokens[0]!))&&!POINTER_TABLE_READ.test(tokenText(tokens[0]!))
-      ?'OPERATOR_POINTER_READER':'LIVE_OR_UNVERIFIED_POINTER_READER';
+    // R2 + R15; final fix wave F7 (ruling R78): exactly one call of the reader, and at most one read of the table: the
+    // rollback's history read, a top-level const reached only by rollbackSettingsVersion.
+    const reader=tokens.filter(node=>ts.isStringLiteralLike(node)&&POINTER_READER_CALL.test(tokenText(node))&&!POINTER_TABLE_READ.test(tokenText(node)));
+    const history=tokens.filter(node=>ts.isStringLiteralLike(node)&&POINTER_TABLE_READ.test(tokenText(node))&&!POINTER_READER_CALL.test(tokenText(node)));
+    if(reader.length!==1||history.length>1||reader.length+history.length!==tokens.length)return 'LIVE_OR_UNVERIFIED_POINTER_READER';
+    for(const node of history){
+      const declaration=node.parent;
+      if(declaration===undefined||!ts.isVariableDeclaration(declaration)||!ts.isIdentifier(declaration.name)
+        ||!ts.isVariableDeclarationList(declaration.parent)||(declaration.parent.flags&ts.NodeFlags.Const)===0
+        ||!ts.isVariableStatement(declaration.parent.parent)||!ts.isSourceFile(declaration.parent.parent.parent))return 'LIVE_OR_UNVERIFIED_POINTER_READER';
+      if([...functionsReaching(declaration.parent.parent.parent,declaration.name.text)].join(',')!=='rollbackSettingsVersion')return 'LIVE_OR_UNVERIFIED_POINTER_READER';
+    }
+    return 'OPERATOR_POINTER_READER';
   }
   const readsTable=tokens.some(node=>POINTER_TABLE_READ.test(tokenText(node)));
   if(file===ACTIVATION_POINTER_SCHEMA_FILE){
@@ -1052,6 +1063,11 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
       const operatorSource = sources.get(ACTIVATION_POINTER_OPERATOR_FILE)!;
       expect(pointerFileClassification(ACTIVATION_POINTER_OPERATOR_FILE, operatorSource
         + '\nexport const again = "SELECT register.read_active_settings_version()";')).toBe("LIVE_OR_UNVERIFIED_POINTER_READER");
+      // Final fix wave F7 (ruling R78): a second table read, or the rollback's history read reached from another function.
+      expect(pointerFileClassification(ACTIVATION_POINTER_OPERATOR_FILE, operatorSource
+        + '\nexport const again = "SELECT a.register_version FROM register.settings_activation AS a";')).toBe("LIVE_OR_UNVERIFIED_POINTER_READER");
+      expect(pointerFileClassification(ACTIVATION_POINTER_OPERATOR_FILE, operatorSource
+        + '\nexport function other() { return LAST_ACTIVE_ON_RELEASE_SQL; }')).toBe("LIVE_OR_UNVERIFIED_POINTER_READER");
       for (const file of [ACTIVATION_POINTER_SCHEMA_FILE, ACTIVATION_POINTER_FORWARD_FILE]) {
         expect(pointerFileClassification(file, sources.get(file)!
           + '\nexport const read = "SELECT a.register_version FROM register.settings_activation AS a";'), file)

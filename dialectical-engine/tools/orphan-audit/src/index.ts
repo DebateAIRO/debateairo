@@ -920,7 +920,7 @@ export async function auditOrphans(): Promise<{
       // Side-by-side spec §13 (S14): check-version's two halves, operator commands run from a release's own folders.
       "apps/runner:settings:check-runner (check-version, the runner half)",
       "apps/api:settings:check-api (check-version, the API half)",
-      // Side-by-side spec §13, §11 (S15): the settings operator (verdict, activate, status, latest-passed, switch-plan).
+      // Side-by-side spec §13, §11 (S15): the settings operator (verdict, activate, status, rollback-version, switch-plan).
       "tools/settings-version:settings:verdict|activate|status (the settings operator, cli.ts)",
       "apps/scheduler:job:replay-self-test",
       "apps/scheduler:job:liveness-sweep",
