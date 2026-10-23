@@ -57,12 +57,14 @@ import { firstCallPlanModels, type RoleRotationCounts } from "@debateai/scorecar
 import {
   assertPreviewProviderTargets,
   assertPreviewRoleTargets,
+  previewPlanTierRosters,
   resolvePreviewLineUp,
   type PreviewGateSettings,
   type PreviewLineUp,
   type PreviewProviderTestConfig,
   type ProviderDiscoveryTarget
 } from "@debateai/providers";
+import { journalSettingsCode } from "./admission-alarm.js";
 import { composeAskModelPicker, type AskModelPickerBoot, type AskModelPickerSettings, type CallTokenCeilings } from "./ask-model-picker.js";
 import { assertEngineHasLengthPolicy } from "./engine-ask.js";
 import { previewVersionTermsOf, readPreviewBudgetGateSettings, type PreviewBudgetGateSettings, type PreviewVersionTerms } from "./preview-budget-estimate.js";
@@ -313,7 +315,15 @@ const UNSTAGED: AdmissionStage = async (_name, run) => run();
  * failure propagates (ruling R32), so no version is kept story-less because of one passing blip.
  */
 export async function loadAdmissionSettings(pool: Pool, version: number, site: AdmissionSiteContext,
-  stage?: AdmissionStage, options?: Readonly<{ readers?: AdmissionVersionReaders }>): Promise<AdmissionVersionSettings> {
+  stage?: AdmissionStage, options?: Readonly<{
+    readers?: AdmissionVersionReaders;
+    /**
+     * Final fix wave F9, ruling R79: B9's first calls grouped by the version's composed preview rosters (true), or by the
+     * code's plan rosters (false). Absent: true for every version but the site version — the site version at boot keeps
+     * today's grouping until a live dry run (owner-visible). check-version's API half passes true for any version.
+     */
+    groupRunCeilingByPreviewRosters?: boolean;
+  }>): Promise<AdmissionVersionSettings> {
   const run = stage ?? UNSTAGED;
   const readers = options?.readers ?? ADMISSION_VERSION_READERS;
   const { declaredProviderTargets } = site;
@@ -435,7 +445,13 @@ export async function loadAdmissionSettings(pool: Pool, version: number, site: A
    * models refuses the version (RUN_CEILING_BELOW_ONE_CALL). Hosted, and only with the site's band. The per-run ceiling
    * is the version's; with a VALID scorecard each plan is seated from every configured model, except Free while billing
    * is on (paid plans S4b), which is priced on its own roster.
+   * Final fix wave F9, ruling R79: the rosters are the version's own composed preview rosters (`previewPlanTierRosters`:
+   * the code's PLAN_TIER_ROSTERS off the preview, exactly as before) for every version but the site version, and in
+   * check-version for any version (`groupRunCeilingByPreviewRosters`); the code's rosters, which no preview target
+   * serves, made the check vacuous on the preview. The site version at boot keeps today's grouping (no new boot refusal
+   * without a live dry run). The runner's loader (apps/runner/src/run-settings.ts) groups by the same rule.
    */
+  const groupByPreviewRosters = options?.groupRunCeilingByPreviewRosters ?? version !== site.siteVersion;
   await run("run-ceiling-covers-one-call", async () => {
     if (costEnvelope === null || siteBand === null) return;
     const firstCalls = firstPositionCallProjections({
@@ -455,7 +471,7 @@ export async function loadAdmissionSettings(pool: Pool, version: number, site: A
         projections: firstCalls,
         rosters: firstCallPlanModels({
           scorecardInForce: modelPicker.scorecard.state === "VALID",
-          rosters: PLAN_TIER_ROSTERS,
+          rosters: groupByPreviewRosters ? previewPlanTierRosters(previewConfig, PLAN_TIER_ROSTERS) : PLAN_TIER_ROSTERS,
           models: firstCalls.map((call) => call.model),
           ownRosterOnly: site.billingEnabled ? ["free"] : []
         })
@@ -627,8 +643,14 @@ export function admissionViewOf(version: AdmissionVersionSettings): AdmissionVie
  * this once per request (the pointer's one-second cache, then the per-version cache), so /new advises on the version
  * the next ask is admitted on. Their answers only advise (the ask is authoritative and refuses on its own), so a version
  * the cache refuses with a settings code (never in practice: activation needs a PASS of the same loader) is answered
- * from `fallback` (the site version) with one ADMISSION_SETTINGS_UNSUPPORTED line per version; a database failure
- * propagates, as any route's.
+ * from `fallback` (the site version) with one ADMISSION_SETTINGS_UNSUPPORTED line per version (its detail withheld
+ * unless plainly not a secret: final fix wave S14).
+ * Final fix wave F1: these reads NEVER throw. The page reads a 500 from GET /v1/session as "signed out", so a failure
+ * that is not a settings code (the database, an untyped error) while the pointer is read or a NEW active version loads
+ * is answered from the last view answered well (the version before the activation), else from `fallback`, with one
+ * content-free ADMISSION_VIEW_FALLBACK line per version (`version` null for the pointer's own failure, whose `cause` is
+ * its code; a load's is UNTYPED);
+ * the failure is not kept, so the next read reads and loads again (the cache keeps none: ruling R31).
  */
 export function createAdmissionView(input: Readonly<{
   activeSettingsVersion: () => Promise<number>;
@@ -638,25 +660,45 @@ export function createAdmissionView(input: Readonly<{
 }>): () => Promise<AdmissionView> {
   const views = new Map<number, AdmissionView>();
   const said = new Set<number>();
+  const fellBack = new Set<number | null>();
   const fallbackView = admissionViewOf(input.fallback);
+  let lastGood: AdmissionView | null = null;
+  const fellBackOn = (version: number | null, cause: string): AdmissionView => {
+    if (!fellBack.has(version)) {
+      fellBack.add(version);
+      input.log(JSON.stringify({ kind: "DEBATEAI_ADMISSION_SETTINGS", code: "ADMISSION_VIEW_FALLBACK", version, cause }));
+    }
+    return lastGood ?? fallbackView;
+  };
   return async () => {
-    const version = await input.activeSettingsVersion();
+    let version: number;
+    try {
+      version = await input.activeSettingsVersion();
+    } catch (error) {
+      const code = settingsRefusalCode(error);
+      return fellBackOn(null, code === null ? "UNTYPED" : journalSettingsCode(code));
+    }
     const kept = views.get(version);
-    if (kept !== undefined) return kept;
+    if (kept !== undefined) {
+      lastGood = kept;
+      return kept;
+    }
     let loaded: AdmissionVersionSettings;
     try {
       loaded = await input.admissionSettingsFor(version);
     } catch (error) {
       const code = settingsRefusalCode(error);
-      if (code === null) throw error;
+      if (code === null) return fellBackOn(version, "UNTYPED");
       if (!said.has(version)) {
         said.add(version);
-        input.log(JSON.stringify({ kind: "DEBATEAI_ADMISSION_SETTINGS", code: "ADMISSION_SETTINGS_UNSUPPORTED", version, cause: code }));
+        input.log(JSON.stringify({ kind: "DEBATEAI_ADMISSION_SETTINGS", code: "ADMISSION_SETTINGS_UNSUPPORTED", version,
+          cause: journalSettingsCode(code) }));
       }
       return fallbackView;
     }
     const view = admissionViewOf(loaded);
     views.set(version, view);
+    lastGood = view;
     return view;
   };
 }

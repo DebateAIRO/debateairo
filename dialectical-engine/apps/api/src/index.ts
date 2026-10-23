@@ -3,6 +3,7 @@ import { registerPasswordResetRoutes, passwordResetPolicyInventory } from "./pas
 import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-routes.js";
 import type { PasswordResetApplication } from "./password-reset.js";
 import { settingsVersionPassed, type ReleaseLifecycleState, type ReleaseState, type ReleaseWatcher } from "./release-state.js";
+import { activeVersionAlarm, journalSettingsCode, type ActiveVersionAlarm } from "./admission-alarm.js";
 import type { BackupEmailApplication, MfaRecoveryApplication } from "./email-mfa-recovery.js";
 import type { SocialStepUpApplication } from './social-step-up.js';
 import { SocialAuthError, SOCIAL_BROWSER_COOKIE, SOCIAL_FLOW_COOKIE, SOCIAL_APPLE_FLOW_COOKIE, type SocialAuthApplication } from './social-auth.js';
@@ -108,7 +109,7 @@ import {
 import type { Pool, PoolClient, QueryResultRow, QueryResult } from "pg";
 import { assertPreviewBudgetAdmits, PreviewGateUnavailableRefusal, type PreviewAdmissionLock, type PreviewBudgetGateSettings } from "./preview-budget-estimate.js";
 import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository } from "@debateai/battery";
-import type { SpendScope, WaitsFor } from "@debateai/budget";
+import type { AdmissionHold, SpendScope, WaitsFor } from "@debateai/budget";
 import {
   MAX_OWNER_PRIVATE_HISTORY_SCAN,
   RELEASE_LIFECYCLE_STATES,
@@ -2320,6 +2321,18 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   });
   const admissionView = async (): Promise<Omit<AdmissionView, "registerVersion"> & Readonly<{ registerVersion?: number }>> =>
     options.admissionView === undefined ? staticView : options.admissionView();
+  /**
+   * Addition D24, final fix wave S13: GET /v1/public/ai-providers' one answer, parsed ONCE, here, when the API is built
+   * (main.ts builds it at boot): a set the strict schema refuses (an empty name, more than 32 companies) refuses the
+   * build loudly and content-free (PUBLIC_AI_PROVIDERS_INVALID), instead of a 500 on every page read.
+   */
+  const aiProvidersAnswer = (() => {
+    try {
+      return Object.freeze(PublicAiProvidersResponseSchema.parse({ companies: [...(options.aiProviderCompanies ?? [])] }));
+    } catch {
+      throw new TypeError("PUBLIC_AI_PROVIDERS_INVALID");
+    }
+  })();
   // Crisis check: compile its patterns now, not on the first question (about a second, once).
   warmCrisisCheck();
   const allowedOrigin = options.allowedOrigin === undefined
@@ -3515,7 +3528,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (!admitOrRefuse(reply, "publicReads", "GET /v1/public/ai-providers", clientIpNetworkScope(sourceFor(request).ip))) {
       return reply;
     }
-    return reply.send(PublicAiProvidersResponseSchema.parse({ companies: [...(options.aiProviderCompanies ?? [])] }));
+    return reply.send(aiProvidersAnswer);
   });
   if (options.registration !== undefined) {
     api.post("/v1/auth/register", credentialRoutePolicy("POST /v1/auth/register"), async (request, reply) => {
@@ -4584,6 +4597,12 @@ export interface RunCreationSettings {
     activeSettingsVersion(): Promise<number>;
     admissionSettingsFor(version: number): Promise<AdmissionRunMembers>;
   }>;
+  /**
+   * Ruling R77 (final fix wave F2b): the once-a-minute alarm an ask says when the active version is not passed by this
+   * release or cannot be loaded by this API (./admission-alarm.ts). Absent: the process's own (`activeVersionAlarm`);
+   * tests hand their own. A process member, never a version's.
+   */
+  readonly activeVersionAlarm?: ActiveVersionAlarm;
 }
 
 /**
@@ -4657,7 +4676,7 @@ async function askSettingsOf(process: RunCreationSettings): Promise<AskSettings>
   } catch (error) {
     const code = settingsRefusalCode(error);
     if (code === null) throw error;
-    unsupportedAdmissionVersion(version, code);
+    unsupportedAdmissionVersion(version, code, process.activeVersionAlarm ?? activeVersionAlarm);
     return Object.freeze({ settings: process, settingsUnavailable: true });
   }
   if (members.registerVersion !== version) throw new TypeError("ADMISSION_SETTINGS_VERSION_MISMATCH");
@@ -4672,11 +4691,14 @@ async function askSettingsOf(process: RunCreationSettings): Promise<AskSettings>
 
 /**
  * Side-by-side spec §13 (S10) — AN ACTIVE VERSION THIS API CANNOT ADMIT ON: one content-free line
- * (ADMISSION_SETTINGS_UNSUPPORTED: the version and the loader's code). What the ask then comes to is the caller's
- * (Task S11, ruling R47): with a room it waits in line (SWITCHING), without one the plain refusal below.
+ * (ADMISSION_SETTINGS_UNSUPPORTED: the version and the loader's code, its owner-typed detail withheld unless plainly not a
+ * secret: final fix wave S14, `journalSettingsCode`), and ruling R77's once-a-minute alarm (UNSUPPORTED). What the ask
+ * then comes to is the caller's (Task S11, ruling R47): with a room it waits in line (SWITCHING), without one the plain
+ * refusal below.
  */
-function unsupportedAdmissionVersion(version: number, code: string): void {
-  console.error(JSON.stringify({ kind: "DEBATEAI_ADMISSION_SETTINGS", code: ADMISSION_SETTINGS_UNSUPPORTED, version, cause: code }));
+function unsupportedAdmissionVersion(version: number, code: string, alarm: ActiveVersionAlarm): void {
+  console.error(JSON.stringify({ kind: "DEBATEAI_ADMISSION_SETTINGS", code: ADMISSION_SETTINGS_UNSUPPORTED, version, cause: journalSettingsCode(code) }));
+  alarm(version, "UNSUPPORTED");
 }
 
 /**
@@ -5245,9 +5267,13 @@ export async function evaluationOrRefusal(
 }
 
 /** What the room's locked decision produced inside the lease. */
+/**
+ * What the room's decision came to for one ask. A WAIT's `cause` (final fix wave S8b) is the hold that ALONE decided the
+ * wait (decideAdmission's `cause`: SWITCHING or SITE_BUSY), else null; the journal line names it instead of the scope.
+ */
 type RoomOutcome =
   | Readonly<{ kind: "START"; runId: string; workItemId: string }>
-  | Readonly<{ kind: "WAIT"; runId: string; waitsUntil: Date; scope: SpendScope; waitsFor: WaitsFor | null }>;
+  | Readonly<{ kind: "WAIT"; runId: string; waitsUntil: Date; scope: SpendScope; waitsFor: WaitsFor | null; cause: AdmissionHold | null }>;
 
 /**
  * A run's first job, named once: `submit` queues it, and a failed setup records
@@ -5387,6 +5413,19 @@ export class PostgresAskApplication implements AskApplication {
     // S11 (ruling R47): a version this API cannot load waits in the room's line (SWITCHING), else is refused plainly.
     const { settings, settingsUnavailable } = await askSettingsOf(this.settings);
     if (settingsUnavailable && settings.room === undefined) settingsUnavailableRefusal();
+    // Side-by-side spec §13 "The API re-checks at admission" (Task S11, ruling R47; final fix wave S3): the direct path
+    // has no room and so no waiting line (P7). Right beside the cannot-load refusal, before any provider probe, admission
+    // step or reservation, one query asks whether this release has passed the version the ask is admitted on; not passed,
+    // the ask is refused plainly (nothing written, nothing charged, no paid probe) with one content-free line and ruling
+    // R77's alarm. Without the reader (`admissionSettings` absent) the ask is admitted on the site version, which its own
+    // release always passes (D1; RELEASE_KEY's number is REGISTER_VERSION), so nothing is asked. The room path asks the
+    // same question inside its locked decision instead (its gate: SWITCHING, the ask waits in line).
+    if (settings.room === undefined && settings.admissionSettings !== undefined
+      && !(await settingsVersionPassed(this.pool, settings.releaseKey, settings.registerVersion))) {
+      console.error(JSON.stringify({ kind: "DEBATEAI_ADMISSION_SETTINGS", code: ADMISSION_SETTINGS_NOT_PASSED, version: settings.registerVersion }));
+      (settings.activeVersionAlarm ?? activeVersionAlarm)(settings.registerVersion, "NOT_PASSED");
+      settingsUnavailableRefusal();
+    }
     if (principal.kind === "server") {
       if (session.ownership_provenance !== "server_session" || session.asker_id !== `owner:${principal.ownerRef}`) {
         throw new TypedDomainError("RUN_PRINCIPAL_SESSION_MISMATCH", "The server session and opaque run owner must match");
@@ -5496,16 +5535,8 @@ export class PostgresAskApplication implements AskApplication {
     // receipt the runner locks by. A run with no shape (one maker) stores today's guess and today's ask contract.
     const storedLanguageLock = (envelopeBasis.shape ?? null) === null ? null : questionLanguageLock;
     const argumentLanguage = runLanguageOf(storedLanguageLock, ask.question_line);
-    // Side-by-side spec §13 "The API re-checks at admission" (Task S11, ruling R47): the direct path has no room and so no
-    // waiting line (P7). Just before anything is written, one query asks whether this release has passed the version
-    // the ask was admitted on; not passed, the ask is refused plainly (nothing written, nothing charged) with one
-    // content-free line. Without the reader (`admissionSettings` absent) the ask is admitted on the site version, which
-    // its own release always passes (D1; RELEASE_KEY's number is REGISTER_VERSION), so nothing is asked.
-    if (settings.admissionSettings !== undefined
-      && !(await settingsVersionPassed(this.pool, settings.releaseKey, settings.registerVersion))) {
-      console.error(JSON.stringify({ kind: "DEBATEAI_ADMISSION_SETTINGS", code: ADMISSION_SETTINGS_NOT_PASSED, version: settings.registerVersion }));
-      settingsUnavailableRefusal();
-    }
+    // (The direct path's "has this release passed the version?" re-check runs first of all, beside the cannot-load
+    // refusal: final fix wave S3.)
     let runId:string;
     // Set the moment startRun commits: the lease's release can still throw
     // after that, and the run then exists with nothing to start it.
@@ -5885,7 +5916,7 @@ export class PostgresAskApplication implements AskApplication {
             await room.enterWait(tx, runId, now);
             return Object.freeze({
               kind: "WAIT" as const, runId, waitsUntil: admission.waitsUntil, scope: admission.worstScope,
-              waitsFor: admission.waitsFor ?? null
+              waitsFor: admission.waitsFor ?? null, cause: admission.cause ?? null
             });
           }
           if (swappedAt !== null) {
@@ -5925,7 +5956,11 @@ export class PostgresAskApplication implements AskApplication {
       model_strength_stepped_down: pinned.assignment.steppedDown
     };
     if (outcome.kind === "WAIT") {
-      console.info(JSON.stringify(Object.freeze({ event: "api.ask.waiting", runId: outcome.runId, scope: outcome.scope })));
+      // Final fix wave S8b: a wait the hold alone decided (a switch, or the version not passed: SWITCHING; the site's cap:
+      // SITE_BUSY) names that cause, not the day's scope it never measured; any other wait names its scope, as before.
+      console.info(JSON.stringify(Object.freeze(outcome.cause === null
+        ? { event: "api.ask.waiting", runId: outcome.runId, scope: outcome.scope }
+        : { event: "api.ask.waiting", runId: outcome.runId, cause: outcome.cause })));
       return Object.freeze({
         run_ref: outcome.runId,
         status: "WAITING" as const,

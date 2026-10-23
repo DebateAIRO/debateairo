@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from "pg";
 import { SITE_CONCURRENT_DEBATES, readCurrentRelease, readReleaseState, type ReleaseLifecycleState } from "@debateai/db";
 import { readActiveSettingsVersionOn } from "./active-settings-version.js";
+import { activeVersionAlarm, type ActiveVersionAlarm } from "./admission-alarm.js";
 import type { AskAdmissionGate } from "./ask-room.js";
 
 /**
@@ -351,7 +352,10 @@ export function siteCapBootLine(input: Readonly<{ hosted: boolean; roomComposed:
  *   start on, a current release must also have passed it — one query, after the release read and on the same
  *   transaction (`settingsVersionPassed`); not passed is not current (the decision waits, SWITCHING). This covers an
  *   ask in flight across an activation or a switch and the 1 s pointer cache; the current release's waker starts it
- *   within a tick, re-admitted under O3 (S13). Without a version, the release alone, as in Phase 1.
+ *   within a tick, re-admitted under O3 (S13). Without a version, the release alone, as in Phase 1. Ruling R77 (final
+ *   fix wave F2b): a CURRENT release that has not passed the version says the once-a-minute alarm (NOT_PASSED,
+ *   ./admission-alarm.ts) — the asks and the waiting debates it holds would otherwise wait silently; a staged release
+ *   (not current) says nothing, its SWITCHING is a switch under way.
  * - `activeDebates` counts the runs with a READY or CLAIMED job across every release (0083's partial index
  *   work_item_live_run_idx answers it without reading history).
  * - `activeSettingsVersion` (side-by-side spec §13, C14, Task S13; only when built with `siteVersion`, as main.ts and
@@ -369,13 +373,19 @@ export class PostgresAskAdmissionGate implements AskAdmissionGate {
   readonly siteConcurrentDebates: number;
   readonly #hosted: boolean;
   readonly activeSettingsVersion?: (tx: Pick<PoolClient, "query">) => Promise<number>;
+  readonly #alarm: ActiveVersionAlarm;
 
-  constructor(options: Readonly<{ releaseKey: string; hosted: boolean; siteConcurrentDebates?: number; siteVersion?: number }>) {
+  constructor(options: Readonly<{
+    releaseKey: string; hosted: boolean; siteConcurrentDebates?: number; siteVersion?: number;
+    /** Ruling R77: the alarm a current release's unpassed version says (absent: the process's own). */
+    alarm?: ActiveVersionAlarm;
+  }>) {
     const cap = options.siteConcurrentDebates ?? SITE_CONCURRENT_DEBATES;
     if (!Number.isSafeInteger(cap) || cap < 1) throw new TypeError("ASK_ADMISSION_GATE_INVALID");
     this.releaseKey = options.releaseKey;
     this.siteConcurrentDebates = cap;
     this.#hosted = options.hosted;
+    this.#alarm = options.alarm ?? activeVersionAlarm;
     const siteVersion = options.siteVersion;
     if (siteVersion !== undefined) {
       if (!Number.isSafeInteger(siteVersion) || siteVersion < 1) throw new TypeError("ASK_ADMISSION_GATE_INVALID");
@@ -387,7 +397,9 @@ export class PostgresAskAdmissionGate implements AskAdmissionGate {
     const current = await readCurrentRelease(tx as Pick<Pool, "query">);
     const own = current === null ? !this.#hosted : current.releaseKey === this.releaseKey;
     if (!own || registerVersion === undefined) return own;
-    return settingsVersionPassed(tx, this.releaseKey, registerVersion);
+    const passed = await settingsVersionPassed(tx, this.releaseKey, registerVersion);
+    if (!passed) this.#alarm(registerVersion, "NOT_PASSED");
+    return passed;
   }
 
   async activeDebates(tx: Pick<PoolClient, "query">): Promise<number> {

@@ -176,7 +176,10 @@ export type AdmissionCheckReaders = Readonly<{
 
 export const ADMISSION_CHECK_READERS: AdmissionCheckReaders = Object.freeze({
   readSite: readAdmissionCheckSite,
-  loadVersion: (pool: Pool, version: number, site: AdmissionSiteContext) => loadAdmissionSettings(pool, version, site),
+  // Final fix wave F9, ruling R79: B9 groups by the version's own preview rosters for ANY version checked (the runner
+  // half by the same rule): the code's rosters, which no preview target serves, checked nothing on the preview.
+  loadVersion: (pool: Pool, version: number, site: AdmissionSiteContext) =>
+    loadAdmissionSettings(pool, version, site, undefined, { groupRunCeilingByPreviewRosters: true }),
   readVersionFacts: readSettingsVersionFacts,
   readComparisonRows: readSettingsComparisonRows,
   readLineUp: readSealedPreviewLineUp,

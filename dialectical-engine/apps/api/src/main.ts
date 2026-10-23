@@ -7,6 +7,7 @@ import {
   admissionSettingsOfVersion, buildAdmissionSiteContext, createAdmissionSettingsCache, decideAskRoomReadiness, createAdmissionView, loadAdmissionSettings, type AdmissionSiteContext
 } from "./admission-settings.js";
 import { createActiveSettingsVersionReader } from "./active-settings-version.js";
+import { activeVersionAlarm, checkActiveSettingsVersionAtBoot } from "./admission-alarm.js";
 import { PasswordResetService } from "./password-reset.js";
 import { PasswordResetNotificationWorker, SendmailPasswordResetSender } from "./password-reset-mail.js";
 import { BackupEmailService, MfaRecoveryService } from "./email-mfa-recovery.js";
@@ -161,7 +162,7 @@ import {
 } from "./account-erasure.js";
 import { installBootCustody } from "./boot-custody.js";
 import { installStartupResourceOwner } from "./startup-resource-owner.js";
-import { PostgresAskAdmissionGate, PostgresReleaseStateReader, ReleaseWatcher, siteCapBootLine } from "./release-state.js";
+import { PostgresAskAdmissionGate, PostgresReleaseStateReader, ReleaseWatcher, settingsVersionPassed, siteCapBootLine } from "./release-state.js";
 import { gatedInterval, gatedTrigger } from "./release-loops.js";
 import { PostgresEvaluatorDevMenuRepository } from "@debateai/evaluator";
 import { RecoveryStartService } from "./recovery.js";
@@ -625,7 +626,8 @@ const admissionCache = createAdmissionSettingsCache({
  * second, on this main pool; empty = the site version). Read once at boot, so a login that cannot call the reader
  * refuses the boot. The pointer's version itself is NOT loaded here: an API boots before its switch, while the pointer
  * may name the other release's version, which this release may not have passed; asks reach this API only once it is
- * current, and the switch guarantees the current release passed the active version.
+ * current, and the switch guarantees the current release passed the active version. (A release that is ALREADY current
+ * looks at it once after the release watcher's first read, below: "active-settings-version-check", ruling R77.)
  */
 const activeSettings = createActiveSettingsVersionReader({
   pool, siteVersion: environment.REGISTER_VERSION, log: (line) => { console.error(JSON.stringify(line)); }
@@ -1047,6 +1049,20 @@ const publications = publicationCipher === undefined
     );
 // Side-by-side spec §4 (plan C3): the first read is awaited (a failure is recorded, never thrown), then it polls.
 await boot.run("release-watcher", () => releaseWatcher.start());
+/**
+ * Ruling R77 (final fix wave F2c): a release that is ALREADY current (a restart, not a staged boot) loads the active
+ * version once and asks whether it passed it; either failing prints the loud ADMISSION_ACTIVE_VERSION_UNAVAILABLE line
+ * (an env change after a restart, or a FAIL on the pair, would otherwise hold every new debate silently). It never
+ * refuses the boot (never throws): a staged release boots before its switch, as the pointer's comment above says.
+ */
+await boot.run("active-settings-version-check", () => checkActiveSettingsVersionAtBoot({
+  current: releaseWatcher.ownIsCurrent(),
+  activeSettingsVersion: () => activeSettings.current(),
+  admissionSettingsFor: (version) => admissionCache.admissionSettingsFor(version),
+  passed: (version) => settingsVersionPassed(pool, environment.RELEASE_KEY, version),
+  alarm: activeVersionAlarm,
+  log: (line) => { console.error(line); }
+}));
 let publicationCleanupTimer: ReturnType<typeof setInterval> | undefined;
 if (publications !== undefined) {
   // Crash-orphan publication keys are claimed and removed before the process

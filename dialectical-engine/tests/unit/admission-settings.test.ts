@@ -11,6 +11,7 @@
  * - the cache: one load per version, kept forever, the seed never loaded, settings refusals kept, database failures and
  *   untyped errors never kept.
  */
+import { readFileSync } from "node:fs";
 import { createServer, type Server, type Socket } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createPool, isDatabasePoolBusy } from "@debateai/db";
@@ -454,5 +455,58 @@ describe("createAdmissionSettingsCache over the house pool: a busy pool is never
     } finally {
       await pool.end().catch(() => undefined);
     }
+  });
+});
+
+/**
+ * Final fix wave F9, ruling R79 — THE RUN CEILING COVERS ONE CALL ON THE VERSION'S OWN PREVIEW ROSTERS. Plain words: a
+ * settings version may give the preview its own AI line-up and its own per-run money. B9 refuses a version whose money
+ * for arguing cannot pay even the first position's own call. On the preview it grouped the first calls by the CODE's
+ * plan rosters, which no preview target serves, so it checked nothing; for a version that is not the site version (and
+ * in check-version, for any version) it now groups them by the version's composed preview rosters. The site version at
+ * boot keeps today's grouping until a live dry run (owner-visible, R79).
+ */
+describe("final fix wave F9 (R79): B9 on the version's own preview rosters", () => {
+  /** A per-run ceiling far below any first call (seventy micro-dollars for arguing). */
+  const TINY_ROW = envelope(100, "tiny-version-row");
+  const preview = site({ preview: SOCKETS_ONLY_ENV });
+
+  it("a NON-site version whose per-run ceiling is below one call on its own preview roster is refused, and the cache keeps it unsupported", async () => {
+    const tiny = readers(VERSION, { readCostEnvelopePolicy: async () => TINY_ROW });
+    await expect(loadAdmissionSettings(POOL, VERSION, preview, undefined, { readers: tiny.readers }))
+      .rejects.toMatchObject({ code: "RUN_CEILING_BELOW_ONE_CALL" });
+    const load = vi.fn((version: number) => loadAdmissionSettings(POOL, version, preview, undefined,
+      { readers: readers(version, { readCostEnvelopePolicy: async () => TINY_ROW }).readers }));
+    const cache = createAdmissionSettingsCache({ load, seed: Object.freeze({ registerVersion: SITE_VERSION }) as unknown as AdmissionVersionSettings });
+    await expect(cache.admissionSettingsFor(VERSION)).rejects.toMatchObject({ code: "RUN_CEILING_BELOW_ONE_CALL" });
+    await expect(cache.admissionSettingsFor(VERSION)).rejects.toMatchObject({ code: "RUN_CEILING_BELOW_ONE_CALL" });
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it("(control) the same version with money that covers one call loads", async () => {
+    const fake = readers(VERSION);
+    await expect(loadAdmissionSettings(POOL, VERSION, preview, undefined, { readers: fake.readers })).resolves.toMatchObject({ registerVersion: VERSION });
+  });
+
+  it("the SITE version at boot keeps today's grouping (the code's rosters, which no preview target serves): it still loads", async () => {
+    const tiny = readers(SITE_VERSION, { readCostEnvelopePolicy: async () => TINY_ROW });
+    await expect(loadAdmissionSettings(POOL, SITE_VERSION, preview, undefined, { readers: tiny.readers }))
+      .resolves.toMatchObject({ registerVersion: SITE_VERSION });
+  });
+
+  it("check-version groups by the preview rosters for any version, the site version included (its loader option)", async () => {
+    const tiny = readers(SITE_VERSION, { readCostEnvelopePolicy: async () => TINY_ROW });
+    await expect(loadAdmissionSettings(POOL, SITE_VERSION, preview, undefined, { readers: tiny.readers, groupRunCeilingByPreviewRosters: true }))
+      .rejects.toMatchObject({ code: "RUN_CEILING_BELOW_ONE_CALL" });
+    const source = readFileSync(new URL("../../apps/api/src/settings-check.ts", import.meta.url), "utf8");
+    expect(source).toContain("loadVersion: (pool: Pool, version: number, site: AdmissionSiteContext) =>\n"
+      + "    loadAdmissionSettings(pool, version, site, undefined, { groupRunCeilingByPreviewRosters: true }),");
+  });
+
+  it("off the preview a non-site version is grouped by the code's rosters, as today", async () => {
+    const fake = readers(VERSION, { readCostEnvelopePolicy: async () => TINY_ROW, readPreviewLineUpPolicy: async () => null });
+    // Off the preview no preview target serves the code's rosters here either: nothing to check, it loads.
+    await expect(loadAdmissionSettings(POOL, VERSION, site({ preview: undefined }), undefined, { readers: fake.readers }))
+      .resolves.toMatchObject({ registerVersion: VERSION, previewConfig: undefined });
   });
 });

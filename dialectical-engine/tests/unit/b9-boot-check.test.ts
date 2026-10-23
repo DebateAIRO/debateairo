@@ -291,7 +291,10 @@ describe("B9d · both hosted boots run the check, under the new settings only", 
     expect(loader).toContain(
       "judgeTokenCeiling: lengthGuidedFirstCallCeiling(await readers.readJudgeTokenCeiling(pool, version), lengthGuidancePolicy),");
     expect(stage).toBeGreaterThan(loader.indexOf("await run(\"length-guidance-policy\""));
-    expect(loader).toContain("rosters: PLAN_TIER_ROSTERS");
+    // Final fix wave F9, ruling R79: the version's own preview rosters (the code's off the preview), except the site
+    // version at boot, which keeps the code's rosters; check-version passes the option for any version.
+    expect(loader).toContain("rosters: groupByPreviewRosters ? previewPlanTierRosters(previewConfig, PLAN_TIER_ROSTERS) : PLAN_TIER_ROSTERS,");
+    expect(loader).toContain("const groupByPreviewRosters = options?.groupRunCeilingByPreviewRosters ?? version !== site.siteVersion;");
     // PF-L38: the lock is priced only with the debate-shape row in force (read before this stage).
     expect(loader).toContain("questionLanguageLocked: debateShapeInForcePolicy !== null");
     expect(stage).toBeGreaterThan(loader.indexOf("const debateShapeInForcePolicy ="));

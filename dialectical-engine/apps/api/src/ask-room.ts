@@ -21,6 +21,7 @@ import {
 } from "@debateai/budget";
 import { recordRunSupersession, settingsRefusalCode, type RunOwnershipAccess, type WaitReason, type WaitingRun, type WaitingRunCursor, type WaitingRunRef } from "@debateai/db";
 import { debateShapePlanKeyOf, planById, type BillingPlans, type DebateShapePlanKey, type PlanId } from "@debateai/register";
+import { journalSettingsCode } from "./admission-alarm.js";
 import { runShapeClassOf } from "./debate-shape-ask.js";
 import type { ReadmissionPlan } from "./readmission.js";
 
@@ -701,8 +702,12 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
       const active = gate?.activeSettingsVersion === undefined ? undefined : await gate.activeSettingsVersion(tx);
       // Re-admitted, never started on its own row: another release admitted it, or (S13) its version is not the active one.
       const stale = gate !== undefined && (run.releaseKey !== gate.releaseKey || (active !== undefined && run.registerVersion !== active));
-      // S13: a READMIT planned on a version that is no longer the active one plans again (step 4).
-      const planMoved = readmit !== null && active !== undefined && readmission?.registerVersion !== active;
+      // S13: a READMIT planned on a version that is no longer the active one plans again (step 4). Final fix wave S4: so
+      // does an ASK_AGAIN decided on one (any re-admission naming its version): "please ask again" is never said on a
+      // version that is no longer active, whose choices the person might still have.
+      // (A READMIT without a version is moved, as before S4; an ASK_AGAIN only when it names one.)
+      const planMoved = active !== undefined && readmission !== undefined
+        && (readmit !== null || readmission.registerVersion !== undefined) && readmission.registerVersion !== active;
       // Side-by-side spec §13 (Task S11, S13): the version this start would run on — the run's own stamp (the active
       // version, when the pointer is read), or a re-admission's new one. Phase one of a stale run starts nothing (its old
       // version is not this start's to pass), and neither does an ASK_AGAIN plan or a moved plan: the release alone.
@@ -732,7 +737,7 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
       const planId = entitlement?.planId ?? null;
       // Side-by-side C11, step 4: the plan was made for the billing plan read in phase one; another one now plans again.
       // S13: so does a plan made on a version that is no longer the active one (an activation between plan and START).
-      if (readmit !== null && (planId !== readmit.planId || planMoved)) return Object.freeze({ kind: "NEEDS_READMISSION" as const, planId });
+      if ((readmit !== null && planId !== readmit.planId) || planMoved) return Object.freeze({ kind: "NEEDS_READMISSION" as const, planId });
       // RULINGS-R2 Q-11: the hold is B2's estimate for the run's settings class; the
       // waker never re-picks the run's models (a known limit, bounded by B9's wall).
       // Side-by-side spec §13 (S10): at the version the run was stamped with (its own per-run cap).
@@ -892,7 +897,9 @@ export class AskRoom implements AskRoomPort, AskRoomReader, AskWaitingLinePort {
       if (!this.#estimatorFallbacksSaid.has(version)) {
         this.#estimatorFallbacksSaid.add(version);
         console.error(JSON.stringify({
-          kind: "DEBATEAI_ADMISSION_SETTINGS", code: "ADMISSION_ESTIMATOR_FALLBACK", version, cause: settingsRefusalCode(error) ?? "UNTYPED"
+          kind: "DEBATEAI_ADMISSION_SETTINGS", code: "ADMISSION_ESTIMATOR_FALLBACK", version,
+          // Final fix wave S14: an owner-typed detail is printed only when plainly not a secret.
+          cause: journalSettingsCode(settingsRefusalCode(error) ?? "UNTYPED")
         }));
       }
       return this.#options.estimator;

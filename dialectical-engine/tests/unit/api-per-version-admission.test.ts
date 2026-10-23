@@ -648,7 +648,7 @@ describe("(5, composition) main.ts answers the pages from the active version: cr
     expect(load.mock.calls).toEqual([[ACTIVE], [19]]);
   });
 
-  it("a version the cache refuses is answered from the site version, said once per version; a database failure propagates", async () => {
+  it("a version the cache refuses is answered from the site version, said once per version; a database failure is never thrown (F1)", async () => {
     const lines: string[] = [];
     const failure = new Error("Connection terminated unexpectedly");
     let refusal: unknown = new TypedDomainError("PREVIEW_LINE_UP_REQUIRED", "PREVIEW_LINE_UP_REQUIRED");
@@ -659,8 +659,12 @@ describe("(5, composition) main.ts answers the pages from the active version: cr
     expect(lines).toEqual([JSON.stringify({
       kind: "DEBATEAI_ADMISSION_SETTINGS", code: "ADMISSION_SETTINGS_UNSUPPORTED", version: ACTIVE, cause: "PREVIEW_LINE_UP_REQUIRED"
     })]);
+    // Final fix wave F1: a database failure is answered too (no good view yet: the site version's), with its own one line.
     refusal = failure;
-    await expect(view()).rejects.toBe(failure);
+    expect(await view()).toEqual({ registerVersion: SITE, modelScorecardInForce: false });
+    expect(lines.slice(1)).toEqual([JSON.stringify({
+      kind: "DEBATEAI_ADMISSION_SETTINGS", code: "ADMISSION_VIEW_FALLBACK", version: ACTIVE, cause: "UNTYPED"
+    })]);
   });
 
   it("main.ts hands buildApi the view over the pointer's reader and the admission cache, and no static row or yes/no", () => {
@@ -677,6 +681,90 @@ describe("(5, composition) main.ts answers the pages from the active version: cr
     // The application reads the same pointer and the same cache per ask (S9's composition).
     expect(main).toContain("activeSettingsVersion: () => activeSettings.current(),\n    admissionSettingsFor: async (version) => "
       + "admissionSettingsOfVersion(await admissionCache.admissionSettingsFor(version))");
+  });
+});
+
+/**
+ * Side-by-side spec §13, final fix wave F1 — A NEW ACTIVE VERSION THAT FAILS TO LOAD NEVER FAILS A PAGE READ. Plain words:
+ * the sign-in check (GET /v1/session) and the /new page's room read only advise; the page treats a 500 from the session
+ * read as "signed out". So when the active version's first load fails for a reason that is not a settings code (the
+ * database, an untyped error), these reads answer the last version they answered well, else the site version, with one
+ * content-free line per version; the failure is not kept, so the next read loads again.
+ */
+describe("(F1) GET /v1/session and the room read never fail because a new active version did not load", () => {
+  function loaded(version: number, scorecard: "VALID" | "ABSENT"): AdmissionVersionSettings {
+    return Object.freeze({ registerVersion: version, debateShapePolicy: null, lengthGuidancePolicy: null,
+      modelPicker: { scorecard: { state: scorecard } }, previewConfig: undefined }) as unknown as AdmissionVersionSettings;
+  }
+  const DATABASE_DOWN = Object.assign(new Error("Connection terminated unexpectedly"), { code: "57P01" });
+
+  it("answers the last good view (the version answered before the activation), once said, and loads again next time", async () => {
+    const lines: string[] = [];
+    let active = ACTIVE;
+    let down = true;
+    const load = vi.fn(async (version: number) => {
+      if (version === 19 && down) throw DATABASE_DOWN;
+      return loaded(version, version === ACTIVE ? "VALID" : "ABSENT");
+    });
+    const view = createAdmissionView({ activeSettingsVersion: async () => active, admissionSettingsFor: load,
+      fallback: loaded(SITE, "ABSENT"), log: (line) => lines.push(line) });
+    expect(await view()).toEqual({ registerVersion: ACTIVE, modelScorecardInForce: true });
+    active = 19;
+    expect(await view()).toEqual({ registerVersion: ACTIVE, modelScorecardInForce: true });
+    expect(await view()).toEqual({ registerVersion: ACTIVE, modelScorecardInForce: true });
+    expect(lines).toEqual([JSON.stringify({ kind: "DEBATEAI_ADMISSION_SETTINGS", code: "ADMISSION_VIEW_FALLBACK", version: 19, cause: "UNTYPED" })]);
+    down = false;
+    expect(await view()).toEqual({ registerVersion: 19, modelScorecardInForce: false });
+    expect(load.mock.calls).toEqual([[ACTIVE], [19], [19], [19]]);
+  });
+
+  it("with no good view yet, the site version's; a pointer read that fails is answered the same way, said once", async () => {
+    const lines: string[] = [];
+    const view = createAdmissionView({ activeSettingsVersion: async () => { throw new Error("pointer down"); },
+      admissionSettingsFor: async () => loaded(ACTIVE, "VALID"), fallback: loaded(SITE, "ABSENT"), log: (line) => lines.push(line) });
+    expect(await view()).toEqual({ registerVersion: SITE, modelScorecardInForce: false });
+    expect(await view()).toEqual({ registerVersion: SITE, modelScorecardInForce: false });
+    expect(lines).toEqual([JSON.stringify({ kind: "DEBATEAI_ADMISSION_SETTINGS", code: "ADMISSION_VIEW_FALLBACK", version: null, cause: "UNTYPED" })]);
+  });
+
+  /** buildApi over main.ts's own view (`createAdmissionView`) whose active version 19 cannot be loaded: the database is down. */
+  async function withFailingView<T>(use: (api: ReturnType<typeof buildApi>, identity: ReturnType<typeof testHttpIdentity>,
+    read: RoomQuestion[]) => Promise<T>): Promise<T> {
+    const identity = testHttpIdentity("f1-admission-view");
+    const read: RoomQuestion[] = [];
+    const askRoom: AskRoomReader = {
+      readRoom: async (question) => {
+        read.push(question);
+        return { room: "FITS", scope: null, resetsAt: null, waitingRunRef: null, planId: null };
+      }
+    };
+    const admissionView = createAdmissionView({ activeSettingsVersion: async () => 19,
+      admissionSettingsFor: async () => { throw DATABASE_DOWN; }, fallback: loaded(SITE, "ABSENT"), log: () => undefined });
+    const api = buildApi({ application: fixtureApplication(), sessions: testSessionApplication([identity]),
+      allowedOrigin: TEST_APP_ORIGIN, askRoom, admissionView });
+    try {
+      return await use(api, identity, read);
+    } finally {
+      await api.close();
+    }
+  }
+
+  it("GET /v1/session answers 200 (the site version's yes/no), never a 500 the page would read as signed out", async () => {
+    await withFailingView(async (api, identity) => {
+      const response = await api.inject({ method: "GET", url: "/v1/session", headers: testSessionHeaders(identity) });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ model_scorecard_in_force: false });
+    });
+  });
+
+  it("GET /v1/asks/room answers 200, read from (and naming) the site version", async () => {
+    await withFailingView(async (api, identity, read) => {
+      const response = await api.inject({ method: "GET", url: "/v1/asks/room?plan_tier=premium&composition_budget_tier=high&depth=3",
+        headers: testSessionHeaders(identity) });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ room: "FITS", settings_version: SITE });
+      expect(read.map((question) => question.registerVersion)).toEqual([SITE]);
+    });
   });
 });
 
@@ -1123,6 +1211,16 @@ describe("(S11) the admission re-check also needs a passed settings version (sid
     expect(settingsAsked).toEqual([]);
   });
 
+  it("(S8b) the waiting journal line names the hold that alone decided the wait (SWITCHING), not the day's scope", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const gated = gatedRoom({ passed: (version) => version !== ACTIVE });
+    const { application } = arrange({ room: gated.room });
+    await expect(application.submit(ask(), session, principal)).resolves.toMatchObject({ status: "WAITING" });
+    const waiting = info.mock.calls.map(([line]) => JSON.parse(String(line)) as Record<string, unknown>)
+      .filter((line) => line.event === "api.ask.waiting");
+    expect(waiting).toEqual([{ event: "api.ask.waiting", runId: RUN_ID, cause: "SWITCHING" }]);
+  });
+
   it("through the room: a passed version is unchanged: QUEUED, its hold opened and its first job queued", async () => {
     const gated = gatedRoom();
     const { application } = arrange({ room: gated.room });
@@ -1165,13 +1263,55 @@ describe("(S11) the admission re-check also needs a passed settings version (sid
     }));
   });
 
-  it("the direct path: a passed version is admitted as before; the one query runs once, after the evaluation, before the run is written", async () => {
+  it("the direct path: a passed version is admitted as before; the one query runs once, before any provider probe (S3)", async () => {
     const { application, started, settingsAsked, used } = arrange();
     await expect(application.submit(ask(), session, principal)).resolves.toMatchObject({ run_ref: RUN_ID, status: "QUEUED" });
     expect(settingsAsked).toEqual([[PASSED_SQL, [RELEASE, ACTIVE]]]);
-    expect(used.indexOf("passed?")).toBeGreaterThan(used.indexOf("discovery"));
+    // Final fix wave S3: next to the cannot-load refusal, so a refused ask never paid for a probe.
+    expect(used.indexOf("passed?")).toBeGreaterThan(used.indexOf(`members:${String(ACTIVE)}`));
+    expect(used.indexOf("passed?")).toBeLessThan(used.indexOf("discovery"));
     expect(used.indexOf("passed?")).toBeLessThan(used.indexOf("startRun"));
     expect(started[0]!.registerVersion).toBe(ACTIVE);
+  });
+
+  it("(S3) the direct path: not passed is refused before any provider probe, admission step or reservation", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { application, used } = arrange({ passed: false });
+    await expect(application.submit(ask(), session, principal)).rejects.toMatchObject({ name: "AskRefusal", retryAt: expect.any(Date) });
+    expect(used).toEqual(["pointer", `members:${String(ACTIVE)}`, "passed?"]);
+  });
+
+  it("(F2b) the direct path: not passed also says the alarm line, through the process's once-a-minute alarm", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const alarm = vi.fn(() => true);
+    const { application } = arrange({ passed: false, site: () => ({ activeVersionAlarm: alarm }) });
+    await expect(application.submit(ask(), session, principal)).rejects.toMatchObject({ name: "AskRefusal" });
+    expect(alarm.mock.calls).toEqual([[ACTIVE, "NOT_PASSED"]]);
+  });
+
+  it("(F2b) a version this API cannot load says UNSUPPORTED: refused on the direct path, waiting SWITCHING through the room", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const refuse = () => new TypedDomainError("PREVIEW_LINE_UP_REQUIRED", "PREVIEW_LINE_UP_REQUIRED");
+    const direct = vi.fn(() => true);
+    await expect(arrange({ refuse, site: () => ({ activeVersionAlarm: direct }) }).application.submit(ask(), session, principal))
+      .rejects.toMatchObject({ name: "AskRefusal" });
+    expect(direct.mock.calls).toEqual([[ACTIVE, "UNSUPPORTED"]]);
+    const roomed = vi.fn(() => true);
+    const gated = gatedRoom();
+    await expect(arrange({ refuse, room: gated.room, site: () => ({ activeVersionAlarm: roomed }) }).application.submit(ask(), session, principal))
+      .resolves.toMatchObject({ status: "WAITING" });
+    expect(roomed.mock.calls).toEqual([[ACTIVE, "UNSUPPORTED"]]);
+  });
+
+  it("(F2b) the real gate: a CURRENT release that has not passed the version says NOT_PASSED; a staged one, or a passed version, nothing", async () => {
+    const alarm = vi.fn(() => true);
+    const gate = new PostgresAskAdmissionGate({ releaseKey: RELEASE, hosted: false, alarm });
+    expect(await gate.ownReleaseIsCurrent(gateTx({ current: RELEASE, passed: false }).tx, ACTIVE)).toBe(false);
+    expect(alarm.mock.calls).toEqual([[ACTIVE, "NOT_PASSED"]]);
+    expect(await gate.ownReleaseIsCurrent(gateTx({ current: OTHER_RELEASE, passed: false }).tx, ACTIVE)).toBe(false);
+    expect(await gate.ownReleaseIsCurrent(gateTx({ current: RELEASE, passed: true }).tx, ACTIVE)).toBe(true);
+    expect(await gate.ownReleaseIsCurrent(gateTx({ current: RELEASE, passed: false }).tx)).toBe(true);
+    expect(alarm).toHaveBeenCalledTimes(1);
   });
 
   it("the direct path without the reader asks nothing: the site version, which its own release always passes (D1)", async () => {
@@ -1198,7 +1338,11 @@ describe("(S12) an ask whose choices the active version no longer offers is aske
     expect(arranged.started).toEqual([]);
     expect(arranged.memory).toEqual([]);
     expect(arranged.used).not.toContain("discovery");
-    expect(arranged.settingsAsked).toEqual([]);
+    // Final fix wave S3: the direct path's one read-only "has this release passed it?" query now runs first, beside the
+    // cannot-load refusal (before this check) on the direct path; it writes nothing, and nothing else is asked.
+    // (Through the room the question is the room's own, on its transaction: none here.)
+    expect(arranged.settingsAsked.length).toBeLessThanOrEqual(1);
+    for (const [sql] of arranged.settingsAsked) expect(sql).toBe("SELECT register.settings_version_passed($1::text, $2::bigint) AS passed");
     expect(vi.mocked(WorkItemRepository.prototype.enqueue)).not.toHaveBeenCalled();
     expect(vi.mocked(WorkItemRepository.prototype.enqueueOn)).not.toHaveBeenCalled();
   }
@@ -1425,6 +1569,20 @@ describe("(S13) a waiting debate started after an activation is re-admitted on t
     expect(r.steps).toEqual(["pointer:tx", "release:undefined:tx"]);
     expect(createRun).not.toHaveBeenCalled();
     expect([r.holds, r.edges]).toEqual([[], []]);
+  });
+
+  it("(S4) an ASK_AGAIN decided on 18 while its START reads 19 plans again too: no 'please ask again' on a version no longer active", async () => {
+    const run = waiting({ registerVersion: SITE });
+    const r = s13Room({ active: () => 19, line: [run] });
+    const createRun = vi.fn(async () => "never");
+    const askAgain: Readmission = { plan: { kind: "ASK_AGAIN" } as unknown as Readmission["plan"], createRun, registerVersion: ACTIVE };
+    await expect(r.room.startWaiting(run, never, askAgain)).resolves.toEqual({ kind: "NEEDS_READMISSION", planId: null });
+    expect(r.steps).toEqual(["pointer:tx", "release:undefined:tx"]);
+    expect(createRun).not.toHaveBeenCalled();
+    expect([r.holds, r.edges, r.reasons]).toEqual([[], [], []]);
+    // (control) decided on the version still active, the same plan answers ASK_AGAIN, as before.
+    const same = s13Room({ active: () => ACTIVE, line: [run] });
+    await expect(same.room.startWaiting(run, never, { ...askAgain })).resolves.toEqual({ kind: "ASK_AGAIN" });
   });
 
   it("(5) a run stamped 18 while 18 is active starts on its own row, re-checked about 18 on the same transaction", async () => {
