@@ -2341,6 +2341,7 @@ echo "role connection limits:"; psqlq "SELECT rolname||' '||rolconnlimit FROM pg
 echo "connections in use, by login:"; psqlq "SELECT coalesce(usename, '(none)')||' '||count(*) FROM pg_stat_activity WHERE backend_type = 'client backend' GROUP BY usename ORDER BY 1" | tee "$P/pg-connections"
 echo "databases of this cluster:"; psqlq "SELECT datname FROM pg_database WHERE NOT datistemplate ORDER BY 1" | tee "$P/pg-databases"
 if grep -qx hatchet "$P/pg-databases"; then echo "HATCHET_DATABASE_IN_THIS_CLUSTER yes"; else echo "HATCHET_DATABASE_IN_THIS_CLUSTER no"; fi
+if grep -qx hatchet "$P/pg-databases"; then if runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d hatchet -XAt -c 'SELECT 1' >/dev/null 2>&1; then echo "HATCHET_DATABASE_ADMIN_CONNECT yes"; else echo "HATCHET_DATABASE_ADMIN_CONNECT no"; fi; fi
 for U in api:2147483648 ui:1073741824 runner:3221225472; do
   MP=$(systemctl show -p MemoryPeak --value "debateai-preview-${U%%:*}"); echo "${U%%:*} MemoryPeak $MP (new cap ${U#*:})" | tee -a "$P/memory"
   case "$MP" in ''|*[!0-9]*) ;; *) [ "$MP" -lt "${U#*:}" ] || { echo "TA0_NOT_DONE: the ${U%%:*}'s memory peak reaches its new MemoryMax: ask"; exit 1; };; esac
@@ -2398,6 +2399,10 @@ How to read what it printed:
 - `waiting debates` must be 0 at TB1; a number now only tells you to pick another quiet hour.
 - `HATCHET_DATABASE_IN_THIS_CLUSTER no` means Hatchet's database lives outside this cluster: the online backup of later
   uploads (SB7) would not hold it. Tell the owner.
+- `HATCHET_DATABASE_ADMIN_CONNECT no` means the postgres administrator may not connect to Hatchet's database (its
+  `pg_hba.conf` line names only `postgres,debateai`), so SB7's online backup would stop with `DUMP_FAILED` (R21 did).
+  Nothing to do for T; tell the owner: SB4 and SB7 refuse until that line also names `hatchet` ("What R21 needed",
+  under SB7).
 - The role limits, the connections in use and the memory lines are the numbers the connection budget (320, at least
   120 free during a switch) and the caps (runner 3G, API 2G, website 1G) were set from: show them to the owner.
 - The two lists under `/etc/systemd/system` name every file and link that still mentions a fixed unit. TB5 moves the
@@ -3603,6 +3608,8 @@ set -euo pipefail
 # SB4: the release check. SIDE_BY_SIDE goes on; DRAINED_PATH and NOT_READY stop here.
 GRR=''                                                    # the digest GATE_ROWS_N1 printed, once the owner reviewed those gate files; else empty
 LIFE=''                                                   # yes, once the owner reviewed the LIFECYCLE_FILES change; else empty
+HC=$(psqlq "SELECT count(*) FROM pg_database WHERE datname = 'hatchet'") || { echo "SB4_NOT_DONE: the database is unreadable"; exit 1; }
+if [ "$HC" = 1 ]; then runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d hatchet -XAt -c 'SELECT 1' >/dev/null || { echo "SB4_NOT_DONE: the postgres administrator cannot connect to the hatchet database (the error above), so SB7's online backup would stop with DUMP_FAILED. The fix R21 needed: in pg_hba.conf, 'local postgres,debateai postgres peer map=preview_root' becomes 'local postgres,debateai,hatchet postgres peer map=preview_root', checked with pg_hba_file_rules, then SELECT pg_reload_conf() (a server change: the owner's yes first): ask"; exit 1; }; fi
 RC=0; OUT=$(lc release-check.mjs check --label "$LABEL" --older-manifest "$OART/candidate-api-source.json" --newer-manifest "$ART/candidate-api-source.json" ${GRR:+--gate-rows-reviewed "$GRR"} ${LIFE:+--lifecycle-reviewed} 2>&1) || RC=$?
 printf '%s\n' "$OUT" > "$S/release-check.json"
 jq -r 'if .event == "PREVIEW_RELEASE_CHECK" then ((.checks[] | "\(if .ok then "OK " else "BAD" end) \(.name): \(.detail)"), "verdict \(.verdict)") else tostring end' <<<"$OUT" 2>/dev/null || echo "$OUT"
@@ -3713,12 +3720,27 @@ publish register 19 with delta 3c4d…, start `<commit>` as `r19-<12 hex>` in sl
 
 Every database of the preview cluster, the roles and the key stores the old release's API and runner files name, each
 checked, while everything keeps running. The key stores are live: GNU tar refuses a file that changed while it was read
-(`KEYS_FAILED`); then run SB7 again with a new folder name in `OB` (the first folder keeps what it wrote).
+(`KEYS_FAILED`); then run SB7 again with a new folder name in `OB` (the first folder keeps what it wrote). Before it
+writes anything, SB7 checks (as SB4 did) that the postgres administrator can connect to Hatchet's database.
+
+**What R21 needed (23 October 2026).** The first side-by-side upload stopped twice here; each fix was made on the
+server with the owner's yes:
+1. The dump of `hatchet` failed (`DUMP_FAILED`): the postgres administrator was not allowed on that database, because
+   line 2 of the cluster's `pg_hba.conf` named only `postgres,debateai`. The line became
+   `local postgres,debateai,hatchet postgres peer map=preview_root`, checked with `pg_hba_file_rules`, then
+   `SELECT pg_reload_conf()` (no restart). SB4 and SB7 now refuse, before anything is written, until this is so.
+2. The check of `online-postgres.dump` failed (`VERIFY_FAILED`): the built-in `postgres` database holds nothing, so its
+   archive lists no entry, which the tool read as a broken file. R21 added a comment on that database's `public` schema
+   (`COMMENT ON SCHEMA public …`) so the dump had one entry. The tool now accepts a whole archive with no entry for that
+   one database (`listingValid` in `backup.mjs`: the full header, naming `postgres`, in the custom format), so later
+   uploads need no comment; the comment stays, it harms nothing. Every other database must still list an entry.
 
 ```sh
 set -euo pipefail
 . /root/preview-archive/rNN-names.sh
 # SB7: the online backup (pg_dump of every database, pg_dumpall --globals-only, the key stores, sha256 sums). Nothing stops.
+HC=$(psqlq "SELECT count(*) FROM pg_database WHERE datname = 'hatchet'") || { echo "SB7_NOT_DONE: the database is unreadable"; exit 1; }
+if [ "$HC" = 1 ]; then runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d hatchet -XAt -c 'SELECT 1' >/dev/null || { echo "SB7_NOT_DONE: the postgres administrator cannot connect to the hatchet database (the error above), so SB7's online backup would stop with DUMP_FAILED. The fix R21 needed: in pg_hba.conf, 'local postgres,debateai postgres peer map=preview_root' becomes 'local postgres,debateai,hatchet postgres peer map=preview_root', checked with pg_hba_file_rules, then SELECT pg_reload_conf() (a server change: the owner's yes first): ask"; exit 1; }; fi
 OB=$S/online                                              # after KEYS_FAILED: a NEW name, e.g. $S/online-2
 [ ! -e "$OB" ] || { echo "SB7_NOT_DONE: $OB exists (after KEYS_FAILED give OB a new name)"; exit 1; }
 install -d -o root -g root -m 0700 "$OB"

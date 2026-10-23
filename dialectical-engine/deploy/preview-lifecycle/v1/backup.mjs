@@ -58,6 +58,36 @@ export function restoreListArgv({ layout }) {
   return [...asPostgres(layout), `${layout.pgBin}/pg_restore`, '--list'];
 }
 
+/** The databases that may hold nothing at all: PostgreSQL's built-in maintenance database, which no app uses. */
+export const MAY_BE_EMPTY = Object.freeze(['postgres']);
+/** pg_restore's header lines, in the order it prints them (`dbname` is checked against the database dumped). */
+const HEADER = Object.freeze([/^; Archive created at \S/, /^;\s+dbname: (.*)$/, /^;\s+TOC Entries: \d+$/, /^;\s+Format: CUSTOM$/, /^;\s+Dumped by pg_dump version: \S/, /^; Selected TOC Entries:$/]);
+/**
+ * The check of every dump, nightly and online. `pg_restore --list` proves a readable archive with a table of
+ * contents, not restorable data. Plain rule: the listing must start with pg_restore's header and list at least one
+ * entry (a table, a schema, ...). The one exception is an empty database (R21, 2026-10-23: the built-in `postgres`
+ * database holds no object, so its archive lists no entry and was refused): a listing with no entry passes only for a
+ * database named in MAY_BE_EMPTY, and only when pg_restore printed its whole header, in order, naming that database,
+ * in the custom format, down to its closing `Selected TOC Entries` line. A truncated or garbage file still fails: pg_restore
+ * exits non-zero on it (the caller refuses that before this check), or its listing lacks the header. The preview and
+ * Hatchet databases are never empty, so an empty listing of theirs means a wrong or broken dump and is refused.
+ */
+export function listingValid(toc, database) {
+  if (typeof toc !== 'string' || !/^; Archive created at /m.test(toc)) return false;
+  const lines = toc.split('\n');
+  if (lines.some(line => line && !line.startsWith(';'))) return true;
+  if (!MAY_BE_EMPTY.includes(database)) return false;
+  let at = 0;
+  for (const pattern of HEADER) {
+    while (at < lines.length && !pattern.test(lines[at])) at += 1;
+    if (at === lines.length) return false;
+    const named = pattern.exec(lines[at]);
+    if (pattern === HEADER[1] && named[1] !== database) return false;
+    at += 1;
+  }
+  return true;
+}
+
 async function fileSha256(path) {
   const hash = createHash('sha256');
   for await (const chunk of createReadStream(path)) hash.update(chunk);
@@ -93,11 +123,10 @@ export async function runBackup({ layout = LAYOUT, deps = {}, keep = KEEP }) {
     const bytes = (await handle.stat()).size;
     await handle.close(); handle = undefined;
     if (bytes < 1) refuse('DUMP_FAILED');
-    // pg_restore --list proves a readable archive with a table of contents, not restorable data.
+    // pg_restore --list proves a readable archive with a table of contents, not restorable data (listingValid: the rule).
     let toc;
     try { toc = await list(partialPath); } catch { refuse('VERIFY_FAILED'); }
-    const entries = toc.split('\n').filter(line => line && !line.startsWith(';'));
-    if (!/^; Archive created at /m.test(toc) || entries.length < 1) refuse('VERIFY_FAILED');
+    if (!listingValid(toc, layout.database)) refuse('VERIFY_FAILED');
     await rename(partialPath, finalPath);
     finished = true;
     const folder = await open(layout.backupDir, constants.O_RDONLY);
@@ -256,8 +285,6 @@ async function readBack(path, argv, run, timeoutMs) {
   } finally { await handle.close(); }
 }
 
-/** pg_restore --list proves a readable archive with a table of contents (as the nightly check), not restorable data. */
-const listingValid = toc => typeof toc === 'string' && /^; Archive created at /m.test(toc) && toc.split('\n').some(line => line && !line.startsWith(';'));
 
 /**
  * The online backup (side-by-side spec §12 step 7). Order: the folder, the env files and their key paths, the list of
@@ -286,7 +313,7 @@ export async function runOnlineBackup({ out, envPaths, layout = LAYOUT, deps = {
     files.push(await writeChecked(out, dumpNames[index], {
       uid, gid, failCode: 'DUMP_FAILED',
       fill: fd => run(dumpArgv({ layout, database }), { env: {}, stdoutFd: fd, timeoutMs: 30 * 60 * 1000, maxOutputBytes: 65536 }),
-      check: async path => listingValid(await readBack(path, restoreListArgv({ layout }), run, 10 * 60 * 1000))
+      check: async path => listingValid(await readBack(path, restoreListArgv({ layout }), run, 10 * 60 * 1000), database)
     }));
   }
   files.push(await writeChecked(out, GLOBALS_FILE, {

@@ -216,6 +216,12 @@ side-by-side upload:
 | `unit-templates.mjs` | the API and website templates from the live units (`render`) and the property check (`compare`) |
 | `backup.mjs --online` | the online backup before a side-by-side upload's migrations (the nightly run takes no argument) |
 
+The online backup dumps every database of the cluster as the postgres administrator over the local socket, so the
+cluster's `pg_hba.conf` must let that administrator into each one. On the test site that is line 2,
+`local postgres,debateai,hatchet postgres peer map=preview_root` (R21, 23 October 2026, added `hatchet`; the release
+guide's SB4 and SB7 check it before the backup). Each dump must list at least one entry, except the built-in
+`postgres` database, which is empty: its archive passes with pg_restore's whole header and no entry (`listingValid`).
+
 prestart, alert and backup use Node built-ins plus the reviewed `deploy/preview-auth-dev/v1`
 helpers (custody reader, launch-plan and attestation validators). `release-switch.mjs` also imports
 `deploy/preview-release/v1/caddy-slots.mjs` (the readiness listener's address), so the operator folder holds that
