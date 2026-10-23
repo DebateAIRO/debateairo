@@ -538,6 +538,11 @@ describe("the runner's wiring (source pins)", () => {
     expect(keepAliveCatch).toBeGreaterThan(execute.indexOf("keepAlive = startRunKeepAlive({"));
     expect(execute.indexOf("callLane?.close();\n      throw error;\n    }", keepAliveCatch)).toBe(execute.indexOf("callLane?.close();"));
     expect(execute.indexOf("return await runKeepAliveScope.run(keepAlive,")).toBeGreaterThan(execute.indexOf("callLane?.close();"));
+    // S20 re-pin review: the outermost try (whose finally holds the other close) opens AFTER the keep-alive's catch, so
+    // the keep-alive's own failure can never reach that finally too (a double close and a masked keep-alive error).
+    expect(execute.indexOf("    try {\n    return await runKeepAliveScope.run(keepAlive,")).toBeGreaterThan(keepAliveCatch);
+    // Final fix wave S12: the lane opens BEFORE the keep-alive starts (a lane refusal leaves no claim renewing forever).
+    expect(open).toBeLessThan(execute.indexOf("keepAlive = startRunKeepAlive({"));
   });
 
   /**
