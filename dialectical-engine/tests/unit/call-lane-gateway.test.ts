@@ -516,7 +516,12 @@ describe("the runner's wiring (source pins)", () => {
   const MAIN = read("apps/runner/src/main.ts");
 
   it("execute opens the debate's lane after the claim and closes it in the outermost finally", () => {
-    const execute = RUNNER.slice(RUNNER.indexOf("private async execute("), RUNNER.indexOf("export type RunnerExecutionResult ="));
+    // S20 re-pin: the slice ends where the class ends. Final fix wave S14 (d9d6e73cc) put `settingsJournalCode` and its
+    // doc comment right after the runner class, before `export type RunnerExecutionResult =`, so that old end marker
+    // took the new function into the slice and the `$`-anchored check below read past the class.
+    const classEnd = RUNNER.indexOf("\n/**\n * Final fix wave S14 — THE COMMON RULE");
+    expect(classEnd).toBeGreaterThan(RUNNER.indexOf("private async execute("));
+    const execute = RUNNER.slice(RUNNER.indexOf("private async execute("), classEnd);
     const claim = execute.indexOf("if (claimed === null) return { kind: \"NO_WORK\" };");
     // Side-by-side spec §13 (S4, S6): the lane opens with the debate's own version's limits.
     const open = execute.indexOf("callScheduler.openLane(claimedRunId, settings.callLaneLimits)");
@@ -525,7 +530,14 @@ describe("the runner's wiring (source pins)", () => {
     // The outermost finally: it ends the method (then the class), after the story ran inside the try.
     expect(execute).toMatch(/\} finally \{\s*callLane\?\.close\(\);\s*keepAlive\.stop\(\);\s*\}\s*\}\s*\}\s*$/u);
     expect(execute.indexOf("await storyWriter.writeAfterSettle(")).toBeLessThan(execute.lastIndexOf("callLane?.close();"));
-    expect(execute.match(/callLane\?\.close\(\)/gu) ?? []).toHaveLength(1);
+    // S20 re-pin — final fix wave S12 (d9d6e73cc): the lane now opens BEFORE the keep-alive starts, so a keep-alive that
+    // cannot start closes it in its own catch and rethrows, before the outermost try (whose finally holds the other close)
+    // is entered. Exactly two closes, one per path, and the first is that catch's.
+    expect(execute.match(/callLane\?\.close\(\)/gu) ?? []).toHaveLength(2);
+    const keepAliveCatch = execute.indexOf("    } catch (error) {\n      // Final fix wave S12: the lane opened above is closed when the keep-alive cannot start");
+    expect(keepAliveCatch).toBeGreaterThan(execute.indexOf("keepAlive = startRunKeepAlive({"));
+    expect(execute.indexOf("callLane?.close();\n      throw error;\n    }", keepAliveCatch)).toBe(execute.indexOf("callLane?.close();"));
+    expect(execute.indexOf("return await runKeepAliveScope.run(keepAlive,")).toBeGreaterThan(execute.indexOf("callLane?.close();"));
   });
 
   /**
