@@ -107,6 +107,8 @@ describe("the rows are the companies the API answers (addition D24)", () => {
       retentionKey: "legal.providers.unconfirmed",
       zeroRetention: "unconfirmed",
       training: "unconfirmed",
+      // Ruling R35 (final fix wave F5): never a US transfer basis for a company nobody has checked.
+      basisKey: "legal.providers.unconfirmed",
       contact: "[…]",
       checkedOn: null
     });
@@ -123,6 +125,10 @@ describe("the rows are the companies the API answers (addition D24)", () => {
         if (FACT_LABEL_KEYS[index] === "legal.providers.colPurpose") continue;
         expect(cell, FACT_LABEL_KEYS[index]).toContain("[");
       }
+      // Ruling R35: the basis cell reads "[to confirm]", not the bracketed EU–US wording.
+      const basis = cells[FACT_LABEL_KEYS.indexOf("legal.providers.colBasis")];
+      expect(basis).toBe(escaped(catalog["legal.providers.unconfirmed"]));
+      expect(section).not.toContain(escaped(catalog["legal.providers.usBasis"]));
     }
   });
 

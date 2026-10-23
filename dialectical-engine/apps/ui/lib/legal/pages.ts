@@ -399,7 +399,8 @@ const HOST_COMPANY_PREFIX = "host:";
 /**
  * Ruling R20: a company the catalogue does not know yet (a hosted vendor nobody has reviewed) is still shown, headed
  * by its host name, with every fact "[to confirm]" and "[not checked yet]" (existing keys only), so the page never
- * hides a company that receives text.
+ * hides a company that receives text. Ruling R35: its transfer basis is "[to confirm]" too, never the bracketed US
+ * wording — nobody knows where an unchecked company is.
  */
 function uncheckedCompanyEntry(company: string): ProviderRegisterEntry {
   const name = company.startsWith(HOST_COMPANY_PREFIX) ? company.slice(HOST_COMPANY_PREFIX.length) : company;
@@ -410,6 +411,7 @@ function uncheckedCompanyEntry(company: string): ProviderRegisterEntry {
     models: "",
     entity: "[…]",
     homeCountryKey: "legal.providers.unconfirmed",
+    basisKey: "legal.providers.unconfirmed",
     purposesConfirmed: false
   });
 }
