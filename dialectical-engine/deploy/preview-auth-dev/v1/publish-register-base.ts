@@ -10,11 +10,14 @@
 // version (D1); on a database with no release at all (a fresh database, a test fixture), today's rule stays
 // (publish-register-v2.ts assertBaseIsCurrent: nothing sealed above the base but this publication's own replay).
 // The pointer is read through the settings operator module (tools/settings-version/settings-operator.ts
-// readSettingsStatus), the one operator module allowed to read it (plan D8; S16 pins its readers).
+// readEffectiveActiveSettings), the one operator module allowed to read it (plan D8; S16 pins its readers). That read
+// asks the catalog first (ruling R69): a side-by-side upload plans (SB3) before its migrations run (SB8), so the first
+// upload with Phase 2 composes on a database without 0124 (then: no pointer, the current release's site version) and
+// one before 0123 has no release table either (then: the old rule).
 // Kit v2 (a local-mode preview, byte for byte unchanged) keeps assertBaseIsCurrent; only kit v3 uses this rule.
 import type { Pool } from 'pg';
 import { parseRegisterVersionText } from '@debateai/register';
-import { readSettingsStatus } from '../../../tools/settings-version/settings-operator.js';
+import { readEffectiveActiveSettings } from '../../../tools/settings-version/settings-operator.js';
 import { assertBaseIsCurrent } from './publish-register-v2.js';
 
 /** The base refusal the native operator prints in words: the operator can act on it (plan again from the active version). */
@@ -30,7 +33,7 @@ export class PreviewRegisterBaseNotActiveError extends TypeError { readonly code
  */
 export async function assertBaseIsActive(pool:Pool,baseRegisterVersion:string,publicationId:string):Promise<void> {
   const base=parseRegisterVersionText(baseRegisterVersion);
-  const status=await readSettingsStatus(pool);
+  const status=await readEffectiveActiveSettings(pool);
   if(status.effectiveActive===null)return assertBaseIsCurrent(pool,baseRegisterVersion,publicationId);
   if(String(status.effectiveActive)!==String(base))throw new PreviewRegisterBaseNotActiveError();
 }

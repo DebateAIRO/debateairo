@@ -503,7 +503,9 @@ const VARS: Readonly<Record<string, string>> = Object.freeze({
   HB: '{"billing":"on","perRunCeilingMicros":2500000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}',
   LINEUP: '/opt/debateai-v3-preview/artifacts/settings-20261023t120000z/line-up.json',
   CC: '{"perDebate":12,"perModelPerDebate":3,"perModelPerRunner":{"default":50}}',
-  LG: '{"kind":"LENGTH_GUIDANCE_POLICY"}', SHAPE: 'off'
+  LG: '{"kind":"LENGTH_GUIDANCE_POLICY"}', SHAPE: 'off',
+  // S18 fix round 1: the choices a plan does not take from its base, read from the active version's publish plan.
+  DS: 'yes', SEATS: '{"writer":"preview:claude-haiku-5-5","checker":"preview:fixture-b"}', ROT: 'off'
 });
 
 type Invocation = Readonly<{ tool: string; script: string; argv: readonly string[]; line: string }>;
@@ -727,11 +729,12 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     expect(prose).toContain('A settings-only change of a site rule (logins, rate limits, countries, plan prices, the daily budget, funding) is refused and needs an upload.');
     expect(prose).toContain('already carries the call-concurrency row, so the per-debate lane limits can change by activation');
     for (const line of ['DEBATEAI_SETTINGS_CHECK', 'DEBATEAI_SETTINGS_VERDICT', 'DEBATEAI_SETTINGS_ACTIVATED', 'DEBATEAI_RUNNER_SETTINGS {',
-      'DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED {"version"', 'DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED {"runId"', 'ADMISSION_SETTINGS_UNSUPPORTED',
+      '{"kind":"DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED","version"', '{"kind":"DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED","runId"', 'ADMISSION_SETTINGS_UNSUPPORTED',
       'ADMISSION_ESTIMATOR_FALLBACK', 'ADMISSION_SETTINGS_NOT_PASSED', 'SETTINGS_GATE_UNANSWERED', '--seatable-env']) expect(section, line).toContain(line);
     // The line-up file: root 0644 under umask 022, printed by the release's own checker into the artifacts folder.
     expect(section).toContain('( umask 022; cd "$CAPI/dialectical-engine" && ');
-    expect(section).toContain('tools/preview-practice/check-thinking-levels.ts --print-line-up --settings "$E/api-$LABEL.env" > "$SART/line-up.json"');
+    expect(section).toContain('tools/preview-practice/check-thinking-levels.ts --print-line-up --settings "$E/api-$LABEL.env" > "$TMP" )');
+    expect(section).toContain('TMP=$SART/line-up.json.printing');
     // The line-up task (SA11) appends to this section.
     expect(section).toContain('<!-- Reserved for the line-up task (SA11)');
   });
@@ -750,5 +753,51 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     const b5 = sectionOf(guide, '### B5. The two env edits');
     expect(b5.indexOf('B5 to B7 are not how a settings change')).toBeLessThan(b5.indexOf('```sh'));
     expect(sectionOf(guide, WAY_BACK)).toContain('**The settings each way back activates (side-by-side spec §11, §13).**');
+  });
+
+  it('an upload follows the active version: SB1 records it, SB3 plans from it, SB9 and DR5 publish only on it (ruling R69 fix round)', () => {
+    const sb1 = scriptOf('SB1').lines;
+    const activev = sb1.find(line => line.startsWith('activev() { '))!;
+    expect(activev).toContain('if [ -f "$L/settings-version.mjs" ] && [ -f "$OCAPI/dialectical-engine/tools/settings-version/cli.ts" ]; then lc settings-version.mjs status');
+    expect(activev).toContain('else printf \'%s\\n\' "${o#r}"; fi; }');
+    expect(sb1.findIndex(line => line.startsWith('activev > "$S/active-before" || '))).toBeGreaterThan(sb1.indexOf('. "$NAMES"'));
+    const sb3 = scriptOf('SB3').lines;
+    const from = sb3.findIndex(line => line.startsWith('if [ "$AV" = "$OSITE" ]; then FROM=$S/native-plan.before.json; CP=$OART/native-plan-publish.json; else FROM=/opt/debateai-v3-preview/artifacts/settings-v$AV/native-plan-verify.json;'));
+    const plan = sb3.findIndex(line => line.startsWith('rel native-plan --operation plan --from "$FROM" '));
+    expect(from).toBeGreaterThan(-1);
+    expect(plan).toBeGreaterThan(from);
+    expect(sb3[plan]).toContain('${DS:+--checker deepseek --deepseek-enabled-on-gate yes} ${SEATS:+--answer-seats "$SEATS"} ${ROT:+--role-rotation "$ROT"} --hosted-billing "$HB"');
+    expect(sb3).toContain('HB=$(jq -c .hostedBilling "$FROM")');
+    expect(sb3.join('\n')).toContain('[ "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" = "$AV" ] && cmp -s "$S/native-plan.before.json" "$ONP"');
+    expect(scriptOf('SB9').lines.join('\n')).toContain('[ "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" = "$AV" ]');
+    expect(scriptOf('SB9').lines.join('\n')).toContain('PREVIEW_REGISTER_BASE_NOT_ACTIVE');
+    expect(scriptOf('DR5').lines.join('\n')).toContain('[ "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" = "$(cat "$S/active-before")" ]');
+    // REG0 still names the key and guards that nothing was published meanwhile.
+    expect(scriptOf('SB9').lines.join('\n')).toContain('the newest register is not $REG0');
+  });
+
+  it('SB13 and DR6 stop when settings were activated since SB3, before the switch (ruling R70)', () => {
+    for (const step of ['SB13', 'DR6']) {
+      const lines = scriptOf(step).lines;
+      const read = lines.findIndex(line => line.startsWith('AVN=$(activev) || '));
+      const guard = lines.findIndex(line => line.startsWith('[ "$AVN" = "$(cat "$S/active-before")" ] && [ "$AVN" = "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" ] || '));
+      const sw = lines.findIndex(line => line.includes('lc release-switch.mjs switch --to "$LABEL" --from "$OLABEL"'));
+      expect(read, step).toBeGreaterThan(-1);
+      expect(guard, step).toBe(read + 1);
+      expect(lines[guard], step).toContain(`${step}_NOT_DONE: settings were activated since SB3`);
+      expect(sw, step).toBeGreaterThan(guard);
+    }
+    expect(section.replace(/\s+/g, ' ')).toContain('Never activate while an upload is between its SB3 and its SB13');
+  });
+
+  it('SV1 keeps the active version\'s hosted inputs and choices; SV2 keeps the publish plan; the line-up draft never blocks a re-run', () => {
+    const sv1 = steps.find(block => stepOf(block) === 'SV1')!.lines;
+    expect(sv1).toContain('HB=$(jq -c .hostedBilling "$FROM")                         # the active version\'s hosted inputs; only perRunCeilingMicros may change');
+    expect(sv1.join('\n')).toContain('.hostedBilling | {billing,dailyCeilingMicros,askRoomReads}');
+    expect(sv1.find(line => line.startsWith('rel native-plan --operation plan --from "$FROM" '))).toContain('${DS:+--checker deepseek --deepseek-enabled-on-gate yes} ${SEATS:+--answer-seats "$SEATS"} ${ROT:+--role-rotation "$ROT"}');
+    expect(steps.find(block => stepOf(block) === 'SV2')!.lines).toContain('install -o root -g root -m 0644 "$SART/native-plan-publish.json" "$VART/native-plan-publish.json"');
+    const lineUp = blocks.find(block => block.lines.some(line => line.includes('--print-line-up')))!.lines;
+    expect(lineUp.find(line => line.includes('--print-line-up'))).toContain('> "$TMP" )');
+    expect(lineUp.at(-2)).toBe('mv "$TMP" "$SART/line-up.json"');
   });
 });

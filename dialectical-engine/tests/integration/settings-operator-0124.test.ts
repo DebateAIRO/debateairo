@@ -12,6 +12,7 @@ import {
   SettingsOperatorRefusal,
   activateSettingsVersion,
   latestPassedSettingsVersion,
+  readEffectiveActiveSettings,
   readSettingsStatus,
   recordSettingsVerdict,
   settingsForSwitch,
@@ -207,5 +208,10 @@ describe("S15: the settings operator on migration 0124", () => {
     const publicationId = "11111111-1111-4111-8111-111111111111";
     await expect(assertBaseIsActive(database.pool, String(G1), publicationId)).resolves.toBeUndefined();
     for (const base of ["4", String(G2)]) await expect(assertBaseIsActive(database.pool, base, publicationId)).rejects.toThrow(BASE_NOT_ACTIVE);
+    // Ruling R69: the kit's light read asks the catalog first; on this database both exist. A name the catalog lacks
+    // answers false (never an error), which is what a database before 0124 (or 0123) gives.
+    expect(await readEffectiveActiveSettings(database.pool)).toEqual({ currentRelease: A, pointer: G1, effectiveActive: G1 });
+    expect((await database.pool.query("SELECT to_regprocedure('core.read_current_release_absent()') IS NOT NULL AS releases, to_regclass('register.settings_verdict_absent') IS NOT NULL AS settings")).rows)
+      .toEqual([{ releases: false, settings: false }]);
   });
 });

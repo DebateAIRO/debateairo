@@ -496,10 +496,12 @@ describe('publish kit v3: composing from the active settings version', () => {
   // Release keys are built from pieces (the secret scanner reads r<n>-<12 hex> as a key).
   const release = (site: number) => [`r${site}`, 'a'.repeat(12)].join('-');
   const id = '11111111-1111-4111-8111-111111111111';
-  const statusPool = (state: { release: string | null; pointer: string | null; above?: { register_version: string; publication_id: string | null }[] }) => {
+  const statusPool = (state: { release: string | null; pointer: string | null; above?: { register_version: string; publication_id: string | null }[];
+    has0123?: boolean; has0124?: boolean }) => {
     const statements: string[] = [];
     const pool = { async query(sql: string) {
       statements.push(sql);
+      if (/to_regprocedure/.test(sql)) return { rows: [{ releases: state.has0123 ?? true, settings: state.has0124 ?? true }] };
       if (/core\.read_current_release\(\)/.test(sql)) return { rows: state.release === null ? [] : [{ release_key: state.release }] };
       if (/register\.read_active_settings_version\(\)/.test(sql)) return { rows: [{ pointer: state.pointer }] };
       if (/register\.read_passed_settings_versions/.test(sql)) return { rows: [] };
@@ -529,6 +531,16 @@ describe('publish kit v3: composing from the active settings version', () => {
     const f = statusPool({ release: release(12), pointer: null, above: [{ register_version: '13', publication_id: null }] });
     await expect(assertBaseIsActive(f.pool, '12', id)).resolves.toBeUndefined();
     expect(oldRule(f.statements)).toBe(false);
+  });
+  it('T+1\'s SB3 runs before 0124 is applied (ruling R69): the current release\'s site version is the base; with no 0123 either, the old rule', async () => {
+    const before0124 = statusPool({ release: release(12), pointer: null, has0124: false, above: [{ register_version: '13', publication_id: null }] });
+    await expect(assertBaseIsActive(before0124.pool, '12', id)).resolves.toBeUndefined();
+    await expect(assertBaseIsActive(before0124.pool, '11', id)).rejects.toThrow(BASE_NOT_ACTIVE);
+    expect(before0124.statements.some(sql => /read_active_settings_version|read_passed_settings_versions/.test(sql))).toBe(false);
+    const before0123 = statusPool({ release: null, pointer: null, has0123: false, has0124: false, above: [{ register_version: '13', publication_id: null }] });
+    await expect(assertBaseIsActive(before0123.pool, '12', id)).rejects.toThrow('PREVIEW_REGISTER_BASE_NOT_CURRENT');
+    await expect(assertBaseIsActive(statusPool({ release: null, pointer: null, has0123: false, has0124: false }).pool, '12', id)).resolves.toBeUndefined();
+    expect(before0123.statements.some(sql => /read_current_release\(\) AS|read_active_settings_version\(\)::/.test(sql))).toBe(false);
   });
   it('with no release yet, the old rule decides: nothing above the base but this publication\'s replay', async () => {
     await expect(assertBaseIsActive(statusPool({ release: null, pointer: null }).pool, '12', id)).resolves.toBeUndefined();

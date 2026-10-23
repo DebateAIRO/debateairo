@@ -317,6 +317,30 @@ export async function readSettingsStatus(client: SettingsOperatorClient): Promis
   });
 }
 
+/** What the kit's base check needs (readEffectiveActiveSettings): the live release, the pointer, what new asks use. */
+export type EffectiveActiveSettings = Readonly<Pick<SettingsStatus, "currentRelease" | "pointer" | "effectiveActive">>;
+
+/**
+ * Ruling R69 (S18 fix round 1): the preview publish kit's light read of what new asks use, on a database the new
+ * release's migrations may not have reached yet. A side-by-side upload plans (SB3) BEFORE its migrations go in (SB8), so
+ * the first upload with Phase 2 composes on a database without 0124 (and the one before 0123's release table has
+ * neither). One catalog query first: 0123's `core.read_current_release()` and 0124's tables (`register.settings_verdict`
+ * stands for the migration: one file, one transaction) exist or not. A missing release reader = no release; a missing
+ * 0124 = no pointer, so the current release's own site version is what new asks use (D1). Nothing it lacks is asked
+ * (an undefined function would refuse every plan). The pointer, when there, is read through the module's one reader.
+ */
+export async function readEffectiveActiveSettings(client: SettingsOperatorClient): Promise<EffectiveActiveSettings> {
+  const schema = await client.query<{ releases: boolean; settings: boolean }>(
+    "SELECT to_regprocedure('core.read_current_release()') IS NOT NULL AS releases, to_regclass('register.settings_verdict') IS NOT NULL AS settings");
+  const present = schema.rows[0];
+  if (schema.rows.length !== 1 || typeof present?.releases !== "boolean" || typeof present.settings !== "boolean") {
+    throw new TypeError("SETTINGS_SCHEMA_READ_INVALID");
+  }
+  const currentRelease = present.releases ? await readCurrentRelease(client) : null;
+  const pointer = present.settings ? await readPointer(client) : null;
+  return Object.freeze({ currentRelease, pointer, effectiveActive: pointer ?? siteVersionOfRelease(currentRelease) });
+}
+
 /**
  * Spec §11 (rollback): the version a rollback to `releaseKey` activates — that release's most recent PASS (by
  * `checked_at`) whose latest verdict is still PASS; with none, the release's own site version (D1: the case of T, which

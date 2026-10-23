@@ -2245,10 +2245,17 @@ when the change is done.
 
 ### SV0. Names, the archive and the from-plan
 
+**Never activate while an upload is between its SB3 and its SB13** (or a drained upload between SB3 and DR6): the
+upload's plan was made from the version active at SB3, and its switch stops (`SB13_NOT_DONE: settings were activated
+since SB3`) rather than undo the activation. Finish or give up the upload first.
+
 The plan must start from the active version. While the active version is the current release's own site version, the
 from-plan is that release's verify plan (`native-plan-<label>.json`, copied into `$S`). After an activation of another
 version, it is that version's verify plan, which SV2 keeps as
-`/opt/debateai-v3-preview/artifacts/settings-v<version>/native-plan-verify.json` when it publishes the version.
+`/opt/debateai-v3-preview/artifacts/settings-v<version>/native-plan-verify.json` when it publishes the version. Beside
+it sits the publish plan that made the version (`native-plan-publish.json`: the release's own in its artifacts folder,
+or SV2's copy in `settings-v<version>`): it holds the choices a plan does not take from its base (the checker or the
+answer seats, role rotation off), so a new plan keeps them unless the owner changes them.
 
 ```sh
 set -euo pipefail
@@ -2267,15 +2274,16 @@ AV=$(sed -n 's/^DEBATEAI_SETTINGS_STATUS //p' <<<"$SS" | jq -r '.effectiveActive
 printf '%s\n' "$AV" | grep -qxE '[1-9][0-9]*' || { echo "$SS"; echo "SV0_NOT_DONE: no active version read"; exit 1; }
 NP=$E/native-plan-$LABEL.json
 [ "$(jq -r .operation "$NP")" = verify ] || { echo "SV0_NOT_DONE: $NP is not the current release's verify plan: ask"; exit 1; }
-if [ "$AV" = "$SITE" ]; then FROM=; else FROM=/opt/debateai-v3-preview/artifacts/settings-v$AV/native-plan-verify.json; fi
+if [ "$AV" = "$SITE" ]; then FROM=; CP=/opt/debateai-v3-preview/artifacts/auth-dev-$LABEL/native-plan-publish.json; else FROM=/opt/debateai-v3-preview/artifacts/settings-v$AV/native-plan-verify.json; CP=/opt/debateai-v3-preview/artifacts/settings-v$AV/native-plan-publish.json; fi
 [ -z "$FROM" ] || [ "$(jq -r '.approval.publication.registerVersion' "$FROM")" = "$AV" ] || { echo "SV0_NOT_DONE: no kept verify plan names the active version $AV ($FROM): ask"; exit 1; }
+[ "$(jq -r .approval.snapshotSha256 "$CP")" = "$(jq -r .approval.publication.snapshotSha256 "${FROM:-$NP}")" ] || { echo "SV0_NOT_DONE: the publish plan $CP did not make the active version $AV: ask"; exit 1; }
 TS=$(date -u +%Y%m%dT%H%M%SZ); S=/root/preview-archive/settings-$TS
 SART=/opt/debateai-v3-preview/artifacts/settings-$(printf '%s' "$TS" | tr 'TZ' 'tz')
 install -d -o root -g root -m 0700 "$S"; install -d -o root -g root -m 0755 "$SART"
 cp -a "$NP" "$S/native-plan.before.json"
 [ -n "$FROM" ] || FROM=$S/native-plan.before.json
 umask 077
-{ printf 'LABEL=%s\nKEY=%s\nSITE=%s\nAV=%s\nS=%s\nSART=%s\nFROM=%s\n' "$LABEL" "$KEY" "$SITE" "$AV" "$S" "$SART" "$FROM"
+{ printf 'LABEL=%s\nKEY=%s\nSITE=%s\nAV=%s\nS=%s\nSART=%s\nFROM=%s\nCP=%s\n' "$LABEL" "$KEY" "$SITE" "$AV" "$S" "$SART" "$FROM" "$CP"
   cat <<'EOF'
 umask 022
 E=/etc/debateai-v3-preview/auth-dev-v1
@@ -2293,19 +2301,20 @@ EOF
 } > "$NAMES"
 chmod 0600 "$NAMES"
 umask 022
-echo "current release $LABEL ($KEY, site version $SITE); active version $AV; from-plan $FROM; S=$S SART=$SART"
+echo "current release $LABEL ($KEY, site version $SITE); active version $AV; from-plan $FROM; its choices $CP; S=$S SART=$SART"
 echo SV0_DONE
 ```
 
 ### SV1. The plan and its proposal
 
-Fill in the owner's choices at the top; an empty choice keeps the base's row as it is. The live checker (`--checker
-deepseek --deepseek-enabled-on-gate yes`) and the hosted inputs (`HB`, billing on) are on every plan, exactly as in SB3:
-without them the plan would switch the checker back to GLM, or billing off. `HB` may change `perRunCeilingMicros` only;
-its `dailyCeilingMicros` and `askRoomReads` are site rules (the check refuses a change). The JSON options have the shape
-the kit's section above gives (`--call-concurrency`, `--length-guidance`, `--debate-shape`); `--question-language`,
-`--role-rotation` and `--answer-seats` are added the same way (`--answer-seats` replaces the `--checker` pair: one way
-to set the checker). For a new line-up, make its file first ("The line-up file" below). The native operator reads only
+Fill in the owner's choices at the top; an empty choice keeps the base's row as it is. Three choices are not taken from
+the base by the kit, so the script reads them from the active version's plans (SV0's `FROM` and `CP`): the hosted inputs
+(`HB`, billing on), the checker or the answer seats (`DS` for the live DeepSeek checker, or `SEATS`), and role rotation
+off (`ROT`). Left as read, a plan never switches the checker back to GLM, billing off, or rotation on by accident. `HB`
+may change `perRunCeilingMicros` only; its `dailyCeilingMicros` and `askRoomReads` are site rules (the script and the
+check refuse a change). The JSON options have the shape the kit's section above gives (`--call-concurrency`,
+`--length-guidance`, `--debate-shape`, `--answer-seats`); `--question-language` is added the same way. `SEATS` replaces
+the DeepSeek checker (one way to set the checker): set `DS=''` with it. For a new line-up, make its file first ("The line-up file" below). The native operator reads only
 this release's own plan file, so the plan is put in place for the one run and the verify plan goes back at once (a
 restart in between would refuse: prestart accepts only a verify plan).
 
@@ -2313,14 +2322,18 @@ restart in between would refuse: prestart accepts only a verify plan).
 set -euo pipefail
 . /root/preview-archive/settings-names.sh
 # SV1: the plan (the active version as base, the live checker, billing-on inputs, the owner's choices) and its proposal.
-HB=$HB_ON                                                  # the hosted inputs; only perRunCeilingMicros may differ from HB_ON
+HB=$(jq -c .hostedBilling "$FROM")                         # the active version's hosted inputs; only perRunCeilingMicros may change
+DS=$(jq -r 'if .answerSeats == null and .checkerChoice.checker == "deepseek" then "yes" else empty end' "$CP")   # yes = the DeepSeek checker
+SEATS=$(jq -c '.answerSeats // empty' "$CP")               # the answer seats JSON, or empty
+ROT=$(jq -r '.roleRotation // empty' "$CP")                # off, or empty (rotation on)
 LINEUP=''                                                  # a line-up file in $SART (see "The line-up file"), or empty
 CC=''                                                      # call-concurrency JSON, or empty
 LG=''                                                      # length-guidance JSON, or empty
 SHAPE=''                                                   # debate-shape JSON or off, or empty
 cmp -s "$S/native-plan.before.json" "$NP" || { echo "SV1_NOT_DONE: the live verify plan moved since SV0"; exit 1; }
+[ "$(jq -cS '{billing,dailyCeilingMicros,askRoomReads}' <<<"$HB")" = "$(jq -cS '.hostedBilling | {billing,dailyCeilingMicros,askRoomReads}' "$FROM")" ] || { echo "SV1_NOT_DONE: HB changes a site rule (billing, the day's ceiling or the room-read budget): only perRunCeilingMicros may change"; exit 1; }
 [ ! -e "$SART/native-plan-plan.json" ] && [ ! -e "$SART/register-proposal.json" ] || { echo "SV1_NOT_DONE: an earlier plan or proposal exists in $SART (look first)"; exit 1; }
-rel native-plan --operation plan --from "$FROM" --source-manifest "$ART/candidate-api-source.json" --checker deepseek --deepseek-enabled-on-gate yes --hosted-billing "$HB" ${LINEUP:+--line-up "$LINEUP"} ${CC:+--call-concurrency "$CC"} ${LG:+--length-guidance "$LG"} ${SHAPE:+--debate-shape "$SHAPE"} --out "$SART/native-plan-plan.json" || { echo "SV1_NOT_DONE: the release tool refused the plan"; exit 1; }
+rel native-plan --operation plan --from "$FROM" --source-manifest "$ART/candidate-api-source.json" ${DS:+--checker deepseek --deepseek-enabled-on-gate yes} ${SEATS:+--answer-seats "$SEATS"} ${ROT:+--role-rotation "$ROT"} --hosted-billing "$HB" ${LINEUP:+--line-up "$LINEUP"} ${CC:+--call-concurrency "$CC"} ${LG:+--length-guidance "$LG"} ${SHAPE:+--debate-shape "$SHAPE"} --out "$SART/native-plan-plan.json" || { echo "SV1_NOT_DONE: the release tool refused the plan"; exit 1; }
 put "$SART/native-plan-plan.json" || { put "$S/native-plan.before.json"; echo "SV1_NOT_DONE: put of the plan failed (the verify plan is back)"; exit 1; }
 OUT=$(nat "$SART/register-proposal.json"); echo "nat: $OUT"
 put "$S/native-plan.before.json" || { echo "SV1_NOT_DONE: PUT THE VERIFY PLAN BACK BY HAND: put \"$S/native-plan.before.json\""; exit 1; }
@@ -2335,7 +2348,7 @@ echo SV1_DONE
 The owner reads every delta entry, old value against new, and only the rows the change is about may differ
 (`nodeRuntimeVersion`'s source reference aside). The yes names the printed `deltaSha256`: SV2's `YES`.
 
-### SV2. Publish, and keep the new version's verify plan
+### SV2. Publish, and keep the new version's verify and publish plans
 
 Publishing writes a new sealed version and nothing else: the running API and runner never read it until it is activated.
 A re-run of `nat` with the same publish plan after a crash replays the same version; never make a second publish plan
@@ -2359,8 +2372,9 @@ printf '%s\n' "$V" | grep -qxE '[1-9][0-9]*' || { echo "SV2_NOT_DONE: no publish
 VART=/opt/debateai-v3-preview/artifacts/settings-v$V
 install -d -o root -g root -m 0755 "$VART"
 rel native-plan --operation verify --from "$SART/native-plan-publish.json" --publication "$SART/register-published.json" --source-manifest "$ART/candidate-api-source.json" --out "$VART/native-plan-verify.json" || { echo "SV2_NOT_DONE: the release tool refused the verify plan of $V"; exit 1; }
+install -o root -g root -m 0644 "$SART/native-plan-publish.json" "$VART/native-plan-publish.json"
 printf '%s\n' "$V" > "$S/new-register-version"
-echo "published settings version $V (not active); its verify plan: $VART/native-plan-verify.json"
+echo "published settings version $V (not active); its verify and publish plans: $VART"
 echo SV2_DONE
 ```
 
@@ -2414,7 +2428,7 @@ RC=0; OUT=$(lc settings-version.mjs activate "$V" --by "$BY" --reason "$WHY" 2>&
 printf '%s\n' "$OUT" | tee "$S/settings-activate.txt"
 case "$RC" in
   0) ;;
-  1) echo "SV4_NOT_DONE: refused by the live gate check or the version's kind (codes above): fix the gate, then run SV4 again"; exit 1;;
+  1) echo "SV4_NOT_DONE: refused: read the code above (a gate that is off or did not answer, a gate not on this release's code, the version's kind, or a refusal of the tool itself), fix that, then run SV4 again"; exit 1;;
   3) echo "SV4_NOT_DONE: SETTINGS_ACTIVATION_CONFLICT: the release or the pointer moved meanwhile (a switch?): read settings-version.mjs status, then ask"; exit 1;;
   4) echo "SV4_NOT_DONE: SETTINGS_VERSION_NOT_PASSED: the current release has not passed $V (run SV3)"; exit 1;;
   *) echo "SV4_NOT_DONE: refused (the line above): ask"; exit 1;;
@@ -2482,9 +2496,11 @@ set -euo pipefail
 . /root/preview-archive/settings-names.sh
 # The line-up the API's env file carries, as the plan member {"lineUp":{…}}, into $SART/line-up.json (root 0644).
 [ ! -e "$SART/line-up.json" ] || { echo "LINEUP_NOT_DONE: $SART/line-up.json exists (look first)"; exit 1; }
-( umask 022; cd "$CAPI/dialectical-engine" && /usr/bin/env -i PATH=/usr/bin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node --import ./node_modules/tsx/dist/loader.mjs tools/preview-practice/check-thinking-levels.ts --print-line-up --settings "$E/api-$LABEL.env" > "$SART/line-up.json" ) || { echo "LINEUP_NOT_DONE: the checker refused the value (run it without the redirect to read why)"; exit 1; }
-jq -e '.lineUp.free_model_ids and .lineUp.premium_model_ids' "$SART/line-up.json" > /dev/null || { cat "$SART/line-up.json"; echo "LINEUP_NOT_DONE: no line-up printed (the env file has only the gate part: the line-up lives in the settings version)"; exit 1; }
-[ "$(stat -c '%U %a' "$SART/line-up.json")" = "root 644" ] || { echo "LINEUP_NOT_DONE: the file is not root 0644"; exit 1; }
+TMP=$SART/line-up.json.printing
+( umask 022; cd "$CAPI/dialectical-engine" && /usr/bin/env -i PATH=/usr/bin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node --import ./node_modules/tsx/dist/loader.mjs tools/preview-practice/check-thinking-levels.ts --print-line-up --settings "$E/api-$LABEL.env" > "$TMP" ) || { echo "LINEUP_NOT_DONE: the checker refused the value (run it without the redirect to read why; $TMP is only a draft)"; exit 1; }
+jq -e '.lineUp.free_model_ids and .lineUp.premium_model_ids' "$TMP" > /dev/null || { cat "$TMP"; echo "LINEUP_NOT_DONE: no line-up printed (the env file has only the gate part: the line-up lives in the settings version)"; exit 1; }
+[ "$(stat -c '%U %a' "$TMP")" = "root 644" ] || { echo "LINEUP_NOT_DONE: the draft is not root 0644"; exit 1; }
+mv "$TMP" "$SART/line-up.json"
 echo "line-up file: $SART/line-up.json (SV1's LINEUP)"
 ```
 
@@ -2503,8 +2519,8 @@ Content-free lines (codes, versions, ids), in each unit's journal (`journalctl -
 | `DEBATEAI_SETTINGS_ACTIVATED {"version":…,"previous":…,"releaseKey":…,"activationSeq":…}` | SV4, SV6 | the activation receipt: new questions use `version` from now on |
 | `DEBATEAI_SETTINGS_REFUSED {"command":…,"code":…,"codes":[…],"passed":[…]}` | any operator command | a refusal: the code, the gate codes, or the versions the release has passed |
 | `DEBATEAI_RUNNER_SETTINGS {"releaseKey":…,"siteVersion":…,"loaded":[…],"unsupported":[…]}` | runner, once, right after its ready line | the settings versions the runner preloaded at boot (its open debates' and every version its release passed); `unsupported` lists a version it cannot run with its code |
-| `DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED {"version":…,"code":…}` | runner, once per version | a settings version this release's code cannot run, and the check that refused it; should never happen after a PASS: report it |
-| `DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED {"runId":…,"version":…,"code":…}` | runner, once per debate | a debate on such a version was set aside before any AI call, with its waiver: the asker reads the "update on our side" sentence and kept the allowance (the line above comes first for the first such debate) |
+| `{"kind":"DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED","version":…,"code":…}` | runner, once per version | a settings version this release's code cannot run, and the check that refused it; should never happen after a PASS: report it |
+| `{"kind":"DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED","runId":…,"version":…,"code":…}` | runner, once per debate | a debate on such a version was set aside before any AI call, with its waiver: the asker reads the "update on our side" sentence and kept the allowance (the line above comes first for the first such debate) |
 | `{"kind":"DEBATEAI_ADMISSION_SETTINGS","code":"ADMISSION_SETTINGS_UNSUPPORTED","version":…,"cause":…}` | API, per version | the API cannot admit on the active version (`cause`: the loader's code): asks wait in line ("switching") or get the plain "try again in a minute"; report it |
 | `{"kind":"DEBATEAI_ADMISSION_SETTINGS","code":"ADMISSION_SETTINGS_NOT_PASSED","version":…}` | API, per refused ask | an ask without a waiting line met a version this release has not passed (a switch or an activation in between): refused plainly, nothing written or charged; the person asks again |
 | `{"kind":"DEBATEAI_ADMISSION_SETTINGS","code":"ADMISSION_ESTIMATOR_FALLBACK","version":…,"cause":…}` | API, once per version | the cost estimate for another debate's version could not be built; it was priced on the asking version's terms instead |
@@ -2539,10 +2555,13 @@ silent skip.
   whose latest verdict is still PASS, else its own site version. A switch that reverts by itself (`SWITCH_REVERTED`)
   puts back what was active before; after a switch between two releases on one site version it activates nothing.
   Neither asks the gates: putting back a known state must work while a gate is down.
-- **An upload after an activation.** The upload's own plan (SB3) composes from the active version too (kit v3), but its
-  from-plan is still the old release's verify plan, which names the old release's site version. While the active
-  version is another one, SB3's native operator therefore refuses with `PREVIEW_REGISTER_BASE_NOT_ACTIVE` (nothing
-  written): stop and ask. SB3 does not plan from a kept `settings-v<version>` verify plan yet.
+- **An upload follows the active version.** SB1 records the active settings version (`$S/active-before`; a release
+  without the settings operator: its own site version). SB3 plans from it, as SV1 does: from the old release's verify
+  plan while that is its site version, else from the kept `settings-v<version>` plans, with the hosted inputs, the
+  checker or answer seats and rotation read from them, so the new site version keeps every activated debate setting.
+  SB9 and DR5 publish only a proposal based on it.
+- **Never activate while an upload is between SB3 and SB13** (or DR6). SB13 and DR6 read the active version again and
+  stop, nothing changed, when it is not the one SB3 planned from: switching would undo that activation.
 
 <!-- Reserved for the line-up task (SA11): the line-up and thinking-level examples and the T+1 env migration are added here. -->
 
@@ -3841,6 +3860,7 @@ cad() { systemd-run --quiet --pipe --wait --collect -p EnvironmentFile=/etc/deba
 readyz() { printf 'X-Debateai-Edge-Secret: %s\n' "$(cat "$EDGE")" | curl -s -m 5 -H @- -w '\n%{http_code}' "http://127.0.0.1:$1/readyz" || true; }
 edgekey() { { curl -s -m 15 -o /dev/null -D - http://127.0.0.1:3090/readyz || true; } | tr -d '\r' | awk 'NR == 1 { s = $2 } tolower($1) == "x-debateai-release:" { k = $2 } END { print (s == "" ? "000" : s) " " (k == "" ? "none" : k) }'; }
 gs() { /usr/bin/python3 -I "$1/preview_budget_authority.py" status --private "$2"; }
+activev() { local o=${OKEY%%-*}; if [ -f "$L/settings-version.mjs" ] && [ -f "$OCAPI/dialectical-engine/tools/settings-version/cli.ts" ]; then lc settings-version.mjs status | sed -n 's/^DEBATEAI_SETTINGS_STATUS //p' | jq -er .effectiveActive; else printf '%s\n' "${o#r}"; fi; }
 EOF
 } > "$NAMES"
 chmod 0600 "$NAMES" "$SP"
@@ -3853,10 +3873,12 @@ jq -r --arg o "$OLABEL" '.releases[$o].services.api.basePlan.path, .releases[$o]
 ( cd /etc/systemd/system && tar -czf "$S/systemd-before.tgz" debateai-preview-* debateai-preview.target debateai-preview.target.d ) || { echo "SB1_NOT_DONE: the copy of the systemd files failed (the boot target or its drop-in is missing?): ask"; exit 1; }
 psqlq "SELECT count(*)||'|'||max(name) FROM public.debateai_schema_migration" > "$S/ledger-before"
 psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1" > "$S/register-before"
+activev > "$S/active-before" || { echo "SB1_NOT_DONE: settings-version.mjs status refused (the active settings version is unread): ask"; exit 1; }
+grep -qxE '[1-9][0-9]*' "$S/active-before" || { echo "SB1_NOT_DONE: no active settings version read"; exit 1; }
 umask 022
 cmp -s "$S/native-plan.before.json" "$ONP" && cmp -s "$S/release-lock.before.json" "$LOCK" || { echo "SB1_NOT_DONE: a copy differs from the live file"; exit 1; }
 for SVC in api ui runner; do cmp -s "$S/$SVC-$OLABEL.env.before" "$E/$SVC-$OLABEL.env" || { echo "SB1_NOT_DONE: the copy of $SVC-$OLABEL.env differs"; exit 1; }; done
-echo "S=$S ART=$ART; new release $LABEL, key $KEY, slot $SLOT; old release $OLABEL ($OKEY, slot $OSLOT); ledger $(cat "$S/ledger-before"), register $(cat "$S/register-before")"
+echo "S=$S ART=$ART; new release $LABEL, key $KEY, slot $SLOT; old release $OLABEL ($OKEY, slot $OSLOT); ledger $(cat "$S/ledger-before"), register $(cat "$S/register-before"), active settings $(cat "$S/active-before")"
 echo SB1_DONE
 ```
 
@@ -3903,21 +3925,36 @@ step needs no "nothing running" guard.
 set -euo pipefail
 . /root/preview-archive/rNN-names.sh
 # SB3: the plan (billing-on inputs, the live checker) and the native operator's proposal, in the new release's own native-plan file.
-REG0=$(cat "$S/register-before")
+REG0=$(cat "$S/register-before"); AV=$(cat "$S/active-before"); OSITE=${OKEY%%-*}; OSITE=${OSITE#r}
 [ "$(jq -cS . <<<"$HB_ON")" = '{"askRoomReads":{"capacity":65536,"limit":60,"windowMs":60000},"billing":"on","dailyCeilingMicros":10000000,"perRunCeilingMicros":3000000}' ] || { echo "SB3_NOT_DONE: HB_ON is not the billing-on JSON"; exit 1; }
 cmp -s "$S/native-plan.before.json" "$ONP" || { echo "SB3_NOT_DONE: the old release's verify plan moved since SB1"; exit 1; }
 [ ! -e "$NP" ] || { echo "SB3_NOT_DONE: $NP exists (look first)"; exit 1; }
 [ ! -e "$ART/native-plan-plan.json" ] && [ ! -e "$ART/register-proposal.json" ] || { echo "SB3_NOT_DONE: an earlier plan or proposal exists (look first)"; exit 1; }
-rel native-plan --operation plan --from "$S/native-plan.before.json" --source-manifest "$ART/candidate-api-source.json" --checker deepseek --deepseek-enabled-on-gate yes --hosted-billing "$HB_ON" --out "$ART/native-plan-plan.json" || { echo "SB3_NOT_DONE: the release tool refused the plan"; exit 1; }
+# The base is the active settings version (kit v3): the old release's own verify plan while that is its site version,
+# else the verify plan SV2 kept for the activated version; the choices a plan does not carry from its base come with it.
+if [ "$AV" = "$OSITE" ]; then FROM=$S/native-plan.before.json; CP=$OART/native-plan-publish.json; else FROM=/opt/debateai-v3-preview/artifacts/settings-v$AV/native-plan-verify.json; CP=/opt/debateai-v3-preview/artifacts/settings-v$AV/native-plan-publish.json; fi
+[ "$(jq -r .approval.publication.registerVersion "$FROM")" = "$AV" ] && [ "$(jq -r .approval.snapshotSha256 "$CP")" = "$(jq -r .approval.publication.snapshotSha256 "$FROM")" ] || { echo "SB3_NOT_DONE: no kept verify and publish plan names the active settings version $AV ($FROM): ask"; exit 1; }
+HB=$(jq -c .hostedBilling "$FROM")
+[ "$(jq -cS '{billing,dailyCeilingMicros,askRoomReads}' <<<"$HB")" = "$(jq -cS '{billing,dailyCeilingMicros,askRoomReads}' <<<"$HB_ON")" ] || { echo "SB3_NOT_DONE: the active version's site inputs differ from HB_ON: ask"; exit 1; }
+SEATS=$(jq -c '.answerSeats // empty' "$CP"); ROT=$(jq -r '.roleRotation // empty' "$CP"); DS=$(jq -r 'if .answerSeats == null and .checkerChoice.checker == "deepseek" then "yes" else empty end' "$CP")
+echo "active settings version $AV; per-debate inputs $(jq -c '{perRunCeilingMicros}' <<<"$HB"); checker $([ -n "$DS" ] && echo deepseek || echo "${SEATS:-glm}"); rotation ${ROT:-on}"
+rel native-plan --operation plan --from "$FROM" --source-manifest "$ART/candidate-api-source.json" ${DS:+--checker deepseek --deepseek-enabled-on-gate yes} ${SEATS:+--answer-seats "$SEATS"} ${ROT:+--role-rotation "$ROT"} --hosted-billing "$HB" --out "$ART/native-plan-plan.json" || { echo "SB3_NOT_DONE: the release tool refused the plan"; exit 1; }
 [ "$(jq -r .operation "$ART/native-plan-plan.json")" = plan ] && [ "$(jq -r '.hostedBilling.billing // "none"' "$ART/native-plan-plan.json")" = on ] && [ "$(jq -r .sourceRoot "$ART/native-plan-plan.json")" = "$CAPI" ] || { echo "SB3_NOT_DONE: the plan is not this release's billing-on plan"; exit 1; }
 put "$ART/native-plan-plan.json" || { echo "SB3_NOT_DONE: put of the plan failed"; exit 1; }
 OUT=$(nat "$ART/register-proposal.json"); echo "nat: $OUT"
-[ "$OUT" = "exit 0" ] || { head -c 2000 "$ART/register-proposal.json"; echo; echo "SB3_NOT_DONE: the native operator refused the plan"; exit 1; }
-[ "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" = "$REG0" ] && cmp -s "$S/native-plan.before.json" "$ONP" || { echo "SB3_NOT_DONE: the proposal is not based on register $REG0, or the old plan moved"; exit 1; }
+[ "$OUT" = "exit 0" ] || { head -c 2000 "$ART/register-proposal.json"; echo; echo "SB3_NOT_DONE: the native operator refused the plan (PREVIEW_REGISTER_BASE_NOT_ACTIVE: settings were activated since SB1: ask)"; exit 1; }
+[ "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" = "$AV" ] && cmp -s "$S/native-plan.before.json" "$ONP" || { echo "SB3_NOT_DONE: the proposal is not based on the active settings version $AV, or the old plan moved"; exit 1; }
 sha256sum "$ART/native-plan-plan.json" "$ART/register-proposal.json" > "$S/plan-proposal.sha256"
 jq -c '{baseRegisterVersion,addedKeys,changedKeys,removedKeys,deltaSha256}' "$ART/register-proposal.json"
 echo SB3_DONE
 ```
+
+**The base is the active settings version (side-by-side spec §13).** SB1 recorded it in `$S/active-before`. While it
+is the old release's own site version, the plan starts from the old release's verify plan, as before; after an
+activation of another version, from that version's kept plans (`/opt/debateai-v3-preview/artifacts/settings-v<version>/`,
+SV2 of "Changing debate settings without an upload"). The hosted inputs, the checker or the answer seats and role
+rotation are read from the same plans (a plan does not take them from its base), so the upload's site version keeps
+every activated debate setting; their site part must still equal `HB_ON`.
 
 The owner reads the delta exactly as A9 says; the yes in SB6 names its `deltaSha256`. Gate files: A10's check. A changed
 gate file follows spec §9's rule for gate rows: a change that only widens (adds a model, raises a bound) is deployed now,
@@ -4091,17 +4128,17 @@ set -euo pipefail
 . /root/preview-archive/rNN-names.sh
 # SB9: publish SB3's plan with the owner's yes. The old release keeps serving on its own version.
 YES='<the deltaSha256 the owner approved, in full>'
-REG0=$(cat "$S/register-before"); VNEXT=$((REG0 + 1)); VK=${KEY#r}; VK=${VK%%-*}
+REG0=$(cat "$S/register-before"); AV=$(cat "$S/active-before"); VNEXT=$((REG0 + 1)); VK=${KEY#r}; VK=${VK%%-*}
 [ "$VK" = "$VNEXT" ] || { echo "SB9_NOT_DONE: $KEY does not name version $VNEXT"; exit 1; }
 [ "$(psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1")" = "$REG0" ] || { echo "SB9_NOT_DONE: the newest register is not $REG0"; exit 1; }
 for M in $(cat "$S/new-migrations.txt"); do [ "$(psqlq "SELECT count(*) FROM public.debateai_schema_migration WHERE name = '$M'")" = 1 ] || { echo "SB9_NOT_DONE: $M is not applied (SB8 first)"; exit 1; }; done
 sha256sum -c --quiet "$S/plan-proposal.sha256" || { echo "SB9_NOT_DONE: the plan or the proposal changed since SB3"; exit 1; }
-[ "$(jq -r .deltaSha256 "$ART/register-proposal.json")" = "$YES" ] && [ "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" = "$REG0" ] || { echo "SB9_NOT_DONE: the proposal is not the approved one"; exit 1; }
+[ "$(jq -r .deltaSha256 "$ART/register-proposal.json")" = "$YES" ] && [ "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" = "$AV" ] || { echo "SB9_NOT_DONE: the proposal is not the approved one, or not based on the active settings version $AV"; exit 1; }
 [ ! -e "$ART/native-plan-publish.json" ] && [ ! -e "$ART/register-published.json" ] || { echo "SB9_NOT_DONE: an earlier publish file exists (look first)"; exit 1; }
 rel native-plan --operation publish --from "$ART/native-plan-plan.json" --proposal "$ART/register-proposal.json" --approved-delta-sha256 "$YES" --source-manifest "$ART/candidate-api-source.json" --out "$ART/native-plan-publish.json" || { echo "SB9_NOT_DONE: the release tool refused the publish plan (nothing published)"; exit 1; }
 put "$ART/native-plan-publish.json" || { echo "SB9_NOT_DONE: put of the publish plan failed (nothing published)"; exit 1; }
 OUT=$(nat "$ART/register-published.json"); echo "nat: $OUT"
-[ "$OUT" = "exit 0" ] || { head -c 800 "$ART/register-published.json"; echo; echo "SB9_NOT_DONE: the publish was refused (PREVIEW_REGISTER_BASE_NOT_CURRENT needs a new plan and a new yes)"; exit 1; }
+[ "$OUT" = "exit 0" ] || { head -c 800 "$ART/register-published.json"; echo; echo "SB9_NOT_DONE: the publish was refused (PREVIEW_REGISTER_BASE_NOT_ACTIVE: settings were activated since SB3; PREVIEW_REGISTER_BASE_NOT_CURRENT: no release yet; each needs a new plan and a new yes)"; exit 1; }
 V=$(jq -r .publication.registerVersion "$ART/register-published.json"); echo "new REGISTER_VERSION=$V"
 [ "$V" = "$VK" ] && [ "$(psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1")" = "$V" ] || { echo "SB9_NOT_DONE: the published version is not the one $KEY names"; exit 1; }
 printf '%s\n' "$V" > "$S/new-register-version"
@@ -4247,8 +4284,10 @@ passed) before anything is written. The script names `ACT`, the new release's ow
 the upload's own version becomes active with the switch. The first T+1 switch, with nothing ever activated, would
 activate it even without the argument (owner answer Q-S2). Set `ACT` to another version only on the owner's word, after
 `settings-version.mjs check "$LABEL" <version>` passed it (SB10 must have pinned the new release first); such a forward
-`--activate` first runs the live gate check of an activation (both gates must answer). "Changing debate settings
-without an upload" has the whole settings flow.
+`--activate` first runs the live gate check of an activation (both gates must answer). Before the switch, the script
+reads the active version again: it must still be the one SB3 planned from (`$S/active-before`, the proposal's base),
+else it stops with nothing changed, since activating `ACT` would undo the activation made meanwhile. "Changing debate
+settings without an upload" has the whole settings flow.
 
 What a visitor sees during the switch is watched by the operator, with the owner's own password, from the Mac. Before
 SB13, in a second terminal, the owner puts the site's user and password in a private netrc file with an editor (one
@@ -4271,6 +4310,8 @@ set -euo pipefail
 . /root/preview-archive/rNN-names.sh
 # SB13: the switch. Exit 0 = done with nothing bad; 2 = done, but a check after the write failed (read bad); 1 = refused.
 [ ! -e /etc/debateai-v3-preview/lifecycle/maintenance-pending ] || { echo "SB13_NOT_DONE: infrastructure maintenance is pending (nothing changed)"; exit 1; }
+AVN=$(activev) || { echo "SB13_NOT_DONE: settings-version.mjs status refused (nothing changed): ask"; exit 1; }
+[ "$AVN" = "$(cat "$S/active-before")" ] && [ "$AVN" = "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" ] || { echo "SB13_NOT_DONE: settings were activated since SB3 (active $AVN; nothing changed): ask"; exit 1; }
 ACT=${KEY%%-*}; ACT=${ACT#r}                              # the settings version the switch activates: this release's own site version
 SC=0; SW=$(lc release-switch.mjs switch --to "$LABEL" --from "$OLABEL" --activate "$ACT" 2>&1) || SC=$?
 echo "$SW"
@@ -4703,13 +4744,13 @@ YES='<the deltaSha256 the owner approved, in full>'
 UD=/etc/systemd/system; REG0=$(cat "$S/register-before"); VK=${KEY#r}; VK=${VK%%-*}
 [ "$VK" = "$((REG0 + 1))" ] || { echo "DR5_NOT_DONE: $KEY does not name version $((REG0 + 1))"; exit 1; }
 cmp -s "$ART/native-plan-apply-and-plan.json" "$NP" || { echo "DR5_NOT_DONE: DR4 is not done"; exit 1; }
-sha256sum -c --quiet "$S/plan-proposal.sha256" && [ "$(jq -r .deltaSha256 "$ART/register-proposal.json")" = "$YES" ] || { echo "DR5_NOT_DONE: the proposal is not the approved one"; exit 1; }
+sha256sum -c --quiet "$S/plan-proposal.sha256" && [ "$(jq -r .deltaSha256 "$ART/register-proposal.json")" = "$YES" ] && [ "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" = "$(cat "$S/active-before")" ] || { echo "DR5_NOT_DONE: the proposal is not the approved one, or not based on the active settings version"; exit 1; }
 for F in native-plan-publish.json register-published.json native-plan-verify.json native-first-verify.json api-launch.json ui-launch.json runner-launch.json; do [ ! -e "$ART/$F" ] || { echo "DR5_NOT_DONE: $F exists (look first)"; exit 1; }; done
 OLDA=$(sed -n 1p "$S/old-plans.txt"); OLDU=$(sed -n 2p "$S/old-plans.txt"); OLDR=$(sed -n 3p "$S/old-plans.txt")
 rel native-plan --operation publish --from "$ART/native-plan-plan.json" --proposal "$ART/register-proposal.json" --approved-delta-sha256 "$YES" --source-manifest "$ART/candidate-api-source.json" --out "$ART/native-plan-publish.json" || { echo "DR5_NOT_DONE: the release tool refused the publish plan (nothing published)"; exit 1; }
 put "$ART/native-plan-publish.json" || { echo "DR5_NOT_DONE: put of the publish plan failed (nothing published)"; exit 1; }
 OUT=$(nat "$ART/register-published.json"); echo "nat: $OUT"
-[ "$OUT" = "exit 0" ] || { head -c 800 "$ART/register-published.json"; echo; echo "DR5_NOT_DONE: the publish was refused"; exit 1; }
+[ "$OUT" = "exit 0" ] || { head -c 800 "$ART/register-published.json"; echo; echo "DR5_NOT_DONE: the publish was refused (PREVIEW_REGISTER_BASE_NOT_ACTIVE: settings were activated since SB3: a new plan and a new yes)"; exit 1; }
 V=$(jq -r .publication.registerVersion "$ART/register-published.json"); echo "new REGISTER_VERSION=$V"
 [ "$V" = "$VK" ] || { echo "DR5_NOT_DONE: the published version is not the one $KEY names"; exit 1; }
 printf '%s\n' "$V" > "$S/new-register-version"
@@ -4759,6 +4800,8 @@ for i in $(seq 1 80); do [ "$(journalctl -u "debateai-preview-api@$LABEL" --sinc
 systemctl start "debateai-preview-ui@$LABEL" || echo "systemctl start of the new website returned non-zero"
 RC=000; for i in $(seq 1 60); do RZ=$(readyz "$UIP"); RC=${RZ##*$'\n'}; [ "$RC" = 503 ] && [ "$(jq -c '[.releaseKey, .reasons]' <<<"${RZ%$'\n'*}" 2>/dev/null)" = "[\"$KEY\",[\"NOT_CURRENT\"]]" ] && break; sleep 2; done
 [ "$RC" = 503 ] || { echo "DR6_NOT_DONE: the new website is not up and waiting (way back: rbD-B)"; exit 1; }
+AVN=$(activev) || { echo "DR6_NOT_DONE: settings-version.mjs status refused (nothing changed): ask"; exit 1; }
+[ "$AVN" = "$(cat "$S/active-before")" ] && [ "$AVN" = "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" ] || { echo "DR6_NOT_DONE: settings were activated since SB3 (active $AVN; nothing changed): ask"; exit 1; }
 ACT=${KEY%%-*}; ACT=${ACT#r}                              # the settings version the switch activates: this release's own site version (SB13)
 SC=0; SW=$(lc release-switch.mjs switch --to "$LABEL" --from "$OLABEL" --old-pair-stopped --activate "$ACT" 2>&1) || SC=$?
 echo "$SW"

@@ -19,6 +19,7 @@ import {
   latestPassedSettingsVersion,
   parseSettingsCheckLine,
   parseSettingsCheckOutput,
+  readEffectiveActiveSettings,
   readSettingsStatus,
   recordSettingsVerdict,
   settingsForSwitch,
@@ -323,6 +324,25 @@ describe("the status, the rollback's version and the switch's settings step", ()
     expect(await readSettingsStatus(empty.client)).toEqual({ currentRelease: KEY, pointer: null, effectiveActive: 17, passed: [17] });
     const none = fakeClient([["core.read_current_release()", rows()], ["read_active_settings_version()", rows({ pointer: null })]]);
     expect(await readSettingsStatus(none.client)).toEqual({ currentRelease: null, pointer: null, effectiveActive: null, passed: [] });
+  });
+
+  it("the kit's light read (ruling R69): a database without 0124's reader or 0123's release table is asked nothing it lacks", async () => {
+    const schema = (releases: boolean, settings: boolean) => rows({ releases, settings });
+    const full = fakeClient([
+      ["to_regprocedure", schema(true, true)],
+      ["core.read_current_release()", rows({ release_key: KEY })],
+      ["read_active_settings_version()", rows({ pointer: "18" })]
+    ]);
+    expect(await readEffectiveActiveSettings(full.client)).toEqual({ currentRelease: KEY, pointer: 18, effectiveActive: 18 });
+    expect(full.sqls().some((sql) => sql.includes("read_passed_settings_versions"))).toBe(false);
+    // T+1's SB3: T is current (0123 applied), 0124 not applied yet: the pointer is null, the site version is active.
+    const before0124 = fakeClient([["to_regprocedure", schema(true, false)], ["core.read_current_release()", rows({ release_key: KEY })]]);
+    expect(await readEffectiveActiveSettings(before0124.client)).toEqual({ currentRelease: KEY, pointer: null, effectiveActive: 17 });
+    expect(before0124.sqls().some((sql) => sql.includes("read_active_settings_version"))).toBe(false);
+    // Neither: no release, no pointer (the caller's old rule decides).
+    const before0123 = fakeClient([["to_regprocedure", schema(false, false)]]);
+    expect(await readEffectiveActiveSettings(before0123.client)).toEqual({ currentRelease: null, pointer: null, effectiveActive: null });
+    expect(before0123.queries).toHaveLength(1);
   });
 
   it("latest passed: the most recent PASS still PASS (by checked_at), else the release's own site version (D1, T)", async () => {
