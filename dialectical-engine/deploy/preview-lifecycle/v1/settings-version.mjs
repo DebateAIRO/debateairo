@@ -13,10 +13,11 @@
 //                               records the verdict (tools/settings-version/cli.ts verdict). A FAIL lists every code with one
 //                               plain hint. A half that could not run writes nothing to the database;
 //   - activate <version> --by <owner> --reason <text>
-//                               first proves every spending gate runs this release's gate code (addition D21, SA10: the
-//                               sha256 of each gate folder's preview_budget_helper.py = this release's
-//                               packages/providers/ops/preview_budget_helper.py = the gate's GO helper_sha256; else
-//                               SETTINGS_GATE_HELPER_DIFFERS, nothing asked, nothing written to the database); then reads
+//                               first proves every spending gate runs this release's gate code (addition D21, SA10, R65b:
+//                               for preview_budget_helper.py and preview_budget_authority.py, the sha256 of each gate
+//                               folder's copy = this release's packages/providers/ops copy = the gate's GO record,
+//                               helper_sha256 and bridge_sha256; else SETTINGS_GATE_HELPER_DIFFERS, nothing asked,
+//                               nothing written to the database); then reads
 //                               both gates' read-only /remaining (the sockets from the current release's API env file),
 //                               saves each answer and the release's line-up and target models next to the current
 //                               release's plans and hands them to `cli.ts activate`, which checks condition 6 live over
@@ -43,7 +44,7 @@ import { lstat, readFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { readEnvironmentFile } from '../../preview-auth-dev/v1/environment.mjs';
-import { LAYOUT, RELEASE_LABEL, atomicWrite, currentDirFor, envPathFor, logLine, runBounded, sha256 } from './common.mjs';
+import { LAYOUT, RELEASE_LABEL, atomicWrite, currentDirFor, ensureDirectory, envPathFor, logLine, runBounded, sha256 } from './common.mjs';
 import { loadPinnedRelease, readLock } from './prestart.mjs';
 import { verifyReleaseForImport } from './release-guard.mjs';
 import { RELEASE_KEY_PATTERN, readCurrentRelease } from './release-table.mjs';
@@ -62,12 +63,19 @@ export const RECEIPT_SCHEMA = 'preview-settings-check-receipt-v1';
 /** `activated_by`'s CHECK in migration 0124, exactly (no colon). */
 export const ACTIVATED_BY = /^[A-Za-z0-9][A-Za-z0-9 ._@-]{0,127}$/;
 /**
- * Addition D21 (SA10, owner answer Q-L3): the gate code whose fingerprint proves the live gates hold this release's
- * reviewed rows (menus and bounds): the file in each gate's folder (common.mjs `gates[].folder`) and the release's own
- * copy, inside its engine folder (the release guide's same-helper check, deploy/preview-release/v1/README.md).
+ * Addition D21 (SA10, owner answer Q-L3; ruling R65b): the gate code whose fingerprint proves the live gates hold this
+ * release's reviewed rows (the helper's menus, bounds and prices; the authority's `efforts_reviewed`): each file in each
+ * gate's folder (common.mjs `gates[].folder`), the release's own copy inside its engine folder, and the digest the gate's
+ * GO records for it (the release guide's same() check, deploy/preview-release/v1/README.md: `helper_sha256` and
+ * `bridge_sha256`, both required GO members of the gate, preview_budget_authority.py GO_REQUIRED).
  */
 export const GATE_HELPER_FILE = 'preview_budget_helper.py';
 export const RELEASE_GATE_HELPER = `packages/providers/ops/${GATE_HELPER_FILE}`;
+export const GATE_CODE_FILES = Object.freeze([
+  Object.freeze({ file: GATE_HELPER_FILE, goMember: 'helper_sha256' }),
+  Object.freeze({ file: 'preview_budget_authority.py', goMember: 'bridge_sha256' })
+]);
+export const RELEASE_GATE_CODE_DIR = 'packages/providers/ops';
 /** The release's line-up and target models, handed to the operator (`cli.ts … --seatable-env`, settings-operator.ts). */
 export const SEATABLE_ENV_SCHEMA = 'preview-settings-seatable-env-v1';
 
@@ -83,6 +91,9 @@ export const CHECK_HINTS = Object.freeze({
   SETTINGS_GATE_THINKING_UNREVIEWED: 'a thinking level is not on that AI\'s reviewed menu in this release: choose a level from its menu',
   SETTINGS_GATE_TOKEN_CEILING: 'a sealed answer length is above what one of the AIs may answer: lower it to that AI\'s limit',
   SETTINGS_GATE_HELPER_DIFFERS: 'a spending gate does not run this release\'s gate code: align that gate first (the release guide\'s same-helper steps), then activate again',
+  SETTINGS_GATE_MODEL_DISABLED: 'that AI is switched off at its spending gate: switch it on there, then try again',
+  SETTINGS_GATE_UNANSWERED: 'a spending gate did not answer: check it is running, then try again',
+  SETTINGS_GATE_LIVE_CHECK_FAILED: 'an AI this version can use is not ready at its spending gate: read the codes listed with it, fix those, then try again',
   PREVIEW_LINE_UP_REQUIRED: 'the version names no list of AIs and the server setting has none either: publish the version with a line-up',
   SETTINGS_CHECK_DETAIL_UNPRINTABLE: 'a value in the version has a character a receipt cannot carry: read the version\'s rows and ask',
   SETTINGS_ROW_UNCLASSIFIED: 'the version has a row this code does not know: the code must learn it first (an upload)',
@@ -167,6 +178,8 @@ function withDefaults(layout, deps) {
     readRemaining: deps.readRemaining ?? readRemaining,
     // Root-only gate files and the release's own helper, read as bytes for their sha256 (addition D21).
     readBytes: deps.readBytes ?? (path => readFile(path)),
+    // A release's lifecycle-current folder, as prestart.mjs makes it (root, 0755: the operator, postgres, reads what is saved there).
+    ensureCurrentDir: deps.ensureCurrentDir ?? (path => ensureDirectory(path, { mode: 0o755, uid })),
     // Root-owned 0644 in the release's 0755 lifecycle-current folder: the operator (postgres) reads the answers back.
     writeFile: deps.writeFile ?? ((path, text) => atomicWrite(path, Buffer.from(text, 'utf8'), { mode: 0o644, uid, gid }))
   };
@@ -358,29 +371,36 @@ export function gateSockets(configText, gates) {
 
 /** A file's sha256, or null when it cannot be read (a missing gate file differs from any release). */
 const digestOf = async (io, path) => { try { return sha256(await io.readBytes(path)); } catch { return null; } };
-/** A GO file's `helper_sha256` (lowercase hex), or null when the file or the member cannot be read. */
-async function goHelperDigest(io, path) {
+/** A GO file's recorded digests by member (`helper_sha256`, `bridge_sha256`: lowercase hex), or {} when unreadable. */
+async function goDigests(io, path) {
   try {
-    const value = JSON.parse(Buffer.from(await io.readBytes(path)).toString('utf8'))?.helper_sha256;
-    return typeof value === 'string' && /^[0-9a-f]{64}$/.test(value) ? value : null;
-  } catch { return null; }
+    const go = JSON.parse(Buffer.from(await io.readBytes(path)).toString('utf8'));
+    return Object.fromEntries(GATE_CODE_FILES.map(({ goMember }) => [goMember, own(go, goMember)])
+      .filter(([, value]) => typeof value === 'string' && /^[0-9a-f]{64}$/.test(value)));
+  } catch { return {}; }
 }
 
 /**
- * Addition D21 (SA10, owner answer Q-L3) — THE GATE-CODE FINGERPRINT. `/remaining` carries no menus and no bounds, so
- * the live proof that the gates hold this release's reviewed rows is that they run this release's gate code: for each
- * gate in the layout's `gates` (common.mjs), the sha256 of `<gate folder>/preview_budget_helper.py`, of the release's own
- * `<engine>/packages/providers/ops/preview_budget_helper.py` and the gate's GO file's `helper_sha256` must all be equal
- * (the release guide's same() check; equal code means equal menus and bounds, the parity tests). Returns the codes
- * SETTINGS_GATE_HELPER_DIFFERS:<gate> in the layout's order (none: every gate matches). Reads files only.
+ * Addition D21 (SA10, owner answer Q-L3; ruling R65b) — THE GATE-CODE FINGERPRINT. `/remaining` carries no menus and no
+ * bounds, so the live proof that the gates hold this release's reviewed rows is that they run this release's gate code:
+ * for each gate in the layout's `gates` (common.mjs) and each of the two gate files (GATE_CODE_FILES: the helper and the
+ * authority), the sha256 of `<gate folder>/<file>`, of the release's own `<engine>/packages/providers/ops/<file>` and the
+ * digest the gate's GO records for it (`helper_sha256`, `bridge_sha256`; the gate itself refuses a GO without either)
+ * must all be equal (the release guide's same() check; equal code means equal menus and bounds, the parity tests).
+ * Returns the codes SETTINGS_GATE_HELPER_DIFFERS:<gate> in the layout's order (none: every gate matches). Reads files only.
  */
 export async function gateHelperDifferences({ engine, gates, io }) {
-  const release = await digestOf(io, `${engine}/${RELEASE_GATE_HELPER}`);
+  const release = {};
+  for (const { file } of GATE_CODE_FILES) release[file] = await digestOf(io, `${engine}/${RELEASE_GATE_CODE_DIR}/${file}`);
   const codes = [];
   for (const gate of gates) {
-    const installed = await digestOf(io, `${gate.folder}/${GATE_HELPER_FILE}`);
-    const go = await goHelperDigest(io, gate.go);
-    if (release === null || installed !== release || go !== release) codes.push(`SETTINGS_GATE_HELPER_DIFFERS:${gate.name}`);
+    const recorded = await goDigests(io, gate.go);
+    let same = true;
+    for (const { file, goMember } of GATE_CODE_FILES) {
+      const installed = await digestOf(io, `${gate.folder}/${file}`);
+      if (release[file] === null || installed !== release[file] || recorded[goMember] !== release[file]) same = false;
+    }
+    if (!same) codes.push(`SETTINGS_GATE_HELPER_DIFFERS:${gate.name}`);
   }
   return Object.freeze(codes);
 }
@@ -388,13 +408,14 @@ export async function gateHelperDifferences({ engine, gates, io }) {
 /**
  * The release's line-up and target models for the operator's seatable set (settings-operator.ts parseSeatableEnvironment):
  * the API env's PREVIEW_PROVIDER_TEST_CONFIG_JSON text as it is (the operator reads it with the env's own parser) and
- * each declared target's model (PROVIDER_DISCOVERY_TARGETS_JSON). SETTINGS_SEATABLE_ENV_UNREADABLE otherwise.
+ * each declared target's model (PROVIDER_DISCOVERY_TARGETS_JSON, at least one: an empty list would shrink the seatable
+ * set silently). SETTINGS_SEATABLE_ENV_UNREADABLE otherwise.
  */
 export function seatableEnvironmentText(environment) {
   const config = own(environment, 'PREVIEW_PROVIDER_TEST_CONFIG_JSON');
   let targets;
   try { targets = JSON.parse(own(environment, 'PROVIDER_DISCOVERY_TARGETS_JSON')); } catch { refuse('SETTINGS_SEATABLE_ENV_UNREADABLE'); }
-  if (typeof config !== 'string' || !Array.isArray(targets) || !targets.every(target => typeof own(target, 'model') === 'string' && target.model.length > 0)) {
+  if (typeof config !== 'string' || !Array.isArray(targets) || targets.length === 0 || !targets.every(target => typeof own(target, 'model') === 'string' && target.model.length > 0)) {
     refuse('SETTINGS_SEATABLE_ENV_UNREADABLE');
   }
   return `${JSON.stringify({ schema: SEATABLE_ENV_SCHEMA, previewConfig: config, declaredModels: [...new Set(targets.map(target => target.model))] })}\n`;
@@ -415,6 +436,9 @@ async function liveGateArguments(io, layout, { label, pinned, engine, prefix }) 
   const handOver = seatableEnvironmentText(environment);
   const stamp = utcStamp(io.now());
   const folder = currentDirFor(layout, label);
+  // Prestart makes this folder at every start of the release (so a STAGED release with its units up has it); made here
+  // the same way if not (root, 0755), never a refusal of a legitimate switch or activation.
+  await io.ensureCurrentDir(folder).catch(() => refuse('CURRENT_DIRECTORY_REFUSED'));
   const seatablePath = `${folder}/${prefix}-${stamp}-seatable-env.json`;
   await io.writeFile(seatablePath, handOver);
   const args = ['--seatable-env', seatablePath];

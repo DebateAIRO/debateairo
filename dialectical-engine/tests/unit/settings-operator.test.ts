@@ -173,11 +173,13 @@ const switchDatabase = (pointer: string | null, passed: string[]) => fakeClient(
   ["read_passed_settings_versions", () => passed.map((v) => ({ v }))]
 ]);
 const BOTH_GATES = { deepinfra: ["zai-org/GLM-5.3-Flash"], anthropic: ["claude-haiku-5-5"] };
+/** The release's env line-up and declared models (required since SA10 fix round 1; the S15 readers here ignore them). */
+const SEAT_ENV: SettingsSeatableEnvironment = { envLineUp: null, declaredModels: ["zai-org/GLM-5.3-Flash", "claude-haiku-5-5"] };
 
 describe("the activation (spec §13 activate <v>)", () => {
   it("reads the release and the pointer, checks the gates live, then activates in one READ COMMITTED transaction", async () => {
     const db = activationDatabase();
-    const done = await activateSettingsVersion(db.client, { version: 18, activatedBy: "owner", reason: "new lengths", gateEnabledModels: BOTH_GATES }, readersOf(SEATS));
+    const done = await activateSettingsVersion(db.client, { version: 18, activatedBy: "owner", reason: "new lengths", gateEnabledModels: BOTH_GATES, seatableEnvironment: SEAT_ENV }, readersOf(SEATS));
     expect(done).toEqual({ activationSeq: "3", previous: 17, releaseKey: KEY });
     expect(db.sqls()).toEqual([
       "SELECT c.release_key FROM core.read_current_release() AS c",
@@ -190,17 +192,17 @@ describe("the activation (spec §13 activate <v>)", () => {
     expect(db.queries[4]!.params).toEqual([18, 17, KEY, "owner", "new lengths"]);
     // Never activated: the expected previous is NULL.
     const first = activationDatabase({ pointer: null });
-    expect((await activateSettingsVersion(first.client, { version: 18, activatedBy: "owner", reason: "first", gateEnabledModels: BOTH_GATES }, readersOf(SEATS))).previous).toBeNull();
+    expect((await activateSettingsVersion(first.client, { version: 18, activatedBy: "owner", reason: "first", gateEnabledModels: BOTH_GATES, seatableEnvironment: SEAT_ENV }, readersOf(SEATS))).previous).toBeNull();
     expect(first.queries.find(({ sql }) => sql.includes("activate_settings_version"))!.params[1]).toBeNull();
   });
 
   it("refuses early, with a plain line naming what passed, when the current release has not passed the version", async () => {
     const db = activationDatabase({ passed: false, passedList: ["17"] });
-    const error = await refusal(activateSettingsVersion(db.client, { version: 19, activatedBy: "owner", reason: "x", gateEnabledModels: BOTH_GATES }, readersOf(SEATS)));
+    const error = await refusal(activateSettingsVersion(db.client, { version: 19, activatedBy: "owner", reason: "x", gateEnabledModels: BOTH_GATES, seatableEnvironment: SEAT_ENV }, readersOf(SEATS)));
     expect([error.code, error.passed]).toEqual(["SETTINGS_VERSION_NOT_PASSED", [17]]);
     expect(db.sqls().some((sql) => sql.includes("BEGIN") || sql.includes("activate_settings_version"))).toBe(false);
     const none = activationDatabase({ current: null });
-    expect((await refusal(activateSettingsVersion(none.client, { version: 18, activatedBy: "owner", reason: "x", gateEnabledModels: BOTH_GATES }, readersOf(SEATS)))).code).toBe("SETTINGS_ACTIVATION_CONFLICT");
+    expect((await refusal(activateSettingsVersion(none.client, { version: 18, activatedBy: "owner", reason: "x", gateEnabledModels: BOTH_GATES, seatableEnvironment: SEAT_ENV }, readersOf(SEATS)))).code).toBe("SETTINGS_ACTIVATION_CONFLICT");
   });
 
   it("condition 6 live: every seat's model on at its gate; a missing gate answer or an unreviewed ref refuses, all codes together, nothing written", async () => {
@@ -211,7 +213,7 @@ describe("the activation (spec §13 activate <v>)", () => {
     ];
     for (const [gates, refs, codes] of cases) {
       const db = activationDatabase();
-      const error = await refusal(activateSettingsVersion(db.client, { version: 18, activatedBy: "owner", reason: "x", gateEnabledModels: gates }, readersOf(refs)));
+      const error = await refusal(activateSettingsVersion(db.client, { version: 18, activatedBy: "owner", reason: "x", gateEnabledModels: gates, seatableEnvironment: SEAT_ENV }, readersOf(refs)));
       expect([error.code, error.codes]).toEqual(["SETTINGS_GATE_LIVE_CHECK_FAILED", codes]);
       expect(db.sqls().some((sql) => sql.includes("BEGIN"))).toBe(false);
     }
@@ -228,22 +230,22 @@ describe("the activation (spec §13 activate <v>)", () => {
     ];
     for (const [error, code] of cases) {
       const db = activationDatabase({ activate: () => error });
-      expect((await refusal(activateSettingsVersion(db.client, { version: 18, activatedBy: "owner", reason: "x", gateEnabledModels: BOTH_GATES }, readersOf(SEATS)))).code).toBe(code);
+      expect((await refusal(activateSettingsVersion(db.client, { version: 18, activatedBy: "owner", reason: "x", gateEnabledModels: BOTH_GATES, seatableEnvironment: SEAT_ENV }, readersOf(SEATS)))).code).toBe(code);
       expect(db.sqls().at(-1)).toBe("ROLLBACK");
     }
     // The deferred check fails at COMMIT: the same mapping.
     const atCommit = activationDatabase({ commit: () => pgError("55000", "SETTINGS_VERSION_NOT_PASSED") });
-    expect((await refusal(activateSettingsVersion(atCommit.client, { version: 18, activatedBy: "owner", reason: "x", gateEnabledModels: BOTH_GATES }, readersOf(SEATS)))).code).toBe("SETTINGS_VERSION_NOT_PASSED");
+    expect((await refusal(activateSettingsVersion(atCommit.client, { version: 18, activatedBy: "owner", reason: "x", gateEnabledModels: BOTH_GATES, seatableEnvironment: SEAT_ENV }, readersOf(SEATS)))).code).toBe("SETTINGS_VERSION_NOT_PASSED");
     // An unmapped error passes through untouched.
     const broken = activationDatabase({ activate: () => pgError("57014", "canceling statement due to statement timeout") });
-    await expect(activateSettingsVersion(broken.client, { version: 18, activatedBy: "owner", reason: "x", gateEnabledModels: BOTH_GATES }, readersOf(SEATS))).rejects.toMatchObject({ code: "57014" });
+    await expect(activateSettingsVersion(broken.client, { version: 18, activatedBy: "owner", reason: "x", gateEnabledModels: BOTH_GATES, seatableEnvironment: SEAT_ENV }, readersOf(SEATS))).rejects.toMatchObject({ code: "57014" });
   });
 
   it("--by matches the table's CHECK (no colon) and --reason is one line, both before any read", async () => {
     expect(ACTIVATED_BY_PATTERN.source).toBe("^[A-Za-z0-9][A-Za-z0-9 ._@-]{0,127}$");
     for (const [activatedBy, reason] of [["root:owner", "x"], ["", "x"], [" owner", "x"], ["a".repeat(129), "x"], ["owner", ""], ["owner", "two\nlines"], ["owner", "x".repeat(513)]]) {
       const db = activationDatabase();
-      expect((await refusal(activateSettingsVersion(db.client, { version: 18, activatedBy: activatedBy!, reason: reason!, gateEnabledModels: BOTH_GATES }, readersOf(SEATS)))).code).toBe("SETTINGS_OPERATOR_USAGE");
+      expect((await refusal(activateSettingsVersion(db.client, { version: 18, activatedBy: activatedBy!, reason: reason!, gateEnabledModels: BOTH_GATES, seatableEnvironment: SEAT_ENV }, readersOf(SEATS)))).code).toBe("SETTINGS_OPERATOR_USAGE");
       expect(db.queries).toEqual([]);
     }
   });
@@ -262,7 +264,7 @@ describe("condition 6 live over every model a version can seat (addition D21, SA
   it("a roster model off at its gate refuses the activation, where the seat-only check (S15) would have passed", async () => {
     const gates = { deepinfra: [GLM], anthropic: [HAIKU] };
     // The seats alone (the writer's GLM) are on: S15's check passes.
-    await expect(activateSettingsVersion(activationDatabase().client, { version: 18, activatedBy: "owner", reason: "x", gateEnabledModels: gates },
+    await expect(activateSettingsVersion(activationDatabase().client, { version: 18, activatedBy: "owner", reason: "x", gateEnabledModels: gates, seatableEnvironment: ENV },
       readersOf(["preview:fixture-a"]))).resolves.toMatchObject({ activationSeq: "3" });
     // The version's Premium list also seats DeepSeek, which its gate has switched off: refused, nothing written.
     const db = activationDatabase();
@@ -281,11 +283,12 @@ describe("condition 6 live over every model a version can seat (addition D21, SA
       seatableEnvironment: withHaiku }, seatable(["preview:fixture-a"], lineUp([GLM])))).resolves.toBeUndefined();
   });
 
-  it("a row-less version runs on the env's line-up; with none (sockets-only, or no environment handed) it refuses PREVIEW_LINE_UP_REQUIRED", async () => {
+  it("a row-less version runs on the env's line-up; with none (the sockets-only form) it refuses PREVIEW_LINE_UP_REQUIRED", async () => {
     const gates = { deepinfra: [GLM, DEEPSEEK] };
     await expect(assertSettingsGatesServe(fakeClient([]).client, { version: 18, gateEnabledModels: gates,
       seatableEnvironment: { envLineUp: lineUp([GLM, DEEPSEEK]), declaredModels: [GLM, DEEPSEEK] } }, seatable(["preview:fixture-a"], null))).resolves.toBeUndefined();
-    const none = await refusal(assertSettingsGatesServe(fakeClient([]).client, { version: 18, gateEnabledModels: gates }, seatable(["preview:fixture-a"], null)));
+    const none = await refusal(assertSettingsGatesServe(fakeClient([]).client, { version: 18, gateEnabledModels: gates,
+      seatableEnvironment: { envLineUp: null, declaredModels: [GLM, DEEPSEEK] } }, seatable(["preview:fixture-a"], null)));
     expect([none.code, none.codes]).toEqual(["SETTINGS_GATE_LIVE_CHECK_FAILED", ["PREVIEW_LINE_UP_REQUIRED"]]);
   });
 
@@ -297,7 +300,7 @@ describe("condition 6 live over every model a version can seat (addition D21, SA
     // The two-maker rule holds for the old six-key form: each list names two makers.
     const oldForm = { ...sockets, free_model_ids: [GLM, DEEPSEEK], premium_model_ids: [DEEPSEEK, GLM] };
     expect(parseSeatableEnvironment(text(JSON.stringify(oldForm))).envLineUp).toEqual({ free_model_ids: [GLM, DEEPSEEK], premium_model_ids: [DEEPSEEK, GLM], thinking_levels: null });
-    for (const bad of ["{", text("{}"), text(JSON.stringify(sockets), "x"), text(JSON.stringify(sockets), [""]), text(null), text(JSON.stringify(sockets), [GLM], { more: 1 }),
+    for (const bad of ["{", text("{}"), text(JSON.stringify(sockets), "x"), text(JSON.stringify(sockets), [""]), text(JSON.stringify(sockets), []), text(null), text(JSON.stringify(sockets), [GLM], { more: 1 }),
       JSON.stringify({ schema: "other", previewConfig: JSON.stringify(sockets), declaredModels: [] })]) {
       expect(() => parseSeatableEnvironment(bad), bad).toThrow(expect.objectContaining({ code: "SETTINGS_SEATABLE_ENV_INVALID" }));
     }

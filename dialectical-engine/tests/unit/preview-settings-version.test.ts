@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 const settings = await import('../../deploy/' + 'preview-lifecycle/v1/settings-version.mjs');
 const common = await import('../../deploy/' + 'preview-lifecycle/v1/common.mjs');
 
-const { CHECK_HINTS, GATE_HELPER_FILE, HALF_ENTRIES, OPERATOR_ENTRY, OPERATOR_IMPORTS, RECEIPT_SCHEMA, RELEASE_GATE_HELPER, SEATABLE_ENV_SCHEMA, activateSettings,
+const { CHECK_HINTS, GATE_CODE_FILES, GATE_HELPER_FILE, HALF_ENTRIES, OPERATOR_ENTRY, OPERATOR_IMPORTS, RECEIPT_SCHEMA, RELEASE_GATE_HELPER, SEATABLE_ENV_SCHEMA, activateSettings,
   checkHalfArgv, checkSettingsGatesLive, checkSettingsVersion, gateHelperDifferences, gateSockets, hintFor, main, operatorArgv, planSettingsForSwitch,
   seatableEnvironmentText, settingsStatus } = settings;
 const LAYOUT = common.LAYOUT;
@@ -30,12 +30,18 @@ const ENV_VALUES: Record<string, Record<string, string>> = {
     PROVIDER_DISCOVERY_TARGETS_JSON: JSON.stringify([{ provider_ref: 'preview:fixture-a', model: 'zai-org/GLM-5.3-Flash' },
       { provider_ref: 'preview:fixture-b', model: 'zai-org/GLM-5.3-Flash' }, { provider_ref: 'preview:claude-haiku-5-5', model: 'claude-haiku-5-5' }]) }
 };
-/** SA10 (addition D21): one gate code, installed in both gate folders, in each release, and named by both GO files. */
+/**
+ * SA10 (addition D21, R65b): one gate code (the helper and the authority), installed in both gate folders, in each
+ * release, and recorded by both GO files (helper_sha256, bridge_sha256).
+ */
 const HELPER = 'print("gate helper v3")\n';
+const AUTHORITY = 'print("gate authority v3")\n';
+const AUTHORITY_FILE = 'preview_budget_authority.py';
 const sha = (text: string) => createHash('sha256').update(text).digest('hex');
-const gateFilesOf = (helper = HELPER): Record<string, string> => Object.fromEntries([
-  ...LAYOUT.gates.flatMap((gate: { folder: string; go: string }) => [[`${gate.folder}/${GATE_HELPER_FILE}`, helper], [gate.go, JSON.stringify({ helper_sha256: sha(helper), bridge_sha256: 'b'.repeat(64) })]]),
-  ...[OLD, NEW].map(label => [`${engine(label, 'api')}/${RELEASE_GATE_HELPER}`, helper])
+const gateFilesOf = (helper = HELPER, authority = AUTHORITY): Record<string, string> => Object.fromEntries([
+  ...LAYOUT.gates.flatMap((gate: { folder: string; go: string }) => [[`${gate.folder}/${GATE_HELPER_FILE}`, helper], [`${gate.folder}/${AUTHORITY_FILE}`, authority],
+    [gate.go, JSON.stringify({ helper_sha256: sha(helper), bridge_sha256: sha(authority) })]]),
+  ...[OLD, NEW].flatMap(label => [[`${engine(label, 'api')}/${RELEASE_GATE_HELPER}`, helper], [`${engine(label, 'api')}/packages/providers/ops/${AUTHORITY_FILE}`, authority]])
 ]);
 const IDS: Record<string, { uid: number; gid: number }> = { runner: { uid: 1201, gid: 1202 }, api: { uid: 1301, gid: 1302 } };
 
@@ -118,6 +124,7 @@ function host(options: Options = {}) {
       return o.remaining[gate] ?? null;
     },
     writeFile: async (path: string, text: string) => { log.push(`write ${path}`); files[path] = text; },
+    ensureCurrentDir: async (path: string) => { log.push(`folder ${path}`); },
     readBytes: async (path: string) => {
       if (!Object.hasOwn(o.gateFiles, path)) throw Object.assign(new Error('missing'), { code: 'ENOENT' });
       return Buffer.from(o.gateFiles[path]!);
@@ -240,6 +247,7 @@ describe('activate and status', () => {
     expect(h.log).toEqual([
       `guard ${root(OLD, 'api')} api dialectical-engine/node_modules/tsx/dist/loader.mjs dialectical-engine/tools/settings-version/cli.ts dialectical-engine/tools/settings-version/settings-operator.ts`,
       `env /etc/debateai-v3-preview/auth-dev-v1/api-${OLD}.env gid 1302`,
+      `folder ${folder}`,
       `write ${folder}/settings-activate-${STAMP}-seatable-env.json`,
       'remaining deepinfra preview-team', `write ${folder}/settings-activate-${STAMP}-deepinfra-remaining.json`,
       'remaining anthropic preview-team', `write ${folder}/settings-activate-${STAMP}-anthropic-remaining.json`,
@@ -311,14 +319,23 @@ describe('the gate-code fingerprint and the live check for a switch (addition D2
     const noRelease = gateFilesOf();
     delete noRelease[`${engineOld}/${RELEASE_GATE_HELPER}`];
     expect(await gateHelperDifferences({ engine: engineOld, gates: LAYOUT.gates, io: io(noRelease) })).toEqual([differs('deepinfra'), differs('anthropic')]);
+    // R65b: the authority (bridge) file the same way: its installed copy, the release's copy and the GO's bridge_sha256.
+    const anthropic = LAYOUT.gates.find((gate: { name: string }) => gate.name === 'anthropic')!;
+    expect(await gateHelperDifferences({ engine: engineOld, gates: LAYOUT.gates, io: io({ ...gateFilesOf(), [`${anthropic.folder}/${AUTHORITY_FILE}`]: 'older' }) }))
+      .toEqual([differs('anthropic')]);
+    expect(await gateHelperDifferences({ engine: engineOld, gates: LAYOUT.gates, io: io({ ...gateFilesOf(),
+      [anthropic.go]: JSON.stringify({ helper_sha256: sha(HELPER), bridge_sha256: sha('older') }) }) })).toEqual([differs('anthropic')]);
+    expect(await gateHelperDifferences({ engine: engineOld, gates: LAYOUT.gates, io: io({ ...gateFilesOf(), [anthropic.go]: JSON.stringify({ helper_sha256: sha(HELPER) }) }) }))
+      .toEqual([differs('anthropic')]);
     expect(RELEASE_GATE_HELPER).toBe('packages/providers/ops/preview_budget_helper.py');
+    expect(GATE_CODE_FILES).toEqual([{ file: 'preview_budget_helper.py', goMember: 'helper_sha256' }, { file: 'preview_budget_authority.py', goMember: 'bridge_sha256' }]);
   });
 
   it('the hand-over of the release\'s line-up and target models; an env without readable targets refuses', () => {
     expect(JSON.parse(seatableEnvironmentText(ENV_VALUES.api))).toEqual({ schema: SEATABLE_ENV_SCHEMA,
       previewConfig: ENV_VALUES.api!.PREVIEW_PROVIDER_TEST_CONFIG_JSON, declaredModels: ['zai-org/GLM-5.3-Flash', 'claude-haiku-5-5'] });
     for (const bad of [{ ...ENV_VALUES.api, PROVIDER_DISCOVERY_TARGETS_JSON: undefined }, { ...ENV_VALUES.api, PROVIDER_DISCOVERY_TARGETS_JSON: '[{"provider_ref":"x"}]' },
-      { ...ENV_VALUES.api, PREVIEW_PROVIDER_TEST_CONFIG_JSON: undefined }]) {
+      { ...ENV_VALUES.api, PREVIEW_PROVIDER_TEST_CONFIG_JSON: undefined }, { ...ENV_VALUES.api, PROVIDER_DISCOVERY_TARGETS_JSON: '[]' }]) {
       expect(() => seatableEnvironmentText(bad)).toThrow(expect.objectContaining({ code: 'SETTINGS_SEATABLE_ENV_UNREADABLE' }));
     }
   });
@@ -329,6 +346,8 @@ describe('the gate-code fingerprint and the live check for a switch (addition D2
     expect(h.log).toEqual([
       `guard ${root(NEW, 'api')} api ${OPERATOR_IMPORTS.map((path: string) => `dialectical-engine/${path}`).join(' ')}`,
       `env /etc/debateai-v3-preview/auth-dev-v1/api-${NEW}.env gid 1302`,
+      // R65 item 7: the STAGED release's own lifecycle-current folder is made if missing (as prestart makes it), never refused.
+      `folder ${CURRENT_NEW}`,
       `write ${CURRENT_NEW}/settings-switch-${STAMP}-seatable-env.json`,
       'remaining deepinfra preview-team', `write ${CURRENT_NEW}/settings-switch-${STAMP}-deepinfra-remaining.json`,
       'remaining anthropic preview-team', `write ${CURRENT_NEW}/settings-switch-${STAMP}-anthropic-remaining.json`,
@@ -354,11 +373,17 @@ describe('the gate-code fingerprint and the live check for a switch (addition D2
     const vps = host();
     expect(await checkSettingsGatesLive({ label: NEW, version: 21, layout: common.VPS_LAYOUT, deps: vps.deps })).toEqual({ version: 21, checked: false });
     expect(vps.calls).toEqual([]);
+    // A folder that cannot be made is a refusal before anything is saved or asked.
+    const noFolder = host();
+    noFolder.deps.ensureCurrentDir = async () => { throw Object.assign(new Error('x'), { code: 'LIFECYCLE_DIRECTORY_REFUSED' }); };
+    expect((await refusal(checkSettingsGatesLive({ label: NEW, version: 21, layout: LAYOUT, deps: noFolder.deps }))).code).toBe('CURRENT_DIRECTORY_REFUSED');
+    expect([noFolder.files, operatorCalls(noFolder.calls)]).toEqual([{}, []]);
   });
 
   it('one plain hint line per new code', () => {
     for (const code of ['SETTINGS_GATE_THINKING_UNREVIEWED:Qwen/Qwen3.8-Flash:high', 'SETTINGS_GATE_TOKEN_CEILING:synthesizerCallBound:zai-org/GLM-5.3-Flash',
-      'SETTINGS_GATE_HELPER_DIFFERS:anthropic', 'PREVIEW_LINE_UP_REQUIRED', 'SETTINGS_CHECK_DETAIL_UNPRINTABLE']) {
+      'SETTINGS_GATE_HELPER_DIFFERS:anthropic', 'PREVIEW_LINE_UP_REQUIRED', 'SETTINGS_CHECK_DETAIL_UNPRINTABLE',
+      'SETTINGS_GATE_MODEL_DISABLED:deepinfra:zai-org/GLM-5.3-Flash', 'SETTINGS_GATE_UNANSWERED:anthropic', 'SETTINGS_GATE_LIVE_CHECK_FAILED']) {
       const hint = hintFor(code);
       expect(hint, code).not.toBe(CHECK_HINTS.DEFAULT);
       expect(hint, code).toMatch(/^[a-z][^\n]*[a-z)]$/u);

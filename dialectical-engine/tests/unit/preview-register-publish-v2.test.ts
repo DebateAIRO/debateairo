@@ -734,7 +734,7 @@ describe('publish kit v2: the optional previewLineUpPolicy row and the answer se
     expect(kept.snapshotSha256).toBe(published.snapshotSha256);
     const offMenu = base.map(row => row.rowKey === PREVIEW_LINE_UP_POLICY_ROW_KEY
       ? { ...row, valueJsonText: canonical({ ...JSON.parse(row.valueJsonText), thinking_levels: { [QWEN]: { level: 'high' } } }) } : row);
-    expect(() => compose(f.source, offMenu, '10')).toThrow(`PREVIEW_THINKING_LEVELS_INVALID:level ${QWEN}`);
+    expect(() => compose(f.source, offMenu, '10')).toThrow(`PREVIEW_THINKING_LEVELS_INVALID:level:${QWEN}`);
     const wrongKind = base.map(row => row.rowKey === PREVIEW_LINE_UP_POLICY_ROW_KEY ? { ...row, valueJsonText: row.valueJsonText.replace('"PREVIEW_LINE_UP_POLICY"', '"X"') } : row);
     expect(() => compose(f.source, wrongKind, '10')).toThrow('PREVIEW_LINE_UP_POLICY_INVALID:kind');
   });
@@ -766,9 +766,9 @@ describe('publish kit v2: the optional previewLineUpPolicy row and the answer se
 
   it('(3) an invalid lineUp (Qwen at high) is refused with the parser\'s message before any row is built', async () => {
     const qwenHigh = { ...LIVE, thinking_levels: { ...OWNER_LIVE_TABLE, [QWEN]: { level: 'high' } } };
-    await expect(build(qwenHigh)).rejects.toThrow(`PREVIEW_THINKING_LEVELS_INVALID:level ${QWEN}`);
+    await expect(build(qwenHigh)).rejects.toThrow(`PREVIEW_THINKING_LEVELS_INVALID:level:${QWEN}`);
     // Checked before anything else: even a runtime the gate refuses never gets that far.
-    await expect(build(qwenHigh, undefined, undefined, { ...runtime, nodeVersion: 'v22.23.1' })).rejects.toThrow(`PREVIEW_THINKING_LEVELS_INVALID:level ${QWEN}`);
+    await expect(build(qwenHigh, undefined, undefined, { ...runtime, nodeVersion: 'v22.23.1' })).rejects.toThrow(`PREVIEW_THINKING_LEVELS_INVALID:level:${QWEN}`);
     await expect(build({ ...LIVE, free_model_ids: [GLM] })).rejects.toThrow('PREVIEW_LINE_UP_POLICY_INVALID:maker_rule');
     await expect(build({ ...LIVE, extra: true })).rejects.toThrow('PREVIEW_LINE_UP_POLICY_INVALID:members');
     await expect(build({ free_model_ids: LIVE.free_model_ids, premium_model_ids: LIVE.premium_model_ids })).rejects.toThrow('PREVIEW_LINE_UP_POLICY_INVALID:members');
@@ -788,7 +788,7 @@ describe('publish kit v2: the optional previewLineUpPolicy row and the answer se
     expect(() => op.validateNativePlan({ ...plan, lineUp: 'off' })).toThrow('PREVIEW_NATIVE_PLAN_REFUSED');
     const qwenHigh = { ...value, thinking_levels: { ...value.thinking_levels, [QWEN]: { level: 'high' } } };
     expect(op.validateNativePlan({ ...plan, lineUp: qwenHigh })).toBeTruthy(); // shape only: the parser runs where the rows are built
-    await expect(build(op.validateNativePlan({ ...plan, lineUp: qwenHigh }).lineUp)).rejects.toThrow(`PREVIEW_THINKING_LEVELS_INVALID:level ${QWEN}`);
+    await expect(build(op.validateNativePlan({ ...plan, lineUp: qwenHigh }).lineUp)).rejects.toThrow(`PREVIEW_THINKING_LEVELS_INVALID:level:${QWEN}`);
   });
 
   it('(5) the --print-line-up member, merged into a plan, passes the plan check and the builder seals exactly that row', async () => {

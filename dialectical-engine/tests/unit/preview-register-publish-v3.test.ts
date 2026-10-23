@@ -453,7 +453,7 @@ describe('publish kit v3: the optional previewLineUpPolicy row and the answer se
     expect(await v3(null, null)).toEqual(absent);
     expect(absent).toEqual([...await buildPreviewSourceRowsV3(await loadBootstrapRegister(), runtime, ON)]);
     expect(given.filter(row => row.rowKey !== PREVIEW_LINE_UP_POLICY_ROW_KEY)).toEqual(absent);
-    await expect(v3({ ...LIVE, thinking_levels: { [QWEN]: { level: 'high' } } })).rejects.toThrow(`PREVIEW_THINKING_LEVELS_INVALID:level ${QWEN}`);
+    await expect(v3({ ...LIVE, thinking_levels: { [QWEN]: { level: 'high' } } })).rejects.toThrow(`PREVIEW_THINKING_LEVELS_INVALID:level:${QWEN}`);
   });
 
   it('R19: a base line-up row the source leaves out is carried unchanged, outside the delta; a malformed one is refused, never carried', async () => {

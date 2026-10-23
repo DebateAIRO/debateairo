@@ -404,6 +404,15 @@ describe("check-version on the preview's line-up (SA10, addition D19-D20)", () =
     expect(() => previewLineUpPolicyFromValue({ ...NEW_LINE_UP, thinking_levels: { [QWEN]: { level: "high" } } })).toThrow(/^PREVIEW_THINKING_LEVELS_INVALID:/u);
   });
 
+  it("(k) a sealed row the publish parser would refuse (Qwen at \"high\", written past it): the boot's refusal is a code, and the runner names the level (R65)", async () => {
+    const version = await publishFromPreview({ previewLineUpPolicy: () => ({ ...NEW_LINE_UP, thinking_levels: { [QWEN]: { level: "high" } } }) });
+    const { runner, api } = await checkPreview(version);
+    expect({ runner: runner.codes, api: api.codes }).toEqual({
+      runner: [`PREVIEW_THINKING_LEVELS_INVALID:level:${QWEN}`, `SETTINGS_GATE_THINKING_UNREVIEWED:${QWEN}:high`],
+      api: [`PREVIEW_THINKING_LEVELS_INVALID:level:${QWEN}`]
+    });
+  });
+
   it("(j) a roster naming a model no declared target serves: SETTINGS_NEEDS_ENV_CHANGE:TARGET:<model> from both halves", async () => {
     // A release that reaches DeepInfra only: its site version configures (and its env declares) the DeepInfra refs alone
     // (the declared set must equal the configured one); the candidate, published from it, seats Claude Haiku on Premium.

@@ -442,13 +442,6 @@ async function settingsPlan(io, { newKey, labels, activate, next }) {
   }
 }
 
-/**
- * The revert's settings (spec §11): it expects what the switch left (the version it activated, else the pointer it saw)
- * and, when the switch activated one, activates again what was active before — or, when nothing was ever activated
- * before, the old release's own site version (the pointer never goes back to empty; the old release passes its own, D1).
- * When that version IS the one the switch activated (a code-only upload: both releases on one site version), nothing is
- * activated (0124 would refuse SETTINGS_ACTIVATION_UNCHANGED): the old release has passed it already.
- */
 /** A release key's own site version: the number after `r` (D1). */
 const siteVersionOfKey = key => Number(/^r([1-9][0-9]*)-/.exec(key)[1]);
 
@@ -469,6 +462,13 @@ async function forwardActivationGates(io, { to, toKey, activate, settings }) {
   }
 }
 
+/**
+ * The revert's settings (spec §11): it expects what the switch left (the version it activated, else the pointer it saw)
+ * and, when the switch activated one, activates again what was active before — or, when nothing was ever activated
+ * before, the old release's own site version (the pointer never goes back to empty; the old release passes its own, D1).
+ * When that version IS the one the switch activated (a code-only upload: both releases on one site version), nothing is
+ * activated (0124 would refuse SETTINGS_ACTIVATION_UNCHANGED): the old release has passed it already.
+ */
 function revertSettings(settings, fromKey) {
   if (settings.activate === null) return settings;
   const back = settings.expectedActiveSettings ?? siteVersionOfKey(fromKey);

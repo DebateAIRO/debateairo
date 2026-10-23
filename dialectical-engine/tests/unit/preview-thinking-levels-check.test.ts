@@ -57,9 +57,9 @@ describe("check-thinking-levels: the offline table check (spec 2026-10-12 §4.2)
 
   it("an off-menu level: the parser's exact detail, exit 1", () => {
     const result = checkThinkingLevels(line({ ...BASE, thinking_levels: { [GLM]: { level: "medium" } } }));
-    expect(result).toEqual({ exitCode: 1, lines: [`PREVIEW_THINKING_LEVELS_INVALID:level ${GLM}`] });
+    expect(result).toEqual({ exitCode: 1, lines: [`PREVIEW_THINKING_LEVELS_INVALID:level:${GLM}`] });
     expect(checkThinkingLevels(line({ ...BASE, thinking_levels: { [GLM]: { steps: { closing: "low" } } } })).lines)
-      .toEqual([`PREVIEW_THINKING_LEVELS_INVALID:step ${GLM} closing`]);
+      .toEqual([`PREVIEW_THINKING_LEVELS_INVALID:step:${GLM}:closing`]);
   });
 
   it("malformed JSON, or a config the parser refuses: the config code, exit 1", () => {
@@ -162,7 +162,7 @@ describe("check-thinking-levels --print-line-up: the plan member from today's va
   });
 
   it("a refused or key-shaped value: the check's own lines and exit codes, nothing printed of it", () => {
-    expect(printLineUp(line({ ...BASE, thinking_levels: { [GLM]: { level: "medium" } } }))).toEqual({ exitCode: 1, lines: [`PREVIEW_THINKING_LEVELS_INVALID:level ${GLM}`] });
+    expect(printLineUp(line({ ...BASE, thinking_levels: { [GLM]: { level: "medium" } } }))).toEqual({ exitCode: 1, lines: [`PREVIEW_THINKING_LEVELS_INVALID:level:${GLM}`] });
     expect(printLineUp("PREVIEW_PROVIDER_TEST_CONFIG_JSON={not json")).toEqual({ exitCode: 1, lines: ["PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID"] });
     const vendorKey = ["sk", "ant", "x".repeat(6) + "Q9".repeat(12)].join("-");
     expect(printLineUp(line({ ...BASE, thinking_levels: { [vendorKey]: { level: "low" } } })).exitCode).toBe(2);

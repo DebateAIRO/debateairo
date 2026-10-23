@@ -64,11 +64,11 @@ describe("parsePreviewLineUp: the row value's own check (addition D12)", () => {
     ["a missing table member", { free_model_ids: LIVE_FREE, premium_model_ids: ALL_FIVE }, "PREVIEW_LINE_UP_POLICY_INVALID:members"],
     ["not an object", [LIVE_FREE, ALL_FIVE], "PREVIEW_LINE_UP_POLICY_INVALID:value"],
     ["{} as a table", lineUp({ thinking_levels: {} }), "PREVIEW_THINKING_LEVELS_INVALID:table"],
-    ["Qwen at \"high\"", lineUp({ thinking_levels: { [QWEN]: { level: "high" } } }), `PREVIEW_THINKING_LEVELS_INVALID:level ${QWEN}`],
-    ["GLM at \"medium\"", lineUp({ thinking_levels: { [GLM]: { level: "medium" } } }), `PREVIEW_THINKING_LEVELS_INVALID:level ${GLM}`],
-    ["MiMo at \"low\"", lineUp({ thinking_levels: { [MIMO]: { level: "low" } } }), `PREVIEW_THINKING_LEVELS_INVALID:level ${MIMO}`],
-    ["Haiku at \"none\"", lineUp({ thinking_levels: { [HAIKU]: { level: "none" } } }), `PREVIEW_THINKING_LEVELS_INVALID:level ${HAIKU}`],
-    ["an unknown step", lineUp({ thinking_levels: { [GLM]: { steps: { judging: "low" } } } }), `PREVIEW_THINKING_LEVELS_INVALID:step ${GLM} judging`]
+    ["Qwen at \"high\"", lineUp({ thinking_levels: { [QWEN]: { level: "high" } } }), `PREVIEW_THINKING_LEVELS_INVALID:level:${QWEN}`],
+    ["GLM at \"medium\"", lineUp({ thinking_levels: { [GLM]: { level: "medium" } } }), `PREVIEW_THINKING_LEVELS_INVALID:level:${GLM}`],
+    ["MiMo at \"low\"", lineUp({ thinking_levels: { [MIMO]: { level: "low" } } }), `PREVIEW_THINKING_LEVELS_INVALID:level:${MIMO}`],
+    ["Haiku at \"none\"", lineUp({ thinking_levels: { [HAIKU]: { level: "none" } } }), `PREVIEW_THINKING_LEVELS_INVALID:level:${HAIKU}`],
+    ["an unknown step", lineUp({ thinking_levels: { [GLM]: { steps: { judging: "low" } } } }), `PREVIEW_THINKING_LEVELS_INVALID:step:${GLM}:judging`]
   ])("refuses %s", (_name, value, message) => {
     let thrown: unknown;
     try { parsePreviewLineUp(value); } catch (error) { thrown = error; }

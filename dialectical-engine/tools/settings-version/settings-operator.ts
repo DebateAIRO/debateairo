@@ -59,8 +59,6 @@ export type SettingsGateModel = Readonly<{ ref?: string; gate: string; model: st
  * them over as one file (`--seatable-env`, parseSeatableEnvironment).
  */
 export type SettingsSeatableEnvironment = Readonly<{ envLineUp: SealedPreviewLineUp | null; declaredModels: readonly string[] }>;
-/** No environment known (a direct caller that hands none): no env line-up, no declared model. */
-export const NO_SEATABLE_ENVIRONMENT: SettingsSeatableEnvironment = Object.freeze({ envLineUp: null, declaredModels: Object.freeze([]) });
 
 /**
  * The reads the live condition 6 makes (addition D21, SA10): every model the version can SEAT (its seatable set, the
@@ -116,8 +114,9 @@ const SEATABLE_ENV_KEYS = Object.freeze(["declaredModels", "previewConfig", "sch
 /**
  * The root wiring's `--seatable-env` file (deploy/preview-lifecycle/v1/settings-version.mjs): exactly
  * `{"schema":"preview-settings-seatable-env-v1","previewConfig":<the API env's PREVIEW_PROVIDER_TEST_CONFIG_JSON text>,
- * "declaredModels":[<each declared target's model>]}`. The config text is read by the env's own parser
- * (`parsePreviewEnvironmentConfig`, so the three forms cannot drift); anything else is SETTINGS_SEATABLE_ENV_INVALID.
+ * "declaredModels":[<each declared target's model>, at least one]}`. The config text is read by the env's own parser
+ * (`parsePreviewEnvironmentConfig`, so the three forms cannot drift); anything else is SETTINGS_SEATABLE_ENV_INVALID —
+ * an empty model list included: a wrong file must never shrink the seatable set silently (SA10 fix round 1).
  */
 export function parseSeatableEnvironment(text: string): SettingsSeatableEnvironment {
   const refusedEnv = (): SettingsOperatorRefusal => new SettingsOperatorRefusal("SETTINGS_SEATABLE_ENV_INVALID",
@@ -128,7 +127,7 @@ export function parseSeatableEnvironment(text: string): SettingsSeatableEnvironm
   const row = value as Record<string, unknown>;
   if (Object.keys(row).sort().join(",") !== SEATABLE_ENV_KEYS.join(",") || row.schema !== SEATABLE_ENV_SCHEMA) throw refusedEnv();
   const models = row.declaredModels;
-  if (!Array.isArray(models) || models.some((model) => typeof model !== "string" || model.length === 0)) throw refusedEnv();
+  if (!Array.isArray(models) || models.length === 0 || models.some((model) => typeof model !== "string" || model.length === 0)) throw refusedEnv();
   if (typeof row.previewConfig !== "string") throw refusedEnv();
   let envLineUp: SealedPreviewLineUp | null;
   try { envLineUp = parsePreviewEnvironmentConfig(row.previewConfig)?.envLineUp ?? null; } catch { throw refusedEnv(); }
@@ -405,10 +404,10 @@ export function assertActivationLabels(activatedBy: unknown, reason: unknown): v
  * files (settings-version.mjs).
  */
 export async function assertSettingsGatesServe(client: SettingsOperatorClient, input: Readonly<{
-  version: number; gateEnabledModels: GateEnabledModels; seatableEnvironment?: SettingsSeatableEnvironment;
+  version: number; gateEnabledModels: GateEnabledModels; seatableEnvironment: SettingsSeatableEnvironment;
 }>, readers: ActivationReaders = ACTIVATION_READERS): Promise<void> {
   const gates = input.gateEnabledModels;
-  const { models, unreviewed, refusals } = await readers.readGateModels(client, input.version, input.seatableEnvironment ?? NO_SEATABLE_ENVIRONMENT);
+  const { models, unreviewed, refusals } = await readers.readGateModels(client, input.version, input.seatableEnvironment);
   const codes = [...(refusals ?? []), ...unreviewed.map((ref) => `SETTINGS_GATE_UNREVIEWED:${ref}`)];
   for (const { gate, model } of models) {
     const enabled = Object.hasOwn(gates, gate) ? gates[gate] : undefined;
@@ -427,7 +426,7 @@ export async function assertSettingsGatesServe(client: SettingsOperatorClient, i
  *   3. an early plain refusal when the current release has not passed `v` (register.settings_version_passed; the
  *      database refuses again anyway): SETTINGS_VERSION_NOT_PASSED, naming what it passed;
  *   4. condition 6 live, ALWAYS (ruling R59), over the version's whole seatable set (SA10, `assertSettingsGatesServe`;
- *      `seatableEnvironment` is the release's env line-up and declared models, none when not handed): every gate's
+ *      `seatableEnvironment`, required, is the release's env line-up and declared models): every gate's
  *      `/remaining` answer that was read; a gate with no answer refuses the models it serves (no answers at all =
  *      everything refused, never "skip the check"). The public server,
  *      which has no preview gates, has no settings operator until Phase 3 (R58): that phase decides its exemption from
@@ -441,7 +440,7 @@ export async function assertSettingsGatesServe(client: SettingsOperatorClient, i
 export async function activateSettingsVersion(
   client: SettingsOperatorClient,
   input: Readonly<{
-    version: number; activatedBy: string; reason: string; gateEnabledModels: GateEnabledModels; seatableEnvironment?: SettingsSeatableEnvironment;
+    version: number; activatedBy: string; reason: string; gateEnabledModels: GateEnabledModels; seatableEnvironment: SettingsSeatableEnvironment;
   }>,
   readers: ActivationReaders = ACTIVATION_READERS
 ): Promise<Readonly<{ activationSeq: string; previous: number | null; releaseKey: string }>> {
@@ -459,8 +458,7 @@ export async function activateSettingsVersion(
       "The current release has not passed this version: run the check first", { passed: await readPassed(client, currentRelease) });
   }
   await assertSettingsGatesServe(client, {
-    version: input.version, gateEnabledModels: input.gateEnabledModels,
-    ...(input.seatableEnvironment === undefined ? {} : { seatableEnvironment: input.seatableEnvironment })
+    version: input.version, gateEnabledModels: input.gateEnabledModels, seatableEnvironment: input.seatableEnvironment
   }, readers);
   await client.query("BEGIN ISOLATION LEVEL READ COMMITTED");
   let activationSeq: string;

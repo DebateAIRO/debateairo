@@ -49,6 +49,8 @@ const READERS: ActivationReaders = Object.freeze({
   readGateModels: async () => Object.freeze({ models: Object.freeze([Object.freeze({ ref: "preview:fixture-a", gate: "deepinfra", model: "zai-org/GLM-5.3-Flash" })]), unreviewed: Object.freeze([]) })
 });
 const GATES = Object.freeze({ deepinfra: Object.freeze(["zai-org/GLM-5.3-Flash"]) });
+/** SA10 fix round 1: the release's env line-up and declared models are required (READERS above ignore them). */
+const SEAT_ENV = Object.freeze({ envLineUp: null, declaredModels: Object.freeze(["zai-org/GLM-5.3-Flash"]) });
 
 let database: TestDatabase;
 let G1 = 0;
@@ -142,13 +144,13 @@ describe("S15: the settings operator on migration 0124", () => {
 
   it("3. activation: refused early when not passed, then G1 activated, then unchanged; the live gate check refuses a model that is off", async () => {
     await withClient(async (client) => {
-      const notPassed = await refusal(activateSettingsVersion(client, { version: G2, activatedBy: "owner", reason: "x", gateEnabledModels: GATES }, READERS));
+      const notPassed = await refusal(activateSettingsVersion(client, { version: G2, activatedBy: "owner", reason: "x", gateEnabledModels: GATES, seatableEnvironment: SEAT_ENV }, READERS));
       expect([(notPassed as SettingsOperatorRefusal).code, (notPassed as SettingsOperatorRefusal).passed]).toEqual(["SETTINGS_VERSION_NOT_PASSED", [4, G1]]);
-      const off = await refusal(activateSettingsVersion(client, { version: G1, activatedBy: "owner", reason: "x", gateEnabledModels: { deepinfra: [] } }, READERS));
+      const off = await refusal(activateSettingsVersion(client, { version: G1, activatedBy: "owner", reason: "x", gateEnabledModels: { deepinfra: [] }, seatableEnvironment: SEAT_ENV }, READERS));
       expect((off as SettingsOperatorRefusal).codes).toEqual(["SETTINGS_GATE_MODEL_DISABLED:deepinfra:zai-org/GLM-5.3-Flash"]);
-      const done = await activateSettingsVersion(client, { version: G1, activatedBy: "owner", reason: "new lengths", gateEnabledModels: GATES }, READERS);
+      const done = await activateSettingsVersion(client, { version: G1, activatedBy: "owner", reason: "new lengths", gateEnabledModels: GATES, seatableEnvironment: SEAT_ENV }, READERS);
       expect([done.previous, done.releaseKey, Number(done.activationSeq) > 0]).toEqual([4, A, true]);
-      const unchanged = await refusal(activateSettingsVersion(client, { version: G1, activatedBy: "owner", reason: "again", gateEnabledModels: GATES }, READERS));
+      const unchanged = await refusal(activateSettingsVersion(client, { version: G1, activatedBy: "owner", reason: "again", gateEnabledModels: GATES, seatableEnvironment: SEAT_ENV }, READERS));
       expect((unchanged as SettingsOperatorRefusal).code).toBe("SETTINGS_ACTIVATION_UNCHANGED");
       expect(await readSettingsStatus(client)).toEqual({ currentRelease: A, pointer: G1, effectiveActive: G1, passed: [4, G1] });
       expect((await client.query("SELECT activated_by, reason FROM register.settings_activation ORDER BY activation_seq DESC LIMIT 1")).rows)

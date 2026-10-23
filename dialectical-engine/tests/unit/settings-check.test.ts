@@ -310,6 +310,25 @@ describe("check-version on the preview: the line-up and every model it can seat 
     ].sort());
   });
 
+  it("R65: the strict loader's own refusal of an off-menu table is a code (recorded), and the named codes are added beside it", async () => {
+    const value = sealed([GLM], [GLM], { [QWEN]: { level: "high" }, [GLM]: { steps: { judge_panel: "max" } } });
+    // The loader stand-in throws exactly what the boot's strict reader throws for this row (previewLineUpPolicyFromValue).
+    const strict = () => { previewLineUpPolicyFromValue(value); throw new Error("unreachable"); };
+    const runner = runnerReaders({ loadVersion: async () => strict(), readLineUp: async () => sealedPreviewLineUpFromValue(value) });
+    expect((await checkRunner(runner.readers, previewRunner())).codes).toEqual([
+      `PREVIEW_THINKING_LEVELS_INVALID:level:${QWEN}`,
+      `SETTINGS_GATE_THINKING_UNREVIEWED:${QWEN}:high`, `SETTINGS_GATE_THINKING_UNREVIEWED:${GLM}:max`
+    ].sort());
+    const api = apiReaders({ readSite: async () => apiSite(), loadVersion: async () => strict(), readLineUp: async () => sealedPreviewLineUpFromValue(value) });
+    expect((await checkApi(api.readers, previewApi())).codes).toEqual([`PREVIEW_THINKING_LEVELS_INVALID:level:${QWEN}`]);
+    // A model the table names that no reviewed row holds: the loader's code, and the runner half names the model.
+    const unknown = sealed([GLM], [GLM], { "vendor/Unknown-1": { level: "low" } });
+    const named = runnerReaders({ loadVersion: async () => { previewLineUpPolicyFromValue(unknown); return {} as never; },
+      readLineUp: async () => sealedPreviewLineUpFromValue(unknown) });
+    expect((await checkRunner(named.readers, previewRunner())).codes)
+      .toEqual(["PREVIEW_THINKING_LEVELS_INVALID:model:vendor/Unknown-1", "SETTINGS_GATE_UNREVIEWED:vendor/Unknown-1"]);
+  });
+
   it("a sealed row that is not even the line-up's shape is one code the check records (never a failure to check)", async () => {
     const bent = { ...sealed([GLM], [GLM]), thinking_levels: { [GLM]: { level: 3 } } };
     expect(() => sealedPreviewLineUpFromValue(bent)).toThrow(new TypeError("PREVIEW_LINE_UP_POLICY_INVALID:thinking_levels"));
@@ -341,14 +360,19 @@ describe("check-version on the preview: the line-up and every model it can seat 
     expect((await checkRunner(readers, previewRunner())).codes).toEqual([`SETTINGS_NEEDS_ENV_CHANGE:TARGET:${DEEPSEEK}`]);
   });
 
-  it("SETTINGS_NEEDS_ENV_CHANGE:GATE_SOCKET:anthropic: Claude Haiku in the roster, no Anthropic gate socket in the env", async () => {
-    const { readers } = runnerReaders({ readLineUp: async () => lineUp([GLM, HAIKU]) });
-    expect((await checkRunner(readers, previewRunner({ PREVIEW_GATE_SETTINGS: NO_ANTHROPIC_GATE }))).codes)
-      .toEqual(["SETTINGS_NEEDS_ENV_CHANGE:GATE_SOCKET:anthropic"]);
+  it("SETTINGS_NEEDS_ENV_CHANGE:GATE_SOCKET:anthropic: Claude Haiku in the roster (its only source), no Anthropic gate socket in the env", async () => {
+    // DeepInfra targets only: Claude Haiku is no structure-repair model here, so only the roster can seat it.
+    const deepinfraOnly = reviewedTargets(PREVIEW_DEEPINFRA_REFS);
+    const runner = (roster: readonly string[]) => runnerReaders({ readSite: async () => runnerSite(deepinfraOnly), readLineUp: async () => lineUp(roster) }).readers;
+    const env = previewRunner({ PREVIEW_GATE_SETTINGS: NO_ANTHROPIC_GATE });
+    expect((await checkRunner(runner([GLM, HAIKU]), env)).codes).toEqual(["SETTINGS_NEEDS_ENV_CHANGE:GATE_SOCKET:anthropic", `SETTINGS_NEEDS_ENV_CHANGE:TARGET:${HAIKU}`]);
+    // Haiku leaves the roster: both codes go.
+    expect((await checkRunner(runner([GLM, DEEPSEEK]), env)).codes).toEqual([]);
     // The API half runs the same check against its own env.
-    const api = apiReaders({ readSite: async () => apiSite(), readLineUp: async () => lineUp([GLM, HAIKU]) });
-    expect((await checkApi(api.readers, previewApi({ PREVIEW_GATE_SETTINGS: NO_ANTHROPIC_GATE }))).codes)
-      .toEqual(["SETTINGS_NEEDS_ENV_CHANGE:GATE_SOCKET:anthropic"]);
+    const api = (roster: readonly string[]) => apiReaders({ readSite: async () => apiSite(deepinfraOnly), readLineUp: async () => lineUp(roster) }).readers;
+    const apiEnv = previewApi({ PREVIEW_GATE_SETTINGS: NO_ANTHROPIC_GATE });
+    expect((await checkApi(api([GLM, HAIKU]), apiEnv)).codes).toEqual(["SETTINGS_NEEDS_ENV_CHANGE:GATE_SOCKET:anthropic", `SETTINGS_NEEDS_ENV_CHANGE:TARGET:${HAIKU}`]);
+    expect((await checkApi(api([GLM, DEEPSEEK]), apiEnv)).codes).toEqual([]);
   });
 
   it("the API half names TARGET from ITS OWN declared targets: api.env lacks Claude Haiku while runner.env serves it (the providers page's guard, D24 item 5)", async () => {

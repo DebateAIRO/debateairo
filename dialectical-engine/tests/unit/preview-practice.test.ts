@@ -437,7 +437,7 @@ describe("practice start refusals", () => {
     const bad = JSON.stringify({ ...JSON.parse(config) as object, thinking_levels: { "zai-org/GLM-5.3-Flash": { level: "medium" } } });
     expect(() => parsePracticeSettings(lines.map((line) => line.startsWith("PREVIEW_PROVIDER_TEST_CONFIG_JSON=")
       ? `PREVIEW_PROVIDER_TEST_CONFIG_JSON=${bad}` : line).join("\n")))
-      .toThrow("PRACTICE_SETTINGS_VALUE_INVALID: PREVIEW_PROVIDER_TEST_CONFIG_JSON: PREVIEW_THINKING_LEVELS_INVALID:level zai-org/GLM-5.3-Flash");
+      .toThrow("PRACTICE_SETTINGS_VALUE_INVALID: PREVIEW_PROVIDER_TEST_CONFIG_JSON: PREVIEW_THINKING_LEVELS_INVALID:level:zai-org/GLM-5.3-Flash");
     expect(() => parsePracticeSettings(lines.map((line) => line.startsWith("PREVIEW_PROVIDER_TEST_CONFIG_JSON=")
       ? "PREVIEW_PROVIDER_TEST_CONFIG_JSON={" : line).join("\n")))
       .toThrow("PRACTICE_SETTINGS_VALUE_INVALID: PREVIEW_PROVIDER_TEST_CONFIG_JSON: PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
