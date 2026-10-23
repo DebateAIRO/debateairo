@@ -10,12 +10,12 @@ base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
 first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third, role rotation (0114,
-below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth and the side-by-side releases (0123, below) the thirteenth. A step is added with new files only; NNNN is its number, the step before's number plus one:
+below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth and the side-by-side releases (0123, below) the thirteenth, then row-level security (0124, below) the fourteenth. A step is added with new files only; NNNN is its number, the step before's number plus one:
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
-   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0123: 0123,
-   `side-by-side-releases-forward0123.json`, and `verify-effective-capabilities-111.sql`, which 0112 to 0123 keep),
+   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0124: 0124,
+   `row-level-security-forward0124.json`, and `verify-effective-capabilities-124.sql`, which supersedes 0111's),
    and its own migration and verifier. (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json`
    and the sealed `verify-effective-capabilities.sql`.)
 3. A new verifier `lineage/verify-effective-capabilities-NNNN.sql` only when the step adds billing relations or
@@ -298,6 +298,50 @@ later drained step may widen or redefine them again. While the build is open eac
 end of this file; once merged, 0123 is never edited again. If `origin/dev` takes 0123 first, renumber this step (rename
 every file and constant that carries the number, recompute the manifest, re-pin the chain lists).
 
+## Row-level security (0124)
+
+The fourteenth chain step, after the side-by-side releases' 0123 (mission row-level-security, slice S01:
+`docs/missions/row-level-security/slices/S01/SPEC-v4.md`, `PLAN.md` steps S1.3-S1.6, `DECISIONS.md` D27-D33 and D38;
+ADR-0033): `0124_row_level_security.sql`, `row-level-security-forward0124.json`,
+`packages/db/src/migration-forward0124.ts` (`loadForward0124`, appended last to `STEPS`, `MIGRATION_FORWARD0124_*`
+refusals). It enables row security (never forced) on the 110 in-scope tables, each with two permissive `FOR ALL`
+policies: `rls_account` `TO debateai_runtime` (the per-account predicate of D32, `USING` = `WITH CHECK`) and
+`rls_all_accounts` `TO` the eleven cross-account roles of D29 (`true`); it sets `security_invoker = true` on the three
+in-scope views and moves `core.run_waiting_v`'s SELECT from `debateai_runtime` to `debateai_billing_runtime` (D33); and
+it adds the schema `rls` (USAGE for `debateai_runtime` only) with five `STABLE SECURITY DEFINER` functions on
+`search_path = pg_catalog` (`rls.session_credential_hash()`, callable by no role; `rls.context_user_id()`,
+`rls.context_owner_ref()`, `rls.owns_run(uuid)`, `rls.owns_execution_ref(text)`, EXECUTE for `debateai_runtime`), which
+derive the account from the session token in the setting `debateai.session_credential` by looking its hash up in
+`identity.session`, and the NOLOGIN NOINHERIT marker role `debateai_rls_all_accounts` (no member until the provisioners
+grant it to the system logins). Its postcondition digests, for every in-scope table, `relrowsecurity`,
+`relforcerowsecurity` and every policy (name, command, roles, permissive flag, `USING`, `WITH CHECK`), the views'
+options and ACLs, the five functions whole and the marker's attributes, so any unrecorded change refuses
+`MIGRATION_FORWARD_CHAIN_POSTCONDITION_DRIFT 0124_row_level_security.sql`. No supplemental verifier, so no
+`replayVerifierSql`.
+
+Two earlier promises change by design, each by a recorded mechanism (D38; Ruling R-10, F-C1-1). (1) Six earlier
+postconditions digest the row-security flag of eighteen tables (0111: its eight in-scope NETOPIA tables
+`billing.card_token`, `billing.card_token_revocation`, `billing.hosted_payment`, `billing.notice_quarantine`,
+`billing.payment_notice`, `billing.payment_notice_outcome`, `billing.payment_notice_raw`, `billing.status_read`; 0117: `core.map_choice`, `core.map_item`, `core.map_position`; 0119:
+`core.map_position_repoint`; 0121: `ledger.point_investigation`, `ledger.verdict_vote`; 0122: `core.map_answer_check`,
+`core.map_item_rests_on`; 0123: `core.run_supersession`, `ledger.model_spend_waiver`). The step declares them in
+`amendsPostconditionsOf` (loader and manifest, which must agree, else `MIGRATION_FORWARD0124_MANIFEST`), and
+`applyForwardStep` stores one row per amended step in the migrator-private table
+`public.debateai_schema_migration_step_amendment` (`source_name`, `amended_by`, `amendment` jsonb,
+`postcondition_evidence_digest`, `recorded_at`; primary key `(source_name, amended_by)`; created on first use by
+`replayForwardChain` and checked like the declaration table, `MIGRATION_FORWARD_CHAIN_AMENDMENT_ACL`) with that step's
+digest re-measured right after 0124's SQL; from then on each amended step is compared against its latest amendment,
+so any later unrecorded change to its objects, the flag included, still refuses `POSTCONDITION_DRIFT <step>`. An
+amendment of a step not yet applied refuses `MIGRATION_FORWARD_CHAIN_AMENDMENT_ORDER`, and a row whose `amended_by` is
+not an applied step refuses `MIGRATION_FORWARD_CHAIN_AMENDMENT_BINDING_DRIFT`. (2) 0111's verifier refused row security
+on its NETOPIA tables; `verify-effective-capabilities-124.sql` supersedes it (R34), a byte copy except line 217 (its
+comment) and line 221, where `OR c.relrowsecurity` becomes `OR c.relrowsecurity IS DISTINCT FROM (v_name <> 'tool_order')
+OR c.relforcerowsecurity`: the eight in-scope NETOPIA tables must have row security on and not forced, and
+`billing.tool_order` (out of scope, R3) must keep none. So the header declares `-- n1: drained` (uploaded with no debate
+waiting or running, V-1: an expand step may not change row security) and no `-- n1: keeps-verifier`. If `origin/dev`
+takes 0124 first, renumber this step (rename every file and constant that carries the number, recompute the manifest,
+re-pin the chain lists).
+
 ## Replay: every applied step keeps its own checks
 
 On a later `migrate()` EVERY applied step is checked by its receipt and by its postcondition digest (not only the
@@ -309,7 +353,9 @@ changes something an earlier step's verifier pins must change that verifier thro
 cannot silently pass. The effective-capability verifier of the last applied step (after 0123: 0111's, which the batch,
 Part C's step, role rotation, the data export, the mail locale, the debate shape map, the language check's site cost,
 the reclaim resume, the reply measures, the engine verdict, the engine's map answer step and the side-by-side releases
-keep) still runs at the end of every `migrate()`.
+keep; after 0124: `verify-effective-capabilities-124.sql`) still runs at the end of every `migrate()`. A step that
+changes by design a field an earlier step's postcondition digests declares it (`amendsPostconditionsOf`, 0124 below):
+the earlier step is then compared against its latest recorded amendment instead of its receipt.
 
 ## One transaction per step (side-by-side §5)
 
