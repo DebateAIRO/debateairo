@@ -42,7 +42,10 @@ the preview runs, R18 and R19 were built with it). The list is baked into
 the website when it is built, so changing it means a new build. The build writes the list it used
 into `.next/preview-model-roster.json` (covered by the build manifest), and the UI start-up check
 refuses unless `ui.env` names the same list. Which list belongs at which moment is in
-`deploy/preview-gate/v3/README.md`, "Switching on the new models, in order".
+`deploy/preview-gate/v3/README.md`, "One deploy session: from GLM only to all five AIs". Since the line-up became a
+settings value (side-by-side spec §13 addition D24), the list only sets the new-debate page's fallback list (an older
+API) and the ask proxy's time limit: the AIs a debate uses come from its settings version, and the "AI providers" page
+follows the API ("The providers page", in "Changing debate settings without an upload").
 
 Only the values above are set. Three other public flags are read only at build time and are left
 unset, which means their built-in defaults: `NEXT_PUBLIC_VERDICT_FIRST_UI` (verdict-first layout
@@ -2563,7 +2566,197 @@ silent skip.
 - **Never activate while an upload is between SB3 and SB13** (or DR6). SB13 and DR6 read the active version again and
   stop, nothing changed, when it is not the one SB3 planned from: switching would undo that activation.
 
-<!-- Reserved for the line-up task (SA11): the line-up and thinking-level examples and the T+1 env migration are added here. -->
+### The line-up, the thinking levels and the answer seats (side-by-side spec §13 addition)
+
+**In plain words.** The line-up (which AIs debate on Free and on Premium), how hard each AI thinks (the thinking
+levels) and the four answer seats are debate settings. From the first upload that carries the line-up row (T+1, below)
+on, a change to any of them is an activation (SV0 to SV5), never an edit of `PREVIEW_PROVIDER_TEST_CONFIG_JSON` and
+never a restart. Debates already running keep the line-up and the thinking levels they started with; going back is
+SV6. Examples of what the owner can ask for this way:
+
+- **"Take Qwen off Free."** A new line-up file without Qwen in `free_model_ids` (below), as SV1's `LINEUP`.
+- **"Qwen low for pros & cons."** The same file with Qwen's `pros_cons` step at `low`; Qwen's usual level and its other
+  steps stay as they are.
+- **"Haiku in the writer seat."** SV1's `SEATS='{"writer":"preview:claude-haiku-5-5","checker":"preview:deepseek-v4-1-flash"}'`
+  with `DS=''` (`SEATS` replaces the DeepSeek checker). With role rotation on (the kit's default) each debate's writer
+  and checker are picked from that debate's line-up and the seat is the stand-in; for Haiku to write every answer, set
+  `ROT=off` as well.
+
+**The two plan members.** SV1's choices reach the publish kit as two members of the plan (`native-operator.mjs`):
+- `lineUp`: exactly `free_model_ids`, `premium_model_ids` and `thinking_levels` (the table, or `null` for every AI at
+  its default), from `--line-up <file>`. It seals the `previewLineUpPolicy` row. Left out, the active version's row is
+  kept as it is.
+- `answerSeats`: `writer` and `checker`, optionally `storyteller` and `storyChecker` (which otherwise follow the writer
+  and the checker), each a reviewed preview ref (`preview:fixture-a`, `preview:fixture-b`, `preview:deepseek-v4-1-flash`,
+  `preview:mimo-v2-6-pro`, `preview:qwen-3-8-flash`, `preview:claude-haiku-5-5`), from `--answer-seats '<JSON>'`. One
+  AI never checks its own work: the writer as its own checker is refused, and so is the storyteller as its own story
+  checker. Left out, the seats of the active version's publish plan are kept (SV1 reads them from `CP`).
+
+**The thinking menus.** Only a word on an AI's reviewed menu is accepted: GLM `high`, `low`; DeepSeek `high`, `low`,
+`none`; Qwen `default`, `low`, `medium`, `none`; MiMo `default`, `none`; Claude Haiku `high`, `medium`, `low`. The step
+names are those of `deploy/preview-auth-dev/v1/README.md` ("The optional `thinking_levels` table"). Any other word
+(`max`, `xhigh`, Qwen at `high`) is refused at SV1 (the native operator's line names it:
+`PREVIEW_THINKING_LEVELS_INVALID:<detail>`), and so is a list with one maker only (`maker_rule`). A new word needs a
+reviewed gate change first (new gate code, root's restart of the gate): an upload, not an activation.
+
+**A model that is not switched on at its gate yet** (for example a model the gate's GO has never listed). Two steps,
+in this order:
+1. Root switches it on at its spending gate: its probe, then a new GO with the model added to `enabled_models`, then
+   `stop` and `activate` (`deploy/preview-gate/v3/README.md`, "Switching on DeepSeek, MiMo and Qwen"; Claude Haiku:
+   `README-anthropic.md`, "Switch it on"). This stays root's step, and it comes first.
+2. Then the activation: SV1 (the plan with the new line-up or seat), SV2 (publish), SV3 (the check), the owner's fresh
+   yes, SV4 (activate). SV4 refuses while any model the version can seat is off at its gate.
+
+Taking a model away goes the other way: first activate a version that no longer seats it, then (once the debates on the
+older version have finished) take it out of `enabled_models`. A model that is not a reviewed row, or that no declared
+target serves, or whose company has no gate socket in the env, is refused by the check (`SETTINGS_GATE_UNREVIEWED`,
+`SETTINGS_NEEDS_ENV_CHANGE:TARGET:<model>`, `SETTINGS_NEEDS_ENV_CHANGE:GATE_SOCKET:<provider>`): that is an upload.
+
+**A new line-up file from the active one.** Once the active version carries the row (T+1 and later), its line-up is
+read from the database into this change's `$SART`, as root 0644; before T+1, "The line-up file" above prints it from the
+env file instead.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/settings-names.sh
+# The active version's line-up row, as the plan member {"lineUp":{…}}, into $SART/line-up-now.json (root 0644).
+[ ! -e "$SART/line-up-now.json" ] || { echo "LINEUP_NOT_DONE: $SART/line-up-now.json exists (look first)"; exit 1; }
+ROW=$(psqlq "SELECT jsonb_build_object('lineUp', value_json - 'kind') FROM register.register_row WHERE register_version = $AV AND row_key = 'previewLineUpPolicy'")
+[ -n "$ROW" ] || { echo "LINEUP_NOT_DONE: the active version $AV has no line-up row (before T+1: \"The line-up file\" above)"; exit 1; }
+( umask 022; jq -c . <<<"$ROW" > "$SART/line-up-now.json" )
+jq -r '.lineUp | "free: \(.free_model_ids | join(", "))\npremium: \(.premium_model_ids | join(", "))\nthinking table: \(if .thinking_levels == null then "none" else (.thinking_levels | keys | join(", ")) end)"' "$SART/line-up-now.json"
+echo "the active line-up: $SART/line-up-now.json"
+```
+
+Then each change is a new file beside it (a new lower-case name in `$SART`, root 0644 under the names file's umask),
+given as SV1's `LINEUP`, for example:
+
+```sh
+. /root/preview-archive/settings-names.sh
+# "Take Qwen off Free":
+jq -c '.lineUp.free_model_ids -= ["Qwen/Qwen3.8-Flash"]' "$SART/line-up-now.json" > "$SART/line-up-no-qwen-free.json"
+# "Qwen low for pros & cons" (its level and other steps are kept):
+jq -c '.lineUp.thinking_levels["Qwen/Qwen3.8-Flash"].steps.pros_cons = "low"' "$SART/line-up-now.json" > "$SART/line-up-qwen-low.json"
+```
+
+The owner reads the change in SV1's delta as `previewLineUpPolicy` `changed`, with the old and the new value. A trial
+debate first is optional (tools/preview-practice/README.md, "Trying a new line-up before an activation").
+
+**What the env setting no longer does.** From T+1 on, `PREVIEW_PROVIDER_TEST_CONFIG_JSON` in each release's
+`api-<label>.env` and `runner-<label>.env` carries only the gate part (`budget_socket`, `deployment`,
+`requested_thinking_level`, `scope_id`, optional `anthropic_budget_socket`). Writing rosters or a `thinking_levels` table
+back into it does not change the line-up: both processes refuse to start (`PREVIEW_LINE_UP_ENV_CONFLICT`; the
+launchers print only `PREVIEW_API_STARTUP_REFUSED` / `PREVIEW_RUNNER_STARTUP_REFUSED`).
+
+### The first upload with this change (T+1)
+
+**In plain words.** Once, in the first side-by-side upload (T+1, the release that brings Phase 2 and the line-up row,
+owner answer Q-L1), the line-up moves out of the env setting into the settings version. On that day nothing changes for
+debates: T+1's own site version carries exactly the line-up and thinking table T runs. T's own files are not touched,
+so every way back (WB1, WB2) runs T as before, on its own env line-up. Four additions to "Side-by-side release (from
+T+1)", in this order (on the drained path: the first two the same, the third right after DR1, the fourth after DR5 and
+before DR6):
+
+1. **Before SB3: today's line-up into the release's artifacts folder.** The new release's own checker prints the old
+   release's env line-up as the plan member.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# T+1 only, before SB3: the old release's env line-up, as the plan member {"lineUp":{…}}, into $ART/line-up.json (root 0644).
+[ ! -e "$ART/line-up.json" ] || { echo "LINEUP_NOT_DONE: $ART/line-up.json exists (look first)"; exit 1; }
+cmp -s "$S/api-$OLABEL.env.before" "$E/api-$OLABEL.env" || { echo "LINEUP_NOT_DONE: api-$OLABEL.env moved since SB1"; exit 1; }
+TMP=$ART/line-up.json.printing
+( umask 022; cd "$CAPI/dialectical-engine" && /usr/bin/env -i PATH=/usr/bin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node --import ./node_modules/tsx/dist/loader.mjs tools/preview-practice/check-thinking-levels.ts --print-line-up --settings "$E/api-$OLABEL.env" > "$TMP" ) || { echo "LINEUP_NOT_DONE: the checker refused the value (run it without the redirect to read why; $TMP is only a draft)"; exit 1; }
+jq -e '.lineUp.free_model_ids and .lineUp.premium_model_ids' "$TMP" > /dev/null || { cat "$TMP"; echo "LINEUP_NOT_DONE: no line-up printed (the old release's setting has only the gate part: this is not the first upload with the line-up row)"; exit 1; }
+[ "$(stat -c '%U %a' "$TMP")" = "root 644" ] || { echo "LINEUP_NOT_DONE: the draft is not root 0644"; exit 1; }
+mv "$TMP" "$ART/line-up.json"
+jq -r '.lineUp | "free: \(.free_model_ids | join(", "))\npremium: \(.premium_model_ids | join(", "))\nthinking table: \(if .thinking_levels == null then "none" else (.thinking_levels | keys | join(", ")) end)"' "$ART/line-up.json"
+echo "line-up file: $ART/line-up.json (SB3's LINEUP)"
+```
+
+2. **SB3 with `LINEUP="$ART/line-up.json"`.** T+1's site version is planned with that `lineUp`. The owner reads
+   `previewLineUpPolicy` as `added` in the delta, with exactly the lists and the table printed above; SB6's yes names
+   it ("the line-up moves into the settings version, unchanged"). Later uploads leave `LINEUP` empty: the row comes
+   with the active version.
+3. **Right after SB5: the new release's two env files in the sockets-only form.** SB5's `derive` copied the old
+   release's `PREVIEW_PROVIDER_TEST_CONFIG_JSON` byte for byte, line-up included; beside a site version that carries the
+   row it would refuse the start (`PREVIEW_LINE_UP_ENV_CONFLICT`, owner answer Q-L2). This keeps only its gate part, in
+   `api-$LABEL.env` and `runner-$LABEL.env` alike, and prints no value. The old release's files stay as they are (SB5's
+   SAME check compares only the gate sockets and the scope across the two releases, so it still holds). `ui-$LABEL.env`
+   keeps its model list: the website's start-up check accepts the sockets-only API setting beside any reviewed list.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# T+1 only, right after SB5: PREVIEW_PROVIDER_TEST_CONFIG_JSON of api- and runner-<LABEL>.env keeps only its gate part. No value is printed.
+K=PREVIEW_PROVIDER_TEST_CONFIG_JSON
+for SVC in api runner; do [ "$(grep -c "^$K=" "$E/$SVC-$LABEL.env")" = 1 ] || { echo "SOCKETS_NOT_DONE: $K is not in $SVC-$LABEL.env exactly once"; exit 1; }; done
+[ "$(sed -n "s/^$K=//p" "$E/api-$LABEL.env")" = "$(sed -n "s/^$K=//p" "$E/runner-$LABEL.env")" ] || { echo "SOCKETS_NOT_DONE: the API's and the runner's values differ (SB5's SAME check stops that): ask"; exit 1; }
+G=$(sed -n "s/^$K=//p" "$E/api-$LABEL.env" | jq -ce '{budget_socket, deployment, requested_thinking_level, scope_id} + (if has("anthropic_budget_socket") then {anthropic_budget_socket} else {} end) | select(all(.[]; type == "string" and length > 0))') || { echo "SOCKETS_NOT_DONE: the value has no complete gate part: ask"; exit 1; }
+for SVC in api runner; do
+  F=$E/$SVC-$LABEL.env; D=$S/$SVC-$LABEL.env.derived
+  [ -e "$D" ] || { cp -p "$F" "$D"; chmod 0600 "$D"; }
+  MODE=$(stat -c '%a %U:%G' "$F")
+  cp -p "$F" "$F.sockets"
+  G="$G" awk -v k="$K" 'index($0, k "=") == 1 { print k "=" ENVIRON["G"]; next } { print }' "$F" > "$F.sockets"
+  diff <(grep -v "^$K=" "$D") <(grep -v "^$K=" "$F.sockets") > /dev/null || { echo "SOCKETS_NOT_DONE: another line of $SVC-$LABEL.env would change ($F.sockets is only a draft)"; exit 1; }
+  [ "$(stat -c '%a %U:%G' "$F.sockets")" = "$MODE" ] || { echo "SOCKETS_NOT_DONE: the draft's mode or owner differs ($F.sockets)"; exit 1; }
+  mv "$F.sockets" "$F"
+done
+[ "$(sed -n "s/^$K=//p" "$E/api-$LABEL.env")" = "$G" ] && [ "$(sed -n "s/^$K=//p" "$E/runner-$LABEL.env")" = "$G" ] || { echo "SOCKETS_NOT_DONE: a file does not carry the gate part (the copies before: $S/*-$LABEL.env.derived)"; exit 1; }
+[ "$(jq -cS '{budget_socket, anthropic_budget_socket, scope_id}' <<<"$G")" = "$(sed -n "s/^$K=//p" "$E/api-$OLABEL.env" | jq -cS '{budget_socket, anthropic_budget_socket, scope_id}')" ] || { echo "SOCKETS_NOT_DONE: the gate part differs from the old release's: ask"; exit 1; }
+for SVC in api runner; do
+  C=$( cd "$CAPI/dialectical-engine" && /usr/bin/env -i PATH=/usr/bin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node --import ./node_modules/tsx/dist/loader.mjs tools/preview-practice/check-thinking-levels.ts --settings "$E/$SVC-$LABEL.env" 2>&1 ) || { echo "$C"; echo "SOCKETS_NOT_DONE: the checker refused $SVC-$LABEL.env"; exit 1; }
+  grep -q 'No line-up in this setting' <<<"$C" || { echo "SOCKETS_NOT_DONE: $SVC-$LABEL.env is not in the sockets-only form"; exit 1; }
+done
+echo "api-$LABEL.env and runner-$LABEL.env: sockets-only (the line-up lives in the settings version)"
+```
+
+4. **After SB10 (the new release is pinned) and before SB11: the check of T+1's own site version.** Both halves of the
+   new release dry-boot it, each with its own env file and its own declared targets, so every model the version can
+   seat is served by both processes' targets and has its gate socket (and so its company is on the providers page, which
+   lists what the API reaches). A version without the row beside the sockets-only setting fails here
+   (`PREVIEW_LINE_UP_REQUIRED`: SB3 ran without `LINEUP`); so does a model no target serves. On FAIL nothing has started:
+   WB1, then a corrected upload.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# T+1 only, after SB10, before SB11: both halves of the new release dry-boot its own site version (no AI call).
+V=$(cat "$S/new-register-version")
+RC=0; OUT=$(lc settings-version.mjs check "$LABEL" "$V" 2>&1) || RC=$?
+printf '%s\n' "$OUT" > "$S/settings-check-site-$V.json"
+jq -r 'if .event == "PREVIEW_SETTINGS_CHECKED" then "verdict \(.verdict) for version \(.version) on \(.releaseKey) (receipt \(.receipt))", (.hints[] | "  \(.code): \(.hint)") else tostring end' <<<"$OUT" 2>/dev/null || echo "$OUT"
+[ "$RC" = 0 ] || { echo "SITECHECK_NOT_DONE: not PASS (exit $RC, the lines above): stop; WB1 takes the new release away"; exit 1; }
+echo "the new release passes its own site version $V"
+```
+
+### The providers page
+
+- **It follows the API by itself.** The "AI providers" legal page (`/providers`) names the companies the API's declared
+  targets (`PROVIDER_DISCOVERY_TARGETS_JSON`) reach, read from the API at request time (`GET /v1/public/ai-providers`),
+  companies only, no models. Today: DeepInfra and Anthropic. When the API does not answer, the page shows its last good
+  answer (up to 60 s old), else every company of the reviewed catalogue: it never shows fewer.
+- **A line-up or model change never needs a website upload.** Activations change no page; nor does a new model of a
+  company the page already names.
+- **Adding a company is an upload**, never an activation: its code, a reviewed spending gate, its targets in the env,
+  and its legal facts checked by a person into the catalogue (`apps/ui/lib/legal/pages.ts`). The page lists it from that
+  release on, when that release's API serves.
+- **Advance notice first (manual).** The page promises "We tell you before a new provider receives any data". So before
+  any upload that adds a company, the owner tells the users, and the upload waits until that notice has gone out; the
+  page cannot do this by itself, because it lists a company only once the release that reaches it serves (owner to
+  confirm: ruling R21).
+- **A company leaves the targets one release later.** Drop a company's targets only in an upload after the release in
+  which it stopped being seated (by an activation or an upload), never in that same upload. During a side-by-side switch
+  the old release's runner finishes its own debates (up to the 6 h ceiling) while the page already follows the new
+  release's API: dropping the company at once would take it off the page while it may still receive text. The tools
+  hold the first half of the order: a release without the company's targets refuses a settings version that still seats
+  one of its models (the check names `SETTINGS_NEEDS_ENV_CHANGE:TARGET:<model>`).
+- **The website build's model list** (`ui-build --models`, `NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON`) now only sets the
+  new-debate page's fallback list (shown when an older API sends no line-up with the room read) and the ask proxy's
+  time limit for the preview's ask (1,260 s); the providers page no longer reads it. The UI start-up check still demands that
+  `ui.env` and the build name the same list.
 
 ## Transition release T (one last drained upload)
 
@@ -3925,6 +4118,7 @@ step needs no "nothing running" guard.
 set -euo pipefail
 . /root/preview-archive/rNN-names.sh
 # SB3: the plan (billing-on inputs, the live checker) and the native operator's proposal, in the new release's own native-plan file.
+LINEUP=''                                                 # the first upload with the line-up row (T+1) only: "$ART/line-up.json"; else empty
 REG0=$(cat "$S/register-before"); AV=$(cat "$S/active-before"); OSITE=${OKEY%%-*}; OSITE=${OSITE#r}
 [ "$(jq -cS . <<<"$HB_ON")" = '{"askRoomReads":{"capacity":65536,"limit":60,"windowMs":60000},"billing":"on","dailyCeilingMicros":10000000,"perRunCeilingMicros":3000000}' ] || { echo "SB3_NOT_DONE: HB_ON is not the billing-on JSON"; exit 1; }
 cmp -s "$S/native-plan.before.json" "$ONP" || { echo "SB3_NOT_DONE: the old release's verify plan moved since SB1"; exit 1; }
@@ -3938,7 +4132,7 @@ HB=$(jq -c .hostedBilling "$FROM")
 [ "$(jq -cS '{billing,dailyCeilingMicros,askRoomReads}' <<<"$HB")" = "$(jq -cS '{billing,dailyCeilingMicros,askRoomReads}' <<<"$HB_ON")" ] || { echo "SB3_NOT_DONE: the active version's site inputs differ from HB_ON: ask"; exit 1; }
 SEATS=$(jq -c '.answerSeats // empty' "$CP"); ROT=$(jq -r '.roleRotation // empty' "$CP"); DS=$(jq -r 'if .answerSeats == null and .checkerChoice.checker == "deepseek" then "yes" else empty end' "$CP")
 echo "active settings version $AV; per-debate inputs $(jq -c '{perRunCeilingMicros}' <<<"$HB"); checker $([ -n "$DS" ] && echo deepseek || echo "${SEATS:-glm}"); rotation ${ROT:-on}"
-rel native-plan --operation plan --from "$FROM" --source-manifest "$ART/candidate-api-source.json" ${DS:+--checker deepseek --deepseek-enabled-on-gate yes} ${SEATS:+--answer-seats "$SEATS"} ${ROT:+--role-rotation "$ROT"} --hosted-billing "$HB" --out "$ART/native-plan-plan.json" || { echo "SB3_NOT_DONE: the release tool refused the plan"; exit 1; }
+rel native-plan --operation plan --from "$FROM" --source-manifest "$ART/candidate-api-source.json" ${DS:+--checker deepseek --deepseek-enabled-on-gate yes} ${SEATS:+--answer-seats "$SEATS"} ${ROT:+--role-rotation "$ROT"} --hosted-billing "$HB" ${LINEUP:+--line-up "$LINEUP"} --out "$ART/native-plan-plan.json" || { echo "SB3_NOT_DONE: the release tool refused the plan"; exit 1; }
 [ "$(jq -r .operation "$ART/native-plan-plan.json")" = plan ] && [ "$(jq -r '.hostedBilling.billing // "none"' "$ART/native-plan-plan.json")" = on ] && [ "$(jq -r .sourceRoot "$ART/native-plan-plan.json")" = "$CAPI" ] || { echo "SB3_NOT_DONE: the plan is not this release's billing-on plan"; exit 1; }
 put "$ART/native-plan-plan.json" || { echo "SB3_NOT_DONE: put of the plan failed"; exit 1; }
 OUT=$(nat "$ART/register-proposal.json"); echo "nat: $OUT"
@@ -3954,7 +4148,9 @@ is the old release's own site version, the plan starts from the old release's ve
 activation of another version, from that version's kept plans (`/opt/debateai-v3-preview/artifacts/settings-v<version>/`,
 SV2 of "Changing debate settings without an upload"). The hosted inputs, the checker or the answer seats and role
 rotation are read from the same plans (a plan does not take them from its base), so the upload's site version keeps
-every activated debate setting; their site part must still equal `HB_ON`.
+every activated debate setting; their site part must still equal `HB_ON`. `LINEUP` stays empty, except once: the first
+upload with the line-up row (T+1) sets it to the file its first step printed ("The first upload with this change
+(T+1)" in "Changing debate settings without an upload"); from then on the line-up row comes with the active version.
 
 The owner reads the delta exactly as A9 says; the yes in SB6 names its `deltaSha256`. Gate files: A10's check. A changed
 gate file follows spec §9's rule for gate rows: a change that only widens (adds a model, raises a bound) is deployed now,

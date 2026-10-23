@@ -735,8 +735,40 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     expect(section).toContain('( umask 022; cd "$CAPI/dialectical-engine" && ');
     expect(section).toContain('tools/preview-practice/check-thinking-levels.ts --print-line-up --settings "$E/api-$LABEL.env" > "$TMP" )');
     expect(section).toContain('TMP=$SART/line-up.json.printing');
-    // The line-up task (SA11) appends to this section.
-    expect(section).toContain('<!-- Reserved for the line-up task (SA11)');
+    // The line-up task (SA11) appends to this section: the examples, the T+1 env migration and the providers page.
+    for (const heading of ['### The line-up, the thinking levels and the answer seats (side-by-side spec §13 addition)',
+      '### The first upload with this change (T+1)', '### The providers page']) expect(section.split('\n'), heading).toContain(heading);
+  });
+
+  it('the line-up and thinking changes are activations; T+1 moves the line-up out of the env (SA11, addition D15, D23, D24)', () => {
+    const prose = section.replace(/\s+/g, ' ');
+    // The two plan members, the reviewed menus, and the order for a model the gate has not switched on yet.
+    for (const text of ['`lineUp`: exactly `free_model_ids`, `premium_model_ids` and `thinking_levels`', '`answerSeats`: `writer` and `checker`',
+      'GLM `high`, `low`; DeepSeek `high`, `low`, `none`; Qwen `default`, `low`, `medium`, `none`; MiMo `default`, `none`; Claude Haiku `high`, `medium`, `low`.',
+      'Root switches it on at its spending gate', 'This stays root\'s step, and it comes first.']) expect(prose, text).toContain(text);
+    const t1 = sectionOf(guide, '### The first upload with this change (T+1)');
+    const t1Blocks = blocksOf(t1);
+    // Step 1, before SB3: today's line-up printed by the new release's checker from the OLD release's API env file.
+    expect(t1Blocks[0]!.lines.join('\n')).toContain('tools/preview-practice/check-thinking-levels.ts --print-line-up --settings "$E/api-$OLABEL.env" > "$TMP" )');
+    expect(t1Blocks[0]!.lines).toContain('mv "$TMP" "$ART/line-up.json"');
+    // Step 2: SB3 takes it (and only then: empty by default).
+    const sb3 = scriptOf('SB3').lines;
+    expect(sb3).toContain('LINEUP=\'\'                                                 # the first upload with the line-up row (T+1) only: "$ART/line-up.json"; else empty');
+    expect(sb3.find(line => line.startsWith('rel native-plan --operation plan --from "$FROM" '))).toContain('--hosted-billing "$HB" ${LINEUP:+--line-up "$LINEUP"} --out');
+    // Step 3, after SB5: the new release's two env files keep only the gate part, checked, and no other line changes.
+    const sockets = t1Blocks[1]!.lines.join('\n');
+    expect(sockets).toContain('jq -ce \'{budget_socket, deployment, requested_thinking_level, scope_id} + (if has("anthropic_budget_socket") then {anthropic_budget_socket} else {} end)');
+    expect(sockets).toContain('diff <(grep -v "^$K=" "$D") <(grep -v "^$K=" "$F.sockets") > /dev/null');
+    expect(sockets).toContain("grep -q 'No line-up in this setting'");
+    expect(prose).toContain('PREVIEW_LINE_UP_ENV_CONFLICT');
+    // Step 4, before SB11: both halves check the new release's own site version.
+    expect(t1Blocks[2]!.lines).toContain('RC=0; OUT=$(lc settings-version.mjs check "$LABEL" "$V" 2>&1) || RC=$?');
+    // None of these blocks is a step of its own (the settings steps stay SV0-SV6, the upload's stay as STEPS).
+    for (const block of t1Blocks) expect(stepOf(block)).toBeNull();
+    // The providers page: automatic, one release later to drop a company, a manual notice before adding one.
+    const providers = sectionOf(guide, '### The providers page').replace(/\s+/g, ' ');
+    for (const text of ['A line-up or model change never needs a website upload.', 'Adding a company is an upload', 'Advance notice first (manual).',
+      'A company leaves the targets one release later.', 'now only sets the new-debate page\'s fallback list']) expect(providers, text).toContain(text);
   });
 
   it('the switch activates the new release\'s own site version (SB13, DR6), and the old re-pin sections point to the activation', () => {
