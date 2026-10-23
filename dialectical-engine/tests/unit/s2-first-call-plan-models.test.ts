@@ -119,10 +119,12 @@ describe("S2 · both hosted boots hand the check the picker's lists", () => {
     expect(start).toBeGreaterThan(-1);
     const end = main.indexOf("\n  });\n", start);
     expect(end).toBeGreaterThan(start);
+    // S20 re-pin — final fix wave F9 (ruling R79, 4e3854ca2): a version other than the site's (and check-version) is
+    // grouped by its own preview rosters; the site version keeps the code's PLAN_TIER_ROSTERS. The Free rule is unchanged.
     expect(main.slice(start, end)).toContain(
       "        rosters: firstCallPlanModels({\n"
       + "          scorecardInForce: modelPicker.scorecard.state === \"VALID\",\n"
-      + "          rosters: PLAN_TIER_ROSTERS,\n"
+      + "          rosters: groupByPreviewRosters ? previewPlanTierRosters(previewConfig, PLAN_TIER_ROSTERS) : PLAN_TIER_ROSTERS,\n"
       + "          models: firstCalls.map((call) => call.model),\n"
       + "          ownRosterOnly: site.billingEnabled ? [\"free\"] : []\n"
       + "        })\n"
