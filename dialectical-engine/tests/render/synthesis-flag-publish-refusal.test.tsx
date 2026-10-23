@@ -91,7 +91,7 @@ describe("S01 publication refusal", () => {
       expires_at: new Date(Date.now() + 600_000).toISOString() } };
     await act(async () => { root.render(<SecurityActionResume catalog={{}} settingsCatalog={{}}
       publicCatalog={publicCatalog} locale="en" takeProof={() => proof as never}
-      client={{ publishRun: async () => { throw refusal(410, "DEBATE_REMOVED_BY_CHECK"); } } as never} />); });
+      client={{ readPublicationReview: async () => ({ flagged: false, state: "NONE", categories: [], asks_used: 0, may_ask: false, refusal: null }), publishRun: async () => { throw refusal(410, "DEBATE_REMOVED_BY_CHECK"); } } as never} />); });
     const assign = vi.fn();
     const actualWindow = window;
     vi.stubGlobal("window", new Proxy(actualWindow, { get(target, key) {
