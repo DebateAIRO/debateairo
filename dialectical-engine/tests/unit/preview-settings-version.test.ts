@@ -1,12 +1,14 @@
 // Side-by-side spec §13 "Activating a settings version" (Task S15): the preview's root wiring,
 // deploy/preview-lifecycle/v1/settings-version.mjs. Fake runners only: no server, no database, no gate, no AI call.
 import { describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 const settings = await import('../../deploy/' + 'preview-lifecycle/v1/settings-version.mjs');
 const common = await import('../../deploy/' + 'preview-lifecycle/v1/common.mjs');
 
-const { CHECK_HINTS, HALF_ENTRIES, OPERATOR_ENTRY, OPERATOR_IMPORTS, RECEIPT_SCHEMA, activateSettings, checkHalfArgv, checkSettingsVersion, gateSockets, hintFor,
-  main, operatorArgv, planSettingsForSwitch, settingsStatus } = settings;
+const { CHECK_HINTS, GATE_HELPER_FILE, HALF_ENTRIES, OPERATOR_ENTRY, OPERATOR_IMPORTS, RECEIPT_SCHEMA, RELEASE_GATE_HELPER, SEATABLE_ENV_SCHEMA, activateSettings,
+  checkHalfArgv, checkSettingsGatesLive, checkSettingsVersion, gateHelperDifferences, gateSockets, hintFor, main, operatorArgv, planSettingsForSwitch,
+  seatableEnvironmentText, settingsStatus } = settings;
 const LAYOUT = common.LAYOUT;
 const NODE = '/usr/local/lib/nodejs/bin/node';
 // Keys are built from pieces (the secret scanner reads r<n>-<12 hex> as a key).
@@ -23,8 +25,18 @@ const ENV_VALUES: Record<string, Record<string, string>> = {
   runner: { NODE_ENV: 'production', RELEASE_KEY: NEW_KEY, DATABASE_URL: ['postgres://runner', 'pw@db/x'].join(':') },
   api: { NODE_ENV: 'production', RELEASE_KEY: NEW_KEY, DATABASE_URL: ['postgres://api', 'pw@db/x'].join(':'),
     PREVIEW_PROVIDER_TEST_CONFIG_JSON: JSON.stringify({ budget_socket: '/run/debateai-v3-preview/deepinfra-budget-v3.sock', anthropic_budget_socket: '/run/debateai-v3-preview/anthropic-budget-v1.sock',
-      deployment: 'v3-preview', requested_thinking_level: 'high', scope_id: 'preview-team' }) }
+      deployment: 'v3-preview', requested_thinking_level: 'high', scope_id: 'preview-team' }),
+    // SA10: root hands the operator each declared target's model (the structure-repair model is seatable when served).
+    PROVIDER_DISCOVERY_TARGETS_JSON: JSON.stringify([{ provider_ref: 'preview:fixture-a', model: 'zai-org/GLM-5.3-Flash' },
+      { provider_ref: 'preview:fixture-b', model: 'zai-org/GLM-5.3-Flash' }, { provider_ref: 'preview:claude-haiku-5-5', model: 'claude-haiku-5-5' }]) }
 };
+/** SA10 (addition D21): one gate code, installed in both gate folders, in each release, and named by both GO files. */
+const HELPER = 'print("gate helper v3")\n';
+const sha = (text: string) => createHash('sha256').update(text).digest('hex');
+const gateFilesOf = (helper = HELPER): Record<string, string> => Object.fromEntries([
+  ...LAYOUT.gates.flatMap((gate: { folder: string; go: string }) => [[`${gate.folder}/${GATE_HELPER_FILE}`, helper], [gate.go, JSON.stringify({ helper_sha256: sha(helper), bridge_sha256: 'b'.repeat(64) })]]),
+  ...[OLD, NEW].map(label => [`${engine(label, 'api')}/${RELEASE_GATE_HELPER}`, helper])
+]);
 const IDS: Record<string, { uid: number; gid: number }> = { runner: { uid: 1201, gid: 1202 }, api: { uid: 1301, gid: 1302 } };
 
 type Result = { code: number | null; signal: null; error: undefined | Error; timedOut: boolean; overflow: boolean; stdout: Buffer; stderr: Buffer };
@@ -42,6 +54,8 @@ type Options = Partial<{
   guardFails: string[];
   // Fix round 1: the lock's API source root for a label (the operator's folder comes from the lock).
   apiRoots: Record<string, string>;
+  // SA10: the gate files and the releases' own helper, by path (absent = unreadable).
+  gateFiles: Record<string, string>;
 }>;
 
 /** A fake preview host: the lock (two releases), the release table, the env files, the gates, the files root writes, and one runner for every command. */
@@ -52,7 +66,7 @@ function host(options: Options = {}) {
       ? result(`DEBATEAI_SETTINGS_VERDICT ${JSON.stringify({ releaseKey: NEW_KEY, version: '21', verdict: 'PASS', digest: 'd'.repeat(64), codes: [] })}\n`, 0)
       : result(`DEBATEAI_SETTINGS_STATUS {"currentRelease":"${OLD_KEY}","pointer":"19","effectiveActive":"19","passed":["19"]}\n`)),
     current: OLD_KEY as string | null, remaining: { deepinfra: '{"enabled_models":[]}', anthropic: '{"enabled_models":["claude-haiku-5-5"]}' } as Record<string, string | null>,
-    envFails: [] as string[], existing: [] as string[], guardFails: [] as string[], apiRoots: {} as Record<string, string>, ...options
+    envFails: [] as string[], existing: [] as string[], guardFails: [] as string[], apiRoots: {} as Record<string, string>, gateFiles: gateFilesOf(), ...options
   };
   const calls: Call[] = [], log: string[] = [], files: Record<string, string> = {};
   const lockOf = () => {
@@ -103,7 +117,11 @@ function host(options: Options = {}) {
       log.push(`remaining ${gate} ${scope}`);
       return o.remaining[gate] ?? null;
     },
-    writeFile: async (path: string, text: string) => { log.push(`write ${path}`); files[path] = text; }
+    writeFile: async (path: string, text: string) => { log.push(`write ${path}`); files[path] = text; },
+    readBytes: async (path: string) => {
+      if (!Object.hasOwn(o.gateFiles, path)) throw Object.assign(new Error('missing'), { code: 'ENOENT' });
+      return Buffer.from(o.gateFiles[path]!);
+    }
   };
   return { deps, calls, log, files };
 }
@@ -222,14 +240,19 @@ describe('activate and status', () => {
     expect(h.log).toEqual([
       `guard ${root(OLD, 'api')} api dialectical-engine/node_modules/tsx/dist/loader.mjs dialectical-engine/tools/settings-version/cli.ts dialectical-engine/tools/settings-version/settings-operator.ts`,
       `env /etc/debateai-v3-preview/auth-dev-v1/api-${OLD}.env gid 1302`,
+      `write ${folder}/settings-activate-${STAMP}-seatable-env.json`,
       'remaining deepinfra preview-team', `write ${folder}/settings-activate-${STAMP}-deepinfra-remaining.json`,
       'remaining anthropic preview-team', `write ${folder}/settings-activate-${STAMP}-anthropic-remaining.json`,
       'operator activate'
     ]);
     expect(h.files[`${folder}/settings-activate-${STAMP}-anthropic-remaining.json`]).toBe('{"enabled_models":["claude-haiku-5-5"]}');
+    // SA10: the release's line-up (the env text as it is) and its target models, for the operator's seatable set.
+    expect(JSON.parse(h.files[`${folder}/settings-activate-${STAMP}-seatable-env.json`]!)).toEqual({ schema: SEATABLE_ENV_SCHEMA,
+      previewConfig: ENV_VALUES.api!.PREVIEW_PROVIDER_TEST_CONFIG_JSON, declaredModels: ['zai-org/GLM-5.3-Flash', 'claude-haiku-5-5'] });
     const [call] = operatorCalls(h.calls);
     expect(call!.opts.cwd).toBe(engine(OLD, 'api'));
     expect(call!.argv.slice(call!.argv.indexOf(`${engine(OLD, 'api')}/${OPERATOR_ENTRY}`) + 1)).toEqual(['activate', '21', '--by', 'owner', '--reason', 'longer answers',
+      '--seatable-env', `${folder}/settings-activate-${STAMP}-seatable-env.json`,
       '--gate-remaining', `deepinfra=${folder}/settings-activate-${STAMP}-deepinfra-remaining.json`, '--gate-remaining', `anthropic=${folder}/settings-activate-${STAMP}-anthropic-remaining.json`]);
   });
 
@@ -255,6 +278,93 @@ describe('activate and status', () => {
     const out = await settingsStatus({ layout: LAYOUT, deps: h.deps });
     expect(out).toEqual({ code: 0, stdout: [`DEBATEAI_SETTINGS_STATUS {"currentRelease":"${OLD_KEY}","pointer":"19","effectiveActive":"19","passed":["19"]}`], stderr: [] });
     expect(operatorCalls(h.calls)[0]!.opts.cwd).toBe(engine(OLD, 'api'));
+  });
+});
+
+describe('the gate-code fingerprint and the live check for a switch (addition D21, ruling R60, SA10)', () => {
+  const differs = (gate: string) => `SETTINGS_GATE_HELPER_DIFFERS:${gate}`;
+  it('activate refuses SETTINGS_GATE_HELPER_DIFFERS:anthropic when that gate\'s helper file has another sha256: no gate asked, nothing written, the operator never run', async () => {
+    const anthropic = LAYOUT.gates.find((gate: { name: string }) => gate.name === 'anthropic')!;
+    const h = host({ gateFiles: { ...gateFilesOf(), [`${anthropic.folder}/${GATE_HELPER_FILE}`]: 'print("older gate helper")\n' } });
+    const error = await refusal(activateSettings({ version: 21, by: 'owner', reason: 'x', layout: LAYOUT, deps: h.deps }));
+    expect(error).toMatchObject({ code: 'SETTINGS_GATE_HELPER_DIFFERS', fields: { codes: [differs('anthropic')],
+      hints: [{ code: differs('anthropic'), hint: CHECK_HINTS.SETTINGS_GATE_HELPER_DIFFERS }] } });
+    expect([operatorCalls(h.calls), h.files, h.log.filter(line => line.startsWith('remaining') || line.startsWith('env'))]).toEqual([[], {}, []]);
+  });
+
+  it('the three digests must agree: the gate folder\'s file, the release\'s own copy and the GO\'s helper_sha256', async () => {
+    const io = (files: Record<string, string>) => ({ readBytes: async (path: string) => {
+      if (!Object.hasOwn(files, path)) throw new Error('ENOENT');
+      return Buffer.from(files[path]!);
+    } });
+    const deepinfra = LAYOUT.gates.find((gate: { name: string }) => gate.name === 'deepinfra')!;
+    const engineOld = engine(OLD, 'api');
+    expect(await gateHelperDifferences({ engine: engineOld, gates: LAYOUT.gates, io: io(gateFilesOf()) })).toEqual([]);
+    // An old gate file with its old GO agree with each other, but not with this release.
+    const old = gateFilesOf('print("old")\n');
+    expect(await gateHelperDifferences({ engine: engineOld, gates: LAYOUT.gates, io: io({ ...old, [`${engineOld}/${RELEASE_GATE_HELPER}`]: HELPER }) }))
+      .toEqual([differs('deepinfra'), differs('anthropic')]);
+    // The GO names another digest; the GO is unreadable; the release's own copy is missing (every gate differs).
+    expect(await gateHelperDifferences({ engine: engineOld, gates: LAYOUT.gates, io: io({ ...gateFilesOf(), [deepinfra.go]: JSON.stringify({ helper_sha256: 'a'.repeat(64) }) }) }))
+      .toEqual([differs('deepinfra')]);
+    expect(await gateHelperDifferences({ engine: engineOld, gates: LAYOUT.gates, io: io({ ...gateFilesOf(), [deepinfra.go]: '{' }) })).toEqual([differs('deepinfra')]);
+    const noRelease = gateFilesOf();
+    delete noRelease[`${engineOld}/${RELEASE_GATE_HELPER}`];
+    expect(await gateHelperDifferences({ engine: engineOld, gates: LAYOUT.gates, io: io(noRelease) })).toEqual([differs('deepinfra'), differs('anthropic')]);
+    expect(RELEASE_GATE_HELPER).toBe('packages/providers/ops/preview_budget_helper.py');
+  });
+
+  it('the hand-over of the release\'s line-up and target models; an env without readable targets refuses', () => {
+    expect(JSON.parse(seatableEnvironmentText(ENV_VALUES.api))).toEqual({ schema: SEATABLE_ENV_SCHEMA,
+      previewConfig: ENV_VALUES.api!.PREVIEW_PROVIDER_TEST_CONFIG_JSON, declaredModels: ['zai-org/GLM-5.3-Flash', 'claude-haiku-5-5'] });
+    for (const bad of [{ ...ENV_VALUES.api, PROVIDER_DISCOVERY_TARGETS_JSON: undefined }, { ...ENV_VALUES.api, PROVIDER_DISCOVERY_TARGETS_JSON: '[{"provider_ref":"x"}]' },
+      { ...ENV_VALUES.api, PREVIEW_PROVIDER_TEST_CONFIG_JSON: undefined }]) {
+      expect(() => seatableEnvironmentText(bad)).toThrow(expect.objectContaining({ code: 'SETTINGS_SEATABLE_ENV_UNREADABLE' }));
+    }
+  });
+
+  it('a forward switch\'s --activate <v>: the NEW release\'s fingerprint, then cli.ts gate-check from its own folder over its own env (read-only)', async () => {
+    const h = host({ operator: () => result('DEBATEAI_SETTINGS_GATES_SERVE {"version":"21"}\n') });
+    expect(await checkSettingsGatesLive({ label: NEW, version: 21, layout: LAYOUT, deps: h.deps })).toEqual({ version: 21, checked: true });
+    expect(h.log).toEqual([
+      `guard ${root(NEW, 'api')} api ${OPERATOR_IMPORTS.map((path: string) => `dialectical-engine/${path}`).join(' ')}`,
+      `env /etc/debateai-v3-preview/auth-dev-v1/api-${NEW}.env gid 1302`,
+      `write ${CURRENT_NEW}/settings-switch-${STAMP}-seatable-env.json`,
+      'remaining deepinfra preview-team', `write ${CURRENT_NEW}/settings-switch-${STAMP}-deepinfra-remaining.json`,
+      'remaining anthropic preview-team', `write ${CURRENT_NEW}/settings-switch-${STAMP}-anthropic-remaining.json`,
+      'operator gate-check'
+    ]);
+    const [call] = operatorCalls(h.calls);
+    expect(call!.opts.cwd).toBe(engine(NEW, 'api'));
+    expect(call!.argv.slice(call!.argv.indexOf(`${engine(NEW, 'api')}/${OPERATOR_ENTRY}`) + 1)).toEqual(['gate-check', '21',
+      '--seatable-env', `${CURRENT_NEW}/settings-switch-${STAMP}-seatable-env.json`,
+      '--gate-remaining', `deepinfra=${CURRENT_NEW}/settings-switch-${STAMP}-deepinfra-remaining.json`, '--gate-remaining', `anthropic=${CURRENT_NEW}/settings-switch-${STAMP}-anthropic-remaining.json`]);
+  });
+
+  it('the switch\'s live check refuses with the operator\'s codes, or the fingerprint\'s, before the switch writes anything; the public server has no gates', async () => {
+    const off = host({ operator: () => result('', 1, 'DEBATEAI_SETTINGS_REFUSED {"command":"gate-check","code":"SETTINGS_GATE_LIVE_CHECK_FAILED","codes":["SETTINGS_GATE_MODEL_DISABLED:deepinfra:deepseek-ai/DeepSeek-V4.1-Flash"]}\n') });
+    expect(await refusal(checkSettingsGatesLive({ label: NEW, version: 21, layout: LAYOUT, deps: off.deps }))).toMatchObject({ code: 'SETTINGS_GATE_LIVE_CHECK_FAILED',
+      fields: { codes: ['SETTINGS_GATE_MODEL_DISABLED:deepinfra:deepseek-ai/DeepSeek-V4.1-Flash'] } });
+    const deepinfra = LAYOUT.gates.find((gate: { name: string }) => gate.name === 'deepinfra')!;
+    const stale = host({ gateFiles: { ...gateFilesOf(), [`${deepinfra.folder}/${GATE_HELPER_FILE}`]: 'x' } });
+    expect(await refusal(checkSettingsGatesLive({ label: NEW, version: 21, layout: LAYOUT, deps: stale.deps }))).toMatchObject({ code: 'SETTINGS_GATE_HELPER_DIFFERS', fields: { codes: [differs('deepinfra')] } });
+    expect(operatorCalls(stale.calls)).toEqual([]);
+    const silent = host({ operator: () => result('', null, '', { timedOut: true }) });
+    expect((await refusal(checkSettingsGatesLive({ label: NEW, version: 21, layout: LAYOUT, deps: silent.deps }))).code).toBe('SETTINGS_OPERATOR_UNAVAILABLE');
+    const vps = host();
+    expect(await checkSettingsGatesLive({ label: NEW, version: 21, layout: common.VPS_LAYOUT, deps: vps.deps })).toEqual({ version: 21, checked: false });
+    expect(vps.calls).toEqual([]);
+  });
+
+  it('one plain hint line per new code', () => {
+    for (const code of ['SETTINGS_GATE_THINKING_UNREVIEWED:Qwen/Qwen3.8-Flash:high', 'SETTINGS_GATE_TOKEN_CEILING:synthesizerCallBound:zai-org/GLM-5.3-Flash',
+      'SETTINGS_GATE_HELPER_DIFFERS:anthropic', 'PREVIEW_LINE_UP_REQUIRED', 'SETTINGS_CHECK_DETAIL_UNPRINTABLE']) {
+      const hint = hintFor(code);
+      expect(hint, code).not.toBe(CHECK_HINTS.DEFAULT);
+      expect(hint, code).toMatch(/^[a-z][^\n]*[a-z)]$/u);
+    }
+    expect(hintFor('SETTINGS_NEEDS_ENV_CHANGE:TARGET:claude-haiku-5-5')).toBe(CHECK_HINTS.SETTINGS_NEEDS_ENV_CHANGE);
+    expect(hintFor('SETTINGS_NEEDS_ENV_CHANGE:GATE_SOCKET:anthropic')).toBe(CHECK_HINTS.SETTINGS_NEEDS_ENV_CHANGE);
   });
 });
 

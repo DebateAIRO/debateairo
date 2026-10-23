@@ -35,6 +35,11 @@
 // passed the active one); a rollback activates the older release's latest still-passing version, or its own site version
 // (D1); a revert puts back what the switch replaced. A new release that has not passed the active version, with no
 // `--activate`, refuses SETTINGS_VERSION_NOT_PASSED before anything is written (`passed` names what it passed).
+// Ruling R60 (SA10): a forward switch whose `--activate <v>` activates a version other than the new release's own site
+// version first runs the activation's live condition 6 (settings-version.mjs checkSettingsGatesLive: the gate-code
+// fingerprint, then every model v can seat on at its gate, through the operator's one check), before anything is
+// written; the Q-S2 activation of the new release's own site version, a rollback's and a revert's re-activation skip it
+// (restoring a known state must work while a gate is down).
 //
 // The same functions serve the public server (side-by-side plan D16b): deploy/vps/release.mjs calls them with
 // common.mjs's VPS_LAYOUT. Everything that differs between the two servers comes from the layout: where a release's
@@ -68,7 +73,7 @@ import { LAYOUT, RELEASE_LABEL, atomicWrite, ensureDirectory, logLine, runBounde
 import { releaseInfos, slotsOf } from './release-info.mjs';
 import { disarmTimers as disarmRetireTimers, gateState } from './release-retire.mjs';
 import { RELEASE_KEY_PATTERN, countOpenWork, readCurrentRelease, readReleaseEvents, readReleaseState, recordReleaseEvent, recordReleaseSwitch } from './release-table.mjs';
-import { planSettingsForSwitch } from './settings-version.mjs';
+import { checkSettingsGatesLive, planSettingsForSwitch } from './settings-version.mjs';
 
 /**
  * Caddy's health_interval, the switch's take-traffic delay, the edge budget and the backstop. TAKE_TRAFFIC_AFTER_S (final
@@ -258,6 +263,8 @@ function withDefaults(layout, deps) {
     recordReleaseSwitch: deps.recordReleaseSwitch ?? (input => recordReleaseSwitch({ ...input, layout, run })),
     // The switch's settings step (settings-version.mjs: cli.ts switch-plan from a release's own folder).
     planSettings: deps.planSettings ?? (input => planSettingsForSwitch({ ...input, layout, deps: { run } })),
+    // Ruling R60: the live condition 6 for a forward switch's `--activate <v>` (settings-version.mjs, from the new release's folder).
+    checkGatesLive: deps.checkGatesLive ?? (input => checkSettingsGatesLive({ ...input, layout, deps: { run } })),
     recordReleaseEvent: deps.recordReleaseEvent ?? (input => recordReleaseEvent({ ...input, layout, run })),
     gateState: gate => gateState(gate, { run }),
     gateFilesDigest: deps.gateFilesDigest ?? (() => gateFilesDigest(layout.gates)),
@@ -442,9 +449,29 @@ async function settingsPlan(io, { newKey, labels, activate, next }) {
  * When that version IS the one the switch activated (a code-only upload: both releases on one site version), nothing is
  * activated (0124 would refuse SETTINGS_ACTIVATION_UNCHANGED): the old release has passed it already.
  */
+/** A release key's own site version: the number after `r` (D1). */
+const siteVersionOfKey = key => Number(/^r([1-9][0-9]*)-/.exec(key)[1]);
+
+/**
+ * Ruling R60: before a FORWARD switch's write, when its explicit `--activate <v>` (`activate`, a number) plans an
+ * activation of a version other than the new release's own site version, the activation's live condition 6 runs for the
+ * new release (`io.checkGatesLive`: the gate-code fingerprint, then `cli.ts gate-check`). Its refusal
+ * (SETTINGS_GATE_HELPER_DIFFERS, SETTINGS_GATE_LIVE_CHECK_FAILED with `codes`, or the operator's own) passes through:
+ * nothing is written. No `--activate` (the Q-S2 activation of the own site version, or nothing), a rollback and a revert
+ * never get here.
+ */
+async function forwardActivationGates(io, { to, toKey, activate, settings }) {
+  if (typeof activate !== 'number' || settings.activate === null || settings.activate === siteVersionOfKey(toKey)) return;
+  try {
+    await io.checkGatesLive({ label: to, version: settings.activate });
+  } catch (error) {
+    refuse(codeOf(error) === 'UNEXPECTED' ? 'SETTINGS_OPERATOR_UNAVAILABLE' : codeOf(error), error?.fields);
+  }
+}
+
 function revertSettings(settings, fromKey) {
   if (settings.activate === null) return settings;
-  const back = settings.expectedActiveSettings ?? Number(/^r([1-9][0-9]*)-/.exec(fromKey)[1]);
+  const back = settings.expectedActiveSettings ?? siteVersionOfKey(fromKey);
   return Object.freeze({ expectedActiveSettings: settings.activate, activate: back === settings.activate ? null : back });
 }
 
@@ -639,6 +666,7 @@ async function runSwitch({ to, from, oldPairStopped, rollback, activate = null, 
   const { toKey, fromKey, watch } = await preconditions({ to, from, oldPairStopped, rollback, layout, io });
   const settings = planned ?? await settingsPlan(io, { newKey: toKey, labels: [to, from], activate,
     next: `${toolOf(layout)} switch --to ${to} --from ${from}${oldPairStopped ? ' --old-pair-stopped' : ''} --activate <a version it passed>` });
+  if (!rollback) await forwardActivationGates(io, { to, toKey, activate, settings });
   const tally = { edgeFailures: 0 };
   try {
     await recordSwitch(io, { newKey: toKey, expectedCurrentKey: fromKey, seconds: TAKE_TRAFFIC_AFTER_S, recordedBy, settings, reason: rollback ? 'rollback to' : 'release switch to' });

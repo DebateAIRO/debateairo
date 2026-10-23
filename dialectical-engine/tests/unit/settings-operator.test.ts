@@ -5,11 +5,16 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { previewModelRowForRef } from "@debateai/providers";
-import { SETTINGS_CHECKER, settingsCheckLine, settingsCheckReport, type SettingsCheckReport } from "@debateai/register";
+import {
+  SETTINGS_CHECKER, SETTINGS_CHECK_DETAIL_UNPRINTABLE, settingsCheckLine, settingsCheckReport, type SealedPreviewLineUp, type SettingsCheckReport
+} from "@debateai/register";
 import {
   ACTIVATED_BY_PATTERN,
   SettingsOperatorRefusal,
   activateSettingsVersion,
+  assertSettingsGatesServe,
+  parseSeatableEnvironment,
+  seatableGateModelsReader,
   canonicalSettingsJson,
   latestPassedSettingsVersion,
   parseSettingsCheckLine,
@@ -19,7 +24,8 @@ import {
   settingsForSwitch,
   settingsVerdictOf,
   type ActivationReaders,
-  type SettingsOperatorClient
+  type SettingsOperatorClient,
+  type SettingsSeatableEnvironment
 } from "../../tools/settings-version/settings-operator.js";
 import { runSettingsCli, type SettingsCliDeps } from "../../tools/settings-version/cli.js";
 
@@ -63,6 +69,10 @@ describe("the verdict (spec §13: PASS only when both halves PASS)", () => {
     // S14's own code rule (isSettingsCheckCode): a long detail is a code; a character outside its alphabet is not.
     const long = report("api", [`SETTINGS_GATE_UNREVIEWED:${"x".repeat(300)}`]);
     expect(parseSettingsCheckLine(settingsCheckLine(long))).toEqual(long);
+    // FINAL-FIX 20: a ref with such a character never reaches the line: the report records a code the verdict reads (FAIL).
+    const odd = report("runner", ["SETTINGS_GATE_UNREVIEWED:preview:a@b"]);
+    expect(odd.codes).toEqual([SETTINGS_CHECK_DETAIL_UNPRINTABLE, "SETTINGS_GATE_UNREVIEWED"]);
+    expect(parseSettingsCheckLine(settingsCheckLine(odd))).toMatchObject({ verdict: "FAIL", codes: odd.codes });
     const json = JSON.parse(settingsCheckLine(runner).slice("DEBATEAI_SETTINGS_CHECK ".length));
     const variants: string[] = [
       `DEBATEAI_SETTINGS_VERDICT ${JSON.stringify(json)}`,
@@ -239,6 +249,61 @@ describe("the activation (spec §13 activate <v>)", () => {
   });
 });
 
+describe("condition 6 live over every model a version can seat (addition D21, SA10)", () => {
+  const GLM = "zai-org/GLM-5.3-Flash", DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash", HAIKU = "claude-haiku-5-5";
+  const lineUp = (free: readonly string[], premium: readonly string[] = free): SealedPreviewLineUp =>
+    ({ free_model_ids: free, premium_model_ids: premium, thinking_levels: null });
+  /** The real seatable reader (settings-operator.ts) over fake register reads: the seats and the line-up row only. */
+  const seatable = (seatRefs: readonly string[], row: SealedPreviewLineUp | null): ActivationReaders => ({
+    readGateModels: seatableGateModelsReader({ readSeatRefs: async () => seatRefs, readLineUp: async () => row })
+  });
+  const ENV: SettingsSeatableEnvironment = { envLineUp: null, declaredModels: [GLM, DEEPSEEK] };
+
+  it("a roster model off at its gate refuses the activation, where the seat-only check (S15) would have passed", async () => {
+    const gates = { deepinfra: [GLM], anthropic: [HAIKU] };
+    // The seats alone (the writer's GLM) are on: S15's check passes.
+    await expect(activateSettingsVersion(activationDatabase().client, { version: 18, activatedBy: "owner", reason: "x", gateEnabledModels: gates },
+      readersOf(["preview:fixture-a"]))).resolves.toMatchObject({ activationSeq: "3" });
+    // The version's Premium list also seats DeepSeek, which its gate has switched off: refused, nothing written.
+    const db = activationDatabase();
+    const error = await refusal(activateSettingsVersion(db.client, { version: 18, activatedBy: "owner", reason: "x", gateEnabledModels: gates,
+      seatableEnvironment: ENV }, seatable(["preview:fixture-a"], lineUp([GLM], [GLM, DEEPSEEK]))));
+    expect([error.code, error.codes]).toEqual(["SETTINGS_GATE_LIVE_CHECK_FAILED", [`SETTINGS_GATE_MODEL_DISABLED:deepinfra:${DEEPSEEK}`]]);
+    expect(db.sqls().some((sql) => sql.includes("BEGIN"))).toBe(false);
+  });
+
+  it("the structure-repair model counts when a declared target serves it; an unreviewed seat and a dropped roster id are named", async () => {
+    const withHaiku = { envLineUp: null, declaredModels: [GLM, HAIKU] };
+    const off = await refusal(assertSettingsGatesServe(fakeClient([]).client, { version: 18, gateEnabledModels: { deepinfra: [GLM], anthropic: [] },
+      seatableEnvironment: withHaiku }, seatable(["preview:fixture-a", "preview:never"], lineUp([GLM, "vendor/Dropped-1"]))));
+    expect(off.codes).toEqual([`SETTINGS_GATE_MODEL_DISABLED:anthropic:${HAIKU}`, "SETTINGS_GATE_UNREVIEWED:preview:never", "SETTINGS_GATE_UNREVIEWED:vendor/Dropped-1"]);
+    await expect(assertSettingsGatesServe(fakeClient([]).client, { version: 18, gateEnabledModels: { deepinfra: [GLM], anthropic: [HAIKU] },
+      seatableEnvironment: withHaiku }, seatable(["preview:fixture-a"], lineUp([GLM])))).resolves.toBeUndefined();
+  });
+
+  it("a row-less version runs on the env's line-up; with none (sockets-only, or no environment handed) it refuses PREVIEW_LINE_UP_REQUIRED", async () => {
+    const gates = { deepinfra: [GLM, DEEPSEEK] };
+    await expect(assertSettingsGatesServe(fakeClient([]).client, { version: 18, gateEnabledModels: gates,
+      seatableEnvironment: { envLineUp: lineUp([GLM, DEEPSEEK]), declaredModels: [GLM, DEEPSEEK] } }, seatable(["preview:fixture-a"], null))).resolves.toBeUndefined();
+    const none = await refusal(assertSettingsGatesServe(fakeClient([]).client, { version: 18, gateEnabledModels: gates }, seatable(["preview:fixture-a"], null)));
+    expect([none.code, none.codes]).toEqual(["SETTINGS_GATE_LIVE_CHECK_FAILED", ["PREVIEW_LINE_UP_REQUIRED"]]);
+  });
+
+  it("the root wiring's hand-over file: exactly its three members; the config read by the env's own parser", () => {
+    const sockets = { budget_socket: "/run/debateai-v3-preview/deepinfra-budget-v3.sock", deployment: "v3-preview", requested_thinking_level: "high", scope_id: "preview-team" };
+    const text = (previewConfig: unknown, declaredModels: unknown = [GLM, GLM], extra: object = {}) =>
+      JSON.stringify({ schema: "preview-settings-seatable-env-v1", previewConfig, declaredModels, ...extra });
+    expect(parseSeatableEnvironment(text(JSON.stringify(sockets)))).toEqual({ envLineUp: null, declaredModels: [GLM] });
+    // The two-maker rule holds for the old six-key form: each list names two makers.
+    const oldForm = { ...sockets, free_model_ids: [GLM, DEEPSEEK], premium_model_ids: [DEEPSEEK, GLM] };
+    expect(parseSeatableEnvironment(text(JSON.stringify(oldForm))).envLineUp).toEqual({ free_model_ids: [GLM, DEEPSEEK], premium_model_ids: [DEEPSEEK, GLM], thinking_levels: null });
+    for (const bad of ["{", text("{}"), text(JSON.stringify(sockets), "x"), text(JSON.stringify(sockets), [""]), text(null), text(JSON.stringify(sockets), [GLM], { more: 1 }),
+      JSON.stringify({ schema: "other", previewConfig: JSON.stringify(sockets), declaredModels: [] })]) {
+      expect(() => parseSeatableEnvironment(bad), bad).toThrow(expect.objectContaining({ code: "SETTINGS_SEATABLE_ENV_INVALID" }));
+    }
+  });
+});
+
 describe("the status, the rollback's version and the switch's settings step", () => {
   it("status: the release, the pointer, what new asks use (the site version while nothing was activated), what passed", async () => {
     const set = fakeClient([
@@ -317,8 +382,11 @@ describe("cli.ts (one line per command, the exit codes of its header)", () => {
   });
 
   const GATE_ANSWER = (models: string[]) => JSON.stringify({ enabled_models: models, largest_reservation_usd: "0.01", max_concurrent_calls: 4, remaining_calls: 100, remaining_usd: "1.5", state: "active", window_open: true });
-  const GATE_FILES = { "/g/di.json": GATE_ANSWER(["zai-org/GLM-5.3-Flash"]), "/g/an.json": GATE_ANSWER(["claude-haiku-5-5"]) };
-  const WITH_GATES = ["--gate-remaining", "deepinfra=/g/di.json", "--gate-remaining", "anthropic=/g/an.json"];
+  const SEATABLE_FILE = { "/s/env.json": JSON.stringify({ schema: "preview-settings-seatable-env-v1", declaredModels: ["zai-org/GLM-5.3-Flash", "claude-haiku-5-5"],
+    previewConfig: JSON.stringify({ budget_socket: "/run/debateai-v3-preview/deepinfra-budget-v3.sock", deployment: "v3-preview", requested_thinking_level: "high", scope_id: "preview-team" }) }) };
+  const SEATABLE = ["--seatable-env", "/s/env.json"];
+  const GATE_FILES = { ...SEATABLE_FILE, "/g/di.json": GATE_ANSWER(["zai-org/GLM-5.3-Flash"]), "/g/an.json": GATE_ANSWER(["claude-haiku-5-5"]) };
+  const WITH_GATES = [...SEATABLE, "--gate-remaining", "deepinfra=/g/di.json", "--gate-remaining", "anthropic=/g/an.json"];
   it("activate: the receipt line; unchanged exits 0; conflict 3; not passed 4 (with what passed); usage 2 before any read", async () => {
     const o = output();
     expect(await runSettingsCli(["activate", "18", "--by", "owner", "--reason", "new lengths", ...WITH_GATES], o.io, depsOf(activationDatabase().client, GATE_FILES))).toBe(0);
@@ -331,10 +399,12 @@ describe("cli.ts (one line per command, the exit codes of its header)", () => {
     expect(await runSettingsCli(["activate", "18", "--by", "owner", "--reason", "x", ...WITH_GATES], conflict.io,
       depsOf(activationDatabase({ activate: () => pgError("40001", "SETTINGS_ACTIVATION_CONFLICT") }).client, GATE_FILES))).toBe(3);
     const notPassed = output();
-    expect(await runSettingsCli(["activate", "19", "--by", "owner", "--reason", "x"], notPassed.io,
-      depsOf(activationDatabase({ passed: false, passedList: ["17"] }).client))).toBe(4);
+    expect(await runSettingsCli(["activate", "19", "--by", "owner", "--reason", "x", ...SEATABLE], notPassed.io,
+      depsOf(activationDatabase({ passed: false, passedList: ["17"] }).client, SEATABLE_FILE))).toBe(4);
     expect(notPassed.err).toEqual(['DEBATEAI_SETTINGS_REFUSED {"command":"activate","code":"SETTINGS_VERSION_NOT_PASSED","passed":["17"]}\n']);
-    for (const args of [["activate", "18", "--reason", "x"], ["activate", "18", "--by", "root:owner", "--reason", "x"], ["activate", "018", "--by", "o", "--reason", "x"], ["activate", "18", "--by", "o", "--by", "p", "--reason", "x"]]) {
+    // SA10: without the release's line-up and target models (--seatable-env) the seatable set is unknown: usage, never a skip.
+    for (const args of [["activate", "18", "--reason", "x"], ["activate", "18", "--by", "root:owner", "--reason", "x"], ["activate", "018", "--by", "o", "--reason", "x"],
+      ["activate", "18", "--by", "o", "--by", "p", "--reason", "x"], ["activate", "18", "--by", "o", "--reason", "x"], ["gate-check", "18"], ["gate-check", "x", ...SEATABLE]]) {
       const db = activationDatabase();
       const u = output();
       let connected = 0;
@@ -346,32 +416,47 @@ describe("cli.ts (one line per command, the exit codes of its header)", () => {
   it("activate with no gate answer at all (both gates silent, or a direct pnpm settings:activate) is refused: condition 6 always runs (ruling R59)", async () => {
     const db = activationDatabase();
     const silent = output();
-    expect(await runSettingsCli(["activate", "18", "--by", "owner", "--reason", "x"], silent.io, depsOf(db.client))).toBe(1);
+    expect(await runSettingsCli(["activate", "18", "--by", "owner", "--reason", "x", ...SEATABLE], silent.io, depsOf(db.client, SEATABLE_FILE))).toBe(1);
     expect(silent.err).toEqual(['DEBATEAI_SETTINGS_REFUSED {"command":"activate","code":"SETTINGS_GATE_LIVE_CHECK_FAILED","codes":["SETTINGS_GATE_UNANSWERED:anthropic","SETTINGS_GATE_UNANSWERED:deepinfra"]}\n']);
     expect(db.sqls().some((sql) => sql.includes("BEGIN") || sql.includes("activate_settings_version"))).toBe(false);
     // Both answer files unreadable: the same refusal.
     const unreadable = activationDatabase();
     const both = output();
-    expect(await runSettingsCli(["activate", "18", "--by", "owner", "--reason", "x", "--gate-remaining", "deepinfra=/g/none.json", "--gate-remaining", "anthropic=/g/none2.json"], both.io, depsOf(unreadable.client))).toBe(1);
+    expect(await runSettingsCli(["activate", "18", "--by", "owner", "--reason", "x", ...SEATABLE, "--gate-remaining", "deepinfra=/g/none.json", "--gate-remaining", "anthropic=/g/none2.json"], both.io, depsOf(unreadable.client, SEATABLE_FILE))).toBe(1);
     expect(unreadable.sqls().some((sql) => sql.includes("activate_settings_version"))).toBe(false);
   });
 
   it("activate --gate-remaining: each gate's raw /remaining answer; an unreadable or invalid answer is no answer (condition 6 refuses, exit 1)", async () => {
     const answer = (models: string[]) => JSON.stringify({ enabled_models: models, largest_reservation_usd: "0.01", max_concurrent_calls: 4, remaining_calls: 100, remaining_usd: "1.5", state: "active", window_open: true });
-    const files = { "/g/deepinfra.json": answer(["zai-org/GLM-5.3-Flash"]), "/g/anthropic.json": "{\"state\":\"active\"}" };
+    const files = { ...SEATABLE_FILE, "/g/deepinfra.json": answer(["zai-org/GLM-5.3-Flash"]), "/g/anthropic.json": "{\"state\":\"active\"}" };
     const db = activationDatabase();
     const o = output();
-    const exit = await runSettingsCli(["activate", "18", "--by", "owner", "--reason", "x", "--gate-remaining", "deepinfra=/g/deepinfra.json",
+    const exit = await runSettingsCli(["activate", "18", "--by", "owner", "--reason", "x", ...SEATABLE, "--gate-remaining", "deepinfra=/g/deepinfra.json",
       "--gate-remaining", "anthropic=/g/anthropic.json", "--gate-remaining", "spare=/g/missing.json"], o.io, depsOf(db.client, files));
     expect(exit).toBe(1);
     expect(o.err).toEqual(['DEBATEAI_SETTINGS_REFUSED {"command":"activate","code":"SETTINGS_GATE_LIVE_CHECK_FAILED","codes":["SETTINGS_GATE_UNANSWERED:anthropic"]}\n']);
     expect(db.sqls().some((sql) => sql.includes("activate_settings_version"))).toBe(false);
     const on = output();
-    expect(await runSettingsCli(["activate", "18", "--by", "owner", "--reason", "x", "--gate-remaining", "deepinfra=/g/deepinfra.json",
+    expect(await runSettingsCli(["activate", "18", "--by", "owner", "--reason", "x", ...SEATABLE, "--gate-remaining", "deepinfra=/g/deepinfra.json",
       "--gate-remaining", "anthropic=/g/on.json"], on.io, depsOf(activationDatabase().client, { ...files, "/g/on.json": answer(["claude-haiku-5-5"]) }))).toBe(0);
     expect(on.out[0]).toMatch(/^DEBATEAI_SETTINGS_ACTIVATED /u);
     const bad = output();
     expect(await runSettingsCli(["activate", "18", "--by", "owner", "--reason", "x", "--gate-remaining", "deepinfra"], bad.io, depsOf(activationDatabase().client))).toBe(2);
+  });
+
+  it("gate-check (ruling R60): the same live condition 6, read-only; exit 0 with one line, 1 refused with every code, 2 for a bad hand-over", async () => {
+    const db = fakeClient([]);
+    const o = output();
+    expect(await runSettingsCli(["gate-check", "21", ...WITH_GATES], o.io, depsOf(db.client, GATE_FILES))).toBe(0);
+    expect(o.out).toEqual(['DEBATEAI_SETTINGS_GATES_SERVE {"version":"21"}\n']);
+    // Nothing is read but the gates' answers and the seats (fake readers here): no write, no transaction.
+    expect(db.queries).toEqual([]);
+    const off = output();
+    expect(await runSettingsCli(["gate-check", "21", ...SEATABLE, "--gate-remaining", "deepinfra=/g/di.json"], off.io, depsOf(fakeClient([]).client, GATE_FILES))).toBe(1);
+    expect(off.err).toEqual(['DEBATEAI_SETTINGS_REFUSED {"command":"gate-check","code":"SETTINGS_GATE_LIVE_CHECK_FAILED","codes":["SETTINGS_GATE_UNANSWERED:anthropic"]}\n']);
+    const bad = output();
+    expect(await runSettingsCli(["gate-check", "21", ...SEATABLE], bad.io, depsOf(fakeClient([]).client, { "/s/env.json": "{}" }))).toBe(2);
+    expect(bad.err).toEqual(['DEBATEAI_SETTINGS_REFUSED {"command":"gate-check","code":"SETTINGS_SEATABLE_ENV_INVALID"}\n']);
   });
 
   it("status, latest-passed and switch-plan print one line each; switch-plan's refusal names what passed (exit 4)", async () => {

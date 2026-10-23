@@ -1127,6 +1127,7 @@ packages/register/src/register-publication.ts
 packages/register/src/runtime-environment.ts
 packages/register/src/session-policy.ts
 packages/register/src/settings-check-report.ts
+packages/register/src/settings-check-seatable.ts
 packages/register/src/settings-classification.ts
 packages/register/src/staff-access-policy.ts
 packages/register/src/story-policy.ts

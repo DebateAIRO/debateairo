@@ -1,16 +1,24 @@
 import type { Pool } from "pg";
 import {
   assertHostedCostEnvelopesSealed,
+  readSealedPreviewLineUp,
   readSettingsVersionFacts,
   readStoryPolicyFromRegister,
   runSettingsCheckSteps,
   settingsCheckReport,
+  settingsGateThinkingCodes,
+  settingsGateTokenCeilingCodes,
+  settingsGateUnreviewedCodes,
+  settingsLineUpEnvironmentCodes,
+  settingsSeatableModels,
   settingsVersionKindRefusal,
+  settingsVersionLineUp,
+  type SealedPreviewLineUp,
+  type SettingsCallBound,
   type SettingsCheckReport,
   type SettingsCheckStep,
   type SettingsVersionFacts
 } from "@debateai/register";
-import { previewModelRowForRef } from "@debateai/providers";
 import { readDevelopmentRunnerPolicy } from "./dev-runner-policy.js";
 import { createRunInFlight } from "./run-in-flight.js";
 import {
@@ -40,8 +48,18 @@ import {
  *    release's declared targets, else SETTINGS_NEEDS_ENV_CHANGE:ROLE_REF:<ref> (the env must change: an upload);
  *  - condition 5 (plan D5): both prompt-fingerprint rows sealed and equal to this code's
  *    (`declaredContractHashRefusals`);
- *  - condition 6, the code copy, on the preview only (addition D26 replaces plan D6; SA10 adds the whole seatable set):
- *    each role ref's model is a reviewed row (`previewModelRowForRef`), else SETTINGS_GATE_UNREVIEWED:<ref>.
+ *  - on the preview only, the version's line-up (addition D14: its own row, else the env's; neither:
+ *    PREVIEW_LINE_UP_REQUIRED) and its SEATABLE SET (addition D20, SA10: both rosters, the four seats' models, the
+ *    structure-repair model when a declared target serves it; `settingsSeatableModels`), and on it:
+ *    - condition 3 for the line-up (addition D19): every seatable model is served by one of this runner's declared
+ *      targets (SETTINGS_NEEDS_ENV_CHANGE:TARGET:<model>) and its gate has a socket in `runner.env`
+ *      (SETTINGS_NEEDS_ENV_CHANGE:GATE_SOCKET:<provider>);
+ *    - condition 6, the code copy (addition D20, which with D26 replaces plan D6): every seatable model and every model
+ *      the sealed table names is a reviewed row (SETTINGS_GATE_UNREVIEWED:<model or ref>), every level of the sealed
+ *      table is on its model's reviewed menu in this code (SETTINGS_GATE_THINKING_UNREVIEWED:<model>:<level>), and no
+ *      sealed ceiling the preview sends is above a seatable model's output bound
+ *      (SETTINGS_GATE_TOKEN_CEILING:<rowKey>:<model>; the storyteller's bound exempt). The line-up is read as sealed
+ *      (shape only, `readSealedPreviewLineUp`), so a version an older, wider code sealed is named code by code;
  *  - first of the version's own steps, the activation's rule (0124): a sealed GENERAL version, else
  *    SETTINGS_VERSION_KIND_INVALID and the version's steps are skipped (an unknown version is a finding, not exit 2).
  * The role-ref and gate codes are REPORT codes (returned, never thrown); the two typed codes this check's modules can
@@ -60,6 +78,10 @@ export type RunnerCheckReaders = Readonly<{
   loadVersion: (pool: Pool, version: number, site: RunnerSiteContext) => Promise<RunnerVersionSettings>;
   /** The four role refs the version names, by the register's own readers at the version (story refs only with story rows). */
   readRoleRefs: (pool: Pool, version: number) => Promise<readonly string[]>;
+  /** SA10: the version's line-up row as sealed (shape only), or null without the row (`readSealedPreviewLineUp`). */
+  readLineUp: (pool: Pool, version: number) => Promise<SealedPreviewLineUp | null>;
+  /** SA10: the sealed call bounds the version's debates and stories send (`readRunnerCallBounds`). */
+  readCallBounds: (pool: Pool, version: number) => Promise<readonly SettingsCallBound[]>;
   contractHashRefusals: (pool: Pick<Pool, "query">, version: number) => Promise<readonly string[]>;
   readVersionFacts: (pool: Pick<Pool, "query">, version: number) => Promise<SettingsVersionFacts | null>;
 }>;
@@ -74,19 +96,41 @@ export async function readRunnerRoleRefs(pool: Pool, version: number): Promise<r
   ]);
 }
 
+/**
+ * Addition D20 (SA10): the sealed call bounds one version's calls carry, read by the loader's own readers at the version
+ * (`readDevelopmentRunnerPolicy`, `readStoryPolicyFromRegister`): the three organ bounds (row key
+ * `acceptanceOrganCostBounds.<organ>`), the synthesizer and evaluator bounds, and with the story rows the storyteller's
+ * (exempt from the ceiling check: the preview sends the row's allowance) and the story checker's.
+ */
+export async function readRunnerCallBounds(pool: Pool, version: number): Promise<readonly SettingsCallBound[]> {
+  const { bounds, synthesisRolePolicy } = await readDevelopmentRunnerPolicy(pool, version);
+  const story = await readStoryPolicyFromRegister(pool, version);
+  const bound = (rowKey: string, tokenCeiling: number): SettingsCallBound => Object.freeze({ rowKey, tokenCeiling });
+  return Object.freeze([
+    ...(["JUDGE", "COMPOSER", "CONFORMANCE"] as const).map((organ) => bound(`acceptanceOrganCostBounds.${organ}`, bounds[organ].tokenCeiling)),
+    bound("synthesizerCallBound", synthesisRolePolicy.synthesizerBound.tokenCeiling),
+    bound("evaluatorCallBound", synthesisRolePolicy.evaluatorBound.tokenCeiling),
+    ...(story === null ? [] : [
+      bound("storytellerCallBound", story.storytellerBound.tokenCeiling), bound("storyCheckerCallBound", story.checkerBound.tokenCeiling)
+    ])
+  ]);
+}
+
 export const RUNNER_CHECK_READERS: RunnerCheckReaders = Object.freeze({
   readSite: async (pool: Pool, environment: RunnerSiteEnvironment) =>
     (await readRunnerSiteContext({ pool, environment, moneyInFlight: createRunInFlight() })).site,
   loadVersion: (pool: Pool, version: number, site: RunnerSiteContext) =>
     loadRunnerVersionSettings(pool, version, site, { strict: true }),
   readRoleRefs: readRunnerRoleRefs,
+  readLineUp: readSealedPreviewLineUp,
+  readCallBounds: readRunnerCallBounds,
   contractHashRefusals: declaredContractHashRefusals,
   readVersionFacts: readSettingsVersionFacts
 });
 
 /**
- * The runner half's steps, in order. SA10 (addition D19-D20) adds its target, socket, thinking-level and ceiling checks
- * as further steps of this list. A step needing the site reads is skipped (no code of its own) when they refused, and
+ * The runner half's steps, in order; SA10 (addition D19-D20) added the line-up, target, socket, thinking-level and
+ * ceiling steps (preview only). A step needing the site reads is skipped (no code of its own) when they refused, and
  * the version's own steps when it is not a sealed GENERAL version: the code already found fails the half.
  */
 export function runnerSettingsCheckSteps(input: Readonly<{
@@ -102,6 +146,22 @@ export function runnerSettingsCheckSteps(input: Readonly<{
   let checkable = false;
   let roleRefs: Promise<readonly string[]> | undefined;
   const refs = (): Promise<readonly string[]> => (roleRefs ??= readers.readRoleRefs(pool, version));
+  const previewGate = environment.PREVIEW_GATE_SETTINGS;
+  const declaredModels = (): readonly string[] => site?.declaredProviderTargets.map((target) => target.model) ?? [];
+  /**
+   * SA10: the version's line-up (its row, else the env's; null = neither) and its seatable set, read once. Without a
+   * line-up the set still holds the seats' models, so an unreviewed seat is still named.
+   */
+  let seatableRead: Promise<Readonly<{ lineUp: SealedPreviewLineUp | null; seatable: readonly string[] }>> | undefined;
+  const seatableOf = () => (seatableRead ??= (async () => {
+    const lineUp = settingsVersionLineUp(await readers.readLineUp(pool, version), environment.PREVIEW_ENV_LINE_UP);
+    const seatable = settingsSeatableModels({
+      lineUp: lineUp ?? { free_model_ids: [], premium_model_ids: [], thinking_levels: null },
+      seatRefs: await refs(), declaredModels: declaredModels()
+    });
+    return Object.freeze({ lineUp, seatable });
+  })());
+  const onPreview = (): boolean => previewGate !== undefined && checkable;
   return Object.freeze([
     {
       name: "hosted-cost-envelopes-sealed",
@@ -144,11 +204,37 @@ export function runnerSettingsCheckSteps(input: Readonly<{
       run: async () => (checkable ? readers.contractHashRefusals(pool, version) : [])
     },
     {
-      // Condition 6 (the code copy): on the preview, every role's model is a row the gates' helper reviewed.
+      // Addition D14: the version's line-up exists (its row, or the env's old forms); else the boot's own refusal.
+      name: "preview-line-up",
+      run: async () => (onPreview() && (await seatableOf()).lineUp === null ? ["PREVIEW_LINE_UP_REQUIRED"] : [])
+    },
+    {
+      // Condition 3 for the line-up (addition D19): every seatable model is served and has its gate's socket here.
+      name: "line-up-environment",
+      run: async () => (!onPreview() || site === undefined ? [] : settingsLineUpEnvironmentCodes({
+        seatable: (await seatableOf()).seatable, declaredModels: declaredModels(), gate: previewGate!
+      }))
+    },
+    {
+      // Condition 6 (the code copy, addition D20): every seatable model and every table model is a reviewed row.
       name: "gate-models-reviewed",
-      run: async () => environment.PREVIEW_GATE_SETTINGS === undefined || !checkable
-        ? []
-        : (await refs()).filter((ref) => previewModelRowForRef(ref) === undefined).map((ref) => `SETTINGS_GATE_UNREVIEWED:${ref}`)
+      run: async () => {
+        if (!onPreview()) return [];
+        const { lineUp, seatable } = await seatableOf();
+        return settingsGateUnreviewedCodes({ seatable, lineUp });
+      }
+    },
+    {
+      // Condition 6: every sealed level is on its model's reviewed menu in this code.
+      name: "gate-thinking-levels",
+      run: async () => (onPreview() ? settingsGateThinkingCodes({ lineUp: (await seatableOf()).lineUp }) : [])
+    },
+    {
+      // Condition 6: no sealed ceiling the preview sends is above a seatable model's output bound (storyteller exempt).
+      name: "gate-token-ceilings",
+      run: async () => (!onPreview() ? [] : settingsGateTokenCeilingCodes({
+        seatable: (await seatableOf()).seatable, callBounds: await readers.readCallBounds(pool, version), gate: previewGate!
+      }))
     }
   ]);
 }

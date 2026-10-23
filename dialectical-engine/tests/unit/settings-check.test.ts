@@ -15,13 +15,19 @@ import {
 } from "@debateai/providers";
 import {
   SETTINGS_CHECKER,
+  SETTINGS_CHECK_DETAIL_UNPRINTABLE,
+  isSettingsCheckCode,
   parseSettingsCheckArguments,
+  previewLineUpPolicyFromValue,
+  sealedPreviewLineUpFromValue,
   runSettingsCheckCommand,
   runSettingsCheckSteps,
   settingsCheckLine,
   settingsCheckRefusalCode,
   settingsCheckReport,
   settingsCheckUnavailableReason,
+  type SealedPreviewLineUp,
+  type SettingsCallBound,
   type SettingsCheckReport,
   type SettingsComparisonRow
 } from "@debateai/register";
@@ -58,6 +64,21 @@ const SOCKETS = {
 };
 const PREVIEW_GATE = parsePreviewEnvironmentConfig(JSON.stringify(SOCKETS))!.gate;
 const [REF_A, REF_B] = PREVIEW_REVIEWED_PROVIDER_REFS as readonly [string, string];
+const GLM = "zai-org/GLM-5.3-Flash";
+const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
+const QWEN = "Qwen/Qwen3.8-Flash";
+const HAIKU = "claude-haiku-5-5";
+/** SA10: a version's line-up as sealed; the default names only GLM (the seats' model), so the default checks pass. */
+const lineUp = (free: readonly string[] = [GLM], premium: readonly string[] = free,
+  table: SealedPreviewLineUp["thinking_levels"] = null): SealedPreviewLineUp => ({ free_model_ids: free, premium_model_ids: premium, thinking_levels: table });
+/** SA10: the development register's sealed bounds (2,048 organs and checkers, 12,000 storyteller): far below every row. */
+const BOUNDS: readonly SettingsCallBound[] = [
+  { rowKey: "acceptanceOrganCostBounds.JUDGE", tokenCeiling: 2048 }, { rowKey: "acceptanceOrganCostBounds.COMPOSER", tokenCeiling: 2048 },
+  { rowKey: "acceptanceOrganCostBounds.CONFORMANCE", tokenCeiling: 2048 }, { rowKey: "synthesizerCallBound", tokenCeiling: 2048 },
+  { rowKey: "evaluatorCallBound", tokenCeiling: 2048 }, { rowKey: "storytellerCallBound", tokenCeiling: 12000 },
+  { rowKey: "storyCheckerCallBound", tokenCeiling: 2048 }
+];
+const PREVIEW_DEEPINFRA_REFS = PREVIEW_REVIEWED_PROVIDER_REFS.filter((ref) => previewModelRow(previewTargetJsonRow(ref).model as string)!.provider === "deepinfra");
 
 function reviewedTargets(refs: readonly string[] = PREVIEW_REVIEWED_PROVIDER_REFS): readonly ProviderDiscoveryTarget[] {
   return parseProviderDiscoveryTargets(JSON.stringify(refs.map((ref) => previewTargetJsonRow(ref))), refs.map((ref) => {
@@ -81,6 +102,8 @@ function runnerReaders(change: Partial<RunnerCheckReaders> = {}) {
     readSite: vi.fn(async () => { calls.push("readSite"); return runnerSite(); }),
     loadVersion: vi.fn(async (_pool: Pool, version: number) => { calls.push(`loadVersion:${version}`); return {} as never; }),
     readRoleRefs: vi.fn(async () => { calls.push("readRoleRefs"); return [REF_A, REF_B, REF_A, REF_B]; }),
+    readLineUp: vi.fn(async () => { calls.push("readLineUp"); return lineUp(); }),
+    readCallBounds: vi.fn(async () => { calls.push("readCallBounds"); return BOUNDS; }),
     contractHashRefusals: vi.fn(async () => { calls.push("contractHashRefusals"); return []; }),
     readVersionFacts: vi.fn(async () => { calls.push("readVersionFacts"); return { sealed: true, publicationKind: "GENERAL", snapshotSha256: SNAPSHOT }; }),
     ...change
@@ -111,6 +134,8 @@ function apiReaders(change: Partial<AdmissionCheckReaders> = {}, candidate = com
     // The site version and a candidate that raises only a debate member (the per-run ceiling): no site difference.
     readComparisonRows: vi.fn(async (_pool: Pick<Pool, "query">, version: number) =>
       version === SITE_VERSION ? comparison(SESSION, ENVELOPE(2000000, 250000)) : candidate),
+    readLineUp: vi.fn(async () => { calls.push("readLineUp"); return lineUp(); }),
+    readSeatRefs: vi.fn(async () => { calls.push("readSeatRefs"); return [REF_A, REF_B, REF_A, REF_B]; }),
     ...change
   };
   return { readers, calls };
@@ -232,6 +257,136 @@ describe("check-version, the runner half (side-by-side §13)", () => {
     const report = await checkRunner(readers, runnerEnvironment({ PREVIEW_GATE_SETTINGS: PREVIEW_GATE }));
     expect(report).toMatchObject({ verdict: "FAIL", codes: ["SETTINGS_VERSION_KIND_INVALID"], snapshotSha256: facts?.snapshotSha256 ?? null });
     expect(calls).toEqual(["readSite"]);
+  });
+});
+
+describe("check-version on the preview: the line-up and every model it can seat (addition D19-D20, SA10)", () => {
+  const DROPPED = "zai-org/GLM-4.9-Flash";
+  const NO_ANTHROPIC_GATE = parsePreviewEnvironmentConfig(JSON.stringify({ ...SOCKETS, anthropic_budget_socket: undefined }))!.gate;
+  const previewRunner = (change: Partial<RunnerCheckEnvironment> = {}) =>
+    runnerEnvironment({ PREVIEW_GATE_SETTINGS: PREVIEW_GATE, PREVIEW_ENV_LINE_UP: null, ...change });
+  const previewApi = (change: Partial<ApiCheckEnvironment> = {}) =>
+    apiEnvironment({ PREVIEW_GATE_SETTINGS: PREVIEW_GATE, PREVIEW_ENV_LINE_UP: null, ...change });
+  const apiSite = (targets = reviewedTargets()) => ({ declaredProviderTargets: targets } as unknown as AdmissionSiteContext);
+  /** A sealed row value, read the way check-version reads it (shape only). */
+  const sealed = (free: readonly string[], premium: readonly string[], table: unknown = null) =>
+    ({ kind: "PREVIEW_LINE_UP_POLICY", free_model_ids: free, premium_model_ids: premium, thinking_levels: table });
+
+  it("a clean preview version: both halves PASS; the line-up, the seats and the bounds are each read once", async () => {
+    const runner = runnerReaders();
+    expect(await checkRunner(runner.readers, previewRunner())).toMatchObject({ verdict: "PASS", codes: [] });
+    expect(runner.readers.readLineUp).toHaveBeenCalledTimes(1);
+    expect(runner.readers.readCallBounds).toHaveBeenCalledTimes(1);
+    expect(runner.readers.readRoleRefs).toHaveBeenCalledTimes(1);
+    const api = apiReaders({ readSite: async () => apiSite() });
+    expect(await checkApi(api.readers, previewApi())).toMatchObject({ verdict: "PASS", codes: [] });
+    expect([api.readers.readLineUp, api.readers.readSeatRefs].map((reader) => (reader as ReturnType<typeof vi.fn>).mock.calls.length)).toEqual([1, 1]);
+  });
+
+  it("off the preview none of it runs: no line-up, no bounds read", async () => {
+    const runner = runnerReaders();
+    await checkRunner(runner.readers);
+    expect([runner.readers.readLineUp, runner.readers.readCallBounds].map((reader) => (reader as ReturnType<typeof vi.fn>).mock.calls.length)).toEqual([0, 0]);
+    const api = apiReaders();
+    await checkApi(api.readers);
+    expect(api.calls).not.toContain("readLineUp");
+  });
+
+  it("SETTINGS_GATE_UNREVIEWED:<model>: a roster id this code's reviewed rows no longer hold (a newer code dropped it)", async () => {
+    expect(previewModelRow(DROPPED)).toBeUndefined();
+    const { readers } = runnerReaders({ readLineUp: async () => sealedPreviewLineUpFromValue(sealed([GLM, DROPPED], [GLM, DROPPED])) });
+    // No declared target can serve it either (a preview target is a reviewed row): condition 3 names it too.
+    expect((await checkRunner(readers, previewRunner())).codes)
+      .toEqual([`SETTINGS_GATE_UNREVIEWED:${DROPPED}`, `SETTINGS_NEEDS_ENV_CHANGE:TARGET:${DROPPED}`]);
+  });
+
+  it("SETTINGS_GATE_THINKING_UNREVIEWED:<model>:<level>: a table an older, wider menu sealed, read as sealed and checked against this code's menus", async () => {
+    const table = { [QWEN]: { level: "high" }, [GLM]: { level: "low", steps: { judge_panel: "max", opening: "high" } } };
+    // Today's row parser refuses such a table at publish (Qwen has no "high", GLM no "max"): only an older code sealed it.
+    expect(() => previewLineUpPolicyFromValue(sealed([GLM], [GLM], table))).toThrow(/^PREVIEW_THINKING_LEVELS_INVALID:/u);
+    const { readers } = runnerReaders({ readLineUp: async () => sealedPreviewLineUpFromValue(sealed([GLM], [GLM], table)) });
+    expect((await checkRunner(readers, previewRunner())).codes).toEqual([
+      `SETTINGS_GATE_THINKING_UNREVIEWED:${QWEN}:high`, `SETTINGS_GATE_THINKING_UNREVIEWED:${GLM}:max`
+    ].sort());
+  });
+
+  it("a sealed row that is not even the line-up's shape is one code the check records (never a failure to check)", async () => {
+    const bent = { ...sealed([GLM], [GLM]), thinking_levels: { [GLM]: { level: 3 } } };
+    expect(() => sealedPreviewLineUpFromValue(bent)).toThrow(new TypeError("PREVIEW_LINE_UP_POLICY_INVALID:thinking_levels"));
+    const { readers } = runnerReaders({ readLineUp: async () => sealedPreviewLineUpFromValue(bent) });
+    expect((await checkRunner(readers, previewRunner())).codes).toEqual(["PREVIEW_LINE_UP_POLICY_INVALID:thinking_levels"]);
+  });
+
+  it("SETTINGS_GATE_TOKEN_CEILING:<rowKey>:<model>: a 40,000 synthesizer ceiling is above every seatable model's bound; the storyteller's 65,536 is exempt", async () => {
+    expect([GLM, DEEPSEEK].map((model) => previewModelRow(model)!.outputBound)).toEqual([32768, 32768]);
+    const raised = (rowKey: string, tokenCeiling: number) => BOUNDS.map((bound) => (bound.rowKey === rowKey ? { rowKey, tokenCeiling } : bound));
+    const synthesizer = runnerReaders({ readLineUp: async () => lineUp([GLM, DEEPSEEK]), readCallBounds: async () => raised("synthesizerCallBound", 40000) });
+    // Every seatable model: the roster's two and Claude Haiku, the structure-repair model a declared target serves.
+    expect((await checkRunner(synthesizer.readers, previewRunner())).codes).toEqual([
+      `SETTINGS_GATE_TOKEN_CEILING:synthesizerCallBound:${HAIKU}`,
+      `SETTINGS_GATE_TOKEN_CEILING:synthesizerCallBound:${DEEPSEEK}`, `SETTINGS_GATE_TOKEN_CEILING:synthesizerCallBound:${GLM}`
+    ]);
+    const storyteller = runnerReaders({ readLineUp: async () => lineUp([GLM, DEEPSEEK]), readCallBounds: async () => raised("storytellerCallBound", 65536) });
+    expect((await checkRunner(storyteller.readers, previewRunner())).codes).toEqual([]);
+    // An organ bound counts the same (its row key names the organ).
+    const judge = runnerReaders({
+      readSite: async () => runnerSite(reviewedTargets(PREVIEW_DEEPINFRA_REFS)),
+      readCallBounds: async () => raised("acceptanceOrganCostBounds.JUDGE", 40000)
+    });
+    expect((await checkRunner(judge.readers, previewRunner())).codes).toEqual([`SETTINGS_GATE_TOKEN_CEILING:acceptanceOrganCostBounds.JUDGE:${GLM}`]);
+  });
+
+  it("SETTINGS_NEEDS_ENV_CHANGE:TARGET:<model>: a roster model no declared target of this runner serves", async () => {
+    const { readers } = runnerReaders({ readSite: async () => runnerSite(reviewedTargets([REF_A, REF_B])), readLineUp: async () => lineUp([GLM, DEEPSEEK]) });
+    expect((await checkRunner(readers, previewRunner())).codes).toEqual([`SETTINGS_NEEDS_ENV_CHANGE:TARGET:${DEEPSEEK}`]);
+  });
+
+  it("SETTINGS_NEEDS_ENV_CHANGE:GATE_SOCKET:anthropic: Claude Haiku in the roster, no Anthropic gate socket in the env", async () => {
+    const { readers } = runnerReaders({ readLineUp: async () => lineUp([GLM, HAIKU]) });
+    expect((await checkRunner(readers, previewRunner({ PREVIEW_GATE_SETTINGS: NO_ANTHROPIC_GATE }))).codes)
+      .toEqual(["SETTINGS_NEEDS_ENV_CHANGE:GATE_SOCKET:anthropic"]);
+    // The API half runs the same check against its own env.
+    const api = apiReaders({ readSite: async () => apiSite(), readLineUp: async () => lineUp([GLM, HAIKU]) });
+    expect((await checkApi(api.readers, previewApi({ PREVIEW_GATE_SETTINGS: NO_ANTHROPIC_GATE }))).codes)
+      .toEqual(["SETTINGS_NEEDS_ENV_CHANGE:GATE_SOCKET:anthropic"]);
+  });
+
+  it("the API half names TARGET from ITS OWN declared targets: api.env lacks Claude Haiku while runner.env serves it (the providers page's guard, D24 item 5)", async () => {
+    const roster = async () => lineUp([GLM, HAIKU]);
+    const runner = runnerReaders({ readLineUp: roster });
+    expect((await checkRunner(runner.readers, previewRunner())).codes).toEqual([]);
+    const api = apiReaders({ readSite: async () => apiSite(reviewedTargets(PREVIEW_DEEPINFRA_REFS)), readLineUp: roster });
+    expect((await checkApi(api.readers, previewApi())).codes).toEqual([`SETTINGS_NEEDS_ENV_CHANGE:TARGET:${HAIKU}`]);
+  });
+
+  it("PREVIEW_LINE_UP_REQUIRED: a sockets-only env and a row-less version, in both halves; the old env forms' line-up stands in", async () => {
+    const runner = runnerReaders({ readLineUp: async () => null });
+    expect((await checkRunner(runner.readers, previewRunner())).codes).toEqual(["PREVIEW_LINE_UP_REQUIRED"]);
+    const api = apiReaders({ readSite: async () => apiSite(), readLineUp: async () => null });
+    expect((await checkApi(api.readers, previewApi())).codes).toEqual(["PREVIEW_LINE_UP_REQUIRED"]);
+    // The env's own line-up (the two old forms) is the line-up of a version without the row (addition D14).
+    const envLineUp = runnerReaders({ readLineUp: async () => null });
+    expect((await checkRunner(envLineUp.readers, previewRunner({ PREVIEW_ENV_LINE_UP: { ...lineUp([GLM, DEEPSEEK]), thinking_levels: null } }))).codes).toEqual([]);
+  });
+
+  it("every problem in one report, sorted and unique: roster, seats, table, ceilings and the environment", async () => {
+    const { readers } = runnerReaders({
+      readSite: async () => runnerSite(reviewedTargets(PREVIEW_DEEPINFRA_REFS)),
+      readRoleRefs: async () => [REF_A, "preview:unreviewed", REF_A, REF_A],
+      readLineUp: async () => sealedPreviewLineUpFromValue(sealed([GLM, HAIKU], [GLM, HAIKU, DROPPED], { [QWEN]: { level: "high" } })),
+      readCallBounds: async () => BOUNDS.map((bound) => (bound.rowKey === "synthesizerCallBound" ? { ...bound, tokenCeiling: 40000 } : bound))
+    });
+    const report = await checkRunner(readers, previewRunner({ PREVIEW_GATE_SETTINGS: NO_ANTHROPIC_GATE }));
+    const expected = [
+      `SETTINGS_GATE_THINKING_UNREVIEWED:${QWEN}:high`,
+      `SETTINGS_GATE_TOKEN_CEILING:synthesizerCallBound:${HAIKU}`, `SETTINGS_GATE_TOKEN_CEILING:synthesizerCallBound:${GLM}`,
+      "SETTINGS_GATE_UNREVIEWED:preview:unreviewed", `SETTINGS_GATE_UNREVIEWED:${DROPPED}`,
+      "SETTINGS_NEEDS_ENV_CHANGE:GATE_SOCKET:anthropic", "SETTINGS_NEEDS_ENV_CHANGE:ROLE_REF:preview:unreviewed",
+      `SETTINGS_NEEDS_ENV_CHANGE:TARGET:${HAIKU}`, `SETTINGS_NEEDS_ENV_CHANGE:TARGET:${DROPPED}`
+    ];
+    expect(report).toMatchObject({ verdict: "FAIL", codes: expected });
+    expect([...report.codes].sort()).toEqual(report.codes);
+    expect(new Set(report.codes).size).toBe(report.codes.length);
   });
 });
 
@@ -412,6 +567,13 @@ describe("the report line and the step runner", () => {
     expect(typeof parsed.version).toBe("number");
     expect(settingsCheckReport({ half: "runner", releaseKey: RELEASE_KEY, version: VERSION, codes: [], snapshotSha256: SNAPSHOT }).verdict)
       .toBe("PASS");
+  });
+
+  it("FINAL-FIX 20: a step code outside the report's alphabet still FAILs with a code (its code part and SETTINGS_CHECK_DETAIL_UNPRINTABLE)", () => {
+    const report = settingsCheckReport({ half: "runner", releaseKey: RELEASE_KEY, version: VERSION,
+      codes: ["SETTINGS_GATE_UNREVIEWED:preview:a@b", "SETTINGS_NEEDS_ENV_CHANGE:ROLE_REF:x+y", "not a code at all", "STORY_POLICY_INVALID"], snapshotSha256: null });
+    expect(report).toMatchObject({ verdict: "FAIL", codes: [SETTINGS_CHECK_DETAIL_UNPRINTABLE, "SETTINGS_GATE_UNREVIEWED", "SETTINGS_NEEDS_ENV_CHANGE", "STORY_POLICY_INVALID"] });
+    expect(report.codes.every((code) => isSettingsCheckCode(code))).toBe(true);
   });
 
   it("a refusal's code: typed (with its detail when the message is exactly code:detail), code-shaped; never a database failure or prose", () => {

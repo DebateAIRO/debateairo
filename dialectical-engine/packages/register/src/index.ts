@@ -1473,6 +1473,7 @@ export {
   type SiteSettingsDifference
 } from "./settings-classification.js";
 export {
+  SETTINGS_CHECK_DETAIL_UNPRINTABLE,
   SETTINGS_CHECK_LINE_KIND,
   SETTINGS_CHECKER,
   isSettingsCheckCode,
@@ -1494,5 +1495,23 @@ export {
   PREVIEW_LINE_UP_POLICY_ROW_KEY,
   previewLineUpPolicyFromValue,
   previewLineUpPolicyRow,
-  readPreviewLineUpPolicy
+  readPreviewLineUpPolicy,
+  readSealedPreviewLineUp,
+  sealedPreviewLineUpFromValue,
+  type SealedPreviewLineUp,
+  type SealedPreviewThinkingChoice
 } from "./preview-line-up-policy.js";
+export {
+  SETTINGS_EXEMPT_CEILING_ROW_KEY,
+  readSettingsSeatRefs,
+  settingsGateThinkingCodes,
+  settingsGateTokenCeilingCodes,
+  settingsGateUnreviewedCodes,
+  settingsLineUpEnvironmentCodes,
+  settingsSeatableGateModels,
+  settingsSeatableModels,
+  settingsVersionLineUp,
+  unreviewedSeatRef,
+  type SettingsCallBound,
+  type SettingsSeatableGateModel
+} from "./settings-check-seatable.js";

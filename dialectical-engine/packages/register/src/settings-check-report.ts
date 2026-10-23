@@ -85,7 +85,27 @@ export async function runSettingsCheckSteps(steps: readonly SettingsCheckStep[])
   return Object.freeze(codes);
 }
 
-/** A half's report from what it found: codes sorted and unique, PASS exactly when there are none. */
+/**
+ * FINAL-FIX 20 (S15 review): the code a report records when a step's code is not in the report's alphabet. A code is
+ * built from values the version holds (a provider ref, a model id, a level); one with an unexpected character (`@`, `+`,
+ * a space) must still FAIL the half with a code, never print a line S15's verdict refuses as a whole
+ * (SETTINGS_CHECK_REPORT_INVALID). Its code part is kept when that part is itself a code; the detail is dropped.
+ */
+export const SETTINGS_CHECK_DETAIL_UNPRINTABLE = "SETTINGS_CHECK_DETAIL_UNPRINTABLE" as const;
+const BARE_CODE = /^[A-Z][A-Z0-9_]{2,}$/u;
+
+/** One step code as the report may carry it (`isSettingsCheckCode`): itself, or its code part and the marker above. */
+function printableCodes(code: unknown): readonly string[] {
+  if (isSettingsCheckCode(code)) return [code as string];
+  const head = typeof code === "string" ? code.split(":")[0]! : "";
+  return BARE_CODE.test(head) ? [head, SETTINGS_CHECK_DETAIL_UNPRINTABLE] : [SETTINGS_CHECK_DETAIL_UNPRINTABLE];
+}
+
+/**
+ * A half's report from what it found: codes sorted and unique, PASS exactly when there are none. Every code is asserted
+ * to be in the report's alphabet (`isSettingsCheckCode`, the rule S15's verdict reads the line with); one that is not
+ * is recorded as its code part plus SETTINGS_CHECK_DETAIL_UNPRINTABLE (FINAL-FIX 20), so the half still FAILs.
+ */
 export function settingsCheckReport(input: Readonly<{
   half: SettingsCheckHalf;
   releaseKey: string;
@@ -93,7 +113,7 @@ export function settingsCheckReport(input: Readonly<{
   codes: readonly string[];
   snapshotSha256: string | null;
 }>): SettingsCheckReport {
-  const codes = Object.freeze([...new Set(input.codes)].sort());
+  const codes = Object.freeze([...new Set(input.codes.flatMap(printableCodes))].sort());
   return Object.freeze({
     half: input.half,
     releaseKey: input.releaseKey,

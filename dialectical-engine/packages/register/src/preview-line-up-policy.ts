@@ -66,6 +66,68 @@ export async function readPreviewLineUpPolicy(pool: Pick<Pool, "query">, registe
   return row === undefined ? null : previewLineUpPolicyFromValue(row.value_json);
 }
 
+/**
+ * Addition D20 (SA10): one AI's sealed thinking entry AS SEALED — its levels are any words, not yet checked against this
+ * code's menus. A PreviewThinkingChoice is one.
+ */
+export type SealedPreviewThinkingChoice = Readonly<{
+  level?: string | undefined;
+  steps?: Readonly<Record<string, string | undefined>> | undefined;
+}>;
+/**
+ * Addition D20 (SA10): a version's line-up AS SEALED, for check-version's condition 6: the rosters and the table read by
+ * shape only, so a version sealed by an older code (whose rows or menus were wider) is named model by model and level by
+ * level (SETTINGS_GATE_UNREVIEWED / SETTINGS_GATE_THINKING_UNREVIEWED) instead of refusing as a whole. A PreviewLineUp is
+ * one, so the env's line-up (already checked) fits the same checks.
+ */
+export type SealedPreviewLineUp = Readonly<{
+  free_model_ids: readonly string[];
+  premium_model_ids: readonly string[];
+  thinking_levels: Readonly<Record<string, SealedPreviewThinkingChoice>> | null;
+}>;
+const sealedChoice = z.object({
+  level: z.string().min(1).optional(),
+  steps: z.record(z.string(), z.string().min(1)).optional()
+}).strict();
+const sealedSchema = z.object({
+  kind: z.literal(KIND),
+  free_model_ids: roster,
+  premium_model_ids: roster,
+  thinking_levels: z.record(z.string(), sealedChoice).refine(table => Object.keys(table).length > 0).nullable()
+}).strict();
+
+/**
+ * Addition D20 (SA10): a sealed value by its SHAPE only (kind, exact members, the size bounds, a table of words): no
+ * reviewed-row, menu or maker check, which is condition 6's job, code by code. A value that is not even this shape
+ * throws TypeError `PREVIEW_LINE_UP_POLICY_INVALID:<member>` (a code: the check records it). Frozen.
+ */
+export function sealedPreviewLineUpFromValue(value: unknown): SealedPreviewLineUp {
+  const parsed = sealedSchema.safeParse(value);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    if (issue === undefined || issue.path.length === 0) return invalid(issue?.code === "unrecognized_keys" ? "members" : "value");
+    return invalid(String(issue.path[0]));
+  }
+  const table = parsed.data.thinking_levels;
+  return Object.freeze({
+    free_model_ids: Object.freeze([...parsed.data.free_model_ids]),
+    premium_model_ids: Object.freeze([...parsed.data.premium_model_ids]),
+    thinking_levels: table === null ? null : Object.freeze(Object.fromEntries(Object.entries(table).map(([model, choice]) => [model,
+      Object.freeze({ ...(choice.level === undefined ? {} : { level: choice.level }),
+        ...(choice.steps === undefined ? {} : { steps: Object.freeze({ ...choice.steps }) }) })])))
+  });
+}
+
+/** Addition D20 (SA10): the version's line-up as sealed (shape only), or null when the version has no row. */
+export async function readSealedPreviewLineUp(pool: Pick<Pool, "query">, registerVersion: number): Promise<SealedPreviewLineUp | null> {
+  const result = await pool.query<{ value_json: unknown }>(
+    `SELECT value_json FROM register.register_row WHERE register_version=$1 AND row_key=$2`,
+    [registerVersion, PREVIEW_LINE_UP_POLICY_ROW_KEY]
+  );
+  const row = result.rows[0];
+  return row === undefined ? null : sealedPreviewLineUpFromValue(row.value_json);
+}
+
 /** The table as canonical JSON: strings and objects only (the parser's output never holds a number or undefined). */
 function thinkingLevelsAst(table: PreviewThinkingLevels): CanonicalJsonAst {
   return Object.freeze(Object.fromEntries(Object.entries(table).map(([model, choice]) => {

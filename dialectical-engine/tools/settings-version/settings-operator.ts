@@ -1,8 +1,18 @@
 import { createHash } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { RELEASE_KEY_PATTERN, TypedDomainError, parseReleaseKey } from "@debateai/kernel";
-import { previewModelRowForRef } from "@debateai/providers";
-import { SETTINGS_CHECKER, SETTINGS_CHECK_LINE_KIND, isSettingsCheckCode, type SettingsCheckReport } from "@debateai/register";
+import { parsePreviewEnvironmentConfig } from "@debateai/providers";
+import {
+  SETTINGS_CHECKER,
+  SETTINGS_CHECK_LINE_KIND,
+  isSettingsCheckCode,
+  readSealedPreviewLineUp,
+  settingsSeatableGateModels,
+  settingsSeatableModels,
+  settingsVersionLineUp,
+  type SealedPreviewLineUp,
+  type SettingsCheckReport
+} from "@debateai/register";
 import { readRunnerRoleRefs } from "../../apps/runner/src/settings-check.js";
 
 /**
@@ -38,40 +48,92 @@ export type SettingsStatus = Readonly<{
 /** One gate's live answer, as condition 6 reads it: the models it serves now (`/remaining`'s `enabled_models`). */
 export type GateEnabledModels = Readonly<Record<string, readonly string[]>>;
 
-/** A model a version can seat, and the gate (provider) its calls go through. */
-export type SettingsGateModel = Readonly<{ ref: string; gate: string; model: string }>;
+/** A model a version can seat, and the gate (provider) its calls go through (`ref`: the seat ref, when one named it). */
+export type SettingsGateModel = Readonly<{ ref?: string; gate: string; model: string }>;
 
 /**
- * The reads the live condition 6 makes. Today (S15) every role ref the version names (synthesizer, evaluator, storyteller,
- * story checker), read with the register's own readers at the version, as check-version reads them. SA10 (addition D21)
- * widens it to every seatable model of the version: it replaces `readGateModels` and nothing else.
+ * Addition D21 (SA10): what the live check needs of the release's own environment to know a version's seatable set:
+ * the env's line-up (the two old forms of PREVIEW_PROVIDER_TEST_CONFIG_JSON carry one; null for the sockets-only form),
+ * which a version without the row runs on, and the models the release's declared targets serve (the structure-repair
+ * model is seatable when one of them serves it). The root wiring reads both from the release's API env file and hands
+ * them over as one file (`--seatable-env`, parseSeatableEnvironment).
+ */
+export type SettingsSeatableEnvironment = Readonly<{ envLineUp: SealedPreviewLineUp | null; declaredModels: readonly string[] }>;
+/** No environment known (a direct caller that hands none): no env line-up, no declared model. */
+export const NO_SEATABLE_ENVIRONMENT: SettingsSeatableEnvironment = Object.freeze({ envLineUp: null, declaredModels: Object.freeze([]) });
+
+/**
+ * The reads the live condition 6 makes (addition D21, SA10): every model the version can SEAT (its seatable set, the
+ * same rule check-version's runner half applies: both rosters, the four seats' models, the structure-repair model when a
+ * declared target serves it), not only the four seats (S15). `refusals` are codes found while reading (a row-less
+ * version with no env line-up: PREVIEW_LINE_UP_REQUIRED).
  */
 export type ActivationReaders = Readonly<{
-  /** Each model the version can seat with its gate; an unreviewed ref is SETTINGS_GATE_UNREVIEWED:<ref> (in `unreviewed`). */
-  readGateModels: (client: SettingsOperatorClient, version: number) => Promise<Readonly<{
+  /** Each model the version can seat with its gate; an unreviewed ref or model is SETTINGS_GATE_UNREVIEWED (in `unreviewed`). */
+  readGateModels: (client: SettingsOperatorClient, version: number, environment: SettingsSeatableEnvironment) => Promise<Readonly<{
     models: readonly SettingsGateModel[];
     unreviewed: readonly string[];
+    refusals?: readonly string[];
   }>>;
 }>;
 
-/** The S15 reader: the four role refs at the version, each mapped to its reviewed preview row (provider = gate). */
-export async function readRoleRefGateModels(client: SettingsOperatorClient, version: number): Promise<Readonly<{
-  models: readonly SettingsGateModel[];
-  unreviewed: readonly string[];
-}>> {
-  // The runner half's own reader (check-version, S14), over this one connection: it only runs `query`.
-  const refs = await readRunnerRoleRefs(client as unknown as Pool, version);
-  const models: SettingsGateModel[] = [];
-  const unreviewed: string[] = [];
-  for (const ref of new Set(refs)) {
-    const row = previewModelRowForRef(ref);
-    if (row === undefined) unreviewed.push(ref);
-    else models.push(Object.freeze({ ref, gate: row.provider, model: row.model }));
-  }
-  return Object.freeze({ models: Object.freeze(models), unreviewed: Object.freeze(unreviewed) });
+/** The two register reads the seatable set is built from (the defaults below; unit tests hand fakes of these alone). */
+export type SeatableVersionReads = Readonly<{
+  readSeatRefs: (client: SettingsOperatorClient, version: number) => Promise<readonly string[]>;
+  readLineUp: (client: SettingsOperatorClient, version: number) => Promise<SealedPreviewLineUp | null>;
+}>;
+
+/**
+ * The SA10 reader (addition D21): the version's seatable set over this one connection — its four seat refs and its
+ * line-up as sealed (its row, else the env's: `settingsVersionLineUp`; neither: PREVIEW_LINE_UP_REQUIRED), with the
+ * declared models (`settingsSeatableModels`, check-version's rule) — each reviewed model with its gate (provider = gate).
+ */
+export function seatableGateModelsReader(reads: SeatableVersionReads): ActivationReaders["readGateModels"] {
+  return async (client, version, environment) => {
+    const seatRefs = await reads.readSeatRefs(client, version);
+    const lineUp = settingsVersionLineUp(await reads.readLineUp(client, version), environment.envLineUp);
+    const seatable = settingsSeatableModels({
+      lineUp: lineUp ?? { free_model_ids: [], premium_model_ids: [], thinking_levels: null }, seatRefs, declaredModels: environment.declaredModels
+    });
+    const { models, unreviewed } = settingsSeatableGateModels(seatable);
+    return Object.freeze({ models, unreviewed, refusals: Object.freeze(lineUp === null ? ["PREVIEW_LINE_UP_REQUIRED"] : []) });
+  };
 }
 
-export const ACTIVATION_READERS: ActivationReaders = Object.freeze({ readGateModels: readRoleRefGateModels });
+/**
+ * The register reads at the version: the seat refs by the runner half's own reader (check-version, S14; over this one
+ * connection, it only runs `query`), the line-up row as sealed (shape only, `readSealedPreviewLineUp`).
+ */
+export const SEATABLE_VERSION_READS: SeatableVersionReads = Object.freeze({
+  readSeatRefs: (client: SettingsOperatorClient, version: number) => readRunnerRoleRefs(client as unknown as Pool, version),
+  readLineUp: (client: SettingsOperatorClient, version: number) => readSealedPreviewLineUp(client, version)
+});
+
+export const ACTIVATION_READERS: ActivationReaders = Object.freeze({ readGateModels: seatableGateModelsReader(SEATABLE_VERSION_READS) });
+
+const SEATABLE_ENV_SCHEMA = "preview-settings-seatable-env-v1";
+const SEATABLE_ENV_KEYS = Object.freeze(["declaredModels", "previewConfig", "schema"]);
+/**
+ * The root wiring's `--seatable-env` file (deploy/preview-lifecycle/v1/settings-version.mjs): exactly
+ * `{"schema":"preview-settings-seatable-env-v1","previewConfig":<the API env's PREVIEW_PROVIDER_TEST_CONFIG_JSON text>,
+ * "declaredModels":[<each declared target's model>]}`. The config text is read by the env's own parser
+ * (`parsePreviewEnvironmentConfig`, so the three forms cannot drift); anything else is SETTINGS_SEATABLE_ENV_INVALID.
+ */
+export function parseSeatableEnvironment(text: string): SettingsSeatableEnvironment {
+  const refusedEnv = (): SettingsOperatorRefusal => new SettingsOperatorRefusal("SETTINGS_SEATABLE_ENV_INVALID",
+    "The release's line-up and target models could not be read from the hand-over file");
+  let value: unknown;
+  try { value = JSON.parse(text); } catch { throw refusedEnv(); }
+  if (typeof value !== "object" || value === null || Array.isArray(value)) throw refusedEnv();
+  const row = value as Record<string, unknown>;
+  if (Object.keys(row).sort().join(",") !== SEATABLE_ENV_KEYS.join(",") || row.schema !== SEATABLE_ENV_SCHEMA) throw refusedEnv();
+  const models = row.declaredModels;
+  if (!Array.isArray(models) || models.some((model) => typeof model !== "string" || model.length === 0)) throw refusedEnv();
+  if (typeof row.previewConfig !== "string") throw refusedEnv();
+  let envLineUp: SealedPreviewLineUp | null;
+  try { envLineUp = parsePreviewEnvironmentConfig(row.previewConfig)?.envLineUp ?? null; } catch { throw refusedEnv(); }
+  return Object.freeze({ envLineUp, declaredModels: Object.freeze([...new Set(models as string[])]) });
+}
 
 /**
  * The module's refusals: a typed code (the house class) plus what the operator line needs, content-free. `codes` lists
@@ -334,13 +396,20 @@ export function assertActivationLabels(activatedBy: unknown, reason: unknown): v
 }
 
 /**
- * Condition 6, live (plan D6/D9, addition D21): each model the version can seat must be switched on at its gate now
- * (`/remaining`'s `enabled_models`). An unreviewed ref, a gate with no answer, or a model its gate does not serve each
- * add their code; all of them refuse together (SETTINGS_GATE_LIVE_CHECK_FAILED with `codes`).
+ * Condition 6, live (plan D6/D9, addition D21): each model the version can SEAT (its seatable set, SA10) must be
+ * switched on at its gate now (`/remaining`'s `enabled_models`). An unreviewed ref or model, a gate with no answer, a
+ * model its gate does not serve, or a missing line-up each add their code; all of them refuse together
+ * (SETTINGS_GATE_LIVE_CHECK_FAILED with `codes`). THE ONE live check: the activation (`activateSettingsVersion`) and a
+ * forward release switch's `--activate <v>` (`cli.ts gate-check`, ruling R60) both run it. The gate-code fingerprint
+ * half of D21 (the gates run this release's helper, so equal menus and bounds) is the root wiring's: it reads root-only
+ * files (settings-version.mjs).
  */
-async function assertGatesServe(client: SettingsOperatorClient, version: number, gates: GateEnabledModels, readers: ActivationReaders): Promise<void> {
-  const { models, unreviewed } = await readers.readGateModels(client, version);
-  const codes = unreviewed.map((ref) => `SETTINGS_GATE_UNREVIEWED:${ref}`);
+export async function assertSettingsGatesServe(client: SettingsOperatorClient, input: Readonly<{
+  version: number; gateEnabledModels: GateEnabledModels; seatableEnvironment?: SettingsSeatableEnvironment;
+}>, readers: ActivationReaders = ACTIVATION_READERS): Promise<void> {
+  const gates = input.gateEnabledModels;
+  const { models, unreviewed, refusals } = await readers.readGateModels(client, input.version, input.seatableEnvironment ?? NO_SEATABLE_ENVIRONMENT);
+  const codes = [...(refusals ?? []), ...unreviewed.map((ref) => `SETTINGS_GATE_UNREVIEWED:${ref}`)];
   for (const { gate, model } of models) {
     const enabled = Object.hasOwn(gates, gate) ? gates[gate] : undefined;
     if (enabled === undefined) codes.push(`SETTINGS_GATE_UNANSWERED:${gate}`);
@@ -357,8 +426,10 @@ async function assertGatesServe(client: SettingsOperatorClient, version: number,
  *   2. the current release (core.read_current_release) and the pointer; no current release: SETTINGS_ACTIVATION_CONFLICT;
  *   3. an early plain refusal when the current release has not passed `v` (register.settings_version_passed; the
  *      database refuses again anyway): SETTINGS_VERSION_NOT_PASSED, naming what it passed;
- *   4. condition 6 live, ALWAYS (ruling R59): every gate's `/remaining` answer that was read; a gate with no answer
- *      refuses the models it serves (no answers at all = everything refused, never "skip the check"). The public server,
+ *   4. condition 6 live, ALWAYS (ruling R59), over the version's whole seatable set (SA10, `assertSettingsGatesServe`;
+ *      `seatableEnvironment` is the release's env line-up and declared models, none when not handed): every gate's
+ *      `/remaining` answer that was read; a gate with no answer refuses the models it serves (no answers at all =
+ *      everything refused, never "skip the check"). The public server,
  *      which has no preview gates, has no settings operator until Phase 3 (R58): that phase decides its exemption from
  *      the release's deployment; this module has no opt-out;
  *   5. `SELECT register.activate_settings_version($1,$2,$3,$4,$5)` inside `BEGIN ISOLATION LEVEL READ COMMITTED` … `COMMIT`
@@ -369,7 +440,9 @@ async function assertGatesServe(client: SettingsOperatorClient, version: number,
  */
 export async function activateSettingsVersion(
   client: SettingsOperatorClient,
-  input: Readonly<{ version: number; activatedBy: string; reason: string; gateEnabledModels: GateEnabledModels }>,
+  input: Readonly<{
+    version: number; activatedBy: string; reason: string; gateEnabledModels: GateEnabledModels; seatableEnvironment?: SettingsSeatableEnvironment;
+  }>,
   readers: ActivationReaders = ACTIVATION_READERS
 ): Promise<Readonly<{ activationSeq: string; previous: number | null; releaseKey: string }>> {
   if (!Number.isSafeInteger(input.version) || input.version < 1) throw usage("activate takes one positive settings version");
@@ -385,7 +458,10 @@ export async function activateSettingsVersion(
     throw new SettingsOperatorRefusal("SETTINGS_VERSION_NOT_PASSED",
       "The current release has not passed this version: run the check first", { passed: await readPassed(client, currentRelease) });
   }
-  await assertGatesServe(client, input.version, input.gateEnabledModels, readers);
+  await assertSettingsGatesServe(client, {
+    version: input.version, gateEnabledModels: input.gateEnabledModels,
+    ...(input.seatableEnvironment === undefined ? {} : { seatableEnvironment: input.seatableEnvironment })
+  }, readers);
   await client.query("BEGIN ISOLATION LEVEL READ COMMITTED");
   let activationSeq: string;
   try {

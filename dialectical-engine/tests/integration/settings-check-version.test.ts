@@ -7,11 +7,26 @@ import type { Pool } from "pg";
 import { createPool, migrate } from "@debateai/db";
 import { costEnvelopeGuardPolicy } from "@debateai/budget";
 import {
+  PREVIEW_GLM_DEADLINE_MS,
+  PREVIEW_REVIEWED_PROVIDER_REFS,
+  parsePreviewEnvironmentConfig,
+  parsePreviewLineUp,
+  previewModelRow,
+  previewTargetJsonRow
+} from "@debateai/providers";
+import {
+  canonicalRegisterJson,
   costEnvelopePolicyFromValue,
+  createPostgresRegisterPublicationPort,
+  loadBootstrapRegister,
   parseRegisterVersionText,
+  previewLineUpPolicyFromValue,
   registerVersionToSafeLegacyNumber,
   type SettingsCheckReport
 } from "../../packages/register/src/index.js";
+import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from "../../packages/register/src/staff-access-policy.js";
+import { buildPreviewSourceRowsV2, composePreviewSnapshotV2, publishPreviewRegisterV2, readSealedSnapshot } from "../../deploy/preview-auth-dev/v1/publish-register-v2.js";
+import { DEVELOPMENT_RUN_DEATH_POLICY } from "../../apps/runner/src/dev-deployment-register.js";
 import { seedDevelopmentDeploymentRegister } from "../../apps/runner/src/dev-deployment-register.js";
 import { checkRunnerSettingsVersion, type RunnerCheckEnvironment } from "../../apps/runner/src/settings-check.js";
 import { checkAdmissionSettingsVersion, type ApiCheckEnvironment } from "../../apps/api/src/settings-check.js";
@@ -45,11 +60,11 @@ let apiPool: Pool;
 
 const SOURCE_REF = "fixture:settings-check-version";
 
-/** A house pool on the test database, read-only in every transaction, as `role`. */
-function readOnlyPool(role: string, name: string): Pool {
+/** A house pool on a test database (the shared one by default), read-only in every transaction, as `role`. */
+function readOnlyPool(role: string, name: string, on: TestDatabase = database): Pool {
   const options = encodeURIComponent(`-c default_transaction_read_only=on -c role=${role}`);
-  const separator = database.connectionString.includes("?") ? "&" : "?";
-  return createPool(`${database.connectionString}${separator}options=${options}`, { max: 2, connectionTimeoutMillis: 5000, name });
+  const separator = on.connectionString.includes("?") ? "&" : "?";
+  return createPool(`${on.connectionString}${separator}options=${options}`, { max: 2, connectionTimeoutMillis: 5000, name });
 }
 
 type Mode = "local" | "hosted";
@@ -291,5 +306,118 @@ describe("check-version over a real database (side-by-side §13, S14)", () => {
     for (const report of [unknown.runner, unknown.api]) {
       expect(report).toMatchObject({ verdict: "FAIL", codes: ["SETTINGS_VERSION_KIND_INVALID"], snapshotSha256: null, version: 999999 });
     }
+  });
+});
+
+/**
+ * SA10 (addition D19-D20): check-version on the PREVIEW's line-up, over a second real database holding a register built
+ * the way the live preview's is (history v4, then the publish kit v2 with the plan's `lineUp`, so its site version
+ * carries the previewLineUpPolicy row), checked under the sockets-only server setting (addition D14-D15) and the
+ * reviewed targets. Both halves run on read-only pools under their runtime roles, as above.
+ */
+describe("check-version on the preview's line-up (SA10, addition D19-D20)", () => {
+  const GLM = "zai-org/GLM-5.3-Flash", DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash", MIMO = "XiaomiMiMo/MiMo-V2.6-Pro";
+  const QWEN = "Qwen/Qwen3.8-Flash", HAIKU = "claude-haiku-5-5";
+  const OBSERVATION = { nodeVersion: "v26.8.2", pnpmVersion: "11.20.0", sourceRevision: "a".repeat(40), sourceTree: "b".repeat(40),
+    operatorSha256: "c".repeat(64), observedAt: "2026-10-22T08:00:00.000Z" };
+  /** The site version's line-up (today's live values, the kit's plan `lineUp`, addition D23). */
+  const SITE_LINE_UP = parsePreviewLineUp({ free_model_ids: [GLM, DEEPSEEK], premium_model_ids: [GLM, DEEPSEEK, MIMO, QWEN, HAIKU], thinking_levels: null });
+  const SOCKETS_ONLY = parsePreviewEnvironmentConfig(JSON.stringify({ deployment: "v3-preview", requested_thinking_level: "high",
+    budget_socket: "/run/debateai-v3-preview/deepinfra-budget-v3.sock", anthropic_budget_socket: "/run/debateai-v3-preview/anthropic-budget-v1.sock",
+    scope_id: "settings-check-preview" }))!;
+  const CLAIM_MS = 2 * (DEVELOPMENT_RUN_DEATH_POLICY.cooldown_ms + PREVIEW_GLM_DEADLINE_MS) + PREVIEW_GLM_DEADLINE_MS + 60000;
+  const targetsOf = (refs: readonly string[]) => JSON.stringify(refs.map((ref) => previewTargetJsonRow(ref)));
+  const ALL_TARGETS = targetsOf(PREVIEW_REVIEWED_PROVIDER_REFS);
+  /** The reviewed DeepInfra set alone (a valid preview target set: every DeepInfra ref, no Anthropic one). */
+  const DEEPINFRA_REFS = PREVIEW_REVIEWED_PROVIDER_REFS.filter((ref) => previewModelRow(previewTargetJsonRow(ref).model as string)!.provider === "deepinfra");
+  const DEEPINFRA_TARGETS = targetsOf(DEEPINFRA_REFS);
+  let preview: TestDatabase;
+  let previewRunnerPool: Pool;
+  let previewApiPool: Pool;
+  let PREVIEW_SITE = 0;
+
+  beforeAll(async () => {
+    preview = await startTestDatabase();
+    await migrate(preview.pool);
+    const source = [...await buildPreviewSourceRowsV2(await loadBootstrapRegister(), OBSERVATION, undefined, "on", null, null, null, null, null, SITE_LINE_UP)];
+    const owned = [STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW]
+      .map((row) => ({ rowKey: row.rowKey, valueJsonText: canonicalRegisterJson(row.valueAst), sourceRef: row.sourceRef }));
+    const base = [...source.filter((row) => !["consumerRecoveryPolicy", "publicationCheckPolicy", "taxAuthorities", "answerRoleRotationPolicy"]
+      .includes(row.rowKey)), ...owned];
+    await createPostgresRegisterPublicationPort(preview.pool).importHistorical({ registerVersion: parseRegisterVersionText("4"), rows: base });
+    const v4 = await readSealedSnapshot(preview.pool, "4");
+    const snapshot = composePreviewSnapshotV2({ sourceRows: source, baseRows: v4.rows, baseRegisterVersion: "4", baseSnapshotSha256: v4.snapshotSha256 });
+    const receipt = await publishPreviewRegisterV2(preview.pool, { publicationId: randomUUID(), sourceRef: "settings-check preview fixture", snapshot,
+      approval: { baseRegisterVersion: snapshot.baseRegisterVersion, baseSnapshotSha256: snapshot.baseSnapshotSha256,
+        snapshotSha256: snapshot.snapshotSha256, deltaSha256: snapshot.deltaSha256 } });
+    PREVIEW_SITE = registerVersionToSafeLegacyNumber(parseRegisterVersionText(String(receipt.registerVersion)));
+    previewRunnerPool = readOnlyPool("debateai_runtime", "test:check-runner-preview", preview);
+    previewApiPool = readOnlyPool("debateai_billing_runtime", "test:check-api-preview", preview);
+  }, 600_000);
+
+  afterAll(async () => {
+    await Promise.allSettled([previewRunnerPool?.end(), previewApiPool?.end()]);
+    await preview?.stop();
+  });
+
+  /** A release on the preview: its site version (the preview's own by default) and its key. */
+  async function checkPreview(version: number, targets = ALL_TARGETS, site = PREVIEW_SITE): Promise<Readonly<{ runner: SettingsCheckReport; api: SettingsCheckReport }>> {
+    const common = { REGISTER_VERSION: site, RELEASE_KEY: [`r${site}`, "0123456789ab"].join("-"), DEPLOYMENT_MODE: "local" as const, NODE_ENV: "test",
+      PROVIDER_DISCOVERY_TARGETS_JSON: targets, PREVIEW_GATE_SETTINGS: SOCKETS_ONLY.gate, PREVIEW_ENV_LINE_UP: SOCKETS_ONLY.envLineUp };
+    const runner = await checkRunnerSettingsVersion({ pool: previewRunnerPool, environment: { ...common, CLAIM_MS, CLAIM_MARGIN_MS: 60000 }, version });
+    const api = await checkAdmissionSettingsVersion({ pool: previewApiPool, environment: common, version });
+    return Object.freeze({ runner, api });
+  }
+  /**
+   * A new GENERAL version from a preview version (its site version by default) with some rows' values replaced (each
+   * row's source reference kept): `change` maps a row key to its new value, from its current one.
+   */
+  async function publishFromPreview(change: Readonly<Record<string, (current: unknown) => unknown>>, from = PREVIEW_SITE): Promise<number> {
+    const base = parseRegisterVersionText(String(from));
+    const rows = new Map((await readCompleteRegisterFixtureRows(preview.pool, base)).map((row) => [row.rowKey, row] as const));
+    for (const [rowKey, next] of Object.entries(change)) {
+      const current = rows.get(rowKey);
+      expect(current, rowKey).toBeDefined();
+      rows.set(rowKey, registerFixtureRow(rowKey, next(JSON.parse(current!.valueJsonText)), current!.sourceRef));
+    }
+    const receipt = await publishRegisterFixture(preview.pool, {
+      publicationId: randomUUID(), baseRegisterVersion: base, rows: Object.freeze([...rows.values()]), sourceRef: SOURCE_REF
+    });
+    return registerVersionToSafeLegacyNumber(receipt.registerVersion);
+  }
+  const NEW_LINE_UP = { kind: "PREVIEW_LINE_UP_POLICY", free_model_ids: [QWEN, GLM], premium_model_ids: [GLM, DEEPSEEK, QWEN, HAIKU],
+    thinking_levels: { [QWEN]: { level: "low", steps: { judge_panel: "medium" } }, [GLM]: { level: "high" } } };
+
+  it("the preview's own site version: both halves PASS under the sockets-only setting (its row is the line-up)", async () => {
+    const { runner, api } = await checkPreview(PREVIEW_SITE);
+    expect({ runner: runner.codes, api: api.codes }).toEqual({ runner: [], api: [] });
+  });
+
+  it("(h) a version with a valid new line-up and thinking table: both halves PASS", async () => {
+    const version = await publishFromPreview({ previewLineUpPolicy: () => NEW_LINE_UP });
+    const { runner, api } = await checkPreview(version);
+    expect([runner.verdict, runner.codes, api.verdict, api.codes]).toEqual(["PASS", [], "PASS", []]);
+    expect(runner.snapshotSha256).toBe(api.snapshotSha256);
+  });
+
+  it("(i) Qwen at \"high\" cannot even be published: the row parser refuses it (so the check meets it only from an older, wider code)", () => {
+    expect(() => previewLineUpPolicyFromValue({ ...NEW_LINE_UP, thinking_levels: { [QWEN]: { level: "high" } } })).toThrow(/^PREVIEW_THINKING_LEVELS_INVALID:/u);
+  });
+
+  it("(j) a roster naming a model no declared target serves: SETTINGS_NEEDS_ENV_CHANGE:TARGET:<model> from both halves", async () => {
+    // A release that reaches DeepInfra only: its site version configures (and its env declares) the DeepInfra refs alone
+    // (the declared set must equal the configured one); the candidate, published from it, seats Claude Haiku on Premium.
+    const deepinfraSite = await publishFromPreview({ configuredProviderSet: (current) => {
+      const set = current as { providers: { providerRef: string }[] };
+      return { ...set, providers: set.providers.filter((provider) => DEEPINFRA_REFS.includes(provider.providerRef)) };
+    } });
+    const version = await publishFromPreview({ previewLineUpPolicy: () => NEW_LINE_UP }, deepinfraSite);
+    const { runner, api } = await checkPreview(version, DEEPINFRA_TARGETS, deepinfraSite);
+    // Each half names the model (condition 3, against its own targets), beside its boot's own refusal of the same roster
+    // (the served half of the target check, a code without detail).
+    for (const report of [runner, api]) {
+      expect(report).toMatchObject({ verdict: "FAIL", codes: ["PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID", `SETTINGS_NEEDS_ENV_CHANGE:TARGET:${HAIKU}`] });
+    }
+    // The same candidate under a release that reaches Anthropic too passes (h): only the environment differs.
   });
 });

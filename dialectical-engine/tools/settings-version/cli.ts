@@ -2,8 +2,11 @@
  * Side-by-side spec §13, §11 (S15) — THE SETTINGS OPERATOR COMMANDS.
  *
  *   cli.ts verdict --runner <file> --api <file>          record check-version's verdict (both halves' lines)
- *   cli.ts activate <v> --by <name> --reason <text> [--gate-remaining <gate>=<file>]…   (condition 6 always runs: a gate
- *                                                        with no answer refuses the models it serves, ruling R59)
+ *   cli.ts activate <v> --by <name> --reason <text> --seatable-env <file> [--gate-remaining <gate>=<file>]…
+ *                                                        (condition 6 always runs over the version's seatable set: a gate
+ *                                                        with no answer refuses the models it serves, ruling R59, SA10)
+ *   cli.ts gate-check <v> --seatable-env <file> [--gate-remaining <gate>=<file>]…   the same live condition 6 alone,
+ *                                                        read-only (a forward release switch's --activate <v>, ruling R60)
  *   cli.ts status                                        the current release, the pointer, what new asks use, what passed
  *   cli.ts latest-passed <releaseKey>                    the version a rollback to that release activates
  *   cli.ts switch-plan <releaseKey> [--activate <v> | --latest-passed]   the release switch's settings step (read-only)
@@ -17,10 +20,10 @@
  *
  * Output: one stdout line on success — `DEBATEAI_SETTINGS_VERDICT`, `DEBATEAI_SETTINGS_ACTIVATED`,
  * `SETTINGS_ACTIVATION_UNCHANGED`, `DEBATEAI_SETTINGS_STATUS`, `DEBATEAI_SETTINGS_LATEST_PASSED`,
- * `DEBATEAI_SETTINGS_SWITCH_PLAN`, each `<kind> <json>` with versions as decimal strings — or one stderr line,
+ * `DEBATEAI_SETTINGS_SWITCH_PLAN`, `DEBATEAI_SETTINGS_GATES_SERVE`, each `<kind> <json>` with versions as decimal strings — or one stderr line,
  * `DEBATEAI_SETTINGS_REFUSED <json>` ({command, code, codes?, passed?}). Content-free: codes, keys, versions, digests.
  * Exit codes: 0 done (a PASS verdict, an activation, an unchanged activation, a read); 1 a FAIL verdict recorded, or an
- * activation refused by condition 6 or by the version's kind; 2 usage, a bad report, or the database could not be asked;
+ * activation (or a gate-check) refused by condition 6 or by the version's kind; 2 usage, a bad report, or the database could not be asked;
  * 3 SETTINGS_ACTIVATION_CONFLICT; 4 SETTINGS_VERSION_NOT_PASSED.
  */
 import { readFile, stat } from "node:fs/promises";
@@ -33,7 +36,9 @@ import {
   SettingsOperatorRefusal,
   activateSettingsVersion,
   assertActivationLabels,
+  assertSettingsGatesServe,
   latestPassedSettingsVersion,
+  parseSeatableEnvironment,
   parseSettingsCheckOutput,
   readSettingsStatus,
   recordSettingsVerdict,
@@ -43,7 +48,8 @@ import {
   siteVersionOfRelease,
   type ActivationReaders,
   type GateEnabledModels,
-  type SettingsOperatorClient
+  type SettingsOperatorClient,
+  type SettingsSeatableEnvironment
 } from "./settings-operator.js";
 
 export type SettingsCliOutput = Readonly<{ stdout(text: string): void; stderr(text: string): void }>;
@@ -52,7 +58,7 @@ export type SettingsCliConnection = Readonly<{ client: SettingsOperatorClient; c
 export type SettingsCliDeps = Readonly<{
   connect: () => Promise<SettingsCliConnection>;
   readText: (path: string) => Promise<string>;
-  /** The live condition 6's reads (settings-operator.ts; SA10 widens them to the seatable set). */
+  /** The live condition 6's reads (settings-operator.ts: the version's seatable set, SA10). */
   activationReaders: ActivationReaders;
 }>;
 
@@ -129,6 +135,15 @@ async function gateAnswers(values: readonly string[] | undefined, deps: Settings
   return Object.freeze(answers);
 }
 
+/**
+ * `--seatable-env <file>` (SA10, addition D21): the release's env line-up and declared models, as the root wiring hands
+ * them over (parseSeatableEnvironment). Required: without it the seatable set could not be known (never a silent skip).
+ */
+async function seatableEnvironment(path: string | undefined, deps: SettingsCliDeps): Promise<SettingsSeatableEnvironment> {
+  if (path === undefined) throw usage("--seatable-env <file> is required (the release's line-up and target models)");
+  return parseSeatableEnvironment(await deps.readText(path));
+}
+
 type Command = (args: readonly string[], deps: SettingsCliDeps, output: SettingsCliOutput) => Promise<number>;
 
 const COMMANDS: Readonly<Record<string, Command>> = Object.freeze({
@@ -148,14 +163,17 @@ const COMMANDS: Readonly<Record<string, Command>> = Object.freeze({
   },
   activate: async (args, deps, output) => {
     const version = positive(args[0]);
-    const found = options(args.slice(1), ["--by", "--reason", "--gate-remaining"], ["--gate-remaining"]);
-    const activatedBy = only(found, "--by"), reason = only(found, "--reason");
-    if (activatedBy === undefined || reason === undefined) throw usage("activate <v> --by <name> --reason <text>");
+    const found = options(args.slice(1), ["--by", "--reason", "--seatable-env", "--gate-remaining"], ["--gate-remaining"]);
+    const activatedBy = only(found, "--by"), reason = only(found, "--reason"), seatablePath = only(found, "--seatable-env");
+    if (activatedBy === undefined || reason === undefined || seatablePath === undefined) {
+      throw usage("activate <v> --by <name> --reason <text> --seatable-env <file>");
+    }
     assertActivationLabels(activatedBy, reason);
+    const environment = await seatableEnvironment(seatablePath, deps);
     const gateEnabledModels = await gateAnswers(found.get("--gate-remaining"), deps);
     try {
       const done = await withConnection(deps, (client) => activateSettingsVersion(client, {
-        version, activatedBy, reason, gateEnabledModels
+        version, activatedBy, reason, gateEnabledModels, seatableEnvironment: environment
       }, deps.activationReaders));
       output.stdout(line("DEBATEAI_SETTINGS_ACTIVATED", {
         version: String(version), previous: versionText(done.previous), releaseKey: done.releaseKey, activationSeq: done.activationSeq
@@ -164,6 +182,17 @@ const COMMANDS: Readonly<Record<string, Command>> = Object.freeze({
       if (!(error instanceof SettingsOperatorRefusal) || error.code !== "SETTINGS_ACTIVATION_UNCHANGED") throw error;
       output.stdout(line("SETTINGS_ACTIVATION_UNCHANGED", { version: String(version) }));
     }
+    return 0;
+  },
+  "gate-check": async (args, deps, output) => {
+    const version = positive(args[0]);
+    const found = options(args.slice(1), ["--seatable-env", "--gate-remaining"], ["--gate-remaining"]);
+    const environment = await seatableEnvironment(only(found, "--seatable-env"), deps);
+    const gateEnabledModels = await gateAnswers(found.get("--gate-remaining"), deps);
+    await withConnection(deps, (client) => assertSettingsGatesServe(client, {
+      version, gateEnabledModels, seatableEnvironment: environment
+    }, deps.activationReaders));
+    output.stdout(line("DEBATEAI_SETTINGS_GATES_SERVE", { version: String(version) }));
     return 0;
   },
   status: async (args, deps, output) => {
@@ -215,7 +244,7 @@ export async function runSettingsCli(args: readonly string[], output: SettingsCl
   const name = args[0] ?? "";
   const command = Object.hasOwn(COMMANDS, name) ? COMMANDS[name] : undefined;
   try {
-    if (command === undefined) throw usage("commands: verdict, activate, status, latest-passed, switch-plan");
+    if (command === undefined) throw usage("commands: verdict, activate, gate-check, status, latest-passed, switch-plan");
     return await command(args.slice(1), deps, output);
   } catch (error) {
     const typed = error instanceof TypedDomainError && CODE.test(error.code);

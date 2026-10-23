@@ -10,12 +10,18 @@ import {
   readBillingPlans,
   readBillingPolicy,
   readCostEnvelopePolicy,
+  readSealedPreviewLineUp,
   readSettingsComparisonRows,
+  readSettingsSeatRefs,
   readSettingsVersionFacts,
   runSettingsCheckSteps,
   settingsCheckReport,
+  settingsLineUpEnvironmentCodes,
+  settingsSeatableModels,
   settingsVersionKindRefusal,
+  settingsVersionLineUp,
   type DeploymentMode,
+  type SealedPreviewLineUp,
   type QuestionLanguagePolicy,
   type SettingsCheckReport,
   type SettingsCheckStep,
@@ -51,8 +57,14 @@ import { newQuestionLanguageReferenceKey } from "./question-language/reference.j
  *  - condition 2: every SITE row and every MIXED row's site members equal the release's site version's
  *    (`compareSiteSettings`): each difference SETTINGS_SITE_MEMBER_DIFFERS:<row>[.<member>], a row or member this code
  *    never classified SETTINGS_ROW_UNCLASSIFIED:<row>[.<member>].
- * SA10 (addition D19, D24 item 5) adds the line-up's target and socket checks against this API's own declared targets as
- * further steps (what keeps every seatable model's company on the providers page). The condition codes are REPORT codes
+ *  - on the preview only (SA10, addition D19 and D24 item 5): the version's line-up (its row, else the env's; neither:
+ *    PREVIEW_LINE_UP_REQUIRED) and condition 3 for its SEATABLE SET (both rosters, the four seats' models, the
+ *    structure-repair model when a declared target serves it) against THIS API's own declared targets and `api.env`:
+ *    SETTINGS_NEEDS_ENV_CHANGE:TARGET:<model> (no target of this API serves it: this is also what keeps every seatable
+ *    model's company on the providers page, which lists the companies of exactly these targets) and
+ *    SETTINGS_NEEDS_ENV_CHANGE:GATE_SOCKET:<provider> (its gate has no socket here). No website input: the page asks
+ *    this API (D24 item 5). Condition 6's code copy (reviewed rows, menus, ceilings) is the runner half's.
+ * The condition codes are REPORT codes
  * (returned, never thrown); SETTINGS_CHECK_NO_AI_CALL, thrown by the check's never-sending fetch, is in both
  * KNOWN_DOMAIN_CODES lists (ruling R57b).
  */
@@ -149,19 +161,25 @@ export type AdmissionCheckReaders = Readonly<{
   loadVersion: (pool: Pool, version: number, site: AdmissionSiteContext) => Promise<unknown>;
   readVersionFacts: (pool: Pick<Pool, "query">, version: number) => Promise<SettingsVersionFacts | null>;
   readComparisonRows: (pool: Pick<Pool, "query">, version: number) => Promise<readonly SettingsComparisonRow[]>;
+  /** SA10: the version's line-up row as sealed (shape only), or null without the row (`readSealedPreviewLineUp`). */
+  readLineUp: (pool: Pool, version: number) => Promise<SealedPreviewLineUp | null>;
+  /** SA10: the four seat refs the version names, by the register's own readers (`readSettingsSeatRefs`). */
+  readSeatRefs: (pool: Pool, version: number) => Promise<readonly string[]>;
 }>;
 
 export const ADMISSION_CHECK_READERS: AdmissionCheckReaders = Object.freeze({
   readSite: readAdmissionCheckSite,
   loadVersion: (pool: Pool, version: number, site: AdmissionSiteContext) => loadAdmissionSettings(pool, version, site),
   readVersionFacts: readSettingsVersionFacts,
-  readComparisonRows: readSettingsComparisonRows
+  readComparisonRows: readSettingsComparisonRows,
+  readLineUp: readSealedPreviewLineUp,
+  readSeatRefs: readSettingsSeatRefs
 });
 
 /**
- * The API half's steps, in order (SA10 adds its own as further entries). The loader step is skipped (no code of its
- * own) when the site reads refused (their code already fails the half); the loader and condition 2 are skipped when
- * the version is not a sealed GENERAL one (SETTINGS_VERSION_KIND_INVALID already fails it).
+ * The API half's steps, in order (SA10 added the two preview line-up steps last). The loader step is skipped (no code
+ * of its own) when the site reads refused (their code already fails the half); the loader, condition 2 and the line-up
+ * steps are skipped when the version is not a sealed GENERAL one (SETTINGS_VERSION_KIND_INVALID already fails it).
  */
 export function admissionSettingsCheckSteps(input: Readonly<{
   pool: Pool;
@@ -173,6 +191,11 @@ export function admissionSettingsCheckSteps(input: Readonly<{
   const { pool, environment, version, readers } = input;
   let site: AdmissionSiteContext | undefined;
   let checkable = false;
+  const previewGate = environment.PREVIEW_GATE_SETTINGS;
+  // SA10: the version's line-up (its row, else the env's; null = neither), read once for both line-up steps.
+  let lineUpRead: Promise<SealedPreviewLineUp | null> | undefined;
+  const lineUpOf = () => (lineUpRead ??= (async () =>
+    settingsVersionLineUp(await readers.readLineUp(pool, version), environment.PREVIEW_ENV_LINE_UP))());
   return Object.freeze([
     {
       name: "hosted-cost-envelopes-sealed",
@@ -208,6 +231,25 @@ export function admissionSettingsCheckSteps(input: Readonly<{
         site: await readers.readComparisonRows(pool, environment.REGISTER_VERSION),
         candidate: await readers.readComparisonRows(pool, version)
       }).map(({ code, rowKey, member }) => `${code}:${rowKey}${member === undefined ? "" : `.${member}`}`)
+    },
+    {
+      // Addition D14: the version's line-up exists (its row, or the env's old forms); else the boot's own refusal.
+      name: "preview-line-up",
+      run: async () => (previewGate !== undefined && checkable && await lineUpOf() === null ? ["PREVIEW_LINE_UP_REQUIRED"] : [])
+    },
+    {
+      // Condition 3 for the line-up (addition D19, D24 item 5): every seatable model is served by THIS API's declared
+      // targets and has its gate's socket in this API's env.
+      name: "line-up-environment",
+      run: async () => {
+        if (previewGate === undefined || !checkable || site === undefined) return [];
+        const declaredModels = site.declaredProviderTargets.map((target) => target.model);
+        const seatable = settingsSeatableModels({
+          lineUp: await lineUpOf() ?? { free_model_ids: [], premium_model_ids: [], thinking_levels: null },
+          seatRefs: await readers.readSeatRefs(pool, version), declaredModels
+        });
+        return settingsLineUpEnvironmentCodes({ seatable, declaredModels, gate: previewGate });
+      }
     }
   ]);
 }

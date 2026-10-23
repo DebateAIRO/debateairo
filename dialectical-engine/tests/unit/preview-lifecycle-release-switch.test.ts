@@ -57,6 +57,8 @@ type Options = Partial<{
   settings: Record<string, { expectedActiveSettings: number | null; activate: number | null; planned?: boolean } | string>;
   // S15: the database's settings refusal of a switch write (the hook's CAS, or the COMMIT's deferred check).
   settingsRefusal: string | undefined;
+  // SA10, ruling R60: the live condition 6's refusal for a forward switch's --activate <v> (settings-version.mjs checkSettingsGatesLive).
+  gatesLive: string | undefined;
 }>;
 const fail = (code: string) => Object.assign(new Error(code), { code });
 const result = (stdout = '', code: number | null = 0) => ({ code, signal: null, error: undefined, timedOut: false, overflow: false, stdout: Buffer.from(stdout), stderr: Buffer.from('') });
@@ -74,7 +76,8 @@ function host(options: Options = {}) {
   const o = { history: DEFAULT_HISTORY, units: {} as Record<string, string>, started: {} as Record<string, Record<string, unknown> | null>, gates: {} as Record<string, string>,
     maintenance: false, eventFails: {} as Record<string, string>, stopRecorder: true, slots: { 'old-v1': 'A', 'new-v1': 'B', 'older-v1': 'A' } as Record<string, string>,
     openWork: {} as Record<string, number>, startAnnounces: true, runnerDispatched: 0, lockLabels: ['old-v1', 'new-v1'],
-    settings: {} as Record<string, { expectedActiveSettings: number | null; activate: number | null } | string>, settingsRefusal: undefined as string | undefined, ...options };
+    settings: {} as Record<string, { expectedActiveSettings: number | null; activate: number | null } | string>, settingsRefusal: undefined as string | undefined,
+    gatesLive: undefined as string | undefined, ...options };
   let clock = START, invocations = 0, switchCount = 0;
   const log: string[] = [], switchCalls: (string | null)[][] = [], timeouts: [string, number][] = [];
   const events: { key: string; kind: string; reason: string | null; at: number; ttf: number | null }[] = [];
@@ -262,6 +265,11 @@ function host(options: Options = {}) {
       const plan = o.settings[newKey] ?? { expectedActiveSettings: null, activate: null };
       if (typeof plan === 'string') throw Object.assign(fail(plan), { fields: { passed: ['20'] } });
       return { planned: true, ...plan };
+    },
+    checkGatesLive: async ({ label, version }: { label: string; version: number }) => {
+      log.push(`read:gates-live(${label} ${version})`);
+      if (o.gatesLive !== undefined) throw Object.assign(fail(o.gatesLive), { fields: { codes: [`SETTINGS_GATE_MODEL_DISABLED:deepinfra:deepseek-ai/DeepSeek-V4.1-Flash`] } });
+      return { version, checked: true };
     },
     readEdgeSecret: async () => { log.push('read:secret'); return SECRET; },
     pathExists: async (path: string) => { log.push(`read:exists(${path})`); return (o.maintenance && path === '/etc/debateai-v3-preview/lifecycle/maintenance-pending') || Object.hasOwn(files, path); },
@@ -660,6 +668,44 @@ describe('the switch\'s settings step (side-by-side spec §13, §11; S15, ruling
     const broken = host({ history: AFTER_SWITCH, units: AFTER_SWITCH_UNITS, settings: { [OLD_KEY]: 'SETTINGS_PLAN_UNAVAILABLE' } });
     expect((await refusal(rollbackRelease({ to: 'old-v1', from: 'new-v1', layout, deps: broken.deps }))).code).toBe('SETTINGS_PLAN_UNAVAILABLE');
     expect(broken.writes()).toEqual([]);
+  });
+
+  it('ruling R60: a forward switch\'s --activate <v> (not the new release\'s own site version) runs the live condition 6 for the new release before the write', async () => {
+    const h = host({ settings: { [NEW_KEY]: { expectedActiveSettings: 19, activate: 21 } } });
+    await switchRelease({ to: 'new-v1', from: 'old-v1', activate: 21, layout, deps: h.deps });
+    const at = h.log.indexOf('read:gates-live(new-v1 21)');
+    expect(at).toBeGreaterThan(h.log.indexOf('read:settings-plan(new from new-v1,old-v1 21)'));
+    expect(at).toBeLessThan(h.log.indexOf(h.writes()[0]!));
+    // Refused (a model it seats is off, or a gate runs other code): its code and codes, and nothing written.
+    for (const code of ['SETTINGS_GATE_LIVE_CHECK_FAILED', 'SETTINGS_GATE_HELPER_DIFFERS']) {
+      const off = host({ settings: { [NEW_KEY]: { expectedActiveSettings: 19, activate: 21 } }, gatesLive: code });
+      expect(await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', activate: 21, layout, deps: off.deps })))
+        .toMatchObject({ code, fields: { codes: ['SETTINGS_GATE_MODEL_DISABLED:deepinfra:deepseek-ai/DeepSeek-V4.1-Flash'] } });
+      expect(off.writes()).toEqual([]);
+    }
+    // An untyped failure of the check is never a pass.
+    const broken = host({ settings: { [NEW_KEY]: { expectedActiveSettings: 19, activate: 21 } } });
+    broken.deps.checkGatesLive = async () => { throw new Error('socket hang up'); };
+    expect((await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', activate: 21, layout, deps: broken.deps }))).code).toBe('SETTINGS_OPERATOR_UNAVAILABLE');
+    expect(broken.writes()).toEqual([]);
+  });
+
+  it('ruling R60: the own site version (Q-S2, with or without --activate), an --activate that is already the pointer, a revert and a rollback skip the live check', async () => {
+    const own = host({ settings: { [NEW_KEY]: { expectedActiveSettings: 19, activate: 20 } } });
+    await switchRelease({ to: 'new-v1', from: 'old-v1', activate: 20, layout, deps: own.deps });
+    const automatic = host({ settings: { [NEW_KEY]: { expectedActiveSettings: null, activate: 20 } } });
+    await switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: automatic.deps });
+    const pointer = host({ settings: { [NEW_KEY]: { expectedActiveSettings: 21, activate: null } } });
+    await switchRelease({ to: 'new-v1', from: 'old-v1', activate: 21, layout, deps: pointer.deps });
+    const rollback = host({ history: AFTER_SWITCH, units: AFTER_SWITCH_UNITS, settings: { [OLD_KEY]: { expectedActiveSettings: 21, activate: 18 } } });
+    await rollbackRelease({ to: 'old-v1', from: 'new-v1', layout, deps: rollback.deps });
+    for (const h of [own, automatic, pointer, rollback]) expect(h.log.filter(line => line.startsWith('read:gates-live'))).toEqual([]);
+    expect(rollback.writes().filter(entry => entry.startsWith('recordReleaseSwitch'))).toEqual(['recordReleaseSwitch(old→, expect new, 8s, settings 21 → activate 18 by root rollback (rollback to old))']);
+    // The revert after a forward --activate re-activates what was active before without a second check.
+    const reverted = host({ edgeAfter: [[site(OLD_KEY, 503, ['DRAINING'])]], settings: { [NEW_KEY]: { expectedActiveSettings: 18, activate: 21 } } });
+    await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', activate: 21, layout, deps: reverted.deps }));
+    expect(reverted.log.filter(line => line.startsWith('read:gates-live'))).toEqual(['read:gates-live(new-v1 21)']);
+    expect(reverted.writes().filter(entry => entry.startsWith('recordReleaseSwitch'))[1]).toBe('recordReleaseSwitch(old→, expect new, 8s, settings 21 → activate 18 by root release-switch (switch reverted to old))');
   });
 
   it('the seed passes the pointer too (all four switch writes, ruling R12)', async () => {
