@@ -911,12 +911,23 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     expect(prose).toContain('PREVIEW_LINE_UP_ENV_CONFLICT');
     // Step 4, before SB11: both halves check the new release's own site version.
     expect(t1Blocks[2]!.lines).toContain('RC=0; OUT=$(lc settings-version.mjs check "$LABEL" "$V" 2>&1) || RC=$?');
+    // Owner 2026-10-23 (R79, R81): that same check is named as the dry check of the stricter one-call rule, before the
+    // switch; a PASS tightens the boot in the upload after T+1, a FAIL stops for the owner.
+    const t1Prose = t1.replace(/\s+/g, ' ');
+    for (const text of ['This is also the dry check of the stricter "run ceiling covers one call" rule',
+      '`settings-version.mjs check <label> <site version>` (the block below, before the switch)', 'fails `RUN_CEILING_BELOW_ONE_CALL` if not.',
+      'If the check passes, the boot is made just as strict in the upload after T+1 (a follow-up code change, not part of this upload).',
+      'If it fails with that code, nothing has started: stop and ask the owner before WB1 or anything else.']) expect(t1Prose, text).toContain(text);
+    expect(t1Prose.indexOf('This is also the dry check')).toBeLessThan(t1Prose.indexOf('RC=0; OUT=$(lc settings-version.mjs check "$LABEL" "$V" 2>&1) || RC=$?'));
     // None of these blocks is a step of its own (the settings steps stay SV0-SV6, the upload's stay as STEPS).
     for (const block of t1Blocks) expect(stepOf(block)).toBeNull();
-    // The providers page: automatic, one release later to drop a company, a manual notice before adding one.
+    // The providers page: automatic, one release later to drop a company; no notice before adding one (owner 2026-10-23
+    // reworded the page's promise, superseding R21's manual advance-notice step).
     const providers = sectionOf(guide, '### The providers page').replace(/\s+/g, ' ');
-    for (const text of ['A line-up or model change never needs a website upload.', 'Adding a company is an upload', 'Advance notice first (manual).',
-      'A company leaves the targets one release later.', 'now only sets the new-debate page\'s fallback list']) expect(providers, text).toContain(text);
+    for (const text of ['A line-up or model change never needs a website upload.', 'Adding a company is an upload',
+      'No notice goes out first: the page says "This list is kept up to date automatically. It always shows the companies we currently send data to."',
+      'A company leaves the targets one release later.', 'never in that same upload', 'now only sets the new-debate page\'s fallback list']) expect(providers, text).toContain(text);
+    for (const gone of ['Advance notice first', 'We tell you before a new provider receives any data']) expect(guide.replace(/\s+/g, ' '), gone).not.toContain(gone);
   });
 
   it('the switch activates the new release\'s own site version (SB13, DR6), and the old re-pin sections point to the activation', () => {

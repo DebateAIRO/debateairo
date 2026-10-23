@@ -2758,6 +2758,13 @@ echo "api-$LABEL.env and runner-$LABEL.env: sockets-only (the line-up lives in t
    (`PREVIEW_LINE_UP_REQUIRED`: SB3 ran without `LINEUP`); so does a model no target serves. On FAIL nothing has started:
    WB1 (drained path: rbD-B), then a corrected upload.
 
+   **This is also the dry check of the stricter "run ceiling covers one call" rule (rulings R79, R81; owner,
+   2026-10-23).** `settings-version.mjs check <label> <site version>` (the block below, before the switch) asks of every
+   version, the site's own included, whether one debate's arguing ceiling pays for the first call of each preview
+   line-up (free and premium), and fails `RUN_CEILING_BELOW_ONE_CALL` if not. The services' boot does not ask this of the
+   site version yet. If the check passes, the boot is made just as strict in the upload after T+1 (a follow-up code
+   change, not part of this upload). If it fails with that code, nothing has started: stop and ask the owner before WB1 or anything else.
+
 ```sh
 set -euo pipefail
 . /root/preview-archive/rNN-names.sh
@@ -2780,17 +2787,15 @@ echo "the new release passes its own site version $V"
   company the page already names.
 - **Adding a company is an upload**, never an activation: its code, a reviewed spending gate, its targets in the env,
   and its legal facts checked by a person into the catalogue (`apps/ui/lib/legal/pages.ts`). The page lists it from that
-  release on, when that release's API serves.
-- **Advance notice first (manual).** The page promises "We tell you before a new provider receives any data". So before
-  any upload that adds a company, the owner tells the users, and the upload waits until that notice has gone out; the
-  page cannot do this by itself, because it lists a company only once the release that reaches it serves (owner to
-  confirm: ruling R21).
-- **A company leaves the targets one release later.** Drop a company's targets only in an upload after the release in
-  which it stopped being seated (by an activation or an upload), never in that same upload. During a side-by-side switch
-  the old release's runner finishes its own debates (up to the 6 h ceiling) while the page already follows the new
-  release's API: dropping the company at once would take it off the page while it may still receive text. The tools
-  hold the first half of the order: a release without the company's targets refuses a settings version that still seats
-  one of its models (the check names `SETTINGS_NEEDS_ENV_CHANGE:TARGET:<model>`).
+  release on: the switch hands the website and the API to the new release together, before its runner takes a debate.
+  No notice goes out first: the page says "This list is kept up to date automatically. It always shows the companies we
+  currently send data to." (owner, 2026-10-23).
+- **A company leaves the targets one release later.** The page shows only what the API it is served by can reach, but
+  after a switch the old release's runner keeps finishing its own debates for up to 6 hours, still sending text to the
+  companies it used. So take a company's targets out only in an upload after the release that stopped using it (by an
+  activation or an upload), never in that same upload; otherwise the page would drop the company while it may still
+  receive text. The tools hold the first half of the order: a release without the company's targets refuses a settings
+  version that still seats one of its models (the check names `SETTINGS_NEEDS_ENV_CHANGE:TARGET:<model>`).
 - **The website build's model list** (`ui-build --models`, `NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON`) now only sets the
   new-debate page's fallback list (shown when an older API sends no line-up with the room read), the new-debate page's
   maximum depth (a build with the flag set offers the preview's shallower ceiling) and the ask proxy's time limit for the
