@@ -139,6 +139,12 @@ describe("the rows are the companies the API answers (addition D24)", () => {
       expect(html).toContain(escaped(en["legal.providers.intro"]));
     }
   });
+
+  it("the intro promises an automatic, current list, not advance notice (owner 2026-10-23, supersedes ruling R21)", () => {
+    const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={en} entries={[DEEPINFRA_PROVIDER, SUPPORT_PROVIDER]} />);
+    expect(html).toContain("This list is kept up to date automatically. It always shows the companies we currently send data to.");
+    expect(html).not.toContain("We tell you before a new provider receives any data.");
+  });
 });
 
 describe("no row names a model, in any of the 35 languages (owner 2026-10-22: providers, not models)", () => {
