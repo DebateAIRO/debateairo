@@ -644,6 +644,8 @@ const VARS: Readonly<Record<string, string>> = Object.freeze({
   YES: 'ab'.repeat(32), GRR: '01'.repeat(32), LIFE: 'yes',
   // Side-by-side spec §13 (Task S18): the switch's settings version, and the settings-activation section's names.
   ACT: '18', V: '19', OLDV: '18', BY: 'Stefan Nour', WHY: 'shorter answers for the test team',
+  // Final fix wave S10: the active version SB13 and DR6 read, passed to the switch as --expect-active.
+  AVN: '17',
   FROM: '/opt/debateai-v3-preview/artifacts/settings-v18/native-plan-verify.json',
   SART: '/opt/debateai-v3-preview/artifacts/settings-20261023t120000z', VART: '/opt/debateai-v3-preview/artifacts/settings-v19',
   HB: '{"billing":"on","perRunCeilingMicros":2500000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}',
@@ -924,7 +926,8 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
       const sw = lines.findIndex(line => line.includes('lc release-switch.mjs switch --to "$LABEL" --from "$OLABEL"'));
       expect(act, step).toBeGreaterThan(-1);
       expect(sw, step).toBeGreaterThan(act);
-      expect(lines[sw], step).toContain('--activate "$ACT" 2>&1) || SC=$?');
+      // Final fix wave S10: the switch also refuses if the active version moved after the step's own read (AVN).
+      expect(lines[sw], step).toContain('--activate "$ACT" --expect-active "$AVN" 2>&1) || SC=$?');
     }
     const kitV2 = sectionOf(guide, '## Publishing a new register version on the preview (publish kit v2)');
     expect(kitV2.indexOf('steps 5 and 6 are not how a settings change')).toBeLessThan(kitV2.indexOf('5. **Point both environment files at the new version.**'));
@@ -968,14 +971,57 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     expect(section.replace(/\s+/g, ' ')).toContain('Never activate while an upload is between its SB3 and its SB13');
   });
 
+  it('final fix wave S7: the drained path reads the active version before DR2 starts the downtime; DR6\'s guard names the downtime and rbD-B', () => {
+    const dr2 = scriptOf('DR2').lines;
+    const read = dr2.findIndex(line => line.startsWith('AVN=$(activev) || '));
+    const guard = dr2.findIndex(line => line.startsWith('[ "$AVN" = "$(cat "$S/active-before")" ] && [ "$AVN" = "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" ] || '));
+    const downtime = dr2.findIndex(line => line.startsWith('date -u +%s >> "$S/downtime-start-epoch"'));
+    expect(read).toBeGreaterThan(-1);
+    expect(guard).toBe(read + 1);
+    expect(guard).toBeLessThan(downtime);
+    expect(dr2[guard]).toContain('DR2_NOT_DONE: settings were activated since SB3 (active $AVN; nothing was stopped)');
+    const dr6 = scriptOf('DR6').lines;
+    const dr6Guard = dr6.find(line => line.startsWith('[ "$AVN" = "$(cat "$S/active-before")" ] && '))!;
+    expect(dr6Guard).toContain('the site is DOWN since DR2');
+    expect(dr6Guard).toContain('rbD-B');
+  });
+
   it('SV1 keeps the active version\'s hosted inputs and choices; SV2 keeps the publish plan; the line-up draft never blocks a re-run', () => {
     const sv1 = steps.find(block => stepOf(block) === 'SV1')!.lines;
     expect(sv1).toContain('HB=$(jq -c .hostedBilling "$FROM")                         # the active version\'s hosted inputs; only perRunCeilingMicros may change');
     expect(sv1.join('\n')).toContain('.hostedBilling | {billing,dailyCeilingMicros,askRoomReads}');
     expect(sv1.find(line => line.startsWith('rel native-plan --operation plan --from "$FROM" '))).toContain('${DS:+--checker deepseek --deepseek-enabled-on-gate yes} ${SEATS:+--answer-seats "$SEATS"} ${ROT:+--role-rotation "$ROT"}');
-    expect(steps.find(block => stepOf(block) === 'SV2')!.lines).toContain('install -o root -g root -m 0644 "$SART/native-plan-publish.json" "$VART/native-plan-publish.json"');
+    // Final fix wave S7: each install line of SV2 carries its own SV2_NOT_DONE marker.
+    const sv2 = steps.find(block => stepOf(block) === 'SV2')!.lines;
+    const copy = sv2.find(line => line.startsWith('install -o root -g root -m 0644 "$SART/native-plan-publish.json" "$VART/native-plan-publish.json" || '));
+    expect(copy).toContain('SV2_NOT_DONE: ');
+    expect(sv2.find(line => line.startsWith('install -d -o root -g root -m 0755 "$VART" || '))).toContain('SV2_NOT_DONE: ');
     const lineUp = blocks.find(block => block.lines.some(line => line.includes('--print-line-up')))!.lines;
     expect(lineUp.find(line => line.includes('--print-line-up'))).toContain('> "$TMP" )');
     expect(lineUp.at(-2)).toBe('mv "$TMP" "$SART/line-up.json"');
+  });
+
+  it('final fix wave: the guide says what F2, F7, F8, S15 and S16 changed, in plain words', () => {
+    const prose = section.replace(/\s+/g, ' ');
+    // F2d (ruling R77): re-checking the active version can only record PASS; how to recover when new debates wait.
+    const sv3 = sectionOf(guide, '### SV3. The check (the dry boot) and its verdict').replace(/\s+/g, ' ');
+    expect(sv3).toContain('Re-checking the active version can only record PASS.');
+    expect(sv3).toContain('SETTINGS_VERDICT_ACTIVE_PAIR');
+    const uploads = sectionOf(guide, '### Settings and uploads').replace(/\s+/g, ' ');
+    expect(uploads).toContain('**If new debates wait ("switching") and do not start.**');
+    expect(uploads).toContain('activate a passed version');
+    expect(prose).toContain('ADMISSION_ACTIVE_VERSION_UNAVAILABLE');
+    // F7 (ruling R78): the rollback's order, in both places that describe it.
+    for (const text of [uploads, sectionOf(guide, WAY_BACK).replace(/\s+/g, ' ')]) {
+      expect(text).toContain('keeps the active version when');
+      expect(text).toContain('never a version it only checked');
+    }
+    // F8 (ruling R80): the switch's live gate check also covers the new release's own site version.
+    expect(uploads).toContain('whenever the version the switch activates differs from the active one');
+    // S15: two API processes may disagree for about a second.
+    expect(prose).toContain('for about a second after an activation two processes may disagree on the active version');
+    // S16 (ruling R28, built in this wave): the storyteller as its own story checker is refused, seats left out included.
+    expect(prose).toContain('answer-seats-storyteller-is-story-checker');
+    expect(prose).toContain('counting a seat left out as the seat it follows');
   });
 });

@@ -82,7 +82,7 @@ writing, so they take a few minutes each. `ui-build` refuses a folder that alrea
 | `operator-digest --source <file>` | prints `operatorManifestSha256` (the shared function the launchers use) and the operator file count |
 | `launch-plan --service api\|ui\|runner --slot A\|B --from <existing plan> --root <release root> --source-manifest <file> [--ui-build <file>] --native-attestation <file> --out <dir>/<service>-launch.json` | new launch plan: release fields from the manifests, the ports from the slot (A: website 3100, API 3101; B: 3200, 3201; never from `--from`), the env file `/etc/debateai-v3-preview/auth-dev-v1/<service>-<label>.env` of the release the root names (`--root` ends in `-<label>-<service>`), everything else from `--from`; for `--service runner` the API plan may be `--from` (identity from the runner OS account, `runner-<label>.env` custody); `validateLaunchPlan` before writing |
 | `native-plan --operation apply-and-plan\|verify --from <existing native plan> --source-manifest <candidate api manifest> --out <file>` | new native plan for a candidate API root; `verify` carries the `approval` of `--from` over unchanged; the reviewed `validateNativePlan` before writing |
-| `native-plan --operation plan --from <live verify plan> --source-manifest <candidate api manifest> [--checker glm\|deepseek --deepseek-enabled-on-gate yes] [--role-rotation on\|off] [--call-concurrency '<JSON object>'] [--debate-shape off\|'<JSON object>'] [--question-language '<JSON object>'] [--length-guidance '<JSON object>'] [--line-up <file>] [--answer-seats '<JSON object>'] --out <file>` | register publication, step 1: the base is the publication the preview runs now (`approval.publication` of the live verify plan: its version and snapshot hash, never typed); no approval. The answer checker stays GLM unless `--checker deepseek` is given together with `--deepseek-enabled-on-gate yes` (your statement that the gate's GO switches DeepSeek on). Role rotation stays on unless `--role-rotation off` is given: the rotation row is then published disabled (the preview's rollback for rotation; a later plan without the flag switches it back on, and its delta shows that row changing). `--call-concurrency` sets the call-concurrency row as one JSON object; without it the current value is kept, or there is no row if the base has none (see "Publishing the call-concurrency row" below). `--hosted-billing '<JSON object>'` composes a HOSTED version with publish kit v3 from the owner's billing switch, ceilings and room-read budget (see "Hosted preview with NETOPIA sandbox billing" below); a plan from a hosted base needs it (`HOSTED_BILLING_REQUIRED`). `publish` carries the plan's choices; `verify` and `apply-and-plan` carry `--from`'s hosted inputs. `--debate-shape` sets the debate shape row. `off` publishes it disabled: the start values with `enabled: false`, so the API asks today's shape, and a runner on that version still finishes the debates admitted with the shape. A JSON object (the whole policy, with its kind) publishes that policy; the register's own parser checks it on the server before any row is built. Without the option the current row is kept, or there is none. `--question-language` sets the optional `questionLanguagePolicy` row (the policy without its `kind`; `deploy/vps/register/README.md`); `"fastCheck": null` in it switches the fast language check off. Before anything is sealed the kit asks the API's own question-language boot refusals while the debate shape is in force (a reserved prompt-frame token in the instruction, a fast-check model the preview gate does not list). Without the option the base's row is kept, or there is none (the code's start values). Length guidance (LG-C) is optional: `--length-guidance '<JSON object>'` carries the whole policy, with its `kind`; use `"$(cat dialectical-engine/tools/preview-practice/length-policy-start.json)"` for the owners' start values (the preview practice's start file). The policy is about 4-5 KB, inside the native plan's 32 KiB limit. There is no `off` word: a version without the row is the rollback. Left out, the base's length-guidance row is kept as it is, or none. Only `plan` takes the flag; `publish` carries the plan's choice. The line-up and the answer seats (side-by-side spec §13 addition D23) are optional too. `--line-up <file>` names a root-owned 0644 JSON file in the artifacts folder holding the plan member that `dialectical-engine/tools/preview-practice/check-thinking-levels.ts --print-line-up --settings <api.env>` prints (`{"lineUp":{…}}`), or the bare line-up (`free_model_ids`, `premium_model_ids`, `thinking_levels`); it seals the `previewLineUpPolicy` row. Left out, the base's line-up row is kept as it is, or none (the env's line-up). `--answer-seats '{"writer":"preview:…","checker":"preview:…"}'` (optional `storyteller` and `storyChecker`, which otherwise follow the writer and the checker) chooses the four answer seats from the reviewed preview refs; never beside `--checker` (one way to set the checker), and never with the writer as its own checker. Left out, the seats are today's. Only `plan` takes these two flags; `publish` carries the plan's choices. |
+| `native-plan --operation plan --from <live verify plan> --source-manifest <candidate api manifest> [--checker glm\|deepseek --deepseek-enabled-on-gate yes] [--role-rotation on\|off] [--call-concurrency '<JSON object>'] [--debate-shape off\|'<JSON object>'] [--question-language '<JSON object>'] [--length-guidance '<JSON object>'] [--line-up <file>] [--answer-seats '<JSON object>'] --out <file>` | register publication, step 1: the base is the publication the preview runs now (`approval.publication` of the live verify plan: its version and snapshot hash, never typed); no approval. The answer checker stays GLM unless `--checker deepseek` is given together with `--deepseek-enabled-on-gate yes` (your statement that the gate's GO switches DeepSeek on). Role rotation stays on unless `--role-rotation off` is given: the rotation row is then published disabled (the preview's rollback for rotation; a later plan without the flag switches it back on, and its delta shows that row changing). `--call-concurrency` sets the call-concurrency row as one JSON object; without it the current value is kept, or there is no row if the base has none (see "Publishing the call-concurrency row" below). `--hosted-billing '<JSON object>'` composes a HOSTED version with publish kit v3 from the owner's billing switch, ceilings and room-read budget (see "Hosted preview with NETOPIA sandbox billing" below); a plan from a hosted base needs it (`HOSTED_BILLING_REQUIRED`). `publish` carries the plan's choices; `verify` and `apply-and-plan` carry `--from`'s hosted inputs. `--debate-shape` sets the debate shape row. `off` publishes it disabled: the start values with `enabled: false`, so the API asks today's shape, and a runner on that version still finishes the debates admitted with the shape. A JSON object (the whole policy, with its kind) publishes that policy; the register's own parser checks it on the server before any row is built. Without the option the current row is kept, or there is none. `--question-language` sets the optional `questionLanguagePolicy` row (the policy without its `kind`; `deploy/vps/register/README.md`); `"fastCheck": null` in it switches the fast language check off. Before anything is sealed the kit asks the API's own question-language boot refusals while the debate shape is in force (a reserved prompt-frame token in the instruction, a fast-check model the preview gate does not list). Without the option the base's row is kept, or there is none (the code's start values). Length guidance (LG-C) is optional: `--length-guidance '<JSON object>'` carries the whole policy, with its `kind`; use `"$(cat dialectical-engine/tools/preview-practice/length-policy-start.json)"` for the owners' start values (the preview practice's start file). The policy is about 4-5 KB, inside the native plan's 32 KiB limit. There is no `off` word: a version without the row is the rollback. Left out, the base's length-guidance row is kept as it is, or none. Only `plan` takes the flag; `publish` carries the plan's choice. The line-up and the answer seats (side-by-side spec §13 addition D23) are optional too. `--line-up <file>` names a root-owned 0644 JSON file in the artifacts folder holding the plan member that `dialectical-engine/tools/preview-practice/check-thinking-levels.ts --print-line-up --settings <api.env>` prints (`{"lineUp":{…}}`), or the bare line-up (`free_model_ids`, `premium_model_ids`, `thinking_levels`); it seals the `previewLineUpPolicy` row. Left out, the base's line-up row is kept as it is, or none (the env's line-up). `--answer-seats '{"writer":"preview:…","checker":"preview:…"}'` (optional `storyteller` and `storyChecker`, which otherwise follow the writer and the checker) chooses the four answer seats from the reviewed preview refs; never beside `--checker` (one way to set the checker), never with the writer as its own checker, and never with the storyteller as its own story checker (a seat left out counts as the seat it follows: storyteller → writer, story checker → checker). Left out, the seats are today's. Only `plan` takes these two flags; `publish` carries the plan's choices. |
 | `native-plan --operation publish --from <the plan above> --proposal <what the native operator printed for it> --source-manifest <same manifest> --out <file>` | step 2, after the owner reviewed the proposal: re-hashes every value the proposal shows and its `deltaSha256`, checks it belongs to that plan (release, operator digest, base), copies the approval from it, picks a fresh `publicationId`, and prints the approval it wrote |
 | `native-plan --operation verify --from <the publish plan> --publication <what the native operator printed for publish> --source-manifest <manifest> --out <file>` | step 3: the verify plan for the NEW publication (same id, base and snapshot as the publish plan) |
 | `launch-plan … --publication <what the native operator printed for publish>` | launch plans that carry the new publication instead of the old plan's; the `--native-attestation` proof must already name it |
@@ -2250,7 +2250,9 @@ when the change is done.
 
 **Never activate while an upload is between its SB3 and its SB13** (or a drained upload between SB3 and DR6): the
 upload's plan was made from the version active at SB3, and its switch stops (`SB13_NOT_DONE: settings were activated
-since SB3`) rather than undo the activation. Finish or give up the upload first.
+since SB3`) rather than undo the activation; an activation that lands even after that read refuses the switch itself
+(`--expect-active`, `SETTINGS_ACTIVE_VERSION_MOVED`). A drained upload checks it before DR2 too, before its downtime
+starts. Finish or give up the upload first.
 
 The plan must start from the active version. While the active version is the current release's own site version, the
 from-plan is that release's verify plan (`native-plan-<label>.json`, copied into `$S`). After an activation of another
@@ -2373,9 +2375,9 @@ put "$S/native-plan.before.json" || { echo "SV2_NOT_DONE: PUT THE VERIFY PLAN BA
 V=$(jq -r .publication.registerVersion "$SART/register-published.json")
 printf '%s\n' "$V" | grep -qxE '[1-9][0-9]*' || { echo "SV2_NOT_DONE: no published version read"; exit 1; }
 VART=/opt/debateai-v3-preview/artifacts/settings-v$V
-install -d -o root -g root -m 0755 "$VART"
+install -d -o root -g root -m 0755 "$VART" || { echo "SV2_NOT_DONE: the folder $VART could not be made (version $V IS published): ask"; exit 1; }
 rel native-plan --operation verify --from "$SART/native-plan-publish.json" --publication "$SART/register-published.json" --source-manifest "$ART/candidate-api-source.json" --out "$VART/native-plan-verify.json" || { echo "SV2_NOT_DONE: the release tool refused the verify plan of $V"; exit 1; }
-install -o root -g root -m 0644 "$SART/native-plan-publish.json" "$VART/native-plan-publish.json"
+install -o root -g root -m 0644 "$SART/native-plan-publish.json" "$VART/native-plan-publish.json" || { echo "SV2_NOT_DONE: the publish plan was not kept in $VART (version $V IS published): run this line again"; exit 1; }
 printf '%s\n' "$V" > "$S/new-register-version"
 echo "published settings version $V (not active); its verify and publish plans: $VART"
 echo SV2_DONE
@@ -2388,6 +2390,15 @@ release's own folder as its unit's user with its own env file (the runner half, 
 both lines as a receipt (`/opt/debateai-v3-preview/artifacts/lifecycle-current-<label>/settings-check-<version>-<UTC>.json`)
 and records the verdict. Exit 0 is PASS, 2 is FAIL (every code with one plain hint), 1 is refused (nothing recorded; a
 half that could not run says why).
+
+**Re-checking the active version can only record PASS.** The version new debates use now can be checked again on the
+current release (for example after a gate or env change). When it passes, the PASS is recorded. When it fails, the FAIL
+is not recorded (ruling R77): a FAIL there would stop every new debate at once. The check exits 1 with
+`SETTINGS_VERDICT_ACTIVE_PAIR`, every code it found with its hint, and then the line
+`DEBATEAI_SETTINGS_ACTIVE_PAIR NOT RECORDED: this is the active version: activate another passed version first, then re-check`.
+Nothing is written and new debates keep running on that version. To act on the failure, activate another version the
+release has passed first (its own site version always passes: SV6's script with that number, after the owner's fresh
+yes), then check the old one again.
 
 ```sh
 set -euo pipefail
@@ -2527,6 +2538,8 @@ Content-free lines (codes, versions, ids), in each unit's journal (`journalctl -
 | `{"kind":"DEBATEAI_ADMISSION_SETTINGS","code":"ADMISSION_SETTINGS_UNSUPPORTED","version":…,"cause":…}` | API, per version | the API cannot admit on the active version (`cause`: the loader's code): asks wait in line ("switching") or get the plain "try again in a minute"; report it |
 | `{"kind":"DEBATEAI_ADMISSION_SETTINGS","code":"ADMISSION_SETTINGS_NOT_PASSED","version":…}` | API, per refused ask | an ask without a waiting line met a version this release has not passed (a switch or an activation in between): refused plainly, nothing written or charged; the person asks again |
 | `{"kind":"DEBATEAI_ADMISSION_SETTINGS","code":"ADMISSION_ESTIMATOR_FALLBACK","version":…,"cause":…}` | API, once per version | the cost estimate for another debate's version could not be built; it was priced on the asking version's terms instead |
+| `{"kind":"DEBATEAI_ADMISSION_SETTINGS","code":"ADMISSION_ACTIVE_VERSION_UNAVAILABLE","version":…,"reason":…}` | API, at most once a minute, and at its start when its release is current | new asks wait ("switching") because the current release has not passed the active version (`NOT_PASSED`) or cannot load it (`UNSUPPORTED`): activate a passed version ("Settings and uploads") |
+| `DEBATEAI_SETTINGS_ACTIVE_PAIR NOT RECORDED: …` | the operator, after a `SETTINGS_VERDICT_ACTIVE_PAIR` refusal | a check of the active version failed and its FAIL was not recorded (SV3): new debates still use that version |
 
 **Two API processes.** Where more than one API process serves (hosted), each reads the pointer with its own 1 s cache, so
 for about a second after an activation two processes may disagree on the active version. A page that talks to both in
@@ -2551,20 +2564,32 @@ silent skip.
   activates the new release's own site version by itself (owner answer Q-S2). SB13 and DR6 therefore name
   `--activate "$ACT"`, `ACT` being the new release's own site version (the number in `KEY`): the upload's version
   becomes the active one in the switch's own transaction. To keep another version active instead, check it with the new
-  release first (`settings-version.mjs check <new label> <version>`, after SB10 pinned it), and set `ACT` to it; a
-  forward `--activate` of a version other than the new release's own runs the live gate check before the switch (both
-  gates must answer).
-- **The way back activates by itself.** A rollback (WB2, and WB3's retry) activates the target release's latest version
-  whose latest verdict is still PASS, else its own site version. A switch that reverts by itself (`SWITCH_REVERTED`)
-  puts back what was active before; after a switch between two releases on one site version it activates nothing.
-  Neither asks the gates: putting back a known state must work while a gate is down.
+  release first (`settings-version.mjs check <new label> <version>`, after SB10 pinned it), and set `ACT` to it. The
+  switch runs the live gate check before it writes anything whenever the version the switch activates differs from the
+  active one (the new release's own site version included: it may carry a new line-up; ruling R80); both gates must
+  answer. SB13 and DR6 also pass the active version they read as `--expect-active`, so an activation that lands after
+  their read refuses the switch (`SETTINGS_ACTIVE_VERSION_MOVED`, nothing written).
+- **The way back activates by itself.** A rollback (WB2, and WB3's retry) keeps the active version when the target
+  release has passed it (it activates nothing); else it activates the version that was active the last time the target
+  was current, while the target still passes it; else the target's own site version: never a version it only checked
+  and never ran (ruling R78). A switch that reverts by itself (`SWITCH_REVERTED`) puts back what was active before;
+  after a switch between two releases on one site version it activates nothing. Neither asks the gates: putting back a
+  known state must work while a gate is down.
+- **If new debates wait ("switching") and do not start.** The API prints
+  `{"kind":"DEBATEAI_ADMISSION_SETTINGS","code":"ADMISSION_ACTIVE_VERSION_UNAVAILABLE","version":…,"reason":…}` at most
+  once a minute, and once at its start when its release is current: the current release has not passed the active
+  version (`NOT_PASSED`), or this release's code cannot load it (`UNSUPPORTED`, for example after an env change and a
+  restart). Nothing is lost: the asks wait in line, uncharged. To recover, activate a passed version:
+  `lc settings-version.mjs status` names the versions the current release passed (its own site version always passes);
+  run SV6's script with one of them after the owner's fresh yes. The waiting asks start within a minute.
 - **An upload follows the active version.** SB1 records the active settings version (`$S/active-before`; a release
   without the settings operator: its own site version). SB3 plans from it, as SV1 does: from the old release's verify
   plan while that is its site version, else from the kept `settings-v<version>` plans, with the hosted inputs, the
   checker or answer seats and rotation read from them, so the new site version keeps every activated debate setting.
   SB9 and DR5 publish only a proposal based on it.
-- **Never activate while an upload is between SB3 and SB13** (or DR6). SB13 and DR6 read the active version again and
-  stop, nothing changed, when it is not the one SB3 planned from: switching would undo that activation.
+- **Never activate while an upload is between SB3 and SB13** (or DR6). SB13 and DR6 (and DR2, before the drained
+  path's downtime starts) read the active version again and stop, nothing changed, when it is not the one SB3 planned
+  from: switching would undo that activation.
 
 ### The line-up, the thinking levels and the answer seats (side-by-side spec §13 addition)
 
@@ -2589,8 +2614,11 @@ SV6. Examples of what the owner can ask for this way:
 - `answerSeats`: `writer` and `checker`, optionally `storyteller` and `storyChecker` (which otherwise follow the writer
   and the checker), each a reviewed preview ref (`preview:fixture-a`, `preview:fixture-b`, `preview:deepseek-v4-1-flash`,
   `preview:mimo-v2-6-pro`, `preview:qwen-3-8-flash`, `preview:claude-haiku-5-5`), from `--answer-seats '<JSON>'`. The
-  same seat ref as writer and checker is refused, and so is the same ref as storyteller and story checker (refs, not
-  models: `preview:fixture-a` and `preview:fixture-b` are both GLM). Left out, the seats of the active version's publish plan are kept (SV1 reads them from `CP`).
+  same seat ref as writer and checker is refused (`answer-seats-writer-is-checker`), and so is a storyteller that is its
+  own story checker, counting a seat left out as the seat it follows (storyteller → writer, story checker → checker):
+  `{"writer":"preview:claude-haiku-5-5","checker":"preview:fixture-b","storyteller":"preview:fixture-b"}` is refused
+  (`answer-seats-storyteller-is-story-checker`; ruling R28). Refs, not models: `preview:fixture-a` and
+  `preview:fixture-b` are both GLM. Left out, the seats of the active version's publish plan are kept (SV1 reads them from `CP`).
 
 **The thinking menus.** Only a word on an AI's reviewed menu is accepted: GLM `high`, `low`; DeepSeek `high`, `low`,
 `none`; Qwen `default`, `low`, `medium`, `none`; MiMo `default`, `none`; Claude Haiku `high`, `medium`, `low`. The step
@@ -2599,7 +2627,7 @@ names are those of `deploy/preview-auth-dev/v1/README.md` ("The optional `thinki
 row. The release tool checks only the file's shape; the native operator's run then stops before anything is sealed and
 prints the code (Ruling R72), for example `PREVIEW_THINKING_LEVELS_INVALID:level:Qwen/Qwen3.8-Flash`,
 `PREVIEW_LINE_UP_POLICY_INVALID:maker_rule`, `PREVIEW_LINE_UP_POLICY_INVALID:free_model_ids:unreviewed` or, for the seats,
-`PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seats-writer-is-checker`. To see a line-up debate before publishing it, use the
+`PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seats-writer-is-checker` (or `…: answer-seats-storyteller-is-story-checker`). To see a line-up debate before publishing it, use the
 practice's trial (tools/preview-practice/README.md, "Trying a new line-up before an activation"). A new word needs a
 reviewed gate change first (new gate code, root's restart of the gate): an upload, not an activation.
 
@@ -4562,10 +4590,13 @@ version, so without `--activate` the switch would refuse `SETTINGS_VERSION_NOT_P
 passed) before anything is written. The script names `ACT`, the new release's own site version (the number in `KEY`):
 the upload's own version becomes active with the switch. The first T+1 switch, with nothing ever activated, would
 activate it even without the argument (owner answer Q-S2). Set `ACT` to another version only on the owner's word, after
-`settings-version.mjs check "$LABEL" <version>` passed it (SB10 must have pinned the new release first); such a forward
-`--activate` first runs the live gate check of an activation (both gates must answer). Before the switch, the script
-reads the active version again: it must still be the one SB3 planned from (`$S/active-before`, the proposal's base),
-else it stops with nothing changed, since activating `ACT` would undo the activation made meanwhile. "Changing debate
+`settings-version.mjs check "$LABEL" <version>` passed it (SB10 must have pinned the new release first). Whenever the
+version the switch activates differs from the active one (the upload's own site version too: SB3's `LINEUP` can give it
+a new line-up), the switch first runs the live gate check of an activation (both gates must answer; ruling R80).
+Before the switch, the script reads the active version again: it must still be the one SB3 planned from
+(`$S/active-before`, the proposal's base), else it stops with nothing changed, since activating `ACT` would undo the
+activation made meanwhile. It hands that version to the switch as `--expect-active "$AVN"`: an activation landing after
+this read still refuses the switch (`SETTINGS_ACTIVE_VERSION_MOVED`) before anything is written. "Changing debate
 settings without an upload" has the whole settings flow.
 
 What a visitor sees during the switch is watched by the operator, with the owner's own password, from the Mac. Before
@@ -4592,7 +4623,7 @@ set -euo pipefail
 AVN=$(activev) || { echo "SB13_NOT_DONE: settings-version.mjs status refused (nothing changed): ask"; exit 1; }
 [ "$AVN" = "$(cat "$S/active-before")" ] && [ "$AVN" = "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" ] || { echo "SB13_NOT_DONE: settings were activated since SB3 (active $AVN; nothing changed): ask"; exit 1; }
 ACT=${KEY%%-*}; ACT=${ACT#r}                              # the settings version the switch activates: this release's own site version
-SC=0; SW=$(lc release-switch.mjs switch --to "$LABEL" --from "$OLABEL" --activate "$ACT" 2>&1) || SC=$?
+SC=0; SW=$(lc release-switch.mjs switch --to "$LABEL" --from "$OLABEL" --activate "$ACT" --expect-active "$AVN" 2>&1) || SC=$?
 echo "$SW"
 printf '%s\n' "$SW" > "$S/switch.json"
 case "$SC" in
@@ -4778,9 +4809,11 @@ the upload stopped:
 | SB13 said `SWITCH_REVERT_FAILED` or `SWITCH_REVERT_UNCONFIRMED` | stop and ask: read `release-check.mjs status` first |
 
 **The settings each way back activates (side-by-side spec §11, §13).** Nothing to do by hand, and no gate is asked:
-putting back a known state must work while a gate is down. WB2's rollback activates the old release's latest settings
-version whose latest verdict is still PASS, else its own site version. WB3's retry is the same rollback command towards
-the new release, so it activates the new release's latest still-passing version, else its own site version. A switch
+putting back a known state must work while a gate is down. WB2's rollback keeps the active version when the old release
+has passed it (it activates nothing); else it activates the version that was active the last time the old release was
+current, while the old release still passes it; else the old release's own site version: never a version it only checked
+and never ran (ruling R78). WB3's retry is the same rollback command towards the new release, in the same order (after
+`SWITCH_REVERTED` that is the version its switch activated). A switch
 that reverts by itself (`SWITCH_REVERTED`) puts back the version that was active before it; between two releases on one
 site version it activates nothing. WB1 and WB4 activate nothing (WB4 never writes the switch). Afterwards
 `lc settings-version.mjs status` prints the pointer.
@@ -4931,7 +4964,9 @@ echo DR1_DONE
 #### DR2. The downtime starts: nothing open, the old release stopped
 
 The old website and API stop first (no new debate can be admitted), then the old runner, but only once none of its work
-is READY or CLAIMED: it is the drained path's one planned runner stop, with nothing to do.
+is READY or CLAIMED: it is the drained path's one planned runner stop, with nothing to do. The settings guard of DR6
+runs here too, before the downtime starts: when settings were activated since SB3, DR2 stops with nothing stopped (a new
+plan from SB3 and a new yes), instead of DR6 stopping later with the site down.
 
 ```sh
 set -euo pipefail
@@ -4941,6 +4976,8 @@ set -euo pipefail
 [ "$(psqlq "SELECT count(*) FROM core.run_waiting_v")" = 0 ] || { echo "DR2_NOT_DONE: a debate is waiting in line (nothing was stopped): ask"; exit 1; }
 [ "$(gs "$GD" "$PD" | jq -r .in_flight)" = 0 ] && [ "$(gs "$GAN" "$PAN" | jq -r .in_flight)" = 0 ] || { echo "DR2_NOT_DONE: a gate has a call in flight (nothing was stopped)"; exit 1; }
 [ "$(lc release-check.mjs status | jq -r --arg o "$OLABEL" '.releases[] | select(.label == $o) | .state')" = CURRENT ] || { echo "DR2_NOT_DONE: the old release is not current (nothing was stopped)"; exit 1; }
+AVN=$(activev) || { echo "DR2_NOT_DONE: settings-version.mjs status refused (nothing was stopped): ask"; exit 1; }
+[ "$AVN" = "$(cat "$S/active-before")" ] && [ "$AVN" = "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" ] || { echo "DR2_NOT_DONE: settings were activated since SB3 (active $AVN; nothing was stopped): a new plan from SB3 and a new yes"; exit 1; }
 date -u +%s >> "$S/downtime-start-epoch"; echo "DOWNTIME START $(date -u)"
 systemctl stop "debateai-preview-ui@$OLABEL" "debateai-preview-api@$OLABEL" debateai-preview-backup.timer || { echo "DR2_NOT_DONE: the stop of the old pair failed"; exit 1; }
 for U in "debateai-preview-ui@$OLABEL" "debateai-preview-api@$OLABEL" debateai-preview-backup.timer; do case "$(systemctl is-active "$U" || true)" in inactive|failed) ;; *) echo "DR2_NOT_DONE: $U is still running"; exit 1;; esac; done
@@ -5089,9 +5126,9 @@ systemctl start "debateai-preview-ui@$LABEL" || echo "systemctl start of the new
 RC=000; for i in $(seq 1 60); do RZ=$(readyz "$UIP"); RC=${RZ##*$'\n'}; [ "$RC" = 503 ] && [ "$(jq -c '[.releaseKey, .reasons]' <<<"${RZ%$'\n'*}" 2>/dev/null)" = "[\"$KEY\",[\"NOT_CURRENT\"]]" ] && break; sleep 2; done
 [ "$RC" = 503 ] || { echo "DR6_NOT_DONE: the new website is not up and waiting (way back: rbD-B)"; exit 1; }
 AVN=$(activev) || { echo "DR6_NOT_DONE: settings-version.mjs status refused (nothing changed): ask"; exit 1; }
-[ "$AVN" = "$(cat "$S/active-before")" ] && [ "$AVN" = "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" ] || { echo "DR6_NOT_DONE: settings were activated since SB3 (active $AVN; nothing changed): ask"; exit 1; }
+[ "$AVN" = "$(cat "$S/active-before")" ] && [ "$AVN" = "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" ] || { echo "DR6_NOT_DONE: settings were activated since SB3 (active $AVN): the site is DOWN since DR2 and nothing was switched; ask now: the way back is rbD-B (DR4's migrations ran)"; exit 1; }
 ACT=${KEY%%-*}; ACT=${ACT#r}                              # the settings version the switch activates: this release's own site version (SB13)
-SC=0; SW=$(lc release-switch.mjs switch --to "$LABEL" --from "$OLABEL" --old-pair-stopped --activate "$ACT" 2>&1) || SC=$?
+SC=0; SW=$(lc release-switch.mjs switch --to "$LABEL" --from "$OLABEL" --old-pair-stopped --activate "$ACT" --expect-active "$AVN" 2>&1) || SC=$?
 echo "$SW"
 case "$SC" in
   0) ;;
