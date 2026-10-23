@@ -59,6 +59,8 @@
   "mail.M10.subject": "Tá do ghnéithe íoctha ar sos",
   "mail.M10.paused": "Chuir do bhanc in iúl dúinn go bhfuil íocaíocht as do phlean {plan} faoi dhíospóid. Tá na gnéithe íoctha ar sos fad is atá an díospóid oscailte. Coinnítear do dhíospóireachtaí.",
   "mail.M10.contact": "Más botún é seo, scríobh chugainn ag {merchantEmail}.",
+  "mail.M10_ENDED.subject": "Tháinig deireadh le do phlean {plan}",
+  "mail.M10_ENDED.ended": "Thóg do bhanc ar ais an íocaíocht as do phlean {plan} tar éis díospóide. Dá bharr sin, tá deireadh le do phlean agus tá do chuntas ar an bplean Saor in aisce anois. Coinnítear do dhíospóireachtaí.",
   "mail.M11.subject": "Níorbh fhéidir linn glacadh le do chárta",
   "mail.M11.refunded": "Ní féidir linn glacadh le cártaí a eisíodh i dtír an chárta sin, mar sin téann an {refundAmount} a tógadh nó a coinníodh air ar ais go hiomlán chuig do chárta.",
   "mail.M11.planEnded": "Dá bharr sin, tá deireadh le do phlean {endedPlan} agus tá do chuntas ar an bplean Saor in aisce anois. Coinnítear do dhíospóireachtaí.",

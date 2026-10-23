@@ -1,5 +1,5 @@
 import {
-  foldSubscription, invoiceIssuerFor, paymentErrorCode, type CardPayments, type PaymentEnvironment,
+  foldSubscription, invoiceIssuerFor, microsToDecimal, paymentErrorCode, type CardPayments, type PaymentEnvironment,
   type PaymentReport, type SubscriptionEvent
 } from "@debateai/billing-core";
 import type {
@@ -15,6 +15,7 @@ import { answerRejected, credentialsRefused, type BillingAudit } from "./audit.j
 import { adoptingKindOf, chooseAdoptableToken, writeCardSaved, type AdoptingKind } from "./card-adoption.js";
 import { storeReportedCard } from "./card-store.js";
 import { REFUND_REASONS_REFUSING_THE_PAYMENT, type RequestedRefundReason } from "./codes.js";
+import { endForLostDispute } from "./dispute-cli.js";
 import { enqueueEmail } from "./email-job.js";
 import { locationVerdict } from "./location-verdict.js";
 import { clientIdOf } from "./netopia-payer.js";
@@ -24,8 +25,8 @@ import {
 import { queuePaymentAlert } from "./payment-alert.js";
 import { openNoticeAllowed, openQuoteLocation, sealIpEvidence } from "./records.js";
 import {
-  disputeCommand, heldByChargeback, openOwnRequest, PAUSED_EMAIL_SENTENCE, queueRefundHeldAlert, refundedAlready,
-  refundedMicros, wholePaymentOpen, type RefundDesk, type RefundIntent
+  heldByChargeback, openOwnRequest, queueRefundHeldAlert, refundedAlready, refundedMicros, wholePaymentOpen,
+  type RefundDesk, type RefundIntent
 } from "./refunds.js";
 import { retiredVerifyJob } from "./retired-jobs.js";
 import { chargeEvent, subscriptionEvent } from "./rows.js";
@@ -141,21 +142,32 @@ export function noticeToDecide(notices: ReadonlyArray<PaymentNoticeRow>, paidSee
 }
 
 /**
- * The owner's O3 steps for a charge-back NETOPIA reports lost (status 10, N-8: nothing ends by itself). `paused`: the
- * plan folds SUSPENDED (written only with the customer's M10). F8 (ruling PR-56, as ops-4 did for O2): the dispute
- * command is README §14.8's host form, on its own line (`disputeCommand`; it records at once).
+ * The owner's O3 CHARGEBACK_LOST steps (the owner's decision of 24 October 2026): NETOPIA notifies only a lost
+ * charge-back (status 10), and VERIFY_PAYMENT ends the plan by itself, as `pnpm billing:dispute --outcome lost` does.
+ * `ended`: this notification ended the plan (the customer's M10_ENDED was queued with it). `heldRefund`: an owner
+ * refund the dispute holds on this payment (PR-41); it stays held for good, so nothing is left to refund.
  */
-export function chargebackLostSteps(input: Readonly<{ chargeId: string; paymentId: string; paused: boolean }>): string {
-  return `NETOPIA reports the dispute on this payment (NETOPIA payment ${input.paymentId}) as lost: status 10,`
-    + " \"chargeback accepted\"."
-    // F6a (ui-3): SUSPENDED is written only with the customer's M10, so a paused plan's customer was told.
-    + (input.paused
-      ? ` The paid features are paused. ${PAUSED_EMAIL_SENTENCE}`
-      : " No plan was paused for it: the payment bought nothing, or its plan was not active.")
-    + " NETOPIA has not confirmed what this status means, so nothing ends by itself. Once you have checked it in"
-    + " NETOPIA's admin, record the outcome as root on the server with the command below (it records at once; if the"
-    + " dispute ended for us, put --outcome won in place of --outcome lost).\n"
-    + `  ${disputeCommand(input.chargeId, "lost")}`;
+export function chargebackLostSteps(input: Readonly<{
+  paymentId: string; ended: boolean;
+  heldRefund: Readonly<{ openMicros: number; currency: string; reason: string }> | null;
+}>): string {
+  const { paymentId, ended, heldRefund } = input;
+  return [
+    `NETOPIA reports that the person's bank took back this payment (NETOPIA payment ${paymentId}): the dispute on it`
+      + " is lost (status 10). "
+      + (ended
+        ? "The site has ended the plan, the person is on Free, and the customer was emailed that the plan has ended"
+          + " (M10_ENDED)."
+        : "No plan changed: the payment bought nothing, or its plan had already ended, was not active, or its dispute"
+          + " was already recorded."),
+    ...(heldRefund === null ? [] : [
+      `A refund of ${microsToDecimal(heldRefund.openMicros)} ${heldRefund.currency} (reason ${heldRefund.reason}) was`
+        + " held on this payment because of the dispute. The bank has taken the money back, so nothing is left to"
+        + " refund: do not refund it in NETOPIA's admin."
+    ]),
+    "No command is needed.",
+    "Ask your accountant whether a cancelling invoice (storno) is needed for this payment."
+  ].join("\n");
 }
 
 /** Spec §2.11: how long a paid or authorised 0 card check waits for its saved card before it fails CARD_NOT_SAVED. */
@@ -623,17 +635,24 @@ export class VerifyPaymentHandler {
   /**
    * Spec §2.13 (ruling C-7): a charge-back NETOPIA reports as a status of the payment itself. Under the owner lock, the
    * charge read again on the transaction's own client: one CHARGEBACK per payment (0086's key), written first whatever
-   * the status (a 10 or a 16 whose 9 was never seen still pauses the plan first), then SUSPENDED + Free + M10 for a live
-   * plan; a payment that bought nothing is coded DUPLICATE_PAYMENT and changes no plan, for every charge kind: a
-   * CARD_CHECK charge, a charge holding a refund request of `BOUGHT_NOTHING`, or a charge never seen paid (no SUCCEEDED;
-   * none is invented for it). A 16 then adds CHARGEBACK_REPRESENTED once. A 10 ("chargeback accepted") is never acted
-   * on further by itself (N-8): the notice's outcome OWNER_REVIEW and one O3 tell the owner, who ends the plan with
-   * `pnpm billing:dispute`; the O3 says the paid features are paused only when the plan folds SUSPENDED afterwards.
+   * the status (a 10 or a 16 whose 9 was never seen still pauses the plan first), then SUSPENDED + Free for a live plan,
+   * with the customer's M10 for a 9 or a 16; a payment that bought nothing is coded DUPLICATE_PAYMENT and changes no
+   * plan, for every charge kind: a CARD_CHECK charge, a charge holding a refund request of `BOUGHT_NOTHING`, or a charge
+   * never seen paid (no SUCCEEDED; none is invented for it). A 16 then adds CHARGEBACK_REPRESENTED once.
+   * The owner's decision of 24 October 2026: NETOPIA notifies only a LOST charge-back (status 10), and it ends the plan
+   * by itself in the same transaction, through `pnpm billing:dispute --outcome lost`'s own end path
+   * (`endForLostDispute`: a SUSPENDED plan of this subscription is ENDED(DISPUTE); anything else is left as it is).
+   * Only when this transaction ended the plan is the customer's M10_ENDED queued, so a repeated notification sends
+   * nothing more. The owner's one O3 CHARGEBACK_LOST (once per charge, queued in the same transaction) says what
+   * happened, that no command is needed, and to ask the accountant about a cancelling invoice (storno). A refund the
+   * dispute holds stays held for good, as `--outcome lost` leaves it (no charge event: nothing is left to refund); the
+   * O3 says so, and no separate REFUND_HELD_BY_CHARGEBACK is queued for a 10. The audit line billing.chargeback.lost
+   * (`chargeKind`, `ended`) follows every 10.
    * The audit line billing.chargeback carries `code: "DUPLICATE_PAYMENT"` when the CHARGEBACK written is so coded.
-   * N15b (ruling PR-41): when the CHARGEBACK written finds an open owner refund on the same payment (`openOwnRequest`),
-   * that refund is now held (`heldByChargeback`): the O3 REFUND_HELD_BY_CHARGEBACK (`queueRefundHeldAlert`, shared with
-   * the PAYMENT_REFUND job's hold) is queued in the same transaction, once per payment ever, and the audit line
-   * billing.refund.held_by_chargeback follows only when that O3 was queued now.
+   * N15b (ruling PR-41): when the CHARGEBACK written for a 9 or a 16 finds an open owner refund on the same payment
+   * (`openOwnRequest`), that refund is now held (`heldByChargeback`): the O3 REFUND_HELD_BY_CHARGEBACK
+   * (`queueRefundHeldAlert`, shared with the PAYMENT_REFUND job's hold) is queued in the same transaction, once per
+   * payment ever, and the audit line billing.refund.held_by_chargeback follows only when that O3 was queued now.
    */
   private async netopiaChargedBack(
     charge: ChargeWithEvents, report: PaymentReport, now: Date, stage: "OPENED" | "LOST" | "REPRESENTED"
@@ -641,16 +660,18 @@ export class VerifyPaymentHandler {
     const paid = charge.events.find((event) => event.kind === "SUCCEEDED");
     const paymentId = paid?.providerPaymentId ?? report.providerPaymentId;
     const owner = await this.owner(charge);
-    type Recorded = Readonly<{ written: boolean; boughtNothing: boolean; held: RefundIntent | null }>;
+    const lost = stage === "LOST";
+    type Recorded = Readonly<{ written: boolean; boughtNothing: boolean; held: RefundIntent | null; ended: boolean }>;
     const recorded = await this.deps.repository.withTransaction(async (client): Promise<Recorded> => {
       await this.deps.jobs.lockOwner(client, owner.ownerRef);
       const current = (await this.deps.repository.charge(charge.chargeId, client)) ?? charge;
       const boughtNothing = charge.kind === "CARD_CHECK" || current.events.some((event) => event.kind === "REFUND_REQUESTED"
         && event.errorCode !== null && BOUGHT_NOTHING.has(event.errorCode))
         || !current.events.some((event) => event.kind === "SUCCEEDED");
+      const recordedBefore = current.events.find((event) => event.kind === "CHARGEBACK" && event.providerPaymentId === paymentId);
       let written = false;
       let held: RefundIntent | null = null;
-      if (!current.events.some((event) => event.kind === "CHARGEBACK" && event.providerPaymentId === paymentId)) {
+      if (recordedBefore === undefined) {
         const inserted = await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "CHARGEBACK", now, {
           providerPaymentId: paymentId, amountMicros: paid?.amountMicros ?? charge.totalMicros,
           errorCode: boughtNothing ? "DUPLICATE_PAYMENT" : null
@@ -665,15 +686,18 @@ export class VerifyPaymentHandler {
               ownerRef: owner.ownerRef, planId: "FREE", periodAnchorAt: subscription.periodAnchorAt ?? now, cause: "SUSPENDED_CHARGEBACK",
               effectiveAt: now, subscriptionId: subscription.subscriptionId, paidThrough: null, monthCreditOverrideMicros: null
             });
-            await enqueueEmail(this.deps.repository, client, {
-              template: "M10", recipient: { kind: "CUSTOMER", customerId: owner.customerId }, dedupeRef: charge.chargeId,
-              params: { plan: subscription.planId }, notBefore: now
-            });
-            pausedEmailQueued = true;
+            // A lost charge-back ends the plan below: its customer gets M10_ENDED, never a pause email first.
+            if (!lost) {
+              await enqueueEmail(this.deps.repository, client, {
+                template: "M10", recipient: { kind: "CUSTOMER", customerId: owner.customerId }, dedupeRef: charge.chargeId,
+                params: { plan: subscription.planId }, notBefore: now
+              });
+              pausedEmailQueued = true;
+            }
           }
         }
         // F6a (ui-3): after the M10 decision, so the owner's O3 says what the customer was told.
-        const open = written ? openOwnRequest(current, paymentId) : null;
+        const open = written && !lost ? openOwnRequest(current, paymentId) : null;
         if (open !== null && open.openMicros > 0 && await queueRefundHeldAlert(
           { repository: this.deps.repository, jobs: this.deps.netopia.jobs }, charge, open, now, client, pausedEmailQueued
         )) {
@@ -686,7 +710,8 @@ export class VerifyPaymentHandler {
           providerPaymentId: paymentId, amountMicros: paid?.amountMicros ?? charge.totalMicros, errorCode: null
         }));
       }
-      return { written, boughtNothing, held };
+      const ended = lost && await this.endLostChargeback(client, charge, owner, current, paymentId, recordedBefore, boughtNothing, now);
+      return { written, boughtNothing, held, ended };
     });
     if (recorded.written) {
       this.deps.audit("billing.chargeback", recorded.boughtNothing
@@ -694,16 +719,44 @@ export class VerifyPaymentHandler {
         : { chargeKind: charge.kind });
     }
     if (recorded.held !== null) this.deps.audit("billing.refund.held_by_chargeback", { reason: recorded.held.reason });
-    if (stage !== "LOST") return DONE;
-    const paused = foldSubscription(await this.deps.repository.subscriptionEvents(charge.subscriptionId)).status === "SUSPENDED";
-    const notice = await this.newestNotice(charge.chargeId);
-    if (notice !== null) await this.noticeOutcome(notice.noticeId, now, "OWNER_REVIEW");
-    this.deps.audit("billing.payment.owner_review", { state: report.state });
-    await queuePaymentAlert({ repository: this.deps.repository, jobs: this.deps.netopia.jobs }, {
-      code: "OWNER_REVIEW", reference: `charge ${charge.chargeId}`, dedupeRef: `${charge.chargeId}:CHARGEBACK_LOST`, now,
-      nextSteps: chargebackLostSteps({ chargeId: charge.chargeId, paymentId, paused })
-    });
+    if (lost) this.deps.audit("billing.chargeback.lost", { chargeKind: charge.kind, ended: recorded.ended });
     return DONE;
+  }
+
+  /**
+   * A lost charge-back (status 10), on `netopiaChargedBack`'s transaction: the plan's own payment (not one coded
+   * DUPLICATE_PAYMENT, nor a second payment's, as `pnpm billing:dispute` reads it) ends its plan through
+   * `endForLostDispute`, with the customer's M10_ENDED when it ended now; then the owner's one O3 CHARGEBACK_LOST,
+   * naming a refund the dispute holds (`heldByChargeback`: a dispute recorded won earlier has released it). `current`
+   * is the charge as read before this transaction's writes. Returns whether the plan ended now.
+   */
+  private async endLostChargeback(
+    client: PoolClient, charge: ChargeRow, owner: Owner, current: ChargeWithEvents, paymentId: string,
+    recordedBefore: ChargeEventRow | undefined, boughtNothing: boolean, now: Date
+  ): Promise<boolean> {
+    const ownPayment = (recordedBefore === undefined ? !boughtNothing : recordedBefore.errorCode !== "DUPLICATE_PAYMENT")
+      && !current.events.some((event) => event.kind === "DUPLICATE_PAYMENT" && event.providerPaymentId === paymentId);
+    let ended = false;
+    if (ownPayment) {
+      const { subscription } = await this.context(client, charge, owner, now);
+      ended = await endForLostDispute({ billing: this.deps.repository, jobs: this.deps.jobs }, client, owner.ownerRef,
+        charge.subscriptionId, now) === "ENDED_DISPUTE";
+      if (ended) {
+        await enqueueEmail(this.deps.repository, client, {
+          template: "M10_ENDED", recipient: { kind: "CUSTOMER", customerId: owner.customerId }, dedupeRef: charge.chargeId,
+          params: { plan: subscription.planId }, notBefore: now
+        });
+      }
+    }
+    const open = openOwnRequest(current, paymentId);
+    const released = current.events.some((event) => event.kind === "CHARGEBACK_RESOLVED" && event.providerPaymentId === paymentId);
+    const heldRefund = open !== null && open.openMicros > 0 && !released
+      ? { openMicros: open.openMicros, currency: charge.currency, reason: open.intent.reason } : null;
+    await queuePaymentAlert({ repository: this.deps.repository, jobs: this.deps.netopia.jobs }, {
+      code: "CHARGEBACK_LOST", reference: `charge ${charge.chargeId}`, dedupeRef: `${charge.chargeId}:CHARGEBACK_LOST`, now,
+      nextSteps: chargebackLostSteps({ paymentId, ended, heldRefund })
+    }, client);
+    return ended;
   }
 
   /** Ruling C-7: nothing recorded; the notice's outcome OWNER_REVIEW, audit lines, and one O3 per charge and status. */

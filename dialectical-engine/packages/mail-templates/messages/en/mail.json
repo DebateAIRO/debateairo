@@ -59,6 +59,8 @@
   "mail.M10.subject": "Your paid features are paused",
   "mail.M10.paused": "Your bank told us that a payment for your {plan} plan is disputed. Paid features are paused while the dispute is open. Your debates are kept.",
   "mail.M10.contact": "If this is a mistake, write to us at {merchantEmail}.",
+  "mail.M10_ENDED.subject": "Your {plan} plan has ended",
+  "mail.M10_ENDED.ended": "Your bank took back a payment for your {plan} plan after a dispute, so the plan has ended and your account is now on the Free plan. Your debates are kept.",
   "mail.M11.subject": "We couldn't accept your card",
   "mail.M11.refunded": "We can't accept cards issued in that card's country, so the {refundAmount} taken or held on it goes back to your card in full.",
   "mail.M11.planEnded": "Because of this, your {endedPlan} plan has ended and your account is now on the Free plan. Your debates are kept.",

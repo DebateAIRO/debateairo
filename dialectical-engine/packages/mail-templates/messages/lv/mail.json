@@ -59,6 +59,8 @@
   "mail.M10.subject": "Jūsu maksas funkcijas ir apturētas",
   "mail.M10.paused": "Jūsu banka mums paziņoja, ka maksājums par jūsu plānu {plan} tiek apstrīdēts. Maksas funkcijas ir apturētas, kamēr strīds ir atvērts. Jūsu debates tiek saglabātas.",
   "mail.M10.contact": "Ja tā ir kļūda, rakstiet mums uz {merchantEmail}.",
+  "mail.M10_ENDED.subject": "Jūsu plāns {plan} ir beidzies",
+  "mail.M10_ENDED.ended": "Jūsu banka pēc strīda atsauca maksājumu par jūsu plānu {plan}, tāpēc plāns ir beidzies un jūsu konts tagad ir plānā Bezmaksas. Jūsu debates tiek saglabātas.",
   "mail.M11.subject": "Mēs nevarējām pieņemt jūsu karti",
   "mail.M11.refunded": "Mēs nevaram pieņemt kartes, kas izdotas šīs kartes valstī, tāpēc no tās iekasētie vai rezervētie {refundAmount} pilnībā atgriežas jūsu kartē.",
   "mail.M11.planEnded": "Tāpēc jūsu plāns {endedPlan} ir beidzies, un jūsu konts tagad ir plānā Bezmaksas. Jūsu debates tiek saglabātas.",

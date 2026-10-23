@@ -59,6 +59,8 @@
   "mail.M10.subject": "Uw betaalde functies zijn gepauzeerd",
   "mail.M10.paused": "Uw bank heeft ons laten weten dat een betaling voor uw {plan}-abonnement wordt betwist. Betaalde functies zijn gepauzeerd zolang het geschil loopt. Uw debatten blijven bewaard.",
   "mail.M10.contact": "Als dit een vergissing is, schrijf ons dan op {merchantEmail}.",
+  "mail.M10_ENDED.subject": "Uw {plan}-abonnement is beëindigd",
+  "mail.M10_ENDED.ended": "Uw bank heeft na een geschil een betaling voor uw {plan}-abonnement teruggeboekt. Daarom is het abonnement beëindigd en staat uw account nu op het Gratis-abonnement. Uw debatten blijven bewaard.",
   "mail.M11.subject": "Wij konden uw kaart niet accepteren",
   "mail.M11.refunded": "Wij kunnen geen kaarten accepteren die zijn uitgegeven in het land van die kaart, dus de {refundAmount} die erop is afgeschreven of gereserveerd, gaat volledig terug naar uw kaart.",
   "mail.M11.planEnded": "Daarom is uw {endedPlan}-abonnement beëindigd en staat uw account nu op het Gratis-abonnement. Uw debatten blijven bewaard.",

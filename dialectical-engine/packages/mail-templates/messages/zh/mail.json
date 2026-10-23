@@ -59,6 +59,8 @@
   "mail.M10.subject": "您的付费功能已暂停",
   "mail.M10.paused": "您的银行通知我们，您的 {plan} 方案的一笔付款存在争议。争议处理期间，付费功能将暂停。您的辩论将被保留。",
   "mail.M10.contact": "如有错误，请发送邮件至 {merchantEmail}。",
+  "mail.M10_ENDED.subject": "您的 {plan} 方案已结束",
+  "mail.M10_ENDED.ended": "您的银行在争议后追回了 {plan} 方案的一笔付款，因此该方案已结束，您的账户现已转为免费方案。您的辩论将被保留。",
   "mail.M11.subject": "我们无法接受您的银行卡",
   "mail.M11.refunded": "我们无法接受在该卡发卡国签发的银行卡，因此从该卡扣取或冻结的 {refundAmount} 将全额退回您的卡。",
   "mail.M11.planEnded": "因此，您的 {endedPlan} 方案已结束，您的账户现已转为免费方案。您的辩论将被保留。",

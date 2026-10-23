@@ -59,6 +59,8 @@
   "mail.M10.subject": "Các tính năng trả phí của quý vị đang bị tạm dừng",
   "mail.M10.paused": "Ngân hàng của quý vị đã thông báo rằng một khoản thanh toán cho gói {plan} của quý vị đang bị tranh chấp. Các tính năng trả phí bị tạm dừng trong khi tranh chấp còn mở. Các cuộc tranh luận của quý vị được giữ lại.",
   "mail.M10.contact": "Nếu đây là nhầm lẫn, vui lòng viết thư cho chúng tôi tại {merchantEmail}.",
+  "mail.M10_ENDED.subject": "Gói {plan} của quý vị đã kết thúc",
+  "mail.M10_ENDED.ended": "Ngân hàng của quý vị đã thu hồi một khoản thanh toán cho gói {plan} của quý vị sau một tranh chấp, nên gói này đã kết thúc và tài khoản của quý vị hiện đang dùng gói Miễn phí. Các cuộc tranh luận của quý vị được giữ lại.",
   "mail.M11.subject": "Chúng tôi không thể chấp nhận thẻ của quý vị",
   "mail.M11.refunded": "Chúng tôi không thể chấp nhận thẻ được phát hành tại quốc gia của thẻ đó, vì vậy khoản {refundAmount} đã thu hoặc tạm giữ trên thẻ sẽ được trả lại đầy đủ vào thẻ của quý vị.",
   "mail.M11.planEnded": "Vì lý do này, gói {endedPlan} của quý vị đã kết thúc và tài khoản của quý vị hiện đang dùng gói Miễn phí. Các cuộc tranh luận của quý vị được giữ lại.",

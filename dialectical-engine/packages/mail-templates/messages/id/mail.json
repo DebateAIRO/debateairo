@@ -59,6 +59,8 @@
   "mail.M10.subject": "Fitur berbayar Anda dijeda",
   "mail.M10.paused": "Bank Anda memberi tahu kami bahwa pembayaran untuk paket {plan} Anda disengketakan. Fitur berbayar dijeda selama sengketa masih terbuka. Debat Anda tetap disimpan.",
   "mail.M10.contact": "Jika ini kesalahan, tulis kepada kami di {merchantEmail}.",
+  "mail.M10_ENDED.subject": "Paket {plan} Anda telah berakhir",
+  "mail.M10_ENDED.ended": "Bank Anda menarik kembali pembayaran untuk paket {plan} Anda setelah sengketa, sehingga paket tersebut telah berakhir dan akun Anda kini menggunakan paket Gratis. Debat Anda tetap disimpan.",
   "mail.M11.subject": "Kami tidak dapat menerima kartu Anda",
   "mail.M11.refunded": "Kami tidak dapat menerima kartu yang diterbitkan di negara kartu tersebut, sehingga {refundAmount} yang ditagih atau ditahan pada kartu itu kembali sepenuhnya ke kartu Anda.",
   "mail.M11.planEnded": "Karena itu, paket {endedPlan} Anda telah berakhir dan akun Anda kini menggunakan paket Gratis. Debat Anda tetap disimpan.",
