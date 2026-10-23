@@ -42,6 +42,7 @@ import {
   assertPreviewTargetSet,
   assertPricedProviderTargets,
   parseProviderDiscoveryTargets,
+  previewPlanTierRosters,
   previewRunnerPolicy,
   resolvePreviewLineUp,
   type PreviewGateSettings,
@@ -50,7 +51,7 @@ import {
   type PreviewThinkingLevels,
   type ProviderDiscoveryTarget
 } from "@debateai/providers";
-import { assertRegisterPromptContractHashes, assertRunnerSettingsGates, plansUnresolvedPersonAllowance, type WalkingSkeletonSettings } from "./index.js";
+import { assertRegisterPromptContractHashes, assertRunnerSettingsGates, plansUnresolvedPersonAllowance, settingsJournalCode, type WalkingSkeletonSettings } from "./index.js";
 import { engineContractHash } from "./engine-contracts.js";
 import { runnerConfiguredMakerRefs } from "./provider-topology.js";
 import type { RunInFlight } from "./run-in-flight.js";
@@ -389,18 +390,21 @@ export function assertPreviewVersionTargets(input: Readonly<{
  * version's refusal as UNSUPPORTED). The story rows are the exception they always were: unreadable story rows are
  * `storyPolicy: null` and one content-free STORY_POLICY_UNREADABLE line, so the story never stops the runner — except
  * under `strict: true` (check-version, S14), where the refusal propagates.
+ *
+ * `readers` replaces any of the register reads (unit tests inject them all; final fix wave F4: the practice's
+ * --call-concurrency replaces only `readCallConcurrencyPolicy`, for every version it loads); the rest are the boot's own.
  */
 export async function loadRunnerVersionSettings(pool: Pool, version: number, site: RunnerSiteContext,
   options?: Readonly<{
     strict?: true;
-    readers?: RunnerVersionReaders;
+    readers?: Partial<RunnerVersionReaders>;
     /** Where the STORY_POLICY_UNREADABLE line goes. Default: one JSON line on standard error (main.ts's). */
     log?: (line: Readonly<Record<string, unknown>>) => void;
   }>): Promise<RunnerVersionSettings> {
   const {
     readDevelopmentRunnerPolicy, readStoryPolicyFromRegister, readPreviewLineUpPolicy, readDebateShapeRunnerSettings,
     readEngineRunnerSettings, readModelScorecard, readEngineVersion, readCostEnvelopePolicy, readCallConcurrencyPolicy
-  } = options?.readers ?? RUNNER_VERSION_READERS;
+  } = { ...RUNNER_VERSION_READERS, ...options?.readers };
   const log = options?.log ?? ((line: Readonly<Record<string, unknown>>) => { console.warn(JSON.stringify(line)); });
   // Addition D16: previewRunnerPolicy only tests whether this runner is the preview's, which the site's gate part says
   // for every version (a version that resolves a preview configuration has one exactly when the gate part exists).
@@ -470,6 +474,12 @@ export async function loadRunnerVersionSettings(pool: Pool, version: number, sit
    * process never reads billingPolicy (amendment A20), so it keeps the looser
    * all-models groups; the API's boot and the hosted publish, which know billing,
    * price Free on its own roster (`ownRosterOnly`).
+   *
+   * Final fix wave F9 (ruling R79, owner-visible): the plan groups are the version's own PREVIEW rosters
+   * (`previewPlanTierRosters(previewConfig, PLAN_TIER_ROSTERS)`: its line-up's free and premium rosters on the preview,
+   * the code's plan rosters off it) for every version but the site version at boot, and for every version under
+   * check-version (`strict`). The site version's boot keeps today's grouping (PLAN_TIER_ROSTERS, which no preview target
+   * serves) until a live dry run on the preview: no new boot refusal without one.
    */
   // Side-by-side spec §13: the version's money envelope, read once (hosted: the site's money row is non-null) — its
   // per-run members over the site's day and band. B9 below and the version's guard both use it.
@@ -492,7 +502,9 @@ export async function loadRunnerVersionSettings(pool: Pool, version: number, sit
         projections: firstCalls,
         rosters: firstCallPlanModels({
           scorecardInForce: (await readModelScorecard(pool, version, await readEngineVersion())).state === "VALID",
-          rosters: PLAN_TIER_ROSTERS,
+          rosters: options?.strict === true || version !== site.siteVersion
+            ? previewPlanTierRosters(previewConfig, PLAN_TIER_ROSTERS)
+            : PLAN_TIER_ROSTERS,
           models: firstCalls.map((call) => call.model)
         })
       })
@@ -597,7 +609,8 @@ export function createRunnerSettingsCache(input: Readonly<{
         if (code === null) throw error;
         const entry = Object.freeze({ kind: "UNSUPPORTED" as const, code, error });
         settled.set(version, entry);
-        input.log({ kind: "DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED", version: String(version), code });
+        // Final fix wave S14: an owner-typed detail is printed only when plainly an id (`settingsJournalCode`).
+        input.log({ kind: "DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED", version: String(version), code: settingsJournalCode(code) });
         return entry;
       }
     ).finally(() => { pending.delete(version); });
@@ -710,7 +723,8 @@ export function runnerSettingsSummary(preload: RunnerSettingsPreload): Readonly<
     releaseKey: preload.releaseKey,
     siteVersion: String(preload.siteVersion),
     loaded: Object.freeze(preload.loaded.map(String)),
-    unsupported: Object.freeze(preload.unsupported.map(({ version, code }) => Object.freeze({ version: String(version), code })))
+    // Final fix wave S14: the code as the cache's line printed it (`settingsJournalCode`).
+    unsupported: Object.freeze(preload.unsupported.map(({ version, code }) => Object.freeze({ version: String(version), code: settingsJournalCode(code) })))
   });
 }
 

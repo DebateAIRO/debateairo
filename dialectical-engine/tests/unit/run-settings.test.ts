@@ -41,7 +41,9 @@ import {
   type ProviderDiscoveryTarget
 } from "@debateai/providers";
 import { PLAN_TIER_ROSTERS } from "@debateai/contract";
-import { codePromptContractHashes } from "../../apps/runner/src/index.js";
+import { codePromptContractHashes, settingsJournalCode } from "../../apps/runner/src/index.js";
+import { createCallScheduler } from "../../apps/runner/src/call-scheduler.js";
+import { practiceVersionReaders } from "../../tools/preview-practice/practice-runner-composition.js";
 import { CostEnvelopeGuard } from "@debateai/budget";
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import type { DevelopmentRunnerPolicy } from "../../apps/runner/src/dev-runner-policy.js";
@@ -781,5 +783,134 @@ describe("the boot preload: open debates' and passed versions, never the pointer
     const flatPractice = practice.replace(/\s+/gu, " ");
     expect(flatPractice).toContain("cache: runnerSettings, pool, work: new WorkItemRepository(pool, { releaseKey: environment.RELEASE_KEY }), releaseKey: environment.RELEASE_KEY, siteVersion: environment.REGISTER_VERSION");
     expect(flatPractice).toContain("settingsLog({ kind: \"DEBATEAI_RUNNER_SETTINGS\", ...runnerSettingsSummary(runnerSettingsPreload) });");
+  });
+});
+
+/**
+ * Final fix wave F4: the practice's --call-concurrency reaches the debate's lanes. The practice's version loader takes the
+ * flag's per-debate limits for EVERY version (a reader override in the loader's options, `practiceVersionReaders`), so
+ * the lane a debate opens (execute(): `openLane(runId, settings.callLaneLimits)`) really runs that many calls at once,
+ * and the report's "FLAG" policy is the one the lanes ran.
+ */
+describe("final fix wave F4: the practice's --call-concurrency reaches every version's lanes", () => {
+  const FLAG = Object.freeze({ perDebate: 3, perModelPerDebate: 3, perModelPerRunner: Object.freeze({ default: 6 }) });
+  const ticket = Object.freeze({ model: "zai-org/GLM-5.3-Flash", vendor: "default", gate: null, priority: "OTHER" as const });
+  /** Six calls through one lane, each held until released: the most running at once is the lane's real width. */
+  async function widthOf(limits: Readonly<{ perDebate: number; perModelPerDebate: number }>): Promise<number> {
+    const lane = createCallScheduler({ policy: FLAG }).openLane("run-f4", limits);
+    const releases: (() => void)[] = [];
+    let running = 0;
+    let peak = 0;
+    const calls = Array.from({ length: 6 }, () => lane.run(ticket, async () => {
+      running += 1;
+      peak = Math.max(peak, running);
+      await new Promise<void>((resolve) => { releases.push(resolve); });
+      running -= 1;
+    }));
+    const settle = async () => { for (let tick = 0; tick < 5; tick += 1) await new Promise((resolve) => setImmediate(resolve)); };
+    await settle();
+    while (releases.length > 0) {
+      for (const release of releases.splice(0)) release();
+      await settle();
+    }
+    await Promise.all(calls);
+    lane.close();
+    expect(lane.stats().peakInFlight).toBe(peak);
+    return peak;
+  }
+
+  it("without the flag every version keeps its own row; with it every version's lanes take the flag's limits", async () => {
+    expect(practiceVersionReaders(undefined)).toEqual({});
+    for (const version of [SITE_VERSION, VERSION]) {
+      const plain = await load(version, site(), readers(version).readers);
+      expect(plain.callLaneLimits).toEqual({ perDebate: 1, perModelPerDebate: 1 });
+      // A version whose own row is SET to something else: the flag still wins, for this practice only.
+      const own = { readCallConcurrencyPolicy: async () => ({ state: "SET" as const, policy: { perDebate: 2, perModelPerDebate: 2,
+        perModelPerRunner: { default: 4 } } }) };
+      expect((await load(version, site(), readers(version, own).readers)).callLaneLimits).toEqual({ perDebate: 2, perModelPerDebate: 2 });
+      const flagged = await load(version, site(), readers(version, { ...own, ...practiceVersionReaders(FLAG) }).readers);
+      expect(flagged.callLaneLimits).toEqual({ perDebate: 3, perModelPerDebate: 3 });
+    }
+  });
+
+  it("a lane opened with the loaded limits really runs the flag's number of calls at once (control: the row's one)", async () => {
+    const flagged = await load(VERSION, site(), readers(VERSION, practiceVersionReaders(FLAG)).readers);
+    expect(await widthOf(flagged.callLaneLimits)).toBe(3);
+    const plain = await load(VERSION, site(), readers(VERSION).readers);
+    expect(await widthOf(plain.callLaneLimits)).toBe(1);
+  });
+
+  it("the practice runner's loader is handed the override (the one composition both modes run)", () => {
+    const practice = readFileSync(new URL("../../tools/preview-practice/practice-runner-composition.ts", import.meta.url), "utf8")
+      .replace(/\s+/gu, " ");
+    expect(practice).toContain("load: (version) => loadRunnerVersionSettings(pool, version, runnerSite, { readers: practiceVersionReaders(input.callConcurrency),");
+  });
+});
+
+/**
+ * Final fix wave F9 (ruling R79): the "run ceiling covers one call" check groups by the version's own PREVIEW rosters
+ * (`previewPlanTierRosters(previewConfig, PLAN_TIER_ROSTERS)`) for every non-site version at runtime and for every version
+ * under check-version (strict). The site version's boot keeps today's grouping (PLAN_TIER_ROSTERS) until a live dry run.
+ */
+describe("final fix wave F9 (ruling R79): the run ceiling is priced on the version's own preview rosters", () => {
+  const tiny = { readCostEnvelopePolicy: async () => envelope(1, "version-row") };
+  it("a non-site version whose per-run ceiling is below one call on its preview roster is refused, and the cache keeps it UNSUPPORTED", async () => {
+    await expect(load(VERSION, hostedPreviewSite(), readers(VERSION, tiny).readers)).rejects.toMatchObject({ code: "RUN_CEILING_BELOW_ONE_CALL" });
+    const cache = createRunnerSettingsCache({ log: () => undefined,
+      load: (version) => load(version, hostedPreviewSite(), readers(version, tiny).readers) });
+    expect(await cache.settingsFor(VERSION)).toEqual({ kind: "UNSUPPORTED", code: "RUN_CEILING_BELOW_ONE_CALL" });
+    // Control: a ceiling that covers one call passes on the same rosters.
+    await expect(load(VERSION, hostedPreviewSite(), readers(VERSION).readers)).resolves.toMatchObject({ registerVersion: VERSION });
+  });
+
+  it("the site version's boot keeps today's grouping; check-version (strict) prices every version on its preview rosters", async () => {
+    await expect(load(SITE_VERSION, hostedPreviewSite(), readers(SITE_VERSION, tiny).readers)).resolves.toMatchObject({ registerVersion: SITE_VERSION });
+    await expect(load(SITE_VERSION, hostedPreviewSite(), readers(SITE_VERSION, tiny).readers, { strict: true }))
+      .rejects.toMatchObject({ code: "RUN_CEILING_BELOW_ONE_CALL" });
+    await expect(load(VERSION, hostedPreviewSite(), readers(VERSION, tiny).readers, { strict: true }))
+      .rejects.toMatchObject({ code: "RUN_CEILING_BELOW_ONE_CALL" });
+  });
+
+  it("off the preview nothing changes: the code's plan rosters, for the site version and every other", async () => {
+    const siteEnvelope = envelope(250000, "site-row");
+    for (const version of [SITE_VERSION, VERSION]) {
+      await expect(load(version, hostedSite(siteEnvelope), readers(version, tiny).readers)).rejects.toMatchObject({ code: "RUN_CEILING_BELOW_ONE_CALL" });
+    }
+  });
+});
+
+/**
+ * Final fix wave S14: an owner-typed detail is printed whole in the settings journal lines only when every part is a
+ * plain id and the detail is not key-shaped (`settingsJournalCode`); else the bare code. The cache's
+ * DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED line and the boot's DEBATEAI_RUNNER_SETTINGS summary both apply it.
+ */
+describe("final fix wave S14: the settings journal lines withhold a key-shaped detail", () => {
+  const CODE = "PREVIEW_THINKING_LEVELS_INVALID";
+  const run24 = "a1".repeat(12);
+  it("prints a plain detail whole and the bare code for a key-shaped or odd one", () => {
+    expect(settingsJournalCode("ENGINE_CONTRACT_HASH_MISMATCH")).toBe("ENGINE_CONTRACT_HASH_MISMATCH");
+    expect(settingsJournalCode(`${CODE}:level:zai-org/GLM-5.3-Flash`)).toBe(`${CODE}:level:zai-org/GLM-5.3-Flash`);
+    expect(settingsJournalCode(`${CODE}:step:zai-org/GLM-5.3-Flash:closing`)).toBe(`${CODE}:step:zai-org/GLM-5.3-Flash:closing`);
+    expect(settingsJournalCode("SETTINGS_HASH_UNDECLARED:engineContractHash")).toBe("SETTINGS_HASH_UNDECLARED:engineContractHash");
+    // 23 letters and digits in a row are fine; 24 are a key shape (a step name too).
+    expect(settingsJournalCode(`${CODE}:model:${run24.slice(1)}`)).toBe(`${CODE}:model:${run24.slice(1)}`);
+    for (const detail of [`model:${run24}`, `step:zai-org/GLM-5.3-Flash:${run24}`, "model:unix//run/gate.sock", "step:GLM:" + "sk" + "-abc",
+      "model:has space", `model:${"m".repeat(30)}-${"n".repeat(34)}`, "model::empty", "model:"]) {
+      expect(settingsJournalCode(`${CODE}:${detail}`), detail).toBe(CODE);
+    }
+  });
+
+  it("the cache's line and the boot summary print the bare code; the cache's own resolution keeps the whole code", async () => {
+    const lines: Readonly<Record<string, unknown>>[] = [];
+    const whole = `${CODE}:model:${run24}`;
+    const cache = createRunnerSettingsCache({ load: async () => { throw new TypeError(whole); }, log: (line) => { lines.push(line); } });
+    expect(await cache.settingsFor(9)).toEqual({ kind: "UNSUPPORTED", code: whole });
+    expect(lines).toEqual([{ kind: "DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED", version: "9", code: CODE }]);
+    expect(JSON.stringify(lines)).not.toContain(run24);
+    const summary = runnerSettingsSummary({ releaseKey: "legacy", siteVersion: 17, loaded: [17], unsupported: [{ version: 9, code: whole }] });
+    expect(summary.unsupported).toEqual([{ version: "9", code: CODE }]);
+    expect(runnerSettingsSummary({ releaseKey: "legacy", siteVersion: 17, loaded: [17],
+      unsupported: [{ version: 9, code: `${CODE}:level:zai-org/GLM-5.3-Flash` }] }).unsupported)
+      .toEqual([{ version: "9", code: `${CODE}:level:zai-org/GLM-5.3-Flash` }]);
   });
 });

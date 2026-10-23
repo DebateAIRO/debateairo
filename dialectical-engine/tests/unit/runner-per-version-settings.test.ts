@@ -478,12 +478,16 @@ describe("execute() reads one debate's settings only (O1): the source scan", () 
     const execute = text.slice(text.indexOf("  private async execute("), text.indexOf("export type RunnerExecutionResult ="));
     const claim = execute.indexOf("const claimed = workItemId === undefined");
     const map = execute.indexOf("if (resolution !== null) settings.runSettingsVersions?.set(claimedRunId, resolution.version);");
-    const keepAlive = execute.indexOf("const keepAlive = startRunKeepAlive({");
+    // Final fix wave S12: a resolver that resolved nothing for a claimed run refuses right after the claim.
+    const unresolved = execute.indexOf("if (settingsForVersion !== undefined && resolution === null) {");
+    const keepAlive = execute.indexOf("keepAlive = startRunKeepAlive({");
     const lane = execute.indexOf("callScheduler.openLane(claimedRunId, settings.callLaneLimits)");
     expect(claim).toBeGreaterThan(-1);
-    expect(map).toBeGreaterThan(claim);
-    expect(keepAlive).toBeGreaterThan(map);
-    expect(lane).toBeGreaterThan(keepAlive);
+    expect(unresolved).toBeGreaterThan(claim);
+    expect(map).toBeGreaterThan(unresolved);
+    // Final fix wave S12: the lane opens BEFORE the keep-alive starts, so a lane refusal never leaves a claim renewing.
+    expect(lane).toBeGreaterThan(map);
+    expect(keepAlive).toBeGreaterThan(lane);
     const head = execute.indexOf("run = await this.#runs.readFrozenHead(claimedRunId);");
     const stamp = execute.indexOf("if (resolution !== null && run.registerVersion !== resolution.version) {");
     expect(stamp).toBeGreaterThan(head);
@@ -585,7 +589,8 @@ function processSettings(change: Partial<Record<string, unknown>> = {}) {
   return { settings, opened, versions };
 }
 
-const provider = { complete: async () => { throw new Error("NO_MODEL_CALL_EXPECTED"); } } as never;
+/** The gateway's one method is `call` (final fix wave S2): every model call would go through it. */
+const provider = { call: async () => { throw new Error("NO_MODEL_CALL_EXPECTED"); } } as never;
 
 describe("executeWorkItem resolves the debate's own version (side-by-side spec §13, plan D2)", () => {
   afterEach(() => { vi.restoreAllMocks(); });
@@ -661,6 +666,44 @@ describe("executeWorkItem resolves the debate's own version (side-by-side spec �
     }]);
     expect(lines.join("\n")).not.toContain("connection reset");
   });
+
+  it("final fix wave S12: a claimed run the resolver resolved nothing for refuses RUN_SETTINGS_VERSION_UNKNOWN right after the claim", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const settingsForVersion = vi.fn(async (): Promise<RunnerSettingsResolution> => ({ kind: "SETTINGS", version: versionSettings() }));
+    const renewClaim = vi.fn(async () => ({ kind: "RENEWED" as const, claimDeadline: new Date(Date.now() + 60000) }));
+    // The boot's settings pass the gates (the composition row present), so only the missing version stops the debate.
+    const { settings, opened, versions } = processSettings({ settingsForVersion, compositionRow: { sentinel: "boot" },
+      renewals: { renewClaim } });
+    // The peek finds no run (the claim, scripted, still succeeds: the race this guards).
+    const db = scriptedPool({ peekVersion: null });
+    await expect(new WalkingSkeletonRunner(db.pool, provider, settings).executeWorkItem("item-1"))
+      .rejects.toMatchObject({ code: "RUN_SETTINGS_VERSION_UNKNOWN" });
+    expect(db.statements.some((sql) => sql.includes("SET state = 'CLAIMED'"))).toBe(true);
+    expect(settingsForVersion).not.toHaveBeenCalled();
+    // Nothing of the debate ran on the boot's settings: no lane, no run → version entry, no renewal.
+    expect(opened).toEqual([]);
+    expect(versions.versionOf("run-1")).toBeUndefined();
+    expect(renewClaim).not.toHaveBeenCalled();
+  });
+
+  it("final fix wave S12: a lane refusal leaves no keep-alive renewing the claim", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      const renewClaim = vi.fn(async () => ({ kind: "RENEWED" as const, claimDeadline: new Date(Date.now() + 60000) }));
+      // Limits outside CALL_CONCURRENCY_LIMITS: `openLane` refuses (CALL_LANE_LIMITS_INVALID) and opens no lane.
+      const refusedLane = Object.freeze({ ...versionSettings(), callLaneLimits: Object.freeze({ perDebate: 0, perModelPerDebate: 1 }) });
+      const { settings } = processSettings({ renewals: { renewClaim },
+        settingsForVersion: async (): Promise<RunnerSettingsResolution> => ({ kind: "SETTINGS", version: refusedLane }) });
+      await expect(new WalkingSkeletonRunner(scriptedPool({ peekVersion: VERSION }).pool, provider, settings).executeWorkItem("item-1"))
+        .rejects.toThrow("CALL_LANE_LIMITS_INVALID");
+      // Many renewal periods later (claimMs 10 s: one renewal every 3.3 s), still none was asked.
+      await vi.advanceTimersByTimeAsync(60000);
+      expect(renewClaim).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 /**
@@ -685,10 +728,11 @@ describe("a settings version this release cannot run (side-by-side spec §13, §
 
   it("claims the item, sets it aside with ONE waiver on one transaction, makes no call, logs one line, and refuses", async () => {
     const lines = capturedLines();
-    const complete = vi.fn(async () => { throw new Error("NO_MODEL_CALL_EXPECTED"); });
+    // Final fix wave S2: the gateway's method is `call` (a `complete` mock would never be asked, whatever ran).
+    const call = vi.fn(async () => { throw new Error("NO_MODEL_CALL_EXPECTED"); });
     const { settings, opened, versions } = processSettings({ settingsForVersion: unsupported });
     const db = scriptedPool({ peekVersion: VERSION });
-    const runner = new WalkingSkeletonRunner(db.pool, { complete } as never, settings);
+    const runner = new WalkingSkeletonRunner(db.pool, { call } as never, settings);
     const refusal = await runner.executeWorkItem("item-1").catch((error: unknown) => error);
     expect(refusal).toBeInstanceOf(TypedDomainError);
     // The loader's code is not in the error (it reaches Hatchet's store and stderr): only the journal line carries it.
@@ -710,12 +754,13 @@ describe("a settings version this release cannot run (side-by-side spec §13, §
     expect(setAside!.sql).toContain("NOT (item.claim_deadline > clock_timestamp() AND item.claimed_by IS DISTINCT FROM $5::text)");
     expect(waiver!.params).toEqual(["run-1", "SETTINGS_VERSION_UNSUPPORTED"]);
     // No model call, no lane, no run → version entry (nothing of the debate ran).
-    expect(complete).not.toHaveBeenCalled();
+    expect(call).not.toHaveBeenCalled();
     expect(opened).toEqual([]);
     expect(versions.versionOf("run-1")).toBeUndefined();
-    // One content-free line: the run, the version and the loader's code; no text.
+    // One content-free line: the run, the version, the loader's code and (ruling R42) whether this copy set it aside.
     expect(lines).toEqual([{
-      kind: "DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED", runId: "run-1", version: String(VERSION), code: "ENGINE_CONTRACT_HASH_MISMATCH"
+      kind: "DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED", runId: "run-1", version: String(VERSION), code: "ENGINE_CONTRACT_HASH_MISMATCH",
+      setAside: true
     }]);
   });
 
@@ -732,7 +777,8 @@ describe("a settings version this release cannot run (side-by-side spec §13, §
     expect(waiver!.params).toEqual(["run-1", "SETTINGS_VERSION_UNSUPPORTED"]);
     expect(opened).toEqual([]);
     expect(lines).toEqual([{
-      kind: "DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED", runId: "run-1", version: String(VERSION), code: "ENGINE_CONTRACT_HASH_MISMATCH"
+      kind: "DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED", runId: "run-1", version: String(VERSION), code: "ENGINE_CONTRACT_HASH_MISMATCH",
+      setAside: true
     }]);
   });
 
@@ -794,16 +840,33 @@ describe("a settings version this release cannot run (side-by-side spec §13, §
   const ITEM_ID = "22222222-2222-4222-8222-222222222222";
 
   it.each([1, 0])("the task's catch writes nothing over the set-aside reason (set-aside rows: %i)", async (setAsideRows) => {
-    capturedLines();
+    const lines = capturedLines();
+    const call = vi.fn(async () => { throw new Error("NO_MODEL_CALL_EXPECTED"); });
     const { settings } = processSettings({ settingsForVersion: unsupported });
     const db = scriptedPool({ peekVersion: VERSION, setAsideRows });
     const recorded: unknown[] = [];
-    const task = hatchetTaskOver(new WalkingSkeletonRunner(db.pool, provider, settings), recorded);
+    const task = hatchetTaskOver(new WalkingSkeletonRunner(db.pool, { call } as never, settings), recorded);
     await expect(task({ runId: RUN_ID, workItemId: ITEM_ID })).rejects.toMatchObject({ code: "SETTINGS_VERSION_UNSUPPORTED" });
     // No RUNNER_EXECUTION_FAILED:SETTINGS_VERSION_UNSUPPORTED (which reads STOPPED, a different sentence) replaces
     // RUN_SET_ASIDE:SETTINGS_VERSION_UNSUPPORTED (SET_ASIDE); an item no longer this copy's is left to its holder.
     expect(recorded).toEqual([]);
     // A set-aside that wrote nothing wrote no waiver either (Phase 1: both on one transaction, the waiver only after).
-    expect(writes(db).filter((call) => call.sql.includes("model_spend_waiver")).length).toBe(setAsideRows);
+    expect(writes(db).filter((write) => write.sql.includes("model_spend_waiver")).length).toBe(setAsideRows);
+    // Ruling R42 (final fix wave S2): the line says whether this copy set it aside (true) or left it to its holder (false).
+    expect(lines).toEqual([{ kind: "DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED", runId: "run-1", version: String(VERSION),
+      code: "ENGINE_CONTRACT_HASH_MISMATCH", setAside: setAsideRows === 1 }]);
+    expect(call).not.toHaveBeenCalled();
+  });
+
+  it("final fix wave S14: a key-shaped detail in the loader's code is printed as the bare code", async () => {
+    const run24 = "b2".repeat(12);
+    const lines = capturedLines();
+    const { settings } = processSettings({ settingsForVersion: async (): Promise<RunnerSettingsResolution> =>
+      ({ kind: "UNSUPPORTED", code: `PREVIEW_THINKING_LEVELS_INVALID:model:${run24}` }) });
+    await expect(new WalkingSkeletonRunner(scriptedPool({ peekVersion: VERSION }).pool, provider, settings).executeWorkItem("item-1"))
+      .rejects.toMatchObject({ code: "SETTINGS_VERSION_UNSUPPORTED" });
+    expect(lines).toEqual([{ kind: "DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED", runId: "run-1", version: String(VERSION),
+      code: "PREVIEW_THINKING_LEVELS_INVALID", setAside: true }]);
+    expect(JSON.stringify(lines)).not.toContain(run24);
   });
 });

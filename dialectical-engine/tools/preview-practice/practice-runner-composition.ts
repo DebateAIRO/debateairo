@@ -90,7 +90,7 @@ import { applyPreviewGateCapacities, previewCallSubjects, previewGateNames, stru
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import {
   createRunnerSettingsCache, createRunSettingsVersions, loadRunnerVersionSettings, preloadRunnerSettings, readRunnerSiteContext,
-  runCostEnvelopeGuardOf, runnerSettingsOfVersion, runnerSettingsSummary, runPreviewThinkingLevelsOf
+  runCostEnvelopeGuardOf, runnerSettingsOfVersion, runnerSettingsSummary, runPreviewThinkingLevelsOf, type RunnerVersionReaders
 } from "../../apps/runner/src/run-settings.js";
 import { createRunnerRetirementSignal } from "../../apps/runner/src/runner-retirement.js";
 import { PracticeCallStats } from "./practice-parallel.js";
@@ -128,6 +128,19 @@ export type PracticeRunnerSettings = Readonly<{
 }>;
 
 export type PracticeRunnerComposition = Awaited<ReturnType<typeof composePracticeRunner>>;
+
+/**
+ * Final fix wave F4: the practice's --call-concurrency reaches the debate's lanes. A debate's lane opens with its
+ * version's per-debate limits (execute(): `openLane(runId, settings.callLaneLimits)`, from the version's
+ * callConcurrencyPolicy row), so the flag replaces that one read for EVERY version the practice's loader loads: the
+ * lanes then run the flag's per-debate limits and the report's "FLAG" policy is the one they ran. Without the flag
+ * nothing is replaced: each version's own row, as main.ts. Never written anywhere.
+ */
+export function practiceVersionReaders(callConcurrency: CallConcurrencyPolicy | undefined): Partial<RunnerVersionReaders> {
+  if (callConcurrency === undefined) return Object.freeze({});
+  const flag = Object.freeze({ state: "SET" as const, policy: callConcurrency });
+  return Object.freeze({ readCallConcurrencyPolicy: async () => flag });
+}
 
 export async function composePracticeRunner(input: Readonly<{
   pool: Pool;
@@ -183,7 +196,8 @@ export async function composePracticeRunner(input: Readonly<{
   const settingsLog = input.settingsLog ?? (() => undefined);
   const runnerSettings = createRunnerSettingsCache({
     // The practice's story lines go to its own story log (main.ts's go to standard error).
-    load: (version) => loadRunnerVersionSettings(pool, version, runnerSite, {
+    // Final fix wave F4: with --call-concurrency every version's lanes take the flag's per-debate limits.
+    load: (version) => loadRunnerVersionSettings(pool, version, runnerSite, { readers: practiceVersionReaders(input.callConcurrency),
       log: ({ event, ...detail }) => { storyLog(String(event), detail); }
     }),
     log: settingsLog

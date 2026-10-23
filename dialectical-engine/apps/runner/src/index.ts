@@ -5541,17 +5541,21 @@ export class WalkingSkeletonRunner {
       const held = early?.claimed ?? await this.#work.claimById({ ...claimInput, workItemId: workItemId! });
       if (held === null) return { kind: "NO_WORK" };
       if (held.runId === null) throw new TypedDomainError("WORK_ITEM_WITHOUT_RUN", held.workItemId);
-      await this.#work.setAsideWorkItem({
+      const setAside = await this.#work.setAsideWorkItem({
         runId: held.runId,
         workItemId: held.workItemId,
         reason: "SETTINGS_VERSION_UNSUPPORTED",
         readyOnly: false
       });
+      // Ruling R42 (final fix wave S2): `setAside` tells the operator whether this copy set the debate aside (true) or
+      // wrote nothing because the item was no longer its own or had already ended (false: left to its holder). Final fix
+      // wave S14: the loader's code with an owner-typed detail only when that detail is plainly an id.
       console.warn(JSON.stringify({
         kind: "DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED",
         runId: held.runId,
         version: String(resolution.version),
-        code: resolution.code
+        code: settingsJournalCode(resolution.code),
+        setAside
       }));
       throw new TypedDomainError("SETTINGS_VERSION_UNSUPPORTED", "SETTINGS_VERSION_UNSUPPORTED");
     }
@@ -5568,11 +5572,29 @@ export class WalkingSkeletonRunner {
     if (claimed.runId === null) throw new TypedDomainError("WORK_ITEM_WITHOUT_RUN", claimed.workItemId);
     const claimedRunId = claimed.runId;
     /**
+     * Final fix wave S12: with a version resolver, a run this copy now holds runs on its own stamped version or not at
+     * all. A resolution of nothing (the peek found no run of this release, then the claim succeeded: a race) would run
+     * the debate on the boot's settings, and in local mode no money seam would notice; refused here, right after the
+     * claim and before the lane, the keep-alive or any call. The task's catch records it as the debate's failure.
+     */
+    if (settingsForVersion !== undefined && resolution === null) {
+      throw new TypedDomainError("RUN_SETTINGS_VERSION_UNKNOWN", "RUN_SETTINGS_VERSION_UNKNOWN:UNRESOLVED");
+    }
+    /**
      * Side-by-side spec §13 (S6): the run's version, recorded right after the claim and before the keep-alive, the lane
      * or any call, so every money seam and (addition D17) every preview call finds this run's own version by its run
      * id. Kept for the life of the process; a second, different value is refused (RUN_SETTINGS_VERSION_DRIFT).
      */
     if (resolution !== null) settings.runSettingsVersions?.set(claimedRunId, resolution.version);
+    /**
+     * Parallel AI calls (spec 2026-10-12 §3.2): this debate's lane of the runner's call scheduler, opened once the
+     * debate is claimed and closed in the `finally` below, after the story: a call still waiting then is refused
+     * (CALL_LANE_STOPPED) and never sent. Without a scheduler there is no lane and nothing is wrapped. Final fix wave S12:
+     * opened BEFORE the keep-alive starts, so a lane refusal (CALL_LANE_LIMITS_INVALID) leaves no claim renewing forever.
+     */
+    const callScheduler = settings.callScheduler;
+    // Side-by-side spec §13 (S4): the lane opens with this debate's own version's limits (absent: the scheduler's).
+    const callLane = callScheduler === undefined ? undefined : callScheduler.openLane(claimedRunId, settings.callLaneLimits);
     /**
      * L4-F9 repair (owner ruling 2026-10-11): the claim covers ONE model call and
      * the debate makes many, so it is renewed while the debate runs, fenced on the
@@ -5580,22 +5602,22 @@ export class WalkingSkeletonRunner {
      * stops at its next model call once the claim is another copy's, or once
      * Hatchet gives up on the task (run-keep-alive.ts).
      */
-    const keepAlive = startRunKeepAlive({
-      claimDeadline: claimed.claimDeadline,
-      renewEveryMs: settings.claimMs / 3,
-      renew: (heldUntil) => (settings.renewals ?? this.#work).renewClaim({ ...claimInput, workItemId: claimed.workItemId, heldUntil }),
-      ...(task === undefined ? {} : { task }),
-      // Side-by-side spec §4: once this release retires, the debate's next model call is refused (RUNNER_RETIRING).
-      stopCalls: () => settings.retirement?.callsStopped() === true
-    });
-    /**
-     * Parallel AI calls (spec 2026-10-12 §3.2): this debate's lane of the runner's call scheduler, opened once the
-     * debate is claimed and closed in the `finally` below, after the story: a call still waiting then is refused
-     * (CALL_LANE_STOPPED) and never sent. Without a scheduler there is no lane and nothing is wrapped.
-     */
-    const callScheduler = settings.callScheduler;
-    // Side-by-side spec §13 (S4): the lane opens with this debate's own version's limits (absent: the scheduler's).
-    const callLane = callScheduler === undefined ? undefined : callScheduler.openLane(claimedRunId, settings.callLaneLimits);
+    let keepAlive: ReturnType<typeof startRunKeepAlive>;
+    try {
+      keepAlive = startRunKeepAlive({
+        claimDeadline: claimed.claimDeadline,
+        renewEveryMs: settings.claimMs / 3,
+        renew: (heldUntil) => (settings.renewals ?? this.#work).renewClaim({ ...claimInput, workItemId: claimed.workItemId, heldUntil }),
+        ...(task === undefined ? {} : { task }),
+        // Side-by-side spec §4: once this release retires, the debate's next model call is refused (RUNNER_RETIRING).
+        stopCalls: () => settings.retirement?.callsStopped() === true
+      });
+    } catch (error) {
+      // Final fix wave S12: the lane opened above is closed when the keep-alive cannot start (the `finally` below is not
+      // reached yet).
+      callLane?.close();
+      throw error;
+    }
     /**
      * WHETHER THIS DEBATE'S CALLS RUN TOGETHER: only when its lane admits more than one call at a time (the register's
      * `callConcurrencyPolicy` row, set above one per debate). With the row absent — or no scheduler at all — the debate
@@ -11751,6 +11773,31 @@ export class WalkingSkeletonRunner {
   }
 }
 
+/**
+ * Final fix wave S14 — THE COMMON RULE for an owner-typed detail in a settings code (`CODE:detail[:detail…]`), the same
+ * rule the native operator's THINKING_REFUSAL pass-through and the practice's thinking-level check
+ * (tools/preview-practice/practice-redaction.ts `printableSettingsCode`) apply. The detail is key-shaped when it holds an
+ * unbroken run of 24+ letters and digits, a `//` (a socket or URL path) or a vendor `sk-` prefix.
+ */
+const SETTINGS_DETAIL_KEY_SHAPED = /[A-Za-z0-9]{24,}|\/\/|\bsk-/u;
+/** Final fix wave S14: one detail part a journal line may name whole (a model id, a step or level word, a row key). */
+const SETTINGS_DETAIL_PART = /^[A-Za-z0-9_.\/-]{1,64}$/u;
+
+/**
+ * Final fix wave S14: the `code` field of the runner's DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED lines (the cache's and the
+ * per-debate one) and of the boot's DEBATEAI_RUNNER_SETTINGS summary. A loader's code may carry what the owner typed
+ * into a settings version (a model or step name in PREVIEW_THINKING_LEVELS_INVALID:…); it is printed whole only when
+ * every detail part is plainly an id and the detail is not key-shaped, else the bare code (the part before the first
+ * ':'). A code without a detail is printed as it is.
+ */
+export function settingsJournalCode(code: string): string {
+  const colon = code.indexOf(":");
+  if (colon === -1) return code;
+  const detail = code.slice(colon + 1);
+  const plain = detail.split(":").every((part) => SETTINGS_DETAIL_PART.test(part)) && !SETTINGS_DETAIL_KEY_SHAPED.test(detail);
+  return plain ? code : code.slice(0, colon);
+}
+
 export type RunnerExecutionResult =
   | { readonly kind: "NO_WORK" }
   | { readonly kind: "COMPLETED"; readonly answerId: string }
@@ -13228,6 +13275,9 @@ export function createPostgresProviderGateway(
           "A story call and the STORY: call-site namespace must agree"
         );
       }
+      // Final fix wave S1: a defence for a composition that meters debate calls but gives no story seam. main.ts and the
+      // practice always give both, so in production a version without a story ceiling is refused by its guard's story
+      // seam instead (the same STORY_ENVELOPE_MISSING, built below before the provider-failure capture).
       if (storyScope && buildStoryCostEnvelopeSeam === undefined && buildCostEnvelopeSeam !== undefined) {
         throw new TypedDomainError(
           "STORY_ENVELOPE_MISSING",
@@ -13302,28 +13352,34 @@ export function createPostgresProviderGateway(
       if (remaining <= 0) {
         throw new TypedDomainError("CALL_BUDGET_EXHAUSTED", request.subjectItemId);
       }
+      /**
+       * V-28: the money envelope binds EVERY call, the authenticated evaluator
+       * scope included. That scope is exempt from the ATTEMPT ceiling because
+       * its attempts are billed to the evaluator rather than to the run
+       * (`ledger_entry_is_authenticated_scope`), but its calls are made against
+       * the same paid vendor with the same money, so exempting them from the
+       * money ceiling would leave a hole the size of the evaluator leg. The run
+       * id is the leased one, for the same reason as the attempt hook below.
+       *
+       * Verdict story: a story call is bound by the STORY's seam instead —
+       * its own ceiling, summed over STORY charges only.
+       *
+       * Task M1: the run's seam is built for the call's phase, so an
+       * answer-writing call is compared with the answer's ceiling.
+       *
+       * Parallel AI calls: built here, so the finally below can release what
+       * it still counts in flight once the call has settled.
+       *
+       * Final fix wave S1 (FINAL-FIX 6): built BEFORE the try that captures a
+       * failed call as PROVIDER_EXHAUSTED. A seam that cannot be built (the run's
+       * version unknown to this process, RUN_SETTINGS_VERSION_UNKNOWN; a version
+       * without a story ceiling, STORY_ENVELOPE_MISSING) is a settings refusal:
+       * it ends the call before anything is sent, with its own code, uncaptured.
+       */
+      costEnvelope = storyScope
+        ? buildStoryCostEnvelopeSeam?.(leasedRunId)
+        : buildCostEnvelopeSeam?.(leasedRunId, costEnvelopePhase, providerCallSharedWall(request));
       try {
-        /**
-         * V-28: the money envelope binds EVERY call, the authenticated evaluator
-         * scope included. That scope is exempt from the ATTEMPT ceiling because
-         * its attempts are billed to the evaluator rather than to the run
-         * (`ledger_entry_is_authenticated_scope`), but its calls are made against
-         * the same paid vendor with the same money, so exempting them from the
-         * money ceiling would leave a hole the size of the evaluator leg. The run
-         * id is the leased one, for the same reason as the attempt hook below.
-         *
-         * Verdict story: a story call is bound by the STORY's seam instead —
-         * its own ceiling, summed over STORY charges only.
-         *
-         * Task M1: the run's seam is built for the call's phase, so an
-         * answer-writing call is compared with the answer's ceiling.
-         *
-         * Parallel AI calls: built here, so the finally below can release what
-         * it still counts in flight once the call has settled.
-         */
-        costEnvelope = storyScope
-          ? buildStoryCostEnvelopeSeam?.(leasedRunId)
-          : buildCostEnvelopeSeam?.(leasedRunId, costEnvelopePhase, providerCallSharedWall(request));
         return await http.call({
           // Preview retry fix, option B (spec 2026-10-11 §1.1): the spread forwards the preview's
           // `maxAttemptsThisCall` (one POST per call), and `remaining` stays the step's billed allowance,
