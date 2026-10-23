@@ -52,6 +52,30 @@ describe("S02 publication review words are S01's words", () => {
     }
   });
 
+  it("the four Terms §7 rule lines share one form, the Terms' titles: none ends with a sentence terminator (REV-S02-p2 product N1)", () => {
+    for (const locale of LOCALES) {
+      const owner = messages(locale, "public");
+      for (const [category] of CATEGORIES) {
+        const rule = word(owner, `public.publicationReview.rule.${category}`, `${locale}/public`);
+        expect(/[.。．।]\s*$/u.test(rule), `${locale}: rule.${category} "${rule}" ends with a sentence terminator`).toBe(false);
+      }
+    }
+  });
+
+  it("S02's own owner strings use the catalogue's apostrophe: no straight ' where the rest of public.json prints ’ (REV-S02-p2 translation N3)", () => {
+    // category.* copy S01's export words and rule.* copy the Terms verbatim (both out of class: their source decides).
+    const own = (key: string) => key.startsWith("public.publicationReview.") && !/\.(category|rule)\./.test(key);
+    for (const locale of LOCALES) {
+      const owner = messages(locale, "public");
+      const rest = Object.entries(owner).filter(([key]) => !key.startsWith("public.publicationReview.")).map(([, value]) => value).join(" ");
+      const curly = (rest.match(/’/g) ?? []).length; const straight = (rest.match(/'/g) ?? []).length;
+      if (curly === 0 || straight > 0) continue;
+      for (const [key, value] of Object.entries(owner)) {
+        if (own(key)) expect(value.includes("'"), `${locale}: ${key} "${value}" uses ' where the catalogue uses ’`).toBe(false);
+      }
+    }
+  });
+
   it("the UNDER REVIEW card label opens with S01's FLAGGED label word in every locale", () => {
     for (const locale of LOCALES) {
       const home = messages(locale, "home");

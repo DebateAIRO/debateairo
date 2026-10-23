@@ -219,10 +219,10 @@
   "public.publicationReview.category.TERRORISM": "Kemungkinan terorisme",
   "public.publicationReview.category.WEAPONS_OR_DRUGS": "pembuatan senjata atau narkoba",
   "public.publicationReview.category.SUICIDE_OR_HARM_TO_OTHERS": "kecenderungan bunuh diri atau menyakiti orang lain",
-  "public.publicationReview.rule.HATE_SPEECH": "Jangan mengirimkan atau memublikasikan ujaran kebencian dalam bentuk apa pun.",
+  "public.publicationReview.rule.HATE_SPEECH": "Tidak boleh ada ujaran kebencian dalam bentuk apa pun",
   "public.publicationReview.rule.TERRORISM": "Jangan mengirimkan atau memublikasikan konten yang melanggar hukum",
-  "public.publicationReview.rule.WEAPONS_OR_DRUGS": "Jangan mengirimkan atau memublikasikan petunjuk pembuatan senjata atau narkoba.",
-  "public.publicationReview.rule.SUICIDE_OR_HARM_TO_OTHERS": "Jangan mengirimkan atau memublikasikan konten yang mendorong bunuh diri atau menyakiti orang lain.",
+  "public.publicationReview.rule.WEAPONS_OR_DRUGS": "Tidak boleh ada petunjuk pembuatan senjata atau narkoba",
+  "public.publicationReview.rule.SUICIDE_OR_HARM_TO_OTHERS": "Tidak boleh ada konten yang mendorong bunuh diri atau menyakiti orang lain",
   "public.publicationReview.ruleLine": "{category} — Ketentuan Layanan, bagian 7: {rule}",
   "public.publicationReview.underReview": "Debat ini sedang ditinjau oleh tim kami.",
   "public.publicationReview.pendingError": "Anda sudah meminta persetujuan. Debat ini sedang ditinjau oleh tim kami.",
@@ -230,10 +230,10 @@
   "public.publicationReview.statement.heading": "Kami tidak menyetujui penerbitan debat ini",
   "public.publicationReview.statement.what": "Debat ini tidak dapat diterbitkan. Debat ini tetap privat, dan hanya Anda yang dapat membacanya. Akun Anda dan debat Anda yang lain tidak terpengaruh.",
   "public.publicationReview.statement.facts": "Pemeriksaan otomatis kami sendiri menandai sintesis debat; tidak ada yang melaporkannya kepada kami. Seorang anggota tim kami kemudian membaca debat tersebut dan menolak menyetujuinya.",
-  "public.publicationReview.statement.automated": "Penandaan dilakukan oleh alat otomatis. Penolakan diputuskan oleh seseorang.",
+  "public.publicationReview.statement.automated": "Penandaan dilakukan oleh alat otomatis. Keputusan untuk menolak diambil oleh seseorang.",
   "public.publicationReview.statement.categoriesIntro": "Yang ditemukan pemeriksaan:",
   "public.publicationReview.statement.groundIntro": "Aturan yang berlaku bagi masing-masing, dalam Ketentuan Layanan kami:",
   "public.publicationReview.statement.reasonIntro": "Alasan peninjau:",
-  "public.publicationReview.statement.challengeFirst": "Untuk menantang keputusan ini, kirim pesan ke office@dezbatere.ro dalam waktu enam bulan, atau minta persetujuan sekali lagi di bawah: anggota tim kami yang lain yang akan memutuskan. Anda juga dapat membawa keputusan ini ke badan penyelesaian sengketa di luar pengadilan yang disertifikasi atau ke pengadilan.",
-  "public.publicationReview.statement.challengeFinal": "Anda tetap dapat menantang keputusan ini melalui badan penyelesaian sengketa di luar pengadilan yang disertifikasi atau di pengadilan."
+  "public.publicationReview.statement.challengeFirst": "Untuk mengajukan keberatan atas keputusan ini, kirim pesan ke office@dezbatere.ro dalam waktu enam bulan, atau minta persetujuan sekali lagi di bawah: anggota tim kami yang lain yang akan memutuskan. Anda juga dapat membawa keputusan ini ke badan penyelesaian sengketa di luar pengadilan yang disertifikasi atau ke pengadilan.",
+  "public.publicationReview.statement.challengeFinal": "Anda tetap dapat mengajukan keberatan atas keputusan ini melalui badan penyelesaian sengketa di luar pengadilan yang disertifikasi atau di pengadilan."
 }
