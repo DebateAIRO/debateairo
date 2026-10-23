@@ -8,12 +8,17 @@
  * wiring is mirrored here, and tests/unit/preview-practice-wiring-drift.test.ts fails when the settings main.ts hands
  * PostgresAskApplication gain a key this file does not hand it (hosted-only keys excepted).
  *
- * HOSTED mode (owner rulings 2026-10-13) adds main.ts's hosted ask wiring, in `composePracticeAskMoney` below: the
- * sealed-envelope and support-scope boot refusals, the daily guard over both money rows, and, with the band, THE ROOM
- * (the site's day at its close edge, the waiting line, the estimate from recent runs), the picker's per-run money
- * limits and the refusal of a run ceiling below one call. The boot questions are asked of the register exactly as the
- * server's API asks them, billing included (assertBillingReady with the register's own billingPolicy), so a version
- * the hosted API would refuse to start on is refused here too.
+ * Side-by-side spec §13: every per-version admission read (the preview's line-up and gate terms, the per-run money and
+ * the story's reserve, the shape, length, engine and question-language rows, the picker, the run ceiling against one
+ * call, the risk tier, the role rotation) is made by main.ts's ONE loader (apps/api/src/admission-settings.ts), over the
+ * same site context, and kept in the same per-version cache beside the same activation-pointer reader.
+ *
+ * HOSTED mode (owner rulings 2026-10-13) adds main.ts's hosted ask wiring, in `composePracticeAskMoney` (before the
+ * loader) and `composePracticeAskRoom` (after it) below: the sealed-envelope and support-scope boot refusals, the
+ * site's day and band, the daily guard over both money rows (the loader's), and, with the band, THE ROOM (the site's
+ * day at its close edge, the waiting line, the estimate from recent runs). The boot questions are asked of the register
+ * exactly as the server's API asks them, billing included (assertBillingReady with the register's own billingPolicy),
+ * so a version the hosted API would refuse to start on is refused here too.
  *
  * BILLING IS KEPT OFF in the practice's ask, whatever the register says (the server's own "hosted, billing off"
  * composition, H6 of deploy/preview-release/v1/README.md): no `billing` member (the server-decided plan tier, the
@@ -36,32 +41,18 @@
  *    built, so an internal-funding selection is neither read nor refused (side-by-side spec §9, C17, as main.ts).
  */
 import type { Pool } from "pg";
-import { PostgresAskApplication, preserveSubmittedTierSource, type Dispatcher, type RunCreationSettings } from "@debateai/api";
-import type { AskRequest } from "@debateai/contract";
-import { ProviderProbeRepository, readRoleRotationCounts, RunWaitRepository } from "@debateai/db";
+import { PostgresAskApplication, type Dispatcher, type RunCreationSettings } from "@debateai/api";
+import { ProviderProbeRepository, RunWaitRepository } from "@debateai/db";
 import { readDeploymentMakerCapability } from "@debateai/critique";
-import { TypedDomainError, type RiskTier } from "@debateai/kernel";
-import { PLAN_TIER_ROSTERS, askQuestionMaxBytes } from "@debateai/contract";
+import { TypedDomainError } from "@debateai/kernel";
 import {
-  CostEnvelopeGuard,
   NO_PERSON_ALLOWANCE,
   PostgresModelSpendStore,
-  PostgresRecentRunUsageSource,
-  RecentRunsCostEstimator,
-  assertRunCeilingCoversOneCall,
-  costEnvelopeGuardPolicy,
-  mostOneRunMaySpendMicros
+  type CostEstimator
 } from "@debateai/budget";
-import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
-import { firstCallPlanModels } from "@debateai/scorecard";
 import {
-  assertDeploymentProviderTargets,
-  assertPreviewProviderTargets,
-  assertPreviewRoleTargets,
-  assertPricedProviderTargets,
   createPreviewGuardedFetch,
   createPreviewRemainingRpcPort,
-  parseProviderDiscoveryTargets,
   PREVIEW_GLM_DEADLINE_MS,
   previewProbeControls,
   resolveProviderTargetCredentials,
@@ -69,54 +60,40 @@ import {
   type PreviewGateRemaining
 } from "@debateai/providers";
 import {
-  assertAskRoomAdmissionSealed,
-  assertBillingReady,
   assertHostedCostEnvelopesSealed,
   assertHostedSupportAdmissionSealed,
-  computeStructuralCeilingBasis,
-  costEnvelopeBand,
-  costEnvelopeCeilings,
-  debateShapeInForce,
-  engineInForce,
   readAdmissionPolicy,
-  readAnswerRoleRotationPolicy,
   readBillingPlans,
   readBillingPolicy,
-  readCallTokenCeilings,
   readCostEnvelopePolicy,
   readCostEstimateStartPolicy,
-  readDebateShapePolicy,
-  readDeploymentRiskTier,
-  readEngineVersion,
-  readEngineVersionPolicy,
-  readEnvelopeFormulaInputs,
-  readJudgeTokenCeiling,
-  lengthGuidedFirstCallCeiling,
-  readLengthGuidancePolicy,
-  readModelScorecard,
   readPanelDiscoveryPolicy,
-  readQuestionLanguagePolicy,
-  readStoryPolicyFromRegister,
-  readStructuralCeilingPolicyInputs,
-  resolveEffectiveRiskTier,
-  type DeploymentMode,
-  type LengthGuidancePolicy
+  type CostEnvelopePolicy,
+  type CostEstimateStartPolicy,
+  type DeploymentMode
 } from "@debateai/register";
-import { composeAskModelPicker } from "../../apps/api/src/ask-model-picker.js";
-import { assertEngineHasLengthPolicy } from "../../apps/api/src/engine-ask.js";
 import { AskRoom } from "../../apps/api/src/ask-room.js";
 import { PostgresAskAdmissionGate } from "../../apps/api/src/release-state.js";
-import { buildApiProviderPriceMap, createProviderDiscoveryResolver } from "../../apps/api/src/provider-discovery.js";
-import { readPreviewBudgetGateSettings } from "../../apps/api/src/preview-budget-estimate.js";
-import { composeQuestionLanguage, questionLanguageRouteFor } from "../../apps/api/src/question-language/boot.js";
+import { createProviderDiscoveryResolver, parseDeclaredProviderTargets } from "../../apps/api/src/provider-discovery.js";
+import {
+  admissionSettingsOfVersion,
+  buildAdmissionSiteContext,
+  createAdmissionSettingsCache,
+  decideAskRoomReadiness,
+  loadAdmissionSettings,
+  type AdmissionRunMembers,
+  type AdmissionSiteContext
+} from "../../apps/api/src/admission-settings.js";
+import { createActiveSettingsVersionReader } from "../../apps/api/src/active-settings-version.js";
+import { questionLanguageRouteFor } from "../../apps/api/src/question-language/boot.js";
 import type { QuestionLanguageChoiceNeeded, QuestionLanguageLock } from "../../apps/api/src/question-language/decider.js";
 import { newQuestionLanguageReferenceKey } from "../../apps/api/src/question-language/reference.js";
 import { practicePinsRequireRotation, practiceRotationCountsWithPins, type PracticeWriterPins } from "./practice-pins.js";
 import type { PracticeSettings, PracticeSockets } from "./practice-settings.js";
 
-/** The read-only "what is left today" answer of each gate, over the forwarded sockets. */
+/** The read-only "what is left today" answer of each gate, over the forwarded sockets (the gate part's scope). */
 export function practiceRemainingPorts(settings: PracticeSettings, sockets: PracticeSockets) {
-  const scope = settings.previewConfig.scope_id;
+  const scope = settings.runner.PREVIEW_GATE_SETTINGS.scope_id;
   const deepinfra = createPreviewRemainingRpcPort({ budget_socket: sockets.deepinfra, scope_id: scope });
   const anthropic = createPreviewRemainingRpcPort({ budget_socket: sockets.anthropic, scope_id: scope });
   return Object.freeze({
@@ -126,50 +103,36 @@ export function practiceRemainingPorts(settings: PracticeSettings, sockets: Prac
 }
 
 /**
- * HOSTED only (null in local mode, where main.ts builds none of it): apps/api/src/main.ts's money stages, in its order
- * and with its statements (tests/unit/preview-practice-hosted.test.ts pins them): "support-admission-scopes",
- * "cost-envelope-policy" and the daily guard, then "ask-room" with billing kept off (see the file's head).
+ * HOSTED only (null in local mode, where main.ts builds none of it): apps/api/src/main.ts's site money stages, in its
+ * order and with its statements, BEFORE the admission loader: the sealed-envelope and support-scope boot refusals,
+ * "site-cost-envelope-policy" (the site's day and band), then "ask-room"'s boot questions with the register's own
+ * billingPolicy (refuses exactly as the hosted API's boot does). The per-version money (the run's ceiling, the story's
+ * reserve, the daily guard and the room's estimator) is the loader's; the room is built after it
+ * (`composePracticeAskRoom`), with billing kept off (see the file's head).
  */
 export async function composePracticeAskMoney(input: Readonly<{
   pool: Pool;
-  /** The room's own decision pool (main.ts: API_DATABASE_POOLS.roomDecision), distinct from `pool`; hosted only. */
-  roomDecisionPool?: Pool;
   registerVersion: number;
   deploymentMode: DeploymentMode;
-  /** Side-by-side spec §1, §3: the practice's one release key is read from here, as its runner reads it. */
-  settings: Readonly<{ runner: Pick<PracticeSettings["runner"], "RELEASE_KEY"> }>;
-  declaredProviderTargets: Parameters<typeof buildApiProviderPriceMap>[0];
-  log?: (line: string) => void;
 }>) {
-  const { pool, settings } = input;
+  const { pool } = input;
   const environment = Object.freeze({ DEPLOYMENT_MODE: input.deploymentMode, REGISTER_VERSION: input.registerVersion });
   if (environment.DEPLOYMENT_MODE !== "hosted") return null;
   assertHostedCostEnvelopesSealed(environment.DEPLOYMENT_MODE);
   const admissionPolicy = await readAdmissionPolicy(pool, environment.REGISTER_VERSION);
   assertHostedSupportAdmissionSealed(environment.DEPLOYMENT_MODE, admissionPolicy);
-  const costEnvelopeRows = await (async () => {
-    const runPolicy = await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION);
-    const storyPolicy = await readStoryPolicyFromRegister(pool, environment.REGISTER_VERSION)
-      .catch((error: unknown) => {
-        input.log?.(JSON.stringify({ kind: "DEBATEAI_STORY", event: "STORY_POLICY_UNREADABLE",
-          code: error instanceof TypedDomainError ? error.code : "UNTYPED" }));
-        return null;
-      });
-    return Object.freeze({ runPolicy, guardPolicy: costEnvelopeGuardPolicy(runPolicy, storyPolicy) });
-  })();
-  const costEnvelopeGuard = new CostEnvelopeGuard({ store: new PostgresModelSpendStore(pool), policy: costEnvelopeRows.guardPolicy });
+  const siteCostEnvelopePolicy: CostEnvelopePolicy = await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION);
   // main.ts's "ask-room" stage: the readiness question with the register's OWN billingPolicy (refuses exactly as the
-  // hosted API's boot does). Its answer (the plans when billing is on) is kept only for the report and the boot's
-  // run-ceiling question: the practice's room is built with billing off.
-  const registerBillingPlans = assertBillingReady({
+  // hosted API's boot does). Its answer (the plans when billing is on) is kept for the report and, as main.ts's
+  // `billingEnabled`, for the loader's picker and run-ceiling stages: the practice's room is built with billing off.
+  // Side-by-side spec §13 (S14, ruling R57): main.ts's one decision (admission-settings.ts), check-version's too.
+  const readiness = decideAskRoomReadiness({
+    envelope: siteCostEnvelopePolicy,
+    admission: admissionPolicy,
     policy: await readBillingPolicy(pool, environment.REGISTER_VERSION),
-    plans: await readBillingPlans(pool, environment.REGISTER_VERSION),
-    envelope: costEnvelopeRows.runPolicy
+    plans: await readBillingPlans(pool, environment.REGISTER_VERSION)
   });
-  const billingPlans = null;
-  const band = costEnvelopeBand(costEnvelopeRows.runPolicy);
-  let askRoom: AskRoom | undefined;
-  if (band === null) {
+  if (readiness === null) {
     const stranded = await new RunWaitRepository(pool).countWaiting();
     if (stranded > 0) {
       throw new TypedDomainError(
@@ -177,98 +140,73 @@ export async function composePracticeAskMoney(input: Readonly<{
         "Questions are waiting in line, and a register version without the band has no waker to start them"
       );
     }
-  } else {
-    assertAskRoomAdmissionSealed({ envelope: costEnvelopeRows.runPolicy, admission: admissionPolicy });
-    const spend = new PostgresModelSpendStore(pool);
-    const entitlements = null;
-    // Side-by-side spec §9 (C17), as main.ts: no funding read and no funding refusal at boot. main.ts builds the funding
-    // source only with billing on; billing is kept off here, so there is none (the room gets no `funding`).
-    const personAllowance = NO_PERSON_ALLOWANCE;
-    // main.ts's "cost-estimate-start-policy" stage (fresh-site estimate, owner rulings 2026-10-22): the sealed starting
-    // figures at the version in force; null at a version without the row (today's estimate).
-    const costEstimateStartPolicy = await readCostEstimateStartPolicy(pool, environment.REGISTER_VERSION);
-    const estimator = new RecentRunsCostEstimator({
-      source: new PostgresRecentRunUsageSource(pool),
-      prices: buildApiProviderPriceMap(input.declaredProviderTargets, environment.DEPLOYMENT_MODE),
-      maximumMicros: mostOneRunMaySpendMicros(costEnvelopeRows.guardPolicy),
-      start: costEstimateStartPolicy
-    });
-    if (input.roomDecisionPool === undefined) throw new TypeError("PRACTICE_ROOM_POOL_REQUIRED");
-    const room = new AskRoom({
-      lockPool: input.roomDecisionPool,
-      spend,
-      line: new RunWaitRepository(pool),
-      estimator,
-      personAllowance,
-      entitlements,
-      billingPlans,
-      dailyCeilingMicros: costEnvelopeRows.runPolicy.dailyCeilingMicros,
-      closeBasisPoints: band.closeBasisPoints,
-      waitingLinePerPerson: band.waitingLinePerPerson,
-      // Side-by-side C8, as main.ts: the site's cap of debates and the release re-check, in the decision's lock. The
-      // practice's throwaway database records no release and its runner lives in this process, so it is the only
-      // release there is: read as not hosted ("no row, not hosted" is current), under the key its runs are stamped with
-      // and its runner claims under (settings.runner.RELEASE_KEY, practice-settings.ts practiceReleaseKey).
-      gate: new PostgresAskAdmissionGate({ releaseKey: settings.runner.RELEASE_KEY, hosted: false })
-    });
-    askRoom = room;
   }
+  // main.ts's "cost-estimate-start-policy" stage (fresh-site estimate, owner rulings 2026-10-22): the sealed starting
+  // figures, a SITE row read from the site version (null without the row: today's estimate); every version's estimator
+  // starts from it through the site context.
+  const costEstimateStartPolicy: CostEstimateStartPolicy | null = await readCostEstimateStartPolicy(pool, environment.REGISTER_VERSION);
+  // Billing on needs the band (B4a refuses it otherwise), so no answer means billing off.
+  const registerBillingPlans = readiness?.billingPlans ?? null;
+  const band = readiness?.band ?? null;
   return Object.freeze({
-    costEnvelopeRows, costEnvelopeGuard, askRoom,
+    siteCostEnvelopePolicy, costEstimateStartPolicy, band,
+    /** The room's readiness answer, as main.ts's (null when no room is built): the site context's billing switch. */
+    readiness,
     /** What the register says (the practice runs billing off either way). */
-    billingInRegister: registerBillingPlans === null ? "off" as const : "on" as const,
-    /** The boot's run-ceiling question prices Free on its own roster when billing is on (main.ts, paid plans S4b). */
-    registerBillingEnabled: registerBillingPlans !== null
+    billingInRegister: registerBillingPlans === null ? "off" as const : "on" as const
   });
 }
 
 /**
- * main.ts's "run-ceiling-covers-one-call" stage (hosted, with the band): a run ceiling below the first position's own
- * call at the cheapest price among each plan's models refuses (RUN_CEILING_BELOW_ONE_CALL). Asked with the register's
- * own billing state, as the server's boot asks it.
+ * main.ts's "ask-room-composition" (hosted, with the band), after the admission loader: THE ROOM over the site
+ * version's estimator and each version's own (`estimatorFor`), with billing kept off (no person allowance, no
+ * entitlements, no plans, no funding).
  */
-async function assertPracticeRunCeilingCoversOneCall(input: Readonly<{
+export function composePracticeAskRoom(input: Readonly<{
   pool: Pool;
-  registerVersion: number;
+  /** The room's own decision pool (main.ts: API_DATABASE_POOLS.roomDecision), distinct from `pool`; hosted only. */
+  roomDecisionPool?: Pool;
+  /** Side-by-side spec §1, §3: the practice's one release key is read from here, as its runner reads it. */
+  settings: Readonly<{ runner: Pick<PracticeSettings["runner"], "RELEASE_KEY"> }>;
   money: NonNullable<Awaited<ReturnType<typeof composePracticeAskMoney>>>;
-  declaredProviderTargets: Parameters<typeof firstPositionCallProjections>[0]["targets"];
-  scorecardState: string;
-  /** main.ts's `debateShapeInForcePolicy !== null`: a shaped run's first call carries the locked language. */
-  questionLanguageLocked: boolean;
-  /** Length guidance (spec 2026-10-15 §3.3), as main.ts: the first call is checked at the largest guided opening allowance. */
-  lengthGuidancePolicy: LengthGuidancePolicy | null;
-}>): Promise<void> {
-  const { pool, money: { costEnvelopeRows }, declaredProviderTargets } = input;
-  const billingEnabled = input.money.registerBillingEnabled;
-  if (costEnvelopeBand(costEnvelopeRows.runPolicy) === null) return;
-  const firstCalls = firstPositionCallProjections({
-    targets: declaredProviderTargets,
-    judgeTokenCeiling: lengthGuidedFirstCallCeiling(await readJudgeTokenCeiling(pool, input.registerVersion), input.lengthGuidancePolicy),
-    questionMaxBytes: askQuestionMaxBytes(),
-    // Pre-flight PF-L38, as main.ts: with the debate-shape row in force a run may be shaped, and its first call carries
-    // the locked language: priced at the longest lock too. Row absent (or switched off): today's price.
-    questionLanguageLocked: input.questionLanguageLocked,
-    // Length guidance (spec 2026-10-15 §3.2), as main.ts: with the row the first call is the lengthed variant.
-    lengthed: input.lengthGuidancePolicy !== null
+  estimator: CostEstimator | null;
+  estimatorFor: (registerVersion: number) => Promise<CostEstimator>;
+  /** Side-by-side spec §13 (C14, Task S13), as main.ts: the gate reads the activation pointer, NULL = this version. */
+  siteVersion: number;
+}>): AskRoom | undefined {
+  const { pool, settings, money } = input;
+  const band = money.band;
+  if (band === null) return undefined;
+  const spend = new PostgresModelSpendStore(pool);
+  const billingPlans = null;
+  const entitlements = null;
+  // Side-by-side spec §9 (C17), as main.ts: no funding read and no funding refusal at boot. main.ts builds the funding
+  // source only with billing on; billing is kept off here, so there is none (the room gets no `funding`).
+  const personAllowance = NO_PERSON_ALLOWANCE;
+  const estimator = input.estimator;
+  if (estimator === null) throw new TypeError("ASK_ROOM_ESTIMATOR_REQUIRED");
+  if (input.roomDecisionPool === undefined) throw new TypeError("PRACTICE_ROOM_POOL_REQUIRED");
+  const room = new AskRoom({
+    lockPool: input.roomDecisionPool,
+    spend,
+    line: new RunWaitRepository(pool),
+    estimator,
+    estimatorFor: input.estimatorFor,
+    personAllowance,
+    entitlements,
+    billingPlans,
+    dailyCeilingMicros: money.siteCostEnvelopePolicy.dailyCeilingMicros,
+    closeBasisPoints: band.closeBasisPoints,
+    waitingLinePerPerson: band.waitingLinePerPerson,
+    // Side-by-side C8, as main.ts: the site's cap of debates and the release re-check, in the decision's lock. The
+    // practice's throwaway database records no release and its runner lives in this process, so it is the only
+    // release there is: read as not hosted ("no row, not hosted" is current), under the key its runs are stamped with
+    // and its runner claims under (settings.runner.RELEASE_KEY, practice-settings.ts practiceReleaseKey).
+    // Side-by-side spec §13 (C14, Task S13), as main.ts: a waiting debate's START reads the pointer on its own transaction.
+    gate: new PostgresAskAdmissionGate({ releaseKey: settings.runner.RELEASE_KEY, hosted: false, siteVersion: input.siteVersion })
   });
-  assertRunCeilingCoversOneCall({
-    bodyCeilingMicros: costEnvelopeCeilings(costEnvelopeRows.runPolicy).bodyMicros,
-    firstCallsByRoster: firstCallsByPlanRoster({
-      projections: firstCalls,
-      rosters: firstCallPlanModels({
-        scorecardInForce: input.scorecardState === "VALID",
-        rosters: PLAN_TIER_ROSTERS,
-        models: firstCalls.map((call) => call.model),
-        ownRosterOnly: billingEnabled ? ["free"] : []
-      })
-    })
-  });
+  return room;
 }
-
-const BOOT = Object.freeze({
-  run: async <T>(_stage: string, step: () => Promise<T> | T): Promise<T> => step(),
-  runSync: <T>(_stage: string, step: () => T): T => step()
-});
 
 export async function composePracticeAsk(input: Readonly<{
   pool: Pool;
@@ -291,27 +229,19 @@ export async function composePracticeAsk(input: Readonly<{
   pins?: PracticeWriterPins;
 }>) {
   const { pool, settings } = input;
-  const version = settings.runner.REGISTER_VERSION;
-  const previewConfig = settings.previewConfig;
-  const deploymentMakers = await readDeploymentMakerCapability(pool, version);
-  const discoveryPolicy = await readPanelDiscoveryPolicy(pool, version);
-  const structuralInputs = await readStructuralCeilingPolicyInputs(pool, version);
-  const envelopeFormulaInputs = await readEnvelopeFormulaInputs(pool, version);
+  const environment = settings.runner;
+  // Addition D14-D16 / ruling R25, as main.ts: "is this the preview?" keys on the gate part; each settings version's
+  // line-up is the admission loader's, composed over it.
+  const previewGate = environment.PREVIEW_GATE_SETTINGS;
+  const deploymentMakers = await readDeploymentMakerCapability(pool, environment.REGISTER_VERSION);
+  const discoveryPolicy = await readPanelDiscoveryPolicy(pool, environment.REGISTER_VERSION);
   const probes = new ProviderProbeRepository(pool);
-  const declaredProviderTargets = parseProviderDiscoveryTargets(
-    settings.runner.PROVIDER_DISCOVERY_TARGETS_JSON, deploymentMakers.configuredProviders);
-  assertDeploymentProviderTargets(declaredProviderTargets, { mode: settings.runner.DEPLOYMENT_MODE, nodeEnv: settings.runner.NODE_ENV });
-  assertPricedProviderTargets(declaredProviderTargets, settings.runner.DEPLOYMENT_MODE);
-  assertPreviewProviderTargets(previewConfig, declaredProviderTargets);
-  if ((await readModelScorecard(pool, version, await readEngineVersion())).state === "VALID") {
-    throw new TypedDomainError("PREVIEW_SCORECARD_CONFLICT", "Preview roster cannot override a valid scorecard");
-  }
+  // As main.ts (S14, ruling R57): the one decision over the declared targets (provider-discovery.ts).
+  const declaredProviderTargets = parseDeclaredProviderTargets({
+    targetsJson: environment.PROVIDER_DISCOVERY_TARGETS_JSON, configuredProviders: deploymentMakers.configuredProviders,
+    mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV
+  });
   const previewFetch = createPreviewGuardedFetch(input.budgetPorts);
-  const gateSettings = await readPreviewBudgetGateSettings(pool, version, previewConfig,
-    declaredProviderTargets.map((target) => target.model));
-  assertPreviewRoleTargets(previewConfig, declaredProviderTargets, gateSettings.roleProviderRefs);
-  // The one seam: the read-only answer comes over the forwarded sockets, not the configuration's server paths.
-  const previewBudgetGate = Object.freeze({ ...gateSettings, remaining: practiceRemainingPorts(settings, input.sockets) });
   const providerDiscoveryTargets = resolveProviderTargetCredentials(declaredProviderTargets, () => {
     throw new TypeError("PRACTICE_TARGET_DECLARES_A_CREDENTIAL");
   });
@@ -323,133 +253,96 @@ export async function composePracticeAsk(input: Readonly<{
     probeTimeoutMs: PREVIEW_GLM_DEADLINE_MS,
     probeControlsFor: previewProbeControls, fetchImplementation: previewFetch, previewRound: true
   });
-  // Hosted only: the money stages (null in local mode, which builds none of them).
-  const money = await composePracticeAskMoney({
-    pool, registerVersion: version, deploymentMode: settings.runner.DEPLOYMENT_MODE, settings, declaredProviderTargets,
-    ...(input.roomDecisionPool === undefined ? {} : { roomDecisionPool: input.roomDecisionPool }),
-    ...(input.log === undefined ? {} : { log: input.log })
-  });
-  const costEnvelopeRows = money?.costEnvelopeRows;
-  const costEnvelopeGuard = money?.costEnvelopeGuard;
-  const askRoom = money?.askRoom;
-  const callTokenCeilings = await readCallTokenCeilings(pool, version);
-  // Debate shape (spec 2026-10-12 §3.1): as main.ts reads it; the practice runner's composition resolves the shape.
-  const debateShapePolicy = await readDebateShapePolicy(pool, version);
-  // As main.ts: the row in force for the ask side (amendment 2026-10-13, the preview's rollback).
-  const debateShapeInForcePolicy = debateShapeInForce(debateShapePolicy);
-  // Length guidance (spec 2026-10-15 §3.1): as main.ts reads it.
-  const lengthGuidancePolicy = await readLengthGuidancePolicy(pool, version);
-  // Engine redesign (R1d), as main.ts: the row, the boot rule (in force without the length row refuses), and the row in
-  // force for the ask side. The throwaway practice register is the only place the practice writes it (Task 20).
-  const engineVersionPolicy = await readEngineVersionPolicy(pool, version);
-  const engineInForcePolicy = engineInForce(engineVersionPolicy);
-  assertEngineHasLengthPolicy(engineInForcePolicy, lengthGuidancePolicy);
-  // Question language (spec 2026-10-13), as main.ts composes it: only with the shape row in force. The route is the
-  // practice's guarded fetch when it has the Anthropic gate (ruling L-ROUTE), else no fast check. One process and no
-  // blind-index key here, so the check reference key is per process. The same in hosted mode: the hosted preview still
-  // has its preview configuration, so main.ts takes this preview route there too (never its hosted route, L-ROUTE).
-  const questionLanguage = debateShapeInForcePolicy === null ? undefined : await composeQuestionLanguage({
-    policy: await readQuestionLanguagePolicy(pool, version),
-    route: questionLanguageRouteFor({
-      previewConfigured: true,
-      previewFetch,
-      // The forwarded Anthropic gate socket, when the practice has a port on it (the seam main.ts reads from the config).
-      anthropicSocket: input.budgetPorts.anthropic === undefined ? undefined : input.sockets.anthropic,
-      hosted: () => { throw new TypeError("PRACTICE_QUESTION_LANGUAGE_HOSTED_ROUTE"); }
-    }),
-    clock: () => new Date(),
-    maxQuestionBytes: askQuestionMaxBytes(),
-    referenceKey: newQuestionLanguageReferenceKey(),
-    ...(input.onQuestionLanguage === undefined ? {} : { onDecided: input.onQuestionLanguage })
-  });
-  const modelPicker = await composeAskModelPicker({
-    boot: BOOT,
+  // Hosted only: main.ts's site money stages, before the loader (null in local mode, which builds none of them).
+  const money = await composePracticeAskMoney({ pool, registerVersion: environment.REGISTER_VERSION, deploymentMode: environment.DEPLOYMENT_MODE });
+  /**
+   * Side-by-side spec §13, as main.ts: THE SITE CONTEXT of the one per-version admission loader. Differences, on purpose:
+   * the gates' "what is left" answer comes over the forwarded sockets; the question-language route is the practice's
+   * guarded fetch when it has the Anthropic gate (ruling L-ROUTE), else no fast check, and its reference key is per
+   * process (one process, no blind-index key). The same in hosted mode: the hosted preview still has its preview
+   * configuration, so main.ts takes this preview route there too (never its hosted route, L-ROUTE).
+   */
+  const admissionSite: AdmissionSiteContext = buildAdmissionSiteContext({
     pool,
-    deploymentMode: settings.runner.DEPLOYMENT_MODE,
-    registerVersion: version,
-    targets: declaredProviderTargets,
-    perRunCeilingMicros: costEnvelopeRows?.guardPolicy.perRunCeilingMicros ?? null,
-    callTokenCeilings,
-    moneyPolicy: costEnvelopeRows?.guardPolicy ?? null,
-    // Billing kept off in the practice (the file's head says why); on the preview it changes nothing here, because the
-    // picker's billing rules apply only under a VALID scorecard, which the preview refuses (PREVIEW_SCORECARD_CONFLICT).
-    billingEnabled: false,
-    debateShapePolicy: debateShapeInForcePolicy,
-    lengthGuidancePolicy,
-    log: (line) => input.log?.(line)
+    environment,
+    declaredProviderTargets,
+    siteCostEnvelopePolicy: money === null ? null : money.siteCostEnvelopePolicy,
+    // As main.ts: the site's costEstimateStartPolicy row (hosted; null without it), every estimator's start.
+    costEstimateStartPolicy: money === null ? null : money.costEstimateStartPolicy,
+    // As main.ts: the room's readiness answer (present exactly when the room is built; its plans say billing is on).
+    askRoomReadiness: money === null ? null : money.readiness,
+    questionLanguage: Object.freeze({
+      routeFor: async () => questionLanguageRouteFor({
+        previewConfigured: true,
+        previewFetch,
+        // The forwarded Anthropic gate socket, when the practice has a port on it (the seam main.ts reads from the config).
+        anthropicSocket: input.budgetPorts.anthropic === undefined ? undefined : input.sockets.anthropic,
+        hosted: () => { throw new TypeError("PRACTICE_QUESTION_LANGUAGE_HOSTED_ROUTE"); }
+      }),
+      referenceKey: newQuestionLanguageReferenceKey(),
+      ...(input.onQuestionLanguage === undefined ? {} : { onDecided: input.onQuestionLanguage })
+    }),
+    // The one seam: the read-only answer comes over the forwarded sockets, not the configuration's server paths.
+    previewRemaining: practiceRemainingPorts(settings, input.sockets),
+    log: (line: string) => input.log?.(line)
   });
-  if (money !== null) {
-    await assertPracticeRunCeilingCoversOneCall({ pool, registerVersion: version, money, declaredProviderTargets,
-      scorecardState: modelPicker.scorecard.state, questionLanguageLocked: debateShapeInForcePolicy !== null,
-      lengthGuidancePolicy });
-  }
-  const deploymentRiskTier = await readDeploymentRiskTier(pool, version);
-  const answerRoleRotation = await readAnswerRoleRotationPolicy(pool, version);
+  // As main.ts: the site version, loaded by the one loader (its refusals refuse the practice with the same codes).
+  const siteAdmission = await loadAdmissionSettings(pool, environment.REGISTER_VERSION, admissionSite);
+  const admissionCache = createAdmissionSettingsCache({
+    load: (version) => loadAdmissionSettings(pool, version, admissionSite),
+    seed: siteAdmission
+  });
+  // As main.ts: the activation pointer's one reader, read once (a database that cannot answer it refuses the practice).
+  const activeSettings = createActiveSettingsVersionReader({
+    pool, siteVersion: environment.REGISTER_VERSION, ...(input.log === undefined ? {} : { log: (line) => input.log?.(JSON.stringify(line)) })
+  });
+  await activeSettings.current();
+  const askRoom = money === null ? undefined : composePracticeAskRoom({
+    pool, settings, money, estimator: siteAdmission.estimator, siteVersion: environment.REGISTER_VERSION,
+    estimatorFor: async (version) => (await admissionCache.admissionSettingsFor(version)).estimator!,
+    ...(input.roomDecisionPool === undefined ? {} : { roomDecisionPool: input.roomDecisionPool })
+  });
   // Pinned final writers (R1d): they work through the rotation; refused with the rotation off, before any AI is asked.
-  if (input.pins !== undefined) practicePinsRequireRotation(input.pins, answerRoleRotation.state === "ON");
+  if (input.pins !== undefined) practicePinsRequireRotation(input.pins, siteAdmission.roleRotation !== null);
+  /**
+   * Pinned final writers (R1d, INTERFACE §15.2, counts mechanism): the counts the rotation reads give the pinned model
+   * share 0 in its role and every other preview model share 1, so the rotation's own rule picks it when it is on the
+   * panel; the checkers still come from another maker. Without a pin: main.ts's own members, unchanged. Applied to every
+   * version's members (the defaults and S10's per-ask read alike).
+   */
+  const practiceMembersOf = (members: AdmissionRunMembers): AdmissionRunMembers => {
+    const pins = input.pins;
+    const rotation = members.roleRotation;
+    const premium = members.previewProviderTestConfig?.premium_model_ids ?? [];
+    return pins === undefined || rotation === undefined ? members : Object.freeze({
+      ...members,
+      roleRotation: { readCounts: async () => practiceRotationCountsWithPins(await rotation.readCounts(), pins, premium) }
+    });
+  };
   const runSettings: RunCreationSettings = {
-    previewProviderTestConfig: previewConfig, previewTeamUserIds: [...input.teamUserIds],
-    previewBudgetGate,
+    // Side-by-side spec §13, as main.ts: the site version's members by the one mapping (the defaults).
+    ...practiceMembersOf(admissionSettingsOfVersion(siteAdmission)),
+    previewTeamUserIds: [...input.teamUserIds],
     strangerSampleRate: settings.strangerSampleRate,
-    registerVersion: version,
     // Side-by-side spec §1, §3, as main.ts: every practice run is stamped, with the one key its runner claims under
     // (practice-runner-composition.ts reads the same settings.runner.RELEASE_KEY); a run stamped with another key would
     // be NO_WORK for that runner.
     releaseKey: settings.runner.RELEASE_KEY,
     batteryVersion: settings.batteryVersion,
     settlementWatchHandle: settings.settlementWatchHandle,
-    // Hosted, as main.ts: the room when it is composed (the band), else the daily guard; neither locally. No `billing`.
-    ...(askRoom !== undefined
-      ? { room: askRoom, waitingLine: askRoom }
-      : costEnvelopeGuard === undefined ? {} : {
-          assertDailyCostEnvelope: () => costEnvelopeGuard.assertDailyEnvelopeAdmitsNewRun()
-        }),
+    // Hosted, as main.ts: the room when it is composed (the band); else the mapping's daily guard; neither locally. No `billing`.
+    ...(askRoom === undefined ? {} : { room: askRoom, waitingLine: askRoom }),
     resolveDiscoveredPanel: resolveProviderPanel,
-    modelPicker,
-    // Pinned final writers (R1d, INTERFACE §15.2, counts mechanism): the counts the rotation reads give the pinned model
-    // share 0 in its role and every other preview model share 1, so the rotation's own rule picks it when it is on the
-    // panel; the checkers still come from another maker. Without a pin: main.ts's own counts, unchanged.
-    ...(answerRoleRotation.state === "ON" ? { roleRotation: { readCounts: async () => {
-      const counts = await readRoleRotationCounts(pool);
-      return input.pins === undefined ? counts : practiceRotationCountsWithPins(counts, input.pins, previewConfig.premium_model_ids);
-    } } } : {}),
-    ...(debateShapeInForcePolicy === null ? {} : { debateShapePolicy: debateShapeInForcePolicy }),
-    ...(lengthGuidancePolicy === null ? {} : { lengthGuidancePolicy }),
-    ...(engineInForcePolicy === null ? {} : { engineVersionPolicy: engineInForcePolicy }),
-    ...(questionLanguage === undefined ? {} : { questionLanguage }),
-    resolveEnvelopeBasis: async (basis) => computeStructuralCeilingBasis({
-      ...structuralInputs,
-      panelSize: basis.panelSize,
-      depth: Number(basis.depthParams.depth),
-      maxRecompose: envelopeFormulaInputs.maxRecompose,
-      branchingFactor: envelopeFormulaInputs.branchingFactor,
-      compositionSegmentCap: envelopeFormulaInputs.compositionSegmentCap,
-      fixedOrgansPerComposition: envelopeFormulaInputs.fixedOrgansPerComposition,
-      reviewerCallsPerNode: envelopeFormulaInputs.reviewerCallsPerNode,
-      synthesizerMaxRounds: envelopeFormulaInputs.synthesizerMaxRounds,
-      evaluatorMaxRounds: envelopeFormulaInputs.evaluatorMaxRounds,
-      maxDepth: envelopeFormulaInputs.maxDepth,
-      backupSequencesProvisioned: basis.backupSequencesProvisioned,
-      ...(basis.shape === null ? {} : { shape: basis.shape }),
-      ...(basis.length === null ? {} : { length: basis.length }),
-      ...(basis.engine === null ? {} : { engine: basis.engine })
-    }),
-    resolveRisk(askerRiskTier: RiskTier, askerTierSource: AskRequest["tier_source"], askerProvenanceRef: string) {
-      const resolved = resolveEffectiveRiskTier({
-        askerTier: askerRiskTier,
-        askerProvenanceRef,
-        policyLevels: {
-          parent: {},
-          run: {},
-          deployment: { riskTier: deploymentRiskTier.value }
-        }
-      });
-      return preserveSubmittedTierSource(resolved, askerTierSource);
+    // Side-by-side spec §13, as main.ts: the active version and each version's members (S10 reads them per ask).
+    admissionSettings: {
+      activeSettingsVersion: () => activeSettings.current(),
+      admissionSettingsFor: async (version: number) =>
+        practiceMembersOf(admissionSettingsOfVersion(await admissionCache.admissionSettingsFor(version)))
     }
   } as RunCreationSettings;
   const application = new PostgresAskApplication(pool, input.dispatcher, runSettings, undefined, input.provisionPool,
     Object.freeze({ server: input.serverAdmissionPool, legacy: input.legacyAdmissionPool }));
-  return Object.freeze({ application, rotationOn: answerRoleRotation.state === "ON", declaredProviderTargets,
+  return Object.freeze({ application, rotationOn: siteAdmission.roleRotation !== null, declaredProviderTargets,
     configuredProviders: deploymentMakers.configuredProviders,
     hosted: money === null ? null : Object.freeze({ room: askRoom !== undefined, billingInRegister: money.billingInRegister,
       billingInPractice: "off" as const }) });

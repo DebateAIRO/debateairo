@@ -32,6 +32,8 @@ const FILE_PATH = "/var/run/secrets/dialectical-api.key";
 // would register its suites a second time.
 const EXPECTED_DOMAIN_CODES: readonly string[] = Object.freeze([
   "ABSENT_SIGNAL_HAS_FRESHNESS",
+  "ACTIVE_SETTINGS_READ_DEADLINE",
+  "ACTIVE_SETTINGS_VERSION_INVALID",
   "ADAPTIVE_STOPPING_CONTROLS_INVALID",
   "ADAPTIVE_STOPPING_CONTROLS_PROVENANCE_MISSING",
   "ADAPTIVE_STOPPING_CONTROLS_UNRESOLVED",
@@ -318,6 +320,10 @@ const EXPECTED_DOMAIN_CODES: readonly string[] = Object.freeze([
   "PERSON_ALLOWANCE_REACHED",
   "POSITIVE_CAPTURE_REQUIRED",
   "PRESENT_SIGNAL_FRESHNESS_UNKNOWN",
+  "PREVIEW_LINE_UP_ENV_CONFLICT",
+  "PREVIEW_LINE_UP_POLICY_INVALID",
+  "PREVIEW_LINE_UP_REQUIRED",
+  "PREVIEW_LINE_UP_WITHOUT_PREVIEW",
   "PRIVATE_CONTENT_ERASED",
   "PRODUCER_GRADING_FORBIDDEN",
   "PRODUCING_RUN_REQUIRED",
@@ -410,6 +416,9 @@ const EXPECTED_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUN_PRINCIPAL_SESSION_MISMATCH",
   "RUN_ROLE_ASSIGNMENT_INVALID",
   "RUN_ROLE_ROTATION_INVALID",
+  // Side-by-side spec §13 (S6): a run's settings version re-pointed (never happens) or unmapped at a money seam.
+  "RUN_SETTINGS_VERSION_DRIFT",
+  "RUN_SETTINGS_VERSION_UNKNOWN",
   "SCALAR_DECISION_CANNOT_SPAWN",
   "SCORECARD_INTERVAL_INVALID",
   "SCORECARD_TASK_CLASS_AMBIGUOUS",
@@ -442,6 +451,11 @@ const EXPECTED_DOMAIN_CODES: readonly string[] = Object.freeze([
   "SERVE_STATUS_UNKNOWN",
   "SESSION_POLICY_INVALID",
   "SESSION_POLICY_UNRESOLVED",
+  // Side-by-side spec §13 (S14, ruling R57b): check-version's two typed codes (its never-sending fetch; D5's assertion).
+  "SETTINGS_CHECK_NO_AI_CALL",
+  "SETTINGS_HASH_UNDECLARED",
+  // Side-by-side spec §13 (S6; S7 writes its plain path): a settings version this release cannot run.
+  "SETTINGS_VERSION_UNSUPPORTED",
   "SETTLEMENT_FIELD_REQUIRED",
   "SETTLEMENT_IDENTITY_INVALID",
   "SETTLEMENT_NUMBER_INVALID",

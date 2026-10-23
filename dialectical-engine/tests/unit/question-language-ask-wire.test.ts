@@ -85,6 +85,25 @@ describe("P2L Task 18 — the ask's language fields on the wire", () => {
     expect(isQuestionLanguageCheckStale(new Error("QUESTION_LANGUAGE_CHECK_EXPIRED"))).toBe(false);
   });
 
+  it("side-by-side §13 (Task S12): the room read's settings version rides with the ask, on both calls, and only when named", async () => {
+    const named = buildNewDebateAskConfig({
+      riskTier: "standard", budgetTier: "low", decisionScope: "language wire", asOf: "2026-10-13T09:00:00.000Z",
+      depth: 2, asOfWasEdited: false, planTier: "premium", settingsVersion: 17
+    }, SUBMIT_TIME);
+    expect(named).toMatchObject({ settings_version: 17 });
+    expect(CONFIG).not.toHaveProperty("settings_version");
+    const { client, today, withChoice } = capturingClient();
+    await createDebate("Q?", named, "test-token", client);
+    await createDebate("Q?", named, "test-token", client, { siteLanguage: "ro" });
+    await createDebate("Q?", CONFIG, "test-token", client);
+    expect(today[0]).toMatchObject({ settings_version: 17 });
+    expect(withChoice[0]).toMatchObject({ settings_version: 17, site_language: "ro" });
+    expect(today[1]).not.toHaveProperty("settings_version");
+    // The strict contract accepts exactly what the page builds.
+    for (const ask of [...today, ...withChoice]) expect(AskRequestSchema.parse(ask)).toEqual(ask);
+    await expect(createDebate("Q?", { ...named, settings_version: 0 }, "test-token", client)).rejects.toThrow(/settings_version/u);
+  });
+
   it("a stale check or an offer the page could not answer reads 'try again', never the coordinator failing", () => {
     expect(classifyRequestFailure("DEBATE_CREATE", stale("QUESTION_LANGUAGE_CHECK_EXPIRED")).kind).toBe("BUSY");
     expect(classifyRequestFailure("DEBATE_CREATE", new QuestionLanguageChoiceNeededError(OFFER)).kind).toBe("BUSY");

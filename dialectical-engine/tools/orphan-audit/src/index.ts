@@ -586,7 +586,11 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // (the register law bans JavaScript version coercion). migrate() is byte-identical.
 // Side-by-side integration round 2 (2026-10-22): the merged module after lane C's C11 review above
 // (listUnstartedReadmissions) joined the integration branch's module. migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "eb61b605427f7bc16bf9147eed029b6b790b8088093acc9a804fa6cd893d6546";
+// Side-by-side Phase 2, S6 (2026-10-22, spec §13): readFrozenHead returns registerVersion and RunRepository gains
+// readRunRegisterVersion (both cast register_version in SQL). migrate() is byte-identical.
+// Side-by-side Phase 2, S9 fix round 1 (2026-10-22, spec §13, ruling R31): isDatabaseFailure and settingsRefusalCode
+// (the one rule both settings caches use) moved here beside isDatabasePoolBusy. migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "86dcfe0ab92121807b4e8d9ef19f84f89c126046f2fda863ee38d43c126e5b1a";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each
@@ -731,9 +735,12 @@ export function auditNumericSourceLiteralExports(name: string, source: string): 
 }
 
 /** The deployed preview-test module is a finite production budget/config boundary.
- * Only its reviewed direct runtime imports are exceptional; mixed fixture imports still block. */
+ * Only its reviewed direct runtime imports are exceptional; mixed fixture imports still block.
+ * Side-by-side addition D14-D16 (owner 2026-10-22): preview-line-up.ts, the env's gate part and the line-up composed back
+ * into that module's config shape, is one more reviewed direct caller (it reuses the one env key check there). */
 export function auditProductionFixtureImports(where:string,source:string):readonly string[]{
- const runtimeCaller=where==="packages/providers/src/index.ts"||where==="packages/providers/src/provider-probe.ts";
+ const runtimeCaller=where==="packages/providers/src/index.ts"||where==="packages/providers/src/provider-probe.ts"
+  ||where==="packages/providers/src/preview-line-up.ts";
  for(const match of source.matchAll(/from\s+["']([^"']+)["']/g)){
   const specifier=match[1]!;
   if(!/(?:tests?|fixtures?)/.test(specifier))continue;
@@ -910,6 +917,11 @@ export async function auditOrphans(): Promise<{
       "apps/api:GET /v1/session",
       "apps/api:GET /v1/runs/:id/events",
       "apps/runner:Hatchet walking-skeleton task",
+      // Side-by-side spec §13 (S14): check-version's two halves, operator commands run from a release's own folders.
+      "apps/runner:settings:check-runner (check-version, the runner half)",
+      "apps/api:settings:check-api (check-version, the API half)",
+      // Side-by-side spec §13, §11 (S15): the settings operator (verdict, activate, status, rollback-version, switch-plan).
+      "tools/settings-version:settings:verdict|activate|status (the settings operator, cli.ts)",
       "apps/scheduler:job:replay-self-test",
       "apps/scheduler:job:liveness-sweep",
       "apps/scheduler:job:reaper (stub; invocation throws SCAFFOLD_ONLY)",

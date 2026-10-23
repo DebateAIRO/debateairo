@@ -516,15 +516,33 @@ describe("the runner's wiring (source pins)", () => {
   const MAIN = read("apps/runner/src/main.ts");
 
   it("execute opens the debate's lane after the claim and closes it in the outermost finally", () => {
-    const execute = RUNNER.slice(RUNNER.indexOf("private async execute("), RUNNER.indexOf("export type RunnerExecutionResult ="));
+    // S20 re-pin: the slice ends where the class ends. Final fix wave S14 (d9d6e73cc) put `settingsJournalCode` and its
+    // doc comment right after the runner class, before `export type RunnerExecutionResult =`, so that old end marker
+    // took the new function into the slice and the `$`-anchored check below read past the class.
+    const classEnd = RUNNER.indexOf("\n/**\n * Final fix wave S14 — THE COMMON RULE");
+    expect(classEnd).toBeGreaterThan(RUNNER.indexOf("private async execute("));
+    const execute = RUNNER.slice(RUNNER.indexOf("private async execute("), classEnd);
     const claim = execute.indexOf("if (claimed === null) return { kind: \"NO_WORK\" };");
-    const open = execute.indexOf("callScheduler.openLane(claimedRunId)");
+    // Side-by-side spec §13 (S4, S6): the lane opens with the debate's own version's limits.
+    const open = execute.indexOf("callScheduler.openLane(claimedRunId, settings.callLaneLimits)");
     expect(claim).toBeGreaterThan(0);
     expect(open).toBeGreaterThan(claim);
     // The outermost finally: it ends the method (then the class), after the story ran inside the try.
     expect(execute).toMatch(/\} finally \{\s*callLane\?\.close\(\);\s*keepAlive\.stop\(\);\s*\}\s*\}\s*\}\s*$/u);
     expect(execute.indexOf("await storyWriter.writeAfterSettle(")).toBeLessThan(execute.lastIndexOf("callLane?.close();"));
-    expect(execute.match(/callLane\?\.close\(\)/gu) ?? []).toHaveLength(1);
+    // S20 re-pin — final fix wave S12 (d9d6e73cc): the lane now opens BEFORE the keep-alive starts, so a keep-alive that
+    // cannot start closes it in its own catch and rethrows, before the outermost try (whose finally holds the other close)
+    // is entered. Exactly two closes, one per path, and the first is that catch's.
+    expect(execute.match(/callLane\?\.close\(\)/gu) ?? []).toHaveLength(2);
+    const keepAliveCatch = execute.indexOf("    } catch (error) {\n      // Final fix wave S12: the lane opened above is closed when the keep-alive cannot start");
+    expect(keepAliveCatch).toBeGreaterThan(execute.indexOf("keepAlive = startRunKeepAlive({"));
+    expect(execute.indexOf("callLane?.close();\n      throw error;\n    }", keepAliveCatch)).toBe(execute.indexOf("callLane?.close();"));
+    expect(execute.indexOf("return await runKeepAliveScope.run(keepAlive,")).toBeGreaterThan(execute.indexOf("callLane?.close();"));
+    // S20 re-pin review: the outermost try (whose finally holds the other close) opens AFTER the keep-alive's catch, so
+    // the keep-alive's own failure can never reach that finally too (a double close and a masked keep-alive error).
+    expect(execute.indexOf("    try {\n    return await runKeepAliveScope.run(keepAlive,")).toBeGreaterThan(keepAliveCatch);
+    // Final fix wave S12: the lane opens BEFORE the keep-alive starts (a lane refusal leaves no claim renewing forever).
+    expect(open).toBeLessThan(execute.indexOf("keepAlive = startRunKeepAlive({"));
   });
 
   /**
@@ -564,12 +582,12 @@ describe("the runner's wiring (source pins)", () => {
     expect(code).toContain("const provider = replayingGateway(replayBook, maker.provider, () => keepAlive.assertMayCall(), structureReplay);\n      return Object.freeze({ ...maker, provider, judge: new Judge(provider) });");
     // Refused-repair salvage (Task 6 review): the replay reads A1 and B calls only on a run whose structure-repair route is
     // wired (the runner composition's `structureRepairCeiling`); hosted and local replay as today.
-    expect(code).toContain("const structureReplay = (this.settings.structureRepairCeiling ?? null) !== null;");
+    expect(code).toContain("const structureReplay = (settings.structureRepairCeiling ?? null) !== null;");
     expect(code).toContain("const sitOutMaker = <T extends ConfiguredSeatMaker>(maker: T): T => {");
   });
 
   it("the lane's beforeSlot is the runner setting, and the panel asks together only when the debate's calls run together", () => {
-    expect(RUNNER).toContain("...(this.settings.callBeforeSlot === undefined ? {} : { beforeSlot: this.settings.callBeforeSlot })");
+    expect(RUNNER).toContain("...(settings.callBeforeSlot === undefined ? {} : { beforeSlot: settings.callBeforeSlot })");
     // Ruling R32: one place decides it, from the lane. Two panels pass it on, never anything else: the node's panel
     // and (debate shape, 9602e79c7) its close-call extension, which asks its extra graders the same way.
     expect(RUNNER.match(/askTogether: /gu) ?? []).toHaveLength(2);
@@ -579,18 +597,26 @@ describe("the runner's wiring (source pins)", () => {
   });
 
   it("claim renewals use the keep-alive repository when one is given", () => {
-    expect(RUNNER).toContain("renew: (heldUntil) => (this.settings.renewals ?? this.#work).renewClaim(");
+    expect(RUNNER).toContain("renew: (heldUntil) => (settings.renewals ?? this.#work).renewClaim(");
   });
 
   it("main.ts builds one scheduler, one busy coordinator and two separate in-flight counters", () => {
     expect(MAIN.match(/createCallScheduler\(/gu) ?? []).toHaveLength(1);
     expect(MAIN.match(/createPreviewBusyCoordinator\(\)/gu) ?? []).toHaveLength(1);
     expect(MAIN.match(/createRunInFlight\(\)/gu) ?? []).toHaveLength(2);
-    expect(MAIN).toContain("withPreviewProviderCallPolicy(gateway, previewConfig, target, {\n    busy: previewBusy,\n    onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); },\n    gateRemaining: previewGateRemaining,\n    onFinalWriterTierUnread: previewFinalWriterTierUnread\n  });");
+    expect(MAIN).toContain("withPreviewProviderCallPolicy(gateway, siteVersionSettings.previewConfig!, target, {\n    busy: previewBusy,\n    onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); },\n    gateRemaining: previewGateRemaining,\n    onFinalWriterTierUnread: previewFinalWriterTierUnread,\n    thinkingLevelsOf: runPreviewThinkingLevelsOf(runnerSettings, runSettingsVersions, environment.REGISTER_VERSION)\n  });");
     // Ruling R31: on the preview only, every lane call waits on the busy coordinator before it asks for a slot.
-    expect(MAIN).toContain("...(previewConfig === undefined ? {} : { callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model) }),");
+    expect(MAIN).toContain("...(previewGate === undefined ? {} : { callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model) }),");
     expect(MAIN).toContain("inFlight: gatewayInFlight");
-    expect(MAIN).toContain("inFlight: moneyInFlight");
+    // Side-by-side spec §13 (S6): the money counter is the one every version's guard shares, in the site's money. S14:
+    // main.ts creates it and hands it to the site reads it shares with the practice and check-version
+    // (readRunnerSiteContext), which put it in the site's money, once; the gateway's counter never goes there.
+    expect(MAIN).toContain("const { site: runnerSite } = await readRunnerSiteContext({ pool, environment, moneyInFlight });");
+    expect(MAIN.match(/\bmoneyInFlight\b/gu) ?? []).toHaveLength(2);
+    const SITE_READS = read("apps/runner/src/run-settings.ts");
+    expect(SITE_READS).toContain("money: costEnvelopePolicy === null ? null : Object.freeze({\n      store: modelSpendStore,\n      inFlight: moneyInFlight,");
+    expect(SITE_READS.match(/inFlight: moneyInFlight/gu) ?? []).toHaveLength(1);
+    expect(SITE_READS).not.toContain("gatewayInFlight");
     expect(MAIN).toContain("createPool(environment.DATABASE_URL, RUNNER_DATABASE_POOLS.keepAlive)");
   });
 });

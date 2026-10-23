@@ -48,7 +48,8 @@ describe("verdict story — wired into the shipped runner, after settle, never i
     expect(returned).toBeGreaterThan(write);
     // Its own try/catch, which swallows: the story can never cost the verdict.
     const after = runner.slice(leaseClosed, returned);
-    expect(after).toMatch(/try \{[\s\S]*await storyWriter\.writeAfterSettle\(settled\.input\);[\s\S]*\} catch \{/u);
+    // Side-by-side spec §13 (S6, ruling R36): the one write carries the debate's own version's story policy.
+    expect(after).toMatch(/try \{[\s\S]*await storyWriter\.writeAfterSettle\(settings\.storyPolicy === undefined \? settled\.input : Object\.freeze\(\{ \.\.\.settled\.input, policy: settings\.storyPolicy \}\)\);[\s\S]*\} catch \{/u);
     expect(after).not.toMatch(/\bthrow\b/u);
     // Each step re-takes the DISCLOSURE lease (the run and its memory-linked
     // prior run, exactly as the debate held them), never a bare run lease.
@@ -121,8 +122,16 @@ describe("verdict story — wired into the shipped runner, after settle, never i
     expect(main).toContain("resolveStoryPackDir({");
     expect(main).toContain("[STORY_SHAPES_DIR_ENV_KEY]: environment.DEBATEAI_STORY_SHAPES_DIR");
     expect(main).toContain("moduleUrl: import.meta.url");
-    expect(main).toContain("readStoryPolicyFromRegister(pool, environment.REGISTER_VERSION)");
+    // Side-by-side spec §13: the optional story rows are read by the one per-version loader, for its version; main.ts
+    // loads its site version through it and never reads the story policy itself.
+    const loader = await read("apps/runner/src/run-settings.ts");
+    expect(loader).toContain("readStoryPolicyFromRegister(pool, version)");
+    expect(main).not.toContain("readStoryPolicyFromRegister(");
+    // Side-by-side spec §13 (ruling R36): the writer has no boot policy; each write carries its debate's version's.
+    expect(main).not.toContain("const { storyPolicy } = siteVersionSettings;");
     expect(main).toContain("new StoryWriter({");
+    expect(main.slice(main.indexOf("new StoryWriter({"), main.indexOf("resolveProvider:", main.indexOf("new StoryWriter({"))))
+      .not.toMatch(/\bpolicy:/u);
     // A detail key can never overwrite the line's kind or event.
     expect(main).toContain('console.warn(JSON.stringify({ ...detail, kind: "DEBATEAI_STORY", event }));');
     expect(main).toContain("story: storyWriter");
@@ -139,12 +148,15 @@ describe("verdict story — wired into the shipped runner, after settle, never i
     expect(main).toContain("await Promise.allSettled([pool.end(), keepAlivePool.end()]);");
     // Side-by-side spec §3 (B6): the renewals are fenced by this release and worker, like every work repository.
     expect(main).toContain("renewals: new WorkItemRepository(keepAlivePool, workFence),");
-    expect(main).toContain("buildStoryCostEnvelopeSeam: (runId: string) => costEnvelopeGuard.storySeam({");
+    // Side-by-side spec §13 (S6): the story's money seam is its own run's version's guard.
+    expect(main).toContain("buildStoryCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).storySeam({");
     expect(main).not.toContain(["process", "env"].join("."));
     // Any boot failure to load the pack — a broken rule, an unresolvable
     // directory, a raw file-system or URL error — becomes a refusal value, never
     // a thrown boot error: the story can never stop the runner from starting.
-    const load = main.slice(main.indexOf("let storyPack:"), main.indexOf("const deploymentMakers"));
+    // Side-by-side spec §13 (S14): the pack's block is followed by the two in-flight counters (the site reads moved out).
+    const load = main.slice(main.indexOf("let storyPack:"), main.indexOf("const gatewayInFlight = createRunInFlight();"));
+    expect(load.length).toBeGreaterThan(0);
     expect(load).toMatch(/try \{\s*storyPack = loadStoryPack\(resolveStoryPackDir\(\{/u);
     expect(load).toContain("} catch (error) {");
     expect(load).not.toMatch(/\bthrow\b/u);

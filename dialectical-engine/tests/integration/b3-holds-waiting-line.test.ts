@@ -258,12 +258,13 @@ describe("B3 the waiting line (budget spec §2.7)", () => {
       { runId: first, waitingSince: since },
       { runId: second, waitingSince: new Date(since.getTime() + 1_000) }
     ]);
+    // Side-by-side spec §1 (C10) and §13 (S10): the run's release (no key at start: `legacy`) and the settings version it
+    // was admitted on (its register version) come with it.
     expect(await waits.readWaiting(first)).toEqual({
-      runId: first, waitingSince: since, ownerRef: null, legacyAskerId: askerId,
-      planTier: "free", compositionBudgetTier: "low", depth: 1, makerCount: 2,
-      waitsFor: null, personRecheckAt: null, reasonAt: null,
       // Side-by-side (plan C task C10): the release that admitted the run; legacyRun() stamps no key of its own.
-      releaseKey: LEGACY_RELEASE_KEY
+      runId: first, waitingSince: since, releaseKey: LEGACY_RELEASE_KEY, registerVersion: 1, ownerRef: null, legacyAskerId: askerId,
+      planTier: "free", compositionBudgetTier: "low", depth: 1, makerCount: 2,
+      waitsFor: null, personRecheckAt: null, reasonAt: null
     });
     expect(await waits.isWaiting(database.pool, first)).toBe(true);
     const oldest = (await waits.oldestWaiting(1_000)).map((run) => run.runId);

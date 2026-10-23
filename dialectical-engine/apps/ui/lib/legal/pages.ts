@@ -185,13 +185,14 @@ export type ContractFlag = "yes" | "no" | "unconfirmed";
  * `checkedOn` date, once someone has checked it against the provider's current terms.
  */
 export type ProviderRegisterEntry = Readonly<{
-  /** The family key in `lib/models.ts`, or "support" for the support chat's model. */
+  /** The family key in `lib/models.ts`, "support" for the support chat's model, or an unchecked company's key (`host:<hostname>`, ruling R20). */
   key: string;
   /** The row heading: a brand name, or null when `nameKey` names the row. */
   provider: string | null;
   nameKey: string | null;
+  /** The models this company serves us: a reviewed fact the page no longer shows (addition D24: providers, not models). */
   models: string;
-  /** A message key when the value is prose, or null when the models column is a brand name. */
+  /** A message key when the value is prose, or null when the models fact is a brand name. */
   modelsKey: string | null;
   /** The legal entity we contract with — a fact, bracketed until the contract names it. */
   entity: string;
@@ -235,9 +236,9 @@ const UNCHECKED_CLOUD = Object.freeze({
  * A `contact` is filled only where the provider's own privacy policy confirms it; the others stay bracketed.
  * The owner confirmed on 10 October 2026 that each family runs on the provider's direct API under those terms, so the
  * entities lost their brackets and `checkedOn` records that date. Location, retention, zero retention and training stay
- * "unconfirmed" until the production endpoints and account settings are fixed. Since 12 October 2026 these hosted rows
- * reach `/providers` only on a build whose flag narrows the roster, and then only the own-servers Qwen row (the GLM-only
- * first preview keeps it); the Claude, GPT, Gemini and Grok rows never show.
+ * "unconfirmed" until the production endpoints and account settings are fixed. Since addition D24 (owner 2026-10-22)
+ * none of these hosted rows reaches `/providers`: the page lists the companies the API's declared targets reach
+ * (`providerRegister`), and no declared target is one of these rows.
  */
 export const MODEL_PROVIDERS: readonly ProviderRegisterEntry[] = Object.freeze([
   { ...UNCHECKED_CLOUD, key: "claude", provider: "Anthropic", models: "Claude", entity: "Anthropic Ireland, Limited", homeCountryKey: "legal.providers.ireland", contact: "privacy@anthropic.com", checkedOn: "2026-10-10" },
@@ -293,10 +294,9 @@ export const SUPPORT_PROVIDER: ProviderRegisterEntry = Object.freeze({
 });
 
 /**
- * The models the private preview offers, by the id its build flag names them with. DeepInfra
- * serves the first four (each made by another company, named in brackets); Anthropic and Google
- * serve their own. Gemini is kept for later: the owner swapped it for Qwen on 10 October 2026, so
- * no reviewed preview flag offers it, and nothing about it shows unless one does. Facts checked against the vendors' published terms: see
+ * The four open-weight models DeepInfra serves on the private preview, each made by another company (named in
+ * brackets). Kept as the DeepInfra row's `models` fact; the page no longer shows models (addition D24, owner
+ * 2026-10-22: providers only, not the models). Facts checked against the vendors' published terms: see
  * `docs/legal/2026-10-10-preview-provider-facts.md`.
  */
 const PREVIEW_DEEPINFRA_MODELS: ReadonlyArray<readonly [id: string, label: string]> = Object.freeze([
@@ -305,33 +305,13 @@ const PREVIEW_DEEPINFRA_MODELS: ReadonlyArray<readonly [id: string, label: strin
   ["XiaomiMiMo/MiMo-V2.6-Pro", "MiMo-V2.6-Pro (Xiaomi)"],
   ["Qwen/Qwen3.8-Flash", "Qwen3.8-Flash (Alibaba)"]
 ] as const);
-const PREVIEW_DEEPINFRA_QWEN = "Qwen/Qwen3.8-Flash";
-const PREVIEW_ANTHROPIC_MODEL = "claude-haiku-5-5";
-const PREVIEW_GOOGLE_MODEL = "gemini-3.8-flash";
-/** Every preview model id and its maker, as the new-debate form's roster reader knows them. */
-const PREVIEW_MODEL_MAKERS: ReadonlyMap<string, string> = new Map([
-  ["zai-org/GLM-5.3-Flash", "Z.AI"],
-  ["deepseek-ai/DeepSeek-V4.1-Flash", "DeepSeek"],
-  ["XiaomiMiMo/MiMo-V2.6-Pro", "Xiaomi"],
-  [PREVIEW_DEEPINFRA_QWEN, "Alibaba"],
-  [PREVIEW_ANTHROPIC_MODEL, "Anthropic"],
-  [PREVIEW_GOOGLE_MODEL, "Google"]
-]);
-const LEGACY_PREVIEW_MODEL = "zai-org/GLM-5.3-Flash";
-/**
- * The multi-model preview register (feat/2026-10-10-preview-mm-a-app, publish-register-v2.ts) gives
- * the fixed roles to DeepInfra models whatever the panel: GLM writes the answer and the verdict
- * story, DeepSeek checks both. So a per-plan build always sends text to DeepInfra for these two,
- * even when its plans list only Anthropic and Google. (The first preview's build runs GLM alone.)
- */
-const PREVIEW_ROLE_MODELS: ReadonlySet<string> = new Set(["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash"]);
 
 /**
  * Serving company for the private preview's open-weight models; terms reviewed 5 October 2026 and
- * rechecked 10 October 2026. Listed by any build that offers a DeepInfra model (`providerRegister`),
- * which names in `models` the DeepInfra models that build uses (all four with no flag). Its jobs are
- * confirmed: every panel member writes and judges arguments, GLM writes the answer and the verdict
- * story, DeepSeek checks both (the first preview's GLM alone does all three).
+ * rechecked 10 October 2026. Listed whenever the API's declared targets reach `api.deepinfra.com`
+ * (company `deepinfra`, addition D24), and when the API gives no answer. Its jobs are confirmed: every
+ * panel member writes and judges arguments, GLM writes the answer and the verdict story, DeepSeek
+ * checks both (the first preview's GLM alone does all three).
  */
 export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
   ...UNCHECKED_CLOUD,
@@ -354,8 +334,9 @@ export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
  * outputs are deleted within 30 days unless flagged for misuse or the law requires more (privacy
  * center); zero data retention needs Anthropic's approval, which the preview does not have; no
  * training on customer content (Commercial Terms B); transfers under standard contractual clauses
- * (Data Processing Addendum). On any build that offers it, it replaces the hosted-site placeholder
- * row for Claude, so the page never shows Anthropic twice; with no flag, every build offers it.
+ * (Data Processing Addendum). Listed whenever the API's declared targets reach `api.anthropic.com`
+ * (company `anthropic`, addition D24), and when the API gives no answer; the hosted-site placeholder
+ * row for Claude never shows, so the page never shows Anthropic twice.
  */
 export const ANTHROPIC_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
   ...UNCHECKED_CLOUD,
@@ -382,8 +363,8 @@ export const ANTHROPIC_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
  * are not used to improve Google's products and are logged 55 days for abuse monitoring, in any
  * country where Google or its agents have facilities (Gemini API terms and usage policies); zero
  * data retention is guaranteed only on Vertex AI, not on this API. Google's EU–US Data Privacy
- * Framework listing could not be read, so the transfer basis stays bracketed. On a preview build
- * that offers it, it replaces the hosted-site placeholder row for Gemini.
+ * Framework listing could not be read, so the transfer basis stays bracketed. Kept for later: no
+ * company the API answers maps to it (addition D24), so it shows nowhere today.
  */
 export const GOOGLE_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
   ...UNCHECKED_CLOUD,
@@ -401,94 +382,61 @@ export const GOOGLE_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
   checkedOn: "2026-10-10"
 });
 
-/** A non-empty list of known preview ids with no repeats, or undefined. */
-function previewRoster(value: unknown): readonly string[] | undefined {
-  if (!Array.isArray(value) || value.length === 0) return undefined;
-  if (!value.every((id) => typeof id === "string" && PREVIEW_MODEL_MAKERS.has(id))) return undefined;
-  if (new Set(value).size !== value.length) return undefined;
-  return value as string[];
-}
-
-const makersOf = (roster: readonly string[]): Set<string> => new Set(roster.map((id) => PREVIEW_MODEL_MAKERS.get(id) ?? id));
+/**
+ * Addition D24 (owner's answer to Q-L6, 2026-10-22: providers only, not the models, listed automatically): the
+ * reviewed catalogue, keyed by the company keys the API answers on `GET /v1/public/ai-providers`
+ * (`providerCompaniesOfTargets`, `PROVIDER_COMPANY_HOSTS` in `@debateai/providers`), in the order the page shows
+ * them. A person checks each row's facts; only the choice of rows is automatic.
+ */
+const REVIEWED_PROVIDER_COMPANIES = Object.freeze([
+  ["anthropic", ANTHROPIC_PREVIEW_PROVIDER],
+  ["deepinfra", DEEPINFRA_PROVIDER]
+] as const);
+const REVIEWED_COMPANY_KEYS: ReadonlySet<string> = new Set(REVIEWED_PROVIDER_COMPANIES.map(([company]) => company));
+/** The prefix the API gives a public host no catalogue row knows yet (ruling R20). */
+const HOST_COMPANY_PREFIX = "host:";
 
 /**
- * The model ids a preview build offers, read from its public flag exactly as strictly as the
- * new-debate form's roster reader (`parsePreviewRosterFlag`): the first preview's list
- * `["zai-org/GLM-5.3-Flash"]`, or a plain object with exactly the keys "free" and "premium", each a
- * non-empty list of known ids with no repeats, and, when the two lists together name two or more
- * makers, each naming at least two makers. Anything else, which the form refuses loudly, returns
- * null: "list every preview provider". A legal page discloses rather than hides, and never throws
- * (the root layout imports this module).
+ * Ruling R20: a company the catalogue does not know yet (a hosted vendor nobody has reviewed) is still shown, headed
+ * by its host name, with every fact "[to confirm]" and "[not checked yet]" (existing keys only), so the page never
+ * hides a company that receives text. Ruling R35: its transfer basis is "[to confirm]" too, never the bracketed US
+ * wording — nobody knows where an unchecked company is.
  */
-function previewModelIds(flag: string): ReadonlySet<string> | null {
-  let decoded: unknown;
-  try {
-    decoded = JSON.parse(flag);
-  } catch {
-    return null;
-  }
-  if (Array.isArray(decoded)) {
-    return decoded.length === 1 && decoded[0] === LEGACY_PREVIEW_MODEL ? new Set([LEGACY_PREVIEW_MODEL]) : null;
-  }
-  if (decoded === null || typeof decoded !== "object" || Object.getPrototypeOf(decoded) !== Object.prototype) return null;
-  const keys = Object.keys(decoded).sort();
-  if (keys.length !== 2 || keys[0] !== "free" || keys[1] !== "premium") return null;
-  const record = decoded as Record<string, unknown>;
-  const free = previewRoster(record.free);
-  const premium = previewRoster(record.premium);
-  if (free === undefined || premium === undefined) return null;
-  if (makersOf([...free, ...premium]).size >= 2 && (makersOf(free).size < 2 || makersOf(premium).size < 2)) return null;
-  return new Set([...free, ...premium]);
-}
-
-/**
- * The whole Register, in the order `/providers` shows it. Only a build that narrows the roster sets
- * the public flag the new-debate form reads (NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON,
- * `previewPlanRoster`). A build with no flag, the real site included, lists the five models the
- * product runs (owner, 12 October 2026): Anthropic for Claude Haiku 5.5 and DeepInfra for the other
- * four. Every build lists only the companies that receive text on it (owner, 10 October 2026): the
- * hosted Anthropic, OpenAI, Google and xAI rows never show, only their checked preview rows.
- * It lists DeepInfra just before the support chat's model, naming the DeepInfra models its plans
- * offer plus, on a per-plan build, the two role models (GLM writes, DeepSeek checks); it shows the
- * checked Anthropic or Google preview row only when it offers Claude Haiku 5.5 or Gemini 3.8 Flash;
- * and it drops the hosted "own servers" Qwen row when it sends Qwen3.8-Flash to DeepInfra, so no
- * maker is shown twice or where it does not run. A flag the new-debate form would refuse lists every
- * DeepInfra model and the Anthropic preview row (never Gemini, which only a flag naming it shows).
- * Never throws.
- */
-export function providerRegister(previewFreeModelIdsJson: string | undefined): readonly ProviderRegisterEntry[] {
-  const ids = previewFreeModelIdsJson === undefined ? null : previewModelIds(previewFreeModelIdsJson);
-  const offers = (id: string): boolean => ids === null || ids.has(id);
-  // A per-plan build always uses the role models; the first preview's build (GLM alone) has no others.
-  const roleModels = ids !== null && ids.size === 1 && ids.has(LEGACY_PREVIEW_MODEL) ? new Set<string>() : PREVIEW_ROLE_MODELS;
-  const deepInfraModels = PREVIEW_DEEPINFRA_MODELS.filter(([id]) => offers(id) || roleModels.has(id)).map(([, label]) => label);
-  const rows = MODEL_PROVIDERS.flatMap((row): ProviderRegisterEntry[] => {
-    switch (row.key) {
-      // The hosted cloud rows never show on a preview: only a company the build sends text to is named.
-      case "claude":
-        return offers(PREVIEW_ANTHROPIC_MODEL) ? [ANTHROPIC_PREVIEW_PROVIDER] : [];
-      // Gemini only when the flag names it: a bad flag must not invent a Google model the preview never offers.
-      case "gemini":
-        return ids?.has(PREVIEW_GOOGLE_MODEL) === true ? [GOOGLE_PREVIEW_PROVIDER] : [];
-      case "gpt":
-      case "grok":
-        return [];
-      // The hosted row says Qwen runs on our own servers; a build that sends Qwen to DeepInfra names it there instead.
-      case "qwen":
-        return offers(PREVIEW_DEEPINFRA_QWEN) ? [] : [row];
-      default:
-        return [row];
-    }
+function uncheckedCompanyEntry(company: string): ProviderRegisterEntry {
+  const name = company.startsWith(HOST_COMPANY_PREFIX) ? company.slice(HOST_COMPANY_PREFIX.length) : company;
+  return Object.freeze({
+    ...UNCHECKED_CLOUD,
+    key: company,
+    provider: name,
+    models: "",
+    entity: "[…]",
+    homeCountryKey: "legal.providers.unconfirmed",
+    basisKey: "legal.providers.unconfirmed",
+    purposesConfirmed: false
   });
-  return Object.freeze([
-    ...rows,
-    ...(deepInfraModels.length === 0 ? [] : [Object.freeze({ ...DEEPINFRA_PROVIDER, models: deepInfraModels.join(", ") })]),
-    SUPPORT_PROVIDER
-  ]);
 }
 
-export const PROVIDER_REGISTER: readonly ProviderRegisterEntry[] =
-  providerRegister(process.env.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON);
+/**
+ * The AI Provider Register, in the order `/providers` shows it (addition D24, owner 2026-10-22: "providers only,
+ * not the models, listed automatically"). `companies` is the API's answer (`readAiProviderCompanies`): the
+ * companies its declared provider targets reach. Each reviewed company it names gets its checked row, Anthropic
+ * then DeepInfra; each other company (`host:<hostname>`) one unchecked row headed by its host name, sorted; the
+ * support chat's model always last. No answer (`null`) or an empty list lists the whole reviewed catalogue: a legal
+ * page discloses rather than hides. No row names a model, so a model or line-up change never changes the page, and
+ * the hosted cloud rows (`MODEL_PROVIDERS`: OpenAI, xAI, Google, the own-servers Qwen) never show, since no
+ * declared target reaches them. Never throws.
+ */
+export function providerRegister(companies: readonly string[] | null): readonly ProviderRegisterEntry[] {
+  const named = companies === null || companies.length === 0
+    ? null
+    : new Set(companies.filter((company) => typeof company === "string" && company.length > 0));
+  const reviewed = REVIEWED_PROVIDER_COMPANIES
+    .filter(([company]) => named === null || named.size === 0 || named.has(company))
+    .map(([, entry]) => entry);
+  const unchecked = named === null ? [] : [...named].filter((company) => !REVIEWED_COMPANY_KEYS.has(company)).sort()
+    .map(uncheckedCompanyEntry);
+  return Object.freeze([...reviewed, ...unchecked, SUPPORT_PROVIDER]);
+}
 
 export type TermsVersion = Readonly<{
   version: string;

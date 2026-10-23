@@ -42,22 +42,36 @@ import { describe, expect, it } from "vitest";
  */
 
 const RUNNER = new URL("../../apps/runner/src/index.ts", import.meta.url);
+/**
+ * Side-by-side spec §13: the shipped entry point takes every debate member of its settings version from ONE mapping,
+ * `runnerSettingsOfVersion` (apps/runner/src/run-debate-members.ts), spread into its settings literal. A gated field is then
+ * supplied by that mapping's returned literal, but only while the literal really spreads it (checked below). The
+ * acceptance composition stays single-version (plan D7) and supplies each field itself.
+ */
+// S6: the mapping is its own module (index.ts maps each debate's version with it), re-exported by run-settings.ts.
+const RUN_SETTINGS = new URL("../../apps/runner/src/run-debate-members.ts", import.meta.url);
+const DEBATE_MEMBERS_SPREAD = "...runnerSettingsOfVersion(siteVersionSettings),";
 const DEPLOYMENT_ENTRY_POINTS = Object.freeze([
-  { label: "dev (shipped)", url: new URL("../../apps/runner/src/main.ts", import.meta.url) },
-  { label: "acceptance (ceremony)", url: new URL("../../acceptance/main.ts", import.meta.url) }
+  { label: "dev (shipped)", url: new URL("../../apps/runner/src/main.ts", import.meta.url), mapping: RUN_SETTINGS },
+  { label: "acceptance (ceremony)", url: new URL("../../acceptance/main.ts", import.meta.url), mapping: null }
 ]);
 
 /**
  * Every settings field the runner REFUSES a work item over. Both gate shapes
  * count: the unconditional one that binds at every maker count, and the
- * `#configuredMakers.length > 1 &&` one that binds as soon as a second maker is
+ * `configuredMakerRefs.length > 1 &&` one that binds as soon as a second maker is
  * configured. Both deployments configure more than one maker, so both shapes are
  * obligations on both of them.
  */
 function gatedSettingsFields(runnerSource: string): readonly string[] {
-  const pattern = /if \((?:this\.#configuredMakers\.length > 1 && )?this\.settings\.([A-Za-z]+) === undefined\)[\s\S]{0,1600}?throw new TypedDomainError\(\s*"([A-Z0-9_]+_UNRESOLVED)"/g;
+  // Side-by-side spec §13 (S6): the gates run against one debate's settings, in `assertRunnerSettingsGates` (its
+  // `settings` and `configuredMakerRefs` inputs); the derivation reads that function's body.
+  const start = runnerSource.indexOf("export function assertRunnerSettingsGates(");
+  expect(start).toBeGreaterThan(-1);
+  const gates = runnerSource.slice(start, runnerSource.indexOf("\n}\n", start));
+  const pattern = /if \((?:configuredMakerRefs\.length > 1 && )?settings\.([A-Za-z]+) === undefined\)[\s\S]{0,1600}?throw new TypedDomainError\(\s*"([A-Z0-9_]+_UNRESOLVED)"/g;
   const found = new Set<string>();
-  for (const match of runnerSource.matchAll(pattern)) found.add(match[1]!);
+  for (const match of gates.matchAll(pattern)) found.add(match[1]!);
   return Object.freeze([...found].sort());
 }
 
@@ -71,6 +85,15 @@ function runnerSettingsRegion(entryPointSource: string): string {
   const constructed = entryPointSource.indexOf("new WalkingSkeletonRunner(");
   expect(constructed).toBeGreaterThan(-1);
   return entryPointSource.slice(constructed);
+}
+
+/** The body of `runnerSettingsOfVersion` in run-debate-members.ts: its one returned literal of debate members. */
+function debateMembersRegion(mappingSource: string): string {
+  const start = mappingSource.indexOf("export function runnerSettingsOfVersion(");
+  expect(start).toBeGreaterThan(-1);
+  const end = mappingSource.indexOf("\n}\n", start);
+  expect(end).toBeGreaterThan(start);
+  return mappingSource.slice(start, end);
 }
 
 describe("F33 class — every register family the runner gates on is wired into EVERY deployment", () => {
@@ -92,15 +115,20 @@ describe("F33 class — every register family the runner gates on is wired into 
   });
 
   it("finds every gated family supplied by BOTH shipped deployment entry points", async () => {
-    const [runnerSource, ...entryPointSources] = await Promise.all([
+    const [runnerSource, mappingSource, ...entryPointSources] = await Promise.all([
       readFile(RUNNER, "utf8"),
+      readFile(RUN_SETTINGS, "utf8"),
       ...DEPLOYMENT_ENTRY_POINTS.map(({ url }) => readFile(url, "utf8"))
     ]);
     const gated = gatedSettingsFields(runnerSource!);
 
     const missing: string[] = [];
     for (const [index, entryPoint] of DEPLOYMENT_ENTRY_POINTS.entries()) {
-      const region = runnerSettingsRegion(entryPointSources[index]!);
+      const literal = runnerSettingsRegion(entryPointSources[index]!);
+      // The mapping counts only for an entry point whose literal spreads it.
+      const spreads = entryPoint.mapping !== null && literal.includes(DEBATE_MEMBERS_SPREAD);
+      if (entryPoint.mapping !== null) expect(spreads, entryPoint.label).toBe(true);
+      const region = spreads ? `${literal}\n${debateMembersRegion(mappingSource!)}` : literal;
       for (const field of gated) {
         if (!suppliesField(region, field)) missing.push(`${entryPoint.label}: ${field}`);
       }

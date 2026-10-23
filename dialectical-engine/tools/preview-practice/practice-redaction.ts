@@ -73,6 +73,28 @@ export function capReplyText(text: string, capBytes: number = PRACTICE_REPLY_CAP
   return `${head}\n[... ${String(omitted)} bytes left out ...]\n${tail}`;
 }
 
+/**
+ * Final fix wave S14 — THE COMMON RULE for an owner-typed detail in a code (`CODE:detail[:detail…]`), the same rule the
+ * runner's settings journal lines (apps/runner/src/index.ts `settingsJournalCode`) and the native operator's
+ * THINKING_REFUSAL pass-through apply, so the three places stay aligned. The detail is key-shaped when it holds an
+ * unbroken run of 24+ letters and digits, a `//` (a socket or URL path) or a vendor `sk-` prefix.
+ */
+const SETTINGS_DETAIL_KEY_SHAPED = /[A-Za-z0-9]{24,}|\/\/|\bsk-/u;
+/** Final fix wave S14: one detail part a code may name whole (a model id, a step or level word, a row key). */
+const SETTINGS_DETAIL_PART = /^[A-Za-z0-9_.\/-]{1,64}$/u;
+
+/**
+ * Final fix wave S14: the code printed whole only when every detail part is plainly an id and the detail is not
+ * key-shaped; otherwise the bare code (the part before the first ':'), and nothing of the detail.
+ */
+export function printableSettingsCode(code: string): string {
+  const colon = code.indexOf(":");
+  if (colon === -1) return code;
+  const detail = code.slice(colon + 1);
+  const plain = detail.split(":").every((part) => SETTINGS_DETAIL_PART.test(part)) && !SETTINGS_DETAIL_KEY_SHAPED.test(detail);
+  return plain ? code : code.slice(0, colon);
+}
+
 /** The one function every reply text goes through before it enters a report. */
 export function reportableReplyText(text: string, capBytes: number = PRACTICE_REPLY_CAP_BYTES): string {
   return capReplyText(redactKeyShapes(text), capBytes);

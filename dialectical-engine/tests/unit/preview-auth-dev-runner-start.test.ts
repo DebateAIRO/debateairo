@@ -10,6 +10,8 @@ import * as runtime from '../../packages/register/src/runtime-environment.js';
 import { fixtureReleaseKey, validRunnerEnvironmentFixture } from '../support/apiEnvironmentFixture.js';
 import { RUNNER_READY_PROCESS_EVENT, announceRunnerReady } from '../../apps/runner/src/runner-ready.js';
 import { RUNNER_RETIRED_PROCESS_EVENT } from '../../apps/runner/src/runner-retirement.js';
+// launch-runner.mjs's start rule (preview-only start, non-empty team), keyed on the gate part since addition D14.
+const TEAM_REQUIRED_CONDITION = 'parsed.PREVIEW_GATE_SETTINGS===undefined||!Array.isArray(parsed.PREVIEW_TEAM_USER_IDS)||parsed.PREVIEW_TEAM_USER_IDS.length===0';
 const execute = promisify(execFile);
 const receipt = await import('../../deploy/' + 'preview-auth-dev/v1/runtime-receipt.mjs');
 const env = await import('../../deploy/' + 'preview-auth-dev/v1/environment.mjs');
@@ -398,9 +400,23 @@ describe('launch-runner.mjs: start mirrors launch-api.mjs, prepare-only stays th
     const code = await readFile(resolve(OPERATOR, 'launch-runner.mjs'), 'utf8');
     const start = code.slice(code.indexOf('export async function launchRunner'));
     const check = start.indexOf("refuse('PREVIEW_RUNNER_TEAM_REQUIRED')");
-    expect(start).toContain('parsed.PREVIEW_PROVIDER_TEST_CONFIG===undefined||!Array.isArray(parsed.PREVIEW_TEAM_USER_IDS)||parsed.PREVIEW_TEAM_USER_IDS.length===0');
+    // Addition D14 (owner 2026-10-22): the same rule keyed on the gate part, present for all three forms of the setting.
+    expect(start).toContain(`if(${TEAM_REQUIRED_CONDITION})refuse('PREVIEW_RUNNER_TEAM_REQUIRED');`);
     expect(check).toBeGreaterThan(start.indexOf("narrowEnvironment('runner'"));
     expect(check).toBeLessThan(start.indexOf('assertSelectedRunnerConnection'));
+  });
+  it('the start rule, run on parsed runner environments: refused without the preview configuration or team, passed with a sockets-only one', () => {
+    // The pinned condition above, evaluated as written in launch-runner.mjs (true = refuse).
+    const refuses = new Function('parsed', `return ${TEAM_REQUIRED_CONDITION};`) as (parsed: unknown) => boolean;
+    const TEAM = '["0b7c6f1e-2d3a-4b5c-8d9e-0f1a2b3c4d5e"]';
+    const GATE = { deployment: 'v3-preview', requested_thinking_level: 'high', budget_socket: '/run/debateai-v3-preview/team-budget-v2.sock', scope_id: 'preview-team-v2-20261009' };
+    const parse = (extra: Record<string, string>) => runtime.parseRunnerEnvironment({ ...validRunnerEnvironmentFixture(), ...extra });
+    expect(refuses(parse({}))).toBe(true);
+    expect(refuses(parse({ PREVIEW_PROVIDER_TEST_CONFIG_JSON: JSON.stringify(GATE) }))).toBe(true);
+    expect(refuses(parse({ PREVIEW_PROVIDER_TEST_CONFIG_JSON: JSON.stringify(GATE), PREVIEW_TEAM_USER_IDS_JSON: '[]' }))).toBe(true);
+    expect(refuses(parse({ PREVIEW_PROVIDER_TEST_CONFIG_JSON: JSON.stringify(GATE), PREVIEW_TEAM_USER_IDS_JSON: TEAM }))).toBe(false);
+    expect(refuses(parse({ PREVIEW_PROVIDER_TEST_CONFIG_JSON: JSON.stringify({ ...GATE, anthropic_budget_socket: '/run/debateai-v3-preview/anthropic-budget-v1.sock' }), PREVIEW_TEAM_USER_IDS_JSON: TEAM }))).toBe(false);
+    expect(refuses(parse({ PREVIEW_PROVIDER_TEST_CONFIG_JSON: JSON.stringify({ ...GATE, free_model_ids: ['zai-org/GLM-5.3-Flash'] }), PREVIEW_TEAM_USER_IDS_JSON: TEAM }))).toBe(false);
   });
   it('every failure of a started runner prints one fixed code and exits 1', () => {
     const events: Record<string, (value?: unknown) => void> = {}, written: string[] = [], exits: number[] = [];
@@ -539,6 +555,13 @@ describe('runner environment narrowing', () => {
     delete bare.PREVIEW_PROVIDER_TEST_CONFIG_JSON; delete bare.PREVIEW_TEAM_USER_IDS_JSON;
     expect(() => env.narrowEnvironment('runner', bare, runtime, { registerVersion: '12' }, approved)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
     expect(() => env.narrowEnvironment('runner', { ...configured(), DEBATEAI_DEPLOYMENT_MODE: 'hosted', BILLING_STAGE_CLOCK_OFFSET_DAYS: '31' }, runtime, { registerVersion: '12' }, approved)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
+  });
+  // Addition D14 (owner 2026-10-22): the preview configuration may carry only the gate part (the line-up lives in settings).
+  it('admits hosted with the sockets-only preview configuration', () => {
+    const socketsOnly = JSON.stringify({ deployment: 'v3-preview', requested_thinking_level: 'high', budget_socket: '/run/debateai-v3-preview/team-budget-v2.sock', scope_id: 'preview-team-v2-20261009' });
+    const result = env.narrowEnvironment('runner', { ...configured(), DEBATEAI_DEPLOYMENT_MODE: 'hosted', PREVIEW_PROVIDER_TEST_CONFIG_JSON: socketsOnly }, runtime, { registerVersion: '12' }, approved);
+    expect(result.deploymentMode).toBe('hosted');
+    expect(result.environment.PREVIEW_PROVIDER_TEST_CONFIG_JSON).toBe(socketsOnly);
   });
 });
 

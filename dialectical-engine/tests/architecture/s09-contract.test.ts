@@ -18,16 +18,20 @@ describe("S09 structural attachment and migration law", () => {
   });
 
   it("attaches the attempt-ledger-backed envelope to the runner and avoids source-literal tier arithmetic", async () => {
-    const [runner, apiMain, budget] = await Promise.all([
+    // Side-by-side spec §13 (S9): the API's risk resolution is each settings version's, composed by its one per-version
+    // admission loader (admission-settings.ts), which main.ts boots through.
+    const [runner, apiMain, admission, budget] = await Promise.all([
       readFile(new URL("../../apps/runner/src/index.ts", import.meta.url), "utf8"),
       readFile(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8"),
+      readFile(new URL("../../apps/api/src/admission-settings.ts", import.meta.url), "utf8"),
       readFile(new URL("../../packages/budget/src/index.ts", import.meta.url), "utf8")
     ]);
     expect(runner).toContain("BudgetRepository");
     expect(budget).toContain("countRunModelAttempts");
-    expect(apiMain).toContain("resolveEffectiveRiskTier");
-    expect(apiMain).toContain("preserveSubmittedTierSource(resolved, askerTierSource)");
-    expect(apiMain).not.toContain("RISK_TIERS.indexOf");
+    expect(admission).toContain("resolveEffectiveRiskTier");
+    expect(admission).toContain("preserveSubmittedTierSource(resolved, askerTierSource)");
+    expect(apiMain).toContain("...admissionSettingsOfVersion(siteAdmission),");
+    for (const source of [apiMain, admission]) expect(source).not.toContain("RISK_TIERS.indexOf");
   });
 
   it("persists typed condition marks and their inspected affected nodes", async () => {

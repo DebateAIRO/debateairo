@@ -19,7 +19,7 @@ import {
   loadBootstrapRegister,
   parseRegisterVersionText
 } from "@debateai/register";
-import { PREVIEW_REVIEWED_PROVIDER_REFS, PREVIEW_GLM_DEADLINE_MS, previewTargetJsonRow } from "@debateai/providers";
+import { PREVIEW_REVIEWED_PROVIDER_REFS, PREVIEW_GLM_DEADLINE_MS, parsePreviewLineUp, previewTargetJsonRow, type PreviewLineUp } from "@debateai/providers";
 import { loadStoryPack, resolveStoryPackDir } from "@debateai/story";
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from "../../packages/register/src/staff-access-policy.js";
 import { buildPreviewSourceRowsV2, composePreviewSnapshotV2, publishPreviewRegisterV2, readSealedSnapshot } from "../../deploy/preview-auth-dev/v1/publish-register-v2.js";
@@ -88,12 +88,16 @@ let folder: string;
 let registerExportPath: string;
 const closers: (() => Promise<void>)[] = [];
 
-/** A register built the way the live preview's was (history v4, then the publish kit v2 on top), exported by the README's SQL. */
-async function exportedRegister(): Promise<string> {
+/**
+ * A register built the way the live preview's was (history v4, then the publish kit v2 on top), exported by the README's
+ * SQL. `lineUp` (addition D23): the kit's plan `lineUp`, so version 5 carries the previewLineUpPolicy row.
+ */
+async function exportedRegister(lineUp: PreviewLineUp | null = null): Promise<string> {
   const scratch = await startTestDatabase();
   try {
     await migrate(scratch.pool);
-    const source = [...await buildPreviewSourceRowsV2(await loadBootstrapRegister(), OBSERVATION)];
+    const source = [...await buildPreviewSourceRowsV2(await loadBootstrapRegister(), OBSERVATION, undefined, "on", null, null, null, null, null,
+      lineUp)];
     const owned = [STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW]
       .map((row) => ({ rowKey: row.rowKey, valueJsonText: canonicalRegisterJson(row.valueAst), sourceRef: row.sourceRef }));
     const base = [...source.filter((row) => !["consumerRecoveryPolicy", "publicationCheckPolicy", "taxAuthorities", "answerRoleRotationPolicy"]
@@ -114,11 +118,15 @@ async function exportedRegister(): Promise<string> {
   }
 }
 
-/** The live settings file's shape (README step S-2), with the preview's own values. */
-function settingsText(): string {
-  const config = { deployment: "v3-preview", free_model_ids: FIVE.slice(0, 2), premium_model_ids: FIVE, requested_thinking_level: "high",
+/**
+ * The live settings file's shape (README step S-2), with the preview's own values. `socketsOnly` (addition D14, R25): the
+ * server setting from T+1 on, the gate part alone (no lists of AIs, no table).
+ */
+function settingsText(options: Readonly<{ socketsOnly?: boolean }> = {}): string {
+  const gate = { deployment: "v3-preview", requested_thinking_level: "high",
     budget_socket: "/run/debateai-v3-preview/deepinfra-budget-v3.sock", anthropic_budget_socket: "/run/debateai-v3-preview/anthropic-budget-v1.sock",
     scope_id: "preview-practice-test" };
+  const config = options.socketsOnly === true ? gate : { ...gate, free_model_ids: FIVE.slice(0, 2), premium_model_ids: FIVE };
   const claimMs = 2 * (DEVELOPMENT_RUN_DEATH_POLICY.cooldown_ms + PREVIEW_GLM_DEADLINE_MS) + PREVIEW_GLM_DEADLINE_MS + 60_000;
   return [
     `PREVIEW_PROVIDER_TEST_CONFIG_JSON=${JSON.stringify(config)}`,
@@ -869,6 +877,67 @@ describe("preview practice: debate mode", () => {
     expect(outcome.report.reasons).toEqual(["HARNESS_ERROR:PRACTICE_SHAPE_SETTINGS_WITHOUT_ROW"]);
     expect(stubs.requests).toEqual([]);
   }, 300_000);
+});
+
+// Side-by-side spec §13, ADDITION D14-D16, D23 (Task SA8): the practice debates the line-up of the version it runs on, and
+// can try a new one with `--line-up <file>` in its own throwaway version; a sockets-only settings file (R25) works.
+describe("preview practice: debate mode, the line-up (addition D14-D16, D23)", () => {
+  type LineUpReport = { verdict: string; reasons: string[]; register: { registerVersion: string; importedRegisterVersion?: string };
+    admission: { admitted: boolean; panel: { modelId: string }[]; satOut: unknown[] }; run: { workItemOutcome: string };
+    byModelAndSite: { model: string; site: string }[] };
+  /** Qwen off both plans, Haiku on Free: a line-up today's server setting does not hold. */
+  const FOUR = FIVE.filter((model) => model !== "Qwen/Qwen3.8-Flash");
+  const TRIED = { free_model_ids: [GLM, HAIKU], premium_model_ids: FOUR, thinking_levels: null };
+  const exportDigest = (path: string) => createHash("sha256").update(readFileSync(path)).digest("hex");
+
+  it("a sockets-only settings file and a live version carrying the row: the debate runs the row's line-up, on the live version: PASS (exit 0)", async () => {
+    const socketsOnly = join(folder, `settings-sockets-only-${randomUUID()}.env`);
+    await writeFile(socketsOnly, settingsText({ socketsOnly: true }));
+    const withRow = join(folder, `register-export-line-up-${randomUUID()}.json`);
+    await writeFile(withRow, await exportedRegister(parsePreviewLineUp(TRIED)));
+    const before = exportDigest(withRow);
+    const { env, common, quiet } = await scenario();
+    const args = common.map((value) => value === join(folder, "settings.env") ? socketsOnly : value);
+    const logged: string[] = [];
+    const outcome = await runPractice(["debate", ...args, "--register-export", withRow, "--depth", "1"], env,
+      { ...quiet, log: (line) => logged.push(line) });
+    const report = outcome.report as unknown as LineUpReport;
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(report.register.registerVersion).toBe("5");
+    expect(report.admission).toMatchObject({ admitted: true, satOut: [] });
+    expect(report.admission.panel.map((member) => member.modelId).sort()).toEqual([...FOUR].sort());
+    expect(report.byModelAndSite.some((row) => row.model === "Qwen/Qwen3.8-Flash" && row.site === "JUDGE")).toBe(false);
+    expect(logged.some((line) => line.startsWith("line-up of version 5: the version's own row;"))).toBe(true);
+    expect(exportDigest(withRow)).toBe(before);
+  }, 900_000);
+
+  it("--line-up on today's settings file: the row goes into the practice's own version (6), the settings' lists set aside, the export untouched: PASS (exit 0)", async () => {
+    const tried = join(folder, `line-up-${randomUUID()}.json`);
+    // The --print-line-up member form, as the release tool's --line-up takes it.
+    await writeFile(tried, JSON.stringify({ lineUp: TRIED }));
+    const before = exportDigest(registerExportPath);
+    const { env, common, quiet } = await scenario();
+    const logged: string[] = [];
+    const outcome = await runPractice(["debate", ...common, "--register-export", registerExportPath, "--depth", "1", "--line-up", tried], env,
+      { ...quiet, log: (line) => logged.push(line) });
+    const report = outcome.report as unknown as LineUpReport;
+    expect({ verdict: report.verdict, reasons: report.reasons }).toEqual({ verdict: "PASS", reasons: [] });
+    expect(report.register).toMatchObject({ registerVersion: "6", importedRegisterVersion: "5" });
+    expect(report.admission.panel.map((member) => member.modelId).sort()).toEqual([...FOUR].sort());
+    expect(logged).toContain("the line-up row added in this throwaway copy as version 6, with this code's contract hashes");
+    expect(logged.some((line) => line.startsWith("line-up of version 6: the --line-up file's;"))).toBe(true);
+    expect(exportDigest(registerExportPath)).toBe(before);
+  }, 900_000);
+
+  it("a sockets-only settings file and a row-less version: PREVIEW_LINE_UP_REQUIRED before the database starts (HARNESS_ERROR, exit 40)", async () => {
+    const socketsOnly = join(folder, `settings-sockets-only-${randomUUID()}.env`);
+    await writeFile(socketsOnly, settingsText({ socketsOnly: true }));
+    const { stubs, env, common, quiet } = await scenario();
+    const args = common.map((value) => value === join(folder, "settings.env") ? socketsOnly : value);
+    const outcome = await runPractice(["debate", ...args, "--register-export", registerExportPath, "--depth", "1"], env, quiet);
+    expect([outcome.report.verdict, outcome.exitCode, outcome.report.reasons]).toEqual(["HARNESS_ERROR", 40, ["HARNESS_ERROR:PREVIEW_LINE_UP_REQUIRED"]]);
+    expect(stubs.requests).toEqual([]);
+  }, 120_000);
 });
 
 describe("preview practice: debate mode, the new debate shape (spec 2026-10-12 §5)", () => {

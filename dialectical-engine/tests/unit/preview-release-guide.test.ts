@@ -674,7 +674,19 @@ const VARS: Readonly<Record<string, string>> = Object.freeze({
   CAPI: `${RELS}/auth-dev-candidate-${LABEL}-api`, CUI: `${RELS}/auth-dev-candidate-${LABEL}-ui`, CRUN: `${RELS}/auth-dev-candidate-${LABEL}-runner`,
   OLDA: `${OART}/api-launch.json`, OLDU: `${OART}/ui-launch.json`, OLDR: `${OART}/runner-launch.json`, PLAN: `${ART}/api-launch.json`,
   HB_ON: '{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}',
-  YES: 'ab'.repeat(32), GRR: '01'.repeat(32), LIFE: 'yes'
+  YES: 'ab'.repeat(32), GRR: '01'.repeat(32), LIFE: 'yes',
+  // Side-by-side spec §13 (Task S18): the switch's settings version, and the settings-activation section's names.
+  ACT: '18', V: '19', OLDV: '18', BY: 'Stefan Nour', WHY: 'shorter answers for the test team',
+  // Final fix wave S10: the active version SB13 and DR6 read, passed to the switch as --expect-active.
+  AVN: '17',
+  FROM: '/opt/debateai-v3-preview/artifacts/settings-v18/native-plan-verify.json',
+  SART: '/opt/debateai-v3-preview/artifacts/settings-20261023t120000z', VART: '/opt/debateai-v3-preview/artifacts/settings-v19',
+  HB: '{"billing":"on","perRunCeilingMicros":2500000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}',
+  LINEUP: '/opt/debateai-v3-preview/artifacts/settings-20261023t120000z/line-up.json',
+  CC: '{"perDebate":12,"perModelPerDebate":3,"perModelPerRunner":{"default":50}}',
+  LG: '{"kind":"LENGTH_GUIDANCE_POLICY"}', SHAPE: 'off',
+  // S18 fix round 1: the choices a plan does not take from its base, read from the active version's publish plan.
+  DS: 'yes', SEATS: '{"writer":"preview:claude-haiku-5-5","checker":"preview:fixture-b"}', ROT: 'off'
 });
 
 type Invocation = Readonly<{ tool: string; script: string; argv: readonly string[]; line: string }>;
@@ -719,9 +731,9 @@ function commandWords(text: string, line: string): string[][] {
   return variants;
 }
 
-function invocations(): Invocation[] {
+function invocations(blocks: readonly Block[] = allBlocks): Invocation[] {
   const found: Invocation[] = [];
-  for (const block of allBlocks) {
+  for (const block of blocks) {
     const script = stepOf(block) ?? `block at line ${block.start + 1}`;
     for (const line of block.lines.filter(code)) {
       for (const match of line.matchAll(/(?:^|[\s;&|(`])(lc|tl|pre|rel|cslots) (?=\S)/g)) {
@@ -828,5 +840,259 @@ describe('the guide\'s commands are the tools\' real command lines (D1-D13)', ()
     expect(Math.max(timers, target)).toBeLessThan(reload);
     // SB1's copy holds the boot target and its drop-in (the debateai-preview-* glob does not match debateai-preview.target).
     expect(scriptOf('SB1').lines.join('\n')).toContain('tar -czf "$S/systemd-before.tgz" debateai-preview-* debateai-preview.target debateai-preview.target.d');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Side-by-side spec §13 (Task S18): settings activation replaces the re-pin and restart. Its section sits before the
+// transition (so the step order above is unchanged); its scripts follow the same rules and its calls the same parsers.
+
+const SETTINGS = '## Changing debate settings without an upload (settings activation)';
+const SETTINGS_STEPS = Object.freeze(['SV0', 'SV1', 'SV2', 'SV3', 'SV4', 'SV5', 'SV6']);
+
+describe('settings activation: the guide (side-by-side spec §13)', async () => {
+  const section = sectionOf(guide, SETTINGS);
+  const blocks = blocksOf(section);
+  const steps = blocks.filter(block => stepOf(block) !== null);
+  const { BASE_NOT_ACTIVE } = await import('../../deploy/' + 'preview-auth-dev/v1/publish-register-base.ts');
+
+  it('sits before the transition, after the hosted-base recipe, and its steps run in order with their own guards', () => {
+    expect(guide.indexOf(`\n${SETTINGS}\n`)).toBeGreaterThan(guide.indexOf('### The way back\n'));
+    expect(guide.indexOf(`\n${SETTINGS}\n`)).toBeLessThan(guide.indexOf(`\n${TRANSITION}\n`));
+    expect(steps.map(stepOf)).toEqual([...SETTINGS_STEPS]);
+    for (const block of steps) {
+      const step = stepOf(block)!;
+      expect(block.lines[0], step).toBe('set -euo pipefail');
+      if (step !== 'SV0' && step !== 'SV6') expect(block.lines[1], step).toBe('. /root/preview-archive/settings-names.sh');
+      for (const line of block.lines) {
+        for (const match of line.matchAll(/([A-Z][A-Z0-9_]*)_NOT_DONE/g)) expect(match[1], `${step}: ${line}`).toBe(step);
+        if (line.includes('_NOT_DONE')) expect(line, `${step}: ${line}`).toMatch(/exit 1/);
+      }
+    }
+  });
+
+  it('every settings-version.mjs, release-check.mjs and release-artifacts.mjs call passes its tool\'s own parser', async () => {
+    const calls = invocations(blocks);
+    expect(new Set(calls.map(call => call.tool))).toEqual(new Set(['release-check.mjs', 'settings-version.mjs', 'release-artifacts']));
+    const wrong: string[] = [];
+    for (const call of calls) {
+      const reason = await parserReason(call);
+      if (reason !== 'ACTOR_REFUSED') wrong.push(`${call.script}: ${reason}: ${call.line.trim()}`);
+    }
+    expect(wrong).toEqual([]);
+    const lines = blocks.flatMap(block => block.lines);
+    for (const command of ['lc settings-version.mjs check "$LABEL" "$V"', 'lc settings-version.mjs activate "$V" --by "$BY" --reason "$WHY"',
+      'lc settings-version.mjs activate "$OLDV" --by "$BY" --reason "$WHY"', 'lc settings-version.mjs status']) {
+      expect(lines.some(line => line.includes(command)), command).toBe(true);
+    }
+  });
+
+  it('plans from the active version, puts the verify plan back at once, and keeps each published version\'s verify plan', () => {
+    const sv0 = steps.find(block => stepOf(block) === 'SV0')!.lines.join('\n');
+    expect(sv0).toContain("jq -r '.effectiveActive // empty'");
+    expect(sv0).toContain('FROM=/opt/debateai-v3-preview/artifacts/settings-v$AV/native-plan-verify.json');
+    for (const step of ['SV1', 'SV2']) {
+      const lines = steps.find(block => stepOf(block) === step)!.lines;
+      const nat = lines.findIndex(line => line.startsWith('OUT=$(nat '));
+      // The very next line puts the release's own verify plan back, before the result is even read.
+      expect(lines[nat + 1], step).toMatch(/^put "\$S\/native-plan\.before\.json" \|\| /);
+    }
+    const sv2 = steps.find(block => stepOf(block) === 'SV2')!.lines.join('\n');
+    expect(sv2).toContain('VART=/opt/debateai-v3-preview/artifacts/settings-v$V');
+    expect(sv2).toContain('--out "$VART/native-plan-verify.json"');
+    expect(section).toContain(BASE_NOT_ACTIVE);
+  });
+
+  it('names the owner\'s fresh yes, what cannot change by activation, and every settings journal line', () => {
+    expect(section).toMatch(/fresh in\s+the live chat/);
+    // Prose may wrap anywhere: the owner's words are read with the line breaks folded.
+    const prose = section.replace(/\s+/g, ' ');
+    expect(prose).toContain('A settings-only change of a site rule (logins, rate limits, countries, plan prices, the daily budget, funding) is refused and needs an upload.');
+    expect(prose).toContain('already carries the call-concurrency row, so the per-debate lane limits can change by activation');
+    for (const line of ['DEBATEAI_SETTINGS_CHECK', 'DEBATEAI_SETTINGS_VERDICT', 'DEBATEAI_SETTINGS_ACTIVATED', 'DEBATEAI_RUNNER_SETTINGS {',
+      '{"kind":"DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED","version"', '{"kind":"DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED","runId"', 'ADMISSION_SETTINGS_UNSUPPORTED',
+      'ADMISSION_ESTIMATOR_FALLBACK', 'ADMISSION_SETTINGS_NOT_PASSED', 'SETTINGS_GATE_UNANSWERED', '--seatable-env']) expect(section, line).toContain(line);
+    // The line-up file: root 0644 under umask 022, printed by the release's own checker into the artifacts folder.
+    expect(section).toContain('( umask 022; cd "$CAPI/dialectical-engine" && ');
+    expect(section).toContain('tools/preview-practice/check-thinking-levels.ts --print-line-up --settings "$E/api-$LABEL.env" > "$TMP" )');
+    expect(section).toContain('TMP=$SART/line-up.json.printing');
+    // The line-up task (SA11) appends to this section: the examples, the T+1 env migration and the providers page.
+    for (const heading of ['### The line-up, the thinking levels and the answer seats (side-by-side spec §13 addition)',
+      '### The first upload with this change (T+1)', '### The providers page']) expect(section.split('\n'), heading).toContain(heading);
+  });
+
+  it('the line-up and thinking changes are activations; T+1 moves the line-up out of the env (SA11, addition D15, D23, D24)', () => {
+    const prose = section.replace(/\s+/g, ' ');
+    // The two plan members, the reviewed menus, and the order for a model the gate has not switched on yet.
+    for (const text of ['`lineUp`: exactly `free_model_ids`, `premium_model_ids` and `thinking_levels`', '`answerSeats`: `writer` and `checker`',
+      'GLM `high`, `low`; DeepSeek `high`, `low`, `none`; Qwen `default`, `low`, `medium`, `none`; MiMo `default`, `none`; Claude Haiku `high`, `medium`, `low`.',
+      'Root switches it on at its spending gate', 'This stays root\'s step, and it comes first.']) expect(prose, text).toContain(text);
+    const t1 = sectionOf(guide, '### The first upload with this change (T+1)');
+    const t1Blocks = blocksOf(t1);
+    // Step 1, before SB3: today's line-up printed by the new release's checker from the OLD release's API env file.
+    expect(t1Blocks[0]!.lines.join('\n')).toContain('tools/preview-practice/check-thinking-levels.ts --print-line-up --settings "$E/api-$OLABEL.env" > "$TMP" )');
+    expect(t1Blocks[0]!.lines).toContain('mv "$TMP" "$ART/line-up.json"');
+    // Step 2: SB3 takes it (and only then: empty by default).
+    const sb3 = scriptOf('SB3').lines;
+    expect(sb3).toContain('LINEUP=\'\'                                                 # the first upload with the line-up row (T+1) only: "$ART/line-up.json"; else empty');
+    expect(sb3.find(line => line.startsWith('rel native-plan --operation plan --from "$FROM" '))).toContain('--hosted-billing "$HB" ${LINEUP:+--line-up "$LINEUP"} --out');
+    // Step 3, after SB5: the new release's two env files keep only the gate part, checked, and no other line changes.
+    const sockets = t1Blocks[1]!.lines.join('\n');
+    expect(sockets).toContain('jq -ce \'{budget_socket, deployment, requested_thinking_level, scope_id} + (if has("anthropic_budget_socket") then {anthropic_budget_socket} else {} end)');
+    expect(sockets).toContain('diff <(grep -v "^$K=" "$D") <(grep -v "^$K=" "$F.sockets") > /dev/null');
+    expect(sockets).toContain("grep -q 'No line-up in this setting'");
+    expect(prose).toContain('PREVIEW_LINE_UP_ENV_CONFLICT');
+    // Step 4, before SB11: both halves check the new release's own site version.
+    expect(t1Blocks[2]!.lines).toContain('RC=0; OUT=$(lc settings-version.mjs check "$LABEL" "$V" 2>&1) || RC=$?');
+    // Owner 2026-10-23 (R79, R81): that same check is named as the dry check of the stricter one-call rule, before the
+    // switch; a PASS tightens the boot in the upload after T+1, a FAIL stops for the owner.
+    const t1Prose = t1.replace(/\s+/g, ' ');
+    for (const text of ['This is also the dry check of the stricter "run ceiling covers one call" rule',
+      '`settings-version.mjs check <label> <site version>` (the block below, before the switch)', 'fails `RUN_CEILING_BELOW_ONE_CALL` if not.',
+      'If the check passes, the boot is made just as strict in the upload after T+1 (a follow-up code change, not part of this upload).',
+      'If it fails with that code, nothing has started: stop and ask the owner before WB1 or anything else.']) expect(t1Prose, text).toContain(text);
+    expect(t1Prose.indexOf('This is also the dry check')).toBeLessThan(t1Prose.indexOf('RC=0; OUT=$(lc settings-version.mjs check "$LABEL" "$V" 2>&1) || RC=$?'));
+    // None of these blocks is a step of its own (the settings steps stay SV0-SV6, the upload's stay as STEPS).
+    for (const block of t1Blocks) expect(stepOf(block)).toBeNull();
+    // The providers page: automatic, one release later to drop a company; the page itself is never edited for a new
+    // company (owner 2026-10-23 reworded its promise, superseding R21).
+    const providers = sectionOf(guide, '### The providers page').replace(/\s+/g, ' ');
+    for (const text of ['A line-up or model change never needs a website upload.', 'Adding a company is an upload',
+      'The page itself needs no edit for this: it lists the company by itself, from the new release\'s declared targets, once that release is current',
+      'its intro keeps saying "This list is kept up to date automatically. It always shows the companies we currently send data to." (owner, 2026-10-23)',
+      'A company leaves the targets one release later.', 'never in that same upload', 'now only sets the new-debate page\'s fallback list']) expect(providers, text).toContain(text);
+    // Owner 2026-10-23 (OA2): Privacy Policy 3.5 §14 and §5 stay, so an upload that adds a new AI company tells people
+    // first and notes the change in the Register, before its switch; every other upload skips the step.
+    for (const text of ['**A new AI company: tell people first, and note it in the Register (only an upload that adds one).**',
+      'The Privacy Policy (version 3.5) makes two promises the owner keeps (2026-10-23), so before that upload\'s switch:',
+      '**Privacy Policy §14: tell people before.** Before a new recipient starts receiving data, people are told by email and in the product, and given time to object.',
+      'the switch (SB13; on the drained path, the downtime at DR2) waits until the notice has gone out and that time has passed.',
+      'There is no tool for this in the release kit: the owner sends the notice.',
+      '**Privacy Policy §5: note the change in the Register.** The Register is the `/providers` page; its facts are the reviewed catalogue in `apps/ui/lib/legal/pages.ts`',
+      'with its facts checked by a person and its `checkedOn` date (the page shows it as "Last checked")', '`docs/missions/provider-register/FILL-IN.md` lists the fields.',
+      'The Register has no version number or change list of its own today, so that dated row is the note',
+      'No legal text changes for this step, and no Privacy Policy version.',
+      'An upload that adds no new company skips this step: so does every activation (a line-up or model change) and a new model of a company the page already names.'])
+      expect(providers, text).toContain(text);
+    // The step names no shell block of its own (STEPS unchanged) and sits right after the "adding a company" bullet.
+    expect(blocksOf(sectionOf(guide, '### The providers page'))).toHaveLength(0);
+    expect(providers.indexOf('Adding a company is an upload')).toBeLessThan(providers.indexOf('A new AI company: tell people first'));
+    expect(providers.indexOf('A new AI company: tell people first')).toBeLessThan(providers.indexOf('A company leaves the targets one release later.'));
+    // The owner's yes before the switch names it, on both paths (SB6; the drained path's yes before DR2).
+    const sb6 = sectionOf(guide, guide.split('\n').find(line => line.startsWith('### SB6. '))!).replace(/\s+/g, ' ');
+    expect(sb6).toContain('- only when this upload adds a new AI company: that the Privacy Policy §14 notice went out (by email and in the product, on which date) and its time to object has passed, and that the company\'s dated Register row (§5) is in this release ("The providers page");');
+    expect(sb6.indexOf('a new AI company')).toBeLessThan(sb6.indexOf('- the Caddy payment-marks rule (PM2), when this upload adds it.'));
+    expect(sectionOf(guide, DRAINED).replace(/\s+/g, ' ')).toContain('When this upload adds a new AI company, the yes before DR2 also names the Privacy Policy §14 notice and the dated Register row (§5), as in SB6.');
+    // The page's old promise and the step that said no notice goes out stay gone.
+    for (const gone of ['Advance notice first', 'We tell you before a new provider receives any data', 'No notice goes out first'])
+      expect(guide.replace(/\s+/g, ' '), gone).not.toContain(gone);
+  });
+
+  it('the switch activates the new release\'s own site version (SB13, DR6), and the old re-pin sections point to the activation', () => {
+    for (const step of ['SB13', 'DR6']) {
+      const lines = scriptOf(step).lines;
+      const act = lines.indexOf(lines.find(line => line.startsWith('ACT=${KEY%%-*}; ACT=${ACT#r}'))!);
+      const sw = lines.findIndex(line => line.includes('lc release-switch.mjs switch --to "$LABEL" --from "$OLABEL"'));
+      expect(act, step).toBeGreaterThan(-1);
+      expect(sw, step).toBeGreaterThan(act);
+      // Final fix wave S10: the switch also refuses if the active version moved after the step's own read (AVN).
+      expect(lines[sw], step).toContain('--activate "$ACT" --expect-active "$AVN" 2>&1) || SC=$?');
+    }
+    const kitV2 = sectionOf(guide, '## Publishing a new register version on the preview (publish kit v2)');
+    expect(kitV2.indexOf('steps 5 and 6 are not how a settings change')).toBeLessThan(kitV2.indexOf('5. **Point both environment files at the new version.**'));
+    const b5 = sectionOf(guide, '### B5. The two env edits');
+    expect(b5.indexOf('B5 to B7 are not how a settings change')).toBeLessThan(b5.indexOf('```sh'));
+    expect(sectionOf(guide, WAY_BACK)).toContain('**The settings each way back activates (side-by-side spec §11, §13).**');
+  });
+
+  it('an upload follows the active version: SB1 records it, SB3 plans from it, SB9 and DR5 publish only on it (ruling R69 fix round)', () => {
+    const sb1 = scriptOf('SB1').lines;
+    const activev = sb1.find(line => line.startsWith('activev() { '))!;
+    expect(activev).toContain('if [ -f "$L/settings-version.mjs" ] && [ -f "$OCAPI/dialectical-engine/tools/settings-version/cli.ts" ]; then lc settings-version.mjs status');
+    expect(activev).toContain('else printf \'%s\\n\' "${o#r}"; fi; }');
+    expect(sb1.findIndex(line => line.startsWith('activev > "$S/active-before" || '))).toBeGreaterThan(sb1.indexOf('. "$NAMES"'));
+    const sb3 = scriptOf('SB3').lines;
+    const from = sb3.findIndex(line => line.startsWith('if [ "$AV" = "$OSITE" ]; then FROM=$S/native-plan.before.json; CP=$OART/native-plan-publish.json; else FROM=/opt/debateai-v3-preview/artifacts/settings-v$AV/native-plan-verify.json;'));
+    const plan = sb3.findIndex(line => line.startsWith('rel native-plan --operation plan --from "$FROM" '));
+    expect(from).toBeGreaterThan(-1);
+    expect(plan).toBeGreaterThan(from);
+    expect(sb3[plan]).toContain('${DS:+--checker deepseek --deepseek-enabled-on-gate yes} ${SEATS:+--answer-seats "$SEATS"} ${ROT:+--role-rotation "$ROT"} --hosted-billing "$HB"');
+    expect(sb3).toContain('HB=$(jq -c .hostedBilling "$FROM")');
+    expect(sb3.join('\n')).toContain('[ "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" = "$AV" ] && cmp -s "$S/native-plan.before.json" "$ONP"');
+    expect(scriptOf('SB9').lines.join('\n')).toContain('[ "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" = "$AV" ]');
+    expect(scriptOf('SB9').lines.join('\n')).toContain('PREVIEW_REGISTER_BASE_NOT_ACTIVE');
+    expect(scriptOf('DR5').lines.join('\n')).toContain('[ "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" = "$(cat "$S/active-before")" ]');
+    // REG0 still names the key and guards that nothing was published meanwhile.
+    expect(scriptOf('SB9').lines.join('\n')).toContain('the newest register is not $REG0');
+  });
+
+  it('SB13 and DR6 stop when settings were activated since SB3, before the switch (ruling R70)', () => {
+    for (const step of ['SB13', 'DR6']) {
+      const lines = scriptOf(step).lines;
+      const read = lines.findIndex(line => line.startsWith('AVN=$(activev) || '));
+      const guard = lines.findIndex(line => line.startsWith('[ "$AVN" = "$(cat "$S/active-before")" ] && [ "$AVN" = "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" ] || '));
+      const sw = lines.findIndex(line => line.includes('lc release-switch.mjs switch --to "$LABEL" --from "$OLABEL"'));
+      expect(read, step).toBeGreaterThan(-1);
+      expect(guard, step).toBe(read + 1);
+      expect(lines[guard], step).toContain(`${step}_NOT_DONE: settings were activated since SB3`);
+      expect(sw, step).toBeGreaterThan(guard);
+    }
+    expect(section.replace(/\s+/g, ' ')).toContain('Never activate while an upload is between its SB3 and its SB13');
+  });
+
+  it('final fix wave S7: the drained path reads the active version before DR2 starts the downtime; DR6\'s guard names the downtime and rbD-B', () => {
+    const dr2 = scriptOf('DR2').lines;
+    const read = dr2.findIndex(line => line.startsWith('AVN=$(activev) || '));
+    const guard = dr2.findIndex(line => line.startsWith('[ "$AVN" = "$(cat "$S/active-before")" ] && [ "$AVN" = "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" ] || '));
+    const downtime = dr2.findIndex(line => line.startsWith('date -u +%s >> "$S/downtime-start-epoch"'));
+    expect(read).toBeGreaterThan(-1);
+    expect(guard).toBe(read + 1);
+    expect(guard).toBeLessThan(downtime);
+    expect(dr2[guard]).toContain('DR2_NOT_DONE: settings were activated since SB3 (active $AVN; nothing was stopped)');
+    const dr6 = scriptOf('DR6').lines;
+    const dr6Guard = dr6.find(line => line.startsWith('[ "$AVN" = "$(cat "$S/active-before")" ] && '))!;
+    expect(dr6Guard).toContain('the site is DOWN since DR2');
+    expect(dr6Guard).toContain('rbD-B');
+  });
+
+  it('SV1 keeps the active version\'s hosted inputs and choices; SV2 keeps the publish plan; the line-up draft never blocks a re-run', () => {
+    const sv1 = steps.find(block => stepOf(block) === 'SV1')!.lines;
+    expect(sv1).toContain('HB=$(jq -c .hostedBilling "$FROM")                         # the active version\'s hosted inputs; only perRunCeilingMicros may change');
+    expect(sv1.join('\n')).toContain('.hostedBilling | {billing,dailyCeilingMicros,askRoomReads}');
+    expect(sv1.find(line => line.startsWith('rel native-plan --operation plan --from "$FROM" '))).toContain('${DS:+--checker deepseek --deepseek-enabled-on-gate yes} ${SEATS:+--answer-seats "$SEATS"} ${ROT:+--role-rotation "$ROT"}');
+    // Final fix wave S7: each install line of SV2 carries its own SV2_NOT_DONE marker.
+    const sv2 = steps.find(block => stepOf(block) === 'SV2')!.lines;
+    const copy = sv2.find(line => line.startsWith('install -o root -g root -m 0644 "$SART/native-plan-publish.json" "$VART/native-plan-publish.json" || '));
+    expect(copy).toContain('SV2_NOT_DONE: ');
+    expect(sv2.find(line => line.startsWith('install -d -o root -g root -m 0755 "$VART" || '))).toContain('SV2_NOT_DONE: ');
+    const lineUp = blocks.find(block => block.lines.some(line => line.includes('--print-line-up')))!.lines;
+    expect(lineUp.find(line => line.includes('--print-line-up'))).toContain('> "$TMP" )');
+    expect(lineUp.at(-2)).toBe('mv "$TMP" "$SART/line-up.json"');
+  });
+
+  it('final fix wave: the guide says what F2, F7, F8, S15 and S16 changed, in plain words', () => {
+    const prose = section.replace(/\s+/g, ' ');
+    // F2d (ruling R77): re-checking the active version can only record PASS; how to recover when new debates wait.
+    const sv3 = sectionOf(guide, '### SV3. The check (the dry boot) and its verdict').replace(/\s+/g, ' ');
+    expect(sv3).toContain('Re-checking the active version can only record PASS.');
+    expect(sv3).toContain('SETTINGS_VERDICT_ACTIVE_PAIR');
+    const uploads = sectionOf(guide, '### Settings and uploads').replace(/\s+/g, ' ');
+    expect(uploads).toContain('**If new debates wait ("switching") and do not start.**');
+    expect(uploads).toContain('activate a passed version');
+    expect(prose).toContain('ADMISSION_ACTIVE_VERSION_UNAVAILABLE');
+    // F1, F2c: the page read's fallback line and the boot look's unfinished line are documented beside the alarm.
+    for (const code of ['ADMISSION_ACTIVE_VERSION_UNCHECKED', 'ADMISSION_VIEW_FALLBACK']) expect(prose).toContain(code);
+    // F7 (ruling R78): the rollback's order, in both places that describe it.
+    for (const text of [uploads, sectionOf(guide, WAY_BACK).replace(/\s+/g, ' ')]) {
+      expect(text).toContain('keeps the active version when');
+      expect(text).toContain('never a version it only checked');
+    }
+    // F8 (ruling R80): the switch's live gate check also covers the new release's own site version.
+    expect(uploads).toContain('whenever the version the switch activates differs from the active one');
+    // S15: two API processes may disagree for about a second.
+    expect(prose).toContain('for about a second after an activation two processes may disagree on the active version');
+    // S16 (ruling R28, built in this wave): the storyteller as its own story checker is refused, seats left out included.
+    expect(prose).toContain('answer-seats-storyteller-is-story-checker');
+    expect(prose).toContain('counting a seat left out as the seat it follows');
   });
 });

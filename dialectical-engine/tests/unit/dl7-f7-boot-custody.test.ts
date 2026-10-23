@@ -216,9 +216,9 @@ describe("DL7-F7 a synchronous boot decision answers to the ledger too", () => {
 
     for (const decision of [
       "throw new TypeError(\"PROVIDER_DISCOVERY_TARGETS_REQUIRED\")",
-      "parseProviderDiscoveryTargets(",
-      "assertDeploymentProviderTargets(",
-      "assertPricedProviderTargets(",
+      // Side-by-side spec §13 (S14, ruling R57): the parse and both target judgements are one decision
+      // (provider-discovery.ts), called once, inside the "provider-targets" stage.
+      "parseDeclaredProviderTargets(",
       "resolveProviderTargetCredentials(",
       "parseSupportModelTargetJson(",
       // Model scorecard A20.4 / final review I5: the picker settings refuse a hosted
@@ -244,17 +244,39 @@ describe("DL7-F7 a synchronous boot decision answers to the ledger too", () => {
 
   /**
    * Final review I5: the API's "model-scorecard" and "model-picker" stages are one exported
-   * function, `composeAskModelPicker`, and main.ts hands it the boot's OWN ledger. Its every
-   * await is a `boot.run` stage and its throwing decision a `boot.runSync` one, so the ledger
-   * sees both exactly as it did when they were written out in main.ts.
+   * function, `composeAskModelPicker`. Side-by-side spec §13 (S9): it runs inside the API's one
+   * per-version admission loader (admission-settings.ts), which main.ts hands its OWN ledger as the
+   * loader's stage; the loader hands the same stage to the picker for both its stages. Every await of
+   * the loader is a stage or inside a callback it only defines, and every await of the picker is a
+   * `boot.run` stage and its throwing decision a `boot.runSync` one, so the ledger sees all of them
+   * exactly as it did when they were written out in main.ts.
    */
-  it("runs the extracted model-picker stages under the ledger main.ts hands them", async () => {
+  it("runs the loader's stages, the extracted model-picker stages among them, under the ledger main.ts hands them", async () => {
     const main = await readFile("apps/api/src/main.ts", "utf8");
     const from = main.indexOf("const boot = installBootCustody(");
     const until = main.indexOf("boot.release()");
-    const call = main.indexOf("const modelPicker = await composeAskModelPicker({\n  boot,\n");
+    const call = main.indexOf("const siteAdmission = await loadAdmissionSettings(pool, environment.REGISTER_VERSION, admissionSite, (name, run) => boot.run(name, async () => run()));");
     expect(call).toBeGreaterThan(from);
     expect(call).toBeLessThan(until);
+    const loaderSource = await readFile("apps/api/src/admission-settings.ts", "utf8");
+    const loaderStart = loaderSource.indexOf("export async function loadAdmissionSettings(");
+    expect(loaderStart).toBeGreaterThan(-1);
+    const loaderBody = loaderSource.slice(loaderStart, loaderSource.indexOf("\n}\n", loaderStart) + 3);
+    const loaderAwaits = [...loaderBody.matchAll(/\bawait\s/gu)].map((match) => {
+      const at = match.index ?? 0;
+      // The statement an await belongs to, at the loader body's own indentation (two spaces).
+      const lines = loaderBody.slice(0, at).split("\n");
+      let first = lines.length - 1;
+      while (first > 0 && /^ {3}|^\s*$|^ {2}[).\]}]/u.test(lines[first] ?? "")) first -= 1;
+      return lines.slice(first).join("\n") + loaderBody.slice(at, loaderBody.indexOf("\n", at));
+    });
+    expect(loaderAwaits.length).toBeGreaterThan(10);
+    for (const statement of loaderAwaits) {
+      if (!/\brun\(|readers\.composeAskModelPicker\(/u.test(statement)) expect(definesACallback(statement), statement).toBe(true);
+    }
+    expect(loaderBody).toContain("const modelPicker = await readers.composeAskModelPicker({\n    boot: pickerBoot,\n");
+    expect(loaderBody).toContain("run: <T>(name: string, operation: () => Promise<T>) => run(name, operation),");
+    expect(loaderBody).toContain("runSync: <T>(name: string, decision: () => T) => run(name, decision)");
     const source = await readFile("apps/api/src/ask-model-picker.ts", "utf8");
     const start = source.indexOf("export async function composeAskModelPicker(");
     expect(start).toBeGreaterThan(-1);
@@ -274,26 +296,41 @@ describe("DL7-F7 a synchronous boot decision answers to the ledger too", () => {
 });
 
 describe("DL7-F7 every awaited boot stage runs under an owner", () => {
+  // Side-by-side spec §13 (S9): the preview's scorecard check is the admission loader's stage "preview-scorecard-conflict",
+  // which main.ts runs under its ledger (the loader's stage) before credential resolution. Executed through the loader.
   it.each(["read failure", "VALID conflict"])("cleans owned keys and pools on the actual early preview %s before credentials", async reason => {
     const source = await readFile("apps/api/src/main.ts", "utf8");
-    const start = source.indexOf("if (previewConfig !== undefined) {", source.indexOf("const declaredProviderTargets"));
-    const end = source.indexOf("const previewFetch =", start);
-    expect(start).toBeGreaterThan(-1);expect(end).toBeGreaterThan(start);
-    const AsyncFunction = Object.getPrototypeOf(async () => undefined).constructor;
-    const execute = new AsyncFunction("boot", "previewConfig", "declaredProviderTargets", "assertPreviewProviderTargets",
-      "readModelScorecard", "pool", "environment", "readEngineVersion", "TypedDomainError", "credentials",
-      source.slice(start,end)+"\ncredentials();");
+    const load = source.indexOf("const siteAdmission = await loadAdmissionSettings(pool, environment.REGISTER_VERSION, admissionSite, (name, run) => boot.run(name, async () => run()));");
+    expect(load).toBeGreaterThan(-1);
+    expect(load).toBeLessThan(source.indexOf("const providerDiscoveryTargets = boot.runSync(\"provider-credentials\""));
+    const { loadAdmissionSettings } = await import("../../apps/api/src/admission-settings.js");
+    const { parsePreviewEnvironmentConfig, parseProviderDiscoveryTargets, previewModelRow, previewTargetJsonRow } = await import("@debateai/providers");
+    const refs = ["preview:fixture-a", "preview:fixture-b"];
+    const targets = parseProviderDiscoveryTargets(JSON.stringify(refs.map((ref) => previewTargetJsonRow(ref))), refs.map((ref) => {
+      const row = previewModelRow(previewTargetJsonRow(ref).model as string)!;
+      return { providerRef: ref, maker: row.maker, adapterKind: row.adapterKind };
+    }));
+    const preview = parsePreviewEnvironmentConfig(JSON.stringify({ deployment: "v3-preview", free_model_ids: ["zai-org/GLM-5.3-Flash"],
+      requested_thinking_level: "high", budget_socket: "/run/debateai-v3-preview/glm.sock", scope_id: "fixture" }));
+    const failure = new Error("SCORECARD_READ_FAILED");
+    const later = vi.fn();
+    const readers = new Proxy({}, { get: (_target, name) => name === "readModelScorecard"
+      ? async () => { if (reason === "read failure") throw failure; return { state: "VALID" }; }
+      : name === "readPreviewLineUpPolicy" ? async () => null
+        : name === "readEngineVersion" ? async () => "stage-version"
+          : async () => { later(String(name)); return { sentinel: String(name) }; } }) as never;
+    const site = { siteVersion: 8, deploymentMode: "local", preview, declaredProviderTargets: targets, siteCostEnvelope: null,
+      billingEnabled: false, spend: null, recentRunUsage: null, prices: new Map(),
+      questionLanguage: { routeFor: async () => ({ kind: "NONE", reason: "NO_GATE" }), referenceKey: { bytes: Buffer.alloc(32) } },
+      log: () => undefined } as never;
     const boot = installBootCustody({ logger: { error: () => undefined } });
     const handle = boot.holdKek(heldKek()), ended: string[] = [];
     boot.hold({ end: async () => { ended.push("pool"); } });
-    const failure = new Error("SCORECARD_READ_FAILED"), credentials = vi.fn();
-    const read = async () => { if (reason === "read failure") throw failure;return { state: "VALID" }; };
-    class DomainError extends Error { constructor(readonly code: string,message: string){super(message);} }
     try {
-      await expect(execute(boot, {}, [], () => undefined, read, {}, { REGISTER_VERSION: "8" },
-        async () => "stage-version", DomainError, credentials)).rejects.toMatchObject(reason === "read failure"
-          ? { message: failure.message } : { code: "PREVIEW_SCORECARD_CONFLICT" });
-      expect(credentials).not.toHaveBeenCalled();
+      await expect(loadAdmissionSettings({} as never, 8, site, (name, run) => boot.run(name, async () => run()), { readers }))
+        .rejects.toMatchObject(reason === "read failure" ? { message: failure.message } : { code: "PREVIEW_SCORECARD_CONFLICT" });
+      // Nothing after the refusing stage ran (the gate terms, the rows after it).
+      expect(later.mock.calls.map(([name]) => name)).not.toContain("readPreviewBudgetGateSettings");
       expect(ended).toEqual(["pool"]);
       expect(() => kekId(handle)).toThrowError(expect.objectContaining({ code: "KEK_DESTROYED" }));
     } finally {
@@ -324,9 +361,6 @@ describe("DL7-F7 every awaited boot stage runs under an owner", () => {
       const lineEnd = source.indexOf("\n", at);
       const line = source.slice(at, lineEnd === -1 ? source.length : lineEnd).trim();
       if (/(?:boot|startup)\.run(?:Sync)?\(/u.test(statement + line)) continue;
-      // Final review I5: the model-picker stages run inside `composeAskModelPicker`, under the
-      // ledger this statement hands it (its own stages are pinned in the scan above).
-      if (source.startsWith("await composeAskModelPicker({\n  boot,\n", at)) continue;
       if (definesACallback(statement)) continue;
       unguarded.push(`${lineOf(source, at)}: ${line}`);
     }

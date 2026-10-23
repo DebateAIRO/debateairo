@@ -75,13 +75,16 @@ export async function assertRootOnlyImport(path, { sourceRoot, rootUid = 0, ceil
  * executing-entry binding, since this caller is not a release launcher): the pinned source
  * manifest, read through the launcher's reader (root-owned, hash-checked), verified as role
  * "api" against the release tree, plus the operator digest. Then each import path is root-only.
+ * `role` (side-by-side spec §13, S15): the service whose release tree it is — "api" unless the caller runs a runner
+ * release's code (settings-version.mjs, check-version's runner half), as its launcher verifies it (prepareLaunch).
  */
-export async function verifyReleaseForImport({ plan, importPaths, rootUid = 0, ceiling = '/', readArtifact = readPublicArtifact, verifyManifest = verifySourceManifest }) {
+export async function verifyReleaseForImport({ plan, importPaths, role = 'api', rootUid = 0, ceiling = '/', readArtifact = readPublicArtifact, verifyManifest = verifySourceManifest }) {
+  if (role !== 'api' && role !== 'runner') refuse('RELEASE_UNVERIFIED');
   let source;
   try {
     source = await readArtifact(plan.sourceManifest, 'source');
     if (source?.uid !== rootUid) refuse('RELEASE_UNVERIFIED');
-    await verifyManifest(source, { sourceRevision: plan.sourceRevision, sourceTree: plan.sourceTree, sourceRoot: plan.sourceRoot, role: 'api', manifestSha256: plan.sourceManifest.sha256 });
+    await verifyManifest(source, { sourceRevision: plan.sourceRevision, sourceTree: plan.sourceTree, sourceRoot: plan.sourceRoot, role, manifestSha256: plan.sourceManifest.sha256 });
     if (operatorManifestSha256(source) !== plan.operatorManifestSha256) refuse('RELEASE_UNVERIFIED');
   } catch { refuse('RELEASE_UNVERIFIED'); }
   if (!Array.isArray(importPaths) || importPaths.length < 1) refuse('RELEASE_PATH_NOT_ROOT_ONLY');

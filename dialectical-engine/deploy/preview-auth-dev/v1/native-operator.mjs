@@ -73,6 +73,40 @@ export function validateLengthGuidanceChoice(value) {
  return value;
 }
 /**
+ * The operator's optional line-up (side-by-side spec §13, addition D12, D23; owner 2026-10-22): kit v2's tenth argument and
+ * kit v3's eleventh, sealed as the previewLineUpPolicy row. Exactly the three members the env carries today
+ * (`free_model_ids`, `premium_model_ids`: lists of model-id texts; `thinking_levels`: the owner's table, or null for every AI
+ * at its default), so `check-thinking-levels.ts --print-line-up` output pastes in unchanged. Shape only here: the providers'
+ * line-up parser checks the values (reviewed ids, the maker rule, each level on its AI's menu) where the rows are built,
+ * before any row is, and its message is the refusal. Like the checker choice, only plan and publish may carry it.
+ */
+export function validateLineUpChoice(value) {
+ const plain=item=>item!==null&&typeof item==='object'&&!Array.isArray(item)&&Object.getPrototypeOf(item)===Object.prototype;
+ exactKeys(value,['free_model_ids','premium_model_ids','thinking_levels'],'PREVIEW_NATIVE_PLAN_REFUSED');
+ const roster=list=>Array.isArray(list)&&list.every(id=>typeof id==='string');
+ if(!plain(value)||!roster(value.free_model_ids)||!roster(value.premium_model_ids)||(value.thinking_levels!==null&&!plain(value.thinking_levels)))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ return value;
+}
+/**
+ * The operator's optional four answer seats (addition D23; publish-register-v2.ts PreviewAnswerSeatsChoice): kit v2's eleventh
+ * argument and kit v3's twelfth. `writer` and `checker` required, `storyteller` and `storyChecker` optional (they otherwise
+ * follow the writer and the checker), each a non-empty text, the writer never its own checker (Ruling R27b) and the
+ * storyteller never its own story checker (Ruling R28: `storyteller ?? writer` against `storyChecker ?? checker`; the
+ * release tool's --answer-seats runs this same check). Shape only here: the kit refuses a ref outside the reviewed
+ * preview refs before any row is built. One way to set the checker: a plan may not carry both `answerSeats` and
+ * `checkerChoice`. Like the checker choice, only plan and publish may carry it.
+ */
+export function validateAnswerSeatsChoice(value) {
+ if(value===null||typeof value!=='object'||Array.isArray(value)||Object.getPrototypeOf(value)!==Object.prototype)refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ exactKeys(value,['writer','checker',...['storyteller','storyChecker'].filter(key=>Object.hasOwn(value,key))],'PREVIEW_NATIVE_PLAN_REFUSED');
+ if(Object.values(value).some(ref=>typeof ref!=='string'||ref.length<1))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ // Ruling R27b (SA9 fix round 1): one AI must not check its own answer (the kit refuses it too, answer-seats-writer-is-checker).
+ if(value.writer===value.checker)refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ // Ruling R28 (final fix wave F3): nor the storyteller its own story (the kit's answer-seats-storyteller-is-story-checker).
+ if((value.storyteller??value.writer)===(value.storyChecker??value.checker))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ return value;
+}
+/**
  * Sanity bounds on the owner's hosted-preview ceilings (publish-register-v3.ts PREVIEW_HOSTED_CEILING_BOUNDS; a unit
  * test pins the two equal). They catch a typed extra digit; the ceilings themselves are always the owner's inputs.
  */
@@ -102,7 +136,9 @@ export function validateNativePlan(plan) {
  const language=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'questionLanguage');
  const lengthGuided=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'lengthGuidance');
  const hosted=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'hostedBilling');
- exactKeys(plan,[...NATIVE_PLAN_KEYS,...(chosen?['checkerChoice']:[]),...(rotation?['roleRotation']:[]),...(concurrency?['callConcurrency']:[]),...(shape?['debateShape']:[]),...(language?['questionLanguage']:[]),...(lengthGuided?['lengthGuidance']:[]),...(hosted?['hostedBilling']:[])]);
+ const lineUp=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'lineUp');
+ const seated=plan!==null&&typeof plan==='object'&&Object.hasOwn(plan,'answerSeats');
+ exactKeys(plan,[...NATIVE_PLAN_KEYS,...(chosen?['checkerChoice']:[]),...(rotation?['roleRotation']:[]),...(concurrency?['callConcurrency']:[]),...(shape?['debateShape']:[]),...(language?['questionLanguage']:[]),...(lengthGuided?['lengthGuidance']:[]),...(hosted?['hostedBilling']:[]),...(lineUp?['lineUp']:[]),...(seated?['answerSeats']:[])]);
  if(plan.schema!=='preview-auth-dev-native-plan-v1'||!['apply-and-plan','plan','publish','verify'].includes(plan.operation)
   ||!/^\/opt\/debateai-v3-preview\/releases\/auth-dev-candidate-[a-z0-9-]+$/.test(plan.sourceRoot))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  if(chosen){
@@ -125,6 +161,15 @@ export function validateNativePlan(plan) {
  if(lengthGuided){
   validateLengthGuidanceChoice(plan.lengthGuidance);
   if(!['plan','publish'].includes(plan.operation))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ }
+ // Addition D23: the line-up and the seats, shape only (the kit's parsers run before any row is built).
+ if(lineUp){
+  validateLineUpChoice(plan.lineUp);
+  if(!['plan','publish'].includes(plan.operation))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ }
+ if(seated){
+  validateAnswerSeatsChoice(plan.answerSeats);
+  if(!['plan','publish'].includes(plan.operation)||chosen)refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  }
  // Unlike the choices above, every operation may carry it: once a hosted version is the base, verify and
  // apply-and-plan compose with kit v3 too (kit v2 refuses a base with billing on).
@@ -207,12 +252,15 @@ export async function runNativeOperator(argv=process.argv.slice(2)) {
   if(plan.operation==='apply-and-plan')await db.migrate(pool);
   const base=await publisher.readSealedSnapshot(pool,plan.selectedBaseRegisterVersion);
   if(base.snapshotSha256!==plan.selectedBaseSnapshotSha256)refuse('PREVIEW_SELECTED_BASE_DRIFT');
+  // Kit v3 (side-by-side spec §13, Task S18): plan and publish compose from the ACTIVE settings version (the pointer, else
+  // the current release's site version; no release yet = the rule below). Versions sealed above it are allowed.
   // Publish kit v2: plan and publish compose from the CURRENT published version (nothing sealed above the base but this publication's own replay).
-  if(plan.operation==='plan'||plan.operation==='publish')await publisher.assertBaseIsCurrent(pool,base.registerVersion,plan.publicationId);
+  if(hosted&&(plan.operation==='plan'||plan.operation==='publish'))await publisher.assertBaseIsActive(pool,base.registerVersion,plan.publicationId);
+  else if(plan.operation==='plan'||plan.operation==='publish')await publisher.assertBaseIsCurrent(pool,base.registerVersion,plan.publicationId);
   const runtimeObservedAt=plan.approval?.runtimeObservedAt??new Date().toISOString();
   const observation={nodeVersion:process.version,pnpmVersion:source.pnpmVersion,sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,operatorSha256:plan.operatorManifestSha256,observedAt:runtimeObservedAt};
-  const rows=hosted?await publisher.buildPreviewSourceRowsV3(await register.loadBootstrapRegister(),observation,plan.hostedBilling,plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null,plan.debateShape??null,plan.questionLanguage??null,plan.lengthGuidance??null)
-   :await publisher.buildPreviewSourceRowsV2(await register.loadBootstrapRegister(),{...observation},plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null,plan.debateShape??null,plan.questionLanguage??null,plan.lengthGuidance??null);
+  const rows=hosted?await publisher.buildPreviewSourceRowsV3(await register.loadBootstrapRegister(),observation,plan.hostedBilling,plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null,plan.debateShape??null,plan.questionLanguage??null,plan.lengthGuidance??null,null,plan.lineUp??null,plan.answerSeats??null)
+   :await publisher.buildPreviewSourceRowsV2(await register.loadBootstrapRegister(),{...observation},plan.checkerChoice,plan.roleRotation,plan.callConcurrency??null,plan.debateShape??null,plan.questionLanguage??null,plan.lengthGuidance??null,null,plan.lineUp??null,plan.answerSeats??null);
   const composition={sourceRows:rows,baseRows:base.rows,baseRegisterVersion:base.registerVersion,baseSnapshotSha256:base.snapshotSha256};
   const snapshot=hosted?publisher.composePreviewSnapshotV3(composition):publisher.composePreviewSnapshotV2(composition);
   const metadata=snapshotProposal({runtimeObservedAt,source,plan,snapshot});
@@ -231,15 +279,38 @@ export async function runNativeOperator(argv=process.argv.slice(2)) {
 const PENDING_FORWARD_STEP=/^PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: \d{4}_[a-z0-9_]+\.sql(?:, \d{4}_[a-z0-9_]+\.sql){0,63}\. Verify never applies a migration; run the native operator with operation apply-and-plan first\.$/;
 /** Fixed text of publish-register-v2.ts BASE_NOT_CURRENT, which v3 re-exports (both load lazily through tsx; a unit test pins the two equal). */
 export const BASE_NOT_CURRENT_LINE='PREVIEW_REGISTER_BASE_NOT_CURRENT: a sealed register version exists above the selected base; plan again from the newest publication';
+/** Fixed text of publish-register-base.ts BASE_NOT_ACTIVE, kit v3's base refusal (side-by-side spec §13; a unit test pins the two equal). */
+export const BASE_NOT_ACTIVE_LINE='PREVIEW_REGISTER_BASE_NOT_ACTIVE: the selected base is not the active settings version; plan again from the active version';
 /** The exact refusal verify-native.ts gives a database ahead of this source with no database-ahead file pinned (side-by-side spec §5). */
 const DATABASE_AHEAD=/^PREVIEW_NATIVE_VERIFY_DATABASE_AHEAD: the database has steps this release does not know: \d{4}_[a-z0-9_]+\.sql(?:, \d{4}_[a-z0-9_]+\.sql){0,63}\. Pin the newer release's database-ahead file with prestart\.mjs accept-ahead first\.$/;
 /**
+ * Ruling R72 (side-by-side spec §13 addition, SA11 fix round 1): the kit's refusal of the operator's line-up or answer
+ * seats, printed as its code so the owner learns why a plan stopped (nothing is sealed when it stops). Whole-message
+ * matches only: the providers' and the register's line-up codes (`PREVIEW_LINE_UP_POLICY_INVALID:<member>[:list|unreviewed|duplicate]`,
+ * `maker_rule`), the thinking parser's code-shaped detail (Ruling R65: `<what>[:<model>[:<step>]]`, each part at most 64
+ * characters of the code alphabet) and the kit's `answer-seat…` rules. A thinking detail is owner-typed (a model or step
+ * name could be anything, a pasted key or socket path included), so it follows the common rule of the final fix wave S14,
+ * shared with the practice's redaction and the runner's and API's journal `code` fields: printed whole only when every
+ * part is 1-64 characters of [A-Za-z0-9_./-] and the detail is not key-shaped (an unbroken run of 24 or more letters or
+ * digits, a '//', or a vendor `sk-` prefix); otherwise the line stays opaque.
+ */
+const LINE_UP_REFUSAL=/^PREVIEW_LINE_UP_POLICY_INVALID:(?:value|members|maker_rule|kind|thinking_levels|(?:free_model_ids|premium_model_ids)(?::(?:list|unreviewed|duplicate))?)$/;
+const THINKING_REFUSAL=/^PREVIEW_THINKING_LEVELS_INVALID:(?:table|(?:model|entry|steps|level|step)(?::[A-Za-z0-9_./-]{1,64}){0,2})$/;
+const SEAT_REFUSAL=/^PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seat[a-z-]{0,48}$/;
+/** Final fix wave S14: the common key-shaped rule (24+ letters/digits in one run, a '//', a vendor `sk-` prefix). */
+const KEY_SHAPED=/[A-Za-z0-9]{24,}|\/\/|\bsk-/;
+const isChoiceRefusal=message=>typeof message==='string'&&(LINE_UP_REFUSAL.test(message)||SEAT_REFUSAL.test(message)
+ ||(THINKING_REFUSAL.test(message)&&!KEY_SHAPED.test(message.slice(message.indexOf(':')+1))));
+/**
  * Every failure stays opaque except a pending forward step (its line says to run apply-and-plan), a database ahead with
- * no pinned file (its line says to pin the newer release's database-ahead file) or a stale register base (its line says
- * to plan again).
+ * no pinned file (its line says to pin the newer release's database-ahead file), a stale register base (its line says
+ * to plan again: from the newest publication for kit v2, from the active settings version for kit v3) or a refused
+ * line-up or answer seats (its code, Ruling R72).
  */
 export function operatorRefusalLine(error){
+ if(error instanceof Error&&isChoiceRefusal(error.message))return `${error.message}\n`;
  if(error?.code==='PREVIEW_REGISTER_BASE_NOT_CURRENT'&&error.message===BASE_NOT_CURRENT_LINE)return `${error.message}\n`;
+ if(error?.code==='PREVIEW_REGISTER_BASE_NOT_ACTIVE'&&error.message===BASE_NOT_ACTIVE_LINE)return `${error.message}\n`;
  if(error?.code==='PREVIEW_NATIVE_VERIFY_DATABASE_AHEAD'&&typeof error.message==='string'&&DATABASE_AHEAD.test(error.message))return `${error.message}\n`;
  return error?.code==='PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP'&&typeof error.message==='string'&&PENDING_FORWARD_STEP.test(error.message)?`${error.message}\n`:'PREVIEW_NATIVE_OPERATION_REFUSED\n';
 }

@@ -351,7 +351,7 @@ describe("B9c · the shipped runner switches it on only with the new settings", 
     const call = source.slice(source.indexOf("const panel = await runJudgePanel({"), source.indexOf("const spendStop = Object.hasOwn(panel, \"stoppedBy\")"));
     // M2's mapping for the other stops is untouched (tests/architecture/v28-serve-decision-wiring.test.ts pins it).
     expect(call).toContain("onRunLevelSpendStop: input.onSpendStop === \"AUTHOR_ONLY\" ? \"RETURN_HEARD\" : \"RETHROW\"");
-    expect(call).toContain("leaveOutMoneyRefusedSeats: this.settings.bodyCostFallback === true");
+    expect(call).toContain("leaveOutMoneyRefusedSeats: settings.bodyCostFallback === true");
   });
 
   // Paid plans S4c (final review P3-M3): an assigned run's seats build their judges over the cheaper-model
@@ -363,7 +363,7 @@ describe("B9c · the shipped runner switches it on only with the new settings", 
     const call = source.slice(start, source.indexOf("});", start));
     // Parallel AI calls (2026-10-12): the configured makers through the debate's call lane, when the runner has one.
     expect(call).toContain("assignment: roleAssignment, configured: assignedConfigured, routeHealth,");
-    expect(call).toContain("...(this.settings.bodyCostFallback === true ? { judgeGatewayFor: bodyGatewayFor } : {})");
+    expect(call).toContain("...(settings.bodyCostFallback === true ? { judgeGatewayFor: bodyGatewayFor } : {})");
     // The factory is the one the legacy book's judges are wrapped with, over the claim-eligible makers.
     expect(source).toContain("const bodyGatewayFor = (planned: ConfiguredSeatMaker, provider: ProviderGateway): ProviderGateway =>\n      bodyCostFallbackGateway({");
   });

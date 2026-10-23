@@ -12,9 +12,14 @@
  */
 import { lstatSync, readFileSync } from "node:fs";
 import { isAbsolute } from "node:path";
-import { PREVIEW_THINKING_LEVELS_INVALID, parsePreviewProviderTestConfig, type PreviewProviderTestConfig } from "@debateai/providers";
+import {
+  composePreviewProviderTestConfig, PREVIEW_LINE_UP_POLICY_INVALID, PREVIEW_THINKING_LEVELS_INVALID, parsePreviewEnvironmentConfig,
+  parsePreviewLineUp, resolvePreviewLineUp, type PreviewLineUp, type PreviewProviderTestConfig
+} from "@debateai/providers";
 import { developmentReleaseKey, parseReleaseKey, TypedDomainError } from "@debateai/kernel";
-import { assertReleaseKeyForRegister, resolveDeploymentMode, type DeploymentMode } from "@debateai/register";
+import {
+  assertReleaseKeyForRegister, previewLineUpPolicyFromValue, previewLineUpPolicyRow, resolveDeploymentMode, type DeploymentMode
+} from "@debateai/register";
 import { redactKeyShapes } from "./practice-redaction.js";
 import type { PracticeRunnerSettings } from "./practice-runner-composition.js";
 
@@ -88,7 +93,13 @@ const REQUIRED_KEYS: readonly SettingsKey[] = Object.freeze([
 
 export type PracticeSettings = Readonly<{
   runner: PracticeRunnerSettings;
-  previewConfig: PreviewProviderTestConfig;
+  /**
+   * Addition D14-D16 (owner 2026-10-22): the preview configuration the practice's rosters and thinking table are read
+   * from. As the settings file gives it: the env line-up's composition for the two old forms (today's config, byte for
+   * byte), null for the sockets-only form (the line-up then lives in the settings version, or in `--line-up <file>`).
+   * practiceSettingsWithLineUp fills it before any roster is read; a debate composes it again from the version it runs on.
+   */
+  previewConfig: PreviewProviderTestConfig | null;
   strangerSampleRate: number;
   batteryVersion: string;
   settlementWatchHandle: string;
@@ -187,8 +198,17 @@ export function parsePracticeSettings(text: string, context?: Readonly<{ sourceR
     if (!Number.isSafeInteger(parsed) || parsed < minimum) throw new PracticeRefusal("PRACTICE_SETTINGS_VALUE_INVALID", key);
     return parsed;
   };
-  let previewConfig: PreviewProviderTestConfig | undefined;
-  try { previewConfig = parsePreviewProviderTestConfig(get("PREVIEW_PROVIDER_TEST_CONFIG_JSON")); } catch (error) {
+  let previewConfig: PreviewProviderTestConfig | null;
+  // Addition D14-D16: the runner's two preview keys, exactly as the runner's environment parses the same value (its gate
+  // part and its line-up), and the config the old forms carry composed from them (composePreviewProviderTestConfig is
+  // built by today's validator, so it is today's parse byte for byte); the sockets-only form (R25: the T+1 env) carries no
+  // line-up, so no config yet. One try, so any refusal of the value is a PracticeRefusal, never a raw error.
+  let previewEnvironment: ReturnType<typeof parsePreviewEnvironmentConfig>;
+  try {
+    previewEnvironment = parsePreviewEnvironmentConfig(get("PREVIEW_PROVIDER_TEST_CONFIG_JSON"));
+    previewConfig = previewEnvironment === undefined || previewEnvironment.envLineUp === null ? null
+      : composePreviewProviderTestConfig(previewEnvironment.gate, previewEnvironment.envLineUp);
+  } catch (error) {
     // Spec 2026-10-12 §4.2: the parser's own code is kept, and a bad table's detail with it, so a practice on a bad table
     // says why. The detail can repeat an unreviewed table key or step word verbatim, and the key-shape screen above skips
     // the long-run rules, so every key shape (a bare long token too) is blanked before it is shown.
@@ -197,7 +217,8 @@ export function parsePracticeSettings(text: string, context?: Readonly<{ sourceR
       : "PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID";
     throw new PracticeRefusal("PRACTICE_SETTINGS_VALUE_INVALID", `PREVIEW_PROVIDER_TEST_CONFIG_JSON: ${parserSays}`);
   }
-  if (previewConfig === undefined || previewConfig.anthropic_budget_socket === undefined) {
+  // R25: preview presence is the gate part's (a sockets-only value has no config, and is still the preview's).
+  if (previewEnvironment === undefined || previewEnvironment.gate.anthropic_budget_socket === undefined) {
     throw new PracticeRefusal("PRACTICE_SETTINGS_VALUE_INVALID", "PREVIEW_PROVIDER_TEST_CONFIG_JSON names no Anthropic gate");
   }
   // The preview declares no credential: a target with an inline header or a credential file is refused.
@@ -227,7 +248,8 @@ export function parsePracticeSettings(text: string, context?: Readonly<{ sourceR
   const runner: PracticeRunnerSettings = Object.freeze({
     REGISTER_VERSION: registerVersion,
     RELEASE_KEY: practiceReleaseKey(values.get("RELEASE_KEY"), registerVersion, mode, context?.sourceRevision),
-    PREVIEW_PROVIDER_TEST_CONFIG: previewConfig,
+    PREVIEW_GATE_SETTINGS: previewEnvironment.gate,
+    PREVIEW_ENV_LINE_UP: previewEnvironment.envLineUp,
     PROVIDER_DISCOVERY_TARGETS_JSON: get("PROVIDER_DISCOVERY_TARGETS_JSON"),
     DEPLOYMENT_MODE: mode,
     NODE_ENV: nodeEnv as PracticeRunnerSettings["NODE_ENV"],
@@ -255,6 +277,97 @@ export function readPracticeSettings(path: string, sourceRevision: string | null
   let text: string;
   try { text = readFileSync(path, "utf8"); } catch { throw new PracticeRefusal("PRACTICE_SETTINGS_UNREADABLE"); }
   return parsePracticeSettings(text, { sourceRevision });
+}
+
+/* ---------------------------------------------- the line-up (side-by-side spec §13, addition D14-D16, D23; owner 2026-10-22) */
+
+/** The source ref of the line-up row the practice adds to its own throwaway version: no reader can mistake it for a live one. */
+export const PRACTICE_LINE_UP_SOURCE_REF = "preview practice: --line-up, this throwaway register only" as const;
+/** The modes that read the settings, and so a line-up; `report` and `rescore` read neither. */
+const LINE_UP_MODES: ReadonlySet<string> = new Set(["formats", "debate", "openings", "language", "judge-order"]);
+const LINE_UP_PARSER_CODES = Object.freeze([PREVIEW_LINE_UP_POLICY_INVALID, PREVIEW_THINKING_LEVELS_INVALID] as const);
+
+/**
+ * The text of a `--line-up` file, checked. It holds what `check-thinking-levels.ts --print-line-up` prints (the kit's plan
+ * member `{"lineUp":{…}}`, exactly that one key) or the bare line-up (`free_model_ids`, `premium_model_ids`,
+ * `thinking_levels`), as the release tool's own `--line-up` reads it (deploy/preview-release/v1/release-artifacts.mjs).
+ * Checked by the providers' line-up parser (parsePreviewLineUp: reviewed ids, each once, the two-maker rule, each level on
+ * its AI's menu) and then by the row's own reader over the row the practice would seal (previewLineUpPolicyFromValue over
+ * previewLineUpPolicyRow), so the throwaway version never carries a row the runner and the ask would refuse. A refusal is
+ * PRACTICE_LINE_UP_INVALID with the parser's own code and detail (member names, model ids, level words, every key shape
+ * blanked as the settings' table refusal blanks it), or "$" for a text that is not JSON.
+ */
+export function parsePracticeLineUpText(text: string): PreviewLineUp {
+  let value: unknown;
+  try { value = JSON.parse(text); } catch { throw new PracticeRefusal("PRACTICE_LINE_UP_INVALID", "$"); }
+  const member = typeof value === "object" && value !== null && !Array.isArray(value) && Object.keys(value).length === 1
+    && Object.hasOwn(value, "lineUp") ? (value as { lineUp: unknown }).lineUp : value;
+  try {
+    const lineUp = parsePreviewLineUp(member);
+    previewLineUpPolicyFromValue(JSON.parse(previewLineUpPolicyRow(lineUp, PRACTICE_LINE_UP_SOURCE_REF).valueJsonText));
+    return lineUp;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (!LINE_UP_PARSER_CODES.some((code) => message.startsWith(`${code}:`))) throw new PracticeRefusal("PRACTICE_LINE_UP_INVALID", "$");
+    throw new PracticeRefusal("PRACTICE_LINE_UP_INVALID", redactKeyShapes(message).slice(0, 200));
+  }
+}
+
+/**
+ * `--line-up <file>` (addition D23; S plan Q-S1, the owner's optional trial before an activation): null when absent; refused
+ * in `report` mode (it reads no settings); read and checked here, before any socket, settings file or gate is touched, so
+ * a refused line-up never starts a paid run. In a debate it goes into the practice's own throwaway version beside
+ * `--shape-policy`, `--length-policy` and `--engine-policy` (or into the code's next version with `--register-next`); in the
+ * modes that run no settings version (formats, openings, language, judge-order) it is the line-up they ask with.
+ */
+export function practiceLineUpFromArgs(mode: string, flags: ReadonlyMap<string, string>,
+  read: (path: string) => string = (path) => readFileSync(path, "utf8")): PreviewLineUp | null {
+  const path = flags.get("--line-up");
+  if (path === undefined) return null;
+  if (!LINE_UP_MODES.has(mode)) throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", `--line-up (not read by ${mode})`);
+  let text: string;
+  try { text = read(path); } catch { throw new PracticeRefusal("PRACTICE_LINE_UP_UNREADABLE"); }
+  return parsePracticeLineUpText(text);
+}
+
+/** Settings whose preview configuration is composed: what every roster read and every call policy of a practice reads. */
+export type PracticeLinedSettings = PracticeSettings & Readonly<{ previewConfig: PreviewProviderTestConfig }>;
+
+/** What the two refusals of the resolution mean for the operator (content-free). */
+const LINE_UP_REFUSAL_DETAILS: Readonly<Record<string, string>> = Object.freeze({
+  PREVIEW_LINE_UP_REQUIRED: "the settings carry only the gate part and the settings version carries no line-up: give --line-up <file>",
+  PREVIEW_LINE_UP_ENV_CONFLICT: "the settings version carries the line-up and the settings still carry rosters or a table (the live boot "
+    + "refuses this too): export the gate part alone, or try a line-up with --line-up <file>"
+});
+
+/**
+ * Addition D14-D16 (owner 2026-10-22): the practice's preview configuration, by THE ONE resolution rule the runner's and
+ * the API's loaders use (resolvePreviewLineUp, ruling R17), for the version the practice runs on (its own site version):
+ * `row` present → its composition over the settings' gate part; absent → the settings' env line-up (the two old forms:
+ * today's config); absent with a sockets-only settings file → PREVIEW_LINE_UP_REQUIRED; a row beside an env line-up →
+ * PREVIEW_LINE_UP_ENV_CONFLICT (D15), both as PracticeRefusals with their own codes. `trial` (the row is a `--line-up`
+ * file's): the env's line-up is set aside in the runner settings too, so the practice runs the trial exactly as a release
+ * whose site version carries the row runs it (D15: a sockets-only env), and the runner's and the ask's loaders compose
+ * the same row. Pure; the result is frozen.
+ */
+export function practiceSettingsWithLineUp(settings: PracticeSettings, row: PreviewLineUp | null,
+  options: Readonly<{ trial: boolean }>): PracticeLinedSettings {
+  const runner: PracticeRunnerSettings = options.trial ? Object.freeze({ ...settings.runner, PREVIEW_ENV_LINE_UP: null }) : settings.runner;
+  let previewConfig: PreviewProviderTestConfig | undefined;
+  try {
+    previewConfig = resolvePreviewLineUp({ preview: { gate: runner.PREVIEW_GATE_SETTINGS, envLineUp: runner.PREVIEW_ENV_LINE_UP },
+      row, isSiteVersion: true });
+  } catch (error) {
+    if (error instanceof TypedDomainError) throw new PracticeRefusal(error.code, LINE_UP_REFUSAL_DETAILS[error.code]);
+    // composePreviewProviderTestConfig: a roster model whose gate has no socket in these settings (today's rule).
+    if (error instanceof TypeError && error.message === "PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID") {
+      throw new PracticeRefusal("PRACTICE_LINE_UP_INVALID", error.message);
+    }
+    throw error;
+  }
+  // With the gate part given the rule always composes (undefined is only "no preview at all").
+  if (previewConfig === undefined) throw new PracticeRefusal("PRACTICE_LINE_UP_INVALID", "no preview configuration");
+  return Object.freeze({ ...settings, runner, previewConfig });
 }
 
 export type PracticeGateStatus = Readonly<{

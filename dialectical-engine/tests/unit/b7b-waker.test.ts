@@ -323,6 +323,45 @@ describe("B7b one tick of the waiting line (budget spec §2.7)", () => {
     expect(reads.filter((read) => read.after === null).map((read) => read.everyPerson)).toEqual([true, true, false]);
   });
 
+  it("side-by-side §13 (S13): after the reader observes a new active version, the next tick sweeps every person once", async () => {
+    // The pointer as each tick's first read sees it: 17, 17, then an activation of 18 (read twice), then 18 again.
+    const answers = [17, 17, 18, 18];
+    const pointer = vi.fn(async () => answers.length > 1 ? answers.shift()! : answers[0]!);
+    const a = waitingRun({ legacyAskerId: "legacy:a" });
+    const { application, reads } = arrange({
+      pages: [[a]], extra: { admissionSettings: { activeSettingsVersion: pointer, admissionSettingsFor: async () => { throw new Error("unused"); } } }
+    });
+    for (let tick = 0; tick < 5; tick += 1) await application.wakeWaitingRuns();
+    expect(reads.filter((read) => read.after === null).map((read) => read.everyPerson)).toEqual([true, false, true, false, false]);
+    expect(pointer).toHaveBeenCalledTimes(5);
+  });
+
+  it("side-by-side §13 (S13): a full sweep cut short by the site's day is owed again after a new version too; a failed read changes nothing", async () => {
+    const answers: Array<number | Error> = [17, 18, 18, new Error("test: the pointer read failed")];
+    const pointer = vi.fn(async () => {
+      const next = answers.length > 1 ? answers.shift()! : answers[0]!;
+      if (next instanceof Error) throw next;
+      return next;
+    });
+    const a = waitingRun({ legacyAskerId: "legacy:a" });
+    const b = waitingRun({ legacyAskerId: "legacy:b" });
+    const { application, reads, setPages } = arrange({
+      pages: [[a]], outcomes: { [b.runId]: "SITE_FULL" },
+      extra: { admissionSettings: { activeSettingsVersion: pointer, admissionSettingsFor: async () => { throw new Error("unused"); } } }
+    });
+    // 17: the first tick sweeps every person and gets through the whole line.
+    await application.wakeWaitingRuns();
+    // 18 observed: this tick sweeps every person again, but the site's day stops it, so the sweep is still owed.
+    setPages([[b]]);
+    await application.wakeWaitingRuns();
+    // 18 again (no change): the owed sweep runs and completes; then the read fails, which changes nothing: only those due.
+    setPages([[a]]);
+    await application.wakeWaitingRuns();
+    await application.wakeWaitingRuns();
+    expect(reads.filter((read) => read.after === null).map((read) => read.everyPerson)).toEqual([true, true, true, false]);
+    expect(pointer).toHaveBeenCalledTimes(4);
+  });
+
   it("does nothing, and logs nothing, with an empty line", async () => {
     const { application, lines } = arrange({ pages: [] });
     await expect(application.wakeWaitingRuns()).resolves.toEqual({ waiting: 0, started: 0, skipped: 0, failed: 0, stopped: false, redispatched: 0 });
@@ -438,6 +477,52 @@ describe("side-by-side C11: the waker re-admits a run another release admitted",
     expect(recorded).toEqual([readmissionFailure("orphan-1")]);
     expect(dispatched).toEqual([`new:${a.runId}`]);
     expect(lines()).toContainEqual({ event: "api.wait.readmission_orphan", runId: a.runId, newRunId: "orphan-1" });
+  });
+
+  it("side-by-side §13 (S10): a re-admission is planned and stamped on one version read through the per-version path", async () => {
+    // S10/S13 boundary: the plan's evaluation, the new row's register version and its memory question's policy version all
+    // come from the settings `askSettingsOf` hands it (here the pointer names 2 over the site version 1); S13 owns the
+    // re-admission condition and the pointer read on the START transaction.
+    const a = waitingRun({ legacyAskerId: "legacy:a" }, { releaseKey: OLD_RELEASE });
+    const pointer = vi.fn(async () => 2);
+    const versionTwo: Pick<RunCreationSettings, "registerVersion" | "resolveEnvelopeBasis" | "resolveRisk"> = {
+      registerVersion: 2,
+      resolveEnvelopeBasis: async ({ panelSize }) => ({ ...fixtureStructuralCeiling(12, panelSize, 1), version_mark: 2 }),
+      resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) =>
+        ({ effectiveRiskTier, tierSource: tierSource as never, tierProvenanceRef: `${tierProvenanceRef}:v2` })
+    };
+    const { application, dispatched, readmissions } = arrange({
+      pages: [[a]], steps: { [a.runId]: ["NEEDS_READMISSION", { startAs: "unused" }] },
+      extra: { ...readmittable(), admissionSettings: { activeSettingsVersion: pointer, admissionSettingsFor: async () => versionTwo } },
+      stored: (runId) => storedAsk(runId)
+    });
+    await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ started: 1, failed: 0 });
+    expect(dispatched).toEqual([`new:${a.runId}`]);
+    // S11: the START is told the version the new run is stamped with, so it re-checks that this release passed it.
+    expect(readmissions.map((readmission) => readmission?.registerVersion)).toEqual([undefined, 2]);
+    const row = vi.mocked(RunRepository.prototype.startReadmittedRun).mock.calls[0]![0];
+    expect(row).toMatchObject({ fromRunId: a.runId, registerVersion: 2, tierProvenanceRef: "asker:b7b:v2", releaseKey: TEST_RELEASE_KEY });
+    expect(row.envelopeBasis).toMatchObject({ version_mark: 2 });
+    expect(vi.mocked(ServeRepository.prototype.recordMemoryQuestion).mock.calls[0]![0]).toMatchObject({ policyVersion: 2 });
+    // One read for the plan (the per-version path), and S13's one read as the tick begins (does it sweep every person?).
+    expect(pointer).toHaveBeenCalledTimes(2);
+  });
+
+  it("side-by-side §13 (S11, ruling R47): a version this API cannot load re-admits nothing; the run keeps its place", async () => {
+    const a = waitingRun({ legacyAskerId: "legacy:a" }, { releaseKey: OLD_RELEASE });
+    const { application, tried, dispatched, recorded, lines } = arrange({
+      pages: [[a]], steps: { [a.runId]: ["NEEDS_READMISSION", { startAs: "unused" }] },
+      extra: { ...readmittable(), admissionSettings: { activeSettingsVersion: async () => 2, admissionSettingsFor: async () => {
+        throw new TypedDomainError("PREVIEW_LINE_UP_REQUIRED", "PREVIEW_LINE_UP_REQUIRED");
+      } } },
+      stored: (runId) => storedAsk(runId)
+    });
+    await expect(application.wakeWaitingRuns()).resolves.toEqual({ waiting: 1, started: 0, skipped: 1, failed: 0, stopped: false, redispatched: 0 });
+    expect(tried).toEqual([a.runId]);
+    expect(dispatched).toEqual([]);
+    expect(recorded).toEqual([]);
+    expect(lines()).toContainEqual({ kind: "DEBATEAI_ADMISSION_SETTINGS", code: "ADMISSION_SETTINGS_UNSUPPORTED", version: 2, cause: "PREVIEW_LINE_UP_REQUIRED" });
+    expect(lines()).toContainEqual({ event: "api.wait.readmission_not_now", runId: a.runId, code: "ADMISSION_SETTINGS_UNSUPPORTED" });
   });
 
   it("a START that committed is never recorded FAILED when the lease's release then fails: its job is handed over later", async () => {

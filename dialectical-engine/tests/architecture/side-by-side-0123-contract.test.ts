@@ -28,8 +28,8 @@ const shape = (value: unknown): unknown => typeof value === "object" && value !=
   : typeof value;
 
 describe("0123: the side-by-side releases step", () => {
-  it("is appended last to the chain's STEPS, after the engine's map answer step", () => {
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0122,loadForward0123]");
+  it("is appended to the chain's STEPS after the engine's map answer step (the settings activation 0124 follows it)", () => {
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0122,loadForward0123,loadForward0124]");
     const loader = read("packages/db/src/migration-forward0123.ts");
     expect(loader).toContain("const NAME='0123_side_by_side_releases.sql';");
     expect(loader).toContain("const VERSION='side-by-side-releases-forward0123-v1';");
@@ -401,14 +401,15 @@ describe("0123: the side-by-side releases step", () => {
     const readme = read("migrations/lineage/README.md");
     expect(readme).toContain("## Side-by-side releases (0123)");
     expect(readme.replace(/\s+/gu, " ")).toContain(
-      "the engine's map answer step (0122, below) the twelfth and the side-by-side releases (0123, below) the thirteenth");
+      "the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth");
   });
 
-  it("is the plan's last step, with no supplemental verifier", async () => {
+  it("is the plan's step after 0122 and before 0124 (the settings activation), with no supplemental verifier", async () => {
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.at(-1)?.name).toBe("0123_side_by_side_releases.sql");
-    expect(plan.forwardChain.at(-2)?.name).toBe("0122_engine_map_check.sql");
-    expect(plan.forwardChain.at(-1)?.replayVerifierSql).toBeUndefined();
-    expect(plan.forwardChain.at(-1)?.verifierPath).toBe("lineage/verify-effective-capabilities-111.sql");
+    expect(plan.forwardChain.at(-2)?.name).toBe("0123_side_by_side_releases.sql");
+    expect(plan.forwardChain.at(-3)?.name).toBe("0122_engine_map_check.sql");
+    expect(plan.forwardChain.at(-1)?.name).toBe("0124_settings_activation.sql");
+    expect(plan.forwardChain.at(-2)?.replayVerifierSql).toBeUndefined();
+    expect(plan.forwardChain.at(-2)?.verifierPath).toBe("lineage/verify-effective-capabilities-111.sql");
   });
 });

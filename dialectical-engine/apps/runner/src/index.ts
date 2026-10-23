@@ -70,7 +70,8 @@ import {
   resolveScoringOperator,
   type AdaptiveStoppingControls,
   type EngineSettings,
-  type LengthGuidance
+  type LengthGuidance,
+  type StoryPolicy
 } from "@debateai/register";
 import {
   BudgetRepository,
@@ -275,6 +276,10 @@ import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type Ru
 import type { RunnerRetirementSignal, TaskExecutionCounter } from "./runner-retirement.js";
 import { EMPTY_REPLAY_BOOK, readReplayBook, replayingGateway, type ReplayBook } from "./run-replay.js";
 import type { RunInFlight } from "./run-in-flight.js";
+// Side-by-side spec §13 (S6): the per-version settings types (type-only: run-settings.ts imports this module) and the one
+// debate-member mapping, from its own module so this one never loads the loader.
+import type { RunnerSettingsResolution, RunSettingsVersions } from "./run-settings.js";
+import { runnerSettingsOfVersion, type RunnerDebateMembers } from "./run-debate-members.js";
 import type { DebateShapeRunnerSettings } from "./debate-shape-boot.js";
 import type { EngineRunnerSettings } from "./engine-boot.js";
 import { CALL_LANE_HELD_BACK, CALL_LANE_STOPPED, type CallScheduler, type CallSubject, type CallTicket } from "./call-scheduler.js";
@@ -2725,6 +2730,24 @@ export interface WalkingSkeletonSettings {
    */
   readonly engine?: EngineRunnerSettings | null;
   /**
+   * Side-by-side spec §13 (S5 adds them, S6 reads them): the debate's own version's story policy (null: the version
+   * sealed no story rows) and its call-lane limits (`perDebate`, `perModelPerDebate`, from its callConcurrencyPolicy
+   * row; absent: one call at a time). Both come from `runnerSettingsOfVersion` (apps/runner/src/run-debate-members.ts).
+   * S6: every story write carries `storyPolicy` and the debate's lane opens with `callLaneLimits`; absent: the story
+   * writer's own policy and the scheduler's own limits, today's runner.
+   */
+  readonly storyPolicy?: StoryPolicy | null;
+  readonly callLaneLimits?: Readonly<{ perDebate: number; perModelPerDebate: number }>;
+  /**
+   * Side-by-side spec §13 (S6), process members: the per-version resolver (main.ts and the practice runner:
+   * `(version) => runnerSettings.settingsFor(version)`, the loader's cache) and the run → version map the money seams
+   * and (addition D17) the preview's thinking table read by run id. With the resolver, each debate runs on its own
+   * stamped version's merged settings (`mergeRunnerSettings`); absent (fixtures, acceptance/main.ts, plan D7): the
+   * boot's settings, today's single-version runner.
+   */
+  readonly settingsForVersion?: (registerVersion: number) => Promise<RunnerSettingsResolution>;
+  readonly runSettingsVersions?: RunSettingsVersions;
+  /**
    * The model, vendor and preview gate each provider ref's calls use (`previewCallSubjects` on the preview,
    * `targetCallSubjects` elsewhere). Read only with `callScheduler`; absent, each ref is its own model behind no gate.
    */
@@ -4960,6 +4983,213 @@ async function runnerStage<T>(code: string, operation: () => Promise<T>): Promis
   }
 }
 
+/** What the claim-time gates read: a debate's settings (its version's members) and this process's claim time. */
+export type RunnerGatedSettings = Pick<WalkingSkeletonSettings,
+  "claimMs" | "claimMarginMs" | "judgeBound" | "composerBound" | "conformanceBound" | "synthesisRolePolicy" |
+  "runDeathPolicy" | "compositionRow" | "judgementPolicy" | "servePolicy" | "scoringOperator" | "panelPolicy" |
+  "stoppingPolicy" | "verdictLabelPolicy">;
+
+/**
+ * Side-by-side spec §13 (S6) — THE CLAIM-TIME GATES, against ONE debate's settings. The block `execute()` ran before
+ * every claim (the longest deadline against the claim, the nine family gates, J24's configured-ref check), moved here
+ * verbatim, so it runs against the debate's own merged settings (`mergeRunnerSettings`) rather than the boot's: every
+ * code, message and order is unchanged. `configuredMakerRefs` are the runner's makers' provider refs (`.length > 1` is
+ * the same multi-maker test). `execute()` calls it before the claim (Hatchet path) or right after it (`claimNext`), and
+ * the per-version loader calls it last over each version it loads (apps/runner/src/run-settings.ts), so a version that
+ * fails a gate is UNSUPPORTED at load. It returns the three settings `execute()` reads later, present.
+ */
+export function assertRunnerSettingsGates(input: Readonly<{
+  settings: RunnerGatedSettings;
+  configuredMakerRefs: readonly string[];
+}>): Readonly<{
+  compositionRow: CompositionMapRegisterRow;
+  judgementPolicy: NonNullable<WalkingSkeletonSettings["judgementPolicy"]>;
+  servePolicy: NonNullable<WalkingSkeletonSettings["servePolicy"]>;
+}> {
+  const { settings, configuredMakerRefs } = input;
+  // W10/3: the claim must cover the LONGEST call this execution can make, and
+  // since the synthesis legs now spend their own sealed bounds those two
+  // deadlines belong in the max. The composer/conformance pair STAYS: both are
+  // still declared deployment bounds, `Math.max` makes a shorter one a no-op,
+  // and dropping them would loosen the claim guard for no gain.
+  const longestDeadline = Math.max(
+    settings.judgeBound.deadlineMs,
+    settings.composerBound.deadlineMs,
+    settings.conformanceBound.deadlineMs,
+    // Optional-chained ON PURPOSE, and `0` can never raise a maximum. The
+    // ABSENT family is not this guard's to report: a caller who defeats the
+    // required type (a JavaScript caller, a cast, settings built from parsed
+    // data) must still reach the NAMED refusal below —
+    // `SYNTHESIS_ROLE_CONTROLS_UNRESOLVED`, ~80 lines on — instead of dying
+    // here on `Cannot read properties of undefined`. Measured: without this,
+    // the test that pins that runtime gate reports a raw TypeError.
+    // F2: `?.` on the POLICY alone was narrower than the case above. A policy
+    // built from parsed data can arrive PRESENT with a bound missing, and
+    // `?? 0` never saw it — the read of `.deadlineMs` died first. An
+    // unresolved bound is refused HERE, under the SAME name, before the claim
+    // and before anything is spent; `0` for an ABSENT family is unchanged, so
+    // that case still reaches the gate below.
+    //
+    // Round 2: each bound is its OWN scalar argument, never a list. A numeric
+    // ARRAY in shipped code is read by the S1-1 single-source oracle
+    // (`tests/unit/s1-1-depth-contract.test.ts`) as a candidate domain for the
+    // ruled depth ceiling, and one it cannot evaluate is conservatively a
+    // site — this expression was flagged `[DOMAIN_ENUMERATION]` when it built
+    // its arguments with `.map`. The maximum stays scalar for that reader.
+    settings.synthesisRolePolicy === undefined
+      ? 0
+      : settings.synthesisRolePolicy.synthesizerBound?.deadlineMs ?? ((): never => {
+        throw new TypedDomainError(
+          "SYNTHESIS_ROLE_CONTROLS_UNRESOLVED",
+          "T9: the sealed synthesizerBound is a T16 register row (J8); a synthesis-role policy that reached the runner without it is refused by name, never dereferenced (goal 39-40)"
+        );
+      })(),
+    settings.synthesisRolePolicy === undefined
+      ? 0
+      : settings.synthesisRolePolicy.evaluatorBound?.deadlineMs ?? ((): never => {
+        throw new TypedDomainError(
+          "SYNTHESIS_ROLE_CONTROLS_UNRESOLVED",
+          "T9: the sealed evaluatorBound is a T16 register row (J8); a synthesis-role policy that reached the runner without it is refused by name, never dereferenced (goal 39-40)"
+        );
+      })()
+  );
+  assertClaimCoversCall({
+    claimMs: settings.claimMs,
+    deadlineMs: longestDeadline,
+    marginMs: settings.claimMarginMs,
+    ...(settings.runDeathPolicy === undefined ? {} : {
+      cooldownMs: settings.runDeathPolicy.cooldownMs,
+      maxCooldownHoldsPerRun: settings.runDeathPolicy.maxCooldownHoldsPerRun
+    })
+  });
+  const compositionRow = settings.compositionRow;
+  if (compositionRow === undefined) {
+    throw new TypedDomainError(
+      "CLAIM_TYPE_COMPOSITION_MAP_UNRESOLVED",
+      "S04 requires the V-ratified claim-type composition register row"
+    );
+  }
+  const judgementPolicy = settings.judgementPolicy;
+  if (judgementPolicy === undefined) {
+    throw new TypedDomainError(
+      "JUDGEMENT_POLICY_UNRESOLVED",
+      "S04 requires V-ratified composition and judgement-selection register rows"
+    );
+  }
+  const servePolicy = settings.servePolicy;
+  if (servePolicy === undefined) {
+    throw new TypedDomainError(
+      "SERVE_POLICY_UNRESOLVED",
+      "S05 requires V-ratified composition-budget and band-ceiling register rows"
+    );
+  }
+  if (configuredMakerRefs.length > 1 && settings.scoringOperator === undefined) {
+    // FAIR-01 × DR-074: the critique leg always yields an attack arrow, and
+    // an arrow-bearing graph cannot propagate without the mandatory
+    // deployment scoringOperator row. The value is V's at DR-023 — stop
+    // loudly BEFORE any claim or model call, never invent it (AC-76/DR-039).
+    throw new TypedDomainError(
+      "SCORING_OPERATOR_UNRESOLVED",
+      "DR-074: the mandatory deployment scoringOperator register row is unruled; its value is V's at DR-023 and is never invented (AC-76/DR-039)"
+    );
+  }
+  if (configuredMakerRefs.length > 1 && settings.panelPolicy === undefined) {
+    // S2-2 × J12: a multi-maker deployment that never sealed the T16 panel rows STOPS
+    // LOUDLY, here — before the work item is claimed and before a single model call.
+    // Recording a reason and grading the node on its author's own voice is the
+    // silent-degradation shape the goal repeals; the Global DoD's "missing rows fail
+    // loudly" and the scoringOperator precedent directly above both govern.
+    throw new TypedDomainError(
+      "PANEL_WEIGHTING_UNRESOLVED",
+      "J12: a multi-maker run requires the sealed T16 panel-weighting rows (dispersion scale, repeated-family multiplier, downgrade bands, provider-family map) and the sealed disagreement threshold; they are read from the register and never invented"
+    );
+  }
+  if (configuredMakerRefs.length > 1 && settings.stoppingPolicy === undefined) {
+    // S3-2/S5-1 × J12, same shape and same place: a multi-maker run is the only
+    // run that expands, and expansion is what δ and ε govern. Running the
+    // ceiling with the stopping rule quietly absent — or with a δ/ε invented
+    // here — is the silent-degradation shape the mission repeals.
+    throw new TypedDomainError(
+      "ADAPTIVE_STOPPING_UNRESOLVED",
+      "J12: a multi-maker run requires the sealed T16 adaptive-stopping rows (globalStopDelta, branchFreezeEpsilon); they are read from the register and never invented"
+    );
+  }
+  if (settings.verdictLabelPolicy === undefined) {
+    // S6-1 / T11 x codex r1 B1: EVERY served answer carries a code-derived
+    // three-state label, so the sealed T16 verdict-label family is mandatory
+    // for every maker count — unlike J12's panel rows, which only bind at
+    // M>=2. The gate sits HERE, beside J12's, before the work item is claimed
+    // and before a single model call: a deployment that never handed the
+    // runner these rows is going to refuse anyway, and refusing after
+    // judgement and propagation bills it for a run that was always rejected.
+    //
+    // T7 merge: this gate follows the two above rather than preceding them, so
+    // each comment's "directly above"/"beside J12's" stays true. Order is not
+    // observable to either lane's landed assertion — both fixtures omit ONE
+    // policy from a helper that supplies all of them, so the other gate passes.
+    throw new TypedDomainError(
+      "VERDICT_LABEL_CONTROLS_UNRESOLVED",
+      "T11: the served answer's label reads gamma, the two cuts and the disagreement threshold from T16's sealed register rows; they are read from the register and never invented (goal 39-40)"
+    );
+  }
+  if (settings.synthesisRolePolicy === undefined) {
+    // S6-2 / T9 x J12 x board F33: EVERY served statement is written by the
+    // synthesizer and graded by the evaluator, both of them NAMED provider
+    // roles whose refs and loop bound are sealed T16 rows. So this family
+    // binds at every maker count, and its gate sits HERE beside the other
+    // two: refusing after judgement and propagation would bill the asker for
+    // a run that could never have served an answer.
+    throw new TypedDomainError(
+      "SYNTHESIS_ROLE_CONTROLS_UNRESOLVED",
+      "T9: the synthesizer and evaluator role refs and the evaluator loop bound are sealed T16 register rows (J8); they are read from the register and never invented (goal 39-40)"
+    );
+  }
+  // J24 discriminator (2) — the family being PRESENT is not the same as its
+  // refs being RESOLVABLE. A sealed ref naming a provider this deployment
+  // never configured can be refused before the work item is claimed, because
+  // it needs no health information at all. Refusing here spends nothing.
+  for (const role of SYNTHESIS_ROLES) {
+    const roleRef = role === "SYNTHESIZER"
+      ? settings.synthesisRolePolicy.synthesizerRoleRef
+      : settings.synthesisRolePolicy.evaluatorRoleRef;
+    if (!configuredMakerRefs.some((providerRef) => providerRef === roleRef)) {
+      throw new TypedDomainError(
+        "SYNTHESIS_ROLE_PROVIDER_UNRESOLVED",
+        `J24: the sealed ${role} role ref ${roleRef} (register version ${String(settings.synthesisRolePolicy.registerVersion)}) names no configured provider on this deployment; a sealed identity is never substituted`
+      );
+    }
+  }
+  return Object.freeze({ compositionRow, judgementPolicy, servePolicy });
+}
+
+/**
+ * Side-by-side spec §13 (S6) — ONE DEBATE'S SETTINGS: the runner's process settings with exactly the debate members
+ * replaced by its version's (`runnerSettingsOfVersion`, apps/runner/src/run-debate-members.ts). Every process member (the
+ * worker, the claim times, the makers, the scheduler, the story writer, the probes, the money seams, the retirement
+ * signal, the version resolver and the run map) is kept as is. Pure; the result is frozen.
+ */
+export function mergeRunnerSettings(process: WalkingSkeletonSettings, debate: RunnerDebateMembers): WalkingSkeletonSettings {
+  const merged: Record<string, unknown> = { ...process };
+  for (const member of Object.keys(RUNNER_DEBATE_MEMBERS)) {
+    merged[member] = (debate as Readonly<Record<string, unknown>>)[member];
+  }
+  return Object.freeze(merged as unknown as WalkingSkeletonSettings);
+}
+
+/** Every debate member, written once (the type refuses a missing or an extra one). */
+const RUNNER_DEBATE_MEMBERS: Readonly<Record<keyof RunnerDebateMembers, true>> = Object.freeze({
+  judgeBound: true, composerBound: true, conformanceBound: true, judgeContractHash: true, composerContractHash: true,
+  conformanceContractHash: true, propagationContractHash: true, serveContractHash: true, factBundleVersion: true,
+  compositionRow: true, servePolicy: true, judgementPolicy: true, scoringOperator: true, runDeathPolicy: true,
+  hiddenNodeScoreThreshold: true, verdictLabelPolicy: true, panelPolicy: true, stoppingPolicy: true,
+  synthesisRolePolicy: true, debateShape: true, engine: true, storyPolicy: true, callLaneLimits: true
+});
+
+/** Side-by-side spec §13 (S6): one debate's resolved settings version, as `execute()` runs it. */
+type RunVersionResolution =
+  | Readonly<{ kind: "SETTINGS"; version: number; settings: WalkingSkeletonSettings }>
+  | Readonly<{ kind: "UNSUPPORTED"; version: number; code: string }>;
+
 export class WalkingSkeletonRunner {
   readonly #runs: RunRepository;
   readonly #work: WorkItemRepository;
@@ -5151,7 +5381,11 @@ export class WalkingSkeletonRunner {
    * propagation reads the graph through the SAME door; two doors would let the
    * rounds and the served answer disagree about what the graph is.
    */
-  async #resolveOperatorResolvedSnapshot(runId: string): Promise<{
+  async #resolveOperatorResolvedSnapshot(
+    runId: string,
+    // Side-by-side spec §13 (S6): the debate's own version's row, handed in by both callers (never the boot's).
+    scoringRegisterRow: ScoringOperatorRegisterInput | undefined
+  ): Promise<{
     readonly materialised: EvaluationSnapshot;
     readonly snapshot: EvaluationSnapshot;
   }> {
@@ -5162,7 +5396,6 @@ export class WalkingSkeletonRunner {
     if (arrowTargetNodeIds.length === 0) {
       return Object.freeze({ materialised, snapshot: materialised });
     }
-    const scoringRegisterRow = this.settings.scoringOperator;
     if (scoringRegisterRow === undefined) {
       throw new TypedDomainError(
         "SCORING_OPERATOR_UNRESOLVED",
@@ -5187,6 +5420,69 @@ export class WalkingSkeletonRunner {
     });
   }
 
+  /**
+   * Side-by-side spec §13 (S6): one merged settings object per settings version (`mergeRunnerSettings` over the
+   * version's debate members), kept for the life of this runner: a sealed version never changes. Only a version the
+   * resolver answered with SETTINGS is kept here; its own cache keeps the refusals (UNSUPPORTED) and never a database
+   * failure (ruling R31).
+   */
+  readonly #versionSettings = new Map<number, WalkingSkeletonSettings>();
+
+  /** Side-by-side spec §13 (S6): one version's resolution, as this debate runs it. */
+  async #runSettingsFor(
+    version: number,
+    settingsForVersion: NonNullable<WalkingSkeletonSettings["settingsForVersion"]>
+  ): Promise<RunVersionResolution> {
+    const known = this.#versionSettings.get(version);
+    if (known !== undefined) return Object.freeze({ kind: "SETTINGS" as const, version, settings: known });
+    const resolved = await settingsForVersion(version);
+    if (resolved.kind === "UNSUPPORTED") return Object.freeze({ kind: "UNSUPPORTED" as const, version, code: resolved.code });
+    // Two first debates of one version may both get here: the first merged object stays, so both share it.
+    const merged = this.#versionSettings.get(version)
+      ?? mergeRunnerSettings(this.settings, runnerSettingsOfVersion(resolved.version));
+    this.#versionSettings.set(version, merged);
+    return Object.freeze({ kind: "SETTINGS" as const, version, settings: merged });
+  }
+
+  /**
+   * Side-by-side spec §13 (S6, plan D2): the Hatchet path's version, read BEFORE the claim by the work item id. Null for
+   * no such item or run, or a run of another release (the fenced claim refuses it). Ruling R37: a resolver that rejects
+   * untyped (a database blip; its cache keeps nothing) leaves the item READY and unclaimed, prints one content-free line
+   * and lets the error reach the task (Hatchet retries); no claim the runner could only fail.
+   */
+  async #peekRunVersion(
+    workItemId: string,
+    settingsForVersion: NonNullable<WalkingSkeletonSettings["settingsForVersion"]>
+  ): Promise<RunVersionResolution | null> {
+    const peeked = await this.#work.peekRunSettingsVersion(workItemId);
+    if (peeked === null || peeked.releaseKey !== this.#releaseKey) return null;
+    try {
+      return await this.#runSettingsFor(peeked.registerVersion, settingsForVersion);
+    } catch (error) {
+      console.warn(JSON.stringify({
+        kind: "DEBATEAI_RUNNER_CLAIM", event: "RUN_SETTINGS_UNREADABLE", workItemId,
+        version: String(peeked.registerVersion), code: error instanceof TypedDomainError ? error.code : "UNTYPED"
+      }));
+      throw error;
+    }
+  }
+
+  /**
+   * Side-by-side spec §13 (S6, plan D2): the `claimNext` path (only `executeNext`, the acceptance ceremony) cannot know
+   * its run before claiming, so it claims with this process's worker and claim time, then reads the run's version.
+   */
+  async #claimNextThenResolveVersion(
+    settingsForVersion: NonNullable<WalkingSkeletonSettings["settingsForVersion"]>
+  ): Promise<Readonly<{
+    claimed: Awaited<ReturnType<WorkItemRepository["claimNext"]>>;
+    resolution: RunVersionResolution | null;
+  }>> {
+    const claimed = await this.#work.claimNext({ workerId: this.settings.workerId, claimSeconds: this.settings.claimMs / 1000 });
+    if (claimed === null || claimed.runId === null) return Object.freeze({ claimed, resolution: null });
+    const version = await this.#runs.readRunRegisterVersion(claimed.runId);
+    return Object.freeze({ claimed, resolution: await this.#runSettingsFor(version, settingsForVersion) });
+  }
+
   private async execute(workItemId?: string, task?: RunnerTaskControl): Promise<RunnerExecutionResult> {
     // Side-by-side spec §4 (D1): a retiring release stops claiming. The very first check, so nothing of this release
     // touches the item: no release read, no claim, no probe, no call. It is left as is for this release's backstop,
@@ -5208,165 +5504,97 @@ export class WalkingSkeletonRunner {
         return { kind: "NO_WORK" };
       }
     }
-    // W10/3: the claim must cover the LONGEST call this execution can make, and
-    // since the synthesis legs now spend their own sealed bounds those two
-    // deadlines belong in the max. The composer/conformance pair STAYS: both are
-    // still declared deployment bounds, `Math.max` makes a shorter one a no-op,
-    // and dropping them would loosen the claim guard for no gain.
-    const longestDeadline = Math.max(
-      this.settings.judgeBound.deadlineMs,
-      this.settings.composerBound.deadlineMs,
-      this.settings.conformanceBound.deadlineMs,
-      // Optional-chained ON PURPOSE, and `0` can never raise a maximum. The
-      // ABSENT family is not this guard's to report: a caller who defeats the
-      // required type (a JavaScript caller, a cast, settings built from parsed
-      // data) must still reach the NAMED refusal below —
-      // `SYNTHESIS_ROLE_CONTROLS_UNRESOLVED`, ~80 lines on — instead of dying
-      // here on `Cannot read properties of undefined`. Measured: without this,
-      // the test that pins that runtime gate reports a raw TypeError.
-      // F2: `?.` on the POLICY alone was narrower than the case above. A policy
-      // built from parsed data can arrive PRESENT with a bound missing, and
-      // `?? 0` never saw it — the read of `.deadlineMs` died first. An
-      // unresolved bound is refused HERE, under the SAME name, before the claim
-      // and before anything is spent; `0` for an ABSENT family is unchanged, so
-      // that case still reaches the gate below.
-      //
-      // Round 2: each bound is its OWN scalar argument, never a list. A numeric
-      // ARRAY in shipped code is read by the S1-1 single-source oracle
-      // (`tests/unit/s1-1-depth-contract.test.ts`) as a candidate domain for the
-      // ruled depth ceiling, and one it cannot evaluate is conservatively a
-      // site — this expression was flagged `[DOMAIN_ENUMERATION]` when it built
-      // its arguments with `.map`. The maximum stays scalar for that reader.
-      this.settings.synthesisRolePolicy === undefined
-        ? 0
-        : this.settings.synthesisRolePolicy.synthesizerBound?.deadlineMs ?? ((): never => {
-          throw new TypedDomainError(
-            "SYNTHESIS_ROLE_CONTROLS_UNRESOLVED",
-            "T9: the sealed synthesizerBound is a T16 register row (J8); a synthesis-role policy that reached the runner without it is refused by name, never dereferenced (goal 39-40)"
-          );
-        })(),
-      this.settings.synthesisRolePolicy === undefined
-        ? 0
-        : this.settings.synthesisRolePolicy.evaluatorBound?.deadlineMs ?? ((): never => {
-          throw new TypedDomainError(
-            "SYNTHESIS_ROLE_CONTROLS_UNRESOLVED",
-            "T9: the sealed evaluatorBound is a T16 register row (J8); a synthesis-role policy that reached the runner without it is refused by name, never dereferenced (goal 39-40)"
-          );
-        })()
-    );
-    assertClaimCoversCall({
-      claimMs: this.settings.claimMs,
-      deadlineMs: longestDeadline,
-      marginMs: this.settings.claimMarginMs,
-      ...(this.settings.runDeathPolicy === undefined ? {} : {
-        cooldownMs: this.settings.runDeathPolicy.cooldownMs,
-        maxCooldownHoldsPerRun: this.settings.runDeathPolicy.maxCooldownHoldsPerRun
-      })
+    /**
+     * Side-by-side spec §13 (S6, plan D2) — THE DEBATE'S OWN SETTINGS VERSION. With a version resolver (main.ts and the
+     * practice runner), the version is the run's stamped `core.run.register_version`: on the Hatchet path it is read
+     * BEFORE the claim by the work item id (immutable, so race-free, and a refusing gate still leaves the item READY and
+     * unclaimed); the `claimNext` path cannot know its run first, so it claims, then reads it. A run of another release
+     * (or none) is not resolved: the fenced claim below refuses it (NO_WORK), as Phase 1 rules. Without a resolver
+     * (fixtures, acceptance/main.ts, plan D7) `settings` is the boot's, today's single-version runner byte for byte.
+     */
+    const settingsForVersion = this.settings.settingsForVersion;
+    const early = settingsForVersion === undefined ? null : workItemId === undefined
+      ? await this.#claimNextThenResolveVersion(settingsForVersion)
+      : Object.freeze({ claimed: undefined, resolution: await this.#peekRunVersion(workItemId, settingsForVersion) });
+    if (early !== null && early.claimed === null) return { kind: "NO_WORK" };
+    const resolution = early?.resolution ?? null;
+    /**
+     * O1 (side-by-side spec §13 runner point 3): EVERY setting this debate reads below is read from this one local, its
+     * own version's merged settings, never from the boot's `this.settings`; every closure captures it. Nothing reads a
+     * process-wide "current run" value (the rejected AsyncLocalStorage getter: the call scheduler's pump starts a waiting
+     * call of debate B from inside debate A's release, so B's call would run in A's async context).
+     */
+    const settings: WalkingSkeletonSettings = resolution?.kind === "SETTINGS" ? resolution.settings : this.settings;
+    const claimInput = { workerId: settings.workerId, claimSeconds: settings.claimMs / 1_000 };
+    if (resolution?.kind === "UNSUPPORTED") {
+      /**
+       * A VERSION THIS RELEASE CANNOT RUN (side-by-side spec §13 runner point 3, §9 "the waiver"; Task S7; plan D3;
+       * ruling R10) ends plainly, uses none of the person's quota and makes no model call. The fenced claim is taken
+       * first (the `claimNext` path already holds it), so nothing is ever written for a run this copy does not hold.
+       * Then Phase 1's set-aside of this one item, its claimed state allowed (`readyOnly: false`) and never under another
+       * worker's live claim: FAILED with `RUN_SET_ASIDE:SETTINGS_VERSION_UNSUPPORTED` (the site reads SET_ASIDE's plain
+       * sentence) and the run's SETTINGS_VERSION_UNSUPPORTED waiver, on one transaction. The loader's code goes only to
+       * this content-free journal line (the run, the version, the code); the error that ends the task carries none, and
+       * the task's catch writes nothing over the set-aside (LEAVES_WORK_ITEM_ALONE). A set-aside that wrote nothing
+       * (the item is no longer this copy's, or already ended) wrote no waiver either and is left to its holder.
+       */
+      const held = early?.claimed ?? await this.#work.claimById({ ...claimInput, workItemId: workItemId! });
+      if (held === null) return { kind: "NO_WORK" };
+      if (held.runId === null) throw new TypedDomainError("WORK_ITEM_WITHOUT_RUN", held.workItemId);
+      const setAside = await this.#work.setAsideWorkItem({
+        runId: held.runId,
+        workItemId: held.workItemId,
+        reason: "SETTINGS_VERSION_UNSUPPORTED",
+        readyOnly: false
+      });
+      // Ruling R42 (final fix wave S2): `setAside` tells the operator whether this copy set the debate aside (true) or
+      // wrote nothing because the item was no longer its own or had already ended (false: left to its holder). Final fix
+      // wave S14: the loader's code with an owner-typed detail only when that detail is plainly an id.
+      console.warn(JSON.stringify({
+        kind: "DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED",
+        runId: held.runId,
+        version: String(resolution.version),
+        code: settingsJournalCode(resolution.code),
+        setAside
+      }));
+      throw new TypedDomainError("SETTINGS_VERSION_UNSUPPORTED", "SETTINGS_VERSION_UNSUPPORTED");
+    }
+    // The claim-time gates, against this debate's own settings (side-by-side spec §13): before the claim on the Hatchet
+    // path, so a refusal leaves the item READY; right after it on the `claimNext` path with a resolver (plan D2).
+    const { compositionRow, judgementPolicy, servePolicy } = assertRunnerSettingsGates({
+      settings,
+      configuredMakerRefs: this.#configuredMakers.map((maker) => maker.providerRef)
     });
-    const compositionRow = this.settings.compositionRow;
-    if (compositionRow === undefined) {
-      throw new TypedDomainError(
-        "CLAIM_TYPE_COMPOSITION_MAP_UNRESOLVED",
-        "S04 requires the V-ratified claim-type composition register row"
-      );
-    }
-    const judgementPolicy = this.settings.judgementPolicy;
-    if (judgementPolicy === undefined) {
-      throw new TypedDomainError(
-        "JUDGEMENT_POLICY_UNRESOLVED",
-        "S04 requires V-ratified composition and judgement-selection register rows"
-      );
-    }
-    const servePolicy = this.settings.servePolicy;
-    if (servePolicy === undefined) {
-      throw new TypedDomainError(
-        "SERVE_POLICY_UNRESOLVED",
-        "S05 requires V-ratified composition-budget and band-ceiling register rows"
-      );
-    }
-    if (this.#configuredMakers.length > 1 && this.settings.scoringOperator === undefined) {
-      // FAIR-01 × DR-074: the critique leg always yields an attack arrow, and
-      // an arrow-bearing graph cannot propagate without the mandatory
-      // deployment scoringOperator row. The value is V's at DR-023 — stop
-      // loudly BEFORE any claim or model call, never invent it (AC-76/DR-039).
-      throw new TypedDomainError(
-        "SCORING_OPERATOR_UNRESOLVED",
-        "DR-074: the mandatory deployment scoringOperator register row is unruled; its value is V's at DR-023 and is never invented (AC-76/DR-039)"
-      );
-    }
-    if (this.#configuredMakers.length > 1 && this.settings.panelPolicy === undefined) {
-      // S2-2 × J12: a multi-maker deployment that never sealed the T16 panel rows STOPS
-      // LOUDLY, here — before the work item is claimed and before a single model call.
-      // Recording a reason and grading the node on its author's own voice is the
-      // silent-degradation shape the goal repeals; the Global DoD's "missing rows fail
-      // loudly" and the scoringOperator precedent directly above both govern.
-      throw new TypedDomainError(
-        "PANEL_WEIGHTING_UNRESOLVED",
-        "J12: a multi-maker run requires the sealed T16 panel-weighting rows (dispersion scale, repeated-family multiplier, downgrade bands, provider-family map) and the sealed disagreement threshold; they are read from the register and never invented"
-      );
-    }
-    if (this.#configuredMakers.length > 1 && this.settings.stoppingPolicy === undefined) {
-      // S3-2/S5-1 × J12, same shape and same place: a multi-maker run is the only
-      // run that expands, and expansion is what δ and ε govern. Running the
-      // ceiling with the stopping rule quietly absent — or with a δ/ε invented
-      // here — is the silent-degradation shape the mission repeals.
-      throw new TypedDomainError(
-        "ADAPTIVE_STOPPING_UNRESOLVED",
-        "J12: a multi-maker run requires the sealed T16 adaptive-stopping rows (globalStopDelta, branchFreezeEpsilon); they are read from the register and never invented"
-      );
-    }
-    if (this.settings.verdictLabelPolicy === undefined) {
-      // S6-1 / T11 x codex r1 B1: EVERY served answer carries a code-derived
-      // three-state label, so the sealed T16 verdict-label family is mandatory
-      // for every maker count — unlike J12's panel rows, which only bind at
-      // M>=2. The gate sits HERE, beside J12's, before the work item is claimed
-      // and before a single model call: a deployment that never handed the
-      // runner these rows is going to refuse anyway, and refusing after
-      // judgement and propagation bills it for a run that was always rejected.
-      //
-      // T7 merge: this gate follows the two above rather than preceding them, so
-      // each comment's "directly above"/"beside J12's" stays true. Order is not
-      // observable to either lane's landed assertion — both fixtures omit ONE
-      // policy from a helper that supplies all of them, so the other gate passes.
-      throw new TypedDomainError(
-        "VERDICT_LABEL_CONTROLS_UNRESOLVED",
-        "T11: the served answer's label reads gamma, the two cuts and the disagreement threshold from T16's sealed register rows; they are read from the register and never invented (goal 39-40)"
-      );
-    }
-    if (this.settings.synthesisRolePolicy === undefined) {
-      // S6-2 / T9 x J12 x board F33: EVERY served statement is written by the
-      // synthesizer and graded by the evaluator, both of them NAMED provider
-      // roles whose refs and loop bound are sealed T16 rows. So this family
-      // binds at every maker count, and its gate sits HERE beside the other
-      // two: refusing after judgement and propagation would bill the asker for
-      // a run that could never have served an answer.
-      throw new TypedDomainError(
-        "SYNTHESIS_ROLE_CONTROLS_UNRESOLVED",
-        "T9: the synthesizer and evaluator role refs and the evaluator loop bound are sealed T16 register rows (J8); they are read from the register and never invented (goal 39-40)"
-      );
-    }
-    // J24 discriminator (2) — the family being PRESENT is not the same as its
-    // refs being RESOLVABLE. A sealed ref naming a provider this deployment
-    // never configured can be refused before the work item is claimed, because
-    // it needs no health information at all. Refusing here spends nothing.
-    for (const role of SYNTHESIS_ROLES) {
-      const roleRef = role === "SYNTHESIZER"
-        ? this.settings.synthesisRolePolicy.synthesizerRoleRef
-        : this.settings.synthesisRolePolicy.evaluatorRoleRef;
-      if (!this.#configuredMakers.some((maker) => maker.providerRef === roleRef)) {
-        throw new TypedDomainError(
-          "SYNTHESIS_ROLE_PROVIDER_UNRESOLVED",
-          `J24: the sealed ${role} role ref ${roleRef} (register version ${String(this.settings.synthesisRolePolicy.registerVersion)}) names no configured provider on this deployment; a sealed identity is never substituted`
-        );
-      }
-    }
-    const claimInput = { workerId: this.settings.workerId, claimSeconds: this.settings.claimMs / 1_000 };
     const claimed = workItemId === undefined
-      ? await this.#work.claimNext(claimInput)
+      ? early?.claimed ?? await this.#work.claimNext(claimInput)
       : await this.#work.claimById({ ...claimInput, workItemId });
     if (claimed === null) return { kind: "NO_WORK" };
     if (claimed.runId === null) throw new TypedDomainError("WORK_ITEM_WITHOUT_RUN", claimed.workItemId);
     const claimedRunId = claimed.runId;
+    /**
+     * Final fix wave S12: with a version resolver, a run this copy now holds runs on its own stamped version or not at
+     * all. A resolution of nothing (the peek found no run of this release, then the claim succeeded: a race) would run
+     * the debate on the boot's settings, and in local mode no money seam would notice; refused here, right after the
+     * claim and before the lane, the keep-alive or any call. The task's catch records it as the debate's failure.
+     */
+    if (settingsForVersion !== undefined && resolution === null) {
+      throw new TypedDomainError("RUN_SETTINGS_VERSION_UNKNOWN", "RUN_SETTINGS_VERSION_UNKNOWN:UNRESOLVED");
+    }
+    /**
+     * Side-by-side spec §13 (S6): the run's version, recorded right after the claim and before the keep-alive, the lane
+     * or any call, so every money seam and (addition D17) every preview call finds this run's own version by its run
+     * id. Kept for the life of the process; a second, different value is refused (RUN_SETTINGS_VERSION_DRIFT).
+     */
+    if (resolution !== null) settings.runSettingsVersions?.set(claimedRunId, resolution.version);
+    /**
+     * Parallel AI calls (spec 2026-10-12 §3.2): this debate's lane of the runner's call scheduler, opened once the
+     * debate is claimed and closed in the `finally` below, after the story: a call still waiting then is refused
+     * (CALL_LANE_STOPPED) and never sent. Without a scheduler there is no lane and nothing is wrapped. Final fix wave S12:
+     * opened BEFORE the keep-alive starts, so a lane refusal (CALL_LANE_LIMITS_INVALID) leaves no claim renewing forever.
+     */
+    const callScheduler = settings.callScheduler;
+    // Side-by-side spec §13 (S4): the lane opens with this debate's own version's limits (absent: the scheduler's).
+    const callLane = callScheduler === undefined ? undefined : callScheduler.openLane(claimedRunId, settings.callLaneLimits);
     /**
      * L4-F9 repair (owner ruling 2026-10-11): the claim covers ONE model call and
      * the debate makes many, so it is renewed while the debate runs, fenced on the
@@ -5374,21 +5602,22 @@ export class WalkingSkeletonRunner {
      * stops at its next model call once the claim is another copy's, or once
      * Hatchet gives up on the task (run-keep-alive.ts).
      */
-    const keepAlive = startRunKeepAlive({
-      claimDeadline: claimed.claimDeadline,
-      renewEveryMs: this.settings.claimMs / 3,
-      renew: (heldUntil) => (this.settings.renewals ?? this.#work).renewClaim({ ...claimInput, workItemId: claimed.workItemId, heldUntil }),
-      ...(task === undefined ? {} : { task }),
-      // Side-by-side spec §4: once this release retires, the debate's next model call is refused (RUNNER_RETIRING).
-      stopCalls: () => this.settings.retirement?.callsStopped() === true
-    });
-    /**
-     * Parallel AI calls (spec 2026-10-12 §3.2): this debate's lane of the runner's call scheduler, opened once the
-     * debate is claimed and closed in the `finally` below, after the story: a call still waiting then is refused
-     * (CALL_LANE_STOPPED) and never sent. Without a scheduler there is no lane and nothing is wrapped.
-     */
-    const callScheduler = this.settings.callScheduler;
-    const callLane = callScheduler === undefined ? undefined : callScheduler.openLane(claimedRunId);
+    let keepAlive: ReturnType<typeof startRunKeepAlive>;
+    try {
+      keepAlive = startRunKeepAlive({
+        claimDeadline: claimed.claimDeadline,
+        renewEveryMs: settings.claimMs / 3,
+        renew: (heldUntil) => (settings.renewals ?? this.#work).renewClaim({ ...claimInput, workItemId: claimed.workItemId, heldUntil }),
+        ...(task === undefined ? {} : { task }),
+        // Side-by-side spec §4: once this release retires, the debate's next model call is refused (RUNNER_RETIRING).
+        stopCalls: () => settings.retirement?.callsStopped() === true
+      });
+    } catch (error) {
+      // Final fix wave S12: the lane opened above is closed when the keep-alive cannot start (the `finally` below is not
+      // reached yet).
+      callLane?.close();
+      throw error;
+    }
     /**
      * WHETHER THIS DEBATE'S CALLS RUN TOGETHER: only when its lane admits more than one call at a time (the register's
      * `callConcurrencyPolicy` row, set above one per debate). With the row absent — or no scheduler at all — the debate
@@ -5397,7 +5626,7 @@ export class WalkingSkeletonRunner {
      * lands exactly where it lands today (ruling R2: the serial run's saved content is the reference).
      */
     const callsRunTogether = callLane !== undefined && callLane.callsAtOnce > 1;
-    const callSubjects = this.settings.callSubjects;
+    const callSubjects = settings.callSubjects;
     /**
      * Spec §2.3 (Task 12): told of every failed call of this debate's lane BEFORE its slot frees (`laneGateway`'s
      * `onFailed`); set only while the arguing runs together (`argueTogether`), never on today's serial engine.
@@ -5413,7 +5642,7 @@ export class WalkingSkeletonRunner {
           : callSubjects.subjectOf(providerRef),
         provider,
         onFailed: (error) => { laneCallFailed?.(error); },
-        ...(this.settings.callBeforeSlot === undefined ? {} : { beforeSlot: this.settings.callBeforeSlot })
+        ...(settings.callBeforeSlot === undefined ? {} : { beforeSlot: settings.callBeforeSlot })
       });
     try {
     return await runKeepAliveScope.run(keepAlive, async () => {
@@ -5445,6 +5674,14 @@ export class WalkingSkeletonRunner {
         "The frozen run could not be read through its required content lease"
       );
     }
+    // Side-by-side spec §13 (S6): never happens (`core.run` is insert-only), refused by name if it ever did: the run's
+    // stamp is the version this debate's settings came from.
+    if (resolution !== null && run.registerVersion !== resolution.version) {
+      throw new TypedDomainError(
+        "RUN_SETTINGS_VERSION_DRIFT",
+        `RUN_SETTINGS_VERSION_DRIFT:${String(resolution.version)}:${String(run.registerVersion)}`
+      );
+    }
     const preflightHaltedSites = new Map<string, {
       readonly outcome: "TIMED_OUT" | "FAILED";
       readonly ledgerEntryRef: string;
@@ -5466,9 +5703,9 @@ export class WalkingSkeletonRunner {
     }>();
     // Parallel AI calls (spec 2026-10-12 §2.3): one reservation book per run,
     // so sites failing together cannot pass the run's hold cap.
-    const runHoldRecorder = this.settings.holdRecorder === undefined
+    const runHoldRecorder = settings.holdRecorder === undefined
       ? undefined
-      : reservingHoldRecorder(this.settings.holdRecorder);
+      : reservingHoldRecorder(settings.holdRecorder);
     const cooldownAttempt = async <T>(input: {
       readonly callSiteKey: string;
       /** Parallel AI calls (§2.1): a reply's parent may be saved later (`LaterParentNode`); its records wait for it. */
@@ -5498,9 +5735,9 @@ export class WalkingSkeletonRunner {
       // encrypted run, and the halt list is keyed by site. Callers already pass
       // the bare site; this keeps a marked key from ever reaching the record.
       const siteKey = seatBaseCallSiteKey(input.callSiteKey);
-      const policy = this.settings.runDeathPolicy;
+      const policy = settings.runDeathPolicy;
       if (policy === undefined) {
-        return { kind: "AUTHORED", value: await input.attempt(this.settings.judgeBound.maxAttempts) };
+        return { kind: "AUTHORED", value: await input.attempt(settings.judgeBound.maxAttempts) };
       }
       const hold = runHoldRecorder;
       if (hold === undefined) {
@@ -5521,7 +5758,7 @@ export class WalkingSkeletonRunner {
           total += await this.#ledger.countModelAttempts({
             runId: run.runId,
             workItemId: claimed.workItemId,
-            contractHash: this.settings.judgeContractHash,
+            contractHash: settings.judgeContractHash,
             callSiteKey: seatCallSiteKey(siteKey, seat)
           });
         }
@@ -5549,7 +5786,7 @@ export class WalkingSkeletonRunner {
           holdMs: policy.cooldownMs,
           holdUntil: null,
           attemptsSpent: siteAttemptsSpent === undefined
-            ? this.settings.judgeBound.maxAttempts + policy.finalRetryAttempts
+            ? settings.judgeBound.maxAttempts + policy.finalRetryAttempts
             : await siteAttemptsSpent(),
           transportOutcome: preflight.outcome,
           plannedLegCount: input.plannedLegCount
@@ -5562,7 +5799,7 @@ export class WalkingSkeletonRunner {
         callSiteKey: siteKey,
         parentNodeId: knownParentNodeId,
         plannedLegCount: input.plannedLegCount,
-        baseMaxAttempts: this.settings.judgeBound.maxAttempts,
+        baseMaxAttempts: settings.judgeBound.maxAttempts,
         failureScope: input.failureScope,
         policy,
         hold: laterParent === null ? hold : laterParentHold(hold, laterParent),
@@ -5589,9 +5826,9 @@ export class WalkingSkeletonRunner {
             return await this.#ledger.countModelAttempts({
               runId: run.runId,
               workItemId: claimed.workItemId,
-              contractHash: this.settings.judgeContractHash,
+              contractHash: settings.judgeContractHash,
               callSiteKey: seatCallSiteKey(siteKey, retrying.pinnedAs === "MAIN" ? "runnerUp" : "main")
-            }) <= this.settings.judgeBound.maxAttempts;
+            }) <= settings.judgeBound.maxAttempts;
           }
         })
       });
@@ -5627,7 +5864,7 @@ export class WalkingSkeletonRunner {
      * no trims), today's limits without. Root 0's kept room and every root's framing read this one value (Task 14 review 6).
      */
     const rootMaterialChars = rootZeroMapMaterialCharsFor(mapLimitsFor(lengthGuidance !== null));
-    if (shapeShape !== null && (this.settings.debateShape == null || callScheduler === undefined)) {
+    if (shapeShape !== null && (settings.debateShape == null || callScheduler === undefined)) {
       throw new TypedDomainError("DEBATE_SHAPE_RUNNER_UNCONFIGURED",
         "This run was admitted with the debate shape, and this runner has no sealed map contracts or no call scheduler");
     }
@@ -5638,7 +5875,7 @@ export class WalkingSkeletonRunner {
      * is refused before any call.
      */
     const engine = engineOfRun(envelopeBasis);
-    if (engine.engine === 2 && this.settings.engine == null) {
+    if (engine.engine === 2 && settings.engine == null) {
       throw new TypedDomainError("ENGINE_RUNNER_UNCONFIGURED",
         "This run was admitted with engine 2, and this runner has no sealed engine contracts");
     }
@@ -5722,11 +5959,11 @@ export class WalkingSkeletonRunner {
     replayBookInLease = replayBook;
     // Refused-repair salvage (2026-10-16): A1 and B exist only on a run whose structure-repair route is wired (main.ts sets
     // `structureRepairCeiling` only then), so only such a run replays the calls they answered (`replayingGateway`).
-    const structureReplay = (this.settings.structureRepairCeiling ?? null) !== null;
+    const structureReplay = (settings.structureRepairCeiling ?? null) !== null;
     /** Setting nodes aside changes rows another copy saved, so it is fenced on THIS copy's claim (RUNNER_CLAIM_LOST). */
     const retireClaim = () => Object.freeze({
-      workItemId: claimed.workItemId, workerId: this.settings.workerId,
-      heldUntil: keepAlive.heldUntil(), claimMs: this.settings.claimMs
+      workItemId: claimed.workItemId, workerId: settings.workerId,
+      heldUntil: keepAlive.heldUntil(), claimMs: settings.claimMs
     });
     const replayedMaker = <T extends ConfiguredSeatMaker>(maker: T): T => {
       if (replayBook.pending === 0) return maker;
@@ -5746,9 +5983,9 @@ export class WalkingSkeletonRunner {
       let state: "HEALTHY" | "ABSENT" = configured === undefined ? "ABSENT" : "HEALTHY";
       let modelId: string | null = configured === undefined ? null : member.model_id;
       let failureCode: string | null = configured === undefined ? "CLAIM_GATEWAY_UNRESOLVED" : null;
-      if (configured !== undefined && this.settings.claimTimeProbe !== undefined) {
+      if (configured !== undefined && settings.claimTimeProbe !== undefined) {
         try {
-          const probe = await this.settings.claimTimeProbe(member);
+          const probe = await settings.claimTimeProbe(member);
           state = probe.state;
           modelId = probe.modelId;
           failureCode = probe.failureCode;
@@ -5777,7 +6014,7 @@ export class WalkingSkeletonRunner {
         absentAtClaim.push(Object.freeze({ member, failureCode: resolvedFailureCode }));
         continue;
       }
-      if (this.settings.claimTimeProbe !== undefined) {
+      if (settings.claimTimeProbe !== undefined) {
         await this.#providerProbes.record({
           probeEvidenceRef: randomUUID(),
           providerRef: member.provider_ref,
@@ -5797,9 +6034,9 @@ export class WalkingSkeletonRunner {
      * makers all read these entries), so a member that sits out is refused before anything is sent wherever it was
      * planned. Without `runResilience` (hosted and local) nothing is wrapped and every path below is today's.
      */
-    const sitOut: RunSitOutBook | null = this.settings.runResilience === undefined
+    const sitOut: RunSitOutBook | null = settings.runResilience === undefined
       ? null
-      : createRunSitOutBook(this.settings.runResilience);
+      : createRunSitOutBook(settings.runResilience);
     /**
      * Parallel AI calls (spec 2026-10-12 §3.2): the same loop puts every maker's gateway through this debate's call
      * lane, OUTSIDE the sit-out book: a call that waited for a slot meets the sit-out check only when it may start. So
@@ -5862,7 +6099,7 @@ export class WalkingSkeletonRunner {
      */
     const movedCallBars = new Map<string, (member: Readonly<{ maker: string }>) => boolean>();
     const bodyMakers = Object.freeze([...configuredMakers]);
-    const bodyPrices = this.settings.providerPrices ?? EMPTY_PROVIDER_PRICES;
+    const bodyPrices = settings.providerPrices ?? EMPTY_PROVIDER_PRICES;
     const bodyGatewayFor = (planned: ConfiguredSeatMaker, provider: ProviderGateway): ProviderGateway =>
       bodyCostFallbackGateway({
         planned: Object.freeze({ ...planned, provider }),
@@ -5876,7 +6113,7 @@ export class WalkingSkeletonRunner {
         onServed: (callSiteKey, servedBy) => { bodyServedBy.set(seatBaseCallSiteKey(callSiteKey), servedBy.providerRef); },
         onMoved: (moved) => this.#recordCostSubstitution(run.runId, moved)
       });
-    if (this.settings.bodyCostFallback === true) {
+    if (settings.bodyCostFallback === true) {
       bodyMakers.forEach((planned, index) => {
         configuredMakers[index] = Object.freeze({ ...planned, judge: new Judge(bodyGatewayFor(planned, planned.provider)) });
       });
@@ -5930,7 +6167,7 @@ export class WalkingSkeletonRunner {
           routeHealth.set(candidate.providerRef, Object.freeze({ state: "ABSENT" as const, failureCode: "CLAIM_GATEWAY_UNRESOLVED" }));
           continue;
         }
-        if (this.settings.claimTimeSynthesisRoleProbe === undefined) {
+        if (settings.claimTimeSynthesisRoleProbe === undefined) {
           routeHealth.set(candidate.providerRef, Object.freeze({ state: "HEALTHY" as const }));
           continue;
         }
@@ -5940,7 +6177,7 @@ export class WalkingSkeletonRunner {
           readonly failureCode: string | null;
         };
         try {
-          observation = await this.settings.claimTimeSynthesisRoleProbe(candidate.providerRef);
+          observation = await settings.claimTimeSynthesisRoleProbe(candidate.providerRef);
         } catch (error) {
           observation = {
             state: "ABSENT", modelId: null,
@@ -5972,7 +6209,7 @@ export class WalkingSkeletonRunner {
       assignedSeats = buildAssignedRunSeatBook({
         assignment: roleAssignment, configured: assignedConfigured, routeHealth,
         // B9c x S1a: an assigned seat's judge goes through the cheaper-model gateway too.
-        ...(this.settings.bodyCostFallback === true ? { judgeGatewayFor: bodyGatewayFor } : {})
+        ...(settings.bodyCostFallback === true ? { judgeGatewayFor: bodyGatewayFor } : {})
       });
       // A POSITION seat with neither candidate claim-eligible is today's absent
       // maker: dropped, compacted and disclosed through the same
@@ -6017,21 +6254,21 @@ export class WalkingSkeletonRunner {
     const standInFor = (pinnedRef: string, sealedRef: string): string | null =>
       configuredMakers.some((maker) => maker.providerRef === pinnedRef) || sealedRef === pinnedRef
         || !run.discoveredPanel.some((member) => member.provider_ref === sealedRef)
-        || !(this.settings.answerRoleFallbackCovered?.({ roleRef: sealedRef, panel: run.discoveredPanel }) ?? true)
+        || !(settings.answerRoleFallbackCovered?.({ roleRef: sealedRef, panel: run.discoveredPanel }) ?? true)
         ? null
         : sealedRef;
-    const rotationStandIns = this.settings.synthesisRolePolicy === undefined || rotationPin === null ? null : Object.freeze({
-      writerRef: standInFor(rotationPin.answerWriter.providerRef, this.settings.synthesisRolePolicy.synthesizerRoleRef),
-      checkerRef: standInFor(rotationPin.answerChecker.providerRef, this.settings.synthesisRolePolicy.evaluatorRoleRef)
+    const rotationStandIns = settings.synthesisRolePolicy === undefined || rotationPin === null ? null : Object.freeze({
+      writerRef: standInFor(rotationPin.answerWriter.providerRef, settings.synthesisRolePolicy.synthesizerRoleRef),
+      checkerRef: standInFor(rotationPin.answerChecker.providerRef, settings.synthesisRolePolicy.evaluatorRoleRef)
     });
     // Role rotation: a rotated run's per-claim policy is the boot policy with the two answer-role refs
     // replaced by the pin's, or by a role's stand-in (bounds and loop bound unchanged). Every per-run use below
     // reads this one value; the pre-claim J24 (2) check above keeps the sealed refs, the fallback a one-maker
     // debate needs.
-    const synthesisRolePolicy = this.settings.synthesisRolePolicy === undefined || rotationPin === null || rotationStandIns === null
-      ? this.settings.synthesisRolePolicy
+    const synthesisRolePolicy = settings.synthesisRolePolicy === undefined || rotationPin === null || rotationStandIns === null
+      ? settings.synthesisRolePolicy
       : Object.freeze({
-        ...this.settings.synthesisRolePolicy,
+        ...settings.synthesisRolePolicy,
         synthesizerRoleRef: rotationStandIns.writerRef ?? rotationPin.answerWriter.providerRef,
         evaluatorRoleRef: rotationStandIns.checkerRef ?? rotationPin.answerChecker.providerRef
       });
@@ -6070,7 +6307,7 @@ export class WalkingSkeletonRunner {
       // Run resilience (fix (d)): an out-of-panel role maker sits out on the same book as the panel.
       const unwrapped = configuredByProviderRef.get(roleRef);
       const configured = unwrapped === undefined ? undefined : sitOutMaker(unwrapped);
-      if (configured === undefined || this.settings.claimTimeSynthesisRoleProbe === undefined) continue;
+      if (configured === undefined || settings.claimTimeSynthesisRoleProbe === undefined) continue;
       // A15d (fix round 1, minor 4): a route the assignment also names was
       // probed above in this claim; its verdict stands, and no second probe row
       // is written for it.
@@ -6082,7 +6319,7 @@ export class WalkingSkeletonRunner {
       }
       let observation;
       try {
-        observation = await this.settings.claimTimeSynthesisRoleProbe(roleRef);
+        observation = await settings.claimTimeSynthesisRoleProbe(roleRef);
       } catch (error) {
         observation = {
           state: "ABSENT" as const, modelId: null,
@@ -6223,8 +6460,8 @@ export class WalkingSkeletonRunner {
      * Debate shape (spec §3.3 step 1): the run's shape context — its frozen sizes, its settings and the sealed map
      * hash — or null. A shaped run left with one maker at claim keeps today's single-position path (null).
      */
-    const shapeRun = shapeShape !== null && shapeSettings !== null && this.settings.debateShape != null && effectiveMakerCount >= 2
-      ? Object.freeze({ shape: shapeShape, settings: shapeSettings, mapContractHash: this.settings.debateShape.mapContractHash })
+    const shapeRun = shapeShape !== null && shapeSettings !== null && settings.debateShape != null && effectiveMakerCount >= 2
+      ? Object.freeze({ shape: shapeShape, settings: shapeSettings, mapContractHash: settings.debateShape.mapContractHash })
       : null;
     /**
      * Engine redesign R3 (spec 2026-10-15 §5): engine 2's map answer step — new shape only. The receipt's engine (never
@@ -6456,7 +6693,7 @@ export class WalkingSkeletonRunner {
      * counted as a stand-in, and the switch the ledger itself makes, `newLedgerMove`.
      */
     const seatCallPlan = (seat: RunSeat, siteKey: string, rule?: (candidate: SeatIdentity) => boolean) => {
-      const judgeAttempts = this.settings.judgeBound.maxAttempts;
+      const judgeAttempts = settings.judgeBound.maxAttempts;
       const fair = (candidate: SeatIdentity): boolean => rule === undefined || rule(candidate);
       const allowed = (member: SeatMember): boolean => fair(member) && spentSeatSlots.get(siteKey) !== member.pinnedAs;
       const fromLedger = ledgerSeatRule(seat, () => siteKey, allowed, judgeAttempts);
@@ -6521,8 +6758,8 @@ export class WalkingSkeletonRunner {
      */
     const synthesisSeatOptions = (role: "SYNTHESIZER" | "EVALUATOR", seat: RunSeat, siteKey: string) => {
       const rule = ledgerSeatRule(seat, () => siteKey, () => true, role === "SYNTHESIZER"
-        ? this.settings.synthesisRolePolicy.synthesizerBound.maxAttempts
-        : this.settings.synthesisRolePolicy.evaluatorBound.maxAttempts);
+        ? settings.synthesisRolePolicy.synthesizerBound.maxAttempts
+        : settings.synthesisRolePolicy.evaluatorBound.maxAttempts);
       const ordinal = synthesisOrdinal(seat);
       // A16c (carry 8c): a spent main's synthesis handed to its backup on a resumed pass is a switch.
       const ledgerMove = newLedgerMove({ seat, siteKey, baseKeyOf: () => siteKey, fair: () => true, eligible: rule.eligible, ordinal });
@@ -6533,7 +6770,7 @@ export class WalkingSkeletonRunner {
         ...(ledgerMove === undefined ? {} : { ledgerMove })
       };
     };
-    const panelPolicy = this.settings.panelPolicy;
+    const panelPolicy = settings.panelPolicy;
     // S2-2 / J13(b): one record per node whose panel degraded, bound to the node the
     // graph minted — the same discipline `bindWayOfKnowingDowngrade` follows. Declared
     // here because BOTH judgement producers (root and child) append to it.
@@ -6604,7 +6841,7 @@ export class WalkingSkeletonRunner {
       /** Debate shape (spec §3.3 step 6): the members the close-call extension called and heard (0: none; always 0 today). */
       readonly closeCallAdded: number;
     }> => {
-      const judgeContractHash = this.settings.judgeContractHash;
+      const judgeContractHash = settings.judgeContractHash;
       // Engine redesign R2 (INTERFACE §6.2): engine 2's selection rule names the engine row, on the register version and
       // source today's rule was read from (the receipt carries no register version). Null on engine 1. Built in
       // engine-reduce.ts so this file never names the engine row (runner-engine-wiring.test.ts, R1d).
@@ -6701,7 +6938,7 @@ export class WalkingSkeletonRunner {
         // A16a (controller ruling on carry 1; fix round 1): a panel site a slot
         // answered on an earlier pass is PREFERRED for that slot again, and the
         // other member stays its backup (`ledgerSeatRule`).
-        const fromLedger = ledgerSeatRule(seat, panelKeyFor, notTheAuthor, this.settings.judgeBound.maxAttempts);
+        const fromLedger = ledgerSeatRule(seat, panelKeyFor, notTheAuthor, settings.judgeBound.maxAttempts);
         const eligible = (member: SeatMember): boolean => notTheAuthor(member) && fromLedger.eligible(member);
         // A16c: the author rule alone (`fair`), so a member it bars is never a stand-in, and the
         // ledger's own switch at this panel site (carry 8c), keyed by each member's route.
@@ -6755,7 +6992,7 @@ export class WalkingSkeletonRunner {
               authorMaker: input.authorMaker,
               providerRef: member.providerRef,
               contractHash: judgeContractHash,
-              bound: guidedCallBound(this.settings.judgeBound, "judge_panel", lengthGuidance)
+              bound: guidedCallBound(settings.judgeBound, "judge_panel", lengthGuidance)
             })
           });
           // A15c (controller carry 7): the member that ANSWERED, route and
@@ -6811,7 +7048,7 @@ export class WalkingSkeletonRunner {
         // a vendor with no usage keep the rule above. It never sets
         // runBodyBudgetStop: the next authoring call gets its own (free) fallback
         // try, and the arguing stops only when a movable call fits no maker.
-        leaveOutMoneyRefusedSeats: this.settings.bodyCostFallback === true
+        leaveOutMoneyRefusedSeats: settings.bodyCostFallback === true
       });
       /**
        * Task M2 — THE FIRST ROOT'S PANEL, CUT SHORT BY A SPEND STOP.
@@ -6953,7 +7190,7 @@ export class WalkingSkeletonRunner {
             // first on purpose: tests/architecture/v28-serve-decision-wiring.test.ts pins the base panel's own mapping
             // text exactly ONCE in this file (PANEL_STOP_MAPPING).
             onRunLevelSpendStop: input.onSpendStop === "TRAVEL" ? "RETHROW" : "RETURN_HEARD",
-            leaveOutMoneyRefusedSeats: this.settings.bodyCostFallback === true
+            leaveOutMoneyRefusedSeats: settings.bodyCostFallback === true
           });
           // The author is judgements[0] of both runs: kept once. The extras come AFTER every voice already heard. A stop
           // the extension handed back is classified by the base panel's own rule, or rethrown (shapeCloseCallFold).
@@ -6985,7 +7222,7 @@ export class WalkingSkeletonRunner {
       // run) the base panel IS the panel: today's marks, byte for byte.
       const { marks, panelFailureReason } = panelDegradationOf(baseReduced.reducedMembers.length - 1, panel.notes, spendStop);
 
-      const candidateBand = this.settings.servePolicy?.candidateConfidenceBand ?? null;
+      const candidateBand = settings.servePolicy?.candidateConfidenceBand ?? null;
       const steppedDownBand = candidateBand === null
         ? null
         : panelPolicy.oneStepDown[candidateBand] ?? null;
@@ -7052,20 +7289,20 @@ export class WalkingSkeletonRunner {
     }
     for (const callSite of [
       {
-        contractHash: this.settings.judgeContractHash,
-        maxAttempts: this.settings.judgeBound.maxAttempts + (this.settings.runDeathPolicy?.finalRetryAttempts ?? 0)
+        contractHash: settings.judgeContractHash,
+        maxAttempts: settings.judgeBound.maxAttempts + (settings.runDeathPolicy?.finalRetryAttempts ?? 0)
       },
       // W10/3: the CONTRACT HASH still names the OUTPUT contract (the composition
       // and verdict schemas), which this ticket does not touch — but the attempt
       // budget must be the one the call actually spends, and that is now the
       // synthesis role's sealed `maxAttempts`, not the retired organ's.
       {
-        contractHash: this.settings.composerContractHash,
-        maxAttempts: this.settings.synthesisRolePolicy.synthesizerBound.maxAttempts
+        contractHash: settings.composerContractHash,
+        maxAttempts: settings.synthesisRolePolicy.synthesizerBound.maxAttempts
       },
       {
-        contractHash: this.settings.conformanceContractHash,
-        maxAttempts: this.settings.synthesisRolePolicy.evaluatorBound.maxAttempts
+        contractHash: settings.conformanceContractHash,
+        maxAttempts: settings.synthesisRolePolicy.evaluatorBound.maxAttempts
       }
     ]) {
       const exhausted = await this.#ledger.findExhaustedModelAttempt({
@@ -7074,7 +7311,7 @@ export class WalkingSkeletonRunner {
         ...callSite,
         // Run resilience (spec 2026-10-12, fix (b)): on the preview each maker's attempts are its own, as the
         // counting gateway counts them (`attemptScope`), so the serve fallback's hops never end the work item here.
-        ...(this.settings.runResilience === undefined ? {} : { byActor: true })
+        ...(settings.runResilience === undefined ? {} : { byActor: true })
       });
       if (exhausted !== null) {
         if (exhausted.outcome === "OK") continue;
@@ -7082,7 +7319,7 @@ export class WalkingSkeletonRunner {
         // keys, while the cooldown wrapper (and so this halt list) and the two
         // root exceptions name the SITE by its bare key.
         const exhaustedSite = seatBaseCallSiteKey(exhausted.callSiteKey);
-        const isJudgeSite = callSite.contractHash === this.settings.judgeContractHash;
+        const isJudgeSite = callSite.contractHash === settings.judgeContractHash;
         const isExemptRoot = exhaustedSite === "JUDGE" || exhaustedSite === "JUDGE:root:secondary";
         /**
          * A15d (controller carry 6; fix round 1): a judge seat key at its
@@ -7120,7 +7357,7 @@ export class WalkingSkeletonRunner {
         // the ledger read below; a backup that answered it, or an untried one next
         // to this spent main, answers it again instead of the work item failing.
         if (!isJudgeSite && exhaustedMarker !== null) continue;
-        if (isJudgeSite && exhaustedMarker !== null && (this.settings.runDeathPolicy?.finalRetryAttempts ?? 0) >= 1) {
+        if (isJudgeSite && exhaustedMarker !== null && (settings.runDeathPolicy?.finalRetryAttempts ?? 0) >= 1) {
           const spentSlot: SeatSlot = exhaustedMarker === "main" ? "MAIN" : "RUNNER_UP";
           const rootSeat = exhaustedSite === "JUDGE"
             ? seatBook.position[0]
@@ -7137,7 +7374,7 @@ export class WalkingSkeletonRunner {
               callSiteKey: seatCallSiteKey(exhaustedSite, exhaustedMarker === "main" ? "runnerUp" : "main")
             })
             : null;
-          if (partnerAttempts !== null && partnerAttempts < this.settings.judgeBound.maxAttempts) {
+          if (partnerAttempts !== null && partnerAttempts < settings.judgeBound.maxAttempts) {
             spentSeatSlots.set(exhaustedSite, spentSlot);
             // The halt below is only the fallback for a site whose seat turns out
             // to hold no partner on this pass (cooldownAttempt reads it only when
@@ -7174,9 +7411,9 @@ export class WalkingSkeletonRunner {
     if (seatBook.assigned) {
       let order = 0;
       for (const contractHash of [
-        this.settings.judgeContractHash, this.settings.composerContractHash, this.settings.conformanceContractHash
+        settings.judgeContractHash, settings.composerContractHash, settings.conformanceContractHash
       ]) {
-        const isJudge = contractHash === this.settings.judgeContractHash;
+        const isJudge = contractHash === settings.judgeContractHash;
         for (const row of await this.#ledger.readSeatMarkedModelCalls({
           runId: run.runId, workItemId: claimed.workItemId, contractHash
         })) {
@@ -7233,13 +7470,13 @@ export class WalkingSkeletonRunner {
       for (const synthesis of [
         {
           seat: seatBook.answerWriter,
-          contractHash: this.settings.composerContractHash,
-          bound: this.settings.synthesisRolePolicy.synthesizerBound.maxAttempts
+          contractHash: settings.composerContractHash,
+          bound: settings.synthesisRolePolicy.synthesizerBound.maxAttempts
         },
         {
           seat: seatBook.answerChecker,
-          contractHash: this.settings.conformanceContractHash,
-          bound: this.settings.synthesisRolePolicy.evaluatorBound.maxAttempts
+          contractHash: settings.conformanceContractHash,
+          bound: settings.synthesisRolePolicy.evaluatorBound.maxAttempts
         }
       ]) {
         for (const siteKey of synthesisSitesByContract.get(synthesis.contractHash) ?? []) {
@@ -7297,9 +7534,9 @@ export class WalkingSkeletonRunner {
       subjectItemId: claimed.workItemId,
       stanceAtAction: "UNASSIGNED",
       outcome: "OK",
-      actorRef: this.settings.workerId,
+      actorRef: settings.workerId,
       inputHash: hash({ questionLine: run.questionLine, workItemId: claimed.workItemId }),
-      contractHash: this.settings.judgeContractHash,
+      contractHash: settings.judgeContractHash,
       startedAt: judgementScheduledAt,
       finishedAt: new Date()
     });
@@ -7344,15 +7581,15 @@ export class WalkingSkeletonRunner {
         // to when its member sits out); hosted prices only. It covers root 0's first attempt + one retry, the larger of a
         // length retry and a format repair (`rootZeroRoomAttempts`, `rootZeroKeepRoomMicros`), plus, on a routed run, the
         // structure-repair call (the sum: refused-repair salvage B is root 0's own second POST after it).
-        const providerPrices = this.settings.providerPrices ?? EMPTY_PROVIDER_PRICES;
+        const providerPrices = settings.providerPrices ?? EMPTY_PROVIDER_PRICES;
         const rootZeroPrices = rootZeroRoomRefs({ seats: rootSeats, membersOf, canHandOver: sitOut !== null, sitsOut: seatSitsOut })
           .flatMap((providerRef) => { const price = providerPrices.get(providerRef); return price === undefined ? [] : [price]; });
         // LG-A (Task 14 carry): on a routed run root 0 may also send the structure-repair call, at the repair target's price.
-        const repairCeiling = this.settings.structureRepairCeiling ?? null;
+        const repairCeiling = settings.structureRepairCeiling ?? null;
         const repairPrice = repairCeiling === null ? undefined : providerPrices.get(repairCeiling.providerRef);
         const keepRoomMicros = rootZeroKeepRoomMicros({ prices: rootZeroPrices, ...rootZeroRoomAttempts({
           questionLine: run.questionLine, argumentLanguageName: run.argumentLanguageName, questionLanguage: shapeLanguage,
-          tokenCeiling: guidedCallBound(this.settings.judgeBound, "opening", lengthGuidance).tokenCeiling,
+          tokenCeiling: guidedCallBound(settings.judgeBound, "opening", lengthGuidance).tokenCeiling,
           lengthed: lengthGuidance !== null,
           // Ruling "PF-C5 root-0 bound" (a): with the row, root 0's map material is bounded by the runaway limits (L19).
           materialChars: rootEngineMaterialChars ?? rootMaterialChars }),
@@ -7360,7 +7597,7 @@ export class WalkingSkeletonRunner {
             attempt: { requestBytes: repairCeiling.requestBytes, completionTokenCeiling: repairCeiling.completionTokenCeiling } } });
         const mapCaller = createRunnerMapCaller({
           runId: run.runId, subjectItemId: claimed.workItemId, mapContractHash: shapeRun.mapContractHash,
-          judgeBound: this.settings.judgeBound,
+          judgeBound: settings.judgeBound,
           longBounds: { merge: shapeRun.shape.mapMergeBound, choose: shapeRun.shape.mapChooseBound },
           // Pre-flight PF-B40: an assigned (scorecard) seat book is built from `configuredByProviderRef` and can name a
           // route outside the claim-eligible `configuredMakers`; such a map seat calls through the same wrappers
@@ -7387,7 +7624,7 @@ export class WalkingSkeletonRunner {
           lengthGuidance,
           // Engine redesign R3: an engine-2 map call records the engine seal (R1d's per-run refusal above guarantees the
           // engine settings for an engine receipt).
-          ...(engineMap ? { engineContractHash: this.settings.engine!.engineContractHash } : {})
+          ...(engineMap ? { engineContractHash: settings.engine!.engineContractHash } : {})
         });
         // Spec §2.3 (O6), the map's own guard: once the map has stopped, no queued map call starts.
         callLane?.guardStarts(() => !mapCaller.stopped());
@@ -7681,8 +7918,8 @@ export class WalkingSkeletonRunner {
             ...lengthGuideOf(judgeLegLengthStep(leg)),
             leg,
             providerRef: member.providerRef,
-            contractHash: this.settings.judgeContractHash,
-            bound: { ...guidedCallBound(this.settings.judgeBound, judgeLegLengthStep(leg), lengthGuidance), maxAttempts }
+            contractHash: settings.judgeContractHash,
+            bound: { ...guidedCallBound(settings.judgeBound, judgeLegLengthStep(leg), lengthGuidance), maxAttempts }
           })
         })
       }).catch((error: unknown) => {
@@ -7917,9 +8154,9 @@ export class WalkingSkeletonRunner {
         subjectItemId: claimed.workItemId,
         stanceAtAction: "UNASSIGNED",
         outcome: "OK",
-        actorRef: this.settings.workerId,
+        actorRef: settings.workerId,
         inputHash: hash({ leg: input.leg, questionLine: run.questionLine, workItemId: claimed.workItemId }),
-        contractHash: this.settings.judgeContractHash,
+        contractHash: settings.judgeContractHash,
         startedAt: new Date(),
         finishedAt: new Date()
       });
@@ -7954,8 +8191,8 @@ export class WalkingSkeletonRunner {
             ...lengthGuideOf(judgeLegLengthStep(input.leg)),
             leg: input.leg,
             providerRef: member.providerRef,
-            contractHash: this.settings.judgeContractHash,
-            bound: { ...guidedCallBound(this.settings.judgeBound, judgeLegLengthStep(input.leg), lengthGuidance), maxAttempts }
+            contractHash: settings.judgeContractHash,
+            bound: { ...guidedCallBound(settings.judgeBound, judgeLegLengthStep(input.leg), lengthGuidance), maxAttempts }
           })
         })
       }).catch(async (error: unknown) => {
@@ -8078,8 +8315,8 @@ export class WalkingSkeletonRunner {
         nodeId: childNodeId,
         rawArtifactRef: childJudged.provenanceRef,
         tau: childSelection.tau,
-        numberKind: this.settings.judgementNumberKind,
-        producer: this.settings.judgementProducer,
+        numberKind: settings.judgementNumberKind,
+        producer: settings.judgementProducer,
         wayOfKnowing: childJudged.wayOfKnowing,
         uncertaintyLadderPosition: childReduced.uncertaintyLadderPosition,
         uncertaintyDrivers: childReduced.drivers,
@@ -8242,8 +8479,8 @@ export class WalkingSkeletonRunner {
               statement: authoredNode.statement,
               authorMaker: authoredNode.maker,
               providerRef: member.providerRef,
-              contractHash: this.settings.judgeContractHash,
-              bound: { ...guidedCallBound(this.settings.judgeBound, "reviewer", lengthGuidance), maxAttempts },
+              contractHash: settings.judgeContractHash,
+              bound: { ...guidedCallBound(settings.judgeBound, "reviewer", lengthGuidance), maxAttempts },
               // S3-1: this ONE call measures every edge the node sources.
               edges: authoredNode.sourcedEdges
             })
@@ -8696,12 +8933,12 @@ export class WalkingSkeletonRunner {
       if (adaptiveShape && completedRounds === 1) keepAdaptiveChains(() => null);
     };
     const closeGlobalRound = async (completedRounds: number, boundaryLegIndex: number): Promise<boolean> => {
-      const stoppingPolicy = this.settings.stoppingPolicy;
+      const stoppingPolicy = settings.stoppingPolicy;
       if (stoppingPolicy === undefined) {
         keepNoChainAtRoundOne(completedRounds);
         return false;
       }
-      const { snapshot: roundSnapshot } = await this.#resolveOperatorResolvedSnapshot(run.runId);
+      const { snapshot: roundSnapshot } = await this.#resolveOperatorResolvedSnapshot(run.runId, settings.scoringOperator);
       const roundReviewedNodeIds = await this.#judgements.readReviewedNodeIds(run.runId);
       // Engine 2: the round's stopping reads the same link-weighted graph the answer is served from (null on engine 1).
       const roundLinked = await engineLinkedGraphNow(roundSnapshot, roundReviewedNodeIds);
@@ -8756,8 +8993,8 @@ export class WalkingSkeletonRunner {
         previousStrengths: previousRoundStrengths,
         snapshot: roundStanding.snapshot,
         controls: stoppingPolicy,
-        propagationContractHash: this.settings.propagationContractHash,
-        propagationProducer: this.settings.propagationProducer
+        propagationContractHash: settings.propagationContractHash,
+        propagationProducer: settings.propagationProducer
       }, { appendLedger: (entry) => this.#ledger.append(entry) });
       previousRoundStrengths = boundary.propagation.strengths;
       const frozenNodeIds = new Set(boundary.frozenCarryingNodeIds);
@@ -9251,7 +9488,7 @@ export class WalkingSkeletonRunner {
        * (nothing more is saved), the lane stopped (nothing more is sent) and the arguing ends at once (`keepAliveStopped`).
        */
       let spendRefusalSeen = false;
-      const spendRefusalsCount = this.settings.bodyCostFallback !== true;
+      const spendRefusalsCount = settings.bodyCostFallback !== true;
       laneCallFailed = (error) => {
         if (keepAliveStop(error)) {
           bodyFailed = true;
@@ -9423,7 +9660,7 @@ export class WalkingSkeletonRunner {
       }
     }
     const { materialised, snapshot: operatorResolvedSnapshot } =
-      await this.#resolveOperatorResolvedSnapshot(run.runId);
+      await this.#resolveOperatorResolvedSnapshot(run.runId, settings.scoringOperator);
     let snapshot: EvaluationSnapshot = operatorResolvedSnapshot;
     const monoMakerConditionMarks = effectiveMakerCount === 1
       ? ["SINGLE-LINEAGE", "CRITIQUE-UNAVAILABLE"] as const
@@ -9514,7 +9751,7 @@ export class WalkingSkeletonRunner {
      * after the serve decision (Ruling PF-R2a8.10). Engine 1 never reaches this.
      */
     const investigateCannotAssessPoints = async (
-      settings: EngineSettings,
+      engineSettings: EngineSettings,
       facts: ReadonlyMap<string, EngineNodeFacts>,
       materialisedSnapshot: EvaluationSnapshot
     ): Promise<Readonly<{
@@ -9531,7 +9768,7 @@ export class WalkingSkeletonRunner {
       if (lengthGuidance === null) {
         throw new TypedDomainError("ENGINE_REQUIRES_LENGTH_POLICY", "Engine 2 runs only with the length row frozen on its receipt");
       }
-      const engineSeal = this.settings.engine?.engineContractHash;
+      const engineSeal = settings.engine?.engineContractHash;
       if (engineSeal === undefined) {
         throw new TypedDomainError("ENGINE_RUNNER_UNCONFIGURED", "Engine 2's calls carry the engine seal this runner was not given");
       }
@@ -9555,7 +9792,7 @@ export class WalkingSkeletonRunner {
       const fairFor = (authorMaker: string, reviewerMaker: string) => (member: Readonly<{ maker: string }>): boolean =>
         member.maker !== authorMaker && member.maker !== reviewerMaker;
       const investigated = await runPointInvestigations({
-        engine: settings,
+        engine: engineSettings,
         facts,
         candidates: engineInvestigationCandidates({ source, cannotAssess, reviews, honestScores }),
         spendStopped: runBodyBudgetStop !== null,
@@ -9594,7 +9831,7 @@ export class WalkingSkeletonRunner {
                 callSiteKey: memberCallSiteKey,
                 providerRef: member.providerRef,
                 contractHash: engineSeal,
-                bound: guidedCallBound(this.settings.judgeBound, "investigator", lengthGuidance),
+                bound: guidedCallBound(settings.judgeBound, "investigator", lengthGuidance),
                 material,
                 length: lengthGuide,
                 argumentLanguageName: run.argumentLanguageName,
@@ -9728,11 +9965,11 @@ export class WalkingSkeletonRunner {
       }
       // The one engine seal of the run body (A14's source; pre-flight PF-R2b3.15): R1d's boot refuses a runner whose
       // register seal differs from `engineContractHash()`, and its per-run guard refuses an engine-2 run without it.
-      const engineSeal = this.settings.engine?.engineContractHash;
+      const engineSeal = settings.engine?.engineContractHash;
       if (engineSeal === undefined) {
         throw new TypedDomainError("ENGINE_RUNNER_UNCONFIGURED", "Engine 2's calls carry the engine seal this runner was not given");
       }
-      const judgeBound = guidedCallBound(this.settings.judgeBound, "comparing_judge", lengthGuidance);
+      const judgeBound = guidedCallBound(settings.judgeBound, "comparing_judge", lengthGuidance);
       const planKey = comparingJudgeCallSiteKey(1);
       const judgeSeats = seatBook.judge.filter((seat) => !seatSitsOut(seat)).flatMap((seat) => {
         const member = seatCaller.plan(seat, planKey);
@@ -9872,7 +10109,7 @@ export class WalkingSkeletonRunner {
     const classHNodeIds = new Set(standing.hiddenNodeIds);
     const classDNodeIds = new Set(standing.derivedStandingNodeIds);
     const propagation = makerPositionServe.propagation;
-    const threshold = this.settings.hiddenNodeScoreThreshold;
+    const threshold = settings.hiddenNodeScoreThreshold;
     const lowScoreRows = threshold === undefined
       ? []
       : propagation.strengths.filter((row) => row.strength <= threshold.value);
@@ -9910,7 +10147,7 @@ export class WalkingSkeletonRunner {
     // stays acyclic (confirm-item 3: the round-3 objection is a mark, never a
     // label input). The mark it may earn is attached to the served answer's
     // result below, once the terminal is known.
-    const verdictLabelControls = this.settings.verdictLabelPolicy;
+    const verdictLabelControls = settings.verdictLabelPolicy;
     if (verdictLabelControls === undefined) {
       // Unreachable from executeWorkItem: the claim-time gate above refuses
       // first. Kept as the typed defence for any future caller that reaches
@@ -9970,7 +10207,7 @@ export class WalkingSkeletonRunner {
     const propagationRunId = await this.#ledger.recordPropagation({
       runId: run.runId,
       inputHash: hash(snapshot),
-      contractHash: this.settings.propagationContractHash,
+      contractHash: settings.propagationContractHash,
       graphFingerprint: hash(propagation.graphFingerprintMaterial),
       arrowOrder: propagation.arrowOrder,
       clusterRecords: propagation.clusterRecords,
@@ -10021,9 +10258,9 @@ export class WalkingSkeletonRunner {
         return {
           ...strength,
           reducedJudgementRef: lineage.reducedJudgementId,
-          numberKind: this.settings.propagationNumberKind,
+          numberKind: settings.propagationNumberKind,
           sourceRef: lineage.provenanceRef,
-          producer: this.settings.propagationProducer,
+          producer: settings.propagationProducer,
           replayHandle: `replay:${run.runId}:${lineage.nodeId}`,
           wayOfKnowing: lineage.wayOfKnowing
         };
@@ -10036,9 +10273,9 @@ export class WalkingSkeletonRunner {
       subjectItemId: servedRoot.nodeId,
       stanceAtAction: "UNASSIGNED",
       outcome: "OK",
-      actorRef: this.settings.propagationProducer,
+      actorRef: settings.propagationProducer,
       inputHash: hash(snapshot),
-      contractHash: this.settings.propagationContractHash,
+      contractHash: settings.propagationContractHash,
       rawArtifactRef: servedRoot.provenanceRef,
       startedAt: propagationStartedAt,
       finishedAt: new Date()
@@ -10185,7 +10422,7 @@ export class WalkingSkeletonRunner {
     let servePhaseFailure: unknown = null;
     /** Task M4: the digest the answer-writer was handed (every round's is the same), for the owner's row. */
     let writerDigest: SynthesisDigest | null = null;
-    const servePrices = this.settings.providerPrices ?? EMPTY_PROVIDER_PRICES;
+    const servePrices = settings.providerPrices ?? EMPTY_PROVIDER_PRICES;
     const whileServing = async <T>(call: () => Promise<T>): Promise<T> => {
       try {
         return await call();
@@ -10449,7 +10686,7 @@ export class WalkingSkeletonRunner {
       workItemId: claimed.workItemId,
       attemptId: runnerAttemptId,
       actorRef: "run-cost-envelope",
-      contractHash: this.settings.serveContractHash,
+      contractHash: settings.serveContractHash,
       decision
     });
     const makeEnvelopeTerminal = async (
@@ -10813,9 +11050,9 @@ export class WalkingSkeletonRunner {
             // judge, answering about ONE node, had 180.
             // Debate shape (spec §3.3 step 8): max(the sealed bound, the row's writer bound) — never under the sealed one;
             // the sealed bound itself, the same object, on today's run (`shapeWriterBound`).
-            bound: guidedCallBound(shapeWriterBound(this.settings.synthesisRolePolicy.synthesizerBound,
+            bound: guidedCallBound(shapeWriterBound(settings.synthesisRolePolicy.synthesizerBound,
               shapeRun === null ? null : shapeRun.shape.writerBound), "answer_writer", lengthGuidance),
-            contractHash: this.settings.composerContractHash,
+            contractHash: settings.composerContractHash,
             // Length guidance: the writer is told its target, so its words are recorded beside what it wrote.
             ...(lengthGuidance === null ? {} : { guidedWords: lengthGuidance.steps.answer_writer }),
             providerRef: planned.providerRef,
@@ -10946,8 +11183,8 @@ export class WalkingSkeletonRunner {
             lane: "served",
             modelRole: "ANSWER_CHECKER",
             // W10/3: the EVALUATOR's own sealed bound, formerly CONFORMANCE's.
-            bound: guidedCallBound(this.settings.synthesisRolePolicy.evaluatorBound, "answer_checker", lengthGuidance),
-            contractHash: this.settings.conformanceContractHash,
+            bound: guidedCallBound(settings.synthesisRolePolicy.evaluatorBound, "answer_checker", lengthGuidance),
+            contractHash: settings.conformanceContractHash,
             // Length guidance: the checker is told its own target, so its words are recorded beside what it wrote.
             ...(lengthGuidance === null ? {} : { guidedWords: lengthGuidance.steps.answer_checker }),
             providerRef: planned.providerRef,
@@ -11074,7 +11311,7 @@ export class WalkingSkeletonRunner {
     // node identity, never by array position (a multi-node graph reorders).
     const strength = propagation.strengths.find((row) => row.nodeId === servedRoot.nodeId);
     if (strength === undefined) throw new TypedDomainError("EMPTY_PROPAGATION", run.runId);
-    const terminalEvaluator = this.settings.resolveTerminalActivations;
+    const terminalEvaluator = settings.resolveTerminalActivations;
     if (terminalEvaluator === undefined) {
       throw new TypedDomainError(
         "TERMINAL_ACTIVATION_EVALUATOR_UNRESOLVED",
@@ -11215,7 +11452,7 @@ export class WalkingSkeletonRunner {
      */
     if (seatBook.assigned && result.crashClass === null) {
       const actorByArtifact = new Map<string, string>();
-      for (const contractHash of [this.settings.composerContractHash, this.settings.conformanceContractHash]) {
+      for (const contractHash of [settings.composerContractHash, settings.conformanceContractHash]) {
         const rows = await runnerStage("TERMINAL_STATE_READ_FAILED", () => this.#ledger.readSeatMarkedModelCalls({
           runId: run.runId, workItemId: claimed.workItemId, contractHash
         }));
@@ -11245,7 +11482,7 @@ export class WalkingSkeletonRunner {
     const persisted = await runnerStage("ANSWER_PERSIST_FAILED", () => this.#serve.persist({
       runId: run.runId,
       workItemId: claimed.workItemId,
-      factBundleVersion: this.settings.factBundleVersion,
+      factBundleVersion: settings.factBundleVersion,
       factBundleContentHash: hash(factBundle),
       factBundle,
       result,
@@ -11257,9 +11494,9 @@ export class WalkingSkeletonRunner {
       servedNumber: compositionEvidenceRequired(result) ? {
         numberRef: "number:final-strength",
         value: strength.strength,
-        numberKind: this.settings.propagationNumberKind,
+        numberKind: settings.propagationNumberKind,
         sourceRef: servedRoot.provenanceRef,
-        producer: this.settings.propagationProducer,
+        producer: settings.propagationProducer,
         replayHandle,
         propagationRunId
       } : null,
@@ -11323,7 +11560,7 @@ export class WalkingSkeletonRunner {
       outcome: "OK",
       actorRef: "serve-gate-chain",
       inputHash: hash({ factBundle, propagationRunId }),
-      contractHash: this.settings.serveContractHash,
+      contractHash: settings.serveContractHash,
       startedAt: serveStartedAt,
       finishedAt: new Date()
     }));
@@ -11352,7 +11589,7 @@ export class WalkingSkeletonRunner {
        * unavailable. The failed write is already logged by its code
        * (SERVE_DISCLOSURE_WRITE_FAILED); there is then no floor story.
        */
-      const storyWriter = this.settings.story;
+      const storyWriter = settings.story;
       const floorRecorded = floor !== null && disclosureRecorded;
       if (storyWriter !== undefined && (answerCarriesLabel || floorRecorded)) {
         try {
@@ -11512,12 +11749,14 @@ export class WalkingSkeletonRunner {
      * does can change that: the writer never rejects, and this catch exists so
      * that no defect in the writer can reach the failure path of a DONE item.
      */
-    const storyWriter = this.settings.story;
+    const storyWriter = settings.story;
     const settled = afterSettle.story;
     if (storyWriter !== undefined && settled !== null) {
       try {
         if (settled.kind === "SNAPSHOT") {
-          await storyWriter.writeAfterSettle(settled.input);
+          // Side-by-side spec §13 (S3, ruling R36): every write carries this debate's own version's story policy (null
+          // included: the version sealed no story rows); undefined only without per-version settings (the writer's own).
+          await storyWriter.writeAfterSettle(settings.storyPolicy === undefined ? settled.input : Object.freeze({ ...settled.input, policy: settings.storyPolicy }));
         } else {
           storyWriter.reportSnapshotFailure(settled);
         }
@@ -11532,6 +11771,31 @@ export class WalkingSkeletonRunner {
       keepAlive.stop();
     }
   }
+}
+
+/**
+ * Final fix wave S14 — THE COMMON RULE for an owner-typed detail in a settings code (`CODE:detail[:detail…]`), the same
+ * rule the native operator's THINKING_REFUSAL pass-through and the practice's thinking-level check
+ * (tools/preview-practice/practice-redaction.ts `printableSettingsCode`) apply. The detail is key-shaped when it holds an
+ * unbroken run of 24+ letters and digits, a `//` (a socket or URL path) or a vendor `sk-` prefix.
+ */
+const SETTINGS_DETAIL_KEY_SHAPED = /[A-Za-z0-9]{24,}|\/\/|\bsk-/u;
+/** Final fix wave S14: one detail part a journal line may name whole (a model id, a step or level word, a row key). */
+const SETTINGS_DETAIL_PART = /^[A-Za-z0-9_.\/-]{1,64}$/u;
+
+/**
+ * Final fix wave S14: the `code` field of the runner's DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED lines (the cache's and the
+ * per-debate one) and of the boot's DEBATEAI_RUNNER_SETTINGS summary. A loader's code may carry what the owner typed
+ * into a settings version (a model or step name in PREVIEW_THINKING_LEVELS_INVALID:…); it is printed whole only when
+ * every detail part is plainly an id and the detail is not key-shaped, else the bare code (the part before the first
+ * ':'). A code without a detail is printed as it is.
+ */
+export function settingsJournalCode(code: string): string {
+  const colon = code.indexOf(":");
+  if (colon === -1) return code;
+  const detail = code.slice(colon + 1);
+  const plain = detail.split(":").every((part) => SETTINGS_DETAIL_PART.test(part)) && !SETTINGS_DETAIL_KEY_SHAPED.test(detail);
+  return plain ? code : code.slice(0, colon);
 }
 
 export type RunnerExecutionResult =
@@ -11645,6 +11909,8 @@ const UNRECOGNIZED_DOMAIN_CODE = "UNRECOGNIZED_DOMAIN_ERROR";
  */
 const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "ABSENT_SIGNAL_HAS_FRESHNESS",
+  "ACTIVE_SETTINGS_READ_DEADLINE",
+  "ACTIVE_SETTINGS_VERSION_INVALID",
   "ADAPTIVE_STOPPING_CONTROLS_INVALID",
   "ADAPTIVE_STOPPING_CONTROLS_PROVENANCE_MISSING",
   "ADAPTIVE_STOPPING_CONTROLS_UNRESOLVED",
@@ -11931,6 +12197,10 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "PERSON_ALLOWANCE_REACHED",
   "POSITIVE_CAPTURE_REQUIRED",
   "PRESENT_SIGNAL_FRESHNESS_UNKNOWN",
+  "PREVIEW_LINE_UP_ENV_CONFLICT",
+  "PREVIEW_LINE_UP_POLICY_INVALID",
+  "PREVIEW_LINE_UP_REQUIRED",
+  "PREVIEW_LINE_UP_WITHOUT_PREVIEW",
   "PRIVATE_CONTENT_ERASED",
   "PRODUCER_GRADING_FORBIDDEN",
   "PRODUCING_RUN_REQUIRED",
@@ -12021,6 +12291,8 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUN_PRINCIPAL_SESSION_MISMATCH",
   "RUN_ROLE_ASSIGNMENT_INVALID",
   "RUN_ROLE_ROTATION_INVALID",
+  "RUN_SETTINGS_VERSION_DRIFT",
+  "RUN_SETTINGS_VERSION_UNKNOWN",
   "SCALAR_DECISION_CANNOT_SPAWN",
   "SCORECARD_INTERVAL_INVALID",
   "SCORECARD_TASK_CLASS_AMBIGUOUS",
@@ -12053,6 +12325,9 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "SERVE_STATUS_UNKNOWN",
   "SESSION_POLICY_INVALID",
   "SESSION_POLICY_UNRESOLVED",
+  "SETTINGS_CHECK_NO_AI_CALL",
+  "SETTINGS_HASH_UNDECLARED",
+  "SETTINGS_VERSION_UNSUPPORTED",
   "SETTLEMENT_FIELD_REQUIRED",
   "SETTLEMENT_IDENTITY_INVALID",
   "SETTLEMENT_NUMBER_INVALID",
@@ -12648,9 +12923,17 @@ export const RUNNER_EXECUTION_LIMIT = "3600s" as const;
  * before anything runs, so this is the defence for a mismatch raised anywhere later). Neither becomes a
  * `terminal_reason`. Side-by-side spec §4: nor a debate stopped because its release is retiring (RUNNER_RETIRING): the
  * item is left as is for this release's backstop, which sets it aside FAILED with the waiver (spec §4 step 3); the §3
- * fence keeps every other release off it.
+ * fence keeps every other release off it. Side-by-side spec §13, §9 (Task S7): nor a debate whose settings version this
+ * release cannot run (SETTINGS_VERSION_UNSUPPORTED): `execute` already set it aside, FAILED with
+ * `RUN_SET_ASIDE:SETTINGS_VERSION_UNSUPPORTED` and its waiver, so a wrapped failure here would replace SET_ASIDE's plain
+ * sentence with another one (or the item is no longer this copy's, and is left to its holder).
  */
-const LEAVES_WORK_ITEM_ALONE: ReadonlySet<string> = new Set(["RUNNER_CLAIM_LOST", "RUNNER_RELEASE_MISMATCH", "RUNNER_RETIRING"]);
+const LEAVES_WORK_ITEM_ALONE: ReadonlySet<string> = new Set([
+  "RUNNER_CLAIM_LOST",
+  "RUNNER_RELEASE_MISMATCH",
+  "RUNNER_RETIRING",
+  "SETTINGS_VERSION_UNSUPPORTED"
+]);
 
 export function declareHatchetWalkingSkeletonTask(input: {
   readonly client: Pick<Hatchet, "task">;
@@ -12992,6 +13275,9 @@ export function createPostgresProviderGateway(
           "A story call and the STORY: call-site namespace must agree"
         );
       }
+      // Final fix wave S1: a defence for a composition that meters debate calls but gives no story seam. main.ts and the
+      // practice always give both, so in production a version without a story ceiling is refused by its guard's story
+      // seam instead (the same STORY_ENVELOPE_MISSING, built below before the provider-failure capture).
       if (storyScope && buildStoryCostEnvelopeSeam === undefined && buildCostEnvelopeSeam !== undefined) {
         throw new TypedDomainError(
           "STORY_ENVELOPE_MISSING",
@@ -13066,28 +13352,34 @@ export function createPostgresProviderGateway(
       if (remaining <= 0) {
         throw new TypedDomainError("CALL_BUDGET_EXHAUSTED", request.subjectItemId);
       }
+      /**
+       * V-28: the money envelope binds EVERY call, the authenticated evaluator
+       * scope included. That scope is exempt from the ATTEMPT ceiling because
+       * its attempts are billed to the evaluator rather than to the run
+       * (`ledger_entry_is_authenticated_scope`), but its calls are made against
+       * the same paid vendor with the same money, so exempting them from the
+       * money ceiling would leave a hole the size of the evaluator leg. The run
+       * id is the leased one, for the same reason as the attempt hook below.
+       *
+       * Verdict story: a story call is bound by the STORY's seam instead —
+       * its own ceiling, summed over STORY charges only.
+       *
+       * Task M1: the run's seam is built for the call's phase, so an
+       * answer-writing call is compared with the answer's ceiling.
+       *
+       * Parallel AI calls: built here, so the finally below can release what
+       * it still counts in flight once the call has settled.
+       *
+       * Final fix wave S1 (FINAL-FIX 6): built BEFORE the try that captures a
+       * failed call as PROVIDER_EXHAUSTED. A seam that cannot be built (the run's
+       * version unknown to this process, RUN_SETTINGS_VERSION_UNKNOWN; a version
+       * without a story ceiling, STORY_ENVELOPE_MISSING) is a settings refusal:
+       * it ends the call before anything is sent, with its own code, uncaptured.
+       */
+      costEnvelope = storyScope
+        ? buildStoryCostEnvelopeSeam?.(leasedRunId)
+        : buildCostEnvelopeSeam?.(leasedRunId, costEnvelopePhase, providerCallSharedWall(request));
       try {
-        /**
-         * V-28: the money envelope binds EVERY call, the authenticated evaluator
-         * scope included. That scope is exempt from the ATTEMPT ceiling because
-         * its attempts are billed to the evaluator rather than to the run
-         * (`ledger_entry_is_authenticated_scope`), but its calls are made against
-         * the same paid vendor with the same money, so exempting them from the
-         * money ceiling would leave a hole the size of the evaluator leg. The run
-         * id is the leased one, for the same reason as the attempt hook below.
-         *
-         * Verdict story: a story call is bound by the STORY's seam instead —
-         * its own ceiling, summed over STORY charges only.
-         *
-         * Task M1: the run's seam is built for the call's phase, so an
-         * answer-writing call is compared with the answer's ceiling.
-         *
-         * Parallel AI calls: built here, so the finally below can release what
-         * it still counts in flight once the call has settled.
-         */
-        costEnvelope = storyScope
-          ? buildStoryCostEnvelopeSeam?.(leasedRunId)
-          : buildCostEnvelopeSeam?.(leasedRunId, costEnvelopePhase, providerCallSharedWall(request));
         return await http.call({
           // Preview retry fix, option B (spec 2026-10-11 §1.1): the spread forwards the preview's
           // `maxAttemptsThisCall` (one POST per call), and `remaining` stays the step's billed allowance,

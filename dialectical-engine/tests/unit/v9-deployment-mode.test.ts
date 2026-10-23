@@ -472,11 +472,20 @@ describe("V-28 seam: hosted refuses unless the cost envelopes are sealed (task 1
 
 describe("V-9 both shipped roots take the mode decision (task 10a)", () => {
   it("runs the mode-aware target assertion in the API and the runner", async () => {
-    for (const path of ["../../apps/api/src/main.ts", "../../apps/runner/src/main.ts"]) {
-      const source = await readFile(new URL(path, import.meta.url), "utf8");
-      expect(source).toContain("assertDeploymentProviderTargets(");
-      expect(source).toContain("environment.DEPLOYMENT_MODE");
-    }
+    // Side-by-side spec §13 (S14): the runner's is in its site reads (readRunnerSiteContext, run-settings.ts), which
+    // main.ts calls.
+    expect(await readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8"))
+      .toContain("await readRunnerSiteContext({ pool, environment, moneyInFlight })");
+    // S14 (ruling R57): the API's is its one targets decision (parseDeclaredProviderTargets, provider-discovery.ts), which
+    // main.ts calls with its environment's mode and NODE_ENV.
+    const apiMain = await readFile(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
+    expect(apiMain).toContain("parseDeclaredProviderTargets({");
+    expect(apiMain).toContain("mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV");
+    expect(await readFile(new URL("../../apps/api/src/provider-discovery.ts", import.meta.url), "utf8"))
+      .toContain("assertDeploymentProviderTargets(declared, { mode: input.mode, nodeEnv: input.nodeEnv });");
+    const runnerSiteReads = await readFile(new URL("../../apps/runner/src/run-settings.ts", import.meta.url), "utf8");
+    expect(runnerSiteReads).toContain("assertDeploymentProviderTargets(");
+    expect(runnerSiteReads).toContain("environment.DEPLOYMENT_MODE");
   });
 
   it("asks BOTH roots for sealed cost envelopes before either spends anything", async () => {

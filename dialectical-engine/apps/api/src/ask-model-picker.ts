@@ -38,7 +38,6 @@ import {
   type RoleAssignment,
   type TargetPrice
 } from "@debateai/scorecard";
-import type { BootCustody } from "./boot-custody.js";
 
 /**
  * A20 — WHAT ASK ADMISSION HANDS THE MODEL PICKER, stated once.
@@ -345,6 +344,15 @@ export function askModelPickerSettings(input: Readonly<{
 }
 
 /**
+ * The ledger composeAskModelPicker runs its two stages under: the boot's own (`Pick<BootCustody, "run" | "runSync">`
+ * fits), or the admission loader's stage (side-by-side spec §13), whose `runSync` answers a promise.
+ */
+export type AskModelPickerBoot = Readonly<{
+  run<T>(stage: string, operation: () => Promise<T>): Promise<T>;
+  runSync<T>(stage: string, decision: () => T): T | Promise<T>;
+}>;
+
+/**
  * A20 / final review I5 — THE API'S TWO MODEL-PICKER BOOT STAGES, as one
  * function the boot ledger runs and a test can drive without Postgres.
  *
@@ -364,12 +372,14 @@ export function askModelPickerSettings(input: Readonly<{
  *
  * `boot` is the API boot's own ledger (`installBootCustody`), so a failure in
  * either stage closes everything the boot holds and names the stage, exactly as
- * when these stages were written out in apps/api/src/main.ts. The two file
- * locations default to the engine's own manifest and bundled scorecard; only a
- * test passes others.
+ * when these stages were written out in apps/api/src/main.ts. Side-by-side spec
+ * §13: the per-version admission loader (./admission-settings.ts) hands its own
+ * stage for both, which runs a decision through the ledger's awaited `run`, so
+ * `runSync` may answer a promise. The two file locations default to the
+ * engine's own manifest and bundled scorecard; only a test passes others.
  */
 export async function composeAskModelPicker(input: Readonly<{
-  boot: Pick<BootCustody, "run" | "runSync">;
+  boot: AskModelPickerBoot;
   pool: Pool;
   deploymentMode: "hosted" | "local";
   registerVersion: number;

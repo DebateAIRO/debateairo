@@ -455,6 +455,34 @@ export const mapAnswerCheck = core.table("map_answer_check", {
   recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull()
 });
 
+// Side-by-side spec §13 (0124): settings changes without an upload. Append-only, codes and numbers only, written only by
+// 0124's definer functions (owned by debateai_release_owner). The runner never reads the pointer (plan S, D8): these
+// definitions name the tables for the migration machinery only (ruling R2).
+export const settingsActivation = register.table("settings_activation", {
+  activationSeq: bigint("activation_seq", { mode: "number" }).primaryKey(),
+  registerVersion: bigint("register_version", { mode: "number" }).notNull(),
+  expectedPrevious: bigint("expected_previous", { mode: "number" }),
+  releaseKey: text("release_key").notNull(),
+  activatedAt: timestamp("activated_at", { withTimezone: true }).notNull(),
+  activatedBy: text("activated_by").notNull(),
+  reason: text("reason").notNull()
+});
+
+export const settingsVerdict = register.table("settings_verdict", {
+  releaseKey: text("release_key").notNull(),
+  registerVersion: bigint("register_version", { mode: "number" }).notNull(),
+  verdict: text("verdict").notNull(),
+  digest: text("digest").notNull(),
+  checkedAt: timestamp("checked_at", { withTimezone: true }).notNull()
+});
+
+export const settingsSwitchCheck = register.table("settings_switch_check", {
+  checkSeq: bigint("check_seq", { mode: "number" }).primaryKey(),
+  releaseKey: text("release_key").notNull(),
+  expectedActiveSettings: bigint("expected_active_settings", { mode: "number" }),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull()
+});
+
 export const nodeReview = ledger.table("node_review", {
   nodeReviewId: uuid("node_review_id").primaryKey(),
   runId: uuid("run_id").notNull(),

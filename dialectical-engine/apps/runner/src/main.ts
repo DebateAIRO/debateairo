@@ -8,40 +8,23 @@ import {
   loadKekRing,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { configureContentEncryption, createPool, EntitlementRepository, PostgresInternalAllowanceRepository, RUNNER_CAPACITY, RUNNER_DATABASE_POOLS, RunRepository } from "@debateai/db";
-import { BillingPersonAllowanceSource } from "@debateai/billing-core";
-import { FundingAwarePersonAllowanceSource } from "@debateai/billing-core";
+import { configureContentEncryption, createPool, RUNNER_CAPACITY, RUNNER_DATABASE_POOLS, RunRepository } from "@debateai/db";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
 import { releaseTaskName, TypedDomainError } from "@debateai/kernel";
 import {
   assertHostedCostEnvelopesSealed,
-  costEnvelopeBand,
-  costEnvelopeCeilings,
   loadRunnerEnvironment,
-  readBillingPlans,
-  readCostEnvelopePolicy,
-  readEngineVersion,
-  readModelScorecard,
-  readStoryPolicyFromRegister,
   effectiveCallConcurrency,
   readCallConcurrencyPolicy
 } from "@debateai/register";
 import {
-  CostEnvelopeGuard,
-  PostgresModelSpendStore,
-  assertRunCeilingCoversOneCall,
-  costEnvelopeGuardPolicy,
   type CostEnvelopePhase,
   type SharedWallApplication
 } from "@debateai/budget";
-import { PLAN_TIER_ROSTERS, askQuestionMaxBytes } from "@debateai/contract";
-import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
-import { firstCallPlanModels } from "@debateai/scorecard";
-import { readDeploymentMakerCapability } from "@debateai/critique";
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
 // any local name (codex r2 B1). A multi-line import hides the specifiers from that pin.
-import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, createPreviewBusyCoordinator, previewRunnerPolicy, previewRunResilience, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, assertDeploymentProviderTargets, assertPricedProviderTargets, observeClaimTimeTarget, parseProviderDiscoveryTargets, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials, previewStructureRepairRoute, previewStructureRepairCeiling, withStructureRepair, previewFinalWriterTierUnreadLine, type PreviewFinalWriterTierUnread, type ProviderGateway } from "@debateai/providers";
+import { createPreviewGuardedFetch, createPreviewBudgetRpcPorts, createPreviewBusyCoordinator, previewRunResilience, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, observeClaimTimeTarget, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials, previewStructureRepairRoute, previewStructureRepairCeiling, withStructureRepair, previewFinalWriterTierUnreadLine, type PreviewFinalWriterTierUnread, type ProviderGateway } from "@debateai/providers";
 import {
   STORY_SHAPES_DIR_ENV_KEY,
   StoryWriter,
@@ -49,17 +32,15 @@ import {
   resolveStoryPackDir,
   type StoryPack
 } from "@debateai/story";
-import { assertRegisterPromptContractHashes, buildProviderPriceMap, createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, logBodyCostFallback, logServeDisclosure, plansUnresolvedPersonAllowance, WalkingSkeletonRunner } from "./index.js";
+import { buildProviderPriceMap, createPostgresProviderGateway, declareHatchetWalkingSkeletonTask, logBodyCostFallback, logServeDisclosure, WalkingSkeletonRunner } from "./index.js";
 import { createCallScheduler, type CallSubject } from "./call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateRemainingReaders, structureRepairThroughLane, targetCallSubjects } from "./call-lane-gateway.js";
 import { createRunInFlight } from "./run-in-flight.js";
-import { readDebateShapeRunnerSettings } from "./debate-shape-boot.js";
-import { readEngineRunnerSettings } from "./engine-boot.js";
+import { createRunnerSettingsCache, createRunSettingsVersions, loadRunnerVersionSettings, preloadRunnerSettings, readRunnerSiteContext, runCostEnvelopeGuardOf, runnerSettingsLine, runnerSettingsOfVersion, runPreviewThinkingLevelsOf } from "./run-settings.js";
 import {
   assertRunnerPrimaryProviderConfiguration,
   createRunnerProviderTopology
 } from "./provider-topology.js";
-import { readDevelopmentRunnerPolicy } from "./dev-runner-policy.js";
 import { reconcileRunnerStartupWork } from "./runner-startup-reconciliation.js";
 import { startLapsedClaimResend } from "./runner-lapsed-resend.js";
 import { postgresRunnerPreviewTeamGateStore, refusePreviewOutsiderWork } from "./runner-preview-team-gate.js";
@@ -76,7 +57,12 @@ import {
 } from "./runner-retirement.js";
 
 const environment = loadRunnerEnvironment();
-const previewConfig = environment.PREVIEW_PROVIDER_TEST_CONFIG;
+/**
+ * Addition D14-D16 (side-by-side spec §13): "is this the preview?" keys on the env's GATE part, present for every accepted
+ * form (the sockets-only one too), never on a composed config: the line-up is each settings version's own
+ * (`siteVersionSettings.previewConfig` below; run-settings.ts). Every gate-only helper takes this part.
+ */
+const previewGate = environment.PREVIEW_GATE_SETTINGS;
 // V-9(c) / V-28: a hosted deployment spends money on paid vendor APIs, so it may
 // not claim work until the per-run and daily cost envelopes are sealed. The seam
 // is `readSealedCostEnvelopeStatus` in @debateai/register — task 11 publishes the
@@ -116,43 +102,6 @@ if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {
     )
   ));
 }
-const policy = previewRunnerPolicy(await readDevelopmentRunnerPolicy(pool, environment.REGISTER_VERSION), previewConfig);
-// Practice debate 3 (2026-10-12): every judge, answer-writer and answer-checker call is recorded under the register's
-// prompt fingerprint, so a register that does not carry the fingerprint of a prompt this code sends refuses the start
-// (REGISTER_PROMPT_CONTRACT_HASH_MISMATCH) instead of logging the new prompt under the old fingerprint.
-assertRegisterPromptContractHashes(policy.hashes, environment.REGISTER_VERSION);
-/**
- * VERDICT STORY (spec 2026-09-26 §9): the story's register rows are OPTIONAL.
- * A register that never sealed them — every version before this feature,
- * acceptance v3 included — reads as `null`, and each story is then written as
- * FAILED/STORY_NOT_CONFIGURED without a model call. A PARTLY sealed or
- * malformed family is logged by code and treated the same way: the story can
- * never stop this runner from claiming a debate.
- */
-const storyPolicy = await readStoryPolicyFromRegister(pool, environment.REGISTER_VERSION)
-  .catch((error: unknown) => {
-    console.warn(JSON.stringify({
-      kind: "DEBATEAI_STORY",
-      event: "STORY_POLICY_UNREADABLE",
-      code: error instanceof TypedDomainError ? error.code : "UNTYPED"
-    }));
-    return null;
-  });
-const storyCeilingMicros = storyPolicy?.perStoryCeilingMicros ?? null;
-/**
- * Debate shape (spec 2026-10-12 §3.1, §4): the optional row (absent = today's shape, byte for byte; malformed = boot
- * refused, DEBATE_SHAPE_POLICY_INVALID) and, only with it, the sealed map contracts (DEBATE_SHAPE_MAP_HASH_UNSEALED /
- * MAP_CONTRACT_HASH_MISMATCH). A run's sizes are read from its own receipt, never from this row.
- */
-const debateShape = await readDebateShapeRunnerSettings(pool, environment.REGISTER_VERSION);
-/**
- * Engine redesign (spec 2026-10-15 §3.3; INTERFACE §1.5, §2.3): the optional engineVersionPolicy row (absent = engine 1,
- * today's runner byte for byte, and neither the length row nor the seal is read; malformed = boot refused,
- * ENGINE_VERSION_POLICY_INVALID) and, only with it (enabled or not), the length row's presence and the sealed
- * engineContractHash (ENGINE_REQUIRES_LENGTH_POLICY / ENGINE_CONTRACT_HASH_UNSEALED / ENGINE_CONTRACT_HASH_MISMATCH).
- * A run's engine is read from its own receipt, never from this row.
- */
-const engine = await readEngineRunnerSettings(pool, environment.REGISTER_VERSION);
 /**
  * Codes and ids only: a story log line never carries story or debate text. The
  * detail goes FIRST, so no detail key can overwrite the line's kind or event.
@@ -187,60 +136,6 @@ try {
   });
   storyLog("STORY_PACK_INVALID", { reason: storyPack.error });
 }
-const deploymentMakers = await readDeploymentMakerCapability(pool, environment.REGISTER_VERSION);
-if (environment.PROVIDER_DISCOVERY_TARGETS_JSON === undefined) {
-  throw new TypeError("PROVIDER_DISCOVERY_TARGETS_REQUIRED");
-}
-const declaredProviderTargets = parseProviderDiscoveryTargets(
-  environment.PROVIDER_DISCOVERY_TARGETS_JSON,
-  deploymentMakers.configuredProviders
-);
-// The mode decision is taken on what the operator DECLARED, before any credential
-// is resolved: that is what makes an inline `authorization_header` refusable in
-// hosted mode even though a resolved target legitimately carries a header.
-assertDeploymentProviderTargets(declaredProviderTargets, {
-  mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV
-});
-// V-28: and a hosted DEBATE target must carry its price, or its calls cannot be
-// billed against the per-run and daily envelopes. Separate from the rule above
-// because the support chat's target shares that one and keeps its own accounting.
-assertPricedProviderTargets(declaredProviderTargets, environment.DEPLOYMENT_MODE);
-// V-9(2): each vendor's credential file, read once under the custody contract.
-if (previewConfig !== undefined) {
-  assertPreviewProviderTargets(previewConfig, declaredProviderTargets);
-  // Every role the register names must be a declared target, or its debates would fail at claim.
-  assertPreviewRoleTargets(previewConfig, declaredProviderTargets, [
-    policy.synthesisRolePolicy.synthesizerRoleRef, policy.synthesisRolePolicy.evaluatorRoleRef,
-    ...(storyPolicy === null ? [] : [storyPolicy.storytellerRoleRef, storyPolicy.storyCheckerRoleRef])
-  ]);
-  if ((await readModelScorecard(pool, environment.REGISTER_VERSION, await readEngineVersion())).state === "VALID") {
-    throw new TypedDomainError("PREVIEW_SCORECARD_CONFLICT", "Preview roster cannot override a valid scorecard");
-  }
-}
-const previewFetch = previewConfig === undefined ? fetch : createPreviewGuardedFetch(createPreviewBudgetRpcPorts(previewConfig));
-const providerTargets = resolveProviderTargetCredentials(
-  declaredProviderTargets, readCustodyAuthorizationHeader
-);
-const hatchet = new Hatchet({
-  token: environment.HATCHET_CLIENT_TOKEN, host_port: environment.HATCHET_HOST_PORT,
-  api_url: environment.HATCHET_API_URL, tenant_id: environment.HATCHET_TENANT_ID,
-  tls_config: { tls_strategy: environment.HATCHET_TLS_STRATEGY }
-});
-/**
- * V-28 (DL4-F2) — THE PER-RUN MONEY ENVELOPE, wired per target.
- *
- * HOSTED only, and the mode decides it once here rather than at every call:
- * local mode is the relays and loopback model servers, which report no usage and
- * cost no money, and V-28(3) leaves it untouched with the attempt ceiling it has
- * always had. In hosted mode `assertPricedProviderTargets` above has already
- * refused any target with no declared price, so `providerTargetPrice` below
- * cannot be null there — the refusal is kept anyway, because a control that
- * depends on another control having run is one edit away from being none.
- */
-const costEnvelopePolicy = environment.DEPLOYMENT_MODE === "hosted"
-  ? await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION)
-  : null;
-const modelSpendStore = new PostgresModelSpendStore(pool);
 /**
  * Parallel AI calls (spec 2026-10-12 §3.5; ruling R15) — the calls in flight, TWO counters, never one shared: the
  * counting gateway's (each call's attempt, for the run-wide attempt ceiling) and the money guard's (each call's
@@ -256,117 +151,47 @@ const moneyInFlight = createRunInFlight();
  */
 const modelCalls = createModelCallCounter();
 /**
- * B9 (budget spec §2.9, paid-plans spec §2.4.1–2.4.2) — THE SHARED WALL WHILE
- * ARGUING, in two independent halves, built whenever hosted.
- *
- *  · THE SITE'S DAY, only with the costEnvelopePolicy row's three band members,
- *    read by their one reader (`costEnvelopeBand`, task B1), at the band's
- *    finish edge (115%). Without the band there is no site-day wall and no body
- *    fallback (budget spec §2.4): `finishBasisPoints` is null.
- *  · THE PERSON, for every run with a charge scope (ruling R-19: the person wall
- *    applies iff the row exists), band or no band: each of the run owner's
- *    windows at its own finish edge (110%, from the plan). The owner is the one
- *    billing pinned on the run at admission (`billing.run_charge_scope`, read by
- *    the spend store); the windows come from `BillingPersonAllowanceSource`
- *    (billing-core) over the READ-ONLY entitlement port —
- *    `billing.person_windows_v`, never the lazy Free append (ruling R-12). The
- *    wall reads each window's finish edge and never its close edge, so without
- *    the band the source is built with a close edge of 10 000 (inside the range
- *    it accepts). B6 writes a charge scope only while billing is on, so under
- *    old settings the only change is one read by primary key per walled BODY
- *    call, and it finds no owner.
- *
- * Amendment A20: those two relations, the billingPlans and costEnvelopePolicy
- * rows and the pure billing-core are all this process reads of billing — never
- * billingPolicy — and a paid plan past its paid-through time already reads as
- * FREE inside the view (A8).
- *
- * A missing band or missing plans at the runner, on a run with a charge scope,
- * means the API and the runner are on different register versions (billing on
- * needs both at the API's version, A22; the runbook pins the same
- * REGISTER_VERSION in both units; a mismatch or a staggered restart breaks
- * that). The walls fail closed: without the band the person half still stands;
- * without `billingPlans` it refuses (`plansUnresolvedPersonAllowance`) every
- * walled call of such a run as the person's month, the arguing stops and the
- * answer is still written. A run with no charge scope is untouched. The boot
- * says the plans are missing once, in one content-free line.
+ * Side-by-side spec §13 (S14) — THE SITE READS, read once by `readRunnerSiteContext` (run-settings.ts), the one
+ * function this boot, the preview practice and `check-version`'s runner half share: the declared provider targets with
+ * the mode decision (V-9(c)), a hosted target's price (V-28) and, on the preview, the reviewed provider set (addition
+ * D16), all taken on what the operator DECLARED, before any credential file is read; and, hosted only, the site's money
+ * row and band, the billingPlans row (one PLANS_UNRESOLVED line when it is missing) and the money every version's guard
+ * shares — one spend store, the money counter above and the B9 shared wall with the funding admission (never
+ * billingPolicy, amendment A20). The release's site members, handed to the per-version loader below.
  */
-const envelopeBand = costEnvelopePolicy === null ? null : costEnvelopeBand(costEnvelopePolicy);
-const billingPlans = costEnvelopePolicy === null ? null : await readBillingPlans(pool, environment.REGISTER_VERSION);
-if (costEnvelopePolicy !== null && billingPlans === null) {
-  console.warn(JSON.stringify({ kind: "DEBATEAI_PERSON_WALL", event: "PLANS_UNRESOLVED" }));
-}
-const fundingEntitlements = new EntitlementRepository(pool);
-const allowances = new PostgresInternalAllowanceRepository(pool);
-// Side-by-side spec §9: no funding read and no funding refusal at boot. A grant is checked against the policy of the
-// version it was issued with, never the pointer, so a funding selection made after boot works without a restart.
-const fundingAllowance = billingPlans === null ? undefined : new FundingAwarePersonAllowanceSource({
-  allowances,entitlements:{...fundingEntitlements.readOnlyPort(),readRunFundingBasis:(runId)=>fundingEntitlements.readRunFundingBasis(runId)},
-  plans:billingPlans,closeBasisPoints:envelopeBand?.closeBasisPoints ?? 10000
+const { site: runnerSite } = await readRunnerSiteContext({ pool, environment, moneyInFlight });
+const { declaredProviderTargets, envelopeBand } = runnerSite;
+const previewFetch = previewGate === undefined ? fetch : createPreviewGuardedFetch(createPreviewBudgetRpcPorts(previewGate));
+const hatchet = new Hatchet({
+  token: environment.HATCHET_CLIENT_TOKEN, host_port: environment.HATCHET_HOST_PORT,
+  api_url: environment.HATCHET_API_URL, tenant_id: environment.HATCHET_TENANT_ID,
+  tls_config: { tls_strategy: environment.HATCHET_TLS_STRATEGY }
 });
-const sharedWallTerms = costEnvelopePolicy === null
-  ? null
-  : Object.freeze({
-      finishBasisPoints: envelopeBand === null ? null : envelopeBand.finishBasisPoints,
-      persons: billingPlans === null
-        ? plansUnresolvedPersonAllowance()
-        : fundingAllowance ?? new BillingPersonAllowanceSource({
-            entitlements: new EntitlementRepository(pool).readOnlyPort(),
-            plans: billingPlans,
-            closeBasisPoints: envelopeBand === null ? 10_000 : envelopeBand.closeBasisPoints
-          }),
-      owners: modelSpendStore
-    });
-const costEnvelopeGuard = costEnvelopePolicy === null
-  ? undefined
-  : new CostEnvelopeGuard({
-      store: modelSpendStore,
-      // Verdict story: the story's OWN ceiling and overrun, when the register
-      // sealed them. Engine money rule, Task M7: built by the one check over
-      // BOTH money rows, which refuses this boot (STORY_DAILY_CEILING_INSUFFICIENT)
-      // when the day cannot hold one full run plus its story.
-      policy: costEnvelopeGuardPolicy(costEnvelopePolicy, storyPolicy),
-      ...(sharedWallTerms === null ? {} : { sharedWall: sharedWallTerms }),
-      ...(fundingAllowance === undefined ? {} : {fundingAdmission:fundingAllowance}),
-      inFlight: moneyInFlight
-    });
 /**
- * B9 (budget spec §2.10) — A LIMIT BELOW ONE CALL REFUSES THIS BOOT
- * (RUN_CEILING_BELOW_ONE_CALL), instead of failing a person's first debate.
- * Hosted, and only with the costEnvelopePolicy row's three band members (the
- * same `envelopeBand` that builds the shared wall's site-day half, B9b).
- * Priced per plan: the cheapest price among each plan's models, and every
- * plan's cheapest must fit.
- * Paid plans S2: while the sealed model scorecard at this register version is
- * VALID (the row the hosted API's picker reads), each plan's models are every
- * configured model, because the picker seats from all of them. Paid plans S4b:
- * with billing on the picker seats Free from the Free roster only, but this
- * process never reads billingPolicy (amendment A20), so it keeps the looser
- * all-models groups; the API's boot and the hosted publish, which know billing,
- * price Free on its own roster (`ownRosterOnly`).
+ * Side-by-side spec §13 (runner points 1, 2, 7) — ONE PER-VERSION SETTINGS LOADER. Every read of this boot that belongs
+ * to a settings version (the runner policy and its prompt fingerprints, the story's rows, the preview line-up, the
+ * debate shape, the engine, the preview's roster, role and scorecard checks, the run ceiling against one call, the
+ * debate's call lanes) is made by `loadRunnerVersionSettings` (run-settings.ts), for the version asked, and kept in one
+ * cache for the life of this process. The release's site members are read here, once, and handed in. The boot loads
+ * the site version and refuses with the loader's own typed code, as before; from S6 every debate then runs on its own
+ * stamped version through the same cache (`settingsForVersion` in the runner's settings below).
  */
-if (costEnvelopePolicy !== null && envelopeBand !== null) {
-  const firstCalls = firstPositionCallProjections({
-    targets: declaredProviderTargets,
-    judgeTokenCeiling: policy.bounds.JUDGE.tokenCeiling,
-    questionMaxBytes: askQuestionMaxBytes(),
-    // Ruling L-B9R (P2L Task 17): with ANY debateShapePolicy row (read raw above, enabled false too: this runner still
-    // finishes the shaped runs admitted before the switch), a run's first call may carry the locked language, so it is
-    // priced at the longest lock too. No row: today's price.
-    questionLanguageLocked: debateShape !== null
-  });
-  assertRunCeilingCoversOneCall({
-    bodyCeilingMicros: costEnvelopeCeilings(costEnvelopePolicy).bodyMicros,
-    firstCallsByRoster: firstCallsByPlanRoster({
-      projections: firstCalls,
-      rosters: firstCallPlanModels({
-        scorecardInForce: (await readModelScorecard(pool, environment.REGISTER_VERSION, await readEngineVersion())).state === "VALID",
-        rosters: PLAN_TIER_ROSTERS,
-        models: firstCalls.map((call) => call.model)
-      })
-    })
-  });
-}
+const runnerSettings = createRunnerSettingsCache({
+  load: (version) => loadRunnerVersionSettings(pool, version, runnerSite),
+  log: (line) => { console.warn(JSON.stringify(line)); }
+});
+const siteVersionSettings = await runnerSettings.requireSettings(environment.REGISTER_VERSION);
+/**
+ * Side-by-side spec §13 (S6): each claimed run's version, by run id, set by the runner right after the claim; every
+ * money seam below charges a call to its own run's version's guard through it (RUN_SETTINGS_VERSION_UNKNOWN otherwise).
+ */
+const runSettingsVersions = createRunSettingsVersions();
+const runCostEnvelopeGuard = runCostEnvelopeGuardOf(runnerSettings, runSettingsVersions);
+// V-9(2): each vendor's credential file, read once under the custody contract: after the settings checks above, so a
+// boot they refuse (the preview's scorecard conflict among them) never reads a credential.
+const providerTargets = resolveProviderTargetCredentials(
+  declaredProviderTargets, readCustodyAuthorizationHeader
+);
 /**
  * Parallel AI calls (spec 2026-10-12 §3.2-§3.4) — THE RUNNER'S CALL SCHEDULER. One for this process: every debate opens
  * a lane in it, and every model call waits there for a slot under the register's `callConcurrencyPolicy` row (absent:
@@ -377,15 +202,15 @@ if (costEnvelopePolicy !== null && envelopeBand !== null) {
 const runnerCallScheduler = createCallScheduler({
   policy: effectiveCallConcurrency(await readCallConcurrencyPolicy(pool, environment.REGISTER_VERSION))
 });
-if (previewConfig !== undefined) {
-  await applyPreviewGateCapacities({ scheduler: runnerCallScheduler, gates: previewGateRemainingReaders(previewConfig) });
+if (previewGate !== undefined) {
+  await applyPreviewGateCapacities({ scheduler: runnerCallScheduler, gates: previewGateRemainingReaders(previewGate) });
 }
 /**
  * Pre-flight PF-B2.3 (LG-B): each preview gate's read-only `/remaining`, by gate, for the call policy: a final writer's
  * call asks its gate once and gets the final-writer tier only when the gate serves it (a gate older than LG-B: STANDARD).
  */
-const previewGateRemaining = previewConfig === undefined ? {} : Object.freeze(Object.fromEntries(
-  previewGateRemainingReaders(previewConfig).map(({ gate, remaining }) => [gate, remaining] as const)));
+const previewGateRemaining = previewGate === undefined ? {} : Object.freeze(Object.fromEntries(
+  previewGateRemainingReaders(previewGate).map(({ gate, remaining }) => [gate, remaining] as const)));
 /**
  * Task 4 review fix 1: ONE notice for every target's policy, so a final writer sent as STANDARD (its gate offers no
  * final-writer slots, or could not be read) is one warn line per gate and reason for this runner. Codes only.
@@ -395,50 +220,60 @@ const previewFinalWriterTierUnread = (event: PreviewFinalWriterTierUnread): void
 };
 /** Spec §3.3 (owner ruling O4): ONE busy coordinator for every preview call of this runner, so one call probes a busy model. */
 const previewBusy = createPreviewBusyCoordinator();
+/**
+ * V-28 (DL4-F2) — THE PER-RUN MONEY ENVELOPE, wired per target.
+ *
+ * HOSTED only, and the mode decided it once, in the site reads (`runnerSite.money` is null in local mode): local mode
+ * is the relays and loopback model servers, which report no usage and cost no money, and V-28(3) leaves it untouched
+ * with the attempt ceiling it has always had. In hosted mode `assertPricedProviderTargets` (the site reads) has already
+ * refused any target with no declared price, so `providerTargetPrice` below cannot be null there — the refusal is kept
+ * anyway, because a control that depends on another control having run is one edit away from being none.
+ */
 function targetGateway(target: (typeof providerTargets)[number]): ProviderGateway {
   const price = providerTargetPrice(target);
-  if (costEnvelopeGuard !== undefined && price === null) {
+  if (runnerSite.money !== null && price === null) {
     throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`);
   }
   const gateway = createPostgresProviderGateway(pool, {
-    ...(previewConfig === undefined ? {} : { fetchImplementation: previewFetch }),
+    ...(previewGate === undefined ? {} : { fetchImplementation: previewFetch }),
     endpoint: target.baseUrl,
     model: target.model,
     maker: target.maker,
     // Model scorecard §2.2/§2.10: the levels this target can set and its window.
     ...providerTargetGatewayControls(target),
     // Contract A §2: on the preview only, max_tokens never exceeds the target's reviewed row bound.
-    ...previewTargetGatewayControls(previewConfig, target),
+    ...previewTargetGatewayControls(previewGate, target),
     ...(target.authorizationHeader === undefined
       ? {} : { authorizationHeader: target.authorizationHeader }),
     // Spec §3.5: this process's calls in flight count toward each run's attempt ceiling.
     inFlight: gatewayInFlight,
-    ...(costEnvelopeGuard === undefined || price === null ? {} : {
+    ...(runnerSite.money === null || price === null ? {} : {
       // The run is not known until a work item is claimed, so the seam is built
       // per call from the run the gateway was handed. Hosted requires the vendor
       // to report usage: a call that cannot be billed cannot be bounded.
       // Task M1: the gateway also names the call's phase, so an answer-writing
       // call is held to the answer's ceiling and every other call to the body's.
       // B9: and whether the call is walled (`providerCallSharedWall`).
-      buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => costEnvelopeGuard.providerSeam({
-        runId, price, requireReportedUsage: true, phase, sharedWall
-      }),
-      // Verdict story (spec §8): the story's calls spend its OWN envelope. With
-      // no sealed story ceiling there is no story seam, and the gateway refuses
-      // a metered story call (STORY_ENVELOPE_MISSING) rather than run it unbounded.
-      ...(storyCeilingMicros === null ? {} : {
-        buildStoryCostEnvelopeSeam: (runId: string) => costEnvelopeGuard.storySeam({
-          runId, price, requireReportedUsage: true
-        })
-      })
+      // Side-by-side spec §13 (S6): every call is charged to its OWN run's version's guard (`runCostEnvelopeGuard`).
+      buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => runCostEnvelopeGuard(runId).providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }),
+      // Verdict story (spec §8): the story's calls spend its OWN envelope, its run's version's story ceiling. A
+      // version that sealed no story ceiling refuses inside the guard (STORY_ENVELOPE_MISSING), the code the gateway
+      // used to raise without a seam; the story writer refuses before that anyway (no story rows, no story).
+      buildStoryCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).storySeam({ runId, price, requireReportedUsage: true })
     })
   });
   // Spec §3.4: the policy marks the gate unhealthy on its FIRST unsent refusal, before the minute's resend wait.
-  return previewConfig === undefined ? gateway : withPreviewProviderCallPolicy(gateway, previewConfig, target, {
+  // Addition D16-D18 (SA5): each call runs at its OWN debate's thinking table, read per call by its run id through the
+  // run → version map (`runPreviewThinkingLevelsOf`; a call of no debate: the site version's), so a debate keeps its
+  // levels through re-claims and its story (O1). The site version's composed config gives only the gate part here (its
+  // table is replaced by the resolver's); it exists whenever the gate part does: the loader refuses a preview version it
+  // cannot compose.
+  return previewGate === undefined ? gateway : withPreviewProviderCallPolicy(gateway, siteVersionSettings.previewConfig!, target, {
     busy: previewBusy,
     onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); },
     gateRemaining: previewGateRemaining,
-    onFinalWriterTierUnread: previewFinalWriterTierUnread
+    onFinalWriterTierUnread: previewFinalWriterTierUnread,
+    thinkingLevelsOf: runPreviewThinkingLevelsOf(runnerSettings, runSettingsVersions, environment.REGISTER_VERSION)
   });
 }
 /**
@@ -450,8 +285,8 @@ function targetGateway(target: (typeof providerTargets)[number]): ProviderGatewa
  * for the repair model's slots the original call does not hold (`structureRepairThroughLane`): the owner's limits hold.
  */
 const targetGateways = new Map(providerTargets.map((target) => [target.providerRef, targetGateway(target)] as const));
-const structureRepairRoute = previewConfig === undefined ? null : structureRepairThroughLane(
-  previewStructureRepairRoute(providerTargets, (providerRef) => targetGateways.get(providerRef)), previewCallSubjects(previewConfig));
+const structureRepairRoute = previewGate === undefined ? null : structureRepairThroughLane(
+  previewStructureRepairRoute(providerTargets, (providerRef) => targetGateways.get(providerRef)), previewCallSubjects(previewGate));
 // R1: every model call the runner and the story make goes through one of these members, so each is counted here, from
 // the ask until it settles: the preview's one 60-second unbilled resend and a structure repair's call (the route's
 // gateway is only ever called inside the call it repairs) included.
@@ -478,7 +313,8 @@ assertRunnerPrimaryProviderConfiguration({
 const storyWriter = new StoryWriter({
   pool,
   pack: storyPack,
-  policy: storyPolicy,
+  // Side-by-side spec §13 (ruling R36): no boot policy. Every write carries its own debate's version's story policy
+  // (WalkingSkeletonRunner's `settings.storyPolicy`, null included).
   hosted: environment.DEPLOYMENT_MODE === "hosted",
   resolveProvider: (roleRef) => {
     const member = [
@@ -499,10 +335,10 @@ function observeClaimTarget(target: (typeof providerTargets)[number]) {
   // R1: a probe is a model call through the gate too (its 60-second resend included): counted until it settles.
   const leave = modelCalls.enter();
   return observeClaimTimeTarget({
-    preview: previewConfig !== undefined,
+    preview: previewGate !== undefined,
     target,
-    timeoutMs: previewConfig === undefined ? environment.PROVIDER_PROBE_TIMEOUT_MS : PREVIEW_GLM_DEADLINE_MS,
-    ...(previewConfig === undefined ? {} : previewProbeControls(target)),
+    timeoutMs: previewGate === undefined ? environment.PROVIDER_PROBE_TIMEOUT_MS : PREVIEW_GLM_DEADLINE_MS,
+    ...(previewGate === undefined ? {} : previewProbeControls(target)),
     fetchImplementation: previewFetch,
     clock: () => new Date()
   }).finally(leave);
@@ -510,6 +346,19 @@ function observeClaimTarget(target: (typeof providerTargets)[number]) {
 // Side-by-side spec §3: every work repository this process builds serves only this release's work items (claims,
 // renewals, the start-up re-send, failure writes), and its failure writes land only under this worker's live claim.
 const workFence = Object.freeze({ releaseKey: environment.RELEASE_KEY, workerId: environment.RUNNER_WORKER_ID });
+/**
+ * Side-by-side spec §13 runner point 3 (S8) — THE BOOT PRELOAD: "a bad version still fails loudly at start". After the
+ * site version (whose refusal refuses the boot, above), every version this release may meet is loaded through the same
+ * cache before anything is claimed: its open debates' versions and every version it has a PASS verdict for — never the
+ * activation pointer, which is the API's alone. Another version this release cannot run prints its one loud
+ * DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED line and the boot goes on (its debates are set aside at claim, S7). A database
+ * failure refuses the boot (S8 ruling: at boot the database must work). Before the team gate and the worker: nothing is
+ * claimed until it has run. Summed up after the ready line (DEBATEAI_RUNNER_SETTINGS).
+ */
+const runnerSettingsPreload = await preloadRunnerSettings({
+  cache: runnerSettings, pool, work: new WorkItemRepository(pool, workFence),
+  releaseKey: environment.RELEASE_KEY, siteVersion: environment.REGISTER_VERSION
+});
 // Side-by-side spec §4 (D1): this process's running tasks (each whole task, the verdict story included) and its two
 // retirement stops (claims, then new model calls), both off until this release retires.
 const executions = createTaskExecutionCounter();
@@ -520,36 +369,21 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   releaseKey: environment.RELEASE_KEY,
   // Side-by-side spec §4: a retiring release stops claiming and starts no new model call (RUNNER_RETIRING).
   retirement: retirementSignal,
-  judgeBound: policy.bounds.JUDGE,
-  composerBound: policy.bounds.COMPOSER,
-  conformanceBound: policy.bounds.CONFORMANCE,
+  // Side-by-side spec §13 runner point 7: every debate member of the site version, written once (run-settings.ts).
+  ...runnerSettingsOfVersion(siteVersionSettings),
+  // Side-by-side spec §13 (S6): and every debate runs on its OWN stamped version, through the loader's cache, with
+  // its run → version map (the money seams above read it).
+  settingsForVersion: (version) => runnerSettings.settingsFor(version),
+  runSettingsVersions,
   providerRef: providerTopology.primary.providerRef, maker: providerTopology.primary.maker,
   ...(providerTopology.critique === undefined
     ? {} : { critique: providerTopology.critique }),
   additionalMakers: providerTopology.additionalMakers,
-  judgeContractHash: policy.hashes.judge,
-  composerContractHash: policy.hashes.composer,
-  conformanceContractHash: policy.hashes.conformance,
-  propagationContractHash: policy.hashes.propagation,
-  serveContractHash: policy.hashes.serve,
-  maxRecompose: environment.MAX_RECOMPOSE, factBundleVersion: environment.REGISTER_VERSION,
+  maxRecompose: environment.MAX_RECOMPOSE,
   judgementNumberKind: environment.JUDGEMENT_NUMBER_KIND, judgementProducer: environment.JUDGEMENT_PRODUCER,
   propagationNumberKind: environment.PROPAGATION_NUMBER_KIND,
   propagationProducer: environment.PROPAGATION_PRODUCER,
   resolveTerminalActivations: createTerminalActivationEvaluator(pool),
-  compositionRow: policy.compositionRow,
-  servePolicy: {
-    compositionBudgets: policy.compositionBudgets,
-    candidateConfidenceBand: policy.candidateConfidenceBand,
-    bandCeiling: policy.bandCeiling
-  },
-  judgementPolicy: policy.judgementPolicy,
-  scoringOperator: policy.scoringOperator,
-  runDeathPolicy: policy.runDeathPolicy,
-  hiddenNodeScoreThreshold: policy.hiddenNodeScoreThreshold,
-  verdictLabelPolicy: policy.verdictLabelPolicy,
-  panelPolicy: policy.panelPolicy,
-  stoppingPolicy: policy.stoppingPolicy,
   // T3C / F34 (ruling J20): DR-182 VROW-5's claim-time health re-probe. Without
   // this the runner's probe block is skipped entirely — a member pinned at ask
   // time that has since gone absent is trusted, the panel is never revised, and
@@ -576,10 +410,6 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
       failureCode: observation.failureCode
     };
   },
-  // S6-2 / T9 (board F33 class): the SHIPPED entry point must LOAD and PASS
-  // every register family the run reads. Without this line the claim-time
-  // gate refuses every work item and no statement is ever synthesized.
-  synthesisRolePolicy: policy.synthesisRolePolicy,
   // Verdict story (spec §3): written after each settled debate; never inside it.
   story: storyWriter,
   // Engine money rule, Task M3 (spec §14.4.2): each target's price, so an
@@ -624,19 +454,15 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   // preview only, each maker's own attempt allowance at re-claim, a busy member or an unavailable gate sitting out
   // the rest of the run, and the answer and story roles moving on from it (ROLE_UNAVAILABLE). Off the preview the
   // setting is absent and the runner is today's.
-  ...(previewConfig === undefined ? {} : { runResilience: previewRunResilience(previewConfig)! }),
+  ...(previewGate === undefined ? {} : { runResilience: previewRunResilience(previewGate)! }),
   // Parallel AI calls (spec 2026-10-12 §3.2, §3.6): every debate's calls through its lane of the one scheduler above,
   // each provider ref's model, vendor and (preview) gate, and the claim renewals on their own pool.
   callScheduler: runnerCallScheduler,
-  // Debate shape (spec 2026-10-12 §3): resolved at boot above; null without the row (today's runner).
-  debateShape,
-  // Engine redesign (R1d): resolved at boot above; null without the engine row (engine 1, today's runner).
-  engine,
-  callSubjects: previewConfig === undefined ? targetCallSubjects(providerTargets) : previewCallSubjects(previewConfig),
+  callSubjects: previewGate === undefined ? targetCallSubjects(providerTargets) : previewCallSubjects(previewGate),
   // Ruling R31 (preview only): a call to a busy model waits on the busy coordinator BEFORE it takes any slot.
-  ...(previewConfig === undefined ? {} : { callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model) }),
+  ...(previewGate === undefined ? {} : { callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model) }),
   renewals: new WorkItemRepository(keepAlivePool, workFence),
-  ...(previewConfig === undefined ? {} : {
+  ...(previewGate === undefined ? {} : {
     answerRoleFallbackCovered: ({ roleRef, panel }: Readonly<{ roleRef: string; panel: readonly Readonly<{ provider_ref: string; model_id: string }>[] }>) =>
       previewSealedRoleFallbackCovered(roleRef, panel)
   }),
@@ -664,7 +490,7 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
 // other's retries between two codes; the `legacy` key keeps the bare base name (today's single task).
 const taskName = releaseTaskName(environment.HATCHET_WORKFLOW_NAME, environment.RELEASE_KEY);
 const task = declareHatchetWalkingSkeletonTask({ client: hatchet, runner,
-  ...(previewConfig === undefined ? {} : { previewExecutionTimeout: "3600s" as const }),
+  ...(previewGate === undefined ? {} : { previewExecutionTimeout: "3600s" as const }),
   // Side-by-side spec §3: a failed task records FAILED only on this release's item, under this worker's own live claim.
   failures: new WorkItemRepository(pool, workFence),
   // Side-by-side spec §4: every task counted while it runs, the story included.
@@ -674,7 +500,7 @@ const task = declareHatchetWalkingSkeletonTask({ client: hatchet, runner,
 // FAILED (RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY) BEFORE this worker exists, so neither the start-up
 // re-dispatch below nor an older job-system dispatch can run it. Off the preview: no read.
 await refusePreviewOutsiderWork({
-  previewConfigured: previewConfig !== undefined,
+  previewConfigured: previewGate !== undefined,
   teamUserIds: environment.PREVIEW_TEAM_USER_IDS,
   // Side-by-side spec §3: this release's jobs only (its live-outsider refusal and its 100 cap included).
   ...postgresRunnerPreviewTeamGateStore(pool, environment.RELEASE_KEY),
@@ -722,6 +548,8 @@ announceRunnerReady({
   releaseKey: environment.RELEASE_KEY,
   startupDispatched: startupReconciliation.dispatched
 });
+// Side-by-side spec §13 runner point 3 (S8): what the boot preloaded, content-free, right after the unchanged ready line.
+process.stdout.write(runnerSettingsLine(runnerSettingsPreload));
 // Side-by-side spec §2 (plan B D4): every five minutes this release re-sends its own lapsed CLAIMED items (a copy that
 // died mid-debate) under its own task name, not only at a fresh start; none while it retires (claims stopped, §4).
 const lapsedResend = startLapsedClaimResend({

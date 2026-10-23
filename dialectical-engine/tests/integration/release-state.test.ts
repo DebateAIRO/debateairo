@@ -228,39 +228,32 @@ describe("0123 §3: the release table, its state view and its serialized writers
     expect(await state(E)).toBeNull();
   });
 
-  it("the settings hook: without 0124's hook a non-NULL expected settings version refuses, a NULL one switches (D current, C draining)", async () => {
+  it("the settings hook: 0124's hook refuses an expected settings version the pointer does not hold, a NULL one switches (D current, C draining)", async () => {
     await recordReleaseEvent(database.pool, { releaseKey: B, kind: "RETIRED", recordedBy: BY, reason: "DRAINED" });
-    expect(await database.pool.query("SELECT to_regprocedure('register.release_switch_settings_hook(text,bigint)') AS hook"))
-      .toMatchObject({ rows: [{ hook: null }] });
+    // 0124 (plan S1) defines the hook 0123's switch calls after its compare-and-swap; nothing is activated yet, so the
+    // pointer is NULL and only a NULL expected settings version matches it.
+    expect(await database.pool.query("SELECT to_regprocedure('register.release_switch_settings_hook(text,bigint)') IS NOT NULL AS hook"))
+      .toMatchObject({ rows: [{ hook: true }] });
+    const checks = async (): Promise<number> =>
+      (await database.pool.query<{ n: number }>("SELECT count(*)::int AS n FROM register.settings_switch_check")).rows[0]!.n;
+    const checksBefore = await checks();
     const before = await eventCount();
     const error = await refusal(database.pool.query("SELECT core.record_release_switch($1,$2,$3,$4,5)", [D, C, T6, BY]));
     expect(messageOf(error)).toBe("SETTINGS_ACTIVATION_CONFLICT");
     expect(await eventCount()).toBe(before);
-    // When 0124's hook exists, the switch calls it with its own arguments after the compare-and-swap (rolled back here).
-    const client = await database.pool.connect();
-    let clean = false;
-    try {
-      await client.query("BEGIN");
-      await client.query(`CREATE FUNCTION register.release_switch_settings_hook(p_new text, p_expected bigint) RETURNS void
-        LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'HOOK_SAW %/%', p_new, coalesce(p_expected::text, 'none'); END $$`);
-      const hooked = await refusal(client.query("SELECT core.record_release_switch($1,$2,$3,$4,7)", [D, C, T6, BY]));
-      expect(messageOf(hooked)).toBe(`HOOK_SAW ${D}/7`);
-      await client.query("ROLLBACK");
-      await client.query("BEGIN");
-      await client.query(`CREATE FUNCTION register.release_switch_settings_hook(p_new text, p_expected bigint) RETURNS void
-        LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'HOOK_SAW %/%', p_new, coalesce(p_expected::text, 'none'); END $$`);
-      // A stale expected current refuses BEFORE the hook is reached.
-      const stale = await refusal(client.query("SELECT core.record_release_switch($1,$2,$3,$4,7)", [D, B, T6, BY]));
-      expect(messageOf(stale)).toBe("RELEASE_SWITCH_CONFLICT");
-      await client.query("ROLLBACK");
-      clean = true;
-    } finally { client.release(!clean); }
-    expect(await database.pool.query("SELECT to_regprocedure('register.release_switch_settings_hook(text,bigint)') AS hook"))
-      .toMatchObject({ rows: [{ hook: null }] });
+    // A stale expected current refuses BEFORE the hook is reached.
+    const stale = await refusal(database.pool.query("SELECT core.record_release_switch($1,$2,$3,$4,7)", [D, B, T6, BY]));
+    expect(messageOf(stale)).toBe("RELEASE_SWITCH_CONFLICT");
+    expect(await eventCount()).toBe(before);
+    expect(await checks()).toBe(checksBefore);
     const nulled = (await database.pool.query<{ seq: string }>("SELECT core.record_release_switch($1,$2,$3,$4,NULL)::text AS seq", [D, C, T6, BY])).rows[0]!;
     expect(Number(nulled.seq)).toBeGreaterThan(0);
     expect(await readCurrentRelease(database.pool)).toEqual({ releaseKey: D, takeTrafficFrom: T6 });
     expect(await state(C)).toEqual(live("DRAINING"));
+    // The hook saw the switch's own arguments: one check row for D, expecting no activation.
+    expect(await checks()).toBe(checksBefore + 1);
+    expect((await database.pool.query("SELECT release_key, expected_active_settings FROM register.settings_switch_check ORDER BY check_seq DESC LIMIT 1")).rows)
+      .toEqual([{ release_key: D, expected_active_settings: null }]);
   });
 
   it("append-only: UPDATE, DELETE and TRUNCATE core.release_event each reject", async () => {

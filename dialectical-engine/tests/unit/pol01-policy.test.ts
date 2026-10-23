@@ -34,10 +34,14 @@ describe("POL-01 register-owned deployment floor", () => {
   });
 
   it("composes apps/api/main from the same register row rather than DEPLOYMENT_RISK_TIER", async () => {
+    // Side-by-side spec §13 (S9): the read is the API's one per-version admission loader's, which main.ts boots
+    // through; neither file consults the environment.
     const source = await readFile(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
-    expect(source).toContain("readDeploymentRiskTier");
-    expect(source).toContain("deploymentRiskTier.value");
-    expect(source).not.toContain("environment.DEPLOYMENT_RISK_TIER");
+    const loader = await readFile(new URL("../../apps/api/src/admission-settings.ts", import.meta.url), "utf8");
+    expect(loader).toContain("readers.readDeploymentRiskTier(pool, version)");
+    expect(loader).toContain("deploymentRiskTier.value");
+    expect(source).toContain("loadAdmissionSettings(pool, environment.REGISTER_VERSION, admissionSite");
+    for (const file of [source, loader]) expect(file).not.toContain("environment.DEPLOYMENT_RISK_TIER");
   });
 
   it("surfaces the typed refusal code and reason through the /new form data path", async () => {

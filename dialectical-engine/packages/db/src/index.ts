@@ -880,6 +880,38 @@ export function isDatabasePoolBusy(error: unknown): boolean {
   return false;
 }
 
+/** A code-shaped refusal message (`CODE` or `CODE:detail`, the house TypeError form); prose is never a code. */
+const SETTINGS_REFUSAL_CODE = /^[A-Z][A-Z0-9_]{2,}(?::[A-Za-z0-9_.:/-]+)?$/u;
+
+/**
+ * Ruling R31 (side-by-side spec §13): true when this failure, or one it wraps as `cause`, is the database's, not a
+ * settings version's: the house pool's own typed failure (createPool: a lost or refused connection, a server restart,
+ * a busy pool or a full server all become TypedDomainError DATABASE_POOL_FAILED), busy or not. Statement timeouts and
+ * serialization failures reach callers as the driver's raw errors, which are untyped already.
+ */
+export function isDatabaseFailure(error: unknown): boolean {
+  if (isDatabasePoolBusy(error)) return true;
+  let current: unknown = error;
+  for (let depth = 0; depth < 8 && current instanceof Error; depth += 1) {
+    if (current instanceof TypedDomainError && current.code === DATABASE_POOL_FAILED) return true;
+    current = current.cause;
+  }
+  return false;
+}
+
+/**
+ * Ruling R31 (side-by-side spec §13): the code of a REAL settings refusal, the one rule both settings caches keep a
+ * version's refusal by (the runner's, apps/runner/src/run-settings.ts; the API's, apps/api/src/admission-settings.ts):
+ * a TypedDomainError's code, or an Error whose whole message is a code (the house form the register readers refuse
+ * with, e.g. CALL_CONCURRENCY_POLICY_INVALID). The database's own failures (`isDatabaseFailure`) and anything else (a
+ * driver error, a runtime TypeError in prose) are null: untyped, so a cache keeps nothing and the next ask loads again.
+ */
+export function settingsRefusalCode(error: unknown): string | null {
+  if (isDatabaseFailure(error)) return null;
+  if (error instanceof TypedDomainError) return error.code;
+  return error instanceof Error && SETTINGS_REFUSAL_CODE.test(error.message) ? error.message : null;
+}
+
 function typedPoolFailure(error: unknown): TypedDomainError {
   if (error instanceof TypedDomainError && error.code === DATABASE_POOL_FAILED) return error;
   const detail = error instanceof Error ? error.message : String(error);
@@ -2741,6 +2773,11 @@ export class RunRepository {
     readonly compositionBudgetTier: CompositionBudgetTier;
     readonly strangerSampleRate: number;
     readonly envelopeBasis: Readonly<Record<string, unknown>>;
+    /**
+     * Side-by-side spec §13 (S6): the settings version the run was admitted under (`core.run.register_version`,
+     * insert-only). The runner checks it against the version it resolved before the claim (RUN_SETTINGS_VERSION_DRIFT).
+     */
+    readonly registerVersion: number;
   }> {
     return withRunContentLease(this.pool,[runId],async () => {
     const encryptionSchemaApplied = await contentEncryptionSchemaIsApplied(this.pool);
@@ -2762,10 +2799,13 @@ export class RunRepository {
       composition_budget_tier: CompositionBudgetTier;
       stranger_sample_rate: number;
       envelope_basis: Readonly<Record<string, unknown>>;
+      register_version: number;
     }>(
+      // The bigint version is cast by the database (an out-of-range one refuses), never coerced in JavaScript.
       `SELECT run_id, question_line${contentCiphertextProjection}${argumentLanguageProjection},
               agent_count, discovered_panel, depth_params,
-              composition_budget_tier, stranger_sample_rate, envelope_basis
+              composition_budget_tier, stranger_sample_rate, envelope_basis,
+              register_version::integer AS register_version
        FROM core.run WHERE run_id = $1`,
       [runId]
     );
@@ -2791,9 +2831,26 @@ export class RunRepository {
       depthParams: Object.freeze({ ...row.depth_params }),
       compositionBudgetTier: row.composition_budget_tier,
       strangerSampleRate: Number(row.stranger_sample_rate),
-      envelopeBasis: Object.freeze({ ...row.envelope_basis })
+      envelopeBasis: Object.freeze({ ...row.envelope_basis }),
+      registerVersion: row.register_version
     };
     });
+  }
+
+  /**
+   * Side-by-side spec §13 (S6, D2): the settings version a run was admitted under, by run id — no content, no lease
+   * (`core.run.register_version` is insert-only). The runner's `claimNext` path reads it right after its claim, since it
+   * cannot know its run before. RUN_NOT_FOUND when there is no such run.
+   */
+  async readRunRegisterVersion(runId: string): Promise<number> {
+    const result = await this.pool.query<{ register_version: number }>(
+      // The bigint version is cast by the database (an out-of-range one refuses), never coerced in JavaScript.
+      "SELECT register_version::integer AS register_version FROM core.run WHERE run_id = $1",
+      [runId]
+    );
+    const row = result.rows[0];
+    if (row === undefined) throw new TypedDomainError("RUN_NOT_FOUND", `Run ${runId} does not exist`);
+    return row.register_version;
   }
 
   /**

@@ -84,8 +84,11 @@ function rebuiltAsk(stored: StoredAsk): AskRequest | null {
   return parsed.success ? Object.freeze(parsed.data) : null;
 }
 
-/** Step 2: every member the person's stored settings had is still there, with the same value. */
-function keepsEveryStoredChoice(stored: Readonly<Record<string, unknown>>, normalised: Readonly<Record<string, unknown>>): boolean {
+/**
+ * Step 2: every member the person's stored settings had is still there, with the same value. Side-by-side spec §13
+ * (Task S12): the same rule decides whether an ask's choices survive a settings version that changed under the page.
+ */
+export function keepsEveryStoredChoice(stored: Readonly<Record<string, unknown>>, normalised: Readonly<Record<string, unknown>>): boolean {
   return Object.entries(stored).every(([key, value]) => Object.hasOwn(normalised, key) && isDeepStrictEqual(normalised[key], value));
 }
 

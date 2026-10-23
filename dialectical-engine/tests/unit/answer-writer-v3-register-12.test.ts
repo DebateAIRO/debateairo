@@ -145,18 +145,25 @@ describe("the runner refuses a register that does not carry the code's prompt fi
 
   it("is called by the runner's boot and by the practice composition, right after the register policy is read", () => {
     const read = (relative: string) => readFileSync(new URL(`../../${relative}`, import.meta.url), "utf8");
+    // Side-by-side spec §13: the read and the guard are the one per-version loader's, for the version it loads, and both
+    // the runner's boot and the practice composition load their site version through it.
     for (const [file, policyLine, indent] of [
-      ["apps/runner/src/main.ts", "const policy = previewRunnerPolicy(await readDevelopmentRunnerPolicy(pool, environment.REGISTER_VERSION), previewConfig);", ""],
-      ["tools/preview-practice/practice-runner-composition.ts", "  const policy = previewRunnerPolicy(await readDevelopmentRunnerPolicy(pool, environment.REGISTER_VERSION), previewConfig);", "  "]
+      ["apps/runner/src/run-settings.ts", "  const policy = previewRunnerPolicy(await readDevelopmentRunnerPolicy(pool, version), previewGate);", "  "]
     ] as const) {
       const source = read(file);
       const at = source.indexOf(policyLine);
       expect(at, file).toBeGreaterThanOrEqual(0);
-      const guard = source.indexOf(`${indent}assertRegisterPromptContractHashes(policy.hashes, environment.REGISTER_VERSION);`, at);
+      expect(source.split(policyLine), file).toHaveLength(2);
+      const guard = source.indexOf(`${indent}assertRegisterPromptContractHashes(policy.hashes, version);`, at);
       expect(guard, file).toBeGreaterThan(at);
       // Nothing that uses the policy runs between the read and the guard: only comment lines stand there.
       const between = source.slice(at + policyLine.length, guard).split("\n").map((line) => line.trim()).filter((line) => line !== "");
       expect(between.every((line) => line.startsWith("//")), file).toBe(true);
+    }
+    for (const file of ["apps/runner/src/main.ts", "tools/preview-practice/practice-runner-composition.ts"]) {
+      const source = read(file);
+      expect(source, file).not.toContain("readDevelopmentRunnerPolicy(");
+      expect(source, file).toContain("const siteVersionSettings = await runnerSettings.requireSettings(environment.REGISTER_VERSION);");
     }
   });
 });

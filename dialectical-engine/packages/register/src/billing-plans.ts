@@ -152,6 +152,12 @@ const EUR_COUNTRIES = Object.freeze([
 ] as const);
 
 /**
+ * Side-by-side spec §13: the row's member names, so the settings classification's member map
+ * (`settings-classification.ts`) is proved complete against the schema without exporting the schema.
+ */
+export const BILLING_PLANS_MEMBERS: readonly string[] = Object.freeze(Object.keys(billingPlansValueSchema.shape));
+
+/**
  * THE PLAN VALUES: the owner's of 29 September 2026 (§1.10), priced in USD, EUR
  * and RON by region since Part C (spec 2026-10-05 §2.16.2). The EUR and RON
  * prices are placeholders until the owner publishes a price list (go-live row

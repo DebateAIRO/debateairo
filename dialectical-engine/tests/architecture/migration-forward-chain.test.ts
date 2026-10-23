@@ -57,8 +57,9 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     // export's 0115 follows 0114 (V-41), the mail locale (0116) follows 0115 (S01-C05), the debate shape's map (0117)
     // follows 0116, the language check's site cost (0118) follows 0117, the reclaim resume (0119) follows 0118, then the
     // reply measures (0120, spec 2026-10-15), then the engine verdict (0121, spec 2026-10-15 engine redesign R2), then
-    // the engine's map answer step (0122, spec 2026-10-15 engine redesign R3), then the side-by-side releases (0123),
-    // last (spec 2026-10-21 side-by-side uploads) (migrations/lineage/README.md).
+    // the engine's map answer step (0122, spec 2026-10-15 engine redesign R3), then the side-by-side releases (0123,
+    // spec 2026-10-21 side-by-side uploads), then the settings activation (0124), last (side-by-side spec §13)
+    // (migrations/lineage/README.md).
     expect(plan.forwardChain.map((step) => step.name)).toEqual([
       "0111_billing_netopia.sql",
       "0112_auth_db_batch.sql",
@@ -72,7 +73,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
       "0122_engine_map_check.sql",
-      "0123_side_by_side_releases.sql"
+      "0123_side_by_side_releases.sql",
+      "0124_settings_activation.sql"
     ]);
     const [step] = plan.forwardChain;
     // 0110 runs the sealed effective-capability verifier after its SQL (applyForward110) and its own manifest names it
@@ -126,7 +128,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
       "0122_engine_map_check.sql",
-      "0123_side_by_side_releases.sql"
+      "0123_side_by_side_releases.sql",
+      "0124_settings_activation.sql"
     ]);
     // The verifier in force after 0112 is the one 0112's manifest names (it adds no billing object): 0111's.
     const batchManifest = JSON.parse((await bytesOf("lineage/auth-db-batch-forward.json")).toString("utf8"));
@@ -174,7 +177,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
       "0122_engine_map_check.sql",
-      "0123_side_by_side_releases.sql"
+      "0123_side_by_side_releases.sql",
+      "0124_settings_activation.sql"
     ]);
     expect(partC!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/role-rotation-forward0114.json")).toString("utf8"));
@@ -218,7 +222,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
       "0122_engine_map_check.sql",
-      "0123_side_by_side_releases.sql"
+      "0123_side_by_side_releases.sql",
+      "0124_settings_activation.sql"
     ]);
     expect(mailLocale!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/debate-shape-map-forward0117.json")).toString("utf8"));
@@ -262,7 +267,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
       "0122_engine_map_check.sql",
-      "0123_side_by_side_releases.sql"
+      "0123_side_by_side_releases.sql",
+      "0124_settings_activation.sql"
     ]);
     expect(mapStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/language-check-spend-forward0118.json")).toString("utf8"));
@@ -306,7 +312,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
       "0122_engine_map_check.sql",
-      "0123_side_by_side_releases.sql"
+      "0123_side_by_side_releases.sql",
+      "0124_settings_activation.sql"
     ]);
     expect(languageStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/reclaim-resume-forward0119.json")).toString("utf8"));
@@ -538,7 +545,50 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     expect(readme.replace(/\s+/gu, " ")).toContain("the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth");
   });
 
-  it("refuses a changed 0111, 0113, 0114, 0117, 0118, 0119, 0120, 0121, 0122 or 0123, a manifest bound to the wrong previous step, and an undeclared file, before any database", async () => {
+  it("chains 0124 after 0123: the recipe, 0123's manifest and the effective verifier 0123 keeps (0111's)", async () => {
+    const plan = await loadMigrationPlan();
+    const netopia = plan.forwardChain[0];
+    const names = plan.forwardChain.map((entry) => entry.name);
+    const releasesStep = plan.forwardChain[names.indexOf("0123_side_by_side_releases.sql")];
+    const step = plan.forwardChain[names.indexOf("0124_settings_activation.sql")];
+    expect(names.indexOf("0124_settings_activation.sql")).toBe(names.indexOf("0123_side_by_side_releases.sql") + 1);
+    expect(releasesStep!.verifierSha256).toBe(netopia!.verifierSha256);
+    const manifest = JSON.parse((await bytesOf("lineage/settings-activation-forward0124.json")).toString("utf8"));
+    expect(manifest).toEqual({
+      version: "settings-activation-forward0124-v1",
+      baseRecipeSha256: plan.recipeSha256,
+      previous: {
+        name: "0123_side_by_side_releases.sql",
+        manifestSha256: sha256(await bytesOf("lineage/side-by-side-releases-forward0123.json")),
+        verifierSha256: sha256(await bytesOf("lineage/verify-effective-capabilities-111.sql"))
+      },
+      migration: { name: "0124_settings_activation.sql", sha256: sha256(await bytesOf("0124_settings_activation.sql")) },
+      verifier: { path: "lineage/verify-effective-capabilities-111.sql", sha256: sha256(await bytesOf("lineage/verify-effective-capabilities-111.sql")) }
+    });
+    expect(step!.manifestSha256).toBe(sha256(await bytesOf("lineage/settings-activation-forward0124.json")));
+    expect(step!.previousName).toBe(releasesStep!.name);
+    expect(step!.previousManifestSha256).toBe(releasesStep!.manifestSha256);
+    expect(step!.previousVerifierSha256).toBe(releasesStep!.verifierSha256);
+    expect(step!.verifierSql).toBe((await bytesOf("lineage/verify-effective-capabilities-111.sql")).toString("utf8"));
+    // The first expand step after the drained 0123: its header says expand and keeps-verifier, as its manifest agrees.
+    expect(step!.n1).toEqual({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
+    // Its checks are its postcondition (the three tables and the ten functions whole); no supplemental verifier.
+    expect(step!.replayVerifierSql).toBeUndefined();
+  });
+
+  it("documents 0124 as the step after 0123, with its manifest, its loader and the verifier it keeps", async () => {
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.slice(readme.indexOf("## The settings activation (0124)"));
+    expect(section.startsWith("## The settings activation (0124)")).toBe(true);
+    for (const needle of ["0123", "0124_settings_activation.sql", "settings-activation-forward0124.json", "verify-effective-capabilities-111.sql",
+      "packages/db/src/migration-forward0124.ts", "replayVerifierSql", "register.settings_activation", "register.release_switch_settings_hook",
+      "-- n1: expand", "MIGRATION_FORWARD0124_", "`STEPS`", "renumber"
+    ]) expect(section.slice(0, section.indexOf("\n## ", 1)), needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toContain(
+      "the side-by-side releases (0123, below) the thirteenth and the settings activation (0124, below) the fourteenth");
+  });
+
+  it("refuses a changed 0111, 0113, 0114, 0117, 0118, 0119, 0120, 0121, 0122, 0123 or 0124, a manifest bound to the wrong previous step, and an undeclared file, before any database", async () => {
     const root = await mkdtemp(join(tmpdir(), "forward-chain-111-"));
     try {
       await mkdir(join(root, "packages/db/src"), { recursive: true });
@@ -686,6 +736,18 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       }, "MIGRATION_FORWARD0123_MANIFEST");
       // The same refusal when 0122's own manifest changes under 0123: 0122 stays valid, 0123 alone refuses.
       await refusal("lineage/engine-map-check-forward0122.json", (text) => `${text}\n`, "MIGRATION_FORWARD0123_MANIFEST");
+      // The settings activation 0124 changed by one character, and its manifest bound to 0122 instead of 0123.
+      await refusal("0124_settings_activation.sql", (text) => text.replace("SETTINGS_ACTIVATION_GUARD_CONTRACT_INCOMPLETE", "SETTINGS_ACTIVATION_GUARD_CONTRACT_INCOMPLETe"),
+        "MIGRATION_FORWARD0124_SOURCE_DIGEST");
+      const mapCheckDigest = sha256(await bytesOf("lineage/engine-map-check-forward0122.json"));
+      await refusal("lineage/settings-activation-forward0124.json", (text) => {
+        const manifest = JSON.parse(text);
+        manifest.previous.name = "0122_engine_map_check.sql";
+        manifest.previous.manifestSha256 = mapCheckDigest;
+        return `${JSON.stringify(manifest, null, 2)}\n`;
+      }, "MIGRATION_FORWARD0124_MANIFEST");
+      // The same refusal when 0123's own manifest changes under 0124: 0123 stays valid, 0124 alone refuses.
+      await refusal("lineage/side-by-side-releases-forward0123.json", (text) => `${text}\n`, "MIGRATION_FORWARD0124_MANIFEST");
       // Side-by-side §5 (A6 review): 0123 without its `-- n1: keeps-verifier` line, its manifest re-digested so 0123's own
       // loader accepts the bytes: the header now says the verifier changes while the manifest names the one before, so
       // the chain refuses the disagreement (an older release trusts keeps-verifier when it accepts a database ahead).

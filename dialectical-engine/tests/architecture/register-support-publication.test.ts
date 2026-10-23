@@ -3,7 +3,7 @@ import {migrate, SUPPORT_CONTROL_PLANE_POOL} from "@debateai/db";
 import {startTestDatabase} from "../support/testDatabase.js";
 import { execFile } from "node:child_process";
 import { readFile, readdir } from "node:fs/promises";
-import { extname } from "node:path";
+import { extname, posix } from "node:path";
 import { promisify } from "node:util";
 import ts from "typescript-classic";
 import { describe, expect, it } from "vitest";
@@ -55,6 +55,250 @@ function readerClassification(site:ReturnType<typeof latestRegisterSites>[number
     ? 'RETIRED_HISTORICAL_READER' : 'LIVE_OR_UNVERIFIED_LATEST_READER';
 }
 
+/**
+ * Side-by-side spec §13 (settings changes without an upload), plan D8, task S16; rulings R1, R2, R15 — the activation
+ * pointer category, pinned the way the 0103 allow-list above is. The pointer (`register.settings_activation`) has ONE
+ * SQL reader, `register.read_active_settings_version()`; 0124's activation, the release switch's hook and the switch's
+ * commit check read it only through that function (R1). A site is pinned only while the file's bytes, the exact
+ * {signature, line} and the catalog evidence (owner NOLOGIN without members; the runner's role cannot call it; only
+ * the API's billing role and the release operator can) all hold; anything else is LIVE_OR_UNVERIFIED_POINTER_READER.
+ * A pointer name that merely slips past the latest-version regex above is exactly what this category catches.
+ */
+const ACTIVATION_POINTER_FILE="migrations/0124_settings_activation.sql";
+const ACTIVATION_POINTER_SHA="2db64b6e96273123bfb3f7e4daecf33bb57514fbfb9dc44be608e9de2ed64a2f";
+const ACTIVATION_POINTER_SITES=Object.freeze([
+  {signature:"register.read_active_settings_version()",line:190},
+  {signature:"register.activate_settings_version(bigint,bigint,text,text,text)",line:241},
+  {signature:"register.release_switch_settings_hook(text,bigint)",line:281},
+  {signature:"register.settings_switch_check_at_commit()",line:303}
+]);
+/** The only non-owner, non-superuser roles that may EXECUTE the reader (0124's two GRANT lines), sorted. */
+const ACTIVATION_POINTER_EXECUTE_HOLDERS=Object.freeze(["debateai_billing_runtime","debateai_release_operator"]);
+/** R2 + R15: the TypeScript files outside tests/ that may name the pointer, each under its own rule below. */
+const ACTIVATION_POINTER_API_FILE="apps/api/src/active-settings-version.ts";
+const ACTIVATION_POINTER_OPERATOR_FILE="tools/settings-version/settings-operator.ts";
+const ACTIVATION_POINTER_SCHEMA_FILE="packages/db/src/schema.ts";
+const ACTIVATION_POINTER_FORWARD_FILE="packages/db/src/migration-forward0124.ts";
+/**
+ * Case-INSENSITIVE (Postgres folds unquoted names: `REGISTER.READ_ACTIVE_SETTINGS_VERSION()` is the same call) and
+ * whole-word: `_` is a word character, so packages/db/src/release-state.ts's SETTINGS_ACTIVATION_CONFLICT (a code, not a
+ * read) and 0124's `settings_activation_insert_guard` do not match.
+ */
+const POINTER_NAME=/\b(?:read_active_settings_version|settings_activation)\b/iu;
+const POINTER_TABLE_READ=/\b(?:FROM|JOIN)\s+register[.]settings_activation\b/iu;
+const POINTER_READER_CALL=/\bregister[.]read_active_settings_version\s*\(\s*\)/iu;
+/**
+ * The only non-owner, non-superuser roles that may SELECT the pointer table itself, sorted: 0124's two GRANT lines and
+ * Postgres's predefined pg_read_all_data (it reads every table by definition; a role made its member would appear here
+ * by name, since has_table_privilege follows membership). The runner's role is not among them.
+ */
+const ACTIVATION_POINTER_TABLE_SELECT_HOLDERS=Object.freeze(["debateai_release_operator","debateai_release_owner","pg_read_all_data"]);
+type PointerEvidence=Readonly<{readerOwner:string;ownerLogin:boolean;ownerMemberships:number;runtimeExecute:boolean;executeHolders:readonly string[];
+  runtimeTableSelect:boolean;tableSelectHolders:readonly string[]}>;
+/**
+ * Every place a SQL text reads the pointer: a FROM/JOIN of the table, or a call of the reader that is not DDL naming it
+ * (`FUNCTION register.read_active_settings_version()` in CREATE/ALTER/GRANT/REVOKE), comments blanked first (lengths
+ * kept, so lines stay exact). Each site carries its enclosing function's one-line header signature, or null when the
+ * read is outside every function body.
+ */
+function activationPointerSites(file:string,text:string) {
+  const code=text.replace(/--[^\n]*/gu,comment=>' '.repeat(comment.length));
+  const reads=[...code.matchAll(new RegExp(POINTER_TABLE_READ.source,'giu')),...code.matchAll(new RegExp(POINTER_READER_CALL.source,'giu'))]
+    .filter(match=>!/\bFUNCTION\s+$/iu.test(code.slice(Math.max(0,match.index-40),match.index)))
+    .sort((left,right)=>left.index-right.index);
+  return reads.map(match=>{
+    const before=code.slice(0,match.index),headers=[...before.matchAll(/^CREATE OR REPLACE FUNCTION ([a-z_.]+)\(([^)]*)\) RETURNS/gmi)],header=headers.at(-1);
+    const bodyEnd=header===undefined?-1:code.indexOf('\n$$;',header.index);
+    const signature=header!==undefined && match.index<bodyEnd
+      ? header[1]+'('+header[2]!.split(',').map(arg=>arg.trim().split(/\s+/)[1]??'').join(',')+')' : null;
+    return {file,line:before.split('\n').length,signature};
+  });
+}
+function pointerSiteClassification(site:ReturnType<typeof activationPointerSites>[number],source:string,evidence:PointerEvidence) {
+  return site.file===ACTIVATION_POINTER_FILE && createHash('sha256').update(source).digest('hex')===ACTIVATION_POINTER_SHA
+    && ACTIVATION_POINTER_SITES.some(expected=>expected.signature===site.signature && expected.line===site.line)
+    && evidence.readerOwner==='debateai_release_owner' && !evidence.ownerLogin && evidence.ownerMemberships===0
+    && !evidence.runtimeExecute && evidence.executeHolders.join(',')===ACTIVATION_POINTER_EXECUTE_HOLDERS.join(',')
+    && !evidence.runtimeTableSelect && evidence.tableSelectHolders.join(',')===ACTIVATION_POINTER_TABLE_SELECT_HOLDERS.join(',')
+    ? 'PINNED_ACTIVATION_POINTER_SITE' : 'LIVE_OR_UNVERIFIED_POINTER_READER';
+}
+/**
+ * The code tokens naming the pointer, comments excluded, read DECODED (an escaped `read\u005factive_…` is caught):
+ * string and template text and identifiers, once per name; plus, for an outermost static `+` concatenation or template
+ * (`"read_active_" + "settings_version"`), each name its pieces do not already carry on their own.
+ */
+function pointerNameTokens(file:string,source:string):readonly ts.Node[] {
+  const root=ts.createSourceFile(file,source,ts.ScriptTarget.Latest,true,/[.][cm]?js$/u.test(file)?ts.ScriptKind.JS:ts.ScriptKind.TS);
+  const found=[] as ts.Node[];
+  const names=(text:string|undefined)=>text===undefined?0:(text.match(new RegExp(POINTER_NAME.source,'giu'))??[]).length;
+  const isJoined=(node:ts.Node):node is ts.Expression=>(ts.isBinaryExpression(node)&&node.operatorToken.kind===ts.SyntaxKind.PlusToken)||ts.isTemplateExpression(node);
+  const visit=(node:ts.Node):void=>{
+    const text=ts.isStringLiteralLike(node)||ts.isTemplateLiteralToken(node)||ts.isIdentifier(node)?node.text:undefined;
+    for(let index=0;index<names(text);index+=1)found.push(node);
+    let outer:ts.Node|undefined=node.parent;
+    while(outer!==undefined&&ts.isParenthesizedExpression(outer))outer=outer.parent;
+    if(isJoined(node)&&!(outer!==undefined&&isJoined(outer))){
+      let pieces=0;
+      const count=(child:ts.Node):void=>{
+        pieces+=names(ts.isStringLiteralLike(child)||ts.isTemplateLiteralToken(child)?child.text:undefined);
+        ts.forEachChild(child,count);
+      };
+      ts.forEachChild(node,count);
+      for(let index=pieces;index<names(staticText(node));index+=1)found.push(node);
+    }
+    ts.forEachChild(node,visit);
+  };
+  visit(root);
+  return found;
+}
+/** Whether a census file names the pointer: its raw text, or (JS/TS) its decoded code tokens. */
+function namesPointer(file:string,source:string):boolean {
+  return POINTER_NAME.test(source)||(/[.][cm]?[jt]s$/u.test(file)&&pointerNameTokens(file,source).length>0);
+}
+/** The top-level function names in `root` whose bodies reach `constant` (directly or through another such function). */
+function functionsReaching(root:ts.SourceFile,constant:string):ReadonlySet<string> {
+  const uses=new Map<string,Set<string>>();
+  for(const statement of root.statements){
+    if(!ts.isFunctionDeclaration(statement)||statement.name===undefined)continue;
+    const names=new Set<string>();
+    const visit=(node:ts.Node):void=>{if(ts.isIdentifier(node))names.add(node.text);ts.forEachChild(node,visit);};
+    if(statement.body!==undefined)visit(statement.body);
+    uses.set(statement.name.text,names);
+  }
+  const reaching=new Set<string>();
+  for(let grew=true;grew;){
+    grew=false;
+    for(const [name,names] of uses)if(!reaching.has(name)&&(names.has(constant)||[...reaching].some(other=>names.has(other)))){reaching.add(name);grew=true;}
+  }
+  return reaching;
+}
+/**
+ * R2 + R15, file by file: the migration as written; the API's reader (the SQL text exactly ONCE, as one top-level module
+ * constant both its readers reach: the cached reader and `readActiveSettingsVersionOn`); the operator (the reader's
+ * call exactly once, plus at most one table read: the rollback's history, R78); files under tests/; the Drizzle table and 0124's postcondition evidence (no SQL
+ * reading the table; the reader's name only as an entry of the evidence FUNCTIONS list). Anything else fails.
+ */
+function pointerFileClassification(file:string,source:string) {
+  if(!namesPointer(file,source))return 'NO_POINTER_NAME';
+  if(file===ACTIVATION_POINTER_FILE)return createHash('sha256').update(source).digest('hex')===ACTIVATION_POINTER_SHA
+    ?'ACTIVATION_POINTER_MIGRATION':'LIVE_OR_UNVERIFIED_POINTER_READER';
+  if(/^tests\//u.test(file))return 'TEST_FILE';
+  if(!/[.][cm]?[jt]s$/u.test(file))return 'LIVE_OR_UNVERIFIED_POINTER_READER';
+  const tokens=pointerNameTokens(file,source);
+  const tokenText=(node:ts.Node):string=>ts.isStringLiteralLike(node)||ts.isIdentifier(node)||ts.isTemplateLiteralToken(node)?node.text
+    :ts.isExpression(node)?staticText(node)??'':'';
+  if(file===ACTIVATION_POINTER_API_FILE){
+    const literal=tokens[0];
+    const declaration=literal?.parent;
+    if(tokens.length!==1||!ts.isStringLiteralLike(literal!)||!POINTER_READER_CALL.test(tokenText(literal!))||POINTER_TABLE_READ.test(tokenText(literal!))
+      ||declaration===undefined||!ts.isVariableDeclaration(declaration)||!ts.isIdentifier(declaration.name)
+      ||!ts.isVariableDeclarationList(declaration.parent)||(declaration.parent.flags&ts.NodeFlags.Const)===0
+      ||!ts.isVariableStatement(declaration.parent.parent)||!ts.isSourceFile(declaration.parent.parent.parent))return 'LIVE_OR_UNVERIFIED_POINTER_READER';
+    const reaching=functionsReaching(declaration.parent.parent.parent,declaration.name.text);
+    return reaching.has('readActiveSettingsVersionOn')&&reaching.has('createActiveSettingsVersionReader')
+      ?'API_POINTER_READER':'LIVE_OR_UNVERIFIED_POINTER_READER';
+  }
+  if(file===ACTIVATION_POINTER_OPERATOR_FILE){
+    // R2 + R15; final fix wave F7 (ruling R78): exactly one call of the reader, and at most one read of the table: the
+    // rollback's history read, a top-level const reached only by rollbackSettingsVersion.
+    const reader=tokens.filter(node=>ts.isStringLiteralLike(node)&&POINTER_READER_CALL.test(tokenText(node))&&!POINTER_TABLE_READ.test(tokenText(node)));
+    const history=tokens.filter(node=>ts.isStringLiteralLike(node)&&POINTER_TABLE_READ.test(tokenText(node))&&!POINTER_READER_CALL.test(tokenText(node)));
+    if(reader.length!==1||history.length>1||reader.length+history.length!==tokens.length)return 'LIVE_OR_UNVERIFIED_POINTER_READER';
+    for(const node of history){
+      const declaration=node.parent;
+      if(declaration===undefined||!ts.isVariableDeclaration(declaration)||!ts.isIdentifier(declaration.name)
+        ||!ts.isVariableDeclarationList(declaration.parent)||(declaration.parent.flags&ts.NodeFlags.Const)===0
+        ||!ts.isVariableStatement(declaration.parent.parent)||!ts.isSourceFile(declaration.parent.parent.parent))return 'LIVE_OR_UNVERIFIED_POINTER_READER';
+      if([...functionsReaching(declaration.parent.parent.parent,declaration.name.text)].join(',')!=='rollbackSettingsVersion')return 'LIVE_OR_UNVERIFIED_POINTER_READER';
+    }
+    return 'OPERATOR_POINTER_READER';
+  }
+  const readsTable=tokens.some(node=>POINTER_TABLE_READ.test(tokenText(node)));
+  if(file===ACTIVATION_POINTER_SCHEMA_FILE){
+    return !readsTable&&!/read_active_settings_version/iu.test(source)&&!tokens.some(node=>/read_active_settings_version/iu.test(tokenText(node)))
+      ?'MIGRATION_MACHINERY':'LIVE_OR_UNVERIFIED_POINTER_READER';
+  }
+  if(file===ACTIVATION_POINTER_FORWARD_FILE){
+    const evidenceOnly=tokens.filter(node=>/read_active_settings_version/iu.test(tokenText(node))).every(node=>{
+      const list=node.parent;
+      const holder=list!==undefined&&ts.isArrayLiteralExpression(list)?list.parent:undefined;
+      const declaration=holder!==undefined&&ts.isAsExpression(holder)?holder.parent:holder;
+      return ts.isStringLiteralLike(node)&&declaration!==undefined&&ts.isVariableDeclaration(declaration)&&ts.isIdentifier(declaration.name)&&declaration.name.text==='FUNCTIONS';
+    });
+    return !readsTable&&evidenceOnly?'MIGRATION_MACHINERY':'LIVE_OR_UNVERIFIED_POINTER_READER';
+  }
+  return 'LIVE_OR_UNVERIFIED_POINTER_READER';
+}
+/** The modules a file imports (static, re-export, import-equals, dynamic import(), require(), import types), resolved. */
+function importedModules(file:string,source:string):readonly string[] {
+  const root=ts.createSourceFile(file,source,ts.ScriptTarget.Latest,true,/[.][cm]?js$/u.test(file)?ts.ScriptKind.JS:ts.ScriptKind.TS);
+  const specifiers=[] as string[];
+  const visit=(node:ts.Node):void=>{
+    if((ts.isImportDeclaration(node)||ts.isExportDeclaration(node))&&node.moduleSpecifier!==undefined&&ts.isStringLiteralLike(node.moduleSpecifier))specifiers.push(node.moduleSpecifier.text);
+    if(ts.isExternalModuleReference(node)&&ts.isStringLiteralLike(node.expression))specifiers.push(node.expression.text);
+    if(ts.isCallExpression(node)&&(node.expression.kind===ts.SyntaxKind.ImportKeyword||(ts.isIdentifier(node.expression)&&node.expression.text==='require'))
+      &&node.arguments[0]!==undefined&&ts.isStringLiteralLike(node.arguments[0]))specifiers.push(node.arguments[0].text);
+    if(ts.isImportTypeNode(node)&&ts.isLiteralTypeNode(node.argument)&&ts.isStringLiteralLike(node.argument.literal))specifiers.push(node.argument.literal.text);
+    ts.forEachChild(node,visit);
+  };
+  visit(root);
+  return specifiers.map(specifier=>specifier.startsWith('.')
+    ?posix.normalize(posix.join(posix.dirname(file),specifier)).replace(/[.](?:[cm]?[jt]s)$/u,''):specifier);
+}
+function isPointerReaderModule(module:string):boolean {
+  return /^apps\/api\/src\/active-settings-version(?:[.][cm]?[jt]s)?$/u.test(module)||module.startsWith('tools/settings-version/')
+    ||(!module.startsWith('apps/')&&!module.startsWith('tools/')&&!module.startsWith('packages/')
+      &&/active-settings-version|(?:^|\/)settings-version(?:\/|$)/u.test(module));
+}
+function importsPointerReader(file:string,source:string):boolean {
+  return importedModules(file,source).some(isPointerReaderModule);
+}
+/**
+ * The import closure of `entries` over the census `sources`: relative imports resolved to census files (.ts/.mts/.tsx/
+ * .js/.mjs/.cjs, or a folder's index), workspace packages (`@debateai/<name>[/<subpath>]`) through their package.json
+ * exports, followed transitively (type-only imports too: conservative). Returns each reached pointer-reader module with
+ * the import chain that reaches it, so one more runner import of a module that pulls in a reader (apps/api's
+ * release-state.ts imports active-settings-version.ts) fails.
+ */
+function pointerReaderImportChains(entries:readonly string[],sources:ReadonlyMap<string,string>,packages:ReadonlyMap<string,string>):readonly string[] {
+  const resolve=(module:string):string|undefined=>{
+    const base=packages.get(module)??module;
+    return [base,...['.ts','.mts','.tsx','.js','.mjs','.cjs','/index.ts','/index.js'].map(suffix=>base+suffix)].find(candidate=>sources.has(candidate));
+  };
+  const via=new Map<string,string|null>(entries.map(entry=>[entry,null]));
+  const queue=[...entries],chains=[] as string[];
+  while(queue.length>0){
+    const file=queue.shift()!;
+    for(const module of importedModules(file,sources.get(file)??'')){
+      const target=resolve(module);
+      if(isPointerReaderModule(module)||(target!==undefined&&isPointerReaderModule(target))){
+        const chain=[target??module];
+        for(let at:string|null=file;at!==null;at=via.get(at)??null)chain.unshift(at);
+        chains.push(chain.join(' -> '));
+        continue;
+      }
+      if(target===undefined||via.has(target)||!/[.][cm]?[jt]sx?$/u.test(target))continue;
+      via.set(target,file);queue.push(target);
+    }
+  }
+  return chains;
+}
+/** `@debateai/<name>[/<subpath>]` → the census path its package.json exports, for every workspace package. */
+async function workspacePackageEntries():Promise<ReadonlyMap<string,string>> {
+  const entries=new Map<string,string>();
+  for(const folder of await readdir("packages")){
+    const manifest=await readFile(`packages/${folder}/package.json`,"utf8").then(text=>JSON.parse(text) as {name?:string;exports?:unknown;main?:string},()=>null);
+    if(manifest?.name===undefined)continue;
+    const exported=manifest.exports??manifest.main;
+    const map:Record<string,unknown>=typeof exported==="string"?{".":exported}:typeof exported==="object"&&exported!==null?exported as Record<string,unknown>:{};
+    for(const [subpath,target] of Object.entries(map)){
+      if(typeof target!=="string")continue;
+      entries.set(subpath==="."?manifest.name:`${manifest.name}/${subpath.replace(/^[.]\//u,"")}`,posix.normalize(`packages/${folder}/${target}`));
+    }
+  }
+  return entries;
+}
+
 async function migrationSource(): Promise<string> {
   return readFile(migrationPath, "utf8").catch(() => "");
 }
@@ -63,6 +307,8 @@ const execFileAsync = promisify(execFile);
 const CENSUS_ROOTS = Object.freeze([
   "apps", "packages", "acceptance", "tests", "tools", "scripts", "migrations"
 ]);
+/** The pointer's census of names: the census roots plus deploy/ (the release tooling calls the operator CLI, never reads). */
+const ACTIVATION_POINTER_CENSUS_ROOTS = Object.freeze([...CENSUS_ROOTS, "deploy"]);
 const CLOSED_WRITE_SURFACES = new Set([
   "migrations/0055_register_support_publication.sql",
   "packages/register/src/register-publication.ts",
@@ -682,6 +928,183 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     );
     expect([...new Set(markerCapableGenericCalls)]).toEqual([]);
   });
+
+  it("pins the activation pointer's readers: 0124's sites, the two TypeScript readers, the runner's silence, and the catalog", async () => {
+    // Side-by-side spec §13, plan D8, task S16 (rulings R1, R2, R15). The census is git's, as above, plus deploy/.
+    const listed = await execFileAsync("git", [
+      "ls-files", "--cached", "--others", "--exclude-standard", "--", ...ACTIVATION_POINTER_CENSUS_ROOTS
+    ]);
+    const files = listed.stdout.split("\n").filter((file) => /[.](?:[cm]?[jt]s|sql)$/u.test(file));
+    const sources = new Map(await Promise.all(files.map(async (file) => [file, await readFile(file, "utf8")] as const)));
+    expect(sources.has(ACTIVATION_POINTER_FILE)).toBe(true);
+
+    // Every file naming the pointer, by class: exactly the allow-list's non-test files, and nothing unclassified.
+    const named = [...sources].filter(([file, source]) => namesPointer(file, source))
+      .map(([file, source]) => ({ file, kind: pointerFileClassification(file, source) }));
+    expect(named.filter(({ kind }) => kind === "LIVE_OR_UNVERIFIED_POINTER_READER")).toEqual([]);
+    expect(named.filter(({ kind }) => kind !== "TEST_FILE")).toEqual([
+      { file: ACTIVATION_POINTER_API_FILE, kind: "API_POINTER_READER" },
+      { file: ACTIVATION_POINTER_FILE, kind: "ACTIVATION_POINTER_MIGRATION" },
+      { file: ACTIVATION_POINTER_FORWARD_FILE, kind: "MIGRATION_MACHINERY" },
+      { file: ACTIVATION_POINTER_SCHEMA_FILE, kind: "MIGRATION_MACHINERY" },
+      { file: ACTIVATION_POINTER_OPERATOR_FILE, kind: "OPERATOR_POINTER_READER" }
+    ]);
+    expect(named.filter(({ kind }) => kind === "TEST_FILE").every(({ file }) => file.startsWith("tests/"))).toBe(true);
+
+    // The negative scan the spec names: the runner never names the pointer nor imports a reader of it; no other file
+    // under packages/ names it (R2/R15: only the Drizzle table and 0124's evidence); the release tooling under deploy/
+    // (settings-version.mjs, release-switch.mjs, release-check.mjs) calls the operator CLI and names neither.
+    const runnerNaming = [...sources].filter(([file, source]) => file.startsWith("apps/runner/") && namesPointer(file, source));
+    expect(runnerNaming.map(([file]) => file)).toEqual([]);
+    const packagesNaming = [...sources].filter(([file, source]) => file.startsWith("packages/") && namesPointer(file, source))
+      .map(([file]) => file);
+    expect(packagesNaming).toEqual([ACTIVATION_POINTER_FORWARD_FILE, ACTIVATION_POINTER_SCHEMA_FILE]);
+    expect(sources.get("packages/db/src/release-state.ts")).toContain("SETTINGS_ACTIVATION_CONFLICT");
+    const deployNaming = [...sources].filter(([file, source]) => file.startsWith("deploy/") && namesPointer(file, source));
+    expect(deployNaming.map(([file]) => file)).toEqual([]);
+    for (const file of ["settings-version.mjs", "release-switch.mjs", "release-check.mjs"]) {
+      expect(sources.has(`deploy/preview-lifecycle/v1/${file}`), file).toBe(true);
+    }
+    const runnerImports = [...sources].filter(([file, source]) =>
+      file.startsWith("apps/runner/") && /[.][cm]?[jt]s$/u.test(file) && importsPointerReader(file, source));
+    expect(runnerImports.map(([file]) => file)).toEqual([]);
+    // ... and not through anything it imports: the runner's whole import closure (apps/api modules and workspace
+    // packages included) never reaches the API reader or the operator.
+    const packageEntries = await workspacePackageEntries();
+    expect(packageEntries.get("@debateai/db")).toBe("packages/db/src/index.ts");
+    const runnerEntries = [...sources.keys()].filter((file) => file.startsWith("apps/runner/") && /[.][cm]?[jt]sx?$/u.test(file));
+    expect(pointerReaderImportChains(runnerEntries, sources, packageEntries)).toEqual([]);
+    expect(importedModules("apps/runner/src/unapproved.ts", 'import { x } from "../../api/src/active-settings-version.js";'))
+      .toEqual(["apps/api/src/active-settings-version"]);
+
+    // 0124's sites, as written (R1): the ONE FROM of the table inside the reader, and the three functions that call it.
+    const pointerSql = sources.get(ACTIVATION_POINTER_FILE)!;
+    const sqlSites = [...sources].filter(([file]) => file.endsWith(".sql"))
+      .flatMap(([file, source]) => activationPointerSites(file, source));
+    expect([...pointerSql.matchAll(/\bFROM\s+register[.]settings_activation\b/gu)]).toHaveLength(1);
+    expect(sqlSites).toEqual(ACTIVATION_POINTER_SITES.map((site) => ({ file: ACTIVATION_POINTER_FILE, ...site })));
+
+    const db = await startTestDatabase();
+    try {
+      await migrate(db.pool);
+      const state = async (): Promise<PointerEvidence> => (await db.pool.query(`SELECT
+          pg_get_userbyid(f.proowner) AS "readerOwner", r.rolcanlogin AS "ownerLogin",
+          (SELECT count(*)::int FROM pg_auth_members m WHERE m.roleid = r.oid) AS "ownerMemberships",
+          has_function_privilege('debateai_runtime', f.oid, 'EXECUTE') AS "runtimeExecute",
+          (SELECT coalesce(array_agg(caller.rolname::text ORDER BY caller.rolname), '{}') FROM pg_roles caller
+            WHERE NOT caller.rolsuper AND caller.oid <> f.proowner
+              AND has_function_privilege(caller.oid, f.oid, 'EXECUTE')) AS "executeHolders",
+          has_table_privilege('debateai_runtime', t.oid, 'SELECT') AS "runtimeTableSelect",
+          (SELECT coalesce(array_agg(caller.rolname::text ORDER BY caller.rolname), '{}') FROM pg_roles caller
+            WHERE NOT caller.rolsuper AND caller.oid <> t.relowner
+              AND has_table_privilege(caller.oid, t.oid, 'SELECT')) AS "tableSelectHolders"
+        FROM pg_proc f JOIN pg_roles r ON r.rolname = 'debateai_release_owner'
+          JOIN pg_class t ON t.oid = 'register.settings_activation'::regclass
+        WHERE f.oid = 'register.read_active_settings_version()'::regprocedure`)).rows[0];
+      const evidence = await state();
+      expect(evidence).toEqual({
+        readerOwner: "debateai_release_owner", ownerLogin: false, ownerMemberships: 0, runtimeExecute: false,
+        executeHolders: [...ACTIVATION_POINTER_EXECUTE_HOLDERS],
+        runtimeTableSelect: false, tableSelectHolders: [...ACTIVATION_POINTER_TABLE_SELECT_HOLDERS]
+      });
+      const pinned = sqlSites.filter((site) =>
+        pointerSiteClassification(site, sources.get(site.file) ?? "", evidence) === "PINNED_ACTIVATION_POINTER_SITE");
+      expect(pinned).toEqual(sqlSites);
+
+      // Proof 1: one byte more in the migration and no site is classified (and the file itself is no longer allowed).
+      for (const site of pinned) {
+        expect(pointerSiteClassification(site, pointerSql + "\n", evidence)).toBe("LIVE_OR_UNVERIFIED_POINTER_READER");
+      }
+      expect(pointerFileClassification(ACTIVATION_POINTER_FILE, pointerSql + "\n")).toBe("LIVE_OR_UNVERIFIED_POINTER_READER");
+      // Proof 2: a planted runner (or packages/) file naming the reader fails, and so does a runner importing a reader.
+      const plantedSql = 'await pool.query("SELECT register.read_active_settings_version() AS version");';
+      for (const file of ["apps/runner/src/unapproved.ts", "packages/db/src/unapproved.ts"]) {
+        expect(pointerFileClassification(file, plantedSql)).toBe("LIVE_OR_UNVERIFIED_POINTER_READER");
+        const site = activationPointerSites(file, plantedSql);
+        expect(site).toHaveLength(1);
+        expect(pointerSiteClassification(site[0]!, pointerSql, evidence)).toBe("LIVE_OR_UNVERIFIED_POINTER_READER");
+      }
+      expect(pointerFileClassification("apps/runner/src/unapproved.ts", "const table = 'register.settings_activation';"))
+        .toBe("LIVE_OR_UNVERIFIED_POINTER_READER");
+      // Postgres folds unquoted names, so an upper-case read is the same read; an escaped or split name is decoded.
+      for (const evasion of [
+        'await pool.query("SELECT REGISTER.READ_ACTIVE_SETTINGS_VERSION() AS version");',
+        'await pool.query("SELECT a.register_version FROM REGISTER.SETTINGS_ACTIVATION a");',
+        'await pool.query("SELECT register.read\\u005factive_settings_version() AS version");',
+        'await pool.query("SELECT register.read_active_" + "settings_version() AS version");',
+        'await pool.query(`SELECT register.read_active_${""}settings_version() AS version`);',
+        'await pool.query(("SELECT register.read_active_" + "settings_" + ("version() AS version")));'
+      ]) {
+        expect(namesPointer("apps/runner/src/unapproved.ts", evasion), evasion).toBe(true);
+        expect(pointerFileClassification("apps/runner/src/unapproved.ts", evasion), evasion).toBe("LIVE_OR_UNVERIFIED_POINTER_READER");
+      }
+      expect(activationPointerSites("apps/runner/src/unapproved.ts",
+        'await pool.query("SELECT REGISTER.READ_ACTIVE_SETTINGS_VERSION() AS version");')).toHaveLength(1);
+      expect(namesPointer("packages/db/src/release-state.ts", sources.get("packages/db/src/release-state.ts")!)).toBe(false);
+      // A runner file importing a module that imports the reader (apps/api's release-state.ts does) fails by its chain.
+      const plantedImporter = "apps/runner/src/unapproved.ts";
+      const planted = new Map(sources).set(plantedImporter, 'import { x } from "../../api/src/release-state.js";');
+      expect(pointerReaderImportChains([plantedImporter], planted, packageEntries)).toEqual([
+        `${plantedImporter} -> apps/api/src/release-state.ts -> ${ACTIVATION_POINTER_API_FILE}`
+      ]);
+      planted.set(plantedImporter, 'export * from "../../../tools/settings-version/settings-operator.js";');
+      expect(pointerReaderImportChains([plantedImporter], planted, packageEntries)).toEqual([
+        `${plantedImporter} -> ${ACTIVATION_POINTER_OPERATOR_FILE}`
+      ]);
+      for (const specifier of ["../../api/src/active-settings-version.js", "../../../tools/settings-version/settings-operator.js"]) {
+        expect(importsPointerReader("apps/runner/src/unapproved.ts", `import * as reader from "${specifier}";`), specifier).toBe(true);
+        expect(importsPointerReader("apps/runner/src/unapproved.ts", `const reader = await import("${specifier}");`), specifier).toBe(true);
+      }
+      // The allowed modules stay allowed only in their exact form: a second SQL text in the API reader, a second read
+      // in the operator, or a table read in the machinery files fails.
+      const apiSource = sources.get(ACTIVATION_POINTER_API_FILE)!;
+      expect(pointerFileClassification(ACTIVATION_POINTER_API_FILE, apiSource
+        + '\nexport const again = "SELECT register.read_active_settings_version()";')).toBe("LIVE_OR_UNVERIFIED_POINTER_READER");
+      const operatorSource = sources.get(ACTIVATION_POINTER_OPERATOR_FILE)!;
+      expect(pointerFileClassification(ACTIVATION_POINTER_OPERATOR_FILE, operatorSource
+        + '\nexport const again = "SELECT register.read_active_settings_version()";')).toBe("LIVE_OR_UNVERIFIED_POINTER_READER");
+      // Final fix wave F7 (ruling R78): a second table read, or the rollback's history read reached from another function.
+      expect(pointerFileClassification(ACTIVATION_POINTER_OPERATOR_FILE, operatorSource
+        + '\nexport const again = "SELECT a.register_version FROM register.settings_activation AS a";')).toBe("LIVE_OR_UNVERIFIED_POINTER_READER");
+      expect(pointerFileClassification(ACTIVATION_POINTER_OPERATOR_FILE, operatorSource
+        + '\nexport function other() { return LAST_ACTIVE_ON_RELEASE_SQL; }')).toBe("LIVE_OR_UNVERIFIED_POINTER_READER");
+      for (const file of [ACTIVATION_POINTER_SCHEMA_FILE, ACTIVATION_POINTER_FORWARD_FILE]) {
+        expect(pointerFileClassification(file, sources.get(file)!
+          + '\nexport const read = "SELECT a.register_version FROM register.settings_activation AS a";'), file)
+          .toBe("LIVE_OR_UNVERIFIED_POINTER_READER");
+      }
+      expect(pointerFileClassification(ACTIVATION_POINTER_SCHEMA_FILE, sources.get(ACTIVATION_POINTER_SCHEMA_FILE)!
+        + "\n// register.read_active_settings_version()")).toBe("LIVE_OR_UNVERIFIED_POINTER_READER");
+
+      // Proof 3: a temporary grant to the runner's role breaks the evidence; revoked, the catalog is as before.
+      await db.pool.query("GRANT EXECUTE ON FUNCTION register.read_active_settings_version() TO debateai_runtime");
+      try {
+        const granted = await state();
+        expect(granted.runtimeExecute).toBe(true);
+        expect(granted.executeHolders).toContain("debateai_runtime");
+        for (const site of pinned) {
+          expect(pointerSiteClassification(site, pointerSql, granted)).toBe("LIVE_OR_UNVERIFIED_POINTER_READER");
+        }
+      } finally {
+        await db.pool.query("REVOKE EXECUTE ON FUNCTION register.read_active_settings_version() FROM debateai_runtime");
+      }
+      expect(await state()).toEqual(evidence);
+      // Proof 3b, the table backstop: a temporary SELECT on the pointer table for the runner's role breaks it too.
+      await db.pool.query("GRANT SELECT ON register.settings_activation TO debateai_runtime");
+      try {
+        const granted = await state();
+        expect(granted.runtimeTableSelect).toBe(true);
+        expect(granted.tableSelectHolders).toContain("debateai_runtime");
+        for (const site of pinned) {
+          expect(pointerSiteClassification(site, pointerSql, granted)).toBe("LIVE_OR_UNVERIFIED_POINTER_READER");
+        }
+      } finally {
+        await db.pool.query("REVOKE SELECT ON register.settings_activation FROM debateai_runtime");
+      }
+      expect(await state()).toEqual(evidence);
+    } finally { await db.stop(); }
+  });
+
   it("defines the allocated replay-safe schema and closed SQL capabilities", async () => {
     const source = await migrationSource();
 

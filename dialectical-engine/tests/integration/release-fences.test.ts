@@ -8,6 +8,7 @@ import { acceptanceFailureRecorder, ACCEPTANCE_WORKER_ID } from "../../acceptanc
 import { ACCEPTANCE_RELEASE_KEY } from "../../acceptance/seed-register.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { listRunnerSettingsPreload } from "../../apps/runner/src/run-settings.js";
 
 /**
  * Side-by-side spec §3 ("the database refuses to give a runner another release's debate"), over embedded Postgres,
@@ -330,5 +331,31 @@ describe("work items are fenced by release (side-by-side §3)", () => {
     expect(await new WorkItemRepository(runtime, { releaseKey: KEY_B, workerId: "worker:b" })
       .setAsideWorkItem({ ...bClaimed, reason: "BACKSTOP", readyOnly: false })).toBe(true);
     expect(await jobRow(bClaimed.workItemId)).toEqual({ state: "FAILED", terminal_reason: "RUN_SET_ASIDE:BACKSTOP", claimed_by: null });
+  });
+});
+
+// Side-by-side spec §13 runner point 3 (S8): the boot preload's two reads, as the runtime principal really makes them.
+describe("the runner's boot preload reads its own release's open versions and its passed versions (side-by-side §13)", () => {
+  it("lists the fenced release's READY and CLAIMED runs' versions only, and unions them with the passed versions", async () => {
+    const ready = await runWithJob(KEY_A), claimed = await runWithJob(KEY_A), failed = await runWithJob(KEY_A);
+    await claim(claimed, "worker:a", true);
+    await database.pool.query("UPDATE core.work_item SET state = 'FAILED', terminal_reason = 'TEST_LAYER:S8' WHERE work_item_id = $1",
+      [failed.workItemId]);
+    await runWithJob(KEY_B);
+    await runWithJob();
+    expect(ready.runId).not.toBe(claimed.runId);
+    // Two open runs, both stamped version 1: one version, once.
+    expect(await fenceA().listOpenRunSettingsVersions(KEY_A)).toEqual([1]);
+    // Legacy runs are never listed, and a fence reads only its own release.
+    expect(await new WorkItemRepository(runtime).listOpenRunSettingsVersions(LEGACY_RELEASE_KEY)).toEqual([]);
+    await expect(fenceA().listOpenRunSettingsVersions(KEY_B)).rejects.toThrow("WORK_ITEM_FENCE_RELEASE_MISMATCH");
+    // Release B (key r2-…): its open run's version 1, its key's own number 2 (read_passed_settings_versions), its site 2.
+    const fenceB = new WorkItemRepository(runtime, { releaseKey: KEY_B });
+    expect(await listRunnerSettingsPreload({ pool: runtime, work: fenceB, releaseKey: KEY_B, siteVersion: 2 })).toEqual([1, 2]);
+    expect(await listRunnerSettingsPreload({ pool: runtime, work: fenceA(), releaseKey: KEY_A, siteVersion: 1 })).toEqual([1]);
+    // Nothing open for release A any more: its site version (and its key's number) only.
+    await database.pool.query("UPDATE core.work_item SET state = 'FAILED', claimed_by = NULL, claim_deadline = NULL, terminal_reason = 'TEST_LAYER:S8' WHERE work_item_id = ANY($1::uuid[])",
+      [[ready.workItemId, claimed.workItemId]]);
+    expect(await fenceA().listOpenRunSettingsVersions(KEY_A)).toEqual([]);
   });
 });

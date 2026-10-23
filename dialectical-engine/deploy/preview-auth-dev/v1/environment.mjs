@@ -26,23 +26,31 @@ const REVIEWED_ROSTER_FLAGS=Object.values(PREVIEW_MODEL_ROSTER_FLAGS);
 export const isReviewedModelRosterFlag=value=>typeof value==='string'&&REVIEWED_ROSTER_FLAGS.includes(value);
 const LEGACY_CONFIG_KEYS='budget_socket,deployment,free_model_ids,requested_thinking_level,scope_id';
 const ROSTER_CONFIG_KEYS='budget_socket,deployment,free_model_ids,premium_model_ids,requested_thinking_level,scope_id';
+// Addition D14 (owner 2026-10-22): the gate part alone, the line-up living in the settings version (previewLineUpPolicy).
+const SOCKETS_ONLY_CONFIG_KEYS='budget_socket,deployment,requested_thinking_level,scope_id';
 // PR B: the roster form may also name the Anthropic gate's socket (the API's parser checks its value).
 const OPTIONAL_SOCKET_KEYS=Object.freeze(['anthropic_budget_socket']);
 // Spec 2026-10-12 §4.2: the owner's thinking-level table is optional on both forms (the API's parser checks its contents).
 const OPTIONAL_TABLE_KEYS=Object.freeze(['thinking_levels']);
 /**
- * Whether the UI's public model list (NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON) offers exactly what the
- * API's preview configuration (PREVIEW_PROVIDER_TEST_CONFIG_JSON) allows: the legacy array only with the
- * legacy five-key config holding that one list; the two-list object only with the six-key config holding
- * the same free and premium lists, in the same order. A UI that offers a model the API refuses, or the
- * reverse, is a mismatch. The API config's own parser (packages/providers preview-test.ts) checks the rest.
- * The optional thinking_levels table (spec 2026-10-12 §4.2) may ride on either form and is not compared here.
+ * Whether the UI's public model list (NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON) agrees with the API's preview
+ * configuration (PREVIEW_PROVIDER_TEST_CONFIG_JSON). For the two old forms, which carry the line-up, it must offer exactly
+ * what they allow: the legacy array only with the legacy five-key config holding that one list; the two-list object only
+ * with the six-key config holding the same free and premium lists, in the same order. A UI that offers a model the API
+ * refuses, or the reverse, is a mismatch. The optional thinking_levels table (spec 2026-10-12 §4.2) may ride on either
+ * old form and is not compared here.
+ * Addition D14/D24 items 5-6 (owner 2026-10-22): the sockets-only config (the four gate keys, optionally the Anthropic
+ * socket, no rosters, no table) names no line-up; the line-up lives in the settings version (previewLineUpPolicy), so any
+ * reviewed list matches it and nothing else checks the list against the line-up: the list now only feeds the new-debate
+ * page's fallback (an older API) and the ask proxy ceiling, and the providers page reads the API. An unreviewed list
+ * never matches. The API config's own parser (packages/providers preview-test.ts) checks the rest.
  */
 export function uiRosterMatchesApiConfig(uiFlag,apiConfigJson) {
  try{
   if(!isReviewedModelRosterFlag(uiFlag)||typeof apiConfigJson!=='string')return false;
   const ui=JSON.parse(uiFlag),api=JSON.parse(apiConfigJson);
   if(!api||typeof api!=='object'||Array.isArray(api))return false;
+  if(Object.keys(api).filter(key=>!OPTIONAL_SOCKET_KEYS.includes(key)).sort().join(',')===SOCKETS_ONLY_CONFIG_KEYS)return true;
   const keys=Object.keys(api).filter(key=>!OPTIONAL_TABLE_KEYS.includes(key)).sort().join(','),same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
   if(Array.isArray(ui))return keys===LEGACY_CONFIG_KEYS&&same(api.free_model_ids,ui);
   const rosterKeys=Object.keys(api).filter(key=>!OPTIONAL_SOCKET_KEYS.includes(key)&&!OPTIONAL_TABLE_KEYS.includes(key)).sort().join(',');
@@ -178,10 +186,11 @@ export function narrowEnvironment(service,configured,runtime,publication,approve
   }
   if(REFUSED_ON_PREVIEW.some(key=>configured[key]!==undefined))refuse();
   const normalized=service==='api'?runtime.parseApiEnvironment(configured):runtime.parseRunnerEnvironment(configured);
-  // Local, or hosted (owner rulings 2026-10-13) only on the preview's own configuration (the spending gates and the team).
+  // Local, or hosted (owner rulings 2026-10-13) only on the preview's own configuration (the spending gates and the team);
+  // any of its three forms (addition D14: the gate part, PREVIEW_GATE_SETTINGS, is present for each).
   const mode=configured.DEBATEAI_DEPLOYMENT_MODE;
   if(!['local','hosted'].includes(mode)||normalized.DEPLOYMENT_MODE!==mode||String(normalized.REGISTER_VERSION)!==publication.registerVersion
-    ||(mode==='hosted'&&normalized.PREVIEW_PROVIDER_TEST_CONFIG===undefined))refuse();
+    ||(mode==='hosted'&&normalized.PREVIEW_GATE_SETTINGS===undefined))refuse();
   if(service==='api'){
    if(configured.PUBLIC_APP_URL!==PREVIEW_ORIGIN||configured.API_HOST!=='127.0.0.1'||configured.API_PORT!==approved.apiPort
     ||configured.MAIL_SENDMAIL_PATH!==approved.mailExecutable||configured.MAIL_FROM!==approved.mailFrom

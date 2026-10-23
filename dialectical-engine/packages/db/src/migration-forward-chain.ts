@@ -15,6 +15,7 @@ import { loadForward0120 } from './migration-forward0120.js';
 import { loadForward0121 } from './migration-forward0121.js';
 import { loadForward0122 } from './migration-forward0122.js';
 import { loadForward0123 } from './migration-forward0123.js';
+import { loadForward0124 } from './migration-forward0124.js';
 
 /**
  * The forward steps after dev's sealed lineage, its 0108 and its 0110 (PR-54, PR-58, migrations/lineage/README.md): an
@@ -56,9 +57,10 @@ export type ChainStep=ForwardStepPlan&Readonly<{n1:N1Declaration}>;
  * check's site cost (0118, spec 2026-10-13), then the reclaim resume (0119, spec 2026-10-14), then the reply measures
  * (0120, spec 2026-10-15 length guidance), then the engine verdict (0121, spec 2026-10-15 engine redesign R2), then the
  * engine's map answer step (0122, spec 2026-10-15 engine redesign R3), then the side-by-side releases (0123, spec
- * 2026-10-21 side-by-side uploads). A new step appends its loader here (README).
+ * 2026-10-21 side-by-side uploads), then the settings activation (0124, side-by-side spec §13: settings changes without
+ * an upload). A new step appends its loader here (README).
  */
-const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116,loadForward0117,loadForward0118,loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123]);
+const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116,loadForward0117,loadForward0118,loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124]);
 
 /** A forward step's file name; the receipt and declaration tables CHECK the same shape. */
 export const FORWARD_STEP_NAME=/^\d{4}_[a-z0-9_]+\.sql$/;

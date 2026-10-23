@@ -186,7 +186,7 @@ launchers still re-check every byte exactly as before.
 prestart.mjs  common.mjs  alert.mjs  backup.mjs  release-guard.mjs  release-table.mjs
 unlock-team-tools.mjs  jit-creator-actor.mjs  self-capture-actor.mjs  readiness-writer-actor.mjs
 release-switch.mjs  release-check.mjs  release-retire.mjs  release-env.mjs  release-archive.mjs
-unit-templates.mjs  migration-steps.mjs
+unit-templates.mjs  migration-steps.mjs  settings-version.mjs
 systemd/debateai-preview.target
 systemd/debateai-preview-{api,ui}@.service.d/50-lifecycle.conf
 systemd/debateai-preview-postgresql.service.d/50-lifecycle.conf
@@ -208,13 +208,41 @@ side-by-side upload:
 | File | What it does |
 |---|---|
 | `release-table.mjs` | root's only door to the release table (staged, current, draining, retired), through `psql` variables |
-| `release-switch.mjs` | `stage`, `seed` (the transition only), `switch`, `switch --finish`, `rollback --to … --from …`, `rollback --before-switch` |
+| `release-switch.mjs` | `stage`, `seed` (the transition only), `switch [--activate <v>]`, `switch --finish`, `rollback --to … --from …`, `rollback --before-switch` |
 | `release-check.mjs` | `check` (the verdict before an upload), `status`, `receipt` (a release that retired by itself), `maintenance` |
 | `release-retire.mjs` | the units' stop recorder (`stopped`), the backstop's `retire-request`, the 25-minute `retire-check`, and `mark-retired` (drained path only) |
 | `release-env.mjs` | each release's `<service>-<label>.env` (`derive`) and the SAME checks across releases (`same`) |
 | `release-archive.mjs` | moves a RETIRED release aside on the owner's yes (`archive`); never deletes |
 | `unit-templates.mjs` | the API and website templates from the live units (`render`) and the property check (`compare`) |
 | `backup.mjs --online` | the online backup before a side-by-side upload's migrations (the nightly run takes no argument) |
+| `settings-version.mjs` | debate settings without an upload (side-by-side spec §13): `check <label> <v>` (the dry boot, both halves, and the verdict), `activate <v> --by <owner> --reason <text>`, `status` |
+
+The settings step of the switch (side-by-side spec §13, §11): every database write of `release-switch.mjs` (switch,
+its revert, the first switch, the seed) passes the settings pointer it saw, read by the operator module
+(`tools/settings-version/cli.ts switch-plan`, run as `postgres` from a release's own API folder), and can activate a
+version in the same transaction. The first switch to a release while nothing was ever activated activates that
+release's own site version. A new release that has not passed the active version refuses
+`SETTINGS_VERSION_NOT_PASSED` before anything is written, naming the versions it passed: run
+`settings-version.mjs check <label> <active version>`, or plan the switch with `switch --to <new> --from <old>
+--activate <a version it passed>`. A forward switch that activates a version other than the active one (the new
+release's own site version included) first runs the live gate check of an activation (ruling R80); `--expect-active <v>`
+refuses `SETTINGS_ACTIVE_VERSION_MOVED` before anything is written when the active version is not `v`. A rollback keeps
+the active version when the older release passed it, else re-activates the version last active while that release was
+current, else its own site version (ruling R78: never a version it only checked); a revert puts back what the switch
+replaced. `release-check.mjs check` gains the line `SETTINGS` (and takes the same `--activate <v>`).
+
+`settings-version.mjs` runs each check-version half from the release's own folder (`apps/runner/src/settings-check-cli.ts`
+and `apps/api/src/settings-check-cli.ts`, the files `pnpm settings:check-runner|settings:check-api` name) with the
+lock's pinned identity of its unit (`setpriv`) and that release's `<service>-<label>.env` values as its environment, and
+keeps both lines as `lifecycle-current-<label>/settings-check-<v>-<UTC>.json`. Every file it hands the operator (the
+lines, the receipt, the line-up and target models, the gate answers) is root's, mode 0640, in the group the operator
+runs as (`postgres`'s primary group, read through `getent`). The operator never records a FAIL for the current
+release's active version (`SETTINGS_VERDICT_ACTIVE_PAIR`: the codes, then one plain line; activate another passed
+version first). The operator commands
+(`cli.ts verdict|activate|status`) run as `postgres` through the server's own socket (libpq's `PGHOST`/`PGPORT`/
+`PGDATABASE`/`PGUSER`), the principal `release-table.mjs` uses. `activate` first reads both gates' read-only
+`/remaining` (the sockets from the current release's API env file) and hands the answers to the operator, which refuses
+unless every model the version can seat is switched on at its gate.
 
 The online backup dumps every database of the cluster as the postgres administrator over the local socket, so the
 cluster's `pg_hba.conf` must let that administrator into each one. On the test site that is line 2,

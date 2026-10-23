@@ -49,7 +49,7 @@ describe('release table door (side-by-side spec §4)', () => {
 
   it('lets the database give up before root does, so no write lands after a timeout', async () => {
     const { calls, run } = recorder(ok('41\n'));
-    await recordReleaseSwitch({ newKey: KEY, expectedCurrentKey: OLD, takeTrafficAfterSeconds: 5, recordedBy: 'root:release-switch', layout: LAYOUT, run });
+    await recordReleaseSwitch({ newKey: KEY, expectedCurrentKey: OLD, takeTrafficAfterSeconds: 5, recordedBy: 'root:release-switch', expectedActiveSettings: null, layout: LAYOUT, run });
     expect(sql(calls[0])).toMatch(/^SET statement_timeout = '10s';\n/);
   });
 
@@ -77,7 +77,7 @@ describe('release table door (side-by-side spec §4)', () => {
   it('maps a refused switch to RELEASE_SWITCH_CONFLICT and nothing else leaks', async () => {
     const stderr = `psql:<stdin>:2: ERROR:  RELEASE_SWITCH_CONFLICT current is ${OLD}\nCONTEXT:  PL/pgSQL function core.record_release_switch secret-detail\n`;
     const { run } = recorder(result({ code: 3, stderr }));
-    const error = await recordReleaseSwitch({ newKey: KEY, expectedCurrentKey: null, takeTrafficAfterSeconds: 5, recordedBy: 'root:release-switch', layout: LAYOUT, run }).catch((caught: any) => caught);
+    const error = await recordReleaseSwitch({ newKey: KEY, expectedCurrentKey: null, takeTrafficAfterSeconds: 5, recordedBy: 'root:release-switch', expectedActiveSettings: null, layout: LAYOUT, run }).catch((caught: any) => caught);
     expect(error.code).toBe('RELEASE_SWITCH_CONFLICT');
     expect(error.message).toBe('RELEASE_SWITCH_CONFLICT');
     expect(JSON.stringify({ ...error, message: error.message, stack: error.stack })).not.toMatch(/secret-detail|current is|psql/);
@@ -121,7 +121,10 @@ describe('release table door (side-by-side spec §4)', () => {
       ['', run => countWaiting({ layout: LAYOUT, run })],
       ['3\n4\n', run => countWaiting({ layout: LAYOUT, run })],
       ['', run => recordReleaseEvent({ releaseKey: KEY, kind: 'STAGED', recordedBy: 'root:rollback', reason: null, layout: LAYOUT, run })],
-      ['abc\n', run => recordReleaseSwitch({ newKey: KEY, expectedCurrentKey: OLD, takeTrafficAfterSeconds: 5, recordedBy: 'root:release-switch', layout: LAYOUT, run })]
+      ['abc\n', run => recordReleaseSwitch({ newKey: KEY, expectedCurrentKey: OLD, takeTrafficAfterSeconds: 5, recordedBy: 'root:release-switch', expectedActiveSettings: null, layout: LAYOUT, run })],
+      // S15: with an activation the transaction prints two rows (event_seq, activation_seq); one is not the answer.
+      ['41\n', run => recordReleaseSwitch({ newKey: KEY, expectedCurrentKey: OLD, takeTrafficAfterSeconds: 5, recordedBy: 'root:release-switch', expectedActiveSettings: 16,
+        activation: { version: 17, activatedBy: 'root release-switch', reason: `release switch to ${KEY}` }, layout: LAYOUT, run })]
     ];
     for (const [stdout, call] of bad) await expect(call(recorder(ok(stdout)).run), JSON.stringify(stdout)).rejects.toMatchObject({ code: 'RELEASE_TABLE_UNREADABLE' });
   });
@@ -182,17 +185,63 @@ describe('release table door (side-by-side spec §4)', () => {
     expect(variables(empty.calls[0])).toEqual([`release_key=${KEY}`, 'kind=STAGED', 'recorded_by=root:rollback', 'reason=']);
   });
 
-  it('asks the database clock for the take-traffic time', async () => {
+  it('asks the database clock for the take-traffic time, in one READ COMMITTED transaction that passes the settings pointer (S15)', async () => {
     const { calls, run } = recorder(ok('41\n'));
-    expect(await recordReleaseSwitch({ newKey: KEY, expectedCurrentKey: OLD, takeTrafficAfterSeconds: 5, recordedBy: 'root:release-switch', layout: LAYOUT, run })).toBeUndefined();
-    expect(sql(calls[0])).toContain("SELECT core.record_release_switch(:'new_key', NULLIF(:'expected_current', ''), clock_timestamp() + make_interval(secs => :'seconds'), :'recorded_by');");
+    expect(await recordReleaseSwitch({ newKey: KEY, expectedCurrentKey: OLD, takeTrafficAfterSeconds: 5, recordedBy: 'root:release-switch', expectedActiveSettings: 16, layout: LAYOUT, run })).toBeUndefined();
+    expect(sql(calls[0])).toContain([
+      'BEGIN ISOLATION LEVEL READ COMMITTED;',
+      "SELECT core.record_release_switch(:'new_key', NULLIF(:'expected_current', ''), clock_timestamp() + make_interval(secs => :'seconds'), :'recorded_by', NULLIF(:'expected_active', '')::bigint);",
+      'COMMIT;'
+    ].join('\n'));
+    expect(sql(calls[0])).not.toContain('activate_settings_version');
     expect(calls[0]!.argv).toContain('seconds=5');
-    expect(variables(calls[0])).toEqual([`new_key=${KEY}`, `expected_current=${OLD}`, 'seconds=5', 'recorded_by=root:release-switch']);
+    expect(calls[0]!.argv).toContain('ON_ERROR_STOP=1');
+    expect(variables(calls[0])).toEqual([`new_key=${KEY}`, `expected_current=${OLD}`, 'seconds=5', 'recorded_by=root:release-switch', 'expected_active=16']);
     for (const value of [KEY, OLD, 'root:release-switch']) expect(sql(calls[0])).not.toContain(value);
-    // No current release yet: the expected current reaches the function as NULL.
+    // No current release yet, and no pointer yet: both reach the functions as NULL.
     const first = recorder(ok('1\n'));
-    await recordReleaseSwitch({ newKey: KEY, expectedCurrentKey: null, takeTrafficAfterSeconds: 0, recordedBy: 'root:release-switch', layout: LAYOUT, run: first.run });
-    expect(variables(first.calls[0])).toEqual([`new_key=${KEY}`, 'expected_current=', 'seconds=0', 'recorded_by=root:release-switch']);
+    await recordReleaseSwitch({ newKey: KEY, expectedCurrentKey: null, takeTrafficAfterSeconds: 0, recordedBy: 'root:release-switch', expectedActiveSettings: null, layout: LAYOUT, run: first.run });
+    expect(variables(first.calls[0])).toEqual([`new_key=${KEY}`, 'expected_current=', 'seconds=0', 'recorded_by=root:release-switch', 'expected_active=']);
+  });
+
+  it('activates a settings version in the same transaction, right after the switch, every value a variable (S15, ruling R12)', async () => {
+    const { calls, run } = recorder(ok('41\n3\n'));
+    const activation = { version: 17, activatedBy: 'root release-switch', reason: `release switch to ${KEY}` };
+    await recordReleaseSwitch({ newKey: KEY, expectedCurrentKey: OLD, takeTrafficAfterSeconds: 8, recordedBy: 'root:release-switch', expectedActiveSettings: null, activation, layout: LAYOUT, run });
+    expect(sql(calls[0])).toContain([
+      'BEGIN ISOLATION LEVEL READ COMMITTED;',
+      "SELECT core.record_release_switch(:'new_key', NULLIF(:'expected_current', ''), clock_timestamp() + make_interval(secs => :'seconds'), :'recorded_by', NULLIF(:'expected_active', '')::bigint);",
+      "SELECT register.activate_settings_version(:'activate'::bigint, NULLIF(:'expected_active', '')::bigint, :'new_key', :'activated_by', :'activation_reason');",
+      'COMMIT;'
+    ].join('\n'));
+    expect(variables(calls[0])).toEqual([`new_key=${KEY}`, `expected_current=${OLD}`, 'seconds=8', 'recorded_by=root:release-switch', 'expected_active=',
+      'activate=17', 'activated_by=root release-switch', `activation_reason=release switch to ${KEY}`]);
+    for (const value of ['root release-switch', 'release switch to']) expect(sql(calls[0])).not.toContain(value);
+  });
+
+  it('requires the settings pointer at every switch and refuses a bad activation before psql runs (S15)', async () => {
+    const base = { newKey: KEY, expectedCurrentKey: OLD, takeTrafficAfterSeconds: 8, recordedBy: 'root:release-switch', layout: LAYOUT };
+    const bad: Record<string, unknown>[] = [
+      {}, { expectedActiveSettings: undefined }, { expectedActiveSettings: 0 }, { expectedActiveSettings: '17' }, { expectedActiveSettings: 1.5 },
+      { expectedActiveSettings: null, activation: { version: 0, activatedBy: 'root release-switch', reason: 'x' } },
+      { expectedActiveSettings: null, activation: { version: 17, activatedBy: 'root:release-switch', reason: 'x' } },
+      { expectedActiveSettings: null, activation: { version: 17, activatedBy: 'root release-switch', reason: '' } },
+      { expectedActiveSettings: null, activation: { version: 17, activatedBy: 'root release-switch', reason: 'two\nlines' } }
+    ];
+    for (const extra of bad) {
+      const { calls, run } = recorder(ok('41\n'));
+      await expect(recordReleaseSwitch({ ...base, ...extra, run }), JSON.stringify(extra)).rejects.toMatchObject({ code: 'RELEASE_EVENT_REFUSED' });
+      expect(calls).toEqual([]);
+    }
+  });
+
+  it("keeps the database's settings refusals by name, the COMMIT's deferred one included (S15)", async () => {
+    for (const code of ['SETTINGS_ACTIVATION_CONFLICT', 'SETTINGS_VERSION_NOT_PASSED', 'SETTINGS_ACTIVATION_UNCHANGED', 'SETTINGS_VERSION_KIND_INVALID']) {
+      const { run } = recorder(result({ code: 3, stderr: `psql:<stdin>:6: ERROR:  ${code}\nCONTEXT:  secret-detail\n` }));
+      const error = await recordReleaseSwitch({ newKey: KEY, expectedCurrentKey: OLD, takeTrafficAfterSeconds: 8, recordedBy: 'root:release-switch', expectedActiveSettings: 16,
+        activation: { version: 17, activatedBy: 'root release-switch', reason: 'x' }, layout: LAYOUT, run }).catch((caught: any) => caught);
+      expect([error.code, error.message]).toEqual([code, code]);
+    }
   });
 
   it('reads the current release and its take-traffic time, or null when there is none', async () => {

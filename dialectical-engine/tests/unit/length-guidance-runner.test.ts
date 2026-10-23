@@ -80,15 +80,15 @@ describe("the runner's length call sites (source pins)", () => {
     expect(count("guidedCallBound(")).toBe(11);
     for (const site of [
       "guidedCallBound(input.judgeBound, \"reviewer\", catchUpLength)",
-      "guidedCallBound(this.settings.judgeBound, \"judge_panel\", lengthGuidance)",
-      "guidedCallBound(this.settings.judgeBound, \"opening\", lengthGuidance).tokenCeiling",
-      "guidedCallBound(this.settings.judgeBound, judgeLegLengthStep(leg), lengthGuidance)",
-      "guidedCallBound(this.settings.judgeBound, judgeLegLengthStep(input.leg), lengthGuidance)",
-      "guidedCallBound(this.settings.judgeBound, \"reviewer\", lengthGuidance)",
+      "guidedCallBound(settings.judgeBound, \"judge_panel\", lengthGuidance)",
+      "guidedCallBound(settings.judgeBound, \"opening\", lengthGuidance).tokenCeiling",
+      "guidedCallBound(settings.judgeBound, judgeLegLengthStep(leg), lengthGuidance)",
+      "guidedCallBound(settings.judgeBound, judgeLegLengthStep(input.leg), lengthGuidance)",
+      "guidedCallBound(settings.judgeBound, \"reviewer\", lengthGuidance)",
       "\"answer_writer\", lengthGuidance),",
-      "guidedCallBound(this.settings.synthesisRolePolicy.evaluatorBound, \"answer_checker\", lengthGuidance)",
-      "guidedCallBound(this.settings.judgeBound, \"investigator\", lengthGuidance)",
-      "guidedCallBound(this.settings.judgeBound, \"comparing_judge\", lengthGuidance)"
+      "guidedCallBound(settings.synthesisRolePolicy.evaluatorBound, \"answer_checker\", lengthGuidance)",
+      "guidedCallBound(settings.judgeBound, \"investigator\", lengthGuidance)",
+      "guidedCallBound(settings.judgeBound, \"comparing_judge\", lengthGuidance)"
     ]) expect(count(site), site).toBe(1);
   });
 

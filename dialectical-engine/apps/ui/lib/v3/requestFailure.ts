@@ -272,6 +272,29 @@ function isAccountPhoneRequired(error: unknown): boolean {
     && error.serverCode === PHONE_REQUIRED_SERVER_CODE;
 }
 
+/**
+ * Side-by-side spec §13 (Task S12, owner-approved wording 2026-10-22): POST /v1/asks answers 409 ASK_SETTINGS_CHANGED
+ * when the choices for new debates changed between the page's room read and the ask, and the new settings no longer
+ * offer one of the person's choices. Nothing was started; /new reads the room again and shows this one plain sentence,
+ * never the code. Read from `serverCode`: the client's own `.code` for every 409 is "SERVER_FAILURE".
+ */
+const SETTINGS_CHANGED_SERVER_CODE = "ASK_SETTINGS_CHANGED";
+const SETTINGS_CHANGED_KEY = "newDebate.settingsChanged";
+const SETTINGS_CHANGED_ENGLISH = "The choices for new debates just changed. Please check yours and ask again.";
+
+export function isAskSettingsChanged(error: unknown): boolean {
+  return error instanceof ContractHttpError && error.status === 409
+    && error.serverCode === SETTINGS_CHANGED_SERVER_CODE;
+}
+
+/**
+ * The same sentence when /new sees the switch itself (ruling R51): a room read names a settings version other than the
+ * one the page's choices were offered under, before any ask was refused.
+ */
+export function settingsChangedMessage(catalog?: MessageCatalog): string {
+  return catalog === undefined ? SETTINGS_CHANGED_ENGLISH : t(catalog, SETTINGS_CHANGED_KEY);
+}
+
 /** The user-facing line for a banner. Never a sentence a server wrote. */
 export function requestFailureMessage(
   subject: RequestFailureSubject,
@@ -287,6 +310,7 @@ export function requestFailureMessage(
   if (subject === "DEBATE_CREATE" && isAccountPhoneRequired(error)) {
     return catalog === undefined ? PHONE_REQUIRED_ENGLISH : t(catalog, PHONE_REQUIRED_KEY);
   }
+  if (subject === "DEBATE_CREATE" && isAskSettingsChanged(error)) return settingsChangedMessage(catalog);
   const classified = classifyRequestFailure(subject,error);
   if (catalog === undefined) return classified.message;
   return `${t(catalog,`requestFailure.subject.${classified.subject}`)} ${

@@ -14,6 +14,9 @@ apps/api/src/account-erasure.ts
 apps/api/src/account-mail-template.d.mts
 apps/api/src/account-mail-template.mjs
 apps/api/src/account-profile.ts
+apps/api/src/active-settings-version.ts
+apps/api/src/admission-alarm.ts
+apps/api/src/admission-settings.ts
 apps/api/src/admission.ts
 apps/api/src/ask-billing.ts
 apps/api/src/ask-model-picker.ts
@@ -162,6 +165,8 @@ apps/api/src/retention-purge.ts
 apps/api/src/risk-signal-identity.ts
 apps/api/src/run-event-tail.ts
 apps/api/src/sessions.ts
+apps/api/src/settings-check-cli.ts
+apps/api/src/settings-check.ts
 apps/api/src/social-auth.ts
 apps/api/src/social-providers/hashes.ts
 apps/api/src/social-providers/oidc.ts
@@ -373,10 +378,12 @@ apps/runner/src/production-database-url.ts
 apps/runner/src/provider-topology.ts
 apps/runner/src/rotate-kek-cli.ts
 apps/runner/src/rotate-kek.ts
+apps/runner/src/run-debate-members.ts
 apps/runner/src/run-in-flight.ts
 apps/runner/src/run-keep-alive.ts
 apps/runner/src/run-replay.ts
 apps/runner/src/run-seats.ts
+apps/runner/src/run-settings.ts
 apps/runner/src/run-sit-out.ts
 apps/runner/src/runner-lapsed-resend.ts
 apps/runner/src/runner-preview-team-gate.ts
@@ -384,6 +391,8 @@ apps/runner/src/runner-ready.ts
 apps/runner/src/runner-retirement.ts
 apps/runner/src/runner-startup-reconciliation.ts
 apps/runner/src/serve-disclosure-cli.ts
+apps/runner/src/settings-check-cli.ts
+apps/runner/src/settings-check.ts
 apps/runner/src/shape-plan.ts
 apps/runner/src/shape-seats.ts
 apps/runner/src/shape-select.ts
@@ -704,6 +713,7 @@ apps/ui/lib/legal/pageCatalogs.ts
 apps/ui/lib/legal/pages.ts
 apps/ui/lib/legal/pl/privacyPolicy.ts
 apps/ui/lib/legal/pl/termsOfService.ts
+apps/ui/lib/legal/providerCompanies.ts
 apps/ui/lib/legal/pt/privacyPolicy.ts
 apps/ui/lib/legal/pt/termsOfService.ts
 apps/ui/lib/legal/ro/privacyPolicy.ts
@@ -935,6 +945,7 @@ packages/db/src/migration-forward0120.ts
 packages/db/src/migration-forward0121.ts
 packages/db/src/migration-forward0122.ts
 packages/db/src/migration-forward0123.ts
+packages/db/src/migration-forward0124.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
 packages/db/src/migration-forward111.ts
@@ -1070,12 +1081,14 @@ packages/providers/src/index.ts
 packages/providers/src/model-json.ts
 packages/providers/src/patch-follow-up.ts
 packages/providers/src/preview-busy.ts
+packages/providers/src/preview-line-up.ts
 packages/providers/src/preview-models.ts
 packages/providers/src/preview-remaining.ts
 packages/providers/src/preview-test.ts
 packages/providers/src/preview-thinking.ts
 packages/providers/src/prompt-frame.ts
 packages/providers/src/prompt-tripwire.ts
+packages/providers/src/provider-companies.ts
 packages/providers/src/provider-probe.ts
 packages/providers/src/reply-fixer.ts
 packages/providers/src/reply-words.ts
@@ -1107,6 +1120,7 @@ packages/register/src/map-contract-hash.ts
 packages/register/src/mfa-policy.ts
 packages/register/src/model-scorecard-policy.ts
 packages/register/src/password-reset-policy.ts
+packages/register/src/preview-line-up-policy.ts
 packages/register/src/product-role-policy.ts
 packages/register/src/publication-check-policy.ts
 packages/register/src/question-language-policy.ts
@@ -1114,6 +1128,9 @@ packages/register/src/recovery-policy.ts
 packages/register/src/register-publication.ts
 packages/register/src/runtime-environment.ts
 packages/register/src/session-policy.ts
+packages/register/src/settings-check-report.ts
+packages/register/src/settings-check-seatable.ts
+packages/register/src/settings-classification.ts
 packages/register/src/staff-access-policy.ts
 packages/register/src/story-policy.ts
 packages/register/src/support-config.ts

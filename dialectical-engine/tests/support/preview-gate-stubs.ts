@@ -417,13 +417,16 @@ export function classifyGateRequest(chat: string): GateRequestKind | "UNKNOWN" {
   return "UNKNOWN";
 }
 
+/** The tokens a reply reports by default (100 in, 50 out); a scenario may report others (`startPreviewGateStubs` `usage`). */
+export type StubUsage = Readonly<{ input: number; output: number }>;
+const STUB_DEFAULT_USAGE: StubUsage = Object.freeze({ input: 100, output: 50 });
 /** The vendor's own reply shape: an OpenAI chat completion (DeepInfra) or a Messages reply (Anthropic), with usage. */
-export function stubVendorReply(provider: GateProvider, model: string, content: string, id: string): string {
+export function stubVendorReply(provider: GateProvider, model: string, content: string, id: string, usage: StubUsage = STUB_DEFAULT_USAGE): string {
   return provider === "anthropic"
     ? JSON.stringify({ id: `msg_${id}`, type: "message", role: "assistant", model, content: [{ type: "text", text: content }],
-      stop_reason: "end_turn", stop_sequence: null, usage: { input_tokens: 100, output_tokens: 50 } })
+      stop_reason: "end_turn", stop_sequence: null, usage: { input_tokens: usage.input, output_tokens: usage.output } })
     : JSON.stringify({ id, model, choices: [{ message: { role: "assistant", content }, finish_reason: "stop" }],
-      usage: { prompt_tokens: 100, completion_tokens: 50 } });
+      usage: { prompt_tokens: usage.input, completion_tokens: usage.output } });
 }
 
 /* ------------------------------------------------------------------ the gates */
@@ -473,6 +476,7 @@ export type PreviewGateStubs = Readonly<{
  *  - `enabledModels`: what /remaining says each gate serves (default: the five reviewed models by their gate).
  *  - `remainingState`: what /remaining says while the gate has not halted (default "active"); a halted DeepInfra gate
  *    always answers "halted".
+ *  - `usage`: the tokens an answered request's reply reports (default 100 in, 50 out).
  * The order of answers: a halted DeepInfra gate (STOPPED or HALTED), a model cooling off (COOLING), a refused model
  * (BILLED_500), an unbilled step (the probe's script, or `debate.unbilled` for any other request), the override, the
  * contract.
@@ -487,6 +491,11 @@ export async function startPreviewGateStubs(input: Readonly<{
   remainingState?: "active" | "halted";
   /** Holds each /complete request this long before answering it (a slow vendor), so calls can overlap. */
   delayMs?: (request: GateRequest) => number;
+  /**
+   * Side-by-side spec §13 (Task S19): the tokens an answered (OK) request's reply reports, so a scenario can make its
+   * debates spend; null or absent: the default 100 in, 50 out.
+   */
+  usage?: (request: GateRequest, chat: string) => StubUsage | null;
 }>): Promise<PreviewGateStubs> {
   const concurrency: GateConcurrency = { now: 0, most: 0, mostByProvider: { deepinfra: 0, anthropic: 0 }, mostByModel: {} };
   const holding = { deepinfra: 0, anthropic: 0 } as Record<GateProvider, number>;
@@ -633,13 +642,13 @@ export async function startPreviewGateStubs(input: Readonly<{
           }
           served += 1;
           record("OK");
-          reply(200, stubVendorReply(provider, model, override.content, `practice-stub-${String(served)}`));
+          reply(200, stubVendorReply(provider, model, override.content, `practice-stub-${String(served)}`, input.usage?.(seen, chat) ?? undefined));
           return;
         }
         const content = answerFor(kind, chat);
         if (content === null) { record("UNEXPECTED"); reply(500, JSON.stringify({ error: { message: "unexpected test request" } })); return; }
         record("OK");
-        reply(200, stubVendorReply(provider, model, content, `practice-stub-${String(served)}`));
+        reply(200, stubVendorReply(provider, model, content, `practice-stub-${String(served)}`, input.usage?.(seen, chat) ?? undefined));
       };
     });
     servers.push(server);

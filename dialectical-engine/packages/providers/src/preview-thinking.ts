@@ -22,33 +22,47 @@ export type PreviewThinkingLevels = Readonly<Record<string, PreviewThinkingChoic
 export const PREVIEW_THINKING_LEVELS_INVALID = "PREVIEW_THINKING_LEVELS_INVALID" as const;
 
 function invalid(detail: string): never { throw new TypeError(`${PREVIEW_THINKING_LEVELS_INVALID}:${detail}`); }
+/** One detail part as it may stand in a refusal code (the settings caches' alphabet); a part outside it is dropped. */
+const CODE_PART = /^[A-Za-z0-9_./-]{1,200}$/u;
+/**
+ * Ruling R65 (SA10 fix round 1): a refusal's detail is code-shaped, `<what>[:<model>[:<step>]]`, so check-version records
+ * the boot's own refusal as a code (a detail with a space made the half fail to check). A model or step name outside the
+ * code alphabet is left out (the detail then names only what is printable).
+ */
+function codeDetail(what: string, ...parts: string[]): string {
+  const printable: string[] = [];
+  for (const part of parts) { if (!CODE_PART.test(part)) break; printable.push(part); }
+  return [what, ...printable].join(":");
+}
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function onMenu(row: PreviewModelRow, value: unknown, where: string): PreviewEffort {
-  if (typeof value !== "string" || !(row.efforts as readonly string[]).includes(value)) invalid(`level ${where}`);
+  if (typeof value !== "string" || !(row.efforts as readonly string[]).includes(value)) invalid(where);
   return value as PreviewEffort;
 }
 
 /**
  * Spec 2026-10-12 §4.2: the table as the owner wrote it, checked against every named AI's reviewed menu. Throws
- * `PREVIEW_THINKING_LEVELS_INVALID:<detail>` for an unknown model, step or level, an empty object, or any other key.
+ * `PREVIEW_THINKING_LEVELS_INVALID:<detail>` for an unknown model, step or level, an empty object, or any other key;
+ * the detail is code-shaped (ruling R65): `table`, `model:<model>`, `entry:<model>`, `level:<model>`, `steps:<model>`,
+ * `step:<model>:<step>` or `level:<model>:<step>`.
  */
 export function parsePreviewThinkingLevels(value: unknown): PreviewThinkingLevels {
   if (!isPlainObject(value) || Object.keys(value).length === 0) invalid("table");
   const table: Record<string, PreviewThinkingChoice> = {};
   for (const [model, choice] of Object.entries(value)) {
-    const row = previewModelRow(model) ?? invalid(`model ${model}`);
+    const row = previewModelRow(model) ?? invalid(codeDetail("model", model));
     if (!isPlainObject(choice) || Object.keys(choice).length === 0
-      || Object.keys(choice).some(key => key !== "level" && key !== "steps")) invalid(`entry ${model}`);
-    const level = choice.level === undefined ? undefined : onMenu(row, choice.level, model);
+      || Object.keys(choice).some(key => key !== "level" && key !== "steps")) invalid(codeDetail("entry", model));
+    const level = choice.level === undefined ? undefined : onMenu(row, choice.level, codeDetail("level", model));
     let steps: Partial<Record<PreviewThinkingStep, PreviewEffort>> | undefined;
     if (choice.steps !== undefined) {
-      if (!isPlainObject(choice.steps) || Object.keys(choice.steps).length === 0) invalid(`steps ${model}`);
+      if (!isPlainObject(choice.steps) || Object.keys(choice.steps).length === 0) invalid(codeDetail("steps", model));
       steps = {};
       for (const [step, stepLevel] of Object.entries(choice.steps)) {
-        if (!(PREVIEW_THINKING_STEPS as readonly string[]).includes(step)) invalid(`step ${model} ${step}`);
-        steps[step as PreviewThinkingStep] = onMenu(row, stepLevel, `${model} ${step}`);
+        if (!(PREVIEW_THINKING_STEPS as readonly string[]).includes(step)) invalid(codeDetail("step", model, step));
+        steps[step as PreviewThinkingStep] = onMenu(row, stepLevel, codeDetail("level", model, step));
       }
     }
     table[model] = Object.freeze({ ...(level === undefined ? {} : { level }), ...(steps === undefined ? {} : { steps: Object.freeze(steps) }) });

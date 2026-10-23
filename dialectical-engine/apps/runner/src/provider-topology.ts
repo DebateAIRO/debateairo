@@ -29,6 +29,15 @@ export function createRunnerProviderTopology(
 }
 
 /**
+ * Side-by-side spec §13 (S6): the provider refs of the runner's makers, in `createRunnerProviderTopology`'s order (the
+ * primary, the critique, the additional makers: every declared target), for the per-version loader's claim-time gates
+ * (`RunnerSiteContext.configuredMakerRefs`). `.length > 1` is the runner's multi-maker test.
+ */
+export function runnerConfiguredMakerRefs(targets: readonly Pick<ProviderDiscoveryTarget, "providerRef">[]): readonly string[] {
+  return Object.freeze(targets.map((target) => target.providerRef));
+}
+
+/**
  * V-20, ruled 2026-09-22 — the runner's primary-provider agreement, lifted out of
  * the composition root so it is a decision with tests rather than an `if` nobody
  * can run.

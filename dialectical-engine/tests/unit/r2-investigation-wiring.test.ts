@@ -43,7 +43,7 @@ describe("engine 2: the investigation step's place in the runner", () => {
     const body = source.slice(start, source.indexOf("if (engine.engine === 2 && effectiveMakerCount > 1) {", start));
     expect(start).toBeGreaterThan(0);
     expect(body).toContain("contractHash: engineSeal,");
-    expect(body).toContain("bound: guidedCallBound(this.settings.judgeBound, \"investigator\", lengthGuidance),");
+    expect(body).toContain("bound: guidedCallBound(settings.judgeBound, \"investigator\", lengthGuidance),");
     expect(body).toContain("movedCallBars.set(callSiteKey, fair);");
     expect(body).toContain("if (pointInvestigationFailureOutcome(error) === \"RETHROW\") throw error;");
     expect(body).toContain("spendStopped: runBodyBudgetStop !== null,");

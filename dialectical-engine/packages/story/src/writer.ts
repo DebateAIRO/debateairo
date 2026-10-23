@@ -140,8 +140,11 @@ export interface StoryWriterDependencies {
   readonly pool: Pool;
   /** The pack loaded at boot, or the loader's refusal (every story is then STORY_PACK_INVALID). */
   readonly pack: StoryPack | { readonly error: string };
-  /** The optional register family; `null` switches the story off (STORY_NOT_CONFIGURED). */
-  readonly policy: StoryPolicy | null;
+  /**
+   * The construction policy, used by a write that carries none (`StoryWriteInput.policy` absent). Side-by-side spec §13
+   * runner point 6: a write's own policy is THE policy of that write. `null` switches the story off (STORY_NOT_CONFIGURED).
+   */
+  readonly policy?: StoryPolicy | null;
   readonly hosted: boolean;
   /** The boot-time resolver over the deployment's configured providers. */
   resolveProvider(roleRef: string): { provider: ProviderGateway; providerRef: string } | null;
@@ -175,6 +178,12 @@ export type StoryWriteInput = StoryRunSnapshot & {
   readonly resolveProvider?: StoryRoleResolver;
   readonly stepLease?: StoryStepLease;
   readonly costFallback?: StoryCostFallback;
+  /**
+   * Side-by-side spec §13 runner point 6: the story runs after DONE, so the policy travels with the write, never with the
+   * writer. When present it is THE policy of this write (`null`: the story is off for this write); absent, the writer's
+   * construction policy serves (tests, practice tools without per-version settings).
+   */
+  readonly policy?: StoryPolicy | null;
   /** P4-D: the run's own story roles (`StoryRunRoleMakers`); absent on every other run. */
   readonly roleMakers?: StoryRunRoleMakers;
   /**
@@ -557,11 +566,21 @@ export class StoryWriter {
     }));
   }
 
+  /**
+   * Side-by-side spec §13 runner point 6: the story runs after DONE, so the policy travels with the write, never with the
+   * writer. The write's own policy is the one used, `null` included; only an absent one falls back to the writer's
+   * construction policy. With neither, the story is off, and the missing policy is logged once, by code and ids.
+   */
   async #compose(input: StoryWriteInput): Promise<StoryRecordInput> {
     const pack = this.#deps.pack;
     if (!isStoryPack(pack)) return failedRecord(input, "STORY_PACK_INVALID", null);
-    const policy = this.#deps.policy;
-    if (policy === null) return failedRecord(input, "STORY_NOT_CONFIGURED", pack);
+    const policy = input.policy !== undefined ? input.policy : (this.#deps.policy ?? null);
+    if (policy === null) {
+      if (input.policy === undefined) {
+        this.#log("STORY_POLICY_NOT_PASSED", () => ({ answerId: input.answerId, answerVersion: input.answerVersion }));
+      }
+      return failedRecord(input, "STORY_NOT_CONFIGURED", pack);
+    }
     // Hosted spends money, and a story with no sealed ceiling of its own would be
     // refused by the gateway anyway (STORY_ENVELOPE_MISSING), after the material
     // was read and with a code the loop cannot name. Refuse here, before anything.

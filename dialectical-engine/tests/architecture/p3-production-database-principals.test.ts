@@ -486,6 +486,10 @@ describe("P3-01 production database-principal manifest", () => {
         // NETOPIA spec 2026-10-05 §2.17.3 (N21): the owner's check command (`pnpm billing:check`) runs as the API under
         // systemd-run on a READ-ONLY one-connection pool and reads only the register's billing rows; it writes nothing.
         { component: "apps/api:billing-check-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_CHECK_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:check" },
+        // Side-by-side spec §13 (S14): check-version's API half (`pnpm settings:check-api <v>`) runs as the API, with that
+        // release's own api.env, on a two-connection pool, and only reads (the register's rows, the site's money row,
+        // billing's register rows); it writes nothing, so no privilege is added.
+        { component: "apps/api:settings-check-cli", environmentKey: "DATABASE_URL", purpose: "SETTINGS_CHECK_OPERATOR_COMMAND", binding: "WIRED", condition: "package script settings:check-api" },
         // B1 part 2 (NETOPIA answers 2026-10-21, Q22): the owner's resume command (`pnpm billing:renewal-resume`) runs as
         // the API under systemd-run and appends only billing.charge_event rows (REQUESTED CHARGE_RESUMED), which that
         // principal already writes; no privilege is added.
@@ -514,6 +518,10 @@ describe("P3-01 production database-principal manifest", () => {
         // writes (serve.serve_disclosure, serve.synthesis_round, ledger.raw_artifact);
         // no privilege is added.
         { component: "apps/runner:serve-disclosure-cli", environmentKey: "DATABASE_URL", purpose: "SERVE_DISCLOSURE_OPERATOR_REPORT", binding: "WIRED", condition: "package script ops:serve-disclosure" },
+        // Side-by-side spec §13 (S14): check-version's runner half (`pnpm settings:check-runner <v>`) runs as the runner,
+        // with that release's own runner.env, on a two-connection pool, and only reads (the register's rows); it writes
+        // nothing, so no privilege is added.
+        { component: "apps/runner:settings-check-cli", environmentKey: "DATABASE_URL", purpose: "SETTINGS_CHECK_OPERATOR_COMMAND", binding: "WIRED", condition: "package script settings:check-runner" },
         { component: "apps/scheduler:replay-self-test", environmentKey: "REPLAY_SELF_TEST_DATABASE_URL", purpose: "REPLAY_SELF_TEST", binding: "WIRED" },
         { component: "apps/scheduler:liveness", environmentKey: "LIVENESS_DATABASE_URL", purpose: "LIVENESS_SWEEP", binding: "WIRED" },
         { component: "apps/scheduler:settlement", environmentKey: "SETTLEMENT_DATABASE_URL", purpose: "SETTLEMENT_WATCH", binding: "WIRED" },
@@ -728,6 +736,23 @@ describe("P3-01 production database-principal manifest", () => {
   "source": "migrations/0123_side_by_side_releases.sql",
   "grants": [
     "SELECT ON ledger.model_spend_waiver"
+  ]
+},
+// Side-by-side spec §13 (migration 0124, plan S1, D8), in source order: the activation pointer's one reader for the API's
+// role alone (the runner's login holds debateai_runtime only, so it cannot read the pointer), then the two pass readers
+// for the runtime. The release owner and operator stay outside this manifest until Phase 3 (sideBySideReleaseRoles).
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0124_settings_activation.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION register.read_active_settings_version()"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0124_settings_activation.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION register.settings_version_passed(text,bigint), register.read_passed_settings_versions(text)"
   ]
 }
 ]);
@@ -1018,4 +1043,22 @@ it("discloses exactly 0123's grants to the runtime, the API's billing role and t
   // table grants. The append-only tables are never writable beyond INSERT.
   expect(declared).toHaveLength(15);
   expect(declared.some(grant => /\b(?:UPDATE|DELETE|TRUNCATE)\b/u.test(grant))).toBe(false);
+});
+
+it("discloses exactly 0124's grants to the runtime and the API's billing role (side-by-side §13, D8)", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0124_settings_activation.sql", "utf8");
+  const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime";
+  // As for 0123: every GRANT line naming one of the disclosed roles names it alone.
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
+    .filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+      && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = [...sql.matchAll(new RegExp(`^GRANT [^\\n]+ TO (?:${disclosed});$`, "gm"))]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0124_settings_activation.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  // The pointer reader for the API's role; the two pass readers for the runtime. Nothing else, and no table grant.
+  expect(declared).toHaveLength(2);
+  expect(declared.some(grant => /\bON register\.settings_/u.test(grant))).toBe(false);
 });
