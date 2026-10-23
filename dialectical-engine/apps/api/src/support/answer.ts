@@ -13,8 +13,8 @@ import {
 import { buildSupportKnowledgeContext,supportCorpusLanguage } from "@debateai/support-kb/context";
 import { supportRecoveryFallback,supportSourceLabel } from "@debateai/support-kb/control-names";
 import { resolveSupportActions } from "@debateai/support-kb/navigation";
-import { redactSupportMessage, type SupportMessageCipherPort } from "./session.js";
-import { SupportModelError, type SupportModelPort, type SupportModelUsage } from "./model.js";
+import { redactSupportMessage } from "./session.js";
+import { SupportModelError, type SupportModelPort } from "./model.js";
 import { buildSupportAnswerPrompt,buildSupportDraftAnswerPrompt,buildSupportNoSourceJudgementPrompt } from "./prompt.js";
 import { supportTemplate, type SupportLanguage } from "./templates.js";
 import { supportIntentSurface } from "./classify.js";
@@ -60,18 +60,15 @@ const INTENT_SIGNALS: Readonly<Record<string,readonly RegExp[]>> = Object.freeze
 });
 
 export type SupportAnswerResult = Readonly<{
-  messageId: string;
   outcome: "ANSWER_GROUNDED" | "NO_SOURCE" | "OFF_TOPIC" | "CRISIS" | "THREAT" | "REFUSE_SAFETY" | "DEGRADED" | "DISABLED";
   text: string;
   canEscalate: true;
   sources?: readonly Readonly<{ id: string;label: string }>[];
   actions?: readonly SupportAction[];
-  usage?: SupportModelUsage;
 }>;
 
 export interface SupportAnswerPort {
   respond(input: Readonly<{
-    sessionId: string;
     text: string;
     language: SupportLanguage;
     detectedLanguage: SupportCorpusLanguage;
@@ -233,7 +230,6 @@ export function createSupportAnswerService(input: Readonly<{
   snapshots?: HelpCorpusSnapshotLookup;
   requireStructuredDraft?: true;
   noSourceCheck?: Readonly<{ timeoutMs: number }>;
-  messages: SupportMessageCipherPort;
   modelFor: (modelRef: string) => SupportModelPort;
   queue?: Pick<SupportRelayQueue,"execute">;
   degraded?: SupportDegradedPort;
@@ -281,20 +277,13 @@ export function createSupportAnswerService(input: Readonly<{
       if (entries.length === 0) {
         if (input.noSourceCheck !== undefined) {
           let completion: Awaited<ReturnType<SupportModelPort["complete"]>> | undefined;
-          let modelCalled = false;
           let judgement: ReturnType<typeof parseSupportNoSourceJudgement> = null;
-          await input.messages.writeAndTransit({
-            messageId: randomUUID(),sessionId: request.sessionId,role: "user",
-            text: prepared.text,outcome: "NO_SOURCE",language: request.language,
-            detectedLanguage: request.detectedLanguage,overrideLanguage: request.overrideLanguage,
-            receivedAt: request.receivedAt,firstTokenAt: null,completedAt: null
-          },async (safeText) => {
+          const transit = async (safeText: string) => {
             try {
               if (input.degraded?.isDegraded().degraded === true) return;
               const signal = AbortSignal.timeout(input.noSourceCheck!.timeoutMs);
               const packet = buildSupportNoSourceJudgementPrompt({ visitorMessage: safeText }).packet;
               const complete = (activeSignal?: AbortSignal) => {
-                modelCalled = true;
                 return input.modelFor(request.modelRef).complete({
                   packet,language: request.language,
                   ...(activeSignal === undefined ? {} : { signal: activeSignal })
@@ -308,46 +297,21 @@ export function createSupportAnswerService(input: Readonly<{
                 },complete);
               judgement = parseSupportNoSourceJudgement(completion.text);
             } catch { judgement = null; }
-          });
+          };
+          await transit(prepared.text);
           const outcome = judgement === "off_topic" ? "OFF_TOPIC" as const
             : judgement === "crisis" ? "CRISIS" as const
             : judgement === "threat" ? "THREAT" as const : "NO_SOURCE" as const;
           const template = outcome === "CRISIS" ? "CRISIS_SUPPORT" as const
             : outcome === "THREAT" ? "THREAT_LINE" as const : outcome;
-          const completedAt = strictAfter(request.receivedAt,clock);
-          const messageId = randomUUID();
-          const stored = await input.messages.write({
-            messageId,sessionId: request.sessionId,role: "assistant",
-            text: supportTemplate(template,request.language),outcome,language: request.language,
-            detectedLanguage: request.detectedLanguage,overrideLanguage: request.overrideLanguage,
-            receivedAt: request.receivedAt,firstTokenAt: null,completedAt,modelCalled,
-            ...(completion?.usage?.input_tokens === undefined ? {} : { inputTokens: completion.usage.input_tokens }),
-            ...(completion?.usage?.output_tokens === undefined ? {} : { outputTokens: completion.usage.output_tokens }),
-            ...(completion?.usage?.cost_usd === undefined ? {} : { costUsd: completion.usage.cost_usd })
-          });
           return Object.freeze({
-            messageId,outcome,text: stored.text,canEscalate: true as const,
-            sources: Object.freeze([]),actions: Object.freeze([]),
-            ...(completion?.usage === undefined ? {} : { usage: completion.usage })
+            outcome,text: supportTemplate(template,request.language),canEscalate: true as const,
+            sources: Object.freeze([]),actions: Object.freeze([])
           });
         }
-        const completedAt = strictAfter(request.receivedAt,clock);
         const text = supportTemplate("NO_SOURCE",request.language);
-        const messageId = randomUUID();
-        await input.messages.write({
-          messageId: randomUUID(),sessionId: request.sessionId,role: "user",
-          text: prepared.text,outcome: "NO_SOURCE",language: request.language,
-          detectedLanguage: request.detectedLanguage,overrideLanguage: request.overrideLanguage,
-          receivedAt: request.receivedAt,firstTokenAt: null,completedAt
-        });
-        const stored = await input.messages.write({
-          messageId,sessionId: request.sessionId,role: "assistant",
-          text,outcome: "NO_SOURCE",language: request.language,
-          detectedLanguage: request.detectedLanguage,overrideLanguage: request.overrideLanguage,
-          receivedAt: request.receivedAt,firstTokenAt: null,completedAt
-        });
         return Object.freeze({
-          messageId,outcome: "NO_SOURCE",text: stored.text,canEscalate: true as const,
+          outcome: "NO_SOURCE",text,canEscalate: true as const,
           sources: Object.freeze([]),actions: Object.freeze([])
         });
       }
@@ -362,19 +326,11 @@ export function createSupportAnswerService(input: Readonly<{
       );
 
       let completion: Awaited<ReturnType<SupportModelPort["complete"]>> | undefined;
-      let firstTokenAt: Date | undefined;
-      let completedAt: Date | undefined;
-      let modelCalled = false;
       let circuitShortCircuited = false;
       let halfOpenProbe = false;
       const attemptId = randomUUID();
       try {
-        await input.messages.writeAndTransit({
-          messageId: randomUUID(),sessionId: request.sessionId,role: "user",
-          text: prepared.text,outcome: "ANSWER_GROUNDED",language: request.language,
-          detectedLanguage: request.detectedLanguage,overrideLanguage: request.overrideLanguage,
-          receivedAt: request.receivedAt,firstTokenAt: null,completedAt: null
-        },async (safeText) => {
+        const transit = async (safeText: string) => {
           if (input.degraded?.beginModelAttempt(request.receivedAt) === false) {
             circuitShortCircuited = true;
             throw new SupportModelError("SUPPORT_MODEL_UNAVAILABLE");
@@ -406,7 +362,6 @@ export function createSupportAnswerService(input: Readonly<{
               visitorMessage: safeText
             });
           const complete = (signal?: AbortSignal) => {
-            modelCalled = true;
             return input.modelFor(request.modelRef).complete({
               packet: framed.packet,language: request.language,
               ...(signal === undefined ? {} : { signal })
@@ -420,10 +375,9 @@ export function createSupportAnswerService(input: Readonly<{
             ...(request.onQueueProgress === undefined
               ? {} : { onProgress: request.onQueueProgress })
           },complete);
-          firstTokenAt = strictAfter(request.receivedAt,clock);
-          completedAt = strictAfter(firstTokenAt,clock);
-        });
-        if (completion === undefined || firstTokenAt === undefined || completedAt === undefined) {
+        };
+        await transit(prepared.text);
+        if (completion === undefined) {
           throw new SupportModelError("SUPPORT_MODEL_UNAVAILABLE");
         }
         const diagnostic = structured ? diagnoseSupportDraftV3(
@@ -454,20 +408,9 @@ export function createSupportAnswerService(input: Readonly<{
           const template = outcome === "CRISIS" ? "CRISIS_SUPPORT" as const
             : outcome === "THREAT" ? "THREAT_LINE" as const : "OFF_TOPIC" as const;
           const text = supportTemplate(template,request.language);
-          const messageId = randomUUID();
-          const stored = await input.messages.write({
-            messageId,sessionId: request.sessionId,role: "assistant",
-            text,outcome,language: request.language,
-            detectedLanguage: request.detectedLanguage,overrideLanguage: request.overrideLanguage,
-            receivedAt: request.receivedAt,firstTokenAt,completedAt,modelCalled: true,
-            ...(completion.usage?.input_tokens === undefined ? {} : { inputTokens: completion.usage.input_tokens }),
-            ...(completion.usage?.output_tokens === undefined ? {} : { outputTokens: completion.usage.output_tokens }),
-            ...(completion.usage?.cost_usd === undefined ? {} : { costUsd: completion.usage.cost_usd })
-          });
           return Object.freeze({
-            messageId,outcome,text: stored.text,canEscalate: true as const,
-            sources: Object.freeze([]),actions: Object.freeze([]),
-            ...(completion.usage === undefined ? {} : { usage: completion.usage })
+            outcome,text,canEscalate: true as const,
+            sources: Object.freeze([]),actions: Object.freeze([])
           });
         }
         const referenceDraft = !structured ? undefined
@@ -521,22 +464,8 @@ export function createSupportAnswerService(input: Readonly<{
           recovered ? sourceActionIds : draft!.actionIds,
           { signedIn: request.signedIn === true,language: request.language }
         );
-        const messageId = randomUUID();
-        const stored = await input.messages.write({
-          messageId,sessionId: request.sessionId,role: "assistant",
-          text,outcome,language: request.language,
-          detectedLanguage: request.detectedLanguage,overrideLanguage: request.overrideLanguage,
-          receivedAt: request.receivedAt,firstTokenAt,completedAt,modelCalled: true,
-          ...(completion.usage?.input_tokens === undefined
-            ? {} : { inputTokens: completion.usage.input_tokens }),
-          ...(completion.usage?.output_tokens === undefined
-            ? {} : { outputTokens: completion.usage.output_tokens }),
-          ...(completion.usage?.cost_usd === undefined
-            ? {} : { costUsd: completion.usage.cost_usd })
-        });
         return Object.freeze({
-          messageId,outcome,text: stored.text,canEscalate: true as const,sources,actions,
-          ...(completion.usage === undefined ? {} : { usage: completion.usage })
+          outcome,text,canEscalate: true as const,sources,actions
         });
       } catch (error) {
         if (!(error instanceof SupportModelError) && !(error instanceof SupportQueueError)) {
@@ -546,18 +475,9 @@ export function createSupportAnswerService(input: Readonly<{
         }
         if (error instanceof SupportModelError && error.code === "SUPPORT_DISABLED") {
           input.degraded?.endModelAttempt();
-          const disabledAt = strictAfter(request.receivedAt,clock);
           const text = supportTemplate("DISABLED",request.language);
-          const messageId = randomUUID();
-          const stored = await input.messages.write({
-            messageId,sessionId: request.sessionId,role: "assistant",
-            text,outcome: "DISABLED",language: request.language,
-            detectedLanguage: request.detectedLanguage,overrideLanguage: request.overrideLanguage,
-            receivedAt: request.receivedAt,firstTokenAt: null,completedAt: disabledAt,
-            modelCalled: false
-          });
           return Object.freeze({
-            messageId,outcome: "DISABLED",text: stored.text,canEscalate: true as const,
+            outcome: "DISABLED",text,canEscalate: true as const,
             sources: Object.freeze([]),actions: Object.freeze([])
           });
         }
@@ -571,20 +491,9 @@ export function createSupportAnswerService(input: Readonly<{
         } else {
           input.degraded?.endModelAttempt();
         }
-        const degradedReason = error instanceof SupportModelError || halfOpenProbe ? "relay" as const
-          : error.code === "SUPPORT_DAILY_CAP" ? "cap" as const : undefined;
         const text = supportTemplate("DEGRADED",request.language);
-        const messageId = randomUUID();
-        const stored = await input.messages.write({
-          messageId,sessionId: request.sessionId,role: "assistant",
-          text,outcome: "DEGRADED",language: request.language,
-          detectedLanguage: request.detectedLanguage,overrideLanguage: request.overrideLanguage,
-          receivedAt: request.receivedAt,firstTokenAt: null,completedAt: degradedAt,
-          modelCalled,
-          ...(degradedReason === undefined ? {} : { degradedReason })
-        });
         return Object.freeze({
-          messageId,outcome: "DEGRADED",text: stored.text,canEscalate: true as const,
+          outcome: "DEGRADED",text,canEscalate: true as const,
           sources: Object.freeze([]),actions: Object.freeze([])
         });
       }

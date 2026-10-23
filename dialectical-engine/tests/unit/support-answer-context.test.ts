@@ -13,7 +13,6 @@ import {
 import { SUPPORT_ACTION_IDS,SUPPORT_CAPABILITIES } from "../../packages/support-kb/src/catalog.js";
 import { buildSupportKnowledgeContext } from "../../packages/support-kb/src/context.js";
 import { resolveSupportActions } from "../../packages/support-kb/src/navigation.js";
-import type { SupportMessageCipherPort } from "../../apps/api/src/support/session.js";
 import { createSupportModelReferenceFactory } from "../../apps/api/src/support/model-references.js";
 import { framedInstruction } from "../support/framed-packet.js";
 
@@ -58,17 +57,8 @@ function productionReviewedCorpus(): LoadedHelpCorpus {
   });
 }
 
-const messages = Object.freeze({
-  write: vi.fn(async (input) => Object.freeze({ ...input,redacted: false })),
-  writeAndTransit: vi.fn(async (input,transit) => {
-    await transit(input.text);
-    return Object.freeze({ ...input,redacted: false });
-  }),read: vi.fn(async () => null),listSession: vi.fn(async () => [])
-}) as unknown as SupportMessageCipherPort;
-
 function request(snapshot: LoadedHelpCorpus) {
   return {
-    sessionId: "10000000-0000-4000-8000-000000000001",
     text: "crosscap",
     language: "en" as const,detectedLanguage: "en" as const,overrideLanguage: null,
     modelRef: "support-fixture",kbVersion: snapshot.kbVersion,snapshot,signedIn: false,
@@ -107,7 +97,7 @@ describe("CP1 composed answer context", () => {
       sourceIds:[SOURCE_REFERENCE],actionIds:[],offTopic:"none",crisis:false,threat:false
     }) }));
     const service = createSupportAnswerService({
-      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),
       modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
       clock:(() => { let at=Date.parse("2026-09-17T12:00:00.000Z");return () => new Date(++at); })()
     });
@@ -131,7 +121,7 @@ describe("CP1 composed answer context", () => {
       sourceIds:[SOURCE_REFERENCE],actionIds:[],offTopic:"none",crisis:false,threat:false
     }) }));
     const service = createSupportAnswerService({
-      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),
       modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
       clock:(() => { let at=Date.parse("2026-09-17T12:00:00.000Z");return () => new Date(++at); })()
     });
@@ -162,7 +152,7 @@ describe("CP1 composed answer context", () => {
       }) });
     });
     const service = createSupportAnswerService({
-      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),
       modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
       clock:(() => { let at=Date.parse("2026-09-17T12:00:00.000Z");return () => new Date(++at); })()
     });
@@ -193,7 +183,7 @@ describe("CP1 composed answer context", () => {
     ],"2".repeat(64));
     const complete = vi.fn();
     const service = createSupportAnswerService({
-      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),
       modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
       clock:(() => { let at=Date.parse("2026-09-17T12:00:00.000Z");return () => new Date(++at); })()
     });
@@ -215,7 +205,7 @@ describe("CP1 composed answer context", () => {
       sourceIds:[SOURCE_REFERENCE],actionIds:[SECOND_ACTION_REFERENCE],offTopic:"none",crisis:false,threat:false
     }) }));
     const service = createSupportAnswerService({
-      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),
       modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
       clock:(() => { let at=Date.parse("2026-09-17T13:00:00.000Z");return () => new Date(++at); })()
     });
@@ -248,7 +238,7 @@ describe("CP1 composed answer context", () => {
       sourceIds:[SECOND_SOURCE_REFERENCE],actionIds:[],offTopic:"none",crisis:false,threat:false
     }) }));
     const service = createSupportAnswerService({
-      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),
       modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
       clock:(() => { let at=Date.parse("2026-09-20T19:00:00.000Z");return () => new Date(++at); })()
     });
@@ -289,7 +279,7 @@ describe("CP1 composed answer context", () => {
     const reportDraftDiagnostic = vi.fn();
     const complete = vi.fn<SupportModelPort["complete"]>(async () => Object.freeze({ text:draft }));
     const service = createSupportAnswerService({
-      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),
       reportDraftDiagnostic,modelReferenceFactory,
       modelFor:() => Object.freeze({ complete }) as never,
       clock:(() => { let at=Date.parse("2026-09-22T13:00:00.000Z");return () => new Date(++at); })()
@@ -324,7 +314,7 @@ describe("CP1 composed answer context", () => {
       sourceIds:[SOURCE_REFERENCE,SECOND_SOURCE_REFERENCE],actionIds:[],offTopic:"none",crisis:false,threat:false
     }) }));
     const service = createSupportAnswerService({
-      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),
       modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
       clock:(() => { let at=Date.parse("2026-09-20T19:10:00.000Z");return () => new Date(++at); })()
     });
@@ -376,7 +366,7 @@ describe("CP1 composed answer context", () => {
       )!),offTopic:"none",crisis:false,threat:false
     }) }));
     const service = createSupportAnswerService({
-      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),
       modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
       clock:(() => { let at=Date.parse("2026-09-20T19:15:00.000Z");return () => new Date(++at); })()
     });
@@ -402,7 +392,7 @@ describe("CP1 composed answer context", () => {
       kind:"answer",text:badText,sourceIds:[SOURCE_REFERENCE],actionIds:[],offTopic:"none",crisis:false,threat:false
     }) }));
     const service = createSupportAnswerService({
-      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),
       modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
       clock:(() => { let at=Date.parse("2026-09-20T19:20:00.000Z");return () => new Date(++at); })()
     });
@@ -435,7 +425,7 @@ describe("CP1 composed answer context", () => {
       kind:"answer",text:answerText,sourceIds:[SOURCE_REFERENCE],actionIds:[],offTopic:"none",crisis:false,threat:false
     }) }));
     const service = createSupportAnswerService({
-      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),
       modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
       clock:(() => { let at=Date.parse("2026-09-20T19:22:00.000Z");return () => new Date(++at); })()
     });
@@ -467,7 +457,7 @@ describe("CP1 composed answer context", () => {
       ].includes(candidate.id)),`compound-recovery-${language}`);
     const complete = vi.fn(async () => Object.freeze({ text:"not-json" }));
     const service = createSupportAnswerService({
-      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),
       modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
       clock:(() => { let at=Date.parse("2026-09-17T14:00:00.000Z");return () => new Date(++at); })()
     });
@@ -513,7 +503,7 @@ describe("CP1 composed answer context", () => {
         kind:"answer",text:candidate.text,sourceIds:candidate.ids,actionIds:[],offTopic:"none",crisis:false,threat:false
       }) }));
       const service = createSupportAnswerService({
-        entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+        entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),
         modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
         clock:(() => { let at=Date.parse("2026-09-17T14:30:00.000Z");return () => new Date(++at); })()
       });
@@ -540,7 +530,7 @@ describe("CP1 composed answer context", () => {
       sourceIds:[SOURCE_REFERENCE],actionIds:[],offTopic:"none",crisis:false,threat:false
     }) }));
     const service = createSupportAnswerService({
-      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),
       modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
       clock:(() => { let at=Date.parse("2026-09-17T13:30:00.000Z");return () => new Date(++at); })()
     });
@@ -568,7 +558,7 @@ describe("CP1 composed answer context", () => {
       })
     }));
     const service = createSupportAnswerService({
-      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),
       modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
       clock:(() => { let at=Date.parse("2026-09-21T00:00:00.000Z");return () => new Date(++at); })()
     });
@@ -596,7 +586,7 @@ describe("CP1 composed answer context", () => {
       })
     }));
     const service = createSupportAnswerService({
-      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),
       modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
       clock:(() => { let at=Date.parse("2026-09-21T00:30:00.000Z");return () => new Date(++at); })()
     });
@@ -629,7 +619,7 @@ describe("CP1 composed answer context", () => {
       sourceIds:[SOURCE_REFERENCE],actionIds:[ACTION_REFERENCE],offTopic:"none",crisis:false,threat:false
     }) }));
     const service = createSupportAnswerService({
-      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),
       modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
       clock:(() => { let at=Date.parse("2026-09-17T13:45:00.000Z");return () => new Date(++at); })()
     });
@@ -661,7 +651,7 @@ describe("CP1 composed answer context", () => {
       }) });
     });
     const service = createSupportAnswerService({
-      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),
       modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
       clock:(() => { let at=Date.parse("2026-09-17T13:50:00.000Z");return () => new Date(++at); })()
     });
@@ -692,7 +682,7 @@ describe("CP1 composed answer context", () => {
       sourceIds:[SOURCE_REFERENCE],actionIds:[],offTopic:"none",crisis:false,threat:false
     }) }));
     const service = createSupportAnswerService({
-      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),
       modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
       clock:(() => { let at=Date.parse("2026-09-17T12:45:00.000Z");return () => new Date(++at); })()
     });
@@ -718,7 +708,7 @@ describe("CP1 composed answer context", () => {
       kind:"answer",text:"Unsupported synthetic claim.",sourceIds:[SOURCE_REFERENCE],actionIds:[],offTopic:"none",crisis:false,threat:false
     }) }));
     const service = createSupportAnswerService({
-      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries:snapshot.entries,snapshots:createHelpCorpusSnapshotLookup(snapshot),
       modelReferenceFactory,modelFor:() => Object.freeze({ complete }) as never,
       clock:(() => { let at=Date.parse("2026-09-17T12:30:00.000Z");return () => new Date(++at); })()
     });
@@ -738,7 +728,7 @@ describe("CP1 composed answer context", () => {
         text: completionText,usage: { input_tokens: 11,output_tokens: 7,cost_usd: 0.002 }
       }));
       const service = createSupportAnswerService({
-        entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,
+        entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),
         modelReferenceFactory,modelFor: () => Object.freeze({ complete }) as never,
         clock: (() => { let at = Date.parse("2026-09-14T10:00:00.000Z");return () => new Date(++at); })()
       });
@@ -748,11 +738,8 @@ describe("CP1 composed answer context", () => {
       expect(complete).toHaveBeenCalledTimes(1);
       expect(result).toMatchObject({
         outcome: "ANSWER_GROUNDED",text: top.fallback,
-        sources: [{ id: top.id,label: top.title }],usage: { input_tokens: 11,output_tokens: 7,cost_usd: 0.002 }
+        sources: [{ id: top.id,label: top.title }]
       });
-      expect(messages.write).toHaveBeenLastCalledWith(expect.objectContaining({
-        role: "assistant",outcome: "ANSWER_GROUNDED",text: top.fallback
-      }));
     }
   );
   it("maps request-local model references to canonical response provenance", async () => {
@@ -763,7 +750,7 @@ describe("CP1 composed answer context", () => {
     const actionReference = "a-10000000000040008000000000000001-1";
     let system = "";
     const service = createSupportAnswerService({
-      entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),
       modelReferenceFactory: () => Object.freeze({
         referenceFor: (kind: "source" | "action") =>
           kind === "source" ? sourceReference : actionReference
@@ -812,7 +799,7 @@ describe("CP1 composed answer context", () => {
       }) });
     });
     const service = createSupportAnswerService({
-      entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,modelReferenceFactory,
+      entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),modelReferenceFactory,
       modelFor: () => Object.freeze({ complete }) as never,
       clock: (() => { let at = Date.parse("2026-09-14T10:00:00.000Z");return () => new Date(++at); })()
     });
@@ -834,7 +821,7 @@ describe("CP1 composed answer context", () => {
     const snapshot = corpus([entry("export-json","export JSON served answer ledger")],"d".repeat(64));
     let system = "";
     const service = createSupportAnswerService({
-      entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),
       modelFor: () => Object.freeze({
         complete: async (input: Parameters<SupportModelPort["complete"]>[0]) => {
           system = framedInstruction(input.packet);
@@ -875,7 +862,7 @@ describe("CP1 composed answer context", () => {
     });
     const service = createSupportAnswerService({
       entries: snapshotB.entries,
-      snapshots: createHelpCorpusSnapshotLookup(snapshotB),messages,
+      snapshots: createHelpCorpusSnapshotLookup(snapshotB),
       modelFor: () => Object.freeze({ complete }) as never,modelReferenceFactory,
       clock: (() => { let at = Date.parse("2026-09-14T10:00:00.000Z");return () => new Date(++at); })()
     });
@@ -893,7 +880,7 @@ describe("CP1 composed answer context", () => {
     const snapshot = corpus([entry("selected-a","alpha crosscap selected-a-end")],"c".repeat(64));
     const reportDraftDiagnostic = vi.fn();
     const service = createSupportAnswerService({
-      entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),
       reportDraftDiagnostic,modelReferenceFactory,
       modelFor: () => Object.freeze({
         complete: async () => Object.freeze({ text: "```json\n{}\n```" })
@@ -918,10 +905,10 @@ describe("CP1 composed answer context", () => {
     expect(JSON.stringify(reportDraftDiagnostic.mock.calls)).not.toContain("selected-a");
   });
 
-  it("rejects an internal identifier before canonical assistant storage", async () => {
+  it("rejects an internal identifier before returning the answer", async () => {
     const snapshot = corpus([entry("selected-a","alpha crosscap selected-a-end")],"e".repeat(64));
     const service = createSupportAnswerService({
-      entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),
       modelFor: () => Object.freeze({
         complete: async () => Object.freeze({ text: JSON.stringify({
           kind: "answer",text: "Select start-debate to continue.",
@@ -937,15 +924,12 @@ describe("CP1 composed answer context", () => {
       outcome: "ANSWER_GROUNDED",sources: [{ id: "selected-a" }],actions: []
     });
     expect(result.text).not.toContain("start-debate");
-    expect(messages.write).toHaveBeenLastCalledWith(expect.objectContaining({
-      role: "assistant",outcome: "ANSWER_GROUNDED"
-    }));
   });
 
-  it("rejects a request alias in narrative text before canonical assistant storage", async () => {
+  it("rejects a request alias in narrative text before returning the answer", async () => {
     const snapshot = corpus([entry("selected-a","alpha crosscap selected marker")],"7".repeat(64));
     const service = createSupportAnswerService({
-      entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),
       modelReferenceFactory,
       modelFor: () => Object.freeze({
         complete: async () => Object.freeze({ text: JSON.stringify({
@@ -970,7 +954,7 @@ describe("CP1 composed answer context", () => {
     const secondFactory = createSupportModelReferenceFactory("20000000-0000-4000-8000-000000000002");
     const factories = [firstFactory,secondFactory];
     const service = createSupportAnswerService({
-      entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),
       modelReferenceFactory: () => factories.shift()!,
       modelFor: () => Object.freeze({
         complete: async () => Object.freeze({ text: JSON.stringify({
@@ -997,29 +981,17 @@ describe("CP1 composed answer context", () => {
     "Asistența nu cere coduri de autentificare; de asemenea le poate valida.",
     "Asistența nu cere coduri de securitate; în plus le poate verifica.",
     "Network=%5C%5Cserver%5Cshare to continue."
-  ])("keeps a rejected transformed completion out of assistant storage and return: %s", async (
+  ])("keeps a rejected transformed completion out of the answer: %s", async (
     hostile
   ) => {
     const top = entry("selected-a","alpha crosscap selected marker");
     const snapshot = corpus([top],"4".repeat(64));
-    const stored: string[] = [];
-    const localMessages = Object.freeze({
-      write: vi.fn(async (input) => {
-        stored.push(input.text);
-        return Object.freeze({ ...input,redacted: false });
-      }),
-      writeAndTransit: vi.fn(async (input,transit) => {
-        await transit(input.text);
-        stored.push(input.text);
-        return Object.freeze({ ...input,redacted: false });
-      }),read: vi.fn(async () => null),listSession: vi.fn(async () => [])
-    }) as unknown as SupportMessageCipherPort;
     const complete = vi.fn(async () => Object.freeze({ text: JSON.stringify({
       kind: "answer",text: hostile,sourceIds: [SOURCE_REFERENCE],actionIds: [],offTopic:"none",crisis:false,threat:false
     }) }));
     const service = createSupportAnswerService({
       entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),
-      messages: localMessages,modelReferenceFactory,
+      modelReferenceFactory,
       modelFor: () => Object.freeze({ complete }) as never,
       clock: (() => { let at = Date.parse("2026-09-17T10:00:00.000Z");return () => new Date(++at); })()
     });
@@ -1031,15 +1003,13 @@ describe("CP1 composed answer context", () => {
       outcome: "ANSWER_GROUNDED",text: top.fallback,sources: [{ id: top.id }]
     });
     expect(result.text).not.toContain(hostile);
-    expect(stored).not.toContain(hostile);
-    expect(stored).toContain(top.fallback!);
   });
 
   it("assigns distinct opaque identities to separate rejected model attempts", async () => {
     const snapshot = corpus([entry("selected-a","alpha crosscap selected-a-end")],"f".repeat(64));
     const reports: Array<Readonly<{ attemptId: string }>> = [];
     const service = createSupportAnswerService({
-      entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,
+      entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),
       reportDraftDiagnostic: (report) => { reports.push(report); },modelReferenceFactory,
       modelFor: () => Object.freeze({
         complete: async () => Object.freeze({ text: "not-json" })
