@@ -1,7 +1,7 @@
 {
   "schema": "debateai-n1-baseline-v1",
-  "commit": "432cd8f09a800848fce8cab28aef79610b126ab0",
-  "reason": "432cd8f09-r20-v1",
+  "commit": "368d578bbf3597a1df4e3b9f9f2f69110e6631ee",
+  "reason": "368d578bb-r21-v1",
   "suites": [
     "tests/integration/b3-holds-waiting-line.test.ts",
     "tests/integration/b7b-waiting-line.test.ts",
@@ -25,14 +25,5 @@
       "reason": "measures migration 0099 while the suite's own migrate() applies it; on a database HEAD already migrated 0099 never runs there, so there is nothing to measure"
     }
   ],
-  "knownRed": [
-    {
-      "name": "tests/integration/b3-holds-waiting-line.test.ts > B3 the waiting line (budget spec §2.7) > lists a waiting run oldest first with its class, until it starts or fails",
-      "reason": "stale at 432cd8f09 (R20 live): readWaiting() gained releaseKey (side-by-side 18a48127c) and the test was not updated; red on its own schema too; fixed on dev in #209; drop at the next baseline"
-    },
-    {
-      "name": "tests/integration/run-setup-failure.test.ts > a run whose setup fails after it was created > leaves a job alone that a runner already claimed before dispatch reported its error",
-      "reason": "stale at 432cd8f09 (R20 live): claimById() is fenced to the runner's release (side-by-side) and the test's runner used the legacy fence; red on its own schema too; fixed on dev in #209; drop at the next baseline"
-    }
-  ]
+  "knownRed": []
 }
