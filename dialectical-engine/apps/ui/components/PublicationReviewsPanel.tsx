@@ -11,6 +11,7 @@ import publicEnglish from "../messages/en/public.json";
 import composeEnglish from "../messages/en/compose.json";
 import composeRomanian from "../messages/ro/compose.json";
 import { PublicDebateOverview } from "./PublicDebateOverview.js";
+import { storyLabelWords } from "../lib/v3/storyWords.js";
 import "./StaffAccessPanel.css";
 
 type Queue = Awaited<ReturnType<StaffApiClient["publicationReviews"]>>;
@@ -24,7 +25,7 @@ function reviewError(failure: unknown): string {
   if (failure.status === 409 && failure.serverCode === "PUBLICATION_REVIEW_DECIDED") return "staff.reviews.error.decided";
   if (failure.status === 503 && failure.serverCode === "STAFF_ALERT_UNAVAILABLE") return "staff.reviews.error.locked";
   if (failure.status === 401) return "staff.reviews.notElevated";
-  if (failure.status === 403) return "staff.failed";
+  if (failure.status === 403) return "staff.reviews.error.noPermission";
   if (failure.status === 503) return "staff.unavailable";
   return "staff.failed";
 }
@@ -147,7 +148,7 @@ export function PublicationReviewsPanel({ client, catalog = staffEnglish, public
     ? snapshot?.answer.nodes?.find(node => node.node_id === detail.nodeId) : null;
 
   return <div className={`setInner staffAccess${snapshot !== null ? " rvReadScreen" : ""}`} aria-busy={busy || queue === null && !notElevated}>
-    {notElevated ? <section className="setCard"><p className="setCardHint">{t(catalog, "staff.reviews.notElevated")}</p><a className="setBtn setBtnQuiet" href="/admin/team">{t(catalog, "staff.teamLink")}</a></section> : null}
+    {notElevated ? <section className="setCard"><h2 className="staffSectionTitle">{t(catalog, "staff.reviews.heading")}</h2><p className="setCardHint">{t(catalog, "staff.reviews.notElevated")}</p><div className="staffActions"><a className="setBtn" href="/admin/team">{t(catalog, "staff.title")}</a></div></section> : null}
     {!notElevated && snapshot !== null ? <><header className="staffHeading"><h1 className="setTitle rvQuestion">{snapshot.question}</h1></header><section className="rvReview">
       {categories(snapshot.categories, "staffPermissions rvChips")}
       <PublicDebateOverview debate={snapshot as unknown as PublicDebate} catalog={publicCatalog} storyCatalog={publicCatalog} storyLocale={locale} composeCatalog={locale === "ro" ? composeRomanian : composeEnglish} viewingNote="NONE" onDetails={() => setDetail({ kind: "verdict" })} onRead={(nodeId) => setDetail({ kind: "argument", nodeId })} />
@@ -155,7 +156,7 @@ export function PublicationReviewsPanel({ client, catalog = staffEnglish, public
         <h2>{t(publicCatalog, detail.kind === "verdict" ? "public.overview.details" : "public.overview.read")}</h2>
         {detail.kind === "verdict" ? <>
           {snapshot.answer.summary_segments.map((segment, index) => <p key={index}>{segment.text}</p>)}
-          <p>{t(publicCatalog, "public.honesty.verdict")}: {snapshot.answer.verdict ?? t(publicCatalog, "public.honesty.verdictUnavailable")}</p>
+          <p>{t(publicCatalog, "public.honesty.verdict")}: {snapshot.answer.verdict === null ? t(publicCatalog, "public.overview.verdictUnavailable") : storyLabelWords(snapshot.answer.verdict, publicCatalog)}</p>
           {snapshot.answer.reversal_point ? <p>{snapshot.answer.reversal_point}</p> : null}
         </> : selectedNode !== null && selectedNode !== undefined ? <>
           <p>{selectedNode.claim}</p>
@@ -177,8 +178,8 @@ export function PublicationReviewsPanel({ client, catalog = staffEnglish, public
       </div> : null}
     </section></> : null}
     {!notElevated && snapshot === null && requestError ? <section className="setCard"><h2 className="staffSectionTitle">{t(catalog, "staff.reviews.heading")}</h2>
-      {status !== null ? <p role="status" className="setError">{t(catalog, status)}</p> : null}
-      <div className="staffActions"><button className="setBtn" type="button" onClick={leave}>{t(catalog, "staff.reviews.back")}</button></div>
+      {status !== null ? <p role="status" className="setCardHint">{t(catalog, status)}</p> : null}
+      <div className="staffActions"><button className="setBtn setBtnQuiet" type="button" onClick={leave}>{t(catalog, "staff.reviews.back")}</button></div>
     </section> : null}
     {!notElevated && snapshot === null && !requestError && queue !== null ? <section className="setCard">
       <div className="staffSectionHead"><h2 className="staffSectionTitle">{t(catalog, "staff.reviews.heading")}</h2></div>
@@ -192,7 +193,7 @@ export function PublicationReviewsPanel({ client, catalog = staffEnglish, public
       {queue.has_more ? <p className="setCardHint" role="status">{t(catalog, "staff.reviews.moreWaiting")}</p> : null}
     </section> : null}
     {!notElevated && snapshot === null && !requestError && queue === null ? <section className="setCard"><h2 className="staffSectionTitle">{t(catalog, "staff.reviews.heading")}</h2>
-      {status !== null ? <><p role="status" className="setError">{t(catalog, status)}</p><a className="setBtn" href="/admin/team">{t(catalog, "staff.teamLink")}</a></> : null}
+      {status !== null ? <><p role="status" className="setError">{t(catalog, status)}</p><div className="staffActions"><a className="setBtn" href="/admin/team">{t(catalog, "staff.teamLink")}</a></div></> : null}
     </section> : null}
   </div>;
 }

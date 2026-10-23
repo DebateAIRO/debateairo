@@ -150,6 +150,7 @@ it("Ask refusals map pending, not allowed, unauthorized and unavailable to their
       const panel = host.querySelector(".publicationReviewPanel")!;
       expect(panel.querySelector("form")).toBeNull();
       expect([...panel.querySelectorAll("button")].filter(button => button.textContent === "Ask for approval")).toHaveLength(status === 409 ? 0 : 1);
+      if (status !== 409) expect([...panel.children].findIndex(node => node.matches('[role="status"]'))).toBeLessThan([...panel.children].findIndex(node => node.textContent === "Ask for approval"));
     }
     finally { await unmount(root, host); }
   }

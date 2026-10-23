@@ -154,6 +154,7 @@
   "staff.reviews.error.sameReviewer": "You refused this debate before. Another reviewer must decide.",
   "staff.reviews.error.decided": "This request has already been decided.",
   "staff.reviews.error.locked": "Team tools are locked until the team's security alert is ready.",
+  "staff.reviews.error.noPermission": "Your account does not have the Publication reviews permission.",
   "staff.reviews.notElevated": "Sign in to the team console first.",
   "staff.permission.PUBLICATION_REVIEW": "Publication reviews",
   "staff.event.PUBLICATION_REVIEW_LISTED": "Publication reviews listed",

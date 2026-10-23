@@ -83,6 +83,7 @@ export function PublicationReviewPanel({ runId, state, client, catalog, onAsked 
     {state.state === "NONE" ? <><p>{t(catalog, "public.publication.approvalRequired")}</p><p>{t(catalog, "public.publicationReview.flaggedLine")}</p><ul>{categoryLines(state, catalog)}</ul></> : null}
     {state.state === "UNDER_REVIEW" && message === null ? <p>{t(catalog, "public.publicationReview.underReview")}</p> : null}
     {state.state === "REFUSED" ? <PublicationReviewStatement state={state} catalog={catalog} /> : null}
+    {message ? <p role="status">{message}</p> : null}
     {state.may_ask && state.state !== "UNDER_REVIEW" && !open ? <button type="button" className="button" onClick={() => { setOpen(true); setAcknowledged(false); setMessage(null); }}>{t(catalog, "public.publicationReview.askButton")}</button> : null}
     {open ? <form noValidate onSubmit={submit}>
       <p><strong>{t(catalog, "public.publicationReview.askWarning")}</strong></p>
@@ -91,6 +92,6 @@ export function PublicationReviewPanel({ runId, state, client, catalog, onAsked 
     </form> : null}
     {confirming ? <SecurityConfirmation catalog={authCatalog} client={client} authorization={{ action: "PUBLISH", target_run_id: runId }} disabled={!acknowledged || busy} onConfirmed={confirmed} onCancel={() => setConfirming(false)} onError={() => { close(); setMessage(t(catalog, "public.publication.statusUnavailable")); }} /> : null}
     </> : null}
-    {message ? <p role="status">{message}</p> : null}
+    {answerOnly && message ? <p role="status">{message}</p> : null}
   </div>;
 }

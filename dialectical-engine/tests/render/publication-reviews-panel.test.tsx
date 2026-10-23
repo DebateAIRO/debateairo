@@ -153,12 +153,14 @@ describe("publication reviews staff surface", () => {
   it("Details and Read open review-local content from the pending snapshot", async () => {
     const fair = buildFairShapedAnswer({ answer_id: reviewRef, run_ref: newer.review_ref,
       question_line: snapshot.question, verdict_state: "CONTESTED" });
-    const readable = { ...snapshot, answer: { ...snapshot.answer, nodes: fair.nodes ?? [], edges: fair.edges ?? [] } };
+    const readable = { ...snapshot, answer: { ...snapshot.answer, verdict: "SUPPORTED", nodes: fair.nodes ?? [], edges: fair.edges ?? [] } };
     const host = await reviews(panelClient({ publicationReview: async () => readable }));
     await click(button(host, enStaff["staff.reviews.open"]));
     expect(host.querySelector("[role=dialog]")).toBeNull();
     await click(host.querySelector(".publicDetailsAction"));
     expect(host.querySelector('[role=dialog][data-review-detail="verdict"]')?.textContent).toContain("The synthesis to review.");
+    expect(host.querySelector('[data-review-detail="verdict"]')?.textContent).toContain("Clear answer");
+    expect(host.querySelector('[data-review-detail="verdict"]')?.textContent).not.toContain("SUPPORTED");
     await click(button(host, enPublic["public.honesty.close"]));
     await click(host.querySelector(".publicReadAction"));
     expect(host.querySelector('[role=dialog][data-review-detail="argument"]')?.textContent).toContain("The defeater claim attacking the position.");
@@ -238,6 +240,8 @@ describe("publication reviews staff surface", () => {
       expect(host.textContent).toContain(enStaff[message]);
       expect(host.textContent).not.toContain(snapshot.question);
       expect(host.querySelector(".setCard [role=status]")?.textContent).toBe(enStaff[message]);
+      expect(host.querySelector(".setCard [role=status]")?.classList.contains("setCardHint")).toBe(true);
+      expect(button(host, enStaff["staff.reviews.back"])?.classList.contains("setBtnQuiet")).toBe(true);
       expect(button(host, enStaff["staff.reviews.back"])).not.toBeNull();
       expect(host.querySelector(".rvQueue")).toBeNull();
     }
@@ -248,11 +252,14 @@ describe("publication reviews staff surface", () => {
     expect(locked.textContent).not.toContain(snapshot.question);
     expect(button(locked, enStaff["staff.reviews.back"])).not.toBeNull();
     const denied = await reviews(panelClient({ publicationReviews: async () => { throw new ContractHttpError("FORBIDDEN", 403, "STAFF_REQUEST_FAILED"); } }));
-    expect(denied.textContent).toContain(enStaff["staff.failed"]);
-    expect(denied.querySelector('a[href="/admin/team"]')).not.toBeNull();
+    expect(denied.textContent).toContain("Your account does not have the Publication reviews permission.");
+    expect(denied.querySelector('a[href="/admin/team"]')?.closest(".staffActions")).not.toBeNull();
     const signedOut = await reviews(panelClient({ publicationReviews: async () => { throw new ContractHttpError("SESSION_REQUIRED", 401, "STAFF_REQUEST_FAILED"); } }));
     expect(signedOut.textContent).toContain(enStaff["staff.reviews.notElevated"]);
     expect(signedOut.textContent).not.toContain(enStaff["staff.failed"]);
+    expect(signedOut.querySelector(".staffSectionTitle")?.textContent).toBe(enStaff["staff.reviews.heading"]);
+    expect(signedOut.querySelector('a[href="/admin/team"]')?.textContent).toBe(enStaff["staff.title"]);
+    expect(signedOut.querySelector('a[href="/admin/team"]')?.closest(".staffActions")).not.toBeNull();
   });
 
   it("the audit list renders review events without a delivery state", async () => {
@@ -282,7 +289,7 @@ describe("publication reviews staff surface", () => {
 
   it("staff.json en and ro hold the same keys", () => {
     expect(Object.keys(roStaff).sort()).toEqual(Object.keys(enStaff).sort());
-    expect(Object.keys(enStaff).filter(key => key.startsWith("staff.reviews."))).toHaveLength(24);
+    expect(Object.keys(enStaff).filter(key => key.startsWith("staff.reviews."))).toHaveLength(25);
     expect(enStaff["staff.reviews.category.TERRORISM"]).not.toBe(roStaff["staff.reviews.category.TERRORISM"]);
   });
 

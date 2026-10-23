@@ -154,6 +154,7 @@
   "staff.reviews.error.sameReviewer": "Ai refuzat anterior aprobarea acestei dezbateri. Un alt examinator trebuie să decidă.",
   "staff.reviews.error.decided": "Această cerere a fost deja decisă.",
   "staff.reviews.error.locked": "Instrumentele echipei sunt blocate până când alerta de securitate este pregătită.",
+  "staff.reviews.error.noPermission": "Contul tău nu are permisiunea Cereri de publicare.",
   "staff.reviews.notElevated": "Mai întâi, autentifică-te în consola echipei.",
   "staff.permission.PUBLICATION_REVIEW": "Cereri de publicare",
   "staff.event.PUBLICATION_REVIEW_LISTED": "Cereri de publicare listate",

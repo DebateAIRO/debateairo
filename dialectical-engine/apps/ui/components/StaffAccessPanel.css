@@ -58,10 +58,10 @@
 .staffAccess .rvQueue > li { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 0; border-top: 1px solid var(--line); font-size: 12px; }
 .staffAccess .rvQueue .rvRowBody { min-width: 0; }
 .staffAccess .rvRowHead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.staffAccess .rvRowHead time { color: var(--ink); font-size: 11px; font-weight: 600; }
+.staffAccess .rvRowHead time { color: var(--ink); font-size: 12px; font-weight: 600; }
 .staffAccess .rvQueue .rvCats { margin: 8px 0 0; }
 .staffAccess .rvQueue > li > .setBtn { flex: 0 0 auto; }
-.staffAccess .rvQuestion { margin: 0 0 6px; }
+.staffAccess .rvQuestion { margin: 0 0 6px; overflow-wrap: anywhere; }
 .staffAccess.rvReadScreen { max-width: 960px; }
 .staffAccess.rvReadScreen .publicOverview { padding: 0; }
 .staffAccess.rvReadScreen .publicOverviewInner { max-width: none; }
