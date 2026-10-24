@@ -63,6 +63,10 @@ const VULNERABLE: Record<string, (version: string) => boolean> = {
   // error; two moderate: an unbounded-growth denial of service and a Subresource Integrity bypass), reached
   // through jsdom (test tooling only); 8.12.2 was published 2026-10-15, so it clears the 7-day cooldown.
   undici: (v) => v.startsWith("8.") && compare(v, "8.12.2") < 0,
+  // 2026-10-25: zod < 4.6.6 (high: memory exhaustion while validating oversized input). zod is a direct
+  // dependency, so the fix is the PIN in every package.json that lists it (4.6.7, the newest release, published
+  // 2026-10-12, so it clears the 7-day cooldown), not an override.
+  zod: (v) => compare(v, "4.6.6") < 0,
   qs: (v) => compare(v, "6.16.0") < 0,
   // 2026-10-21: GHSA-8r9p-f939-6h3c and its sibling follow-redirects advisory (>=1.16.0 <1.16.1, array-form headers
   // and sensitiveHeaders regex escaping), reached through the Hatchet SDK's axios; 1.16.1 was published 2026-10-01.
