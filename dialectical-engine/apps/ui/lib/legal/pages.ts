@@ -139,7 +139,7 @@ export const LEGAL_COOKIES: readonly LegalInventoryItem[] = Object.freeze([
 ]);
 
 /**
- * Browser-storage keys the UI writes: two in local storage and five in session storage. The
+ * Browser-storage keys the UI writes: two in local storage and six in session storage. The
  * export link token is sent to the Dialectical Engine server when redeemed; the link outcome stays in the
  * browser. The help-chat name is literal so this page does not pull in the support widget.
  */
@@ -148,6 +148,7 @@ export const LEGAL_BROWSER_STORAGE: readonly LegalInventoryItem[] = Object.freez
   { name: "debateai.mode", kindKey: "legal.cookies.mode.kind", purposeKey: "legal.cookies.mode.purpose", lifeKey: "legal.cookies.mode.life", recipientKey: "legal.cookies.recipient.browser" },
   { name: LANGUAGE_OFFER_DISMISSED_KEY, kindKey: "legal.cookies.languageOffer.kind", purposeKey: "legal.cookies.languageOffer.purpose", lifeKey: "legal.cookies.languageOffer.life", recipientKey: "legal.cookies.recipient.browser" },
   { name: "debateai.support.conversation.v2", kindKey: "legal.cookies.supportConversation.kind", purposeKey: "legal.cookies.supportConversation.purpose", lifeKey: "legal.cookies.supportConversation.life", recipientKey: "legal.cookies.recipient.browser" },
+  { name: "debateai.support.offered.v1", kindKey: "legal.cookies.supportConversation.kind", purposeKey: "legal.cookies.supportOffered.purpose", lifeKey: "legal.cookies.supportConversation.life", recipientKey: "legal.cookies.recipient.browser" },
   { name: "debateai.phone-completion-draft.v1", kindKey: "legal.cookies.supportConversation.kind", purposeKey: "legal.cookies.phoneDraft.purpose", lifeKey: "legal.cookies.phoneDraft.life", recipientKey: "legal.cookies.recipient.browser" },
   { name: "debateai.exportPending", kindKey: "legal.cookies.languageOffer.kind", purposeKey: "legal.cookies.exportPending.purpose", lifeKey: "legal.cookies.exportPending.life", recipientKey: "legal.cookies.recipient.server" },
   { name: "debateai.exportLinkOutcome", kindKey: "legal.cookies.languageOffer.kind", purposeKey: "legal.cookies.exportLinkOutcome.purpose", lifeKey: "legal.cookies.exportLinkOutcome.life", recipientKey: "legal.cookies.recipient.browser" }
