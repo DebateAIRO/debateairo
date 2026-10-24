@@ -167,3 +167,21 @@ test("the canonical verification route still delegates to MFA enrollment", () =>
 });
 
 test("all 35 signup headlines match the approved Appendix A exactly",()=>{const spec=readFileSync(join(root,"../../docs/superpowers/specs/2026-10-04-account-onboarding-passkeys-design.md"),"utf8");const rows=[...spec.matchAll(/^\| ([a-z]{2}) \| (.*?) \|$/gm)];assert.equal(rows.length,35);for(const [,locale,headline] of rows)assert.equal(JSON.parse(source(`messages/${locale}/auth.json`))["auth.signUp.title"],headline);});
+
+// Italy clause approval S01 (final review): nothing may stand before the clause number. ItalyApprovalBox.tsx's
+// clauseCells puts whatever the template has before {number} into the bold number cell, so in every catalog the
+// clause template starts with {number}, names {title}, and carries no "§".
+test("all 35 Italy approval clause templates start with {number}, name {title} and carry no §", () => {
+  const localeDirectories = readdirSync(join(root, "messages"), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+  assert.equal(localeDirectories.length, 35);
+  for (const locale of localeDirectories) {
+    const clause = JSON.parse(source(`messages/${locale}/auth.json`))["auth.signUp.italyApprovalClause"];
+    assert.equal(typeof clause, "string", `${locale}/auth.signUp.italyApprovalClause must be a string`);
+    assert.ok(clause.startsWith("{number}"), `${locale}/auth.signUp.italyApprovalClause must start with {number}: ${clause}`);
+    assert.ok(clause.includes("{title}"), `${locale}/auth.signUp.italyApprovalClause must contain {title}: ${clause}`);
+    assert.ok(!clause.includes("§"), `${locale}/auth.signUp.italyApprovalClause must not contain §: ${clause}`);
+  }
+});

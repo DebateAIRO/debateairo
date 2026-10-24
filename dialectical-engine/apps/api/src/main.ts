@@ -361,8 +361,9 @@ const admissionPolicy = await boot.run("admission-policy", () => readAdmissionPo
  * Paid plans G3a (amendment A14): the country gate runs only in hosted mode AND when the register
  * version in force publishes `countryPolicy` — one decision, countryPolicyInForce, which never reads
  * the row in local mode. The row is read under the ledger; the data files are opened
- * (GEOIP_PATHS_REQUIRED already guaranteed their paths in hosted mode) and held, so a missing file
- * refuses the boot with its own code and zeroes nothing it should not.
+ * (GEOIP_PATHS_REQUIRED already guaranteed their paths in hosted mode) and held. While the gate is
+ * in force a missing file refuses the boot with its own code and zeroes nothing it should not;
+ * without it a missing file only turns the Italy approval's IP leg off (geo-lookup below, ADR-0038).
  */
 const countryPolicy = await boot.run("country-policy", () => countryPolicyInForce(
   environment.DEPLOYMENT_MODE,

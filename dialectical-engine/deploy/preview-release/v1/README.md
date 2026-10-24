@@ -2792,7 +2792,7 @@ echo "the new release passes its own site version $V"
   that release is current, and its intro keeps saying "This list is kept up to date automatically. It always shows the
   companies we currently send data to." (owner, 2026-10-23).
 - **A new AI company: tell people first, and note it in the Register (only an upload that adds one).** The Privacy
-  Policy (version 3.5) makes two promises the owner keeps (2026-10-23), so before that upload's switch:
+  Policy (version 3.6) makes two promises the owner keeps (2026-10-23), so before that upload's switch:
   1. **Privacy Policy §14: tell people before.** Before a new recipient starts receiving data, people are told by email
      and in the product, and given time to object. So the owner tells the users which company is added and what it will
      receive, by email and in the product, and the switch (SB13; on the drained path, the downtime at DR2) waits until

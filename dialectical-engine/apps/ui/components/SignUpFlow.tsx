@@ -158,12 +158,13 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
         if (flight.current)
             return;
         const form = event.currentTarget;
-        /* Owner ruling V-18 (R17): no account without a region and both boxes ticked. Create account stays
+        /* Owner ruling V-18 (R17): no account without a region and both boxes ticked, and the Italy box too while it
+           is shown (italy-clause-approval S01). Create account stays
            focusable (aria-disabled, a11y repair 2026-10-15), so a press made while one is missing — a click on it,
            or Enter in a field, both of which name it (the form's only submit button) as the submitter — is answered
            here and sends nothing: the hint is said, and focus goes to the first thing still missing. That is exactly
            what the native `disabled` used to block; a submission with no submitter was never blocked by it, and it
-           still meets validateSignup's two boxes and the region check below. */
+           still meets validateSignup's two boxes, the region check and the Italy box check below. */
         if ((event.nativeEvent as SubmitEvent).submitter && (declaredRegion === null || !privacyAccepted || !termsAccepted || italyMissing)) {
             const missing = declaredRegion === null
                 ? form.querySelector<HTMLElement>(region.country === 'US' ? '#signup-region-state' : '#signup-region-trigger')

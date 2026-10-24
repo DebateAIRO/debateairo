@@ -1530,6 +1530,39 @@ socket here, never a runtime login); the API's runtime login may only read the a
 what passed. No new environment key. Until an activation exists, every release runs on its own site version, as before;
 on this server nothing activates anything before Phase 3.
 
+### Upgrading to the Italy-specific approval (migration 0125)
+
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
+
+This release adds one migration, `migrations/0125_italy_specific_approval.sql` (after `0124_settings_activation.sql`;
+`n1: expand`, so §5's migration step applies it while the older release keeps serving). It is the database half of the
+second, unticked sign-up box for the Italian Civil Code arts. 1341-1342, owed when Italy is picked in Region or the
+request IP resolves to Italy: two nullable columns on `legal.acceptance`, `clauses` (the Terms clauses approved: 11, 12,
+14, 15 and 18) and `leg` (`PICKED`, `IP` or `BOTH`: which test placed the sign-up in Italy); the new acceptance kind
+`ITALY_SPECIFIC_APPROVAL` in the two widened CHECKs `acceptance_kind_check` and `acceptance_document_version_shape`, and
+the new CHECK `acceptance_italy_fields`; and two functions, `identity.record_signup_italy_approval` (the sign-up writer,
+inside the sign-up transaction; EXECUTE for `debateai_billing_runtime`, the API's role, only) and
+`identity.read_data_export_snapshot_v2` (0115's export snapshot with `clauses` and `leg` on every acceptance; EXECUTE for
+`debateai_data_export_worker` only). Apply it BEFORE the new code runs, as step 1 of the debate-shape upgrade above does
+(open the migrator window, `pnpm db:migrate`, then `hardening.sql`, close the window), then restart the API. On a
+database without it the new API fails in two ways. Wherever the data-export pool is configured (`DATA_EXPORT_STORE_PATH`
+set, as `env/api.env.example` has it), its boot step `database-roles` (`assertDataExportDatabaseRoles`) refuses the
+WHOLE API with `DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED`, because the export worker's function list now names the v2
+reader, which only 0125 creates. And every sign-up that owes the Italy approval fails: its transaction calls the missing
+writer and is rolled back, account included.
+
+The DB-IP and Tor files (§5 "Country data") now feed the Italy approval's IP leg on every hosted boot, whether or not
+the register version in force publishes `countryPolicy`: the API opens them at boot (boot step `geo-lookup`). With a
+`countryPolicy` row a missing file still refuses the boot, as before. Without one the API still starts: it writes one
+`italy_approval.ip_leg_off` line (its `code` names the refusal, for example `GEOIP_COUNTRY_DB_UNAVAILABLE`), each
+sign-up then writes `italy_approval.ip_leg_skipped` with `reason` `NO_LOOKUP`, and the picked Region alone decides. The
+IP leg stays off until the API is restarted after the files appear.
+
+No new environment key. This release publishes Terms of Service 2.5 and Privacy Policy 3.6, and re-asks nobody. Rolling
+back the code needs no database step: the two columns, the three CHECKs and the two functions stay; the older code never
+writes the new kind or the two columns, and its export still calls 0115's `identity.read_data_export_snapshot`, which
+0125 calls and does not replace.
+
 ### Upgrading an existing host (paid plans Part 1a)
 
 > Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
@@ -1601,16 +1634,22 @@ appears in any file under `/etc/debateai`, and the architecture test pins that.
 
 ### Country data — the GeoIP and Tor refresh (paid plans G4)
 
-The country gate reads two public data files: DB-IP's Lite country database and the Tor exit list.
+The country gate and the Italy approval's IP leg (§5 "Upgrading to the Italy-specific approval
+(migration 0125)") read two public data files: DB-IP's Lite country database and the Tor exit list.
 Their PATHS are required in every hosted `api.env` (`GEOIP_COUNTRY_DB_PATH`, `TOR_EXIT_LIST_PATH`;
-without them the API refuses with `GEOIP_PATHS_REQUIRED`). The FILES must exist from the moment the
-register version in force publishes a `countryPolicy` row: the API then opens them at boot, and a
+without them the API refuses with `GEOIP_PATHS_REQUIRED`). The FILES are needed on every hosted
+server, whatever the register version in force publishes, because the IP leg reads them. The API
+opens them only at boot (a file it opened is re-read within a minute of being replaced, below; one
+missing at boot is not looked for again): without a `countryPolicy` row, a file missing at boot
+leaves the IP leg off, with one `italy_approval.ip_leg_off` line, until the API is restarted after
+the file appears. From the moment the register version in force publishes a `countryPolicy` row, a
 missing file refuses the boot with `GEOIP_COUNTRY_DB_UNAVAILABLE` or `TOR_EXIT_LIST_UNAVAILABLE` (a
 malformed one with `GEOIP_COUNTRY_DB_INVALID` or `TOR_EXIT_LIST_INVALID`; what the refresh checks
 before it renames a file into place, and where that falls short of the API's own check, is at the
 end of this section). A Tor list with no address in it — an
-empty file, or only blank lines and `#` comments — counts as malformed: the boot refuses it with
-`TOR_EXIT_LIST_INVALID`, and a running API keeps its last good list and logs the code
+empty file, or only blank lines and `#` comments — counts as malformed: with a `countryPolicy` row
+the boot refuses it with `TOR_EXIT_LIST_INVALID` (without one it turns the IP leg off, as a missing
+file does), and a running API keeps its last good list and logs the code
 (`geo.reload.failed`), because an empty list would let every Tor exit through. So never create the
 file by hand to get past a first boot's `TOR_EXIT_LIST_UNAVAILABLE`: run the refresh (below) until
 it prints `GEOIP_REFRESH_OK tor-list`. `debateai-geoip-refresh.service` writes
