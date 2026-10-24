@@ -317,6 +317,10 @@ await boot.run("publication-secret-domains", async () => assertPublicationSecret
   additionalStorePaths: [environment.AUDIT_KEY_STORE_PATH, ...billingCustodyPaths(environment),
     ...(environment.DATA_EXPORT_STORE_PATH === undefined ? [] : [environment.DATA_EXPORT_STORE_PATH])]
 }));
+// Row-level security S01 (DECISIONS D29, D50): the two system logins, the targets every statement made outside a
+// request goes to (wired to the T1 pools after this block).
+const systemPool = boot.hold(createPool(environment.API_SYSTEM_DATABASE_URL!, API_DATABASE_POOLS.system));
+const authorizationSystemPool = boot.hold(createPool(environment.API_AUTHORIZATION_SYSTEM_DATABASE_URL!, API_DATABASE_POOLS.authorizationSystem));
 const pool = boot.hold(createPool(environment.DATABASE_URL, API_DATABASE_POOLS.runtime));
 const authorizationPool = boot.hold(createPool(environment.AUTHORIZATION_DATABASE_URL!, API_DATABASE_POOLS.authorization));
 const publicationCleanupPool = environment.PUBLICATION_ENABLED === "true"
@@ -335,8 +339,9 @@ const legacyAskAdmissionPool=boot.hold(createPool(environment.DATABASE_URL, API_
 // a decision waiting for the lock must never hold a connection the decision it
 // waits for needs (packages/budget/src/spend-lock.ts). The runtime principal's
 // URL on purpose: the hold, the wait row and the run's charge scope are
-// debateai_runtime's grants (0083, 0084), never the content-provision role's.
-const roomDecisionPool=boot.hold(createPool(environment.DATABASE_URL, API_DATABASE_POOLS.roomDecision));
+// debateai_runtime's grants (0083, 0084), never the content-provision role's. Row-level security S01 (X19, D29): the
+// system login, which holds the same roles and reads every account's debates in flight for the site cap.
+const roomDecisionPool=boot.hold(createPool(environment.API_SYSTEM_DATABASE_URL!, API_DATABASE_POOLS.roomDecision));
 await boot.run("ask-admission-pools", async () => {
   if (serverAskAdmissionPool === contentProvisionPool
     || serverAskAdmissionPool === pool

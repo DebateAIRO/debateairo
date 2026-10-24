@@ -206,10 +206,12 @@ observation agent's is set separately (§12).
 
 | `EnvironmentFile` key | Principal (P3-01) | Role | Purpose |
 |---|---|---|---|
-| `api.env` `DATABASE_URL` | `api-runtime` | `debateai_prod_api_runtime` | the API's product runtime, and the owner's six billing commands (among them the resume command `pnpm billing:renewal-resume`), the dispute command `pnpm billing:dispute`, the withdrawal command `pnpm billing:withdraw`, the tax summary `pnpm billing:tax-summary` (read-only), the e-Factura status command `pnpm billing:efactura-status` and the invoice command `pnpm billing:invoice`, all run as the API |
+| `api.env` `DATABASE_URL` | `api-runtime` | `debateai_prod_api_runtime` | the API's product runtime: signed-in requests, each seeing only its own account's rows |
 | `api.env` `CONTENT_PROVISION_DATABASE_URL` | `api-content-provision` | `debateai_prod_api_content_provision` | run content keys, server-side ask admission |
 | `api.env` `SUPPORT_DATABASE_URL` | `api-support` | `debateai_prod_api_support` | **the support database principal**: the support chat's data plane, and the ONLY database the master-key rotation opens (it alone may rewrite the two support key columns) |
 | `api.env` `AUTHORIZATION_DATABASE_URL` | `api-authorization` | `debateai_prod_api_authorization` | step-up session rotation |
+| `api.env` `API_SYSTEM_DATABASE_URL` | `api-system` | `debateai_prod_api_system` | cross-account work outside a request (D29): the API's background jobs, boot checks and room-decision pool, and the owner's billing commands (among them the resume command `pnpm billing:renewal-resume`), the dispute command `pnpm billing:dispute`, the withdrawal command `pnpm billing:withdraw`, the tax summary `pnpm billing:tax-summary` (read-only), the e-Factura status command `pnpm billing:efactura-status` and the invoice command `pnpm billing:invoice`, all run as the API with this URL from the same file |
+| `api.env` `API_AUTHORIZATION_SYSTEM_DATABASE_URL` | `api-authorization-system` | `debateai_prod_api_authorization_system` | cross-account work outside a request (D29) on the authorization pool |
 | `api.env` `PUBLICATION_CLEANUP_DATABASE_URL` | `api-publication-cleanup` | `debateai_prod_api_publication_cleanup` | publication-key cleanup |
 | `api.env` `ERASURE_DATABASE_URL` | `api-erasure` | `debateai_prod_api_erasure` | account and private-run erasure |
 | `api.env` `DATA_EXPORT_DATABASE_URL` | `api-data-export` | `debateai_prod_api_data_export` | the data-export worker: claim, snapshot read, complete, fail, sweep — never a request route (V-25) |
@@ -1572,6 +1574,7 @@ checkout in place, with its dependencies installed: this release adds the `mmdb-
 
 The API adds `ERASURE_DATABASE_URL_MUST_BE_SEPARATE`,
 `CONTENT_PROVISION_DATABASE_URL_MUST_BE_SEPARATE`, `AUTHORIZATION_DATABASE_URL_MUST_BE_SEPARATE`,
+`API_SYSTEM_DATABASE_URL_MUST_BE_SEPARATE`, `API_AUTHORIZATION_SYSTEM_DATABASE_URL_MUST_BE_SEPARATE`,
 `PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE` and `EVALUATOR_DEV_MENU_PRODUCTION_FORBIDDEN`. None of
 these are advisory: the process exits.
 

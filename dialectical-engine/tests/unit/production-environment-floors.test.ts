@@ -3,6 +3,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadApiEnvironment, loadObservationAgentEnvironment } from "../../packages/register/src/runtime-environment.js";
 import {
   parseApiEnvironment,
+  parseBillingInvoiceEnvironment,
+  parseBillingOperatorEnvironment,
+  parseBillingRefundDoneEnvironment,
+  parseBillingRenewalResumeEnvironment,
+  parseBillingWithdrawEnvironment,
   parseKeyRotationEnvironment,
   parseLivenessEnvironment,
   parseMigrationEnvironment,
@@ -243,6 +248,52 @@ describe("production provider targets refuse cleartext off-box (L4-F7)", () => {
       new URL("../../packages/providers/src/index.ts", import.meta.url), "utf8"
     );
     expect(dispatcher).toContain("assertProductionProviderTargets(targets, deployment.nodeEnv)");
+  });
+});
+
+// Row-level security S01 (PLAN S2.5, S2.7; DECISIONS D29, D48, D56): the API's two system logins are required and
+// separate, and the owner's billing commands, which read the API's own EnvironmentFile, connect as api-system.
+describe("row-level security S01: the API system database URLs", () => {
+  const local = (overrides: Overrides) => parseApiEnvironment({ ...validApiEnvironmentFixture(), ...overrides });
+
+  it("S2.5-a each of API_SYSTEM_DATABASE_URL and API_AUTHORIZATION_SYSTEM_DATABASE_URL missing throws its _REQUIRED code", () => {
+    expect(() => local({})).not.toThrow();
+    expect(() => local({ API_SYSTEM_DATABASE_URL: undefined })).toThrowError(/^API_SYSTEM_DATABASE_URL_REQUIRED$/u);
+    expect(() => local({ API_AUTHORIZATION_SYSTEM_DATABASE_URL: undefined }))
+      .toThrowError(/^API_AUTHORIZATION_SYSTEM_DATABASE_URL_REQUIRED$/u);
+    expect(() => production({ API_SYSTEM_DATABASE_URL: undefined })).toThrowError(/^API_SYSTEM_DATABASE_URL_REQUIRED$/u);
+  });
+
+  it("S2.5-b each equal to DATABASE_URL, AUTHORIZATION_DATABASE_URL or the other throws its _MUST_BE_SEPARATE code", () => {
+    const fixture = validApiEnvironmentFixture();
+    for (const other of [fixture.DATABASE_URL, fixture.AUTHORIZATION_DATABASE_URL, fixture.API_AUTHORIZATION_SYSTEM_DATABASE_URL]) {
+      expect(() => local({ API_SYSTEM_DATABASE_URL: other }), other)
+        .toThrowError(/^API_SYSTEM_DATABASE_URL_MUST_BE_SEPARATE$/u);
+    }
+    for (const other of [fixture.DATABASE_URL, fixture.AUTHORIZATION_DATABASE_URL]) {
+      expect(() => local({ API_AUTHORIZATION_SYSTEM_DATABASE_URL: other }), other)
+        .toThrowError(/^API_AUTHORIZATION_SYSTEM_DATABASE_URL_MUST_BE_SEPARATE$/u);
+    }
+  });
+
+  it("S2.7-b each billing operator parser given DATABASE_URL and API_SYSTEM_DATABASE_URL returns DATABASE_URL equal to the API_SYSTEM_DATABASE_URL value, and given DATABASE_URL alone returns it", () => {
+    const runtimeUrl = "postgresql://debateai_prod_api_runtime:x@localhost/debateai";
+    const systemUrl = "postgresql://debateai_prod_api_system:y@localhost/debateai";
+    const apiFile = {
+      DATABASE_URL: runtimeUrl, REGISTER_VERSION: "7", NODE_ENV: "test",
+      NETOPIA_API_BASE_URL: "https://secure-sandbox.netopia-payments.com", PUBLIC_APP_URL: "https://dezbatere.ro"
+    };
+    const parsers = [
+      ["operator", parseBillingOperatorEnvironment],
+      ["withdraw", parseBillingWithdrawEnvironment],
+      ["invoice", parseBillingInvoiceEnvironment],
+      ["refund-done", parseBillingRefundDoneEnvironment],
+      ["renewal-resume", parseBillingRenewalResumeEnvironment]
+    ] as const;
+    for (const [name, parse] of parsers) {
+      expect(parse({ ...apiFile, API_SYSTEM_DATABASE_URL: systemUrl }).DATABASE_URL, name).toBe(systemUrl);
+      expect(parse(apiFile).DATABASE_URL, name).toBe(runtimeUrl);
+    }
   });
 });
 

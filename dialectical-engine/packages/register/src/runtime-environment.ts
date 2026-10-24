@@ -282,7 +282,8 @@ export function loadDevelopmentCommandEnvironment(): Readonly<Record<string, str
     XDG_CONFIG_HOME: z.string().min(1).optional(),
     PNPM_EXECUTABLE: z.string().min(1).optional(),
     DEBATEAI_DEV_DOCKER_BIN: z.string().min(1).optional(),
-    DEBATEAI_DEV_AUTH_STACK_PROFILE: z.enum(["default", "support-preview"]).optional(),
+    // Row-level security S01 (DECISIONS D43): "rls" is V's isolated TEST stack (apps/runner/src/dev-auth-stack-profile.ts).
+    DEBATEAI_DEV_AUTH_STACK_PROFILE: z.enum(["default", "support-preview", "rls"]).optional(),
     DEBATEAI_DEV_PROVIDER_TARGETS_JSON: z.string().min(1).optional(),
     DEBATEAI_DEV_CUSTODY_ROOT: z.string().min(1).optional(),
     // T16 · operator overrides for the sealed synthesizer/evaluator role
@@ -375,11 +376,24 @@ const legacyRegisterVersion = z.string().regex(/^[1-9][0-9]*$/u).transform((valu
  * the API's own database URL, the register version and the mode; the production floors hold here too.
  */
 const billingOperatorShape = {
-  DATABASE_URL: z.string().url(), NODE_ENV: nodeEnvironment, REGISTER_VERSION: legacyRegisterVersion
+  DATABASE_URL: z.string().url(), NODE_ENV: nodeEnvironment, REGISTER_VERSION: legacyRegisterVersion,
+  // Row-level security S01 (DECISIONS D48, D56; V-9's default): the same EnvironmentFile carries the API's system login,
+  // which reads across accounts outside a request; the commands connect as it. A file without it keeps DATABASE_URL,
+  // which assertBillingOperatorConnection refuses in production.
+  API_SYSTEM_DATABASE_URL: z.string().url().optional()
 } as const;
 
+/** The URL a billing operator command connects with: the API's system login when the file names one. */
+function withBillingOperatorSystemUrl<
+  T extends Readonly<{ DATABASE_URL: string; API_SYSTEM_DATABASE_URL?: string | undefined }>
+>(environment: T): T {
+  return environment.API_SYSTEM_DATABASE_URL === undefined
+    ? environment
+    : { ...environment, DATABASE_URL: environment.API_SYSTEM_DATABASE_URL } as T;
+}
+
 export function parseBillingOperatorEnvironment(source: EnvironmentSource) {
-  return withProductionFloors(parseEnvironmentSource(billingOperatorShape, source));
+  return withBillingOperatorSystemUrl(withProductionFloors(parseEnvironmentSource(billingOperatorShape, source)));
 }
 
 export function loadBillingOperatorEnvironment() {
@@ -392,9 +406,9 @@ export function loadBillingOperatorEnvironment() {
  * plan of another system. Required: without it the command cannot tell the systems apart and refuses to start.
  */
 export function parseBillingWithdrawEnvironment(source: EnvironmentSource) {
-  return withProductionFloors(parseEnvironmentSource({
+  return withBillingOperatorSystemUrl(withProductionFloors(parseEnvironmentSource({
     ...billingOperatorShape, NETOPIA_API_BASE_URL: z.string().url()
-  }, source));
+  }, source)));
 }
 
 export function loadBillingWithdrawEnvironment() {
@@ -408,10 +422,10 @@ export function loadBillingWithdrawEnvironment() {
  * Quaderno link, R-7). Both required.
  */
 export function parseBillingInvoiceEnvironment(source: EnvironmentSource) {
-  return withProductionFloors(parseEnvironmentSource({
+  return withBillingOperatorSystemUrl(withProductionFloors(parseEnvironmentSource({
     ...billingOperatorShape, NETOPIA_API_BASE_URL: z.string().url(),
     PUBLIC_APP_URL: z.string().url().refine((value) => value.startsWith("https://"))
-  }, source));
+  }, source)));
 }
 
 export function loadBillingInvoiceEnvironment() {
@@ -423,9 +437,9 @@ export function loadBillingInvoiceEnvironment() {
  * NETOPIA environment whose refunds it records (it refuses another system's charge). Required.
  */
 export function parseBillingRefundDoneEnvironment(source: EnvironmentSource) {
-  return withProductionFloors(parseEnvironmentSource({
+  return withBillingOperatorSystemUrl(withProductionFloors(parseEnvironmentSource({
     ...billingOperatorShape, NETOPIA_API_BASE_URL: z.string().url()
-  }, source));
+  }, source)));
 }
 
 export function loadBillingRefundDoneEnvironment() {
@@ -439,10 +453,10 @@ export function loadBillingRefundDoneEnvironment() {
  * billing clock (`billingClock`, which refuses it against live).
  */
 export function parseBillingRenewalResumeEnvironment(source: EnvironmentSource) {
-  return withProductionFloors(parseEnvironmentSource({
+  return withBillingOperatorSystemUrl(withProductionFloors(parseEnvironmentSource({
     ...billingOperatorShape, NETOPIA_API_BASE_URL: z.string().url(),
     BILLING_STAGE_CLOCK_OFFSET_DAYS: z.coerce.number().int().min(1).max(400).optional()
-  }, source));
+  }, source)));
 }
 
 export function loadBillingRenewalResumeEnvironment() {
@@ -518,6 +532,10 @@ const apiEnvironmentShape = {
     CORPUS_KEK_PATH: z.string().min(1).optional(),
     PUBLICATION_KEY_STORE_PATH: z.string().min(1).optional(),
     AUTHORIZATION_DATABASE_URL: z.string().url().optional(),
+    // Row-level security S01 (DECISIONS D29): the system targets of the runtime and authorization pools, which run every
+    // statement made outside a request; required and separate (validateApiEnvironment).
+    API_SYSTEM_DATABASE_URL: z.string().url().optional(),
+    API_AUTHORIZATION_SYSTEM_DATABASE_URL: z.string().url().optional(),
     PUBLICATION_CLEANUP_DATABASE_URL: z.string().url().optional(),
     ERASURE_DATABASE_URL: z.string().url(),
     ACCOUNT_ERASURE_GRACE_MS: z.literal(String(ACCOUNT_ERASURE_GRACE_MS))
@@ -680,7 +698,9 @@ function validateApiEnvironment(
     environment.DATABASE_URL, environment.AUTHORIZATION_DATABASE_URL,
     environment.CONTENT_PROVISION_DATABASE_URL, environment.PUBLICATION_CLEANUP_DATABASE_URL,
     environment.ERASURE_DATABASE_URL, environment.SUPPORT_DATABASE_URL,
-    environment.EVALUATOR_DEV_MENU_DATABASE_URL
+    environment.EVALUATOR_DEV_MENU_DATABASE_URL,
+    // Row-level security S01 (DECISIONS D66, B6 (b)): both system logins read every account.
+    environment.API_SYSTEM_DATABASE_URL, environment.API_AUTHORIZATION_SYSTEM_DATABASE_URL
   ].includes(environment.DATA_EXPORT_DATABASE_URL)) {
     throw new TypeError("DATA_EXPORT_DATABASE_URL_MUST_BE_SEPARATE");
   }
@@ -700,6 +720,22 @@ function validateApiEnvironment(
   }
   if (environment.AUTHORIZATION_DATABASE_URL === undefined) {
     throw new TypeError("AUTHORIZATION_DATABASE_URL_REQUIRED");
+  }
+  // Row-level security S01 (DECISIONS D29): each system login is its own URL, never a T1 login's or the other's.
+  if (environment.API_SYSTEM_DATABASE_URL === undefined) {
+    throw new TypeError("API_SYSTEM_DATABASE_URL_REQUIRED");
+  }
+  if (environment.API_AUTHORIZATION_SYSTEM_DATABASE_URL === undefined) {
+    throw new TypeError("API_AUTHORIZATION_SYSTEM_DATABASE_URL_REQUIRED");
+  }
+  if (environment.API_SYSTEM_DATABASE_URL === environment.DATABASE_URL
+    || environment.API_SYSTEM_DATABASE_URL === environment.AUTHORIZATION_DATABASE_URL
+    || environment.API_SYSTEM_DATABASE_URL === environment.API_AUTHORIZATION_SYSTEM_DATABASE_URL) {
+    throw new TypeError("API_SYSTEM_DATABASE_URL_MUST_BE_SEPARATE");
+  }
+  if (environment.API_AUTHORIZATION_SYSTEM_DATABASE_URL === environment.DATABASE_URL
+    || environment.API_AUTHORIZATION_SYSTEM_DATABASE_URL === environment.AUTHORIZATION_DATABASE_URL) {
+    throw new TypeError("API_AUTHORIZATION_SYSTEM_DATABASE_URL_MUST_BE_SEPARATE");
   }
   if (environment.PUBLICATION_ENABLED === "true"
     && environment.PUBLICATION_CLEANUP_DATABASE_URL === undefined) {

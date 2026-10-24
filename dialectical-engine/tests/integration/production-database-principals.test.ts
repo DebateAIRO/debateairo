@@ -77,6 +77,7 @@ const CAPABILITY_ROLES = [
   "debateai_evaluator_worker",
   "debateai_publication_cleanup",
   "debateai_replay",
+  "debateai_rls_all_accounts",
   "debateai_runtime",
   "debateai_settlement_watch",
   "debateai_support",
@@ -396,7 +397,7 @@ afterAll(async () => {
 });
 
 describe("P3-02 production database LOGIN principal provisioning", () => {
-  it("creates and idempotently reuses nineteen pairwise-distinct actual LOGIN principals", async () => {
+  it("creates and idempotently reuses twenty-one pairwise-distinct actual LOGIN principals", async () => {
     const envelope = credentialEnvelope();
     const first = await provisionProductionDatabasePrincipals({
       adminPool,
@@ -406,8 +407,8 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
       supportConfigCredentialFilePath
     });
     expect(first).toMatchObject({
-      principalCount: 19,
-      createdCount: 15,
+      principalCount: 21,
+      createdCount: 17,
       supportConfigCredentialFilePath
     });
     expect(first.humanCredentialExpiresAtByPrincipal).toEqual({
@@ -456,7 +457,7 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
       WHERE rolname=ANY($1::text[])
       ORDER BY rolname
     `,[roleNames]);
-    expect(catalog.rows).toHaveLength(19);
+    expect(catalog.rows).toHaveLength(21);
     expect(catalog.rows.every((role) => role.rolcanlogin
       && !role.rolsuper
       && !role.rolcreatedb
@@ -496,6 +497,118 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
         await loginPool.end();
       }
     }
+  }, 120_000);
+
+  // Row-level security S01 (PLAN S2.2, DECISIONS D29, D54): the two API-process system logins, and the cross-account
+  // marker role 0124 creates, granted with the one option set the provisioner grants.
+  async function directRolesOf(roleNames: readonly string[]) {
+    return (await adminPool.query<{
+      rolname: string;
+      rolcanlogin: boolean;
+      rolinherit: boolean;
+      rolconfig: string[] | null;
+      directRoles: unknown;
+    }>(`
+      SELECT target.rolname,target.rolcanlogin,target.rolinherit,target.rolconfig,
+        COALESCE((
+          SELECT jsonb_agg(jsonb_build_object(
+            'roleName',parent.rolname,'adminOption',membership.admin_option,
+            'inheritOption',membership.inherit_option,'setOption',membership.set_option
+          ) ORDER BY parent.rolname)
+          FROM pg_catalog.pg_auth_members AS membership
+          JOIN pg_catalog.pg_roles AS parent ON parent.oid=membership.roleid
+          WHERE membership.member=target.oid
+        ),'[]'::jsonb) AS "directRoles"
+      FROM pg_catalog.pg_roles AS target
+      WHERE target.rolname=ANY($1::text[])
+      ORDER BY target.rolname
+    `,[roleNames])).rows;
+  }
+
+  it("S2.2-a provisions api-system and api-authorization-system with exactly their directMemberships, INHERIT, rolconfig null", async () => {
+    await provisionProductionDatabasePrincipals({
+      adminPool,
+      adminDatabaseUrl,
+      manifest,
+      credentialEnvelope: credentialEnvelope(),
+      supportConfigCredentialFilePath
+    });
+    const granted = (roleName: string) =>
+      ({ roleName, adminOption: false, inheritOption: true, setOption: true });
+    expect(await directRolesOf([
+      "debateai_prod_api_system", "debateai_prod_api_authorization_system"
+    ])).toEqual([
+      {
+        rolname: "debateai_prod_api_authorization_system",
+        rolcanlogin: true,
+        rolinherit: true,
+        rolconfig: null,
+        directRoles: [granted("debateai_authorization_runtime"), granted("debateai_rls_all_accounts")]
+      },
+      {
+        rolname: "debateai_prod_api_system",
+        rolcanlogin: true,
+        rolinherit: true,
+        rolconfig: null,
+        directRoles: [granted("debateai_billing_runtime"), granted("debateai_rls_all_accounts")]
+      }
+    ]);
+  }, 120_000);
+
+  it("S2.2-b runner-runtime and scheduler-liveness hold debateai_rls_all_accounts with admin_option false, inherit_option true, set_option true", async () => {
+    await provisionProductionDatabasePrincipals({
+      adminPool,
+      adminDatabaseUrl,
+      manifest,
+      credentialEnvelope: credentialEnvelope(),
+      supportConfigCredentialFilePath
+    });
+    // Every member of the marker: the two system logins and the runner and liveness logins, and no T1 login.
+    const members = (await adminPool.query<{
+      member: string;
+      admin_option: boolean;
+      inherit_option: boolean;
+      set_option: boolean;
+    }>(`
+      SELECT member.rolname AS member,membership.admin_option,membership.inherit_option,membership.set_option
+      FROM pg_catalog.pg_auth_members AS membership
+      JOIN pg_catalog.pg_roles AS marker ON marker.oid=membership.roleid
+      JOIN pg_catalog.pg_roles AS member ON member.oid=membership.member
+      WHERE marker.rolname='debateai_rls_all_accounts'
+      ORDER BY member.rolname
+    `)).rows;
+    expect(members).toEqual([
+      "debateai_prod_api_authorization_system",
+      "debateai_prod_api_system",
+      "debateai_prod_runner_runtime",
+      "debateai_prod_scheduler_liveness"
+    ].map((member) => ({ member, admin_option: false, inherit_option: true, set_option: true })));
+  }, 120_000);
+
+  it("S2.2-c a second provisioning run reuses every login (R41)", async () => {
+    const envelope = credentialEnvelope();
+    await provisionProductionDatabasePrincipals({
+      adminPool,
+      adminDatabaseUrl,
+      manifest,
+      credentialEnvelope: envelope,
+      supportConfigCredentialFilePath
+    });
+    const roleOids = async () => new Map((await adminPool.query<{ rolname: string; oid: string }>(
+      "SELECT rolname,oid::text AS oid FROM pg_catalog.pg_roles WHERE rolname LIKE 'debateai\\_prod\\_%' ORDER BY rolname"
+    )).rows.map(({ rolname, oid }) => [rolname, oid]));
+    const before = await roleOids();
+    const second = await provisionProductionDatabasePrincipals({
+      adminPool,
+      adminDatabaseUrl,
+      manifest,
+      credentialEnvelope: envelope,
+      supportConfigCredentialFilePath
+    });
+    expect(second).toMatchObject({ principalCount: 21, createdCount: 0 });
+    expect(await roleOids()).toEqual(before);
+    expect(before.has("debateai_prod_api_system")).toBe(true);
+    expect(before.has("debateai_prod_api_authorization_system")).toBe(true);
   }, 120_000);
 
   it("provisions the unwired principals present but expired, and nothing else (V-20)", async () => {
@@ -667,7 +780,7 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
       manifest,
       credentialEnvelope: envelope,
       supportConfigCredentialFilePath
-    })).resolves.toMatchObject({ principalCount: 19, createdCount: 0 });
+    })).resolves.toMatchObject({ principalCount: 21, createdCount: 0 });
 
     const repaired = (await adminPool.query<{
       rolinherit: boolean;
@@ -756,7 +869,7 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
         manifest,
         credentialEnvelope: envelope,
         supportConfigCredentialFilePath
-      })).resolves.toMatchObject({ principalCount: 19, createdCount: 0 });
+      })).resolves.toMatchObject({ principalCount: 21, createdCount: 0 });
 
       const direct = (await adminPool.query<{
         databaseAclCount: number;
@@ -3288,13 +3401,14 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
       expect(output).not.toContain(new URL(databaseUrl).password);
       expect(output).not.toContain(decodeURIComponent(new URL(databaseUrl).password));
     }
-    expect(outcome.stdout).toBe("PRODUCTION_DATABASE_PRINCIPALS_READY=19\n");
+    expect(outcome.stdout).toBe("PRODUCTION_DATABASE_PRINCIPALS_READY=21\n");
   }, 120_000);
 
   // Go-live row 41 (Part 2's final review P2-I5, part 3): the billing tables are written by the API
   // alone. runner-runtime and scheduler-liveness hold debateai_runtime, and api-authorization inherits
   // it, so none of the billing writes may sit on that role; they sit on debateai_billing_runtime (0093),
-  // which only api-runtime holds. The runner keeps the two billing reads it makes (A20, R-12).
+  // which only the API process holds (api-runtime and, since row-level security S01, api-system: D48). The runner
+  // keeps the two billing reads it makes (A20, R-12).
   it("lets only the API runtime principal write billing rows (go-live row 41)", async () => {
     const envelope = credentialEnvelope();
     await provisionProductionDatabasePrincipals({
@@ -3330,7 +3444,15 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
     const entitlement = "INSERT INTO billing.entitlement_event (owner_ref) SELECT owner_ref FROM billing.entitlement_event WHERE false";
     const purge = "SELECT billing.purge_expired_records(clock_timestamp())";
 
-    expect(await outcome("api-runtime", enqueue)).toBe("ok");
+    // Row-level security S01 (Ruling R-12 F-C2-1; D48, V-9's default): the billing runtime runs on api-system, the API
+    // process's login outside a request, so the write controls run there. api-runtime keeps the billing role, but a row
+    // of no account is refused to it (it serves signed-in requests, T1): its enqueue with no account context is 42501.
+    // The other four write no row (WHERE false) or run a definer function, so they still reach their privilege check.
+    for (const statement of [enqueue, claim, chargeEvent, entitlement, purge]) {
+      expect(`api-system: ${statement.slice(0, 40)}: ${await outcome("api-system", statement)}`)
+        .toBe(`api-system: ${statement.slice(0, 40)}: ok`);
+    }
+    expect(await outcome("api-runtime", enqueue)).toBe("42501");
     expect(await outcome("api-runtime", claim)).toBe("ok");
     expect(await outcome("api-runtime", chargeEvent)).toBe("ok");
     expect(await outcome("api-runtime", entitlement)).toBe("ok");
@@ -3362,7 +3484,7 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
     `,[manifest.principals
       .filter(({ id }) => manifest.provisioner.managedPrincipalIds.includes(id))
       .map(({ roleName }) => roleName)])).rows;
-    expect(new Set(writers.map(({ principal }) => principal))).toEqual(new Set(["debateai_prod_api_runtime"]));
+    expect(new Set(writers.map(({ principal }) => principal))).toEqual(new Set(["debateai_prod_api_runtime", "debateai_prod_api_system"]));
     expect(writers.map(({ relation }) => relation)).toContain("outbox");
     expect(writers.map(({ relation }) => relation)).toContain("charge_event");
   }, 120_000);
@@ -3371,7 +3493,8 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
   // consent and the country-gate audit are the API's alone. 0080 granted them to debateai_runtime, which
   // runner-runtime and scheduler-liveness hold and api-authorization inherits (0039), so a compromised runner could
   // forge a CHECKOUT acceptance or create a pending account with consent. Since 0094 they sit on
-  // debateai_billing_runtime (0093), which only api-runtime holds; the API's own code paths still run as api-runtime.
+  // debateai_billing_runtime (0093), which only the API process holds (api-runtime and, since row-level security S01,
+  // api-system: D48); the API's own code paths outside a request run as api-system.
   it("lets only the API runtime principal write the acceptance record, sign up with consent or audit the country gate", async () => {
     const envelope = credentialEnvelope();
     await provisionProductionDatabasePrincipals({
@@ -3428,13 +3551,21 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
     const regionWriter = "SELECT identity.record_registration_region(NULL::uuid,'RO',NULL::text)";
     const countryGate = "SELECT identity.audit_country_gate_refused('{}'::jsonb,'')";
 
-    // The control: the forged row's shape is valid, so api-runtime may write it (and rolls it back).
-    expect(await outcome("api-runtime", forgeCheckout)).toBe("ok");
+    // The control (Ruling R-12 F-C2-1; D48, V-10's default): checkout writes the acceptance record on api-system, the API
+    // process's login outside a request. The forged row's shape is valid, so api-system may write it (and rolls it back).
+    expect(await outcome("api-system", forgeCheckout)).toBe("ok");
+    expect(await outcome("api-system", readAcceptances)).toBe("ok");
+    // Both API logins reach the three functions' bodies, which refuse these empty arguments for their own reasons.
+    for (const principalId of ["api-system", "api-runtime"]) {
+      for (const statement of [signUpWithConsent, regionWriter, countryGate]) {
+        expect(`${principalId}: ${statement.slice(0, 60)}: ${await outcome(principalId, statement)}`)
+          .toBe(`${principalId}: ${statement.slice(0, 60)}: 22023`);
+      }
+    }
+    // api-runtime serves signed-in requests (T1): an acceptance row of no account context is refused to it, 42501; a
+    // re-acceptance inside a request carries the account's context (C4's request scope, SPEC-v4 R23).
+    expect(await outcome("api-runtime", forgeCheckout)).toBe("42501");
     expect(await outcome("api-runtime", readAcceptances)).toBe("ok");
-    // api-runtime reaches both functions' bodies, which refuse these empty arguments for their own reasons.
-    expect(await outcome("api-runtime", signUpWithConsent)).toBe("22023");
-    expect(await outcome("api-runtime", regionWriter)).toBe("22023");
-    expect(await outcome("api-runtime", countryGate)).toBe("22023");
     for (const principalId of ["runner-runtime", "scheduler-liveness", "api-authorization"]) {
       for (const statement of [forgeCheckout, readAcceptances, purge, signUpWithConsent, regionWriter, countryGate]) {
         expect(`${principalId}: ${statement.slice(0, 60)}: ${await outcome(principalId, statement)}`)
@@ -3470,7 +3601,9 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
     `,[manifest.principals
       .filter(({ id }) => manifest.provisioner.managedPrincipalIds.includes(id))
       .map(({ roleName }) => roleName)])).rows;
-    expect(holders).toEqual([
+    // Row-level security S01 (DECISIONS D48, V-10's default): the API process's second login, api-system, holds the
+    // same billing role, so it is listed with the same rows; no other principal is.
+    const apiHeld = [
       "EXECUTE identity.audit_country_gate_refused(jsonb,text)",
       "EXECUTE identity.create_pending_account_with_consent(uuid,bytea,jsonb,jsonb,text,text,timestamptz,timestamptz,text,timestamptz,jsonb,smallint,text,text,jsonb)",
       "EXECUTE identity.record_registration_region(uuid,text,text)",
@@ -3478,11 +3611,15 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
       "INSERT legal.acceptance",
       "SELECT legal.acceptance",
       "USAGE legal"
-    ].map((what) => ({ principal: "debateai_prod_api_runtime", what })));
+    ];
+    expect(holders).toEqual([
+      ...apiHeld.map((what) => ({ principal: "debateai_prod_api_runtime", what })),
+      ...apiHeld.map((what) => ({ principal: "debateai_prod_api_system", what }))
+    ]);
 
-    // The API's own code paths, logged in as api-runtime: sign-up with consent (the identity repository the API
-    // builds on DATABASE_URL), the country-gate audit, a re-acceptance, and the daily retention purge.
-    const apiPool = createPool(urls.get("api-runtime")!);
+    // The API's own code paths outside a signed-in request, logged in as api-system (Ruling R-12 F-C2-1; D29, D48): sign-up
+    // with consent, the country-gate audit, an acceptance written with no request, and the daily retention purge.
+    const apiPool = createPool(urls.get("api-system")!);
     const argon2 = new Argon2WorkerPool();
     try {
       await argon2.ready();

@@ -420,7 +420,7 @@ export async function openProductionSession(): Promise<SandboxSession> {
   const keys = loadTrustedKeys(readTrustedKeyFile(group.netopiaIpnKeysPath, productionTrustedKeyOwners()));
   const apiKey = readCustodyAuthorizationHeader(group.netopiaApiKeyPath);
   const recordsKey = loadSecretKey(environment.RECORDS_KEY_PATH);
-  const pool = await openBillingOperatorPool(environment.DATABASE_URL, { production: environment.NODE_ENV === "production", readOnly: false, max: 1 });
+  const pool = await openBillingOperatorPool(environment.API_SYSTEM_DATABASE_URL!, { production: environment.NODE_ENV === "production", readOnly: false, max: 1 });
   const repository = new BillingRepository(pool);
   const exchanges: CapturedExchange[] = [];
   const recordingFetch = captureFetch(fetch, (exchange) => exchanges.push(exchange));

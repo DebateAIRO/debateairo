@@ -65,7 +65,7 @@ describe("DEV-03 development database principal provisioning source contract", (
    * this count follow the declared list. The row was red on dev and listed
    * known-red until 2026-09-28, when the tests were brought back to the source.
    */
-  it("declares exactly the twelve fixed wrappers the development stack provisions", async () => {
+  it("declares exactly the fifteen fixed wrappers the development stack provisions", async () => {
     const source = await readFile("apps/runner/src/dev-database-principals.ts", "utf8");
     expect(source.match(/roleName: "debateai_dev_[a-z_]+"/g)).toEqual([
       'roleName: "debateai_dev_runtime"',
@@ -80,6 +80,10 @@ describe("DEV-03 development database principal provisioning source contract", (
       'roleName: "debateai_dev_support_config_operator"',
       'roleName: "debateai_dev_support"',
       'roleName: "debateai_dev_data_export"',
+      // Row-level security S01 (PLAN S2.3, DECISIONS D46): the API's two system logins and the runner's own login.
+      'roleName: "debateai_dev_api_system"',
+      'roleName: "debateai_dev_authorization_system"',
+      'roleName: "debateai_dev_runner"',
     ]);
   });
 });

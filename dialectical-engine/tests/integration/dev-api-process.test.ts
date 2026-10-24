@@ -46,6 +46,9 @@ function environment(
     CONTENT_ENCRYPTION_ENABLED: "true",
     CONTENT_PROVISION_DATABASE_URL: database("debateai_dev_content_provision", "one"),
     AUTHORIZATION_DATABASE_URL: database("debateai_dev_authorization", "auth"),
+    // Row-level security S01 (PLAN S2.4): the API's two system logins.
+    API_SYSTEM_DATABASE_URL: database("debateai_dev_api_system", "system"),
+    API_AUTHORIZATION_SYSTEM_DATABASE_URL: database("debateai_dev_authorization_system", "authorization-system"),
     PUBLICATION_ENABLED: "true",
     PUBLICATION_CLEANUP_DATABASE_URL: database("debateai_dev_publication_cleanup", "pub"),
     ERASURE_DATABASE_URL: database("debateai_dev_erasure", "two"),

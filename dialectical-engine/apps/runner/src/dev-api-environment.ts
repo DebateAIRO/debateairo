@@ -46,6 +46,10 @@ export const DEVELOPMENT_API_ENVIRONMENT_KEYS = Object.freeze([
   "CONTENT_ENCRYPTION_ENABLED",
   "CONTENT_PROVISION_DATABASE_URL",
   "AUTHORIZATION_DATABASE_URL",
+  // Row-level security S01 (DECISIONS D29): the API's system pool (every statement outside a request) and the
+  // authorization pool's system target. The runner's own RUNNER_DATABASE_URL is never part of the API's environment.
+  "API_SYSTEM_DATABASE_URL",
+  "API_AUTHORIZATION_SYSTEM_DATABASE_URL",
   "PUBLICATION_ENABLED",
   "CORPUS_KEK_PATH",
   "PUBLICATION_KEY_STORE_PATH",
@@ -427,6 +431,37 @@ function isExactProviderRuntimeRefreshWithLegacyProbeTimeout(
   return upgraded !== existing && isExactProviderRuntimeRefresh(upgraded, expected, profile);
 }
 
+/**
+ * Row-level security S01 (DECISIONS D74): an api.env assembled before the API's two system logins existed is this
+ * stack's own output minus the API_SYSTEM_DATABASE_URL and API_AUTHORIZATION_SYSTEM_DATABASE_URL rows (every dev stack
+ * has one). It is rewritten, not refused, only when every other row matches the expected file, provider targets aside
+ * (the shape of isExactLegacyEnvironmentWithoutSupportModelTarget); anything else stays drift.
+ */
+function isExactLegacyEnvironmentWithoutSystemDatabaseUrls(
+  existing: string,
+  expected: string,
+  profile: DevelopmentAuthStackProfile
+): boolean {
+  try {
+    const legacyKeys = DEVELOPMENT_API_ENVIRONMENT_KEYS.filter((key) =>
+      key !== "API_SYSTEM_DATABASE_URL" && key !== "API_AUTHORIZATION_SYSTEM_DATABASE_URL"
+    );
+    const existingValues = parseExactEnvironment(existing, legacyKeys);
+    const expectedValues = parseExactEnvironment(expected, DEVELOPMENT_API_ENVIRONMENT_KEYS);
+    for (const key of legacyKeys) {
+      if (key === "PROVIDER_DISCOVERY_TARGETS_JSON") continue;
+      if (existingValues.get(key) !== expectedValues.get(key)) return false;
+    }
+    parseDevelopmentProviderPanelTargets(
+      existingValues.get("PROVIDER_DISCOVERY_TARGETS_JSON")!,
+      profile
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function isExactLegacyEnvironmentWithoutSupportModelTarget(
   existing: string,
   expected: string,
@@ -470,6 +505,7 @@ function isExactEnvironmentWithoutDeclaredDeploymentMode(
     || isExactProviderRuntimeRefreshWithLegacyProbeTimeout(declared, expected, profile)
     || isExactPublishedRegisterRefresh(declared, expected, profile)
     || isExactLegacyEnvironmentWithoutSupportModelTarget(declared, expected, profile)
+    || isExactLegacyEnvironmentWithoutSystemDatabaseUrls(declared, expected, profile)
     || isExactEnvironmentWithoutRecordsKey(declared, expected, profile)
     || isExactEnvironmentWithoutReleaseKey(declared, expected, profile);
 }
@@ -497,7 +533,8 @@ function isExactEnvironmentWithoutRecordsKey(
     || isExactProviderRuntimeRefresh(upgraded, expected, profile)
     || isExactProviderRuntimeRefreshWithLegacyProbeTimeout(upgraded, expected, profile)
     || isExactPublishedRegisterRefresh(upgraded, expected, profile)
-    || isExactLegacyEnvironmentWithoutSupportModelTarget(upgraded, expected, profile);
+    || isExactLegacyEnvironmentWithoutSupportModelTarget(upgraded, expected, profile)
+    || isExactLegacyEnvironmentWithoutSystemDatabaseUrls(upgraded, expected, profile);
 }
 
 const RELEASE_KEY_ROW_PREFIX = "RELEASE_KEY=";
@@ -522,7 +559,8 @@ function isExactEnvironmentWithoutReleaseKey(
     || isExactProviderRuntimeRefresh(upgraded, expected, profile)
     || isExactProviderRuntimeRefreshWithLegacyProbeTimeout(upgraded, expected, profile)
     || isExactPublishedRegisterRefresh(upgraded, expected, profile)
-    || isExactLegacyEnvironmentWithoutSupportModelTarget(upgraded, expected, profile);
+    || isExactLegacyEnvironmentWithoutSupportModelTarget(upgraded, expected, profile)
+    || isExactLegacyEnvironmentWithoutSystemDatabaseUrls(upgraded, expected, profile);
 }
 
 export async function assembleDevelopmentApiEnvironment(
@@ -575,6 +613,8 @@ export async function assembleDevelopmentApiEnvironment(
     ["CONTENT_ENCRYPTION_ENABLED", "true"],
     ["CONTENT_PROVISION_DATABASE_URL", databases.get("CONTENT_PROVISION_DATABASE_URL")!],
     ["AUTHORIZATION_DATABASE_URL", databases.get("AUTHORIZATION_DATABASE_URL")!],
+    ["API_SYSTEM_DATABASE_URL", databases.get("API_SYSTEM_DATABASE_URL")!],
+    ["API_AUTHORIZATION_SYSTEM_DATABASE_URL", databases.get("API_AUTHORIZATION_SYSTEM_DATABASE_URL")!],
     ["PUBLICATION_ENABLED", "true"],
     ["CORPUS_KEK_PATH", join(custodyRoot, "secrets", "corpus-kek.bin")],
     ["PUBLICATION_KEY_STORE_PATH", join(custodyRoot, "publication-keys")],
@@ -622,11 +662,28 @@ export async function assembleDevelopmentApiEnvironment(
       || isExactProviderRuntimeRefreshWithLegacyProbeTimeout(existing, source, profile)
       || isExactPublishedRegisterRefresh(existing, source, profile)
       || isExactLegacyEnvironmentWithoutSupportModelTarget(existing, source, profile)
+      || isExactLegacyEnvironmentWithoutSystemDatabaseUrls(existing, source, profile)
       || isExactEnvironmentWithoutDeclaredDeploymentMode(existing, source, profile)
       || isExactEnvironmentWithoutRecordsKey(existing, source, profile)
       || isExactEnvironmentWithoutReleaseKey(existing, source, profile)
   );
   return Object.freeze({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused });
+}
+
+/**
+ * Row-level security S01 (PLAN S2.4, SPEC X1): the dev runner's own login, RUNNER_DATABASE_URL, read from the same
+ * private credential file and checked the same way as the API's (every row present, local host, the profile's port,
+ * each URL on its own principal with its own password). The runner no longer shares the API's DATABASE_URL.
+ */
+export async function readDevelopmentRunnerDatabaseUrl(
+  repositoryRoot: string,
+  profile: DevelopmentAuthStackProfile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE
+): Promise<string> {
+  const custodyRoot = resolveDevCustodyRoot(resolve(repositoryRoot));
+  await assertPrivateCustodyRoot(custodyRoot);
+  const databaseSource = await readPrivateFile(join(custodyRoot, "database-principals.env"));
+  if (databaseSource === undefined) throw new TypeError("DEV_API_ENVIRONMENT_CREDENTIAL_REQUIRED");
+  return readDatabaseCredentials(databaseSource, String(profile.postgresPort)).get("RUNNER_DATABASE_URL")!;
 }
 
 /**
