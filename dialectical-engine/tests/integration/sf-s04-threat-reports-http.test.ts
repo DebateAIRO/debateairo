@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { randomBytes, randomUUID } from "node:crypto";
-import { StaffCapabilitySchema, FundedActiveStaffCapabilitiesSchema, staffContractInventory } from "@debateai/contract";
+import { StaffCapabilitySchema, FundedActiveStaffCapabilitiesSchema, ThreatReportSchema, staffContractInventory } from "@debateai/contract";
 import { authorizationPolicyInventory, buildApi, type AskApplication } from "@debateai/api";
 import { StaffAccessService, staffTokenHash } from "../../apps/api/src/staff/access.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
@@ -8,8 +8,14 @@ import { TypedDomainError } from "@debateai/kernel";
 import { encrypt } from "@debateai/crypto";
 import { threatReportEmailReader } from "../../apps/api/src/staff/threat-reports.js";
 import { PostgresThreatReportRepository } from "../../packages/db/src/threat-reports.js";
+import { SUPPORT_PAGE_ROUTES } from "../../packages/support-kb/src/catalog.js";
 
 describe("S04 threat report staff contract", () => {
+  it("lists the threat reports page among shipped support page routes", () => {
+    // Property: a support catalog consumer can identify the shipped staff page as a route.
+    // Mutant: omit this page from SUPPORT_PAGE_ROUTES; changing its API path is a neighbour.
+    expect(SUPPORT_PAGE_ROUTES).toContain("/admin/threat-reports");
+  });
   it("passes a retained email only to the prepared-erasure keep writer", async () => {
     const accountId = randomUUID();
     const seen: { sql: string; values: unknown[] | undefined }[] = [];
@@ -104,7 +110,7 @@ function headers(mutation = false) {
     ...(mutation ? { "x-staff-csrf-token": csrf } : {}) };
 }
 
-function grantedServer(own = false, proofAvailable = true, proofTarget?: "CURRENT" | "OTHER", emailAvailable = true) {
+function grantedServer(own = false, proofAvailable = true, proofTarget?: "CURRENT" | "OTHER", emailAvailable = true, anonymous = false) {
   const reportRef = randomUUID();
   const boundTarget = proofTarget === "CURRENT" ? reportRef : proofTarget === "OTHER" ? randomUUID() : undefined;
   const oldest = { report_ref: reportRef, kept_at: new Date("2026-10-20T09:00:00.000Z"),
@@ -131,11 +137,11 @@ function grantedServer(own = false, proofAvailable = true, proofTarget?: "CURREN
     countUnread: async () => 1,
     peekAccount: async () => {
       if (own) throw new TypedDomainError("THREAT_REPORT_OWN", "THREAT_REPORT_OWN");
-      return { account_user_id: reportUserId, has_held_email: false };
+      return { account_user_id: anonymous ? null : reportUserId, has_held_email: false };
     },
     read: async () => {
       readCalls.push(reportRef);
-      return { ...oldest, question: "Should I harm my neighbour?", account_user_id: reportUserId, held_email: null };
+      return { ...oldest, question: "Should I harm my neighbour?", account_user_id: anonymous ? null : reportUserId, held_email: null };
     },
     decide: async (_context: unknown, _token: string, target: string, decision: "REPORTED" | "NOT_REPORTED") => {
       if (decided.has(target)) throw new TypedDomainError("THREAT_REPORT_ALREADY_DECIDED", "THREAT_REPORT_ALREADY_DECIDED");
@@ -208,6 +214,20 @@ describe("S04 threat report HTTP authorization", () => {
         status: 200, cache: "no-store", body: { report_ref: reportRef, question: "Should I harm my neighbour?",
           kept_at: "2026-10-20T09:00:00.000Z", account: { email: "asker@example.test", user_id: expect.any(String) },
           decision: "UNREAD", decided_at: null } });
+      expect(readCalls).toEqual([reportRef]);
+    } finally { await server.close(); }
+  });
+
+  it("opens a signed-out asker's kept threat and states that no account exists", async () => {
+    // Property: an anonymous report remains readable without inventing an email or account identity.
+    // Mutant: require an email before the audited read; a changed list order is a neighbour.
+    const { server, reportRef, readCalls } = grantedServer(false, true, undefined, false, true);
+    try {
+      const response = await server.inject({ method: "GET", url: `/v1/admin/threat-reports/${reportRef}`, headers: headers() });
+      expect(response.statusCode).toBe(200);
+      expect(response.headers["cache-control"]).toBe("no-store");
+      expect(response.json()).toMatchObject({ question: "Should I harm my neighbour?", account: null });
+      expect(ThreatReportSchema.safeParse(response.json()).success).toBe(true);
       expect(readCalls).toEqual([reportRef]);
     } finally { await server.close(); }
   });

@@ -565,11 +565,7 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
   }
 
   async function nativeAuditMigrateSource(): Promise<string> {
-    const source = await readFile(new URL("../../packages/db/src/index.ts", import.meta.url), "utf8");
-    // 0125 adds exactly this public adapter export; the frozen native migrate() body stays byte-identical.
-    const exportLine = 'export { PostgresThreatReportRepository, type ThreatReportDecision, type ThreatReportListRow, type ThreatReportReadRow, type ThreatReportAlertClaim } from "./threat-reports.js";\n';
-    expect(source.split(exportLine), "the 0125 repository export occurs exactly once").toHaveLength(2);
-    return source.replace(exportLine, "");
+    return readFile(new URL("../../packages/db/src/index.ts", import.meta.url), "utf8");
   }
 
   it("guards every CREATE TABLE and CREATE INDEX outside the two ledgered files", async () => {

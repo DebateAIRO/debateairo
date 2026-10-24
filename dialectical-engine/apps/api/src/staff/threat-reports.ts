@@ -101,12 +101,13 @@ export function registerThreatReportRoutes(
     const reportRef = reference(request);
     const account = await service!.repository.peekAccount(authentication.context, authentication.baseSession.tokenHash, reportRef);
     const liveEmail = account.account_user_id === null ? null : await service!.readRecipientEmail(account.account_user_id);
-    if (liveEmail === null && !account.has_held_email) throw new ThreatReportHttpError(503, "STAFF_UNAVAILABLE");
+    const anonymous = account.account_user_id === null && !account.has_held_email;
+    if (!anonymous && liveEmail === null && !account.has_held_email) throw new ThreatReportHttpError(503, "STAFF_UNAVAILABLE");
     const row = await service!.repository.read(authentication.context, authentication.baseSession.tokenHash, reportRef);
     const email = row.held_email ?? liveEmail;
-    if (email === null) throw new ThreatReportHttpError(503, "STAFF_UNAVAILABLE");
+    if (!anonymous && email === null) throw new ThreatReportHttpError(503, "STAFF_UNAVAILABLE");
     return projected(contract.ThreatReportSchema, { report_ref: row.report_ref, question: row.question,
-      kept_at: iso(row.kept_at), account: { email, user_id: row.account_user_id },
+      kept_at: iso(row.kept_at), account: anonymous ? null : { email, user_id: row.account_user_id },
       decision: row.decision, decided_at: iso(row.decided_at) });
   });
 

@@ -12,7 +12,7 @@ const options = { challenge_handle: handle, options: { challenge: handle, rpId: 
 const kept = "2026-10-20T08:00:00.000Z";
 const later = "2026-10-20T09:00:00.000Z";
 const decided = "2026-10-21T10:00:00.000Z";
-type Setup = { listStatus?: number; readStatus?: number; decisionStatus?: number; networkFailure?: boolean; direct?: boolean; romanian?: boolean };
+type Setup = { listStatus?: number; readStatus?: number; decisionStatus?: number; networkFailure?: boolean; direct?: boolean; romanian?: boolean; anonymous?: boolean };
 let root: Root;
 let host: HTMLDivElement;
 let calls: { path: string; body: Record<string, unknown> | null }[];
@@ -55,7 +55,7 @@ async function mount(setup: Setup = {}) {
       if (path.endsWith(`/threat-reports/${oldRef}`)) {
         if (setup.readStatus && setup.readStatus !== 200) return Response.json({ error: setup.readStatus === 404 ? "THREAT_REPORT_NOT_FOUND" : "FORBIDDEN" }, { status: setup.readStatus });
         if (current === "NOT_REPORTED") return Response.json({ error: "THREAT_REPORT_NOT_FOUND" }, { status: 404 });
-        return Response.json({ report_ref: oldRef, kept_at: kept, decision: current, decided_at: current === "REPORTED" ? decided : null, question: "Threat question about Ion", account: { email: "asker@example.test", user_id: newRef } });
+        return Response.json({ report_ref: oldRef, kept_at: kept, decision: current, decided_at: current === "REPORTED" ? decided : null, question: "Threat question about Ion", account: setup.anonymous ? null : { email: "asker@example.test", user_id: newRef } });
       }
       return Response.json({ error: "NOT_FOUND" }, { status: 404 });
     }) as typeof fetch
@@ -109,6 +109,18 @@ describe("S04 threat reports page", () => {
     expect(text()).toContain(newRef);
     expect(host.querySelector(".threatReportsDecideHint")?.compareDocumentPosition(host.querySelector(".threatReportsDecisions")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(text()).not.toContain("payment");
+  });
+  it("shows no account identifiers for a kept threat from a signed-out asker", async () => {
+    // Property: staff can read and decide an anonymous report without a fabricated identity.
+    // Mutant: require a non-null account in the item schema; a list-order change is a neighbour.
+    await mount({ anonymous: true }); await openOld();
+    expect(text()).toContain("Threat question about Ion");
+    expect(text()).not.toContain("asker@example.test");
+    expect(text()).not.toContain(newRef);
+    expect([...host.querySelectorAll(".threatReportsFacts dd")].map(item => item.textContent)).toEqual([
+      expect.any(String), "—", "—"
+    ]);
+    expect(host.querySelector(".threatReportsDecisions")).not.toBeNull();
   });
   it("confirms Reported with WebAuthn and shows the reported date and completion notice", async () => {
     await mount(); await openOld(); await press("Reported");

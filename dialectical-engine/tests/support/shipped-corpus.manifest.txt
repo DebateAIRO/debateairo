@@ -137,6 +137,8 @@ apps/api/src/publication-check/judge-transport.ts
 apps/api/src/publication-check/material.ts
 apps/api/src/publication-check/policy.ts
 apps/api/src/publication-check/verdict.ts
+apps/api/src/publication-review/owner.ts
+apps/api/src/publication-review/staff.ts
 apps/api/src/publications.ts
 apps/api/src/question-check/ask-gate.ts
 apps/api/src/question-check/check.ts
@@ -170,6 +172,9 @@ apps/api/src/staff/alerts.ts
 apps/api/src/staff/internal-allowances.ts
 apps/api/src/staff/routes.ts
 apps/api/src/staff/runtime.ts
+apps/api/src/staff/threat-report-alert.ts
+apps/api/src/staff/threat-report-closure.ts
+apps/api/src/staff/threat-reports.ts
 apps/api/src/staff/webauthn-codec.ts
 apps/api/src/staff/webauthn-verifier.ts
 apps/api/src/staff/webauthn.ts
@@ -402,6 +407,7 @@ apps/runner/src/support-switch-cli.ts
 apps/scheduler/src/cli.ts
 apps/scheduler/src/index.ts
 apps/ui/app/admin/invitation/page.tsx
+apps/ui/app/admin/reviews/page.tsx
 apps/ui/app/admin/team/page.tsx
 apps/ui/app/admin/threat-reports/page.tsx
 apps/ui/app/admin/workers/page.tsx
@@ -504,6 +510,8 @@ apps/ui/components/PublicAnswerDisclosure.tsx
 apps/ui/components/PublicDebateOverview.tsx
 apps/ui/components/PublicHonestyDrawer.tsx
 apps/ui/components/PublicationControl.tsx
+apps/ui/components/PublicationReviewPanel.tsx
+apps/ui/components/PublicationReviewsPanel.tsx
 apps/ui/components/QuestionLanguageChoice.tsx
 apps/ui/components/QuestionLanguageOffer.tsx
 apps/ui/components/QuestionRefusal.tsx
@@ -523,6 +531,7 @@ apps/ui/components/StoryPanel.tsx
 apps/ui/components/StoryShortBlocks.tsx
 apps/ui/components/SynthesisHoldRefresher.tsx
 apps/ui/components/SynthesisPanel.tsx
+apps/ui/components/TakeDownControl.tsx
 apps/ui/components/ThreatReportsLink.tsx
 apps/ui/components/ThreatReportsPanel.tsx
 apps/ui/components/Toast.tsx
@@ -900,6 +909,7 @@ packages/contract/src/map-view.ts
 packages/contract/src/mfa-recovery.ts
 packages/contract/src/password-reset.ts
 packages/contract/src/plan-tiers.ts
+packages/contract/src/publication-review.ts
 packages/contract/src/question-check.ts
 packages/contract/src/romania-address.ts
 packages/contract/src/social-auth.ts
@@ -944,6 +954,8 @@ packages/db/src/migration-forward0120.ts
 packages/db/src/migration-forward0121.ts
 packages/db/src/migration-forward0122.ts
 packages/db/src/migration-forward0123.ts
+packages/db/src/migration-forward0124.ts
+packages/db/src/migration-forward0125.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
 packages/db/src/migration-forward111.ts
@@ -970,6 +982,7 @@ packages/db/src/social-identity.ts
 packages/db/src/staff-access.ts
 packages/db/src/support.ts
 packages/db/src/synthesis-check-erasure.ts
+packages/db/src/threat-reports.ts
 packages/evaluator/src/blind-sample.ts
 packages/evaluator/src/consumer-postgres.ts
 packages/evaluator/src/consumer.ts
@@ -1136,6 +1149,7 @@ packages/serve/src/engine-verdict.ts
 packages/serve/src/index.ts
 packages/serve/src/judges-comparison.ts
 packages/serve/src/model-assignment.ts
+packages/serve/src/publication-review.ts
 packages/serve/src/synthesis-check.ts
 packages/serve/src/synthesis.ts
 packages/settlement/src/index.ts

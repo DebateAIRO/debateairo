@@ -536,7 +536,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
 export const SUPPORT_PAGE_ROUTES: readonly string[] = Object.freeze(
   // Knowing these stateful routes grants no model-selectable action or private account authority.
   [...new Set([...SUPPORT_CAPABILITIES.map(({ route }) => route),
-    "/admin/invitation", "/admin/team", "/social/complete", "/recover", "/settings/security", "/verify-recovery-email", "/reset-password", "/recover-authenticator", "/verify-backup-email", "/export"
+    "/admin/invitation", "/admin/team", "/admin/threat-reports", "/social/complete", "/recover", "/settings/security", "/verify-recovery-email", "/reset-password", "/recover-authenticator", "/verify-backup-email", "/export"
   ])].sort(),
 );
 

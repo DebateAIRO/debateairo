@@ -174,6 +174,23 @@ describe("0125 applied database", () => {
     expect((await database.pool.query("SELECT count(*)::int n FROM staff.threat_report_event WHERE report_ref=$1 AND action='READ'",[ref])).rows[0].n).toBe(1);
   });
 
+  it("keeps a signed-out ask without an account and lets a holder open it once", async () => {
+    // Property: the keep writer accepts the absent signed-in account and the audited holder read preserves that absence.
+    // Mutant: require an account in keep_threat_report; changing alert order is a neighbour.
+    const ref = await keep("Signed-out threat question", null);
+    const runtime = { query: async (sql: string, values?: unknown[]) => ({ rows: await asRole("debateai_runtime", sql, values) }) };
+    const repository = new db.PostgresThreatReportRepository(runtime as never);
+    await expect(repository.peekAccount(holder.context, holder.tokenHash, ref)).resolves.toEqual({
+      account_user_id: null, has_held_email: false
+    });
+    await expect(repository.read(holder.context, holder.tokenHash, ref)).resolves.toMatchObject({
+      question: "Signed-out threat question", account_user_id: null, held_email: null
+    });
+    expect((await database.pool.query(
+      "SELECT count(*)::int n FROM staff.threat_report_event WHERE report_ref=$1 AND action='READ'", [ref]
+    )).rows[0].n).toBe(1);
+  });
+
   it("checks account availability without reading the question or writing a READ event", async () => {
     // Property: the API can resolve the email before the audited question read.
     // Mutant: call the audited read during preflight; changing the decision action is a neighbour.

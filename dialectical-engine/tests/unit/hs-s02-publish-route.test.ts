@@ -684,6 +684,9 @@ describe("hate-speech S02 publish path", () => {
         "apps/api/src/index.ts",
         "apps/api/src/main.ts",
         "apps/api/src/publications.ts",
+        "apps/api/src/question-check/compose.ts",
+        "apps/api/src/question-check/transport.ts",
+        "apps/api/src/question-check/verdict.ts",
         "apps/api/src/synthesis-check/check.ts",
         "apps/api/src/synthesis-check/transport.ts"
       ]);
