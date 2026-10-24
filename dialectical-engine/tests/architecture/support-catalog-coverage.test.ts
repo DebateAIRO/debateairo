@@ -33,6 +33,7 @@ describe("Support catalog route coverage", () => {
     expect(SUPPORT_PAGE_ROUTES).toEqual([
       "/",
       "/admin/invitation",
+      "/admin/reviews",
       "/admin/team",
       "/admin/workers",
       "/ai-transparency",

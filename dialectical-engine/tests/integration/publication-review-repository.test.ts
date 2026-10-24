@@ -318,6 +318,19 @@ describe("publication review repository under debateai_runtime", () => {
       (SELECT count(*)::int FROM serve.publication_review_copy WHERE run_id=$1) copies`,[d.runId])).rows[0])
       .toEqual({requests:2,decisions:1,copies:1});
     await reviews.listPending({context:actor.context,tokenHash:actor.tokenHash,limit:100});
+    const revisedComposedTextId=randomUUID();
+    const revisedComposedText=await import("@debateai/db").then(db=>db.encryptAttestedContentForRun(
+      database.pool,d.runId,"serve.composed_text",revisedComposedTextId,{segments:["A revised synthesis"]}));
+    const synthesisSeed=await database.pool.connect();
+    try {await synthesisSeed.query("BEGIN");await synthesisSeed.query("SET LOCAL session_replication_role=replica");
+      await synthesisSeed.query(`INSERT INTO serve.composed_text
+        (composed_text_id,fact_bundle_id,segments,raw_artifact_ref,attempt,content_ciphertext,content_attestation)
+        SELECT $2,fact_bundle_id,'[]'::jsonb,$3,2,$4::jsonb,$5
+        FROM serve.answer WHERE answer_id=$1 AND answer_version=1`,
+        [d.answerId,revisedComposedTextId,randomUUID(),
+          JSON.stringify(revisedComposedText!.envelope),revisedComposedText!.attestation]);
+      await synthesisSeed.query("COMMIT");
+    } catch(error) {await synthesisSeed.query("ROLLBACK");throw error;} finally {synthesisSeed.release();}
     const sealed=await import("@debateai/db").then(db=>db.encryptAttestedContentForRun(
       database.pool,d.runId,"serve.answer",`${d.answerId}:2`,{answerForm:null}));
     await database.pool.query(`INSERT INTO serve.answer (
@@ -326,11 +339,11 @@ describe("publication review repository under debateai_runtime", () => {
       sealed_at_seq,confidence_band,band_ceiling,reversal_point,builds_on_previous,badges,
       verdict_unavailable,memory_disclosure,content_ciphertext,content_attestation
     ) SELECT answer_id,2,run_id,work_item_id,terminal,serve_state,verdict_state,
-      answer_form,condition_marks,fact_bundle_id,composed_text_id,conformance_record_id,
+      answer_form,condition_marks,fact_bundle_id,$4,conformance_record_id,
       ledger.allocate_sequence(),confidence_band,band_ceiling,reversal_point,
       builds_on_previous,badges,verdict_unavailable,memory_disclosure,$2::jsonb,$3
       FROM serve.answer WHERE answer_id=$1 AND answer_version=1`,
-      [d.answerId,JSON.stringify(sealed!.envelope),sealed!.attestation]);
+      [d.answerId,JSON.stringify(sealed!.envelope),sealed!.attestation,revisedComposedTextId]);
     expect(await attempt(d,{verdict:"FLAGGED",categories:["SUICIDE_OR_HARM_TO_OTHERS"]},2)).toBe("INSERTED");
     expect((await reviews.listPending({context:actor.context,tokenHash:actor.tokenHash,limit:100}))
       .some(item=>item.reviewRef===ref)).toBe(false);
