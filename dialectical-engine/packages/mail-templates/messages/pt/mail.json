@@ -59,6 +59,8 @@
   "mail.M10.subject": "As suas funcionalidades pagas estão suspensas",
   "mail.M10.paused": "O seu banco informou-nos de que um pagamento do seu plano {plan} está contestado. As funcionalidades pagas ficam suspensas enquanto a contestação estiver aberta. Os seus debates são mantidos.",
   "mail.M10.contact": "Se se tratar de um erro, escreva-nos para {merchantEmail}.",
+  "mail.M10_ENDED.subject": "O seu plano {plan} terminou",
+  "mail.M10_ENDED.ended": "O pagamento do seu plano {plan} foi-lhe devolvido pelo seu banco, após uma contestação. Por este motivo, o plano terminou e a sua conta está agora no plano Gratuito. Os seus debates são mantidos.",
   "mail.M11.subject": "Não conseguimos aceitar o seu cartão",
   "mail.M11.refunded": "Não podemos aceitar cartões emitidos no país desse cartão, pelo que os {refundAmount} cobrados ou retidos nele regressam integralmente ao seu cartão.",
   "mail.M11.planEnded": "Por este motivo, o seu plano {endedPlan} terminou e a sua conta está agora no plano Gratuito. Os seus debates são mantidos.",

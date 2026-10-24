@@ -13,6 +13,7 @@ import {
   type BillingPlans,
   type BillingPolicy,
   type CountryPolicy,
+  type CountryPolicyValue,
   type CountryRule
 } from "@debateai/register";
 import type { BillingRecipientReader } from "../../apps/api/src/billing/account-email.js";
@@ -101,6 +102,31 @@ export const testClosedRegionsPolicy: CountryPolicy = Object.freeze({
   regions: countryPolicyFromValue(COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value, "test:launch-regions").regions,
   sourceRef: "test:country-policy-closed-regions"
 });
+
+/**
+ * NETOPIA's check of the public main site (the owner's choice of 24 October 2026): billing on, and every country closed
+ * for payment. The deployment register row with every `pay` switch off (the default rule, each country and each US
+ * state), sign-up and the blocked countries as they were, and the countries that were open marked NOT_OFFERED: the
+ * value an owner's hosted file carries as its `countryPolicy` member.
+ */
+export function everyCountryClosedPolicyValue(): CountryPolicyValue {
+  const value = COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value;
+  const closed = <R extends Readonly<{ pay: boolean; reason: CountryRule["reason"] }>>(rule: R): R =>
+    ({ ...rule, pay: false, reason: rule.reason === "OFFERED" ? "NOT_OFFERED" : rule.reason });
+  const closedAll = <R extends Readonly<{ pay: boolean; reason: CountryRule["reason"] }>>(rules: Readonly<Record<string, R>>) =>
+    Object.fromEntries(Object.entries(rules).map(([code, rule]) => [code, closed(rule)]));
+  return {
+    ...value,
+    default_rule: closed(value.default_rule),
+    countries: closedAll(value.countries),
+    us_states: closedAll(value.us_states),
+    regions: { ...value.regions }
+  } as CountryPolicyValue;
+}
+
+/** `everyCountryClosedPolicyValue` through the register's own parser, as the API reads the sealed row. */
+export const testEveryCountryClosedPolicy: CountryPolicy =
+  countryPolicyFromValue(everyCountryClosedPolicyValue(), "test:every-country-closed");
 
 /** An AskApplication no billing test ever reaches. */
 export function unusedAskApplication(): AskApplication {

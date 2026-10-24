@@ -179,10 +179,13 @@ export async function startUpgrade(deps: SubscriptionRouteDeps, input: UpgradeIn
   if (before === null || before.status !== "ACTIVE" || !servedByNetopia(deps, before)) {
     refuse(409, "NOT_SUBSCRIBED");
   }
+  const stored = await storedTaxContext({ billing: deps.billing, recordsKey: deps.recordsKey }, before);
+  // The card actions' payment gate again, as the checkout's start decides the country again: a quote priced before the
+  // owner closed the country (a new country policy version) opens no payment page after it, nor reuses one.
+  await gateCardAction(deps, input.ownerRef, input.ip, stored);
   const open = await openUpgrade(deps, before, input.quoteRef, now);
   if (open.kind === "PENDING") throw new BillingRefusal(409, "UPGRADE_PENDING", open.chargeId);
   if (open.kind === "REUSE") return Object.freeze({ redirect_url: open.redirectUrl, charge_ref: open.chargeId });
-  const stored = await storedTaxContext({ billing: deps.billing, recordsKey: deps.recordsKey }, before);
   const email = await deps.accountEmail.read(input.userId);
   // Spec §2.5.3: NETOPIA's payer (names, phone, street, city) from the newest profile, the account's current email.
   const payer = payerFromProfile(stored.profile, email);
