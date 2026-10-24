@@ -34,6 +34,7 @@ import {
 import type { DevelopmentProviderPanel } from "../../apps/runner/src/dev-provider-panel.js";
 import { composePracticeRunner } from "../../tools/preview-practice/practice-runner-composition.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
+import { questionCheckPass } from "../support/questionCheckPass.js";
 
 const RUN_ID = "11111111-1111-4111-8111-111111111111";
 const WORK_ITEM_ID = "22222222-2222-4222-8222-222222222222";
@@ -344,6 +345,7 @@ describe("a refusal naming the ceiling's figures tells the caller its code only 
         await evaluateAskAdmission(refusing, sent);
         return { run_ref: RUN_ID, status: "QUEUED" as const };
       }),
+      questionCheck: questionCheckPass,
       sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN
     });
     try {

@@ -7,6 +7,7 @@ import {
   testSessionApplication,
   testSessionHeaders
 } from "../support/httpSession.js";
+import { questionCheckPass } from "../support/questionCheckPass.js";
 
 const RUN_ID = "11111111-1111-4111-8111-111111111111";
 const IDENTITY = testHttpIdentity("ask-question-bound");
@@ -23,7 +24,7 @@ function apiRecordingSubmissions() {
   } as unknown as AskApplication;
   return {
     submitted,
-    api: buildApi({ application, sessions: testSessionApplication([IDENTITY]), allowedOrigin: TEST_APP_ORIGIN })
+    api: buildApi({ application, questionCheck: questionCheckPass, sessions: testSessionApplication([IDENTITY]), allowedOrigin: TEST_APP_ORIGIN })
   };
 }
 
