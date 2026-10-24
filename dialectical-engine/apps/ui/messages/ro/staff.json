@@ -165,7 +165,9 @@
   "staff.event.THREAT_REPORT_REPORTED": "Raport despre amenințare marcat ca raportat",
   "staff.event.THREAT_REPORT_NOT_REPORTED": "Raport despre amenințare marcat ca neraportat",
   "staff.threatReports.link": "Rapoarte despre amenințări",
-  "staff.threatReports.unread": "{count} necitite",
+  "staff.threatReports.unread.one": "{count} necitit",
+  "staff.threatReports.unread.few": "{count} necitite",
+  "staff.threatReports.unread.other": "{count} de necitite",
   "staff.threatReports.title": "Rapoarte despre amenințări",
   "staff.threatReports.lede": "Întrebări pe care verificarea automată le-a refuzat și le-a păstrat pentru că pot amenința pe cineva. Citește fiecare raport și înregistrează dacă l-ai raportat autorităților.",
   "staff.threatReports.listTitle": "Întrebări păstrate, de la cea mai veche",
@@ -185,5 +187,6 @@
   "staff.threatReports.noAccess": "Nu ai acces la rapoartele despre amenințări.",
   "staff.threatReports.gone": "Acest raport nu mai există: a fost șters sau un alt membru al echipei l-a marcat ca neraportat.",
   "staff.threatReports.alreadyDecided": "Un alt membru al echipei a înregistrat deja o decizie pentru acest raport. Aceasta este starea lui actuală.",
-  "staff.threatReports.loadFailed": "Rapoartele despre amenințări nu au putut fi încărcate. Revino și încearcă din nou."
+  "staff.threatReports.loadFailed": "Rapoartele despre amenințări nu au putut fi încărcate. Revino și încearcă din nou.",
+  "staff.threatReports.verifyFirst": "Verifică mai întâi accesul la echipă pentru a citi rapoartele despre amenințări."
 }

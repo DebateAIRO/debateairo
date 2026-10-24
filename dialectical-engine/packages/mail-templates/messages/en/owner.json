@@ -46,7 +46,7 @@
   "owner.O4.received": "Received at: {receivedAt} (UTC)",
   "owner.O4.next": "Check the NETOPIA key with the check command, run as root on the server as the runbook shows. If the key is wrong or out of date, put the right one in place with deploy/vps/billing-setup.sh --replace netopia and restart the API: every kept message is checked again at the start, saved cards included.",
   "owner.O4.listed": "At most one such email is sent an hour; the owner summary (the quarterly email, or the tax summary command) counts every kept message by day.",
-  "owner.threatReport.subject": "A threat report waits",
-  "owner.threatReport.waiting": "A threat report is waiting for a member of the team.",
+  "owner.threatReport.subject": "A threat report is waiting",
+  "owner.threatReport.waiting": "A question our automatic check refused has been kept as a threat report and is waiting to be read.",
   "owner.threatReport.open": "Open the staff console and go to Threat reports to read it."
 }

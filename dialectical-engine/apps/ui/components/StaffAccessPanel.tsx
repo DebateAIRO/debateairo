@@ -81,7 +81,7 @@ export function StaffAccessPanel({ client, catalog = staffEnglish, locale = "en"
     const [ownerRecord, setOwnerRecord] = useState<OwnerPossessionRecord>({ receipts: [], status: null });
     const [activeMutation, setActiveMutation] = useState<{ kind: MutationKind; staffId?: string } | null>(null);
     const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true);
-    function clearAuthority() { generation.current++; activeApi.current.cancel(); baseApi.cancel(); setSelf(null); setTeam(null); setAudit(null); setActiveMutation(null); }
+    function clearAuthority() { generation.current++; activeApi.current.cancel(); baseApi.cancel(); setSelf(null); setTeam(null); setAudit(null); setActiveMutation(null); try { sessionStorage.removeItem("debateai:staff-authority"); } catch {} window.dispatchEvent(new CustomEvent("debateai:staff-authority-changed", { detail: { capabilities: [] } })); }
     useEffect(() => {
         let active = true;
         void baseApi.enrollment().then((value) => {
@@ -138,6 +138,10 @@ export function StaffAccessPanel({ client, catalog = staffEnglish, locale = "en"
                 throw new ContractHttpError("FORBIDDEN", 403, "STAFF_AUTHORITY_INVALID");
             setSelf(value);
             await readData(value, epoch);
+            if (generation.current === epoch) {
+                try { sessionStorage.setItem("debateai:staff-authority", JSON.stringify({ expires_at: value.expires_at, capabilities: value.capabilities })); } catch {}
+                window.dispatchEvent(new CustomEvent("debateai:staff-authority-changed", { detail: { capabilities: value.capabilities } }));
+            }
         }
         catch (failure) {
             if (generation.current === epoch) {

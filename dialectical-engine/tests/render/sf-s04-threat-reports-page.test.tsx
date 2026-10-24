@@ -2,6 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import staffRomanian from "../../apps/ui/messages/ro/staff.json";
 
 const oldRef = "11111111-1111-4111-8111-111111111111";
 const newRef = "22222222-2222-4222-8222-222222222222";
@@ -11,15 +12,15 @@ const options = { challenge_handle: handle, options: { challenge: handle, rpId: 
 const kept = "2026-10-20T08:00:00.000Z";
 const later = "2026-10-20T09:00:00.000Z";
 const decided = "2026-10-21T10:00:00.000Z";
-type Setup = { listStatus?: number; readStatus?: number; decisionStatus?: number; networkFailure?: boolean; direct?: boolean };
+type Setup = { listStatus?: number; readStatus?: number; decisionStatus?: number; networkFailure?: boolean; direct?: boolean; romanian?: boolean };
 let root: Root;
 let host: HTMLDivElement;
 let calls: { path: string; body: Record<string, unknown> | null }[];
 let current: "UNREAD" | "REPORTED" | "NOT_REPORTED";
 let key = 0;
 
-beforeEach(() => { vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); history.replaceState(null, "", "/admin/threat-reports"); host = document.createElement("div"); document.body.append(host); root = createRoot(host); calls = []; current = "UNREAD"; key = 0; });
-afterEach(async () => { await act(async () => root.unmount()); document.body.replaceChildren(); vi.unstubAllGlobals(); });
+beforeEach(() => { vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); sessionStorage.removeItem("debateai:staff-authority"); history.replaceState(null, "", "/admin/threat-reports"); host = document.createElement("div"); document.body.append(host); root = createRoot(host); calls = []; current = "UNREAD"; key = 0; });
+afterEach(async () => { await act(async () => root.unmount()); document.body.replaceChildren(); sessionStorage.removeItem("debateai:staff-authority"); vi.unstubAllGlobals(); });
 
 async function mount(setup: Setup = {}) {
   const componentPath = "../../apps/ui/components/ThreatReportsPanel.js";
@@ -60,7 +61,7 @@ async function mount(setup: Setup = {}) {
     }) as typeof fetch
   });
   const ThreatReportsPanel = component.ThreatReportsPanel;
-  await act(async () => root.render(<ThreatReportsPanel key={++key} client={client}/>));
+  await act(async () => root.render(<ThreatReportsPanel key={++key} client={client} {...(setup.romanian ? { catalog: staffRomanian, locale: "ro" } : {})}/>));
 }
 async function press(label: string) {
   const control = [...host.querySelectorAll<HTMLButtonElement | HTMLAnchorElement>("button, a")].find(item => item.textContent?.trim() === label);
@@ -71,6 +72,25 @@ async function openOld() { await press("Open"); }
 const text = () => host.textContent ?? "";
 
 describe("S04 threat reports page", () => {
+  it("asks for Team access verification before the first list request in a fresh tab", async () => {
+    // Property: a holder without a verified staff session sees the required action without a 401.
+    sessionStorage.removeItem("debateai:staff-authority");
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ error: "UNAUTHORIZED" }, { status: 401 }));
+    const { ThreatReportsPanel } = await import("../../apps/ui/components/ThreatReportsPanel.js");
+    await act(async () => root.render(<ThreatReportsPanel />));
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(text()).toContain("Verify Team access first");
+  });
+  it("shows the no-access state for verified staff without the report capability", async () => {
+    // Property: a verified non-holder still reaches the server's 403 outcome.
+    sessionStorage.setItem("debateai:staff-authority", JSON.stringify({ expires_at: "2099-01-01T00:00:00.000Z", capabilities: [] }));
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ error: "FORBIDDEN" }, { status: 403 }));
+    const { ThreatReportsPanel } = await import("../../apps/ui/components/ThreatReportsPanel.js");
+    await act(async () => root.render(<ThreatReportsPanel />));
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    expect(text()).toContain("You don't have access to threat reports.");
+    sessionStorage.removeItem("debateai:staff-authority");
+  });
   it("lists kept threats oldest first with time, state badges and Open", async () => {
     await mount();
     expect(text()).toContain("Kept questions, oldest first");
@@ -97,6 +117,8 @@ describe("S04 threat reports page", () => {
     expect(calls.find(call => call.path.endsWith("/decision"))?.body?.decision).toBe("REPORTED");
     expect(text()).toContain("The operation was recorded.");
     expect(host.querySelector('.staffBadge[data-state="active"]')?.textContent).toContain("Reported ·");
+    // Property: a reported badge gives the calendar date without a clock time.
+    expect(host.querySelector('.staffBadge[data-state="active"]')?.textContent).not.toMatch(/\d{1,2}:\d{2}/u);
   });
   it("erases Not reported from the list and an old address shows no report", async () => {
     await mount(); await openOld(); await press("Not reported");
@@ -116,12 +138,21 @@ describe("S04 threat reports page", () => {
     await mount({ readStatus: 404 }); await openOld();
     expect(text()).toContain("This report no longer exists");
     expect(text()).not.toContain("asker@example.test");
+    // Property: the gone state lets a holder return directly to the list.
+    expect(host.querySelector(".threatReportsBackList")?.textContent).toBe("Back to the list");
+    expect(host.querySelector(".threatReportsBackTop")).toBeNull();
   });
   it("reloads current state on decision 409 and offers no second decision", async () => {
     await mount({ decisionStatus: 409 }); await openOld(); await press("Reported");
     expect(text()).toContain("Another team member already recorded a decision");
     expect(host.querySelector('.staffBadge[data-state="active"]')?.textContent).toContain("Reported ·");
     expect(host.querySelector(".threatReportsDecisions")).toBeNull();
+    // Property: the conflict notice precedes the reloaded record in the error style.
+    const notice = host.querySelector(".setError");
+    const card = host.querySelector(".setCard");
+    expect(notice?.textContent).toContain("Another team member already recorded");
+    expect(notice && card && (notice.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy();
+    expect(host.querySelector(".threatReportsBackTop")).toBeNull();
   });
   it("shows load failed and no report for an unavailable list, item or network", async () => {
     await mount({ listStatus: 503 });
@@ -132,5 +163,21 @@ describe("S04 threat reports page", () => {
     await mount({ networkFailure: true });
     expect(text()).toContain("Threat reports could not be loaded.");
     expect(host.querySelector(".threatReportsRow")).toBeNull();
+  });
+  it("tells a holder without a staff session to verify Team access", async () => {
+    // Property: retry instructions for a missing staff cookie identify the prerequisite.
+    await mount({ listStatus: 401 });
+    expect(text()).toContain("Verify Team access first");
+    expect(text()).not.toContain("Threat reports could not be loaded");
+  });
+  it("gives the same verification prerequisite in Romanian", async () => {
+    // Property: the staff error remains actionable in both shipped staff languages.
+    await mount({ listStatus: 401, romanian: true });
+    expect(text()).toContain("Verifică mai întâi accesul la echipă");
+  });
+  it("omits the Team access back link while a report is open", async () => {
+    // Property: the record state has only the back-to-list control drawn by V.
+    await mount(); await openOld();
+    expect(host.querySelector(".threatReportsBackTop")).toBeNull();
   });
 });

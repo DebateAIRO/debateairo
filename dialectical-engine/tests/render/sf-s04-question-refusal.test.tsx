@@ -46,6 +46,14 @@ const REFUSING_KINDS = QUESTION_NOT_STARTED_KINDS;
 const KEPT_LABELS = ["HARM_TO_OTHERS", "WEAPONS_DRUGS_TERRORISM"] as const;
 
 describe("question refusal screens", () => {
+  it.each([...REFUSING_KINDS, "UNAVAILABLE"] as const)("places the opening words with the title for %s", async (kind) => {
+    // Property: the opening words remain in the modal head, like the help screen's ledes.
+    const { node } = await open(kind === "UNAVAILABLE" ? unavailable() : refusal(kind));
+    const head = node.querySelector(".policyHeadText");
+    expect(head?.querySelector('[data-part="not-started"].crisisSupportLede')).not.toBeNull();
+    expect(head?.querySelector(kind === "UNAVAILABLE" ? '[data-part="try-again"].crisisSupportLede' : '[data-part="automatic"].crisisSupportLede')).not.toBeNull();
+    expect(node.querySelector('.crisisSupportBody [data-part="not-started"]')).toBeNull();
+  });
   it.each(REFUSING_KINDS)("renders parts 1-6 and only one button for %s", async (kind) => {
     const { node, accepted } = await open(refusal(kind), { country: "RO" });
     expect(accepted).toBe(true);

@@ -75,14 +75,13 @@ function QuestionRefusalDialog({ catalog, locale, countryHint, screen, onBack, o
         <div className="policyHead"><div className="policyHeadText">
           <h2 id="question-refusal-title" className="policyTitle" tabIndex={-1}
             ref={(node) => { titleRef.current = node; }}>{title}</h2>
+          <p className="crisisSupportLede" data-part="not-started">{t(catalog, "home.questionRefusal.notStarted")}</p>
+          {unavailable ? <p className="crisisSupportLede" data-part="try-again">{t(catalog, "home.questionRefusal.unavailable")}</p>
+            : <p className="crisisSupportLede" data-part="automatic">{t(catalog, "home.questionRefusal.automatic")}</p>}
         </div></div>
         <div className="crisisSupportBody">
-          <p data-part="not-started">{t(catalog, "home.questionRefusal.notStarted")}</p>
-          {unavailable ? (
-            <p data-part="try-again">{t(catalog, "home.questionRefusal.unavailable")}</p>
-          ) : (
+          {!unavailable ? (
             <>
-              <p data-part="automatic">{t(catalog, "home.questionRefusal.automatic")}</p>
               <p className="questionRefusalRule" data-part="rule">{t(catalog, `home.questionRefusal.rule.${screen}`)}</p>
               <p className="questionRefusalComplain" data-part="complain">
                 {beforeAddress}<a className="crisisSupportAction" href={`mailto:${COMPLAINT_ADDRESS}`}>{COMPLAINT_ADDRESS}</a>{afterAddress}
@@ -92,7 +91,7 @@ function QuestionRefusalDialog({ catalog, locale, countryHint, screen, onBack, o
               ) : null}
               {screen === "HARM_TO_OTHERS" ? <HarmHelpLine catalog={catalog} locale={locale} country={country} /> : null}
             </>
-          )}
+          ) : null}
           {(unavailable || screen === "SENSITIVE_TOPIC") ? (
             <a className="crisisSupportElsewhere" data-part="help-numbers" href="#"
               onClick={(event) => { event.preventDefault(); onHelpNumbers(); }}>
