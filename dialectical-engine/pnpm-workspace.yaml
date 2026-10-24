@@ -68,8 +68,13 @@ overrides:
   'fast-uri@<3.1.8': '3.1.8'
   'fast-uri@>=4.0.0 <4.1.5': '4.1.5'
   'brace-expansion@>=2.0.0 <2.1.7': '2.1.7'
-  'undici@>=8.1.0 <8.10.2': '8.10.2'
+  'undici@>=8.0.0 <8.12.2': '8.12.2'
   'qs@<6.16.0': '6.16.0'
+  # 2026-10-25: three undici advisories of >=8.0.0 <8.12.2 (one high, two moderate; test tooling only:
+  # jsdom), floor published 2026-10-15: cooldown satisfied, no exclusion. zod < 4.6.6 (high) is a direct
+  # dependency (a package.json pin, not an override) and is held: 4.6 changes behaviour this repo relies on.
+  # fast-uri 3.1.9 / 4.2.3 (published 2026-10-19) are still inside the 7-day cooldown: BLOCKED until
+  # 2026-10-26 23:06Z, never excluded.
   # 2026-10-21: follow-redirects >=1.16.0 <1.16.1 (two header advisories, through the Hatchet SDK's axios) and
   # vite >=8.2.0 <=8.2.3 (three launch-editor advisories, test tooling only: vitest). Floors published
   # 2026-10-01 and 2026-10-06: cooldown satisfied, no exclusion.
