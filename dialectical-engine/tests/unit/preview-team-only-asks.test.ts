@@ -21,6 +21,7 @@ import {
   testSessionHeaders,
   type TestHttpIdentity
 } from "../support/httpSession.js";
+import { questionCheckPass } from "../support/questionCheckPass.js";
 
 const MODEL = "zai-org/GLM-5.3-Flash";
 const PREVIEW = parsePreviewProviderTestConfig(JSON.stringify({
@@ -98,7 +99,7 @@ function harness(input: Readonly<{
       previewProviderTestConfig: PREVIEW,
       ...(input.team === undefined ? {} : { previewTeamUserIds: input.team })
     }),
-    application: application(counters), sessions, admission, countryGate, allowedOrigin: TEST_APP_ORIGIN
+    application: application(counters), questionCheck: questionCheckPass, sessions, admission, countryGate, allowedOrigin: TEST_APP_ORIGIN
   });
   return { api, counters };
 }
@@ -255,7 +256,7 @@ describe("PostgresAskApplication.submit refuses outside the team too (defense in
         : async () => null
     }) as AskApplication;
     // No preview configuration on the API itself: the route's own gate is off.
-    const api = buildApi({ application: app, sessions: testSessionApplication([outsider]), allowedOrigin: TEST_APP_ORIGIN });
+    const api = buildApi({ application: app, questionCheck: questionCheckPass, sessions: testSessionApplication([outsider]), allowedOrigin: TEST_APP_ORIGIN });
     try {
       const response = await ask(api, outsider);
       expect(response.statusCode).toBe(403);

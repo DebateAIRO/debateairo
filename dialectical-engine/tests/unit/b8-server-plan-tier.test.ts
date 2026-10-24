@@ -19,6 +19,7 @@ import type { Pool, PoolClient, QueryResult } from "pg";
 import { decideCoarseFit, decideRoomSettings, normaliseAskForPlan, type AskBilling } from "../../apps/api/src/ask-billing.js";
 import type { AskRoomPort, AskRoomReader, RoomDecision, RoomQuestion } from "../../apps/api/src/ask-room.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
+import { questionCheckPass } from "../support/questionCheckPass.js";
 
 /**
  * PAID PLANS (spec 2026-09-29 §2.3.4, §2.6 item 7; R1 A5; ruling R-28). With
@@ -569,7 +570,7 @@ describe("the HTTP face of ASK_SIGN_IN_REQUIRED", () => {
     const application = fixtureApplication(async () => {
       throw new AskRefusal(new TypedDomainError("ASK_SIGN_IN_REQUIRED", "Sign in to ask a question"));
     });
-    const api = buildApi({ application, sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN });
+    const api = buildApi({ application, questionCheck: questionCheckPass, sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN });
     const response = await api.inject({ method: "POST", url: "/v1/asks", headers: testSessionHeaders(identity, true), payload: ask() });
     expect(response.statusCode).toBe(401);
     expect(response.json()).toEqual({ error: "ASK_SIGN_IN_REQUIRED", message: "Sign in to ask a question" });
@@ -626,7 +627,7 @@ describe("no phone is needed to ask",()=>{
 it("offers crisis support first for an owner without a phone, then accepts an ordinary question",async()=>{
  const identity=testHttpIdentity("task3-phone-crisis"),{billing}=billingFor("FREE"),{room,questions}=recordingRoom();
  let phoneReads=0;const {application,started}=arrange(billing,room,undefined,{hasPhone:async()=>{phoneReads++;return false;}});
- const api=buildApi({application,sessions:testSessionApplication([identity]),allowedOrigin:TEST_APP_ORIGIN});
+ const api=buildApi({application,questionCheck:questionCheckPass,sessions:testSessionApplication([identity]),allowedOrigin:TEST_APP_ORIGIN});
  try{const response=await api.inject({method:"POST",url:"/v1/asks",headers:testSessionHeaders(identity,true),payload:ask({question_line:"I want to kill myself"})});
  expect(response.statusCode).toBe(422);expect(response.json()).toMatchObject({error:"CRISIS_SUPPORT_OFFERED"});expect(phoneReads).toBe(0);expect(questions).toEqual([]);expect(started).toEqual([]);
  const ordinary=await api.inject({method:"POST",url:"/v1/asks",headers:testSessionHeaders(identity,true),payload:ask()});
