@@ -22,6 +22,8 @@ import { DebateMapViewSchema } from "./map-view.js"; export * from "./map-view.j
 export * from "./crisis.js";
 import { SynthesisCheckHoldSchema, SynthesisFlagSchema, RemovalNoticeTakeSchema } from "./synthesis-check.js";
 export * from "./synthesis-check.js";
+import { PublicationReviewSummarySchema } from "./publication-review.js";
+export * from "./publication-review.js";
 export * from "./romania-address.js";
 export * from "./billing-address.js";
 
@@ -1202,6 +1204,7 @@ export const AnswerSummarySchema = z.object({
   created_at_sequence: z.number().int().positive(),
   synthesis_flag: SynthesisFlagSchema.nullable().optional(),
   synthesis_check: SynthesisCheckHoldSchema.optional(),
+  publication_review: PublicationReviewSummarySchema.nullable().optional(),
   // DL3-F2: the library row states the model lineage that made it, exactly as
   // PublicDebateSummarySchema.models does for a published debate. The index
   // query already reads every answer projection it summarises, so this costs
@@ -1715,6 +1718,8 @@ export const contractInventory = Object.freeze({
     "GET /v1/runs/{id}/answer",
     "POST /v1/runs/{id}/publish",
     "POST /v1/runs/{id}/unpublish",
+    "POST /v1/runs/{id}/publication-review",
+    "GET /v1/runs/{id}/publication-review",
     "GET /v1/billing/usage",
     "GET /v1/billing/plans",
     "POST /v1/billing/quote",

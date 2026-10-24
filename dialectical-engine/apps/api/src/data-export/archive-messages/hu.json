@@ -26,5 +26,9 @@
   "archive.category.terrorism": "Lehetséges terrorizmus",
   "archive.category.hateSpeech": "bármilyen jellegű gyűlöletbeszéd",
   "archive.category.suicideOrHarm": "öngyilkosságra vagy mások bántására irányuló hajlamok",
-  "archive.category.weaponsOrDrugs": "fegyverek vagy drogok készítése"
+  "archive.category.weaponsOrDrugs": "fegyverek vagy drogok készítése",
+  "archive.publicationReview": "Közzétételi felülvizsgálat",
+  "archive.reviewAsked": "Kérve",
+  "archive.reviewApproved": "Jóváhagyva",
+  "archive.reviewRefused": "Elutasítva"
 }

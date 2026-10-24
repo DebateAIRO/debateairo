@@ -18,7 +18,7 @@ const required = (value: string | undefined, locale: string, key: string): strin
 
 describe("K-ARCHIVE copy", () => {
   it("KA-1 has every non-empty archive key in all 35 locales", () => {
-    expect(ARCHIVE_KEYS).toHaveLength(28);
+    expect(ARCHIVE_KEYS).toHaveLength(32);
     expect(DATA_EXPORT_LOCALES).toHaveLength(35);
     for (const locale of DATA_EXPORT_LOCALES) {
       const values = catalogue(locale);
@@ -50,7 +50,7 @@ describe("K-ARCHIVE copy", () => {
     }
   });
 
-  it("KA-4 has exactly the 28 archive keys per file", () => {
+  it("KA-4 has exactly the 32 archive keys per file", () => {
     for (const locale of DATA_EXPORT_LOCALES) {
       expect(Object.keys(catalogue(locale)).sort(), locale).toEqual([...ARCHIVE_KEYS].sort());
     }

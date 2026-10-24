@@ -130,5 +130,9 @@
   "home.removal.automatic": "Ovu je odluku donio automatizirani alat, bez sudjelovanja osobe.",
   "home.removal.ground": "Osnova: naši Uvjeti korištenja, odjeljak 9 (rasprave koje naša provjera briše).",
   "home.removal.complain": "Da biste uložili pritužbu, pišite na office@dezbatere.ro u roku od šest mjeseci. Pritužba ne može vratiti raspravu.",
-  "home.removal.close": "Zatvorite"
+  "home.removal.close": "Zatvorite",
+  "home.flag.underReview": "OZNAČENO · U PREGLEDU",
+  "home.flag.approved": "ODOBRENO",
+  "home.flag.refused": "NIJE ODOBRENO",
+  "home.takeDown.button": "Povucite"
 }

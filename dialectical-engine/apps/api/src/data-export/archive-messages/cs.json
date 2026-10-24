@@ -26,5 +26,9 @@
   "archive.category.terrorism": "Možný terorismus",
   "archive.category.hateSpeech": "nenávistné projevy jakéhokoli druhu",
   "archive.category.suicideOrHarm": "sklony k sebevraždě nebo k ubližování jiným lidem",
-  "archive.category.weaponsOrDrugs": "výroba zbraní nebo drog"
+  "archive.category.weaponsOrDrugs": "výroba zbraní nebo drog",
+  "archive.publicationReview": "Posouzení zveřejnění",
+  "archive.reviewAsked": "Požádáno",
+  "archive.reviewApproved": "Schváleno",
+  "archive.reviewRefused": "Zamítnuto"
 }

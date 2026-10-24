@@ -26,5 +26,9 @@
   "archive.category.terrorism": "Terroriżmu possibbli",
   "archive.category.hateSpeech": "diskors ta’ mibegħda ta’ kull tip",
   "archive.category.suicideOrHarm": "tendenzi lejn is-suwiċidju jew li jagħmlu ħsara lil persuni oħra",
-  "archive.category.weaponsOrDrugs": "fabbrikazzjoni ta’ armi jew drogi"
+  "archive.category.weaponsOrDrugs": "fabbrikazzjoni ta’ armi jew drogi",
+  "archive.publicationReview": "Rieżami tal-pubblikazzjoni",
+  "archive.reviewAsked": "Mitlub",
+  "archive.reviewApproved": "Approvat",
+  "archive.reviewRefused": "Rifjutat"
 }

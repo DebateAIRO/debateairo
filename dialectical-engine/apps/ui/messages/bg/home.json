@@ -129,5 +129,9 @@
   "home.removal.automatic": "Това решение е взето от автоматизиран инструмент, без участие на човек.",
   "home.removal.ground": "Основание: нашите Условия за ползване, раздел 9 (дебати, които нашата проверка изтрива).",
   "home.removal.complain": "За да подадете жалба, пишете на office@dezbatere.ro в срок от шест месеца. Жалбата не може да върне дебата.",
-  "home.removal.close": "Затваряне"
+  "home.removal.close": "Затваряне",
+  "home.flag.underReview": "МАРКИРАНО · В ПРОЦЕС НА ПРЕГЛЕД",
+  "home.flag.approved": "ОДОБРЕНО",
+  "home.flag.refused": "НЕОДОБРЕНО",
+  "home.takeDown.button": "Премахване"
 }

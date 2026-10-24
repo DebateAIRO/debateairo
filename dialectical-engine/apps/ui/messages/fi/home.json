@@ -129,5 +129,9 @@
   "home.removal.automatic": "Tämän päätöksen teki automaattinen työkalu, eikä siinä ollut mukana yhtään ihmistä.",
   "home.removal.ground": "Peruste: Käyttöehdot, kohta 9 (väittelyt, jotka tarkistuksemme poistaa).",
   "home.removal.complain": "Voit tehdä valituksen kirjoittamalla osoitteeseen office@dezbatere.ro kuuden kuukauden kuluessa. Valitus ei voi tuoda väittelyä takaisin.",
-  "home.removal.close": "Sulje"
+  "home.removal.close": "Sulje",
+  "home.flag.underReview": "MERKITTY · TARKASTETTAVANA",
+  "home.flag.approved": "HYVÄKSYTTY",
+  "home.flag.refused": "EI HYVÄKSYTTY",
+  "home.takeDown.button": "Poista näkyvistä"
 }

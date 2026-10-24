@@ -131,5 +131,9 @@
   "home.removal.automatic": "Šį sprendimą priėmė automatinė priemonė, nedalyvaujant jokiam žmogui.",
   "home.removal.ground": "Pagrindas: mūsų Paslaugų teikimo sąlygos, 9 skyrius (debatai, kuriuos ištrina mūsų patikra).",
   "home.removal.complain": "Norėdami pateikti skundą, per šešis mėnesius parašykite adresu office@dezbatere.ro. Skundas negali sugrąžinti debatų.",
-  "home.removal.close": "Uždaryti"
+  "home.removal.close": "Uždaryti",
+  "home.flag.underReview": "PAŽYMĖTA · PERŽIŪRIMA",
+  "home.flag.approved": "PRITARTA",
+  "home.flag.refused": "NEPRITARTA",
+  "home.takeDown.button": "Nuimti"
 }

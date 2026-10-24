@@ -128,5 +128,9 @@
   "home.removal.automatic": "Keputusan ini dibuat oleh alat otomatis, tanpa keterlibatan manusia.",
   "home.removal.ground": "Dasar: Ketentuan Layanan kami, bagian 9 (debat yang dihapus oleh pemeriksaan kami).",
   "home.removal.complain": "Untuk mengajukan pengaduan, kirim pesan ke office@dezbatere.ro dalam waktu enam bulan. Pengaduan tidak dapat memulihkan debat ini.",
-  "home.removal.close": "Tutup"
+  "home.removal.close": "Tutup",
+  "home.flag.underReview": "DITANDAI · DALAM PENINJAUAN",
+  "home.flag.approved": "DISETUJUI",
+  "home.flag.refused": "TIDAK DISETUJUI",
+  "home.takeDown.button": "Turunkan"
 }

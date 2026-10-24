@@ -26,5 +26,9 @@
   "archive.category.terrorism": "Terrorisme éventuel",
   "archive.category.hateSpeech": "discours de haine de toute nature",
   "archive.category.suicideOrHarm": "tendances au suicide ou à nuire à autrui",
-  "archive.category.weaponsOrDrugs": "fabrication d’armes ou de drogues"
+  "archive.category.weaponsOrDrugs": "fabrication d’armes ou de drogues",
+  "archive.publicationReview": "Examen de publication",
+  "archive.reviewAsked": "Demandé",
+  "archive.reviewApproved": "Approuvé",
+  "archive.reviewRefused": "Refusé"
 }

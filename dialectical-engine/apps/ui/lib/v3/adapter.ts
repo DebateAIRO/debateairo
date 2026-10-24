@@ -735,6 +735,8 @@ export function debateSummariesFromIndex(index: AnswerIndex): DebateSummary[] {
   const served = index.items.map((item) => ({
     // A held answer has no answer read yet; its page must use the owner-visible run id.
     id: item.synthesis_check === "CHECKING" ? item.run_ref : item.answer_id,
+    run_ref: item.run_ref,
+    publication_review: item.publication_review ?? null,
     topic: item.question_line,
     status: "complete",
     created_at: "",
@@ -751,6 +753,7 @@ export function debateSummariesFromIndex(index: AnswerIndex): DebateSummary[] {
     .filter((run) => !servedRunRefs.has(run.run_ref))
     .map((run) => ({
       id: run.run_ref,
+      publication_review: null,
       topic: run.question_line,
       status: run.state === "FAILED" ? "failed" : run.state === "WAITING" ? "waiting" : "generating",
       created_at: "",

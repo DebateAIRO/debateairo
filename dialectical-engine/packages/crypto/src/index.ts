@@ -2412,7 +2412,10 @@ export const CONTENT_CARRIERS = Object.freeze([
   "ledger.point_investigation",
   "ledger.verdict_vote",
   // Synthesis check (migration 0123): the verdict payload, encrypted under its run key.
-  "serve.synthesis_check_result"
+  "serve.synthesis_check_result",
+  // Publication review (migration 0124): decision reason and the transient reviewer copy.
+  "serve.publication_review_decision",
+  "serve.publication_review_copy"
 ] as const);
 
 export type ContentCarrier = typeof CONTENT_CARRIERS[number];

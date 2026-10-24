@@ -311,6 +311,7 @@
         "staff.owner_recovery_generation",
         "staff.owner_recovery_operation",
         "staff.funding_policy_selection",
+        "staff.publication_review_event",
         "billing.internal_grant",
         "billing.internal_grant_event",
         "billing.internal_provider_admission"
@@ -352,6 +353,10 @@
         "staff.read_enrollment",
         "staff.read_team_page",
         "staff.read_audit_page",
+        "staff.list_publication_reviews",
+        "staff.open_publication_review",
+        "staff.record_publication_review_copy",
+        "staff.decide_publication_review",
         "staff.read_invitation_proof",
         "staff.read_issued_invitation",
         "staff.read_mutation_target",
@@ -2232,6 +2237,41 @@
       "source": "migrations/0118_language_check_spend.sql",
       "grants": [
         "EXECUTE ON FUNCTION ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)"
+      ]
+    },
+    {
+      "roleName": "debateai_staff_security_owner",
+      "source": "migrations/0124_publication_review.sql",
+      "grants": [
+        "USAGE ON SCHEMA serve",
+        "SELECT ON serve.publication_review_request",
+        "SELECT, INSERT ON serve.publication_review_decision",
+        "SELECT, INSERT, DELETE ON serve.publication_review_copy",
+        "SELECT (run_id, asker_id) ON core.run",
+        "EXECUTE ON FUNCTION serve.publication_review_run_live(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0124_publication_review.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION staff.authorize_action(jsonb,text)",
+        "EXECUTE ON FUNCTION staff.begin_owned_webauthn(uuid,uuid,text,text,text,text,text,text,uuid,jsonb,jsonb,jsonb)",
+        "EXECUTE ON FUNCTION serve.ask_publication_review(text,uuid,uuid,uuid,uuid,uuid,integer)",
+        "EXECUTE ON FUNCTION serve.read_publication_review_state(uuid,uuid,uuid)",
+        "EXECUTE ON FUNCTION serve.publication_review_approved(uuid,uuid,integer)",
+        "EXECUTE ON FUNCTION staff.list_publication_reviews(jsonb,text,integer)",
+        "EXECUTE ON FUNCTION staff.open_publication_review(jsonb,text,uuid,text)",
+        "EXECUTE ON FUNCTION staff.record_publication_review_copy(jsonb,text,uuid,uuid,uuid,integer,jsonb,jsonb,bytea)",
+        "EXECUTE ON FUNCTION staff.decide_publication_review(jsonb,text,uuid,jsonb,uuid,text,jsonb,jsonb,bytea)",
+        "EXECUTE ON FUNCTION staff.read_audit_page(jsonb,text,integer,timestamptz,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_staff_recovery",
+      "source": "migrations/0124_publication_review.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION staff.commit_owner_command(uuid,uuid[],uuid,text,uuid,text,uuid,text,uuid,jsonb)"
       ]
     }
   ],

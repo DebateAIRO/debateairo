@@ -56,6 +56,16 @@ function renderDebate(entry: DebateEntry, catalog: ArchiveCatalog, locale: strin
     SUICIDE_OR_HARM_TO_OTHERS: "archive.category.suicideOrHarm", WEAPONS_OR_DRUGS: "archive.category.weaponsOrDrugs"
   } as const;
   const checkCategories = latestCheck?.categories.map((category) => catalog[checkCategoryKeys[category]]).join(", ") ?? "";
+  const publicationReviews = answer?.publication_reviews ?? [];
+  const reviewRows = publicationReviews.map((review) => {
+    const asked = `${escapeHtml(catalog["archive.reviewAsked"])} ${escapeHtml(formatArchiveTime(new Date(review.asked_at), locale))}`;
+    const decision = review.outcome === "APPROVE"
+      ? `${escapeHtml(catalog["archive.reviewApproved"])} ${escapeHtml(formatArchiveTime(new Date(review.decided_at!), locale))}`
+      : review.outcome === "REFUSE"
+        ? `${escapeHtml(catalog["archive.reviewRefused"])} ${escapeHtml(formatArchiveTime(new Date(review.decided_at!), locale))}${review.reason === null ? "" : ` · ${escapeHtml(review.reason)}`}`
+        : "";
+    return `<p class="check">${asked}${decision ? ` · ${decision}` : ""}</p>`;
+  }).join("");
   const answerData = object(latest?.answer);
   const claims = list(answerData.nodes).map((node) => words(object(node).claim)).filter(Boolean);
   const answerText = list(answerData.composed_text).map((segment) => words(object(segment).text)).filter(Boolean).join("\n\n");
@@ -67,6 +77,7 @@ function renderDebate(entry: DebateEntry, catalog: ArchiveCatalog, locale: strin
     ${story.length ? `<p class="label section-label">${escapeHtml(catalog["archive.story"])}</p>${story.map((text) => `<p class="story-text">${escapeHtml(text)}</p>`).join("")}` : ""}
     ${claims.length ? `<p class="label section-label">${escapeHtml(catalog["archive.arguments"])}</p><ul>${claims.map((claim) => `<li>${escapeHtml(claim)}</li>`).join("")}</ul>` : ""}
     ${latestCheck && checkVerdictKey ? `<p class="label section-label">${escapeHtml(catalog["archive.contentCheck"])}</p><p class="check"><strong${latestCheck.verdict === "FLAGGED" ? ' class="flagged"' : ""}>${escapeHtml(catalog[checkVerdictKey])}</strong> · ${checkCategories ? `${escapeHtml(checkCategories)} · ` : ""}${escapeHtml(formatArchiveTime(new Date(latestCheck.checked_at), locale))}</p>` : ""}
+    ${reviewRows ? `<p class="label section-label">${escapeHtml(catalog["archive.publicationReview"])}</p>${reviewRows}` : ""}
   </article>`;
 }
 

@@ -26,5 +26,9 @@
   "archive.category.terrorism": "Sceimhlitheoireacht fhéideartha",
   "archive.category.hateSpeech": "óráid fhuatha de gach cineál",
   "archive.category.suicideOrHarm": "claonta féinmharfacha nó claonta chun dochar a dhéanamh do dhaoine eile",
-  "archive.category.weaponsOrDrugs": "monarú arm nó drugaí"
+  "archive.category.weaponsOrDrugs": "monarú arm nó drugaí",
+  "archive.publicationReview": "Athbhreithniú foilsithe",
+  "archive.reviewAsked": "Iarrtha",
+  "archive.reviewApproved": "Formheasta",
+  "archive.reviewRefused": "Diúltaithe"
 }

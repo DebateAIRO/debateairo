@@ -129,5 +129,9 @@
   "home.removal.automatic": "यह निर्णय एक स्वचालित उपकरण ने लिया है, किसी व्यक्ति की भागीदारी के बिना।",
   "home.removal.ground": "आधार: हमारी सेवा की शर्तें, खंड 9 (हमारी जाँच जिन वाद-विवादों को हटाती है)।",
   "home.removal.complain": "शिकायत करने के लिए छह महीने के भीतर office@dezbatere.ro पर लिखें। शिकायत से वाद-विवाद वापस नहीं लाया जा सकता।",
-  "home.removal.close": "बंद करें"
+  "home.removal.close": "बंद करें",
+  "home.flag.underReview": "चिह्नित · समीक्षाधीन",
+  "home.flag.approved": "अनुमोदित",
+  "home.flag.refused": "अनुमोदित नहीं",
+  "home.takeDown.button": "हटाएँ"
 }

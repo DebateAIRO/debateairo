@@ -26,5 +26,9 @@
   "archive.category.terrorism": "Nguy cơ khủng bố",
   "archive.category.hateSpeech": "ngôn từ thù hận dưới mọi hình thức",
   "archive.category.suicideOrHarm": "xu hướng tự tử hoặc làm hại người khác",
-  "archive.category.weaponsOrDrugs": "chế tạo vũ khí hoặc ma túy"
+  "archive.category.weaponsOrDrugs": "chế tạo vũ khí hoặc ma túy",
+  "archive.publicationReview": "Việc xem xét xuất bản",
+  "archive.reviewAsked": "Đã yêu cầu",
+  "archive.reviewApproved": "Đã phê duyệt",
+  "archive.reviewRefused": "Đã từ chối"
 }

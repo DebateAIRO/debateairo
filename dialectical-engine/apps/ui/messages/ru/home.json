@@ -131,5 +131,9 @@
   "home.removal.automatic": "Это решение принято автоматическим инструментом, без участия человека.",
   "home.removal.ground": "Основание: наши Условия использования, раздел 9 (дебаты, которые удаляет наша проверка).",
   "home.removal.complain": "Чтобы подать жалобу, напишите на office@dezbatere.ro в течение шести месяцев. Жалоба не может восстановить дебаты.",
-  "home.removal.close": "Закрыть"
+  "home.removal.close": "Закрыть",
+  "home.flag.underReview": "ПОМЕЧЕНО · НА РАССМОТРЕНИИ",
+  "home.flag.approved": "ОДОБРЕНО",
+  "home.flag.refused": "НЕ ОДОБРЕНО",
+  "home.takeDown.button": "Убрать"
 }

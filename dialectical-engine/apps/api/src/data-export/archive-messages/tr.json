@@ -26,5 +26,9 @@
   "archive.category.terrorism": "Olası terörizm",
   "archive.category.hateSpeech": "her türlü nefret söylemi",
   "archive.category.suicideOrHarm": "intihara veya başkalarına zarar vermeye yönelik eğilimler",
-  "archive.category.weaponsOrDrugs": "silah veya uyuşturucu yapımı"
+  "archive.category.weaponsOrDrugs": "silah veya uyuşturucu yapımı",
+  "archive.publicationReview": "Yayın incelemesi",
+  "archive.reviewAsked": "Talep edildi",
+  "archive.reviewApproved": "Onaylandı",
+  "archive.reviewRefused": "Reddedildi"
 }

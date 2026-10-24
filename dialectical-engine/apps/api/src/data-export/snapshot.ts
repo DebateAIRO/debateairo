@@ -1,4 +1,4 @@
-import type { ExportSnapshot, DebateEntry, RoleRotation, Row, SupportCaseEntry, SupportSessionEntry, SynthesisCheckEntry } from "./types.js";
+import type { ExportSnapshot, DebateEntry, RoleRotation, Row, SupportCaseEntry, SupportSessionEntry, SynthesisCheckEntry, PublicationReviewEntry } from "./types.js";
 import type { RecordAad } from "../../../../packages/crypto/src/records.js";
 
 export type ExportClaim = Readonly<{
@@ -25,6 +25,7 @@ export interface OwnerViewPort {
   runKeyPresent(runId: string): Promise<boolean>;
   runRemovedByCheck(runId: string): Promise<boolean>;
   readSynthesisChecks(ownerRef: string, answerId: string): Promise<readonly SynthesisCheckEntry[]>;
+  readPublicationReviews(ownerRef: string, runId: string, answerId: string): Promise<readonly PublicationReviewEntry[]>;
   readRun(ownerRef: string, runId: string): Promise<unknown>;
   readRunAnswer(ownerRef: string, runId: string): Promise<unknown | null>;
   readAnswer(ownerRef: string, answerId: string, version: number): Promise<unknown>;
@@ -244,6 +245,7 @@ async function collectDebates(raw: RawExportRows, ownerView: OwnerViewPort, owne
           answer_version: check.answer_version, verdict: check.verdict,
           categories: [...check.categories], checked_at: check.checked_at,
         })),
+        publication_reviews: await ownerView.readPublicationReviews(ownerRef, reference, id),
         ledger_digest: await ownerView.readLedgerDigest(ownerRef, id),
         story: await ownerView.readStory(ownerRef, id),
         disclosure: await ownerView.readDisclosure(ownerRef, id),

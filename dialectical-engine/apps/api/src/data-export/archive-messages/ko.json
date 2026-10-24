@@ -26,5 +26,9 @@
   "archive.category.terrorism": "테러 가능성",
   "archive.category.hateSpeech": "모든 종류의 혐오 표현",
   "archive.category.suicideOrHarm": "자살 또는 타인을 해치는 성향",
-  "archive.category.weaponsOrDrugs": "무기 또는 마약 제조"
+  "archive.category.weaponsOrDrugs": "무기 또는 마약 제조",
+  "archive.publicationReview": "게시 검토",
+  "archive.reviewAsked": "요청됨",
+  "archive.reviewApproved": "승인됨",
+  "archive.reviewRefused": "거부됨"
 }

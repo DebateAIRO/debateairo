@@ -213,6 +213,8 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       "packages/map/src/repository.ts",
       "packages/memory/src/index.ts",
       "packages/serve/src/index.ts",
+      // The publication review (0124) seals the review copy and the decision reason.
+      "packages/serve/src/publication-review.ts",
       // The synthesis check (0123) seals and reads serve.synthesis_check_result inside withRunContentLease.
       "packages/serve/src/synthesis-check.ts",
       "packages/settlement/src/index.ts",

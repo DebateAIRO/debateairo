@@ -130,5 +130,9 @@
   "home.removal.automatic": "Esta decisión la tomó una herramienta automática, sin intervención de ninguna persona.",
   "home.removal.ground": "Fundamento: nuestros Términos de servicio, sección 9 (debates que elimina nuestra comprobación).",
   "home.removal.complain": "Para presentar una reclamación, escriba a office@dezbatere.ro en un plazo de seis meses. Una reclamación no puede restaurar el debate.",
-  "home.removal.close": "Cerrar"
+  "home.removal.close": "Cerrar",
+  "home.flag.underReview": "MARCADO · EN REVISIÓN",
+  "home.flag.approved": "APROBADO",
+  "home.flag.refused": "NO APROBADO",
+  "home.takeDown.button": "Retirar"
 }

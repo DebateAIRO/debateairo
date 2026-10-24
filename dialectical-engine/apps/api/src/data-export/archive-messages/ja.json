@@ -26,5 +26,9 @@
   "archive.category.terrorism": "テロの可能性",
   "archive.category.hateSpeech": "あらゆる種類のヘイトスピーチ",
   "archive.category.suicideOrHarm": "自殺や他者を傷つける傾向",
-  "archive.category.weaponsOrDrugs": "武器や薬物の製造"
+  "archive.category.weaponsOrDrugs": "武器や薬物の製造",
+  "archive.publicationReview": "公開審査",
+  "archive.reviewAsked": "申請",
+  "archive.reviewApproved": "承認",
+  "archive.reviewRefused": "却下"
 }

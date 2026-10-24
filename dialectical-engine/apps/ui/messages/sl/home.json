@@ -131,5 +131,9 @@
   "home.removal.automatic": "To odločitev je sprejelo samodejno orodje, brez sodelovanja osebe.",
   "home.removal.ground": "Podlaga: naši Pogoji uporabe, razdelek 9 (razprave, ki jih naše preverjanje izbriše).",
   "home.removal.complain": "Če želite vložiti pritožbo, v šestih mesecih pišite na office@dezbatere.ro. Pritožba ne more obnoviti razprave.",
-  "home.removal.close": "Zapri"
+  "home.removal.close": "Zapri",
+  "home.flag.underReview": "OZNAČENO · V PREGLEDU",
+  "home.flag.approved": "ODOBRENO",
+  "home.flag.refused": "NI ODOBRENO",
+  "home.takeDown.button": "Umakni"
 }

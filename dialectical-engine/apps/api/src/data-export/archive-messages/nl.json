@@ -26,5 +26,9 @@
   "archive.category.terrorism": "Mogelijk terrorisme",
   "archive.category.hateSpeech": "haatzaaiende uitlatingen van welke aard dan ook",
   "archive.category.suicideOrHarm": "neigingen tot zelfdoding of het schaden van andere mensen",
-  "archive.category.weaponsOrDrugs": "het maken van wapens of drugs"
+  "archive.category.weaponsOrDrugs": "het maken van wapens of drugs",
+  "archive.publicationReview": "Beoordeling voor publicatie",
+  "archive.reviewAsked": "Aangevraagd",
+  "archive.reviewApproved": "Goedgekeurd",
+  "archive.reviewRefused": "Geweigerd"
 }

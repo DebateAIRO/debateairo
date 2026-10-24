@@ -26,5 +26,9 @@
   "archive.category.terrorism": "Võimalik terrorism",
   "archive.category.hateSpeech": "vihakõne mis tahes kujul",
   "archive.category.suicideOrHarm": "kalduvused enesetapule või teiste inimeste kahjustamisele",
-  "archive.category.weaponsOrDrugs": "relvade või uimastite valmistamine"
+  "archive.category.weaponsOrDrugs": "relvade või uimastite valmistamine",
+  "archive.publicationReview": "Avaldamise läbivaatamine",
+  "archive.reviewAsked": "Taotletud",
+  "archive.reviewApproved": "Heaks kiidetud",
+  "archive.reviewRefused": "Keeldutud"
 }

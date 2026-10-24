@@ -132,5 +132,9 @@
   "home.removal.automatic": "Rinne uirlis uathoibríoch an cinneadh seo, gan aon duine páirteach ann.",
   "home.removal.ground": "Bunús: ár dTéarmaí Seirbhíse, alt 9 (díospóireachtaí a scriosann ár seiceáil).",
   "home.removal.complain": "Chun gearán a dhéanamh, scríobh chuig office@dezbatere.ro laistigh de shé mhí. Ní féidir leis an ngearán an díospóireacht a thabhairt ar ais.",
-  "home.removal.close": "Dún"
+  "home.removal.close": "Dún",
+  "home.flag.underReview": "MARCÁILTE · FAOI ATHBHREITHNIÚ",
+  "home.flag.approved": "FORMHEASTA",
+  "home.flag.refused": "GAN FORMHEAS",
+  "home.takeDown.button": "Bain anuas"
 }

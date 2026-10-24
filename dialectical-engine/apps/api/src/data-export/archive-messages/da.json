@@ -26,5 +26,9 @@
   "archive.category.terrorism": "Mulig terrorisme",
   "archive.category.hateSpeech": "hadtale af enhver art",
   "archive.category.suicideOrHarm": "tendenser til selvmord eller til at skade andre mennesker",
-  "archive.category.weaponsOrDrugs": "fremstilling af våben eller narkotika"
+  "archive.category.weaponsOrDrugs": "fremstilling af våben eller narkotika",
+  "archive.publicationReview": "Gennemgang før offentliggørelse",
+  "archive.reviewAsked": "Anmodet",
+  "archive.reviewApproved": "Godkendt",
+  "archive.reviewRefused": "Afvist"
 }

@@ -1,5 +1,6 @@
 export type DebateSummary = {
   id: string;
+  run_ref?: string;
   topic: string;
   status: string;
   created_at: string;
@@ -13,6 +14,11 @@ export type DebateSummary = {
   waits_for?: "OWN_DEBATES" | null;
   synthesis_flag?: { verdict: "FLAGGED" } | null;
   synthesis_check?: "CHECKING";
+  publication_review?: {
+    review_state: "NONE" | "UNDER_REVIEW" | "APPROVED" | "REFUSED";
+    asks_used: 0 | 1 | 2;
+    visibility: "PRIVATE" | "PUBLISHED";
+  } | null;
 };
 
 export type Generation = {

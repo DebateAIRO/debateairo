@@ -1,5 +1,7 @@
 import { ContractHttpError, type ContractErrorCode, type ContractWaitingRefusal } from "./http-error.js";
 import type { VerdictState } from "./verdict-state.js";
+import { PublicationReviewAskRequestSchema, PublicationReviewAskResponseSchema, PublicationReviewStateSchema,
+  type PublicationReviewState } from "./publication-review.js";
 import { SocialStepUpStatusResponseSchema,type SocialStepUpStatusResponse,type CompleteSocialStepUpRequest } from './index.js';
 import { SocialLoginStatusResponseSchema, type SocialLoginStatusResponse, AuthProvidersResponseSchema, BeginSocialLoginResponseSchema, SocialSignupStatusResponseSchema, CompleteSocialSignupResponseSchema, SocialLinksResponseSchema, type AuthProvidersResponse, type SocialSignupStatusResponse, type CompleteSocialSignupRequest, type CompleteSocialSignupResponse, type SocialLinksResponse } from './social-auth.js';
 import {ConsumerRecoveryProofResponseSchema,RecoveryEnrollmentOptionsResponseSchema,OnboardingRequirementsResponseSchema,
@@ -419,6 +421,8 @@ export interface ContractClient {
   readRunVisibility(runId: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
   publishRun(runId: string, stepUpGrant: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
   unpublishRun(runId: string, stepUpGrant: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
+  requestPublicationReview(runId: string, stepUpGrant: string): Promise<{ state: "UNDER_REVIEW" }>;
+  readPublicationReview(runId: string): Promise<PublicationReviewState>;
   scheduleAccountErasure(stepUpGrant:string,deletePublicDebates?:boolean):Promise<{
     status:"SCHEDULED"|"DUE"|"PROCESSING";execute_at:string;cancellation_ref:string;delete_public_debates:boolean;
   }>;
@@ -738,6 +742,17 @@ export function createContractClient(
           step_up_grant: stepUpGrant,
           copies_may_persist_acknowledged: true
         }) }
+    ),
+    requestPublicationReview: (runId: string, stepUpGrant: string) => request(
+      `/v1/runs/${encodeURIComponent(runId)}/publication-review`,
+      PublicationReviewAskResponseSchema,
+      { method: "POST", body: JSON.stringify(PublicationReviewAskRequestSchema.parse({
+        step_up_grant: stepUpGrant, team_read_acknowledged: true
+      })) }
+    ),
+    readPublicationReview: (runId: string) => request(
+      `/v1/runs/${encodeURIComponent(runId)}/publication-review`,
+      PublicationReviewStateSchema
     ),
     scheduleAccountErasure:(stepUpGrant:string,deletePublicDebates?:boolean)=>request(
       "/v1/account",AccountErasureStatusSchema,

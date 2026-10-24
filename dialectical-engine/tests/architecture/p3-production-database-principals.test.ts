@@ -236,8 +236,8 @@ describe("P3-01 production database-principal manifest", () => {
         ownsFunctions: []
       }
        ,{ roleName: "debateai_staff_security_owner", login: false, inherit: false, directMemberships: [], ownsSchemas: ["staff"],
-        ownsRelations: ['staff.independent_alert_readiness','staff.alert_operation_readiness','staff.alert_dispatch_state','staff.owner_lineage','staff.owner_recovery_generation','staff.owner_recovery_operation', 'staff.funding_policy_selection', 'billing.internal_grant', 'billing.internal_grant_event','billing.internal_provider_admission'],
-        ownsFunctions: ['staff.require_alert_readiness_jit','staff.publish_independent_alert_readiness','staff.revoke_independent_alert_readiness','staff.read_independent_alert_readiness','staff.authorize_alert_operation','staff.require_alert_operation','staff.guard_alert_audit_insert','staff.guard_alert_outbox_insert','staff.guard_alert_commit','staff.read_alert_user_mapping','staff.read_alert_key_mapping','staff.claim_alert_delivery','staff.settle_alert_delivery','staff.read_alert_delivery_status','staff.require_owner_recovery_jit','staff.owner_recovery_commit_guard','staff.owner_command_prepare_commit_guard','staff.prepare_owner_command','staff.install_owner_recovery_generation','staff.owner_command_json','staff.require_owner_predecessor','staff.prepare_owner_command_v2','staff.read_owner_command','staff.read_owner_receipts','staff.read_owner_alert_metadata','staff.authorize_owner_alert_operation','staff.owner_recovery_request','staff.read_committed_owner_operation','staff.commit_owner_command','staff.recheck_owner_commit','staff.erase_subject_mapping','staff.require_http_authority','staff.http_delivery_state','staff.read_enrollment','staff.read_team_page','staff.read_audit_page','staff.read_invitation_proof','staff.read_issued_invitation','staff.read_mutation_target','staff.read_target_invitation_channel','staff.read_owner_recovery_installation', 'billing.guard_internal_grant_projection', 'staff.erase_internal_grant_mapping', 'staff.read_internal_funding_policy', 'staff.effective_capabilities', 'staff.read_self_allowance_command', 'staff.internal_allowance_body', 'staff.assert_internal_allowance_binding', 'staff.configure_internal_allowance', 'staff.revoke_internal_allowance', 'billing.guard_internal_grant_commit', 'billing.internal_grant_json', 'billing.read_internal_allowance', 'billing.read_internal_allowance_for_run', 'billing.guard_internal_charge_scope', 'billing.record_internal_charge_scope', 'billing.read_run_funding_basis','billing.read_internal_grant_spent','billing.read_internal_grant_commitments','billing.reserve_internal_provider_call','billing.settle_internal_provider_call','billing.read_internal_run_state','ledger.record_language_check_spend'] },
+        ownsRelations: ['staff.independent_alert_readiness','staff.alert_operation_readiness','staff.alert_dispatch_state','staff.owner_lineage','staff.owner_recovery_generation','staff.owner_recovery_operation', 'staff.funding_policy_selection', 'staff.publication_review_event', 'billing.internal_grant', 'billing.internal_grant_event','billing.internal_provider_admission'],
+        ownsFunctions: ['staff.require_alert_readiness_jit','staff.publish_independent_alert_readiness','staff.revoke_independent_alert_readiness','staff.read_independent_alert_readiness','staff.authorize_alert_operation','staff.require_alert_operation','staff.guard_alert_audit_insert','staff.guard_alert_outbox_insert','staff.guard_alert_commit','staff.read_alert_user_mapping','staff.read_alert_key_mapping','staff.claim_alert_delivery','staff.settle_alert_delivery','staff.read_alert_delivery_status','staff.require_owner_recovery_jit','staff.owner_recovery_commit_guard','staff.owner_command_prepare_commit_guard','staff.prepare_owner_command','staff.install_owner_recovery_generation','staff.owner_command_json','staff.require_owner_predecessor','staff.prepare_owner_command_v2','staff.read_owner_command','staff.read_owner_receipts','staff.read_owner_alert_metadata','staff.authorize_owner_alert_operation','staff.owner_recovery_request','staff.read_committed_owner_operation','staff.commit_owner_command','staff.recheck_owner_commit','staff.erase_subject_mapping','staff.require_http_authority','staff.http_delivery_state','staff.read_enrollment','staff.read_team_page','staff.read_audit_page','staff.list_publication_reviews','staff.open_publication_review','staff.record_publication_review_copy','staff.decide_publication_review','staff.read_invitation_proof','staff.read_issued_invitation','staff.read_mutation_target','staff.read_target_invitation_channel','staff.read_owner_recovery_installation', 'billing.guard_internal_grant_projection', 'staff.erase_internal_grant_mapping', 'staff.read_internal_funding_policy', 'staff.effective_capabilities', 'staff.read_self_allowance_command', 'staff.internal_allowance_body', 'staff.assert_internal_allowance_binding', 'staff.configure_internal_allowance', 'staff.revoke_internal_allowance', 'billing.guard_internal_grant_commit', 'billing.internal_grant_json', 'billing.read_internal_allowance', 'billing.read_internal_allowance_for_run', 'billing.guard_internal_charge_scope', 'billing.record_internal_charge_scope', 'billing.read_run_funding_basis','billing.read_internal_grant_spent','billing.read_internal_grant_commitments','billing.reserve_internal_provider_call','billing.settle_internal_provider_call','billing.read_internal_run_state','ledger.record_language_check_spend'] },
       {"roleName":"debateai_password_recovery_owner","login":false,"inherit":false,"directMemberships":[],"ownsSchemas":[],"ownsRelations":["identity.password_recovery_control","identity.password_recovery_staged_code","identity.password_recovery_retry_lock","identity.password_recovery_source_window","identity.password_recovery_notice","identity.password_recovery_feed"],"ownsFunctions":["identity.password_recovery_rules","identity.password_recovery_eligible","identity.password_recovery_audit","identity.password_recovery_notice_event","identity.password_recovery_close","identity.password_recovery_current","identity.password_recovery_prepare","identity.password_recovery_start","identity.password_recovery_exchange","identity.password_recovery_read","identity.password_recovery_read_code","identity.password_recovery_accept_code","identity.password_recovery_stage_factor","identity.password_recovery_verify_factor","identity.password_recovery_stage_codes","identity.password_recovery_ack_code","identity.password_recovery_complete","identity.password_recovery_cancel","identity.expire_password_recovery","identity.password_recovery_started_scope","identity.password_recovery_admit","identity.password_recovery_failure","identity.password_recovery_cancel_session","identity.password_recovery_read_feed","identity.password_recovery_cancel_own","identity.password_recovery_claim_notice","identity.password_recovery_finish_notice"]}
     ]);
 
@@ -681,6 +681,41 @@ describe("P3-01 production database-principal manifest", () => {
   "grants": [
     "EXECUTE ON FUNCTION ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)"
   ]
+},
+{
+  "roleName": "debateai_staff_security_owner",
+  "source": "migrations/0124_publication_review.sql",
+  "grants": [
+    "USAGE ON SCHEMA serve",
+    "SELECT ON serve.publication_review_request",
+    "SELECT, INSERT ON serve.publication_review_decision",
+    "SELECT, INSERT, DELETE ON serve.publication_review_copy",
+    "SELECT (run_id, asker_id) ON core.run",
+    "EXECUTE ON FUNCTION serve.publication_review_run_live(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0124_publication_review.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION staff.authorize_action(jsonb,text)",
+    "EXECUTE ON FUNCTION staff.begin_owned_webauthn(uuid,uuid,text,text,text,text,text,text,uuid,jsonb,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION serve.ask_publication_review(text,uuid,uuid,uuid,uuid,uuid,integer)",
+    "EXECUTE ON FUNCTION serve.read_publication_review_state(uuid,uuid,uuid)",
+    "EXECUTE ON FUNCTION serve.publication_review_approved(uuid,uuid,integer)",
+    "EXECUTE ON FUNCTION staff.list_publication_reviews(jsonb,text,integer)",
+    "EXECUTE ON FUNCTION staff.open_publication_review(jsonb,text,uuid,text)",
+    "EXECUTE ON FUNCTION staff.record_publication_review_copy(jsonb,text,uuid,uuid,uuid,integer,jsonb,jsonb,bytea)",
+    "EXECUTE ON FUNCTION staff.decide_publication_review(jsonb,text,uuid,jsonb,uuid,text,jsonb,jsonb,bytea)",
+    "EXECUTE ON FUNCTION staff.read_audit_page(jsonb,text,integer,timestamptz,uuid)"
+  ]
+},
+{
+  "roleName": "debateai_staff_recovery",
+  "source": "migrations/0124_publication_review.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION staff.commit_owner_command(uuid,uuid[],uuid,text,uuid,text,uuid,text,uuid,jsonb)"
+  ]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))
@@ -949,4 +984,34 @@ it("discloses exactly the reviewed additive funding grants without other princip
     .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
   expect(actual).toEqual(declared);
   expect(declared.some(grant => /(?:INSERT|UPDATE|DELETE).*funding_policy_selection/u.test(grant))).toBe(false);
+});
+
+it("discloses every 0124 publication review grant, including the run ownership columns", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0124_publication_review.sql", "utf8");
+  const actual = [...sql.matchAll(/^GRANT [^\n]+ TO (?:debateai_runtime|debateai_staff_security_owner|debateai_staff_recovery);$/gm)]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0124_publication_review.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(declared).toEqual(actual);
+  expect(declared).toContain("GRANT SELECT (run_id, asker_id) ON core.run TO debateai_staff_security_owner;");
+});
+
+it("lists every new 0124 staff-owned review object in the production ownership manifest", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0124_publication_review.sql", "utf8");
+  const role = manifest.ownershipRoles.find(({ roleName }) => roleName === "debateai_staff_security_owner");
+  expect(role).toBeDefined();
+
+  const relations = [...sql.matchAll(/^ALTER TABLE (staff\.publication_review_\w+) OWNER TO debateai_staff_security_owner;$/gmu)]
+    .map((match) => match[1]!);
+  const functions = [...sql.matchAll(/^ALTER FUNCTION (staff\.\w*publication_review\w*)\([^\n]*\) OWNER TO debateai_staff_security_owner;$/gmu)]
+    .map((match) => match[1]!);
+  expect(relations).toEqual(["staff.publication_review_event"]);
+  expect(functions.sort()).toEqual([
+    "staff.decide_publication_review", "staff.list_publication_reviews",
+    "staff.open_publication_review", "staff.record_publication_review_copy"
+  ]);
+  for (const name of relations) expect(role!.ownsRelations).toContain(name);
+  for (const name of functions) expect(role!.ownsFunctions).toContain(name);
 });

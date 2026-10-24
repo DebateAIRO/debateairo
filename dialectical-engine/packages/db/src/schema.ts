@@ -806,6 +806,39 @@ export const synthesisCheckErasureBinding = identity.table("synthesis_check_eras
   consumedAt: timestamp("consumed_at", { withTimezone: true })
 });
 
+export const publicationReviewRequest = serve.table("publication_review_request", {
+  reviewRef: uuid("review_ref").primaryKey(),
+  runId: uuid("run_id").notNull().references(() => run.runId),
+  answerId: uuid("answer_id").notNull(),
+  synthesisOriginVersion: integer("synthesis_origin_version").notNull(),
+  askOrdinal: smallint("ask_ordinal").notNull(),
+  askedAt: timestamp("asked_at", { withTimezone: true }).notNull().defaultNow(),
+  reasonSalt: uuid("reason_salt").notNull().defaultRandom()
+});
+
+export const publicationReviewDecision = serve.table("publication_review_decision", {
+  reviewRef: uuid("review_ref").primaryKey().references(() => publicationReviewRequest.reviewRef),
+  runId: uuid("run_id").notNull(),
+  outcome: text("outcome").notNull(),
+  reviewerStaffId: uuid("reviewer_staff_id").notNull(),
+  decidedAt: timestamp("decided_at", { withTimezone: true }).notNull().defaultNow(),
+  content: jsonb("content").notNull(),
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation")
+});
+
+export const publicationReviewCopy = serve.table("publication_review_copy", {
+  copyRef: uuid("copy_ref").primaryKey(),
+  reviewRef: uuid("review_ref").notNull().references(() => publicationReviewRequest.reviewRef),
+  runId: uuid("run_id").notNull(),
+  answerId: uuid("answer_id").notNull(),
+  answerVersion: integer("answer_version").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  content: jsonb("content").notNull(),
+  contentCiphertext: jsonb("content_ciphertext"),
+  contentAttestation: bytea("content_attestation")
+});
+
 export const segmentSuppression = serve.table("segment_suppression", {
   answerId: uuid("answer_id").notNull(),
   answerVersion: integer("answer_version").notNull(),
@@ -1429,6 +1462,14 @@ export const staffSubject = staff.table("subject", {
   grantRevision: bigint("grant_revision", { mode: "number" }).notNull().default(0),
   capabilities: text("capabilities").array().notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+});
+
+export const publicationReviewEvent = staff.table("publication_review_event", {
+  eventId: uuid("event_id").primaryKey().defaultRandom(),
+  actorStaffId: uuid("actor_staff_id").notNull().references(() => staffSubject.staffId),
+  action: text("action").notNull(),
+  reviewRef: uuid("review_ref"),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow()
 });
 
 export const STAFF_ACCESS_SCHEMA_MANIFEST = Object.freeze({

@@ -161,10 +161,11 @@ import { SessionService } from "./sessions.js";
 import { StaffWebAuthnService } from "./staff/webauthn.js";
 import { StaffAccessService } from "./staff/access.js";
 import { createStaffRuntime } from "./staff/runtime.js";
-import { PostgresPublicationApplication } from "./publications.js";
+import { PostgresPublicationApplication, buildPublicDebateBody } from "./publications.js";
+import { createPublicationReviewStaffService } from "./publication-review/staff.js";
 import { createPublicationContentCheck } from "./publication-check/check.js";
-import { SynthesisCheckRepository, synthesisTextOf } from "@debateai/serve";
-import { ownerSession } from "./owner-read.js";
+import { PublicationReviewRefusal, PublicationReviewRepository, SynthesisCheckRepository, originVersionOf, synthesisTextOf, verdictOfRecord } from "@debateai/serve";
+import { ownerSession, readOwnerAnswer } from "./owner-read.js";
 import { SynthesisCheckWorker } from "./synthesis-check/worker.js";
 import type { SynthesisCheckDeps } from "./synthesis-check/check.js";
 import { createSynthesisPublishGate } from "./synthesis-check/publish-gate.js";
@@ -1357,6 +1358,7 @@ const synthesisCheckSwitch = createLocalOffFlagSwitch(supportModelTarget === und
     deadlineMs: publicationCheckPolicy.deadlineMs
   }), { offFlagPath: synthesisCheckOffFlag });
 const synthesisCheckRepository = new SynthesisCheckRepository(pool);
+const publicationReviewRepository = new PublicationReviewRepository(pool);
 const synthesisAnswerAccess = createSynthesisAnswerAccess({ repository: synthesisCheckRepository, deadlineMs: publicationCheckPolicy.deadlineMs });
 const synthesisCheckDeps: SynthesisCheckDeps = {
   port: synthesisCheckSwitch.current,
@@ -1379,6 +1381,7 @@ const readSynthesisAnswer = (runId: string, answerId: string, version: number, o
     version, { ownerRef, legacyAskerId: null });
 const synthesisPublishGate = createSynthesisPublishGate({
   repository: synthesisCheckRepository,
+  approvalCovers: input => publicationReviewRepository.approvalCovers(input),
   readAnswerVersions: async (runId, answerId, maxVersion, ownerRef) => {
     const texts = new Map<number, string | null>();
     for (let version = 1; version <= maxVersion; version++) {
@@ -1397,6 +1400,42 @@ const synthesisCheckWorker = new SynthesisCheckWorker({
   readAnswer: readSynthesisAnswer, check: synthesisCheckDeps,
   deadlineMs: publicationCheckPolicy.deadlineMs,
   log: (line) => console.error(`[${line}]`)
+});
+const publicationReviewStaff = createPublicationReviewStaffService({
+  repository: publicationReviewRepository,
+  readVerdictCategories: ({ runId, answerId, originVersion }) =>
+    application.withContentLease(runId, async () => [
+      ...(verdictOfRecord(await synthesisCheckRepository.readRecords({ runId, answerId, maxVersion: originVersion }),
+        (version) => version === originVersion)?.categories ?? [])
+    ]),
+  readReviewBody: (opened) => application.withContentLease(opened.runId, async () => {
+    const session = ownerSession(opened.ownerRef, "00000000-0000-0000-0000-000000000000");
+    const ownership = { ownerRef: opened.ownerRef, legacyAskerId: null };
+    const reviewDeps = { application, synthesisAnswerAccess };
+    const current = await application.readAnswer(opened.answerId, session, undefined, ownership);
+    if (current === null) throw new PublicationReviewRefusal("PUBLICATION_REVIEW_NOT_FOUND");
+    const bound = current.answer_version;
+    const origin = await readSynthesisAnswer(opened.runId, opened.answerId, opened.originVersion, opened.ownerRef);
+    if (origin === null) throw new PublicationReviewRefusal("PUBLICATION_REVIEW_NOT_FOUND");
+    const originText = synthesisTextOf(origin);
+    for (let version = bound; version >= opened.originVersion; version--) {
+      const candidate = await readOwnerAnswer(reviewDeps, opened.answerId, version, session, ownership);
+      if (candidate === null || synthesisTextOf(candidate) !== originText) continue;
+      return {
+        answerVersion: candidate.answer_version,
+        body: await buildPublicDebateBody({
+          runId: opened.runId, answer: candidate,
+          owner: { userId: opened.ownerUserId, ownerRef: opened.ownerRef },
+          readers: {
+            stories: new RepositoryPublicationStoryReader(storyRepository),
+            repository: new PostgresPublicationRepository(pool, auditContextHasher), mapViews
+          },
+          source: { ip: "", userAgent: "", requestId: "staff-publication-review" }
+        })
+      };
+    }
+    throw new PublicationReviewRefusal("PUBLICATION_REVIEW_NOT_FOUND");
+  })
 });
 const SYNTHESIS_CHECK_TICK_MS = 5_000;
 const triggerSynthesisCheckWork = createSingleFlightErasureReconciler(
@@ -1629,7 +1668,7 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
     publicAppUrl: environment.PUBLIC_APP_URL, workerId: randomUUID(),
     collect: (claim, workerId) => collectSnapshot({
       claim, workerId, source,
-      ownerView: new OwnerViewAdapter(ownerDeps, runKeyStore, claim.sessionId),
+      ownerView: new OwnerViewAdapter(ownerDeps, runKeyStore, publicationReviewRepository, claim.sessionId),
       decrypt: {
         openUserField: async (userId, field, envelope) => {
           const dek = await dekStore.load(userId);
@@ -1694,7 +1733,7 @@ const api = buildApi({
   consumerWebAuthn: new ConsumerWebAuthnService(new PostgresConsumerAuthRepository(authorizationPool,auditContextHasher),sessions.consumerProducer(),{publicAppUrl:environment.PUBLIC_APP_URL}),
   ...(staffAccess === undefined ? {} : { staffAccess }),
   staffPolicyVersion: environment.STAFF_ACCESS.policyVersion,
-  ...(staffHttp === undefined ? {} : {staff: staffHttp}),
+  ...(staffHttp === undefined ? {} : { staff: { ...staffHttp, publicationReviews: publicationReviewStaff } }),
   legacyRunClaim,
   legal,
   emailChange,
@@ -1748,6 +1787,35 @@ const api = buildApi({
   },
   ...(publications === undefined ? {} : { publications }),
   publicationContentCheck,
+  publicationReviews: {
+    repository: publicationReviewRepository,
+    readOwnedAnswer: async ({ runId, authenticated }) => {
+      const live = await pool.query<{ live: boolean }>(
+        "SELECT core.run_private_content_is_live($1) AND NOT serve.run_removed_by_synthesis_check($1) AS live",
+        [runId]
+      );
+      if (!live.rows[0]?.live) return null;
+      return application.withContentLease(runId, () => application.readRunAnswer(
+        runId, authenticated.session, { ownerRef: authenticated.ownerRef, legacyAskerId: null }
+      ));
+    },
+    readVerdictOfRecord: async ({ runId, authenticated, answer }) => {
+      const texts = await application.withContentLease(runId, async () => {
+        const versions = new Map<number, string | null>();
+        for (let version = 1; version <= answer.answer_version; version++) {
+          const candidate = await readSynthesisAnswer(runId, answer.answer_id, version, authenticated.ownerRef);
+          if (candidate === null) return null;
+          versions.set(version, synthesisTextOf(candidate));
+        }
+        return versions;
+      });
+      if (texts === null) return null;
+      const origin = originVersionOf(texts, answer.answer_version);
+      return verdictOfRecord(await synthesisCheckRepository.readRecords({
+        runId, answerId: answer.answer_id, maxVersion: answer.answer_version
+      }), candidate => candidate === origin);
+    }
+  },
   synthesisPublishGate,
   synthesisAnswerAccess,
   allowedOrigin: environment.PUBLIC_APP_URL,

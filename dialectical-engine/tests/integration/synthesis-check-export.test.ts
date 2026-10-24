@@ -35,6 +35,7 @@ function exportHarness() {
     readDisclosure: vi.fn(async () => null),
     readNode: vi.fn(async () => null),
     readSynthesisChecks: vi.fn(async (_ownerRef: string, _answerId: string): Promise<readonly SynthesisCheckEntry[]> => checks),
+    readPublicationReviews: vi.fn(async () => []),
   };
   const collect = (ownerRef = "owner-1", locale = "en") => collectSnapshot({
     claim: { exportId: "export-1", userId: "user-1", ownerRef, sessionId: "session-1", locale,
@@ -125,7 +126,7 @@ describe("synthesis checks in the owner's data export", () => {
       })).toBe("INSERTED");
       const application = new PostgresAskApplication(runtime, {} as never, {} as never, undefined, runtime,
         createTestAskAdmissionPoolFacades(runtime));
-      const adapter = new OwnerViewAdapter({ application }, { exists: async () => true });
+      const adapter = new OwnerViewAdapter({ application }, { exists: async () => true }, { readStates: async () => [] });
       const real = exportHarness();
       real.ownerView.readRunAnswer.mockResolvedValue({ answer_id: answerId, answer_version: 2 });
       real.ownerView.readSynthesisChecks.mockImplementation((ownerRef, id) => adapter.readSynthesisChecks(ownerRef, id));
@@ -150,7 +151,7 @@ describe("synthesis checks in the owner's data export", () => {
     const h = exportHarness();
     const readSynthesisChecks = vi.fn(async (_answerId: string, _session: unknown, ownership: { ownerRef: string }) =>
       ownership.ownerRef === "owner-1" ? checks : []);
-    const adapter = new OwnerViewAdapter({ application: { readSynthesisChecks } as never }, { exists: async () => true });
+    const adapter = new OwnerViewAdapter({ application: { readSynthesisChecks } as never }, { exists: async () => true }, { readStates: async () => [] });
     h.ownerView.readSynthesisChecks.mockImplementation((ownerRef, answerId) => adapter.readSynthesisChecks(ownerRef, answerId));
     const snapshot = await h.collect("owner-2");
     expect(snapshot.debates.debates[0]?.answers?.[0]?.synthesis_checks).toEqual([]);
@@ -209,7 +210,7 @@ describe("synthesis checks in the owner's data export", () => {
         createTestAskAdmissionPoolFacades(runtime));
       const adapter = new OwnerViewAdapter({ application,
         synthesisAnswerAccess: createSynthesisAnswerAccess({ repository, deadlineMs: 60_000 }) },
-      { exists: async () => true });
+      { exists: async () => true }, { readStates: async () => [] });
       const heldAnswer = await adapter.readRunAnswer(owner.ownerRef, runId);
       expect(heldAnswer).toBeNull();
       const h = exportHarness();

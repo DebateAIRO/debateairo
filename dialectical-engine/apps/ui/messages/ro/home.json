@@ -130,5 +130,9 @@
   "home.removal.automatic": "Această decizie a fost luată de un instrument automat, fără nicio persoană implicată.",
   "home.removal.ground": "Temei: Termenii serviciului, secțiunea 9 (dezbaterile pe care le șterge verificarea noastră).",
   "home.removal.complain": "Pentru a depune o reclamație, scrieți la office@dezbatere.ro în termen de șase luni. O reclamație nu poate readuce dezbaterea.",
-  "home.removal.close": "Închideți"
+  "home.removal.close": "Închideți",
+  "home.flag.underReview": "MARCATĂ · ÎN CURS DE EXAMINARE",
+  "home.flag.approved": "APROBATĂ",
+  "home.flag.refused": "NEAPROBATĂ",
+  "home.takeDown.button": "Retrageți"
 }

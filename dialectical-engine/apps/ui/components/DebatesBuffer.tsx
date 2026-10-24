@@ -7,6 +7,8 @@ import type { DebateSummary } from "@/lib/types";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { runFailureMessage } from "@/lib/v3/runFailure";
 import composeEnglish from "@/messages/en/compose.json";
+import publicEnglish from "@/messages/en/public.json";
+import { TakeDownControl } from "@/components/TakeDownControl";
 import { RESET_TIME_MARK, ResetSentence } from "@/components/billing/ResetSentence";
 
 /* The published verdict, in the reader's locale (it used to be the enum title-cased in English). */
@@ -47,6 +49,7 @@ function LibraryRow({
   state,
   generatedStatus = false,
   flagged = false,
+  flagLabel,
   confidenceBand,
   catalog,
   composeCatalog
@@ -60,6 +63,7 @@ function LibraryRow({
   state: "complete" | "generating" | "failed" | "contested" | "unsupported" | "split";
   generatedStatus?: boolean;
   flagged?: boolean;
+  flagLabel?: string;
   confidenceBand?: string | null;
   catalog: MessageCatalog;
   composeCatalog: MessageCatalog;
@@ -69,7 +73,7 @@ function LibraryRow({
     <Link className="libRow" href={href} data-library-row data-bezel="shell" data-flagged={flagged ? "true" : undefined} style={{ background: "var(--shell)" }}>
       <div className="libRowCore" data-bezel="core" style={{ background: "var(--core)" }}>
         <div className="libRowBody">
-          {flagged ? <div className="libFlag"><span className="libFlagMark" aria-hidden /><span className="libFlagLabel">{t(catalog, "home.flag.flagged")}</span></div> : null}
+          {flagged ? <div className="libFlag"><span className="libFlagMark" aria-hidden /><span className="libFlagLabel">{flagLabel ?? t(catalog, "home.flag.flagged")}</span></div> : null}
           <div className="libRowClaim">{claim}</div>
           <p className="libRowMeta">
             {by === undefined ? null : <>{byBefore}<span className="libRowBy">{by}</span>{byAfter} · </>}
@@ -105,7 +109,8 @@ export function DebatesBuffer({
   timeCatalog,
   locale,
   checkingLabel,
-  composeCatalog = composeEnglish
+  composeCatalog = composeEnglish,
+  publicCatalog = publicEnglish
 }: {
   readonly debates: readonly DebateSummary[];
   catalog: MessageCatalog;
@@ -114,6 +119,7 @@ export function DebatesBuffer({
   checkingLabel: string;
   /** The reader's `compose` catalogue: model family names on the row dots. */
   composeCatalog?: MessageCatalog;
+  publicCatalog?: MessageCatalog;
 }) {
   if (debates.length === 0) {
     return <div className="libEmpty">{t(catalog, "home.noDebates")}</div>;
@@ -138,7 +144,12 @@ export function DebatesBuffer({
            debate.models.length > 0
              ? tPlural(catalog, "home.models", debate.models.length, locale)
              : null]);
-    return (
+    const flagged = !checking && debate.synthesis_flag?.verdict === "FLAGGED";
+    const labelKey = debate.publication_review?.review_state === "UNDER_REVIEW" ? "home.flag.underReview"
+      : debate.publication_review?.review_state === "APPROVED" ? "home.flag.approved"
+      : debate.publication_review?.review_state === "REFUSED" ? "home.flag.refused"
+      : "home.flag.flagged";
+    const row = (
       <LibraryRow
         key={debate.id}
         href={`/debate/${debate.id}`}
@@ -147,11 +158,14 @@ export function DebatesBuffer({
         models={debate.models}
         status={checking ? checkingLabel : statusLabel(debate.status, timeCatalog)}
         state={checking ? "generating" : failed ? "failed" : isComplete(debate.status) ? "complete" : "generating"}
-        flagged={!checking && debate.synthesis_flag?.verdict === "FLAGGED"}
+        flagged={flagged}
+        flagLabel={t(catalog, labelKey)}
         catalog={catalog}
         composeCatalog={composeCatalog}
       />
     );
+    if (!flagged || debate.publication_review?.visibility !== "PUBLISHED" || !debate.run_ref) return row;
+    return <div className="libTakeDownGroup" key={debate.id}>{row}<TakeDownControl runRef={debate.run_ref} homeCatalog={catalog} publicCatalog={publicCatalog} /></div>;
   });
 }
 

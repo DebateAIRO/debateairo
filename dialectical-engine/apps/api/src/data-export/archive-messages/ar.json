@@ -26,5 +26,9 @@
   "archive.category.terrorism": "الإرهاب المحتمل",
   "archive.category.hateSpeech": "خطاب الكراهية بأي شكل كان",
   "archive.category.suicideOrHarm": "النزعات إلى الانتحار أو إيذاء الآخرين",
-  "archive.category.weaponsOrDrugs": "صنع الأسلحة أو المخدرات"
+  "archive.category.weaponsOrDrugs": "صنع الأسلحة أو المخدرات",
+  "archive.publicationReview": "مراجعة النشر",
+  "archive.reviewAsked": "طُلب",
+  "archive.reviewApproved": "اعتُمد",
+  "archive.reviewRefused": "رُفض"
 }

@@ -129,5 +129,9 @@
   "home.removal.automatic": "Selle otsuse tegi automaatne tööriist, ilma et ükski inimene oleks sellesse kaasatud.",
   "home.removal.ground": "Alus: meie Teenusetingimused, jaotis 9 (väitlused, mille meie kontroll kustutab).",
   "home.removal.complain": "Kaebuse esitamiseks kirjutage kuue kuu jooksul aadressile office@dezbatere.ro. Kaebus ei saa väitlust tagasi tuua.",
-  "home.removal.close": "Sulgege"
+  "home.removal.close": "Sulgege",
+  "home.flag.underReview": "MÄRGISTATUD · LÄBIVAATAMISEL",
+  "home.flag.approved": "HEAKS KIIDETUD",
+  "home.flag.refused": "HEAKS KIITMATA",
+  "home.takeDown.button": "Eemaldage avalikust vaatest"
 }

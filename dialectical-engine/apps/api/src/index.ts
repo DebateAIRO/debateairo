@@ -125,7 +125,7 @@ import {
   type RunOwnershipAccess,
   type WaitingRunCursor
 } from "@debateai/db";
-import { ServeRepository, SynthesisCheckRepository, synthesisTextOf, verdictOfRecord, type MemoryQuestionRegistration } from "@debateai/serve";
+import { ServeRepository, SynthesisCheckRepository, synthesisTextOf, verdictOfRecord, type MemoryQuestionRegistration, type PublicationReviewRepository, type VerdictOfRecord } from "@debateai/serve";
 import type { SynthesisVerdict, SynthesisCheckCategory } from "@debateai/contract";
 import { applyCriticUnavailableCap, assertMakerAdmission } from "@debateai/critique";
 export {
@@ -264,6 +264,7 @@ export { staffRoutePolicy, staffCookies, clearStaffCookies, STAFF_COOKIE_NAME, S
 import type { PublicationApplication } from "./publications.js";
 import type { PublicationContentCheck } from "./publication-check/check.js";
 import { UNCONFIGURED_SYNTHESIS_PUBLISH_GATE, type SynthesisPublishGate } from "./synthesis-check/publish-gate.js";
+import { createPublicationReviewOwnerRoutes } from "./publication-review/owner.js";
 import { OPEN_SYNTHESIS_ANSWER_ACCESS, type SynthesisAnswerAccess } from "./synthesis-check/hold.js";
 import type { AnswerStoryApplication } from "./stories.js";
 import type { AnswerDisclosureApplication } from "./disclosures.js";
@@ -1458,6 +1459,8 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/runs/{id}/answer", auth: "user", resource: "run-owner", action: "read-run-answer" },
   { route: "POST /v1/runs/{id}/publish", auth: "user", resource: "run-owner", action: "publish" },
   { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" },
+  { route: "POST /v1/runs/{id}/publication-review", auth: "user", resource: "run-owner", action: "request-review" },
+  { route: "GET /v1/runs/{id}/publication-review", auth: "user", resource: "run-owner", action: "read-review" },
   { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
   { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" },
   { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
@@ -1491,7 +1494,7 @@ export const authorizationPolicyInventory = Object.freeze([
   staffCapability?: StaffCapability;
   resource: "identity" | "session-self" | "session-owner" | "run-owner" | "public-debate" |
     "deployment" | "evaluator" | "support-session" | "support-message" | "support-case" |
-    "support-status" | "geo" | "billing" | "staff-self" | "staff-team" | "staff-invitation" | "owner-possession" | "staff-audit";
+    "support-status" | "geo" | "billing" | "staff-self" | "staff-team" | "staff-invitation" | "owner-possession" | "staff-audit" | "staff-publication-review";
   action: string;
 }>[]);
 
@@ -1729,6 +1732,11 @@ export interface ApiOptions {
   readonly staffPolicyVersion?: 1 | 2;
   readonly staff?: StaffHttpApplication;
   readonly publications?: PublicationApplication;
+  readonly publicationReviews?: Readonly<{
+    repository: PublicationReviewRepository;
+    readOwnedAnswer(input: Readonly<{ runId: string; authenticated: AuthenticatedSession }>): Promise<Answer | null>;
+    readVerdictOfRecord(input: Readonly<{ runId: string; authenticated: AuthenticatedSession; answer: Answer }>): Promise<VerdictOfRecord>;
+  }>;
   /**
    * hate-speech S02 (SPEC-v2 R1, D-S02-22): the pre-publish content check,
    * composed in main.ts. Absent, every publish answers 503
@@ -4036,6 +4044,39 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return unpublished === null
         ? reply.status(404).send({ error: "RUN_NOT_FOUND" })
         : reply.send(PublicationTransitionSchema.parse(unpublished));
+    }
+  );
+  const publicationReviewOwner = options.publicationReviews === undefined ? null : createPublicationReviewOwnerRoutes({
+    repository: options.publicationReviews.repository,
+    publications: options.publications,
+    readOwnedAnswer: options.publicationReviews.readOwnedAnswer,
+    readVerdictOfRecord: options.publicationReviews.readVerdictOfRecord,
+    auditDenial: async ({ authenticated, requestId }) => options.publications?.auditPreflightDenial({ authenticated, requestId })
+  });
+  api.post<{ Params: { id: string } }>(
+    "/v1/runs/:id/publication-review",
+    credentialRoutePolicy("POST /v1/runs/{id}/publication-review"),
+    async (request, reply) => {
+      const runId = ResourceIdSchema.safeParse(request.params.id);
+      const authenticated = request.authenticatedSession;
+      if (!runId.success || authenticated === undefined) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      if (publicationReviewOwner === null) return reply.status(503).send({ error: "PUBLICATION_REVIEW_UNAVAILABLE" });
+      const response = await publicationReviewOwner.ask({
+        runId: runId.data, authenticated, body: request.body, requestId: request.id
+      });
+      return reply.status(response.status).send(response.body);
+    }
+  );
+  api.get<{ Params: { id: string } }>(
+    "/v1/runs/:id/publication-review",
+    routePolicy("GET /v1/runs/{id}/publication-review"),
+    async (request, reply) => {
+      const runId = ResourceIdSchema.safeParse(request.params.id);
+      const authenticated = request.authenticatedSession;
+      if (!runId.success || authenticated === undefined) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      if (publicationReviewOwner === null) return reply.status(503).send({ error: "PUBLICATION_REVIEW_UNAVAILABLE" });
+      const response = await publicationReviewOwner.read({ runId: runId.data, authenticated });
+      return reply.status(response.status).send(response.body);
     }
   );
   api.post<{ Params: { id: string } }>("/v1/answers/:id/memory-link/unlink", routePolicy("POST /v1/answers/{id}/memory-link/unlink"), async (request, reply) => {

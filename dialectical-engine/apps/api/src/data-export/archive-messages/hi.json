@@ -26,5 +26,9 @@
   "archive.category.terrorism": "संभावित आतंकवाद",
   "archive.category.hateSpeech": "किसी भी प्रकार का घृणास्पद भाषण",
   "archive.category.suicideOrHarm": "आत्महत्या या दूसरों को हानि पहुँचाने की प्रवृत्तियाँ",
-  "archive.category.weaponsOrDrugs": "हथियार या नशीले पदार्थ बनाना"
+  "archive.category.weaponsOrDrugs": "हथियार या नशीले पदार्थ बनाना",
+  "archive.publicationReview": "प्रकाशन समीक्षा",
+  "archive.reviewAsked": "अनुरोध किया गया",
+  "archive.reviewApproved": "अनुमोदित",
+  "archive.reviewRefused": "इनकार किया गया"
 }

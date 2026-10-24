@@ -128,5 +128,9 @@
   "home.removal.automatic": "此决定由自动化工具作出，没有人参与。",
   "home.removal.ground": "依据：我们的《服务条款》第9节（我们的检测删除的辩论）。",
   "home.removal.complain": "如需投诉，请在六个月内致信 office@dezbatere.ro。投诉无法恢复这场辩论。",
-  "home.removal.close": "关闭"
+  "home.removal.close": "关闭",
+  "home.flag.underReview": "已标记 · 审核中",
+  "home.flag.approved": "已批准",
+  "home.flag.refused": "未获批准",
+  "home.takeDown.button": "撤下"
 }

@@ -115,6 +115,17 @@ test("the flagged card label is in capitals in every locale whose script has the
   }
 });
 
+test("S02's card labels are in capitals in every locale whose script has them (V-110, FIX-SF-S02-p1-W)", () => {
+  for (const { code } of LOCALES) {
+    const home = readCatalog(code, "home");
+    for (const key of ["home.flag.underReview", "home.flag.approved", "home.flag.refused"]) {
+      const label = home[key];
+      const cased = [...label].some((character) => character.toLowerCase() !== character.toUpperCase());
+      if (cased) assert.equal(label, label.toLocaleUpperCase(code), `${code}/home:${key} is not in capitals`);
+    }
+  }
+});
+
 test("no locale keeps the /new keys retired by debate shape P2c", () => {
   const retired = [
     "newDebate.legacyNotice", "newDebate.selectionStrategy", "newDebate.manual", "newDebate.recommended",

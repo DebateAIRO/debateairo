@@ -26,5 +26,9 @@
   "archive.category.terrorism": "Possibile terrorismo",
   "archive.category.hateSpeech": "discorsi d'odio di qualsiasi tipo",
   "archive.category.suicideOrHarm": "tendenze al suicidio o a nuocere ad altre persone",
-  "archive.category.weaponsOrDrugs": "fabbricazione di armi o droghe"
+  "archive.category.weaponsOrDrugs": "fabbricazione di armi o droghe",
+  "archive.publicationReview": "Revisione per la pubblicazione",
+  "archive.reviewAsked": "Richiesto",
+  "archive.reviewApproved": "Approvato",
+  "archive.reviewRefused": "Rifiutato"
 }

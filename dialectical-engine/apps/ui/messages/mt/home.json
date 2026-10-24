@@ -132,5 +132,9 @@
   "home.removal.automatic": "Din id-deċiżjoni ttieħdet minn għodda awtomatika, mingħajr l-involviment ta’ persuna.",
   "home.removal.ground": "Bażi: it-Termini tas-Servizz tagħna, taqsima 9 (dibattiti li l-verifika tagħna tħassar).",
   "home.removal.complain": "Biex tressaq ilment, ikteb lil office@dezbatere.ro fi żmien sitt xhur. Ilment ma jistax iġib id-dibattitu lura.",
-  "home.removal.close": "Agħlaq"
+  "home.removal.close": "Agħlaq",
+  "home.flag.underReview": "IMMARKAT · TAĦT RIEŻAMI",
+  "home.flag.approved": "APPROVAT",
+  "home.flag.refused": "MHUX APPROVAT",
+  "home.takeDown.button": "Neħħi"
 }

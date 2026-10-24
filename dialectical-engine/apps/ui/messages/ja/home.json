@@ -128,5 +128,9 @@
   "home.removal.automatic": "この判断は自動ツールによるものです。人は関与していません。",
   "home.removal.ground": "根拠：利用規約第9条（当社のチェックが削除するディベート）。",
   "home.removal.complain": "苦情を申し立てるには、6か月以内に office@dezbatere.ro までご連絡ください。苦情によってディベートを復元することはできません。",
-  "home.removal.close": "閉じる"
+  "home.removal.close": "閉じる",
+  "home.flag.underReview": "フラグ付き · 審査中",
+  "home.flag.approved": "承認されました",
+  "home.flag.refused": "承認されていません",
+  "home.takeDown.button": "取り下げる"
 }

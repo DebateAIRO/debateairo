@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from 'react';
-import { ContractHttpError, type PublicationRefusalStatement } from '@debateai/contract';
+import { ContractHttpError, type PublicationRefusalStatement, type PublicationReviewState } from '@debateai/contract';
 import { PublicationStatement } from '../PublicationControl';
 import type { ContractClient, StepUpAuthorizationRequest, StepUpResponse } from '@debateai/contract';
 import { contractClient } from '@/lib/api';
@@ -32,6 +32,7 @@ export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, 
     const [email, setEmail] = useState('');
     const [phrase, setPhrase] = useState('');
     const [acknowledged, setAcknowledged] = useState(false);
+    const [publishReview, setPublishReview] = useState<PublicationReviewState | null | undefined>(undefined);
     const [statement, setStatement] = useState<PublicationRefusalStatement | null>(null);
     const [status, setStatus] = useState<string | null>(null);
     const [cancellation, setCancellation] = useState<string | null>(null);
@@ -59,6 +60,19 @@ export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, 
         }, Math.max(0, Date.parse(proof.step_up_grant.expires_at) - Date.now()));
         return () => clearTimeout(timer);
     }, [proof, catalog]);
+    useEffect(() => {
+        const grant = proof?.step_up_grant;
+        if (!grant || grant.action !== 'PUBLISH' || !('target_run_id' in grant)) return;
+        let active = true;
+        setPublishReview(undefined);
+        setAcknowledged(false);
+        void client.readPublicationReview(grant.target_run_id).then((state) => {
+            if (active) { setPublishReview(state); setAcknowledged(false); }
+        }, () => {
+            if (active) { setPublishReview(null); setStatus(t(publicCatalog, 'public.publication.statusUnavailable')); }
+        });
+        return () => { active = false; };
+    }, [proof, client, publicCatalog]);
     if (!proof)
         return <section>{statement ? <PublicationStatement statement={statement} catalog={publicCatalog}/> : null}{status ? <p role="status">{status}</p> : <p>{t(catalog, "auth.security.resumeEmpty")}</p>}{cancellation ? <button type="button" onClick={async () => {
                     try {
@@ -74,7 +88,10 @@ export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, 
     const { token, expires_at, ...authorization } = grant;
     const action = grant.action;
     const isRun = 'target_run_id' in grant;
-    const warning = action === 'PUBLISH' ? t(publicCatalog, "public.publication.publishWarning") : action === 'UNPUBLISH' ? t(publicCatalog, "public.publication.unpublishWarning") : action === 'DELETE_PRIVATE_DEBATE' ? t(publicCatalog, "public.publication.deleteExplanation") : action === 'DELETE_ACCOUNT' ? t(settingsCatalog, "settings.erasure.dataWarning") : action === 'EXPORT_DATA' ? t(settingsCatalog, "settings.export.title") : t(catalog, "auth.security.providerProof");
+    const asksReview = action === 'PUBLISH' && publishReview?.flagged === true && publishReview.state !== 'APPROVED';
+    if (action === 'PUBLISH' && publishReview === undefined) return <section className="authSecurityConfirmation"><a href={`/debate/${grant.target_run_id}`}>{t(catalog, "auth.security.returnToDebate")}</a></section>;
+    if (action === 'PUBLISH' && publishReview === null) return <section className="authSecurityConfirmation"><p role="status">{t(publicCatalog, 'public.publication.statusUnavailable')}</p><a href={`/debate/${grant.target_run_id}`}>{t(catalog, "auth.security.returnToDebate")}</a></section>;
+    const warning = action === 'PUBLISH' ? t(publicCatalog, asksReview ? "public.publicationReview.askWarning" : "public.publication.publishWarning") : action === 'UNPUBLISH' ? t(publicCatalog, "public.publication.unpublishWarning") : action === 'DELETE_PRIVATE_DEBATE' ? t(publicCatalog, "public.publication.deleteExplanation") : action === 'DELETE_ACCOUNT' ? t(settingsCatalog, "settings.erasure.dataWarning") : action === 'EXPORT_DATA' ? t(settingsCatalog, "settings.export.title") : t(catalog, "auth.security.providerProof");
     const destructive = action === 'PUBLISH' || action === 'UNPUBLISH' || action === 'DELETE_PRIVATE_DEBATE';
     const allowed = destructive ? acknowledged : action === 'DELETE_ACCOUNT' ? confirmationPhraseMatches(phrase, t(settingsCatalog, "settings.erasure.confirmationPhrase"), locale) : action === 'CHANGE_EMAIL' ? emailShape(email) : true;
     async function confirm(result: ConfirmedSecurityAction) {
@@ -84,8 +101,13 @@ export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, 
         try {
             let message = t(catalog, "auth.security.complete");
             if (action === 'PUBLISH' && 'target_run_id' in grant) {
-                await client.publishRun(grant.target_run_id, result.step_up_grant.token);
-                message = t(publicCatalog, "public.publication.publishedSuccess");
+                if (asksReview) {
+                    await client.requestPublicationReview(grant.target_run_id, result.step_up_grant.token);
+                    message = t(publicCatalog, "public.publicationReview.asked");
+                } else {
+                    await client.publishRun(grant.target_run_id, result.step_up_grant.token);
+                    message = t(publicCatalog, "public.publication.publishedSuccess");
+                }
             }
             else if (action === 'UNPUBLISH' && 'target_run_id' in grant) {
                 await client.unpublishRun(grant.target_run_id, result.step_up_grant.token);
@@ -124,6 +146,17 @@ export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, 
         catch (failure) {
             if (active.current) {
                 setProof(null);
+                if (asksReview) {
+                    const key = failure instanceof ContractHttpError && failure.serverCode === 'PUBLICATION_REVIEW_PENDING'
+                        ? 'public.publicationReview.pendingError'
+                        : failure instanceof ContractHttpError && failure.serverCode === 'PUBLICATION_REVIEW_NOT_ALLOWED'
+                            ? 'public.publicationReview.notAllowed'
+                            : failure instanceof ContractHttpError && failure.status === 404
+                                ? 'public.publication.changeUnauthorized'
+                                : 'public.publication.statusUnavailable';
+                    setStatus(t(publicCatalog, key));
+                    return;
+                }
                 if (action === 'PUBLISH' && failure instanceof ContractHttpError && failure.serverCode === 'DEBATE_REMOVED_BY_CHECK' && 'target_run_id' in grant) {
                     if (onRemovedByCheck) onRemovedByCheck(grant.target_run_id);
                     else window.location.assign(`/debate/${grant.target_run_id}`);
@@ -152,7 +185,7 @@ export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, 
         }
     }
     return <section className="authSecurityConfirmation"><p>{warning}</p>{isRun ? <a href={`/debate/${grant.target_run_id}`}>{t(catalog, "auth.security.returnToDebate")}</a> : null}
- {destructive ? <label className="authCheck"><input type="checkbox" checked={acknowledged} onChange={e => setAcknowledged(e.target.checked)}/>{t(publicCatalog, action === 'PUBLISH' ? 'public.publication.acknowledgePublish' : action === 'UNPUBLISH' ? 'public.publication.acknowledgeUnpublish' : 'public.publication.deleteAcknowledgement')}</label> : null}
+ {destructive ? <label className="authCheck"><input type="checkbox" checked={acknowledged} onChange={e => setAcknowledged(e.target.checked)}/>{t(publicCatalog, action === 'PUBLISH' ? (asksReview ? 'public.publicationReview.askAcknowledge' : 'public.publication.acknowledgePublish') : action === 'UNPUBLISH' ? 'public.publication.acknowledgeUnpublish' : 'public.publication.deleteAcknowledgement')}</label> : null}
  {action === 'DELETE_ACCOUNT' ? <div className="authField"><label htmlFor="resume-erasure-phrase">{t(settingsCatalog, "settings.erasure.typeConfirmation", { confirmation: t(settingsCatalog, "settings.erasure.confirmationPhrase") })}</label><input id="resume-erasure-phrase" value={phrase} onChange={e => setPhrase(e.target.value)} autoComplete="off"/></div> : null}
  {action === 'CHANGE_EMAIL' ? <div className="authField"><label htmlFor="resume-new-email">{t(settingsCatalog, "settings.emailChange.newLabel")}</label><input id="resume-new-email" type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email"/></div> : null}
  <SecurityConfirmation catalog={catalog} client={client} authorization={authorization} initialProof={proof} disabled={!allowed} onConfirmed={confirm} onCancel={() => {

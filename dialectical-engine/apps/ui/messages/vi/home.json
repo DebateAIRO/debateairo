@@ -128,5 +128,9 @@
   "home.removal.automatic": "Quyết định này do một công cụ tự động đưa ra, không có người nào tham gia.",
   "home.removal.ground": "Căn cứ: Điều khoản dịch vụ của chúng tôi, mục 9 (các cuộc tranh luận bị bước kiểm tra của chúng tôi xóa).",
   "home.removal.complain": "Để khiếu nại, hãy viết đến office@dezbatere.ro trong vòng sáu tháng. Khiếu nại không thể khôi phục cuộc tranh luận.",
-  "home.removal.close": "Đóng"
+  "home.removal.close": "Đóng",
+  "home.flag.underReview": "BỊ GẮN CỜ · ĐANG XEM XÉT",
+  "home.flag.approved": "ĐÃ ĐƯỢC PHÊ DUYỆT",
+  "home.flag.refused": "KHÔNG ĐƯỢC PHÊ DUYỆT",
+  "home.takeDown.button": "Gỡ xuống"
 }

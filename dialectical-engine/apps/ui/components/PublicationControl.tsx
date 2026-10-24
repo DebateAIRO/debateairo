@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { contractClient } from "@/lib/api";
 import { ContractHttpError } from "@debateai/contract";
-import type { ContractClient, PublicationPartKind, PublicationRefusalStatement } from "@debateai/contract";
+import type { ContractClient, PublicationPartKind, PublicationRefusalStatement, PublicationReviewState } from "@debateai/contract";
 import {SecurityConfirmation,type SecurityConfirmationClient} from '@/components/auth/SecurityConfirmation';
 import {useSelectedAuthCatalog} from '@/components/AuthShell';
 import {useChromeI18n} from '@/lib/i18n/I18nProvider';
 import type {ConfirmedSecurityAction} from '@/lib/securityConfirmation';
 import publicEnglish from "@/messages/en/public.json";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { PublicationReviewPanel } from "@/components/PublicationReviewPanel";
 
 type Visibility = Readonly<{
   state: "PRIVATE" | "PUBLISHED";
@@ -19,7 +20,7 @@ type Visibility = Readonly<{
 
 export type PrivateDeletionStatus="PENDING"|"CLEANED";
 type PublicationControlClient=Pick<ContractClient,
-  "readRunVisibility"|"publishRun"|"unpublishRun"|"deletePrivateDebate"
+  "readRunVisibility"|"readPublicationReview"|"requestPublicationReview"|"publishRun"|"unpublishRun"|"deletePrivateDebate"
 > & SecurityConfirmationClient;
 
 export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,client=contractClient,catalog=publicEnglish }: {
@@ -30,6 +31,7 @@ export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,cl
   readonly catalog?:MessageCatalog;
 }) {
   const [visibility, setVisibility] = useState<Visibility | null>(null);
+  const [review, setReview] = useState<PublicationReviewState | null | undefined>(undefined);
   const [action, setAction] = useState<"PUBLISH" | "UNPUBLISH" | null>(null);
   const {locale}=useChromeI18n(),authCatalog=useSelectedAuthCatalog(locale),[confirming,setConfirming]=useState<"publication"|"delete"|null>(null);
   const [acknowledged, setAcknowledged] = useState(false);
@@ -64,6 +66,15 @@ export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,cl
       .catch(() => { if (active) setMessage(t(catalog, "public.publication.statusUnavailable")); });
     return () => { active = false; };
   }, [catalog,client,runId]);
+
+  useEffect(() => {
+    let active = true;
+    setReview(undefined);
+    void client.readPublicationReview(runId)
+      .then((next) => { if (active) setReview(next); })
+      .catch(() => { if (active) setReview(null); });
+    return () => { active = false; };
+  }, [client, runId]);
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -151,6 +162,7 @@ export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,cl
   const warning = selected === "PUBLISH"
     ? t(catalog, "public.publication.publishWarning")
     : t(catalog, "public.publication.unpublishWarning");
+  const pendingReview = review?.flagged === true && review.state !== "APPROVED" ? review : null;
 
 
   if (deleted) {
@@ -180,7 +192,7 @@ export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,cl
       {statement !== null ? (
         <PublicationStatement statement={statement} catalog={catalog}/>
       ) : message ? <p role="status">{message}</p> : null}
-      {action === null ? (
+      {visibility !== null && pendingReview !== null ? <PublicationReviewPanel runId={runId} state={pendingReview} client={client} catalog={catalog} onAsked={() => setReview((current) => current === null || current === undefined ? current : { ...current, state: "UNDER_REVIEW", may_ask: false, asks_used: current.asks_used === 0 ? 1 : 2 })} /> : visibility === null || review === undefined ? null : action === null ? (
         <button
           type="button"
           className="button"
