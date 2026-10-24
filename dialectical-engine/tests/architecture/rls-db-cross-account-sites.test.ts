@@ -5,6 +5,8 @@
  * only its own rows visible. So the set of methods that open a frame IS the set of readers that see more than one
  * account from inside a request — a site unrouted, routed under the wrong id, or one added without a SPEC row changes
  * this map. Parsed with the TypeScript AST (typescript-classic), so a comment or a string naming a call does not count.
+ * Each call SITE is one entry (F-C4-4, Ruling R-14): a second `crossAccount("<id>", …)` inside a method the map already
+ * lists adds a second copy of that entry, so a new site under an id the map already holds changes the map too.
  */
 import { readdir, readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
@@ -14,7 +16,10 @@ import { describe, expect, it } from "vitest";
 
 const PRODUCT_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 
-/** PLAN S3.6, verbatim as a map: reader id → `<file>#<method or function>` that opens its frame. */
+/**
+ * PLAN S3.6, verbatim as a map: reader id → `<file>#<method or function>` that opens its frame, one entry per call site
+ * (16 sites: X10 3, X23 2, every other id 1; measured at b6a70bc0c).
+ */
 const EXPECTED: Readonly<Record<string, readonly string[]>> = Object.freeze({
   X10: [
     "packages/db/src/publication.ts#listPublicRefs",
@@ -79,9 +84,8 @@ async function crossAccountSites(): Promise<Sites> {
         if (reader === undefined || !ts.isStringLiteralLike(reader) || site === null) {
           unpinnable.push(`${path}:${line}`);
         } else {
-          const entry = `${path}#${site}`;
-          const list = (map[reader.text] ??= []);
-          if (!list.includes(entry)) list.push(entry);
+          // One entry per call site, never de-duplicated (F-C4-4): a de-duplicated entry hides a second site.
+          (map[reader.text] ??= []).push(`${path}#${site}`);
         }
       }
       ts.forEachChild(node, visit);

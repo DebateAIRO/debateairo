@@ -586,7 +586,12 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // (the register law bans JavaScript version coercion). migrate() is byte-identical.
 // Side-by-side integration round 2 (2026-10-22): the merged module after lane C's C11 review above
 // (listUnstartedReadmissions) joined the integration branch's module. migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "eb61b605427f7bc16bf9147eed029b6b790b8088093acc9a804fa6cd893d6546";
+// Row-level security S01, C3 (2026-10-24, 47e673787; PLAN §0.3, DECISIONS D55, D58, D72): the module after it re-exported
+// ./account-context.js, createPool gained the crossAccount option and the request-scope routing (the credential sent at
+// checkout, release rule v3), wrapClientQueries looked a client's query up per call, and readRoleRotationCounts ran
+// inside crossAccount("X24"). migrate() is byte-identical (its 13,111-byte slice, sha256 d1495dbe4bbf…, at ca61cbe00 and
+// b6a70bc0c). Re-pinned by BUILD-S01-C10 (Ruling R-15), not by the module's writer; REV(S01) reviews the module.
+const NATIVE_MIGRATE_MODULE_SHA256 = "94fbfc2f4889c3c7158d977ebb93fbadee4b01f9fe42c90f53aef3f7f006638b";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each
