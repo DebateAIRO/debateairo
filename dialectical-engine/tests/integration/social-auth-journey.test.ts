@@ -23,6 +23,7 @@ import { socialHash } from '../../apps/api/src/social-providers/hashes.js';
 import { ConsumerWebAuthnService } from '../../apps/api/src/consumer-webauthn.js';
 import { consumerFixture, origin } from '../support/consumerWebAuthnFixtures.js';
 import { startTestDatabase, type TestDatabase } from '../support/testDatabase.js';
+import { apiTestPools, provisionRlsLogins } from '../support/rls-logins.js';
 let db: TestDatabase, runtime: Pool, registrationRuntime: Pool, erasureRuntime: Pool, argon2: Argon2WorkerPool, dummy: string;
 const audit = { hashSourceIp: async () => 'ab'.repeat(32), hashUserAgent: async () => 'cd'.repeat(32) } as unknown as AuditContextHasher;
 const authPolicy = authPolicyFromRegisterRows(AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS), mfaPolicy = mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value), blindKey = Buffer.alloc(32, 7), recordsKey = Buffer.alloc(32, 9);
@@ -39,16 +40,19 @@ beforeAll(async () => {
     const url = new URL(db.connectionString);
     url.username = 'social_journey';
     url.password = 'journey-test-only';
-    runtime = createPool(url.toString());
+    const journeyUrl = url.toString();
     url.username = 'social_registration';
-    registrationRuntime = createPool(url.toString());
+    const registrationUrl = url.toString();
+    // R21 (PLAN S5.3, D67): the file's own logins, wired as main.ts wires `authorizationPool` and `pool` (each with its
+    // system target), in both modes; the erasure login keeps its own pool.
+    ({ authorization: runtime, runtime: registrationRuntime } = await apiTestPools(db, import.meta.url, { authorization: journeyUrl, runtime: registrationUrl }));
     url.username = 'social_erasure';
     erasureRuntime = createPool(url.toString());
     argon2 = new Argon2WorkerPool({ workers: 1 });
     await argon2.ready();
     dummy = await hashPassword(argon2, 'Strong dummy password 123!', authPolicy.password.argon2id);
 }, 120000);
-afterAll(async () => { await argon2?.close(); await runtime?.end(); await registrationRuntime?.end(); await erasureRuntime?.end(); await db?.stop(); });
+afterAll(async () => { await argon2?.close(); if (db) await (await provisionRlsLogins(db)).end(); await erasureRuntime?.end(); await db?.stop(); });
 async function harness() {
     const keys = new Map<string, Buffer>(), sent: {
         token: string;

@@ -2,7 +2,10 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PostgresAskApplication, SESSION_COOKIE_NAME, buildApi } from "@debateai/api";
 import { AnswerDisclosureSchema, AnswerSchema, AnswerStorySchema, type Session } from "@debateai/contract";
-import { ServeDisclosureRepository, migrate, withRunContentLease } from "@debateai/db";
+import { hashToken } from "@debateai/crypto";
+import {
+  ServeDisclosureRepository, configureContentEncryption, contentCipherFor, migrate, withRunContentLease
+} from "@debateai/db";
 import { StoryRepository, type StoryRecordInput } from "@debateai/story";
 import type { AuthenticatedSession, SessionApplication } from "../../apps/api/src/sessions.js";
 import { RepositoryAnswerStoryApplication } from "../../apps/api/src/stories.js";
@@ -21,6 +24,7 @@ import {
   createTestAskAdmissionPoolFacades, startTestDatabase, type TestDatabase
 } from "../support/testDatabase.js";
 import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
+import { apiTestPools, provisionRlsLogins, type ApiTestPools } from "../support/rls-logins.js";
 
 /**
  * Verdict story, Task 10 — spec §11: "The owner API returns the story and a
@@ -36,6 +40,7 @@ const OWNER_TOKEN = "s".repeat(43);
 const FOREIGN_TOKEN = "t".repeat(43);
 
 let database: TestDatabase;
+let pools: ApiTestPools | undefined;
 let owner: StoryEncryptedOwner | undefined;
 let api: ReturnType<typeof buildApi> | undefined;
 let ownerAuth: AuthenticatedSession;
@@ -97,7 +102,9 @@ async function provisionForeignAccount(): Promise<AuthenticatedSession> {
        created_at,last_seen_at,idle_expires_at,absolute_expires_at,last_mfa_at
      ) VALUES ($1,$2,$3,$4,'{}'::jsonb,now(),now(),now()+interval '1 hour',
        now()+interval '2 hours',now())`,
-    [sessionId, userId, `sha256:${randomBytes(32).toString("hex")}`,
+    // D55: the row of the token the session application maps to this account, so the database finds the foreigner's own
+    // context and the 404s below are the API's refusal, not an empty context.
+    [sessionId, userId, hashToken("session", FOREIGN_TOKEN),
       `sha256:${randomBytes(32).toString("hex")}`]
   );
   return authenticated({ userId, ownerRef, sessionId, token: FOREIGN_TOKEN });
@@ -140,6 +147,22 @@ function readyRecord(runId: string, answerId: string): StoryRecordInput {
   };
 }
 
+/**
+ * The two ask-admission pools main.ts hands PostgresAskApplication. Superuser mode hands one pool in every field, which
+ * the constructor refuses in two places, so it gets the harness's two facades over it, as at base.
+ */
+function askAdmissionPools(api: ApiTestPools): Readonly<{ server: ApiTestPools["runtime"]; legacy: ApiTestPools["runtime"] }> {
+  return api.serverAskAdmission === api.runtime
+    ? createTestAskAdmissionPoolFacades(api.runtime)
+    : Object.freeze({ server: api.serverAskAdmission, legacy: api.legacyAskAdmission });
+}
+
+/** The pool every API reader of this file uses: `apiTestPools`' runtime field (R21, PLAN S5.3). */
+function runtimePool(): ApiTestPools["runtime"] {
+  if (pools === undefined) throw new Error("STORY_TEST_POOLS_UNBUILT");
+  return pools.runtime;
+}
+
 function headersFor(token: string): Record<string, string> {
   return { cookie: `${SESSION_COOKIE_NAME}=${token}` };
 }
@@ -149,6 +172,10 @@ beforeAll(async () => {
   await migrate(database.pool);
   owner = await provisionStoryEncryptedOwner(database.pool);
   const theOwnerNow = theOwner();
+  // D55: the owner's session row (written by provisionStoryEncryptedOwner with a random hash) is keyed to the token the
+  // session application maps to it, so the database finds the owner's context for OWNER_TOKEN.
+  await database.pool.query("UPDATE identity.session SET token_hash = $2 WHERE session_id = $1",
+    [theOwnerNow.sessionId, hashToken("session", OWNER_TOKEN)]);
   ownerAuth = authenticated({
     userId: theOwnerNow.userId, ownerRef: theOwnerNow.ownerRef, sessionId: theOwnerNow.sessionId, token: OWNER_TOKEN
   });
@@ -179,6 +206,10 @@ beforeAll(async () => {
     floorVerdictState: "SUPPORTED", floorLeadingNodeId: FLOOR_LEADING_NODE_ID, floorReason: "ENVELOPE_EXHAUSTED"
   })).resolves.toBe("INSERTED");
 
+  // R21 (PLAN S5.3): every pool the API reads through is the mode's (the product's logins in API-login mode); seeding
+  // above stays on the harness superuser. main.ts gives the runtime pool the content cipher (configureContentEncryption).
+  pools = await apiTestPools(database, import.meta.url);
+  if (contentCipherFor(pools.runtime) === undefined) configureContentEncryption(pools.runtime, contentCipherFor(database.pool)!);
   const sessionsByToken = new Map([[OWNER_TOKEN, ownerAuth], [FOREIGN_TOKEN, foreignAuth]]);
   const sessions = {
     authenticate: async (token: string) => sessionsByToken.get(token) ?? null,
@@ -186,18 +217,19 @@ beforeAll(async () => {
   } as unknown as SessionApplication;
   api = buildApi({
     application: new PostgresAskApplication(
-      database.pool, {} as never, { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, undefined, database.pool,
-      createTestAskAdmissionPoolFacades(database.pool)
+      pools.runtime, {} as never, { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, undefined,
+      pools.contentProvision, askAdmissionPools(pools)
     ),
     sessions,
     allowedOrigin: ORIGIN,
-    stories: new RepositoryAnswerStoryApplication(new StoryRepository(database.pool)),
-    disclosures: new RepositoryAnswerDisclosureApplication(new ServeDisclosureRepository(database.pool))
+    stories: new RepositoryAnswerStoryApplication(new StoryRepository(pools.runtime)),
+    disclosures: new RepositoryAnswerDisclosureApplication(new ServeDisclosureRepository(pools.runtime))
   });
 }, 180_000);
 
 afterAll(async () => {
   await api?.close();
+  if (database !== undefined && pools !== undefined && pools.runtime !== database.pool) await (await provisionRlsLogins(database)).end();
   await database?.stop();
   if (owner !== undefined) await releaseStoryEncryptedOwner(owner);
 });
@@ -253,7 +285,7 @@ describe("GET /v1/answers/{id}/story over the real database (spec §11)", () => 
   });
 
   it("refuses the foreigner at the repository too, not only at the answer gate", async () => {
-    const reader = new RepositoryAnswerStoryApplication(new StoryRepository(database.pool));
+    const reader = new RepositoryAnswerStoryApplication(new StoryRepository(runtimePool()));
     await expect(reader.readStory({
       answerId: storiedAnswerId, answerVersion: 1,
       ownership: { ownerRef: foreignAuth.ownerRef, legacyAskerId: null }
@@ -315,7 +347,7 @@ describe("GET /v1/answers/{id}/disclosure over the real database (engine money r
   });
 
   it("refuses the foreigner at the repository too, not only at the answer gate", async () => {
-    const reader = new RepositoryAnswerDisclosureApplication(new ServeDisclosureRepository(database.pool));
+    const reader = new RepositoryAnswerDisclosureApplication(new ServeDisclosureRepository(runtimePool()));
     await expect(reader.readDisclosure({
       answerId: flooredAnswerId, ownership: { ownerRef: foreignAuth.ownerRef, legacyAskerId: null }
     })).resolves.toBeNull();
