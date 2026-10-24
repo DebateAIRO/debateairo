@@ -165,7 +165,9 @@
   "staff.event.THREAT_REPORT_REPORTED": "Threat report marked reported",
   "staff.event.THREAT_REPORT_NOT_REPORTED": "Threat report marked not reported",
   "staff.threatReports.link": "Threat reports",
-  "staff.threatReports.unread": "{count} unread",
+  "staff.threatReports.unread.one": "{count} unread",
+  "staff.threatReports.unread.few": "{count} unread",
+  "staff.threatReports.unread.other": "{count} unread",
   "staff.threatReports.title": "Threat reports",
   "staff.threatReports.lede": "Questions our automatic check refused and kept because they may threaten someone. Read each one and record whether you reported it to the authorities.",
   "staff.threatReports.listTitle": "Kept questions, oldest first",
@@ -185,5 +187,6 @@
   "staff.threatReports.noAccess": "You don't have access to threat reports.",
   "staff.threatReports.gone": "This report no longer exists: it was erased, or another team member recorded it as not reported.",
   "staff.threatReports.alreadyDecided": "Another team member already recorded a decision on this report. This is its current state.",
-  "staff.threatReports.loadFailed": "Threat reports could not be loaded. Go back and try again."
+  "staff.threatReports.loadFailed": "Threat reports could not be loaded. Go back and try again.",
+  "staff.threatReports.verifyFirst": "Verify Team access first to read threat reports."
 }
