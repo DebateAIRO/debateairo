@@ -33,6 +33,7 @@
  * gate the config does not name has no port, so a debate needing it is refused (as unavailable)
  * before it starts.
  */
+import { crossAccount } from "@debateai/db";
 import { exhaustive, TypedDomainError } from "@debateai/kernel";
 import {
   createPreviewRemainingRpcPort,
@@ -1478,10 +1479,12 @@ export async function readPreviewBudgetGateSettings(
     ...own,
     askProbeModelIds: Object.freeze([...askProbeModelIds]),
     structureRepairModel: askProbeModelIds.includes(PREVIEW_STRUCTURE_REPAIR_MODEL) ? PREVIEW_STRUCTURE_REPAIR_MODEL : null,
+    // Row-level security S01 (X21, D36): the gate counts every account's unfinished debates and the site's measured
+    // usage, so both reads run on the pool's system login, also inside the ask request.
     readUnfinishedRuns: async () => {
-      const result = await pool.query<{ envelope_basis: unknown; discovered_panel: unknown; phase: unknown; composition_budget_tier: unknown;
+      const result = await crossAccount("X21", () => pool.query<{ envelope_basis: unknown; discovered_panel: unknown; phase: unknown; composition_budget_tier: unknown;
         rotated: unknown; register_version: unknown }>(
-        PREVIEW_UNFINISHED_RUNS_SQL, [true, PREVIEW_STORY_HOLD_WINDOW_SECONDS]);
+        PREVIEW_UNFINISHED_RUNS_SQL, [true, PREVIEW_STORY_HOLD_WINDOW_SECONDS]));
       return Object.freeze(result.rows.map(previewUnfinishedRunFrom));
     },
     termsForVersion: (version: number) => {
@@ -1494,8 +1497,8 @@ export async function readPreviewBudgetGateSettings(
       return read;
     },
     readMeasuredCallUsage: async () => {
-      const result = await pool.query<{ provider_ref: unknown; spend_source: unknown; calls: unknown; input_tokens: unknown; output_tokens: unknown }>(
-        PREVIEW_MEASURED_USAGE_SQL, [[...PREVIEW_REVIEWED_PROVIDER_REFS], PREVIEW_CALIBRATION_WINDOW_DAYS]);
+      const result = await crossAccount("X21", () => pool.query<{ provider_ref: unknown; spend_source: unknown; calls: unknown; input_tokens: unknown; output_tokens: unknown }>(
+        PREVIEW_MEASURED_USAGE_SQL, [[...PREVIEW_REVIEWED_PROVIDER_REFS], PREVIEW_CALIBRATION_WINDOW_DAYS]));
       return previewMeasuredCallUsageFrom(result.rows);
     },
     openAdmissionLock: () => createPreviewAdmissionLock(pool)

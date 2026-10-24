@@ -59,6 +59,7 @@ import {
 import { AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
 // Role rotation (spec 2026-10-11): the per-role, per-model counts admission reads when the row is ON.
 import { readRoleRotationCounts, recordSpendWaiver } from "@debateai/db";
+import { crossAccount, crossAccountPool, setCrossAccountTarget } from "@debateai/db";
 import { WorkItemRepository } from "@debateai/battery";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes, type AskRequest } from "@debateai/contract";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
@@ -359,6 +360,12 @@ const dataExportPool = environment.DATA_EXPORT_STORE_PATH === undefined ? undefi
 // Final fix wave P1: on a pool of its own (the runtime principal's URL), so a burst of page reads queued on the runtime
 // pool never holds its read past the 5 s stale bound (/readyz DATABASE_UNREACHABLE, the front pair marked down).
 const releaseWatchPool = boot.hold(createPool(environment.DATABASE_URL, API_DATABASE_POOLS.releaseWatch));
+// Row-level security S01 (PLAN S4.3; DECISIONS D29, D68): every statement a T1 pool makes outside a request — boot,
+// background loops, jobs — runs on its system login, before any of them uses the pool; inside a request it runs on
+// the T1 login with that request's account context. releaseWatchPool keeps none (0123's readers are definers).
+setCrossAccountTarget(pool, systemPool);
+setCrossAccountTarget(legacyAskAdmissionPool, systemPool);
+setCrossAccountTarget(authorizationPool, authorizationSystemPool);
 const releaseWatcher = new ReleaseWatcher({
   releaseKey: environment.RELEASE_KEY,
   hosted: environment.DEPLOYMENT_MODE === "hosted",
@@ -905,7 +912,7 @@ const billingNoticeSpool = environment.BILLING_NOTICE_SPOOL_PATH === undefined
  * card, no job and no email. Nothing drains an outbox here, so the kick does nothing.
  */
 const providerOnlyIntake = providerOnlyConnectors === null ? undefined : new NetopiaNoticeIntake({
-  repository: new BillingRepository(pool), jobs: new BillingJobQueries(pool), trust: providerOnlyConnectors.noticeTrust,
+  repository: new BillingRepository(crossAccountPool(pool, "X11")), jobs: new BillingJobQueries(crossAccountPool(pool, "X11")), trust: providerOnlyConnectors.noticeTrust,
   recordsKey: providerOnlyConnectors.recordsKey, paymentEnvironment: providerOnlyConnectors.paymentEnvironment,
   mode: "PROVIDER_ONLY", audit: consoleBillingAudit, kick: () => undefined,
   ...(billingNoticeSpool === undefined ? {} : { spool: billingNoticeSpool })
@@ -974,11 +981,12 @@ const runKeyStore = boot.runSync("run-content-key-store", () =>
     environment.USER_DEK_STORE_PATH,
     dekStore,
     async (ownerRef) => {
-      const resolved = await pool.query<{ user_id: string }>(
+      // Row-level security S01 (X18h, D36): a run's owner may be another account (a public debate's), so api-system.
+      const resolved = await crossAccount("X18h", () => pool.query<{ user_id: string }>(
         `SELECT user_id FROM identity."user"
          WHERE owner_ref=$1 AND state='active'`,
         [ownerRef]
-      );
+      ));
       const userId = resolved.rows[0]?.user_id;
       if (userId === undefined) throw new TypeError("OWNER_REF_UNRESOLVED");
       return userId;
@@ -1072,7 +1080,7 @@ const mfa = new MfaEnrollmentService({
 });
 // Explicit v2 composition retains current-state checks and refuses unavailable operator readiness.
 const staffAccess = environment.STAFF_ACCESS.policyVersion === 2
-  ? new StaffAccessService(new PostgresStaffRepository(pool), sessions) : undefined;
+  ? new StaffAccessService(new PostgresStaffRepository(crossAccountPool(pool, "X14")), sessions) : undefined;
 // Explicit protected adapters, config custody, installation and policy are startup-only gates. A stale ACK
 // proof or readiness publication never blocks boot: Team tools start locked (one api.staff.tools_locked line)
 // and each staff action re-checks readiness, so an operator unlock needs no restart.
@@ -1080,8 +1088,8 @@ const staffAlerts = environment.STAFF_ACCESS.policyVersion === 2
   ? await boot.run("staff-activation", () => createStaffRuntime({environment:environment.STAFF_ACCESS as Extract<typeof environment.STAFF_ACCESS,{policyVersion:2}>,registerVersion:environment.REGISTER_VERSION,publicAppUrl:environment.PUBLIC_APP_URL,pool,keys:dekStore,deploymentMode:environment.DEPLOYMENT_MODE,billingPlans:askRoomComposition?.billingPlans??null,providerTargets:declaredProviderTargets,log:code=>console.error('[STAFF_ALERT_FAILURE]',code)})) : undefined;
 if (staffAlerts !== undefined) boot.hold({end:()=>staffAlerts.close()});
 const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undefined : {
-  access: staffAccess, sessions, repository: new PostgresStaffRepository(pool),
-  webauthn: new StaffWebAuthnService(new PostgresStaffRepository(pool), {publicAppUrl: environment.PUBLIC_APP_URL}),
+  access: staffAccess, sessions, repository: new PostgresStaffRepository(crossAccountPool(pool, "X14")),
+  webauthn: new StaffWebAuthnService(new PostgresStaffRepository(crossAccountPool(pool, "X14")), {publicAppUrl: environment.PUBLIC_APP_URL}),
   intents: staffAlerts.intents, readiness: staffAlerts.readiness,
   targetInvitationTransport: staffAlerts.targetInvitationTransport,
   ...(staffAlerts.funding === undefined ? {} : { funding: staffAlerts.funding })
@@ -1573,7 +1581,7 @@ const billingRuntime = billingConnectors === null
         payments: new TimeShiftedCardPayments(billingConnectors.payments, stageOffsetDays)
       });
     return createBillingRuntime({
-      pool, connectors: runtimeConnectors, policy: billingPolicy, plans: billingPlans, countryPolicy,
+      pool: crossAccountPool(pool, "X11"), connectors: runtimeConnectors, policy: billingPolicy, plans: billingPlans, countryPolicy,
       geo: geoLookup, legal, dekStore,
       // P17 (spec §2.5.10): the EMAIL jobs send through the same sendmail path, sender and timeout as the mail above.
       mail: {
