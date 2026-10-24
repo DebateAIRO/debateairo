@@ -1,5 +1,6 @@
 import type { QuestionCheckOutcome } from "./contract.js";
 import { CRISIS_SUPPORT_OFFERED } from "@debateai/contract";
+import { exhaustive } from "@debateai/kernel";
 
 export interface AskQuestionCheck {
   check(questionLine: string): Promise<QuestionCheckOutcome>;
@@ -28,5 +29,6 @@ export function answerForOutcome(outcome: QuestionCheckOutcome, country: string 
       status: 503,
       body: { error: "QUESTION_CHECK_UNAVAILABLE", message: "QUESTION_CHECK_UNAVAILABLE" }
     };
+    default: return exhaustive(outcome);
   }
 }

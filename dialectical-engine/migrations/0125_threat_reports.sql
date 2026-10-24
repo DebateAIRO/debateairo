@@ -15,7 +15,7 @@ AS $$
 DECLARE v_today date := (pg_catalog.clock_timestamp() AT TIME ZONE 'UTC')::date;
 BEGIN
   IF p_charged_on IS NULL OR p_charged_on < v_today - 1 OR p_charged_on > v_today + 1
-    OR p_provider_ref IS NULL OR p_provider_ref !~ '^question-check:[a-z0-9-]+:[A-Za-z0-9._/-]{1,128}$'
+    OR p_provider_ref IS NULL OR p_provider_ref !~ '^question-check:((development|vendor):)?[A-Za-z0-9._/-]{1,128}:[A-Za-z0-9._/-]{1,128}$'
     OR p_charge_micros IS NULL OR p_input_tokens IS NULL OR p_output_tokens IS NULL
     OR p_charge_micros < 0 OR p_input_tokens < 0 OR p_output_tokens < 0 THEN
     RAISE EXCEPTION 'QUESTION_CHECK_SPEND_INVALID' USING ERRCODE = 'check_violation';
@@ -374,18 +374,28 @@ CREATE TRIGGER staff_immutable BEFORE UPDATE OR DELETE OR TRUNCATE ON staff.thre
 GRANT SELECT (erasure_id, user_id, prepared_at, cancelled_at, committed_at)
   ON identity.account_erasure_request TO debateai_staff_security_owner;
 
+-- Alert claims carry staff ids; resolve a currently eligible holder before decrypting their user email.
+CREATE OR REPLACE FUNCTION staff.threat_report_recipient_user(p_staff uuid) RETURNS uuid
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog AS $$
+  SELECT s.user_id FROM staff.subject s
+  WHERE s.staff_id=p_staff AND s.state='ACTIVE' AND 'THREAT_REPORT'=ANY(s.capabilities)
+$$;
+ALTER FUNCTION staff.threat_report_recipient_user(uuid) OWNER TO debateai_staff_security_owner;
+REVOKE ALL ON FUNCTION staff.threat_report_recipient_user(uuid) FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
+GRANT EXECUTE ON FUNCTION staff.threat_report_recipient_user(uuid) TO debateai_runtime;
+
 CREATE OR REPLACE FUNCTION staff.keep_threat_report(p_question text, p_account uuid) RETURNS uuid
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog AS $$
 DECLARE v_ref uuid; v_account uuid := p_account;
 BEGIN
   IF p_account IS NOT NULL THEN
     -- Serialize a keep with the email hold: a keep before the hold is swept up by it;
-    -- a keep after the hold sees the open prepared erasure and carries no account.
+    -- a keep after the hold cannot retain the email and must not leave an unreadable report.
     PERFORM pg_advisory_xact_lock(hashtextextended('staff:threat-report-erasure:' || p_account::text,0));
     IF EXISTS (SELECT 1 FROM identity.account_erasure_request
       WHERE user_id=p_account AND prepared_at IS NOT NULL
         AND cancelled_at IS NULL AND committed_at IS NULL) THEN
-      v_account:=NULL;
+      RAISE EXCEPTION 'THREAT_REPORT_ACCOUNT_ERASING';
     END IF;
   END IF;
   INSERT INTO staff.threat_report(question, account_user_id) VALUES (p_question, v_account)
@@ -398,6 +408,33 @@ END $$;
 ALTER FUNCTION staff.keep_threat_report(text,uuid) OWNER TO debateai_staff_security_owner;
 REVOKE ALL ON FUNCTION staff.keep_threat_report(text,uuid) FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
 GRANT EXECUTE ON FUNCTION staff.keep_threat_report(text,uuid) TO debateai_runtime;
+
+-- A keep after the erasure hold can still retain the live email before the user DEK is destroyed.
+CREATE OR REPLACE FUNCTION staff.keep_threat_report_with_email(p_question text, p_account uuid, p_held_email text) RETURNS uuid
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog AS $$
+DECLARE v_ref uuid;
+BEGIN
+  IF p_account IS NULL THEN RAISE EXCEPTION 'THREAT_REPORT_ACCOUNT_ERASING' USING ERRCODE='22023'; END IF;
+  PERFORM pg_advisory_xact_lock(hashtextextended('staff:threat-report-erasure:' || p_account::text,0));
+  IF NOT EXISTS (SELECT 1 FROM identity.account_erasure_request
+    WHERE user_id=p_account AND prepared_at IS NOT NULL
+      AND cancelled_at IS NULL AND committed_at IS NULL) THEN
+    RETURN staff.keep_threat_report(p_question,p_account);
+  END IF;
+  IF p_held_email IS NULL OR length(p_held_email) NOT BETWEEN 3 AND 320
+    OR p_held_email !~ '^[^[:space:]@]+@[^[:space:]@]+$' THEN
+    RAISE EXCEPTION 'THREAT_REPORT_EMAIL_INVALID' USING ERRCODE='22023';
+  END IF;
+  INSERT INTO staff.threat_report(question, account_user_id, held_email)
+    VALUES (p_question,NULL,p_held_email) RETURNING report_ref INTO v_ref;
+  INSERT INTO staff.threat_report_alert(recipient_staff_id)
+    SELECT staff_id FROM staff.subject
+    WHERE state='ACTIVE' AND 'THREAT_REPORT'=ANY(capabilities);
+  RETURN v_ref;
+END $$;
+ALTER FUNCTION staff.keep_threat_report_with_email(text,uuid,text) OWNER TO debateai_staff_security_owner;
+REVOKE ALL ON FUNCTION staff.keep_threat_report_with_email(text,uuid,text) FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
+GRANT EXECUTE ON FUNCTION staff.keep_threat_report_with_email(text,uuid,text) TO debateai_runtime;
 
 CREATE OR REPLACE FUNCTION staff.list_threat_reports(p_context jsonb, p_token text)
 RETURNS TABLE(report_ref uuid, kept_at timestamptz, decision text, decided_at timestamptz)
@@ -424,6 +461,25 @@ END $$;
 ALTER FUNCTION staff.count_unread_threat_reports(jsonb,text) OWNER TO debateai_staff_security_owner;
 REVOKE ALL ON FUNCTION staff.count_unread_threat_reports(jsonb,text) FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
 GRANT EXECUTE ON FUNCTION staff.count_unread_threat_reports(jsonb,text) TO debateai_runtime;
+
+-- Resolve only the account availability before the audited question read. No question or email leaves this function.
+CREATE OR REPLACE FUNCTION staff.peek_threat_report_account(p_context jsonb, p_token text, p_report uuid)
+RETURNS TABLE(account_user_id uuid, has_held_email boolean)
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog AS $$
+DECLARE v_account uuid; v_has_held_email boolean;
+BEGIN
+  PERFORM staff.require_http_authority(p_context,p_token,'THREAT_REPORT');
+  SELECT r.account_user_id,r.held_email IS NOT NULL INTO v_account,v_has_held_email
+    FROM staff.threat_report r WHERE r.report_ref=p_report;
+  IF NOT FOUND THEN RAISE EXCEPTION 'THREAT_REPORT_NOT_FOUND' USING ERRCODE='P0002'; END IF;
+  IF v_account=(p_context->>'userId')::uuid THEN
+    RAISE EXCEPTION 'THREAT_REPORT_OWN' USING ERRCODE='42501';
+  END IF;
+  RETURN QUERY SELECT v_account,v_has_held_email;
+END $$;
+ALTER FUNCTION staff.peek_threat_report_account(jsonb,text,uuid) OWNER TO debateai_staff_security_owner;
+REVOKE ALL ON FUNCTION staff.peek_threat_report_account(jsonb,text,uuid) FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
+GRANT EXECUTE ON FUNCTION staff.peek_threat_report_account(jsonb,text,uuid) TO debateai_runtime;
 
 CREATE OR REPLACE FUNCTION staff.read_threat_report(p_context jsonb, p_token text, p_report uuid)
 RETURNS TABLE(report_ref uuid, question text, kept_at timestamptz, account_user_id uuid, held_email text, decision text, decided_at timestamptz)
@@ -658,8 +714,10 @@ BEGIN
     END IF;
   END LOOP;
   FOREACH v_name IN ARRAY ARRAY[
-    'staff.keep_threat_report(text,uuid)','staff.list_threat_reports(jsonb,text)',
-    'staff.count_unread_threat_reports(jsonb,text)','staff.read_threat_report(jsonb,text,uuid)',
+    'staff.keep_threat_report(text,uuid)','staff.keep_threat_report_with_email(text,uuid,text)',
+    'staff.list_threat_reports(jsonb,text)',
+    'staff.count_unread_threat_reports(jsonb,text)','staff.peek_threat_report_account(jsonb,text,uuid)',
+    'staff.read_threat_report(jsonb,text,uuid)','staff.threat_report_recipient_user(uuid)',
     'staff.decide_threat_report(jsonb,text,uuid,text,jsonb)','staff.erase_due_threat_reports()',
     'staff.hold_threat_report_email(uuid,text)','staff.claim_threat_report_alerts(integer)',
     'staff.complete_threat_report_alert(uuid,uuid,boolean)',

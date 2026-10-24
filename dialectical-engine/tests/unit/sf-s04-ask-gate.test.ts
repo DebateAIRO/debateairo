@@ -5,6 +5,7 @@ import { parsePreviewProviderTestConfig } from "@debateai/providers";
 import type { AdmissionLimiter } from "../../apps/api/src/admission.js";
 import type { CountryGate } from "../../apps/api/src/country-gate.js";
 import { KEPT_LABELS, QUESTION_CHECK_FAILURE_CODES, QUESTION_CHECK_LABELS, REFUSING_KINDS, type QuestionCheckOutcome } from "../../apps/api/src/question-check/contract.js";
+import { answerForOutcome } from "../../apps/api/src/question-check/ask-gate.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 
 const ASK = Object.freeze({
@@ -93,13 +94,19 @@ describe("S04 question gate position", () => {
     } finally { await h.api.close(); }
   });
 
-  it("keeps the base composition working without a question check", async () => {
+  it("refuses an ask when the composition omitted the question check", async () => {
     const h = harness({ check: false });
     try {
-      expect((await h.ask()).statusCode).toBe(202);
-      expect(h.submitted).toHaveBeenCalledOnce();
+      expect((await h.ask()).statusCode).toBe(503);
+      expect(h.submitted).not.toHaveBeenCalled();
     } finally { await h.api.close(); }
   });
+});
+
+it("throws for a future outcome instead of silently allowing an undefined answer", () => {
+  // Property: extending the outcome union requires an explicit HTTP decision.
+  // Mutant: remove the exhaustive default; changing a refusal's message is a neighbour.
+  expect(() => answerForOutcome({ outcome: "FUTURE" } as unknown as QuestionCheckOutcome, null)).toThrow();
 });
 
 describe("S04 kept refusals", () => {
@@ -135,6 +142,19 @@ describe("S04 kept refusals", () => {
       expect(response.json()).toEqual({ error: "QUESTION_CHECK_UNAVAILABLE", message: "QUESTION_CHECK_UNAVAILABLE" });
       expect(h.submitted).not.toHaveBeenCalled();
     } finally { await h.api.close(); }
+  });
+
+  it("logs a failed keep as a generic check outage without naming its outcome class", async () => {
+    // Property: a log reader cannot infer that this refusal was one of the two kept labels.
+    // Mutant: call the event keep_failed; changing the failure code is a neighbour.
+    const lines: string[] = [];
+    const log = vi.spyOn(console, "error").mockImplementation(value => { lines.push(String(value)); });
+    const h = harness({ outcome: { outcome: "REFUSE", kind: "HARM_TO_OTHERS", kept: true }, keepFails: true });
+    try {
+      await h.ask();
+      expect(lines.map(line => JSON.parse(line))).toContainEqual({ event: "api.question_check.unavailable", code: "KEEP_IO_DOWN" });
+      expect(lines.join(" ")).not.toMatch(/keep_failed|HARM_TO_OTHERS|WEAPONS_DRUGS_TERRORISM/u);
+    } finally { log.mockRestore(); await h.api.close(); }
   });
 });
 

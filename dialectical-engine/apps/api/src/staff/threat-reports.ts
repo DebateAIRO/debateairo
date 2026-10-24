@@ -11,16 +11,22 @@ export class ThreatReportHttpError extends Error {
 }
 
 export interface ThreatReportStaffService {
-  repository: Pick<PostgresThreatReportRepository, "list" | "countUnread" | "read" | "decide">;
+  repository: Pick<PostgresThreatReportRepository, "list" | "countUnread" | "peekAccount" | "read" | "decide">;
   /** Opens the live user's email using the user DEK and identity.user.email_ciphertext AAD. */
   readRecipientEmail(userId: string): Promise<string | null>;
 }
 
-/** Reads the live identity envelope on the runtime pool; the held address bypasses this after erasure. */
+/** Reads the live identity envelope on the runtime pool; alert claims first resolve a current staff holder. */
 export function threatReportEmailReader(
-  pool: Pick<Pool, "query">, keys: Pick<ReadableUserDekStore, "load">
-): (userId: string) => Promise<string | null> {
-  return async userId => {
+  pool: Pick<Pool, "query">, keys: Pick<ReadableUserDekStore, "load">, idKind: "user" | "staff" = "user"
+): (id: string) => Promise<string | null> {
+  return async id => {
+    const userId = idKind === "staff"
+      ? (await pool.query<{ user_id: string | null }>(
+        "SELECT staff.threat_report_recipient_user($1::uuid) user_id", [id]
+      )).rows[0]?.user_id ?? null
+      : id;
+    if (userId === null) return null;
     const row = (await pool.query<{ email_ciphertext: CryptoEnvelope }>(
       'SELECT email_ciphertext FROM identity."user" WHERE user_id=$1', [userId]
     )).rows[0];
@@ -92,8 +98,12 @@ export function registerThreatReportRoutes(
   route("GET", "/v1/admin/threat-reports/:reportRef", async (request, reply) => {
     reply.header("Cache-Control", "no-store");
     const authentication = await permitted(request);
-    const row = await service!.repository.read(authentication.context, authentication.baseSession.tokenHash, reference(request));
-    const email = row.held_email ?? (row.account_user_id === null ? null : await service!.readRecipientEmail(row.account_user_id));
+    const reportRef = reference(request);
+    const account = await service!.repository.peekAccount(authentication.context, authentication.baseSession.tokenHash, reportRef);
+    const liveEmail = account.account_user_id === null ? null : await service!.readRecipientEmail(account.account_user_id);
+    if (liveEmail === null && !account.has_held_email) throw new ThreatReportHttpError(503, "STAFF_UNAVAILABLE");
+    const row = await service!.repository.read(authentication.context, authentication.baseSession.tokenHash, reportRef);
+    const email = row.held_email ?? liveEmail;
     if (email === null) throw new ThreatReportHttpError(503, "STAFF_UNAVAILABLE");
     return projected(contract.ThreatReportSchema, { report_ref: row.report_ref, question: row.question,
       kept_at: iso(row.kept_at), account: { email, user_id: row.account_user_id },

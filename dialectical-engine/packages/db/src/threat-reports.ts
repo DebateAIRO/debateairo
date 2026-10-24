@@ -23,6 +23,7 @@ export type ThreatReportListRow = Readonly<{
 export type ThreatReportReadRow = ThreatReportListRow & Readonly<{
   question: string; account_user_id: string | null; held_email: string | null;
 }>;
+export type ThreatReportAccount = Readonly<{ account_user_id: string | null; has_held_email: boolean }>;
 export type ThreatReportAlertClaim = Readonly<{
   alert_id: string; recipient_staff_id: string; claim_token: string;
 }>;
@@ -35,6 +36,15 @@ export class PostgresThreatReportRepository {
     try {
       const result = await this.pool.query<{ report_ref: string }>(
         "SELECT staff.keep_threat_report($1::text,$2::uuid) report_ref", [question, account]);
+      return result.rows[0]!.report_ref;
+    } catch (error) { return rethrow(error); }
+  }
+
+  async keepWithHeldEmail(question: string, account: string, email: string): Promise<string> {
+    try {
+      const result = await this.pool.query<{ report_ref: string }>(
+        "SELECT staff.keep_threat_report_with_email($1::text,$2::uuid,$3::text) report_ref",
+        [question, account, email]);
       return result.rows[0]!.report_ref;
     } catch (error) { return rethrow(error); }
   }
@@ -59,6 +69,14 @@ export class PostgresThreatReportRepository {
     try {
       const result = await this.pool.query<ThreatReportReadRow>(
         "SELECT * FROM staff.read_threat_report($1::jsonb,$2::text,$3::uuid)", [context, token, ref]);
+      return result.rows[0]!;
+    } catch (error) { return rethrow(error); }
+  }
+
+  async peekAccount(context: unknown, token: string, ref: string): Promise<ThreatReportAccount> {
+    try {
+      const result = await this.pool.query<ThreatReportAccount>(
+        "SELECT * FROM staff.peek_threat_report_account($1::jsonb,$2::text,$3::uuid)", [context, token, ref]);
       return result.rows[0]!;
     } catch (error) { return rethrow(error); }
   }

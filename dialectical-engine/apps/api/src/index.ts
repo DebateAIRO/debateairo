@@ -3602,22 +3602,23 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (Buffer.byteLength(ask.question_line, "utf8") > ASK_QUESTION_MAX_BYTES) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
-    if (options.questionCheck !== undefined) {
-      const outcome = await options.questionCheck.check(ask.question_line);
-      if (outcome.outcome === "REFUSE" && outcome.kept) {
-        try {
-          await options.questionCheck.keep({
-            questionLine: ask.question_line,
-            accountUserId: request.authenticatedSession?.userId ?? null
-          });
-        } catch (error) {
-          console.error(JSON.stringify({ event: "api.question_check.keep_failed", code: keepFailureCode(error) }));
-          return reply.status(503).send({ error: "QUESTION_CHECK_UNAVAILABLE", message: "QUESTION_CHECK_UNAVAILABLE" });
-        }
-      }
-      const answer = answerForOutcome(outcome, edgeCountry(request.headers));
-      if (answer !== null) return reply.status(answer.status).send(answer.body);
+    if (options.questionCheck === undefined) {
+      return reply.status(503).send({ error: "QUESTION_CHECK_UNAVAILABLE", message: "QUESTION_CHECK_UNAVAILABLE" });
     }
+    const outcome = await options.questionCheck.check(ask.question_line);
+    if (outcome.outcome === "REFUSE" && outcome.kept) {
+      try {
+        await options.questionCheck.keep({
+          questionLine: ask.question_line,
+          accountUserId: request.authenticatedSession?.userId ?? null
+        });
+      } catch (error) {
+        console.error(JSON.stringify({ event: "api.question_check.unavailable", code: keepFailureCode(error) }));
+        return reply.status(503).send({ error: "QUESTION_CHECK_UNAVAILABLE", message: "QUESTION_CHECK_UNAVAILABLE" });
+      }
+    }
+    const answer = answerForOutcome(outcome, edgeCountry(request.headers));
+    if (answer !== null) return reply.status(answer.status).send(answer.body);
     const accepted = AskAcceptedSchema.parse(await options.application.submit(
       ask,
       request.session,

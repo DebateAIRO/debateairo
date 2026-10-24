@@ -58,6 +58,8 @@ function allIndices(source: string, expression: RegExp): number[] {
   return [...source.matchAll(new RegExp(expression.source, "gu"))].map((match) => match.index);
 }
 
+const submitCall = /\.submit\s*\(/u;
+
 function scope(source: string, open: number): { start: number; end: number } {
   expect(source[open]).toBe("{");
   let depth = 0;
@@ -100,7 +102,7 @@ describe("S04 run creation stays behind the ask gate", () => {
 
   it("submit is called only by POST /v1/asks, after the question check", () => {
     const masked = codeMask(api);
-    const calls = allIndices(masked, /options\.application\.submit\s*\(/u);
+    const calls = allIndices(masked, submitCall);
     expect(calls).toHaveLength(1);
     const routeAt = api.indexOf('api.post("/v1/asks"');
     expect(routeAt).toBeGreaterThan(-1);
@@ -110,6 +112,16 @@ describe("S04 run creation stays behind the ask gate", () => {
     const checkAt = masked.indexOf("options.questionCheck.check(", route.start);
     expect(checkAt).toBeGreaterThan(route.start);
     expect(calls[0]).toBeGreaterThan(checkAt);
+    const roomCalls = allIndices(masked, /\.#submitWithRoom\s*\(/u);
+    expect(roomCalls).toHaveLength(1);
+    const submit = method(api, "submit");
+    expect(roomCalls[0]).toBeGreaterThan(submit.start);
+    expect(roomCalls[0]).toBeLessThan(submit.end);
+  });
+
+  it("recognizes a submit call through an aliased application", () => {
+    const alias = "const app = options.application; app.submit(question);";
+    expect(allIndices(codeMask(alias), submitCall)).toHaveLength(1);
   });
 
   it("core.create_encrypted_run has one call in apps and packages, inside startRun", () => {

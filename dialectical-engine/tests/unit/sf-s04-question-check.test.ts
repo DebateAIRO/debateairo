@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createQuestionCheck } from "../../apps/api/src/question-check/check.js";
 import { QuestionCheckFailure, type QuestionCheckPort } from "../../apps/api/src/question-check/transport.js";
 import type { QuestionCheckLabel } from "../../apps/api/src/question-check/contract.js";
+import { SUPPORT_RELAY_PROVIDER_REF } from "../../apps/api/src/support/model.js";
 
 const day = new Date("2026-10-20T12:00:00.000Z");
 const marker = /DEBATEAI-FENCE-([0-9a-f]{32})/u;
@@ -17,6 +18,8 @@ function harness(label: QuestionCheckLabel = "ORDINARY") {
     port: QuestionCheckPort | null;
     price: { input: number; output: number } | null;
     dayPot: { ceilingMicros: number; spentMicros: () => Promise<number> } | null;
+    now: Date;
+    deadlineMs: number;
   } = {
     completion: async ({ packet }) => ({
       text: JSON.stringify({ call: packet.messages[1]!.content.match(marker)![1], label }),
@@ -26,17 +29,19 @@ function harness(label: QuestionCheckLabel = "ORDINARY") {
     spent: 0,
     port: null,
     price: { input: 1, output: 2 },
-    dayPot: null
+    dayPot: null,
+    now: day,
+    deadlineMs: 10
   };
   const port: QuestionCheckPort = {
-    providerRef: "anthropic-test", modelId: "claude-haiku-5-5",
+    providerRef: SUPPORT_RELAY_PROVIDER_REF, modelId: "claude-haiku-5-5",
     complete: input => state.completion(input)
   };
   state.port = port;
   const create = () => createQuestionCheck({
-    port: () => state.port, deadlineMs: 10, price: state.price,
+    port: () => state.port, deadlineMs: state.deadlineMs, price: state.price,
     spend: { record: entry => state.record(entry) },
-    dayPot: state.dayPot, clock: () => day,
+    dayPot: state.dayPot, clock: () => state.now,
     report: line => { reports.push(line); }
   });
   return { state, entries, reports, create, port };
@@ -81,7 +86,9 @@ describe("S04 question check", () => {
         signal.addEventListener("abort", () => reject(new QuestionCheckFailure("QUESTION_CHECK_DEADLINE")), { once: true });
       });
     } else h.state.completion = async () => { throw new QuestionCheckFailure(code); };
+    const started = performance.now();
     await expect(h.create().check("line")).resolves.toEqual({ outcome: "UNAVAILABLE", code });
+    if (code === "QUESTION_CHECK_DEADLINE") expect(performance.now() - started).toBeLessThan(250);
     expect(h.reports).toContainEqual({ event: "api.question_check.unavailable", code });
     expect(h.entries).toHaveLength(code === "QUESTION_CHECK_NOT_CONFIGURED" || code === "QUESTION_CHECK_BUDGET_REFUSED" ? 0 : 1);
   });
@@ -116,6 +123,70 @@ describe("S04 question check", () => {
     expect(sends).toBe(5);
   });
 
+  it("retries a latched spend writer after five minutes and closes the breaker on a recorded check", async () => {
+    // Property: a transient spend outage does not keep all later questions unavailable until restart.
+    // Mutant: keep the breaker latched forever; changing the provider model is a neighbour.
+    const h = harness();
+    let records = 0;
+    h.state.record = async () => {
+      records++;
+      if (records === 1) throw Object.assign(new Error("writer down"), { code: "42501" });
+    };
+    const check = h.create();
+    await expect(check.check("first")).resolves.toEqual({ outcome: "PASS" });
+    h.state.now = new Date(day.getTime() + 299_999);
+    await expect(check.check("before retry")).resolves.toEqual({ outcome: "UNAVAILABLE", code: "QUESTION_CHECK_SPEND_RECORD_DOWN" });
+    expect(records).toBe(1);
+    h.state.now = new Date(day.getTime() + 300_000);
+    await expect(check.check("retry")).resolves.toEqual({ outcome: "PASS" });
+    await expect(check.check("after recovery")).resolves.toEqual({ outcome: "PASS" });
+    expect(records).toBe(3);
+  });
+
+  it("opens the breaker again when the five-minute retry still cannot record", async () => {
+    // Property: a failed half-open trial must not send every subsequent question to a known-down writer.
+    const h = harness();
+    let records = 0;
+    h.state.record = async () => {
+      records++;
+      if (records === 1) throw Object.assign(new Error("writer down"), { code: "42501" });
+      throw new Error("retry failed");
+    };
+    const check = h.create();
+    await check.check("first");
+    h.state.now = new Date(day.getTime() + 300_000);
+    await check.check("retry");
+    h.state.now = new Date(day.getTime() + 300_001);
+    await expect(check.check("after failed retry")).resolves.toEqual({
+      outcome: "UNAVAILABLE", code: "QUESTION_CHECK_SPEND_RECORD_DOWN"
+    });
+    expect(records).toBe(2);
+  });
+
+  it.each(["day pot", "spend writer"] as const)("bounds a slow %s by the same D4 deadline", async part => {
+    // Property: no awaited part of the check keeps the ask past D4.
+    // Mutant: await this part outside the race; changing the question wording is a neighbour.
+    const h = harness();
+    h.state.deadlineMs = 20;
+    const slow = () => new Promise<void>(resolve => setTimeout(resolve, 200));
+    if (part === "day pot") h.state.dayPot = { ceilingMicros: 100, spentMicros: async () => { await slow(); return 0; } };
+    else h.state.record = async () => { await slow(); };
+    const started = performance.now();
+    await expect(h.create().check("deadline probe")).resolves.toEqual({ outcome: "UNAVAILABLE", code: "QUESTION_CHECK_DEADLINE" });
+    expect(performance.now() - started).toBeLessThan(120);
+  });
+
+  it("reports the final deadline code when a slow spend follows an unusable answer", async () => {
+    // Property: the one unavailable log names the outcome returned to the caller.
+    // Mutant: report ANSWER_NOT_JSON before the spend await; changing the day is a neighbour.
+    const h = harness();
+    h.state.deadlineMs = 20;
+    h.state.completion = async () => ({ text: "not json" });
+    h.state.record = async () => { await new Promise(resolve => setTimeout(resolve, 200)); };
+    await expect(h.create().check("line")).resolves.toEqual({ outcome: "UNAVAILABLE", code: "QUESTION_CHECK_DEADLINE" });
+    expect(h.reports).toEqual([{ event: "api.question_check.unavailable", code: "QUESTION_CHECK_DEADLINE" }]);
+  });
+
   it("records one priced entry per sent call with adapter token counts", async () => {
     const h = harness();
     const check = h.create();
@@ -123,7 +194,7 @@ describe("S04 question check", () => {
     await check.check("second line");
     expect(h.entries).toHaveLength(2);
     expect(h.entries[0]).toMatchObject({
-      providerRef: "question-check:anthropic-test:claude-haiku-5-5",
+      providerRef: "question-check:development:claude-haiku-5.5:claude-haiku-5-5",
       chargedOn: "2026-10-20", chargeMicros: 1, inputTokens: 3, outputTokens: 4
     });
     expect((h.entries[0] as { spendId: string }).spendId).toBeTruthy();

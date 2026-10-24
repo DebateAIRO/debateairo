@@ -7,8 +7,21 @@ import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionH
 import { TypedDomainError } from "@debateai/kernel";
 import { encrypt } from "@debateai/crypto";
 import { threatReportEmailReader } from "../../apps/api/src/staff/threat-reports.js";
+import { PostgresThreatReportRepository } from "../../packages/db/src/threat-reports.js";
 
 describe("S04 threat report staff contract", () => {
+  it("passes a retained email only to the prepared-erasure keep writer", async () => {
+    const accountId = randomUUID();
+    const seen: { sql: string; values: unknown[] | undefined }[] = [];
+    const repository = new PostgresThreatReportRepository({ query: async (sql: string, values?: unknown[]) => {
+      seen.push({ sql, values });
+      return { rows: [{ report_ref: ref }] };
+    } } as never);
+    await expect(repository.keepWithHeldEmail("Kept question", accountId, "asker@example.test")).resolves.toBe(ref);
+    expect(seen).toEqual([{ sql: "SELECT staff.keep_threat_report_with_email($1::text,$2::uuid,$3::text) report_ref",
+      values: ["Kept question", accountId, "asker@example.test"] }]);
+  });
+
   it("decrypts the live user's email with the user DEK and the identity AAD", async () => {
     // Property: the item route's email dependency opens only the stored identity envelope.
     // Mutant: use a different AAD or return ciphertext; a list-order change is a neighbour.
@@ -91,7 +104,7 @@ function headers(mutation = false) {
     ...(mutation ? { "x-staff-csrf-token": csrf } : {}) };
 }
 
-function grantedServer(own = false, proofAvailable = true, proofTarget?: "CURRENT" | "OTHER") {
+function grantedServer(own = false, proofAvailable = true, proofTarget?: "CURRENT" | "OTHER", emailAvailable = true) {
   const reportRef = randomUUID();
   const boundTarget = proofTarget === "CURRENT" ? reportRef : proofTarget === "OTHER" ? randomUUID() : undefined;
   const oldest = { report_ref: reportRef, kept_at: new Date("2026-10-20T09:00:00.000Z"),
@@ -99,7 +112,8 @@ function grantedServer(own = false, proofAvailable = true, proofTarget?: "CURREN
   const newer = { report_ref: randomUUID(), kept_at: new Date("2026-10-20T10:00:00.000Z"),
     decision: "REPORTED", decided_at: new Date("2026-10-20T11:00:00.000Z") };
   const decided = new Set<string>();
-  const events: Record<string, unknown>[] = [];
+  const readCalls: string[] = [];
+  const reportUserId = randomUUID();
   const record = Object.freeze({ context: Object.freeze({ staffId: randomUUID(), userId: account.authenticated.userId,
     ordinarySessionId: account.authenticated.session.session_id, privilegeSessionId: randomUUID(),
     designation: "OWNER" as const, securityEpoch: 1, accountSecurityEpoch: 1, grantRevision: 1,
@@ -112,30 +126,29 @@ function grantedServer(own = false, proofAvailable = true, proofTarget?: "CURREN
       proofAvailable && (boundTarget === undefined || input.binding.targetId === boundTarget) ? ({ proofId: randomUUID() }) : null,
     readInvitationContext: async () => null, readOwnerPossessionContext: async () => null
   } as never, sessions);
-  const audit = (action: string, report: string | null) => events.push({ event_id: randomUUID(),
-    actor_staff_id: record.context.staffId, event: `THREAT_REPORT_${action}`, threat_report_ref: report,
-    recorded_at: "2026-10-20T12:00:00.000Z" });
   const repository = {
-    list: async () => { audit("LIST", null); return [oldest, newer]; },
+    list: async () => [oldest, newer],
     countUnread: async () => 1,
-    read: async () => {
+    peekAccount: async () => {
       if (own) throw new TypedDomainError("THREAT_REPORT_OWN", "THREAT_REPORT_OWN");
-      audit("READ", reportRef);
-      return { ...oldest, question: "Should I harm my neighbour?", account_user_id: randomUUID(), held_email: null };
+      return { account_user_id: reportUserId, has_held_email: false };
+    },
+    read: async () => {
+      readCalls.push(reportRef);
+      return { ...oldest, question: "Should I harm my neighbour?", account_user_id: reportUserId, held_email: null };
     },
     decide: async (_context: unknown, _token: string, target: string, decision: "REPORTED" | "NOT_REPORTED") => {
       if (decided.has(target)) throw new TypedDomainError("THREAT_REPORT_ALREADY_DECIDED", "THREAT_REPORT_ALREADY_DECIDED");
       decided.add(target);
-      audit(decision, target);
       return decision;
     }
   };
   const server = buildApi({ application, sessions, allowedOrigin: TEST_APP_ORIGIN, staffPolicyVersion: 2,
     staffAccess: access, staff: { access, sessions,
-      repository: { readAuditPage: async () => ({ events, next_cursor: null, order: "RECORDED_AT_ID_ASC" }) } as never,
+      repository: { readAuditPage: async () => ({ events: [], next_cursor: null, order: "RECORDED_AT_ID_ASC" }) } as never,
       webauthn: {} as never, intents: {} as never,
-      threatReports: { repository, readRecipientEmail: async () => "asker@example.test" } } as never });
-  return { server, reportRef, newerRef: newer.report_ref, events };
+      threatReports: { repository, readRecipientEmail: async () => emailAvailable ? "asker@example.test" : null } } as never });
+  return { server, reportRef, newerRef: newer.report_ref, readCalls, decisionCount: () => decided.size };
 }
 
 const decisionPayload = (decision: "REPORTED" | "NOT_REPORTED") => ({
@@ -188,13 +201,25 @@ describe("S04 threat report HTTP authorization", () => {
   it("reads exactly the kept question, time, account and decision with no-store", async () => {
     // Property: staff sees only the contracted item projection after capability enforcement.
     // Mutant: drop account.email or expose an internal column; a list-order change is a neighbour.
-    const { server, reportRef } = grantedServer();
+    const { server, reportRef, readCalls } = grantedServer();
     try {
       const response = await server.inject({ method: "GET", url: `/v1/admin/threat-reports/${reportRef}`, headers: headers() });
       expect({ status: response.statusCode, cache: response.headers["cache-control"], body: response.json() }).toEqual({
         status: 200, cache: "no-store", body: { report_ref: reportRef, question: "Should I harm my neighbour?",
           kept_at: "2026-10-20T09:00:00.000Z", account: { email: "asker@example.test", user_id: expect.any(String) },
           decision: "UNREAD", decided_at: null } });
+      expect(readCalls).toEqual([reportRef]);
+    } finally { await server.close(); }
+  });
+
+  it("does not record a READ when the account email cannot be shown", async () => {
+    // Property: a failed item response is not an opening in the staff audit.
+    // Mutant: audit inside the SQL read before email resolution; changing list order is a neighbour.
+    const { server, reportRef, readCalls } = grantedServer(false, true, undefined, false);
+    try {
+      const response = await server.inject({ method: "GET", url: `/v1/admin/threat-reports/${reportRef}`, headers: headers() });
+      expect(response.statusCode).toBe(503);
+      expect(readCalls).toEqual([]);
     } finally { await server.close(); }
   });
 
@@ -212,80 +237,61 @@ describe("S04 threat report HTTP authorization", () => {
   it("summarizes unread reports without adding an audit event", async () => {
     // Property: the count route is read-only in the audit trail.
     // Mutant: call list in summary; a read-item projection change is a neighbour.
-    const { server, events } = grantedServer();
+    const { server, readCalls } = grantedServer();
     try {
       const response = await server.inject({ method: "GET", url: "/v1/admin/threat-reports/summary", headers: headers() });
-      expect({ status: response.statusCode, body: response.json(), events }).toEqual({
-        status: 200, body: { unread: 1 }, events: [] });
+      expect({ status: response.statusCode, body: response.json(), readCalls }).toEqual({
+        status: 200, body: { unread: 1 }, readCalls: [] });
     } finally { await server.close(); }
   });
 
   it("refuses a decision whose proof handle resolves to no proof", async () => {
     // Property: knowing a report ref does not grant the ability to decide it.
     // Mutant: call repository.decide when readActionProof returns null; list projection is a neighbour.
-    const { server, reportRef, events } = grantedServer(false, false);
+    const { server, reportRef, decisionCount } = grantedServer(false, false);
     try {
       const response = await server.inject({ method: "POST", url: `/v1/admin/threat-reports/${reportRef}/decision`,
         headers: headers(true), payload: decisionPayload("REPORTED") });
-      expect({ status: response.statusCode, body: response.json(), events }).toEqual({
-        status: 403, body: { error: "STAFF_REQUEST_REFUSED" }, events: [] });
+      expect({ status: response.statusCode, body: response.json(), decisionCount: decisionCount() }).toEqual({
+        status: 403, body: { error: "STAFF_REQUEST_REFUSED" }, decisionCount: 0 });
     } finally { await server.close(); }
   });
 
   it("refuses a proof bound to a different report", async () => {
     // Property: the WebAuthn action binding names the exact kept report.
     // Mutant: bind a constant targetId; a changed summary count is a neighbour.
-    const { server, reportRef, events } = grantedServer(false, true, "OTHER");
+    const { server, reportRef, decisionCount } = grantedServer(false, true, "OTHER");
     try {
       const response = await server.inject({ method: "POST", url: `/v1/admin/threat-reports/${reportRef}/decision`,
         headers: headers(true), payload: decisionPayload("REPORTED") });
-      expect({ status: response.statusCode, events }).toEqual({ status: 403, events: [] });
+      expect({ status: response.statusCode, decisionCount: decisionCount() }).toEqual({ status: 403, decisionCount: 0 });
     } finally { await server.close(); }
   });
 
-  it.each(["REPORTED", "NOT_REPORTED"] as const)("decides %s with a proof and writes one audit entry", async decision => {
-    // Property: one verified action changes one report and records the matching audit action.
+  it.each(["REPORTED", "NOT_REPORTED"] as const)("decides %s with a proof", async decision => {
+    // Property: one verified action changes one report.
     // Mutant: pass the opposite decision; a summary-count change is a neighbour.
-    const { server, reportRef, events } = grantedServer(false, true, "CURRENT");
+    const { server, reportRef, decisionCount } = grantedServer(false, true, "CURRENT");
     try {
       const response = await server.inject({ method: "POST", url: `/v1/admin/threat-reports/${reportRef}/decision`,
         headers: headers(true), payload: decisionPayload(decision) });
-      expect({ status: response.statusCode, body: response.json(), event: events[0]?.event }).toEqual({
-        status: 200, body: { report_ref: reportRef, decision }, event: `THREAT_REPORT_${decision}` });
+      expect({ status: response.statusCode, body: response.json(), decisionCount: decisionCount() }).toEqual({
+        status: 200, body: { report_ref: reportRef, decision }, decisionCount: 1 });
     } finally { await server.close(); }
   });
 
   it("refuses a second decision on the same report with 409", async () => {
     // Property: a decided report cannot receive another decision or audit action.
     // Mutant: remove the already-decided guard; a different report may still be decided.
-    const { server, reportRef, events } = grantedServer();
+    const { server, reportRef, decisionCount } = grantedServer();
     try {
       await server.inject({ method: "POST", url: `/v1/admin/threat-reports/${reportRef}/decision`,
         headers: headers(true), payload: decisionPayload("REPORTED") });
       const response = await server.inject({ method: "POST", url: `/v1/admin/threat-reports/${reportRef}/decision`,
         headers: headers(true), payload: decisionPayload("NOT_REPORTED") });
-      expect({ status: response.statusCode, body: response.json(), eventCount: events.length }).toEqual({
-        status: 409, body: { error: "THREAT_REPORT_ALREADY_DECIDED" }, eventCount: 1 });
+      expect({ status: response.statusCode, body: response.json(), decisionCount: decisionCount() }).toEqual({
+        status: 409, body: { error: "THREAT_REPORT_ALREADY_DECIDED" }, decisionCount: 1 });
     } finally { await server.close(); }
   });
 
-  it("shows list, read and both decision audit entries without question or email", async () => {
-    // Property: audit reads a fixed metadata row, never the kept content or account.
-    // Mutant: add question to an audit event; a list-cache change is a neighbour.
-    const { server, reportRef, newerRef } = grantedServer();
-    try {
-      await server.inject({ method: "GET", url: "/v1/admin/threat-reports", headers: headers() });
-      await server.inject({ method: "GET", url: `/v1/admin/threat-reports/${reportRef}`, headers: headers() });
-      for (const [ref, decision] of [[reportRef, "REPORTED"], [newerRef, "NOT_REPORTED"]] as const) {
-        await server.inject({ method: "POST", url: `/v1/admin/threat-reports/${ref}/decision`,
-          headers: headers(true), payload: decisionPayload(decision) });
-      }
-      const response = await server.inject({ method: "GET", url: "/v1/admin/audit?limit=20", headers: headers() });
-      const body = response.json();
-      expect({ status: response.statusCode, actions: body.events?.map((event: { event: string }) => event.event),
-        leaked: JSON.stringify(body).includes("Should I harm my neighbour?") || JSON.stringify(body).includes("asker@example.test") }).toEqual({
-        status: 200, actions: ["THREAT_REPORT_LIST", "THREAT_REPORT_READ", "THREAT_REPORT_REPORTED", "THREAT_REPORT_NOT_REPORTED"],
-        leaked: false });
-    } finally { await server.close(); }
-  });
 });
