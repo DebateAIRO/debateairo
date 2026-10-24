@@ -127,6 +127,8 @@
   "legal.providers.purpose.arguments": "Текст дебатов — для написания аргументов",
   "legal.providers.purpose.judging": "Текст дебатов — для оценки и проверки аргументов",
   "legal.providers.purpose.story": "Завершённые дебаты — для написания истории вердикта",
+  "legal.providers.purpose.synthesisCheck": "Синтез завершённых дебатов — для проверки по четырём категориям",
+  "legal.providers.purpose.questionCheck": "Вопрос до начала дебатов — для проверки, могут ли дебаты начаться",
   "legal.providers.purpose.support": "То, что вы пишете в чате поддержки, — чтобы ответить вам",
   "legal.providers.purposesUnconfirmed": "[уточнить: какие из этих задач ему поручены]",
   "legal.providers.supportName": "Модель чата поддержки",

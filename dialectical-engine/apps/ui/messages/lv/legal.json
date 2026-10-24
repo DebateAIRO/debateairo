@@ -127,6 +127,8 @@
   "legal.providers.purpose.arguments": "Debašu teksts — lai uzrakstītu argumentus",
   "legal.providers.purpose.judging": "Debašu teksts — lai novērtētu un pārbaudītu argumentus",
   "legal.providers.purpose.story": "Pabeigtās debates — lai uzrakstītu sprieduma stāstu",
+  "legal.providers.purpose.synthesisCheck": "Pabeigto debašu sintēze — lai to pārbaudītu pēc četrām kategorijām",
+  "legal.providers.purpose.questionCheck": "Jautājums pirms debašu sākuma — lai pārbaudītu, vai debates drīkst sākties",
   "legal.providers.purpose.support": "Atbalsta sarunā ievadītais teksts — lai jums atbildētu",
   "legal.providers.purposesUnconfirmed": "[jāapstiprina: kuri no šiem uzdevumiem tam tiek uzticēti]",
   "legal.providers.supportName": "Atbalsta sarunas modelis",

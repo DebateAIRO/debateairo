@@ -127,6 +127,8 @@
   "legal.providers.purpose.arguments": "Tekst rasprave — za pisanje argumenata",
   "legal.providers.purpose.judging": "Tekst rasprave — za ocjenjivanje i provjeru argumenata",
   "legal.providers.purpose.story": "Završena rasprava — za pisanje priče o presudi",
+  "legal.providers.purpose.synthesisCheck": "Sinteza završene rasprave — za provjeru s obzirom na četiri kategorije",
+  "legal.providers.purpose.questionCheck": "Pitanje prije nego što rasprava započne — za provjeru smije li rasprava započeti",
   "legal.providers.purpose.support": "Ono što upišete u razgovor s podrškom — kako bi vam odgovorio",
   "legal.providers.purposesUnconfirmed": "[potvrditi: koje od ovih zadaća obavlja]",
   "legal.providers.supportName": "Model za razgovor s podrškom",

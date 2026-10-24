@@ -127,6 +127,8 @@
   "legal.providers.purpose.arguments": "Tekst van het debat — om de argumenten te schrijven",
   "legal.providers.purpose.judging": "Tekst van het debat — om de argumenten te beoordelen en te controleren",
   "legal.providers.purpose.story": "Het afgeronde debat — om het verhaal achter het oordeel te schrijven",
+  "legal.providers.purpose.synthesisCheck": "De synthese van een afgerond debat — om het op vier categorieën te controleren",
+  "legal.providers.purpose.questionCheck": "Een vraag voordat een debat begint — om te controleren of het debat mag beginnen",
   "legal.providers.purpose.support": "Wat u in de ondersteuningschat typt — om u te antwoorden",
   "legal.providers.purposesUnconfirmed": "[te bevestigen: welke van deze taken de aanbieder krijgt]",
   "legal.providers.supportName": "Model van de ondersteuningschat",

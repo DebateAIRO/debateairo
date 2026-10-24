@@ -127,6 +127,8 @@
   "legal.providers.purpose.arguments": "वाद-विवाद का पाठ — तर्क लिखने के लिए",
   "legal.providers.purpose.judging": "वाद-विवाद का पाठ — तर्कों को परखने और जाँचने के लिए",
   "legal.providers.purpose.story": "पूरा हो चुका वाद-विवाद — निर्णय की कहानी लिखने के लिए",
+  "legal.providers.purpose.synthesisCheck": "समाप्त वाद-विवाद का संश्लेषण — उसे चार श्रेणियों के लिए जाँचने के लिए",
+  "legal.providers.purpose.questionCheck": "वाद-विवाद शुरू होने से पहले का प्रश्न — यह जाँचने के लिए कि वाद-विवाद शुरू हो सकता है या नहीं",
   "legal.providers.purpose.support": "आप सहायता चैट में जो लिखते हैं — आपको उत्तर देने के लिए",
   "legal.providers.purposesUnconfirmed": "[पुष्टि की जानी है: इनमें से कौन-से कार्य उसे सौंपे जाते हैं]",
   "legal.providers.supportName": "सहायता चैट मॉडल",

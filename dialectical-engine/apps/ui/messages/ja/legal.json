@@ -127,6 +127,8 @@
   "legal.providers.purpose.arguments": "ディベートのテキスト — 論拠を作成するため",
   "legal.providers.purpose.judging": "ディベートのテキスト — 論拠を審査し、検証するため",
   "legal.providers.purpose.story": "完了したディベート — 判定に至る経緯を作成するため",
+  "legal.providers.purpose.synthesisCheck": "完了したディベートの総合評価 — 四つのカテゴリーについてチェックするため",
+  "legal.providers.purpose.questionCheck": "ディベートが始まる前の質問 — ディベートを開始してよいかどうかをチェックするため",
   "legal.providers.purpose.support": "サポートチャットで入力された内容 — お客様に回答するため",
   "legal.providers.purposesUnconfirmed": "[要確認：上記のうちどの業務を担うか]",
   "legal.providers.supportName": "サポートチャットのモデル",

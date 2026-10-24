@@ -127,6 +127,8 @@
   "legal.providers.purpose.arguments": "Debatų tekstas — argumentams parašyti",
   "legal.providers.purpose.judging": "Debatų tekstas — argumentams įvertinti ir patikrinti",
   "legal.providers.purpose.story": "Užbaigti debatai — verdikto istorijai parašyti",
+  "legal.providers.purpose.synthesisCheck": "Užbaigtų debatų apibendrinimas — kad jį patikrintume pagal keturias kategorijas",
+  "legal.providers.purpose.questionCheck": "Klausimas prieš debatų pradžią — kad patikrintume, ar debatai gali prasidėti",
   "legal.providers.purpose.support": "Pagalbos pokalbyje įvestas tekstas — kad galėtume jums atsakyti",
   "legal.providers.purposesUnconfirmed": "[patvirtinti: kurios iš šių užduočių jam pavedamos]",
   "legal.providers.supportName": "Pagalbos pokalbio modelis",

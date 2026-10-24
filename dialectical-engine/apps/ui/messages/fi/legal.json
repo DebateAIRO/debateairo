@@ -127,6 +127,8 @@
   "legal.providers.purpose.arguments": "Väittelyn teksti — argumenttien kirjoittamiseen",
   "legal.providers.purpose.judging": "Väittelyn teksti — argumenttien arvioimiseen ja tarkistamiseen",
   "legal.providers.purpose.story": "Valmis väittely — tuomion tarinan kirjoittamiseen",
+  "legal.providers.purpose.synthesisCheck": "Päättyneen väittelyn synteesi — sen tarkistamiseen neljän luokan osalta",
+  "legal.providers.purpose.questionCheck": "Kysymys ennen väittelyn alkua — sen tarkistamiseen, saako väittely alkaa",
   "legal.providers.purpose.support": "Tukikeskusteluun kirjoittamasi teksti — sinulle vastaamiseen",
   "legal.providers.purposesUnconfirmed": "[vahvistetaan: mitkä näistä tehtävistä sille annetaan]",
   "legal.providers.supportName": "Tukikeskustelun malli",

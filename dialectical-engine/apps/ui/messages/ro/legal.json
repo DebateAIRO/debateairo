@@ -127,6 +127,8 @@
   "legal.providers.purpose.arguments": "Textul dezbaterii — pentru redactarea argumentelor",
   "legal.providers.purpose.judging": "Textul dezbaterii — pentru evaluarea și verificarea argumentelor",
   "legal.providers.purpose.story": "Dezbaterea finalizată — pentru redactarea poveștii verdictului",
+  "legal.providers.purpose.synthesisCheck": "Sinteza unei dezbateri finalizate — pentru verificarea ei cu privire la patru categorii",
+  "legal.providers.purpose.questionCheck": "O întrebare înainte de începerea unei dezbateri — pentru a verifica dacă dezbaterea poate începe",
   "legal.providers.purpose.support": "Ceea ce scrieți în chatul de asistență — pentru a vă răspunde",
   "legal.providers.purposesUnconfirmed": "[de confirmat: care dintre aceste sarcini îi sunt încredințate]",
   "legal.providers.supportName": "Modelul chatului de asistență",

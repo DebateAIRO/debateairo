@@ -111,12 +111,13 @@ describe("data export privacy policy", () => {
     }
   });
 
-  // SPEC-v6 R40 (V-6, no bump): the version stays the base's, "3.3" since origin/dev fbe779cbd; the floor stays "3.2".
-  it("keeps the base Privacy version (3.4) and the reacceptance floor (3.2)", () => {
+  // SPEC-v6 R40 (V-6, no bump) kept the base's version; synthesis-flag S03 raises it to 3.5 (the base, ae95dc8d0, has 3.4).
+  // No one re-accepts it (synthesis-flag S03-R5, V-24/V-70), so the reacceptance floor stays "3.2".
+  it("pins the current Privacy version (3.5, raised from the base's 3.4) and the reacceptance floor (3.2)", () => {
     const manifest = JSON.parse(
       readFileSync(join(root, "packages/legal-manifest/src/manifest.json"), "utf8"),
     ) as { reacceptance: { PRIVACY: string } };
-    expect(PRIVACY_POLICY.version).toBe("3.4");
+    expect(PRIVACY_POLICY.version).toBe("3.5");
     expect(manifest.reacceptance.PRIVACY).toBe("3.2");
   });
 });

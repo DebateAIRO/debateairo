@@ -127,6 +127,8 @@
   "legal.providers.purpose.arguments": "Văn bản tranh luận — để viết các lập luận",
   "legal.providers.purpose.judging": "Văn bản tranh luận — để đánh giá và kiểm tra các lập luận",
   "legal.providers.purpose.story": "Cuộc tranh luận đã hoàn tất — để viết phần diễn biến dẫn đến phán quyết",
+  "legal.providers.purpose.synthesisCheck": "Phần tổng hợp của cuộc tranh luận đã hoàn tất — để kiểm tra theo bốn loại",
+  "legal.providers.purpose.questionCheck": "Một câu hỏi trước khi cuộc tranh luận bắt đầu — để kiểm tra xem cuộc tranh luận có thể bắt đầu hay không",
   "legal.providers.purpose.support": "Nội dung bạn nhập trong kênh trò chuyện hỗ trợ — để trả lời bạn",
   "legal.providers.purposesUnconfirmed": "[cần xác nhận: nhà cung cấp được giao những việc nào trong số này]",
   "legal.providers.supportName": "Mô hình của kênh trò chuyện hỗ trợ",

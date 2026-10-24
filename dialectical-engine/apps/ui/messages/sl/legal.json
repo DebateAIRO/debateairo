@@ -127,6 +127,8 @@
   "legal.providers.purpose.arguments": "Besedilo razprave — za pisanje argumentov",
   "legal.providers.purpose.judging": "Besedilo razprave — za presojo in preverjanje argumentov",
   "legal.providers.purpose.story": "Končana razprava — za pisanje zgodbe razsodbe",
+  "legal.providers.purpose.synthesisCheck": "Sinteza končane razprave — za preverjanje glede štirih kategorij",
+  "legal.providers.purpose.questionCheck": "Vprašanje pred začetkom razprave — za preverjanje, ali se razprava sme začeti",
   "legal.providers.purpose.support": "Kar vnesete v klepet s podporo — da vam odgovori",
   "legal.providers.purposesUnconfirmed": "[treba potrditi: katere od teh nalog opravlja]",
   "legal.providers.supportName": "Model klepeta s podporo",

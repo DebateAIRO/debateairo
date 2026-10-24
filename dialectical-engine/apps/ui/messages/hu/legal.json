@@ -127,6 +127,8 @@
   "legal.providers.purpose.arguments": "A vita szövege — az érvek megírásához",
   "legal.providers.purpose.judging": "A vita szövege — az érvek elbírálásához és ellenőrzéséhez",
   "legal.providers.purpose.story": "A befejezett vita — az ítélet történetének megírásához",
+  "legal.providers.purpose.synthesisCheck": "Egy befejezett vita szintézise — a négy kategória szempontjából való ellenőrzéséhez",
+  "legal.providers.purpose.questionCheck": "Egy kérdés egy vita elindulása előtt — annak ellenőrzéséhez, hogy a vita elindulhat-e",
   "legal.providers.purpose.support": "Amit Ön az ügyfélszolgálati csevegésbe beír — hogy válaszoljon Önnek",
   "legal.providers.purposesUnconfirmed": "[megerősítendő: ezek közül mely feladatokat kapja]",
   "legal.providers.supportName": "Az ügyfélszolgálati csevegés modellje",
