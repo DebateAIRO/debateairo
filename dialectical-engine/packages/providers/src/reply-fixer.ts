@@ -175,7 +175,7 @@ function setAt(root: unknown, path: Path, value: unknown): boolean {
 }
 
 /** An empty registry: no schema carries an `id` in it, so `z.toJSONSchema` keeps the list itself at the root (no `$ref`). */
-const NO_SCHEMA_IDS = z.registry();
+const NO_SCHEMA_IDS = z.registry<Record<string, unknown>>();
 
 /**
  * Whether a schema admits exactly one value, the empty list: a list (`z.array`) whose size limit is 0 (`.max(0)` or
