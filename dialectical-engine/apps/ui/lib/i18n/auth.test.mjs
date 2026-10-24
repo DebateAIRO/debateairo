@@ -13,6 +13,7 @@ const ownedFiles = [
   "components/PhoneProfileCard.tsx",
   "components/SecuritySettings.tsx",
   "components/auth/InlineFieldMessage.tsx",
+  "components/auth/ItalyApprovalBox.tsx",
   "components/auth/SecurityEnrollment.tsx",
   "components/auth/OnboardingEvidence.tsx",
   "components/auth/EphemeralCodes.tsx",
