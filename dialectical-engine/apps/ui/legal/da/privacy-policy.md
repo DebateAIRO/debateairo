@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort fortalt
-eyebrow: PRIVATLIVSPOLITIK · v3.5 · GÆLDENDE FRA 12. OKTOBER 2026
+eyebrow: PRIVATLIVSPOLITIK · v3.6 · GÆLDENDE FRA 24. OKTOBER 2026
 title: Hvad vi opbevarer, og hvorfor
 lede: Dine rettigheder og vores forpligtelser i henhold til GDPR (EU) 2016/679 forklaret i et klart sprog. Fjorten afsnit og bilag B — rul helt ned.
-endMarker: SLUT PÅ POLITIKKEN · GDPR (EU) 2016/679 · v3.5
+endMarker: SLUT PÅ POLITIKKEN · GDPR (EU) 2016/679 · v3.6
 bodyLabel: Privatlivspolitikkens tekst
 annexTitle: Bilag B — Regionale privatlivsvilkår
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 3.5 · Effective 12. oktober 2026 · Tidligere versioner på dezbatere.ro/privacy/versions · Dataansvarlig: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 24. oktober 2026 · Tidligere versioner på dezbatere.ro/privacy/versions · Dataansvarlig: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Vi indsamler det, en konto har brug for, og det, du vælger at skrive. Dine spørgsmål sendes til AI-udbydere, der er anført i vores Register; de bruges ikke til at træne modeller. Vores hostingudbyder opbevarer din konto og dine debatter i London i Storbritannien; afsnit 5 beskriver, hvor dine data ellers sendes hen. Debatter er private, medmindre du offentliggør dem. Når du sletter din konto, destrueres nøglerne til dine private data; når du planlægger sletningen, vælger du, om dine offentliggjorte debatter også skal fjernes eller forblive offentlige under dit udfasede pseudonym. Du kan kontakte os på privacy@dezbatere.ro, og personer, som nævnes i en debat, kan anmode om fjernelse uden at have en konto.
 
@@ -34,7 +34,7 @@ Vi indsamler kun det, som en konto behøver for at fungere, det, du vælger at g
 | Kategori | Præcist indhold | Kilde |
 | --- | --- | --- |
 | **Konto** | E-mailadresse og e-mailadresse til gendannelse (opbevaret krypteret med et nøglebaseret indeks, så vi kan finde kontoen uden at læse adressen); adgangskode (opbevaret som en hash, aldrig i klartekst); din hemmelighed til tofaktorgodkendelse (krypteret); ti gendannelseskoder (opbevaret som hashes); dit pseudonym; resultatet af din alderskontrol | Dig ved registreringen |
-| **Kontrol af land ud fra IP-adresse** | Ved tilmelding slår vi IP-landet op lokalt med DB-IP Lite og kontrollerer en liste over Tor-udgangsadresser. Ved starten af hver ny debat slår vi igen IP-landet op lokalt og kan afvise debatten, hvis landet altid er blokeret. Ved afslag samler vi revisionsregistreringer efter rute, kode, land og tidsvindue; IP-adressen opbevares her kun som et envejsdigest med nøgle. Afvisningsposten indeholder kode, land og en angivelse af, at IP-adressen var grundlaget; IP-adressen og browserens user-agent gemmes kun som nøglebaserede envejs-hashværdier. | Din browser ved tilmelding og ved starten af en ny debat |
+| **Kontrol af land ud fra IP-adresse** | Ved tilmelding slår vi IP-landet op lokalt med DB-IP Lite og kontrollerer en liste over Tor-udgangsadresser. Ved starten af hver ny debat slår vi igen IP-landet op lokalt og kan afvise debatten, hvis landet altid er blokeret. Ved afslag samler vi revisionsregistreringer efter rute, kode, land og tidsvindue; IP-adressen opbevares her kun som et envejsdigest med nøgle. Afvisningsposten indeholder kode, land og en angivelse af, at IP-adressen var grundlaget; IP-adressen og browserens user-agent gemmes kun som nøglebaserede envejs-hashværdier. Ved tilmelding afgør IP-landet sammen med den region, du vælger, også, om vi viser det særskilte godkendelsesfelt for Italien; hvis du giver denne godkendelse, gemmer registreringen af den, om visningen blev udløst af regionsvalget, af IP-landet eller af begge dele. | Din browser ved tilmelding og ved starten af en ny debat |
 | **Alderskontrol** | Du indtaster din fødselsdato kun til kontrollen; vi gemmer den ikke. Vi gemmer resultatet, minimumsalderen, IP-landet hvis det kendes, regelversionen, sammenhængen og kontroltidspunktet. Ved gennemført tilmelding gemmes kun resultatet »bestået«; for eksisterende konti kan resultatet være »bestået« eller »afvist« | Dig og din browser |
 | **Oplyst bopæl** | Det land, du oplyser som bopælsland, og delstaten, hvis du bor i USA | Dig ved tilmelding |
 | **Sessioner og sikkerhed** | Et hashet sessionstoken; en nøglebaseret hash af din browsers user-agent-streng, der bruges til at opdage, når en session flyttes til en anden browser; tidsstempler for oprettelse, seneste brug og udløb. Vi opbevarer **ikke** din IP-adresse, enhedsnavn eller browseroplysninger sammen med en session, og den sessionsliste, du ser i Indstillinger, viser kun tidsstempler | Din browser |
@@ -215,7 +215,7 @@ For at afvise disse elementer skal du blokere eller slette cookies og webstedsda
 
 Når vi ændrer denne politik, offentliggør vi den nye version med en oversigt over ændringerne og en ny ikrafttrædelsesdato og beholder de tidligere versioner på dezbatere.ro/privacy/versions. Ved en ændring, der tilføjer et nyt formål eller en ny modtager, underretter vi dig via e-mail og i produktet, før den nye behandling begynder, og giver dig tid til at gøre indsigelse. Hvor et nyt formål afhænger af dit samtykke — eksempelvis hvis vi nogensinde ønskede at bruge indhold til at forbedre modeller — beder vi særskilt og specifikt om dette samtykke; vi behandler aldrig accept af opdaterede Vilkår som samtykke til ny behandling. Ved præciseringer, der ikke ændrer noget ved det, vi gør, offentliggør vi blot den nye version.
 
-Denne politik blev senest opdateret den 12. oktober 2026. Version 3.5 erstattede version 3.4: afsnit 2 oplyser nu, hvilke fakturerings- og kortoplysninger vi opbevarer, og at dit fulde kortnummer aldrig når frem til os, og afsnit 7 oplyser, hvor længe vi opbevarer et gemt kort og betalingsudbyderens meddelelser om betalinger.
+Denne politik blev senest opdateret den 24. oktober 2026. Version 3.6 erstattede version 3.5: afsnit 2 oplyser nu, at IP-landet ved tilmelding sammen med den region, du vælger, også afgør, om vi viser det særskilte godkendelsesfelt for Italien.
 
 ## Annex B — Regionale privatlivsvilkår
 

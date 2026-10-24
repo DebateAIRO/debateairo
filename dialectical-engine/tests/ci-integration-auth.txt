@@ -23,6 +23,8 @@ tests/integration/pending-onboarding-database.test.ts
 tests/integration/identity-database.test.ts
 tests/integration/age-gate-database.test.ts
 tests/integration/legal-acceptance.test.ts
+tests/integration/italy-approval-database.test.ts
+tests/integration/italy-approval-signup-database.test.ts
 tests/integration/sensitive-data-consent-database.test.ts
 
 # Sessions and sign-in

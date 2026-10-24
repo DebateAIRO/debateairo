@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort fortalt
-eyebrow: TJENESTEVILKÅR · v2.4 · GÆLDENDE FRA 12. OKTOBER 2026
+eyebrow: TJENESTEVILKÅR · v2.5 · GÆLDENDE FRA 24. OKTOBER 2026
 title: Det, du accepterer
 lede: Aftalen mellem dig og DMS Merchandise Shop S.R.L. i et klart sprog. Nitten afsnit og bilag A — rul ned til slutningen.
-endMarker: SLUT PÅ VILKÅRENE · v2.4
+endMarker: SLUT PÅ VILKÅRENE · v2.5
 bodyLabel: Tjenestevilkårenes tekst
 annexTitle: Bilag A — Regionale vilkår
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LOVVALG
 -->
 
-**Version 2.4 · Effective 12. oktober 2026 · Tidligere versioner på dezbatere.ro/terms/versions · Sprog: Dansk.**
+**Version 2.5 · Effective 24. oktober 2026 · Tidligere versioner på dezbatere.ro/terms/versions · Sprog: Dansk.**
 
 **In short.** Du skal være fyldt 18 år. Dialectical Engine opbygger argumenter ved hjælp af AI-modeller, og alt, hvad tjenesten genererer, kan være forkert — det er ikke rådgivning. Dine debatter er private, medmindre du offentliggør dem; hvis du offentliggør dem, kan alle læse dem. Tekst, du indsender, sendes til de AI-udbydere, der er anført i vores udbyderregister, og bruges ikke til at træne modeller. Anmeld ulovligt indhold på support@dezbatere.ro, uanset om du har en konto eller ej. Rumænsk ret finder anvendelse, men du bevarer din lokale forbrugerbeskyttelse.
 
@@ -277,7 +277,7 @@ Hvert punkt gælder for personer, der bor i den pågældende region, og angiver 
 
 ### A.1 Den Europæiske Union og Det Europæiske Økonomiske Samarbejdsområde
 
-Hovedteksten i disse vilkår er skrevet til dig. Derudover gælder følgende: Du kan anlægge sag ved domstolene i det land, hvor du bor; fortrydelsesretten i afsnit 13 gælder; alternativ tvistbilæggelse er tilgængelig gennem www.onoratainstanta.ro. **Tyskland:** Opsigelsesknappen på dezbatere.ro/cancel giver dig mulighed for at opsige et abonnement uden at logge ind; abonnementsperioder, fornyelsesperioder og opsigelsesvarsler overholder §309(9) BGB: hvert abonnement løber i én måned og fornyes månedligt, indtil du opsiger det, og du kan til enhver tid opsige det med virkning fra udgangen af den igangværende måned. **Frankrig:** Du kan opsige et abonnement online i tre trin på dezbatere.ro/cancel. **Italien:** Bestemmelserne om ansvar (15), suspension (11), ændringer (14) og lovvalg (18) kræver din specifikke godkendelse, som du giver ved den særskilte bekræftelse ved tilmelding. **Nederlandene:** Disse vilkår stilles til rådighed i en form, der kan lagres, inden aftalen indgås. **Polen:** En polsk version er tilgængelig; vælg Polski i sprogvælgeren.
+Hovedteksten i disse vilkår er skrevet til dig. Derudover gælder følgende: Du kan anlægge sag ved domstolene i det land, hvor du bor; fortrydelsesretten i afsnit 13 gælder; alternativ tvistbilæggelse er tilgængelig gennem www.onoratainstanta.ro. **Tyskland:** Opsigelsesknappen på dezbatere.ro/cancel giver dig mulighed for at opsige et abonnement uden at logge ind; abonnementsperioder, fornyelsesperioder og opsigelsesvarsler overholder §309(9) BGB: hvert abonnement løber i én måned og fornyes månedligt, indtil du opsiger det, og du kan til enhver tid opsige det med virkning fra udgangen af den igangværende måned. **Frankrig:** Du kan opsige et abonnement online i tre trin på dezbatere.ro/cancel. **Italien:** Bestemmelserne om suspension og ophør (11), betalingsabonnementer og deres fornyelse (12), ændringer (14), ansvar (15) og lovvalg og værneting (18) kræver din specifikke godkendelse i henhold til artikel 1341 og 1342 i den italienske civillov. Du giver den ved hjælp af et særskilt felt ved tilmelding, som vises for alle, der vælger Italien i feltet Region, eller hvis forbindelse kommer fra Italien. **Nederlandene:** Disse vilkår stilles til rådighed i en form, der kan lagres, inden aftalen indgås. **Polen:** En polsk version er tilgængelig; vælg Polski i sprogvælgeren.
 
 ### A.2 USA
 

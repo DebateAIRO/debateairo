@@ -296,7 +296,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Liên minh Châu Âu và Khu vực Kinh tế Châu Âu",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Phần nội dung chung của các Điều khoản này được soạn cho bạn. Ngoài ra: bạn có thể khởi kiện tại tòa án của quốc gia nơi bạn sống; quyền rút lui tại mục 13 được áp dụng; phương thức giải quyết tranh chấp thay thế được cung cấp thông qua www.onoratainstanta.ro. Đức: nút hủy tại dezbatere.ro/cancel cho phép bạn chấm dứt gói đăng ký mà không cần đăng nhập; thời hạn đăng ký, kỳ gia hạn và thời hạn thông báo tuân thủ §309(9) BGB: mỗi gói kéo dài một tháng và tự động gia hạn hằng tháng cho đến khi bạn hủy, và bạn có thể hủy bất cứ lúc nào, có hiệu lực từ cuối tháng hiện tại. Pháp: bạn có thể chấm dứt gói đăng ký trực tuyến trong ba bước tại dezbatere.ro/cancel. Ý: các điều khoản về trách nhiệm (15), đình chỉ (11), thay đổi (14) và luật điều chỉnh (18) cần sự chấp thuận cụ thể của bạn, được đưa ra bằng xác nhận riêng khi đăng ký. Hà Lan: các Điều khoản này được cung cấp dưới hình thức có thể lưu trữ trước khi giao kết. Ba Lan: có phiên bản tiếng Ba Lan; hãy chọn Polski trong menu ngôn ngữ." }
+      { kind: "p", text: "Phần nội dung chung của các Điều khoản này được soạn cho bạn. Ngoài ra: bạn có thể khởi kiện tại tòa án của quốc gia nơi bạn sống; quyền rút lui tại mục 13 được áp dụng; phương thức giải quyết tranh chấp thay thế được cung cấp thông qua www.onoratainstanta.ro. Đức: nút hủy tại dezbatere.ro/cancel cho phép bạn chấm dứt gói đăng ký mà không cần đăng nhập; thời hạn đăng ký, kỳ gia hạn và thời hạn thông báo tuân thủ §309(9) BGB: mỗi gói kéo dài một tháng và tự động gia hạn hằng tháng cho đến khi bạn hủy, và bạn có thể hủy bất cứ lúc nào, có hiệu lực từ cuối tháng hiện tại. Pháp: bạn có thể chấm dứt gói đăng ký trực tuyến trong ba bước tại dezbatere.ro/cancel. Ý: các điều khoản về đình chỉ và chấm dứt (11), gói trả phí và việc gia hạn (12), thay đổi (14), trách nhiệm (15) cũng như luật điều chỉnh và nơi giải quyết tranh chấp (18) cần sự chấp thuận cụ thể của bạn theo Điều 1341 và Điều 1342 của Bộ luật Dân sự Ý. Bạn đưa ra chấp thuận này bằng một ô riêng khi đăng ký, ô này được hiển thị cho bất kỳ ai chọn Ý trong trường Khu vực hoặc có kết nối đến từ Ý. Hà Lan: các Điều khoản này được cung cấp dưới hình thức có thể lưu trữ trước khi giao kết. Ba Lan: có phiên bản tiếng Ba Lan; hãy chọn Polski trong menu ngôn ngữ." }
     ]
   },
   {
@@ -353,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.4",
-  sha256: "2b1b1753b2160c219c29f1992d94b5c47aa9c190104fc9a723565b2369ba852e",
-  eyebrow: "ĐIỀU KHOẢN DỊCH VỤ · v2.4 · CÓ HIỆU LỰC 12 THÁNG 10 NĂM 2026",
+  version: "2.5",
+  sha256: "b332451793a62699b8593e9e08bebc0f826dd629430b6e72ac5593a9c4d5ebe4",
+  eyebrow: "ĐIỀU KHOẢN DỊCH VỤ · v2.5 · CÓ HIỆU LỰC 24 THÁNG 10 NĂM 2026",
   title: "Những điều bạn đồng ý",
   lede: "Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.",
-  endMarker: "HẾT ĐIỀU KHOẢN · v2.4",
+  endMarker: "HẾT ĐIỀU KHOẢN · v2.5",
   contact: "support@dezbatere.ro",
   bodyLabel: "Nội dung Điều khoản dịch vụ",
   sectionIdPrefix: "terms-section-",

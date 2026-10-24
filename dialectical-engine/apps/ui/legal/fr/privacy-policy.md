@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: En bref
-eyebrow: POLITIQUE DE CONFIDENTIALITÉ · v3.5 · EN VIGUEUR LE 12 OCTOBRE 2026
+eyebrow: POLITIQUE DE CONFIDENTIALITÉ · v3.6 · EN VIGUEUR LE 24 OCTOBRE 2026
 title: Ce que nous conservons, et pourquoi
 lede: Vos droits et nos obligations au titre du GDPR (EU) 2016/679, en termes clairs. Quatorze sections et l'annexe B — faites défiler jusqu'à la fin.
-endMarker: FIN DE LA POLITIQUE · GDPR (EU) 2016/679 · v3.5
+endMarker: FIN DE LA POLITIQUE · GDPR (EU) 2016/679 · v3.6
 bodyLabel: Texte de la Politique de confidentialité
 annexTitle: Annexe B — Dispositions régionales relatives à la confidentialité
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 3.5 · Effective 12 octobre 2026 · Versions antérieures sur dezbatere.ro/privacy/versions · Responsable du traitement : DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 24 octobre 2026 · Versions antérieures sur dezbatere.ro/privacy/versions · Responsable du traitement : DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Nous collectons ce dont un compte a besoin et ce que vous choisissez de saisir. Vos questions sont transmises aux fournisseurs d'IA répertoriés dans notre Registre ; elles ne servent pas à entraîner des modèles. Notre fournisseur d'hébergement stocke votre compte et vos débats à Londres, au Royaume-Uni ; la section 5 précise où vos données sont envoyées par ailleurs. Les débats restent privés, sauf si vous les publiez. La suppression de votre compte détruit les clés de vos données privées ; lorsque vous la programmez, vous choisissez si vos débats publiés sont aussi retirés ou restent publics sous votre pseudonyme retiré. Vous pouvez nous contacter à l'adresse privacy@dezbatere.ro, et les personnes nommées dans un débat peuvent demander son retrait sans avoir de compte.
 
@@ -34,7 +34,7 @@ Nous collectons uniquement ce qui est nécessaire au fonctionnement d'un compte,
 | Catégorie | Données exactes | Source |
 | --- | --- | --- |
 | **Compte** | Adresse e-mail et adresse e-mail de récupération (conservées sous forme chiffrée, avec un index à clé qui nous permet de retrouver le compte sans lire l'adresse) ; mot de passe (conservé sous forme de hachage, jamais en clair) ; secret d'authentification à deux facteurs (chiffré) ; dix codes de récupération (conservés sous forme de hachages) ; votre pseudonyme ; le résultat de la vérification de votre âge | Vous, lors de l'inscription |
-| **Vérification du pays de l’adresse IP** | Lors de l’inscription, nous déterminons localement le pays de l’adresse IP avec DB-IP Lite et vérifions une liste d’adresses de sortie Tor. Au début de chaque nouveau débat, nous déterminons de nouveau ce pays localement et pouvons refuser le débat si le pays est bloqué en permanence. En cas de refus, nous agrégeons les entrées d’audit par route, code, pays et intervalle de temps; l’adresse IP n’y est conservée que sous forme d’empreinte unidirectionnelle avec clé. L’entrée de refus contient le code, le pays et une indication que l’adresse IP a servi de fondement ; l’adresse IP et la chaîne user-agent ne sont conservées que sous forme d’empreintes unidirectionnelles avec clé. | Votre navigateur lors de l’inscription et au début d’un nouveau débat |
+| **Vérification du pays de l’adresse IP** | Lors de l’inscription, nous déterminons localement le pays de l’adresse IP avec DB-IP Lite et vérifions une liste d’adresses de sortie Tor. Au début de chaque nouveau débat, nous déterminons de nouveau ce pays localement et pouvons refuser le débat si le pays est bloqué en permanence. En cas de refus, nous agrégeons les entrées d’audit par route, code, pays et intervalle de temps; l’adresse IP n’y est conservée que sous forme d’empreinte unidirectionnelle avec clé. L’entrée de refus contient le code, le pays et une indication que l’adresse IP a servi de fondement ; l’adresse IP et la chaîne user-agent ne sont conservées que sous forme d’empreintes unidirectionnelles avec clé. Lors de l’inscription, le pays de l’adresse IP, avec la région que vous choisissez, détermine aussi si nous affichons la case d’approbation distincte pour l’Italie ; si vous donnez cette approbation, son enregistrement conserve si le choix de la région, le pays de l’adresse IP ou les deux l’ont déclenchée. | Votre navigateur lors de l’inscription et au début d’un nouveau débat |
 | **Vérification de l’âge** | Vous fournissez votre date de naissance uniquement pour le contrôle ; nous ne la conservons pas. Nous conservons le résultat, l’âge minimum requis, le pays de l’adresse IP s’il est connu, la version de la règle, le contexte et l’heure du contrôle. Une inscription réussie n’enregistre que « validé » ; pour un compte existant, le résultat peut être « validé » ou « refusé » | Vous et votre navigateur |
 | **Résidence déclarée** | Le pays où vous déclarez résider et, si vous habitez aux États-Unis, votre État | Vous lors de l’inscription |
 | **Sessions et sécurité** | Le hachage d'un jeton de session ; un hachage à clé de la chaîne user-agent de votre navigateur, utilisé pour détecter le déplacement d'une session vers un autre navigateur ; les horodatages de création, de dernière utilisation et d'expiration. Nous ne conservons **pas** votre adresse IP, le nom de votre appareil ou les informations relatives à votre navigateur avec une session, et la liste des sessions visible dans les Paramètres n'affiche que les horodatages | Votre navigateur |
@@ -215,7 +215,7 @@ Pour refuser ces éléments, bloquez ou supprimez les cookies et les données de
 
 Lorsque nous modifions la présente politique, nous publions la nouvelle version avec un résumé des modifications et une nouvelle date d'entrée en vigueur, et conservons les versions antérieures à l'adresse dezbatere.ro/privacy/versions. Si une modification ajoute une nouvelle finalité ou un nouveau destinataire, nous vous en informons par e-mail et dans le produit avant le début du nouveau traitement, et vous laissons le temps de vous y opposer. Lorsqu'une nouvelle finalité dépend de votre consentement — par exemple, si nous souhaitions un jour utiliser du contenu pour améliorer des modèles — nous sollicitons ce consentement séparément et spécifiquement ; nous ne considérons jamais l'acceptation de Conditions mises à jour comme un consentement à un nouveau traitement. Pour les clarifications qui ne modifient en rien nos pratiques, nous publions simplement la nouvelle version.
 
-La présente politique a été mise à jour pour la dernière fois le 12 octobre 2026. La version 3.5 a remplacé la version 3.4 : la section 2 indique désormais quelles données de facturation et de carte nous conservons et que le numéro complet de votre carte ne nous parvient jamais, et la section 7 indique combien de temps nous conservons une carte enregistrée et les messages du prestataire de paiement au sujet des paiements.
+La présente politique a été mise à jour pour la dernière fois le 24 octobre 2026. La version 3.6 a remplacé la version 3.5 : la section 2 indique désormais que, lors de l’inscription, le pays de l’adresse IP, avec la région que vous choisissez, détermine aussi si nous affichons la case d’approbation distincte pour l’Italie.
 
 ## Annex B — Dispositions régionales relatives à la confidentialité
 

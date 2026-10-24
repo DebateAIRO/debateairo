@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kısaca
-eyebrow: GİZLİLİK POLİTİKASI · v3.5 · YÜRÜRLÜK TARİHİ 12 EKİM 2026
+eyebrow: GİZLİLİK POLİTİKASI · v3.6 · YÜRÜRLÜK TARİHİ 24 EKİM 2026
 title: Neleri neden saklıyoruz?
 lede: GDPR (EU) 2016/679 kapsamındaki haklarınız ve yükümlülüklerimiz sade bir dille açıklanmıştır. On dört bölüm ve Ek B — sonuna kadar kaydırın.
-endMarker: POLİTİKANIN SONU · GDPR (EU) 2016/679 · v3.5
+endMarker: POLİTİKANIN SONU · GDPR (EU) 2016/679 · v3.6
 bodyLabel: Gizlilik Politikası metni
 annexTitle: Ek B — Bölgesel gizlilik hükümleri
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 ÇEREZLER
 -->
 
-**Version 3.5 · Effective 12 Ekim 2026 · Önceki sürümler: dezbatere.ro/privacy/versions · Veri sorumlusu: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 24 Ekim 2026 · Önceki sürümler: dezbatere.ro/privacy/versions · Veri sorumlusu: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Bir hesabın ihtiyaç duyduğu bilgileri ve yazmayı seçtiğiniz içerikleri toplarız. Sorularınız Sicilimizde listelenen yapay zekâ sağlayıcılarına gider; model eğitimi için kullanılmazlar. Barındırma sağlayıcımız hesabınızı ve tartışmalarınızı Birleşik Krallık'taki Londra'da saklar; verilerinizin başka nerelere gittiğini bölüm 5 anlatır. Tartışmalar, siz yayımlamadıkça gizlidir. Hesabınızı silmek özel verilerinizin anahtarlarını imha eder; silme işlemini planlarken yayımlanmış tartışmalarınızın da kaldırılmasını veya kullanımdan kaldırılmış takma adınız altında herkese açık kalmasını seçersiniz. Bize privacy@dezbatere.ro adresinden ulaşabilirsiniz; bir tartışmada adı geçen kişiler de hesapları olmadan kaldırma talebinde bulunabilir.
 
@@ -34,7 +34,7 @@ Yalnızca bir hesabın çalışması için gerekenleri, bize vermeyi seçtiğini
 | Kategori | Tam olarak neler | Kaynak |
 | --- | --- | --- |
 | **Hesap** | E-posta adresi ve kurtarma e-posta adresi (şifrelenmiş olarak ve adresi okumadan hesabı bulabilmemizi sağlayan anahtarlı bir dizinle saklanır); parola (karma değer olarak saklanır, hiçbir zaman açık metin hâlinde saklanmaz); iki faktörlü kimlik doğrulama sırrınız (şifreli); on kurtarma kodu (karma değerler olarak saklanır); takma adınız; yaş kontrolünün sonucu; doğum tarihiniz değil | Siz, kayıt sırasında |
-| **IP adresinin ülke kontrolü** | Kayıt sırasında IP adresinin ülkesini DB-IP Lite ile yerel olarak belirler, Tor çıkış adresleri listesini ayrıca kontrol ederiz. Her yeni tartışma başlamadan önce IP adresinin ülkesini yine yerel olarak kontrol eder ve ülke her zaman engellenenler listesindeyse tartışmayı reddedebiliriz. Retlerde güzergâhı, kodu, ülkeyi, zaman aralığını ve kanıtın IP adresi olduğunu toplulaştırarak kaydederiz; Denetim kaydında IP adresi ve kullanıcı aracısı (user-agent) yalnızca anahtarlı, tek yönlü özetler olarak tutulur. | Kayıtta ve her yeni tartışmanın başlangıcında kullanılan IP adresi |
+| **IP adresinin ülke kontrolü** | Kayıt sırasında IP adresinin ülkesini DB-IP Lite ile yerel olarak belirler, Tor çıkış adresleri listesini ayrıca kontrol ederiz. Her yeni tartışma başlamadan önce IP adresinin ülkesini yine yerel olarak kontrol eder ve ülke her zaman engellenenler listesindeyse tartışmayı reddedebiliriz. Retlerde güzergâhı, kodu, ülkeyi, zaman aralığını ve kanıtın IP adresi olduğunu toplulaştırarak kaydederiz; Denetim kaydında IP adresi ve kullanıcı aracısı (user-agent) yalnızca anahtarlı, tek yönlü özetler olarak tutulur. Kayıt sırasında IP adresinin ülkesi, seçtiğiniz Bölge ile birlikte İtalya için ayrı onay kutusunu gösterip göstermeyeceğimizi de belirler; bu onayı verirseniz onayın kaydı, kutunun gösterilmesini Bölge seçiminin mi, IP adresinin ülkesinin mi yoksa her ikisinin mi tetiklediğini saklar. | Kayıtta ve her yeni tartışmanın başlangıcında kullanılan IP adresi |
 | **Yaş kontrolü** | Sonuç (kayıtta yalnızca geçti; mevcut hesap için geçti veya reddedildi), uygulanan asgari yaş, biliniyorsa IP ülkesi, kural sürümü, bağlam ve kontrol zamanı. Doğum tarihini saklamayız | Kontrol için verdiğiniz doğum tarihi; IP adresinden belirlenen ülke |
 | **Beyan edilen bölge** | Kayıtta seçtiğiniz ikamet ülkesi ve ABD için eyalet | Siz, kayıt sırasında |
 | **Oturumlar ve güvenlik** | Karma değere dönüştürülmüş bir oturum belirteci; bir oturumun farklı bir tarayıcıya geçtiğini fark etmek için kullanılan, tarayıcınızın kullanıcı aracısı dizisinin anahtarlı karması; oluşturma, son kullanım ve sona erme zaman damgaları. IP adresinizi, cihaz adınızı veya tarayıcı ayrıntılarınızı bir oturumla birlikte **saklamayız** ve Ayarlar'da gördüğünüz oturum listesi yalnızca zaman damgalarını gösterir | Tarayıcınız |
@@ -215,7 +215,7 @@ Bu öğeleri reddetmek için tarayıcı ayarlarınızda bu sitenin çerezlerini 
 
 Bu politikayı değiştirdiğimizde yeni sürümü, değişikliklerin özeti ve yeni bir yürürlük tarihiyle birlikte yayımlar ve önceki sürümleri dezbatere.ro/privacy/versions adresinde tutarız. Yeni bir amaç veya yeni bir alıcı ekleyen değişikliklerde, yeni işleme başlamadan önce size e-postayla ve ürün içinde bilgi verir ve itiraz etmeniz için süre tanırız. Yeni bir amaç rızanıza bağlıysa — örneğin bir gün içeriği modelleri geliştirmek için kullanmak istersek — bu rızayı ayrıca ve özel olarak isteriz; güncellenmiş Koşulların kabulünü hiçbir zaman yeni işleme için rıza saymayız. Yaptıklarımızı değiştirmeyen açıklamalar bakımından yeni sürümü yayımlamakla yetiniriz.
 
-Bu politika en son 12 Ekim 2026 tarihinde güncellenmiştir. Sürüm 3.5, sürüm 3.4'ün yerine geçmiştir: 2. bölüm artık hangi fatura ve kart bilgilerini sakladığımızı ve tam kart numaranızın hiçbir zaman bize ulaşmadığını söylüyor; 7. bölüm ise kayıtlı bir kartı ve ödeme sağlayıcısının ödemelerle ilgili mesajlarını ne kadar süreyle sakladığımızı söylüyor.
+Bu politika en son 24 Ekim 2026 tarihinde güncellenmiştir. Sürüm 3.6, sürüm 3.5'in yerine geçmiştir: 2. bölüm artık kayıt sırasında IP adresinin ülkesinin, seçtiğiniz Bölge ile birlikte, İtalya için ayrı onay kutusunu gösterip göstermeyeceğimizi de belirlediğini söylüyor.
 
 ## Annex B — Bölgesel gizlilik hükümleri
 

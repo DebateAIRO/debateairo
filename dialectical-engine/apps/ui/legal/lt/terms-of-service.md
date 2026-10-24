@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Trumpai
-eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.4 · ĮSIGALIOJA 2026 M. SPALIO 12 D.
+eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.5 · ĮSIGALIOJA 2026 M. SPALIO 24 D.
 title: Su kuo sutinkate
 lede: Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.
-endMarker: SĄLYGŲ PABAIGA · v2.4
+endMarker: SĄLYGŲ PABAIGA · v2.5
 bodyLabel: Paslaugų teikimo sąlygų tekstas
 annexTitle: A priedas — Regioninės sąlygos
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TAIKYTINA TEISĖ
 -->
 
-**Version 2.4 · Effective 2026 m. spalio 12 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
+**Version 2.5 · Effective 2026 m. spalio 24 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
 
 **In short.** Turite būti ne jaunesni kaip 18 metų. Dialectical Engine kuria argumentus naudodama DI modelius, todėl viskas, ką ji sugeneruoja, gali būti klaidinga — tai nėra konsultacija. Jūsų debatai yra privatūs, nebent juos paskelbiate; paskelbtus debatus gali skaityti bet kas. Jūsų pateiktas tekstas siunčiamas mūsų Paslaugų teikėjų registre nurodytiems DI paslaugų teikėjams ir nenaudojamas modeliams mokyti. Apie neteisėtą turinį praneškite adresu support@dezbatere.ro, nesvarbu, ar turite paskyrą. Taikoma Rumunijos teisė, tačiau jums ir toliau taikoma vietos vartotojų apsauga.
 
@@ -277,7 +277,7 @@ Kiekvienas įrašas taikomas žmonėms, gyvenantiems jo regione, ir jame nurodom
 
 ### A.1 Europos Sąjunga ir Europos ekonominė erdvė
 
-Pagrindinė šių Sąlygų dalis parengta jums. Be to: galite iškelti bylą šalies, kurioje gyvenate, teismuose; taikoma 13 skyriuje nustatyta teisė atsisakyti sutarties; alternatyviu ginčų sprendimu galima pasinaudoti per www.onoratainstanta.ro. **Vokietija:** naudodamiesi atšaukimo mygtuku adresu dezbatere.ro/cancel galite nutraukti prenumeratą neprisijungę; prenumeratos sąlygos, atnaujinimo laikotarpiai ir įspėjimo terminai atitinka BGB §309(9): kiekvienas planas galioja vieną mėnesį ir kas mėnesį atnaujinamas, kol jo neatšauksite; atšaukti galite bet kada, o atšaukimas įsigalioja einamojo mėnesio pabaigoje. **Prancūzija:** galite internetu trimis veiksmais nutraukti prenumeratą adresu dezbatere.ro/cancel. **Italija:** atsakomybės (15), sustabdymo (11), pakeitimų (14) ir taikytinos teisės (18) nuostatoms būtinas konkretus jūsų pritarimas, kurį duodate atskiru patvirtinimu registruodamiesi. **Nyderlandai:** prieš sudarant sutartį šios Sąlygos pateikiamos forma, kurią galima išsaugoti. **Lenkija:** pateikiama ir versija lenkų kalba; kalbos perjungikliu pasirinkite Polski.
+Pagrindinė šių Sąlygų dalis parengta jums. Be to: galite iškelti bylą šalies, kurioje gyvenate, teismuose; taikoma 13 skyriuje nustatyta teisė atsisakyti sutarties; alternatyviu ginčų sprendimu galima pasinaudoti per www.onoratainstanta.ro. **Vokietija:** naudodamiesi atšaukimo mygtuku adresu dezbatere.ro/cancel galite nutraukti prenumeratą neprisijungę; prenumeratos sąlygos, atnaujinimo laikotarpiai ir įspėjimo terminai atitinka BGB §309(9): kiekvienas planas galioja vieną mėnesį ir kas mėnesį atnaujinamas, kol jo neatšauksite; atšaukti galite bet kada, o atšaukimas įsigalioja einamojo mėnesio pabaigoje. **Prancūzija:** galite internetu trimis veiksmais nutraukti prenumeratą adresu dezbatere.ro/cancel. **Italija:** sustabdymo ir nutraukimo (11), mokamų planų ir jų atnaujinimo (12), pakeitimų (14), atsakomybės (15) bei taikytinos teisės ir ginčų nagrinėjimo vietos (18) nuostatoms pagal Italijos civilinio kodekso 1341 ir 1342 straipsnius būtinas konkretus jūsų pritarimas. Jį duodate registruodamiesi pažymėdami atskirą langelį; jis rodomas kiekvienam, kuris lauke „Regionas“ pasirenka Italiją arba jungiasi iš Italijos. **Nyderlandai:** prieš sudarant sutartį šios Sąlygos pateikiamos forma, kurią galima išsaugoti. **Lenkija:** pateikiama ir versija lenkų kalba; kalbos perjungikliu pasirinkite Polski.
 
 ### A.2 Jungtinės Amerikos Valstijos
 

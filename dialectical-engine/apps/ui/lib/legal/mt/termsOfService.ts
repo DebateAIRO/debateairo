@@ -296,7 +296,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "L-Unjoni Ewropea u ż-Żona Ekonomika Ewropea",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Il-parti ewlenija ta’ dawn it-Termini nkitbet għalik. Barra minn hekk: tista’ tibda proċedimenti fil-qrati tal-pajjiż fejn tgħix; japplika d-dritt tal-irtirar fit-taqsima 13; soluzzjoni alternattiva għat-tilwim hija disponibbli permezz ta’ www.onoratainstanta.ro. Il-Ġermanja: il-buttuna tal-kanċellazzjoni fuq dezbatere.ro/cancel tħallik ittemm abbonament mingħajr ma tidħol fil-kont; it-termini tal-abbonament, il-perjodi tat-tiġdid u l-perjodi tal-avviż jikkonformaw mal-§309(9) BGB: kull pjan jgħaddi għal xahar u jitġedded kull xahar sakemm tikkanċella, u tista’ tikkanċella fi kwalunkwe ħin b’effett minn tmiem ix-xahar kurrenti. Franza: tista’ ttemm abbonament fuq l-internet fi tliet passi fuq dezbatere.ro/cancel. L-Italja: il-klawżoli dwar ir-responsabbiltà (15), is-sospensjoni (11), il-bidliet (14) u l-liġi applikabbli (18) jeħtieġu l-approvazzjoni speċifika tiegħek, li tagħtiha bil-konferma separata waqt ir-reġistrazzjoni. Il-Pajjiżi l-Baxxi: dawn it-Termini jiġu pprovduti f’forma li tista’ tinħażen qabel il-konklużjoni. Il-Polonja: verżjoni bil-Pollakk hija disponibbli; agħżel Polski bis-selettur tal-lingwa." }
+      { kind: "p", text: "Il-parti ewlenija ta’ dawn it-Termini nkitbet għalik. Barra minn hekk: tista’ tibda proċedimenti fil-qrati tal-pajjiż fejn tgħix; japplika d-dritt tal-irtirar fit-taqsima 13; soluzzjoni alternattiva għat-tilwim hija disponibbli permezz ta’ www.onoratainstanta.ro. Il-Ġermanja: il-buttuna tal-kanċellazzjoni fuq dezbatere.ro/cancel tħallik ittemm abbonament mingħajr ma tidħol fil-kont; it-termini tal-abbonament, il-perjodi tat-tiġdid u l-perjodi tal-avviż jikkonformaw mal-§309(9) BGB: kull pjan jgħaddi għal xahar u jitġedded kull xahar sakemm tikkanċella, u tista’ tikkanċella fi kwalunkwe ħin b’effett minn tmiem ix-xahar kurrenti. Franza: tista’ ttemm abbonament fuq l-internet fi tliet passi fuq dezbatere.ro/cancel. L-Italja: il-klawżoli dwar is-sospensjoni u t-terminazzjoni (11), il-pjanijiet bi ħlas u t-tiġdid tagħhom (12), il-bidliet (14), ir-responsabbiltà (15) u l-liġi applikabbli u fejn jinstema’ t-tilwim (18) jeħtieġu l-approvazzjoni speċifika tiegħek skont l-artikoli 1341 u 1342 tal-Kodiċi Ċivili Taljan. Tagħtiha b’kaxxa separata waqt ir-reġistrazzjoni, murija lil kull min jagħżel l-Italja fil-qasam “Reġjun” jew li l-konnessjoni tiegħu tiġi mill-Italja. Il-Pajjiżi l-Baxxi: dawn it-Termini jiġu pprovduti f’forma li tista’ tinħażen qabel il-konklużjoni. Il-Polonja: verżjoni bil-Pollakk hija disponibbli; agħżel Polski bis-selettur tal-lingwa." }
     ]
   },
   {
@@ -353,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.4",
-  sha256: "d373f89b70125f4f4b6bccf7ae1cafbe9214dd8bf7c38c67c19bd7911ba9b97d",
-  eyebrow: "TERMINI TAS-SERVIZZ · v2.4 · EFFETTIVI 12 TA’ OTTUBRU 2026",
+  version: "2.5",
+  sha256: "2dbc01ecd6bddae87a0617c0c51699c112b02164d5d416eca3798fd952c0e6ee",
+  eyebrow: "TERMINI TAS-SERVIZZ · v2.5 · EFFETTIVI 24 TA’ OTTUBRU 2026",
   title: "Dak li taqbel miegħu",
   lede: "Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.",
-  endMarker: "TMIEM IT-TERMINI · v2.4",
+  endMarker: "TMIEM IT-TERMINI · v2.5",
   contact: "support@dezbatere.ro",
   bodyLabel: "Test tat-Termini tas-Servizz",
   sectionIdPrefix: "terms-section-",

@@ -47,7 +47,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Cont — Adresa de e-mail și adresa de e-mail pentru recuperare (stocate criptat, cu un index bazat pe cheie pentru a putea găsi contul fără a citi adresa); parola (stocată sub formă de hash, niciodată în clar); secretul pentru autentificarea cu doi factori (criptat); zece coduri de recuperare (stocate sub formă de hash); pseudonimul dumneavoastră; rezultatul verificării vârstei, dar nu data nașterii — Dumneavoastră, la înregistrare",
-        "Verificarea țării adresei IP — La înregistrare, stabilim local țara adresei IP cu DB-IP Lite și verificăm separat lista adreselor de ieșire Tor. La începutul fiecărei dezbateri noi, verificăm tot local țara adresei IP și putem refuza dezbaterea dacă țara se află pe lista celor blocate întotdeauna. Pentru refuzuri, consemnăm agregat ruta, codul, țara, intervalul de timp și faptul că proba a fost adresa IP; În jurnalul de audit, adresa IP și identificatorul browserului (user-agent) sunt păstrate numai ca amprente unidirecționale bazate pe cheie. — Adresa IP folosită la înregistrare și la începutul unei dezbateri noi",
+        "Verificarea țării adresei IP — La înregistrare, stabilim local țara adresei IP cu DB-IP Lite și verificăm separat lista adreselor de ieșire Tor. La începutul fiecărei dezbateri noi, verificăm tot local țara adresei IP și putem refuza dezbaterea dacă țara se află pe lista celor blocate întotdeauna. Pentru refuzuri, consemnăm agregat ruta, codul, țara, intervalul de timp și faptul că proba a fost adresa IP; În jurnalul de audit, adresa IP și identificatorul browserului (user-agent) sunt păstrate numai ca amprente unidirecționale bazate pe cheie. La înregistrare, țara adresei IP, împreună cu regiunea pe care o alegeți, stabilește și dacă afișăm căsuța separată de aprobare pentru Italia; dacă acordați această aprobare, înregistrarea ei păstrează dacă alegerea regiunii, țara adresei IP sau ambele au determinat afișarea căsuței. — Adresa IP folosită la înregistrare și la începutul unei dezbateri noi",
         "Verificarea vârstei — Rezultatul (admis la înregistrare; admis sau respins pentru un cont existent), vârsta minimă aplicată, țara adresei IP dacă este cunoscută, versiunea regulii, contextul și momentul verificării. Nu păstrăm data nașterii — Data nașterii introdusă pentru verificare; țara dedusă din IP",
         "Regiunea declarată — Țara de reședință aleasă la înregistrare și, pentru SUA, statul — Dumneavoastră, la înregistrare",
         "Sesiuni și securitate — Un token de sesiune stocat sub formă de hash; un hash bazat pe cheie al șirului user-agent al browserului, folosit pentru a observa când o sesiune trece la alt browser; marcajele temporale ale creării, ultimei utilizări și expirării. Nu stocăm împreună cu o sesiune adresa IP, numele dispozitivului sau detaliile browserului, iar lista de sesiuni afișată în Setări conține numai marcaje temporale — Browserul dumneavoastră",
@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Când modificăm această politică, publicăm noua versiune împreună cu un rezumat al modificărilor și o nouă dată de intrare în vigoare și păstrăm versiunile anterioare la dezbatere.ro/privacy/versions. Pentru o modificare care adaugă un scop sau un destinatar nou, vă informăm prin e-mail și în produs înainte de începerea noii prelucrări și vă acordăm timp pentru a vă opune. Dacă un scop nou depinde de consimțământul dumneavoastră — de exemplu, dacă am dori vreodată să folosim conținutul pentru îmbunătățirea modelelor — solicităm consimțământul separat și specific; nu considerăm niciodată acceptarea Termenilor actualizați drept consimțământ pentru o prelucrare nouă. Pentru clarificări care nu schimbă nimic din ceea ce facem, publicăm pur și simplu noua versiune." },
-      { kind: "p", text: "Această politică a fost actualizată ultima dată la 12 octombrie 2026. Versiunea 3.5 a înlocuit versiunea 3.4: secțiunea 2 spune acum ce date de facturare și ce date ale cardului păstrăm și că numărul complet al cardului nu ajunge niciodată la noi, iar secțiunea 7 spune cât timp păstrăm un card salvat și mesajele furnizorului de plăți despre plăți." }
+      { kind: "p", text: "Această politică a fost actualizată ultima dată la 24 octombrie 2026. Versiunea 3.6 a înlocuit versiunea 3.5: secțiunea 2 spune acum că, la înregistrare, țara adresei IP, împreună cu regiunea pe care o alegeți, stabilește și dacă afișăm căsuța separată de aprobare pentru Italia." }
     ]
   },
   {
@@ -332,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.5",
-  sha256: "999d5660c2f2cb684b618c357d50bc1405ebdcf6f1753905628d576fde474cd3",
-  eyebrow: "POLITICA DE CONFIDENȚIALITATE · v3.5 · ÎN VIGOARE DE LA 12 OCTOMBRIE 2026",
+  version: "3.6",
+  sha256: "ae0f59109237e9460bc7b9dff23b59ae1de6b294f8f8bba0e5a44e6242357905",
+  eyebrow: "POLITICA DE CONFIDENȚIALITATE · v3.6 · ÎN VIGOARE DE LA 24 OCTOMBRIE 2026",
   title: "Ce stocăm și de ce",
   lede: "Drepturile dumneavoastră și obligațiile noastre în temeiul GDPR (EU) 2016/679, într-un limbaj clar. Paisprezece secțiuni și Anexa B — derulați până la final.",
-  endMarker: "SFÂRȘITUL POLITICII · GDPR (EU) 2016/679 · v3.5",
+  endMarker: "SFÂRȘITUL POLITICII · GDPR (EU) 2016/679 · v3.6",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Textul Politicii de confidențialitate",
   sectionIdPrefix: "policy-section-",

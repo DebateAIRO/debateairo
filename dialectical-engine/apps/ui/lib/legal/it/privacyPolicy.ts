@@ -47,7 +47,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Account — Indirizzo email e indirizzo email di recupero (conservati in forma cifrata, con un indice dotato di chiave che ci consente di trovare l'account senza leggere l'indirizzo); password (conservata come hash, mai in chiaro); il segreto per l'autenticazione a due fattori (cifrato); dieci codici di recupero (conservati come hash); il tuo pseudonimo — Tu e il servizio, al momento della registrazione",
-        "Verifica del Paese dell’IP alla registrazione e prima di un nuovo dibattito — Alla registrazione verifichiamo localmente il Paese dell’indirizzo IP e le uscite Tor con DB-IP Lite e l’elenco Tor. Prima di ogni nuovo dibattito verifichiamo di nuovo localmente il Paese dell’IP e rifiutiamo il dibattito se il Paese è nell’elenco di quelli sempre bloccati. Rifiutiamo le registrazioni da Paesi non serviti, da Tor e da indirizzi IP di cui non possiamo determinare il Paese; l’IP non viene inviato a terzi. I rifiuti sono aggregati per percorso, codice, Paese e intervallo di tempo; l’indirizzo IP e lo user-agent figurano solo come digest unidirezionali con chiave. Il tipo di prova è indicato come «indirizzo IP». — La tua connessione",
+        "Verifica del Paese dell’IP alla registrazione e prima di un nuovo dibattito — Alla registrazione verifichiamo localmente il Paese dell’indirizzo IP e le uscite Tor con DB-IP Lite e l’elenco Tor. Prima di ogni nuovo dibattito verifichiamo di nuovo localmente il Paese dell’IP e rifiutiamo il dibattito se il Paese è nell’elenco di quelli sempre bloccati. Rifiutiamo le registrazioni da Paesi non serviti, da Tor e da indirizzi IP di cui non possiamo determinare il Paese; l’IP non viene inviato a terzi. I rifiuti sono aggregati per percorso, codice, Paese e intervallo di tempo; l’indirizzo IP e lo user-agent figurano solo come digest unidirezionali con chiave. Il tipo di prova è indicato come «indirizzo IP». Alla registrazione, il Paese dell’IP, insieme alla regione che scegli, decide anche se mostriamo la casella di approvazione separata per l’Italia; se dai tale approvazione, la relativa registrazione conserva se a far comparire la casella sono stati la scelta della regione, il Paese dell’IP o entrambi. — La tua connessione",
         "Verifica dell’età — Inserisci la data di nascita, ma non la conserviamo. Per una registrazione riuscita registriamo l’esito positivo; per gli account esistenti l’esito può essere positivo o negativo. Il record comprende l’età minima richiesta, il Paese dell’IP se disponibile, la versione della regola, il contesto e l’ora della verifica — Tu e il sistema di registrazione",
         "Residenza dichiarata — Il Paese di residenza scelto alla registrazione e, se negli Stati Uniti, lo Stato federato — Tu",
         "Sessioni e sicurezza — Un token di sessione sottoposto a hash; un hash con chiave della stringa user-agent del tuo browser, utilizzato per rilevare quando una sessione passa a un browser diverso; data e ora di creazione, ultimo utilizzo e scadenza. Non conserviamo con una sessione il tuo indirizzo IP, il nome del dispositivo o i dettagli del browser; l'elenco delle sessioni visualizzato nelle Impostazioni mostra soltanto data e ora — Il tuo browser",
@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Quando modifichiamo la presente informativa, pubblichiamo la nuova versione insieme a una sintesi delle modifiche e a una nuova data di entrata in vigore e conserviamo le versioni precedenti su dezbatere.ro/privacy/versions. Per una modifica che aggiunga una nuova finalità o un nuovo destinatario, ti informiamo per email e all'interno del prodotto prima dell'inizio del nuovo trattamento e ti concediamo il tempo necessario per opporti. Laddove una nuova finalità dipenda dal tuo consenso — ad esempio, se in futuro volessimo utilizzare i contenuti per migliorare i modelli — chiediamo tale consenso separatamente e in modo specifico; non consideriamo mai l'accettazione di Condizioni aggiornate come consenso a un nuovo trattamento. Per chiarimenti che non modificano in alcun modo le nostre attività, ci limitiamo a pubblicare la nuova versione." },
-      { kind: "p", text: "La presente informativa è stata aggiornata da ultimo il 12 ottobre 2026. La versione 3.5 ha sostituito la versione 3.4: la sezione 2 ora precisa quali dati di fatturazione e della carta conserviamo e che il numero completo della tua carta non ci arriva mai, e la sezione 7 precisa per quanto tempo conserviamo una carta salvata e i messaggi del fornitore di servizi di pagamento sui pagamenti." }
+      { kind: "p", text: "La presente informativa è stata aggiornata da ultimo il 24 ottobre 2026. La versione 3.6 ha sostituito la versione 3.5: la sezione 2 ora precisa che, alla registrazione, il Paese dell’IP, insieme alla regione che scegli, decide anche se mostriamo la casella di approvazione separata per l’Italia." }
     ]
   },
   {
@@ -332,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.5",
-  sha256: "218e4c54b369cbf1ff0a72a67b8790a621944971b058cadf41796ad66f5246da",
-  eyebrow: "INFORMATIVA SULLA PRIVACY · v3.5 · IN VIGORE DAL 12 OTTOBRE 2026",
+  version: "3.6",
+  sha256: "0b6167a46016cfb4be680bd408956d6a8e259e6a309d0a38c64ee84745936e93",
+  eyebrow: "INFORMATIVA SULLA PRIVACY · v3.6 · IN VIGORE DAL 24 OTTOBRE 2026",
   title: "Cosa conserviamo e perché",
   lede: "I tuoi diritti e i nostri obblighi ai sensi del GDPR (EU) 2016/679, in un linguaggio chiaro. Quattordici sezioni e Allegato B — scorri fino alla fine.",
-  endMarker: "FINE DELL'INFORMATIVA · GDPR (EU) 2016/679 · v3.5",
+  endMarker: "FINE DELL'INFORMATIVA · GDPR (EU) 2016/679 · v3.6",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Testo dell'Informativa sulla privacy",
   sectionIdPrefix: "policy-section-",

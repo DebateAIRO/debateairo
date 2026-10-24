@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: En bref
-eyebrow: CONDITIONS D’UTILISATION · v2.4 · PRISE D’EFFET 12 OCTOBRE 2026
+eyebrow: CONDITIONS D’UTILISATION · v2.5 · PRISE D’EFFET 24 OCTOBRE 2026
 title: Ce que vous acceptez
 lede: Le contrat entre vous et DMS Merchandise Shop S.R.L., en termes clairs. Dix-neuf sections et l’annexe A — faites défiler jusqu’à la fin.
-endMarker: FIN DES CONDITIONS · v2.4
+endMarker: FIN DES CONDITIONS · v2.5
 bodyLabel: Texte des Conditions d’utilisation
 annexTitle: Annexe A — Conditions régionales
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 DROIT APPLICABLE
 -->
 
-**Version 2.4 · Effective 12 octobre 2026 · Versions précédentes sur dezbatere.ro/terms/versions · Langue : français.**
+**Version 2.5 · Effective 24 octobre 2026 · Versions précédentes sur dezbatere.ro/terms/versions · Langue : français.**
 
 **In short.** Vous devez avoir au moins 18 ans. Dialectical Engine construit des arguments à l’aide de modèles d’IA et tout ce qu’il génère peut être erroné — il ne s’agit pas d’un conseil. Vos débats sont privés, sauf si vous les publiez ; si vous les publiez, tout le monde peut les lire. Le texte que vous soumettez est transmis aux fournisseurs d’IA inscrits dans notre Registre des fournisseurs et n’est pas utilisé pour entraîner des modèles. Signalez tout contenu illicite à support@dezbatere.ro, que vous ayez ou non un compte. Le droit roumain s’applique, mais les protections locales dont vous bénéficiez en tant que consommateur demeurent acquises.
 
@@ -277,7 +277,7 @@ Chaque entrée s’applique aux personnes qui résident dans sa région et n’i
 
 ### A.1 Union européenne et Espace économique européen
 
-Le corps des présentes Conditions est rédigé pour vous. En outre : vous pouvez saisir les juridictions du pays dans lequel vous résidez ; le droit de rétractation prévu à la section 13 s’applique ; un règlement extrajudiciaire des litiges est disponible par l’intermédiaire du site www.onoratainstanta.ro. **Allemagne :** le bouton de résiliation disponible à l’adresse dezbatere.ro/cancel vous permet de mettre fin à un abonnement sans vous connecter ; les durées d’abonnement et de renouvellement ainsi que les délais de préavis sont conformes au §309(9) BGB : chaque formule dure un mois et se renouvelle chaque mois jusqu’à ce que vous la résiliiez, et vous pouvez la résilier à tout moment avec effet à la fin du mois en cours. **France :** vous pouvez résilier un abonnement en ligne en trois étapes à l’adresse dezbatere.ro/cancel. **Italie :** les clauses relatives à la responsabilité (15), à la suspension (11), aux modifications (14) et au droit applicable (18) nécessitent votre approbation expresse, que vous donnez par une confirmation distincte lors de l’inscription. **Pays-Bas :** les présentes Conditions sont fournies sous une forme permettant leur conservation avant la conclusion du contrat. **Pologne :** une version polonaise est disponible ; choisissez Polski dans le menu des langues.
+Le corps des présentes Conditions est rédigé pour vous. En outre : vous pouvez saisir les juridictions du pays dans lequel vous résidez ; le droit de rétractation prévu à la section 13 s’applique ; un règlement extrajudiciaire des litiges est disponible par l’intermédiaire du site www.onoratainstanta.ro. **Allemagne :** le bouton de résiliation disponible à l’adresse dezbatere.ro/cancel vous permet de mettre fin à un abonnement sans vous connecter ; les durées d’abonnement et de renouvellement ainsi que les délais de préavis sont conformes au §309(9) BGB : chaque formule dure un mois et se renouvelle chaque mois jusqu’à ce que vous la résiliiez, et vous pouvez la résilier à tout moment avec effet à la fin du mois en cours. **France :** vous pouvez résilier un abonnement en ligne en trois étapes à l’adresse dezbatere.ro/cancel. **Italie :** les clauses relatives à la suspension et à la résiliation (11), aux formules payantes et à leur renouvellement (12), aux modifications (14), à la responsabilité (15) et au droit applicable et aux juridictions compétentes (18) nécessitent votre approbation expresse au titre des articles 1341 et 1342 du Code civil italien. Vous la donnez au moyen d’une case distincte lors de l’inscription, affichée à toute personne qui choisit l’Italie dans le champ Région ou dont la connexion provient d’Italie. **Pays-Bas :** les présentes Conditions sont fournies sous une forme permettant leur conservation avant la conclusion du contrat. **Pologne :** une version polonaise est disponible ; choisissez Polski dans le menu des langues.
 
 ### A.2 États-Unis
 

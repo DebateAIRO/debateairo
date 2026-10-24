@@ -754,6 +754,22 @@ describe("P3-01 production database-principal manifest", () => {
   "grants": [
     "EXECUTE ON FUNCTION register.settings_version_passed(text,bigint), register.read_passed_settings_versions(text)"
   ]
+},
+// Italy clause approval (migration 0125, mission italy-clause-approval S01), in source order: the sign-up writer for the
+// API's role alone (as 0095's record_registration_region), then the export reader v2 for the export worker alone.
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0125_italy_specific_approval.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.record_signup_italy_approval(uuid,jsonb)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0125_italy_specific_approval.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_data_export_snapshot_v2(uuid,uuid)"
+  ]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))
@@ -1061,4 +1077,22 @@ it("discloses exactly 0124's grants to the runtime and the API's billing role (s
   // The pointer reader for the API's role; the two pass readers for the runtime. Nothing else, and no table grant.
   expect(declared).toHaveLength(2);
   expect(declared.some(grant => /\bON register\.settings_/u.test(grant))).toBe(false);
+});
+
+it("discloses exactly 0125's grants to the API's billing role and the export worker (italy-clause-approval S01)", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0125_italy_specific_approval.sql", "utf8");
+  const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime|debateai_data_export_worker";
+  // As for 0123 and 0124: every GRANT line naming one of the disclosed roles names it alone.
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
+    .filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+      && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = [...sql.matchAll(new RegExp(`^GRANT [^\\n]+ TO (?:${disclosed});$`, "gm"))]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0125_italy_specific_approval.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  // The sign-up writer for the API's role; the export reader v2 for the worker. Nothing else, and no table grant.
+  expect(declared).toHaveLength(2);
+  expect(declared.some(grant => /\bON legal\./u.test(grant))).toBe(false);
 });

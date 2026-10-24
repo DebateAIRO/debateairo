@@ -47,7 +47,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Račun — E-poštni naslov in e-poštni naslov za obnovitev (shranjena šifrirano, z indeksom s ključem, da lahko račun najdemo, ne da bi naslov prebrali); geslo (shranjeno kot zgoščena vrednost, nikoli v čisti obliki); vaša skrivnost za dvostopenjsko preverjanje pristnosti (šifrirana); deset obnovitvenih kod (shranjenih kot zgoščene vrednosti); vaš psevdonim; rezultat preverjanja starosti, ne pa rojstnega datuma — Vi, ob registraciji",
-        "Preverjanje države naslova IP — Ob registraciji lokalno določimo državo naslova IP s podatki DB-IP Lite in seznamom izhodnih vozlišč Tor. Pred vsako novo razpravo prav tako lokalno preverimo državo naslova IP in lahko razpravo zavrnemo, če je država na seznamu vedno blokiranih. Ob zavrnitvi združeno zabeležimo pot, kodo, državo, časovno okno in podatek, da je bil dokaz naslov IP; V revizijski sledi sta naslov IP in niz user-agent shranjena le kot enosmerni zgoščeni vrednosti s ključem. — Naslov IP ob registraciji in začetku nove razprave",
+        "Preverjanje države naslova IP — Ob registraciji lokalno določimo državo naslova IP s podatki DB-IP Lite in seznamom izhodnih vozlišč Tor. Pred vsako novo razpravo prav tako lokalno preverimo državo naslova IP in lahko razpravo zavrnemo, če je država na seznamu vedno blokiranih. Ob zavrnitvi združeno zabeležimo pot, kodo, državo, časovno okno in podatek, da je bil dokaz naslov IP; V revizijski sledi sta naslov IP in niz user-agent shranjena le kot enosmerni zgoščeni vrednosti s ključem. Ob registraciji država naslova IP skupaj z regijo, ki jo izberete, odloča tudi o tem, ali prikažemo ločeno polje z odobritvijo za Italijo; če to odobritev podate, njen zapis hrani, ali je prikaz polja sprožila izbira regije, država naslova IP ali oboje. — Naslov IP ob registraciji in začetku nove razprave",
         "Preverjanje starosti — Rezultat (ob registraciji samo uspešen; pri obstoječem računu uspešen ali zavrnjen), uporabljena najnižja starost, država naslova IP, če je znana, različica pravila, kontekst in čas preverjanja. Rojstnega datuma ne shranimo — Rojstni datum, vnesen za preverjanje; država iz naslova IP",
         "Navedena regija — Država prebivališča, izbrana ob registraciji, in za ZDA tudi zvezna država — Vi, ob registraciji",
         "Seje in varnost — Zgoščen žeton seje; zgoščena vrednost s ključem, izračunana iz niza user-agent vašega brskalnika, s katero zaznavamo prenos seje v drug brskalnik; časovni žigi nastanka, zadnje uporabe in poteka veljavnosti. Znotraj seje ne hranimo vašega naslova IP, imena naprave ali podatkov o brskalniku, seznam sej v Nastavitvah pa prikazuje samo časovne žige — Vaš brskalnik",
@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Ko ta pravilnik spremenimo, objavimo novo različico s povzetkom sprememb in novim datumom začetka veljavnosti, prejšnje različice pa ohranimo na dezbatere.ro/privacy/versions. O spremembi, ki dodaja nov namen ali novega prejemnika, vas obvestimo po e-pošti in v izdelku pred začetkom nove obdelave ter vam damo čas za ugovor. Kadar je nov namen odvisen od vaše privolitve — na primer, če bi kadar koli želeli uporabiti vsebino za izboljševanje modelov — vas za to privolitev zaprosimo ločeno in posebej; sprejetja posodobljenih Pogojev nikoli ne obravnavamo kot privolitev za novo obdelavo. Pri pojasnilih, ki ničesar ne spremenijo glede našega ravnanja, preprosto objavimo novo različico." },
-      { kind: "p", text: "Ta pravilnik je bil nazadnje posodobljen 12. oktobra 2026. Različica 3.5 je nadomestila različico 3.4: razdelek 2 zdaj navaja, katere podatke za obračun in katere podatke o kartici hranimo ter da vaša celotna številka kartice nikoli ne pride do nas, razdelek 7 pa navaja, kako dolgo hranimo shranjeno kartico in sporočila ponudnika plačilnih storitev o plačilih." }
+      { kind: "p", text: "Ta pravilnik je bil nazadnje posodobljen 24. oktobra 2026. Različica 3.6 je nadomestila različico 3.5: razdelek 2 zdaj navaja, da ob registraciji država naslova IP skupaj z regijo, ki jo izberete, odloča tudi o tem, ali prikažemo ločeno polje z odobritvijo za Italijo." }
     ]
   },
   {
@@ -332,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.5",
-  sha256: "0a6607bf81ed5aa91c66f265f67420372ac2daf898491ef7013389d01fad1733",
-  eyebrow: "PRAVILNIK O ZASEBNOSTI · v3.5 · VELJA OD 12. OKTOBRA 2026",
+  version: "3.6",
+  sha256: "b1c34432016d5af1ed56dfc0effc42f87ef001b7eee84036eb864f56d49abd01",
+  eyebrow: "PRAVILNIK O ZASEBNOSTI · v3.6 · VELJA OD 24. OKTOBRA 2026",
   title: "Kaj hranimo in zakaj",
   lede: "Vaše pravice in naše obveznosti po GDPR (EU) 2016/679 v razumljivem jeziku. Štirinajst razdelkov in Priloga B — pomaknite se do konca.",
-  endMarker: "KONEC PRAVILNIKA · GDPR (EU) 2016/679 · v3.5",
+  endMarker: "KONEC PRAVILNIKA · GDPR (EU) 2016/679 · v3.6",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Besedilo pravilnika o zasebnosti",
   sectionIdPrefix: "policy-section-",

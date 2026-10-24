@@ -47,7 +47,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Account — E-mailadres en herstel-e-mailadres (versleuteld opgeslagen, met een index op basis van een sleutel zodat wij het account kunnen vinden zonder het adres te lezen); wachtwoord (opgeslagen als hash, nooit in leesbare tekst); uw geheim voor tweefactorauthenticatie (versleuteld); tien herstelcodes (opgeslagen als hashes); uw pseudoniem — U en de dienst, bij registratie",
-        "Controle van het IP-land bij registratie en een nieuw debat — Bij registratie controleren wij het land van het IP-adres en Tor-uitgangsadressen lokaal met DB-IP Lite en de Tor-lijst. Vóór elk nieuw debat controleren wij het IP-land opnieuw lokaal en weigeren wij het debat als het land op de lijst met altijd geblokkeerde landen staat. Registraties uit niet bediende landen, via Tor en vanaf IP-adressen waarvan wij het land niet kunnen vaststellen worden geweigerd; het IP-adres gaat niet naar derden. Weigeringen worden geaggregeerd naar route, code, land en tijdvenster; het IP-adres en de user-agent worden uitsluitend als eenrichtingsdigests met sleutel bewaard. Als bewijssoort wordt ‘IP-adres’ vastgelegd. — Uw verbinding",
+        "Controle van het IP-land bij registratie en een nieuw debat — Bij registratie controleren wij het land van het IP-adres en Tor-uitgangsadressen lokaal met DB-IP Lite en de Tor-lijst. Vóór elk nieuw debat controleren wij het IP-land opnieuw lokaal en weigeren wij het debat als het land op de lijst met altijd geblokkeerde landen staat. Registraties uit niet bediende landen, via Tor en vanaf IP-adressen waarvan wij het land niet kunnen vaststellen worden geweigerd; het IP-adres gaat niet naar derden. Weigeringen worden geaggregeerd naar route, code, land en tijdvenster; het IP-adres en de user-agent worden uitsluitend als eenrichtingsdigests met sleutel bewaard. Als bewijssoort wordt ‘IP-adres’ vastgelegd. Bij registratie bepaalt het IP-land samen met de regio die u kiest ook of wij het afzonderlijke goedkeuringsvakje voor Italië tonen; als u die goedkeuring geeft, wordt in de registratie daarvan bewaard of de regiokeuze, het IP-land of beide het vakje hebben doen verschijnen. — Uw verbinding",
         "Leeftijdscontrole — U voert uw geboortedatum in, maar wij slaan die niet op. Na een geslaagde registratie leggen wij een positieve uitslag vast; bij bestaande accounts kan de uitslag positief of afgewezen zijn. De vastlegging bevat de minimumleeftijd, het land van het IP-adres indien bekend, de versie van de regel, de context en het tijdstip van de controle — U en het registratiesysteem",
         "Opgegeven woonplaats — Het bij registratie gekozen woonland en, als dit de VS is, de staat — U",
         "Sessies en beveiliging — Een gehasht sessietoken; een met een sleutel berekende hash van de user-agentstring van uw browser, gebruikt om op te merken wanneer een sessie naar een andere browser wordt verplaatst; tijdstippen van aanmaak, laatste gebruik en verloop. Wij slaan uw IP-adres, apparaatnaam of browsergegevens niet bij een sessie op, en de sessielijst die u in Instellingen ziet, toont alleen tijdstippen — Uw browser",
@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Wanneer wij dit beleid wijzigen, publiceren wij de nieuwe versie met een samenvatting van de wijzigingen en een nieuwe ingangsdatum, en bewaren wij eerdere versies op dezbatere.ro/privacy/versions. Bij een wijziging die een nieuw doel of een nieuwe ontvanger toevoegt, informeren wij u per e-mail en in het product voordat de nieuwe verwerking begint en geven wij u tijd om bezwaar te maken. Wanneer een nieuw doel afhankelijk is van uw toestemming — bijvoorbeeld als wij ooit inhoud zouden willen gebruiken om modellen te verbeteren — vragen wij die toestemming afzonderlijk en specifiek; wij beschouwen aanvaarding van bijgewerkte Voorwaarden nooit als toestemming voor nieuwe verwerking. Bij verduidelijkingen die niets veranderen aan wat wij doen, publiceren wij eenvoudigweg de nieuwe versie." },
-      { kind: "p", text: "Dit beleid is voor het laatst bijgewerkt op 12 oktober 2026. Versie 3.5 verving versie 3.4: hoofdstuk 2 zegt nu welke factuur- en kaartgegevens wij bewaren en dat uw volledige kaartnummer ons nooit bereikt, en hoofdstuk 7 zegt hoe lang wij een opgeslagen kaart en de berichten van de betalingsaanbieder over betalingen bewaren." }
+      { kind: "p", text: "Dit beleid is voor het laatst bijgewerkt op 24 oktober 2026. Versie 3.6 verving versie 3.5: hoofdstuk 2 zegt nu dat bij registratie het IP-land samen met de regio die u kiest ook bepaalt of wij het afzonderlijke goedkeuringsvakje voor Italië tonen." }
     ]
   },
   {
@@ -332,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.5",
-  sha256: "630acd3d7c646fb2f4fab5ce0be2087d821d6247532d79b5c7f8e61fd3ada11c",
-  eyebrow: "PRIVACYBELEID · v3.5 · VAN KRACHT OP 12 OKTOBER 2026",
+  version: "3.6",
+  sha256: "36efe7011e740b65dd89935e5851a3c09488b2976749364f1304c38a988d38d2",
+  eyebrow: "PRIVACYBELEID · v3.6 · VAN KRACHT OP 24 OKTOBER 2026",
   title: "Wat wij opslaan en waarom",
   lede: "Uw rechten en onze verplichtingen krachtens de GDPR (EU) 2016/679, in begrijpelijke taal. Veertien hoofdstukken en Bijlage B — scrol tot het einde.",
-  endMarker: "EINDE VAN HET BELEID · GDPR (EU) 2016/679 · v3.5",
+  endMarker: "EINDE VAN HET BELEID · GDPR (EU) 2016/679 · v3.6",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Tekst van het privacybeleid",
   sectionIdPrefix: "policy-section-",

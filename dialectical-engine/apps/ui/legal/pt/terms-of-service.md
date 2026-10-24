@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Em resumo
-eyebrow: TERMOS DE SERVIÇO · v2.4 · EM VIGOR DESDE 12 DE OUTUBRO DE 2026
+eyebrow: TERMOS DE SERVIÇO · v2.5 · EM VIGOR DESDE 24 DE OUTUBRO DE 2026
 title: Aquilo com que concorda
 lede: O contrato entre si e a DMS Merchandise Shop S.R.L., em linguagem clara. Dezanove secções e o Anexo A — desloque-se até ao fim.
-endMarker: FIM DOS TERMOS · v2.4
+endMarker: FIM DOS TERMOS · v2.5
 bodyLabel: Texto dos Termos de Serviço
 annexTitle: Anexo A — Termos regionais
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEI APLICÁVEL
 -->
 
-**Version 2.4 · Effective 12 de outubro de 2026 · Versões anteriores em dezbatere.ro/terms/versions · Idioma: português.**
+**Version 2.5 · Effective 24 de outubro de 2026 · Versões anteriores em dezbatere.ro/terms/versions · Idioma: português.**
 
 **In short.** Tem de ter pelo menos 18 anos. A Dialectical Engine constrói argumentos com modelos de IA e tudo o que gera pode estar errado — não constitui aconselhamento. Os seus debates são privados, a menos que os publique; se os publicar, qualquer pessoa poderá lê-los. O texto que envia é transmitido aos fornecedores de IA indicados no nosso Registo de Fornecedores e não é utilizado para treinar modelos. Denuncie conteúdos ilegais através de support@dezbatere.ro, tenha ou não uma conta. É aplicável a lei romena, mas as proteções locais de que beneficia enquanto consumidor mantêm-se.
 
@@ -277,7 +277,7 @@ Cada entrada aplica-se às pessoas que residam na respetiva região e estabelece
 
 ### A.1 União Europeia e Espaço Económico Europeu
 
-O corpo destes Termos foi redigido para si. Adicionalmente: pode intentar ações nos tribunais do país onde reside; aplica-se o direito de retratação previsto na secção 13; a resolução alternativa de litígios está disponível através de www.onoratainstanta.ro. **Alemanha:** o botão de cancelamento em dezbatere.ro/cancel permite-lhe terminar uma subscrição sem iniciar sessão; os prazos da subscrição, os períodos de renovação e os prazos de pré-aviso cumprem o §309(9) BGB: cada plano tem a duração de um mês e renova-se mensalmente até ser cancelado, podendo cancelar a qualquer momento com efeitos no final do mês em curso. **França:** pode terminar uma subscrição em linha em três passos, em dezbatere.ro/cancel. **Itália:** as cláusulas relativas a responsabilidade (15), suspensão (11), alterações (14) e lei aplicável (18) exigem a sua aprovação específica, que presta através da confirmação separada no momento do registo. **Países Baixos:** estes Termos são disponibilizados num formato suscetível de conservação antes da celebração. **Polónia:** está disponível uma versão em polaco; escolha Polski no seletor de idioma.
+O corpo destes Termos foi redigido para si. Adicionalmente: pode intentar ações nos tribunais do país onde reside; aplica-se o direito de retratação previsto na secção 13; a resolução alternativa de litígios está disponível através de www.onoratainstanta.ro. **Alemanha:** o botão de cancelamento em dezbatere.ro/cancel permite-lhe terminar uma subscrição sem iniciar sessão; os prazos da subscrição, os períodos de renovação e os prazos de pré-aviso cumprem o §309(9) BGB: cada plano tem a duração de um mês e renova-se mensalmente até ser cancelado, podendo cancelar a qualquer momento com efeitos no final do mês em curso. **França:** pode terminar uma subscrição em linha em três passos, em dezbatere.ro/cancel. **Itália:** as cláusulas relativas a suspensão e cessação (11), planos pagos e respetiva renovação (12), alterações (14), responsabilidade (15) e lei aplicável e tribunais competentes para os litígios (18) exigem a sua aprovação específica, nos termos dos artigos 1341.º e 1342.º do Código Civil italiano. Presta-a através de uma caixa separada no momento do registo, apresentada a quem escolha Itália no campo «Região» ou cuja ligação provenha de Itália. **Países Baixos:** estes Termos são disponibilizados num formato suscetível de conservação antes da celebração. **Polónia:** está disponível uma versão em polaco; escolha Polski no seletor de idioma.
 
 ### A.2 Estados Unidos
 

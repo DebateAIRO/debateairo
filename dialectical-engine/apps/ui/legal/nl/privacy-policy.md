@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In het kort
-eyebrow: PRIVACYBELEID · v3.5 · VAN KRACHT OP 12 OKTOBER 2026
+eyebrow: PRIVACYBELEID · v3.6 · VAN KRACHT OP 24 OKTOBER 2026
 title: Wat wij opslaan en waarom
 lede: Uw rechten en onze verplichtingen krachtens de GDPR (EU) 2016/679, in begrijpelijke taal. Veertien hoofdstukken en Bijlage B — scrol tot het einde.
-endMarker: EINDE VAN HET BELEID · GDPR (EU) 2016/679 · v3.5
+endMarker: EINDE VAN HET BELEID · GDPR (EU) 2016/679 · v3.6
 bodyLabel: Tekst van het privacybeleid
 annexTitle: Bijlage B — Regionale privacybepalingen
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 3.5 · Effective 12 oktober 2026 · Eerdere versies op dezbatere.ro/privacy/versions · Verwerkingsverantwoordelijke: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 24 oktober 2026 · Eerdere versies op dezbatere.ro/privacy/versions · Verwerkingsverantwoordelijke: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Wij verzamelen wat nodig is voor een account en wat u zelf invoert. Uw vragen gaan naar de AI-aanbieders die in ons Register staan en worden niet gebruikt om modellen te trainen. Onze hostingprovider bewaart uw account en uw debatten in Londen, in het Verenigd Koninkrijk; hoofdstuk 5 zegt waar uw gegevens verder naartoe gaan. Debatten zijn privé, tenzij u ze publiceert. Wanneer u uw account verwijdert, worden de sleutels tot uw privégegevens vernietigd; bij het plannen kiest u of ook uw gepubliceerde debatten worden verwijderd of openbaar blijven onder uw uitgefaseerde pseudoniem. U kunt ons bereiken via privacy@dezbatere.ro, en personen die in een debat worden genoemd, kunnen zonder account om verwijdering verzoeken.
 
@@ -34,7 +34,7 @@ Wij verzamelen uitsluitend wat nodig is om een account te laten functioneren, wa
 | Categorie | Wat precies | Bron |
 | --- | --- | --- |
 | **Account** | E-mailadres en herstel-e-mailadres (versleuteld opgeslagen, met een index op basis van een sleutel zodat wij het account kunnen vinden zonder het adres te lezen); wachtwoord (opgeslagen als hash, nooit in leesbare tekst); uw geheim voor tweefactorauthenticatie (versleuteld); tien herstelcodes (opgeslagen als hashes); uw pseudoniem | U en de dienst, bij registratie |
-| **Controle van het IP-land bij registratie en een nieuw debat** | Bij registratie controleren wij het land van het IP-adres en Tor-uitgangsadressen lokaal met DB-IP Lite en de Tor-lijst. Vóór elk nieuw debat controleren wij het IP-land opnieuw lokaal en weigeren wij het debat als het land op de lijst met altijd geblokkeerde landen staat. Registraties uit niet bediende landen, via Tor en vanaf IP-adressen waarvan wij het land niet kunnen vaststellen worden geweigerd; het IP-adres gaat niet naar derden. Weigeringen worden geaggregeerd naar route, code, land en tijdvenster; het IP-adres en de user-agent worden uitsluitend als eenrichtingsdigests met sleutel bewaard. Als bewijssoort wordt ‘IP-adres’ vastgelegd. | Uw verbinding |
+| **Controle van het IP-land bij registratie en een nieuw debat** | Bij registratie controleren wij het land van het IP-adres en Tor-uitgangsadressen lokaal met DB-IP Lite en de Tor-lijst. Vóór elk nieuw debat controleren wij het IP-land opnieuw lokaal en weigeren wij het debat als het land op de lijst met altijd geblokkeerde landen staat. Registraties uit niet bediende landen, via Tor en vanaf IP-adressen waarvan wij het land niet kunnen vaststellen worden geweigerd; het IP-adres gaat niet naar derden. Weigeringen worden geaggregeerd naar route, code, land en tijdvenster; het IP-adres en de user-agent worden uitsluitend als eenrichtingsdigests met sleutel bewaard. Als bewijssoort wordt ‘IP-adres’ vastgelegd. Bij registratie bepaalt het IP-land samen met de regio die u kiest ook of wij het afzonderlijke goedkeuringsvakje voor Italië tonen; als u die goedkeuring geeft, wordt in de registratie daarvan bewaard of de regiokeuze, het IP-land of beide het vakje hebben doen verschijnen. | Uw verbinding |
 | **Leeftijdscontrole** | U voert uw geboortedatum in, maar wij slaan die niet op. Na een geslaagde registratie leggen wij een positieve uitslag vast; bij bestaande accounts kan de uitslag positief of afgewezen zijn. De vastlegging bevat de minimumleeftijd, het land van het IP-adres indien bekend, de versie van de regel, de context en het tijdstip van de controle | U en het registratiesysteem |
 | **Opgegeven woonplaats** | Het bij registratie gekozen woonland en, als dit de VS is, de staat | U |
 | **Sessies en beveiliging** | Een gehasht sessietoken; een met een sleutel berekende hash van de user-agentstring van uw browser, gebruikt om op te merken wanneer een sessie naar een andere browser wordt verplaatst; tijdstippen van aanmaak, laatste gebruik en verloop. Wij slaan uw IP-adres, apparaatnaam of browsergegevens **niet** bij een sessie op, en de sessielijst die u in Instellingen ziet, toont alleen tijdstippen | Uw browser |
@@ -215,7 +215,7 @@ Om deze items te weigeren, blokkeert of verwijdert u cookies en sitegegevens voo
 
 Wanneer wij dit beleid wijzigen, publiceren wij de nieuwe versie met een samenvatting van de wijzigingen en een nieuwe ingangsdatum, en bewaren wij eerdere versies op dezbatere.ro/privacy/versions. Bij een wijziging die een nieuw doel of een nieuwe ontvanger toevoegt, informeren wij u per e-mail en in het product voordat de nieuwe verwerking begint en geven wij u tijd om bezwaar te maken. Wanneer een nieuw doel afhankelijk is van uw toestemming — bijvoorbeeld als wij ooit inhoud zouden willen gebruiken om modellen te verbeteren — vragen wij die toestemming afzonderlijk en specifiek; wij beschouwen aanvaarding van bijgewerkte Voorwaarden nooit als toestemming voor nieuwe verwerking. Bij verduidelijkingen die niets veranderen aan wat wij doen, publiceren wij eenvoudigweg de nieuwe versie.
 
-Dit beleid is voor het laatst bijgewerkt op 12 oktober 2026. Versie 3.5 verving versie 3.4: hoofdstuk 2 zegt nu welke factuur- en kaartgegevens wij bewaren en dat uw volledige kaartnummer ons nooit bereikt, en hoofdstuk 7 zegt hoe lang wij een opgeslagen kaart en de berichten van de betalingsaanbieder over betalingen bewaren.
+Dit beleid is voor het laatst bijgewerkt op 24 oktober 2026. Versie 3.6 verving versie 3.5: hoofdstuk 2 zegt nu dat bij registratie het IP-land samen met de regio die u kiest ook bepaalt of wij het afzonderlijke goedkeuringsvakje voor Italië tonen.
 
 ## Annex B — Regionale privacybepalingen
 

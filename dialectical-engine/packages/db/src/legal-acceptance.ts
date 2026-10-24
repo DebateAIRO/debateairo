@@ -1,4 +1,5 @@
 import type { Pool, PoolClient } from "pg";
+import type { ItalyApprovalLeg } from "@debateai/kernel";
 
 /**
  * Paid plans L3a (spec 2026-09-29 §2.3.2) — the acceptance record, legal.acceptance (0080).
@@ -30,6 +31,19 @@ export type SignUpAcceptanceRow = Readonly<{
   documentVersion: string;
   documentSha256: string;
   locale: string;
+  evidenceCiphertext: Buffer;
+  keyId: string;
+}>;
+
+/**
+ * The Italy clause approval row (kind ITALY_SPECIFIC_APPROVAL, migration 0125) before the account exists: the
+ * clauses approved and the leg that put the account in Italy, evidence already sealed. Written by
+ * identity.record_signup_italy_approval in the sign-up transaction.
+ */
+export type ItalyApprovalAcceptanceRow = Readonly<{
+  acceptanceId: string;
+  clauses: readonly number[];
+  leg: ItalyApprovalLeg;
   evidenceCiphertext: Buffer;
   keyId: string;
 }>;

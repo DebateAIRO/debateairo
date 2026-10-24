@@ -1,6 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { sealRecord } from "@debateai/crypto";
-import type { AcceptanceInput, AcceptanceKind, AcceptanceRepository, SignUpAcceptanceRow } from "@debateai/db";
+import type {
+  AcceptanceInput,
+  AcceptanceKind,
+  AcceptanceRepository,
+  ItalyApprovalAcceptanceRow,
+  SignUpAcceptanceRow
+} from "@debateai/db";
+import { ITALY_APPROVAL_CLAUSES, type ItalyApprovalLeg } from "@debateai/kernel";
 import {
   currentDocument,
   documentVersionAtLeast,
@@ -94,6 +101,25 @@ export function signUpAcceptanceRows(input: Readonly<{
     row("TERMS", input.documents.terms),
     row("PRIVACY_SHOWN", input.documents.privacy)
   ]);
+}
+
+/**
+ * Italy clause approval (S01, R12): the ITALY_SPECIFIC_APPROVAL row a sign-up owes when a leg fired — the clauses
+ * approved, in order, and the leg the server decided. Its own id, and evidence sealed under the records key and bound
+ * to that id, through the one sealer above. The database copies the TERMS row's pair and time into it (migration 0125).
+ */
+export function italyApprovalRow(input: Readonly<{
+  recordsKey: Buffer;
+  leg: ItalyApprovalLeg;
+  source: Readonly<{ ip: string; userAgent: string }>;
+}>): ItalyApprovalAcceptanceRow {
+  const acceptanceId = randomUUID();
+  return Object.freeze({
+    acceptanceId,
+    clauses: [...ITALY_APPROVAL_CLAUSES],
+    leg: input.leg,
+    ...sealAcceptanceEvidence(input.recordsKey, acceptanceId, input.source)
+  });
 }
 
 export type ReacceptableKind = "TERMS" | "PRIVACY";

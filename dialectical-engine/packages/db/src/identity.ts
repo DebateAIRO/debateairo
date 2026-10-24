@@ -4,7 +4,7 @@ import {
   type AuditContextHasher,
   type CryptoEnvelope
 } from "@debateai/crypto";
-import type { SignUpAcceptanceRow } from "./legal-acceptance.js";
+import type { ItalyApprovalAcceptanceRow, SignUpAcceptanceRow } from "./legal-acceptance.js";
 import type { DeclaredRegion } from "@debateai/kernel";
 import { MAIL_LOCALE_SETTING } from "./mail-locale.js";
 
@@ -50,6 +50,8 @@ export interface PendingAccountInput {
    * transaction. Absent only in test compositions that predate the acceptance record.
    */
   readonly acceptances?: ReadonlyArray<SignUpAcceptanceRow>;
+  /** Italy clause approval: written by identity.record_signup_italy_approval in the same transaction (migration 0125). */
+  readonly italyApproval?: ItalyApprovalAcceptanceRow;
 }
 
 export interface RegistrationAgeCheck {
@@ -129,6 +131,30 @@ export interface PreparedAuditContext {
 function versionedAuditDigest(value: string): string {
   if (!/^[0-9a-f]{64}$/.test(value)) throw new TypeError("AUDIT_CONTEXT_DIGEST_INVALID");
   return `argon2id-audit:v1:${value}`;
+}
+
+/**
+ * Italy clause approval S01 (R12): the ITALY_SPECIFIC_APPROVAL row, written by identity.record_signup_italy_approval
+ * (migration 0125) inside the caller's sign-up transaction, after the account and its three sign-up rows exist; the
+ * database copies the TERMS row's pair and time into it. Shared by the email (createPendingAccount) and social
+ * (PostgresSocialIdentityRepository.createAccount) adapters. No approval: nothing is written. An approval without the
+ * three rows is refused, and the throw rolls the account back with it.
+ */
+export async function recordSignupItalyApproval(
+  client: PoolClient,
+  userId: string,
+  input: Readonly<Pick<PendingAccountInput, "acceptances" | "italyApproval">>
+): Promise<void> {
+  const approval = input.italyApproval;
+  if (approval === undefined) return;
+  if (input.acceptances === undefined) throw new Error("ITALY_APPROVAL_WITHOUT_ACCEPTANCES");
+  await client.query("SELECT identity.record_signup_italy_approval($1::uuid,$2::jsonb)", [userId, JSON.stringify({
+    acceptance_id: approval.acceptanceId,
+    clauses: approval.clauses,
+    leg: approval.leg,
+    evidence_ciphertext: approval.evidenceCiphertext.toString("base64"),
+    key_id: approval.keyId
+  })]);
 }
 
 export class PostgresIdentityRepository {
@@ -290,6 +316,8 @@ export class PostgresIdentityRepository {
           row.user_id, input.declaredRegion.country, input.declaredRegion.usState
         ]);
       }
+      // Italy clause approval S01 (R12): the approval row, in this transaction, after the account's three rows.
+      await recordSignupItalyApproval(client, row.user_id, input);
       await beforeCommit();
       return Object.freeze({
         status: "created" as const,

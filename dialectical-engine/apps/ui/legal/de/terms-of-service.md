@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kurz gesagt
-eyebrow: NUTZUNGSBEDINGUNGEN · v2.4 · GÜLTIG AB 12. OKTOBER 2026
+eyebrow: NUTZUNGSBEDINGUNGEN · v2.5 · GÜLTIG AB 24. OKTOBER 2026
 title: Womit Sie sich einverstanden erklären
 lede: Der Vertrag zwischen Ihnen und DMS Merchandise Shop S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.
-endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.4
+endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.5
 bodyLabel: Text der Nutzungsbedingungen
 annexTitle: Anhang A – Regionale Bestimmungen
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ANWENDBARES RECHT
 -->
 
-**Version 2.4 · Effective 12. Oktober 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
+**Version 2.5 · Effective 24. Oktober 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
 
 **In short.** Sie müssen mindestens 18 Jahre alt sein. Dialectical Engine erstellt Argumente mithilfe von KI-Modellen, und alles, was es erzeugt, kann falsch sein – es handelt sich nicht um Beratung. Ihre Debatten sind privat, sofern Sie sie nicht veröffentlichen; wenn Sie sie veröffentlichen, kann jede Person sie lesen. Von Ihnen übermittelter Text wird an die in unserem Verzeichnis aufgeführten KI-Anbieter gesendet und nicht zum Trainieren von Modellen verwendet. Melden Sie rechtswidrige Inhalte unter support@dezbatere.ro, unabhängig davon, ob Sie ein Konto haben. Es gilt rumänisches Recht, Ihre örtlichen Verbraucherschutzrechte bleiben Ihnen jedoch erhalten.
 
@@ -277,7 +277,7 @@ Jeder Eintrag gilt für Personen, die in seiner Region leben, und nennt ausschli
 
 ### A.1 Europäische Union und Europäischer Wirtschaftsraum
 
-Der allgemeine Teil dieser Nutzungsbedingungen ist für Sie abgefasst. Zusätzlich gilt: Sie können vor den Gerichten des Landes klagen, in dem Sie leben; das Widerrufsrecht nach Abschnitt 13 findet Anwendung; alternative Streitbeilegung ist über www.onoratainstanta.ro möglich. **Deutschland:** Über die Kündigungsschaltfläche unter dezbatere.ro/cancel können Sie ein Abonnement ohne Anmeldung beenden; Vertragslaufzeiten, Verlängerungszeiträume und Kündigungsfristen entsprechen §309(9) BGB: Jeder Tarif läuft einen Monat und verlängert sich monatlich, bis Sie kündigen, und Sie können jederzeit mit Wirkung zum Ende des laufenden Monats kündigen. **Frankreich:** Sie können ein Abonnement online in drei Schritten unter dezbatere.ro/cancel beenden. **Italien:** Die Klauseln zur Haftung (15), Sperrung (11), zu Änderungen (14) und zum anwendbaren Recht (18) bedürfen Ihrer gesonderten Zustimmung, die Sie durch eine separate Bestätigung bei der Registrierung erteilen. **Niederlande:** Diese Nutzungsbedingungen werden vor Vertragsschluss in speicherbarer Form bereitgestellt. **Polen:** Eine polnische Fassung ist verfügbar; wählen Sie im Sprachmenü Polski.
+Der allgemeine Teil dieser Nutzungsbedingungen ist für Sie abgefasst. Zusätzlich gilt: Sie können vor den Gerichten des Landes klagen, in dem Sie leben; das Widerrufsrecht nach Abschnitt 13 findet Anwendung; alternative Streitbeilegung ist über www.onoratainstanta.ro möglich. **Deutschland:** Über die Kündigungsschaltfläche unter dezbatere.ro/cancel können Sie ein Abonnement ohne Anmeldung beenden; Vertragslaufzeiten, Verlängerungszeiträume und Kündigungsfristen entsprechen §309(9) BGB: Jeder Tarif läuft einen Monat und verlängert sich monatlich, bis Sie kündigen, und Sie können jederzeit mit Wirkung zum Ende des laufenden Monats kündigen. **Frankreich:** Sie können ein Abonnement online in drei Schritten unter dezbatere.ro/cancel beenden. **Italien:** Die Klauseln zu Sperrung und Kündigung (11), zu kostenpflichtigen Tarifen und ihrer Verlängerung (12), zu Änderungen (14), zur Haftung (15) sowie zu anwendbarem Recht und Gerichtsstand (18) bedürfen Ihrer gesonderten Zustimmung nach den Artikeln 1341 und 1342 des italienischen Zivilgesetzbuchs. Sie erteilen sie durch ein separates Kästchen bei der Registrierung, das jedem angezeigt wird, der im Feld Region Italien wählt oder dessen Verbindung aus Italien stammt. **Niederlande:** Diese Nutzungsbedingungen werden vor Vertragsschluss in speicherbarer Form bereitgestellt. **Polen:** Eine polnische Fassung ist verfügbar; wählen Sie im Sprachmenü Polski.
 
 ### A.2 Vereinigte Staaten
 

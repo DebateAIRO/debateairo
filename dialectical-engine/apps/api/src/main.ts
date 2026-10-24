@@ -116,6 +116,7 @@ import { RepositoryLegalAcceptanceApplication } from "./legal.js";
 import { AdmissionLimiter } from "./admission.js";
 import { openGeoLookup } from "@debateai/geo";
 import { CountryGate, countryPolicyInForce } from "./country-gate.js";
+import { composeGeoLookup } from "./italy-approval.js";
 import { AskRoom, everyWholeMinute } from "./ask-room.js";
 import type { AskBilling } from "./ask-billing.js";
 import { PersonUsageReader } from "./billing/usage.js";
@@ -360,8 +361,9 @@ const admissionPolicy = await boot.run("admission-policy", () => readAdmissionPo
  * Paid plans G3a (amendment A14): the country gate runs only in hosted mode AND when the register
  * version in force publishes `countryPolicy` — one decision, countryPolicyInForce, which never reads
  * the row in local mode. The row is read under the ledger; the data files are opened
- * (GEOIP_PATHS_REQUIRED already guaranteed their paths in hosted mode) and held, so a missing file
- * refuses the boot with its own code and zeroes nothing it should not.
+ * (GEOIP_PATHS_REQUIRED already guaranteed their paths in hosted mode) and held. While the gate is
+ * in force a missing file refuses the boot with its own code and zeroes nothing it should not;
+ * without it a missing file only turns the Italy approval's IP leg off (geo-lookup below, ADR-0038).
  */
 const countryPolicy = await boot.run("country-policy", () => countryPolicyInForce(
   environment.DEPLOYMENT_MODE,
@@ -373,10 +375,20 @@ await boot.run("country-gate-admission", async () => {
       "A hosted register with countryPolicy must also seal the geoAvailability admission scope");
   }
 });
-const geoLookup = countryPolicy === null ? undefined : boot.runSync("geo-lookup", () => openGeoLookup({
-  countryDbPath: environment.GEOIP_COUNTRY_DB_PATH!,
-  torListPath: environment.TOR_EXIT_LIST_PATH!,
-  onReloadFailure: (code) => console.error(JSON.stringify({ event: "geo.reload.failed", code }))
+/**
+ * Italy clause approval S01 (R14, R16, R17): the same one lookup also answers the sign-up's IP leg, so it is opened
+ * whenever hosted, gate or not. With the gate composed a failed open still refuses the boot; without it the IP leg is
+ * turned off with one `italy_approval.ip_leg_off` line and the boot goes on. Local mode opens nothing.
+ */
+const geoLookup = boot.runSync("geo-lookup", () => composeGeoLookup({
+  mode: environment.DEPLOYMENT_MODE,
+  gateComposed: countryPolicy !== null,
+  open: () => openGeoLookup({
+    countryDbPath: environment.GEOIP_COUNTRY_DB_PATH!,
+    torListPath: environment.TOR_EXIT_LIST_PATH!,
+    onReloadFailure: (code) => console.error(JSON.stringify({ event: "geo.reload.failed", code }))
+  }),
+  log: (line) => console.error(line)
 }));
 if (geoLookup !== undefined) boot.hold({ end: async () => { geoLookup.close(); } });
 /**
@@ -1583,6 +1595,8 @@ const api = buildApi({
   // ends the plan once the erasure commits).
   ...(billingRuntime === undefined ? {} : { billingErasure: billingRuntime.erasure }),
   ...(countryGate === undefined ? {} : { countryGate }),
+  // Italy clause approval S01: the IP leg asks the gate's own lookup; without one it is skipped and logged.
+  italyApproval: { ...(geoLookup === undefined ? {} : { lookup: geoLookup }), log: (line) => console.error(line) },
   support: {
     configuration: supportConfiguration,
     // DL5-F3: the caller's network is pseudonymised under a key derived from

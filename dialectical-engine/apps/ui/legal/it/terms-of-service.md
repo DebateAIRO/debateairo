@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In breve
-eyebrow: CONDIZIONI DI SERVIZIO · v2.4 · IN VIGORE DAL 12 OTTOBRE 2026
+eyebrow: CONDIZIONI DI SERVIZIO · v2.5 · IN VIGORE DAL 24 OTTOBRE 2026
 title: Ciò che accetti
 lede: Il contratto tra te e DMS Merchandise Shop S.R.L., in un linguaggio chiaro. Diciannove sezioni e Allegato A — scorri fino alla fine.
-endMarker: FINE DELLE CONDIZIONI · v2.4
+endMarker: FINE DELLE CONDIZIONI · v2.5
 bodyLabel: Testo delle Condizioni di servizio
 annexTitle: Allegato A — Condizioni regionali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEGGE APPLICABILE
 -->
 
-**Version 2.4 · Effective 12 ottobre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
+**Version 2.5 · Effective 24 ottobre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
 
 **In short.** Devi avere almeno 18 anni. Dialectical Engine costruisce argomentazioni con modelli di IA e tutto ciò che genera può essere errato — non costituisce consulenza. I tuoi dibattiti sono privati, salvo che tu non li pubblichi; se li pubblichi, chiunque può leggerli. Il testo che invii viene trasmesso ai fornitori di IA elencati nel nostro Registro dei fornitori e non viene utilizzato per addestrare i modelli. Segnala i contenuti illegali a support@dezbatere.ro, indipendentemente dal fatto che tu abbia un account. Si applica la legge rumena, ma le tutele locali dei consumatori restano impregiudicate.
 
@@ -277,7 +277,7 @@ Ciascuna voce si applica alle persone che vivono nella regione interessata e ind
 
 ### A.1 Unione europea e Spazio economico europeo
 
-Il corpo delle presenti Condizioni è redatto per te. Inoltre, puoi avviare un procedimento presso i tribunali del Paese in cui vivi; si applica il diritto di recesso di cui alla sezione 13; la risoluzione alternativa delle controversie è disponibile tramite www.onoratainstanta.ro. **Germania:** il pulsante di disdetta all'indirizzo dezbatere.ro/cancel ti consente di porre fine a un abbonamento senza effettuare l'accesso; le condizioni di abbonamento, i periodi di rinnovo e i termini di preavviso rispettano il §309(9) BGB: ogni piano ha durata di un mese e si rinnova mensilmente finché non lo disdici, e puoi disdire in qualsiasi momento con effetto dalla fine del mese in corso. **Francia:** puoi porre fine a un abbonamento online in tre passaggi all'indirizzo dezbatere.ro/cancel. **Italia:** le clausole sulla responsabilità (15), sulla sospensione (11), sulle modifiche (14) e sulla legge applicabile (18) richiedono la tua specifica approvazione, che presti mediante la conferma separata al momento della registrazione. **Paesi Bassi:** le presenti Condizioni ti vengono fornite in una forma memorizzabile prima della conclusione del contratto. **Polonia:** è disponibile una versione in polacco; scegli Polski nel selettore della lingua.
+Il corpo delle presenti Condizioni è redatto per te. Inoltre, puoi avviare un procedimento presso i tribunali del Paese in cui vivi; si applica il diritto di recesso di cui alla sezione 13; la risoluzione alternativa delle controversie è disponibile tramite www.onoratainstanta.ro. **Germania:** il pulsante di disdetta all'indirizzo dezbatere.ro/cancel ti consente di porre fine a un abbonamento senza effettuare l'accesso; le condizioni di abbonamento, i periodi di rinnovo e i termini di preavviso rispettano il §309(9) BGB: ogni piano ha durata di un mese e si rinnova mensilmente finché non lo disdici, e puoi disdire in qualsiasi momento con effetto dalla fine del mese in corso. **Francia:** puoi porre fine a un abbonamento online in tre passaggi all'indirizzo dezbatere.ro/cancel. **Italia:** le clausole sulla sospensione e cessazione (11), sui piani a pagamento e sul loro rinnovo (12), sulle modifiche (14), sulla responsabilità (15) e sulla legge applicabile e sul foro competente (18) richiedono la tua specifica approvazione ai sensi degli articoli 1341 e 1342 del Codice civile. La presti mediante una casella separata al momento della registrazione, mostrata a chiunque scelga l'Italia nel campo Regione o si connetta dall'Italia. **Paesi Bassi:** le presenti Condizioni ti vengono fornite in una forma memorizzabile prima della conclusione del contratto. **Polonia:** è disponibile una versione in polacco; scegli Polski nel selettore della lingua.
 
 ### A.2 Stati Uniti
 

@@ -47,7 +47,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Compte — Adresse e-mail et adresse e-mail de récupération (conservées sous forme chiffrée, avec un index à clé qui nous permet de retrouver le compte sans lire l'adresse) ; mot de passe (conservé sous forme de hachage, jamais en clair) ; secret d'authentification à deux facteurs (chiffré) ; dix codes de récupération (conservés sous forme de hachages) ; votre pseudonyme ; le résultat de la vérification de votre âge — Vous, lors de l'inscription",
-        "Vérification du pays de l’adresse IP — Lors de l’inscription, nous déterminons localement le pays de l’adresse IP avec DB-IP Lite et vérifions une liste d’adresses de sortie Tor. Au début de chaque nouveau débat, nous déterminons de nouveau ce pays localement et pouvons refuser le débat si le pays est bloqué en permanence. En cas de refus, nous agrégeons les entrées d’audit par route, code, pays et intervalle de temps; l’adresse IP n’y est conservée que sous forme d’empreinte unidirectionnelle avec clé. L’entrée de refus contient le code, le pays et une indication que l’adresse IP a servi de fondement ; l’adresse IP et la chaîne user-agent ne sont conservées que sous forme d’empreintes unidirectionnelles avec clé. — Votre navigateur lors de l’inscription et au début d’un nouveau débat",
+        "Vérification du pays de l’adresse IP — Lors de l’inscription, nous déterminons localement le pays de l’adresse IP avec DB-IP Lite et vérifions une liste d’adresses de sortie Tor. Au début de chaque nouveau débat, nous déterminons de nouveau ce pays localement et pouvons refuser le débat si le pays est bloqué en permanence. En cas de refus, nous agrégeons les entrées d’audit par route, code, pays et intervalle de temps; l’adresse IP n’y est conservée que sous forme d’empreinte unidirectionnelle avec clé. L’entrée de refus contient le code, le pays et une indication que l’adresse IP a servi de fondement ; l’adresse IP et la chaîne user-agent ne sont conservées que sous forme d’empreintes unidirectionnelles avec clé. Lors de l’inscription, le pays de l’adresse IP, avec la région que vous choisissez, détermine aussi si nous affichons la case d’approbation distincte pour l’Italie ; si vous donnez cette approbation, son enregistrement conserve si le choix de la région, le pays de l’adresse IP ou les deux l’ont déclenchée. — Votre navigateur lors de l’inscription et au début d’un nouveau débat",
         "Vérification de l’âge — Vous fournissez votre date de naissance uniquement pour le contrôle ; nous ne la conservons pas. Nous conservons le résultat, l’âge minimum requis, le pays de l’adresse IP s’il est connu, la version de la règle, le contexte et l’heure du contrôle. Une inscription réussie n’enregistre que « validé » ; pour un compte existant, le résultat peut être « validé » ou « refusé » — Vous et votre navigateur",
         "Résidence déclarée — Le pays où vous déclarez résider et, si vous habitez aux États-Unis, votre État — Vous lors de l’inscription",
         "Sessions et sécurité — Le hachage d'un jeton de session ; un hachage à clé de la chaîne user-agent de votre navigateur, utilisé pour détecter le déplacement d'une session vers un autre navigateur ; les horodatages de création, de dernière utilisation et d'expiration. Nous ne conservons pas votre adresse IP, le nom de votre appareil ou les informations relatives à votre navigateur avec une session, et la liste des sessions visible dans les Paramètres n'affiche que les horodatages — Votre navigateur",
@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Lorsque nous modifions la présente politique, nous publions la nouvelle version avec un résumé des modifications et une nouvelle date d'entrée en vigueur, et conservons les versions antérieures à l'adresse dezbatere.ro/privacy/versions. Si une modification ajoute une nouvelle finalité ou un nouveau destinataire, nous vous en informons par e-mail et dans le produit avant le début du nouveau traitement, et vous laissons le temps de vous y opposer. Lorsqu'une nouvelle finalité dépend de votre consentement — par exemple, si nous souhaitions un jour utiliser du contenu pour améliorer des modèles — nous sollicitons ce consentement séparément et spécifiquement ; nous ne considérons jamais l'acceptation de Conditions mises à jour comme un consentement à un nouveau traitement. Pour les clarifications qui ne modifient en rien nos pratiques, nous publions simplement la nouvelle version." },
-      { kind: "p", text: "La présente politique a été mise à jour pour la dernière fois le 12 octobre 2026. La version 3.5 a remplacé la version 3.4 : la section 2 indique désormais quelles données de facturation et de carte nous conservons et que le numéro complet de votre carte ne nous parvient jamais, et la section 7 indique combien de temps nous conservons une carte enregistrée et les messages du prestataire de paiement au sujet des paiements." }
+      { kind: "p", text: "La présente politique a été mise à jour pour la dernière fois le 24 octobre 2026. La version 3.6 a remplacé la version 3.5 : la section 2 indique désormais que, lors de l’inscription, le pays de l’adresse IP, avec la région que vous choisissez, détermine aussi si nous affichons la case d’approbation distincte pour l’Italie." }
     ]
   },
   {
@@ -332,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.5",
-  sha256: "7588ced887bec405da3d9aba5ca5c76090bd3b97d9577b078782fd628fc28c1b",
-  eyebrow: "POLITIQUE DE CONFIDENTIALITÉ · v3.5 · EN VIGUEUR LE 12 OCTOBRE 2026",
+  version: "3.6",
+  sha256: "cb8827ad7ef839382b8ebb39c2488d6be1911998dfda880043df3ee5b2d3afb5",
+  eyebrow: "POLITIQUE DE CONFIDENTIALITÉ · v3.6 · EN VIGUEUR LE 24 OCTOBRE 2026",
   title: "Ce que nous conservons, et pourquoi",
   lede: "Vos droits et nos obligations au titre du GDPR (EU) 2016/679, en termes clairs. Quatorze sections et l'annexe B — faites défiler jusqu'à la fin.",
-  endMarker: "FIN DE LA POLITIQUE · GDPR (EU) 2016/679 · v3.5",
+  endMarker: "FIN DE LA POLITIQUE · GDPR (EU) 2016/679 · v3.6",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Texte de la Politique de confidentialité",
   sectionIdPrefix: "policy-section-",

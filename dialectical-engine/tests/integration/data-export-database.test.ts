@@ -5,14 +5,15 @@ import { migrate, RunRepository } from "@debateai/db";
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import { Pool, type PoolClient } from "pg";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
-import { PostgresDataExportRepository } from "../../packages/db/src/data-export.js";
+import { PostgresDataExportRepository, PostgresDataExportSource } from "../../packages/db/src/data-export.js";
 
 const hash = (c: string) => `sha256:${c.repeat(64)}`;
 const source = { ipArgon2id: `argon2id-audit:v1:${"a".repeat(64)}`, userAgentArgon2id: `argon2id-audit:v1:${"b".repeat(64)}` };
 const signatures = [
   "request_data_export(uuid,uuid,text,uuid,text,jsonb)", "read_data_export_status(uuid)",
   "claim_data_export(uuid,integer)", "renew_data_export_lease(uuid,uuid,integer)",
-  "read_data_export_snapshot(uuid,uuid)", "complete_data_export(uuid,uuid,text,text,bigint,timestamp with time zone)",
+  "read_data_export_snapshot(uuid,uuid)", "read_data_export_snapshot_v2(uuid,uuid)",
+  "complete_data_export(uuid,uuid,text,text,bigint,timestamp with time zone)",
   "fail_data_export(uuid,uuid,text)", "sweep_data_exports()", "mark_data_export_key_destroyed(uuid)",
   "live_data_export_ids(uuid[])", "open_data_export_link(uuid,text)", "record_data_export_download(uuid,uuid,jsonb)"
 ];
@@ -343,7 +344,7 @@ describe("data export database authority", () => {
     expect((await open(a.user, hash("9"))).outcome).toBe("INVALID");
   });
 
-  it("D14 denies table DML and other runtime roles execute on all twelve functions", async () => {
+  it("D14 denies table DML and other runtime roles execute on all thirteen functions", async () => {
     const workerAttributes = (await db.pool.query("SELECT rolcanlogin,rolinherit,rolsuper,rolbypassrls FROM pg_roles WHERE rolname='debateai_data_export_worker'")).rows[0];
     expect(workerAttributes).toEqual({ rolcanlogin: false, rolinherit: false, rolsuper: false, rolbypassrls: false });
     expect((await db.pool.query("SELECT has_schema_privilege('debateai_data_export_worker','identity','USAGE') allowed")).rows[0].allowed).toBe(true);
@@ -358,6 +359,7 @@ describe("data export database authority", () => {
     for (const [sql, params] of [
       ["SELECT * FROM identity.claim_data_export($1,60)", [thief]],
       ["SELECT identity.read_data_export_snapshot($1,$2)", [exportId, thief]],
+      ["SELECT identity.read_data_export_snapshot_v2($1,$2)", [exportId, thief]],
       ["SELECT identity.complete_data_export($1,$2,$3,$4,1,clock_timestamp())", [exportId, thief, hash("9"), "a".repeat(64)]],
       ["SELECT * FROM identity.sweep_data_exports()", []]
     ] as const) await expect(asRuntime(client => client.query(sql, [...params]))).rejects.toMatchObject({ code: "42501" });
@@ -372,7 +374,7 @@ describe("data export database authority", () => {
     for (const [index, signature] of signatures.entries()) {
       const request = (await db.pool.query("SELECT has_function_privilege('debateai_authorization_runtime',$1,'EXECUTE') allowed", [`identity.${signature}`])).rows[0].allowed;
       const worker = (await db.pool.query("SELECT has_function_privilege('debateai_data_export_worker',$1,'EXECUTE') allowed", [`identity.${signature}`])).rows[0].allowed;
-      expect([request, worker], signature).toEqual(index < 2 || index >= 10 ? [true, false] : [false, true]);
+      expect([request, worker], signature).toEqual(index < 2 || index >= 11 ? [true, false] : [false, true]);
     }
     const { assertDataExportDatabaseRoles } = await import("../../packages/db/src/data-export.js");
     await expect(assertDataExportDatabaseRoles(requestPool, workerPool)).resolves.toBeUndefined();
@@ -427,6 +429,35 @@ describe("data export database authority", () => {
     expect(byId[plain].role_rotation).toBeNull();
     await expect(workerPool.query("SELECT 1 FROM core.run_role_rotation LIMIT 1")).rejects.toMatchObject({ code: "42501" });
     await db.pool.query("UPDATE identity.data_export SET status='CANCELLED',closed_at=clock_timestamp(),lease_owner=NULL,lease_until=NULL WHERE export_id=$1", [exportId]);
+  });
+
+  it("X-IT the worker adapter reads the snapshot through v2: every acceptance carries clauses and leg", async () => {
+    const a = await account(), exportId = randomUUID(), worker = randomUUID();
+    const owner = (await db.pool.query(`SELECT owner_ref FROM identity."user" WHERE user_id=$1`, [a.user])).rows[0].owner_ref as string;
+    // Built from pieces so no whole secret-shaped literal appears in the source.
+    const keyId = ["89abcdef", "01234567"].join("");
+    const accept = (kind: string, clauses: string | null, leg: string | null) => db.pool.query(
+      `INSERT INTO legal.acceptance(acceptance_id,owner_ref,kind,document_version,document_sha256,locale,surface,accepted_at,evidence_ciphertext,key_id,clauses,leg)
+       VALUES($1,$2,$3,'2.3',$4,'it','SIGN_UP',clock_timestamp(),$5,$6,$7::smallint[],$8) RETURNING acceptance_id`,
+      [randomUUID(), owner, kind, "b".repeat(64), Buffer.alloc(29, 1), keyId, clauses, leg]);
+    const terms = (await accept("TERMS", null, null)).rows[0].acceptance_id as string;
+    const italy = (await accept("ITALY_SPECIFIC_APPROVAL", "{11,12,14,15,18}", "BOTH")).rows[0].acceptance_id as string;
+    await db.pool.query(`INSERT INTO identity.data_export(export_id,user_id,session_id,locale,status,requested_at,attempts,lease_owner,lease_until)
+      VALUES($1,$2,$3,'it','PREPARING',clock_timestamp(),1,$4,clock_timestamp()+interval '45 seconds')`, [exportId, a.user, a.session, worker]);
+    try {
+      const raw = await new PostgresDataExportSource(workerPool).readRaw(exportId, worker);
+      const items = raw.legal_acceptances as ReadonlyArray<Record<string, unknown>>;
+      expect(items.map(item => item.acceptance_id).sort()).toEqual([terms, italy].sort());
+      for (const item of items) {
+        expect(Object.hasOwn(item, "clauses"), String(item.kind)).toBe(true);
+        expect(Object.hasOwn(item, "leg"), String(item.kind)).toBe(true);
+      }
+      expect(Object.fromEntries(items.map(item => [item.kind, [item.clauses, item.leg]]))).toEqual({
+        TERMS: [null, null], ITALY_SPECIFIC_APPROVAL: [[11, 12, 14, 15, 18], "BOTH"]
+      });
+    } finally {
+      await db.pool.query("UPDATE identity.data_export SET status='CANCELLED',closed_at=clock_timestamp(),lease_owner=NULL,lease_until=NULL WHERE export_id=$1", [exportId]);
+    }
   });
 
   it("R31 fails a PREPARING row whose fourth lease expired without fail()", async () => {

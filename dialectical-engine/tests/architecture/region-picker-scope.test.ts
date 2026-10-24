@@ -14,6 +14,9 @@ const socialWriter = "packages/db/src/social-identity.ts";
 const exportMigration = "migrations/0115_data_export.sql";
 const exportSnapshot = "apps/api/src/data-export/snapshot.ts";
 const exportTypes = "apps/api/src/data-export/types.ts";
+// Italy clause approval S01: 0125 names record_registration_region only in a comment (its writer's grant follows that
+// writer's); its bytes are sha-pinned by the lineage, so it is listed here rather than edited.
+const italyApprovalMigration = "migrations/0125_italy_specific_approval.sql";
 
 function productionFiles(): string[] {
   return execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "--", "migrations", "apps", "packages"], {
@@ -31,12 +34,14 @@ describe("registration region scope", () => {
     const references = productionFiles().filter((path) => source(path).includes("registration_region"));
     expect(references.sort()).toEqual([
       migration, forwardContract, verifier, supersedingVerifier, writer, socialWriter,
-      exportMigration, exportSnapshot, exportTypes,
+      exportMigration, exportSnapshot, exportTypes, italyApprovalMigration,
     ].sort());
 
     // The export reads this account's declared region; it never creates or changes a region row.
     expect(source(exportMigration)).toMatch(/FROM identity\.registration_region r WHERE r\.user_id=v_user/);
     expect(source(exportMigration)).not.toMatch(/\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+identity\.registration_region\b/i);
+    // 0125 neither reads nor writes the table.
+    expect(source(italyApprovalMigration)).not.toMatch(/\b(?:FROM|JOIN|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+identity\.registration_region\b/i);
     expect(source(exportSnapshot)).toContain('registration_region: raw.registration_region == null ? null : project(');
     expect(source(exportTypes)).toContain("registration_region: Row | null");
 

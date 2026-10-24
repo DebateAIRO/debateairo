@@ -47,7 +47,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Tài khoản — Địa chỉ email và địa chỉ email khôi phục (được lưu trữ dưới dạng mã hóa, cùng một chỉ mục có khóa để chúng tôi có thể tìm tài khoản mà không đọc địa chỉ); mật khẩu (được lưu dưới dạng hàm băm, không bao giờ ở dạng rõ); bí mật xác thực hai yếu tố của bạn (được mã hóa); mười mã khôi phục (được lưu dưới dạng hàm băm); bí danh của bạn; kết quả kiểm tra độ tuổi, nhưng không lưu ngày sinh — Bạn, khi đăng ký",
-        "Kiểm tra quốc gia theo địa chỉ IP — Khi đăng ký, chúng tôi xác định quốc gia của IP tại chỗ bằng DB-IP Lite và kiểm tra danh sách địa chỉ thoát Tor. Trước mỗi cuộc tranh luận mới, chúng tôi cũng kiểm tra quốc gia của IP ngay trên hệ thống và có thể từ chối nếu quốc gia thuộc danh sách luôn bị chặn. Nếu từ chối, chúng tôi ghi tổng hợp tuyến, mã từ chối, quốc gia, khoảng thời gian và việc địa chỉ IP là căn cứ; Trong nhật ký kiểm toán, địa chỉ IP và chuỗi user-agent chỉ được lưu dưới dạng mã băm một chiều có khóa. — Địa chỉ IP khi đăng ký và bắt đầu cuộc tranh luận mới",
+        "Kiểm tra quốc gia theo địa chỉ IP — Khi đăng ký, chúng tôi xác định quốc gia của IP tại chỗ bằng DB-IP Lite và kiểm tra danh sách địa chỉ thoát Tor. Trước mỗi cuộc tranh luận mới, chúng tôi cũng kiểm tra quốc gia của IP ngay trên hệ thống và có thể từ chối nếu quốc gia thuộc danh sách luôn bị chặn. Nếu từ chối, chúng tôi ghi tổng hợp tuyến, mã từ chối, quốc gia, khoảng thời gian và việc địa chỉ IP là căn cứ; Trong nhật ký kiểm toán, địa chỉ IP và chuỗi user-agent chỉ được lưu dưới dạng mã băm một chiều có khóa. Khi đăng ký, quốc gia của IP, cùng với Khu vực bạn chọn, cũng quyết định việc chúng tôi có hiển thị ô chấp thuận riêng cho Ý hay không; nếu bạn đưa ra chấp thuận đó, bản ghi của chấp thuận sẽ lưu việc lựa chọn Khu vực, quốc gia của IP hay cả hai đã kích hoạt ô này. — Địa chỉ IP khi đăng ký và bắt đầu cuộc tranh luận mới",
         "Kiểm tra độ tuổi — Kết quả (khi đăng ký chỉ lưu đạt; với tài khoản hiện có có thể là đạt hoặc không đạt), độ tuổi tối thiểu áp dụng, quốc gia theo IP nếu biết, phiên bản quy tắc, bối cảnh và thời điểm kiểm tra. Không lưu ngày sinh — Ngày sinh nhập để kiểm tra; quốc gia suy ra từ IP",
         "Khu vực khai báo — Quốc gia cư trú bạn chọn khi đăng ký và, nếu ở Hoa Kỳ, tiểu bang — Bạn, khi đăng ký",
         "Phiên và bảo mật — Mã thông báo phiên đã băm; hàm băm có khóa của chuỗi tác nhân người dùng trong trình duyệt của bạn, dùng để nhận biết khi một phiên chuyển sang trình duyệt khác; dấu thời gian tạo, lần sử dụng cuối và hết hạn. Chúng tôi không lưu địa chỉ IP, tên thiết bị hoặc thông tin chi tiết về trình duyệt của bạn cùng với phiên, và danh sách phiên bạn thấy trong phần Cài đặt chỉ hiển thị dấu thời gian — Trình duyệt của bạn",
@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Khi thay đổi chính sách này, chúng tôi đăng phiên bản mới kèm bản tóm tắt những thay đổi và ngày hiệu lực mới, đồng thời lưu các phiên bản trước tại dezbatere.ro/privacy/versions. Đối với thay đổi bổ sung mục đích mới hoặc bên nhận mới, chúng tôi thông báo cho bạn trước khi hoạt động xử lý mới bắt đầu, qua email và trong sản phẩm, đồng thời dành cho bạn thời gian phản đối. Khi mục đích mới phụ thuộc vào sự đồng ý của bạn — ví dụ nếu sau này chúng tôi muốn sử dụng nội dung để cải thiện mô hình — chúng tôi sẽ xin sự đồng ý đó một cách riêng biệt và cụ thể; chúng tôi không bao giờ coi việc chấp nhận Điều khoản cập nhật là sự đồng ý cho hoạt động xử lý mới. Đối với các nội dung làm rõ không làm thay đổi cách chúng tôi hành động, chúng tôi chỉ đăng phiên bản mới." },
-      { kind: "p", text: "Chính sách này được cập nhật lần cuối vào ngày 12 tháng 10 năm 2026. Phiên bản 3.5 thay thế phiên bản 3.4: mục 2 nay nêu rõ chúng tôi lưu những thông tin lập hóa đơn và thông tin thẻ nào và số thẻ đầy đủ của bạn không bao giờ đến được với chúng tôi, và mục 7 nêu rõ chúng tôi giữ thẻ đã lưu và các thông báo của nhà cung cấp dịch vụ thanh toán về các khoản thanh toán trong bao lâu." }
+      { kind: "p", text: "Chính sách này được cập nhật lần cuối vào ngày 24 tháng 10 năm 2026. Phiên bản 3.6 thay thế phiên bản 3.5: mục 2 nay nêu rõ rằng khi đăng ký, quốc gia của IP, cùng với Khu vực bạn chọn, cũng quyết định việc chúng tôi có hiển thị ô chấp thuận riêng cho Ý hay không." }
     ]
   },
   {
@@ -332,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.5",
-  sha256: "05a5be7b35ad2f49db572e208eb4be0d06cce74a396ef22d62b57fefc920e1cc",
-  eyebrow: "CHÍNH SÁCH QUYỀN RIÊNG TƯ · v3.5 · CÓ HIỆU LỰC 12 THÁNG 10 NĂM 2026",
+  version: "3.6",
+  sha256: "e003608d6cab7082310cff9577b8f3b73f2ca3d30434a9246b3561aa9584064b",
+  eyebrow: "CHÍNH SÁCH QUYỀN RIÊNG TƯ · v3.6 · CÓ HIỆU LỰC 24 THÁNG 10 NĂM 2026",
   title: "Dữ liệu chúng tôi lưu trữ và lý do",
   lede: "Các quyền của bạn và nghĩa vụ của chúng tôi theo GDPR (EU) 2016/679, được trình bày bằng ngôn ngữ dễ hiểu. Mười bốn mục và Phụ lục B — cuộn đến cuối.",
-  endMarker: "HẾT CHÍNH SÁCH · GDPR (EU) 2016/679 · v3.5",
+  endMarker: "HẾT CHÍNH SÁCH · GDPR (EU) 2016/679 · v3.6",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Nội dung Chính sách quyền riêng tư",
   sectionIdPrefix: "policy-section-",

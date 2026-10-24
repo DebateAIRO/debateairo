@@ -47,7 +47,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Fiók — E-mail-cím és helyreállítási e-mail-cím (titkosítva tárolva, kulcsolt indexszel, hogy a címet annak elolvasása nélkül is megtalálhassuk); jelszó (kivonatként tárolva, soha nem egyszerű szövegként); a kétfaktoros hitelesítés titka (titkosítva); tíz helyreállítási kód (kivonatként tárolva); az Ön álneve — Öntől és a szolgáltatástól, a regisztráció során",
-        "IP-cím országának ellenőrzése regisztrációnál és új vitánál — Regisztrációnál az IP-cím országát és a Tor-kilépőpontokat helyben ellenőrizzük a DB-IP Lite és a Tor-lista alapján. Minden új vita előtt helyben ismét ellenőrizzük az IP-cím országát, és elutasítjuk a vitát, ha az ország a mindig tiltott országok listáján szerepel. Elutasítjuk a nem támogatott országokból, Tor-kilépőcímekről és olyan IP-címekről érkező regisztrációkat, amelyek országát nem tudjuk meghatározni; az IP-címet nem küldjük harmadik félnek. Az elutasításokat útvonal, kód, ország és időablak szerint összesítve rögzítjük; az IP-cím és a felhasználói ügynök csak egyirányú, kulcsos kivonatként szerepel. A bizonyíték típusa „IP-cím”. — Az Ön kapcsolata",
+        "IP-cím országának ellenőrzése regisztrációnál és új vitánál — Regisztrációnál az IP-cím országát és a Tor-kilépőpontokat helyben ellenőrizzük a DB-IP Lite és a Tor-lista alapján. Minden új vita előtt helyben ismét ellenőrizzük az IP-cím országát, és elutasítjuk a vitát, ha az ország a mindig tiltott országok listáján szerepel. Elutasítjuk a nem támogatott országokból, Tor-kilépőcímekről és olyan IP-címekről érkező regisztrációkat, amelyek országát nem tudjuk meghatározni; az IP-címet nem küldjük harmadik félnek. Az elutasításokat útvonal, kód, ország és időablak szerint összesítve rögzítjük; az IP-cím és a felhasználói ügynök csak egyirányú, kulcsos kivonatként szerepel. A bizonyíték típusa „IP-cím”. Regisztrációnál az IP-cím országa az Ön által kiválasztott régióval együtt azt is eldönti, hogy megjelenítjük-e az Olaszországra vonatkozó külön jóváhagyási négyzetet; ha Ön megadja ezt a jóváhagyást, annak nyilvántartása megőrzi, hogy azt a régióválasztás, az IP-cím országa vagy mindkettő váltotta-e ki. — Az Ön kapcsolata",
         "Életkor-ellenőrzés — Megadja születési dátumát, de azt nem tároljuk. Sikeres regisztrációnál a sikeres ellenőrzést rögzítjük; meglévő fióknál az eredmény sikeres vagy elutasított lehet. A bejegyzés tartalmazza az alsó korhatárt, az IP-cím országát, ha ismert, a szabály verzióját, az ellenőrzés körülményeit és időpontját — Ön és a regisztrációs rendszer",
         "Bejelentett lakóhely — A regisztrációnál kiválasztott lakóhely szerinti ország és az amerikai állam, ha az Egyesült Államokban él — Ön",
         "Munkamenetek és biztonság — Kivonatolt munkamenet-token; a böngésző user-agent karakterláncának kulcsolt kivonata, amellyel észlelhető, ha egy munkamenet másik böngészőbe kerül; a létrehozás, az utolsó használat és a lejárat időbélyege. A munkamenethez nem tároljuk az Ön IP-címét, eszköznevét vagy böngészőadatait, a Beállításokban látható munkamenetlista pedig kizárólag időbélyegeket mutat — Az Ön böngészőjéből",
@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Amikor módosítjuk ezt a szabályzatot, közzétesszük az új változatot a változások összefoglalásával és új hatálybalépési dátummal, a korábbi változatokat pedig a dezbatere.ro/privacy/versions címen őrizzük meg. Új célt vagy új címzettet bevezető változásról az új adatkezelés megkezdése előtt e-mailben és a termékben tájékoztatjuk Önt, és időt biztosítunk a tiltakozásra. Ha egy új cél az Ön hozzájárulásától függ — például ha valaha tartalmat kívánnánk használni modellek fejlesztésére —, ezt a hozzájárulást külön és kifejezetten kérjük; a frissített Feltételek elfogadását soha nem tekintjük új adatkezeléshez való hozzájárulásnak. Az olyan pontosítások esetében, amelyek semmit nem változtatnak tevékenységünkön, egyszerűen közzétesszük az új változatot." },
-      { kind: "p", text: "Ezt a szabályzatot legutóbb 2026. október 12. napján frissítettük. A 3.5-ös verzió a 3.4-es verzió helyébe lépett: a 2. szakasz most már leírja, mely számlázási és kártyaadatokat őrizzük meg, és hogy az Ön teljes kártyaszáma soha nem jut el hozzánk, a 7. szakasz pedig azt, hogy mennyi ideig őrizzük meg a mentett kártyát és a fizetési szolgáltató fizetésekről szóló üzeneteit." }
+      { kind: "p", text: "Ezt a szabályzatot legutóbb 2026. október 24. napján frissítettük. A 3.6-os verzió a 3.5-ös verzió helyébe lépett: a 2. szakasz most már leírja, hogy regisztrációnál az IP-cím országa az Ön által kiválasztott régióval együtt azt is eldönti, hogy megjelenítjük-e az Olaszországra vonatkozó külön jóváhagyási négyzetet." }
     ]
   },
   {
@@ -332,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.5",
-  sha256: "33228453438b765daf1d1ac3243d213817db016aee77e695b7fca06f680a9f03",
-  eyebrow: "ADATVÉDELMI SZABÁLYZAT · v3.5 · HATÁLYOS 2026. OKTÓBER 12.",
+  version: "3.6",
+  sha256: "97aeaad0a359d6a9c8632d24a81817062abb6ab794018a0914f85554bea8bd5c",
+  eyebrow: "ADATVÉDELMI SZABÁLYZAT · v3.6 · HATÁLYOS 2026. OKTÓBER 24.",
   title: "Mit tárolunk és miért",
   lede: "Az Ön jogai és a GDPR (EU) 2016/679 szerinti kötelezettségeink közérthetően. Tizennégy szakasz és a B. melléklet — görgessen a végéig.",
-  endMarker: "A SZABÁLYZAT VÉGE · GDPR (EU) 2016/679 · v3.5",
+  endMarker: "A SZABÁLYZAT VÉGE · GDPR (EU) 2016/679 · v3.6",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Az Adatvédelmi szabályzat szövege",
   sectionIdPrefix: "policy-section-",
