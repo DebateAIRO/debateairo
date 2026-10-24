@@ -35,6 +35,7 @@ describe("Support catalog route coverage", () => {
       "/admin/invitation",
       "/admin/reviews",
       "/admin/team",
+      "/admin/threat-reports",
       "/admin/workers",
       "/ai-transparency",
       "/social/complete",
