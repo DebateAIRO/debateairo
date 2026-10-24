@@ -725,7 +725,7 @@ describe("0124 publication review database boundary", () => {
     )).rows[0]!).toMatchObject({capabilities:ownerRow.capabilities,grant_revision:1,security_epoch:1});
   });
 
-  it("a newly bootstrapped owner receives all six team capabilities and PUBLICATION_REVIEW", async () => {
+  it("a newly bootstrapped owner receives all six team capabilities, PUBLICATION_REVIEW and THREAT_REPORT", async () => {
     const isolated=await startTestDatabase();
     let runtime:Pool|undefined,jit:Pool|undefined;
     try {
@@ -754,7 +754,7 @@ describe("0124 publication review database boundary", () => {
       expect(result.outcome).toBe('COMPLETED');
       expect((await isolated.pool.query(
         'SELECT capabilities FROM staff.subject WHERE user_id=$1',[target.userId]
-      )).rows[0]!.capabilities).toEqual(['TEAM_READ','TEAM_INVITE','TEAM_GRANT','TEAM_DISABLE','AUDIT_READ','EMERGENCY_DISABLE','PUBLICATION_REVIEW']);
+      )).rows[0]!.capabilities).toEqual(['TEAM_READ','TEAM_INVITE','TEAM_GRANT','TEAM_DISABLE','AUDIT_READ','EMERGENCY_DISABLE','PUBLICATION_REVIEW','THREAT_REPORT']);
     } finally {
       await jit?.end();await runtime?.end();await isolated.stop();
     }

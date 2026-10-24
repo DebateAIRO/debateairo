@@ -16,6 +16,7 @@ import { MODEL_STRENGTHS, TypedDomainError, type ActivationState, type Compositi
 
 export * from "./publication-check.js";
 export * from "./synthesis-check-erasure.js";
+export { PostgresThreatReportRepository, type ThreatReportDecision, type ThreatReportListRow, type ThreatReportReadRow, type ThreatReportAlertClaim } from "./threat-reports.js";
 export { PostgresDataExportRepository, PostgresDataExportSource } from "./data-export.js";
 export * from "./pool-budget.js";
 import { SUPPORT_CONTROL_PLANE_POOL } from "./pool-budget.js";

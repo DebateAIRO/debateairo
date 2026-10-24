@@ -134,6 +134,22 @@ async function typescriptFiles(directory: string): Promise<string[]> {
 }
 
 describe("every support-chat hand-off posts through the frame door (V-11 addendum)", () => {
+  it("keeps the question check behind the framed support adapter", async () => {
+    const files = (await typescriptFiles("apps/api/src/question-check")).sort();
+    expect(files.length).toBeGreaterThanOrEqual(6);
+    expect(files).toContain("apps/api/src/question-check/compose.ts");
+    const offenders: string[] = [];
+    for (const file of files) {
+      const source = await readFile(file, "utf8");
+      expect(source).not.toMatch(/\bfetch\s*\(/u);
+      for (const offence of scanSupportPosts(file, source).offences) {
+        offenders.push(`${offence.file}:${offence.line} ${offence.rule}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+    const transport = await readFile("apps/api/src/question-check/transport.ts", "utf8");
+    expect(transport).toMatch(/import\s*\{[^}]*createSupportModelAdapter[^}]*\}\s*from\s*["']\.\.\/support\/model\.js["']/su);
+  });
   it("the synthesis check's root posts only through the support adapter, and has no offence", async () => {
     // Property: all synthesis-check files stay behind the existing framed support adapter.
     const files = (await typescriptFiles("apps/api/src/synthesis-check")).sort();

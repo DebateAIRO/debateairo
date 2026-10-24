@@ -12,7 +12,7 @@ export const RAW_SECTIONS = [
   "email_change_requests", "recovery_email_requests", "recovery_requests", "runs",
   "erasure_tombstones", "visibility_events", "legal_acceptances", "sensitive_data_consents",
   "billing", "support_sessions", "support_messages", "support_cases", "support_case_events",
-  "support_case_messages", "support_ratings", "support_key_states", "audit_events",
+  "support_case_messages", "support_ratings", "support_key_states", "audit_events", "threat_reports",
 ] as const;
 export type RawSection = typeof RAW_SECTIONS[number];
 export type RawExportRows = Readonly<Record<RawSection, unknown>>;
@@ -98,6 +98,7 @@ export const KEEP_COLUMNS = {
   support_ratings: ["rating", "at"],
   support_key_states: ["kind", "ref", "destroyed_at"],
   audit_events: ["event_type", "occurred_at"],
+  threat_reports: ["question", "kept_at"],
 } as const;
 
 type RawRow = Record<string, unknown>;
@@ -396,6 +397,7 @@ export async function collectSnapshot(input: {
         account, channels,
         registration_region: raw.registration_region == null ? null : project(row(raw.registration_region), KEEP_COLUMNS.registration_region),
         age_checks: simple("age_checks"), erasure_requests: simple("erasure_requests"),
+        kept_questions: simple("threat_reports"),
       },
       security: {
         mfa_factors: simple("mfa_factors"), passkeys: simple("passkey_credentials"),

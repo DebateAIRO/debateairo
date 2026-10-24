@@ -660,7 +660,9 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // data-export module above. migrate() is unchanged by this.
 // synthesis-flag S01 (0123): the reviewed module after it re-exported the synthesis check's erasure module
 // (export * from "./synthesis-check-erasure.js", after the publication check's). migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "437a1fc0ba019b9dcb6efd4e95551e914e473085f216c89f4febc880a00febab";
+// synthesis-flag S04 (0125): the reviewed module after it exported the threat-report repository adapter;
+// migrate() is byte-identical, and the full module is re-sealed without stripping that export in the audit test.
+const NATIVE_MIGRATE_MODULE_SHA256 = "446dc05574ffcc87d240485bdc489520e719fed1a6eccd713ad0c2b4d3b15121";
 const NATIVE_ONCE_SOURCES = new Set([
   "0104_password_only_reset.sql", "0105_backup_email_verification.sql",
   "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"

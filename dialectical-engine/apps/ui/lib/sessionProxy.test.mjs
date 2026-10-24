@@ -6,7 +6,7 @@ import { join } from "node:path";
 import test, { after } from "node:test";
 import { pathToFileURL } from "node:url";
 
-const outDir = join(process.cwd(), ".tmp-s5-api-route-test");
+const outDir = join(process.env.SF_S04_PROXY_TMP_ROOT ?? process.cwd(), ".tmp-s5-api-route-test");
 const RETIRED_DEV_HEADER = ["x", "user", "dev", "token"].join("-");
 
 async function loadRoute() {
@@ -209,7 +209,7 @@ test("L3-F12: an upstream timeout is reported as 504, never as a fabricated API 
   assert.equal((await response.json()).error, "API_UPSTREAM_TIMEOUT");
 });
 
-test("hate-speech S02 R-D: only POST /v1/runs/{id}/publish gets the longer upstream ceiling; every other route keeps 30 s", async () => {
+test("S04 asks and S02 publish retain their own upstream ceilings; other routes keep 30 s", async () => {
   process.env.DIALECTICAL_API_BASE = "http://api.internal:8000";
   globalThis.fetch = async () => new Response("{}");
   const { GET, POST } = await loadRoute();
@@ -227,12 +227,13 @@ test("hate-speech S02 R-D: only POST /v1/runs/{id}/publish gets the longer upstr
   const PUBLISH_CEILING_MS = 145_000;
   assert.ok(PUBLISH_CEILING_MS >= 2 * 60_000 + 20_000);
   const DEFAULT_CEILING_MS = 30_000;
+  const ASK_CEILING_MS = 55_000;
   const only = (values) => { assert.equal(values.length, 1, "exactly one ceiling is armed"); return values[0]; };
   try {
     assert.equal(only(await call("POST", ["v1", "runs", RUN, "publish"])), PUBLISH_CEILING_MS);
+    assert.equal(only(await call("POST", ["v1", "asks"])), ASK_CEILING_MS);
     for (const [method, path] of [
       ["POST", ["v1", "runs", RUN, "unpublish"]],
-      ["POST", ["v1", "asks"]],
       ["POST", ["v1", "runs", RUN, "publish", "extra"]],
       // FIX-HS2-p2 (REV p2 survivor P6): a deeper path that also ends in /publish is not the publish route
       ["POST", ["v1", "runs", RUN, "answers", "publish"]],

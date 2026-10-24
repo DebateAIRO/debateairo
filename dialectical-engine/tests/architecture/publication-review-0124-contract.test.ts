@@ -108,7 +108,7 @@ describe("0124 publication review contract", () => {
       "subject_capabilities_check"
     ]) expect(source, shared).not.toContain(shared);
     const chain = await readFile(new URL("../../packages/db/src/migration-forward-chain.ts", import.meta.url), "utf8");
-    expect(chain).toContain("loadForward0123,loadForward0124]");
+    expect(chain).toContain("loadForward0123,loadForward0124,loadForward0125]");
   });
 });
 

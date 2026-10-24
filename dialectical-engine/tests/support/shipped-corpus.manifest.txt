@@ -140,6 +140,13 @@ apps/api/src/publication-check/verdict.ts
 apps/api/src/publication-review/owner.ts
 apps/api/src/publication-review/staff.ts
 apps/api/src/publications.ts
+apps/api/src/question-check/ask-gate.ts
+apps/api/src/question-check/check.ts
+apps/api/src/question-check/compose.ts
+apps/api/src/question-check/contract.ts
+apps/api/src/question-check/instruction.ts
+apps/api/src/question-check/transport.ts
+apps/api/src/question-check/verdict.ts
 apps/api/src/question-language/boot.ts
 apps/api/src/question-language/decide.ts
 apps/api/src/question-language/decider.ts
@@ -165,6 +172,9 @@ apps/api/src/staff/alerts.ts
 apps/api/src/staff/internal-allowances.ts
 apps/api/src/staff/routes.ts
 apps/api/src/staff/runtime.ts
+apps/api/src/staff/threat-report-alert.ts
+apps/api/src/staff/threat-report-closure.ts
+apps/api/src/staff/threat-reports.ts
 apps/api/src/staff/webauthn-codec.ts
 apps/api/src/staff/webauthn-verifier.ts
 apps/api/src/staff/webauthn.ts
@@ -399,6 +409,7 @@ apps/scheduler/src/index.ts
 apps/ui/app/admin/invitation/page.tsx
 apps/ui/app/admin/reviews/page.tsx
 apps/ui/app/admin/team/page.tsx
+apps/ui/app/admin/threat-reports/page.tsx
 apps/ui/app/admin/workers/page.tsx
 apps/ui/app/ai-transparency/page.tsx
 apps/ui/app/api/[...path]/route.ts
@@ -480,6 +491,7 @@ apps/ui/components/EvaluatorDevMenu.tsx
 apps/ui/components/ExportDownloadClient.tsx
 apps/ui/components/FloorAnswer.tsx
 apps/ui/components/GuideModal.tsx
+apps/ui/components/HarmHelpLine.tsx
 apps/ui/components/InvestigationDrawer.tsx
 apps/ui/components/KnownPasswordRecoveryLink.tsx
 apps/ui/components/LanguageSwitcher.tsx
@@ -502,6 +514,7 @@ apps/ui/components/PublicationReviewPanel.tsx
 apps/ui/components/PublicationReviewsPanel.tsx
 apps/ui/components/QuestionLanguageChoice.tsx
 apps/ui/components/QuestionLanguageOffer.tsx
+apps/ui/components/QuestionRefusal.tsx
 apps/ui/components/RecommendedInvestigations.tsx
 apps/ui/components/ReferenceNodeMeta.tsx
 apps/ui/components/RegionField.tsx
@@ -519,6 +532,8 @@ apps/ui/components/StoryShortBlocks.tsx
 apps/ui/components/SynthesisHoldRefresher.tsx
 apps/ui/components/SynthesisPanel.tsx
 apps/ui/components/TakeDownControl.tsx
+apps/ui/components/ThreatReportsLink.tsx
+apps/ui/components/ThreatReportsPanel.tsx
 apps/ui/components/Toast.tsx
 apps/ui/components/TopBar.tsx
 apps/ui/components/VerdictBanner.tsx
@@ -744,6 +759,7 @@ apps/ui/lib/previewPlanRoster.ts
 apps/ui/lib/privacyPolicy.ts
 apps/ui/lib/publicDebatePresentation.test.mjs
 apps/ui/lib/publicDebatePresentation.ts
+apps/ui/lib/questionRefusal.ts
 apps/ui/lib/recommendation.test.mjs
 apps/ui/lib/recommendation.ts
 apps/ui/lib/report/ReportDocument.tsx
@@ -774,6 +790,7 @@ apps/ui/lib/socialStepUpHandoff.ts
 apps/ui/lib/staffApi.ts
 apps/ui/lib/staffWebAuthn.ts
 apps/ui/lib/termsOfService.ts
+apps/ui/lib/threatReportsApi.ts
 apps/ui/lib/totpQr.ts
 apps/ui/lib/trustedClientIp.test.mjs
 apps/ui/lib/turnstile.ts
@@ -884,6 +901,7 @@ packages/contract/src/crisis-lexicon/zh.ts
 packages/contract/src/crisis.ts
 packages/contract/src/disclosure.ts
 packages/contract/src/generate.ts
+packages/contract/src/harm-helpline.ts
 packages/contract/src/http-error.ts
 packages/contract/src/index.ts
 packages/contract/src/lineage.ts
@@ -893,6 +911,7 @@ packages/contract/src/mfa-recovery.ts
 packages/contract/src/password-reset.ts
 packages/contract/src/plan-tiers.ts
 packages/contract/src/publication-review.ts
+packages/contract/src/question-check.ts
 packages/contract/src/romania-address.ts
 packages/contract/src/social-auth.ts
 packages/contract/src/staff-access.ts
@@ -937,6 +956,7 @@ packages/db/src/migration-forward0121.ts
 packages/db/src/migration-forward0122.ts
 packages/db/src/migration-forward0123.ts
 packages/db/src/migration-forward0124.ts
+packages/db/src/migration-forward0125.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
 packages/db/src/migration-forward111.ts
@@ -963,6 +983,7 @@ packages/db/src/social-identity.ts
 packages/db/src/staff-access.ts
 packages/db/src/support.ts
 packages/db/src/synthesis-check-erasure.ts
+packages/db/src/threat-reports.ts
 packages/evaluator/src/blind-sample.ts
 packages/evaluator/src/consumer-postgres.ts
 packages/evaluator/src/consumer.ts
@@ -1104,6 +1125,7 @@ packages/register/src/model-scorecard-policy.ts
 packages/register/src/password-reset-policy.ts
 packages/register/src/product-role-policy.ts
 packages/register/src/publication-check-policy.ts
+packages/register/src/question-check-policy.ts
 packages/register/src/question-language-policy.ts
 packages/register/src/recovery-policy.ts
 packages/register/src/register-publication.ts

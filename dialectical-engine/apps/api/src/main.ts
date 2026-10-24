@@ -46,6 +46,7 @@ import {
   assertPublicationSecretDomains,
   configureCustodyGroup,
   ContentCipher,
+  type CryptoEnvelope,
   decrypt,
   openRecord,
   FilePublicationKeyStore,
@@ -56,7 +57,7 @@ import {
   PublicationCipher,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, SynthesisCheckErasureCoordinator, PostgresSynthesisCheckErasureRepository, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
+import { AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresThreatReportRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, SynthesisCheckErasureCoordinator, PostgresSynthesisCheckErasureRepository, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
 // Role rotation (spec 2026-10-11): the per-role, per-model counts admission reads when the row is ON.
 import { readRoleRotationCounts } from "@debateai/db";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes, type AskRequest } from "@debateai/contract";
@@ -91,6 +92,7 @@ import {
   readMfaPolicy,
   readProductRolePolicy,
   readPublicationCheckPolicy,
+  readQuestionCheckPolicy,
   readAnswerRoleRotationPolicy,
   readDebateShapePolicy,
   debateShapeInForce,
@@ -115,8 +117,10 @@ import {
   assertRunCeilingCoversOneCall,
   costEnvelopeGuardPolicy,
   languageCheckSpendWriterPresent,
+  questionCheckSpendWriterPresent,
   mostOneRunMaySpendMicros,
-  recordLanguageCheckSpend
+  recordLanguageCheckSpend,
+  recordQuestionCheckSpend
 } from "@debateai/budget";
 import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
 import { firstCallPlanModels } from "@debateai/scorecard";
@@ -164,6 +168,10 @@ import { createStaffRuntime } from "./staff/runtime.js";
 import { PostgresPublicationApplication, buildPublicDebateBody } from "./publications.js";
 import { createPublicationReviewStaffService } from "./publication-review/staff.js";
 import { createPublicationContentCheck } from "./publication-check/check.js";
+import { composeQuestionCheck } from "./question-check/compose.js";
+import { startThreatReportAlerts } from "./staff/threat-report-alert.js";
+import { startThreatReportErasure, threatReportEmailHold } from "./staff/threat-report-closure.js";
+import { threatReportEmailReader } from "./staff/threat-reports.js";
 import { PublicationReviewRefusal, PublicationReviewRepository, SynthesisCheckRepository, originVersionOf, synthesisTextOf, verdictOfRecord } from "@debateai/serve";
 import { ownerSession, readOwnerAnswer } from "./owner-read.js";
 import { SynthesisCheckWorker } from "./synthesis-check/worker.js";
@@ -1026,11 +1034,15 @@ const staffAccess = environment.STAFF_ACCESS.policyVersion === 2
 const staffAlerts = environment.STAFF_ACCESS.policyVersion === 2
   ? await boot.run("staff-activation", () => createStaffRuntime({environment:environment.STAFF_ACCESS as Extract<typeof environment.STAFF_ACCESS,{policyVersion:2}>,registerVersion:environment.REGISTER_VERSION,publicAppUrl:environment.PUBLIC_APP_URL,pool,keys:dekStore,deploymentMode:environment.DEPLOYMENT_MODE,billingPlans:askRoomComposition?.billingPlans??null,providerTargets:declaredProviderTargets,log:code=>console.error('[STAFF_ALERT_FAILURE]',code)})) : undefined;
 if (staffAlerts !== undefined) boot.hold({end:()=>staffAlerts.close()});
+const threatReportRepository = new PostgresThreatReportRepository(pool);
+const readThreatReportRecipientEmail = threatReportEmailReader(pool, dekStore);
+const readThreatReportStaffEmail = threatReportEmailReader(pool, dekStore, "staff");
 const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undefined : {
   access: staffAccess, sessions, repository: new PostgresStaffRepository(pool),
   webauthn: new StaffWebAuthnService(new PostgresStaffRepository(pool), {publicAppUrl: environment.PUBLIC_APP_URL}),
   intents: staffAlerts.intents, readiness: staffAlerts.readiness,
   targetInvitationTransport: staffAlerts.targetInvitationTransport,
+  threatReports: { repository: threatReportRepository, readRecipientEmail: readThreatReportRecipientEmail },
   ...(staffAlerts.funding === undefined ? {} : { funding: staffAlerts.funding })
 };
 // Self-service profile/recovery capabilities use the existing authorization
@@ -1186,8 +1198,23 @@ const accountErasureRepository = new PostgresAccountErasureRepository(
   erasurePool,auditContextHasher,contentProvisionPool
 );
 const accountErasure = new AccountErasureCoordinator(
-  accountErasureRepository,dekStore,runKeyStore,publicationCipher
+  accountErasureRepository,dekStore,runKeyStore,publicationCipher,{
+    readEmailCiphertext: async userId => (await pool.query<{ email_ciphertext: CryptoEnvelope }>(
+      'SELECT email_ciphertext FROM identity."user" WHERE user_id=$1', [userId]
+    )).rows[0]?.email_ciphertext ?? null,
+    beforeKeyDestruction: threatReportEmailHold(threatReportRepository)
+  }
 );
+const threatReportAlertsTimer = startThreatReportAlerts({
+  repository: threatReportRepository,
+  mail: new TemplatedMailSender({
+    executable: environment.MAIL_SENDMAIL_PATH,
+    from: environment.MAIL_FROM,
+    timeoutMs: authPolicy.channel.transportTimeoutMs
+  }),
+  readRecipientEmail: readThreatReportStaffEmail
+});
+const threatReportErasureTimer = startThreatReportErasure({ repository: threatReportRepository });
 const privateErasure = new PrivateRunErasureCoordinator(
   new PostgresPrivateRunErasureRepository(erasurePool,auditContextHasher),
   runKeyStore,publicationCipher
@@ -1350,6 +1377,37 @@ const publicationContentCheck = createPublicationContentCheck({
   clock: () => new Date(),
   deadlineMs: publicationCheckPolicy.deadlineMs
 });
+const questionCheckPolicy = await boot.run("question-check-policy", () =>
+  readQuestionCheckPolicy(pool, environment.REGISTER_VERSION));
+const questionCheck = await boot.run("question-check", () => composeQuestionCheck({
+  mode: environment.DEPLOYMENT_MODE,
+  apiPort: environment.API_PORT,
+  target: supportModelTarget,
+  readAuthorizationHeader: readCustodyAuthorizationHeader,
+  reportDiagnostic: reportSupportDiagnostic,
+  policy: questionCheckPolicy,
+  spend: {
+    writerPresent: () => questionCheckSpendWriterPresent(pool),
+    record: entry => recordQuestionCheckSpend(pool, entry)
+  },
+  dayPot: costEnvelopeRows === undefined ? null : {
+    ceilingMicros: costEnvelopeRows.guardPolicy.dailyCeilingMicros,
+    spentMicros: day => new PostgresModelSpendStore(pool).readDaySpentMicros(day)
+  },
+  keeper: { keep: async (questionLine, accountUserId) => {
+    try {
+      return await threatReportRepository.keep(questionLine, accountUserId);
+    } catch (error) {
+      if (accountUserId === null || !(error instanceof Error)
+        || error.message !== "THREAT_REPORT_ACCOUNT_ERASING") throw error;
+      const email = await readThreatReportRecipientEmail(accountUserId);
+      if (email === null) throw error;
+      return threatReportRepository.keepWithHeldEmail(questionLine, accountUserId, email);
+    }
+  } },
+  clock: () => new Date(),
+  report: line => console.error(JSON.stringify(line))
+}));
 const synthesisCheckOffFlag = environment.DEPLOYMENT_MODE === "hosted" ? null : synthesisCheckOffFlagPath(environment.API_PORT);
 const synthesisCheckSwitch = createLocalOffFlagSwitch(supportModelTarget === undefined ? null
   : createSynthesisCheckTransport(supportModelTarget, {
@@ -1702,6 +1760,7 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
   dataExportTimer.unref();
 }
 const api = buildApi({
+  questionCheck,
   ...(previewConfig === undefined ? {} : { previewProviderTestConfig: previewConfig, previewTeamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [] }),
   application,
   stories: ownerStories,
@@ -1828,6 +1887,8 @@ if (publicationCleanupTimer !== undefined) {
   api.addHook("onClose",async () => clearInterval(publicationCleanupTimer));
 }
 api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
+api.addHook("onClose",async () => clearInterval(threatReportAlertsTimer));
+api.addHook("onClose",async () => clearInterval(threatReportErasureTimer));
 api.addHook("onClose",async () => clearInterval(synthesisCheckTimer));
 api.addHook("onClose",async () => { if (dataExportTimer !== undefined) clearInterval(dataExportTimer); });
 api.addHook("onClose",async () => billingRuntime?.stop());

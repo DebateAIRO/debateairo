@@ -17,6 +17,7 @@ import { AccountProfileError, type AccountProfileService } from "./account-profi
 import { RecoveryEmailError, type RecoveryEmailService } from "./recovery-email.js";
 import type { ProfileSession } from "@debateai/db";
 import { normalizeManualPhone } from "./phone-profile.js";
+import { answerForOutcome, keepFailureCode, type AskQuestionCheck } from "./question-check/ask-gate.js";
 import { resolveSourceMailLocale } from "./mail-locale.js";
 import { exhaustive, type FundingBasis } from "@debateai/kernel";
 import { timingSafeEqual } from "node:crypto";
@@ -1494,7 +1495,7 @@ export const authorizationPolicyInventory = Object.freeze([
   staffCapability?: StaffCapability;
   resource: "identity" | "session-self" | "session-owner" | "run-owner" | "public-debate" |
     "deployment" | "evaluator" | "support-session" | "support-message" | "support-case" |
-    "support-status" | "geo" | "billing" | "staff-self" | "staff-team" | "staff-invitation" | "owner-possession" | "staff-audit" | "staff-publication-review";
+    "support-status" | "geo" | "billing" | "staff-self" | "staff-team" | "staff-invitation" | "owner-possession" | "staff-audit" | "staff-publication-review" | "staff-threat-report";
   action: string;
 }>[]);
 
@@ -1692,6 +1693,7 @@ const EMAIL_CHANGE_STATUS: Readonly<Record<EmailChangeErrorCode, number>> = Obje
 });
 
 export interface ApiOptions {
+  readonly questionCheck?: AskQuestionCheck;
   readonly previewProviderTestConfig?: PreviewProviderTestConfig;
   /**
    * Step 1 (owner, 2026-10-08): the identity user ids that may start debates on the private
@@ -2405,7 +2407,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
           await options.staffAccess.assertCurrent(staffAuth);
           if (request.routeOptions.config.staffCapability !== undefined) await options.staffAccess.requireCapability(staffAuth, request.routeOptions.config.staffCapability);
         }
-        catch { return reply.status(403).send({ error: "STAFF_AUTHORITY_INVALID" }); }
+        catch { return reply.status(403).send({ error: request.routeOptions.url?.startsWith("/v1/admin/threat-reports")
+          ? "STAFF_REQUEST_REFUSED" : "STAFF_AUTHORITY_INVALID" }); }
         if (MUTATING_METHODS.has(request.method)) {
           const csrf = exactStaffCsrfPair(request.headers[STAFF_CSRF_HEADER], exactStaffCookie(rawCookie, STAFF_CSRF_COOKIE_NAME));
           if (csrf === null || !await options.staffAccess.verifyCsrf(staffAuth, csrf)) return reply.status(403).send({ error: "CSRF_VALIDATION_FAILED" });
@@ -3555,7 +3558,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // crisis check is done in the pre-flight"). A question that reads as a person in crisis gets
     // help numbers, never a debate. It stays the FIRST thing this route does: before the
     // consent, quota and country rules, and before any other pre-flight check of the question
-    // (the hate-speech check, S03). A person in crisis must never meet a refusal or a "check
+    // (the question check, S04, which runs after the body's validation). A person in crisis must never meet a refusal or a "check
     // unavailable" message instead of help, and their words go to no judge model. Nothing of
     // the question is kept. `country` is the edge's guess, only to pick which helplines the
     // screen shows first. Pinned by tests/unit/crisis-check-api.test.ts.
@@ -3599,6 +3602,23 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (Buffer.byteLength(ask.question_line, "utf8") > ASK_QUESTION_MAX_BYTES) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
+    if (options.questionCheck === undefined) {
+      return reply.status(503).send({ error: "QUESTION_CHECK_UNAVAILABLE", message: "QUESTION_CHECK_UNAVAILABLE" });
+    }
+    const outcome = await options.questionCheck.check(ask.question_line);
+    if (outcome.outcome === "REFUSE" && outcome.kept) {
+      try {
+        await options.questionCheck.keep({
+          questionLine: ask.question_line,
+          accountUserId: request.authenticatedSession?.userId ?? null
+        });
+      } catch (error) {
+        console.error(JSON.stringify({ event: "api.question_check.unavailable", code: keepFailureCode(error) }));
+        return reply.status(503).send({ error: "QUESTION_CHECK_UNAVAILABLE", message: "QUESTION_CHECK_UNAVAILABLE" });
+      }
+    }
+    const answer = answerForOutcome(outcome, edgeCountry(request.headers));
+    if (answer !== null) return reply.status(answer.status).send(answer.body);
     const accepted = AskAcceptedSchema.parse(await options.application.submit(
       ask,
       request.session,

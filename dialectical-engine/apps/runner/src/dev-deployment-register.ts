@@ -18,6 +18,7 @@ import {
   BILLING_POLICY_DEPLOYMENT_REGISTER_ROW,
   TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW,
   PUBLICATION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW,
+  QUESTION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW,
   ALGORITHM_REGISTER_ROW_KEYS,
   AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS,
   ENGINE_BAND_ORDER,
@@ -735,6 +736,7 @@ function developmentRows(
     // hate-speech S02 (owner's ruling 2026-10-04): the pre-publish check's deadline D. Code-owned, so every
     // publication carries it and the API can refuse a version without it; a hosted file may supersede it.
     PUBLICATION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW,
+    QUESTION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW,
     ...buildDevelopmentDeploymentRegisterRows(providerPanel),
     ...buildDevelopmentAlgorithmRegisterRows(providerPanel, roleRefs),
     // Verdict story (spec 2026-09-26 §9): OPTIONAL rows. Every reader treats

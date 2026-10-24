@@ -29,7 +29,10 @@
  *    band must carry it (ruling C7, `ASK_ROOM_ADMISSION_UNSEALED`). Likewise optional, the
  *    `publicationCheckPolicy` (the pre-publish check's deadline, owner's ruling 2026-10-04,
  *    checked by the register's own parser); without the member the seeder's code-owned row is
- *    sealed as it is. Likewise optional, the `answerRoleRotation` (spec 2026-10-11, role rotation):
+ *    sealed as it is. Likewise optional, the `questionCheckPolicy` (the pre-start question
+ *    check's deadline, synthesis-flag S04-R8, checked by the register's own parser); without
+ *    the member the seeder's code-owned row is sealed as it is. Likewise optional, the
+ *    `answerRoleRotation` (spec 2026-10-11, role rotation):
  *    `{ "enabled": true | false }`, sealed as the ADDITIVE `answerRoleRotationPolicy` row under the
  *    file's sourceRef; left out, no such row is sealed and the engine keeps its fixed roles. Likewise optional,
  *    the `callConcurrencyPolicy` (spec 2026-10-12, parallel calls): `{ "perDebate", "perModelPerDebate",
@@ -112,6 +115,7 @@ import {
   MODEL_SCORECARD_MAX_BYTES,
   MODEL_SCORECARD_ROW_KEY,
   PUBLICATION_CHECK_POLICY_ROW_KEY,
+  QUESTION_CHECK_POLICY_ROW_KEY,
   STORY_ROW_KEYS,
   TAX_AUTHORITIES_ROW_KEY,
   admissionPolicyFromValue,
@@ -164,6 +168,7 @@ import {
   persistBootstrapRegister,
   planCapMicros,
   publicationCheckPolicyFromValue,
+  questionCheckPolicyFromValue,
   readAdmissionPolicy,
   readAnswerRoleRotationPolicy,
   readCallConcurrencyPolicy,
@@ -245,6 +250,7 @@ const TOP_LEVEL_KEYS = Object.freeze([
   "askRoomReads",
   // hate-speech S02 (owner, 2026-10-04): OPTIONAL. Left out, the code-owned publicationCheckPolicy row is sealed as it is.
   "publicationCheckPolicy",
+  "questionCheckPolicy",
   // Role rotation (spec 2026-10-11): OPTIONAL. Left out, no row is sealed and the engine keeps its fixed roles.
   "answerRoleRotation",
   // Parallel calls (spec 2026-10-12): OPTIONAL. Left out, no row is sealed and the runner makes one call at a time per debate.
@@ -446,6 +452,8 @@ export type HostedRegisterFile = Readonly<{
   askRoomReads?: unknown;
   /** Optional (2026-10-04): the pre-publish check's deadline; absent = the code-owned row. */
   publicationCheckPolicy?: unknown;
+  /** Optional S04 question-check deadline; absent = the code-owned row. */
+  questionCheckPolicy?: unknown;
   /** Optional (spec 2026-10-11): `{ "enabled": boolean }`; absent = no answerRoleRotationPolicy row. */
   answerRoleRotation?: unknown;
   /** Optional (spec 2026-10-12): the policy without its `kind`; absent = no callConcurrencyPolicy row. */
@@ -518,6 +526,7 @@ export function parseHostedRegisterFile(bytes: Uint8Array): HostedRegisterFile {
     ...(Object.hasOwn(record, "taxAuthorities") ? { taxAuthorities: record.taxAuthorities } : {}),
     ...(Object.hasOwn(record, "askRoomReads") ? { askRoomReads: record.askRoomReads } : {}),
     ...(Object.hasOwn(record, "publicationCheckPolicy") ? { publicationCheckPolicy: record.publicationCheckPolicy } : {}),
+    ...(Object.hasOwn(record, "questionCheckPolicy") ? { questionCheckPolicy: record.questionCheckPolicy } : {}),
     ...(Object.hasOwn(record, "answerRoleRotation") ? { answerRoleRotation: record.answerRoleRotation } : {}),
     ...(Object.hasOwn(record, "callConcurrencyPolicy") ? { callConcurrencyPolicy: record.callConcurrencyPolicy } : {}),
     ...(Object.hasOwn(record, "debateShapePolicy") ? { debateShapePolicy: record.debateShapePolicy } : {}),
@@ -983,6 +992,7 @@ export async function planHostedRegisterPublication(
   // hate-speech S02: the operator's deadline, by the register's own parser (PUBLICATION_CHECK_POLICY_INVALID).
   // Absent member = the code-owned row, sealed as it is.
   if (file.publicationCheckPolicy !== undefined) publicationCheckPolicyFromValue(file.publicationCheckPolicy, file.sourceRef);
+  if (file.questionCheckPolicy !== undefined) questionCheckPolicyFromValue(file.questionCheckPolicy, file.sourceRef);
   // Role rotation (spec 2026-10-11): the member is the file's own shape, exactly `{ "enabled": boolean }`, so it is
   // checked here, before anything is sealed. Absent = no row (the fixed roles, as before).
   const roleRotationRow = file.answerRoleRotation === undefined ? null
@@ -1109,6 +1119,13 @@ export async function planHostedRegisterPublication(
     operatorRows.set(PUBLICATION_CHECK_POLICY_ROW_KEY, Object.freeze({
       rowKey: PUBLICATION_CHECK_POLICY_ROW_KEY,
       valueJsonText: canonicalRowValue(file.publicationCheckPolicy),
+      sourceRef: file.sourceRef
+    }));
+  }
+  if (file.questionCheckPolicy !== undefined) {
+    operatorRows.set(QUESTION_CHECK_POLICY_ROW_KEY, Object.freeze({
+      rowKey: QUESTION_CHECK_POLICY_ROW_KEY,
+      valueJsonText: canonicalRowValue(file.questionCheckPolicy),
       sourceRef: file.sourceRef
     }));
   }

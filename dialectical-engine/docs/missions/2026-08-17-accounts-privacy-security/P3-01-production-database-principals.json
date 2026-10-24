@@ -314,7 +314,10 @@
         "staff.publication_review_event",
         "billing.internal_grant",
         "billing.internal_grant_event",
-        "billing.internal_provider_admission"
+        "billing.internal_provider_admission",
+        "staff.threat_report",
+        "staff.threat_report_event",
+        "staff.threat_report_alert"
       ],
       "ownsFunctions": [
         "staff.require_alert_readiness_jit",
@@ -383,7 +386,18 @@
         "billing.reserve_internal_provider_call",
         "billing.settle_internal_provider_call",
         "billing.read_internal_run_state",
-        "ledger.record_language_check_spend"
+        "ledger.record_language_check_spend",
+        "ledger.record_question_check_spend",
+        "staff.keep_threat_report",
+        "staff.list_threat_reports",
+        "staff.count_unread_threat_reports",
+        "staff.read_threat_report",
+        "staff.decide_threat_report",
+        "staff.erase_due_threat_reports",
+        "staff.hold_threat_report_email",
+        "staff.claim_threat_report_alerts",
+        "staff.complete_threat_report_alert",
+        "identity.read_data_export_threat_reports"
       ]
     },
     {
@@ -2272,6 +2286,37 @@
       "source": "migrations/0124_publication_review.sql",
       "grants": [
         "EXECUTE ON FUNCTION staff.commit_owner_command(uuid,uuid[],uuid,text,uuid,text,uuid,text,uuid,jsonb)"
+      ]
+    },
+    {
+      "roleName": "debateai_staff_security_owner",
+      "source": "migrations/0125_threat_reports.sql",
+      "grants": [
+        "SELECT (erasure_id, user_id, prepared_at, cancelled_at, committed_at) ON identity.account_erasure_request",
+        "EXECUTE ON FUNCTION identity.data_export_lease_user(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0125_threat_reports.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION ledger.record_question_check_spend(uuid,text,date,bigint,bigint,bigint)",
+        "EXECUTE ON FUNCTION staff.keep_threat_report(text,uuid)",
+        "EXECUTE ON FUNCTION staff.list_threat_reports(jsonb,text)",
+        "EXECUTE ON FUNCTION staff.count_unread_threat_reports(jsonb,text)",
+        "EXECUTE ON FUNCTION staff.read_threat_report(jsonb,text,uuid)",
+        "EXECUTE ON FUNCTION staff.decide_threat_report(jsonb,text,uuid,text,jsonb)",
+        "EXECUTE ON FUNCTION staff.erase_due_threat_reports()",
+        "EXECUTE ON FUNCTION staff.hold_threat_report_email(uuid,text)",
+        "EXECUTE ON FUNCTION staff.claim_threat_report_alerts(integer)",
+        "EXECUTE ON FUNCTION staff.complete_threat_report_alert(uuid,uuid,boolean)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0125_threat_reports.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_threat_reports(uuid,uuid)"
       ]
     }
   ],

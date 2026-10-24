@@ -5,8 +5,13 @@ export * from "./mfa-recovery.js";
 import { socialAuthContractSchemas } from './social-auth.js';
 export * from './social-auth.js';
 import { staffContractInventory, fundedStaffContractInventory } from "./staff-access.js";
+import { ThreatReportSchema as StaffThreatReportSchema } from "./staff-access.js";
 export * from "./staff-access.js";
 import { z } from "zod";
+/** A kept question from an unsigned ask has no account to identify (S04-R18). */
+export const ThreatReportSchema = StaffThreatReportSchema.extend({
+  account: StaffThreatReportSchema.shape.account.nullable()
+}).strict();
 import { CatalogLocaleCodeSchema } from "./locale.js";
 import { SessionSchema, LegalDocumentPairSchema } from "./auth-shared.js";
 export * from "./auth-shared.js";
@@ -20,6 +25,8 @@ import { AnswerDisclosureSchema, AnswerFloorSchema } from "./disclosure.js"; exp
 import { VerdictStateSchema } from "./verdict-state.js"; export * from "./verdict-state.js";
 import { DebateMapViewSchema } from "./map-view.js"; export * from "./map-view.js";
 export * from "./crisis.js";
+export * from "./question-check.js";
+export * from "./harm-helpline.js";
 import { SynthesisCheckHoldSchema, SynthesisFlagSchema, RemovalNoticeTakeSchema } from "./synthesis-check.js";
 export * from "./synthesis-check.js";
 import { PublicationReviewSummarySchema } from "./publication-review.js";
