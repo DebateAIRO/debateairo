@@ -119,5 +119,14 @@
   "home.crisisSupport.misread": "質問を読み違えていた場合は、言い方を変えて入力し直すことができます。",
   "home.crisisSupport.back": "質問に戻る",
   "home.crisisSupport.chooseCountry": "国を選ぶと、その国の相談窓口が表示されます。",
-  "home.crisisSupport.emergencyAnywhere": "あなたや誰かに差し迫った危険がある場合は、今すぐお住まいの地域の緊急通報番号に電話してください。"
+  "home.crisisSupport.emergencyAnywhere": "あなたや誰かに差し迫った危険がある場合は、今すぐお住まいの地域の緊急通報番号に電話してください。",
+  "home.flag.flagged": "フラグ付き",
+  "home.removal.title": "このディベートを削除しました",
+  "home.removal.what": "このディベートは保管せず、復元もできません。",
+  "home.removal.reach": "削除されたのはこのディベートだけです。あなたのアカウントと他のディベートには影響しません。",
+  "home.removal.facts": "その結論に対する当社の自動チェックで、「自殺や他者を傷つける傾向」が見つかりました。誰からも当社に報告されておらず、人が読むこともありませんでした。",
+  "home.removal.automatic": "この判断は自動ツールによるものです。人は関与していません。",
+  "home.removal.ground": "根拠：利用規約第9条（当社のチェックが削除するディベート）。",
+  "home.removal.complain": "苦情を申し立てるには、6か月以内に office@dezbatere.ro までご連絡ください。苦情によってディベートを復元することはできません。",
+  "home.removal.close": "閉じる"
 }

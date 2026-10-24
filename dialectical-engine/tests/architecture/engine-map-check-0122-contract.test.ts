@@ -50,13 +50,13 @@ describe("0122: the map answer step's two code tables", () => {
     expect(sql).toContain("RAISE EXCEPTION 'ENGINE_MAP_CHECK_GUARD_CONTRACT_INCOMPLETE'");
   });
 
-  it("is the chain's last step, after R2's, with its own loader", () => {
+  it("follows R2 in the chain, with its own loader", () => {
     const manifest = JSON.parse(readFileSync(new URL("lineage/engine-map-check-forward0122.json", MIGRATIONS), "utf8")) as
       { version: string; previous: { name: string }; migration: { name: string } };
     expect(manifest.version).toBe("engine-map-check-forward0122-v1");
     expect(manifest.migration.name).toBe("0122_engine_map_check.sql");
     expect(manifest.previous.name).toBe("0121_engine_verdict.sql");
-    // Pre-flight PF-R34.2: the loader is appended last, after R2's, in the one chain list.
-    expect(readFileSync(new URL("../../packages/db/src/migration-forward-chain.ts", import.meta.url), "utf8")).toContain("loadForward0121,loadForward0122]");
+    // 0123 follows 0122, which still follows R2 in the one chain list.
+    expect(readFileSync(new URL("../../packages/db/src/migration-forward-chain.ts", import.meta.url), "utf8")).toContain("loadForward0121,loadForward0122,loadForward0123]");
   });
 });

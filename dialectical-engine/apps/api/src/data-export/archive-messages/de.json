@@ -17,5 +17,14 @@
   "archive.visibilityPrivate": "Privat",
   "archive.unreadable": "Der Inhalt dieser Debatte kann nicht mehr gelesen werden, da ihr Schlüssel vernichtet wurde.",
   "archive.noDebates": "Sie haben keine Debatten.",
-  "archive.filesNote": "Die JSON-Dateien in diesem ZIP-Archiv enthalten dieselben Daten in maschinenlesbarer Form; README.txt listet sie auf."
+  "archive.filesNote": "Die JSON-Dateien in diesem ZIP-Archiv enthalten dieselben Daten in maschinenlesbarer Form; README.txt listet sie auf.",
+  "archive.contentCheck": "Inhaltsprüfung",
+  "archive.verdict.flagged": "Markiert",
+  "archive.verdict.clear": "Unbedenklich",
+  "archive.verdict.noSynthesis": "Keine Synthese",
+  "archive.verdict.unavailable": "Nicht verfügbar",
+  "archive.category.terrorism": "Möglicher Terrorismus",
+  "archive.category.hateSpeech": "Hassrede jeder Art",
+  "archive.category.suicideOrHarm": "Neigungen zu Suizid oder zur Schädigung anderer Menschen",
+  "archive.category.weaponsOrDrugs": "Herstellung von Waffen oder Drogen"
 }

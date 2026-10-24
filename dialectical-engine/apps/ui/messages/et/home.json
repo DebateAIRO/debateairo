@@ -120,5 +120,14 @@
   "home.crisisSupport.misread": "Kui saime teie küsimusest valesti aru, võite selle ümber sõnastada.",
   "home.crisisSupport.back": "Tagasi minu küsimuse juurde",
   "home.crisisSupport.chooseCountry": "Valige oma riik, et näha selle abiliine.",
-  "home.crisisSupport.emergencyAnywhere": "Kui teie või keegi teine on otseses ohus, helistage kohe oma kohalikul hädaabinumbril."
+  "home.crisisSupport.emergencyAnywhere": "Kui teie või keegi teine on otseses ohus, helistage kohe oma kohalikul hädaabinumbril.",
+  "home.flag.flagged": "MÄRGISTATUD",
+  "home.removal.title": "Kustutasime selle väitluse",
+  "home.removal.what": "Me ei säilita seda ja seda ei saa taastada.",
+  "home.removal.reach": "Kustutati ainult see väitlus. Teie konto ja teised väitlused on puutumata.",
+  "home.removal.facts": "Meie automaatne kontroll leidis selle lõppjäreldusest „kalduvused enesetapule või teiste inimeste kahjustamisele“. Keegi ei teatanud sellest meile ja ükski inimene ei lugenud seda.",
+  "home.removal.automatic": "Selle otsuse tegi automaatne tööriist, ilma et ükski inimene oleks sellesse kaasatud.",
+  "home.removal.ground": "Alus: meie Teenusetingimused, jaotis 9 (väitlused, mille meie kontroll kustutab).",
+  "home.removal.complain": "Kaebuse esitamiseks kirjutage kuue kuu jooksul aadressile office@dezbatere.ro. Kaebus ei saa väitlust tagasi tuua.",
+  "home.removal.close": "Sulgege"
 }

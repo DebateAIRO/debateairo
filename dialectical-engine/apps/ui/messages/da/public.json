@@ -207,5 +207,7 @@
   "public.publication.contentCheck.automated": "Denne beslutning blev truffet af et automatisk værktøj. Ingen person har gennemgået den endnu.",
   "public.publication.contentCheck.stillPrivate": "Din debat forbliver privat og uændret. Kun du kan se den.",
   "public.publication.contentCheck.appeal": "For at bede en person om at gennemgå denne beslutning skal du skrive til office@dezbatere.ro inden for seks måneder.",
-  "public.publication.contentCheck.unavailable": "Indholdskontrollen er ikke tilgængelig lige nu, så intet blev offentliggjort. Din debat forbliver privat. Prøv igen om et par minutter."
+  "public.publication.contentCheck.unavailable": "Indholdskontrollen er ikke tilgængelig lige nu, så intet blev offentliggjort. Din debat forbliver privat. Prøv igen om et par minutter.",
+  "public.publication.approvalRequired": "Denne debat kræver vores godkendelse, før den kan offentliggøres.",
+  "public.publication.checkingDebate": "Kontrollerer debatten…"
 }

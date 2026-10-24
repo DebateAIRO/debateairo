@@ -17,5 +17,14 @@
   "archive.visibilityPrivate": "Privado",
   "archive.unreadable": "O conteúdo deste debate já não pode ser lido porque a respetiva chave foi destruída.",
   "archive.noDebates": "Não tem debates.",
-  "archive.filesNote": "Os ficheiros JSON neste arquivo ZIP contêm os mesmos dados num formato legível por máquina; o README.txt apresenta a lista."
+  "archive.filesNote": "Os ficheiros JSON neste arquivo ZIP contêm os mesmos dados num formato legível por máquina; o README.txt apresenta a lista.",
+  "archive.contentCheck": "Verificação de conteúdo",
+  "archive.verdict.flagged": "Sinalizado",
+  "archive.verdict.clear": "Sem problemas",
+  "archive.verdict.noSynthesis": "Sem síntese",
+  "archive.verdict.unavailable": "Indisponível",
+  "archive.category.terrorism": "Possível terrorismo",
+  "archive.category.hateSpeech": "discurso de ódio de qualquer tipo",
+  "archive.category.suicideOrHarm": "tendências ao suicídio ou a prejudicar outras pessoas",
+  "archive.category.weaponsOrDrugs": "fabrico de armas ou drogas"
 }

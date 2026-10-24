@@ -17,5 +17,14 @@
   "archive.visibilityPrivate": "Privatno",
   "archive.unreadable": "Sadržaj ove rasprave više se ne može pročitati jer je njezin ključ uništen.",
   "archive.noDebates": "Nemate rasprava.",
-  "archive.filesNote": "JSON datoteke u ovoj ZIP arhivi sadrže iste podatke u strojno čitljivom obliku; navedene su u README.txt."
+  "archive.filesNote": "JSON datoteke u ovoj ZIP arhivi sadrže iste podatke u strojno čitljivom obliku; navedene su u README.txt.",
+  "archive.contentCheck": "Provjera sadržaja",
+  "archive.verdict.flagged": "Označeno",
+  "archive.verdict.clear": "Bez problema",
+  "archive.verdict.noSynthesis": "Bez sinteze",
+  "archive.verdict.unavailable": "Nedostupno",
+  "archive.category.terrorism": "Mogući terorizam",
+  "archive.category.hateSpeech": "govor mržnje bilo koje vrste",
+  "archive.category.suicideOrHarm": "sklonosti samoubojstvu ili nanošenju štete drugim ljudima",
+  "archive.category.weaponsOrDrugs": "izrada oružja ili droga"
 }

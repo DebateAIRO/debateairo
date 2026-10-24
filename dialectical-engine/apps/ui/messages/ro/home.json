@@ -121,5 +121,14 @@
   "home.crisisSupport.misread": "Dacă v-am înțeles greșit întrebarea, o puteți reformula.",
   "home.crisisSupport.back": "Înapoi la întrebarea mea",
   "home.crisisSupport.chooseCountry": "Alegeți țara dumneavoastră pentru a vedea liniile de sprijin disponibile.",
-  "home.crisisSupport.emergencyAnywhere": "Dacă există un pericol imediat pentru dumneavoastră sau pentru altcineva, sunați acum la numărul local de urgență."
+  "home.crisisSupport.emergencyAnywhere": "Dacă există un pericol imediat pentru dumneavoastră sau pentru altcineva, sunați acum la numărul local de urgență.",
+  "home.flag.flagged": "MARCATĂ",
+  "home.removal.title": "Am șters această dezbatere",
+  "home.removal.what": "Nu o păstrăm și nu poate fi restaurată.",
+  "home.removal.reach": "Doar această dezbatere a fost ștearsă. Contul dvs. și celelalte dezbateri ale dvs. sunt neatinse.",
+  "home.removal.facts": "Verificarea noastră automată a concluziei sale a constatat: „tendințe de sinucidere sau de a face rău altor persoane”. Nimeni nu ne-a raportat dezbaterea și nicio persoană nu a citit-o.",
+  "home.removal.automatic": "Această decizie a fost luată de un instrument automat, fără nicio persoană implicată.",
+  "home.removal.ground": "Temei: Termenii serviciului, secțiunea 9 (dezbaterile pe care le șterge verificarea noastră).",
+  "home.removal.complain": "Pentru a depune o reclamație, scrieți la office@dezbatere.ro în termen de șase luni. O reclamație nu poate readuce dezbaterea.",
+  "home.removal.close": "Închideți"
 }

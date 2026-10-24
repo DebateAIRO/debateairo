@@ -122,5 +122,14 @@
   "home.crisisSupport.misread": "Če smo vaše vprašanje narobe razumeli, ga lahko preoblikujete.",
   "home.crisisSupport.back": "Nazaj na moje vprašanje",
   "home.crisisSupport.chooseCountry": "Izberite svojo državo, da vidite njene linije za pomoč.",
-  "home.crisisSupport.emergencyAnywhere": "Če ste vi ali kdo drug v neposredni nevarnosti, takoj pokličite lokalno številko za nujne primere."
+  "home.crisisSupport.emergencyAnywhere": "Če ste vi ali kdo drug v neposredni nevarnosti, takoj pokličite lokalno številko za nujne primere.",
+  "home.flag.flagged": "OZNAČENO",
+  "home.removal.title": "To razpravo smo izbrisali",
+  "home.removal.what": "Ne hranimo je in je ni mogoče obnoviti.",
+  "home.removal.reach": "Izbrisana je bila samo ta razprava. Vaš račun in vaše druge razprave so nedotaknjeni.",
+  "home.removal.facts": "Naše samodejno preverjanje njenega sklepa je ugotovilo »nagnjenja k samomoru ali škodovanju drugim ljudem«. Nihče nam je ni prijavil in nobena oseba je ni prebrala.",
+  "home.removal.automatic": "To odločitev je sprejelo samodejno orodje, brez sodelovanja osebe.",
+  "home.removal.ground": "Podlaga: naši Pogoji uporabe, razdelek 9 (razprave, ki jih naše preverjanje izbriše).",
+  "home.removal.complain": "Če želite vložiti pritožbo, v šestih mesecih pišite na office@dezbatere.ro. Pritožba ne more obnoviti razprave.",
+  "home.removal.close": "Zapri"
 }

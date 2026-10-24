@@ -4,7 +4,10 @@ export const ARCHIVE_KEYS = [
   "archive.pageTitle", "archive.generated", "archive.accountHeading", "archive.email", "archive.memberSince",
   "archive.debatesHeading", "archive.question", "archive.verdict", "archive.verdictSupported",
   "archive.verdictContested", "archive.verdictUnsupported", "archive.verdictSplit", "archive.story", "archive.arguments",
-  "archive.visibilityPublic", "archive.visibilityPrivate", "archive.unreadable", "archive.noDebates", "archive.filesNote"
+  "archive.visibilityPublic", "archive.visibilityPrivate", "archive.unreadable", "archive.noDebates", "archive.filesNote",
+  "archive.contentCheck", "archive.verdict.flagged", "archive.verdict.clear", "archive.verdict.noSynthesis",
+  "archive.verdict.unavailable", "archive.category.terrorism", "archive.category.hateSpeech",
+  "archive.category.suicideOrHarm", "archive.category.weaponsOrDrugs"
 ] as const;
 
 export type ArchiveCatalog = Readonly<Record<string, string>>;

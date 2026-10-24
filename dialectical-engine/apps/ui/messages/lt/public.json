@@ -209,5 +209,7 @@
   "public.publication.contentCheck.automated": "Šį sprendimą priėmė automatinė priemonė. Joks žmogus jo dar neperžiūrėjo.",
   "public.publication.contentCheck.stillPrivate": "Jūsų diskusija lieka privati ir nepakeista. Ją matote tik jūs.",
   "public.publication.contentCheck.appeal": "Norėdami paprašyti žmogaus peržiūrėti šį sprendimą, per šešis mėnesius parašykite adresu office@dezbatere.ro.",
-  "public.publication.contentCheck.unavailable": "Turinio patikra šiuo metu neprieinama, todėl nieko nepaskelbta. Jūsų diskusija lieka privati. Bandykite dar kartą po kelių minučių."
+  "public.publication.contentCheck.unavailable": "Turinio patikra šiuo metu neprieinama, todėl nieko nepaskelbta. Jūsų diskusija lieka privati. Bandykite dar kartą po kelių minučių.",
+  "public.publication.approvalRequired": "Šiems debatams reikia mūsų pritarimo, kad juos būtų galima paskelbti.",
+  "public.publication.checkingDebate": "Tikrinami debatai…"
 }

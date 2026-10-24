@@ -32,6 +32,7 @@ const REPLY_MEASURES_STEP = '0120_reply_measures.sql';
 const ENGINE_VERDICT_STEP = '0121_engine_verdict.sql';
 // The engine's map answer step (engine redesign R3, spec 2026-10-15): the chain's twelfth step.
 const ENGINE_MAP_CHECK_STEP = '0122_engine_map_check.sql';
+const SYNTHESIS_CHECK_STEP = '0123_synthesis_check.sql';
 const DEV_STEP = '0110_account_erasure_public_debates.sql';
 const LEDGER = 'SELECT name FROM public.debateai_schema_migration';
 const RESOLUTION_TABLE = "SELECT to_regclass('public.debateai_schema_migration_resolution') IS NOT NULL present";
@@ -68,26 +69,27 @@ describe('pendingForwardSteps', () => {
  it('returns none when every name is applied', () => {
   expect(pendingForwardSteps(chainOf('0111_a.sql', '0112_b.sql'), new Set([...BASE, '0110_dev.sql', '0111_a.sql', '0112_b.sql']))).toEqual([]);
  });
- it('reads this source\'s plan: 0110, 0111, 0112, 0113, 0114, 0115, 0116, 0117, 0118, 0119, 0120, 0121 and 0122 are pending, in that order, on a database complete through 0108', async () => {
+ it('reads this source\'s plan: 0110 through 0123 are pending, in that order, on a database complete through 0108', async () => {
   const plan = await loadMigrationPlan();
   expect(plan.forward110.name).toBe(DEV_STEP);
-  expect(plan.forwardChain.map(step => step.name)).toEqual([NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP]);
-  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name]))).toEqual([DEV_STEP, NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP]);
+  expect(plan.forwardChain.map(step => step.name)).toEqual([NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP, SYNTHESIS_CHECK_STEP]);
+  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name]))).toEqual([DEV_STEP, NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP, SYNTHESIS_CHECK_STEP]);
  });
- it('reads this source\'s plan: only the chain (0111, 0112, 0113, 0114, 0115, 0116, 0117, 0118, 0119, 0120, 0121, 0122) is pending on a database complete through dev\'s 0110', async () => {
+ it('reads this source\'s plan: only the chain (0111 through 0123) is pending on a database complete through dev\'s 0110', async () => {
   const plan = await loadMigrationPlan();
-  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP]))).toEqual([NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP]);
-  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP, NETOPIA_STEP]))).toEqual([BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP]);
-  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP, NETOPIA_STEP, BATCH_STEP]))).toEqual([PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP]);
-  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP, NETOPIA_STEP, BATCH_STEP, PART_C_STEP]))).toEqual([ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP]);
-  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP, NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP]))).toEqual([EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP]);
-  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP, NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP]))).toEqual([MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP]);
-  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP, NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP]))).toEqual([MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP]);
-  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP, NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP]))).toEqual([LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP]);
-  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP, NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP]))).toEqual([RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP]);
-  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP, NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP]))).toEqual([REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP]);
-  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP, NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP]))).toEqual([ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP]);
-  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP, NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP]))).toEqual([ENGINE_MAP_CHECK_STEP]);
+  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP]))).toEqual([NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP, SYNTHESIS_CHECK_STEP]);
+  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP, NETOPIA_STEP]))).toEqual([BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP, SYNTHESIS_CHECK_STEP]);
+  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP, NETOPIA_STEP, BATCH_STEP]))).toEqual([PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP, SYNTHESIS_CHECK_STEP]);
+  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP, NETOPIA_STEP, BATCH_STEP, PART_C_STEP]))).toEqual([ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP, SYNTHESIS_CHECK_STEP]);
+  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP, NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP]))).toEqual([EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP, SYNTHESIS_CHECK_STEP]);
+  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP, NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP]))).toEqual([MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP, SYNTHESIS_CHECK_STEP]);
+  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP, NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP]))).toEqual([MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP, SYNTHESIS_CHECK_STEP]);
+  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP, NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP]))).toEqual([LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP, SYNTHESIS_CHECK_STEP]);
+  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP, NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP]))).toEqual([RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP, SYNTHESIS_CHECK_STEP]);
+  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP, NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP]))).toEqual([REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP, SYNTHESIS_CHECK_STEP]);
+  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP, NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP]))).toEqual([ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP, SYNTHESIS_CHECK_STEP]);
+  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP, NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP]))).toEqual([ENGINE_MAP_CHECK_STEP, SYNTHESIS_CHECK_STEP]);
+  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP, NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP]))).toEqual([SYNTHESIS_CHECK_STEP]);
  });
  it('reads this source\'s plan: a recipe source the database lacks is pending, in apply order before 0108', async () => {
   const plan = await loadMigrationPlan();
@@ -111,15 +113,15 @@ describe('refusePendingForwardSteps', () => {
   const error = refusal as NativeVerifyPendingForwardStepError;
   expect(error.code).toBe('PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP');
   expect(error.name).toBe('NativeVerifyPendingForwardStepError');
-  expect(error.pending).toEqual([NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP]);
+  expect(error.pending).toEqual([NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP, SYNTHESIS_CHECK_STEP]);
   expect(Object.isFrozen(error.pending)).toBe(true);
   expect(error.message).toBe(`PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: ${error.pending.join(', ')}. Verify never applies a migration; run the native operator with operation apply-and-plan first.`);
   expect(queries).toEqual([LEDGER, RESOLUTION_TABLE, RESOLUTIONS]);
  });
- it('refuses, naming 0110, 0111, 0112, 0113, 0114, 0115, 0116, 0117, 0118, 0119, 0120, 0121 and 0122 in that order, on a database complete through 0108 (a plan carrying forward110 not applied)', async () => {
+ it('refuses, naming 0110 through 0123 in order, on a database complete through 0108 (a plan carrying forward110 not applied)', async () => {
   const plan = await loadMigrationPlan();
   const { pool } = fakePool([...plan.manifest.order, plan.forward108.name]);
-  await expect(refusePendingForwardSteps(pool, plan)).rejects.toMatchObject({ code: 'PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP', pending: [DEV_STEP, NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP] });
+  await expect(refusePendingForwardSteps(pool, plan)).rejects.toMatchObject({ code: 'PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP', pending: [DEV_STEP, NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, EXPORT_STEP, MAIL_LOCALE_STEP, MAP_STEP, LANGUAGE_CHECK_STEP, RECLAIM_STEP, REPLY_MEASURES_STEP, ENGINE_VERDICT_STEP, ENGINE_MAP_CHECK_STEP, SYNTHESIS_CHECK_STEP] });
  });
  it('refuses, naming 0110, when only 0110 is missing', async () => {
   const plan = await loadMigrationPlan();

@@ -208,5 +208,7 @@
   "public.publication.contentCheck.automated": "Questa decisione è stata presa da uno strumento automatico. Nessuna persona l’ha ancora esaminata.",
   "public.publication.contentCheck.stillPrivate": "Il dibattito resta privato e invariato. Solo tu puoi vederlo.",
   "public.publication.contentCheck.appeal": "Per chiedere a una persona di riesaminare questa decisione, scrivi a office@dezbatere.ro entro sei mesi.",
-  "public.publication.contentCheck.unavailable": "Il controllo dei contenuti non è disponibile al momento, quindi non è stato pubblicato nulla. Il dibattito resta privato. Riprova tra qualche minuto."
+  "public.publication.contentCheck.unavailable": "Il controllo dei contenuti non è disponibile al momento, quindi non è stato pubblicato nulla. Il dibattito resta privato. Riprova tra qualche minuto.",
+  "public.publication.approvalRequired": "Questo dibattito richiede la nostra approvazione prima di poter essere pubblicato.",
+  "public.publication.checkingDebate": "Verifica del dibattito…"
 }

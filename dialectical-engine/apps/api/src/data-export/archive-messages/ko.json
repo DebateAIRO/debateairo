@@ -17,5 +17,14 @@
   "archive.visibilityPrivate": "비공개",
   "archive.unreadable": "이 토론의 키가 폐기되어 내용을 더 이상 읽을 수 없습니다.",
   "archive.noDebates": "토론이 없습니다.",
-  "archive.filesNote": "이 ZIP의 JSON 파일에는 동일한 데이터가 기계가 읽을 수 있는 형식으로 들어 있습니다. 파일 목록은 README.txt를 참조하세요."
+  "archive.filesNote": "이 ZIP의 JSON 파일에는 동일한 데이터가 기계가 읽을 수 있는 형식으로 들어 있습니다. 파일 목록은 README.txt를 참조하세요.",
+  "archive.contentCheck": "콘텐츠 검사",
+  "archive.verdict.flagged": "플래그 표시됨",
+  "archive.verdict.clear": "문제 없음",
+  "archive.verdict.noSynthesis": "종합 없음",
+  "archive.verdict.unavailable": "이용 불가",
+  "archive.category.terrorism": "테러 가능성",
+  "archive.category.hateSpeech": "모든 종류의 혐오 표현",
+  "archive.category.suicideOrHarm": "자살 또는 타인을 해치는 성향",
+  "archive.category.weaponsOrDrugs": "무기 또는 마약 제조"
 }

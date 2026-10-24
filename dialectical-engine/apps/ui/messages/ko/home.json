@@ -119,5 +119,14 @@
   "home.crisisSupport.misread": "질문을 잘못 이해했다면 표현을 바꿔 다시 작성하실 수 있습니다.",
   "home.crisisSupport.back": "내 질문으로 돌아가기",
   "home.crisisSupport.chooseCountry": "국가를 선택하면 해당 국가의 상담 전화를 볼 수 있습니다.",
-  "home.crisisSupport.emergencyAnywhere": "본인이나 다른 사람이 즉각적인 위험에 처해 있다면 지금 바로 현지 긴급 전화번호로 전화하세요."
+  "home.crisisSupport.emergencyAnywhere": "본인이나 다른 사람이 즉각적인 위험에 처해 있다면 지금 바로 현지 긴급 전화번호로 전화하세요.",
+  "home.flag.flagged": "플래그 표시됨",
+  "home.removal.title": "이 토론을 삭제했습니다",
+  "home.removal.what": "이 토론은 보관하지 않으며 복원할 수 없습니다.",
+  "home.removal.reach": "삭제된 것은 이 토론뿐입니다. 본인의 계정과 다른 토론에는 영향이 없습니다.",
+  "home.removal.facts": "그 결론에 대한 당사의 자동 검사에서 “자살 또는 타인을 해치는 성향”이 발견되었습니다. 누구도 이 토론을 당사에 신고하지 않았으며, 읽은 사람도 없습니다.",
+  "home.removal.automatic": "이 결정은 자동화된 도구가 내렸습니다. 사람은 관여하지 않았습니다.",
+  "home.removal.ground": "근거: 서비스 이용약관 제9조(당사의 검사가 삭제하는 토론).",
+  "home.removal.complain": "이의를 제기하려면 6개월 이내에 office@dezbatere.ro로 연락하세요. 이의 제기로는 토론을 복원할 수 없습니다.",
+  "home.removal.close": "닫기"
 }

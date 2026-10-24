@@ -1,0 +1,17 @@
+{
+  "version": "synthesis-check-forward0123-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0122_engine_map_check.sql",
+    "manifestSha256": "4be47ecbbdee2a22da0d61af95292c0c3da614ba8cf8a46d5145dba0ed964166",
+    "verifierSha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
+  },
+  "migration": {
+    "name": "0123_synthesis_check.sql",
+    "sha256": "2f9b1e93483a68b24e9e3356efbc71029bf1290ff8c6b2a15fe77d7490a77889"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-111.sql",
+    "sha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
+  }
+}

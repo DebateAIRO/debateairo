@@ -82,6 +82,7 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "GET /v1/account/export", auth: "user", resource: "identity", action: "read-data-export" },
   { route: "POST /v1/account/export", auth: "user", resource: "identity", action: "request-data-export" },
   { route: "POST /v1/account/export/download", auth: "user", resource: "identity", action: "download-data-export" },
+  { route: "POST /v1/account/removal-notice/take", auth: "user", resource: "identity", action: "take-removal-notice" },
   { route: "GET /v1/account/legal-status", auth: "user", resource: "identity", action: "read-legal-status" },
   { route: "POST /v1/account/legal-accept", auth: "user", resource: "identity", action: "accept-legal" },
   { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
@@ -332,7 +333,8 @@ describe("S7 deny-by-default authorization", () => {
     // GET /v1/billing/subscription/card, the auth DB batch's four MFA-recovery wait routes, beside dev's 158, and
     // data-export S01's 3 routes.
     // Debate shape P2c adds GET /v1/answers/{id}/map.
-    expect(contractInventory.routes).toHaveLength(167);
+    // The synthesis check adds the once-only removal notice route.
+    expect(contractInventory.routes).toHaveLength(168);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 

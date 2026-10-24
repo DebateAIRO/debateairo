@@ -144,7 +144,7 @@ describe("Part C's migration step: the currency of every quote, charge and subsc
     // (0122), last (spec 2026-10-15 engine redesign R3).
     expect(before.steps.map((row) => row.source_name)).toEqual([NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, "0115_data_export.sql",
       "0116_mail_locale.sql", "0117_debate_shape_map.sql", "0118_language_check_spend.sql", "0119_reclaim_resume.sql",
-      "0120_reply_measures.sql", "0121_engine_verdict.sql", "0122_engine_map_check.sql"]);
+      "0120_reply_measures.sql", "0121_engine_verdict.sql", "0122_engine_map_check.sql", "0123_synthesis_check.sql"]);
     const step = plan.forwardChain.find((entry) => entry.name === PART_C_STEP)!;
     const netopia = plan.forwardChain.find((entry) => entry.name === NETOPIA_STEP)!;
     const batch = plan.forwardChain.find((entry) => entry.name === BATCH_STEP)!;

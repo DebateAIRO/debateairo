@@ -122,5 +122,14 @@
   "home.crisisSupport.misread": "Pokud jsme vaši otázku pochopili špatně, můžete ji přeformulovat.",
   "home.crisisSupport.back": "Zpět k mé otázce",
   "home.crisisSupport.chooseCountry": "Vyberte svou zemi a zobrazí se vám její linky pomoci.",
-  "home.crisisSupport.emergencyAnywhere": "Pokud jste vy nebo někdo jiný v bezprostředním ohrožení, zavolejte hned místní číslo tísňového volání."
+  "home.crisisSupport.emergencyAnywhere": "Pokud jste vy nebo někdo jiný v bezprostředním ohrožení, zavolejte hned místní číslo tísňového volání.",
+  "home.flag.flagged": "OZNAČENO",
+  "home.removal.title": "Tuto debatu jsme smazali",
+  "home.removal.what": "Neuchováváme ji a nelze ji obnovit.",
+  "home.removal.reach": "Pouze tato debata byla smazána. Váš účet a vaše další debaty jsou nedotčeny.",
+  "home.removal.facts": "Naše automatická kontrola jejího závěru zjistila „sklony k sebevraždě nebo k ubližování jiným lidem“. Nikdo nám ji nenahlásil a žádný člověk ji nepřečetl.",
+  "home.removal.automatic": "Toto rozhodnutí učinil automatický nástroj, bez účasti člověka.",
+  "home.removal.ground": "Důvod: naše Podmínky poskytování služby, oddíl 9 (debaty, které naše kontrola smaže).",
+  "home.removal.complain": "Chcete-li podat stížnost, napište do šesti měsíců na office@dezbatere.ro. Stížnost nemůže debatu obnovit.",
+  "home.removal.close": "Zavřít"
 }

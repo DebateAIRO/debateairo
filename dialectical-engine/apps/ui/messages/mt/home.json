@@ -123,5 +123,14 @@
   "home.crisisSupport.misread": "Jekk ma fhimniex sew il-mistoqsija tiegħek, tista’ tiktibha mod ieħor.",
   "home.crisisSupport.back": "Lura għall-mistoqsija tiegħi",
   "home.crisisSupport.chooseCountry": "Agħżel il-pajjiż tiegħek biex tara l-linji ta’ għajnuna tiegħu.",
-  "home.crisisSupport.emergencyAnywhere": "Jekk int jew xi ħadd ieħor tinsabu f’periklu immedjat, ċempel issa lin-numru tal-emerġenza lokali tiegħek."
+  "home.crisisSupport.emergencyAnywhere": "Jekk int jew xi ħadd ieħor tinsabu f’periklu immedjat, ċempel issa lin-numru tal-emerġenza lokali tiegħek.",
+  "home.flag.flagged": "IMMARKAT",
+  "home.removal.title": "Ħassarna dan id-dibattitu",
+  "home.removal.what": "Ma nżommuhx, u ma jistax jiġi rrestawrat.",
+  "home.removal.reach": "Dan id-dibattitu biss tħassar. Il-kont tiegħek u d-dibattiti l-oħra tiegħek ma ntmessux.",
+  "home.removal.facts": "Il-verifika awtomatika tagħna tal-konklużjoni tiegħu sabet “tendenzi lejn is-suwiċidju jew li jagħmlu ħsara lil persuni oħra”. Ħadd ma rrappurtah lilna, u ebda persuna ma qratu.",
+  "home.removal.automatic": "Din id-deċiżjoni ttieħdet minn għodda awtomatika, mingħajr l-involviment ta’ persuna.",
+  "home.removal.ground": "Bażi: it-Termini tas-Servizz tagħna, taqsima 9 (dibattiti li l-verifika tagħna tħassar).",
+  "home.removal.complain": "Biex tressaq ilment, ikteb lil office@dezbatere.ro fi żmien sitt xhur. Ilment ma jistax iġib id-dibattitu lura.",
+  "home.removal.close": "Agħlaq"
 }

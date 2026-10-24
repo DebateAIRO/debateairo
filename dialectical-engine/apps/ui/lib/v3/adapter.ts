@@ -706,7 +706,8 @@ export function debateDetailFromRunProjection(
   waits_for: run.state === "WAITING" ? run.waits_for ?? null : null,
   ...(holdReason === null ? {} : {
     completion: { state: "running" as const, reasonCode: "PROVIDER_RECOVERY_HOLD", humanReason: holdReason }
-  }) };
+  }),
+  ...(run.synthesis_check === "CHECKING" ? { synthesis_check: "CHECKING" as const } : {}) };
 }
 
 export function hiddenNodeScoreThresholdFromDeployment(deployment: Deployment): Readonly<{
@@ -732,7 +733,8 @@ export function hiddenNodeScoreThresholdFromDeployment(deployment: Deployment): 
 export function debateSummariesFromIndex(index: AnswerIndex): DebateSummary[] {
   const servedRunRefs = new Set(index.items.map((item) => item.run_ref));
   const served = index.items.map((item) => ({
-    id: item.answer_id,
+    // A held answer has no answer read yet; its page must use the owner-visible run id.
+    id: item.synthesis_check === "CHECKING" ? item.run_ref : item.answer_id,
     topic: item.question_line,
     status: "complete",
     created_at: "",
@@ -741,7 +743,9 @@ export function debateSummariesFromIndex(index: AnswerIndex): DebateSummary[] {
     // not is typed absence, never a model this seam invented.
     models: item.models === undefined ? [] : [...item.models],
     created_at_sequence: item.created_at_sequence,
-    terminal_reason: null
+    terminal_reason: null,
+    ...(item.synthesis_flag !== null && item.synthesis_flag !== undefined ? { synthesis_flag: item.synthesis_flag } : {}),
+    ...(item.synthesis_check === "CHECKING" ? { synthesis_check: "CHECKING" as const } : {})
   }));
   const open = index.open_runs
     .filter((run) => !servedRunRefs.has(run.run_ref))

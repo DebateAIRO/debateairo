@@ -119,5 +119,14 @@
   "home.crisisSupport.misread": "Nếu chúng tôi hiểu sai câu hỏi của bạn, bạn có thể diễn đạt lại.",
   "home.crisisSupport.back": "Quay lại câu hỏi của tôi",
   "home.crisisSupport.chooseCountry": "Hãy chọn quốc gia của bạn để xem các đường dây hỗ trợ tại đó.",
-  "home.crisisSupport.emergencyAnywhere": "Nếu bạn hoặc người khác đang gặp nguy hiểm ngay lúc này, hãy gọi ngay số điện thoại khẩn cấp tại địa phương."
+  "home.crisisSupport.emergencyAnywhere": "Nếu bạn hoặc người khác đang gặp nguy hiểm ngay lúc này, hãy gọi ngay số điện thoại khẩn cấp tại địa phương.",
+  "home.flag.flagged": "BỊ GẮN CỜ",
+  "home.removal.title": "Chúng tôi đã xóa cuộc tranh luận này",
+  "home.removal.what": "Chúng tôi không lưu giữ cuộc tranh luận và không thể khôi phục nó.",
+  "home.removal.reach": "Chỉ cuộc tranh luận này bị xóa. Tài khoản và các cuộc tranh luận khác của bạn không bị ảnh hưởng.",
+  "home.removal.facts": "Quá trình kiểm tra tự động của chúng tôi đã phát hiện “xu hướng tự tử hoặc làm hại người khác” trong kết luận của cuộc tranh luận. Không ai báo cáo cuộc tranh luận cho chúng tôi và không có người nào đọc nó.",
+  "home.removal.automatic": "Quyết định này do một công cụ tự động đưa ra, không có người nào tham gia.",
+  "home.removal.ground": "Căn cứ: Điều khoản dịch vụ của chúng tôi, mục 9 (các cuộc tranh luận bị bước kiểm tra của chúng tôi xóa).",
+  "home.removal.complain": "Để khiếu nại, hãy viết đến office@dezbatere.ro trong vòng sáu tháng. Khiếu nại không thể khôi phục cuộc tranh luận.",
+  "home.removal.close": "Đóng"
 }

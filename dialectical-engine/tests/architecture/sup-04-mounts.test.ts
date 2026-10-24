@@ -29,7 +29,7 @@ function importedSpecifiers(file: string,source: string): readonly string[] {
 }
 
 describe("SUP-04 widget mount boundary", () => {
-  it("admits exactly the four product-route importers", async () => {
+  it("admits exactly the five product-route importers", async () => {
     const files = await sourceFiles("apps/ui");
     const importers = (await Promise.all(files.map(async (file) => ({
       file,imports: importedSpecifiers(file,await readFile(file,"utf8"))
@@ -37,6 +37,7 @@ describe("SUP-04 widget mount boundary", () => {
       .map(({ file }) => file).sort();
     expect(importers).toEqual([
       "apps/ui/app/debate/[id]/DebatePageGate.tsx",
+      "apps/ui/app/debate/[id]/page.tsx",
       "apps/ui/app/new/NewDebatePageClient.tsx",
       "apps/ui/app/page.tsx",
       "apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx"

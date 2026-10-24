@@ -120,5 +120,14 @@
   "home.crisisSupport.misread": "Sorunuzu yanlış anladıysak, farklı bir şekilde yazabilirsiniz.",
   "home.crisisSupport.back": "Soruma dön",
   "home.crisisSupport.chooseCountry": "Yardım hatlarını görmek için ülkenizi seçin.",
-  "home.crisisSupport.emergencyAnywhere": "Siz ya da bir başkası hemen tehlikedeyse, şimdi bulunduğunuz yerin acil durum numarasını arayın."
+  "home.crisisSupport.emergencyAnywhere": "Siz ya da bir başkası hemen tehlikedeyse, şimdi bulunduğunuz yerin acil durum numarasını arayın.",
+  "home.flag.flagged": "İŞARETLENDİ",
+  "home.removal.title": "Bu tartışmayı sildik",
+  "home.removal.what": "Bu tartışmayı saklamıyoruz ve geri yüklenemez.",
+  "home.removal.reach": "Yalnızca bu tartışma silindi. Hesabınız ve diğer tartışmalarınız etkilenmedi.",
+  "home.removal.facts": "Sonucuna ilişkin otomatik kontrolümüz “intihara veya başkalarına zarar vermeye yönelik eğilimler” tespit etti. Kimse bunu bize bildirmedi ve hiçbir kişi okumadı.",
+  "home.removal.automatic": "Bu karar otomatik bir araç tarafından verildi, hiçbir kişinin katılımı olmadan.",
+  "home.removal.ground": "Dayanak: Hizmet Koşullarımızın 9. bölümü (kontrolümüzün sildiği tartışmalar).",
+  "home.removal.complain": "Şikâyet etmek için altı ay içinde office@dezbatere.ro adresine yazın. Şikâyet, tartışmayı geri getiremez.",
+  "home.removal.close": "Kapat"
 }

@@ -7625,6 +7625,48 @@ a:focus-visible {
   color: var(--muted);
   font-size: 12px;
 }
+.libRow[data-flagged="true"] .libRowCore {
+  border-color: var(--dispute);
+  box-shadow: 0 0 0 1px var(--dispute);
+}
+.libFlag { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.libFlagMark { width: 6px; height: 6px; transform: rotate(45deg); background: var(--dispute); }
+.libFlagLabel {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--dispute-text);
+}
+.checkingNotice {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--gen-bg);
+  color: var(--gen-text);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.heldMobileQuestion { display: none; }
+@media (max-width: 920px) {
+  .heldMobileQuestion {
+    display: block;
+    margin: 0;
+    padding: 8px 12px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-family: var(--font-serif);
+    font-size: 13.5px;
+    font-style: italic;
+    color: var(--muted);
+  }
+}
+@media (max-width: 600px) { .checkingNotice { padding: 8px 12px; } }
+.removalNoticeReasons { margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--line); }
+.removalNoticeReasons p { margin: 0 0 8px; font-size: 12px; line-height: 1.5; color: var(--text-2); }
+.removalNoticeReasons p:last-child { margin-bottom: 0; }
 .libPublicNote {
   margin: 12px 0 0;
   font-size: 10.5px;

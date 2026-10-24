@@ -22,9 +22,10 @@ type PublicationControlClient=Pick<ContractClient,
   "readRunVisibility"|"publishRun"|"unpublishRun"|"deletePrivateDebate"
 > & SecurityConfirmationClient;
 
-export function PublicationControl({ runId,onPrivateDeletion,client=contractClient,catalog=publicEnglish }: {
+export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,client=contractClient,catalog=publicEnglish }: {
   readonly runId:string;
   readonly onPrivateDeletion?:(status:PrivateDeletionStatus)=>void;
+  readonly onRemovedByCheck?:()=>void;
   readonly client?:PublicationControlClient;
   readonly catalog?:MessageCatalog;
 }) {
@@ -85,7 +86,11 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
         ? t(catalog, "public.publication.publishedSuccess")
         : t(catalog, "public.publication.unpublishedSuccess"));
     } catch (failure) {
-      if (failure instanceof ContractHttpError && failure.statement !== null) {
+      if (failure instanceof ContractHttpError && failure.serverCode === "DEBATE_REMOVED_BY_CHECK") {
+        onRemovedByCheck?.();
+      } else if (failure instanceof ContractHttpError && failure.serverCode === "PUBLICATION_APPROVAL_REQUIRED") {
+        setMessage(t(catalog, "public.publication.approvalRequired"));
+      } else if (failure instanceof ContractHttpError && failure.statement !== null) {
         setStatement(failure.statement);
       } else if (failure instanceof ContractHttpError && failure.serverCode === "PUBLICATION_CHECK_UNAVAILABLE") {
         setMessage(t(catalog, "public.publication.contentCheck.unavailable"));
@@ -208,7 +213,9 @@ export function PublicationControl({ runId,onPrivateDeletion,client=contractClie
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             <button className="button" disabled={!acknowledged || busy}>
               {busy
-                ? t(catalog, "public.publication.authorizing")
+                ? selected === "PUBLISH"
+                  ? t(catalog, "public.publication.checkingDebate")
+                  : t(catalog, "public.publication.authorizing")
                 : selected === "PUBLISH"
                   ? t(catalog, "public.publication.publishPublicly")
                   : t(catalog, "public.publication.unpublish")}

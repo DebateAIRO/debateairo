@@ -124,5 +124,14 @@
   "home.crisisSupport.misread": "إذا أسأنا فهم سؤالك، يمكنك إعادة صياغته.",
   "home.crisisSupport.back": "العودة إلى سؤالي",
   "home.crisisSupport.chooseCountry": "اختر بلدك لترى خطوط المساعدة فيه.",
-  "home.crisisSupport.emergencyAnywhere": "إذا كنت أنت أو أي شخص آخر في خطر مباشر، فاتصل برقم الطوارئ المحلي الآن."
+  "home.crisisSupport.emergencyAnywhere": "إذا كنت أنت أو أي شخص آخر في خطر مباشر، فاتصل برقم الطوارئ المحلي الآن.",
+  "home.flag.flagged": "مُعلَّم",
+  "home.removal.title": "حذفنا هذه المناظرة",
+  "home.removal.what": "لا نحتفظ بها، ولا يمكن استعادتها.",
+  "home.removal.reach": "حُذفت هذه المناظرة فقط. لم يتأثر حسابك ولا مناظراتك الأخرى.",
+  "home.removal.facts": "وجد فحصنا الآلي في خلاصتها «النزعات إلى الانتحار أو إيذاء الآخرين». لم يرسل إلينا أحد بلاغًا عن هذه المناظرة، ولم يقرأها أي شخص.",
+  "home.removal.automatic": "اتخذت أداة آلية هذا القرار، دون مشاركة أي شخص.",
+  "home.removal.ground": "الأساس: شروط الخدمة لدينا، القسم 9 (المناظرات التي يحذفها فحصنا).",
+  "home.removal.complain": "لتقديم شكوى، اكتب إلى office@dezbatere.ro خلال ستة أشهر. لا يمكن للشكوى أن تعيد المناظرة.",
+  "home.removal.close": "إغلاق"
 }

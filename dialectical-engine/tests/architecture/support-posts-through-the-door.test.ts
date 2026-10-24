@@ -134,6 +134,22 @@ async function typescriptFiles(directory: string): Promise<string[]> {
 }
 
 describe("every support-chat hand-off posts through the frame door (V-11 addendum)", () => {
+  it("the synthesis check's root posts only through the support adapter, and has no offence", async () => {
+    // Property: all synthesis-check files stay behind the existing framed support adapter.
+    const files = (await typescriptFiles("apps/api/src/synthesis-check")).sort();
+    expect(files.length).toBeGreaterThanOrEqual(4);
+    const offenders: string[] = [];
+    for (const file of files) {
+      const source = await readFile(file, "utf8");
+      expect(source).not.toMatch(/\bfetch\s*\(/u);
+      for (const offence of scanSupportPosts(file, source).offences) {
+        offenders.push(`${offence.file}:${offence.line} ${offence.rule}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+    const transport = await readFile("apps/api/src/synthesis-check/transport.ts", "utf8");
+    expect(transport).toMatch(/import\s*\{[^}]*createSupportModelAdapter[^}]*\}\s*from\s*["']\.\.\/support\/model\.js["']/su);
+  });
   it("recognises the two shapes, and only those", () => {
     const rules = (source: string): readonly string[] =>
       scanSupportPosts("fixture.ts", source).offences.map((offence) => `${offence.line}:${offence.rule}`);

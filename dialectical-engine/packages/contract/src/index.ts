@@ -20,6 +20,8 @@ import { AnswerDisclosureSchema, AnswerFloorSchema } from "./disclosure.js"; exp
 import { VerdictStateSchema } from "./verdict-state.js"; export * from "./verdict-state.js";
 import { DebateMapViewSchema } from "./map-view.js"; export * from "./map-view.js";
 export * from "./crisis.js";
+import { SynthesisCheckHoldSchema, SynthesisFlagSchema, RemovalNoticeTakeSchema } from "./synthesis-check.js";
+export * from "./synthesis-check.js";
 export * from "./romania-address.js";
 export * from "./billing-address.js";
 
@@ -748,6 +750,7 @@ export const RunProjectionSchema = z.object({
   state: z.enum(["QUEUED", "WAITING", "CLAIMED", "RUNNING", "HOLDING", "SETTLED", "FAILED"]),
   terminal_reason: z.string().trim().min(1).nullable(),
   hold_until: z.iso.datetime().nullable(),
+  synthesis_check: SynthesisCheckHoldSchema.optional(),
   // R2 (spec 2026-09-26 §14.3): null on a database without dev's migration
   // 0072; optional, so a reader built before the field still parses.
   argument_language: ArgumentLanguageSchema.nullable().optional(),
@@ -1197,6 +1200,8 @@ export const AnswerSummarySchema = z.object({
   staleness_state: StalenessStateSchema,
   builds_on_previous: z.boolean(),
   created_at_sequence: z.number().int().positive(),
+  synthesis_flag: SynthesisFlagSchema.nullable().optional(),
+  synthesis_check: SynthesisCheckHoldSchema.optional(),
   // DL3-F2: the library row states the model lineage that made it, exactly as
   // PublicDebateSummarySchema.models does for a published debate. The index
   // query already reads every answer projection it summarises, so this costs
@@ -1657,6 +1662,7 @@ export const contractInventory = Object.freeze({
     "GET /v1/account/export",
     "POST /v1/account/export",
     "POST /v1/account/export/download",
+    "POST /v1/account/removal-notice/take",
     "GET /v1/account/legal-status",
     "POST /v1/account/legal-accept",
     "POST /v1/account/legacy-runs/claim",
@@ -1755,6 +1761,7 @@ export const contractInventory = Object.freeze({
     EmailChangeConfirmedSchema,EmailChangeCancelledSchema,
     PublicationTransitionSchema, PublicDebateSummarySchema, PublicDebateSchema, PublicDebateListSchema,
     DeploymentSchema, AnswerSummarySchema, OpenRunSummarySchema, AnswerIndexSchema,
+    SynthesisFlagSchema, SynthesisCheckHoldSchema, RemovalNoticeTakeSchema,
     AnswerSchema, InspectionSchema, NodeSchema,
     RunEventSchema, ComposedSegmentSchema, NumberSlotSchema, BandCeilingSchema, StalenessStateSchema,
     ShadowSuppressionSchema, AbstentionSchema, InvestigationGapSchema, InvestigationRequestSchema,

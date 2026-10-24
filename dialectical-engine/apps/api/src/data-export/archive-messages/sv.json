@@ -17,5 +17,14 @@
   "archive.visibilityPrivate": "Privat",
   "archive.unreadable": "Innehållet i den här debatten går inte längre att läsa eftersom dess nyckel har förstörts.",
   "archive.noDebates": "Du har inga debatter.",
-  "archive.filesNote": "JSON-filerna i den här ZIP-filen innehåller samma uppgifter i maskinläsbart format; de finns listade i README.txt."
+  "archive.filesNote": "JSON-filerna i den här ZIP-filen innehåller samma uppgifter i maskinläsbart format; de finns listade i README.txt.",
+  "archive.contentCheck": "Innehållskontroll",
+  "archive.verdict.flagged": "Markerad",
+  "archive.verdict.clear": "Utan problem",
+  "archive.verdict.noSynthesis": "Ingen syntes",
+  "archive.verdict.unavailable": "Inte tillgänglig",
+  "archive.category.terrorism": "Möjlig terrorism",
+  "archive.category.hateSpeech": "hatretorik av något slag",
+  "archive.category.suicideOrHarm": "tendenser till självmord eller till att skada andra människor",
+  "archive.category.weaponsOrDrugs": "tillverkning av vapen eller droger"
 }

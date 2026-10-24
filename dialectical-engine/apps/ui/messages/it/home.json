@@ -121,5 +121,14 @@
   "home.crisisSupport.misread": "Se abbiamo frainteso la tua domanda, puoi riformularla.",
   "home.crisisSupport.back": "Torna alla mia domanda",
   "home.crisisSupport.chooseCountry": "Scegli il tuo paese per vedere le sue linee di ascolto.",
-  "home.crisisSupport.emergencyAnywhere": "Se tu o un’altra persona siete in pericolo immediato, chiama subito il numero di emergenza locale."
+  "home.crisisSupport.emergencyAnywhere": "Se tu o un’altra persona siete in pericolo immediato, chiama subito il numero di emergenza locale.",
+  "home.flag.flagged": "CONTRASSEGNATO",
+  "home.removal.title": "Abbiamo cancellato questo dibattito",
+  "home.removal.what": "Non lo conserviamo e non può essere ripristinato.",
+  "home.removal.reach": "È stato cancellato solo questo dibattito. Il tuo account e i tuoi altri dibattiti non sono stati toccati.",
+  "home.removal.facts": "La nostra verifica automatica della sua conclusione ha rilevato: «tendenze al suicidio o a nuocere ad altre persone». Nessuno ce l’ha segnalato e nessuna persona l’ha letto.",
+  "home.removal.automatic": "Questa decisione è stata presa da uno strumento automatico, senza alcuna persona coinvolta.",
+  "home.removal.ground": "Motivo: le nostre Condizioni di servizio, sezione 9 (dibattiti che la nostra verifica cancella).",
+  "home.removal.complain": "Per presentare un reclamo, scrivi a office@dezbatere.ro entro sei mesi. Un reclamo non può riportare indietro il dibattito.",
+  "home.removal.close": "Chiudi"
 }

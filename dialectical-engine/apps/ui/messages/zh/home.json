@@ -119,5 +119,14 @@
   "home.crisisSupport.misread": "如果我们误解了您的问题，您可以换一种说法。",
   "home.crisisSupport.back": "返回我的问题",
   "home.crisisSupport.chooseCountry": "请选择您所在的国家，查看当地的求助热线。",
-  "home.crisisSupport.emergencyAnywhere": "如果您或他人正面临紧急危险，请立即拨打当地的紧急电话。"
+  "home.crisisSupport.emergencyAnywhere": "如果您或他人正面临紧急危险，请立即拨打当地的紧急电话。",
+  "home.flag.flagged": "已标记",
+  "home.removal.title": "我们已删除这场辩论",
+  "home.removal.what": "我们不会保留它，也无法恢复。",
+  "home.removal.reach": "只有这场辩论被删除。您的账户和其他辩论不受影响。",
+  "home.removal.facts": "我们对其结论的自动检查发现了“自杀或伤害他人的倾向”。没有人向我们举报它，也没有人阅读过它。",
+  "home.removal.automatic": "此决定由自动化工具作出，没有人参与。",
+  "home.removal.ground": "依据：我们的《服务条款》第9节（我们的检测删除的辩论）。",
+  "home.removal.complain": "如需投诉，请在六个月内致信 office@dezbatere.ro。投诉无法恢复这场辩论。",
+  "home.removal.close": "关闭"
 }

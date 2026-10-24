@@ -79,6 +79,8 @@
   "public.publication.controlsAria": "Publication controls",
   "public.publication.visibility": "Visibility",
   "public.publication.checking": "Checking visibility…",
+  "public.publication.checkingDebate": "Checking the debate…",
+  "public.publication.approvalRequired": "This debate needs our approval before it can be published.",
   "public.publication.privateStatus": "Private — only your account can read this debate.",
   "public.publication.publishedStatus": "Published — this debate has a separate permanent public snapshot.",
   "public.publication.openPublicVersion": "Open the public version",

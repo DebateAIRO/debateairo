@@ -207,5 +207,7 @@
   "public.publication.contentCheck.automated": "Tämän päätöksen teki automaattinen työkalu. Kukaan ihminen ei ole vielä tarkistanut sitä.",
   "public.publication.contentCheck.stillPrivate": "Keskustelusi pysyy yksityisenä ja muuttumattomana. Vain sinä näet sen.",
   "public.publication.contentCheck.appeal": "Voit pyytää ihmistä tarkistamaan tämän päätöksen kirjoittamalla osoitteeseen office@dezbatere.ro kuuden kuukauden kuluessa.",
-  "public.publication.contentCheck.unavailable": "Sisällön tarkistus ei ole juuri nyt käytettävissä, joten mitään ei julkaistu. Keskustelusi pysyy yksityisenä. Yritä uudelleen muutaman minuutin kuluttua."
+  "public.publication.contentCheck.unavailable": "Sisällön tarkistus ei ole juuri nyt käytettävissä, joten mitään ei julkaistu. Keskustelusi pysyy yksityisenä. Yritä uudelleen muutaman minuutin kuluttua.",
+  "public.publication.approvalRequired": "Tämä väittely tarvitsee hyväksyntämme, ennen kuin se voidaan julkaista.",
+  "public.publication.checkingDebate": "Väittelyä tarkistetaan…"
 }

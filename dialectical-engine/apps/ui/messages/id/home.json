@@ -119,5 +119,14 @@
   "home.crisisSupport.misread": "Jika kami salah memahami pertanyaan Anda, Anda dapat menuliskannya dengan kata-kata lain.",
   "home.crisisSupport.back": "Kembali ke pertanyaan saya",
   "home.crisisSupport.chooseCountry": "Pilih negara Anda untuk melihat layanan bantuannya.",
-  "home.crisisSupport.emergencyAnywhere": "Jika Anda atau orang lain dalam bahaya langsung, segera hubungi nomor darurat setempat."
+  "home.crisisSupport.emergencyAnywhere": "Jika Anda atau orang lain dalam bahaya langsung, segera hubungi nomor darurat setempat.",
+  "home.flag.flagged": "DITANDAI",
+  "home.removal.title": "Kami menghapus debat ini",
+  "home.removal.what": "Kami tidak menyimpannya, dan debat ini tidak dapat dipulihkan.",
+  "home.removal.reach": "Hanya debat ini yang dihapus. Akun Anda dan debat Anda yang lain tidak terpengaruh.",
+  "home.removal.facts": "Pemeriksaan otomatis kami atas kesimpulannya menemukan “kecenderungan bunuh diri atau menyakiti orang lain”. Tidak ada yang melaporkannya kepada kami, dan tidak ada orang yang membacanya.",
+  "home.removal.automatic": "Keputusan ini dibuat oleh alat otomatis, tanpa keterlibatan manusia.",
+  "home.removal.ground": "Dasar: Ketentuan Layanan kami, bagian 9 (debat yang dihapus oleh pemeriksaan kami).",
+  "home.removal.complain": "Untuk mengajukan pengaduan, kirim pesan ke office@dezbatere.ro dalam waktu enam bulan. Pengaduan tidak dapat memulihkan debat ini.",
+  "home.removal.close": "Tutup"
 }

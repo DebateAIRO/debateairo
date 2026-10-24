@@ -121,5 +121,14 @@
   "home.crisisSupport.misread": "Si hemos interpretado mal su pregunta, puede reformularla.",
   "home.crisisSupport.back": "Volver a mi pregunta",
   "home.crisisSupport.chooseCountry": "Elija su país para ver sus líneas de ayuda.",
-  "home.crisisSupport.emergencyAnywhere": "Si usted u otra persona está en peligro inmediato, llame ahora al número de emergencias de su zona."
+  "home.crisisSupport.emergencyAnywhere": "Si usted u otra persona está en peligro inmediato, llame ahora al número de emergencias de su zona.",
+  "home.flag.flagged": "MARCADO",
+  "home.removal.title": "Eliminamos este debate",
+  "home.removal.what": "No lo conservamos y no se puede restaurar.",
+  "home.removal.reach": "Solo se eliminó este debate. Su cuenta y sus otros debates están intactos.",
+  "home.removal.facts": "Nuestra comprobación automática de la conclusión del debate encontró: «tendencias al suicidio o a dañar a otras personas». Nadie nos lo denunció y ninguna persona lo leyó.",
+  "home.removal.automatic": "Esta decisión la tomó una herramienta automática, sin intervención de ninguna persona.",
+  "home.removal.ground": "Fundamento: nuestros Términos de servicio, sección 9 (debates que elimina nuestra comprobación).",
+  "home.removal.complain": "Para presentar una reclamación, escriba a office@dezbatere.ro en un plazo de seis meses. Una reclamación no puede restaurar el debate.",
+  "home.removal.close": "Cerrar"
 }

@@ -209,5 +209,7 @@
   "public.publication.contentCheck.automated": "Это решение принято автоматическим инструментом. Человек его ещё не проверял.",
   "public.publication.contentCheck.stillPrivate": "Ваша дискуссия остаётся приватной и неизменной. Только вы можете её видеть.",
   "public.publication.contentCheck.appeal": "Чтобы попросить человека пересмотреть это решение, напишите на office@dezbatere.ro в течение шести месяцев.",
-  "public.publication.contentCheck.unavailable": "Проверка контента сейчас недоступна, поэтому ничего не было опубликовано. Ваша дискуссия остаётся приватной. Попробуйте снова через несколько минут."
+  "public.publication.contentCheck.unavailable": "Проверка контента сейчас недоступна, поэтому ничего не было опубликовано. Ваша дискуссия остаётся приватной. Попробуйте снова через несколько минут.",
+  "public.publication.approvalRequired": "Эти дебаты требуют нашего одобрения, прежде чем их можно будет опубликовать.",
+  "public.publication.checkingDebate": "Проверяем дебаты…"
 }

@@ -36,7 +36,10 @@ const ERASURE_FUNCTION_SIGNATURES = Object.freeze([
   "core.private_run_erasure_status(uuid)",
   "core.private_run_erasure_manifest(uuid)",
   "core.pending_private_run_key_cleanup(integer)",
-  "core.finalize_private_run_erasure(uuid,timestamptz,timestamptz,integer,integer)"
+  "core.finalize_private_run_erasure(uuid,timestamptz,timestamptz,integer,integer)",
+  "core.prepare_synthesis_check_erasures(integer)",
+  "core.pending_synthesis_check_erasure_cleanup(integer)",
+  "core.finalize_synthesis_check_erasure(uuid,timestamptz,timestamptz,integer,integer)"
 ] as const);
 const ERASURE_FORBIDDEN_ROLES = Object.freeze([
   "public","debateai_runtime","debateai_authorization_runtime",

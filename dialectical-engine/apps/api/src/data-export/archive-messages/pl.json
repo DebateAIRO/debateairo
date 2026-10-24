@@ -17,5 +17,14 @@
   "archive.visibilityPrivate": "Prywatna",
   "archive.unreadable": "Treści tej debaty nie można już odczytać, ponieważ jej klucz został zniszczony.",
   "archive.noDebates": "Nie masz żadnych debat.",
-  "archive.filesNote": "Pliki JSON w tym archiwum ZIP zawierają te same dane w formacie czytelnym maszynowo; ich lista znajduje się w README.txt."
+  "archive.filesNote": "Pliki JSON w tym archiwum ZIP zawierają te same dane w formacie czytelnym maszynowo; ich lista znajduje się w README.txt.",
+  "archive.contentCheck": "Kontrola treści",
+  "archive.verdict.flagged": "Oznaczona",
+  "archive.verdict.clear": "Bez zastrzeżeń",
+  "archive.verdict.noSynthesis": "Brak syntezy",
+  "archive.verdict.unavailable": "Niedostępne",
+  "archive.category.terrorism": "Możliwy terroryzm",
+  "archive.category.hateSpeech": "mowa nienawiści w jakiejkolwiek formie",
+  "archive.category.suicideOrHarm": "skłonności do samobójstwa lub krzywdzenia innych osób",
+  "archive.category.weaponsOrDrugs": "wytwarzanie broni lub narkotyków"
 }

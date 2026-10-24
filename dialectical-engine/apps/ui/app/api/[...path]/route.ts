@@ -52,13 +52,11 @@ const MAX_PROXY_BODY_BYTES = 1_048_576;
 /** L3-F12: ceiling for a non-stream upstream request; event streams are open-ended by design. */
 const UPSTREAM_TIMEOUT_MS = 30_000;
 /**
- * hate-speech S02 (ruling R-D, V-13): `POST /v1/runs/{id}/publish` runs the content check, whose deadline D is at
- * most 60 000 ms (the register's `publicationCheckPolicy` row, packages/register/src/publication-check-policy.ts,
- * which refuses more: SPEC-v2 R7's cap, ruling R-D2), before the publish itself. Its ceiling is the largest D plus
- * 25 s for the rest of the attempt (preflight, three lease phases, the record, encryption and the transition); every
- * other route keeps UPSTREAM_TIMEOUT_MS.
+ * Publish may wait up to 60 s for the synthesis check and then up to 60 s for
+ * the publication judge. Allow 25 s more for preflight, persistence and the
+ * visibility transition; every other route keeps UPSTREAM_TIMEOUT_MS.
  */
-const PUBLISH_UPSTREAM_TIMEOUT_MS = 85_000;
+const PUBLISH_UPSTREAM_TIMEOUT_MS = 145_000;
 const RUN_PUBLISH_PATH = /^v1\/runs\/[^/]+\/publish$/u;
 const SESSION_COOKIE_NAME = "__Host-debateai-session";
 const CSRF_COOKIE_NAME = "__Host-debateai-csrf";

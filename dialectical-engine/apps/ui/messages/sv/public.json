@@ -207,5 +207,7 @@
   "public.publication.contentCheck.automated": "Det här beslutet fattades av ett automatiskt verktyg. Ingen person har granskat det ännu.",
   "public.publication.contentCheck.stillPrivate": "Din debatt förblir privat och oförändrad. Bara du kan se den.",
   "public.publication.contentCheck.appeal": "För att be en person granska det här beslutet, skriv till office@dezbatere.ro inom sex månader.",
-  "public.publication.contentCheck.unavailable": "Innehållskontrollen är inte tillgänglig just nu, så inget publicerades. Din debatt förblir privat. Försök igen om några minuter."
+  "public.publication.contentCheck.unavailable": "Innehållskontrollen är inte tillgänglig just nu, så inget publicerades. Din debatt förblir privat. Försök igen om några minuter.",
+  "public.publication.approvalRequired": "Den här debatten behöver vårt godkännande innan den kan publiceras.",
+  "public.publication.checkingDebate": "Kontrollerar debatten…"
 }

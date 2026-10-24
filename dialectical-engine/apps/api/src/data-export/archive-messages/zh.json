@@ -17,5 +17,14 @@
   "archive.visibilityPrivate": "私密",
   "archive.unreadable": "此辩论的密钥已销毁，因此内容无法再读取。",
   "archive.noDebates": "您还没有辩论记录。",
-  "archive.filesNote": "此 ZIP 压缩包中的 JSON 文件以机器可读格式保存了相同的数据；文件列表见 README.txt。"
+  "archive.filesNote": "此 ZIP 压缩包中的 JSON 文件以机器可读格式保存了相同的数据；文件列表见 README.txt。",
+  "archive.contentCheck": "内容检查",
+  "archive.verdict.flagged": "已标记",
+  "archive.verdict.clear": "无问题",
+  "archive.verdict.noSynthesis": "无综合结论",
+  "archive.verdict.unavailable": "不可用",
+  "archive.category.terrorism": "可能的恐怖主义",
+  "archive.category.hateSpeech": "任何形式的仇恨言论",
+  "archive.category.suicideOrHarm": "自杀或伤害他人的倾向",
+  "archive.category.weaponsOrDrugs": "制造武器或毒品"
 }

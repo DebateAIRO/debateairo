@@ -121,5 +121,14 @@
   "home.crisisSupport.misread": "Si nous avons mal compris votre question, vous pouvez la reformuler.",
   "home.crisisSupport.back": "Revenir à ma question",
   "home.crisisSupport.chooseCountry": "Choisissez votre pays pour voir ses lignes d’écoute.",
-  "home.crisisSupport.emergencyAnywhere": "Si vous ou une autre personne êtes en danger immédiat, appelez maintenant le numéro d’urgence local."
+  "home.crisisSupport.emergencyAnywhere": "Si vous ou une autre personne êtes en danger immédiat, appelez maintenant le numéro d’urgence local.",
+  "home.flag.flagged": "MARQUÉ",
+  "home.removal.title": "Nous avons supprimé ce débat",
+  "home.removal.what": "Nous ne le conservons pas et il ne peut pas être rétabli.",
+  "home.removal.reach": "Seul ce débat a été supprimé. Votre compte et vos autres débats sont intacts.",
+  "home.removal.facts": "Notre vérification automatique de sa conclusion a relevé : « tendances au suicide ou à nuire à autrui ». Personne ne nous l’a signalé, et aucune personne ne l’a lu.",
+  "home.removal.automatic": "Cette décision a été prise par un outil automatique, sans intervention d’une personne.",
+  "home.removal.ground": "Fondement : nos Conditions d’utilisation, section 9 (débats que notre vérification supprime).",
+  "home.removal.complain": "Pour déposer une réclamation, écrivez à office@dezbatere.ro dans un délai de six mois. Une réclamation ne peut pas rétablir le débat.",
+  "home.removal.close": "Fermer"
 }

@@ -17,5 +17,14 @@
   "archive.visibilityPrivate": "Özel",
   "archive.unreadable": "Bu tartışmanın anahtarı yok edildiği için içeriği artık okunamıyor.",
   "archive.noDebates": "Henüz tartışmanız yok.",
-  "archive.filesNote": "Bu ZIP arşivindeki JSON dosyaları aynı verileri makine tarafından okunabilir biçimde içerir; dosyaların listesi README.txt içindedir."
+  "archive.filesNote": "Bu ZIP arşivindeki JSON dosyaları aynı verileri makine tarafından okunabilir biçimde içerir; dosyaların listesi README.txt içindedir.",
+  "archive.contentCheck": "İçerik denetimi",
+  "archive.verdict.flagged": "İşaretlendi",
+  "archive.verdict.clear": "Sorun yok",
+  "archive.verdict.noSynthesis": "Sentez yok",
+  "archive.verdict.unavailable": "Kullanılamıyor",
+  "archive.category.terrorism": "Olası terörizm",
+  "archive.category.hateSpeech": "her türlü nefret söylemi",
+  "archive.category.suicideOrHarm": "intihara veya başkalarına zarar vermeye yönelik eğilimler",
+  "archive.category.weaponsOrDrugs": "silah veya uyuşturucu yapımı"
 }

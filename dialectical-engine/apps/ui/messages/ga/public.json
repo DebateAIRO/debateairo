@@ -210,5 +210,7 @@
   "public.publication.contentCheck.automated": "Rinne uirlis uathoibríoch an cinneadh seo. Níl athbhreithniú déanta ag duine ar bith air fós.",
   "public.publication.contentCheck.stillPrivate": "Fanann do dhíospóireacht príobháideach agus gan athrú. Is tusa amháin atá in ann í a fheiceáil.",
   "public.publication.contentCheck.appeal": "Chun iarraidh ar dhuine an cinneadh seo a athbhreithniú, scríobh chuig office@dezbatere.ro laistigh de shé mhí.",
-  "public.publication.contentCheck.unavailable": "Níl an tseiceáil ábhair ar fáil faoi láthair, mar sin níor foilsíodh aon rud. Fanann do dhíospóireacht príobháideach. Bain triail eile as i gceann cúpla nóiméad."
+  "public.publication.contentCheck.unavailable": "Níl an tseiceáil ábhair ar fáil faoi láthair, mar sin níor foilsíodh aon rud. Fanann do dhíospóireacht príobháideach. Bain triail eile as i gceann cúpla nóiméad.",
+  "public.publication.approvalRequired": "Teastaíonn ár bhformheas ón díospóireacht seo sular féidir í a fhoilsiú.",
+  "public.publication.checkingDebate": "An díospóireacht á seiceáil…"
 }

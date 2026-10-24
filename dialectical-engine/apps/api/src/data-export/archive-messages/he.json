@@ -17,5 +17,14 @@
   "archive.visibilityPrivate": "פרטי",
   "archive.unreadable": "אי אפשר עוד לקרוא את תוכן הדיון הזה, כי המפתח שלו הושמד.",
   "archive.noDebates": "אין לכם דיונים.",
-  "archive.filesNote": "קובצי JSON בארכיון ZIP הזה מכילים את אותם נתונים בפורמט קריא למכונה; רשימתם מופיעה ב־README.txt."
+  "archive.filesNote": "קובצי JSON בארכיון ZIP הזה מכילים את אותם נתונים בפורמט קריא למכונה; רשימתם מופיעה ב־README.txt.",
+  "archive.contentCheck": "בדיקת תוכן",
+  "archive.verdict.flagged": "סומן",
+  "archive.verdict.clear": "תקין",
+  "archive.verdict.noSynthesis": "ללא סינתזה",
+  "archive.verdict.unavailable": "לא זמין",
+  "archive.category.terrorism": "טרור אפשרי",
+  "archive.category.hateSpeech": "דברי שנאה מכל סוג",
+  "archive.category.suicideOrHarm": "נטיות להתאבדות או לפגיעה באנשים אחרים",
+  "archive.category.weaponsOrDrugs": "הכנת נשק או סמים"
 }
