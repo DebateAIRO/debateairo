@@ -1585,8 +1585,9 @@ checkout in place, with its dependencies installed: this release adds the `mmdb-
 3. **Add the two country-data paths to `api.env`**, as `env/api.env.example` has them:
    `GEOIP_COUNTRY_DB_PATH=/var/lib/debateai-geoip/dbip-country-lite.mmdb` and
    `TOR_EXIT_LIST_PATH=/var/lib/debateai-geoip/tor-exit-list.txt`. Only the paths are needed now: a
-   hosted API without them refuses with `GEOIP_PATHS_REQUIRED`. The files themselves are needed
-   once a register version carrying `countryPolicy` is in force (§5 "Country data").
+   hosted API without them refuses with `GEOIP_PATHS_REQUIRED`. For this release the files themselves
+   were needed only once a register version carrying `countryPolicy` is in force; from the
+   Italy-specific approval (migration 0125) on, every hosted server needs them (§5 "Country data").
 4. **Add `RECORDS_KEY_PATH=/etc/debateai/api/records-key.bin` to `/etc/debateai/backup.conf`**, as
    `backup.conf.example` has it. Without it `backup.sh` stops before it writes anything — the whole
    nightly backup, not only the key — and the restore drill refuses too.
