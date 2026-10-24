@@ -59,7 +59,10 @@ const VULNERABLE: Record<string, (version: string) => boolean> = {
   "brace-expansion": (v) => v.startsWith("2.") && compare(v, "2.1.7") < 0,
   // 2026-09-29: GHSA-3wwx-pv8p-q78v (>=8.1.0 <8.10.2), reached through jsdom and testcontainers
   // (test tooling only); 8.10.2 was published 2026-09-04.
-  undici: (v) => v.startsWith("8.") && compare(v, "8.10.2") < 0,
+  // 2026-10-25: three advisories on undici >=8.0.0 <8.12.2 (one high: denial of service through an unhandled
+  // error; two moderate: an unbounded-growth denial of service and a Subresource Integrity bypass), reached
+  // through jsdom (test tooling only); 8.12.2 was published 2026-10-15, so it clears the 7-day cooldown.
+  undici: (v) => v.startsWith("8.") && compare(v, "8.12.2") < 0,
   qs: (v) => compare(v, "6.16.0") < 0,
   // 2026-10-21: GHSA-8r9p-f939-6h3c and its sibling follow-redirects advisory (>=1.16.0 <1.16.1, array-form headers
   // and sensitiveHeaders regex escaping), reached through the Hatchet SDK's axios; 1.16.1 was published 2026-10-01.
