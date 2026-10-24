@@ -60,7 +60,7 @@
   "mail.M10.paused": "Teie pank teatas meile, et teie paketi {plan} makse on vaidlustatud. Tasulised funktsioonid on peatatud, kuni vaidlus on lahtine. Teie debatid säilivad.",
   "mail.M10.contact": "Kui see on viga, kirjutage meile aadressil {merchantEmail}.",
   "mail.M10_ENDED.subject": "Teie pakett {plan} on lõppenud",
-  "mail.M10_ENDED.ended": "Teie pank võttis pärast vaidlust tagasi paketi {plan} eest tehtud makse. Seetõttu on pakett lõppenud ja teie konto on nüüd paketil Tasuta. Teie debatid säilivad.",
+  "mail.M10_ENDED.ended": "Teie makse paketi {plan} eest tagastati teile panga kaudu pärast vaidlust selle makse üle. Seetõttu on pakett lõppenud ja teie konto on nüüd paketil Tasuta. Teie debatid säilivad.",
   "mail.M11.subject": "Me ei saanud teie kaarti vastu võtta",
   "mail.M11.refunded": "Me ei saa vastu võtta kaarte, mis on välja antud selle kaardi riigis, seega läheb sellelt võetud või broneeritud {refundAmount} täies ulatuses teie kaardile tagasi.",
   "mail.M11.planEnded": "Seetõttu on teie pakett {endedPlan} lõppenud ja teie konto on nüüd paketil Tasuta. Teie debatid säilivad.",

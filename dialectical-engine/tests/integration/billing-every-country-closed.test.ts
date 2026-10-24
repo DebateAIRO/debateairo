@@ -10,9 +10,9 @@ import { everyCountryClosedPolicyValue, testEveryCountryClosedPolicy } from "../
  * with their prices and that every way to pay is refused with COUNTRY_PAYMENT_UNAVAILABLE, for a Romanian, a German
  * and a US buyer, before any charge row or NETOPIA request exists.
  *
- * The subscribers (for the upgrade and the card change) and the checkout quotes are made first, while the stack's
- * test countries can pay: on the public site they stand for anything made before the version closing every country
- * was published. Then the stack takes the closed policy, as the API reads it after a restart on the new version over
+ * The subscribers (for the upgrade and the card change), their upgrade quotes and the checkout quotes are made first,
+ * while the stack's test countries can pay: on the public site they stand for anything made before the version closing
+ * every country was published. Then the stack takes the closed policy, as the API reads it after a restart on the new version over
  * the same database. The cases share one stack, and the last one counts what the others made, so their order matters.
  */
 const COUNTRIES = ["RO", "DE", "US"] as const;
@@ -27,6 +27,8 @@ const CARD_DETAILS: Readonly<Record<Country, Readonly<Record<string, string>>>> 
 let stack: BillingStack;
 const subscribers = new Map<Country, BillingPerson>();
 const quotedBuyers = new Map<Country, Readonly<{ person: BillingPerson; quoteRef: string }>>();
+/** Each subscriber's upgrade quote to PRO, priced while their country could still pay. */
+const upgradeQuotes = new Map<Country, string>();
 
 type Counts = Readonly<Record<"charges" | "chargeEvents" | "hostedPayments" | "quotes" | "subscriptionEvents" | "outbox" | "netopiaRequests", number>>;
 async function counts(): Promise<Counts> {
@@ -47,6 +49,9 @@ beforeAll(async () => {
     const subscriber = await stack.signUp(`closed.subscriber.${country.toLowerCase()}@example.test`, country);
     await stack.subscribe(subscriber, "PLUS", country);
     subscribers.set(country, subscriber);
+    const upgradeQuote = await stack.post(subscriber, "/v1/billing/subscription/upgrade-quote", { plan_id: "PRO" });
+    if (upgradeQuote.status !== 200) throw new Error(`SETUP_UPGRADE_QUOTE_${country}_${upgradeQuote.status}_${String(upgradeQuote.body.error)}`);
+    upgradeQuotes.set(country, String(upgradeQuote.body.quote_ref));
     const buyer = await stack.signUp(`closed.quoted.${country.toLowerCase()}@example.test`, country);
     const quote = await stack.quote(buyer, "PLUS");
     if (quote.status !== 200) throw new Error(`SETUP_QUOTE_${country}_${quote.status}_${String(quote.body.error)}`);
@@ -110,6 +115,16 @@ describe("NETOPIA's check: billing on with every country closed for payment", ()
   it("billing on with every country closed: an upgrade answers 403 COUNTRY_PAYMENT_UNAVAILABLE for a Romanian, a German and a US subscriber", async () => {
     for (const country of COUNTRIES) {
       refusedForCountry(await stack.post(subscribers.get(country)!, "/v1/billing/subscription/upgrade-quote", { plan_id: "PRO" }));
+    }
+  });
+
+  it("billing on with every country closed: an upgrade start answers 403 COUNTRY_PAYMENT_UNAVAILABLE with an upgrade quote priced before the countries closed, and opens no payment page", async () => {
+    for (const country of COUNTRIES) {
+      const before = await counts();
+      refusedForCountry(await stack.post(subscribers.get(country)!, "/v1/billing/subscription/upgrade", {
+        plan_id: "PRO", quote_ref: upgradeQuotes.get(country)!, locale: "en", renewal_terms: stack.consents("en").renewal_terms
+      }));
+      expect(await counts(), country).toEqual(before);
     }
   });
 

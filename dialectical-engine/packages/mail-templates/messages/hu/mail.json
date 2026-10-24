@@ -60,7 +60,7 @@
   "mail.M10.paused": "Bankja tájékoztatott minket, hogy a(z) {plan} csomagjáért történt egyik fizetést vitatják. A fizetős funkciók szünetelnek, amíg a vita nyitott. Vitái megmaradnak.",
   "mail.M10.contact": "Ha ez tévedés, írjon nekünk a(z) {merchantEmail} címre.",
   "mail.M10_ENDED.subject": "A(z) {plan} csomagja véget ért",
-  "mail.M10_ENDED.ended": "Bankja egy vitát követően visszaterhelt egy fizetést a(z) {plan} csomagjáért, ezért a csomag véget ért, és fiókja mostantól az Ingyenes csomagon van. Vitái megmaradnak.",
+  "mail.M10_ENDED.ended": "A(z) {plan} csomagjáért fizetett összeget a vitát követően bankján keresztül visszatérítették. Ezért a csomag véget ért, és fiókja mostantól az Ingyenes csomagon van. Vitái megmaradnak.",
   "mail.M11.subject": "Nem tudtuk elfogadni a kártyáját",
   "mail.M11.refunded": "Nem fogadhatunk el olyan kártyát, amelyet az adott kártya országában bocsátottak ki, ezért a rajta terhelt vagy zárolt {refundAmount} összeg teljes egészében visszakerül a kártyájára.",
   "mail.M11.planEnded": "Emiatt a(z) {endedPlan} csomagja megszűnt, és fiókja mostantól az Ingyenes csomagon van. Vitái megmaradnak.",

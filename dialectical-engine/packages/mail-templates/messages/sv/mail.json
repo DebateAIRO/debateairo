@@ -60,7 +60,7 @@
   "mail.M10.paused": "Din bank har meddelat oss att en betalning för ditt {plan}-abonnemang är bestridd. Betalfunktionerna är pausade så länge tvisten pågår. Dina debatter sparas.",
   "mail.M10.contact": "Om detta är ett misstag, skriv till oss på {merchantEmail}.",
   "mail.M10_ENDED.subject": "Ditt {plan}-abonnemang har upphört",
-  "mail.M10_ENDED.ended": "Din bank har efter tvisten tagit tillbaka en betalning för ditt {plan}-abonnemang. Därför har abonnemanget upphört, och ditt konto har nu abonnemanget Kostnadsfritt. Dina debatter sparas.",
+  "mail.M10_ENDED.ended": "Betalningen för ditt {plan}-abonnemang har återbetalats till dig via din bank, efter tvisten. Därför har abonnemanget upphört, och ditt konto har nu abonnemanget Kostnadsfritt. Dina debatter sparas.",
   "mail.M11.subject": "Vi kunde inte godta ditt kort",
   "mail.M11.refunded": "Vi kan inte godta kort som har utfärdats i det kortets land, så de {refundAmount} som dragits eller reserverats på det går i sin helhet tillbaka till ditt kort.",
   "mail.M11.planEnded": "Därför har ditt {endedPlan}-abonnemang upphört, och ditt konto har nu abonnemanget Kostnadsfritt. Dina debatter sparas.",

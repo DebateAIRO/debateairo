@@ -60,7 +60,7 @@
   "mail.M10.paused": "Ihre Bank hat uns mitgeteilt, dass eine Zahlung für Ihren Tarif {plan} angefochten wird. Kostenpflichtige Funktionen sind pausiert, solange die Anfechtung offen ist. Ihre Debatten bleiben erhalten.",
   "mail.M10.contact": "Falls dies ein Irrtum ist, schreiben Sie uns an {merchantEmail}.",
   "mail.M10_ENDED.subject": "Ihr Tarif {plan} ist beendet",
-  "mail.M10_ENDED.ended": "Ihre Bank hat nach einer Anfechtung eine Zahlung für Ihren Tarif {plan} zurückgebucht. Deshalb ist der Tarif beendet, und Ihr Konto ist jetzt im Tarif Kostenlos. Ihre Debatten bleiben erhalten.",
+  "mail.M10_ENDED.ended": "Die Zahlung für Ihren Tarif {plan} wurde Ihnen nach der Anfechtung über Ihre Bank zurückerstattet. Deshalb ist der Tarif beendet, und Ihr Konto ist jetzt im Tarif Kostenlos. Ihre Debatten bleiben erhalten.",
   "mail.M11.subject": "Wir konnten Ihre Karte nicht akzeptieren",
   "mail.M11.refunded": "Wir können keine Karten aus dem Ausstellungsland dieser Karte akzeptieren, daher werden die {refundAmount}, die darauf abgebucht oder reserviert wurden, vollständig auf Ihre Karte zurückgebucht.",
   "mail.M11.planEnded": "Deshalb ist Ihr Tarif {endedPlan} beendet, und Ihr Konto ist jetzt im Tarif Kostenlos. Ihre Debatten bleiben erhalten.",

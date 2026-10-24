@@ -60,7 +60,7 @@
   "mail.M10.paused": "Bankanız, {plan} planınız için yapılan bir ödemenin itiraz altında olduğunu bildirdi. İtiraz açık kaldığı sürece ücretli özellikler duraklatılır. Tartışmalarınız saklanır.",
   "mail.M10.contact": "Bu bir hataysa bize {merchantEmail} adresinden yazın.",
   "mail.M10_ENDED.subject": "{plan} planınız sona erdi",
-  "mail.M10_ENDED.ended": "Bankanız, itirazın ardından {plan} planınız için yapılan bir ödemeyi geri aldı; bu nedenle plan sona erdi ve hesabınız artık Ücretsiz planda. Tartışmalarınız saklanır.",
+  "mail.M10_ENDED.ended": "{plan} planınız için yapılan ödeme, itirazın ardından bankanız aracılığıyla size iade edildi. Bu nedenle planınız sona erdi ve hesabınız artık Ücretsiz planda. Tartışmalarınız saklanır.",
   "mail.M11.subject": "Kartınızı kabul edemedik",
   "mail.M11.refunded": "O kartın ülkesinde çıkarılan kartları kabul edemiyoruz, bu nedenle kart üzerinden tahsil edilen veya bloke edilen {refundAmount} tutarın tamamı kartınıza geri döner.",
   "mail.M11.planEnded": "Bu nedenle {endedPlan} planınız sona erdi ve hesabınız artık Ücretsiz planda. Tartışmalarınız saklanır.",

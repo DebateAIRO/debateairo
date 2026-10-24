@@ -60,7 +60,7 @@
   "mail.M10.paused": "Banca dumneavoastră ne-a anunțat că o plată pentru abonamentul dumneavoastră {plan} este contestată. Funcțiile plătite sunt suspendate cât timp contestația este deschisă. Dezbaterile dumneavoastră se păstrează.",
   "mail.M10.contact": "Dacă este o greșeală, scrieți-ne la {merchantEmail}.",
   "mail.M10_ENDED.subject": "Abonamentul dumneavoastră {plan} s-a încheiat",
-  "mail.M10_ENDED.ended": "În urma unei contestații, banca dumneavoastră a recuperat o plată făcută pentru abonamentul dumneavoastră {plan}, așa că abonamentul s-a încheiat, iar contul dumneavoastră este acum pe abonamentul Gratuit. Dezbaterile dumneavoastră se păstrează.",
+  "mail.M10_ENDED.ended": "Plata dumneavoastră pentru abonamentul {plan} v-a fost restituită prin banca dumneavoastră, în urma contestației privind această plată. Din acest motiv, abonamentul s-a încheiat, iar contul dumneavoastră este acum pe abonamentul Gratuit. Dezbaterile dumneavoastră se păstrează.",
   "mail.M11.subject": "Nu am putut accepta cardul dumneavoastră",
   "mail.M11.refunded": "Nu putem accepta carduri emise în țara acestui card, așa că suma de {refundAmount} încasată sau blocată pe el se întoarce integral pe card.",
   "mail.M11.planEnded": "Din acest motiv, abonamentul dumneavoastră {endedPlan} s-a încheiat, iar contul dumneavoastră este acum pe abonamentul Gratuit. Dezbaterile dumneavoastră se păstrează.",

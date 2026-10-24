@@ -60,7 +60,7 @@
   "mail.M10.paused": "Państwa bank poinformował nas, że płatność za Państwa plan {plan} jest kwestionowana. Płatne funkcje są wstrzymane, dopóki spór jest otwarty. Państwa debaty zostają zachowane.",
   "mail.M10.contact": "Jeśli to pomyłka, prosimy napisać do nas na adres {merchantEmail}.",
   "mail.M10_ENDED.subject": "Państwa plan {plan} się zakończył",
-  "mail.M10_ENDED.ended": "Państwa bank cofnął płatność za Państwa plan {plan} po sporze, więc plan się zakończył, a Państwa konto jest teraz na planie Bezpłatny. Państwa debaty zostają zachowane.",
+  "mail.M10_ENDED.ended": "Płatność za Państwa plan {plan} została Państwu zwrócona przez Państwa bank po sporze o nią. Dlatego plan się zakończył, a Państwa konto jest teraz na planie Bezpłatny. Państwa debaty zostają zachowane.",
   "mail.M11.subject": "Nie mogliśmy zaakceptować Państwa karty",
   "mail.M11.refunded": "Nie możemy akceptować kart wydanych w kraju tej karty, dlatego kwota {refundAmount} pobrana lub zablokowana na niej wraca w całości na Państwa kartę.",
   "mail.M11.planEnded": "Z tego powodu Państwa plan {endedPlan} się zakończył, a Państwa konto jest teraz na planie Bezpłatny. Państwa debaty zostają zachowane.",

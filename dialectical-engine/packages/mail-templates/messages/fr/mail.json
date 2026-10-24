@@ -60,7 +60,7 @@
   "mail.M10.paused": "Votre banque nous a informés qu’un paiement de votre formule {plan} est contesté. Les fonctionnalités payantes sont suspendues tant que la contestation est en cours. Vos débats sont conservés.",
   "mail.M10.contact": "S’il s’agit d’une erreur, écrivez-nous à {merchantEmail}.",
   "mail.M10_ENDED.subject": "Votre formule {plan} a pris fin",
-  "mail.M10_ENDED.ended": "Votre banque a récupéré un paiement de votre formule {plan} à la suite d’une contestation. C’est pourquoi votre formule a pris fin et votre compte est désormais sur la formule Gratuite. Vos débats sont conservés.",
+  "mail.M10_ENDED.ended": "Votre paiement pour la formule {plan} vous a été restitué par votre banque, à la suite d’une contestation. C’est pourquoi votre formule a pris fin et votre compte est désormais sur la formule Gratuite. Vos débats sont conservés.",
   "mail.M11.subject": "Nous n’avons pas pu accepter votre carte",
   "mail.M11.refunded": "Nous ne pouvons pas accepter les cartes émises dans le pays de cette carte ; les {refundAmount} prélevés ou bloqués sur celle-ci vous sont donc intégralement restitués sur votre carte.",
   "mail.M11.planEnded": "C’est pourquoi votre formule {endedPlan} a pris fin et votre compte est désormais sur la formule Gratuite. Vos débats sont conservés.",

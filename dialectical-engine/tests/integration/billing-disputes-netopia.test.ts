@@ -7,7 +7,7 @@ import { testBillingPolicy, testCountryPolicy } from "../support/billingFixtures
 import { recordingAudit, seedNetopiaSubscription, TEST_RECORDS_KEY } from "../support/billingSubscriptionFixtures.js";
 import { recordDisputeOutcome } from "../../apps/api/src/billing/dispute-cli.js";
 import { heldByChargeback, RefundDesk } from "../../apps/api/src/billing/refunds.js";
-import { chargeEvent, newChargeId } from "../../apps/api/src/billing/rows.js";
+import { chargeEvent, newChargeId, subscriptionEvent } from "../../apps/api/src/billing/rows.js";
 import { VerifyPaymentHandler } from "../../apps/api/src/billing/verify-payment.js";
 
 let database: TestDatabase;
@@ -81,6 +81,39 @@ const lostLines = (audit: ReturnType<typeof recordingAudit>) =>
 const LOST_HEAD = "the dispute on it is lost (status 10).";
 const NO_COMMAND = "No command is needed.\nAsk your accountant whether a cancelling invoice (storno) is needed for this payment.";
 const stores = () => Object.freeze({ billing: repository, jobs, entitlements, clock: () => new Date() });
+/** Claims the queued PAYMENT_REFUND job of `chargeId`'s payment, as the outbox worker does, for `RefundDesk.handle`. */
+async function claimRefund(chargeId: string, paymentId: string): Promise<OutboxJob> {
+  const now = new Date();
+  const row = (await database.pool.query<{ job_id: string; payload: Record<string, unknown>; created_at: Date; not_before: Date; attempts: number }>(`
+    UPDATE billing.outbox SET claimed_by = 'n15', claimed_at = $2, attempts = attempts + 1
+    WHERE kind = 'PAYMENT_REFUND' AND ref = $1 AND done_at IS NULL AND dead_at IS NULL
+    RETURNING job_id, payload, created_at, not_before, attempts
+  `, [`${chargeId}:${paymentId}`, now])).rows[0]!;
+  return {
+    jobId: row.job_id, kind: "PAYMENT_REFUND", ref: `${chargeId}:${paymentId}`, payload: row.payload, createdAt: row.created_at,
+    notBefore: row.not_before, attempts: row.attempts, claimedBy: "n15", claimedAt: now
+  } as unknown as OutboxJob;
+}
+/** The owner's open WITHDRAWAL refund of 12.10 on the plan's first payment (owner mode: a PAYMENT_REFUND job is queued). */
+async function requestRefund(seeded: Awaited<ReturnType<typeof plan>>, refunds: RefundDesk): Promise<void> {
+  await repository.withTransaction(async (client) => {
+    await jobs.lockOwner(client, seeded.ownerRef);
+    await refunds.request(client, {
+      chargeId: seeded.initialChargeId, transactionId: seeded.providerPaymentId, amountMicros: 12_100_000, whole: false,
+      ownerRef: seeded.ownerRef, reason: "WITHDRAWAL"
+    }, new Date());
+  });
+}
+/** A plan ACTIVATED 33 days ago: its first period ended three days ago (for a renewal, or a renewal that failed). */
+const oldPlan = () => seedNetopiaSubscription(database.pool, {
+  ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(Date.now() - 33 * DAY), taxCountry: "DE"
+});
+const appendSubscription = async (subscriptionId: string, kind: "RENEWED" | "PAST_DUE", at: Date, data: Readonly<Record<string, string | number | boolean | null>>) => {
+  const state = foldSubscription(await repository.subscriptionEvents(subscriptionId));
+  await repository.withTransaction((client) => repository.appendSubscriptionEvent(client, subscriptionEvent(state, kind, at, data)));
+};
+const ON_HOST = "systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api"
+  + " --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm";
 
 describe("N15 charge-backs on NETOPIA's statuses (spec §2.13)", () => {
   it("pauses a live plan at status 9: CHARGEBACK, SUSPENDED, Free and M10, once", async () => {
@@ -170,17 +203,11 @@ describe("N15 charge-backs on NETOPIA's statuses (spec §2.13)", () => {
     expect((await entitlements.current(seeded.ownerRef, new Date())).planId).toBe("FREE");
   });
 
-  it("closes a refund the lost dispute holds as --outcome lost does: held for good, named in the one O3", async () => {
+  it("keeps a refund the lost dispute holds held for good, as --outcome lost does: named in the one O3, with the command for a refund already made, and its PAYMENT_REFUND job sends no second O3", async () => {
     const seeded = await plan("lost-held-refund");
     const statuses = new Statuses();
     const { check, audit, refunds } = handler(statuses);
-    await repository.withTransaction(async (client) => {
-      await jobs.lockOwner(client, seeded.ownerRef);
-      await refunds.request(client, {
-        chargeId: seeded.initialChargeId, transactionId: seeded.providerPaymentId, amountMicros: 12_100_000, whole: false,
-        ownerRef: seeded.ownerRef, reason: "WITHDRAWAL"
-      }, new Date());
-    });
+    await requestRefund(seeded, refunds);
     statuses.set(seeded.initialChargeId, seeded.providerPaymentId, "CHARGEBACK_LOST", seeded.totalMicros);
     await check(seeded.initialChargeId);
     await check(seeded.initialChargeId);
@@ -198,10 +225,106 @@ describe("N15 charge-backs on NETOPIA's statuses (spec §2.13)", () => {
     expect(alerts.map((alert) => alert["param.reasonCode"])).toEqual(["CHARGEBACK_LOST"]);
     expect(alerts[0]!["param.nextSteps"]).toContain("A refund of 12.10 USD (reason WITHDRAWAL) was held on this payment"
       + " because of the dispute. The bank has taken the money back, so nothing is left to refund: do not refund it in"
-      + " NETOPIA's admin.");
+      + " NETOPIA's admin.\nIf you had already refunded this payment in NETOPIA's admin before the dispute, the person got"
+      + " the money twice: record your refund with the command below and tell NETOPIA, so they can answer the bank.\n"
+      + `  ${ON_HOST} billing:refund-done --charge ${seeded.initialChargeId} --amount 12.10 --despite-chargeback\n`
+      + "Run it as root on the server once to see what it records, then again with --confirm added at the end to record"
+      + " it.\nNo command is needed unless you had already refunded it.\n");
+    expect(alerts[0]!["param.nextSteps"]).not.toContain(NO_COMMAND);
+    expect(audit.events.filter((entry) => entry.event === "billing.refund.held_by_chargeback")).toEqual([]);
+    // Reviewer M-1: the refund's PAYMENT_REFUND job runs after the 10: held, it moves nothing and sends no second O3.
+    const rows = await outboxRows(seeded.initialChargeId);
+    expect(await refunds.handle(await claimRefund(seeded.initialChargeId, seeded.providerPaymentId), new Date()))
+      .toEqual({ kind: "DONE" });
+    expect((await ownerAlerts(seeded.initialChargeId)).map((alert) => alert["param.reasonCode"])).toEqual(["CHARGEBACK_LOST"]);
+    expect(await outboxRows(seeded.initialChargeId)).toBe(rows);
     expect(audit.events.filter((entry) => entry.event === "billing.refund.held_by_chargeback")).toEqual([]);
     expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "lost" })).toBe("ALREADY_SETTLED");
     expect(heldByChargeback((await repository.charge(seeded.initialChargeId))!, seeded.providerPaymentId)).toBe(true);
+  });
+
+  it("tells the owner of a 10 after a dispute recorded won (reviewer M-2): the plan stays as it is, the released refund is checked first", async () => {
+    const seeded = await plan("won-then-lost");
+    const statuses = new Statuses();
+    const { check, refunds } = handler(statuses);
+    await requestRefund(seeded, refunds);
+    statuses.set(seeded.initialChargeId, seeded.providerPaymentId, "CHARGEBACK_OPENED", seeded.totalMicros);
+    await check(seeded.initialChargeId);
+    expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "won" })).toBe("RESUMED");
+    expect(heldByChargeback((await repository.charge(seeded.initialChargeId))!, seeded.providerPaymentId)).toBe(false);
+    const events = await subscriptionKinds(seeded.subscriptionId);
+    statuses.set(seeded.initialChargeId, seeded.providerPaymentId, "CHARGEBACK_LOST", seeded.totalMicros);
+    expect(await check(seeded.initialChargeId)).toEqual({ kind: "DONE" });
+    expect(await subscriptionKinds(seeded.subscriptionId)).toEqual(events);
+    expect(await status(seeded.subscriptionId)).toBe("ACTIVE");
+    expect(await m10Ended(seeded.initialChargeId)).toBe(0);
+    const lost = (await ownerAlerts(seeded.initialChargeId)).filter((alert) => alert["param.reasonCode"] === "CHARGEBACK_LOST");
+    expect(lost).toHaveLength(1);
+    const steps = lost[0]!["param.nextSteps"]!;
+    expect(steps).toContain("This dispute was recorded as won earlier, but NETOPIA now reports it lost: the plan was not"
+      + " ended. Check the payment in NETOPIA's admin before making the released refund, and end the plan by hand if the"
+      + " bank kept the money.\nNo owner command ends it: billing:dispute --outcome lost answers that the dispute is"
+      + " already settled once it was recorded won.\n");
+    expect(steps).not.toContain("held on this payment");
+    expect(steps).not.toContain("No command is needed");
+    // What the steps say of the command holds: --outcome lost changes nothing now.
+    expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "lost" })).toBe("ALREADY_SETTLED");
+    expect(await status(seeded.subscriptionId)).toBe("ACTIVE");
+  });
+
+  it("ends a live ACTIVE plan at a 10 on its RENEWAL charge (reviewer M-3)", async () => {
+    const seeded = await oldPlan();
+    await appendSubscription(seeded.subscriptionId, "RENEWED", seeded.periodEnd, {});
+    expect(await status(seeded.subscriptionId)).toBe("ACTIVE");
+    const renewal = newChargeId();
+    const paymentId = `ntp-renewal-${renewal.slice(0, 8)}`;
+    await repository.withTransaction(async (client) => {
+      const first = (await repository.charge(seeded.initialChargeId, client))!;
+      await repository.insertCharge(client, {
+        chargeId: renewal, ownerRef: seeded.ownerRef, subscriptionId: seeded.subscriptionId, kind: "RENEWAL", attempt: 1,
+        periodStart: seeded.periodEnd, periodEnd: new Date(seeded.periodEnd.getTime() + 30 * DAY), quoteId: first.quoteId,
+        netMicros: first.netMicros, taxMicros: first.taxMicros, totalMicros: first.totalMicros, currency: "USD",
+        createdAt: seeded.periodEnd, paymentProvider: "netopia", paymentEnvironment: "sandbox"
+      });
+      for (const kind of ["REQUESTED", "SUCCEEDED"] as const) {
+        await repository.appendChargeEvent(client, chargeEvent(renewal, kind, seeded.periodEnd, {
+          providerPaymentId: kind === "REQUESTED" ? null : paymentId, amountMicros: first.totalMicros, errorCode: null
+        }));
+      }
+    });
+    const statuses = new Statuses();
+    const { check, audit } = handler(statuses);
+    statuses.set(renewal, paymentId, "CHARGEBACK_LOST", seeded.totalMicros);
+    expect(await check(renewal)).toEqual({ kind: "DONE" });
+    expect((await subscriptionKinds(seeded.subscriptionId)).slice(-2)).toEqual(["SUSPENDED", "ENDED"]);
+    expect(foldSubscription(await repository.subscriptionEvents(seeded.subscriptionId))).toMatchObject({
+      status: "ENDED", endedCause: "DISPUTE"
+    });
+    expect((await entitlements.current(seeded.ownerRef, new Date())).planId).toBe("FREE");
+    expect(await m10Ended(renewal)).toBe(1);
+    expect(await m10(renewal)).toBe(0);
+    const alerts = await ownerAlerts(renewal);
+    expect(alerts.map((alert) => alert["param.reasonCode"])).toEqual(["CHARGEBACK_LOST"]);
+    expect(alerts[0]!["param.nextSteps"]).toContain(`(NETOPIA payment ${paymentId}): ${LOST_HEAD} The site has ended the plan`);
+    expect(lostLines(audit)).toEqual([{ chargeKind: "RENEWAL", ended: true }]);
+  });
+
+  it("ends a PAST_DUE plan at a 10 on its payment (reviewer M-3): SUSPENDED first, then ENDED(DISPUTE)", async () => {
+    const seeded = await oldPlan();
+    await appendSubscription(seeded.subscriptionId, "PAST_DUE", new Date(seeded.periodEnd.getTime() + 60_000), { attempt: 1 });
+    expect(await status(seeded.subscriptionId)).toBe("PAST_DUE");
+    const statuses = new Statuses();
+    const { check, audit } = handler(statuses);
+    statuses.set(seeded.initialChargeId, seeded.providerPaymentId, "CHARGEBACK_LOST", seeded.totalMicros);
+    expect(await check(seeded.initialChargeId)).toEqual({ kind: "DONE" });
+    expect((await subscriptionKinds(seeded.subscriptionId)).slice(-3)).toEqual(["PAST_DUE", "SUSPENDED", "ENDED"]);
+    expect(foldSubscription(await repository.subscriptionEvents(seeded.subscriptionId))).toMatchObject({
+      status: "ENDED", endedCause: "DISPUTE"
+    });
+    expect((await entitlements.current(seeded.ownerRef, new Date())).planId).toBe("FREE");
+    expect(await m10Ended(seeded.initialChargeId)).toBe(1);
+    expect(await m10(seeded.initialChargeId)).toBe(0);
+    expect(lostLines(audit)).toEqual([{ chargeKind: "INITIAL", ended: true }]);
   });
 
   it("only tells the owner of a status 10 on the payment of a plan already ended: no plan change, no customer email", async () => {

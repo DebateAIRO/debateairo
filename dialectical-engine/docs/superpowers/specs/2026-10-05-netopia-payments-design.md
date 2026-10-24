@@ -57,7 +57,7 @@ reminders after a failed payment (after 1, 3 and 7 days), every email, cancellin
 formula, the dispute pause, account deletion, the quarterly tax summary and the owner commands.
 
 Two things changed after NETOPIA's answers of 21 October 2026. The site charges a card again by itself only after
-refusal 20 (not enough money), and never more than twice a day (§2.26). And a dispute the bank decides against us
+refusal 20 (not enough money) or our own failure, never more than twice in 24 hours (§2.26). And a dispute the bank decides against us
 (NETOPIA status 10) ends the plan by itself: the person gets one email, you get one email, and no command is needed
 (your decision of 24 October 2026, §2.13).
 
@@ -1019,13 +1019,20 @@ a status read (§2.14) can still show them, and they are handled as below if the
   - A live plan (ACTIVE or PAST_DUE) is SUSPENDED with the FREE entitlement, as for a 9 but with no M10, then
     ENDED(DISPUTE) at once. A plan already SUSPENDED (a 9 came first) is ENDED(DISPUTE). A 10 with no earlier 9 ends
     the plan directly.
-  - **The customer** gets one new email, **M10_ENDED** ("Your {plan} plan has ended": the bank took back a payment
-    after a dispute, so the plan ended and the account is on Free; the debates are kept; "If this is a mistake, write
-    to us at {merchantEmail}."). It is queued only when this transaction ended the plan, so a repeated notification
+  - **The customer** gets one new email, **M10_ENDED** ("Your {plan} plan has ended"; the owner's wording of 24
+    October 2026: "Your payment for the {plan} plan was given back to you through your bank, after the dispute on it.
+    So the plan has ended, and your account is now on the Free plan; your debates are kept." and "If this is a
+    mistake, write to us at {merchantEmail}."). It is queued only when this transaction ended the plan, so a repeated notification
     sends nothing more. M10 stays the email for a pause (9 or 16).
   - **The owner** gets one O3 with the reason code **`CHARGEBACK_LOST`** (deduplicated once per charge). It says what
     happened, that no command is needed, and: "ask your accountant whether a cancelling invoice (storno) is needed for
-    this payment."
+    this payment." With a refund the dispute held, it says nothing is left to refund, and that if the owner had
+    already refunded the payment in NETOPIA's admin before the dispute, the person got the money twice: record that
+    refund with `billing:refund-done … --despite-chargeback` (host form, preview first, then `--confirm`) and tell
+    NETOPIA; "No command is needed unless you had already refunded it." After a dispute recorded won (its refund
+    released), it says the plan was not ended, to check the payment before making the released refund and to end the
+    plan by hand if the bank kept the money; no owner command ends it then (`--outcome lost` answers
+    `ALREADY_SETTLED`).
   - When the payment bought nothing (a payment coded `DUPLICATE_PAYMENT`), or its plan had already ended, was not
     active, or already had its dispute recorded, no plan changes and only the O3 is sent.
   - The stored notice no longer gets the outcome `OWNER_REVIEW` for a 10. The journal line is
@@ -1042,8 +1049,9 @@ a status read (§2.14) can still show them, and they are handled as below if the
   due again when the dispute is won; never due when it is lost. The owner gets one O3 `REFUND_HELD_BY_CHARGEBACK` for
   a 9 or a 16. **After a 10** the refund stays held for good, the way `--outcome lost` leaves it ("if it ends for the
   person, nothing is left to refund"): no charge event is written and it never comes back into the reminder. No
-  separate `REFUND_HELD_BY_CHARGEBACK` is queued for a 10; the O3 `CHARGEBACK_LOST` says nothing is left to refund and
-  not to refund it in NETOPIA's admin.
+  separate `REFUND_HELD_BY_CHARGEBACK` is queued for a 10, nor later: the refund's PAYMENT_REFUND job, run after the
+  10, queues none once the charge has its O3 `CHARGEBACK_LOST`, which says nothing is left to refund and not to refund
+  it in NETOPIA's admin (and the command for a refund already made before the dispute).
 
 ### 2.14 The checks that replace the transaction listing
 

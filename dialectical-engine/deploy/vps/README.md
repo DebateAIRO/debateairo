@@ -3617,10 +3617,15 @@ systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --prop
 **Disputes (chargebacks).** NETOPIA reports a dispute as a status of the payment itself, and it sends a message
 only when a dispute is LOST (status 10, "chargeback accepted"). A lost dispute needs no command from you: the site
 ends the plan by itself, at once, exactly as `pnpm billing:dispute --outcome lost` would. The person is on Free and
-gets one email that the plan has ended because their bank took the payment back (M10_ENDED), and you get one email
-(O3 `CHARGEBACK_LOST`) saying what happened. That email also asks you to check with your accountant whether a
+gets one email that the plan has ended because their bank gave the payment back to them (M10_ENDED), and you get one
+email (O3 `CHARGEBACK_LOST`) saying what happened. That email also asks you to check with your accountant whether a
 cancelling invoice (storno) is needed for that payment. If the payment bought nothing, or its plan had already ended,
-no plan changes and only your email is sent. A refund the dispute held stays held: nothing is left to refund.
+no plan changes and only your email is sent. A refund the dispute held stays held: nothing is left to refund. If you
+had already refunded that payment in NETOPIA's admin before the dispute, the person got the money twice: the email
+gives the `pnpm billing:refund-done … --despite-chargeback` command to record your refund, and you tell NETOPIA. If you
+had recorded the dispute as won earlier, the plan is not ended: the email asks you to check the payment in NETOPIA's
+admin before making the released refund, and to end the plan by hand if the bank kept the money (no owner command
+ends it then).
 
 A dispute NETOPIA reports as opened (status 9) or defended (status 16), if one ever arrives, pauses the paid
 features until its outcome is recorded. The command is for the outcomes NETOPIA does not send: a dispute won (you hear

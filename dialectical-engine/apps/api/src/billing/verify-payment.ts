@@ -22,10 +22,11 @@ import { clientIdOf } from "./netopia-payer.js";
 import {
   DONE, isThisPaymentSystem, notFinalRetryAt, otherPaymentSystem, type OutboxHandler, type OutboxOutcome
 } from "./outbox.js";
-import { queuePaymentAlert } from "./payment-alert.js";
+import { chargebackLostAlertRef, queuePaymentAlert } from "./payment-alert.js";
 import { openNoticeAllowed, openQuoteLocation, sealIpEvidence } from "./records.js";
 import {
-  heldByChargeback, openOwnRequest, queueRefundHeldAlert, refundedAlready, refundedMicros, wholePaymentOpen,
+  heldByChargeback, openOwnRequest, queueRefundHeldAlert, refundDoneCommand, refundedAlready, refundedMicros,
+  wholePaymentOpen,
   type RefundDesk, type RefundIntent
 } from "./refunds.js";
 import { retiredVerifyJob } from "./retired-jobs.js";
@@ -145,13 +146,20 @@ export function noticeToDecide(notices: ReadonlyArray<PaymentNoticeRow>, paidSee
  * The owner's O3 CHARGEBACK_LOST steps (the owner's decision of 24 October 2026): NETOPIA notifies only a lost
  * charge-back (status 10), and VERIFY_PAYMENT ends the plan by itself, as `pnpm billing:dispute --outcome lost` does.
  * `ended`: this notification ended the plan (the customer's M10_ENDED was queued with it). `heldRefund`: an owner
- * refund the dispute holds on this payment (PR-41); it stays held for good, so nothing is left to refund.
+ * refund the dispute holds on this payment (PR-41); it stays held for good, so nothing is left to refund, unless the
+ * owner had already made it in NETOPIA's admin before the dispute (reviewer I-1): then the person got the money twice,
+ * and the steps name `pnpm billing:refund-done … --despite-chargeback` in README §14.8's host form. `releasedRefund`
+ * (reviewer M-2): an owner refund on this payment that a dispute recorded WON earlier released (CHARGEBACK_RESOLVED),
+ * so it is due again although NETOPIA now reports the dispute lost: one sentence says so (the owner's words), and that
+ * no owner command ends the plan then (`billing:dispute --outcome lost` answers ALREADY_SETTLED once a dispute is
+ * recorded won).
  */
 export function chargebackLostSteps(input: Readonly<{
-  paymentId: string; ended: boolean;
+  chargeId: string; paymentId: string; ended: boolean;
   heldRefund: Readonly<{ openMicros: number; currency: string; reason: string }> | null;
+  releasedRefund: Readonly<{ openMicros: number; currency: string; reason: string }> | null;
 }>): string {
-  const { paymentId, ended, heldRefund } = input;
+  const { chargeId, paymentId, ended, heldRefund, releasedRefund } = input;
   return [
     `NETOPIA reports that the person's bank took back this payment (NETOPIA payment ${paymentId}): the dispute on it`
       + " is lost (status 10). "
@@ -163,9 +171,26 @@ export function chargebackLostSteps(input: Readonly<{
     ...(heldRefund === null ? [] : [
       `A refund of ${microsToDecimal(heldRefund.openMicros)} ${heldRefund.currency} (reason ${heldRefund.reason}) was`
         + " held on this payment because of the dispute. The bank has taken the money back, so nothing is left to"
-        + " refund: do not refund it in NETOPIA's admin."
+        + " refund: do not refund it in NETOPIA's admin.",
+      "If you had already refunded this payment in NETOPIA's admin before the dispute, the person got the money twice:"
+        + " record your refund with the command below and tell NETOPIA, so they can answer the bank.",
+      `  ${refundDoneCommand(chargeId, heldRefund.openMicros)} --despite-chargeback`,
+      "Run it as root on the server once to see what it records, then again with --confirm added at the end to record it.",
+      "No command is needed unless you had already refunded it."
     ]),
-    "No command is needed.",
+    ...(releasedRefund === null ? [] : [
+      ended
+        ? "This dispute was recorded as won earlier, but NETOPIA now reports it lost. Check the payment in NETOPIA's"
+          + " admin before making the released refund."
+        : "This dispute was recorded as won earlier, but NETOPIA now reports it lost: the plan was not ended. Check the"
+          + " payment in NETOPIA's admin before making the released refund, and end the plan by hand if the bank kept"
+          + " the money.",
+      ...(ended ? [] : [
+        "No owner command ends it: billing:dispute --outcome lost answers that the dispute is already settled once it"
+          + " was recorded won."
+      ])
+    ]),
+    ...(heldRefund === null && releasedRefund === null ? ["No command is needed."] : []),
     "Ask your accountant whether a cancelling invoice (storno) is needed for this payment."
   ].join("\n");
 }
@@ -646,8 +671,9 @@ export class VerifyPaymentHandler {
    * nothing more. The owner's one O3 CHARGEBACK_LOST (once per charge, queued in the same transaction) says what
    * happened, that no command is needed, and to ask the accountant about a cancelling invoice (storno). A refund the
    * dispute holds stays held for good, as `--outcome lost` leaves it (no charge event: nothing is left to refund); the
-   * O3 says so, and no separate REFUND_HELD_BY_CHARGEBACK is queued for a 10. The audit line billing.chargeback.lost
-   * (`chargeKind`, `ended`) follows every 10.
+   * O3 says so, with the command for a refund the owner had made before the dispute (`chargebackLostSteps`), and no
+   * separate REFUND_HELD_BY_CHARGEBACK is queued for a 10, nor afterwards (`queueRefundHeldAlert`). The audit line
+   * billing.chargeback.lost (`chargeKind`, `ended`) follows every 10.
    * The audit line billing.chargeback carries `code: "DUPLICATE_PAYMENT"` when the CHARGEBACK written is so coded.
    * N15b (ruling PR-41): when the CHARGEBACK written for a 9 or a 16 finds an open owner refund on the same payment
    * (`openOwnRequest`), that refund is now held (`heldByChargeback`): the O3 REFUND_HELD_BY_CHARGEBACK
@@ -750,11 +776,14 @@ export class VerifyPaymentHandler {
     }
     const open = openOwnRequest(current, paymentId);
     const released = current.events.some((event) => event.kind === "CHARGEBACK_RESOLVED" && event.providerPaymentId === paymentId);
-    const heldRefund = open !== null && open.openMicros > 0 && !released
+    const refund = open !== null && open.openMicros > 0
       ? { openMicros: open.openMicros, currency: charge.currency, reason: open.intent.reason } : null;
     await queuePaymentAlert({ repository: this.deps.repository, jobs: this.deps.netopia.jobs }, {
-      code: "CHARGEBACK_LOST", reference: `charge ${charge.chargeId}`, dedupeRef: `${charge.chargeId}:CHARGEBACK_LOST`, now,
-      nextSteps: chargebackLostSteps({ paymentId, ended, heldRefund })
+      code: "CHARGEBACK_LOST", reference: `charge ${charge.chargeId}`, dedupeRef: chargebackLostAlertRef(charge.chargeId), now,
+      nextSteps: chargebackLostSteps({
+        chargeId: charge.chargeId, paymentId, ended,
+        heldRefund: released ? null : refund, releasedRefund: released ? refund : null
+      })
     }, client);
     return ended;
   }

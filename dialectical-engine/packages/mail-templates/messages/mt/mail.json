@@ -60,7 +60,7 @@
   "mail.M10.paused": "Il-bank tiegħek infurmana li ħlas għall-pjan {plan} tiegħek qed jiġi kkontestat. Il-karatteristiċi bi ħlas huma sospiżi sakemm il-kontestazzjoni tkun miftuħa. Id-dibattiti tiegħek jinżammu.",
   "mail.M10.contact": "Jekk dan huwa żball, iktbilna fuq {merchantEmail}.",
   "mail.M10_ENDED.subject": "Il-pjan {plan} tiegħek intemm",
-  "mail.M10_ENDED.ended": "Il-bank tiegħek ħa lura ħlas għall-pjan {plan} tiegħek wara kontestazzjoni, għalhekk il-pjan intemm u l-kont tiegħek issa jinsab fuq il-pjan B’xejn. Id-dibattiti tiegħek jinżammu.",
+  "mail.M10_ENDED.ended": "Il-ħlas tiegħek għall-pjan {plan} ingħata lura lilek permezz tal-bank tiegħek, wara kontestazzjoni dwaru. Minħabba f’hekk, il-pjan intemm u l-kont tiegħek issa jinsab fuq il-pjan B’xejn. Id-dibattiti tiegħek jinżammu.",
   "mail.M11.subject": "Ma stajniex naċċettaw il-karta tiegħek",
   "mail.M11.refunded": "Ma nistgħux naċċettaw karti maħruġa fil-pajjiż ta’ dik il-karta, għalhekk is-somma ta’ {refundAmount} meħuda jew miżmuma fuqha tmur lura kollha fuq il-karta tiegħek.",
   "mail.M11.planEnded": "Minħabba f’hekk, il-pjan {endedPlan} tiegħek intemm u l-kont tiegħek issa jinsab fuq il-pjan B’xejn. Id-dibattiti tiegħek jinżammu.",
