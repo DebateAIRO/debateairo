@@ -65,6 +65,8 @@
     "billing:check": "tsx apps/api/src/billing/check-cli.ts",
     "billing:renewal-resume": "tsx apps/api/src/billing/renewal-resume-cli.ts",
     "billing:netopia-sandbox": "tsx tools/billing/netopia-sandbox.ts",
+    "rls:proof": "tsx tools/rls/proof.ts",
+    "rls:test-accounts": "tsx tools/rls/test-accounts-cli.ts",
     "compose:env": "tsx packages/register/src/compose-env.ts",
     "job:replay-self-test": "tsx apps/scheduler/src/cli.ts replay-self-test",
     "job:liveness-sweep": "tsx apps/scheduler/src/cli.ts liveness-sweep",
