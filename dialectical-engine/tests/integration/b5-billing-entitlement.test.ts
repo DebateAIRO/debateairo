@@ -4,6 +4,7 @@ import { BillingPersonAllowanceSource } from "@debateai/billing-core";
 import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue } from "@debateai/register";
 import { EntitlementRepository, RunRepository, migrate } from "../../packages/db/src/index.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
+import { createSystemTwin } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
@@ -22,10 +23,13 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  */
 let database: TestDatabase;
 let entitlements: EntitlementRepository;
+/** Row-level security (0124, D29): the runner's login is debateai_runtime and the cross-account marker. */
+const RUNNER_TWIN = "b5_runner_twin";
 
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
+  await createSystemTwin(database, RUNNER_TWIN, ["debateai_runtime"]);
   entitlements = new EntitlementRepository(database.pool);
 }, 600_000);
 
@@ -247,7 +251,13 @@ describe("the runner's read-only path (A20)", () => {
 
     const client = await database.pool.connect();
     try {
+      // The bare runtime role with no account context reads no person's windows (row-level security, 0124).
       await client.query("SET ROLE debateai_runtime");
+      expect((await client.query("SELECT plan_id FROM billing.person_windows_v WHERE owner_ref=$1", [ownerRef])).rows)
+        .toEqual([]);
+      await client.query("RESET ROLE");
+      // The runner reads it on its own login (RUNNER_TWIN: debateai_runtime and the cross-account marker).
+      await client.query(`SET ROLE ${RUNNER_TWIN}`);
       const row = await client.query<{ plan_id: string }>(
         "SELECT plan_id FROM billing.person_windows_v WHERE owner_ref=$1", [ownerRef]
       );

@@ -9,6 +9,7 @@ import {
 } from "@debateai/budget";
 import { RunRepository, migrate } from "../../packages/db/src/index.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
+import { createSystemTwin } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
@@ -22,10 +23,16 @@ let database: TestDatabase;
 const dayOffset = (days: number): string => costEnvelopeDay(new Date(Date.now() + days * 86_400_000));
 const TODAY = dayOffset(0);
 const PROVIDER = "language-check:anthropic:claude-haiku-5-5";
+/**
+ * Row-level security (0124, D29): a system login holds debateai_runtime and the cross-account marker (the runner's
+ * shape); the bare runtime role with no account context may write no row that names no run of its account.
+ */
+const RUNTIME_TWIN = "language_check_runtime_twin";
 
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
+  await createSystemTwin(database, RUNTIME_TWIN, ["debateai_runtime"]);
 }, 600_000);
 
 afterAll(async () => {
@@ -55,11 +62,11 @@ async function createLegacyRun(): Promise<string> {
   });
 }
 
-/** One client acting as the API's runtime role for `work`; the role is reset before the client goes back. */
-async function asRuntime<T>(work: (client: { query: TestDatabase["pool"]["query"] }) => Promise<T>): Promise<T> {
+/** One client acting as the API's runtime role (or `role`) for `work`; the role is reset before the client goes back. */
+async function asRuntime<T>(work: (client: { query: TestDatabase["pool"]["query"] }) => Promise<T>, role = "debateai_runtime"): Promise<T> {
   const client = await database.pool.connect();
   try {
-    await client.query("SET ROLE debateai_runtime");
+    await client.query(`SET ROLE ${role}`);
     return await work(client as never);
   } finally {
     await client.query("RESET ROLE");
@@ -147,9 +154,16 @@ describe("0118: the language check's site cost (one writer, the day's pot)", () 
     // The migration owner (this database's superuser) too: only the writer's owner, inside the writer, may.
     await expect(database.pool.query(raw, [randomUUID(), PROVIDER, TODAY]))
       .rejects.toMatchObject({ code: "42501", message: "LANGUAGE_CHECK_SPEND_WRITER_ONLY" });
-    // The runtime role's other sources are untouched by the guard.
-    await asRuntime((client) => client.query(`INSERT INTO ledger.model_spend (spend_id, spend_source, run_id, provider_ref, charged_on,
-      charge_micros, input_tokens, output_tokens) VALUES ($1,'SUPPORT',NULL,'support:x',$2::date,1,1,1)`, [randomUUID(), TODAY]));
+    // On a system login (RUNTIME_TWIN), whose row-level security admits the row, the guard alone refuses it.
+    await expect(asRuntime((client) => client.query(raw, [randomUUID(), PROVIDER, TODAY]), RUNTIME_TWIN))
+      .rejects.toMatchObject({ code: "42501", message: "LANGUAGE_CHECK_SPEND_WRITER_ONLY" });
+    // The runtime role's other sources are untouched by the guard (on the system login; row-level security, 0124).
+    const other = `INSERT INTO ledger.model_spend (spend_id, spend_source, run_id, provider_ref, charged_on,
+      charge_micros, input_tokens, output_tokens) VALUES ($1,'SUPPORT',NULL,'support:x',$2::date,1,1,1)`;
+    await asRuntime((client) => client.query(other, [randomUUID(), TODAY]), RUNTIME_TWIN);
+    // The bare runtime role with no account context may not write a row that names no run of its account.
+    await expect(asRuntime((client) => client.query(other, [randomUUID(), TODAY])))
+      .rejects.toMatchObject({ code: "42501", message: 'new row violates row-level security policy for table "model_spend"' });
   });
 
   it("a LANGUAGE_CHECK row that names a run, a phase or an attempt is refused by the CHECK, even as the writer's owner", async () => {

@@ -9,6 +9,7 @@ import { RunRepository, RunWaitRepository, createPool, migrate, type Pool } from
 import { AskRoom, nextWholeMinute } from "../../apps/api/src/ask-room.js";
 import { PostgresAskAdmissionGate } from "../../apps/api/src/release-state.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
+import { createSystemTwin } from "../support/rls-logins.js";
 import { createTestAskAdmissionPoolFacades, startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { testReleaseKey } from "../support/releaseKey.js";
 
@@ -25,6 +26,7 @@ const R16 = testReleaseKey(16);
 const R17 = testReleaseKey(17);
 const R18 = testReleaseKey(18);
 const LOGIN = "c8_room_decision";
+const BARE = "c8_room_decision_bare";
 const SECRET = ["c8", "fixture", "only"].join("-");
 
 let database: TestDatabase;
@@ -196,11 +198,14 @@ describe("side-by-side C8: at most 8 debates across releases", () => {
   });
 
   it("the room decision pool's login (debateai_runtime) may make both reads", async () => {
-    await database.pool.query(`CREATE ROLE ${LOGIN} LOGIN PASSWORD '${SECRET}' IN ROLE debateai_runtime`);
+    // Row-level security (0124, D29): the room decision pool is a system login, so the file's login is the system twin
+    // of debateai_runtime (the role and the cross-account marker); BARE holds the role alone, with no account context.
+    const runtime: Pool = createPool(await createSystemTwin(database, LOGIN, ["debateai_runtime"]), { max: 1 });
+    await database.pool.query(`CREATE ROLE ${BARE} LOGIN PASSWORD '${SECRET}' IN ROLE debateai_runtime`);
     const url = new URL(database.connectionString);
-    url.username = LOGIN;
+    url.username = BARE;
     url.password = SECRET;
-    const runtime: Pool = createPool(url.toString(), { max: 1 });
+    const bare: Pool = createPool(url.toString(), { max: 1 });
     try {
       await liveDebate(R16);
       const client = await runtime.connect();
@@ -214,8 +219,18 @@ describe("side-by-side C8: at most 8 debates across releases", () => {
       } finally {
         client.release();
       }
+      // The bare role counts none of the site's debates: the cap needs the system login.
+      const bareClient = await bare.connect();
+      try {
+        await bareClient.query("BEGIN");
+        expect(await new PostgresAskAdmissionGate({ releaseKey: R17, hosted: false }).activeDebates(bareClient)).toBe(0);
+        await bareClient.query("COMMIT");
+      } finally {
+        bareClient.release();
+      }
     } finally {
       await runtime.end();
+      await bare.end();
     }
   });
 });

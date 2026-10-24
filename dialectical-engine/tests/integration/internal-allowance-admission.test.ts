@@ -8,12 +8,19 @@ import { AskRoom } from "../../apps/api/src/ask-room.js";
 import { PersonUsageReader } from "../../apps/api/src/billing/usage.js";
 import { startTestDatabase,type TestDatabase } from "../support/testDatabase.js";
 import { internalFundingFixture } from "../support/internalFundingFixture.js";
+import { createSystemTwin } from "../support/rls-logins.js";
 import { testReleaseKey } from "../support/releaseKey.js";
-let database:TestDatabase,runtime:Pool,fixture:ReturnType<typeof internalFundingFixture>;
+/**
+ * Row-level security (0124, D29): the room, the waker and the usage read run on the API's runtime pool, whose statements
+ * outside a request go to api-system (the billing role and the cross-account marker), so `runtime` is the system twin of
+ * the file's login. `bare` holds the same roles with no account context and no marker: it reads no person and appends
+ * no plan event.
+ */
+let database:TestDatabase,runtime:Pool,bare:Pool,fixture:ReturnType<typeof internalFundingFixture>;
 const plans=billingPlansFromValue(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value,"test:task11");
-beforeAll(async()=>{database=await startTestDatabase();await migrate(database.pool);await database.pool.query("CREATE ROLE task11_admission LOGIN PASSWORD 'private-fixture-only' IN ROLE debateai_runtime,debateai_billing_runtime");const url=new URL(database.connectionString);url.username="task11_admission";url.password="private-fixture-only";runtime=createPool(url.toString());fixture=internalFundingFixture(database.pool,runtime);},120000);
+beforeAll(async()=>{database=await startTestDatabase();await migrate(database.pool);runtime=createPool(await createSystemTwin(database,"task11_admission",["debateai_runtime","debateai_billing_runtime"]));await database.pool.query("CREATE ROLE task11_admission_bare LOGIN PASSWORD 'private-fixture-only' IN ROLE debateai_runtime,debateai_billing_runtime");const url=new URL(database.connectionString);url.username="task11_admission_bare";url.password="private-fixture-only";bare=createPool(url.toString());fixture=internalFundingFixture(database.pool,runtime);},120000);
 afterEach(async()=>{await database.pool.query("INSERT INTO core.run_wait_start(run_id,started_at) SELECT run_id,clock_timestamp() FROM core.run_waiting_v");});
-afterAll(async()=>{await runtime?.end();await database?.stop();});
+afterAll(async()=>{await runtime?.end();await bare?.end();await database?.stop();});
 function source(){const C=(billing as unknown as {FundingAwarePersonAllowanceSource:new(input:unknown)=>any}).FundingAwarePersonAllowanceSource;return new C({allowances:new PostgresInternalAllowanceRepository(runtime),entitlements:new EntitlementRepository(runtime),plans,closeBasisPoints:9500});}
 const settingsClass={planTier:"premium",compositionBudgetTier:"low",makerCount:2,depth:1} as const;
 function room(personAllowance:ReturnType<typeof source>,ceiling=10000000){return new AskRoom({lockPool:database.pool,spend:new PostgresModelSpendStore(runtime),line:new RunWaitRepository(runtime),estimator:{estimateMicros:async()=>1000},personAllowance,entitlements:new EntitlementRepository(runtime),funding:personAllowance,billingPlans:plans,dailyCeilingMicros:ceiling,closeBasisPoints:9500,waitingLinePerPerson:1} as never);}
@@ -155,6 +162,15 @@ describe("actual grant-aware room and waiting admission",()=>{
   expect(spent).toEqual([200000,200000,200000]);
   // The site's day still counts the real spend of both.
   expect(await store.readDaySpentMicros(new Date().toISOString().slice(0,10))).toBeGreaterThanOrEqual(500000);
+ });
+ it("row-level security (0124): the same roles with no account context read no person and append no plan event",async()=>{
+  const actor=await fixture.fundedActor(),now=new Date();
+  // The control on the API's system login: the person reads as Free.
+  expect((await new EntitlementRepository(runtime).current(actor.ownerRef,now)).planId).toBe("FREE");
+  await expect(new EntitlementRepository(bare).current(actor.ownerRef,now)).rejects.toMatchObject({code:"BILLING_OWNER_UNKNOWN"});
+  const tx=await bare.connect();
+  try{await expect(new EntitlementRepository(bare).append(tx,{ownerRef:actor.ownerRef,planId:"PLUS",effectiveAt:now,periodAnchorAt:now,cause:"SUBSCRIBED",subscriptionId:null,paidThrough:new Date(now.getTime()+86400000)})).rejects.toMatchObject({code:"42501"});}finally{tx.release();}
+  expect((await new EntitlementRepository(runtime).current(actor.ownerRef,new Date())).planId).toBe("FREE");
  });
 
 });
