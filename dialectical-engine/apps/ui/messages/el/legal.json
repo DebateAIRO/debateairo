@@ -128,6 +128,8 @@
   "legal.providers.purpose.arguments": "Κείμενο της αντιπαράθεσης — για τη σύνταξη των επιχειρημάτων",
   "legal.providers.purpose.judging": "Κείμενο της αντιπαράθεσης — για την κρίση και τον έλεγχο των επιχειρημάτων",
   "legal.providers.purpose.story": "Η ολοκληρωμένη αντιπαράθεση — για τη σύνταξη της ιστορίας της ετυμηγορίας",
+  "legal.providers.purpose.synthesisCheck": "Η σύνθεση της ολοκληρωμένης αντιπαράθεσης — για τον έλεγχό της ως προς τέσσερις κατηγορίες",
+  "legal.providers.purpose.questionCheck": "Η ερώτηση πριν ξεκινήσει μια αντιπαράθεση — για τον έλεγχο του αν μπορεί να ξεκινήσει",
   "legal.providers.purpose.support": "Όσα πληκτρολογείτε στη συνομιλία υποστήριξης — για να σας απαντήσει",
   "legal.providers.purposesUnconfirmed": "[προς επιβεβαίωση: ποιες από αυτές τις εργασίες του ανατίθενται]",
   "legal.providers.supportName": "Μοντέλο συνομιλίας υποστήριξης",

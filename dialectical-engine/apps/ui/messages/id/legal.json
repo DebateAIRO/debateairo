@@ -128,6 +128,8 @@
   "legal.providers.purpose.arguments": "Teks debat — untuk menulis argumen",
   "legal.providers.purpose.judging": "Teks debat — untuk menilai dan memeriksa argumen",
   "legal.providers.purpose.story": "Debat yang telah selesai — untuk menulis kisah putusan",
+  "legal.providers.purpose.synthesisCheck": "Sintesis debat yang telah selesai — untuk memeriksanya terhadap empat kategori",
+  "legal.providers.purpose.questionCheck": "Pertanyaan sebelum debat dimulai — untuk memeriksa apakah debat boleh dimulai",
   "legal.providers.purpose.support": "Apa yang Anda ketik dalam obrolan dukungan — untuk menjawab Anda",
   "legal.providers.purposesUnconfirmed": "[perlu dikonfirmasi: tugas mana saja yang diberikan kepadanya]",
   "legal.providers.supportName": "Model obrolan dukungan",

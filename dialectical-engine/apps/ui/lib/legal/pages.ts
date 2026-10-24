@@ -169,9 +169,9 @@ export function inventoryCopy(legal: MessageCatalog): MessageCatalog {
 }
 
 /** The jobs a provider can be given, and so why it receives text (PP §5 "what it receives and for what purpose"). */
-export type ProviderPurpose = "arguments" | "judging" | "story" | "support";
+export type ProviderPurpose = "arguments" | "judging" | "story" | "synthesisCheck" | "questionCheck" | "support";
 
-export const PROVIDER_PURPOSES: readonly ProviderPurpose[] = Object.freeze(["arguments", "judging", "story", "support"]);
+export const PROVIDER_PURPOSES: readonly ProviderPurpose[] = Object.freeze(["arguments", "judging", "story", "synthesisCheck", "questionCheck", "support"]);
 
 /** A yes/no fact from the provider's contract, or "unconfirmed" until someone has read that contract. */
 export type ContractFlag = "yes" | "no" | "unconfirmed";
@@ -366,6 +366,9 @@ export const ANTHROPIC_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
   entity: "Anthropic Ireland, Limited",
   homeCountryKey: "legal.providers.ireland",
   // One of the five launch models (owner, 12 October 2026): role rotation gives it every debate job.
+  // It is also the model of the end-of-debate check of each synthesis (synthesis-flag S01-R9; PP §5)
+  // and of the question check before a debate starts (synthesis-flag S04-R5; PP §5).
+  purposes: Object.freeze<ProviderPurpose[]>(["arguments", "judging", "story", "synthesisCheck", "questionCheck"]),
   purposesConfirmed: true,
   locationKey: "legal.providers.locationAnthropic",
   retentionKey: "legal.providers.retentionAnthropic",
@@ -481,10 +484,16 @@ export function providerRegister(previewFreeModelIdsJson: string | undefined): r
         return [row];
     }
   });
+  // The two checks always call Claude Haiku 5.5 on Anthropic's API (synthesis-flag S01-R9, S04-R5), the model and
+  // contract the support chat uses. A build whose debates do not offer Claude Haiku 5.5 shows no Claude row, so the
+  // support chat's row names both checks there and the Register still names their recipient (REV-S03-p1 privacy N2).
+  const support = offers(PREVIEW_ANTHROPIC_MODEL)
+    ? SUPPORT_PROVIDER
+    : Object.freeze({ ...SUPPORT_PROVIDER, purposes: Object.freeze<ProviderPurpose[]>(["synthesisCheck", "questionCheck", "support"]) });
   return Object.freeze([
     ...rows,
     ...(deepInfraModels.length === 0 ? [] : [Object.freeze({ ...DEEPINFRA_PROVIDER, models: deepInfraModels.join(", ") })]),
-    SUPPORT_PROVIDER
+    support
   ]);
 }
 
@@ -504,7 +513,9 @@ export type TermsVersion = Readonly<{
  * that was current before the next revision.
  */
 export const TERMS_VERSIONS: readonly TermsVersion[] = Object.freeze([
-  { version: "2.3", dateKey: "legal.versions.v2.date", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "2.4", dateKey: "legal.versions.v2.date", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "2.3", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+    href: "/terms/versions/0535525218bb7c975ea4f8459bc2011a494efed363bee79d6382805ad5981f6c" },
   { version: "2.2", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/fcffb706c7ab2dcbfa09594dd5b0686e274cc5ba3e3a4377573f5b771c07a660" },
   { version: "2.1", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,

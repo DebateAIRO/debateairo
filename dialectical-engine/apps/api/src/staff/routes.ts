@@ -11,6 +11,10 @@ import type { AuthenticatedSession, SessionApplication } from '../sessions.js';
 import { exactStaffCookie, exactStaffCsrfPair, staffCookies, staffTokenHash, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME, STAFF_CSRF_HEADER, type StaffAccessApplication, type StaffAuthentication } from './access.js';
 import { StaffAlertError, type StaffAlertIntentProducer, type StaffTargetInvitationTransport } from './alerts.js';
 import type { StaffWebAuthnService } from './webauthn.js';
+import { PublicationReviewRefusal } from '@debateai/serve';
+import type { PublicationReviewIntent, PublicationReviewStaffService } from '../publication-review/staff.js';
+import { registerThreatReportRoutes, ThreatReportHttpError, type ThreatReportStaffService } from './threat-reports.js';
+import { TypedDomainError } from '@debateai/kernel';
 export const staffAuthorizationPolicyInventory = Object.freeze([
     { route: 'GET /v1/admin/enrollment', auth: 'user', resource: 'staff-self', action: 'enrollment' },
     { route: 'POST /v1/admin/prerequisites/step-up', auth: 'user', resource: 'staff-self', action: 'prerequisite' },
@@ -31,6 +35,14 @@ export const staffAuthorizationPolicyInventory = Object.freeze([
     // The strict mode selects TEAM_DISABLE or EMERGENCY_DISABLE inside the handler.
     { route: 'POST /v1/admin/team/{staffId}/disable', auth: 'staff', resource: 'staff-team', action: 'disable' },
     { route: 'GET /v1/admin/audit', auth: 'staff', staffCapability: 'AUDIT_READ', resource: 'staff-audit', action: 'list' },
+    { route: 'GET /v1/admin/threat-reports', auth: 'staff', staffCapability: 'THREAT_REPORT', resource: 'staff-threat-report', action: 'list' },
+    { route: 'GET /v1/admin/threat-reports/summary', auth: 'staff', staffCapability: 'THREAT_REPORT', resource: 'staff-threat-report', action: 'summary' },
+    { route: 'GET /v1/admin/threat-reports/{reportRef}', auth: 'staff', staffCapability: 'THREAT_REPORT', resource: 'staff-threat-report', action: 'read' },
+    { route: 'POST /v1/admin/threat-reports/{reportRef}/decision', auth: 'staff', staffCapability: 'THREAT_REPORT', resource: 'staff-threat-report', action: 'decide' },
+    { route: 'GET /v1/admin/publication-reviews', auth: 'staff', staffCapability: 'PUBLICATION_REVIEW', resource: 'staff-publication-review', action: 'list' },
+    { route: 'GET /v1/admin/publication-reviews/{reviewRef}', auth: 'staff', staffCapability: 'PUBLICATION_REVIEW', resource: 'staff-publication-review', action: 'read' },
+    { route: 'POST /v1/admin/publication-reviews/{reviewRef}/approve', auth: 'staff', staffCapability: 'PUBLICATION_REVIEW', resource: 'staff-publication-review', action: 'approve' },
+    { route: 'POST /v1/admin/publication-reviews/{reviewRef}/refuse', auth: 'staff', staffCapability: 'PUBLICATION_REVIEW', resource: 'staff-publication-review', action: 'refuse' },
     { route: 'POST /v1/admin/internal-allowances', auth: 'staff', staffCapability: 'ALLOWANCE_WRITE', resource: 'staff-self', action: 'allowance-configure' },
     { route: 'DELETE /v1/admin/internal-allowances/{grantId}', auth: 'staff', staffCapability: 'ALLOWANCE_WRITE', resource: 'staff-self', action: 'allowance-revoke' }
 ] as const);
@@ -43,6 +55,8 @@ export interface StaffHttpApplication {
     intents: Pick<StaffAlertIntentProducer, 'mutation' | 'newInvitation' | 'enrollment'>;
     targetInvitationTransport?: StaffTargetInvitationTransport;
     funding?: StaffInternalFundingApplication;
+    publicationReviews?: PublicationReviewStaffService;
+    threatReports?: ThreatReportStaffService;
     /** Early lock check before any key ceremony (not the authority: the alert producer and the DB guard
      * still check every mutation). Production passes the runtime's readiness; absent, only those run. */
     readiness?: Readonly<{ readIndependentAlertReadiness(): Promise<'READY' | 'UNAVAILABLE'> }>;
@@ -81,7 +95,14 @@ const ordinary = (base: AuthenticatedSession) => ({ userId: base.userId, ordinar
 const reason = (wire: z.infer<typeof contract.ReasonSchema>): Reason => ({ code: wire.code, ...(wire.ticket_ref === undefined ? {} : { ticketRef: wire.ticket_ref }) });
 const receipt = (value: SecurityReceipt) => ({ operation_id: value.operationId, outcome: value.outcome, recorded_at: value.recordedAt.toISOString() });
 /** Fixed field order + sorted sets make the proof independent of browser object/key ordering. */
-export function canonicalStaffActionBinding(intent: contract.StaffActionIntent, auth: StaffAuthentication): ActionBinding {
+export function canonicalStaffActionBinding(intent: Exclude<contract.StaffActionIntent, PublicationReviewIntent>, auth: StaffAuthentication): ActionBinding {
+    if (intent.action === 'THREAT_REPORT_DECIDE') {
+        const action = `THREAT_REPORT_${intent.decision}` as const;
+        const body = { action, target_id: intent.target_report_ref, decision: intent.decision,
+            expected_revision: intent.expected_revision, operation_id: intent.operation_id };
+        return { action, targetId: intent.target_report_ref, expectedRevision: intent.expected_revision,
+            operationId: intent.operation_id, bodySha256: createHash('sha256').update(JSON.stringify(body)).digest('hex') };
+    }
     if (intent.action === 'CREDENTIAL_REGISTER') {
         const body = { action: intent.action, target_id: auth.context.userId, expected_revision: auth.context.grantRevision, operation_id: intent.operation_id };
         return { action: intent.action, targetId: auth.context.userId, expectedRevision: auth.context.grantRevision,
@@ -116,6 +137,8 @@ export function canonicalInternalAllowanceActionBinding(input: contract.Internal
 }
 function capability(intent: contract.FundedStaffActionIntent): StaffCapability | null {
     if (intent.action === 'ALLOWANCE_CONFIGURE' || intent.action === 'ALLOWANCE_REVOKE') return 'ALLOWANCE_WRITE';
+    if (intent.action === 'PUBLICATION_REVIEW_APPROVE' || intent.action === 'PUBLICATION_REVIEW_REFUSE') return 'PUBLICATION_REVIEW';
+    if (intent.action === 'THREAT_REPORT_DECIDE') return 'THREAT_REPORT';
     return intent.action === 'CREDENTIAL_REGISTER' ? null : intent.action;
 }
 export function registerStaffRoutes(api: FastifyInstance, application: StaffHttpApplication | undefined, routePolicy: RoutePolicy, transport: StaffRouteTransport): void {
@@ -148,6 +171,9 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
                 authentication.baseSession.tokenHash, intent.action === 'ALLOWANCE_REVOKE' ? intent.grant_id : null);
             if (authentication.context.designation !== 'OWNER' || allowanceState.ownerRef !== authentication.baseSession.ownerRef) refuse();
             binding = canonicalInternalAllowanceActionBinding(intent, allowanceState);
+        } else if (intent.action === 'PUBLICATION_REVIEW_APPROVE' || intent.action === 'PUBLICATION_REVIEW_REFUSE') {
+            if (application!.publicationReviews === undefined) throw new StaffHttpRefusal(503, 'STAFF_UNAVAILABLE');
+            binding = await application!.publicationReviews.decisionBinding(authentication, intent);
         } else binding = canonicalStaffActionBinding(intent, authentication);
         await application!.access.assertCurrent(authentication);
         if (required !== null)
@@ -175,6 +201,20 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
                 catch (error) {
                     if (error instanceof StaffHttpRefusal)
                         return reply.code(error.status).send({ error: error.code });
+                    if (error instanceof ThreatReportHttpError)
+                        return reply.code(error.status).send({ error: error.code });
+                    if (error instanceof TypedDomainError && error.code.startsWith('THREAT_REPORT_')) {
+                        const status = error.code === 'THREAT_REPORT_NOT_FOUND' ? 404
+                            : error.code === 'THREAT_REPORT_OWN' ? 403
+                            : error.code === 'THREAT_REPORT_ALREADY_DECIDED' ? 409 : 403;
+                        return reply.code(status).send({ error: error.code });
+                    }
+                    if (error instanceof PublicationReviewRefusal) {
+                        const status = error.code === 'PUBLICATION_REVIEW_NOT_FOUND' ? 404
+                            : error.code === 'PUBLICATION_REVIEW_OWN_DEBATE' || error.code === 'PUBLICATION_REVIEW_SAME_REVIEWER' ? 403
+                            : error.code === 'PUBLICATION_REVIEW_UNAVAILABLE' ? 503 : 409;
+                        return reply.code(status).send({ error: error.code });
+                    }
                     // Team tools are locked: no fresh independent alert readiness for this action (no destination exposed).
                     if ((error instanceof StaffAlertError && error.code === 'STAFF_ALERT_UNAVAILABLE') || lockedByDatabaseGuard(error))
                         return reply.code(503).send({ error: 'STAFF_ALERT_UNAVAILABLE' });
@@ -273,6 +313,48 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
         await application!.access.requireCapability(authentication, 'AUDIT_READ');
         return project(contract.StaffAuditPageSchema, await application!.repository.readAuditPage({ context: authentication.context, ordinaryTokenHash: authentication.baseSession.tokenHash, limit: query.limit, ...(query.cursor === undefined ? {} : { cursor: query.cursor }) }));
     });
+    registerThreatReportRoutes(route, application?.threatReports, application?.access, auth, actionAuthority);
+    const reviewRef = (request: FastifyRequest): string => {
+        const value = (request.params as { reviewRef?: unknown }).reviewRef;
+        if (!contract.PublicationReviewQueueItemSchema.shape.review_ref.safeParse(value).success)
+            throw new StaffHttpRefusal(404, 'PUBLICATION_REVIEW_NOT_FOUND');
+        return value as string;
+    };
+    route('GET', '/v1/admin/publication-reviews', async (request, reply) => {
+        reply.header('Cache-Control', 'no-store');
+        const authentication = auth(request);
+        await application!.access.requireCapability(authentication, 'PUBLICATION_REVIEW');
+        if (application!.publicationReviews === undefined) throw new StaffHttpRefusal(503, 'STAFF_UNAVAILABLE');
+        return project(contract.PublicationReviewQueuePageSchema, await application!.publicationReviews.list(authentication));
+    });
+    route('GET', '/v1/admin/publication-reviews/:reviewRef', async (request, reply) => {
+        reply.header('Cache-Control', 'no-store');
+        const authentication = auth(request);
+        await application!.access.requireCapability(authentication, 'PUBLICATION_REVIEW');
+        if (application!.publicationReviews === undefined) throw new StaffHttpRefusal(503, 'STAFF_UNAVAILABLE');
+        return project(contract.PublicationReviewSnapshotSchema, await application!.publicationReviews.read(authentication, reviewRef(request)));
+    });
+    async function decideReview(request: FastifyRequest, action: 'PUBLICATION_REVIEW_APPROVE' | 'PUBLICATION_REVIEW_REFUSE') {
+        const ref = reviewRef(request);
+        let intent: PublicationReviewIntent;
+        let proofHandle: string;
+        if (action === 'PUBLICATION_REVIEW_APPROVE') {
+            const input = parse(contract.PublicationReviewApproveRequestSchema, request.body);
+            intent = { action, review_ref: ref, operation_id: input.operation_id };
+            proofHandle = input.proof_handle;
+        } else {
+            const input = parse(contract.PublicationReviewRefuseRequestSchema, request.body);
+            intent = { action, review_ref: ref, operation_id: input.operation_id, reason: input.reason };
+            proofHandle = input.proof_handle;
+        }
+        const { authentication, binding } = await actionAuthority(request, intent);
+        const proof = await application!.access.readActionProof(authentication, proofHandle, binding);
+        if (proof === null) refuse();
+        return project(contract.PublicationReviewDecisionResponseSchema,
+            await application!.publicationReviews!.decide(authentication, intent, proof.proofId, binding));
+    }
+    route('POST', '/v1/admin/publication-reviews/:reviewRef/approve', request => decideReview(request, 'PUBLICATION_REVIEW_APPROVE'));
+    route('POST', '/v1/admin/publication-reviews/:reviewRef/refuse', request => decideReview(request, 'PUBLICATION_REVIEW_REFUSE'));
     route('POST', '/v1/admin/team/invitations', async (request) => {
         const input = parse(contract.StaffInviteRequestSchema, request.body);
         const intent: contract.StaffActionIntent = { action: 'TEAM_INVITE', target_user_id: input.target_user_id, capabilities: input.capabilities,

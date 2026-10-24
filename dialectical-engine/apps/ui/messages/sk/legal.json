@@ -128,6 +128,8 @@
   "legal.providers.purpose.arguments": "Text debaty — na písanie argumentov",
   "legal.providers.purpose.judging": "Text debaty — na hodnotenie a kontrolu argumentov",
   "legal.providers.purpose.story": "Dokončená debata — na napísanie príbehu verdiktu",
+  "legal.providers.purpose.synthesisCheck": "Syntéza dokončenej debaty — na jej kontrolu z hľadiska štyroch kategórií",
+  "legal.providers.purpose.questionCheck": "Otázka pred začatím debaty — na kontrolu, či debata môže začať",
   "legal.providers.purpose.support": "Čo napíšete do chatu podpory — aby vám mohol odpovedať",
   "legal.providers.purposesUnconfirmed": "[na overenie: ktoré z týchto úloh plní]",
   "legal.providers.supportName": "Model chatu podpory",

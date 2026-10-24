@@ -1,4 +1,4 @@
-import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS, previewProviderSocket } from "@debateai/providers";
+import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS, previewProviderSocket, previewModelRow } from "@debateai/providers";
 import { readModelScorecard, readEngineVersion, questionLanguagePolicyStartValues, readQuestionLanguagePolicy } from "@debateai/register";
 import { composeQuestionLanguage, hostedQuestionLanguageRoute, questionLanguageRouteFor } from "./question-language/boot.js";
 import { questionLanguageReferenceKeyFrom } from "./question-language/reference.js";
@@ -46,6 +46,7 @@ import {
   assertPublicationSecretDomains,
   configureCustodyGroup,
   ContentCipher,
+  type CryptoEnvelope,
   decrypt,
   openRecord,
   FilePublicationKeyStore,
@@ -56,7 +57,7 @@ import {
   PublicationCipher,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
+import { AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresThreatReportRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, SynthesisCheckErasureCoordinator, PostgresSynthesisCheckErasureRepository, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
 // Role rotation (spec 2026-10-11): the per-role, per-model counts admission reads when the row is ON.
 import { readRoleRotationCounts } from "@debateai/db";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes, type AskRequest } from "@debateai/contract";
@@ -91,6 +92,7 @@ import {
   readMfaPolicy,
   readProductRolePolicy,
   readPublicationCheckPolicy,
+  readQuestionCheckPolicy,
   readAnswerRoleRotationPolicy,
   readDebateShapePolicy,
   debateShapeInForce,
@@ -117,8 +119,10 @@ import {
   assertRunCeilingCoversOneCall,
   costEnvelopeGuardPolicy,
   languageCheckSpendWriterPresent,
+  questionCheckSpendWriterPresent,
   mostOneRunMaySpendMicros,
-  recordLanguageCheckSpend
+  recordLanguageCheckSpend,
+  recordQuestionCheckSpend
 } from "@debateai/budget";
 import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
 import { firstCallPlanModels } from "@debateai/scorecard";
@@ -163,8 +167,21 @@ import { SessionService } from "./sessions.js";
 import { StaffWebAuthnService } from "./staff/webauthn.js";
 import { StaffAccessService } from "./staff/access.js";
 import { createStaffRuntime } from "./staff/runtime.js";
-import { PostgresPublicationApplication } from "./publications.js";
+import { PostgresPublicationApplication, buildPublicDebateBody } from "./publications.js";
+import { createPublicationReviewStaffService } from "./publication-review/staff.js";
 import { createPublicationContentCheck } from "./publication-check/check.js";
+import { composeQuestionCheck } from "./question-check/compose.js";
+import { startThreatReportAlerts } from "./staff/threat-report-alert.js";
+import { startThreatReportErasure, threatReportEmailHold } from "./staff/threat-report-closure.js";
+import { threatReportEmailReader } from "./staff/threat-reports.js";
+import { PublicationReviewRefusal, PublicationReviewRepository, SynthesisCheckRepository, originVersionOf, synthesisTextOf, verdictOfRecord } from "@debateai/serve";
+import { ownerSession, readOwnerAnswer } from "./owner-read.js";
+import { SynthesisCheckWorker } from "./synthesis-check/worker.js";
+import type { SynthesisCheckDeps } from "./synthesis-check/check.js";
+import { createSynthesisPublishGate } from "./synthesis-check/publish-gate.js";
+import { createSynthesisAnswerAccess } from "./synthesis-check/hold.js";
+import { createSynthesisCheckTransport, synthesisCheckOffFlagPath } from "./synthesis-check/transport.js";
+import { createLocalOffFlagSwitch } from "./publication-check/judge-transport.js";
 import { createPublicationJudgeSwitch, createPublicationJudgeTransport, publicationJudgeOffFlagPath } from "./publication-check/judge-transport.js";
 import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } from "./stories.js";
 import { RepositoryAnswerDisclosureApplication } from "./disclosures.js";
@@ -1019,11 +1036,15 @@ const staffAccess = environment.STAFF_ACCESS.policyVersion === 2
 const staffAlerts = environment.STAFF_ACCESS.policyVersion === 2
   ? await boot.run("staff-activation", () => createStaffRuntime({environment:environment.STAFF_ACCESS as Extract<typeof environment.STAFF_ACCESS,{policyVersion:2}>,registerVersion:environment.REGISTER_VERSION,publicAppUrl:environment.PUBLIC_APP_URL,pool,keys:dekStore,deploymentMode:environment.DEPLOYMENT_MODE,billingPlans:askRoomComposition?.billingPlans??null,providerTargets:declaredProviderTargets,log:code=>console.error('[STAFF_ALERT_FAILURE]',code)})) : undefined;
 if (staffAlerts !== undefined) boot.hold({end:()=>staffAlerts.close()});
+const threatReportRepository = new PostgresThreatReportRepository(pool);
+const readThreatReportRecipientEmail = threatReportEmailReader(pool, dekStore);
+const readThreatReportStaffEmail = threatReportEmailReader(pool, dekStore, "staff");
 const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undefined : {
   access: staffAccess, sessions, repository: new PostgresStaffRepository(pool),
   webauthn: new StaffWebAuthnService(new PostgresStaffRepository(pool), {publicAppUrl: environment.PUBLIC_APP_URL}),
   intents: staffAlerts.intents, readiness: staffAlerts.readiness,
   targetInvitationTransport: staffAlerts.targetInvitationTransport,
+  threatReports: { repository: threatReportRepository, readRecipientEmail: readThreatReportRecipientEmail },
   ...(staffAlerts.funding === undefined ? {} : { funding: staffAlerts.funding })
 };
 // Self-service profile/recovery capabilities use the existing authorization
@@ -1179,11 +1200,29 @@ const accountErasureRepository = new PostgresAccountErasureRepository(
   erasurePool,auditContextHasher,contentProvisionPool
 );
 const accountErasure = new AccountErasureCoordinator(
-  accountErasureRepository,dekStore,runKeyStore,publicationCipher
+  accountErasureRepository,dekStore,runKeyStore,publicationCipher,{
+    readEmailCiphertext: async userId => (await pool.query<{ email_ciphertext: CryptoEnvelope }>(
+      'SELECT email_ciphertext FROM identity."user" WHERE user_id=$1', [userId]
+    )).rows[0]?.email_ciphertext ?? null,
+    beforeKeyDestruction: threatReportEmailHold(threatReportRepository)
+  }
 );
+const threatReportAlertsTimer = startThreatReportAlerts({
+  repository: threatReportRepository,
+  mail: new TemplatedMailSender({
+    executable: environment.MAIL_SENDMAIL_PATH,
+    from: environment.MAIL_FROM,
+    timeoutMs: authPolicy.channel.transportTimeoutMs
+  }),
+  readRecipientEmail: readThreatReportStaffEmail
+});
+const threatReportErasureTimer = startThreatReportErasure({ repository: threatReportRepository });
 const privateErasure = new PrivateRunErasureCoordinator(
   new PostgresPrivateRunErasureRepository(erasurePool,auditContextHasher),
   runKeyStore,publicationCipher
+);
+const synthesisCheckErasure = new SynthesisCheckErasureCoordinator(
+  new PostgresSynthesisCheckErasureRepository(erasurePool), runKeyStore, publicationCipher
 );
 const erasureApplication=new PostgresAccountErasureApplication(
   accountErasureRepository,privateErasure
@@ -1205,6 +1244,7 @@ const reconcileErasure = async ():Promise<void> => {
   try { await consumerSecurityNotices.reconcile(100); } catch { console.error('[CONSUMER_SECURITY_NOTICE_PENDING]'); }
   await erasureNotifications.reconcile(100);
   await accountErasure.reconcileRunKeyProvisionIntents(100);
+  try { await synthesisCheckErasure.reconcile(100); } catch { console.error('[SYNTHESIS_CHECK_ERASURE_PENDING]'); }
   await privateErasure.reconcile(reconciliationSource(),100);
   await accountErasure.reconcile(reconciliationSource(),100);
 };
@@ -1339,6 +1379,130 @@ const publicationContentCheck = createPublicationContentCheck({
   clock: () => new Date(),
   deadlineMs: publicationCheckPolicy.deadlineMs
 });
+const questionCheckPolicy = await boot.run("question-check-policy", () =>
+  readQuestionCheckPolicy(pool, environment.REGISTER_VERSION));
+const questionCheck = await boot.run("question-check", () => composeQuestionCheck({
+  mode: environment.DEPLOYMENT_MODE,
+  apiPort: environment.API_PORT,
+  target: supportModelTarget,
+  readAuthorizationHeader: readCustodyAuthorizationHeader,
+  reportDiagnostic: reportSupportDiagnostic,
+  policy: questionCheckPolicy,
+  spend: {
+    writerPresent: () => questionCheckSpendWriterPresent(pool),
+    record: entry => recordQuestionCheckSpend(pool, entry)
+  },
+  dayPot: costEnvelopeRows === undefined ? null : {
+    ceilingMicros: costEnvelopeRows.guardPolicy.dailyCeilingMicros,
+    spentMicros: day => new PostgresModelSpendStore(pool).readDaySpentMicros(day)
+  },
+  keeper: { keep: async (questionLine, accountUserId) => {
+    try {
+      return await threatReportRepository.keep(questionLine, accountUserId);
+    } catch (error) {
+      if (accountUserId === null || !(error instanceof Error)
+        || error.message !== "THREAT_REPORT_ACCOUNT_ERASING") throw error;
+      const email = await readThreatReportRecipientEmail(accountUserId);
+      if (email === null) throw error;
+      return threatReportRepository.keepWithHeldEmail(questionLine, accountUserId, email);
+    }
+  } },
+  clock: () => new Date(),
+  report: line => console.error(JSON.stringify(line))
+}));
+const synthesisCheckOffFlag = environment.DEPLOYMENT_MODE === "hosted" ? null : synthesisCheckOffFlagPath(environment.API_PORT);
+const synthesisCheckSwitch = createLocalOffFlagSwitch(supportModelTarget === undefined ? null
+  : createSynthesisCheckTransport(supportModelTarget, {
+    readAuthorizationHeader: readCustodyAuthorizationHeader,
+    reportDiagnostic: reportSupportDiagnostic,
+    deadlineMs: publicationCheckPolicy.deadlineMs
+  }), { offFlagPath: synthesisCheckOffFlag });
+const synthesisCheckRepository = new SynthesisCheckRepository(pool);
+const publicationReviewRepository = new PublicationReviewRepository(pool);
+const synthesisAnswerAccess = createSynthesisAnswerAccess({ repository: synthesisCheckRepository, deadlineMs: publicationCheckPolicy.deadlineMs });
+const synthesisCheckDeps: SynthesisCheckDeps = {
+  port: synthesisCheckSwitch.current,
+  deadlineMs: publicationCheckPolicy.deadlineMs,
+  ...(costEnvelopeRows === undefined ? {} : { dayPot: {
+    ceilingMicros: costEnvelopeRows.guardPolicy.dailyCeilingMicros,
+    spentMicros: (day: string) => new PostgresModelSpendStore(pool).readDaySpentMicros(day)
+  } }),
+  recordSpend: (entry) =>
+    new PostgresModelSpendStore(pool).recordSpend({ ...entry, spendId: randomUUID() }),
+  priceOf: (model: string) => {
+    const row = previewModelRow(model);
+    return row === undefined ? null : { inputUsdPerM: row.inputUsdPerM, outputUsdPerM: row.outputUsdPerM };
+  },
+  clock: () => new Date(),
+  log: (line: { event: string; answer_id: string; answer_version: number; code: string }) => console.error(JSON.stringify(line))
+};
+const readSynthesisAnswer = (runId: string, answerId: string, version: number, ownerRef: string) =>
+  application.readAnswer(answerId, ownerSession(ownerRef, "00000000-0000-0000-0000-000000000000"),
+    version, { ownerRef, legacyAskerId: null });
+const synthesisPublishGate = createSynthesisPublishGate({
+  repository: synthesisCheckRepository,
+  approvalCovers: input => publicationReviewRepository.approvalCovers(input),
+  readAnswerVersions: async (runId, answerId, maxVersion, ownerRef) => {
+    const texts = new Map<number, string | null>();
+    for (let version = 1; version <= maxVersion; version++) {
+      const answer = await readSynthesisAnswer(runId, answerId, version, ownerRef);
+      if (answer === null) throw new Error("SYNTHESIS_ANSWER_UNREADABLE");
+      texts.set(version, synthesisTextOf(answer));
+    }
+    return texts;
+  },
+  check: synthesisCheckDeps, deadlineMs: publicationCheckPolicy.deadlineMs,
+  clock: () => new Date(), sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+});
+const synthesisCheckWorker = new SynthesisCheckWorker({
+  repository: synthesisCheckRepository, erasure: synthesisCheckErasure,
+  withContentLease: (runId, use) => application.withContentLease(runId, use),
+  readAnswer: readSynthesisAnswer, check: synthesisCheckDeps,
+  deadlineMs: publicationCheckPolicy.deadlineMs,
+  log: (line) => console.error(`[${line}]`)
+});
+const publicationReviewStaff = createPublicationReviewStaffService({
+  repository: publicationReviewRepository,
+  readVerdictCategories: ({ runId, answerId, originVersion }) =>
+    application.withContentLease(runId, async () => [
+      ...(verdictOfRecord(await synthesisCheckRepository.readRecords({ runId, answerId, maxVersion: originVersion }),
+        (version) => version === originVersion)?.categories ?? [])
+    ]),
+  readReviewBody: (opened) => application.withContentLease(opened.runId, async () => {
+    const session = ownerSession(opened.ownerRef, "00000000-0000-0000-0000-000000000000");
+    const ownership = { ownerRef: opened.ownerRef, legacyAskerId: null };
+    const reviewDeps = { application, synthesisAnswerAccess };
+    const current = await application.readAnswer(opened.answerId, session, undefined, ownership);
+    if (current === null) throw new PublicationReviewRefusal("PUBLICATION_REVIEW_NOT_FOUND");
+    const bound = current.answer_version;
+    const origin = await readSynthesisAnswer(opened.runId, opened.answerId, opened.originVersion, opened.ownerRef);
+    if (origin === null) throw new PublicationReviewRefusal("PUBLICATION_REVIEW_NOT_FOUND");
+    const originText = synthesisTextOf(origin);
+    for (let version = bound; version >= opened.originVersion; version--) {
+      const candidate = await readOwnerAnswer(reviewDeps, opened.answerId, version, session, ownership);
+      if (candidate === null || synthesisTextOf(candidate) !== originText) continue;
+      return {
+        answerVersion: candidate.answer_version,
+        body: await buildPublicDebateBody({
+          runId: opened.runId, answer: candidate,
+          owner: { userId: opened.ownerUserId, ownerRef: opened.ownerRef },
+          readers: {
+            stories: new RepositoryPublicationStoryReader(storyRepository),
+            repository: new PostgresPublicationRepository(pool, auditContextHasher), mapViews
+          },
+          source: { ip: "", userAgent: "", requestId: "staff-publication-review" }
+        })
+      };
+    }
+    throw new PublicationReviewRefusal("PUBLICATION_REVIEW_NOT_FOUND");
+  })
+});
+const SYNTHESIS_CHECK_TICK_MS = 5_000;
+const triggerSynthesisCheckWork = createSingleFlightErasureReconciler(
+  () => synthesisCheckWorker.runOnce(), () => console.error("[SYNTHESIS_CHECK_WORK_PENDING]")
+);
+const synthesisCheckTimer = setInterval(triggerSynthesisCheckWork, SYNTHESIS_CHECK_TICK_MS);
+synthesisCheckTimer.unref();
 if (publicationJudgeOffFlag !== null) installPublicationJudgeSwitchSignal(process, publicationJudgeSwitch);
 const supportModelReservations = new SupportModelReservationLedger({
   processId: `support-api-${process.pid}`,
@@ -1562,13 +1726,13 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
     from: environment.MAIL_FROM,
     timeoutMs: authPolicy.channel.transportTimeoutMs
   }));
-  const ownerDeps = { application, stories: ownerStories, disclosures: ownerDisclosures };
+  const ownerDeps = { application, stories: ownerStories, disclosures: ownerDisclosures, synthesisAnswerAccess };
   dataExport = new DataExportApplication({
     repository, store, mail, archiveCatalog: loadArchiveCatalog,
     publicAppUrl: environment.PUBLIC_APP_URL, workerId: randomUUID(),
     collect: (claim, workerId) => collectSnapshot({
       claim, workerId, source,
-      ownerView: new OwnerViewAdapter(ownerDeps, runKeyStore, claim.sessionId),
+      ownerView: new OwnerViewAdapter(ownerDeps, runKeyStore, publicationReviewRepository, claim.sessionId),
       decrypt: {
         openUserField: async (userId, field, envelope) => {
           const dek = await dekStore.load(userId);
@@ -1602,6 +1766,7 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
   dataExportTimer.unref();
 }
 const api = buildApi({
+  questionCheck,
   ...(previewConfig === undefined ? {} : { previewProviderTestConfig: previewConfig, previewTeamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [] }),
   application,
   stories: ownerStories,
@@ -1633,7 +1798,7 @@ const api = buildApi({
   consumerWebAuthn: new ConsumerWebAuthnService(new PostgresConsumerAuthRepository(authorizationPool,auditContextHasher),sessions.consumerProducer(),{publicAppUrl:environment.PUBLIC_APP_URL}),
   ...(staffAccess === undefined ? {} : { staffAccess }),
   staffPolicyVersion: environment.STAFF_ACCESS.policyVersion,
-  ...(staffHttp === undefined ? {} : {staff: staffHttp}),
+  ...(staffHttp === undefined ? {} : { staff: { ...staffHttp, publicationReviews: publicationReviewStaff } }),
   legacyRunClaim,
   legal,
   emailChange,
@@ -1687,6 +1852,37 @@ const api = buildApi({
   },
   ...(publications === undefined ? {} : { publications }),
   publicationContentCheck,
+  publicationReviews: {
+    repository: publicationReviewRepository,
+    readOwnedAnswer: async ({ runId, authenticated }) => {
+      const live = await pool.query<{ live: boolean }>(
+        "SELECT core.run_private_content_is_live($1) AND NOT serve.run_removed_by_synthesis_check($1) AS live",
+        [runId]
+      );
+      if (!live.rows[0]?.live) return null;
+      return application.withContentLease(runId, () => application.readRunAnswer(
+        runId, authenticated.session, { ownerRef: authenticated.ownerRef, legacyAskerId: null }
+      ));
+    },
+    readVerdictOfRecord: async ({ runId, authenticated, answer }) => {
+      const texts = await application.withContentLease(runId, async () => {
+        const versions = new Map<number, string | null>();
+        for (let version = 1; version <= answer.answer_version; version++) {
+          const candidate = await readSynthesisAnswer(runId, answer.answer_id, version, authenticated.ownerRef);
+          if (candidate === null) return null;
+          versions.set(version, synthesisTextOf(candidate));
+        }
+        return versions;
+      });
+      if (texts === null) return null;
+      const origin = originVersionOf(texts, answer.answer_version);
+      return verdictOfRecord(await synthesisCheckRepository.readRecords({
+        runId, answerId: answer.answer_id, maxVersion: answer.answer_version
+      }), candidate => candidate === origin);
+    }
+  },
+  synthesisPublishGate,
+  synthesisAnswerAccess,
   allowedOrigin: environment.PUBLIC_APP_URL,
   ...(evaluatorDevMenu === undefined ? {} : {
     evaluatorDevMenu,
@@ -1697,6 +1893,9 @@ if (publicationCleanupTimer !== undefined) {
   api.addHook("onClose",async () => clearInterval(publicationCleanupTimer));
 }
 api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
+api.addHook("onClose",async () => clearInterval(threatReportAlertsTimer));
+api.addHook("onClose",async () => clearInterval(threatReportErasureTimer));
+api.addHook("onClose",async () => clearInterval(synthesisCheckTimer));
 api.addHook("onClose",async () => { if (dataExportTimer !== undefined) clearInterval(dataExportTimer); });
 api.addHook("onClose",async () => billingRuntime?.stop());
 api.addHook("onClose",async () => providerOnlyJobs?.stop());

@@ -8,9 +8,16 @@ import type { RunOwnershipAccess } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import { STORY_UNREADABLE, answerCarriesStoryLabel, buildAnswerStory, deriveStoryStatus } from "@debateai/story";
 import { apiOperationalErrorDiagnostic, type ApiOptions } from "./index.js";
+import { OPEN_SYNTHESIS_ANSWER_ACCESS } from "./synthesis-check/hold.js";
 
-export type OwnerReadDeps = Pick<ApiOptions, "application" | "stories" | "disclosures" | "storyClock">;
+export type OwnerReadDeps = Pick<ApiOptions, "application" | "stories" | "disclosures" | "storyClock" | "synthesisAnswerAccess">;
 type LogContext = Readonly<{ requestId: string; route: string }>;
+
+async function answerIsShown(d: OwnerReadDeps, answer: Pick<Answer, "run_ref" | "answer_id" | "answer_version">): Promise<boolean> {
+  return (await (d.synthesisAnswerAccess ?? OPEN_SYNTHESIS_ANSWER_ACCESS).stateOf({
+    runId: answer.run_ref, answerId: answer.answer_id, answerVersion: answer.answer_version
+  })) === "SHOW";
+}
 
 export function ownerSession(ownerRef: string, sessionId: string): Session {
   return Object.freeze({
@@ -26,26 +33,33 @@ export async function readOwnerRun(
   d: OwnerReadDeps, runId: string, session: Session, ownership: RunOwnershipAccess
 ): Promise<RunProjection | null> {
   const run = await d.application.readRun(runId, session, ownership);
-  return run === null ? null : RunProjectionSchema.parse(run);
+  if (run === null) return null;
+  const state = await (d.synthesisAnswerAccess ?? OPEN_SYNTHESIS_ANSWER_ACCESS).stateOf({ runId });
+  if (state === "REMOVED") return null;
+  return RunProjectionSchema.parse(state === "HELD" ? { ...run, synthesis_check: "CHECKING" } : run);
 }
 
 export async function readOwnerRunAnswer(
   d: OwnerReadDeps, runId: string, session: Session, ownership: RunOwnershipAccess
 ): Promise<Answer | null> {
   const answer = await d.application.readRunAnswer(runId, session, ownership);
-  return answer === null ? null : AnswerSchema.parse(answer);
+  return answer === null || !await answerIsShown(d, answer) ? null : AnswerSchema.parse(answer);
 }
 
 export async function readOwnerAnswer(
   d: OwnerReadDeps, answerId: string, version: number | undefined, session: Session, ownership: RunOwnershipAccess
 ): Promise<Answer | null> {
   const answer = await d.application.readAnswer(answerId, session, version, ownership);
-  return answer === null ? null : AnswerSchema.parse(answer);
+  return answer === null || !await answerIsShown(d, answer) ? null : AnswerSchema.parse(answer);
 }
 
 export async function readOwnerInspection(
   d: OwnerReadDeps, answerId: string, version: number | undefined, session: Session, ownership: RunOwnershipAccess
 ): Promise<Inspection | null> {
+  if (d.synthesisAnswerAccess !== undefined) {
+    const answer = await d.application.readAnswer(answerId, session, version, ownership);
+    if (answer === null || !await answerIsShown(d, answer)) return null;
+  }
   const inspection = await d.application.readInspection(answerId, session, version, ownership);
   return inspection === null ? null : InspectionSchema.parse(inspection);
 }
@@ -53,6 +67,10 @@ export async function readOwnerInspection(
 export async function readOwnerLedgerDigest(
   d: OwnerReadDeps, answerId: string, session: Session, ownership: RunOwnershipAccess
 ): Promise<ExecutionLedgerDigest | null> {
+  if (d.synthesisAnswerAccess !== undefined) {
+    const answer = await d.application.readAnswer(answerId, session, undefined, ownership);
+    if (answer === null || !await answerIsShown(d, answer)) return null;
+  }
   const digest = await d.application.readLedgerDigest(answerId, session, ownership);
   return digest === null ? null : ExecutionLedgerDigestSchema.parse(digest);
 }
@@ -65,6 +83,7 @@ export async function readOwnerStory(
   if (stories === undefined) return null;
   const answer = await d.application.readAnswer(answerId, session, undefined, ownership);
   if (answer === null) return null;
+  if (!await answerIsShown(d, answer)) return null;
   let body: AnswerStory;
   try {
     const stored = await stories.readStory({
@@ -117,6 +136,7 @@ export async function readOwnerDisclosure(
   if (disclosures === undefined) return null;
   const answer = await d.application.readAnswer(answerId, session, undefined, ownership);
   if (answer === null) return null;
+  if (!await answerIsShown(d, answer)) return null;
   let disclosure: AnswerDisclosure | null;
   try {
     const read = await disclosures.readDisclosure({ answerId: answer.answer_id, ownership });
@@ -138,6 +158,10 @@ export async function readOwnerDisclosure(
 export async function readOwnerNode(
   d: OwnerReadDeps, answerId: string, nodeId: string, session: Session, ownership: RunOwnershipAccess
 ): Promise<Node | null> {
+  if (d.synthesisAnswerAccess !== undefined) {
+    const answer = await d.application.readAnswer(answerId, session, undefined, ownership);
+    if (answer === null || !await answerIsShown(d, answer)) return null;
+  }
   const node = await d.application.readNode(answerId, nodeId, session, ownership);
   return node === null ? null : NodeSchema.parse(node);
 }

@@ -128,6 +128,8 @@
   "legal.providers.purpose.arguments": "Text der Debatte – zum Verfassen der Argumente",
   "legal.providers.purpose.judging": "Text der Debatte – zur Bewertung und Prüfung der Argumente",
   "legal.providers.purpose.story": "Die abgeschlossene Debatte – zum Verfassen der Geschichte hinter dem Urteil",
+  "legal.providers.purpose.synthesisCheck": "Die Synthese einer abgeschlossenen Debatte – zur Prüfung auf vier Kategorien",
+  "legal.providers.purpose.questionCheck": "Eine Frage, bevor eine Debatte beginnt – zur Prüfung, ob die Debatte beginnen darf",
   "legal.providers.purpose.support": "Was Sie in den Support-Chat eingeben – um Ihnen zu antworten",
   "legal.providers.purposesUnconfirmed": "[zu bestätigen: welche dieser Aufgaben er übernimmt]",
   "legal.providers.supportName": "Modell des Support-Chats",

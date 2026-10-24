@@ -128,6 +128,8 @@
   "legal.providers.purpose.arguments": "Texte du débat — pour rédiger les arguments",
   "legal.providers.purpose.judging": "Texte du débat — pour juger et vérifier les arguments",
   "legal.providers.purpose.story": "Le débat terminé — pour rédiger l’histoire du verdict",
+  "legal.providers.purpose.synthesisCheck": "La synthèse d’un débat terminé — pour la vérifier au regard de quatre catégories",
+  "legal.providers.purpose.questionCheck": "Une question avant le début d’un débat — pour vérifier si le débat peut commencer",
   "legal.providers.purpose.support": "Ce que vous saisissez dans le chat d’assistance — pour vous répondre",
   "legal.providers.purposesUnconfirmed": "[à confirmer : lesquelles de ces tâches lui sont confiées]",
   "legal.providers.supportName": "Modèle du chat d’assistance",

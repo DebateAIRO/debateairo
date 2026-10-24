@@ -17,5 +17,18 @@
   "archive.visibilityPrivate": "Pribadi",
   "archive.unreadable": "Isi debat ini tidak dapat dibaca lagi karena kuncinya telah dimusnahkan.",
   "archive.noDebates": "Anda belum memiliki debat.",
-  "archive.filesNote": "Berkas JSON dalam arsip ZIP ini memuat data yang sama dalam format yang dapat dibaca mesin; daftarnya ada di README.txt."
+  "archive.filesNote": "Berkas JSON dalam arsip ZIP ini memuat data yang sama dalam format yang dapat dibaca mesin; daftarnya ada di README.txt.",
+  "archive.contentCheck": "Pemeriksaan konten",
+  "archive.verdict.flagged": "Ditandai",
+  "archive.verdict.clear": "Tidak bermasalah",
+  "archive.verdict.noSynthesis": "Tanpa sintesis",
+  "archive.verdict.unavailable": "Tidak tersedia",
+  "archive.category.terrorism": "Kemungkinan terorisme",
+  "archive.category.hateSpeech": "ujaran kebencian dalam bentuk apa pun",
+  "archive.category.suicideOrHarm": "kecenderungan bunuh diri atau menyakiti orang lain",
+  "archive.category.weaponsOrDrugs": "pembuatan senjata atau narkoba",
+  "archive.publicationReview": "Tinjauan publikasi",
+  "archive.reviewAsked": "Diminta",
+  "archive.reviewApproved": "Disetujui",
+  "archive.reviewRefused": "Ditolak"
 }

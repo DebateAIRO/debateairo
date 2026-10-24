@@ -17,6 +17,7 @@ import { AccountProfileError, type AccountProfileService } from "./account-profi
 import { RecoveryEmailError, type RecoveryEmailService } from "./recovery-email.js";
 import type { ProfileSession } from "@debateai/db";
 import { normalizeManualPhone } from "./phone-profile.js";
+import { answerForOutcome, keepFailureCode, type AskQuestionCheck } from "./question-check/ask-gate.js";
 import { resolveSourceMailLocale } from "./mail-locale.js";
 import { exhaustive, type FundingBasis } from "@debateai/kernel";
 import { timingSafeEqual } from "node:crypto";
@@ -99,7 +100,10 @@ import {
   AskRoomQuerySchema,
   AskRoomResponseSchema,
   QUESTION_LANGUAGE_CHOICE_NEEDED,
-  QuestionLanguageChoiceNeededSchema
+  QuestionLanguageChoiceNeededSchema,
+  PUBLICATION_APPROVAL_REQUIRED,
+  DEBATE_REMOVED_BY_CHECK,
+  RemovalNoticeTakeSchema
 } from "@debateai/contract";
 import type { Pool, PoolClient, QueryResultRow, QueryResult } from "pg";
 import { assertPreviewBudgetAdmits, PreviewGateUnavailableRefusal, type PreviewAdmissionLock, type PreviewBudgetGateSettings } from "./preview-budget-estimate.js";
@@ -122,7 +126,8 @@ import {
   type RunOwnershipAccess,
   type WaitingRunCursor
 } from "@debateai/db";
-import { ServeRepository, type MemoryQuestionRegistration } from "@debateai/serve";
+import { ServeRepository, SynthesisCheckRepository, synthesisTextOf, verdictOfRecord, type MemoryQuestionRegistration, type PublicationReviewRepository, type VerdictOfRecord } from "@debateai/serve";
+import type { SynthesisVerdict, SynthesisCheckCategory } from "@debateai/contract";
 import { applyCriticUnavailableCap, assertMakerAdmission } from "@debateai/critique";
 export {
   ASK_MODEL_ASSIGNMENT_INVALID,
@@ -259,6 +264,9 @@ import { exactStaffCookie, exactStaffCsrfPair, STAFF_COOKIE_NAME, STAFF_CSRF_COO
 export { staffRoutePolicy, staffCookies, clearStaffCookies, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME, STAFF_CSRF_HEADER } from "./staff/access.js";
 import type { PublicationApplication } from "./publications.js";
 import type { PublicationContentCheck } from "./publication-check/check.js";
+import { UNCONFIGURED_SYNTHESIS_PUBLISH_GATE, type SynthesisPublishGate } from "./synthesis-check/publish-gate.js";
+import { createPublicationReviewOwnerRoutes } from "./publication-review/owner.js";
+import { OPEN_SYNTHESIS_ANSWER_ACCESS, type SynthesisAnswerAccess } from "./synthesis-check/hold.js";
 import type { AnswerStoryApplication } from "./stories.js";
 import type { AnswerDisclosureApplication } from "./disclosures.js";
 import { answerNodeIds, type AnswerMapViewApplication } from "./map-views.js";
@@ -1391,6 +1399,7 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/account/export", auth: "user", resource: "identity", action: "read-data-export" },
   { route: "POST /v1/account/export", auth: "user", resource: "identity", action: "request-data-export" },
   { route: "POST /v1/account/export/download", auth: "user", resource: "identity", action: "download-data-export" },
+  { route: "POST /v1/account/removal-notice/take", auth: "user", resource: "identity", action: "take-removal-notice" },
   { route: "GET /v1/account/legal-status", auth: "user", resource: "identity", action: "read-legal-status" },
   { route: "POST /v1/account/legal-accept", auth: "user", resource: "identity", action: "accept-legal" },
   { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
@@ -1451,6 +1460,8 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/runs/{id}/answer", auth: "user", resource: "run-owner", action: "read-run-answer" },
   { route: "POST /v1/runs/{id}/publish", auth: "user", resource: "run-owner", action: "publish" },
   { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" },
+  { route: "POST /v1/runs/{id}/publication-review", auth: "user", resource: "run-owner", action: "request-review" },
+  { route: "GET /v1/runs/{id}/publication-review", auth: "user", resource: "run-owner", action: "read-review" },
   { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
   { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" },
   { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
@@ -1484,7 +1495,7 @@ export const authorizationPolicyInventory = Object.freeze([
   staffCapability?: StaffCapability;
   resource: "identity" | "session-self" | "session-owner" | "run-owner" | "public-debate" |
     "deployment" | "evaluator" | "support-session" | "support-message" | "support-case" |
-    "support-status" | "geo" | "billing" | "staff-self" | "staff-team" | "staff-invitation" | "owner-possession" | "staff-audit";
+    "support-status" | "geo" | "billing" | "staff-self" | "staff-team" | "staff-invitation" | "owner-possession" | "staff-audit" | "staff-publication-review" | "staff-threat-report";
   action: string;
 }>[]);
 
@@ -1635,6 +1646,9 @@ export interface AskApplication {
   readRunAnswer(runId: string, session: Session, ownership: RunOwnershipAccess): Promise<Answer | null>;
   readRun(runId: string, session: Session, ownership: RunOwnershipAccess): Promise<RunProjection | null>;
   readAnswerIndex(session: Session, limit: number, offset: number, ownership: RunOwnershipAccess): Promise<AnswerIndex>;
+  readSynthesisChecks?(answerId: string, session: Session, ownership: RunOwnershipAccess): Promise<readonly {
+    answer_version: number; verdict: SynthesisVerdict; categories: readonly SynthesisCheckCategory[]; checked_at: string
+  }[]>;
   readInspection(answerId: string, session: Session, version: number | undefined, ownership: RunOwnershipAccess): Promise<Inspection | null>;
   readLedgerDigest(answerId: string, session: Session, ownership: RunOwnershipAccess): Promise<ExecutionLedgerDigest | null>;
   readNode(answerId: string, nodeId: string, session: Session, ownership: RunOwnershipAccess): Promise<Node | null>;
@@ -1679,6 +1693,7 @@ const EMAIL_CHANGE_STATUS: Readonly<Record<EmailChangeErrorCode, number>> = Obje
 });
 
 export interface ApiOptions {
+  readonly questionCheck?: AskQuestionCheck;
   readonly previewProviderTestConfig?: PreviewProviderTestConfig;
   /**
    * Step 1 (owner, 2026-10-08): the identity user ids that may start debates on the private
@@ -1719,6 +1734,11 @@ export interface ApiOptions {
   readonly staffPolicyVersion?: 1 | 2;
   readonly staff?: StaffHttpApplication;
   readonly publications?: PublicationApplication;
+  readonly publicationReviews?: Readonly<{
+    repository: PublicationReviewRepository;
+    readOwnedAnswer(input: Readonly<{ runId: string; authenticated: AuthenticatedSession }>): Promise<Answer | null>;
+    readVerdictOfRecord(input: Readonly<{ runId: string; authenticated: AuthenticatedSession; answer: Answer }>): Promise<VerdictOfRecord>;
+  }>;
   /**
    * hate-speech S02 (SPEC-v2 R1, D-S02-22): the pre-publish content check,
    * composed in main.ts. Absent, every publish answers 503
@@ -1726,6 +1746,8 @@ export interface ApiOptions {
    * publishes nothing (fail closed), never everything.
    */
   readonly publicationContentCheck?: PublicationContentCheck;
+  readonly synthesisPublishGate?: SynthesisPublishGate;
+  readonly synthesisAnswerAccess?: SynthesisAnswerAccess;
   /**
    * Verdict story (spec 2026-09-26 §10). Optional like `publications`: the
    * many test compositions of AskApplication do not supply it, and the route
@@ -2385,7 +2407,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
           await options.staffAccess.assertCurrent(staffAuth);
           if (request.routeOptions.config.staffCapability !== undefined) await options.staffAccess.requireCapability(staffAuth, request.routeOptions.config.staffCapability);
         }
-        catch { return reply.status(403).send({ error: "STAFF_AUTHORITY_INVALID" }); }
+        catch { return reply.status(403).send({ error: request.routeOptions.url?.startsWith("/v1/admin/threat-reports")
+          ? "STAFF_REQUEST_REFUSED" : "STAFF_AUTHORITY_INVALID" }); }
         if (MUTATING_METHODS.has(request.method)) {
           const csrf = exactStaffCsrfPair(request.headers[STAFF_CSRF_HEADER], exactStaffCookie(rawCookie, STAFF_CSRF_COOKIE_NAME));
           if (csrf === null || !await options.staffAccess.verifyCsrf(staffAuth, csrf)) return reply.status(403).send({ error: "CSRF_VALIDATION_FAILED" });
@@ -3042,6 +3065,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       default: return exhaustive(result);
     }
   });
+  api.post("/v1/account/removal-notice/take", credentialRoutePolicy("POST /v1/account/removal-notice/take"), async (request, reply) => {
+    const ownerRef = ownershipFor(request).ownerRef;
+    const access = options.synthesisAnswerAccess ?? OPEN_SYNTHESIS_ANSWER_ACCESS;
+    return reply.send(RemovalNoticeTakeSchema.parse({
+      notice: ownerRef === null ? false : await access.takeRemovalNotice(ownerRef)
+    }));
+  });
   api.post(
     "/v1/account/legacy-runs/claim",
     credentialRoutePolicy("POST /v1/account/legacy-runs/claim"),
@@ -3528,7 +3558,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // crisis check is done in the pre-flight"). A question that reads as a person in crisis gets
     // help numbers, never a debate. It stays the FIRST thing this route does: before the
     // consent, quota and country rules, and before any other pre-flight check of the question
-    // (the hate-speech check, S03). A person in crisis must never meet a refusal or a "check
+    // (the question check, S04, which runs after the body's validation). A person in crisis must never meet a refusal or a "check
     // unavailable" message instead of help, and their words go to no judge model. Nothing of
     // the question is kept. `country` is the edge's guess, only to pick which helplines the
     // screen shows first. Pinned by tests/unit/crisis-check-api.test.ts.
@@ -3572,6 +3602,23 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (Buffer.byteLength(ask.question_line, "utf8") > ASK_QUESTION_MAX_BYTES) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
+    if (options.questionCheck === undefined) {
+      return reply.status(503).send({ error: "QUESTION_CHECK_UNAVAILABLE", message: "QUESTION_CHECK_UNAVAILABLE" });
+    }
+    const outcome = await options.questionCheck.check(ask.question_line);
+    if (outcome.outcome === "REFUSE" && outcome.kept) {
+      try {
+        await options.questionCheck.keep({
+          questionLine: ask.question_line,
+          accountUserId: request.authenticatedSession?.userId ?? null
+        });
+      } catch (error) {
+        console.error(JSON.stringify({ event: "api.question_check.unavailable", code: keepFailureCode(error) }));
+        return reply.status(503).send({ error: "QUESTION_CHECK_UNAVAILABLE", message: "QUESTION_CHECK_UNAVAILABLE" });
+      }
+    }
+    const answer = answerForOutcome(outcome, edgeCountry(request.headers));
+    if (answer !== null) return reply.status(answer.status).send(answer.body);
     const accepted = AskAcceptedSchema.parse(await options.application.submit(
       ask,
       request.session,
@@ -3644,9 +3691,22 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       || !Number.isInteger(offset) || offset < 0) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
     }
-    return reply.send(AnswerIndexSchema.parse(await options.application.readAnswerIndex(
+    const index = await options.application.readAnswerIndex(
       request.session, limit, offset, ownershipFor(request)
-    )));
+    );
+    const access = options.synthesisAnswerAccess ?? OPEN_SYNTHESIS_ANSWER_ACCESS;
+    const items = (await Promise.all(index.items.map(async (item) => {
+      const state = await access.stateOf({
+        runId: item.run_ref, answerId: item.answer_id, answerVersion: item.answer_version
+      });
+      if (state === "REMOVED") return null;
+      if (state === "HELD") {
+        const { synthesis_flag: _flag, models: _models, ...held } = item;
+        return { ...held, verdict_state: null, abstention: null, synthesis_check: "CHECKING" as const };
+      }
+      return item;
+    }))).filter((item) => item !== null);
+    return reply.send(AnswerIndexSchema.parse({ ...index, items }));
   });
 
   api.get<{ Params: { id: string }; Querystring: { version?: string } }>("/v1/answers/:id", routePolicy("GET /v1/answers/{id}"), async (request, reply) => {
@@ -3747,6 +3807,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (mapRunId === null) return reply.status(404).send({ error: "MAP_VIEW_NOT_FOUND" });
     const answer = await options.application.readAnswer(answerId.data, request.session, undefined, ownership);
     if (answer === null || answer.run_ref !== mapRunId) return reply.status(404).send({ error: "MAP_VIEW_NOT_FOUND" });
+    if (await (options.synthesisAnswerAccess ?? OPEN_SYNTHESIS_ANSWER_ACCESS).stateOf({
+      runId: answer.run_ref, answerId: answer.answer_id, answerVersion: answer.answer_version
+    }) !== "SHOW") return reply.status(404).send({ error: "MAP_VIEW_NOT_FOUND" });
     const view = await mapViews.readMapView({
       runId: answer.run_ref,
       nodeIds: answerNodeIds(answer),
@@ -3770,6 +3833,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (!answerId.success) return reply.status(404).send({ error: "INVESTIGATION_GAP_NOT_FOUND" });
     const gapRef = parseRequest(InvestigationGapRefSchema, request.params.gapRef);
     const input = parseRequest(InvestigationRequestSchema, request.body);
+    if (options.synthesisAnswerAccess !== undefined) {
+      const answer = await options.application.readAnswer(answerId.data, request.session, undefined, ownershipFor(request));
+      if (answer === null || await options.synthesisAnswerAccess.stateOf({
+        runId: answer.run_ref, answerId: answer.answer_id, answerVersion: answer.answer_version
+      }) !== "SHOW") return reply.status(404).send({ error: "INVESTIGATION_GAP_NOT_FOUND" });
+    }
     const accepted = await options.application.recordInvestigation(
       answerId.data, gapRef, input.user_input, request.session, ownershipFor(request)
     );
@@ -3783,6 +3852,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (!runId.success || await options.application.readRun(runId.data, request.session, ownership) === null) {
       return reply.status(404).send({ error: "RUN_NOT_FOUND" });
     }
+    const access = options.synthesisAnswerAccess ?? OPEN_SYNTHESIS_ANSWER_ACCESS;
+    if (await access.stateOf({ runId: runId.data }) !== "SHOW") {
+      return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    }
     reply.raw.writeHead(200, {
       ...SECURITY_HEADERS,
       "content-type": "text/event-stream",
@@ -3794,15 +3867,25 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // Live run events (2026-10-11): one admission (above) buys one long-lived stream that
     // replays the stored events, then follows the run until its terminal event.
     const application = options.application;
-    const snapshot = (signal: AbortSignal) => options.application.events(runId.data, request.session, ownership, signal);
+    const snapshot = async function* (signal: AbortSignal) {
+      for await (const event of options.application.events(runId.data, request.session, ownership, signal)) {
+        if (await access.stateOf({ runId: runId.data }) !== "SHOW") return;
+        yield event;
+      }
+    };
     await streamAuthorizedEvents({
       events: signal => application.eventMark === undefined
         ? snapshotRunEventItems(snapshot(signal))
         : tailRunEvents({
           snapshot,
-          mark: markSignal => application.eventMark === undefined
-            ? Promise.resolve(null)
-            : application.eventMark(runId.data, request.session, ownership, markSignal),
+          mark: async markSignal => {
+            // The owner may enter the synthesis hold while this SSE response is
+            // open. Stop the stream before a heartbeat or a later event reveals
+            // any private progress from the held run.
+            if (await access.stateOf({ runId: runId.data }) !== "SHOW") return null;
+            return application.eventMark === undefined
+              ? null : application.eventMark(runId.data, request.session, ownership, markSignal);
+          },
           signal,
           ...(options.runEventTail === undefined ? {} : { timing: options.runEventTail }),
           ...(options.runEventTail?.clock === undefined ? {} : { clock: options.runEventTail.clock })
@@ -3856,6 +3939,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     "/v1/runs/:id/publish",
     credentialRoutePolicy("POST /v1/runs/{id}/publish"),
     async (request, reply) => {
+      const startedAt = new Date();
       const runId = ResourceIdSchema.safeParse(request.params.id);
       const authenticated = request.authenticatedSession;
       if (!runId.success || authenticated === undefined) {
@@ -3884,8 +3968,35 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         run: <T>(use: () => Promise<T>) => options.application.withContentLease(runId.data, use),
         readAnswer: () => options.application.readRunAnswer(runId.data, request.session, ownershipFor(request))
       };
-      const answer = await contentLease.run(contentLease.readAnswer);
-      const published = answer === null ? null : await options.publications.publish({
+      let answer: Answer | null;
+      try { answer = await contentLease.run(contentLease.readAnswer); }
+      catch (error) {
+        if (!(error instanceof TypedDomainError) || error.code !== "PRIVATE_CONTENT_ERASED") throw error;
+        answer = null;
+      }
+      if (answer === null) {
+        const access = options.synthesisAnswerAccess ?? OPEN_SYNTHESIS_ANSWER_ACCESS;
+        const ownerRef = ownershipFor(request).ownerRef;
+        if (ownerRef !== null && await access.ownerOf?.(runId.data) === ownerRef
+          && await access.stateOf({ runId: runId.data }) === "REMOVED"
+          && await access.removalNoticeExists(ownerRef)) {
+          return reply.status(410).send({ error: DEBATE_REMOVED_BY_CHECK, message: DEBATE_REMOVED_BY_CHECK });
+        }
+        return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      }
+      const synthesisDecision = await (options.synthesisPublishGate ?? UNCONFIGURED_SYNTHESIS_PUBLISH_GATE).decide({
+        runId: runId.data, answer, contentLease, startedAt
+      });
+      if (synthesisDecision === "APPROVAL_REQUIRED") {
+        return reply.status(409).send({ error: PUBLICATION_APPROVAL_REQUIRED, message: PUBLICATION_APPROVAL_REQUIRED });
+      }
+      if (synthesisDecision === "REMOVED") {
+        return reply.status(410).send({ error: DEBATE_REMOVED_BY_CHECK, message: DEBATE_REMOVED_BY_CHECK });
+      }
+      if (synthesisDecision === "UNAVAILABLE") {
+        return reply.status(503).send({ error: "PUBLICATION_CHECK_UNAVAILABLE", message: "PUBLICATION_CHECK_UNAVAILABLE" });
+      }
+      const published = await options.publications.publish({
         runId: runId.data,
         answer,
         authenticated,
@@ -3953,6 +4064,39 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return unpublished === null
         ? reply.status(404).send({ error: "RUN_NOT_FOUND" })
         : reply.send(PublicationTransitionSchema.parse(unpublished));
+    }
+  );
+  const publicationReviewOwner = options.publicationReviews === undefined ? null : createPublicationReviewOwnerRoutes({
+    repository: options.publicationReviews.repository,
+    publications: options.publications,
+    readOwnedAnswer: options.publicationReviews.readOwnedAnswer,
+    readVerdictOfRecord: options.publicationReviews.readVerdictOfRecord,
+    auditDenial: async ({ authenticated, requestId }) => options.publications?.auditPreflightDenial({ authenticated, requestId })
+  });
+  api.post<{ Params: { id: string } }>(
+    "/v1/runs/:id/publication-review",
+    credentialRoutePolicy("POST /v1/runs/{id}/publication-review"),
+    async (request, reply) => {
+      const runId = ResourceIdSchema.safeParse(request.params.id);
+      const authenticated = request.authenticatedSession;
+      if (!runId.success || authenticated === undefined) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      if (publicationReviewOwner === null) return reply.status(503).send({ error: "PUBLICATION_REVIEW_UNAVAILABLE" });
+      const response = await publicationReviewOwner.ask({
+        runId: runId.data, authenticated, body: request.body, requestId: request.id
+      });
+      return reply.status(response.status).send(response.body);
+    }
+  );
+  api.get<{ Params: { id: string } }>(
+    "/v1/runs/:id/publication-review",
+    routePolicy("GET /v1/runs/{id}/publication-review"),
+    async (request, reply) => {
+      const runId = ResourceIdSchema.safeParse(request.params.id);
+      const authenticated = request.authenticatedSession;
+      if (!runId.success || authenticated === undefined) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      if (publicationReviewOwner === null) return reply.status(503).send({ error: "PUBLICATION_REVIEW_UNAVAILABLE" });
+      const response = await publicationReviewOwner.read({ runId: runId.data, authenticated });
+      return reply.status(response.status).send(response.body);
     }
   );
   api.post<{ Params: { id: string } }>("/v1/answers/:id/memory-link/unlink", routePolicy("POST /v1/answers/{id}/memory-link/unlink"), async (request, reply) => {
@@ -5505,6 +5649,32 @@ export class PostgresAskApplication implements AskApplication {
 
   readAnswerIndex(_session: Session, limit: number, offset: number, ownership: RunOwnershipAccess): Promise<AnswerIndex> {
     return this.#serve.readAnswerIndex(ownership, limit, offset);
+  }
+
+  async readSynthesisChecks(answerId: string, _session: Session, ownership: RunOwnershipAccess): Promise<readonly {
+    answer_version: number; verdict: SynthesisVerdict; categories: readonly SynthesisCheckCategory[]; checked_at: string
+  }[]> {
+    const answer = await this.#serve.readAnswerProjection(answerId, ownership);
+    if (answer === null) return [];
+    const repository = new SynthesisCheckRepository(this.pool);
+    if (await repository.runRemovedByCheck(answer.run_ref)) return [];
+    const records = await repository.readRecords({
+      runId: answer.run_ref, answerId, maxVersion: answer.answer_version
+    });
+    const texts = new Map<number, string | null>();
+    for (let version = 1; version <= answer.answer_version; version++) {
+      const projection = version === answer.answer_version
+        ? answer : await this.#serve.readAnswerProjection(answerId, ownership, version);
+      texts.set(version, projection === null ? null : synthesisTextOf(projection));
+    }
+    return [...texts.keys()].flatMap((version) => {
+      const text = texts.get(version);
+      const selected = verdictOfRecord(records, (origin) => texts.get(origin) === text);
+      return selected === null ? [] : [{
+        answer_version: version, verdict: selected.verdict,
+        categories: selected.categories, checked_at: selected.checkedAt.toISOString()
+      }];
+    });
   }
 
   readInspection(answerId: string, _session: Session, version: number | undefined, ownership: RunOwnershipAccess): Promise<Inspection | null> {

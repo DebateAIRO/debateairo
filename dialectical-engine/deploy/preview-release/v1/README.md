@@ -284,8 +284,8 @@ a changed value (e.g. dev b75e4c294: `composerContractHash` moved to the answer-
 `countryPolicy` closed Tennessee) or a new key (e.g. `outboundMailPolicy`, which must also be added
 to `PREVIEW_SOURCE_ROW_KEYS_V2` in `deploy/preview-auth-dev/v1/publish-register-v2.ts`).
 
-**What changed from v1.** The v1 composer (`publish-register.ts`, kept unchanged) could make only one
-publication: 66 source rows on a 65-row base, adding three fixed keys. It refuses the live 68-row
+**What changed from v1.** The v1 composer (`publish-register.ts`, unchanged but for S04's questionCheckPolicy, which the API reads at start-up) could make only one
+publication: 67 source rows on a 65-row base, adding four fixed keys. It refuses the live 68-row
 version. Kit v2 (`publish-register-v2.ts`) composes from the version the preview runs now. The
 proposal it prints lists every added or changed row with its old and new value in full. A base row
 the source no longer builds is refused, except `staffAccessPolicy` and `internalAllowancePolicy`,

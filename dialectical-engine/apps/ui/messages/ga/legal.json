@@ -128,6 +128,8 @@
   "legal.providers.purpose.arguments": "Téacs na díospóireachta — chun na hargóintí a scríobh",
   "legal.providers.purpose.judging": "Téacs na díospóireachta — chun breithiúnas a thabhairt ar na hargóintí agus iad a sheiceáil",
   "legal.providers.purpose.story": "An díospóireacht chríochnaithe — chun scéal an bhreithiúnais a scríobh",
+  "legal.providers.purpose.synthesisCheck": "Sintéis díospóireachta críochnaithe — chun í a sheiceáil le haghaidh ceithre chatagóir",
+  "legal.providers.purpose.questionCheck": "Ceist sula dtosaíonn díospóireacht — chun a sheiceáil an bhféadfaidh an díospóireacht tosú",
   "legal.providers.purpose.support": "An méid a chlóscríobhann tú sa chomhrá tacaíochta — chun freagra a thabhairt ort",
   "legal.providers.purposesUnconfirmed": "[le deimhniú: cé acu de na tascanna seo a thugtar dó]",
   "legal.providers.supportName": "Samhail an chomhrá tacaíochta",

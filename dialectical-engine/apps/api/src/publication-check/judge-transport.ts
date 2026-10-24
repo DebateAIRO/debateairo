@@ -70,7 +70,11 @@ export function createPublicationJudgeTransport(target: SupportModelTarget, opti
  * the switch reads OFF.
  */
 export function publicationJudgeOffFlagPath(apiPort: number, directory: string = tmpdir()): string {
-  return join(privateDirectory(directory) ? directory : perUserDirectory(directory), `debateai-publication-judge-${apiPort}.off`);
+  return localOffFlagPath(apiPort, "publication-judge", directory);
+}
+
+export function localOffFlagPath(apiPort: number, stem: string, directory: string = tmpdir()): string {
+  return join(privateDirectory(directory) ? directory : perUserDirectory(directory), `debateai-${stem}-${apiPort}.off`);
 }
 
 const currentUid = (): number | undefined => typeof process.getuid === "function" ? process.getuid() : undefined;
@@ -157,6 +161,12 @@ function flagAbsent(flag: string): boolean {
 export function createPublicationJudgeSwitch(port: PublicationJudgePort | null, options: {
   offFlagPath: string | null;
 }): { current(): PublicationJudgePort | null; switchOff(): boolean } {
+  return createLocalOffFlagSwitch<PublicationJudgePort>(port, options);
+}
+
+export function createLocalOffFlagSwitch<P>(port: P | null, options: {
+  offFlagPath: string | null;
+}): { current(): P | null; switchOff(): boolean } {
   const flag = options.offFlagPath;
   let forcedOff = false;
   const off = () => flag !== null && (forcedOff || !flagAbsent(flag));

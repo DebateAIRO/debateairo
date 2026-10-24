@@ -19,6 +19,7 @@ import {
   LEGAL_PAGES,
   MODEL_PROVIDERS,
   PROVIDER_REGISTER,
+  providerRegister,
   TERMS_VERSIONS
 } from "../../apps/ui/lib/legal/pages.js";
 import { PRIVACY_POLICY } from "../../apps/ui/lib/privacyPolicy.js";
@@ -319,11 +320,11 @@ describe("the text pages render the same documents as the sign-up modals", () =>
 
 describe("the terms versions page lists only versions that exist", () => {
   it("names the current and previous versions, linking each to its text", () => {
-    expect(TERMS_VERSIONS).toHaveLength(4);
+    expect(TERMS_VERSIONS).toHaveLength(5);
     expect(TERMS_OF_SERVICE.eyebrow).toContain(`v${TERMS_VERSIONS[0]?.version}`);
     const view = render(<LegalVersionsBody legalCatalog={legalEnglish} />);
     const rows = view.querySelectorAll(".legalVersionRow");
-    expect(rows).toHaveLength(4);
+    expect(rows).toHaveLength(5);
     expect(rows[0]?.querySelector("a")?.getAttribute("href")).toBe("/terms");
     expect(rows[1]?.querySelector("a")?.getAttribute("href")).toBe(TERMS_VERSIONS[1]?.href);
     expect(view.querySelector(".legalVersionsNone")).toBeNull();
@@ -553,7 +554,7 @@ describe("the model providers page lists the model families the product runs", (
     }
   });
 
-  it("names the four jobs a provider can be given, and brackets every job nobody has confirmed", () => {
+  it("names the six jobs a provider can be given, and brackets every job nobody has confirmed", () => {
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} />);
     const jobs = new Set(texts(view.querySelectorAll(".legalProviderPurposes li")));
     expect([...jobs].sort()).toEqual(
@@ -561,6 +562,8 @@ describe("the model providers page lists the model families the product runs", (
         "Debate text — to write the arguments",
         "Debate text — to judge and check the arguments",
         "The finished debate — to write the verdict story",
+        "The synthesis of a finished debate — to check it for four categories",
+        "A question before a debate starts — to check whether the debate may start",
         "What you type in the support chat — to answer you"
       ].sort()
     );
@@ -568,6 +571,22 @@ describe("the model providers page lists the model families the product runs", (
       const note = view.querySelectorAll(".legalProviderEntry")[index]?.querySelector(".legalProviderPurposes .legalFactNote");
       expect(note === null).toBe(entry.purposesConfirmed);
     });
+  });
+
+  // FIX-SF-S03-p1 (t_566873aa): both checks always call Claude Haiku 5.5 on Anthropic (S01-R9, S04-R5), so every build's
+  // Register names that recipient for both purposes, whether or not the build offers Claude as a debate model.
+  it.each([
+    ["no flag (the real site)", undefined],
+    ["the first preview (GLM alone)", '["zai-org/GLM-5.3-Flash"]'],
+    ["a per-plan preview with DeepInfra only", '{"free":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro","Qwen/Qwen3.8-Flash"],"premium":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro","Qwen/Qwen3.8-Flash"]}'],
+    ["a per-plan preview with Claude Haiku 5.5", '{"free":["zai-org/GLM-5.3-Flash","claude-haiku-5-5"],"premium":["zai-org/GLM-5.3-Flash","gemini-3.8-flash"]}']
+  ])("names Anthropic's Claude Haiku 5.5 for both checks on exactly one row: %s", (_build, flag) => {
+    const register = providerRegister(flag);
+    for (const purpose of ["synthesisCheck", "questionCheck"] as const) {
+      const rows = register.filter((entry) => entry.purposes.includes(purpose));
+      expect(rows.map((entry) => entry.key), purpose).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ models: "Claude Haiku 5.5", entity: "Anthropic Ireland, Limited" });
+    }
   });
 
   it("claims nothing unverified: a cloud provider's contract facts stay bracketed until someone checks the row", () => {

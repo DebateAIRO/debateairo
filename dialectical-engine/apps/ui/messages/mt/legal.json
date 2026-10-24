@@ -128,6 +128,8 @@
   "legal.providers.purpose.arguments": "It-test tad-dibattitu — biex jikteb l-argumenti",
   "legal.providers.purpose.judging": "It-test tad-dibattitu — biex jiġġudika u jivverifika l-argumenti",
   "legal.providers.purpose.story": "Id-dibattitu komplut — biex jikteb l-istorja tal-verdett",
+  "legal.providers.purpose.synthesisCheck": "Is-sinteżi ta’ dibattitu li jkun intemm — biex jivverifikaha għal erba’ kategoriji",
+  "legal.providers.purpose.questionCheck": "Mistoqsija qabel ma jibda dibattitu — biex jivverifika jekk id-dibattitu jistax jibda",
   "legal.providers.purpose.support": "Dak li tikteb fil-konverżazzjoni tal-appoġġ — biex iwieġbek",
   "legal.providers.purposesUnconfirmed": "[għandu jiġi kkonfermat: liema minn dawn il-kompiti jingħatawlu]",
   "legal.providers.supportName": "Mudell tal-konverżazzjoni tal-appoġġ",

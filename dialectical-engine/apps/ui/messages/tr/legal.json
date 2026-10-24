@@ -128,6 +128,8 @@
   "legal.providers.purpose.arguments": "Tartışma metni — argümanları yazmak için",
   "legal.providers.purpose.judging": "Tartışma metni — argümanları değerlendirmek ve kontrol etmek için",
   "legal.providers.purpose.story": "Tamamlanan tartışma — hükmün hikâyesini yazmak için",
+  "legal.providers.purpose.synthesisCheck": "Biten bir tartışmanın sentezi — dört kategori bakımından kontrol etmek için",
+  "legal.providers.purpose.questionCheck": "Bir tartışma başlamadan önceki soru — tartışmanın başlayıp başlayamayacağını kontrol etmek için",
   "legal.providers.purpose.support": "Destek sohbetine yazdıklarınız — size yanıt vermek için",
   "legal.providers.purposesUnconfirmed": "[teyit edilecek: bu görevlerden hangilerinin kendisine verildiği]",
   "legal.providers.supportName": "Destek sohbeti modeli",

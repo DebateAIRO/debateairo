@@ -113,7 +113,7 @@ const STAFF_OWNER = "debateai_staff_security_owner";
 const RECOVERY_READERS = ["debateai_password_recovery_owner", "debateai_password_reset_owner", "debateai_backup_email_owner", "debateai_mfa_recovery_owner"];
 const PRIVATE_READERS = [STAFF_OWNER, ...RECOVERY_READERS];
 const PRIVATE_TABLE_OWNERS: Readonly<Record<string, string>> = Object.fromEntries([
-  ...["action_proof", "alert_delivery_receipt", "alert_dispatch_state", "alert_operation_readiness", "alert_outbox", "audit_event", "bootstrap_marker", "funding_policy_selection", "grant_event", "independent_alert_readiness", "invitation", "invitation_proof", "owner_command", "owner_designation", "owner_lineage", "owner_possession_receipt", "owner_recovery_generation", "owner_recovery_operation", "password_totp_rotation_receipt", "prerequisite_receipt", "privilege_session", "subject", "webauthn_challenge"].map((name) => [`staff.${name}`, STAFF_OWNER]),
+  ...["action_proof", "alert_delivery_receipt", "alert_dispatch_state", "alert_operation_readiness", "alert_outbox", "audit_event", "bootstrap_marker", "funding_policy_selection", "grant_event", "independent_alert_readiness", "invitation", "invitation_proof", "owner_command", "owner_designation", "owner_lineage", "owner_possession_receipt", "owner_recovery_generation", "owner_recovery_operation", "password_totp_rotation_receipt", "prerequisite_receipt", "privilege_session", "publication_review_event", "subject", "threat_report", "threat_report_alert", "threat_report_event", "webauthn_challenge"].map((name) => [`staff.${name}`, STAFF_OWNER]),
   ...["internal_grant", "internal_grant_event", "internal_provider_admission"].map((name) => [`billing.${name}`, STAFF_OWNER]),
   ...["password_reset_control", "password_reset_notice_binding", "password_reset_notice", "password_reset_source_window"].map((name) => [`identity.${name}`, "debateai_password_reset_owner"]),
   ...["backup_email_control", "backup_email_notice_binding", "backup_email_notice", "backup_email_source_window", "backup_email_proof_window"].map((name) => [`identity.${name}`, "debateai_backup_email_owner"]),
@@ -564,10 +564,14 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
     return (await readdir(MIGRATIONS)).filter((name) => /^\d+.*\.sql$/u.test(name)).sort();
   }
 
+  async function nativeAuditMigrateSource(): Promise<string> {
+    return readFile(new URL("../../packages/db/src/index.ts", import.meta.url), "utf8");
+  }
+
   it("guards every CREATE TABLE and CREATE INDEX outside the two ledgered files", async () => {
     const files = await migrationFiles();
     const plan = await loadMigrationPlan();
-    const migrateSource = await readFile(new URL("../../packages/db/src/index.ts", import.meta.url), "utf8");
+    const migrateSource = await nativeAuditMigrateSource();
     const unguardedTables: string[] = [];
     const unguardedIndexes: string[] = [];
     const classifiedTables: string[] = [];
@@ -597,7 +601,7 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
   it("binds every full migration name and intentional collision to the closed native order", async () => {
     const files = await migrationFiles();
     const plan = await loadMigrationPlan();
-    const migrateSource = await readFile(new URL("../../packages/db/src/index.ts", import.meta.url), "utf8");
+    const migrateSource = await nativeAuditMigrateSource();
     expect(plan.manifest.order).toHaveLength(128);
     // PR-54, PR-58: dev's 0110, then the forward chain after it (0111, NETOPIA), each declared by its own manifests
     // (migrations/lineage/README.md).
@@ -638,7 +642,9 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
       "0122_engine_map_check.sql",
-      "0126_support_answer_scope.sql"
+      "0123_synthesis_check.sql",
+      "0124_publication_review.sql",
+      "0125_threat_reports.sql"
     ]);
     expect(plan.forwardChain[1]!.name).toBe(AUTH_DB_BATCH_MIGRATION);
   });

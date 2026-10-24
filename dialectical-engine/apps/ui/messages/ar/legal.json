@@ -128,6 +128,8 @@
   "legal.providers.purpose.arguments": "نص المناظرة — لكتابة الحجج",
   "legal.providers.purpose.judging": "نص المناظرة — للحكم على الحجج والتحقق منها",
   "legal.providers.purpose.story": "المناظرة المكتملة — لكتابة قصة الحكم",
+  "legal.providers.purpose.synthesisCheck": "تركيب المناظرة المنتهية — لفحصه بحثًا عن أربع فئات",
+  "legal.providers.purpose.questionCheck": "السؤال قبل بدء المناظرة — لفحص ما إذا كان يجوز للمناظرة أن تبدأ",
   "legal.providers.purpose.support": "ما تكتبه في محادثة الدعم — للرد عليك",
   "legal.providers.purposesUnconfirmed": "[قيد التأكيد: أيّ هذه المهام تُسند إليه]",
   "legal.providers.supportName": "نموذج محادثة الدعم",

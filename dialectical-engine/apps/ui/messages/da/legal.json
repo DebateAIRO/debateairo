@@ -128,6 +128,8 @@
   "legal.providers.purpose.arguments": "Debattekst — til at skrive argumenterne",
   "legal.providers.purpose.judging": "Debattekst — til at bedømme og kontrollere argumenterne",
   "legal.providers.purpose.story": "Den afsluttede debat — til at skrive historien om konklusionen",
+  "legal.providers.purpose.synthesisCheck": "Syntesen af en afsluttet debat — til at kontrollere den for fire kategorier",
+  "legal.providers.purpose.questionCheck": "Et spørgsmål, før en debat starter — til at kontrollere, om debatten må starte",
   "legal.providers.purpose.support": "Det, du skriver i supportsamtalen — til at svare dig",
   "legal.providers.purposesUnconfirmed": "[skal bekræftes: hvilke af disse opgaver den får]",
   "legal.providers.supportName": "Supportsamtalens model",

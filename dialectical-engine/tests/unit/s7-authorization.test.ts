@@ -82,6 +82,7 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "GET /v1/account/export", auth: "user", resource: "identity", action: "read-data-export" },
   { route: "POST /v1/account/export", auth: "user", resource: "identity", action: "request-data-export" },
   { route: "POST /v1/account/export/download", auth: "user", resource: "identity", action: "download-data-export" },
+  { route: "POST /v1/account/removal-notice/take", auth: "user", resource: "identity", action: "take-removal-notice" },
   { route: "GET /v1/account/legal-status", auth: "user", resource: "identity", action: "read-legal-status" },
   { route: "POST /v1/account/legal-accept", auth: "user", resource: "identity", action: "accept-legal" },
   { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
@@ -135,6 +136,8 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "GET /v1/runs/{id}/answer", auth: "user", resource: "run-owner", action: "read-run-answer" },
   { route: "POST /v1/runs/{id}/publish", auth: "user", resource: "run-owner", action: "publish" },
   { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" },
+  { route: "POST /v1/runs/{id}/publication-review", auth: "user", resource: "run-owner", action: "request-review" },
+  { route: "GET /v1/runs/{id}/publication-review", auth: "user", resource: "run-owner", action: "read-review" },
   { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
   { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" },
   { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
@@ -175,6 +178,14 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   // No static capability: the handler selects TEAM_DISABLE or EMERGENCY_DISABLE from the strict mode.
   { route: "POST /v1/admin/team/{staffId}/disable", auth: "staff", resource: "staff-team", action: "disable" },
   { route: "GET /v1/admin/audit", auth: "staff", staffCapability: "AUDIT_READ", resource: "staff-audit", action: "list" },
+  { route: "GET /v1/admin/threat-reports", auth: "staff", staffCapability: "THREAT_REPORT", resource: "staff-threat-report", action: "list" },
+  { route: "GET /v1/admin/threat-reports/summary", auth: "staff", staffCapability: "THREAT_REPORT", resource: "staff-threat-report", action: "summary" },
+  { route: "GET /v1/admin/threat-reports/{reportRef}", auth: "staff", staffCapability: "THREAT_REPORT", resource: "staff-threat-report", action: "read" },
+  { route: "POST /v1/admin/threat-reports/{reportRef}/decision", auth: "staff", staffCapability: "THREAT_REPORT", resource: "staff-threat-report", action: "decide" },
+  { route: "GET /v1/admin/publication-reviews", auth: "staff", staffCapability: "PUBLICATION_REVIEW", resource: "staff-publication-review", action: "list" },
+  { route: "GET /v1/admin/publication-reviews/{reviewRef}", auth: "staff", staffCapability: "PUBLICATION_REVIEW", resource: "staff-publication-review", action: "read" },
+  { route: "POST /v1/admin/publication-reviews/{reviewRef}/approve", auth: "staff", staffCapability: "PUBLICATION_REVIEW", resource: "staff-publication-review", action: "approve" },
+  { route: "POST /v1/admin/publication-reviews/{reviewRef}/refuse", auth: "staff", staffCapability: "PUBLICATION_REVIEW", resource: "staff-publication-review", action: "refuse" },
   { route: "POST /v1/admin/internal-allowances", auth: "staff", staffCapability: "ALLOWANCE_WRITE", resource: "staff-self", action: "allowance-configure" },
   { route: "DELETE /v1/admin/internal-allowances/{grantId}", auth: "staff", staffCapability: "ALLOWANCE_WRITE", resource: "staff-self", action: "allowance-revoke" },
 ] as const);
@@ -324,15 +335,16 @@ describe("S7 deny-by-default authorization", () => {
     // The WHOLE inventory, staff rows included, row for row (no route family is filtered out).
     const order=(a:{route:string},b:{route:string})=>a.route<b.route?-1:a.route>b.route?1:0;
     expect([...authorizationPolicyInventory].sort(order)).toEqual([...EXPECTED_AUTHORIZATION_MATRIX].sort(order));
-    // 18 staff contract routes + the two internal-allowance routes.
-    expect(EXPECTED_AUTHORIZATION_MATRIX.filter(policy => policy.route.includes(" /v1/admin/"))).toHaveLength(20);
-    expect(staffContractInventory.routes).toHaveLength(18);
+    // 26 staff contract routes + the two internal-allowance routes.
+    expect(EXPECTED_AUTHORIZATION_MATRIX.filter(policy => policy.route.includes(" /v1/admin/"))).toHaveLength(28);
+    expect(staffContractInventory.routes).toHaveLength(26);
     // The merged closed inventory adds the twenty-one external recovery routes to the current ordinary inventory and 20 staff/internal
     // allowance routes; set equality and Fastify mounting above check each one. NETOPIA's card page (N13) adds
     // GET /v1/billing/subscription/card, the auth DB batch's four MFA-recovery wait routes, beside dev's 158, and
     // data-export S01's 3 routes.
     // Debate shape P2c adds GET /v1/answers/{id}/map.
-    expect(contractInventory.routes).toHaveLength(167);
+    // The synthesis check adds the once-only removal notice route.
+    expect(contractInventory.routes).toHaveLength(178);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 

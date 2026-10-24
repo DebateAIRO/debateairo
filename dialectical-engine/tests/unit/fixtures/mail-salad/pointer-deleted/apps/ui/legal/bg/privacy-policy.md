@@ -12,7 +12,7 @@ jumps:
 
 # Политика за поверителност
 
-**Version 3.4 · Effective 12 октомври 2026 г. · Предишни версии на dezbatere.ro/privacy/versions**
+**Version 3.5 · Effective 12 октомври 2026 г. · Предишни версии на dezbatere.ro/privacy/versions**
 
 **In short.** Пазим езика, който сте избрали на сайта, за имейлите, които ви изпращаме.
 

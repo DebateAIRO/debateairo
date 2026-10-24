@@ -128,6 +128,8 @@
   "legal.providers.purpose.arguments": "Debate text — to write the arguments",
   "legal.providers.purpose.judging": "Debate text — to judge and check the arguments",
   "legal.providers.purpose.story": "The finished debate — to write the verdict story",
+  "legal.providers.purpose.synthesisCheck": "The synthesis of a finished debate — to check it for four categories",
+  "legal.providers.purpose.questionCheck": "A question before a debate starts — to check whether the debate may start",
   "legal.providers.purpose.support": "What you type in the support chat — to answer you",
   "legal.providers.purposesUnconfirmed": "[to confirm: which of these jobs it is given]",
   "legal.providers.supportName": "Support chat model",

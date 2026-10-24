@@ -128,6 +128,8 @@
   "legal.providers.purpose.arguments": "טקסט הדיון — לכתיבת הטיעונים",
   "legal.providers.purpose.judging": "טקסט הדיון — לשיפוט הטיעונים ולבדיקתם",
   "legal.providers.purpose.story": "הדיון שהושלם — לכתיבת סיפור ההכרעה",
+  "legal.providers.purpose.synthesisCheck": "הסינתזה של דיון שהסתיים — לבדיקתה בארבע קטגוריות",
+  "legal.providers.purpose.questionCheck": "שאלה לפני שדיון מתחיל — לבדיקה אם הדיון רשאי להתחיל",
   "legal.providers.purpose.support": "מה שאתם מקלידים בשיחת התמיכה — כדי לענות לכם",
   "legal.providers.purposesUnconfirmed": "[טעון אישור: אילו מהמשימות האלה מוטלות עליו]",
   "legal.providers.supportName": "מודל שיחת התמיכה",

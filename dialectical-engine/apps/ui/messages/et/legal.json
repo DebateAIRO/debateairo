@@ -128,6 +128,8 @@
   "legal.providers.purpose.arguments": "Väitluse tekst — argumentide kirjutamiseks",
   "legal.providers.purpose.judging": "Väitluse tekst — argumentide hindamiseks ja kontrollimiseks",
   "legal.providers.purpose.story": "Lõpetatud väitlus — otsuse loo kirjutamiseks",
+  "legal.providers.purpose.synthesisCheck": "Lõppenud väitluse süntees — selle kontrollimiseks nelja kategooria suhtes",
+  "legal.providers.purpose.questionCheck": "Küsimus enne väitluse algust — kontrollimiseks, kas väitlus võib alata",
   "legal.providers.purpose.support": "Kasutajatoe vestluses sisestatu — teile vastamiseks",
   "legal.providers.purposesUnconfirmed": "[kinnitada: milliseid neist ülesannetest talle antakse]",
   "legal.providers.supportName": "Kasutajatoe vestluse mudel",
