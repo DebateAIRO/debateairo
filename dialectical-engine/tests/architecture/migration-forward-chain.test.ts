@@ -57,8 +57,9 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     // export's 0115 follows 0114 (V-41), the mail locale (0116) follows 0115 (S01-C05), the debate shape's map (0117)
     // follows 0116, the language check's site cost (0118) follows 0117, the reclaim resume (0119) follows 0118, then the
     // reply measures (0120, spec 2026-10-15), then the engine verdict (0121, spec 2026-10-15 engine redesign R2), then
-    // the engine's map answer step (0122, spec 2026-10-15 engine redesign R3), then the side-by-side releases (0123),
-    // last (spec 2026-10-21 side-by-side uploads) (migrations/lineage/README.md).
+    // the engine's map answer step (0122, spec 2026-10-15 engine redesign R3), then the side-by-side releases (0123,
+    // spec 2026-10-21 side-by-side uploads), then row-level security (0124), last (mission row-level-security, SPEC-v4
+    // R26) (migrations/lineage/README.md).
     expect(plan.forwardChain.map((step) => step.name)).toEqual([
       "0111_billing_netopia.sql",
       "0112_auth_db_batch.sql",
@@ -72,7 +73,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
       "0122_engine_map_check.sql",
-      "0123_side_by_side_releases.sql"
+      "0123_side_by_side_releases.sql",
+      "0124_row_level_security.sql"
     ]);
     const [step] = plan.forwardChain;
     // 0110 runs the sealed effective-capability verifier after its SQL (applyForward110) and its own manifest names it
@@ -126,7 +128,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
       "0122_engine_map_check.sql",
-      "0123_side_by_side_releases.sql"
+      "0123_side_by_side_releases.sql",
+      "0124_row_level_security.sql"
     ]);
     // The verifier in force after 0112 is the one 0112's manifest names (it adds no billing object): 0111's.
     const batchManifest = JSON.parse((await bytesOf("lineage/auth-db-batch-forward.json")).toString("utf8"));
@@ -174,7 +177,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
       "0122_engine_map_check.sql",
-      "0123_side_by_side_releases.sql"
+      "0123_side_by_side_releases.sql",
+      "0124_row_level_security.sql"
     ]);
     expect(partC!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/role-rotation-forward0114.json")).toString("utf8"));
@@ -218,7 +222,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
       "0122_engine_map_check.sql",
-      "0123_side_by_side_releases.sql"
+      "0123_side_by_side_releases.sql",
+      "0124_row_level_security.sql"
     ]);
     expect(mailLocale!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/debate-shape-map-forward0117.json")).toString("utf8"));
@@ -262,7 +267,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
       "0122_engine_map_check.sql",
-      "0123_side_by_side_releases.sql"
+      "0123_side_by_side_releases.sql",
+      "0124_row_level_security.sql"
     ]);
     expect(mapStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/language-check-spend-forward0118.json")).toString("utf8"));
@@ -306,7 +312,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
       "0122_engine_map_check.sql",
-      "0123_side_by_side_releases.sql"
+      "0123_side_by_side_releases.sql",
+      "0124_row_level_security.sql"
     ]);
     expect(languageStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/reclaim-resume-forward0119.json")).toString("utf8"));

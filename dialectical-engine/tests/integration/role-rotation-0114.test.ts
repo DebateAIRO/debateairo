@@ -215,10 +215,11 @@ describe("0114: a forward step, applied once", () => {
     // the debate shape's map 0117 after 0116, the language check's site cost 0118 after 0117, the reclaim resume
     // 0119 after 0118, then the reply measures (0120, spec 2026-10-15), then the engine verdict (0121, spec 2026-10-15
     // engine redesign R2), then the engine's map answer step (0122, spec 2026-10-15 engine redesign R3), then the
-    // side-by-side releases (0123), last (spec 2026-10-21 side-by-side uploads).
-    expect(steps.slice(-11)).toEqual(["0113_billing_price_currencies.sql", STEP, "0115_data_export.sql", "0116_mail_locale.sql",
+    // side-by-side releases (0123, spec 2026-10-21 side-by-side uploads), then row-level security (0124), last (mission
+    // row-level-security, SPEC-v4 R26).
+    expect(steps.slice(-12)).toEqual(["0113_billing_price_currencies.sql", STEP, "0115_data_export.sql", "0116_mail_locale.sql",
       "0117_debate_shape_map.sql", "0118_language_check_spend.sql", "0119_reclaim_resume.sql", "0120_reply_measures.sql",
-      "0121_engine_verdict.sql", "0122_engine_map_check.sql", "0123_side_by_side_releases.sql"]);
+      "0121_engine_verdict.sql", "0122_engine_map_check.sql", "0123_side_by_side_releases.sql", "0124_row_level_security.sql"]);
     const ledger = async () => (await db().query("SELECT name, applied_at FROM public.debateai_schema_migration ORDER BY name")).rows;
     const before = await ledger();
     expect(before.filter((row) => row.name === STEP)).toHaveLength(1);

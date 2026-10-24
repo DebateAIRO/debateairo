@@ -22,15 +22,18 @@ local     all        postgres                                                pee
 # its password is NULL between ceremonies and VALID UNTIL <= 15 minutes during one.
 local     debateai   debateai_prod_migrator                                  scram-sha-256
 #
-# The 21 service principals from P3-01 — the 19 `pnpm db:provision-principals` manages plus the
+# The 23 service principals from P3-01 — the 21 `pnpm db:provision-principals` manages plus the
 # observation agent (migration 0057) and its threshold operator (migration 0071, DL7-F9) —
-# socket + SCRAM. Six of the 19 are provisioned with VALID UNTIL in the past (V-20, README §4):
-# listed here, refused at login.
+# socket + SCRAM. Six of the 21 are provisioned with VALID UNTIL in the past (V-20, README §4):
+# listed here, refused at login. Row-level security (0124, D29) added the two cross-account API
+# logins, api-system and api-authorization-system.
 local     debateai   debateai_prod_api_runtime               scram-sha-256
 local     debateai   debateai_prod_api_content_provision     scram-sha-256
 local     debateai   debateai_prod_api_erasure               scram-sha-256
 local     debateai   debateai_prod_api_data_export           scram-sha-256
 local     debateai   debateai_prod_api_authorization         scram-sha-256
+local     debateai   debateai_prod_api_system                scram-sha-256
+local     debateai   debateai_prod_api_authorization_system  scram-sha-256
 local     debateai   debateai_prod_api_publication_cleanup   scram-sha-256
 local     debateai   debateai_prod_api_support               scram-sha-256
 local     debateai   debateai_prod_staff_recovery            scram-sha-256
@@ -54,8 +57,8 @@ local     hatchet    debateai_prod_hatchet                                   scr
 #
 # Loopback TCP is TLS-only (server.crt has SAN IP:127.0.0.1 + IP:::1, TLSv1.3 floor in
 # postgresql.hardening.conf). Clients use sslmode=verify-full&sslrootcert=/etc/debateai/postgres-tls/ca.crt.
-hostssl   debateai   debateai_prod_api_runtime,debateai_prod_api_content_provision,debateai_prod_api_erasure,debateai_prod_api_data_export,debateai_prod_api_authorization,debateai_prod_api_publication_cleanup,debateai_prod_api_support,debateai_prod_support_config_operator,debateai_prod_runner_runtime,debateai_prod_scheduler_replay,debateai_prod_scheduler_liveness,debateai_prod_scheduler_settlement,debateai_prod_evaluator_worker,debateai_prod_evaluator_api,debateai_prod_evaluator_reader,debateai_obs_writer,debateai_obs_listener,debateai_obs_watchdog,debateai_obs_human,debateai_observation_agent,debateai_observation_threshold_operator 127.0.0.1/32 scram-sha-256
-hostssl   debateai   debateai_prod_api_runtime,debateai_prod_api_content_provision,debateai_prod_api_erasure,debateai_prod_api_data_export,debateai_prod_api_authorization,debateai_prod_api_publication_cleanup,debateai_prod_api_support,debateai_prod_support_config_operator,debateai_prod_runner_runtime,debateai_prod_scheduler_replay,debateai_prod_scheduler_liveness,debateai_prod_scheduler_settlement,debateai_prod_evaluator_worker,debateai_prod_evaluator_api,debateai_prod_evaluator_reader,debateai_obs_writer,debateai_obs_listener,debateai_obs_watchdog,debateai_obs_human,debateai_observation_agent,debateai_observation_threshold_operator ::1/128 scram-sha-256
+hostssl   debateai   debateai_prod_api_runtime,debateai_prod_api_content_provision,debateai_prod_api_erasure,debateai_prod_api_data_export,debateai_prod_api_authorization,debateai_prod_api_system,debateai_prod_api_authorization_system,debateai_prod_api_publication_cleanup,debateai_prod_api_support,debateai_prod_support_config_operator,debateai_prod_runner_runtime,debateai_prod_scheduler_replay,debateai_prod_scheduler_liveness,debateai_prod_scheduler_settlement,debateai_prod_evaluator_worker,debateai_prod_evaluator_api,debateai_prod_evaluator_reader,debateai_obs_writer,debateai_obs_listener,debateai_obs_watchdog,debateai_obs_human,debateai_observation_agent,debateai_observation_threshold_operator 127.0.0.1/32 scram-sha-256
+hostssl   debateai   debateai_prod_api_runtime,debateai_prod_api_content_provision,debateai_prod_api_erasure,debateai_prod_api_data_export,debateai_prod_api_authorization,debateai_prod_api_system,debateai_prod_api_authorization_system,debateai_prod_api_publication_cleanup,debateai_prod_api_support,debateai_prod_support_config_operator,debateai_prod_runner_runtime,debateai_prod_scheduler_replay,debateai_prod_scheduler_liveness,debateai_prod_scheduler_settlement,debateai_prod_evaluator_worker,debateai_prod_evaluator_api,debateai_prod_evaluator_reader,debateai_obs_writer,debateai_obs_listener,debateai_obs_watchdog,debateai_obs_human,debateai_observation_agent,debateai_observation_threshold_operator ::1/128 scram-sha-256
 hostssl   hatchet    debateai_prod_hatchet                   127.0.0.1/32    scram-sha-256
 hostssl   hatchet    debateai_prod_hatchet                   ::1/128         scram-sha-256
 #

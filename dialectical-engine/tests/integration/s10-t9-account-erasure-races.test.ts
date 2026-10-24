@@ -3,6 +3,10 @@ import type { Pool, PoolClient } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "@debateai/db";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { createSystemTwin } from "../support/rls-logins.js";
+
+/** The runner's login shape since row-level security (D29): debateai_runtime and the cross-account marker. */
+const RUNNER_TWIN = "s10_t9_runner_twin";
 
 let database: TestDatabase;
 
@@ -584,6 +588,7 @@ async function insertScorecardCarrier(
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
+  await createSystemTwin(database, RUNNER_TWIN, ["debateai_runtime"]);
 },120_000);
 
 afterAll(async () => database?.stop());
@@ -794,7 +799,7 @@ describe("S10 T9 account erasure race matrix on real PostgreSQL", () => {
         "SELECT 1 FROM core.run WHERE run_id=$1 FOR UPDATE",[orderProbe.runId]
       );
       await writer.query("BEGIN");
-      await writer.query("SET LOCAL ROLE debateai_runtime");
+      await writer.query(`SET LOCAL ROLE ${RUNNER_TWIN}`);
       const inserting = insertScorecardCarrier(writer,orderProbe,"routing_decision");
       await expectStillPending(inserting);
       await bindingProbe.query("BEGIN");
@@ -824,7 +829,7 @@ describe("S10 T9 account erasure race matrix on real PostgreSQL", () => {
       const erasureClient = await database.pool.connect();
       try {
         await writerClient.query("BEGIN");
-        await writerClient.query("SET LOCAL ROLE debateai_runtime");
+        await writerClient.query(`SET LOCAL ROLE ${RUNNER_TWIN}`);
         await insertScorecardCarrier(writerClient,writerFirst,carrier,baseline);
         await erasureClient.query("BEGIN");
         await erasureClient.query("SET LOCAL ROLE debateai_erasure_runtime");
@@ -855,7 +860,7 @@ describe("S10 T9 account erasure race matrix on real PostgreSQL", () => {
         expect(await prepare(deleting,deletionFirst.erasureId,[deletionFirst.runId]))
           .toBe("PREPARED");
         await following.query("BEGIN");
-        await following.query("SET LOCAL ROLE debateai_runtime");
+        await following.query(`SET LOCAL ROLE ${RUNNER_TWIN}`);
         const insertion = insertScorecardCarrier(
           following,deletionFirst,carrier,deletionBaseline
         );
@@ -886,7 +891,7 @@ describe("S10 T9 account erasure race matrix on real PostgreSQL", () => {
         await finalizer.query("SET LOCAL ROLE debateai_erasure_runtime");
         expect(await finalizeAccount(finalizer,finalizeFirst)).toBe("COMMITTED");
         await following.query("BEGIN");
-        await following.query("SET LOCAL ROLE debateai_runtime");
+        await following.query(`SET LOCAL ROLE ${RUNNER_TWIN}`);
         const insertion = insertScorecardCarrier(
           following,finalizeFirst,carrier,finalizeBaseline
         );
@@ -919,7 +924,7 @@ describe("S10 T9 account erasure race matrix on real PostgreSQL", () => {
           WHERE execution_ref=$1 FOR UPDATE
         `,[writerFirst.executionRef]);
         await insertingClient.query("BEGIN");
-        await insertingClient.query("SET LOCAL ROLE debateai_runtime");
+        await insertingClient.query(`SET LOCAL ROLE ${RUNNER_TWIN}`);
         const insertion = insertScorecardCarrier(
           insertingClient,writerFirst,carrier,writerBaseline
         );
@@ -948,13 +953,25 @@ describe("S10 T9 account erasure race matrix on real PostgreSQL", () => {
     const wrongClient = await database.pool.connect();
     try {
       await wrongClient.query("BEGIN");
-      await wrongClient.query("SET LOCAL ROLE debateai_runtime");
+      await wrongClient.query(`SET LOCAL ROLE ${RUNNER_TWIN}`);
       await expect(insertScorecardCarrier(
         wrongClient,{ ...wrong,executionRef: randomUUID() },"routing_decision"
       )).rejects.toMatchObject({ code: "55000" });
     } finally {
       await wrongClient.query("ROLLBACK").catch(() => undefined);
       wrongClient.release();
+    }
+    // Row-level security (0124, D29): the runner writes both carriers on its own login (RUNNER_TWIN above); the bare
+    // runtime role with no account context is refused.
+    const bare = await encryptedRunFixture("scorecard-bare-runtime");
+    const bareClient = await database.pool.connect();
+    try {
+      await bareClient.query("BEGIN");
+      await bareClient.query("SET LOCAL ROLE debateai_runtime");
+      await expect(insertScorecardCarrier(bareClient,bare,"routing_decision")).rejects.toMatchObject({ code: "42501" });
+    } finally {
+      await bareClient.query("ROLLBACK").catch(() => undefined);
+      bareClient.release();
     }
     const deadlocksAfter = Number((await database.pool.query<{ deadlocks: string }>(`
       SELECT deadlocks::text FROM pg_stat_database WHERE datname=current_database()

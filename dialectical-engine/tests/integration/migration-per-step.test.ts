@@ -29,6 +29,8 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * directory; run it alone.
  */
 const SIDE_BY_SIDE = "0123_side_by_side_releases.sql";
+/** Row-level security (mission row-level-security, SPEC-v4 R26): the chain's step after 0123, its last. */
+const RLS = "0124_row_level_security.sql";
 const EXPAND: N1Declaration = Object.freeze({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
 /** A later step with constant digests, as forward-chain-replay-verifiers.test.ts builds its probes, plus its n1 header. */
 function probe(previous: ChainStep, name: string, sql: string, n1: N1Declaration = EXPAND): ChainStep {
@@ -61,13 +63,14 @@ describe("Review Focus 1: a step that fails (or a kill) between steps", () => {
 
   it("a failing step leaves every earlier step committed", async () => {
     const real = (await loadMigrationPlan()).forwardChain.map((step) => step.name);
-    expect(real).toHaveLength(13);
+    expect(real).toHaveLength(14);
+    expect(real.at(-1)).toBe(RLS);
     chain.shape = extendedBy((last) => probe(last, "0199_probe_fail.sql", "SELECT 1/0"));
     await expect(migrate(db.pool)).rejects.toMatchObject({ code: "22012" });
     chain.shape = undefined;
-    // All thirteen real steps were applied by that same run and stay committed; the probe left nothing.
+    // All fourteen real steps were applied by that same run and stay committed; the probe left nothing.
     expect(await receipts()).toEqual(real);
-    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(13);
+    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(14);
     expect(await ledger()).toEqual(expect.arrayContaining(real));
     expect(await ledger()).not.toContain("0199_probe_fail.sql");
     // The next run continues where the last one stopped: everything replays, nothing is left to apply.
@@ -79,10 +82,12 @@ describe("Review Focus 1: a step that fails (or a kill) between steps", () => {
 describe("Review Focus 2: a page read holding a lock on core.run while 0123's ALTER waits", () => {
   beforeAll(async () => {
     db = await startTestDatabase();
-    // The database a release before 0123 leaves: the chain minus its last step.
-    chain.shape = (steps) => steps.slice(0, -1);
+    // The database a release before 0123 leaves: the chain minus its last two steps (0123 and row-level security's
+    // 0124, which follows it).
+    chain.shape = (steps) => steps.slice(0, -2);
     try { await migrate(db.pool); } finally { chain.shape = undefined; }
     expect(await ledger()).not.toContain(SIDE_BY_SIDE);
+    expect(await ledger()).not.toContain(RLS);
   }, 300_000);
   afterAll(async () => { await db?.stop(); });
 
