@@ -84,7 +84,17 @@ const CODE_LINES: Readonly<Record<string, RegExp>> = Object.freeze({
     "apps/api/src/data-export/snapshot.ts", "apps/api/src/data-export/types.ts", "migrations/0115_data_export.sql",
     "tests/fixtures/data-export/raw-a.json", "tests/fixtures/data-export/snapshot-a.ts", "tests/integration/data-export-e2e.test.ts",
     "tests/unit/data-export-archive.test.ts", "tests/unit/data-export-service.test.ts"
-  ].map((path) => [`dialectical-engine/${path}`, new RegExp(`customer_${NAME}|${NAME}_customer_id|${NAME}_order_id`, "u")]))
+  ].map((path) => [`dialectical-engine/${path}`, new RegExp(`customer_${NAME}|${NAME}_customer_id|${NAME}_order_id`, "u")])),
+  // row-level-security S01 (SPEC-v4 R1, R2): the three tables 0085 and 0086 named after it and 0111 keeps —
+  // billing.customer_<name>, billing.<name>_notice and billing.<name>_notice_outcome — are members of the in-scope set,
+  // so 0124 enables row security on them, and its forward step, its successor verifier (R34), the isolation seed and
+  // the isolation suites name those tables and the two stored columns they write (<name>_customer_id, <name>_environment).
+  ...Object.fromEntries([
+    "migrations/0124_row_level_security.sql", "migrations/lineage/verify-effective-capabilities-124.sql",
+    "packages/db/src/migration-forward0124.ts", "tests/integration/rls-isolation.test.ts", "tests/support/rls-scope.ts",
+    "tools/rls/seed.ts"
+  ].map((path) => [`dialectical-engine/${path}`,
+    new RegExp(`customer_${NAME}|${NAME}_notice|${NAME}_customer_id|${NAME}_environment`, "u")]))
 });
 
 function allowed(path: string): boolean {

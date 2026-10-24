@@ -9,6 +9,9 @@ const forwardContract = "migrations/0107_auth_dev_integration.sql";
 const verifier = "migrations/lineage/verify-effective-capabilities.sql";
 // PR-54: the verifier that supersedes the sealed one once forward step 0111 is applied keeps its checks unchanged.
 const supersedingVerifier = "migrations/lineage/verify-effective-capabilities-111.sql";
+// row-level-security S01 (SPEC-v4 R34): the slice's verifier supersedes that one once forward step 0124 is applied, and
+// every check it makes on the region table and its two writers appears unchanged in it.
+const rlsVerifier = "migrations/lineage/verify-effective-capabilities-124.sql";
 const writer = "packages/db/src/identity.ts";
 const socialWriter = "packages/db/src/social-identity.ts";
 const exportMigration = "migrations/0115_data_export.sql";
@@ -30,7 +33,7 @@ describe("registration region scope", () => {
   it("S1 keeps region writes in the two bounded account-creation paths and reads in the verifier", () => {
     const references = productionFiles().filter((path) => source(path).includes("registration_region"));
     expect(references.sort()).toEqual([
-      migration, forwardContract, verifier, supersedingVerifier, writer, socialWriter,
+      migration, forwardContract, verifier, supersedingVerifier, rlsVerifier, writer, socialWriter,
       exportMigration, exportSnapshot, exportTypes,
     ].sort());
 
@@ -43,6 +46,7 @@ describe("registration region scope", () => {
     const contractSource = source(forwardContract);
     expect(source(verifier)).toContain("identity.record_registration_region(uuid,text,text)");
     expect(source(supersedingVerifier)).toContain("identity.record_registration_region(uuid,text,text)");
+    expect(source(rlsVerifier)).toContain("identity.record_registration_region(uuid,text,text)");
     const socialHelper = /CREATE OR REPLACE FUNCTION identity\.record_social_registration_region\([\s\S]*?END \$\$;/i.exec(contractSource)?.[0];
     expect(socialHelper).toContain('INSERT INTO identity.registration_region(user_id,country_code,us_state)');
     expect(contractSource.replace(socialHelper!, '')).not.toMatch(/\b(?:FROM|JOIN|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+identity\.registration_region\b/i);
@@ -54,6 +58,10 @@ describe("registration region scope", () => {
     expect(socialSource).toContain('SELECT identity.record_social_registration_region($1::uuid,$2::text,$3::text,$4::text,$5::text)');
     expect(socialSource).not.toMatch(/\b(?:FROM|JOIN|INSERT\s+INTO)\s+identity\.registration_region\b/i);
     expect(source(verifier)).not.toMatch(/\b(?:FROM|JOIN|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+identity\.registration_region\b/i);
+    // Each successor verifier reads the region table only through the privilege functions, as the sealed one does.
+    for (const successor of [supersedingVerifier, rlsVerifier]) {
+      expect(source(successor), successor).not.toMatch(/\b(?:FROM|JOIN|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+identity\.registration_region\b/i);
+    }
   });
 
   it("S2 does not backfill region rows during migration", () => {
