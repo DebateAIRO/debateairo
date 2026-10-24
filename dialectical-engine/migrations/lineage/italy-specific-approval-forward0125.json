@@ -1,0 +1,17 @@
+{
+  "version": "italy-specific-approval-forward0125-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0124_settings_activation.sql",
+    "manifestSha256": "860ea0de6288405ec798f03d17b45367a263c8d627bc7cbaa1082a765b87ffd7",
+    "verifierSha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
+  },
+  "migration": {
+    "name": "0125_italy_specific_approval.sql",
+    "sha256": "50fde0adfb8968fe8be710c2600975768c799e2d219e7a7488ac54be69c4a176"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-111.sql",
+    "sha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
+  }
+}
