@@ -6,15 +6,18 @@ import { PostgresModelSpendStore, costEnvelopeDay } from "@debateai/budget";
 import { EntitlementRepository, RunRepository, createPool, migrate, withWriteTransaction } from "@debateai/db";
 import { postgresRunnerRetirementStore } from "../../apps/runner/src/runner-retirement.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
+import { createSystemTwin } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
  * Side-by-side spec §4 (the backstop, step 3) and §9 ("the waiver"): what a retiring release leaves open is recorded
  * FAILED as RUN_SET_ASIDE:<reason>, and in the SAME transaction its run gets a spend waiver, so the person's quota is
- * whole again while the site's day still counts the money that really left. Over embedded Postgres, as a principal
- * with exactly the live runner principal's one membership (debateai_runtime); the superuser pool only arranges rows
- * (a person, a live claim, a DONE item). The cases run in order on one database; each name states what it expects.
- * CI skips this directory; run it before merging.
+ * whole again while the site's day still counts the money that really left. Over embedded Postgres, as the live
+ * runner's own login: debateai_runtime and, since row-level security S01, the marker role debateai_rls_all_accounts
+ * (a system twin, as deploy/postgres/hardening.sql and the dev runner login grant it); the bare debateai_runtime
+ * login, with no account context, records no spend and sets nothing aside (the first case). The superuser pool only
+ * arranges rows (a person, a live claim, a DONE item). The cases run in order on one database; each name states what
+ * it expects. CI skips this directory; run it before merging.
  */
 const R1 = ["r1", "aaaaaaaaaaaa"].join("-");
 const R2 = ["r2", "bbbbbbbbbbbb"].join("-");
@@ -22,6 +25,7 @@ const FENCE = Object.freeze({ releaseKey: R1, workerId: "worker:a" });
 
 let database: TestDatabase;
 let runtime: Pool;
+let bareRuntime: Pool;
 
 type Job = Readonly<{ runId: string; workItemId: string }>;
 
@@ -97,11 +101,12 @@ describe("set aside, never charged (side-by-side §4, §9)", () => {
   beforeAll(async () => {
     database = await startTestDatabase();
     await migrate(database.pool);
-    await database.pool.query(`CREATE ROLE backstop_runner LOGIN PASSWORD '${["private", "fixture", "backstop_runner"].join("-")}' IN ROLE debateai_runtime`);
+    runtime = createPool(await createSystemTwin(database, "backstop_runner", ["debateai_runtime"]));
+    await database.pool.query(`CREATE ROLE backstop_bare_runner LOGIN PASSWORD '${["private", "fixture", "backstop_bare_runner"].join("-")}' IN ROLE debateai_runtime`);
     const url = new URL(database.connectionString);
-    url.username = "backstop_runner";
-    url.password = ["private", "fixture", "backstop_runner"].join("-");
-    runtime = createPool(url.toString());
+    url.username = "backstop_bare_runner";
+    url.password = ["private", "fixture", "backstop_bare_runner"].join("-");
+    bareRuntime = createPool(url.toString());
 
     // Oldest first: A1 READY, A2 claimed live by this runner and already charged 1,000 micros, A3 DONE; B1 and B2 r2's.
     a1 = await runWithJob(R1);
@@ -124,7 +129,19 @@ describe("set aside, never charged (side-by-side §4, §9)", () => {
 
   afterAll(async () => {
     await runtime?.end();
+    await bareRuntime?.end();
     await database?.stop();
+  });
+
+  it("the bare runtime login, with no account context, records no spend and sets nothing aside (row-level security, 0124)", async () => {
+    await expect(new PostgresModelSpendStore(bareRuntime).recordSpend({
+      spendId: randomUUID(), spendSource: "RUN", runId: a1.runId, providerRef: "fake-provider",
+      chargedOn: today, chargeMicros: 1, inputTokens: 1, outputTokens: 1
+    })).rejects.toMatchObject({ code: "42501", message: 'new row violates row-level security policy for table "model_spend"' });
+    expect(await new WorkItemRepository(bareRuntime, FENCE).setAsideOpenWork({ reason: "BACKSTOP", limit: 100 })).toEqual([]);
+    expect(await jobRow(a1.workItemId)).toEqual({ state: "READY", terminal_reason: null, claimed_by: null });
+    expect(await jobRow(a2.workItemId)).toEqual({ state: "CLAIMED", terminal_reason: null, claimed_by: "worker:a" });
+    expect(await waivers()).toEqual([]);
   });
 
   it("before the set-aside the person's window and the site day both count A2's 1,000 micros", async () => {

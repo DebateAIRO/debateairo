@@ -5,14 +5,17 @@ import { WorkItemRepository } from "@debateai/battery";
 import { RunRepository, createPool, migrate, recordReleaseEvent, recordReleaseSwitch } from "@debateai/db";
 import { postgresRunnerRetirementStore } from "../../apps/runner/src/runner-retirement.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
+import { createSystemTwin } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
  * Side-by-side spec §4: a draining release's runner retires once, "in one database transaction", its release is
- * DRAINING, its front pair stopped and no READY or CLAIMED item of it is left. Over embedded Postgres, read as a
- * principal with exactly the live runner principal's one membership (debateai_runtime); the superuser pool only
- * arranges rows (the switch, the release events, a FAILED item). The cases run in order on one database; each name
- * states what it expects. CI skips this directory; run it before merging.
+ * DRAINING, its front pair stopped and no READY or CLAIMED item of it is left. Over embedded Postgres, read as the
+ * live runner's own login: debateai_runtime and, since row-level security S01, the marker role
+ * debateai_rls_all_accounts (a system twin, as deploy/postgres/hardening.sql and the dev runner login grant it); the
+ * bare debateai_runtime login, with no account context, counts no open work. The superuser pool only arranges rows
+ * (the switch, the release events, a FAILED item). The cases run in order on one database; each name states what it
+ * expects. CI skips this directory; run it before merging.
  */
 const R1 = ["r1", "aaaaaaaaaaaa"].join("-");
 const R2 = ["r2", "bbbbbbbbbbbb"].join("-");
@@ -21,6 +24,7 @@ const BY = "test:runner-retirement-store";
 
 let database: TestDatabase;
 let runtime: Pool;
+let bareRuntime: Pool;
 let r1Item: string;
 
 /** A run stamped with `releaseKey` and its first job READY. */
@@ -46,11 +50,12 @@ describe("the retirement facts, read in one snapshot as the runner principal", (
   beforeAll(async () => {
     database = await startTestDatabase();
     await migrate(database.pool);
-    await database.pool.query("CREATE ROLE retire_runner_runtime LOGIN PASSWORD 'retire-runner-private-fixture-only' IN ROLE debateai_runtime");
+    runtime = createPool(await createSystemTwin(database, "retire_runner_runtime", ["debateai_runtime"]));
+    await database.pool.query("CREATE ROLE retire_bare_runtime LOGIN PASSWORD 'retire-bare-private-fixture-only' IN ROLE debateai_runtime");
     const url = new URL(database.connectionString);
-    url.username = "retire_runner_runtime";
-    url.password = "retire-runner-private-fixture-only";
-    runtime = createPool(url.toString());
+    url.username = "retire_bare_runtime";
+    url.password = "retire-bare-private-fixture-only";
+    bareRuntime = createPool(url.toString());
 
     for (const [key, expectedCurrent] of [[R1, null], [R2, R1]] as const) {
       await recordReleaseEvent(database.pool, { releaseKey: key, kind: "STAGED", recordedBy: BY });
@@ -63,6 +68,7 @@ describe("the retirement facts, read in one snapshot as the runner principal", (
 
   afterAll(async () => {
     await runtime?.end();
+    await bareRuntime?.end();
     await database?.stop();
   });
 
@@ -81,6 +87,13 @@ describe("the retirement facts, read in one snapshot as the runner principal", (
 
   it("r2 is current with its own item open (r1's items never count for it)", async () => {
     expect(await store(R2).readFacts(R2)).toEqual({ state: "CURRENT", frontPairStopped: false, retireRequested: false, openWork: 1 });
+  });
+
+  it("the bare runtime login, with no account context, counts none of r2's open work (row-level security, 0124)", async () => {
+    const bare = postgresRunnerRetirementStore(bareRuntime, { releaseKey: R2, workerId: "worker:retire" });
+    expect(await bare.readFacts(R2)).toEqual({ state: "CURRENT", frontPairStopped: false, retireRequested: false, openWork: 0 });
+    // Not vacuous: the runner's own login still counts r2's item.
+    expect((await store(R2).readFacts(R2)).openWork).toBe(1);
   });
 
   it("a release never recorded reads state null, no flags, no work", async () => {

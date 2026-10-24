@@ -6,6 +6,7 @@ import { WorkItemRepository } from "@debateai/battery";
 import { PostgresModelSpendStore, costEnvelopeDay } from "@debateai/budget";
 import { RunRepository, createPool, migrate, recordReleaseEvent, recordReleaseSwitch, recordSpendWaiver } from "@debateai/db";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
+import { createSystemTwin } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
@@ -13,8 +14,11 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * release, and a retired release's run is never sent. Its never-claimed first job is closed FAILED
  * (RUN_SETUP_FAILED:RELEASE_NOT_SERVED), its waiver written, and the site's counted holds drop by its hold. The
  * dispatcher reads, closes and waives through a login with exactly the API's two memberships (debateai_runtime and
- * debateai_billing_runtime), as main.ts builds it on the runtime pool; the superuser pool only arranges rows (the
- * release events, the runs, their holds). Only the job system is a stand-in. CI skips this directory; run it alone.
+ * debateai_billing_runtime), as main.ts builds it on the runtime pool — and, since row-level security S01, with that
+ * pool's cross-account target, the API's system login (the same roles and the marker role debateai_rls_all_accounts,
+ * main.ts's setCrossAccountTarget(pool, systemPool)), which runs every statement made outside a request. The same
+ * login with no target sends no account context and sees no run (the last case). The superuser pool only arranges
+ * rows (the release events, the runs, their holds). Only the job system is a stand-in. CI skips this directory; run it alone.
  */
 const R16 = ["r16", "0123456789ab"].join("-");
 const R17 = ["r17", "0123456789ab"].join("-");
@@ -23,13 +27,15 @@ const BASE = "dialectical-run";
 const BY = "test:side-by-side-release-dispatch";
 
 let database: TestDatabase;
+let apiSystem: Pool;
 let api: Pool;
+let bareApi: Pool;
 
-function login(name: string): Pool {
+function login(name: string, crossAccount?: Pool): Pool {
   const url = new URL(database.connectionString);
   url.username = name;
   url.password = ["private", "fixture", name].join("-");
-  return createPool(url.toString());
+  return createPool(url.toString(), crossAccount === undefined ? {} : { crossAccount });
 }
 
 beforeAll(async () => {
@@ -38,7 +44,9 @@ beforeAll(async () => {
   await database.pool.query(
     `CREATE ROLE release_dispatch_api LOGIN PASSWORD '${["private", "fixture", "release_dispatch_api"].join("-")}' IN ROLE debateai_runtime,debateai_billing_runtime`
   );
-  api = login("release_dispatch_api");
+  apiSystem = createPool(await createSystemTwin(database, "release_dispatch_api_system", ["debateai_runtime", "debateai_billing_runtime"]));
+  api = login("release_dispatch_api", apiSystem);
+  bareApi = login("release_dispatch_api");
   // r16 CURRENT, then r17 CURRENT (r16 now DRAINING), then r16 RETIRED.
   for (const [key, expectedCurrent] of [[R16, null], [R17, R16]] as const) {
     await recordReleaseEvent(database.pool, { releaseKey: key, kind: "STAGED", recordedBy: BY });
@@ -51,6 +59,8 @@ afterEach(() => { vi.restoreAllMocks(); });
 
 afterAll(async () => {
   await api?.end();
+  await bareApi?.end();
+  await apiSystem?.end();
   await database?.stop();
 });
 
@@ -173,5 +183,19 @@ describe("every send is routed by the run's own release (side-by-side C4)", () =
     expect(await jobRow(r17.workItemId)).toEqual({ state: "READY", terminal_reason: null });
     expect(await waivers(r17.runId)).toEqual([]);
     expect(alerts).toEqual([]);
+  });
+
+  it("the API's login with no cross-account target, outside a request, sees no run and writes no waiver (row-level security, 0124)", async () => {
+    const r16 = await startedRun(R16, 1);
+    expect(await new PostgresRunReleaseLookup(bareApi).lookup(r16.runId)).toBeNull();
+    await expect(recordSpendWaiver(bareApi, r16.runId, "RELEASE_NOT_SERVED")).rejects.toMatchObject({ code: "42501" });
+    expect(await waivers(r16.runId)).toEqual([]);
+    expect(await jobRow(r16.workItemId)).toEqual({ state: "READY", terminal_reason: null });
+    // Not vacuous: the same login, routed to its system target as main.ts wires it, reads the run.
+    expect(await new PostgresRunReleaseLookup(api).lookup(r16.runId)).toMatchObject({ releaseKey: R16, anyCurrent: true });
+    await database.pool.query(
+      "UPDATE core.work_item SET state = 'FAILED', terminal_reason = 'TEST_LAYER:RELEASE_DISPATCH_CLEARED' WHERE work_item_id = $1",
+      [r16.workItemId]
+    );
   });
 });

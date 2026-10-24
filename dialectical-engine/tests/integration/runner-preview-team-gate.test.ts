@@ -7,30 +7,36 @@ import {
   postgresRunnerPreviewTeamGateStore, refusePreviewOutsiderWork
 } from "../../apps/runner/src/runner-preview-team-gate.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
+import { createSystemTwin } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
  * GAP-RUNNER (2026-10-09): the runner's start-up team gate over embedded Postgres, connected as
- * a principal with exactly the live runner principal's one membership (debateai_runtime,
- * measured on the preview), so every read and write below is one the runner may really make.
+ * the live runner's own login — debateai_runtime (measured on the preview) and, since row-level
+ * security S01, the marker role debateai_rls_all_accounts (a system twin, as deploy/postgres/hardening.sql
+ * and the dev runner login grant it) — so every read and write below is one the runner may really make.
+ * The bare debateai_runtime login, with no account context, sees no job at all (the last case).
  * CI skips this directory; run it before merging. Side-by-side spec §3: every run carries a release key and the gate
  * reads, fails, refuses and counts only its own release's jobs.
  */
 let database: TestDatabase;
 let runner: Pool;
+let bareRunner: Pool;
 
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
-  await database.pool.query("CREATE ROLE gate_runner_runtime LOGIN PASSWORD 'gate-runner-private-fixture-only' IN ROLE debateai_runtime");
+  runner = createPool(await createSystemTwin(database, "gate_runner_runtime", ["debateai_runtime"]));
+  await database.pool.query("CREATE ROLE gate_bare_runtime LOGIN PASSWORD 'gate-bare-private-fixture-only' IN ROLE debateai_runtime");
   const url = new URL(database.connectionString);
-  url.username = "gate_runner_runtime";
-  url.password = "gate-runner-private-fixture-only";
-  runner = createPool(url.toString());
+  url.username = "gate_bare_runtime";
+  url.password = "gate-bare-private-fixture-only";
+  bareRunner = createPool(url.toString());
 }, 600_000);
 
 afterAll(async () => {
   await runner?.end();
+  await bareRunner?.end();
   await database?.stop();
 });
 
@@ -183,5 +189,23 @@ describe("the runner's start-up team gate, as the runner principal", () => {
     const own = postgresRunnerPreviewTeamGateStore(runner, ["r2", "bbbbbbbbbbbb"].join("-"));
     expect(await own.work.failClaimable({ runId: other.runId, workItemId: other.workItemId, reason: "X" })).toBe(true);
     expect(await jobRow(other.workItemId)).toMatchObject({ state: "FAILED" });
+  });
+
+  it("the bare runtime login, with no account context, sees no job: it neither refuses the start nor fails a job (row-level security, 0124)", async () => {
+    const team = await activeUser(), outsider = await activeUser();
+    const ready = await runWithJob(outsider.ownerRef), live = await runWithJob(outsider.ownerRef);
+    await database.pool.query(
+      "UPDATE core.work_item SET state='CLAIMED', claimed_by='old-runner', claim_deadline=clock_timestamp()+interval '10 minutes' WHERE work_item_id=$1",
+      [live.workItemId]
+    );
+    const bare = postgresRunnerPreviewTeamGateStore(bareRunner, ["r1", "aaaaaaaaaaaa"].join("-"));
+    expect(await bare.work.listOpenRunWork(100)).toEqual([]);
+    expect(await refusePreviewOutsiderWork({ previewConfigured: true, teamUserIds: [team.userId], ...bare, log: () => undefined }))
+      .toEqual({ checked: 0, refused: 0 });
+    expect(await bare.work.failClaimable({ ...ready, reason: "RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY" })).toBe(false);
+    expect(await jobRow(ready.workItemId)).toMatchObject({ state: "READY", terminal_reason: null });
+    expect(await jobRow(live.workItemId)).toMatchObject({ state: "CLAIMED", claimed_by: "old-runner" });
+    // Not vacuous: the runner's own login refuses the same start.
+    await expect(gate([team.userId], [])).rejects.toMatchObject({ code: "RUNNER_PREVIEW_OUTSIDER_CLAIM_LIVE" });
   });
 });
