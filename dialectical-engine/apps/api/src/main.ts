@@ -1036,6 +1036,7 @@ const staffAlerts = environment.STAFF_ACCESS.policyVersion === 2
 if (staffAlerts !== undefined) boot.hold({end:()=>staffAlerts.close()});
 const threatReportRepository = new PostgresThreatReportRepository(pool);
 const readThreatReportRecipientEmail = threatReportEmailReader(pool, dekStore);
+const readThreatReportStaffEmail = threatReportEmailReader(pool, dekStore, "staff");
 const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undefined : {
   access: staffAccess, sessions, repository: new PostgresStaffRepository(pool),
   webauthn: new StaffWebAuthnService(new PostgresStaffRepository(pool), {publicAppUrl: environment.PUBLIC_APP_URL}),
@@ -1211,7 +1212,7 @@ const threatReportAlertsTimer = startThreatReportAlerts({
     from: environment.MAIL_FROM,
     timeoutMs: authPolicy.channel.transportTimeoutMs
   }),
-  readRecipientEmail: readThreatReportRecipientEmail
+  readRecipientEmail: readThreatReportStaffEmail
 });
 const threatReportErasureTimer = startThreatReportErasure({ repository: threatReportRepository });
 const privateErasure = new PrivateRunErasureCoordinator(
@@ -1393,7 +1394,17 @@ const questionCheck = await boot.run("question-check", () => composeQuestionChec
     ceilingMicros: costEnvelopeRows.guardPolicy.dailyCeilingMicros,
     spentMicros: day => new PostgresModelSpendStore(pool).readDaySpentMicros(day)
   },
-  keeper: threatReportRepository,
+  keeper: { keep: async (questionLine, accountUserId) => {
+    try {
+      return await threatReportRepository.keep(questionLine, accountUserId);
+    } catch (error) {
+      if (accountUserId === null || !(error instanceof Error)
+        || error.message !== "THREAT_REPORT_ACCOUNT_ERASING") throw error;
+      const email = await readThreatReportRecipientEmail(accountUserId);
+      if (email === null) throw error;
+      return threatReportRepository.keepWithHeldEmail(questionLine, accountUserId, email);
+    }
+  } },
   clock: () => new Date(),
   report: line => console.error(JSON.stringify(line))
 }));

@@ -49,13 +49,14 @@ describe("0125 threat reports contract", () => {
     }
   });
 
-  it("creates the thirteen named functions and keeps the sealed export reader untouched", async () => {
+  it("creates the sixteen named functions and keeps the sealed export reader untouched", async () => {
     // Property: 0125 adds a lease reader beside 0115's sealed function and exposes only named report operations.
     const sql = await read0125();
     for (const name of [
       "ledger.record_question_check_spend", "ledger.refuse_question_check_spend_outside_writer",
-      "staff.keep_threat_report", "staff.list_threat_reports", "staff.count_unread_threat_reports",
-      "staff.read_threat_report", "staff.decide_threat_report", "staff.erase_due_threat_reports",
+      "staff.keep_threat_report", "staff.keep_threat_report_with_email", "staff.list_threat_reports", "staff.count_unread_threat_reports",
+      "staff.peek_threat_report_account", "staff.read_threat_report", "staff.threat_report_recipient_user",
+      "staff.decide_threat_report", "staff.erase_due_threat_reports",
       "staff.hold_threat_report_email", "staff.claim_threat_report_alerts", "staff.complete_threat_report_alert",
       "identity.read_data_export_threat_reports", "identity.data_export_lease_user"
     ]) expect(sql).toContain(`CREATE OR REPLACE FUNCTION ${name}(`);

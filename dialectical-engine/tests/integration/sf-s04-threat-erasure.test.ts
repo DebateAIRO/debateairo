@@ -14,6 +14,7 @@ const ciphertext = encrypt(key, Buffer.from("asker@example.test"), aad);
 
 function fixture(beforeKeyDestruction: (input: { erasureId: string; userId: string; email: string }) => Promise<void>) {
   const order: string[] = [];
+  let userKeyExists = true;
   const manifest = { userId, ownerRef, runIds: [], legacyRunIds: [], publishedRunIds: [],
     currentPublicationRefs: [], cleanupPublicationRefs: [], deletePublicDebates: false };
   const repository = {
@@ -22,8 +23,8 @@ function fixture(beforeKeyDestruction: (input: { erasureId: string; userId: stri
     completionNotificationsReady: async () => true, finalize: async () => "CLEANED",
     status: async () => "CLEANED"
   };
-  const users = { load: async () => Buffer.from(key), destroy: async () => { order.push("destroy"); return "DESTROYED"; },
-    exists: async () => false };
+  const users = { load: async () => Buffer.from(key), destroy: async () => { order.push("destroy"); userKeyExists = false; return "DESTROYED"; },
+    exists: async () => userKeyExists };
   const runs = { listByOwner: async () => [], exists: async () => false, ownerRef: async () => ownerRef,
     destroy: async () => "ALREADY_ABSENT" };
   const coordinator = new AccountErasureCoordinator(repository as never, users as never, runs as never, undefined,
@@ -49,6 +50,40 @@ describe("S04 threat report account erasure", () => {
     const { coordinator, order } = fixture(async () => { throw new Error("hold failed"); });
     const outcome = await coordinator.execute(erasureId, { ip: "127.0.0.1", userAgent: "test", requestId: randomUUID() });
     expect({ outcome, order }).toEqual({ outcome: "CONTENDED", order: ["hold"] });
+  });
+
+  it("finishes a retry after the user key was already destroyed", async () => {
+    // Property: the email hold is required before the first key destruction, but an interrupted finalize can be retried.
+    // Mutant: load the absent key on every retry; changing the report-erasure timer is a neighbour.
+    const calls: string[] = [];
+    const manifest = { userId, ownerRef, runIds: [], legacyRunIds: [], publishedRunIds: [],
+      currentPublicationRefs: [], cleanupPublicationRefs: [], deletePublicDebates: false };
+    const repository = {
+      preview: async () => null,
+      status: async () => calls.includes("finalize") ? "CLEANED" : "PREPARED",
+      cleanupManifest: async () => manifest,
+      withNotificationLease: async (_user: string, run: () => Promise<unknown>) => run(),
+      completionNotificationsReady: async () => true,
+      finalize: async (input: { alreadyAbsentUserDekCount: number }) => {
+        calls.push("finalize");
+        expect(input.alreadyAbsentUserDekCount).toBe(1);
+        return "CLEANED";
+      }
+    };
+    const users = {
+      load: async () => { calls.push("load"); throw new Error("USER_DEK_UNRESOLVED"); },
+      destroy: async () => { calls.push("destroy"); return "ALREADY_ABSENT" as const; },
+      exists: async () => false
+    };
+    const runs = { listByOwner: async () => [], exists: async () => false, ownerRef: async () => ownerRef,
+      destroy: async () => "ALREADY_ABSENT" as const };
+    const coordinator = new AccountErasureCoordinator(repository as never, users as never, runs as never, undefined, {
+      readEmailCiphertext: async () => { calls.push("read"); return ciphertext; },
+      beforeKeyDestruction: async () => { calls.push("hold"); }
+    });
+    const outcome = await coordinator.execute(erasureId, { ip: "127.0.0.1", userAgent: "test", requestId: randomUUID() });
+    expect(outcome).toBe("CLEANED");
+    expect(calls).toEqual(["destroy", "finalize"]);
   });
 
 });
@@ -111,9 +146,9 @@ describe("S04 threat report erasure database gates", () => {
   }, 600_000);
   afterAll(async () => database?.stop());
 
-  it("stores a threat kept during the prepared erasure with no account or email and lists it", async () => {
-    // Property: a new keep cannot reattach an account after the before-key-destruction hold.
-    // Mutant: insert p_account unconditionally in keep_threat_report; erasure timing is a neighbour.
+  it("keeps a prepared-erasure threat with the held email and leaves it readable", async () => {
+    // Property: a new keep after the hold retains the email without reattaching the erasing account.
+    // Mutant: insert a null held_email; erasure timing is a neighbour.
     const target = randomUUID(), erasure = randomUUID();
     await database.pool.query(`INSERT INTO identity."user"
       (user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at)
@@ -125,11 +160,16 @@ describe("S04 threat report erasure database gates", () => {
        prepared_cleanup_publication_refs)
       VALUES($1,$2,now(),now(),now(),'{}','{}','{}','{}','{}')`, [erasure,target]);
     await closure.threatReportEmailHold(repository)({ erasureId: erasure, userId: target, email: "held@example.test" });
-    const ref = await repository.keep("Question kept during erasure", target);
+    await expect(repository.keep("Question kept during erasure", target))
+      .rejects.toMatchObject({ message: "THREAT_REPORT_ACCOUNT_ERASING" });
+    const ref = await repository.keepWithHeldEmail("Question kept during erasure", target, "held@example.test");
     const rows = (await database.pool.query(`SELECT report_ref,account_user_id,held_email FROM staff.threat_report
       WHERE report_ref=$1 ORDER BY kept_at`, [ref])).rows;
-    expect(rows).toEqual([{ report_ref: ref, account_user_id: null, held_email: null }]);
+    expect(rows).toEqual([{ report_ref: ref, account_user_id: null, held_email: "held@example.test" }]);
     expect((await repository.list(reader.context, reader.tokenHash)).map(row => row.report_ref)).toContain(ref);
+    await expect(repository.read(reader.context, reader.tokenHash, ref)).resolves.toMatchObject({
+      question: "Question kept during erasure", held_email: "held@example.test"
+    });
   }, 600_000);
 
   it("one worker tick erases due reports and keeps the future reports by the database clock", async () => {

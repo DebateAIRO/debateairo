@@ -730,16 +730,19 @@ export class AccountErasureCoordinator {
     if (!await this.repository.completionNotificationsReady(erasureId)) return "CONTENDED";
     if (this.options.beforeKeyDestruction !== undefined) {
       try {
-        if (this.options.readEmailCiphertext === undefined) return "CONTENDED";
-        const encrypted = await this.options.readEmailCiphertext(cleanup.userId);
-        if (encrypted === null) return "CONTENDED";
-        const key = await this.users.load(cleanup.userId);
-        let email: string;
-        try {
-          email = decrypt(key, encrypted, ["identity", "user.email_ciphertext", cleanup.userId,
-            "run:none", cleanup.userId, `user-dek:${cleanup.userId}`, "1"]).toString("utf8");
-        } finally { key.fill(0); }
-        await this.options.beforeKeyDestruction({ erasureId, userId: cleanup.userId, email });
+        // A retry after key destruction already ran the hold on its first attempt.
+        if (await this.users.exists(cleanup.userId)) {
+          if (this.options.readEmailCiphertext === undefined) return "CONTENDED";
+          const encrypted = await this.options.readEmailCiphertext(cleanup.userId);
+          if (encrypted === null) return "CONTENDED";
+          const key = await this.users.load(cleanup.userId);
+          let email: string;
+          try {
+            email = decrypt(key, encrypted, ["identity", "user.email_ciphertext", cleanup.userId,
+              "run:none", cleanup.userId, `user-dek:${cleanup.userId}`, "1"]).toString("utf8");
+          } finally { key.fill(0); }
+          await this.options.beforeKeyDestruction({ erasureId, userId: cleanup.userId, email });
+        }
       } catch { return "CONTENDED"; }
     }
     if ((cleanup.currentPublicationRefs.length > 0

@@ -13,8 +13,10 @@ const TABLES = ["staff.threat_report", "staff.threat_report_event", "staff.threa
 const FUNCTIONS = [
   "ledger.record_question_check_spend(uuid,text,date,bigint,bigint,bigint)",
   "ledger.refuse_question_check_spend_outside_writer()",
-  "staff.keep_threat_report(text,uuid)", "staff.list_threat_reports(jsonb,text)",
-  "staff.count_unread_threat_reports(jsonb,text)", "staff.read_threat_report(jsonb,text,uuid)",
+  "staff.keep_threat_report(text,uuid)", "staff.keep_threat_report_with_email(text,uuid,text)",
+  "staff.list_threat_reports(jsonb,text)",
+  "staff.count_unread_threat_reports(jsonb,text)", "staff.peek_threat_report_account(jsonb,text,uuid)",
+  "staff.read_threat_report(jsonb,text,uuid)", "staff.threat_report_recipient_user(uuid)",
   "staff.decide_threat_report(jsonb,text,uuid,text,jsonb)", "staff.erase_due_threat_reports()",
   "staff.hold_threat_report_email(uuid,text)", "staff.claim_threat_report_alerts(integer)",
   "staff.complete_threat_report_alert(uuid,uuid,boolean)",

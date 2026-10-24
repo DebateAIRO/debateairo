@@ -5,6 +5,7 @@ import { recordQuestionCheckSpend } from "@debateai/budget";
 import { migrate, PostgresThreatReportRepository, RunRepository } from "@debateai/db";
 import { createQuestionCheck } from "../../apps/api/src/question-check/check.js";
 import { QuestionCheckFailure, type QuestionCheckPort } from "../../apps/api/src/question-check/transport.js";
+import { SUPPORT_RELAY_PROVIDER_REF } from "../../apps/api/src/support/model.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
@@ -71,7 +72,7 @@ async function personSpend(): Promise<number> {
 
 function serverFor(label: typeof labels[number], reports: { event: string; code: string }[]) {
   const port: QuestionCheckPort = {
-    providerRef: "anthropic-test", modelId: "claude-haiku-5-5",
+    providerRef: SUPPORT_RELAY_PROVIDER_REF, modelId: "claude-haiku-5-5",
     complete: async ({ packet }) => {
       if (label === "QUESTION_CHECK_HTTP_STATUS") throw new QuestionCheckFailure(label);
       return { text: JSON.stringify({ call: packet.messages[1]!.content.match(marker)![1], label }),
@@ -79,7 +80,7 @@ function serverFor(label: typeof labels[number], reports: { event: string; code:
     }
   };
   const check = createQuestionCheck({ port: () => port, deadlineMs: 1_000,
-    price: { input: 1, output: 2 }, dayPot: null, clock: () => new Date("2026-10-21T12:00:00.000Z"),
+    price: { input: 1, output: 2 }, dayPot: null, clock: () => new Date(),
     spend: { record: entry => recordQuestionCheckSpend({ query: async (sql: string, values?: unknown[]) =>
       ({ rows: await asRuntime(sql, values) }) } as never, entry) }, report: line => { reports.push(line); } });
   const repository = new PostgresThreatReportRepository({ query: async (sql: string, values?: unknown[]) =>

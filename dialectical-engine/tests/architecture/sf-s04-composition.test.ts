@@ -18,6 +18,18 @@ describe("S04 production composition", () => {
     expect(source).toContain("beforeKeyDestruction: threatReportEmailHold(");
   });
 
+  it("resolves queued alert staff ids through an active capability holder", () => {
+    const source = main();
+    expect(source).toContain('const readThreatReportStaffEmail = threatReportEmailReader(pool, dekStore, "staff");');
+    expect(source).toMatch(/startThreatReportAlerts\(\{[\s\S]*?readRecipientEmail: readThreatReportStaffEmail/u);
+  });
+
+  it("keeps a threat with its email when account erasure is already prepared", () => {
+    const source = main();
+    expect(source).toContain("keepWithHeldEmail(questionLine, accountUserId, email)");
+    expect(source).toContain("const email = await readThreatReportRecipientEmail(accountUserId);");
+  });
+
   it("composes from the support target and the sealed policy through the local switch", () => {
     expect(existsSync("apps/api/src/question-check/compose.ts")).toBe(true);
     const source = readFileSync("apps/api/src/question-check/compose.ts", "utf8");

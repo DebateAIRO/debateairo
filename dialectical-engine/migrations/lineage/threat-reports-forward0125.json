@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0125_threat_reports.sql",
-    "sha256": "2decf6569ffc9c79cb865720360d61657ae1bc1a5a50eb914cfffc4be77eee57"
+    "sha256": "a84f893ebb09b5dccb4f0242787bc7d545c9bb8b87e7481875d6577ec410fc98"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-111.sql",

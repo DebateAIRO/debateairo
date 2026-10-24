@@ -2,6 +2,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createHash, randomUUID } from "node:crypto";
 import * as budget from "../../packages/budget/src/index.js";
 import * as db from "../../packages/db/src/index.js";
+import { encrypt } from "@debateai/crypto";
+import { SUPPORT_RELAY_PROVIDER_REF } from "../../apps/api/src/support/model.js";
+import { createQuestionCheckTransport } from "../../apps/api/src/question-check/transport.js";
+import { threatReportEmailReader } from "../../apps/api/src/staff/threat-reports.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 let database: TestDatabase;
@@ -116,9 +120,11 @@ describe("0125 applied database", () => {
     }
   });
 
-  it("grants nine staff functions to runtime and none to erasure runtime", async () => {
-    for (const signature of ["keep_threat_report(text,uuid)","list_threat_reports(jsonb,text)",
-      "count_unread_threat_reports(jsonb,text)","read_threat_report(jsonb,text,uuid)",
+  it("grants twelve staff functions to runtime and none to erasure runtime", async () => {
+    for (const signature of ["keep_threat_report(text,uuid)","keep_threat_report_with_email(text,uuid,text)",
+      "list_threat_reports(jsonb,text)",
+      "count_unread_threat_reports(jsonb,text)","peek_threat_report_account(jsonb,text,uuid)",
+      "read_threat_report(jsonb,text,uuid)","threat_report_recipient_user(uuid)",
       "decide_threat_report(jsonb,text,uuid,text,jsonb)","erase_due_threat_reports()",
       "hold_threat_report_email(uuid,text)","claim_threat_report_alerts(integer)",
       "complete_threat_report_alert(uuid,uuid,boolean)"]) {
@@ -166,6 +172,23 @@ describe("0125 applied database", () => {
       "SELECT * FROM staff.read_threat_report($1::jsonb,$2,$3::uuid)", [owner.context,owner.tokenHash,ref]);
     expect(rows[0]?.question).toBe("Read boundary");
     expect((await database.pool.query("SELECT count(*)::int n FROM staff.threat_report_event WHERE report_ref=$1 AND action='READ'",[ref])).rows[0].n).toBe(1);
+  });
+
+  it("checks account availability without reading the question or writing a READ event", async () => {
+    // Property: the API can resolve the email before the audited question read.
+    // Mutant: call the audited read during preflight; changing the decision action is a neighbour.
+    const ref = await keep("Private preflight question", noHolder.userId);
+    const runtime = { query: async (sql: string, values?: unknown[]) => ({ rows: await asRole("debateai_runtime", sql, values) }) };
+    const repository = new db.PostgresThreatReportRepository(runtime as never);
+    await expect(repository.peekAccount(owner.context, owner.tokenHash, ref)).resolves.toEqual({
+      account_user_id: noHolder.userId, has_held_email: false
+    });
+    expect((await database.pool.query("SELECT count(*)::int n FROM staff.threat_report_event WHERE report_ref=$1 AND action='READ'", [ref])).rows[0].n).toBe(0);
+    await repository.read(owner.context, owner.tokenHash, ref);
+    expect((await database.pool.query("SELECT count(*)::int n FROM staff.threat_report_event WHERE report_ref=$1 AND action='READ'", [ref])).rows[0].n).toBe(1);
+    const own = await keep("Private own preflight", holder.userId);
+    await expect(repository.peekAccount(holder.context, holder.tokenHash, own))
+      .rejects.toMatchObject({ code: "THREAT_REPORT_OWN" });
   });
 
   it("marks REPORTED once and refuses a second decision", async () => {
@@ -258,6 +281,35 @@ describe("0125 applied database", () => {
       [prepared,"fixture@example.test"])).rejects.toMatchObject({message:"THREAT_REPORT_HOLD_NOT_ERASING",code:"42501"});
   });
 
+  it("retains the account email for a threat kept during prepared erasure", async () => {
+    // Property: a prepared erasure needs the live email to keep the threat readable after the user key is destroyed.
+    // Mutant: insert a null held_email; changing alert claim order is a neighbour.
+    const asker = await actor(["TEAM_READ"]);
+    const prepared = randomUUID();
+    await database.pool.query(`INSERT INTO identity.account_erasure_request
+      (erasure_id,user_id,requested_at,execute_at,prepared_at,prepared_run_ids,
+       prepared_legacy_run_ids,prepared_published_run_ids,prepared_current_publication_refs,
+       prepared_cleanup_publication_refs)
+       VALUES($1,$2,now(),now(),now(),'{}','{}','{}','{}','{}')`, [prepared, asker.userId]);
+    const question = `prepared-erasure-probe-${randomUUID()}`;
+    await expect(keep(question, asker.userId)).rejects.toMatchObject({ message: "THREAT_REPORT_ACCOUNT_ERASING" });
+    expect((await database.pool.query("SELECT count(*)::int n FROM staff.threat_report WHERE question=$1", [question])).rows[0].n).toBe(0);
+    const email = "prepared-asker@example.test";
+    const ref = (await asRole<{ ref: string }>("debateai_runtime",
+      "SELECT staff.keep_threat_report_with_email($1::text,$2::uuid,$3::text) ref",
+      [question, asker.userId, email]))[0]!.ref;
+    expect((await database.pool.query("SELECT account_user_id,held_email FROM staff.threat_report WHERE report_ref=$1", [ref])).rows[0])
+      .toEqual({ account_user_id: null, held_email: email });
+    const runtime = { query: async (sql: string, values?: unknown[]) => ({ rows: await asRole("debateai_runtime", sql, values) }) };
+    const repository = new db.PostgresThreatReportRepository(runtime as never);
+    await expect(repository.peekAccount(owner.context, owner.tokenHash, ref)).resolves.toEqual({
+      account_user_id: null, has_held_email: true
+    });
+    await expect(repository.read(owner.context, owner.tokenHash, ref)).resolves.toMatchObject({
+      question, held_email: email
+    });
+  });
+
   it("places code-only threat events into the audit page", async () => {
     const ref=await keep("Audit must omit this question",noHolder.userId);
     await asRole("debateai_runtime","SELECT * FROM staff.list_threat_reports($1::jsonb,$2)",
@@ -281,7 +333,7 @@ describe("0125 applied database", () => {
 
   it("writes QUESTION_CHECK spend through its writer and rejects direct or malformed writes", async () => {
     const spendId=randomUUID();
-    const entry={spendId,providerRef:"question-check:anthropic:haiku-5.5",
+    const entry={spendId,providerRef:`question-check:${SUPPORT_RELAY_PROVIDER_REF}:claude-haiku-5-5`,
       chargedOn:new Date().toISOString().slice(0,10),chargeMicros:4,inputTokens:3,outputTokens:2};
     await budget.recordQuestionCheckSpend({query: (sql:string,values?:unknown[]) =>
       asRole("debateai_runtime",sql,values)} as unknown as Parameters<typeof budget.recordQuestionCheckSpend>[0],entry);
@@ -303,6 +355,44 @@ describe("0125 applied database", () => {
     await expect(new budget.PostgresModelSpendStore(database.pool).recordSpend({
       ...entry,spendSource:"QUESTION_CHECK",runId:null
     })).rejects.toMatchObject({code:"MODEL_SPEND_QUESTION_CHECK_FUNCTION_ONLY"});
+  });
+
+  it("records spend for both provider references made by the deployed transport", async () => {
+    // Property: each configured transport's provider identity is accepted by the real runtime writer.
+    // Mutant: reject a colon in the provider reference; changing chargeMicros is a neighbour.
+    for (const providerRef of [SUPPORT_RELAY_PROVIDER_REF, "vendor:anthropic"] as const) {
+      const port = createQuestionCheckTransport({ providerRef, baseUrl: "http://127.0.0.1:1/v1",
+        model: "claude-haiku-5-5", authorizationHeader: "Bearer synthetic-not-a-key" },
+      { readAuthorizationHeader: () => "", deadlineMs: 1_000 });
+      const spendId = randomUUID();
+      await budget.recordQuestionCheckSpend({ query: (sql: string, values?: unknown[]) =>
+        asRole("debateai_runtime", sql, values) } as unknown as Parameters<typeof budget.recordQuestionCheckSpend>[0], {
+        spendId, providerRef: `question-check:${port.providerRef}:${port.modelId}`,
+        chargedOn: new Date().toISOString().slice(0, 10), chargeMicros: 1, inputTokens: 1, outputTokens: 1
+      });
+      expect((await database.pool.query("SELECT provider_ref FROM ledger.model_spend WHERE spend_id=$1", [spendId])).rows)
+        .toEqual([{ provider_ref: `question-check:${providerRef}:claude-haiku-5-5` }]);
+    }
+  });
+
+  it("resolves an active THREAT_REPORT staff id to its user's email only while the capability remains active", async () => {
+    // Property: queued staff ids resolve to the current holder's email, never to an unrelated user id.
+    // Mutant: query identity.user directly by staff id; changing alert cadence is a neighbour.
+    const recipient = await actor(["THREAT_REPORT"]);
+    const key = Buffer.alloc(32, 7);
+    const email = "active-holder@example.test";
+    const aad = ["identity", "user.email_ciphertext", recipient.userId, "run:none", recipient.userId,
+      `user-dek:${recipient.userId}`, "1"] as const;
+    await database.pool.query('UPDATE identity."user" SET email_ciphertext=$1 WHERE user_id=$2',
+      [JSON.stringify(encrypt(key, Buffer.from(email), aad)), recipient.userId]);
+    const runtime = { query: async (sql: string, values?: unknown[]) => ({ rows: await asRole("debateai_runtime", sql, values) }) };
+    const reader = threatReportEmailReader(runtime as never, { load: async () => Buffer.from(key) } as never, "staff");
+    expect(recipient.staffId).not.toBe(recipient.userId);
+    await expect(reader(recipient.staffId)).resolves.toBe(email);
+    await database.pool.query("UPDATE staff.subject SET capabilities=ARRAY['TEAM_READ']::text[] WHERE staff_id=$1", [recipient.staffId]);
+    await expect(reader(recipient.staffId)).resolves.toBeNull();
+    await database.pool.query("UPDATE staff.subject SET capabilities=ARRAY['THREAT_REPORT']::text[],state='DISABLED' WHERE staff_id=$1", [recipient.staffId]);
+    await expect(reader(recipient.staffId)).resolves.toBeNull();
   });
 
   it("backfills the active owner capability with a revision, epoch and session revoke", async () => {
