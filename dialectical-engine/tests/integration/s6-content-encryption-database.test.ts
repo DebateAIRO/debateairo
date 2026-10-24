@@ -57,6 +57,7 @@ import {
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import { persistTerminalRun } from "../support/settledRun.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { createSystemTwin } from "../support/rls-logins.js";
 import { AccountErasureNotificationReconciler } from "../../apps/api/src/account-erasure.js";
 import {
   MailDeliveryError,
@@ -1706,6 +1707,10 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
     };
     let runtimePool: InstanceType<typeof PgPool> | undefined;
     let contentPool: InstanceType<typeof PgPool> | undefined;
+    // Row-level security (0124; D29, D46): the runner writes a run's nodes on its own login, which holds debateai_runtime's
+    // grants plus the cross-account marker (RUNNER_DATABASE_URL, the system twin's shape).
+    const runnerLogin = `s10_runner_${suffix}`;
+    let runnerPool: InstanceType<typeof PgPool> | undefined;
     await database.pool.query(`
       CREATE ROLE ${runtimeLogin} LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE
         NOREPLICATION NOBYPASSRLS PASSWORD '${password}';
@@ -1719,6 +1724,9 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
     try {
       runtimePool = new PgPool({ connectionString:loginUrl(runtimeLogin),max:2 });
       contentPool = new PgPool({ connectionString:loginUrl(contentLogin),max:2 });
+      runnerPool = new PgPool({
+        connectionString:await createSystemTwin(database,runnerLogin,["debateai_runtime"]),max:2
+      });
       configureContentEncryption(runtimePool,cipher);
       await expect(assertContentProvisionDatabaseRole(runtimePool,contentPool))
         .resolves.toBeUndefined();
@@ -1866,7 +1874,11 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
         "core.node",childId,"content_ciphertext",childEnvelope
       );
       prepared.close();
-      await expect(runtimePool.query(`
+      // The bare runtime login with no account context sees no run, so it writes no node; the runner's login does.
+      expect((await runtimePool.query(
+        "SELECT content_encryption_version FROM core.run WHERE run_id=$1",[runId]
+      )).rows).toEqual([]);
+      await expect(runnerPool.query(`
         INSERT INTO core.node(
           node_id,run_id,claim_text,claim_type,depth,sibling_ordinal,materialized_path,
           generation_status,path_status,exploration_decision,way_of_knowing,
@@ -1971,13 +1983,14 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
         .rejects.toThrow("CONTENT_PROVISION_DATABASE_ROLE_MUST_BE_ISOLATED");
       await database.pool.query(`ALTER ROLE ${contentLogin} NOSUPERUSER`);
     } finally {
-      await Promise.allSettled([runtimePool?.end(),contentPool?.end()]);
+      await Promise.allSettled([runtimePool?.end(),contentPool?.end(),runnerPool?.end()]);
       await database.pool.query(`
         REVOKE debateai_runtime FROM ${runtimeLogin};
         REVOKE debateai_content_provision FROM ${contentLogin};
         DROP ROLE IF EXISTS ${runtimeLogin};
         DROP ROLE IF EXISTS ${contentLogin};
-        DROP ROLE IF EXISTS ${elevatedBridge}
+        DROP ROLE IF EXISTS ${elevatedBridge};
+        DROP ROLE IF EXISTS ${runnerLogin}
       `);
     }
   },120_000);
@@ -3460,6 +3473,11 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
       "core.node",nodeId,"wrong-purpose",envelope
     );
     prepared.close();
+    // Row-level security (0124; D29, D46): the node writes below run as the runner runs them, on a login holding
+    // debateai_runtime's grants plus the cross-account marker (the system twin's shape). The bare runtime role with no
+    // account context sees no run.
+    const runner = "s6_attestation_runner_system";
+    await createSystemTwin(database, runner, ["debateai_runtime"]);
     const runtime = await database.pool.connect();
     try {
       await runtime.query("SET ROLE debateai_runtime");
@@ -3467,6 +3485,11 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
         "SELECT secret FROM core.run_content_attestation_secret WHERE run_id=$1",
         [runId]
       )).rejects.toMatchObject({ code: "42501" });
+      expect((await runtime.query(
+        "SELECT content_encryption_version FROM core.run WHERE run_id=$1",
+        [runId]
+      )).rows).toEqual([]);
+      await runtime.query(`SET ROLE ${runner}`);
       const fakeEnvelope = {
         v:1,keyId:`run-content:${runId}:v1`,
         nonce:Buffer.alloc(12,0x11).toString("base64url"),

@@ -1,11 +1,12 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createPool, migrate, PostgresConsumerSecurityNoticeRepository, PostgresConsumerSecurityRepository, PostgresIdentityRepository, PostgresSessionRepository, type Pool } from "@debateai/db";
+import { createPool, migrate, PostgresConsumerSecurityNoticeRepository, PostgresConsumerSecurityRepository, PostgresIdentityRepository, PostgresSessionRepository, runInRequestScope, type Pool } from "@debateai/db";
 import { createEmailBlindIndex, encrypt, hashToken, type AuditContextHasher } from "@debateai/crypto";
 import { ConsumerSecurityNoticeReconciler } from "../../apps/api/src/consumer-security-notices.js";
 import type { ConsumerSecurityNoticeSender } from "../../apps/api/src/mail-channel.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { createSystemTwin } from "../support/rls-logins.js";
 
 /**
  * Mission email-locale, S01-C07 (R-13, R-14; D-1 row 1, D-2 row 2, D-4 row 18; D-56 and D-57). A consumer-security writer
@@ -15,6 +16,9 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  */
 let database: TestDatabase;
 let runtime: Pool;
+// Row-level security (0124; D28, D29): the authorization pool as main.ts wires it. Inside a request it runs on its own
+// login with that request's account context; outside one, or inside a crossAccount frame (X18a), on its system twin.
+let runtimeSystem: Pool, scopedRuntime: Pool;
 const audit = { hashSourceIp: async () => "ab".repeat(32), hashUserAgent: async () => "cd".repeat(32) } as unknown as AuditContextHasher;
 const blindKey = Buffer.alloc(32, 7);
 const fixturePasswordHash = "$argon2id$v=19$m=65536,t=3,p=1$" + Buffer.alloc(16, 1).toString("base64").replace(/=/g, "") + "$" + Buffer.alloc(32, 1).toString("base64").replace(/=/g, "");
@@ -30,8 +34,12 @@ beforeAll(async () => {
   url.username = "mail_locale_test_runtime";
   url.password = "mail-locale-test-only";
   runtime = createPool(url.toString());
+  runtimeSystem = createPool(await createSystemTwin(database, "mail_locale_test_runtime_system", ["debateai_authorization_runtime"]));
+  scopedRuntime = createPool(url.toString(), { crossAccount: runtimeSystem });
 }, 300_000);
 afterAll(async () => {
+  await scopedRuntime?.end();
+  await runtimeSystem?.end();
   await runtime?.end();
   await database?.stop();
 });
@@ -129,19 +137,24 @@ describe("S01-C07 consumer-security writers and worker (R-13, R-14)", () => {
       await client.query("INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp','{}','active',now(),now())", [randomUUID(), a.userId]);
       await client.query("INSERT INTO identity.recovery_code(recovery_code_id,user_id,code_slot,code_hash,created_at) VALUES($1,$2,1,$3,now())", [recoveryCodeId, a.userId, argon2Hash()]);
     });
-    const repository = new PostgresSessionRepository(runtime, audit);
-    const identity = await repository.findLoginIdentity(createEmailBlindIndex(blindKey, a.email));
+    // The sign-in's two requests run as the API runs them: before any session exists, on the wired authorization pool, so
+    // the saved-code lookup (X18a) reads on the system twin. The bare login with no account context reads no saved code.
+    const repository = new PostgresSessionRepository(scopedRuntime, audit);
+    const identity = await runInRequestScope(() => repository.findLoginIdentity(createEmailBlindIndex(blindKey, a.email)));
     expect(identity?.userId).toBe(a.userId);
     const challengeToken = token(), bindingHash = "sha256:" + "ef".repeat(32);
     const challengeTokenHash = hashToken("login-challenge", challengeToken);
     const expiresAt = new Date(Date.now() + 5 * 60_000);
     const source = { ip: "198.51.100.16", userAgent: "mail-locale-test", requestId: randomUUID(), mailLocale: "pl" };
-    expect(await repository.createLoginChallenge({ identity: identity!, challengeId: randomUUID(), challengeTokenHash, bindingHash, occurredAt: new Date(), expiresAt, source })).toBe(true);
-    const found = await repository.readRecoveryCodeForLogin(challengeTokenHash, 1);
-    expect(found).not.toBeNull();
+    expect(await runInRequestScope(() => repository.createLoginChallenge({ identity: identity!, challengeId: randomUUID(), challengeTokenHash, bindingHash, occurredAt: new Date(), expiresAt, source }))).toBe(true);
+    expect(await new PostgresSessionRepository(runtime, audit).readRecoveryCodeForLogin(challengeTokenHash, 1)).toBeNull();
     const sessionId = randomUUID(), sessionToken = token();
     const idleExpiresAt = new Date(Date.now() + 60 * 60_000), absoluteExpiresAt = new Date(Date.now() + 12 * 60 * 60_000);
-    const completed = await repository.completeRecoveryLogin({ challenge: found!.challenge, recoveryCodeId: found!.recoveryCodeId, bindingHash, sessionId, sessionTokenHash: hashToken("session", sessionToken), csrfTokenHash: hashToken("csrf", token()), sessionBindingContext: {}, occurredAt: new Date(), idleExpiresAt, absoluteExpiresAt, source });
+    const completed = await runInRequestScope(async () => {
+      const found = await repository.readRecoveryCodeForLogin(challengeTokenHash, 1);
+      expect(found).not.toBeNull();
+      return repository.completeRecoveryLogin({ challenge: found!.challenge, recoveryCodeId: found!.recoveryCodeId, bindingHash, sessionId, sessionTokenHash: hashToken("session", sessionToken), csrfTokenHash: hashToken("csrf", token()), sessionBindingContext: {}, occurredAt: new Date(), idleExpiresAt, absoluteExpiresAt, source });
+    });
     expect(completed).toBe(true);
     expect(await languageOf(a.userId, "RECOVERY_CODE_USED")).toBe("pl");
   });
