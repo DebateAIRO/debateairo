@@ -1,5 +1,5 @@
 import { readFile, readdir } from "node:fs/promises";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   CSRF_COOKIE_NAME,
@@ -20,6 +20,7 @@ import {
   MemoryRunContentKeyStore,
   appendAuditEvent,
   generateDek,
+  hashToken,
   type ReadableUserDekStore
 } from "../../packages/crypto/src/index.js";
 import { persistTerminalRun } from "../support/settledRun.js";
@@ -27,6 +28,7 @@ import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import {
   createTestAskAdmissionPoolFacades,startTestDatabase,type TestDatabase
 } from "../support/testDatabase.js";
+import { apiTestPools, provisionRlsLogins, type ApiTestPools, type RlsLogins } from "../support/rls-logins.js";
 import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const ORIGIN = "https://ui.s7.test";
@@ -55,6 +57,9 @@ interface RunFixture {
 
 let database: TestDatabase;
 let api: ReturnType<typeof buildApi>;
+let pools: ApiTestPools;
+/** The dev logins apiTestPools provisioned (login mode only), ended after the suite. */
+let apiLogins: RlsLogins | undefined;
 let owner: IdentityFixture;
 let foreign: IdentityFixture;
 let owned: RunFixture;
@@ -110,19 +115,21 @@ async function createIdentity(label: string, token: string, csrf: string): Promi
   const session = serverSession(ownerRef);
   userIdsByOwnerRef.set(ownerRef, userId);
   await users.store(userId, generateDek());
+  // Row-level security S01 (PLAN S5.2 (2), DECISIONS D55): the rows hold hashToken("session"/"csrf", …), the hashes the
+  // database's rls.* functions compute from the credential a request carries, so this session is live to the database.
+  const tokenHash = hashToken("session", token), csrfTokenHash = hashToken("csrf", csrf);
   await database.pool.query(
     `INSERT INTO identity.session(
        session_id,user_id,token_hash,csrf_token_hash,binding_context,
        created_at,last_seen_at,idle_expires_at,absolute_expires_at,last_mfa_at
      ) VALUES ($1,$2,$3,$4,'{}'::jsonb,now(),now(),now()+interval '1 hour',
        now()+interval '2 hours',now())`,
-    [session.session_id,userId,`sha256:${createHash("sha256").update(token).digest("hex")}`,
-      `sha256:${createHash("sha256").update(csrf).digest("hex")}`]
+    [session.session_id,userId,tokenHash,csrfTokenHash]
   );
   return Object.freeze({
     userId, ownerRef, auditToken, pseudonym, email, blindHex: blind.toString("hex"), csrf,
     auth: Object.freeze({
-      session, userId, ownerRef, tokenHash: `sha256:${createHash("sha256").update(token).digest("hex")}`, csrfTokenHash: `sha256:${createHash("sha256").update(csrf).digest("hex")}`, authKind: "cookie"
+      session, userId, ownerRef, tokenHash, csrfTokenHash, authKind: "cookie"
     })
   });
 }
@@ -295,6 +302,13 @@ beforeAll(async () => {
     }
   ));
   configureContentEncryption(database.pool, contentCipher);
+  // Row-level security S01, R21 (PLAN S5.2): the API's pools as apps/api/src/main.ts builds them. In login mode the
+  // runtime pool is a login pool of its own and carries the same content cipher; in superuser mode it is database.pool.
+  pools = await apiTestPools(database, import.meta.url);
+  if (pools.runtime !== database.pool) {
+    apiLogins = await provisionRlsLogins(database);
+    configureContentEncryption(pools.runtime, contentCipher);
+  }
   owner = await createIdentity("owner", OWNER_TOKEN, OWNER_CSRF);
   foreign = await createIdentity("foreign", FOREIGN_TOKEN, FOREIGN_CSRF);
   owned = await createOwnedTerminalRun(owner, "owned");
@@ -336,7 +350,8 @@ beforeAll(async () => {
     [OWNER_TOKEN, owner.auth],
     [FOREIGN_TOKEN, foreign.auth]
   ]);
-  const currentSessions = new PostgresSessionRepository(database.pool,{} as never);
+  // main.ts builds PostgresSessionRepository on authorizationPool.
+  const currentSessions = new PostgresSessionRepository(pools.authorization,{} as never);
   const sessions = {
     assertCurrent: async (session:AuthenticatedSession,signal?:AbortSignal) => {
       if (![...sessionsByToken.values()].some(current => current.userId===session.userId
@@ -347,10 +362,14 @@ beforeAll(async () => {
     verifyCsrf: (authenticated: AuthenticatedSession, supplied: string) =>
       supplied === (authenticated.userId === owner.userId ? OWNER_CSRF : FOREIGN_CSRF)
   } as unknown as SessionApplication;
+  // In superuser mode every field is database.pool, so the admission pools are its facades, as before this slice.
+  const admission = pools.serverAskAdmission === pools.legacyAskAdmission
+    ? createTestAskAdmissionPoolFacades(pools.serverAskAdmission)
+    : { server: pools.serverAskAdmission, legacy: pools.legacyAskAdmission };
   api = buildApi({
     application:new PostgresAskApplication(
-      database.pool,{} as never,{ releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never,undefined,database.pool,
-      createTestAskAdmissionPoolFacades(database.pool)
+      pools.runtime,{} as never,{ releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never,undefined,pools.contentProvision,
+      admission
     ),
     sessions,
     allowedOrigin: ORIGIN
@@ -359,6 +378,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await api?.close();
+  await apiLogins?.end();
   await database?.stop();
 });
 

@@ -26,6 +26,8 @@ import {
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { readFramedMaterial, wirePacket } from "../support/framed-packet.js";
 import { createTestAskAdmissionPoolFacades, startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { apiTestPools, provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
+import { persistLiveSession } from "../support/httpSession.js";
 import { persistCatchUpVersion } from "../support/catchUpVersion.js";
 import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } from "../../apps/api/src/stories.js";
 import { RepositoryAnswerDisclosureApplication } from "../../apps/api/src/disclosures.js";
@@ -41,6 +43,8 @@ import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
  */
 
 let database: TestDatabase;
+/** The dev logins apiTestPools provisioned for the API root (login mode only), ended after the suite. */
+let apiLogins: RlsLogins | undefined;
 const batteryRows = createInitialBatteryRows({ settlementWatchHandle: "settlement-watch:story-e2e" });
 const PACK = loadStoryPack(resolveStoryPackDir({ env: {}, moduleUrl: import.meta.url }));
 
@@ -406,19 +410,32 @@ async function claimedByOwner(runId: string): Promise<AuthenticatedSession> {
 
 /** The real API root over this database, for one owner, and the reads the tests make through it. */
 async function ownerReads(owner: AuthenticatedSession, answerId: string) {
-  const token = "o".repeat(43);
+  // One token per call: it is now a live identity.session row (D55, below), and token_hash is unique.
+  const token = randomBytes(32).toString("base64url");
+  // Row-level security S01, R21 (PLAN S5.2): the API root on the pools apps/api/src/main.ts builds (runtime, content
+  // provision, ask admission). In superuser mode every field is the harness pool, so the admission pools are its facades.
+  const pools = await apiTestPools(database, import.meta.url);
+  apiLogins ??= pools.runtime === database.pool ? undefined : await provisionRlsLogins(database);
+  const admission = pools.serverAskAdmission === pools.legacyAskAdmission
+    ? createTestAskAdmissionPoolFacades(pools.serverAskAdmission)
+    : { server: pools.serverAskAdmission, legacy: pools.legacyAskAdmission };
+  // D55: the inline application accepts `token` for the owner's session, so that session is live in identity.session
+  // and the database's rls.* functions derive the owner's account from the credential the request carries.
+  await persistLiveSession(database.pool, {
+    rawSessionToken: token, rawCsrfToken: randomBytes(32).toString("base64url"), authenticated: owner
+  });
   const api = buildApi({
     application: new PostgresAskApplication(
-      database.pool, {} as never, { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, undefined, database.pool,
-      createTestAskAdmissionPoolFacades(database.pool)
+      pools.runtime, {} as never, { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, undefined, pools.contentProvision,
+      admission
     ),
     sessions: {
       authenticate: async (presented: string) => presented === token ? owner : null,
       verifyCsrf: () => false
     } as unknown as SessionApplication,
     allowedOrigin: "https://ui.story-e2e.test",
-    stories: new RepositoryAnswerStoryApplication(new StoryRepository(database.pool)),
-    disclosures: new RepositoryAnswerDisclosureApplication(new ServeDisclosureRepository(database.pool))
+    stories: new RepositoryAnswerStoryApplication(new StoryRepository(pools.runtime)),
+    disclosures: new RepositoryAnswerDisclosureApplication(new ServeDisclosureRepository(pools.runtime))
   });
   const get = async (path: string) => {
     const response = await api.inject({ method: "GET", url: `/v1/answers/${answerId}${path}`, headers: {
@@ -433,7 +450,7 @@ async function ownerReads(owner: AuthenticatedSession, answerId: string) {
       story: AnswerStorySchema.parse(await get("/story")),
       disclosure: AnswerDisclosureSchema.parse(await get("/disclosure")),
       // The publish-time read: the story of the version being published.
-      publishedShort: await new RepositoryPublicationStoryReader(new StoryRepository(database.pool)).readStoryShort({
+      publishedShort: await new RepositoryPublicationStoryReader(new StoryRepository(pools.runtime)).readStoryShort({
         answerId, answerVersion: 2, ownerRef: owner.ownerRef
       })
     };
@@ -547,6 +564,7 @@ beforeAll(async () => {
 }, 240_000);
 
 afterAll(async () => {
+  await apiLogins?.end();
   await database?.stop();
 });
 
