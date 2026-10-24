@@ -38,7 +38,9 @@ const VULNERABLE: Record<string, (version: string) => boolean> = {
   // 2026-10-01: GHSA advisories on fastify < 5.12.2 (request body replacement, authentication,
   // request and header validation bypasses) and < 5.12.5 (an unhandled-error denial of service)
   // turned pnpm audit red; 5.12.5 was published 2026-09-16, so it clears the cooldown.
-  fastify: (v) => compare(v, "5.12.5") < 0,
+  // 2026-10-25: a low advisory on fastify >=5.12.2 <5.12.6; fastify is a direct dependency, so the fix is the PIN
+  // in package.json and apps/api/package.json (5.12.7, the newest release, published 2026-10-13, clears the cooldown).
+  fastify: (v) => compare(v, "5.12.6") < 0,
   // 2026-10-01: the axios advisories of 1.x < 1.20.0 (ReDoS, prototype-pollution gadgets, header
   // injection, proxy and redirect bypasses), reached through the Hatchet SDK; 1.20.0 was
   // published 2026-08-26.
