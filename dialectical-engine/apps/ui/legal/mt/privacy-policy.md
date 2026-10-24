@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Fil-qosor
-eyebrow: POLITIKA DWAR IL-PRIVATEZZA · v3.5 · EFFETTIVA 12 TA’ OTTUBRU 2026
+eyebrow: POLITIKA DWAR IL-PRIVATEZZA · v3.6 · EFFETTIVA 24 TA’ OTTUBRU 2026
 title: X’naħżnu, u għaliex
 lede: Id-drittijiet tiegħek u l-obbligi tagħna skont il-GDPR (EU) 2016/679, b’lingwaġġ ċar. Erbatax-il taqsima u l-Anness B — niżżel sal-aħħar.
-endMarker: TMIEM IL-POLITIKA · GDPR (EU) 2016/679 · v3.5
+endMarker: TMIEM IL-POLITIKA · GDPR (EU) 2016/679 · v3.6
 bodyLabel: Test tal-Politika dwar il-Privatezza
 annexTitle: Anness B — Termini reġjonali dwar il-privatezza
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 3.5 · Effective 12 ta’ Ottubru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/privacy/versions · Kontrollur: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 24 ta’ Ottubru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/privacy/versions · Kontrollur: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Niġbru dak li jeħtieġ kont u dak li tagħżel li tittajpja. Il-mistoqsijiet tiegħek jintbagħtu lill-fornituri tal-IA elenkati fir-Reġistru tagħna; ma jintużawx għat-taħriġ tal-mudelli. Il-fornitur tal-ospitar tagħna jaħżen il-kont tiegħek u d-dibattiti tiegħek f’Londra, fir-Renju Unit; it-taqsima 5 tispjega fejn oħra tmur id-data tiegħek. Id-dibattiti huma privati sakemm ma tippubblikahomx. It-tħassir tal-kont tiegħek jeqred iċ-ċwievet tad-data privata tiegħek; meta tiskedah, tagħżel jekk id-dibattiti ppubblikati tiegħek jitneħħewx ukoll jew jibqgħux pubbliċi taħt il-psewdonimu rtirat tiegħek. Tista’ tikkuntattjana fuq privacy@dezbatere.ro, u persuni msemmija f’dibattitu jistgħu jitolbu t-tneħħija mingħajr kont.
 
@@ -34,7 +34,7 @@ Niġbru biss dak li jeħtieġ kont biex jaħdem, dak li tagħżel li tagħtina, 
 | Kategorija | X’inhu, eżattament | Sors |
 | --- | --- | --- |
 | **Kont** | Indirizz elettroniku u indirizz elettroniku għall-irkupru (maħżuna kriptati, b’indiċi biċ-ċavetta biex inkunu nistgħu nsibu l-kont mingħajr ma naqraw l-indirizz); password (maħżuna bħala hash, qatt f’test ċar); is-sigriet tiegħek għall-awtentikazzjoni b’żewġ fatturi (kriptat); għaxar kodiċijiet għall-irkupru (maħżuna bħala hashes); il-psewdonimu tiegħek | Int u s-servizz, waqt ir-reġistrazzjoni |
-| **Verifika tal-pajjiż tal-IP waqt ir-reġistrazzjoni u qabel dibattitu ġdid** | Waqt ir-reġistrazzjoni nivverifikaw lokalment il-pajjiż tal-IP u l-indirizzi tal-ħruġ ta’ Tor permezz ta’ DB-IP Lite u l-lista Tor. Qabel kull dibattitu ġdid, nerġgħu nivverifikaw lokalment il-pajjiż tal-IP u nirrifjutaw id-dibattitu jekk il-pajjiż ikun fil-lista ta’ pajjiżi dejjem imblukkati. Nirrifjutaw reġistrazzjonijiet minn pajjiżi mhux servuti, minn Tor jew minn indirizzi IP li l-pajjiż tagħhom ma nistgħux niddeterminaw; l-indirizz IP ma jintbagħatx lil terzi. Ir-rifjuti jinġabru flimkien skont ir-rotta, il-kodiċi, il-pajjiż u l-perjodu ta’ żmien; l-indirizz IP u l-aġent tal-utent jinżammu biss bħala diġests unidirezzjonali b’ċavetta. It-tip ta’ evidenza jiġi rreġistrat bħala “indirizz IP”. | Il-konnessjoni tiegħek |
+| **Verifika tal-pajjiż tal-IP waqt ir-reġistrazzjoni u qabel dibattitu ġdid** | Waqt ir-reġistrazzjoni nivverifikaw lokalment il-pajjiż tal-IP u l-indirizzi tal-ħruġ ta’ Tor permezz ta’ DB-IP Lite u l-lista Tor. Qabel kull dibattitu ġdid, nerġgħu nivverifikaw lokalment il-pajjiż tal-IP u nirrifjutaw id-dibattitu jekk il-pajjiż ikun fil-lista ta’ pajjiżi dejjem imblukkati. Nirrifjutaw reġistrazzjonijiet minn pajjiżi mhux servuti, minn Tor jew minn indirizzi IP li l-pajjiż tagħhom ma nistgħux niddeterminaw; l-indirizz IP ma jintbagħatx lil terzi. Ir-rifjuti jinġabru flimkien skont ir-rotta, il-kodiċi, il-pajjiż u l-perjodu ta’ żmien; l-indirizz IP u l-aġent tal-utent jinżammu biss bħala diġests unidirezzjonali b’ċavetta. It-tip ta’ evidenza jiġi rreġistrat bħala “indirizz IP”. Waqt ir-reġistrazzjoni, il-pajjiż tal-IP, flimkien mar-Reġjun li tagħżel, jiddeċiedi wkoll jekk nuru l-kaxxa separata ta’ approvazzjoni għall-Italja; jekk tagħti dik l-approvazzjoni, ir-rekord tagħha jżomm jekk il-kaxxa dehret minħabba l-għażla tar-Reġjun, il-pajjiż tal-IP jew it-tnejn. | Il-konnessjoni tiegħek |
 | **Verifika tal-età** | Tdaħħal id-data tat-twelid iżda ma naħżnuhiex. Meta r-reġistrazzjoni tirnexxi, nirreġistraw riżultat pożittiv; għal kont eżistenti r-riżultat jista’ jkun pożittiv jew miċħud. Ir-rekord jinkludi l-età minima, il-pajjiż tal-IP jekk magħruf, il-verżjoni tar-regola, il-kuntest u l-ħin tal-verifika | Int u s-sistema tar-reġistrazzjoni |
 | **Residenza ddikjarata** | Il-pajjiż fejn tgħix li tagħżel waqt ir-reġistrazzjoni u, jekk hu l-Istati Uniti, l-istat | Int |
 | **Sessjonijiet u sigurtà** | Token tas-sessjoni f’forma ta’ hash; hash biċ-ċavetta tas-sekwenza tal-aġent tal-utent tal-browser tiegħek, użat biex nindunaw meta sessjoni tgħaddi għal browser differenti; marki tal-ħin tal-ħolqien, tal-aħħar użu u tal-iskadenza. **Ma naħżnux** l-indirizz IP, l-isem tal-apparat jew id-dettalji tal-browser tiegħek ma’ sessjoni, u l-lista tas-sessjonijiet li tara fl-issettjar turi biss marki tal-ħin | Il-browser tiegħek |
@@ -215,7 +215,7 @@ Biex tirrifjuta dawn l-elementi, imblokka jew ħassar il-cookies u d-data tas-si
 
 Meta nibdlu din il-politika nippubblikaw il-verżjoni l-ġdida b’sommarju ta’ dak li nbidel u data effettiva ġdida, u nżommu l-verżjonijiet preċedenti fuq dezbatere.ro/privacy/versions. Għal bidla li żżid skop ġdid jew riċevitur ġdid, ngħarrfuk qabel jibda l-ipproċessar il-ġdid, bil-posta elettronika u fil-prodott, u nagħtuk żmien biex toġġezzjona. Fejn skop ġdid jiddependi mill-kunsens tiegħek — pereżempju jekk xi darba nkunu rridu nużaw il-kontenut biex intejbu l-mudelli — nitolbu dak il-kunsens separatament u b’mod speċifiku; qatt ma nqisu l-aċċettazzjoni ta’ Termini aġġornati bħala kunsens għal ipproċessar ġdid. Għal kjarifiki li ma jbiddlu xejn dwar dak li nagħmlu, sempliċement nippubblikaw il-verżjoni l-ġdida.
 
-Din il-politika ġiet aġġornata l-aħħar fit-12 ta’ Ottubru 2026. Il-Verżjoni 3.5 issostitwiet il-verżjoni 3.4: it-taqsima 2 issa tgħid liema dettalji tal-kontijiet u tal-karta nżommu u li n-numru sħiħ tal-karta tiegħek qatt ma jasal għandna, u t-taqsima 7 tgħid għal kemm żmien inżommu karta maħżuna u l-messaġġi tal-fornitur tal-pagamenti dwar il-pagamenti.
+Din il-politika ġiet aġġornata l-aħħar fl-24 ta’ Ottubru 2026. Il-Verżjoni 3.6 issostitwiet il-verżjoni 3.5: it-taqsima 2 issa tgħid li, waqt ir-reġistrazzjoni, il-pajjiż tal-IP, flimkien mar-Reġjun li tagħżel, jiddeċiedi wkoll jekk nuru l-kaxxa separata ta’ approvazzjoni għall-Italja.
 
 ## Annex B — Termini reġjonali dwar il-privatezza
 

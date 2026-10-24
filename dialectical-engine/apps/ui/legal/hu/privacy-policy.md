@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Röviden
-eyebrow: ADATVÉDELMI SZABÁLYZAT · v3.5 · HATÁLYOS 2026. OKTÓBER 12.
+eyebrow: ADATVÉDELMI SZABÁLYZAT · v3.6 · HATÁLYOS 2026. OKTÓBER 24.
 title: Mit tárolunk és miért
 lede: Az Ön jogai és a GDPR (EU) 2016/679 szerinti kötelezettségeink közérthetően. Tizennégy szakasz és a B. melléklet — görgessen a végéig.
-endMarker: A SZABÁLYZAT VÉGE · GDPR (EU) 2016/679 · v3.5
+endMarker: A SZABÁLYZAT VÉGE · GDPR (EU) 2016/679 · v3.6
 bodyLabel: Az Adatvédelmi szabályzat szövege
 annexTitle: B. melléklet — Regionális adatvédelmi feltételek
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 SÜTIK
 -->
 
-**Version 3.5 · Effective 2026. október 12. · Korábbi változatok: dezbatere.ro/privacy/versions · Adatkezelő: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 2026. október 24. · Korábbi változatok: dezbatere.ro/privacy/versions · Adatkezelő: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** A fiók működéséhez szükséges és az Ön által megadni választott adatokat gyűjtjük. Kérdéseit a Nyilvántartásunkban felsorolt MI-szolgáltatókhoz továbbítjuk; azokat nem használják modellek betanítására. Tárhelyszolgáltatónk az Ön fiókját és vitáit Londonban, az Egyesült Királyságban tárolja; hogy adatai még hová jutnak, azt az 5. szakasz mondja el. A viták mindaddig magánjellegűek, amíg Ön közzé nem teszi őket. Fiókja törlése megsemmisíti magánjellegű adatainak kulcsait; a törlés ütemezésekor Ön dönt arról, hogy közzétett vitáit is eltávolítsuk-e, vagy azok visszavont álneve alatt nyilvánosak maradjanak. A privacy@dezbatere.ro címen érhet el bennünket, és a vitában megnevezett személyek fiók nélkül is kérhetik az eltávolítást.
 
@@ -34,7 +34,7 @@ Csak a fiók működéséhez szükséges, az Ön által önként megadott, valam
 | Kategória | Pontosan milyen adat | Forrás |
 | --- | --- | --- |
 | **Fiók** | E-mail-cím és helyreállítási e-mail-cím (titkosítva tárolva, kulcsolt indexszel, hogy a címet annak elolvasása nélkül is megtalálhassuk); jelszó (kivonatként tárolva, soha nem egyszerű szövegként); a kétfaktoros hitelesítés titka (titkosítva); tíz helyreállítási kód (kivonatként tárolva); az Ön álneve | Öntől és a szolgáltatástól, a regisztráció során |
-| **IP-cím országának ellenőrzése regisztrációnál és új vitánál** | Regisztrációnál az IP-cím országát és a Tor-kilépőpontokat helyben ellenőrizzük a DB-IP Lite és a Tor-lista alapján. Minden új vita előtt helyben ismét ellenőrizzük az IP-cím országát, és elutasítjuk a vitát, ha az ország a mindig tiltott országok listáján szerepel. Elutasítjuk a nem támogatott országokból, Tor-kilépőcímekről és olyan IP-címekről érkező regisztrációkat, amelyek országát nem tudjuk meghatározni; az IP-címet nem küldjük harmadik félnek. Az elutasításokat útvonal, kód, ország és időablak szerint összesítve rögzítjük; az IP-cím és a felhasználói ügynök csak egyirányú, kulcsos kivonatként szerepel. A bizonyíték típusa „IP-cím”. | Az Ön kapcsolata |
+| **IP-cím országának ellenőrzése regisztrációnál és új vitánál** | Regisztrációnál az IP-cím országát és a Tor-kilépőpontokat helyben ellenőrizzük a DB-IP Lite és a Tor-lista alapján. Minden új vita előtt helyben ismét ellenőrizzük az IP-cím országát, és elutasítjuk a vitát, ha az ország a mindig tiltott országok listáján szerepel. Elutasítjuk a nem támogatott országokból, Tor-kilépőcímekről és olyan IP-címekről érkező regisztrációkat, amelyek országát nem tudjuk meghatározni; az IP-címet nem küldjük harmadik félnek. Az elutasításokat útvonal, kód, ország és időablak szerint összesítve rögzítjük; az IP-cím és a felhasználói ügynök csak egyirányú, kulcsos kivonatként szerepel. A bizonyíték típusa „IP-cím”. Regisztrációnál az IP-cím országa az Ön által kiválasztott régióval együtt azt is eldönti, hogy megjelenítjük-e az Olaszországra vonatkozó külön jóváhagyási négyzetet; ha Ön megadja ezt a jóváhagyást, annak nyilvántartása megőrzi, hogy azt a régióválasztás, az IP-cím országa vagy mindkettő váltotta-e ki. | Az Ön kapcsolata |
 | **Életkor-ellenőrzés** | Megadja születési dátumát, de azt nem tároljuk. Sikeres regisztrációnál a sikeres ellenőrzést rögzítjük; meglévő fióknál az eredmény sikeres vagy elutasított lehet. A bejegyzés tartalmazza az alsó korhatárt, az IP-cím országát, ha ismert, a szabály verzióját, az ellenőrzés körülményeit és időpontját | Ön és a regisztrációs rendszer |
 | **Bejelentett lakóhely** | A regisztrációnál kiválasztott lakóhely szerinti ország és az amerikai állam, ha az Egyesült Államokban él | Ön |
 | **Munkamenetek és biztonság** | Kivonatolt munkamenet-token; a böngésző user-agent karakterláncának kulcsolt kivonata, amellyel észlelhető, ha egy munkamenet másik böngészőbe kerül; a létrehozás, az utolsó használat és a lejárat időbélyege. A munkamenethez **nem** tároljuk az Ön IP-címét, eszköznevét vagy böngészőadatait, a Beállításokban látható munkamenetlista pedig kizárólag időbélyegeket mutat | Az Ön böngészőjéből |
@@ -215,7 +215,7 @@ Ha el szeretné utasítani ezeket az elemeket, böngészője beállításaiban t
 
 Amikor módosítjuk ezt a szabályzatot, közzétesszük az új változatot a változások összefoglalásával és új hatálybalépési dátummal, a korábbi változatokat pedig a dezbatere.ro/privacy/versions címen őrizzük meg. Új célt vagy új címzettet bevezető változásról az új adatkezelés megkezdése előtt e-mailben és a termékben tájékoztatjuk Önt, és időt biztosítunk a tiltakozásra. Ha egy új cél az Ön hozzájárulásától függ — például ha valaha tartalmat kívánnánk használni modellek fejlesztésére —, ezt a hozzájárulást külön és kifejezetten kérjük; a frissített Feltételek elfogadását soha nem tekintjük új adatkezeléshez való hozzájárulásnak. Az olyan pontosítások esetében, amelyek semmit nem változtatnak tevékenységünkön, egyszerűen közzétesszük az új változatot.
 
-Ezt a szabályzatot legutóbb 2026. október 12. napján frissítettük. A 3.5-ös verzió a 3.4-es verzió helyébe lépett: a 2. szakasz most már leírja, mely számlázási és kártyaadatokat őrizzük meg, és hogy az Ön teljes kártyaszáma soha nem jut el hozzánk, a 7. szakasz pedig azt, hogy mennyi ideig őrizzük meg a mentett kártyát és a fizetési szolgáltató fizetésekről szóló üzeneteit.
+Ezt a szabályzatot legutóbb 2026. október 24. napján frissítettük. A 3.6-os verzió a 3.5-ös verzió helyébe lépett: a 2. szakasz most már leírja, hogy regisztrációnál az IP-cím országa az Ön által kiválasztott régióval együtt azt is eldönti, hogy megjelenítjük-e az Olaszországra vonatkozó külön jóváhagyási négyzetet.
 
 ## Annex B — Regionális adatvédelmi feltételek
 

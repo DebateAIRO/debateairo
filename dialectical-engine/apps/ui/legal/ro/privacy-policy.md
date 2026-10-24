@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Pe scurt
-eyebrow: POLITICA DE CONFIDENȚIALITATE · v3.5 · ÎN VIGOARE DE LA 12 OCTOMBRIE 2026
+eyebrow: POLITICA DE CONFIDENȚIALITATE · v3.6 · ÎN VIGOARE DE LA 24 OCTOMBRIE 2026
 title: Ce stocăm și de ce
 lede: Drepturile dumneavoastră și obligațiile noastre în temeiul GDPR (EU) 2016/679, într-un limbaj clar. Paisprezece secțiuni și Anexa B — derulați până la final.
-endMarker: SFÂRȘITUL POLITICII · GDPR (EU) 2016/679 · v3.5
+endMarker: SFÂRȘITUL POLITICII · GDPR (EU) 2016/679 · v3.6
 bodyLabel: Textul Politicii de confidențialitate
 annexTitle: Anexa B — Condiții regionale privind confidențialitatea
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 MODULE COOKIE
 -->
 
-**Version 3.5 · Effective 12 octombrie 2026 · Versiunile anterioare la dezbatere.ro/privacy/versions · Operator: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 24 octombrie 2026 · Versiunile anterioare la dezbatere.ro/privacy/versions · Operator: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Colectăm ceea ce este necesar unui cont și ceea ce alegeți să introduceți. Întrebările dumneavoastră sunt transmise furnizorilor de IA enumerați în Registrul furnizorilor de IA; acestea nu sunt folosite pentru antrenarea modelelor. Furnizorul nostru de găzduire vă stochează contul și dezbaterile la Londra, în Regatul Unit; secțiunea 5 arată unde ajung în rest datele dumneavoastră. Dezbaterile sunt private dacă nu le publicați. Ștergerea contului distruge cheile datelor dumneavoastră private; când o programați, alegeți dacă dezbaterile publicate sunt și ele eliminate sau rămân publice sub pseudonimul dumneavoastră retras. Ne puteți contacta la privacy@dezbatere.ro, iar persoanele menționate într-o dezbatere pot solicita eliminarea fără a avea cont.
 
@@ -34,7 +34,7 @@ Colectăm numai ceea ce este necesar pentru funcționarea unui cont, ceea ce ale
 | Categorie | Date exacte | Sursă |
 | --- | --- | --- |
 | **Cont** | Adresa de e-mail și adresa de e-mail pentru recuperare (stocate criptat, cu un index bazat pe cheie pentru a putea găsi contul fără a citi adresa); parola (stocată sub formă de hash, niciodată în clar); secretul pentru autentificarea cu doi factori (criptat); zece coduri de recuperare (stocate sub formă de hash); pseudonimul dumneavoastră; rezultatul verificării vârstei, dar nu data nașterii | Dumneavoastră, la înregistrare |
-| **Verificarea țării adresei IP** | La înregistrare, stabilim local țara adresei IP cu DB-IP Lite și verificăm separat lista adreselor de ieșire Tor. La începutul fiecărei dezbateri noi, verificăm tot local țara adresei IP și putem refuza dezbaterea dacă țara se află pe lista celor blocate întotdeauna. Pentru refuzuri, consemnăm agregat ruta, codul, țara, intervalul de timp și faptul că proba a fost adresa IP; În jurnalul de audit, adresa IP și identificatorul browserului (user-agent) sunt păstrate numai ca amprente unidirecționale bazate pe cheie. | Adresa IP folosită la înregistrare și la începutul unei dezbateri noi |
+| **Verificarea țării adresei IP** | La înregistrare, stabilim local țara adresei IP cu DB-IP Lite și verificăm separat lista adreselor de ieșire Tor. La începutul fiecărei dezbateri noi, verificăm tot local țara adresei IP și putem refuza dezbaterea dacă țara se află pe lista celor blocate întotdeauna. Pentru refuzuri, consemnăm agregat ruta, codul, țara, intervalul de timp și faptul că proba a fost adresa IP; În jurnalul de audit, adresa IP și identificatorul browserului (user-agent) sunt păstrate numai ca amprente unidirecționale bazate pe cheie. La înregistrare, țara adresei IP, împreună cu regiunea pe care o alegeți, stabilește și dacă afișăm căsuța separată de aprobare pentru Italia; dacă acordați această aprobare, înregistrarea ei păstrează dacă alegerea regiunii, țara adresei IP sau ambele au determinat afișarea căsuței. | Adresa IP folosită la înregistrare și la începutul unei dezbateri noi |
 | **Verificarea vârstei** | Rezultatul (admis la înregistrare; admis sau respins pentru un cont existent), vârsta minimă aplicată, țara adresei IP dacă este cunoscută, versiunea regulii, contextul și momentul verificării. Nu păstrăm data nașterii | Data nașterii introdusă pentru verificare; țara dedusă din IP |
 | **Regiunea declarată** | Țara de reședință aleasă la înregistrare și, pentru SUA, statul | Dumneavoastră, la înregistrare |
 | **Sesiuni și securitate** | Un token de sesiune stocat sub formă de hash; un hash bazat pe cheie al șirului user-agent al browserului, folosit pentru a observa când o sesiune trece la alt browser; marcajele temporale ale creării, ultimei utilizări și expirării. **Nu** stocăm împreună cu o sesiune adresa IP, numele dispozitivului sau detaliile browserului, iar lista de sesiuni afișată în Setări conține numai marcaje temporale | Browserul dumneavoastră |
@@ -215,7 +215,7 @@ Pentru a refuza aceste elemente, blocați sau ștergeți modulele cookie și dat
 
 Când modificăm această politică, publicăm noua versiune împreună cu un rezumat al modificărilor și o nouă dată de intrare în vigoare și păstrăm versiunile anterioare la dezbatere.ro/privacy/versions. Pentru o modificare care adaugă un scop sau un destinatar nou, vă informăm prin e-mail și în produs înainte de începerea noii prelucrări și vă acordăm timp pentru a vă opune. Dacă un scop nou depinde de consimțământul dumneavoastră — de exemplu, dacă am dori vreodată să folosim conținutul pentru îmbunătățirea modelelor — solicităm consimțământul separat și specific; nu considerăm niciodată acceptarea Termenilor actualizați drept consimțământ pentru o prelucrare nouă. Pentru clarificări care nu schimbă nimic din ceea ce facem, publicăm pur și simplu noua versiune.
 
-Această politică a fost actualizată ultima dată la 12 octombrie 2026. Versiunea 3.5 a înlocuit versiunea 3.4: secțiunea 2 spune acum ce date de facturare și ce date ale cardului păstrăm și că numărul complet al cardului nu ajunge niciodată la noi, iar secțiunea 7 spune cât timp păstrăm un card salvat și mesajele furnizorului de plăți despre plăți.
+Această politică a fost actualizată ultima dată la 24 octombrie 2026. Versiunea 3.6 a înlocuit versiunea 3.5: secțiunea 2 spune acum că, la înregistrare, țara adresei IP, împreună cu regiunea pe care o alegeți, stabilește și dacă afișăm căsuța separată de aprobare pentru Italia.
 
 ## Annex B — Condiții regionale privind confidențialitatea
 

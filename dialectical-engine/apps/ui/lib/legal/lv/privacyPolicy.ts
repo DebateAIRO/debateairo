@@ -47,7 +47,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Konts — E-pasta adrese un atkopšanas e-pasta adrese (glabātas šifrētā veidā, izmantojot ar atslēgu aizsargātu indeksu, lai mēs varētu atrast kontu, nelasot adresi); parole (glabāta kā jaucējvērtība, nekad ne atklātā tekstā); jūsu divfaktoru autentifikācijas slepenā atslēga (šifrēta); desmit atkopšanas kodi (glabāti kā jaucējvērtības); jūsu pseidonīms — Jūs un pakalpojums, reģistrācijas laikā",
-        "IP adreses valsts pārbaude reģistrējoties un sākot jaunas debates — Reģistrējoties IP adreses valsti un Tor izejas mezglus lokāli pārbaudām ar DB-IP Lite un Tor sarakstu. Pirms katrām jaunām debatēm IP adreses valsti lokāli pārbaudām vēlreiz un debates atsakām, ja valsts ir vienmēr bloķēto valstu sarakstā. Reģistrāciju no neapkalpotām valstīm, Tor vai IP adresēm, kuru valsti nevaram noteikt atsakām; IP adresi trešajām personām nesūtām. Atteikumus apkopo pēc maršruta, koda, valsts un laika intervāla; IP adresi un lietotāja aģentu glabā tikai kā ar atslēgu veidotus vienvirziena īssavilkumus. Pierādījuma veids ir norādīts kā “IP adrese”. — Jūsu savienojums",
+        "IP adreses valsts pārbaude reģistrējoties un sākot jaunas debates — Reģistrējoties IP adreses valsti un Tor izejas mezglus lokāli pārbaudām ar DB-IP Lite un Tor sarakstu. Pirms katrām jaunām debatēm IP adreses valsti lokāli pārbaudām vēlreiz un debates atsakām, ja valsts ir vienmēr bloķēto valstu sarakstā. Reģistrāciju no neapkalpotām valstīm, Tor vai IP adresēm, kuru valsti nevaram noteikt atsakām; IP adresi trešajām personām nesūtām. Atteikumus apkopo pēc maršruta, koda, valsts un laika intervāla; IP adresi un lietotāja aģentu glabā tikai kā ar atslēgu veidotus vienvirziena īssavilkumus. Pierādījuma veids ir norādīts kā “IP adrese”. Reģistrējoties IP adreses valsts kopā ar jūsu izvēlēto reģionu arī nosaka, vai rādām atsevišķo apstiprinājuma rūtiņu attiecībā uz Itāliju; ja jūs šo apstiprinājumu sniedzat, tā ierakstā tiek glabāts, vai rūtiņas parādīšanos izraisīja reģiona izvēle, IP adreses valsts vai abi kopā. — Jūsu savienojums",
         "Vecuma pārbaude — Jūs ievadāt dzimšanas datumu, taču mēs to neglabājam. Veiksmīgas reģistrācijas gadījumā reģistrējam pozitīvu rezultātu; esoša konta pārbaudes rezultāts var būt pozitīvs vai negatīvs. Ierakstā ir minimālais vecums, IP adreses valsts, ja zināma, noteikuma versija, pārbaudes konteksts un laiks — Jūs un reģistrācijas sistēma",
         "Deklarētā dzīvesvieta — Reģistrējoties izvēlētā dzīvesvietas valsts un, ja tā ir ASV, štats — Jūs",
         "Sesijas un drošība — Sesijas pilnvara jaucējvērtības veidā; ar atslēgu aizsargāta jūsu pārlūkprogrammas user-agent virknes jaucējvērtība, ko izmanto, lai pamanītu sesijas pāreju uz citu pārlūkprogrammu; izveides, pēdējās izmantošanas un termiņa beigu laikspiedoli. Mēs neglabājam jūsu IP adresi, ierīces nosaukumu vai pārlūkprogrammas informāciju kopā ar sesiju, un sesiju sarakstā, ko redzat Iestatījumos, ir norādīti tikai laikspiedoli — Jūsu pārlūkprogramma",
@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Mainot šo politiku, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un jaunu spēkā stāšanās datumu un saglabājam iepriekšējās versijas vietnē dezbatere.ro/privacy/versions. Par izmaiņām, ar kurām tiek pievienots jauns nolūks vai jauns saņēmējs, mēs jūs informējam pa e-pastu un produktā pirms jaunās apstrādes sākšanas un dodam laiku iebilst. Ja jauns nolūks ir atkarīgs no jūsu piekrišanas — piemēram, ja mēs kādreiz vēlētos izmantot saturu modeļu uzlabošanai —, mēs šādu piekrišanu lūdzam atsevišķi un konkrēti; atjaunināto Noteikumu akceptēšanu mēs nekad neuzskatām par piekrišanu jaunai apstrādei. Ja precizējumi neko nemaina mūsu darbībās, mēs vienkārši publicējam jauno versiju." },
-      { kind: "p", text: "Šī politika pēdējo reizi atjaunināta 2026. gada 12. oktobrī. Versija 3.5 aizstāja versiju 3.4: 2. sadaļā tagad norādīts, kādus norēķinu un kartes datus mēs glabājam un ka jūsu pilnais kartes numurs nekad nenonāk pie mums, un 7. sadaļā norādīts, cik ilgi mēs glabājam saglabātu karti un maksājumu pakalpojumu sniedzēja ziņojumus par maksājumiem." }
+      { kind: "p", text: "Šī politika pēdējo reizi atjaunināta 2026. gada 24. oktobrī. Versija 3.6 aizstāja versiju 3.5: 2. sadaļā tagad norādīts, ka, reģistrējoties, IP adreses valsts kopā ar jūsu izvēlēto reģionu arī nosaka, vai rādām atsevišķo apstiprinājuma rūtiņu attiecībā uz Itāliju." }
     ]
   },
   {
@@ -332,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.5",
-  sha256: "15ec7fa8897b565b206ab776cb04d7389602aa6aea4ef148dd4be58331250eaf",
-  eyebrow: "PRIVĀTUMA POLITIKA · v3.5 · SPĒKĀ NO 2026. GADA 12. OKTOBRA",
+  version: "3.6",
+  sha256: "3de2fe4c8a64f6dec80c873665fc71f007ff6f5b1e9a5f4669611170bfb9c4d0",
+  eyebrow: "PRIVĀTUMA POLITIKA · v3.6 · SPĒKĀ NO 2026. GADA 24. OKTOBRA",
   title: "Ko mēs glabājam un kāpēc",
   lede: "Jūsu tiesības un mūsu pienākumi saskaņā ar GDPR (EU) 2016/679, izklāstīti vienkāršā valodā. Četrpadsmit sadaļas un B pielikums — ritiniet līdz beigām.",
-  endMarker: "POLITIKAS BEIGAS · GDPR (EU) 2016/679 · v3.5",
+  endMarker: "POLITIKAS BEIGAS · GDPR (EU) 2016/679 · v3.6",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privātuma politikas teksts",
   sectionIdPrefix: "policy-section-",

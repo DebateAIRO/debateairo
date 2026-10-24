@@ -47,7 +47,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Cuntas — Seoladh ríomhphoist agus seoladh ríomhphoist athshlánaithe (stóráilte agus criptithe, le hinnéacs eochraithe ionas gur féidir linn an cuntas a aimsiú gan an seoladh a léamh); pasfhocal (stóráilte mar hais, agus ní i ngnáth-théacs riamh); do rún fíordheimhnithe dhá fhachtóir (criptithe); deich gcód athshlánaithe (stóráilte mar hais); d'ainm cleite; toradh do sheiceála aoise — Tusa, tráth clárúcháin",
-        "Seiceáil thír an tseolta IP — Tráth clárúcháin aimsímid tír an tseolta IP go háitiúil le DB-IP Lite agus seiceálaimid liosta de sheoltaí imeachta Tor. Ag tús gach díospóireachta nua aimsímid tír an tseolta IP arís go háitiúil agus féadfaimid an díospóireacht a dhiúltú má tá an tír toirmiscthe go buan. Má dhiúltaítear d’iarratas, déanaimid na taifid iniúchóireachta a chomhiomlánú de réir bealaigh, cóid, tíre agus tréimhse ama; ní choinnítear an seoladh IP ann ach mar achoimre aontreo eochraithe. Tá an cód diúltaithe, an tír agus comhartha gur fianaise a bhí sa seoladh IP sa taifead diúltaithe; ní choinnítear an seoladh IP ná an teaghrán gníomhaire úsáideora ach mar hais aontreo eochraithe. — Do bhrabhsálaí tráth clárúcháin agus ag tús díospóireachta nua",
+        "Seiceáil thír an tseolta IP — Tráth clárúcháin aimsímid tír an tseolta IP go háitiúil le DB-IP Lite agus seiceálaimid liosta de sheoltaí imeachta Tor. Ag tús gach díospóireachta nua aimsímid tír an tseolta IP arís go háitiúil agus féadfaimid an díospóireacht a dhiúltú má tá an tír toirmiscthe go buan. Má dhiúltaítear d’iarratas, déanaimid na taifid iniúchóireachta a chomhiomlánú de réir bealaigh, cóid, tíre agus tréimhse ama; ní choinnítear an seoladh IP ann ach mar achoimre aontreo eochraithe. Tá an cód diúltaithe, an tír agus comhartha gur fianaise a bhí sa seoladh IP sa taifead diúltaithe; ní choinnítear an seoladh IP ná an teaghrán gníomhaire úsáideora ach mar hais aontreo eochraithe. Tráth clárúcháin, cinneann tír an tseolta IP, in éineacht leis an réigiún a roghnaíonn tú, freisin an dtaispeánaimid an bosca ceadaithe ar leith don Iodáil; má thugann tú an ceadú sin, coinníonn a thaifead cibé ar bhain an roghnú réigiúin, tír an tseolta IP nó an dá cheann leis a spreagadh. — Do bhrabhsálaí tráth clárúcháin agus ag tús díospóireachta nua",
         "Seiceáil aoise — Cuireann tú do dháta breithe isteach don tseiceáil amháin; ní stórálaimid é. Coinnímid an toradh, an aois íosta, tír an tseolta IP má tá sí ar fáil, leagan na rialach, an comhthéacs agus am na seiceála. Ní stóráiltear ach toradh «pasáilte» i gcás clárú rathúil; d’fhéadfadh «pasáilte» nó «diúltaithe» a bheith ag cuntas atá ann cheana — Tusa agus do bhrabhsálaí",
         "Áit chónaithe dhearbhaithe — An tír ina ndeir tú go bhfuil cónaí ort agus an stát má tá cónaí ort sna Stáit Aontaithe — Tusa tráth clárúcháin",
         "Seisiúin agus slándáil — Comhartha seisiúin haisithe; hais eochraithe de theaghrán gníomhaire úsáideora do bhrabhsálaí, a úsáidtear chun a thabhairt faoi deara nuair a aistrítear seisiún go brabhsálaí eile; stampaí ama an chruthaithe, na húsáide deireanaí agus an éaga. Ní stórálaimid do sheoladh IP, ainm do ghléis ná sonraí do bhrabhsálaí le seisiún, agus ní thaispeántar ach stampaí ama sa liosta seisiún a fheiceann tú sna Socruithe — Do bhrabhsálaí",
@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Nuair a athraímid an beartas seo, cuirimid an leagan nua ar fáil mar aon le hachoimre ar an méid a d'athraigh agus dáta nua teachta i bhfeidhm, agus coinnímid na leaganacha roimhe seo ag dezbatere.ro/privacy/versions. I gcás athraithe lena gcuirtear cuspóir nua nó faighteoir nua leis, insímid duit sula dtosaíonn an phróiseáil nua, trí ríomhphost agus sa táirge, agus tugaimid am duit agóid a dhéanamh. Sa chás ina mbraitheann cuspóir nua ar do thoiliú — mar shampla, dá mba mhian linn riamh ábhar a úsáid chun samhlacha a fheabhsú — iarraimid an toiliú sin ar leithligh agus go sonrach; ní chaithimid riamh le glacadh le Téarmaí nuashonraithe mar thoiliú le próiseáil nua. I gcás soiléirithe nach n-athraíonn aon ní faoin méid a dhéanaimid, ní dhéanaimid ach an leagan nua a fhoilsiú." },
-      { kind: "p", text: "Nuashonraíodh an beartas seo an uair dheireanach ar 12 Deireadh Fómhair 2026. Tháinig Leagan 3.5 in ionad leagan 3.4: deir rannán 2 anois cé na sonraí billeála agus cárta a choinnímid agus nach sroicheann uimhir iomlán do chárta sinn riamh, agus deir rannán 7 cá fhad a choinnímid cárta sábháilte agus teachtaireachtaí an tsoláthraí íocaíochta faoi íocaíochtaí." }
+      { kind: "p", text: "Nuashonraíodh an beartas seo an uair dheireanach ar 24 Deireadh Fómhair 2026. Tháinig Leagan 3.6 in ionad leagan 3.5: deir rannán 2 anois go gcinneann tír an tseolta IP tráth clárúcháin, in éineacht leis an réigiún a roghnaíonn tú, freisin an dtaispeánaimid an bosca ceadaithe ar leith don Iodáil." }
     ]
   },
   {
@@ -332,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.5",
-  sha256: "5a022913f96c97bface61fd618a2ebccadd1a4d3d15d7cfe31f45a5f59b4f556",
-  eyebrow: "BEARTAS PRÍOBHÁIDEACHAIS · v3.5 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026",
+  version: "3.6",
+  sha256: "ff1ccd74f42c182bb48a5de3355852a0332562bf24ee0212a5d9d87ebb9a921b",
+  eyebrow: "BEARTAS PRÍOBHÁIDEACHAIS · v3.6 · I bhFEIDHM 24 DEIREADH FÓMHAIR 2026",
   title: "An méid a stórálaimid, agus an fáth",
   lede: "Do chearta agus ár n-oibleagáidí faoin GDPR (EU) 2016/679, i bhfriotal soiléir. Ceithre rannán déag agus Iarscríbhinn B — scrollaigh go dtí an deireadh.",
-  endMarker: "DEIREADH AN BHEARTAIS · GDPR (EU) 2016/679 · v3.5",
+  endMarker: "DEIREADH AN BHEARTAIS · GDPR (EU) 2016/679 · v3.6",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Téacs an Bheartais Príobháideachais",
   sectionIdPrefix: "policy-section-",

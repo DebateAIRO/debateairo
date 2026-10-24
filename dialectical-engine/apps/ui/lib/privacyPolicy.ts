@@ -47,7 +47,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Account — Email address and recovery email address (stored encrypted, with a keyed index so we can find the account without reading the address); password (stored as a hash, never in clear); your two-factor authentication secret (encrypted); ten recovery codes (stored as hashes); your pseudonym — You, at registration",
-        "IP country checks — At sign-up and when you start a new debate, we use your IP address to look up its country locally with DB-IP Lite; at sign-up we also check a locally held Tor exit list. If we refuse access, an aggregated audit entry records the refusal code, country and that the IP was the evidence; the audit trail holds one-way keyed digests of the IP address and user-agent, not readable addresses — Your connection at sign-up or when you start a debate",
+        "IP country checks — At sign-up and when you start a new debate, we use your IP address to look up its country locally with DB-IP Lite; at sign-up we also check a locally held Tor exit list. If we refuse access, an aggregated audit entry records the refusal code, country and that the IP was the evidence; the audit trail holds one-way keyed digests of the IP address and user-agent, not readable addresses. At sign-up, the IP country, together with the Region you pick, also decides whether we show the separate approval box for Italy; if you give that approval, its record keeps whether the Region pick, the IP country or both triggered it. — Your connection at sign-up or when you start a debate",
         "Age check — The result (passed or refused), the minimum age applied, the IP country if available, the rule version, whether the check was at registration or for an existing account, and the time. We do not store your date of birth — You, when you enter your date of birth",
         "Declared location — The country where you say you live and, if that is the United States, your state — You, at registration",
         "Sessions and security — A hashed session token; a keyed hash of your browser's user-agent string, used to notice when a session moves to a different browser; timestamps of creation, last use and expiry. We do not store your IP address, device name or browser details with a session, and the session list you see in Settings shows only timestamps — Your browser",
@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "When we change this policy we post the new version with a summary of what changed and a new effective date, and keep the previous versions at dezbatere.ro/privacy/versions. For a change that adds a new purpose or a new recipient we tell you before the new processing starts, by email and in the product, and give you time to object. Where a new purpose depends on your consent — for example if we ever wanted to use content to improve models — we ask for that consent separately and specifically; we never treat acceptance of updated Terms as consent to new processing. For clarifications that change nothing about what we do, we simply post the new version." },
-      { kind: "p", text: "This policy was last updated on 12 October 2026. Version 3.5 replaced version 3.4: section 2 now says which billing and card details we keep and that your full card number never reaches us, and section 7 says how long we keep a saved card and the payment provider's messages about payments." }
+      { kind: "p", text: "This policy was last updated on 24 October 2026. Version 3.6 replaced version 3.5: section 2 now says that, at sign-up, the IP country, together with the Region you pick, also decides whether we show the separate approval box for Italy." }
     ]
   },
   {
@@ -332,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.5",
-  sha256: "d6e1f3d42e8396739fc573efeca88c8dbecf7c95f160f7b1221ebff31f61495d",
-  eyebrow: "PRIVACY POLICY · v3.5 · EFFECTIVE 12 OCTOBER 2026",
+  version: "3.6",
+  sha256: "f4ba904e1d0589f8fc36909b175011195381164794a7124ba09486f99933b934",
+  eyebrow: "PRIVACY POLICY · v3.6 · EFFECTIVE 24 OCTOBER 2026",
   title: "What we store, and why",
   lede: "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end.",
-  endMarker: "END OF POLICY · GDPR (EU) 2016/679 · v3.5",
+  endMarker: "END OF POLICY · GDPR (EU) 2016/679 · v3.6",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privacy Policy text",
   sectionIdPrefix: "policy-section-",

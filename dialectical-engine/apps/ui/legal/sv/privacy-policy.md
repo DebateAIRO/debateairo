@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort sagt
-eyebrow: INTEGRITETSPOLICY · v3.5 · GÄLLER FRÅN 12 OKTOBER 2026
+eyebrow: INTEGRITETSPOLICY · v3.6 · GÄLLER FRÅN 24 OKTOBER 2026
 title: Vad vi lagrar och varför
 lede: Dina rättigheter och våra skyldigheter enligt GDPR (EU) 2016/679, på ett lättbegripligt språk. Fjorton avsnitt och bilaga B — rulla till slutet.
-endMarker: SLUT PÅ POLICYN · GDPR (EU) 2016/679 · v3.5
+endMarker: SLUT PÅ POLICYN · GDPR (EU) 2016/679 · v3.6
 bodyLabel: Integritetspolicyns text
 annexTitle: Bilaga B — Regionala integritetsvillkor
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 3.5 · Effective 12 oktober 2026 · Tidigare versioner på dezbatere.ro/privacy/versions · Personuppgiftsansvarig: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 24 oktober 2026 · Tidigare versioner på dezbatere.ro/privacy/versions · Personuppgiftsansvarig: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Vi samlar in det som behövs för ett konto och det du väljer att skriva. Dina frågor skickas till de AI-leverantörer som anges i vårt register; de används inte för att träna modeller. Vår värdleverantör lagrar ditt konto och dina debatter i London i Storbritannien; avsnitt 5 anger vart dina uppgifter i övrigt skickas. Debatter är privata om du inte publicerar dem. När du raderar ditt konto förstörs nycklarna till dina privata uppgifter; när du schemalägger raderingen väljer du om dina publicerade debatter också ska tas bort eller förbli offentliga under din avvecklade pseudonym. Du kan nå oss på privacy@dezbatere.ro, och personer som nämns i en debatt kan begära borttagning utan att ha ett konto.
 
@@ -34,7 +34,7 @@ Vi samlar endast in det som behövs för att ett konto ska fungera, det du välj
 | Kategori | Exakt vilka uppgifter | Källa |
 | --- | --- | --- |
 | **Konto** | E-postadress och återställningsadress (lagras krypterade, med ett nycklat index så att vi kan hitta kontot utan att läsa adressen); lösenord (lagras som ett hashvärde, aldrig i klartext); din hemlighet för tvåfaktorsautentisering (krypterad); tio återställningskoder (lagras som hashvärden); din pseudonym; resultatet av ålderskontrollen, men inte ditt födelsedatum | Du, vid registreringen |
-| **Kontroll av IP-adressens land** | Vid registrering slår vi lokalt upp IP-adressens land med DB-IP Lite och kontrollerar listan över Tor-utgångar. Inför varje ny debatt kontrollerar vi också IP-adressens land lokalt och kan neka debatten om landet finns på listan över länder som alltid blockeras. Vid avslag loggar vi väg, kod, land, tidsfönster och att IP-adressen var underlag, i aggregerad form; I granskningsloggen sparas IP-adressen och webbläsarens user-agent endast som nyckelbaserade envägs-hashvärden. | IP-adressen vid registrering och inför en ny debatt |
+| **Kontroll av IP-adressens land** | Vid registrering slår vi lokalt upp IP-adressens land med DB-IP Lite och kontrollerar listan över Tor-utgångar. Inför varje ny debatt kontrollerar vi också IP-adressens land lokalt och kan neka debatten om landet finns på listan över länder som alltid blockeras. Vid avslag loggar vi väg, kod, land, tidsfönster och att IP-adressen var underlag, i aggregerad form; I granskningsloggen sparas IP-adressen och webbläsarens user-agent endast som nyckelbaserade envägs-hashvärden. Vid registrering avgör IP-adressens land, tillsammans med den region du väljer, också om vi visar den separata godkännanderutan för Italien; om du lämnar det godkännandet sparas i dess registrering vad som utlöste att rutan visades: regionvalet, IP-adressens land eller båda. | IP-adressen vid registrering och inför en ny debatt |
 | **Ålderskontroll** | Resultat (vid registrering endast godkänt; för ett befintligt konto godkänt eller underkänt), tillämpad minimiålder, IP-adressens land om känt, regelversion, sammanhang och tidpunkt. Födelsedatum lagras inte | Födelsedatum som du anger för kontrollen; land från IP-adressen |
 | **Angiven region** | Bosättningsland som du väljer vid registrering och, om du bor i USA, delstat | Du, vid registreringen |
 | **Sessioner och säkerhet** | En hashad sessionstoken; ett nycklat hashvärde av webbläsarens user-agent-sträng, som används för att upptäcka när en session flyttas till en annan webbläsare; tidsstämplar för skapande, senaste användning och utgång. Vi lagrar **inte** din IP-adress, enhetsnamn eller webbläsaruppgifter tillsammans med en session, och sessionslistan som visas i Inställningar innehåller endast tidsstämplar | Din webbläsare |
@@ -215,7 +215,7 @@ För att vägra dessa objekt blockerar eller raderar du cookies och webbplatsdat
 
 När vi ändrar denna policy publicerar vi den nya versionen med en sammanfattning av vad som har ändrats och ett nytt ikraftträdandedatum, och vi behåller tidigare versioner på dezbatere.ro/privacy/versions. Om en ändring lägger till ett nytt ändamål eller en ny mottagare informerar vi dig via e-post och i produkten innan den nya behandlingen börjar och ger dig tid att invända. Om ett nytt ändamål är beroende av ditt samtycke — exempelvis om vi någon gång skulle vilja använda innehåll för att förbättra modeller — ber vi separat och specifikt om det samtycket; vi behandlar aldrig godkännande av uppdaterade villkor som samtycke till ny behandling. Vid förtydliganden som inte ändrar något i det vi gör publicerar vi helt enkelt den nya versionen.
 
-Denna policy uppdaterades senast den 12 oktober 2026. Version 3.5 ersatte version 3.4: avsnitt 2 anger nu vilka fakturerings- och kortuppgifter vi lagrar och att ditt fullständiga kortnummer aldrig når oss, och avsnitt 7 anger hur länge vi lagrar ett sparat kort och betalningsleverantörens meddelanden om betalningar.
+Denna policy uppdaterades senast den 24 oktober 2026. Version 3.6 ersatte version 3.5: avsnitt 2 anger nu att IP-adressens land vid registrering, tillsammans med den region du väljer, också avgör om vi visar den separata godkännanderutan för Italien.
 
 ## Annex B — Regionala integritetsvillkor
 

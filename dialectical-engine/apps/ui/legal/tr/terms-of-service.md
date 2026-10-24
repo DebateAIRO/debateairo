@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kısaca
-eyebrow: HİZMET KOŞULLARI · v2.4 · YÜRÜRLÜK TARİHİ 12 EKİM 2026
+eyebrow: HİZMET KOŞULLARI · v2.5 · YÜRÜRLÜK TARİHİ 24 EKİM 2026
 title: Kabul ettiğiniz hükümler
 lede: Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.
-endMarker: KOŞULLARIN SONU · v2.4
+endMarker: KOŞULLARIN SONU · v2.5
 bodyLabel: Hizmet Koşulları metni
 annexTitle: Ek A — Bölgesel koşullar
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 UYGULANACAK HUKUK
 -->
 
-**Version 2.4 · Effective 12 Ekim 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
+**Version 2.5 · Effective 24 Ekim 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
 
 **In short.** En az 18 yaşında olmalısınız. Dialectical Engine, yapay zekâ modelleriyle argümanlar oluşturur ve ürettiği her şey yanlış olabilir — bunlar tavsiye değildir. Tartışmalarınız, siz yayımlamadıkça özeldir; yayımlarsanız herkes okuyabilir. Gönderdiğiniz metin, Sağlayıcı Sicilimizde belirtilen yapay zekâ sağlayıcılarına iletilir ve modelleri eğitmek için kullanılmaz. Hesabınız olsun veya olmasın, hukuka aykırı içerikleri support@dezbatere.ro adresine bildirin. Romanya hukuku uygulanır; ancak yerel tüketici korumalarınız saklıdır.
 
@@ -277,7 +277,7 @@ Her bir madde, bölgesinde yaşayan kişilere uygulanır ve yalnızca ana metind
 
 ### A.1 Avrupa Birliği ve Avrupa Ekonomik Alanı
 
-Bu Koşulların ana metni sizin için kaleme alınmıştır. Buna ek olarak: yaşadığınız ülkenin mahkemelerinde dava açabilirsiniz; 13. bölümdeki cayma hakkı uygulanır; www.onoratainstanta.ro üzerinden alternatif uyuşmazlık çözümü kullanılabilir. **Almanya:** dezbatere.ro/cancel adresindeki iptal düğmesi, oturum açmadan aboneliği sona erdirmenize olanak tanır; abonelik süreleri, yenileme dönemleri ve bildirim süreleri §309(9) BGB'ye uygundur: her plan bir ay sürer, siz iptal edene kadar aylık olarak yenilenir ve istediğiniz zaman, içinde bulunulan ayın sonunda geçerli olacak şekilde iptal edebilirsiniz. **Fransa:** dezbatere.ro/cancel adresinden üç adımda çevrim içi abonelik iptali yapabilirsiniz. **İtalya:** sorumluluk (15), askıya alma (11), değişiklikler (14) ve uygulanacak hukuk (18) hakkındaki hükümler özel onayınızı gerektirir; kayıt sırasında ayrı bir teyitle bu onayı verirsiniz. **Hollanda:** bu Koşullar sözleşme kurulmadan önce saklanabilir bir biçimde sunulur. **Polonya:** Lehçe sürüm mevcuttur; dil menüsünden Polski'yi seçin.
+Bu Koşulların ana metni sizin için kaleme alınmıştır. Buna ek olarak: yaşadığınız ülkenin mahkemelerinde dava açabilirsiniz; 13. bölümdeki cayma hakkı uygulanır; www.onoratainstanta.ro üzerinden alternatif uyuşmazlık çözümü kullanılabilir. **Almanya:** dezbatere.ro/cancel adresindeki iptal düğmesi, oturum açmadan aboneliği sona erdirmenize olanak tanır; abonelik süreleri, yenileme dönemleri ve bildirim süreleri §309(9) BGB'ye uygundur: her plan bir ay sürer, siz iptal edene kadar aylık olarak yenilenir ve istediğiniz zaman, içinde bulunulan ayın sonunda geçerli olacak şekilde iptal edebilirsiniz. **Fransa:** dezbatere.ro/cancel adresinden üç adımda çevrim içi abonelik iptali yapabilirsiniz. **İtalya:** askıya alma ve sona erdirme (11), ücretli planlar ve yenilenmeleri (12), değişiklikler (14), sorumluluk (15) ile uygulanacak hukuk ve uyuşmazlıkların görüleceği yer (18) hakkındaki hükümler, İtalyan Medeni Kanunu'nun 1341 ve 1342. maddeleri uyarınca özel onayınızı gerektirir. Bu onayı kayıt sırasında ayrı bir kutuyla verirsiniz; kutu, Bölge alanında İtalya'yı seçen veya bağlantısı İtalya'dan gelen herkese gösterilir. **Hollanda:** bu Koşullar sözleşme kurulmadan önce saklanabilir bir biçimde sunulur. **Polonya:** Lehçe sürüm mevcuttur; dil menüsünden Polski'yi seçin.
 
 ### A.2 Amerika Birleşik Devletleri
 

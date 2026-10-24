@@ -296,7 +296,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Unione europea e Spazio economico europeo",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Il corpo delle presenti Condizioni è redatto per te. Inoltre, puoi avviare un procedimento presso i tribunali del Paese in cui vivi; si applica il diritto di recesso di cui alla sezione 13; la risoluzione alternativa delle controversie è disponibile tramite www.onoratainstanta.ro. Germania: il pulsante di disdetta all'indirizzo dezbatere.ro/cancel ti consente di porre fine a un abbonamento senza effettuare l'accesso; le condizioni di abbonamento, i periodi di rinnovo e i termini di preavviso rispettano il §309(9) BGB: ogni piano ha durata di un mese e si rinnova mensilmente finché non lo disdici, e puoi disdire in qualsiasi momento con effetto dalla fine del mese in corso. Francia: puoi porre fine a un abbonamento online in tre passaggi all'indirizzo dezbatere.ro/cancel. Italia: le clausole sulla responsabilità (15), sulla sospensione (11), sulle modifiche (14) e sulla legge applicabile (18) richiedono la tua specifica approvazione, che presti mediante la conferma separata al momento della registrazione. Paesi Bassi: le presenti Condizioni ti vengono fornite in una forma memorizzabile prima della conclusione del contratto. Polonia: è disponibile una versione in polacco; scegli Polski nel selettore della lingua." }
+      { kind: "p", text: "Il corpo delle presenti Condizioni è redatto per te. Inoltre, puoi avviare un procedimento presso i tribunali del Paese in cui vivi; si applica il diritto di recesso di cui alla sezione 13; la risoluzione alternativa delle controversie è disponibile tramite www.onoratainstanta.ro. Germania: il pulsante di disdetta all'indirizzo dezbatere.ro/cancel ti consente di porre fine a un abbonamento senza effettuare l'accesso; le condizioni di abbonamento, i periodi di rinnovo e i termini di preavviso rispettano il §309(9) BGB: ogni piano ha durata di un mese e si rinnova mensilmente finché non lo disdici, e puoi disdire in qualsiasi momento con effetto dalla fine del mese in corso. Francia: puoi porre fine a un abbonamento online in tre passaggi all'indirizzo dezbatere.ro/cancel. Italia: le clausole sulla sospensione e cessazione (11), sui piani a pagamento e sul loro rinnovo (12), sulle modifiche (14), sulla responsabilità (15) e sulla legge applicabile e sul foro competente (18) richiedono la tua specifica approvazione ai sensi degli articoli 1341 e 1342 del Codice civile. La presti mediante una casella separata al momento della registrazione, mostrata a chiunque scelga l'Italia nel campo Regione o si connetta dall'Italia. Paesi Bassi: le presenti Condizioni ti vengono fornite in una forma memorizzabile prima della conclusione del contratto. Polonia: è disponibile una versione in polacco; scegli Polski nel selettore della lingua." }
     ]
   },
   {
@@ -353,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.4",
-  sha256: "8ae46004efa3fb840d7f084c12ecf26fe509d2945afc6cf814a477095a96ef40",
-  eyebrow: "CONDIZIONI DI SERVIZIO · v2.4 · IN VIGORE DAL 12 OTTOBRE 2026",
+  version: "2.5",
+  sha256: "e006d18f6c6cd47e48a325beae7a2f158d4b9132f0dcb072fc9a60fb55176532",
+  eyebrow: "CONDIZIONI DI SERVIZIO · v2.5 · IN VIGORE DAL 24 OTTOBRE 2026",
   title: "Ciò che accetti",
   lede: "Il contratto tra te e DMS Merchandise Shop S.R.L., in un linguaggio chiaro. Diciannove sezioni e Allegato A — scorri fino alla fine.",
-  endMarker: "FINE DELLE CONDIZIONI · v2.4",
+  endMarker: "FINE DELLE CONDIZIONI · v2.5",
   contact: "support@dezbatere.ro",
   bodyLabel: "Testo delle Condizioni di servizio",
   sectionIdPrefix: "terms-section-",

@@ -47,7 +47,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Konto — Adres e-mail i adres e-mail do odzyskiwania dostępu (przechowywane w postaci zaszyfrowanej, z indeksem opartym na kluczu, abyśmy mogli znaleźć konto bez odczytywania adresu); hasło (przechowywane jako skrót, nigdy w postaci jawnej); klucz uwierzytelniania dwuskładnikowego (zaszyfrowany); dziesięć kodów odzyskiwania (przechowywanych jako skróty); Twój pseudonim; wynik sprawdzenia wieku, lecz nie data urodzenia — Ty, podczas rejestracji",
-        "Kontrola kraju na podstawie adresu IP — Przy rejestracji lokalnie ustalamy kraj adresu IP z bazy DB-IP Lite i sprawdzamy listę adresów wyjściowych Tor. Przed rozpoczęciem każdej nowej debaty sprawdzamy też lokalnie kraj adresu IP i możemy odmówić, jeśli znajduje się on na liście krajów zawsze blokowanych. Przy odmowie zapisujemy zbiorczo trasę, kod odmowy, kraj, przedział czasu oraz fakt, że dowodem był adres IP; W dzienniku audytu adres IP i identyfikator przeglądarki (user-agent) są przechowywane wyłącznie jako jednokierunkowe skróty oparte na kluczu. — Adres IP przy rejestracji i rozpoczynaniu nowej debaty",
+        "Kontrola kraju na podstawie adresu IP — Przy rejestracji lokalnie ustalamy kraj adresu IP z bazy DB-IP Lite i sprawdzamy listę adresów wyjściowych Tor. Przed rozpoczęciem każdej nowej debaty sprawdzamy też lokalnie kraj adresu IP i możemy odmówić, jeśli znajduje się on na liście krajów zawsze blokowanych. Przy odmowie zapisujemy zbiorczo trasę, kod odmowy, kraj, przedział czasu oraz fakt, że dowodem był adres IP; W dzienniku audytu adres IP i identyfikator przeglądarki (user-agent) są przechowywane wyłącznie jako jednokierunkowe skróty oparte na kluczu. Przy rejestracji kraj adresu IP wraz z wybranym przez Ciebie regionem decyduje też o tym, czy pokazujemy odrębne pole akceptacji dotyczące Włoch; jeśli udzielisz tej akceptacji, jej zapis zawiera informację, czy pole to wywołał wybór regionu, kraj adresu IP, czy oba te czynniki. — Adres IP przy rejestracji i rozpoczynaniu nowej debaty",
         "Sprawdzenie wieku — Wynik (przy rejestracji tylko pozytywny; przy sprawdzeniu istniejącego konta pozytywny lub negatywny), zastosowany minimalny wiek, kraj adresu IP, jeśli jest znany, wersja reguły, kontekst i czas sprawdzenia. Daty urodzenia nie przechowujemy — Data urodzenia podana do sprawdzenia; kraj ustalony z adresu IP",
         "Zadeklarowany region — Kraj zamieszkania wskazany przy rejestracji oraz stan, jeśli jest to USA — Ty, podczas rejestracji",
         "Sesje i bezpieczeństwo — Skrót tokenu sesji; skrót ciągu user-agent Twojej przeglądarki oparty na kluczu, służący do wykrywania przeniesienia sesji do innej przeglądarki; znaczniki czasu utworzenia, ostatniego użycia i wygaśnięcia. Nie przechowujemy wraz z sesją Twojego adresu IP, nazwy urządzenia ani szczegółów przeglądarki, a lista sesji widoczna w Ustawieniach pokazuje wyłącznie znaczniki czasu — Twoja przeglądarka",
@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Gdy zmieniamy niniejszą politykę, publikujemy nową wersję wraz z podsumowaniem zmian i nową datą wejścia w życie, a poprzednie wersje zachowujemy pod adresem dezbatere.ro/privacy/versions. O zmianie wprowadzającej nowy cel lub nowego odbiorcę informujemy Cię przed rozpoczęciem nowego przetwarzania, pocztą elektroniczną i w produkcie, oraz zapewniamy czas na wniesienie sprzeciwu. Jeżeli nowy cel zależy od Twojej zgody — na przykład gdybyśmy kiedykolwiek chcieli wykorzystać treści do ulepszania modeli — prosimy o tę zgodę osobno i w sposób konkretny; nigdy nie traktujemy akceptacji zaktualizowanych Warunków świadczenia usług jako zgody na nowe przetwarzanie. W przypadku wyjaśnień, które nie zmieniają naszych działań, po prostu publikujemy nową wersję." },
-      { kind: "p", text: "Niniejsza polityka została ostatnio zaktualizowana 12 października 2026. Wersja 3.5 zastąpiła wersję 3.4: sekcja 2 mówi teraz, jakie dane rozliczeniowe i dane karty przechowujemy oraz że pełny numer Twojej karty nigdy do nas nie trafia, a sekcja 7 mówi, jak długo przechowujemy zapisaną kartę i wiadomości dostawcy płatności dotyczące płatności." }
+      { kind: "p", text: "Niniejsza polityka została ostatnio zaktualizowana 24 października 2026. Wersja 3.6 zastąpiła wersję 3.5: sekcja 2 mówi teraz, że przy rejestracji kraj adresu IP wraz z wybranym przez Ciebie regionem decyduje też o tym, czy pokazujemy odrębne pole akceptacji dotyczące Włoch." }
     ]
   },
   {
@@ -332,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.5",
-  sha256: "e4842622c30b97093f83e94d1581a79fdb79eb4f4fe75aaa27fd930444b62a3b",
-  eyebrow: "POLITYKA PRYWATNOŚCI · v3.5 · OBOWIĄZUJE OD 12 PAŹDZIERNIKA 2026",
+  version: "3.6",
+  sha256: "a44c79dd1bd2a8e3e905e97f79b085c5f532b3fac60e8079596c818018823970",
+  eyebrow: "POLITYKA PRYWATNOŚCI · v3.6 · OBOWIĄZUJE OD 24 PAŹDZIERNIKA 2026",
   title: "Co przechowujemy i dlaczego",
   lede: "Twoje prawa i nasze obowiązki wynikające z RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679), wyjaśnione prostym językiem. Czternaście sekcji i załącznik B — przewiń do końca.",
-  endMarker: "KONIEC POLITYKI · RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679) · v3.5",
+  endMarker: "KONIEC POLITYKI · RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679) · v3.6",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Tekst Polityki prywatności",
   sectionIdPrefix: "policy-section-",

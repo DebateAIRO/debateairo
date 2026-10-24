@@ -47,7 +47,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Račun — Adresa e-pošte i adresa e-pošte za oporavak (pohranjene u šifriranom obliku, s indeksom s ključem kako bismo mogli pronaći račun bez čitanja adrese); lozinka (pohranjena kao sažetak, nikada u čitljivom obliku); vaša tajna za dvofaktorsku autentifikaciju (šifrirana); deset kodova za oporavak (pohranjeni kao sažeci); vaš pseudonim — Vi i usluga, pri registraciji",
-        "Provjera države IP adrese pri registraciji i novoj raspravi — Pri registraciji državu IP adrese i Tor provjeravamo lokalno pomoću DB-IP Lite i popisa izlaznih Tor adresa. Prije svake nove rasprave lokalno ponovno provjeravamo državu IP adrese i odbijamo raspravu ako je ta država na popisu država koje su uvijek blokirane. Odbijamo registracije iz država u kojima ne pružamo uslugu, s izlaznih adresa Tora i s IP adresa čiju državu ne možemo utvrditi; IP adresu ne šaljemo trećima. Odbijanja se bilježe skupno prema putanji, kodu, državi i vremenskom razdoblju; IP adresa i korisnički agent bilježe se samo kao jednosmjerni sažeci s ključem. Vrsta dokaza bilježi se kao „IP adresa”. — Vaša veza",
+        "Provjera države IP adrese pri registraciji i novoj raspravi — Pri registraciji državu IP adrese i Tor provjeravamo lokalno pomoću DB-IP Lite i popisa izlaznih Tor adresa. Prije svake nove rasprave lokalno ponovno provjeravamo državu IP adrese i odbijamo raspravu ako je ta država na popisu država koje su uvijek blokirane. Odbijamo registracije iz država u kojima ne pružamo uslugu, s izlaznih adresa Tora i s IP adresa čiju državu ne možemo utvrditi; IP adresu ne šaljemo trećima. Odbijanja se bilježe skupno prema putanji, kodu, državi i vremenskom razdoblju; IP adresa i korisnički agent bilježe se samo kao jednosmjerni sažeci s ključem. Vrsta dokaza bilježi se kao „IP adresa”. Pri registraciji država IP adrese, zajedno s regijom koju odaberete, odlučuje i o tome prikazujemo li zasebno polje za odobrenje za Italiju; ako dajete to odobrenje, u njegovu se zapisu bilježi je li ga pokrenuo odabir regije, država IP adrese ili oboje. — Vaša veza",
         "Provjera dobi — Unosite datum rođenja, ali ga ne pohranjujemo. Pri uspješnoj registraciji bilježimo da je provjera prošla; za postojeće račune ishod može biti prošao ili odbijen. Zapis sadrži najnižu dopuštenu dob, državu IP adrese ako je dostupna, verziju pravila, kontekst i vrijeme provjere — Vi i sustav za registraciju",
         "Prijavljena regija prebivališta — Država prebivališta koju odaberete pri registraciji i savezna država ako živite u SAD-u — Vi",
         "Sesije i sigurnost — Sažeti token sesije; sažetak s ključem niza korisničkog agenta vašeg preglednika koji služi za uočavanje premještanja sesije u drugi preglednik; vremenske oznake stvaranja, posljednje uporabe i isteka. Ne pohranjujemo vašu IP adresu, naziv uređaja ni pojedinosti o pregledniku uz sesiju, a popis sesija koji vidite u Postavkama prikazuje samo vremenske oznake — Vaš preglednik",
@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Kada izmijenimo ova pravila, objavljujemo novu verziju sa sažetkom izmjena i novim datumom stupanja na snagu te čuvamo prethodne verzije na dezbatere.ro/privacy/versions. Za izmjenu kojom se dodaje nova svrha ili novi primatelj obavještavamo vas prije početka nove obrade, e-poštom i u proizvodu, te vam dajemo vrijeme za prigovor. Ako nova svrha ovisi o vašoj privoli — primjerice ako ikada poželimo upotrebljavati sadržaj za poboljšavanje modela — tu privolu tražimo zasebno i određeno; prihvaćanje ažuriranih Uvjeta nikada ne smatramo privolom za novu obradu. Za pojašnjenja koja ništa ne mijenjaju u vezi s našim postupanjem jednostavno objavljujemo novu verziju." },
-      { kind: "p", text: "Ova su pravila posljednji put ažurirana 12. listopada 2026. Verzija 3.5 zamijenila je verziju 3.4: u odjeljku 2. sada stoji koje podatke za naplatu i koje podatke o kartici čuvamo te da vaš puni broj kartice nikada ne dolazi do nas, a u odjeljku 7. stoji koliko dugo čuvamo spremljenu karticu i poruke pružatelja platnih usluga o plaćanjima." }
+      { kind: "p", text: "Ova su pravila posljednji put ažurirana 24. listopada 2026. Verzija 3.6 zamijenila je verziju 3.5: u odjeljku 2. sada stoji da pri registraciji država IP adrese, zajedno s regijom koju odaberete, odlučuje i o tome prikazujemo li zasebno polje za odobrenje za Italiju." }
     ]
   },
   {
@@ -332,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.5",
-  sha256: "613ce9388f037c955244aa78c6aeaa80a7ef18651848823d7c469af1f978b049",
-  eyebrow: "PRAVILA O PRIVATNOSTI · v3.5 · NA SNAZI OD 12. LISTOPADA 2026.",
+  version: "3.6",
+  sha256: "e174a8f000a34dc51d7c7baec99d4d2aca1763c2f9a14e9f263f6682827e1587",
+  eyebrow: "PRAVILA O PRIVATNOSTI · v3.6 · NA SNAZI OD 24. LISTOPADA 2026.",
   title: "Što pohranjujemo i zašto",
   lede: "Vaša prava i naše obveze prema Uredbi GDPR (EU) 2016/679, jednostavnim jezikom. Četrnaest odjeljaka i Prilog B — pomaknite se do kraja.",
-  endMarker: "KRAJ PRAVILA · GDPR (EU) 2016/679 · v3.5",
+  endMarker: "KRAJ PRAVILA · GDPR (EU) 2016/679 · v3.6",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Tekst Pravila o privatnosti",
   sectionIdPrefix: "policy-section-",

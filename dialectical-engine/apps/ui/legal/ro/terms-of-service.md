@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Pe scurt
-eyebrow: TERMENII SERVICIULUI · v2.4 · ÎN VIGOARE DE LA 12 OCTOMBRIE 2026
+eyebrow: TERMENII SERVICIULUI · v2.5 · ÎN VIGOARE DE LA 24 OCTOMBRIE 2026
 title: Ce acceptați
 lede: Contractul dintre dumneavoastră și DMS Merchandise Shop S.R.L., într-un limbaj clar. Nouăsprezece secțiuni și Anexa A — derulați până la final.
-endMarker: SFÂRȘITUL TERMENILOR · v2.4
+endMarker: SFÂRȘITUL TERMENILOR · v2.5
 bodyLabel: Textul Termenilor serviciului
 annexTitle: Anexa A — Termeni regionali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEGEA APLICABILĂ
 -->
 
-**Version 2.4 · Effective 12 octombrie 2026 · Versiunile anterioare la dezbatere.ro/terms/versions · Limba: română.**
+**Version 2.5 · Effective 24 octombrie 2026 · Versiunile anterioare la dezbatere.ro/terms/versions · Limba: română.**
 
 **In short.** Trebuie să aveți cel puțin 18 ani. Dialectical Engine construiește argumente cu modele de inteligență artificială, iar tot ceea ce generează poate fi greșit — nu constituie consultanță. Dezbaterile dumneavoastră sunt private dacă nu le publicați; dacă le publicați, oricine le poate citi. Textul pe care îl transmiteți este trimis furnizorilor de IA enumerați în Registrul furnizorilor de IA și nu este folosit pentru antrenarea modelelor. Raportați conținutul ilegal la support@dezbatere.ro, indiferent dacă aveți sau nu un cont. Se aplică legea română, însă protecția locală a consumatorilor de care beneficiați se menține.
 
@@ -277,7 +277,7 @@ Fiecare intrare se aplică persoanelor care locuiesc în regiunea respectivă ș
 
 ### A.1 Uniunea Europeană și Spațiul Economic European
 
-Corpul acestor Termeni este redactat pentru dumneavoastră. În plus: puteți introduce acțiuni în fața instanțelor din țara în care locuiți; se aplică dreptul de retragere din secțiunea 13; soluționarea alternativă a litigiilor este disponibilă prin www.onoratainstanta.ro. **Germania:** butonul de anulare de la dezbatere.ro/cancel vă permite să încetați un abonament fără autentificare; durata abonamentelor, perioadele de reînnoire și termenele de notificare respectă §309(9) BGB: fiecare plan se derulează pe o durată de o lună și se reînnoiește lunar până la anulare, și îl puteți anula oricând, cu efect de la sfârșitul lunii în curs. **Franța:** puteți înceta online un abonament în trei pași la dezbatere.ro/cancel. **Italia:** clauzele privind răspunderea (15), suspendarea (11), modificările (14) și legea aplicabilă (18) necesită aprobarea dumneavoastră specifică, pe care o acordați prin confirmarea separată la înregistrare. **Țările de Jos:** acești Termeni vă sunt furnizați într-o formă care poate fi stocată înainte de încheiere. **Polonia:** o versiune în limba polonă este disponibilă; alegeți Polski în selectorul de limbă.
+Corpul acestor Termeni este redactat pentru dumneavoastră. În plus: puteți introduce acțiuni în fața instanțelor din țara în care locuiți; se aplică dreptul de retragere din secțiunea 13; soluționarea alternativă a litigiilor este disponibilă prin www.onoratainstanta.ro. **Germania:** butonul de anulare de la dezbatere.ro/cancel vă permite să încetați un abonament fără autentificare; durata abonamentelor, perioadele de reînnoire și termenele de notificare respectă §309(9) BGB: fiecare plan se derulează pe o durată de o lună și se reînnoiește lunar până la anulare, și îl puteți anula oricând, cu efect de la sfârșitul lunii în curs. **Franța:** puteți înceta online un abonament în trei pași la dezbatere.ro/cancel. **Italia:** clauzele privind suspendarea și încetarea (11), planurile cu plată și reînnoirea lor (12), modificările (14), răspunderea (15) și legea aplicabilă și instanțele competente pentru soluționarea litigiilor (18) necesită aprobarea dumneavoastră specifică, în temeiul articolelor 1341 și 1342 din Codul civil italian. O acordați printr-o căsuță separată la înregistrare, afișată oricui alege Italia în câmpul „Regiune” sau a cărui conexiune provine din Italia. **Țările de Jos:** acești Termeni vă sunt furnizați într-o formă care poate fi stocată înainte de încheiere. **Polonia:** o versiune în limba polonă este disponibilă; alegeți Polski în selectorul de limbă.
 
 ### A.2 Statele Unite
 

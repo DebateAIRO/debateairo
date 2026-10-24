@@ -47,7 +47,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Akun — Alamat email dan alamat email pemulihan (disimpan secara terenkripsi, dengan indeks berkunci agar kami dapat menemukan akun tanpa membaca alamat); kata sandi (disimpan sebagai hash, tidak pernah dalam teks biasa); rahasia autentikasi dua faktor Anda (terenkripsi); sepuluh kode pemulihan (disimpan sebagai hash); nama samaran Anda — Anda dan layanan, saat pendaftaran",
-        "Pemeriksaan negara IP saat pendaftaran dan debat baru — Saat pendaftaran, kami memeriksa negara alamat IP dan daftar keluar Tor secara lokal memakai DB-IP Lite dan daftar Tor. Sebelum setiap debat baru, kami kembali memeriksa negara IP secara lokal dan menolak debat jika negara itu termasuk daftar negara yang selalu diblokir. Pendaftaran dari negara yang tidak dilayani, dari Tor, atau dari alamat IP yang negaranya tidak dapat kami tentukan ditolak; alamat IP tidak dikirim ke pihak ketiga. Penolakan dicatat secara agregat menurut rute, kode, negara, dan jangka waktu; Alamat IP dan agen pengguna hanya disimpan sebagai intisari satu arah dengan kunci. Jenis bukti dicatat sebagai “alamat IP”. — Koneksi Anda",
+        "Pemeriksaan negara IP saat pendaftaran dan debat baru — Saat pendaftaran, kami memeriksa negara alamat IP dan daftar keluar Tor secara lokal memakai DB-IP Lite dan daftar Tor. Sebelum setiap debat baru, kami kembali memeriksa negara IP secara lokal dan menolak debat jika negara itu termasuk daftar negara yang selalu diblokir. Pendaftaran dari negara yang tidak dilayani, dari Tor, atau dari alamat IP yang negaranya tidak dapat kami tentukan ditolak; alamat IP tidak dikirim ke pihak ketiga. Penolakan dicatat secara agregat menurut rute, kode, negara, dan jangka waktu; Alamat IP dan agen pengguna hanya disimpan sebagai intisari satu arah dengan kunci. Jenis bukti dicatat sebagai “alamat IP”. Saat pendaftaran, negara IP, bersama Wilayah yang Anda pilih, juga menentukan apakah kami menampilkan kotak persetujuan terpisah untuk Italia; jika Anda memberikan persetujuan itu, catatannya menyimpan apakah pilihan Wilayah, negara IP, atau keduanya yang memicunya. — Koneksi Anda",
         "Pemeriksaan usia — Anda memasukkan tanggal lahir, tetapi kami tidak menyimpannya. Pada pendaftaran yang berhasil, kami mencatat hasil lulus; pemeriksaan akun yang sudah ada dapat mencatat lulus atau ditolak. Catatan mencakup usia minimum, negara alamat IP jika tersedia, versi aturan, konteks, dan waktu pemeriksaan — Anda dan sistem pendaftaran",
         "Wilayah tempat tinggal yang dinyatakan — Negara tempat tinggal yang Anda pilih saat mendaftar, serta negara bagian jika berada di AS — Anda",
         "Sesi dan keamanan — Token sesi yang di-hash; hash berkunci atas string agen pengguna peramban Anda, yang digunakan untuk mengetahui ketika suatu sesi berpindah ke peramban lain; stempel waktu pembuatan, penggunaan terakhir, dan kedaluwarsa. Kami tidak menyimpan alamat IP, nama perangkat, atau detail peramban Anda bersama sesi, dan daftar sesi yang Anda lihat di Pengaturan hanya menampilkan stempel waktu — Peramban Anda",
@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Ketika mengubah kebijakan ini, kami menerbitkan versi baru beserta ringkasan perubahan dan tanggal berlaku baru, serta menyimpan versi sebelumnya di dezbatere.ro/privacy/versions. Untuk perubahan yang menambahkan tujuan atau penerima baru, kami memberi tahu Anda sebelum pemrosesan baru dimulai, melalui email dan di dalam produk, serta memberi waktu untuk mengajukan keberatan. Jika tujuan baru bergantung pada persetujuan Anda — misalnya jika kami suatu saat ingin menggunakan konten untuk meningkatkan model — kami meminta persetujuan tersebut secara terpisah dan spesifik; kami tidak pernah menganggap penerimaan Ketentuan yang diperbarui sebagai persetujuan atas pemrosesan baru. Untuk klarifikasi yang tidak mengubah apa pun tentang tindakan kami, kami hanya menerbitkan versi baru." },
-      { kind: "p", text: "Kebijakan ini terakhir diperbarui pada 12 Oktober 2026. Versi 3.5 menggantikan versi 3.4: bagian 2 kini menyatakan detail penagihan dan detail kartu mana yang kami simpan dan bahwa nomor kartu lengkap Anda tidak pernah sampai kepada kami, dan bagian 7 menyatakan berapa lama kami menyimpan kartu tersimpan dan pesan penyedia pembayaran tentang pembayaran." }
+      { kind: "p", text: "Kebijakan ini terakhir diperbarui pada 24 Oktober 2026. Versi 3.6 menggantikan versi 3.5: bagian 2 kini menyatakan bahwa saat pendaftaran, negara IP, bersama Wilayah yang Anda pilih, juga menentukan apakah kami menampilkan kotak persetujuan terpisah untuk Italia." }
     ]
   },
   {
@@ -332,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.5",
-  sha256: "7a3d6de330e4782cb631fe448161e472123ee6bca0c1bf0220b4248140c47301",
-  eyebrow: "KEBIJAKAN PRIVASI · v3.5 · BERLAKU 12 OKTOBER 2026",
+  version: "3.6",
+  sha256: "3b83fbe499bd927c3401df61d950a531266ba7d3be403f8579442f47be960bb9",
+  eyebrow: "KEBIJAKAN PRIVASI · v3.6 · BERLAKU 24 OKTOBER 2026",
   title: "Apa yang kami simpan, dan alasannya",
   lede: "Hak Anda dan kewajiban kami berdasarkan GDPR (EU) 2016/679, dalam bahasa yang mudah dipahami. Empat belas bagian dan Lampiran B — gulir hingga akhir.",
-  endMarker: "AKHIR KEBIJAKAN · GDPR (EU) 2016/679 · v3.5",
+  endMarker: "AKHIR KEBIJAKAN · GDPR (EU) 2016/679 · v3.6",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Teks Kebijakan Privasi",
   sectionIdPrefix: "policy-section-",

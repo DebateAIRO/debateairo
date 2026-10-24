@@ -47,7 +47,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Tili — Sähköpostiosoite ja palautussähköpostiosoite (säilytetään salattuina ja avaimellisella indeksillä, jotta löydämme tilin lukematta osoitetta); salasana (säilytetään tiivisteenä, ei koskaan selväkielisenä); kaksivaiheisen tunnistautumisen salaisuus (salattu); kymmenen palautuskoodia (säilytetään tiivisteinä); nimimerkkisi; ikäsi tarkistuksen tulos — Sinulta rekisteröitymisen yhteydessä",
-        "IP-osoitteen maan tarkistus — Rekisteröityessä selvitämme IP-osoitteen maan paikallisesti DB-IP Lite -aineistolla ja tarkistamme Tor-poistumisosoitteiden luettelon. Jokaisen uuden väittelyn alkaessa selvitämme IP-osoitteen maan uudelleen paikallisesti ja voimme estää väittelyn, jos maa on pysyvästi estetty. Hylkäyksissä koostamme auditointimerkinnät reitin, koodin, maan ja aikajakson mukaan; IP-osoite säilyy siellä vain avaimellisena yksisuuntaisena tiivisteenä. Epäämismerkintä sisältää koodin, maan ja tiedon siitä, että IP-osoite oli perusteena; IP-osoite ja selaimen user-agent-merkkijono säilytetään vain avaimella muodostettuina yksisuuntaisina tiivisteinä. — Selaimesi rekisteröityessä ja uuden väittelyn alkaessa",
+        "IP-osoitteen maan tarkistus — Rekisteröityessä selvitämme IP-osoitteen maan paikallisesti DB-IP Lite -aineistolla ja tarkistamme Tor-poistumisosoitteiden luettelon. Jokaisen uuden väittelyn alkaessa selvitämme IP-osoitteen maan uudelleen paikallisesti ja voimme estää väittelyn, jos maa on pysyvästi estetty. Hylkäyksissä koostamme auditointimerkinnät reitin, koodin, maan ja aikajakson mukaan; IP-osoite säilyy siellä vain avaimellisena yksisuuntaisena tiivisteenä. Epäämismerkintä sisältää koodin, maan ja tiedon siitä, että IP-osoite oli perusteena; IP-osoite ja selaimen user-agent-merkkijono säilytetään vain avaimella muodostettuina yksisuuntaisina tiivisteinä. Rekisteröitymisen yhteydessä IP-osoitteen maa yhdessä valitsemasi alueen kanssa ratkaisee myös sen, näytämmekö erillisen hyväksyntäruudun Italiaa varten; jos annat tämän hyväksynnän, sen kirjaus säilyttää tiedon siitä, laukaisiko ruudun näyttämisen alueen valinta, IP-osoitteen maan vai molemmat. — Selaimesi rekisteröityessä ja uuden väittelyn alkaessa",
         "Iän tarkistus — Annat syntymäaikasi vain tarkistusta varten; emme tallenna sitä. Tallennamme tuloksen, vähimmäisiän, IP-osoitteen maan, jos se on saatavilla, säännön version, asiayhteyden ja tarkistusajan. Onnistuneissa rekisteröinneissä tallennetaan vain ”hyväksytty”; nykyisten tilien tulos voi olla ”hyväksytty” tai ”hylätty” — Sinä ja selaimesi",
         "Ilmoitettu asuinpaikka — Maa, jossa ilmoitat asuvasi, ja osavaltio, jos asut Yhdysvalloissa — Sinä rekisteröityessäsi",
         "Istunnot ja turvallisuus — Istuntotunnisteen tiiviste; selaimesi user-agent-merkkijonon avaimellinen tiiviste, jonka avulla havaitsemme istunnon siirtymisen toiseen selaimeen; luonti-, viimeisin käyttö- ja vanhenemisajankohdat. Emme tallenna istunnon yhteyteen IP-osoitettasi, laitteen nimeä tai selaimen tietoja, ja Asetuksissa näkyvä istuntoluettelo näyttää vain ajankohdat — Selaimeltasi",
@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Kun muutamme tätä käytäntöä, julkaisemme uuden version, yhteenvedon muutoksista ja uuden voimaantulopäivän sekä säilytämme aiemmat versiot osoitteessa dezbatere.ro/privacy/versions. Jos muutos lisää uuden tarkoituksen tai uuden vastaanottajan, ilmoitamme sinulle sähköpostitse ja tuotteessa ennen uuden käsittelyn aloittamista ja annamme aikaa vastustaa sitä. Jos uusi tarkoitus perustuu suostumukseesi — esimerkiksi jos joskus haluaisimme käyttää sisältöä mallien parantamiseen — pyydämme suostumuksen erikseen ja yksilöidysti; emme koskaan pidä päivitettyjen Ehtojen hyväksymistä suostumuksena uuteen käsittelyyn. Jos selvennykset eivät muuta toimintaamme, julkaisemme vain uuden version." },
-      { kind: "p", text: "Tämä käytäntö päivitettiin viimeksi 12. lokakuuta 2026. Versio 3.5 korvasi version 3.4: osiossa 2 kerrotaan nyt, mitä laskutus- ja korttitietoja säilytämme ja että korttisi koko numero ei koskaan päädy meille, ja osiossa 7 kerrotaan, kuinka kauan säilytämme tallennetun kortin ja maksupalveluntarjoajan maksuja koskevat viestit." }
+      { kind: "p", text: "Tämä käytäntö päivitettiin viimeksi 24. lokakuuta 2026. Versio 3.6 korvasi version 3.5: osiossa 2 kerrotaan nyt, että rekisteröitymisen yhteydessä IP-osoitteen maa yhdessä valitsemasi alueen kanssa ratkaisee myös sen, näytämmekö erillisen hyväksyntäruudun Italiaa varten." }
     ]
   },
   {
@@ -332,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.5",
-  sha256: "f47d382a18d3b09844f9e2272a01c6dce17bc6396b81c252c65ea06172a68f0c",
-  eyebrow: "TIETOSUOJAKÄYTÄNTÖ · v3.5 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN",
+  version: "3.6",
+  sha256: "7cfa4c42c871704a6662dea7c338dbf15d10f3c3d2ede4a4bb53485ccb3f28e1",
+  eyebrow: "TIETOSUOJAKÄYTÄNTÖ · v3.6 · VOIMASSA 24. LOKAKUUTA 2026 ALKAEN",
   title: "Mitä säilytämme ja miksi",
   lede: "Oikeutesi ja velvollisuutemme GDPR (EU) 2016/679 -asetuksen nojalla selkeällä kielellä. Neljätoista osiota ja liite B — vieritä loppuun asti.",
-  endMarker: "TIETOSUOJAKÄYTÄNNÖN LOPPU · GDPR (EU) 2016/679 · v3.5",
+  endMarker: "TIETOSUOJAKÄYTÄNNÖN LOPPU · GDPR (EU) 2016/679 · v3.6",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Tietosuojakäytännön teksti",
   sectionIdPrefix: "policy-section-",

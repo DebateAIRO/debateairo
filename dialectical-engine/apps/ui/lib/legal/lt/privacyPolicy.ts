@@ -47,7 +47,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Paskyra — El. pašto adresas ir atkūrimo el. pašto adresas (saugomi užšifruoti, su raktiniu indeksu, kad galėtume rasti paskyrą neskaitydami adreso); slaptažodis (saugomas kaip maiša, niekada atviruoju tekstu); jūsų dviejų veiksnių autentifikavimo paslaptis (užšifruota); dešimt atkūrimo kodų (saugomi kaip maišos); jūsų slapyvardis — Jūs ir paslauga, registracijos metu",
-        "IP adreso šalies patikra registruojantis ir pradedant naujus debatus — Registruojantis IP adreso šalį ir Tor išėjimo mazgus vietoje tikriname naudodami DB-IP Lite ir Tor sąrašą. Prieš kiekvienus naujus debatus IP adreso šalį vėl patikriname vietoje ir debatus atmetame, jei šalis yra visada blokuojamų šalių sąraše. Registraciją iš neaptarnaujamų šalių, Tor ar IP adresų, kurių šalies negalime nustatyti atmetame; IP adreso trečiosioms šalims nesiunčiame. Atmetimai apibendrinami pagal maršrutą, kodą, šalį ir laiko intervalą; IP adresas ir naudotojo agentas saugomi tik kaip vienkryptės santraukos, sudarytos naudojant raktą. Įrodymo rūšis nurodoma kaip „IP adresas“. — Jūsų ryšys",
+        "IP adreso šalies patikra registruojantis ir pradedant naujus debatus — Registruojantis IP adreso šalį ir Tor išėjimo mazgus vietoje tikriname naudodami DB-IP Lite ir Tor sąrašą. Prieš kiekvienus naujus debatus IP adreso šalį vėl patikriname vietoje ir debatus atmetame, jei šalis yra visada blokuojamų šalių sąraše. Registraciją iš neaptarnaujamų šalių, Tor ar IP adresų, kurių šalies negalime nustatyti atmetame; IP adreso trečiosioms šalims nesiunčiame. Atmetimai apibendrinami pagal maršrutą, kodą, šalį ir laiko intervalą; IP adresas ir naudotojo agentas saugomi tik kaip vienkryptės santraukos, sudarytos naudojant raktą. Įrodymo rūšis nurodoma kaip „IP adresas“. Registruojantis IP adreso šalis kartu su jūsų pasirinktu regionu taip pat lemia, ar rodome atskirą pritarimo langelį dėl Italijos; jei tokį pritarimą duodate, jo įraše saugoma, ar langelis buvo parodytas dėl regiono pasirinkimo, IP adreso šalies, ar abiejų kartu. — Jūsų ryšys",
         "Amžiaus patikra — Įvedate gimimo datą, tačiau jos nesaugome. Sėkmingai užsiregistravus išsaugomas teigiamas rezultatas; esamos paskyros patikra gali būti teigiama arba neigiama. Įraše nurodomas minimalus amžius, IP adreso šalis, jei žinoma, taisyklės versija, patikros aplinkybės ir laikas — Jūs ir registracijos sistema",
         "Deklaruota gyvenamoji vieta — Registruojantis pasirinkta gyvenamoji šalis ir, jei gyvenate JAV, valstija — Jūs",
         "Seansai ir saugumas — Seanso prieigos rakto maiša; jūsų naršyklės naudotojo agento eilutės raktinė maiša, naudojama pastebėti, kai seansas perkeliamas į kitą naršyklę; sukūrimo, paskutinio naudojimo ir galiojimo pabaigos laiko žymos. Su seansu nesaugome jūsų IP adreso, įrenginio pavadinimo ar naršyklės duomenų, o Nustatymuose matomame seansų sąraše rodomos tik laiko žymos — Jūsų naršyklė",
@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Pakeitę šią politiką paskelbiame naują versiją kartu su pakeitimų santrauka ir nauja įsigaliojimo data, o ankstesnes versijas saugome adresu dezbatere.ro/privacy/versions. Jei pakeitimu pridedamas naujas tikslas ar naujas gavėjas, prieš pradėdami naują tvarkymą informuojame jus el. paštu ir produkte bei suteikiame laiko nesutikti. Jei naujas tikslas priklauso nuo jūsų sutikimo — pavyzdžiui, jei kada nors norėtume naudoti turinį modeliams tobulinti — tokio sutikimo prašome atskirai ir konkrečiai; atnaujintų Sąlygų priėmimo niekada nelaikome sutikimu su nauju duomenų tvarkymu. Jei paaiškinimai nieko nekeičia mūsų veikloje, tiesiog paskelbiame naują versiją." },
-      { kind: "p", text: "Ši politika paskutinį kartą atnaujinta 2026 m. spalio 12 d. 3.5 versija pakeitė 3.4 versiją: 2 skyriuje dabar nurodyta, kokius atsiskaitymo ir kortelės duomenis saugome ir kad visas jūsų kortelės numeris niekada mūsų nepasiekia, o 7 skyriuje nurodyta, kiek laiko saugome išsaugotą kortelę ir mokėjimo paslaugų teikėjo pranešimus apie mokėjimus." }
+      { kind: "p", text: "Ši politika paskutinį kartą atnaujinta 2026 m. spalio 24 d. 3.6 versija pakeitė 3.5 versiją: 2 skyriuje dabar nurodyta, kad registruojantis IP adreso šalis kartu su jūsų pasirinktu regionu taip pat lemia, ar rodome atskirą pritarimo langelį dėl Italijos." }
     ]
   },
   {
@@ -332,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.5",
-  sha256: "58bb5cc200307518a58ac1d1831f929625554178def835930efe0ddded7b9779",
-  eyebrow: "PRIVATUMO POLITIKA · v3.5 · ĮSIGALIOJA 2026 M. SPALIO 12 D.",
+  version: "3.6",
+  sha256: "bb52718b3ed7c836ad9b5506dc028dabaf6b71ad6053a8f57b8870d31912d0f2",
+  eyebrow: "PRIVATUMO POLITIKA · v3.6 · ĮSIGALIOJA 2026 M. SPALIO 24 D.",
   title: "Ką saugome ir kodėl",
   lede: "Jūsų teisės ir mūsų pareigos pagal GDPR (EU) 2016/679, paaiškintos paprastai. Keturiolika skyrių ir B priedas — slinkite iki pabaigos.",
-  endMarker: "POLITIKOS PABAIGA · GDPR (EU) 2016/679 · v3.5",
+  endMarker: "POLITIKOS PABAIGA · GDPR (EU) 2016/679 · v3.6",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privatumo politikos tekstas",
   sectionIdPrefix: "policy-section-",

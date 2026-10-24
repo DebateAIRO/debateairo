@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Go hachomair
-eyebrow: BEARTAS PRÍOBHÁIDEACHAIS · v3.5 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026
+eyebrow: BEARTAS PRÍOBHÁIDEACHAIS · v3.6 · I bhFEIDHM 24 DEIREADH FÓMHAIR 2026
 title: An méid a stórálaimid, agus an fáth
 lede: Do chearta agus ár n-oibleagáidí faoin GDPR (EU) 2016/679, i bhfriotal soiléir. Ceithre rannán déag agus Iarscríbhinn B — scrollaigh go dtí an deireadh.
-endMarker: DEIREADH AN BHEARTAIS · GDPR (EU) 2016/679 · v3.5
+endMarker: DEIREADH AN BHEARTAIS · GDPR (EU) 2016/679 · v3.6
 bodyLabel: Téacs an Bheartais Príobháideachais
 annexTitle: Iarscríbhinn B — Téarmaí príobháideachais réigiúnacha
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 FIANÁIN
 -->
 
-**Version 3.5 · Effective 12 Deireadh Fómhair 2026 · Leaganacha roimhe seo ag dezbatere.ro/privacy/versions · Rialaitheoir: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 24 Deireadh Fómhair 2026 · Leaganacha roimhe seo ag dezbatere.ro/privacy/versions · Rialaitheoir: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Bailímid an méid atá de dhíth ar chuntas agus an méid a roghnaíonn tú a chlóscríobh. Seoltar do cheisteanna chuig soláthraithe IS atá liostaithe inár gClár; ní úsáidtear iad chun samhlacha a oiliúint. Stórálann ár soláthraí óstála do chuntas agus do dhíospóireachtaí i Londain, sa Ríocht Aontaithe; insíonn rannán 5 cá háit eile a dtéann do shonraí. Bíonn díospóireachtaí príobháideach mura bhfoilsíonn tú iad. Scriosann scriosadh do chuntais na heochracha do do shonraí príobháideacha; nuair a sceidealaíonn tú é, roghnaíonn tú an mbainfear anuas do dhíospóireachtaí foilsithe freisin nó an bhfanfaidh siad poiblí faoi d'ainm cleite scortha. Is féidir teagmháil a dhéanamh linn ag privacy@dezbatere.ro, agus is féidir le daoine a ainmnítear i ndíospóireacht a iarraidh go mbainfí í gan cuntas a bheith acu.
 
@@ -34,7 +34,7 @@ Ní bhailímid ach an méid atá de dhíth chun go bhfeidhmeoidh cuntas, an méi
 | Catagóir | Cad é go díreach | Foinse |
 | --- | --- | --- |
 | **Cuntas** | Seoladh ríomhphoist agus seoladh ríomhphoist athshlánaithe (stóráilte agus criptithe, le hinnéacs eochraithe ionas gur féidir linn an cuntas a aimsiú gan an seoladh a léamh); pasfhocal (stóráilte mar hais, agus ní i ngnáth-théacs riamh); do rún fíordheimhnithe dhá fhachtóir (criptithe); deich gcód athshlánaithe (stóráilte mar hais); d'ainm cleite; toradh do sheiceála aoise | Tusa, tráth clárúcháin |
-| **Seiceáil thír an tseolta IP** | Tráth clárúcháin aimsímid tír an tseolta IP go háitiúil le DB-IP Lite agus seiceálaimid liosta de sheoltaí imeachta Tor. Ag tús gach díospóireachta nua aimsímid tír an tseolta IP arís go háitiúil agus féadfaimid an díospóireacht a dhiúltú má tá an tír toirmiscthe go buan. Má dhiúltaítear d’iarratas, déanaimid na taifid iniúchóireachta a chomhiomlánú de réir bealaigh, cóid, tíre agus tréimhse ama; ní choinnítear an seoladh IP ann ach mar achoimre aontreo eochraithe. Tá an cód diúltaithe, an tír agus comhartha gur fianaise a bhí sa seoladh IP sa taifead diúltaithe; ní choinnítear an seoladh IP ná an teaghrán gníomhaire úsáideora ach mar hais aontreo eochraithe. | Do bhrabhsálaí tráth clárúcháin agus ag tús díospóireachta nua |
+| **Seiceáil thír an tseolta IP** | Tráth clárúcháin aimsímid tír an tseolta IP go háitiúil le DB-IP Lite agus seiceálaimid liosta de sheoltaí imeachta Tor. Ag tús gach díospóireachta nua aimsímid tír an tseolta IP arís go háitiúil agus féadfaimid an díospóireacht a dhiúltú má tá an tír toirmiscthe go buan. Má dhiúltaítear d’iarratas, déanaimid na taifid iniúchóireachta a chomhiomlánú de réir bealaigh, cóid, tíre agus tréimhse ama; ní choinnítear an seoladh IP ann ach mar achoimre aontreo eochraithe. Tá an cód diúltaithe, an tír agus comhartha gur fianaise a bhí sa seoladh IP sa taifead diúltaithe; ní choinnítear an seoladh IP ná an teaghrán gníomhaire úsáideora ach mar hais aontreo eochraithe. Tráth clárúcháin, cinneann tír an tseolta IP, in éineacht leis an réigiún a roghnaíonn tú, freisin an dtaispeánaimid an bosca ceadaithe ar leith don Iodáil; má thugann tú an ceadú sin, coinníonn a thaifead cibé ar bhain an roghnú réigiúin, tír an tseolta IP nó an dá cheann leis a spreagadh. | Do bhrabhsálaí tráth clárúcháin agus ag tús díospóireachta nua |
 | **Seiceáil aoise** | Cuireann tú do dháta breithe isteach don tseiceáil amháin; ní stórálaimid é. Coinnímid an toradh, an aois íosta, tír an tseolta IP má tá sí ar fáil, leagan na rialach, an comhthéacs agus am na seiceála. Ní stóráiltear ach toradh «pasáilte» i gcás clárú rathúil; d’fhéadfadh «pasáilte» nó «diúltaithe» a bheith ag cuntas atá ann cheana | Tusa agus do bhrabhsálaí |
 | **Áit chónaithe dhearbhaithe** | An tír ina ndeir tú go bhfuil cónaí ort agus an stát má tá cónaí ort sna Stáit Aontaithe | Tusa tráth clárúcháin |
 | **Seisiúin agus slándáil** | Comhartha seisiúin haisithe; hais eochraithe de theaghrán gníomhaire úsáideora do bhrabhsálaí, a úsáidtear chun a thabhairt faoi deara nuair a aistrítear seisiún go brabhsálaí eile; stampaí ama an chruthaithe, na húsáide deireanaí agus an éaga. **Ní** stórálaimid do sheoladh IP, ainm do ghléis ná sonraí do bhrabhsálaí le seisiún, agus ní thaispeántar ach stampaí ama sa liosta seisiún a fheiceann tú sna Socruithe | Do bhrabhsálaí |
@@ -215,7 +215,7 @@ Chun na míreanna seo a dhiúltú, cuir bac ar fhianáin agus ar shonraí suímh
 
 Nuair a athraímid an beartas seo, cuirimid an leagan nua ar fáil mar aon le hachoimre ar an méid a d'athraigh agus dáta nua teachta i bhfeidhm, agus coinnímid na leaganacha roimhe seo ag dezbatere.ro/privacy/versions. I gcás athraithe lena gcuirtear cuspóir nua nó faighteoir nua leis, insímid duit sula dtosaíonn an phróiseáil nua, trí ríomhphost agus sa táirge, agus tugaimid am duit agóid a dhéanamh. Sa chás ina mbraitheann cuspóir nua ar do thoiliú — mar shampla, dá mba mhian linn riamh ábhar a úsáid chun samhlacha a fheabhsú — iarraimid an toiliú sin ar leithligh agus go sonrach; ní chaithimid riamh le glacadh le Téarmaí nuashonraithe mar thoiliú le próiseáil nua. I gcás soiléirithe nach n-athraíonn aon ní faoin méid a dhéanaimid, ní dhéanaimid ach an leagan nua a fhoilsiú.
 
-Nuashonraíodh an beartas seo an uair dheireanach ar 12 Deireadh Fómhair 2026. Tháinig Leagan 3.5 in ionad leagan 3.4: deir rannán 2 anois cé na sonraí billeála agus cárta a choinnímid agus nach sroicheann uimhir iomlán do chárta sinn riamh, agus deir rannán 7 cá fhad a choinnímid cárta sábháilte agus teachtaireachtaí an tsoláthraí íocaíochta faoi íocaíochtaí.
+Nuashonraíodh an beartas seo an uair dheireanach ar 24 Deireadh Fómhair 2026. Tháinig Leagan 3.6 in ionad leagan 3.5: deir rannán 2 anois go gcinneann tír an tseolta IP tráth clárúcháin, in éineacht leis an réigiún a roghnaíonn tú, freisin an dtaispeánaimid an bosca ceadaithe ar leith don Iodáil.
 
 ## Annex B — Téarmaí príobháideachais réigiúnacha
 

@@ -47,7 +47,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Účet — E-mailová adresa a e-mailová adresa na obnovenie (uložené šifrovane, s kľúčovaným indexom, aby sme účet našli bez prečítania adresy); heslo (uložené ako haš, nikdy nie v otvorenom tvare); váš tajný údaj dvojfaktorového overovania (šifrovaný); desať obnovovacích kódov (uložených ako haše); váš pseudonym; výsledok overenia veku, nie dátum narodenia — Vy, pri registrácii",
-        "Kontrola krajiny podľa IP adresy — Pri registrácii zisťujeme krajinu IP adresy lokálne pomocou DB-IP Lite a osobitne kontrolujeme zoznam výstupných uzlov Tor. Pred každou novou debatou tiež lokálne kontrolujeme krajinu IP adresy a môžeme ju odmietnuť, ak je krajina na zozname trvalo blokovaných. Pri odmietnutí súhrnne zaznamenáme trasu, kód, krajinu, časové okno a skutočnosť, že dôkazom bola IP adresa; V auditnom zázname sa IP adresa aj reťazec user-agent uchovávajú iba ako jednosmerné súhrny vytvorené pomocou kľúča. — IP adresa použitá pri registrácii a začatí novej debaty",
+        "Kontrola krajiny podľa IP adresy — Pri registrácii zisťujeme krajinu IP adresy lokálne pomocou DB-IP Lite a osobitne kontrolujeme zoznam výstupných uzlov Tor. Pred každou novou debatou tiež lokálne kontrolujeme krajinu IP adresy a môžeme ju odmietnuť, ak je krajina na zozname trvalo blokovaných. Pri odmietnutí súhrnne zaznamenáme trasu, kód, krajinu, časové okno a skutočnosť, že dôkazom bola IP adresa; V auditnom zázname sa IP adresa aj reťazec user-agent uchovávajú iba ako jednosmerné súhrny vytvorené pomocou kľúča. Pri registrácii krajina IP adresy spolu s regiónom, ktorý zvolíte, rozhoduje aj o tom, či zobrazíme samostatné políčko so súhlasom pre Taliansko; ak tento súhlas udelíte, jeho záznam uchováva, či zobrazenie spustila voľba regiónu, krajina IP adresy, alebo obe. — IP adresa použitá pri registrácii a začatí novej debaty",
         "Overenie veku — Výsledok (pri registrácii iba úspešný; pri existujúcom účte úspešný alebo zamietnutý), použitý minimálny vek, krajina IP adresy, ak je známa, verzia pravidla, kontext a čas overenia. Dátum narodenia neuchovávame — Dátum narodenia zadaný na overenie; krajina z IP adresy",
         "Deklarovaný región — Krajina pobytu zvolená pri registrácii a pri pobyte v USA aj štát — Vy, pri registrácii",
         "Relácie a bezpečnosť — Hašovaný token relácie; kľúčovaný haš reťazca user-agent vášho prehliadača, používaný na zistenie presunu relácie do iného prehliadača; časové pečiatky vytvorenia, posledného použitia a skončenia platnosti. S vašou reláciou neuchovávame IP adresu, názov zariadenia ani údaje o prehliadači a zoznam relácií v Nastaveniach zobrazuje iba časové pečiatky — Váš prehliadač",
@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Keď tieto zásady zmeníme, zverejníme novú verziu so zhrnutím zmien a novým dátumom účinnosti a predchádzajúce verzie ponecháme na dezbatere.ro/privacy/versions. O zmene, ktorá pridáva nový účel alebo nového príjemcu, vás informujeme e-mailom aj v produkte pred začatím nového spracúvania a poskytneme vám čas na vznesenie námietky. Ak nový účel závisí od vášho súhlasu — napríklad ak by sme niekedy chceli obsah používať na zlepšovanie modelov — požiadame vás o tento súhlas samostatne a konkrétne; prijatie aktualizovaných podmienok nikdy nepovažujeme za súhlas s novým spracúvaním. Pri spresneniach, ktoré nemenia naše postupy, jednoducho zverejníme novú verziu." },
-      { kind: "p", text: "Tieto zásady boli naposledy aktualizované 12. októbra 2026. Verzia 3.5 nahradila verziu 3.4: časť 2 teraz uvádza, ktoré fakturačné údaje a údaje o karte uchovávame a že celé číslo vašej karty sa k nám nikdy nedostane, a časť 7 uvádza, ako dlho uchovávame uloženú kartu a správy poskytovateľa platobných služieb o platbách." }
+      { kind: "p", text: "Tieto zásady boli naposledy aktualizované 24. októbra 2026. Verzia 3.6 nahradila verziu 3.5: časť 2 teraz uvádza, že pri registrácii krajina IP adresy spolu s regiónom, ktorý zvolíte, rozhoduje aj o tom, či zobrazíme samostatné políčko so súhlasom pre Taliansko." }
     ]
   },
   {
@@ -332,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.5",
-  sha256: "0b0c56c97eef08dc0eb3b77131bd97d5d627af66580b2d698c83dfcc70c0c863",
-  eyebrow: "ZÁSADY OCHRANY OSOBNÝCH ÚDAJOV · v3.5 · ÚČINNÉ OD 12. OKTÓBRA 2026",
+  version: "3.6",
+  sha256: "ecfb549bc778ce0e6b34e1d9c69b7668caec587951d2a6665c9a09f8f354c44b",
+  eyebrow: "ZÁSADY OCHRANY OSOBNÝCH ÚDAJOV · v3.6 · ÚČINNÉ OD 24. OKTÓBRA 2026",
   title: "Čo uchovávame a prečo",
   lede: "Vaše práva a naše povinnosti podľa GDPR (EU) 2016/679 zrozumiteľne. Štrnásť častí a príloha B — prejdite až na koniec.",
-  endMarker: "KONIEC ZÁSAD · GDPR (EU) 2016/679 · v3.5",
+  endMarker: "KONIEC ZÁSAD · GDPR (EU) 2016/679 · v3.6",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Text zásad ochrany osobných údajov",
   sectionIdPrefix: "policy-section-",

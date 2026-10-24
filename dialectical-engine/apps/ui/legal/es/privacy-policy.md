@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: En resumen
-eyebrow: POLÍTICA DE PRIVACIDAD · v3.5 · EN VIGOR DESDE 12 DE OCTUBRE DE 2026
+eyebrow: POLÍTICA DE PRIVACIDAD · v3.6 · EN VIGOR DESDE 24 DE OCTUBRE DE 2026
 title: Qué almacenamos y por qué
 lede: Sus derechos y nuestras obligaciones conforme al RGPD – GDPR (EU) 2016/679, en lenguaje claro. Catorce secciones y el anexo B — desplácese hasta el final.
-endMarker: FIN DE LA POLÍTICA · RGPD – GDPR (EU) 2016/679 · v3.5
+endMarker: FIN DE LA POLÍTICA · RGPD – GDPR (EU) 2016/679 · v3.6
 bodyLabel: Texto de la Política de privacidad
 annexTitle: Anexo B — Condiciones regionales de privacidad
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 3.5 · Effective 12 de octubre de 2026 · Versiones anteriores en dezbatere.ro/privacy/versions · Responsable: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 24 de octubre de 2026 · Versiones anteriores en dezbatere.ro/privacy/versions · Responsable: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Recopilamos lo que una cuenta necesita y lo que usted decide escribir. Sus preguntas se envían a los proveedores de IA que figuran en nuestro Registro; no se utilizan para entrenar modelos. Nuestro proveedor de alojamiento almacena su cuenta y sus debates en Londres, en el Reino Unido; la sección 5 indica adónde más van sus datos. Los debates son privados salvo que usted los publique. La eliminación de su cuenta destruye las claves de sus datos privados; al programarla, usted elige si también se retiran sus debates publicados o si permanecen públicos bajo su seudónimo retirado. Puede escribirnos a privacy@dezbatere.ro, y las personas mencionadas en un debate pueden solicitar su retirada sin disponer de una cuenta.
 
@@ -34,7 +34,7 @@ Recopilamos únicamente lo que una cuenta necesita para funcionar, lo que usted 
 | Categoría | Datos exactos | Fuente |
 | --- | --- | --- |
 | **Cuenta** | Dirección de correo electrónico y dirección de recuperación (almacenadas cifradas, con un índice con clave que nos permite localizar la cuenta sin leer la dirección); contraseña (almacenada como hash, nunca en texto claro); su secreto de autenticación de dos factores (cifrado); diez códigos de recuperación (almacenados como hashes); su seudónimo; el resultado de la comprobación de su edad | Usted, al registrarse |
-| **Comprobación del país de la IP** | Al registrarse determinamos el país de la IP localmente con DB-IP Lite y comprobamos una lista de direcciones de salida de Tor. Al iniciar cada nuevo debate volvemos a determinar el país de la IP localmente y podemos rechazarlo si ese país está bloqueado permanentemente. En caso de rechazo, agregamos los registros de auditoría por ruta, código, país e intervalo de tiempo; la IP solo se conserva allí como resumen unidireccional con clave. El registro de rechazo incluye el código, el país y una indicación de que la dirección IP sirvió de fundamento; la dirección IP y la cadena de agente de usuario solo se conservan como resúmenes unidireccionales con clave. | Su navegador al registrarse y al iniciar un nuevo debate |
+| **Comprobación del país de la IP** | Al registrarse determinamos el país de la IP localmente con DB-IP Lite y comprobamos una lista de direcciones de salida de Tor. Al iniciar cada nuevo debate volvemos a determinar el país de la IP localmente y podemos rechazarlo si ese país está bloqueado permanentemente. En caso de rechazo, agregamos los registros de auditoría por ruta, código, país e intervalo de tiempo; la IP solo se conserva allí como resumen unidireccional con clave. El registro de rechazo incluye el código, el país y una indicación de que la dirección IP sirvió de fundamento; la dirección IP y la cadena de agente de usuario solo se conservan como resúmenes unidireccionales con clave. Al registrarse, el país de la IP, junto con la Región que elija, también decide si mostramos la casilla separada de aprobación para Italia; si usted presta esa aprobación, su registro conserva si la casilla se mostró por la elección de la Región, por el país de la IP o por ambos. | Su navegador al registrarse y al iniciar un nuevo debate |
 | **Comprobación de edad** | Introduce su fecha de nacimiento solo para comprobar la edad; no la conservamos. Guardamos el resultado, la edad mínima exigida, el país de la IP si está disponible, la versión de la regla, el contexto y la hora de la comprobación. Las inscripciones completadas solo guardan «aprobado»; en cuentas existentes puede guardarse «aprobado» o «rechazado» | Usted y su navegador |
 | **Lugar de residencia declarado** | El país en el que declara vivir y el estado si reside en Estados Unidos | Usted al registrarse |
 | **Sesiones y seguridad** | Un token de sesión sometido a hash; un hash con clave de la cadena de agente de usuario de su navegador, utilizado para detectar cuándo una sesión pasa a otro navegador; marcas temporales de creación, último uso y caducidad. **No** almacenamos su dirección IP, el nombre del dispositivo ni los datos del navegador junto con una sesión, y la lista de sesiones que ve en Configuración solo muestra marcas temporales | Su navegador |
@@ -215,7 +215,7 @@ Para rechazar estos elementos, bloquee o elimine las cookies y los datos de este
 
 Cuando modificamos esta política, publicamos la nueva versión con un resumen de los cambios y una nueva fecha de entrada en vigor, y conservamos las versiones anteriores en dezbatere.ro/privacy/versions. Si un cambio añade una nueva finalidad o un nuevo destinatario, se lo comunicamos por correo electrónico y en el producto antes de que comience el nuevo tratamiento, y le damos tiempo para oponerse. Cuando una nueva finalidad dependa de su consentimiento —por ejemplo, si alguna vez quisiéramos utilizar contenido para mejorar modelos—, solicitaremos dicho consentimiento de forma independiente y específica; nunca consideramos la aceptación de unos Términos actualizados como consentimiento para un nuevo tratamiento. Cuando se trate de aclaraciones que no cambien nada de lo que hacemos, simplemente publicaremos la nueva versión.
 
-Esta política se actualizó por última vez el 12 de octubre de 2026. La versión 3.5 sustituyó a la versión 3.4: la sección 2 indica ahora qué datos de facturación y de la tarjeta conservamos y que el número completo de su tarjeta nunca llega a nosotros, y la sección 7 indica durante cuánto tiempo conservamos una tarjeta guardada y los mensajes del proveedor de pagos sobre pagos.
+Esta política se actualizó por última vez el 24 de octubre de 2026. La versión 3.6 sustituyó a la versión 3.5: la sección 2 indica ahora que, al registrarse, el país de la IP, junto con la Región que elija, también decide si mostramos la casilla separada de aprobación para Italia.
 
 ## Annex B — Condiciones regionales de privacidad
 

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Īsumā
-eyebrow: PRIVĀTUMA POLITIKA · v3.5 · SPĒKĀ NO 2026. GADA 12. OKTOBRA
+eyebrow: PRIVĀTUMA POLITIKA · v3.6 · SPĒKĀ NO 2026. GADA 24. OKTOBRA
 title: Ko mēs glabājam un kāpēc
 lede: Jūsu tiesības un mūsu pienākumi saskaņā ar GDPR (EU) 2016/679, izklāstīti vienkāršā valodā. Četrpadsmit sadaļas un B pielikums — ritiniet līdz beigām.
-endMarker: POLITIKAS BEIGAS · GDPR (EU) 2016/679 · v3.5
+endMarker: POLITIKAS BEIGAS · GDPR (EU) 2016/679 · v3.6
 bodyLabel: Privātuma politikas teksts
 annexTitle: B pielikums — Reģionālie privātuma noteikumi
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 SĪKDATNES
 -->
 
-**Version 3.5 · Effective 2026. gada 12. oktobris · Iepriekšējās versijas: dezbatere.ro/privacy/versions · Pārzinis: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 2026. gada 24. oktobris · Iepriekšējās versijas: dezbatere.ro/privacy/versions · Pārzinis: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Mēs vācam konta darbībai nepieciešamo informāciju un to, ko izvēlaties ievadīt. Jūsu jautājumi tiek nosūtīti mūsu Reģistrā norādītajiem MI pakalpojumu sniedzējiem; tie netiek izmantoti modeļu apmācībai. Mūsu mitināšanas pakalpojumu sniedzējs glabā jūsu kontu un debates Londonā, Apvienotajā Karalistē; 5. sadaļā norādīts, uz kurieni jūsu dati tiek nosūtīti vēl. Debates ir privātas, ja vien jūs tās nepublicējat. Dzēšot kontu, tiek iznīcinātas jūsu privāto datu atslēgas; plānojot dzēšanu, jūs izvēlaties, vai arī publicētās debates tiks noņemtas vai paliks publiskas ar jūsu vairs neizmantoto pseidonīmu. Varat ar mums sazināties, rakstot uz privacy@dezbatere.ro, un debatēs minētās personas var pieprasīt satura noņemšanu arī bez konta.
 
@@ -34,7 +34,7 @@ Mēs vācam tikai to, kas nepieciešams konta darbībai, ko jūs izvēlaties mum
 | Kategorija | Precīzi kādi dati | Avots |
 | --- | --- | --- |
 | **Konts** | E-pasta adrese un atkopšanas e-pasta adrese (glabātas šifrētā veidā, izmantojot ar atslēgu aizsargātu indeksu, lai mēs varētu atrast kontu, nelasot adresi); parole (glabāta kā jaucējvērtība, nekad ne atklātā tekstā); jūsu divfaktoru autentifikācijas slepenā atslēga (šifrēta); desmit atkopšanas kodi (glabāti kā jaucējvērtības); jūsu pseidonīms | Jūs un pakalpojums, reģistrācijas laikā |
-| **IP adreses valsts pārbaude reģistrējoties un sākot jaunas debates** | Reģistrējoties IP adreses valsti un Tor izejas mezglus lokāli pārbaudām ar DB-IP Lite un Tor sarakstu. Pirms katrām jaunām debatēm IP adreses valsti lokāli pārbaudām vēlreiz un debates atsakām, ja valsts ir vienmēr bloķēto valstu sarakstā. Reģistrāciju no neapkalpotām valstīm, Tor vai IP adresēm, kuru valsti nevaram noteikt atsakām; IP adresi trešajām personām nesūtām. Atteikumus apkopo pēc maršruta, koda, valsts un laika intervāla; IP adresi un lietotāja aģentu glabā tikai kā ar atslēgu veidotus vienvirziena īssavilkumus. Pierādījuma veids ir norādīts kā “IP adrese”. | Jūsu savienojums |
+| **IP adreses valsts pārbaude reģistrējoties un sākot jaunas debates** | Reģistrējoties IP adreses valsti un Tor izejas mezglus lokāli pārbaudām ar DB-IP Lite un Tor sarakstu. Pirms katrām jaunām debatēm IP adreses valsti lokāli pārbaudām vēlreiz un debates atsakām, ja valsts ir vienmēr bloķēto valstu sarakstā. Reģistrāciju no neapkalpotām valstīm, Tor vai IP adresēm, kuru valsti nevaram noteikt atsakām; IP adresi trešajām personām nesūtām. Atteikumus apkopo pēc maršruta, koda, valsts un laika intervāla; IP adresi un lietotāja aģentu glabā tikai kā ar atslēgu veidotus vienvirziena īssavilkumus. Pierādījuma veids ir norādīts kā “IP adrese”. Reģistrējoties IP adreses valsts kopā ar jūsu izvēlēto reģionu arī nosaka, vai rādām atsevišķo apstiprinājuma rūtiņu attiecībā uz Itāliju; ja jūs šo apstiprinājumu sniedzat, tā ierakstā tiek glabāts, vai rūtiņas parādīšanos izraisīja reģiona izvēle, IP adreses valsts vai abi kopā. | Jūsu savienojums |
 | **Vecuma pārbaude** | Jūs ievadāt dzimšanas datumu, taču mēs to neglabājam. Veiksmīgas reģistrācijas gadījumā reģistrējam pozitīvu rezultātu; esoša konta pārbaudes rezultāts var būt pozitīvs vai negatīvs. Ierakstā ir minimālais vecums, IP adreses valsts, ja zināma, noteikuma versija, pārbaudes konteksts un laiks | Jūs un reģistrācijas sistēma |
 | **Deklarētā dzīvesvieta** | Reģistrējoties izvēlētā dzīvesvietas valsts un, ja tā ir ASV, štats | Jūs |
 | **Sesijas un drošība** | Sesijas pilnvara jaucējvērtības veidā; ar atslēgu aizsargāta jūsu pārlūkprogrammas user-agent virknes jaucējvērtība, ko izmanto, lai pamanītu sesijas pāreju uz citu pārlūkprogrammu; izveides, pēdējās izmantošanas un termiņa beigu laikspiedoli. Mēs **neglabājam** jūsu IP adresi, ierīces nosaukumu vai pārlūkprogrammas informāciju kopā ar sesiju, un sesiju sarakstā, ko redzat Iestatījumos, ir norādīti tikai laikspiedoli | Jūsu pārlūkprogramma |
@@ -215,7 +215,7 @@ Lai atteiktos no šiem elementiem, pārlūkprogrammas iestatījumos bloķējiet 
 
 Mainot šo politiku, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un jaunu spēkā stāšanās datumu un saglabājam iepriekšējās versijas vietnē dezbatere.ro/privacy/versions. Par izmaiņām, ar kurām tiek pievienots jauns nolūks vai jauns saņēmējs, mēs jūs informējam pa e-pastu un produktā pirms jaunās apstrādes sākšanas un dodam laiku iebilst. Ja jauns nolūks ir atkarīgs no jūsu piekrišanas — piemēram, ja mēs kādreiz vēlētos izmantot saturu modeļu uzlabošanai —, mēs šādu piekrišanu lūdzam atsevišķi un konkrēti; atjaunināto Noteikumu akceptēšanu mēs nekad neuzskatām par piekrišanu jaunai apstrādei. Ja precizējumi neko nemaina mūsu darbībās, mēs vienkārši publicējam jauno versiju.
 
-Šī politika pēdējo reizi atjaunināta 2026. gada 12. oktobrī. Versija 3.5 aizstāja versiju 3.4: 2. sadaļā tagad norādīts, kādus norēķinu un kartes datus mēs glabājam un ka jūsu pilnais kartes numurs nekad nenonāk pie mums, un 7. sadaļā norādīts, cik ilgi mēs glabājam saglabātu karti un maksājumu pakalpojumu sniedzēja ziņojumus par maksājumiem.
+Šī politika pēdējo reizi atjaunināta 2026. gada 24. oktobrī. Versija 3.6 aizstāja versiju 3.5: 2. sadaļā tagad norādīts, ka, reģistrējoties, IP adreses valsts kopā ar jūsu izvēlēto reģionu arī nosaka, vai rādām atsevišķo apstiprinājuma rūtiņu attiecībā uz Itāliju.
 
 ## Annex B — Reģionālie privātuma noteikumi
 

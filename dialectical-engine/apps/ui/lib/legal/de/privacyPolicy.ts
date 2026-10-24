@@ -47,7 +47,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Konto — E-Mail-Adresse und Wiederherstellungs-E-Mail-Adresse (verschlüsselt gespeichert, mit einem schlüsselbasierten Index, damit wir das Konto finden können, ohne die Adresse zu lesen); Passwort (als Hash gespeichert, niemals im Klartext); Ihr Geheimnis für die Zwei-Faktor-Authentifizierung (verschlüsselt); zehn Wiederherstellungscodes (als Hashes gespeichert); Ihr Pseudonym; das Ergebnis Ihrer Altersprüfung — Sie, bei der Registrierung",
-        "IP-Länderprüfung — Bei der Registrierung ermitteln wir das IP-Land lokal mit DB-IP Lite und prüfen eine Liste von Tor-Ausgangsadressen. Beim Start jeder neuen Debatte ermitteln wir das IP-Land erneut lokal und können die Debatte ablehnen, wenn das Land dauerhaft gesperrt ist. Bei einer Ablehnung aggregieren wir die Prüfprotokolle nach Route, Code, Land und Zeitfenster; die IP-Adresse wird im Prüfprotokoll nur als schlüsselbasierter Einweg-Digest gespeichert. Der Ablehnungsvermerk enthält Code, Land und die Angabe, dass die IP-Adresse als Grundlage diente; IP-Adresse und User-Agent werden nur als schlüsselbasierte Einweg-Hashwerte gespeichert. — Ihr Browser bei der Registrierung und beim Start einer neuen Debatte",
+        "IP-Länderprüfung — Bei der Registrierung ermitteln wir das IP-Land lokal mit DB-IP Lite und prüfen eine Liste von Tor-Ausgangsadressen. Beim Start jeder neuen Debatte ermitteln wir das IP-Land erneut lokal und können die Debatte ablehnen, wenn das Land dauerhaft gesperrt ist. Bei einer Ablehnung aggregieren wir die Prüfprotokolle nach Route, Code, Land und Zeitfenster; die IP-Adresse wird im Prüfprotokoll nur als schlüsselbasierter Einweg-Digest gespeichert. Der Ablehnungsvermerk enthält Code, Land und die Angabe, dass die IP-Adresse als Grundlage diente; IP-Adresse und User-Agent werden nur als schlüsselbasierte Einweg-Hashwerte gespeichert. Bei der Registrierung entscheidet das IP-Land zusammen mit der von Ihnen gewählten Region auch darüber, ob wir das gesonderte Zustimmungskästchen für Italien anzeigen; wenn Sie diese Zustimmung erteilen, wird in ihrem Nachweis festgehalten, ob die Regionswahl, das IP-Land oder beides die Anzeige ausgelöst hat. — Ihr Browser bei der Registrierung und beim Start einer neuen Debatte",
         "Altersprüfung — Sie geben Ihr Geburtsdatum nur für die Prüfung ein; wir speichern es nicht. Wir speichern das Ergebnis, das Mindestalter, das IP-Land, soweit verfügbar, die Regelversion, den Kontext und den Prüfzeitpunkt. Bei erfolgreicher Registrierung wird nur „bestanden“ gespeichert; bei bestehenden Konten ist „bestanden“ oder „abgelehnt“ möglich — Sie und Ihr Browser",
         "Angegebener Wohnsitz — Das Land, in dem Sie nach Ihrer Angabe wohnen, und bei einem Wohnsitz in den USA der Bundesstaat — Sie bei der Registrierung",
         "Sitzungen und Sicherheit — Ein gehashtes Sitzungstoken; ein schlüsselbasierter Hash der User-Agent-Zeichenfolge Ihres Browsers, mit dem erkannt wird, wenn eine Sitzung zu einem anderen Browser wechselt; Zeitstempel der Erstellung, letzten Nutzung und des Ablaufs. Wir speichern weder Ihre IP-Adresse noch den Gerätenamen oder Browserdetails zusammen mit einer Sitzung, und die Sitzungsliste in den Einstellungen zeigt nur Zeitstempel — Ihr Browser",
@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Wenn wir diese Datenschutzerklärung ändern, veröffentlichen wir die neue Fassung mit einer Zusammenfassung der Änderungen und einem neuen Gültigkeitsdatum und bewahren die früheren Fassungen unter dezbatere.ro/privacy/versions auf. Bei einer Änderung, durch die ein neuer Zweck oder ein neuer Empfänger hinzukommt, informieren wir Sie vor Beginn der neuen Verarbeitung per E-Mail und im Produkt und geben Ihnen Zeit zum Widerspruch. Hängt ein neuer Zweck von Ihrer Einwilligung ab – etwa wenn wir Inhalte jemals zur Verbesserung von Modellen nutzen wollten –, holen wir diese Einwilligung gesondert und ausdrücklich ein; die Annahme aktualisierter Nutzungsbedingungen behandeln wir niemals als Einwilligung in eine neue Verarbeitung. Bei Klarstellungen, die nichts an unserem Vorgehen ändern, veröffentlichen wir lediglich die neue Fassung." },
-      { kind: "p", text: "Diese Datenschutzerklärung wurde zuletzt am 12. Oktober 2026 aktualisiert. Version 3.5 ersetzte Version 3.4: Abschnitt 2 nennt nun, welche Rechnungs- und Kartendaten wir speichern und dass Ihre vollständige Kartennummer uns nie erreicht, und Abschnitt 7 nennt, wie lange wir eine gespeicherte Karte und die Nachrichten des Zahlungsanbieters zu Zahlungen aufbewahren." }
+      { kind: "p", text: "Diese Datenschutzerklärung wurde zuletzt am 24. Oktober 2026 aktualisiert. Version 3.6 ersetzte Version 3.5: Abschnitt 2 nennt nun, dass bei der Registrierung das IP-Land zusammen mit der von Ihnen gewählten Region auch darüber entscheidet, ob wir das gesonderte Zustimmungskästchen für Italien anzeigen." }
     ]
   },
   {
@@ -332,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.5",
-  sha256: "761e6bbb89973bdc6245c33ddfaea4aef1b59cab69b40cf90b0a636469b0fff4",
-  eyebrow: "DATENSCHUTZERKLÄRUNG · v3.5 · GÜLTIG AB 12. OKTOBER 2026",
+  version: "3.6",
+  sha256: "87816cedaff5ff6a25c53407b649d1ab00e9cc22643d62d187b4719d853fd9a3",
+  eyebrow: "DATENSCHUTZERKLÄRUNG · v3.6 · GÜLTIG AB 24. OKTOBER 2026",
   title: "Was wir speichern und warum",
   lede: "DSGVO – GDPR (EU) 2016/679: Ihre Rechte und unsere Pflichten, verständlich formuliert. Vierzehn Abschnitte und Anhang B – scrollen Sie bis zum Ende.",
-  endMarker: "ENDE DER DATENSCHUTZERKLÄRUNG · DSGVO – GDPR (EU) 2016/679 · v3.5",
+  endMarker: "ENDE DER DATENSCHUTZERKLÄRUNG · DSGVO – GDPR (EU) 2016/679 · v3.6",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Text der Datenschutzerklärung",
   sectionIdPrefix: "policy-section-",

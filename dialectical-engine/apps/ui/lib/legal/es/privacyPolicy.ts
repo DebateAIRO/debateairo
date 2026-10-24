@@ -47,7 +47,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Cuenta — Dirección de correo electrónico y dirección de recuperación (almacenadas cifradas, con un índice con clave que nos permite localizar la cuenta sin leer la dirección); contraseña (almacenada como hash, nunca en texto claro); su secreto de autenticación de dos factores (cifrado); diez códigos de recuperación (almacenados como hashes); su seudónimo; el resultado de la comprobación de su edad — Usted, al registrarse",
-        "Comprobación del país de la IP — Al registrarse determinamos el país de la IP localmente con DB-IP Lite y comprobamos una lista de direcciones de salida de Tor. Al iniciar cada nuevo debate volvemos a determinar el país de la IP localmente y podemos rechazarlo si ese país está bloqueado permanentemente. En caso de rechazo, agregamos los registros de auditoría por ruta, código, país e intervalo de tiempo; la IP solo se conserva allí como resumen unidireccional con clave. El registro de rechazo incluye el código, el país y una indicación de que la dirección IP sirvió de fundamento; la dirección IP y la cadena de agente de usuario solo se conservan como resúmenes unidireccionales con clave. — Su navegador al registrarse y al iniciar un nuevo debate",
+        "Comprobación del país de la IP — Al registrarse determinamos el país de la IP localmente con DB-IP Lite y comprobamos una lista de direcciones de salida de Tor. Al iniciar cada nuevo debate volvemos a determinar el país de la IP localmente y podemos rechazarlo si ese país está bloqueado permanentemente. En caso de rechazo, agregamos los registros de auditoría por ruta, código, país e intervalo de tiempo; la IP solo se conserva allí como resumen unidireccional con clave. El registro de rechazo incluye el código, el país y una indicación de que la dirección IP sirvió de fundamento; la dirección IP y la cadena de agente de usuario solo se conservan como resúmenes unidireccionales con clave. Al registrarse, el país de la IP, junto con la Región que elija, también decide si mostramos la casilla separada de aprobación para Italia; si usted presta esa aprobación, su registro conserva si la casilla se mostró por la elección de la Región, por el país de la IP o por ambos. — Su navegador al registrarse y al iniciar un nuevo debate",
         "Comprobación de edad — Introduce su fecha de nacimiento solo para comprobar la edad; no la conservamos. Guardamos el resultado, la edad mínima exigida, el país de la IP si está disponible, la versión de la regla, el contexto y la hora de la comprobación. Las inscripciones completadas solo guardan «aprobado»; en cuentas existentes puede guardarse «aprobado» o «rechazado» — Usted y su navegador",
         "Lugar de residencia declarado — El país en el que declara vivir y el estado si reside en Estados Unidos — Usted al registrarse",
         "Sesiones y seguridad — Un token de sesión sometido a hash; un hash con clave de la cadena de agente de usuario de su navegador, utilizado para detectar cuándo una sesión pasa a otro navegador; marcas temporales de creación, último uso y caducidad. No almacenamos su dirección IP, el nombre del dispositivo ni los datos del navegador junto con una sesión, y la lista de sesiones que ve en Configuración solo muestra marcas temporales — Su navegador",
@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Cuando modificamos esta política, publicamos la nueva versión con un resumen de los cambios y una nueva fecha de entrada en vigor, y conservamos las versiones anteriores en dezbatere.ro/privacy/versions. Si un cambio añade una nueva finalidad o un nuevo destinatario, se lo comunicamos por correo electrónico y en el producto antes de que comience el nuevo tratamiento, y le damos tiempo para oponerse. Cuando una nueva finalidad dependa de su consentimiento —por ejemplo, si alguna vez quisiéramos utilizar contenido para mejorar modelos—, solicitaremos dicho consentimiento de forma independiente y específica; nunca consideramos la aceptación de unos Términos actualizados como consentimiento para un nuevo tratamiento. Cuando se trate de aclaraciones que no cambien nada de lo que hacemos, simplemente publicaremos la nueva versión." },
-      { kind: "p", text: "Esta política se actualizó por última vez el 12 de octubre de 2026. La versión 3.5 sustituyó a la versión 3.4: la sección 2 indica ahora qué datos de facturación y de la tarjeta conservamos y que el número completo de su tarjeta nunca llega a nosotros, y la sección 7 indica durante cuánto tiempo conservamos una tarjeta guardada y los mensajes del proveedor de pagos sobre pagos." }
+      { kind: "p", text: "Esta política se actualizó por última vez el 24 de octubre de 2026. La versión 3.6 sustituyó a la versión 3.5: la sección 2 indica ahora que, al registrarse, el país de la IP, junto con la Región que elija, también decide si mostramos la casilla separada de aprobación para Italia." }
     ]
   },
   {
@@ -332,12 +332,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.5",
-  sha256: "4e26482180a3f77a086b8f5428a25456486fbf0bdd48c51ab6863661f79f2d8c",
-  eyebrow: "POLÍTICA DE PRIVACIDAD · v3.5 · EN VIGOR DESDE 12 DE OCTUBRE DE 2026",
+  version: "3.6",
+  sha256: "47be6d80fcc4d4937348978df108456302d3aae8b0331036e5ecae021b138401",
+  eyebrow: "POLÍTICA DE PRIVACIDAD · v3.6 · EN VIGOR DESDE 24 DE OCTUBRE DE 2026",
   title: "Qué almacenamos y por qué",
   lede: "Sus derechos y nuestras obligaciones conforme al RGPD – GDPR (EU) 2016/679, en lenguaje claro. Catorce secciones y el anexo B — desplácese hasta el final.",
-  endMarker: "FIN DE LA POLÍTICA · RGPD – GDPR (EU) 2016/679 · v3.5",
+  endMarker: "FIN DE LA POLÍTICA · RGPD – GDPR (EU) 2016/679 · v3.6",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Texto de la Política de privacidad",
   sectionIdPrefix: "policy-section-",

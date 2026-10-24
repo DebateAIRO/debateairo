@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručne
-eyebrow: ZÁSADY OCHRANY OSOBNÝCH ÚDAJOV · v3.5 · ÚČINNÉ OD 12. OKTÓBRA 2026
+eyebrow: ZÁSADY OCHRANY OSOBNÝCH ÚDAJOV · v3.6 · ÚČINNÉ OD 24. OKTÓBRA 2026
 title: Čo uchovávame a prečo
 lede: Vaše práva a naše povinnosti podľa GDPR (EU) 2016/679 zrozumiteľne. Štrnásť častí a príloha B — prejdite až na koniec.
-endMarker: KONIEC ZÁSAD · GDPR (EU) 2016/679 · v3.5
+endMarker: KONIEC ZÁSAD · GDPR (EU) 2016/679 · v3.6
 bodyLabel: Text zásad ochrany osobných údajov
 annexTitle: Príloha B — Regionálne podmienky ochrany osobných údajov
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 SÚBORY COOKIE
 -->
 
-**Version 3.5 · Effective 12. októbra 2026 · Predchádzajúce verzie na dezbatere.ro/privacy/versions · Prevádzkovateľ: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 24. októbra 2026 · Predchádzajúce verzie na dezbatere.ro/privacy/versions · Prevádzkovateľ: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Zhromažďujeme údaje potrebné pre účet a to, čo sa rozhodnete napísať. Vaše otázky sa odosielajú poskytovateľom umelej inteligencie uvedeným v našom registri; nepoužívajú sa na trénovanie modelov. Náš poskytovateľ hostingu uchováva váš účet a vaše debaty v Londýne vo Spojenom kráľovstve; časť 5 uvádza, kam ďalej putujú vaše údaje. Debaty sú súkromné, pokiaľ ich nezverejníte. Odstránením účtu sa zničia kľúče k vašim súkromným údajom; pri plánovaní odstránenia si zvolíte, či sa odstránia aj vaše zverejnené debaty, alebo zostanú verejné pod vaším vyradeným pseudonymom. Môžete nás kontaktovať na privacy@dezbatere.ro a osoby uvedené v debate môžu požiadať o odstránenie aj bez účtu.
 
@@ -34,7 +34,7 @@ Zhromažďujeme iba údaje potrebné na fungovanie účtu, údaje, ktoré sa ná
 | Kategória | Konkrétne údaje | Zdroj |
 | --- | --- | --- |
 | **Účet** | E-mailová adresa a e-mailová adresa na obnovenie (uložené šifrovane, s kľúčovaným indexom, aby sme účet našli bez prečítania adresy); heslo (uložené ako haš, nikdy nie v otvorenom tvare); váš tajný údaj dvojfaktorového overovania (šifrovaný); desať obnovovacích kódov (uložených ako haše); váš pseudonym; výsledok overenia veku, nie dátum narodenia | Vy, pri registrácii |
-| **Kontrola krajiny podľa IP adresy** | Pri registrácii zisťujeme krajinu IP adresy lokálne pomocou DB-IP Lite a osobitne kontrolujeme zoznam výstupných uzlov Tor. Pred každou novou debatou tiež lokálne kontrolujeme krajinu IP adresy a môžeme ju odmietnuť, ak je krajina na zozname trvalo blokovaných. Pri odmietnutí súhrnne zaznamenáme trasu, kód, krajinu, časové okno a skutočnosť, že dôkazom bola IP adresa; V auditnom zázname sa IP adresa aj reťazec user-agent uchovávajú iba ako jednosmerné súhrny vytvorené pomocou kľúča. | IP adresa použitá pri registrácii a začatí novej debaty |
+| **Kontrola krajiny podľa IP adresy** | Pri registrácii zisťujeme krajinu IP adresy lokálne pomocou DB-IP Lite a osobitne kontrolujeme zoznam výstupných uzlov Tor. Pred každou novou debatou tiež lokálne kontrolujeme krajinu IP adresy a môžeme ju odmietnuť, ak je krajina na zozname trvalo blokovaných. Pri odmietnutí súhrnne zaznamenáme trasu, kód, krajinu, časové okno a skutočnosť, že dôkazom bola IP adresa; V auditnom zázname sa IP adresa aj reťazec user-agent uchovávajú iba ako jednosmerné súhrny vytvorené pomocou kľúča. Pri registrácii krajina IP adresy spolu s regiónom, ktorý zvolíte, rozhoduje aj o tom, či zobrazíme samostatné políčko so súhlasom pre Taliansko; ak tento súhlas udelíte, jeho záznam uchováva, či zobrazenie spustila voľba regiónu, krajina IP adresy, alebo obe. | IP adresa použitá pri registrácii a začatí novej debaty |
 | **Overenie veku** | Výsledok (pri registrácii iba úspešný; pri existujúcom účte úspešný alebo zamietnutý), použitý minimálny vek, krajina IP adresy, ak je známa, verzia pravidla, kontext a čas overenia. Dátum narodenia neuchovávame | Dátum narodenia zadaný na overenie; krajina z IP adresy |
 | **Deklarovaný región** | Krajina pobytu zvolená pri registrácii a pri pobyte v USA aj štát | Vy, pri registrácii |
 | **Relácie a bezpečnosť** | Hašovaný token relácie; kľúčovaný haš reťazca user-agent vášho prehliadača, používaný na zistenie presunu relácie do iného prehliadača; časové pečiatky vytvorenia, posledného použitia a skončenia platnosti. S vašou reláciou **neuchovávame** IP adresu, názov zariadenia ani údaje o prehliadači a zoznam relácií v Nastaveniach zobrazuje iba časové pečiatky | Váš prehliadač |
@@ -215,7 +215,7 @@ Ak chcete tieto položky odmietnuť, zablokujte alebo vymažte súbory cookie a 
 
 Keď tieto zásady zmeníme, zverejníme novú verziu so zhrnutím zmien a novým dátumom účinnosti a predchádzajúce verzie ponecháme na dezbatere.ro/privacy/versions. O zmene, ktorá pridáva nový účel alebo nového príjemcu, vás informujeme e-mailom aj v produkte pred začatím nového spracúvania a poskytneme vám čas na vznesenie námietky. Ak nový účel závisí od vášho súhlasu — napríklad ak by sme niekedy chceli obsah používať na zlepšovanie modelov — požiadame vás o tento súhlas samostatne a konkrétne; prijatie aktualizovaných podmienok nikdy nepovažujeme za súhlas s novým spracúvaním. Pri spresneniach, ktoré nemenia naše postupy, jednoducho zverejníme novú verziu.
 
-Tieto zásady boli naposledy aktualizované 12. októbra 2026. Verzia 3.5 nahradila verziu 3.4: časť 2 teraz uvádza, ktoré fakturačné údaje a údaje o karte uchovávame a že celé číslo vašej karty sa k nám nikdy nedostane, a časť 7 uvádza, ako dlho uchovávame uloženú kartu a správy poskytovateľa platobných služieb o platbách.
+Tieto zásady boli naposledy aktualizované 24. októbra 2026. Verzia 3.6 nahradila verziu 3.5: časť 2 teraz uvádza, že pri registrácii krajina IP adresy spolu s regiónom, ktorý zvolíte, rozhoduje aj o tom, či zobrazíme samostatné políčko so súhlasom pre Taliansko.
 
 ## Annex B — Regionálne podmienky ochrany osobných údajov
 

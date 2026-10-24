@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lühidalt
-eyebrow: PRIVAATSUSPOLIITIKA · v3.5 · KEHTIB ALATES 12. OKTOOBRIST 2026
+eyebrow: PRIVAATSUSPOLIITIKA · v3.6 · KEHTIB ALATES 24. OKTOOBRIST 2026
 title: Mida ja miks me talletame
 lede: Teie õigused ja meie kohustused GDPR (EU) 2016/679 alusel lihtsas keeles. Neliteist jaotist ja lisa B — kerige lõpuni.
-endMarker: POLIITIKA LÕPP · GDPR (EU) 2016/679 · v3.5
+endMarker: POLIITIKA LÕPP · GDPR (EU) 2016/679 · v3.6
 bodyLabel: Privaatsuspoliitika tekst
 annexTitle: Lisa B — Piirkondlikud privaatsustingimused
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 KÜPSISED
 -->
 
-**Version 3.5 · Effective 12. oktoober 2026 · Varasemad versioonid aadressil dezbatere.ro/privacy/versions · Vastutav töötleja: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 24. oktoober 2026 · Varasemad versioonid aadressil dezbatere.ro/privacy/versions · Vastutav töötleja: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Kogume seda, mida konto vajab, ja seda, mida otsustate sisestada. Teie küsimused saadetakse meie registris loetletud tehisintellekti pakkujatele; neid ei kasutata mudelite treenimiseks. Meie majutusteenuse pakkuja säilitab teie konto ja väitlused Londonis Ühendkuningriigis; jaotises 5 on öeldud, kuhu mujale teie andmed jõuavad. Väitlused on privaatsed, kui te neid ei avalda. Konto kustutamisel hävitatakse teie privaatsete andmete võtmed; kustutamist ajastades valite, kas ka teie avaldatud väitlused eemaldatakse või jäävad teie kasutuselt kõrvaldatud pseudonüümi all avalikuks. Meiega saab ühendust aadressil privacy@dezbatere.ro ning väitluses nimetatud isikud võivad taotleda eemaldamist ilma kontota.
 
@@ -34,7 +34,7 @@ Kogume ainult seda, mida konto toimimiseks vajab, mida otsustate meile anda ja m
 | Kategooria | Täpne sisu | Allikas |
 | --- | --- | --- |
 | **Konto** | E-posti aadress ja taastamise e-posti aadress (säilitatakse krüpteeritult koos võtmestatud indeksiga, et saaksime konto leida ilma aadressi lugemata); parool (säilitatakse räsina, mitte kunagi avatekstina); teie kaheastmelise autentimise saladus (krüpteeritud); kümme taastekoodi (säilitatakse räsidena); teie pseudonüüm; teie vanusekontrolli tulemus | Teie, registreerumisel |
-| **IP-aadressi riigi kontroll** | Registreerumisel määrame IP-aadressi riigi kohapeal DB-IP Lite’i abil ja kontrollime Tori väljumisaadresside nimekirja. Iga uue väitluse alustamisel määrame IP-aadressi riigi uuesti kohapeal ja võime väitluse tagasi lükata, kui riik on püsivalt blokeeritud. Keeldumise korral koondame auditikirjed teekonna, koodi, riigi ja ajavahemiku järgi; IP-aadress jääb sinna ainult võtmega ühesuunalise räsina. Keeldumiskanne sisaldab koodi, riiki ja märget, et aluseks oli IP-aadress; IP-aadressi ja brauseri user-agent’i stringi säilitame ainult võtmega ühesuunaliste räsidena. | Teie brauser registreerumisel ja uue väitluse alustamisel |
+| **IP-aadressi riigi kontroll** | Registreerumisel määrame IP-aadressi riigi kohapeal DB-IP Lite’i abil ja kontrollime Tori väljumisaadresside nimekirja. Iga uue väitluse alustamisel määrame IP-aadressi riigi uuesti kohapeal ja võime väitluse tagasi lükata, kui riik on püsivalt blokeeritud. Keeldumise korral koondame auditikirjed teekonna, koodi, riigi ja ajavahemiku järgi; IP-aadress jääb sinna ainult võtmega ühesuunalise räsina. Keeldumiskanne sisaldab koodi, riiki ja märget, et aluseks oli IP-aadress; IP-aadressi ja brauseri user-agent’i stringi säilitame ainult võtmega ühesuunaliste räsidena. Registreerumisel otsustab IP-aadressi riik koos teie valitud piirkonnaga ka selle, kas kuvame Itaalia jaoks eraldi heakskiidu ruudu; kui annate selle heakskiidu, säilitab selle kirje, kas ruudu kuvamise käivitas piirkonna valik, IP-aadressi riik või mõlemad. | Teie brauser registreerumisel ja uue väitluse alustamisel |
 | **Vanusekontroll** | Sisestate sünnikuupäeva ainult kontrolliks; me ei talleta seda. Hoiame alles tulemuse, vanuse alampiiri, IP-aadressi riigi, kui see on teada, reegli versiooni, konteksti ja kontrolli aja. Eduka registreerimise puhul salvestatakse ainult „läbitud“; olemasoleva konto puhul võib tulemus olla „läbitud“ või „keeldutud“ | Teie ja teie brauser |
 | **Teatatud elukoht** | Riik, kus te enda sõnul elate, ja USA osariik, kui elate Ameerika Ühendriikides | Teie registreerumisel |
 | **Seansid ja turvalisus** | Räsitud seansitõend; teie brauseri user-agent'i stringi võtmestatud räsi, mida kasutatakse tuvastamaks, kui seanss liigub teise brauserisse; loomise, viimase kasutamise ja aegumise ajatemplid. Me **ei** salvesta seansiga koos teie IP-aadressi, seadme nime ega brauseri üksikasju ning seadetes kuvatavas seansiloendis on ainult ajatemplid | Teie brauser |
@@ -215,7 +215,7 @@ Nende üksuste keelamiseks blokeerige või kustutage selle saidi küpsised ja sa
 
 Kui muudame seda poliitikat, avaldame uue versiooni koos muudatuste kokkuvõtte ja uue jõustumiskuupäevaga ning säilitame varasemad versioonid aadressil dezbatere.ro/privacy/versions. Uue eesmärgi või vastuvõtja lisamisel teavitame teid enne uue töötlemise algust e-posti teel ja tootes ning anname teile aega vastuväite esitamiseks. Kui uus eesmärk sõltub teie nõusolekust — näiteks kui sooviksime kunagi kasutada sisu mudelite täiustamiseks — küsime selleks eraldi ja konkreetset nõusolekut; me ei käsita uuendatud Tingimustega nõustumist kunagi nõusolekuna uueks töötlemiseks. Selgituste korral, mis ei muuda meie tegevust, avaldame lihtsalt uue versiooni.
 
-Seda poliitikat ajakohastati viimati 12. oktoobril 2026. Versioon 3.5 asendas versiooni 3.4: jaotis 2 ütleb nüüd, milliseid arveldus- ja kaardiandmeid me säilitame ning et teie kaardi täisnumber ei jõua kunagi meieni, ja jaotis 7 ütleb, kui kaua säilitame salvestatud kaarti ja makseteenuse pakkuja sõnumeid maksete kohta.
+Seda poliitikat ajakohastati viimati 24. oktoobril 2026. Versioon 3.6 asendas versiooni 3.5: jaotis 2 ütleb nüüd, et registreerumisel otsustab IP-aadressi riik koos teie valitud piirkonnaga ka selle, kas kuvame Itaalia jaoks eraldi heakskiidu ruudu.
 
 ## Annex B — Piirkondlikud privaatsustingimused
 
