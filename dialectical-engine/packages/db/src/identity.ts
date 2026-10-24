@@ -4,7 +4,7 @@ import {
   type AuditContextHasher,
   type CryptoEnvelope
 } from "@debateai/crypto";
-import type { SignUpAcceptanceRow } from "./legal-acceptance.js";
+import type { ItalyApprovalAcceptanceRow, SignUpAcceptanceRow } from "./legal-acceptance.js";
 import type { DeclaredRegion } from "@debateai/kernel";
 import { MAIL_LOCALE_SETTING } from "./mail-locale.js";
 
@@ -50,6 +50,8 @@ export interface PendingAccountInput {
    * transaction. Absent only in test compositions that predate the acceptance record.
    */
   readonly acceptances?: ReadonlyArray<SignUpAcceptanceRow>;
+  /** Italy clause approval: written by identity.record_signup_italy_approval in the same transaction (migration 0125). */
+  readonly italyApproval?: ItalyApprovalAcceptanceRow;
 }
 
 export interface RegistrationAgeCheck {
