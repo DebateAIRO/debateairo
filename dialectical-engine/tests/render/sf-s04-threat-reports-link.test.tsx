@@ -26,24 +26,21 @@ async function mount(status: number, unread = 3) {
 }
 
 describe("S04 threat reports link", () => {
-  it("does not probe the capability route before this tab verifies staff access", async () => {
-    // Property: a fresh Team access page makes no unauthorized summary request.
-    sessionStorage.removeItem("debateai:staff-authority");
+  it("hides the link when the server rejects a fresh tab", async () => {
+    // Property: a server 401 keeps the link hidden without a browser authority key.
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ error: "UNAUTHORIZED" }, { status: 401 }));
     const { ThreatReportsLink } = await import("../../apps/ui/components/ThreatReportsLink.js");
     await act(async () => root.render(<ThreatReportsLink />));
-    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(fetchSpy).toHaveBeenCalledOnce();
     expect(host.querySelector(".threatReportsLinkRow")).toBeNull();
   });
-  it("restores the link after reload while this tab's verified authority is live", async () => {
-    // Property: a reload does not hide a report link backed by an unexpired staff session.
-    sessionStorage.setItem("debateai:staff-authority", JSON.stringify({ expires_at: "2099-01-01T00:00:00.000Z", capabilities: ["THREAT_REPORT"] }));
+  it("restores the link after reload from the server's live staff session", async () => {
+    // Property: a reload with no browser authority key shows the server-authorized report link.
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ unread: 2 }));
     const { ThreatReportsLink } = await import("../../apps/ui/components/ThreatReportsLink.js");
     await act(async () => root.render(<ThreatReportsLink />));
     expect(fetchSpy).toHaveBeenCalledOnce();
     expect(host.querySelector(".threatReportsCount")?.textContent).toBe("2 unread");
-    sessionStorage.removeItem("debateai:staff-authority");
   });
   it("shows the count in a pill link to the threat reports page", async () => {
     await mount(200);
@@ -72,7 +69,7 @@ describe("S04 threat reports link", () => {
     expect(host.querySelector(".threatReportsCount")?.textContent).toBe("3 unread");
   });
   it("shows the link when the real Team access panel verifies a holder", async () => {
-    // Property: the successful Verify action itself publishes authority to the mounted link.
+    // Property: Verify updates the mounted link without writing a browser authority key.
     const { ThreatReportsLink } = await import("../../apps/ui/components/ThreatReportsLink.js");
     const { StaffAccessPanel } = await import("../../apps/ui/components/StaffAccessPanel.js");
     const api = await import("../../apps/ui/lib/threatReportsApi.js");
@@ -91,10 +88,12 @@ describe("S04 threat reports link", () => {
     };
     await act(async () => root.render(<><ThreatReportsLink client={reportsClient}/><StaffAccessPanel client={staffClient as never}/></>));
     expect(host.querySelector(".threatReportsLinkRow")).toBeNull();
+    const storedKeysBefore = Array.from({ length: sessionStorage.length }, (_, index) => sessionStorage.key(index));
     const verify = [...host.querySelectorAll("button")].find(button => button.textContent === "Verify security key for team access");
     expect(verify?.disabled).toBe(false);
     await act(async () => verify!.click());
     expect(host.querySelector(".threatReportsCount")?.textContent).toBe("3 unread");
+    expect(Array.from({ length: sessionStorage.length }, (_, index) => sessionStorage.key(index))).toEqual(storedKeysBefore);
   });
   it.each([[1, "1 necitit"], [3, "3 necitite"], [20, "20 de necitite"]] as const)("uses Romanian count agreement for %i", async (unread, expected) => {
     // Property: the label follows Romanian one, few and other agreement.
