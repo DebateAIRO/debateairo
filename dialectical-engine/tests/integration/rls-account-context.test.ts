@@ -288,6 +288,62 @@ describe("row-level security S01 C3: the verified account context on the product
     }
   });
 
+  /**
+   * FIX-S01-p1b, COR-N7 (t_7428c428): an anonymous request's checkout (a scope with no credential yet) used to be
+   * pg-pool's own release, so a client it handed back inside a block went back to the pool and the NEXT checkout — A's —
+   * set its credential and ran its statements inside that leftover block. Every own checkout of a pool with a target now
+   * runs under the release rule (the empty credential before sign-in), so the anonymous client is destroyed instead.
+   */
+  it("S3.2-o COR-N7 on a pool of max 1, after each of S3.2-d's six shapes run by an ANONYMOUS checkout, A's next checkout is handed over idle, runs its statement in a transaction of its own and reads only A's rows; in (3)-(6) the anonymous client was destroyed (ACCOUNT_CONTEXT_RELEASE_IN_TRANSACTION, totalCount 0)", async () => {
+    const shapes: readonly Readonly<{ id: string; destroyed: boolean; run: (p: Pool) => Promise<void> }>[] = [
+      { id: "(1) pool.query", destroyed: false, run: async (p) => { await counts(p); } },
+      { id: "(2) connect/release", destroyed: false, run: async (p) => {
+        const c = await p.connect(); await counts(c); c.release();
+      } },
+      { id: "(3) open block", destroyed: true, run: async (p) => {
+        const c = await p.connect(); await c.query("BEGIN"); await counts(c); c.release();
+      } },
+      { id: "(4) pool.query(BEGIN)", destroyed: true, run: async (p) => { await p.query("BEGIN"); } },
+      { id: "(5) aborted block", destroyed: true, run: async (p) => {
+        const c = await p.connect(); await c.query("BEGIN"); await c.query("SELECT 1/0").catch(() => undefined); c.release();
+      } },
+      { id: "(6) BEGIN in flight", destroyed: true, run: async (p) => {
+        const c = await p.connect(); void c.query("BEGIN").catch(() => undefined); c.release();
+      } }
+    ];
+    const seen: unknown[] = [];
+    const wanted: unknown[] = [];
+    for (const login of t1) {
+      for (const shape of shapes) {
+        const one = routedPool(login, 1);
+        const releasing = nextRelease(one);
+        await anonymous(() => shape.run(one));
+        const releaseError = await releasing;
+        const total = one.totalCount;
+        const next = await asA(async () => {
+          const c = await one.connect();
+          try {
+            const status = c.getTransactionStatus();
+            const own = (await c.query("SELECT now() = statement_timestamp() AS fresh")).rows[0].fresh as boolean;
+            const rows = await counts(c);
+            return { status, own, onlyA: RELATIONS.every(({ relation }) => rows[relation]!.a >= 1 && rows[relation]!.b === 0
+              && rows[relation]!.all === rows[relation]!.a) };
+          } finally { c.release(); }
+        }).catch((error: unknown) => ({ error: String(error) }));
+        const released = releaseError instanceof Error ? releaseError.message : releaseError ?? "none";
+        const where = `${login.name} ${shape.id}`;
+        seen.push({ where, total, released, next });
+        wanted.push({
+          where, total: shape.destroyed ? 0 : 1,
+          released: shape.destroyed ? "ACCOUNT_CONTEXT_RELEASE_IN_TRANSACTION" : "none",
+          next: { status: "I", own: true, onlyA: true }
+        });
+        await endOwnPools();
+      }
+    }
+    expect(seen).toEqual(wanted);
+  });
+
   it("S3.2-e R11 50 interleaved A/B calls on max 1 and on max 10: each sees only its own rows", async () => {
     for (const login of t1) {
       for (const max of [1, 10]) {

@@ -60,6 +60,9 @@ import { AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, Bi
 // Role rotation (spec 2026-10-11): the per-role, per-model counts admission reads when the row is ON.
 import { readRoleRotationCounts, recordSpendWaiver } from "@debateai/db";
 import { crossAccount, crossAccountPool, setCrossAccountTarget } from "@debateai/db";
+// FIX-S01-p1b (COR-B1): the boot attestations' routes, from the module itself (packages/db/src/index.ts is hash-pinned
+// by tools/orphan-audit; the module's state is process-global, so this instance routes the same pools).
+import { assertAccountContextLogins, attestEveryRoute, onOwnConnections } from "../../../packages/db/src/account-context.js";
 import { WorkItemRepository } from "@debateai/battery";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes, type AskRequest } from "@debateai/contract";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
@@ -374,7 +377,10 @@ const releaseWatcher = new ReleaseWatcher({
 boot.hold({ end: async () => { releaseWatcher.stop(); } });
 // DL7-F7: the hand-rolled pool cleanup this stage carried is the ledger's job
 // now, and it covers the KEKs the old one never reached.
-await boot.run("database-roles", () => Promise.all([
+// Row-level security S01, FIX-S01-p1b (COR-B1): outside a request a T1 pool runs on its system target, so each role check
+// runs on BOTH logins its statements can run as — its own connections (the T1 login of a request), then the target — and
+// a DATABASE_URL naming the superuser, the authorization, erasure or content-provision login refuses here as before.
+await boot.run("database-roles", () => attestEveryRoute(() => Promise.all([
   assertAccountErasureDatabaseRole(pool,erasurePool),
   assertAccountErasureDatabaseRole(legacyAskAdmissionPool,erasurePool),
   assertPublicationDatabaseRoleSeparation(pool, authorizationPool),
@@ -384,7 +390,13 @@ await boot.run("database-roles", () => Promise.all([
   assertContentProvisionDatabaseRole(pool,contentProvisionPool),
   assertContentProvisionDatabaseRole(pool,serverAskAdmissionPool),
   ...(dataExportPool === undefined ? [] : [assertDataExportDatabaseRoles(authorizationPool, dataExportPool)])
-]));
+])));
+// COR-B1: and the logins themselves — no T1 login reaches every account (an alias of a system login passes the URL
+// compare and every check above), and each system login reaches them through the marker role only.
+await boot.run("account-context-logins", () => assertAccountContextLogins({
+  requestPools: [pool, legacyAskAdmissionPool, authorizationPool, releaseWatchPool],
+  systemPools: [systemPool, authorizationSystemPool, roomDecisionPool]
+}));
 const authPolicy = await boot.run("auth-policy", () => readAuthPolicy(pool, environment.REGISTER_VERSION));
 const mfaPolicy = await boot.run("mfa-policy", () => readMfaPolicy(pool, environment.REGISTER_VERSION));
 const sessionPolicy = await boot.run("session-policy", () => readSessionPolicy(pool, environment.REGISTER_VERSION));
@@ -740,7 +752,8 @@ const questionLanguage = debateShapeInForcePolicy === null ? undefined : await b
     fastCheck: (policy ?? questionLanguagePolicyStartValues()).fastCheck,
     readCredential: () => supportAnthropicMessagesKey(supportModelTarget, readSupportCredentialOnce),
     spend: {
-      writerPresent: () => languageCheckSpendWriterPresent(pool),
+      // COR-B1: the writes run inside the ask's request, as the T1 login: the probe asks that login, not the target.
+      writerPresent: () => onOwnConnections(() => languageCheckSpendWriterPresent(pool)),
       record: (entry) => recordLanguageCheckSpend(pool, entry)
     },
     // Ruling L-POT: the day ceiling the ask admission uses (costEnvelopeGuardPolicy), against the day's whole site pot.
@@ -1052,15 +1065,16 @@ const consumerRecovery=new ConsumerRecoveryService(new PostgresConsumerRecoveryR
 const onboardingEvidence=new OnboardingEvidenceService(new PostgresOnboardingEvidenceRepository(authorizationPool,auditContextHasher),sessions.consumerProducer(),recordsKey);
 const consumerSecurityNotices=new ConsumerSecurityNoticeReconciler(new PostgresConsumerSecurityNoticeRepository(authorizationPool),dekStore,consumerAccountMail);
 const passwordResetRepository=passwordResetPolicy?new PostgresPasswordResetRepository(pool,auditContextHasher,environment.REGISTER_VERSION):undefined;
-if(passwordResetRepository)await boot.run("password-reset-role",()=>passwordResetRepository.assertRole());
+// COR-B1, V-12: the request path runs on the T1 login, the notification worker on the target: both are attested.
+if(passwordResetRepository)await boot.run("password-reset-role",()=>attestEveryRoute(()=>passwordResetRepository.assertRole()));
 const passwordReset=passwordResetRepository&&passwordResetPolicy?new PasswordResetService({repository:passwordResetRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,passwordResetPolicy,blindIndexKey,reportDiagnostic:code=>console.error(`[${code}]`)}):undefined;
 const passwordResetNotices=passwordResetRepository&&passwordResetPolicy?new PasswordResetNotificationWorker({repository:passwordResetRepository,users:dekStore,sender:new SendmailPasswordResetSender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs}),authPolicy,passwordResetPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)}):undefined;
 const triggerPasswordResetReconciliation=passwordResetNotices?createSingleFlightErasureReconciler(()=>passwordResetNotices.reconcile(100),()=>console.error("[PASSWORD_RESET_RECONCILIATION_PENDING]")):undefined;
 let passwordResetTimer:ReturnType<typeof setInterval>|undefined;
 const backupEmailRepository=backupEmailPolicy?new PostgresBackupEmailRepository(pool,auditContextHasher,environment.REGISTER_VERSION):undefined;
 const mfaRecoveryRepository=mfaRecoveryPolicy?new PostgresMfaRecoveryRepository(pool,auditContextHasher,environment.REGISTER_VERSION):undefined;
-if(backupEmailRepository)await boot.run("backup-email-role",()=>backupEmailRepository.assertRole());
-if(mfaRecoveryRepository)await boot.run("mfa-recovery-role",()=>mfaRecoveryRepository.assertRole());
+if(backupEmailRepository)await boot.run("backup-email-role",()=>attestEveryRoute(()=>backupEmailRepository.assertRole()));
+if(mfaRecoveryRepository)await boot.run("mfa-recovery-role",()=>attestEveryRoute(()=>mfaRecoveryRepository.assertRole()));
 const backupEmail=backupEmailRepository&&backupEmailPolicy?new BackupEmailService({repository:backupEmailRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,policy:backupEmailPolicy}):undefined;
 const mfaRecovery=mfaRecoveryRepository&&mfaRecoveryPolicy?new MfaRecoveryService({repository:mfaRecoveryRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,policy:mfaRecoveryPolicy,blindIndexKey}):undefined;
 const emailRecoverySender=new SendmailEmailRecoverySender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs});
@@ -1863,8 +1877,11 @@ announceArgon2BreakerTrip = (): void => {
   void startup.close("ARGON2_BREAKER_TRIPPED").catch(() => undefined);
 };
 await startup.run("support-attestation", async () => {
-  await assertSupportDatabaseRole(pool, supportPool);
-  await assertSupportDatabaseRole(pool, supportRelayLeasePool);
+  // COR-B1: the runtime half (the ordinary principal reaches no support data) on both of `pool`'s logins.
+  await attestEveryRoute(async () => {
+    await assertSupportDatabaseRole(pool, supportPool);
+    await assertSupportDatabaseRole(pool, supportRelayLeasePool);
+  });
   await assertSupportKeyCoverage(supportPool);
 });
 await startup.run("listen", async () => {

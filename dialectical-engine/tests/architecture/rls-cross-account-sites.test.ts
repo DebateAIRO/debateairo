@@ -8,7 +8,9 @@
  * a site unrouted, routed under the wrong id, or one added without a SPEC row changes what this file reads. Outside a
  * request a statement goes to the target `setCrossAccountTarget` gave the pool — so a pool left without one, or given it
  * after its first use, runs boot and background work on the T1 login with no account context. Parsed with the
- * TypeScript AST (typescript-classic), so a comment or a string naming a call does not count.
+ * TypeScript AST (typescript-classic), so a comment or a string naming a call does not count. FIX-S01-p1b (COR-B1): the
+ * same rule sends a boot role check made on a T1 pool to its system login, so main.ts runs each one on both routes
+ * (attestEveryRoute) and attests the logins themselves (assertAccountContextLogins); the two COR-B1 cases pin that wiring.
  */
 import { readdir, readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
@@ -108,6 +110,24 @@ function enclosingFunctionName(node: ts.Node): string | null {
   return null;
 }
 
+/** The account-context wrapper a node runs inside: the call whose first argument (the callback) encloses it. */
+function wrapperOf(node: ts.Node): string | null {
+  for (let current: ts.Node | undefined = node.parent; current !== undefined; current = current.parent) {
+    if (ts.isCallExpression(current) && ts.isIdentifier(current.expression)
+      && ["attestEveryRoute", "onOwnConnections"].includes(current.expression.text)
+      && current.arguments[0] !== undefined && enclosedBy(node, current.arguments[0])) return current.expression.text;
+  }
+  return null;
+}
+
+/** The names main.ts declares with `boot.hold(createPool(environment.<KEY>…))` for the URL keys `keys`, sorted. */
+function poolsOn(source: ts.SourceFile, keys: readonly string[]): string[] {
+  return descendants(source).filter((node): node is ts.VariableDeclaration => ts.isVariableDeclaration(node)
+    && node.initializer !== undefined
+    && callsOf(node.initializer, "createPool").some((call) => keys.includes(call.arguments[0]?.getText().replace(/^environment\.|!$/gu, "") ?? "")))
+    .map((declaration) => declaration.name.getText()).sort();
+}
+
 type Sites = Readonly<{ map: Record<string, string[]>; counts: Record<string, number>; unpinnable: string[] }>;
 
 async function crossAccountSites(): Promise<Sites> {
@@ -175,6 +195,68 @@ describe("row-level security S01 C4: the apps/api cross-account sites and the T1
       const inside = matches.filter((index) => index >= calls[0]!.getStart() && index < calls[0]!.getEnd());
       expect(inside, name).toHaveLength(1);
     }
+  });
+
+  /**
+   * FIX-S01-p1b, COR-B1 (t_25f52da5): a boot read that answers for the connection's OWN principal (a role check, a
+   * capability probe) made on a T1 pool after its target is set reads the system login's catalog — outside a scope every
+   * statement goes to the target. Derived, not listed: every call in main.ts of an `assert…DatabaseRole…` function,
+   * every `.assertRole()` and the language-check writer probe. Each runs inside attestEveryRoute (the pool's own login,
+   * then its target — V-12: the recovery workers' background work runs on the target) or, for the writer probe whose
+   * writes run inside requests only, onOwnConnections.
+   */
+  it("COR-B1 every main.ts boot read that answers for the connection's own principal runs through attestEveryRoute — the writer probe through onOwnConnections — 13 calls, 12 on a T1 pool", async () => {
+    const source = await parse(MAIN);
+    const found = descendants(source).filter((node): node is ts.CallExpression => ts.isCallExpression(node)).flatMap((call) => {
+      const callee = call.expression;
+      const name = ts.isIdentifier(callee) ? callee.text : ts.isPropertyAccessExpression(callee) ? callee.name.text : "";
+      return /^assert\w*DatabaseRole\w*$/u.test(name) || name === "assertRole" || name === "languageCheckSpendWriterPresent"
+        ? [`${call.getText()} @ ${wrapperOf(call) ?? "UNWRAPPED"}`] : [];
+    });
+    expect(found).toEqual([
+      "assertAccountErasureDatabaseRole(pool,erasurePool) @ attestEveryRoute",
+      "assertAccountErasureDatabaseRole(legacyAskAdmissionPool,erasurePool) @ attestEveryRoute",
+      "assertPublicationDatabaseRoleSeparation(pool, authorizationPool) @ attestEveryRoute",
+      "assertPublicationCleanupDatabaseRole(publicationCleanupPool) @ attestEveryRoute",
+      "assertContentProvisionDatabaseRole(pool,contentProvisionPool) @ attestEveryRoute",
+      "assertContentProvisionDatabaseRole(pool,serverAskAdmissionPool) @ attestEveryRoute",
+      "assertDataExportDatabaseRoles(authorizationPool, dataExportPool) @ attestEveryRoute",
+      "languageCheckSpendWriterPresent(pool) @ onOwnConnections",
+      "passwordResetRepository.assertRole() @ attestEveryRoute",
+      "backupEmailRepository.assertRole() @ attestEveryRoute",
+      "mfaRecoveryRepository.assertRole() @ attestEveryRoute",
+      "assertSupportDatabaseRole(pool, supportPool) @ attestEveryRoute",
+      "assertSupportDatabaseRole(pool, supportRelayLeasePool) @ attestEveryRoute"
+    ]);
+  });
+
+  it("COR-B1 boot.run(\"account-context-logins\") calls assertAccountContextLogins once, after boot.run(\"database-roles\") and before the first register read, over every pool main.ts builds on a T1 URL (requestPools) and every pool it builds on a system URL (systemPools)", async () => {
+    const source = await parse(MAIN);
+    const boots = bootCalls(source);
+    const stage = boots.get("account-context-logins") ?? [];
+    expect(stage).toHaveLength(1);
+    const calls = callsOf(stage[0]!, "assertAccountContextLogins");
+    expect(calls).toHaveLength(1);
+    const options = calls[0]!.arguments[0];
+    expect(options !== undefined && ts.isObjectLiteralExpression(options)).toBe(true);
+    const listed = (name: string): string[] => {
+      const property = (options as ts.ObjectLiteralExpression).properties
+        .find((member): member is ts.PropertyAssignment => ts.isPropertyAssignment(member) && member.name.getText() === name);
+      return property !== undefined && ts.isArrayLiteralExpression(property.initializer)
+        ? property.initializer.elements.map((element) => element.getText()).sort() : [];
+    };
+    const request = poolsOn(source, ["DATABASE_URL", "AUTHORIZATION_DATABASE_URL"]);
+    const system = poolsOn(source, ["API_SYSTEM_DATABASE_URL", "API_AUTHORIZATION_SYSTEM_DATABASE_URL"]);
+    expect({ request, system }).toEqual({
+      request: ["authorizationPool", "legacyAskAdmissionPool", "pool", "releaseWatchPool"],
+      system: ["authorizationSystemPool", "roomDecisionPool", "systemPool"]
+    });
+    expect({ requestPools: listed("requestPools"), systemPools: listed("systemPools") }).toEqual({ requestPools: request, systemPools: system });
+    const roles = boots.get("database-roles") ?? [];
+    const firstRegisterRead = boots.get("auth-policy") ?? [];
+    expect([roles.length, firstRegisterRead.length]).toEqual([1, 1]);
+    expect(stage[0]!.getStart()).toBeGreaterThan(roles[0]!.getEnd());
+    expect(stage[0]!.getEnd()).toBeLessThan(firstRegisterRead[0]!.getStart());
   });
 
   it("S4.5 main.ts's createBillingRuntime({ call's pool property is crossAccountPool(pool, \"X11\")", async () => {

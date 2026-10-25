@@ -12,6 +12,7 @@
  * and how many of A's and of B's runs it sees — the observables of R7/R8 a keyed product read cannot show.
  */
 import { randomBytes } from "node:crypto";
+import { EventEmitter } from "node:events";
 import { request as httpRequest } from "node:http";
 import { setTimeout as sleep } from "node:timers/promises";
 import pg from "pg";
@@ -54,6 +55,19 @@ let floatNext = false;
 let floating: Promise<Outcome> | undefined;
 let responded = false;
 let signInProbe: Probe | undefined;
+/**
+ * S4.1-h: requests a preParsing step hands to a loop started outside every request (a queue drained by a timer made in
+ * beforeAll), so their body parsing and every later stage resume in a fresh async context — the case the preValidation
+ * re-entry exists for (Fastify 5.12.5 rebinds a content-type parser's `done` to the context the parser STARTED in,
+ * fastify/lib/content-type-parser.js:206-212, so only an earlier stage can lose the scope).
+ */
+const PARK_HEADER = "x-rls-request-scope-park";
+const parked: (() => void)[] = [];
+let drain: ReturnType<typeof setInterval> | undefined;
+/** S4.1-i: an emitter shared across requests, made outside every request; a handler registers a listener on it. */
+const shared = new EventEmitter();
+let escapeNext = false;
+let escaped: Promise<Outcome> | undefined;
 
 async function probe(pool: Pool): Promise<Probe> {
   const { rows } = await pool.query<{ login: string; context_user: string | null; runs_a: number; runs_b: number }>(
@@ -145,6 +159,13 @@ beforeAll(async () => {
         latest: async (ownerRef, kind) => {
           if (jitter) await sleep(Math.floor(Math.random() * 6));
           observations.push(Object.freeze({ ownerRef, probe: await probe(pools.runtime) }));
+          if (escapeNext) {
+            escapeNext = false;
+            // Registered here, inside the request's scope; the emitter calls it later from outside every request.
+            shared.once("tick", () => {
+              escaped = probe(pools.runtime).then((value): Outcome => ({ value }), (error: unknown): Outcome => ({ error: String(error) }));
+            });
+          }
           if (floatNext) {
             floatNext = false;
             // Started here and never awaited by the handler: it runs after the response is sent.
@@ -172,6 +193,15 @@ beforeAll(async () => {
     if (request.url === "/v1/auth/login") signInProbe = await probe(pools.runtime);
     return payload;
   });
+  // S4.1-h: the drain runs in beforeAll's async context, outside every request scope.
+  drain = setInterval(() => { for (const resume of parked.splice(0)) resume(); }, 5);
+  api.addHook("preParsing", (request, _reply, payload, done) => {
+    if (request.headers[PARK_HEADER] === "1") {
+      parked.push(() => { done(null, payload); });
+      return;
+    }
+    done(null, payload);
+  });
   await api.ready();
   // S4.1-d: a timer started at boot, outside every request, as main.ts's background loops are.
   bootTimer = await new Promise<Outcome>((resolve) => {
@@ -182,6 +212,7 @@ beforeAll(async () => {
 }, 300_000);
 
 afterAll(async () => {
+  if (drain !== undefined) clearInterval(drain);
   await api?.close();
   if (database !== undefined) await (await provisionRlsLogins(database)).end();
   await database?.stop();
@@ -290,5 +321,28 @@ describe("row-level security S01 C4: the request scope apps/api opens for every 
     expect(response.statusCode).toBe(200);
     expect(String(response.headers["set-cookie"])).toContain(`__Host-debateai-session=${A.token};`);
     expect(signInProbe).toEqual(own(A));
+  });
+
+  it("S4.1-h COR-N1 a body-bearing request whose preParsing step resumes from a loop outside every request (so its parsing, preValidation and preHandler start in a fresh async context) still authenticates and runs as debateai_dev_runtime with the presenter's credential: the preValidation re-entry restores its scope", async () => {
+    observations.length = 0;
+    const response = await api.inject({
+      method: "POST", url: "/v1/auth/mfa/totp/begin", headers: { ...testSessionHeaders(identityB, true), [PARK_HEADER]: "1" },
+      payload: { step_up_grant: "g".repeat(43) }
+    });
+    expect({ status: response.statusCode, observations }).toEqual({ status: 200, observations: [{ ownerRef: B.ownerRef, probe: own(B) }] });
+  });
+
+  it("S4.1-i SEC-N1 (V-14's default, fail-open kept) a listener a handler registers on an emitter shared across requests, emitted later from outside every request, runs outside the request: on debateai_dev_api_system, with no account, reading every account's runs", async () => {
+    observations.length = 0;
+    escaped = undefined;
+    escapeNext = true;
+    const response = await api.inject({
+      method: "GET", url: "/v1/account/legal-status?locale=en", headers: testSessionHeaders(identityA)
+    });
+    expect(response.statusCode).toBe(200);
+    expect(observations[0]).toEqual({ ownerRef: A.ownerRef, probe: own(A) });
+    expect(shared.listenerCount("tick")).toBe(1);
+    shared.emit("tick");
+    expect(await escaped).toEqual({ value: { login: SYSTEM_LOGIN, contextUser: null, runsOfA: 1, runsOfB: 1 } });
   });
 });
