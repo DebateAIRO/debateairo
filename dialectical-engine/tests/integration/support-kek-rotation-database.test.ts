@@ -28,7 +28,6 @@ import {
   assertSupportPrincipalRole,
   migrate,
   PostgresSupportKeyRotationRepository,
-  PostgresSupportSessionRepository,
   PostgresSupportShredRepository
 } from "../../packages/db/src/index.js";
 import { generateDek } from "../../packages/crypto/src/index.js";
@@ -39,6 +38,25 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 
 let database: TestDatabase;
 const temporaryDirectories: string[] = [];
+
+async function seedSession(sessionId: string, wrappedKey: Uint8Array, token: string): Promise<void> {
+  const client = await database.pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(`INSERT INTO support.session(
+      session_id,session_token_sha256,identity_owner_ref,language,state,kb_version,created_at
+    ) VALUES($1,$2,NULL,'en','OPEN',$3,$4)`,
+    [sessionId, token.repeat(64), "2".repeat(64), new Date()]);
+    await client.query(`INSERT INTO support.session_key(session_id,wrapped_key,created_at)
+      VALUES($1,$2,$3)`, [sessionId, wrappedKey, new Date()]);
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
 
 async function supportKekPath(name: string): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "debateai-rotate-db-"));
@@ -75,29 +93,12 @@ describe("V-3 support-KEK rotation against the real columns", () => {
     const pool = database.pool;
     {
       const before = await createSupportKeyPort({ supportKekPath: oldPath });
-      const sessions = new PostgresSupportSessionRepository(
-        pool, createWrappedSupportSessionKey(before)
-      );
       const sessionId = randomUUID();
-      await sessions.create({
-        sessionId,
-        tokenSha256: "1".repeat(64),
-        identityOwnerRef: null,
-        language: "en",
-        kbVersion: "2".repeat(64),
-        createdAt: new Date()
-      });
+      await seedSession(sessionId, await createWrappedSupportSessionKey(before)(sessionId), "1");
       // A destroyed row beside it, shredded through the real SUP-07 path, so the
       // tombstone is exactly what the shred writes: 61 zero bytes, destroyed_at set.
       const shreddedId = randomUUID();
-      await sessions.create({
-        sessionId: shreddedId,
-        tokenSha256: "5".repeat(64),
-        identityOwnerRef: null,
-        language: "en",
-        kbVersion: "2".repeat(64),
-        createdAt: new Date()
-      });
+      await seedSession(shreddedId, await createWrappedSupportSessionKey(before)(shreddedId), "5");
       await new PostgresSupportShredRepository(pool).shredSession(shreddedId, "vitest", new Date());
       await before.close();
 
@@ -168,18 +169,8 @@ describe("V-3 support-KEK rotation against the real columns", () => {
     const pool = database.pool;
     {
       const keys = await createSupportKeyPort({ supportKekPath: path });
-      const sessions = new PostgresSupportSessionRepository(
-        pool, createWrappedSupportSessionKey(keys)
-      );
       const sessionId = randomUUID();
-      await sessions.create({
-        sessionId,
-        tokenSha256: "3".repeat(64),
-        identityOwnerRef: null,
-        language: "en",
-        kbVersion: "4".repeat(64),
-        createdAt: new Date()
-      });
+      await seedSession(sessionId, await createWrappedSupportSessionKey(keys)(sessionId), "3");
 
       const repository = new PostgresSupportKeyRotationRepository(pool);
       const fresh = await keys.createDataKey({ kind: "session", ref: sessionId });
