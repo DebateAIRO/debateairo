@@ -104,16 +104,8 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "GET /v1/public/debates", auth: "public", resource: "public-debate", action: "list" },
   { route: "GET /v1/public/debates/{id}", auth: "public", resource: "public-debate", action: "read" },
   { route: "GET /v1/geo/availability", auth: "public", resource: "geo", action: "read-availability" },
-  // DL1-F7: every mutating support route, anonymous callers included.
-  { route: "POST /v1/support/sessions", auth: "public", origin: "trusted", session: "optional", resource: "support-session", action: "create" },
-  { route: "GET /v1/support/sessions/{id}", auth: "public", session: "optional", resource: "support-session", action: "read" },
-  { route: "POST /v1/support/sessions/{id}/messages", auth: "public", origin: "trusted", session: "optional", resource: "support-message", action: "create" },
-  { route: "POST /v1/support/messages/{id}/rating", auth: "public", origin: "trusted", session: "optional", resource: "support-message", action: "rate" },
-  { route: "POST /v1/support/sessions/{id}/escalate", auth: "public", origin: "trusted", session: "optional", resource: "support-case", action: "create" },
-  { route: "GET /v1/support/cases", auth: "user", resource: "support-case", action: "list" },
-  // DL1-F5c/DL3-F4: the bearer is a header, never a path segment.
-  { route: "GET /v1/support/case", auth: "public", session: "optional", resource: "support-case", action: "read" },
-  { route: "POST /v1/support/case/messages", auth: "public", origin: "trusted", session: "optional", resource: "support-case", action: "reply" },
+  // One stateless message door. The removed session and case doors have no policy.
+  { route: "POST /v1/support/messages", auth: "public", origin: "trusted", session: "optional", resource: "support-message", action: "create" },
   { route: "GET /v1/support/status", auth: "public", session: "optional", resource: "support-status", action: "read" },
   { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
   { route: "GET /v1/asks/room", auth: "user", resource: "run-owner", action: "read-room" },
@@ -345,7 +337,7 @@ describe("S7 deny-by-default authorization", () => {
     // data-export S01's 3 routes.
     // Debate shape P2c adds GET /v1/answers/{id}/map.
     // The synthesis check adds the once-only removal notice route.
-    expect(contractInventory.routes).toHaveLength(178);
+    expect(contractInventory.routes).toHaveLength(171);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 

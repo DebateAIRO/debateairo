@@ -20,7 +20,7 @@ import { normalizeManualPhone } from "./phone-profile.js";
 import { answerForOutcome, keepFailureCode, type AskQuestionCheck } from "./question-check/ask-gate.js";
 import { resolveSourceMailLocale } from "./mail-locale.js";
 import { exhaustive, type FundingBasis } from "@debateai/kernel";
-import { timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
@@ -1422,21 +1422,8 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/public/debates", auth: "public", resource: "public-debate", action: "list" },
   { route: "GET /v1/public/debates/{id}", auth: "public", resource: "public-debate", action: "read" },
   { route: "GET /v1/geo/availability", auth: "public", resource: "geo", action: "read-availability" },
-  // DL1-F7: every mutating support route requires the exact first-party Origin,
-  // for anonymous callers too. Without it a page on any site could drive every
-  // one of its visitors' browsers into the support surface — spending the shared
-  // model budget from real visitors' addresses, which defeats the per-IP windows
-  // as well. The reads stay Origin-free: the widget's first paint and a case
-  // link opened from an e-mail are both GETs.
-  { route: "POST /v1/support/sessions", auth: "public", origin: "trusted", session: "optional", resource: "support-session", action: "create" },
-  { route: "GET /v1/support/sessions/{id}", auth: "public", session: "optional", resource: "support-session", action: "read" },
-  { route: "POST /v1/support/sessions/{id}/messages", auth: "public", origin: "trusted", session: "optional", resource: "support-message", action: "create" },
-  { route: "POST /v1/support/messages/{id}/rating", auth: "public", origin: "trusted", session: "optional", resource: "support-message", action: "rate" },
-  { route: "POST /v1/support/sessions/{id}/escalate", auth: "public", origin: "trusted", session: "optional", resource: "support-case", action: "create" },
-  { route: "GET /v1/support/cases", auth: "user", resource: "support-case", action: "list" },
-  // DL1-F5c/DL3-F4: the bearer is `x-support-case-token`, never a path segment.
-  { route: "GET /v1/support/case", auth: "public", session: "optional", resource: "support-case", action: "read" },
-  { route: "POST /v1/support/case/messages", auth: "public", origin: "trusted", session: "optional", resource: "support-case", action: "reply" },
+  // Anonymous support writes require the exact first-party Origin.
+  { route: "POST /v1/support/messages", auth: "public", origin: "trusted", session: "optional", resource: "support-message", action: "create" },
   { route: "GET /v1/support/status", auth: "public", session: "optional", resource: "support-status", action: "read" },
   { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
   { route: "GET /v1/asks/room", auth: "user", resource: "run-owner", action: "read-room" },
@@ -1813,6 +1800,7 @@ export interface ApiOptions {
    */
   readonly billingErasure?: Pick<BillingErasureHook, "stop">;
   readonly support?: SupportApplication;
+  readonly networkPseudonym?: (network: string) => string;
   /**
    * Paid plans G3a: the country gate on sign-up and new debates. Composed only in hosted mode when the
    * register version in force publishes `countryPolicy`; absent, every route behaves exactly as before.
@@ -2174,7 +2162,13 @@ const ONBOARDING_SIGN_IN_ROUTES: ReadonlySet<string> = new Set([
   "/v1/auth/passkeys/enrollment/complete"
 ]);
 
+export function createProcessNetworkPseudonym(): (network: string) => string {
+  const key = randomBytes(32);
+  return (network) => createHmac("sha256", key).update(network, "utf8").digest("hex");
+}
+
 export function buildApi(options: ApiOptions): FastifyInstance {
+  const processNetworkPseudonym = createProcessNetworkPseudonym();
   const previewConfig=validatePreviewProviderTestConfig(options.previewProviderTestConfig);
   // Crisis check: compile its patterns now, not on the first question (about a second, once).
   warmCrisisCheck();
@@ -3444,7 +3438,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   api.get("/v1/geo/availability", routePolicy("GET /v1/geo/availability"), async (request, reply) => {
     const source = sourceFor(request);
     if (options.admission?.configured("geoAvailability") === true
-      && !admitOrRefuse(reply, "geoAvailability", "GET /v1/geo/availability", clientIpNetworkScope(source.ip))) {
+      && !admitOrRefuse(reply, "geoAvailability", "GET /v1/geo/availability",
+        (options.networkPseudonym ?? processNetworkPseudonym)(clientIpNetworkScope(source.ip)))) {
       return reply;
     }
     // No gate composed (local mode, or hosted without countryPolicy): sign-up is open and payment is
