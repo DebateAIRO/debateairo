@@ -117,10 +117,11 @@ describe("P13 the cancel link on real PostgreSQL", () => {
     expect(mails[0]).toMatchObject({ to: "subscriber@example.test", templateId: "M9", locale: "en", attachments: [] });
     expect(mails[0]!.params.cancelLinkUrl).toMatch(new RegExp(`^${TEST_PUBLIC_APP_URL}/cancel#token=[A-Za-z0-9_-]{43}$`));
     const token = tokenOf(mails[0]!);
-    const stored = await database.pool.query<{ token_sha256: string }>(
-      "SELECT token_sha256 FROM billing.cancel_token WHERE subscription_id=$1", [seeded.subscriptionId]
+    // V-15 (SEC-B1): the link is issued with its owner, the column 0124's row security reads.
+    const stored = await database.pool.query<{ token_sha256: string; owner_ref: string | null }>(
+      "SELECT token_sha256, owner_ref::text AS owner_ref FROM billing.cancel_token WHERE subscription_id=$1", [seeded.subscriptionId]
     );
-    expect(stored.rows).toEqual([{ token_sha256: cancelTokenSha256(token) }]);
+    expect(stored.rows).toEqual([{ token_sha256: cancelTokenSha256(token), owner_ref: ownerRef }]);
     expect(JSON.stringify(stored.rows)).not.toContain(token);
     expect(await links.cancelByToken(token)).toBe("CANCELLED");
     const events = await new BillingRepository(database.pool).subscriptionEvents(seeded.subscriptionId);

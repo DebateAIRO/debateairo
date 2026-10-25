@@ -12,7 +12,8 @@
 --       debateai_runtime to debateai_billing_runtime (D33);
 --   (5) on each of the 110 in-scope tables, in D32's row order: row security enabled (never forced), policy
 --       rls_account TO debateai_runtime with D32's per-account predicate as USING and WITH CHECK, and policy
---       rls_all_accounts TO the eleven cross-account roles of D29 with USING (true) WITH CHECK (true).
+--       rls_all_accounts TO the eleven cross-account roles of D29 with USING (true) WITH CHECK (true); billing.cancel_token
+--       first gains its own owner_ref and keys on it (V-15's default, REV-S01-p1-security B1), not on D32's key.
 -- The loader (packages/db/src/migration-forward0124.ts) digests every RLS field of the 110 tables, the views, the
 -- functions and the marker role, and records the six earlier postconditions that pinned the flag as amended (D38, F-C1-1).
 -- Its verifier supersedes 0111's (lineage/verify-effective-capabilities-124.sql, R34), so the header keeps none.
@@ -71,11 +72,23 @@ REVOKE SELECT ON core.run_waiting_v FROM debateai_runtime;
 GRANT SELECT ON core.run_waiting_v TO debateai_billing_runtime;
 
 -- (5) The 110 in-scope tables, in D32's row order.
--- 1 · billing.cancel_token · K7 (ARCH key, D32)
+-- 1 · billing.cancel_token · K2 (V-15's default; D32's K7 key was an EXISTS over billing.subscription_event, whose
+--     subscription_id any account may append under its own owner_ref, so one own event naming another account's
+--     subscription read and wrote that account's links: REV-S01-p1-security B1, t_37152b67). The link carries its own
+--     owner: set at issue (packages/db/src/billing.ts insertCancelToken, from apps/api/src/billing/cancel-link.ts), and
+--     here backfilled with the owner of its subscription's first event, the owner cancelByToken acts for. A link whose
+--     subscription has no event keeps NULL, which no context matches. The backfill is an UPDATE of an append-only table,
+--     so its statement guard is off for that one statement and back on before the policies, in this step's transaction.
+ALTER TABLE billing.cancel_token ADD COLUMN IF NOT EXISTS owner_ref uuid;
+ALTER TABLE billing.cancel_token DISABLE TRIGGER reject_mutation;
+UPDATE billing.cancel_token AS token SET owner_ref = (SELECT event.owner_ref FROM billing.subscription_event AS event
+  WHERE event.subscription_id = token.subscription_id ORDER BY event.seq LIMIT 1);
+ALTER TABLE billing.cancel_token ENABLE TRIGGER reject_mutation;
 ALTER TABLE billing.cancel_token ENABLE ROW LEVEL SECURITY;
-CREATE POLICY rls_account ON billing.cancel_token AS PERMISSIVE FOR ALL TO debateai_runtime USING ((EXISTS (SELECT 1 FROM billing.subscription_event p WHERE p.subscription_id = cancel_token.subscription_id))) WITH CHECK ((EXISTS (SELECT 1 FROM billing.subscription_event p WHERE p.subscription_id = cancel_token.subscription_id)));
+CREATE POLICY rls_account ON billing.cancel_token AS PERMISSIVE FOR ALL TO debateai_runtime USING ((owner_ref = (SELECT rls.context_owner_ref()))) WITH CHECK ((owner_ref = (SELECT rls.context_owner_ref())));
 CREATE POLICY rls_all_accounts ON billing.cancel_token AS PERMISSIVE FOR ALL TO debateai_rls_all_accounts, debateai_replay, debateai_settlement_watch, debateai_evaluator_worker, debateai_staff_security_owner, debateai_mfa_recovery_owner, debateai_password_recovery_owner, debateai_password_reset_owner, debateai_obs_view_owner, debateai_backup_email_owner, debateai_release_owner USING (true) WITH CHECK (true);
--- 2 · billing.cancel_token_use · K7 (ARCH key, D32)
+-- 2 · billing.cancel_token_use · K7 (ARCH key, D32), through billing.cancel_token's primary key (a foreign key holds every
+--     use to its link) and so through the link's own owner since V-15
 ALTER TABLE billing.cancel_token_use ENABLE ROW LEVEL SECURITY;
 CREATE POLICY rls_account ON billing.cancel_token_use AS PERMISSIVE FOR ALL TO debateai_runtime USING ((EXISTS (SELECT 1 FROM billing.cancel_token p WHERE p.token_sha256 = cancel_token_use.token_sha256))) WITH CHECK ((EXISTS (SELECT 1 FROM billing.cancel_token p WHERE p.token_sha256 = cancel_token_use.token_sha256)));
 CREATE POLICY rls_all_accounts ON billing.cancel_token_use AS PERMISSIVE FOR ALL TO debateai_rls_all_accounts, debateai_replay, debateai_settlement_watch, debateai_evaluator_worker, debateai_staff_security_owner, debateai_mfa_recovery_owner, debateai_password_recovery_owner, debateai_password_reset_owner, debateai_obs_view_owner, debateai_backup_email_owner, debateai_release_owner USING (true) WITH CHECK (true);

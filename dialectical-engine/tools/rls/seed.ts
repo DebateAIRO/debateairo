@@ -286,8 +286,8 @@ export const RLS_SEED_STEPS: readonly RlsSeedStep[] = Object.freeze([
   } },
   { relation: "billing.cancel_token", run: async (insert, _q, w) => {
     w.made.set("cancel_token", await insert("billing.cancel_token", `INSERT INTO billing.cancel_token
-      (token_sha256,subscription_id,issued_at,expires_at) VALUES($1,$2,now(),now()+interval '1 day')`,
-    [hex(32), made(w, "subscription_event").subscription_id]));
+      (token_sha256,subscription_id,issued_at,expires_at,owner_ref) VALUES($1,$2,now(),now()+interval '1 day',$3)`,
+    [hex(32), made(w, "subscription_event").subscription_id, w.account.ownerRef]));
   } },
   { relation: "billing.cancel_token_use", run: async (insert, _q, w) => {
     w.made.set("cancel_token_use", await insert("billing.cancel_token_use", `INSERT INTO billing.cancel_token_use(token_sha256,used_at)

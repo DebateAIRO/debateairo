@@ -47,6 +47,20 @@ const T1_LOGINS = Object.freeze(["debateai_prod_api_runtime", "debateai_prod_api
 const MANIFEST_PATH = fileURLToPath(new URL(
   "../../docs/missions/2026-08-17-accounts-privacy-security/P3-01-production-database-principals.json", import.meta.url));
 
+/**
+ * SEC-B1's class (REV-S01-p1-security §2 B1, V-15): a per-account check that a row the requester may write can meet. An
+ * `rls_account` predicate is ANCHORED when it compares the row's own account key with the verified context, or calls a
+ * context function over the trust anchors (SPEC-v4 T8; the forgery families of rls-forgery.test.ts); otherwise it is a PARENT check,
+ * `EXISTS (SELECT 1 FROM <parent> p WHERE p.<col> = <child>.<col> AND …)`, whose subquery sees the parent rows the
+ * context owns. A parent check holds only when no T1 login can make an own parent row that matches another account's
+ * child row: the compared parent columns hold a unique key, every child row has its parent by a validated foreign key
+ * (so no child row waits for a parent a requester could insert with a chosen key), no T1 login re-keys the parent, and
+ * the parent's own check holds.
+ */
+const ANCHORED_CHECK = /^(?:\((?:owner_ref|user_id) = \( SELECT rls\.context_(?:owner_ref|user_id)\(\) AS context_(?:owner_ref|user_id)\)\)|false|rls\.owns_run\([a-z0-9_]+\)|rls\.owns_execution_ref\([a-z0-9_]+\))$/u;
+const PARENT_CHECK = /^\(EXISTS \( SELECT 1\n {3}FROM ([a-z0-9_]+\.[a-z0-9_]+) p\n {2}WHERE (.+)\)\)$/su;
+const PARENT_PAIR = /\(p\.([a-z0-9_]+) = ([a-z0-9_]+)\.([a-z0-9_]+)\)/gu;
+
 type ManifestRole = Readonly<{ id?: string; roleName: string; forbiddenMemberships?: readonly string[] }>;
 type Manifest = Readonly<{ principals: readonly ManifestRole[]; capabilityRoles: readonly ManifestRole[];
   ownershipRoles: readonly ManifestRole[]; provisioner: Readonly<{ managedPrincipalIds: readonly string[] }> }>;
@@ -68,15 +82,95 @@ afterAll(async () => {
   await database?.stop();
 });
 
+/**
+ * FIX-S01-p1a NEW-1 (measured 2026-10-25 on debateai_dev_runtime and debateai_prod_api_runtime, A's live credential: an
+ * unmatched payment_notice, its outcome, an unmatched notice_quarantine row and a card_token_revocation whose token
+ * 0111's purge_revoked_card_tokens deleted each became readable, 0 → 1, once A inserted an own parent row carrying the
+ * key). Its parent keys are unique, so no duplicate is possible; the child rows simply need no parent row. The remedy
+ * (a foreign key, or an owner column filled by the NETOPIA writers) is outside FIX-S01-p1a's contract, so the set is
+ * pinned here: a new member, or a fixed one, moves it.
+ */
+const ORPHAN_CLAIM_RESIDUE: readonly string[] = Object.freeze([
+  "billing.card_token",
+  "billing.card_token_revocation",
+  "billing.notice_quarantine",
+  "billing.payment_notice",
+  "billing.payment_notice_outcome via billing.payment_notice",
+  "billing.payment_notice_raw via billing.payment_notice"
+]);
+
+type ClassVerdict = Readonly<{ kind: "ANCHORED" | "HOLDS" | "NON_UNIQUE" | "REKEY" | "ORPHAN" | "UNRECOGNIZED"; via?: string }>;
+let swept: Promise<Readonly<{ verdicts: ReadonlyMap<string, ClassVerdict>; unrecognized: readonly string[] }>> | undefined;
+
+/** SEC-B1's class, member by member (one line per parent check), computed once from the catalog at head. */
+function classSweep(): Promise<Readonly<{ verdicts: ReadonlyMap<string, ClassVerdict>; unrecognized: readonly string[] }>> {
+  swept ??= (async () => {
+    const tables = RLS_IN_SCOPE.filter(({ kind }) => kind === "r").map(({ relation }) => relation);
+    const checks = new Map((await database.pool.query(`SELECT relation, pg_get_expr(p.polqual, p.polrelid) AS using_expr
+      FROM unnest($1::text[]) AS relation JOIN pg_policy p ON p.polrelid = to_regclass(CASE WHEN relation = 'identity.user'
+        THEN 'identity."user"' ELSE relation END) AND p.polname = 'rls_account'`, [tables])).rows
+      .map((row) => [row.relation as string, row.using_expr as string] as const));
+    expect([...checks.keys()].sort()).toEqual([...tables].sort());
+    const verdicts = new Map<string, ClassVerdict>();
+    const unrecognized: string[] = [];
+    const verdictOf = async (child: string): Promise<ClassVerdict> => {
+      const known = verdicts.get(child);
+      if (known !== undefined) return known;
+      const text = checks.get(child);
+      const settle = (verdict: ClassVerdict): ClassVerdict => { verdicts.set(child, verdict); return verdict; };
+      if (text !== undefined && ANCHORED_CHECK.test(text)) return settle({ kind: "ANCHORED" });
+      const parsed = text === undefined ? null : PARENT_CHECK.exec(text);
+      const pairs = parsed === null ? [] : [...parsed[2]!.matchAll(PARENT_PAIR)].map((m) => ({ parent: m[1]!, alias: m[2]!, child: m[3]! }));
+      if (parsed === null || pairs.length === 0 || pairs.some(({ alias }) => alias !== child.split(".")[1])
+        || parsed[2]!.replaceAll(PARENT_PAIR, "").replace(/^\(|\)$/gu, "").split(" AND ").some((rest) => rest !== "")) {
+        unrecognized.push(`${child} ${JSON.stringify(text)}`);
+        return settle({ kind: "UNRECOGNIZED" });
+      }
+      const parent = parsed[1]!;
+      const facts = (await database.pool.query(`SELECT
+          (SELECT string_agg(i.indexrelid::regclass::text, ',' ORDER BY 1) FROM pg_index i
+            WHERE i.indrelid = $1::regclass AND i.indisunique AND i.indpred IS NULL AND i.indexprs IS NULL
+              AND (SELECT bool_and(a.attname = ANY ($2::text[])) FROM unnest(i.indkey::int2[]) AS k(attnum)
+                JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum)) AS unique_keys,
+          (SELECT string_agg(k.conname, ',' ORDER BY 1) FROM pg_constraint k
+            WHERE k.contype = 'f' AND k.convalidated AND k.conrelid = $3::regclass AND k.confrelid = $1::regclass
+              AND (SELECT bool_and(pa.attname || '=' || ca.attname = ANY ($4::text[])) FROM unnest(k.conkey, k.confkey) AS u(ck, pk)
+                JOIN pg_attribute ca ON ca.attrelid = k.conrelid AND ca.attnum = u.ck
+                JOIN pg_attribute pa ON pa.attrelid = k.confrelid AND pa.attnum = u.pk)) AS foreign_keys,
+          (SELECT string_agg(l, ',' ORDER BY 1) FROM unnest($5::text[]) AS l
+            WHERE has_table_privilege(l, $1::regclass, 'INSERT') OR has_any_column_privilege(l, $1::regclass, 'INSERT')) AS inserters,
+          (SELECT string_agg(l || ':' || col, ',' ORDER BY 1) FROM unnest($5::text[]) AS l CROSS JOIN unnest($2::text[]) AS col
+            WHERE has_column_privilege(l, $1::regclass, col, 'UPDATE')) AS rekeyers`,
+      [parent, pairs.map((pair) => pair.parent), rlsRelationSql(child), pairs.map((pair) => `${pair.parent}=${pair.child}`),
+        T1_LOGINS])).rows[0] as { unique_keys: string | null; foreign_keys: string | null; inserters: string | null; rekeyers: string | null };
+      const upstream = await verdictOf(parent);
+      // A parent key no unique index covers lets a T1 login that inserts the parent duplicate another account's key
+      // (SEC-B1); a child row with no foreign key to its parent can wait for a parent a T1 login inserts with that key.
+      const verdict: ClassVerdict = facts.unique_keys === null && facts.inserters !== null ? { kind: "NON_UNIQUE" }
+        : facts.rekeyers !== null ? { kind: "REKEY" }
+        : facts.foreign_keys === null && facts.inserters !== null ? { kind: "ORPHAN" }
+        : upstream.kind === "ANCHORED" || upstream.kind === "HOLDS" ? { kind: "HOLDS" }
+        : { kind: upstream.kind, via: parent };
+      console.info(`SEC-B1 CLASS child=${child} parent=${parent} pairs=${pairs.map((pair) => `p.${pair.parent}=c.${pair.child}`).join("&")} `
+        + `unique=${facts.unique_keys ?? "NO"} fk=${facts.foreign_keys ?? "NO"} t1_insert_parent=${facts.inserters ?? "none"} `
+        + `t1_rekey_parent=${facts.rekeyers ?? "none"} parent_check=${upstream.kind} verdict=${verdict.kind}${verdict.via === undefined ? "" : `:via-${verdict.via}`}`);
+      return settle(verdict);
+    };
+    for (const table of tables) await verdictOf(table);
+    return Object.freeze({ verdicts, unrecognized: Object.freeze([...unrecognized]) });
+  })();
+  return swept;
+}
+
 describe("row-level security S01 C6: the catalog keeps every T1 login inside its own account", () => {
-  it("S6.4-a R15 a verbatim copy of probes/REQ-FIX-RLS-2/policy-reach-v3.sql, run with the 4 T1 logins provisioned, prints texts whose set EQUALS RLS_ALLOW_LIST (39)", async () => {
+  it("S6.4-a R15 a verbatim copy of probes/REQ-FIX-RLS-2/policy-reach-v3.sql, run with the 4 T1 logins provisioned, prints texts whose set EQUALS RLS_ALLOW_LIST (38)", async () => {
     expect(createHash("sha256").update(POLICY_REACH_V3_SQL).digest("hex")).toBe(POLICY_REACH_V3_SHA256);
     const present = (await database.pool.query("SELECT rolname FROM pg_roles WHERE rolname = ANY ($1::text[]) ORDER BY 1",
       [T1_LOGINS])).rows.map((row) => row.rolname as string);
     expect(present).toEqual([...T1_LOGINS].sort());
     const rows = (await database.pool.query(POLICY_REACH_V3_SQL)).rows as { using_expr: string | null; check_expr: string | null }[];
     const texts = [...new Set(rows.flatMap((row) => [row.using_expr, row.check_expr]).filter((text): text is string => text !== null))];
-    expect(RLS_ALLOW_LIST).toHaveLength(39);
+    expect(RLS_ALLOW_LIST).toHaveLength(38);
     expect(texts.sort()).toEqual([...RLS_ALLOW_LIST].sort());
   });
 
@@ -105,6 +199,27 @@ describe("row-level security S01 C6: the catalog keeps every T1 login inside its
     expect(memberships).toHaveLength(44);
     const held = memberships.filter(({ member }) => member).map(({ login, role }) => `RLS_FAIL ${login} ${role} R19 member`);
     expect([...missing, ...held]).toEqual([]);
+  });
+
+  it("S6.4-e R7, R13 (SEC-B1, V-15) no rls_account check keys on a parent key a T1 login can duplicate or re-key, and every check is anchored or a parent check this sweep reads", async () => {
+    const sweep = await classSweep();
+    console.info(`SEC-B1 CLASS FRAME tables=${sweep.verdicts.size} anchored=${[...sweep.verdicts.values()].filter(({ kind }) => kind === "ANCHORED").length} `
+      + `parent_checks=${[...sweep.verdicts.values()].filter(({ kind }) => kind !== "ANCHORED").length} `
+      + `holds=${[...sweep.verdicts.values()].filter(({ kind }) => kind === "HOLDS").length} `
+      + `orphan_claims=${[...sweep.verdicts.values()].filter(({ kind }) => kind === "ORPHAN").length} `
+      + `bridges=${[...sweep.verdicts.values()].filter(({ kind }) => kind === "NON_UNIQUE" || kind === "REKEY").length}`);
+    expect({
+      unrecognized: sweep.unrecognized,
+      bridges: [...sweep.verdicts].filter(([, { kind }]) => kind === "NON_UNIQUE" || kind === "REKEY" || kind === "UNRECOGNIZED")
+        .map(([child, verdict]) => `${child} ${verdict.kind}${verdict.via === undefined ? "" : ` via ${verdict.via}`}`)
+    }).toEqual({ unrecognized: [], bridges: [] });
+  });
+
+  it("S6.4-f R7 (FIX-S01-p1a NEW-1, the orphan-claim residue) the parent checks a child row without its parent row lets a T1 login meet are exactly these six", async () => {
+    const sweep = await classSweep();
+    expect([...sweep.verdicts].filter(([, { kind }]) => kind === "ORPHAN")
+      .map(([child, verdict]) => `${child}${verdict.via === undefined ? "" : ` via ${verdict.via}`}`).sort())
+      .toEqual([...ORPHAN_CLAIM_RESIDUE].sort());
   });
 
   it("S6.4-d R17 rolconfig is null for every role of the P3-01 manifest and of DEVELOPMENT_DATABASE_PRINCIPALS", async () => {

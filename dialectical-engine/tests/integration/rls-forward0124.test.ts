@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 // Test-only, as tests/integration/migration-per-step.test.ts:3-15: loadMigrationPlan returns the real plan with its
@@ -332,6 +332,78 @@ describe("S1.2 migration 0124 on an empty database", () => {
     });
     await expect(db.pool.query(verifier)).resolves.toBeDefined();
   });
+
+  it("S1.2-T17 (R28, SEC-N5) an amended step is compared against its latest amendment's digest, never its receipt's; an unamended step against its receipt", async () => {
+    const ZERO = "0".repeat(64);
+    const receiptOf = async (step: string): Promise<string> => (await db.pool.query<{ digest: string }>(
+      "SELECT postcondition_evidence_digest AS digest FROM public.debateai_schema_migration_step WHERE source_name=$1", [step])).rows[0]!.digest;
+    const amendmentOf = async (step: string, by: string): Promise<string> => (await db.pool.query<{ digest: string }>(
+      "SELECT postcondition_evidence_digest AS digest FROM public.debateai_schema_migration_step_amendment WHERE source_name=$1 AND amended_by=$2",
+      [step, by])).rows[0]!.digest;
+    const setReceipt = (step: string, digest: string) => db.pool.query(
+      "UPDATE public.debateai_schema_migration_step SET postcondition_evidence_digest=$2 WHERE source_name=$1", [step, digest]);
+    const setAmendment = (step: string, by: string, digest: string) => db.pool.query(
+      "UPDATE public.debateai_schema_migration_step_amendment SET postcondition_evidence_digest=$3 WHERE source_name=$1 AND amended_by=$2",
+      [step, by, digest]);
+    const NETOPIA = "0111_billing_netopia.sql";
+    const receipt = await receiptOf(NETOPIA);
+    const amended = await amendmentOf(NETOPIA, HEAD);
+    // 0124 turned row security on for eight of 0111's tables, so 0111's receipt no longer matches the catalog.
+    expect(receipt).not.toBe(amended);
+    // (a) the amendment is the one comparand: a receipt that now matches the catalog does not excuse a drifted amendment.
+    await setReceipt(NETOPIA, amended);
+    await setAmendment(NETOPIA, HEAD, ZERO);
+    try {
+      await expect(migrate(db.pool)).rejects.toThrow(`POSTCONDITION_DRIFT ${NETOPIA}`);
+    } finally {
+      await setAmendment(NETOPIA, HEAD, amended);
+      await setReceipt(NETOPIA, receipt);
+    }
+    // (b) and the receipt is not compared at all: a drifted receipt of an amended step passes.
+    await setReceipt(NETOPIA, ZERO);
+    try {
+      expect(await outcome(migrate(db.pool))).toEqual({ ok: true });
+    } finally {
+      await setReceipt(NETOPIA, receipt);
+    }
+    // (c) a step nobody amended keeps its receipt as the comparand.
+    const PRICES = "0113_billing_price_currencies.sql";
+    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step_amendment WHERE source_name=$1",
+      [PRICES])).rows[0].n).toBe(0);
+    const prices = await receiptOf(PRICES);
+    await setReceipt(PRICES, ZERO);
+    try {
+      await expect(migrate(db.pool)).rejects.toThrow(`POSTCONDITION_DRIFT ${PRICES}`);
+    } finally {
+      await setReceipt(PRICES, prices);
+    }
+    // (d) with two amendments of one step, the one with the greatest amended_by decides: a later probe step amends 0117
+    // as 0124 did (its digest re-measured after it, so equal), then each amendment in turn is drifted.
+    const SHAPE = "0117_debate_shape_map.sql";
+    const PROBE = "0199_probe_amendment.sql";
+    const { relations, policies } = AMENDMENTS.find(({ step }) => step === SHAPE)!;
+    const declared = { step: SHAPE, relations, field: "relrowsecurity" as const, value: true as const, policies };
+    chain.shape = (steps) => [...steps, probe(steps.at(-1) as ChainStep, [declared])];
+    const shape = await amendmentOf(SHAPE, HEAD);
+    try {
+      expect(await outcome(migrate(db.pool))).toEqual({ ok: true });
+      expect(await amendmentOf(SHAPE, PROBE)).toBe(shape);
+      await setAmendment(SHAPE, HEAD, ZERO);
+      expect(await outcome(migrate(db.pool))).toEqual({ ok: true });
+      await setAmendment(SHAPE, HEAD, shape);
+      await setAmendment(SHAPE, PROBE, ZERO);
+      await expect(migrate(db.pool)).rejects.toThrow(`POSTCONDITION_DRIFT ${SHAPE}`);
+    } finally {
+      chain.shape = undefined;
+      await setAmendment(SHAPE, HEAD, shape);
+      await db.pool.query("DELETE FROM public.debateai_schema_migration_step_amendment WHERE amended_by=$1", [PROBE]);
+      await db.pool.query("DELETE FROM public.debateai_schema_migration_step_n1 WHERE source_name=$1", [PROBE]);
+      await db.pool.query("DELETE FROM public.debateai_schema_migration_step WHERE source_name=$1", [PROBE]);
+      await db.pool.query("DELETE FROM public.debateai_schema_migration WHERE name=$1", [PROBE]);
+    }
+    expect(await outcome(migrate(db.pool))).toEqual({ ok: true });
+    expect(await lastApplied(db)).toBe(HEAD);
+  }, 600_000);
 });
 
 describe("S1.2 migration 0124 on a database the release before migrated", () => {
@@ -339,6 +411,9 @@ describe("S1.2 migration 0124 on a database the release before migrated", () => 
   let before: Awaited<ReturnType<typeof amendedSnapshot>>;
   let head: Outcome;
   let after: Awaited<ReturnType<typeof amendedSnapshot>>;
+  /** T18's links, issued before 0124: one whose subscription a later event of another owner also names, one with no event. */
+  const links = { first: randomUUID(), later: randomUUID(), subscription: randomUUID(), bridged: randomBytes(32).toString("hex"),
+    orphan: randomBytes(32).toString("hex") };
   beforeAll(async () => {
     db = await startTestDatabase();
     chain.shape = (steps) => steps.filter((step) => (step as ChainStep).name <= PREVIOUS);
@@ -346,6 +421,15 @@ describe("S1.2 migration 0124 on a database the release before migrated", () => 
       await migrate(db.pool);
     } finally {
       chain.shape = undefined;
+    }
+    for (const owner of [links.first, links.later]) {
+      await db.pool.query(`INSERT INTO billing.subscription_event(event_id,subscription_id,owner_ref,kind,at,plan_id,data)
+        VALUES($1,$2,$3,'CREATED',now(),'PLUS',$4::jsonb)`,
+      [randomUUID(), links.subscription, owner, JSON.stringify({ payment_provider: "netopia", payment_environment: "sandbox" })]);
+    }
+    for (const [token, subscription] of [[links.bridged, links.subscription], [links.orphan, randomUUID()]] as const) {
+      await db.pool.query(`INSERT INTO billing.cancel_token(token_sha256,subscription_id,issued_at,expires_at)
+        VALUES($1,$2,now(),now()+interval '1 day')`, [token, subscription]);
     }
     before = await amendedSnapshot(db);
     head = await outcome(migrate(db.pool));
@@ -362,6 +446,20 @@ describe("S1.2 migration 0124 on a database the release before migrated", () => 
     expect(before.map(({ relation }) => relation)).toEqual(RLS_AMENDED.map(({ relation }) => relation).sort());
     for (const row of before) expect([row.relation, row.relrowsecurity, row.relforcerowsecurity, row.policies]).toEqual([row.relation, false, false, []]);
     expect(after).toEqual(before.map((row) => ({ ...row, relrowsecurity: true, policies: POLICIES })));
+  });
+
+  it("S1.2-T18 (SEC-B1, V-15) 0124 gives each existing cancel link the owner of its subscription's first event, leaves a link with no event ownerless, and keeps the table append-only", async () => {
+    const column = (await db.pool.query(`SELECT format_type(a.atttypid,a.atttypmod) AS type,a.attnotnull AS required FROM pg_attribute a
+      WHERE a.attrelid='billing.cancel_token'::regclass AND a.attname='owner_ref' AND NOT a.attisdropped`)).rows;
+    expect(column).toEqual([{ type: "uuid", required: false }]);
+    const owners = (await db.pool.query(`SELECT token_sha256,owner_ref::text AS owner_ref FROM billing.cancel_token
+      WHERE token_sha256=ANY($1::text[]) ORDER BY token_sha256=$2 DESC`, [[links.bridged, links.orphan], links.bridged])).rows;
+    expect(owners).toEqual([{ token_sha256: links.bridged, owner_ref: links.first }, { token_sha256: links.orphan, owner_ref: null }]);
+    const guard = (await db.pool.query(`SELECT tgenabled::text AS enabled FROM pg_trigger WHERE tgrelid='billing.cancel_token'::regclass
+      AND tgname='reject_mutation'`)).rows;
+    expect(guard).toEqual([{ enabled: "O" }]);
+    await expect(db.pool.query("UPDATE billing.cancel_token SET owner_ref=$1 WHERE token_sha256=$2", [links.later, links.bridged]))
+      .rejects.toMatchObject({ code: "55000" });
   });
 });
 

@@ -135,7 +135,7 @@ export class CancelLinkService {
       );
       if (recent >= LINKS_PER_DAY) return false;
       await this.deps.billing.insertCancelToken(client, {
-        tokenSha256: cancelTokenSha256(token), subscriptionId: state.subscriptionId,
+        tokenSha256: cancelTokenSha256(token), subscriptionId: state.subscriptionId, ownerRef,
         issuedAt: now, expiresAt: new Date(now.getTime() + DAY_MS)
       });
       return true;

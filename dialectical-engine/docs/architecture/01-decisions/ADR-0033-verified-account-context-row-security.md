@@ -46,6 +46,14 @@ login can write — a setting, a role, a function argument — makes the databas
 - Every new account-keyed table must get the two policies in the migration that creates it (its predicate one of the
   shapes of S01 DECISIONS D32), and every new repository method that must read across accounts must take an id and
   be added to the pinned site list; a missed one reads zero rows of other accounts, it does not fail open.
+- A predicate that reaches the account through a parent (`EXISTS` over a parent row the context owns) holds only when a
+  request login cannot make an own parent row that matches another account's child: the compared parent columns are a
+  unique key, every child row has its parent by a validated foreign key, and no request login re-keys the parent.
+  Otherwise the table carries its own owner column, filled by its writer, and its predicate is the owner one:
+  `billing.cancel_token` keyed on `billing.subscription_event.subscription_id`, a key any account may append under its
+  own owner, so one own event naming another account's subscription read that account's cancel links (REV-S01-p1-security
+  B1, measured); since V-15's default it keys on its own `owner_ref`. `tests/integration/rls-catalog.test.ts` S6.4-e
+  sweeps every parent predicate against these conditions; S6.4-f pins the members whose child rows need no parent row.
 - A statement on a request login costs one InitPlan per policy evaluation (re-hash and session lookup); measured once
   (25.1 ms for a full scan of 1,001 runs), otherwise UNVERIFIED.
 - Code that runs on a system login (the billing runtime, background loops, the listed sites) is not limited by row

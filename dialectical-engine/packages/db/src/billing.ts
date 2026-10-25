@@ -1073,12 +1073,12 @@ export class BillingRepository {
     return released.rowCount === 1;
   }
 
-  async insertCancelToken(c: PoolClient, i: Readonly<{
-    tokenSha256: string; subscriptionId: string; issuedAt: Date; expiresAt: Date;
+  async insertCancelToken(c: PoolClient, i: Readonly<{ // ownerRef: the link's owner, the key 0124's row security reads (V-15)
+    tokenSha256: string; subscriptionId: string; issuedAt: Date; expiresAt: Date; ownerRef?: string;
   }>): Promise<void> {
     await c.query(`
-      INSERT INTO billing.cancel_token (token_sha256, subscription_id, issued_at, expires_at) VALUES ($1,$2,$3,$4)
-    `, [i.tokenSha256, i.subscriptionId, i.issuedAt, i.expiresAt]);
+      INSERT INTO billing.cancel_token (token_sha256, subscription_id, issued_at, expires_at, owner_ref) VALUES ($1,$2,$3,$4,$5)
+    `, [i.tokenSha256, i.subscriptionId, i.issuedAt, i.expiresAt, i.ownerRef ?? null]);
   }
 
   /**

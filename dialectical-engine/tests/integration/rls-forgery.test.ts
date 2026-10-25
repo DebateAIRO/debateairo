@@ -9,7 +9,7 @@
  * privilege narrows the read instead of failing it whole); a returned row is classified by its primary-key text against
  * the seed's lists (never by re-deriving a policy). No T1 policy admits public rows (D34, D35).
  */
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPool, migrate, runInRequestScope, setRequestCredential, type Pool } from "../../packages/db/src/index.js";
@@ -316,6 +316,72 @@ describe("row-level security S01 C6: forgery by SQL on the four T1 logins widens
       }
     }
     expect(failures).toEqual([]);
+  });
+
+  it("S6.3-F10 (SEC-B1, V-15) an own-account subscription event naming B's subscription makes no row of B readable, and no cancel link of B writable", async () => {
+    // REV-S01-p1-security B1: billing.cancel_token was B's when ANY subscription event with its subscription_id was
+    // visible, and A may append one under A's own owner_ref. The bridge below is that permitted write; it must be
+    // accepted on the logins that hold INSERT on billing.subscription_event, or this case pins nothing.
+    const su = database.pool;
+    const bSubscription = (await su.query(`SELECT subscription_id::text AS id FROM billing.subscription_event WHERE owner_ref = $1
+      ORDER BY seq LIMIT 1`, [B.ownerRef])).rows[0]!.id as string;
+    const bToken = (await su.query("SELECT token_sha256 FROM billing.cancel_token WHERE subscription_id = $1", [bSubscription]))
+      .rows.map((row) => row.token_sha256 as string);
+    expect(bToken).toHaveLength(1);
+    expect((await su.query("SELECT count(*)::int AS n FROM billing.cancel_token_use WHERE token_sha256 = $1", [bToken[0]])).rows[0].n)
+      .toBe(1);
+    const failures: string[] = [];
+    const bridged: string[] = [];
+    const writes: string[] = [];
+    const attempt = async (client: pg.Client, sql: string, values: readonly unknown[]): Promise<string> => {
+      await client.query("SAVEPOINT f10");
+      try {
+        await client.query(sql, [...values]);
+        await client.query("RELEASE SAVEPOINT f10");
+        return "ACCEPTED";
+      } catch (error) {
+        await client.query("ROLLBACK TO SAVEPOINT f10");
+        return (error as { code?: string }).code ?? "NO_SQLSTATE";
+      }
+    };
+    for (const login of t1) {
+      const eventId = randomUUID();
+      failures.push(...(await forgery(login, "A", "F10", "F10:subscription-bridge", async (c) => {
+        await c.query("BEGIN");
+        const bridge = await attempt(c, `INSERT INTO billing.subscription_event(event_id, subscription_id, owner_ref, kind, at, plan_id, data)
+          VALUES ($1, $2, (SELECT rls.context_owner_ref()), 'CREATED', now(), 'PLUS', $3::jsonb)`,
+        [eventId, bSubscription, JSON.stringify({ payment_provider: "netopia", payment_environment: "sandbox" })]);
+        if (bridge === "ACCEPTED") bridged.push(login.name);
+      }, async (c) => {
+        try {
+          // The bridge event is A's own row (T4: its owner_ref is A's), and so is the one row of the latest-event view it
+          // makes for B's subscription id while that row carries A's owner_ref; every other returned row is classified.
+          const own = new Set<string>();
+          if (bridged.includes(login.name)) {
+            own.add(`RLS_FAIL ${login.name} billing.subscription_event R14:F10:subscription-bridge:A foreign=other:${JSON.stringify([eventId])}`);
+            const latest = (await c.query("SELECT owner_ref::text AS owner FROM billing.subscription_latest_v WHERE subscription_id = $1",
+              [bSubscription])).rows;
+            if (latest.length === 1 && latest[0].owner === A.ownerRef) {
+              own.add(`RLS_FAIL ${login.name} billing.subscription_latest_v R14:F10:subscription-bridge:A foreign=b:${JSON.stringify([bSubscription])}`);
+            }
+          }
+          const read = (await readFailures(c, login.name, "A", "F10:subscription-bridge")).filter((line) => !own.has(line));
+          writes.push(`${login.name} use-of-b-token ${await attempt(c,
+            "INSERT INTO billing.cancel_token_use(token_sha256, used_at) VALUES ($1, now())", [bToken[0]])}`);
+          writes.push(`${login.name} token-owned-by-b ${await attempt(c, `INSERT INTO billing.cancel_token(token_sha256, subscription_id,
+            issued_at, expires_at, owner_ref) VALUES ($1, $2, now(), now() + interval '1 day', $3)`,
+          [randomBytes(32).toString("hex"), bSubscription, B.ownerRef])}`);
+          return read;
+        } finally {
+          await c.query("ROLLBACK");
+        }
+      })).failures);
+    }
+    console.info(`F10 FRAME bridged=${bridged.join(",")} writes=${writes.join(";")} reads_failed=${failures.length}`);
+    expect(bridged).toEqual(["debateai_dev_runtime", "debateai_prod_api_runtime"]);
+    expect(failures).toEqual([]);
+    // 42501: the row-security WITH CHECK refuses it (a login without INSERT on the table refuses with the same code).
+    expect(writes).toEqual(t1.flatMap(({ name }) => [`${name} use-of-b-token 42501`, `${name} token-owned-by-b 42501`]));
   });
 
   it("S6.3-F9 while an A call runs and after it ends, a second connection of the same login sees no credential or context value of A", async () => {
