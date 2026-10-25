@@ -129,7 +129,7 @@ Team rule at start: on the preview, before the worker exists, every claimable ru
   rule widened so they accept `SPLIT` and the judges' rule before any code writes them. Run the native operator's
   `apply-and-plan` with the owner's yes before that release's first start (see "Verify never applies a database step"). It
   changes nothing a debate does: engine 2 stays off while no register version carries the engine row.
-- This release adds `migrations/0126_support_answer_scope.sql` (after `0122_engine_map_check.sql`): it widens the support message outcome check by OFF_TOPIC, CRISIS and THREAT.
+- This release adds `migrations/0126_support_answer_scope.sql` (after `0125_threat_reports.sql`): it empties the support conversation and model-call tables and revokes the support role's INSERT on them (V-111).
 - A release with R3 (engine redesign, the map's answer step) adds the database step `0122_engine_map_check.sql`:
   two append-only code tables, what each engine-2 map point rests on and the answer check's codes. Every map read
   of the new code joins the first one (engine 1 included), so run the native operator's `apply-and-plan` with the

@@ -30,6 +30,7 @@ const ENGINE_MAP_CHECK = "0122_engine_map_check.sql";
 const SYNTHESIS_CHECK = "0123_synthesis_check.sql";
 const PUBLICATION_REVIEW = "0124_publication_review.sql";
 const THREAT_REPORT = "0125_threat_reports.sql";
+const SUPPORT_ANSWER_SCOPE = "0126_support_answer_scope.sql";
 const ROTATE = "identity.rotate_session_after_step_up(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,timestamp with time zone,uuid,text,text,uuid,timestamp with time zone)";
 const rows = async (db: TestDatabase, table: string) => (await db.pool.query(`SELECT * FROM ${table} ORDER BY 1`)).rows;
 const ledger = (db: TestDatabase) => rows(db, "public.debateai_schema_migration");
@@ -43,11 +44,11 @@ describe("data export forward115", () => {
 
   it("G1 applies the forward chain through the synthesis check 0123 with linked receipts", async () => {
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.map(step => step.name)).toEqual([NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM, REPLY_MEASURES, ENGINE_VERDICT, ENGINE_MAP_CHECK, SYNTHESIS_CHECK, PUBLICATION_REVIEW, THREAT_REPORT]);
+    expect(plan.forwardChain.map(step => step.name)).toEqual([NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM, REPLY_MEASURES, ENGINE_VERDICT, ENGINE_MAP_CHECK, SYNTHESIS_CHECK, PUBLICATION_REVIEW, THREAT_REPORT, SUPPORT_ANSWER_SCOPE]);
     const names = (await ledger(db)).map(row => row.name).filter(name => name.startsWith("011") || name.startsWith("012"));
-    expect(names).toEqual(["0110_account_erasure_public_debates.sql", NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM, REPLY_MEASURES, ENGINE_VERDICT, ENGINE_MAP_CHECK, SYNTHESIS_CHECK, PUBLICATION_REVIEW, THREAT_REPORT]);
+    expect(names).toEqual(["0110_account_erasure_public_debates.sql", NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM, REPLY_MEASURES, ENGINE_VERDICT, ENGINE_MAP_CHECK, SYNTHESIS_CHECK, PUBLICATION_REVIEW, THREAT_REPORT, SUPPORT_ANSWER_SCOPE]);
     const steps = await receipts(db);
-    expect(steps.map(step => step.source_name)).toEqual([NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM, REPLY_MEASURES, ENGINE_VERDICT, ENGINE_MAP_CHECK, SYNTHESIS_CHECK, PUBLICATION_REVIEW, THREAT_REPORT]);
+    expect(steps.map(step => step.source_name)).toEqual([NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM, REPLY_MEASURES, ENGINE_VERDICT, ENGINE_MAP_CHECK, SYNTHESIS_CHECK, PUBLICATION_REVIEW, THREAT_REPORT, SUPPORT_ANSWER_SCOPE]);
     expect(steps[4].previous_manifest_sha256).toBe(steps[3].forward_manifest_sha256);
     expect(steps[4].verifier_sha256).toBe(steps[3].verifier_sha256);
     expect(steps[5].previous_manifest_sha256).toBe(steps[4].forward_manifest_sha256);

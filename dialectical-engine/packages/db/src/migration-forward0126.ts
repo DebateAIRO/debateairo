@@ -3,12 +3,12 @@ import { readFile } from 'node:fs/promises';
 import type { PoolClient } from 'pg';
 import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-chain.js';
 
-/** S05 widens the stored support outcome check after the engine map step. */
+/** S05 retires persisted support conversations and model-call records. */
 const NAME='0126_support_answer_scope.sql';
 const VERSION='support-answer-scope-forward0126-v1';
 const MANIFEST_PATH='lineage/support-answer-scope-forward0126.json';
 const VERIFIER_PATH='lineage/verify-effective-capabilities-111.sql';
-const PREVIOUS='0122_engine_map_check.sql';
+const PREVIOUS='0125_threat_reports.sql';
 const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD0126_${detail}`);};
 const sha=(value:string|Buffer)=>createHash('sha256').update(value).digest('hex');
 const exactKeys=(value:unknown,keys:readonly string[]):value is Record<string,unknown>=>typeof value==='object'&&value!==null&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.hasOwn(value,key));
@@ -16,13 +16,24 @@ const digest=(value:unknown):value is string=>typeof value==='string'&&/^[0-9a-f
 
 /** The effective definition is compared on every later migrate(), including after S06. */
 async function postconditionEvidence(client:PoolClient):Promise<string>{
- const rows=(await client.query<{definition:string}>(`
-  SELECT pg_get_constraintdef(k.oid) definition
-  FROM pg_constraint k
-  WHERE k.conrelid=to_regclass('support.message')
-   AND k.conname='support_message_outcome_ck' AND k.contype='c'`)).rows;
- if(rows.length!==1||typeof rows[0]?.definition!=='string')return fail('POSTCONDITION_OBJECTS');
- return sha(rows[0].definition);
+ const grants=(await client.query(`
+  SELECT c.relname name,
+   has_table_privilege('debateai_support',c.oid,'SELECT') "select",
+   has_table_privilege('debateai_support',c.oid,'INSERT') "insert",
+   has_table_privilege('debateai_support',c.oid,'UPDATE') "update",
+   has_table_privilege('debateai_support',c.oid,'DELETE') "delete"
+  FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+  WHERE n.nspname='support' AND c.relkind='r' ORDER BY c.relname`)).rows;
+ const guards=(await client.query(`
+  SELECT c.relname relation,t.tgname name,t.tgfoid::regprocedure function_name,
+    t.tgtype,t.tgenabled,t.tgdeferrable,t.tginitdeferred
+  FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
+   JOIN pg_namespace n ON n.oid=c.relnamespace
+  WHERE n.nspname='support' AND c.relkind='r' AND NOT t.tgisinternal
+   AND t.tgname IN ('reject_mutation','reject_delete','reject_truncate','support_shred_row_guard')
+  ORDER BY c.relname,t.tgname`)).rows;
+ if(grants.length<17||guards.length<37)return fail('POSTCONDITION_OBJECTS');
+ return sha(JSON.stringify({grants,guards}));
 }
 
 export async function loadForward0126(anchor:ForwardStepAnchor):Promise<ForwardStepPlan>{

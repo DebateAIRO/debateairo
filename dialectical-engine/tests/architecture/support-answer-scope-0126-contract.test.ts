@@ -1,38 +1,64 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { loadForward0126 } from "../../packages/db/src/migration-forward0126.js";
 
-const migrations = new URL("../../migrations/", import.meta.url);
-const migration = new URL("0126_support_answer_scope.sql", migrations);
-const sql = existsSync(migration) ? readFileSync(migration, "utf8") : "";
-const statements = sql.replace(/--[^\n]*/gu, "").trim().split(";").map((part) => part.trim()).filter(Boolean);
+const sql = readFileSync(new URL("../../migrations/0126_support_answer_scope.sql", import.meta.url), "utf8")
+  .replace(/--[^\n]*/gu, "");
+const tables = ["session", "session_key", "message", "abuse_event", '"case"', "case_key", "case_event",
+  "case_message", "rating", "tool_call", "admission_event", "relay_call", "relay_waiter", "relay_waiter_event"];
+const deletion = ["rating", "case_message", "case_event", "case_key", '"case"', "tool_call", "abuse_event",
+  "message", "session_key", "admission_event", "session", "shred_audit", "relay_waiter_event", "relay_waiter", "relay_call"];
+const guarded = [...["abuse_event", "case_event", "rating", "tool_call", "relay_call", "relay_waiter",
+  "relay_waiter_event", "admission_event", "shred_audit"].map((table) => `${table}.reject_mutation`),
+  ...["session", '"case"', "session_key", "case_key"].map((table) => `${table}.reject_delete`)];
 
-const outcomes = [
-  "ANSWER_GROUNDED", "NO_SOURCE", "REFUSE_ZONE", "REFUSE_INJECTION", "REFUSE_SAFETY",
-  "DEGRADED", "DISABLED", "RATE_LIMITED", "CASE_OPENED", "CONSENT_NEEDED", "ANON_CONTEXT",
-  "REFUSE_OTHER_USER", "ANSWER_OWN_STATE", "ANSWER_INCIDENT", "NO_INCIDENT",
-  "OFF_TOPIC", "CRISIS", "THREAT"
-];
-
-describe("0126 support answer scope", () => {
-  it("only drops and re-adds the outcome check on support.message", () => {
-    expect(statements).toHaveLength(2);
-    expect(statements[0]).toMatch(/^ALTER TABLE support\.message DROP CONSTRAINT IF EXISTS support_message_outcome_ck$/u);
-    expect(statements[1]).toMatch(/^ALTER TABLE support\.message ADD CONSTRAINT support_message_outcome_ck CHECK \(outcome IN \([\s\S]*\)\)$/u);
+describe("0126 support tables keep nothing", () => {
+  it("revokes INSERT on exactly the fourteen conversation and model-call tables", () => {
+    const revokes = [...sql.matchAll(/REVOKE\s+INSERT\s+ON\s+([\s\S]*?)\s+FROM\s+debateai_support\s*;/giu)];
+    expect(revokes).toHaveLength(1);
+    expect(revokes[0]![1]!.split(",").map((table) => table.trim()).sort())
+      .toEqual(tables.map((table) => `support.${table}`).sort());
   });
 
-  it("lists exactly the fifteen existing outcomes and three new outcomes", () => {
-    const match = sql.match(/ADD CONSTRAINT support_message_outcome_ck CHECK \(outcome IN \(([\s\S]*?)\)\)/u);
-    expect(match).not.toBeNull();
-    expect([...match![1]!.matchAll(/'([^']+)'/gu)].map(([, value]) => value)).toEqual(outcomes);
+  it("deletes fifteen tables in dependency order without TRUNCATE", () => {
+    expect([...sql.matchAll(/DELETE\s+FROM\s+support\.([\w"]+)\s*;/giu)].map((match) => match[1])).toEqual(deletion);
+    expect(sql).not.toMatch(/\bTRUNCATE\b/iu);
   });
 
-  it("drops the existing check before adding its widened replacement", () => {
-    expect(statements[0]).toContain("DROP CONSTRAINT IF EXISTS support_message_outcome_ck");
-    expect(statements[1]).toContain("ADD CONSTRAINT support_message_outcome_ck");
+  it("restores the thirteen guards after making the shred row guard immediate", () => {
+    const changes = [...sql.matchAll(/ALTER\s+TABLE\s+support\.([\w"]+)\s+(DISABLE|ENABLE)\s+TRIGGER\s+(reject_mutation|reject_delete)\s*;/giu)];
+    for (const action of ["DISABLE", "ENABLE"]) {
+      expect(changes.filter(([, , value]) => value === action).map(([, table, , trigger]) => `${table}.${trigger}`).sort())
+        .toEqual([...guarded].sort());
+    }
+    const firstDelete = sql.indexOf("DELETE FROM");
+    const lastDelete = sql.lastIndexOf("DELETE FROM");
+    const immediate = sql.indexOf("SET CONSTRAINTS support.support_shred_row_guard IMMEDIATE");
+    const firstEnable = sql.indexOf("ENABLE TRIGGER");
+    const deferred = sql.indexOf("SET CONSTRAINTS support.support_shred_row_guard DEFERRED");
+    expect(sql.lastIndexOf("DISABLE TRIGGER")).toBeLessThan(firstDelete);
+    expect(lastDelete).toBeLessThan(immediate);
+    expect(immediate).toBeLessThan(firstEnable);
+    expect(sql.lastIndexOf("ENABLE TRIGGER")).toBeLessThan(deferred);
   });
 
-  it("appends the 0126 loader last in the forward chain", () => {
-    const chain = readFileSync(new URL("../../packages/db/src/migration-forward-chain.ts", import.meta.url), "utf8");
-    expect(chain).toMatch(/const STEPS:[^\n]+\[([^\]]*,)?loadForward0126\]\)/u);
+  it("does not bypass role replication or all constraints or replace a function", () => {
+    expect(sql).not.toMatch(/session_replication_role|SET\s+CONSTRAINTS\s+ALL|CREATE\s+(OR\s+REPLACE\s+)?FUNCTION/iu);
+  });
+
+  it("ends with checks for missing guards, truncation guards, INSERT rights and retained rows", () => {
+    const last = sql.slice(sql.lastIndexOf("DO $$"));
+    expect(last).toMatch(/DO \$\$[\s\S]*\$\$\s*;\s*$/u);
+    for (const code of ["MIGRATION_0126_GUARD_MISSING", "MIGRATION_0126_TRUNCATE_GUARDS",
+      "MIGRATION_0126_INSERT_KEPT", "MIGRATION_0126_ROWS_KEPT"]) expect(last).toContain(code);
+  });
+
+  it("refuses a catalog with none of the guarded objects", async () => {
+    const manifest = JSON.parse(readFileSync(new URL("../../migrations/lineage/support-answer-scope-forward0126.json", import.meta.url), "utf8"));
+    const step = await loadForward0126({ baseRecipeSha256: manifest.baseRecipeSha256,
+      previousName: manifest.previous.name, previousManifestSha256: manifest.previous.manifestSha256,
+      previousVerifierSha256: manifest.previous.verifierSha256 });
+    await expect(step.postconditionEvidence({ query: async () => ({ rows: [] }) } as never))
+      .rejects.toThrow("MIGRATION_FORWARD0126_POSTCONDITION_OBJECTS");
   });
 });
