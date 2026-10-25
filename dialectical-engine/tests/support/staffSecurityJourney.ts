@@ -35,6 +35,7 @@ import { MemoryMailSender } from '../../apps/api/src/mail-channel.js';
 import { buildDevelopmentStaffV2DeploymentRegisterPublicationRows } from '../../apps/runner/src/dev-deployment-register.js';
 import { TEST_DEVELOPMENT_PROVIDER_PANEL } from './developmentProviderPanel.js';
 import { createStaffRuntime } from '../../apps/api/src/staff/runtime.js';
+import { createSystemTwin } from './rls-logins.js';
 import { decodeBase32, type UserDekStore } from '@debateai/crypto';
 
 function selectedSet(values:readonly string[]):OwnerCredentialSet {
@@ -45,7 +46,12 @@ function selectedSet(values:readonly string[]):OwnerCredentialSet {
 export async function runStaffSecurityJourney(database:TestDatabase,runtime:Pool,ownerKeyCount:1|2=2) {
  let authorization:Pool|undefined;const argon2=new Argon2WorkerPool({workers:1});let sessions:SessionService;
  const passwordHash=await hashPassword(argon2,'Task9-disposable-signup-password!A42',authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS).password.argon2id);
- const authUrl=new URL(database.connectionString);await database.pool.query("CREATE ROLE task9_journey_authorization LOGIN PASSWORD 'task9-ordinary-only' IN ROLE debateai_authorization_runtime");authUrl.username='task9_journey_authorization';authUrl.password='task9-ordinary-only';authorization=createPool(authUrl.toString());
+ const authUrl=new URL(database.connectionString);await database.pool.query("CREATE ROLE task9_journey_authorization LOGIN PASSWORD 'task9-ordinary-only' IN ROLE debateai_authorization_runtime");authUrl.username='task9_journey_authorization';authUrl.password='task9-ordinary-only';
+ // Row-level security (0124; D28, D29): the authorization pool as main.ts wires it. Inside a request it runs on its own login
+ // with that request's account context; outside one, or inside a crossAccount frame, on its system twin. The bare login is
+ // kept for the no-context control only.
+ const authorizationSystem=createPool(await createSystemTwin(database,'task9_journey_authorization_system',['debateai_authorization_runtime']));
+ authorization=createPool(authUrl.toString(),{crossAccount:authorizationSystem});const authorizationBare=createPool(authUrl.toString());
 const password = 'Task9-disposable-signup-password!A42', blindIndexKey = Buffer.alloc(32, 7), deks = new Map<string, Buffer>();
 const authPolicy = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS), mfaPolicy = mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value);
 const source = {ip: '127.0.0.1',userAgent: 'task7-native-browser',requestId: 'task7-fixture'};
@@ -140,6 +146,8 @@ async function prerequisite(api:ReturnType<typeof buildApi>,a:Account,purpose:{p
 async function disconnectPrerequisite(api:ReturnType<typeof buildApi>,a:Account) {
  await api.listen({host:'127.0.0.1',port:0});const address=api.server.address();if(address===null||typeof address==='string')throw new Error('LOOPBACK_HTTP_ADDRESS_REQUIRED');
  ceremonyClock=new Date(ceremonyClock.getTime()+30000);
+ // The step-up below reads the account's password and TOTP factor inside its request; the bare login with no account context reads neither.
+ expect(await new PostgresSessionRepository(authorizationBare,audit).readStepUpIdentity(a.userId)).toBeNull();
  const body=JSON.stringify({purpose:'KEY_PREREGISTRATION',password,totp_code:totpCodeAtStep(a.secret,Math.floor(ceremonyClock.getTime()/30000))}),barrier=await database.pool.connect();
  const tokenBefore=(await database.pool.query('SELECT token_hash FROM identity.session WHERE session_id=$1',[a.ordinarySessionId])).rows[0].token_hash;
  let request:ReturnType<typeof httpRequest>|undefined;
@@ -277,6 +285,6 @@ async function possession(api:ReturnType<typeof buildApi>,a:Account,commandId:st
   const metadataCapture=await readFile(independentCapture,'utf8');expect(metadataCapture).not.toContain(handle);expect(metadataCapture).not.toContain(colleague.email);
   for(const sentinel of [...STAFF_PRIVATE_SENTINELS,bundle.proof,currentBundle.proof,nonce,recoveryNonce])expect(JSON.stringify(responses)+JSON.stringify(applicationLogs)).not.toContain(sentinel);
  } finally {
-  await runtimeComposed?.close();await api.close();await registration.drainMailDispatches();await jit?.end();await database.pool.query("ALTER ROLE debateai_prod_staff_recovery PASSWORD NULL VALID UNTIL '-infinity'");await authorization.end();await argon2.close();for(const dek of deks.values())dek.fill(0);errorLog.mockRestore();await rm(root,{recursive:true,force:true});
+  await runtimeComposed?.close();await api.close();await registration.drainMailDispatches();await jit?.end();await database.pool.query("ALTER ROLE debateai_prod_staff_recovery PASSWORD NULL VALID UNTIL '-infinity'");await authorization.end();await authorizationBare.end();await authorizationSystem.end();await argon2.close();for(const dek of deks.values())dek.fill(0);errorLog.mockRestore();await rm(root,{recursive:true,force:true});
  }
 }
