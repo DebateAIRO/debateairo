@@ -8,7 +8,7 @@ import { Assistant } from "../../apps/ui/components/support/Assistant.js";
 describe("SUP-03 public-only Support UI", () => {
   it("renders no private-context controls or attachment claims", () => {
     const html = renderToStaticMarkup(<Assistant fullPage signedIn client={{
-      createSession: vi.fn(),sendMessage: vi.fn(),rate: vi.fn(),escalate: vi.fn()
+      sendMessage: vi.fn()
     }} />);
     expect(html).not.toMatch(/Attach a debate|consent toggle|My latest debate|question line|run id|selected debate context|session and device details/iu);
   });

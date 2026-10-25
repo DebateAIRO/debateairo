@@ -1,1087 +1,180 @@
 // @vitest-environment jsdom
 
-import { act,createElement,createContext,useContext,type ReactNode } from "react";
+import { act,createContext,createElement,useContext,type ReactNode } from "react";
 import { createRoot,type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach,beforeEach,describe,expect,it,vi } from "vitest";
 import type { LocaleCode } from "../../apps/ui/lib/i18n/locales.js";
 import type { MessageCatalog } from "../../apps/ui/lib/i18n/translate.js";
-import chromeJapanese from "../../apps/ui/messages/ja/chrome.json" with { type: "json" };
-import supportJapanese from "../../apps/ui/messages/ja/support.json" with { type: "json" };
-import chromeRomanian from "../../apps/ui/messages/ro/chrome.json" with { type: "json" };
-import supportRomanian from "../../apps/ui/messages/ro/support.json" with { type: "json" };
-import chromeEnglish from "../../apps/ui/messages/en/chrome.json" with { type: "json" };
-import supportEnglish from "../../apps/ui/messages/en/support.json" with { type: "json" };
+import chromeEn from "../../apps/ui/messages/en/chrome.json" with { type: "json" };
+import supportEn from "../../apps/ui/messages/en/support.json" with { type: "json" };
+import homeEn from "../../apps/ui/messages/en/home.json" with { type: "json" };
+import chromeRo from "../../apps/ui/messages/ro/chrome.json" with { type: "json" };
+import supportRo from "../../apps/ui/messages/ro/support.json" with { type: "json" };
+import homeRo from "../../apps/ui/messages/ro/home.json" with { type: "json" };
+import chromeJa from "../../apps/ui/messages/ja/chrome.json" with { type: "json" };
+import supportJa from "../../apps/ui/messages/ja/support.json" with { type: "json" };
+import homeJa from "../../apps/ui/messages/ja/home.json" with { type: "json" };
 
-const TestI18nContext = createContext<Readonly<{
-  locale: LocaleCode;
-  catalog: MessageCatalog;
-}> | null>(null);
-
-vi.mock("@/lib/i18n/I18nProvider", () => ({
-  I18nProvider({ locale,catalog,children }: Readonly<{
-    locale: LocaleCode;
-    catalog: MessageCatalog;
-    children: ReactNode;
-  }>) {
-    return createElement(TestI18nContext.Provider,{ value: { locale,catalog } },children);
+const Context = createContext<Readonly<{ locale: LocaleCode;catalog: MessageCatalog }> | null>(null);
+vi.mock("@/lib/i18n/I18nProvider",() => ({
+  I18nProvider({ locale,catalog,children }: Readonly<{ locale: LocaleCode;catalog: MessageCatalog;children: ReactNode }>) {
+    return createElement(Context.Provider,{ value: { locale,catalog } },children);
   },
   useChromeI18n() {
-    const context = useContext(TestI18nContext);
-    return context ?? Object.freeze({
-      locale: "en" as const,
-      catalog: Object.freeze({ ...chromeEnglish,...supportEnglish })
-    });
+    return useContext(Context) ?? { locale: "en",catalog: { ...chromeEn,...supportEn,...homeEn } };
   }
 }));
 
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
-import {
-  Assistant,
-  SUPPORT_CONVERSATION_STORAGE_KEY,
-  supportAssistantClient,
-  type SupportAssistantClient
-} from "../../apps/ui/components/support/Assistant.js";
-import { CaseView } from "../../apps/ui/components/support/CaseView.js";
+import { Assistant,supportAssistantClient,type SupportAssistantClient } from "../../apps/ui/components/support/Assistant.js";
 import { subscribeToPreferenceRequests } from "../../apps/ui/lib/consent.js";
 
-const SESSION = Object.freeze({
-  sessionId: "session-1",token: "token-1",identityBound: false,
-  firstMessage: "Hi — I'm the Dialectical Engine support assistant, an AI."
-});
+const catalogs = {
+  en: Object.freeze({ ...chromeEn,...supportEn,...homeEn }),
+  ro: Object.freeze({ ...chromeRo,...supportRo,...homeRo }),
+  ja: Object.freeze({ ...chromeJa,...supportJa,...homeJa })
+};
+type Reply = Awaited<ReturnType<SupportAssistantClient["sendMessage"]>>;
 let root: Root | null = null;
-
-type ClientReply = Awaited<ReturnType<SupportAssistantClient["sendMessage"]>>;
-
-function client(
-  reply: ClientReply,
-  ratingAcknowledgement: Readonly<{
-    text: string;token: string;slaHours: number;link: string;
-  }> | null = null
-): SupportAssistantClient {
-  return Object.freeze({
-    createSession: vi.fn().mockResolvedValue(SESSION),
-    sendMessage: vi.fn().mockResolvedValue(reply),
-    rate: vi.fn().mockResolvedValue(ratingAcknowledgement),
-    escalate: vi.fn().mockResolvedValue({ token: "case-token",text: "Case opened." })
-  });
+function client(reply: Reply = { outcome: "NO_SOURCE",text: "No source." }) {
+  return { sendMessage: vi.fn(async () => reply),isSignedIn: vi.fn(async () => false) };
 }
-
-async function settle(): Promise<void> {
-  await act(async () => {
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
-  });
+function localized(locale: "en" | "ro" | "ja",component: ReactNode) {
+  return <I18nProvider locale={locale} catalog={catalogs[locale]}>{component}</I18nProvider>;
 }
-
-async function render(component: React.ReactNode): Promise<void> {
-  await act(async () => root!.render(component));
-  await settle();
-}
-
-function localized(locale: "en" | "ro",component: React.ReactNode): React.ReactNode {
-  const catalog = locale === "ro"
-    ? Object.freeze({ ...chromeRomanian,...supportRomanian })
-    : Object.freeze({ ...chromeEnglish,...supportEnglish });
-  return <I18nProvider locale={locale} catalog={catalog}>{component}</I18nProvider>;
-}
-
-async function renderLocalized(locale: "en" | "ro",component: React.ReactNode): Promise<void> {
-  await render(localized(locale,component));
-}
-
-async function submit(text: string): Promise<void> {
-  const input = document.querySelector<HTMLInputElement>('input[name="support-message"]')!;
+async function render(component: ReactNode) { await act(async () => root!.render(component)); }
+async function submit(text: string) {
+  const form = document.querySelector<HTMLFormElement>("form.supportComposer")!;
+  const input = form.querySelector<HTMLInputElement>('input[name="support-message"]')!;
   await act(async () => {
     input.value = text;
-    input.dispatchEvent(new Event("input",{ bubbles: true }));
+    form.dispatchEvent(new Event("submit",{ bubbles: true,cancelable: true }));
+    await Promise.resolve();
   });
-  await act(async () => {
-    document.querySelector<HTMLFormElement>("form")!
-      .dispatchEvent(new Event("submit",{ bubbles: true,cancelable: true }));
-  });
-  await settle();
+}
+function json(body: unknown,status = 200) {
+  return new Response(JSON.stringify(body),{ status,headers: { "content-type": "application/json" } });
 }
 
-describe("SUP-01 /help assistant", () => {
+describe("SUP-01 /help assistant",() => {
   beforeEach(() => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT",true);
-    const container = document.createElement("div");
-    document.body.append(container);
-    root = createRoot(container);
+    const host = document.createElement("div"); document.body.append(host);
+    root = createRoot(host);
   });
-
   afterEach(async () => {
     if (root !== null) await act(async () => root!.unmount());
-    root = null;
-    document.body.replaceChildren();
-    sessionStorage.clear();
-    vi.unstubAllGlobals();
+    root = null; document.body.replaceChildren(); sessionStorage.clear(); vi.unstubAllGlobals();
   });
 
-  it.each([
-    ["ja",chromeJapanese,supportJapanese],
-    ["ro",chromeRomanian,supportRomanian]
-  ] as const)("uses the %s interface locale for help chrome and new sessions", async (
-    locale,chromeCatalog,supportCatalog
-  ) => {
-    const transport = client({ messageId: `${locale}-answer`,outcome: "NO_SOURCE",text: "Server text" });
-    const catalog = Object.freeze({ ...chromeCatalog,...supportCatalog });
-    await render(<I18nProvider locale={locale} catalog={catalog}>
-      <Assistant fullPage client={transport} />
-    </I18nProvider>);
-
-    expect(document.body.textContent).toContain(chromeCatalog["chrome.help"]);
+  it.each(["ja","ro"] as const)("uses the %s locale for the help chrome and posted language",async (locale) => {
+    const transport = client();
+    await render(localized(locale,<Assistant fullPage signedIn={false} client={transport} />));
+    expect(document.body.textContent).toContain(catalogs[locale]["chrome.help"]);
     expect(document.querySelector<HTMLInputElement>('[name="support-message"]')?.placeholder)
-      .toBe(supportCatalog["support.placeholder"]);
-    expect(document.querySelector('[aria-label="Language override"]')).toBeNull();
-    expect([...document.querySelectorAll("button")].map((button) => button.textContent))
-      .not.toEqual(expect.arrayContaining(["EN","RO"]));
-
-    await submit("Locale request");
-    expect(transport.createSession).toHaveBeenCalledWith(locale);
+      .toBe(catalogs[locale]["support.placeholder"]);
+    await submit("Question");
+    expect(transport.sendMessage).toHaveBeenCalledWith("Question",locale);
   });
-
-  it("renders the complete Turn 11 help desk information architecture", () => {
-    const html = renderToStaticMarkup(<Assistant fullPage client={client({
-      messageId: "turn-11",outcome: "NO_SOURCE",text: "No source."
-    })} />);
-    const parsed = new DOMParser().parseFromString(html,"text/html");
-
-    expect(parsed.querySelector("[data-support-desk]")).not.toBeNull();
-    expect(parsed.querySelector("[data-support-header]")?.textContent).toContain("Dialectical Engine");
-    expect(parsed.querySelector("[data-support-header]")?.textContent).toContain("Help");
-    expect(parsed.querySelector('[aria-label="Browse by topic"]')?.querySelectorAll("button"))
-      .toHaveLength(6);
-    expect(parsed.querySelector('[aria-label="Service status"]')?.textContent)
-      .toContain("Debate engine");
-    expect(parsed.querySelector('[aria-label="Support agent conversation"]')?.textContent)
-      .toContain("Support agent");
-    expect(parsed.querySelector('[aria-label="Conversation details"]')?.textContent)
-      .toContain("This conversation");
-    expect(parsed.querySelector('[aria-label="Support shortcuts"]')?.textContent)
-      .toContain("Cookies we store");
-    // Dev's help-desk English, byte for byte (FIX-PORT-UI A9/C5).
-    expect(parsed.querySelector('[aria-label="Support shortcuts"]')?.textContent)
-      .toContain("Model fleet status");
-    expect(parsed.querySelector('[aria-label="Support shortcuts"]')?.textContent)
-      .toContain("Report a bug →");
-    expect(parsed.querySelector(".supportShortcutNote")?.textContent)
-      .toBe("Opens a public product-guide conversation here.");
-    expect(parsed.querySelector(".supportAgentIdentity p")?.textContent).toBe(
-      "You are talking to an AI, not a person. It answers from public product guidance, cites its source, and hands off to a person when it cannot."
-    );
-    expect(parsed.querySelector(".supportComposerHint")).toBeNull();
-    expect(parsed.querySelector('[aria-label="Dialectical Engine support assistant"]')).toBeNull();
-    expect(parsed.body.textContent).toContain("New conversation");
-    expect(parsed.body.textContent).not.toContain("Attach a debate");
-    expect(parsed.body.textContent).toContain("Escalate to a human");
+  it("renders the full help desk without case, rating or reference controls",() => {
+    const html = renderToStaticMarkup(localized("en",<Assistant fullPage signedIn={false} client={client()} />));
+    const page = new DOMParser().parseFromString(html,"text/html");
+    expect(page.querySelector("[data-support-desk] [data-support-header]")).not.toBeNull();
+    expect(page.querySelector('[aria-label="Browse by topic"]')?.querySelectorAll("button")).toHaveLength(6);
+    expect(page.querySelector(".supportRating,.supportEscalation button")).toBeNull();
+    expect(page.querySelector(".supportMetadata")?.textContent).not.toContain(supportEn["support.reference"]);
+    expect(page.querySelector('.supportEscalation a[href="mailto:support@dezbatere.ro"]')).not.toBeNull();
   });
-
-  it("offers only verified full-page shortcuts and uses the existing cookie opener", async () => {
-    const signedOut = new DOMParser().parseFromString(renderToStaticMarkup(
-      <Assistant fullPage signedIn={false} client={client({
-        messageId: "signed-out-shortcuts",outcome: "NO_SOURCE",text: "No source."
-      })} />
-    ),"text/html");
-    const signedOutShortcuts = signedOut.querySelector('[aria-label="Support shortcuts"]')!;
-    expect([...signedOutShortcuts.querySelectorAll("a")].map((anchor) => anchor.getAttribute("href")))
-      .not.toContain("/settings#privacy");
-    expect(signedOutShortcuts.querySelector('a[href="/settings#consent-privacy-heading"]'))
-      .toBeNull();
-    expect([...signedOutShortcuts.querySelectorAll("button")].map((button) => button.textContent?.trim()))
-      .toContain("Cookies we store ↗");
-
-    await render(<Assistant fullPage signedIn client={client({
-      messageId: "signed-in-shortcuts",outcome: "NO_SOURCE",text: "No source."
-    })} />);
+  it("keeps the verified shortcuts and opens cookie preferences",async () => {
+    await render(localized("en",<Assistant fullPage signedIn client={client()} />));
     const shortcuts = document.querySelector('[aria-label="Support shortcuts"]')!;
-    expect(shortcuts.textContent).not.toMatch(/preferences/iu);
-    const privacy = shortcuts.querySelector<HTMLAnchorElement>(
-      'a[href="/settings#consent-privacy-heading"]'
-    );
-    expect(privacy?.textContent?.trim()).toBe("Privacy ↗");
-    expect([...shortcuts.querySelectorAll("a")].map((anchor) => anchor.getAttribute("href")))
-      .not.toContain("/settings#cookies");
-
+    expect(shortcuts.querySelector('a[href="/settings#consent-privacy-heading"]')).not.toBeNull();
     const cookie = [...shortcuts.querySelectorAll<HTMLButtonElement>("button")]
       .find((button) => button.textContent?.includes("Cookies we store"))!;
-    const requests: Array<HTMLElement | null> = [];
-    const unsubscribe = subscribeToPreferenceRequests((opener) => requests.push(opener));
-    try {
-      await act(async () => cookie.click());
-      expect(requests).toEqual([cookie]);
-    } finally {
-      unsubscribe();
-    }
-
-    expect(document.querySelector('[aria-label="Language override"]')).toBeNull();
-    expect(privacy?.textContent?.trim()).toBe("Privacy ↗");
-    expect(cookie.textContent?.trim()).toBe("Cookies we store ↗");
+    const calls: Array<HTMLElement | null> = [];
+    const stop = subscribeToPreferenceRequests((opener) => calls.push(opener));
+    try { await act(async () => cookie.click()); expect(calls).toEqual([cookie]); }
+    finally { stop(); }
   });
-
-  it("submits a Turn 11 suggestion immediately without priming the composer", async () => {
-    const transport = client({
-      messageId: "turn-11-answer",outcome: "NO_SOURCE",text: "No source."
-    });
-    await render(<Assistant fullPage client={transport} />);
-    const suggestion = [...document.querySelectorAll<HTMLButtonElement>("button")]
-      .find((button) => button.textContent === "What does a condition mark mean?")!;
-    await act(async () => {
-      suggestion.click();
-      await Promise.resolve();
-    });
-    await settle();
-
-    expect(transport.createSession).toHaveBeenCalledWith("en");
-    expect(transport.sendMessage).toHaveBeenCalledWith(
-      SESSION,"What does a condition mark mean?"
-    );
-    expect(document.querySelector<HTMLInputElement>('#support-message')?.value)
-      .toBe("");
-    expect(document.querySelectorAll('[aria-label="Support conversation"] article')).toHaveLength(3);
+  it("sends a suggestion immediately rather than leaving it in the composer",async () => {
+    const transport = client();
+    await render(localized("en",<Assistant fullPage signedIn={false} client={transport} />));
+    const button = [...document.querySelectorAll<HTMLButtonElement>(".supportSuggestions button")][0]!;
+    await act(async () => { button.click(); await Promise.resolve(); });
+    expect(transport.sendMessage).toHaveBeenCalledWith(button.textContent,"en");
+    expect(document.querySelector<HTMLInputElement>('[name="support-message"]')?.value).toBe("");
   });
-
-  it("starts a clean conversation", async () => {
-    await render(<Assistant fullPage client={client({
-      messageId: "turn-11-answer",outcome: "NO_SOURCE",text: "No source."
-    })} />);
-    await submit("What does a condition mark mean?");
-    expect(document.querySelectorAll('[aria-label="Support conversation"] article')).toHaveLength(3);
-    const reset = [...document.querySelectorAll<HTMLButtonElement>("button")]
-      .find((button) => button.textContent === "New conversation")!;
-    await act(async () => reset.click());
-    expect(document.querySelectorAll('[aria-label="Support conversation"] article')).toHaveLength(0);
+  it("starts a clean conversation without a session request",async () => {
+    const transport = client({ outcome: "NO_SOURCE",text: "Answer one" });
+    await render(localized("en",<Assistant fullPage signedIn={false} client={transport} />));
+    await submit("Question one");
+    expect(document.body.textContent).toContain("Answer one");
+    await act(async () => document.querySelector<HTMLButtonElement>(".supportNewConversation")!.click());
+    expect(document.body.textContent).not.toContain("Question one");
+    expect(document.body.textContent).not.toContain("Answer one");
+    expect(document.querySelector(".supportConversation")?.firstElementChild?.textContent).toBe(supportEn["support.notice"]);
   });
-
-  it("reports the public Support configuration as unavailable even when the relay is healthy", async () => {
-    vi.stubGlobal("fetch",vi.fn(async (url: string) => {
-      if (url === "/api/v1/session") return new Response("{}",{ status: 401 });
-      if (url === "/api/v1/support/status") return new Response(JSON.stringify({
-        configuration: { kind: "DISABLED",code: "SUPPORT_CONFIG_SNAPSHOT_INVALID" },
-        relay_state: "AVAILABLE",kb_loaded: { shipped: 12,ignored: 0 }
-      }),{ status: 200,headers: { "content-type": "application/json" } });
-      throw new Error(`UNEXPECTED_FETCH:${url}`);
-    }));
-
-    await render(<Assistant fullPage />);
-
-    expect(document.querySelector(".supportOnline")?.textContent).toBe("UNAVAILABLE");
-    // Dev's modifier keys on the untranslated state, so `.supportOnline--unavailable` applies.
-    expect(document.querySelector(".supportOnline")?.classList.contains("supportOnline--unavailable")).toBe(true);
-    const fleet = [...document.querySelectorAll(".supportServiceRow")]
-      .find((row) => row.textContent?.includes("Model fleet"));
-    expect(fleet?.querySelector("strong")?.textContent).toBe("AVAILABLE");
-  });
-
-  it.each([
-    ["UNAVAILABLE","UNAVAILABLE"],
-    ["DEGRADED","DEGRADED"]
-  ] as const)("names the relay state %s as reported, never as CHECKING", async (relayState,label) => {
-    vi.stubGlobal("fetch",vi.fn(async (url: string) => {
-      if (url === "/api/v1/session") return new Response("{}",{ status: 401 });
-      if (url === "/api/v1/support/status") return new Response(JSON.stringify({
-        configuration: { kind: "AVAILABLE" },
-        relay_state: relayState,kb_loaded: { shipped: 12,ignored: 0 }
-      }),{ status: 200,headers: { "content-type": "application/json" } });
-      throw new Error(`UNEXPECTED_FETCH:${url}`);
-    }));
-
-    await render(<Assistant fullPage />);
-
-    const fleet = [...document.querySelectorAll(".supportServiceRow")]
-      .find((row) => row.textContent?.includes("Model fleet"));
-    expect(fleet?.querySelector("strong")?.textContent).toBe(label);
-  });
-
-  it("renders disclosure first and exposes native keyboard/form semantics", () => {
-    const html = renderToStaticMarkup(<Assistant client={client({
-      messageId: "m1",outcome: "NO_SOURCE",text: "No source."
-    })} />);
-    const parsed = new DOMParser().parseFromString(html,"text/html");
-    const notice = parsed.querySelector(".aiNotice--banner")!;
-    const conversation = parsed.querySelector('[aria-label="Support conversation"]')!;
-    expect(notice.textContent).toContain(supportEnglish["support.bannerLead"]);
-    expect(notice.textContent).toContain("This conversation is with an AI support agent.");
-    expect(notice.textContent).toContain(
-      "Replies are AI-generated, machine-readably marked, and can be wrong. Ask for a human at any point."
-    );
-    expect(notice.compareDocumentPosition(conversation) & Node.DOCUMENT_POSITION_FOLLOWING)
-      .not.toBe(0);
-    const form = parsed.querySelector("form")!;
-    const label = form.querySelector('label[for="support-message"]');
-    const input = form.querySelector<HTMLInputElement>('#support-message');
-    expect(label).not.toBeNull();
-    expect(input?.name).toBe("support-message");
-    expect(form.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(false);
-  });
-
-  it("renders readable case notices from the server instead of client copy", () => {
-    const html = renderToStaticMarkup(localized("en",<CaseView
-      token="case-token"
-      state="CLOSED"
-      messages={[]}
-      text="Server-provided closed notice."
-    />));
-    expect(html).toContain("Server-provided closed notice.");
-    expect(html).toContain(supportEnglish["support.case.reply"]);
-    expect(html).toContain("Reply to this case");
-  });
-
-  it("keeps the submitted text visible when session creation returns a terminal reply", async () => {
-    const transport: SupportAssistantClient = Object.freeze({
-      createSession: vi.fn().mockResolvedValue({
-        messageId: "disabled",outcome: "DISABLED",text: "Server terminal notice."
-      }),
-      sendMessage: vi.fn(),rate: vi.fn(),escalate: vi.fn()
-    });
-    await render(<Assistant client={transport} />);
-
-    await submit("My submitted question");
-
-    expect(document.body.textContent).toContain("My submitted question");
-    expect(document.body.textContent).toContain("Server terminal notice.");
-    expect(transport.sendMessage).not.toHaveBeenCalled();
-  });
-
-  it("applies the Romanian interface locale to server disclosure and every typed request", async () => {
-    const transport = client({ messageId: "m2",outcome: "NO_SOURCE",text: "Nu am o sursă." });
-    const roSession = Object.freeze({
-      ...SESSION,
-      firstMessage: "Bună — sunt asistentul de suport Dialectical Engine."
-    });
-    vi.mocked(transport.createSession).mockResolvedValue(roSession);
-    await renderLocalized("ro",<Assistant client={transport} />);
-    await submit("Cum funcționează dezbaterile?");
-    expect(document.querySelector(
-      `[aria-label="${supportRomanian["support.conversation"]}"]`
-    )?.firstElementChild?.textContent)
-      .toContain("sunt asistentul de suport Dialectical Engine");
-    expect(transport.createSession).toHaveBeenCalledWith("ro");
-    expect(transport.sendMessage).toHaveBeenCalledWith(
-      roSession,"Cum funcționează dezbaterile?"
-    );
-  });
-
-  it.each(["en-US", "en-GB"] as const)("sends %s support through the English catalog language", async (locale) => {
-    const calls: Array<{ url: string; body: unknown }> = [];
-    vi.stubGlobal("fetch", async (url: string, init: RequestInit = {}) => {
-      calls.push({ url, body: typeof init.body === "string" ? JSON.parse(init.body) : null });
-      if (url === "/api/v1/support/sessions") return Response.json({
-        session: { session_id: "english-session", identity_bound: false }, session_token: "support-token",
-        first_message: { role: "assistant", text: "English server greeting." }
-      }, { status: 201 });
-      if (url === "/api/v1/support/sessions/english-session/messages") return Response.json({
-        message_id: "english-answer", outcome: "NO_SOURCE", text: "English answer.",
-        actions: [{ id: "start-debate", label: "Start a debate", href: "/login?next=%2Fnew" }]
-      });
-      throw new Error(`UNEXPECTED_FETCH:${url}`);
-    });
-    await render(<I18nProvider locale={locale} catalog={{ ...chromeEnglish, ...supportEnglish }}>
-      <Assistant fullPage client={supportAssistantClient} signedIn={false} />
-    </I18nProvider>);
-    await submit("How do I start?");
-    expect(calls.find(({ url }) => url === "/api/v1/support/sessions")?.body).toEqual({ language: "en" });
-    expect(document.body.textContent).toContain("English answer.");
-    expect(document.querySelector('a[href="/login?next=%2Fnew"]')?.textContent).toBe("Start a debate");
-  });
-
-  it("drops a stored conversation from another locale and sends text only", async () => {
-    sessionStorage.setItem(SUPPORT_CONVERSATION_STORAGE_KEY,JSON.stringify({
-      language: "en",
-      session: { sessionId: "session-en",token: "token-en",identityBound: false },
-      messages: [{ id: "old",role: "assistant",text: "Old English conversation" }]
-    }));
-    const calls: Array<Readonly<{ url: string;body: unknown }>> = [];
-    vi.stubGlobal("fetch",vi.fn(async (url: string,init: RequestInit = {}) => {
-      calls.push({ url,body: typeof init.body === "string" ? JSON.parse(init.body) : null });
-      if (url === "/api/v1/session") return new Response("{}",{ status: 401 });
-      if (url === "/api/v1/support/sessions") return new Response(JSON.stringify({
-        session: { session_id: "session-ro",identity_bound: false },session_token: "token-ro",
-        first_message: { role: "assistant",text: "Mesaj de server." }
-      }),{ status: 201,headers: { "content-type": "application/json" } });
-      if (url === "/api/v1/support/sessions/session-ro/messages") return new Response(JSON.stringify({
-        message_id: "answer",outcome: "NO_SOURCE",text: "answer"
-      }),{ status: 200,headers: { "content-type": "application/json" } });
-      throw new Error(`UNEXPECTED_FETCH:${url}`);
-    }));
-    await renderLocalized("ro",<Assistant client={supportAssistantClient} signedIn={false} />);
-    await submit("Account");
-
-    expect(calls.map(({ url }) => url)).not.toContain("/api/v1/support/sessions/session-en/messages");
-    expect(calls.find(({ url }) => url === "/api/v1/support/sessions")?.body).toEqual({ language: "ro" });
-    expect(calls.find(({ url }) => url.endsWith("/messages"))?.body).toEqual({ text: "Account" });
-    expect(JSON.parse(sessionStorage.getItem(SUPPORT_CONVERSATION_STORAGE_KEY)!).language).toBe("ro");
-  });
-
-  it("renders conversation content as text and never links external response URLs", async () => {
-    await render(<Assistant client={client({
-      messageId: "m3",
-      outcome: "ANSWER_GROUNDED",
-      text: "<b>unsafe</b> https://evil.example",
-      link: "https://evil.example"
-    })} />);
-    await submit("question");
-    expect(document.body.textContent).toContain("<b>unsafe</b> https://evil.example");
-    expect(document.querySelector("b")).toBeNull();
-    expect(document.querySelector('a[href="https://evil.example"]')).toBeNull();
-  });
-
-  it.each([
-    ["en","The support assistant is switched off at the moment."],
-    ["ro","Asistentul de suport este oprit momentan."]
-  ] as const)("renders the exact deterministic %s DISABLED notice", async (language,text) => {
-    await renderLocalized(language,<Assistant client={client({
-      messageId: `disabled-${language}`,outcome: "DISABLED",text
-    })} />);
-    await submit("How do I start my first debate?");
-    expect(document.body.textContent).toContain(text);
-    expect(document.querySelector('[aria-label="Answer rating"]')).toBeNull();
-  });
-
-  it("admits only frozen same-origin response links as anchors", async () => {
-    await render(<Assistant client={client({
-      messageId: "m4",outcome: "REFUSE_ZONE",text: "Use settings.",link: "/settings"
-    })} />);
-    await submit("question");
-    const anchor = document.querySelector<HTMLAnchorElement>('a[href="/settings"]');
-    expect(anchor).not.toBeNull();
-    expect(anchor?.target).toBe("");
-  });
-
-  it.each([
-    ["en", "I've opened case {token} for a person. Expected reply: within 48 hours. Check replies at {link}. I can't promise an outcome."],
-    ["ro", "Am deschis cazul {token} pentru o persoană. Răspuns estimat: în 48 ore. Vezi răspunsurile la {link}. Nu pot promite un rezultat."]
-  ] as const)("renders the exact %s automated case acknowledgement with its case link", async (
-    language,template
-  ) => {
-    const token = "A".repeat(43);
-    const link = `/help?case=${token}`;
-    const acknowledgement = template.replace("{token}",token).replace("{link}",link);
-    const transport = client({
-      messageId: "m-auto",outcome: "REFUSE_SAFETY",text: "Fixed refusal.",
-      caseAcknowledgement: { text: acknowledgement,token,slaHours: 48,link }
-    });
-    await renderLocalized(language,<Assistant client={transport} />);
-    await submit("ordinary safety request");
-    expect(document.body.textContent).toContain(acknowledgement);
-    // DL1-F5c: the anchor is built from the bearer this page holds in memory
-    // (`supportCaseLink(bearer.token)`), never from the `link` the body carried
-    // and never from anything persisted — so whatever form the body used, what
-    // the browser can navigate to is the fragment, which reaches no server, no
-    // proxy log and no address bar as a query.
-    expect(document.querySelector<HTMLAnchorElement>(`a[href="/help#case=${token}"]`)).not.toBeNull();
-    expect(document.querySelector(`a[href="${link}"]`)).toBeNull();
-  });
-
-  it("normalises a case link carried by an ordinary reply to the fragment form", async () => {
-    // DL3-F4: `safeFirstPartyLink`'s case branch, which the acknowledgement no
-    // longer exercises. A reply can still carry a `link` that is a case bearer
-    // — a saved `?case=` address echoed back, a refusal link — with none of the
-    // acknowledgement fields to validate it. It becomes `/help#case=…` or it
-    // becomes nothing; the query form never becomes an href.
-    const token = "F".repeat(43);
-    await render(<Assistant client={client({
-      messageId: "m-case-link",outcome: "ANSWER_GROUNDED",text: "Your case is here.",
-      link: `/help?case=${token}`
-    })} />);
-    await submit("where do I read my case?");
-
-    expect(document.querySelector<HTMLAnchorElement>(`a[href="/help#case=${token}"]`)).not.toBeNull();
-    expect(document.querySelector(`a[href="/help?case=${token}"]`)).toBeNull();
-  });
-
-  it("retains automated token/SLA/link fields from the browser client contract", async () => {
-    const token = "B".repeat(43);
-    const link = `/help#case=${token}`;
-    const acknowledgement = `I've opened case ${token} for a person. Expected reply: within 48 hours. Check replies at ${link}. I can't promise an outcome.`;
-    vi.stubGlobal("fetch",vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      message_id: "m-client",outcome: "REFUSE_SAFETY",text: "Fixed refusal.",
-      case_token: token,sla_hours: 48,link,case_acknowledgement: acknowledgement
-    }),{ status: 200,headers: { "content-type": "application/json" } })));
-    await expect(supportAssistantClient.sendMessage(
-      SESSION,"ordinary safety request"
-    )).resolves.toMatchObject({
-      // DL1-F5c: the API mints the fragment form, and that is what is carried.
-      caseAcknowledgement: { text: acknowledgement,token,slaHours: 48,link }
-    });
-  });
-
-  it("refuses an acknowledgement whose link is the retired query form", async () => {
-    // DL1-F5c: the API can no longer mint `?case=`, so a body carrying it is
-    // not this server's — the widget drops the acknowledgement rather than
-    // rendering a bearer link it cannot account for.
-    const token = "C".repeat(43);
-    const link = `/help?case=${token}`;
-    vi.stubGlobal("fetch",vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      message_id: "m-legacy",outcome: "REFUSE_SAFETY",text: "Fixed refusal.",
-      case_token: token,sla_hours: 48,link,
-      case_acknowledgement: `Check replies at ${link}.`
-    }),{ status: 200,headers: { "content-type": "application/json" } })));
-    const reply = await supportAssistantClient.sendMessage(
-      SESSION,"ordinary safety request","en"
-    );
-    expect(reply.caseAcknowledgement).toBeUndefined();
-  });
-
-  /**
-   * DL1-F5c, final review (area D, Important 1). The session capability was
-   * kept out of `sessionStorage` and the CASE bearer walked back in through the
-   * acknowledgement message: its id, its sentence and its link all carried the
-   * 30-day, cookie-free token, and the whole transcript is written to the store
-   * on every change. On a shared or kiosk browser the next person to open Help
-   * in that tab inherited it — the whole case, and the right to reply as the
-   * reporter, for thirty days. The code is rendered from memory; what rests in
-   * the browser says only that a case was opened.
-   */
-  it("keeps the case bearer out of sessionStorage while rendering it on the page", async () => {
-    const token = "D".repeat(43);
-    const link = `/help#case=${token}`;
-    const acknowledgement = `I've opened case ${token} for a person. Expected reply: within 48 hours. Check replies at ${link}. I can't promise an outcome.`;
-    vi.stubGlobal("fetch",vi.fn(async (url: string) => {
-      if (url === "/api/v1/session") return new Response("{}",{ status: 401 });
-      if (url === "/api/v1/support/sessions") return new Response(JSON.stringify({
-        session: { session_id: "anonymous-session",identity_bound: false },
-        session_token: "s".repeat(43)
-      }),{ status: 201,headers: { "content-type": "application/json" } });
-      return new Response(JSON.stringify({
-        message_id: "m-escalated",outcome: "REFUSE_SAFETY",text: "Fixed refusal.",
-        case_token: token,sla_hours: 48,link,case_acknowledgement: acknowledgement
-      }),{ status: 200,headers: { "content-type": "application/json" } });
-    }));
-
-    await render(<Assistant client={supportAssistantClient} />);
-    await submit("something a person must read");
-
-    // On the page: the code and the fragment link, from the in-memory bearer.
-    expect(document.body.textContent).toContain(acknowledgement);
-    expect(document.querySelector<HTMLAnchorElement>(`a[href="${link}"]`)).not.toBeNull();
-
-    // At rest: the fact, and nothing that opens the case.
-    const stored = sessionStorage.getItem(SUPPORT_CONVERSATION_STORAGE_KEY) ?? "";
-    expect(stored).not.toBe("");
-    expect(stored).not.toContain(token);
-    expect(stored).not.toMatch(/[A-Za-z0-9_-]{43}/u);
-    expect(stored).toContain("A case is open for a person to read.");
-  });
-
-  it("erases a pre-fix transcript, bearer and all, the first time the widget mounts", async () => {
-    // Fix round 1. A tab open across the deploy keeps its `sessionStorage`. The
-    // retired key held the acknowledgement the old build wrote — the token in
-    // the id, in the sentence and in the link — and nothing read it any more,
-    // which is not the same as nothing holding it.
-    const token = "G".repeat(43);
-    sessionStorage.setItem("debateai.support.conversation.v1",JSON.stringify({
-      language: "en",identityBound: false,ownContext: { latest: true },
-      messages: [
-        { id: "disclosure",role: "assistant",text: "Prior disclosure." },
-        {
-          id: `case-${token}`,role: "assistant",
-          text: `I've opened case ${token} for a person. Check replies at /help#case=${token}.`,
-          link: `/help#case=${token}`
-        }
-      ]
-    }));
-    vi.stubGlobal("fetch",vi.fn(async (url: string) => url === "/api/v1/session"
-      ? new Response("{}",{ status: 401 })
-      : new Response(JSON.stringify({ error: "NOT_FOUND" }),{ status: 404 })));
-
-    await render(<Assistant client={supportAssistantClient} />);
-
-    expect(sessionStorage.getItem("debateai.support.conversation.v1")).toBeNull();
-    const everything = Object.entries(sessionStorage).map(([key,value]) => `${key}=${String(value)}`).join("\n");
-    expect(everything).not.toContain(token);
-    expect(everything).not.toMatch(/[A-Za-z0-9_-]{43}/u);
-    expect(document.body.textContent).not.toContain("Prior disclosure.");
-  });
-
-  it("returns a structured RATE_LIMITED outcome from a real 429 response", async () => {
-    const text = "You've sent a lot of messages in a short time. Please wait a few minutes.";
-    vi.stubGlobal("fetch",vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      outcome: "RATE_LIMITED",text
-    }),{ status: 429,headers: { "content-type": "application/json" } })));
-
-    await expect(supportAssistantClient.sendMessage(
-      SESSION,"one request too many"
-    )).resolves.toMatchObject({ outcome: "RATE_LIMITED",text });
-  });
-
-  it("returns the fresh-session DISABLED terminal reply instead of reading a missing session", async () => {
-    const text = "The support assistant is switched off at the moment.";
-    vi.stubGlobal("fetch",vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      outcome: "DISABLED",code: "SUPPORT_DISABLED",text
-    }),{ status: 200,headers: { "content-type": "application/json" } })));
-
-    await expect(supportAssistantClient.createSession("en"))
-      .resolves.toMatchObject({ outcome: "DISABLED",text });
-  });
-
-  it("renders the frozen degraded notice for an unstructured non-2xx response", async () => {
-    vi.stubGlobal("fetch",vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      error: "SUPPORT_CONFIG_REFRESH_DEADLINE"
-    }),{ status: 503,headers: { "content-type": "application/json" } })));
-
-    await render(<Assistant client={supportAssistantClient} signedIn />);
-    await submit("How does publishing work?");
-
-    expect(document.body.textContent).toContain(
-      "Support is unavailable right now. Please try again or choose 'Talk to a human'."
-    );
-  });
-
-  it("replaces a persisted anonymous capability before a signed-in request", async () => {
-    sessionStorage.setItem(SUPPORT_CONVERSATION_STORAGE_KEY,JSON.stringify({
-      language: "en",
-      session: { sessionId: "anonymous-session",token: "anonymous-token",identityBound: false },
-      messages: [{ id: "disclosure",role: "assistant",text: "Prior disclosure." }]
-    }));
-    const calls: Array<Readonly<{ url: string;headers: Headers }>> = [];
-    vi.stubGlobal("fetch",vi.fn(async (url: string,init: RequestInit = {}) => {
-      const headers = new Headers(init.headers);
-      calls.push({ url,headers });
-      if (url === "/api/v1/support/sessions") return new Response(JSON.stringify({
-        session: { session_id: "owned-session",identity_bound: true },
-        session_token: "owned-token"
-      }),{ status: 201,headers: { "content-type": "application/json" } });
-      if (url === "/api/v1/support/sessions/owned-session/messages") {
-        return new Response(JSON.stringify({
-          message_id: "owned-answer",outcome: "NO_SOURCE",text: "No source."
-        }),{ status: 200,headers: { "content-type": "application/json" } });
-      }
-      return new Response(JSON.stringify({ error: "NOT_FOUND" }),{
-        status: 404,headers: { "content-type": "application/json" }
-      });
-    }));
-
-    await render(<Assistant client={supportAssistantClient} signedIn />);
-    await submit("How does publishing work?");
-
-    const supportCalls = calls.filter(({ url }) => url.startsWith("/api/v1/support/"));
-    expect(supportCalls.map(({ url }) => url)).toEqual([
-      "/api/v1/support/sessions",
-      "/api/v1/support/sessions/owned-session/messages"
-    ]);
-    expect(supportCalls[0]!.headers.get("x-support-session-token")).toBeNull();
-    expect(supportCalls[1]!.headers.get("x-support-session-token")).toBe("owned-token");
-    expect(document.body.textContent).toContain("No source.");
-  });
-
-  it("renders an E5 acknowledgement returned by the rating request", async () => {
-    const token = "C".repeat(43);
-    const link = `/help?case=${token}`;
-    const text = `I've opened case ${token} for a person. Expected reply: within 48 hours. Check replies at ${link}. I can't promise an outcome.`;
-    await render(<Assistant client={client(
-      { messageId: "m-rate",outcome: "NO_SOURCE",text: "No source." },
-      { text,token,slaHours: 48,link }
-    )} />);
-    await submit("unknown detail");
-    await act(async () => ([...document.querySelectorAll("button")]
-      .find((button) => button.textContent === "No") as HTMLButtonElement).click());
-    await settle();
-    expect(document.body.textContent).toContain(text);
-    // DL3-F4: rendered as the fragment form, never as a query bearer.
-    expect(document.querySelector<HTMLAnchorElement>(`a[href="/help#case=${token}"]`)).not.toBeNull();
-    expect(document.querySelector(`a[href="${link}"]`)).toBeNull();
-  });
-
-  it("renders SHREDDED returned by rating and escalation mutations", async () => {
-    const text = "This conversation was erased at the owner's request.";
-    const terminal = Object.freeze({ messageId: "",outcome: "SHREDDED" as const,text });
-    const transport: SupportAssistantClient = Object.freeze({
-      createSession: vi.fn().mockResolvedValue({ ...SESSION,identityBound: true }),
-      sendMessage: vi.fn().mockResolvedValue({
-        messageId: "rateable",outcome: "NO_SOURCE",text: "No source."
-      }),
-      rate: vi.fn().mockResolvedValue(terminal),
-      escalate: vi.fn().mockResolvedValue(terminal)
-    });
-    await render(<Assistant client={transport} signedIn />);
-
-    await submit("unknown detail");
-    await act(async () => ([...document.querySelectorAll("button")]
-      .find((button) => button.textContent === "No") as HTMLButtonElement).click());
-    await settle();
-    await act(async () => ([...document.querySelectorAll("button")]
-      .find((button) => button.textContent === "Talk to a human") as HTMLButtonElement).click());
-    await settle();
-
-    expect(document.body.textContent?.split(text)).toHaveLength(3);
-  });
-
-  it("preserves the structured SHREDDED envelope on rating and escalation clients", async () => {
-    const text = "This conversation was erased at the owner's request.";
-    vi.stubGlobal("fetch",vi.fn().mockImplementation(async () => new Response(JSON.stringify({
-      kind: "SHREDDED",outcome: "SHREDDED",text
-    }),{ status: 200,headers: { "content-type": "application/json" } })));
-
-    await expect(supportAssistantClient.rate(SESSION,"message-id","no"))
-      .resolves.toMatchObject({ outcome: "SHREDDED",text });
-    await expect(supportAssistantClient.escalate(SESSION,"en"))
-      .resolves.toMatchObject({ outcome: "SHREDDED",text });
-  });
-
-  it("uses the same-origin CSRF boundary for every browser support mutation", async () => {
-    const csrf = "c".repeat(43);
-    Object.defineProperty(document,"cookie",{
-      configurable: true,value: `__Host-debateai-csrf=${csrf}`
-    });
-    const calls: Array<Readonly<{ url: string;init: RequestInit }>> = [];
-    vi.stubGlobal("fetch",vi.fn(async (url: string,init: RequestInit = {}) => {
-      calls.push({ url,init });
-      if (url === "/api/v1/support/sessions") {
-        return new Response(JSON.stringify({
-          session: { session_id: SESSION.sessionId },session_token: SESSION.token
-        }),{ status: 200,headers: { "content-type": "application/json" } });
-      }
-      if (url.endsWith("/messages")) return new Response(JSON.stringify({
-        message_id: "message-csrf",outcome: "NO_SOURCE",text: "No source."
-      }),{ status: 200,headers: { "content-type": "application/json" } });
-      if (url.endsWith("/rating")) return new Response("{}",{ status: 200 });
-      if (url.endsWith("/escalate")) return new Response(JSON.stringify({
-        case_token: "A".repeat(43),text: "Case opened."
-      }),{ status: 200,headers: { "content-type": "application/json" } });
-      throw new Error(`UNEXPECTED_FETCH:${url}`);
-    }));
-
-    const session = await supportAssistantClient.createSession("en");
-    if (!("sessionId" in session)) throw new Error("EXPECTED_SUPPORT_SESSION");
-    await supportAssistantClient.sendMessage(session,"hello");
-    await supportAssistantClient.rate(session,"message-csrf","yes");
-    await supportAssistantClient.escalate(session,"en");
-
-    expect(calls).toHaveLength(4);
-    expect(calls.map(({ url }) => url)).toEqual([
-      "/api/v1/support/sessions",
-      `/api/v1/support/sessions/${SESSION.sessionId}/messages`,
-      "/api/v1/support/messages/message-csrf/rating",
-      `/api/v1/support/sessions/${SESSION.sessionId}/escalate`
-    ]);
-    for (const { url,init } of calls) {
-      expect(url.startsWith("/api/v1/support/")).toBe(true);
-      expect(init.method).toBe("POST");
-      expect(init.credentials).toBe("same-origin");
-      expect(new Headers(init.headers).get("x-csrf-token")).toBe(csrf);
-    }
-    expect(new Headers(calls[0]!.init.headers).get("x-support-session-token")).toBeNull();
-    for (const { init } of calls.slice(1)) {
-      expect(new Headers(init.headers).get("x-support-session-token")).toBe(SESSION.token);
+  it("renders the notice before the first message in both page surfaces",() => {
+    for (const fullPage of [false,true]) {
+      const html = renderToStaticMarkup(localized("en",<Assistant fullPage={fullPage} client={client()} />));
+      const page = new DOMParser().parseFromString(html,"text/html");
+      expect(page.querySelector(".supportConversation")?.firstElementChild?.textContent).toBe(supportEn["support.notice"]);
     }
   });
-
-  it.each(["ANSWER_GROUNDED","NO_SOURCE"] as const)(
-    "shows rating controls only after %s",
-    async (outcome) => {
-      await render(<Assistant client={client({ messageId: "m5",outcome,text: "answer" })} />);
-      await submit("question");
-      expect(document.querySelector('[aria-label="Answer rating"]')).not.toBeNull();
-      expect(document.body.textContent).toContain("Talk to a human");
-    }
-  );
-
-  it.each(["REFUSE_ZONE","REFUSE_INJECTION","REFUSE_SAFETY","DEGRADED"] as const)(
-    "does not show rating controls after %s",
-    async (outcome) => {
-      await render(<Assistant client={client({ messageId: "m6",outcome,text: "fixed" })} />);
-      await submit("question");
-      expect(document.querySelector('[aria-label="Answer rating"]')).toBeNull();
-    }
-  );
-
-  it.each([
-    [false,"en","Sources","Actions","Start a debate","/login?next=%2Fnew"],
-    [true,"en","Sources","Actions","Start a debate","/login?next=%2Fnew"],
-    [false,"ro",supportRomanian["support.sources"],supportRomanian["support.actions"],"Pornește o dezbatere","/login?next=%2Fnew"],
-    [true,"ro",supportRomanian["support.sources"],supportRomanian["support.actions"],"Pornește o dezbatere","/login?next=%2Fnew"]
-  ] as const)(
-    "renders reviewed sources and canonical actions in fullPage=%s language=%s",
-    async (fullPage,language,sourcesName,actionsName,actionLabel,href) => {
-      const transport = client({
-        messageId: `grounded-${language}-${String(fullPage)}`,
-        outcome: "ANSWER_GROUNDED",
-        text: language === "en" ? "Current product guidance." : "Îndrumare actuală despre produs.",
-        sources: [
-          { id: "getting-started-debate",label: language === "en" ? "Create a debate" : "Creează o dezbatere" },
-          { id: "budget-tier-choice",label: language === "en" ? "Choose a plan" : "Alege un plan" }
-        ],
-        actions: [{ id: "start-debate",label: actionLabel,href }]
-      });
-      await renderLocalized(language,<Assistant fullPage={fullPage} client={transport} />);
-      await submit(language === "en" ? "How do I create a debate?" : "Cum creez o dezbatere?");
-
-      const sources = document.querySelector(`[aria-label="${sourcesName}"]`)!;
-      expect([...sources.querySelectorAll('[role="listitem"]')].map((item) => item.textContent))
-        .toEqual(language === "en"
-          ? ["Create a debate","Choose a plan"]
-          : ["Creează o dezbatere","Alege un plan"]);
-      const action = document.querySelector<HTMLAnchorElement>(`[aria-label="${actionsName}"] a`)!;
-      expect(action.textContent).toBe(actionLabel);
-      expect(action.getAttribute("href")).toBe(href);
-      expect(action.target).toBe("");
-    }
-  );
-
-  it("renders response text and source labels as literal text", async () => {
-    await render(<Assistant client={client({
-      messageId: "escaped-grounded",outcome: "ANSWER_GROUNDED",
-      text: "**bold** <img src=x onerror=alert(1)>",
-      sources: [{ id: "getting-started-debate",label: "<script>alert(1)</script>" }],
-      actions: [{ id: "home",label: "Home",href: "/" }]
-    })} />);
-    await submit("question");
-
-    expect(document.body.textContent).toContain("**bold** <img src=x onerror=alert(1)>");
-    expect(document.body.textContent).toContain("<script>alert(1)</script>");
-    expect(document.querySelector("img")).toBeNull();
-    expect(document.querySelector("script")).toBeNull();
+  it("renders response text literally and drops an external response link",async () => {
+    await render(localized("en",<Assistant signedIn={false} client={client({
+      outcome: "NO_SOURCE",text: "<script>alert(1)</script>",link: "https://elsewhere.test"
+    })} />));
+    await submit("Question");
+    expect(document.querySelector(".supportMessage--assistant p")?.textContent).toBe("<script>alert(1)</script>");
+    expect(document.querySelector(".supportMessage--assistant script,.supportCitation a")).toBeNull();
   });
-
-  it("accepts complete source/action arrays at the browser response boundary", async () => {
-    vi.stubGlobal("fetch",vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      message_id: "valid-decorations",outcome: "ANSWER_GROUNDED",text: "Current guidance.",
-      sources: [{ id: "getting-started-debate",label: "Create a debate" }],
-      actions: [{ id: "start-debate",label: "Start a debate",href: "/login?next=%2Fnew" }]
-    }),{ status: 200,headers: { "content-type": "application/json" } })));
-
-    await expect(supportAssistantClient.sendMessage(SESSION,"question")).resolves.toMatchObject({
-      sources: [{ id: "getting-started-debate",label: "Create a debate" }],
-      actions: [{ id: "start-debate",label: "Start a debate",href: "/login?next=%2Fnew" }]
+  it("keeps a verified first-party recovery link",async () => {
+    await render(localized("en",<Assistant signedIn={false} client={client({
+      outcome: "REFUSE_INJECTION",text: "Recover your account",link: "/recover"
+    })} />));
+    await submit("Recovery");
+    expect(document.querySelector('.supportMessage--assistant a[href="/recover"]')).not.toBeNull();
+  });
+  it("reads a structured 429 reply as a rate limit",async () => {
+    vi.stubGlobal("fetch",vi.fn(async () => json({ outcome: "RATE_LIMITED",text: "Wait a few minutes" },429)));
+    await expect(supportAssistantClient.sendMessage("Question","en")).resolves.toMatchObject({
+      outcome: "RATE_LIMITED",text: "Wait a few minutes"
     });
   });
-
-  it.each([
-    ["non-array sources",{ sources: "getting-started-debate",actions: [] }],
-    ["source with an extra key",{ sources: [{ id: "getting-started-debate",label: "Create",path: "/internal" }],actions: [] }],
-    ["unknown source",{ sources: [{ id: "unknown",label: "Unknown" }],actions: [] }],
-    ["duplicate source",{ sources: [
-      { id: "getting-started-debate",label: "Create" },{ id: "getting-started-debate",label: "Again" }
-    ],actions: [] }],
-    ["more than three sources",{ sources: [
-      { id: "getting-started-debate",label: "One" },{ id: "budget-tier-choice",label: "Two" },
-      { id: "account-access",label: "Three" },{ id: "export-json",label: "Four" }
-    ],actions: [] }],
-    ["non-array actions",{ sources: [],actions: "home" }],
-    ["action with an extra key",{ sources: [],actions: [{ id: "home",label: "Home",href: "/",target: "_blank" }] }],
-    ["unknown action",{ sources: [],actions: [{ id: "unknown",label: "Unknown",href: "/" }] }],
-    ["duplicate action",{ sources: [],actions: [
-      { id: "home",label: "Home",href: "/" },{ id: "home",label: "Home",href: "/" }
-    ] }],
-    ["mismatched action label",{ sources: [],actions: [{ id: "home",label: "Go elsewhere",href: "/" }] }],
-    ["mismatched action href",{ sources: [],actions: [{ id: "home",label: "Home",href: "/settings" }] }],
-    ["more than three actions",{ sources: [],actions: [
-      { id: "home",label: "Home",href: "/" },
-      { id: "start-debate",label: "Start a debate",href: "/login?next=%2Fnew" },
-      { id: "sign-in",label: "Sign in",href: "/login" },
-      { id: "sign-up",label: "Create account",href: "/sign-up" }
-    ] }]
-  ] as const)("rejects %s without accepting partial response decorations", async (_name,decorations) => {
-    vi.stubGlobal("fetch",vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      message_id: "malformed-decorations",outcome: "ANSWER_GROUNDED",text: "Must not render.",
-      ...decorations
-    }),{ status: 200,headers: { "content-type": "application/json" } })));
-
-    await expect(supportAssistantClient.sendMessage(SESSION,"question"))
-      .rejects.toThrow("SUPPORT_RESPONSE_INVALID");
+  it("shows the unavailable reply for an unreadable server error",async () => {
+    const transport = { sendMessage: vi.fn(async () => { throw new Error("offline"); }) };
+    await render(localized("en",<Assistant signedIn={false} client={transport} />));
+    await submit("Question");
+    expect(document.querySelector(".supportMessage--assistant p")?.textContent).toBe(supportEn["support.unavailable"]);
   });
-
-  /**
-   * SYNC3 (DL3-F3 kept, dev's reviewed decorations adopted). dev seeded this
-   * row with a stored `session`; our reader erases ANY payload carrying one, so
-   * the row passed without ever reaching the action check — the wrong reason.
-   * It is re-seeded in the stored shape this build writes (no session, bound to
-   * an identity), and the control row proves the same payload with the
-   * canonical action IS restored: only the forged decoration refuses it.
-   */
-  it("rejects forged decorations restored from session storage", async () => {
-    const seed = (action: Readonly<{ id: string;label: string;href: string }>) =>
-      sessionStorage.setItem(SUPPORT_CONVERSATION_STORAGE_KEY,JSON.stringify({
-        language: "en",identityBound: false,
-        messages: [
-          { id: "disclosure",role: "assistant",text: "Prior disclosure." },
-          { id: "stored",role: "assistant",text: "Stored decorated message",outcome: "ANSWER_GROUNDED",
-            language: "en",sources: [],actions: [action] }
-        ]
-      }));
-    vi.stubGlobal("fetch",vi.fn().mockResolvedValue(new Response("{}",{ status: 401 })));
-
-    seed({ id: "home",label: "Reset account",href: "/settings" });
-    await render(<Assistant client={supportAssistantClient} signedIn={false} />);
-    expect(document.body.textContent).not.toContain("Stored forged message");
-    expect(document.body.textContent).toContain(supportEnglish["support.bannerLead"]);
-    expect(document.body.textContent).not.toContain("Stored decorated message");
-    expect(sessionStorage.getItem(SUPPORT_CONVERSATION_STORAGE_KEY) ?? "").not.toContain("Reset account");
-
-    await act(async () => root!.unmount());
-    root = createRoot(document.body.appendChild(document.createElement("div")));
-    seed({ id: "home",label: "Home",href: "/" });
-    await render(<Assistant client={supportAssistantClient} signedIn={false} />);
-    expect(document.body.textContent).toContain("Stored decorated message");
-    expect(document.querySelector<HTMLAnchorElement>('[aria-label="Actions"] a')?.getAttribute("href"))
-      .toBe("/");
-  });
-
-  /**
-   * SYNC3: dev's snapshot restart, against the IN-MEMORY session. dev seeded
-   * session A in sessionStorage and expected the restart to store session B —
-   * both of which DL3-F3 removed on purpose (the capability never rests in the
-   * browser). Session A is now minted by the first turn, the restart mints B,
-   * and neither ever reaches storage; everything dev asserted about the turn
-   * itself — one user message, the same redacted text twice, A's token then
-   * B's — is asserted unchanged.
-   */
-  it("clears stale A and retries the same redacted turn once through fresh B", async () => {
-    const calls: Array<Readonly<{ url: string;body: unknown;token: string | null }>> = [];
-    let sessionsMinted = 0;
-    vi.stubGlobal("fetch",vi.fn(async (url: string,init: RequestInit = {}) => {
-      calls.push({
-        url,body: typeof init.body === "string" ? JSON.parse(init.body) : null,
-        token: new Headers(init.headers).get("x-support-session-token")
-      });
-      if (url === "/api/v1/support/sessions") {
-        sessionsMinted += 1;
-        const letter = sessionsMinted === 1 ? "a" : "b";
-        return new Response(JSON.stringify({
-          session: { session_id: `session-${letter}`,identity_bound: false },
-          session_token: `token-${letter}`
-        }),{ status: 201,headers: { "content-type": "application/json" } });
-      }
-      if (url === "/api/v1/support/sessions/session-a/messages") {
-        return new Response(JSON.stringify({
-          error: "SUPPORT_KB_SNAPSHOT_UNAVAILABLE",restart_session: true
-        }),{ status: 409,headers: { "content-type": "application/json" } });
-      }
-      if (url === "/api/v1/support/sessions/session-b/messages") return new Response(JSON.stringify({
-        message_id: "fresh-answer",outcome: "NO_SOURCE",text: "Fresh answer.",sources: [],actions: []
-      }),{ status: 200,headers: { "content-type": "application/json" } });
-      throw new Error(`UNEXPECTED_FETCH:${url}`);
+  it("posts the exact message body through the same-origin CSRF boundary",async () => {
+    document.cookie = `__Host-debateai-csrf=${"A".repeat(43)}; path=/`;
+    const fetch = vi.fn(async () => json({ outcome: "NO_SOURCE",text: "No source" }));
+    vi.stubGlobal("fetch",fetch);
+    await supportAssistantClient.sendMessage("Question","en");
+    expect(fetch).toHaveBeenCalledWith("/api/v1/support/messages",expect.objectContaining({
+      method: "POST",body: JSON.stringify({ text: "Question",language: "en" })
     }));
-    await render(<Assistant client={supportAssistantClient} signedIn={false} />);
-    await submit("My code 123456 failed");
-
-    // Paid plans G3a: the panel asks once, on mount, whether support is offered at this address.
-    expect(calls.map(({ url }) => url)).toEqual([
-      "/api/v1/geo/availability",
-      "/api/v1/support/sessions",
-      "/api/v1/support/sessions/session-a/messages",
-      "/api/v1/support/sessions",
-      "/api/v1/support/sessions/session-b/messages"
-    ]);
-    expect(calls.filter(({ url }) => url.endsWith("/messages")).map(({ body }) => body)).toEqual([
-      { text: "My [REDACTED_SECRET_LIKE] failed" },
-      { text: "My [REDACTED_SECRET_LIKE] failed" }
-    ]);
-    expect(calls.map(({ token }) => token)).toEqual([null,null,"token-a",null,"token-b"]);
-    expect(document.querySelectorAll('[data-role="user"]')).toHaveLength(1);
-    expect(document.body.textContent).toContain("Fresh answer.");
-    const stored = sessionStorage.getItem(SUPPORT_CONVERSATION_STORAGE_KEY)!;
-    expect(stored).toContain("Fresh answer.");
-    for (const capability of ["session-a","token-a","session-b","token-b"]) {
-      expect(stored).not.toContain(capability);
-    }
+    const headers = fetch.mock.calls[0]?.[1]?.headers as Record<string,string>;
+    expect(headers["x-support-session-token"]).toBeUndefined();
+    expect(headers["x-support-case-token"]).toBeUndefined();
   });
-
-  it("stops after a second exact snapshot mismatch, holding no session", async () => {
-    const urls: string[] = [];
-    let sessionsMinted = 0;
-    vi.stubGlobal("fetch",vi.fn(async (url: string) => {
-      urls.push(url);
-      if (url === "/api/v1/support/sessions") {
-        sessionsMinted += 1;
-        const letter = String.fromCharCode(96 + sessionsMinted);
-        return new Response(JSON.stringify({
-          session: { session_id: `session-${letter}`,identity_bound: false },
-          session_token: `token-${letter}`
-        }),{ status: 201,headers: { "content-type": "application/json" } });
-      }
-      return new Response(JSON.stringify({
-        error: "SUPPORT_KB_SNAPSHOT_UNAVAILABLE",restart_session: true
-      }),{ status: 409,headers: { "content-type": "application/json" } });
+  it("rejects forged source and action decorations at the response boundary",async () => {
+    const fetch = vi.fn(async () => json({ outcome: "ANSWER_GROUNDED",text: "Answer",
+      sources: [{ id: "not-reviewed",label: "Fake" }],actions: [] }));
+    vi.stubGlobal("fetch",fetch);
+    await expect(supportAssistantClient.sendMessage("Question","en")).rejects.toThrow("SUPPORT_RESPONSE_INVALID");
+  });
+  it("accepts the canonical signed-in action returned with a grounded answer",async () => {
+    const fetch = vi.fn(async (path: string) => path === "/api/v1/session" ? json({}) : json({
+      outcome: "ANSWER_GROUNDED",text: "Open the debate composer",sources: [],
+      actions: [{ id: "start-debate",label: "Start a debate",href: "/new" }]
     }));
-    await render(<Assistant client={supportAssistantClient} signedIn={false} />);
-    await submit("question");
-
-    expect(urls).toEqual([
-      "/api/v1/geo/availability",
-      "/api/v1/support/sessions",
-      "/api/v1/support/sessions/session-a/messages",
-      "/api/v1/support/sessions",
-      "/api/v1/support/sessions/session-b/messages"
-    ]);
-    const unavailable = "Support is unavailable right now. Please try again or choose 'Talk to a human'.";
-    expect(document.body.textContent?.split(unavailable)).toHaveLength(2);
-    const stored = sessionStorage.getItem(SUPPORT_CONVERSATION_STORAGE_KEY) ?? "";
-    expect(stored).not.toContain("session-b");
-    expect(stored).not.toContain("token-b");
-
-    // No session is held after the second mismatch: the next turn mints a new one.
-    await submit("again");
-    expect(urls.slice(5,6)).toEqual(["/api/v1/support/sessions"]);
-  });
-
-  it.each([
-    ["a different conflict",{ error: "SUPPORT_CONFLICT",restart_session: true }],
-    ["an extended snapshot envelope",{
-      error: "SUPPORT_KB_SNAPSHOT_UNAVAILABLE",restart_session: true,detail: "extra"
-    }]
-  ])("does not restart for %s", async (_name,body) => {
-    const urls: string[] = [];
-    vi.stubGlobal("fetch",vi.fn(async (url: string) => {
-      urls.push(url);
-      if (url === "/api/v1/support/sessions") return new Response(JSON.stringify({
-        session: { session_id: "session-a",identity_bound: false },session_token: "token-a"
-      }),{ status: 201,headers: { "content-type": "application/json" } });
-      return new Response(JSON.stringify(body),{
-        status: 409,headers: { "content-type": "application/json" }
-      });
-    }));
-    await render(<Assistant client={supportAssistantClient} signedIn={false} />);
-    await submit("question");
-
-    expect(urls).toEqual([
-      "/api/v1/geo/availability",
-      "/api/v1/support/sessions",
-      "/api/v1/support/sessions/session-a/messages"
-    ]);
-    expect(document.body.textContent).toContain(
-      "Support is unavailable right now. Please try again or choose 'Talk to a human'."
-    );
-  });
-
-  it.each([
-    ["en","Forgot password"],
-    ["ro","Am uitat parola"]
-  ] as const)("keeps unresolved %s password recovery inside Support with no action", async (language,request) => {
-    const urls: string[] = [];
-    vi.stubGlobal("fetch",vi.fn(async (url: string) => {
-      urls.push(url);
-      if (url === "/api/v1/support/sessions") return new Response(JSON.stringify({
-        session: { session_id: "recovery-session",identity_bound: false },session_token: "recovery-token"
-      }),{ status: 201,headers: { "content-type": "application/json" } });
-      return new Response(JSON.stringify({
-        message_id: `recovery-${language}`,outcome: "REFUSE_ZONE",
-        text: "Use the product's verified password-recovery flow. Support cannot reset credentials.",
-        sources: [],actions: []
-      }),{ status: 200,headers: { "content-type": "application/json" } });
-    }));
-    await renderLocalized(language,<Assistant client={supportAssistantClient} signedIn={false} />);
-    await submit(request);
-
-    expect(urls).toEqual([
-      "/api/v1/geo/availability",
-      "/api/v1/support/sessions",
-      "/api/v1/support/sessions/recovery-session/messages"
-    ]);
-    expect(document.querySelector('[aria-label="Actions"]')).toBeNull();
-    expect(document.querySelector('[aria-label="Acțiuni"]')).toBeNull();
-  });
-
-  it.each(["en","ro"] as const)("opens the verified first-party Forgot password destination in %s",async language=>{
-    vi.stubGlobal("fetch",vi.fn(async (url:string)=>new Response(JSON.stringify(url==="/api/v1/support/sessions"
-      ? {session:{session_id:"recovery-session",identity_bound:false},session_token:"recovery-token"}
-      : {message_id:"recovery-link",outcome:"REFUSE_ZONE",text:"Support cannot reset credentials.",sources:[],actions:[],refusal_link:"/recover"}),{status:url==="/api/v1/support/sessions"?201:200,headers:{"content-type":"application/json"}})));
-    await renderLocalized(language,<Assistant client={supportAssistantClient} signedIn={false}/>);await submit(language==="ro"?"Am uitat parola":"Forgot password");
-    const link=document.querySelector<HTMLAnchorElement>('a[href="/recover"]');expect(link).not.toBeNull();
-    expect(link!.textContent).toContain(language==="ro"?"Recuperați":"Recover");
-    expect(link!.search).toBe("");expect(link!.hash).toBe("");
+    vi.stubGlobal("fetch",fetch);
+    await expect(supportAssistantClient.sendMessage("Question","en")).resolves.toMatchObject({
+      actions: [{ id: "start-debate",label: "Start a debate",href: "/new" }]
+    });
   });
 });

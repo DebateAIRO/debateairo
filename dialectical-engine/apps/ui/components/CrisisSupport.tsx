@@ -108,7 +108,7 @@ function withCallLink(message: string, number: string): React.ReactNode {
   );
 }
 
-function browserLanguages(): readonly string[] {
+export function browserLanguages(): readonly string[] {
   if (typeof navigator === "undefined") return [];
   return navigator.languages?.length ? navigator.languages : [navigator.language].filter(Boolean);
 }
