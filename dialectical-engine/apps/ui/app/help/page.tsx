@@ -1,16 +1,12 @@
+import { headers } from "next/headers";
 import { Assistant } from "@/components/support/Assistant";
-import { CaseLookup,OwnCaseLookup } from "@/components/support/CaseView";
+import { HelpSupport } from "@/components/support/HelpSupport";
+import { readCrisisCountryHint } from "@/lib/crisisLines";
 
-export default function HelpPage() {
+export default async function HelpPage() {
   return (
     <div className="supportPage" data-help-page>
-      <Assistant
-        fullPage
-        auxiliaryContent={<>
-          <CaseLookup />
-          <OwnCaseLookup />
-        </>}
-      />
+      <HelpSupport chat={<Assistant fullPage crisisCountryHint={readCrisisCountryHint(await headers())} />} />
     </div>
   );
 }
