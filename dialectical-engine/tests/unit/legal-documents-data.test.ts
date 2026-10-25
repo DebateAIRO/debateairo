@@ -173,7 +173,7 @@ describe("legal documents — generated data", () => {
       const read = (locale: string) => readFileSync(resolve(process.cwd(), `apps/ui/legal/${locale}/privacy-policy.md`), "utf8").split("\n");
       const english = read("en");
       const rows = english.flatMap((line, index) => (line.includes(CRISIS_EXCEPTION) ? [index] : []));
-      const members = rows.flatMap((index) => english[index].split(marker).flatMap((part, segment) => (part.includes(CRISIS_EXCEPTION) ? [[index, segment] as const] : [])));
+      const members = rows.flatMap((index) => english[index]!.split(marker).flatMap((part, segment) => (part.includes(CRISIS_EXCEPTION) ? [[index, segment] as const] : [])));
       expect(members).toHaveLength(4);
       const shared = (parts: readonly string[]) => {
         const shortest = parts.reduce((a, b) => (b.length < a.length ? b : a));
@@ -184,13 +184,13 @@ describe("legal documents — generated data", () => {
         }
         return best;
       };
-      const base = CRISIS_EXCEPTION.length / english[rows[0]].length;
+      const base = CRISIS_EXCEPTION.length / english[rows[0]!]!.length;
       const locales = readdirSync(resolve(process.cwd(), "apps/ui/legal")).filter((name) => /^[a-z]{2}$/.test(name) && name !== "en");
       expect(locales).toHaveLength(34);
       for (const locale of locales) {
         const lines = read(locale);
-        const parts = members.map(([index, segment]) => lines[index].split(marker)[segment] ?? "");
-        const k = (shared(parts).length / lines[rows[0]].length) / base;
+        const parts = members.map(([index, segment]) => lines[index]?.split(marker)[segment] ?? "");
+        const k = (shared(parts).length / (lines[rows[0]!] ?? "").length) / base;
         expect(k, `${locale} k=${k.toFixed(2)}`).toBeGreaterThan(0.75);
       }
     });

@@ -72,24 +72,21 @@ async function openOld() { await press("Open"); }
 const text = () => host.textContent ?? "";
 
 describe("S04 threat reports page", () => {
-  it("asks for Team access verification before the first list request in a fresh tab", async () => {
-    // Property: a holder without a verified staff session sees the required action without a 401.
-    sessionStorage.removeItem("debateai:staff-authority");
+  it("asks for Team access verification when the server rejects a fresh tab", async () => {
+    // Property: the server's 401 gives a fresh tab the required action without a browser key.
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ error: "UNAUTHORIZED" }, { status: 401 }));
     const { ThreatReportsPanel } = await import("../../apps/ui/components/ThreatReportsPanel.js");
     await act(async () => root.render(<ThreatReportsPanel />));
-    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(fetchSpy).toHaveBeenCalledOnce();
     expect(text()).toContain("Verify Team access first");
   });
   it("shows the no-access state for verified staff without the report capability", async () => {
-    // Property: a verified non-holder still reaches the server's 403 outcome.
-    sessionStorage.setItem("debateai:staff-authority", JSON.stringify({ expires_at: "2099-01-01T00:00:00.000Z", capabilities: [] }));
+    // Property: a staff session without this capability reaches the server's 403 outcome.
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ error: "FORBIDDEN" }, { status: 403 }));
     const { ThreatReportsPanel } = await import("../../apps/ui/components/ThreatReportsPanel.js");
     await act(async () => root.render(<ThreatReportsPanel />));
     expect(fetchSpy).toHaveBeenCalledOnce();
     expect(text()).toContain("You don't have access to threat reports.");
-    sessionStorage.removeItem("debateai:staff-authority");
   });
   it("lists kept threats oldest first with time, state badges and Open", async () => {
     await mount();
