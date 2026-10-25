@@ -12,17 +12,6 @@ type Summary = z.infer<typeof ThreatReportListSchema>["reports"][number];
 type Report = z.infer<typeof ThreatReportSchema>;
 type View = "list" | "item" | "noAccess" | "gone" | "loadFailed" | "verifyFirst";
 const requestedReport = () => typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("report");
-function hasStaffAuthorityInThisTab(): boolean {
-  try {
-    const stored = sessionStorage.getItem("debateai:staff-authority");
-    if (stored === null) return false;
-    const authority: unknown = JSON.parse(stored);
-    if (authority === null || typeof authority !== "object") return false;
-    const expiresAt = (authority as { expires_at?: unknown }).expires_at;
-    return typeof expiresAt === "string" && Date.parse(expiresAt) > Date.now();
-  } catch { return false; }
-}
-
 export function ThreatReportsPanel({ client, catalog = staffEnglish, locale = "en" }: {
   client?: ThreatReportsClient;
   catalog?: MessageCatalog;
@@ -68,16 +57,12 @@ export function ThreatReportsPanel({ client, catalog = staffEnglish, locale = "e
   }, [api]);
   useEffect(() => {
     const loadLocation = () => {
-      if (client === undefined && !hasStaffAuthorityInThisTab()) {
-        setReport(null); setRows([]); setView("verifyFirst");
-        return;
-      }
       const ref = requestedReport(); void (ref === null ? loadList() : loadItem(ref));
     };
     loadLocation();
     window.addEventListener("popstate", loadLocation);
     return () => { window.removeEventListener("popstate", loadLocation); api.cancel(); };
-  }, [api, client, loadItem, loadList]);
+  }, [api, loadItem, loadList]);
   function open(event: MouseEvent<HTMLAnchorElement>, ref: string) {
     event.preventDefault();
     history.pushState(null, "", `/admin/threat-reports?report=${encodeURIComponent(ref)}`);
