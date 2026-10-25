@@ -421,17 +421,6 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
     searchTerms: terms(["workers", "operator", "deployment"], ["lucrători", "operator", "implementare"]),
   }),
   capability({
-    id: "operator-publication-reviews",
-    route: "/admin/reviews",
-    labels: labels("Operator-only publication reviews", "Revizuiri de publicare doar pentru operatori"),
-    audience: "operator",
-    availability: "excluded",
-    disposition: "excluded",
-    actionIds: [],
-    articleIds: ["unsupported-capabilities"],
-    searchTerms: terms(["publication reviews", "operator", "approval queue"], ["revizuiri de publicare", "operator", "coadă de aprobare"]),
-  }),
-  capability({
     id: "billing-pricing",
     route: "/pricing",
     labels: labels("Pricing", "Prețuri"),
@@ -547,7 +536,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
 export const SUPPORT_PAGE_ROUTES: readonly string[] = Object.freeze(
   // Knowing these stateful routes grants no model-selectable action or private account authority.
   [...new Set([...SUPPORT_CAPABILITIES.map(({ route }) => route),
-    "/admin/invitation", "/admin/team", "/social/complete", "/recover", "/settings/security", "/verify-recovery-email", "/reset-password", "/recover-authenticator", "/verify-backup-email", "/export"
+    "/admin/invitation", "/admin/reviews", "/admin/team", "/social/complete", "/recover", "/settings/security", "/verify-recovery-email", "/reset-password", "/recover-authenticator", "/verify-backup-email", "/export"
   ])].sort(),
 );
 
