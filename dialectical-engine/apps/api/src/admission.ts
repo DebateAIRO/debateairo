@@ -183,7 +183,7 @@ export class AdmissionLimiter {
     let removed = 0;
     for (const scope of scopes) {
       const bucket = this.buckets.get(scope);
-      if (bucket === undefined) throw new TypeError(`ADMISSION_SCOPE_UNKNOWN:${String(scope)}`);
+      if (bucket === undefined) continue;
       for (const [key, entry] of bucket.entries) {
         if (expired(entry, bucket.policy.windowMs, instant)) {
           bucket.entries.delete(key);

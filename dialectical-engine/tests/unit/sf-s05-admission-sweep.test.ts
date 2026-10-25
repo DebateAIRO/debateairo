@@ -30,6 +30,23 @@ function policy(): AdmissionPolicy {
 }
 
 describe("S05 admission counter sweep", () => {
+  it.each(SUPPORT_SCOPES)("%s: skips an absent scope and sweeps the present ones", (absentScope) => {
+    const configured = { ...policy(), [absentScope]: null };
+    const limiter = new AdmissionLimiter(configured);
+    for (const scope of SUPPORT_SCOPES) {
+      if (scope !== absentScope) limiter.decide(scope, scope, new Date(AT_MS));
+    }
+    const afterEveryWindow = AT_MS + Math.max(
+      ...SUPPORT_SCOPES.filter((scope) => scope !== absentScope)
+        .map((scope) => configured[scope]!.windowMs)
+    );
+
+    expect(limiter.sweep(new Date(afterEveryWindow), SUPPORT_SWEPT_SCOPES)).toBe(3);
+    for (const scope of SUPPORT_SCOPES) {
+      if (scope !== absentScope) expect(limiter.keys(scope)).toEqual([]);
+    }
+  });
+
   it.each(SUPPORT_SCOPES)("%s: removes a single expired key below capacity", (scope) => {
     const configured = policy();
     const limiter = new AdmissionLimiter(configured);
