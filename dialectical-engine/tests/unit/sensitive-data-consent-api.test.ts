@@ -8,6 +8,7 @@ import {
   testSessionApplication,
   testSessionHeaders
 } from "../support/httpSession.js";
+import { questionCheckPass } from "../support/questionCheckPass.js";
 
 /* Sensitive-data consent — the API half (V's ruling of 2026-09-29): an account that has not
    agreed starts no debate; agreeing once, from a live session, lets it debate. */
@@ -79,7 +80,7 @@ describe("sensitive-data consent before the first debate", () => {
     const identity = testHttpIdentity("consents");
     const { sessions, recorded } = consentingSessions(identity);
     const asks = askSpy();
-    const api = buildApi({ application: asks.app, sessions, allowedOrigin: TEST_APP_ORIGIN });
+    const api = buildApi({ application: asks.app, questionCheck: questionCheckPass, sessions, allowedOrigin: TEST_APP_ORIGIN });
     try {
       const before = await api.inject({
         method: "GET", url: "/v1/account/sensitive-data-consent", headers: testSessionHeaders(identity)

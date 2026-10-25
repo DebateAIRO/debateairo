@@ -14,6 +14,7 @@ import {
   testSessionHeaders,
   type TestHttpIdentity
 } from "../support/httpSession.js";
+import { questionCheckPass } from "../support/questionCheckPass.js";
 
 const RUN_ID = "11111111-1111-4111-8111-111111111111";
 const PUBLIC_REF = "22222222-2222-4222-8222-222222222222";
@@ -87,6 +88,7 @@ function harness(policy: AdmissionPolicy = POLICY) {
   const readPublicDebate = vi.fn(async () => null);
   const api = buildApi({
     application: { ...fixtureApplication(), submit },
+    questionCheck: questionCheckPass,
     sessions: testSessionApplication([OWNER_A, OWNER_B, OWNER_C]),
     // Only the two anonymous read entry points are exercised here.
     publications: { list, readPublicDebate } as unknown as PublicationApplication,
@@ -225,6 +227,7 @@ describe("B10 admission limits (F-07, L1-F1, L1-F2)", () => {
     const submit = vi.fn(async () => ({ run_ref: RUN_ID, status: "QUEUED" as const }));
     const api = buildApi({
       application: { ...fixtureApplication(), submit },
+      questionCheck: questionCheckPass,
       sessions: testSessionApplication([OWNER_A]),
       allowedOrigin: TEST_APP_ORIGIN
     });

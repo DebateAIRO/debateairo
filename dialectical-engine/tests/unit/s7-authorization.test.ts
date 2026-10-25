@@ -9,6 +9,7 @@ import {
   RETIRED_DEV_HEADER,TEST_APP_ORIGIN,testHttpIdentity,
   testSessionApplication,testSessionHeaders
 } from "../support/httpSession.js";
+import { questionCheckPass } from "../support/questionCheckPass.js";
 import type { AnswerStoryApplication } from "../../apps/api/src/stories.js";
 import type { AnswerDisclosureApplication } from "../../apps/api/src/disclosures.js";
 import type { AnswerMapViewApplication } from "../../apps/api/src/map-views.js";
@@ -315,7 +316,7 @@ const USER_MUTATION_HEADERS=testSessionHeaders(USER_IDENTITY,true);
 
 function buildUserApi(application:AskApplication=fixtureApplication()) {
   return buildApi({
-    application,sessions:testSessionApplication([USER_IDENTITY]),allowedOrigin:TEST_APP_ORIGIN
+    application,questionCheck:questionCheckPass,sessions:testSessionApplication([USER_IDENTITY]),allowedOrigin:TEST_APP_ORIGIN
   });
 }
 

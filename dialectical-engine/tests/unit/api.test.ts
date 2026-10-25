@@ -23,6 +23,7 @@ import {
   testSessionApplication,
   testSessionHeaders
 } from "../support/httpSession.js";
+import { questionCheckPass } from "../support/questionCheckPass.js";
 
 const RUN_ID = "11111111-1111-4111-8111-111111111111";
 const QUEUED_RUN_ID = "22222222-2222-4222-8222-222222222222";
@@ -49,6 +50,7 @@ function rosterPanel(
 function buildApi(options: Parameters<typeof buildApiBase>[0]) {
   return buildApiBase({
     ...options,
+    questionCheck: options.questionCheck ?? questionCheckPass,
     sessions: options.sessions ?? testSessionApplication([USER_IDENTITY]),
     allowedOrigin: options.allowedOrigin ?? TEST_APP_ORIGIN
   });

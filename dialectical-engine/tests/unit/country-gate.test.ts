@@ -13,6 +13,7 @@ import { AdmissionLimiter } from "../../apps/api/src/admission.js";
 import { CountryGate, countryPolicyInForce, type CountryGateAuditWriter } from "../../apps/api/src/country-gate.js";
 import type { SessionApplication } from "../../apps/api/src/sessions.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
+import { questionCheckPass } from "../support/questionCheckPass.js";
 
 const policy = countryPolicyFromValue(
   COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value, COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef
@@ -145,6 +146,7 @@ describe("the gate on the routes", () => {
       register, submit,
       instance: buildApi({
         application: { submit } as unknown as AskApplication,
+        questionCheck: questionCheckPass,
         turnstile: passedTurnstile,
         registration: { register, verifyEmail: vi.fn(), resendVerification: vi.fn() } as never,
         sessions: options.sessions ?? testSessionApplication([IDENTITY]),
