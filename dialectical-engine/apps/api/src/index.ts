@@ -294,7 +294,7 @@ import { answerNodeIds, type AnswerMapViewApplication } from "./map-views.js";
 import type { AccountErasureApplication } from "./account-erasure.js";
 import type { DataExportApplication } from "./data-export/service.js";
 import {
-  readOwnerRun, readOwnerRunAnswer, readOwnerAnswer, readOwnerInspection,
+  readOwnerRun, readOwnerRunAnswer, readOwnerAnswer, readOwnerInspection, unlessRemovedByCheck,
   readOwnerLedgerDigest, readOwnerStory, readOwnerDisclosure, readOwnerNode
 } from "./owner-read.js";
 import type { LegacyRunClaimApplication } from "./legacy-claim.js";
@@ -4092,7 +4092,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // Side-by-side C9: the stream follows the newest run; a stream still open on an old id reads a null mark
     // (eventMark) and ends with the clean close the page treats as "reconnect", and the reconnect lands here.
     const runId = parsedRunId.success ? await resolvedRunId(options, parsedRunId.data) : null;
-    if (runId === null || await options.application.readRun(runId, request.session, ownership) === null) {
+    if (runId === null || await unlessRemovedByCheck(options, runId,
+      () => options.application.readRun(runId, request.session, ownership)) === null) {
       return reply.status(404).send({ error: "RUN_NOT_FOUND" });
     }
     const access = options.synthesisAnswerAccess ?? OPEN_SYNTHESIS_ANSWER_ACCESS;

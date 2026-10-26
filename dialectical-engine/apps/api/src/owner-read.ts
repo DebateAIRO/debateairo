@@ -29,10 +29,27 @@ export function ownerSession(ownerRef: string, sessionId: string): Session {
   });
 }
 
+/**
+ * S01: the end check's removal destroys a debate's keys in the same tick, so from then on the debate's own reads fail
+ * as erased content. For its page that is "not found", on which the page takes the removal notice, never a server
+ * failure. An erased read of a debate the check did not remove still fails as before.
+ */
+export async function unlessRemovedByCheck<T>(
+  d: Pick<OwnerReadDeps, "synthesisAnswerAccess">, runId: string, read: () => Promise<T | null>
+): Promise<T | null> {
+  try {
+    return await read();
+  } catch (error) {
+    if (error instanceof TypedDomainError && error.code === "PRIVATE_CONTENT_ERASED"
+      && await (d.synthesisAnswerAccess ?? OPEN_SYNTHESIS_ANSWER_ACCESS).stateOf({ runId }) === "REMOVED") return null;
+    throw error;
+  }
+}
+
 export async function readOwnerRun(
   d: OwnerReadDeps, runId: string, session: Session, ownership: RunOwnershipAccess
 ): Promise<RunProjection | null> {
-  const run = await d.application.readRun(runId, session, ownership);
+  const run = await unlessRemovedByCheck(d, runId, () => d.application.readRun(runId, session, ownership));
   if (run === null) return null;
   const state = await (d.synthesisAnswerAccess ?? OPEN_SYNTHESIS_ANSWER_ACCESS).stateOf({ runId });
   if (state === "REMOVED") return null;
@@ -42,7 +59,7 @@ export async function readOwnerRun(
 export async function readOwnerRunAnswer(
   d: OwnerReadDeps, runId: string, session: Session, ownership: RunOwnershipAccess
 ): Promise<Answer | null> {
-  const answer = await d.application.readRunAnswer(runId, session, ownership);
+  const answer = await unlessRemovedByCheck(d, runId, () => d.application.readRunAnswer(runId, session, ownership));
   return answer === null || !await answerIsShown(d, answer) ? null : AnswerSchema.parse(answer);
 }
 

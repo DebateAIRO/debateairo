@@ -299,6 +299,41 @@ describe("S01 held route boundary", () => {
 
 });
 
+describe("S01: a debate the check removed reads as not found on its own open page", () => {
+  // Found on the merged stack (2026-10-26): the check's removal destroys the run's keys in the same tick, so the held
+  // page's next reads failed as erased content (500, "Loading this debate did not complete") and never reached the
+  // not-found answer the page takes the removal notice on.
+  const erased = async () => { throw new TypedDomainError("PRIVATE_CONTENT_ERASED", "Content erased"); };
+  const pageApi = (state: "REMOVED" | "SHOW", owner: ReturnType<typeof testHttpIdentity>) => buildApi({
+    application: { readRun: erased, readRunAnswer: erased } as unknown as ApiOptions["application"],
+    sessions: testSessionApplication([owner]), allowedOrigin: TEST_APP_ORIGIN,
+    synthesisAnswerAccess: { stateOf: async () => state, removalNoticeExists: async () => true,
+      takeRemovalNotice: async () => true }
+  });
+
+  it("answers the run, its answer and its event stream 404, so the page takes the removal notice", async () => {
+    const runId = randomUUID();
+    const owner = testHttpIdentity(`removed-page-${randomUUID()}`);
+    const api = pageApi("REMOVED", owner);
+    try {
+      for (const url of [`/v1/runs/${runId}`, `/v1/runs/${runId}/answer`, `/v1/runs/${runId}/events`]) {
+        const response = await api.inject({ method: "GET", url, headers: testSessionHeaders(owner) });
+        expect([url, response.statusCode]).toEqual([url, 404]);
+      }
+    } finally { await api.close(); }
+  });
+
+  it("still fails an erased read of a debate the check did not remove", async () => {
+    const runId = randomUUID();
+    const owner = testHttpIdentity(`erased-page-${randomUUID()}`);
+    const api = pageApi("SHOW", owner);
+    try {
+      const response = await api.inject({ method: "GET", url: `/v1/runs/${runId}`, headers: testSessionHeaders(owner) });
+      expect(response.statusCode).toBe(500);
+    } finally { await api.close(); }
+  });
+});
+
 describe("S01 removed Publish ownership boundary", () => {
   it("answers Publish after its removal notice with RUN_NOT_FOUND", async () => {
     const runId = randomUUID();

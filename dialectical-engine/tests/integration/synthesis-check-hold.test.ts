@@ -18,6 +18,9 @@ import {
 
 let database: TestDatabase;
 let runtime: Pool;
+/** The answer list as the API's login reads it: debateai_billing_runtime, which 0123 (side-by-side releases) grants
+ * core.run_supersession, a table the list reads since that merge. Everything else here stays on debateai_runtime. */
+let apiPool: Pool;
 let owner: StoryEncryptedOwner;
 let repository: SynthesisCheckRepository;
 let serve: ServeRepository;
@@ -30,12 +33,17 @@ beforeAll(async () => {
   url.searchParams.set("options", "-c role=debateai_runtime");
   runtime = createPool(url.toString());
   configureContentEncryption(runtime, contentCipherFor(database.pool)!);
+  const apiUrl = new URL(database.connectionString);
+  apiUrl.searchParams.set("options", "-c role=debateai_billing_runtime");
+  apiPool = createPool(apiUrl.toString());
+  configureContentEncryption(apiPool, contentCipherFor(database.pool)!);
   repository = new SynthesisCheckRepository(runtime);
   serve = new ServeRepository(runtime);
 }, 180_000);
 
 afterAll(async () => {
   await runtime?.end();
+  await apiPool?.end();
   await database?.stop();
   if (owner !== undefined) await releaseStoryEncryptedOwner(owner);
 });
@@ -171,7 +179,7 @@ describe("synthesis answer access under debateai_runtime", () => {
     };
     const application = {
       readAnswerIndex: (_session: unknown, limit: number, offset: number) =>
-        serve.readAnswerIndex({ ownerRef: owner.ownerRef, legacyAskerId: null }, limit, offset)
+        new ServeRepository(apiPool).readAnswerIndex({ ownerRef: owner.ownerRef, legacyAskerId: null }, limit, offset)
     } as unknown as ApiOptions["application"];
     const api = buildApi({
       application, sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN,
