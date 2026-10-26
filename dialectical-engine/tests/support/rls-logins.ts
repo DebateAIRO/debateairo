@@ -15,6 +15,7 @@
  *   a client connected as the harness superuser throws R21_SUPERUSER_POOL_IN_REQUEST inside a request scope.
  */
 import { randomBytes, randomUUID } from "node:crypto";
+import { appendFileSync } from "node:fs";
 import { appendFile, chmod, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
@@ -27,7 +28,9 @@ import {
   generateVerificationToken,
   hashToken
 } from "@debateai/crypto";
-import { API_DATABASE_POOLS, createPool, migrate, requestScopeActive, type Pool } from "@debateai/db";
+import {
+  API_DATABASE_POOLS, createPool, migrate, requestScopeActive, runInRequestScope, setRequestCredential, type Pool
+} from "@debateai/db";
 import { provisionDevelopmentDatabasePrincipals } from "../../apps/runner/src/dev-database-principals.js";
 import {
   PRODUCTION_DATABASE_PRINCIPAL_CREDENTIAL_FORMAT,
@@ -330,6 +333,64 @@ function loginOf(url: string): string {
 }
 
 /**
+ * PRD-N2 (t_283643c4): runs `fn` as the product runs a repository call inside a request — in a request scope carrying
+ * the account's raw session token (`null`: an anonymous request) — so in login mode a T1 pool sends the call's
+ * statements on its own login with that account's context instead of routing them to its system target, as it does for
+ * every statement made outside a scope. In superuser mode the pools have no target and the scope changes nothing.
+ */
+export function inAccountRequest<T>(sessionToken: string | null, fn: () => Promise<T>): Promise<T> {
+  return runInRequestScope(async () => {
+    setRequestCredential(sessionToken);
+    return fn();
+  });
+}
+
+const ROUTED_OBSERVED = Symbol.for("debateai.rls.routed-call-report.v1");
+/** The T1 fields of ApiTestPools: the pools main.ts gives a system target (runtime, legacyAskAdmission, authorization). */
+const T1_FIELDS: readonly ApiPoolField[] = Object.freeze(API_POOL_WIRING.filter(({ target }) => target !== undefined)
+  .map(({ field }) => field));
+
+/** The first stack frame in a test file (not tests/support), as `<path from the product root>:<line>`. */
+function callingTestLine(): string {
+  const limit = Error.stackTraceLimit;
+  Error.stackTraceLimit = 60;
+  const stack = new Error().stack ?? "";
+  Error.stackTraceLimit = limit;
+  for (const frame of stack.split("\n").slice(1)) {
+    const found = /(\/[^\s():]+\.test\.tsx?):(\d+):\d+/u.exec(frame);
+    if (found !== null && !found[1]!.includes("/tests/support/")) return `${relative(PRODUCT_ROOT, found[1]!)}:${found[2]}`;
+  }
+  return "no-test-frame";
+}
+
+/**
+ * PRD-N2 (t_283643c4), login mode with $DEBATEAI_TEST_API_LOGINS_ROUTED_REPORT set: a query or checkout on a T1 pool
+ * made OUTSIDE a request scope — which therefore runs on the system login, not on the T1 login — appends
+ * "<test file>\t<pool field>\t<test file:line that made it>" once. A direct call the product makes inside a request then
+ * shows by line; background readers, boot checks and fixture writes through a T1 pool show too, and the reader of the
+ * report classifies each line. Off unless the variable is set: cluster.sh's report and counts are unchanged.
+ */
+function reportRoutedCalls(pools: ApiTestPools, file: string, report: string): void {
+  const seen = new Set<string>();
+  for (const field of T1_FIELDS) {
+    const pool = pools[field] as Pool & { [ROUTED_OBSERVED]?: true };
+    if (pool[ROUTED_OBSERVED] === true) continue;
+    Object.defineProperty(pool, ROUTED_OBSERVED, { value: true });
+    const methods = pool as unknown as Record<"query" | "connect", (...args: unknown[]) => unknown>;
+    for (const method of ["query", "connect"] as const) {
+      const original = methods[method];
+      methods[method] = function observedRoutedCall(...args: unknown[]): unknown {
+        if (!requestScopeActive()) {
+          const line = `${file}\t${field}\t${callingTestLine()}\n`;
+          if (!seen.has(line)) { seen.add(line); appendFileSync(report, line); }
+        }
+        return original.apply(pool, args);
+      };
+    }
+  }
+}
+
+/**
  * The R21 mode switch (S5.x): the login pools when DEBATEAI_TEST_API_LOGINS=1, the harness superuser pool in every field
  * otherwise. A field named in `overrides` is, in both modes, a pool on that URL (a login the file made itself) wired as
  * main.ts wires that field: runtime and legacyAskAdmission with the `system` pool (or overrides.system) as target,
@@ -371,6 +432,10 @@ export async function apiTestPools(
     if (report !== undefined && report !== "") {
       const file = relative(PRODUCT_ROOT, fileURLToPath(testFile));
       await appendFile(report, fields.map((field) => `${file}\t${field}\t${loginOf(own[field]!)}\n`).join(""));
+    }
+    const routed = process.env.DEBATEAI_TEST_API_LOGINS_ROUTED_REPORT;
+    if (routed !== undefined && routed !== "") {
+      reportRoutedCalls(pools, relative(PRODUCT_ROOT, fileURLToPath(testFile)), routed);
     }
   }
   return pools;

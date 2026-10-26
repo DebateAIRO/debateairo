@@ -752,6 +752,68 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
     expect(noServedAnswer.json()).toEqual({ error: "ANSWER_NOT_SERVED" });
   }, 60_000);
 
+  // Row-level security S01, PRD-N1 (t_f667b6ff): under the real logins the ten-route test above stops at its owner gap
+  // write (V-13: no API login holds INSERT on core.investigation_request nor UPDATE on memory.memory_link, so the
+  // owner's writes answer 500), and the routes after it went unmeasured there. V-13 keeps that test as it is; this one
+  // pins those routes again, foreign-valid against absent plus the owner's reads, with none of the owner writes, so it
+  // runs in both modes.
+  it("keeps memory-link unlink and the run, events and answer routes indistinguishable for foreign-valid and absent resources, without the owner writes V-13 lists", async () => {
+    const absentRunId = randomUUID();
+    const absentAnswerId = randomUUID();
+    const ownerHeaders = cookieHeaders(owner);
+    const ownerMutationHeaders = cookieHeaders(owner, true);
+    const paired = async (foreignUrl: string, absentUrl: string, expectedBody: unknown) => {
+      const [foreignResponse, absentResponse] = await Promise.all([
+        api.inject({ method: "GET", url: foreignUrl, headers: ownerHeaders }),
+        api.inject({ method: "GET", url: absentUrl, headers: ownerHeaders })
+      ]);
+      expect(foreignResponse.statusCode).toBe(404);
+      expect(absentResponse.statusCode).toBe(404);
+      expect(foreignResponse.json()).toEqual(expectedBody);
+      expect(absentResponse.json()).toEqual(expectedBody);
+      expect(foreignResponse.body).toBe(absentResponse.body);
+      return foreignResponse;
+    };
+
+    const unlinkCount = async () => Number((await database.pool.query<{ count: string }>(
+      "SELECT count(*) FROM memory.memory_link_event"
+    )).rows[0]!.count);
+    const beforeUnlinks = await unlinkCount();
+    const foreignLinkEventsBefore = Number((await database.pool.query<{ count: string }>(
+      `SELECT count(*) FROM memory.memory_link_event WHERE memory_link_id=$1`, [foreignMemoryLinkId]
+    )).rows[0]!.count);
+    expect(foreignLinkEventsBefore).toBeGreaterThan(0);
+    const [foreignUnlink, absentUnlink] = await Promise.all([
+      api.inject({ method: "POST", url: `/v1/answers/${foreignRun.answerId}/memory-link/unlink`, headers: ownerMutationHeaders }),
+      api.inject({ method: "POST", url: `/v1/answers/${absentAnswerId}/memory-link/unlink`, headers: ownerMutationHeaders })
+    ]);
+    expect(foreignUnlink.statusCode).toBe(404);
+    expect(absentUnlink.statusCode).toBe(404);
+    expect(foreignUnlink.body).toBe(absentUnlink.body);
+    expect(await unlinkCount()).toBe(beforeUnlinks);
+    expect(Number((await database.pool.query<{ count: string }>(
+      `SELECT count(*) FROM memory.memory_link_event WHERE memory_link_id=$1`, [foreignMemoryLinkId]
+    )).rows[0]!.count)).toBe(foreignLinkEventsBefore);
+
+    expect((await api.inject({ method: "GET", url: `/v1/runs/${owned.runId}`, headers: ownerHeaders })).statusCode).toBe(200);
+    await paired(`/v1/runs/${foreignRun.runId}`, `/v1/runs/${absentRunId}`, { error: "RUN_NOT_FOUND" });
+
+    const ownedEvents = await api.inject({ method: "GET", url: `/v1/runs/${owned.runId}/events`, headers: ownerHeaders });
+    expect(ownedEvents.statusCode).toBe(200);
+    expect(ownedEvents.headers["content-type"]).toContain("text/event-stream");
+    expect(ownedEvents.body).toContain("event: run.terminal");
+    const deniedEvents = await paired(`/v1/runs/${foreignRun.runId}/events`, `/v1/runs/${absentRunId}/events`, { error: "RUN_NOT_FOUND" });
+    expect(deniedEvents.headers["content-type"]).not.toContain("text/event-stream");
+
+    expect((await api.inject({ method: "GET", url: `/v1/runs/${owned.runId}/answer`, headers: ownerHeaders })).statusCode).toBe(200);
+    await paired(`/v1/runs/${foreignRun.runId}/answer`, `/v1/runs/${absentRunId}/answer`, { error: "ANSWER_NOT_SERVED" });
+    const openRunId = await createOwnedRunHead(owner, "open-no-answer-prd-n1");
+    expect((await api.inject({ method: "GET", url: `/v1/runs/${openRunId}`, headers: ownerHeaders })).statusCode).toBe(200);
+    const noServedAnswer = await api.inject({ method: "GET", url: `/v1/runs/${openRunId}/answer`, headers: ownerHeaders });
+    expect(noServedAnswer.statusCode).toBe(404);
+    expect(noServedAnswer.json()).toEqual({ error: "ANSWER_NOT_SERVED" });
+  }, 60_000);
+
   it("serializes a rejected encrypted ownership transfer on the run lock without changing the owner", async () => {
     const claimedRunId = await createOwnedRunHead(owner, "claim-race");
     const mutator = await database.pool.connect();

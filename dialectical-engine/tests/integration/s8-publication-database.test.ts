@@ -28,12 +28,13 @@ import {
   PostgresPublicationRepository,
   RunRepository,
   migrate,
+  requestScopeActive,
   type LoginIdentityRecord
 } from "@debateai/db";
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
-import { apiTestPools, provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
+import { apiTestPools, inAccountRequest, provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
 import { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
 import { buildApi, type AskApplication } from "@debateai/api";
 import { createPublicEvaluatorConsumerWorker } from "../../apps/evaluator-worker/src/index.js";
@@ -70,6 +71,50 @@ let contentCipher: ContentCipher;
 let runKeys: MemoryRunContentKeyStore;
 const userDeks = new Map<string, Buffer>();
 const userIdsByOwnerRef = new Map<string, string>();
+/** Each createIdentity session's raw token, by session id and by the account's user id (PRD-N2). */
+const sessionTokensBySession = new Map<string, string>();
+const sessionTokensByUser = new Map<string, string>();
+
+/**
+ * The credential of the request a call stands for: the raw token of the session the call names (`sessionId`, or
+ * `session.session_id`), else the token of the account it names (`userId`, or a user id passed as a plain argument —
+ * the account a session id the file forged stands for); null when the call names no account of this file: a public
+ * read, served inside an anonymous request.
+ */
+function requestCredentialOf(args: readonly unknown[]): string | null {
+  for (const arg of args) {
+    if (typeof arg === "string" && sessionTokensByUser.has(arg)) return sessionTokensByUser.get(arg)!;
+    if (typeof arg !== "object" || arg === null) continue;
+    const named = arg as Readonly<{ sessionId?: unknown; session?: Readonly<{ session_id?: unknown }>; userId?: unknown }>;
+    for (const sessionId of [named.sessionId, named.session?.session_id]) {
+      if (typeof sessionId === "string" && sessionTokensBySession.has(sessionId)) return sessionTokensBySession.get(sessionId)!;
+    }
+    if (typeof named.userId === "string" && sessionTokensByUser.has(named.userId)) return sessionTokensByUser.get(named.userId)!;
+  }
+  return null;
+}
+
+/**
+ * Row-level security S01, PRD-N2 (t_283643c4): the product calls the publication repository and application on the
+ * runtime pool inside a request — publish, unpublish, the grant preflight and the key provision inside the publisher's
+ * own request (POST /v1/runs/{id}/publish, …/unpublish), the public reads inside an anonymous one (GET
+ * /v1/public/debates…). So each method the file calls on them runs inside a request scope carrying the credential
+ * `requestCredentialOf` names. In login mode the runtime pool then sends the call on its own T1 login with that
+ * account's context, not to its system target. A call made while a scope is active (a repository call the application
+ * makes inside a request) keeps that scope. In superuser mode the pool has no target and the scope changes nothing.
+ */
+function asRequests<T extends object>(target: T): T {
+  return new Proxy(target, {
+    get(object, property, receiver) {
+      const value = Reflect.get(object, property, receiver) as unknown;
+      if (typeof value !== "function") return value;
+      const method = (value as (...args: unknown[]) => unknown).bind(object);
+      return (...args: unknown[]) => requestScopeActive()
+        ? method(...args)
+        : inAccountRequest(requestCredentialOf(args), async () => method(...args));
+    }
+  });
+}
 
 const users: ReadableUserDekStore = Object.freeze({
   async store(userId: string, dek: Uint8Array): Promise<void> {
@@ -182,7 +227,11 @@ async function createIdentity(label: string): Promise<Identity> {
     ) VALUES ($1,$2,'totp','{}'::jsonb,NULL,NULL,'active',now(),now(),10)
   `, [factorId, userId]);
   const sessionId = randomUUID();
-  const sessionTokenHash = `sha256:${randomBytes(32).toString("hex")}`;
+  // PRD-N2: a real raw token behind the stored hash, so a request scope can carry this session's credential.
+  const sessionToken = randomBytes(32).toString("base64url");
+  const sessionTokenHash = hashToken("session", sessionToken);
+  sessionTokensBySession.set(sessionId, sessionToken);
+  sessionTokensByUser.set(userId, sessionToken);
   const csrfTokenHash = `sha256:${randomBytes(32).toString("hex")}`;
   const now = new Date();
   await database.pool.query(`
@@ -333,7 +382,7 @@ beforeAll(async () => {
     apiLogins = await provisionRlsLogins(database);
     configureContentEncryption(pools.runtime, contentCipher);
   }
-  repository = new PostgresPublicationRepository(pools.runtime, fakeAuditHasher);
+  repository = asRequests(new PostgresPublicationRepository(pools.runtime, fakeAuditHasher));
   // main.ts hands PostgresPublicationApplication a second repository on publicationCleanupPool for the key cleanups
   // (claim/complete key cleanup and key provision cleanup); the file's direct cleanup calls use it too.
   cleanupRepository = new PostgresPublicationRepository(pools.publicationCleanup, fakeAuditHasher);
@@ -2183,12 +2232,16 @@ describe("S8 publication on real PostgreSQL", () => {
     const runtime = await database.pool.connect();
     try {
       await runtime.query("SET ROLE debateai_runtime");
+      // COR-N3 (t_b5865189): serve.publication_snapshot has row security (0124), whose WITH CHECK refuses this bare role's
+      // row with 42501 too (measured with INSERT granted: it does, before any trigger), so the missing INSERT grant is
+      // pinned by the ACL message, not by the code alone. The visibility-event INSERT below needs no message: granted,
+      // a BEFORE trigger refuses it first with its own error.
       await expect(runtime.query(`
         INSERT INTO serve.publication_snapshot (
           publication_ref,run_id,format_version,content_ciphertext,created_at
         ) VALUES ($1,$2,1,$3::jsonb,now())
       `, [publicationRef, runId, JSON.stringify(contentCiphertext)]))
-        .rejects.toMatchObject({ code: "42501" });
+        .rejects.toMatchObject({ code: "42501", message: "permission denied for table publication_snapshot" });
       await expect(runtime.query(`
         INSERT INTO core.run_visibility_event (
           run_visibility_event_id,run_id,publication_ref,state,actor_audit_token,
@@ -2216,7 +2269,9 @@ describe("S8 publication on real PostgreSQL", () => {
         new Date(), randomUUID(), randomUUID(), randomUUID()
       ]);
       expect(attempted.rows[0]?.publication_ref).toBeNull();
-      expect((await runtime.query(
+      // COR-N3 (t_b5865189): counted on the superuser pool, which sees every row. As the bare runtime role, with no
+      // account context, row security (0124) hides every snapshot, so a 0 there held whether or not one was written.
+      expect((await database.pool.query(
         "SELECT 1 FROM serve.publication_snapshot WHERE publication_ref=$1", [publicationRef]
       )).rowCount).toBe(0);
     } finally {

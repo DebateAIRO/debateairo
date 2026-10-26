@@ -1712,9 +1712,12 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
         return { status: "rejected" as const, reason };
       }
     );
+    // COR-N9 (t_2510e056): the third recovery delay races the provisioning outcome, the event that proves it will
+    // never come, not a 2-second wall clock (four titles lost that window on a loaded host at head, never at base);
+    // a provisioner that neither delays a third time nor settles fails on the test's own timeout.
     const reachedThirdDelay = await Promise.race([
       thirdRecoveryDelay.promise.then(() => true),
-      delay(2_000).then(() => false)
+      originalOutcome.then(() => false)
     ]);
     if (!reachedThirdDelay) {
       recoveryLifted = true;
@@ -1826,9 +1829,12 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
         () => { settled = true; return undefined; },
         (error: unknown) => { settled = true; return error; }
       );
+      // COR-N9 (t_2510e056): the third recovery delay races the provisioning outcome, the event that proves it will
+      // never come, not a 2-second wall clock (four titles lost that window on a loaded host at head, never at base);
+      // a provisioner that neither delays a third time nor settles fails on the test's own timeout.
       const reachedThirdDelay = await Promise.race([
         thirdRecoveryDelay.promise.then(() => true),
-        delay(2_000).then(() => false)
+        outcomePromise.then(() => false)
       ]);
       if (!reachedThirdDelay) {
         recoveryLifted = true;
@@ -1979,9 +1985,12 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
         (error: unknown) => { settled = true; return error; }
       );
       try {
+        // COR-N9 (t_2510e056): the third recovery delay races the provisioning outcome, the event that proves it will
+        // never come, not a 2-second wall clock (four titles lost that window on a loaded host at head, never at base);
+        // a provisioner that neither delays a third time nor settles fails on the test's own timeout.
         const reachedThirdDelay = await Promise.race([
           thirdRecoveryDelay.promise.then(() => true),
-          delay(2_000).then(() => false)
+          outcomePromise.then(() => false)
         ]);
         if (!reachedThirdDelay) {
           recoveryLifted = true;
@@ -2094,9 +2103,12 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
         (error: unknown) => { settled = true; return error; }
       );
       try {
+        // COR-N9 (t_2510e056): the third recovery delay races the provisioning outcome, the event that proves it will
+        // never come, not a 2-second wall clock (four titles lost that window on a loaded host at head, never at base);
+        // a provisioner that neither delays a third time nor settles fails on the test's own timeout.
         const reachedThirdDelay = await Promise.race([
           thirdRecoveryDelay.promise.then(() => true),
-          delay(2_000).then(() => false)
+          outcomePromise.then(() => false)
         ]);
         if (!reachedThirdDelay) {
           recoveryLifted = true;

@@ -26,7 +26,7 @@ import {
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { readFramedMaterial, wirePacket } from "../support/framed-packet.js";
 import { createTestAskAdmissionPoolFacades, startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
-import { apiTestPools, provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
+import { apiTestPools, inAccountRequest, provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
 import { persistLiveSession } from "../support/httpSession.js";
 import { persistCatchUpVersion } from "../support/catchUpVersion.js";
 import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } from "../../apps/api/src/stories.js";
@@ -449,10 +449,11 @@ async function ownerReads(owner: AuthenticatedSession, answerId: string) {
       answer: await get("") as { answer_version: number; verdict_state: string | null },
       story: AnswerStorySchema.parse(await get("/story")),
       disclosure: AnswerDisclosureSchema.parse(await get("/disclosure")),
-      // The publish-time read: the story of the version being published.
-      publishedShort: await new RepositoryPublicationStoryReader(new StoryRepository(pools.runtime)).readStoryShort({
-        answerId, answerVersion: 2, ownerRef: owner.ownerRef
-      })
+      // The publish-time read: the story of the version being published. The product makes it inside the owner's
+      // publish request, so it runs inside a request scope carrying the owner's live token (PRD-N2, t_283643c4): in
+      // login mode the runtime pool sends it on its own T1 login with the owner's context, not to its system target.
+      publishedShort: await inAccountRequest(token, () => new RepositoryPublicationStoryReader(new StoryRepository(pools.runtime))
+        .readStoryShort({ answerId, answerVersion: 2, ownerRef: owner.ownerRef }))
     };
   } finally {
     await api.close();
