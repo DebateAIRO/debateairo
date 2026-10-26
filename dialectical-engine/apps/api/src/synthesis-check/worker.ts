@@ -1,6 +1,6 @@
 import { removesDebate, type Answer } from "@debateai/contract";
 import { TypedDomainError } from "@debateai/kernel";
-import { originVersionOf, synthesisTextOf, verdictOfRecord, SynthesisCheckRepository } from "@debateai/serve";
+import { originVersionOf, readSynthesisTexts, verdictOfRecord, SynthesisCheckRepository } from "@debateai/serve";
 import { runSynthesisCheck, type SynthesisCheckDeps } from "./check.js";
 import { SYNTHESIS_CHECK_POLICY_VERSION } from "./policy.js";
 
@@ -27,15 +27,8 @@ export class SynthesisCheckWorker {
             this.deps.log("SYNTHESIS_CHECK_UNEXPECTED");
             return false;
           }
-          const texts = await this.deps.withContentLease(claim.runId, async () => {
-            const versions = new Map<number, string | null>();
-            for (let version = 1; version <= claim.answerVersion; version++) {
-              const answer = await this.deps.readAnswer(claim.runId, claim.answerId, version, ownerRef);
-              if (answer === null) return null;
-              versions.set(version, synthesisTextOf(answer));
-            }
-            return versions;
-          });
+          const texts = await this.deps.withContentLease(claim.runId, () => readSynthesisTexts(claim.answerVersion,
+            (version) => this.deps.readAnswer(claim.runId, claim.answerId, version, ownerRef)));
           if (texts === null) {
             this.deps.log("SYNTHESIS_CHECK_ANSWER_UNREADABLE");
             return false;
@@ -99,15 +92,9 @@ export class SynthesisCheckWorker {
         let texts: Map<number, string | null> | null = null;
         try {
           const ownerRef = await this.deps.repository.ownerRefOfRun(ordered[0]!.runId);
-          if (ownerRef !== null) texts = await this.deps.withContentLease(ordered[0]!.runId, async () => {
-            const versions = new Map<number, string | null>();
-            for (let version = 1; version <= ordered[ordered.length - 1]!.answerVersion; version++) {
-              const answer = await this.deps.readAnswer(ordered[0]!.runId, ordered[0]!.answerId, version, ownerRef);
-              if (answer === null) return null;
-              versions.set(version, synthesisTextOf(answer));
-            }
-            return versions;
-          });
+          if (ownerRef !== null) texts = await this.deps.withContentLease(ordered[0]!.runId,
+            () => readSynthesisTexts(ordered[ordered.length - 1]!.answerVersion,
+              (version) => this.deps.readAnswer(ordered[0]!.runId, ordered[0]!.answerId, version, ownerRef)));
         } catch { /* processClaim reports the unavailable content for each claim */ }
         const byOrigin = new Map<number, typeof claims>();
         for (const claim of ordered) {

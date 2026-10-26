@@ -105,13 +105,14 @@ describe("publication review production composition", () => {
 
   it("selects the changed synthesis origin rather than every verdict", async () => {
     const source = await compositionSource();
+    const { readSynthesisTexts } = await import("../../packages/serve/src/synthesis-check.js");
     const options = evaluate<{ readVerdictOfRecord(input: Record<string, unknown>): Promise<unknown> }>(
       apiOption(source, "publicationReviews"), {
         publicationReviewRepository: {}, pool: {},
         application: { withContentLease: async (_runId: string, use: () => Promise<unknown>) => use() },
         readSynthesisAnswer: async (_runId: string, _answerId: string, version: number) =>
-          ({ synthesis: version === 1 ? "old" : "changed" }),
-        synthesisTextOf: (answer: { synthesis: string }) => answer.synthesis,
+          ({ serve_state: "COMPOSED", composed_text: [{ text: version === 1 ? "old" : "changed" }] }),
+        readSynthesisTexts,
         originVersionOf: () => 2,
         synthesisCheckRepository: { readRecords: async () => [
           { originVersion: 1 }, { originVersion: 2 }
@@ -124,5 +125,33 @@ describe("publication review production composition", () => {
       runId: "run", authenticated: { ownerRef: "owner" },
       answer: { answer_id: "answer", answer_version: 2 }
     })).toEqual({ originVersion: 2 });
+  });
+
+  it("reads the verdict of an answer whose first version is not 1 (its debate's settings version)", async () => {
+    const source = await compositionSource();
+    const { originVersionOf, readSynthesisTexts, verdictOfRecord } =
+      await import("../../packages/serve/src/synthesis-check.js");
+    const verdict = { verdict: "FLAGGED", categories: ["TERRORISM"], checkedAt: new Date(0) };
+    const options = evaluate<{ readVerdictOfRecord(input: Record<string, unknown>): Promise<unknown> }>(
+      apiOption(source, "publicationReviews"), {
+        publicationReviewRepository: {}, pool: {},
+        application: { withContentLease: async (_runId: string, use: () => Promise<unknown>) => use() },
+        // Versions 1-4 were never written: the answer starts at 5.
+        readSynthesisAnswer: async (_runId: string, _answerId: string, version: number) => version < 5 ? null
+          : { serve_state: "COMPOSED", composed_text: [{ text: version === 5 ? "first" : "changed" }] },
+        originVersionOf, readSynthesisTexts, verdictOfRecord,
+        synthesisCheckRepository: { readRecords: async () => [
+          { synthesisOriginVersion: 5, final: true, outcome: verdict, checkedAt: verdict.checkedAt }
+        ] }
+      }
+    );
+    expect(await options.readVerdictOfRecord({
+      runId: "run", authenticated: { ownerRef: "owner" },
+      answer: { answer_id: "answer", answer_version: 5 }
+    })).toMatchObject({ verdict: "FLAGGED", categories: ["TERRORISM"] });
+    expect(await options.readVerdictOfRecord({
+      runId: "run", authenticated: { ownerRef: "owner" },
+      answer: { answer_id: "answer", answer_version: 6 }
+    })).toBeNull();
   });
 });

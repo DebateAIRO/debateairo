@@ -138,7 +138,7 @@ import {
   type WaitingRun,
   type WaitingRunCursor
 } from "@debateai/db";
-import { ServeRepository, SynthesisCheckRepository, synthesisTextOf, verdictOfRecord, type MemoryQuestionRegistration, type PublicationReviewRepository, type VerdictOfRecord } from "@debateai/serve";
+import { ServeRepository, SynthesisCheckRepository, readSynthesisTexts, verdictOfRecord, type MemoryQuestionRegistration, type PublicationReviewRepository, type VerdictOfRecord } from "@debateai/serve";
 import type { SynthesisVerdict, SynthesisCheckCategory } from "@debateai/contract";
 import { applyCriticUnavailableCap, assertMakerAdmission } from "@debateai/critique";
 export {
@@ -6637,12 +6637,8 @@ export class PostgresAskApplication implements AskApplication {
     const records = await repository.readRecords({
       runId: answer.run_ref, answerId, maxVersion: answer.answer_version
     });
-    const texts = new Map<number, string | null>();
-    for (let version = 1; version <= answer.answer_version; version++) {
-      const projection = version === answer.answer_version
-        ? answer : await this.#serve.readAnswerProjection(answerId, ownership, version);
-      texts.set(version, projection === null ? null : synthesisTextOf(projection));
-    }
+    const texts = await readSynthesisTexts(answer.answer_version, async (version) => version === answer.answer_version
+      ? answer : this.#serve.readAnswerProjection(answerId, ownership, version)) ?? new Map<number, string | null>();
     return [...texts.keys()].flatMap((version) => {
       const text = texts.get(version);
       const selected = verdictOfRecord(records, (origin) => texts.get(origin) === text);

@@ -11,6 +11,7 @@ import { renderYourDataHtml } from "../../apps/api/src/data-export/html-page.js"
 import { loadArchiveCatalog } from "../../apps/api/src/data-export/archive-catalog.js";
 import type { SynthesisCheckEntry } from "../../apps/api/src/data-export/types.js";
 import { snapshotA } from "../fixtures/data-export/snapshot-a.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 import { startTestDatabase, createTestAskAdmissionPoolFacades } from "../support/testDatabase.js";
 import { createEncryptedStoryRun, provisionStoryEncryptedOwner, releaseStoryEncryptedOwner } from "../support/storyEncryptedOwner.js";
 import { persistTerminalRun } from "../support/settledRun.js";
@@ -125,7 +126,9 @@ describe("synthesis checks in the owner's data export", () => {
         outcome: { verdict: "CLEAR", categories: [] }, modelProviderRef: "anthropic", modelId: "claude-haiku-5-5",
         policyVersion: "synthesis.content-check.v1@0123456789abcdef", callCount: 1, deadlineMs: 60_000
       })).toBe("INSERTED");
-      const application = new PostgresAskApplication(runtime, {} as never, {} as never, undefined, runtime,
+      // Side-by-side spec §1 (origin/dev): the application refuses a release key that is not its register version's.
+      const application = new PostgresAskApplication(runtime, {} as never,
+        { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, undefined, runtime,
         createTestAskAdmissionPoolFacades(runtime));
       const adapter = new OwnerViewAdapter({ application }, { exists: async () => true }, { readStates: async () => [] });
       const real = exportHarness();
@@ -207,7 +210,9 @@ describe("synthesis checks in the owner's data export", () => {
       });
       const repository = new SynthesisCheckRepository(runtime);
       await repository.insertRequest({ runId, answerId, answerVersion: 1 });
-      const application = new PostgresAskApplication(runtime, {} as never, {} as never, undefined, runtime,
+      // Side-by-side spec §1 (origin/dev): the application refuses a release key that is not its register version's.
+      const application = new PostgresAskApplication(runtime, {} as never,
+        { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, undefined, runtime,
         createTestAskAdmissionPoolFacades(runtime));
       const adapter = new OwnerViewAdapter({ application,
         synthesisAnswerAccess: createSynthesisAnswerAccess({ repository, deadlineMs: 60_000 }) },

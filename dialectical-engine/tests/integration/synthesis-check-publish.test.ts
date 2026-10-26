@@ -21,6 +21,9 @@ import {
 
 let database: TestDatabase;
 let runtime: Pool;
+/** The answer list as the API's login reads it: debateai_billing_runtime, which 0123 (side-by-side releases) grants
+ * core.run_supersession, a table the list reads since that merge. Everything else here stays on debateai_runtime. */
+let apiPool: Pool;
 let owner: StoryEncryptedOwner;
 let repository: SynthesisCheckRepository;
 let serve: ServeRepository;
@@ -33,12 +36,17 @@ beforeAll(async () => {
   url.searchParams.set("options", "-c role=debateai_runtime");
   runtime = createPool(url.toString());
   configureContentEncryption(runtime, contentCipherFor(database.pool)!);
+  const apiUrl = new URL(database.connectionString);
+  apiUrl.searchParams.set("options", "-c role=debateai_billing_runtime");
+  apiPool = createPool(apiUrl.toString());
+  configureContentEncryption(apiPool, contentCipherFor(database.pool)!);
   repository = new SynthesisCheckRepository(runtime);
   serve = new ServeRepository(runtime);
 }, 180_000);
 
 afterAll(async () => {
   await runtime?.end();
+  await apiPool?.end();
   await database?.stop();
   if (owner !== undefined) await releaseStoryEncryptedOwner(owner);
 });
@@ -288,11 +296,11 @@ describe("synthesis publish gate under debateai_runtime", () => {
     // REV-S01-p3 security N3: the item list already dropped the debate; the count kept it until the erasure timer.
     const ownership = { ownerRef: owner.ownerRef, legacyAskerId: null };
     const target = await settled();
-    const before = await serve.readAnswerIndex(ownership, 100, 0);
+    const before = await new ServeRepository(apiPool).readAnswerIndex(ownership, 100, 0);
     expect(before.items.some((item) => item.run_ref === target.runId)).toBe(true);
     await final(target, "FLAGGED", ["SUICIDE_OR_HARM_TO_OTHERS"]);
     expect(await repository.runRemovedByCheck(target.runId)).toBe(true);
-    const after = await serve.readAnswerIndex(ownership, 100, 0);
+    const after = await new ServeRepository(apiPool).readAnswerIndex(ownership, 100, 0);
     expect(after.items.some((item) => item.run_ref === target.runId)).toBe(false);
     expect(after.total).toBe(before.total - 1);
   });

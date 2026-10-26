@@ -154,7 +154,7 @@ import { composeQuestionCheck } from "./question-check/compose.js";
 import { startThreatReportAlerts } from "./staff/threat-report-alert.js";
 import { startThreatReportErasure, threatReportEmailHold } from "./staff/threat-report-closure.js";
 import { threatReportEmailReader } from "./staff/threat-reports.js";
-import { PublicationReviewRefusal, PublicationReviewRepository, SynthesisCheckRepository, originVersionOf, synthesisTextOf, verdictOfRecord } from "@debateai/serve";
+import { PublicationReviewRefusal, PublicationReviewRepository, SynthesisCheckRepository, originVersionOf, readSynthesisTexts, synthesisTextOf, verdictOfRecord } from "@debateai/serve";
 import { ownerSession, readOwnerAnswer } from "./owner-read.js";
 import { SynthesisCheckWorker } from "./synthesis-check/worker.js";
 import type { SynthesisCheckDeps } from "./synthesis-check/check.js";
@@ -1350,12 +1350,9 @@ const synthesisPublishGate = createSynthesisPublishGate({
   repository: synthesisCheckRepository,
   approvalCovers: input => publicationReviewRepository.approvalCovers(input),
   readAnswerVersions: async (runId, answerId, maxVersion, ownerRef) => {
-    const texts = new Map<number, string | null>();
-    for (let version = 1; version <= maxVersion; version++) {
-      const answer = await readSynthesisAnswer(runId, answerId, version, ownerRef);
-      if (answer === null) throw new Error("SYNTHESIS_ANSWER_UNREADABLE");
-      texts.set(version, synthesisTextOf(answer));
-    }
+    const texts = await readSynthesisTexts(maxVersion,
+      (version) => readSynthesisAnswer(runId, answerId, version, ownerRef));
+    if (texts === null) throw new Error("SYNTHESIS_ANSWER_UNREADABLE");
     return texts;
   },
   check: synthesisCheckDeps, deadlineMs: publicationCheckPolicy.deadlineMs,
@@ -1711,15 +1708,8 @@ const api = buildApi({
       ));
     },
     readVerdictOfRecord: async ({ runId, authenticated, answer }) => {
-      const texts = await application.withContentLease(runId, async () => {
-        const versions = new Map<number, string | null>();
-        for (let version = 1; version <= answer.answer_version; version++) {
-          const candidate = await readSynthesisAnswer(runId, answer.answer_id, version, authenticated.ownerRef);
-          if (candidate === null) return null;
-          versions.set(version, synthesisTextOf(candidate));
-        }
-        return versions;
-      });
+      const texts = await application.withContentLease(runId, () => readSynthesisTexts(answer.answer_version,
+        (version) => readSynthesisAnswer(runId, answer.answer_id, version, authenticated.ownerRef)));
       if (texts === null) return null;
       const origin = originVersionOf(texts, answer.answer_version);
       return verdictOfRecord(await synthesisCheckRepository.readRecords({

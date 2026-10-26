@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
+const loops = readFileSync(new URL("../../apps/api/src/release-loops.ts", import.meta.url), "utf8");
 
 describe("synthesis check production composition", () => {
   it("uses the support target, registered deadline, local switch, worker, and publish gate", () => {
@@ -15,8 +16,9 @@ describe("synthesis check production composition", () => {
   });
 
   it("unrefs and clears the worker timer without a process signal", () => {
-    expect(source).toMatch(/synthesisCheckTimer = setInterval\([^;]+;/);
-    expect(source).toContain("synthesisCheckTimer.unref()");
+    // Side-by-side C7 (origin/dev): the tick runs through gatedInterval, which unrefs its own timer.
+    expect(source).toMatch(/synthesisCheckTimer = gatedInterval\(releaseWatcher, [^;]+;/);
+    expect(loops).toMatch(/const timer = setInterval\(gatedTrigger\(gate, trigger\), ms\);\s*timer\.unref\(\);/);
     expect(source).toContain("clearInterval(synthesisCheckTimer)");
     expect(source).not.toMatch(/installSynthesisCheck.*Signal/);
   });
@@ -33,7 +35,8 @@ describe("synthesis check production composition", () => {
       source.indexOf("const synthesisCheckWorker ="));
     expect(read).toContain("application.readAnswer(answerId, ownerSession(ownerRef");
     expect(read).not.toContain("readOwnerAnswer(");
-    expect(read).toContain("await readSynthesisAnswer(runId, answerId, version, ownerRef)");
-    expect(read).toContain("texts.set(version, synthesisTextOf(answer))");
+    // An answer's first version is its debate's register version, so the versions are read down from the newest.
+    expect(read).toContain("readSynthesisTexts(maxVersion,");
+    expect(read).toContain("(version) => readSynthesisAnswer(runId, answerId, version, ownerRef)");
   });
 });

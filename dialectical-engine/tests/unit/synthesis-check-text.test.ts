@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { originVersionOf, synthesisTextOf, verdictOfRecord } from "../../packages/serve/src/synthesis-check.js";
+import {
+  originVersionOf, readSynthesisTexts, synthesisTextOf, verdictOfRecord
+} from "../../packages/serve/src/synthesis-check.js";
 
 const segment = (text: string, id: string) => ({
   segment_id: id, text, load_bearing: false, served_number_refs: []
@@ -44,5 +46,22 @@ describe("synthesis check text", () => {
     });
     expect(verdictOfRecord(records, (origin) => origin === 3)?.verdict).toBe("UNAVAILABLE");
     expect(verdictOfRecord(records, (origin) => origin === 4)).toBeNull();
+  });
+
+  it("readSynthesisTexts reads down from the newest version to the answer's first, which need not be 1", async () => {
+    // Production stamps an answer's first version with its debate's register version; versions below it never exist.
+    const reads: number[] = [];
+    const texts = await readSynthesisTexts(7, async (version) => {
+      reads.push(version);
+      return version < 5 ? null : composed(version === 7 ? "changed" : "first");
+    });
+    expect(reads).toEqual([7, 6, 5, 4]);
+    expect([...texts!]).toEqual([[5, "first"], [6, "first"], [7, "changed"]]);
+    expect(originVersionOf(texts!, 6)).toBe(5);
+    expect([...(await readSynthesisTexts(1, async () => composed("only")))!]).toEqual([[1, "only"]]);
+  });
+
+  it("readSynthesisTexts is null when the newest version itself does not read", async () => {
+    expect(await readSynthesisTexts(3, async (version) => version === 3 ? null : composed("older"))).toBeNull();
   });
 });

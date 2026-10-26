@@ -21,6 +21,9 @@ import {
 
 let database: TestDatabase;
 let runtime: Pool;
+/** The answer list as the API's login reads it: debateai_billing_runtime, which 0123 (side-by-side releases) grants
+ * core.run_supersession, a table the list reads since that merge. Everything else here stays on debateai_runtime. */
+let apiPool: Pool;
 let owner: StoryEncryptedOwner;
 let repository: SynthesisCheckRepository;
 let serve: ServeRepository;
@@ -33,12 +36,17 @@ beforeAll(async () => {
   url.searchParams.set("options", "-c role=debateai_runtime");
   runtime = createPool(url.toString());
   configureContentEncryption(runtime, contentCipherFor(database.pool)!);
+  const apiUrl = new URL(database.connectionString);
+  apiUrl.searchParams.set("options", "-c role=debateai_billing_runtime");
+  apiPool = createPool(apiUrl.toString());
+  configureContentEncryption(apiPool, contentCipherFor(database.pool)!);
   repository = new SynthesisCheckRepository(runtime);
   serve = new ServeRepository(runtime);
 }, 180_000);
 
 afterAll(async () => {
   await runtime?.end();
+  await apiPool?.end();
   await database?.stop();
   if (owner !== undefined) await releaseStoryEncryptedOwner(owner);
 });
@@ -226,6 +234,39 @@ describe("synthesis check worker under debateai_runtime", () => {
     }
   });
 
+  it("checks an answer whose first version is its debate's settings version, not 1", async () => {
+    // Property: production stamps an answer's first version with the register version its debate ran on (5 on the
+    // merged stack), so versions below it do not exist; the worker reads down to the first version and checks it.
+    const runId = await createEncryptedStoryRun(database.pool, owner, `Worker ${randomUUID()}?`);
+    const { answerId } = await persistTerminalRun({
+      pool: database.pool, runId, fixtureKey: randomUUID(), factBundleVersion: 5,
+      factBundle: {
+        facts: [], residualObjections: [], badges: [], conditionMarks: ["DEFECT"],
+        reversalPoint: "No firm conclusion", buildsOnPrevious: { value: false, answerRef: null },
+        memoryDisclosure: null
+      }
+    });
+    const answer = { runId, answerId, answerVersion: 5 };
+    await repository.insertRequest(answer);
+    const lines: string[] = [];
+    const reads: number[] = [];
+    const worker = await workerFor({
+      text: "A specific synthesis", port: () => modelPort([0, 0, 0, 0]), log: (line) => lines.push(line),
+      readAnswer: async (_runId, id, version, ownerRef) => {
+        reads.push(version);
+        const stored = await serve.readAnswerProjection(id, { ownerRef, legacyAskerId: null }, version);
+        return stored === null ? null : composed(stored, "A specific synthesis");
+      }
+    });
+    await worker.runOnce();
+    expect(lines).toEqual([]);
+    expect((await repository.readRecords({ ...answer, maxVersion: 5 })).map((record) => [
+      record.answerVersion, record.synthesisOriginVersion, record.outcome
+    ])).toEqual([[5, 5, { verdict: "CLEAR", categories: [] }]]);
+    // Down from 5 to the first missing version, never up from 1.
+    expect(reads.every((version) => version >= 4)).toBe(true);
+  });
+
   it("an unreadable claimed answer makes no model call, stores no result and logs one fixed code", async () => {
     // Property: an erased or unreadable answer never crosses the model boundary.
     const { SynthesisCheckWorker } = await import("../../apps/api/src/synthesis-check/worker.js");
@@ -306,7 +347,7 @@ describe("synthesis check worker under debateai_runtime", () => {
     expect(await repository.runRemovedByCheck(answer.runId)).toBe(true);
     expect(await keys.exists(answer.runId)).toBe(false);
     await expect(withRunContentLease(runtime, [answer.runId], async () => true)).rejects.toMatchObject({ code: "PRIVATE_CONTENT_ERASED" });
-    const index = await serve.readAnswerIndex({ ownerRef: owner.ownerRef, legacyAskerId: null }, 100, 0);
+    const index = await new ServeRepository(apiPool).readAnswerIndex({ ownerRef: owner.ownerRef, legacyAskerId: null }, 100, 0);
     expect(index.items.some((item) => item.run_ref === answer.runId)).toBe(false);
   });
 

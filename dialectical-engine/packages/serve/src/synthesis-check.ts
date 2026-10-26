@@ -398,6 +398,28 @@ export function synthesisTextOf(answer: Pick<Answer, "serve_state" | "composed_t
   return answer.composed_text.map((segment) => segment.text).join("\n\n").trim() || null;
 }
 
+/**
+ * The synthesis text of each version of one answer, oldest first, for the end check's reads. An answer's first version
+ * is the register version its debate ran on (ServeRepository.persist stamps `factBundleVersion`), not 1, and each later
+ * version is the one before it plus one. So the read starts at `top` and walks down until a version does not exist.
+ * Null when `top` itself does not read: the answer is unreadable.
+ */
+export async function readSynthesisTexts(
+  top: number,
+  read: (version: number) => Promise<Pick<Answer, "serve_state" | "composed_text"> | null>
+): Promise<Map<number, string | null> | null> {
+  const newestFirst: [number, string | null][] = [];
+  for (let version = top; version >= 1; version--) {
+    const answer = await read(version);
+    if (answer === null) {
+      if (version === top) return null;
+      break;
+    }
+    newestFirst.push([version, synthesisTextOf(answer)]);
+  }
+  return new Map(newestFirst.reverse());
+}
+
 export function originVersionOf(texts: ReadonlyMap<number, string | null>, version: number): number {
   if (!texts.has(version)) return version;
   const text = texts.get(version);

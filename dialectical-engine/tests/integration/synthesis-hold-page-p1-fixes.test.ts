@@ -13,6 +13,7 @@ import type { ApiOptions } from "../../apps/api/src/index.js";
 import { buildApi, CSRF_COOKIE_NAME, PostgresAskApplication } from "../../apps/api/src/index.js";
 import { debateSummariesFromIndex } from "../../apps/ui/lib/v3/adapter.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { persistTerminalRun } from "../support/settledRun.js";
 import {
@@ -22,6 +23,9 @@ import {
 
 let database: TestDatabase;
 let runtime: Pool;
+/** The answer list as the API's login reads it: debateai_billing_runtime, which 0123 (side-by-side releases) grants
+ * core.run_supersession, a table the list reads since that merge. Everything else here stays on debateai_runtime. */
+let apiPool: Pool;
 let owner: StoryEncryptedOwner;
 
 function postHeaders(identity: ReturnType<typeof testHttpIdentity>) {
@@ -55,10 +59,15 @@ beforeAll(async () => {
   url.searchParams.set("options", "-c role=debateai_runtime");
   runtime = createPool(url.toString());
   configureContentEncryption(runtime, contentCipherFor(database.pool)!);
+  const apiUrl = new URL(database.connectionString);
+  apiUrl.searchParams.set("options", "-c role=debateai_billing_runtime");
+  apiPool = createPool(apiUrl.toString());
+  configureContentEncryption(apiPool, contentCipherFor(database.pool)!);
 }, 180_000);
 
 afterAll(async () => {
   await runtime?.end();
+  await apiPool?.end();
   await database?.stop();
   if (owner !== undefined) await releaseStoryEncryptedOwner(owner);
 });
@@ -81,7 +90,8 @@ describe("REV-SF-S01-p1-product: the held card's own link", () => {
     const ownership = { ownerRef: owner.ownerRef, legacyAskerId: null };
     // The production Application's four reads (apps/api/src/index.ts:5544-5583), minus the waiting-line fields.
     const application = {
-      readAnswerIndex: (_s: unknown, limit: number, offset: number) => serve.readAnswerIndex(ownership, limit, offset),
+      readAnswerIndex: (_s: unknown, limit: number, offset: number) =>
+        new ServeRepository(apiPool).readAnswerIndex(ownership, limit, offset),
       readAnswer: (id: string, _s: unknown, version: number | undefined) => serve.readAnswerProjection(id, ownership, version),
       readRunAnswer: (id: string) => serve.readRunAnswerProjection(id, ownership),
       readRun: async (id: string) => {
@@ -153,7 +163,9 @@ describe("S01 held route boundary", () => {
       final: true
     }] as never);
     try {
-      const application = new PostgresAskApplication(database.pool, {} as never, {} as never,
+      // Side-by-side spec §1 (origin/dev): the application refuses a release key that is not its register version's.
+      const application = new PostgresAskApplication(database.pool, {} as never,
+        { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never,
         undefined, runtime, { server: {} as never, legacy: {} as never });
       const exported = await application.readSynthesisChecks(answerId, {} as never, ownership);
       expect(exported).toEqual([
@@ -172,7 +184,9 @@ describe("S01 held route boundary", () => {
     const records = vi.spyOn(SynthesisCheckRepository.prototype, "readRecords")
       .mockImplementation(async () => { throw new Error("REMOVED_RECORDS_MUST_NOT_BE_READ"); });
     try {
-      const application = new PostgresAskApplication(database.pool, {} as never, {} as never,
+      // Side-by-side spec §1 (origin/dev): the application refuses a release key that is not its register version's.
+      const application = new PostgresAskApplication(database.pool, {} as never,
+        { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never,
         undefined, runtime, { server: {} as never, legacy: {} as never });
       const found = await application.readSynthesisChecks(answerId, {} as never,
         { ownerRef: owner.ownerRef, legacyAskerId: null });

@@ -20,6 +20,9 @@ const unavailable = { verdict: "UNAVAILABLE", categories: [], failureCode: "TRAN
 
 let database: TestDatabase;
 let runtime: Pool;
+/** The answer list as the API's login reads it: debateai_billing_runtime, which 0123 (side-by-side releases) grants
+ * core.run_supersession, a table the list reads since that merge. Everything else here stays on debateai_runtime. */
+let apiPool: Pool;
 let owner: StoryEncryptedOwner;
 let repository: SynthesisCheckRepository;
 
@@ -31,11 +34,16 @@ beforeAll(async () => {
   url.searchParams.set("options", "-c role=debateai_runtime");
   runtime = createPool(url.toString());
   configureContentEncryption(runtime, contentCipherFor(database.pool)!);
+  const apiUrl = new URL(database.connectionString);
+  apiUrl.searchParams.set("options", "-c role=debateai_billing_runtime");
+  apiPool = createPool(apiUrl.toString());
+  configureContentEncryption(apiPool, contentCipherFor(database.pool)!);
   repository = new SynthesisCheckRepository(runtime);
 }, 180_000);
 
 afterAll(async () => {
   await runtime?.end();
+  await apiPool?.end();
   await database?.stop();
   if (owner !== undefined) await releaseStoryEncryptedOwner(owner);
 });
@@ -423,7 +431,7 @@ describe("synthesis check repository under debateai_runtime", () => {
     const resultId = await repository.readFinalResultId({ answerId: bad.answerId, synthesisOriginVersion: 1 });
     await repository.insertInheritance({ ...inherited, attemptId: inheritedAttempt.attemptId,
       inheritedResultId: resultId! });
-    const index = await new ServeRepository(runtime).readAnswerIndex({ ownerRef: owner.ownerRef, legacyAskerId: null }, 100, 0);
+    const index = await new ServeRepository(apiPool).readAnswerIndex({ ownerRef: owner.ownerRef, legacyAskerId: null }, 100, 0);
     expect(index.items.find((item) => item.answer_id === bad.answerId)?.synthesis_flag).toEqual({ verdict: "FLAGGED" });
     expect(index.items.find((item) => item.answer_id === good.answerId)?.synthesis_flag).toBeNull();
     for (const answer of [noSynthesis, noResult, failed]) {
@@ -442,7 +450,7 @@ describe("synthesis check repository under debateai_runtime", () => {
        ) VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,NULL,'test-password-hash',$3,$4,$5,'active',now(),now())`,
       [randomUUID(), randomBytes(32), `synthesis-${randomUUID()}`, randomUUID(), otherOwnerRef]
     );
-    const index = await new ServeRepository(runtime).readAnswerIndex({ ownerRef: otherOwnerRef, legacyAskerId: null }, 10, 0);
+    const index = await new ServeRepository(apiPool).readAnswerIndex({ ownerRef: otherOwnerRef, legacyAskerId: null }, 10, 0);
     expect(index.items.some((item) => item.answer_id === answer.answerId)).toBe(false);
   });
 
