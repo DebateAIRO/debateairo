@@ -52,6 +52,6 @@ describe("S04 kept threat mail alert", () => {
     // Mutant: require a reportRef param; a billing template change is a neighbour.
     const rendered = renderMail("THREAT_REPORT_WAITING" as MailTemplateId, "ro", {});
     expect({ subject: rendered.subject, text: rendered.text.includes("Open the staff console and go to Threat reports to read it.") }).toEqual({
-      subject: "A threat report waits", text: true });
+      subject: "A threat report is waiting", text: true });
   });
 });

@@ -103,11 +103,14 @@ describe("0125 applied database", () => {
   afterAll(async () => database?.stop());
 
   it("migrate runs twice through 0125 without a forward-chain drift", async () => {
+    // A later slice's migration may follow 0125 in the merged chain (0126, S05); the second run must add no step.
+    const steps = async () => (await database.pool.query<{ source_name: string }>(
+      "SELECT source_name FROM public.debateai_schema_migration_step ORDER BY source_name"
+    )).rows.map((row) => row.source_name);
+    const before = await steps();
     await db.migrate(database.pool);
-    const rows = (await database.pool.query(
-      "SELECT source_name FROM public.debateai_schema_migration_step ORDER BY source_name DESC LIMIT 1"
-    )).rows;
-    expect(rows).toEqual([{ source_name: "0125_threat_reports.sql" }]);
+    expect(await steps()).toEqual(before);
+    expect(before).toContain("0125_threat_reports.sql");
   }, 180_000);
 
   it("refuses runtime SELECT, INSERT, UPDATE and DELETE on each private table", async () => {
