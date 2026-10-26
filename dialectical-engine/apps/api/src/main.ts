@@ -224,7 +224,7 @@ import { PostgresSupportIncidentRepository } from "./support/incidents.js";
 import { readLimits } from "./support/limits.js";
 import { SupportRelayQueue } from "./support/queue.js";
 import { SupportDegradedState } from "./support/degraded.js";
-import { SupportMessageLimiter, SUPPORT_COUNTER_SWEEP_MS } from "./support/memory-limits.js";
+import { SupportMessageLimiter } from "./support/memory-limits.js";
 import { createMemorySupportCallRecords } from "./support/memory-call-records.js";
 import { assertEngineHasLengthPolicy } from "./engine-ask.js";
 
@@ -1803,6 +1803,8 @@ const api = buildApi({
 if (publicationCleanupTimer !== undefined) {
   api.addHook("onClose",async () => clearInterval(publicationCleanupTimer));
 }
+// S05: the support counters live in API memory; one sweep a second drops the expired ones.
+const SUPPORT_COUNTER_SWEEP_MS = 1_000;
 const supportSweepTimer = setInterval(() => {
   admission.sweep(new Date(), SUPPORT_SWEPT_SCOPES);
   supportLimiter.sweep(Date.now());

@@ -34,8 +34,9 @@ describe("S05 support composition", () => {
     expect(routes).not.toMatch(/from ["']\.\/(?:cases|escalation)[.]js["']/u);
   });
 
-  it("starts one unref'd interval for both support memory sweeps", () => {
+  it("starts one unref'd interval for both support memory sweeps, once a second", () => {
     const main = readFileSync(resolve(process.cwd(), "apps/api/src/main.ts"), "utf8");
+    expect(main.match(/\nconst SUPPORT_COUNTER_SWEEP_MS = 1_000;\n/gu)).toHaveLength(1);
     expect(main.match(/setInterval\(\(\) => \{\s*admission\.sweep\(new Date\(\), SUPPORT_SWEPT_SCOPES\);\s*supportLimiter\.sweep\(Date\.now\(\)\);\s*\}, SUPPORT_COUNTER_SWEEP_MS\)\.unref\(\)/gu))
       .toHaveLength(1);
   });

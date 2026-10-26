@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  SUPPORT_COUNTER_SWEEP_MS,
-  SUPPORT_MESSAGE_LIMITER_CAPACITY,
   SupportMessageLimiter,
   supportMessageLimitsFrom,
   type SupportMessageLimits
@@ -119,8 +117,7 @@ describe("SupportMessageLimiter", () => {
     expect([...limiter.keys()].sort()).toEqual(["owner:owner-xyz", "source:pseudo-abc"]);
   });
 
-  it("uses the published limit values and a 1000 ms counter sweep interval", () => {
-    expect(SUPPORT_COUNTER_SWEEP_MS).toBe(1_000);
+  it("uses the published limit values", () => {
     const values = {
       supportLimitAnonMessages10m: 7,
       supportLimitAnonMessages24h: 8,
@@ -145,7 +142,6 @@ describe("SupportMessageLimiter", () => {
     for (let index = 0; index < 65_536; index += 1) {
       if (admit(limiter, epoch, { source: `pseudo-${index}` }) === "ADMITTED") admitted += 1;
     }
-    expect(SUPPORT_MESSAGE_LIMITER_CAPACITY).toBe(65_536);
     expect(admitted).toBe(65_536);
     expect(admit(limiter, epoch, { source: "one-more" })).toBe("RATE_LIMITED");
   });

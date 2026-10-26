@@ -1,7 +1,6 @@
 import type { SupportConfigurationValues } from "../../../../packages/register/src/support-config.js";
 
-export const SUPPORT_COUNTER_SWEEP_MS = 1_000;
-export const SUPPORT_MESSAGE_LIMITER_CAPACITY = 65_536;
+const SUPPORT_MESSAGE_LIMITER_CAPACITY = 65_536;
 
 export type SupportMessageLimits = Readonly<{
   anonymous10m: number;

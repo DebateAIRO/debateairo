@@ -25,8 +25,6 @@ export function ThreatReportsLink({ client, catalog = staffEnglish, locale }: { 
   }, [api]);
   if (unread === null) return null;
   const language = locale ?? document.documentElement.lang ?? "en";
-  const countLabel = language.startsWith("ro")
-    ? t(catalog, `staff.threatReports.unread.${new Intl.PluralRules("ro").select(unread)}`, { count: unread })
-    : tPlural(catalog, "staff.threatReports.unread", unread, { count: unread });
+  const countLabel = tPlural(catalog, "staff.threatReports.unread", unread, language);
   return <div className="threatReportsLinkRow"><a className="setBtn threatReportsLink" href="/admin/threat-reports">{t(catalog, "staff.threatReports.link")}<span className="threatReportsCount" data-part="unread-count">{countLabel}</span></a></div>;
 }
