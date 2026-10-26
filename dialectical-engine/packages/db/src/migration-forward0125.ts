@@ -3,26 +3,36 @@ import { readFile } from "node:fs/promises";
 import type { PoolClient } from "pg";
 import type { ForwardStepAnchor, ForwardStepPlan } from "./migration-forward-chain.js";
 
-/** 0125 pins only its new objects; 0123 and 0124 retain their own postconditions. */
-const NAME = "0125_threat_reports.sql";
-const VERSION = "threat-reports-forward0125-v1";
-const MANIFEST_PATH = "lineage/threat-reports-forward0125.json";
+/** The synthesis check's own objects are pinned; shared source and tombstone lists remain extendable. */
+const NAME = "0125_synthesis_check.sql";
+const VERSION = "synthesis-check-forward0125-v1";
+const MANIFEST_PATH = "lineage/synthesis-check-forward0125.json";
 const VERIFIER_PATH = "lineage/verify-effective-capabilities-111.sql";
-const PREVIOUS = "0124_publication_review.sql";
-const TABLES = ["staff.threat_report", "staff.threat_report_event", "staff.threat_report_alert"] as const;
-const FUNCTIONS = [
-  "ledger.record_question_check_spend(uuid,text,date,bigint,bigint,bigint)",
-  "ledger.refuse_question_check_spend_outside_writer()",
-  "staff.keep_threat_report(text,uuid)", "staff.keep_threat_report_with_email(text,uuid,text)",
-  "staff.list_threat_reports(jsonb,text)",
-  "staff.count_unread_threat_reports(jsonb,text)", "staff.peek_threat_report_account(jsonb,text,uuid)",
-  "staff.read_threat_report(jsonb,text,uuid)", "staff.threat_report_recipient_user(uuid)",
-  "staff.decide_threat_report(jsonb,text,uuid,text,jsonb)", "staff.erase_due_threat_reports()",
-  "staff.hold_threat_report_email(uuid,text)", "staff.claim_threat_report_alerts(integer)",
-  "staff.complete_threat_report_alert(uuid,uuid,boolean)",
-  "identity.read_data_export_threat_reports(uuid,uuid)", "identity.data_export_lease_user(uuid,uuid)"
+const PREVIOUS = "0122_engine_map_check.sql";
+const TABLES = [
+  "serve.synthesis_check_request", "serve.synthesis_check_attempt", "serve.synthesis_check_result",
+  "serve.synthesis_check_inheritance", "serve.synthesis_check_removal_request",
+  "serve.synthesis_check_removal_notice", "identity.synthesis_check_erasure_binding"
 ] as const;
-const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0125_${detail}`); };
+const FUNCTIONS = [
+  "core.enforce_synthesis_check_answer_run()",
+  "core.enforce_content_attestation_v2_synthesis_check_result()",
+  "core.enforce_content_ciphertext_synthesis_check_result()",
+  "core.enforce_erasure_barrier_synthesis_check_result()",
+  "core.enforce_synthesis_check_inheritance()",
+  "core.enforce_synthesis_check_removal_request()",
+  "serve.store_synthesis_check_result(uuid,uuid,uuid,uuid,integer,integer,boolean,text,text,jsonb,jsonb,bytea,boolean)",
+  "serve.record_synthesis_check_inheritance(uuid,uuid,uuid,integer,uuid)",
+  "core.prepare_synthesis_check_erasures(integer)",
+  "core.pending_synthesis_check_erasure_cleanup(integer)",
+  "core.finalize_synthesis_check_erasure(uuid,timestamptz,timestamptz,integer,integer)",
+  "serve.take_synthesis_check_removal_notice(uuid)",
+  "serve.synthesis_check_removal_notice_exists(uuid)",
+  "serve.purge_expired_synthesis_check_removal_notices()",
+  "serve.run_removed_by_synthesis_check(uuid)"
+] as const;
+const OWN_CONSTRAINT = "model_spend_synthesis_check_names_its_run";
+const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0123_${detail}`); };
 const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 const exactKeys = (value: unknown, keys: readonly string[]): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -46,16 +56,11 @@ async function postconditionEvidence(client: PoolClient): Promise<string> {
       (SELECT jsonb_agg(g.item ORDER BY g.item) FROM (SELECT coalesce(pg_get_userbyid(nullif(a.grantee,0)),'PUBLIC')||':'||a.privilege_type||':'||a.is_grantable::text item FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a) g) acl
     FROM unnest($1::text[]) signature JOIN pg_proc p ON p.oid=to_regprocedure(signature) ORDER BY signature`, [FUNCTIONS])).rows;
   if (functions.length !== FUNCTIONS.length) return fail("POSTCONDITION_OBJECTS");
-  const trigger = (await client.query(`
-    SELECT t.tgname,t.tgenabled,pg_get_triggerdef(t.oid) definition
-    FROM pg_trigger t WHERE t.tgrelid='ledger.model_spend'::regclass
-      AND t.tgname='question_check_spend_writer_only'`)).rows;
-  const check = (await client.query(`
-    SELECT k.conname,pg_get_constraintdef(k.oid) definition
-    FROM pg_constraint k WHERE k.conrelid='ledger.model_spend'::regclass
-      AND k.conname='model_spend_question_check_is_runless'`)).rows;
-  if (trigger.length !== 1 || check.length !== 1) return fail("POSTCONDITION_OBJECTS");
-  return sha(JSON.stringify({ tables, functions, trigger, check }));
+  const constraints = (await client.query(`
+    SELECT k.conname,pg_get_constraintdef(k.oid) definition FROM pg_constraint k
+    WHERE k.conrelid='ledger.model_spend'::regclass AND k.conname=$1`, [OWN_CONSTRAINT])).rows;
+  if (constraints.length !== 1) return fail("POSTCONDITION_OBJECTS");
+  return sha(JSON.stringify({ tables, functions, constraints }));
 }
 
 export async function loadForward0125(anchor: ForwardStepAnchor): Promise<ForwardStepPlan> {

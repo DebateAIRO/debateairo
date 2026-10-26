@@ -1,5 +1,5 @@
--- 0123: append-only post-settle synthesis checks and the system erasure path.
--- Each function and trigger introduced here has an 0123-specific name. Earlier
+-- 0125: append-only post-settle synthesis checks and the system erasure path.
+-- Each function and trigger introduced here has an 0125-specific name. Earlier
 -- migration bodies are immutable, including their forward postconditions.
 
 CREATE TABLE IF NOT EXISTS serve.synthesis_check_request (

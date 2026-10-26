@@ -4,8 +4,8 @@ import { CONTENT_CARRIERS } from "../../packages/crypto/src/index.js";
 import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
 import { auditMigrationReplaySafety } from "../../tools/orphan-audit/src/index.js";
 
-const migration = new URL("../../migrations/0124_publication_review.sql", import.meta.url);
-const loader = new URL("../../packages/db/src/migration-forward0124.ts", import.meta.url);
+const migration = new URL("../../migrations/0126_publication_review.sql", import.meta.url);
+const loader = new URL("../../packages/db/src/migration-forward0126.ts", import.meta.url);
 const sql = () => readFile(migration, "utf8");
 const newTables = [
   "serve.publication_review_request",
@@ -35,14 +35,14 @@ const newFunctions = [
   "serve.publication_review_run_live(uuid)"
 ];
 
-describe("0124 publication review contract", () => {
-  it("0124 is replay-safe in the repository's form", async () => {
+describe("0126 publication review contract", () => {
+  it("0126 is replay-safe in the repository's form", async () => {
     const plan = await loadMigrationPlan();
     const migrateSource = await readFile(new URL("../../packages/db/src/index.ts", import.meta.url), "utf8");
-    expect(auditMigrationReplaySafety("migrations/0124_publication_review.sql", await sql(), { plan, migrateSource })).toEqual([]);
+    expect(auditMigrationReplaySafety("migrations/0126_publication_review.sql", await sql(), { plan, migrateSource })).toEqual([]);
   });
 
-  it("0124 creates four private tables and grants debateai_runtime no table privilege", async () => {
+  it("0126 creates four private tables and grants debateai_runtime no table privilege", async () => {
     const source = await sql();
     expect([...source.matchAll(/CREATE TABLE IF NOT EXISTS ([a-z_.]+)/gu)].map((match) => match[1])).toEqual(newTables);
     for (const table of newTables) {
@@ -56,7 +56,7 @@ describe("0124 publication review contract", () => {
     expect(CONTENT_CARRIERS).toContain("serve.publication_review_copy");
   });
 
-  it("0124 changes no identity step-up DDL and consumes one PUBLISH grant without a new row lock", async () => {
+  it("0126 changes no identity step-up DDL and consumes one PUBLISH grant without a new row lock", async () => {
     let source = await sql();
     for (const forbidden of [
       "step_up_grant_action_check", "FUNCTION identity.rotate_session_after_step_up",
@@ -79,7 +79,7 @@ describe("0124 publication review contract", () => {
     for (const name of ["subject_capabilities_check", "staff.valid_capabilities", "staff.authorize_action", "staff.owned_action_allowed", "staff.begin_owned_webauthn"]) {
       expect(source, name).toContain(name);
     }
-    const begin = "-- BEGIN staff.commit_owner_command (owner set of 0124; a later migration that changes the owner set copies this block whole)";
+    const begin = "-- BEGIN staff.commit_owner_command (owner set of 0126; a later migration that changes the owner set copies this block whole)";
     const end = "-- END staff.commit_owner_command";
     expect(source.split(begin)).toHaveLength(2);
     expect(source.split(end)).toHaveLength(2);
@@ -97,7 +97,7 @@ describe("0124 publication review contract", () => {
     expect(source).toMatch(/CREATE TRIGGER zz_sever_publication_review\s+AFTER INSERT ON serve\.private_run_key_cleanup_intent/gu);
   });
 
-  it("loadForward0124 pins only the four new tables, nineteen new functions and two sever triggers", async () => {
+  it("loadForward0126 pins only the four new tables, nineteen new functions and two sever triggers", async () => {
     const source = (await readFile(loader, "utf8")).replace(/\/\*[\s\S]*?\*\//gu, "").replace(/\/\/[^\n]*/gu, "");
     for (const name of [...newTables, ...newFunctions, "zz_sever_publication_review", "core.run_content_attestation_secret", "serve.private_run_key_cleanup_intent"]) {
       expect(source, name).toContain(name);
@@ -108,7 +108,7 @@ describe("0124 publication review contract", () => {
       "subject_capabilities_check"
     ]) expect(source, shared).not.toContain(shared);
     const chain = await readFile(new URL("../../packages/db/src/migration-forward-chain.ts", import.meta.url), "utf8");
-    expect(chain).toContain("loadForward0123,loadForward0124,loadForward0125,loadForward0126]");
+    expect(chain).toContain("loadForward0125,loadForward0126,loadForward0127,loadForward0128]");
   });
 });
 

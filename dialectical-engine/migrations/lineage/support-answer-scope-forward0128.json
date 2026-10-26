@@ -1,14 +1,14 @@
 {
-  "version": "support-answer-scope-forward0126-v1",
+  "version": "support-answer-scope-forward0128-v1",
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
-    "name": "0125_threat_reports.sql",
-    "manifestSha256": "c1a25f89edc6924ef1b8f94651d95801b7ae22a3236990bc4e7ac68b6c39b5c4",
+    "name": "0127_threat_reports.sql",
+    "manifestSha256": "2fcec4363a4ffff560727d4e0e476a6417f5cb3afe493a73eea9899505308295",
     "verifierSha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
   },
   "migration": {
-    "name": "0126_support_answer_scope.sql",
-    "sha256": "3c85972fbde52d727b5d9b9df4c58f49053bdb9a9934141baca546ee54bba898"
+    "name": "0128_support_answer_scope.sql",
+    "sha256": "7d8fd3afc4856c3a395b3da9fa65a86cdfa705487499ddc4daa742fd48d8fa79"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-111.sql",

@@ -75,7 +75,7 @@ beforeAll(async () => {
 }, 600_000);
 afterAll(async () => { await database?.stop(); });
 
-describe("0123 synthesis check records and runtime boundaries", () => {
+describe("0125 synthesis check records and runtime boundaries", () => {
   it("the result writer refuses an attempt whose answer version differs from its parameters", async () => {
     const run = await seedRun();
     await secondVersion(run);

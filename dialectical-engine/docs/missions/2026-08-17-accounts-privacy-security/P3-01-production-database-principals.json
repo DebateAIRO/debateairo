@@ -2255,7 +2255,7 @@
     },
     {
       "roleName": "debateai_staff_security_owner",
-      "source": "migrations/0124_publication_review.sql",
+      "source": "migrations/0126_publication_review.sql",
       "grants": [
         "USAGE ON SCHEMA serve",
         "SELECT ON serve.publication_review_request",
@@ -2267,7 +2267,7 @@
     },
     {
       "roleName": "debateai_runtime",
-      "source": "migrations/0124_publication_review.sql",
+      "source": "migrations/0126_publication_review.sql",
       "grants": [
         "EXECUTE ON FUNCTION staff.authorize_action(jsonb,text)",
         "EXECUTE ON FUNCTION staff.begin_owned_webauthn(uuid,uuid,text,text,text,text,text,text,uuid,jsonb,jsonb,jsonb)",
@@ -2283,14 +2283,14 @@
     },
     {
       "roleName": "debateai_staff_recovery",
-      "source": "migrations/0124_publication_review.sql",
+      "source": "migrations/0126_publication_review.sql",
       "grants": [
         "EXECUTE ON FUNCTION staff.commit_owner_command(uuid,uuid[],uuid,text,uuid,text,uuid,text,uuid,jsonb)"
       ]
     },
     {
       "roleName": "debateai_staff_security_owner",
-      "source": "migrations/0125_threat_reports.sql",
+      "source": "migrations/0127_threat_reports.sql",
       "grants": [
         "SELECT (erasure_id, user_id, prepared_at, cancelled_at, committed_at) ON identity.account_erasure_request",
         "EXECUTE ON FUNCTION identity.data_export_lease_user(uuid,uuid)"
@@ -2298,7 +2298,7 @@
     },
     {
       "roleName": "debateai_runtime",
-      "source": "migrations/0125_threat_reports.sql",
+      "source": "migrations/0127_threat_reports.sql",
       "grants": [
         "EXECUTE ON FUNCTION ledger.record_question_check_spend(uuid,text,date,bigint,bigint,bigint)",
         "EXECUTE ON FUNCTION staff.keep_threat_report(text,uuid)",
@@ -2314,7 +2314,7 @@
     },
     {
       "roleName": "debateai_data_export_worker",
-      "source": "migrations/0125_threat_reports.sql",
+      "source": "migrations/0127_threat_reports.sql",
       "grants": [
         "EXECUTE ON FUNCTION identity.read_data_export_threat_reports(uuid,uuid)"
       ]

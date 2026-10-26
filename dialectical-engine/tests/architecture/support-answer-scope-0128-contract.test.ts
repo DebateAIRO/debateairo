@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { loadForward0126 } from "../../packages/db/src/migration-forward0126.js";
+import { loadForward0128 } from "../../packages/db/src/migration-forward0128.js";
 
-const sql = readFileSync(new URL("../../migrations/0126_support_answer_scope.sql", import.meta.url), "utf8")
+const sql = readFileSync(new URL("../../migrations/0128_support_answer_scope.sql", import.meta.url), "utf8")
   .replace(/--[^\n]*/gu, "");
 const tables = ["session", "session_key", "message", "abuse_event", '"case"', "case_key", "case_event",
   "case_message", "rating", "tool_call", "admission_event", "relay_call", "relay_waiter", "relay_waiter_event"];
@@ -12,7 +12,7 @@ const guarded = [...["abuse_event", "case_event", "rating", "tool_call", "relay_
   "relay_waiter_event", "admission_event", "shred_audit"].map((table) => `${table}.reject_mutation`),
   ...["session", '"case"', "session_key", "case_key"].map((table) => `${table}.reject_delete`)];
 
-describe("0126 support tables keep nothing", () => {
+describe("0128 support tables keep nothing", () => {
   it("revokes INSERT on exactly the fourteen conversation and model-call tables", () => {
     const revokes = [...sql.matchAll(/REVOKE\s+INSERT\s+ON\s+([\s\S]*?)\s+FROM\s+debateai_support\s*;/giu)];
     expect(revokes).toHaveLength(1);
@@ -49,13 +49,13 @@ describe("0126 support tables keep nothing", () => {
   it("ends with checks for missing guards, truncation guards, INSERT rights and retained rows", () => {
     const last = sql.slice(sql.lastIndexOf("DO $$"));
     expect(last).toMatch(/DO \$\$[\s\S]*\$\$\s*;\s*$/u);
-    for (const code of ["MIGRATION_0126_GUARD_MISSING", "MIGRATION_0126_TRUNCATE_GUARDS",
-      "MIGRATION_0126_INSERT_KEPT", "MIGRATION_0126_ROWS_KEPT"]) expect(last).toContain(code);
+    for (const code of ["MIGRATION_0128_GUARD_MISSING", "MIGRATION_0128_TRUNCATE_GUARDS",
+      "MIGRATION_0128_INSERT_KEPT", "MIGRATION_0128_ROWS_KEPT"]) expect(last).toContain(code);
   });
 
   it("refuses a catalog with none of the guarded objects", async () => {
-    const manifest = JSON.parse(readFileSync(new URL("../../migrations/lineage/support-answer-scope-forward0126.json", import.meta.url), "utf8"));
-    const step = await loadForward0126({ baseRecipeSha256: manifest.baseRecipeSha256,
+    const manifest = JSON.parse(readFileSync(new URL("../../migrations/lineage/support-answer-scope-forward0128.json", import.meta.url), "utf8"));
+    const step = await loadForward0128({ baseRecipeSha256: manifest.baseRecipeSha256,
       previousName: manifest.previous.name, previousManifestSha256: manifest.previous.manifestSha256,
       previousVerifierSha256: manifest.previous.verifierSha256 });
     await expect(step.postconditionEvidence({ query: async () => ({ rows: [] }) } as never))

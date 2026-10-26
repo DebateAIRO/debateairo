@@ -75,7 +75,7 @@ async function keep(question: string, account: string | null = null): Promise<st
     "SELECT staff.keep_threat_report($1,$2) ref", [question,account]))[0]!.ref;
 }
 
-describe("0125 threat report database boundary", () => {
+describe("0127 threat report database boundary", () => {
   it("exports a dedicated QUESTION_CHECK spend writer from the budget package", () => {
     // Property: call sites have one named writer and a boot probe for the new runless source.
     expect(budget).toHaveProperty("QUESTION_CHECK_SPEND_WRITER", "ledger.record_question_check_spend(uuid,text,date,bigint,bigint,bigint)");
@@ -89,7 +89,7 @@ describe("0125 threat report database boundary", () => {
   });
 });
 
-describe("0125 applied database", () => {
+describe("0127 applied database", () => {
   let owner: Awaited<ReturnType<typeof actor>>;
   let holder: Awaited<ReturnType<typeof actor>>;
   let noHolder: Awaited<ReturnType<typeof actor>>;
@@ -102,15 +102,15 @@ describe("0125 applied database", () => {
   }, 180_000);
   afterAll(async () => database?.stop());
 
-  it("migrate runs twice through 0125 without a forward-chain drift", async () => {
-    // A later slice's migration may follow 0125 in the merged chain (0126, S05); the second run must add no step.
+  it("migrate runs twice through 0127 without a forward-chain drift", async () => {
+    // A later slice's migration may follow 0127 in the merged chain (0128, S05); the second run must add no step.
     const steps = async () => (await database.pool.query<{ source_name: string }>(
       "SELECT source_name FROM public.debateai_schema_migration_step ORDER BY source_name"
     )).rows.map((row) => row.source_name);
     const before = await steps();
     await db.migrate(database.pool);
     expect(await steps()).toEqual(before);
-    expect(before).toContain("0125_threat_reports.sql");
+    expect(before).toContain("0127_threat_reports.sql");
   }, 180_000);
 
   it("refuses runtime SELECT, INSERT, UPDATE and DELETE on each private table", async () => {

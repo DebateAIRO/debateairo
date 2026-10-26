@@ -10,12 +10,12 @@ base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
 first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third, role rotation (0114,
-below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the synthesis check (0123, below) the thirteenth, the publication review (0124, below) the fourteenth and the threat reports (0125, below) the fifteenth. A step is added with new files only; NNNN is its number, the step before's number plus one:
+below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the synthesis check (0125, below) the thirteenth, the publication review (0126, below) the fourteenth and the threat reports (0127, below) the fifteenth. A step is added with new files only; NNNN is its number, the step before's number plus one:
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
-   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0125: 0125,
-   `threat-reports-forward0125.json`, and `verify-effective-capabilities-111.sql`, which 0112 to 0125 keep),
+   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0127: 0127,
+   `threat-reports-forward0127.json`, and `verify-effective-capabilities-111.sql`, which 0112 to 0127 keep),
    and its own migration and verifier. (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json`
    and the sealed `verify-effective-capabilities.sql`.)
 3. A new verifier `lineage/verify-effective-capabilities-NNNN.sql` only when the step adds billing relations or
@@ -206,10 +206,10 @@ tables are not altered (their digest is 0117's; see 0119's note). No billing rel
 `replayVerifierSql`: its postcondition is the two tables whole. If `origin/dev` takes 0122 first, renumber this step
 (rename every file and constant that carries the number, recompute the manifest, re-pin the chain lists).
 
-## The synthesis check (0123)
+## The synthesis check (0125)
 
-The thirteenth chain step, after the engine's map answer step's 0122, is `0123_synthesis_check.sql` with
-`synthesis-check-forward0123.json` and `packages/db/src/migration-forward0123.ts`. Its loader is appended to
+The thirteenth chain step, after the engine's map answer step's 0122, is `0125_synthesis_check.sql` with
+`synthesis-check-forward0125.json` and `packages/db/src/migration-forward0125.ts`. Its loader is appended to
 `STEPS` and refuses altered inputs with `MIGRATION_FORWARD0123_` codes. It has no supplemental
 `replayVerifierSql`; the effective `verify-effective-capabilities-111.sql` stays in force. Its postcondition
 records its own seven tables: `serve.synthesis_check_request`, `serve.synthesis_check_attempt`,
@@ -217,30 +217,30 @@ records its own seven tables: `serve.synthesis_check_request`, `serve.synthesis_
 `serve.synthesis_check_removal_request`, `serve.synthesis_check_removal_notice` and
 `identity.synthesis_check_erasure_binding`, plus its own functions, triggers and constraint. It widens the
 model-spend source list with `SYNTHESIS_CHECK` and grants the three erasure functions only to
-`debateai_erasure_runtime`. If an earlier pending step takes 0123 first, renumber this step and recompute
+`debateai_erasure_runtime`. If an earlier pending step takes 0125 first, renumber this step and recompute
 its manifest and chain pins before merge.
 
-## The publication review (0124)
+## The publication review (0126)
 
 The fourteenth step adds the request, decision and transient reviewer-copy tables in serve, plus the staff review event table.
 It extends the staff capability and staff-action lists and installs two sever triggers so key destruction removes the run-linked review rows.
 The Ask consumes a PUBLISH grant; no identity step-up object changes.
-Its manifest is `publication-review-forward0124.json`, and its loader is `packages/db/src/migration-forward0124.ts`.
+Its manifest is `publication-review-forward0126.json`, and its loader is `packages/db/src/migration-forward0126.ts`.
 It keeps the previous effective verifier because it adds no billing relation or function.
 A hosted deploy applies it with `pnpm db:migrate`.
 
-## The threat reports (0125)
+## The threat reports (0127)
 
-The fifteenth chain step, after the publication review's 0124 (synthesis-flag S04, `docs/missions/synthesis-flag/slices/S04/SPEC-v8.md` §5a): `0125_threat_reports.sql`, `threat-reports-forward0125.json`, `packages/db/src/migration-forward0125.ts` (`loadForward0125`, appended last to `STEPS`, `MIGRATION_FORWARD0125_` refusals).
+The fifteenth chain step, after the publication review's 0126 (synthesis-flag S04, `docs/missions/synthesis-flag/slices/S04/SPEC-v8.md` §5a): `0127_threat_reports.sql`, `threat-reports-forward0127.json`, `packages/db/src/migration-forward0127.ts` (`loadForward0127`, appended last to `STEPS`, `MIGRATION_FORWARD0125_` refusals).
 It creates `staff.threat_report`, `staff.threat_report_event`, `staff.threat_report_alert`, eleven staff and export functions, and two ledger functions for the question-check spend writer and its invoker trigger.
 The eight shared objects it changes are `model_spend_spend_source_check`, `subject_capabilities_check`, `staff.valid_capabilities`, `staff.authorize_action`, `staff.owned_action_allowed`, `staff.begin_owned_webauthn`, `staff.commit_owner_command` and `staff.read_audit_page`; it pins none of them (W-0117).
 `verify-effective-capabilities-111.sql` stays the verifier in force; there is no `replayVerifierSql`.
-If an earlier pending step takes 0125 first, renumber this step, recompute its manifest and re-pin the chain lists before merge.
+If an earlier pending step takes 0127 first, renumber this step, recompute its manifest and re-pin the chain lists before merge.
 
-## The support answer scope (0126)
+## The support answer scope (0128)
 
-The sixteenth step, after the threat reports (0125), is `0126_support_answer_scope.sql` with
-`support-answer-scope-forward0126.json` and `packages/db/src/migration-forward0126.ts`.
+The sixteenth step, after the threat reports (0127), is `0128_support_answer_scope.sql` with
+`support-answer-scope-forward0128.json` and `packages/db/src/migration-forward0128.ts`.
 It revokes `INSERT` on the fourteen support conversation and model-call tables from `debateai_support`.
 It deletes every row in those tables and `support.shred_audit` in dependency order, with the thirteen
 0065 mutation and delete guards temporarily disabled, then makes `support.support_shred_row_guard`
@@ -249,7 +249,7 @@ truncate guards, the revoked privileges and empty tables. Its catalog-only postc
 the support relation grants and guard definitions without retaining a row count: a later owner
 seed followed by `migrate()` does not drift. The effective verifier remains
 `verify-effective-capabilities-111.sql`; there is no `replayVerifierSql`. If an earlier pending
-step takes 0126 first, renumber it and recompute the manifest and `STEPS` chain pins.
+step takes 0128 first, renumber it and recompute the manifest and `STEPS` chain pins.
 
 ## Replay: every applied step keeps its own checks
 
@@ -259,7 +259,7 @@ own `replayVerifierSql` (the batch: `verify-auth-db-batch.sql`); both run again 
 COMMIT — so a step's promises (for example the batch's "no runtime may
 publish staff alert readiness") are still enforced after other steps are appended. A later step that deliberately
 changes something an earlier step's verifier pins must change that verifier through its own reviewed step design; it
-cannot silently pass. The effective-capability verifier of the last applied step (after 0124: 0111's, which the batch,
+cannot silently pass. The effective-capability verifier of the last applied step (after 0126: 0111's, which the batch,
 Part C's step, role rotation, the data export, the mail locale, the debate shape map, the language check's site cost,
 the reclaim resume, the reply measures, the engine verdict, the engine's map answer step, the synthesis check and the publication review keep) still runs at the end
 of every `migrate()`.

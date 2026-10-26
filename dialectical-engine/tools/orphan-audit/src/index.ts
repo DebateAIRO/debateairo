@@ -658,9 +658,9 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // Opener rotation (spec 2026-10-11 Part 2, option B): the reviewed module after readRoleRotationCounts gained the
 // OPENER tally (each pin's first eligible entry) and the pin type's comment its position order, merged with the
 // data-export module above. migrate() is unchanged by this.
-// synthesis-flag S01 (0123): the reviewed module after it re-exported the synthesis check's erasure module
+// synthesis-flag S01 (0125): the reviewed module after it re-exported the synthesis check's erasure module
 // (export * from "./synthesis-check-erasure.js", after the publication check's). migrate() is byte-identical.
-// synthesis-flag S04 (0125): the reviewed module after it exported the threat-report repository adapter;
+// synthesis-flag S04 (0127): the reviewed module after it exported the threat-report repository adapter;
 // migrate() is byte-identical, and the full module is re-sealed without stripping that export in the audit test.
 // synthesis-flag S05 r5: the reviewed module drops retired support repository exports; migrate() is unchanged.
 const NATIVE_MIGRATE_MODULE_SHA256 = "5e9805a93fcfd92fbc0e4369c89b530ee959a141bd0f93e795ef6521b0fa9d0f";

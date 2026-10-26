@@ -78,7 +78,7 @@ async function timeCommits(
   return Number(process.hrtime.bigint() - started) / 1e6 / count;
 }
 
-/** Historical session pairs are seeded by the database owner after 0126. */
+/** Historical session pairs are seeded by the database owner after 0128. */
 async function createSessions(count: number): Promise<number> {
   return timeCommits(count, (client) => insertSessionPair(client, randomUUID()));
 }

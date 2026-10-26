@@ -28,7 +28,7 @@ export type ThreatReportAlertClaim = Readonly<{
   alert_id: string; recipient_staff_id: string; claim_token: string;
 }>;
 
-/** Every operation delegates to one 0125 function; no application clock enters these calls. */
+/** Every operation delegates to one 0127 function; no application clock enters these calls. */
 export class PostgresThreatReportRepository {
   constructor(private readonly pool: Pick<Pool, "query">) {}
 

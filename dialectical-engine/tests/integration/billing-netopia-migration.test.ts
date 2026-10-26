@@ -37,10 +37,10 @@ const REPLY_MEASURES_MIGRATION = "0120_reply_measures.sql";
 const ENGINE_VERDICT_MIGRATION = "0121_engine_verdict.sql";
 /** The engine's map answer step (engine redesign R3, spec 2026-10-15), chained after the engine verdict's. */
 const ENGINE_MAP_CHECK_MIGRATION = "0122_engine_map_check.sql";
-const SYNTHESIS_CHECK_MIGRATION = "0123_synthesis_check.sql";
-const PUBLICATION_REVIEW_MIGRATION = "0124_publication_review.sql";
-const THREAT_REPORT_MIGRATION = "0125_threat_reports.sql";
-const SUPPORT_ANSWER_SCOPE_MIGRATION = "0126_support_answer_scope.sql";
+const SYNTHESIS_CHECK_MIGRATION = "0125_synthesis_check.sql";
+const PUBLICATION_REVIEW_MIGRATION = "0126_publication_review.sql";
+const THREAT_REPORT_MIGRATION = "0127_threat_reports.sql";
+const SUPPORT_ANSWER_SCOPE_MIGRATION = "0128_support_answer_scope.sql";
 const CHAIN = [NETOPIA_MIGRATION, AUTH_DB_BATCH, PART_C_MIGRATION, ROLE_ROTATION_MIGRATION, EXPORT_MIGRATION, MAIL_LOCALE_MIGRATION, MAP_MIGRATION, LANGUAGE_CHECK_MIGRATION, RECLAIM_MIGRATION, REPLY_MEASURES_MIGRATION, ENGINE_VERDICT_MIGRATION, ENGINE_MAP_CHECK_MIGRATION, SYNTHESIS_CHECK_MIGRATION, PUBLICATION_REVIEW_MIGRATION, THREAT_REPORT_MIGRATION, SUPPORT_ANSWER_SCOPE_MIGRATION] as const;
 const DEV_110 = "0110_account_erasure_public_debates.sql";
 const SUPERSEDING_VERIFIER = "lineage/verify-effective-capabilities-111.sql";

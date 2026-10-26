@@ -684,7 +684,7 @@ describe("P3-01 production database-principal manifest", () => {
 },
 {
   "roleName": "debateai_staff_security_owner",
-  "source": "migrations/0124_publication_review.sql",
+  "source": "migrations/0126_publication_review.sql",
   "grants": [
     "USAGE ON SCHEMA serve",
     "SELECT ON serve.publication_review_request",
@@ -696,7 +696,7 @@ describe("P3-01 production database-principal manifest", () => {
 },
 {
   "roleName": "debateai_runtime",
-  "source": "migrations/0124_publication_review.sql",
+  "source": "migrations/0126_publication_review.sql",
   "grants": [
     "EXECUTE ON FUNCTION staff.authorize_action(jsonb,text)",
     "EXECUTE ON FUNCTION staff.begin_owned_webauthn(uuid,uuid,text,text,text,text,text,text,uuid,jsonb,jsonb,jsonb)",
@@ -712,15 +712,15 @@ describe("P3-01 production database-principal manifest", () => {
 },
 {
   "roleName": "debateai_staff_recovery",
-  "source": "migrations/0124_publication_review.sql",
+  "source": "migrations/0126_publication_review.sql",
   "grants": [
     "EXECUTE ON FUNCTION staff.commit_owner_command(uuid,uuid[],uuid,text,uuid,text,uuid,text,uuid,jsonb)"
   ]
 },
-// S04 0125: the private report owner and the three callers' exact function grants.
+// S04 0127: the private report owner and the three callers' exact function grants.
 {
   "roleName": "debateai_staff_security_owner",
-  "source": "migrations/0125_threat_reports.sql",
+  "source": "migrations/0127_threat_reports.sql",
   "grants": [
     "SELECT (erasure_id, user_id, prepared_at, cancelled_at, committed_at) ON identity.account_erasure_request",
     "EXECUTE ON FUNCTION identity.data_export_lease_user(uuid,uuid)"
@@ -728,7 +728,7 @@ describe("P3-01 production database-principal manifest", () => {
 },
 {
   "roleName": "debateai_runtime",
-  "source": "migrations/0125_threat_reports.sql",
+  "source": "migrations/0127_threat_reports.sql",
   "grants": [
     "EXECUTE ON FUNCTION ledger.record_question_check_spend(uuid,text,date,bigint,bigint,bigint)",
     "EXECUTE ON FUNCTION staff.keep_threat_report(text,uuid)",
@@ -744,7 +744,7 @@ describe("P3-01 production database-principal manifest", () => {
 },
 {
   "roleName": "debateai_data_export_worker",
-  "source": "migrations/0125_threat_reports.sql",
+  "source": "migrations/0127_threat_reports.sql",
   "grants": ["EXECUTE ON FUNCTION identity.read_data_export_threat_reports(uuid,uuid)"]
 }
 ]);
@@ -1016,20 +1016,20 @@ it("discloses exactly the reviewed additive funding grants without other princip
   expect(declared.some(grant => /(?:INSERT|UPDATE|DELETE).*funding_policy_selection/u.test(grant))).toBe(false);
 });
 
-it("discloses every 0124 publication review grant, including the run ownership columns", async () => {
+it("discloses every 0126 publication review grant, including the run ownership columns", async () => {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
-  const sql = await readFile("migrations/0124_publication_review.sql", "utf8");
+  const sql = await readFile("migrations/0126_publication_review.sql", "utf8");
   const actual = [...sql.matchAll(/^GRANT [^\n]+ TO (?:debateai_runtime|debateai_staff_security_owner|debateai_staff_recovery);$/gm)]
     .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
-  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0124_publication_review.sql")
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0126_publication_review.sql")
     .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
   expect(declared).toEqual(actual);
   expect(declared).toContain("GRANT SELECT (run_id, asker_id) ON core.run TO debateai_staff_security_owner;");
 });
 
-it("lists every new 0124 staff-owned review object in the production ownership manifest", async () => {
+it("lists every new 0126 staff-owned review object in the production ownership manifest", async () => {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
-  const sql = await readFile("migrations/0124_publication_review.sql", "utf8");
+  const sql = await readFile("migrations/0126_publication_review.sql", "utf8");
   const role = manifest.ownershipRoles.find(({ roleName }) => roleName === "debateai_staff_security_owner");
   expect(role).toBeDefined();
 

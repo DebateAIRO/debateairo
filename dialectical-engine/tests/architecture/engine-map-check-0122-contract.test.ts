@@ -56,7 +56,7 @@ describe("0122: the map answer step's two code tables", () => {
     expect(manifest.version).toBe("engine-map-check-forward0122-v1");
     expect(manifest.migration.name).toBe("0122_engine_map_check.sql");
     expect(manifest.previous.name).toBe("0121_engine_verdict.sql");
-    // 0123 follows 0122, which still follows R2 in the one chain list.
-    expect(readFileSync(new URL("../../packages/db/src/migration-forward-chain.ts", import.meta.url), "utf8")).toContain("loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126]");
+    // 0125 follows 0122, which still follows R2 in the one chain list.
+    expect(readFileSync(new URL("../../packages/db/src/migration-forward-chain.ts", import.meta.url), "utf8")).toContain("loadForward0121,loadForward0122,loadForward0125,loadForward0126,loadForward0127,loadForward0128]");
   });
 });
