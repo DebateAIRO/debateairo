@@ -192,6 +192,8 @@ apps/api/src/support/incidents.ts
 apps/api/src/support/index.ts
 apps/api/src/support/keys.ts
 apps/api/src/support/limits.ts
+apps/api/src/support/memory-call-records.ts
+apps/api/src/support/memory-limits.ts
 apps/api/src/support/model-references.ts
 apps/api/src/support/model-reservation.ts
 apps/api/src/support/model.ts
@@ -398,7 +400,6 @@ apps/runner/src/shape-seats.ts
 apps/runner/src/shape-select.ts
 apps/runner/src/story-snapshot.ts
 apps/runner/src/support-config-cli-credentials.ts
-apps/runner/src/support-inbox-cli.ts
 apps/runner/src/support-incident-cli.ts
 apps/runner/src/support-limits-cli.ts
 apps/runner/src/support-shred-cli.ts
@@ -601,11 +602,11 @@ apps/ui/components/legal/LegalPageLayout.tsx
 apps/ui/components/modeTransition.test.mjs
 apps/ui/components/modeTransition.ts
 apps/ui/components/support/Assistant.tsx
-apps/ui/components/support/CaseView.tsx
+apps/ui/components/support/HelpSupport.tsx
 apps/ui/components/support/SupportConversationGuard.tsx
 apps/ui/components/support/SupportWidget.tsx
-apps/ui/components/support/caseLink.test.mjs
-apps/ui/components/support/caseLink.ts
+apps/ui/components/support/WhenSupportOffered.tsx
+apps/ui/components/support/availability.ts
 apps/ui/components/support/conversation.ts
 apps/ui/components/support/http.ts
 apps/ui/components/support/sessionChange.ts
