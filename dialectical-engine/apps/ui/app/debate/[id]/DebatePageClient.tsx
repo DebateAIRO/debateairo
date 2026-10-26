@@ -909,9 +909,13 @@ export default function DebatePageClient({
         announceNewerVersion(newerVersion);
         return;
       }
-      heldRef.current = false;
-      setHeld(false);
-      setDebate(null);
+      // S01: a held debate never shows through a failure, and a debate no longer found leaves the screen. Any other
+      // failure keeps what the page already shows, under the banner (side-by-side W1, as before S01).
+      if (heldRef.current || (exc instanceof ContractHttpError && exc.code === "NOT_FOUND")) {
+        heldRef.current = false;
+        setHeld(false);
+        setDebate(null);
+      }
       // Existing in-flight runs resolve through the loading bundle above.
       // A remaining NOT_FOUND therefore means neither a visible run nor a
       // visible answer exists, and must remain an honest fatal result.

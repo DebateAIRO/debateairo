@@ -74,7 +74,14 @@ function method(source: string, name: string): { start: number; end: number } {
   const masked = codeMask(source);
   const hits = allIndices(masked, new RegExp(`\\basync\\s+${name.replace("#", "#")}\\s*\\(`, "u"));
   expect(hits).toHaveLength(1);
-  return scope(masked, masked.indexOf("{", hits[0]!));
+  // The body opens after the parameter list closes: a parameter's type may hold braces of its own.
+  let depth = 0;
+  let close = masked.indexOf("(", hits[0]!);
+  for (; close < masked.length; close++) {
+    if (masked[close] === "(") depth++;
+    if (masked[close] === ")" && --depth === 0) break;
+  }
+  return scope(masked, masked.indexOf("{", close));
 }
 
 function tsFiles(root: string): string[] {
@@ -86,18 +93,32 @@ function tsFiles(root: string): string[] {
 }
 
 describe("S04 run creation stays behind the ask gate", () => {
-  it("core.run has one writer, startRun, called only inside submit and #submitWithRoom", () => {
+  // Merged with origin/dev d78d58b4f (2026-10-26): side-by-side C11 moved the row's insert into the private #insertRun,
+  // shared by startRun (a new ask) and startReadmittedRun (re-admitting a waiting run, whose stored ask passed the check
+  // when it was first submitted). Neither is reachable any other way.
+  it("core.run has one writer, #insertRun, behind startRun (inside submit and #submitWithRoom) and the re-admission", () => {
     const insertions = allIndices(db, /INSERT\s+INTO\s+core\.run\s*\(/u);
     expect(insertions).toHaveLength(1);
-    const startRun = method(db, "startRun");
-    expect(insertions[0]).toBeGreaterThan(startRun.start);
-    expect(insertions[0]).toBeLessThan(startRun.end);
+    const insertRun = method(db, "#insertRun");
+    expect(insertions[0]).toBeGreaterThan(insertRun.start);
+    expect(insertions[0]).toBeLessThan(insertRun.end);
+    const helperCalls = allIndices(codeMask(db), /\.#insertRun\s*\(/u);
+    expect(helperCalls).toHaveLength(2);
+    for (const owner of ["startRun", "startReadmittedRun"]) {
+      const body = method(db, owner);
+      expect(helperCalls.filter((at) => at > body.start && at < body.end), owner).toHaveLength(1);
+    }
     const calls = allIndices(codeMask(api), /\.startRun\s*\(/u);
     expect(calls).toHaveLength(2);
     const submit = method(api, "submit");
     const room = method(api, "#submitWithRoom");
     expect(calls.filter((at) => at > submit.start && at < submit.end)).toHaveLength(1);
     expect(calls.filter((at) => at > room.start && at < room.end)).toHaveLength(1);
+    const readmissions = allIndices(codeMask(api), /\.startReadmittedRun\s*\(/u);
+    expect(readmissions).toHaveLength(1);
+    const readmit = method(api, "#readmit");
+    expect(readmissions[0]).toBeGreaterThan(readmit.start);
+    expect(readmissions[0]).toBeLessThan(readmit.end);
   });
 
   it("submit is called only by POST /v1/asks, after the question check", () => {
@@ -124,14 +145,14 @@ describe("S04 run creation stays behind the ask gate", () => {
     expect(allIndices(codeMask(alias), submitCall)).toHaveLength(1);
   });
 
-  it("core.create_encrypted_run has one call in apps and packages, inside startRun", () => {
+  it("core.create_encrypted_run has one call in apps and packages, inside #insertRun", () => {
     const calls = [...tsFiles("apps"), ...tsFiles("packages")].flatMap((path) =>
       allIndices(readFileSync(path, "utf8"), /SELECT\s+core\.create_encrypted_run\s*\(/u)
         .map((at) => ({ path, at })));
     expect(calls).toHaveLength(1);
     expect(calls[0]?.path).toBe("packages/db/src/index.ts");
-    const startRun = method(db, "startRun");
-    expect(calls[0]!.at).toBeGreaterThan(startRun.start);
-    expect(calls[0]!.at).toBeLessThan(startRun.end);
+    const insertRun = method(db, "#insertRun");
+    expect(calls[0]!.at).toBeGreaterThan(insertRun.start);
+    expect(calls[0]!.at).toBeLessThan(insertRun.end);
   });
 });

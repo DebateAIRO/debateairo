@@ -102,7 +102,7 @@ describe("keyboard: Help's suggested questions", () => {
  * request runs, so the pressed one dropped keyboard focus to the page. Each now puts focus in the message field —
  * where the reply or the opened case is followed up — while the buttons stay disabled, so busy is still conveyed.
  */
-describe("keyboard: Help's Send and Escalate", () => {
+describe("keyboard: Help's Send and Talk to a person", () => {
   it("pressing Send keeps focus in the message field while the answer is pending, and after it", async () => {
     const { client, answer } = pendingClient();
     await act(async () => root!.render(<Assistant fullPage client={client} />));
@@ -127,49 +127,37 @@ describe("keyboard: Help's Send and Escalate", () => {
     expect(document.activeElement, "focus stays in the message field").toBe(input);
   });
 
-  it("pressing the page's Escalate keeps focus in the message field while the case opens", async () => {
-    const { client, open } = pendingClient();
+  // synthesis-flag S05 (merged with origin/dev d78d58b4f, 2026-10-26): Help opens no case. The page's "Need a person"
+  // card is the support address as a mail link, and the widget's Talk to a person shows that address in place; neither
+  // is ever disabled, so neither can drop keyboard focus to the page while something is pending.
+  it("the page's Need a person card is a mail link to the support address, and opens no case", async () => {
+    const { client } = pendingClient();
     await act(async () => root!.render(<Assistant fullPage client={client} />));
     await settle();
-    const input = document.querySelector<HTMLInputElement>("#support-message")!;
-    const escalate = document.querySelector<HTMLButtonElement>(".supportEscalation button")!;
+    const card = document.querySelector<HTMLElement>(".supportEscalation")!;
 
-    await act(async () => escalate.focus());
-    await act(async () => escalate.click());
-    await settle();
-
-    expect(client.escalate).toHaveBeenCalledTimes(1);
-    expect(escalate.disabled, "Escalate is busy while pending").toBe(true);
-    expect(document.activeElement, "focus is not dropped to the page").not.toBe(document.body);
-    expect(document.activeElement).toBe(input);
-
-    await act(async () => open());
-    await settle();
-
-    expect(escalate.disabled).toBe(false);
-    expect(document.activeElement, "focus stays in the message field").toBe(input);
+    expect(card.querySelector("button"), "no case button").toBeNull();
+    const mail = card.querySelector<HTMLAnchorElement>('a[href^="mailto:"]')!;
+    expect(mail).not.toBeNull();
+    await act(async () => mail.focus());
+    expect(document.activeElement).toBe(mail);
+    expect(client.escalate).not.toHaveBeenCalled();
   });
 
-  it("pressing the widget's Talk to a person keeps focus in the message field while the case opens", async () => {
-    const { client, open } = pendingClient();
+  it("pressing the widget's Talk to a person keeps focus on it and shows the support address, opening no case", async () => {
+    const { client } = pendingClient();
     await act(async () => root!.render(<Assistant client={client} />));
     await settle();
-    const input = document.querySelector<HTMLInputElement>("#support-message")!;
-    const escalate = document.querySelector<HTMLButtonElement>("button.supportEscalateCompact")!;
+    const human = document.querySelector<HTMLButtonElement>("button.supportEscalateCompact")!;
 
-    await act(async () => escalate.focus());
-    await act(async () => escalate.click());
+    await act(async () => human.focus());
+    await act(async () => human.click());
     await settle();
 
-    expect(client.escalate).toHaveBeenCalledTimes(1);
-    expect(escalate.disabled, "the button is busy while pending").toBe(true);
-    expect(document.activeElement, "focus is not dropped to the page").not.toBe(document.body);
-    expect(document.activeElement).toBe(input);
-
-    await act(async () => open());
-    await settle();
-
-    expect(escalate.disabled).toBe(false);
-    expect(document.activeElement, "focus stays in the message field").toBe(input);
+    expect(human.disabled).toBe(false);
+    expect(human.getAttribute("aria-expanded")).toBe("true");
+    expect(document.activeElement, "focus is not dropped to the page").toBe(human);
+    expect(document.querySelector('.supportHumanAddress a[href^="mailto:"]')).not.toBeNull();
+    expect(client.escalate).not.toHaveBeenCalled();
   });
 });

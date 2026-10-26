@@ -78,8 +78,8 @@ never required, so restarting it never stops a release's API or a draining runne
 (side-by-side spec §4). The API and runner still require PostgreSQL, and each website is bound to
 its own release's API (`BindsTo=`).
 
-**One API serves at a time.** The support chat's counts (message and session limits, pauses and
-the daily model-call count) live in the API process's memory only: a restart clears them and two
+**One API serves at a time.** The support chat's counts live in the API process's memory only
+(message and session limits, pauses and the daily model-call count): a restart clears them and two
 serving APIs would count separately. During an upgrade the newer release's API starts in the spare
 slot but stays not-ready, and the switch is break-before-make: the older pair stops taking
 requests first, the newer pair takes them a few seconds later, and Caddy holds any request in

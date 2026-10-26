@@ -13,6 +13,8 @@ const runId = "11111111-1111-4111-8111-111111111111";
 const methods = { methods: [], recovery_codes_remaining: 0, available_step_up_methods: ["password_totp"], step_up_providers: [] };
 const client = (overrides: Record<string, unknown> = {}) => ({
   readRunVisibility: vi.fn(async () => ({ state: "PRIVATE" as const, public_ref: null })),
+  // synthesis-flag S02: the control reads the debate's review state beside its visibility (an unflagged debate here).
+  readPublicationReview: vi.fn(async () => ({ flagged: false, state: "NONE", categories: [], asks_used: 0, may_ask: false, refusal: null })),
   publishRun: vi.fn(async () => ({ state: "PUBLISHED" as const, public_ref: "22222222-2222-4222-8222-222222222222" })),
   unpublishRun: vi.fn(async () => ({ state: "PRIVATE" as const, public_ref: null })),
   deletePrivateDebate: vi.fn(async () => ({ status: "CLEANED" as const })),

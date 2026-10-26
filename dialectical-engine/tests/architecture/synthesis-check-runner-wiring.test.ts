@@ -27,7 +27,8 @@ describe("synthesis check request runner wiring", () => {
     expect(catchUp).toMatch(/\bsynthesisCheckRequest:\s*true\b/u);
     expect(source.match(/\bsynthesisCheckRequest:\s*true\b/gu)).toHaveLength(2);
 
-    const base = execFileSync("git", ["show", `27e21e5e1:${basePath}`], {
+    // The base is the origin/dev the integration merged last (d78d58b4f, 2026-10-26): nothing of ours after the lease.
+    const base = execFileSync("git", ["show", `d78d58b4f:${basePath}`], {
       cwd: process.cwd(), encoding: "utf8"
     });
     expect(afterLease(source)).toBe(afterLease(base));
@@ -38,7 +39,7 @@ describe("synthesis check request runner wiring", () => {
     const persist = source.indexOf('const persisted = await runnerStage("ANSWER_PERSIST_FAILED"');
     const request = source.indexOf("synthesisCheckRequest: true", persist);
     const settle = source.indexOf("const wonSettlement = await this.#work.settle(", request);
-    const story = source.indexOf("await storyWriter.writeAfterSettle(settled.input)", settle);
+    const story = source.indexOf("await storyWriter.writeAfterSettle(", settle);
     expect(persist).toBeGreaterThanOrEqual(0);
     expect(request).toBeGreaterThan(persist);
     expect(settle).toBeGreaterThan(request);

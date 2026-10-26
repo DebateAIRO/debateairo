@@ -20,7 +20,7 @@ async function tick(recipient: (staffId: string) => Promise<string | null>) {
   let timer: NodeJS.Timeout | undefined;
   try {
     timer = alert.startThreatReportAlerts?.({ repository, mail: { sendTemplated: async mail => { sent.push(mail); } },
-      readRecipientEmail: recipient, everyMs: 1_000 });
+      readRecipientEmail: recipient, everyMs: 1_000 }, { ownIsCurrent: () => true });
     await vi.advanceTimersByTimeAsync(1_000);
     return { sent, completed };
   } finally { if (timer) clearInterval(timer); vi.useRealTimers(); }

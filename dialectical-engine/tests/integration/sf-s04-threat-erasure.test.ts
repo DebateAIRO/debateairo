@@ -192,7 +192,7 @@ describe("S04 threat report erasure database gates", () => {
     vi.useFakeTimers();
     let timer: NodeJS.Timeout | undefined;
     try {
-      timer = closure.startThreatReportErasure({ repository: workerRepository, everyMs: 1_000 });
+      timer = closure.startThreatReportErasure({ repository: workerRepository, everyMs: 1_000 }, { ownIsCurrent: () => true });
       await vi.advanceTimersByTimeAsync(1_000);
       await completed;
       expect(calls).toEqual([[]]);

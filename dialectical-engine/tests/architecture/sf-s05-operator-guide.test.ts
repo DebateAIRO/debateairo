@@ -56,7 +56,8 @@ describe("S05 operator guide", () => {
   });
 
   it("G7 explains that support counts are process memory cleared by restart", () => {
-    const unit = between("**Exactly one API unit.**", "---\n\n## 2. Host preparation");
+    // Merged with origin/dev d78d58b4f (2026-10-26): dev's side-by-side upgrade names the rule "One API serves at a time".
+    const unit = between("**One API serves at a time.**", "---\n\n## 2. Host preparation");
     expect(unit).toMatch(/support[^\n]*counts[^\n]*process(?:'s)? memory/i);
     expect(unit).toMatch(/restart clears them/i);
   });

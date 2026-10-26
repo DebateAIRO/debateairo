@@ -1,5 +1,6 @@
 import type { PostgresThreatReportRepository } from "@debateai/db";
 import type { TemplatedMailChannel } from "../mail-channel.js";
+import { gatedInterval, type ReleaseGate } from "../release-loops.js";
 
 type AlertRepository = Pick<PostgresThreatReportRepository, "claimAlerts" | "completeAlert">;
 export type ThreatReportAlertInputs = Readonly<{
@@ -29,13 +30,12 @@ export async function drainThreatReportAlerts(input: ThreatReportAlertInputs): P
 
 /** A 15-second tick gives three retries inside the one-minute notice target. */
 const THREAT_REPORT_ALERT_EVERY_MS = 15_000;
-export function startThreatReportAlerts(input: ThreatReportAlertInputs): NodeJS.Timeout {
+/** Side-by-side C7: the tick claims alert rows, so it runs only while this process's release is current (`gate`). */
+export function startThreatReportAlerts(input: ThreatReportAlertInputs, gate: ReleaseGate): NodeJS.Timeout {
   let active = false;
-  const timer = setInterval(() => {
+  return gatedInterval(gate, () => {
     if (active) return;
     active = true;
     void drainThreatReportAlerts(input).catch(() => undefined).finally(() => { active = false; });
   }, input.everyMs ?? THREAT_REPORT_ALERT_EVERY_MS);
-  timer.unref();
-  return timer;
 }

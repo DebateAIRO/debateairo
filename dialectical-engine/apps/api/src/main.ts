@@ -1132,8 +1132,8 @@ const threatReportAlertsTimer = startThreatReportAlerts({
     timeoutMs: authPolicy.channel.transportTimeoutMs
   }),
   readRecipientEmail: readThreatReportStaffEmail
-});
-const threatReportErasureTimer = startThreatReportErasure({ repository: threatReportRepository });
+}, releaseWatcher);
+const threatReportErasureTimer = startThreatReportErasure({ repository: threatReportRepository }, releaseWatcher);
 const privateErasure = new PrivateRunErasureCoordinator(
   new PostgresPrivateRunErasureRepository(erasurePool,auditContextHasher),
   runKeyStore,publicationCipher
@@ -1408,8 +1408,8 @@ const SYNTHESIS_CHECK_TICK_MS = 5_000;
 const triggerSynthesisCheckWork = createSingleFlightErasureReconciler(
   () => synthesisCheckWorker.runOnce(), () => console.error("[SYNTHESIS_CHECK_WORK_PENDING]")
 );
-const synthesisCheckTimer = setInterval(triggerSynthesisCheckWork, SYNTHESIS_CHECK_TICK_MS);
-synthesisCheckTimer.unref();
+// Side-by-side C7: the worker claims check requests, so its tick runs only while this release is current.
+const synthesisCheckTimer = gatedInterval(releaseWatcher, triggerSynthesisCheckWork, SYNTHESIS_CHECK_TICK_MS);
 if (publicationJudgeOffFlag !== null) installPublicationJudgeSwitchSignal(process, publicationJudgeSwitch);
 const supportModelReservations = new SupportModelReservationLedger({
   processId: `support-api-${process.pid}`,
@@ -1742,12 +1742,13 @@ api.addHook("preClose",async () => endBecameCurrent?.());
 if (publicationCleanupTimer !== undefined) {
   api.addHook("onClose",async () => clearInterval(publicationCleanupTimer));
 }
-// S05: the support counters live in API memory; one sweep a second drops the expired ones.
+// S05: the support counters live in API memory; one sweep a second drops the expired ones. Gated like every API loop
+// (side-by-side C7): only the current release takes support requests, so only its counters move.
 const SUPPORT_COUNTER_SWEEP_MS = 1_000;
-const supportSweepTimer = setInterval(() => {
+const supportSweepTimer = gatedInterval(releaseWatcher, () => {
   admission.sweep(new Date(), SUPPORT_SWEPT_SCOPES);
   supportLimiter.sweep(Date.now());
-}, SUPPORT_COUNTER_SWEEP_MS).unref();
+}, SUPPORT_COUNTER_SWEEP_MS);
 api.addHook("onClose", async () => clearInterval(supportSweepTimer));
 api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
 api.addHook("onClose",async () => clearInterval(threatReportAlertsTimer));
