@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0123_synthesis_check.sql",
-    "sha256": "2f9b1e93483a68b24e9e3356efbc71029bf1290ff8c6b2a15fe77d7490a77889"
+    "sha256": "6b22dcb38e4fcf141845fe40941b39c0ae2abcddedd79d88c2889550baf24b06"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-111.sql",

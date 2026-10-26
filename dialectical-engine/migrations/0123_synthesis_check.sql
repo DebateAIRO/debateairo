@@ -342,9 +342,8 @@ REVOKE ALL ON serve.synthesis_check_request, serve.synthesis_check_attempt,
   serve.synthesis_check_result, serve.synthesis_check_inheritance,
   serve.synthesis_check_removal_request, serve.synthesis_check_removal_notice,
   identity.synthesis_check_erasure_binding FROM PUBLIC, debateai_runtime;
-GRANT SELECT, INSERT ON serve.synthesis_check_request, serve.synthesis_check_attempt,
-  serve.synthesis_check_result TO debateai_runtime;
-GRANT SELECT ON serve.synthesis_check_inheritance,
+GRANT SELECT, INSERT ON serve.synthesis_check_request, serve.synthesis_check_attempt TO debateai_runtime;
+GRANT SELECT ON serve.synthesis_check_result, serve.synthesis_check_inheritance,
   serve.synthesis_check_removal_request TO debateai_runtime;
 
 REVOKE ALL ON FUNCTION serve.store_synthesis_check_result(uuid,uuid,uuid,uuid,integer,integer,boolean,text,text,jsonb,jsonb,bytea,boolean) FROM PUBLIC;

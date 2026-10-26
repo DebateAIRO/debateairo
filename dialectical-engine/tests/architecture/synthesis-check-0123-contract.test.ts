@@ -58,14 +58,17 @@ describe("0123 synthesis check database contract", () => {
     expect(sql).toContain("spend_source <> 'SYNTHESIS_CHECK' OR (run_id IS NOT NULL AND spend_phase IS NULL AND attempt_id IS NULL)");
   });
 
-  it("0123 leaves direct runtime INSERT only on request, attempt and result; restricted writes use definer functions", async () => {
+  it("0123 leaves direct runtime INSERT only on request and attempt; results and restricted writes use definer functions", async () => {
     const sql = await source();
     const ordinary = sql.match(/GRANT SELECT, INSERT ON ([^;]+) TO debateai_runtime;/u)?.[1] ?? "";
-    for (const table of [sevenTables[0], sevenTables[1], sevenTables[2]]) {
+    for (const table of [sevenTables[0], sevenTables[1]]) {
       expect(ordinary, table).toContain(table);
     }
-    for (const table of [sevenTables[3], sevenTables[4], sevenTables[5]]) expect(ordinary).not.toContain(table);
-    expect(sql).toContain("GRANT SELECT ON serve.synthesis_check_inheritance,");
+    for (const table of [sevenTables[2], sevenTables[3], sevenTables[4], sevenTables[5]]) expect(ordinary).not.toContain(table);
+    // REV-S01-p3 security N1 (t_52f57ef1): a direct INSERT would bypass the writer's one-final-per-synthesis guard.
+    expect(sql).toMatch(/GRANT SELECT ON [^;]*serve\.synthesis_check_result[^;]* TO debateai_runtime;/u);
+    expect(sql).not.toMatch(/GRANT [^;]*INSERT[^;]*serve\.synthesis_check_result[^;]*TO debateai_runtime;/u);
+    expect(sql).toContain("GRANT SELECT ON serve.synthesis_check_result, serve.synthesis_check_inheritance,");
     expect(sql).toContain("serve.synthesis_check_removal_request TO debateai_runtime;");
     expect(sql).not.toContain("GRANT INSERT ON serve.synthesis_check_removal_notice TO debateai_runtime;");
     expect(sql).not.toMatch(/GRANT [^;]*SELECT[^;]*synthesis_check_removal_notice/u);

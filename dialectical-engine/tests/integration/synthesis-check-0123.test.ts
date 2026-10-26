@@ -118,7 +118,7 @@ describe("0123 synthesis check records and runtime boundaries", () => {
       [randomUUID(),resultId,run.runId]))).rejects.toMatchObject({ code: "42501" });
   });
 
-  it("the runtime role inserts and selects a request, an attempt and a sealed result", async () => {
+  it("the runtime role inserts and selects a request and an attempt, and stores a sealed result only through the writer", async () => {
     const run = await seedRun();
     await withRuntime(async (client) => {
       const requestId = randomUUID(), attemptId = randomUUID(), resultId = randomUUID();
@@ -127,9 +127,10 @@ describe("0123 synthesis check records and runtime boundaries", () => {
       await client.query(`INSERT INTO serve.synthesis_check_attempt
         (attempt_id,run_id,answer_id,answer_version,origin,request_id) VALUES($1,$2,$3,1,'SETTLEMENT',$4)`,
         [attemptId,run.runId,run.answerId,requestId]);
-      await client.query(`INSERT INTO serve.synthesis_check_result
-        (result_id,attempt_id,run_id,answer_id,answer_version,synthesis_origin_version,final,failure_code,policy_version,content)
-        VALUES ($1,$2,$3,$4,1,1,true,NULL,$5,'{}'::jsonb)`, [resultId,attemptId,run.runId,run.answerId,policy]);
+      const stored = await client.query(`SELECT serve.store_synthesis_check_result(
+        $1,$2,$3,$4,1,1,true,NULL,$5,'{"verdict":"CLEAR","categories":[]}'::jsonb,NULL,NULL,false) AS stored`,
+        [resultId,attemptId,run.runId,run.answerId,policy]);
+      expect(stored.rows[0]?.stored).toBe(true);
       for (const [table, id, key] of [
         ["synthesis_check_request",requestId,"request_id"], ["synthesis_check_attempt",attemptId,"attempt_id"],
         ["synthesis_check_result",resultId,"result_id"]
@@ -137,6 +138,18 @@ describe("0123 synthesis check records and runtime boundaries", () => {
         expect((await client.query(`SELECT ${key} FROM serve.${table} WHERE ${key}=$1`, [id])).rows).toHaveLength(1);
       }
     });
+  });
+
+  it("the runtime role cannot insert a result row directly, so it cannot forge a second final past the writer's origin guard (REV-S01-p3 security N1)", async () => {
+    const run = await seedRun();
+    await secondVersion(run);
+    const first = await insertAttempt(run, 1), second = await insertAttempt(run, 2);
+    await insertResult(run, first.attemptId);
+    await expect(withRuntime((client) => client.query(`INSERT INTO serve.synthesis_check_result
+      (result_id,attempt_id,run_id,answer_id,answer_version,synthesis_origin_version,final,failure_code,policy_version,content)
+      VALUES ($1,$2,$3,$4,2,2,true,NULL,$5,'{"verdict":"FLAGGED","categories":["HATE_SPEECH"]}'::jsonb)`,
+      [randomUUID(),second.attemptId,run.runId,run.answerId,policy]))).rejects.toMatchObject({ code: "42501" });
+    expect((await query("SELECT count(*)::int AS n FROM serve.synthesis_check_result WHERE answer_id=$1", [run.answerId])).rows[0]?.n).toBe(1);
   });
 
   it("a second final result for the same answer and synthesis origin is refused with 23505 on synthesis_check_result_one_final_per_synthesis, after the run-match and the three carrier guards accepted it", async () => {
