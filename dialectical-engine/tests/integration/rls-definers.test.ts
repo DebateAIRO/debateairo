@@ -2,7 +2,7 @@
  * Row-level security S01, cluster C7, steps S7.2 and S7.3 (PLAN.md S7.2, S7.3, §7; SPEC-v4 R14 F7, R20, R36, R42, T11,
  * X15-X17; DECISIONS D39, D45).
  *
- * S7.2 (R42, D39): the six `rls` functions a T1 login may EXECUTE, called by each of the four T1 logins (T9: the dev
+ * S7.2 (R42, D39): the four `rls` functions a T1 login may EXECUTE, called by each of the four T1 logins (T9: the dev
  * runtime and authorization logins and their production namesakes, provisioned by the product's own provisioners) under
  * A's live credential, under no credential and under each of the seven forged kinds of S3.2-c (R9), with R42's call set
  * built as the reference harness `probes/REQ-FIX-RLS-3/p4-probe.mts` (function `v4`) builds it: the T3 call, one call per
@@ -10,9 +10,7 @@
  * compares `core.run.run_id` (a T3 key), `owns_execution_ref(p_execution_ref)` compares
  * `identity.run_execution_binding.execution_ref` (not a T3 key); the context functions take no parameter; no secret
  * exception (T11). A's and B's values are read as the superuser from their seeded rows. `rls.session_credential_hash()`
- * is EXECUTE-able by no T1 login. V-18 (FIX-S01-p1d) adds `may_name_subscription(p_subscription_id)`, comparing
- * `billing.subscription_event.subscription_id`, and `may_name_card_token(p_token_id)`, comparing
- * `billing.card_token.token_id` (neither a T3 key): B's value is never the context's to name; NULL names nothing (true).
+ * is EXECUTE-able by no T1 login.
  *
  * S7.3 (R20, D45): the 25 owner-role objects PLAN §7 marks "R35 base/head call", each called with the same arguments
  * with row security off (the base emulation of D45: row security disabled on the 110 in-scope tables and
@@ -52,7 +50,7 @@ let A: RlsTestAccount;
 let B: RlsTestAccount;
 let t1: readonly T1Login[];
 /** A's and B's values of D39's compared columns, read as the superuser from their seeded rows. */
-let values: Readonly<Record<"a" | "b", Readonly<{ runId: string; executionRef: string; subscriptionId: string; cardTokenId: string }>>>;
+let values: Readonly<Record<"a" | "b", Readonly<{ runId: string; executionRef: string }>>>;
 /** S7.3's fixture: B is a staff subject; A holds an internal grant funding two runs (one with a live hold). */
 let fixture: Readonly<{
   staffB: string; emailChannelA: string; grantA: string; grantEventA: string; internalRuns: readonly [string, string];
@@ -100,23 +98,17 @@ function r42Functions(): readonly R42Function[] {
     { signature: "rls.owns_run(uuid)", sql: "SELECT rls.owns_run($1::uuid)::text AS v",
       calls: r42Calls([values.b.runId], [values.a.runId], [true]) },
     { signature: "rls.owns_execution_ref(text)", sql: "SELECT rls.owns_execution_ref($1::text)::text AS v",
-      calls: r42Calls([values.b.executionRef], [values.a.executionRef], [false]) },
-    { signature: "rls.may_name_subscription(uuid)", sql: "SELECT rls.may_name_subscription($1::uuid)::text AS v",
-      calls: r42Calls([values.b.subscriptionId], [values.a.subscriptionId], [false]) },
-    { signature: "rls.may_name_card_token(uuid)", sql: "SELECT rls.may_name_card_token($1::uuid)::text AS v",
-      calls: r42Calls([values.b.cardTokenId], [values.a.cardTokenId], [false]) }
+      calls: r42Calls([values.b.executionRef], [values.a.executionRef], [false]) }
   ]);
 }
 
 /**
  * D39's expected result of one call: the context functions return A's own key under A's credential and NULL otherwise;
- * owns_run and owns_execution_ref return false for every call R42 lists (B's values or NULL), under every context; the
- * two may_name functions return false for B's value and true for NULL (it names nothing), under every context.
+ * owns_run and owns_execution_ref return false for every call R42 lists (B's values or NULL), under every context.
  */
-function expected(signature: string, context: Context, call: R42Call): string | null {
+function expected(signature: string, context: Context): string | null {
   if (signature === "rls.context_user_id()") return context.kind === "A" ? A.userId : null;
   if (signature === "rls.context_owner_ref()") return context.kind === "A" ? A.ownerRef : null;
-  if (signature.startsWith("rls.may_name_")) return call.args.every((arg) => arg === null) ? "true" : "false";
   return "false";
 }
 
@@ -138,12 +130,7 @@ beforeAll(async () => {
     const ref = (await database.pool.query<{ ref: string }>(`SELECT execution_ref::text AS ref FROM identity.run_execution_binding
       WHERE user_id = $1 ORDER BY created_at, execution_ref LIMIT 1`, [account.userId])).rows[0]?.ref;
     if (ref === undefined) throw new TypeError("RLS_C7_NO_EXECUTION_BINDING_SEEDED");
-    const subscriptionId = (await database.pool.query<{ id: string }>(`SELECT subscription_id::text AS id
-      FROM billing.subscription_event WHERE owner_ref = $1 ORDER BY seq LIMIT 1`, [account.ownerRef])).rows[0]?.id;
-    const cardTokenId = (await database.pool.query<{ id: string }>(`SELECT t.token_id::text AS id FROM billing.card_token AS t
-      JOIN billing.customer AS c ON c.customer_id = t.customer_id WHERE c.owner_ref = $1 LIMIT 1`, [account.ownerRef])).rows[0]?.id;
-    if (subscriptionId === undefined || cardTokenId === undefined) throw new TypeError("RLS_C7_NO_BILLING_ROWS_SEEDED");
-    return Object.freeze({ runId: account.runId, executionRef: ref, subscriptionId, cardTokenId });
+    return Object.freeze({ runId: account.runId, executionRef: ref });
   };
   values = Object.freeze({ a: await read(A), b: await read(B) });
   fixture = await baseHeadFixture();
@@ -168,7 +155,7 @@ describe("row-level security S01 C7: the rls functions (R42) and the owner-role 
           for (const fn of r42Functions()) {
             for (const call of fn.calls) {
               calls += 1;
-              const want = expected(fn.signature, context, call);
+              const want = expected(fn.signature, context);
               try {
                 const got = (await client.query<{ v: string | null }>(fn.sql, [...call.args])).rows[0]!.v;
                 if (got !== want) {
@@ -180,23 +167,20 @@ describe("row-level security S01 C7: the rls functions (R42) and the owner-role 
               }
             }
           }
-          // Control: the context the calls ran under is the one intended — A's credential makes owns_run(A's run),
-          // owns_execution_ref(A's ref) and the two may_name functions on A's values true, every other context leaves
-          // them false (so a `false` above is not vacuous).
-          const own = (await client.query<{ run: boolean; ref: boolean; subscription: boolean; card: boolean }>(
-            `SELECT rls.owns_run($1::uuid) AS run, rls.owns_execution_ref($2::text) AS ref,
-              rls.may_name_subscription($3::uuid) AS subscription, rls.may_name_card_token($4::uuid) AS card`,
-            [values.a.runId, values.a.executionRef, values.a.subscriptionId, values.a.cardTokenId])).rows[0]!;
+          // Control: the context the calls ran under is the one intended — A's credential makes owns_run(A's run) and
+          // owns_execution_ref(A's ref) true, every other context leaves them false (so a `false` above is not vacuous).
+          const own = (await client.query<{ run: boolean; ref: boolean }>(
+            "SELECT rls.owns_run($1::uuid) AS run, rls.owns_execution_ref($2::text) AS ref",
+            [values.a.runId, values.a.executionRef])).rows[0]!;
           const ownWant = context.kind === "A";
-          if (own.run !== ownWant || own.ref !== ownWant || own.subscription !== ownWant || own.card !== ownWant) {
-            failures.push(`RLS_FAIL ${login.name} control context=${context.kind} owns_run(A)=${own.run} owns_execution_ref(A)=${own.ref} `
-              + `may_name_subscription(A)=${own.subscription} may_name_card_token(A)=${own.card} want=${ownWant}`);
+          if (own.run !== ownWant || own.ref !== ownWant) {
+            failures.push(`RLS_FAIL ${login.name} control context=${context.kind} owns_run(A)=${own.run} owns_execution_ref(A)=${own.ref} want=${ownWant}`);
           }
         });
       }
     }
-    // 4 logins x 9 contexts x (3 + 3 + 5 + 5 + 5 + 5) calls (two zero-parameter functions: t3, all-of-b, all-null each).
-    expect({ calls, failures }).toEqual({ calls: 4 * 9 * (3 + 3 + 5 + 5 + 5 + 5), failures: [] });
+    // 4 logins x 9 contexts x (1 + 1 + 5 + 5) calls (two zero-parameter functions: t3, all-of-b, all-null each).
+    expect({ calls, failures }).toEqual({ calls: 4 * 9 * (3 + 3 + 5 + 5), failures: [] });
   });
 
   it("S7.2-b rls.session_credential_hash() is not EXECUTE-able by any T1 login (has_function_privilege false)", async () => {

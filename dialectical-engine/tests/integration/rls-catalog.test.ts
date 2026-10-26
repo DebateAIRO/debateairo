@@ -59,8 +59,7 @@ const MANIFEST_PATH = fileURLToPath(new URL(
  */
 const ANCHORED_CHECK = /^(?:\((?:owner_ref|user_id) = \( SELECT rls\.context_(?:owner_ref|user_id)\(\) AS context_(?:owner_ref|user_id)\)\)|false|rls\.owns_run\([a-z0-9_]+\)|rls\.owns_execution_ref\([a-z0-9_]+\))$/u;
 /**
- * V-18 (FIX-S01-p1d): the K2 key ANDed with checks on what the row names (a subscription, a card token, a run, a parent
- * row). Its first conjunct is the anchored key, and a conjunction only narrows it, so it is anchored too.
+ * V-18 (FIX-S01-p1d, p1e): the K2 key ANDed with checks on the rows the row names (a run, a parent row). Its first conjunct is the anchored key, and a conjunction only narrows it, so it is anchored too.
  */
 const ANCHORED_NARROWED = /^\(\(owner_ref = \( SELECT rls\.context_owner_ref\(\) AS context_owner_ref\)\) AND .+\)$/su;
 const PARENT_CHECK = /^\(EXISTS \( SELECT 1\n {3}FROM ([a-z0-9_]+\.[a-z0-9_]+) p\n {2}WHERE (.+)\)\)$/su;
@@ -161,14 +160,14 @@ function classSweep(): Promise<Readonly<{ verdicts: ReadonlyMap<string, ClassVer
 }
 
 describe("row-level security S01 C6: the catalog keeps every T1 login inside its own account", () => {
-  it("S6.4-a R15 a verbatim copy of probes/REQ-FIX-RLS-2/policy-reach-v3.sql, run with the 4 T1 logins provisioned, prints texts whose set EQUALS RLS_ALLOW_LIST (37)", async () => {
+  it("S6.4-a R15 a verbatim copy of probes/REQ-FIX-RLS-2/policy-reach-v3.sql, run with the 4 T1 logins provisioned, prints texts whose set EQUALS RLS_ALLOW_LIST (35)", async () => {
     expect(createHash("sha256").update(POLICY_REACH_V3_SQL).digest("hex")).toBe(POLICY_REACH_V3_SHA256);
     const present = (await database.pool.query("SELECT rolname FROM pg_roles WHERE rolname = ANY ($1::text[]) ORDER BY 1",
       [T1_LOGINS])).rows.map((row) => row.rolname as string);
     expect(present).toEqual([...T1_LOGINS].sort());
     const rows = (await database.pool.query(POLICY_REACH_V3_SQL)).rows as { using_expr: string | null; check_expr: string | null }[];
     const texts = [...new Set(rows.flatMap((row) => [row.using_expr, row.check_expr]).filter((text): text is string => text !== null))];
-    expect(RLS_ALLOW_LIST).toHaveLength(37);
+    expect(RLS_ALLOW_LIST).toHaveLength(35);
     expect(texts.sort()).toEqual([...RLS_ALLOW_LIST].sort());
   });
 

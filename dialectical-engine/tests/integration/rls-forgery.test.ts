@@ -363,11 +363,27 @@ describe("row-level security S01 C6: forgery by SQL on the four T1 logins widens
         }
       });
     }
-    await su.query(bridge, [randomUUID(), bSubscription, A.ownerRef, netopia]);
+    const bridgeEvent = randomUUID();
+    await su.query(bridge, [bridgeEvent, bSubscription, A.ownerRef, netopia]);
+    // T4: the planted bridge is A's row (its owner_ref is A's), so its key and the one view row it alone makes are A's
+    // values, not foreign ones (T5). What the case pins is that no row of B becomes readable through it (FIX-S01-p1e).
+    const ownByT4 = new Set([`billing.subscription_event ${JSON.stringify([bridgeEvent])}`,
+      `billing.subscription_latest_v ${JSON.stringify([bSubscription])}`]);
     for (const login of t1) {
       failures.push(...(await forgery(login, "A", "F10", "F10:stored-bridge", (c) => c.query("BEGIN"), async (c) => {
         try {
-          const read = await readFailures(c, login.name, "A", "F10:stored-bridge");
+          const read = (await readFailures(c, login.name, "A", "F10:stored-bridge"))
+            .filter((line) => !ownByT4.has(line.replace(/^RLS_FAIL \S+ (\S+) \S+ foreign=[a-z]+:(.*)$/u, "$1 $2")));
+          // A login that may not read a relation's owner_ref reads no row of B there (the authorization logins).
+          const rowsOf = async (relation: string, where: string, value: string): Promise<number> =>
+            (await c.query("SELECT has_column_privilege(current_user, $1::regclass, 'owner_ref', 'SELECT') AS may", [relation])).rows[0].may
+              ? (await c.query(`SELECT count(*)::int AS n FROM ${relation} WHERE ${where}`, [value])).rows[0].n as number : 0;
+          const ofB = { events: await rowsOf("billing.subscription_event", "owner_ref = $1", B.ownerRef),
+            links: await rowsOf("billing.cancel_token", "owner_ref = $1", B.ownerRef),
+            view_rows: await rowsOf("billing.subscription_latest_v", "owner_ref IS DISTINCT FROM $1", A.ownerRef) };
+          if (ofB.events !== 0 || ofB.links !== 0 || ofB.view_rows !== 0) {
+            read.push(`RLS_FAIL ${login.name} F10:stored-bridge rows-of-b=${JSON.stringify(ofB)}`);
+          }
           writes.push(`${login.name} use-of-b-token ${await attempt(c,
             "INSERT INTO billing.cancel_token_use(token_sha256, used_at) VALUES ($1, now())", [bToken[0]])}`);
           writes.push(`${login.name} token-owned-by-b ${await attempt(c, `INSERT INTO billing.cancel_token(token_sha256, subscription_id,

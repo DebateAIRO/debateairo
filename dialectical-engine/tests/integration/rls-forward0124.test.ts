@@ -53,8 +53,10 @@ const VERIFIER_124 = "lineage/verify-effective-capabilities-124.sql";
 const DRIFT_0124 = `POSTCONDITION_DRIFT ${HEAD}`;
 const TABLES = RLS_IN_SCOPE.filter(({ kind }) => kind === "r").map(({ relation }) => relation);
 const VIEWS = RLS_IN_SCOPE.filter(({ kind }) => kind === "v").map(({ relation }) => relation);
-const FUNCTIONS = ["rls.session_credential_hash()", "rls.context_user_id()", "rls.context_owner_ref()", "rls.owns_run(uuid)", "rls.owns_execution_ref(text)",
-  "rls.may_name_subscription(uuid)", "rls.may_name_card_token(uuid)"];
+const FUNCTIONS = ["rls.session_credential_hash()", "rls.context_user_id()", "rls.context_owner_ref()", "rls.owns_run(uuid)", "rls.owns_execution_ref(text)"];
+/** V-18's guard (FIX-S01-p1e) and the five tables its trigger guard_own_references fires on. */
+const GUARD = "billing.guard_own_references()";
+const GUARDED = ["billing.cancel_token", "billing.charge", "billing.entitlement_event", "billing.subscription_event", "billing.withdrawal_owner_settlement"];
 const POLICIES = ["rls_account", "rls_all_accounts"];
 /** The six amendments of D38 and F-C1-1, hand-copied (relations sorted), as T11 expects them stored. */
 const AMENDMENTS = [
@@ -167,7 +169,7 @@ describe("S1.2 migration 0124 on an empty database", () => {
     ]);
   });
 
-  it("S1.2-T6 (D27, D39, V-18) the seven rls functions, and no other, are the migrator's STABLE definers on pg_catalog, executable as D39 says", async () => {
+  it("S1.2-T6 (D27, D39, V-18) the five rls functions, and no other, are the migrator's STABLE definers on pg_catalog, executable as D39 says", async () => {
     const migrator = (await db.pool.query<{ name: string }>("SELECT current_user AS name")).rows[0]!.name;
     const present = (await db.pool.query<{ signature: string }>(`SELECT p.oid::regprocedure::text AS signature FROM pg_proc p
       JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'rls' ORDER BY 1`)).rows.map(({ signature }) => signature);
@@ -187,6 +189,21 @@ describe("S1.2 migration 0124 on an empty database", () => {
       SELECT has_schema_privilege('debateai_runtime','rls','USAGE') AS runtime,
        (SELECT count(*)::int FROM pg_namespace n,aclexplode(coalesce(n.nspacl,acldefault('n',n.nspowner))) a WHERE n.nspname='rls' AND a.grantee=0) AS public_grants`)).rows[0];
     expect(schema).toEqual({ runtime: true, public_grants: 0 });
+  });
+
+  it("S1.2-T6b (V-18, FIX-S01-p1e) the guard is a migrator definer on pg_catalog that no login may EXECUTE, fired before each INSERT and UPDATE of the five tables", async () => {
+    const migrator = (await db.pool.query<{ name: string }>("SELECT current_user AS name")).rows[0]!.name;
+    const guard = (await db.pool.query(`
+      SELECT pg_get_userbyid(p.proowner)::text AS owner,p.prosecdef AS definer,p.proconfig AS config,
+       coalesce((SELECT jsonb_agg(g.name ORDER BY g.name COLLATE "C") FROM (SELECT DISTINCT CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee)::text END AS name
+         FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE a.privilege_type='EXECUTE' AND a.grantee<>p.proowner) g),'[]'::jsonb) AS executors
+      FROM pg_proc p WHERE p.oid=to_regprocedure($1)`, [GUARD])).rows;
+    expect(guard).toEqual([{ owner: migrator, definer: true, config: ["search_path=pg_catalog"], executors: [] }]);
+    const triggers = (await db.pool.query<{ relation: string; enabled: string; definition: string }>(`
+      SELECT t.tgrelid::regclass::text AS relation,t.tgenabled::text AS enabled,pg_get_triggerdef(t.oid) AS definition
+      FROM pg_trigger t WHERE t.tgfoid=to_regprocedure($1) AND NOT t.tgisinternal ORDER BY 1`, [GUARD])).rows;
+    expect(triggers).toEqual(GUARDED.map((relation) => ({ relation, enabled: "O",
+      definition: `CREATE TRIGGER guard_own_references BEFORE INSERT OR UPDATE ON ${relation} FOR EACH ROW EXECUTE FUNCTION ${GUARD}` })));
   });
 
   it("S1.2-T7 (D29) the marker role cannot log in, inherit, act as superuser or bypass row security, and has no member", async () => {
@@ -217,6 +234,31 @@ describe("S1.2 migration 0124 on an empty database", () => {
       };
       for (const table of TABLES) await moved(`ALTER TABLE ${ident(table)} DISABLE ROW LEVEL SECURITY`, `${table}:relrowsecurity`);
       await moved("ALTER TABLE core.run FORCE ROW LEVEL SECURITY", "core.run:relforcerowsecurity");
+      return missed;
+    });
+    expect(unpinned).toEqual([]);
+  }, 600_000);
+
+  it("S1.2-T8b (R29, V-18) disabling the guard on billing.subscription_event makes the next migrate() refuse 0124, and 0124's digest moves with each guarded table's trigger and the guard's EXECUTE grants", async () => {
+    await db.pool.query("ALTER TABLE billing.subscription_event DISABLE TRIGGER guard_own_references");
+    try {
+      await expect(migrate(db.pool)).rejects.toThrow(DRIFT_0124);
+    } finally {
+      await db.pool.query("ALTER TABLE billing.subscription_event ENABLE TRIGGER guard_own_references");
+    }
+    expect(await outcome(migrate(db.pool))).toEqual({ ok: true });
+    const step = await step0124();
+    const unpinned = await rolledBack(db, async (client) => {
+      const baseline = await step.postconditionEvidence(client);
+      const missed: string[] = [];
+      const moved = async (statement: string, label: string): Promise<void> => {
+        await client.query("SAVEPOINT mutant");
+        await client.query(statement);
+        if (await step.postconditionEvidence(client) === baseline) missed.push(label);
+        await client.query("ROLLBACK TO SAVEPOINT mutant");
+      };
+      for (const table of GUARDED) await moved(`DROP TRIGGER guard_own_references ON ${table}`, `${table}:guard_own_references`);
+      await moved(`GRANT EXECUTE ON FUNCTION ${GUARD} TO debateai_runtime`, "guard:execute");
       return missed;
     });
     expect(unpinned).toEqual([]);

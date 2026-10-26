@@ -60,10 +60,13 @@ login can write — a setting, a role, a function argument — makes the databas
 - A row keyed on its own owner may still NAME an entity of another account that a cross-account reader then acts on for
   that account: a subscription event or cancel link naming another account's subscription let the public cancel page
   cancel that plan (FIX-S01-p1a NEW-2, measured), and a subscription event naming another account's saved card would let
-  a renewal charge it. Since V-18's default the owner predicate of such a table is ANDed with what the row may name: a
-  subscription with no event yet or whose first event is the context's (`rls.may_name_subscription`), a saved card of the
-  context's customer (`rls.may_name_card_token`), a run the context owns (`rls.owns_run`), or a parent row the request
-  login can see (`EXISTS`). `cancelByToken` also refuses a link whose owner is not its subscription's first owner.
+  a renewal charge it. Since V-18's default a row written under an account's context may name only a subscription with no
+  event yet or whose first event is the context's, and only a saved card of the context's customer: the trigger guard
+  `billing.guard_own_references()` on the five tables that name a subscription refuses anything else (42501). It is a
+  trigger, EXECUTE-able by no login, because a function a request login may EXECUTE answers R42's calls, and a
+  "may name" answer is true for an id no row carries (FIX-S01-p1e: two such definers made `rls:proof` print `widened=1`).
+  The owner predicate is also ANDed with a run the context owns (`rls.owns_run`) or a parent row the request login can
+  see (`EXISTS`). `cancelByToken` also refuses a link whose owner is not its subscription's first owner.
   `tests/integration/rls-forgery.test.ts` S6.3-F12 writes each of the ten members, once naming the other account's
   entity (refused) and once naming its own (accepted).
 - A statement on a request login costs one InitPlan per policy evaluation (re-hash and session lookup); measured once

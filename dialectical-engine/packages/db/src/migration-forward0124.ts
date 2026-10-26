@@ -51,9 +51,12 @@ const TABLES=['billing.cancel_token','billing.cancel_token_use','billing.card_to
  'serve.synthesis_round'] as const;
 /** The three in-scope views (R12, D33). */
 const VIEWS=['billing.person_windows_v','billing.subscription_latest_v','core.run_waiting_v'] as const;
-/** The five context functions of schema rls (D27, D39), and the two of V-18 that say what an own row may name. */
-const FUNCTIONS=['rls.context_owner_ref()','rls.context_user_id()','rls.may_name_card_token(uuid)','rls.may_name_subscription(uuid)',
+/** The five context functions of schema rls (D27, D39), and V-18's trigger guard (FIX-S01-p1e). */
+const FUNCTIONS=['billing.guard_own_references()','rls.context_owner_ref()','rls.context_user_id()',
  'rls.owns_execution_ref(text)','rls.owns_run(uuid)','rls.session_credential_hash()'] as const;
+/** The five tables V-18's guard fires on, each by its trigger guard_own_references (FIX-S01-p1e). */
+const GUARDED=['billing.cancel_token','billing.charge','billing.entitlement_event','billing.subscription_event',
+ 'billing.withdrawal_owner_settlement'] as const;
 const MARKER_ROLE='debateai_rls_all_accounts';
 const POLICIES=['rls_account','rls_all_accounts'] as const;
 /**
@@ -79,8 +82,9 @@ const grantee=(oid:string)=>GRANTEE.replaceAll('%s',oid);
 /**
  * R29: for each in-scope table its row-security flag, its FORCE flag and every policy (name, command, roles as sorted
  * names with PUBLIC for oid 0, permissive flag, USING and WITH CHECK as pg_get_expr prints them); the views' options
- * and ACL items; the rls functions whole (owner, SECURITY DEFINER, settings, volatility, definition digest, ACL items);
- * the marker role's attributes. Not the marker's memberships: the provisioners grant it to logins after migrate().
+ * and ACL items; the rls functions and V-18's guard whole (owner, SECURITY DEFINER, settings, volatility, definition digest,
+ * ACL items); the guard's trigger on each guarded table (enabled flag and definition, null when it is gone); the marker
+ * role's attributes. Not the marker's memberships: the provisioners grant it to logins after migrate().
  */
 async function postconditionEvidence(client:PoolClient):Promise<string>{
  const tables=(await client.query(`
@@ -102,11 +106,15 @@ async function postconditionEvidence(client:PoolClient):Promise<string>{
    (SELECT jsonb_agg(g.item ORDER BY g.item COLLATE "C") FROM (SELECT ${grantee('a.grantee')}||':'||a.privilege_type||':'||a.is_grantable::text item FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a) g) acl
   FROM unnest($1::text[]) signature JOIN pg_proc p ON p.oid=to_regprocedure(signature) ORDER BY signature COLLATE "C"`,[FUNCTIONS])).rows;
  if(functions.length!==FUNCTIONS.length)return fail('POSTCONDITION_OBJECTS');
+ const guards=(await client.query(`
+  SELECT relation,t.tgenabled::text enabled,pg_get_triggerdef(t.oid) definition
+  FROM unnest($1::text[]) relation LEFT JOIN pg_trigger t ON t.tgrelid=to_regclass(relation) AND t.tgname='guard_own_references' AND NOT t.tgisinternal
+  ORDER BY relation COLLATE "C"`,[GUARDED])).rows;
  const role=(await client.query(`
   SELECT r.rolname::text name,r.rolcanlogin,r.rolinherit,r.rolsuper,r.rolcreaterole,r.rolcreatedb,r.rolreplication,r.rolbypassrls
   FROM pg_roles r WHERE r.rolname=$1`,[MARKER_ROLE])).rows;
  if(role.length!==1)return fail('POSTCONDITION_OBJECTS');
- return sha(JSON.stringify({tables,views,functions,role}));
+ return sha(JSON.stringify({tables,views,functions,guards,role}));
 }
 
 export async function loadForward0124(anchor:ForwardStepAnchor):Promise<ForwardStepPlan>{
