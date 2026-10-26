@@ -31,6 +31,11 @@
     "db:provision-principals": "tsx apps/runner/src/production-database-principals-cli.ts",
     "keys:rotate-kek": "tsx apps/runner/src/rotate-kek-cli.ts",
     "register:publish-hosted": "tsx apps/runner/src/hosted-register-publish-cli.ts",
+    "settings:check-runner": "tsx apps/runner/src/settings-check-cli.ts",
+    "settings:check-api": "tsx apps/api/src/settings-check-cli.ts",
+    "settings:verdict": "tsx tools/settings-version/cli.ts verdict",
+    "settings:activate": "tsx tools/settings-version/cli.ts activate",
+    "settings:status": "tsx tools/settings-version/cli.ts status",
     "dev:auth:provision-principals": "tsx apps/runner/src/dev-database-principals-cli.ts",
     "dev:auth:generate-secrets": "tsx apps/runner/src/dev-secret-files-cli.ts",
     "dev:auth:seed-register": "tsx apps/runner/src/dev-deployment-register-cli.ts",
@@ -59,6 +64,7 @@
     "billing:withdraw": "tsx apps/api/src/billing/withdraw-cli.ts",
     "billing:refund-done": "tsx apps/api/src/billing/refund-done-cli.ts",
     "billing:check": "tsx apps/api/src/billing/check-cli.ts",
+    "billing:renewal-resume": "tsx apps/api/src/billing/renewal-resume-cli.ts",
     "billing:netopia-sandbox": "tsx tools/billing/netopia-sandbox.ts",
     "compose:env": "tsx packages/register/src/compose-env.ts",
     "job:replay-self-test": "tsx apps/scheduler/src/cli.ts replay-self-test",
@@ -125,6 +131,6 @@
     "tsx": "4.23.11",
     "typescript": "7.0.2",
     "typescript-classic": "npm:typescript@5.9.3",
-    "vitest": "5.0.1"
+    "vitest": "5.0.3"
   }
 }

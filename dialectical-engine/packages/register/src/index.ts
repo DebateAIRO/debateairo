@@ -829,6 +829,11 @@ const bootstrapKeys = [
 ] as const;
 
 export type BootstrapKey = typeof bootstrapKeys[number];
+/**
+ * Side-by-side spec §13: the toolchain rows `register.bootstrap.json` resolves, by name, so the settings
+ * classification (settings-classification.ts) is proved to give each a kind. They are SITE rows: they follow the release.
+ */
+export const BOOTSTRAP_REGISTER_ROW_KEYS: readonly BootstrapKey[] = Object.freeze([...bootstrapKeys]);
 
 const bootstrapSchema = z.object({
   registerVersion: z.literal(1),
@@ -1049,6 +1054,8 @@ export {
   readOperatorCommandEnvironment,
   readSealedCostEnvelopeStatus,
   resolveDeploymentMode,
+  // Side-by-side spec §1: the one check of a configured release key (the practice's settings reuse it).
+  assertReleaseKeyForRegister,
   CostEnvelopesNotSealedError,
   DeploymentModeInvalidError,
   DeploymentModeUnresolvedError,
@@ -1059,6 +1066,7 @@ export {
   loadBillingInvoiceEnvironment,
   loadBillingOperatorEnvironment,
   loadBillingRefundDoneEnvironment,
+  loadBillingRenewalResumeEnvironment,
   loadBillingWithdrawEnvironment,
   loadDeploymentModeSource,
   loadDevelopmentCommandEnvironment,
@@ -1075,6 +1083,7 @@ export {
   parseBillingInvoiceEnvironment,
   parseBillingOperatorEnvironment,
   parseBillingRefundDoneEnvironment,
+  parseBillingRenewalResumeEnvironment,
   parseBillingWithdrawEnvironment,
   parseKeyRotationEnvironment,
   parseLivenessEnvironment,
@@ -1119,6 +1128,7 @@ export {
 export {
   COST_ENVELOPE_POLICY_DEPLOYMENT_REGISTER_ROW,
   COST_ENVELOPE_POLICY_ROW_KEY,
+  COST_ENVELOPE_POLICY_MEMBERS,
   costEnvelopeCeilings,
   costEnvelopeBand,
   costEnvelopePolicyFromValue,
@@ -1140,15 +1150,18 @@ export {
   countryRule,
   declaredRegionRule,
   readCountryPolicy,
+  regionRule,
   type CountryPolicy,
   type CountryPolicyValue,
   type CountryReason,
-  type CountryRule
+  type CountryRule,
+  type RegionRule
 } from "./country-policy.js";
 // Paid plans (spec 2026-09-29 §2.5.1): the plans row and the billing switch.
 export {
   BILLING_PLANS_DEPLOYMENT_REGISTER_ROW,
   BILLING_PLANS_ROW_KEY,
+  BILLING_PLANS_MEMBERS,
   PLAN_IDS,
   billingPlansFromValue,
   planById,
@@ -1201,6 +1214,16 @@ export {
   type QuestionCheckPolicy,
   type QuestionCheckPolicyValue
 } from "./question-check-policy.js";
+
+// Fresh-site estimate (owner rulings 2026-10-22): the estimate's trusted minimum and per-depth starting figures, code-owned.
+export {
+  COST_ESTIMATE_START_POLICY_DEPLOYMENT_REGISTER_ROW,
+  COST_ESTIMATE_START_POLICY_ROW_KEY,
+  costEstimateStartPolicyFromValue,
+  readCostEstimateStartPolicy,
+  type CostEstimateStartPolicy,
+  type CostEstimateStartPolicyValue
+} from "./cost-estimate-start-policy.js";
 // Verdict story (spec 2026-09-26 §9): the OPTIONAL story rows and their readers.
 export {
   STORY_COST_RULING_REF,
@@ -1236,6 +1259,7 @@ export {
 export {
   CALL_CONCURRENCY_LIMITS,
   CALL_CONCURRENCY_POLICY_ROW_KEY,
+  CALL_CONCURRENCY_POLICY_MEMBERS,
   callConcurrencyPolicyFromValue,
   callConcurrencyPolicyRow,
   effectiveCallConcurrency,
@@ -1461,3 +1485,59 @@ export * from "./consumer-recovery-policy.js";
 
 export * from "./password-reset-policy.js";
 export * from "./email-mfa-policy.js";
+export {
+  MIXED_SETTINGS_ROW_MEMBERS,
+  SETTINGS_ROW_KINDS,
+  compareSiteSettings,
+  composeDebateCostEnvelope,
+  debateCallLaneLimits,
+  readSettingsComparisonRows,
+  settingsRowKind,
+  type MixedSettingsRowKey,
+  type SettingsComparisonRow,
+  type SettingsRowKind,
+  type SiteSettingsDifference
+} from "./settings-classification.js";
+export {
+  SETTINGS_CHECK_DETAIL_UNPRINTABLE,
+  SETTINGS_CHECK_LINE_KIND,
+  SETTINGS_CHECKER,
+  isSettingsCheckCode,
+  parseSettingsCheckArguments,
+  readSettingsVersionFacts,
+  runSettingsCheckCommand,
+  runSettingsCheckSteps,
+  settingsCheckUnavailableReason,
+  settingsVersionKindRefusal,
+  settingsCheckLine,
+  settingsCheckRefusalCode,
+  settingsCheckReport,
+  type SettingsCheckHalf,
+  type SettingsCheckReport,
+  type SettingsCheckStep,
+  type SettingsVersionFacts
+} from "./settings-check-report.js";
+export {
+  PREVIEW_LINE_UP_POLICY_ROW_KEY,
+  previewLineUpPolicyFromValue,
+  previewLineUpPolicyRow,
+  readPreviewLineUpPolicy,
+  readSealedPreviewLineUp,
+  sealedPreviewLineUpFromValue,
+  type SealedPreviewLineUp,
+  type SealedPreviewThinkingChoice
+} from "./preview-line-up-policy.js";
+export {
+  SETTINGS_EXEMPT_CEILING_ROW_KEY,
+  readSettingsSeatRefs,
+  settingsGateThinkingCodes,
+  settingsGateTokenCeilingCodes,
+  settingsGateUnreviewedCodes,
+  settingsLineUpEnvironmentCodes,
+  settingsSeatableGateModels,
+  settingsSeatableModels,
+  settingsVersionLineUp,
+  unreviewedSeatRef,
+  type SettingsCallBound,
+  type SettingsSeatableGateModel
+} from "./settings-check-seatable.js";

@@ -18,8 +18,14 @@ them to every user.
 
 ## Where the facts live
 
-All facts are in `PROVIDER_REGISTER` in `apps/ui/lib/legal/pages.ts`. Filling a fact there
-updates all 35 languages at once. A value in square brackets is shown exactly as written and
+All facts are in the catalogue entries in `apps/ui/lib/legal/pages.ts` (`ANTHROPIC_PREVIEW_PROVIDER`,
+`DEEPINFRA_PROVIDER`, `SUPPORT_PROVIDER`, keyed by company in `REVIEWED_PROVIDER_COMPANIES`). Filling a fact there
+updates all 35 languages at once. The choice of rows is not edited by hand (side-by-side spec §13 addition D24,
+owner 2026-10-22: providers only, not the models, listed automatically): the page asks the API
+(`GET /v1/public/ai-providers`) which companies its declared provider targets reach, and shows one row per company,
+no models. A company with no catalogue entry yet shows as an unchecked row headed by its host name; adding its entry
+(and its host in `PROVIDER_COMPANY_HOSTS`, `packages/providers/src/provider-companies.ts`) fills it in.
+A value in square brackets is shown exactly as written and
 means "not confirmed yet". Contact emails become links once the brackets are removed.
 
 | Field | Now | Fill with |

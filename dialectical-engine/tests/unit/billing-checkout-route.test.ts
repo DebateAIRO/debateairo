@@ -73,7 +73,7 @@ describe("P8c POST /v1/billing/checkout", () => {
   });
 
   it("maps each refusal to its status and code, and refuses a body without both consents or a locale", async () => {
-    for (const [status, code] of [[409, "LEGAL_DOCUMENT_STALE"], [409, "QUOTE_EXPIRED"], [409, "COUNTRY_CONFIRMATION_REQUIRED"], [422, "BILLING_ADDRESS_REQUIRED"], [503, "PAYMENT_PROVIDER_UNAVAILABLE"], [404, "NOT_FOUND"]] as const) {
+    for (const [status, code] of [[409, "LEGAL_DOCUMENT_STALE"], [409, "QUOTE_EXPIRED"], [409, "COUNTRY_CONFIRMATION_REQUIRED"], [422, "BILLING_ADDRESS_REQUIRED"], [503, "PAYMENT_PROVIDER_UNAVAILABLE"], [404, "NOT_FOUND"], [403, "REGION_PAYMENT_UNAVAILABLE"], [422, "BILLING_POSTCODE_INVALID"]] as const) {
       const api = harness({ start: async () => { throw new BillingRefusal(status, code); } });
       const response = await api.inject({ method: "POST", url: "/v1/billing/checkout", headers: { ...testSessionHeaders(OWNER, true), "content-type": "application/json" }, payload: JSON.stringify(BODY) });
       expect([response.statusCode, response.json()]).toEqual([status, { error: code, message: code }]);

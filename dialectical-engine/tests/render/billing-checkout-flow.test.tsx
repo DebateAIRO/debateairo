@@ -337,7 +337,10 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
       ["COUNTRY_CONFIRMATION_REQUIRED", 422, "billing.checkout.confirmCountryRequired"],
       ["ACCOUNT_ERASURE_PENDING", 409, "billing.checkout.erasurePending"],
       ["ADMISSION_RATE_LIMITED", 429, "billing.checkout.rateLimited"],
-      ["AGE_CHECK_UNAVAILABLE", 503, "billing.checkout.genericError"]
+      ["AGE_CHECK_UNAVAILABLE", 503, "billing.checkout.genericError"],
+      // Payment region blocks (2026-10-20): checkout start re-checks the full address.
+      ["REGION_PAYMENT_UNAVAILABLE", 403, "billing.checkout.regionUnavailable"],
+      ["BILLING_POSTCODE_INVALID", 422, "billing.checkout.postalCodeInvalid"]
     ] as const) {
       client.startBillingCheckout.mockRejectedValueOnce(new ContractHttpError("SERVER_FAILURE", status, "x", code));
       await remount();
@@ -347,6 +350,15 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
     client.createBillingQuote.mockRejectedValueOnce(new ContractHttpError("UNPROCESSABLE", 422, "x", "BILLING_PHONE_INVALID"));
     await remount();
     expect(text()).toContain(EN["billing.checkout.phoneInvalid"]);
+    // The quote refuses a closed region, or a postal code that does not fit its country, before any price.
+    for (const [code, status, key] of [
+      ["REGION_PAYMENT_UNAVAILABLE", 403, "billing.checkout.regionUnavailable"],
+      ["BILLING_POSTCODE_INVALID", 422, "billing.checkout.postalCodeInvalid"]
+    ] as const) {
+      client.createBillingQuote.mockRejectedValueOnce(new ContractHttpError(status === 403 ? "FORBIDDEN" : "UNPROCESSABLE", status, "x", code));
+      await remount();
+      expect(text(), code).toContain(EN[key]);
+    }
     expect(goToPayment).not.toHaveBeenCalled();
   });
 
@@ -458,7 +470,7 @@ describe("N25b the payment marks under Continue (spec §2.18)", () => {
     expect(group.previousElementSibling?.contains(button("billing.checkout.continueToCard")!)).toBe(true);
   });
 
-  it("shows only the marks whose files are there, and no group when none is given or none is there", async () => {
+  it("shows only the marks it is given, and no group when none is given or none is on", async () => {
     client.createBillingQuote.mockResolvedValue(quote());
     await renderWithMarks({ netopia: true, visa: false, mastercard: false });
     expect(marksImages()).toEqual([["/payment-marks/netopia.svg", "NETOPIA Payments"]]);

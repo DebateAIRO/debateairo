@@ -194,6 +194,9 @@ describe("P16b the summary", () => {
       + " retry again, but at a total the person was never told about (a tax change), so nothing is charged and the plan"
       + " ends after its last retry day unless a later retry prices at the announced total again; there is nothing to fix"
       + " in the tax service, and the person can subscribe again at the new price;");
+    // B2 (NETOPIA answers 2026-10-21, Q15): a refusal other than code 20 is never charged again by itself.
+    expect(text).toContain("REFUSAL_NOT_RETRIED (named after DUNNING_UNPRICED or ENDED_UNPRICED): NETOPIA refused the card"
+      + " for a reason other than missing funds, so it was not charged again; the person was emailed to add a card;");
     expect(text).toContain("subscription 7d0a3b4c-5e6f-4a7b-8c8d-9e0f1a2b3c4d: RENEWAL_BLOCKED, since 2026-11-16");
     expect(text).toContain("WITHDRAWAL_BY_OWNER: a withdrawal over a payment an admin refund touched, refund in NETOPIA's"
       + " admin what the command cannot take back, then settle it with the withdraw command under this list, run as root on"

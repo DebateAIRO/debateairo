@@ -22,7 +22,7 @@ const FUNCTIONS = [
   "staff.complete_threat_report_alert(uuid,uuid,boolean)",
   "identity.read_data_export_threat_reports(uuid,uuid)", "identity.data_export_lease_user(uuid,uuid)"
 ] as const;
-const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0125_${detail}`); };
+const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0127_${detail}`); };
 const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 const exactKeys = (value: unknown, keys: readonly string[]): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)

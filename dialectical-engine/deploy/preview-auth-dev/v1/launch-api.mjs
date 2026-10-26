@@ -19,7 +19,7 @@ export async function launchApi(argv) {
  // Hosted (owner rulings 2026-10-13): the API's https calls go through the loopback egress proxy, before main is imported.
  installHostedEgress(selected.deploymentMode);
  return afterApiListen({binding:{sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,sourceManifestSha256:plan.sourceManifest.sha256,operatorManifestSha256:plan.operatorManifestSha256,contractSha256:source.contractSha256,apiMainSha256:main.sha256},publication:plan.publication,identity:await linuxProcessIdentity(),
-  readSelection:()=>({REGISTER_VERSION:process.env.REGISTER_VERSION,DEBATEAI_DEPLOYMENT_MODE:process.env.DEBATEAI_DEPLOYMENT_MODE}),
+  readSelection:()=>({REGISTER_VERSION:process.env.REGISTER_VERSION,DEBATEAI_DEPLOYMENT_MODE:process.env.DEBATEAI_DEPLOYMENT_MODE,RELEASE_KEY:process.env.RELEASE_KEY}),
   importMain:()=>tsImport(entry,import.meta.url),emit:event=>process.stdout.write(`PREVIEW_API_STARTED ${JSON.stringify(event)}\n`)});
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){try{await launchApi(process.argv.slice(2));}catch{process.stderr.write('PREVIEW_API_STARTUP_REFUSED\n');process.exitCode=1;}}

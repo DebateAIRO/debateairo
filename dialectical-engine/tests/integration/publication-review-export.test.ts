@@ -33,6 +33,7 @@ async function ownerExport(ownerRef = "owner-1", locale = "en") {
   const ownerView = {
     runKeyPresent: async () => true,
     runRemovedByCheck: async () => false,
+    resolveRunRef: async (runId: string) => runId,
     readSynthesisChecks: async () => [],
     readPublicationReviews: (owner: string, run: string, answer: string) => adapter.readPublicationReviews(owner, run, answer),
     readRun: async () => ({ state: "SETTLED", question_line: "Owner question" }),

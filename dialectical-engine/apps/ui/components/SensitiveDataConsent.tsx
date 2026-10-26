@@ -24,12 +24,23 @@ export function isSensitiveDataConsentRefusal(failure: unknown): boolean {
  *
  * `ensureConsent()` resolves `true` when the account has agreed (now or before) and `false`
  * when the person declined or the answer could not be saved. `dialog` is rendered by the caller.
+ *
+ * `returnFocusRef` names where keyboard focus goes when the screen closes and the control that
+ * opened it can no longer hold focus: a press of Start disables Start for as long as the screen is
+ * up, so the browser has already dropped focus to the page. Callers pass their question field, so
+ * declining (or Escape) leaves the person where they can edit the question.
  */
 export function useSensitiveDataConsent({
   catalog,
   locale,
-  client = contractClient
-}: Readonly<{ catalog: MessageCatalog; locale: string; client?: ConsentClient }>): Readonly<{
+  client = contractClient,
+  returnFocusRef
+}: Readonly<{
+  catalog: MessageCatalog;
+  locale: string;
+  client?: ConsentClient;
+  returnFocusRef?: React.RefObject<HTMLElement | null>;
+}>): Readonly<{
   ensureConsent: (options?: Readonly<{ known?: "required" }>) => Promise<boolean>;
   declined: boolean;
   dialog: React.ReactElement | null;
@@ -71,20 +82,28 @@ export function useSensitiveDataConsent({
     settle(true);
   };
 
-  const dialog = open
-    ? <SensitiveDataConsentDialog catalog={catalog} onAgree={agree} onDecline={() => settle(false)} />
-    : null;
+  const dialog = open ? (
+    <SensitiveDataConsentDialog
+      catalog={catalog}
+      onAgree={agree}
+      onDecline={() => settle(false)}
+      returnFocusRef={returnFocusRef}
+    />
+  ) : null;
   return { ensureConsent, declined, dialog };
 }
 
 export function SensitiveDataConsentDialog({
   catalog,
   onAgree,
-  onDecline
+  onDecline,
+  returnFocusRef
 }: Readonly<{
   catalog: MessageCatalog;
   onAgree: () => Promise<void>;
   onDecline: () => void;
+  /** Where focus goes on close when the opener can no longer hold it (see the hook above). */
+  returnFocusRef?: React.RefObject<HTMLElement | null>;
 }>): React.ReactElement {
   const scrimRef = React.useRef<HTMLDivElement | null>(null);
   const dialogRef = React.useRef<HTMLElement | null>(null);
@@ -93,7 +112,7 @@ export function SensitiveDataConsentDialog({
   const [failed, setFailed] = React.useState(false);
   // Esc, the backdrop and "I don't agree" all decline: no dismissal can agree on anyone's behalf.
   useHideOutside(dialogRef);
-  useModalSurface(true, { containerRef: dialogRef, initialFocusRef: agreeRef, onClose: onDecline });
+  useModalSurface(true, { containerRef: dialogRef, initialFocusRef: agreeRef, onClose: onDecline, returnFocusRef });
 
   async function agree(): Promise<void> {
     setBusy(true);

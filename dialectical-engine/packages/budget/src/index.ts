@@ -106,6 +106,7 @@ export {
   decideSharedWall,
   waitingUntil,
   type Admission,
+  type AdmissionHold,
   type Room,
   type ScopeRoom,
   type WaitsFor,

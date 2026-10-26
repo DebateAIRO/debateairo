@@ -36,6 +36,7 @@ import { computeStructuralCeilingBasis } from "@debateai/register";
 import { createProviderDiscoveryResolver } from "../../apps/api/src/provider-discovery.js";
 import type { PreviewBudgetGateSettings } from "../../apps/api/src/preview-budget-estimate.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { testReleaseKey } from "../support/releaseKey.js";
 
 const GLM = "zai-org/GLM-5.3-Flash";
 const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
@@ -142,7 +143,8 @@ function budgetGate(enabled: readonly string[]): PreviewBudgetGateSettings {
     callOutputTokens: { debate: 8192, storyteller: 12_000, storytellerRetry: 24_000, storyChecker: 8192 },
     askProbeModelIds: [GLM, GLM, DEEPSEEK, MIMO, QWEN, HAIKU],
     maxCooldownHoldsPerRun: 2,
-    readUnfinishedRuns: async () => []
+    readUnfinishedRuns: async () => [],
+    termsForVersion: async () => { throw new Error("FIXTURE_HAS_NO_UNFINISHED_DEBATES"); }
   }) as PreviewBudgetGateSettings;
 }
 
@@ -177,7 +179,7 @@ async function askRound(input: Readonly<{ glm: readonly GateStep[]; hosted?: boo
   });
   const settings: RunCreationSettings = {
     ...(input.hosted === true ? {} : { previewProviderTestConfig: config, previewBudgetGate: budgetGate(input.enabled ?? FIVE) }),
-    strangerSampleRate: 0, registerVersion: 11, batteryVersion: "busy-model", settlementWatchHandle: "watch:busy-model",
+    strangerSampleRate: 0, releaseKey: testReleaseKey(11), registerVersion: 11, batteryVersion: "busy-model", settlementWatchHandle: "watch:busy-model",
     resolveDiscoveredPanel,
     resolveEnvelopeBasis: async ({ depthParams, panelSize, backupSequencesProvisioned }) =>
       computeStructuralCeilingBasis({ ...CEILING_TERMS, panelSize, depth: Number(depthParams.depth), backupSequencesProvisioned }),

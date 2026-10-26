@@ -46,6 +46,7 @@ import {
 } from "@/lib/debateHeaderOverflow";
 import { classifyTokenUnlockFailure } from "@/lib/v3/tokenUnlock";
 import { requestFailureMessage } from "@/lib/v3/requestFailure";
+import { announceNewerVersion, newerVersionReasonOf } from "@/lib/v3/releaseWatch";
 import { runFailureMessage } from "@/lib/v3/runFailure";
 import {
   applyRunEvent,
@@ -223,7 +224,8 @@ export function createDebatePageRunEventConsumer(input: DebatePageRunEventConsum
 }
 
 type StreamState = {
-  status: "connecting" | "live" | "reconnecting";
+  /** "offline": stopped for good under the reload note (lib/v3/liveEvents.ts LiveStreamStatus, final fix wave W3). */
+  status: "connecting" | "live" | "reconnecting" | "offline";
   retryInMs?: number;
 };
 
@@ -346,6 +348,18 @@ function findNode(root: DebateNode | null, id: string | null): DebateNode | null
     if (found) return found;
   }
   return null;
+}
+
+/**
+ * The control that stands for `nodeId` in whichever view is showing: its Details button in Tree
+ * or Thread, else the first control on its Tree card. The argument drawer returns focus here when
+ * the button that opened it has left the page — "Open target" switches the view under the drawer.
+ */
+function nodeFocusTarget(nodeId: string): HTMLElement | null {
+  const details = document.getElementById(`canvas-details-${nodeId}`) ?? document.getElementById(`thread-details-${nodeId}`);
+  if (details !== null) return details;
+  const card = document.querySelector(`[data-node-id="${nodeId.replace(/["\\]/g, "\\$&")}"]`);
+  return card?.querySelector<HTMLElement>("button:not([disabled]), a[href]") ?? null;
 }
 
 function hasHighPriorityScoringIssue(scoring: NodeScoringPayload): boolean {
@@ -740,6 +754,11 @@ export default function DebatePageClient({
   // each reconnect replays the run's history, and history is applied once.
   const liveGateRef = useRef(createLiveEventGate());
   const answerRef = useRef<Answer | null>(initialAnswer);
+  // Side-by-side C9 (controller ruling (h)): the run_ref of the run projection the page last read. After a re-admission
+  // GET /v1/runs/<old id> answers with the NEW run's projection, so a page opened from an old link learns the newest run
+  // here; everything that acts on the debate (the stream, publication, deletion and their step-up target) names it.
+  // Kept with the id it was read for, so a page reused for another debate never acts on the previous one's run.
+  const [projectionRunRef, setProjectionRunRef] = useState<Readonly<{ forId: string; runRef: string }> | null>(null);
   const [synthesisDraft, setSynthesisDraft] = useState<SynthesisDraft | null>(() =>
     activeSynthesisDraft(initialDebate)
   );
@@ -777,6 +796,7 @@ export default function DebatePageClient({
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<number | null>(null);
   const canvasElRef = useRef<HTMLDivElement | null>(null);
+  const drawerReturnFocusRef = useRef<HTMLElement | null>(null);
   const debateHeaderRef = useRef<HTMLElement | null>(null);
   const debateHeaderIdentityRef = useRef<HTMLDivElement | null>(null);
   const debateHeaderClaimRef = useRef<HTMLDivElement | null>(null);
@@ -814,6 +834,7 @@ export default function DebatePageClient({
       });
       if (privateDeletionRef.current!==null || removedByCheckRef.current) return;
       seenRunRef.current = true;
+      if (bundle.run !== null) setProjectionRunRef(Object.freeze({ forId: id, runRef: bundle.run.run_ref }));
       setReadQuestionLocale(questionLocaleOf(bundle.questionLanguage?.tag, locale));
       const checking = bundle.kind === "loading" && bundle.run.state === "SETTLED"
         && bundle.run.synthesis_check === "CHECKING";
@@ -880,6 +901,14 @@ export default function DebatePageClient({
         }
         if (removedByCheckRef.current) return;
       }
+      // Side-by-side spec §7 (final fix wave W1): an answer this build cannot read (INVALID_RESPONSE) or one a newer
+      // release made (MADE_BY_NEWER_RELEASE) is the reload note's to tell: no DEBATE_READ banner beside it, and the
+      // page keeps what it already shows. Announced here too, so the note shows whichever client made the read.
+      const newerVersion = newerVersionReasonOf(exc);
+      if (newerVersion !== null) {
+        announceNewerVersion(newerVersion);
+        return;
+      }
       heldRef.current = false;
       setHeld(false);
       setDebate(null);
@@ -914,6 +943,8 @@ export default function DebatePageClient({
   const debateTerminal = debate
     ? isComplete(debate.status) || (debate.status || "").toLowerCase() === "failed"
     : false;
+  // Side-by-side C9 (ruling h): the run every action names — the served answer's, else the projection's, else the URL's.
+  const actingRunRef = answer?.run_ref ?? (projectionRunRef?.forId === id ? projectionRunRef.runRef : null) ?? id;
 
   useEffect(() => {
     if (publicMode) return;
@@ -1029,7 +1060,7 @@ export default function DebatePageClient({
     if (publicMode) return;
     if (privateDeletionStatus!==null) return;
     if (held || removedByCheck) return;
-    const runRef = answerRef.current?.run_ref ?? id;
+    const runRef = actingRunRef;
 
     const consume = createDebatePageRunEventConsumer({
       runRef,
@@ -1063,6 +1094,12 @@ export default function DebatePageClient({
         })
         .catch((failure) => {
           if (!active) return;
+          // Final fix wave W1: the reload note tells this one; no "replay unavailable: INVALID_RESPONSE" line.
+          const newerVersion = newerVersionReasonOf(failure);
+          if (newerVersion !== null) {
+            announceNewerVersion(newerVersion);
+            return;
+          }
           setHonestyActionState(
             failure instanceof ContractHttpError
               ? t(debateChromeCatalog, "debateChrome.error.recordedReplayUnavailableWithCode", {
@@ -1098,7 +1135,7 @@ export default function DebatePageClient({
       },
       gate: liveGateRef.current
     });
-  }, [answer?.run_ref,composeCatalog,debateChromeCatalog,debateTerminal,held,id,privateDeletionStatus,refresh,removedByCheck]);
+  }, [actingRunRef,answer?.run_ref,composeCatalog,debateChromeCatalog,debateTerminal,held,privateDeletionStatus,refresh,removedByCheck]);
 
   // Honesty surfaces: the execution-ledger digest rides every settled answer.
   useEffect(() => {
@@ -1600,14 +1637,17 @@ export default function DebatePageClient({
     );
   }
   if (!debate) {
+    // Final fix wave W3: once the stream is offline for good, the reload note speaks; no progress line stays under it.
     return (
       <div className="screen scroll">
         <div className="screenInner narrow">
-          <p className="muted" role="status">
-            {initialPending
-              ? localizedPendingProgressCopy(live, streamState, debateChromeCatalog, locale)
-              : t(debateChromeCatalog, "debateChrome.loading")}
-          </p>
+          {streamState.status === "offline" ? null : (
+            <p className="muted" role="status">
+              {initialPending
+                ? localizedPendingProgressCopy(live, streamState, debateChromeCatalog, locale)
+                : t(debateChromeCatalog, "debateChrome.loading")}
+            </p>
+          )}
         </div>
       </div>
     );
@@ -1788,9 +1828,12 @@ export default function DebatePageClient({
       {/* ---- also raised, not debated (owner; the public page shows it in its overview) ---- */}
       {publicMode ? null : <AlsoRaisedList view={storyLocaleReady ? mapView : null} catalog={storyCatalog} locale={storyLocale} />}
 
+      {/* The reference design clips this panel to one pixel (globals.css
+          `.debateView > .scoringInsightsPanel`), so nobody can see it; `inert` keeps its summary
+          and buttons from being invisible Tab stops. Un-clip it and drop `inert` together. */}
       <ScoringErrorBoundary catalog={miscCatalog}>
         {scoringInsightsExpandable ? (
-          <details className="scoringInsightsPanel">
+          <details className="scoringInsightsPanel" inert>
             <summary className="scoringInsightsSummary">
               <span className="progressLabel">{t(debateChromeCatalog, "debateChrome.scoring.insights")}</span>
               <span className="progressCount">{scoringVisibility.title}</span>
@@ -1839,6 +1882,7 @@ export default function DebatePageClient({
           </details>
         ) : (
           <section
+            inert
             className="scoringInsightsPanel scoringInsightsPanelCompact"
             aria-label={t(debateChromeCatalog, "debateChrome.scoring.insights")}
             data-scoring-insights-compact="true"
@@ -2043,7 +2087,11 @@ export default function DebatePageClient({
           currentUserFeedback={currentUserFeedbackByNodeId.get(detailNode.id)}
           lifecycleDecision={lifecycleDecisionByNodeId.get(detailNode.id)}
           token={publicMode ? null : actionToken}
-          onClose={() => setDetailNodeId(null)}
+          onClose={() => {
+            drawerReturnFocusRef.current = nodeFocusTarget(detailNode.id);
+            setDetailNodeId(null);
+          }}
+          returnFocusRef={drawerReturnFocusRef}
           {...(publicMode
             ? {}
             : { onChallenge: (anchor: HTMLElement, text: string) => openChallenge(detailNode, anchor, text) })}
@@ -2148,7 +2196,7 @@ export default function DebatePageClient({
       ) : null}
 
       {debate && !publicMode ? <PublicationControl
-        runId={answer?.run_ref ?? id}
+        runId={actingRunRef}
         onPrivateDeletion={purgePrivateDebate}
         onRemovedByCheck={() => { void contractClient.takeRemovalNotice().then((taken) => {
           if (taken.notice) showRemovalNotice();

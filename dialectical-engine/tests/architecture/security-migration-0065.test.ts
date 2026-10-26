@@ -572,6 +572,8 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
     const files = await migrationFiles();
     const plan = await loadMigrationPlan();
     const migrateSource = await nativeAuditMigrateSource();
+    // Side-by-side §5 (A6): the reviewed migrator includes its per-step transaction module.
+    const transactionSource = await readFile(new URL("../../packages/db/src/migration-transaction.ts", import.meta.url), "utf8");
     const unguardedTables: string[] = [];
     const unguardedIndexes: string[] = [];
     const classifiedTables: string[] = [];
@@ -582,13 +584,13 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
           const relation = /^\s*CREATE\s+TABLE\s+([^\s(]+)/iu.exec(line)?.[1];
           if (relation !== undefined && NATIVE_TABLE_SITES[name]?.includes(relation)) {
             // Exact15 table sites, including one pre107 cohort; no standalone replay or reseed.
-            expect(auditMigrationReplaySafety(`migrations/${name}`, source, { plan, migrateSource })).toEqual([]);
+            expect(auditMigrationReplaySafety(`migrations/${name}`, source, { plan, migrateSource, transactionSource })).toEqual([]);
             classifiedTables.push(`${name}:${relation}`);
           } else unguardedTables.push(name);
         }
         if (/^\s*CREATE\s+(UNIQUE\s+)?INDEX\s+/iu.test(line) && !/IF\s+NOT\s+EXISTS/iu.test(line)) {
           if (name === "0105_backup_email_verification.sql" && line === "CREATE UNIQUE INDEX backup_email_one_pending ON identity.backup_email_control(user_id) WHERE stage='EMAIL_REQUIRED';") {
-            expect(auditMigrationReplaySafety(`migrations/${name}`, source, { plan, migrateSource })).toEqual([]);
+            expect(auditMigrationReplaySafety(`migrations/${name}`, source, { plan, migrateSource, transactionSource })).toEqual([]);
           } else unguardedIndexes.push(name);
         }
       }
@@ -602,12 +604,14 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
     const files = await migrationFiles();
     const plan = await loadMigrationPlan();
     const migrateSource = await nativeAuditMigrateSource();
+    // Side-by-side §5 (A6): the reviewed migrator includes its per-step transaction module.
+    const transactionSource = await readFile(new URL("../../packages/db/src/migration-transaction.ts", import.meta.url), "utf8");
     expect(plan.manifest.order).toHaveLength(128);
     // PR-54, PR-58: dev's 0110, then the forward chain after it (0111, NETOPIA), each declared by its own manifests
     // (migrations/lineage/README.md).
     expect(files).toEqual([...plan.manifest.order, plan.forward108.name, plan.forward110.name, ...plan.forwardChain.map((step) => step.name)].sort());
     for (const name of ["0104_password_only_reset.sql", "0105_backup_email_verification.sql", "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"]) {
-      expect(auditMigrationReplaySafety(`migrations/${name}`, plan.sources.get(name)!.sql, { plan, migrateSource })).toEqual([]);
+      expect(auditMigrationReplaySafety(`migrations/${name}`, plan.sources.get(name)!.sql, { plan, migrateSource, transactionSource })).toEqual([]);
     }
     const byPrefix = new Map<string, string[]>();
     for (const name of files) byPrefix.set(name.slice(0, 4), [...(byPrefix.get(name.slice(0, 4)) ?? []), name]);
@@ -627,8 +631,9 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
     // prices (spec 2026-10-05 §2.16.6), then role rotation (spec 2026-10-11 Part 3), then the data export (V-41), then the
     // mail-locale step (S01-C05), then the debate shape's map (spec 2026-10-12 §3.4), then the language check's site cost
     // (spec 2026-10-13), then the reclaim resume (spec 2026-10-14), then the reply measures (0120, spec 2026-10-15), then
-    // the engine verdict (0121, spec 2026-10-15 engine redesign R2), then the engine's map answer step (0122), last (spec
-    // 2026-10-15 engine redesign R3).
+    // the engine verdict (0121, spec 2026-10-15 engine redesign R2), then the engine's map answer step (0122, spec
+    // 2026-10-15 engine redesign R3), then the side-by-side releases (0123, spec 2026-10-21 side-by-side uploads), then the
+    // settings activation (0124), last (side-by-side spec §13).
     expect(plan.forwardChain.map((step) => step.name)).toEqual([
       "0111_billing_netopia.sql",
       "0112_auth_db_batch.sql",
@@ -642,6 +647,8 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
       "0120_reply_measures.sql",
       "0121_engine_verdict.sql",
       "0122_engine_map_check.sql",
+      "0123_side_by_side_releases.sql",
+      "0124_settings_activation.sql",
       "0125_synthesis_check.sql",
       "0126_publication_review.sql",
       "0127_threat_reports.sql",

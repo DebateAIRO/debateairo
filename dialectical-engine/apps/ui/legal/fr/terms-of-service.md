@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: En bref
-eyebrow: CONDITIONS D’UTILISATION · v2.4 · PRISE D’EFFET 12 OCTOBRE 2026
+eyebrow: CONDITIONS D’UTILISATION · v2.5 · PRISE D’EFFET 12 OCTOBRE 2026
 title: Ce que vous acceptez
 lede: Le contrat entre vous et DMS Merchandise Shop S.R.L., en termes clairs. Dix-neuf sections et l’annexe A — faites défiler jusqu’à la fin.
-endMarker: FIN DES CONDITIONS · v2.4
+endMarker: FIN DES CONDITIONS · v2.5
 bodyLabel: Texte des Conditions d’utilisation
 annexTitle: Annexe A — Conditions régionales
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 DROIT APPLICABLE
 -->
 
-**Version 2.4 · Effective 12 octobre 2026 · Versions précédentes sur dezbatere.ro/terms/versions · Langue : français.**
+**Version 2.5 · Effective 12 octobre 2026 · Versions précédentes sur dezbatere.ro/terms/versions · Langue : français.**
 
 **In short.** Vous devez avoir au moins 18 ans. Dialectical Engine construit des arguments à l’aide de modèles d’IA et tout ce qu’il génère peut être erroné — il ne s’agit pas d’un conseil. Vos débats sont privés, sauf si vous les publiez ; si vous les publiez, tout le monde peut les lire. Le texte que vous soumettez est transmis aux fournisseurs d’IA inscrits dans notre Registre des fournisseurs et n’est pas utilisé pour entraîner des modèles. Signalez tout contenu illicite à support@dezbatere.ro, que vous ayez ou non un compte. Le droit roumain s’applique, mais les protections locales dont vous bénéficiez en tant que consommateur demeurent acquises.
 
@@ -213,7 +213,11 @@ Dialectical Engine propose une formule gratuite. Une formule **Premium** payante
 
 **Échecs de paiement.** En cas d’échec d’un paiement, nous le réessayons pendant 7 jours et vous avertissons par e-mail avant de rétrograder votre compte vers la formule gratuite. Nous ne supprimons pas vos débats en raison d’un échec de paiement.
 
-**Taxes et bénéficiaire de votre paiement.** Les prix incluent la TVA, la TPS ou la taxe sur les ventes, selon votre lieu de résidence, ce qui est indiqué avant votre paiement. Les paiements par carte sont traités par NETOPIA Payments (netopia-payments.com). Le vendeur est DMS Merchandise Shop S.R.L., qui établit votre facture et demeure responsable du service lui-même et des présentes Conditions.
+**Taxes et bénéficiaire de votre paiement.** Les prix incluent la TVA, la TPS ou la taxe sur les ventes, selon votre lieu de résidence, ce qui est indiqué avant votre paiement. Le vendeur est DMS Merchandise Shop S.R.L., qui établit votre facture et demeure responsable du service lui-même et des présentes Conditions.
+
+**Moyens de paiement.** Vous payez par carte. Nous acceptons Visa et Mastercard ; nous n’acceptons pas American Express. Les paiements par carte sont traités par NETOPIA Payments (netopia-payments.com), et le numéro complet de votre carte ne nous parvient jamais.
+
+**Livraison.** Dialectical Engine est un service en ligne : rien ne vous est expédié. Les fonctionnalités de votre formule payante sont disponibles dans votre compte dès que votre paiement est confirmé.
 
 **Rétrofacturations.** Si vous contestez une opération auprès de l’émetteur de votre carte, nous pouvons suspendre les fonctionnalités payantes pendant le règlement du litige. Nous ne facturons aucuns frais à ce titre.
 
@@ -235,7 +239,7 @@ Nous vous informons à l’avance, sur un support durable, de la modification et
 
 **Modifications des présentes Conditions.** Nous pouvons modifier les présentes Conditions pour les mêmes types de motifs. Pour les modifications qui ne réduisent pas vos droits, nous publions la nouvelle version avec un résumé des changements et vous envoyons un e-mail au moins **30 jours** avant son entrée en vigueur ; la poursuite de l’utilisation de Dialectical Engine après cette date vaut acceptation et vous pouvez clôturer votre compte avant celle-ci. Pour les modifications qui réduisent vos droits — notamment les hausses de prix d’une formule existante, les diminutions de limites, la suppression de fonctionnalités, les nouvelles utilisations de votre contenu ou les modifications relatives à la responsabilité, au droit applicable ou au règlement des litiges —, nous vous demandons d’accepter expressément la nouvelle version lors de votre prochaine connexion et la modification ne s’applique que pour l’avenir. Nous n’appliquons jamais une modification rétroactivement et n’utilisons jamais la présente section pour modifier, pendant sa durée, l’essence de ce pour quoi vous avez payé sans vous offrir une possibilité de résiliation. Les versions antérieures restent disponibles à l’adresse dezbatere.ro/terms/versions.
 
-La version 2.4 a remplacé la version 2.3 : elle ajoute la vérification des questions, qui lit chaque question avant le début d’un débat, en refuse certaines et conserve, pour que notre équipe la lise, chaque question refusée qui menace, planifie ou demande si ou comment nuire à une autre personne ou à d’autres personnes, nommées ou non, y compris par une attaque contre des personnes non nommées, ou qui demande comment fabriquer des armes, des explosifs, des poisons ou des drogues ou comment soutenir un acte terroriste, ou qui en fait l’apologie (sections 7, 8, 10 et 11) ; la vérification qui lit la synthèse de chaque débat terminé, l’approbation dont un débat marqué a besoin avant de pouvoir être publié, et les débats que cette vérification supprime (sections 5, 8, 9, 10 et 11) ; ce que le chat d’aide envoie au modèle Claude d’Anthropic, le fait qu’il ne conserve rien de ce que vous écrivez et n’ouvre aucun dossier, et le fait que son bouton « Parler à une personne » affiche notre adresse d’assistance (sections 8 et 10) ; et des règles de la section 7 qui interdisent le discours de haine de toute nature, les instructions de fabrication d’armes ou de drogues, le contenu encourageant le suicide ou le fait de nuire à autrui, et l’insulte religieuse, et indiquent quelles questions ne font pas commencer un débat.
+La version 2.5 a remplacé la version 2.4 : elle ajoute la vérification des questions, qui lit chaque question avant le début d’un débat, en refuse certaines et conserve, pour que notre équipe la lise, chaque question refusée qui menace, planifie ou demande si ou comment nuire à une autre personne ou à d’autres personnes, nommées ou non, y compris par une attaque contre des personnes non nommées, ou qui demande comment fabriquer des armes, des explosifs, des poisons ou des drogues ou comment soutenir un acte terroriste, ou qui en fait l’apologie (sections 7, 8, 10 et 11) ; la vérification qui lit la synthèse de chaque débat terminé, l’approbation dont un débat marqué a besoin avant de pouvoir être publié, et les débats que cette vérification supprime (sections 5, 8, 9, 10 et 11) ; ce que le chat d’aide envoie au modèle Claude d’Anthropic, le fait qu’il ne conserve rien de ce que vous écrivez et n’ouvre aucun dossier, et le fait que son bouton « Parler à une personne » affiche notre adresse d’assistance (sections 8 et 10) ; et des règles de la section 7 qui interdisent le discours de haine de toute nature, les instructions de fabrication d’armes ou de drogues, le contenu encourageant le suicide ou le fait de nuire à autrui, et l’insulte religieuse, et indiquent quelles questions ne font pas commencer un débat.
 
 ## 15. Responsabilité
 

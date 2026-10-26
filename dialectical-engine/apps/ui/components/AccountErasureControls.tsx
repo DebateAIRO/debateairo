@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ContractHttpError,
   type ContractClient
@@ -87,6 +87,22 @@ export function AccountErasureControls({
   const [paidPlanLive, setPaidPlanLive] = useState(false);
   const confirmationPhrase = t(catalog, "settings.erasure.confirmationPhrase");
   const confirmed = confirmationPhraseMatches(confirmation, confirmationPhrase, locale);
+  // Cancel on the security check, a scheduled deletion and its cancellation each remove (or disable) the focused
+  // control: focus goes back to the control that started the step, or to the card's heading when it is gone.
+  const heading = useRef<HTMLHeadingElement>(null);
+  const opener = useRef<HTMLElement | null>(null);
+  const returnFocus = useRef(false);
+  useEffect(() => {
+    if (!returnFocus.current || busy) return;
+    returnFocus.current = false;
+    const back = opener.current;
+    if (back && back !== document.body && back.isConnected && !back.matches(":disabled")) back.focus();
+    else heading.current?.focus();
+  });
+  function rememberOpener(): void {
+    const focused = document.activeElement;
+    opener.current = focused instanceof HTMLElement ? focused : null;
+  }
 
   useEffect(() => {
     if (client.getBillingSubscription === undefined) return;
@@ -120,6 +136,7 @@ export function AccountErasureControls({
   async function schedule(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (!confirmed || busy) return;
+    rememberOpener();
     setConfirming(true);
   }
   async function scheduleConfirmed(result:ConfirmedSecurityAction):Promise<void> {
@@ -132,6 +149,7 @@ export function AccountErasureControls({
         : client.scheduleAccountErasure(grant.token));
       setStatus(scheduled);
       setConfirming(false);
+      returnFocus.current = true;
       setConfirmation("");
       setDeletePublicDebates(false);
       setMessage(t(catalog, "settings.erasure.scheduled"));
@@ -144,6 +162,7 @@ export function AccountErasureControls({
 
   async function cancel(): Promise<void> {
     if (busy) return;
+    rememberOpener();
     setBusy(true);
     setMessage(null);
     try {
@@ -155,6 +174,7 @@ export function AccountErasureControls({
     } catch {
       setMessage(t(catalog, "settings.erasure.cancelFailed"));
     } finally {
+      returnFocus.current = true;
       setBusy(false);
     }
   }
@@ -165,7 +185,7 @@ export function AccountErasureControls({
 
   return (
     <section className="setCard setCardDanger" aria-labelledby="account-deletion-heading">
-      <h2 className="setCardTitle" id="account-deletion-heading">
+      <h2 className="setCardTitle" id="account-deletion-heading" ref={heading} tabIndex={-1}>
         {t(catalog, "settings.erasure.title")}
       </h2>
       <p className="setCardHint">
@@ -253,7 +273,7 @@ export function AccountErasureControls({
             </button>
           </div>
         </form>
-        {confirming?<SecurityConfirmation catalog={authCatalog} client={client} authorization={{action:'DELETE_ACCOUNT'}} disabled={!confirmed} onError={failure=>setMessage(failureMessage(failure,catalog))} onConfirmed={scheduleConfirmed} onCancel={()=>setConfirming(false)}/>:null}</div>
+        {confirming?<SecurityConfirmation catalog={authCatalog} client={client} authorization={{action:'DELETE_ACCOUNT'}} disabled={!confirmed} onError={failure=>setMessage(failureMessage(failure,catalog))} onConfirmed={scheduleConfirmed} onCancel={()=>{returnFocus.current=true;setConfirming(false);}}/>:null}</div>
       ) : null}
       {message ? <p className="setStatus" role="status">{message}</p> : null}
     </section>

@@ -121,11 +121,14 @@ export type ComparingJudgesStepResult = Readonly<{
 }>;
 
 /**
- * The stops that end this copy of the debate (`run-keep-alive.ts`) and a call the debate's stopped lane refused unsent
- * (`call-scheduler.ts`): they leave the judging step as they came, as A14's `pointInvestigationFailureOutcome` does
- * (pre-flight PF-R2b3.9). Recorded as a failed judge, a lane stop would be reused by a resumed copy and never asked.
+ * The stops that end this copy of the debate (`run-keep-alive.ts`; side-by-side spec §4 adds a retiring release's
+ * RUNNER_RETIRING) and a call the debate's stopped lane refused unsent (`call-scheduler.ts`): they leave the judging
+ * step as they came, as A14's `pointInvestigationFailureOutcome` does (pre-flight PF-R2b3.9). Recorded as a failed
+ * judge, a lane stop would be reused by a resumed copy and never asked.
  */
-const ENDS_THIS_COPY: ReadonlySet<string> = new Set(["RUNNER_CLAIM_LOST", "RUNNER_TIME_LIMIT_REACHED", CALL_LANE_STOPPED]);
+const ENDS_THIS_COPY: ReadonlySet<string> = new Set([
+  "RUNNER_CLAIM_LOST", "RUNNER_TIME_LIMIT_REACHED", "RUNNER_RETIRING", CALL_LANE_STOPPED
+]);
 export function endsThisCopy(error: unknown): boolean {
   const code = (error as Readonly<{ code?: unknown }> | null)?.code;
   return typeof code === "string" && ENDS_THIS_COPY.has(code);

@@ -258,21 +258,36 @@ describe("M7 · ONE check over both money rows: the day must hold one full run p
 
 describe("M7 · both boots run the one check, on the rows they already read", () => {
   it("the runner builds its guard from costEnvelopeGuardPolicy over both rows", async () => {
+    // Side-by-side spec §13 (S6): one guard per settings version, built by the one loader (run-settings.ts) both runner
+    // compositions boot through, over the composed envelope (the version's per-run members, the site's day and band)
+    // and the version's own story policy. main.ts still reads the site's money row (S14: through the site reads it shares
+    // with the practice and check-version, readRunnerSiteContext) and builds no guard itself.
     const main = await readFile("apps/runner/src/main.ts", "utf8");
-    expect(main).toContain("policy: costEnvelopeGuardPolicy(");
-    expect(main).toContain("await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION)");
-    expect(main.split("new CostEnvelopeGuard(")).toHaveLength(2);
-    const guard = main.slice(main.indexOf("new CostEnvelopeGuard("), main.indexOf("const providerTopology"));
-    expect(guard).toContain("costEnvelopeGuardPolicy(");
-    expect(guard).toContain("storyPolicy");
+    const loader = await readFile("apps/runner/src/run-settings.ts", "utf8");
+    expect(main).toContain("await readRunnerSiteContext({ pool, environment, moneyInFlight })");
+    const siteReads = loader.slice(loader.indexOf("export async function readRunnerSiteContext("), loader.indexOf("export async function declaredContractHashRefusals("));
+    expect(siteReads).toContain("await readCostEnvelopePolicy(pool, environment.REGISTER_VERSION)");
+    expect(main).not.toContain("new CostEnvelopeGuard(");
+    expect(loader.split("new CostEnvelopeGuard(")).toHaveLength(2);
+    const guard = loader.slice(loader.indexOf("new CostEnvelopeGuard("), loader.indexOf("const loaded: RunnerVersionSettings"));
+    expect(guard).toContain("policy: costEnvelopeGuardPolicy(debateEnvelope, storyPolicy),");
+    expect(loader).toContain("composeDebateCostEnvelope(siteCostEnvelopePolicy, await readCostEnvelopePolicy(pool, version))");
+    expect(loader).toContain("const storyPolicy = await readStoryPolicyFromRegister(pool, version)");
   });
 
   it("the API builds its guard from costEnvelopeGuardPolicy over both rows, inside the boot step", async () => {
+    // Side-by-side spec §13 (S9): one guard per settings version, built by the API's one admission loader
+    // (admission-settings.ts) inside its "cost-envelope-policy" stage, over the composed envelope (the version's per-run
+    // members, the site's day and band) and the version's own story policy. main.ts reads the site's money row only.
     const main = await readFile("apps/api/src/main.ts", "utf8");
-    expect(main.split("new CostEnvelopeGuard(")).toHaveLength(2);
-    const step = main.slice(main.indexOf('boot.run("cost-envelope-policy"'), main.indexOf('boot.run("product-role-policy"'));
-    expect(step).toContain("readCostEnvelopePolicy(pool, environment.REGISTER_VERSION)");
-    expect(step).toContain("readStoryPolicyFromRegister(pool, environment.REGISTER_VERSION)");
-    expect(step).toContain("costEnvelopeGuardPolicy(runPolicy, storyPolicy)");
+    const loader = await readFile("apps/api/src/admission-settings.ts", "utf8");
+    expect(main).not.toContain("new CostEnvelopeGuard(");
+    expect(main).toContain('boot.run("site-cost-envelope-policy", () => readCostEnvelopePolicy(pool, environment.REGISTER_VERSION))');
+    expect(loader.split("new CostEnvelopeGuard(")).toHaveLength(2);
+    const step = loader.slice(loader.indexOf('run("cost-envelope-policy"'), loader.indexOf('run("structural-ceilings"'));
+    expect(step).toContain("composeDebateCostEnvelope(siteEnvelope.runPolicy, await readers.readCostEnvelopePolicy(pool, version))");
+    expect(step).toContain("readers.readStoryPolicyFromRegister(pool, version)");
+    expect(step).toContain("const guardPolicy = costEnvelopeGuardPolicy(runPolicy, storyPolicy);");
+    expect(step).toContain("new CostEnvelopeGuard({ store: site.spend, policy: guardPolicy })");
   });
 });

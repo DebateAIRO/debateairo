@@ -43,6 +43,8 @@ import {
   type LegalStatusResponse,
   GeoAvailabilityResponseSchema,
   type GeoAvailabilityResponse,
+  PublicAiProvidersResponseSchema,
+  type PublicAiProvidersResponse,
   EmailChangeCancelledSchema,
   EmailChangeConfirmedSchema,
   EmailChangeLinkRequestSchema,
@@ -446,6 +448,8 @@ export interface ContractClient {
   acceptLegal(input: LegalAcceptRequest): Promise<void>;
   /** Paid plans G3a: whether this address may sign up, pay, and sign in and use the support assistant — booleans, never the country. */
   getGeoAvailability(): Promise<GeoAvailabilityResponse>;
+  /** Addition D24: the companies the API's declared provider targets reach (public, the same for every caller). */
+  readPublicAiProviders(): Promise<PublicAiProvidersResponse>;
   readAccountEmail(): Promise<AccountEmail>;
   phoneProfile():Promise<AccountPhoneProfile>;
   revealPhoneProfile(grantToken:string):Promise<PhoneProfileReveal>;
@@ -826,6 +830,7 @@ export function createContractClient(
       { method: "POST", body: JSON.stringify(input) }, auth
     ),
     getGeoAvailability: () => request("/v1/geo/availability", GeoAvailabilityResponseSchema),
+    readPublicAiProviders: () => request("/v1/public/ai-providers", PublicAiProvidersResponseSchema),
     submitAsk: (input: AskRequest) => request("/v1/asks", AskAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
     submitAskOrLanguageChoice: (input: AskRequest) => requestJson<AskSubmitOutcome>(
       root.href, fetchImplementation, "/v1/asks",

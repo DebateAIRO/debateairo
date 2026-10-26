@@ -10,12 +10,12 @@ base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
 first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third, role rotation (0114,
-below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the synthesis check (0125, below) the thirteenth, the publication review (0126, below) the fourteenth and the threat reports (0127, below) the fifteenth. A step is added with new files only; NNNN is its number, the step before's number plus one:
+below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the synthesis check (0125, below) the fifteenth, the publication review (0126, below) the sixteenth, the threat reports (0127, below) the seventeenth and the support answer scope (0128, below) the eighteenth. A step is added with new files only; NNNN is its number, the step before's number plus one:
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
-   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0127: 0127,
-   `threat-reports-forward0127.json`, and `verify-effective-capabilities-111.sql`, which 0112 to 0127 keep),
+   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0128: 0128,
+   `support-answer-scope-forward0128.json`, and `verify-effective-capabilities-111.sql`, which 0112 to 0128 keep),
    and its own migration and verifier. (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json`
    and the sealed `verify-effective-capabilities.sql`.)
 3. A new verifier `lineage/verify-effective-capabilities-NNNN.sql` only when the step adds billing relations or
@@ -27,6 +27,34 @@ below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116
 5. One loader entry: append it LAST to `STEPS` in `packages/db/src/migration-forward-chain.ts`.
 6. On the preview the step is applied only by the native operator's `apply-and-plan` (with the owner's yes); its `verify`,
    `publish` and every start refuse while the step, or dev's 0110, is pending (`deploy/preview-auth-dev/v1/README.md`).
+7. The SQL file's leading comment block carries its n1 header lines (side-by-side spec §5, "The N-1 rule"; below):
+   `-- n1: expand` for every step after 0123 (only a drained upload, like 0123, may say `-- n1: drained`), and
+   `-- n1: keeps-verifier` exactly when step 3 made no new verifier. CI's N-1 audit (`tools/orphan-audit`
+   `auditMigrationN1Compatibility`, run by `auditSourceRules` on every `migrations/*.sql`; GitHub workflow
+   `security.yml`, job `verify`, step `pnpm run test:ci-gate`, which runs `tests/architecture/migration-n1-audit.test.ts`
+   and `scaffold.test.ts`) refuses a missing or wrong header, a `keeps-verifier` line the manifest contradicts, and,
+   in an expand step, anything the release before cannot run beside. The SQL is read in one lexer pass (comments,
+   literals, quoted names and dollar bodies in source order); a function body is not read (it runs when called), a
+   `DO` body is (it runs when the step applies). A table or view is new only when this step creates it and no earlier
+   step did; everything else is existing. Refused in an expand step:
+   - `DROP`, `RENAME`, a column type change, `SET NOT NULL`, `ADD COLUMN … NOT NULL` without `DEFAULT`;
+   - `REVOKE` on an existing object (an earlier function's name counts, even beside a new overload) and
+     `CREATE OR REPLACE` of an earlier function or view (a new one supersedes it);
+   - on an existing table: a new trigger, `ENABLE`/`DISABLE TRIGGER`, any row-level-security change or policy, a
+     rule, and an `ADD CONSTRAINT` that is not `NOT VALID` or adds `UNIQUE`, `PRIMARY KEY` or `EXCLUDE`;
+   - every strong lock on an existing table: `CREATE INDEX` without `CONCURRENTLY`, `VALIDATE CONSTRAINT` in the step
+     that adds it, `UPDATE` / `DELETE` / `INSERT … SELECT`, `ADD COLUMN` with a default other than a constant (a
+     literal, a number, `TRUE`/`FALSE`/`NULL`, `now()`, `CURRENT_TIMESTAMP`, each optionally cast) or a generated or
+     serial value, `SET LOGGED` / `UNLOGGED` / `TABLESPACE`; and anywhere `TRUNCATE`, `LOCK TABLE`, `CLUSTER`,
+     `VACUUM FULL`, `REINDEX` and `REFRESH MATERIALIZED VIEW` without `CONCURRENTLY`.
+   A `-- n1: reviewed <reason>` line directly above a statement, the reason saying why the older release is
+   unaffected, admits exactly four things: `DROP TRIGGER IF EXISTS t ON x` followed by `CREATE TRIGGER t … ON x`;
+   `ALTER TABLE x DROP CONSTRAINT IF EXISTS c` followed by `ALTER TABLE x ADD CONSTRAINT c … NOT VALID` (same name,
+   same table; on a table the step creates neither pair needs the line); any other `ADD CONSTRAINT … NOT VALID` on an
+   existing table (a new restriction its writes meet); and a `DO` block that runs `EXECUTE` (its other statements are
+   still read). A reviewed line without a reason is refused like a misspelled declaration. Files up to
+   `0122_engine_map_check.sql` predate the rule and are not audited; their count is pinned
+   (`N1_GRANDFATHERED_COUNT`), so a file slipped in before the cut-off is refused too.
 
 `migrate()` then runs the base recipe, 0108, the sealed verifier and 0110 as before, then each pending step in order:
 its SQL, its verifier, its ledger row and its receipt in `public.debateai_schema_migration_step`. A database at 0108
@@ -206,11 +234,101 @@ tables are not altered (their digest is 0117's; see 0119's note). No billing rel
 `replayVerifierSql`: its postcondition is the two tables whole. If `origin/dev` takes 0122 first, renumber this step
 (rename every file and constant that carries the number, recompute the manifest, re-pin the chain lists).
 
+## Side-by-side releases (0123)
+
+The thirteenth chain step, after the engine's map answer step 0122 (side-by-side uploads, spec
+`docs/superpowers/specs/2026-10-21-side-by-side-uploads-design.md` §1 and §5): `0123_side_by_side_releases.sql`,
+`side-by-side-releases-forward0123.json`, `packages/db/src/migration-forward0123.ts` (`loadForward0123`, appended last
+to `STEPS`, `MIGRATION_FORWARD0123_*` refusals). The transition release T's one migration, built in numbered sections
+(plan A, tasks A1-A5), each checked by the file's closing contract block and digested by the loader's postcondition: §1
+adds `core.run.release_key` (`text NOT NULL DEFAULT 'legacy'`, CHECK `run_release_key_shape`), the release that runs
+each debate, written once at insert; §2 redefines `core.create_encrypted_run(jsonb,uuid,uuid,jsonb)` in place (0072's
+body, plus `releaseKey` in its closed key list and the stamp in its INSERT), re-asserting SECURITY DEFINER, the pinned
+`search_path` and EXECUTE for `debateai_content_provision` only; §3 adds the release table `core.release_event`
+(append-only), its view `core.release_state_v`, the readers `core.read_current_release()` and
+`core.read_release_state(text)` (EXECUTE for `debateai_runtime`; the latter also answers `still_draining`, a DRAINING
+event with no later RETIRED one, so a draining release staged again reads true; final review A4) and the writers
+`core.record_release_switch` and `core.record_release_event` (EXECUTE for `debateai_release_operator`, serialized on
+the `debateai:release-switch` advisory lock), all four owned by the new NOLOGIN NOINHERIT role
+`debateai_release_owner`; §4 adds the re-admission
+record `core.run_supersession` (append-only; its row guard `core.guard_run_supersession()` refuses
+`RUN_SUPERSESSION_INVALID` unless the old run still waits, also as `core.run_waiting_v` reads it after the guard's lock
+(not FAILED, its content not erased, its account active: an erasure committed between the new run's write and START
+refuses; final review P3), the new run has no edge of its own, no FAILED work item and no re-admission marker naming
+another run, and both are the same person's; SELECT, INSERT for the API's role
+`debateai_billing_runtime` only), the start guard `core.refuse_starting_superseded_run()` (a trigger on
+`core.run_wait_start` refusing `RUN_SUPERSEDED`), `core.resolve_run_ref(uuid)` (owned by `debateai_release_owner`,
+EXECUTE for `debateai_billing_runtime`, at most 16 hops), the readmitted run's key provision
+`core.prepare_readmitted_run_key_provision(uuid,uuid)` (EXECUTE for `debateai_content_provision` only) with its commit
+lock and the marker column `readmitted_from_run_id` on the intent and on the run's execution binding (one live
+re-admission per old run), `core.list_unstarted_readmissions(uuid)` (a STABLE definer, EXECUTE for
+`debateai_billing_runtime` only: the re-admissions of a waiting run whose START never committed, which the API records
+FAILED under the old run's owner lease; plan C11 review), and redefines `core.run_waiting_v` (0083's view plus "not
+superseded"); §5 widens
+`core.run_wait_reason`'s `waits_for` CHECK with `SITE_BUSY` and `SWITCHING` (NOT VALID, then validated); §6 redefines in
+place, same signature, owner, definer, path and grants, the five funding functions that tied a grant to the funding
+selection's or the run's version (`billing.reserve_internal_provider_call`, `billing.read_internal_run_state`,
+`billing.read_internal_allowance`, `billing.guard_internal_charge_scope`, `staff.revoke_internal_allowance`), so a grant
+stays valid under the version it was issued with, and `staff.read_self_allowance_command` (a revoke names its grant's
+own version), and adds `staff.read_internal_funding_policy_at(bigint)` (owned by `debateai_staff_security_owner`,
+EXECUTE for `debateai_runtime`), the funding publication at a version; §7 adds the append-only spend waiver
+`ledger.model_spend_waiver` (one row per run, reason `BACKSTOP`, `OWNER_STOPPED`, `SETTINGS_VERSION_UNSUPPORTED` or
+`RELEASE_NOT_SERVED`; SELECT, INSERT for `debateai_runtime`, SELECT for `debateai_staff_security_owner` and
+`debateai_replay`) and redefines `billing.read_internal_grant_spent` in place (same signature, owner, definer, path and
+grants) so a waived run's spend leaves a funded person's window; site-day readers still count it; §8 adds
+`core.private_erasure_run_chain(uuid)` (a STABLE definer, callable by no role: a debate's runs, linked by the
+re-admission marker `identity.run_execution_binding.readmitted_from_run_id` between two encrypted runs of one account,
+so the copies no edge links are included and an edge to a run that does not re-admit its old run joins nothing; a
+plaintext run is a chain of one) and redefines in place, same signature, owner, definer, path, grants and 0099's
+session clamp, the per-debate private erasure `core.prepare_private_run_erasure`, `core.resume_private_run_erasure` and
+`core.finalize_private_run_erasure` (EXECUTE for `debateai_erasure_runtime` only), so deleting a debate erases every run
+of its chain that the person owns: the step-up grant may be bound to any run of the chain, prepare marks them all in one
+transaction (under a try of the site-wide supersession guard's lock, which every deletion now tries, and of the other
+runs' content leases), and resume names each one still pending until the coordinator has completed them all (addendum
+A-x3). Its header declares
+`-- n1: drained` (T is uploaded with no debate waiting or running, so it may add a NOT NULL column and redefine earlier
+functions, each such section saying why) and `-- n1: keeps-verifier`: no billing relation or function, so
+`verify-effective-capabilities-111.sql` stays the verifier in force. No supplemental verifier, so no
+`replayVerifierSql`: its postcondition is the three columns (type, NOT NULL, default), the CHECK (name, validation,
+definition), the redefined and added functions whole (§6's six, §7's one and §8's three redefinitions excepted), the
+release, supersession and waiver tables whole, the release view (owner, ACL, definition) and the two roles' attributes
+and memberships. `core.run_waiting_v`, the `waits_for` CHECK, the marker indexes, the seven funding redefinitions of §6
+and §7 and the three erasure redefinitions of §8 are checked by the closing block and by tests, not digested, so a
+later drained step may widen or redefine them again. While the build is open each task appends its section and recomputes `migration.sha256` with the one-liner at the
+end of this file; once merged, 0123 is never edited again. If `origin/dev` takes 0123 first, renumber this step (rename
+every file and constant that carries the number, recompute the manifest, re-pin the chain lists).
+
+## The settings activation (0124)
+
+The fourteenth chain step, after the side-by-side releases' 0123 (side-by-side uploads, spec
+`docs/superpowers/specs/2026-10-21-side-by-side-uploads-design.md` §13, settings changes without an upload; plan
+2026-10-21-side-by-side-S-settings Task S1): `0124_settings_activation.sql`, `settings-activation-forward0124.json`,
+`packages/db/src/migration-forward0124.ts` (`loadForward0124`, appended last to `STEPS`, `MIGRATION_FORWARD0124_*`
+refusals). The first `-- n1: expand` step (with `-- n1: keeps-verifier`): three new append-only tables in schema
+register, `register.settings_activation` (the activation pointer: the latest row's version is the active debate-settings
+version; going back is a new row), `register.settings_verdict` (each dry boot's PASS or FAIL for a release and a
+version; the latest row for the pair decides) and `register.settings_switch_check` (one row per release switch, checked
+at COMMIT by the deferred constraint trigger `settings_switch_check_at_commit`), each with 0122's append-only trigger,
+0056's truncate guard and a SECURITY INVOKER writer guard (only `debateai_release_owner` inserts, inside the definers);
+and ten new functions owned by 0123's `debateai_release_owner`: `register.settings_version_passed(text,bigint)` (a
+release passes its own site version, else its latest verdict must be PASS; EXECUTE for `debateai_runtime`),
+`register.read_passed_settings_versions(text)` (the runner's preload; EXECUTE for `debateai_runtime`),
+`register.read_active_settings_version()` (the pointer's one reader; EXECUTE for `debateai_billing_runtime`, the API's
+role, never the runner's), `register.record_settings_verdict` and `register.activate_settings_version` (EXECUTE for
+`debateai_release_operator`; the activation shares the release switch's advisory lock and refuses
+`SETTINGS_ACTIVATION_CONFLICT`, `SETTINGS_VERSION_KIND_INVALID`, `SETTINGS_ACTIVATION_UNCHANGED` and
+`SETTINGS_VERSION_NOT_PASSED`), `register.release_switch_settings_hook(text,bigint)` (which 0123's
+`core.record_release_switch` already calls when it exists: 0123 is not touched), the commit check and the three insert
+guards. No billing relation or function, so `verify-effective-capabilities-111.sql` stays the verifier in force; no
+supplemental verifier, so no `replayVerifierSql`: its postcondition is the three tables whole and the ten functions
+whole. If `origin/dev` takes 0124 first, renumber this step (rename every file and constant that carries the number,
+recompute the manifest, re-pin the chain lists).
+
 ## The synthesis check (0125)
 
-The thirteenth chain step, after the engine's map answer step's 0122, is `0125_synthesis_check.sql` with
+The fifteenth chain step, after the settings activation's 0124, is `0125_synthesis_check.sql` with
 `synthesis-check-forward0125.json` and `packages/db/src/migration-forward0125.ts`. Its loader is appended to
-`STEPS` and refuses altered inputs with `MIGRATION_FORWARD0123_` codes. It has no supplemental
+`STEPS` and refuses altered inputs with `MIGRATION_FORWARD0125_` codes. It has no supplemental
 `replayVerifierSql`; the effective `verify-effective-capabilities-111.sql` stays in force. Its postcondition
 records its own seven tables: `serve.synthesis_check_request`, `serve.synthesis_check_attempt`,
 `serve.synthesis_check_result`, `serve.synthesis_check_inheritance`,
@@ -222,7 +340,7 @@ its manifest and chain pins before merge.
 
 ## The publication review (0126)
 
-The fourteenth step adds the request, decision and transient reviewer-copy tables in serve, plus the staff review event table.
+The sixteenth step adds the request, decision and transient reviewer-copy tables in serve, plus the staff review event table.
 It extends the staff capability and staff-action lists and installs two sever triggers so key destruction removes the run-linked review rows.
 The Ask consumes a PUBLISH grant; no identity step-up object changes.
 Its manifest is `publication-review-forward0126.json`, and its loader is `packages/db/src/migration-forward0126.ts`.
@@ -231,7 +349,7 @@ A hosted deploy applies it with `pnpm db:migrate`.
 
 ## The threat reports (0127)
 
-The fifteenth chain step, after the publication review's 0126 (synthesis-flag S04, `docs/missions/synthesis-flag/slices/S04/SPEC-v8.md` §5a): `0127_threat_reports.sql`, `threat-reports-forward0127.json`, `packages/db/src/migration-forward0127.ts` (`loadForward0127`, appended last to `STEPS`, `MIGRATION_FORWARD0125_` refusals).
+The seventeenth chain step, after the publication review's 0126 (synthesis-flag S04, `docs/missions/synthesis-flag/slices/S04/SPEC-v8.md` §5a): `0127_threat_reports.sql`, `threat-reports-forward0127.json`, `packages/db/src/migration-forward0127.ts` (`loadForward0127`, appended last to `STEPS`, `MIGRATION_FORWARD0127_` refusals).
 It creates `staff.threat_report`, `staff.threat_report_event`, `staff.threat_report_alert`, eleven staff and export functions, and two ledger functions for the question-check spend writer and its invoker trigger.
 The eight shared objects it changes are `model_spend_spend_source_check`, `subject_capabilities_check`, `staff.valid_capabilities`, `staff.authorize_action`, `staff.owned_action_allowed`, `staff.begin_owned_webauthn`, `staff.commit_owner_command` and `staff.read_audit_page`; it pins none of them (W-0117).
 `verify-effective-capabilities-111.sql` stays the verifier in force; there is no `replayVerifierSql`.
@@ -239,7 +357,7 @@ If an earlier pending step takes 0127 first, renumber this step, recompute its m
 
 ## The support answer scope (0128)
 
-The sixteenth step, after the threat reports (0127), is `0128_support_answer_scope.sql` with
+The eighteenth step, after the threat reports (0127), is `0128_support_answer_scope.sql` with
 `support-answer-scope-forward0128.json` and `packages/db/src/migration-forward0128.ts`.
 It revokes `INSERT` on the fourteen support conversation and model-call tables from `debateai_support`.
 It deletes every row in those tables and `support.shred_audit` in dependency order, with the thirteen
@@ -255,14 +373,106 @@ step takes 0128 first, renumber it and recompute the manifest and `STEPS` chain 
 
 On a later `migrate()` EVERY applied step is checked by its receipt and by its postcondition digest (not only the
 last one: after 0112, 0111's billing objects stay digest-checked), and every applied step that declares one runs its
-own `replayVerifierSql` (the batch: `verify-auth-db-batch.sql`); both run again after a run applies new steps, before
-COMMIT — so a step's promises (for example the batch's "no runtime may
-publish staff alert readiness") are still enforced after other steps are appended. A later step that deliberately
+own `replayVerifierSql` (the batch: `verify-auth-db-batch.sql`); both run again after each step a run applies, with
+that step included, before that step's COMMIT — so a step's promises (for example the batch's "no runtime may publish
+staff alert readiness") are still enforced after other steps are appended. A later step that deliberately
 changes something an earlier step's verifier pins must change that verifier through its own reviewed step design; it
-cannot silently pass. The effective-capability verifier of the last applied step (after 0126: 0111's, which the batch,
+cannot silently pass. The effective-capability verifier of the last applied step (after 0128: 0111's, which the batch,
 Part C's step, role rotation, the data export, the mail locale, the debate shape map, the language check's site cost,
-the reclaim resume, the reply measures, the engine verdict, the engine's map answer step, the synthesis check and the publication review keep) still runs at the end
-of every `migrate()`.
+the reclaim resume, the reply measures, the engine verdict, the engine's map answer step, the side-by-side releases,
+the settings activation, the synthesis check, the publication review, the threat reports and the support answer scope keep) still runs at the end of every `migrate()`.
+
+## One transaction per step (side-by-side §5)
+
+`migrate()` no longer applies every pending step in one transaction (side-by-side uploads, spec
+`docs/superpowers/specs/2026-10-21-side-by-side-uploads-design.md` §5, "Each step runs on its own"; plan A, task A6).
+It takes the `debateai:schema-migrations` advisory lock for its session (`pg_advisory_lock`, released in `finally`;
+a connection that cannot send the unlock is destroyed, which ends the lock with the session), then:
+
+1. the prologue, one transaction: the ledger tables, the lineage and its receipts, the base recipe, the effective
+   verifier, 0108, 0110 and `replayForwardChain` (the receipt table, its ACL, every applied step's binding, own checks
+   and postcondition), which returns the applied prefix;
+2. each pending step, its own transaction (`applyForwardStep`): the step's SQL, its verifier and postcondition, its
+   ledger row and receipt, every applied step's own checks and postcondition with this step included, the receipt
+   ACL, and the 0093 compatibility re-seal when the step moved `lineageEvidence`, all before that step's COMMIT.
+
+Every transaction (`packages/db/src/migration-transaction.ts`) checks read committed and sets
+`SET LOCAL lock_timeout = '2s'`: a step waits at most 2 s for a lock, so page reads that queue behind its waiting
+`ALTER` wait at most that long too. A lock wait that ran out (SQLSTATE `55P03`) rolls the try back, logs
+`[MIGRATION_LOCK_RETRY] <step> try <n>/5`, pauses 2 s and tries again; after the fifth it refuses
+`MIGRATION_LOCK_TIMEOUT <step>` (or `PROLOGUE`) and nothing of that step remains. Any other failure is refused at once.
+A step that fails, or a migrator killed between steps, leaves every earlier step committed with its receipt and its
+re-sealed compatibility row; the next run replays them and continues at the next step.
+
+Each step after `0122_engine_map_check.sql` declares its n1 header in its leading comment block
+(`packages/db/src/migration-n1.ts` `parseN1Header`, the one parser A7 and A8 reuse): exactly one of `-- n1: expand` /
+`-- n1: drained`, `-- n1: keeps-verifier` when its manifest names the verifier of the step before (the loader refuses
+`MIGRATION_FORWARD_CHAIN_N1_KEEPS_VERIFIER` when the two disagree), and `-- n1: outside-transaction` for an expand step
+whose whole body is one `CREATE INDEX CONCURRENTLY IF NOT EXISTS <name> ON <schema>.<table> …`. Such a step runs on
+the session first with the same 2 s lock wait and retries (`runOutsideTransactionStep`: an INVALID index of that name
+is dropped concurrently before the build); its step transaction then refuses
+`MIGRATION_OUTSIDE_TRANSACTION_INDEX_INVALID` unless an index of that name is valid and on the step's own table (the
+header names it, `parseN1Header`'s `concurrentIndex`), and records the step like any other.
+0122 and earlier declare nothing (all false). The modules `loadMigrationPlan` loads import only node built-ins and
+`./migration-*.js` (standalone probes and the preview's superuser JIT creator load them), so their refusals are plain
+Errors whose message starts with the code and which carry it as `.code`. The reviewed bytes of `migrate()`'s module
+and of `migration-transaction.ts` are sealed in `tools/orphan-audit` (`NATIVE_MIGRATE_MODULE_SHA256`,
+`NATIVE_MIGRATE_TRANSACTION_SHA256`) with their ordered controls.
+
+## Database ahead (side-by-side §5)
+
+During a side-by-side upload (spec `docs/superpowers/specs/2026-10-21-side-by-side-uploads-design.md` §5, "The N-1
+rule"; plan A, task A7) the newer release migrates the shared database while the older release keeps running, and the
+older release may restart. Its `migrate()` then meets ledger names it does not know. `splitLedger`
+(`packages/db/src/migration-lineage.ts`) sets apart the **extra** ones: not known to this code, shaped like a step
+name, and sorting after this code's last step. `identifyLineage` sees only the rest, so any other unknown name
+(before this code's last step, or not shaped like a step) still refuses `MIGRATION_LINEAGE_REFUSED UNKNOWN_APPLIED_NAME`.
+
+Each step after `0122_engine_map_check.sql` records its n1 header in the migrator-private declaration table
+`public.debateai_schema_migration_step_n1` (`source_name` primary key with the step-name CHECK `fwdstep_source_check`,
+`n1_expand`, `keeps_verifier`, `outside_transaction`, `chain_head_manifest_sha256` with a 64-hex CHECK, and
+`recorded_at`; all NOT NULL). `applyForwardStep` writes the row in the step's own transaction, and its
+`chain_head_manifest_sha256` is the manifest SHA-256 of the LAST step of the applying code's own chain, so one newer
+release means one head. Steps up to 0122 have no row; 0123 has the first. `replayForwardChain` creates the table on first
+use and checks its ACL like the receipt table's: owned by the installer, no grant, no column grant, no `debateai_` role
+able to act as its owner, exact columns, three keys (`MIGRATION_FORWARD_CHAIN_DECLARATION_ACL_DRIFT`). It binds only the
+receipts of this code's steps; the extra steps' receipts are left to the acceptance check.
+
+Right after the replay, in the prologue transaction, `assertDatabaseAheadAccepted` (`packages/db/src/migration-ahead.ts`)
+accepts the extra steps only when every rule holds, and otherwise refuses
+`DATABASE_AHEAD_NOT_ACCEPTED <DETAIL> <name>` (the prologue rolls back):
+
+1. every step of this code's chain is applied (`PENDING_KNOWN_STEP`);
+2. every extra step has a receipt (`RECEIPT_MISSING`);
+3. the receipts chain from this code's last manifest, one after the other, on the same base recipe (`CHAIN_BROKEN`);
+4. every extra receipt names this code's last verifier, so the verifier this code runs is the one in force
+   (`VERIFIER_CHANGED`);
+5. every extra step has a declaration row (`NOT_DECLARED`) with `n1_expand` (`NOT_EXPAND`) and `keeps_verifier`
+   (`NOT_KEEPS_VERIFIER`);
+6. without `newerChain`: all extra steps carry one `chain_head_manifest_sha256`, so they come from at most one newer
+   release (`MORE_THAN_ONE_RELEASE`);
+7. with `migrate(pool, { newerChain })` (the newer release's `describeForwardSteps()`, from its root-owned plan): this
+   code's chain is a prefix of it by name, manifest, source and verifier, and the extra steps are a prefix of the rest
+   with the receipts' manifests and sources, each declared expand and keeps-verifier (`NEWER_CHAIN_MISMATCH`).
+
+Rule 6 is skipped when `newerChain` is given (the preview always passes it; final review A1). A release T+1 that
+applied 0124 and was rolled back, then its fix release T+1b that keeps 0124 byte for byte and adds 0125, leave two
+chain heads (each `migrate()` records its own), yet rules 3 and 7 already prove one linear chain of that one newer
+release, so T can still restart. Without the newer release's list the heads are the only proof of one release.
+
+Accepted, `migrate()` has replayed every one of its own steps (receipts, own checks, postconditions, and its own last
+verifier, which rule 4 shows is the one in force), applies nothing and returns
+`{ appliedSteps: [], extraSteps: [<the extra names>] }`; on a database it is current with, `extraSteps` is empty and
+`appliedSteps` lists the steps the run applied. Read-only helpers, for the release tooling: `verifyDatabaseAhead(pool,
+options)` makes the same split, lineage and acceptance check in a `BEGIN READ ONLY` transaction and returns
+`{ mode: "CURRENT" | "AHEAD", knownSteps, extraSteps }`; `readPendingForwardSteps(pool)` lists this code's steps the
+database has not applied, with their n1 header (the release check refuses a side-by-side upload when one is not expand);
+`describeForwardSteps()` describes this code's whole chain.
+
+For as long as an older release can start on the database, two things are **frozen**: the declaration table's shape
+(the older release checks its exact columns and keys before it trusts a row) and the SQL of `lineageEvidence()` in
+`packages/db/src/migration-lineage.ts` (a newer step may re-seal the 0093 compatibility receipt with it, and the older
+release compares that receipt with its own copy of the function). Changing either needs a drained upload, like 0123.
 
 ## Merge order: check the preview first
 
@@ -270,7 +480,7 @@ Before merging any branch with a forward step, read the live preview's applied s
 `SELECT name FROM public.debateai_schema_migration ORDER BY name` and
 `SELECT source_name FROM public.debateai_schema_migration_step`. **Whatever is applied there merges first** and keeps
 its number: an applied step can never be renumbered (`migrate()` refuses an unknown applied name,
-`MIGRATION_LINEAGE_REFUSED UNKNOWN_APPLIED_NAME`). Otherwise whichever branch merges first keeps its number and the
+`MIGRATION_LINEAGE_REFUSED UNKNOWN_APPLIED_NAME`, unless it is a newer release's accepted step, above). Otherwise whichever branch merges first keeps its number and the
 other renumbers just before its own merge (new file name, manifest `previous` and `migration`, the loader's two
 constants, then every exact-chain test). The preview's native verify never applies a pending step (it refuses); only
 the native operator's `apply-and-plan` applies one, with the owner's yes.

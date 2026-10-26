@@ -26,6 +26,12 @@ const schema = z.object({
     .refine((value) => Object.hasOwn(value, "default"))
 }).strict();
 
+/**
+ * Side-by-side spec §13: the row's member names, so the settings classification's member map
+ * (`settings-classification.ts`) is proved complete against the schema without exporting the schema.
+ */
+export const CALL_CONCURRENCY_POLICY_MEMBERS: readonly string[] = Object.freeze(Object.keys(schema.shape));
+
 export type CallConcurrencyPolicy = Readonly<{
   perDebate: number;
   perModelPerDebate: number;

@@ -1,5 +1,8 @@
 -- synthesis-flag SPEC-v10 S05-R11, S05-R16; V-111, V-114; ADR-0033 path (a).
 -- Retire persisted support conversations and model-call records without bypassing 0065 guards.
+-- n1 (side-by-side spec §5, the database rule): it revokes the support role's inserts and empties the support tables, so it is uploaded the old way.
+-- n1: drained
+-- n1: keeps-verifier
 REVOKE INSERT ON support.session, support.session_key, support.message, support.abuse_event,
   support."case", support.case_key, support.case_event, support.case_message, support.rating,
   support.tool_call, support.admission_event, support.relay_call, support.relay_waiter,

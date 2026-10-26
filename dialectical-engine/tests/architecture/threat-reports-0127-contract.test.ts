@@ -69,7 +69,8 @@ describe("0127 threat reports contract", () => {
     // Property: replay and orphan checks accept the 0127 DDL after earlier steps are sealed.
     const plan = await loadMigrationPlan();
     const migrateSource = await readFile(new URL("../../packages/db/src/index.ts", import.meta.url), "utf8");
-    expect(auditMigrationReplaySafety("migrations/0127_threat_reports.sql", await read0125(), { plan, migrateSource })).toEqual([]);
+    const transactionSource = await readFile(new URL("../../packages/db/src/migration-transaction.ts", import.meta.url), "utf8");
+    expect(auditMigrationReplaySafety("migrations/0127_threat_reports.sql", await read0125(), { plan, migrateSource, transactionSource })).toEqual([]);
   });
 
   it("makes 0127 the forward step after 0126 (S05's 0128 follows it) and pins only objects it creates", async () => {

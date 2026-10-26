@@ -8,8 +8,10 @@ export type * from "./staff-access.js";
 export type * from "./provider-funding.js";
 export * from "./region.js";
 export * from "./mail-address.js";
+export * from "./payment-regions.js";
 export * from "./engine.js";
 export * from "./engine-material.js";
+export * from "./release-key.js";
 
 export type Brand<T, Name extends string> = T & { readonly __brand: Name };
 

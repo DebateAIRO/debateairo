@@ -1,5 +1,6 @@
 import type { ExportSnapshot, DebateEntry, RoleRotation, Row, SupportCaseEntry, SupportSessionEntry, SynthesisCheckEntry, PublicationReviewEntry } from "./types.js";
 import type { RecordAad } from "../../../../packages/crypto/src/records.js";
+import { TypedDomainError } from "@debateai/kernel";
 
 export type ExportClaim = Readonly<{
   exportId: string; userId: string; ownerRef: string; sessionId: string;
@@ -34,6 +35,8 @@ export interface OwnerViewPort {
   readStory(ownerRef: string, answerId: string): Promise<unknown>;
   readDisclosure(ownerRef: string, answerId: string): Promise<unknown>;
   readNode(ownerRef: string, answerId: string, nodeId: string): Promise<unknown>;
+  /** Side-by-side C9: the newest run of a re-admitted debate (`core.resolve_run_ref`), the id itself otherwise. */
+  resolveRunRef(runId: string): Promise<string>;
 }
 
 export type UserDekField = "user.email_ciphertext" | "user.recovery_email_ciphertext" | "user.phone_ciphertext";
@@ -204,12 +207,30 @@ function roleRotation(value: unknown): RoleRotation | null {
     story_checker: role("story_checker"), eligible_model_ids: eligible.map(string), created_at: string(source.created_at) };
 }
 
+/**
+ * Side-by-side C9 (review): the newest run of `runId`'s re-admission chain. A chain `core.resolve_run_ref` refuses
+ * (RUN_SUPERSESSION_CHAIN_INVALID, more than 16 hops) must not fail the person's whole export: the run is exported as
+ * itself — it is their own data, so over-including is safe — and one content-free code line is printed. Every other
+ * failure still fails the export.
+ */
+async function newestRunOf(ownerView: OwnerViewPort, runId: string): Promise<string> {
+  try {
+    return await ownerView.resolveRunRef(runId);
+  } catch (error) {
+    if (!(error instanceof TypedDomainError) || error.code !== "RUN_SUPERSESSION_CHAIN_INVALID") throw error;
+    console.error(JSON.stringify({ event: "api.data_export.run_ref_chain_invalid", code: error.code }));
+    return runId;
+  }
+}
+
 async function collectDebates(raw: RawExportRows, ownerView: OwnerViewPort, ownerRef: string): Promise<DebateEntry[]> {
   const tombstones = new Map(rows(raw.erasure_tombstones).map((item) => [string(item.run_id), string(item.completed_at)]));
   const visibility = rows(raw.visibility_events);
   const entries: DebateEntry[] = [];
   for (const run of rows(raw.runs)) {
     const reference = string(run.run_id);
+    // Side-by-side C9: a run a re-admission superseded never ran; its newest run is exported in its place.
+    if (await newestRunOf(ownerView, reference) !== reference) continue;
     const history = visibility.filter((item) => item.run_id === reference).map((item) => ({ state: string(item.state), at: string(item.occurred_at) }));
     const deletedAt = tombstones.get(reference) ?? null;
     const base = {

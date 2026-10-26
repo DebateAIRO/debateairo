@@ -3,6 +3,11 @@ import { basename, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { EVENT_CONSUMERS } from "@debateai/contract";
 import { loadMigrationPlan, sha256, type MigrationPlan } from "../../../packages/db/src/migration-lineage.js";
+import { lineAt, maskSqlComments, maskSqlQuotedLiterals, sqlDoBlocks, type SqlDoBlock } from "./sql-text.js";
+import { auditMigrationN1Compatibility, auditN1GrandfatheredCount, definedFunctionNames, definedRelationNames, readLineageKeepsVerifier } from "./migration-n1.js";
+
+// Side-by-side spec 2026-10-21 §5 (plan A, task A8): the N-1 audit, run below by auditSourceRules.
+export * from "./migration-n1.js";
 
 const root = fileURLToPath(new URL("../../..", import.meta.url));
 type Row = readonly [name: string, directory: string, allowed: readonly string[]];
@@ -495,118 +500,6 @@ export async function auditSurfaceReachability(): Promise<{
   };
 }
 
-function lineAt(source: string, index: number): number {
-  return source.slice(0, index).split("\n").length;
-}
-
-function maskSqlComments(source: string): string {
-  return source
-    .replace(/--[^\n]*/g, (comment) => " ".repeat(comment.length))
-    .replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, " "));
-}
-
-type SqlDoBlock = {
-  readonly start: number;
-  readonly end: number;
-  readonly bodyStart: number;
-  readonly bodyEnd: number;
-};
-
-function dollarTagAt(source: string, index: number): string | null {
-  return /^\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/u.exec(source.slice(index))?.[0] ?? null;
-}
-
-function quotedSqlEnd(source: string, index: number, quote: "'" | "\""): number {
-  for (let cursor = index + 1; cursor < source.length; cursor += 1) {
-    if (source[cursor] === quote && source[cursor + 1] === quote) {
-      cursor += 1;
-      continue;
-    }
-    if (source[cursor] === quote) return cursor + 1;
-  }
-  return source.length;
-}
-
-function sqlDoBlocks(source: string): readonly SqlDoBlock[] {
-  const blocks: SqlDoBlock[] = [];
-  for (let index = 0; index < source.length;) {
-    const char = source[index];
-    if (char === "'" || char === "\"") {
-      index = quotedSqlEnd(source, index, char);
-      continue;
-    }
-    const before = source[index - 1] ?? "";
-    const after = source[index + 2] ?? "";
-    if ((source.slice(index, index + 2).toUpperCase() === "DO")
-      && !/[A-Za-z0-9_$]/u.test(before)
-      && !/[A-Za-z0-9_$]/u.test(after)) {
-      let open = index + 2;
-      while (/\s/u.test(source[open] ?? "")) open += 1;
-      const tag = dollarTagAt(source, open);
-      if (tag !== null) {
-        const bodyStart = open + tag.length;
-        const bodyEnd = source.indexOf(tag, bodyStart);
-        if (bodyEnd < 0) break;
-        let semicolon = bodyEnd + tag.length;
-        while (/\s/u.test(source[semicolon] ?? "")) semicolon += 1;
-        if (source[semicolon] === ";") {
-          blocks.push(Object.freeze({
-            start: index,
-            end: semicolon + 1,
-            bodyStart,
-            bodyEnd
-          }));
-          index = semicolon + 1;
-          continue;
-        }
-        index = bodyEnd + tag.length;
-        continue;
-      }
-    }
-    if (char === "$") {
-      const tag = dollarTagAt(source, index);
-      if (tag !== null) {
-        const close = source.indexOf(tag, index + tag.length);
-        if (close < 0) break;
-        index = close + tag.length;
-        continue;
-      }
-    }
-    index += 1;
-  }
-  return blocks;
-}
-
-function maskSqlQuotedLiterals(source: string): string {
-  const output = [...source];
-  for (let index = 0; index < source.length;) {
-    const char = source[index];
-    if (char === "'" || char === "\"") {
-      const end = quotedSqlEnd(source, index, char);
-      for (let cursor = index; cursor < end; cursor += 1) {
-        if (output[cursor] !== "\n") output[cursor] = " ";
-      }
-      index = end;
-      continue;
-    }
-    if (char === "$") {
-      const tag = dollarTagAt(source, index);
-      if (tag !== null) {
-        const close = source.indexOf(tag, index + tag.length);
-        if (close < 0) return output.join("");
-        const end = close + tag.length;
-        for (let cursor = index; cursor < end; cursor += 1) {
-          if (output[cursor] !== "\n") output[cursor] = " ";
-        }
-        index = end;
-        continue;
-      }
-    }
-    index += 1;
-  }
-  return output.join("");
-}
-
 function blockHasConstraintGuard(source: string, block: SqlDoBlock, index: number, name: string): boolean {
   const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const body = source.slice(block.bodyStart, block.bodyEnd);
@@ -637,7 +530,11 @@ function constraintHasReplayGuard(source: string, index: number, name: string): 
   return false;
 }
 
-export type NativeMigrationReplayContext = Readonly<{ plan: MigrationPlan; migrateSource: string }>;
+/**
+ * The reviewed migrator the native once-per-ledger classification relies on: migrate()'s module (packages/db/src/index.ts)
+ * and, since side-by-side spec 2026-10-21 §5, its per-step transaction module (packages/db/src/migration-transaction.ts).
+ */
+export type NativeMigrationReplayContext = Readonly<{ plan: MigrationPlan; migrateSource: string; transactionSource: string }>;
 const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2";
 // Finite reviewed executable module: comments/strings/dead code cannot stand in for its controls.
 // N26m/N26n (PR-54): the reviewed module after the NETOPIA branch merged dev (its billing exports and #101's
@@ -658,53 +555,118 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // Opener rotation (spec 2026-10-11 Part 2, option B): the reviewed module after readRoleRotationCounts gained the
 // OPENER tally (each pin's first eligible entry) and the pin type's comment its position order, merged with the
 // data-export module above. migrate() is unchanged by this.
+// Side-by-side releases A1 (2026-10-21, spec 2026-10-21 §1): the reviewed module after StartRunInput gained releaseKey and
+// startRun stamped core.run.release_key on both insert paths (parseReleaseKey first). migrate() is byte-identical.
+// Side-by-side releases A2 (2026-10-21, spec 2026-10-21 §4, §6): the reviewed module after it re-exported
+// ./release-state.js (the release table's readers and writers). migrate() is byte-identical.
+// Side-by-side releases A3 (2026-10-22, spec 2026-10-21 §4): the reviewed module after it re-exported
+// ./run-supersession.js and CONTENT_PROVISION_SIGNATURES gained core.prepare_readmitted_run_key_provision(uuid,uuid).
+// migrate() is byte-identical.
+// Side-by-side releases A5 (2026-10-22, spec 2026-10-21 §9, C10): the reviewed module after it re-exported
+// ./spend-waiver.js (SPEND_WAIVER_REASONS, recordSpendWaiver, SpendWaiverReason). migrate() is byte-identical.
+// Side-by-side releases C10 (2026-10-22, spec 2026-10-21 §4, O3): the reviewed module after it gained StoredAsk and
+// RunRepository.readStoredAsk (the re-admission plan's read). migrate() is byte-identical.
+// Side-by-side releases C11 (2026-10-22, spec 2026-10-21 §4, O3): the reviewed module after startRun's insert moved into
+// a private helper shared with the new RunRepository.startReadmittedRun (ReadmissionPrincipal, StartReadmittedRunInput).
+// migrate() is byte-identical.
+// Side-by-side releases C11 review (2026-10-22, spec 2026-10-21 §4, O3): the reviewed module after it gained
+// RunRepository.listUnstartedReadmissions (0123's core.list_unstarted_readmissions). migrate() is byte-identical.
+// Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): migrate() CHANGED. It takes the schema-migrations advisory
+// lock for its session, runs a prologue transaction (the ledger tables, lineage, base recipe, 0108, 0110 and
+// replayForwardChain), then each pending forward step in its own transaction (withMigrationStepTransaction: 2 s lock
+// wait, five tries) through applyForwardStep, re-sealing the compatibility row inside each step; an outside-transaction
+// step builds its index first (runOutsideTransactionStep). The controls below follow that shape.
+// Side-by-side releases A7 (2026-10-22, spec 2026-10-21 §5, "database ahead"): migrate() CHANGED. It takes options and
+// returns its report (migrate(pool, options): MigrateReport), splits the ledger (splitLedger: the steps a newer release
+// added are kept out of identifyLineage), and right after replayForwardChain accepts or refuses them
+// (assertDatabaseAheadAccepted, migration-ahead.ts); it re-exports the database-ahead readers. Two controls bind the split
+// and the acceptance.
+// Side-by-side integration (2026-10-22): the merged module of lane C (C10, C11) and lane 1 (A6, A7) above, pinned once.
+// Side-by-side integration fix (2026-10-22): readStoredAsk casts register_version in SQL (::integer) instead of Number()
+// (the register law bans JavaScript version coercion). migrate() is byte-identical.
+// Side-by-side integration round 2 (2026-10-22): the merged module after lane C's C11 review above
+// (listUnstartedReadmissions) joined the integration branch's module. migrate() is byte-identical.
+// Side-by-side Phase 2, S6 (2026-10-22, spec §13): readFrozenHead returns registerVersion and RunRepository gains
+// readRunRegisterVersion (both cast register_version in SQL). migrate() is byte-identical.
+// Side-by-side Phase 2, S9 fix round 1 (2026-10-22, spec §13, ruling R31): isDatabaseFailure and settingsRefusalCode
+// (the one rule both settings caches use) moved here beside isDatabasePoolBusy. migrate() is byte-identical.
 // synthesis-flag S01 (0125): the reviewed module after it re-exported the synthesis check's erasure module
 // (export * from "./synthesis-check-erasure.js", after the publication check's). migrate() is byte-identical.
 // synthesis-flag S04 (0127): the reviewed module after it exported the threat-report repository adapter;
 // migrate() is byte-identical, and the full module is re-sealed without stripping that export in the audit test.
 // synthesis-flag S05 r5: the reviewed module drops retired support repository exports; migrate() is unchanged.
-const NATIVE_MIGRATE_MODULE_SHA256 = "5e9805a93fcfd92fbc0e4369c89b530ee959a141bd0f93e795ef6521b0fa9d0f";
+// synthesis-flag integration with origin/dev d78d58b4f (2026-10-26): the merged module of the side-by-side and
+// synthesis-flag lines above, pinned once. migrate() is origin/dev's.
+const NATIVE_MIGRATE_MODULE_SHA256 = "373f218eef96f24e00e47ef6c18b414661e7c49b0bbf18c1f74243d9f5570f6b";
+// Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
+// ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
+// SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each
+// wait, not the step), so it is re-sealed; the code is byte-identical.
+const NATIVE_MIGRATE_TRANSACTION_SHA256 = "16e9e66b5328f9dcb1ab90e810422bc8ae016ce6cb6fe27e4d5596583fe5326b";
+const NATIVE_MIGRATE_TRANSACTION_CONTROLS = [
+  'await client.query("BEGIN");', "await client.query(\"SET LOCAL lock_timeout = '2s'\");", 'await client.query("COMMIT");',
+  'await client.query("ROLLBACK");', "throw error;", '?.code !== "55P03"'
+] as const;
 const NATIVE_ONCE_SOURCES = new Set([
   "0104_password_only_reset.sql", "0105_backup_email_verification.sql",
   "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"
 ]);
 
+/**
+ * The reviewed migrator's ordered controls alone, on the text (side-by-side §5; A6 review): migrate()'s slice of its
+ * module, from its exact signature to the next export, and the per-step transaction module. assertNativeReplayBinding
+ * runs it after the two module hashes; tests run it on altered text directly, since any altered byte fails a hash
+ * first. Comments, strings and dead code still cannot stand in for a control: the hashes pin the reviewed bytes.
+ */
+export function auditNativeMigratorControls(migrateSource: string, transactionSource: string): void {
+  const refused = (): never => { throw new Error("MIGRATION_NATIVE_AUDIT_BINDING_REFUSED"); };
+  const begin = migrateSource.indexOf("export async function migrate(pool: Pool, options: MigrateOptions = {}): Promise<MigrateReport> {");
+  const end = migrateSource.indexOf("\nexport ", begin + 1);
+  if (begin < 0 || end < 0) refused();
+  const native = migrateSource.slice(begin, end);
+  // Side-by-side §5 (A6): the session lock, the prologue transaction, one transaction per pending step with its
+  // compatibility re-seal, the unlock in `finally` and the release. (A7): the ledger split before the lineage, and the
+  // database-ahead acceptance right after the replay.
+  const controls = [
+    "const plan = await loadMigrationPlan();", "const client = await pool.connect();",
+    "pg_advisory_lock(hashtextextended('debateai:schema-migrations', 0))", 'await withMigrationStepTransaction(client, "PROLOGUE"',
+    "const { known: applied, extra } = splitLedger(plan, ledger);",
+    "const lineage = identifyLineage(plan, applied, resolutions.map", "const appliedSet = new Set(applied);",
+    "const resolvedSet = new Set(resolutions.map", "for (const name of plan.manifest.order)",
+    "if (appliedSet.has(name) || resolvedSet.has(name)) continue;", "await client.query(plan.sources.get(name)!.sql);",
+    "INSERT INTO public.debateai_schema_migration (name, applied_at)", "[name]",
+    "await client.query(plan.effectiveCapabilityVerifierSql);", "await applyForward108(client,plan,lineage,",
+    "await applyForward110(client,plan,lineage,", "await replayForwardChain(client,plan,", "await assertDatabaseAheadAccepted(client,plan,",
+    "for (const step of pending)", "await withMigrationStepTransaction(client, step.name",
+    "await applyForwardStep(client,plan,step,", "[compatEvidenceAfterStep,compat.logicalName]", "} finally {",
+    "pg_advisory_unlock(hashtextextended('debateai:schema-migrations', 0))", "client.release();"
+  ];
+  const inOrder = (text: string, ordered: readonly string[]): void => {
+    let cursor = 0;
+    for (const control of ordered) {
+      const at = text.indexOf(control, cursor);
+      if (at < 0) refused();
+      cursor = at + control.length;
+    }
+  };
+  inOrder(native, controls);
+  inOrder(transactionSource, NATIVE_MIGRATE_TRANSACTION_CONTROLS);
+}
+
 /** The frozen native recipe owns replay through an atomic, full-name migration ledger. */
-function assertNativeReplayBinding(name: string, source: string, { plan, migrateSource }: NativeMigrationReplayContext): void {
+function assertNativeReplayBinding(name: string, source: string, { plan, migrateSource, transactionSource }: NativeMigrationReplayContext): void {
   const refused = (): never => { throw new Error("MIGRATION_NATIVE_AUDIT_BINDING_REFUSED"); };
   const bareName = name.slice("migrations/".length);
   const declared = plan.sources.get(bareName);
   if (name !== `migrations/${bareName}` || !NATIVE_ONCE_SOURCES.has(bareName)
     || plan.recipeSha256 !== NATIVE_ONCE_RECIPE_SHA256
     || sha256(migrateSource) !== NATIVE_MIGRATE_MODULE_SHA256
+    || sha256(transactionSource) !== NATIVE_MIGRATE_TRANSACTION_SHA256
     || sha256(JSON.stringify(plan.manifest, null, 2) + "\n") !== NATIVE_ONCE_RECIPE_SHA256
     || !plan.manifest.order.includes(bareName) || declared?.sql !== source
     || declared.sha256 !== sha256(source)
     || plan.manifest.sources.find((entry) => entry.name === bareName)?.sha256 !== declared.sha256) refused();
-  const begin = migrateSource.indexOf("export async function migrate(pool: Pool): Promise<void> {");
-  const end = migrateSource.indexOf("\nexport ", begin + 1);
-  if (begin < 0 || end < 0) refused();
-  const native = migrateSource.slice(begin, end);
-  const controls = [
-    "const plan = await loadMigrationPlan();", "const client = await pool.connect();",
-    'await client.query("BEGIN")', "pg_advisory_xact_lock",
-    "const lineage = identifyLineage(plan, applied, resolutions.map",
-    "const appliedSet = new Set(applied);", "const resolvedSet = new Set(resolutions.map",
-    "for (const name of plan.manifest.order)", "if (appliedSet.has(name) || resolvedSet.has(name)) continue;",
-    "await client.query(plan.sources.get(name)!.sql);",
-    "INSERT INTO public.debateai_schema_migration (name, applied_at)", "[name]",
-    "await client.query(plan.effectiveCapabilityVerifierSql);", "await applyForward108(client,plan,lineage,", "await applyForward110(client,plan,lineage,",
-    "await applyForwardChain(client,plan,",
-    "[compatEvidenceAfterChain,compat.logicalName]",
-    'await client.query("COMMIT")', "} catch (error) {", 'await client.query("ROLLBACK")',
-    "throw error;", "} finally {", "client.release();"
-  ];
-  let cursor = 0;
-  for (const control of controls) {
-    const at = native.indexOf(control, cursor);
-    if (at < 0) refused();
-    cursor = at + control.length;
-  }
+  auditNativeMigratorControls(migrateSource, transactionSource);
   if (bareName === "0107_auth_dev_integration.sql"
     && !/ALTER TABLE identity\.step_up_grant DROP CONSTRAINT step_up_grant_action_check;\s*ALTER TABLE identity\.step_up_grant ADD CONSTRAINT step_up_grant_action_check CHECK \(/.test(source)) refused();
 }
@@ -759,7 +721,10 @@ export function auditSurfaceAttachmentLiterals(name: string, source: string): re
  * the law, and the law is unchanged everywhere else.
  */
 const GOAL_RULED_LAW_CARRIERS: ReadonlyMap<string, readonly string[]> = new Map([
-  ["packages/contract/src/index.ts", ["EXPANSION_DEPTH_MIN", "EXPANSION_DEPTH_MAX"]]
+  ["packages/contract/src/index.ts", ["EXPANSION_DEPTH_MIN", "EXPANSION_DEPTH_MAX"]],
+  // Side-by-side spec 2026-10-21 §5 (plan A, task A8, owner-approved plan): the count of grandfathered migrations is a
+  // frozen fact of the tree the N-1 audit pins, not a policy value; by name, in its one file, like the two above.
+  ["tools/orphan-audit/src/migration-n1.ts", ["N1_GRANDFATHERED_COUNT"]]
 ]);
 
 /**
@@ -777,9 +742,12 @@ export function auditNumericSourceLiteralExports(name: string, source: string): 
 }
 
 /** The deployed preview-test module is a finite production budget/config boundary.
- * Only its reviewed direct runtime imports are exceptional; mixed fixture imports still block. */
+ * Only its reviewed direct runtime imports are exceptional; mixed fixture imports still block.
+ * Side-by-side addition D14-D16 (owner 2026-10-22): preview-line-up.ts, the env's gate part and the line-up composed back
+ * into that module's config shape, is one more reviewed direct caller (it reuses the one env key check there). */
 export function auditProductionFixtureImports(where:string,source:string):readonly string[]{
- const runtimeCaller=where==="packages/providers/src/index.ts"||where==="packages/providers/src/provider-probe.ts";
+ const runtimeCaller=where==="packages/providers/src/index.ts"||where==="packages/providers/src/provider-probe.ts"
+  ||where==="packages/providers/src/preview-line-up.ts";
  for(const match of source.matchAll(/from\s+["']([^"']+)["']/g)){
   const specifier=match[1]!;
   if(!/(?:tests?|fixtures?)/.test(specifier))continue;
@@ -818,7 +786,9 @@ export async function auditSourceRules(): Promise<{ readonly blocking: readonly 
       blocking.push(`${where} reads a clock or randomness inside the pure core`);
     }
     blocking.push(...auditProductionFixtureImports(where,source));
-    if (/switch\s*\(/.test(source) && (!/default\s*:/.test(source) || !/exhaustive\s*\(/.test(source))) {
+    // \b: a switch STATEMENT, not an identifier ending in "switch" (0123's SQL function core.record_release_switch(...),
+    // named in packages/db/src/release-state.ts and the 0123 loader, side-by-side spec 2026-10-21 §6).
+    if (/\bswitch\s*\(/.test(source) && (!/default\s*:/.test(source) || !/exhaustive\s*\(/.test(source))) {
       blocking.push(`${where} has a switch without default + exhaustive fall-through`);
     }
     blocking.push(...auditNumericSourceLiteralExports(where, source));
@@ -830,10 +800,21 @@ export async function auditSourceRules(): Promise<{ readonly blocking: readonly 
   const migrationsDirectory = join(root, "migrations");
   const nativePlan = await loadMigrationPlan();
   const migrateSource = await readFile(join(root, "packages/db/src/index.ts"), "utf8");
-  for (const name of (await readdir(migrationsDirectory)).filter((entry) => entry.endsWith(".sql")).sort()) {
+  const transactionSource = await readFile(join(root, "packages/db/src/migration-transaction.ts"), "utf8");
+  const migrationNames = (await readdir(migrationsDirectory)).filter((entry) => entry.endsWith(".sql")).sort();
+  // Side-by-side §5 (A8): each file's N-1 audit knows the functions, tables and views of the files sorted before it and
+  // whether its lineage manifest keeps the verifier in force. CI runs this (security.yml, job verify: test:ci-gate).
+  const keepsVerifier = await readLineageKeepsVerifier(join(migrationsDirectory, "lineage"));
+  const earlierFunctions = new Set<string>();
+  const earlierRelations = new Set<string>();
+  for (const name of migrationNames) {
     const source = await readFile(join(migrationsDirectory, name), "utf8");
-    blocking.push(...auditMigrationReplaySafety(`migrations/${name}`, source, { plan: nativePlan, migrateSource }));
+    blocking.push(...auditMigrationReplaySafety(`migrations/${name}`, source, { plan: nativePlan, migrateSource, transactionSource }));
+    blocking.push(...auditMigrationN1Compatibility(`migrations/${name}`, source, { earlierFunctions, earlierRelations, keepsVerifier: keepsVerifier.get(name) ?? null }));
+    for (const defined of definedFunctionNames(source)) earlierFunctions.add(defined);
+    for (const defined of definedRelationNames(source)) earlierRelations.add(defined);
   }
+  blocking.push(...auditN1GrandfatheredCount(migrationNames));
   await auditOrphans();
   if (gatewayDeclarations !== 1) blocking.push(`ProviderGateway declaration count is ${gatewayDeclarations}, expected 1`);
   return { blocking };
@@ -943,6 +924,11 @@ export async function auditOrphans(): Promise<{
       "apps/api:GET /v1/session",
       "apps/api:GET /v1/runs/:id/events",
       "apps/runner:Hatchet walking-skeleton task",
+      // Side-by-side spec §13 (S14): check-version's two halves, operator commands run from a release's own folders.
+      "apps/runner:settings:check-runner (check-version, the runner half)",
+      "apps/api:settings:check-api (check-version, the API half)",
+      // Side-by-side spec §13, §11 (S15): the settings operator (verdict, activate, status, rollback-version, switch-plan).
+      "tools/settings-version:settings:verdict|activate|status (the settings operator, cli.ts)",
       "apps/scheduler:job:replay-self-test",
       "apps/scheduler:job:liveness-sweep",
       "apps/scheduler:job:reaper (stub; invocation throws SCAFFOLD_ONLY)",

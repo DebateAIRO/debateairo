@@ -153,7 +153,7 @@ describe("0121: the engine verdict, R2's one migration", () => {
   });
 
   it("follows the reply measures in the chain, with its own loader", () => {
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0120,loadForward0121,loadForward0122,loadForward0125,loadForward0126,loadForward0127,loadForward0128]");
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128]");
     const loader = read("packages/db/src/migration-forward0121.ts");
     expect(loader).toContain("const PREVIOUS='0120_reply_measures.sql';");
     expect(loader).toContain("const NAME='0121_engine_verdict.sql';");

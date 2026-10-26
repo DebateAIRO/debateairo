@@ -71,8 +71,11 @@ function createRunnerEnvironment(
   );
   const primary = targets[0];
   const registerVersion = apiEnvironment.REGISTER_VERSION;
+  // Side-by-side uploads spec 2026-10-21 §1: the dev runner is the dev API's own release; it never makes up a key.
+  const releaseKey = apiEnvironment.RELEASE_KEY;
   if (primary === undefined
     || registerVersion === undefined
+    || releaseKey === undefined
     || apiEnvironment.REGISTER_DEPLOYMENT_RECEIPT_SHA256 === undefined
     || apiEnvironment.REGISTER_DEPLOYMENT_RECEIPT_FILE === undefined
     || apiEnvironment.PROVIDER_DISCOVERY_TARGETS_JSON !== providerPanel.targetsJson) {
@@ -85,6 +88,7 @@ function createRunnerEnvironment(
     RUNNER_WORKER_ID: "development:walking-skeleton",
     DEBATEAI_DEPLOYMENT_MODE: "local",
     REGISTER_VERSION: registerVersion,
+    RELEASE_KEY: releaseKey,
     REGISTER_DEPLOYMENT_RECEIPT_SHA256: apiEnvironment.REGISTER_DEPLOYMENT_RECEIPT_SHA256!,
     REGISTER_DEPLOYMENT_RECEIPT_FILE: apiEnvironment.REGISTER_DEPLOYMENT_RECEIPT_FILE!,
     CONTENT_ENCRYPTION_ENABLED: apiEnvironment.CONTENT_ENCRYPTION_ENABLED!,
@@ -145,13 +149,18 @@ export async function startDevelopmentRunnerProcess(input: Readonly<{
 }>): Promise<DevelopmentRunnerProcess> {
   const profile = input.profile ?? DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE;
   const apiEnvironment = await input.operations.loadApiEnvironment(input.repositoryRoot);
+  // An environment the runner cannot be given names itself (DEV_RUNNER_PROCESS_ENVIRONMENT_INVALID); any other failure
+  // while building it or spawning stays DEV_RUNNER_PROCESS_START_FAILED, its cause kept off the printed line.
+  let runnerEnvironment: Readonly<Record<string, string>>;
+  try {
+    runnerEnvironment = createRunnerEnvironment(input.commandEnvironment, apiEnvironment, profile);
+  } catch (error) {
+    if (error instanceof DevelopmentRunnerProcessError) throw error;
+    throw new DevelopmentRunnerProcessError("DEV_RUNNER_PROCESS_START_FAILED", error);
+  }
   let child: DevelopmentRunnerChild;
   try {
-    child = input.operations.startRunner(createRunnerEnvironment(
-      input.commandEnvironment,
-      apiEnvironment,
-      profile
-    ));
+    child = input.operations.startRunner(runnerEnvironment);
   } catch (error) {
     throw new DevelopmentRunnerProcessError("DEV_RUNNER_PROCESS_START_FAILED", error);
   }
@@ -164,11 +173,14 @@ export async function startDevelopmentRunnerProcess(input: Readonly<{
       throw new DevelopmentRunnerProcessError("DEV_RUNNER_PROCESS_EXITED");
     }
     const message = outcome.message as Readonly<Record<string, unknown>> | null;
+    // Side-by-side spec §1: the ready line names the release, and it must be the API's own (the key forwarded above).
     if (message === null
       || message.kind !== "DEBATEAI_RUNNER_READY"
       || message.worker !== "debateai-dev-runner"
       || typeof message.registerVersion !== "string"
-      || message.registerVersion !== apiEnvironment.REGISTER_VERSION) {
+      || message.registerVersion !== apiEnvironment.REGISTER_VERSION
+      || typeof message.releaseKey !== "string"
+      || message.releaseKey !== apiEnvironment.RELEASE_KEY) {
       throw new DevelopmentRunnerProcessError("DEV_RUNNER_PROCESS_READINESS_INVALID");
     }
     let stopped = false;

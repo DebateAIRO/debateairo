@@ -302,6 +302,8 @@
   "runFailure.RUN_LIMIT_REACHED": "This debate reached its limit before it could produce an answer.",
   "runFailure.STOPPED": "This debate stopped partway because of a problem on our side. Please ask your question again.",
   "runFailure.PLAN_ENDED": "Your paid plan ended or was paused while this question waited, so the debate didn't start. You can ask it again.",
+  "runFailure.CHOICE_GONE": "The site was updated while your question waited, and one of the options you chose is no longer offered. Please ask it again. It did not use any of your allowance.",
+  "runFailure.SET_ASIDE": "We could not finish this debate because of an update on our side. It did not use your allowance. Please ask your question again.",
   "debateChrome.condition.backupModelUsed": "Where a planned AI model could not be used, another one stepped in",
   "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "This debate would cost more than this site allows for one debate.",
   "requestFailure.kind.MODEL_UNAVAILABLE": "The coordinator refused it: one of the debate's jobs has no AI model it can reach right now. Retry later."

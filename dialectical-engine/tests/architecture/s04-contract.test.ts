@@ -19,12 +19,13 @@ describe("S04 DDL and runtime attachment contract", () => {
   });
 
   it("DR-128 mints only the claim-type composition structure and wires a loud register read", async () => {
-    const [skeleton, sql, register, runnerMain, runnerPolicy] = await Promise.all([
+    const [skeleton, sql, register, runnerMain, runnerPolicy, runnerSettings] = await Promise.all([
       readFile(new URL("../../docs/architecture/05-register-skeleton.md", import.meta.url), "utf8"),
       readFile(reworkMigrationUrl, "utf8"),
       readFile(new URL("../../packages/register/src/index.ts", import.meta.url), "utf8"),
       readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8"),
-      readFile(new URL("../../apps/runner/src/dev-runner-policy.ts", import.meta.url), "utf8")
+      readFile(new URL("../../apps/runner/src/dev-runner-policy.ts", import.meta.url), "utf8"),
+      readFile(new URL("../../apps/runner/src/run-settings.ts", import.meta.url), "utf8")
     ]);
     expect(skeleton).toContain("`claimTypeCompositionMap`");
     expect(skeleton).toContain("`ClaimTypeCompositionMember`");
@@ -44,8 +45,14 @@ describe("S04 DDL and runtime attachment contract", () => {
     // not a second safeguard.
     expect(runnerPolicy).toContain("readClaimTypeCompositionMap");
     expect(runnerPolicy).toContain("DEV_RUNNER_POLICY_PROVENANCE_INVALID");
-    expect(runnerMain).toContain("readDevelopmentRunnerPolicy");
-    expect(runnerMain).toContain("compositionRow: policy.compositionRow");
+    // Side-by-side spec §13: the loader call and the row's mapping now sit in the one per-version settings loader
+    // (run-settings.ts), which main.ts boots its site version through and whose debate members it spreads.
+    expect(runnerSettings).toContain("readDevelopmentRunnerPolicy");
+    // S6: the debate members' one mapping is its own module, re-exported by the loader.
+    expect(await readFile(new URL("../../apps/runner/src/run-debate-members.ts", import.meta.url), "utf8"))
+      .toContain("compositionRow: policy.compositionRow");
+    expect(runnerMain).toContain("loadRunnerVersionSettings");
+    expect(runnerMain).toContain("...runnerSettingsOfVersion(siteVersionSettings),");
   });
 
   it("DR-077 records declared selection-rule provenance and attaches selection to the runner", async () => {

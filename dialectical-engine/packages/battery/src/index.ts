@@ -1,6 +1,12 @@
-import type { ActivationState } from "@debateai/kernel";
+import { LEGACY_RELEASE_KEY, parseReleaseKey, type ActivationState } from "@debateai/kernel";
 import type { Pool, PoolClient } from "pg";
-import { allocateSequence, withWriteTransaction } from "@debateai/db";
+import {
+  allocateSequence,
+  recordSpendWaiver,
+  SPEND_WAIVER_REASONS,
+  withWriteTransaction,
+  type SpendWaiverReason
+} from "@debateai/db";
 
 export {
   SplitLifecycleProjection,
@@ -263,21 +269,165 @@ export type ClaimRenewal =
   | { readonly kind: "FINISHED" }
   | { readonly kind: "LOST" };
 
-export class WorkItemRepository {
-  constructor(private readonly pool: Pool) {}
+/**
+ * Side-by-side spec §3, "the database refuses to give a runner another release's debate": every claim, sweep and
+ * failure write of a repository reads only the work of runs stamped with `releaseKey` (`core.run.release_key`, 0123).
+ * `workerId` is this runner's worker id (one process per release): the copy that holds a live claim is read as
+ * `claimed_by = workerId` (plan B D2), so a failure or set-aside write never lands under another worker's live claim.
+ * A repository told no worker id writes over no live claim at all.
+ */
+export type WorkItemFence = Readonly<{ releaseKey: string; workerId?: string }>;
 
-  async listDispatchable(limit: number): Promise<readonly DispatchableWorkItem[]> {
-    if (!Number.isInteger(limit) || limit < 1 || limit > 1_000) {
-      throw new TypeError("Dispatchable work limit must be an integer between 1 and 1000");
+/** The head of every set-aside reason: the run was stopped by an upload, never by its own failure (spec §4, §9). */
+export const RUN_SET_ASIDE = "RUN_SET_ASIDE";
+
+/**
+ * Why a run was set aside — the reasons a spend waiver may carry, one list (plan A's `SPEND_WAIVER_REASONS`, the
+ * `ledger.model_spend_waiver` CHECK; INTERFACE "Database"), so the waiver carries the word the FAILED row records.
+ */
+export type SetAsideReason = SpendWaiverReason;
+
+const SET_ASIDE_REASONS: ReadonlySet<string> = new Set<string>(SPEND_WAIVER_REASONS);
+
+/**
+ * Spec §9 "the waiver": a set-aside run never uses the person's quota. One waiver per distinct run of `runIds`,
+ * written on the client of the transaction that wrote their FAILED rows, so both commit together or not at all.
+ * Idempotent: a run that already has a waiver keeps its first reason (ON CONFLICT (run_id) DO NOTHING).
+ */
+async function waiveSetAsideRuns(
+  client: PoolClient,
+  runIds: readonly string[],
+  reason: SetAsideReason
+): Promise<void> {
+  for (const runId of new Set(runIds)) await recordSpendWaiver(client, runId, reason);
+}
+
+/** The terminal reason a set-aside writes: `RUN_SET_ASIDE:<waiver reason>` (plan B D7: the site reads it SET_ASIDE). */
+export function runSetAsideReason(reason: SetAsideReason): string {
+  if (!SET_ASIDE_REASONS.has(reason)) throw new TypeError("SET_ASIDE_REASON_INVALID");
+  return `RUN_SET_ASIDE:${reason}`;
+}
+
+/** One work item a set-aside wrote FAILED, and its run (whose waiver was written on the same transaction). */
+export type SetAsideWorkItem = Readonly<{ runId: string; workItemId: string }>;
+
+function assertWorkLimit(limit: number, what: string): void {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 1_000) {
+    throw new TypeError(`${what} limit must be an integer between 1 and 1000`);
+  }
+}
+
+export class WorkItemRepository {
+  readonly #fence: Readonly<{ releaseKey: string; workerId: string | null }>;
+
+  /**
+   * Without a fence the repository serves the `legacy` release (runs written before 0123 or without a key). Any other
+   * key must be well formed (TypedDomainError RELEASE_KEY_INVALID): a mistyped fence would match no run and silently
+   * serve nothing.
+   */
+  constructor(private readonly pool: Pool, fence: WorkItemFence = { releaseKey: LEGACY_RELEASE_KEY }) {
+    if (fence?.releaseKey !== LEGACY_RELEASE_KEY) parseReleaseKey(fence?.releaseKey);
+    if (fence.workerId !== undefined && (typeof fence.workerId !== "string" || fence.workerId.length === 0)) {
+      throw new TypeError("WORK_ITEM_FENCE_WORKER_ID_INVALID");
     }
+    this.#fence = Object.freeze({ releaseKey: fence.releaseKey, workerId: fence.workerId ?? null });
+  }
+
+  /** Spec §3: what a runner may dispatch is its own release's work — READY, or CLAIMED with the claim lapsed. */
+  async listDispatchable(limit: number): Promise<readonly DispatchableWorkItem[]> {
+    assertWorkLimit(limit, "Dispatchable work");
     const result = await this.pool.query<{ work_item_id: string; run_id: string }>(
-      `SELECT work_item_id, run_id
-       FROM core.work_item
-       WHERE run_id IS NOT NULL
-         AND (state = 'READY' OR (state = 'CLAIMED' AND claim_deadline <= clock_timestamp()))
-       ORDER BY created_at_seq, work_item_id
+      `SELECT item.work_item_id, item.run_id
+       FROM core.work_item AS item
+       JOIN core.run AS run ON run.run_id = item.run_id AND run.release_key = $2
+       WHERE item.state = 'READY' OR (item.state = 'CLAIMED' AND item.claim_deadline <= clock_timestamp())
+       ORDER BY item.created_at_seq, item.work_item_id
        LIMIT $1`,
-      [limit]
+      [limit, this.#fence.releaseKey]
+    );
+    return Object.freeze(result.rows.map((row) => Object.freeze({
+      runId: row.run_id,
+      workItemId: row.work_item_id
+    })));
+  }
+
+  /**
+   * Spec §3: the release that owns a work item — its run's `release_key`; null when there is no such item or the item
+   * has no run (D3: a run-less item belongs to no release). The runner reads it before claiming a dispatched item, so
+   * another release's item is left alone without a write.
+   */
+  async releaseKeyOf(workItemId: string): Promise<string | null> {
+    const result = await this.pool.query<{ release_key: string }>(
+      `SELECT run.release_key
+       FROM core.work_item AS item
+       JOIN core.run AS run ON run.run_id = item.run_id
+       WHERE item.work_item_id = $1`,
+      [workItemId]
+    );
+    return result.rows[0]?.release_key ?? null;
+  }
+
+  /**
+   * Side-by-side spec §13 (S6, D2): the settings version of a work item's run, read BEFORE the claim by the work item id:
+   * `core.work_item.run_id` joined to `core.run.register_version` and `release_key`, all insert-only, so the read is
+   * race-free and gives the version the claim would. No content, no lease, no write. Null when there is no such item or
+   * it has no run. The runner resolves the version only for its own release's run; another release's is refused by the
+   * fenced claim (NO_WORK), as Phase 1 rules.
+   */
+  async peekRunSettingsVersion(workItemId: string): Promise<Readonly<{
+    runId: string; registerVersion: number; releaseKey: string;
+  }> | null> {
+    const result = await this.pool.query<{ run_id: string; register_version: number; release_key: string }>(
+      // The bigint version is cast by the database (an out-of-range one refuses), never coerced in JavaScript.
+      `SELECT run.run_id, run.register_version::integer AS register_version, run.release_key
+       FROM core.work_item AS item
+       JOIN core.run AS run ON run.run_id = item.run_id
+       WHERE item.work_item_id = $1`,
+      [workItemId]
+    );
+    const row = result.rows[0];
+    return row === undefined ? null : Object.freeze({
+      runId: row.run_id, registerVersion: row.register_version, releaseKey: row.release_key
+    });
+  }
+
+  /**
+   * Side-by-side spec §13 runner point 3 (S8): the distinct settings versions of this release's OPEN debates — every run
+   * with a READY or CLAIMED work item, by its stamped `core.run.register_version` — read once at boot so the runner
+   * loads them before it claims anything. `releaseKey` must be this repository's own fence (spec §3: a runner reads
+   * only its own release's work; WORK_ITEM_FENCE_RELEASE_MISMATCH otherwise). `legacy` lists nothing, without a query:
+   * a legacy run (written before 0123, development and tests) is never preloaded. Ascending; no content, no write.
+   */
+  async listOpenRunSettingsVersions(releaseKey: string): Promise<readonly number[]> {
+    if (releaseKey !== this.#fence.releaseKey) throw new TypeError("WORK_ITEM_FENCE_RELEASE_MISMATCH");
+    if (releaseKey === LEGACY_RELEASE_KEY) return Object.freeze([]);
+    const result = await this.pool.query<{ register_version: number }>(
+      // The bigint version is cast by the database (an out-of-range one refuses), never coerced in JavaScript.
+      `SELECT DISTINCT run.register_version::integer AS register_version
+       FROM core.work_item AS item
+       JOIN core.run AS run ON run.run_id = item.run_id
+       WHERE item.state IN ('READY','CLAIMED') AND run.release_key = $1
+       ORDER BY register_version`,
+      [releaseKey]
+    );
+    return Object.freeze(result.rows.map((row) => row.register_version));
+  }
+
+  /**
+   * Spec §3 (plan B D4): this release's CLAIMED items whose claim has lapsed — a copy that died mid-debate — oldest
+   * first. The periodic re-send hands only these to Hatchet again; READY items stay with the API's stalled-start
+   * re-send, so a queued job is never sent twice.
+   */
+  async listLapsedClaimed(limit: number): Promise<readonly DispatchableWorkItem[]> {
+    assertWorkLimit(limit, "Lapsed claim");
+    const result = await this.pool.query<{ work_item_id: string; run_id: string }>(
+      `SELECT item.work_item_id, item.run_id
+       FROM core.work_item AS item
+       JOIN core.run AS run ON run.run_id = item.run_id AND run.release_key = $2
+       WHERE item.state = 'CLAIMED' AND item.claim_deadline <= clock_timestamp()
+       ORDER BY item.created_at_seq, item.work_item_id
+       LIMIT $1`,
+      [limit, this.#fence.releaseKey]
     );
     return Object.freeze(result.rows.map((row) => Object.freeze({
       runId: row.run_id,
@@ -345,6 +495,11 @@ export class WorkItemRepository {
     return withWriteTransaction(this.pool, (client) => this.enqueueOn(client, input));
   }
 
+  /**
+   * Spec §3, "the database refuses to give a runner another release's debate": the oldest claimable item of this
+   * fence's release. A run-less item stays claimable by any fence, as before (D3; it still ends in
+   * WORK_ITEM_WITHOUT_RUN).
+   */
   async claimNext(input: { readonly workerId: string; readonly claimSeconds: number }): Promise<ClaimedWorkItem | null> {
     if (!Number.isFinite(input.claimSeconds) || input.claimSeconds <= 0) {
       throw new TypeError("claimSeconds must be a positive register value");
@@ -360,8 +515,10 @@ export class WorkItemRepository {
         run_id: string | null;
       }>(
         `WITH candidate AS (
-          SELECT work_item_id FROM core.work_item
-          WHERE state = 'READY' OR (state = 'CLAIMED' AND claim_deadline <= clock_timestamp())
+          SELECT work_item_id FROM core.work_item AS item
+          WHERE (state = 'READY' OR (state = 'CLAIMED' AND claim_deadline <= clock_timestamp()))
+            AND (item.run_id IS NULL
+              OR EXISTS (SELECT 1 FROM core.run AS run WHERE run.run_id = item.run_id AND run.release_key = $3))
           ORDER BY created_at_seq
           FOR UPDATE SKIP LOCKED
           LIMIT 1
@@ -374,7 +531,7 @@ export class WorkItemRepository {
         WHERE item.work_item_id = candidate.work_item_id
         RETURNING item.work_item_id, item.command_key, item.battery_row_id, item.run_id,
                   item.node_set, item.claimed_by, item.claim_deadline`,
-        [input.workerId, input.claimSeconds]
+        [input.workerId, input.claimSeconds, this.#fence.releaseKey]
       );
       const row = result.rows[0];
       return row === undefined ? null : {
@@ -389,6 +546,7 @@ export class WorkItemRepository {
     });
   }
 
+  /** Spec §3: as `claimNext`, for the one item Hatchet handed over; another release's item is never claimed (null). */
   async claimById(input: {
     readonly workItemId: string;
     readonly workerId: string;
@@ -408,9 +566,11 @@ export class WorkItemRepository {
         run_id: string | null;
       }>(
         `WITH candidate AS (
-          SELECT work_item_id FROM core.work_item
+          SELECT work_item_id FROM core.work_item AS item
           WHERE work_item_id = $1
             AND (state = 'READY' OR (state = 'CLAIMED' AND claim_deadline <= clock_timestamp()))
+            AND (item.run_id IS NULL
+              OR EXISTS (SELECT 1 FROM core.run AS run WHERE run.run_id = item.run_id AND run.release_key = $4))
           FOR UPDATE SKIP LOCKED
         )
         UPDATE core.work_item AS item
@@ -419,7 +579,7 @@ export class WorkItemRepository {
         FROM candidate WHERE item.work_item_id = candidate.work_item_id
         RETURNING item.work_item_id, item.command_key, item.battery_row_id,
                   item.node_set, item.claimed_by, item.claim_deadline, item.run_id`,
-        [input.workItemId, input.workerId, input.claimSeconds]
+        [input.workItemId, input.workerId, input.claimSeconds, this.#fence.releaseKey]
       );
       const row = result.rows[0];
       return row === undefined ? null : {
@@ -474,14 +634,23 @@ export class WorkItemRepository {
     });
   }
 
+  /**
+   * Records the work item DONE with its settled attempt and artifact. R3 (final review), spec §3/§4: a repository that
+   * names its worker settles only that worker's own claim (`state = 'CLAIMED' AND claimed_by = worker`), so a task
+   * finishing after the backstop set its debate aside FAILED (RUN_SET_ASIDE, with the waiver) never writes DONE over
+   * it, and never settles another worker's claim. One told no worker id (test fixtures) settles a READY or CLAIMED
+   * item, and never a FAILED one either. True when this call wrote it.
+   */
   async settle(input: { readonly workItemId: string; readonly attemptId: string; readonly artifactRef: string }): Promise<boolean> {
     return withWriteTransaction(this.pool, async (client) => {
       const result = await client.query(
         `UPDATE core.work_item
          SET state = 'DONE', claimed_by = NULL, claim_deadline = NULL,
              settled_attempt_id = $2, settled_artifact_ref = $3
-         WHERE work_item_id = $1 AND settled_attempt_id IS NULL`,
-        [input.workItemId, input.attemptId, input.artifactRef]
+         WHERE work_item_id = $1 AND settled_attempt_id IS NULL
+           AND state IN ('READY','CLAIMED')
+           AND ($4::text IS NULL OR (state = 'CLAIMED' AND claimed_by = $4::text))`,
+        [input.workItemId, input.attemptId, input.artifactRef, this.#fence.workerId]
       );
       return result.rowCount === 1;
     });
@@ -545,6 +714,11 @@ export class WorkItemRepository {
     });
   }
 
+  /**
+   * Records a run's work item FAILED with `reason`. Spec §3: only an item of this fence's release, and never one under
+   * another worker's live claim — that copy is still running the debate (D2). An item of its own release already
+   * FAILED is re-written with the new reason, as before (D2). True when the item now reads FAILED with `reason`.
+   */
   async recordTerminalFailure(input: {
     readonly runId: string;
     readonly workItemId: string;
@@ -555,14 +729,101 @@ export class WorkItemRepository {
     }
     return withWriteTransaction(this.pool, async (client) => {
       const failed = await client.query(
-        `UPDATE core.work_item
+        `UPDATE core.work_item AS item
          SET state = 'FAILED', claimed_by = NULL, claim_deadline = NULL,
              terminal_reason = $3
-         WHERE work_item_id = $1 AND run_id = $2
-           AND state <> 'DONE' AND settled_attempt_id IS NULL`,
-        [input.workItemId, input.runId, input.reason]
+         FROM core.run AS run
+         WHERE item.work_item_id = $1 AND item.run_id = $2
+           AND item.state <> 'DONE' AND item.settled_attempt_id IS NULL
+           AND run.run_id = item.run_id AND run.release_key = $4
+           AND NOT (item.state = 'CLAIMED' AND item.claim_deadline > clock_timestamp()
+                    AND item.claimed_by IS DISTINCT FROM $5::text)`,
+        [input.workItemId, input.runId, input.reason, this.#fence.releaseKey, this.#fence.workerId]
       );
       return failed.rowCount === 1;
     });
+  }
+
+  /**
+   * Spec §4 steps 1-4 (the backstop): records this fence's release's open work — READY, or CLAIMED by this worker or
+   * with the claim lapsed, never settled — FAILED with `runSetAsideReason(reason)`, at most `limit` items, oldest
+   * first; the caller pages while a full page comes back. Another worker's live claim is left alone (D2).
+   * Spec §9 "the waiver": a set-aside run never uses the person's quota. On the caller's transaction this writes the
+   * FAILED rows AND one waiver per distinct returned run, so both commit together or not at all.
+   */
+  async setAsideOpenWorkOn(
+    client: PoolClient,
+    input: Readonly<{ reason: SetAsideReason; limit: number }>
+  ): Promise<readonly SetAsideWorkItem[]> {
+    const terminalReason = runSetAsideReason(input?.reason);
+    assertWorkLimit(input.limit, "Set-aside");
+    const result = await client.query<{ work_item_id: string; run_id: string }>(
+      `WITH candidate AS (
+         SELECT item.work_item_id
+         FROM core.work_item AS item
+         JOIN core.run AS run ON run.run_id = item.run_id AND run.release_key = $1
+         WHERE item.state IN ('READY','CLAIMED') AND item.settled_attempt_id IS NULL
+           AND NOT (item.state = 'CLAIMED' AND item.claim_deadline > clock_timestamp()
+                    AND item.claimed_by IS DISTINCT FROM $4::text)
+         ORDER BY item.created_at_seq, item.work_item_id
+         LIMIT $3
+         FOR UPDATE OF item
+       ), set_aside AS (
+         UPDATE core.work_item AS item
+         SET state = 'FAILED', claimed_by = NULL, claim_deadline = NULL, terminal_reason = $2
+         FROM candidate
+         WHERE item.work_item_id = candidate.work_item_id
+         RETURNING item.work_item_id, item.run_id, item.created_at_seq
+       )
+       SELECT work_item_id, run_id FROM set_aside ORDER BY created_at_seq, work_item_id`,
+      [this.#fence.releaseKey, terminalReason, input.limit, this.#fence.workerId]
+    );
+    await waiveSetAsideRuns(client, result.rows.map((row) => row.run_id), input.reason);
+    return Object.freeze(result.rows.map((row) => Object.freeze({
+      runId: row.run_id,
+      workItemId: row.work_item_id
+    })));
+  }
+
+  /** `setAsideOpenWorkOn` in its own write transaction: the FAILED rows and their runs' waivers commit together. */
+  async setAsideOpenWork(input: Readonly<{ reason: SetAsideReason; limit: number }>): Promise<readonly SetAsideWorkItem[]> {
+    return withWriteTransaction(this.pool, (client) => this.setAsideOpenWorkOn(client, input));
+  }
+
+  /**
+   * Spec §4, §9: sets one open work item of `runId` aside — FAILED with `runSetAsideReason(reason)` — only when its run
+   * belongs to this fence's release and it is not settled. `readyOnly` limits it to a job never claimed; otherwise a
+   * CLAIMED item qualifies too, except under another worker's live claim (D2). On the caller's transaction, with the
+   * run's waiver (spec §9) when it wrote the item, so both commit together. True when this call wrote it. Plan C's
+   * RELEASE_NOT_SERVED path does not come through here: it closes its never-claimed job through `recordSetupFailure`
+   * with RUN_SETUP_FAILED:RELEASE_NOT_SERVED (shown to the person as "not started") and writes the waiver itself.
+   */
+  async setAsideWorkItemOn(
+    client: PoolClient,
+    input: Readonly<{ runId: string; workItemId: string; reason: SetAsideReason; readyOnly: boolean }>
+  ): Promise<boolean> {
+    const terminalReason = runSetAsideReason(input?.reason);
+    if (typeof input.readyOnly !== "boolean") throw new TypeError("Set-aside readyOnly must be a boolean");
+    const result = await client.query(
+      `UPDATE core.work_item AS item
+       SET state = 'FAILED', claimed_by = NULL, claim_deadline = NULL, terminal_reason = $3
+       FROM core.run AS run
+       WHERE item.work_item_id = $1 AND item.run_id = $2
+         AND run.run_id = item.run_id AND run.release_key = $4
+         AND item.settled_attempt_id IS NULL
+         AND (item.state = 'READY' OR (NOT $6::boolean AND item.state = 'CLAIMED'
+              AND NOT (item.claim_deadline > clock_timestamp() AND item.claimed_by IS DISTINCT FROM $5::text)))`,
+      [input.workItemId, input.runId, terminalReason, this.#fence.releaseKey, this.#fence.workerId, input.readyOnly]
+    );
+    if (result.rowCount !== 1) return false;
+    await waiveSetAsideRuns(client, [input.runId], input.reason);
+    return true;
+  }
+
+  /** `setAsideWorkItemOn` in its own write transaction: the FAILED row and the run's waiver commit together. */
+  async setAsideWorkItem(
+    input: Readonly<{ runId: string; workItemId: string; reason: SetAsideReason; readyOnly: boolean }>
+  ): Promise<boolean> {
+    return withWriteTransaction(this.pool, (client) => this.setAsideWorkItemOn(client, input));
   }
 }

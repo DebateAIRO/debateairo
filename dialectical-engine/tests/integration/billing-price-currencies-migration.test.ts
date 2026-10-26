@@ -141,10 +141,12 @@ describe("Part C's migration step: the currency of every quote, charge and subsc
     // follows the export (S01-C05), the debate shape's map 0117 follows the mail locale, the language check's site
     // cost 0118 follows the map, the reclaim resume 0119 follows the language check, then the reply measures (0120, spec
     // 2026-10-15), then the engine verdict (0121, spec 2026-10-15 engine redesign R2), then the engine's map answer step
-    // (0122), last (spec 2026-10-15 engine redesign R3).
+    // (0122, spec 2026-10-15 engine redesign R3), then the side-by-side releases (0123, spec 2026-10-21), then the settings
+    // activation (0124), last (side-by-side spec §13).
     expect(before.steps.map((row) => row.source_name)).toEqual([NETOPIA_STEP, BATCH_STEP, PART_C_STEP, ROLE_ROTATION_STEP, "0115_data_export.sql",
       "0116_mail_locale.sql", "0117_debate_shape_map.sql", "0118_language_check_spend.sql", "0119_reclaim_resume.sql",
-      "0120_reply_measures.sql", "0121_engine_verdict.sql", "0122_engine_map_check.sql", "0125_synthesis_check.sql", "0126_publication_review.sql", "0127_threat_reports.sql", "0128_support_answer_scope.sql"]);
+      "0120_reply_measures.sql", "0121_engine_verdict.sql", "0122_engine_map_check.sql", "0123_side_by_side_releases.sql",
+      "0124_settings_activation.sql", "0125_synthesis_check.sql", "0126_publication_review.sql", "0127_threat_reports.sql", "0128_support_answer_scope.sql"]);
     const step = plan.forwardChain.find((entry) => entry.name === PART_C_STEP)!;
     const netopia = plan.forwardChain.find((entry) => entry.name === NETOPIA_STEP)!;
     const batch = plan.forwardChain.find((entry) => entry.name === BATCH_STEP)!;

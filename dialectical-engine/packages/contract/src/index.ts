@@ -236,6 +236,9 @@ export const QuestionLanguageChoiceSchema = z.object({
 }).strict();
 export type QuestionLanguageChoice = z.infer<typeof QuestionLanguageChoiceSchema>;
 
+/** Side-by-side spec §13 (Task S12): a sealed settings version's number, as the room read names it and an ask echoes it. */
+const SettingsVersionSchema = z.number().int().positive();
+
 export const AskRequestSchema = z.object({
   question_line: z.string().trim().min(1),
   risk_tier: RiskTierSchema,
@@ -251,7 +254,11 @@ export const AskRequestSchema = z.object({
   steering_annotations: z.array(z.string().min(1)),
   // Question language (spec 2026-10-13): read only when the debate shape row is present; ignored otherwise.
   site_language: SiteLanguageSchema.optional(),
-  question_language_choice: QuestionLanguageChoiceSchema.optional()
+  question_language_choice: QuestionLanguageChoiceSchema.optional(),
+  // Side-by-side spec §13 (Task S12): the settings version the /new page's room read answered from (its
+  // `settings_version`). Present and no longer the active one, an ask whose choices the active version does not offer is
+  // refused 409 ASK_SETTINGS_CHANGED ("please choose again"); absent (an older page), the ask is normalised as before.
+  settings_version: SettingsVersionSchema.optional()
 }).strict();
 export type AskRequest = z.infer<typeof AskRequestSchema>;
 
@@ -342,6 +349,18 @@ export const AskAlreadyWaitingSchema = z.object({
 export type AskAlreadyWaiting = z.infer<typeof AskAlreadyWaitingSchema>;
 
 /**
+ * Side-by-side uploads spec 2026-10-21 §5, §6 (plan C task C14): the 409 body of a debate read whose debate was made by
+ * a newer release than the API answering it — the site shows "open it on the current site", never a 404 or a crash.
+ * Sent on debate reads only (a run, its answer, a public debate): the page's sentence says "this debate".
+ */
+export const MADE_BY_NEWER_RELEASE = "MADE_BY_NEWER_RELEASE" as const;
+export const MadeByNewerReleaseSchema = z.object({
+  error: z.literal(MADE_BY_NEWER_RELEASE),
+  message: z.literal(MADE_BY_NEWER_RELEASE)
+}).strict();
+export type MadeByNewerRelease = z.infer<typeof MadeByNewerReleaseSchema>;
+
+/**
  * Question language (spec 2026-10-13, D1): the 409 body of a real-mix offer. The server signed `check_ref`; the
  * page shows the languages and the proposed rewrite and answers with `question_language_choice` on the same ask.
  * Pre-flight PF-L19 and ruling L-B64: two to six languages, each primary code once, each name at most 64 UTF-8
@@ -407,6 +426,17 @@ const AnswerWordsSchema = z.object({
  * waiting run, and their plan. Never a capacity figure (I6: figures about the room are a capacity oracle); its only
  * numbers are the plan's answer-length targets (`answer_words`, length guidance), which say nothing about capacity.
  */
+/**
+ * Side-by-side spec §13 addition, D24 (Task SA7 part A): the preview line-up of the version a room read was read from —
+ * the model ids on Free and on Premium — so the /new page names the AIs that version seats instead of only the list its
+ * build was made with. Model names the page already shows; no capacity figure (I6). The page checks every id against its
+ * own reviewed list before showing it. Optional: absent off the preview and from an older API (spec §7, additive only).
+ */
+const PreviewRostersSchema = z.object({
+  free: z.array(z.string().min(1)).min(1),
+  premium: z.array(z.string().min(1)).min(1)
+}).strict();
+
 const CustomerAskRoomResponseSchema = z.object({
   room: z.enum(["FITS", "CLOSE", "FULL", "ALREADY_WAITING"]),
   scope: z.enum(["SITE_DAY", "PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]).nullable(),
@@ -424,7 +454,12 @@ const CustomerAskRoomResponseSchema = z.object({
   // Length guidance (spec 2026-10-15 §3.8): present only with the length row (its plan's words) or the shape row (its
   // answer lengths); `length_settings` only when the length row is in force, so the page offers the answer length.
   answer_words: AnswerWordsSchema.optional(),
-  length_settings: z.literal(true).optional()
+  length_settings: z.literal(true).optional(),
+  // Side-by-side spec §13 (Task S12): the settings version this answer was read from (the active one), present when the
+  // API answers the pages from the activation pointer. The page sends it back with the ask (`AskRequest.settings_version`).
+  settings_version: SettingsVersionSchema.optional(),
+  // Addition D24 (Task SA7 part A): on the preview, that version's line-up (PreviewRostersSchema); absent elsewhere.
+  preview_rosters: PreviewRostersSchema.optional()
 }).strict().superRefine((answer, context) => {
   if (answer.waits_for !== undefined
     && (!(answer.room === "FULL" || answer.room === "ALREADY_WAITING") || !PERSON_SCOPES.has(answer.scope ?? ""))) {
@@ -444,7 +479,11 @@ const CustomerAskRoomResponseSchema = z.object({
 const InternalFundingUsageSchema = z.object({kind:z.literal("INTERNAL"),expires_at:z.iso.datetime()}).strict();
 const InternalAskRoomResponseSchema = z.object({
   room:z.enum(["FITS","CLOSE","FULL","ALREADY_WAITING"]),scope:z.enum(["SITE_DAY","PERSON_DAY","PERSON_WEEK","PERSON_GRANT"]).nullable(),
-  resets_at:z.iso.datetime().nullable(),waiting_run_ref:z.string().min(1).nullable(),plan_id:z.null(),funding:InternalFundingUsageSchema,waits_for:WaitsForSchema.optional(),shape_settings:z.literal(true).optional(),answer_words:AnswerWordsSchema.optional(),length_settings:z.literal(true).optional()
+  resets_at:z.iso.datetime().nullable(),waiting_run_ref:z.string().min(1).nullable(),plan_id:z.null(),funding:InternalFundingUsageSchema,waits_for:WaitsForSchema.optional(),shape_settings:z.literal(true).optional(),answer_words:AnswerWordsSchema.optional(),length_settings:z.literal(true).optional(),
+  // Side-by-side spec §13 (Task S12): as the customer answer's `settings_version`.
+  settings_version:SettingsVersionSchema.optional(),
+  // Addition D24 (Task SA7 part A): as the customer answer's `preview_rosters`.
+  preview_rosters:PreviewRostersSchema.optional()
 }).strict().superRefine((answer,context)=>{
   if ((answer.room==="FITS") !== (answer.scope===null) || (answer.room==="FITS" && answer.resets_at!==null)
     || ((answer.room==="ALREADY_WAITING") !== (answer.waiting_run_ref!==null))
@@ -843,6 +882,16 @@ export type LegalAcceptRequest = z.infer<typeof LegalAcceptRequestSchema>;
 /** Paid plans G3a: booleans only — never the country the server saw. `service`: sign-in and the support assistant are open here. */
 export const GeoAvailabilityResponseSchema = z.object({ signup: z.boolean(), pay: z.boolean(), service: z.boolean() }).strict();
 export type GeoAvailabilityResponse = z.infer<typeof GeoAvailabilityResponseSchema>;
+/**
+ * Side-by-side spec §13, addition D24 (owner's answer to Q-L6, 2026-10-22: providers only, not the models, listed
+ * automatically): `GET /v1/public/ai-providers`, the companies the API's declared provider targets reach, for the
+ * "AI providers" legal page. Strict, so a model id, a URL or a price can never ride along; at most 32 entries (the
+ * declared-target limit), each a company key (`anthropic`, `deepinfra`) or `host:<hostname>` (1-260 characters).
+ */
+export const PublicAiProvidersResponseSchema = z.object({
+  companies: z.array(z.string().min(1).max(260)).max(32)
+}).strict();
+export type PublicAiProvidersResponse = z.infer<typeof PublicAiProvidersResponseSchema>;
 
 /**
  * Sensitive-data consent (V's ruling of 2026-09-29). Before the first debate an account
@@ -1692,6 +1741,8 @@ export const contractInventory = Object.freeze({
     "DELETE /v1/debates/{id}",
     "GET /v1/public/debates",
     "GET /v1/public/debates/{id}",
+    // Addition D24: the companies the declared provider targets reach, for the "AI providers" page.
+    "GET /v1/public/ai-providers",
     "GET /v1/geo/availability",
     "POST /v1/support/messages",
     "GET /v1/support/status",
@@ -1699,6 +1750,9 @@ export const contractInventory = Object.freeze({
     "GET /v1/asks/room",
     "GET /v1/session",
     "GET /v1/deployment",
+    // Side-by-side spec §6 (plan C5): the API's liveness and readiness probes.
+    "GET /livez",
+    "GET /readyz",
     "GET /v1/dev/evaluator",
     "POST /v1/dev/evaluator/consumer-selection",
     "GET /v1/answers",
@@ -1750,7 +1804,7 @@ export const contractInventory = Object.freeze({
     BillingUsageResponseSchema, RunProjectionSchema, SessionSchema, SessionSummarySchema,
     SessionListSchema, RevokeAllSessionsSchema, VisibilityGrantActionSchema,
     AgeCheckRequestSchema, AgeCheckResultSchema, AgeConfirmationStatusSchema, RegisterLegalDocumentsSchema,
-    LegalStatusResponseSchema, LegalAcceptRequestSchema, GeoAvailabilityResponseSchema,
+    LegalStatusResponseSchema, LegalAcceptRequestSchema, GeoAvailabilityResponseSchema, PublicAiProvidersResponseSchema,
     SensitiveDataConsentRequestSchema, SensitiveDataConsentStatusSchema,
     RunTargetedGrantActionSchema,
     BeginSocialStepUpRequestSchema,SocialStepUpStatusRequestSchema,SocialStepUpStatusResponseSchema,CompleteSocialStepUpRequestSchema,StepUpAuthorizationRequestSchema, StepUpResponseSchema, BeginPasskeyStepUpRequestSchema, CompletePasskeyStepUpRequestSchema, AuthMethodsResponseSchema, RemoveAuthMethodRequestSchema, RegenerateRecoveryCodesRequestSchema, RecoveryCodesResponseSchema, MfaRecoveryPendingResponseSchema, MfaRecoveryPendingCancelRequestSchema, MfaRecoveryPendingCancelledSchema,

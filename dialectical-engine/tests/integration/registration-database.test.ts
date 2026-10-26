@@ -2152,7 +2152,22 @@ setTimeout(() => undefined, 500);
     )]);
     const acceptedAtSaturation = outcomes.filter((outcome) => outcome === "ALLOWED").length;
     flow.service.drainMailCapacitySignals();
-    const capacitySignals = capacityError.mock.calls.map(([message]) => String(message));
+    // The spy sees every console.error in the window, not only the capacity
+    // signal. On a slow host each activated registration whose pre-transport
+    // work overruns the ruled budget also logs its own content-free line
+    // (owned by "S3d signals pre-transport work outside the ruled 600ms
+    // healthy-storage bound"), so count only capacity lines here and admit
+    // nothing else but that exact diagnostic.
+    const operatorSignals = capacityError.mock.calls.map(([message]) => String(message));
+    const capacitySignals = operatorSignals.filter((signal) =>
+      signal.startsWith("[AUTH_MAIL_CAPACITY_EXHAUSTED]"));
+    const preTransportBudgetSignal = new RegExp(
+      "^\\[AUTH_REGISTRATION_PRETRANSPORT_BUDGET_EXCEEDED\\] correlation=[0-9a-f-]{36} "
+      + "code=REGISTRATION_PRETRANSPORT_SLOW elapsed_ms=\\d+ "
+      + `budget_ms=${basePolicy.channel.mailDispatchPreTransportWorkBudgetMs}$`
+    );
+    const unexpectedSignals = operatorSignals.filter((signal) =>
+      !signal.startsWith("[AUTH_MAIL_CAPACITY_EXHAUSTED]") && !preTransportBudgetSignal.test(signal));
 
     try {
       expect(pending.size).toBeLessThanOrEqual(ruledMaximum);
@@ -2181,12 +2196,16 @@ setTimeout(() => undefined, 500);
       }));
       expect(Math.abs(duplicateAtCapacity.elapsedMs - newAtCapacity.elapsedMs))
         .toBeLessThan(basePolicy.verification.enumerationToleranceMs);
-      expect(capacitySignals).toHaveLength(1);
+      expect(capacitySignals, `capacity lines: ${JSON.stringify(capacitySignals)}`).toHaveLength(1);
       expect(capacitySignals.every((signal) =>
         /^\[AUTH_MAIL_CAPACITY_EXHAUSTED\] correlation=[0-9a-f-]{36} code=MAIL_DISPATCH_CAPACITY window=[^ ]+ count=4$/.test(signal)
-      )).toBe(true);
-      expect(capacitySignals.some((signal) => signal.includes("s3d-hang-")
-        || signal.includes("2001:db8") || signal.includes("vitest-s3d"))).toBe(false);
+      ), `capacity lines: ${JSON.stringify(capacitySignals)}`).toBe(true);
+      expect(operatorSignals.some((signal) => signal.includes("s3d-hang-")
+        || signal.includes("2001:db8") || signal.includes("vitest-s3d")),
+      "a console.error line carries a request email, IP or user agent").toBe(false);
+      expect(unexpectedSignals,
+        `unexpected console.error lines (${unexpectedSignals.length} of ${operatorSignals.length}): `
+        + JSON.stringify(unexpectedSignals.slice(0, 3))).toEqual([]);
     } finally {
       await cleanup();
     }

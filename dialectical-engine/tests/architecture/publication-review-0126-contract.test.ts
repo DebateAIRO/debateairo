@@ -39,7 +39,8 @@ describe("0126 publication review contract", () => {
   it("0126 is replay-safe in the repository's form", async () => {
     const plan = await loadMigrationPlan();
     const migrateSource = await readFile(new URL("../../packages/db/src/index.ts", import.meta.url), "utf8");
-    expect(auditMigrationReplaySafety("migrations/0126_publication_review.sql", await sql(), { plan, migrateSource })).toEqual([]);
+    const transactionSource = await readFile(new URL("../../packages/db/src/migration-transaction.ts", import.meta.url), "utf8");
+    expect(auditMigrationReplaySafety("migrations/0126_publication_review.sql", await sql(), { plan, migrateSource, transactionSource })).toEqual([]);
   });
 
   it("0126 creates four private tables and grants debateai_runtime no table privilege", async () => {

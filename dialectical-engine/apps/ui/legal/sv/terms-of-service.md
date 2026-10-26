@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort sagt
-eyebrow: ANVÄNDARVILLKOR · v2.4 · GÄLLER FRÅN 12 OKTOBER 2026
+eyebrow: ANVÄNDARVILLKOR · v2.5 · GÄLLER FRÅN 12 OKTOBER 2026
 title: Vad du godkänner
 lede: Avtalet mellan dig och DMS Merchandise Shop S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.
-endMarker: SLUT PÅ VILLKOREN · v2.4
+endMarker: SLUT PÅ VILLKOREN · v2.5
 bodyLabel: Användarvillkorens text
 annexTitle: Bilaga A — Regionala villkor
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TILLÄMPLIG LAG
 -->
 
-**Version 2.4 · Effective 12 oktober 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
+**Version 2.5 · Effective 12 oktober 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
 
 **In short.** Du måste ha fyllt 18 år. Dialectical Engine bygger argument med AI-modeller, och allt som tjänsten genererar kan vara felaktigt — det är inte rådgivning. Dina debatter är privata om du inte publicerar dem; om du publicerar kan vem som helst läsa dem. Text som du skickar in överförs till de AI-leverantörer som anges i vårt register över AI-leverantörer och används inte för att träna modeller. Rapportera olagligt innehåll till support@dezbatere.ro, oavsett om du har ett konto eller inte. Rumänsk lag är tillämplig, men du behåller ditt lokala konsumentskydd.
 
@@ -213,7 +213,11 @@ Dialectical Engine erbjuder ett kostnadsfritt abonnemang. Ett avgiftsbelagt **Pr
 
 **Misslyckade betalningar.** Om en betalning misslyckas försöker vi igen under 7 dagar och varnar dig via e-post innan vi nedgraderar ditt konto till det kostnadsfria abonnemanget. Vi raderar inte dina debatter på grund av en misslyckad betalning.
 
-**Skatter och vem du betalar till.** Priserna inkluderar moms, GST eller omsättningsskatt, vilket beror på var du bor och visas innan du betalar. Kortbetalningar hanteras av NETOPIA Payments (netopia-payments.com). Säljaren är DMS Merchandise Shop S.R.L., som utfärdar din faktura och förblir ansvarig för tjänsten i sig och för dessa villkor.
+**Skatter och vem du betalar till.** Priserna inkluderar moms, GST eller omsättningsskatt, vilket beror på var du bor och visas innan du betalar. Säljaren är DMS Merchandise Shop S.R.L., som utfärdar din faktura och förblir ansvarig för tjänsten i sig och för dessa villkor.
+
+**Betalningssätt.** Du betalar med kort. Vi tar emot Visa och Mastercard; vi tar inte emot American Express. Kortbetalningar hanteras av NETOPIA Payments (netopia-payments.com), och ditt fullständiga kortnummer når aldrig fram till oss.
+
+**Leverans.** Dialectical Engine är en onlinetjänst, så inget skickas till dig. Funktionerna i ditt avgiftsbelagda abonnemang är tillgängliga i ditt konto så snart din betalning har bekräftats.
 
 **Kortreklamationer.** Om du bestrider en debitering hos din kortutgivare kan vi stänga av avgiftsbelagda funktioner medan tvisten handläggs. Vi tar inte ut någon avgift för detta.
 
@@ -235,7 +239,7 @@ Vi underrättar dig i förväg, på ett varaktigt medium, om vad som ändras och
 
 **Dessa villkor.** Vi får ändra dessa villkor av samma slags skäl. Vid ändringar som inte minskar dina rättigheter publicerar vi den nya versionen tillsammans med en sammanfattning av ändringarna och skickar e-post till dig minst **30 dagar** innan ändringen träder i kraft; om du fortsätter att använda Dialectical Engine efter det datumet innebär det att du godkänner ändringen, och du får avsluta ditt konto före dess. Vid ändringar som minskar dina rättigheter — däribland prishöjningar för ett befintligt abonnemang, lägre gränser, borttagna funktioner, ny användning av ditt innehåll eller ändringar av ansvar, tillämplig lag eller tvistlösning — ber vi dig uttryckligen godkänna den nya versionen nästa gång du loggar in, och ändringen gäller endast framåt i tiden. Vi gör aldrig en ändring retroaktiv och använder aldrig detta avsnitt för att ändra kärnan i det som du har betalat för under en pågående avtalsperiod utan att erbjuda dig en utväg. Tidigare versioner finns kvar på dezbatere.ro/terms/versions.
 
-Version 2.4 ersatte version 2.3: den lägger till frågekontrollen, som läser varje fråga innan en debatt startar, avvisar vissa och behåller för vårt team att läsa varje avvisad fråga som hotar att skada, planerar att skada eller frågar om eller hur man ska skada en annan person eller andra personer, namngivna eller inte, inklusive ett angrepp på ej namngivna personer, eller som frågar hur man tillverkar vapen, sprängämnen, gifter eller droger eller hur man stöder en terrorhandling, eller som hyllar en sådan (avsnitt 7, 8, 10 och 11); kontrollen som läser syntesen av varje avslutad debatt, godkännandet som en markerad debatt behöver innan den kan publiceras och de debatter som den kontrollen raderar (avsnitt 5, 8, 9, 10 och 11); vad supportchatten skickar till modellen Claude hos Anthropic, att den inte behåller något av det du skriver och inte öppnar något ärende, och att dess knapp ”Prata med en person” visar vår supportadress (avsnitt 8 och 10); samt regler i avsnitt 7 som förbjuder hatretorik av alla slag, instruktioner för tillverkning av vapen eller droger, innehåll som uppmuntrar till självmord eller till att skada andra människor och förolämpning av religion, och som anger vilka frågor som inte startar en debatt.
+Version 2.5 ersatte version 2.4: den lägger till frågekontrollen, som läser varje fråga innan en debatt startar, avvisar vissa och behåller för vårt team att läsa varje avvisad fråga som hotar att skada, planerar att skada eller frågar om eller hur man ska skada en annan person eller andra personer, namngivna eller inte, inklusive ett angrepp på ej namngivna personer, eller som frågar hur man tillverkar vapen, sprängämnen, gifter eller droger eller hur man stöder en terrorhandling, eller som hyllar en sådan (avsnitt 7, 8, 10 och 11); kontrollen som läser syntesen av varje avslutad debatt, godkännandet som en markerad debatt behöver innan den kan publiceras och de debatter som den kontrollen raderar (avsnitt 5, 8, 9, 10 och 11); vad supportchatten skickar till modellen Claude hos Anthropic, att den inte behåller något av det du skriver och inte öppnar något ärende, och att dess knapp ”Prata med en person” visar vår supportadress (avsnitt 8 och 10); samt regler i avsnitt 7 som förbjuder hatretorik av alla slag, instruktioner för tillverkning av vapen eller droger, innehåll som uppmuntrar till självmord eller till att skada andra människor och förolämpning av religion, och som anger vilka frågor som inte startar en debatt.
 
 ## 15. Ansvar
 

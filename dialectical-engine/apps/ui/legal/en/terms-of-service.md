@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In short
-eyebrow: TERMS OF SERVICE · v2.4 · EFFECTIVE 12 OCTOBER 2026
+eyebrow: TERMS OF SERVICE · v2.5 · EFFECTIVE 12 OCTOBER 2026
 title: What you agree to
 lede: The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.
-endMarker: END OF TERMS · v2.4
+endMarker: END OF TERMS · v2.5
 bodyLabel: Terms of Service text
 annexTitle: Annex A — Regional terms
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 GOVERNING LAW
 -->
 
-**Version 2.4 · Effective 12 October 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
+**Version 2.5 · Effective 12 October 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
 
 **In short.** You must be 18 or over. Dialectical Engine builds arguments with AI models and everything it generates may be wrong — it is not advice. Your debates are private unless you publish them; if you publish, anyone can read them. Text you submit is sent to AI providers listed in our Provider Register, and is not used to train models. Report illegal content at support@dezbatere.ro whether or not you have an account. Romanian law governs, but your local consumer protections stay with you.
 
@@ -213,7 +213,11 @@ Dialectical Engine offers a free plan. A paid **Premium** plan will be available
 
 **Failed payments.** If a payment fails we retry for 7 days and warn you by email before downgrading your account to the free plan. We do not delete your debates because a payment failed.
 
-**Taxes, and who you pay.** Prices include VAT, GST or sales tax, which depends on where you live and is shown before you pay. Card payments are processed by NETOPIA Payments (netopia-payments.com). The seller is DMS Merchandise Shop S.R.L., which issues your invoice and remains responsible for the service itself and for these Terms.
+**Taxes, and who you pay.** Prices include VAT, GST or sales tax, which depends on where you live and is shown before you pay. The seller is DMS Merchandise Shop S.R.L., which issues your invoice and remains responsible for the service itself and for these Terms.
+
+**Payment methods.** You pay by card. We accept Visa and Mastercard; we do not accept American Express. Card payments are processed by NETOPIA Payments (netopia-payments.com), and your full card number never reaches us.
+
+**Delivery.** Dialectical Engine is an online service, so nothing is shipped to you. The features of your paid plan are available in your account as soon as your payment is confirmed.
 
 **Chargebacks.** If you dispute a charge with your card issuer, we may suspend paid features while the dispute is resolved. We do not charge fees for this.
 
@@ -235,7 +239,7 @@ We tell you in advance, on a durable medium, what is changing and when. If the c
 
 **To these Terms.** We may change these Terms for the same kinds of reasons. For changes that do not reduce your rights, we post the new version with a summary of what changed and email you at least **30 days** before it takes effect; continuing to use Dialectical Engine after that date means you accept it, and you may close your account before then. For changes that reduce your rights — including price increases on an existing plan, lower limits, removed features, new uses of your content, or changes to liability, governing law or dispute resolution — we ask you to accept the new version expressly at your next sign-in, and the change applies only going forward. We never make a change retroactive, and we never use this section to change the core of what you have paid for mid-term without offering you a way out. Prior versions stay available at dezbatere.ro/terms/versions.
 
-Version 2.4 replaced version 2.3: it adds the question check, which reads each question before a debate starts, refuses some, and keeps for our team to read each refused question that threatens, plans or asks whether or how to harm another person or other people, named or not, including an attack on unnamed people, or that asks how to make weapons, explosives, poisons or drugs or how to support a terrorist act, or praises one (sections 7, 8, 10 and 11); the check that reads the synthesis of each finished debate, the approval a flagged debate needs before it can be published, and the debates that check deletes (sections 5, 8, 9, 10 and 11); what the support chat sends to Anthropic's model Claude, that it keeps nothing of what you write and opens no case, and that its "Talk to a human" button shows our support address (sections 8 and 10); and rules in section 7 that forbid hate speech of any kind, instructions for crafting weapons or drugs, content encouraging suicide or harming other people, and religious insult, and say which questions do not start a debate.
+Version 2.5 replaced version 2.4: it adds the question check, which reads each question before a debate starts, refuses some, and keeps for our team to read each refused question that threatens, plans or asks whether or how to harm another person or other people, named or not, including an attack on unnamed people, or that asks how to make weapons, explosives, poisons or drugs or how to support a terrorist act, or praises one (sections 7, 8, 10 and 11); the check that reads the synthesis of each finished debate, the approval a flagged debate needs before it can be published, and the debates that check deletes (sections 5, 8, 9, 10 and 11); what the support chat sends to Anthropic's model Claude, that it keeps nothing of what you write and opens no case, and that its "Talk to a human" button shows our support address (sections 8 and 10); and rules in section 7 that forbid hate speech of any kind, instructions for crafting weapons or drugs, content encouraging suicide or harming other people, and religious insult, and say which questions do not start a debate.
 
 ## 15. Liability
 

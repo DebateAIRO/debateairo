@@ -8,11 +8,12 @@ import type {
 } from "@debateai/db";
 import { decideCardCountry } from "@debateai/geo";
 import { exhaustive, TypedDomainError } from "@debateai/kernel";
-import { netopiaAmountToMicros, statusToState } from "@debateai/payments-netopia";
+import { bankDeclined, declineSideOf, netopiaAmountToMicros, statusToState } from "@debateai/payments-netopia";
 import type { BillingPolicy, CountryPolicy } from "@debateai/register";
 import type { PoolClient } from "pg";
 import { answerRejected, credentialsRefused, type BillingAudit } from "./audit.js";
 import { adoptingKindOf, chooseAdoptableToken, writeCardSaved, type AdoptingKind } from "./card-adoption.js";
+import { storeReportedCard } from "./card-store.js";
 import { REFUND_REASONS_REFUSING_THE_PAYMENT, type RequestedRefundReason } from "./codes.js";
 import { enqueueEmail } from "./email-job.js";
 import { locationVerdict } from "./location-verdict.js";
@@ -21,7 +22,7 @@ import {
   DONE, isThisPaymentSystem, notFinalRetryAt, otherPaymentSystem, type OutboxHandler, type OutboxOutcome
 } from "./outbox.js";
 import { queuePaymentAlert } from "./payment-alert.js";
-import { openQuoteLocation, sealIpEvidence } from "./records.js";
+import { openNoticeAllowed, openQuoteLocation, sealIpEvidence } from "./records.js";
 import {
   disputeCommand, heldByChargeback, openOwnRequest, PAUSED_EMAIL_SENTENCE, queueRefundHeldAlert, refundedAlready,
   refundedMicros, wholePaymentOpen, type RefundDesk, type RefundIntent
@@ -71,8 +72,29 @@ const BOUGHT_NOTHING: ReadonlySet<string> = new Set<string>([
   ...REFUND_REASONS_REFUSING_THE_PAYMENT, "DUPLICATE_PAYMENT", "UPGRADE_CLOSED", "CARD_CHECK_RELEASE"
 ]);
 
-/** Spec §2.8 step 2: a report from the newest stored (signed) notice; it carries no decline code, so never "bank refused". */
-function reportFromNotice(orderId: string, notice: PaymentNoticeRow): PaymentReport | null {
+/** B3: the read states whose saved card is kept (a payment that went through; a 0.00 card check is only authorised). */
+const CARD_BEARING_STATES: ReadonlySet<string> = new Set(["PAID", "AUTHORIZED"]);
+
+/** NETOPIA's success codes, never a refusal (as its answers read them, `answers.ts`). */
+const NOTICE_SUCCESS_CODES: ReadonlySet<string> = new Set(["00", "0"]);
+
+/** The `code` of a stored notice's sealed allow-list; null when it names none, or its allow-list does not open. */
+function noticeCode(notice: PaymentNoticeRow, recordsKey: Buffer): string | null {
+  try {
+    const code = openNoticeAllowed(recordsKey, notice.noticeId, notice.allowedCiphertext).code;
+    return typeof code === "string" ? code : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Spec §2.8 step 2: a report from the newest stored (signed) notice. B2 (NETOPIA answers 2026-10-21, Q15): a declined
+ * or failed notice carries NETOPIA's refusal code from its sealed allow-list (`payment.code`, unless it is a success
+ * code), and with it the side (§2.4.5) and the bank's refusal, as a status read gives them (`answers.ts`). A notice
+ * whose allow-list does not open carries no code: a decline is then the card's and never "bank refused".
+ */
+function reportFromNotice(orderId: string, notice: PaymentNoticeRow, recordsKey: Buffer): PaymentReport | null {
   if (notice.providerStatus === null || notice.providerPaymentId === null) return null;
   let amountMicros: number | null = null;
   try {
@@ -81,10 +103,14 @@ function reportFromNotice(orderId: string, notice: PaymentNoticeRow): PaymentRep
     amountMicros = null;
   }
   const state = statusToState(notice.providerStatus);
+  const refused = state === "DECLINED" || state === "FAILED";
+  const code = refused ? noticeCode(notice, recordsKey) : null;
+  const declineCode = code === null || NOTICE_SUCCESS_CODES.has(code) ? null : code;
   return Object.freeze({
     orderId, providerPaymentId: notice.providerPaymentId, state, providerStatus: String(notice.providerStatus),
-    amountMicros, currency: notice.currency, cardCountry: notice.cardCountry, savedCard: null, declineCode: null,
-    declineSide: state === "DECLINED" ? "CARD" as const : null, bankDeclined: false, occurredAt: null, clientId: null
+    amountMicros, currency: notice.currency, cardCountry: notice.cardCountry, savedCard: null, declineCode,
+    declineSide: refused ? declineSideOf(declineCode, notice.providerStatus) : null,
+    bankDeclined: state === "DECLINED" && bankDeclined(declineCode), occurredAt: null, clientId: null
   });
 }
 
@@ -228,7 +254,10 @@ export class VerifyPaymentHandler {
     if (charge === null) return notFinal(job, now, "CHARGE_NOT_FOUND");
     if (!isThisPaymentSystem(charge, this.deps.netopia.paymentEnvironment)) return otherPaymentSystem(this.deps.audit, job.kind);
     const read = await this.readNetopiaStatus(charge, now);
-    if (read !== "UNREADABLE" && read !== "NO_SUCH_ORDER") return this.decideNetopia(job, charge, read, now, false);
+    if (read !== "UNREADABLE" && read !== "NO_SUCH_ORDER") {
+      await this.storeReadCard(charge, read, now);
+      return this.decideNetopia(job, charge, read, now, false);
+    }
     const code = read === "NO_SUCH_ORDER" ? "PAYMENT_NOT_FOUND" : "PAYMENT_STATUS_UNREADABLE";
     const retryAt = notFinalRetryAt(job.attempts, now);
     if (retryAt !== null) return Object.freeze({ kind: "RETRY" as const, code, retryAt });
@@ -237,13 +266,29 @@ export class VerifyPaymentHandler {
     if (read === "UNREADABLE") {
       const notices = await this.deps.repository.withTransaction((client) => this.deps.repository.noticesForOrder(client, charge.chargeId));
       const notice = noticeToDecide(notices, charge.events.some((event) => event.kind === "SUCCEEDED"));
-      const fromNotice = notice === null ? null : reportFromNotice(charge.chargeId, notice);
+      const fromNotice = notice === null ? null : reportFromNotice(charge.chargeId, notice, this.deps.recordsKey);
       if (notice !== null && fromNotice !== null) {
         await this.noticeOutcome(notice.noticeId, now, "DECIDED_BY_NOTICE");
         return this.decideNetopia(job, charge, fromNotice, now, true);
       }
     }
     return this.leftToChecks(charge, code);
+  }
+
+  /**
+   * B3 (NETOPIA answers 2026-10-21): NETOPIA sends the saved card only in its FIRST notice of a payment; resent copies
+   * carry none. So a card the status read carries for a payment that went through (PAID, or AUTHORIZED: a 0.00 card
+   * check's success) is stored now (`storeReportedCard`: one row per charge, sealed), in its own transaction under the owner lock, before
+   * the decision: the settlement then adopts it at the decision, a SUCCEEDED charge adopts it late (CARD_SAVED), and a
+   * card check's gate finds it. A refused or unfinished read's card is never kept. A stored notice's report never
+   * carries a card (`reportFromNotice`): the notice intake stored it already.
+   */
+  private async storeReadCard(charge: ChargeRow, report: PaymentReport, now: Date): Promise<void> {
+    if (report.savedCard === null || !CARD_BEARING_STATES.has(report.state)) return;
+    await this.deps.repository.withTransaction(async (client) => {
+      await this.deps.jobs.lockOwner(client, charge.ownerRef);
+      await storeReportedCard({ repository: this.deps.repository, recordsKey: this.deps.recordsKey }, client, charge, report, now);
+    });
   }
 
   /** Spec §2.8 step 2: one status read with the best ntpID (N-16), its `status_read` row; a payment error is UNREADABLE. */
@@ -471,7 +516,7 @@ export class VerifyPaymentHandler {
       }
       await settlement.failed({
         ...(await this.context(client, charge, owner, now)), errorCode,
-        ...(errorCode === "PAYMENT_DECLINED" ? { bankDeclined: report.bankDeclined } : {})
+        ...(errorCode === "PAYMENT_DECLINED" ? { bankDeclined: report.bankDeclined } : {}), declineCode: report.declineCode
       });
       return false;
     });

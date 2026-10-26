@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lühidalt
-eyebrow: TEENUSETINGIMUSED · v2.4 · KEHTIB ALATES 12. OKTOOBRIST 2026
+eyebrow: TEENUSETINGIMUSED · v2.5 · KEHTIB ALATES 12. OKTOOBRIST 2026
 title: Millega te nõustute
 lede: Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.
-endMarker: TINGIMUSTE LÕPP · v2.4
+endMarker: TINGIMUSTE LÕPP · v2.5
 bodyLabel: Teenusetingimuste tekst
 annexTitle: Lisa A — Piirkondlikud tingimused
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 KOHALDATAV ÕIGUS
 -->
 
-**Version 2.4 · Effective 12. oktoober 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
+**Version 2.5 · Effective 12. oktoober 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
 
 **In short.** Peate olema vähemalt 18-aastane. Dialectical Engine koostab tehisintellektimudelite abil argumente ja kõik selle loodud tulemused võivad olla valed — need ei ole nõuanded. Teie väitlused on privaatsed, kui te neid ei avalda; avaldamise korral saab igaüks neid lugeda. Teie sisestatud tekst saadetakse meie tehisintellekti pakkujate registris loetletud pakkujatele ja seda ei kasutata mudelite treenimiseks. Teatage ebaseaduslikust sisust aadressil support@dezbatere.ro, olenemata sellest, kas teil on konto. Kohaldatakse Rumeenia õigust, kuid teile jääb teie kohaliku tarbijakaitse tagatud kaitse.
 
@@ -213,7 +213,11 @@ Dialectical Engine pakub tasuta paketti. Tulevikus on saadaval tasuline **Premiu
 
 **Ebaõnnestunud maksed.** Kui makse ebaõnnestub, proovime seda 7 päeva jooksul uuesti ning hoiatame teid e-posti teel enne konto tasuta paketile üleviimist. Me ei kustuta teie väitlusi makse ebaõnnestumise tõttu.
 
-**Maksud ja makse saaja.** Hinnad sisaldavad käibemaksu, GST-d või müügimaksu, mis sõltub teie elukohast ja mida näidatakse enne maksmist. Kaardimakseid töötleb NETOPIA Payments (netopia-payments.com). Müüja on DMS Merchandise Shop S.R.L., kes väljastab teie arve ja vastutab jätkuvalt teenuse enda ja käesolevate Tingimuste eest.
+**Maksud ja makse saaja.** Hinnad sisaldavad käibemaksu, GST-d või müügimaksu, mis sõltub teie elukohast ja mida näidatakse enne maksmist. Müüja on DMS Merchandise Shop S.R.L., kes väljastab teie arve ja vastutab jätkuvalt teenuse enda ja käesolevate Tingimuste eest.
+
+**Makseviisid.** Maksate kaardiga. Aktsepteerime Visa ja Mastercardi kaarte; American Expressi kaarte me ei aktsepteeri. Kaardimakseid töötleb NETOPIA Payments (netopia-payments.com) ja teie kaardi täielik number ei jõua kunagi meieni.
+
+**Tarnimine.** Dialectical Engine on veebiteenus, seega teile midagi ei saadeta. Teie tasulise paketi funktsioonid on teie kontol kasutatavad kohe, kui makse on kinnitatud.
 
 **Makse tagasinõuded.** Kui vaidlustate tasu oma kaardi väljaandja juures, võime tasulised funktsioonid vaidluse lahendamiseni peatada. Me ei võta selle eest tasu.
 
@@ -235,7 +239,7 @@ Teatame teile püsival andmekandjal ette, mis ja millal muutub. Kui muudatusel o
 
 **Nende Tingimuste muudatused.** Võime neid Tingimusi samalaadsetel põhjustel muuta. Muudatuste puhul, mis ei vähenda teie õigusi, avaldame uue versiooni koos muudatuste kokkuvõttega ja saadame teile e-kirja vähemalt **30 päeva** enne selle jõustumist; Dialectical Engine kasutamise jätkamine pärast seda kuupäeva tähendab, et nõustute muudatusega, ning võite oma konto enne seda sulgeda. Muudatuste puhul, mis vähendavad teie õigusi — sealhulgas olemasoleva paketi hinnatõus, madalamad kasutuslimiidid, eemaldatud funktsioonid, teie sisu uued kasutusviisid või vastutuse, kohaldatava õiguse või vaidluste lahendamise muudatused — palume teil järgmisel sisselogimisel uue versiooniga sõnaselgelt nõustuda ning muudatust kohaldatakse ainult edaspidi. Me ei kohalda muudatust kunagi tagasiulatuvalt ega kasuta seda jaotist selleks, et muuta tähtaja kestel tasulise teenuse põhiolemust ilma teile väljumisvõimalust pakkumata. Varasemad versioonid jäävad kättesaadavaks aadressil dezbatere.ro/terms/versions.
 
-Versioon 2.4 asendas versiooni 2.3: see lisab küsimuse kontrolli, mis loeb iga küsimuse enne väitluse algust, lükkab mõned tagasi ja säilitab meie meeskonna lugemiseks iga tagasilükatud küsimuse, mis ähvardab kahjustada teist inimest või teisi inimesi, nimeliselt või nimetult, sealhulgas rünnak nimetute inimeste vastu, kavandab seda või küsib, kas või kuidas neid kahjustada, või mis küsib, kuidas valmistada relvi, lõhkeaineid, mürke või uimasteid või kuidas toetada terroriakti, või mis seda ülistab (jaotised 7, 8, 10 ja 11); kontrolli, mis loeb iga lõppenud väitluse sünteesi, heakskiitu, mida märgistatud väitlus vajab enne avaldamist, ja väitlusi, mille see kontroll kustutab (jaotised 5, 8, 9, 10 ja 11); seda, mida kasutajatoe vestlus saadab ettevõtte Anthropic mudelile Claude, et see ei säilita midagi sellest, mida kirjutate, ega ava juhtumit, ning et selle nupp „Rääkige inimesega“ näitab meie kasutajatoe aadressi (jaotised 8 ja 10); ning jaotise 7 reegleid, mis keelavad vihakõne mis tahes kujul, relvade või uimastite valmistamise juhised, enesetapule või teiste inimeste kahjustamisele õhutava sisu ja religioosse solvangu ning ütlevad, millised küsimused ei lase väitlusel alata.
+Versioon 2.5 asendas versiooni 2.4: see lisab küsimuse kontrolli, mis loeb iga küsimuse enne väitluse algust, lükkab mõned tagasi ja säilitab meie meeskonna lugemiseks iga tagasilükatud küsimuse, mis ähvardab kahjustada teist inimest või teisi inimesi, nimeliselt või nimetult, sealhulgas rünnak nimetute inimeste vastu, kavandab seda või küsib, kas või kuidas neid kahjustada, või mis küsib, kuidas valmistada relvi, lõhkeaineid, mürke või uimasteid või kuidas toetada terroriakti, või mis seda ülistab (jaotised 7, 8, 10 ja 11); kontrolli, mis loeb iga lõppenud väitluse sünteesi, heakskiitu, mida märgistatud väitlus vajab enne avaldamist, ja väitlusi, mille see kontroll kustutab (jaotised 5, 8, 9, 10 ja 11); seda, mida kasutajatoe vestlus saadab ettevõtte Anthropic mudelile Claude, et see ei säilita midagi sellest, mida kirjutate, ega ava juhtumit, ning et selle nupp „Rääkige inimesega“ näitab meie kasutajatoe aadressi (jaotised 8 ja 10); ning jaotise 7 reegleid, mis keelavad vihakõne mis tahes kujul, relvade või uimastite valmistamise juhised, enesetapule või teiste inimeste kahjustamisele õhutava sisu ja religioosse solvangu ning ütlevad, millised küsimused ei lase väitlusel alata.
 
 ## 15. Vastutus
 

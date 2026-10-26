@@ -747,6 +747,32 @@ describe("consent modal semantics helper", () => {
     expect(document.activeElement, "focus is on the control the caller named").toBe(returned);
   });
 
+  it("returns focus to the named control when the captured opener is DISABLED at close", async () => {
+    // A disabled opener is on the page but cannot take focus, so `focus()` on it is a no-op and
+    // focus stays on the page. The consent and crisis dialogs open from a Start button that stays
+    // disabled while they are up; the caller names the question field instead.
+    function Harness({ open, startDisabled }: { open: boolean; startDisabled: boolean }): ReactNode {
+      const returnFocusRef = useRef<HTMLElement | null>(null);
+      return (
+        <>
+          <textarea aria-label="question" ref={(node) => { returnFocusRef.current = node; }} />
+          <button type="button" disabled={startDisabled}>start</button>
+          <TestSurface open={open} name="only" onClose={vi.fn()} returnFocusRef={returnFocusRef} />
+        </>
+      );
+    }
+
+    await render(<Harness open={false} startDisabled={false} />);
+    await act(async () => {
+      labelled("start").focus();
+    });
+    await render(<Harness open startDisabled />);
+    expect(document.activeElement).toBe(labelled("close-only"));
+
+    await render(<Harness open={false} startDisabled />);
+    expect(document.activeElement).toBe(document.querySelector("textarea"));
+  });
+
   it("keeps the captured opener ahead of the named control while the opener is on the page", async () => {
     // PROPERTY: `returnFocusRef` serves the opens where the capture did NOT survive; it is
     // not a general override. A caller that lends a control and still has its opener on the
@@ -977,6 +1003,61 @@ describe("consent modal semantics helper", () => {
     });
 
     expect(document.activeElement).toBe(labelled("last"));
+  });
+
+  it("reaches a disclosure's summary, and skips the controls a CLOSED disclosure hides", async () => {
+    // A <summary> is a Tab stop with no tabindex, so the attribute selector missed it and the trap
+    // stepped over every "N more" disclosure in a drawer. Its content is not rendered while the
+    // disclosure is closed, but jsdom would focus it, so the trap must skip it by attribute.
+    await render(
+      <TestSurface open name="only" onClose={vi.fn()}>
+        <details>
+          <summary>more</summary>
+          <button type="button">hidden-inside</button>
+          <details open>
+            <summary>nested</summary>
+          </details>
+        </details>
+        <button type="button">last</button>
+      </TestSurface>
+    );
+    const summary = [...document.querySelectorAll("summary")].find((node) => node.textContent === "more")!;
+
+    await act(async () => {
+      labelled("close-only").focus();
+      pressTab();
+    });
+    expect(document.activeElement).toBe(summary);
+
+    await act(async () => {
+      pressTab();
+    });
+    expect(document.activeElement).toBe(labelled("last"));
+
+    // Opened, its content joins the cycle in document order.
+    await act(async () => {
+      summary.parentElement!.setAttribute("open", "");
+      summary.focus();
+      pressTab();
+    });
+    expect(document.activeElement).toBe(labelled("hidden-inside"));
+  });
+
+  it("stops on a scroll region the caller made focusable, so its text can be scrolled", async () => {
+    await render(
+      <TestSurface open name="only" onClose={vi.fn()}>
+        <div data-scroller tabIndex={0} role="region" aria-label="list">
+          text only
+        </div>
+      </TestSurface>
+    );
+
+    await act(async () => {
+      labelled("close-only").focus();
+      pressTab();
+    });
+
+    expect(document.activeElement).toBe(document.querySelector("[data-scroller]"));
   });
 
   it("keeps Escape from reaching a window listener while a surface is open", async () => {

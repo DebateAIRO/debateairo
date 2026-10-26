@@ -10,6 +10,7 @@ import {
   createTestAskAdmissionPoolFacades, startTestDatabase, type TestDatabase
 } from "../support/testDatabase.js";
 import { fixtureStructuralCeiling } from "../support/discoveredPanel.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 /**
  * `submit` writes the run row first and then, outside that write, records the
@@ -37,6 +38,7 @@ afterAll(async () => {
 const settings: RunCreationSettings = {
   strangerSampleRate: 0,
   registerVersion: 1,
+  releaseKey: TEST_RELEASE_KEY,
   batteryVersion: "run-setup-failure-test",
   settlementWatchHandle: "run-setup-failure-test",
   resolveDiscoveredPanel: async () => PLAN_TIER_ROSTERS.free.map((modelId, index) => Object.freeze({
@@ -268,7 +270,9 @@ describe("a run whose setup fails after it was created", () => {
 
   it("leaves a job alone that a runner already claimed before dispatch reported its error", async () => {
     const askerId = `asker:setup-claimed:${randomUUID()}`;
-    const work = new WorkItemRepository(database.pool);
+    // The runner that claims it is fenced to the release that admitted the run (side-by-side spec §1, plan C task C2):
+    // claimById only takes a job whose run carries the runner's own release key.
+    const work = new WorkItemRepository(database.pool, { releaseKey: TEST_RELEASE_KEY });
     const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
     let calls: unknown[][];
     try {

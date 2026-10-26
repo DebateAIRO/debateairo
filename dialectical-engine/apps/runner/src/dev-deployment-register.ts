@@ -19,6 +19,7 @@ import {
   TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW,
   PUBLICATION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW,
   QUESTION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW,
+  COST_ESTIMATE_START_POLICY_DEPLOYMENT_REGISTER_ROW,
   ALGORITHM_REGISTER_ROW_KEYS,
   AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS,
   ENGINE_BAND_ORDER,
@@ -737,6 +738,11 @@ function developmentRows(
     // publication carries it and the API can refuse a version without it; a hosted file may supersede it.
     PUBLICATION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW,
     QUESTION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW,
+    // Fresh-site estimate (owner rulings 2026-10-22): the estimate's trusted minimum of settled runs and per-depth starting
+    // figures. Code-owned and sealed by every HOSTED publication (the hosted publish and the preview kit v3), like the
+    // story's money row: only a hosted API estimates (the room), so local mode has no reader and no row. A version
+    // without it keeps the estimate as before. Changing a figure is a new register version.
+    ...(deployment === "hosted" ? [COST_ESTIMATE_START_POLICY_DEPLOYMENT_REGISTER_ROW] : []),
     ...buildDevelopmentDeploymentRegisterRows(providerPanel),
     ...buildDevelopmentAlgorithmRegisterRows(providerPanel, roleRefs),
     // Verdict story (spec 2026-09-26 §9): OPTIONAL rows. Every reader treats

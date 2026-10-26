@@ -156,15 +156,16 @@ describe("Privacy Policy §13 — the twenty-one actual stored items in every lo
     }
   });
 
-  it("the English 3.5 summary names the 3.5 changes and no 3.4-only change", () => {
+  it("the English 3.6 summary names the 3.6 changes and no 3.5-only change", () => {
     const line = /^This policy was last updated on .*$/m.exec(readFileSync(join(LEGAL_DIR, "en", "privacy-policy.md"), "utf8"))?.[0] ?? "";
-    const summary = line.split("Version 3.5 replaced version 3.4:")[1] ?? "";
-    expect(summary, "the version 3.5 summary follows the version line").not.toBe("");
-    for (const phrase of ["debateai.locale", "queue"]) {
-      expect(summary, `the 3.5 summary still names the 3.4 change "${phrase}"`).not.toContain(phrase);
+    const summary = line.split("Version 3.6 replaced version 3.5:")[1] ?? "";
+    expect(summary, "the version 3.6 summary follows the version line").not.toBe("");
+    // origin/dev's 3.5 (card payments) and synthesis-flag S03's change met at 3.6: the line names S03's change alone.
+    for (const phrase of ["card", "payment provider", "debateai.locale", "queue"]) {
+      expect(summary, `the 3.6 summary still names the earlier change "${phrase}"`).not.toContain(phrase);
     }
     for (const keyword of ["question", "synthesis", "approval", "support chat", "section 7", "section 10"]) {
-      expect(summary, `the 3.5 summary does not name the 3.5 change "${keyword}"`).toContain(keyword);
+      expect(summary, `the 3.6 summary does not name the 3.6 change "${keyword}"`).toContain(keyword);
     }
   });
 

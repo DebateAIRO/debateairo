@@ -10,9 +10,11 @@ import { createDebate, contractClient } from "@/lib/api";
 import { modelDot } from "@/lib/models";
 import {
   classifyRequestFailure,
+  isAskSettingsChanged,
   isQuestionLanguageCheckStale,
   QuestionLanguageChoiceNeededError,
-  requestFailureMessage
+  requestFailureMessage,
+  settingsChangedMessage
 } from "@/lib/v3/requestFailure";
 import { AuthGate } from "@/components/AuthGate";
 import { RoomNotice } from "@/components/billing/RoomNotice";
@@ -35,7 +37,7 @@ import {
   planCardNamesRoster,
   type ScorecardSignal
 } from "@/lib/modelStrength";
-import { previewPlanRoster } from "@/lib/previewPlanRoster";
+import { previewPlanRoster, previewRostersOfRoomRead, type PreviewRosters } from "@/lib/previewPlanRoster";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import {
   ANSWER_LENGTHS,
@@ -57,6 +59,7 @@ import {
 import billingEnglish from "@/messages/en/billing.json";
 
 // NEXT_PUBLIC is intentionally a direct reference so Next inlines this public build flag.
+// Addition D24 (Task SA7 part A): the fallback list only — the plan cards name the room read's line-up when it has one.
 const displayPlanTierRosters = previewPlanRoster(process.env.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON, PLAN_TIER_ROSTERS);
 // Owner ruling 2026-10-10: a preview build (its public model-list flag is set) offers a shallower ceiling,
 // declared beside the depth bound in @debateai/contract; hosted builds keep the whole range.
@@ -200,13 +203,15 @@ function NewDebateForm({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const submitFlight = useRef(false);
-  const consent = useSensitiveDataConsent({ catalog: homeCatalog, locale });
-  const crisis = useCrisisSupport({ catalog: homeCatalog, locale, countryHint: crisisCountryHint });
+  // Start is disabled while a press of it runs, which drops keyboard focus to the page. When the
+  // consent or crisis screen then closes, focus comes back to the question instead.
+  const topicField = useRef<HTMLTextAreaElement | null>(null);
+  const consent = useSensitiveDataConsent({ catalog: homeCatalog, locale, returnFocusRef: topicField });
+  const crisis = useCrisisSupport({ catalog: homeCatalog, locale, countryHint: crisisCountryHint, returnFocusRef: topicField });
   const questionRefusal = useQuestionRefusal({ catalog: homeCatalog, locale, countryHint: crisisCountryHint });
   // Question language (spec 2026-10-13): the page's language goes with the question (PF-L56: `locale` is a string).
   const pageLocale: LocaleCode = isLocale(locale) ? locale : "en";
   const languageChoice = useQuestionLanguageChoice({ catalog, locale: pageLocale });
-  const topicField = useRef<HTMLTextAreaElement | null>(null);
   const topicRef = useCallback((field: HTMLTextAreaElement | null) => {
     topicField.current = field;
     grow(field);
@@ -239,11 +244,53 @@ function NewDebateForm({
       : lengthSettings ? { answer_length: answerLength } : {})
   };
   const [room, setRoom] = useAskRoom(contractClient, roomQuery);
+  // Side-by-side spec §13 (Task S12): the settings version the page's choices are offered under — the one the last room
+  // read that named a version was read from. The ask sends it back, so a version switched under the page asks the person
+  // to choose again instead of silently changing their choices. Kept across a later failed read, like the flags above
+  // (the choices on screen are still that version's). A ref: nothing renders it, and the room effect compares with it.
+  const settingsVersion = useRef<number | undefined>(undefined);
+  // Ruling R50: after a 409 whose room re-read failed, the version is forgotten and the next read naming one is adopted
+  // as a switch (its switches apply as they are), without saying the sentence a second time.
+  const adoptNextVersion = useRef(false);
+  // Addition D24 (Task SA7 part A): the line-up of the version the room read was read from (`preview_rosters`, checked
+  // against the reviewed ids), which the plan cards name; null until a read carries one, and then the build list shows.
+  // Kept across a later failed read, like the switches above (the cards still name that version's AIs).
+  const [roomRosters, setRoomRosters] = useState<PreviewRosters | null>(null);
+  /**
+   * Ruling R51 — A READ FROM ANOTHER VERSION IS AUTHORITATIVE: its shape and length switches apply as they are (they may
+   * turn off, the one case they do), and the model-strength lock is read again from GET /v1/session (locked while that
+   * read is pending or failed), so the next ask sends only what that version offers.
+   */
+  const adoptSettingsRead = useCallback((read: AskRoom) => {
+    setShapeSettings(read.shape_settings === true);
+    setLengthSettings(read.length_settings === true);
+    // Addition D24: that version's line-up, or the build list when the read carries none (or one that fails a check).
+    setRoomRosters(previewRostersOfRoomRead(read.preview_rosters) ?? null);
+    setModelScorecard("PENDING");
+    void contractClient.readSession().then(
+      (session) => { setModelScorecard(session.model_scorecard_in_force === true ? "IN_FORCE" : "NOT_IN_FORCE"); },
+      () => { setModelScorecard("READ_FAILED"); }
+    );
+  }, []);
   useEffect(() => {
-    if (room?.shape_settings === true) setShapeSettings(true);
-    if (room?.length_settings === true) setLengthSettings(true);
-    if (room?.answer_words !== undefined) setAnswerWords(room.answer_words);
-  }, [room]);
+    if (room === null) return;
+    const named = room.settings_version;
+    const switched = named !== undefined && settingsVersion.current !== undefined && named !== settingsVersion.current;
+    if (switched || (named !== undefined && adoptNextVersion.current)) {
+      // Ruling R51: the choices for new debates changed while the page was open (a control moved, the room was read
+      // again, and it names another version): the page offers what the new version offers and says so, as on the 409.
+      adoptSettingsRead(room);
+      if (switched) setError(settingsChangedMessage(catalog));
+      adoptNextVersion.current = false;
+    } else {
+      if (room.shape_settings === true) setShapeSettings(true);
+      if (room.length_settings === true) setLengthSettings(true);
+      const rosters = previewRostersOfRoomRead(room.preview_rosters);
+      if (rosters !== undefined) setRoomRosters(rosters);
+    }
+    if (room.answer_words !== undefined) setAnswerWords(room.answer_words);
+    if (named !== undefined) settingsVersion.current = named;
+  }, [room, catalog, adoptSettingsRead]);
   // Paid plans (spec 2026-09-29 §2.3.4; ruling Q-8): the plan the SERVER decided
   // for this person (B8), as the room read (and B10c's usage read) names it. It
   // is remembered once known: a later failed or plan-less read never clears it,
@@ -348,7 +395,9 @@ function NewDebateForm({
         asOfWasEdited: false,
         riskTierWasEdited,
         // A21 O4: a locked control sends nothing, so the deployment's own default applies.
-        modelStrength: strengthControl.locked ? null : modelStrength
+        modelStrength: strengthControl.locked ? null : modelStrength,
+        // Side-by-side spec §13 (Task S12): the version the choices above were offered under, when a room read named one.
+        ...(settingsVersion.current === undefined ? {} : { settingsVersion: settingsVersion.current })
       }, submitTime, catalog);
       // Question language (spec 2026-10-13; ruling CR-5, D1 order). Every ask carries the page's
       // language — but only once the room read has said the shape row is in force (ruling
@@ -420,11 +469,29 @@ function NewDebateForm({
         return;
       }
       if (questionRefusal.offer(exc)) return;
+      // Side-by-side spec §13 (Task S12): the choices for new debates changed under the page. Nothing started; the room is
+      // read again, so the page offers what the new version offers (its shape and length switches follow that read, the
+      // one case they may also turn off), and the one plain sentence asks the person to check and ask again. A failed
+      // re-read (or one naming no version) forgets the old version, so the next press is the new version's ask rather
+      // than the same refusal again.
+      if (isAskSettingsChanged(exc)) {
+        const fresh = await readAskRoom(contractClient, roomQuery);
+        if (fresh?.settings_version === undefined) {
+          settingsVersion.current = undefined;
+          adoptNextVersion.current = true;
+        } else {
+          // Adopted here (R50), and remembered before the room effect sees the read, so it is not adopted twice.
+          adoptSettingsRead(fresh);
+          settingsVersion.current = fresh.settings_version;
+          adoptNextVersion.current = false;
+        }
+        if (fresh !== null) setRoom(fresh);
+        setError(requestFailureMessage("DEBATE_CREATE", exc, catalog));
       // DL3-F7: see lib/v3/requestFailure.ts. ALREADY_WAITING is answered by
       // the room notice (sentence D, with its start time), not by a banner:
       // from the room re-read, or, when that read fails, from the refusal's
       // own body. The banner is the last fallback, when neither has a time.
-      if (classifyRequestFailure("DEBATE_CREATE", exc).kind === "ALREADY_WAITING") {
+      } else if (classifyRequestFailure("DEBATE_CREATE", exc).kind === "ALREADY_WAITING") {
         const fresh = await readAskRoom(contractClient, roomQuery);
         const shown = fresh === null ? waitingRoomOf(exc) : fresh;
         setRoom(shown);
@@ -478,7 +545,7 @@ function NewDebateForm({
                 >
                   <span className="ndTierName">{t(catalog, option.nameKey)}</span>
                   <span className="ndTierPromise">{t(catalog, option.promiseKey)}</span>
-                  <PlanCardModels plan={option.value} scorecard={modelScorecard} catalog={catalog} />
+                  <PlanCardModels plan={option.value} rosters={roomRosters ?? displayPlanTierRosters} scorecard={modelScorecard} catalog={catalog} />
                 </button>
               ))}
             </div>
@@ -672,7 +739,9 @@ function NewDebateForm({
    session says no scored model list is in force — the one state in which that
    list is what a debate is seated with. Otherwise (in force, pending, failed)
    it carries one plain line, true in every one of those states. */
-function PlanCardModels({ plan, scorecard, catalog }: { plan: PlanTier; scorecard: ScorecardSignal; catalog: MessageCatalog }) {
+function PlanCardModels({ plan, rosters, scorecard, catalog }: {
+  plan: PlanTier; rosters: PreviewRosters; scorecard: ScorecardSignal; catalog: MessageCatalog;
+}) {
   if (!planCardNamesRoster(scorecard)) {
     return (
       <span className="ndTierModels">
@@ -682,7 +751,7 @@ function PlanCardModels({ plan, scorecard, catalog }: { plan: PlanTier; scorecar
   }
   return (
     <span className="ndTierModels">
-      {displayPlanTierRosters[plan].map((modelId) => (
+      {rosters[plan].map((modelId) => (
         <span key={modelId} className="ndTierModel">
           <span
             className="modelDot"

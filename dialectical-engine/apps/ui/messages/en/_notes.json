@@ -35,5 +35,10 @@
   "legal.notice.s01.seller": "{company} is the company's legal name, filled in from the legal notice's facts; keep both.",
   "legal.notice.s04.payments": "NETOPIA Payments is a brand name; keep it.",
   "legal.archive.textId": "{id} is the first 12 characters of the text's fingerprint (letters a–f and digits); copy it unchanged.",
-  "legal.archive.title": "{version} is a document version number such as 2.0; keep it as a number."
+  "legal.archive.title": "{version} is a document version number such as 2.0; keep it as a number.",
+  "chrome.release.newerVersion": "Shown in a thin line under the top bar, next to a Reload button, on a page that was opened before the site was updated. 'Site' means this website. Keep it neutral: the site may have been moved forward or back, so never say 'newer' or 'new version'. Plain words; no technical terms such as build, release or deploy.",
+  "chrome.release.reload": "A button that reloads the page (the browser's reload). Use the usual short word for reloading or refreshing a page.",
+  "chrome.release.madeByNewer": "Shown instead of a public debate this older page cannot display, because a newer version of this website made it. 'Site' means this website.",
+  "runFailure.CHOICE_GONE": "Shown for a question that waited in line while the website was updated; one of the options the person picked (for example an AI model) is no longer offered. 'Site' means this website. 'Allowance' is the person's plan quota of debates, not money: say it did not count against it.",
+  "runFailure.SET_ASIDE": "Shown for a debate that was stopped partway because the website was being updated (not the person's fault, not a fault of the question). 'Update' means an update of this website. 'Allowance' is the person's plan quota of debates, not money; use the same word as runFailure.CHOICE_GONE and billing: say this debate did not count against it."
 }

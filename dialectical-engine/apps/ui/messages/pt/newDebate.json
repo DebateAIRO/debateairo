@@ -115,6 +115,7 @@
   "newDebate.room.locationBlocked": "Não é possível iniciar novos debates a partir da sua localização atual. Os seus debates continuam disponíveis para leitura.",
   "newDebate.room.previewTeamOnly": "Os debates nesta versão de pré-visualização estão abertos apenas à equipa.",
   "newDebate.room.phoneRequired": "Adicione um número de telefone nas Definições ou tente novamente dentro de alguns minutos.",
+  "newDebate.settingsChanged": "As opções para os novos debates acabaram de mudar. Verifique as suas escolhas e volte a perguntar.",
   "newDebate.room.siteFull": "O limite de hoje foi atingido. Pode perguntar na mesma — o seu debate começará sozinho quando o limite for reposto.",
   "newDebate.room.siteClose": "Está perto do limite de hoje. Este debate será realizado na íntegra; os seguintes poderão aguardar até à reposição.",
   "newDebate.room.alreadyWaiting": "Só uma pergunta pode aguardar de cada vez. A sua começará às {time}; faça esta depois disso.",

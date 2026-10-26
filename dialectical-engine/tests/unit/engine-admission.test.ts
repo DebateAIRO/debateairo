@@ -13,6 +13,7 @@ import {
 } from "@debateai/register";
 import { normaliseAskForDebateShape } from "../../apps/api/src/debate-shape-ask.js";
 import { assertEngineHasLengthPolicy, engineForAsk } from "../../apps/api/src/engine-ask.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const CEILING_TERMS = Object.freeze({ judgeMaxAttempts: 3, organMaxAttempts: 3, maxRecompose: 1, maxCooldownHoldsPerRun: 1,
   finalRetryAttempts: 1, branchingFactor: 2, compositionSegmentCap: 4, fixedOrgansPerComposition: 6, reviewerCallsPerNode: 1,
@@ -31,7 +32,7 @@ const ASK: AskRequest = { question_line: "Should cities price congestion?", risk
 
 function settings(input: Readonly<{ engine?: boolean; length?: boolean; shape?: boolean; seen?: (EngineSettings | null)[] }>): RunCreationSettings {
   return {
-    strangerSampleRate: 0, registerVersion: 1, batteryVersion: "battery:engine", settlementWatchHandle: "watch:engine",
+    strangerSampleRate: 0, releaseKey: TEST_RELEASE_KEY, registerVersion: 1, batteryVersion: "battery:engine", settlementWatchHandle: "watch:engine",
     resolveDiscoveredPanel: async () => PANEL,
     resolveEnvelopeBasis: async ({ depthParams, panelSize, backupSequencesProvisioned, shape, length, engine }) => {
       input.seen?.push(engine);
@@ -150,23 +151,29 @@ describe("the wiring (source pins)", () => {
   });
 
   it("apps/api/src/main.ts reads the row once, after the length row, refuses engine 2 without it, and hands the in-force row on", () => {
+    // Side-by-side spec §13 (S9): the stages are the API's one per-version admission loader's, at the version it loads;
+    // main.ts loads REGISTER_VERSION through it before the ask application and spreads its one mapping.
     const main = read("apps/api/src/main.ts");
-    const stage = "boot.run(\"engine-version-policy\", () => readEngineVersionPolicy(pool, environment.REGISTER_VERSION))";
-    expect(main.split(stage)).toHaveLength(2);
-    expect(main.indexOf(stage)).toBeGreaterThan(main.indexOf("boot.run(\"length-guidance-policy\""));
-    expect(main.indexOf(stage)).toBeLessThan(main.indexOf("new PostgresAskApplication("));
-    expect(main).toContain("const engineInForcePolicy = engineInForce(engineVersionPolicy);");
-    expect(main).toContain("boot.runSync(\"engine-requires-length-policy\", () => assertEngineHasLengthPolicy(engineInForcePolicy, lengthGuidancePolicy));");
-    expect(main.split("...(engineInForcePolicy === null ? {} : { engineVersionPolicy: engineInForcePolicy }),")).toHaveLength(2);
-    expect(main).toContain("...(input.engine === null ? {} : { engine: input.engine })");
+    const loader = read("apps/api/src/admission-settings.ts");
+    const stage = "run(\"engine-version-policy\", () => readers.readEngineVersionPolicy(pool, version))";
+    expect(loader.split(stage)).toHaveLength(2);
+    expect(loader.indexOf(stage)).toBeGreaterThan(loader.indexOf("run(\"length-guidance-policy\""));
+    expect(main).not.toContain("readEngineVersionPolicy(");
+    expect(main.indexOf("const siteAdmission = await loadAdmissionSettings(")).toBeLessThan(main.indexOf("new PostgresAskApplication("));
+    expect(loader).toContain("const engineInForcePolicy = engineInForce(engineVersionPolicy);");
+    expect(loader).toContain("await run(\"engine-requires-length-policy\", () => assertEngineHasLengthPolicy(engineInForcePolicy, lengthGuidancePolicy));");
+    expect(loader).toContain("engineVersionPolicy: engineInForcePolicy,");
+    expect(loader.split("...(engineVersionPolicy === null ? {} : { engineVersionPolicy }),")).toHaveLength(2);
+    expect(main).toContain("...admissionSettingsOfVersion(siteAdmission),");
+    expect(loader).toContain("...(input.engine === null ? {} : { engine: input.engine })");
   });
 
   it("the practice's ask composition reads and checks the row as main.ts does", () => {
+    // Side-by-side spec §13 (S9): through main.ts's own loader and mapping, never a read of its own.
     const practice = read("tools/preview-practice/practice-ask-composition.ts");
-    expect(practice.split("const engineVersionPolicy = await readEngineVersionPolicy(pool, version);")).toHaveLength(2);
-    expect(practice).toContain("const engineInForcePolicy = engineInForce(engineVersionPolicy);");
-    expect(practice).toContain("assertEngineHasLengthPolicy(engineInForcePolicy, lengthGuidancePolicy);");
-    expect(practice).toContain("...(engineInForcePolicy === null ? {} : { engineVersionPolicy: engineInForcePolicy }),");
-    expect(practice).toContain("...(basis.engine === null ? {} : { engine: basis.engine })");
+    expect(practice).not.toContain("readEngineVersionPolicy(");
+    expect(practice).not.toContain("assertEngineHasLengthPolicy(");
+    expect(practice.split("const siteAdmission = await loadAdmissionSettings(pool, environment.REGISTER_VERSION, admissionSite);")).toHaveLength(2);
+    expect(practice).toContain("...practiceMembersOf(admissionSettingsOfVersion(siteAdmission)),");
   });
 });

@@ -72,9 +72,14 @@ describe("the runner's boot with the debate shape", () => {
   });
 
   it("main.ts and the practice runner read both rows and no longer carry the Phase 2a guard", () => {
+    // Side-by-side spec §13: both read them through the one per-version loader, which reads the rows exactly once.
+    const loader = readFileSync(new URL("../../apps/runner/src/run-settings.ts", import.meta.url), "utf8");
+    expect(loader.split("await readDebateShapeRunnerSettings(pool, version)")).toHaveLength(2);
+    expect(loader).not.toContain("resolveDebateShapeRunnerSettings(");
     for (const file of ["apps/runner/src/main.ts", "tools/preview-practice/practice-runner-composition.ts"]) {
       const text = readFileSync(new URL(`../../${file}`, import.meta.url), "utf8");
-      expect(text, file).toContain("await readDebateShapeRunnerSettings(pool, environment.REGISTER_VERSION)");
+      expect(text, file).not.toContain("readDebateShapeRunnerSettings(");
+      expect(text, file).toContain("load: (version) => loadRunnerVersionSettings(pool, version, runnerSite");
       expect(text, file).not.toContain("resolveDebateShapeRunnerSettings(");
       expect(text, file).not.toContain("assertDebateShapeRunnerReady");
     }

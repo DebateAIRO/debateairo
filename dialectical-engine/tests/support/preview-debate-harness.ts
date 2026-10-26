@@ -36,6 +36,7 @@ import {
   previewTargetGatewayControls,
   previewTargetJsonRow,
   providerTargetGatewayControls,
+  providerTargetPrice,
   PREVIEW_PROVIDER_REF_MODELS,
   PREVIEW_REVIEWED_PROVIDER_REFS,
   withPreviewProviderCallPolicy,
@@ -55,7 +56,9 @@ import {
   type LengthGuidance
 } from "@debateai/register";
 import type { DebateShapeSettings } from "@debateai/contract";
-import { createPostgresProviderGateway, WalkingSkeletonRunner, type ProviderPriceMap, type WalkingSkeletonSettings } from "@debateai/runner";
+import {
+  buildProviderPriceMap, createPostgresProviderGateway, WalkingSkeletonRunner, type ProviderPriceMap, type WalkingSkeletonSettings
+} from "@debateai/runner";
 import {
   pickRotatedRoles,
   ROLE_ROTATION_RULE,
@@ -78,12 +81,22 @@ import { applyPreviewGateCapacities, previewCallSubjects, structureRepairThrough
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import type { DebateShapeRunnerSettings } from "../../apps/runner/src/debate-shape-boot.js";
 import type { EngineRunnerSettings } from "../../apps/runner/src/engine-boot.js";
+import type { RunnerRetirementSignal } from "../../apps/runner/src/runner-retirement.js";
+import {
+  runCostEnvelopeGuardOf,
+  runnerSettingsOfVersion,
+  runPreviewThinkingLevelsOf,
+  type RunnerSettingsCache,
+  type RunnerSiteContext,
+  type RunSettingsVersions
+} from "../../apps/runner/src/run-settings.js";
 import {
   startPreviewGateStubs,
   type GateDebateScripts,
   type GateOverride,
   type GateProvider,
-  type GateRequest
+  type GateRequest,
+  type StubUsage
 } from "./preview-gate-stubs.js";
 import { clearPendingRunId, fixedRunIdTaken, nextRandomUUIDIs } from "./fixed-run-id.js";
 
@@ -213,13 +226,16 @@ export function previewDebateHarness(input: Readonly<{
   async function startGates(
     probeScripts: Readonly<Record<string, readonly ("OK" | "UNBILLED")[]>>, debate?: GateDebateScripts,
     override?: (request: GateRequest, chat: string) => GateOverride | null,
-    delayMs?: (request: GateRequest) => number
+    delayMs?: (request: GateRequest) => number,
+    /** Side-by-side spec §13 (Task S19): the tokens each answered request reports (default 100 in, 50 out). */
+    usage?: (request: GateRequest, chat: string) => StubUsage | null
   ) {
     const stubs = await startPreviewGateStubs({
       storyDefaultShape: PACK.defaultShape, probeScripts,
       ...(debate === undefined ? { refuseModels: [GLM] } : { debate }),
       ...(override === undefined ? {} : { override }),
-      ...(delayMs === undefined ? {} : { delayMs })
+      ...(delayMs === undefined ? {} : { delayMs }),
+      ...(usage === undefined ? {} : { usage })
     });
     input.stubClosers.push(stubs.close);
     // The /remaining reads arrive on the same socket as /complete, as on the preview (createPreviewRemainingRpcPort).
@@ -335,8 +351,33 @@ export function previewDebateHarness(input: Readonly<{
       engine?: EngineRunnerSettings;
       /** R2 (B12): every composition budget's bound at one byte, so no digest can exist and the answer ends at its floor. */
       noDigest?: boolean;
+      /** Side-by-side spec §3 (B6): the release this runner runs as, as main.ts passes RELEASE_KEY; absent, `legacy`. */
+      releaseKey?: string;
+      /** Side-by-side spec §4 (B8): the retirement signal, as main.ts passes it; absent, the runner never retires. */
+      retirement?: Pick<RunnerRetirementSignal, "claimsStopped" | "callsStopped">;
+      /**
+       * Side-by-side spec §13 (Task S19): the runner composed PER SETTINGS VERSION, as apps/runner/src/main.ts composes it
+       * from the loader's cache (apps/runner/src/run-settings.ts): the site version's debate members spread once
+       * (`runnerSettingsOfVersion`), every debate on its OWN stamped version (`settingsForVersion` over the same cache and
+       * the run → version map), each preview call at its own debate's thinking table (`runPreviewThinkingLevelsOf`), and,
+       * hosted, every call charged to its own run's version's guard (`runCostEnvelopeGuardOf`, each target's own price),
+       * with the targets' price map and the band's body fallback; the story writer gets no boot policy (ruling R36: each
+       * write carries its debate's). The preview's roster, role and scorecard checks are the loader's, per version, so
+       * this harness's fixed-roster boot checks are skipped. The site version must already be loaded (main.ts requires
+       * it before it composes anything). Not with `money` (the money is the versions').
+       */
+      perVersion?: Readonly<{ cache: RunnerSettingsCache; versions: RunSettingsVersions; site: RunnerSiteContext }>;
     }> = {}
   ) {
+    const perVersion = options.perVersion;
+    const siteVersionSettings = perVersion === undefined ? undefined : perVersion.cache.loaded(perVersion.site.siteVersion);
+    if (perVersion !== undefined && siteVersionSettings === undefined) {
+      throw new Error("test: load the site version (requireSettings) before composing a per-version runner, as main.ts does");
+    }
+    if (perVersion !== undefined && options.money !== undefined) throw new Error("test: a per-version runner brings its own money");
+    // Side-by-side spec §13 (S6): hosted, each call's seam is its own run's version's guard (main.ts's runCostEnvelopeGuard).
+    const runGuard = perVersion === undefined || perVersion.site.money === null
+      ? null : runCostEnvelopeGuardOf(perVersion.cache, perVersion.versions);
     const probeSleeps: number[] = [];
     const callSleeps: number[] = [];
     const holdWaits: number[] = [];
@@ -349,6 +390,8 @@ export function previewDebateHarness(input: Readonly<{
     });
     /** Every debate lane the runner opened, in opening order (Task 12: a test reads a stopped run's lane stats). */
     const lanes: DebateCallLane[] = [];
+    /** Side-by-side spec §13 (Task S19): each opened lane's debate (run id), in the same order as `lanes`. */
+    const laneDebateIds: string[] = [];
     /**
      * Ruling R33: every lane's calls in the RUNNER's own order, never the gates' clocks. STARTED is pushed when the
      * scheduler starts a call (after the lane's start guard let it through); FAILED when that call's failure reaches
@@ -358,9 +401,11 @@ export function previewDebateHarness(input: Readonly<{
     const laneEvents: LaneEvent[] = [];
     const callScheduler: CallScheduler = Object.freeze({
       ...scheduler,
-      openLane: (debateId: string) => {
-        const lane = scheduler.openLane(debateId);
+      // Side-by-side spec §13 (S6): the runner opens each lane with its debate's own limits; they are passed through.
+      openLane: (debateId: string, limits?: Parameters<CallScheduler["openLane"]>[1]) => {
+        const lane = scheduler.openLane(debateId, limits);
         lanes.push(lane);
+        laneDebateIds.push(debateId);
         return Object.freeze({
           ...lane,
           run: <T>(ticket: Parameters<DebateCallLane["run"]>[0], call: () => Promise<T>): Promise<T> => lane.run(ticket, () => {
@@ -386,6 +431,15 @@ export function previewDebateHarness(input: Readonly<{
     });
     gates.remainingReads.splice(bootReads);
     const busy = createPreviewBusyCoordinator();
+    const versionSeams = (target: ProviderDiscoveryTarget) => {
+      const price = providerTargetPrice(target);
+      return runGuard === null || price === null ? {} : {
+        buildCostEnvelopeSeam: (runId: string, phase: Parameters<NonNullable<Parameters<typeof createPostgresProviderGateway>[1]["buildCostEnvelopeSeam"]>>[1],
+          sharedWall: Parameters<NonNullable<Parameters<typeof createPostgresProviderGateway>[1]["buildCostEnvelopeSeam"]>>[2]) =>
+          runGuard(runId).providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }),
+        buildStoryCostEnvelopeSeam: (runId: string) => runGuard(runId).storySeam({ runId, price, requireReportedUsage: true })
+      };
+    };
     const targetGateway = (target: ProviderDiscoveryTarget) => withPreviewProviderCallPolicy(
       createPostgresProviderGateway(pool(), {
         fetchImplementation: gates.guardedFetch, endpoint: target.baseUrl, model: target.model, maker: target.maker,
@@ -393,9 +447,16 @@ export function previewDebateHarness(input: Readonly<{
         ...(options.money === undefined ? {} : {
           buildCostEnvelopeSeam: options.money.buildCostEnvelopeSeam(target.providerRef),
           ...(options.money.buildStoryCostEnvelopeSeam === undefined ? {} : { buildStoryCostEnvelopeSeam: options.money.buildStoryCostEnvelopeSeam(target.providerRef) })
-        })
+        }),
+        ...versionSeams(target)
       }),
-      PREVIEW, target, { sleep: async (milliseconds) => { callSleeps.push(milliseconds); }, busy }
+      PREVIEW, target, {
+        sleep: async (milliseconds) => { callSleeps.push(milliseconds); }, busy,
+        // Addition D17 (SA5): each call at its own debate's table, by its run id (a call of no debate: the site's).
+        ...(perVersion === undefined ? {} : {
+          thinkingLevelsOf: runPreviewThinkingLevelsOf(perVersion.cache, perVersion.versions, perVersion.site.siteVersion)
+        })
+      }
     );
     // LG-A (final review I-1): main.ts's order when the route is asked for; otherwise each target's gateway as before.
     const targetGateways = options.structureRepair === true
@@ -405,7 +466,10 @@ export function previewDebateHarness(input: Readonly<{
     const topology = createRunnerProviderTopology(TARGETS, (target) => targetGateways === null ? targetGateway(target)
       : withStructureRepair(targetGateways.get(target.providerRef)!, structureRepairRoute));
     const story = new StoryWriter({
-      pool: pool(), pack: PACK, policy: STORY_POLICY, hosted: false, log: () => undefined,
+      pool: pool(), pack: PACK,
+      // Ruling R36 (per version): no boot policy; every write carries its own debate's version's story policy.
+      ...(perVersion === undefined ? { policy: STORY_POLICY } : {}),
+      hosted: perVersion?.site.deploymentMode === "hosted", log: () => undefined,
       resolveProvider: (roleRef) => {
         const member = [topology.primary, ...(topology.critique === undefined ? [] : [topology.critique]), ...topology.additionalMakers]
           .find((candidate) => candidate.providerRef === roleRef);
@@ -434,9 +498,12 @@ export function previewDebateHarness(input: Readonly<{
       synthesizerBound: POLICY.synthesisRolePolicy.synthesizerBound, evaluatorBound: POLICY.synthesisRolePolicy.evaluatorBound,
       sourceRefs: { synthesizerRoleRef: "test-layer:v11", evaluatorRoleRef: "test-layer:v11", evaluatorLoopMaxRounds: "test-layer:v11" }
     };
-    // main.ts's boot checks: the six reviewed targets, and every role the register names is one of them.
-    assertPreviewProviderTargets(PREVIEW, TARGETS);
-    assertPreviewRoleTargets(PREVIEW, TARGETS, [SEALED_WRITER_REF, SEALED_CHECKER_REF, STORY_POLICY.storytellerRoleRef, STORY_POLICY.storyCheckerRoleRef]);
+    // main.ts's boot checks: the six reviewed targets, and every role the register names is one of them (per version,
+    // the loader's own checks of each version's rosters and roles).
+    if (perVersion === undefined) {
+      assertPreviewProviderTargets(PREVIEW, TARGETS);
+      assertPreviewRoleTargets(PREVIEW, TARGETS, [SEALED_WRITER_REF, SEALED_CHECKER_REF, STORY_POLICY.storytellerRoleRef, STORY_POLICY.storyCheckerRoleRef]);
+    }
     const fixture = fixtureSettings();
     const runner = new WalkingSkeletonRunner(pool(), topology.primary.provider, {
       ...fixture,
@@ -465,13 +532,24 @@ export function previewDebateHarness(input: Readonly<{
       ...(options.structureRepair !== true || options.money?.structureRepairCeiling !== undefined ? {}
         : { structureRepairCeiling: previewStructureRepairCeiling(structureRepairRoute) }),
       callSubjects: previewCallSubjects(PREVIEW),
+      ...(options.releaseKey === undefined ? {} : { releaseKey: options.releaseKey }),
+      ...(options.retirement === undefined ? {} : { retirement: options.retirement }),
+      // Side-by-side spec §13 (Task S19), as main.ts's literal: the site version's debate members, then every debate on its
+      // own stamped version through the cache and the run → version map; hosted, the targets' prices and the band's fallback.
+      ...(perVersion === undefined ? {} : {
+        ...runnerSettingsOfVersion(siteVersionSettings!),
+        settingsForVersion: (version: number) => perVersion.cache.settingsFor(version),
+        runSettingsVersions: perVersion.versions,
+        providerPrices: buildProviderPriceMap(TARGETS, perVersion.site.deploymentMode),
+        bodyCostFallback: perVersion.site.envelopeBand !== null
+      }),
       holdRecorder: {
         countCooldownHolds: async () => holdWaits.length,
         record: async (event) => { holdRecords.push(event); },
         wait: async (cooldownMs) => { holdWaits.push(cooldownMs); }
       }
     });
-    return { runner, topology, probeSleeps, callSleeps, holdWaits, holdRecords, callScheduler, lanes, laneEvents };
+    return { runner, topology, probeSleeps, callSleeps, holdWaits, holdRecords, callScheduler, lanes, laneDebateIds, laneEvents };
   }
 
   const panelMember = (providerRef: string, asOf: string): DiscoveredPanelMember => Object.freeze({
@@ -506,6 +584,10 @@ export function previewDebateHarness(input: Readonly<{
      * (tests/support/fixed-run-id.ts); absent, startRun mints a random id as today.
      */
     runId?: string;
+    /** Side-by-side spec §1 (B6): the release the run is stamped with (startRun's `releaseKey`); absent, `legacy`. */
+    releaseKey?: string;
+    /** Side-by-side spec §13 (Task S19): the settings version the run is stamped with (`core.run.register_version`); absent, 1. */
+    registerVersion?: number;
   }> = { panelRefs: PANEL_REFS }): Promise<{ runId: string; workItemId: string; askerId: string; rotated: RotatedRoles; question: string }> {
     const asOf = "2026-10-11T19:30:00.000Z";
     const depth = admission.depth ?? 2;
@@ -540,7 +622,8 @@ export function previewDebateHarness(input: Readonly<{
           argumentLanguageTag: (admission.language ?? { tag: "en" }).tag,
           argumentLanguageName: (admission.language ?? { name: "English" }).name
         }),
-        registerVersion: 1, batteryVersion: "s00", batteryRows
+        registerVersion: admission.registerVersion ?? 1, batteryVersion: "s00", batteryRows,
+        ...(admission.releaseKey === undefined ? {} : { releaseKey: admission.releaseKey })
       });
     } finally {
       if (admission.runId !== undefined) clearPendingRunId();

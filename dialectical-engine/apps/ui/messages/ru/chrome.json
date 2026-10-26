@@ -70,5 +70,8 @@
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
-  "chrome.footer.consumerProtection": "Защита прав потребителей"
+  "chrome.footer.consumerProtection": "Защита прав потребителей",
+  "chrome.release.newerVersion": "Сайт был обновлён. Перезагрузите страницу.",
+  "chrome.release.reload": "Перезагрузить",
+  "chrome.release.madeByNewer": "Эти дебаты созданы более новой версией сайта. Перезагрузите страницу или попробуйте снова через несколько минут."
 }

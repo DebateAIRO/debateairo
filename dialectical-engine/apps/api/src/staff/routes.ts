@@ -170,6 +170,9 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
             allowanceState = await application!.funding.allowances.readSelfCommand(authentication.context,
                 authentication.baseSession.tokenHash, intent.action === 'ALLOWANCE_REVOKE' ? intent.grant_id : null);
             if (authentication.context.designation !== 'OWNER' || allowanceState.ownerRef !== authentication.baseSession.ownerRef) refuse();
+            // Side-by-side C17 review: a new grant needs this release's env policy to equal the sealed policy of the
+            // version it is issued under (the one bound into the proof); a revoke names its grant's version and narrows.
+            if (intent.action === 'ALLOWANCE_CONFIGURE') await application!.funding.requireNewGrantPolicy(allowanceState.policyRegisterVersion);
             binding = canonicalInternalAllowanceActionBinding(intent, allowanceState);
         } else if (intent.action === 'PUBLICATION_REVIEW_APPROVE' || intent.action === 'PUBLICATION_REVIEW_REFUSE') {
             if (application!.publicationReviews === undefined) throw new StaffHttpRefusal(503, 'STAFF_UNAVAILABLE');

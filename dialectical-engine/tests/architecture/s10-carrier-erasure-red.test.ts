@@ -259,6 +259,10 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       // Run resilience (spec 2026-10-12, fix (d)): the sit-out book hands each runner call, unchanged, to the
       // member's gateway it wraps, or refuses it before anything is sent. It opens no lease and reads no content.
       "apps/runner/src/run-sit-out.ts",
+      // Side-by-side final review R1: the model-call counter hands each call, unchanged, to the member's gateway it
+      // wraps, and counts it until it settles (the backstop never retires under a call in flight). It opens no lease
+      // and reads no content of its own.
+      "apps/runner/src/runner-retirement.ts",
       "packages/evaluator/src/index.ts",
       // Engine redesign R2b (B1): the comparing judges' call is sent through the gateway the runner hands it (the judge
       // seat's own lane-wrapped member gateway, never the arguing judge's, inside the leased runner, naming the run). It

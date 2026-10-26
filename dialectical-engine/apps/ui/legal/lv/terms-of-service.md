@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Īsumā
-eyebrow: PAKALPOJUMA NOTEIKUMI · v2.4 · SPĒKĀ NO 2026. GADA 12. OKTOBRA
+eyebrow: PAKALPOJUMA NOTEIKUMI · v2.5 · SPĒKĀ NO 2026. GADA 12. OKTOBRA
 title: Kam jūs piekrītat
 lede: Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.
-endMarker: NOTEIKUMU BEIGAS · v2.4
+endMarker: NOTEIKUMU BEIGAS · v2.5
 bodyLabel: Pakalpojuma noteikumu teksts
 annexTitle: A pielikums — Reģionālie noteikumi
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PIEMĒROJAMIE TIESĪBU AKTI
 -->
 
-**Version 2.4 · Effective 2026. gada 12. oktobris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
+**Version 2.5 · Effective 2026. gada 12. oktobris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
 
 **In short.** Jums jābūt vismaz 18 gadus vecam. Dialectical Engine veido argumentus ar MI modeļiem, un viss, ko tas ģenerē, var būt nepareizs — tā nav konsultācija. Jūsu debates ir privātas, ja vien tās nepublicējat; ja tās publicējat, ikviens tās var lasīt. Jūsu iesniegtais teksts tiek nosūtīts mūsu Pakalpojumu sniedzēju reģistrā norādītajiem MI pakalpojumu sniedzējiem un netiek izmantots modeļu apmācīšanai. Par nelikumīgu saturu ziņojiet uz support@dezbatere.ro neatkarīgi no tā, vai jums ir konts. Piemēro Rumānijas tiesību aktus, taču jums joprojām ir vietējā patērētāju aizsardzība.
 
@@ -213,7 +213,11 @@ Dialectical Engine piedāvā bezmaksas plānu. Būs pieejams maksas **Premium** 
 
 **Neizdevušies maksājumi.** Ja maksājums neizdodas, mēs atkārtojam mēģinājumus 7 dienas un pirms jūsu konta pazemināšanas uz bezmaksas plānu brīdinām jūs pa e-pastu. Mēs nedzēšam jūsu debates neizdevušās apmaksas dēļ.
 
-**Nodokļi un maksājuma saņēmējs.** Cenās ir iekļauts PVN, GST vai tirdzniecības nodoklis atkarībā no jūsu dzīvesvietas, un tas tiek parādīts pirms maksājuma veikšanas. Kartes maksājumus apstrādā NETOPIA Payments (netopia-payments.com). Pārdevējs ir DMS Merchandise Shop S.R.L., kas izsniedz jūsu rēķinu un paliek atbildīgs par pašu pakalpojumu un šiem Noteikumiem.
+**Nodokļi un maksājuma saņēmējs.** Cenās ir iekļauts PVN, GST vai tirdzniecības nodoklis atkarībā no jūsu dzīvesvietas, un tas tiek parādīts pirms maksājuma veikšanas. Pārdevējs ir DMS Merchandise Shop S.R.L., kas izsniedz jūsu rēķinu un paliek atbildīgs par pašu pakalpojumu un šiem Noteikumiem.
+
+**Maksājumu veidi.** Jūs maksājat ar karti. Mēs pieņemam Visa un Mastercard kartes; American Express kartes mēs nepieņemam. Kartes maksājumus apstrādā NETOPIA Payments (netopia-payments.com), un pilns jūsu kartes numurs nekad nenonāk pie mums.
+
+**Piegāde.** Dialectical Engine ir tiešsaistes pakalpojums, tāpēc jums nekas netiek nosūtīts. Jūsu maksas plāna funkcijas jūsu kontā ir pieejamas, tiklīdz maksājums ir apstiprināts.
 
 **Maksājumu apstrīdēšana.** Ja apstrīdat maksājumu pie savas kartes izdevēja, mēs varam apturēt maksas funkcijas, kamēr strīds tiek atrisināts. Par to mēs neiekasējam maksu.
 
@@ -235,7 +239,7 @@ Mēs pastāvīgā informācijas nesējā iepriekš paziņojam, kas un kad mainī
 
 **Šo Noteikumu izmaiņas.** Mēs varam mainīt šos Noteikumus tādu pašu iemeslu dēļ. Attiecībā uz izmaiņām, kas nesamazina jūsu tiesības, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un vismaz **30 dienu iepriekš** nosūtām jums e-pasta ziņojumu par tās stāšanos spēkā; turpinot lietot Dialectical Engine pēc šī datuma, jūs izmaiņām piekrītat, un pirms tam varat slēgt kontu. Attiecībā uz izmaiņām, kas samazina jūsu tiesības, — tostarp esoša plāna cenas paaugstinājumu, zemākiem ierobežojumiem, noņemtām funkcijām, jauniem jūsu satura lietošanas veidiem vai izmaiņām atbildībā, piemērojamajos tiesību aktos vai strīdu izšķiršanā — mēs lūdzam nākamajā pierakstīšanās reizē skaidri piekrist jaunajai versijai, un izmaiņas attiecas tikai uz turpmāko laiku. Mēs nekad neveicam izmaiņas ar atpakaļejošu spēku un nekad neizmantojam šo sadaļu, lai termiņa vidū mainītu jums apmaksātā pakalpojuma būtību, nepiedāvājot iespēju izstāties. Iepriekšējās versijas ir pieejamas vietnē dezbatere.ro/terms/versions.
 
-Versija 2.4 aizstāja versiju 2.3: tā pievieno jautājumu pārbaudi, kas izlasa katru jautājumu pirms debašu sākuma, dažus noraida un mūsu komandas izlasīšanai glabā katru noraidītu jautājumu, kas draud nodarīt kaitējumu citam cilvēkam vai citiem cilvēkiem, nosaucot viņus vai nenosaucot, tostarp uzbrukumu nenosauktiem cilvēkiem, plāno šādu kaitējumu vai jautā, vai un kā to nodarīt, vai kas jautā, kā izgatavot ieročus, sprāgstvielas, indes vai narkotikas vai kā atbalstīt teroristisku aktu, vai kas to slavina (7., 8., 10. un 11. sadaļa); pārbaudi, kas izlasa katru noslēgto debašu sintēzi, apstiprinājumu, kas atzīmētām debatēm nepieciešams pirms to publicēšanas, un debates, ko šī pārbaude izdzēš (5., 8., 9., 10. un 11. sadaļa); to, ko atbalsta tērzēšana nosūta Anthropic modelim Claude, ka tā neglabā neko no tā, ko rakstāt, un neatver lietu, un to, ka tās poga „Runāt ar cilvēku” parāda mūsu atbalsta adresi (8. un 10. sadaļa); un 7. sadaļas noteikumus, kas aizliedz jebkāda veida naida runu, norādījumus par ieroču vai narkotiku izgatavošanu, saturu, kas mudina uz pašnāvību vai kaitējuma nodarīšanu citiem cilvēkiem, un reliģisku apvainošanu, kā arī norāda, kuri jautājumi neļauj debatēm sākties.
+Versija 2.5 aizstāja versiju 2.4: tā pievieno jautājumu pārbaudi, kas izlasa katru jautājumu pirms debašu sākuma, dažus noraida un mūsu komandas izlasīšanai glabā katru noraidītu jautājumu, kas draud nodarīt kaitējumu citam cilvēkam vai citiem cilvēkiem, nosaucot viņus vai nenosaucot, tostarp uzbrukumu nenosauktiem cilvēkiem, plāno šādu kaitējumu vai jautā, vai un kā to nodarīt, vai kas jautā, kā izgatavot ieročus, sprāgstvielas, indes vai narkotikas vai kā atbalstīt teroristisku aktu, vai kas to slavina (7., 8., 10. un 11. sadaļa); pārbaudi, kas izlasa katru noslēgto debašu sintēzi, apstiprinājumu, kas atzīmētām debatēm nepieciešams pirms to publicēšanas, un debates, ko šī pārbaude izdzēš (5., 8., 9., 10. un 11. sadaļa); to, ko atbalsta tērzēšana nosūta Anthropic modelim Claude, ka tā neglabā neko no tā, ko rakstāt, un neatver lietu, un to, ka tās poga „Runāt ar cilvēku” parāda mūsu atbalsta adresi (8. un 10. sadaļa); un 7. sadaļas noteikumus, kas aizliedz jebkāda veida naida runu, norādījumus par ieroču vai narkotiku izgatavošanu, saturu, kas mudina uz pašnāvību vai kaitējuma nodarīšanu citiem cilvēkiem, un reliģisku apvainošanu, kā arī norāda, kuri jautājumi neļauj debatēm sākties.
 
 ## 15. Atbildība
 

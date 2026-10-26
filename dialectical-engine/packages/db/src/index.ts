@@ -1,9 +1,11 @@
 import { applyForward108, base108Lineage } from "./migration-forward108.js";
 import { applyForward110 } from "./migration-forward110.js";
-import { applyForwardChain, effectiveForwardVerifierSql } from "./migration-forward-chain.js";
+import { applyForwardStep, effectiveForwardVerifierSql, pendingForwardSteps, replayForwardChain, runOutsideTransactionStep } from "./migration-forward-chain.js";
+import { withMigrationLockRetry, withMigrationStepTransaction } from "./migration-transaction.js";
+import { assertDatabaseAheadAccepted, type MigrateOptions, type MigrateReport } from "./migration-ahead.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
-import { assertAuth106Catalog, compatibilityPreconditionDigest, identifyLineage, lineageEvidence, loadMigrationPlan, sha256, transactionBodyPostconditionEvidence, transactionBodyPreconditionDigest } from "./migration-lineage.js";
+import { assertAuth106Catalog, compatibilityPreconditionDigest, identifyLineage, lineageEvidence, loadMigrationPlan, sha256, splitLedger, transactionBodyPostconditionEvidence, transactionBodyPreconditionDigest } from "./migration-lineage.js";
 import type { Pool, PoolClient } from "pg";
 import pg from "pg";
 import type {
@@ -12,13 +14,27 @@ import type {
   CryptoEnvelope,
   PreparedRunContentCipher
 } from "@debateai/crypto";
-import { MODEL_STRENGTHS, TypedDomainError, type ActivationState, type CompositionBudgetTier, type ModelStrength, type RiskTier, type TierSource } from "@debateai/kernel";
+import { MODEL_STRENGTHS, TypedDomainError, parseReleaseKey, type ActivationState, type CompositionBudgetTier, type ModelStrength, type RiskTier, type TierSource } from "@debateai/kernel";
 
 export * from "./publication-check.js";
 export * from "./synthesis-check-erasure.js";
 export { PostgresThreatReportRepository, type ThreatReportDecision, type ThreatReportListRow, type ThreatReportReadRow, type ThreatReportAlertClaim } from "./threat-reports.js";
 export { PostgresDataExportRepository, PostgresDataExportSource } from "./data-export.js";
 export * from "./pool-budget.js";
+export * from "./release-state.js";
+export { recordRunSupersession, resolveRunRef } from "./run-supersession.js";
+export { SPEND_WAIVER_REASONS, recordSpendWaiver, type SpendWaiverReason } from "./spend-waiver.js";
+export {
+  DATABASE_AHEAD_NOT_ACCEPTED,
+  describeChain,
+  describeForwardSteps,
+  readPendingForwardSteps,
+  verifyDatabaseAhead,
+  type DatabaseAheadReport,
+  type ForwardStepDeclaration,
+  type MigrateOptions,
+  type MigrateReport
+} from "./migration-ahead.js";
 import { SUPPORT_CONTROL_PLANE_POOL } from "./pool-budget.js";
 export { abortablePrivateWork, queryPrivateStream } from "./private-stream.js";
 import { abortablePrivateWork, cancelAndDestroyPrivateClient } from "./private-stream.js";
@@ -240,7 +256,9 @@ const CONTENT_PROVISION_SIGNATURES = Object.freeze([
   "core.complete_run_key_provision(uuid,uuid,uuid,uuid)",
   "core.create_encrypted_run(jsonb,uuid,uuid,jsonb)",
   "core.claim_run_key_provision_cleanup(integer)",
-  "core.complete_run_key_provision_cleanup(uuid,uuid)"
+  "core.complete_run_key_provision_cleanup(uuid,uuid)",
+  // Side-by-side spec §4 (0123 §4, plan C11): a waiting owner's run re-admitted under the current release.
+  "core.prepare_readmitted_run_key_provision(uuid,uuid)"
 ] as const);
 const CONTENT_PROVISION_FORBIDDEN_ROLES = Object.freeze([
   "public",
@@ -858,6 +876,38 @@ export function isDatabasePoolBusy(error: unknown): boolean {
   return false;
 }
 
+/** A code-shaped refusal message (`CODE` or `CODE:detail`, the house TypeError form); prose is never a code. */
+const SETTINGS_REFUSAL_CODE = /^[A-Z][A-Z0-9_]{2,}(?::[A-Za-z0-9_.:/-]+)?$/u;
+
+/**
+ * Ruling R31 (side-by-side spec §13): true when this failure, or one it wraps as `cause`, is the database's, not a
+ * settings version's: the house pool's own typed failure (createPool: a lost or refused connection, a server restart,
+ * a busy pool or a full server all become TypedDomainError DATABASE_POOL_FAILED), busy or not. Statement timeouts and
+ * serialization failures reach callers as the driver's raw errors, which are untyped already.
+ */
+export function isDatabaseFailure(error: unknown): boolean {
+  if (isDatabasePoolBusy(error)) return true;
+  let current: unknown = error;
+  for (let depth = 0; depth < 8 && current instanceof Error; depth += 1) {
+    if (current instanceof TypedDomainError && current.code === DATABASE_POOL_FAILED) return true;
+    current = current.cause;
+  }
+  return false;
+}
+
+/**
+ * Ruling R31 (side-by-side spec §13): the code of a REAL settings refusal, the one rule both settings caches keep a
+ * version's refusal by (the runner's, apps/runner/src/run-settings.ts; the API's, apps/api/src/admission-settings.ts):
+ * a TypedDomainError's code, or an Error whose whole message is a code (the house form the register readers refuse
+ * with, e.g. CALL_CONCURRENCY_POLICY_INVALID). The database's own failures (`isDatabaseFailure`) and anything else (a
+ * driver error, a runtime TypeError in prose) are null: untyped, so a cache keeps nothing and the next ask loads again.
+ */
+export function settingsRefusalCode(error: unknown): string | null {
+  if (isDatabaseFailure(error)) return null;
+  if (error instanceof TypedDomainError) return error.code;
+  return error instanceof Error && SETTINGS_REFUSAL_CODE.test(error.message) ? error.message : null;
+}
+
 function typedPoolFailure(error: unknown): TypedDomainError {
   if (error instanceof TypedDomainError && error.code === DATABASE_POOL_FAILED) return error;
   const detail = error instanceof Error ? error.message : String(error);
@@ -1029,161 +1079,201 @@ export function createSupportControlPlanePool(connectionString: string): Pool {
   return pool;
 }
 
-export async function migrate(pool: Pool): Promise<void> {
+/**
+ * Applies this code's pending migrations and replays the applied ones (migrations/lineage/README.md). Side-by-side spec
+ * 2026-10-21 §5 ("database ahead", migration-ahead.ts): on a database a newer release moved forward by expand steps it
+ * declared, it replays its own steps, applies nothing and reports those steps as `extraSteps`; `options.newerChain` (the
+ * newer release's describeForwardSteps()) binds them to that release's own list.
+ */
+export async function migrate(pool: Pool, options: MigrateOptions = {}): Promise<MigrateReport> {
   const plan = await loadMigrationPlan();
+  const compat = plan.manifest.compatibility;
   const client = await pool.connect();
   try {
-    await client.query("BEGIN");
-    const isolation = await client.query<{ transaction_isolation: string }>("SHOW transaction_isolation");
-    if (isolation.rows[0]?.transaction_isolation !== "read committed") {
-      throw new Error("MIGRATION_ISOLATION_REQUIRES_READ_COMMITTED");
-    }
-    await client.query("SELECT pg_advisory_xact_lock(hashtextextended('debateai:schema-migrations', 0))");
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS public.debateai_schema_migration (
-        name text PRIMARY KEY CHECK (length(btrim(name)) > 0),
-        applied_at timestamptz NOT NULL
-      )
-    `);
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS public.debateai_schema_migration_resolution (
-        logical_name text PRIMARY KEY,
-        original_source_sha256 text NOT NULL CHECK(original_source_sha256 ~ '^[0-9a-f]{64}$'),
-        resolution_id text NOT NULL,
-        recipe_sha256 text NOT NULL CHECK(recipe_sha256 ~ '^[0-9a-f]{64}$'),
-        executable_path text NOT NULL,
-        executable_sha256 text NOT NULL CHECK(executable_sha256 ~ '^[0-9a-f]{64}$'),
-        precondition_evidence_digest text NOT NULL CHECK(precondition_evidence_digest ~ '^[0-9a-f]{64}$'),
-        postcondition_evidence_digest text NOT NULL CHECK(postcondition_evidence_digest ~ '^[0-9a-f]{64}$'),
-        executed_at timestamptz NOT NULL
-      )
-    `);
-    await client.query("REVOKE ALL ON public.debateai_schema_migration_resolution FROM PUBLIC");
-    const resolutionAcl = await client.query<{ valid: boolean }>(`
-      SELECT pg_get_userbyid(c.relowner)=current_user
-        AND NOT EXISTS(SELECT 1 FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a
-          WHERE a.grantee<>c.relowner)
-        AND NOT EXISTS(SELECT 1 FROM pg_roles service WHERE service.rolname LIKE 'debateai\\_%'
-          AND service.oid<>c.relowner AND pg_has_role(service.oid,c.relowner,'MEMBER')) AS valid
-      FROM pg_class c WHERE c.oid='public.debateai_schema_migration_resolution'::regclass
-    `);
-    if (resolutionAcl.rows[0]?.valid !== true) throw new Error("MIGRATION_RESOLUTION_ACL_DRIFT");
-    const applied = (await client.query<{ name: string }>("SELECT name FROM public.debateai_schema_migration ORDER BY name")).rows.map(({ name }) => name);
-    const resolutions = (await client.query<{
-      logical_name: string; original_source_sha256: string; resolution_id: string; recipe_sha256: string;
-      executable_path: string; executable_sha256: string; precondition_evidence_digest: string;
-      postcondition_evidence_digest: string;
-    }>("SELECT * FROM public.debateai_schema_migration_resolution ORDER BY logical_name")).rows;
-    const lineage = identifyLineage(plan, applied, resolutions.map(({ logical_name }) => logical_name));
-    const baseLineage=base108Lineage(lineage);
-    const authLineage = lineage === "auth94" || lineage === "auth103" || lineage === "auth106";
-    if (baseLineage === "auth106" || baseLineage === "integrated-original" || baseLineage === "integrated-compatibility" || baseLineage === "integrated-fresh-resolutions") await assertAuth106Catalog(client);
-    if (lineage === "dev95") {
-      // Retained active, expired and consumed withdrawal grants all block the
-      // immutable Auth CHECK replacements. The lock keeps the predicate stable.
-      await client.query("LOCK TABLE identity.step_up_grant IN SHARE ROW EXCLUSIVE MODE");
-      const retained = await client.query<{ retained: boolean }>(
-        "SELECT EXISTS(SELECT 1 FROM identity.step_up_grant WHERE action='WITHDRAW_SUBSCRIPTION') retained"
-      );
-      if (retained.rows[0]?.retained) throw new Error("MIGRATION_WITHDRAWAL_ROWS_RETAINED");
-    }
-    const compat = plan.manifest.compatibility;
-    if (baseLineage === "integrated-fresh-resolutions") {
-      for (const body of plan.manifest.transactionBodies) {
-        const receipt = resolutions.find(({ logical_name }) => logical_name === body.logicalName);
-        if (receipt?.original_source_sha256 !== plan.sources.get(body.logicalName)!.sha256
-          || receipt.resolution_id !== body.resolutionId || receipt.recipe_sha256 !== plan.recipeSha256
-          || receipt.executable_path !== body.executablePath || receipt.executable_sha256 !== body.executableSha256
-          || receipt.precondition_evidence_digest !== transactionBodyPreconditionDigest(plan, body.logicalName)
-          || receipt.postcondition_evidence_digest !== await transactionBodyPostconditionEvidence(client, body.logicalName)) {
+    // Side-by-side spec 2026-10-21 §5 ("Each step runs on its own"): one migrator at a time, held for the session (not
+    // one transaction) because the prologue and every forward step now commit on their own; released in `finally`.
+    await client.query("SELECT pg_advisory_lock(hashtextextended('debateai:schema-migrations', 0))");
+    // The prologue: the ledger tables, the lineage and its receipts, the base recipe, 0108, 0110 and the replay of
+    // every applied chain step, in one transaction with the 2 s lock wait (migration-transaction.ts). It returns the
+    // applied prefix of the chain and the steps a newer release added (accepted in it, or refused).
+    const prologue = await withMigrationStepTransaction(client, "PROLOGUE", async () => {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS public.debateai_schema_migration (
+          name text PRIMARY KEY CHECK (length(btrim(name)) > 0),
+          applied_at timestamptz NOT NULL
+        )
+      `);
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS public.debateai_schema_migration_resolution (
+          logical_name text PRIMARY KEY,
+          original_source_sha256 text NOT NULL CHECK(original_source_sha256 ~ '^[0-9a-f]{64}$'),
+          resolution_id text NOT NULL,
+          recipe_sha256 text NOT NULL CHECK(recipe_sha256 ~ '^[0-9a-f]{64}$'),
+          executable_path text NOT NULL,
+          executable_sha256 text NOT NULL CHECK(executable_sha256 ~ '^[0-9a-f]{64}$'),
+          precondition_evidence_digest text NOT NULL CHECK(precondition_evidence_digest ~ '^[0-9a-f]{64}$'),
+          postcondition_evidence_digest text NOT NULL CHECK(postcondition_evidence_digest ~ '^[0-9a-f]{64}$'),
+          executed_at timestamptz NOT NULL
+        )
+      `);
+      await client.query("REVOKE ALL ON public.debateai_schema_migration_resolution FROM PUBLIC");
+      const resolutionAcl = await client.query<{ valid: boolean }>(`
+        SELECT pg_get_userbyid(c.relowner)=current_user
+          AND NOT EXISTS(SELECT 1 FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a
+            WHERE a.grantee<>c.relowner)
+          AND NOT EXISTS(SELECT 1 FROM pg_roles service WHERE service.rolname LIKE 'debateai\\_%'
+            AND service.oid<>c.relowner AND pg_has_role(service.oid,c.relowner,'MEMBER')) AS valid
+        FROM pg_class c WHERE c.oid='public.debateai_schema_migration_resolution'::regclass
+      `);
+      if (resolutionAcl.rows[0]?.valid !== true) throw new Error("MIGRATION_RESOLUTION_ACL_DRIFT");
+      const ledger = (await client.query<{ name: string }>("SELECT name FROM public.debateai_schema_migration ORDER BY name")).rows.map(({ name }) => name);
+      // Side-by-side §5 ("database ahead"): the steps a newer release added after this code's last one are split off and
+      // judged after the replay below; the lineage is identified from the rest, where any other unknown name still
+      // refuses UNKNOWN_APPLIED_NAME.
+      const { known: applied, extra } = splitLedger(plan, ledger);
+      const resolutions = (await client.query<{
+        logical_name: string; original_source_sha256: string; resolution_id: string; recipe_sha256: string;
+        executable_path: string; executable_sha256: string; precondition_evidence_digest: string;
+        postcondition_evidence_digest: string;
+      }>("SELECT * FROM public.debateai_schema_migration_resolution ORDER BY logical_name")).rows;
+      const lineage = identifyLineage(plan, applied, resolutions.map(({ logical_name }) => logical_name));
+      const baseLineage=base108Lineage(lineage);
+      const authLineage = lineage === "auth94" || lineage === "auth103" || lineage === "auth106";
+      if (baseLineage === "auth106" || baseLineage === "integrated-original" || baseLineage === "integrated-compatibility" || baseLineage === "integrated-fresh-resolutions") await assertAuth106Catalog(client);
+      if (lineage === "dev95") {
+        // Retained active, expired and consumed withdrawal grants all block the
+        // immutable Auth CHECK replacements. The lock keeps the predicate stable.
+        await client.query("LOCK TABLE identity.step_up_grant IN SHARE ROW EXCLUSIVE MODE");
+        const retained = await client.query<{ retained: boolean }>(
+          "SELECT EXISTS(SELECT 1 FROM identity.step_up_grant WHERE action='WITHDRAW_SUBSCRIPTION') retained"
+        );
+        if (retained.rows[0]?.retained) throw new Error("MIGRATION_WITHDRAWAL_ROWS_RETAINED");
+      }
+      if (baseLineage === "integrated-fresh-resolutions") {
+        for (const body of plan.manifest.transactionBodies) {
+          const receipt = resolutions.find(({ logical_name }) => logical_name === body.logicalName);
+          if (receipt?.original_source_sha256 !== plan.sources.get(body.logicalName)!.sha256
+            || receipt.resolution_id !== body.resolutionId || receipt.recipe_sha256 !== plan.recipeSha256
+            || receipt.executable_path !== body.executablePath || receipt.executable_sha256 !== body.executableSha256
+            || receipt.precondition_evidence_digest !== transactionBodyPreconditionDigest(plan, body.logicalName)
+            || receipt.postcondition_evidence_digest !== await transactionBodyPostconditionEvidence(client, body.logicalName)) {
+            throw new Error("MIGRATION_RESOLUTION_BINDING_DRIFT");
+          }
+        }
+      }
+      if (baseLineage === "integrated-compatibility") {
+        const receipt = resolutions[0];
+        const source = plan.sources.get(compat.logicalName)!;
+        if (receipt?.original_source_sha256 !== source.sha256 || receipt.resolution_id !== compat.resolutionId
+          || receipt.recipe_sha256 !== plan.recipeSha256 || receipt.executable_path !== compat.executablePath
+          || receipt.executable_sha256 !== compat.executableSha256
+          || !(["auth94", "auth103", "auth106"] as const)
+            .some((cohort) => receipt.precondition_evidence_digest === compatibilityPreconditionDigest(plan, cohort))
+          || receipt.postcondition_evidence_digest !== await lineageEvidence(client)) {
           throw new Error("MIGRATION_RESOLUTION_BINDING_DRIFT");
         }
       }
-    }
-    if (baseLineage === "integrated-compatibility") {
-      const receipt = resolutions[0];
-      const source = plan.sources.get(compat.logicalName)!;
-      if (receipt?.original_source_sha256 !== source.sha256 || receipt.resolution_id !== compat.resolutionId
-        || receipt.recipe_sha256 !== plan.recipeSha256 || receipt.executable_path !== compat.executablePath
-        || receipt.executable_sha256 !== compat.executableSha256
-        || !(["auth94", "auth103", "auth106"] as const)
-          .some((cohort) => receipt.precondition_evidence_digest === compatibilityPreconditionDigest(plan, cohort))
-        || receipt.postcondition_evidence_digest !== await lineageEvidence(client)) {
-        throw new Error("MIGRATION_RESOLUTION_BINDING_DRIFT");
-      }
-    }
-    const appliedSet = new Set(applied);
-    const resolvedSet = new Set(resolutions.map(({ logical_name }) => logical_name));
-    for (const name of plan.manifest.order) {
-      if (appliedSet.has(name) || resolvedSet.has(name)) continue;
-      const body = lineage === "fresh" ? plan.manifest.transactionBodies.find(({ logicalName }) => logicalName === name) : undefined;
-      if (body !== undefined) {
-        const terminal = [...appliedSet,...resolvedSet].sort();
-        const preceding = plan.manifest.order.slice(0,plan.manifest.order.indexOf(name)).sort();
-        if (terminal.length !== preceding.length || terminal.some((entry,index) => entry !== preceding[index])) {
-          throw new Error("MIGRATION_TRANSACTION_BODY_ORDER_DRIFT");
+      const appliedSet = new Set(applied);
+      const resolvedSet = new Set(resolutions.map(({ logical_name }) => logical_name));
+      for (const name of plan.manifest.order) {
+        if (appliedSet.has(name) || resolvedSet.has(name)) continue;
+        const body = lineage === "fresh" ? plan.manifest.transactionBodies.find(({ logicalName }) => logicalName === name) : undefined;
+        if (body !== undefined) {
+          const terminal = [...appliedSet,...resolvedSet].sort();
+          const preceding = plan.manifest.order.slice(0,plan.manifest.order.indexOf(name)).sort();
+          if (terminal.length !== preceding.length || terminal.some((entry,index) => entry !== preceding[index])) {
+            throw new Error("MIGRATION_TRANSACTION_BODY_ORDER_DRIFT");
+          }
+          await client.query(plan.transactionBodySql.get(name)!);
+          const postconditionEvidence = await transactionBodyPostconditionEvidence(client,name);
+          await client.query(`
+            INSERT INTO public.debateai_schema_migration_resolution
+            (logical_name,original_source_sha256,resolution_id,recipe_sha256,executable_path,executable_sha256,
+             precondition_evidence_digest,postcondition_evidence_digest,executed_at)
+            VALUES($1,$2,$3,$4,$5,$6,$7,$8,statement_timestamp())
+          `,[name,plan.sources.get(name)!.sha256,body.resolutionId,plan.recipeSha256,body.executablePath,
+            body.executableSha256,transactionBodyPreconditionDigest(plan,name),postconditionEvidence]);
+          resolvedSet.add(name);
+          continue;
         }
-        await client.query(plan.transactionBodySql.get(name)!);
-        const postconditionEvidence = await transactionBodyPostconditionEvidence(client,name);
-        await client.query(`
-          INSERT INTO public.debateai_schema_migration_resolution
-          (logical_name,original_source_sha256,resolution_id,recipe_sha256,executable_path,executable_sha256,
-           precondition_evidence_digest,postcondition_evidence_digest,executed_at)
-          VALUES($1,$2,$3,$4,$5,$6,$7,$8,statement_timestamp())
-        `,[name,plan.sources.get(name)!.sha256,body.resolutionId,plan.recipeSha256,body.executablePath,
-          body.executableSha256,transactionBodyPreconditionDigest(plan,name),postconditionEvidence]);
-        resolvedSet.add(name);
-        continue;
-      }
-      if (name === compat.logicalName && authLineage) {
-        const source = plan.sources.get(name)!;
-        const preconditionEvidence = compatibilityPreconditionDigest(plan, lineage);
-        if (preconditionEvidence !== sha256(JSON.stringify({ lineage, applied: [...appliedSet].sort(), source: source.sha256 }))) {
-          throw new Error("MIGRATION_COMPATIBILITY_ORDER_DRIFT");
+        if (name === compat.logicalName && authLineage) {
+          const source = plan.sources.get(name)!;
+          const preconditionEvidence = compatibilityPreconditionDigest(plan, lineage);
+          if (preconditionEvidence !== sha256(JSON.stringify({ lineage, applied: [...appliedSet].sort(), source: source.sha256 }))) {
+            throw new Error("MIGRATION_COMPATIBILITY_ORDER_DRIFT");
+          }
+          await client.query(plan.compatibilitySql);
+          const postconditionEvidence = await lineageEvidence(client);
+          await client.query(`
+            INSERT INTO public.debateai_schema_migration_resolution
+            (logical_name,original_source_sha256,resolution_id,recipe_sha256,executable_path,executable_sha256,
+             precondition_evidence_digest,postcondition_evidence_digest,executed_at)
+            VALUES($1,$2,$3,$4,$5,$6,$7,$8,statement_timestamp())
+          `,[name,source.sha256,compat.resolutionId,plan.recipeSha256,compat.executablePath,
+            compat.executableSha256,preconditionEvidence,postconditionEvidence]);
+          resolvedSet.add(name);
+          continue;
         }
-        await client.query(plan.compatibilitySql);
-        const postconditionEvidence = await lineageEvidence(client);
-        await client.query(`
-          INSERT INTO public.debateai_schema_migration_resolution
-          (logical_name,original_source_sha256,resolution_id,recipe_sha256,executable_path,executable_sha256,
-           precondition_evidence_digest,postcondition_evidence_digest,executed_at)
-          VALUES($1,$2,$3,$4,$5,$6,$7,$8,statement_timestamp())
-        `,[name,source.sha256,compat.resolutionId,plan.recipeSha256,compat.executablePath,
-          compat.executableSha256,preconditionEvidence,postconditionEvidence]);
-        resolvedSet.add(name);
-        continue;
+        await client.query(plan.sources.get(name)!.sql);
+        await client.query(
+          "INSERT INTO public.debateai_schema_migration (name, applied_at) VALUES ($1, statement_timestamp())",
+          [name]
+        );
+        appliedSet.add(name);
       }
-      await client.query(plan.sources.get(name)!.sql);
-      await client.query(
-        "INSERT INTO public.debateai_schema_migration (name, applied_at) VALUES ($1, statement_timestamp())",
-        [name]
-      );
-      appliedSet.add(name);
+      if (authLineage) {
+        const final = await lineageEvidence(client);
+        await client.query("UPDATE public.debateai_schema_migration_resolution SET postcondition_evidence_digest=$1 WHERE logical_name=$2",[final,compat.logicalName]);
+      }
+      // PR-54: once a forward step after 0108 is applied, its verifier supersedes the sealed one (lineage/README.md).
+      const forwardVerifierSql = effectiveForwardVerifierSql(plan, appliedSet);
+      if (forwardVerifierSql === undefined) await client.query(plan.effectiveCapabilityVerifierSql);
+      else await client.query(forwardVerifierSql);
+      await applyForward108(client,plan,lineage,new Set([...appliedSet,...resolvedSet]));
+      await applyForward110(client,plan,lineage,new Set([...appliedSet,...resolvedSet]));
+      const replayed = await replayForwardChain(client,plan,new Set([...appliedSet,...resolvedSet]),extra);
+      // Accepted only when every rule of migration-ahead.ts holds (one newer release, expand and keeps-verifier steps
+      // chained from this code's last one, this code's verifier still in force), else DATABASE_AHEAD_NOT_ACCEPTED and
+      // the prologue rolls back. Accepted, every step of this code is applied, so nothing below is pending.
+      await assertDatabaseAheadAccepted(client,plan,appliedSet,extra,options);
+      return { done: replayed, extra };
+    });
+    let done = prologue.done;
+    const appliedSteps: string[] = [];
+    // Each pending step in its own transaction: a step's locks end with it, a step that fails (or a kill) leaves every
+    // earlier step committed, and the next run continues at the next step. A lock wait that ran out is tried again,
+    // five tries, then MIGRATION_LOCK_TIMEOUT names the step.
+    const pending = pendingForwardSteps(plan, done);
+    for (const step of pending) {
+      // n1 outside-transaction: the concurrent index build runs on the session first; the step transaction then
+      // refuses unless that index is valid, and records the step like any other.
+      if (step.n1.outsideTransaction) {
+        await withMigrationLockRetry(step.name, () => runOutsideTransactionStep(client, step));
+      }
+      const before = done;
+      await withMigrationStepTransaction(client, step.name, async () => {
+        const compatEvidenceBeforeStep = await lineageEvidence(client);
+        await applyForwardStep(client,plan,step,before);
+        // data-export 0115 (V-41; the re-seal is V-28's): a chain step that moves lineageEvidence
+        // (step_up_grant_action_check, valid_consumer_authorization_internal) re-seals the compatibility row it moved,
+        // in the step's own transaction (side-by-side §5), so the row is never stale between steps; the prologue's
+        // check guards every later run (V-18).
+        const compatEvidenceAfterStep = await lineageEvidence(client);
+        if (compatEvidenceAfterStep !== compatEvidenceBeforeStep) {
+          await client.query("UPDATE public.debateai_schema_migration_resolution SET postcondition_evidence_digest=$1 WHERE logical_name=$2",[compatEvidenceAfterStep,compat.logicalName]);
+        }
+      });
+      done = [...before, step];
+      appliedSteps.push(step.name);
     }
-    if (authLineage) {
-      const final = await lineageEvidence(client);
-      await client.query("UPDATE public.debateai_schema_migration_resolution SET postcondition_evidence_digest=$1 WHERE logical_name=$2",[final,compat.logicalName]);
-    }
-    // PR-54: once a forward step after 0108 is applied, its verifier supersedes the sealed one (lineage/README.md).
-    const forwardVerifierSql = effectiveForwardVerifierSql(plan, appliedSet);
-    if (forwardVerifierSql === undefined) await client.query(plan.effectiveCapabilityVerifierSql);
-    else await client.query(forwardVerifierSql);
-    await applyForward108(client,plan,lineage,new Set([...appliedSet,...resolvedSet]));
-    await applyForward110(client,plan,lineage,new Set([...appliedSet,...resolvedSet]));
-    const compatEvidenceBeforeChain = await lineageEvidence(client);
-    await applyForwardChain(client,plan,new Set([...appliedSet,...resolvedSet]));
-    // data-export 0115 (V-41; the re-seal is V-28's): a chain step that moves lineageEvidence (step_up_grant_action_check, valid_consumer_authorization_internal)
-    // re-seals the compatibility row it moved; the check above guards every later run (V-18).
-    const compatEvidenceAfterChain = await lineageEvidence(client);
-    if (compatEvidenceAfterChain !== compatEvidenceBeforeChain) {
-      await client.query("UPDATE public.debateai_schema_migration_resolution SET postcondition_evidence_digest=$1 WHERE logical_name=$2",[compatEvidenceAfterChain,compat.logicalName]);
-    }
-    await client.query("COMMIT");
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
+    return Object.freeze({ appliedSteps: Object.freeze(appliedSteps), extraSteps: prologue.extra });
   } finally {
-    client.release();
+    // A session lock must never outlive the run: when the unlock cannot be sent, the connection is destroyed, which
+    // ends the session and its lock, and the run's own outcome (its refusal, or success) stands.
+    const unlocked = await client.query("SELECT pg_advisory_unlock(hashtextextended('debateai:schema-migrations', 0))")
+      .then(() => true, () => false);
+    if (unlocked) client.release();
+    else client.release(true);
   }
 }
 
@@ -1586,11 +1676,78 @@ export interface StartRunInput {
   readonly batteryVersion: string;
   readonly batteryRows: readonly InitialBatteryRow[];
   readonly askContract?: Readonly<Record<string, unknown>>;
+  /**
+   * The release that runs this debate (side-by-side spec §1, migration 0123): written once into core.run.release_key, in
+   * the same INSERT as registerVersion. When present it must be a well-formed key (`legacy` and malformed keys refuse
+   * with RELEASE_KEY_INVALID before any SQL). When absent the column default `legacy` applies, which no runner serves,
+   * so a forgotten admission path fails loudly downstream.
+   */
+  readonly releaseKey?: string;
 }
+
+/**
+ * Side-by-side uploads spec 2026-10-21 §4, O3 (plan C task C10) — A WAITING DEBATE'S ASK, AS IT WAS STORED: the
+ * columns its run row was written with and its decrypted content (`questionLine`, `askContract`). The API rebuilds the
+ * ask from it and re-evaluates it under the current release (apps/api/src/readmission.ts); C11 starts the re-admitted
+ * run from the plan. `askerRiskTier`, `tierSource` and `tierProvenanceRef` are the columns as written (the asker's risk
+ * tier, the admitted tier source and provenance); `contentEncrypted` says the question and contract came from the
+ * run's envelope, so the new run must be encrypted too. Content: only `questionLine` and `askContract` carry any.
+ */
+export type StoredAsk = Readonly<{
+  runId: string;
+  releaseKey: string;
+  registerVersion: number;
+  questionLine: string;
+  askContract: Readonly<Record<string, unknown>>;
+  askerId: string;
+  sessionId: string;
+  callerScope: "ASKER" | "OPERATOR";
+  asOf: Date;
+  askerRiskTier: RiskTier;
+  tierSource: TierSource;
+  tierProvenanceRef: string;
+  compositionBudgetTier: CompositionBudgetTier;
+  planTier: "free" | "premium" | null;
+  depthParams: Readonly<Record<string, unknown>>;
+  argumentLanguageTag: string;
+  argumentLanguageName: string;
+  contentEncrypted: boolean;
+}>;
 
 export type RunCreationPrincipal =
   | Readonly<{ readonly kind: "server"; readonly userId: string; readonly ownerRef: string }>
   | Readonly<{ readonly kind: "legacy"; readonly legacyAskerId: string }>;
+
+/**
+ * Side-by-side spec §4, O3 (plan C task C11): whose NEW run a re-admission writes. An owner's run is encrypted and its
+ * key is provisioned from the OLD run's identity binding (0123's core.prepare_readmitted_run_key_provision: the same
+ * user and identity session, no live session needed); a legacy asker's run copies the old row's asker id, session and
+ * caller scope (core.run_supersession's guard refuses an edge between two people).
+ */
+export type ReadmissionPrincipal =
+  | Readonly<{ kind: "readmitted-owner"; ownerRef: string }>
+  | Readonly<{ kind: "legacy"; legacyAskerId: string }>;
+
+export type StartReadmittedRunInput = Omit<StartRunInput, "principal" | "sessionId" | "callerScope"> &
+  Readonly<{ fromRunId: string; principal: ReadmissionPrincipal }>;
+
+/** The codes 0123's re-admission key provision refuses with (55000, MESSAGE = code), surfaced typed. */
+const READMISSION_REFUSALS: ReadonlySet<string> = new Set([
+  "RUN_READMISSION_INVALID", "RUN_READMISSION_OWNER_GONE", "RUN_READMISSION_TAKEN"
+]);
+
+/**
+ * Who a new run row belongs to, decided before anything is written. `plain`: a legacy asker's run in the clear.
+ * `encrypted`: an owner's run, whose key provision `prepare` opens on the executor it is given and answers the
+ * execution ref and the user the content key is provisioned for (without a configured cipher such a run is refused
+ * RUN_CONTENT_ENCRYPTION_REQUIRED, inside the transaction, as before).
+ */
+type RunRowIdentity =
+  | Readonly<{ kind: "plain"; askerId: string; sessionId: string; callerScope: "ASKER" | "OPERATOR" }>
+  | Readonly<{
+      kind: "encrypted"; ownerRef: string; callerScope: "ASKER" | "OPERATOR";
+      prepare(executor: Pick<Pool, "query"> | PoolClient, runId: string): Promise<Readonly<{ executionRef: string; userId: string }>>;
+    }>;
 
 export interface RunOwnershipAccess {
   readonly ownerRef: string | null;
@@ -2009,6 +2166,116 @@ export class RunRepository {
     input: StartRunInput,
     admissionClient?: PoolClient
   ): Promise<string> {
+    const principal = input.principal;
+    const identity: RunRowIdentity = principal.kind === "legacy"
+      ? Object.freeze({ kind: "plain", askerId: principal.legacyAskerId, sessionId: input.sessionId, callerScope: input.callerScope })
+      : Object.freeze({
+          kind: "encrypted", ownerRef: principal.ownerRef, callerScope: input.callerScope,
+          prepare: async (executor: Pick<Pool, "query"> | PoolClient, runId: string) => {
+            if (!UUID_V4.test(input.sessionId)) {
+              throw new TypedDomainError(
+                "RUN_OWNER_INVALID",
+                "The authenticated session must be an opaque UUID"
+              );
+            }
+            const intent = await executor.query<{ execution_ref: string | null }>(
+              "SELECT core.prepare_run_key_provision($1,$2,$3,$4) AS execution_ref",
+              [runId,principal.userId,principal.ownerRef,input.sessionId]
+            );
+            if (!UUID_V4.test(intent.rows[0]?.execution_ref ?? "")) {
+              throw new TypedDomainError(
+                "RUN_OWNER_INVALID",
+                "The authenticated owner mapping is no longer active"
+              );
+            }
+            return Object.freeze({ executionRef: intent.rows[0]!.execution_ref!, userId: principal.userId });
+          }
+        });
+    return this.#insertRun(input, identity, admissionClient);
+  }
+
+  /**
+   * Side-by-side spec §4, O3 (plan C task C11) — THE NEW RUN OF A RE-ADMISSION. A waiting debate another release
+   * admitted is re-admitted under the current release as a NEW run, written exactly as `startRun` writes one (stamped
+   * with `input.releaseKey`, the current release), from the plan the API made of the old run's stored ask. Its identity
+   * is the old run's: an owner's run calls 0123's core.prepare_readmitted_run_key_provision(old, new) on the
+   * content-provision executor (the old run's binding copied — same user and identity session — and the intent marked
+   * as this re-admission, so no live session is needed), provisions the new run's key for that user and writes the
+   * content re-encrypted under the new run id (core.create_encrypted_run); a legacy asker's run copies the old row's
+   * session id, asker id and caller scope into the plain insert. The old row is never touched. 0123 allows one live
+   * re-admission per old run: RUN_READMISSION_TAKEN while an earlier one is pending or alive (a FAILED one frees it),
+   * RUN_READMISSION_INVALID when the old run no longer waits (or is not the principal's kind of run),
+   * RUN_READMISSION_OWNER_GONE when its owner's account is gone or no longer active; all typed, nothing written.
+   */
+  async startReadmittedRun(input: StartReadmittedRunInput, admissionClient?: PoolClient): Promise<string> {
+    const { fromRunId, principal, ...rest } = input;
+    const old = (await this.pool.query<{
+      asker_id: string; session_id: string; caller_scope: "ASKER" | "OPERATOR"; encrypted: boolean;
+    }>(
+      `SELECT asker_id, session_id, caller_scope, content_encryption_version IS NOT DISTINCT FROM 1 AS encrypted
+       FROM core.run WHERE run_id = $1`,
+      [fromRunId]
+    )).rows[0];
+    const ownRun = old !== undefined && (principal.kind === "legacy"
+      ? !old.encrypted && old.asker_id === principal.legacyAskerId
+      : old.encrypted && old.asker_id === `owner:${principal.ownerRef}`);
+    if (old === undefined || !ownRun) {
+      throw new TypedDomainError("RUN_READMISSION_INVALID", "The run to re-admit is not this principal's waiting run");
+    }
+    const identity: RunRowIdentity = principal.kind === "legacy"
+      ? Object.freeze({ kind: "plain", askerId: old.asker_id, sessionId: old.session_id, callerScope: old.caller_scope })
+      : Object.freeze({
+          kind: "encrypted", ownerRef: principal.ownerRef, callerScope: old.caller_scope,
+          prepare: async (executor: Pick<Pool, "query"> | PoolClient, runId: string) => {
+            let rows: ReadonlyArray<{ execution_ref: string | null; user_id: string | null }>;
+            try {
+              rows = (await executor.query<{ execution_ref: string | null; user_id: string | null }>(
+                "SELECT execution_ref::text AS execution_ref, user_id::text AS user_id FROM core.prepare_readmitted_run_key_provision($1,$2)",
+                [fromRunId, runId]
+              )).rows;
+            } catch (error) {
+              const code = error instanceof Error ? error.message : undefined;
+              if (code !== undefined && READMISSION_REFUSALS.has(code)) throw new TypedDomainError(code, code);
+              throw error;
+            }
+            const executionRef = rows[0]?.execution_ref ?? "";
+            const userId = rows[0]?.user_id ?? "";
+            if (!UUID_V4.test(executionRef) || !UUID_V4.test(userId)) {
+              throw new TypedDomainError("RUN_OWNER_INVALID", "The re-admitted run's key provision answered no binding");
+            }
+            return Object.freeze({ executionRef, userId });
+          }
+        });
+    return this.#insertRun(rest, identity, admissionClient);
+  }
+
+  /**
+   * Side-by-side C11 review (controller ruling 2026-10-22) — THE RE-ADMISSIONS OF `oldRunId` WHOSE START NEVER
+   * COMMITTED: 0123's core.list_unstarted_readmissions (EXECUTE for the API's role), on this repository's runtime pool.
+   * Each is a new run with no supersession edge and no work item — an owner's run whose binding names the old run, or
+   * a legacy asker's plain copy of it — whose row committed while its START did not, and whose FAILED record never
+   * landed. Ask it only under the old run's owner ask-admission lease, where no START of that person is in flight, so
+   * every id is such an orphan (the waker records it FAILED, RUN_SETUP_FAILED:READMISSION). Ids only, in id order.
+   */
+  async listUnstartedReadmissions(oldRunId: string): Promise<readonly string[]> {
+    const result = await this.pool.query<{ run_id: string }>(
+      "SELECT listed.run_id::text AS run_id FROM core.list_unstarted_readmissions($1::uuid) AS listed(run_id)",
+      [oldRunId]
+    );
+    return Object.freeze(result.rows.map((row) => row.run_id));
+  }
+
+  /**
+   * One new run row and its opening rows, for `startRun` and `startReadmittedRun` alike: `identity` says whose it is
+   * (`RunRowIdentity`); everything else is the run input. Byte for byte what `startRun` always wrote.
+   */
+  async #insertRun(
+    input: Omit<StartRunInput, "principal" | "sessionId" | "callerScope">,
+    identity: RunRowIdentity,
+    admissionClient?: PoolClient
+  ): Promise<string> {
+    // Side-by-side spec §1: the stamp is checked before anything is written (no intent, no key, no row).
+    const releaseKey = input.releaseKey === undefined ? undefined : parseReleaseKey(input.releaseKey).releaseKey;
     const runId = randomUUID();
     const cipher = contentCipherFor(this.pool);
     let contentKeyProvisioned = false;
@@ -2016,10 +2283,10 @@ export class RunRepository {
     let transactionStarted = false;
     let client: PoolClient | undefined;
     let ownsClient = false;
-    const askerId = input.principal.kind === "server"
-      ? `owner:${input.principal.ownerRef}`
-      : input.principal.legacyAskerId;
-    if (input.principal.kind === "legacy") {
+    const askerId = identity.kind === "encrypted"
+      ? `owner:${identity.ownerRef}`
+      : identity.askerId;
+    if (identity.kind === "plain") {
       if (RAW_USER_ASKER.test(askerId)) {
         throw new TypedDomainError("RUN_OWNER_RAW_ID_FORBIDDEN", "Raw user identifiers cannot enter immutable run rows");
       }
@@ -2028,12 +2295,12 @@ export class RunRepository {
       } catch {
         throw new TypedDomainError("RUN_LEGACY_ASKER_INVALID", "Legacy runs cannot use a reserved identity scope");
       }
-    } else if (!UUID_V4.test(input.principal.ownerRef)) {
+    } else if (!UUID_V4.test(identity.ownerRef)) {
       throw new TypedDomainError("RUN_OWNER_REF_INVALID", "The run scope must carry the authenticated opaque owner reference");
     }
-    const planTierColumnApplied = input.principal.kind === "legacy"
+    const planTierColumnApplied = identity.kind === "plain"
       && await planTierColumnIsApplied(this.pool);
-    const argumentLanguageColumnsApplied = input.principal.kind === "legacy"
+    const argumentLanguageColumnsApplied = identity.kind === "plain"
       && await argumentLanguageColumnsAreApplied(this.pool);
     const argumentLanguageTag = input.argumentLanguageTag ?? "und";
     const argumentLanguageName = input.argumentLanguageName ?? "the same language as the question";
@@ -2043,30 +2310,17 @@ export class RunRepository {
     let contentEnvelope: CryptoEnvelope | null = null;
     let contentAttestation: Buffer | null = null;
     let contentAttestationSecret: Buffer | null = null;
-    let runExecutionRef = input.sessionId;
+    let runExecutionRef = identity.kind === "plain" ? identity.sessionId : "";
+    let contentUserId = "";
     try {
-      if (input.principal.kind === "server" && cipher !== undefined) {
-        if (!UUID_V4.test(input.sessionId)) {
-          throw new TypedDomainError(
-            "RUN_OWNER_INVALID",
-            "The authenticated session must be an opaque UUID"
-          );
-        }
+      if (identity.kind === "encrypted" && cipher !== undefined) {
         const provisionExecutor=admissionClient ?? this.provisionPool;
-        const intent = await provisionExecutor.query<{ execution_ref: string | null }>(
-          "SELECT core.prepare_run_key_provision($1,$2,$3,$4) AS execution_ref",
-          [runId,input.principal.userId,input.principal.ownerRef,input.sessionId]
-        );
-        if (!UUID_V4.test(intent.rows[0]?.execution_ref ?? "")) {
-          throw new TypedDomainError(
-            "RUN_OWNER_INVALID",
-            "The authenticated owner mapping is no longer active"
-          );
-        }
-        runExecutionRef = intent.rows[0]!.execution_ref!;
+        const intent = await identity.prepare(provisionExecutor, runId);
+        runExecutionRef = intent.executionRef;
+        contentUserId = intent.userId;
         await cipher.provisionRun(runId, {
-          userId: input.principal.userId,
-          ownerRef: input.principal.ownerRef
+          userId: contentUserId,
+          ownerRef: identity.ownerRef
         });
         contentKeyProvisioned = true;
         const prepared = await cipher.prepareRun(runId);
@@ -2086,7 +2340,7 @@ export class RunRepository {
         storedAskContract = CONTENT_JSON_SENTINEL;
       }
       if (contentEnvelope !== null) {
-        if (input.principal.kind !== "server") {
+        if (identity.kind !== "encrypted") {
           throw new TypedDomainError(
             "RUN_CONTENT_ENCRYPTION_REQUIRED",
             "Encrypted runs require an authenticated owner"
@@ -2094,6 +2348,8 @@ export class RunRepository {
         }
         commitAttempted = true;
         const provisionExecutor=admissionClient ?? this.provisionPool;
+        // `releaseKey` is sent only when given, and the capability probe below never strips it (unlike planTier and the
+        // argument language): a database without 0123 refuses a stamped document rather than run it unstamped (O1).
         const created = await provisionExecutor.query<{
           created: boolean;
           plan_tier_supported: boolean;
@@ -2129,7 +2385,7 @@ export class RunRepository {
             questionLine: storedQuestionLine,
             askerId,
             executionRef: runExecutionRef,
-            callerScope: input.callerScope,
+            callerScope: identity.callerScope,
             asOf: input.asOf.toISOString(),
             askerRiskTier: input.askerRiskTier,
             riskTier: input.effectiveRiskTier,
@@ -2148,8 +2404,9 @@ export class RunRepository {
             askContract: storedAskContract,
             contentCiphertext: contentEnvelope,
             contentAttestation: contentAttestation!.toString("base64"),
-            contentAttestationSecret: contentAttestationSecret!.toString("base64")
-          }),input.principal.userId,input.principal.ownerRef,
+            contentAttestationSecret: contentAttestationSecret!.toString("base64"),
+            ...(releaseKey === undefined ? {} : { releaseKey })
+          }),contentUserId,identity.ownerRef,
           JSON.stringify(input.batteryRows.map((row)=>({
             batteryRowId:row.batteryRowId,
             predicateRef:row.predicateRef,
@@ -2185,7 +2442,7 @@ export class RunRepository {
       ownsClient = admissionClient === undefined;
       await client.query("BEGIN");
       transactionStarted = true;
-      if (input.principal.kind === "server" && contentEnvelope === null) {
+      if (identity.kind === "encrypted" && contentEnvelope === null) {
         throw new TypedDomainError(
           "RUN_CONTENT_ENCRYPTION_REQUIRED",
           "Server-owned runs require the encrypted content capability"
@@ -2193,7 +2450,7 @@ export class RunRepository {
       }
       const createdAtSeq = await allocateSequence(client);
       const baseRunValues = [
-        runId, storedQuestionLine, askerId, runExecutionRef, input.callerScope, input.asOf,
+        runId, storedQuestionLine, askerId, runExecutionRef, identity.callerScope, input.asOf,
         input.askerRiskTier, input.effectiveRiskTier, input.tierSource, input.tierProvenanceRef,
         input.compositionBudgetTier,
         ...(planTierColumnApplied ? [input.planTier ?? null] : []),
@@ -2201,7 +2458,8 @@ export class RunRepository {
         JSON.stringify(input.depthParams),
         JSON.stringify(input.discoveredPanel), input.strangerSampleRate,
         JSON.stringify(input.envelopeBasis), input.registerVersion,
-        input.batteryVersion, JSON.stringify(storedAskContract), createdAtSeq
+        input.batteryVersion, JSON.stringify(storedAskContract), createdAtSeq,
+        ...(releaseKey === undefined ? [] : [releaseKey])
       ];
       const planTierBindOffset = planTierColumnApplied ? 1 : 0;
       const argumentLanguageBindOffset = argumentLanguageColumnsApplied ? 2 : 0;
@@ -2213,7 +2471,7 @@ export class RunRepository {
           composition_budget_tier${planTierColumnApplied ? ", plan_tier" : ""}${argumentLanguageColumnsApplied ? ", argument_language_tag, argument_language_name" : ""},
           depth_params, agent_count, discovered_panel,
           stranger_sample_rate, envelope_basis, register_version,
-          battery_version, ask_contract, created_at_seq
+          battery_version, ask_contract, created_at_seq${releaseKey === undefined ? "" : ", release_key"}
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
           $11${planTierColumnApplied ? ", $12" : ""}${argumentLanguageColumnsApplied ? `, $${12 + planTierBindOffset}, $${13 + planTierBindOffset}` : ""},
@@ -2221,7 +2479,7 @@ export class RunRepository {
           jsonb_array_length($${13 + bindOffset}::jsonb),
           $${13 + bindOffset}::jsonb, $${14 + bindOffset},
           $${15 + bindOffset}::jsonb, $${16 + bindOffset},
-          $${17 + bindOffset}, $${18 + bindOffset}::jsonb, $${19 + bindOffset}
+          $${17 + bindOffset}, $${18 + bindOffset}::jsonb, $${19 + bindOffset}${releaseKey === undefined ? "" : `, $${20 + bindOffset}`}
         )`,
         baseRunValues
       );
@@ -2511,6 +2769,11 @@ export class RunRepository {
     readonly compositionBudgetTier: CompositionBudgetTier;
     readonly strangerSampleRate: number;
     readonly envelopeBasis: Readonly<Record<string, unknown>>;
+    /**
+     * Side-by-side spec §13 (S6): the settings version the run was admitted under (`core.run.register_version`,
+     * insert-only). The runner checks it against the version it resolved before the claim (RUN_SETTINGS_VERSION_DRIFT).
+     */
+    readonly registerVersion: number;
   }> {
     return withRunContentLease(this.pool,[runId],async () => {
     const encryptionSchemaApplied = await contentEncryptionSchemaIsApplied(this.pool);
@@ -2532,10 +2795,13 @@ export class RunRepository {
       composition_budget_tier: CompositionBudgetTier;
       stranger_sample_rate: number;
       envelope_basis: Readonly<Record<string, unknown>>;
+      register_version: number;
     }>(
+      // The bigint version is cast by the database (an out-of-range one refuses), never coerced in JavaScript.
       `SELECT run_id, question_line${contentCiphertextProjection}${argumentLanguageProjection},
               agent_count, discovered_panel, depth_params,
-              composition_budget_tier, stranger_sample_rate, envelope_basis
+              composition_budget_tier, stranger_sample_rate, envelope_basis,
+              register_version::integer AS register_version
        FROM core.run WHERE run_id = $1`,
       [runId]
     );
@@ -2561,8 +2827,100 @@ export class RunRepository {
       depthParams: Object.freeze({ ...row.depth_params }),
       compositionBudgetTier: row.composition_budget_tier,
       strangerSampleRate: Number(row.stranger_sample_rate),
-      envelopeBasis: Object.freeze({ ...row.envelope_basis })
+      envelopeBasis: Object.freeze({ ...row.envelope_basis }),
+      registerVersion: row.register_version
     };
+    });
+  }
+
+  /**
+   * Side-by-side spec §13 (S6, D2): the settings version a run was admitted under, by run id — no content, no lease
+   * (`core.run.register_version` is insert-only). The runner's `claimNext` path reads it right after its claim, since it
+   * cannot know its run before. RUN_NOT_FOUND when there is no such run.
+   */
+  async readRunRegisterVersion(runId: string): Promise<number> {
+    const result = await this.pool.query<{ register_version: number }>(
+      // The bigint version is cast by the database (an out-of-range one refuses), never coerced in JavaScript.
+      "SELECT register_version::integer AS register_version FROM core.run WHERE run_id = $1",
+      [runId]
+    );
+    const row = result.rows[0];
+    if (row === undefined) throw new TypedDomainError("RUN_NOT_FOUND", `Run ${runId} does not exist`);
+    return row.register_version;
+  }
+
+  /**
+   * Side-by-side spec §4, O3 (plan C task C10): the run's ask as it was stored (`StoredAsk`), null when no such run.
+   * Like `readFrozenHead`, under the run's content lease, and the question and contract are decrypted from the run's
+   * envelope (an encrypted run with no cipher configured refuses CONTENT_CIPHER_UNAVAILABLE); a run written in the
+   * clear is read as stored. It reads 0123's release stamp, so it is for a database at 0123 or later. The run's
+   * existence is read first: the lease itself refuses an id with no run (PRIVATE_CONTENT_ERASED), which is not "none".
+   */
+  async readStoredAsk(runId: string): Promise<StoredAsk | null> {
+    const exists = await this.pool.query("SELECT 1 FROM core.run WHERE run_id = $1", [runId]);
+    if (exists.rowCount === 0) return null;
+    return withRunContentLease(this.pool, [runId], async () => {
+      const result = await this.pool.query<{
+        run_id: string;
+        release_key: string;
+        register_version: number;
+        question_line: string;
+        ask_contract: Record<string, unknown>;
+        asker_id: string;
+        session_id: string;
+        caller_scope: "ASKER" | "OPERATOR";
+        as_of: Date;
+        asker_risk_tier: RiskTier;
+        tier_source: TierSource;
+        tier_provenance_ref: string;
+        composition_budget_tier: CompositionBudgetTier;
+        plan_tier: "free" | "premium" | null;
+        depth_params: Record<string, unknown>;
+        argument_language_tag: string;
+        argument_language_name: string;
+        content_encryption_version: number | null;
+        content_ciphertext: CryptoEnvelope | null;
+      }>(
+        // The bigint version is cast by the database (an out-of-range one refuses), never coerced in JavaScript.
+        `SELECT run_id, release_key, register_version::integer AS register_version, question_line, ask_contract,
+                asker_id, session_id, caller_scope, as_of, asker_risk_tier, tier_source, tier_provenance_ref,
+                composition_budget_tier, plan_tier, depth_params, argument_language_tag, argument_language_name,
+                content_encryption_version, content_ciphertext
+         FROM core.run WHERE run_id = $1`,
+        [runId]
+      );
+      const row = result.rows[0];
+      if (row === undefined) return null;
+      if (row.content_encryption_version === 1 && contentCipherFor(this.pool) === undefined) {
+        throw new TypedDomainError(
+          "CONTENT_CIPHER_UNAVAILABLE",
+          "Encrypted content cannot be read without the external key store"
+        );
+      }
+      const content = await decryptContentForRun<{ questionLine: string; askContract: Record<string, unknown> }>(
+        this.pool, row.run_id, "core.run", row.run_id, row.content_ciphertext,
+        { questionLine: row.question_line, askContract: row.ask_contract }
+      );
+      return Object.freeze({
+        runId: row.run_id,
+        releaseKey: row.release_key,
+        registerVersion: row.register_version,
+        questionLine: content.questionLine,
+        askContract: Object.freeze({ ...content.askContract }),
+        askerId: row.asker_id,
+        sessionId: row.session_id,
+        callerScope: row.caller_scope,
+        asOf: row.as_of,
+        askerRiskTier: row.asker_risk_tier,
+        tierSource: row.tier_source,
+        tierProvenanceRef: row.tier_provenance_ref,
+        compositionBudgetTier: row.composition_budget_tier,
+        planTier: row.plan_tier,
+        depthParams: Object.freeze({ ...row.depth_params }),
+        argumentLanguageTag: row.argument_language_tag,
+        argumentLanguageName: row.argument_language_name,
+        contentEncrypted: row.content_ciphertext !== null
+      });
     });
   }
 }

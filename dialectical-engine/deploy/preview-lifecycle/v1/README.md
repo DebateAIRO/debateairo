@@ -159,31 +159,101 @@ launchers still re-check every byte exactly as before.
 ## Boot sequence (what to expect after a reboot)
 
 1. `debateai-preview-postgresql` starts (it restarts itself 10 s after a crash).
-2. `debateai-preview-api` starts after the supporting services. Its root prestart first runs the
-   cheap checks, then waits up to 60 s for PostgreSQL to accept connections on its socket
-   (`pg_isready`), then runs the database verifier (about 12 s), then the launcher re-hashes the
-   release and starts the API. If PostgreSQL is still not ready, prestart refuses with
-   `POSTGRES_NOT_READY` and systemd tries again 30 s later (at most 4 tries in 15 minutes).
-3. `debateai-preview-ui` is ordered `After=` the API, so its own prestart (the same wait and
-   verifier) only begins once the API's start job is done; the two verifiers do not overlap at boot.
+2. `debateai-preview.target` starts the CURRENT release's API and website instances only: every switch (and the
+   transition's seed) writes `debateai-preview.target.d/60-current-release.conf` naming
+   `debateai-preview-api@<label>.service` and `debateai-preview-ui@<label>.service` (side-by-side spec §10); the
+   folder's other drop-ins (the Anthropic gate's `50-anthropic-gate.conf`) start as before.
+   The API instance starts after the supporting services. Its root prestart first runs the cheap checks (the release
+   table must call its release CURRENT or STAGED), then waits up to 60 s for PostgreSQL to accept connections on its
+   socket (`pg_isready`), then runs the database verifier (about 12 s), then the launcher re-hashes the release and
+   starts the API. If PostgreSQL is still not ready, prestart refuses with `POSTGRES_NOT_READY` and systemd tries again
+   30 s later (at most 4 tries in 15 minutes).
+3. The website instance is `BindsTo=` and `After=` its own release's API instance, so its own prestart (the same wait
+   and verifier) only begins once the API's start job is done; the two verifiers do not overlap at boot.
+4. **No runner starts at boot.** A runner instance has no `[Install]` section and the target does not want it. Start
+   the current release's runner by hand: `systemctl start debateai-preview-runner@<label>`. If a release was draining,
+   its runner is down too and its claimed work waits for nobody: `release-check.mjs status` names it in `bad` (exit 2)
+   with that same command, and the stranded email names it too. The release guide's "After a reboot or a runner crash
+   during a drain" (SB14b, `deploy/preview-release/v1/README.md`) checks both gates, then starts the draining runner
+   (database-ahead mode if needed: it finishes or sets aside its own debates and retires) and then the current one. A
+   draining release's backstop timer only asks its runner to retire: it needs a running runner to honour it.
 
 `TimeoutStartSec=300` covers the wait (60 s), the verifier (hard cap 150 s) and the rest.
 
 ## Files
 
 ```text
-prestart.mjs  common.mjs  alert.mjs  backup.mjs  release-guard.mjs
+prestart.mjs  common.mjs  alert.mjs  backup.mjs  release-guard.mjs  release-table.mjs
 unlock-team-tools.mjs  jit-creator-actor.mjs  self-capture-actor.mjs  readiness-writer-actor.mjs
+release-switch.mjs  release-check.mjs  release-retire.mjs  release-env.mjs  release-archive.mjs
+unit-templates.mjs  migration-steps.mjs  settings-version.mjs
 systemd/debateai-preview.target
-systemd/debateai-preview-{api,ui,postgresql}.service.d/50-lifecycle.conf
-systemd/debateai-preview-alert@.service
+systemd/debateai-preview-{api,ui}@.service.d/50-lifecycle.conf
+systemd/debateai-preview-postgresql.service.d/50-lifecycle.conf
+systemd/debateai-preview-runner-retire@.service  systemd/debateai-preview-runner-retire@.timer
+systemd/debateai-preview-runner-retire-check@.service  systemd/debateai-preview-runner-retire-check@.timer
+systemd/debateai-preview-alert@.service  systemd/debateai-preview-notice@.service
 systemd/debateai-preview-backup.service  systemd/debateai-preview-backup.timer
 systemd/debateai-preview-team-unlock.service
 systemd/fallback/50-interim-recovery-login.conf   (fallback only; not installed by default)
 ```
 
+Side by side (side-by-side spec §10), the API, the website and the runner are template units, one instance per
+release: `debateai-preview-<service>@<label>.service`. The runner's template is
+`deploy/preview-auth-dev/v1/debateai-preview-runner@.service`; the API's and the website's are rendered from the live
+fixed units by `unit-templates.mjs render` once, in the transition (`deploy/preview-release/v1/README.md`, "Transition
+release T", TA-units and TB5), and each gets the repo's `@.service.d/50-lifecycle.conf`. The root tools of the
+side-by-side upload:
+
+| File | What it does |
+|---|---|
+| `release-table.mjs` | root's only door to the release table (staged, current, draining, retired), through `psql` variables |
+| `release-switch.mjs` | `stage`, `seed` (the transition only), `switch [--activate <v>]`, `switch --finish`, `rollback --to … --from …`, `rollback --before-switch` |
+| `release-check.mjs` | `check` (the verdict before an upload), `status`, `receipt` (a release that retired by itself), `maintenance` |
+| `release-retire.mjs` | the units' stop recorder (`stopped`), the backstop's `retire-request`, the 25-minute `retire-check`, and `mark-retired` (drained path only) |
+| `release-env.mjs` | each release's `<service>-<label>.env` (`derive`) and the SAME checks across releases (`same`) |
+| `release-archive.mjs` | moves a RETIRED release aside on the owner's yes (`archive`); never deletes |
+| `unit-templates.mjs` | the API and website templates from the live units (`render`) and the property check (`compare`) |
+| `backup.mjs --online` | the online backup before a side-by-side upload's migrations (the nightly run takes no argument) |
+| `settings-version.mjs` | debate settings without an upload (side-by-side spec §13): `check <label> <v>` (the dry boot, both halves, and the verdict), `activate <v> --by <owner> --reason <text>`, `status` |
+
+The settings step of the switch (side-by-side spec §13, §11): every database write of `release-switch.mjs` (switch,
+its revert, the first switch, the seed) passes the settings pointer it saw, read by the operator module
+(`tools/settings-version/cli.ts switch-plan`, run as `postgres` from a release's own API folder), and can activate a
+version in the same transaction. The first switch to a release while nothing was ever activated activates that
+release's own site version. A new release that has not passed the active version refuses
+`SETTINGS_VERSION_NOT_PASSED` before anything is written, naming the versions it passed: run
+`settings-version.mjs check <label> <active version>`, or plan the switch with `switch --to <new> --from <old>
+--activate <a version it passed>`. A forward switch that activates a version other than the active one (the new
+release's own site version included) first runs the live gate check of an activation (ruling R80); `--expect-active <v>`
+refuses `SETTINGS_ACTIVE_VERSION_MOVED` before anything is written when the active version is not `v`. A rollback keeps
+the active version when the older release passed it, else re-activates the version last active while that release was
+current, else its own site version (ruling R78: never a version it only checked); a revert puts back what the switch
+replaced. `release-check.mjs check` gains the line `SETTINGS` (and takes the same `--activate <v>`).
+
+`settings-version.mjs` runs each check-version half from the release's own folder (`apps/runner/src/settings-check-cli.ts`
+and `apps/api/src/settings-check-cli.ts`, the files `pnpm settings:check-runner|settings:check-api` name) with the
+lock's pinned identity of its unit (`setpriv`) and that release's `<service>-<label>.env` values as its environment, and
+keeps both lines as `lifecycle-current-<label>/settings-check-<v>-<UTC>.json`. Every file it hands the operator (the
+lines, the receipt, the line-up and target models, the gate answers) is root's, mode 0640, in the group the operator
+runs as (`postgres`'s primary group, read through `getent`). The operator never records a FAIL for the current
+release's active version (`SETTINGS_VERDICT_ACTIVE_PAIR`: the codes, then one plain line; activate another passed
+version first). The operator commands
+(`cli.ts verdict|activate|status`) run as `postgres` through the server's own socket (libpq's `PGHOST`/`PGPORT`/
+`PGDATABASE`/`PGUSER`), the principal `release-table.mjs` uses. `activate` first reads both gates' read-only
+`/remaining` (the sockets from the current release's API env file) and hands the answers to the operator, which refuses
+unless every model the version can seat is switched on at its gate.
+
+The online backup dumps every database of the cluster as the postgres administrator over the local socket, so the
+cluster's `pg_hba.conf` must let that administrator into each one. On the test site that is line 2,
+`local postgres,debateai,hatchet postgres peer map=preview_root` (R21, 23 October 2026, added `hatchet`; the release
+guide's SB4 and SB7 check it before the backup). Each dump must list at least one entry, except the built-in
+`postgres` database, which is empty: its archive passes with pg_restore's whole header and no entry (`listingValid`).
+
 prestart, alert and backup use Node built-ins plus the reviewed `deploy/preview-auth-dev/v1`
-helpers (custody reader, launch-plan and attestation validators). The unlock and its three actors
+helpers (custody reader, launch-plan and attestation validators). `release-switch.mjs` also imports
+`deploy/preview-release/v1/caddy-slots.mjs` (the readiness listener's address), so the operator folder holds that
+folder too. The unlock and its three actors
 load `pg`, `tsx`, the staff alert code and `native-peer.mjs` from the **pinned release** itself
 (the readiness child loads only `pg`), and only after `release-guard.mjs` has verified that
 release (see the decisions above).
@@ -204,10 +274,10 @@ unit files before installing; nothing else names them.
    chmod 0600 /root/preview-archive/systemd-before-lifecycle-*.tar.gz
    ```
 
-1. **Operator folder.** From a clean checkout of the reviewed commit, copy these two folders,
+1. **Operator folder.** From a clean checkout of the reviewed commit, copy these three folders,
    keeping their relative layout, to `/opt/debateai-v3-preview/operator/lifecycle-v1/`:
-   `dialectical-engine/deploy/preview-lifecycle` and `dialectical-engine/deploy/preview-auth-dev`
-   (the lifecycle no longer needs `deploy/preview-mail`). Then make everything root-owned and
+   `dialectical-engine/deploy/preview-lifecycle`, `dialectical-engine/deploy/preview-auth-dev` and
+   `dialectical-engine/deploy/preview-release` (the lifecycle no longer needs `deploy/preview-mail`). Then make everything root-owned and
    read-only:
 
    ```sh
@@ -216,8 +286,9 @@ unit files before installing; nothing else names them.
    find /opt/debateai-v3-preview/operator/lifecycle-v1 -type f -exec chmod 0644 {} +
    ```
 
-   When updating an installed operator folder (for example to pick up a fix), copy both
-   folders from the same commit, never one alone: the lifecycle files import shared functions
+   When updating an installed operator folder (for example to pick up a fix), copy all three
+   folders from the same commit, never one alone (on the side-by-side layout: the folder swap of
+   `deploy/preview-release/v1/README.md`, TB5 and SB10): the lifecycle files import shared functions
    from `preview-auth-dev` (for example `release-guard.mjs` imports `operatorManifestSha256`
    from `source-manifest.mjs`), so a mix of commits refuses to load.
 
@@ -604,14 +675,34 @@ unit files before installing; nothing else names them.
 
 ## Pinning a NEW release
 
-After the new release has passed its own reviewed checks and its launch plans exist: first make
-`/etc/debateai-v3-preview/auth-dev-v1/native-plan.json` the **new release's verify-only plan**
-(with the API and website stopped, step 3's rule), because `pin` records that file's hash and
-refuses a plan that does not describe the release being pinned. Then `pin --from` the new api
-and ui plans, regenerate both `zzzzzzzzzz-lifecycle-release.conf` files with `dropin`,
-`daemon-reload`, restart api then ui. Until you re-pin, prestart refuses the new
-plans (`RELEASE_LOCK_MISMATCH` or `BASE_PLAN_HASH_MISMATCH`), so nothing unpinned can start
-unattended.
+Since the transition release T the lock has schema v2 (`preview-lifecycle-release-lock-v2`): one entry per release,
+under its label, with its release key, its slot (A or B), its optional database-ahead pin and one entry per service.
+Every per-release file is named by the label:
+- `/etc/debateai-v3-preview/auth-dev-v1/native-plan-<label>.json`, the release's verify-only native plan (the release's
+  own native operator reads only this file; there is no shared `native-plan.json` any more);
+- `/etc/debateai-v3-preview/auth-dev-v1/<service>-<label>.env`, written by `release-env.mjs derive`;
+- `/opt/debateai-v3-preview/artifacts/lifecycle-current-<label>/`, where prestart writes the fresh proof and plan;
+- `debateai-preview-<service>@<label>.service.d/zzzzzzzzzz-lifecycle-release.conf`, the instance's release drop-in.
+
+For a new release: make its `native-plan-<label>.json` its verify-only plan (`pin` records that file's hash and refuses
+a plan that does not describe the release), then `prestart.mjs pin --from <its plan>` for each of api, ui and runner. A
+pin adds or replaces only that release's entry for that service; every other label stays byte for byte (a lock of
+schema v1 on disk is refused: the transition moves it aside first). Then
+`prestart.mjs dropin --service <service> --label <label>` into each instance's drop-in folder, `daemon-reload`, and
+`release-switch.mjs stage --label <label>`: prestart starts a website or an API only for a release the release table
+calls STAGED or CURRENT (a runner also DRAINING), and refuses a website or API whose slot another live release uses.
+The transition records its release with `release-switch.mjs seed` instead. The team unlock and the creator run the
+current release's API, chosen through the release table and the lock: they work only while the table is readable and
+its current release is pinned. `prestart.mjs accept-ahead --label <older> --from
+/etc/debateai-v3-preview/auth-dev-v1/database-ahead-<older>.json` pins a newer release's database-ahead file on the
+older release before the newer release's migrations, so before the newer release is pinned: it holds the file to the
+newer release's own source manifest the file names (root-owned, that sha256, the newer label and revision, each step's
+bytes) and, once the newer release is pinned, to its pinned revision. `prestart.mjs unpin --label <label>` drops a
+RETIRED release (`release-archive.mjs` does it). The
+whole order, with its checks, is `deploy/preview-release/v1/README.md`, "Side-by-side release (from T+1)".
+
+Until you pin, prestart refuses a new plan (`RELEASE_LOCK_RELEASE_MISSING`, `RELEASE_LOCK_MISMATCH` or
+`BASE_PLAN_HASH_MISMATCH`), so nothing unpinned can start unattended.
 
 ## Rollback (back to the manual ceremony)
 
@@ -691,7 +782,12 @@ the API and UI normally: prestart re-verifies the database before either starts.
 ```sh
 pnpm exec vitest run tests/unit/preview-lifecycle-common.test.ts tests/unit/preview-lifecycle-prestart.test.ts \
   tests/unit/preview-lifecycle-alert.test.ts tests/unit/preview-lifecycle-backup.test.ts \
-  tests/unit/preview-lifecycle-unlock.test.ts tests/unit/preview-lifecycle-units.test.ts
+  tests/unit/preview-lifecycle-unlock.test.ts tests/unit/preview-lifecycle-units.test.ts \
+  tests/unit/preview-lifecycle-release-table.test.ts tests/unit/preview-lifecycle-release-switch.test.ts \
+  tests/unit/preview-lifecycle-release-check.test.ts tests/unit/preview-lifecycle-release-retire.test.ts \
+  tests/unit/preview-lifecycle-release-env.test.ts tests/unit/preview-lifecycle-release-archive.test.ts \
+  tests/unit/preview-lifecycle-unit-templates.test.ts tests/unit/preview-lifecycle-migration-steps.test.ts \
+  tests/unit/preview-release-caddy-slots.test.ts tests/unit/preview-release-guide.test.ts
 ```
 
 They use throwaway folders owned by the test user instead of root, synthetic plans and fake

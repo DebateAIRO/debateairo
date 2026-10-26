@@ -35,6 +35,9 @@ const reply = (source: string): string => {
   if (found === undefined) throw new Error(`no fixture ${source}`);
   return found.content;
 };
+const STRAY = JSON.parse(readFileSync(new URL("../support/fixtures/reply-language/stray-script-2026-10.json", import.meta.url), "utf8")) as {
+  readonly cases: readonly { question: string; text: string }[];
+};
 const QUESTION = PRACTICE.question;
 const FRENCH_REVIEW = reply("debate-3c#288");
 const GERMAN_ATTACK = reply("debate-3c#241");
@@ -239,6 +242,19 @@ describe("the story and its checker", () => {
     expect(classifyStoryContent(story(POLISH), INDEX, STOP)).toEqual({ parseStatus: "PARSED", parseError: null });
   });
 
+  it("R19: a long paragraph with Chinese characters inside an English sentence is refused at that paragraph; in English it is accepted", () => {
+    const r19 = STRAY.cases[3]!;
+    const check = replyLanguageCheck(r19.question, STORY_BODY_PROSE);
+    const withParagraph = (text: string) => {
+      const value = JSON.parse(story(english)) as { long: { sections: { paragraphs: { text: string }[] }[] } };
+      value.long.sections[2]!.paragraphs[0]!.text = text;
+      return JSON.stringify(value);
+    };
+    expect(refusedPaths(classifyStoryContent(withParagraph(r19.text), INDEX, STOP, check))).toEqual(["long.sections.2.paragraphs.0.text"]);
+    expect(classifyStoryContent(withParagraph(r19.text.replace("are大于 the", "are greater than the")), INDEX, STOP, check))
+      .toEqual({ parseStatus: "PARSED", parseError: null });
+  });
+
   it("a checker objection in Polish is refused; no objection, or an English one, is accepted", () => {
     const check = replyLanguageCheck(QUESTION, STORY_CHECKER_PROSE);
     const criteria = { faithful_to_material: true, agrees_with_label: true, fair_to_losing_paths: true, no_overstatement: false,
@@ -277,6 +293,12 @@ describe("the answer writer and its checker", () => {
     expect(refusedPaths(classifyComposedContent(composition(englishText, POLISH), citation, STOP))).toEqual(["segments.1.text"]);
     const { questionLine: _omitted, ...withoutQuestion } = citation;
     expect(classifyComposedContent(composition(englishText, POLISH), withoutQuestion, STOP).parseStatus).toBe("PARSED");
+  });
+
+  it("a segment with Chinese characters inside an English sentence is refused at its text", () => {
+    const englishText = "A mid-sized city should make its central lines free only where it can replace the lost fares from a stable source.";
+    const slipped = "The hidden system costs of free fares are大于 the city admits, so the funding must be found first.";
+    expect(refusedPaths(classifyComposedContent(composition(englishText, slipped), citation, STOP))).toEqual(["segments.1.text"]);
   });
 
   it("an objection in Polish is refused; with no question the checker is read as before", () => {

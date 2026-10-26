@@ -4,7 +4,10 @@ import type {
 } from "@debateai/db";
 import { randomUUID } from "node:crypto";
 import {
+  assertDeploymentProviderTargets,
+  assertPricedProviderTargets,
   observeProviderTarget,
+  parseProviderDiscoveryTargets,
   previewProbeRoundBusy,
   probeTarget,
   providerTargetPrice,
@@ -23,6 +26,26 @@ export {
   parseProviderDiscoveryTargets,
   resolveProviderTargetCredentials
 } from "@debateai/providers";
+
+/**
+ * Side-by-side spec §13 (S14, ruling R57) — THE API's DECLARED TARGETS, ONE DECISION: apps/api/src/main.ts's
+ * "provider-targets" stage, the preview practice's ask and check-version's API half all parse and judge the targets
+ * here. Parsed over the register's configured providers; then V-9(c)'s mode decision, the runner's own, over the same
+ * target set and taken on the DECLARED targets, before any credential file is resolved; then V-28: a hosted DEBATE
+ * target must carry its price, or its calls cannot be billed against the per-run and daily envelopes (separate from the
+ * rule above because the support chat's target shares that one and keeps its own accounting). Pure.
+ */
+export function parseDeclaredProviderTargets(input: Readonly<{
+  targetsJson: string;
+  configuredProviders: Parameters<typeof parseProviderDiscoveryTargets>[1];
+  mode: "hosted" | "local";
+  nodeEnv: string | undefined;
+}>): readonly ProviderDiscoveryTarget[] {
+  const declared = parseProviderDiscoveryTargets(input.targetsJson, input.configuredProviders);
+  assertDeploymentProviderTargets(declared, { mode: input.mode, nodeEnv: input.nodeEnv });
+  assertPricedProviderTargets(declared, input.mode);
+  return declared;
+}
 
 /**
  * What one discovery round found: the healthy members, and (preview only, spec 2026-10-11 busy model

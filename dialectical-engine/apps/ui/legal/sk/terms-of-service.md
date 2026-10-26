@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručne
-eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.4 · ÚČINNÉ OD 12. OKTÓBRA 2026
+eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.5 · ÚČINNÉ OD 12. OKTÓBRA 2026
 title: S čím súhlasíte
 lede: Zmluva medzi vami a DMS Merchandise Shop S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.
-endMarker: KONIEC PODMIENOK · v2.4
+endMarker: KONIEC PODMIENOK · v2.5
 bodyLabel: Text Podmienok poskytovania služby
 annexTitle: Príloha A — Regionálne podmienky
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ROZHODNÉ PRÁVO
 -->
 
-**Version 2.4 · Effective 12. októbra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
+**Version 2.5 · Effective 12. októbra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
 
 **In short.** Musíte mať aspoň 18 rokov. Dialectical Engine vytvára argumenty pomocou modelov umelej inteligencie a všetko, čo vygeneruje, môže byť nesprávne — nejde o poradenstvo. Vaše debaty sú súkromné, pokiaľ ich nezverejníte; ak ich zverejníte, môže ich čítať ktokoľvek. Text, ktorý zadáte, sa odosiela poskytovateľom umelej inteligencie uvedeným v našom Registri poskytovateľov a nepoužíva sa na trénovanie modelov. Nezákonný obsah nahláste na support@dezbatere.ro bez ohľadu na to, či máte účet. Rozhodným právom je rumunské právo, vaše miestne práva na ochranu spotrebiteľa vám však zostávajú zachované.
 
@@ -213,7 +213,11 @@ Dialectical Engine ponúka bezplatný program. Bude k dispozícii platený progr
 
 **Neúspešné platby.** Ak platba zlyhá, budeme ju opakovať počas 7 dní a pred prevedením účtu na bezplatný program vás upozorníme e-mailom. Pre neúspešnú platbu vaše debaty nemažeme.
 
-**Dane a komu platíte.** Ceny zahŕňajú DPH, GST alebo daň z predaja v závislosti od miesta vášho bydliska, čo sa zobrazí pred zaplatením. Platby kartou spracúva NETOPIA Payments (netopia-payments.com). Predávajúcim je DMS Merchandise Shop S.R.L., ktorá vystavuje vašu faktúru a zostáva zodpovedná za samotnú službu a za tieto Podmienky.
+**Dane a komu platíte.** Ceny zahŕňajú DPH, GST alebo daň z predaja v závislosti od miesta vášho bydliska, čo sa zobrazí pred zaplatením. Predávajúcim je DMS Merchandise Shop S.R.L., ktorá vystavuje vašu faktúru a zostáva zodpovedná za samotnú službu a za tieto Podmienky.
+
+**Platobné metódy.** Platíte kartou. Prijímame karty Visa a Mastercard; karty American Express neprijímame. Platby kartou spracúva NETOPIA Payments (netopia-payments.com) a celé číslo vašej karty sa k nám nikdy nedostane.
+
+**Dodanie.** Dialectical Engine je online služba, preto vám nič nezasielame. Funkcie vášho plateného programu sú vo vašom účte k dispozícii hneď, ako je platba potvrdená.
 
 **Spätné zúčtovanie.** Ak platbu napadnete u vydavateľa karty, môžeme platené funkcie počas riešenia sporu pozastaviť. Neúčtujeme za to žiadne poplatky.
 
@@ -235,7 +239,7 @@ O tom, čo a kedy sa mení, vás vopred informujeme na trvanlivom médiu. Ak má
 
 **Zmeny týchto Podmienok.** Tieto Podmienky môžeme meniť z rovnakých druhov dôvodov. Pri zmenách, ktoré neobmedzujú vaše práva, zverejníme novú verziu so zhrnutím zmien a najmenej **30 dní** pred nadobudnutím účinnosti vám zašleme e-mail; pokračovaním v používaní Dialectical Engine po tomto dátume zmenu prijímate a pred týmto dátumom môžete svoj účet odstrániť. Pri zmenách, ktoré obmedzujú vaše práva — vrátane zvýšenia ceny existujúceho programu, zníženia limitov, odstránenia funkcií, nového spôsobu použitia vášho obsahu alebo zmien zodpovednosti, rozhodného práva či riešenia sporov — vás pri nasledujúcom prihlásení požiadame, aby ste novú verziu výslovne prijali, a zmena platí iba do budúcnosti. Žiadnu zmenu nikdy neuplatníme spätne a túto časť nikdy nepoužijeme na zmenu podstaty toho, za čo ste počas obdobia zaplatili, bez toho, aby sme vám ponúkli možnosť zmluvu ukončiť. Predchádzajúce verzie zostávajú dostupné na adrese dezbatere.ro/terms/versions.
 
-Verzia 2.4 nahradila verziu 2.3: pridáva kontrolu otázky, ktorá číta každú otázku skôr, ako debata začne, niektoré zamieta a každú zamietnutú otázku, ktorá sa vyhráža ublížením inej osobe alebo iným osobám, menovaným alebo nie, vrátane útoku na nemenované osoby, plánuje takéto ublíženie alebo sa pýta, či a ako inej osobe alebo iným osobám ublížiť, alebo ktorá sa pýta, ako vyrobiť zbrane, výbušniny, jedy alebo drogy alebo ako podporiť teroristický čin, alebo ho oslavuje, uchováva na prečítanie naším tímom (časti 7, 8, 10 a 11); kontrolu, ktorá číta syntézu každej dokončenej debaty, schválenie, ktoré označená debata potrebuje, kým sa môže zverejniť, a debaty, ktoré táto kontrola odstraňuje (časti 5, 8, 9, 10 a 11); čo chat podpory posiela modelu Claude od Anthropic, že nič z toho, čo napíšete, neuchováva a neotvára žiadny prípad, a že jeho tlačidlo „Porozprávať sa s človekom“ zobrazuje našu adresu podpory (časti 8 a 10); a pravidlá v časti 7, ktoré zakazujú nenávistné prejavy akéhokoľvek druhu, návody na výrobu zbraní alebo drog, obsah podnecujúci k samovražde alebo k ubližovaniu iným ľuďom a urážku náboženstva a uvádzajú, ktoré otázky nezačnú debatu.
+Verzia 2.5 nahradila verziu 2.4: pridáva kontrolu otázky, ktorá číta každú otázku skôr, ako debata začne, niektoré zamieta a každú zamietnutú otázku, ktorá sa vyhráža ublížením inej osobe alebo iným osobám, menovaným alebo nie, vrátane útoku na nemenované osoby, plánuje takéto ublíženie alebo sa pýta, či a ako inej osobe alebo iným osobám ublížiť, alebo ktorá sa pýta, ako vyrobiť zbrane, výbušniny, jedy alebo drogy alebo ako podporiť teroristický čin, alebo ho oslavuje, uchováva na prečítanie naším tímom (časti 7, 8, 10 a 11); kontrolu, ktorá číta syntézu každej dokončenej debaty, schválenie, ktoré označená debata potrebuje, kým sa môže zverejniť, a debaty, ktoré táto kontrola odstraňuje (časti 5, 8, 9, 10 a 11); čo chat podpory posiela modelu Claude od Anthropic, že nič z toho, čo napíšete, neuchováva a neotvára žiadny prípad, a že jeho tlačidlo „Porozprávať sa s človekom“ zobrazuje našu adresu podpory (časti 8 a 10); a pravidlá v časti 7, ktoré zakazujú nenávistné prejavy akéhokoľvek druhu, návody na výrobu zbraní alebo drog, obsah podnecujúci k samovražde alebo k ubližovaniu iným ľuďom a urážku náboženstva a uvádzajú, ktoré otázky nezačnú debatu.
 
 ## 15. Zodpovednosť
 

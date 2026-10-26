@@ -16,7 +16,7 @@ import { bestPaymentId, paidOrAlmost, readPaymentStatus, startHostedCharge, stil
 import { clientIdOf, netopiaNotifyUrl, payerFromProfile, paymentReturnUrl } from "./netopia-payer.js";
 import { englishOrderText, planName, type BillingOrderText } from "./order-text.js";
 import { isThisPaymentSystem } from "./outbox.js";
-import { decidePaymentPlace, placeRefusal } from "./place.js";
+import { decidePaymentPlace, decidePaymentRegion, placeRefusal, regionRefusal } from "./place.js";
 import { addressRequired, LIVE_SUBSCRIPTION_STATUSES } from "./quote.js";
 import { statusNeedsVerify } from "./reconcile.js";
 import {
@@ -188,6 +188,10 @@ export class CheckoutService implements CheckoutServicePort {
       geo: this.deps.geo, policy: this.deps.countryPolicy, ip: input.ip, declaredCountry: location.country
     });
     if (place.kind === "REFUSE") throw placeRefusal(place, this.deps.audit);
+    // Payment region blocks (spec 2026-10-20 §8): the stored address again, so a crafted request cannot skip the quote.
+    const region = decidePaymentRegion({ policy: this.deps.countryPolicy, location, postcodeMustFit: true });
+    if (region.kind === "REFUSE") throw regionRefusal(region, location.country, this.deps.audit);
+    if (region.kind === "POSTCODE_INVALID") throw new BillingRefusal(422, "BILLING_POSTCODE_INVALID");
     if (place.kind === "CONFIRM_COUNTRY" && !input.countryConfirmed) {
       throw new BillingRefusal(409, "COUNTRY_CONFIRMATION_REQUIRED");
     }

@@ -51,6 +51,9 @@ import {
   loadBootstrapRegister,
   parseCanonicalRegisterJson,
   parseRegisterVersionText,
+  PREVIEW_LINE_UP_POLICY_ROW_KEY,
+  previewLineUpPolicyFromValue,
+  previewLineUpPolicyRow,
   type BootstrapRegister,
   type CallConcurrencyPolicy,
   type DebateShapePolicy,
@@ -58,6 +61,7 @@ import {
   type LengthGuidancePolicy,
   type RegisterPublicationRow
 } from "@debateai/register";
+import type { PreviewLineUp } from "@debateai/providers";
 import { buildDevelopmentRunnerRegisterRows } from "../../apps/runner/src/dev-deployment-register.js";
 import {
   buildPreviewSourceRowsV2,
@@ -73,6 +77,7 @@ import {
   STORY_COST_ENVELOPE_POLICY_ROW_KEY,
   type PreviewHostedBillingChoice
 } from "../../deploy/preview-auth-dev/v1/publish-register-v3.js";
+import { PRACTICE_LINE_UP_SOURCE_REF, PracticeRefusal } from "./practice-settings.js";
 
 export const PRACTICE_REGISTER_EXPORT_SCHEMA = "preview-practice-register-export-v1" as const;
 
@@ -174,6 +179,20 @@ export function practiceVersionRows(document: PracticeRegisterExport, version: s
     })));
 }
 
+/**
+ * Addition D12, D14 (owner 2026-10-22): the line-up a version's rows carry (its previewLineUpPolicy row, read by the row's
+ * own reader), or null without the row (ABSENT: the env's line-up). For the practice's start checks, before the database
+ * starts: the export's newest version, or the code's next one with --register-next. A row the reader refuses is
+ * PRACTICE_LINE_UP_INVALID with the reader's own code (as the live boot would refuse it).
+ */
+export function practiceRowsLineUp(rows: readonly RegisterPublicationRow[]): PreviewLineUp | null {
+  const row = rows.find((entry) => entry.rowKey === PREVIEW_LINE_UP_POLICY_ROW_KEY);
+  if (row === undefined) return null;
+  try { return previewLineUpPolicyFromValue(JSON.parse(row.valueJsonText)); } catch (error) {
+    throw new PracticeRefusal("PRACTICE_LINE_UP_INVALID", `${PREVIEW_LINE_UP_POLICY_ROW_KEY}: ${error instanceof Error ? error.message.split(":")[0] : "UNKNOWN"}`);
+  }
+}
+
 /** The snapshot hash of one version as it now stands in a database (the same function the publication uses). */
 export async function databaseVersionSnapshotSha256(pool: Pool, version: string): Promise<string | null> {
   const result = await pool.query<{ row_key: string; value_json_text: string; source_ref: string }>(
@@ -236,6 +255,12 @@ export type PracticeNextRegisterChoices = Readonly<{
    * from the code (a base's own row is carried unchanged).
    */
   engineVersion?: EngineVersionPolicy;
+  /**
+   * `--line-up` with `--register-next` (side-by-side spec §13, addition D23): the kit's own source build's `lineUp` (kit
+   * v2's tenth argument, kit v3's eleventh), as the plan's `--line-up` would carry it. Absent: no row from the code (a
+   * base's own row is carried unchanged, R19).
+   */
+  lineUp?: PreviewLineUp;
 }>;
 
 export type PracticeRegisterImportReceipt = Readonly<{
@@ -287,6 +312,8 @@ export async function parsePracticeNextRegisterInputs(flags: Readonly<{
   lengthGuidance?: LengthGuidancePolicy | null | undefined;
   /** `--engine-policy`'s policy, already checked by practice-engine.ts; it goes into the next version and chooses no kit. */
   engineVersion?: EngineVersionPolicy | null | undefined;
+  /** `--line-up`'s line-up, already checked by practice-settings.ts; it goes into the next version and chooses no kit. */
+  lineUp?: PreviewLineUp | null | undefined;
 }>, load: () => Promise<NativeOperatorChecks> = async () => await import(NATIVE_OPERATOR_MODULE) as NativeOperatorChecks):
   Promise<Readonly<{ kit: "v2" | "v3"; hostedBilling: PreviewHostedBillingChoice | null; choices: PracticeNextRegisterChoices }>> {
   const invalid = (flag: string): never => { throw new PracticeRegisterError("PRACTICE_REGISTER_NEXT_INPUT_INVALID", flag); };
@@ -316,7 +343,8 @@ export async function parsePracticeNextRegisterInputs(flags: Readonly<{
     ...(callConcurrency === undefined ? {} : { callConcurrency }),
     ...(flags.debateShape === undefined || flags.debateShape === null ? {} : { debateShape: flags.debateShape }),
     ...(flags.lengthGuidance === undefined || flags.lengthGuidance === null ? {} : { lengthGuidance: flags.lengthGuidance }),
-    ...(flags.engineVersion === undefined || flags.engineVersion === null ? {} : { engineVersion: flags.engineVersion })
+    ...(flags.engineVersion === undefined || flags.engineVersion === null ? {} : { engineVersion: flags.engineVersion }),
+    ...(flags.lineUp === undefined || flags.lineUp === null ? {} : { lineUp: flags.lineUp })
   });
   return Object.freeze({ kit: hostedBilling === null ? "v2" as const : "v3" as const, hostedBilling, choices });
 }
@@ -386,9 +414,11 @@ export async function composePracticeNextRegisterVersion(
   const runtime = practiceBaseRuntime(baseRows, unsupported);
   // `choices.debateShape` (controller ruling D-REGNEXT): the kit's own source build's `debateShape`; `choices.lengthGuidance`
   // (LG-C) its `lengthGuidance` (the question-language argument stays today's default, null).
-  // `choices.engineVersion` (R1d): the kit's own source build's engine row, as the plan's would be.
+  // `choices.engineVersion` (R1d): the kit's own source build's engine row, as the plan's would be; `choices.lineUp`
+  // (addition D23) its line-up row, as the plan's `--line-up` would be.
   const sourceRows = await buildPreviewSourceRowsV2(bootstrap ?? await loadBootstrapRegister(), runtime, checker, roleRotation,
-    choices.callConcurrency ?? null, choices.debateShape ?? null, null, choices.lengthGuidance ?? null, choices.engineVersion ?? null);
+    choices.callConcurrency ?? null, choices.debateShape ?? null, null, choices.lengthGuidance ?? null, choices.engineVersion ?? null,
+    choices.lineUp ?? null);
   const baseSnapshotSha256 = computeRegisterSnapshotSha256(baseRows);
   const snapshot = composePreviewSnapshotV2({
     sourceRows, baseRows, baseRegisterVersion: base.register_version, baseSnapshotSha256
@@ -443,9 +473,11 @@ export async function composePracticeHostedNextRegisterVersion(
   // `choices.debateShape` (controller ruling D-REGNEXT): kit v3 hands it to kit v2's source build, as the plan's own
   // `--debate-shape` does (publish-register-v3.ts), and asks the runner's debate-shape boot refusals before sealing;
   // `choices.lengthGuidance` (LG-C) likewise, as the plan's `--length-guidance`.
-  // `choices.engineVersion` (R1d): the kit's own source build's engine row, as the plan's would be.
+  // `choices.engineVersion` (R1d): the kit's own source build's engine row, as the plan's would be; `choices.lineUp`
+  // (addition D23) its line-up row, as the plan's `--line-up` would be.
   const sourceRows = await buildPreviewSourceRowsV3(bootstrap ?? await loadBootstrapRegister(), runtime, hostedBilling, checker, roleRotation,
-    choices.callConcurrency ?? null, choices.debateShape ?? null, null, choices.lengthGuidance ?? null, choices.engineVersion ?? null);
+    choices.callConcurrency ?? null, choices.debateShape ?? null, null, choices.lengthGuidance ?? null, choices.engineVersion ?? null,
+    choices.lineUp ?? null);
   const baseSnapshotSha256 = computeRegisterSnapshotSha256(baseRows);
   const snapshot = composePreviewSnapshotV3({
     sourceRows, baseRows, baseRegisterVersion: base.register_version, baseSnapshotSha256
@@ -598,17 +630,23 @@ export type PracticeOverrideVersion = Readonly<{
   shapeRow: "ADDED" | "REPLACED" | null; lengthRow: "ADDED" | "REPLACED" | null;
   /** R1d: what the --engine-policy row did in this version (null: no engine override). */
   engineRow: "ADDED" | "REPLACED" | null;
+  /** Addition D23: what the --line-up row did in this version (null: no line-up given; absent from older callers' doubles). */
+  lineUpRow?: "ADDED" | "REPLACED" | null;
+}>;
+
+/** The three override rows a practice version may carry (R1d: engine; addition D23: the line-up), as the debate hands them. */
+export type PracticeOverrideRows = Readonly<{
+  shape: DebateShapePolicy | null; length: LengthGuidancePolicy | null; engine?: EngineVersionPolicy | null; lineUp?: PreviewLineUp | null;
 }>;
 
 /**
  * The practice version's rows: the export's last version's rows with each given override row added (or the export's own
  * replaced) and the code's contract-hash rows in place of the export's, in key order. Pure.
  */
-export function practiceOverrideVersionRows(document: PracticeRegisterExport,
-  overrides: Readonly<{ shape: DebateShapePolicy | null; length: LengthGuidancePolicy | null; engine?: EngineVersionPolicy | null }>,
+export function practiceOverrideVersionRows(document: PracticeRegisterExport, overrides: PracticeOverrideRows,
   codeHashRows: readonly RegisterPublicationRow[]): Readonly<{
     rows: readonly RegisterPublicationRow[]; shapeRow: "ADDED" | "REPLACED" | null; lengthRow: "ADDED" | "REPLACED" | null;
-    engineRow: "ADDED" | "REPLACED" | null;
+    engineRow: "ADDED" | "REPLACED" | null; lineUpRow: "ADDED" | "REPLACED" | null;
   }> {
   const last = document.versions[document.versions.length - 1]!;
   const base = practiceVersionRows(document, last.register_version);
@@ -627,13 +665,20 @@ export function practiceOverrideVersionRows(document: PracticeRegisterExport,
     const row = engineVersionPolicyRow(engine, PRACTICE_ENGINE_SOURCE_REF);
     added.push(Object.freeze({ rowKey: row.rowKey, valueJsonText: row.valueJsonText, sourceRef: row.sourceRef }));
   }
+  // Addition D23 (`--line-up`): the line-up row, in the same one throwaway version (never a second version on top).
+  const lineUp = overrides.lineUp ?? null;
+  if (lineUp !== null) {
+    const row = previewLineUpPolicyRow(lineUp, PRACTICE_LINE_UP_SOURCE_REF);
+    added.push(Object.freeze({ rowKey: row.rowKey, valueJsonText: row.valueJsonText, sourceRef: row.sourceRef }));
+  }
   const own = new Set<string>([...added.map((row) => row.rowKey), ...codeHashRows.map((row) => row.rowKey)]);
   const rows = [...base.filter((row) => !own.has(row.rowKey)), ...added, ...codeHashRows]
     .sort((a, b) => (a.rowKey < b.rowKey ? -1 : a.rowKey > b.rowKey ? 1 : 0));
   const change = (key: string, given: boolean) => !given ? null : base.some((row) => row.rowKey === key) ? "REPLACED" as const : "ADDED" as const;
   return Object.freeze({ rows: Object.freeze(rows), shapeRow: change(DEBATE_SHAPE_POLICY_ROW_KEY, overrides.shape !== null),
     lengthRow: change(LENGTH_GUIDANCE_POLICY_ROW_KEY, overrides.length !== null),
-    engineRow: change(ENGINE_VERSION_POLICY_ROW_KEY, engine !== null) });
+    engineRow: change(ENGINE_VERSION_POLICY_ROW_KEY, engine !== null),
+    lineUpRow: change(PREVIEW_LINE_UP_POLICY_ROW_KEY, lineUp !== null) });
 }
 
 /**
@@ -654,16 +699,18 @@ export function practiceShapeVersionRows(document: PracticeRegisterExport, polic
  * only read.
  */
 export async function publishPracticeOverrideVersion(pool: Pool, document: PracticeRegisterExport, receipt: PracticeRegisterImportReceipt,
-  overrides: Readonly<{ shape: DebateShapePolicy | null; length: LengthGuidancePolicy | null; engine?: EngineVersionPolicy | null }>): Promise<PracticeOverrideVersion> {
-  const { rows, shapeRow, lengthRow, engineRow } = practiceOverrideVersionRows(document, overrides, await practiceCodeContractHashRows());
+  overrides: PracticeOverrideRows): Promise<PracticeOverrideVersion> {
+  const { rows, shapeRow, lengthRow, engineRow, lineUpRow } = practiceOverrideVersionRows(document, overrides, await practiceCodeContractHashRows());
   const expected = String(BigInt(receipt.registerVersion) + 1n);
   const published = await createPostgresRegisterPublicationPort(pool).publishGeneral({
     publicationId: randomUUID(),
     baseRegisterVersion: parseRegisterVersionText(receipt.registerVersion),
     rows,
-    // R1d: `--engine-policy` alone (allowed when the export already holds the length row) is stamped as the engine's.
+    // R1d: `--engine-policy` alone (allowed when the export already holds the length row) is stamped as the engine's;
+    // addition D23: `--line-up` alone as the line-up's.
     sourceRef: overrides.shape !== null ? PRACTICE_SHAPE_SOURCE_REF
-      : overrides.length !== null ? PRACTICE_LENGTH_SOURCE_REF : PRACTICE_ENGINE_SOURCE_REF,
+      : overrides.length !== null ? PRACTICE_LENGTH_SOURCE_REF
+        : (overrides.engine ?? null) !== null ? PRACTICE_ENGINE_SOURCE_REF : PRACTICE_LINE_UP_SOURCE_REF,
     deployment: "local"
   });
   if (published.registerVersion !== expected) {
@@ -673,7 +720,8 @@ export async function publishPracticeOverrideVersion(pool: Pool, document: Pract
   if (await databaseVersionSnapshotSha256(pool, expected) !== snapshotSha256) {
     throw new PracticeRegisterError("PRACTICE_REGISTER_HASH_MISMATCH", `version ${expected} (the practice's override version)`);
   }
-  return Object.freeze({ baseRegisterVersion: receipt.registerVersion, registerVersion: expected, snapshotSha256, shapeRow, lengthRow, engineRow });
+  return Object.freeze({ baseRegisterVersion: receipt.registerVersion, registerVersion: expected, snapshotSha256, shapeRow, lengthRow, engineRow,
+    ...((overrides.lineUp ?? null) === null ? {} : { lineUpRow }) });
 }
 
 /** The practice's own version with the debate-shape row alone (see publishPracticeOverrideVersion). */

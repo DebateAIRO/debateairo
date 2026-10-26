@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { callFamilyOf, issueListFromParseError, practiceJsonRepairOf, practiceStepOf, recheckReply } from "../../tools/preview-practice/practice-lanes.js";
 import {
-  practiceRepairRows, practiceStructureRescues, practiceTryJoiner, practiceUnrepairedRows, recordedSalvageRepairs, type PracticeDebateResult,
-  type PracticeJoinedTry, type PracticeLedgerTry, type PracticeTryRecord
+  practiceLanguageFollowUpRows, practiceRepairRows, practiceStructureRescues, practiceTryJoiner, practiceUnrepairedRows, recordedSalvageRepairs,
+  type PracticeDebateResult, type PracticeJoinedTry, type PracticeLedgerTry, type PracticeTryRecord
 } from "../../tools/preview-practice/practice-debate.js";
 import { PracticeGateObserver } from "../../tools/preview-practice/practice-gate-observer.js";
 import { debateReport, reportMarkdown } from "../../tools/preview-practice/practice-report.js";
@@ -401,5 +401,76 @@ describe("refused-repair salvage in the practice report: review round 1", () => 
         replyForm: "PATCH", repairs: null, failureClass: null, issue: null, replyText: null }
     ];
     expect(practiceStructureRescues(content, ROUTED)).toEqual({ inCode: 0, byPatch: 0, byFullAsk: 0 });
+  });
+});
+
+describe("the stray-letter rule's measure: reply-language refusals and their short follow-ups (PR #194)", () => {
+  const refused = (callKey: string, model: string, callSiteKey: string, issues: readonly string[], replyForm = "ORIGINAL"): PracticeTryRecord => ({
+    callKey, model, callSiteKey, outcome: "FAILED", parseStatus: "SCHEMA_FAILED", replyForm, repairs: null, failureClass: "CONTENT",
+    issue: issues[0]!, issues, replyText: "{}" });
+  const accepted = (callKey: string, model: string, callSiteKey: string, replyForm: string): PracticeTryRecord => ({
+    callKey, model, callSiteKey, outcome: "OK", parseStatus: "PARSED", replyForm, repairs: null, failureClass: null, issue: null, replyText: null });
+  const LANGUAGE: readonly PracticeTryRecord[] = [
+    // R19's case: a Chinese word in the English story, refused, then the short follow-up accepted.
+    refused("glm|STORY", GLM, "STORY:STORYTELLER:1", ["TEXT_NOT_IN_QUESTION_LANGUAGE@long.sections.0.paragraphs.1.text"]),
+    accepted("glm|STORY", GLM, "STORY:STORYTELLER:1", "PATCH"),
+    // Refused beside another issue (the language one second); the follow-up refused again, then the full re-ask accepted.
+    refused("glm|PANEL", GLM, PANEL_KEY, ["too_big@steelman.summary", "TEXT_NOT_IN_QUESTION_LANGUAGE@critic.summary"]),
+    refused("glm|PANEL", GLM, PANEL_KEY, ["TEXT_NOT_IN_QUESTION_LANGUAGE@critic.summary"], "PATCH"),
+    accepted("glm|PANEL", GLM, PANEL_KEY, "FULL"),
+    // The map's own name for the same refusal, with no try after it.
+    refused("haiku|MAP", HAIKU, "MAP:merge", ["MAP_WRONG_LANGUAGE@positions.0.statement"]),
+    // Any other refusal is not counted, whatever follow-up it got.
+    refused("haiku|JUDGE", HAIKU, "JUDGE", ["invalid_type@statement"]),
+    accepted("haiku|JUDGE", HAIKU, "JUDGE", "PATCH")
+  ];
+
+  it("counts per AI, step and code the refused replies, the short follow-ups sent for them and those accepted", () => {
+    expect(practiceLanguageFollowUpRows(LANGUAGE)).toEqual([
+      { model: HAIKU, step: "map", code: "MAP_WRONG_LANGUAGE", refused: 1, followUps: 0, accepted: 0 },
+      { model: GLM, step: "judge_panel", code: "TEXT_NOT_IN_QUESTION_LANGUAGE", refused: 2, followUps: 1, accepted: 0 },
+      { model: GLM, step: "story_writer", code: "TEXT_NOT_IN_QUESTION_LANGUAGE", refused: 1, followUps: 1, accepted: 1 }
+    ]);
+    // A record that kept only its first issue is read by that one; a code inside free text is never a code.
+    const { issues: _issues, ...firstOnly } = LANGUAGE[0]!;
+    expect(practiceLanguageFollowUpRows([firstOnly, LANGUAGE[1]!])).toEqual([
+      { model: GLM, step: "story_writer", code: "TEXT_NOT_IN_QUESTION_LANGUAGE", refused: 1, followUps: 1, accepted: 1 }]);
+    expect(practiceLanguageFollowUpRows([refused("k", GLM, "JUDGE", ["Expected TEXT_NOT_IN_QUESTION_LANGUAGE@x to be fixed"])])).toEqual([]);
+    expect(practiceLanguageFollowUpRows([])).toEqual([]);
+  });
+
+  it("report.json keeps an admitted debate's list (an empty one too) and report.md shows the table, or none", () => {
+    const none = { before: null, after: null };
+    const result = (extra: Record<string, unknown>) => ({
+      register: null, questionId: "lang-en-hukou", depth: 1,
+      admission: { admitted: true, refusalCode: null, panel: [], satOut: [], rotation: null },
+      run: { runId: "r", workItemOutcome: "COMPLETED", failureCode: null,
+        answer: { served: true, terminal: "SERVED", serveState: null, verdictState: null, conditionMarks: [] },
+        story: { outcome: "READY", failureCode: null } },
+      byModelAndSite: [], probes: [], failures: [], formatFailures: 0, callsByModel: {}, answersByModel: {}, jsonRepairs: [],
+      failedCalls: 0, refusedCalls: 0, remaining: { deepinfra: none, anthropic: none }, seconds: { admission: 1, debate: 2 }, ...extra
+    }) as unknown as PracticeDebateResult;
+    const report = (extra: Record<string, unknown>) => debateReport({ result: result(extra), observer: new PracticeGateObserver(),
+      startedAt: new Date(0), finishedAt: new Date(1_000) });
+    const rows = practiceLanguageFollowUpRows(LANGUAGE);
+    const counted = report({ languageFollowUps: rows });
+    expect(counted.languageFollowUps).toEqual(rows);
+    const markdown = reportMarkdown(counted);
+    expect(markdown).toContain("| model | step | code | refused | short follow-ups | follow-ups accepted |");
+    expect(markdown).toContain(`| ${GLM} | story_writer | TEXT_NOT_IN_QUESTION_LANGUAGE | 1 | 1 | 1 |`);
+    expect(markdown).toContain(`| ${HAIKU} | map | MAP_WRONG_LANGUAGE | 1 | 0 | 0 |`);
+    const zero = report({ languageFollowUps: [] });
+    expect(zero.languageFollowUps).toEqual([]);
+    expect(reportMarkdown(zero)).toContain("Reply-language refusals: none (no reply was refused for its language or script).");
+    // A debate never admitted has no list (collect never ran): no key and no line.
+    const unread = report({});
+    expect(Object.keys(unread)).not.toContain("languageFollowUps");
+    expect(reportMarkdown(unread)).not.toContain("Reply-language refusals");
+  });
+
+  it("the debate's collector keeps every issue of a refused reply and counts them", () => {
+    const source = readFileSync(new URL("../../tools/preview-practice/practice-debate.ts", import.meta.url), "utf8");
+    expect(source).toContain("refused = Object.freeze({ issue: issues[0] ?? null, issues, replyText: reportableReplyText(content) });");
+    expect(source).toContain("languageFollowUps: practiceLanguageFollowUpRows(records),");
   });
 });

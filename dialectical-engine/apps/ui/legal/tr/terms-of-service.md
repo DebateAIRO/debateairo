@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kısaca
-eyebrow: HİZMET KOŞULLARI · v2.4 · YÜRÜRLÜK TARİHİ 12 EKİM 2026
+eyebrow: HİZMET KOŞULLARI · v2.5 · YÜRÜRLÜK TARİHİ 12 EKİM 2026
 title: Kabul ettiğiniz hükümler
 lede: Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.
-endMarker: KOŞULLARIN SONU · v2.4
+endMarker: KOŞULLARIN SONU · v2.5
 bodyLabel: Hizmet Koşulları metni
 annexTitle: Ek A — Bölgesel koşullar
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 UYGULANACAK HUKUK
 -->
 
-**Version 2.4 · Effective 12 Ekim 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
+**Version 2.5 · Effective 12 Ekim 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
 
 **In short.** En az 18 yaşında olmalısınız. Dialectical Engine, yapay zekâ modelleriyle argümanlar oluşturur ve ürettiği her şey yanlış olabilir — bunlar tavsiye değildir. Tartışmalarınız, siz yayımlamadıkça özeldir; yayımlarsanız herkes okuyabilir. Gönderdiğiniz metin, Sağlayıcı Sicilimizde belirtilen yapay zekâ sağlayıcılarına iletilir ve modelleri eğitmek için kullanılmaz. Hesabınız olsun veya olmasın, hukuka aykırı içerikleri support@dezbatere.ro adresine bildirin. Romanya hukuku uygulanır; ancak yerel tüketici korumalarınız saklıdır.
 
@@ -213,7 +213,11 @@ Dialectical Engine ücretsiz bir plan sunar. Model listesinin tamamının kilidi
 
 **Başarısız ödemeler.** Ödeme başarısız olursa 7 gün boyunca yeniden dener ve hesabınızı ücretsiz plana düşürmeden önce sizi e-postayla uyarırız. Ödeme başarısız olduğu için tartışmalarınızı silmeyiz.
 
-**Vergiler ve ödemeyi kime yaptığınız.** Fiyatlara, yaşadığınız yere bağlı olan ve ödeme öncesinde gösterilen KDV, GST veya satış vergisi dahildir. Kart ödemeleri NETOPIA Payments (netopia-payments.com) tarafından işlenir. Satıcı, faturanızı düzenleyen ve hizmetin kendisinden ve bu Koşullardan sorumlu olmaya devam eden DMS Merchandise Shop S.R.L.'dir.
+**Vergiler ve ödemeyi kime yaptığınız.** Fiyatlara, yaşadığınız yere bağlı olan ve ödeme öncesinde gösterilen KDV, GST veya satış vergisi dahildir. Satıcı, faturanızı düzenleyen ve hizmetin kendisinden ve bu Koşullardan sorumlu olmaya devam eden DMS Merchandise Shop S.R.L.'dir.
+
+**Ödeme yöntemleri.** Ödemeyi kartla yaparsınız. Visa ve Mastercard kabul ediyoruz; American Express kabul etmiyoruz. Kart ödemeleri NETOPIA Payments (netopia-payments.com) tarafından işlenir ve kartınızın tam numarası hiçbir zaman bize ulaşmaz.
+
+**Teslimat.** Dialectical Engine çevrimiçi bir hizmettir; bu nedenle size hiçbir şey gönderilmez. Ücretli planınızın özellikleri, ödemeniz onaylanır onaylanmaz hesabınızda kullanıma açılır.
 
 **Ters ibrazlar.** Kartı düzenleyen kuruluş nezdinde bir tahsilata itiraz ederseniz uyuşmazlık çözülene kadar ücretli özellikleri askıya alabiliriz. Bunun için ücret almayız.
 
@@ -235,7 +239,7 @@ Neyin ne zaman değişeceğini kalıcı veri saklayıcısıyla önceden bildirir
 
 **Bu Koşullarda.** Bu Koşulları aynı tür nedenlerle değiştirebiliriz. Haklarınızı azaltmayan değişiklikler için yeni sürümü, değişikliklerin özetiyle yayımlar ve yürürlüğe girmesinden en az **30 gün önce** size e-posta göndeririz; o tarihten sonra Dialectical Engine'i kullanmaya devam etmeniz değişikliği kabul ettiğiniz anlamına gelir ve hesabınızı o tarihten önce kapatabilirsiniz. Mevcut bir plandaki fiyat artışları, daha düşük sınırlar, kaldırılan özellikler, içeriğinizin yeni kullanım biçimleri veya sorumluluk, uygulanacak hukuk ya da uyuşmazlık çözümüne ilişkin değişiklikler dahil, haklarınızı azaltan değişiklikler için bir sonraki oturum açışınızda yeni sürümü açıkça kabul etmenizi isteriz ve değişiklik yalnızca ileriye dönük uygulanır. Hiçbir değişikliği geriye yürütmeyiz ve size bir çıkış yolu sunmadan, sürenin ortasında ücretini ödediğiniz hususun özünü değiştirmek için bu bölümü kullanmayız. Önceki sürümler dezbatere.ro/terms/versions adresinde erişilebilir kalır.
 
-Sürüm 2.4, sürüm 2.3'ün yerine geçmiştir: her soruyu bir tartışma başlamadan önce okuyan, bazılarını reddeden ve ekibimizin okuması için, adı belirtilmiş olsun olmasın başka bir kişiye veya başka kişilere zarar vermekle tehdit eden (adı belirtilmeyen kişilere yönelik bir saldırı dâhil), bunu planlayan veya buna zarar verilip verilemeyeceğini ya da nasıl verileceğini soran, silah, patlayıcı, zehir veya uyuşturucunun nasıl yapılacağını ya da bir terör eylemine nasıl destek olunacağını soran veya terörü öven her reddedilmiş soruyu saklayan soru kontrolünü (7., 8., 10. ve 11. bölümler); her biten tartışmanın sentezini okuyan kontrolü, işaretlenmiş bir tartışmanın yayımlanabilmesi için gereken onayı ve o kontrolün sildiği tartışmaları (5., 8., 9., 10. ve 11. bölümler); destek sohbetinin Anthropic'in modeli Claude'a neler gönderdiğini, yazdıklarınızdan hiçbir şey saklamadığını ve hiçbir destek talebi açmadığını, ayrıca “Bir yetkiliyle görüş” düğmesinin destek adresimizi gösterdiğini (8. ve 10. bölümler); ve 7. bölümde her türlü nefret söylemini, silah veya uyuşturucu yapımına ilişkin talimatları, intihara veya başkalarına zarar vermeye teşvik eden içeriği ve dine hakareti yasaklayan ve hangi soruların tartışma başlatmadığını belirten kuralları ekler.
+Sürüm 2.5, sürüm 2.4'ün yerine geçmiştir: her soruyu bir tartışma başlamadan önce okuyan, bazılarını reddeden ve ekibimizin okuması için, adı belirtilmiş olsun olmasın başka bir kişiye veya başka kişilere zarar vermekle tehdit eden (adı belirtilmeyen kişilere yönelik bir saldırı dâhil), bunu planlayan veya buna zarar verilip verilemeyeceğini ya da nasıl verileceğini soran, silah, patlayıcı, zehir veya uyuşturucunun nasıl yapılacağını ya da bir terör eylemine nasıl destek olunacağını soran veya terörü öven her reddedilmiş soruyu saklayan soru kontrolünü (7., 8., 10. ve 11. bölümler); her biten tartışmanın sentezini okuyan kontrolü, işaretlenmiş bir tartışmanın yayımlanabilmesi için gereken onayı ve o kontrolün sildiği tartışmaları (5., 8., 9., 10. ve 11. bölümler); destek sohbetinin Anthropic'in modeli Claude'a neler gönderdiğini, yazdıklarınızdan hiçbir şey saklamadığını ve hiçbir destek talebi açmadığını, ayrıca “Bir yetkiliyle görüş” düğmesinin destek adresimizi gösterdiğini (8. ve 10. bölümler); ve 7. bölümde her türlü nefret söylemini, silah veya uyuşturucu yapımına ilişkin talimatları, intihara veya başkalarına zarar vermeye teşvik eden içeriği ve dine hakareti yasaklayan ve hangi soruların tartışma başlatmadığını belirten kuralları ekler.
 
 ## 15. Sorumluluk
 

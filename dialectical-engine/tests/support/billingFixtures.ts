@@ -6,6 +6,8 @@ import { TypedDomainError } from "@debateai/kernel";
 import {
   BILLING_PLANS_DEPLOYMENT_REGISTER_ROW,
   billingPlansFromValue,
+  COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW,
+  countryPolicyFromValue,
   planById,
   planNetPrice,
   type BillingPlans,
@@ -83,9 +85,21 @@ export const testCountryPolicy: CountryPolicy = Object.freeze({
     RU: rule(false, false, "SANCTIONS", true)
   }),
   usStates: Object.freeze({}),
+  regions: Object.freeze({}),
   unknownIp: "REFUSE",
   tor: "REFUSE",
   sourceRef: "test:country-policy"
+});
+
+/**
+ * Payment region blocks (spec 2026-10-20): testCountryPolicy with Canada and Spain offered too, and the owner's launch
+ * list of closed regions exactly as the deployment register row seals it.
+ */
+export const testClosedRegionsPolicy: CountryPolicy = Object.freeze({
+  ...testCountryPolicy,
+  countries: Object.freeze({ ...testCountryPolicy.countries, CA: rule(true, true, "OFFERED"), ES: rule(true, true, "OFFERED") }),
+  regions: countryPolicyFromValue(COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value, "test:launch-regions").regions,
+  sourceRef: "test:country-policy-closed-regions"
 });
 
 /** An AskApplication no billing test ever reaches. */

@@ -27,10 +27,10 @@ One machine. Exactly one process listens on a public interface.
         internet
            |  443 (and 80, redirect only)
        [ Caddy ]                      automatic TLS, HSTS preload, 1MB body cap
-           |  127.0.0.1:3001
-       [ debateai-ui ]                Next front door, custom server.mjs
-           |  127.0.0.1:8790
-       [ debateai-api ]               Fastify
+           |  127.0.0.1:3001 (slot A) or 127.0.0.1:3002 (slot B), whichever is ready
+       [ debateai-ui@<label> ]        Next front door, custom server.mjs
+           |  127.0.0.1:8790 (slot A) or 127.0.0.1:8791 (slot B), its own release's API
+       [ debateai-api@<label> ]       Fastify
            |                   \
    unix socket                   127.0.0.1:7077 (gRPC, TLS)
            |                             |
@@ -39,12 +39,21 @@ One machine. Exactly one process listens on a public interface.
            |                             |
            +------ unix socket ----------+
                                          |
-                                 [ debateai-runner ]  -> maker CLIs (outbound only)
+                                 [ debateai-runner@<label> ]  -> maker CLIs (outbound only)
 ```
 
 - **Nothing but Caddy binds a public address.** The API is `127.0.0.1:8790`, the UI is
-  `127.0.0.1:3001`, Hatchet publishes `127.0.0.1:8888` and `127.0.0.1:7077`, PostgreSQL listens on
-  `127.0.0.1, ::1` and its unix socket.
+  `127.0.0.1:3001` (slot A; slot B's are `127.0.0.1:8791` and `127.0.0.1:3002`), Caddy's own check
+  site is `127.0.0.1:3090` (§6), Hatchet publishes `127.0.0.1:8888` and `127.0.0.1:7077`,
+  PostgreSQL listens on `127.0.0.1, ::1` and its unix socket.
+- **Releases run side by side (side-by-side spec §10).** Each release lives in its own root-owned
+  folder `/opt/debateai/releases/<label>/` and runs as its own instances
+  `debateai-api@<label>.service`, `debateai-ui@<label>.service` and
+  `debateai-runner@<label>.service`. During an upgrade the older release's runner keeps finishing
+  its own debates while the newer release serves; §5 "Side-by-side upgrades" is the order. The
+  operator checkout `/opt/debateai/dialectical-engine` holds the tools root runs (backups, the
+  country data refresh, the billing setup, the restore drill, the release tool); no application
+  unit runs from it.
 - **PostgreSQL is native, not a container.** With a bridge-networked database the host's client
   address is the docker gateway (172.x), which would force a plaintext `host` rule for the whole
   subnet and make the `hostssl`-only `pg_hba` dishonest (audit L5-F7).
@@ -60,14 +69,21 @@ One machine. Exactly one process listens on a public interface.
 
 ### Boot order
 
-`postgresql.service` -> `debateai-hatchet.service` -> `debateai-api.service` ->
-`debateai-ui.service`. `debateai-backup.timer` is independent and needs only
-`postgresql.service`, as would `debateai-observation-agent.service` once it is enabled (§12). The
-units encode this with `After=`/`Requires=`.
+`postgresql.service` -> `debateai-hatchet.service` -> `debateai-api@<label>.service` ->
+`debateai-ui@<label>.service`, and `debateai-runner@<label>.service` after Hatchet. Only the
+current release's instances are enabled, so only they start at boot. `debateai-backup.timer` is
+independent and needs only `postgresql.service`, as would `debateai-observation-agent.service`
+once it is enabled (§12). The units encode this with `After=` and `Wants=`: Hatchet is wanted,
+never required, so restarting it never stops a release's API or a draining runner mid-call
+(side-by-side spec §4). The API and runner still require PostgreSQL, and each website is bound to
+its own release's API (`BindsTo=`).
 
-**Exactly one API unit.** The support chat's counts live in that process's memory only. A
-restart clears them, including message limits, pauses and the daily model-call count; a second
-API instance would count separately. Run one `debateai-api` (go-live checklist line 4).
+**One API serves at a time.** The support chat's counts (message and session limits, pauses and
+the daily model-call count) live in the API process's memory only: a restart clears them and two
+serving APIs would count separately. During an upgrade the newer release's API starts in the spare
+slot but stays not-ready, and the switch is break-before-make: the older pair stops taking
+requests first, the newer pair takes them a few seconds later, and Caddy holds any request in
+between (§6). The older pair is then stopped. Keep it that way (go-live checklist line 4).
 
 ---
 
@@ -97,6 +113,16 @@ apt install chrony && timedatectl set-ntp true
 swapoff -a
 
 apt install postgresql-18 caddy docker.io docker-compose-v2 age rclone postfix
+```
+
+**systemd 254 or later.** The API unit uses `RestartMode=direct`, so a crash restart of a
+release's API does not stop its website (the website is bound to its API, §1). An older systemd
+ignores the line with a warning, and then every API crash leaves that release's website stopped
+until it is started by hand. Check before the first install (the first line it prints names the
+version):
+
+```sh
+systemctl --version
 ```
 
 Create the three service users, the custody group and the runtime trees:
@@ -157,6 +183,7 @@ process start: restart both units after either change.
 | `/etc/debateai/hatchet-tls/` | `0755` | `root:root` | `server.crt`, `server.key` (`0640 root:docker`), `ca.crt` |
 | `/etc/debateai/ui-edge.secret` | `0400` | `debateai-ui` | the C2b edge secret, the UI's copy |
 | `/etc/debateai/ui-edge.caddy.secret` | `0640` | `root:caddy` | the same bytes, Caddy's copy (the `Caddyfile` reads this one) |
+| `/etc/debateai/payment-marks/` | `0755` | `root:root` | `netopia.svg`, `visa.svg`, `mastercard.svg` (each `0644`, owned by root): the official payment marks Caddy serves at `/payment-marks/<name>.svg` (§6, §14.7); never in the repository or a release folder |
 | `/etc/debateai/backup.conf` | `0600` | `root:root` | age **public** keys and paths — see `backup.conf.example` |
 | `/run/debateai/support-config/` | `0700` | `root:root` | `operator.json`, the JIT support-config operator credential the provisioner publishes (§4, §13). Under `/run`, so it does not survive a reboot |
 | `/run/debateai/support-data/` | `0700` | `root:root` | `api-support.json`, the support data credential `support:status` and `support:shred` read (§13), written for the length of an operator session |
@@ -166,6 +193,7 @@ process start: restart both units after either change.
 | `/var/lib/debateai/api/publication-keys` | `0700` | `debateai-api` | publication-key store |
 | `/var/lib/debateai/api/audit-keys` | `0700` | `debateai-api` | audit-key store |
 | `/var/lib/debateai/data-exports` | `0700` | `debateai-api` | transient encrypted exports; excluded from backups |
+| `/var/lib/debateai/api/billing-notice-spool` | `0700` | `debateai-api` | optional (§14.5): NETOPIA messages the database could not store, sealed, kept at most 14 days; not in the backups |
 | `/var/lib/debateai-geoip` | `0755` | `debateai-geoip` | the DB-IP Lite country file and the Tor exit list (public data, `0644`), written only by `debateai-geoip-refresh.service` (§5 "Country data") |
 
 `/etc/default/caddy` carries `DEBATEAI_PUBLIC_HOSTNAME` and `DEBATEAI_ACME_EMAIL`.
@@ -178,7 +206,7 @@ observation agent's is set separately (§12).
 
 | `EnvironmentFile` key | Principal (P3-01) | Role | Purpose |
 |---|---|---|---|
-| `api.env` `DATABASE_URL` | `api-runtime` | `debateai_prod_api_runtime` | the API's product runtime, and the owner's five billing commands, the dispute command `pnpm billing:dispute`, the withdrawal command `pnpm billing:withdraw`, the tax summary `pnpm billing:tax-summary` (read-only), the e-Factura status command `pnpm billing:efactura-status` and the invoice command `pnpm billing:invoice`, all run as the API |
+| `api.env` `DATABASE_URL` | `api-runtime` | `debateai_prod_api_runtime` | the API's product runtime, and the owner's six billing commands (among them the resume command `pnpm billing:renewal-resume`), the dispute command `pnpm billing:dispute`, the withdrawal command `pnpm billing:withdraw`, the tax summary `pnpm billing:tax-summary` (read-only), the e-Factura status command `pnpm billing:efactura-status` and the invoice command `pnpm billing:invoice`, all run as the API |
 | `api.env` `CONTENT_PROVISION_DATABASE_URL` | `api-content-provision` | `debateai_prod_api_content_provision` | run content keys, server-side ask admission |
 | `api.env` `SUPPORT_DATABASE_URL` | `api-support` | `debateai_prod_api_support` | **the support database principal**: the support chat's data plane, and the ONLY database the master-key rotation opens (it alone may rewrite the two support key columns) |
 | `api.env` `AUTHORIZATION_DATABASE_URL` | `api-authorization` | `debateai_prod_api_authorization` | step-up session rotation |
@@ -241,7 +269,8 @@ test ! -e /etc/debateai/ui-edge.caddy.secret && install -m 0640 -o root -g caddy
 At least 43 base64url characters. Caddy sends its copy as `X-Debateai-Edge-Secret`; the UI
 compares it with its own using `timingSafeEqual` and only then believes `X-Forwarded-For`. The two
 files must hold the same bytes: to change the secret, remove both and paste the block again, then
-restart `debateai-ui` and reload Caddy.
+restart the current release's website (`systemctl restart debateai-ui@$label`, §5 "The current release") and
+restart Caddy (§6).
 
 ### Custody and the three service users — the custody group (V-19, ruled 2026-09-22)
 
@@ -294,14 +323,15 @@ find /var/lib/debateai/api/user-deks -type d ! -perm 2750 -print -o -type f ! -p
 
 The `find` printing nothing is the pass. If the API wrote records before the group existed, they
 are `0600` in `0700` directories and the runner cannot read them; re-set the tree once, with the
-API stopped:
+API stopped, before go-live or while no debate runs and no release is draining (`$label` is the
+current release, §5 "The current release"):
 
 ```sh
-systemctl stop debateai-api debateai-runner
+systemctl stop debateai-api@$label debateai-runner@$label
 chgrp -R debateai-custody /var/lib/debateai/api/user-deks
 find /var/lib/debateai/api/user-deks -type d -exec chmod 2750 {} +
 find /var/lib/debateai/api/user-deks -type f -exec chmod 0640 {} +
-systemctl start debateai-api debateai-runner
+systemctl start debateai-api@$label debateai-runner@$label
 ```
 
 ### Changing a master key (V-3)
@@ -312,6 +342,11 @@ session and case keys, which live in Postgres). One command rotates all three.
 It re-wraps keys and **never re-encrypts content**: a master key wraps data keys
 only, so once a user's DEK is re-wrapped every debate under it opens exactly as
 before, untouched.
+
+**Only while one release runs.** A draining older runner (§5 "Side-by-side upgrades") would keep
+only the old key and could not open a record the rotation re-wraps, so rotate only when no release
+is draining: after the older release has retired (`release.mjs status`, §5), never during an
+upgrade. `$label` below is the current release (§5 "The current release").
 
 **The order below is the whole procedure.** Do not reorder it. Every step
 depends on the one before it, and two orders that look equivalent are not: a
@@ -405,10 +440,11 @@ would mean nothing.
 
 They now hold both keys, and every new record they write is wrapped under the
 new one. Nothing is unreadable during this window, which is what makes the
-rotation an ordinary maintenance task rather than an outage:
+rotation an ordinary maintenance task rather than an outage. A runner restart stops a busy runner,
+so restart with `unfinished` at 0 (§5 "The current release"):
 
 ```sh
-systemctl restart debateai-api debateai-runner
+systemctl restart debateai-api@$label debateai-runner@$label
 ```
 
 #### Step 4 — run the rotation
@@ -493,12 +529,12 @@ opened is never a clean store;
 keep the previous key in place, investigate those records, and run it again.
 
 Once the pass is clean, remove every `*_KEK_PREVIOUS_PATH` line from `api.env`
-and `runner.env`, restart both units so neither process holds the old key any
-more, and only then destroy the old key files. Their absence is the normal
-steady state, and the shred is what makes the rotation meaningful:
+and `runner.env`, restart both units (with `unfinished` at 0, §5 "The current release") so neither
+process holds the old key any more, and only then destroy the old key files. Their absence is the
+normal steady state, and the shred is what makes the rotation meaningful:
 
 ```sh
-systemctl restart debateai-api debateai-runner
+systemctl restart debateai-api@$label debateai-runner@$label
 ```
 
 The shred is refused by a machine check unless neither `EnvironmentFile` still names a previous
@@ -735,7 +771,9 @@ pnpm register:publish-hosted --dry-run --file /etc/debateai/register/hosted-regi
 pnpm register:publish-hosted --file /etc/debateai/register/hosted-register.json
 ```
 
-Copy the printed `REGISTER_VERSION=` line into both `api.env` and `runner.env`. A
+Copy the printed `REGISTER_VERSION=` line into both `api.env` and `runner.env`: these are the base
+files, and the first release's overlays carry the same number (§5 "The first release", and
+§5 "A new register version is a new release"). A
 `HOSTED_REGISTER_NOT_BOOT_READY` line instead means the version was sealed but a start-up reader
 refused it: pin nothing, read the refusal code, correct the file and publish again (a new
 version; the refused one stays sealed and unused).
@@ -763,16 +801,85 @@ baseline test checks that list against the P3-01 manifest.
 
 ## 5. Application units
 
+The three application units are templates, one instance per release (side-by-side spec §10):
+`debateai-api@<label>`, `debateai-ui@<label>` and `debateai-runner@<label>`, where the label names
+the release's folder `/opt/debateai/releases/<label>/`. Each instance reads the shared base file
+(`/etc/debateai/api.env`, `ui.env`, `runner.env`) and then the release's own overlay in
+`/etc/debateai/releases/<label>/` (`env/releases/*.env.example`): the release key, the site
+version, the slot's ports and the runner's worker identity. The later file wins. Only the current
+release's instances are enabled, so only they start at boot.
+
+Before each start, root's release tool checks that the release may start, and after each API and
+runner stop it writes down what it saw (`ExecStartPre=` and `ExecStopPost=`, running
+`deploy/vps/release.mjs` from the operator checkout). The same tool has the commands this section
+names (`check`, `stage`, `switch`, `rollback`, `retire-request`, `retire-check`, `mark-retired`, `status`); it runs
+the preview's own release tools with this server's units, slots and database, and reads each
+release's key and slot from its own overlay (`/etc/debateai/releases/<label>/api.env`). Run it as
+root: `release.mjs <command>` below is short for
+`/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /usr/bin/node /opt/debateai/dialectical-engine/deploy/vps/release.mjs <command>`.
+It prints one line: exit 0 done, 2 done but a later step (or the check's verdict) needs a look, 1 refused.
+
+The operator checkout serves every release (its `release.mjs`, `backup.sh`, `restore-drill.sh` and the billing
+tools), so move the operator checkout forward (`git -C /opt/debateai/dialectical-engine checkout` of a fetched
+commit) only to the reviewed commit of the current release, and only while no release is draining.
+
+### The current release (`$label`)
+
+`$label` in any command of this runbook is the current release's label. The current release is
+the one whose API instance is enabled; this sets `label` in your shell and prints it, and does
+nothing if there is not exactly one:
+
+```sh
+set -- /etc/systemd/system/multi-user.target.wants/debateai-api@*.service && test "$#" -eq 1 && test -e "$1" && label=${1##*/debateai-api@} && label=${label%.service} && echo "current release: $label"
+```
+
+A changed base file reaches the current release at its next restart:
+`systemctl restart debateai-api@$label` (and `debateai-ui@$label`). A runner restart is a stop:
+restart `debateai-runner@$label` only while no release is draining and `unfinished`, the open work
+of every release, is 0:
+
+```sh
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS unfinished FROM core.work_item WHERE state IN ('READY', 'CLAIMED')"
+```
+
+An instance whose start the release tool refuses, or that fails 20 times within 10 minutes, stays
+failed (`systemctl --failed` lists it); the unit's start limit keeps a refused start from retrying
+every 5 seconds for ever. Once that limit is hit, systemd refuses even a start by hand until the
+10 minutes have passed, so clear the count first, then start it:
+`systemctl reset-failed debateai-<service>@<label>`, then `systemctl start debateai-<service>@<label>`.
+
+**A new register version is a new release.** `REGISTER_VERSION` and `RELEASE_KEY` are per release: each release's overlays (`/etc/debateai/releases/<label>/api.env` and `runner.env`) are read after the base files and win, and the release key carries the register version (`r<version>-…`), so a running release never changes version. Writing a new `REGISTER_VERSION` into the base files and restarting `@$label` therefore changes nothing, and a release's overlays are written once and never edited. So wherever this runbook says to pin a new version ("copy the printed `REGISTER_VERSION=` line into both `api.env` and `runner.env`", "pin it in both `EnvironmentFile`s") and then restart the API and the runner, do a side-by-side upgrade instead (below): a new label and a new key on the same commit, the key's number being the version to pin. Its steps 3 and 9 to 12 are that pin and that restart (the overlays name the version; stage, start, switch); when the version is already published, skip step 8, and step 7 has nothing to apply.
+
+The base files' own `REGISTER_VERSION` is read by no service (the overlay wins) but by the operator
+commands that load a base file alone (`systemd-run … --property=EnvironmentFile=/etc/debateai/api.env`,
+§11, §14). After each switch set it in both base files to the current release's version, so those
+commands read the version the site runs.
+
+### The first release
+
+Install Hatchet's compose file first ("Side-by-side upgrades" below, "Hatchet's compose file").
+Then prepare the first release's folder and its overlays exactly as steps 1 to 3 of "Side-by-side
+upgrades" below say, with slot A (`ui=3001 api=8790`), run `label=$new` in your shell, and record
+it in the release table as staged, so its instances may start: `release.mjs stage --label $label`.
+Then install the units and start the first release:
+
 ```sh
 install -m 0644 deploy/vps/systemd/*.service deploy/vps/systemd/*.timer /etc/systemd/system/
 systemctl daemon-reload
 systemctl start debateai-geoip-refresh.service
-systemctl enable --now debateai-hatchet debateai-api debateai-ui debateai-runner \
+test -n "$label" && systemctl enable --now debateai-hatchet debateai-api@$label debateai-ui@$label debateai-runner@$label \
   debateai-backup.timer debateai-geoip-refresh.timer
 ```
 
+Then make it the current release: `release.mjs switch --to $label` (the first release has no older
+release, so no `--from`). The switch waits until Caddy sends traffic to the new pair, so it comes
+after the start, never before; it then enables the release's three instances. If it exits 2, read
+its `bad` and run it again: a release the table already names current repeats only what follows.
+
 `debateai-observation-agent.service` is installed by the first line and deliberately **not**
-enabled by the third (§12).
+enabled by the fourth (§12). The first line also installs the root timers each release's
+retirement uses (`debateai-runner-retire@.timer`, `debateai-runner-retire-check@.timer`); they
+name no time of their own and are armed only by the release tool.
 
 Before the first start, the register version named by `REGISTER_VERSION` must exist on this
 database and carry every row a hosted deployment requires (§11 "Publishing the settings register
@@ -782,10 +889,15 @@ Floor shared by the three application units: `NoNewPrivileges=true`, `ProtectSys
 `ProtectHome=true`, `PrivateTmp=true`, `ProtectProc=invisible` + `ProcSubset=pid` (so the
 recipient address on the sendmail argv is not readable by other local uids — audit L7-F7),
 `CapabilityBoundingSet=`, `UMask=0077`, `RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6`,
-`SystemCallFilter=@system-service`, `TimeoutStopSec=30`, `Restart=on-failure`.
-`MemoryDenyWriteExecute` is deliberately **not** set: it breaks the V8 JIT.
+`SystemCallFilter=@system-service`, `TimeoutStopSec=30`, `Restart=on-failure`. Two releases run at
+once during a drain, so each instance has its own memory ceiling, the preview's values:
+`MemoryMax=2G` for the API, `1G` for the website, `3G` for the runner.
+`MemoryDenyWriteExecute` is deliberately **not** set: it breaks the V8 JIT. `Restart=on-failure`
+is safe with two releases: a restarted API or runner starts again on its own release, from its own
+folder ("database ahead" start mode, side-by-side spec §4).
 
-`ReadWritePaths` is exactly what each service writes — the API's four custody stores, nothing for
+`ReadWritePaths` is exactly what each service writes — the API's four custody stores and the
+optional billing notice spool (§14.5; its leading `-` lets the API start while that folder does not exist), nothing for
 the UI, and `ReadOnlyPaths` on the DEK store for the runner (it only ever *loads* run content keys;
 `ContentCipher.provisionRun` runs on the API's content-provision path).
 
@@ -793,7 +905,254 @@ The API and runner units set `NODE_EXTRA_CA_CERTS=/etc/debateai/hatchet-tls/ca.c
 gRPC TLS chain verifies. The UI unit sets `DIALECTICAL_UI_TRUSTED_PROXIES=127.0.0.1,::1` and
 `DIALECTICAL_UI_EDGE_SECRET_PATH=/etc/debateai/ui-edge.secret`.
 
+### Side-by-side upgrades
+
+In short: the new release gets its own folder and its own instances, starts beside the running
+one, and takes the site over in one break-before-make switch. The older release's runner keeps
+finishing the debates it started, on its own code, and then retires by itself. Every debate
+finishes on the release it started on (side-by-side spec O1).
+
+The rules, whatever the release:
+
+- **A release folder is root's and is never edited in place.** Nothing in an upgrade changes code
+  under a running release: the new code goes into a new folder, and a folder leaves only by a
+  move into `/opt/debateai/archive/` (step 14), never a delete.
+- **Never `systemctl stop` a busy `debateai-runner@`.** An older runner stops by itself when its
+  last debate ends. If it is still running 7.5 hours after the switch, the backstop asks it to
+  retire (`RETIRE_REQUESTED`): it lets its calls settle (up to 20 minutes), sets its open debates
+  aside and exits. It never cuts a model call: one still running after the 20 minutes makes it
+  print `RUNNER_BACKSTOP_CALL_IN_FLIGHT` and stay up. Only if it still runs 25 minutes after that
+  request does root's check stop it (and disable its instance, so it does not start again at boot).
+  That check is the only planned stop of a runner that may still have work.
+- **One release drains at a time.** The release check refuses a new upgrade while an older
+  release is still draining, and refuses infrastructure maintenance (PostgreSQL, Hatchet, Caddy)
+  then too.
+- **A pending reboot waits for the upgrade, and the other way round.** The automatic security
+  reboot (§2: `Automatic-Reboot "true"`, at 04:30) leaves `/run/reboot-required` until it runs;
+  while that file exists the release check answers `NOT_READY` (`NO_MAINTENANCE: reboot required`).
+  Upgrade after the reboot, or reboot by hand first while no release drains. A reboot that comes
+  during a drain is safe on this server: the draining release's runner instance stays enabled until
+  it retires, so it starts again at boot and finishes its debates (from its own folder, database
+  ahead), and its backstop timer is persistent (a time the reboot skipped fires at boot).
+- **A release whose migrations are not all additive** (each step marked `n1: expand`) cannot go
+  side by side; the release check says so (`DRAINED_PATH`), and that release needs a drained
+  upgrade ("A drained upgrade" below): every debate finished, the older release stopped, then the
+  migrations and the switch with the older pair already stopped.
+
+**Hatchet's compose file, once.** It is installed from a reviewed release (the operator checkout
+at that commit) to `/etc/debateai/hatchet/compose.prod.yaml`, outside every release and the
+operator checkout, because Hatchet is shared by every release and updating code must never change
+what it runs. The line never replaces a file that is there:
+
+```sh
+test ! -e /etc/debateai/hatchet/compose.prod.yaml && install -D -m 0644 deploy/vps/compose.prod.yaml /etc/debateai/hatchet/compose.prod.yaml
+```
+
+To change it later, install the reviewed new copy over it while no release is draining and
+`systemctl restart debateai-hatchet`. The compose project keeps its fixed name (`debateai-prod`),
+so the container and its config volume carry on.
+
+Run every block as root. `$label` is the current release (above); the new release's names are
+set in step 1.
+
+**1. The release folder.** Name the new release: its label (lowercase letters, digits and dashes,
+for example `d50e33165-r20-v1`) and its release key, `r` + the register version it will publish
+(the next one) + `-` + the first 12 hex of its commit. The line checks both, refuses a label
+already in use, and forgets both names when it refuses; every later block checks them again
+before it touches a path:
+
+```sh
+read -r new && read -r key && printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && printf '%s\n' "$key" | grep -Eqx 'r[1-9][0-9]*-[0-9a-f]{12}' && test "$new" != "$label" && test ! -e "/opt/debateai/releases/$new" && echo "new release: $new ($key)" || unset new key
+```
+
+Then fetch the reviewed commit into the operator checkout (a fetch changes no file there) and
+export it into the new folder with `git archive`, root-owned, files `0644` and folders `0755`:
+
+```sh
+git -C /opt/debateai/dialectical-engine fetch origin
+printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && printf '%s\n' "$key" | grep -Eqx 'r[1-9][0-9]*-[0-9a-f]{12}' && test ! -e "/opt/debateai/releases/$new" && git -C /opt/debateai/dialectical-engine cat-file -e "${key##*-}^{commit}" && install -d -m 0755 -o root -g root /opt/debateai/releases "/opt/debateai/releases/$new" "/opt/debateai/releases/$new/dialectical-engine" && git -c tar.umask=0022 -C /opt/debateai/dialectical-engine archive --format=tar "${key##*-}" | tar -x --no-same-owner -C "/opt/debateai/releases/$new/dialectical-engine" && echo "exported: /opt/debateai/releases/$new"
+```
+
+**2. Dependencies, offline.** Fill root's package store for this lockfile (the only step that
+downloads), then install the folder from the store with the network off, and build what the
+release needs (the contract and the website; the website build stamps `RELEASE_KEY`):
+
+```sh
+printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && pnpm --dir "/opt/debateai/releases/$new/dialectical-engine" fetch
+printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && pnpm --dir "/opt/debateai/releases/$new/dialectical-engine" install --frozen-lockfile --offline
+printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && printf '%s\n' "$key" | grep -Eqx 'r[1-9][0-9]*-[0-9a-f]{12}' && RELEASE_KEY="$key" pnpm --dir "/opt/debateai/releases/$new/dialectical-engine" run build
+```
+
+**3. The three overlay files.** The new release takes the slot the current one does not use:
+website `3002` and API `8791` when the current release's website is on `3001`, otherwise `3001`
+and `8790`. This picks it:
+
+```sh
+printf '%s\n' "$label" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && if grep -qx 'PORT=3001' "/etc/debateai/releases/$label/ui.env"; then ui=3002 api=8791; else ui=3001 api=8790; fi && echo "new slot: website $ui, API $api"
+```
+
+Then write the overlays (`0640`, root-owned, read by each service's group), once; the block
+refuses a release that already has them:
+
+```sh
+printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && printf '%s\n' "$key" | grep -Eqx 'r[1-9][0-9]*-[0-9a-f]{12}' && test -n "$ui" && test -n "$api" && test ! -e "/etc/debateai/releases/$new" && \
+  install -d -m 0755 -o root -g root /etc/debateai/releases "/etc/debateai/releases/$new" && v=${key#r} && v=${v%%-*} && \
+  (umask 0137 && printf 'REGISTER_VERSION=%s\nRELEASE_KEY=%s\nAPI_PORT=%s\n' "$v" "$key" "$api" > "/etc/debateai/releases/$new/api.env" && \
+  printf 'REGISTER_VERSION=%s\nRELEASE_KEY=%s\nRUNNER_WORKER_ID=debateai-prod-runner-%s\nHATCHET_WORKER_NAME=debateai-prod-runner-%s\n' "$v" "$key" "$key" "$key" > "/etc/debateai/releases/$new/runner.env" && \
+  printf 'RELEASE_KEY=%s\nPORT=%s\nDIALECTICAL_API_BASE=http://127.0.0.1:%s\n' "$key" "$ui" "$api" > "/etc/debateai/releases/$new/ui.env") && \
+  chgrp debateai-api "/etc/debateai/releases/$new/api.env" && chgrp debateai-runner "/etc/debateai/releases/$new/runner.env" && \
+  chgrp debateai-ui "/etc/debateai/releases/$new/ui.env" && ls -l "/etc/debateai/releases/$new"
+```
+
+The three files have exactly the shape of `env/releases/*.env.example`: one `KEY=value` per line
+and no comment line. `release.mjs` reads the API overlay with the release tools' strict env reader,
+which refuses a comment, an empty value or a quote; systemd reads all three after the base file,
+and the later file wins.
+
+| Overlay | Owner and mode | Over the base file | What it holds |
+|---|---|---|---|
+| `/etc/debateai/releases/<label>/api.env` | `0640 root:debateai-api` | `/etc/debateai/api.env` | `REGISTER_VERSION` (the number in the key), `RELEASE_KEY`, `API_PORT` |
+| `/etc/debateai/releases/<label>/runner.env` | `0640 root:debateai-runner` | `/etc/debateai/runner.env` | `REGISTER_VERSION`, `RELEASE_KEY`, `RUNNER_WORKER_ID` and `HATCHET_WORKER_NAME` (the base names followed by the key: two runners never share a worker identity) |
+| `/etc/debateai/releases/<label>/ui.env` | `0640 root:debateai-ui` | `/etc/debateai/ui.env` | `RELEASE_KEY`, `PORT`, `DIALECTICAL_API_BASE` (its own slot's API) |
+
+The examples show slot A; slot B uses `API_PORT=8791`, `PORT=3002` and
+`DIALECTICAL_API_BASE=http://127.0.0.1:8791`. Nothing in them is secret: every credential and path
+stays in the base files, shared by both releases. Root writes them once, before the release first
+starts, and never edits them while that release runs.
+
+**4. The release check** (read-only): `release.mjs check --label $new`. It compares the new
+release's folder with the current one's and answers whether every migration is additive, whether the previous older release has
+retired, whether there is enough connection, disk and memory headroom, whether Hatchet is healthy
+and whether any infrastructure maintenance is pending. Any no: stop here; nothing has changed.
+
+**5. The owner's fresh yes** in the live chat, covering steps 6 to 12.
+
+**6. The online backup**: §9 "The online backup before side-by-side migrations". The nightly
+`backup.sh` is not a substitute: it runs once a day.
+
+**7. Migrations**, inside the migrator window of §4 (step 2 opens it), from the new release's
+folder. The older release keeps serving throughout; each step is a quick transaction with a lock
+timeout:
+
+```sh
+printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && pnpm --dir "/opt/debateai/releases/$new/dialectical-engine" db:migrate
+printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && sudo -u postgres psql -v ON_ERROR_STOP=1 -f "/opt/debateai/releases/$new/dialectical-engine/deploy/postgres/hardening.sql"
+```
+
+**8. Publish the new register version**, still inside the window, from the new release's folder
+(§11 "Publishing the settings register on this host"; run it with `--dry-run` first):
+
+```sh
+printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && pnpm --dir "/opt/debateai/releases/$new/dialectical-engine" register:publish-hosted --file /etc/debateai/register/hosted-register.json
+```
+
+The printed `REGISTER_VERSION=` must be the number in the new release key; the overlays already
+carry it, so nothing is pinned in the base files before the switch (step 12). If it is another number, stop: start nothing,
+and name the release again (a new label and key, step 1). Then close the window (§4 step 5).
+Running processes ignore the new version: each reads its own at start.
+
+**9. Stage it**: `release.mjs stage --label $new` records the
+new release as staged, so its instances may start.
+
+**10. Start the new runner**, then check that its ready line names the new key:
+
+```sh
+printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && systemctl start debateai-runner@$new
+printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && journalctl -u debateai-runner@$new -o cat --no-pager | grep DEBATEAI_RUNNER_READY
+```
+
+**11. Start the new API and website** in the spare slot. They come up but stay not-ready
+(`NOT_CURRENT`): Caddy keeps sending everything to the current pair.
+
+```sh
+printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && systemctl start debateai-api@$new debateai-ui@$new
+test -n "$api" && curl -s "http://127.0.0.1:$api/readyz"
+```
+
+**12. The switch**: `release.mjs switch --to $new --from $label`. In one database transaction it marks the new release current, with a "take traffic from"
+time a few seconds ahead, and the older release draining, so the older pair turns not-ready at
+once and the new pair a few seconds later. It waits until Caddy sends traffic to the new pair
+(asked through `127.0.0.1:3090`, §6), stops the older API and website and records that, enables
+the new release's three instances and disables the older API and website (the older runner stays
+enabled until it retires), and arms the older release's backstop for 7.5 hours later. Then run
+the "current release" line above again: `$label` is now the new release, then set
+`REGISTER_VERSION` in both base files to the new version (§5 "A new register version is a new release").
+
+**13. Retirement and the receipt.** The older runner finishes its debates and retires by itself:
+it exits 0, root records the release `RETIRED` and disables its runner, and the backstop timer is
+turned off. The backstop (`RETIRE_REQUESTED`) and the 25-minute check run only if it is still
+running 7.5 hours after the switch. `release.mjs status` shows each release's state, units and
+open work: the older release `RETIRED`, with its three instances stopped, is the receipt of the upgrade.
+
+**14. The archive**, later and on the owner's yes: move the retired release's folder and overlays
+aside. `release.mjs status` must name it `RETIRED` first. Name it (the line refuses the current
+release, a release with a running unit, and a release whose backstop or check timer is still
+active or enabled: a timer that fires after the move would run against an overlay that is gone;
+it forgets a name it refuses):
+
+```sh
+read -r old && printf '%s\n' "$old" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && test "$old" != "$label" && ! systemctl is-active --quiet debateai-api@$old debateai-ui@$old debateai-runner@$old && ! systemctl is-active --quiet debateai-runner-retire@$old.timer debateai-runner-retire-check@$old.timer && ! systemctl is-enabled --quiet debateai-runner-retire@$old.timer debateai-runner-retire-check@$old.timer && echo "to archive: $old" || unset old
+```
+
+```sh
+printf '%s\n' "$old" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && printf '%s\n' "$label" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && test "$old" != "$label" && install -d -m 0700 -o root -g root /opt/debateai/archive /opt/debateai/archive/etc && test ! -e "/opt/debateai/archive/$old" && test ! -e "/opt/debateai/archive/etc/$old" && mv /opt/debateai/releases/$old /opt/debateai/archive/ && mv /etc/debateai/releases/$old /opt/debateai/archive/etc/
+```
+
+**Going back.** Before the switch: `release.mjs rollback --before-switch --label $new` stops the
+new runner (it has no debate yet), API and website and records the new release retired, so the next
+release check does not wait for it; nothing user-facing changed. After the switch:
+`release.mjs rollback --to <older label> --from $label` runs the same switch in the other direction. It starts the older runner
+again first if it has retired, starts the older pair in the spare slot if it was stopped, and
+switches back; the new runner keeps finishing the debates it started. Restoring the online backup
+is a last resort only.
+
+**A drained upgrade** (step 4 answered `DRAINED_PATH`: a new migration is not `n1: expand`, so the
+older release cannot run beside the new database). The site is down from D1 to D4. Steps 1 to 3 as
+above; the owner's fresh yes (step 5) names the downtime. `$label` is still the older release until
+D5 ends.
+
+**D1. The older website and API stop** (no new debate can be admitted from here), then read what is
+still open or waiting:
+
+```sh
+printf '%s\n' "$label" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && systemctl stop debateai-ui@$label debateai-api@$label
+sudo -u postgres psql -d debateai -c "SELECT (SELECT count(*) FROM core.work_item WHERE state IN ('READY', 'CLAIMED')) AS unfinished, (SELECT count(*) FROM core.run_waiting_v) AS waiting"
+```
+
+**D2. The older runner stops, only with nothing open.** Run the read again until `unfinished` and
+`waiting` are both 0 (the older runner finishes what it started), then stop it: this is the one
+planned stop of a runner, and it has nothing to do. The line stops nothing while anything is open:
+
+```sh
+printf '%s\n' "$label" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && test "$(sudo -u postgres psql -d debateai -XAt -c "SELECT (SELECT count(*) FROM core.work_item WHERE state IN ('READY', 'CLAIMED')) + (SELECT count(*) FROM core.run_waiting_v)")" = 0 && systemctl stop debateai-runner@$label && echo "older runner stopped"
+```
+
+**D3. The backup, the migrations, the version, the new release.** Steps 6 to 11 as above: the
+online backup (now of a quiet database), the migrations, the publish,
+`release.mjs stage --label $new`, the new runner, then the new API and website (not ready: no
+release takes traffic yet, the site answers Caddy's own error).
+
+**D4. The switch with the older pair stopped:**
+`release.mjs switch --to $new --from $label --old-pair-stopped`. It skips the older edge check and
+accepts the older runner stopped; the downtime ends when it returns 0 (the edge answers from the
+new release). If it exits 2, read `bad`; after `SWITCH_OUTCOME_UNKNOWN`, once `release.mjs status`
+names `$new` current: `release.mjs switch --finish --to $new --from $label --old-pair-stopped`.
+
+**D5. The older release marked retired**: `release.mjs mark-retired --label $label`. It records the
+older release `RETIRED` (reason `DRAINED`: its runner was stopped with nothing open, so it never
+printed its own retirement line), turns its backstop and check timers off and disables its runner
+instance (the switch disabled only its API and website), so nothing of it starts at the next boot.
+It refuses while that runner runs or has open work. Then run the "current release" line again
+(`$label` is now the new release) and set `REGISTER_VERSION` in both base files, as after step 12.
+
+Going back: before D3's migrations, start the older release again
+(`systemctl start debateai-runner@$label debateai-api@$label debateai-ui@$label`; it is still the
+current one); after them, the older release cannot run on the new database: restore D3's online
+backup (§9) and ask the owner.
+
 ### Upgrading to the verdict-story release, and rolling it back
+
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 This release (the verdict story and the engine money rule, spec 2026-09-26 §14) changes what the
 API hands the runner and the website, and older code reads the new shapes strictly. Keep to this
@@ -825,6 +1184,8 @@ sudo -u postgres psql -d debateai -c "SELECT count(*) AS unfinished, min(created
   hosted register publish (§11, "What the runner's log says about answers and stories").
 
 ### Upgrading to the model-scorecard release
+
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 This release adds the per-role model picker (spec 2026-09-26 "model scorecard"). The picker chooses no model until a
 model scorecard is sealed into the hosted register with `--scorecard`, but two things act from the first restart on
@@ -874,6 +1235,8 @@ backup grow by roughly the size of every prompt sent; plan disk and backup space
 
 ### Upgrading to the publication-check deadline release
 
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
+
 This release moves the deadline of the safety check that runs before a debate is published (60 seconds) out of
 the code and into the register, as the code-owned row `publicationCheckPolicy` (owner's ruling 2026-10-04). The API
 reads it at start-up and refuses a register version without it (`PUBLICATION_CHECK_POLICY_UNRESOLVED`). No migration.
@@ -889,6 +1252,8 @@ reads it at start-up and refuses a register version without it (`PUBLICATION_CHE
 - **Rolling back** needs no register change: an older API does not read the row.
 
 ### Upgrading to the billing-role release (go-live row 41)
+
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 Migration `migrations/0093_billing_runtime_role.sql` moves every billing privilege from `debateai_runtime`, the
 role the API, the runner and the liveness sweep all hold, to a new role `debateai_billing_runtime` that only the
@@ -908,7 +1273,7 @@ this code:
    its `EnvironmentFile` before the envelope is destroyed). It moves `debateai_prod_api_runtime` from
    `debateai_runtime` to `debateai_billing_runtime` and prints `PRODUCTION_DATABASE_PRINCIPALS_READY=19`.
 4. **Close the migrator window** (§4 step 5).
-5. **Restart the API and the runner** (`systemctl restart debateai-api debateai-runner`) so both connect with the
+5. **Restart the API and the runner**, with `unfinished` at 0 (`systemctl restart debateai-api@$label debateai-runner@$label`) so both connect with the
    passwords step 3 set.
 
 Check: one `retention.purged` line at the API's first purge check after the restart, and no
@@ -916,6 +1281,8 @@ Check: one `retention.purged` line at the API's first purge check after the rest
 privileges through the new membership, because the role inherits `debateai_runtime`.
 
 ### Upgrading to the legal-role release (migration 0094)
+
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 Migration `migrations/0094_legal_runtime_api_only.sql` does for the acceptance record what 0093 did for billing. It
 moves the legal schema, `legal.acceptance`, the legal retention purge (`legal.purge_expired_acceptance`), sign-up
@@ -929,7 +1296,7 @@ sitting, before the API next starts on this code:
 1. **Open the migrator window** (§4 step 2) and **migrate**: `pnpm db:migrate`.
 2. **Run `hardening.sql`** (§4 step 3).
 3. **Re-run the provisioner** (§4 step 4), exactly as the 0093 section above says.
-4. **Close the window** (§4 step 5), then **restart the API**: `systemctl restart debateai-api`. If step 3 set new
+4. **Close the window** (§4 step 5), then **restart the API**: `systemctl restart debateai-api@$label`. If step 3 set new
    passwords, restart the runner too, as that section says.
 
 If the 0093 steps above have already run on this host, the API's login already holds the role. Then
@@ -938,6 +1305,8 @@ moment the migration commits. If both migrations are pending, one pass through t
 check, and a test sign-up that succeeds. **Rolling back** the code needs nothing, for the same reason as 0093.
 
 ### Upgrading to the answer-writer prompt v2 release (serve.synthesizer.v2)
+
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 This release supersedes the answer writer's sealed prompt `serve.synthesizer.v1` with `serve.synthesizer.v2`, which
 also tells the model the exact name of the one served-number slot (`number:final-strength`) and the identifier form
@@ -958,6 +1327,8 @@ the runner accepts. Its fingerprint is the code-owned row `composerContractHash`
 
 ### Upgrading to the answer writer v3 and answer checker v2 release (serve.synthesizer.v3, serve.evaluator.v2)
 
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
+
 This release supersedes `serve.synthesizer.v2` with `serve.synthesizer.v3` and `serve.evaluator.v1` with
 `serve.evaluator.v2` (owner-approved wording, 2026-10-12): the answer writer and its checker are told that the
 answer is for the person who asked, with no score, number, field name or engine mechanics in it. Both fingerprints
@@ -974,6 +1345,8 @@ move: `composerContractHash` and `conformanceContractHash`. No migration, no new
   has no such check, and on the new version it would record its v2 prompts under the v3 fingerprints).
 
 ### Upgrading to the debate shape
+
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 This release adds the debate shape: before the debate, the AIs map the question (the points people raise and the
 answers worth arguing); then several answers are argued, each by a different AI, and the final answer has a set
@@ -1016,7 +1389,7 @@ Do these in this order, with the new checkout in place:
 4. **Restart the API and the runner together**, while `unfinished` is still 0:
 
    ```sh
-   systemctl restart debateai-api debateai-runner
+   systemctl restart debateai-api@$label debateai-runner@$label
    ```
 
    The runner refuses to start on a register that does not carry the fingerprints of its own prompts
@@ -1029,9 +1402,13 @@ them.
 
 ### Upgrading to length guidance LG-A (reply measures)
 
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
+
 This release adds one migration, `migrations/0120_reply_measures.sql` (after the reclaim resume's `migrations/0119_reclaim_resume.sql`; `pnpm db:migrate` applies 0119 first if the host does not have it yet). Apply it BEFORE the new code runs: the new code writes six new columns of `ledger.raw_artifact` (`reply_repairs`, `reply_failure_class`, `reply_form`, `cached_input_tokens`, `guided_words`, `actual_words`) with every model call it records, so on a database without them every model call fails. The migration also redefines the terminal facts function `core.read_terminal_recorded_facts` (same signature, owner and grants), so that a step whose answer was put into its form by the structure-repair call counts like that step; the older code never writes such rows, so it reads the same counts as before. Apply it as step 1 of the debate-shape upgrade above does (open the migrator window, `pnpm db:migrate`, then `hardening.sql`, close the window), then restart the API and the runner. No register version and no new environment key. The structure-repair call itself is wired only where the preview provider config is set; a hosted production host keeps today's follow-ups. Rolling back the code needs no database step: the six columns and the function stay, and the older code never writes the columns.
 
 ### Upgrading to length guidance LG-C (the length row)
+
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 The length row is OFF until a register version carries the `lengthGuidancePolicy` member (`deploy/vps/register/README.md`).
 
@@ -1068,6 +1445,8 @@ and restart both: the older runner refuses this release's seals the other way (`
 
 ### Upgrading to the engine row
 
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
+
 Not before the program's switch-on release: engine 2's AI wording (the story v4 texts) awaits the owners' approval, and the
 comparing judges, investigations and answer check arrive in R2-R3. Until then publish no version with this member.
 
@@ -1090,6 +1469,8 @@ engine-2 debate (`ENGINE_RUNNER_UNCONFIGURED`).
 
 ### Upgrading to the engine redesign R2a (the engine seal and migration 0121)
 
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
+
 A register version for this code carries the code-owned `engineContractHash` row with `bb9e93c372bad372468b03f60eceebf92047889e247b8ccacfb8c949b9da9e7a` (was
 `b98a45d5933d82205d5c6514082d4151bfb8f3f45b3677f6319794ae2a885e24`): R2a seals the investigation's prompt contract.
 Nothing reads the row without an `engineVersionPolicy` row, so the runner boots either way; publish the new version
@@ -1107,6 +1488,8 @@ The runner's journal gains one line kind, `DEBATEAI_POINT_INVESTIGATION` (engine
 
 ### Upgrading to the engine redesign R2b (the engine seal)
 
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
+
 A register version for this code carries the code-owned `engineContractHash` row with `8298e1b36638369d2e1bd58111eec69d1c997f9475965ed183c8750491053473` (was `bb9e93c372bad372468b03f60eceebf92047889e247b8ccacfb8c949b9da9e7a` after R2a, or
 `b98a45d5933d82205d5c6514082d4151bfb8f3f45b3677f6319794ae2a885e24` from a release before R2a): R2b appends the comparing
 judges' prompt contract. Nothing reads the row without an `engineVersionPolicy` row, so the runner boots either way;
@@ -1115,6 +1498,8 @@ publish the new version from this release as for any release. R2b adds no migrat
 The runner's journal gains one line kind, `DEBATEAI_COMPARING_JUDGE` (engine 2 only), listed with its other lines under "What the runner's log says about answers and stories" below.
 
 ### Upgrading to the engine redesign R3 (the engine seal and migration 0122)
+
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 A register version for this code carries the code-owned `engineContractHash` row with `ba2f15d5d89b2f7b4c3168e2f7908f5d3130aa55fc4929ad0825b15028500a4d` (was `8298e1b36638369d2e1bd58111eec69d1c997f9475965ed183c8750491053473` after R2b): R3 appends the map's eight engine-2 contracts and the fixed-words position contracts. Nothing reads the row without an `engineVersionPolicy` row, so the runner boots either way; publish the new version from this release as for any release. A practice register saved with an engine row before this seal must be rebuilt: the runner refuses a stale seal at boot. Rebuild it by running the practice with `--register-next` (tools/preview-practice/README.md, "Optional flags"), which composes this code's next version, with this code's own seal, in the throwaway database.
 
@@ -1128,7 +1513,28 @@ the API and the runner. No new environment key; nothing a debate does changes (e
 version carries the engine row). Rolling back the code needs no database step: the two tables stay, and the older code
 never reads them.
 
+### Upgrading to settings activation (migration 0124)
+
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
+
+This release adds one migration, `migrations/0124_settings_activation.sql` (after `0123_side_by_side_releases.sql`; both
+`n1: expand`, so §5's migration step applies it while the older release keeps serving). It is the database half of
+"Settings activation (Phase 3)" below: three append-only tables in the `register` schema, `settings_activation` (one row
+per activation; the newest row is the active settings version), `settings_verdict` (one row per check of a release
+against a version: PASS or FAIL and its digest) and `settings_switch_check` (one row per release switch, checked when it
+commits), and their functions: `register.settings_version_passed` and `register.read_passed_settings_versions` (a
+release always passes its own site version; the runner reads these at start-up), `register.read_active_settings_version`
+(the one reader of the active version: the API's admission path and the operator), `register.record_settings_verdict`
+and `register.activate_settings_version` (the only writers, compare-and-swap, under the release switch's lock), and the
+switch's hook and commit check. Everything is owned by `debateai_release_owner` (no login, no members); the operator
+commands act as `debateai_release_operator` (no login: the release writers' principal, `postgres` through the local
+socket here, never a runtime login); the API's runtime login may only read the active version, the runner's may only ask
+what passed. No new environment key. Until an activation exists, every release runs on its own site version, as before;
+on this server nothing activates anything before Phase 3.
+
 ### Upgrading an existing host (paid plans Part 1a)
+
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 This release keeps a record of which Terms of Service and Privacy Policy each person accepted,
 sealed under a new key, and ships the country gate switched off. A host that already runs an
@@ -1250,7 +1656,8 @@ Publish no register version that carries `countryPolicy` until ALL of these hold
 Then turn the gate on: open a migrator window (§4 steps 2 and 5), copy the `countryPolicy` member
 from `deploy/vps/register/country-policy.example.json` into the top-level object of
 `/etc/debateai/register/hosted-register.json`, beside `costEnvelopePolicy`, and publish as §11
-"Publishing the settings register on this host" says; pin the version it prints. To turn the gate
+"Publishing the settings register on this host" says; pin the version it prints (a new release,
+§5 "A new register version is a new release"). To turn the gate
 off again, remove the member and publish again: that new version has no row.
 
 To check the last refresh:
@@ -1317,9 +1724,42 @@ journalctl -u debateai-geoip-refresh.service --since '15 minutes ago' --no-pager
 
 ```sh
 install -m 0644 deploy/vps/Caddyfile /etc/caddy/Caddyfile
-systemctl reload caddy
+(set -a && . /etc/default/caddy && caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile)
+systemctl restart caddy
 ```
 
+Then check what only a running Caddy shows (as the preview's TB7): that it filled the edge secret
+into `health_headers` (`{file.…}` is read at run time: without it every health check fails, no
+slot is ever healthy, and the check site answers Caddy's own error with no release header), and
+that the public site refuses `/readyz`. The first line prints the current release's key within
+30 s; the second prints `404`:
+
+```sh
+H=; for i in $(seq 1 30); do H=$(curl -s -m 15 -o /dev/null -D - http://127.0.0.1:3090/readyz | tr -d '\r' | grep -i '^x-debateai-release:' || true); [ -n "$H" ] && break; sleep 1; done; echo "${H:-NO SLOT HEALTHY: Caddy did not fill the file value into health_headers, or no website is ready}"
+(set -a && . /etc/default/caddy && curl -s -o /dev/null -w '%{http_code}\n' "https://$DEBATEAI_PUBLIC_HOSTNAME/readyz")
+```
+
+**Restart, never reload.** The Caddyfile sets `admin off`, so Caddy has no admin endpoint and
+a reload of the service cannot apply anything: a changed file takes effect only through
+`systemctl restart caddy`. A restart drops the connections in flight for a moment and starts the
+health checks over, so do it while no switch is running (§5 "Side-by-side upgrades"); the release
+check counts a pending Caddy change as infrastructure maintenance. Validate first: a file Caddy
+refuses would leave the site down after the restart.
+
+- **Two slots, one front (side-by-side spec §6).** One `reverse_proxy` lists both slots' websites,
+  `127.0.0.1:3001` (slot A) and `127.0.0.1:3002` (slot B), with `lb_policy first`. An active
+  health check asks each website's `/readyz` every 2 s, straight at the slot's port, with the edge
+  secret header (otherwise the website treats the check as an untrusted peer); a website is ready
+  only while its release is the current one, so one slot takes the traffic. The public site
+  refuses `/readyz` itself (`respond /readyz 404`): every request it proxies carries the edge
+  secret, so the website would trust a visitor's `/readyz` too. Readiness is read only by those
+  health checks and through the loopback check site below. A request that arrives while no slot is ready,
+  for the few seconds of a switch, is held and retried for up to 12 s (`lb_try_duration`) instead
+  of failing.
+- **The loopback check site `127.0.0.1:3090`** is the same front without TLS, bound to loopback
+  only. The release tool asks it whether Caddy already sends traffic to the new pair. A local
+  process reaching it is seen as `127.0.0.1`, exactly as when it opens a website port directly, so
+  it cannot forge a client address through it.
 - HSTS `max-age=31536000; includeSubDomains; preload`, `tls { protocols tls1.2 tls1.3 }`,
   `-Server`.
 - `request_body { max_size 1MB }` in front of the API's own Fastify body limit.
@@ -1329,8 +1769,23 @@ systemctl reload caddy
   such a directive is set; leaving it unset is what keeps "the last hop is the address Caddy
   observed" true for `apps/ui/trusted-client-ip.mjs`.
 - `header_up X-Debateai-Edge-Secret {file./etc/debateai/ui-edge.caddy.secret}` — without it, any local
-  process able to open `127.0.0.1:3001` could forge a client address and evade the per-IP
+  process able to open `127.0.0.1:3001` or `127.0.0.1:3002` could forge a client address and evade the per-IP
   admission limits and the audit source IP.
+- **Payment marks.** The website's footer shows the NETOPIA, Visa and Mastercard marks at
+  `/payment-marks/netopia.svg`, `/payment-marks/visa.svg` and `/payment-marks/mastercard.svg`. The
+  brands' artwork may not be redistributed, so it is never in the repository or a release folder:
+  root keeps the official files in `/etc/debateai/payment-marks/` (§3), and the public site serves
+  exactly these three names from there (`handle @paymentMarks`, with `Content-Type image/svg+xml`,
+  a `Content-Security-Policy` that runs nothing and `nosniff`) before any request reaches the
+  website. Any other path under `/payment-marks/` goes on to the website as before; the loopback
+  check site has no such rule. A missing file is Caddy's own `404`. The website shows only the marks
+  its `PAYMENT_MARKS_AVAILABLE` setting names (§14.7). The check below prints two fields: the first
+  is `200` (with `image/svg+xml`) once `visa.svg` is in the folder, and `404` before (the second field
+  may still say `image/svg+xml`, since the rule sets that header on every answer):
+
+```sh
+(set -a && . /etc/default/caddy && curl -s -o /dev/null -w '%{http_code} %{content_type}\n' "https://$DEBATEAI_PUBLIC_HOSTNAME/payment-marks/visa.svg")
+```
 
 ---
 
@@ -1416,6 +1871,45 @@ keeps the whole prompt of every model call a debate makes (`ledger.call_prompt`:
 attempt sent, up to 256 KiB each, never changed or purged), so the dump, every nightly artefact and
 the off-host copy grow by roughly the size of every prompt sent: plan disk and remote space by it.
 
+### The online backup before side-by-side migrations
+
+`backup.sh` stays the nightly backup. Before the migrations of a side-by-side upgrade (§5, step 6)
+take one more, online, while both releases' services keep running: the same three parts in the
+same order as `backup.sh` (cluster globals, the `debateai` database in custom format, then the
+custody tree), each encrypted to the same data recipient, and their sha256 sums. Nothing
+unencrypted touches the disk: each part streams straight into `age`. It stays on this host, in a
+new `0700` folder under `BACKUP_DIR`, with no off-host copy, because it is a last resort for this
+upgrade only (§11 of the side-by-side spec): going back is the switch in the other direction, not
+a restore. The escrowed secrets do not change in an upgrade, so the nightly escrow envelope still
+covers them.
+
+```sh
+(
+  set -euo pipefail
+  umask 077
+  . /etc/debateai/backup.conf
+  dir="$BACKUP_DIR/before-upgrade/$(date -u +%Y%m%dT%H%M%SZ)"
+  install -d -m 0700 -o root -g root "$BACKUP_DIR" "$BACKUP_DIR/before-upgrade"
+  test ! -e "$dir"
+  install -d -m 0700 -o root -g root "$dir"
+  sudo -u postgres pg_dumpall --globals-only | age -r "$BACKUP_DATA_RECIPIENT" > "$dir/globals.sql.age"
+  sudo -u postgres pg_dump --format=custom --compress=9 debateai | age -r "$BACKUP_DATA_RECIPIENT" > "$dir/debateai.dump.age"
+  tar -cf - -C "$(dirname "$USER_DEK_STORE_PATH")" "$(basename "$USER_DEK_STORE_PATH")" -C "$(dirname "$PUBLICATION_KEY_STORE_PATH")" "$(basename "$PUBLICATION_KEY_STORE_PATH")" -C "$(dirname "$AUDIT_KEY_STORE_PATH")" "$(basename "$AUDIT_KEY_STORE_PATH")" | age -r "$BACKUP_DATA_RECIPIENT" > "$dir/custody.tar.age"
+  (cd "$dir" && sha256sum globals.sql.age debateai.dump.age custody.tar.age > SHA256SUMS)
+  echo "ONLINE_BACKUP_OK $dir"
+)
+```
+
+`ONLINE_BACKUP_OK` and the folder name are the pass; without that line, do not start the
+migrations.
+
+`restore-drill.sh` does not take this layout: it expects one `*.tar.age` holding all three files. To
+restore from this backup, on a machine that holds the data recipient's private key (never this
+host), first check the parts with `sha256sum -c SHA256SUMS` in the folder, then decrypt and restore
+them in the drill's own order, with the services stopped: `age -d` `globals.sql.age` and run it
+with `psql` (the roles first), then `age -d` `debateai.dump.age` into `pg_restore`, then `age -d`
+`custody.tar.age` and unpack it over the custody stores' parent folders.
+
 ### Restore drill — **quarterly**, and it is not optional
 
 Mount the removable media, then give the drill the two identity files' paths when asked:
@@ -1475,7 +1969,7 @@ master-key rotation, because the rotation changes what is in escrow.
 ## 10. What is deliberately absent
 
 - **There is no compiled artefact for the API or the runner.** `ExecStart` runs `tsx` from the
-  workspace (`pnpm --dir /opt/debateai/dialectical-engine exec tsx apps/api/src/main.ts`) because
+  release's folder (`pnpm --dir /opt/debateai/releases/<label>/dialectical-engine exec tsx apps/api/src/main.ts`) because
   no build step produces one — the root `build` script only typechecks and builds the UI.
   That is stated plainly rather than papered over with a `dist/` that does not exist. Producing
   real build artefacts is a follow-up task, not a deployment detail.
@@ -1718,11 +2212,12 @@ vendor is refused there rather than at boot.
 
 Publishing it is §11 "Publishing the settings register on this host": add the vendor to
 `/etc/debateai/register/hosted-register.json` and run `pnpm register:publish-hosted` inside a
-migrator window. `REGISTER_VERSION` in both `EnvironmentFile`s then names the new version. Every `provider_ref` in step 3 must appear in this
+migrator window. The new version then reaches the services as a new release whose overlays name it
+(§5 "A new register version is a new release"). Every `provider_ref` in step 3 must appear in this
 row and in the same order, or both services refuse at boot with
 `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH`.
 
-Restart `debateai-api` and `debateai-runner` after steps 3 and 4. A vendor whose endpoint does not
+Restart `debateai-api@$label` and, with `unfinished` at 0, `debateai-runner@$label` after steps 3 and 4. A vendor whose endpoint does not
 answer the health probe is reported ABSENT and simply does not join a panel; it does not stop the
 service.
 
@@ -1780,7 +2275,8 @@ The last three rows switch on the budget rule of `docs/superpowers/specs/2026-09
   - Only when none fits does the arguing stop, and the answer is still written.
   - The opening position and the answer are exempt.
   - Every swap is one row in `core.run_cost_substitution`. The owner sees it; the person never does.
-- **Log lines** (content-free): `api.ask.waiting`, `api.wait.started`, `api.wait.tick` (with counts) and `runner.body.cheaper_model`.
+- **Log lines** (content-free): `api.ask.waiting` (with the wait's `scope`, or its `cause` — `SWITCHING` or `SITE_BUSY` — when that hold alone made the question wait), `api.wait.started`, `api.wait.tick` (with counts) and `runner.body.cheaper_model`.
+  - After an upload a question that waited under the older release is re-admitted under the current one when it starts (side-by-side uploads): `api.wait.readmitted` (with `runId` and the new debate's `newRunId`). `api.wait.readmission_not_now` (with `runId` and the refusal `code`) means the current release would not start it now (a model unreachable, the day's limit, the preview gate): it keeps its place and the next tick asks again. `api.wait.readmission_skipped` (with `runId` and `code`) means another re-admission of it is pending or done, it no longer waits, its owner's account is closed, or it was superseded meanwhile: not this tick's to start. `api.wait.readmission_orphan` (with `runId` and `newRunId`) means an earlier re-admission of it was written but never started (the API stopped in between): that copy is recorded failed (`RUN_SETUP_FAILED:READMISSION`), so the question can be re-admitted again. Their failure lines, `api.wait.readmission_failed`, `api.wait.readmission_release_failed` and `api.wait.readmission_orphans_unread`, are in the API's signal table below ("What the runner's log says").
 - **A started debate whose first job never reached a runner** (the API stopped between starting it and handing the job over, or the hand-over failed) would keep its hold counting on every later day and window. So each minute the waker also hands every such job that has waited five minutes to the job system again: `api.wait.redispatched` with its `runId`, and `redispatched` in `api.wait.tick`. A runner claims a job once, so a debate handed over twice still runs once.
 
 **All three members absent means today's behaviour, exactly.** A version without them keeps the `429 DAILY_COST_ENVELOPE_REACHED` with `Retry-After` at the next UTC midnight, keeps the 30-minute reservation, and has no waiting line and no running wall.
@@ -1794,8 +2290,8 @@ The three are all or none (`COST_ENVELOPE_POLICY_INVALID` otherwise). Their rang
 1. Add them to `costEnvelopePolicy` in `/etc/debateai/register/hosted-register.json`. The kit's example carries `9500`, `11500` and `1`. In the same file, add the top-level `askRoomReads` member too, so the one new version seals the band and the room read's budget together. `askRoomReads` is your budget for the room read (`GET /v1/asks/room`, the "is there room for my question" check), and it is required whenever the band is there. The kit's example carries an EXAMPLE budget: `"key": "owner"`, `"limit": 60`, `"window_ms": 60000`, `"capacity": 65536`; set your own. See "The room read's budget" in `deploy/vps/register/README.md`.
 2. Run the dry run. It prints `cost_envelope_band admission_close_basis_points=… finish_up_to_basis_points=… waiting_line_per_person=…`, and `cost_envelope_band absent` while they are missing. It also prints `ask_room_reads key=owner limit=… window_ms=… capacity=…`. While the band is there and the budget is missing, it refuses with `ASK_ROOM_ADMISSION_UNSEALED`.
 3. Publish.
-4. Pin `REGISTER_VERSION` in both `EnvironmentFile`s.
-5. Restart both units.
+4. Pin it: a new release with this version (§5 "A new register version is a new release").
+5. Start and switch to it (§5 "Side-by-side upgrades", steps 9 to 12).
 
 Publish them only on a build that runs the whole rule. The waiting line, holds, the waker, the running wall and the boot check ship together.
 
@@ -1905,7 +2401,7 @@ The runner writes one JSON line per event to its journal. Each line carries ids 
 never debate or model text, and none of these events changes an answer. Today's lines:
 
 ```sh
-journalctl -u debateai-runner --since today -o cat | grep -E 'DEBATEAI_SERVE_DISCLOSURE|DEBATEAI_STORY|DEBATEAI_BODY_COST_FALLBACK|DEBATEAI_PERSON_WALL|DEBATEAI_POINT_INVESTIGATION|DEBATEAI_COMPARING_JUDGE'
+journalctl -u 'debateai-runner@*' --since today -o cat | grep -E 'DEBATEAI_SERVE_DISCLOSURE|DEBATEAI_STORY|DEBATEAI_BODY_COST_FALLBACK|DEBATEAI_PERSON_WALL|DEBATEAI_POINT_INVESTIGATION|DEBATEAI_COMPARING_JUDGE'
 ```
 
 | Signal | What it means | What to do |
@@ -1914,15 +2410,17 @@ journalctl -u debateai-runner --since today -o cat | grep -E 'DEBATEAI_SERVE_DIS
 | A failed debate whose reason is `RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL`, kept in `core.work_item.terminal_reason` (the asker sees "This debate reached its limit…", see [below](#what-the-asker-sees-when-a-debate-fails)) | The debate's allowance for arguing could not pay for even the first position's own call, so there was nothing to answer from. There are two readings. Either the ceiling for arguing (`per_run_ceiling_micros` less the reserve) is below one call at the vendors' prices, or a re-claim of the same debate found the earlier claim's spend already over it. | Several in a row: publish a register version with a higher `per_run_ceiling_micros` or a lower `serve_reserve_basis_points`. A single one after a runner restart in the middle of a debate is the re-claim reading, and the next debate is unaffected. |
 | A failed debate whose reason is `RUN_SETUP_FAILED:ADMISSION_RELEASE`, `RUN_SETUP_FAILED:MODEL_ASSIGNMENT`, `RUN_SETUP_FAILED:ROLE_ROTATION`, `RUN_SETUP_FAILED:MEMORY_QUESTION`, `RUN_SETUP_FAILED:WORK_QUEUE`, `RUN_SETUP_FAILED:DISPATCH`, `RUN_SETUP_FAILED:WAITING_LINE`, `RUN_SETUP_FAILED:ROOM_HOLD`, `RUN_SETUP_FAILED:PLAN_CHANGED` or `RUN_SETUP_FAILED:COST_RECORD`, kept the same way (the asker sees "Something went wrong on our side before this debate began…", or for `PLAN_CHANGED` "Your paid plan ended or was paused while this question waited…", see [below](#what-the-asker-sees-when-a-debate-fails)) | The API accepted the ask and wrote the debate's record, then a later step of starting it failed: letting go of the owner's ask lock, which keeps one owner's asks from colliding (`ADMISSION_RELEASE`, usually a dropped database connection), saving the AI models chosen for the debate (`MODEL_ASSIGNMENT`, only while a model scorecard is in force), saving which AI models take the debate's answer and story writing and checking roles when those roles rotate between debates (`ROLE_ROTATION`, only while role rotation is on, in `core.run_role_rotation`), recording the question for the owner's history (`MEMORY_QUESTION`), putting the debate's first job in the queue (`WORK_QUEUE`), handing that job to the job system (`DISPATCH`), writing the question's place in the waiting line (`WAITING_LINE`), or writing the hold that reserves the debate's cost on the site's day and on its owner's allowance (`ROOM_HOLD`). With the waiting line on, the first job and the hold are written together, so a debate that failed at `ROOM_HOLD` or `WORK_QUEUE` has no job any runner could pick up. The asker got an error at that moment, and the debate never started, so no model argued in it. Before this reason existed, such a debate showed as "generating" forever. If the job system had in fact taken the job and a runner had already started it, the debate is left running and ends normally. `PLAN_CHANGED` is not a fault: the question waited in line on a paid plan, and by the time there was room its owner's plan had ended (back to Free), so it was not started on the paid plan's models; the owner can ask again under the plan they have now. `COST_RECORD` means a paid question that did not fit its owner's remaining allowance was moved to the Free plan's models, and the owner's record of that move (`core.run_cost_substitution`) could not be written, so the debate was stopped before its first job: no debate runs on cheaper models without that record. On the private preview only (see `api.wait.preview_team_only`), `RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY` is kept the same way, and its owner reads the same "Something went wrong on our side before this debate began…": the question's owner is not on the preview's team, so the question was never started. It is not a fault. | A single one: nothing; the asker can ask again. Several in a row: read the API's `api.request.failed` lines from the same minutes. `DISPATCH` points at the job system, the others at the database. `PLAN_CHANGED`: nothing to do. |
 | `"kind":"DEBATEAI_STORY"`, `"event":"STORY_PACK_INVALID"`, with `reason` (once, when the runner starts) | The story shapes (`story-shapes/`, or the directory `DEBATEAI_STORY_SHAPES_DIR` names) broke a rule or could not be read. `reason` names the rule, for example `STORY_PACK_DIR_UNRESOLVED`. The runner starts anyway, but every story is then stored as failed (`STORY_PACK_INVALID`) and the pages show the answer without one. | Fix the files or the variable, then restart the runner. |
-| `"event":"STORY_POLICY_UNREADABLE"`, with `code` (once, when the runner starts) | The register version pinned by `REGISTER_VERSION` holds the story's rows only in part, or malformed. Every story is then stored as failed with `STORY_NOT_CONFIGURED`. | Publish a new register version (the publication seals the story's code-owned rows whole) and pin it. |
-| `"event":"STORY_STORED"` with `"failureCode":"STORY_NOT_CONFIGURED"` (per debate) | The pinned register version has no story rows at all, as with every version published before the verdict story. **This is expected on this host until the next hosted publish** (`pnpm register:publish-hosted`, below), which seals them. No model is called for the story, and the pages show the answer without one. | Publish once, pin the new version in both `EnvironmentFile`s, and restart both units. |
+| `"event":"STORY_POLICY_UNREADABLE"`, with `code` (once, when the runner starts) | The register version pinned by `REGISTER_VERSION` holds the story's rows only in part, or malformed. Every story is then stored as failed with `STORY_NOT_CONFIGURED`. | Publish a new register version (the publication seals the story's code-owned rows whole) and pin it (§5 "A new register version is a new release"). |
+| `"event":"STORY_STORED"` with `"failureCode":"STORY_NOT_CONFIGURED"` (per debate) | The pinned register version has no story rows at all, as with every version published before the verdict story. **This is expected on this host until the next hosted publish** (`pnpm register:publish-hosted`, below), which seals them. No model is called for the story, and the pages show the answer without one. | Publish once and pin the new version: a new release (§5 "A new register version is a new release"). |
 | `"event":"STORY_LOOP_FAILED"` or `"STORY_STORED"` with `"failureCode":"STORY_ENVELOPE_EXHAUSTED"` (per debate) | The story's own money cap (0.05 USD, or 0.06 with its margin) could not pay for a call on any of the debate's models. **This is expected at premium prices**: the storyteller's output bound of 12,000 tokens can cost more than the whole cap. The answer is untouched, and the page shows it without a story. | Nothing, unless every story fails this way. The cap is a code-owned row, so changing it is a code change and a new publish. |
 | `"kind":"DEBATEAI_BODY_COST_FALLBACK"`, `"event":"RUN_COST_SUBSTITUTION_WRITE_FAILED"`, with `code`, `sqlState`, `runId`, `callSiteKey` | An arguing call was moved to one of the debate's cheaper models (the `runner.body.cheaper_model` line just before it), and the owner's record of that move (`core.run_cost_substitution`) could not be written. The debate is exactly what it would have been. What is lost is that one row, so the operator's run report and the owner's read do not show that move. | Nothing writes the row later. A typed `code` is a defect to report. `UNTYPED` with a `sqlState` is the database refusing or a lost connection. More than one in a day is worth investigating. |
-| `{"kind":"DEBATEAI_PERSON_WALL","event":"PLANS_UNRESOLVED"}` (once, when the runner starts) | The pinned register version has a `costEnvelopePolicy` row but no `billingPlans` row, so the runner cannot read a person's windows. A debate pinned to a person (billing on at the API) would then have every walled arguing call refused as that person's month: the arguing stops and the answer is still written. A debate with no person pin, which is every debate while billing is off, is untouched. **This is expected on this host until the next hosted publish** (`pnpm register:publish-hosted`, below), which seals the engine's own billing rows (billing off). | While billing is off: nothing; it stops once you publish, pin the new version in both `EnvironmentFile`s and restart both units. After billing is switched on it means the API and the runner are on different register versions: pin the same `REGISTER_VERSION` in both and restart both. |
+| `{"kind":"DEBATEAI_PERSON_WALL","event":"PLANS_UNRESOLVED"}` (once, when the runner starts) | The pinned register version has a `costEnvelopePolicy` row but no `billingPlans` row, so the runner cannot read a person's windows. A debate pinned to a person (billing on at the API) would then have every walled arguing call refused as that person's month: the arguing stops and the answer is still written. A debate with no person pin, which is every debate while billing is off, is untouched. **This is expected on this host until the next hosted publish** (`pnpm register:publish-hosted`, below), which seals the engine's own billing rows (billing off). | While billing is off: nothing; it stops once you publish and pin the new version (a new release, §5 "A new register version is a new release"). After billing is switched on it means the API and the runner are on different register versions, which one release's overlays never allow: check that both overlays of the current release name the same `REGISTER_VERSION`. |
 | `"kind":"DEBATEAI_POINT_INVESTIGATION"`, `"event":"INVESTIGATION_UNAVAILABLE"`, with `runId`, `callSiteKey`, `code` (engine 2 only: never while no register version carries the engine row) | Written once per investigation that ended unavailable: one more AI was to look into a point a reviewer could not assess, and no usable answer came back (the call failed or was refused, the money stopped it, or `code` `INVESTIGATOR_SEAT_UNPLANNED`: no investigator was planned). `code` is the error's code or class name, never AI or vendor text. The point keeps its reduced "cannot assess" weight and the debate goes on; the investigation's record says unavailable. | A single one: nothing. Many in a day: read the vendor's status and the runner's other lines from the same minutes. |
 | `"kind":"DEBATEAI_COMPARING_JUDGE"`, `"event":"JUDGE_FAILED"`, with `runId`, `callSiteKey`, `code` (engine 2 only: never while no register version carries the engine row) | Written once per comparing judge whose call ended without a usable answer: one of the up to three AIs that compare the debate's answers side by side gave no vote (the call failed or was refused, or the money stopped it). `callSiteKey` names the judge's seat (`VERDICT:judge:<n>`, the judge's seat number). `code` is the error's code or class name, never AI or vendor text. The judge is recorded as failed and its vote is missing; the debate goes on and the other judges' votes decide. With no judge left, the answer is chosen by its honest strength and labelled at most "Close call". | A single one: nothing. Many in a day: read the vendor's status and the runner's other lines from the same minutes. |
+| `DEBATEAI_RUNNER_SETTINGS {"releaseKey":…,"siteVersion":…,"loaded":[…],"unsupported":[…]}` (once, right after the runner's ready line; side-by-side §13) | The settings versions the runner preloaded at start-up: its release's own site version, the versions of its open debates and every version its release has passed a check of. `unsupported` lists, as `{"version","code"}`, a version this code cannot run. It never reads which version is active: only the debates' own stamps. | Nothing while `unsupported` is empty. A listed version is a defect to report: its debates are set aside (next row). |
+| `"kind":"DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED"`, with `version` and `code` (once per version), then with `runId`, `version`, `code` and `setAside` (once per debate) | A debate's settings version is one this release's code cannot run (`code` names the check that refused it; a detail the owner typed, such as a model name, is left out when it is not plainly a name). The first line comes from the runner's per-version cache; the second is about one debate, taken at its claim before any AI call. `"setAside":true`: this runner set it aside with its waiver: `RUN_SET_ASIDE:SETTINGS_VERSION_UNSUPPORTED` in the [table below](#what-the-asker-sees-when-a-debate-fails), and the asker kept the allowance. `"setAside":false`: nothing was written, because the debate was no longer this runner's (another copy holds it, or it had already ended); it is left to its holder. | Should never happen: a version is activated only after this release passed it. Keep both lines and report them; the asker asks again. |
 
-The API writes these related lines to its own journal (`journalctl -u debateai-api`), again with
+The API writes these related lines to its own journal (`journalctl -u 'debateai-api@*'`), again with
 ids and a bounded diagnostic only:
 
 | Signal | What it means | What to do |
@@ -1930,11 +2428,22 @@ ids and a bounded diagnostic only:
 | `"event":"api.disclosure.unreadable"`, with `diagnostic` | An answer's owner-side record exists but is corrupt: a floor without its label receipt (`SERVE_DISCLOSURE_ROW_INVALID`) or a stored cause outside the closed list (`SCHEMA_VALIDATION_ERROR`). The owner's page and the PDF then behave as if there were no record: no floor, no lower-cost note. A database outage is not this line; it stays a 500. | A defect to report, with the answer id from `pnpm ops:serve-disclosure`. |
 | `"event":"api.story.unreadable"`, with `diagnostic` | The story of an answer the caller owns could not be read, decrypted or derived (a database hiccup included). The route answers "unavailable" rather than an error; the owner's page asks again a few times, then shows the answer without its story. | A single one during a database hiccup is harmless. Repeated ones for the same answer are a defect to report. |
 | `"event":"api.ask.role_rotation_counts_unavailable"`, with `diagnostic` | Only while role rotation is on (the register's `answerRoleRotationPolicy` row). A new question needed the per-model role counts (`core.run_role_rotation`) to pick its writing and checking models, and they could not be read, most likely a database fault. The question was refused before any debate record was written, and the asker was asked to try again in a minute ("a model this debate needs cannot be reached right now"); no question is ever started without its picked models. | One: nothing. Several in a row: read the API's `api.request.failed` lines from the same minutes and check the database. |
-| `"event":"api.run.setup_failure_unrecorded"`, with `runId`, `reason` and `diagnostic` | A debate's start failed as for `RUN_SETUP_FAILED` above, and marking it failed failed too, most likely in the same database outage. The asker still got the original error. What happens next depends on `reason`. With `RUN_SETUP_FAILED:DISPATCH`, or `RUN_SETUP_FAILED:ADMISSION_RELEASE` while the budget rule's members are published, the debate was started or placed in the waiting line before the failure. A started one has its first job queued, but no runner may have been handed it: with the members published, the API's waker hands it to the job system again once it has waited five minutes (`api.wait.redispatched` with the same `runId`), and without them the next runner start does. A question placed in the line starts by itself when there is room. The debate then runs normally, and only once: a runner claims a job once. With `RUN_SETUP_FAILED:PLAN_CHANGED`, the question stays in the line only until a later tick manages to record it failed: its owner's plan no longer covers it, so it never starts. With any other reason the debate has no job, so nothing will ever start it, and it keeps showing as "generating" on its owner's page. | `DISPATCH` with the budget members published: nothing; the waker hands the job over again within about five minutes (if `api.wait.redispatch_failed` repeats with that `runId`, see that row). `DISPATCH` without them (this host until go-live line 13): `systemctl restart debateai-runner.service`; a runner start hands every queued job over. `ADMISSION_RELEASE` with the members published: nothing; the question starts by itself when there is room. `PLAN_CHANGED`: nothing; a later tick records the debate failed, so it never starts. `ADMISSION_RELEASE` without the members, and any other reason: the debate has no job and never starts; rare; report the `runId`. Nothing here closes that debate on its own. |
+| `"event":"api.run.setup_failure_unrecorded"`, with `runId`, `reason` and `diagnostic` | A debate's start failed as for `RUN_SETUP_FAILED` above, and marking it failed failed too, most likely in the same database outage. The asker still got the original error. What happens next depends on `reason`. With `RUN_SETUP_FAILED:DISPATCH`, or `RUN_SETUP_FAILED:ADMISSION_RELEASE` while the budget rule's members are published, the debate was started or placed in the waiting line before the failure. A started one has its first job queued, but no runner may have been handed it: with the members published, the API's waker hands it to the job system again once it has waited five minutes (`api.wait.redispatched` with the same `runId`), and without them the next runner start does. A question placed in the line starts by itself when there is room. The debate then runs normally, and only once: a runner claims a job once. With `RUN_SETUP_FAILED:PLAN_CHANGED`, the question stays in the line only until a later tick manages to record it failed: its owner's plan no longer covers it, so it never starts. With any other reason the debate has no job, so nothing will ever start it, and it keeps showing as "generating" on its owner's page. | `DISPATCH` with the budget members published: nothing; the waker hands the job over again within about five minutes (if `api.wait.redispatch_failed` repeats with that `runId`, see that row). `DISPATCH` without them (this host until go-live line 13): `systemctl restart debateai-runner@$label.service` when `unfinished` counts only those queued debates (a restart stops the debates the runner is running); a runner start hands every queued job over. `ADMISSION_RELEASE` with the members published: nothing; the question starts by itself when there is room. `PLAN_CHANGED`: nothing; a later tick records the debate failed, so it never starts. `ADMISSION_RELEASE` without the members, and any other reason: the debate has no job and never starts; rare; report the `runId`. Nothing here closes that debate on its own. |
 | `"event":"api.wait.redispatch_failed"`, with `runId` and `diagnostic` | The waker tried to hand a started debate's first job to the job system again (the job had waited five minutes, see the row above) and the job system refused. The job stays queued, its hold keeps counting, and the next tick tries again. Nothing is marked failed, because the job may already be on its way. | One: nothing. Every minute: the job system is not taking work. The `diagnostic` names the code; check `debateai-hatchet` and the API's `api.request.failed` lines, as for `RUN_SETUP_FAILED:DISPATCH`. |
 | `"event":"api.wait.preview_team_only"`, with `runId` | Private preview only (`PREVIEW_PROVIDER_TEST_CONFIG_JSON` set). The waker found a waiting question, or a started debate's first job still waiting for a runner, whose owner is not on the team (`PREVIEW_TEAM_USER_IDS_JSON`), or that belongs to a legacy asker. It was not started or handed over; it was recorded failed (`RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY`), so its owner reads "Something went wrong on our side before this debate began". With an empty team list nothing is started, handed over or failed, and no such line appears. Never on the real site. | Nothing; the rule worked. Many at once after a cutover: expected, they are the questions that waited from before it. If a team member's question shows here, their identity user id is missing from `PREVIEW_TEAM_USER_IDS_JSON`. The API's rule does not cover the runner's own start-up recovery, which hands every queued job over without a team check: start the runner only with an empty queue. |
 | `"event":"api.wait.start_failed"`, with `runId` and `diagnostic` | The waker tried to start a waiting question, and the attempt failed inside its locked transaction (most likely the database): before the room was measured, while starting it, or while recording why it still waits. Nothing of the start was written: no hold, no job, no start mark. The question stays in the line, in its place, and the next tick tries again. | One: nothing. Every minute for the same `runId`: that question cannot start, although the tick goes on to the questions behind it. Read the `diagnostic` and the API's `api.request.failed` lines from the same minutes. A typed code is a defect to report with the `runId`. |
+| `"event":"api.wait.release_not_served"`, with `runId`, `releaseKey` and `closed` | Side-by-side uploads. The waker tried to start a waiting question, or to hand a started debate's first job to the job system again, and the release that debate belongs to (`releaseKey`) no longer serves it: it is neither current nor draining (it retired, or root asked it to retire). Nothing was sent. With `closed` true the debate was recorded failed before it began (`RUN_SETUP_FAILED:RELEASE_NOT_SERVED`: its owner reads the "did not start" sentence) and its spend waiver was written, so it used none of the person's allowance. With `closed` false a runner had already taken the job, or it was already settled, and nothing was changed. The API's own `api.dispatch.release_not_served` line and one `DEBATEAI_RELEASE_NOT_SERVED` line per release per half hour come with it. | A few right after an upgrade: nothing, they are the older release's leftovers. Many, or for the current release: run `release.mjs status` and check that the current release is recorded current and its runner is up. |
+| `"event":"api.wait.readmission_failed"`, with `runId`, `newRunId` and `diagnostic` | Side-by-side uploads. The waker re-admitted a waiting question under the current release (its new debate `newRunId` was written), and starting that new debate then failed, most likely the database. The new debate never runs: it was recorded failed (`RUN_SETUP_FAILED:READMISSION`). The waiting question (`runId`) was not touched and keeps its place in line; the next tick re-admits it again. | One: nothing. Every minute for the same `runId`: read the `diagnostic` and the API's `api.request.failed` lines from the same minutes; a typed code is a defect to report with both ids. |
+| `"event":"api.wait.readmission_release_failed"`, with `runId`, `newRunId` and `diagnostic` | Side-by-side uploads. A waiting question was re-admitted and its new debate (`newRunId`) did start (its hold and first job are written); only letting go of the person's admission lock afterwards failed, most likely the database. Nothing is marked failed: the debate is under way, and if its first job stalls the waker hands it over again after five minutes (`api.wait.redispatched`). | One: nothing. Repeated: read the `diagnostic` and the API's `api.request.failed` lines from the same minutes, and check the database. |
+| `"event":"api.wait.readmission_orphans_unread"`, with `runId` and `diagnostic` | Side-by-side uploads. The waker looked for copies of a waiting question that were written but never started (to record them failed, so the question can be re-admitted) and could not read them, most likely the database. Nothing changed; a later tick looks again. | One: nothing. Every minute for the same `runId`: that question cannot be re-admitted; read the `diagnostic` and check the database. |
+| `"event":"api.release.no_site_cap"` (once, when the API starts; hosted only) | Side-by-side uploads. The pinned register version gives the API no room for new questions: no `costEnvelopePolicy` row, or one without the band (see [The band, holds and the waiting line](#the-band-holds-and-the-waiting-line-budget-rule-spec-2026-09-28)). Two side-by-side checks are made inside that room, so neither applies: the site's cap of 8 debates across both releases, and the hold that makes a new question wait (`SWITCHING`) while a switch moves the traffic away. New questions start as they did before the room. Nothing is refused. A local API never prints it. | Before an upgrade that runs two releases side by side, publish and pin a register version with the `costEnvelopePolicy` band, so the cap and the switch hold apply. Without the band, expect it at every start. |
 | `[ASK_WAITING_LINE_WAKE_PENDING]` (a bare marker, once a minute while it lasts) | A whole tick of the waker failed before it finished, most often because the database refused the line's own read. The marker carries no diagnostic. What the tick had already started stays started, and the next whole minute tries again. While it repeats, waiting questions may not start and stalled first jobs are not handed over again. | One: nothing. Every minute: the line has stopped draining. Check the database, and read the API's other lines from the same minutes. Once the database answers again, the next tick drains the line by itself. |
+| `{"kind":"DEBATEAI_ADMISSION_SETTINGS","code":"ADMISSION_SETTINGS_UNSUPPORTED"}`, with `version` and `cause` (side-by-side §13) | The API cannot admit questions on the active settings version (`cause`: the per-version loader's code). With a waiting line the question waits ("switching") and the waker starts it later; without one it gets the plain "try again in a minute" answer, nothing written or charged. | Should never happen after a passed check: report it. |
+| `{"kind":"DEBATEAI_ADMISSION_SETTINGS","code":"ADMISSION_SETTINGS_NOT_PASSED"}`, with `version` | A question without a waiting line met a settings version this release has not passed (a switch or an activation landed meanwhile): refused plainly, nothing written or charged. | Nothing: the person asks again. Many in a row: read `pnpm settings:status`. |
+| `{"kind":"DEBATEAI_ADMISSION_SETTINGS","code":"ADMISSION_ESTIMATOR_FALLBACK"}`, with `version` and `cause` (once per version) | The cost estimate for another debate's settings version could not be built, so it was priced on the asking version's terms. | Nothing unless it repeats for a version still in use: report it. |
+| `{"kind":"DEBATEAI_ADMISSION_SETTINGS","code":"ADMISSION_ACTIVE_VERSION_UNAVAILABLE"}`, with `version` and `reason` (at most once a minute, and once at start when the release is current) | New questions wait ("switching") because the current release has not passed the active settings version (`reason` `NOT_PASSED`) or the API cannot load it (`UNSUPPORTED`). | Activate a settings version this release has passed (deploy/preview-release/v1/README.md, "Settings and uploads"). |
+| `{"kind":"DEBATEAI_ADMISSION_SETTINGS","code":"ADMISSION_ACTIVE_VERSION_UNCHECKED"}`, with `version` and `cause` (once at start, current release only) | The start-up look at the active settings version could not finish (`cause` `UNTYPED`, most likely the database; `version` null when the pointer could not be read). The API starts anyway; the first question looks again. | Nothing unless it repeats at every start: check the database. |
+| `{"kind":"DEBATEAI_ADMISSION_SETTINGS","code":"ADMISSION_VIEW_FALLBACK"}`, with `version` and `cause` (once per version) | A page read (signing in, the ask form) could not load a newly active settings version or read the pointer (`version` null), most likely the database. The page got the settings it last showed (else the release's site version), never an error. | Nothing unless it repeats: check the database. |
 
 The story's other events carry codes only: `STORY_STORED` (every story, with its outcome),
 `STORY_LATER_ROUND_FAILED`, `STORY_MATERIAL_TOO_LARGE`, `STORY_SNAPSHOT_FAILED`,
@@ -1953,17 +2462,19 @@ so copy them in before upgrading.
 
 A failed debate's reason code is for operators. It stays in `core.work_item.terminal_reason`, in
 the `terminal_reason` field of `GET /v1/runs/:id` and in the logs above. The pages never show it.
-They show one of five fixed sentences in the reader's language instead, picked by the code's
+They show one of seven fixed sentences in the reader's language instead, picked by the code's
 group (`apps/ui/lib/v3/runFailure.ts`, words in `apps/ui/messages/<locale>/home.json` and
 `debateChrome.json` under `runFailure.*`). When an asker quotes a sentence, this table gives the codes
 to look for:
 
 | The asker sees (English) | Group | Reason codes |
 |---|---|---|
-| "Something went wrong on our side before this debate began. Please ask again." | `NOT_STARTED` | `RUN_SETUP_FAILED:<step>`, every step but `PLAN_CHANGED` (see the row above), and `RUN_ROLE_ASSIGNMENT_INVALID` (the runner, claiming the debate, found the model scorecard's role assignment pinned at the ask corrupt or unable to seat a debate; its job catch then overwrites it with `RUNNER_EXECUTION_FAILED:RUN_ROLE_ASSIGNMENT_INVALID`, and both forms read the same), and `RUN_ROLE_ROTATION_INVALID` (the same claim-time refusal for the role rotation pinned at the ask: unreadable, beside a scorecard assignment, or naming a model outside the debate's panel; both forms read the same) |
-| "Your paid plan ended or was paused while this question waited, so the debate didn't start. You can ask it again." | `PLAN_ENDED` | `RUN_SETUP_FAILED:PLAN_CHANGED` only, the whole code (see the row above): not a fault. With billing on, a paid question waited in line, and by the time there was room its owner was on Free, because the plan ended, was withdrawn or erased, or was paused by a card dispute. Nothing to do; the owner can ask again under the plan they have now. Every other `RUN_SETUP_FAILED:<step>` reads `NOT_STARTED`. |
+| "Something went wrong on our side before this debate began. Please ask again." | `NOT_STARTED` | `RUN_SETUP_FAILED:<step>`, every step but `PLAN_CHANGED` and `CHOICE_UNAVAILABLE` (see their rows), `RELEASE_NOT_SERVED` (side-by-side uploads: the release that took the question no longer serves it) and `READMISSION` (a waiting question's re-admission under a new release broke after its new run was made) included, and `RUN_ROLE_ASSIGNMENT_INVALID` (the runner, claiming the debate, found the model scorecard's role assignment pinned at the ask corrupt or unable to seat a debate; its job catch then overwrites it with `RUNNER_EXECUTION_FAILED:RUN_ROLE_ASSIGNMENT_INVALID`, and both forms read the same), and `RUN_ROLE_ROTATION_INVALID` (the same claim-time refusal for the role rotation pinned at the ask: unreadable, beside a scorecard assignment, or naming a model outside the debate's panel; both forms read the same) |
+| "Your paid plan ended or was paused while this question waited, so the debate didn't start. You can ask it again." | `PLAN_ENDED` | `RUN_SETUP_FAILED:PLAN_CHANGED` only, the whole code (see the row above): not a fault. With billing on, a paid question waited in line, and by the time there was room its owner was on Free, because the plan ended, was withdrawn or erased, or was paused by a card dispute. Nothing to do; the owner can ask again under the plan they have now. Every other `RUN_SETUP_FAILED:<step>` reads `NOT_STARTED`, except `CHOICE_UNAVAILABLE` (the next row). |
+| "The site was updated while your question waited, and one of the options you chose is no longer offered. Please ask it again. It did not use any of your allowance." | `CHOICE_GONE` | `RUN_SETUP_FAILED:CHOICE_UNAVAILABLE` only, the whole code: not a fault. Side-by-side uploads: a question waiting in line was re-admitted under a new release that no longer offers one of the choices it was asked with (a model, a depth, a length), so the old question is closed and nothing was charged (the waiver). The owner asks again. |
 | "This debate could not start because the AI models it needs were unavailable. Please try again in a while." | `MODELS_UNAVAILABLE` | `RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM`, `SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:<role>`. The runner writes these first, then its job catch overwrites them with `RUNNER_EXECUTION_FAILED:<the same code>` (the role is lost there). Both forms read the same. |
 | "This debate reached its limit before it could produce an answer." | `RUN_LIMIT_REACHED` | `RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL` (see the row above) |
+| "We could not finish this debate because of an update on our side. It did not use your allowance. Please ask your question again." | `SET_ASIDE` | `RUN_SET_ASIDE:<reason>`, any reason (as written; a wrapped `RUNNER_EXECUTION_FAILED:RUN_SET_ASIDE:<reason>` would read the same, but the runner writes none today): not a fault. Side-by-side uploads: the debate was set aside because of an upload, and each one has a spend waiver (`ledger.model_spend_waiver`) with the same reason, written with its FAILED row, so it used none of the person's allowance (the site's day total still counts the money). `RUN_SET_ASIDE:BACKSTOP` (waiver `BACKSTOP`: the old release's runner, told to retire (the backstop, 7.5 hours after the switch), set aside what it still had open), `RUN_SET_ASIDE:RELEASE_NOT_SERVED` (waiver `RELEASE_NOT_SERVED`: no runner serves the release the debate belongs to), `RUN_SET_ASIDE:OWNER_STOPPED` (waiver `OWNER_STOPPED`: the owner stopped it), `RUN_SET_ASIDE:SETTINGS_VERSION_UNSUPPORTED` (waiver `SETTINGS_VERSION_UNSUPPORTED`: its settings version is one this release cannot run. Settings changes without an upload (side-by-side §13): the runner takes the debate's claim, sets it aside with its waiver before any AI call, and prints one `DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED` journal line with the run id, the settings version and the check that refused it (`code`); the task's catch writes nothing over it, so it never reads `RUNNER_EXECUTION_FAILED:…`). A waiting question the API could not send, `RUN_SETUP_FAILED:RELEASE_NOT_SERVED`, never began and reads `NOT_STARTED`. The owner asks again. |
 | "This debate stopped partway because of a problem on our side. Please ask your question again." | `STOPPED` | Everything else: `CALL_BUDGET_EXHAUSTED` (a re-claim found a step's tries already used up), `RUNNER_EXECUTION_FAILED:RUNNER_TIME_LIMIT_REACHED` (the debate was stopped at its next model call because no call had finished for 60 minutes, or it had run past its six-hour ceiling; owner ruling 2026-10-11), `DAILY_COST_ENVELOPE_REACHED` and `PERSON_ALLOWANCE_REACHED` (with the budget members published they stop only the arguing and never end a debate; a question the day holds back waits in line, and its page says when it will start), every other `RUNNER_EXECUTION_FAILED:<diagnostic>`, older codes, and any code the table does not know |
 
 A code added to the engine lands in `STOPPED` until it is given a group of its own. The UI's test
@@ -2077,10 +2588,36 @@ rows a hosted start-up refuses without:
 sudo -u postgres psql -d debateai -c "SELECT register_version, row_key FROM register.register_row WHERE register_version = (SELECT max(register_version) FROM register.register_row) AND row_key IN ('costEnvelopePolicy', 'admissionPolicy', 'configuredProviderSet', 'publicationCheckPolicy', 'questionCheckPolicy') ORDER BY row_key"
 ```
 
-Five rows is the pass. Then set `REGISTER_VERSION` to that version in both `EnvironmentFile`s
-and restart both units.
+Five rows is the pass. Then make that version a new release (§5 "A new register version is a new release").
+
+### Settings activation (Phase 3)
+
+**Not used on this host yet.** From Phase 3 on, this server changes debate settings the way the preview does
+(`deploy/preview-release/v1/README.md`, "Changing debate settings without an upload"): publish a new settings version,
+check it against the live release, and after the owner's fresh yes make it the active version, with no restart and no
+new release. Debate settings only (models' roles, thinking levels, lengths, shape, per-debate budgets); a site rule
+(logins, rate limits, countries, plan prices, the daily budget, funding) still changes with a new release. Until Phase 3,
+`release.mjs switch` passes no expected settings value and activates nothing, `release.mjs switch --activate` refuses
+(`SETTINGS_OPERATOR_MISSING`), and `release.mjs check` prints `SETTINGS` as not planned on this server.
+
+The five commands, in this order (each one prints one content-free line):
+
+| Step | Command | Run as, from | Prints |
+|---|---|---|---|
+| 1 | `pnpm settings:check-runner <version>` | the runner's user, in the current release's runner folder, with its env files | `DEBATEAI_SETTINGS_CHECK {…}`: the runner half's dry boot (no AI call); exit 0 PASS, 1 FAIL, 2 could not check |
+| 2 | `pnpm settings:check-api <version>` | the API's user, in the current release's API folder, with its env files | `DEBATEAI_SETTINGS_CHECK {…}`: the API half's |
+| 3 | `pnpm settings:verdict --runner <file> --api <file>` (the two lines above, saved) | the release writers' principal (`postgres` through the local socket: libpq's `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`), in the API folder | `DEBATEAI_SETTINGS_VERDICT {…}`: the verdict recorded; exit 0 PASS, 1 FAIL |
+| – | the owner's **fresh** yes in the live chat, naming the version and the PASS | | |
+| 4 | `pnpm settings:activate <version> --by <owner> --reason "<why>" --seatable-env <file>` | as step 3 | `DEBATEAI_SETTINGS_ACTIVATED {…}`; refusals as `DEBATEAI_SETTINGS_REFUSED {…}` (exit 3 conflict, 4 not passed) |
+| 5 | `pnpm settings:status` | as step 3 | `DEBATEAI_SETTINGS_STATUS {…}`: the current release, the active version, what passed |
+
+`--seatable-env` names the release's line-up and target models (a usage error without it, never a silent skip). How
+this server, which has no spending gates, answers the gate part of the activation and writes that file is Phase 3's
+decision; until then nothing here activates. Going back is step 4 with the version before: a new row, never an edit.
 
 ### Upgrading to role rotation
+
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 Per-debate role rotation (spec 2026-10-11) gives each of a debate's four jobs (the answer writer, the answer
 checker, the storyteller and the story checker) to a model of that debate's own panel: the one that has done that
@@ -2102,7 +2639,7 @@ next start on this code:
    `/etc/debateai/register/hosted-register.json` (`deploy/vps/register/README.md`), then run the dry run and the
    publish exactly as above. The plan's `row_keys=` line names `answerRoleRotationPolicy`. Pin the version the publish
    prints as `REGISTER_VERSION` in both `EnvironmentFile`s.
-3. **Restart the API and the runner** (`systemctl restart debateai-api debateai-runner`). The API reads the setting at
+3. **Restart the API and the runner**, with `unfinished` at 0 (`systemctl restart debateai-api@$label debateai-runner@$label`). The API reads the setting at
    start-up; the runner never reads it, and a debate accepted before the restart keeps the roles it was given. A
    debate whose panel has models from two or more companies is rotated once the API runs the new version; a panel
    from one company keeps the fixed roles.
@@ -2511,8 +3048,30 @@ whether the company details are still in square brackets (§14.7). It never prin
 change:
 
 ```sh
-systemctl restart debateai-api
+systemctl restart debateai-api@$label
 ```
+
+**A renewal NETOPIA refused because of our own setup waits for you.** NETOPIA allows only 3 tries a day on a saved
+card, so when it refuses a renewal for our API key or a setting of our account (O3 `CHARGE_CREDENTIALS_REFUSED` or
+`CHARGE_CONFIGURATION_REFUSED`), the site does not try that renewal again by itself. The person keeps the plan for 72
+hours from the renewal date (for a payment retry, until the grace period ends, 8 days after the first failed payment);
+after that the paid features pause until the renewal goes through. Fix the cause as the
+O3 says (the key with `--replace netopia` above and a restart, or the setting in NETOPIA's admin), run the check
+command until every line shows a tick, then run this, which sends every renewal held like this once more:
+
+```sh
+systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:renewal-resume
+```
+
+It prints `Sent again: <n> held renewal(s) will each be tried once more within a minute (later if that card was already
+tried twice in the last 24 hours).`, or `Nothing to resume: no
+renewal is waiting for you.` when none is held, so running it twice sends nothing twice. Each renewal released gets a
+fresh 24 hours: one released after its 72 hours is still sent, and its paid features come back once it is paid. A
+`Busy:` line means some renewals were being worked on at that moment: run it again a minute later. If NETOPIA refuses
+again, you get a new O3 and the renewal waits again. While any renewal waits for you, the daily owner job reminds you
+(O3 `RENEWAL_HELD`, with both commands) every third day, and every day in the last 3 days before one can no longer be
+sent: the resume command reaches a renewal only in the 30 days after it was made. One older than that is not sent any
+more; the tax summary lists it with the payments to check (`PAYMENT_UNSETTLED`).
 
 The company's tax codes are not `api.env` settings. In `COMPANY` (`apps/ui/lib/legal/pages.ts`), fill `cui` with the
 CUI as digits only, never with `RO`, and `vat` with `{ kind: "registered", number: "RO…" }`, the RO VAT code (`RO`
@@ -2614,7 +3173,8 @@ pnpm register:publish-hosted --file /etc/debateai/register/hosted-register.json
 ```
 
 Copy the printed `REGISTER_VERSION=` line into both `api.env` and `runner.env`, then restart both. Every change
-below is the same: edit the file, dry-run, publish, pin, restart. A published version is never edited.
+below is the same: edit the file, dry-run, publish, pin, restart. A published version is never edited. On this
+host "pin, restart" is a new release with that version (§5 "A new register version is a new release").
 
 **A price change reaches only new subscriptions.** Each subscription keeps the net price it was sold at (its
 `recurring_net_micros`) and renews at that price plus the current tax. So a `billingPlans` version with a new price
@@ -2622,6 +3182,8 @@ reaches only new subscriptions; existing subscribers keep their price until a pr
 notice of Terms §12 exists (it is not built yet).
 
 #### Upgrading to Part C (migration 0113)
+
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 Part C prices every plan in RON, EUR and USD at once. Its migration `migrations/0113_billing_price_currencies.sql` adds
 each quote's currency and lets a charge be in RON or EUR as well as USD; Part C's code writes and reads that currency,
@@ -2640,7 +3202,7 @@ this code. The engine also refuses to start on a register version whose `billing
    The publish runs inside a migrator window (§4 steps 2 and 5): open one again for it, or do this step before
    closing the window in step 5.
 7. **Pin it**: copy the printed `REGISTER_VERSION=` line into both `api.env` and `runner.env`.
-8. **Restart both**: `systemctl restart debateai-api debateai-runner`.
+8. **Restart both**, with `unfinished` at 0: `systemctl restart debateai-api@$label debateai-runner@$label`.
 
 **Rolling back** past Part C: before restarting the older code, pin the register version it ran on (the one you
 replaced) in both `api.env` and `runner.env`, because the forward migration stays applied and older code refuses a v2
@@ -2675,6 +3237,38 @@ emails you at once (O4, at most one an hour) with the reason, the time and the c
 check command. The owner summary (`pnpm billing:tax-summary`, **The tax summary** in §14.8) counts the kept messages by
 the day they arrived, and every message that does not pass writes the journal line `billing.notice.unverified` (§14.8).
 
+**When the database cannot store a message that passed.** NETOPIA sends the saved card only in its first message about
+a payment; the copies it sends again (5 of them, 5 minutes apart) carry no card. So the API can keep such a message on
+disk, sealed with the records key, and store it later: at its next start and every 10 minutes, it checks each kept
+message again with its current keys, stores it, and deletes the file; a file it cannot read or check is deleted after
+14 days. NETOPIA is still answered `503`, so its copies keep coming as before. To switch this on (once, on the server,
+from the checkout as in §5), run these in order:
+
+```sh
+install -d -m 0700 -o debateai-api -g debateai-api /var/lib/debateai/api/billing-notice-spool
+stat -c '%a %U %G %n' /var/lib/debateai/api/billing-notice-spool
+install -m 0644 deploy/vps/systemd/debateai-api@.service /etc/systemd/system/
+systemctl daemon-reload
+systemctl show -p ReadWritePaths debateai-api@$label
+grep -q '^BILLING_NOTICE_SPOOL_PATH=' /etc/debateai/api.env || printf '\nBILLING_NOTICE_SPOOL_PATH=%s\n' /var/lib/debateai/api/billing-notice-spool >> /etc/debateai/api.env
+grep -c '^BILLING_NOTICE_SPOOL_PATH=' /etc/debateai/api.env
+systemctl restart debateai-api@$label
+```
+
+`stat` prints `700 debateai-api debateai-api`. `systemctl show` must list `/var/lib/debateai/api/billing-notice-spool`
+(with a leading `-`): the unit installed before this release does not let the API write there, and then the API refuses
+to start with `BILLING_NOTICE_SPOOL_PATH_INVALID`. The `printf` line starts on a new line and adds nothing when the line
+is already there, so the last `grep` prints `1`. Without the line the API works as before and writes one
+`billing.notice.spool_off` line at each start; with a path that is not a folder the API can write, it refuses to start
+with `BILLING_NOTICE_SPOOL_PATH_INVALID` (create the folder, or remove the line, then restart). The private test site
+(v3-preview) runs from the preview kit, not this unit: its steps are `deploy/preview-release/v1/README.md` H9.
+
+**When the whole site is down.** The spool cannot help when the API itself (or the server) is down: then nothing
+answers NETOPIA, and after its 5 copies (about 25 minutes) a first payment's card code is gone. The alarm in
+`deploy/notify-alarm/README.md` knocks on this address every 5 minutes and has an outside service (Healthchecks.io)
+email you when it stops answering, or when the knocks stop reporting. Set it up the day billing goes on (go-live row
+75).
+
 ### 14.6 Switching a country's payments on
 
 A country in the "pay off until the tax registration is done" group opens like this:
@@ -2684,6 +3278,19 @@ A country in the "pay off until the tax registration is done" group opens like t
 3. Publish as in §14.4.
 
 Signing up stays as it was. A country can never have `pay: true` with `signup: false`; the publish refuses it.
+
+**Opening a region.** Some regions of an open country stay closed for payment until the company registers for tax
+there: for example Maryland (`US-MD`), Saskatchewan (`CA-SK`) or the Canary Islands (`ES-CN`). They are listed in
+`countryPolicy.regions`; the full launch list is in `deploy/vps/register/README.md`, "Closing payment in a region".
+People there can sign up and use Free; only paying is refused. To open one:
+
+1. Register for tax there.
+2. In the file's `countryPolicy.regions`, delete that region's entry. (Ohio, `US-OH`, is closed for business buyers
+   only; deleting its entry opens it for them too.)
+3. Publish as in §14.4. The new version replaces the old one; a sealed version is never edited.
+
+The publish refuses a region id the code does not know, and a region entry with `signup` or `blocked`: a region
+never closes sign-up.
 
 ### 14.7 The company details and the card marks
 
@@ -2713,17 +3320,37 @@ the company's name (`legalName`), its registered office (`registeredOffice`) and
 (`emails.general`), so until each is filled the API refuses with `BILLING_COMPANY_FACTS_UNVERIFIED:legalName`,
 `BILLING_COMPANY_FACTS_UNVERIFIED:registeredOffice` or `BILLING_COMPANY_FACTS_UNVERIFIED:emails.general`.
 
-**The card marks and NETOPIA's mark.** Put the official Visa and Mastercard artwork at
-`apps/ui/public/payment-marks/visa.svg` and `apps/ui/public/payment-marks/mastercard.svg`. The footer shows a mark only
-when its file is there. The website reads
-the list of files in that folder only when it starts, so after copying the files in, restart it with
-`systemctl restart debateai-ui`. Until then the footer shows them as broken images. No rebuild is needed.
+**NETOPIA's mark and the card marks.** NETOPIA's shop approval asks for NETOPIA's own mark beside the Visa and
+Mastercard marks, in the footer and on the checkout (under its Continue button). Their official files are never in the
+repository or a release folder: the repository is public, the brands' terms forbid redistributing their artwork, and a
+release folder must equal git exactly. Root keeps them in `/etc/debateai/payment-marks/` as `netopia.svg`, `visa.svg`
+and `mastercard.svg`, and Caddy serves them at `/payment-marks/<name>.svg` (§6).
 
-NETOPIA's shop approval also asks for NETOPIA's own mark beside the card marks, in the footer and on the checkout.
-Keep its official artwork at `apps/ui/public/payment-marks/netopia.svg` with the other two. The footer and the checkout
-(under its Continue button) show NETOPIA's mark first, then Visa and Mastercard, each only when its file is there, so
-put all three files in place, and restart the website as above, before NETOPIA checks the site (go-live rows 17 and
-N-23).
+On the public server, as root, create the folder once with
+`install -d -m 0755 -o root -g root /etc/debateai/payment-marks`. Then copy each official file in, for example
+`install -m 0644 -o root -g root <file> /etc/debateai/payment-marks/visa.svg`, where `<file>` is the official file
+you received. Do the same for `/etc/debateai/payment-marks/mastercard.svg` and
+`/etc/debateai/payment-marks/netopia.svg`. Once §6's rule is live, Caddy serves a file as soon as it is there, with
+no restart. Run §6's check for each file (with its own name in place of `visa.svg`), and add a name to
+`PAYMENT_MARKS_AVAILABLE` below only once its check prints `200` as the first field.
+
+Then tell the website which marks to show: add one line to `/etc/debateai/ui.env` that names the marks whose files are
+in the folder, separated by commas, for example `PAYMENT_MARKS_AVAILABLE=visa,mastercard`. The website reads this line
+only when it starts. So restart the current release's website (`systemctl restart debateai-ui@$label`, §5 "The
+current release"; its pages wait a few seconds while it starts), or let the next release pick the line up. Then look
+at the footer of any page and at the checkout.
+
+A name in the line whose file is not in the folder shows a broken image, so copy the file in first and add its name
+after. The order of the names does not matter: the footer and the checkout always show NETOPIA's mark first, then
+Visa and Mastercard. When NETOPIA's official logo arrives, copy it in as `netopia.svg`, then add `netopia` to the
+line (`PAYMENT_MARKS_AVAILABLE=netopia,visa,mastercard`) and restart the website as above. All three must show before
+NETOPIA checks the site (go-live rows 17 and N-23).
+
+**On the test site** the folder is `/etc/debateai-v3-preview/public/payment-marks/`. The preview release guide
+(`deploy/preview-release/v1/README.md`, section "Payment marks: the files and Caddy's rule") has the steps: PM1 copies
+the files in, PM2 adds Caddy's rule, and SB5b adds the line to the new release's own ui file. Never add the line to
+the ui file of a release older than T+1 (the guide's "Side-by-side release (from T+1)"): its website would refuse to
+start.
 
 **What NETOPIA checks on the site before it approves the shop.** NETOPIA looks at the live site (or at the test
 server, if it agrees: go-live row N-26) before it lets the POS take real payments. Make sure each of these is there and
@@ -2750,7 +3377,7 @@ version the person accepted from there, even after the Terms change. The site li
 
 **Switching billing on.** Before this, make sure:
 
-- every row of the go-live checklist from 13 to 74 is proven (its last column holds the proof), the void rows (20, 40
+- every row of the go-live checklist from 13 to 75 is proven (its last column holds the proof), the void rows (20, 40
   and 46) excepted. Some proofs can be read only after the switch-on: they are proven right after it, and their Proof
   cells are filled then. These are parts of four rows' "How to prove it" cells: row 17, the footer of `/pricing` on the
   live site; row 18, the API's start with billing on; row 19, the first real payment's message; row 23, the check run
@@ -2835,7 +3462,7 @@ bash /opt/debateai/dialectical-engine/deploy/vps/billing-setup.sh --replace smar
 ```
 
 ```sh
-systemctl restart debateai-api
+systemctl restart debateai-api@$label
 ```
 
 The API checks this itself at start-up: pointed at live while a sandbox plan, charge or queued job is still open, it
@@ -2903,7 +3530,8 @@ case.
 Run the same check again after the publish, just before you copy its `REGISTER_VERSION=` line into both files and
 restart the two services (§14.4): a question can join the line in the minutes between. If it is not 0 then, pin
 nothing yet: any restart, including systemd's own after a failure, starts the services on the version the files name.
-Wait for the line to empty, check again, then pin and restart.
+Wait for the line to empty, check again, then pin and restart. Here, as everywhere on this host, pinning and
+restarting is a new release with the published version (§5 "A new register version is a new release").
 
 On a host without the band, you can instead publish the band (the three members of go-live line 13, with
 `askRoomReads`, the room read's budget, which every version with the band needs) in the same version that switches
@@ -3199,7 +3827,14 @@ paid, refused, or unknown to NETOPIA at the end of its window (3 days for a rene
 NETOPIA confirms it holds is never closed as failed: the plan stays held and you are emailed (O3
 `RENEWAL_OUTCOME_OPEN`); look it up in NETOPIA's admin.
 
-**What billing writes to the API's journal** (`journalctl -u debateai-api`). The renewal pass runs every minute, the
+**A first payment that brought no saved card.** NETOPIA sends the saved card only once, in its first message about a
+payment. If no card has reached the site 30 minutes after a plan started, the plan still works, and you are emailed
+once for that plan (O3 `FIRST_PAYMENT_NO_CARD`). About 10 days before its renewal the person is asked to add a card.
+On the test site this is expected until NETOPIA turns on sending the card for our test account; on the live site, do
+what the O3 says. A plan is reported only within 7 days of its start, so plans older than that when this check shipped
+are not reported.
+
+**What billing writes to the API's journal** (`journalctl -u 'debateai-api@*'`). The renewal pass runs every minute, the
 status reads against NETOPIA every 10 minutes (each payment is read at its own times, by the spec's §2.14), the
 saved-card upkeep once a day, and the job queue (payment checks, refunds, invoices, credit notes and emails) every 5
 seconds. A marker in square brackets carries no detail; a line with `"event"` names what happened in its other
@@ -3212,14 +3847,16 @@ signals that matter:
 | `"event":"billing.renewal.report"`, with `failed`, `taxRefused` and `codes` | One line for a minute's pass that had trouble. `failed` counts the renewals (or the pass's own steps) that failed, and `codes` lists their distinct codes, for example `TAX_SERVICE_UNAVAILABLE` while the tax service is down, which the 3 days above cover (a NETOPIA outage at the renewal's charge is not counted here: it writes `"event":"billing.renewal.unknown"` instead). `taxRefused` counts renewals the tax service refused to price (a wrong or revoked Quaderno key, or a request it rejects): those are not an outage, so nobody is charged, no retry email goes out, and each such renewal also writes `"event":"billing.renewal.tax_refused"` once per period with Quaderno's code. | `failed` during a known outage: nothing. The same code minute after minute with no outage: read the API's other lines from the same minutes, and report the code. Any `taxRefused`: check the Quaderno key file and the Quaderno account at once; fix the key, restart `debateai-api`, and the next pass prices those renewals again. |
 | `[BILLING_RENEWAL_PENDING]` (a bare marker) | The renewal pass catches each of its three steps and reports their failures in the `billing.renewal.report` line, so in practice this marker means the billing upkeep stopped before it finished, most often because the database did not answer. The upkeep is the period-end sweep, the payment retries and the reminders, which the renewal timer runs at most every 10 minutes. It carries no diagnostic. Its next try is the next upkeep, 10 minutes later. | One: nothing. Again at each upkeep, usually with a `billing.renewal.report` line every minute: the database is failing. Check it and the API's other lines from the same minutes; once the database answers, the next pass catches up by itself. |
 | `"event":"billing.renewal.tax_refused"`, with `code` `TAX_SERVICE_REFUSED` and `reason` | The tax service (Quaderno) refused to price one subscription's renewal: a wrong or revoked Quaderno key (`reason` `QUADERNO_HTTP_401` or `QUADERNO_HTTP_403`), or a request it rejects. One line per subscription and period (again after a restart of the API). That is not an outage: nobody is charged, no "payment failed" email goes out, and the renewal is priced again every minute. An active plan is kept, as in an outage, for up to 3 days past its due time; after that the person is on Free until it prices again. The owner summary lists it as `RENEWAL_BLOCKED`. | At once: check the Quaderno key file and the Quaderno account; fix the key and restart `debateai-api`, and the next pass prices those renewals again (as for `taxRefused` in the `billing.renewal.report` row). |
-| `"event":"billing.renewal.unknown"`, with `attempt` and `code` | A renewal's charge (`attempt` 1) or a payment retry's (2 and up) got no clear answer from NETOPIA. `CHARGE_NOT_SENT`: NETOPIA did not answer, or limited our calls, so nothing was charged. `CHARGE_CREDENTIALS_REFUSED`: NETOPIA refused our key (with a `billing.payment.credentials_refused` line). `CHARGE_CONFIGURATION_REFUSED`: NETOPIA refused the request for a setting of our account; nothing was charged, and you get O3 at once. `CHARGE_OUTCOME_UNKNOWN`, `CHARGE_ORDER_EXISTS` (NETOPIA said it already holds that order, but gave no payment with it), or `SUBMIT_INTERRUPTED` (the call was cut off, for example by a restart): the card may have been charged. The site reads that order's status at NETOPIA before anything else, so one that went through is never charged a second time. The renewal itself keeps the plan meanwhile, for up to 3 days past its due time; a payment retry runs on the plan's grace. | During a known NETOPIA outage, or a single line: nothing; the site catches up by itself. `CHARGE_CREDENTIALS_REFUSED`: the `billing.payment.credentials_refused` row, below. `CHARGE_CONFIGURATION_REFUSED`: read the O3 and fix the setting in NETOPIA's admin with NETOPIA. The same code for hours with no known outage: report it. |
-| `"event":"billing.renewal.pending"`, with `code` | Something outside the plan holds up its renewal, so the plan is kept for up to 3 days past its due time, with no email: the tax service is down (`TAX_SERVICE_UNAVAILABLE`), NETOPIA did not answer, refused our key or a setting, or lost a charge's answer (`CHARGE_NOT_SENT`, `CHARGE_CREDENTIALS_REFUSED`, `CHARGE_CONFIGURATION_REFUSED`, `CHARGE_OUTCOME_UNKNOWN`, `CHARGE_ORDER_EXISTS`, `SUBMIT_INTERRUPTED`), the tax service refused the price (`TAX_SERVICE_REFUSED`), an upgrade of the same month is still waiting for its payment (`UPGRADE_UNSETTLED`), or NETOPIA answered the renewal's charge but its payment check has not settled it yet: the payment is still in 3-D Secure or in progress, or NETOPIA could not be read (`PAYMENT_NOT_VERIFIED`). One line per plan and period. | Nothing on its own: **When NETOPIA or the tax service is down at a renewal**, above, says what follows. `PAYMENT_NOT_VERIFIED`: its payment check settles it, and a renewal charge still without an outcome 30 days after it was made is counted by `billing.reconcile.expired`. `TAX_SERVICE_REFUSED`: the `billing.renewal.tax_refused` row. Many lines with no known outage: read the API's other lines from the same minutes, and report the codes. |
-| `"event":"billing.renewal.stuck"`, with `attempt` and `code` | A renewal's charge (or a payment retry's) was given up and closed as failed (`NO_TRANSACTION`) past its time (the renewal: 3 days past its due time; a payment retry: 24 hours): it never reached NETOPIA (`CHARGE_NOT_SENT`: NETOPIA did not answer for the whole time), its answer was lost and NETOPIA knew no such order at the end (`CHARGE_OUTCOME_UNKNOWN`), or NETOPIA had answered its charge but knew no such order at its deadline (`PAYMENT_NOT_FOUND`). The normal failed-payment path starts: the plan is past due, the person gets the payment emails, and after the last retry the plan moves to Free. An order NETOPIA confirms it holds is never closed this way (`billing.renewal.outcome_open`), and neither is a charge NETOPIA refused for our key or a setting of our account. Only with `CHARGE_OUTCOME_UNKNOWN` does the owner summary list it, as `RENEWAL_STUCK`. A `CHARGE_NOT_SENT` one charged nothing and is not listed there. | `CHARGE_OUTCOME_UNKNOWN`: check in NETOPIA's admin that no payment of that order exists, and report what you find with the charge reference the summary's `RENEWAL_STUCK` line names. `PAYMENT_NOT_FOUND`: check in NETOPIA's admin for a renewal payment of that time, and report what you find with the time of the line. `CHARGE_NOT_SENT`: nothing was charged; read the lines before it (a NETOPIA outage) and fix what they say. |
-| `"event":"billing.renewal.outcome_open"`, with `attempt` | A renewal's charge (or a retry's) is still open at the end of its window, and it is not closed: NETOPIA holds that order (still pending, or confirmed without its payment), its status could not be read, or NETOPIA refused the charge for our key or a setting of our account. The plan stays held, the order is read (or the charge tried) again every hour, and you got O3 `RENEWAL_OUTCOME_OPEN` once for that charge. It also comes once when a due payment retry finds an earlier attempt of the same month still pending at NETOPIA. | Look the order up in NETOPIA's admin by the charge reference the O3 names, and report what you find. A key or settings refusal: fix it as its own O3 (`CHARGE_CREDENTIALS_REFUSED` or `CHARGE_CONFIGURATION_REFUSED`) said, and the hourly tries go on. |
-| `"event":"billing.renewal.retry_held"`, with `code` | A payment retry was not made this pass: an earlier attempt of the same month was found paid (`EARLIER_ATTEMPT_PAID`), NETOPIA still reports it pending or authorised (`EARLIER_ATTEMPT_PENDING`: the retry waits until NETOPIA reports a final status for that order), or its status could not be read (`EARLIER_ATTEMPT_UNREADABLE`). The site never charges a month twice. | `EARLIER_ATTEMPT_PAID`: nothing; the month is settled. `EARLIER_ATTEMPT_PENDING`: do what the O3 `RENEWAL_OUTCOME_OPEN` email for that charge says. `EARLIER_ATTEMPT_UNREADABLE` again and again: the `billing.reconcile.status_failed` row. |
+| `"event":"billing.renewal.unknown"`, with `attempt` and `code` | A renewal's charge (`attempt` 1) or a payment retry's (2 and up) got no clear answer from NETOPIA. `CHARGE_NOT_SENT`: NETOPIA did not answer, or limited our calls, so nothing was charged. `CHARGE_CREDENTIALS_REFUSED`: NETOPIA refused our key (with a `billing.payment.credentials_refused` line). `CHARGE_CONFIGURATION_REFUSED`: NETOPIA refused the request for a setting of our account; nothing was charged, and you get O3 at once. After either refusal the charge is not tried again by itself: it waits for you. `CHARGE_OUTCOME_UNKNOWN`, `CHARGE_ORDER_EXISTS` (NETOPIA said it already holds that order, but gave no payment with it), or `SUBMIT_INTERRUPTED` (the call was cut off, for example by a restart): the card may have been charged. The site reads that order's status at NETOPIA before anything else, so one that went through is never charged a second time. The renewal itself keeps the plan meanwhile, for up to 3 days past its due time; a payment retry runs on the plan's grace. | During a known NETOPIA outage, or a single line: nothing; the site catches up by itself. `CHARGE_CREDENTIALS_REFUSED`: the `billing.payment.credentials_refused` row, below. `CHARGE_CONFIGURATION_REFUSED`: read the O3 and fix the setting in NETOPIA's admin with NETOPIA. After either, run `pnpm billing:renewal-resume` to send the held renewals once more (**A renewal NETOPIA refused because of our own setup waits for you**, §14.2). `CHARGE_NOT_SENT` for hours with no known outage: report it. |
+| `"event":"billing.renewal.pending"`, with `code` | Something outside the plan holds up its renewal, so the plan is kept for up to 3 days past its due time, with no email: the tax service is down (`TAX_SERVICE_UNAVAILABLE`), NETOPIA did not answer, refused our key or a setting, or lost a charge's answer (`CHARGE_NOT_SENT`, `CHARGE_CREDENTIALS_REFUSED`, `CHARGE_CONFIGURATION_REFUSED`, `CHARGE_OUTCOME_UNKNOWN`, `CHARGE_ORDER_EXISTS`, `SUBMIT_INTERRUPTED`), the tax service refused the price (`TAX_SERVICE_REFUSED`), an upgrade of the same month is still waiting for its payment (`UPGRADE_UNSETTLED`), the saved card was already tried twice in the last 24 hours (`SAVED_CARD_DAILY_LIMIT`: the `billing.renewal.send_capped` row), or NETOPIA answered the renewal's charge but its payment check has not settled it yet: the payment is still in 3-D Secure or in progress, or NETOPIA could not be read (`PAYMENT_NOT_VERIFIED`). One line per plan and period. | Nothing on its own: **When NETOPIA or the tax service is down at a renewal**, above, says what follows. `PAYMENT_NOT_VERIFIED`: its payment check settles it, and a renewal charge still without an outcome 30 days after it was made is counted by `billing.reconcile.expired`. `TAX_SERVICE_REFUSED`: the `billing.renewal.tax_refused` row. Many lines with no known outage: read the API's other lines from the same minutes, and report the codes. |
+| `"event":"billing.renewal.stuck"`, with `attempt` and `code` | A renewal's charge (or a payment retry's) was given up and closed as failed (`NO_TRANSACTION`) past its time (the renewal: 3 days past its due time; a payment retry: 24 hours): it never reached NETOPIA (`CHARGE_NOT_SENT`: NETOPIA did not answer for the whole time), its answer was lost and NETOPIA knew no such order at the end (`CHARGE_OUTCOME_UNKNOWN`), or NETOPIA had answered its charge but knew no such order at its deadline (`PAYMENT_NOT_FOUND`). The normal failed-payment path starts: the plan is past due, the person gets the payment emails, and after the last retry the plan moves to Free. An order NETOPIA confirms it holds is never closed this way (`billing.renewal.outcome_open`), and neither is a charge NETOPIA refused for our key or a setting of our account. `CHARGE_RESUMED`: a renewal the owner's resume command released could not be sent for its whole fresh day. Only with `CHARGE_OUTCOME_UNKNOWN` does the owner summary list it, as `RENEWAL_STUCK`. A `CHARGE_NOT_SENT` one charged nothing and is not listed there. | `CHARGE_OUTCOME_UNKNOWN`: check in NETOPIA's admin that no payment of that order exists, and report what you find with the charge reference the summary's `RENEWAL_STUCK` line names. `PAYMENT_NOT_FOUND`: check in NETOPIA's admin for a renewal payment of that time, and report what you find with the time of the line. `CHARGE_NOT_SENT`: nothing was charged; read the lines before it (a NETOPIA outage) and fix what they say. |
+| `"event":"billing.renewal.outcome_open"`, with `attempt` | A renewal's charge (or a retry's) is still open at the end of its window, and it is not closed: NETOPIA holds that order (still pending, or confirmed without its payment), or its status could not be read. The plan stays held, the order is read again every hour, and you got O3 `RENEWAL_OUTCOME_OPEN` once for that charge. It also comes once when a due payment retry finds an earlier attempt of the same month still pending at NETOPIA. | Look the order up in NETOPIA's admin by the charge reference the O3 names, and report what you find. A charge NETOPIA refused for our key or a setting of our account never comes here: it waits for you (**A renewal NETOPIA refused because of our own setup waits for you**, §14.2). |
+| `"event":"billing.renewal.retry_held"`, with `code` | A payment retry was not made this pass: an earlier attempt of the same month was found paid (`EARLIER_ATTEMPT_PAID`), NETOPIA still reports it pending or authorised (`EARLIER_ATTEMPT_PENDING`: the retry waits until NETOPIA reports a final status for that order), or its status could not be read (`EARLIER_ATTEMPT_UNREADABLE`), or the saved card was already tried twice in the last 24 hours (`SAVED_CARD_DAILY_LIMIT`). The site never charges a month twice. | `EARLIER_ATTEMPT_PAID`: nothing; the month is settled. `SAVED_CARD_DAILY_LIMIT`: nothing; a later pass tries again. `EARLIER_ATTEMPT_PENDING`: do what the O3 `RENEWAL_OUTCOME_OPEN` email for that charge says. `EARLIER_ATTEMPT_UNREADABLE` again and again: the `billing.reconcile.status_failed` row. |
+| `"event":"billing.renewal.send_capped"`, with `attempt` | A charge of the saved card was not sent now because that card was already tried twice in the last 24 hours. NETOPIA allows at most 3 tries of a saved card a day, so the site keeps one spare. A try that never reached NETOPIA (it was down or busy) does not count, and a new card starts from zero. The charge goes out on a later pass, once the older try is more than a day old; until then the line comes again at most once an hour for that plan and try (a restart of the API can bring one more). A renewal's plan stays held meanwhile (`billing.renewal.pending`); a payment retry's plan keeps its usual grace. | Nothing on its own. Many lines for many plans at once: read the lines before them (NETOPIA answers lost again and again), and report the codes. |
+| `"event":"billing.renewal.resumed"`, with `resumed` and `busy` | You ran `pnpm billing:renewal-resume`. `resumed` counts the renewals NETOPIA had refused for our key or a setting of our account that were released for one more try (the renewal pass sends each within a minute); `busy` counts open renewals that were being worked on at that moment and were not looked at. One line per run. | Nothing on its own. `busy` above 0: run the command again a minute later. A released renewal NETOPIA refuses again brings a new O3: fix what it says before the next run. |
 | `"event":"billing.renewal.refunded_before_seen"`, with `attempt`, and `voided` when NETOPIA reported the payment cancelled | NETOPIA reports a renewal's payment (or a payment retry's) refunded before the site saw it paid: a refund made in NETOPIA's admin before any of the site's reads saw the payment. The site records the money as NETOPIA shows it (paid, then refunded) and takes the refund as you giving that month back. With `voided`, NETOPIA reported the renewal's payment cancelled (status 4) before it was ever seen paid: the money never moved (the charge is closed `VOIDED`), and since NETOPIA cannot yet tell your cancellation in its admin from any other, the site takes it the same way, never as a failed payment to retry: the plan ends now, the account is on Free, the person gets no email from the site and is never charged for that month again. When the plan was no longer renewing that month (it had already ended, a dispute had paused it, or another payment had renewed it), nothing about the plan changes, and the O3 says so. You got O3 `RENEWAL_REFUNDED_BEFORE_SEEN` once for that charge. | Do what the O3 `RENEWAL_REFUNDED_BEFORE_SEEN` for that charge says. If it says the plan has ended, tell the person yourself; if they should keep it, they can subscribe again. If it says no plan changed, look at the plan and the payment in NETOPIA's admin before telling the person anything. |
-| `"event":"billing.payment.failed"`, with `chargeKind` and `code` | A charge was closed as failed. `chargeKind` names it: `INITIAL` (a checkout), `RENEWAL` (a renewal or a payment retry), `UPGRADE` or `CARD_CHECK` (a card change). From a payment check: `PAYMENT_DECLINED` (the card was declined), `PAYMENT_FAILED`, `PAYMENT_EXPIRED` (the payment page expired unpaid), `VOIDED` (NETOPIA cancelled a payment that had not gone through) or `CARD_NOT_SAVED` (a card change whose payment saved no card, for example a wallet). From a renewal or a payment retry: `PAYMENT_DECLINED` (the bank declined the saved card), `AUTHENTICATION_REQUIRED` (the bank asked for its 3-D Secure check, which nobody can answer for a monthly payment), `PAYMENT_FAILED`, `PAYMENT_EXPIRED` or `VOIDED` (as NETOPIA reported the charge; a renewal's `VOIDED` never starts the failed-payment path: the `billing.renewal.refunded_before_seen` row, with `voided`), `CARD_NOT_SAVED` (the plan had no usable saved card or billing details, so nothing was sent), or `NO_TRANSACTION`, which follows a `billing.renewal.stuck` line, or closes a renewal charge none of whose calls reached NETOPIA once its plan is no longer to be charged (cancelled, ended, or already moved on). A request NETOPIA refuses for our own setup is never closed as failed: it is the `billing.renewal.unknown` row's `CHARGE_CONFIGURATION_REFUSED`. A declined checkout changes nothing, and the person may try again on NETOPIA's page; a failed renewal starts the normal failed-payment path (the plan is past due, the payment retries with their emails, then Free). | A decline: nothing; the person is told, and for a renewal the payment retries follow. `CARD_NOT_SAVED` on a renewal: nothing; the person gets the payment emails and can change the card in Settings. `NO_TRANSACTION`: the `billing.renewal.stuck` row; with no `billing.renewal.stuck` line just before it, no call reached NETOPIA, nothing was charged, and nothing is needed. The same code on many renewals at once: report it at once, with the code. |
-| `"event":"billing.renewal.dunning_unpriced"`, with `attempt` and `code` | A renewal (`attempt` 1) or a payment retry could not be priced, so that attempt was counted as failed with nothing charged. `TAX_SERVICE_UNAVAILABLE`: the tax service stayed down 3 days past the renewal's due time, or at a payment retry. `RETRY_TOTAL_CHANGED`: a retry was priced again at a total the person was never told about (a tax change). The person gets the payment emails, and after the last retry day the plan moves to Free. The owner summary lists it as `DUNNING_UNPRICED`, or `ENDED_UNPRICED` once the plan has ended. | `TAX_SERVICE_UNAVAILABLE`: check Quaderno's status page and your Quaderno account; the next retry prices again once it answers. `RETRY_TOTAL_CHANGED`: nothing to fix; the person can subscribe again at the new price. Any other code: report it. |
+| `"event":"billing.payment.failed"`, with `chargeKind` and `code` | A charge was closed as failed. `chargeKind` names it: `INITIAL` (a checkout), `RENEWAL` (a renewal or a payment retry), `UPGRADE` or `CARD_CHECK` (a card change). From a payment check: `PAYMENT_DECLINED` (the card was declined), `PAYMENT_FAILED`, `PAYMENT_EXPIRED` (the payment page expired unpaid), `VOIDED` (NETOPIA cancelled a payment that had not gone through) or `CARD_NOT_SAVED` (a card change whose payment saved no card, for example a wallet). From a renewal or a payment retry: `PAYMENT_DECLINED` (the bank declined the saved card), `AUTHENTICATION_REQUIRED` (the bank asked for its 3-D Secure check, which nobody can answer for a monthly payment), `PAYMENT_FAILED`, `PAYMENT_EXPIRED` or `VOIDED` (as NETOPIA reported the charge; a renewal's `VOIDED` never starts the failed-payment path: the `billing.renewal.refunded_before_seen` row, with `voided`), `CARD_NOT_SAVED` (the plan had no usable saved card or billing details, so nothing was sent), or `NO_TRANSACTION`, which follows a `billing.renewal.stuck` line, or closes a renewal charge none of whose calls reached NETOPIA once its plan is no longer to be charged (cancelled, ended, or already moved on). A request NETOPIA refuses for our own setup is never closed as failed: it is the `billing.renewal.unknown` row's `CHARGE_CONFIGURATION_REFUSED`. A declined checkout changes nothing, and the person may try again on NETOPIA's page; a failed renewal starts the normal failed-payment path (the plan is past due, the payment retries with their emails, then Free). | A decline: nothing; the person is told. For a renewal the payment retries follow only after NETOPIA's code 20 (not enough money) or our own failure; otherwise the person is asked to add a card. `CARD_NOT_SAVED` on a renewal: nothing; the person gets the payment emails and can change the card in Settings. `NO_TRANSACTION`: the `billing.renewal.stuck` row; with no `billing.renewal.stuck` line just before it, no call reached NETOPIA, nothing was charged, and nothing is needed. The same code on many renewals at once: report it at once, with the code. |
+| `"event":"billing.renewal.dunning_unpriced"`, with `attempt` and `code` | A renewal (`attempt` 1) or a payment retry could not be priced, or (`REFUSAL_NOT_RETRIED`) was not tried because NETOPIA's last refusal is not retried, so that attempt was counted as failed with nothing charged. `TAX_SERVICE_UNAVAILABLE`: the tax service stayed down 3 days past the renewal's due time, or at a payment retry. `RETRY_TOTAL_CHANGED`: a retry was priced again at a total the person was never told about (a tax change). The person gets the payment emails, and after the last retry day the plan moves to Free. The owner summary lists it as `DUNNING_UNPRICED`, or `ENDED_UNPRICED` once the plan has ended. | `TAX_SERVICE_UNAVAILABLE`: check Quaderno's status page and your Quaderno account; the next retry prices again once it answers. `RETRY_TOTAL_CHANGED`: nothing to fix; the person can subscribe again at the new price. `REFUSAL_NOT_RETRIED`: NETOPIA refused the card for a reason other than missing funds, so it was not charged again; the person was emailed to add a card; nothing to do. Any other code: report it. |
 | `"event":"billing.renewal.price_missing"` (no other field) | A subscription due for renewal has no recorded net price, so it is not charged at a guessed one. The renewal is tried again every minute, with this line each time (and `BILLING_RECURRING_PRICE_MISSING` among the `billing.renewal.report` codes); nobody is charged, and the plan is not renewed, while it lasts. | Report it at once: that subscription's records are incomplete, and only the developer can find it and repair them. |
 | `"event":"billing.renewal.history_invalid"`, with `count` and `code` | `count` subscriptions whose records do not add up (`BILLING_SUBSCRIPTION_EVENTS_INVALID`), so the renewal pass skips them: they are neither charged nor renewed. One line for each minute's pass while any is left. The owner summary lists each as `SUBSCRIPTION_HISTORY_INVALID`. | Print the summary (**The tax summary**, above), check in NETOPIA's admin what each such subscriber was charged, and report it to the developer. |
 | `"event":"billing.renewal.owner_stopped"` (no other field) | A charge was due (a renewal, a payment retry, or a second try at one) for an account whose deletion is scheduled or done, or which the age check froze, so it was not made. Scheduling a deletion already stops the renewal; this line is the second guard, and it can come in normal running. | Nothing: nobody was charged. If it comes with `[BILLING_ERASURE_SWEEP_PENDING]` or `[BILLING_ERASURE_STOP_PENDING]`, follow those rows. |
@@ -3244,8 +3881,12 @@ signals that matter:
 | `"event":"billing.refund.held_by_chargeback"`, with `reason` | A dispute (a chargeback) arrived on a NETOPIA payment for which a refund to the person was still open, or a refund to the person was asked for on a NETOPIA payment already under a dispute (`reason` says what the refund was for). The person's bank is taking the money back, so the site holds that refund while the dispute lasts: it leaves the O2_REFUND_REMINDER emails, and `pnpm billing:refund-done` refuses it (`BILLING_REFUND_DONE_HELD_BY_CHARGEBACK`). You got O3 `REFUND_HELD_BY_CHARGEBACK` once for that payment. | Do not refund it in NETOPIA's admin. If the dispute ends for us, record that with `pnpm billing:dispute --outcome won`, and the refund comes back into the reminder; if it ends for the person, nothing is left to refund. If you had already refunded it before the dispute, record that refund with `pnpm billing:refund-done … --despite-chargeback`: run it as **A refund handed to you**, above, shows (`systemd-run` with the API's `EnvironmentFile`), with `--despite-chargeback` after `--confirm`. |
 | `"event":"billing.payment.credentials_refused"`, with `operation` | NETOPIA refused our API key (`operation` says on what: `checkout`, `upgrade`, `card_check`, `verify`, `reconcile`, `charge`, `status` or `refund`). NETOPIA processed nothing, so nothing is counted as failed straight away, and the work is tried again, but not for ever. A renewal whose charge is refused this way is kept, as in a NETOPIA outage, for up to 3 days past its due time (a payment retry: 24 hours), and you get O3 at once. New checkouts fail while it lasts. | At once: run the check command (§14.2); it says whether NETOPIA accepts the key. A revoked or replaced key, or a sandbox key beside the live address (or the reverse): run the setup's NETOPIA section with `--replace netopia` and restart `debateai-api`; the open work then goes on by itself. Fixing the key within that time (3 days past a renewal's due time, 24 hours after a payment retry's call) keeps every renewal. |
 | `"event":"billing.payment.answer_rejected"`, with `operation` | NETOPIA answered in a shape the site cannot read (`operation` says on what), so the site took no decision from it and tries again on the call's own schedule. | Report it at once with the operation: NETOPIA's answers may have changed shape. |
-| `"event":"billing.notice.unverified"`, with `reason` | A message arrived at NETOPIA's notify address that did not pass (§14.5): `NOTICE_HEADER_MISSING`, `NOTICE_ALG_REFUSED`, `NOTICE_SIGNATURE_INVALID`, `NOTICE_ISSUER_INVALID`, `NOTICE_AUDIENCE_INVALID` or `NOTICE_BODY_HASH_INVALID`. It was answered `503` (try again) and, when it could be NETOPIA's, kept in the quarantine for 14 days. Anyone can post to that address, so a stray line now and then means nothing; each run of the check command (§14.2) writes one with `NOTICE_HEADER_MISSING`. Messages over the intake's budget show only as `api.admission.refused` for the route `POST /v1/billing/netopia/notify`, at most once a minute per reason; NETOPIA sends them again, so a later copy is quarantined when the flood passes. | A stray line: nothing. With an O4 email, or many lines with `NOTICE_SIGNATURE_INVALID` or `NOTICE_AUDIENCE_INVALID`: run the check command (§14.2); a wrong public key or POS signature is fixed with the setup's `--replace netopia`, then restart `debateai-api`: the quarantine is checked again at that start. |
+| `"event":"billing.notice.unverified"`, with `reason` | A message arrived at NETOPIA's notify address that did not pass (§14.5): `NOTICE_HEADER_MISSING`, `NOTICE_ALG_REFUSED`, `NOTICE_SIGNATURE_INVALID`, `NOTICE_ISSUER_INVALID`, `NOTICE_AUDIENCE_INVALID` or `NOTICE_BODY_HASH_INVALID`. It was answered `503` (try again) and, when it could be NETOPIA's, kept in the quarantine for 14 days. Anyone can post to that address, so a stray line now and then means nothing; each run of the check command (§14.2), and each knock of the notify alarm (every 5 minutes, `deploy/notify-alarm/README.md`), writes one with `NOTICE_HEADER_MISSING`. Messages over the intake's budget show only as `api.admission.refused` for the route `POST /v1/billing/netopia/notify`, at most once a minute per reason; NETOPIA sends them again, so a later copy is quarantined when the flood passes. | A stray line: nothing. With an O4 email, or many lines with `NOTICE_SIGNATURE_INVALID` or `NOTICE_AUDIENCE_INVALID`: run the check command (§14.2); a wrong public key or POS signature is fixed with the setup's `--replace netopia`, then restart `debateai-api`: the quarantine is checked again at that start. |
 | `"event":"billing.notice.recheck"`, with `quarantined`, `verified` and `failed`, or `code` | At its start the API checked the quarantined messages of the last 14 days again with its current keys; `verified` counts those that now pass and were stored as if they had just arrived. A `code` instead means the check itself failed. | `verified` above 0 after a key fix: nothing more; their payments are checked now. `failed` above 0 or a `code`: restart once more; if it repeats, report it. |
+| `"event":"billing.notice.spooled"` (no other field) | A message that passed could not be stored, and was kept on disk instead (§14.5). It is stored at the next replay (within 10 minutes). | One: nothing. Again and again: check the database. |
+| `"event":"billing.notice.spool_failed"` (no other field) | A message that passed could not be stored, and could not be kept on disk either (the spool folder is missing, read-only or full). NETOPIA still sends it again, but its saved card may be lost. | Check the folder with the `stat` line of §14.5 and the free disk space; then check the database. |
+| `"event":"billing.notice.spool_replay"`, with `stored`, `kept` and `expired`, or `code` | The API checked the kept messages again (at its start, then every 10 minutes): `stored` were stored and deleted, `kept` could not be read, checked or stored yet and wait for the next try, `expired` were older than 14 days and deleted unread. A `code` instead means the folder itself could not be read. | `stored` only: nothing. `kept` above 0 on several lines in a row: check the database, then run the check command (§14.2); a key fix plus a restart stores them. `expired` above 0 or a `code`: report it. |
+| `"event":"billing.notice.spool_off"` (no other field) | At its start the API serves NETOPIA's messages but `BILLING_NOTICE_SPOOL_PATH` is not set, so a message the database cannot store is not kept (§14.5). | Switch it on with the four lines of §14.5. |
 | `"event":"billing.notice.store_failed"` (no other field) | A message that passed could not be stored, almost always because the database did not answer. It was answered `503`, so NETOPIA sends it again. | One: nothing. Again and again: check the database. |
 | `"event":"billing.notice.parse_failed"` (no other field) | A message that passed could not be read: it is stored as it came, and you get O3. Its payment is still found by the status reads. | Report it at once: NETOPIA's message may have changed shape. |
 | `"event":"billing.notice.unknown_order"` (no other field) | A message that passed names an order the site does not know (neither a charge nor a test order). It is stored with no effect. | A single line: nothing. Several: report them; NETOPIA may be sending another shop's messages to this address. |
@@ -3274,7 +3915,8 @@ sudo -u postgres psql -d debateai -c "SELECT j.dead_at, c.payment_environment, j
 **Every other billing line records a normal event and needs nothing from you:** `billing.checkout.started` (a
 checkout began), `billing.payment.verified` (a payment went through), `billing.refund` (a refund was made), `billing.refund.recorded_by_owner` (you recorded a NETOPIA refund with
 `pnpm billing:refund-done`),
-`billing.country.refused` (a purchase the country rules refused), `billing.cancel` and `billing.cancel.revoked` (a
+`billing.country.refused` (a purchase the country rules refused), `billing.region.refused` (a purchase refused
+because its billing address is in a region closed for payment, §14.6), `billing.cancel` and `billing.cancel.revoked` (a
 cancel, and its undo), `billing.downgrade.scheduled`, `billing.upgrade.requested`, `billing.withdrawal` and
 `billing.withdrawal.settled` (a withdrawal recorded, and one you settled), `billing.card.change.started`,
 `billing.card.refused` (a new card from a blocked country), `billing.card.change.deferred` (a card change that waited
@@ -3460,11 +4102,12 @@ is expected on this server unless you publish a price list here too; on the live
 **Before step 1: read the journal of the first start with billing on.** Two minutes after that start, run the command
 below. For the API's current start only, it prints the lines that say NETOPIA refused our key, a message did not pass,
 or a status read failed, and billing's bracketed markers. It should print nothing except one
-`billing.notice.unverified` line with `NOTICE_HEADER_MISSING` for each run of the check command since that start. That
-line is the check's own unsigned message (§14.2) and needs nothing:
+`billing.notice.unverified` line with `NOTICE_HEADER_MISSING` for each run of the check command since that start, and
+one every 5 minutes when the notify alarm is on (`deploy/notify-alarm/README.md`). That line is the check's (or the
+alarm's) own unsigned message (§14.2) and needs nothing:
 
 ```sh
-journalctl --no-pager -u debateai-api _SYSTEMD_INVOCATION_ID="$(systemctl show --property=InvocationID --value debateai-api)" | grep -E 'credentials_refused|notice\.unverified|status_failed|BILLING_[A-Z_]+_PENDING'
+journalctl --no-pager -u debateai-api@$label _SYSTEMD_INVOCATION_ID="$(systemctl show --property=InvocationID --value debateai-api@$label)" | grep -E 'credentials_refused|notice\.unverified|status_failed|BILLING_[A-Z_]+_PENDING'
 ```
 
 Any other line it prints: look it up in the journal table of §14.8 and do what it says before going on. This filter
@@ -3473,7 +4116,7 @@ the same table; a line the table leaves out is in its sentence "Every other bill
 needs nothing:
 
 ```sh
-journalctl --no-pager -u debateai-api _SYSTEMD_INVOCATION_ID="$(systemctl show --property=InvocationID --value debateai-api)" | grep -E '"event":"billing\.|\[BILLING_'
+journalctl --no-pager -u debateai-api@$label _SYSTEMD_INVOCATION_ID="$(systemctl show --property=InvocationID --value debateai-api@$label)" | grep -E '"event":"billing\.|\[BILLING_'
 ```
 
 **Every purchase in steps 1–5 is made as a buyer in the United States (US)**, which pays in USD under the example's
@@ -3511,7 +4154,7 @@ dated ahead (`BILLING_RECORDS_DATED_AHEAD`, §14.8).
    - Open `api.env` and add the line `BILLING_STAGE_CLOCK_OFFSET_DAYS=31`, then restart the API. Keep the line.
    - Two minutes after the restart, run the journal command from **Before step 1** again; it should print nothing
      except one `billing.notice.unverified` line with `NOTICE_HEADER_MISSING` for each run of the check command since
-     the restart. (Its second command, which reads every billing line, now shows the renewal's own lines too.)
+     the restart (and one every 5 minutes when the notify alarm is on). (Its second command, which reads every billing line, now shows the renewal's own lines too.)
    - Within two minutes, a payment with the saved card appears in NETOPIA's sandbox admin and a second receipt email
      arrives.
    - The API refuses to start with `BILLING_STAGE_CLOCK_LIVE_REFUSED` if the offset is set while
@@ -3522,7 +4165,7 @@ sudoedit /etc/debateai/api.env
 ```
 
 ```sh
-systemctl restart debateai-api
+systemctl restart debateai-api@$label
 ```
 
 3. **Change the card.** In Settings, use Update card: correct a billing detail, press **Check my new card**, and pay

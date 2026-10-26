@@ -103,7 +103,9 @@ describe("N11 M5 when the bank asks the person to confirm a renewal (mail.M5.con
     const declined = renderMail("M5C", "en", { ...base, bankDeclined: "true" }).text;
     expect(declined).toContain("Your bank refused the payment.");
     expect(declined).not.toContain("confirm this payment");
-    expect(MAIL_TEMPLATES.M5A.optional).toEqual({ confirmCard: "flag" });
+    // B2 adds the optional `endDate` (a refusal not retried by itself); tests/unit/mail-templates-render.test.ts pins it.
+    // B1 adds `bankAsked` (AUTHENTICATION_REQUIRED not retried by itself); the same file pins it.
+    expect(MAIL_TEMPLATES.M5A.optional).toEqual({ confirmCard: "flag", bankAsked: "flag", endDate: "date" });
   });
 });
 
@@ -121,22 +123,36 @@ describe("N11 O3 for a payment that needs the owner (paymentAlert)", () => {
   });
 });
 
-// A renewal NETOPIA refused for our own setup or key: its O3 names the check command as README §14.8 runs it on the
-// host, on its own line (a bare `pnpm billing:check` fails in a root shell: no settings).
-describe("the owner's check command in a refused renewal's O3", () => {
-  it("prints billing:check as the runbook runs it, on its own line, for both codes", () => {
+// A renewal NETOPIA refused for our own setup or key: its O3 names the check command and, B1 part 2 (NETOPIA answers
+// 2026-10-21, Q22), the resume command, each as README §14.8 runs it on the host, each on its own line (a bare
+// `pnpm billing:…` fails in a root shell: no settings).
+describe("the owner's commands in a refused renewal's O3", () => {
+  it("prints billing:check, then billing:renewal-resume, as the runbook runs them, each on its own line, for both codes", () => {
     for (const code of ["CHARGE_CONFIGURATION_REFUSED", "CHARGE_CREDENTIALS_REFUSED"] as const) {
       const steps = OWNER_STEPS[code];
       expect(steps, code).not.toMatch(BARE_BILLING_COMMAND);
       expect(steps, code).toContain("the check command below as root on the server");
-      expect(printedHostCommands(steps), code).toHaveLength(1);
-      expect(steps.split("\n").at(-1), code).toBe(`  ${printedHostCommands(steps)[0]!}`);
-      expect(runbookBillingCommands(), code).toContain(printedHostCommands(steps)[0]);
+      const printed = printedHostCommands(steps);
+      expect(printed, code).toHaveLength(2);
+      expect(printed[0], code).toMatch(/\/usr\/bin\/pnpm billing:check$/u);
+      expect(printed[1], code).toMatch(/\/usr\/bin\/pnpm billing:renewal-resume$/u);
+      expect(steps.split("\n").slice(-2), code).toEqual(printed.map((command) => `  ${command}`));
+      for (const command of printed) expect(runbookBillingCommands(), code).toContain(command);
+      expect(steps, code).toContain("renewal is not tried again by itself: it waits for you.");
+      expect(steps, code).toContain("Then run the second command: it sends every renewal held like this once more.\n");
+      expect(steps, code).not.toContain("every hour");
     }
-    expect(OWNER_STEPS.CHARGE_CONFIGURATION_REFUSED).toContain("the renewal is tried again every hour. Run the check"
-      + " command below as root on the server, then fix the setting in NETOPIA's admin or ask NETOPIA about the code.\n");
-    expect(OWNER_STEPS.CHARGE_CREDENTIALS_REFUSED).toContain("(deploy/vps/billing-setup.sh --replace netopia), restart the"
-      + " API, and run the check command below as root on the server.\n");
+    expect(OWNER_STEPS.CHARGE_CONFIGURATION_REFUSED).toContain("NETOPIA allows only 3 tries a day on a saved card, so this"
+      + " renewal is not tried again by itself: it waits for you. The person keeps the plan for 72 hours from the renewal date"
+      + " (for a payment retry, until the grace period ends, 8 days after the first failed payment);"
+      + " after that the paid features pause until the renewal goes through. Run the check command below as root on the"
+      + " server and fix the setting in NETOPIA's admin (or ask NETOPIA about the code).");
+    expect(OWNER_STEPS.CHARGE_CREDENTIALS_REFUSED).toContain("NETOPIA refused our API key. Nothing was charged and the"
+      + " customer was not emailed. This renewal is not tried again by itself: it waits for you. The person keeps the plan"
+      + " for 72 hours from the renewal date (for a payment retry, until the grace period ends, 8 days after the first failed"
+      + " payment); after that the paid features pause until the renewal goes through. Replace the"
+      + " key with the guided setup (deploy/vps/billing-setup.sh --replace netopia), restart the API and run the check"
+      + " command below as root on the server.");
     for (const code of ["RENEWAL_OUTCOME_OPEN", "ORDER_REUSED"] as const) expect(OWNER_STEPS[code], code).not.toMatch(BARE_BILLING_COMMAND);
   });
 });

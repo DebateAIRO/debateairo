@@ -53,6 +53,8 @@ describe("P2-I7 a dunning retry is dated by the clock inside its lease, never by
       retryPrice: vi.fn(async () => ({ kind: "PRICED" as const, priced: {} as never })),
       // Spec §2.9.3 step 5 (N11): a NETOPIA retry first asks whether an earlier attempt of the period holds a payment.
       earlierAttemptPaid: vi.fn(async () => "NONE" as const),
+      // B1 (NETOPIA Q22): the card still has a saved-card send left today.
+      savedCardSendAllowed: vi.fn(async (_state: unknown, _now: Date, _attempt?: number) => true),
       createRetryCharge: vi.fn(async (_state: unknown, _periodStart: Date, _attempt: number, _priced: unknown, _now: Date) =>
         ({ charge, state: foldSubscription(events) })),
       submit: vi.fn(async (_charge: ChargeRow, _state: unknown) => undefined),
@@ -77,6 +79,7 @@ describe("P2-I7 a dunning retry is dated by the clock inside its lease, never by
     expect(renewal.retryPrice).toHaveBeenCalledWith(expect.objectContaining({ status: "PAST_DUE" }), periodStart, 2, leaseTime);
     expect(renewal.earlierAttemptPaid).toHaveBeenCalledWith(expect.objectContaining({ status: "PAST_DUE" }), periodStart, 2, leaseTime);
     expect(renewal.createRetryCharge.mock.calls[0]![4]).toEqual(leaseTime);
+    expect(renewal.savedCardSendAllowed).toHaveBeenCalledWith(expect.objectContaining({ status: "PAST_DUE" }), leaseTime, 2);
     expect(renewal.submit).toHaveBeenCalledWith(charge, expect.objectContaining({ status: "PAST_DUE" }));
   });
 });
@@ -204,6 +207,7 @@ describe("F8 an attempt whose payment was refunded in full is not an attempt mad
       erasureBlocks: vi.fn(async () => false),
       retryPrice: vi.fn(async () => ({ kind: "PRICED" as const, priced: {} as never })),
       earlierAttemptPaid: vi.fn(async () => "NONE" as const),
+      savedCardSendAllowed: vi.fn(async () => true),
       createRetryCharge: vi.fn(async () => ({ charge, state: foldSubscription(events) })),
       submit: vi.fn(async () => undefined),
       failUnpricedAttempt: vi.fn(), taxRefused: vi.fn()

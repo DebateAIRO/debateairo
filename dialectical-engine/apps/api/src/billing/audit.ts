@@ -17,6 +17,8 @@ export type BillingAuditEvent =
   | "billing.refund.outcome_unknown"
   | "billing.chargeback"
   | "billing.country.refused"
+  /** Payment region blocks (spec 2026-10-20 §8): the code, the country and the region id only. */
+  | "billing.region.refused"
   | "billing.outbox.dead"
   /**
    * W12 (P2-I16): a job died but the owner's alert (O3) could not be queued (the dead-letter hook threw); the job stays
@@ -71,8 +73,22 @@ export type BillingAuditEvent =
   | "billing.renewal.price_missing"
   /** N11 (spec §2.9.3, §2.9.4): a NETOPIA renewal's outcome is still open past its window; O3 was queued. The attempt. */
   | "billing.renewal.outcome_open"
-  /** N11 (spec §2.9.3 step 5): a dunning retry was not made this pass; the code (EARLIER_ATTEMPT_PAID, _PENDING or _UNREADABLE). */
+  /**
+   * N11 (spec §2.9.3 step 5): a dunning retry was not made this pass; the code (EARLIER_ATTEMPT_PAID, _PENDING or
+   * _UNREADABLE; B1's SAVED_CARD_DAILY_LIMIT: the card already made its 2 saved-card sends in the last 24 hours).
+   */
   | "billing.renewal.retry_held"
+  /**
+   * B1 (NETOPIA answers 2026-10-21, Q22): a saved-card call was not made because the card already made its 2 sends in
+   * the last 24 hours (NETOPIA allows 3 a day). The attempt, when the caller names it; nothing else.
+   */
+  | "billing.renewal.send_capped"
+  /**
+   * B1 part 2 (NETOPIA answers 2026-10-21, Q22): the owner ran `pnpm billing:renewal-resume`. `resumed` counts the
+   * renewals held by our own setup's refusal that were released for one more send, `busy` the open renewals whose
+   * subscription was being worked on at that moment; nothing else.
+   */
+  | "billing.renewal.resumed"
   /** N11: an earlier attempt of the period read PAID before a retry; its check was queued. The attempt. */
   | "billing.renewal.recovered_earlier"
   /**
@@ -190,6 +206,20 @@ export type BillingAuditEvent =
   | "billing.notice.store_failed"
   /** N9 (§2.7.4 step 2): the start's re-check of the quarantine; the counts only, or the failure's code. */
   | "billing.notice.recheck"
+  /**
+   * B3a (NETOPIA answers 2026-10-21: the saved card comes only in the first message): a verified message the database
+   * could not take was kept in the spool (BILLING_NOTICE_SPOOL_PATH) for the replay. No field.
+   */
+  | "billing.notice.spooled"
+  /** B3a: such a message could not be kept either (the spool's folder missing, read-only or full). No field. */
+  | "billing.notice.spool_failed"
+  /**
+   * B3a: one replay of the spool (at the start and every 10 minutes) that found anything: the counts `stored`, `kept`
+   * and `expired` only, or the replay's failure code (BILLING_NOTICE_SPOOL_REPLAY_FAILED).
+   */
+  | "billing.notice.spool_replay"
+  /** B3a: NETOPIA's message is served but BILLING_NOTICE_SPOOL_PATH is not set; written once at the start. No field. */
+  | "billing.notice.spool_off"
   /**
    * P17 (Q-3): M1's accepted-Terms attachment was not attached. The fields are the attachment kind and a code
    * (MAIL_TERMS_NOT_RECORDED or MAIL_TERMS_NOT_ARCHIVED) only, never a hash, a locale or an address.

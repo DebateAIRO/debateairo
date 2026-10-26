@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Fil-qosor
-eyebrow: TERMINI TAS-SERVIZZ · v2.4 · EFFETTIVI 12 TA’ OTTUBRU 2026
+eyebrow: TERMINI TAS-SERVIZZ · v2.5 · EFFETTIVI 12 TA’ OTTUBRU 2026
 title: Dak li taqbel miegħu
 lede: Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.
-endMarker: TMIEM IT-TERMINI · v2.4
+endMarker: TMIEM IT-TERMINI · v2.5
 bodyLabel: Test tat-Termini tas-Servizz
 annexTitle: Anness A — Termini reġjonali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LIĠI APPLIKABBLI
 -->
 
-**Version 2.4 · Effective 12 ta’ Ottubru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
+**Version 2.5 · Effective 12 ta’ Ottubru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
 
 **In short.** Irid ikollok 18-il sena jew aktar. Dialectical Engine tibni argumenti b’mudelli tal-IA u dak kollu li tiġġenera jista’ jkun żbaljat — mhuwiex parir. Id-dibattiti tiegħek huma privati sakemm ma tippubblikahomx; jekk tippubblikahom, kulħadd jista’ jaqrahom. It-test li tissottometti jintbagħat lill-fornituri tal-IA elenkati fir-Reġistru tal-Fornituri tagħna, u ma jintużax għat-taħriġ tal-mudelli. Irrapporta kontenut illegali fuq support@dezbatere.ro kemm jekk għandek kont kif ukoll jekk le. Tapplika l-liġi Rumena, iżda l-protezzjonijiet lokali tiegħek bħala konsumatur jibqgħu japplikaw għalik.
 
@@ -213,7 +213,11 @@ Dialectical Engine toffri pjan bla ħlas. Pjan **Premium** bi ħlas se jkun disp
 
 **Ħlasijiet li jfallu.** Jekk ħlas ifalli nerġgħu nippruvaw għal 7 ijiem u nwissuk bil-posta elettronika qabel inniżżlu l-kont tiegħek għall-pjan bla ħlas. Ma nħassrux id-dibattiti tiegħek għax ħlas ikun falla.
 
-**Taxxi, u lil min tħallas.** Il-prezzijiet jinkludu l-VAT, il-GST jew it-taxxa fuq il-bejgħ, li tiddependi minn fejn tgħix u tintwera qabel ma tħallas. Il-ħlasijiet bil-karta jiġu pproċessati minn NETOPIA Payments (netopia-payments.com). Il-bejjiegħ huwa DMS Merchandise Shop S.R.L., li joħroġlok il-fattura u jibqa’ responsabbli għas-servizz innifsu u għal dawn it-Termini.
+**Taxxi, u lil min tħallas.** Il-prezzijiet jinkludu l-VAT, il-GST jew it-taxxa fuq il-bejgħ, li tiddependi minn fejn tgħix u tintwera qabel ma tħallas. Il-bejjiegħ huwa DMS Merchandise Shop S.R.L., li joħroġlok il-fattura u jibqa’ responsabbli għas-servizz innifsu u għal dawn it-Termini.
+
+**Metodi ta’ ħlas.** Tħallas bil-karta. Naċċettaw Visa u Mastercard; ma naċċettawx American Express. Il-ħlasijiet bil-karta jiġu pproċessati minn NETOPIA Payments (netopia-payments.com), u n-numru sħiħ tal-karta tiegħek qatt ma jasal għandna.
+
+**Kunsinna.** Dialectical Engine huwa servizz online, għalhekk xejn ma jintbagħatlek. Il-funzjonalitajiet tal-pjan bi ħlas tiegħek ikunu disponibbli fil-kont tiegħek hekk kif il-ħlas tiegħek jiġi kkonfermat.
 
 **Treġġigħ lura ta’ ħlasijiet.** Jekk tikkontesta ħlas mal-emittent tal-karta tiegħek, nistgħu nissospendu l-funzjonalitajiet bi ħlas sakemm tissolva t-tilwima. Ma nitolbux tariffi għal dan.
 
@@ -235,7 +239,7 @@ Ngħidulek minn qabel, fuq mezz durabbli, x’inhu jinbidel u meta. Jekk il-bidl
 
 **F’dawn it-Termini.** Nistgħu nibdlu dawn it-Termini għall-istess tipi ta’ raġunijiet. Għal bidliet li ma jnaqqsux id-drittijiet tiegħek, nippubblikaw il-verżjoni l-ġdida b’sommarju ta’ dak li nbidel u nibagħtulek messaġġ elettroniku mill-inqas **30 jum** qabel ma tidħol fis-seħħ; jekk tkompli tuża Dialectical Engine wara dik id-data, dan ifisser li taċċettaha, u tista’ tagħlaq il-kont tiegħek qabel dak iż-żmien. Għal bidliet li jnaqqsu d-drittijiet tiegħek — inkluż żidiet fil-prezz fuq pjan eżistenti, limiti aktar baxxi, funzjonalitajiet imneħħija, użi ġodda tal-kontenut tiegħek, jew bidliet fir-responsabbiltà, fil-liġi applikabbli jew fis-soluzzjoni tat-tilwim — nitolbuk taċċetta l-verżjoni l-ġdida b’mod espliċitu meta terġa’ tidħol fil-kont, u l-bidla tapplika biss għall-futur. Qatt ma nagħmlu bidla retroattiva, u qatt ma nużaw din it-taqsima biex nibdlu l-qalba ta’ dak li ħallast għalih f’nofs it-terminu mingħajr ma noffrulek mod kif toħroġ. Il-verżjonijiet preċedenti jibqgħu disponibbli fuq dezbatere.ro/terms/versions.
 
-Il-Verżjoni 2.4 issostitwiet il-verżjoni 2.3: iżżid il-verifika tal-mistoqsijiet, li taqra kull mistoqsija qabel ma jibda dibattitu, tirrifjuta xi wħud, u żżomm biex jaqraha t-tim tagħna kull mistoqsija rifjutata li thedded, tippjana jew tistaqsi jekk jew kif tista’ ssir ħsara lil persuna oħra jew lil persuni oħra, imsemmija jew le, inkluż attakk fuq persuni mhux imsemmija, jew li tistaqsi kif jiġu fabbrikati armi, splussivi, velenijiet jew drogi jew kif jiġi appoġġat att terroristiku, jew li tfaħħar wieħed (it-taqsimiet 7, 8, 10 u 11); il-verifika li taqra s-sinteżi ta’ kull dibattitu li jintemm, l-approvazzjoni li dibattitu mmarkat jeħtieġ qabel ma jkun jista’ jiġi ppubblikat, u d-dibattiti li dik il-verifika tħassar (it-taqsimiet 5, 8, 9, 10 u 11); x’jibgħat iċ-chat tal-appoġġ lill-mudell Claude ta’ Anthropic, li ma jżomm xejn minn dak li tikteb u ma jiftaħ ebda każ, u li l-buttuna tiegħu “Tkellem ma’ persuna” turi l-indirizz ta’ appoġġ tagħna (it-taqsimiet 8 u 10); u regoli fit-taqsima 7 li jipprojbixxu diskors ta’ mibegħda ta’ kull tip, struzzjonijiet għall-fabbrikazzjoni ta’ armi jew drogi, kontenut li jinkoraġġixxi s-suwiċidju jew li jagħmel ħsara lil persuni oħra, u insult reliġjuż, u jgħidu liema mistoqsijiet ma jibdewx dibattitu.
+Il-Verżjoni 2.5 issostitwiet il-verżjoni 2.4: iżżid il-verifika tal-mistoqsijiet, li taqra kull mistoqsija qabel ma jibda dibattitu, tirrifjuta xi wħud, u żżomm biex jaqraha t-tim tagħna kull mistoqsija rifjutata li thedded, tippjana jew tistaqsi jekk jew kif tista’ ssir ħsara lil persuna oħra jew lil persuni oħra, imsemmija jew le, inkluż attakk fuq persuni mhux imsemmija, jew li tistaqsi kif jiġu fabbrikati armi, splussivi, velenijiet jew drogi jew kif jiġi appoġġat att terroristiku, jew li tfaħħar wieħed (it-taqsimiet 7, 8, 10 u 11); il-verifika li taqra s-sinteżi ta’ kull dibattitu li jintemm, l-approvazzjoni li dibattitu mmarkat jeħtieġ qabel ma jkun jista’ jiġi ppubblikat, u d-dibattiti li dik il-verifika tħassar (it-taqsimiet 5, 8, 9, 10 u 11); x’jibgħat iċ-chat tal-appoġġ lill-mudell Claude ta’ Anthropic, li ma jżomm xejn minn dak li tikteb u ma jiftaħ ebda każ, u li l-buttuna tiegħu “Tkellem ma’ persuna” turi l-indirizz ta’ appoġġ tagħna (it-taqsimiet 8 u 10); u regoli fit-taqsima 7 li jipprojbixxu diskors ta’ mibegħda ta’ kull tip, struzzjonijiet għall-fabbrikazzjoni ta’ armi jew drogi, kontenut li jinkoraġġixxi s-suwiċidju jew li jagħmel ħsara lil persuni oħra, u insult reliġjuż, u jgħidu liema mistoqsijiet ma jibdewx dibattitu.
 
 ## 15. Responsabbiltà
 

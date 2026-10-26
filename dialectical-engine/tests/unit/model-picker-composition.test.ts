@@ -13,44 +13,56 @@ describe("A20 · the picker is composed where runs are created", () => {
     // Final review I5: the two stages are one exported function, `composeAskModelPicker`
     // (apps/api/src/ask-model-picker.ts), which main.ts runs under ITS OWN boot ledger. Its
     // behaviour is tests/unit/model-picker-boot-stages.test.ts; these pins keep the wiring.
-    const source = await readFile("apps/api/src/main.ts", "utf8");
+    // Side-by-side spec §13 (S9): the call is the API's one per-version admission loader's (admission-settings.ts), at
+    // the version it loads, under the stage main.ts hands it (its boot ledger); main.ts spreads the loaded picker into
+    // the API's admission by the one mapping and answers /new from it.
+    const main = await readFile("apps/api/src/main.ts", "utf8");
+    const source = await readFile("apps/api/src/admission-settings.ts", "utf8");
     expect(source).toContain(
-      "const modelPicker = await composeAskModelPicker({\n  boot,\n  pool,\n"
-      + "  deploymentMode: environment.DEPLOYMENT_MODE,\n  registerVersion: environment.REGISTER_VERSION,\n"
-      + "  targets: declaredProviderTargets,\n  perRunCeilingMicros: costEnvelopeRows?.guardPolicy.perRunCeilingMicros ?? null,\n"
+      "const modelPicker = await readers.composeAskModelPicker({\n    boot: pickerBoot,\n    pool,\n"
+      + "    deploymentMode: site.deploymentMode,\n    registerVersion: version,\n"
+      + "    targets: declaredProviderTargets,\n    perRunCeilingMicros: costEnvelope?.guardPolicy.perRunCeilingMicros ?? null,\n"
     );
-    expect(source).toContain("  log: (line) => console.error(line)\n});");
+    expect(source).toContain("    log: site.log\n  });");
+    expect(main).toContain("  log: (line: string) => console.error(line)\n}));");
     // Final review I3: the sealed answer bounds are read once, in their own boot stage, and handed over.
     expect(source).toContain(
-      'const callTokenCeilings = await boot.run("call-token-ceilings", () => readCallTokenCeilings(pool, environment.REGISTER_VERSION));'
+      'const callTokenCeilings = await run("call-token-ceilings", () => readers.readCallTokenCeilings(pool, version));'
     );
-    expect(source).toContain("  perRunCeilingMicros: costEnvelopeRows?.guardPolicy.perRunCeilingMicros ?? null,\n  callTokenCeilings,\n");
-    // Paid plans S4c (final review P3-M4): the picker's money terms are B6b's guard policy, and billing is on
-    // exactly when the room's composition carries the plans. Dropped, the picker would silently fall back to the
-    // bare per-run ceiling, and a scorecard capping Free above ECONOMY would boot with billing on.
-    expect(source).toContain("const billingEnabled = (askRoomComposition?.billingPlans ?? null) !== null;\n");
+    expect(source).toContain("    perRunCeilingMicros: costEnvelope?.guardPolicy.perRunCeilingMicros ?? null,\n    callTokenCeilings,\n");
+    // Paid plans S4c (final review P3-M4): the picker's money terms are the version's guard policy, and billing is on
+    // exactly when the room's readiness answer carries the plans (a site member). Dropped, the picker would silently
+    // fall back to the bare per-run ceiling, and a scorecard capping Free above ECONOMY would boot with billing on.
+    // Side-by-side spec §13 (S14, ruling R57): main.ts hands the room's readiness answer to the one site builder
+    // (buildAdmissionSiteContext), which derives the switch from it for main.ts, the practice and check-version.
+    expect(main).toContain("  askRoomReadiness: askRoomReadiness ?? null,\n");
+    expect(source).toContain("    billingEnabled: (input.askRoomReadiness?.billingPlans ?? null) !== null,\n");
     // Debate shape (P2b Task 6, pre-flight PF-B22): the row in force reaches the Free answer-job check.
     expect(source).toContain(
-      "  callTokenCeilings,\n  moneyPolicy: costEnvelopeRows?.guardPolicy ?? null,\n  billingEnabled,\n"
-      + "  // Debate shape (P2b Task 6, pre-flight PF-B22): only the Free answer-job check reads it (the row's largest writer bound).\n"
-      + "  debateShapePolicy: debateShapeInForcePolicy,\n  lengthGuidancePolicy,\n  log: (line) => console.error(line)\n});"
+      "    callTokenCeilings,\n    moneyPolicy: costEnvelope?.guardPolicy ?? null,\n    billingEnabled: site.billingEnabled,\n"
+      + "    // Debate shape (P2b Task 6, pre-flight PF-B22): only the Free answer-job check reads it (the row's largest writer bound).\n"
+      + "    debateShapePolicy: debateShapeInForcePolicy,\n    lengthGuidancePolicy,\n    log: site.log\n  });"
     );
-    // LG-C Task 6 (spec 2026-10-15 §3.10): the length row, read by its own earlier boot stage, reaches the same check.
-    expect(source.indexOf('boot.run("length-guidance-policy"')).toBeGreaterThan(-1);
-    expect(source.indexOf('boot.run("length-guidance-policy"')).toBeLessThan(source.indexOf("await composeAskModelPicker({"));
-    expect(source.indexOf("const billingEnabled = ")).toBeLessThan(source.indexOf("await composeAskModelPicker({"));
-    expect(source.indexOf('boot.run("call-token-ceilings"')).toBeLessThan(source.indexOf("await composeAskModelPicker({"));
-    expect(source).toMatch(/\n {2}resolveDiscoveredPanel: resolveProviderPanel,\n(?: {2}\/\/[^\n]*\n)* {2}modelPicker,\n/u);
-    expect(source.indexOf("const declaredProviderTargets = ")).toBeLessThan(source.indexOf("await composeAskModelPicker({"));
-    expect(source.indexOf("await composeAskModelPicker({")).toBeLessThan(source.indexOf("new PostgresAskApplication("));
-    // The one additional opt-in read refuses preview before provider credentials.
-    const previewRead = source.indexOf('await boot.run("preview-scorecard-conflict"');
+    // LG-C Task 6 (spec 2026-10-15 §3.10): the length row, read by its own earlier stage, reaches the same check.
+    expect(source.indexOf('run("length-guidance-policy"')).toBeGreaterThan(-1);
+    expect(source.indexOf('run("length-guidance-policy"')).toBeLessThan(source.indexOf("await readers.composeAskModelPicker({"));
+    expect(main.indexOf("  askRoomReadiness: askRoomReadiness ?? null,")).toBeGreaterThan(-1);
+    expect(main.indexOf("  askRoomReadiness: askRoomReadiness ?? null,")).toBeLessThan(main.indexOf("const siteAdmission = await loadAdmissionSettings("));
+    expect(source.indexOf('run("call-token-ceilings"')).toBeLessThan(source.indexOf("await readers.composeAskModelPicker({"));
+    expect(main).toMatch(/\n {2}\.\.\.admissionSettingsOfVersion\(siteAdmission\),\n/u);
+    expect(source).toContain("    modelPicker: version.modelPicker,\n");
+    expect(main).toContain("  resolveDiscoveredPanel: resolveProviderPanel,\n");
+    expect(main.indexOf("const declaredProviderTargets = ")).toBeLessThan(main.indexOf("const siteAdmission = await loadAdmissionSettings("));
+    expect(main.indexOf("const siteAdmission = await loadAdmissionSettings(")).toBeLessThan(main.indexOf("new PostgresAskApplication("));
+    // The one additional opt-in read: the preview's roster may not override this version's VALID scorecard.
+    const previewRead = source.indexOf('await run("preview-scorecard-conflict"');
     expect(previewRead).toBeGreaterThan(source.indexOf("if (previewConfig !== undefined) {"));
-    expect(source.slice(previewRead, source.indexOf("const previewFetch =", previewRead)))
+    expect(source.slice(previewRead, source.indexOf('run("preview-budget-gate"', previewRead)))
       .toContain('throw new TypedDomainError("PREVIEW_SCORECARD_CONFLICT"');
-    expect(previewRead).toBeLessThan(source.indexOf('boot.runSync("provider-credentials"'));
     expect(source.match(/\breadModelScorecard\(/gu)).toHaveLength(1);
+    expect(main).not.toMatch(/\breadModelScorecard\(/u);
     expect(source).not.toContain("askModelPickerSettings(");
+    expect(main).not.toContain("askModelPickerSettings(");
     // Pre-flight ruling F17: admission's backup provision reaches the ceiling.
     expect(source).toContain("backupSequencesProvisioned: input.backupSequencesProvisioned");
 

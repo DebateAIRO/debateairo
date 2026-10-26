@@ -1,0 +1,49 @@
+# Install as /etc/systemd/system/debateai-notify-alarm.service (README.md beside this file). Started by
+# debateai-notify-alarm.timer every 5 minutes: one knock on this site's own public notify address (a second one a minute
+# later if the answer was wrong), then one report to the outside alarm service, which emails the owner.
+# The script is a copy outside the release tree (/usr/local/lib/debateai-notify-alarm), so a release that breaks the
+# site cannot break its alarm. On a host whose Node is not /usr/bin/node (the test site's toolchain), a drop-in sets
+# ExecStart (README.md, "The test site").
+# A throwaway user (DynamicUser) that holds nothing but its own settings, handed over by systemd (LoadCredential=):
+# no application secret, no database, no mail. The worst run (two knocks, the pause, three report tries) takes about
+# 140 seconds, well inside TimeoutStartSec and the 5-minute tick.
+[Unit]
+Description=DebateAI: knock on NETOPIA's notify address and report to the outside alarm
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+DynamicUser=yes
+LoadCredential=notify-alarm:/etc/debateai-notify-alarm/config.json
+ExecStart=/usr/bin/node /usr/local/lib/debateai-notify-alarm/notify-alarm.mjs
+TimeoutStartSec=240
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+# Each "-" path is skipped where it does not exist: the live host's trees and the test site's.
+InaccessiblePaths=-/etc/debateai -/var/lib/debateai -/etc/debateai-v3-preview -/var/lib/debateai-v3-preview -/run/postgresql -/var/run/postgresql
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @obsolete
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryMax=256M
+LimitNOFILE=256
+TasksMax=32

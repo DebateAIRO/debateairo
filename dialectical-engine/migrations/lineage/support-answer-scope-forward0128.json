@@ -3,12 +3,12 @@
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
     "name": "0127_threat_reports.sql",
-    "manifestSha256": "2fcec4363a4ffff560727d4e0e476a6417f5cb3afe493a73eea9899505308295",
+    "manifestSha256": "66f9e0411a183d0d79b2766b48e44cf446b06669b2d84f7b840d7419ac599d03",
     "verifierSha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
   },
   "migration": {
     "name": "0128_support_answer_scope.sql",
-    "sha256": "7d8fd3afc4856c3a395b3da9fa65a86cdfa705487499ddc4daa742fd48d8fa79"
+    "sha256": "db7218678a1467e5616457fa00622de8c4efc212de54bf4f46a3baa4e8f4a663"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-111.sql",

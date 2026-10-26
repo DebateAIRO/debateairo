@@ -338,6 +338,17 @@ The smallest pot that passes with all four switched on is $1.43; with a final wr
     above).
   - `AUTHORITY_HALTED`: the gate is halted, so nothing was set aside. The app shows that the gate
     is unavailable, not that the money ran out, and does not ask `/remaining`.
+  - `MODEL_NOT_ALLOWED` and `RESERVATION_MISMATCH` (side-by-side uploads, 2026-10-21): refused before
+    any reservation: this model or this price is not served by this GO. During an upload an older
+    release's debate may still ask for a model the new GO no longer switches on, or reserve at a price
+    it no longer uses. Nothing was set aside or sent; the app makes that model sit out the debate, as
+    for a busy model, and never reads it as the money running out. Before 2026-10-21 both were the
+    opaque `PREVIEW_TEST_AUTHORITY_STOPPED`. An older app does not know the new codes and reads them
+    as the money running out, without the `/remaining` check it makes for
+    `PREVIEW_TEST_AUTHORITY_STOPPED`. So on a gate that is also halted, an older release's debate
+    now stops as if its money ran out, where before it would have been told the gate is
+    unavailable and let that model sit out. Nothing is charged either way. The gate's file hash
+    changes; a new GO is written at install (the side-by-side transition installs it).
   - `PREVIEW_TEST_AUTHORITY_STOPPED`: any other refusal, for example a call that was already sent
     when the gate halted. The app is not told why.
 - **The model check script has no custody check of its own.** Like the address script, it is
@@ -599,6 +610,22 @@ systemd-run --quiet --wait --pipe --collect -p IPAddressDeny=any -p IPAddressAll
 
 To switch a model off again: the same, with the model taken out of `enabled_models`.
 
+**From the first side-by-side upload (T+1) on, the app side is an activation** (side-by-side spec §13 addition, owner
+2026-10-22). The line-up (which AIs debate on Free and Premium), the thinking levels and the answer seats live in the
+sealed settings version, no longer in the API's and runner's `PREVIEW_PROVIDER_TEST_CONFIG_JSON` (which then holds only
+the gate sockets and the scope). So a model that is already a reviewed row, already in `PROVIDER_DISCOVERY_TARGETS_JSON`
+and behind a gate socket is offered in two steps, in this order:
+1. **Root switches it on here first**: the probe (step 1), then the new GO and `activate` (step 2). This stays root's
+   step, and it always comes first.
+2. **Then the settings activation**: a plan with the new line-up or seat, publish, the check, the owner's fresh yes,
+   activate (`deploy/preview-release/v1/README.md`, "The line-up, the thinking levels and the answer seats"). No restart,
+   no env edit, no website build. The activation itself refuses while any model the version can seat is not in its
+   gate's `enabled_models`, and while a gate does not run this release's gate code.
+
+Switching a model off goes the other way: first an activation without it, then (once the debates on the older version
+have finished) the GO without it. A model that is not a reviewed row yet, a new thinking word, or a new gate is still a
+reviewed code change and an upload.
+
 ## One deploy session: from GLM only to all five AIs
 
 The owner's first debate uses all five AIs: the four DeepInfra models of this gate and Claude Haiku
@@ -666,6 +693,14 @@ so it accepts only a `glm-only` website.
 
 To go back, walk the same steps backwards: the website's list first (a `glm-only` build), then the
 app's model lists and a register version without `--checker`, then the GO.
+
+**Since the first side-by-side upload (T+1)** this session is history for the app's part: steps 5 to 7 become one
+settings activation (the line-up and the answer seats in the settings version, "Switching on DeepSeek, MiMo and Qwen"
+above), and the gate steps (1 to 4) still come first. The comparison block above does not apply to the sockets-only
+`PREVIEW_PROVIDER_TEST_CONFIG_JSON` (it names no AIs, so it prints `MISMATCH`): the website's start-up check accepts that
+form beside any reviewed list. The website's list (`NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON`) then only sets the
+new-debate page's fallback list and the ask proxy's time limit; the "AI providers" legal page names the companies the
+API reaches by itself (`deploy/preview-release/v1/README.md`, "The providers page").
 
 ## Slow answers (2026-10-12): installing this change
 

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { TypedDomainError, US_STATE_CODES, type DeclaredRegion } from "@debateai/kernel";
+import { PAYMENT_REGION_IDS, TypedDomainError, US_STATE_CODES, type DeclaredRegion, type PaymentRegionId } from "@debateai/kernel";
 import type { Pool } from "pg";
 
 /**
@@ -13,6 +13,11 @@ import type { Pool } from "pg";
  * `us_states` (optional) narrows the United States by the state a person DECLARES at sign-up: the
  * address lookup knows countries only, so a state rule is never IP evidence and is never `blocked`.
  *
+ * `regions` (optional; payment region blocks, spec 2026-10-20 §7) closes PAYMENT, never sign-up, in a place
+ * inside an open country, read from the buyer's billing address (kernel payment-regions.ts). It is keyed by
+ * that file's closed list of region ids; a rule carries `pay`, the reason, and `buyers: "business"` when it
+ * applies to business buyers only (absent: every buyer). It never carries `signup` or `blocked`.
+ *
  * A sealed register row like every policy value: changing a country is publishing a NEW version,
  * never an edit. The row is OPTIONAL: a register version that never published it has no country
  * gate (amendment A14), and hosted mode gates only when it is present.
@@ -21,10 +26,13 @@ export const COUNTRY_POLICY_ROW_KEY = "countryPolicy" as const;
 
 export type CountryReason = "OFFERED" | "NOT_OFFERED" | "TAX_NOT_READY" | "SANCTIONS" | "PROVIDER_UNSUPPORTED" | "TERMS_EXCLUDED";
 export type CountryRule = Readonly<{ signup: boolean; pay: boolean; reason: CountryReason; blocked: boolean }>;
+export type RegionRule = Readonly<{ pay: boolean; reason: CountryReason; buyers: "all" | "business" }>;
 export type CountryPolicy = Readonly<{
   defaultRule: CountryRule;
   countries: Readonly<Record<string, CountryRule>>;
   usStates: Readonly<Record<string, CountryRule>>;
+  /** Empty when the version never published the member. */
+  regions: Readonly<Record<PaymentRegionId, RegionRule>>;
   unknownIp: "REFUSE";
   tor: "REFUSE";
   sourceRef: string;
@@ -41,12 +49,21 @@ const ruleSchema = z.object({
 const isoCountrySchema = z.string().regex(/^[A-Z]{2}$/u).refine((code) => code !== "XX");
 /** A state of the region picker's closed list (kernel region.ts). */
 const usStateSchema = z.string().refine((code) => US_STATE_CODES.includes(code));
+/** A payment region of the kernel's closed list (payment-regions.ts), exactly as written there. */
+const regionIdSchema = z.string().refine((id) => PAYMENT_REGION_IDS.includes(id));
+/** No `signup` and no `blocked`: a region closes payment only. `buyers` is "business" or left out (all buyers). */
+const regionRuleSchema = z.object({
+  pay: z.boolean(),
+  reason: reasonSchema,
+  buyers: z.literal("business").optional()
+}).strict();
 
 const countryPolicyValueSchema = z.object({
   kind: z.literal("COUNTRY_POLICY"),
   default_rule: ruleSchema,
   countries: z.record(isoCountrySchema, ruleSchema),
   us_states: z.record(usStateSchema, ruleSchema).optional(),
+  regions: z.record(regionIdSchema, regionRuleSchema).optional(),
   unknown_ip: z.literal("REFUSE"),
   tor: z.literal("REFUSE")
 }).strict().superRefine((value, context) => {
@@ -78,6 +95,9 @@ const NOT_YET: RuleValue = Object.freeze({ signup: false, pay: false, reason: "N
 const EXCLUDED: RuleValue = Object.freeze({ signup: false, pay: false, reason: "TERMS_EXCLUDED" });
 const SANCTIONED: RuleValue = Object.freeze({ signup: false, pay: false, reason: "SANCTIONS", blocked: true });
 const PROVIDERS_REFUSE: RuleValue = Object.freeze({ signup: false, pay: false, reason: "PROVIDER_UNSUPPORTED", blocked: true });
+type RegionRuleValue = z.infer<typeof regionRuleSchema>;
+const REGION_TAX_NOT_READY: RegionRuleValue = Object.freeze({ pay: false, reason: "TAX_NOT_READY" });
+const REGION_TAX_NOT_READY_FOR_BUSINESS: RegionRuleValue = Object.freeze({ pay: false, reason: "TAX_NOT_READY", buyers: "business" });
 
 /**
  * The §1.5 table, every code spelled out. EU 27 + Norway and Iceland (Terms Annex A.1; one EU
@@ -115,10 +135,26 @@ const COUNTRY_GROUPS: ReadonlyArray<readonly [readonly string[], RuleValue]> = O
   [["CN", "HK", "MO", "IR", "CU", "SY", "VE", "VN"], PROVIDERS_REFUSE]
 ]);
 
+/**
+ * The owner's decision of 20 October 2026 (the research is in the payment region blocks spec, 2026-10-20 §2):
+ * payment is closed, until the company registers for tax there, in Saskatchewan and Manitoba; in DC, Hawaii,
+ * Maryland, Rhode Island, Vermont, West Virginia and New Jersey; in Ohio for business buyers only (Ohio taxes
+ * SaaS only when it is bought for business use); and in the EU territories outside the EU VAT area: the Canary
+ * Islands, Ceuta, Melilla, the five French overseas departments, Åland, Mount Athos, Livigno, Campione d'Italia,
+ * Heligoland and Büsingen. Sign-up is open in all of them. Opening one is publishing a version without its entry.
+ */
+const REGION_GROUPS: ReadonlyArray<readonly [readonly PaymentRegionId[], RegionRuleValue]> = Object.freeze([
+  [["CA-SK", "CA-MB", "US-DC", "US-HI", "US-MD", "US-RI", "US-VT", "US-WV", "US-NJ",
+    "ES-CN", "ES-CE", "ES-ML", "FR-971", "FR-972", "FR-973", "FR-974", "FR-976", "FI-01", "GR-69",
+    "IT-LIVIGNO", "IT-CAMPIONE", "DE-HELGOLAND", "DE-BUESINGEN"], REGION_TAX_NOT_READY],
+  [["US-OH"], REGION_TAX_NOT_READY_FOR_BUSINESS]
+]);
+
 export const COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
   rowKey: COUNTRY_POLICY_ROW_KEY,
   sourceRef: "Paid plans spec 2026-09-29 §1.5 country switches (owner decisions 29 September 2026, amended 1, 2, 8 and 9 October 2026):"
-    + " the Terms Annex A, sanctions and the AI providers' country lists",
+    + " the Terms Annex A, sanctions and the AI providers' country lists; payment region blocks spec 2026-10-20 §2"
+    + " (owner decision 20 October 2026): the regions closed for payment",
   value: Object.freeze({
     kind: "COUNTRY_POLICY" as const,
     default_rule: NOT_YET,
@@ -128,6 +164,9 @@ export const COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
     us_states: Object.freeze(Object.fromEntries(
       US_STATE_GROUPS.flatMap(([codes, rule]) => codes.map((code) => [code, rule] as const))
     )),
+    regions: Object.freeze(Object.fromEntries(
+      REGION_GROUPS.flatMap(([ids, rule]) => ids.map((id) => [id, rule] as const))
+    )),
     unknown_ip: "REFUSE" as const,
     tor: "REFUSE" as const
   })
@@ -135,6 +174,10 @@ export const COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
 
 function ruleOf(value: RuleValue): CountryRule {
   return Object.freeze({ signup: value.signup, pay: value.pay, reason: value.reason, blocked: value.blocked === true });
+}
+
+function regionRuleOf(value: RegionRuleValue): RegionRule {
+  return Object.freeze({ pay: value.pay, reason: value.reason, buyers: value.buyers ?? "all" });
 }
 
 export function countryPolicyFromValue(value: unknown, sourceRef: string): CountryPolicy {
@@ -149,6 +192,9 @@ export function countryPolicyFromValue(value: unknown, sourceRef: string): Count
     )),
     usStates: Object.freeze(Object.fromEntries(
       Object.entries(parsed.data.us_states ?? {}).map(([code, rule]) => [code, ruleOf(rule)])
+    )),
+    regions: Object.freeze(Object.fromEntries(
+      Object.entries(parsed.data.regions ?? {}).map(([id, rule]) => [id, regionRuleOf(rule)])
     )),
     unknownIp: parsed.data.unknown_ip,
     tor: parsed.data.tor,
@@ -166,6 +212,14 @@ export function countryRule(policy: CountryPolicy, iso2: string): CountryRule {
 export function declaredRegionRule(policy: CountryPolicy, region: DeclaredRegion): CountryRule {
   const state = region.country.toUpperCase() === "US" ? region.usState : null;
   return state !== null && Object.hasOwn(policy.usStates, state) ? policy.usStates[state]! : countryRule(policy, region.country);
+}
+
+/**
+ * The rule for one payment region (an id from the kernel's paymentRegionsOf, matched exactly), or null when the
+ * region has none: then the country's own rule decides.
+ */
+export function regionRule(policy: CountryPolicy, region: PaymentRegionId): RegionRule | null {
+  return Object.hasOwn(policy.regions, region) ? policy.regions[region]! : null;
 }
 
 /** The row IN FORCE at a register version, or null when that version never published one. */

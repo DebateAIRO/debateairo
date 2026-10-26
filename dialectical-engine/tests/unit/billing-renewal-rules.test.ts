@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { addBusinessDays, type SubscriptionEvent } from "@debateai/billing-core";
 import {
-  addDays, addYearsClamped, anniversaryDue, dunningProgress, recurringNetOf, renewalNoticeDecision,
-  renewalPendingMs, renewalPendingUntil
+  addDays, addYearsClamped, anniversaryDue, autoRetryAllowed, dunningProgress, recurringNetOf, REFUSAL_NOT_RETRIED,
+  renewalNoticeDecision, renewalPendingMs, renewalPendingUntil
 } from "../../apps/api/src/billing/renewal-rules.js";
 
 const NOW = new Date("2026-11-02T10:00:00.000Z");
@@ -101,11 +101,51 @@ describe("P11a where a dunning stands, read from the history (Q-1: an attempt ma
     }]);
     const history = [...base, { ...unpriced!, at: firstAt }, { ...declined!, at: secondAt }];
     expect(dunningProgress(history, { status: "PAST_DUE", pastDueSince: firstAt, retryIndex: 1 }))
-      .toEqual({ firstFailedAt: firstAt, lastFailedAt: secondAt, failedAttempts: 2 });
+      .toEqual({ firstFailedAt: firstAt, lastFailedAt: secondAt, failedAttempts: 2, autoRetry: true });
     // A PAST_DUE with neither key falls back to the fold's own pastDueSince and retryIndex.
     const [bare] = events(["PAST_DUE", "PLUS", { charge_id: "c1" }]);
     expect(dunningProgress([...base, { ...bare!, at: firstAt }], { status: "PAST_DUE", pastDueSince: firstAt, retryIndex: 0 }))
-      .toEqual({ firstFailedAt: firstAt, lastFailedAt: firstAt, failedAttempts: 1 });
+      .toEqual({ firstFailedAt: firstAt, lastFailedAt: firstAt, failedAttempts: 1, autoRetry: true });
+  });
+
+  it("B2: reads the latest attempt's retry decision; a PAST_DUE written before the key existed reads as retried", () => {
+    const at = (data: SubscriptionEvent["data"], when: Date) => ({ ...events(["PAST_DUE", "PLUS", data])[0]!, at: when });
+    const progress = (history: SubscriptionEvent[]) =>
+      dunningProgress(history, { status: "PAST_DUE", pastDueSince: firstAt, retryIndex: 0 })?.autoRetry;
+    expect(progress([...base, at({ charge_id: "c1", attempt: 1, first_failed_at: firstAt.toISOString() }, firstAt)])).toBe(true);
+    expect(progress([...base, at({ charge_id: "c1", attempt: 1, decline_code: "22", auto_retry: false }, firstAt)])).toBe(false);
+    expect(progress([...base, at({ charge_id: "c1", attempt: 1, decline_code: "20", auto_retry: true }, firstAt)])).toBe(true);
+    // The LATEST attempt decides: a refusal not worth retrying after one that was.
+    expect(progress([
+      ...base, at({ charge_id: "c1", attempt: 1, auto_retry: true }, firstAt), at({ charge_id: "c2", attempt: 2, auto_retry: false }, secondAt)
+    ])).toBe(false);
+  });
+});
+
+describe("B2 which failed attempts are retried automatically (NETOPIA answers 2026-10-21, Q15)", () => {
+  const charged = (chargeErrorCode: string, declineCode: string | null) =>
+    autoRetryAllowed({ chargeErrorCode, declineCode, reason: null });
+
+  it("retries a NETOPIA refusal only on code 20 (insufficient funds)", () => {
+    expect(charged("PAYMENT_DECLINED", "20")).toBe(true);
+    for (const code of ["22", "21", "020", null]) expect(charged("PAYMENT_DECLINED", code), String(code)).toBe(false);
+    for (const errorCode of ["PAYMENT_FAILED", "PAYMENT_EXPIRED", "AUTHENTICATION_REQUIRED"]) {
+      expect(charged(errorCode, "20"), errorCode).toBe(true);
+      expect(charged(errorCode, "99"), errorCode).toBe(false);
+      expect(charged(errorCode, null), errorCode).toBe(false);
+    }
+  });
+
+  it("retries our own failures, where NETOPIA never refused anything", () => {
+    expect(charged("NO_TRANSACTION", null)).toBe(true);
+    expect(charged("CARD_NOT_SAVED", null)).toBe(true);
+    expect(autoRetryAllowed({ chargeErrorCode: null, declineCode: null, reason: "TAX_SERVICE_UNAVAILABLE" })).toBe(true);
+    expect(autoRetryAllowed({ chargeErrorCode: null, declineCode: null, reason: "RETRY_TOTAL_CHANGED" })).toBe(true);
+  });
+
+  it("never retries an attempt recorded as not retried", () => {
+    expect(REFUSAL_NOT_RETRIED).toBe("REFUSAL_NOT_RETRIED");
+    expect(autoRetryAllowed({ chargeErrorCode: null, declineCode: null, reason: REFUSAL_NOT_RETRIED })).toBe(false);
   });
 });
 

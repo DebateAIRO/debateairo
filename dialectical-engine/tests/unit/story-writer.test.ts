@@ -644,7 +644,7 @@ describe("StoryWriter — never rejects", () => {
     });
     await expect(writer.writeAfterSettle(SNAPSHOT)).resolves.toBeUndefined();
     expect(attempts).toBe(2);
-    expect(events).toEqual(["STORY_WRITE_FAILED", "STORY_FAILURE_NOT_RECORDED"]);
+    expect(events).toEqual(["STORY_POLICY_NOT_PASSED", "STORY_WRITE_FAILED", "STORY_FAILURE_NOT_RECORDED"]);
   });
 
   it("records the first failure as STORY_UNEXPECTED_ERROR when the second write lands", async () => {
@@ -720,7 +720,7 @@ describe("StoryWriter — never rejects", () => {
   it("an erased run is logged, never thrown", async () => {
     const { writer, events } = harness({ policy: null, repository: { insert: async () => "RUN_ERASED" as const } });
     await expect(writer.writeAfterSettle(SNAPSHOT)).resolves.toBeUndefined();
-    expect(events).toEqual(["STORY_STORED"]);
+    expect(events).toEqual(["STORY_POLICY_NOT_PASSED", "STORY_STORED"]);
   });
 });
 
@@ -817,8 +817,8 @@ describe("StoryWriter — one short lease per step, never the whole story", () =
       repository: { insert: async () => "INSERTED" as const }
     });
     await writer.writeAfterSettle({ ...SNAPSHOT, stepLease: async () => { throw erased; } });
-    expect(events).toEqual(["STORY_STORED"]);
-    expect(details[0]).toMatchObject({ stored: "RUN_ERASED" });
+    expect(events).toEqual(["STORY_POLICY_NOT_PASSED", "STORY_STORED"]);
+    expect(details.at(-1)).toMatchObject({ stored: "RUN_ERASED" });
   });
 
   it("with no step lease, runs each step bare (each store and gateway still takes its own)", async () => {
@@ -1760,5 +1760,103 @@ describe("StoryWriter — story v4 under engine 2 (engine redesign R1d)", () => 
     expect(count("[]")).toBe(0);
     expect(count("{}")).toBe(0);
     for (const scalar of ["42", "null", "true", JSON.stringify("a sentence of prose")]) expect(count(scalar)).toBeNull();
+  });
+});
+
+/**
+ * Side-by-side spec §13 runner point 6: the story runs after DONE, so the policy travels with the write, never with the
+ * writer. A write that carries a policy uses that policy and no other; a write that carries none uses the construction
+ * policy; with neither, the story is STORY_NOT_CONFIGURED and the missing policy is logged once, by code.
+ */
+describe("StoryWriter — the story policy travels with each write (side-by-side §13)", () => {
+  /** Every field a write can change, each different from POLICY, so a read of the construction value shows up. */
+  const POLICY_B: StoryPolicy = Object.freeze({
+    ...POLICY,
+    storytellerRoleRef: "provider:settings-b-storyteller",
+    storyCheckerRoleRef: "provider:settings-b-checker",
+    loopMaxRounds: 1,
+    storytellerBound: Object.freeze({ maxAttempts: 1, tokenCeiling: 11000, deadlineMs: 240000 }),
+    checkerBound: Object.freeze({ maxAttempts: 1, tokenCeiling: 1500, deadlineMs: 150000 }),
+    registerVersion: 8
+  });
+
+  it("a write's policy supplies its role refs, call bounds and loop rounds, not the writer's", async () => {
+    // The checker objects in every round, so the loop's round count decides how many calls are made: A allows two rounds.
+    const { provider, calls } = numbered((request) => (isStoryteller(request) ? story() : CHECKER_OBJECTS));
+    const { writer, inserted } = harness(providing(provider));
+    await writer.writeAfterSettle({ ...SNAPSHOT, policy: POLICY_B });
+    expect(calls.map((call) => ({
+      callSiteKey: call.callSiteKey, providerRef: call.providerRef, bound: call.bound
+    }))).toEqual([
+      { callSiteKey: "STORY:STORYTELLER:1", providerRef: POLICY_B.storytellerRoleRef, bound: POLICY_B.storytellerBound },
+      { callSiteKey: "STORY:CHECKER:1", providerRef: POLICY_B.storyCheckerRoleRef, bound: POLICY_B.checkerBound }
+    ]);
+    expect(inserted).toHaveLength(1);
+    expect(inserted[0]).toMatchObject({
+      outcome: "READY_WITH_RESERVATION",
+      rounds: 1,
+      storytellerLineage: { provider_ref: POLICY_B.storytellerRoleRef },
+      checkerLineage: { provider_ref: POLICY_B.storyCheckerRoleRef }
+    });
+  });
+
+  it("a write's policy supplies its material budget, whichever budget the writer was built with", async () => {
+    const TIGHT: StoryPolicy = Object.freeze({ ...POLICY, materialBudget: Object.freeze({ low: 1, medium: 1, high: 1 }) });
+    const { provider, calls } = scripted(byContract);
+    const refused = harness(providing(provider));
+    await refused.writer.writeAfterSettle({ ...SNAPSHOT, policy: TIGHT });
+    expect(refused.inserted[0]).toMatchObject({ outcome: "FAILED", failureCode: "STORY_MATERIAL_TOO_LARGE" });
+    expect(calls).toEqual([]);
+    // The reverse: a writer built with the tight budget serves a write that carries the generous one.
+    const served = harness({ ...providing(provider), policy: TIGHT });
+    await served.writer.writeAfterSettle({ ...SNAPSHOT, policy: POLICY });
+    expect(served.inserted[0]?.outcome).toBe("READY");
+    expect(calls).toHaveLength(2);
+  });
+
+  it("a write whose policy is null stores STORY_NOT_CONFIGURED, even though the writer was built with one", async () => {
+    const { provider, calls } = scripted(byContract);
+    const { writer, inserted, events } = harness(providing(provider));
+    await writer.writeAfterSettle({ ...SNAPSHOT, policy: null });
+    expect(inserted).toEqual([expect.objectContaining({
+      outcome: "FAILED", failureCode: "STORY_NOT_CONFIGURED", rounds: 0, artifactRefs: [], body: null
+    })]);
+    expect(calls).toEqual([]);
+    // A null policy WAS passed (as off), so nothing is logged as not passed.
+    expect(events).not.toContain("STORY_POLICY_NOT_PASSED");
+  });
+
+  it("hosted, a write whose policy has no story ceiling stores STORY_ENVELOPE_MISSING before any call, whatever the writer has", async () => {
+    const { provider, calls } = scripted(byContract);
+    const { writer, inserted } = harness({
+      ...providing(provider), hosted: true, policy: { ...POLICY, perStoryCeilingMicros: 50000 }
+    });
+    // POLICY carries no ceiling (null); the writer's own policy does.
+    await writer.writeAfterSettle({ ...SNAPSHOT, policy: POLICY });
+    expect(inserted).toEqual([expect.objectContaining({ outcome: "FAILED", failureCode: "STORY_ENVELOPE_MISSING", rounds: 0 })]);
+    expect(calls).toEqual([]);
+    // A write whose own policy has the ceiling runs the loop on the same writer.
+    await writer.writeAfterSettle({ ...SNAPSHOT, policy: { ...POLICY, perStoryCeilingMicros: 50000 } });
+    expect(inserted[1]?.outcome).toBe("READY");
+  });
+
+  it("a writer built without a policy, given a write without one, stores STORY_NOT_CONFIGURED and logs STORY_POLICY_NOT_PASSED once, by code and ids", async () => {
+    const { provider, calls } = scripted(byContract);
+    const { writer, inserted, events, details } = harness({ ...providing(provider), policy: null });
+    await writer.writeAfterSettle(SNAPSHOT);
+    expect(inserted).toEqual([expect.objectContaining({ outcome: "FAILED", failureCode: "STORY_NOT_CONFIGURED" })]);
+    expect(calls).toEqual([]);
+    expect(events.filter((event) => event === "STORY_POLICY_NOT_PASSED")).toHaveLength(1);
+    expect(details).toContainEqual({ event: "STORY_POLICY_NOT_PASSED", answerId: SNAPSHOT.answerId, answerVersion: 1 });
+    expect(JSON.stringify(details)).not.toContain(SNAPSHOT.questionLine);
+  });
+
+  it("a writer built without a policy runs a write that carries one, and logs nothing as not passed", async () => {
+    const { provider, calls } = scripted(byContract);
+    const { writer, inserted, events } = harness({ ...providing(provider), policy: null });
+    await writer.writeAfterSettle({ ...SNAPSHOT, policy: POLICY });
+    expect(inserted[0]).toMatchObject({ outcome: "READY", failureCode: null });
+    expect(calls).toHaveLength(2);
+    expect(events).not.toContain("STORY_POLICY_NOT_PASSED");
   });
 });

@@ -8,7 +8,7 @@ const NAME = "0125_synthesis_check.sql";
 const VERSION = "synthesis-check-forward0125-v1";
 const MANIFEST_PATH = "lineage/synthesis-check-forward0125.json";
 const VERIFIER_PATH = "lineage/verify-effective-capabilities-111.sql";
-const PREVIOUS = "0122_engine_map_check.sql";
+const PREVIOUS = "0124_settings_activation.sql";
 const TABLES = [
   "serve.synthesis_check_request", "serve.synthesis_check_attempt", "serve.synthesis_check_result",
   "serve.synthesis_check_inheritance", "serve.synthesis_check_removal_request",
@@ -32,7 +32,7 @@ const FUNCTIONS = [
   "serve.run_removed_by_synthesis_check(uuid)"
 ] as const;
 const OWN_CONSTRAINT = "model_spend_synthesis_check_names_its_run";
-const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0123_${detail}`); };
+const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0125_${detail}`); };
 const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 const exactKeys = (value: unknown, keys: readonly string[]): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)

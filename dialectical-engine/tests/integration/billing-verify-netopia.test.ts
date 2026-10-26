@@ -14,7 +14,9 @@ import { testBillingPlans, testBillingPolicy, testCountryPolicy } from "../suppo
 import {
   recordingAudit, seedNetopiaSubscription, TEST_PUBLIC_APP_URL, TEST_RECORDS_KEY
 } from "../support/billingSubscriptionFixtures.js";
-import { sealBillingProfile, sealCardToken, sealIpEvidence, sealQuoteLocation } from "../../apps/api/src/billing/records.js";
+import {
+  openCardToken, sealBillingProfile, sealCardToken, sealIpEvidence, sealNoticeAllowed, sealQuoteLocation
+} from "../../apps/api/src/billing/records.js";
 import { RefundDesk } from "../../apps/api/src/billing/refunds.js";
 import { chargeEvent, newChargeId, subscriptionEvent } from "../../apps/api/src/billing/rows.js";
 import { createInitialSettlement } from "../../apps/api/src/billing/settlement-initial.js";
@@ -153,6 +155,26 @@ async function storeNotice(chargeId: string, status: number, amountText: string,
     noticeId: randomUUID(), paymentProvider: "netopia", paymentEnvironment: "sandbox", receivedAt, bodySha256: randomBytes(32).toString("hex"),
     orderId: chargeId, providerPaymentId: `ntp-${chargeId.slice(0, 12)}`, providerStatus: status, amountText, currency: "USD",
     cardCountry: "DE", keyFingerprint: "e".repeat(64), jwtIat: null, allowedCiphertext: sealed.ciphertext, keyId: sealed.keyId
+  }));
+  return stored.noticeId;
+}
+
+/**
+ * A verified NETOPIA message as N9 stores it, its allow-list really sealed (`sealNoticeAllowed`), so VERIFY_PAYMENT can
+ * read NETOPIA's refusal code from it (B2).
+ */
+async function storeSealedNotice(chargeId: string, status: number, code: string | null): Promise<string> {
+  const noticeId = randomUUID();
+  const providerPaymentId = `ntp-${chargeId.slice(0, 12)}`;
+  const sealed = sealNoticeAllowed(TEST_RECORDS_KEY, noticeId, {
+    orderID: chargeId, ntpID: providerPaymentId, status, amount: "23.80", currency: "USD", code, message: null,
+    cardCountry: "DE", last4: null, expireMonth: null, expireYear: null
+  });
+  const stored = await repository.withTransaction((client) => repository.insertPaymentNotice(client, {
+    noticeId, paymentProvider: "netopia", paymentEnvironment: "sandbox", receivedAt: new Date(),
+    bodySha256: randomBytes(32).toString("hex"), orderId: chargeId, providerPaymentId, providerStatus: status,
+    amountText: "23.80", currency: "USD", cardCountry: "DE", keyFingerprint: "e".repeat(64), jwtIat: null,
+    allowedCiphertext: sealed.ciphertext, keyId: sealed.keyId
   }));
   return stored.noticeId;
 }
@@ -409,6 +431,25 @@ describe("N10 VERIFY_PAYMENT on NETOPIA: a renewal", () => {
     }
   });
 
+  it("B2: a renewal decided from a stored notice keeps NETOPIA's refusal code on its PAST_DUE", async () => {
+    for (const [code, autoRetry] of [["20", true], ["34", false]] as const) {
+      const { seeded, chargeId } = await renewal(`notice-${code}`);
+      const noticeId = await storeSealedNotice(chargeId, 12, code);
+      const status = new ScriptedStatus();
+      const now = { at: new Date() };
+      // The status read stays unavailable until the not-final schedule is spent; the signed notice decides.
+      status.script(chargeId, paymentError("PAYMENT_PROVIDER_UNAVAILABLE"));
+      expect(await handlerFor(status, now).verify.handle(job(chargeId, 7, now.at), now.at)).toEqual({ kind: "DONE" });
+      expect(await noticeOutcomes(noticeId)).toContain("DECIDED_BY_NOTICE");
+      expect((await repository.charge(chargeId))!.events.find((event) => event.kind === "FAILED")?.errorCode).toBe("PAYMENT_DECLINED");
+      const pastDue = (await repository.subscriptionEvents(seeded.subscriptionId)).filter((event) => event.kind === "PAST_DUE").at(-1);
+      expect(pastDue?.data, code).toMatchObject({ charge_id: chargeId, decline_code: code, auto_retry: autoRetry });
+      // 20 and 34 are both bank codes (NETOPIA's page names the bank), so M5 says the bank refused.
+      const m5 = (await outbox(chargeId)).find((row) => row.kind === "EMAIL" && row.payload.template === "M5A");
+      expect(m5?.payload, code).toMatchObject({ "param.bankDeclined": "true" });
+    }
+  });
+
   it("leaves a renewal whose read stays unavailable to the pending-renewal deadline instead of letting the job die", async () => {
     const { chargeId } = await renewal("unreadable");
     const status = new ScriptedStatus();
@@ -462,6 +503,78 @@ describe("N10 VERIFY_PAYMENT on NETOPIA: a renewal", () => {
     expect(await kinds(chargeId)).toEqual(["REQUESTED", "SUBMITTED", "FAILED", "SUCCEEDED"]);
     expect((await repository.subscriptionEvents(seeded.subscriptionId)).at(-1)?.kind).toBe("RECOVERED");
     expect((await state(seeded.subscriptionId)).status).toBe("ACTIVE");
+  });
+});
+
+describe("B3 a card in a status read is kept", () => {
+  // NETOPIA answers 2026-10-21: the saved card comes only in the FIRST notice of a payment; resent copies carry none. When
+  // that first notice is lost, the status read that VERIFY_PAYMENT makes is the only other place the card can come from.
+  const answeredCard = (label: string) => Object.freeze({
+    token: createSecretToken(["tok", "b3", label, randomUUID().slice(0, 8)].join("-")), expMonth: 12, expYear: 2031, last4: "4242"
+  });
+  const tokensOf = (chargeId: string) => repository.cardTokensFromCharge(database.pool, chargeId);
+
+  it("stores the card of a PAID read with no notice stored, adopts it at the decision, and stores it once", async () => {
+    const bought = await checkout("b3-first");
+    const card = answeredCard("first");
+    const occurredAt = new Date(Date.now() - 2 * MINUTE);
+    const status = new ScriptedStatus();
+    const now = { at: new Date() };
+    const { verify } = handlerFor(status, now);
+    status.script(bought.chargeId, report(bought.chargeId, "PAID", { savedCard: card, occurredAt }));
+    expect(await verify.handle(job(bought.chargeId, 1, now.at), now.at)).toEqual({ kind: "DONE" });
+    const stored = await tokensOf(bought.chargeId);
+    expect(stored).toHaveLength(1);
+    const token = stored[0]!;
+    expect(token).toMatchObject({
+      customerId: bought.customerId, paymentProvider: "netopia", paymentEnvironment: "sandbox", sourceChargeId: bought.chargeId,
+      sourceNoticeId: null, sourceToolOrder: null, expMonth: 12, expYear: 2031, last4: "4242", cardCountry: "DE"
+    });
+    expect(token.sourcePaidAt?.getTime()).toBe(occurredAt.getTime());
+    expect(openCardToken(TEST_RECORDS_KEY, token).reveal()).toBe(card.token.reveal());
+    const activated = (await repository.subscriptionEvents(bought.subscriptionId)).filter((event) => event.kind === "ACTIVATED");
+    expect(activated.map((event) => event.cardTokenId)).toEqual([token.tokenId]);
+    expect((await state(bought.subscriptionId))).toMatchObject({ status: "ACTIVE", cardTokenId: token.tokenId });
+    // VERIFY_PAYMENT runs again on the same charge, its read carrying the card again: still one row (one per charge).
+    status.script(bought.chargeId, report(bought.chargeId, "PAID", { savedCard: answeredCard("again"), occurredAt }));
+    expect(await verify.handle(job(bought.chargeId, 1, now.at), now.at)).toEqual({ kind: "DONE" });
+    expect((await tokensOf(bought.chargeId)).map((row) => row.tokenId)).toEqual([token.tokenId]);
+    expect((await repository.subscriptionEvents(bought.subscriptionId)).filter((event) => event.kind === "CARD_SAVED")).toEqual([]);
+  });
+
+  it("adopts with CARD_SAVED a card a later read brings for a charge already SUCCEEDED without one", async () => {
+    const bought = await checkout("b3-late");
+    const status = new ScriptedStatus();
+    const now = { at: new Date() };
+    const { verify, audit } = handlerFor(status, now);
+    status.script(bought.chargeId, report(bought.chargeId, "PAID"));
+    expect(await verify.handle(job(bought.chargeId, 1, now.at), now.at)).toEqual({ kind: "DONE" });
+    expect((await state(bought.subscriptionId))).toMatchObject({ status: "ACTIVE", cardTokenId: null });
+    expect(await tokensOf(bought.chargeId)).toEqual([]);
+    status.script(bought.chargeId, report(bought.chargeId, "PAID", { savedCard: answeredCard("late") }));
+    expect(await verify.handle(job(bought.chargeId, 1, now.at), now.at)).toEqual({ kind: "DONE" });
+    const stored = await tokensOf(bought.chargeId);
+    expect(stored).toHaveLength(1);
+    expect(stored[0]).toMatchObject({ sourceChargeId: bought.chargeId, sourceNoticeId: null });
+    const saved = (await repository.subscriptionEvents(bought.subscriptionId)).filter((event) => event.kind === "CARD_SAVED");
+    expect(saved.map((event) => event.cardTokenId)).toEqual([stored[0]!.tokenId]);
+    expect((await state(bought.subscriptionId)).cardTokenId).toBe(stored[0]!.tokenId);
+    expect(audit.events.filter((entry) => entry.event === "billing.card.saved")).toHaveLength(1);
+    expect(await kinds(bought.chargeId)).toEqual(["REQUESTED", "SUCCEEDED"]);
+  });
+
+  it("stores no card from a DECLINED read that happens to carry one", async () => {
+    const bought = await checkout("b3-declined");
+    const status = new ScriptedStatus();
+    const now = { at: new Date() };
+    const { verify } = handlerFor(status, now);
+    status.script(bought.chargeId, report(bought.chargeId, "DECLINED", {
+      savedCard: answeredCard("declined"), declineCode: "20", declineSide: "CARD", bankDeclined: true
+    }));
+    expect(await verify.handle(job(bought.chargeId, 1, now.at), now.at)).toEqual({ kind: "DONE" });
+    expect(await kinds(bought.chargeId)).toEqual(["REQUESTED", "FAILED"]);
+    expect(await tokensOf(bought.chargeId)).toEqual([]);
+    expect((await state(bought.subscriptionId))).toMatchObject({ status: "CREATED", cardTokenId: null });
   });
 });
 

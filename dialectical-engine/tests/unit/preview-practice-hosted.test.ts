@@ -12,10 +12,13 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   canonicalRegisterJson,
+  COST_ESTIMATE_START_POLICY_ROW_KEY,
   computeRegisterSnapshotSha256,
   loadBootstrapRegister,
-  parseCanonicalRegisterJson
+  parseCanonicalRegisterJson,
+  PREVIEW_LINE_UP_POLICY_ROW_KEY
 } from "@debateai/register";
+import { parsePreviewLineUp } from "@debateai/providers";
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from "../../packages/register/src/staff-access-policy.js";
 import { buildPreviewSourceRowsV2 } from "../../deploy/preview-auth-dev/v1/publish-register-v2.js";
 import {
@@ -28,10 +31,11 @@ import {
   composePracticeNextRegisterVersion,
   parsePracticeNextRegisterInputs,
   practiceBaseIsHosted,
+  practiceRowsLineUp,
   PRACTICE_REGISTER_EXPORT_SCHEMA,
   type PracticeRegisterExport
 } from "../../tools/preview-practice/practice-register-import.js";
-import { parsePracticeSettings, PRACTICE_HOSTED_SET_ASIDE_KEYS } from "../../tools/preview-practice/practice-settings.js";
+import { parsePracticeSettings, PRACTICE_HOSTED_SET_ASIDE_KEYS, practiceSettingsWithLineUp } from "../../tools/preview-practice/practice-settings.js";
 import { runPractice } from "../../tools/preview-practice/practice.js";
 
 type Row = { rowKey: string; valueJsonText: string; sourceRef: string };
@@ -93,14 +97,29 @@ describe("hosted settings: read, with the server-only settings set aside unread"
   ];
 
   it("reads a hosted export as hosted, and a hosted export carrying the server-only settings keeps only their names", () => {
-    expect(parsePracticeSettings(base("hosted").join("\n"))).toMatchObject({ runner: { DEPLOYMENT_MODE: "hosted", REGISTER_VERSION: 13 },
-      setAsideKeys: [] });
-    const settings = parsePracticeSettings([...base("hosted"), ...serverOnly].join("\n"));
+    // Side-by-side §1 (B6): a hosted practice names its release from the checkout's source revision.
+    const sourceRevision = "0123456789ab".padEnd(40, "c");
+    expect(parsePracticeSettings(base("hosted").join("\n"), { sourceRevision })).toMatchObject({
+      runner: { DEPLOYMENT_MODE: "hosted", REGISTER_VERSION: 13, RELEASE_KEY: ["r13", "0123456789ab"].join("-") }, setAsideKeys: [] });
+    const settings = parsePracticeSettings([...base("hosted"), ...serverOnly].join("\n"), { sourceRevision });
     expect(settings.runner.DEPLOYMENT_MODE).toBe("hosted");
     expect(settings.setAsideKeys).toEqual(serverOnly.map((line) => line.slice(0, line.indexOf("="))));
     // No value of theirs is kept anywhere in what the practice holds.
     const held = JSON.stringify(settings);
     for (const line of serverOnly) expect(held).not.toContain(line.slice(line.indexOf("=") + 1));
+  });
+
+  it("the hosted T+1 env form (sockets only, R25): read, its server-only settings set aside, its line-up the version's", () => {
+    const { free_model_ids: _free, premium_model_ids: _premium, ...gateOnly } = JSON.parse(config) as Record<string, unknown>;
+    const lines = base("hosted").map((line) => line.startsWith("PREVIEW_PROVIDER_TEST_CONFIG_JSON=")
+      ? `PREVIEW_PROVIDER_TEST_CONFIG_JSON=${JSON.stringify(gateOnly)}` : line);
+    const settings = parsePracticeSettings([...lines, ...serverOnly].join("\n"), { sourceRevision: "0123456789ab".padEnd(40, "c") });
+    expect(settings).toMatchObject({ previewConfig: null, runner: { DEPLOYMENT_MODE: "hosted", PREVIEW_ENV_LINE_UP: null } });
+    expect(settings.setAsideKeys).toHaveLength(serverOnly.length);
+    const lineUp = parsePreviewLineUp({ free_model_ids: ["zai-org/GLM-5.3-Flash", "claude-haiku-5-5"],
+      premium_model_ids: ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash", "claude-haiku-5-5"], thinking_levels: null });
+    expect(practiceSettingsWithLineUp(settings, lineUp, { trial: false }).previewConfig).toMatchObject({
+      scope_id: "preview-practice-hosted", free_model_ids: lineUp.free_model_ids, premium_model_ids: lineUp.premium_model_ids });
   });
 
   it("a local export still refuses each of them at its own line, exactly as any key outside the allow-list", () => {
@@ -143,7 +162,7 @@ describe("--register-next on the hosted preview: publish kit v3, as the server's
     expect(next.snapshotSha256).toBe(server.snapshotSha256);
     expect(next.deltaSha256).toBe(server.deltaSha256);
     expect(next).toMatchObject({ composer: "preview-register-composer-v3", checker: "glm", roleRotation: "on", hostedBilling: OFF, notes: [],
-      addedKeys: [STORY_COST_ENVELOPE_POLICY_ROW_KEY], changedKeys: ["admissionPolicy", "costEnvelopePolicy"] });
+      addedKeys: [COST_ESTIMATE_START_POLICY_ROW_KEY, STORY_COST_ENVELOPE_POLICY_ROW_KEY], changedKeys: ["admissionPolicy", "costEnvelopePolicy"] });
     expect(value(next.rows as readonly Row[], "costEnvelopePolicy")).toMatchObject({ per_run_ceiling_micros: 3_000_000, daily_ceiling_micros: 10_000_000 });
     expect(value(next.rows as readonly Row[], "billingPolicy").enabled).toBe(false);
   });
@@ -186,6 +205,31 @@ describe("--register-next on the hosted preview: publish kit v3, as the server's
     expect(value(next.rows as readonly Row[], "callConcurrencyPolicy")).toMatchObject(policy);
   });
 
+  it("--register-next --line-up (addition D23): the row goes into the code's next version itself, kit v2 or kit v3, as the plan's --line-up", async () => {
+    const lineUp = parsePreviewLineUp({ free_model_ids: ["zai-org/GLM-5.3-Flash", "claude-haiku-5-5"],
+      premium_model_ids: ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash", "XiaomiMiMo/MiMo-V2.6-Pro", "claude-haiku-5-5"],
+      thinking_levels: { "deepseek-ai/DeepSeek-V4.1-Flash": { level: "low" } } });
+    expect((await parsePracticeNextRegisterInputs({ lineUp })).choices).toEqual({ lineUp });
+    expect((await parsePracticeNextRegisterInputs({ lineUp: null })).choices).toEqual({});
+    const base = await local12();
+    // Kit v2: the base is the code's own rows, so the line-up row is the only change (nothing else is practised).
+    const local = await composePracticeNextRegisterVersion(exportOf(base), undefined, { lineUp });
+    expect([local.addedKeys, local.changedKeys]).toEqual([[PREVIEW_LINE_UP_POLICY_ROW_KEY], []]);
+    expect(practiceRowsLineUp(local.rows)).toEqual(lineUp);
+    // Kit v3: byte for byte the server's proposal with the same --line-up.
+    const hosted = await composePracticeHostedNextRegisterVersion(exportOf(base), OFF, { lineUp });
+    const serverRows = await buildPreviewSourceRowsV3(await loadBootstrapRegister(), runtime, OFF, undefined, "on", null, null, null, null, null, lineUp);
+    const server = composePreviewSnapshotV3({ sourceRows: serverRows, baseRows: base as never, baseRegisterVersion: "12",
+      baseSnapshotSha256: computeRegisterSnapshotSha256(base as never) });
+    expect([hosted.snapshotSha256, hosted.deltaSha256]).toEqual([server.snapshotSha256, server.deltaSha256]);
+    expect(hosted.addedKeys).toContain(PREVIEW_LINE_UP_POLICY_ROW_KEY);
+    expect(practiceRowsLineUp(hosted.rows)).toEqual(lineUp);
+    // Without --line-up a base's own row is carried unchanged (R19): no line-up change in the next version.
+    const carried = await composePracticeHostedNextRegisterVersion(exportOf(sorted([...local.rows] as Row[])), OFF);
+    expect([...carried.addedKeys, ...carried.changedKeys]).not.toContain(PREVIEW_LINE_UP_POLICY_ROW_KEY);
+    expect(practiceRowsLineUp(carried.rows)).toEqual(lineUp);
+  });
+
   it("kit v2 refuses a hosted base (the server's HOSTED_BILLING_REQUIRED), and keeps reading a local base as before", async () => {
     const hostedBase = [...(await serverPlan(await local12(), "12", OFF)).rows] as Row[];
     await expect(composePracticeNextRegisterVersion(exportOf(hostedBase, "13")))
@@ -199,6 +243,7 @@ describe("--register-next on the hosted preview: publish kit v3, as the server's
     expect(cli).toContain("if (nextInputs?.kit === \"v2\" && settings.runner.DEPLOYMENT_MODE === \"hosted\") {");
     const debate = read("tools/preview-practice/practice-debate.ts");
     expect(debate).toContain("...(receipt.codeNext.composer === undefined ? {} : { DEPLOYMENT_MODE: \"hosted\" as const })");
+    expect(debate).toContain("nextReleaseKey(receipt.codeNext.composer === undefined ? input.settings.runner.DEPLOYMENT_MODE : \"hosted\")");
   });
 });
 

@@ -30,16 +30,23 @@ describe("B7b the API root wakes the line", () => {
     expect(main).toContain("let askWaker: Readonly<{ stop(): void }> | undefined;");
     expect(main).toContain('api.addHook("onClose",async () => askWaker?.stop());');
     const listen = main.indexOf('await startup.run("listen"');
-    const start = main.indexOf("if (askRoom !== undefined) {\n  triggerAskWake();\n  askWaker = everyWholeMinute(triggerAskWake);\n}");
+    // Side-by-side C7: the whole-minute tick asks the waker only on the current release, and the "once" runs each time
+    // the release becomes current (inside the watcher's listener, pinned by tests/architecture/side-by-side-api-loops).
+    const start = main.indexOf("if (askRoom !== undefined) askWaker = everyWholeMinute(gatedTrigger(releaseWatcher, triggerAskWake));");
+    const once = main.indexOf("\n  if (askRoom !== undefined) triggerAskWake();\n", main.indexOf("releaseWatcher.onBecameCurrent(() => {"));
     expect(listen).toBeGreaterThan(-1);
     expect(start).toBeGreaterThan(listen);
+    expect(once).toBeGreaterThan(start);
     // No free-running interval: a tick a minute after boot would start a question later than it was told.
     expect(main).not.toContain("setInterval(triggerAskWake");
   });
 
   it("hands the room to the application as both the decision and the line, with the plans a waking run is checked against", async () => {
     const main = await readFile("apps/api/src/main.ts", "utf8");
-    expect(main).toContain("? { room: askRoom, waitingLine: askRoom }");
-    expect(main).toMatch(/entitlements,\s*billingPlans,\s*\.\.\.\(fundedAllowance === undefined \? \{\} : \{\s*funding:\s*fundedAllowance\s*\}\),\s*dailyCeilingMicros:\s*costEnvelopeRows\.runPolicy\.dailyCeilingMicros,/u);
+    expect(main).toContain("...(askRoom === undefined ? {} : { room: askRoom, waitingLine: askRoom }),");
+    // Side-by-side spec §13 (S9): the room is built after the admission loader; its day is the SITE's money row, which
+    // the "ask-room" readiness answer carries (`runPolicy`).
+    expect(main).toMatch(/entitlements,\s*billingPlans,\s*\.\.\.\(fundedAllowance === undefined \? \{\} : \{\s*funding:\s*fundedAllowance\s*\}\),\s*dailyCeilingMicros:\s*runPolicy\.dailyCeilingMicros,/u);
+    expect(main).toContain("return Object.freeze({ runPolicy: siteCostEnvelopePolicy, band, spend, entitlements, fundedAllowance, personAllowance, billingPlans });");
   });
 });

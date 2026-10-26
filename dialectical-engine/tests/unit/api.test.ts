@@ -24,6 +24,7 @@ import {
   testSessionHeaders
 } from "../support/httpSession.js";
 import { questionCheckPass } from "../support/questionCheckPass.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const RUN_ID = "11111111-1111-4111-8111-111111111111";
 const QUEUED_RUN_ID = "22222222-2222-4222-8222-222222222222";
@@ -99,6 +100,7 @@ function admissionSettings(
   return {
     strangerSampleRate: 0,
     registerVersion: 1,
+    releaseKey: TEST_RELEASE_KEY,
     batteryVersion: "battery:test",
     settlementWatchHandle: "watch:test",
     resolveDiscoveredPanel: async () => rosterPanel("free", ["maker:1", "maker:2"]),

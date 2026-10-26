@@ -30,6 +30,7 @@ import { persistCatchUpVersion } from "../support/catchUpVersion.js";
 import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } from "../../apps/api/src/stories.js";
 import { RepositoryAnswerDisclosureApplication } from "../../apps/api/src/disclosures.js";
 import type { AuthenticatedSession, SessionApplication } from "../../apps/api/src/sessions.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 /**
  * Verdict story, Task 9 — the whole path, in the t17 style: a real one-maker
@@ -408,7 +409,7 @@ async function ownerReads(owner: AuthenticatedSession, answerId: string) {
   const token = "o".repeat(43);
   const api = buildApi({
     application: new PostgresAskApplication(
-      database.pool, {} as never, {} as never, undefined, database.pool,
+      database.pool, {} as never, { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, undefined, database.pool,
       createTestAskAdmissionPoolFacades(database.pool)
     ),
     sessions: {

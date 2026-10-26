@@ -26,6 +26,7 @@ function exportHarness() {
   const ownerView = {
     runKeyPresent: vi.fn(async () => true),
     runRemovedByCheck: vi.fn(async () => false),
+    resolveRunRef: vi.fn(async (runId: string) => runId),
     readRun: vi.fn(async () => ({ state: "SETTLED", question_line: "Owner question" })),
     readRunAnswer: vi.fn(async (): Promise<{ answer_id: string; answer_version: number } | null> => ({ answer_id: "answer-1", answer_version: 2 })),
     readAnswer: vi.fn(async (_owner: string, _id: string, version: number) => ({ answer_id: "answer-1", answer_version: version, nodes: [] })),

@@ -12,6 +12,7 @@ import {
   type AskRoomLine,
   type AskRoomSpend
 } from "../../apps/api/src/ask-room.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const NOW = new Date("2026-09-30T18:00:20.000Z");
 const MIDNIGHT = new Date("2026-10-01T00:00:00.000Z");
@@ -49,7 +50,7 @@ function window(scope: PersonWindow["scope"], limitMicros: number, resetsAt: Dat
 
 function waitingRun(input: Partial<WaitingRun> = {}): WaitingRun {
   return Object.freeze({
-    runId: randomUUID(), waitingSince: new Date("2026-09-30T17:00:00.000Z"),
+    runId: randomUUID(), waitingSince: new Date("2026-09-30T17:00:00.000Z"), releaseKey: TEST_RELEASE_KEY,
     ownerRef: null, legacyAskerId: `legacy:${randomUUID()}`,
     planTier: "free", compositionBudgetTier: "low", depth: 1, makerCount: 2,
     waitsFor: "SITE", personRecheckAt: null, reasonAt: new Date("2026-09-30T17:00:00.000Z"),

@@ -8,7 +8,7 @@
 import { mkdirSync, realpathSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
-import type { PracticeDebateResult, PracticeRepairRow, PracticeUnrepairedRow } from "./practice-debate.js";
+import type { PracticeDebateResult, PracticeLanguageFollowUpRow, PracticeRepairRow, PracticeUnrepairedRow } from "./practice-debate.js";
 import type { PracticeFormatsResult, PracticeSample } from "./practice-formats.js";
 import { practiceStopIsPause, type PracticeGateName, type PracticeGateObserver, type PracticeGateSummary } from "./practice-gate-observer.js";
 import {
@@ -468,6 +468,8 @@ export function debateReport(input: Readonly<{
     // LG-A (L34): repairs by kind (counts) and the replies code could not repair (each with a short sample, json only).
     repairsByKind: r.repairsByKind ?? [],
     unrepaired: r.unrepaired ?? [],
+    // The stray-letter rule (PR #194): every admitted debate's language refusals, so an empty list is a measured none.
+    ...(r.languageFollowUps === undefined ? {} : { languageFollowUps: r.languageFollowUps }),
     // Refused-repair salvage: the structure rescues (counts only); absent when there was none (today's keys).
     ...(practiceStructureRescuesShown(r.structureRescues) ? { structureRescues: r.structureRescues } : {}),
     // Length guidance L27 (LG-B): tokens and words per AI and step (information only).
@@ -548,7 +550,9 @@ export function reportMarkdown(report: PracticeReport): string {
     for (const [gate, block] of Object.entries(gates)) {
       const observed = (block.observed ?? block) as PracticeGateSummary;
       lines.push(`- ${gate}: ${String(observed.calls)} calls, ${String(observed.unbilled)} refused, not billed (vendor busy `
-        + `${String(observed.vendorRefused)}, cooling off ${String(observed.modelCooling)}, not reached ${String(observed.notReached)}, `
+        + `${String(observed.vendorRefused)}, cooling off ${String(observed.modelCooling)}, `
+        + `not served ${String(observed.notServed ?? 0)}, `
+        + `not reached ${String(observed.notReached)}, `
         + `vendor error not billed ${String(observed.vendorErrorUnbilled ?? 0)}), `
         + (observed.bookedMax ? `${String(observed.bookedMax)} booked at their maximum (sent, then timed out or cut off; `
           + "the gate charged each its full reservation and kept going), " : "")
@@ -598,6 +602,17 @@ export function reportMarkdown(report: PracticeReport): string {
     for (const row of unrepaired) {
       lines.push(`- ${row.model} · ${row.step} · ${row.failureClass} · ${row.code}@${row.path} · next: ${row.followUp}`
         + `${row.recovered ? " · recovered" : " · not recovered"}`);
+    }
+    lines.push("");
+  }
+  const languageFollowUps = report.languageFollowUps as readonly PracticeLanguageFollowUpRow[] | undefined;
+  if (languageFollowUps !== undefined && languageFollowUps.length === 0) {
+    lines.push("Reply-language refusals: none (no reply was refused for its language or script).", "");
+  } else if (languageFollowUps !== undefined) {
+    lines.push("Reply-language refusals (text in another language or script, such as Chinese letters in an English reply; "
+      + "information only):", "", "| model | step | code | refused | short follow-ups | follow-ups accepted |", "|---|---|---|---|---|---|");
+    for (const row of languageFollowUps) {
+      lines.push(`| ${row.model} | ${row.step} | ${row.code} | ${String(row.refused)} | ${String(row.followUps)} | ${String(row.accepted)} |`);
     }
     lines.push("");
   }

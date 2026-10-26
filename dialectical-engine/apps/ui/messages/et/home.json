@@ -26,6 +26,8 @@
   "runFailure.RUN_LIMIT_REACHED": "See väitlus jõudis oma piirini enne, kui suutis vastuse anda.",
   "runFailure.STOPPED": "See väitlus katkes poole pealt meiepoolse probleemi tõttu. Palun esitage oma küsimus uuesti.",
   "runFailure.PLAN_ENDED": "Teie tasuline pakett lõppes või peatati sel ajal, kui see küsimus ootas, seega väitlus ei alanud. Võite selle uuesti esitada.",
+  "runFailure.CHOICE_GONE": "Veebisaiti uuendati sel ajal, kui teie küsimus ootas, ja üks teie valitud võimalustest ei ole enam saadaval. Palun küsige uuesti. Teie limiidist ei kulutatud midagi.",
+  "runFailure.SET_ASIDE": "Seda väitlust ei õnnestunud meie poolel tehtud uuenduse tõttu lõpuni viia. See ei kulutanud teie limiiti. Palun esitage oma küsimus uuesti.",
   "home.status.waiting": "Ootab algust. Teie väitlus algab ise {time}.",
   "home.status.waitingOwnDebates": "Teie teised väitlused kasutavad praegu teie piiri ülejäänud osa. See väitlus algab ise kohe, kui üks neist lõpeb.",
   "home.noPublishedDebates": "Ühtegi väitlust pole veel avaldatud.",

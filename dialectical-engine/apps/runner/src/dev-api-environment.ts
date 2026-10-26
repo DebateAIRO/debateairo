@@ -4,6 +4,8 @@ import { constants } from "node:fs";
 import { open, rename, unlink } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { developmentReleaseKey } from "@debateai/kernel";
+import { registerVersionToSafeLegacyNumber } from "@debateai/register";
 import { DEVELOPMENT_DATABASE_PRINCIPALS } from "./dev-database-principals.js";
 import {
   DEVELOPMENT_CLI_CALL_TIMEOUT_MS,
@@ -78,7 +80,8 @@ export const DEVELOPMENT_API_ENVIRONMENT_KEYS = Object.freeze([
   "HATCHET_TLS_STRATEGY",
   "DEBATEAI_DEV_MAIL_CAPTURE_DIR",
   "DEBATEAI_DEPLOYMENT_MODE",
-  "RECORDS_KEY_PATH"
+  "RECORDS_KEY_PATH",
+  "RELEASE_KEY"
 ] as const);
 
 export type DevelopmentApiEnvironmentReceipt = Readonly<{
@@ -370,7 +373,9 @@ function isExactPublishedRegisterRefresh(
   const receiptKeys = new Set([
     "REGISTER_VERSION",
     "REGISTER_DEPLOYMENT_RECEIPT_SHA256",
-    "REGISTER_DEPLOYMENT_RECEIPT_FILE"
+    "REGISTER_DEPLOYMENT_RECEIPT_FILE",
+    // Side-by-side §1: the dev release key is r<REGISTER_VERSION>-000000000000, so it moves with the version.
+    "RELEASE_KEY"
   ]);
   try {
     const existingValues = parseExactEnvironment(existing, DEVELOPMENT_API_ENVIRONMENT_KEYS);
@@ -465,17 +470,19 @@ function isExactEnvironmentWithoutDeclaredDeploymentMode(
     || isExactProviderRuntimeRefreshWithLegacyProbeTimeout(declared, expected, profile)
     || isExactPublishedRegisterRefresh(declared, expected, profile)
     || isExactLegacyEnvironmentWithoutSupportModelTarget(declared, expected, profile)
-    || isExactEnvironmentWithoutRecordsKey(declared, expected, profile);
+    || isExactEnvironmentWithoutRecordsKey(declared, expected, profile)
+    || isExactEnvironmentWithoutReleaseKey(declared, expected, profile);
 }
 
 const RECORDS_KEY_ROW_PREFIX = "RECORDS_KEY_PATH=";
 
 /**
  * Paid plans L1: an api.env written before the records key existed is this stack's own output
- * minus its LAST row. It is accepted (and rewritten) only when appending that one row makes it the
- * expected file, or one of the four refreshes above; anything else stays drift. A file that also
- * predates the declared deployment mode reaches here through
- * isExactEnvironmentWithoutDeclaredDeploymentMode, which appends its own row first.
+ * minus its records-key row and every row after it (since side-by-side §1, the release key's). It is
+ * accepted (and rewritten) only when appending those rows makes it the expected file, or one of the
+ * four refreshes above; anything else stays drift. A file that also predates the declared deployment
+ * mode reaches here through isExactEnvironmentWithoutDeclaredDeploymentMode, which appends its own
+ * row first.
  */
 function isExactEnvironmentWithoutRecordsKey(
   existing: string,
@@ -485,6 +492,31 @@ function isExactEnvironmentWithoutRecordsKey(
   if (!existing.endsWith("\n") || existing.includes(RECORDS_KEY_ROW_PREFIX)) return false;
   const lastRow = expected.slice(expected.lastIndexOf(RECORDS_KEY_ROW_PREFIX));
   if (!lastRow.startsWith(RECORDS_KEY_ROW_PREFIX) || !lastRow.endsWith("\n")) return false;
+  const upgraded = existing + lastRow;
+  return upgraded === expected
+    || isExactProviderRuntimeRefresh(upgraded, expected, profile)
+    || isExactProviderRuntimeRefreshWithLegacyProbeTimeout(upgraded, expected, profile)
+    || isExactPublishedRegisterRefresh(upgraded, expected, profile)
+    || isExactLegacyEnvironmentWithoutSupportModelTarget(upgraded, expected, profile);
+}
+
+const RELEASE_KEY_ROW_PREFIX = "RELEASE_KEY=";
+
+/**
+ * Side-by-side uploads spec 2026-10-21 §1: an api.env written before RELEASE_KEY existed is this
+ * stack's own output minus its LAST row (the derived development key). It is refreshed, not refused,
+ * only when appending that one row makes it the expected file, or one of the four refreshes above;
+ * anything else stays drift. Older files reach the same row through the records-key and declared-mode
+ * upgrades, which append everything they lack.
+ */
+function isExactEnvironmentWithoutReleaseKey(
+  existing: string,
+  expected: string,
+  profile: DevelopmentAuthStackProfile
+): boolean {
+  if (!existing.endsWith("\n") || existing.includes(`\n${RELEASE_KEY_ROW_PREFIX}`)) return false;
+  const lastRow = expected.slice(expected.lastIndexOf(`\n${RELEASE_KEY_ROW_PREFIX}`) + 1);
+  if (!lastRow.startsWith(RELEASE_KEY_ROW_PREFIX) || !lastRow.endsWith("\n")) return false;
   const upgraded = existing + lastRow;
   return upgraded === expected
     || isExactProviderRuntimeRefresh(upgraded, expected, profile)
@@ -577,7 +609,9 @@ export async function assembleDevelopmentApiEnvironment(
     ["HATCHET_TLS_STRATEGY", "none"],
     ["DEBATEAI_DEV_MAIL_CAPTURE_DIR", join(custodyRoot, "mail")],
     ["DEBATEAI_DEPLOYMENT_MODE", "local"],
-    ["RECORDS_KEY_PATH", join(custodyRoot, "secrets", "records-key.bin")]
+    ["RECORDS_KEY_PATH", join(custodyRoot, "secrets", "records-key.bin")],
+    // Side-by-side §1: a local stack does not know its source revision, so it runs as r<REGISTER_VERSION>-000000000000.
+    ["RELEASE_KEY", developmentReleaseKey(registerVersionToSafeLegacyNumber(custodyRegisterReceipt.registerVersion))]
   ]);
   const source = environmentSource(values);
   const reused = await publishExactFile(
@@ -590,6 +624,7 @@ export async function assembleDevelopmentApiEnvironment(
       || isExactLegacyEnvironmentWithoutSupportModelTarget(existing, source, profile)
       || isExactEnvironmentWithoutDeclaredDeploymentMode(existing, source, profile)
       || isExactEnvironmentWithoutRecordsKey(existing, source, profile)
+      || isExactEnvironmentWithoutReleaseKey(existing, source, profile)
   );
   return Object.freeze({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused });
 }

@@ -23,6 +23,7 @@ import { createQuadernoRefundHandler, createQuadernoSaleHandler } from "./invoic
 import { createSmartBillInvoiceHandler, createSmartBillStornoHandler, smartBillPdfResolver } from "./invoice-smartbill.js";
 import { BillingMaintenance } from "./maintenance.js";
 import { NetopiaNoticeIntake } from "./netopia-intake.js";
+import type { NoticeSpool } from "./notice-spool.js";
 import { catalogueOrderText } from "./order-text-catalogue.js";
 import { BillingOutboxWorker } from "./outbox.js";
 import { OwnerJobs } from "./owner-jobs.js";
@@ -30,6 +31,7 @@ import { QuoteService } from "./quote.js";
 import { BillingReconciler } from "./reconcile.js";
 import { RefundDesk } from "./refunds.js";
 import { RenewalService } from "./renewal.js";
+import { remindHeldRenewals } from "./renewal-resume.js";
 import { registerRetiredJobs } from "./retired-jobs.js";
 import { createRenewalNoticeHandler } from "./renewal-notice-job.js";
 import { createInitialSettlement } from "./settlement-initial.js";
@@ -75,6 +77,11 @@ export type BillingRuntimeDeps = Readonly<{
   identities?: Readonly<{ ownerRefByEmailBlindIndex(emailBlindIndex: Buffer): Promise<string | null> }>;
   /** P16a/P16c (R-35): where and when each tax is paid (the O1 text). Billing does not start without it. */
   taxAuthorities?: TaxAuthorities;
+  /**
+   * B3a (NETOPIA answers 2026-10-21): BILLING_NOTICE_SPOOL_PATH's spool, where the intake keeps a verified message the
+   * database could not take; replayed on the 10-minute tick (main.ts replays it once at the start). Absent: none.
+   */
+  noticeSpool?: NoticeSpool;
 }>;
 
 export type BillingRuntime = Readonly<{
@@ -104,7 +111,8 @@ export type BillingRuntime = Readonly<{
    */
   erasure: BillingErasureHook;
   kick(): void;
-  start(): void;
+  /** Side-by-side spec §4 (plan C7): `when` gates every timer callback and first pass (absent: always). */
+  start(options?: Readonly<{ when?: () => boolean }>): void;
   stop(): void;
 }>;
 
@@ -281,7 +289,7 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   const netopiaNotices = new NetopiaNoticeIntake({
     repository, jobs, trust: deps.connectors.noticeTrust, recordsKey: deps.connectors.recordsKey,
     paymentEnvironment: deps.connectors.paymentEnvironment, mode: "ON", audit: deps.audit, kick: () => drain(),
-    clockOffsetMs: deps.clockOffsetMs ?? 0
+    clockOffsetMs: deps.clockOffsetMs ?? 0, ...(deps.noticeSpool === undefined ? {} : { spool: deps.noticeSpool })
   });
   // P8b onward add their members to this object literal.
   const routes: BillingRouteOptions = Object.freeze({
@@ -314,11 +322,19 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   // P16c: the owner's quarterly tax summary (spec §2.5.9), queued once per quarter and sent as email O1.
   const ownerJobs = new OwnerJobs({
     billing: repository, jobs, taxAuthorities: required(deps.taxAuthorities, "taxAuthorities"),
-    audit: deps.audit, clock: deps.clock, custody, refunds
+    audit: deps.audit, clock: deps.clock, custody, refunds,
+    heldRenewals: {
+      remindOwner: (now) => remindHeldRenewals({ repository, jobs, paymentEnvironment: deps.connectors.paymentEnvironment }, now)
+    }
   });
   outbox.register("OWNER_TAX_SUMMARY", ownerJobs.taxSummary);
   const scheduleOwnerJobs = createCoalescingSingleFlight(
     () => ownerJobs.schedule(), () => deps.reportPending("BILLING_OWNER_JOBS_PENDING")
+  );
+  // B3a: the spool's replay on the reconcile's 10-minute tick, single-flight; a failed replay is one line, tried again.
+  const replaySpool = createCoalescingSingleFlight(
+    () => netopiaNotices.replaySpool(deps.clock()),
+    () => deps.audit("billing.notice.spool_replay", { code: "BILLING_NOTICE_SPOOL_REPLAY_FAILED" })
   );
   const timers: Array<ReturnType<typeof setInterval>> = [];
   return Object.freeze({
@@ -332,26 +348,35 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     maintenance,
     erasure,
     kick: drain,
-    start() {
+    start(options?: Readonly<{ when?: () => boolean }>) {
       if (timers.length > 0) return;
-      const outboxTimer = setInterval(drain, 5_000);
+      // Side-by-side spec §4 (plan C7): every tick and every first pass asks `when` (main.ts: the release watcher's
+      // ownIsCurrent), so a release that is not current claims no billing row; `kick` above stays ungated.
+      const when = options?.when ?? (() => true);
+      const gated = (work: () => void) => (): void => { if (when()) work(); };
+      const outboxTimer = setInterval(gated(drain), 5_000);
       outboxTimer.unref();
       timers.push(outboxTimer);
-      drain();
-      const renewalTimer = setInterval(renewTick, 60_000);
+      gated(drain)();
+      const renewalTimer = setInterval(gated(renewTick), 60_000);
       renewalTimer.unref();
       timers.push(renewalTimer);
-      renewTick();
+      gated(renewTick)();
       // P14a: every 10 minutes; the reconciler itself runs the full pass once a day.
-      const reconcileTimer = setInterval(reconcile, 600_000);
+      const reconcileTimer = setInterval(gated(reconcile), 600_000);
       reconcileTimer.unref();
       timers.push(reconcileTimer);
-      reconcile();
+      gated(reconcile)();
+      if (deps.noticeSpool !== undefined) {
+        const spoolTimer = setInterval(gated(replaySpool), 600_000);
+        spoolTimer.unref();
+        timers.push(spoolTimer);
+      }
       // P16c: the quarter's tax summary is queued once; checking daily is enough.
-      const ownerTimer = setInterval(scheduleOwnerJobs, 86_400_000);
+      const ownerTimer = setInterval(gated(scheduleOwnerJobs), 86_400_000);
       ownerTimer.unref();
       timers.push(ownerTimer);
-      scheduleOwnerJobs();
+      gated(scheduleOwnerJobs)();
     },
     stop() {
       for (const timer of timers.splice(0)) clearInterval(timer);

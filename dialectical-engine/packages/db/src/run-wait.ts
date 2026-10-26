@@ -6,19 +6,30 @@ import type { Pool, PoolClient } from "pg";
  * `core.run_wait` / `core.run_wait_start` / `core.run_wait_reason` are
  * append-only and content-free; the line is read through `core.run_waiting_v`,
  * which derives "still waiting" (no start, no FAILED job, content still live,
- * owner's account still active), the run's owner (its latest ownership event)
- * and why it waits (its latest reason), so no owner is ever stored beside a wait.
+ * owner's account still active, not superseded by a re-admitted run: 0123 §4),
+ * the run's owner (its latest ownership event) and why it waits (its latest
+ * reason), so no owner is ever stored beside a wait.
  */
 export type WaitingRunRef = Readonly<{ runId: string; waitingSince: Date }>;
 
 /**
  * Why a run waits (budget spec §2.3 rule 1). SITE: the site's day, or the line
  * ahead of it. PERSON: its own person's window is full; `personRecheckAt` is the
- * earliest instant that block can lift by itself.
+ * earliest instant that block can lift by itself. Side-by-side spec §9, §13
+ * (0123 §5): SITE_BUSY, the site runs as many debates as its runners take;
+ * SWITCHING, a release switch is under way. Every reason but PERSON is
+ * site-like to the readers below (`IS DISTINCT FROM 'PERSON'`), so such a run
+ * keeps its place in line and the waker still reads it; area C decides when
+ * each is written.
  */
 export type WaitReason =
   | Readonly<{ waitsFor: "SITE"; personRecheckAt: null }>
-  | Readonly<{ waitsFor: "PERSON"; personRecheckAt: Date }>;
+  | Readonly<{ waitsFor: "PERSON"; personRecheckAt: Date }>
+  | Readonly<{ waitsFor: "SITE_BUSY"; personRecheckAt: null }>
+  | Readonly<{ waitsFor: "SWITCHING"; personRecheckAt: null }>;
+
+/** The reasons that carry no recheck instant (0083's run_wait_reason_names_its_recheck). */
+const SITE_LIKE_REASONS: ReadonlySet<unknown> = new Set(["SITE", "SITE_BUSY", "SWITCHING"]);
 
 /** Where one page of the waker's read ended, in the line's own order: (waiting_since, run_id). */
 export type WaitingRunCursor = Readonly<{ waitingSince: Date; runId: string }>;
@@ -26,6 +37,17 @@ export type WaitingRunCursor = Readonly<{ waitingSince: Date; runId: string }>;
 export type WaitingRun = Readonly<{
   runId: string;
   waitingSince: Date;
+  /**
+   * Side-by-side spec §1, §4 (plan C task C10): the release that admitted the run (`core.run.release_key`, `legacy`
+   * before 0123). A waker of another release re-admits it under its own release instead of starting it (C11, O3).
+   */
+  releaseKey: string;
+  /**
+   * Side-by-side spec §13 (S10): the settings version the run was admitted on (`core.run.register_version`). The room
+   * estimates it, and holds it when it starts, with that version's estimator. Always read by this repository; optional
+   * in the type only so a hand-built run (tests) keeps the room's own estimator.
+   */
+  registerVersion?: number;
   /** Exactly one of these is non-null: the owner for an account's run, the legacy asker id otherwise. */
   ownerRef: string | null;
   legacyAskerId: string | null;
@@ -49,6 +71,8 @@ export type WaitingRun = Readonly<{
 type WaitingRow = {
   run_id: string;
   waiting_since: Date;
+  release_key: string;
+  register_version: number;
   owner_ref: string | null;
   legacy_asker_id: string | null;
   plan_tier: "free" | "premium" | null;
@@ -66,12 +90,17 @@ const WAITING_COLUMNS = `run_id, waiting_since, owner_ref::text AS owner_ref, le
   (SELECT CASE WHEN shape_run.depth_params ? 'depthMode' THEN jsonb_build_object(
       'depthMode', shape_run.depth_params->'depthMode', 'scrutiny', shape_run.depth_params->'scrutiny',
       'answerLength', shape_run.depth_params->'answerLength', 'plan', shape_run.envelope_basis->'shape'->'plan') END
-   FROM core.run AS shape_run WHERE shape_run.run_id = line.run_id) AS shape_settings`;
+   FROM core.run AS shape_run WHERE shape_run.run_id = line.run_id) AS shape_settings,
+  (SELECT key_run.release_key FROM core.run AS key_run WHERE key_run.run_id = line.run_id) AS release_key,
+  (SELECT settings_run.register_version FROM core.run AS settings_run WHERE settings_run.run_id = line.run_id)::integer
+    AS register_version`;
 
 function waitingRun(row: WaitingRow): WaitingRun {
   return Object.freeze({
     runId: row.run_id,
     waitingSince: row.waiting_since,
+    releaseKey: row.release_key,
+    registerVersion: row.register_version,
     ownerRef: row.owner_ref,
     legacyAskerId: row.legacy_asker_id,
     planTier: row.plan_tier,
@@ -126,7 +155,7 @@ export class RunWaitRepository {
     reason: WaitReason & Readonly<{ at: Date }>
   ): Promise<void> {
     const person = reason?.waitsFor === "PERSON";
-    if ((reason?.waitsFor !== "SITE" && !person) || !validInstant(reason.at)
+    if ((!SITE_LIKE_REASONS.has(reason?.waitsFor) && !person) || !validInstant(reason.at)
       || (person ? !validInstant(reason.personRecheckAt) : reason.personRecheckAt !== null)) {
       throw new TypeError("RUN_WAIT_REASON_INVALID");
     }

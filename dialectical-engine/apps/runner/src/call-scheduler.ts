@@ -1,16 +1,17 @@
 import { TypedDomainError } from "@debateai/kernel";
-import type { CallConcurrencyPolicy } from "@debateai/register";
+import { CALL_CONCURRENCY_LIMITS, type CallConcurrencyPolicy } from "@debateai/register";
 
 /**
  * Parallel AI calls (spec 2026-10-12 §3.2) — the runner-wide call scheduler.
  *
- * One scheduler per runner process; one lane per debate. Every model call of a
- * debate passes through its lane and starts only when it fits under every limit:
+ * One scheduler per runner process; one lane per debate. A lane opens with its debate's own limits (`openLane`'s
+ * `limits`, side-by-side spec §13 runner point 5); opened without them it runs on the policy's two per-debate members.
+ * Every model call of a debate passes through its lane and starts only when it fits under every limit:
  *
- *  · the debate's own slots (`perDebate`),
- *  · the model's slots inside that debate (`perModelPerDebate`),
+ *  · the debate's own slots (`perDebate`, from the debate's settings version, side-by-side spec §13 runner point 5),
+ *  · the model's slots inside that debate (`perModelPerDebate`, the same source as `perDebate`),
  *  · the model's slots across the whole runner (`perModelPerRunner[vendor]`,
- *    else `perModelPerRunner.default`),
+ *    else `perModelPerRunner.default`: the scheduler's own policy, never a debate's),
  *  · for a call through a gate that announced its slots, the gate's slots
  *    (ONE while the gate cannot reach its vendor, spec §3.4),
  *  · and, for a final writer (LG-B) through a gate that announced final-writer
@@ -35,6 +36,11 @@ import type { CallConcurrencyPolicy } from "@debateai/register";
 export const CALL_LANE_STOPPED = "CALL_LANE_STOPPED" as const;
 /** A call the lane's start guard refused (the debate's arguing had stopped): never sent. Never a debate's failure. */
 export const CALL_LANE_HELD_BACK = "CALL_LANE_HELD_BACK" as const;
+/**
+ * The limits a lane was opened with are outside CALL_CONCURRENCY_LIMITS or not whole numbers (side-by-side spec §13):
+ * `openLane` throws TypeError with this message, and opens no lane.
+ */
+export const CALL_LANE_LIMITS_INVALID = "CALL_LANE_LIMITS_INVALID" as const;
 
 export type CallPriority = "AUTHOR" | "PANEL" | "REVIEW" | "OTHER";
 export interface CallSubject { readonly model: string; readonly vendor: string; readonly gate: string | null; }
@@ -71,7 +77,7 @@ export interface SchedulerStats {
   readonly peakByModel: Readonly<Record<string, number>>;
 }
 export interface DebateCallLane {
-  /** How many of this debate's calls may run at once (the policy's `perDebate`): 1 is one call at a time. */
+  /** How many of this debate's calls may run at once (the lane's own `perDebate`, side-by-side spec §13): 1 is one call at a time. */
   readonly callsAtOnce: number;
   /** Waits for a slot under every limit, runs `call`, always releases. Rejects with TypedDomainError CALL_LANE_STOPPED if the lane is stopped while waiting. */
   run<T>(ticket: CallTicket, call: () => Promise<T>): Promise<T>;
@@ -101,7 +107,13 @@ export interface DebateCallLane {
   stats(): LaneStats;
 }
 export interface CallScheduler {
-  openLane(debateId: string): DebateCallLane;
+  /**
+   * Opens the lane of one debate. `limits` are that debate's own slots (its settings version's `perDebate` and
+   * `perModelPerDebate`, side-by-side spec §13 runner point 5); absent, the scheduler policy's two members. Each must be a
+   * whole number inside CALL_CONCURRENCY_LIMITS, else TypeError CALL_LANE_LIMITS_INVALID and no lane opens. The runner-wide
+   * `perModelPerRunner` is never a lane's: it stays the scheduler's, and caps every lane together.
+   */
+  openLane(debateId: string, limits?: Readonly<{ perDebate: number; perModelPerDebate: number }>): DebateCallLane;
   /** The gate's own slots (preview /remaining max_concurrent_calls); absent gate = unlimited. */
   setGateCapacity(gate: string, slots: number): void;
   /**
@@ -151,6 +163,8 @@ type Waiting = Readonly<{
 
 type Lane = {
   readonly debateId: string;
+  /** The debate's own slots, fixed when the lane opens (`openLane`'s limits, or the policy's two members when absent). */
+  readonly limits: Readonly<{ perDebate: number; perModelPerDebate: number }>;
   stopped: boolean;
   running: number;
   readonly runningByModel: Map<string, number>;
@@ -252,8 +266,8 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
   const admissible = (lane: Lane, entry: Waiting): boolean => {
     const { ticket, takes } = entry;
     const finalWriterGate = finalWriterGateOf(ticket, takes);
-    return (!takes.debate || lane.running < policy.perDebate)
-      && (!takes.model || ((lane.runningByModel.get(ticket.model) ?? 0) < policy.perModelPerDebate
+    return (!takes.debate || lane.running < lane.limits.perDebate)
+      && (!takes.model || ((lane.runningByModel.get(ticket.model) ?? 0) < lane.limits.perModelPerDebate
         && (runnerRunningByModel.get(ticket.model) ?? 0) < runnerCapFor(ticket.vendor)))
       && (!takes.gate || ticket.gate === null || (gateRunning.get(ticket.gate) ?? 0) < gateLimitFor(ticket.gate))
       && (finalWriterGate === null
@@ -362,9 +376,26 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
     }
   };
 
-  const openLane = (debateId: string): DebateCallLane => {
+  /**
+   * A lane's own slots: the debate's limits as given, each a whole number inside CALL_CONCURRENCY_LIMITS (refused otherwise,
+   * before any lane opens); absent, the scheduler policy's two members. Copied, so a later change to the caller's object
+   * never reaches the lane (side-by-side spec §13 runner point 5).
+   */
+  const laneLimitsOf = (limits: Readonly<{ perDebate: number; perModelPerDebate: number }> | undefined): Lane["limits"] => {
+    if (limits === undefined) return Object.freeze({ perDebate: policy.perDebate, perModelPerDebate: policy.perModelPerDebate });
+    const whole = (value: number, max: number): boolean => Number.isInteger(value) && value >= 1 && value <= max;
+    if (!whole(limits.perDebate, CALL_CONCURRENCY_LIMITS.perDebateMax)
+      || !whole(limits.perModelPerDebate, CALL_CONCURRENCY_LIMITS.perModelPerDebateMax)) {
+      throw new TypeError(CALL_LANE_LIMITS_INVALID);
+    }
+    return Object.freeze({ perDebate: limits.perDebate, perModelPerDebate: limits.perModelPerDebate });
+  };
+
+  const openLane = (debateId: string, limits?: Readonly<{ perDebate: number; perModelPerDebate: number }>): DebateCallLane => {
+    const laneLimits = laneLimitsOf(limits);
     const lane: Lane = {
       debateId,
+      limits: laneLimits,
       stopped: false,
       running: 0,
       runningByModel: new Map(),
@@ -419,7 +450,7 @@ export function createCallScheduler(input: Readonly<{ policy: CallConcurrencyPol
     };
 
     return Object.freeze({
-      callsAtOnce: policy.perDebate,
+      callsAtOnce: laneLimits.perDebate,
       run<T>(ticket: CallTicket, call: () => Promise<T>): Promise<T> {
         return enqueue(ticket, EVERY_SLOT, call);
       },

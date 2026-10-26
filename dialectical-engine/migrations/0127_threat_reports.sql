@@ -1,5 +1,8 @@
 -- 0127 · Pre-start question check and kept threat reports (synthesis-flag S04).
 -- 0125's spend source remains accepted when QUESTION_CHECK is added.
+-- n1 (side-by-side spec §5, the database rule): it replaces earlier staff functions and re-adds checked constraints, so it is uploaded the old way.
+-- n1: drained
+-- n1: keeps-verifier
 ALTER TABLE ledger.model_spend
   DROP CONSTRAINT IF EXISTS model_spend_spend_source_check,
   ADD CONSTRAINT model_spend_spend_source_check CHECK (spend_source IN ('RUN','SUPPORT','STORY','LANGUAGE_CHECK','SYNTHESIS_CHECK','QUESTION_CHECK')),

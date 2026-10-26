@@ -90,19 +90,26 @@ export function DebateSplit({
   const path = focusNodeId ? findNodePathById(root, focusNodeId) : [root];
   const focus = path.length ? path[path.length - 1] : root;
   const isRootFocus = focus.node_type === "ROOT_CLAIM";
-  // Focus, a chip or a rebuttal unmounts the button that was pressed. When the focused claim
-  // changes, keyboard focus moves to its heading, so the reader lands on what they chose instead
-  // of the top of the page. Not on first render: opening Split must not move focus.
-  // On first render it moves only when focus was already lost to the page (opened from a Map
-  // segment, which unmounts with the Map); from the view switcher, focus stays where it is.
+  // Focus, a chip or a rebuttal unmounts the button that was pressed. When the reader picks a
+  // claim here, keyboard focus moves to its heading, so they land on what they chose instead of
+  // the top of the page. Any other change of the shown claim moves focus only when it was already
+  // lost to the page: opening Split from a Map segment (which unmounts with the Map) does, and
+  // opening it from the view switcher does not. Nor does a live run settling, which renames the
+  // root from the run ref to the answer id under a reader who may be typing elsewhere.
   const focusHeadingRef = useRef<HTMLDivElement | null>(null);
   const shownFocusId = useRef<string | null>(null);
+  const pickedFocusId = useRef<string | null>(null);
+  const pick = (nodeId: string) => {
+    pickedFocusId.current = nodeId;
+    onFocus(nodeId);
+  };
   useEffect(() => {
-    const firstRender = shownFocusId.current === null;
     if (shownFocusId.current === focus.id) return;
     shownFocusId.current = focus.id;
+    const picked = pickedFocusId.current === focus.id;
+    pickedFocusId.current = null;
     const lost = document.activeElement === null || document.activeElement === document.body;
-    if (!firstRender || lost) focusHeadingRef.current?.focus();
+    if (picked || lost) focusHeadingRef.current?.focus();
   }, [focus.id]);
   const ancestors = path.slice(0, -1);
 
@@ -136,7 +143,7 @@ export function DebateSplit({
                     type="button"
                     className="splitChipBtn"
                     style={{ borderLeftColor: pal.line }}
-                    onClick={() => onFocus(node.id)}
+                    onClick={() => pick(node.id)}
                   >
                     <span
                       className="splitChipRole"
@@ -251,7 +258,7 @@ export function DebateSplit({
         {perspectives.length > 0 ? (
           <div className="splitPerspectives">
             {perspectives.map((node) => (
-              <PerspectiveCard key={node.id} node={node} onFocus={onFocus} debateChromeCatalog={debateChromeCatalog} />
+              <PerspectiveCard key={node.id} node={node} onFocus={pick} debateChromeCatalog={debateChromeCatalog} />
             ))}
           </div>
         ) : null}
@@ -273,7 +280,7 @@ export function DebateSplit({
                     scrutinyStatus={scrutiny[node.id]}
                     v3Node={v3NodesById?.get(node.id)}
                     onOpenNode={onOpenNode}
-                    onFocus={onFocus}
+                    onFocus={pick}
                     onChallengeNode={onChallengeNode}
                     onToggleExpand={onToggleExpand}
                     onProseSelect={onProseSelect}
@@ -300,7 +307,7 @@ export function DebateSplit({
                     scrutinyStatus={scrutiny[node.id]}
                     v3Node={v3NodesById?.get(node.id)}
                     onOpenNode={onOpenNode}
-                    onFocus={onFocus}
+                    onFocus={pick}
                     onChallengeNode={onChallengeNode}
                     onToggleExpand={onToggleExpand}
                     onProseSelect={onProseSelect}

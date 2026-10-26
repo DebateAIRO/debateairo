@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort fortalt
-eyebrow: TJENESTEVILKÅR · v2.4 · GÆLDENDE FRA 12. OKTOBER 2026
+eyebrow: TJENESTEVILKÅR · v2.5 · GÆLDENDE FRA 12. OKTOBER 2026
 title: Det, du accepterer
 lede: Aftalen mellem dig og DMS Merchandise Shop S.R.L. i et klart sprog. Nitten afsnit og bilag A — rul ned til slutningen.
-endMarker: SLUT PÅ VILKÅRENE · v2.4
+endMarker: SLUT PÅ VILKÅRENE · v2.5
 bodyLabel: Tjenestevilkårenes tekst
 annexTitle: Bilag A — Regionale vilkår
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LOVVALG
 -->
 
-**Version 2.4 · Effective 12. oktober 2026 · Tidligere versioner på dezbatere.ro/terms/versions · Sprog: Dansk.**
+**Version 2.5 · Effective 12. oktober 2026 · Tidligere versioner på dezbatere.ro/terms/versions · Sprog: Dansk.**
 
 **In short.** Du skal være fyldt 18 år. Dialectical Engine opbygger argumenter ved hjælp af AI-modeller, og alt, hvad tjenesten genererer, kan være forkert — det er ikke rådgivning. Dine debatter er private, medmindre du offentliggør dem; hvis du offentliggør dem, kan alle læse dem. Tekst, du indsender, sendes til de AI-udbydere, der er anført i vores udbyderregister, og bruges ikke til at træne modeller. Anmeld ulovligt indhold på support@dezbatere.ro, uanset om du har en konto eller ej. Rumænsk ret finder anvendelse, men du bevarer din lokale forbrugerbeskyttelse.
 
@@ -213,7 +213,11 @@ Dialectical Engine tilbyder et gratis abonnement. Et betalt **Premium**-abonneme
 
 **Mislykkede betalinger.** Hvis en betaling mislykkes, forsøger vi igen i 7 dage og advarer dig pr. e-mail, før vi nedgraderer din konto til det gratis abonnement. Vi sletter ikke dine debatter, fordi en betaling mislykkedes.
 
-**Afgifter og betalingsmodtager.** Priserne er inklusive moms, GST eller omsætningsafgift, hvilket afhænger af, hvor du bor, og vises, før du betaler. Kortbetalinger behandles af NETOPIA Payments (netopia-payments.com). Sælgeren er DMS Merchandise Shop S.R.L., som udsteder din faktura og forbliver ansvarlig for selve tjenesten og for disse vilkår.
+**Afgifter og betalingsmodtager.** Priserne er inklusive moms, GST eller omsætningsafgift, hvilket afhænger af, hvor du bor, og vises, før du betaler. Sælgeren er DMS Merchandise Shop S.R.L., som udsteder din faktura og forbliver ansvarlig for selve tjenesten og for disse vilkår.
+
+**Betalingsmetoder.** Du betaler med kort. Vi accepterer Visa og Mastercard; vi accepterer ikke American Express. Kortbetalinger behandles af NETOPIA Payments (netopia-payments.com), og dit fulde kortnummer når aldrig frem til os.
+
+**Levering.** Dialectical Engine er en onlinetjeneste, så intet sendes til dig. Funktionerne i dit betalte abonnement er tilgængelige på din konto, så snart din betaling er bekræftet.
 
 **Tilbageførsler.** Hvis du bestrider en debitering hos din kortudsteder, kan vi suspendere betalingsfunktionerne, mens tvisten behandles. Vi opkræver ikke gebyrer herfor.
 
@@ -235,7 +239,7 @@ Vi oplyser dig på forhånd på et varigt medium om, hvad der ændres og hvornå
 
 **Disse vilkår.** Vi kan ændre disse vilkår af samme type grunde. Ved ændringer, der ikke begrænser dine rettigheder, offentliggør vi den nye version med et resumé af ændringerne og sender dig en e-mail mindst **30 dage**, før den får virkning; hvis du fortsætter med at bruge Dialectical Engine efter denne dato, betyder det, at du accepterer den, og du kan lukke din konto inden da. Ved ændringer, der begrænser dine rettigheder — herunder prisstigninger på et eksisterende abonnement, lavere grænser, fjernede funktioner, nye anvendelser af dit indhold eller ændringer af ansvar, lovvalg eller tvistbilæggelse — beder vi dig udtrykkeligt acceptere den nye version ved dit næste login, og ændringen gælder kun fremadrettet. Vi foretager aldrig ændringer med tilbagevirkende kraft, og vi bruger aldrig dette afsnit til at ændre kernen i det, du har betalt for, midt i en periode uden at tilbyde dig en udvej. Tidligere versioner forbliver tilgængelige på dezbatere.ro/terms/versions.
 
-Version 2.4 erstattede version 2.3: den tilføjer spørgsmålskontrollen, som læser hvert spørgsmål, før en debat starter, afviser nogle og gemmer hvert afvist spørgsmål, der truer med at skade, planlægger at skade eller spørger, om eller hvordan man kan skade en anden person eller andre personer, navngivne eller ej, herunder et angreb på unavngivne personer, eller som spørger, hvordan man fremstiller våben, sprængstoffer, giftstoffer eller narkotika, eller hvordan man støtter en terrorhandling, eller som hylder en sådan, så vores team kan læse det (afsnit 7, 8, 10 og 11); den kontrol, der læser syntesen af hver afsluttet debat, den godkendelse, en markeret debat har brug for, før den kan offentliggøres, og de debatter, som den kontrol sletter (afsnit 5, 8, 9, 10 og 11); hvad supportchatten sender til Anthropics model Claude, at den ikke gemmer noget af det, du skriver, og ikke åbner nogen sag, og at dens knap »Tal med et menneske« viser vores supportadresse (afsnit 8 og 10); og regler i afsnit 7, der forbyder hadtale af enhver art, vejledning i fremstilling af våben eller narkotika, indhold, der tilskynder til selvmord eller til at skade andre mennesker, og religiøs fornærmelse, og som angiver, hvilke spørgsmål der ikke starter en debat.
+Version 2.5 erstattede version 2.4: den tilføjer spørgsmålskontrollen, som læser hvert spørgsmål, før en debat starter, afviser nogle og gemmer hvert afvist spørgsmål, der truer med at skade, planlægger at skade eller spørger, om eller hvordan man kan skade en anden person eller andre personer, navngivne eller ej, herunder et angreb på unavngivne personer, eller som spørger, hvordan man fremstiller våben, sprængstoffer, giftstoffer eller narkotika, eller hvordan man støtter en terrorhandling, eller som hylder en sådan, så vores team kan læse det (afsnit 7, 8, 10 og 11); den kontrol, der læser syntesen af hver afsluttet debat, den godkendelse, en markeret debat har brug for, før den kan offentliggøres, og de debatter, som den kontrol sletter (afsnit 5, 8, 9, 10 og 11); hvad supportchatten sender til Anthropics model Claude, at den ikke gemmer noget af det, du skriver, og ikke åbner nogen sag, og at dens knap »Tal med et menneske« viser vores supportadresse (afsnit 8 og 10); og regler i afsnit 7, der forbyder hadtale af enhver art, vejledning i fremstilling af våben eller narkotika, indhold, der tilskynder til selvmord eller til at skade andre mennesker, og religiøs fornærmelse, og som angiver, hvilke spørgsmål der ikke starter en debat.
 
 ## 15. Ansvar
 

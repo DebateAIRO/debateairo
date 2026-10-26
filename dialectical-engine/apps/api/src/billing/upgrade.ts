@@ -15,7 +15,7 @@ import {
 } from "./hosted-payment.js";
 import { clientIdOf, netopiaNotifyUrl, payerFromProfile, paymentReturnUrl } from "./netopia-payer.js";
 import { planName } from "./order-text.js";
-import { decidePaymentPlace, placeRefusal } from "./place.js";
+import { decidePaymentPlace, decidePaymentRegion, placeRefusal, regionRefusal } from "./place.js";
 import { openPaymentUrl, sealBillingProfile, sealQuoteLocation } from "./records.js";
 import { BillingRefusal } from "./refusal.js";
 import { queueVerifyNow } from "./renewal.js";
@@ -58,8 +58,9 @@ function renewalUnderWay(
 
 /**
  * The payment gate every card action shares with checkout: re-acceptance (spec §2.3.2), then P8b's country
- * decision on the caller's address and the declared country stored at checkout. Returns the address's country
- * (location evidence for the new quote).
+ * decision on the caller's address and the declared country stored at checkout, then the payment region of the
+ * stored address (spec 2026-10-20 §8; never "fix your postcode" to an existing subscriber). Returns the address's
+ * country (location evidence for the new quote).
  */
 export async function gateCardAction(
   deps: Pick<SubscriptionRouteDeps, "legal" | "geo" | "countryPolicy" | "audit">,
@@ -69,6 +70,8 @@ export async function gateCardAction(
   const declaredCountry = context.location.country;
   const place = decidePaymentPlace({ geo: deps.geo, policy: deps.countryPolicy, ip, declaredCountry });
   if (place.kind === "REFUSE") throw placeRefusal(place, deps.audit);
+  const region = decidePaymentRegion({ policy: deps.countryPolicy, location: context.quoteLocation, postcodeMustFit: false });
+  if (region.kind === "REFUSE") throw regionRefusal(region, declaredCountry, deps.audit);
   return place.ipCountry;
 }
 

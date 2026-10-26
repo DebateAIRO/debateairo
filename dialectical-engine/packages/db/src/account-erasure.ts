@@ -1039,7 +1039,20 @@ export class PrivateRunErasureCoordinator {
       if (prepared.outcome !== "PREPARED" || prepared.erasureId === null) return prepared.outcome;
       erasureId = prepared.erasureId;
     }
-    return this.completePrepared(erasureId!, input.source);
+    // Side-by-side A-x3 (0123 §8): one request marks every run of the debate's re-admission chain, each with its own
+    // erasure; resume names the next one still pending under the same grant until none is left. An id named twice was
+    // not finalized: the request stays pending rather than answering CLEANED while a run of the debate keeps its key.
+    const completed = new Set<string>([erasureId!]);
+    let outcome = await this.completePrepared(erasureId!, input.source);
+    while (outcome === "CLEANED") {
+      const next = await this.repository.resume(input);
+      if (next.outcome === "CONTENDED") return "CONTENDED";
+      if (next.outcome !== "PREPARED" || next.erasureId === null) break;
+      if (completed.has(next.erasureId)) return "CONTENDED";
+      completed.add(next.erasureId);
+      outcome = await this.completePrepared(next.erasureId, input.source);
+    }
+    return outcome;
   }
 
   private async completePrepared(

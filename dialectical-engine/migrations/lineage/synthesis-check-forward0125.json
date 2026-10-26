@@ -2,13 +2,13 @@
   "version": "synthesis-check-forward0125-v1",
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
-    "name": "0122_engine_map_check.sql",
-    "manifestSha256": "4be47ecbbdee2a22da0d61af95292c0c3da614ba8cf8a46d5145dba0ed964166",
+    "name": "0124_settings_activation.sql",
+    "manifestSha256": "860ea0de6288405ec798f03d17b45367a263c8d627bc7cbaa1082a765b87ffd7",
     "verifierSha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
   },
   "migration": {
     "name": "0125_synthesis_check.sql",
-    "sha256": "2ce0687fd0ba43d369ccee6a1a1f7c616c274c32d815c6216d7545bf43df3927"
+    "sha256": "045051313c00bc524019619d3b82f419271cb957ae2b7153969a5c45bdb04c57"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-111.sql",

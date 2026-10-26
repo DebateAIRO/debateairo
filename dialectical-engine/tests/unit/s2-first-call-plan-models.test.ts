@@ -95,9 +95,11 @@ describe("S2 · with a scorecard in force the check prices every model the picke
 
 describe("S2 · both hosted boots hand the check the picker's lists", () => {
   it("the API, directly below the picker it composed, asking that picker's scorecard", async () => {
-    const main = await readFile(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
-    const picker = main.indexOf("const modelPicker = await composeAskModelPicker({");
-    const stage = main.indexOf("boot.run(\"run-ceiling-covers-one-call\"");
+    // Side-by-side spec §13 (S9): the API's check is its one per-version admission loader's, at the version it loads
+    // (main.ts's boot loads its site version through it).
+    const main = await readFile(new URL("../../apps/api/src/admission-settings.ts", import.meta.url), "utf8");
+    const picker = main.indexOf("const modelPicker = await readers.composeAskModelPicker({");
+    const stage = main.indexOf("run(\"run-ceiling-covers-one-call\"");
     expect(picker).toBeGreaterThan(-1);
     expect(stage).toBeGreaterThan(picker);
     expect(main.indexOf("scorecardInForce: modelPicker.scorecard.state === \"VALID\",")).toBeGreaterThan(stage);
@@ -111,29 +113,35 @@ describe("S2 · both hosted boots hand the check the picker's lists", () => {
   // billing-off boot with a scorecard could refuse a ceiling that the picker's cheaper models fit. The
   // hosted publish's twin is guarded in tests/unit/hosted-register-publish.test.ts.
   it("the API, keeping Free to the Free roster exactly when billing is on (paid plans S4b)", async () => {
-    const main = await readFile(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
-    const start = main.indexOf("await boot.run(\"run-ceiling-covers-one-call\", async () => {");
+    // Side-by-side spec §13 (S9): in the admission loader, over the site's billing switch (main.ts: the room's readiness).
+    const main = await readFile(new URL("../../apps/api/src/admission-settings.ts", import.meta.url), "utf8");
+    const start = main.indexOf("await run(\"run-ceiling-covers-one-call\", async () => {");
     expect(start).toBeGreaterThan(-1);
-    const end = main.indexOf("\n});\n", start);
+    const end = main.indexOf("\n  });\n", start);
     expect(end).toBeGreaterThan(start);
+    // S20 re-pin — final fix wave F9 (ruling R79, 4e3854ca2): a version other than the site's (and check-version) is
+    // grouped by its own preview rosters; the site version keeps the code's PLAN_TIER_ROSTERS. The Free rule is unchanged.
     expect(main.slice(start, end)).toContain(
-      "      rosters: firstCallPlanModels({\n"
-      + "        scorecardInForce: modelPicker.scorecard.state === \"VALID\",\n"
-      + "        rosters: PLAN_TIER_ROSTERS,\n"
-      + "        models: firstCalls.map((call) => call.model),\n"
-      + "        ownRosterOnly: billingEnabled ? [\"free\"] : []\n"
-      + "      })\n"
+      "        rosters: firstCallPlanModels({\n"
+      + "          scorecardInForce: modelPicker.scorecard.state === \"VALID\",\n"
+      + "          rosters: groupByPreviewRosters ? previewPlanTierRosters(previewConfig, PLAN_TIER_ROSTERS) : PLAN_TIER_ROSTERS,\n"
+      + "          models: firstCalls.map((call) => call.model),\n"
+      + "          ownRosterOnly: site.billingEnabled ? [\"free\"] : []\n"
+      + "        })\n"
     );
   });
 
   it("the runner, asking the sealed scorecard row at its own register version", async () => {
-    const main = await readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8");
-    const block = main.indexOf("if (costEnvelopePolicy !== null && envelopeBand !== null) {");
+    // Side-by-side spec §13: the runner's check is the per-version loader's, at the version it loads (main.ts's boot
+    // loads its site version through it).
+    const loader = await readFile(new URL("../../apps/runner/src/run-settings.ts", import.meta.url), "utf8");
+    // S6: the block keys on the version's composed envelope (non-null exactly when hosted) and the site's band.
+    const block = loader.indexOf("if (debateEnvelope !== null && envelopeBand !== null) {");
     expect(block).toBeGreaterThan(-1);
-    expect(main.indexOf(
-      "scorecardInForce: (await readModelScorecard(pool, environment.REGISTER_VERSION, await readEngineVersion())).state === \"VALID\","
+    expect(loader.indexOf(
+      "scorecardInForce: (await readModelScorecard(pool, version, await readEngineVersion())).state === \"VALID\","
     )).toBeGreaterThan(block);
-    expect(main).toContain("rosters: firstCallPlanModels({");
-    expect(main).toContain("models: firstCalls.map((call) => call.model)");
+    expect(loader).toContain("rosters: firstCallPlanModels({");
+    expect(loader).toContain("models: firstCalls.map((call) => call.model)");
   });
 });

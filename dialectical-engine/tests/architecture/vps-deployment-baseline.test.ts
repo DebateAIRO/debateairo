@@ -96,9 +96,14 @@ const POSTGRES_FILES = [
 const EDGE_FILES = [
   "deploy/vps/Caddyfile",
   "deploy/vps/compose.prod.yaml",
-  "deploy/vps/systemd/debateai-api.service",
-  "deploy/vps/systemd/debateai-ui.service",
-  "deploy/vps/systemd/debateai-runner.service",
+  // Side-by-side spec §10: one instance per service per release (`%i` = the release label).
+  "deploy/vps/systemd/debateai-api@.service",
+  "deploy/vps/systemd/debateai-ui@.service",
+  "deploy/vps/systemd/debateai-runner@.service",
+  "deploy/vps/systemd/debateai-runner-retire@.timer",
+  "deploy/vps/systemd/debateai-runner-retire@.service",
+  "deploy/vps/systemd/debateai-runner-retire-check@.timer",
+  "deploy/vps/systemd/debateai-runner-retire-check@.service",
   "deploy/vps/systemd/debateai-hatchet.service",
   "deploy/vps/systemd/debateai-observation-agent.service",
   "deploy/vps/systemd/debateai-geoip-refresh.service",
@@ -320,6 +325,109 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
     expect(caddy).not.toMatch(/^\s*(http:\/\/|:80\b)/m);
   });
 
+  /**
+   * Side-by-side spec §6 and §10 (plan D area constants): one fixed config with both slots' websites as upstreams,
+   * an active health check on the website's /readyz that carries the edge secret, and a short hold while no slot is
+   * ready. Caddy keeps `admin off`, so it is restarted, never reloaded (README §6). The loopback :3090 site is the
+   * same front for root's switch checks; it answers on 127.0.0.1 only.
+   */
+  it("Caddyfile: both slots behind one health-checked front, shared by the public site and the loopback :3090", () => {
+    const caddy = read("deploy/vps/Caddyfile");
+    expect(caddy).toMatch(/^\s*admin off$/m);
+    const snippet = /^\(debateai_slots\) \{\n([\s\S]*?)^\}$/m.exec(caddy)?.[1] ?? "";
+    expect(snippet).not.toBe("");
+    for (const needle of [
+      "reverse_proxy 127.0.0.1:3001 127.0.0.1:3002 {",
+      "lb_policy first", "lb_try_duration 12s", "lb_try_interval 250ms",
+      "health_uri /readyz", "health_status 200", "health_interval 2s", "health_timeout 1s", "health_passes 1", "health_fails 1",
+      "header_up X-Forwarded-For {remote_host}",
+      "header_up X-Forwarded-Proto https",
+      "header_up X-Debateai-Edge-Secret {file./etc/debateai/ui-edge.caddy.secret}"
+    ]) expect(snippet, needle).toContain(needle);
+    // The health check is an untrusted peer to server.mjs unless it carries the same secret (spec §6).
+    expect(snippet).toMatch(/health_headers \{\s*X-Debateai-Edge-Secret \{file\.\/etc\/debateai\/ui-edge\.caddy\.secret\}\s*\}/);
+    // Every proxy goes through the snippet: one reverse_proxy in the whole file, imported by exactly two sites.
+    expect(caddy.match(/^\s*reverse_proxy\b/gm)).toHaveLength(1);
+    expect(caddy.match(/^\s*import debateai_slots$/gm)).toHaveLength(2);
+    const loopback = /^:3090 \{\n([\s\S]*?)^\}$/m.exec(caddy)?.[1] ?? "";
+    expect(loopback).toMatch(/^\s*bind 127\.0\.0\.1$/m);
+    expect(loopback).toMatch(/^\s*import debateai_slots$/m);
+    expect(loopback).toMatch(/request_body\s*\{\s*max_size 1MB\s*\}/);
+    // The public site refuses /readyz itself (final fix wave W2: every request it proxies carries the edge secret);
+    // the health checks ask the slots directly and root asks the loopback site, which still serves it.
+    const site = /^\{\$DEBATEAI_PUBLIC_HOSTNAME\} \{\n([\s\S]*?)^\}$/m.exec(caddy)?.[1] ?? "";
+    expect(site).toMatch(/^\s*respond \/readyz 404$/m);
+    expect(site.search(/^\s*respond \/readyz 404$/m)).toBeLessThan(site.search(/^\s*import debateai_slots$/m));
+    expect(caddy.match(/^\s*respond \/readyz\b.*$/gm)).toHaveLength(1);
+    expect(loopback).not.toMatch(/respond/);
+  });
+
+  /**
+   * The payment marks (README §14.7): the brands' artwork may not be redistributed, so it is never in the repository
+   * or a release folder. Root keeps the files in /etc/debateai/payment-marks/ and the public site serves exactly the
+   * three names from there before any request reaches the website; anything else under /payment-marks/ goes on to
+   * the website as before. Only the public site has the rule, never the loopback :3090.
+   */
+  it("Caddyfile: the payment marks come from root's folder, exactly three names, before the website", () => {
+    const caddy = read("deploy/vps/Caddyfile");
+    const site = /^\{\$DEBATEAI_PUBLIC_HOSTNAME\} \{\n([\s\S]*?)^\}$/m.exec(caddy)?.[1] ?? "";
+    const matchers = site.match(/^\s*@paymentMarks\b.*$/gm) ?? [];
+    expect(matchers).toHaveLength(1);
+    const [name, kind, ...paths] = (matchers[0] ?? "").trim().split(/\s+/);
+    expect([name, kind]).toEqual(["@paymentMarks", "path"]);
+    expect(paths).toEqual(["/payment-marks/netopia.svg", "/payment-marks/visa.svg", "/payment-marks/mastercard.svg"]);
+    const rule = /^\thandle @paymentMarks \{\n([\s\S]*?)^\t\}$/m.exec(site)?.[1] ?? "";
+    expect(rule.split("\n").map((line) => line.trim()).filter((line) => line !== "")).toEqual([
+      "root * /etc/debateai/payment-marks",
+      "uri strip_prefix /payment-marks",
+      "header Content-Type image/svg+xml",
+      `header Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; sandbox"`,
+      "header X-Content-Type-Options nosniff",
+      "file_server"
+    ]);
+    // One file_server in the whole file, never a folder listing.
+    expect(caddy.match(/^\s*file_server\b.*$/gm)).toEqual(["\t\tfile_server"]);
+    expect(caddy).not.toMatch(/\bbrowse\b/);
+    // Written before the website's proxy and the /readyz refusal; the proxy and the imports stay as they were.
+    expect(site.search(/^\s*handle @paymentMarks \{$/m)).toBeGreaterThan(-1);
+    expect(site.search(/^\s*handle @paymentMarks \{$/m)).toBeLessThan(site.search(/^\s*respond \/readyz 404$/m));
+    expect(site.search(/^\s*handle @paymentMarks \{$/m)).toBeLessThan(site.search(/^\s*import debateai_slots$/m));
+    expect(caddy.match(/^\s*reverse_proxy\b/gm)).toHaveLength(1);
+    expect(caddy.match(/^\s*import debateai_slots$/gm)).toHaveLength(2);
+    const loopback = /^:3090 \{\n([\s\S]*?)^\}$/m.exec(caddy)?.[1] ?? "";
+    expect(loopback).not.toBe("");
+    expect(loopback).not.toContain("payment-marks");
+    const snippet = /^\(debateai_slots\) \{\n([\s\S]*?)^\}$/m.exec(caddy)?.[1] ?? "";
+    expect(snippet).not.toContain("payment-marks");
+  });
+
+  it("README: the payment marks folder in §3 and the check in §6", () => {
+    const readme = read("deploy/vps/README.md");
+    const layout = readme.slice(readme.indexOf("## 3. `/etc/debateai` layout"), readme.indexOf("### The database principals each file names"));
+    expect(layout).toMatch(/^\| `\/etc\/debateai\/payment-marks\/` \| `0755` \| `root:root` \|[^\n]*`netopia\.svg`, `visa\.svg`, `mastercard\.svg`[^\n]*`0644`[^\n]*§14\.7[^\n]*never in the repository[^\n]*\|$/mu);
+    const caddySection = readme.slice(readme.indexOf("## 6. Caddy"), readme.indexOf("## 7. Mail"));
+    expect(caddySection).toContain("/payment-marks/visa.svg");
+    expect(caddySection).toContain("(set -a && . /etc/default/caddy && curl -s -o /dev/null -w '%{http_code} %{content_type}\\n' \"https://$DEBATEAI_PUBLIC_HOSTNAME/payment-marks/visa.svg\")");
+    expect(caddySection).toMatch(/^- \*\*Payment marks/mu);
+  });
+
+  it("the Caddy upstreams are exactly the two slots' website ports, and each slot's website talks to its own API", () => {
+    const caddy = read("deploy/vps/Caddyfile");
+    const upstreams = /reverse_proxy ((?:127\.0\.0\.1:\d+ ?)+)\{/.exec(caddy)?.[1]?.trim().split(" ") ?? [];
+    expect(upstreams).toEqual(["127.0.0.1:3001", "127.0.0.1:3002"]);
+    // The per-release overlays carry the slot (plan D: public server A = 3001 / 8790, B = 3002 / 8791); the
+    // examples show slot A and say what slot B uses.
+    const ui = envKeys(read("deploy/vps/env/releases/ui.env.example"));
+    const api = envKeys(read("deploy/vps/env/releases/api.env.example"));
+    expect(ui.get("PORT")).toBe("3001");
+    expect(api.get("API_PORT")).toBe("8790");
+    expect(ui.get("DIALECTICAL_API_BASE")).toBe(`http://127.0.0.1:${api.get("API_PORT")}`);
+    // The examples are comment-free (the overlay reader refuses comments, final fix wave S6): README §5 step 3 says
+    // what slot B uses.
+    expect(read("deploy/vps/README.md")).toContain("The examples show slot A; slot B uses `API_PORT=8791`, `PORT=3002` and\n`DIALECTICAL_API_BASE=http://127.0.0.1:8791`.");
+    for (const file of ["ui", "api", "runner"]) expect(read(`deploy/vps/env/releases/${file}.env.example`), file).not.toMatch(/^\s*#/mu);
+  });
+
   it("compose.prod.yaml: hatchet-lite only, loopback published, TLS on, no insecure flags, secrets from env_file (L7-F2, L7-F3)", () => {
     const compose = read("deploy/vps/compose.prod.yaml");
     expect(composeServices(compose)).toEqual(["hatchet-lite"]);
@@ -355,13 +463,96 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
     "RestrictSUIDSGID=true", "LockPersonality=true", "CapabilityBoundingSet=", "UMask=0077"
   ] as const;
 
-  it.each(["api", "ui", "runner"] as const)("debateai-%s.service: own user, hardening floor, root-read env file", (service) => {
-    const unit = read(`deploy/vps/systemd/debateai-${service}.service`);
+  it.each(["api", "ui", "runner"] as const)("debateai-%s@.service: own user, hardening floor, root-read env file", (service) => {
+    const unit = read(`deploy/vps/systemd/debateai-${service}@.service`);
     expect(unit).toContain(`User=debateai-${service}`);
     expect(unit).toContain(`EnvironmentFile=/etc/debateai/${service}.env`);
     for (const needle of HARDENING) expect(unit, `${service}: ${needle}`).toContain(needle);
     expect(unit).not.toContain("MemoryDenyWriteExecute=true");
     expect(unit).not.toMatch(/^User=debateai$/m);
+  });
+
+  /**
+   * Side-by-side spec §10: each release runs from its own root-owned folder, never from the operator checkout, so
+   * updating code can never change it under a live older runner. The base env file comes first and the release's own
+   * overlay second (systemd: the later file wins), and the overlay is required (no `-`): a release without its own
+   * file does not start. Root's start check runs before every start and its stop record after every API and runner
+   * stop (release.mjs, side-by-side plan D16b). Only the current release's instances are enabled at boot, which
+   * `systemctl enable <unit>@<label>` does through this [Install] section.
+   */
+  it.each(["api", "ui", "runner"] as const)("debateai-%s@.service: one instance per release, from its own folder", (service) => {
+    const unit = read(`deploy/vps/systemd/debateai-${service}@.service`);
+    const lines = configLines(unit);
+    const envFiles = lines.filter((line) => line.startsWith("EnvironmentFile="));
+    expect(envFiles).toEqual([`EnvironmentFile=/etc/debateai/${service}.env`, `EnvironmentFile=/etc/debateai/releases/%i/${service}.env`]);
+    const tree = "/opt/debateai/releases/%i/dialectical-engine";
+    expect(lines).toContain(service === "ui" ? `WorkingDirectory=${tree}/apps/ui` : `WorkingDirectory=${tree}`);
+    const execs = lines.filter((line) => /^(Exec[A-Za-z]*|WorkingDirectory)=/.test(line));
+    // Nothing the service runs comes from the operator checkout except root's own release.mjs.
+    expect(execs.filter((line) => line.includes("/opt/debateai/dialectical-engine/") && !line.includes("/opt/debateai/dialectical-engine/deploy/vps/release.mjs "))).toEqual([]);
+    expect(unit).not.toContain("%I");
+    // Root's hooks get PATH only: `+` keeps the unit's environment, and the base env file is the service user's, so a
+    // NODE_OPTIONS line in it must never reach a root process.
+    const root = "+/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /usr/bin/node /opt/debateai/dialectical-engine/deploy/vps/release.mjs";
+    expect(lines.filter((line) => /^Exec[A-Za-z]*=\+/.test(line) && !line.includes(`=${root} `))).toEqual([]);
+    expect(lines).toContain(`ExecStartPre=${root} may-start --service ${service} --label %i`);
+    const stopPost = `ExecStopPost=${root} stopped --service ${service} --label %i`;
+    if (service === "ui") expect(unit).not.toContain("ExecStopPost=");
+    else expect(lines).toContain(stopPost);
+    expect(lines).toContain("Restart=on-failure");
+    // A refused start (ExecStartPre=) does not retry every 5 s for ever: the start limit ends it.
+    expect(unit).toMatch(/^\[Unit\][\s\S]*^StartLimitIntervalSec=600$[\s\S]*^\[Service\]/m);
+    expect(unit).toMatch(/^\[Unit\][\s\S]*^StartLimitBurst=20$[\s\S]*^\[Service\]/m);
+    // Once the limit is hit systemd refuses even a start by hand until the interval passes: the runbook clears it first.
+    expect(read("deploy/vps/README.md")).toContain("`systemctl reset-failed debateai-<service>@<label>`, then `systemctl start debateai-<service>@<label>`");
+    expect(unit).toMatch(/^\[Install\]\nWantedBy=multi-user\.target$/m);
+  });
+
+  /**
+   * Side-by-side plan D (area constants) and D16b: two releases run at once during a drain, so each instance has its
+   * own memory ceiling, the preview's values: runner 3G (deploy/preview-auth-dev/v1/debateai-preview-runner@.service),
+   * API 2G and website 1G (deploy/preview-lifecycle/v1/systemd/debateai-preview-<service>@.service.d/50-lifecycle.conf).
+   */
+  it.each([["api", "2G"], ["ui", "1G"], ["runner", "3G"]] as const)("debateai-%s@.service: its own memory ceiling, the preview's %s", (service, size) => {
+    const unit = read(`deploy/vps/systemd/debateai-${service}@.service`);
+    const serviceSection = unit.slice(unit.indexOf("\n[Service]\n"), unit.indexOf("\n[Install]\n"));
+    expect(configLines(unit).filter((line) => line.startsWith("MemoryMax="))).toEqual([`MemoryMax=${size}`]);
+    expect(configLines(serviceSection)).toContain(`MemoryMax=${size}`);
+    const preview = service === "runner"
+      ? read("deploy/preview-auth-dev/v1/debateai-preview-runner@.service")
+      : read(`deploy/preview-lifecycle/v1/systemd/debateai-preview-${service}@.service.d/50-lifecycle.conf`);
+    expect(configLines(preview).filter((line) => line.startsWith("MemoryMax="))).toEqual([`MemoryMax=${size}`]);
+  });
+
+  it("the website of a slot is bound to its own release's API and takes its port from the release overlay", () => {
+    const ui = read("deploy/vps/systemd/debateai-ui@.service");
+    expect(ui).toMatch(/^BindsTo=debateai-api@%i\.service$/m);
+    expect(ui).toMatch(/^After=.*\bdebateai-api@%i\.service\b/m);
+    expect(ui).not.toMatch(/^Requires=/m);
+    expect(ui).not.toMatch(/^Environment=PORT=/m);
+    expect(envKeys(read("deploy/vps/env/releases/ui.env.example")).has("PORT")).toBe(true);
+    // A crash restart of the API must not pass through inactive, or BindsTo= would stop the website for good.
+    expect(read("deploy/vps/systemd/debateai-api@.service")).toMatch(/^RestartMode=direct$/m);
+  });
+
+  /**
+   * Side-by-side spec §4: root's backstop asks a draining release to retire 7.5 hours after the switch and checks 25
+   * minutes after the request. The timers name NO time (the switch and the request write each instance's 50-at.conf
+   * drop-in), so nothing fires by accident; Persistent= keeps an armed time across a reboot.
+   */
+  it("the backstop request and the 25-minute check are root timers per release, with no time of their own", () => {
+    for (const [name, command] of [["runner-retire", "retire-request"], ["runner-retire-check", "retire-check"]] as const) {
+      const timer = read(`deploy/vps/systemd/debateai-${name}@.timer`);
+      expect(timer).toMatch(new RegExp(`^Unit=debateai-${name}@%i\\.service$`, "m"));
+      expect(timer).toMatch(/^Persistent=true$/m);
+      expect(timer).not.toMatch(/^On[A-Za-z]+=/m);
+      expect(timer).toMatch(/^\[Install\]\nWantedBy=timers\.target$/m);
+      const service = read(`deploy/vps/systemd/debateai-${name}@.service`);
+      expect(service).toMatch(/^Type=oneshot$/m);
+      expect(service).toMatch(new RegExp(`^ExecStart=/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /usr/bin/node /opt/debateai/dialectical-engine/deploy/vps/release\\.mjs ${command} --label %i$`, "m"));
+      expect(service).not.toMatch(/^User=/m);
+    }
+    expect(read("deploy/vps/systemd/debateai-runner-retire-check@.timer")).toMatch(/^RemainAfterElapse=false$/m);
   });
 
   /**
@@ -387,30 +578,38 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
   });
 
   it("ReadWritePaths are exactly the custody trees each service writes (L2 out-of-scope, C3 amendment)", () => {
-    const api = read("deploy/vps/systemd/debateai-api.service");
-    expect(api).toMatch(/^ReadWritePaths=\/var\/lib\/debateai\/api\/user-deks \/var\/lib\/debateai\/api\/publication-keys \/var\/lib\/debateai\/api\/audit-keys \/var\/lib\/debateai\/data-exports$/m);
-    expect(api).toContain("ExecStart=/usr/bin/pnpm --dir /opt/debateai/dialectical-engine exec tsx apps/api/src/main.ts");
-    const runner = read("deploy/vps/systemd/debateai-runner.service");
+    const api = read("deploy/vps/systemd/debateai-api@.service");
+    // B3a: the optional billing notice spool, "-"-prefixed so the unit starts while that folder does not exist.
+    expect(api).toMatch(/^ReadWritePaths=\/var\/lib\/debateai\/api\/user-deks \/var\/lib\/debateai\/api\/publication-keys \/var\/lib\/debateai\/api\/audit-keys \/var\/lib\/debateai\/data-exports -\/var\/lib\/debateai\/api\/billing-notice-spool$/m);
+    expect(api).toContain("ExecStart=/usr/bin/pnpm --dir /opt/debateai/releases/%i/dialectical-engine exec tsx apps/api/src/main.ts");
+    const runner = read("deploy/vps/systemd/debateai-runner@.service");
     expect(runner).not.toMatch(/^ReadWritePaths=/m);
     expect(runner).toMatch(/^ReadOnlyPaths=\/var\/lib\/debateai\/api\/user-deks$/m);
-    expect(runner).toContain("ExecStart=/usr/bin/pnpm --dir /opt/debateai/dialectical-engine exec tsx apps/runner/src/main.ts");
-    const ui = read("deploy/vps/systemd/debateai-ui.service");
+    expect(runner).toContain("ExecStart=/usr/bin/pnpm --dir /opt/debateai/releases/%i/dialectical-engine exec tsx apps/runner/src/main.ts");
+    const ui = read("deploy/vps/systemd/debateai-ui@.service");
     expect(ui).not.toMatch(/^ReadWritePaths=/m);
     expect(ui).toContain("Environment=DIALECTICAL_UI_TRUSTED_PROXIES=127.0.0.1,::1");
     expect(ui).toContain("Environment=DIALECTICAL_UI_EDGE_SECRET_PATH=/etc/debateai/ui-edge.secret");
     expect(ui).toContain("Environment=DIALECTICAL_UI_HOST=127.0.0.1");
-    expect(ui).toContain("Environment=PORT=3001");
-    expect(ui).toContain("ExecStart=/usr/bin/node /opt/debateai/dialectical-engine/apps/ui/server.mjs");
+    // The slot's port comes from the release's own overlay (side-by-side spec §6), never from the template.
+    expect(ui).not.toMatch(/^Environment=PORT=/m);
+    expect(ui).toContain("ExecStart=/usr/bin/node /opt/debateai/releases/%i/dialectical-engine/apps/ui/server.mjs");
     for (const unit of [api, runner]) expect(unit).toContain("Environment=NODE_EXTRA_CA_CERTS=/etc/debateai/hatchet-tls/ca.crt");
   });
 
-  it("boot order: hatchet after postgres, api after both, ui after api", () => {
+  it("boot order: hatchet after postgres, api after both, ui after its own api", () => {
     const hatchet = read("deploy/vps/systemd/debateai-hatchet.service");
     expect(hatchet).toMatch(/^After=.*\bpostgresql\.service\b.*\bdocker\.service\b/m);
-    expect(hatchet).toContain("compose.prod.yaml");
-    expect(read("deploy/vps/systemd/debateai-api.service")).toMatch(/^After=.*\bpostgresql\.service\b.*\bdebateai-hatchet\.service\b/m);
-    expect(read("deploy/vps/systemd/debateai-runner.service")).toMatch(/^After=.*\bpostgresql\.service\b.*\bdebateai-hatchet\.service\b/m);
-    expect(read("deploy/vps/systemd/debateai-ui.service")).toMatch(/^After=.*\bdebateai-api\.service\b/m);
+    expect(hatchet).toContain("/etc/debateai/hatchet/compose.prod.yaml");
+    for (const service of ["api", "runner"]) {
+      const unit = read(`deploy/vps/systemd/debateai-${service}@.service`);
+      expect(unit).toMatch(/^After=.*\bpostgresql\.service\b.*\bdebateai-hatchet\.service\b/m);
+      // Side-by-side spec §4: a Hatchet restart must not stop a draining runner mid-call, so Hatchet is wanted,
+      // never required.
+      expect(unit).toMatch(/^Wants=.*\bdebateai-hatchet\.service\b/m);
+      expect(unit).not.toMatch(/^(Requires|BindsTo|PartOf)=.*\bdebateai-hatchet\b/m);
+    }
+    expect(read("deploy/vps/systemd/debateai-ui@.service")).toMatch(/^After=.*\bdebateai-api@%i\.service\b/m);
   });
 });
 
@@ -636,12 +835,12 @@ describe("VPS baseline: runbook and environment templates", () => {
     // where systemd does not consult the group database for the user's other
     // groups. `usermod -a -G` alone would leave the runner outside the group at
     // runtime, and every key read would refuse.
-    for (const unit of ["debateai-api", "debateai-runner"]) {
+    for (const unit of ["debateai-api@", "debateai-runner@"]) {
       expect(read(`deploy/vps/systemd/${unit}.service`), unit)
         .toMatch(/^SupplementaryGroups=.*\bdebateai-custody\b/m);
     }
     // The UI touches no key material and must not be in the group.
-    expect(read("deploy/vps/systemd/debateai-ui.service")).not.toContain("debateai-custody");
+    expect(read("deploy/vps/systemd/debateai-ui@.service")).not.toContain("debateai-custody");
   });
 
   it("README provisions the tree the runner must traverse, with an explicit mode", () => {
@@ -717,7 +916,7 @@ describe("VPS baseline: runbook and environment templates", () => {
     expect(section).toContain("test ! -e /etc/debateai/api-previous/kek.bin");
     // The restart comes BEFORE the rotation command, which is the order that
     // makes the changeover work at all.
-    const restart = section.indexOf("systemctl restart debateai-api debateai-runner");
+    const restart = section.indexOf("systemctl restart debateai-api@$label debateai-runner@$label");
     const rotate = section.indexOf("rotate-kek-cli.ts");
     expect(restart).toBeGreaterThan(-1);
     expect(rotate).toBeGreaterThan(restart);
@@ -759,6 +958,9 @@ describe("VPS baseline: runbook and environment templates", () => {
     expect(ui.get("DIALECTICAL_API_BASE")).toBe("http://127.0.0.1:8790");
     expect(ui.get("NEXT_PUBLIC_API_BASE")).toBe("/api");
     for (const [key] of ui) expect(key).not.toMatch(/KEK|DATABASE_URL|HATCHET|SECRET$/);
+    // The payment marks list is shown, commented out, until root has put each file in /etc/debateai/payment-marks/.
+    expect(read("deploy/vps/env/ui.env.example")).toMatch(/^# PAYMENT_MARKS_AVAILABLE=netopia,visa,mastercard$/m);
+    expect(ui.has("PAYMENT_MARKS_AVAILABLE")).toBe(false);
   });
 
   /**
@@ -995,6 +1197,213 @@ describe("VPS baseline: runbook and environment templates", () => {
   });
 });
 
+/**
+ * Side-by-side spec §10, Phase 3 (plan D17): the public server's runbook for releases that run side by side. Each
+ * release lives in its own folder and runs as `<unit>@<label>`; an upgrade never changes code under a running
+ * release, never stops a busy runner, and switches the front break-before-make through Caddy.
+ */
+describe("VPS baseline: side-by-side upgrades on the public server (side-by-side spec §10)", () => {
+  const readme = read("deploy/vps/README.md");
+  const between = (from: string, to: string): string => {
+    const start = readme.indexOf(from);
+    expect(start, from).toBeGreaterThan(-1);
+    const end = readme.indexOf(to, start + from.length);
+    expect(end, to).toBeGreaterThan(start);
+    return readme.slice(start, end);
+  };
+  const shBlocks = (text: string): string[] => [...text.matchAll(/```sh\n([\s\S]*?)```/gu)].map((match) => match[1] ?? "");
+  const ORDER_LINE = "> Order: §5 \"Side-by-side upgrades\": the new checkout is the new release's folder, and this section's pin and "
+    + "restart lines mean that order's steps 3 and 9 to 12 (§5 \"A new register version is a new release\"). This section adds only what this release needs.";
+
+  it("§5 has the side-by-side section, in its order, before every per-release upgrade section", () => {
+    const section = between("### Side-by-side upgrades", "\n### Upgrading to ");
+    const steps = [
+      "install -D -m 0644 deploy/vps/compose.prod.yaml /etc/debateai/hatchet/compose.prod.yaml",
+      "git -c tar.umask=0022 -C /opt/debateai/dialectical-engine archive --format=tar",
+      "install --frozen-lockfile --offline",
+      "/etc/debateai/releases/$new/api.env",
+      "/etc/debateai/releases/$new/runner.env",
+      "/etc/debateai/releases/$new/ui.env",
+      "release.mjs check",
+      "fresh yes",
+      "§9 \"The online backup before side-by-side migrations\"",
+      "db:migrate",
+      "register:publish-hosted --file /etc/debateai/register/hosted-register.json",
+      "release.mjs stage --label $new",
+      "systemctl start debateai-runner@$new",
+      "systemctl start debateai-api@$new debateai-ui@$new",
+      "release.mjs switch --to $new --from $label",
+      "RETIRE_REQUESTED",
+      "receipt",
+      "mv /opt/debateai/releases/$old /opt/debateai/archive/"
+    ];
+    let previous = -1;
+    for (const step of steps) {
+      const at = section.indexOf(step, previous + 1);
+      expect(at, step).toBeGreaterThan(previous);
+      previous = at;
+    }
+    expect(readme.indexOf("### Side-by-side upgrades")).toBeGreaterThan(readme.indexOf("## 5. Application units"));
+    expect(readme.indexOf("### Side-by-side upgrades")).toBeLessThan(readme.indexOf("### Upgrading to"));
+    // The release tool is built (side-by-side plan D16b): no step says it is still to come.
+    expect(readme).not.toContain("follow-up task D16b");
+    // The release folder is root's and never edited in place; the archive is a move, never a delete.
+    expect(section).toContain("never edited in place");
+    for (const block of shBlocks(section)) expect(block, block).not.toMatch(/\brm\s|\bunlink\b|shred/u);
+  });
+
+  it("the section never stops a busy runner by hand and names the backstop's 25 minutes", () => {
+    const section = between("### Side-by-side upgrades", "\n### Upgrading to ");
+    expect(section).toContain("Never `systemctl stop` a busy `debateai-runner@`");
+    expect(section).toMatch(/25 minutes/u);
+    expect(section).toContain("7.5 hours");
+    // The one exception is the drained upgrade's D2 (final fix wave S2): a runner with nothing open or waiting, the
+    // zero-work test on the same line, before the stop (as the preview guide's DR2). Nowhere else, and never restart/kill.
+    const drained = section.slice(section.indexOf("**A drained upgrade**"));
+    expect(drained.length).toBeLessThan(section.length);
+    for (const block of shBlocks(section.slice(0, section.indexOf("**A drained upgrade**")))) {
+      expect(block, block).not.toMatch(/systemctl (stop|restart|kill)[^\n]*debateai-runner/u);
+    }
+    const stops = shBlocks(drained).flatMap((block) => block.split("\n")).filter((line) => /systemctl (stop|restart|kill)[^\n]*debateai-runner/u.test(line));
+    expect(stops).toHaveLength(1);
+    expect(stops[0]).toMatch(/test "\$\(sudo -u postgres psql -d debateai -XAt -c "SELECT \(SELECT count\(\*\) FROM core\.work_item WHERE state IN \('READY', 'CLAIMED'\)\) \+ \(SELECT count\(\*\) FROM core\.run_waiting_v\)"\)" = 0 && systemctl stop debateai-runner@\$label /u);
+  });
+
+  it("every per-release upgrade section points to the side-by-side order in its first line", () => {
+    const headings = [...readme.matchAll(/^(#{3,4}) (Upgrading [^\n]+)$/gmu)];
+    expect(headings.length).toBeGreaterThanOrEqual(15);
+    for (const heading of headings) {
+      const after = readme.slice((heading.index ?? 0) + heading[0].length).replace(/^\n+/u, "");
+      expect(after.split("\n")[0], heading[2]).toBe(
+        ORDER_LINE
+      );
+    }
+  });
+
+  /**
+   * Fix round 1: REGISTER_VERSION and RELEASE_KEY are per release (the overlay wins, and the key carries the version),
+   * so "pin the new version in both files and restart" would silently change nothing. The runbook names the rule once
+   * and every pin instruction sits in a section that points to it.
+   */
+  it("a new register version is a new release: the rule is stated once and every pin instruction points to it", () => {
+    const current = between("### The current release (`$label`)", "### The first release");
+    const rule = /\*\*A new register version is a new release\.\*\*([\s\S]*?)\n\n/u.exec(current)?.[1] ?? "";
+    for (const needle of ["`REGISTER_VERSION`", "`RELEASE_KEY`", "win", "a new label and a new key on the same commit", "steps 3 and 9 to 12"]) {
+      expect(rule, needle).toContain(needle);
+    }
+    // The base files follow the switch: nothing is pinned in them before it, and step 12 sets them after it.
+    const order = between("### Side-by-side upgrades", "\n### Upgrading to ");
+    expect(order).toContain("nothing is pinned in the base files before the switch (step 12)");
+    expect(order).toMatch(/`\$label` is now the new release, then set\s+`REGISTER_VERSION` in both base files to the new version/u);
+    const pins = /REGISTER_VERSION=` line into|[Pp]in (?:it|that version|the version|the newest version|the gated version)[^.]*\b(?:both|REGISTER_VERSION)\b|`REGISTER_VERSION` in both|REGISTER_VERSION` to that version/u;
+    const sections = readme.split(/^(?=#{2,4} )/mu);
+    const unpointed = sections.filter((section) => pins.test(section))
+      .filter((section) => !section.includes(ORDER_LINE) && !section.includes("§5 \"A new register version is a new release\"")
+        && !section.startsWith("### The current release"))
+      .map((section) => section.split("\n")[0]);
+    expect(unpointed).toEqual([]);
+  });
+
+  it("every runner restart in place waits for `unfinished` at 0", () => {
+    const restarts = [...readme.matchAll(/systemctl restart[^\n`]*debateai-runner@\$label/gu)];
+    expect(restarts.length).toBeGreaterThanOrEqual(6);
+    for (const restart of restarts) {
+      const at = restart.index ?? 0;
+      expect(readme.slice(Math.max(0, at - 700), at + restart[0].length + 200), readme.slice(at - 120, at + 80)).toContain("`unfinished`");
+    }
+    // `unfinished` is defined where `$label` is: the open work of every release, from the work items themselves.
+    expect(between("### The current release (`$label`)", "### The first release")).toContain("AS unfinished");
+  });
+
+  it("a mistyped name never reaches a path: each read unsets on refusal and each path block checks again", () => {
+    const section = between("### Side-by-side upgrades", "\n### Upgrading to ");
+    const LABEL = "grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?'";
+    const reads = section.split("\n").filter((line) => line.startsWith("read -r "));
+    expect(reads).toHaveLength(2);
+    expect(reads[0]).toMatch(/ \|\| unset new key$/u);
+    expect(reads[1]).toMatch(/ \|\| unset old$/u);
+    for (const block of shBlocks(section)) {
+      if (block.startsWith("read -r ")) continue;
+      for (const name of ["new", "old", "label"]) {
+        if (!new RegExp(`\\$${name}\\b`, "u").test(block)) continue;
+        for (const line of block.split("\n").filter((entry) => new RegExp(`\\$${name}\\b`, "u").test(entry) && !entry.startsWith("  "))) {
+          expect(line, line).toContain(`printf '%s\\n' "$${name}" | ${LABEL}`);
+        }
+      }
+      if (/\$\{?key\b/u.test(block)) expect(block, block).toContain(`printf '%s\\n' "$key" | grep -Eqx 'r[1-9][0-9]*-[0-9a-f]{12}'`);
+    }
+    // The archive refuses a name already in the archive, for the folder and for the overlays.
+    expect(section).toContain('test ! -e "/opt/debateai/archive/$old"');
+    expect(section).toContain('test ! -e "/opt/debateai/archive/etc/$old"');
+  });
+
+  it("the first release is staged, started and only then switched (the switch waits for Caddy to route to it)", () => {
+    const first = between("### The first release", "### Side-by-side upgrades");
+    // release.mjs's own shapes (side-by-side plan D16b): the first switch names no --from.
+    const stage = first.indexOf("release.mjs stage --label $label");
+    const enable = first.indexOf("systemctl enable --now");
+    const switched = first.lastIndexOf("release.mjs switch --to $label");
+    expect(first).not.toMatch(/release\.mjs switch --to \$label --from/u);
+    expect(stage).toBeGreaterThan(-1);
+    expect(enable).toBeGreaterThan(stage);
+    expect(switched).toBeGreaterThan(enable);
+  });
+
+  it("the operator checkout moves forward only to a reviewed commit and only while no release drains", () => {
+    const units = between("## 5. Application units", "### The current release");
+    expect(units).toMatch(/operator checkout[^.]*forward[^.]*reviewed commit[^.]*no release is draining/u);
+  });
+
+  it("every command on an application unit names a release instance", () => {
+    const bare = /(systemctl|journalctl)[^`\n]*?\bdebateai-(api|ui|runner)\b(?![@\w-])/gu;
+    expect([...readme.matchAll(bare)].map((match) => match[0])).toEqual([]);
+    // The current release's label is found, not typed: the enabled API instance, exactly one.
+    expect(readme).toContain(
+      "set -- /etc/systemd/system/multi-user.target.wants/debateai-api@*.service && test \"$#\" -eq 1 && test -e \"$1\" && label=${1##*/debateai-api@} && label=${label%.service} && echo \"current release: $label\""
+    );
+  });
+
+  it("§1 states the one-API rule and the boot order without a hard Hatchet dependency", () => {
+    const topology = between("## 1. Topology", "## 2. Host preparation");
+    expect(topology).toContain("One API serves at a time");
+    expect(topology).toContain("break-before-make");
+    expect(topology).toContain("`Wants=`");
+    expect(topology).not.toContain("`Requires=`");
+    expect(topology).toContain("`debateai-api@<label>.service`");
+    expect(between("## 2. Host preparation", "## 3.")).toContain("systemd 254 or later");
+  });
+
+  it("§6 restarts Caddy and never reloads it (admin off)", () => {
+    const caddy = between("## 6. Caddy", "## 7. Mail");
+    expect(shBlocks(caddy).join("\n")).toContain("systemctl restart caddy");
+    expect(readme).not.toMatch(/systemctl reload caddy|reload Caddy/u);
+    expect(caddy).toContain("`admin off`");
+    expect(caddy).toContain("127.0.0.1:3090");
+  });
+
+  it("§9's online backup dumps, archives the custody tree and sums it, encrypted, without the off-host copy", () => {
+    const section = between("### The online backup before side-by-side migrations", "### Restore drill");
+    const block = shBlocks(section).join("\n");
+    for (const needle of [
+      "set -euo pipefail", ". /etc/debateai/backup.conf", "pg_dumpall --globals-only", "pg_dump --format=custom",
+      "tar -cf -", "age -r \"$BACKUP_DATA_RECIPIENT\"", "sha256sum", "ONLINE_BACKUP_OK"
+    ]) expect(block, needle).toContain(needle);
+    expect(block.indexOf("pg_dump --format=custom")).toBeLessThan(block.indexOf("tar -cf -"));
+    for (const forbidden of ["rclone", "scp", "BACKUP_ESCROW_RECIPIENT"]) expect(block, forbidden).not.toContain(forbidden);
+    expect(section).toContain("`backup.sh`");
+    // restore-drill.sh takes one *.tar.age; these three parts are restored by hand, in order.
+    expect(section).toContain("`restore-drill.sh` does not take this layout");
+    const restore = section.slice(section.indexOf("does not take this layout"));
+    expect(restore).toContain("age -d");
+    let previous = -1;
+    for (const file of ["globals.sql.age", "debateai.dump.age", "custody.tar.age"]) {
+      const at = restore.indexOf(file, previous + 1);
+      expect(at, file).toBeGreaterThan(previous);
+      previous = at;
+    }
+  });
+});
+
 describe("VPS baseline: the country data refresh (paid plans G4)", () => {
   it("ships the script, the unit and the timer", () => {
     for (const file of ["deploy/vps/geoip-refresh.sh", "deploy/vps/systemd/debateai-geoip-refresh.service",
@@ -1047,7 +1456,7 @@ describe("VPS baseline: the country data refresh (paid plans G4)", () => {
     const enable = /systemctl enable --now ([^\n\\]*(?:\\\n[^\n\\]*)*)/u.exec(readme)?.[1] ?? "";
     expect(enable).toContain("debateai-geoip-refresh.timer");
     expect(readme.indexOf("systemctl start debateai-geoip-refresh.service"))
-      .toBeLessThan(readme.indexOf("systemctl enable --now debateai-hatchet debateai-api"));
+      .toBeLessThan(readme.indexOf("systemctl enable --now debateai-hatchet debateai-api@$label"));
     expect(readme.indexOf("systemctl start debateai-geoip-refresh.service")).toBeGreaterThan(-1);
   });
 });

@@ -300,6 +300,104 @@ describe("/new reads the room for the ask it would send", () => {
   });
 });
 
+/**
+ * Side-by-side spec §13 (Task S12): the page sends back the settings version its room read named; when the API answers
+ * 409 ASK_SETTINGS_CHANGED (the choices changed under the page), the page reads the room again and shows the one plain
+ * sentence, and its next ask names the version that read named.
+ */
+describe("/new asks the person to choose again when the settings changed under the page", () => {
+  const changed = () => new ContractHttpError("SERVER_FAILURE", 409, "ASK_SETTINGS_CHANGED: x", "ASK_SETTINGS_CHANGED");
+  const sentVersions = () => mocks.createDebate.mock.calls.map(([, config]) => (config as Record<string, unknown>).settings_version);
+
+  it("sends the read's version, and on the 409 re-reads the room, shows the sentence, and asks next on the new version", async () => {
+    mocks.getAskRoom.mockResolvedValueOnce(room({ settings_version: 17 })).mockResolvedValue(room({ settings_version: 18 }));
+    mocks.createDebate.mockRejectedValueOnce(changed()).mockResolvedValueOnce({ id: "run:new" });
+    const container = await mount(newPage());
+    await type(container.querySelector<HTMLTextAreaElement>("#topic")!, "Cities should ban cars downtown");
+    const readsBefore = mocks.getAskRoom.mock.calls.length;
+    await submitForm(container);
+    expect(sentVersions()).toEqual([17]);
+    expect(mocks.getAskRoom.mock.calls.length).toBeGreaterThan(readsBefore);
+    const banners = [...container.querySelectorAll(".error")].map((banner) => banner.textContent ?? "");
+    expect(banners).toContain(en["newDebate.settingsChanged"]);
+    expect(banners.join(" ")).not.toContain("ASK_SETTINGS_CHANGED");
+    expect(mocks.push).not.toHaveBeenCalled();
+    await submitForm(container);
+    expect(sentVersions()).toEqual([17, 18]);
+    expect(mocks.push).toHaveBeenCalledWith("/debate/run%3Anew?starting=1");
+  });
+
+  const SHAPE_KEYS = ["depth_mode", "scrutiny", "answer_length"] as const;
+  const banners = (container: HTMLElement) => [...container.querySelectorAll(".error")].map((banner) => banner.textContent ?? "");
+
+  it("R51: a re-read after a control moves that names another version applies its switches, says so, and asks on it", async () => {
+    let served: Record<string, unknown> = { settings_version: 17, shape_settings: true, length_settings: true };
+    mocks.getAskRoom.mockImplementation(async () => room(served));
+    mocks.createDebate.mockResolvedValue({ id: "run:new" });
+    const container = await mount(newPage());
+    await type(container.querySelector<HTMLTextAreaElement>("#topic")!, "Cities should ban cars downtown");
+    await click(container, "#planTier-premium");
+    await click(container, ".ndOptionsToggle");
+    expect(container.querySelector("#depthMode")).not.toBeNull();
+    expect(banners(container)).not.toContain(en["newDebate.settingsChanged"]);
+    const sessionReads = mocks.readSession.mock.calls.length;
+    // The owners switch to 18, which has neither row; the person moves a control, and the room is read again.
+    served = { settings_version: 18 };
+    await click(container, "#answerLength-detailed");
+    expect(banners(container)).toContain(en["newDebate.settingsChanged"]);
+    expect(container.querySelector("#depthMode")).toBeNull();
+    expect(container.querySelector("#scrutinyDepth")).toBeNull();
+    expect(container.querySelector("#answerLength-detailed")).toBeNull();
+    // The model-strength lock is read again for the new version.
+    expect(mocks.readSession.mock.calls.length).toBeGreaterThan(sessionReads);
+    await submitForm(container);
+    const config = mocks.createDebate.mock.calls[0]![1] as Record<string, unknown>;
+    expect(config.settings_version).toBe(18);
+    for (const key of SHAPE_KEYS) expect(config, key).not.toHaveProperty(key);
+  });
+
+  it("R50: a failed re-read after the 409 forgets the version, so the next press is not refused the same way", async () => {
+    mocks.getAskRoom.mockResolvedValueOnce(room({ settings_version: 17 }))
+      .mockRejectedValue(new ContractHttpError("SERVER_FAILURE", 503, "down"));
+    mocks.createDebate.mockRejectedValueOnce(changed()).mockResolvedValueOnce({ id: "run:new" });
+    const container = await mount(newPage());
+    await type(container.querySelector<HTMLTextAreaElement>("#topic")!, "Cities should ban cars downtown");
+    await submitForm(container);
+    expect(banners(container)).toContain(en["newDebate.settingsChanged"]);
+    await submitForm(container);
+    expect(sentVersions()).toEqual([17, undefined]);
+  });
+
+  it("R50: the 409's re-read may turn the switches off: the next ask carries the new version and no shape choices", async () => {
+    // Every read names 17 (with both rows) until the ask: the owners switch to 18 (no rows) just before it lands.
+    let served: Record<string, unknown> = { settings_version: 17, shape_settings: true, length_settings: true };
+    mocks.getAskRoom.mockImplementation(async () => room(served));
+    mocks.createDebate.mockImplementationOnce(async () => { served = { settings_version: 18 }; throw changed(); })
+      .mockResolvedValueOnce({ id: "run:new" });
+    const container = await mount(newPage());
+    await type(container.querySelector<HTMLTextAreaElement>("#topic")!, "Cities should ban cars downtown");
+    await click(container, ".ndOptionsToggle");
+    expect(container.querySelector("#depthMode")).not.toBeNull();
+    await submitForm(container);
+    expect(banners(container)).toContain(en["newDebate.settingsChanged"]);
+    expect(container.querySelector("#depthMode")).toBeNull();
+    await submitForm(container);
+    const configs = mocks.createDebate.mock.calls.map(([, config]) => config as Record<string, unknown>);
+    expect(configs[0]).toMatchObject({ settings_version: 17, depth_mode: "adaptive" });
+    expect(configs[1]!.settings_version).toBe(18);
+    for (const key of SHAPE_KEYS) expect(configs[1], key).not.toHaveProperty(key);
+  });
+
+  it("a room read that names no version sends none (an older API): today's ask", async () => {
+    mocks.createDebate.mockResolvedValue({ id: "run:new" });
+    const container = await mount(newPage());
+    await type(container.querySelector<HTMLTextAreaElement>("#topic")!, "Cities should ban cars downtown");
+    await submitForm(container);
+    expect(mocks.createDebate).toHaveBeenCalledTimes(1);
+    expect(mocks.createDebate.mock.calls[0]![1]).not.toHaveProperty("settings_version");
+  });
+});
+
 describe("/new hides the plan chooser and names the plan the server decided (spec §2.3.4, ruling Q-8)", () => {
   const chooser = (container: HTMLElement) => container.querySelector('.ndTier[role="radiogroup"]');
   const planLine = (container: HTMLElement) => container.querySelector(".ndPlanCurrent")?.textContent ?? null;

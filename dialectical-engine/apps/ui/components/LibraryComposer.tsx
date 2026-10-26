@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { contractClient, validateSession } from "@/lib/api";
 import { RoomNotice } from "@/components/billing/RoomNotice";
 import { useAskRoom, waitingRoomOf, type AskRoomQuery } from "@/lib/billing/room";
@@ -44,8 +44,16 @@ export function LibraryComposer({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [room, setRoom, refreshRoom] = useAskRoom(contractClient, COMPOSER_ROOM_QUERY);
-  const consent = useSensitiveDataConsent({ catalog, locale });
-  const crisis = useCrisisSupport({ catalog, locale, countryHint: crisisCountryHint });
+  // Start is disabled while a press of it runs, which drops keyboard focus to the page. When the
+  // consent or crisis screen then closes, or the press ends in an answer shown here (one question
+  // already waits, today's limit), focus comes back to the question instead.
+  const claimField = useRef<HTMLTextAreaElement | null>(null);
+  const claimRef = useCallback((field: HTMLTextAreaElement | null) => {
+    claimField.current = field;
+    grow(field);
+  }, []);
+  const consent = useSensitiveDataConsent({ catalog, locale, returnFocusRef: claimField });
+  const crisis = useCrisisSupport({ catalog, locale, countryHint: crisisCountryHint, returnFocusRef: claimField });
 
   // A question too short to debate still reaches the crisis check ("我想死" is three letters).
   const ready = topic.trim().length > 6 || crisis.flags(topic);
@@ -83,6 +91,7 @@ export function LibraryComposer({
         const fresh = await refreshRoom();
         if (fresh === null) setRoom(waitingRoomOf(exc));
         setBusy(false);
+        claimField.current?.focus();
         return;
       }
       // Task M8 (spec 2026-09-26 §14.4.7): today's limit for new debates is an
@@ -91,6 +100,7 @@ export function LibraryComposer({
       if (classifyRequestFailure("DEBATE_CREATE", exc).kind === "DAILY_LIMIT_REACHED") {
         setError(requestFailureMessage("DEBATE_CREATE", exc, newDebateCatalog));
         setBusy(false);
+        claimField.current?.focus();
         return;
       }
       // Anything else falls through to the authenticated /new flow.
@@ -106,7 +116,7 @@ export function LibraryComposer({
           id="library-claim"
           className="libComposerInput"
           aria-label={t(catalog, "home.debateClaim")}
-          ref={grow}
+          ref={claimRef}
           rows={1}
           value={topic}
           onChange={(event) => {

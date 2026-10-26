@@ -85,12 +85,20 @@ describe("the runbook's cost envelopes (B11b)", () => {
     for (const event of ["api.wait.start_failed", "api.wait.redispatch_failed", "api.run.setup_failure_unrecorded"]) {
       expect(signals, event).toContain(`| \`"event":"${event}"\``);
     }
+    // Side-by-side final fix wave P7: the API's release lines (release-state.ts) are swept too, and each has its row.
+    const releaseSource = await read("apps/api/src/release-state.ts");
+    const release = [...new Set([...releaseSource.matchAll(/event: "(api\.release\.[a-z_]+)"/gu)].map((match) => match[1]!))];
+    expect(release).toEqual(expect.arrayContaining(["api.release.no_site_cap"]));
+    for (const event of release) expect(signals, event).toContain(`| \`"event":"${event}"\``);
     expect(await read("apps/api/src/main.ts")).toContain('console.error("[ASK_WAITING_LINE_WAKE_PENDING]")');
     expect(signals).toContain("| `[ASK_WAITING_LINE_WAKE_PENDING]`");
     expect(await read("apps/runner/src/index.ts")).toContain('log("RUN_COST_SUBSTITUTION_WRITE_FAILED", {');
     expect(signals).toContain('| `"kind":"DEBATEAI_BODY_COST_FALLBACK"`, `"event":"RUN_COST_SUBSTITUTION_WRITE_FAILED"`');
-    expect(await read("apps/runner/src/main.ts"))
+    // Side-by-side spec §13 (S14): the line is the runner's site reads' (run-settings.ts, readRunnerSiteContext), which
+    // main.ts calls at boot.
+    expect(await read("apps/runner/src/run-settings.ts"))
       .toContain('console.warn(JSON.stringify({ kind: "DEBATEAI_PERSON_WALL", event: "PLANS_UNRESOLVED" }));');
+    expect(await read("apps/runner/src/main.ts")).toContain("await readRunnerSiteContext({ pool, environment, moneyInFlight })");
     expect(signals).toContain('| `{"kind":"DEBATEAI_PERSON_WALL","event":"PLANS_UNRESOLVED"}`');
     // The setup-failure row no longer says nothing will start a debate whose first job is queued.
     expect(signals).not.toContain("because nothing will ever start it");

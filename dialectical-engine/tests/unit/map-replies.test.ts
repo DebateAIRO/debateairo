@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { replyLanguageExpectation } from "@debateai/kernel";
 import { planPatchFollowUp } from "@debateai/providers";
@@ -33,6 +34,10 @@ const EN_POINTS = ["The cost of the change is high and the state should pay it."
   "The change can be undone later if it fails."].map((claim) => point(claim));
 const RO_POINTS = ["Costul schimbării este mare și statul ar trebui să îl plătească.", "Cei care îl folosesc cel mai mult sunt săraci.",
   "Schimbarea poate fi anulată mai târziu dacă nu merge."].map((claim) => point(claim, RO_WHY));
+// Stray script (2026-10-21): real replies with Chinese characters inside a sentence in the question's language, verbatim.
+const STRAY = JSON.parse(readFileSync(new URL("../support/fixtures/reply-language/stray-script-2026-10.json", import.meta.url), "utf8")) as {
+  readonly cases: readonly { question: string; text: string }[];
+};
 const issuesOf = (parseError: string | null) => JSON.parse(parseError ?? "[]") as { code: string; path: (string | number)[]; message: string }[];
 
 describe("map replies: angles", () => {
@@ -312,6 +317,14 @@ describe("map replies: choose check", () => {
     if (out.classification.parseStatus !== "SCHEMA_FAILED") throw new Error("unreachable");
     const plan = planPatchFollowUp({ content, reply: STOP, parseStatus: out.classification.parseStatus, parseError: out.classification.parseError });
     expect(plan?.locator).toEqual({ code: "MAP_WRONG_LANGUAGE", paths: ["answers"] });
+  });
+
+  // Stray script (2026-10-21): the map's own check refuses the same letters the shared reply-language check refuses.
+  it("practice 2026-10-14: GLM's Romanian statement with one Chinese character inside a word is the wrong language; the same statement without it is not", () => {
+    const map = STRAY.cases[0]!; // MAP:choose, answers.1.statement, Romanian question
+    const expected = replyLanguageExpectation(map.question);
+    expect(mapWrongLanguage(map.text, expected)).toBe(true);
+    expect(mapWrongLanguage(map.text.replace("lovit毙 salariații", "lovit salariații"), expected)).toBe(false);
   });
 
   it("refuses a second answer whose statement repeats the first once case, punctuation and diacritics are set aside", () => {

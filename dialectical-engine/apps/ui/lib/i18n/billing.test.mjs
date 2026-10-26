@@ -95,13 +95,13 @@ const REQUIRED = [
   "billing.checkout.eyebrow", "billing.checkout.title", "billing.checkout.country", "billing.checkout.region",
   "billing.checkout.postalCode", "billing.checkout.city", "billing.checkout.county",
   "billing.checkout.billingTitle", "billing.checkout.billingNote", "billing.checkout.firstName", "billing.checkout.lastName",
-  "billing.checkout.phone", "billing.checkout.street", "billing.checkout.postalCodeOptional", "billing.checkout.phoneInvalid",
+  "billing.checkout.phone", "billing.checkout.street", "billing.checkout.postalCodeOptional", "billing.checkout.postalCodeInvalid", "billing.checkout.phoneInvalid",
   "billing.checkout.detailsRequired", "billing.checkout.upgradeSucceeded", "billing.subscription.upgradePay",
   "billing.card.checkCard", "billing.card.taxPlaceNote",
   "billing.checkout.companyToggle", "billing.checkout.companyName",
   "billing.checkout.companyVatId", "billing.checkout.companyAddress", "billing.checkout.companyIncomplete",
   "billing.checkout.showPrice", "billing.checkout.quoting",
-  "billing.checkout.countryUnavailable", "billing.checkout.confirmCountry", "billing.checkout.confirmCountryYes",
+  "billing.checkout.countryUnavailable", "billing.checkout.regionUnavailable", "billing.checkout.confirmCountry", "billing.checkout.confirmCountryYes",
   "billing.checkout.confirmCountryRequired",
   "billing.checkout.taxLabel", "billing.checkout.taxReverseCharge", "billing.checkout.noTax", "billing.checkout.total",
   "billing.consent.renewal", "billing.consent.immediateStart", "billing.checkout.continueToCard",
@@ -166,6 +166,14 @@ test("the spec's sentences G2, G3, B1–B5 read exactly as approved in English (
   assert.equal(english["billing.checkout.subscribeAndPay"], "Subscribe and pay");
   assert.equal(english["billing.checkout.waitingForBank"], "Waiting for your bank to confirm…");
   assert.equal(english["billing.checkout.willEmail"], "We'll email you as soon as your bank confirms.");
+});
+
+test("the closed-region and postal-code refusals read exactly as the owner approved in English (2026-10-20)", () => {
+  const english = catalogue("en");
+  // REGION_PAYMENT_UNAVAILABLE (403): payment is closed in the billing address's region; sign-up never is.
+  assert.equal(english["billing.checkout.regionUnavailable"], "Paid plans aren't available in your region yet. You can keep using the Free plan.");
+  // BILLING_POSTCODE_INVALID (422): the postal code does not fit its country's format.
+  assert.equal(english["billing.checkout.postalCodeInvalid"], "Please check your postal code.");
 });
 
 test("Romanian names the order button as Terms §12 requires", () => {
@@ -320,6 +328,10 @@ test("every locale names NETOPIA Payments where it names the card processor, and
   assert.equal(english["billing.checkout.formUnavailable"], "The payment page could not be opened. Please try again in a minute.");
   assert.equal(catalogue("ro")["billing.checkout.continueToCard"], "Comandă cu obligație de plată");
   assert.equal(english["billing.card.countryRefused"], "We can't accept cards issued in that card's country. Nothing was charged, and your plan keeps the card it had.");
+  assert.equal(JSON.parse(source("messages/en/legal.json"))["legal.notice.s04.payments"],
+    "We accept Visa and Mastercard; we do not accept American Express. Card payments are processed by NETOPIA Payments. We never see or store your full card number.");
+  assert.equal(JSON.parse(source("messages/ro/legal.json"))["legal.notice.s04.payments"],
+    "Acceptăm Visa și Mastercard; nu acceptăm American Express. Plățile cu cardul sunt procesate de NETOPIA Payments. Nu vedem și nu păstrăm niciodată numărul complet al cardului dumneavoastră.");
   assert.equal(catalogue("ro")["billing.card.countryRefused"], "Nu putem accepta carduri emise în țara acestui card. Nu s-a încasat nimic, iar abonamentul dvs. păstrează cardul pe care îl avea.");
   for (const { code } of LOCALES) {
     const billing = catalogue(code);
@@ -328,6 +340,10 @@ test("every locale names NETOPIA Payments where it names the card processor, and
       assert.ok(billing[key].includes("NETOPIA Payments"), `${code}: ${key} names NETOPIA Payments`);
     }
     assert.ok(legal["legal.notice.s04.payments"].includes("NETOPIA Payments"), `${code}: legal.notice.s04.payments`);
+    // NETOPIA eligibility (2026-10-22): the accepted cards are named, in Latin script, with American Express refused.
+    for (const brand of ["Visa", "Mastercard", "American Express"]) {
+      assert.ok(legal["legal.notice.s04.payments"].includes(brand), `${code}: legal.notice.s04.payments names ${brand}`);
+    }
     assert.ok(billing["billing.consent.renewal"].includes("dezbatere.ro/cancel"), `${code}: the cancel address`);
     assert.equal(Object.hasOwn(billing, "billing.card.holdNote"), false, `${code}: no hold sentence`);
     for (const [key, value] of [...Object.entries(billing), ...Object.entries(legal)]) {

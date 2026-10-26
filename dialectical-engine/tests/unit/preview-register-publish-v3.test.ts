@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, BILLING_POLICY_DEPLOYMENT_REGISTER_ROW, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyStartValues, LENGTH_GUIDANCE_POLICY_ROW_KEY, lengthGuidancePolicyStartValues, ENGINE_CONTRACT_HASH_ROW_KEY, ENGINE_VERSION_POLICY_ROW_KEY, engineVersionPolicyStartValues } from '@debateai/register';
+import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256, BILLING_POLICY_DEPLOYMENT_REGISTER_ROW, DEBATE_SHAPE_POLICY_ROW_KEY, debateShapePolicyStartValues, QUESTION_LANGUAGE_POLICY_ROW_KEY, questionLanguagePolicyStartValues, LENGTH_GUIDANCE_POLICY_ROW_KEY, lengthGuidancePolicyStartValues, ENGINE_CONTRACT_HASH_ROW_KEY, ENGINE_VERSION_POLICY_ROW_KEY, engineVersionPolicyStartValues, PREVIEW_LINE_UP_POLICY_ROW_KEY, COST_ESTIMATE_START_POLICY_ROW_KEY, COST_ESTIMATE_START_POLICY_DEPLOYMENT_REGISTER_ROW } from '@debateai/register';
 import { engineContractHash } from '../../apps/runner/src/engine-contracts.js';
 import { mapPromptContractHash } from '@debateai/map';
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
@@ -11,6 +11,7 @@ import {
   buildPreviewSourceRowsV3, composePreviewSnapshotV3, publishPreviewRegisterV3, previewHostedBillingChoice, assertHostedPreviewBootRows,
   PREVIEW_SOURCE_ROW_KEYS_V3, PREVIEW_HOSTED_CEILING_BOUNDS, STORY_COST_ENVELOPE_POLICY_ROW_KEY
 } from '../../deploy/preview-auth-dev/v1/publish-register-v3.js';
+import { assertBaseIsActive, BASE_NOT_ACTIVE, PreviewRegisterBaseNotActiveError } from '../../deploy/preview-auth-dev/v1/publish-register-base.js';
 
 type Row = { rowKey: string; valueJsonText: string; sourceRef: string };
 const sha = (text: string) => createHash('sha256').update(text).digest('hex');
@@ -22,6 +23,8 @@ const sorted = (rows: Row[]) => [...rows].sort((a, b) => a.rowKey.localeCompare(
 const ON = { billing: 'on', perRunCeilingMicros: 3_000_000, dailyCeilingMicros: 10_000_000, askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 } } as const;
 const OFF = { ...ON, billing: 'off' } as const;
 const OWNER_KEYS = ['admissionPolicy', 'billingPolicy', 'costEnvelopePolicy'];
+/** The two code-owned rows only a hosted build seals: the estimate's starting figures (2026-10-22) and the story's money row. */
+const HOSTED_ADDED = [COST_ESTIMATE_START_POLICY_ROW_KEY, STORY_COST_ENVELOPE_POLICY_ROW_KEY];
 /** A register refusal is a TypedDomainError (its code on `.code`) or a TypeError whose message is the code. */
 const refusal = (run: () => unknown) => { try { run(); } catch (error: any) { return `${error?.code ?? ''} ${error?.message ?? ''}`; } return 'no refusal'; };
 const value = (rows: readonly Row[], key: string) => JSON.parse(rows.find(row => row.rowKey === key)!.valueJsonText);
@@ -36,14 +39,14 @@ async function fixture() {
 const compose = (source: readonly Row[], base: Row[], version = '12') => composePreviewSnapshotV3({ sourceRows: source as any, baseRows: base as any, baseRegisterVersion: version, baseSnapshotSha256: computeRegisterSnapshotSha256(base as any) });
 
 describe('publish kit v3: the hosted source', () => {
-  it('is v2\'s source with the story money row added and only the three owner rows changed', async () => {
+  it('is v2\'s source with the two hosted rows added and only the three owner rows changed', async () => {
     const f = await fixture();
     for (const choice of [ON, OFF]) {
       const rows = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, choice)] as Row[];
       expect(rows.map(row => row.rowKey).sort()).toEqual([...PREVIEW_SOURCE_ROW_KEYS_V3].sort());
-      expect(PREVIEW_SOURCE_ROW_KEYS_V3).toEqual([...PREVIEW_SOURCE_ROW_KEYS_V2, STORY_COST_ENVELOPE_POLICY_ROW_KEY].sort());
+      expect(PREVIEW_SOURCE_ROW_KEYS_V3).toEqual([...PREVIEW_SOURCE_ROW_KEYS_V2, ...HOSTED_ADDED].sort());
       const differing = rows.filter(row => JSON.stringify(row) !== JSON.stringify(f.v2.find(old => old.rowKey === row.rowKey))).map(row => row.rowKey).sort();
-      expect(differing).toEqual(choice.billing === 'on' ? [...OWNER_KEYS, STORY_COST_ENVELOPE_POLICY_ROW_KEY] : ['admissionPolicy', 'costEnvelopePolicy', STORY_COST_ENVELOPE_POLICY_ROW_KEY]);
+      expect(differing).toEqual(choice.billing === 'on' ? [...OWNER_KEYS, ...HOSTED_ADDED].sort() : ['admissionPolicy', 'costEnvelopePolicy', ...HOSTED_ADDED].sort());
     }
   });
 
@@ -108,14 +111,14 @@ describe('publish kit v3: the hosted source', () => {
 });
 
 describe('publish kit v3: composing from the current version', () => {
-  it('from the live register 12 shape: the story money row is added and the three owner rows change, each shown with its old and new value', async () => {
+  it('from the live register 12 shape: the two hosted rows are added and the three owner rows change, each shown with its old and new value', async () => {
     const f = await fixture();
     const before = structuredClone(f.v12);
     const plan = compose([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[], f.v12);
     expect(plan.composer).toBe('preview-register-composer-v3');
-    expect(plan.addedKeys).toEqual([STORY_COST_ENVELOPE_POLICY_ROW_KEY]);
+    expect(plan.addedKeys).toEqual(HOSTED_ADDED);
     expect(plan.changedKeys).toEqual(OWNER_KEYS);
-    expect(plan.rows).toHaveLength(f.v12.length + 1);
+    expect(plan.rows).toHaveLength(f.v12.length + 2);
     for (const key of OWNER_KEYS) {
       const entry = plan.delta.find(row => row.rowKey === key)!;
       expect(entry).toMatchObject({ change: 'changed', reason: 'owner-hosted-billing-input', oldValueJsonText: f.v12.find(row => row.rowKey === key)!.valueJsonText });
@@ -128,7 +131,7 @@ describe('publish kit v3: composing from the current version', () => {
   it('a first provider-only publication (billing off) changes only the ceilings and the room-read budget', async () => {
     const f = await fixture();
     const plan = compose([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, OFF)] as Row[], f.v12);
-    expect(plan.addedKeys).toEqual([STORY_COST_ENVELOPE_POLICY_ROW_KEY]);
+    expect(plan.addedKeys).toEqual(HOSTED_ADDED);
     expect(plan.changedKeys).toEqual(['admissionPolicy', 'costEnvelopePolicy']);
   });
 
@@ -252,7 +255,7 @@ describe('publish kit v3: the optional debateShapePolicy row and the sealed map 
     const plan = compose(await v3(), base);
     expect(shapeRow([...plan.rows] as Row[])).toEqual(shapeRow(base));
     expect(plan.delta.map(entry => entry.rowKey)).not.toContain(DEBATE_SHAPE_POLICY_ROW_KEY);
-    expect(plan.addedKeys).toEqual([STORY_COST_ENVELOPE_POLICY_ROW_KEY]);
+    expect(plan.addedKeys).toEqual(HOSTED_ADDED);
     const broken = base.map(row => row.rowKey === DEBATE_SHAPE_POLICY_ROW_KEY ? { ...row, valueJsonText: row.valueJsonText.replace('"DEBATE_SHAPE_POLICY"', '"X"') } : row);
     const source = await v3();
     expect(refusal(() => compose(source, broken))).toContain('DEBATE_SHAPE_POLICY_INVALID');
@@ -367,7 +370,7 @@ describe('the native operator chooses the kit by the plan', () => {
     expect(body).toContain("const hosted=Object.hasOwn(plan,'hostedBilling');");
     expect(body).toContain("tsImport(hosted?'./publish-register-v3.ts':'./publish-register-v2.ts',import.meta.url)");
     expect(body.split('publisher.buildPreviewSourceRowsV3(')).toHaveLength(2);
-    expect(body.split('publisher.buildPreviewSourceRowsV3(')[1]).toMatch(/^await register\.loadBootstrapRegister\(\),observation,plan\.hostedBilling,plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null,plan\.debateShape\?\?null,plan\.questionLanguage\?\?null,plan\.lengthGuidance\?\?null\)/);
+    expect(body.split('publisher.buildPreviewSourceRowsV3(')[1]).toMatch(/^await register\.loadBootstrapRegister\(\),observation,plan\.hostedBilling,plan\.checkerChoice,plan\.roleRotation,plan\.callConcurrency\?\?null,plan\.debateShape\?\?null,plan\.questionLanguage\?\?null,plan\.lengthGuidance\?\?null,null,plan\.lineUp\?\?null,plan\.answerSeats\?\?null\)/);
     expect(body).toContain('const snapshot=hosted?publisher.composePreviewSnapshotV3(composition):publisher.composePreviewSnapshotV2(composition);');
   });
   it('publishes with kit v3 only after the pending-forward-step check, like kit v2', () => {
@@ -424,5 +427,209 @@ describe('publish kit v3: the optional engineVersionPolicy row and the engine se
     // No engine row = engine 1: the seal is never read.
     const today = [...compose(await v3(null), f.v12).rows] as Row[];
     expect(() => assertHostedPreviewBootRows(edit(today, ENGINE_CONTRACT_HASH_ROW_KEY, () => 'e'.repeat(64)) as any)).not.toThrow();
+  });
+});
+
+/**
+ * Side-by-side spec §13, addition D23 (owner 2026-10-22): kit v3 passes the plan's line-up and answer seats through to
+ * kit v2's builder (v3's eleventh and twelfth arguments); the hosted story rows follow the chosen seats; a carried
+ * previewLineUpPolicy row is re-parsed by the register's own reader.
+ */
+describe('publish kit v3: the optional previewLineUpPolicy row and the answer seats (side-by-side §13 addition D23)', () => {
+  const GLM = 'zai-org/GLM-5.3-Flash', DEEPSEEK_MODEL = 'deepseek-ai/DeepSeek-V4.1-Flash', MIMO = 'XiaomiMiMo/MiMo-V2.6-Pro', QWEN = 'Qwen/Qwen3.8-Flash', HAIKU = 'claude-haiku-5-5';
+  const OWNER_LIVE_TABLE = JSON.parse(`{"zai-org/GLM-5.3-Flash":{"level":"high"},"deepseek-ai/DeepSeek-V4.1-Flash":{"level":"none"},"Qwen/Qwen3.8-Flash":{"level":"medium"},"XiaomiMiMo/MiMo-V2.6-Pro":{"level":"default","steps":{"pros_cons":"none","cross_exchange":"none"}},"claude-haiku-5-5":{"level":"medium","steps":{"judge_panel":"high","reviewer":"high","answer_checker":"high","story_checker":"high","answer_writer":"high","story_writer":"high","slip_fix":"medium"}}}`) as Record<string, unknown>;
+  const LIVE = { free_model_ids: [GLM, DEEPSEEK_MODEL], premium_model_ids: [GLM, DEEPSEEK_MODEL, MIMO, QWEN, HAIKU], thinking_levels: OWNER_LIVE_TABLE };
+  const HAIKU_REF = 'preview:claude-haiku-5-5', GLM_B = 'preview:fixture-b', DEEPSEEK_REF = 'preview:deepseek-v4-1-flash';
+  const v3 = async (lineUp?: unknown, answerSeats?: unknown, checker?: unknown) =>
+    [...await (buildPreviewSourceRowsV3 as (...args: unknown[]) => Promise<readonly Row[]>)(await loadBootstrapRegister(), runtime, ON,
+      checker, undefined, null, null, null, null, null, lineUp, answerSeats)] as Row[];
+  const v2 = async (lineUp?: unknown, answerSeats?: unknown) =>
+    [...await (buildPreviewSourceRowsV2 as (...args: unknown[]) => Promise<readonly Row[]>)(await loadBootstrapRegister(), runtime,
+      undefined, undefined, null, null, null, null, null, lineUp, answerSeats)] as Row[];
+  const lineUpRow = (rows: readonly Row[]) => rows.find(row => row.rowKey === PREVIEW_LINE_UP_POLICY_ROW_KEY);
+  const seats = (rows: readonly Row[]) => ['synthesizerRoleRef', 'evaluatorRoleRef', 'storytellerRoleRef', 'storyCheckerRoleRef'].map(key => value(rows, key).providerRef);
+
+  it('passes the line-up through to kit v2: the same row v2 builds; null or nothing = no row, byte for byte today\'s', async () => {
+    const given = await v3(LIVE), absent = await v3();
+    expect(lineUpRow(given)).toEqual(lineUpRow(await v2(LIVE)));
+    expect(lineUpRow(absent)).toBeUndefined();
+    expect(await v3(null, null)).toEqual(absent);
+    expect(absent).toEqual([...await buildPreviewSourceRowsV3(await loadBootstrapRegister(), runtime, ON)]);
+    expect(given.filter(row => row.rowKey !== PREVIEW_LINE_UP_POLICY_ROW_KEY)).toEqual(absent);
+    await expect(v3({ ...LIVE, thinking_levels: { [QWEN]: { level: 'high' } } })).rejects.toThrow(`PREVIEW_THINKING_LEVELS_INVALID:level:${QWEN}`);
+  });
+
+  it('R19: a base line-up row the source leaves out is carried unchanged, outside the delta; a malformed one is refused, never carried', async () => {
+    const f = await fixture();
+    const published = compose(await v3(LIVE), f.v12);
+    expect(published.addedKeys).toContain(PREVIEW_LINE_UP_POLICY_ROW_KEY);
+    const base = [...published.rows] as Row[];
+    const kept = compose(await v3(), base, '13');
+    expect(lineUpRow([...kept.rows] as Row[])).toEqual(lineUpRow(base));
+    expect(kept.delta).toEqual([]);
+    const broken = base.map(row => row.rowKey === PREVIEW_LINE_UP_POLICY_ROW_KEY ? { ...row, valueJsonText: row.valueJsonText.replace('"PREVIEW_LINE_UP_POLICY"', '"X"') } : row);
+    const source = await v3();
+    expect(refusal(() => compose(source, broken, '13'))).toContain('PREVIEW_LINE_UP_POLICY_INVALID:kind');
+  });
+
+  it('the answer seats reach the hosted story rows: the Haiku writer seals the synthesizer and the storyteller; the story seats may move alone', async () => {
+    const f = await fixture();
+    const haiku = await v3(null, { writer: HAIKU_REF, checker: GLM_B });
+    expect(seats(haiku)).toEqual([HAIKU_REF, GLM_B, HAIKU_REF, GLM_B]);
+    expect(value(haiku, STORY_COST_ENVELOPE_POLICY_ROW_KEY)).toEqual(value(await v3(), STORY_COST_ENVELOPE_POLICY_ROW_KEY));
+    expect(() => compose(haiku, f.v12)).not.toThrow();
+    const story = await v3(null, { writer: 'preview:fixture-a', checker: DEEPSEEK_REF, storyteller: HAIKU_REF, storyChecker: GLM_B });
+    expect(seats(story)).toEqual(['preview:fixture-a', DEEPSEEK_REF, HAIKU_REF, GLM_B]);
+    expect(() => compose(story, f.v12)).not.toThrow();
+    // Seats equal to today's choice change nothing.
+    expect(await v3(null, { writer: 'preview:fixture-a', checker: GLM_B })).toEqual(await v3());
+    expect(await v3(null, { writer: 'preview:fixture-a', checker: DEEPSEEK_REF })).toEqual(await v3(null, null, { checker: 'deepseek', deepseekEnabledOnGate: true }));
+    await expect(v3(null, { writer: 'preview:other', checker: GLM_B })).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seat-unreviewed');
+    await expect(v3(null, { writer: HAIKU_REF, checker: GLM_B }, { checker: 'glm' })).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seats-with-checker-choice');
+    // Ruling R28 (final fix wave F3): the hosted kit refuses the storyteller as its own story checker too (effective seats).
+    for (const storyAlone of [{ writer: HAIKU_REF, checker: GLM_B, storyteller: DEEPSEEK_REF, storyChecker: DEEPSEEK_REF }, { writer: HAIKU_REF, checker: GLM_B, storyteller: GLM_B }])
+      await expect(v3(null, storyAlone)).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED: answer-seats-storyteller-is-story-checker');
+  });
+});
+
+/**
+ * Side-by-side spec §13 (Task S18): kit v3 composes from the ACTIVE settings version — the pointer, else the current
+ * release's own site version, else (no release yet) the old currency rule. The pool answers the kit's light read of what
+ * new asks use (readEffectiveActiveSettings, ruling R69: the catalog query, the current release, the pointer) and the
+ * old rule's read, and records every statement.
+ */
+describe('publish kit v3: composing from the active settings version', () => {
+  // Release keys are built from pieces (the secret scanner reads r<n>-<12 hex> as a key).
+  const release = (site: number) => [`r${site}`, 'a'.repeat(12)].join('-');
+  const id = '11111111-1111-4111-8111-111111111111';
+  const statusPool = (state: { release: string | null; pointer: string | null; above?: { register_version: string; publication_id: string | null }[];
+    has0123?: boolean; has0124?: boolean }) => {
+    const statements: string[] = [];
+    const pool = { async query(sql: string) {
+      statements.push(sql);
+      if (/to_regprocedure/.test(sql)) return { rows: [{ releases: state.has0123 ?? true, settings: state.has0124 ?? true }] };
+      if (/core\.read_current_release\(\)/.test(sql)) return { rows: state.release === null ? [] : [{ release_key: state.release }] };
+      if (/register\.read_active_settings_version\(\)/.test(sql)) return { rows: [{ pointer: state.pointer }] };
+      if (/register\.read_passed_settings_versions/.test(sql)) return { rows: [] };
+      if (/register_version>\$1/.test(sql)) return { rows: state.above ?? [] };
+      throw new Error('unexpected statement');
+    } } as any;
+    return { statements, pool };
+  };
+  const oldRule = (statements: string[]) => statements.some(sql => /register_version>\$1/.test(sql));
+
+  it('passes when the base is the pointer, with a never-activated candidate sealed above it', async () => {
+    const f = statusPool({ release: release(12), pointer: '13', above: [{ register_version: '14', publication_id: '22222222-2222-4222-8222-222222222222' }] });
+    await expect(assertBaseIsActive(f.pool, '13', id)).resolves.toBeUndefined();
+    expect(oldRule(f.statements)).toBe(false);
+  });
+  it.each([
+    ['an older version than the pointer', { release: release(12), pointer: '13' }, '12'],
+    ['a newer candidate than the pointer', { release: release(12), pointer: '13' }, '14'],
+    ['a version other than the release\'s site version while nothing was activated', { release: release(12), pointer: null }, '13']
+  ])('refuses %s', async (_name, state, base) => {
+    const f = statusPool(state);
+    await expect(assertBaseIsActive(f.pool, base, id)).rejects.toThrow(BASE_NOT_ACTIVE);
+    await expect(assertBaseIsActive(f.pool, base, id)).rejects.toBeInstanceOf(PreviewRegisterBaseNotActiveError);
+    expect(oldRule(f.statements)).toBe(false);
+  });
+  it('with the pointer empty, the current release\'s own site version is the active one (D1)', async () => {
+    const f = statusPool({ release: release(12), pointer: null, above: [{ register_version: '13', publication_id: null }] });
+    await expect(assertBaseIsActive(f.pool, '12', id)).resolves.toBeUndefined();
+    expect(oldRule(f.statements)).toBe(false);
+  });
+  it('T+1\'s SB3 runs before 0124 is applied (ruling R69): the current release\'s site version is the base; with no 0123 either, the old rule', async () => {
+    const before0124 = statusPool({ release: release(12), pointer: null, has0124: false, above: [{ register_version: '13', publication_id: null }] });
+    await expect(assertBaseIsActive(before0124.pool, '12', id)).resolves.toBeUndefined();
+    await expect(assertBaseIsActive(before0124.pool, '11', id)).rejects.toThrow(BASE_NOT_ACTIVE);
+    expect(before0124.statements.some(sql => /read_active_settings_version|read_passed_settings_versions/.test(sql))).toBe(false);
+    const before0123 = statusPool({ release: null, pointer: null, has0123: false, has0124: false, above: [{ register_version: '13', publication_id: null }] });
+    await expect(assertBaseIsActive(before0123.pool, '12', id)).rejects.toThrow('PREVIEW_REGISTER_BASE_NOT_CURRENT');
+    await expect(assertBaseIsActive(statusPool({ release: null, pointer: null, has0123: false, has0124: false }).pool, '12', id)).resolves.toBeUndefined();
+    expect(before0123.statements.some(sql => /read_current_release\(\) AS|read_active_settings_version\(\)::/.test(sql))).toBe(false);
+  });
+  it('with no release yet, the old rule decides: nothing above the base but this publication\'s replay', async () => {
+    await expect(assertBaseIsActive(statusPool({ release: null, pointer: null }).pool, '12', id)).resolves.toBeUndefined();
+    await expect(assertBaseIsActive(statusPool({ release: null, pointer: null, above: [{ register_version: '13', publication_id: id }] }).pool, '12', id)).resolves.toBeUndefined();
+    const stale = statusPool({ release: null, pointer: null, above: [{ register_version: '13', publication_id: null }] });
+    await expect(assertBaseIsActive(stale.pool, '12', id)).rejects.toThrow('PREVIEW_REGISTER_BASE_NOT_CURRENT');
+    expect(oldRule(stale.statements)).toBe(true);
+  });
+  it('kit v3 exports the active rule only; publish checks it before any publication statement', async () => {
+    const kit = await import('../../deploy/' + 'preview-auth-dev/v1/publish-register-v3.ts') as Record<string, unknown>;
+    expect(kit.assertBaseIsActive).toBe(assertBaseIsActive);
+    expect(kit.assertBaseIsCurrent).toBeUndefined();
+    const f = await fixture();
+    const snapshot = compose([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[], f.v12);
+    const approval = { baseRegisterVersion: snapshot.baseRegisterVersion, baseSnapshotSha256: snapshot.baseSnapshotSha256, snapshotSha256: snapshot.snapshotSha256, deltaSha256: snapshot.deltaSha256 };
+    const stale = statusPool({ release: release(12), pointer: '13' });
+    await expect(publishPreviewRegisterV3(stale.pool, { publicationId: id, sourceRef: 'x', snapshot, approval })).rejects.toThrow(BASE_NOT_ACTIVE);
+    expect(stale.statements).toHaveLength(3);
+    // Base 12 is active (the pointer) with a candidate above it: the check passes and the publication's own reads begin.
+    const active = statusPool({ release: release(12), pointer: '12', above: [{ register_version: '13', publication_id: null }] });
+    await expect(publishPreviewRegisterV3(active.pool, { publicationId: id, sourceRef: 'x', snapshot, approval })).rejects.toThrow('unexpected statement');
+    expect(active.statements).toHaveLength(4);
+    expect(oldRule(active.statements)).toBe(false);
+  });
+  it('the native operator checks the active rule for kit v3 (kit v2 keeps the current rule) and prints its refusal in words', async () => {
+    const operator = await import('../../deploy/' + 'preview-auth-dev/v1/native-operator.mjs');
+    expect(operator.BASE_NOT_ACTIVE_LINE).toBe(BASE_NOT_ACTIVE);
+    expect(operator.operatorRefusalLine(new PreviewRegisterBaseNotActiveError())).toBe(`${BASE_NOT_ACTIVE}\n`);
+    expect(operator.operatorRefusalLine(new TypeError(BASE_NOT_ACTIVE))).toBe('PREVIEW_NATIVE_OPERATION_REFUSED\n');
+    const text = readFileSync(resolve('deploy/preview-auth-dev/v1/native-operator.mjs'), 'utf8');
+    const body = text.slice(text.indexOf('export async function runNativeOperator('));
+    const active = body.indexOf("if(hosted&&(plan.operation==='plan'||plan.operation==='publish'))await publisher.assertBaseIsActive(pool,base.registerVersion,plan.publicationId);");
+    const current = body.indexOf("else if(plan.operation==='plan'||plan.operation==='publish')await publisher.assertBaseIsCurrent(pool,base.registerVersion,plan.publicationId);");
+    expect(active).toBeGreaterThan(-1);
+    expect(current).toBeGreaterThan(active);
+    expect(current).toBeLessThan(body.indexOf("if(plan.operation==='plan'||plan.operation==='apply-and-plan')return metadata;"));
+  });
+});
+
+describe('publish kit v3: the estimate\'s starting figures (owner rulings 2026-10-22, fresh-site estimate)', () => {
+  const EXPECTED = {
+    kind: 'COST_ESTIMATE_START_POLICY', currency: 'USD', minor_units_per_unit: 1_000_000, min_samples: 5,
+    start_micros_by_depth: { '1': 300_000, '2': 600_000, '3': 1_000_000 }
+  };
+  const setValue = (rows: Row[], key: string, change: (value: any) => void) =>
+    rows.map(row => row.rowKey === key ? { ...row, valueJsonText: canonical((v => (change(v), v))(JSON.parse(row.valueJsonText))) } : row);
+
+  it('seals the code-owned row with the owner\'s values in every hosted source, billing on or off', async () => {
+    const f = await fixture();
+    for (const choice of [ON, OFF]) {
+      const rows = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, choice)] as Row[];
+      expect(rows.find(row => row.rowKey === COST_ESTIMATE_START_POLICY_ROW_KEY)).toEqual({
+        rowKey: COST_ESTIMATE_START_POLICY_ROW_KEY,
+        valueJsonText: canonical(COST_ESTIMATE_START_POLICY_DEPLOYMENT_REGISTER_ROW.value),
+        sourceRef: COST_ESTIMATE_START_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef
+      });
+      expect(value(rows, COST_ESTIMATE_START_POLICY_ROW_KEY)).toEqual(EXPECTED);
+    }
+    // Kit v2 (the local-mode kit) never builds it: only a hosted API estimates.
+    expect(f.v2.map(row => row.rowKey)).not.toContain(COST_ESTIMATE_START_POLICY_ROW_KEY);
+  });
+
+  it('on a hosted base this kit published before the row (the live register 18 shape), it is the one added row', async () => {
+    const f = await fixture();
+    const source = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, OFF)] as Row[];
+    const live = ([...compose(source, f.v12).rows] as Row[]).filter(row => row.rowKey !== COST_ESTIMATE_START_POLICY_ROW_KEY);
+    const next = compose(source, live, '18');
+    expect(next.addedKeys).toEqual([COST_ESTIMATE_START_POLICY_ROW_KEY]);
+    expect(next.changedKeys).toEqual([]);
+    expect(next.delta).toHaveLength(1);
+    expect(next.delta[0]).toMatchObject({ change: 'added', reason: 'added-source-key', oldValueJsonText: null });
+    expect(JSON.parse(next.delta[0]!.newValueJsonText)).toEqual(EXPECTED);
+  });
+
+  it('refuses a source without the row, and a version whose row the API\'s boot would refuse', async () => {
+    const f = await fixture();
+    const source = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[];
+    expect(() => compose(source.filter(row => row.rowKey !== COST_ESTIMATE_START_POLICY_ROW_KEY), f.v12)).toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED: source-key-list');
+    const malformed = setValue(source, COST_ESTIMATE_START_POLICY_ROW_KEY, v => { v.min_samples = 21; });
+    expect(refusal(() => compose(malformed, f.v12))).toContain('COST_ESTIMATE_START_POLICY_INVALID');
+    const rows: Row[] = [...source, ...owned()];
+    expect(() => assertHostedPreviewBootRows(rows as any)).not.toThrow();
+    expect(refusal(() => assertHostedPreviewBootRows(setValue(rows, COST_ESTIMATE_START_POLICY_ROW_KEY, v => { v.start_micros_by_depth['1'] = 0; }) as any)))
+      .toContain('COST_ESTIMATE_START_POLICY_INVALID');
   });
 });

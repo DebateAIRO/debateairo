@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Trumpai
-eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.4 · ĮSIGALIOJA 2026 M. SPALIO 12 D.
+eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.5 · ĮSIGALIOJA 2026 M. SPALIO 12 D.
 title: Su kuo sutinkate
 lede: Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.
-endMarker: SĄLYGŲ PABAIGA · v2.4
+endMarker: SĄLYGŲ PABAIGA · v2.5
 bodyLabel: Paslaugų teikimo sąlygų tekstas
 annexTitle: A priedas — Regioninės sąlygos
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TAIKYTINA TEISĖ
 -->
 
-**Version 2.4 · Effective 2026 m. spalio 12 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
+**Version 2.5 · Effective 2026 m. spalio 12 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
 
 **In short.** Turite būti ne jaunesni kaip 18 metų. Dialectical Engine kuria argumentus naudodama DI modelius, todėl viskas, ką ji sugeneruoja, gali būti klaidinga — tai nėra konsultacija. Jūsų debatai yra privatūs, nebent juos paskelbiate; paskelbtus debatus gali skaityti bet kas. Jūsų pateiktas tekstas siunčiamas mūsų Paslaugų teikėjų registre nurodytiems DI paslaugų teikėjams ir nenaudojamas modeliams mokyti. Apie neteisėtą turinį praneškite adresu support@dezbatere.ro, nesvarbu, ar turite paskyrą. Taikoma Rumunijos teisė, tačiau jums ir toliau taikoma vietos vartotojų apsauga.
 
@@ -213,7 +213,11 @@ Dialectical Engine siūlo nemokamą planą. Mokamas planas **Premium** bus priei
 
 **Nepavykę mokėjimai.** Jei mokėjimas nepavyksta, 7 dienas bandome dar kartą ir prieš pakeisdami paskyrą į nemokamą planą įspėjame jus el. paštu. Debatų dėl nepavykusio mokėjimo neištriname.
 
-**Mokesčiai ir kam mokate.** Į kainas įskaičiuotas PVM, GST ar pardavimo mokestis, priklausantis nuo jūsų gyvenamosios vietos ir parodomas prieš jums mokant. Mokėjimus kortele tvarko NETOPIA Payments (netopia-payments.com). Pardavėjas yra DMS Merchandise Shop S.R.L., kuris išrašo jūsų sąskaitą faktūrą ir išlieka atsakingas už pačią paslaugą bei šias Sąlygas.
+**Mokesčiai ir kam mokate.** Į kainas įskaičiuotas PVM, GST ar pardavimo mokestis, priklausantis nuo jūsų gyvenamosios vietos ir parodomas prieš jums mokant. Pardavėjas yra DMS Merchandise Shop S.R.L., kuris išrašo jūsų sąskaitą faktūrą ir išlieka atsakingas už pačią paslaugą bei šias Sąlygas.
+
+**Mokėjimo būdai.** Mokate kortele. Priimame Visa ir Mastercard korteles; American Express kortelių nepriimame. Mokėjimus kortele tvarko NETOPIA Payments (netopia-payments.com), o visas jūsų kortelės numeris niekada nepasiekia mūsų.
+
+**Pristatymas.** Dialectical Engine yra internetinė paslauga, todėl jums nieko nesiunčiame. Jūsų mokamo plano funkcijos jūsų paskyroje tampa prieinamos iškart, kai mokėjimas patvirtinamas.
 
 **Mokėjimo grąžinimo ginčai.** Jei mokėjimą užginčijate savo kortelės išdavėjui, kol ginčas sprendžiamas, galime sustabdyti mokamas funkcijas. Už tai mokesčių netaikome.
 
@@ -235,7 +239,7 @@ Patvariojoje laikmenoje iš anksto pranešame, kas ir kada keisis. Jei pakeitima
 
 **Šių Sąlygų pakeitimai.** Šias Sąlygas galime keisti dėl tokių pačių priežasčių. Jei pakeitimai nesumažina jūsų teisių, paskelbiame naują versiją su pakeitimų santrauka ir išsiunčiame jums el. laišką bent prieš **30 dienų** iki jos įsigaliojimo; jei po tos dienos toliau naudositės Dialectical Engine, tai reikš, kad su pakeitimais sutinkate, o iki tol galite uždaryti paskyrą. Jei pakeitimais sumažinamos jūsų teisės — įskaitant esamo plano kainos padidinimą, mažesnes ribas, pašalintas funkcijas, naujus jūsų turinio naudojimo būdus arba atsakomybės, taikytinos teisės ar ginčų sprendimo pakeitimus — kitą kartą prisijungus prašome aiškiai sutikti su nauja versija, o pakeitimas taikomas tik ateityje. Niekada netaikome pakeitimo atgaline data ir niekada nesinaudojame šiuo skyriumi tam, kad sutarties laikotarpio viduryje pakeistume esminius dalykus, už kuriuos sumokėjote, nepasiūlydami galimybės atsisakyti sutarties. Ankstesnes versijas galima rasti adresu dezbatere.ro/terms/versions.
 
-2.4 versija pakeitė 2.3 versiją: ji prideda klausimų patikrą, kuri perskaito kiekvieną klausimą prieš debatų pradžią, kai kuriuos atmeta ir mūsų komandos perskaitymui saugo kiekvieną atmestą klausimą, kuriame grasinama pakenkti vienam ar keliems kitiems žmonėms, įvardytiems ar ne, įskaitant išpuolį prieš neįvardytus žmones, planuojama tai padaryti arba klausiama, ar ir kaip jiems pakenkti, arba kuriame klausiama, kaip pagaminti ginklų, sprogmenų, nuodų ar narkotikų arba kaip paremti teroro aktą, arba kuris jį šlovina (7, 8, 10 ir 11 skyriai); patikrą, kuri perskaito kiekvienų pasibaigusių debatų apibendrinimą, pritarimą, kurio reikia pažymėtiems debatams prieš juos paskelbiant, ir debatus, kuriuos ta patikra ištrina (5, 8, 9, 10 ir 11 skyriai); tai, ką pagalbos pokalbis siunčia Anthropic modeliui Claude, kad jis nesaugo nieko, ką rašote, ir neatidaro atvejo, ir kad jo mygtukas „Kalbėtis su žmogumi“ parodo mūsų pagalbos adresą (8 ir 10 skyriai); ir 7 skyriaus taisykles, kurios draudžia bet kokios rūšies neapykantos kalbą, ginklų ar narkotikų gaminimo instrukcijas, turinį, skatinantį savižudybę arba kenkimą kitiems žmonėms, ir religijos įžeidimą bei nurodo, dėl kokių klausimų debatai neprasideda.
+2.5 versija pakeitė 2.4 versiją: ji prideda klausimų patikrą, kuri perskaito kiekvieną klausimą prieš debatų pradžią, kai kuriuos atmeta ir mūsų komandos perskaitymui saugo kiekvieną atmestą klausimą, kuriame grasinama pakenkti vienam ar keliems kitiems žmonėms, įvardytiems ar ne, įskaitant išpuolį prieš neįvardytus žmones, planuojama tai padaryti arba klausiama, ar ir kaip jiems pakenkti, arba kuriame klausiama, kaip pagaminti ginklų, sprogmenų, nuodų ar narkotikų arba kaip paremti teroro aktą, arba kuris jį šlovina (7, 8, 10 ir 11 skyriai); patikrą, kuri perskaito kiekvienų pasibaigusių debatų apibendrinimą, pritarimą, kurio reikia pažymėtiems debatams prieš juos paskelbiant, ir debatus, kuriuos ta patikra ištrina (5, 8, 9, 10 ir 11 skyriai); tai, ką pagalbos pokalbis siunčia Anthropic modeliui Claude, kad jis nesaugo nieko, ką rašote, ir neatidaro atvejo, ir kad jo mygtukas „Kalbėtis su žmogumi“ parodo mūsų pagalbos adresą (8 ir 10 skyriai); ir 7 skyriaus taisykles, kurios draudžia bet kokios rūšies neapykantos kalbą, ginklų ar narkotikų gaminimo instrukcijas, turinį, skatinantį savižudybę arba kenkimą kitiems žmonėms, ir religijos įžeidimą bei nurodo, dėl kokių klausimų debatai neprasideda.
 
 ## 15. Atsakomybė
 

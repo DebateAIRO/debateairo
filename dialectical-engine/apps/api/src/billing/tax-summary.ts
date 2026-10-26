@@ -60,7 +60,8 @@ export type PaymentToCheckItem = Readonly<{
   /**
    * A dead refund's reason (a WITHDRAWAL refund is due within 14 days of the withdrawal), or the code a charge-less
    * attempt names (TAX_SERVICE_UNAVAILABLE: the tax service could not price it; RETRY_TOTAL_CHANGED: P2-M10's retry
-   * priced afresh at a total other than the announced one, so nothing was charged); else null. Null for
+   * priced afresh at a total other than the announced one, so nothing was charged; REFUSAL_NOT_RETRIED: B2, NETOPIA
+   * refused the card for a reason other than missing funds, so it was not charged again); else null. Null for
    * REFUND_NOT_REQUESTED and REFUND_OTHER_SYSTEM: no recorded request was checked, so its payload's reason is only what
    * the job claimed.
    */
@@ -604,6 +605,9 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
       + " tax service priced a retry again, but at a total the person was never told about (a tax change), so nothing"
       + " is charged and the plan ends after its last retry day unless a later retry prices at the announced total"
       + " again; there is nothing to fix in the tax service, and the person can subscribe again at the new price;"
+      // B2 (NETOPIA answers 2026-10-21, Q15): only refusal code 20 is retried by itself.
+      + " REFUSAL_NOT_RETRIED (named after DUNNING_UNPRICED or ENDED_UNPRICED): NETOPIA refused the card for a reason"
+      + " other than missing funds, so it was not charged again; the person was emailed to add a card;"
       + " RENEWAL_BLOCKED: the tax service refuses to price a renewal (a revoked"
       + " Quaderno key or a refused request), so nothing is charged and the person is on Free until it prices again,"
       + " fix the tax service;"

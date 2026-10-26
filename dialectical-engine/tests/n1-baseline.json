@@ -1,0 +1,29 @@
+{
+  "schema": "debateai-n1-baseline-v1",
+  "commit": "368d578bbf3597a1df4e3b9f9f2f69110e6631ee",
+  "reason": "368d578bb-r21-v1",
+  "suites": [
+    "tests/integration/b3-holds-waiting-line.test.ts",
+    "tests/integration/b7b-waiting-line.test.ts",
+    "tests/integration/v28-model-spend.test.ts",
+    "tests/integration/story-budget.test.ts",
+    "tests/integration/reclaim-resume-database.test.ts",
+    "tests/integration/run-setup-failure.test.ts",
+    "tests/integration/runner-preview-team-gate.test.ts",
+    "tests/integration/live-run-events.test.ts",
+    "tests/integration/identity-database.test.ts",
+    "tests/integration/session-database.test.ts",
+    "tests/integration/internal-allowance-database.test.ts"
+  ],
+  "setAside": [
+    {
+      "name": "tests/integration/staff-access-database.test.ts",
+      "reason": "tests the migration chain itself: its setup builds the auth branch's historical lineage (92 migrations and its own debateai_schema_migration table) on an empty database, which HEAD's migrate-cli has already filled"
+    },
+    {
+      "name": "tests/integration/session-database.test.ts > S5 sessions on real PostgreSQL > preserves the exact 29 function identities/owners/ACLs/security while clamping only ordinary sessions",
+      "reason": "measures migration 0099 while the suite's own migrate() applies it; on a database HEAD already migrated 0099 never runs there, so there is nothing to measure"
+    }
+  ],
+  "knownRed": []
+}

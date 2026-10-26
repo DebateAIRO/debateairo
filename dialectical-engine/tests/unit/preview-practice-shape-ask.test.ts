@@ -10,6 +10,7 @@ import {
   type DebateShapePolicy
 } from "@debateai/register";
 import { TypedDomainError } from "@debateai/kernel";
+import { parsePreviewEnvironmentConfig, parsePreviewLineUp } from "@debateai/providers";
 import { runPracticeDebate } from "../../tools/preview-practice/practice-debate.js";
 import { PracticeGateObserver } from "../../tools/preview-practice/practice-gate-observer.js";
 import { practiceLengthBlockLines } from "../../tools/preview-practice/practice-length.js";
@@ -26,11 +27,19 @@ const seen = vi.hoisted(() => ({
   rows: new Map<number, unknown>(),
   /** The length row the stand-in register holds, by version (LG-C). */
   lengthRows: new Map<number, unknown>(),
+  /** The line-up row the stand-in register holds, by version (addition D14-D16, D23). */
+  lineUpRows: new Map<number, unknown>(),
+  /** The env line-up each composition was handed (null: set aside, or a sockets-only settings file). */
+  askEnvLineUps: [] as unknown[],
+  runnerEnvLineUps: [] as unknown[],
   receipt: null as unknown,
   published: [] as unknown[][],
   readVersions: [] as number[],
   askVersions: [] as number[],
   runnerVersions: [] as number[],
+  /** The release key each composition was handed (side-by-side §1, §3: one key, at the version it reads). */
+  askKeys: [] as string[],
+  runnerKeys: [] as string[],
   requests: [] as Record<string, unknown>[],
   /** When set, the stand-in ask refuses the request with it (an admission refusal). */
   submitError: null as Error | null
@@ -47,7 +56,8 @@ vi.mock("@debateai/register", async (importOriginal) => ({
     seen.readVersions.push(version);
     return seen.rows.get(version) ?? null;
   }),
-  readLengthGuidancePolicy: vi.fn(async (_pool: unknown, version: number) => seen.lengthRows.get(version) ?? null)
+  readLengthGuidancePolicy: vi.fn(async (_pool: unknown, version: number) => seen.lengthRows.get(version) ?? null),
+  readPreviewLineUpPolicy: vi.fn(async (_pool: unknown, version: number) => seen.lineUpRows.get(version) ?? null)
 }));
 vi.mock("../../tools/preview-practice/practice-throwaway-db.js", () => ({
   startPracticeDatabase: vi.fn(async () => {
@@ -64,17 +74,22 @@ vi.mock("../../tools/preview-practice/practice-register-import.js", async (impor
   importPracticeRegister: vi.fn(async () => seen.receipt),
   publishPracticeOverrideVersion: vi.fn(async (...args: unknown[]) => {
     seen.published.push(args);
-    const overrides = args[3] as { shape: unknown; length: unknown };
+    const overrides = args[3] as { shape: unknown; length: unknown; lineUp?: unknown };
     seen.rows.set(6, overrides.shape);
     seen.lengthRows.set(6, overrides.length);
+    // The practice's version copies the export's newest (5) and puts the --line-up row in place of its own.
+    seen.lineUpRows.set(6, overrides.lineUp ?? seen.lineUpRows.get(5) ?? null);
     return { baseRegisterVersion: "5", registerVersion: "6", shapeRow: overrides.shape === null ? null : "ADDED",
-      lengthRow: overrides.length === null ? null : "ADDED", snapshotSha256: "a".repeat(64) };
+      lengthRow: overrides.length === null ? null : "ADDED", snapshotSha256: "a".repeat(64),
+      ...(overrides.lineUp === undefined ? {} : { lineUpRow: "ADDED" }) };
   })
 }));
 vi.mock("../../tools/preview-practice/practice-ask-composition.js", () => ({
   practiceRemainingPorts: () => ({ deepinfra: async () => { throw new Error("no gate"); }, anthropic: async () => { throw new Error("no gate"); } }),
   composePracticeAsk: vi.fn(async (input: { settings: PracticeSettings }) => {
     seen.askVersions.push(input.settings.runner.REGISTER_VERSION);
+    seen.askEnvLineUps.push(input.settings.runner.PREVIEW_ENV_LINE_UP);
+    seen.askKeys.push(input.settings.runner.RELEASE_KEY);
     // Admits nothing: the debate ends as an ask that was not dispatched, after the request was handed over.
     // Local mode, as the real composition returns it (hosted: null); submit answers QUEUED as the real ask does.
     return { application: { submit: async (request: Record<string, unknown>) => {
@@ -86,8 +101,10 @@ vi.mock("../../tools/preview-practice/practice-ask-composition.js", () => ({
   })
 }));
 vi.mock("../../tools/preview-practice/practice-runner-composition.js", () => ({
-  composePracticeRunner: vi.fn(async (input: { environment: { REGISTER_VERSION: number } }) => {
+  composePracticeRunner: vi.fn(async (input: { environment: { REGISTER_VERSION: number; RELEASE_KEY: string; PREVIEW_ENV_LINE_UP: unknown } }) => {
     seen.runnerVersions.push(input.environment.REGISTER_VERSION);
+    seen.runnerEnvLineUps.push(input.environment.PREVIEW_ENV_LINE_UP);
+    seen.runnerKeys.push(input.environment.RELEASE_KEY);
     return { runner: {}, callStats: { summary: () => ({}) }, money: null };
   })
 }));
@@ -104,7 +121,19 @@ const REGISTER = parsePracticeRegisterExport(JSON.stringify({
   rows: [{ register_version: "4", row_key: "alpha", value_json: "1", source_ref: "live" },
     { register_version: "5", row_key: "alpha", value_json: "1", source_ref: "live" }]
 }));
-const SETTINGS = { runner: { REGISTER_VERSION: 5 }, previewConfig: { premium_model_ids: [] } } as unknown as PracticeSettings;
+/** The preview's gate part and its old-form env line-up (addition D14: the fallback of a version without the line-up row). */
+const GLM = "zai-org/GLM-5.3-Flash";
+const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
+const HAIKU = "claude-haiku-5-5";
+const GATE = { deployment: "v3-preview", requested_thinking_level: "high", budget_socket: "/run/debateai-v3-preview/deepinfra-budget-v3.sock",
+  anthropic_budget_socket: "/run/debateai-v3-preview/anthropic-budget-v1.sock", scope_id: "preview-practice-unit" };
+const OLD_ENV = parsePreviewEnvironmentConfig(JSON.stringify({ ...GATE, free_model_ids: [GLM, DEEPSEEK],
+  premium_model_ids: [GLM, DEEPSEEK, "XiaomiMiMo/MiMo-V2.6-Pro", "Qwen/Qwen3.8-Flash", HAIKU] }))!;
+const SETTINGS = { runner: { REGISTER_VERSION: 5, RELEASE_KEY: ["r5", "d50e33165a1b"].join("-"), PREVIEW_GATE_SETTINGS: OLD_ENV.gate,
+  PREVIEW_ENV_LINE_UP: OLD_ENV.envLineUp }, previewConfig: null } as unknown as PracticeSettings;
+/** The T+1 env form (sockets only, R25): no env line-up, so the version's row (or --line-up) carries it. */
+const SOCKETS_ONLY_SETTINGS = { ...SETTINGS, runner: { ...SETTINGS.runner, PREVIEW_ENV_LINE_UP: null } } as unknown as PracticeSettings;
+const TRIAL = parsePreviewLineUp({ free_model_ids: [GLM, HAIKU], premium_model_ids: [GLM, DEEPSEEK, HAIKU], thinking_levels: null });
 const SOCKETS = { deepinfra: "/nowhere/deepinfra.sock", anthropic: "/nowhere/anthropic.sock" } as PracticeSockets;
 const ASK = Object.freeze({ depthMode: "fixed", scrutiny: "deep", answerLength: "short" } as const);
 const LIVE: PracticeRegisterImportReceipt = Object.freeze({ registerVersion: "5", steps: [] });
@@ -120,9 +149,13 @@ beforeEach(() => {
   seen.versions = new Set(["4", "5"]);
   seen.rows.clear();
   seen.lengthRows.clear();
+  seen.lineUpRows.clear();
   seen.receipt = LIVE;
   seen.submitError = null;
-  for (const list of [seen.published, seen.readVersions, seen.askVersions, seen.runnerVersions, seen.requests]) list.length = 0;
+  for (const list of [seen.published, seen.readVersions, seen.askVersions, seen.runnerVersions, seen.requests, seen.askKeys, seen.runnerKeys,
+    seen.askEnvLineUps, seen.runnerEnvLineUps]) {
+    list.length = 0;
+  }
 });
 
 describe("practice debate shape: runPracticeDebate receives the shape (Task 1's notes)", () => {
@@ -134,6 +167,8 @@ describe("practice debate shape: runPracticeDebate receives the shape (Task 1's 
     expect(seen.published[0]![2]).toBe(LIVE);
     expect(seen.published[0]![3]).toEqual({ shape: policy, length: null });
     expect([seen.readVersions, seen.askVersions, seen.runnerVersions]).toEqual([[6], [6], [6]]);
+    // Side-by-side §1, §3: both compositions get the ONE key, renumbered to the version they read (same code part).
+    expect([seen.askKeys, seen.runnerKeys]).toEqual([[["r6", "d50e33165a1b"].join("-")], [["r6", "d50e33165a1b"].join("-")]]);
     expect(seen.requests).toHaveLength(1);
     expect(seen.requests[0]!.depth_params).toEqual({ depth: 1, depthMode: "fixed", scrutiny: "deep", answerLength: "short" });
     // Task 1's note (b): a comparison question id is asked, word for word.
@@ -153,6 +188,7 @@ describe("practice debate shape: runPracticeDebate receives the shape (Task 1's 
     const result = await debate({ registerNext: {} as never, shape: { policy: debateShapePolicyStartValues(), ask: ASK } });
     expect(seen.published).toEqual([]);
     expect([seen.readVersions, seen.askVersions, seen.runnerVersions]).toEqual([[6], [6], [6]]);
+    expect([seen.askKeys, seen.runnerKeys]).toEqual([[["r6", "d50e33165a1b"].join("-")], [["r6", "d50e33165a1b"].join("-")]]);
     expect(seen.requests[0]!.depth_params).toEqual({ depth: 1, depthMode: "fixed", scrutiny: "deep", answerLength: "short" });
     // The import's receipt already names the code's next version: it is reported as it is (M-2).
     expect(result.register).toBe(seen.receipt);
@@ -196,6 +232,7 @@ describe("practice debate shape: runPracticeDebate receives the shape (Task 1's 
     expect(result.register).toBe(LIVE);
     expect(seen.published).toEqual([]);
     expect([seen.askVersions, seen.runnerVersions]).toEqual([[5], [5]]);
+    expect([seen.askKeys, seen.runnerKeys]).toEqual([[["r5", "d50e33165a1b"].join("-")], [["r5", "d50e33165a1b"].join("-")]]);
     expect(seen.requests[0]!.depth_params).toEqual({ depth: 1 });
   });
 
@@ -288,5 +325,61 @@ describe("practice debate shape: runPracticeDebate receives the shape (Task 1's 
     await expect(debate({ registerNext: {} as never, shape: { policy: debateShapePolicyStartValues(), ask: {} } }))
       .rejects.toMatchObject({ code: "PRACTICE_SHAPE_POLICY_NOT_PUBLISHED" });
     expect(seen.askVersions).toEqual([]);
+  });
+});
+
+// Side-by-side spec §13, ADDITION D14-D16, D23 (Task SA8): the debate's line-up is the one of the version it runs on, read
+// once that version is chosen, by the runner's and the API's one rule; `--line-up` goes into the practice's ONE throwaway
+// version (never a second version on top), and the live register is never written (the import is only read).
+describe("practice debate line-up: the version's own, or the --line-up trial (addition D14-D16, D23)", () => {
+  it("--line-up without --register-next: one throwaway version (6) carries the row; both compositions read it with the env line-up set aside", async () => {
+    const lines: string[] = [];
+    await debate({ lineUp: TRIAL, progress: (line: string) => lines.push(line) });
+    expect(seen.published).toHaveLength(1);
+    expect(seen.published[0]![1]).toBe(REGISTER);
+    expect(seen.published[0]![3]).toEqual({ shape: null, length: null, lineUp: TRIAL });
+    expect([seen.askVersions, seen.runnerVersions]).toEqual([[6], [6]]);
+    expect([seen.askEnvLineUps, seen.runnerEnvLineUps]).toEqual([[null], [null]]);
+    expect(lines).toContain("the line-up row added in this throwaway copy as version 6, with this code's contract hashes");
+    expect(lines).toContain(`line-up of version 6: the --line-up file's; free ${GLM}, ${HAIKU}; premium ${GLM}, ${DEEPSEEK}, ${HAIKU}; thinking table none`);
+    // Beside --length-policy it is still the same ONE version.
+    seen.published.length = 0;
+    await debate({ lineUp: TRIAL, length: lengthGuidancePolicyStartValues(), shape: { policy: null, ask: {} } });
+    expect(seen.published).toHaveLength(1);
+    expect(seen.published[0]![3]).toEqual({ shape: null, length: lengthGuidancePolicyStartValues(), lineUp: TRIAL });
+  });
+
+  it("a sockets-only settings file and the live version carrying the row: the debate runs that row, nothing published", async () => {
+    seen.lineUpRows.set(5, TRIAL);
+    const lines: string[] = [];
+    await debate({ settings: SOCKETS_ONLY_SETTINGS, progress: (line: string) => lines.push(line) });
+    expect(seen.published).toEqual([]);
+    expect([seen.askVersions, seen.runnerVersions]).toEqual([[5], [5]]);
+    expect(lines.some((line) => line.startsWith("line-up of version 5: the version's own row;"))).toBe(true);
+  });
+
+  it("old-form settings and a row-less version: the settings' line-up (today's), nothing published, the env line-up handed on", async () => {
+    const lines: string[] = [];
+    await debate({ progress: (line: string) => lines.push(line) });
+    expect(seen.published).toEqual([]);
+    expect([seen.askEnvLineUps, seen.runnerEnvLineUps]).toEqual([[OLD_ENV.envLineUp], [OLD_ENV.envLineUp]]);
+    expect(lines.some((line) => line.startsWith("line-up of version 5: the settings' (the version carries none);"))).toBe(true);
+  });
+
+  it("a sockets-only settings file and a row-less version: PREVIEW_LINE_UP_REQUIRED before the ask or the runner is composed", async () => {
+    await expect(debate({ settings: SOCKETS_ONLY_SETTINGS })).rejects.toMatchObject({ code: "PREVIEW_LINE_UP_REQUIRED" });
+    expect([seen.askVersions, seen.runnerVersions, seen.requests]).toEqual([[], [], []]);
+  });
+
+  it("--line-up on a code's next version composed without it: PRACTICE_LINE_UP_NOT_PUBLISHED, nothing published or submitted", async () => {
+    seen.receipt = codeNext([]);
+    seen.versions.add("6");
+    await expect(debate({ registerNext: {} as never, lineUp: TRIAL })).rejects.toMatchObject({ code: "PRACTICE_LINE_UP_NOT_PUBLISHED" });
+    expect([seen.published, seen.askVersions, seen.requests]).toEqual([[], [], []]);
+    // ... and with the row in that version, it is read there and nothing more is published (never a second version).
+    seen.lineUpRows.set(6, TRIAL);
+    await debate({ registerNext: {} as never, lineUp: TRIAL });
+    expect(seen.published).toEqual([]);
+    expect([seen.askVersions, seen.runnerVersions, seen.runnerEnvLineUps]).toEqual([[6], [6], [null]]);
   });
 });

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Röviden
-eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.4 · HATÁLYOS 2026. OKTÓBER 12.
+eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.5 · HATÁLYOS 2026. OKTÓBER 12.
 title: Amit Ön elfogad
 lede: Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.
-endMarker: A FELTÉTELEK VÉGE · v2.4
+endMarker: A FELTÉTELEK VÉGE · v2.5
 bodyLabel: A Szolgáltatási feltételek szövege
 annexTitle: A. melléklet — Regionális feltételek
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 IRÁNYADÓ JOG
 -->
 
-**Version 2.4 · Effective 2026. október 12. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
+**Version 2.5 · Effective 2026. október 12. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
 
 **In short.** Önnek legalább 18 évesnek kell lennie. A Dialectical Engine mesterségesintelligencia-modellekkel épít fel érveket, és minden általa létrehozott tartalom téves lehet — nem minősül tanácsadásnak. Vitái mindaddig bizalmasak, amíg közzé nem teszi őket; közzététel esetén bárki elolvashatja azokat. Az Ön által beküldött szöveget továbbítjuk a Szolgáltatói nyilvántartásunkban felsorolt MI-szolgáltatóknak, és azt nem használjuk modellek betanítására. Jogellenes tartalmat a support@dezbatere.ro címen jelenthet be, függetlenül attól, hogy rendelkezik-e fiókkal. A román jog az irányadó, de az Ön helyi fogyasztóvédelmi jogai változatlanul megilletik.
 
@@ -213,7 +213,11 @@ A Dialectical Engine ingyenes csomagot kínál. Egy fizetős **Prémium** csomag
 
 **Sikertelen fizetések.** Ha egy fizetés sikertelen, 7 napig újra megkíséreljük, és e-mailben figyelmeztetjük Önt, mielőtt fiókját ingyenes csomagra állítanánk vissza. Sikertelen fizetés miatt nem töröljük vitáit.
 
-**Adók és a fizetés kedvezményezettje.** Az árak tartalmazzák a héát, az áruk és szolgáltatások adóját vagy a forgalmi adót; ez az Ön lakóhelyétől függ, és a fizetés előtt megjelenik. A kártyás fizetéseket a NETOPIA Payments (netopia-payments.com) dolgozza fel. Az eladó a DMS Merchandise Shop S.R.L., amely kiállítja az Ön számláját, és felelős marad magáért a szolgáltatásért, valamint e Feltételekért.
+**Adók és a fizetés kedvezményezettje.** Az árak tartalmazzák a héát, az áruk és szolgáltatások adóját vagy a forgalmi adót; ez az Ön lakóhelyétől függ, és a fizetés előtt megjelenik. Az eladó a DMS Merchandise Shop S.R.L., amely kiállítja az Ön számláját, és felelős marad magáért a szolgáltatásért, valamint e Feltételekért.
+
+**Fizetési módok.** Ön bankkártyával fizet. Visa és Mastercard kártyát fogadunk el; American Express kártyát nem fogadunk el. A kártyás fizetéseket a NETOPIA Payments (netopia-payments.com) dolgozza fel, és az Ön teljes kártyaszáma soha nem jut el hozzánk.
+
+**Szállítás.** A Dialectical Engine online szolgáltatás, így semmit sem szállítunk ki Önnek. Fizetős csomagjának funkciói a fizetés megerősítése után azonnal elérhetők a fiókjában.
 
 **Visszaterhelések.** Ha Ön vitat egy terhelést a kártyakibocsátójánál, a vita rendezéséig felfüggeszthetjük a fizetős funkciókat. Ezért nem számítunk fel díjat.
 
@@ -235,7 +239,7 @@ Tartós adathordozón előzetesen közöljük Önnel, mi és mikor változik. Ha
 
 **E Feltételek módosítása.** E Feltételeket ugyanezen típusú okokból módosíthatjuk. Az Ön jogait nem csökkentő módosítások esetén legalább **30 nappal** a hatálybalépés előtt közzétesszük az új változatot a módosítások összefoglalásával, és e-mailben értesítjük Önt; ha ezt az időpontot követően tovább használja a Dialectical Engine szolgáltatást, azzal elfogadja a módosítást, fiókját pedig ezt megelőzően megszüntetheti. Az Ön jogait csökkentő módosítások — ideértve egy meglévő csomag árának emelését, az alacsonyabb korlátokat, funkciók eltávolítását, tartalmának új felhasználási módjait, illetve a felelősség, az irányadó jog vagy a vitarendezés módosítását — esetén következő bejelentkezésekor kifejezett elfogadását kérjük, és a módosítás csak a jövőre nézve alkalmazandó. Módosítást soha nem alkalmazunk visszamenőleg, és e szakaszt soha nem használjuk arra, hogy a már kifizetett szolgáltatás lényegét a futamidő alatt megváltoztassuk anélkül, hogy kilépési lehetőséget biztosítanánk. A korábbi változatok továbbra is elérhetők itt: dezbatere.ro/terms/versions.
 
-A 2.4-es verzió a 2.3-as verzió helyébe lépett: hozzáadja a kérdésellenőrzést, amely minden kérdést elolvas, mielőtt egy vita elindul, némelyiket elutasítja, és csapatunk számára olvasásra megőrzi minden elutasított kérdést, amely másik személy vagy más emberek – megnevezett vagy megnevezetlen – bántásával fenyeget, azt tervezi, vagy azt kérdezi, hogy lehet-e, illetve hogyan lehet bántani őket, ideértve a megnevezetlen emberek elleni támadást is, vagy amely azt kérdezi, hogyan lehet fegyvereket, robbanószereket, mérgeket vagy drogokat készíteni, vagy hogyan lehet támogatni egy terrorcselekményt, vagy azt dicsőíti (7., 8., 10. és 11. szakasz); azt az ellenőrzést, amely minden befejezett vita szintézisét elolvassa, azt a jóváhagyást, amelyre egy megjelölt vitának szüksége van a közzétételhez, és az ellenőrzés által törölt vitákat (5., 8., 9., 10. és 11. szakasz); azt, hogy mit küld a támogatási csevegés az Anthropic cég Claude modelljének, hogy semmit nem őriz meg abból, amit Ön ír, és nem nyit ügyet, valamint hogy „Beszélgetés munkatárssal” gombja a támogatási címünket mutatja (8. és 10. szakasz); valamint a 7. szakasz szabályait, amelyek tiltják a bármilyen jellegű gyűlöletbeszédet, a fegyverek vagy drogok készítésére vonatkozó útmutatást, az öngyilkosságra vagy mások bántására buzdító tartalmat és a vallási sértést, és megmondják, mely kérdésekből nem indul el vita.
+A 2.5-es verzió a 2.4-as verzió helyébe lépett: hozzáadja a kérdésellenőrzést, amely minden kérdést elolvas, mielőtt egy vita elindul, némelyiket elutasítja, és csapatunk számára olvasásra megőrzi minden elutasított kérdést, amely másik személy vagy más emberek – megnevezett vagy megnevezetlen – bántásával fenyeget, azt tervezi, vagy azt kérdezi, hogy lehet-e, illetve hogyan lehet bántani őket, ideértve a megnevezetlen emberek elleni támadást is, vagy amely azt kérdezi, hogyan lehet fegyvereket, robbanószereket, mérgeket vagy drogokat készíteni, vagy hogyan lehet támogatni egy terrorcselekményt, vagy azt dicsőíti (7., 8., 10. és 11. szakasz); azt az ellenőrzést, amely minden befejezett vita szintézisét elolvassa, azt a jóváhagyást, amelyre egy megjelölt vitának szüksége van a közzétételhez, és az ellenőrzés által törölt vitákat (5., 8., 9., 10. és 11. szakasz); azt, hogy mit küld a támogatási csevegés az Anthropic cég Claude modelljének, hogy semmit nem őriz meg abból, amit Ön ír, és nem nyit ügyet, valamint hogy „Beszélgetés munkatárssal” gombja a támogatási címünket mutatja (8. és 10. szakasz); valamint a 7. szakasz szabályait, amelyek tiltják a bármilyen jellegű gyűlöletbeszédet, a fegyverek vagy drogok készítésére vonatkozó útmutatást, az öngyilkosságra vagy mások bántására buzdító tartalmat és a vallási sértést, és megmondják, mely kérdésekből nem indul el vita.
 
 ## 15. Felelősség
 

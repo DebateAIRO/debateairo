@@ -24,14 +24,14 @@ import {
 } from "@debateai/db";
 import { AnswerIndexSchema, ConditionMarkSchema, ExecutionLedgerDigestSchema, type Answer, type AnswerIndex, type ConditionMark, type Edge, type ExecutionLedgerDigest, type Inspection, type InvestigationAccepted, type Node, type VerdictState } from "@debateai/contract";
 import { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
-import { judgesComparisonOf, servedPositionOf } from "./judges-comparison.js";
+import { judgesComparisonOf, judgesRecountApplies, servedPositionOf } from "./judges-comparison.js";
 import type { EngineVerdictTrigger } from "./engine-verdict.js";
 import { SynthesisCheckRepository, synthesisTextOf, verdictOfRecord } from "./synthesis-check.js";
 import { PublicationReviewRepository, reviewStateOf } from "./publication-review.js";
 export { projectModelAssignment, type PinnedRoleAssignmentRow } from "./model-assignment.js";
 export {
-  judgesComparisonOf, recountJudgesVotes, rootIndexOfCallSite, servedPositionOf, type ComparisonVote, type JudgesRecount, type JudgesRecountPosition,
-  type RootCallSite
+  judgesComparisonOf, judgesRecountApplies, recountJudgesVotes, rootIndexOfCallSite, servedPositionOf, type ComparisonVote,
+  type JudgesRecount, type JudgesRecountPosition, type RootCallSite
 } from "./judges-comparison.js"; // pre-flight PF-R2b4.4; R2 B11: the practice report recounts through the same helper
 import { structureRepairAnsweredSql } from "@debateai/ledger";
 import { LivenessRepository } from "@debateai/liveness";
@@ -179,13 +179,23 @@ export interface ConformanceJudgement {
  * PF-D2.3): the answer read's `cost_envelope.basis` without the receipt's private members. Least disclosure: `shape`
  * names the asker's plan and the plan's sizes and thresholds, `length` the plan and its word targets, and `engine` engine
  * 2's scoring terms, caps, label thresholds and judge counts; nothing public needs them, and engine internals never
- * reach user-facing output. A copy without them, every other member as stored; a basis with none of them is returned as
- * the same object, so today's answer body is byte for byte what it was.
+ * reach user-facing output.
+ *
+ * Side-by-side spec §5 (plan C15): an ALLOW-list, because two releases read one database and a receipt minted by a newer
+ * release can carry a member this code has never heard of. Only the public members of `costEnvelopeBasisSchema`
+ * (packages/budget) are shown, each as stored and in the stored order; any other member, known private (`shape`,
+ * `length`, `engine`) or unknown, is dropped. A basis whose members are all public is returned as the same object, so
+ * today's answer body is byte for byte what it was.
  */
+export const PUBLIC_COST_ENVELOPE_BASIS_MEMBERS: readonly string[] = Object.freeze([
+  "kind", "max_model_attempts", "panel_size", "depth", "per_site_attempts", "call_sites", "serve_leg",
+  "serve_reserve_attempts", "hold_cap", "final_retry_attempts", "formula_version", "bounds_source_ref"
+]);
+const PUBLIC_BASIS_MEMBER_SET: ReadonlySet<string> = new Set(PUBLIC_COST_ENVELOPE_BASIS_MEMBERS);
+
 export function publicCostEnvelopeBasis(basis: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
-  if (!Object.hasOwn(basis, "shape") && !Object.hasOwn(basis, "length") && !Object.hasOwn(basis, "engine")) return basis;
-  const { shape: _shape, length: _length, engine: _engine, ...shown } = basis;
-  return shown;
+  if (Object.keys(basis).every((member) => PUBLIC_BASIS_MEMBER_SET.has(member))) return basis;
+  return Object.fromEntries(Object.entries(basis).filter(([member]) => PUBLIC_BASIS_MEMBER_SET.has(member)));
 }
 
 export function deriveConformanceOutcome(
@@ -1995,13 +2005,49 @@ function serveAnswerContentRef(answerId: string, answerVersion: number): string 
   return `${answerId}:${answerVersion}`;
 }
 
+/**
+ * Final fix wave P4 (readAnswerIndex): the re-admission copies of the person's runs still waiting in line whose START
+ * never committed — no supersession edge, no work item (0123's core.list_unstarted_readmissions, called once per such
+ * waiting run, never per listed run). The waiting runs are chosen first (MATERIALIZED), so the definer function runs
+ * only for the asker's own open waits: a run in line that has not started (core.run_wait_start) and that no re-admission
+ * superseded. `$1`/`$2` are the asker's owner ref and legacy asker id, as in the queries that use it.
+ */
+const READMISSION_ORPHANS = `waiting_in_line AS MATERIALIZED (
+           SELECT wait.run_id FROM core.run_wait AS wait
+           WHERE core.run_is_owned_by(wait.run_id,$1,$2)
+             AND NOT EXISTS (SELECT 1 FROM core.run_wait_start AS started WHERE started.run_id = wait.run_id)
+             AND NOT EXISTS (SELECT 1 FROM core.run_supersession AS s WHERE s.old_run_id = wait.run_id)
+         ), unstarted_readmission AS (
+           SELECT listed.run_id
+           FROM waiting_in_line
+           CROSS JOIN LATERAL core.list_unstarted_readmissions(waiting_in_line.run_id) AS listed(run_id)
+         )`;
+
+/**
+ * Final fix wave P4: the listed run is no re-admission orphan — not a copy recorded FAILED with
+ * RUN_SETUP_FAILED:READMISSION (the waker's record, packages/battery recordSetupFailure), and not one of
+ * READMISSION_ORPHANS. A clause on `run`, for the open-run list and the count (an orphan never has an answer).
+ */
+const NOT_A_READMISSION_ORPHAN = `AND NOT EXISTS (
+               SELECT 1 FROM core.work_item AS failed
+               WHERE failed.run_id = run.run_id AND failed.state = 'FAILED'
+                 AND failed.terminal_reason = 'RUN_SETUP_FAILED:READMISSION')
+             AND NOT EXISTS (SELECT 1 FROM unstarted_readmission AS orphan WHERE orphan.run_id = run.run_id)`;
+
 export class ServeRepository {
   readonly #liveness: LivenessRepository;
   readonly #memory: MemoryRepository;
+  /**
+   * Side-by-side spec §5 (plan C15): the release this reader is (the API's checked RELEASE_KEY). The answer read shows
+   * the judges recount of another release's debate only under the rule this code implements (`judgesRecountApplies`).
+   * Absent (the runner, the practice report, tests): every recount is shown, as before.
+   */
+  readonly #releaseKey: string | undefined;
 
-  constructor(private readonly pool: Pool) {
+  constructor(private readonly pool: Pool, options: Readonly<{ releaseKey?: string }> = {}) {
     this.#liveness = new LivenessRepository(pool);
     this.#memory = new MemoryRepository(pool);
+    this.#releaseKey = options.releaseKey;
   }
 
   async recordMemoryQuestion(input: MemoryQuestionRegistration, ownership: RunOwnershipInput): Promise<void> {
@@ -2767,6 +2813,14 @@ export class ServeRepository {
       answer_id: string;
       answer_version: number;
       run_id: string;
+      /** Side-by-side spec §1 (migration 0123): the release that ran this debate; C15 reads it for the judges recount. */
+      release_key: string;
+      /**
+       * Side-by-side spec §5 (plan C15 ruling): the rule that chose this debate's served answer, from its propagation
+       * receipt (`ledger.propagation_run.served_root_selection`, migration 0055): the run's latest selection sealed
+       * before this answer version. A DR-184 catch-up receipt selects nothing (NULL) and is skipped; none reads as null.
+       */
+      served_root_rule: string | null;
       question_line: string;
       run_content_ciphertext: CryptoEnvelope | null;
       fact_bundle_id: string;
@@ -2816,7 +2870,13 @@ export class ServeRepository {
       // Ruling R2b-B6.1: each root's author call site (its plan place, so its letter), read only for a run with vote rows.
       root_sites: Array<{ node_id: string; call_site_key: string }>;
     }>(
-      `SELECT answer.answer_id, answer.answer_version, answer.run_id, run.question_line,
+      `SELECT answer.answer_id, answer.answer_version, answer.run_id, run.release_key,
+              (SELECT receipt.served_root_selection ->> 'rule'
+                 FROM ledger.propagation_run AS receipt
+                WHERE receipt.run_id = answer.run_id AND receipt.served_root_selection IS NOT NULL
+                  AND receipt.at_seq < answer.sealed_at_seq
+                ORDER BY receipt.at_seq DESC LIMIT 1) AS served_root_rule,
+              run.question_line,
               run.content_ciphertext AS run_content_ciphertext,
               facts.fact_bundle_id, facts.facts,
               facts.content_ciphertext AS facts_content_ciphertext,
@@ -2946,18 +3006,6 @@ export class ServeRepository {
     // Follow-up N1: the served answer as recorded (the position the served number's source_ref names), so the panel
     // leads with it even after a review catch-up refreshed the strengths; null for an answer with no served number.
     const servedRootNodeId = servedPositionOf(nodes, edges, numbers.rows.map((number) => number.source_ref));
-    // R2 (INTERFACE §9.8): how the comparing judges' choices fell, recounted from the stored letters, groups and makers
-    // (controller ruling R2b-B5.1), each root lettered by its plan place (ruling R2b-B6.1); undefined for engine 1 (no
-    // vote row). (pre-flight PF-R2b4.5)
-    const judgesComparison = judgesComparisonOf(
-      row.verdict_votes.map((vote) => ({
-        judgeSeat: vote.judge_seat, maker: vote.maker, chosenRootNodeId: vote.chosen_root_node_id,
-        chosenLetter: vote.chosen_letter, conditional: vote.conditional, sameAs: vote.same_as, questionKind: vote.question_kind
-      })),
-      nodes, edges,
-      row.root_sites.map((site) => ({ nodeId: site.node_id, callSiteKey: site.call_site_key })),
-      servedRootNodeId
-    );
     const currentRead = version === undefined;
     const eventStreams = numbers.rows.map((number) => number.events.map((event) => ({
       status: event.status,
@@ -3041,6 +3089,26 @@ export class ServeRepository {
        ORDER BY at_seq`,
       [row.answer_id, row.answer_version]
     );
+    // R2 (INTERFACE §9.8): how the comparing judges' choices fell, recounted from the stored letters, groups and makers
+    // (controller ruling R2b-B5.1), each root lettered by its plan place (ruling R2b-B6.1); undefined for engine 1 (no
+    // vote row). (pre-flight PF-R2b4.5) Side-by-side spec §5 (plan C15): another release's debate is recounted only
+    // under the rule its sealed record names, when that is the rule this code implements (`judgesRecountApplies`);
+    // otherwise no section, never numbers that might differ from the served verdict. The rule is the propagation
+    // receipt's (`served_root_rule` above), never a condition-mark record's: those name a rule only for an
+    // UNSERVED-MAKER-POSITION mark. No receipt or no rule reads as null.
+    const judgesComparison = judgesRecountApplies({
+      runReleaseKey: row.release_key, ownReleaseKey: this.#releaseKey, servedRootRule: row.served_root_rule
+    })
+      ? judgesComparisonOf(
+        row.verdict_votes.map((vote) => ({
+          judgeSeat: vote.judge_seat, maker: vote.maker, chosenRootNodeId: vote.chosen_root_node_id,
+          chosenLetter: vote.chosen_letter, conditional: vote.conditional, sameAs: vote.same_as, questionKind: vote.question_kind
+        })),
+        nodes, edges,
+        row.root_sites.map((site) => ({ nodeId: site.node_id, callSiteKey: site.call_site_key })),
+        servedRootNodeId
+      )
+      : undefined;
     const abstention = await this.pool.query<Answer["abstention"] extends infer T ? Exclude<T, null> : never>(
       `SELECT kind, question_class, risk_tier, price, register_row_key,
               register_version::integer, register_source_ref, unlock_condition, ledger_unknown_ref
@@ -3168,6 +3236,18 @@ export class ServeRepository {
     });
   }
 
+  /**
+   * The person's debates, newest first. Side-by-side C9 (spec 2026-10-21 §4): a run a re-admission superseded
+   * (`core.run_supersession`, 0123) is left out of both lists and the count, so a question re-admitted from the
+   * waiting line shows once, as its newest run.
+   *
+   * Final fix wave P4: a re-admission copy that never became the debate is left out the same way, so the person never
+   * sees an orphan next to the real debate — one recorded FAILED with RUN_SETUP_FAILED:READMISSION (its START failed,
+   * or a later tick closed it), and one whose START never committed and whose FAILED record has not landed yet
+   * (`READMISSION_ORPHANS`: 0123's core.list_unstarted_readmissions over the person's runs still waiting in line). Only
+   * what the API's runtime login already reads (core.work_item, core.run_wait, core.run_wait_start, core.run_supersession)
+   * and calls (core.list_unstarted_readmissions, EXECUTE for debateai_billing_runtime); no migration.
+   */
   async readAnswerIndex(ownership: RunOwnershipInput, limit: number, offset: number): Promise<AnswerIndex> {
     const access = normalizeRunOwnership(ownership);
     if (!Number.isInteger(limit) || limit < 1 || limit > MAX_OWNER_PRIVATE_HISTORY_SCAN
@@ -3185,7 +3265,7 @@ export class ServeRepository {
         question_line: string;
         created_at_sequence: string;
       }>(
-        `WITH served AS (
+        `WITH ${READMISSION_ORPHANS}, served AS (
            SELECT DISTINCT ON (run.run_id)
              'ANSWER'::text AS kind,
              answer.answer_id,
@@ -3198,6 +3278,7 @@ export class ServeRepository {
              AND (run.content_encryption_version IS DISTINCT FROM 1
                OR core.run_private_content_is_live(run.run_id))
              AND NOT serve.run_removed_by_synthesis_check(run.run_id)
+             AND NOT EXISTS (SELECT 1 FROM core.run_supersession AS s WHERE s.old_run_id = run.run_id)
            ORDER BY run.run_id, answer.sealed_at_seq DESC
          ), open_run AS (
            SELECT
@@ -3212,6 +3293,8 @@ export class ServeRepository {
                OR core.run_private_content_is_live(run.run_id))
              AND NOT serve.run_removed_by_synthesis_check(run.run_id)
              AND NOT EXISTS (SELECT 1 FROM serve.answer AS answer WHERE answer.run_id = run.run_id)
+             AND NOT EXISTS (SELECT 1 FROM core.run_supersession AS s WHERE s.old_run_id = run.run_id)
+             ${NOT_A_READMISSION_ORPHAN}
          )
          SELECT kind, answer_id, run_ref, question_line, created_at_sequence
          FROM (SELECT * FROM served UNION ALL SELECT * FROM open_run) AS debate
@@ -3219,12 +3302,15 @@ export class ServeRepository {
          LIMIT $3 OFFSET $4`, [access.ownerRef, access.legacyAskerId, limit, offset]
       ),
       this.pool.query<{ count: string }>(
-        `SELECT count(*)::text AS count FROM core.run AS run
+        `WITH ${READMISSION_ORPHANS}
+         SELECT count(*)::text AS count FROM core.run AS run
          WHERE core.run_is_owned_by(run.run_id,$1,$2)
            AND (run.content_encryption_version IS DISTINCT FROM 1
              OR core.run_private_content_is_live(run.run_id))
+           AND NOT EXISTS (SELECT 1 FROM core.run_supersession AS s WHERE s.old_run_id = run.run_id)
            -- S01-R37 (t_9931dbe1): a debate the check removed is deleted for its owner before its keys are destroyed.
-           AND NOT serve.run_removed_by_synthesis_check(run.run_id)`,
+           AND NOT serve.run_removed_by_synthesis_check(run.run_id)
+           ${NOT_A_READMISSION_ORPHAN}`,
         [access.ownerRef, access.legacyAskerId]
       )
     ]);

@@ -37,7 +37,7 @@ const FUNCTIONS = [
 const TRIGGER_HOSTS = [
   "core.run_content_attestation_secret", "serve.private_run_key_cleanup_intent"
 ] as const;
-const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0124_${detail}`); };
+const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0126_${detail}`); };
 const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 const exactKeys = (value: unknown, keys: readonly string[]): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)

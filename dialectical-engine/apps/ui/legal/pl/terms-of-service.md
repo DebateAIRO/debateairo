@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: W skrócie
-eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v2.4 · OBOWIĄZUJĄ OD 12 PAŹDZIERNIKA 2026
+eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v2.5 · OBOWIĄZUJĄ OD 12 PAŹDZIERNIKA 2026
 title: Na co wyrażasz zgodę
 lede: Umowa między Tobą a DMS Merchandise Shop S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.
-endMarker: KONIEC WARUNKÓW · v2.4
+endMarker: KONIEC WARUNKÓW · v2.5
 bodyLabel: Treść Warunków świadczenia usług
 annexTitle: Załącznik A — Warunki regionalne
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAWO WŁAŚCIWE
 -->
 
-**Version 2.4 · Effective 12 października 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
+**Version 2.5 · Effective 12 października 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
 
 **In short.** Musisz mieć ukończone 18 lat. Dialectical Engine tworzy argumenty przy użyciu modeli sztucznej inteligencji, a wszystko, co generuje, może być błędne — nie jest to porada. Twoje debaty są prywatne, chyba że je opublikujesz; po publikacji każdy może je przeczytać. Przesyłany przez Ciebie tekst jest przekazywany dostawcom AI wymienionym w naszym Rejestrze Dostawców i nie jest wykorzystywany do trenowania modeli. Nielegalne treści zgłaszaj pod adresem support@dezbatere.ro, niezależnie od tego, czy masz konto. Zastosowanie ma prawo rumuńskie, jednak zachowujesz ochronę konsumencką wynikającą z prawa miejscowego.
 
@@ -213,7 +213,11 @@ Dialectical Engine oferuje plan bezpłatny. Dostępny będzie płatny plan **Pre
 
 **Nieudane płatności.** Jeżeli płatność nie powiedzie się, ponawiamy próbę przez 7 dni i przed obniżeniem planu Twojego konta do planu bezpłatnego wysyłamy ostrzeżenie pocztą elektroniczną. Nie usuwamy debat z powodu nieudanej płatności.
 
-**Podatki i odbiorca płatności.** Ceny obejmują VAT, GST lub podatek od sprzedaży, zależnie od miejsca zamieszkania, co zostaje wskazane przed dokonaniem płatności. Płatności kartą obsługuje NETOPIA Payments (netopia-payments.com). Sprzedawcą jest DMS Merchandise Shop S.R.L., który wystawia fakturę i pozostaje odpowiedzialny za samą usługę oraz za niniejsze Warunki.
+**Podatki i odbiorca płatności.** Ceny obejmują VAT, GST lub podatek od sprzedaży, zależnie od miejsca zamieszkania, co zostaje wskazane przed dokonaniem płatności. Sprzedawcą jest DMS Merchandise Shop S.R.L., który wystawia fakturę i pozostaje odpowiedzialny za samą usługę oraz za niniejsze Warunki.
+
+**Metody płatności.** Płacisz kartą. Akceptujemy karty Visa i Mastercard; nie akceptujemy kart American Express. Płatności kartą obsługuje NETOPIA Payments (netopia-payments.com), a pełny numer Twojej karty nigdy do nas nie trafia.
+
+**Dostawa.** Dialectical Engine to usługa online, więc nic nie jest do Ciebie wysyłane. Funkcje Twojego płatnego planu są dostępne na Twoim koncie, gdy tylko płatność zostanie potwierdzona.
 
 **Obciążenia zwrotne.** Jeżeli zakwestionujesz obciążenie u wystawcy karty, możemy zawiesić funkcje płatne do czasu rozstrzygnięcia sporu. Nie pobieramy z tego tytułu opłat.
 
@@ -235,7 +239,7 @@ Z wyprzedzeniem informujemy Cię na trwałym nośniku, co i kiedy ulegnie zmiani
 
 **Zmiany niniejszych Warunków.** Możemy zmieniać niniejsze Warunki z tych samych rodzajów powodów. W przypadku zmian, które nie ograniczają Twoich praw, publikujemy nową wersję wraz z podsumowaniem zmian i wysyłamy Ci wiadomość e-mail co najmniej **30 dni** przed jej wejściem w życie; dalsze korzystanie z Dialectical Engine po tej dacie oznacza akceptację zmiany, a przed tą datą możesz zamknąć konto. W przypadku zmian ograniczających Twoje prawa — w tym podwyżek cen w istniejącym planie, obniżenia limitów, usunięcia funkcji, nowych sposobów wykorzystywania Twoich treści albo zmian odpowiedzialności, prawa właściwego lub rozstrzygania sporów — prosimy Cię o wyraźne zaakceptowanie nowej wersji przy kolejnym logowaniu, a zmiana obowiązuje wyłącznie na przyszłość. Nigdy nie wprowadzamy zmian z mocą wsteczną ani nie wykorzystujemy niniejszej sekcji do zmiany w trakcie okresu podstawowego zakresu opłaconej przez Ciebie usługi bez zapewnienia możliwości rezygnacji. Poprzednie wersje pozostają dostępne pod adresem dezbatere.ro/terms/versions.
 
-Wersja 2.4 zastąpiła wersję 2.3: dodaje kontrolę pytań, która odczytuje każde pytanie, zanim debata się rozpocznie, niektóre odrzuca, a każde odrzucone pytanie, które grozi skrzywdzeniem innej osoby lub innych osób, wskazanych z imienia lub nie, w tym atakiem na osoby niewskazane, planuje to lub pyta, czy i jak skrzywdzić inną osobę lub inne osoby, albo które pyta, jak wytwarzać broń, materiały wybuchowe, trucizny lub narkotyki albo jak wesprzeć akt terrorystyczny, albo go gloryfikuje, przechowuje do przeczytania przez nasz zespół (sekcje 7, 8, 10 i 11); kontrolę, która odczytuje syntezę każdej zakończonej debaty, zatwierdzenie, którego oznaczona debata wymaga przed opublikowaniem, oraz debaty, które ta kontrola usuwa (sekcje 5, 8, 9, 10 i 11); dane, które czat wsparcia wysyła do modelu Claude firmy Anthropic, fakt, że nie przechowuje on niczego z tego, co piszesz, i nie otwiera sprawy, oraz fakt, że jego przycisk „Porozmawiaj z człowiekiem” pokazuje nasz adres wsparcia (sekcje 8 i 10); a także zasady w sekcji 7, które zakazują mowy nienawiści w jakiejkolwiek formie, instrukcji wytwarzania broni lub narkotyków, treści zachęcających do samobójstwa lub krzywdzenia innych osób oraz znieważania religii i wskazują, które pytania nie rozpoczynają debaty.
+Wersja 2.5 zastąpiła wersję 2.4: dodaje kontrolę pytań, która odczytuje każde pytanie, zanim debata się rozpocznie, niektóre odrzuca, a każde odrzucone pytanie, które grozi skrzywdzeniem innej osoby lub innych osób, wskazanych z imienia lub nie, w tym atakiem na osoby niewskazane, planuje to lub pyta, czy i jak skrzywdzić inną osobę lub inne osoby, albo które pyta, jak wytwarzać broń, materiały wybuchowe, trucizny lub narkotyki albo jak wesprzeć akt terrorystyczny, albo go gloryfikuje, przechowuje do przeczytania przez nasz zespół (sekcje 7, 8, 10 i 11); kontrolę, która odczytuje syntezę każdej zakończonej debaty, zatwierdzenie, którego oznaczona debata wymaga przed opublikowaniem, oraz debaty, które ta kontrola usuwa (sekcje 5, 8, 9, 10 i 11); dane, które czat wsparcia wysyła do modelu Claude firmy Anthropic, fakt, że nie przechowuje on niczego z tego, co piszesz, i nie otwiera sprawy, oraz fakt, że jego przycisk „Porozmawiaj z człowiekiem” pokazuje nasz adres wsparcia (sekcje 8 i 10); a także zasady w sekcji 7, które zakazują mowy nienawiści w jakiejkolwiek formie, instrukcji wytwarzania broni lub narkotyków, treści zachęcających do samobójstwa lub krzywdzenia innych osób oraz znieważania religii i wskazują, które pytania nie rozpoczynają debaty.
 
 ## 15. Odpowiedzialność
 

@@ -4,6 +4,7 @@ import {
   type PaymentReport, type PaymentState, type SavedCardCharge
 } from "@debateai/billing-core";
 import { AcceptanceRepository, BillingJobQueries, BillingRepository, EntitlementRepository, migrate, type Pool } from "@debateai/db";
+import { bankDeclined, declineSideOf } from "@debateai/payments-netopia";
 import type { BillingPlans } from "@debateai/register";
 import type { BillingRecipientReader } from "../../apps/api/src/billing/account-email.js";
 import type { BillingAudit } from "../../apps/api/src/billing/audit.js";
@@ -70,7 +71,8 @@ export async function endPoolWithin(pool: Pool, ms = 2_000): Promise<void> {
 /**
  * What a saved-card charge does at NETOPIA, scripted per subscription (spec 2026-10-05 §2.9): `PAID` at once (the
  * default, a frictionless merchant-initiated payment), `PENDING`, `DECLINED` (code 20, a card decline the bank gave),
- * `ACTION_REQUIRED` (3-D Secure asked, code 100), `PAID_ANSWER_LOST` (the charge is made, the answer is lost: a later
+ * `ACTION_REQUIRED` (3-D Secure asked, code 100); B2 (NETOPIA answers 2026-10-21, Q15): `failNextCharge` may name
+ * another refusal code for a `DECLINED` (`"22"`, a card the bank will not charge again), `PAID_ANSWER_LOST` (the charge is made, the answer is lost: a later
  * status read finds it PAID), `UNKNOWN_NOTHING_MADE` (the answer is lost and nothing was made: the order is unknown),
  * and the three errors that prove nothing reached NETOPIA or was refused before any charge.
  */
@@ -91,7 +93,7 @@ export class HarnessPayments implements CardPayments {
   readonly reports = new Map<string, PaymentReport>();
   readonly hosted: HostedPaymentStart[] = [];
   readonly charges: SavedCardCharge[] = [];
-  readonly #outcomes = new Map<string, HarnessChargeOutcome[]>();
+  readonly #outcomes = new Map<string, Array<Readonly<{ outcome: HarnessChargeOutcome; declineCode: string }>>>();
   readonly #countries = new Map<string, string>();
   readonly #statusFailures = new Map<string, number>();
   readonly #calls = new Map<string, number>();
@@ -100,9 +102,12 @@ export class HarnessPayments implements CardPayments {
   /** `subscriptionOf`: the subscription a charge belongs to (the harness reads its own database). */
   constructor(private readonly clock: () => Date, private readonly subscriptionOf: (chargeId: string) => Promise<string>) {}
 
-  /** The next saved-card charge of this subscription ends as `outcome`; several calls queue in order. */
-  failNextCharge(subscriptionId: string, outcome: HarnessChargeOutcome): void {
-    this.#outcomes.set(subscriptionId, [...(this.#outcomes.get(subscriptionId) ?? []), outcome]);
+  /**
+   * The next saved-card charge of this subscription ends as `outcome`; several calls queue in order. `declineCode` is
+   * NETOPIA's refusal code of a `DECLINED` (default `"20"`, insufficient funds: the one code retried by itself, B2).
+   */
+  failNextCharge(subscriptionId: string, outcome: HarnessChargeOutcome, declineCode = "20"): void {
+    this.#outcomes.set(subscriptionId, [...(this.#outcomes.get(subscriptionId) ?? []), { outcome, declineCode }]);
   }
 
   /** The next `times` status reads of this charge fail before anything is sent (PAYMENT_PROVIDER_UNAVAILABLE). */
@@ -162,7 +167,7 @@ export class HarnessPayments implements CardPayments {
     this.charges.push(input);
     const subscriptionId = await this.subscriptionOf(input.orderId);
     this.#calls.set(subscriptionId, this.chargesFor(subscriptionId) + 1);
-    const outcome = this.#outcomes.get(subscriptionId)?.shift() ?? "PAID";
+    const { outcome, declineCode } = this.#outcomes.get(subscriptionId)?.shift() ?? { outcome: "PAID", declineCode: "20" };
     const base = {
       amountMicros: input.amountMicros, currency: input.currency, cardCountry: this.#countries.get(subscriptionId) ?? "RO",
       occurredAt: this.clock()
@@ -191,7 +196,7 @@ export class HarnessPayments implements CardPayments {
       case "DECLINED":
       case "ACTION_REQUIRED": {
         const report = stubPaymentReport(input.orderId, outcome, outcome === "DECLINED"
-          ? { ...base, declineCode: "20", declineSide: "CARD", bankDeclined: true }
+          ? { ...base, declineCode, declineSide: declineSideOf(declineCode, 12), bankDeclined: bankDeclined(declineCode) }
           : outcome === "ACTION_REQUIRED" ? { ...base, declineCode: "100" } : base);
         this.reports.set(input.orderId, report);
         return report;

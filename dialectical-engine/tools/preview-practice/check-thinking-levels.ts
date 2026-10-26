@@ -9,6 +9,13 @@
  *  - OK, then one row per AI: its usual level and its step overrides (an entry for a model not on this config's rosters
  *    is accepted, and the row says it is unused), or
  *  - the parser's exact refusal: PREVIEW_THINKING_LEVELS_INVALID:<detail> or PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID.
+ * Addition D14 (owner 2026-10-22): a sockets-only value (the gate part alone) carries no line-up and so no table: it prints
+ * OK and says the line-up lives in the settings version (previewLineUpPolicy).
+ * Addition D23 (owner 2026-10-22): `--print-line-up` prints, instead of the table, the value's line-up as the publish kit's plan
+ * member, `{"lineUp":{"free_model_ids":[…],"premium_model_ids":[…],"thinking_levels":{…}|null}}` on one line (via
+ * previewLineUpOfConfig), so the first settings version is planned with exactly the line-up the preview runs today. A
+ * sockets-only value prints only the sentence above (there is no line-up to print); a refused value prints what the check
+ * prints, with the same exit code.
  * Exit 0 OK, 1 the value is refused, 2 the check could not run (no value, two values, an unreadable file, a key-shaped
  * value). It sends nothing and reads no environment. OK prints only model ids, level words and step names (all checked
  * against the reviewed rows); a refusal's detail may name the unreviewed table key or step word it refuses, with every
@@ -21,16 +28,20 @@ import { pathToFileURL } from "node:url";
 import {
   PREVIEW_THINKING_LEVELS_INVALID,
   PREVIEW_THINKING_STEPS,
+  parsePreviewEnvironmentConfig,
   parsePreviewProviderTestConfig,
+  previewLineUpOfConfig,
   previewModelRow,
   type PreviewProviderTestConfig
 } from "@debateai/providers";
-import { redactKeyShapes } from "./practice-redaction.js";
+import { printableSettingsCode } from "./practice-redaction.js";
 import { settingsValueIsKeyShaped } from "./practice-settings.js";
 
 const KEY = "PREVIEW_PROVIDER_TEST_CONFIG_JSON";
 const CONFIG_INVALID = "PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID";
-const USAGE = "usage: check-thinking-levels.ts [--settings <settings.env>]  (without --settings: the value on stdin)";
+const SOCKETS_ONLY_NOTE = "No line-up in this setting: it lives in the settings version (previewLineUpPolicy).";
+const USAGE = "usage: check-thinking-levels.ts [--print-line-up] [--settings <settings.env>]  (without --settings: the value on stdin)";
+const PRINT_LINE_UP = "--print-line-up";
 
 export type ThinkingLevelsCheck = Readonly<{ exitCode: 0 | 1 | 2; lines: readonly string[] }>;
 
@@ -67,21 +78,31 @@ function tableLines(config: PreviewProviderTestConfig): string[] {
   return lines;
 }
 
-/** Spec 2026-10-12 §4.2: the check itself, on the text of a settings.env-style file or of stdin. */
-export function checkThinkingLevels(text: string): ThinkingLevelsCheck {
+/** The value read and parsed by the boot's own parsers: its config, or the outcome to print (refusal or sockets-only). */
+function configOf(text: string): PreviewProviderTestConfig | ThinkingLevelsCheck {
   const value = valueOf(text);
   if (typeof value !== "string") return value;
   if (settingsValueIsKeyShaped(value)) return refused(`${KEY} holds something key-shaped (nothing of it printed)`);
   let config: PreviewProviderTestConfig | undefined;
   try {
+    // Addition D14: the env's three forms, read by the boot's own parser; the sockets-only form has no line-up here.
+    if (parsePreviewEnvironmentConfig(value)?.envLineUp === null) return Object.freeze({ exitCode: 0, lines: Object.freeze(["OK", SOCKETS_ONLY_NOTE]) });
     config = parsePreviewProviderTestConfig(value);
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
-    // The detail names a model, step or level the owner wrote: blanked if key-shaped, and kept short.
-    const line = message.startsWith(`${PREVIEW_THINKING_LEVELS_INVALID}:`) ? redactKeyShapes(message).slice(0, 200) : CONFIG_INVALID;
+    // The detail names a model, step or level the owner wrote: printed whole only when plainly an id, else the bare code
+    // (final fix wave S14, the common rule, aligned with the native operator's pass-through).
+    const line = message.startsWith(`${PREVIEW_THINKING_LEVELS_INVALID}:`) ? printableSettingsCode(message) : CONFIG_INVALID;
     return Object.freeze({ exitCode: 1, lines: Object.freeze([line]) });
   }
-  if (config === undefined) return Object.freeze({ exitCode: 1, lines: Object.freeze([CONFIG_INVALID]) });
+  return config ?? Object.freeze({ exitCode: 1, lines: Object.freeze([CONFIG_INVALID]) });
+}
+const isOutcome = (value: PreviewProviderTestConfig | ThinkingLevelsCheck): value is ThinkingLevelsCheck => "exitCode" in value;
+
+/** Spec 2026-10-12 §4.2: the check itself, on the text of a settings.env-style file or of stdin. */
+export function checkThinkingLevels(text: string): ThinkingLevelsCheck {
+  const config = configOf(text);
+  if (isOutcome(config)) return config;
   const lines = ["OK", ...tableLines(config)];
   lines.push(config.thinking_levels === undefined
     ? "No thinking_levels table: every AI runs at its default (today's request)."
@@ -89,14 +110,32 @@ export function checkThinkingLevels(text: string): ThinkingLevelsCheck {
   return Object.freeze({ exitCode: 0, lines: Object.freeze(lines) });
 }
 
-/** The command: `--settings <file>`, or nothing and the value on stdin (a terminal on stdin gets the usage line). */
+/**
+ * Addition D23 (owner 2026-10-22): the value's line-up as the kit's plan member, one line, exit 0. The ids, levels and step
+ * names printed have all passed the boot's parser against the reviewed rows (the same guarantee as the table). A sockets-only
+ * value prints only the sentence that the line-up lives in the settings version; a refusal is the check's own.
+ */
+export function printLineUp(text: string): ThinkingLevelsCheck {
+  const config = configOf(text);
+  if (isOutcome(config)) return config.exitCode === 0 ? Object.freeze({ exitCode: 0, lines: Object.freeze([SOCKETS_ONLY_NOTE]) }) : config;
+  return Object.freeze({ exitCode: 0, lines: Object.freeze([JSON.stringify({ lineUp: previewLineUpOfConfig(config) })]) });
+}
+
+/**
+ * The command: `--settings <file>`, or nothing and the value on stdin (a terminal on stdin gets the usage line); with
+ * `--print-line-up` (once, before or after `--settings <file>`) the line-up is printed as the plan member instead of the table.
+ */
 export function checkThinkingLevelsCommand(argv: readonly string[],
   io: Readonly<{ readStdin: () => string; stdinIsTTY: boolean }>): ThinkingLevelsCheck {
-  if (argv.length === 0) return io.stdinIsTTY ? refused(USAGE) : checkThinkingLevels(io.readStdin());
-  if (argv.length !== 2 || argv[0] !== "--settings") return refused(USAGE);
+  const print = argv.filter((argument) => argument === PRINT_LINE_UP).length;
+  if (print > 1) return refused(USAGE);
+  const rest = argv.filter((argument) => argument !== PRINT_LINE_UP);
+  const run = print === 1 ? printLineUp : checkThinkingLevels;
+  if (rest.length === 0) return io.stdinIsTTY ? refused(USAGE) : run(io.readStdin());
+  if (rest.length !== 2 || rest[0] !== "--settings") return refused(USAGE);
   let text: string;
-  try { text = readFileSync(argv[1]!, "utf8"); } catch { return refused("the settings file cannot be read"); }
-  return checkThinkingLevels(text);
+  try { text = readFileSync(rest[1]!, "utf8"); } catch { return refused("the settings file cannot be read"); }
+  return run(text);
 }
 
 const invokedDirectly = process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;

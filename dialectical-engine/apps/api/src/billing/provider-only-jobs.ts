@@ -3,6 +3,7 @@ import type { PaymentEnvironment } from "@debateai/billing-core";
 import { BillingJobQueries, BillingRepository } from "@debateai/db";
 import type { BillingAudit } from "./audit.js";
 import { CardCustody } from "./card-custody.js";
+import type { NetopiaNoticeIntake } from "./netopia-intake.js";
 import { ProviderOnlyOwnerJobs } from "./owner-jobs.js";
 import { createCoalescingSingleFlight } from "./single-flight.js";
 
@@ -15,12 +16,18 @@ export type ProviderOnlyJobsDeps = Readonly<{
   audit: BillingAudit;
   clock: () => Date;
   reportPending: (code: string) => void;
+  /**
+   * B3a (NETOPIA answers 2026-10-21): the provider-only intake, when it has a spool (BILLING_NOTICE_SPOOL_PATH): its
+   * kept messages are replayed every 10 minutes, as the billing runtime's are (main.ts replays them once at the start).
+   */
+  notices?: Pick<NetopiaNoticeIntake, "replaySpool">;
 }>;
 
 export type ProviderOnlyJobs = Readonly<{
   /** One run of the daily job (the timer's work; tests drive it directly). */
   schedule(): Promise<number>;
-  start(): void;
+  /** Side-by-side spec §4 (plan C7): `when` gates every timer callback and the first pass (absent: always). */
+  start(options?: Readonly<{ when?: () => boolean }>): void;
   stop(): void;
 }>;
 
@@ -39,18 +46,34 @@ export function createProviderOnlyJobs(deps: ProviderOnlyJobsDeps): ProviderOnly
   const schedule = createCoalescingSingleFlight(
     () => owner.schedule(), () => deps.reportPending("BILLING_OWNER_JOBS_PENDING")
   );
+  const { notices } = deps;
+  const replaySpool = notices === undefined ? undefined : createCoalescingSingleFlight(
+    () => notices.replaySpool(deps.clock()),
+    () => deps.audit("billing.notice.spool_replay", { code: "BILLING_NOTICE_SPOOL_REPLAY_FAILED" })
+  );
   let timer: ReturnType<typeof setInterval> | undefined;
+  let spoolTimer: ReturnType<typeof setInterval> | undefined;
   return Object.freeze({
     schedule: () => owner.schedule(),
-    start() {
+    start(options?: Readonly<{ when?: () => boolean }>) {
       if (timer !== undefined) return;
-      timer = setInterval(schedule, 86_400_000);
+      // Side-by-side spec §4 (plan C7): every tick and the first pass ask `when` (main.ts: the release watcher's
+      // ownIsCurrent), as the billing runtime's do.
+      const when = options?.when ?? (() => true);
+      const gated = (work: () => void) => (): void => { if (when()) work(); };
+      timer = setInterval(gated(schedule), 86_400_000);
       timer.unref();
-      schedule();
+      gated(schedule)();
+      if (replaySpool !== undefined) {
+        spoolTimer = setInterval(gated(replaySpool), 600_000);
+        spoolTimer.unref();
+      }
     },
     stop() {
       if (timer !== undefined) clearInterval(timer);
+      if (spoolTimer !== undefined) clearInterval(spoolTimer);
       timer = undefined;
+      spoolTimer = undefined;
     }
   });
 }

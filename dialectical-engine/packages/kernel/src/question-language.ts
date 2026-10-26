@@ -1,6 +1,6 @@
 import { ARGUMENT_LANGUAGE_NAMES, argumentLanguageDirective } from "./argument-language.js";
 import {
-  majorityScript, replyLanguageCheck, replyLanguageIssues, replyProseFieldsAt, replyScriptOfTag,
+  majorityScript, replyLanguageCheck, replyLanguageIssues, replyProseFieldsAt, replyScriptOfTag, withQuestionStrayScript,
   type ReplyLanguageExpectation, type ReplyLanguageIssue, type ReplyScript
 } from "./reply-language.js";
 
@@ -164,8 +164,15 @@ function scriptOfCode(primary: string): ReplyScript | undefined {
  *    Kurdish or Iranian Azerbaijani in Arabic letters, Punjabi in Shahmukhi). This reads the question's script, never
  *    its language: a kept-wording question in Latin letters (romanized Thai) never makes a Thai lock expect Latin.
  *  · the question's letters only when the code names no script at all.
+ * Every reading (2026-10-21) then carries `questionHasStrayScript` when the question line holds Chinese, Japanese or
+ * Korean letters while the locked script is another one, exactly as the unlocked `replyLanguageExpectation` does.
  */
 export function lockedReplyLanguageExpectation(language: QuestionLanguage, questionLine: string): ReplyLanguageExpectation {
+  return withQuestionStrayScript(lockedScriptExpectation(language, questionLine), questionLine);
+}
+
+/** The locked code's script, read as described above (the stray-letter flag is added by the caller). */
+function lockedScriptExpectation(language: QuestionLanguage, questionLine: string): ReplyLanguageExpectation {
   const [primaryRaw, ...rest] = language.code.split("-");
   const primary = (primaryRaw ?? "").toLowerCase();
   const subtag = rest.find((part) => part.length === 4);

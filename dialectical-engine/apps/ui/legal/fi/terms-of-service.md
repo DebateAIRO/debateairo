@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lyhyesti
-eyebrow: KÄYTTÖEHDOT · v2.4 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN
+eyebrow: KÄYTTÖEHDOT · v2.5 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN
 title: Mihin sitoudut
 lede: Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.
-endMarker: KÄYTTÖEHTOJEN LOPPU · v2.4
+endMarker: KÄYTTÖEHTOJEN LOPPU · v2.5
 bodyLabel: Käyttöehtojen teksti
 annexTitle: Liite A — Alueelliset ehdot
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 SOVELLETTAVA LAKI
 -->
 
-**Version 2.4 · Effective 12. lokakuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
+**Version 2.5 · Effective 12. lokakuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
 
 **In short.** Sinun on oltava vähintään 18-vuotias. Dialectical Engine muodostaa argumentteja tekoälymalleilla, ja kaikki sen tuottama voi olla virheellistä — se ei ole neuvontaa. Väittelysi ovat yksityisiä, ellet julkaise niitä; jos julkaiset ne, kuka tahansa voi lukea niitä. Lähettämäsi teksti toimitetaan palveluntarjoajarekisterissämme luetelluille tekoälypalveluntarjoajille, eikä sitä käytetä mallien kouluttamiseen. Ilmoita lainvastaisesta sisällöstä osoitteeseen support@dezbatere.ro riippumatta siitä, onko sinulla tiliä. Sopimukseen sovelletaan Romanian lakia, mutta paikallinen kuluttajansuojasi säilyy.
 
@@ -213,7 +213,11 @@ Dialectical Engine tarjoaa maksuttoman tilauksen. Tarjolle tulee maksullinen **P
 
 **Epäonnistuneet maksut.** Jos maksu epäonnistuu, yritämme sitä uudelleen 7 päivän ajan ja varoitamme sinua sähköpostitse ennen tilisi muuttamista maksuttomaksi tilaukseksi. Emme poista väittelyitäsi epäonnistuneen maksun vuoksi.
 
-**Verot ja maksunsaaja.** Hinnat sisältävät arvonlisäveron, GST-veron tai myyntiveron, mikä riippuu asuinpaikastasi ja näytetään ennen maksamista. Korttimaksut käsittelee NETOPIA Payments (netopia-payments.com). Myyjä on DMS Merchandise Shop S.R.L., joka laatii laskusi ja vastaa edelleen itse palvelusta ja näistä käyttöehdoista.
+**Verot ja maksunsaaja.** Hinnat sisältävät arvonlisäveron, GST-veron tai myyntiveron, mikä riippuu asuinpaikastasi ja näytetään ennen maksamista. Myyjä on DMS Merchandise Shop S.R.L., joka laatii laskusi ja vastaa edelleen itse palvelusta ja näistä käyttöehdoista.
+
+**Maksutavat.** Maksat kortilla. Hyväksymme Visa- ja Mastercard-kortit; American Express -kortteja emme hyväksy. Korttimaksut käsittelee NETOPIA Payments (netopia-payments.com), eikä korttisi koko numero koskaan päädy meille.
+
+**Toimitus.** Dialectical Engine on verkkopalvelu, joten sinulle ei lähetetä mitään. Maksullisen tilauksesi ominaisuudet ovat käytettävissä tililläsi heti, kun maksusi on vahvistettu.
 
 **Takaisinveloitukset.** Jos riitautat veloituksen kortinmyöntäjän kanssa, voimme keskeyttää maksulliset ominaisuudet riidan ratkaisemisen ajaksi. Emme peri tästä maksuja.
 
@@ -235,7 +239,7 @@ Ilmoitamme sinulle etukäteen pysyvällä välineellä, mikä muuttuu ja milloin
 
 **Näiden käyttöehtojen muutokset.** Voimme muuttaa näitä käyttöehtoja samanlaisista syistä. Jos muutos ei vähennä oikeuksiasi, julkaisemme uuden version ja yhteenvedon muutoksista sekä lähetämme sinulle sähköpostia vähintään **30 päivää ennen** sen voimaantuloa; Dialectical Engine -palvelun käytön jatkaminen kyseisen ajankohdan jälkeen merkitsee hyväksyntääsi, ja voit sulkea tilisi ennen sitä. Jos muutos vähentää oikeuksiasi — mukaan lukien olemassa olevan tilauksen hinnankorotukset, alhaisemmat rajat, poistetut ominaisuudet, sisältösi uudet käyttötavat tai vastuuta, sovellettavaa lakia tai riidanratkaisua koskevat muutokset — pyydämme sinua hyväksymään uuden version nimenomaisesti seuraavan kirjautumisesi yhteydessä, ja muutosta sovelletaan vain jatkossa. Emme koskaan muuta ehtoja taannehtivasti emmekä käytä tätä kohtaa muuttaaksemme kesken sopimuskauden maksamasi palvelun ydintä tarjoamatta sinulle mahdollisuutta irtautua. Aiemmat versiot säilyvät saatavilla osoitteessa dezbatere.ro/terms/versions.
 
-Versio 2.4 korvasi version 2.3: se lisää kysymystarkistuksen, joka lukee jokaisen kysymyksen ennen väittelyn alkua, hylkää osan niistä ja säilyttää tiimimme luettavaksi jokaisen hylätyn kysymyksen, joka uhkaa vahingoittaa toista ihmistä tai muita ihmisiä, nimeltä mainittuja tai ei, mukaan lukien hyökkäys nimeämättömiä ihmisiä vastaan, suunnittelee sitä tai kysyy, saako tai miten toista ihmistä tai muita ihmisiä vahingoitetaan, tai joka kysyy, miten valmistetaan aseita, räjähteitä, myrkkyjä tai huumeita tai miten tuetaan terroritekoa, tai joka ylistää sellaista (kohdat 7, 8, 10 ja 11); tarkistuksen, joka lukee jokaisen päättyneen väittelyn synteesin, hyväksynnän, jota merkitty väittely tarvitsee ennen julkaisemista, ja väittelyt, jotka tuo tarkistus poistaa (kohdat 5, 8, 9, 10 ja 11); sen, mitä tukipalvelun chat lähettää Anthropicin mallille Claude, ettei se säilytä mitään siitä, mitä kirjoitat, eikä avaa tapausta, ja että sen ”Keskustele henkilön kanssa” -painike näyttää tukiosoitteemme (kohdat 8 ja 10); sekä kohdan 7 säännöt, jotka kieltävät vihapuheen missä tahansa muodossa, ohjeet aseiden tai huumeiden valmistukseen, itsemurhaan tai muiden ihmisten vahingoittamiseen kannustavan sisällön ja uskonnon loukkaamisen ja kertovat, mitkä kysymykset eivät käynnistä väittelyä.
+Versio 2.5 korvasi version 2.4: se lisää kysymystarkistuksen, joka lukee jokaisen kysymyksen ennen väittelyn alkua, hylkää osan niistä ja säilyttää tiimimme luettavaksi jokaisen hylätyn kysymyksen, joka uhkaa vahingoittaa toista ihmistä tai muita ihmisiä, nimeltä mainittuja tai ei, mukaan lukien hyökkäys nimeämättömiä ihmisiä vastaan, suunnittelee sitä tai kysyy, saako tai miten toista ihmistä tai muita ihmisiä vahingoitetaan, tai joka kysyy, miten valmistetaan aseita, räjähteitä, myrkkyjä tai huumeita tai miten tuetaan terroritekoa, tai joka ylistää sellaista (kohdat 7, 8, 10 ja 11); tarkistuksen, joka lukee jokaisen päättyneen väittelyn synteesin, hyväksynnän, jota merkitty väittely tarvitsee ennen julkaisemista, ja väittelyt, jotka tuo tarkistus poistaa (kohdat 5, 8, 9, 10 ja 11); sen, mitä tukipalvelun chat lähettää Anthropicin mallille Claude, ettei se säilytä mitään siitä, mitä kirjoitat, eikä avaa tapausta, ja että sen ”Keskustele henkilön kanssa” -painike näyttää tukiosoitteemme (kohdat 8 ja 10); sekä kohdan 7 säännöt, jotka kieltävät vihapuheen missä tahansa muodossa, ohjeet aseiden tai huumeiden valmistukseen, itsemurhaan tai muiden ihmisten vahingoittamiseen kannustavan sisällön ja uskonnon loukkaamisen ja kertovat, mitkä kysymykset eivät käynnistä väittelyä.
 
 ## 15. Vastuu
 

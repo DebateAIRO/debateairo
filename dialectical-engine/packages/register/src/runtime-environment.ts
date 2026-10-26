@@ -1,7 +1,12 @@
-import { parsePreviewProviderTestConfig, parsePreviewTeamUserIds } from "@debateai/providers";
+import { parsePreviewEnvironmentConfig, parsePreviewProviderTestConfig, parsePreviewTeamUserIds } from "@debateai/providers";
 import { isAbsolute } from "node:path";
 import { internalAllowancePolicyFromValue } from "./internal-allowance-policy.js";
-import type { StaffAccessEnvironment } from "@debateai/kernel";
+import {
+  TypedDomainError,
+  isDevelopmentReleaseKey,
+  parseReleaseKey,
+  type StaffAccessEnvironment
+} from "@debateai/kernel";
 import { z } from "zod";
 import {
   parseRegisterVersionText,
@@ -40,6 +45,47 @@ const kekPath = z.preprocess((value) => {
   }
   return value;
 }, z.string().min(1));
+
+/**
+ * Side-by-side uploads spec 2026-10-21 §1 (INTERFACE "RELEASE_KEY"): the release this process is, required by the API
+ * and the runner alike (`hatchetShape`). Absent or empty refuses RELEASE_KEY_REQUIRED; a malformed value (upper case,
+ * `legacy`, a leading zero) refuses RELEASE_KEY_INVALID through parseReleaseKey. Thrown from the preprocess, like
+ * `kekPath`, so the key inventory reads it as required. The register-version and hosted checks need the other keys,
+ * so they run after the shape: assertReleaseKeyForRegister.
+ */
+const releaseKeyValue = z.preprocess((value) => {
+  if (typeof value !== "string" || value.length === 0) throw releaseKeyRequired();
+  return parseReleaseKey(value).releaseKey;
+}, z.string().min(1));
+
+/** Content-free, like every refusal here: names the setting, never a value. */
+function releaseKeyRequired(): TypedDomainError {
+  return new TypedDomainError("RELEASE_KEY_REQUIRED", "RELEASE_KEY is required: r<REGISTER_VERSION>-<12 lowercase hex>");
+}
+
+/**
+ * Side-by-side spec §1; INTERFACE environment values. The one check of a configured release key, for every loader that
+ * reads one (the API and runner shapes here; plan C's and plan D's callers reuse it): absent or empty refuses
+ * RELEASE_KEY_REQUIRED; then the key is parsed (RELEASE_KEY_INVALID); then a development key
+ * (`r<v>-000000000000`, isDevelopmentReleaseKey) refuses RELEASE_KEY_INVALID on the hosted site, which always knows its
+ * source revision; then a number that is not this process's REGISTER_VERSION refuses RELEASE_KEY_REGISTER_MISMATCH, so
+ * a process never serves debates under another release's name. Returns the key.
+ */
+export function assertReleaseKeyForRegister(
+  raw: string | undefined,
+  registerVersion: number,
+  deploymentMode: DeploymentMode
+): string {
+  if (raw === undefined || raw.length === 0) throw releaseKeyRequired();
+  const parsed = parseReleaseKey(raw);
+  if (deploymentMode === "hosted" && isDevelopmentReleaseKey(parsed.releaseKey)) {
+    throw new TypedDomainError("RELEASE_KEY_INVALID", "A hosted release key names its source revision, never 000000000000");
+  }
+  if (parsed.siteVersion !== registerVersion) {
+    throw new TypedDomainError("RELEASE_KEY_REGISTER_MISMATCH", "RELEASE_KEY's number is not this process's REGISTER_VERSION");
+  }
+  return parsed.releaseKey;
+}
 
 type EnvironmentSource = Readonly<Record<string, string | undefined>>;
 const nodeEnvironment = z.enum(["development", "test", "production"]).optional();
@@ -399,11 +445,30 @@ export function loadBillingRefundDoneEnvironment() {
   return parseBillingRefundDoneEnvironment(process.env);
 }
 
+/**
+ * B1 part 2 (NETOPIA answers 2026-10-21, Q22): `pnpm billing:renewal-resume` reads `NETOPIA_API_BASE_URL` from the API's
+ * EnvironmentFile, the NETOPIA environment whose held renewals it releases (never another system's). Required. C6: it
+ * also reads the OWNER-RUN sandbox's optional `BILLING_STAGE_CLOCK_OFFSET_DAYS`, so its marker is dated on the API's
+ * billing clock (`billingClock`, which refuses it against live).
+ */
+export function parseBillingRenewalResumeEnvironment(source: EnvironmentSource) {
+  return withProductionFloors(parseEnvironmentSource({
+    ...billingOperatorShape, NETOPIA_API_BASE_URL: z.string().url(),
+    BILLING_STAGE_CLOCK_OFFSET_DAYS: z.coerce.number().int().min(1).max(400).optional()
+  }, source));
+}
+
+export function loadBillingRenewalResumeEnvironment() {
+  return parseBillingRenewalResumeEnvironment(process.env);
+}
+
 export const ACCOUNT_ERASURE_GRACE_MS = 604_800_000 as const;
 const hatchetShape = {
   HATCHET_CLIENT_TOKEN: z.string().min(1), HATCHET_HOST_PORT: z.string().min(1),
   HATCHET_API_URL: z.string().url(), HATCHET_TENANT_ID: z.string().min(1),
-  HATCHET_WORKFLOW_NAME: z.string().min(1), HATCHET_TLS_STRATEGY: z.enum(["tls", "mtls", "none"])
+  HATCHET_WORKFLOW_NAME: z.string().min(1), HATCHET_TLS_STRATEGY: z.enum(["tls", "mtls", "none"]),
+  /** Side-by-side §1-§2: the release this process is; its Hatchet task is named after it (releaseTaskName). */
+  RELEASE_KEY: releaseKeyValue
 } as const;
 
 const apiEnvironmentShape = {
@@ -511,6 +576,12 @@ const apiEnvironmentShape = {
     NETOPIA_POS_SIGNATURE: z.string().min(1).optional(),
     NETOPIA_API_KEY_PATH: z.string().min(1).optional(),
     NETOPIA_IPN_KEYS_PATH: z.string().min(1).optional(),
+    /**
+     * B3a (NETOPIA answers 2026-10-21): the folder where a verified NETOPIA message the database could not take is kept,
+     * sealed, until it is stored (NETOPIA sends the saved card only in its first message). Optional: absent, nothing is
+     * kept (one boot line says so); set, it must be an existing folder the API can write, or the API refuses to start.
+     */
+    BILLING_NOTICE_SPOOL_PATH: z.string().min(1).optional(),
     /**
      * OWNER-RUN sandbox only (spec 2026-10-05 §2.3, README §14.9): whole days added to the billing jobs' clock.
      * Absent in every real deployment; `billingClock` refuses it unless NETOPIA_API_BASE_URL is one of NETOPIA's
@@ -701,7 +772,9 @@ function validateApiEnvironment(
   if ((deploymentMode === "hosted" || turnstileBeyondSignup) && environment.TURNSTILE_SOCKET_PATH === undefined) {
     throw new TypeError("TURNSTILE_SOCKET_PATH_REQUIRED");
   }
-  return { ...environment, DEPLOYMENT_MODE: deploymentMode };
+  // Side-by-side §1: the key names this API's own register version (and a real source revision when hosted).
+  const releaseKey = assertReleaseKeyForRegister(environment.RELEASE_KEY, environment.REGISTER_VERSION, deploymentMode);
+  return { ...environment, RELEASE_KEY: releaseKey, DEPLOYMENT_MODE: deploymentMode };
 }
 
 export function parseApiEnvironment(
@@ -709,9 +782,32 @@ export function parseApiEnvironment(
 ) {
   const staffAccess = parseStaffAccessEnvironment(source);
   const environment = validateApiEnvironment(parseEnvironmentSource(apiEnvironmentShape, source));
-  const previewConfig = parsePreviewProviderTestConfig(source.PREVIEW_PROVIDER_TEST_CONFIG_JSON);
-  return { ...environment, STAFF_ACCESS: staffAccess, PREVIEW_PROVIDER_TEST_CONFIG: previewConfig,
-    PREVIEW_TEAM_USER_IDS: parsePreviewTeamUserIds(environment.PREVIEW_TEAM_USER_IDS_JSON, previewConfig !== undefined) };
+  const preview = parsePreviewEnvironment(source.PREVIEW_PROVIDER_TEST_CONFIG_JSON);
+  return { ...environment, STAFF_ACCESS: staffAccess, ...preview,
+    PREVIEW_TEAM_USER_IDS: parsePreviewTeamUserIds(environment.PREVIEW_TEAM_USER_IDS_JSON, preview.PREVIEW_GATE_SETTINGS !== undefined) };
+}
+
+/**
+ * Side-by-side spec §13 ADDITION D13-D14 (owner 2026-10-22): the one preview variable, PREVIEW_PROVIDER_TEST_CONFIG_JSON,
+ * parsed for the API and the runner alike (no new variable). It may carry the gate part with a line-up (the two old
+ * forms) or the gate part alone (the sockets-only form: the line-up then lives in the settings version,
+ * previewLineUpPolicy). Three parsed keys:
+ * - PREVIEW_GATE_SETTINGS: the gate part (deployment, wire word, sockets, scope), present for every form; "is this the
+ *   preview?" keys on it (the team rule, the hosted preview's check, the runner launcher's start rule);
+ * - PREVIEW_ENV_LINE_UP: the old forms' rosters and table (the fallback for a settings version without the row, D14),
+ *   null for the sockets-only form;
+ * - PREVIEW_PROVIDER_TEST_CONFIG: exactly today's parse of the two old forms (parsePreviewProviderTestConfig, unchanged),
+ *   undefined for the sockets-only form (its readers move to the per-version line-up in SA4/SA6).
+ * All three are undefined without the variable. A refused value throws the parsers' own codes, as before; whether a
+ * sockets-only value may boot beside a given site version is the boot's decision (D15), not this parse's.
+ */
+function parsePreviewEnvironment(source: string | undefined) {
+  const parsed = parsePreviewEnvironmentConfig(source);
+  return {
+    PREVIEW_GATE_SETTINGS: parsed?.gate,
+    PREVIEW_ENV_LINE_UP: parsed?.envLineUp,
+    PREVIEW_PROVIDER_TEST_CONFIG: parsed === undefined || parsed.envLineUp === null ? undefined : parsePreviewProviderTestConfig(source)
+  };
 }
 
 /** NETOPIA (spec 2026-10-05 §2.17.1): the payment system's four settings, in the order a missing one is reported. */
@@ -1005,14 +1101,18 @@ export function parseRunnerEnvironment(source: EnvironmentSource) {
     throw new TypeError("RUNNER_PRIMARY_PROVIDER_KEYS_INCOMPLETE");
   }
   assertProductionFloors(environment);
-  const previewConfig = parsePreviewProviderTestConfig(environment.PREVIEW_PROVIDER_TEST_CONFIG_JSON);
+  // Addition D14: the gate part, the env line-up and today's config (parsePreviewEnvironment, the API's same parse).
+  const preview = parsePreviewEnvironment(environment.PREVIEW_PROVIDER_TEST_CONFIG_JSON);
+  const previewTeamUserIds = parsePreviewTeamUserIds(environment.PREVIEW_TEAM_USER_IDS_JSON, preview.PREVIEW_GATE_SETTINGS !== undefined);
+  const deploymentMode = resolveDeploymentMode(environment.DEBATEAI_DEPLOYMENT_MODE, environment.NODE_ENV);
+  // Side-by-side §1: the same check as the API's, so a runner never serves under another release's name.
+  const releaseKey = assertReleaseKeyForRegister(environment.RELEASE_KEY, environment.REGISTER_VERSION, deploymentMode);
   return {
     ...environment,
-    PREVIEW_PROVIDER_TEST_CONFIG: previewConfig,
-    PREVIEW_TEAM_USER_IDS: parsePreviewTeamUserIds(environment.PREVIEW_TEAM_USER_IDS_JSON, previewConfig !== undefined),
-    DEPLOYMENT_MODE: resolveDeploymentMode(
-      environment.DEBATEAI_DEPLOYMENT_MODE, environment.NODE_ENV
-    )
+    RELEASE_KEY: releaseKey,
+    ...preview,
+    PREVIEW_TEAM_USER_IDS: previewTeamUserIds,
+    DEPLOYMENT_MODE: deploymentMode
   };
 }
 

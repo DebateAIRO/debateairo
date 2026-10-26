@@ -9,11 +9,13 @@
  * says PASS or why not.
  */
 import { randomBytes, randomUUID } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 import type { Pool } from "pg";
 import { QuestionLanguageChoiceNeeded } from "@debateai/api";
 import type { AskRequest } from "@debateai/contract";
 import { ContentCipher, generateDek, MemoryRunContentKeyStore, type KeyDestroyResult, type ReadableUserDekStore } from "@debateai/crypto";
 import { configureContentEncryption, decryptContentForRun, migrate, readCallPrompt } from "@debateai/db";
+import { TEXT_NOT_IN_QUESTION_LANGUAGE } from "@debateai/kernel";
 import type { Session } from "@debateai/contract";
 import {
   DEBATE_SHAPE_POLICY_ROW_KEY,
@@ -22,13 +24,14 @@ import {
   readDebateShapePolicy,
   readEngineVersionPolicy,
   readLengthGuidancePolicy,
+  readPreviewLineUpPolicy,
   type CallConcurrencyPolicy,
   type EngineVersionPolicy,
   type LengthGuidancePolicy
 } from "@debateai/register";
 import {
   PREVIEW_PROVIDER_REF_MODELS, previewModelRow, STRUCTURE_SALVAGE_REPAIRS, structureRepairOriginalKey, type PreviewBudgetPorts,
-  type PreviewGateRemaining
+  type PreviewGateRemaining, type PreviewLineUp
 } from "@debateai/providers";
 import { ServeRepository } from "@debateai/serve";
 import { StoryRepository } from "@debateai/story";
@@ -85,7 +88,9 @@ import {
   type PracticeRegisterImportReceipt
 } from "./practice-register-import.js";
 import { composePracticeRunner } from "./practice-runner-composition.js";
-import { PracticeRefusal, type PracticeSettings, type PracticeSockets } from "./practice-settings.js";
+import {
+  PracticeRefusal, practiceReleaseKeyAt, practiceSettingsWithLineUp, type PracticeSettings, type PracticeSockets
+} from "./practice-settings.js";
 import {
   practiceCheckEmptyReasons,
   practiceMapReaders,
@@ -216,6 +221,8 @@ export type PracticeDebateResult = Readonly<{
   repairsByKind?: readonly PracticeRepairRow[];
   /** LG-A (L34): each reply code could not repair, with its class, its follow-up, whether it recovered, and a sample. */
   unrepaired?: readonly PracticeUnrepairedRow[];
+  /** The stray-letter rule (PR #194): the replies refused for their language and their short follow-ups, per AI and step. */
+  languageFollowUps?: readonly PracticeLanguageFollowUpRow[];
   /**
    * Refused-repair salvage, information only: the structure rescues (A1 in code; B by short follow-up or full re-ask).
    * Absent when every count is 0, so a run with no rescue reports exactly as before.
@@ -283,6 +290,8 @@ export type PracticeTryRecord = Readonly<{
   repairs: readonly string[] | null; failureClass: string | null;
   /** The first issue of a refusal as `code@path`; null for an accepted reply. */
   issue: string | null;
+  /** Every issue of a refusal as `code@path` (`issue` is the first); absent where only the first was kept. */
+  issues?: readonly string[];
   /** A refused reply's own text (already through `reportableReplyText`); null for an accepted one. */
   replyText: string | null;
 }>;
@@ -413,6 +422,45 @@ export function practiceUnrepairedRows(tries: readonly PracticeTryRecord[]): rea
   return Object.freeze(rows);
 }
 
+/**
+ * The reply-language check's two codes: the shared check's (kernel), and MAP_WRONG_LANGUAGE, the map's own name for the
+ * same refusal (its short follow-up says the same sentence).
+ */
+const LANGUAGE_REFUSAL_CODES = Object.freeze([TEXT_NOT_IN_QUESTION_LANGUAGE, "MAP_WRONG_LANGUAGE"] as const);
+
+/**
+ * Information only, per AI, step and code: `refused`, the replies a reply-language refusal named (alone or beside other
+ * issues); `followUps`, those the same call asked again by the short follow-up (its next try a PATCH); `accepted`, those
+ * follow-ups whose reply was accepted. The measure of the stray-letter rule (PR #194): a Chinese, Japanese or Korean
+ * gloss in English or Romanian text is refused there, and the short follow-up asks for just that piece again.
+ */
+export type PracticeLanguageFollowUpRow = Readonly<{ model: string; step: PracticeStep; code: string; refused: number; followUps: number;
+  accepted: number }>;
+
+export function practiceLanguageFollowUpRows(tries: readonly PracticeTryRecord[]): readonly PracticeLanguageFollowUpRow[] {
+  const byCall = new Map<string, PracticeTryRecord[]>();
+  for (const attempt of tries) byCall.set(attempt.callKey, [...(byCall.get(attempt.callKey) ?? []), attempt]);
+  const counts = new Map<string, { model: string; step: PracticeStep; code: string; refused: number; followUps: number; accepted: number }>();
+  for (const attempt of tries) {
+    const issues = attempt.issues ?? (attempt.issue === null ? [] : [attempt.issue]);
+    const code = LANGUAGE_REFUSAL_CODES.find((candidate) => issues.some((issue) => issue.startsWith(`${candidate}@`)));
+    if (code === undefined) continue;
+    const call = byCall.get(attempt.callKey)!;
+    const next = call[call.indexOf(attempt) + 1];
+    const step = practiceStepOf(attempt.callSiteKey);
+    const key = `${attempt.model}\u0000${step}\u0000${code}`;
+    const row = counts.get(key) ?? { model: attempt.model, step, code, refused: 0, followUps: 0, accepted: 0 };
+    row.refused += 1;
+    if (next?.replyForm === "PATCH") {
+      row.followUps += 1;
+      if (next.outcome === "OK") row.accepted += 1;
+    }
+    counts.set(key, row);
+  }
+  return Object.freeze([...counts.values()].sort((a, b) => a.model.localeCompare(b.model) || a.step.localeCompare(b.step)
+    || a.code.localeCompare(b.code)).map((row) => Object.freeze(row)));
+}
+
 
 function usageOf(metadata: unknown): { input: number; output: number } {
   const usage = typeof metadata === "object" && metadata !== null ? (metadata as { usage?: unknown }).usage : undefined;
@@ -429,7 +477,8 @@ async function readRemaining(port: (signal?: AbortSignal) => Promise<PreviewGate
 /** What happened, read from the throwaway database after the debate. */
 async function collect(pool: Pool, runId: string, run: Readonly<{ structureRouted: boolean }>): Promise<Pick<PracticeDebateResult,
   "byModelAndSite" | "failures" | "formatFailures" | "callsByModel" | "repairKindsByModel" | "answersByModel" | "jsonRepairs"
-  | "failedCalls" | "refusedCalls" | "repairsByKind" | "unrepaired" | "structureRescues" | "tokensByModelAndStep" | "lengthByModelAndStep">
+  | "failedCalls" | "refusedCalls" | "repairsByKind" | "unrepaired" | "languageFollowUps" | "structureRescues" | "tokensByModelAndStep"
+  | "lengthByModelAndStep">
   & Readonly<{ answerWritersServed: readonly string[] }>> {
   const entries = (await pool.query<{ sequence: string; attempt_id: string | null; call_site_key: string; actor_ref: string; outcome: string;
     started_at: Date; finished_at: Date; raw_artifact_ref: string | null; thinking_level: string | null }>(
@@ -570,11 +619,12 @@ async function collect(pool: Pool, runId: string, run: Readonly<{ structureRoute
         await mapLengthedOf(entry.attempt_id, entry.call_site_key), mapEngine);
       if (repair !== null) jsonRepairs.push(Object.freeze({ model, repair }));
     }
-    let refused: Readonly<{ issue: string | null; replyText: string }> | null = null;
+    let refused: Readonly<{ issue: string | null; issues: readonly string[]; replyText: string }> | null = null;
     if (formatFailed && artifact !== undefined) {
       const stored = await readContent(entry.raw_artifact_ref!, artifact);
       const content = replyContentOf(stored.rawText);
-      refused = Object.freeze({ issue: issueListFromParseError(stored.parseErrorDetail)[0] ?? null, replyText: reportableReplyText(content) });
+      const issues = issueListFromParseError(stored.parseErrorDetail);
+      refused = Object.freeze({ issue: issues[0] ?? null, issues, replyText: reportableReplyText(content) });
       failureCallKeys.push(callKey);
       failures.push(Object.freeze({
         sequence: Number(entry.sequence), model, providerRef: entry.actor_ref, callSiteKey: entry.call_site_key, parseStatus,
@@ -588,7 +638,8 @@ async function collect(pool: Pool, runId: string, run: Readonly<{ structureRoute
     // repair model's copy, whose own code repairs are counted under that model).
     records.push(Object.freeze({ callKey, model: recordModel, callSiteKey: entry.call_site_key, outcome: entry.outcome,
       parseStatus: artifact === undefined ? null : parseStatus, replyForm, repairs: artifact?.reply_repairs ?? null,
-      failureClass: artifact?.reply_failure_class ?? null, issue: refused?.issue ?? null, replyText: refused?.replyText ?? null }));
+      failureClass: artifact?.reply_failure_class ?? null, issue: refused?.issue ?? null, ...(refused === null ? {} : { issues: refused.issues }),
+      replyText: refused?.replyText ?? null }));
   }
   const callList = [...calls.entries()];
   const structureRescues = practiceStructureRescues(records, run);
@@ -617,6 +668,7 @@ async function collect(pool: Pool, runId: string, run: Readonly<{ structureRoute
     answersByModel: Object.freeze(Object.fromEntries(Object.entries(answersByModel).map(([model, mine]) => [model, Object.freeze(mine)]))),
     jsonRepairs: Object.freeze(jsonRepairs), failedCalls, refusedCalls,
     repairsByKind: practiceRepairRows(records), unrepaired: practiceUnrepairedRows(records),
+    languageFollowUps: practiceLanguageFollowUpRows(records),
     ...(practiceStructureRescuesShown(structureRescues) ? { structureRescues } : {}),
     tokensByModelAndStep: practiceTokenRows(measured), lengthByModelAndStep: practiceLengthRows(measured),
     // Ruling A1 (Task 21 review): the models that served the final writer, for the pins only (not a report member).
@@ -628,6 +680,22 @@ function codeOf(error: unknown): string {
     return (error as { code: string }).code;
   }
   return error instanceof Error ? error.name : "UNKNOWN";
+}
+
+/**
+ * Final fix wave S5 (FINAL-FIX 18): a --line-up trial runs only on a version whose line-up row EQUALS the file. A version
+ * without the row, or with another line-up (another roster, another level, a table more or less), would silently run a
+ * line-up the operator did not ask for: refused PRACTICE_LINE_UP_NOT_PUBLISHED before any AI is asked. Compared as the
+ * parsed JSON values (member order and frozen-ness never matter). Without a trial (`lineUp` null) the version's own row,
+ * or none, is the debate's.
+ */
+export function assertPracticeLineUpPublished(lineUp: PreviewLineUp | null, versionLineUp: PreviewLineUp | null): void {
+  if (lineUp === null) return;
+  const asJson = (value: PreviewLineUp): unknown => JSON.parse(JSON.stringify(value));
+  if (versionLineUp === null || !isDeepStrictEqual(asJson(versionLineUp), asJson(lineUp))) {
+    throw new PracticeRefusal("PRACTICE_LINE_UP_NOT_PUBLISHED",
+      versionLineUp === null ? "the version carries no line-up row" : "the version's line-up row is not the --line-up file's");
+  }
 }
 
 export async function runPracticeDebate(input: Readonly<{
@@ -664,6 +732,12 @@ export async function runPracticeDebate(input: Readonly<{
   pins?: PracticeWriterPins;
   /** Question language (`--site-language`, `--language-choice`; P2L): absent: the question's own language, an offer answered KEEP_MINE. */
   language?: PracticeDebateLanguage;
+  /**
+   * `--line-up` (side-by-side spec §13, addition D23; S plan Q-S1, the owner's optional trial before an activation): put
+   * into the throwaway register only, in the practice's own version (or carried by --register-next's version). Absent:
+   * the line-up of the version the debate runs on (its previewLineUpPolicy row, else the settings' env line-up).
+   */
+  lineUp?: PreviewLineUp;
 }>): Promise<PracticeDebateResult> {
   const progress = input.progress ?? (() => undefined);
   const remainingPorts = practiceRemainingPorts(input.settings, input.sockets);
@@ -711,31 +785,52 @@ export async function runPracticeDebate(input: Readonly<{
     // R1d: the engine row joins the same ONE throwaway version (never a second version on top). `engine` is passed
     // only when given, so a run without --engine-policy hands over exactly LG-C's `{ shape, length }`.
     const enginePolicy = input.engine ?? null;
+    // Addition D23: the --line-up row joins that same ONE version too, passed only when given (the same rule).
+    const lineUpPolicy = input.lineUp ?? null;
     const overrideVersion: PracticeOverrideVersion | null =
-      (shapePolicy === null && lengthPolicy === null && enginePolicy === null) || receipt.codeNext !== undefined ? null
+      (shapePolicy === null && lengthPolicy === null && enginePolicy === null && lineUpPolicy === null) || receipt.codeNext !== undefined ? null
         : await publishPracticeOverrideVersion(pool, input.register, receipt,
-          { shape: shapePolicy, length: lengthPolicy, ...(enginePolicy === null ? {} : { engine: enginePolicy }) });
+          { shape: shapePolicy, length: lengthPolicy, ...(enginePolicy === null ? {} : { engine: enginePolicy }),
+            ...(lineUpPolicy === null ? {} : { lineUp: lineUpPolicy }) });
     // A next version composed by publish kit v3 is a hosted one: the server runs it in hosted mode (runbook H6 step 5
     // switches both units to hosted with it), so the practice runs it in hosted mode too, whatever the settings said.
     // The practice's own override version (no --register-next) keeps the settings' mode.
-    const settings: PracticeSettings = receipt.codeNext !== undefined
+    // Side-by-side spec §1, §3: on the next version the one release key is renumbered with it and checked again against
+    // the FINAL mode (practiceReleaseKeyAt), so a local development key never runs a practice switched to hosted.
+    const nextReleaseKey = (mode: PracticeSettings["runner"]["DEPLOYMENT_MODE"]) =>
+      practiceReleaseKeyAt(input.settings.runner.RELEASE_KEY, nextVersion, mode);
+    const versionSettings: PracticeSettings = receipt.codeNext !== undefined
       ? Object.freeze({ ...input.settings, runner: Object.freeze({ ...input.settings.runner, REGISTER_VERSION: nextVersion,
+        RELEASE_KEY: nextReleaseKey(receipt.codeNext.composer === undefined ? input.settings.runner.DEPLOYMENT_MODE : "hosted"),
         ...(receipt.codeNext.composer === undefined ? {} : { DEPLOYMENT_MODE: "hosted" as const }) }) })
       : overrideVersion === null ? input.settings
-        : Object.freeze({ ...input.settings, runner: Object.freeze({ ...input.settings.runner, REGISTER_VERSION: nextVersion }) });
-    const hosted = settings.runner.DEPLOYMENT_MODE === "hosted";
+        : Object.freeze({ ...input.settings, runner: Object.freeze({ ...input.settings.runner, REGISTER_VERSION: nextVersion,
+          RELEASE_KEY: nextReleaseKey(input.settings.runner.DEPLOYMENT_MODE) }) });
+    const hosted = versionSettings.runner.DEPLOYMENT_MODE === "hosted";
     progress(receipt.codeNext === undefined ? `register imported up to version ${receipt.registerVersion}`
       : `register imported up to live version ${liveVersion}; practising on this code's next version ${receipt.registerVersion}`
         + ` (changed: ${receipt.codeNext.changedKeys.join(", ") || "none"}; added: ${receipt.codeNext.addedKeys.join(", ") || "none"})`);
     if (overrideVersion !== null) {
-      for (const [name, change] of [["debate-shape", overrideVersion.shapeRow], ["length", overrideVersion.lengthRow], ["engine", overrideVersion.engineRow]] as const) {
+      for (const [name, change] of [["debate-shape", overrideVersion.shapeRow], ["length", overrideVersion.lengthRow], ["engine", overrideVersion.engineRow],
+        ["line-up", overrideVersion.lineUpRow]] as const) {
         // `!= null`: a row the version did not touch is null (Task 20 review 2: a caller's double may leave it out).
         if (change != null) progress(`the ${name} row ${change === "ADDED" ? "added" : "replaced"} in this throwaway copy as version `
           + `${overrideVersion.registerVersion}, with this code's contract hashes`);
       }
     }
     // The version both compositions read: the live one, the code's next one, or the practice's own.
-    const registerVersion = String(settings.runner.REGISTER_VERSION);
+    const registerVersion = String(versionSettings.runner.REGISTER_VERSION);
+    // Addition D14-D16 (owner 2026-10-22): the line-up that version carries, read as the runner's and the API's loaders read
+    // it, composed by their one rule (practiceSettingsWithLineUp over resolvePreviewLineUp): its row, else the settings'
+    // env line-up; a sockets-only settings file with a row-less version refuses (PREVIEW_LINE_UP_REQUIRED) before any AI
+    // is asked. Every roster read below (the sat-out list) is the debate's own version's. A --line-up whose row is not in
+    // that version would silently run another line-up: refused, as the other flags are.
+    const versionLineUp = await readPreviewLineUpPolicy(pool, versionSettings.runner.REGISTER_VERSION);
+    assertPracticeLineUpPublished(lineUpPolicy, versionLineUp);
+    const settings = practiceSettingsWithLineUp(versionSettings, versionLineUp, { trial: lineUpPolicy !== null });
+    progress(`line-up of version ${registerVersion}: ${lineUpPolicy !== null ? "the --line-up file's" : versionLineUp !== null
+      ? "the version's own row" : "the settings' (the version carries none)"}; free ${settings.previewConfig.free_model_ids.join(", ")};`
+      + ` premium ${settings.previewConfig.premium_model_ids.join(", ")}; thinking table ${settings.previewConfig.thinking_levels === undefined ? "none" : "set"}`);
     // report.json's register block names that same version (final review M-2): on the practice's own version the
     // import's receipt names the export's newest, which is kept beside it under its own name. Else the receipt as it is.
     const reportedRegister: PracticeRegisterImportReceipt = overrideVersion === null ? receipt
@@ -877,7 +972,7 @@ export async function runPracticeDebate(input: Readonly<{
     }
     const admissionSeconds = (performance.now() - admissionStarted) / 1000;
     const job = dispatched[0];
-    const premium = input.settings.previewConfig.premium_model_ids;
+    const premium = settings.previewConfig.premium_model_ids;
     const probeRows = (await pool.query<{ provider_ref: string; state: string; failure_code: string | null; n: number }>(
       `SELECT provider_ref, state, failure_code, count(*)::int AS n FROM core.provider_probe
         GROUP BY provider_ref, state, failure_code ORDER BY provider_ref, state`)).rows;

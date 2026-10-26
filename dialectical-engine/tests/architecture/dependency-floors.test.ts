@@ -61,8 +61,22 @@ const VULNERABLE: Record<string, (version: string) => boolean> = {
   // (test tooling only); 8.10.2 was published 2026-09-04.
   undici: (v) => v.startsWith("8.") && compare(v, "8.10.2") < 0,
   qs: (v) => compare(v, "6.16.0") < 0,
-  // @vitest/mocker ships in lockstep with vitest, so the vitest floor covers it.
-  vitest: (v) => compare(v, "4.1.11") < 0
+  // 2026-10-21: GHSA-8r9p-f939-6h3c and its sibling follow-redirects advisory (>=1.16.0 <1.16.1, array-form headers
+  // and sensitiveHeaders regex escaping), reached through the Hatchet SDK's axios; 1.16.1 was published 2026-10-01.
+  "follow-redirects": (v) => v.startsWith("1.16.") && compare(v, "1.16.1") < 0,
+  // 2026-10-22: GHSA-2464-fhr4-w9xw (critical: unauthenticated remote code execution in the Image Optimization API when
+  // SVG files are used) and GHSA-p3m5-59mp-jv5r (high: App Router Server Actions denial of service), next <=15.5.27;
+  // 15.5.28 was published 2026-10-14, so it clears the 7-day cooldown on its own.
+  next: (v) => v.startsWith("15.") && compare(v, "15.5.28") < 0,
+  // 2026-10-21: GHSA-587h-7wmj-h5pm / GHSA-698v-4r3x-3vcv / GHSA-r825-w8mm-5pxw (vite >=8.2.0 <=8.2.3, its
+  // launch-editor), test tooling only (vitest); 8.2.4 was published 2026-10-06.
+  vite: (v) => v.startsWith("8.2.") && compare(v, "8.2.4") < 0,
+  vitest: (v) => compare(v, "4.1.11") < 0,
+  // 2026-10-22: GHSA-qxg6-89mg-rqv8 / GHSA-xp26-3454-mjgp (@vitest/mocker >=5.0.0-beta.1 <5.0.3), test
+  // tooling only; reached through the direct dev dependency vitest, so the fix is the vitest PIN (5.0.3),
+  // not an override. @vitest/mocker ships in lockstep with vitest but gets its own floor so the lockfile
+  // is checked where the advisory points. vitest and @vitest/mocker 5.0.3 were published 2026-09-30.
+  "@vitest/mocker": (v) => v.startsWith("5.") && compare(v, "5.0.3") < 0
 };
 
 describe("dependency floors (F-02)", () => {

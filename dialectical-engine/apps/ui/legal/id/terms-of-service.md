@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ringkasnya
-eyebrow: KETENTUAN LAYANAN · v2.4 · BERLAKU 12 OKTOBER 2026
+eyebrow: KETENTUAN LAYANAN · v2.5 · BERLAKU 12 OKTOBER 2026
 title: Hal yang Anda setujui
 lede: Kontrak antara Anda dan DMS Merchandise Shop S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.
-endMarker: AKHIR KETENTUAN · v2.4
+endMarker: AKHIR KETENTUAN · v2.5
 bodyLabel: Teks Ketentuan Layanan
 annexTitle: Lampiran A — Ketentuan regional
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 HUKUM YANG BERLAKU
 -->
 
-**Version 2.4 · Effective 12 Oktober 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
+**Version 2.5 · Effective 12 Oktober 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
 
 **In short.** Anda harus berusia 18 tahun atau lebih. Dialectical Engine menyusun argumen dengan model AI dan segala sesuatu yang dihasilkannya mungkin salah — ini bukan nasihat. Debat Anda bersifat privat kecuali Anda memublikasikannya; jika Anda memublikasikannya, siapa pun dapat membacanya. Teks yang Anda kirim diteruskan kepada penyedia AI yang tercantum dalam Daftar Penyedia kami, dan tidak digunakan untuk melatih model. Laporkan konten ilegal ke support@dezbatere.ro, baik Anda memiliki akun maupun tidak. Hukum Rumania berlaku, tetapi perlindungan konsumen setempat Anda tetap berlaku bagi Anda.
 
@@ -213,7 +213,11 @@ Dialectical Engine menawarkan paket gratis. Paket **Premium** berbayar akan ters
 
 **Pembayaran gagal.** Jika pembayaran gagal, kami mencoba kembali selama 7 hari dan memperingatkan Anda melalui email sebelum menurunkan akun Anda ke paket gratis. Kami tidak menghapus debat Anda karena pembayaran gagal.
 
-**Pajak, dan pihak yang Anda bayar.** Harga mencakup PPN, GST, atau pajak penjualan, yang bergantung pada tempat tinggal Anda dan ditampilkan sebelum Anda membayar. Pembayaran kartu diproses oleh NETOPIA Payments (netopia-payments.com). Penjualnya adalah DMS Merchandise Shop S.R.L., yang menerbitkan faktur Anda dan tetap bertanggung jawab atas layanan itu sendiri serta Ketentuan ini.
+**Pajak, dan pihak yang Anda bayar.** Harga mencakup PPN, GST, atau pajak penjualan, yang bergantung pada tempat tinggal Anda dan ditampilkan sebelum Anda membayar. Penjualnya adalah DMS Merchandise Shop S.R.L., yang menerbitkan faktur Anda dan tetap bertanggung jawab atas layanan itu sendiri serta Ketentuan ini.
+
+**Metode pembayaran.** Anda membayar dengan kartu. Kami menerima Visa dan Mastercard; kami tidak menerima American Express. Pembayaran kartu diproses oleh NETOPIA Payments (netopia-payments.com), dan nomor kartu Anda yang lengkap tidak pernah sampai kepada kami.
+
+**Pengiriman.** Dialectical Engine adalah layanan daring, jadi tidak ada yang dikirimkan kepada Anda. Fitur paket berbayar Anda tersedia di akun Anda segera setelah pembayaran Anda dikonfirmasi.
 
 **Sanggahan transaksi.** Jika Anda menyanggah suatu tagihan kepada penerbit kartu, kami dapat menangguhkan fitur berbayar selama sengketa diselesaikan. Kami tidak mengenakan biaya untuk hal ini.
 
@@ -235,7 +239,7 @@ Kami memberi tahu Anda terlebih dahulu, pada media tahan lama, mengenai hal yang
 
 **Pada Ketentuan ini.** Kami dapat mengubah Ketentuan ini untuk jenis alasan yang sama. Untuk perubahan yang tidak mengurangi hak Anda, kami memublikasikan versi baru beserta ringkasan perubahan dan mengirim email kepada Anda sekurang-kurangnya **30 hari** sebelum perubahan berlaku; jika Anda terus menggunakan Dialectical Engine setelah tanggal tersebut, berarti Anda menerimanya, dan Anda dapat menutup akun sebelumnya. Untuk perubahan yang mengurangi hak Anda — termasuk kenaikan harga pada paket yang sudah ada, batas yang lebih rendah, fitur yang dihapus, penggunaan baru atas konten Anda, atau perubahan pada tanggung jawab, hukum yang berlaku, maupun penyelesaian sengketa — kami meminta Anda menerima versi baru secara tegas saat masuk berikutnya, dan perubahan hanya berlaku untuk waktu mendatang. Kami tidak pernah memberlakukan perubahan secara surut, dan tidak pernah menggunakan bagian ini untuk mengubah inti dari hal yang telah Anda bayar di tengah masa berlaku tanpa menawarkan jalan keluar. Versi sebelumnya tetap tersedia di dezbatere.ro/terms/versions.
 
-Versi 2.4 menggantikan versi 2.3: versi ini menambahkan pemeriksaan pertanyaan, yang membaca setiap pertanyaan sebelum debat dimulai, menolak sebagian, dan menyimpan untuk dibaca tim kami setiap pertanyaan ditolak yang mengancam, merencanakan, atau menanyakan apakah atau bagaimana menyakiti orang lain, disebutkan namanya atau tidak, termasuk serangan terhadap orang yang tidak disebutkan namanya, atau yang menanyakan cara membuat senjata, bahan peledak, racun, atau narkoba atau cara mendukung tindakan terorisme, atau memujinya (bagian 7, 8, 10, dan 11); pemeriksaan yang membaca sintesis setiap debat yang telah selesai, persetujuan yang diperlukan debat yang ditandai sebelum dapat dipublikasikan, dan debat yang dihapus pemeriksaan itu (bagian 5, 8, 9, 10, dan 11); apa yang dikirim obrolan dukungan kepada model Claude milik Anthropic, bahwa obrolan itu tidak menyimpan apa pun dari yang Anda tulis dan tidak membuka kasus, dan bahwa tombol “Bicara dengan petugas” menampilkan alamat dukungan kami (bagian 8 dan 10); serta aturan pada bagian 7 yang melarang ujaran kebencian dalam bentuk apa pun, petunjuk pembuatan senjata atau narkoba, konten yang mendorong bunuh diri atau menyakiti orang lain, dan penghinaan agama, dan menyatakan pertanyaan mana yang tidak memulai debat.
+Versi 2.5 menggantikan versi 2.4: versi ini menambahkan pemeriksaan pertanyaan, yang membaca setiap pertanyaan sebelum debat dimulai, menolak sebagian, dan menyimpan untuk dibaca tim kami setiap pertanyaan ditolak yang mengancam, merencanakan, atau menanyakan apakah atau bagaimana menyakiti orang lain, disebutkan namanya atau tidak, termasuk serangan terhadap orang yang tidak disebutkan namanya, atau yang menanyakan cara membuat senjata, bahan peledak, racun, atau narkoba atau cara mendukung tindakan terorisme, atau memujinya (bagian 7, 8, 10, dan 11); pemeriksaan yang membaca sintesis setiap debat yang telah selesai, persetujuan yang diperlukan debat yang ditandai sebelum dapat dipublikasikan, dan debat yang dihapus pemeriksaan itu (bagian 5, 8, 9, 10, dan 11); apa yang dikirim obrolan dukungan kepada model Claude milik Anthropic, bahwa obrolan itu tidak menyimpan apa pun dari yang Anda tulis dan tidak membuka kasus, dan bahwa tombol “Bicara dengan petugas” menampilkan alamat dukungan kami (bagian 8 dan 10); serta aturan pada bagian 7 yang melarang ujaran kebencian dalam bentuk apa pun, petunjuk pembuatan senjata atau narkoba, konten yang mendorong bunuh diri atau menyakiti orang lain, dan penghinaan agama, dan menyatakan pertanyaan mana yang tidak memulai debat.
 
 ## 15. Tanggung jawab
 

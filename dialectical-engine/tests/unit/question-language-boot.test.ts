@@ -376,51 +376,72 @@ function countOf(source: string, needle: string): number {
   return source.split(needle).length - 1;
 }
 
-/**
- * The lines of the call that opens at `opener`, up to its closing line (the composition's own `    }),` at four
- * spaces), trimmed. A missing opener or closing line fails the test, never passes it.
- */
-function callLines(source: string, opener: string): string[] {
+/** The trimmed lines of the call that opens at `opener`, up to its balanced closing parenthesis. A missing opener fails. */
+function balancedCallLines(source: string, opener: string): string[] {
   const open = source.indexOf(opener);
   expect(open, opener).toBeGreaterThan(-1);
-  const close = source.indexOf("\n    }),", open);
-  expect(close, opener).toBeGreaterThan(open);
-  return source.slice(open, close).split("\n").map((line) => line.trim());
+  let depth = 0;
+  for (let index = source.indexOf("(", open); index < source.length; index += 1) {
+    if (source[index] === "(") depth += 1;
+    if (source[index] === ")") depth -= 1;
+    if (depth === 0) return source.slice(open, index + 1).split("\n").map((line) => line.trim());
+  }
+  throw new Error(`unbalanced call: ${opener}`);
 }
 
 // I6 (final review): nothing else in CI reads these lines. A regression here turns no test red by itself: the guard
 // back on `debateShapePolicy` would load eld and probe 0118 with the row disabled (row-absent drift), and a guarded
 // fetch swapped for the global one would bypass the preview gate (CR-6). The lines are copied from the shipped code.
-const QL_GUARD = "const questionLanguage = debateShapeInForcePolicy === null ? undefined : await boot.run(\"question-language\", async () => {";
-const QL_HOSTED_ROUTE = "const hostedRoute = previewConfig !== undefined ? undefined : await hostedQuestionLanguageRoute({";
-const QL_PREVIEW_SOCKET = "anthropicSocket: previewConfig === undefined ? undefined : previewProviderSocket(previewConfig, \"anthropic\"),";
-const QL_SPREAD = "...(questionLanguage === undefined ? {} : { questionLanguage }),";
-const PRACTICE_GUARD = "const questionLanguage = debateShapeInForcePolicy === null ? undefined : await composeQuestionLanguage({";
+// Side-by-side spec §13 (S9): the guard, the composition and the settings spread are the API's one per-version admission
+// loader's (admission-settings.ts); main.ts and the practice each hand it their own route (`questionLanguage.routeFor`).
+const QL_GUARD = "const questionLanguage = debateShapeInForcePolicy === null ? undefined : await run(\"question-language\", async () => {";
+const QL_HOSTED_ROUTE = "const hostedRoute = previewGate !== undefined ? undefined : await hostedQuestionLanguageRoute({";
+const QL_PREVIEW_SOCKET = "anthropicSocket: previewGate === undefined ? undefined : previewProviderSocket(previewGate, \"anthropic\"),";
+const QL_SPREAD = "...(questionLanguage === undefined ? {} : { questionLanguage })";
 const PRACTICE_SOCKET = "anthropicSocket: input.budgetPorts.anthropic === undefined ? undefined : input.sockets.anthropic,";
 const PRACTICE_HOSTED_REFUSAL = "hosted: () => { throw new TypeError(\"PRACTICE_QUESTION_LANGUAGE_HOSTED_ROUTE\"); }";
 
 describe("I6: the question-language wiring in the API's main.ts and the practice's composition is pinned as source text", () => {
-  it("apps/api/src/main.ts: the guard after the shape row, no hosted route on a preview, the guarded fetch and socket, the settings spread once", async () => {
-    const main = await readFile(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
-    expect(countOf(main, QL_GUARD)).toBe(1);
-    expect(main.indexOf(QL_GUARD)).toBeGreaterThan(main.indexOf("const debateShapeInForcePolicy ="));
-    expect(countOf(main, QL_HOSTED_ROUTE)).toBe(1);
-    const route = callLines(main, "questionLanguageRouteFor({");
-    expect(route).toContain("previewFetch,");
-    expect(route).toContain(QL_PREVIEW_SOCKET);
-    expect(countOf(main, QL_SPREAD)).toBe(1);
-    expect(countOf(main, "composeQuestionLanguage(")).toBe(1);
+  it("the admission loader: the guard after the shape row, the site's route asked per version, the settings spread once", async () => {
+    const loader = await readFile(new URL("../../apps/api/src/admission-settings.ts", import.meta.url), "utf8");
+    expect(countOf(loader, QL_GUARD)).toBe(1);
+    expect(loader.indexOf(QL_GUARD)).toBeGreaterThan(loader.indexOf("const debateShapeInForcePolicy ="));
+    expect(countOf(loader, "route: await site.questionLanguage.routeFor({ policy, dayCeilingMicros: costEnvelope?.guardPolicy.dailyCeilingMicros ?? null }),")).toBe(1);
+    expect(countOf(loader, "referenceKey: site.questionLanguage.referenceKey,")).toBe(1);
+    expect(countOf(loader, QL_SPREAD)).toBe(1);
+    expect(countOf(loader, "readers.composeQuestionLanguage(")).toBe(1);
   });
 
-  it("tools/preview-practice/practice-ask-composition.ts: the same guard, no hosted route on a preview, the guarded fetch and socket, the spread once", async () => {
+  it("apps/api/src/main.ts: no hosted route on a preview, the guarded fetch and socket, one reference key, no composition of its own", async () => {
+    const main = await readFile(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
+    // Side-by-side spec §13 (S14, ruling R57): the route decision is one function (questionLanguageSiteRoute, boot.ts),
+    // which main.ts calls with its guarded fetch and the env's gate part, and check-version with parts that cannot send.
+    const siteRoute = balancedCallLines(main, "questionLanguageSiteRoute({");
+    expect(siteRoute).toContain("previewGate,");
+    expect(siteRoute).toContain("previewFetch,");
+    expect(siteRoute).toContain("readCredential: () => supportAnthropicMessagesKey(supportModelTarget, readSupportCredentialOnce),");
+    expect(countOf(main, "questionLanguageRouteFor(")).toBe(0);
+    const boot = await readFile(new URL("../../apps/api/src/question-language/boot.ts", import.meta.url), "utf8");
+    const decision = boot.slice(boot.indexOf("export async function questionLanguageSiteRoute("), boot.indexOf("export async function composeQuestionLanguage("));
+    expect(countOf(decision, QL_HOSTED_ROUTE)).toBe(1);
+    const route = balancedCallLines(decision, "questionLanguageRouteFor({");
+    expect(route).toContain("previewFetch,");
+    expect(route).toContain(QL_PREVIEW_SOCKET);
+    expect(route).toContain("previewConfigured: previewGate !== undefined,");
+    // CR-5: one key for every API process of this deployment, derived from the blind-index key.
+    expect(countOf(main, "referenceKey: questionLanguageReferenceKeyFrom(blindIndexKey)")).toBe(1);
+    expect(countOf(main, QL_SPREAD)).toBe(0);
+    expect(countOf(main, "composeQuestionLanguage(")).toBe(0);
+  });
+
+  it("tools/preview-practice/practice-ask-composition.ts: no hosted route on a preview, the guarded fetch and socket, no composition of its own", async () => {
     const practice = await readFile(new URL("../../tools/preview-practice/practice-ask-composition.ts", import.meta.url), "utf8");
-    expect(countOf(practice, PRACTICE_GUARD)).toBe(1);
-    expect(practice.indexOf(PRACTICE_GUARD)).toBeGreaterThan(practice.indexOf("const debateShapeInForcePolicy ="));
-    const route = callLines(practice, "questionLanguageRouteFor({");
+    const route = balancedCallLines(practice, "questionLanguageRouteFor({");
     expect(route).toContain("previewFetch,");
     expect(route).toContain(PRACTICE_SOCKET);
     expect(route).toContain(PRACTICE_HOSTED_REFUSAL);
-    expect(countOf(practice, QL_SPREAD)).toBe(1);
-    expect(countOf(practice, "composeQuestionLanguage(")).toBe(1);
+    expect(countOf(practice, "referenceKey: newQuestionLanguageReferenceKey(),")).toBe(1);
+    expect(countOf(practice, QL_SPREAD)).toBe(0);
+    expect(countOf(practice, "composeQuestionLanguage(")).toBe(0);
   });
 });

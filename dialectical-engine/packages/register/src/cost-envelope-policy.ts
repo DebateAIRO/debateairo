@@ -158,6 +158,12 @@ const costEnvelopePolicyValueSchema = z.object({
   }
 });
 
+/**
+ * Side-by-side spec §13: the row's member names, so the settings classification's member map
+ * (`settings-classification.ts`) is proved complete against the schema without exporting the schema.
+ */
+export const COST_ENVELOPE_POLICY_MEMBERS: readonly string[] = Object.freeze(Object.keys(costEnvelopePolicyValueSchema.shape));
+
 export type CostEnvelopePolicyValue = z.infer<typeof costEnvelopePolicyValueSchema>;
 
 export type CostEnvelopePolicy = Readonly<{

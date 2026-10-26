@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Em resumo
-eyebrow: TERMOS DE SERVIÇO · v2.4 · EM VIGOR DESDE 12 DE OUTUBRO DE 2026
+eyebrow: TERMOS DE SERVIÇO · v2.5 · EM VIGOR DESDE 12 DE OUTUBRO DE 2026
 title: Aquilo com que concorda
 lede: O contrato entre si e a DMS Merchandise Shop S.R.L., em linguagem clara. Dezanove secções e o Anexo A — desloque-se até ao fim.
-endMarker: FIM DOS TERMOS · v2.4
+endMarker: FIM DOS TERMOS · v2.5
 bodyLabel: Texto dos Termos de Serviço
 annexTitle: Anexo A — Termos regionais
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEI APLICÁVEL
 -->
 
-**Version 2.4 · Effective 12 de outubro de 2026 · Versões anteriores em dezbatere.ro/terms/versions · Idioma: português.**
+**Version 2.5 · Effective 12 de outubro de 2026 · Versões anteriores em dezbatere.ro/terms/versions · Idioma: português.**
 
 **In short.** Tem de ter pelo menos 18 anos. A Dialectical Engine constrói argumentos com modelos de IA e tudo o que gera pode estar errado — não constitui aconselhamento. Os seus debates são privados, a menos que os publique; se os publicar, qualquer pessoa poderá lê-los. O texto que envia é transmitido aos fornecedores de IA indicados no nosso Registo de Fornecedores e não é utilizado para treinar modelos. Denuncie conteúdos ilegais através de support@dezbatere.ro, tenha ou não uma conta. É aplicável a lei romena, mas as proteções locais de que beneficia enquanto consumidor mantêm-se.
 
@@ -213,7 +213,11 @@ A Dialectical Engine oferece um plano gratuito. Estará disponível um plano **P
 
 **Pagamentos falhados.** Se um pagamento falhar, repetiremos a tentativa durante 7 dias e avisá-lo-emos por correio eletrónico antes de convertermos a sua conta para o plano gratuito. Não eliminaremos os seus debates devido a uma falha de pagamento.
 
-**Impostos e entidade a quem paga.** Os preços incluem IVA, GST ou imposto sobre vendas, conforme o local onde reside, sendo essa informação apresentada antes do pagamento. Os pagamentos com cartão são processados pela NETOPIA Payments (netopia-payments.com). A vendedora é a DMS Merchandise Shop S.R.L., que emite a sua fatura e continua responsável pelo serviço em si e por estes Termos.
+**Impostos e entidade a quem paga.** Os preços incluem IVA, GST ou imposto sobre vendas, conforme o local onde reside, sendo essa informação apresentada antes do pagamento. A vendedora é a DMS Merchandise Shop S.R.L., que emite a sua fatura e continua responsável pelo serviço em si e por estes Termos.
+
+**Meios de pagamento.** O pagamento é feito com cartão. Aceitamos Visa e Mastercard; não aceitamos American Express. Os pagamentos com cartão são processados pela NETOPIA Payments (netopia-payments.com), e o número completo do seu cartão nunca chega até nós.
+
+**Entrega.** A Dialectical Engine é um serviço online, pelo que nada lhe é enviado. As funcionalidades do seu plano pago ficam disponíveis na sua conta assim que o pagamento é confirmado.
 
 **Estornos.** Se contestar uma cobrança junto do emissor do seu cartão, podemos suspender as funcionalidades pagas enquanto o litígio estiver a ser resolvido. Não cobramos taxas por esse motivo.
 
@@ -235,7 +239,7 @@ Informá-lo-emos previamente, num suporte duradouro, sobre o que será alterado 
 
 **A estes Termos.** Podemos alterar estes Termos pelos mesmos tipos de motivos. No caso de alterações que não reduzam os seus direitos, publicamos a nova versão com um resumo das alterações e enviamos-lhe uma mensagem de correio eletrónico pelo menos **30 dias** antes de produzir efeitos; a utilização continuada da Dialectical Engine depois dessa data significa que a aceita; pode encerrar a sua conta antes dessa data. No caso de alterações que reduzam os seus direitos — incluindo aumentos de preço de um plano existente, redução de limites, remoção de funcionalidades, novas utilizações do seu conteúdo ou alterações relativas à responsabilidade, à lei aplicável ou à resolução de litígios — pedimos-lhe que aceite expressamente a nova versão quando voltar a iniciar sessão, e a alteração só se aplica daí em diante. Nunca aplicamos uma alteração retroativamente e nunca utilizamos esta secção para alterar, durante o respetivo prazo, o essencial daquilo por que pagou sem lhe oferecer uma forma de sair. As versões anteriores permanecem disponíveis em dezbatere.ro/terms/versions.
 
-A versão 2.4 substituiu a versão 2.3: acrescenta a verificação de perguntas, que lê cada pergunta antes de um debate começar, recusa algumas e conserva, para a nossa equipa a ler, cada pergunta recusada que ameaça, planeia ou pergunta se ou como prejudicar outra pessoa ou outras pessoas, identificadas ou não, incluindo um ataque a pessoas não identificadas, ou que pergunta como fabricar armas, explosivos, venenos ou drogas ou como apoiar um ato terrorista, ou que faz a sua apologia (secções 7, 8, 10 e 11); a verificação que lê a síntese de cada debate terminado, a aprovação de que um debate sinalizado precisa antes de poder ser publicado e os debates que essa verificação elimina (secções 5, 8, 9, 10 e 11); o que o chat de apoio envia ao modelo Claude da Anthropic, que não conserva nada do que escreve e não abre nenhum caso, e que o seu botão «Falar com uma pessoa» mostra o nosso endereço de apoio (secções 8 e 10); e regras da secção 7 que proíbem o discurso de ódio de qualquer tipo, as instruções para o fabrico de armas ou drogas, o conteúdo que incentive ao suicídio ou a prejudicar outras pessoas e o insulto religioso, e indicam quais as perguntas que não fazem começar um debate.
+A versão 2.5 substituiu a versão 2.4: acrescenta a verificação de perguntas, que lê cada pergunta antes de um debate começar, recusa algumas e conserva, para a nossa equipa a ler, cada pergunta recusada que ameaça, planeia ou pergunta se ou como prejudicar outra pessoa ou outras pessoas, identificadas ou não, incluindo um ataque a pessoas não identificadas, ou que pergunta como fabricar armas, explosivos, venenos ou drogas ou como apoiar um ato terrorista, ou que faz a sua apologia (secções 7, 8, 10 e 11); a verificação que lê a síntese de cada debate terminado, a aprovação de que um debate sinalizado precisa antes de poder ser publicado e os debates que essa verificação elimina (secções 5, 8, 9, 10 e 11); o que o chat de apoio envia ao modelo Claude da Anthropic, que não conserva nada do que escreve e não abre nenhum caso, e que o seu botão «Falar com uma pessoa» mostra o nosso endereço de apoio (secções 8 e 10); e regras da secção 7 que proíbem o discurso de ódio de qualquer tipo, as instruções para o fabrico de armas ou drogas, o conteúdo que incentive ao suicídio ou a prejudicar outras pessoas e o insulto religioso, e indicam quais as perguntas que não fazem começar um debate.
 
 ## 15. Responsabilidade
 

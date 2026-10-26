@@ -8,7 +8,8 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { checkThinkingLevels, checkThinkingLevelsCommand } from "../../tools/preview-practice/check-thinking-levels.js";
+import { parsePreviewLineUp } from "@debateai/providers";
+import { checkThinkingLevels, checkThinkingLevelsCommand, printLineUp } from "../../tools/preview-practice/check-thinking-levels.js";
 
 const GLM = "zai-org/GLM-5.3-Flash";
 const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
@@ -56,9 +57,9 @@ describe("check-thinking-levels: the offline table check (spec 2026-10-12 §4.2)
 
   it("an off-menu level: the parser's exact detail, exit 1", () => {
     const result = checkThinkingLevels(line({ ...BASE, thinking_levels: { [GLM]: { level: "medium" } } }));
-    expect(result).toEqual({ exitCode: 1, lines: [`PREVIEW_THINKING_LEVELS_INVALID:level ${GLM}`] });
+    expect(result).toEqual({ exitCode: 1, lines: [`PREVIEW_THINKING_LEVELS_INVALID:level:${GLM}`] });
     expect(checkThinkingLevels(line({ ...BASE, thinking_levels: { [GLM]: { steps: { closing: "low" } } } })).lines)
-      .toEqual([`PREVIEW_THINKING_LEVELS_INVALID:step ${GLM} closing`]);
+      .toEqual([`PREVIEW_THINKING_LEVELS_INVALID:step:${GLM}:closing`]);
   });
 
   it("malformed JSON, or a config the parser refuses: the config code, exit 1", () => {
@@ -81,14 +82,44 @@ describe("check-thinking-levels: the offline table check (spec 2026-10-12 §4.2)
     expect(other.lines.join("\n")).not.toContain("JUDGEMENT_PRODUCER");
   });
 
-  it("a bare long token typed as a table key or step: named in the detail only blanked", () => {
+  // Final fix wave S14 (the common rule, aligned with the native operator): a detail is printed whole only when every part
+  // is a plain id (letters, digits, `_ . / -`, at most 64) and none is key-shaped (24+ letters and digits in a row, a `//`,
+  // a vendor `sk-` prefix); else the bare code, and nothing of the detail.
+  it("a bare long token typed as a table key or step: only the bare code, nothing of the detail", () => {
     const token = "q7".repeat(20); // a 40-character run, built at run time so the secret scanner sees no literal
     for (const table of [{ [token]: { level: "low" } }, { [GLM]: { steps: { [token]: "low" } } }]) {
       const result = checkThinkingLevels(line({ ...BASE, thinking_levels: table }));
-      expect(result.exitCode).toBe(1);
-      expect(result.lines.join("\n")).toContain("[REDACTED:long-run]");
+      expect(result).toEqual({ exitCode: 1, lines: ["PREVIEW_THINKING_LEVELS_INVALID"] });
       expect(result.lines.join("\n")).not.toContain(token);
     }
+  });
+
+  it("final fix wave S14: a 24-character run, a '//' or a vendor prefix in a model or step name prints only the bare code", () => {
+    const run24 = "q7".repeat(12); // under the old 32-character bar, a key shape under the common rule
+    const vendorish = ["sk", "x".repeat(6)].join("-");
+    for (const name of [run24, "unix//run/gate.sock", vendorish]) {
+      for (const table of [{ [name]: { level: "low" } }, { [GLM]: { steps: { [name]: "low" } } }]) {
+        const result = checkThinkingLevels(line({ ...BASE, thinking_levels: table }));
+        expect(result, name).toEqual({ exitCode: 1, lines: ["PREVIEW_THINKING_LEVELS_INVALID"] });
+      }
+    }
+    // Control: a 23-character name the parser refuses is still named (the operator sees what to fix).
+    const run23 = run24.slice(1);
+    expect(checkThinkingLevels(line({ ...BASE, thinking_levels: { [GLM]: { steps: { [run23]: "low" } } } })).lines)
+      .toEqual([`PREVIEW_THINKING_LEVELS_INVALID:step:${GLM}:${run23}`]);
+  });
+
+  // Addition D14 (owner 2026-10-22): the setting may carry only the gate part; the line-up and its table then live in the
+  // settings version (previewLineUpPolicy), so there is no table here to check.
+  it("a sockets-only value: OK, and it says the line-up lives in the settings version, exit 0", () => {
+    const { free_model_ids: _free, premium_model_ids: _premium, ...gate } = BASE;
+    const expected = { exitCode: 0, lines: ["OK", "No line-up in this setting: it lives in the settings version (previewLineUpPolicy)."] };
+    expect(checkThinkingLevels(line(gate))).toEqual(expected);
+    const { anthropic_budget_socket: _anthropic, ...deepinfraOnly } = gate;
+    expect(checkThinkingLevels(`${JSON.stringify(deepinfraOnly)}\n`)).toEqual(expected);
+    // A table with no line-up to apply it to is the parser's refusal, as at boot.
+    expect(checkThinkingLevels(line({ ...gate, thinking_levels: { [GLM]: { level: "low" } } })))
+      .toEqual({ exitCode: 1, lines: ["PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID"] });
   });
 
   it("refuses no value, or two values", () => {
@@ -118,5 +149,60 @@ describe("check-thinking-levels: the command", () => {
     expect(checkThinkingLevelsCommand([], { readStdin: stdinNever, stdinIsTTY: true }).exitCode).toBe(2);
     expect(checkThinkingLevelsCommand(["--settings", join(folder, "missing.env")], { readStdin: stdinNever, stdinIsTTY: true }))
       .toEqual({ exitCode: 2, lines: ["CHECK_REFUSED: the settings file cannot be read"] });
+  });
+});
+
+/**
+ * Side-by-side spec §13, addition D23 (owner 2026-10-22): `--print-line-up` prints, from an old-form value (the one the
+ * preview runs with today), the plan member the kit takes (`{"lineUp":{…}}`), so the first settings version is planned with
+ * exactly today's line-up and the line-up does not change on the day the env moves to the sockets-only form.
+ */
+describe("check-thinking-levels --print-line-up: the plan member from today's value (addition D23)", () => {
+  /** The owner's live table (final, 2026-10-13), pasted verbatim as SA1's and SA2's tests carry it. */
+  const OWNER_LIVE_TABLE = JSON.parse(`{"zai-org/GLM-5.3-Flash":{"level":"high"},"deepseek-ai/DeepSeek-V4.1-Flash":{"level":"none"},"Qwen/Qwen3.8-Flash":{"level":"medium"},"XiaomiMiMo/MiMo-V2.6-Pro":{"level":"default","steps":{"pros_cons":"none","cross_exchange":"none"}},"claude-haiku-5-5":{"level":"medium","steps":{"judge_panel":"high","reviewer":"high","answer_checker":"high","story_checker":"high","answer_writer":"high","story_writer":"high","slip_fix":"medium"}}}`) as Record<string, unknown>;
+  const OWNER_VALUE = { ...BASE, thinking_levels: OWNER_LIVE_TABLE };
+  const MEMBER = JSON.stringify({ lineUp: { free_model_ids: [GLM, DEEPSEEK], premium_model_ids: [GLM, DEEPSEEK, MIMO, QWEN, HAIKU], thinking_levels: OWNER_LIVE_TABLE } });
+
+  it("the owner's value: exactly the plan member on one line, exit 0, and the kit's parser takes it unchanged", () => {
+    const result = printLineUp([line(OWNER_VALUE), "JUDGEMENT_PRODUCER=p"].join("\n"));
+    expect(result).toEqual({ exitCode: 0, lines: [MEMBER] });
+    expect(parsePreviewLineUp(JSON.parse(result.lines[0]!).lineUp)).toEqual(JSON.parse(MEMBER).lineUp);
+    // No table: the member says null (every AI at its default); the legacy five keys: GLM alone on both rosters.
+    expect(printLineUp(line(BASE)).lines).toEqual([JSON.stringify({ lineUp: { free_model_ids: BASE.free_model_ids, premium_model_ids: BASE.premium_model_ids, thinking_levels: null } })]);
+    const { anthropic_budget_socket: _a, premium_model_ids: _p, ...legacy } = { ...BASE, free_model_ids: [GLM] };
+    expect(printLineUp(line(legacy))).toEqual({ exitCode: 0, lines: [JSON.stringify({ lineUp: { free_model_ids: [GLM], premium_model_ids: [GLM], thinking_levels: null } })] });
+  });
+
+  it("a sockets-only value: the SA3 sentence, exit 0, and no plan member", () => {
+    const { free_model_ids: _free, premium_model_ids: _premium, ...gate } = BASE;
+    expect(printLineUp(line(gate))).toEqual({ exitCode: 0, lines: ["No line-up in this setting: it lives in the settings version (previewLineUpPolicy)."] });
+  });
+
+  it("a refused or key-shaped value: the check's own lines and exit codes, nothing printed of it", () => {
+    expect(printLineUp(line({ ...BASE, thinking_levels: { [GLM]: { level: "medium" } } }))).toEqual({ exitCode: 1, lines: [`PREVIEW_THINKING_LEVELS_INVALID:level:${GLM}`] });
+    expect(printLineUp("PREVIEW_PROVIDER_TEST_CONFIG_JSON={not json")).toEqual({ exitCode: 1, lines: ["PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID"] });
+    const vendorKey = ["sk", "ant", "x".repeat(6) + "Q9".repeat(12)].join("-");
+    expect(printLineUp(line({ ...BASE, thinking_levels: { [vendorKey]: { level: "low" } } })).exitCode).toBe(2);
+    expect(printLineUp("NODE_ENV=production").exitCode).toBe(2);
+  });
+
+  it("the command: --print-line-up with --settings <file> (either order) or stdin; anything else is the usage line", () => {
+    const folder = mkdtempSync(join(tmpdir(), "line-up-print-"));
+    try {
+      const file = join(folder, "settings.env");
+      writeFileSync(file, `${line(OWNER_VALUE)}\n`);
+      const stdinNever = () => { throw new Error("stdin read"); };
+      const tty = { readStdin: stdinNever, stdinIsTTY: true };
+      expect(checkThinkingLevelsCommand(["--print-line-up", "--settings", file], tty)).toEqual({ exitCode: 0, lines: [MEMBER] });
+      expect(checkThinkingLevelsCommand(["--settings", file, "--print-line-up"], tty)).toEqual({ exitCode: 0, lines: [MEMBER] });
+      expect(checkThinkingLevelsCommand(["--print-line-up"], { readStdin: () => line(OWNER_VALUE), stdinIsTTY: false })).toEqual({ exitCode: 0, lines: [MEMBER] });
+      for (const argv of [["--print-line-up"], ["--print-line-up", "--print-line-up"], ["--print-line-up", "--settings"], ["--print-line-up", file]]) {
+        const usage = checkThinkingLevelsCommand(argv, tty);
+        expect(usage.exitCode).toBe(2);
+        expect(usage.lines[0]).toMatch(/^CHECK_REFUSED: usage: /u);
+      }
+      // Without the flag the check is unchanged.
+      expect(checkThinkingLevelsCommand(["--settings", file], tty).lines[0]).toBe("OK");
+    } finally { rmSync(folder, { recursive: true, force: true }); }
   });
 });

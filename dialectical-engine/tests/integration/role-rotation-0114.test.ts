@@ -214,10 +214,13 @@ describe("0114: a forward step, applied once", () => {
     // data-export S01 (V-41): the export's 0115 is recorded after 0114, the mail-locale step's 0116 after 0115 (S01-C05),
     // the debate shape's map 0117 after 0116, the language check's site cost 0118 after 0117, the reclaim resume
     // 0119 after 0118, then the reply measures (0120, spec 2026-10-15), then the engine verdict (0121, spec 2026-10-15
-    // engine redesign R2), then the engine's map answer step (0122, engine redesign R3), then the synthesis check (0125).
-    expect(steps.slice(-14)).toEqual(["0113_billing_price_currencies.sql", STEP, "0115_data_export.sql", "0116_mail_locale.sql",
+    // engine redesign R2), then the engine's map answer step (0122, spec 2026-10-15 engine redesign R3), then the
+    // side-by-side releases (0123, spec 2026-10-21 side-by-side uploads), then the settings activation (0124)
+    // (side-by-side spec §13), then synthesis-flag's 0125-0128.
+    expect(steps.slice(-16)).toEqual(["0113_billing_price_currencies.sql", STEP, "0115_data_export.sql", "0116_mail_locale.sql",
       "0117_debate_shape_map.sql", "0118_language_check_spend.sql", "0119_reclaim_resume.sql", "0120_reply_measures.sql",
-      "0121_engine_verdict.sql", "0122_engine_map_check.sql", "0125_synthesis_check.sql", "0126_publication_review.sql", "0127_threat_reports.sql", "0128_support_answer_scope.sql"]);
+      "0121_engine_verdict.sql", "0122_engine_map_check.sql", "0123_side_by_side_releases.sql", "0124_settings_activation.sql",
+      "0125_synthesis_check.sql", "0126_publication_review.sql", "0127_threat_reports.sql", "0128_support_answer_scope.sql"]);
     const ledger = async () => (await db().query("SELECT name, applied_at FROM public.debateai_schema_migration ORDER BY name")).rows;
     const before = await ledger();
     expect(before.filter((row) => row.name === STEP)).toHaveLength(1);

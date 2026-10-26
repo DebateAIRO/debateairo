@@ -133,9 +133,13 @@ function buildApiCall(source: string, opener: string, closer: string): string {
 describe("A21.2 O4 · both compositions tell /new what their admission runs under", () => {
   it("the production API answers from the picker admission asks", async () => {
     const source = await readFile("apps/api/src/main.ts", "utf8");
-    expect(buildApiCall(source, "const api = buildApi({", "\n});\n")).toContain(
-      '\n  modelScorecardInForce: modelPicker.scorecard.state === "VALID",\n'
-    );
+    // Side-by-side spec §13 (S10): the picker of the ACTIVE settings version, the one the next ask is admitted on —
+    // main.ts's `admissionView` over the pointer's reader and the admission cache, by the loader's `admissionViewOf`.
+    const call = buildApiCall(source, "const api = buildApi({", "\n});\n");
+    expect(call).toContain("\n  admissionView: createAdmissionView({\n    activeSettingsVersion: () => activeSettings.current(),\n");
+    expect(call).not.toContain("modelScorecardInForce:");
+    const loader = await readFile("apps/api/src/admission-settings.ts", "utf8");
+    expect(loader).toContain('\n    modelScorecardInForce: version.modelPicker.scorecard.state === "VALID",\n');
   });
 
   it("the acceptance runtime answers from the scorecard its picker is built on", async () => {

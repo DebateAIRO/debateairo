@@ -136,11 +136,26 @@ export function openCardToken(key: Buffer, row: Pick<CardTokenRow, "tokenId" | "
   }
 }
 
+const noticeAllowedAad = (noticeId: string): RecordAad =>
+  ({ table: "billing.payment_notice", column: "allowed_ciphertext", rowId: noticeId });
+const NoticeAllowedSchema = z.record(z.string(), z.union([z.string(), z.number(), z.null()]));
+
 /** `billing.payment_notice.allowed_ciphertext`: §2.5.2's allow-list of a verified message (never the token). */
 export function sealNoticeAllowed(
   key: Buffer, noticeId: string, allowed: Readonly<Record<string, string | number | null>>
 ): { ciphertext: Buffer; keyId: string } {
-  return seal(key, { table: "billing.payment_notice", column: "allowed_ciphertext", rowId: noticeId }, allowed);
+  return seal(key, noticeAllowedAad(noticeId), allowed);
+}
+
+/**
+ * The counterpart of `sealNoticeAllowed`: a stored message's allow-list, opened for VERIFY_PAYMENT's decision from the
+ * notice (B2: NETOPIA's refusal `code`). Throws when the ciphertext does not open under this key and row, or does not
+ * hold a flat record of strings, numbers and nulls.
+ */
+export function openNoticeAllowed(
+  key: Buffer, noticeId: string, ciphertext: Buffer
+): Readonly<Record<string, string | number | null>> {
+  return Object.freeze(open(key, noticeAllowedAad(noticeId), ciphertext, NoticeAllowedSchema));
 }
 
 /** `billing.payment_notice_raw.raw_ciphertext`: the verified bytes as received (token included), kept 14 days. */
@@ -151,30 +166,30 @@ export function sealNoticeRaw(key: Buffer, noticeId: string, rawBody: Buffer): {
 const quarantineAad = (quarantineId: string, column: "raw_ciphertext" | "header_ciphertext"): RecordAad =>
   ({ table: "billing.notice_quarantine", column, rowId: quarantineId });
 
-/** §2.7.4: a message that failed verification, its bytes and its header sealed apart (14 days, never acted on). */
-export function sealQuarantined(
-  key: Buffer, quarantineId: string, rawBody: Buffer, header: string | undefined
-): Readonly<{ rawCiphertext: Buffer; headerCiphertext: Buffer | null; keyId: string }> {
-  const raw = sealRecord(key, quarantineAad(quarantineId, "raw_ciphertext"), rawBody);
+/** A NETOPIA message's bytes and its `Verification-token` header, each sealed under its own AAD. */
+type SealedMessage = Readonly<{ rawCiphertext: Buffer; headerCiphertext: Buffer | null; keyId: string }>;
+
+function sealMessage(key: Buffer, rawAad: RecordAad, headerAad: RecordAad, rawBody: Buffer, header: string | undefined): SealedMessage {
+  const raw = sealRecord(key, rawAad, rawBody);
   if (header === undefined) return Object.freeze({ rawCiphertext: raw.ciphertext, headerCiphertext: null, keyId: raw.keyId });
   const bytes = Buffer.from(header, "utf8");
   try {
-    const sealed = sealRecord(key, quarantineAad(quarantineId, "header_ciphertext"), bytes);
+    const sealed = sealRecord(key, headerAad, bytes);
     return Object.freeze({ rawCiphertext: raw.ciphertext, headerCiphertext: sealed.ciphertext, keyId: raw.keyId });
   } finally {
     bytes.fill(0);
   }
 }
 
-/** The re-check at every start (§2.7.4 step 2): the caller owns `rawBody` and wipes it when done. */
-export function openQuarantined(
-  key: Buffer, row: Pick<NoticeQuarantineRow, "quarantineId" | "rawCiphertext" | "headerCiphertext">
+/** The counterpart of `sealMessage`: the caller owns `rawBody` and wipes it when done; a refusal wipes it here. */
+function openMessage(
+  key: Buffer, rawAad: RecordAad, headerAad: RecordAad, sealed: Pick<SealedMessage, "rawCiphertext" | "headerCiphertext">
 ): Readonly<{ rawBody: Buffer; header: string | undefined }> {
-  const rawBody = openRecord(key, quarantineAad(row.quarantineId, "raw_ciphertext"), row.rawCiphertext);
-  if (row.headerCiphertext === null) return Object.freeze({ rawBody, header: undefined });
+  const rawBody = openRecord(key, rawAad, sealed.rawCiphertext);
+  if (sealed.headerCiphertext === null) return Object.freeze({ rawBody, header: undefined });
   let header: Buffer;
   try {
-    header = openRecord(key, quarantineAad(row.quarantineId, "header_ciphertext"), row.headerCiphertext);
+    header = openRecord(key, headerAad, sealed.headerCiphertext);
   } catch (error) {
     rawBody.fill(0);
     throw error;
@@ -184,6 +199,42 @@ export function openQuarantined(
   } finally {
     header.fill(0);
   }
+}
+
+/** §2.7.4: a message that failed verification, its bytes and its header sealed apart (14 days, never acted on). */
+export function sealQuarantined(
+  key: Buffer, quarantineId: string, rawBody: Buffer, header: string | undefined
+): SealedMessage {
+  return sealMessage(key, quarantineAad(quarantineId, "raw_ciphertext"), quarantineAad(quarantineId, "header_ciphertext"),
+    rawBody, header);
+}
+
+/** The re-check at every start (§2.7.4 step 2): the caller owns `rawBody` and wipes it when done. */
+export function openQuarantined(
+  key: Buffer, row: Pick<NoticeQuarantineRow, "quarantineId" | "rawCiphertext" | "headerCiphertext">
+): Readonly<{ rawBody: Buffer; header: string | undefined }> {
+  return openMessage(key, quarantineAad(row.quarantineId, "raw_ciphertext"),
+    quarantineAad(row.quarantineId, "header_ciphertext"), row);
+}
+
+/**
+ * B3a (NETOPIA answers 2026-10-21): a spool file is no table row, so its AAD names the file family under a schema no
+ * database has (`file.`), the field and the file's own spool id; a seal copied into another file, or from a database
+ * column, does not open. (@debateai/crypto admits only `schema.table` names, so `file:` reads `file.` here.)
+ */
+const spoolAad = (spoolId: string, column: "raw" | "header"): RecordAad =>
+  ({ table: "file.billing_notice_spool", column, rowId: spoolId });
+
+/** B3a: a verified message the database could not take, its bytes (token included) and its header sealed apart. */
+export function sealSpooledNotice(key: Buffer, spoolId: string, rawBody: Buffer, header: string | undefined): SealedMessage {
+  return sealMessage(key, spoolAad(spoolId, "raw"), spoolAad(spoolId, "header"), rawBody, header);
+}
+
+/** B3a's replay: the caller owns `rawBody` and wipes it when done. Throws for another key, file or a changed byte. */
+export function openSpooledNotice(
+  key: Buffer, spoolId: string, sealed: Readonly<{ rawCiphertext: Buffer; headerCiphertext: Buffer | null }>
+): Readonly<{ rawBody: Buffer; header: string | undefined }> {
+  return openMessage(key, spoolAad(spoolId, "raw"), spoolAad(spoolId, "header"), sealed);
 }
 
 export function taxLocationOf(location: QuoteLocation): TaxLocation {

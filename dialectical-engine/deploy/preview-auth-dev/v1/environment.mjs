@@ -26,23 +26,31 @@ const REVIEWED_ROSTER_FLAGS=Object.values(PREVIEW_MODEL_ROSTER_FLAGS);
 export const isReviewedModelRosterFlag=value=>typeof value==='string'&&REVIEWED_ROSTER_FLAGS.includes(value);
 const LEGACY_CONFIG_KEYS='budget_socket,deployment,free_model_ids,requested_thinking_level,scope_id';
 const ROSTER_CONFIG_KEYS='budget_socket,deployment,free_model_ids,premium_model_ids,requested_thinking_level,scope_id';
+// Addition D14 (owner 2026-10-22): the gate part alone, the line-up living in the settings version (previewLineUpPolicy).
+const SOCKETS_ONLY_CONFIG_KEYS='budget_socket,deployment,requested_thinking_level,scope_id';
 // PR B: the roster form may also name the Anthropic gate's socket (the API's parser checks its value).
 const OPTIONAL_SOCKET_KEYS=Object.freeze(['anthropic_budget_socket']);
 // Spec 2026-10-12 §4.2: the owner's thinking-level table is optional on both forms (the API's parser checks its contents).
 const OPTIONAL_TABLE_KEYS=Object.freeze(['thinking_levels']);
 /**
- * Whether the UI's public model list (NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON) offers exactly what the
- * API's preview configuration (PREVIEW_PROVIDER_TEST_CONFIG_JSON) allows: the legacy array only with the
- * legacy five-key config holding that one list; the two-list object only with the six-key config holding
- * the same free and premium lists, in the same order. A UI that offers a model the API refuses, or the
- * reverse, is a mismatch. The API config's own parser (packages/providers preview-test.ts) checks the rest.
- * The optional thinking_levels table (spec 2026-10-12 §4.2) may ride on either form and is not compared here.
+ * Whether the UI's public model list (NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON) agrees with the API's preview
+ * configuration (PREVIEW_PROVIDER_TEST_CONFIG_JSON). For the two old forms, which carry the line-up, it must offer exactly
+ * what they allow: the legacy array only with the legacy five-key config holding that one list; the two-list object only
+ * with the six-key config holding the same free and premium lists, in the same order. A UI that offers a model the API
+ * refuses, or the reverse, is a mismatch. The optional thinking_levels table (spec 2026-10-12 §4.2) may ride on either
+ * old form and is not compared here.
+ * Addition D14/D24 items 5-6 (owner 2026-10-22): the sockets-only config (the four gate keys, optionally the Anthropic
+ * socket, no rosters, no table) names no line-up; the line-up lives in the settings version (previewLineUpPolicy), so any
+ * reviewed list matches it and nothing else checks the list against the line-up: the list now only feeds the new-debate
+ * page's fallback (an older API) and the ask proxy ceiling, and the providers page reads the API. An unreviewed list
+ * never matches. The API config's own parser (packages/providers preview-test.ts) checks the rest.
  */
 export function uiRosterMatchesApiConfig(uiFlag,apiConfigJson) {
  try{
   if(!isReviewedModelRosterFlag(uiFlag)||typeof apiConfigJson!=='string')return false;
   const ui=JSON.parse(uiFlag),api=JSON.parse(apiConfigJson);
   if(!api||typeof api!=='object'||Array.isArray(api))return false;
+  if(Object.keys(api).filter(key=>!OPTIONAL_SOCKET_KEYS.includes(key)).sort().join(',')===SOCKETS_ONLY_CONFIG_KEYS)return true;
   const keys=Object.keys(api).filter(key=>!OPTIONAL_TABLE_KEYS.includes(key)).sort().join(','),same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
   if(Array.isArray(ui))return keys===LEGACY_CONFIG_KEYS&&same(api.free_model_ids,ui);
   const rosterKeys=Object.keys(api).filter(key=>!OPTIONAL_SOCKET_KEYS.includes(key)&&!OPTIONAL_TABLE_KEYS.includes(key)).sort().join(',');
@@ -63,7 +71,10 @@ export const PREVIEW_HOSTED_FIXED_VALUES=Object.freeze({
  QUADERNO_API_KEY_PATH:'/etc/debateai-v3-preview/billing/quaderno-api-key',
  SMARTBILL_CREDENTIALS_PATH:'/etc/debateai-v3-preview/billing/smartbill-credentials',
  OWNER_REPORT_EMAIL_PATH:'/etc/debateai-v3-preview/billing/owner-report-email',
- SMARTBILL_API_BASE_URL:'https://smartbill.invalid'
+ SMARTBILL_API_BASE_URL:'https://smartbill.invalid',
+ // Optional (NETOPIA's answers 2026-10-21, B3a): the API-owned 0700 folder of NETOPIA messages the database could not
+ // store; its unit's write permission is debateai-preview-api-notice-spool.conf (deploy/preview-release/v1/README.md H9).
+ BILLING_NOTICE_SPOOL_PATH:'/var/lib/debateai-v3-preview/api/billing-notice-spool'
 });
 /** NETOPIA's two sandbox bases, exactly (packages/payments-netopia/src/hosts.ts; a unit test pins the two lists equal). */
 export const PREVIEW_NETOPIA_SANDBOX_BASES=Object.freeze(['https://secure-sandbox.netopia-payments.com','https://secure.sandbox.netopia-payments.com']);
@@ -71,6 +82,7 @@ export const PREVIEW_NETOPIA_SANDBOX_BASES=Object.freeze(['https://secure-sandbo
 export const PREVIEW_QUADERNO_SANDBOX_BASE=/^https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.sandbox-quadernoapp\.com\/api$/;
 const NETOPIA_KEYS=['NETOPIA_API_BASE_URL','NETOPIA_POS_SIGNATURE','NETOPIA_API_KEY_PATH','NETOPIA_IPN_KEYS_PATH'];
 const INVOICING_KEYS=['QUADERNO_API_KEY_PATH','QUADERNO_API_BASE_URL','SMARTBILL_CREDENTIALS_PATH','SMARTBILL_API_BASE_URL','SMARTBILL_SERIES','OWNER_REPORT_EMAIL_PATH'];
+const SPOOL_KEY='BILLING_NOTICE_SPOOL_PATH';
 /**
  * Owner ruling 2026-10-13: moving the billing clock for renewal tests stays refused on the preview (the owner is still
  * deciding). A host that ever ran with it must never go live (deploy/vps/README.md §14.8).
@@ -80,7 +92,8 @@ const REFUSED_ON_PREVIEW=['BILLING_STAGE_CLOCK_OFFSET_DAYS'];
  * The hosted API's extra rules: the country files and the Turnstile relay at their fixed values (the API refuses to
  * start without them in hosted mode); NETOPIA's four settings all or none, and Quaderno's, SmartBill's and the owner's
  * six all or none and only beside NETOPIA's (none: hosted, billing off; NETOPIA alone: the provider-only mode; all
- * ten: billing on, once the register says so); and every value a sandbox form at its fixed path.
+ * ten: billing on, once the register says so); and every value a sandbox form at its fixed path. The billing notice
+ * spool is optional, only beside NETOPIA's four (it keeps NETOPIA's messages), and only at its fixed folder.
  */
 function assertHostedApiValues(configured) {
  const fixed=PREVIEW_HOSTED_FIXED_VALUES;
@@ -93,9 +106,10 @@ function assertHostedApiValues(configured) {
   ||configured.NETOPIA_API_KEY_PATH!==fixed.NETOPIA_API_KEY_PATH||configured.NETOPIA_IPN_KEYS_PATH!==fixed.NETOPIA_IPN_KEYS_PATH))refuse();
  if(invoicing>0&&(!PREVIEW_QUADERNO_SANDBOX_BASE.test(configured.QUADERNO_API_BASE_URL)||configured.SMARTBILL_API_BASE_URL!==fixed.SMARTBILL_API_BASE_URL
   ||['QUADERNO_API_KEY_PATH','SMARTBILL_CREDENTIALS_PATH','OWNER_REPORT_EMAIL_PATH'].some(key=>configured[key]!==fixed[key])))refuse();
+ if(configured[SPOOL_KEY]!==undefined&&(netopia===0||configured[SPOOL_KEY]!==fixed[SPOOL_KEY]))refuse();
 }
 /** No billing setting in local mode: billing exists only in hosted mode (apps/api/src/billing/connectors.ts billingModeOf). */
-const BILLING_ONLY_KEYS=[...NETOPIA_KEYS,...INVOICING_KEYS];
+const BILLING_ONLY_KEYS=[...NETOPIA_KEYS,...INVOICING_KEYS,SPOOL_KEY];
 /** What the hosted API's fetch does: https through the loopback egress proxy, loopback itself direct. */
 export const PREVIEW_HOSTED_PROXY_ENVIRONMENT=Object.freeze({HTTPS_PROXY:PREVIEW_EGRESS_PROXY_URL,NO_PROXY:'localhost,127.0.0.1,[::1]'});
 /**
@@ -109,7 +123,39 @@ export function installHostedEgress(deploymentMode,setProxy=setGlobalProxyFromEn
  if(deploymentMode!=='hosted')refuse('PREVIEW_ENVIRONMENT_REFUSED');
  return setProxy({...PREVIEW_HOSTED_PROXY_ENVIRONMENT});
 }
-const UI=['NODE_ENV','PUBLIC_APP_URL','PORT','DIALECTICAL_UI_HOST','DIALECTICAL_API_BASE','DIALECTICAL_UI_TRUSTED_PROXIES','DIALECTICAL_UI_EDGE_SECRET_PATH','NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON','TURNSTILE_SITE_KEY'];
+/** A release key (side-by-side INTERFACE): `r<site version>-<12 hex of the code revision>`. Root's release-table.mjs keeps the same text; a test pins the two equal. */
+export const RELEASE_KEY_PATTERN=/^r[1-9][0-9]*-[0-9a-f]{12}$/;
+/** The one release key a reviewed plan may run under: its register version and the first 12 hex of its source revision (side-by-side INTERFACE). */
+export function expectedReleaseKey(publication,sourceRevision) {
+ return `r${publication.registerVersion}-${sourceRevision.slice(0,12)}`;
+}
+/** The payment marks the website knows (apps/ui/lib/billing/paymentMarks.ts PAYMENT_MARK_NAMES; a unit test pins the two lists equal). */
+export const PAYMENT_MARK_NAMES=Object.freeze(['netopia','visa','mastercard']);
+/**
+ * The strict form of the website's payment marks list, for the test site's tools (release-env.mjs `same`): one to three of
+ * those names, lower-case, joined by single commas, no spaces, each at most once. The website itself is lenient and ignores
+ * unknown names, so narrowEnvironment never checks this form (a typo must never stop a website from starting).
+ */
+export function isPaymentMarksList(value) {
+ if(typeof value!=='string')return false;
+ const names=value.split(',');
+ return names.every(name=>PAYMENT_MARK_NAMES.includes(name))&&new Set(names).size===names.length;
+}
+// RELEASE_KEY: the website refuses to start without its release key (side-by-side spec §1, §7; apps/ui/release-edge.mjs).
+// PAYMENT_MARKS_AVAILABLE: the website's payment marks list (deploy/vps/README.md §14.7); a release before T+1 refuses it, so it goes only into the ui file of a release that lists it here.
+const UI=['NODE_ENV','PUBLIC_APP_URL','PORT','DIALECTICAL_UI_HOST','DIALECTICAL_API_BASE','DIALECTICAL_UI_TRUSTED_PROXIES','DIALECTICAL_UI_EDGE_SECRET_PATH','NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON','TURNSTILE_SITE_KEY','RELEASE_KEY','PAYMENT_MARKS_AVAILABLE'];
+/**
+ * Side-by-side spec §1 (O1): a preview process starts only as its plan's release. Its RELEASE_KEY must be exactly
+ * r<plan register pin>-<first 12 hex of the plan's source revision>, so an env file of another release (another
+ * revision, another register version) never starts this one's code; the parsers only check the key's form and number.
+ * A runner's worker id and Hatchet worker name end with that key (plan D, release-env.mjs), so two releases' runners
+ * never share a worker identity.
+ */
+function assertReleaseKey(service,configured,publication,approved) {
+ if(typeof approved?.sourceRevision!=='string'||!/^[0-9a-f]{40}$/.test(approved.sourceRevision)||typeof publication?.registerVersion!=='string'
+  ||!RELEASE_KEY_PATTERN.test(configured.RELEASE_KEY??'')||configured.RELEASE_KEY!==expectedReleaseKey(publication,approved.sourceRevision))refuse();
+ if(service==='runner'&&['RUNNER_WORKER_ID','HATCHET_WORKER_NAME'].some(key=>typeof configured[key]!=='string'||!configured[key].endsWith(`-${configured.RELEASE_KEY}`)))refuse();
+}
 export function parseEnvironmentText(text) {
  try{
   if(typeof text!=='string'||Buffer.byteLength(text)>32768||/[\0\r]/.test(text))refuse();const out={};
@@ -118,7 +164,10 @@ export function parseEnvironmentText(text) {
   return out;
  }catch{refuse('PREVIEW_ENVIRONMENT_REFUSED');}
 }
-/** For service ui, `runtime` is `{builtModelRosterFlag}`: the model list the website was built with (ui-build.mjs builtModelRosterFlag). */
+/**
+ * For service ui, `runtime` is `{builtModelRosterFlag}`: the model list the website was built with (ui-build.mjs builtModelRosterFlag).
+ * Every service needs the reviewed plan's publication and source revision for its release key (assertReleaseKey).
+ */
 export function narrowEnvironment(service,configured,runtime,publication,approved) {
  try{
   if(!configured||Object.getPrototypeOf(configured)!==Object.prototype)refuse();
@@ -126,6 +175,7 @@ export function narrowEnvironment(service,configured,runtime,publication,approve
   const keys=service==='ui'?UI:inventory?[...inventory.required,...inventory.optional,...(service==='api'?STAFF:[])]:[];
   if(!keys.length||Object.entries(configured).some(([key,value])=>!keys.includes(key)||typeof value!=='string'||/[\0\r\n]/.test(value)))refuse();
   if(configured.NODE_ENV!=='production')refuse();
+  assertReleaseKey(service,configured,publication,approved);
   const environment={...configured,PATH:'/usr/local/bin:/usr/bin:/bin'};
   if(service==='ui'){
    if(configured.PUBLIC_APP_URL!==PREVIEW_ORIGIN||configured.PORT!==approved.uiPort||configured.DIALECTICAL_UI_HOST!=='127.0.0.1'
@@ -136,10 +186,11 @@ export function narrowEnvironment(service,configured,runtime,publication,approve
   }
   if(REFUSED_ON_PREVIEW.some(key=>configured[key]!==undefined))refuse();
   const normalized=service==='api'?runtime.parseApiEnvironment(configured):runtime.parseRunnerEnvironment(configured);
-  // Local, or hosted (owner rulings 2026-10-13) only on the preview's own configuration (the spending gates and the team).
+  // Local, or hosted (owner rulings 2026-10-13) only on the preview's own configuration (the spending gates and the team);
+  // any of its three forms (addition D14: the gate part, PREVIEW_GATE_SETTINGS, is present for each).
   const mode=configured.DEBATEAI_DEPLOYMENT_MODE;
   if(!['local','hosted'].includes(mode)||normalized.DEPLOYMENT_MODE!==mode||String(normalized.REGISTER_VERSION)!==publication.registerVersion
-    ||(mode==='hosted'&&normalized.PREVIEW_PROVIDER_TEST_CONFIG===undefined))refuse();
+    ||(mode==='hosted'&&normalized.PREVIEW_GATE_SETTINGS===undefined))refuse();
   if(service==='api'){
    if(configured.PUBLIC_APP_URL!==PREVIEW_ORIGIN||configured.API_HOST!=='127.0.0.1'||configured.API_PORT!==approved.apiPort
     ||configured.MAIL_SENDMAIL_PATH!==approved.mailExecutable||configured.MAIL_FROM!==approved.mailFrom

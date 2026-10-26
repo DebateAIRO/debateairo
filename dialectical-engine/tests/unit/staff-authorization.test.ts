@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { StaffContext, ActionBinding } from '@debateai/kernel';
 import type { AuthenticatedSession } from '../../apps/api/src/sessions.js';
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 // The first red explicitly asserts the missing prepared guard, instead of a loader error.
 const access = await import('../../apps/api/src/staff/access.js');
 const context: StaffContext = { staffId: '11111111-1111-4111-8111-111111111111', userId: '22222222-2222-4222-8222-222222222222', ordinarySessionId: '33333333-3333-4333-8333-333333333333', privilegeSessionId: '44444444-4444-4444-8444-444444444444', designation: 'DELEGATED', securityEpoch: 0, accountSecurityEpoch: 0, grantRevision: 0, capabilities: ['TEAM_READ'] };
@@ -75,7 +76,7 @@ it('cancels the actual finite PostgreSQL event producer after its pending snapsh
             return { rows: [] };
         } };
     const realPool = { ...pool, connect: async () => ({ ...pool, release: () => { } }) };
-    const app = new PostgresAskApplication(realPool as never, {} as never, {} as never, { read: async () => { projections++; return []; } }, {} as never, { server: {} as never, legacy: {} as never });
+    const app = new PostgresAskApplication(realPool as never, {} as never, { releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never, { read: async () => { projections++; return []; } }, {} as never, { server: {} as never, legacy: {} as never });
     const controller = new AbortController(), iterator = app.events('11111111-1111-4111-8111-111111111111', base.session, { ownerRef: base.ownerRef, legacyAskerId: null }, controller.signal)[Symbol.asyncIterator]();
     const pending = iterator.next();
     await waiting;

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručně
-eyebrow: PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.4 · ÚČINNÉ OD 12. ŘÍJNA 2026
+eyebrow: PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.5 · ÚČINNÉ OD 12. ŘÍJNA 2026
 title: S čím souhlasíte
 lede: Smlouva mezi vámi a DMS Merchandise Shop S.R.L. srozumitelným jazykem. Devatenáct oddílů a příloha A — přejděte až na konec.
-endMarker: KONEC PODMÍNEK · v2.4
+endMarker: KONEC PODMÍNEK · v2.5
 bodyLabel: Text Podmínek poskytování služby
 annexTitle: Příloha A — Regionální podmínky
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ROZHODNÉ PRÁVO
 -->
 
-**Version 2.4 · Effective 12. října 2026 · Předchozí verze na dezbatere.ro/terms/versions · Jazyk: čeština.**
+**Version 2.5 · Effective 12. října 2026 · Předchozí verze na dezbatere.ro/terms/versions · Jazyk: čeština.**
 
 **In short.** Musí vám být alespoň 18 let. Dialectical Engine vytváří argumenty pomocí modelů AI a vše, co vygeneruje, může být nesprávné — nejde o poradenství. Vaše debaty jsou soukromé, dokud je nezveřejníte; pokud je zveřejníte, může je číst kdokoli. Text, který zadáte, je odesílán poskytovatelům AI uvedeným v našem Registru poskytovatelů a nepoužívá se k trénování modelů. Nezákonný obsah hlaste na support@dezbatere.ro bez ohledu na to, zda máte účet. Rozhodným právem je rumunské právo, vaše místní spotřebitelská ochrana vám však zůstává zachována.
 
@@ -213,7 +213,11 @@ Dialectical Engine nabízí bezplatný tarif. Bude k dispozici placený tarif **
 
 **Neúspěšné platby.** Pokud platba selže, budeme její provedení opakovat po dobu 7 dnů a před převedením účtu na bezplatný tarif vás upozorníme e-mailem. Kvůli neúspěšné platbě vaše debaty nemažeme.
 
-**Daně a komu platíte.** Ceny zahrnují DPH, GST nebo daň z prodeje v závislosti na místě vašeho bydliště, což se zobrazí před zaplacením. Platby kartou zpracovává NETOPIA Payments (netopia-payments.com). Prodejcem je DMS Merchandise Shop S.R.L., která vystavuje vaši fakturu a zůstává odpovědná za samotnou službu a za tyto Podmínky.
+**Daně a komu platíte.** Ceny zahrnují DPH, GST nebo daň z prodeje v závislosti na místě vašeho bydliště, což se zobrazí před zaplacením. Prodejcem je DMS Merchandise Shop S.R.L., která vystavuje vaši fakturu a zůstává odpovědná za samotnou službu a za tyto Podmínky.
+
+**Platební metody.** Platíte kartou. Přijímáme karty Visa a Mastercard; karty American Express nepřijímáme. Platby kartou zpracovává NETOPIA Payments (netopia-payments.com) a celé číslo vaší karty se k nám nikdy nedostane.
+
+**Dodání.** Dialectical Engine je online služba, takže vám nic nezasíláme. Funkce vašeho placeného tarifu jsou ve vašem účtu k dispozici, jakmile je platba potvrzena.
 
 **Reklamace platby.** Pokud platbu zpochybníte u vydavatele karty, můžeme placené funkce po dobu řešení sporu pozastavit. Neúčtujeme za to žádné poplatky.
 
@@ -235,7 +239,7 @@ O tom, co a kdy se mění, vás předem informujeme na trvalém nosiči. Má-li 
 
 **Změny těchto Podmínek.** Tyto Podmínky můžeme měnit ze stejných druhů důvodů. U změn, které neomezují vaše práva, zveřejníme novou verzi se shrnutím změn a nejméně **30 dnů** před nabytím účinku vám zašleme e-mail; pokračováním v používání Dialectical Engine po tomto datu změnu přijímáte a před tímto datem můžete svůj účet uzavřít. U změn, které omezují vaše práva — včetně zvýšení ceny stávajícího tarifu, snížení limitů, odstranění funkcí, nového způsobu použití vašeho obsahu nebo změn odpovědnosti, rozhodného práva či řešení sporů — vás při příštím přihlášení požádáme, abyste novou verzi výslovně přijali, a změna platí pouze do budoucna. Žádnou změnu nikdy neuplatníme zpětně a tento oddíl nikdy nepoužijeme ke změně podstaty toho, za co jste v průběhu období zaplatili, aniž bychom vám nabídli možnost smlouvu ukončit. Předchozí verze zůstávají dostupné na adrese dezbatere.ro/terms/versions.
 
-Verze 2.4 nahradila verzi 2.3: přidává kontrolu otázky, která čte každou otázku dříve, než debata začne, některé zamítá a každou zamítnutou otázku, která vyhrožuje ublížením jiné osobě nebo jiným osobám, jmenovaným či nikoli, včetně útoku na nejmenované osoby, plánuje takové ublížení nebo se ptá, zda a jak jiné osobě nebo jiným osobám ublížit, nebo která se ptá, jak vyrobit zbraně, výbušniny, jedy nebo drogy nebo jak podpořit teroristický čin, nebo jej oslavuje, uchovává ke čtení naším týmem (oddíly 7, 8, 10 a 11); kontrolu, která čte syntézu každé dokončené debaty, schválení, které označená debata potřebuje, než ji lze zveřejnit, a debaty, které tato kontrola maže (oddíly 5, 8, 9, 10 a 11); co chat podpory posílá modelu Claude společnosti Anthropic, že nic z toho, co do něj napíšete, neuchovává a neotevírá případ, a že jeho tlačítko „Promluvit si s člověkem“ zobrazí naši adresu podpory (oddíly 8 a 10); a pravidla v oddílu 7, která zakazují nenávistné projevy jakéhokoli druhu, návody k výrobě zbraní nebo drog, obsah podněcující k sebevraždě nebo k ubližování jiným lidem a urážku náboženství a uvádějí, které otázky nezahájí debatu.
+Verze 2.5 nahradila verzi 2.4: přidává kontrolu otázky, která čte každou otázku dříve, než debata začne, některé zamítá a každou zamítnutou otázku, která vyhrožuje ublížením jiné osobě nebo jiným osobám, jmenovaným či nikoli, včetně útoku na nejmenované osoby, plánuje takové ublížení nebo se ptá, zda a jak jiné osobě nebo jiným osobám ublížit, nebo která se ptá, jak vyrobit zbraně, výbušniny, jedy nebo drogy nebo jak podpořit teroristický čin, nebo jej oslavuje, uchovává ke čtení naším týmem (oddíly 7, 8, 10 a 11); kontrolu, která čte syntézu každé dokončené debaty, schválení, které označená debata potřebuje, než ji lze zveřejnit, a debaty, které tato kontrola maže (oddíly 5, 8, 9, 10 a 11); co chat podpory posílá modelu Claude společnosti Anthropic, že nic z toho, co do něj napíšete, neuchovává a neotevírá případ, a že jeho tlačítko „Promluvit si s člověkem“ zobrazí naši adresu podpory (oddíly 8 a 10); a pravidla v oddílu 7, která zakazují nenávistné projevy jakéhokoli druhu, návody k výrobě zbraní nebo drog, obsah podněcující k sebevraždě nebo k ubližování jiným lidem a urážku náboženství a uvádějí, které otázky nezahájí debatu.
 
 ## 15. Odpovědnost
 

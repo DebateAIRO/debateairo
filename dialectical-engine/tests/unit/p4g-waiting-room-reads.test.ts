@@ -32,12 +32,13 @@ import {
   testSessionApplication,
   testSessionHeaders
 } from "../support/httpSession.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const ROOM_READS = Object.freeze({ key: "owner" as const, limit: 2, window_ms: 60_000, capacity: 1_024 });
 
 function waitingRun(): WaitingRun {
   return Object.freeze({
-    runId: randomUUID(), waitingSince: new Date("2026-09-30T17:00:00.000Z"),
+    runId: randomUUID(), waitingSince: new Date("2026-09-30T17:00:00.000Z"), releaseKey: TEST_RELEASE_KEY,
     ownerRef: null, legacyAskerId: `legacy:${randomUUID()}`,
     planTier: "free", compositionBudgetTier: "low", depth: 1, makerCount: 2,
     waitsFor: "SITE", personRecheckAt: null, reasonAt: new Date("2026-09-30T17:00:00.000Z")
@@ -296,13 +297,20 @@ describe("P4-G ruling C7: a version that seals the band must seal the room-read 
 
   it("is asked by the API's boot in the ask-room stage, of the admission row in force, once the band is read", async () => {
     const main = await readFile("apps/api/src/main.ts", "utf8");
-    const stage = main.slice(main.indexOf("await boot.run(\"ask-room\""), main.indexOf("const askRoom = askRoomComposition?.room;"));
-    expect(stage).toMatch(
-      /assertAskRoomAdmissionSealed\(\{\s*envelope: costEnvelopeRows\.runPolicy,\s*admission: admissionPolicy\s*\}\);/u
-    );
+    // Side-by-side spec §13 (S9): the room's boot questions are asked of the site's money row before the admission
+    // loader; the room itself is built after it ("ask-room-composition").
+    // Side-by-side spec §13 (S14, ruling R57): asked inside the stage's one decision (decideAskRoomReadiness,
+    // admission-settings.ts), of the site's money row and the admission row in force.
+    const stage = main.slice(main.indexOf("await boot.run(\"ask-room\""), main.indexOf("// V-30(1): the support chat's model is configuration"));
+    expect(stage.length).toBeGreaterThan(0);
+    expect(stage).toMatch(/decideAskRoomReadiness\(\{\s*envelope: siteCostEnvelopePolicy,\s*admission: admissionPolicy,/u);
+    const loader = await readFile("apps/api/src/admission-settings.ts", "utf8");
+    const decision = loader.slice(loader.indexOf("export function decideAskRoomReadiness("), loader.indexOf("export function buildAdmissionSiteContext("));
+    expect(decision).toContain("assertAskRoomAdmissionSealed({ envelope: input.envelope, admission: input.admission });");
     // After the band's null exit, so a version without the band boots exactly as before.
-    expect(stage.indexOf("assertAskRoomAdmissionSealed(")).toBeGreaterThan(stage.indexOf("if (band === null) {"));
-    expect(stage.indexOf("assertAskRoomAdmissionSealed(")).toBeLessThan(stage.indexOf("const room = new AskRoom({"));
+    expect(decision.indexOf("assertAskRoomAdmissionSealed(")).toBeGreaterThan(decision.indexOf("if (band === null) return null;"));
+    expect(decision.indexOf("if (band === null) return null;")).toBeGreaterThan(-1);
+    expect(main.indexOf("await boot.run(\"ask-room\"")).toBeLessThan(main.indexOf("const room = new AskRoom({"));
   });
 
   it("is asked by the publish command's plan and its boot-readiness check", async () => {

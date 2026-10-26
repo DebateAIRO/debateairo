@@ -1,5 +1,8 @@
 -- 0126: private publication review records and a staff-only decision window.
 -- The migration is applied once by the forward chain. Its DDL is replay-safe.
+-- n1 (side-by-side spec §5, the database rule): it replaces earlier staff functions and revokes their grants, so it is uploaded the old way.
+-- n1: drained
+-- n1: keeps-verifier
 
 CREATE TABLE IF NOT EXISTS serve.publication_review_request (
   review_ref uuid PRIMARY KEY,

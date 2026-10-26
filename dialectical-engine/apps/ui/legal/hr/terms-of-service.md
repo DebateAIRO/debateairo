@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ukratko
-eyebrow: UVJETI KORIŠTENJA · v2.4 · NA SNAZI OD 12. LISTOPADA 2026.
+eyebrow: UVJETI KORIŠTENJA · v2.5 · NA SNAZI OD 12. LISTOPADA 2026.
 title: Na što pristajete
 lede: Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.
-endMarker: KRAJ UVJETA · v2.4
+endMarker: KRAJ UVJETA · v2.5
 bodyLabel: Tekst Uvjeta korištenja
 annexTitle: Prilog A — Regionalni uvjeti
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 MJERODAVNO PRAVO
 -->
 
-**Version 2.4 · Effective 12. listopada 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
+**Version 2.5 · Effective 12. listopada 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
 
 **In short.** Morate imati najmanje 18 godina. Dialectical Engine izrađuje argumente pomoću modela umjetne inteligencije i sve što generira može biti pogrešno — to nije savjet. Vaše su rasprave privatne osim ako ih objavite; ako ih objavite, svatko ih može pročitati. Tekst koji pošaljete prosljeđuje se pružateljima usluga umjetne inteligencije navedenima u našem Registru pružatelja i ne upotrebljava se za treniranje modela. Nezakonit sadržaj prijavite na support@dezbatere.ro, bez obzira na to imate li račun. Primjenjuje se rumunjsko pravo, ali zadržavate zaštitu potrošača prema svojem lokalnom pravu.
 
@@ -213,7 +213,11 @@ Dialectical Engine nudi besplatni plan. Bit će dostupan plaćeni plan **Premium
 
 **Neuspjela plaćanja.** Ako plaćanje ne uspije, ponovno ga pokušavamo provesti tijekom 7 dana i upozoravamo vas e-poštom prije prebacivanja vašeg računa na besplatni plan. Ne brišemo vaše rasprave zbog neuspjelog plaćanja.
 
-**Porezi i kome plaćate.** Cijene uključuju PDV, GST ili porez na promet, što ovisi o tome gdje živite i prikazuje se prije plaćanja. Plaćanja karticom obrađuje NETOPIA Payments (netopia-payments.com). Prodavatelj je DMS Merchandise Shop S.R.L., koji vam izdaje račun i ostaje odgovoran za samu uslugu i za ove Uvjete.
+**Porezi i kome plaćate.** Cijene uključuju PDV, GST ili porez na promet, što ovisi o tome gdje živite i prikazuje se prije plaćanja. Prodavatelj je DMS Merchandise Shop S.R.L., koji vam izdaje račun i ostaje odgovoran za samu uslugu i za ove Uvjete.
+
+**Načini plaćanja.** Plaćate karticom. Prihvaćamo Visa i Mastercard; ne prihvaćamo American Express. Plaćanja karticom obrađuje NETOPIA Payments (netopia-payments.com), a puni broj vaše kartice nikada ne dolazi do nas.
+
+**Isporuka.** Dialectical Engine je internetska usluga pa vam se ništa ne šalje. Značajke vašeg plaćenog plana dostupne su na vašem računu čim plaćanje bude potvrđeno.
 
 **Osporavanje kartičnih transakcija.** Ako osporite terećenje kod izdavatelja kartice, možemo suspendirati plaćene značajke dok se spor ne riješi. Za to ne naplaćujemo naknade.
 
@@ -235,7 +239,7 @@ Na trajnom mediju unaprijed vas obavještavamo što se mijenja i kada. Ako promj
 
 **Promjene ovih Uvjeta.** Ove Uvjete možemo mijenjati zbog istih vrsta razloga. Za promjene koje ne umanjuju vaša prava objavljujemo novu verziju sa sažetkom promjena i šaljemo vam e-poruku najmanje **30 dana** prije njezina stupanja na snagu; nastavak uporabe Dialectical Engine-a nakon tog datuma znači da je prihvaćate, a prije toga možete zatvoriti račun. Za promjene koje umanjuju vaša prava — uključujući povećanja cijena postojećeg plana, niža ograničenja, uklonjene značajke, nove načine uporabe vašeg sadržaja ili promjene odgovornosti, mjerodavnog prava ili rješavanja sporova — tražimo da izričito prihvatite novu verziju pri sljedećoj prijavi, a promjena se primjenjuje samo ubuduće. Promjenu nikada ne primjenjujemo retroaktivno i ovaj odjeljak nikada ne upotrebljavamo za izmjenu bitnog sadržaja onoga što ste platili usred razdoblja bez omogućavanja izlaska iz ugovora. Prethodne verzije ostaju dostupne na dezbatere.ro/terms/versions.
 
-Verzija 2.4 zamijenila je verziju 2.3: dodaje provjeru pitanja, koja čita svako pitanje prije nego što rasprava započne, neka odbija, a svako odbijeno pitanje, koje prijeti nanošenjem štete drugoj osobi ili drugim osobama, imenovanima ili ne, uključujući napad na neimenovane osobe, planira takvu štetu ili pita treba li i kako nanijeti štetu drugoj osobi ili drugim osobama, ili koje pita kako izraditi oružje, eksploziv, otrove ili droge ili kako podržati teroristički čin, ili ga veliča, čuva kako bi ga čitao naš tim (odjeljci 7., 8., 10. i 11.); provjeru koja čita sintezu svake završene rasprave, odobrenje koje označena rasprava treba prije nego što se može objaviti i rasprave koje ta provjera briše (odjeljci 5., 8., 9., 10. i 11.); što chat za podršku šalje modelu Claude tvrtke Anthropic, da ne čuva ništa od onoga što napišete i ne otvara slučaj te da njegov gumb „Razgovor s osobom” prikazuje našu adresu za podršku (odjeljci 8. i 10.); te pravila u odjeljku 7. koja zabranjuju govor mržnje bilo koje vrste, upute za izradu oružja ili droga, sadržaj koji potiče na samoubojstvo ili nanošenje štete drugim ljudima i vrijeđanje religije te navode koja pitanja ne pokreću raspravu.
+Verzija 2.5 zamijenila je verziju 2.4: dodaje provjeru pitanja, koja čita svako pitanje prije nego što rasprava započne, neka odbija, a svako odbijeno pitanje, koje prijeti nanošenjem štete drugoj osobi ili drugim osobama, imenovanima ili ne, uključujući napad na neimenovane osobe, planira takvu štetu ili pita treba li i kako nanijeti štetu drugoj osobi ili drugim osobama, ili koje pita kako izraditi oružje, eksploziv, otrove ili droge ili kako podržati teroristički čin, ili ga veliča, čuva kako bi ga čitao naš tim (odjeljci 7., 8., 10. i 11.); provjeru koja čita sintezu svake završene rasprave, odobrenje koje označena rasprava treba prije nego što se može objaviti i rasprave koje ta provjera briše (odjeljci 5., 8., 9., 10. i 11.); što chat za podršku šalje modelu Claude tvrtke Anthropic, da ne čuva ništa od onoga što napišete i ne otvara slučaj te da njegov gumb „Razgovor s osobom” prikazuje našu adresu za podršku (odjeljci 8. i 10.); te pravila u odjeljku 7. koja zabranjuju govor mržnje bilo koje vrste, upute za izradu oružja ili droga, sadržaj koji potiče na samoubojstvo ili nanošenje štete drugim ljudima i vrijeđanje religije te navode koja pitanja ne pokreću raspravu.
 
 ## 15. Odgovornost
 

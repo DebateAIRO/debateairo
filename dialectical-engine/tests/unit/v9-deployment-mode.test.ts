@@ -472,11 +472,20 @@ describe("V-28 seam: hosted refuses unless the cost envelopes are sealed (task 1
 
 describe("V-9 both shipped roots take the mode decision (task 10a)", () => {
   it("runs the mode-aware target assertion in the API and the runner", async () => {
-    for (const path of ["../../apps/api/src/main.ts", "../../apps/runner/src/main.ts"]) {
-      const source = await readFile(new URL(path, import.meta.url), "utf8");
-      expect(source).toContain("assertDeploymentProviderTargets(");
-      expect(source).toContain("environment.DEPLOYMENT_MODE");
-    }
+    // Side-by-side spec §13 (S14): the runner's is in its site reads (readRunnerSiteContext, run-settings.ts), which
+    // main.ts calls.
+    expect(await readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8"))
+      .toContain("await readRunnerSiteContext({ pool, environment, moneyInFlight })");
+    // S14 (ruling R57): the API's is its one targets decision (parseDeclaredProviderTargets, provider-discovery.ts), which
+    // main.ts calls with its environment's mode and NODE_ENV.
+    const apiMain = await readFile(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
+    expect(apiMain).toContain("parseDeclaredProviderTargets({");
+    expect(apiMain).toContain("mode: environment.DEPLOYMENT_MODE, nodeEnv: environment.NODE_ENV");
+    expect(await readFile(new URL("../../apps/api/src/provider-discovery.ts", import.meta.url), "utf8"))
+      .toContain("assertDeploymentProviderTargets(declared, { mode: input.mode, nodeEnv: input.nodeEnv });");
+    const runnerSiteReads = await readFile(new URL("../../apps/runner/src/run-settings.ts", import.meta.url), "utf8");
+    expect(runnerSiteReads).toContain("assertDeploymentProviderTargets(");
+    expect(runnerSiteReads).toContain("environment.DEPLOYMENT_MODE");
   });
 
   it("asks BOTH roots for sealed cost envelopes before either spends anything", async () => {
@@ -519,7 +528,9 @@ describe("S02 — the development stack names its deployment mode", () => {
       ready: Promise.resolve({
         kind: "DEBATEAI_RUNNER_READY",
         worker: "debateai-dev-runner",
-        registerVersion: "424242"
+        registerVersion: "424242",
+        // Side-by-side §1: the ready line names the release the runner was handed.
+        releaseKey: ["r424242", "000000000000"].join("-")
       }),
       exited,
       async terminate() {
@@ -531,6 +542,8 @@ describe("S02 — the development stack names its deployment mode", () => {
         return Object.freeze({
           PROVIDER_DISCOVERY_TARGETS_JSON: TEST_DEVELOPMENT_PROVIDER_PANEL.targetsJson,
           REGISTER_VERSION: "424242",
+          // Side-by-side §1: the dev API's derived key, which the dev runner forwards.
+          RELEASE_KEY: ["r424242", "000000000000"].join("-"),
           REGISTER_DEPLOYMENT_RECEIPT_SHA256: "a".repeat(64),
           REGISTER_DEPLOYMENT_RECEIPT_FILE: "/workspace/.local/dev-auth/deployment-register-receipt.v1.json",
           KEK_PATH: "/private/dev/kek.bin",

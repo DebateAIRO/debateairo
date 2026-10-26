@@ -157,8 +157,26 @@ const SCREEN_READER_LENS_CARD_EDITS: ReadonlyArray<readonly [string, string]> = 
   ],
   ['title="V3 exposes no node-regeneration resource.">↻ Regenerate</button>', 'title="V3 exposes no node-regeneration resource."><span aria-hidden="true">↻</span> Regenerate</button>']
 ];
+// The keyboard-only fixes (2026-10-22) are deliberate changes too, applied the same way: the
+// one-pixel scoring insights panel is inert, and the Tree canvas is a named Tab stop whose zoom
+// keys are described and whose new zoom level is announced.
+const KEYBOARD_PAGE_EDITS: ReadonlyArray<readonly [string, string]> = [
+  ['<section class="scoringInsightsPanel', '<section inert="" class="scoringInsightsPanel'],
+  [
+    '<div class="canvas scroll" data-fit-policy=',
+    '<div class="canvas scroll" tabindex="0" role="region" aria-label="Tree" aria-keyshortcuts="Plus - 0 1" aria-describedby="_R_id_" data-fit-policy='
+  ],
+  [
+    '<div class="canvasZoomCluster"',
+    '<span class="srOnly" id="_R_id_">Zoom in +, Zoom out −, Fit whole tree (overview) 0, Reset zoom to 1:1 1</span><span class="srOnly" role="status"></span><div class="canvasZoomCluster"'
+  ]
+];
 function withScreenReaderMarkup(historical: string, lensCard: boolean): string {
-  const edits = lensCard ? [...SCREEN_READER_PAGE_EDITS, ...SCREEN_READER_LENS_CARD_EDITS] : SCREEN_READER_PAGE_EDITS;
+  const edits = [
+    ...SCREEN_READER_PAGE_EDITS,
+    ...(lensCard ? SCREEN_READER_LENS_CARD_EDITS : []),
+    ...KEYBOARD_PAGE_EDITS
+  ];
   return edits.reduce((markup, [before, after]) => {
     expect(markup.split(before), `exactly one ${before.slice(0, 48)}`).toHaveLength(2);
     return markup.replace(before, after);

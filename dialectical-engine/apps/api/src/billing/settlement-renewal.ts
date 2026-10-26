@@ -4,7 +4,7 @@ import type { BillingJobQueries, BillingRepository, ChargeRow, EntitlementReposi
 import type { BillingPolicy } from "@debateai/register";
 import { enqueueEmail, type BillingMailTemplateId } from "./email-job.js";
 import { queuePaymentAlert } from "./payment-alert.js";
-import { addDays, dunningProgress } from "./renewal-rules.js";
+import { addDays, autoRetryAllowed, dunningProgress } from "./renewal-rules.js";
 import { subscriptionEvent } from "./rows.js";
 import { APPLIED, type ChargeSettlement, type SettlementResult } from "./settlement.js";
 
@@ -26,18 +26,26 @@ export type DunningAttempt = Readonly<{
   /** The charge whose attempt failed; null for a charge-less attempt (Q-1: no charge without a quote; P2-M10). */
   chargeId: string | null;
   /**
-   * Why a charge-less attempt failed: `TAX_SERVICE_UNAVAILABLE` (the tax service could not price it) or
-   * `RETRY_TOTAL_CHANGED` (W5, P2-M10: a fresh price differs from the announced total); null with a charge.
+   * Why a charge-less attempt failed: `TAX_SERVICE_UNAVAILABLE` (the tax service could not price it),
+   * `RETRY_TOTAL_CHANGED` (W5, P2-M10: a fresh price differs from the announced total) or `REFUSAL_NOT_RETRIED` (B2:
+   * the latest refusal is not retried by itself, so nothing was sent); null with a charge.
    */
   reason: string | null;
   /**
    * W10 (P2-I21): the failed charge's code (`PAYMENT_DECLINED`, `VOIDED`, `NO_TRANSACTION`, `CARD_NOT_SAVED`,
    * `AUTHENTICATION_REQUIRED`, `PAYMENT_FAILED`, `PAYMENT_EXPIRED`); null for a charge-less attempt.
-   * `AUTHENTICATION_REQUIRED` puts M5's "confirm your card" sentence in place of any bank sentence.
+   * `AUTHENTICATION_REQUIRED` puts M5's "confirm your card" sentence in place of any bank sentence (B1: only "your bank
+   * asked you to confirm this payment" when the attempt is not retried by itself).
    */
   chargeErrorCode: string | null;
   /** Whether a bank refused this attempt's charge (W10; on NETOPIA, the report's `bankDeclined`). Only then M5 says so. */
   bankDeclined: boolean;
+  /**
+   * B2 (NETOPIA answers 2026-10-21, Q15): NETOPIA's own refusal code for this attempt's charge (`"20"`, `"22"`, ...),
+   * kept on the PAST_DUE as `decline_code`; null when NETOPIA named none, and for our own failures and charge-less
+   * attempts. The FAILED charge event keeps its own code (`PAYMENT_DECLINED`, ...) unchanged.
+   */
+  declineCode: string | null;
   periodStart: Date;
   firstFailedAt: Date;
   now: Date;
@@ -49,7 +57,15 @@ export type DunningAttempt = Readonly<{
  * the first failure plus the last retry day plus 1), and M5A/M5B/M5C (whose bank sentence only a charge the bank declined
  * gets, W10, and whose "confirm your card" sentence only an AUTHENTICATION_REQUIRED one, N11); past the last retry day
  * ENDED(DUNNING), Free and M6. A charge-less attempt names its `reason` where a charged one names its `charge_id`, and
- * its M5 is deduplicated on the subscription, the period and the attempt. The settlement's `failed` (a charge) and P11a's
+ * its M5 is deduplicated on the subscription, the period and the attempt. B2 (NETOPIA answers 2026-10-21, Q15): the
+ * PAST_DUE also records whether this attempt may be retried automatically (`auto_retry`, always written,
+ * `autoRetryAllowed`) and NETOPIA's refusal code (`decline_code`, only when it named one); an ENDED row takes neither.
+ * When the attempt is not retried by itself, M5 carries `endDate`, the last retry day (the day the dunning ends unless a
+ * card is added): its wording then promises no retry and asks for a card by that day. Owner ruling 2026-10-21: an M5B
+ * or M5C whose day (`retryDate` when retried by itself, else `endDate`) has already passed when the attempt is decided
+ * is not sent (a refusal decided late, after a hold for the owner, or a pass that ran late); the next step follows on
+ * the next maintenance pass and its own email says what happened. M5A's day is never past (a first failure is dated now).
+ * The settlement's `failed` (a charge) and P11a's
  * `failUnpricedAttempt` (no charge) both write through here, so the two can never drift apart.
  */
 export async function writeDunningAttempt(
@@ -63,9 +79,11 @@ export async function writeDunningAttempt(
   const retryDay = retryDays[input.attempt - 1];
   if (retryDay !== undefined) {
     const nextRetryAt = addDays(input.firstFailedAt, retryDay);
+    const autoRetry = autoRetryAllowed({ chargeErrorCode: input.chargeErrorCode, declineCode: input.declineCode, reason: input.reason });
     await deps.repository.appendSubscriptionEvent(client, subscriptionEvent(subscription, "PAST_DUE", now, {
       ...which, attempt: input.attempt, next_retry_at: nextRetryAt.toISOString(),
-      first_failed_at: input.firstFailedAt.toISOString()
+      first_failed_at: input.firstFailedAt.toISOString(), auto_retry: autoRetry,
+      ...(input.declineCode === null ? {} : { decline_code: input.declineCode })
     }));
     if (input.attempt === 1 && subscription.periodAnchorAt !== null) {
       await deps.entitlements.append(client, {
@@ -74,14 +92,23 @@ export async function writeDunningAttempt(
         paidThrough: addDays(input.firstFailedAt, Math.max(...retryDays) + 1), monthCreditOverrideMicros: null
       });
     }
+    // B2: the same day the last attempt ends the dunning (`first failure + max(dunning_retry_days)`).
+    const lastDay = addDays(input.firstFailedAt, Math.max(...retryDays));
+    // Owner ruling 2026-10-21: a reminder naming a day already gone is not sent.
+    if (input.attempt > 1 && (autoRetry ? nextRetryAt : lastDay).getTime() <= now.getTime()) return "PAST_DUE";
     const templates: ReadonlyArray<BillingMailTemplateId> = ["M5A", "M5B", "M5C"];
+    const endDate = autoRetry ? {} : { endDate: lastDay.toISOString() };
     await enqueueEmail(deps.repository, client, {
       template: templates[Math.min(input.attempt, templates.length) - 1]!, recipient,
       dedupeRef: input.chargeId ?? `${subscription.subscriptionId}:${input.periodStart.toISOString()}:${input.attempt}`,
       params: {
         plan: subscription.planId, retryDate: nextRetryAt.toISOString(), cardPageUrl: page("/settings/card"),
         bankDeclined: String(input.chargeId !== null && input.bankDeclined),
-        ...(input.chargeId !== null && input.chargeErrorCode === "AUTHENTICATION_REQUIRED" ? { confirmCard: "true" } : {})
+        // N11: the bank asked for its check; B1 (final review): with no automatic retry, only that it asked (bankAsked),
+        // never confirmCard's "we'll try again" after "we won't try this card again".
+        ...(input.chargeId !== null && input.chargeErrorCode === "AUTHENTICATION_REQUIRED"
+          ? autoRetry ? { confirmCard: "true" } : { bankAsked: "true" } : {}),
+        ...endDate
       },
       notBefore: now
     });
@@ -242,7 +269,8 @@ export function createRenewalSettlement(deps: RenewalSettlementDeps): ChargeSett
       const bankDeclined = context.bankDeclined ?? false;
       await writeDunningAttempt(deps, client, {
         subscription, customerId: context.customerId, attempt: charge.attempt, chargeId: charge.chargeId, reason: null,
-        chargeErrorCode: context.errorCode, bankDeclined, periodStart: charge.periodStart, firstFailedAt, now
+        chargeErrorCode: context.errorCode, bankDeclined, declineCode: context.declineCode ?? null,
+        periodStart: charge.periodStart, firstFailedAt, now
       });
     }
   });

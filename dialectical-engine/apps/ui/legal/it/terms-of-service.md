@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In breve
-eyebrow: CONDIZIONI DI SERVIZIO · v2.4 · IN VIGORE DAL 12 OTTOBRE 2026
+eyebrow: CONDIZIONI DI SERVIZIO · v2.5 · IN VIGORE DAL 12 OTTOBRE 2026
 title: Ciò che accetti
 lede: Il contratto tra te e DMS Merchandise Shop S.R.L., in un linguaggio chiaro. Diciannove sezioni e Allegato A — scorri fino alla fine.
-endMarker: FINE DELLE CONDIZIONI · v2.4
+endMarker: FINE DELLE CONDIZIONI · v2.5
 bodyLabel: Testo delle Condizioni di servizio
 annexTitle: Allegato A — Condizioni regionali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEGGE APPLICABILE
 -->
 
-**Version 2.4 · Effective 12 ottobre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
+**Version 2.5 · Effective 12 ottobre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
 
 **In short.** Devi avere almeno 18 anni. Dialectical Engine costruisce argomentazioni con modelli di IA e tutto ciò che genera può essere errato — non costituisce consulenza. I tuoi dibattiti sono privati, salvo che tu non li pubblichi; se li pubblichi, chiunque può leggerli. Il testo che invii viene trasmesso ai fornitori di IA elencati nel nostro Registro dei fornitori e non viene utilizzato per addestrare i modelli. Segnala i contenuti illegali a support@dezbatere.ro, indipendentemente dal fatto che tu abbia un account. Si applica la legge rumena, ma le tutele locali dei consumatori restano impregiudicate.
 
@@ -213,7 +213,11 @@ Dialectical Engine offre un piano gratuito. Sarà disponibile un piano **Premium
 
 **Pagamenti non riusciti.** Se un pagamento non va a buon fine, riproviamo per 7 giorni e ti avvertiamo tramite email prima di riportare il tuo account al piano gratuito. Non cancelliamo i tuoi dibattiti a causa di un pagamento non riuscito.
 
-**Imposte e soggetto a cui effettui il pagamento.** I prezzi includono IVA, GST o imposta sulle vendite, a seconda del luogo in cui vivi, e ciò viene indicato prima del pagamento. I pagamenti con carta sono elaborati da NETOPIA Payments (netopia-payments.com). Il venditore è DMS Merchandise Shop S.R.L., che emette la tua fattura e resta responsabile del servizio stesso e delle presenti Condizioni.
+**Imposte e soggetto a cui effettui il pagamento.** I prezzi includono IVA, GST o imposta sulle vendite, a seconda del luogo in cui vivi, e ciò viene indicato prima del pagamento. Il venditore è DMS Merchandise Shop S.R.L., che emette la tua fattura e resta responsabile del servizio stesso e delle presenti Condizioni.
+
+**Metodi di pagamento.** Paghi con carta. Accettiamo Visa e Mastercard; non accettiamo American Express. I pagamenti con carta sono elaborati da NETOPIA Payments (netopia-payments.com) e il numero completo della tua carta non arriva mai a noi.
+
+**Consegna.** Dialectical Engine è un servizio online, quindi non ti viene spedito nulla. Le funzionalità del tuo piano a pagamento sono disponibili nel tuo account non appena il pagamento è confermato.
 
 **Storni.** Se contesti un addebito presso l'emittente della tua carta, possiamo sospendere le funzionalità a pagamento mentre la controversia viene risolta. Non addebitiamo commissioni a tale titolo.
 
@@ -235,7 +239,7 @@ Ti comunichiamo anticipatamente, su un supporto durevole, cosa cambia e quando. 
 
 **Alle presenti Condizioni.** Possiamo modificare le presenti Condizioni per le medesime categorie di motivi. In caso di modifiche che non riducono i tuoi diritti, pubblichiamo la nuova versione con una sintesi delle modifiche e ti inviamo un'email almeno **30 giorni** prima della sua entrata in vigore; continuando a utilizzare Dialectical Engine dopo tale data accetti la modifica e puoi chiudere il tuo account prima di allora. In caso di modifiche che riducono i tuoi diritti — compresi aumenti di prezzo di un piano esistente, limiti inferiori, funzionalità eliminate, nuovi utilizzi dei tuoi contenuti o modifiche alla responsabilità, alla legge applicabile o alla risoluzione delle controversie — ti chiediamo di accettare espressamente la nuova versione al tuo accesso successivo e la modifica si applica soltanto per il futuro. Non apportiamo mai una modifica retroattiva e non utilizziamo mai la presente sezione per modificare, durante il relativo periodo, il nucleo di ciò per cui hai pagato senza offrirti una via d'uscita. Le versioni precedenti restano disponibili all'indirizzo dezbatere.ro/terms/versions.
 
-La versione 2.4 ha sostituito la versione 2.3: aggiunge la verifica delle domande, che legge ogni domanda prima che un dibattito inizi, ne rifiuta alcune e conserva, affinché il nostro team la legga, ogni domanda rifiutata che minaccia, pianifica o chiede se o come nuocere a un'altra persona o ad altre persone, nominate o meno, compreso un attacco a persone non nominate, oppure che chiede come fabbricare armi, esplosivi, veleni o droghe o come sostenere un atto terroristico, o che ne fa apologia (sezioni 7, 8, 10 e 11); la verifica che legge la sintesi di ogni dibattito concluso, l'approvazione di cui un dibattito contrassegnato ha bisogno prima di poter essere pubblicato e i dibattiti che tale verifica cancella (sezioni 5, 8, 9, 10 e 11); che cosa la chat di supporto invia al modello Claude di Anthropic, che non conserva nulla di ciò che scrivi e non apre alcun caso, e che il suo pulsante «Parla con una persona» mostra il nostro indirizzo di supporto (sezioni 8 e 10); e regole della sezione 7 che vietano i discorsi d'odio di qualsiasi tipo, le istruzioni per la fabbricazione di armi o droghe, i contenuti che incoraggiano al suicidio o a nuocere ad altre persone e l'offesa religiosa, e indicano quali domande non fanno iniziare un dibattito.
+La versione 2.5 ha sostituito la versione 2.4: aggiunge la verifica delle domande, che legge ogni domanda prima che un dibattito inizi, ne rifiuta alcune e conserva, affinché il nostro team la legga, ogni domanda rifiutata che minaccia, pianifica o chiede se o come nuocere a un'altra persona o ad altre persone, nominate o meno, compreso un attacco a persone non nominate, oppure che chiede come fabbricare armi, esplosivi, veleni o droghe o come sostenere un atto terroristico, o che ne fa apologia (sezioni 7, 8, 10 e 11); la verifica che legge la sintesi di ogni dibattito concluso, l'approvazione di cui un dibattito contrassegnato ha bisogno prima di poter essere pubblicato e i dibattiti che tale verifica cancella (sezioni 5, 8, 9, 10 e 11); che cosa la chat di supporto invia al modello Claude di Anthropic, che non conserva nulla di ciò che scrivi e non apre alcun caso, e che il suo pulsante «Parla con una persona» mostra il nostro indirizzo di supporto (sezioni 8 e 10); e regole della sezione 7 che vietano i discorsi d'odio di qualsiasi tipo, le istruzioni per la fabbricazione di armi o droghe, i contenuti che incoraggiano al suicidio o a nuocere ad altre persone e l'offesa religiosa, e indicano quali domande non fanno iniziare un dibattito.
 
 ## 15. Responsabilità
 

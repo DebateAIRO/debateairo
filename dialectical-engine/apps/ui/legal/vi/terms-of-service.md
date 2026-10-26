@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Tóm tắt
-eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v2.4 · CÓ HIỆU LỰC 12 THÁNG 10 NĂM 2026
+eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v2.5 · CÓ HIỆU LỰC 12 THÁNG 10 NĂM 2026
 title: Những điều bạn đồng ý
 lede: Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.
-endMarker: HẾT ĐIỀU KHOẢN · v2.4
+endMarker: HẾT ĐIỀU KHOẢN · v2.5
 bodyLabel: Nội dung Điều khoản dịch vụ
 annexTitle: Phụ lục A — Điều khoản theo khu vực
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LUẬT ĐIỀU CHỈNH
 -->
 
-**Version 2.4 · Effective 12 tháng 10 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
+**Version 2.5 · Effective 12 tháng 10 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
 
 **In short.** Bạn phải từ 18 tuổi trở lên. Dialectical Engine xây dựng các lập luận bằng mô hình AI và mọi nội dung do dịch vụ tạo ra đều có thể sai — đó không phải là lời tư vấn. Các cuộc tranh luận của bạn là riêng tư trừ khi bạn công khai chúng; nếu bạn công khai, bất kỳ ai cũng có thể đọc. Văn bản bạn gửi được chuyển đến các nhà cung cấp AI nêu trong Sổ đăng ký nhà cung cấp của chúng tôi và không được dùng để huấn luyện mô hình. Hãy báo cáo nội dung bất hợp pháp tại support@dezbatere.ro dù bạn có tài khoản hay không. Luật Romania điều chỉnh, nhưng các biện pháp bảo vệ người tiêu dùng tại nơi bạn sinh sống vẫn được bảo đảm.
 
@@ -213,7 +213,11 @@ Dialectical Engine cung cấp một gói miễn phí. Gói **Premium** trả ph�
 
 **Thanh toán không thành công.** Nếu một khoản thanh toán không thành công, chúng tôi thử lại trong 7 ngày và cảnh báo bạn qua email trước khi hạ tài khoản xuống gói miễn phí. Chúng tôi không xóa các cuộc tranh luận của bạn vì một khoản thanh toán không thành công.
 
-**Thuế và bên bạn thanh toán.** Giá đã bao gồm VAT, GST hoặc thuế bán hàng, tùy thuộc nơi bạn sống và được hiển thị trước khi thanh toán. Thanh toán bằng thẻ được xử lý bởi NETOPIA Payments (netopia-payments.com). Bên bán là DMS Merchandise Shop S.R.L., đơn vị phát hành hóa đơn cho bạn và tiếp tục chịu trách nhiệm về bản thân dịch vụ cũng như các Điều khoản này.
+**Thuế và bên bạn thanh toán.** Giá đã bao gồm VAT, GST hoặc thuế bán hàng, tùy thuộc nơi bạn sống và được hiển thị trước khi thanh toán. Bên bán là DMS Merchandise Shop S.R.L., đơn vị phát hành hóa đơn cho bạn và tiếp tục chịu trách nhiệm về bản thân dịch vụ cũng như các Điều khoản này.
+
+**Phương thức thanh toán.** Bạn thanh toán bằng thẻ. Chúng tôi chấp nhận Visa và Mastercard; chúng tôi không chấp nhận American Express. Thanh toán bằng thẻ được xử lý bởi NETOPIA Payments (netopia-payments.com), và số thẻ đầy đủ của bạn không bao giờ đến được với chúng tôi.
+
+**Giao hàng.** Dialectical Engine là một dịch vụ trực tuyến, vì vậy không có gì được gửi đến bạn. Các tính năng của gói trả phí sẽ có trong tài khoản của bạn ngay khi khoản thanh toán được xác nhận.
 
 **Yêu cầu hoàn tiền qua tổ chức phát hành thẻ.** Nếu bạn tranh chấp một khoản phí với tổ chức phát hành thẻ, chúng tôi có thể đình chỉ các tính năng trả phí trong khi tranh chấp được giải quyết. Chúng tôi không thu phí cho việc này.
 
@@ -235,7 +239,7 @@ Chúng tôi thông báo trước cho bạn trên một phương tiện bền v�
 
 **Đối với các Điều khoản này.** Chúng tôi có thể thay đổi các Điều khoản này vì các loại lý do tương tự. Đối với thay đổi không làm giảm quyền của bạn, chúng tôi đăng phiên bản mới kèm bản tóm tắt nội dung thay đổi và gửi email cho bạn ít nhất **30 ngày** trước khi phiên bản có hiệu lực; tiếp tục sử dụng Dialectical Engine sau ngày đó có nghĩa là bạn chấp nhận phiên bản mới, và bạn có thể đóng tài khoản trước ngày đó. Đối với thay đổi làm giảm quyền của bạn — bao gồm tăng giá đối với gói hiện có, hạ thấp giới hạn, loại bỏ tính năng, cách sử dụng mới đối với nội dung của bạn, hoặc thay đổi về trách nhiệm, luật điều chỉnh hay giải quyết tranh chấp — chúng tôi yêu cầu bạn chấp nhận rõ ràng phiên bản mới vào lần đăng nhập tiếp theo, và thay đổi chỉ áp dụng về sau. Chúng tôi không bao giờ áp dụng thay đổi hồi tố và không bao giờ dùng mục này để thay đổi nội dung cốt lõi mà bạn đã thanh toán giữa kỳ mà không cho bạn một lối thoát. Các phiên bản trước vẫn được cung cấp tại dezbatere.ro/terms/versions.
 
-Phiên bản 2.4 thay thế phiên bản 2.3: phiên bản này bổ sung bước kiểm tra câu hỏi, đọc từng câu hỏi trước khi một cuộc tranh luận bắt đầu, từ chối một số, và lưu giữ để nhóm của chúng tôi đọc từng câu hỏi bị từ chối đe dọa, lên kế hoạch hoặc hỏi liệu hoặc làm thế nào để làm hại một người khác hoặc những người khác, dù có nêu tên hay không, kể cả tấn công những người không nêu tên, hoặc hỏi cách chế tạo vũ khí, chất nổ, chất độc hoặc ma túy hoặc cách hỗ trợ một hành vi khủng bố, hoặc ca ngợi hành vi đó (mục 7, 8, 10 và 11); bước kiểm tra đọc phần tổng hợp của mỗi cuộc tranh luận đã kết thúc, việc phê duyệt mà một cuộc tranh luận bị gắn cờ cần có trước khi được công khai, và các cuộc tranh luận mà bước kiểm tra đó xóa (mục 5, 8, 9, 10 và 11); những gì trò chuyện hỗ trợ gửi đến mô hình Claude của Anthropic, việc nó không lưu giữ gì từ những gì bạn viết và không mở trường hợp nào, và việc nút “Trò chuyện với nhân viên hỗ trợ” của nó hiển thị địa chỉ hỗ trợ của chúng tôi (mục 8 và 10); và các quy tắc tại mục 7 cấm ngôn từ thù hận dưới mọi hình thức, hướng dẫn chế tạo vũ khí hoặc ma túy, nội dung cổ vũ tự tử hoặc làm hại người khác và xúc phạm tôn giáo, đồng thời nêu những câu hỏi nào không bắt đầu một cuộc tranh luận.
+Phiên bản 2.5 thay thế phiên bản 2.4: phiên bản này bổ sung bước kiểm tra câu hỏi, đọc từng câu hỏi trước khi một cuộc tranh luận bắt đầu, từ chối một số, và lưu giữ để nhóm của chúng tôi đọc từng câu hỏi bị từ chối đe dọa, lên kế hoạch hoặc hỏi liệu hoặc làm thế nào để làm hại một người khác hoặc những người khác, dù có nêu tên hay không, kể cả tấn công những người không nêu tên, hoặc hỏi cách chế tạo vũ khí, chất nổ, chất độc hoặc ma túy hoặc cách hỗ trợ một hành vi khủng bố, hoặc ca ngợi hành vi đó (mục 7, 8, 10 và 11); bước kiểm tra đọc phần tổng hợp của mỗi cuộc tranh luận đã kết thúc, việc phê duyệt mà một cuộc tranh luận bị gắn cờ cần có trước khi được công khai, và các cuộc tranh luận mà bước kiểm tra đó xóa (mục 5, 8, 9, 10 và 11); những gì trò chuyện hỗ trợ gửi đến mô hình Claude của Anthropic, việc nó không lưu giữ gì từ những gì bạn viết và không mở trường hợp nào, và việc nút “Trò chuyện với nhân viên hỗ trợ” của nó hiển thị địa chỉ hỗ trợ của chúng tôi (mục 8 và 10); và các quy tắc tại mục 7 cấm ngôn từ thù hận dưới mọi hình thức, hướng dẫn chế tạo vũ khí hoặc ma túy, nội dung cổ vũ tự tử hoặc làm hại người khác và xúc phạm tôn giáo, đồng thời nêu những câu hỏi nào không bắt đầu một cuộc tranh luận.
 
 ## 15. Trách nhiệm
 

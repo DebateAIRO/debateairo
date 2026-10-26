@@ -50,13 +50,14 @@ describe("0122: the map answer step's two code tables", () => {
     expect(sql).toContain("RAISE EXCEPTION 'ENGINE_MAP_CHECK_GUARD_CONTRACT_INCOMPLETE'");
   });
 
-  it("follows R2 in the chain, with its own loader", () => {
+  it("follows R2's step in the chain, with its own loader", () => {
     const manifest = JSON.parse(readFileSync(new URL("lineage/engine-map-check-forward0122.json", MIGRATIONS), "utf8")) as
       { version: string; previous: { name: string }; migration: { name: string } };
     expect(manifest.version).toBe("engine-map-check-forward0122-v1");
     expect(manifest.migration.name).toBe("0122_engine_map_check.sql");
     expect(manifest.previous.name).toBe("0121_engine_verdict.sql");
-    // 0125 follows 0122, which still follows R2 in the one chain list.
-    expect(readFileSync(new URL("../../packages/db/src/migration-forward-chain.ts", import.meta.url), "utf8")).toContain("loadForward0121,loadForward0122,loadForward0125,loadForward0126,loadForward0127,loadForward0128]");
+    // Pre-flight PF-R34.2: the loader follows R2's in the one chain list (the side-by-side releases 0123, the settings
+    // activation 0124 and synthesis-flag's 0125-0128 come after it).
+    expect(readFileSync(new URL("../../packages/db/src/migration-forward-chain.ts", import.meta.url), "utf8")).toContain("loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128]");
   });
 });

@@ -1,0 +1,20 @@
+export const NOTIFY_PATH: string;
+export const UNSIGNED_ANSWER: Readonly<{ status: number; body: Readonly<Record<string, unknown>> }>;
+export const KNOCK_TIMEOUT_MS: number;
+export const RETRY_DELAY_MS: number;
+export const REPORT_TRIES: number;
+export const REPORT_TIMEOUT_MS: number;
+export const REPORT_RETRY_MS: number;
+export type AlarmConfig = { site: string; pingUrl: string };
+export type KnockResult = Readonly<{ ok: true }> | Readonly<{ ok: false; code: string; reason: string }>;
+export type AlarmDeps = {
+  fetch: typeof globalThis.fetch;
+  sleep(ms: number): Promise<void>;
+  out(line: string): void;
+  err(line: string): void;
+  testAlarm?: boolean;
+};
+export function parseAlarmConfig(text: string): AlarmConfig;
+export function knock(site: string, fetchImpl: typeof globalThis.fetch): Promise<KnockResult>;
+export function runAlarm(config: AlarmConfig, deps: AlarmDeps): Promise<number>;
+export function main(argv: string[], environment: Record<string, string | undefined>, deps: Omit<AlarmDeps, "testAlarm">): Promise<number>;

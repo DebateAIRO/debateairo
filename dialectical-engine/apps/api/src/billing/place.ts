@@ -1,8 +1,8 @@
 import { isIP } from "node:net";
 import { decidePayment, UNKNOWN_COUNTRY, type GeoLookup, type GeoRefusalCode } from "@debateai/geo";
-import { exhaustive } from "@debateai/kernel";
+import { exhaustive, paymentRegionsOf, type PaymentRegionId } from "@debateai/kernel";
 import type { BillingCurrency } from "@debateai/contract";
-import { priceCurrencyFor, type BillingPlans, type CountryPolicy } from "@debateai/register";
+import { priceCurrencyFor, regionRule, type BillingPlans, type CountryPolicy } from "@debateai/register";
 import type { BillingAudit } from "./audit.js";
 import { BillingRefusal, type BillingRefusalCode } from "./refusal.js";
 
@@ -68,4 +68,51 @@ function paymentRefusalCode(code: GeoRefusalCode): BillingRefusalCode {
 export function placeRefusal(place: Extract<PaymentPlace, { kind: "REFUSE" }>, audit: BillingAudit): BillingRefusal {
   audit("billing.country.refused", { code: place.code, country: place.declaredCountry, ipCountry: place.ipCountry });
   return new BillingRefusal(403, paymentRefusalCode(place.code));
+}
+
+export type PaymentRegionDecision =
+  | Readonly<{ kind: "ALLOW" }>
+  | Readonly<{ kind: "REFUSE"; code: "REGION_PAYMENT_UNAVAILABLE"; region: PaymentRegionId }>
+  | Readonly<{ kind: "POSTCODE_INVALID" }>;
+
+const REGION_ALLOW: PaymentRegionDecision = Object.freeze({ kind: "ALLOW" });
+const REGION_POSTCODE_INVALID: PaymentRegionDecision = Object.freeze({ kind: "POSTCODE_INVALID" });
+
+/**
+ * Payment region blocks (spec 2026-10-20 §6, §8): may a buyer at this billing address pay? A region refuses when its
+ * rule says `pay: false` for all buyers, or for business buyers and the location has a company; `pay: true` is open,
+ * like no rule. Preflight ruling R1's order: a refusing region among the address's regions refuses, even when the
+ * postal code doesn't fit (several: the first in sorted order); else a postal code that doesn't fit is sent back
+ * for correction when `postcodeMustFit`, and only in a country the policy closes somewhere (where it could hide a
+ * closed region); else ALLOW.
+ */
+export function decidePaymentRegion(input: Readonly<{
+  policy: CountryPolicy;
+  location: Readonly<{ country: string; postalCode: string | null; region: string | null; company: unknown | null }>;
+  postcodeMustFit: boolean;
+}>): PaymentRegionDecision {
+  const { policy, location } = input;
+  const geography = paymentRegionsOf(location);
+  const refused = [...geography.regions].sort().find((region) => {
+    const rule = regionRule(policy, region);
+    return rule !== null && !rule.pay && (rule.buyers === "all" || location.company !== null);
+  });
+  if (refused !== undefined) {
+    return Object.freeze({ kind: "REFUSE", code: "REGION_PAYMENT_UNAVAILABLE", region: refused });
+  }
+  const prefix = `${location.country.trim().toUpperCase()}-`;
+  const closesInCountry = Object.entries(policy.regions).some(([region, rule]) => !rule.pay && region.startsWith(prefix));
+  return geography.kind === "POSTCODE_INVALID" && input.postcodeMustFit && closesInCountry
+    ? REGION_POSTCODE_INVALID : REGION_ALLOW;
+}
+
+/**
+ * One content-free audit line (the code, the country and the region id; never the postal code, the address or the
+ * typed region), then the 403.
+ */
+export function regionRefusal(
+  decision: Extract<PaymentRegionDecision, { kind: "REFUSE" }>, country: string, audit: BillingAudit
+): BillingRefusal {
+  audit("billing.region.refused", { code: decision.code, country, region: decision.region });
+  return new BillingRefusal(403, decision.code);
 }

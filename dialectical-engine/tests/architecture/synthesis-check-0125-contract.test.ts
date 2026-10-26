@@ -31,7 +31,8 @@ describe("0125 synthesis check database contract", () => {
   it("0125 is replay-safe in the repository's form", async () => {
     const plan = await loadMigrationPlan();
     const migrateSource = await readFile(new URL("../../packages/db/src/index.ts", import.meta.url), "utf8");
-    expect(auditMigrationReplaySafety("migrations/0125_synthesis_check.sql", await source(), { plan, migrateSource })).toEqual([]);
+    const transactionSource = await readFile(new URL("../../packages/db/src/migration-transaction.ts", import.meta.url), "utf8");
+    expect(auditMigrationReplaySafety("migrations/0125_synthesis_check.sql", await source(), { plan, migrateSource, transactionSource })).toEqual([]);
   });
 
   it("0125 creates the check tables with their named constraints and the one-final-per-synthesis partial unique index", async () => {

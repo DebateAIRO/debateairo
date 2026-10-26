@@ -51,6 +51,11 @@ export type OwnerJobsDeps = Readonly<{
   refunds?: Pick<RefundDesk, "remindOwnerRefunds">;
   /** N17 (spec §2.15.4): the daily card sweep, then both purges. Absent: none (billing off, tests). */
   custody?: Pick<CardCustody, "sweep" | "purge">;
+  /**
+   * Follow-up of B1 part 2 (NETOPIA answers 2026-10-21, Q22): the reminder of the renewals held for the owner's resume
+   * command (`remindHeldRenewals`), run by the daily tick. Absent: none (billing off, tests).
+   */
+  heldRenewals?: Readonly<{ remindOwner(now: Date): Promise<number> }>;
 }>;
 
 type DailyStep = () => Promise<number>;
@@ -83,7 +88,8 @@ export class OwnerJobs {
 
   /**
    * The daily owner job: the quarter's tax summary queued once (whatever state an earlier copy is in), then each later
-   * daily step (N14's refund reminders, N17's card custody). Each step is isolated (`runIsolated`).
+   * daily step (N14's refund reminders, the held renewals' reminder, N17's card custody). Each step is isolated
+   * (`runIsolated`).
    */
   async schedule(): Promise<number> {
     return runIsolated(this.dailySteps(this.deps.clock()));
@@ -91,10 +97,12 @@ export class OwnerJobs {
 
   private dailySteps(now: Date): ReadonlyArray<DailyStep> {
     const refunds = this.deps.refunds;
+    const heldRenewals = this.deps.heldRenewals;
     const custody = this.deps.custody;
     return [
       () => this.queueTaxSummary(now),
       ...(refunds === undefined ? [] : [() => refunds.remindOwnerRefunds(now)]),
+      ...(heldRenewals === undefined ? [] : [() => heldRenewals.remindOwner(now)]),
       ...(custody === undefined ? [] : custodySteps(custody, now))
     ];
   }

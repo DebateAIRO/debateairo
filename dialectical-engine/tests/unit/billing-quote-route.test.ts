@@ -2,10 +2,15 @@ import { describe, expect, it, vi } from "vitest";
 import { buildApi } from "@debateai/api";
 import type { AdmissionLimiter } from "../../apps/api/src/admission.js";
 import type { BillingRouteOptions } from "../../apps/api/src/billing/index.js";
-import type { QuoteResult, QuoteServicePort } from "../../apps/api/src/billing/quote.js";
+import type { BillingRepository } from "@debateai/db";
+import { QuoteService, type QuoteResult, type QuoteServicePort } from "../../apps/api/src/billing/quote.js";
 import { BillingRefusal } from "../../apps/api/src/billing/refusal.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
-import { testBillingPlans, unusedAskApplication } from "../support/billingFixtures.js";
+import {
+  StubGeo, testBillingPlans, testBillingPolicy, testClosedRegionsPolicy, unusedAskApplication
+} from "../support/billingFixtures.js";
+import { TEST_RECORDS_KEY } from "../support/billingSubscriptionFixtures.js";
+import { FakeTaxEngine } from "../support/fake-tax-engine.js";
 
 const NOW = new Date("2026-10-01T10:00:00.000Z");
 const OWNER = testHttpIdentity("billing-quote-owner");
@@ -80,7 +85,7 @@ describe("P8b POST /v1/billing/quote", () => {
   });
 
   it("answers a refusal with its status and code only", async () => {
-    for (const [status, code] of [[403, "COUNTRY_PAYMENT_UNAVAILABLE"], [422, "TAX_ID_INVALID"], [503, "TAX_SERVICE_UNAVAILABLE"], [409, "ALREADY_SUBSCRIBED"]] as const) {
+    for (const [status, code] of [[403, "COUNTRY_PAYMENT_UNAVAILABLE"], [422, "TAX_ID_INVALID"], [503, "TAX_SERVICE_UNAVAILABLE"], [409, "ALREADY_SUBSCRIBED"], [403, "REGION_PAYMENT_UNAVAILABLE"], [422, "BILLING_POSTCODE_INVALID"]] as const) {
       const api = harness({ create: async () => { throw new BillingRefusal(status, code); } });
       const response = await post(api, { plan_id: "PLUS", country: "RO" });
       expect(response.statusCode).toBe(status);
@@ -122,5 +127,63 @@ describe("N18 the quote route passes NETOPIA's cardholder fields through (spec ย
     const answer = await post(refused, { plan_id: "PLUS", phone: "0712" });
     expect([answer.statusCode, answer.json()]).toEqual([422, { error: "BILLING_PHONE_INVALID", message: "BILLING_PHONE_INVALID" }]);
     await refused.close();
+  });
+});
+
+describe("payment region blocks: the real quote behind the route (spec 2026-10-20 ยง8)", () => {
+  /** The real QuoteService under the owner's launch list of closed regions; the tax engine counts its calls. */
+  function realQuotes(country: string) {
+    const tax = new FakeTaxEngine();
+    const taxCalls = vi.fn();
+    const insertQuote = vi.fn(async () => {});
+    const repository = {
+      withTransaction: async <T>(fn: (client: never) => Promise<T>): Promise<T> => fn({} as never),
+      insertQuote, subscriptionForOwner: async () => null, ownerErasurePending: async () => false
+    } as unknown as Pick<BillingRepository, "withTransaction" | "insertQuote" | "subscriptionForOwner" | "ownerErasurePending">;
+    const geo = new StubGeo();
+    geo.country = country;
+    const quotes = new QuoteService({
+      repository, geo, countryPolicy: testClosedRegionsPolicy, policy: testBillingPolicy, plans: testBillingPlans,
+      recordsKey: TEST_RECORDS_KEY, audit: () => {},
+      tax: {
+        quote: (i) => { taxCalls("quote"); return tax.quote(i); },
+        validateTaxId: (c, id) => { taxCalls("validateTaxId"); return tax.validateTaxId(c, id); }
+      }
+    });
+    return { api: harness(quotes), taxCalls, insertQuote };
+  }
+
+  it("refuses a Saskatchewan postal code with 403 REGION_PAYMENT_UNAVAILABLE, and never asks the tax engine", async () => {
+    const { api, taxCalls } = realQuotes("CA");
+    const response = await post(api, { plan_id: "PLUS", country: "CA", postal_code: "S4P 3Y2", region: "SK" });
+    expect([response.statusCode, response.json()]).toEqual([403, { error: "REGION_PAYMENT_UNAVAILABLE", message: "REGION_PAYMENT_UNAVAILABLE" }]);
+    expect(taxCalls).not.toHaveBeenCalled();
+    await api.close();
+  });
+
+  it("refuses on the Saskatchewan postal code alone (no typed region): 403, no tax asked, no quote stored", async () => {
+    const { api, taxCalls, insertQuote } = realQuotes("CA");
+    const response = await post(api, { plan_id: "PLUS", country: "CA", postal_code: "S4P 3Y2" });
+    expect([response.statusCode, response.json()]).toEqual([403, { error: "REGION_PAYMENT_UNAVAILABLE", message: "REGION_PAYMENT_UNAVAILABLE" }]);
+    expect(taxCalls).not.toHaveBeenCalled();
+    expect(insertQuote).not.toHaveBeenCalled();
+    await api.close();
+  });
+
+  it("does not refuse the pricing page's first quote, which has no postal code and no region", async () => {
+    const { api, taxCalls } = realQuotes("CA");
+    const response = await post(api, { plan_id: "PLUS" });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ country: "CA", address_required: true });
+    expect(taxCalls).toHaveBeenCalledWith("quote");
+    await api.close();
+  });
+
+  it("sends back a US ZIP that lost its leading zero with 422 BILLING_POSTCODE_INVALID", async () => {
+    const { api, taxCalls } = realQuotes("US");
+    const response = await post(api, { plan_id: "PLUS", country: "US", postal_code: "2903" });
+    expect([response.statusCode, response.json()]).toEqual([422, { error: "BILLING_POSTCODE_INVALID", message: "BILLING_POSTCODE_INVALID" }]);
+    expect(taxCalls).not.toHaveBeenCalled();
+    await api.close();
   });
 });

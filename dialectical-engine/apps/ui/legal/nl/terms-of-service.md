@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In het kort
-eyebrow: SERVICEVOORWAARDEN · v2.4 · VAN KRACHT OP 12 OKTOBER 2026
+eyebrow: SERVICEVOORWAARDEN · v2.5 · VAN KRACHT OP 12 OKTOBER 2026
 title: Waarmee u instemt
 lede: De overeenkomst tussen u en DMS Merchandise Shop S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.
-endMarker: EINDE VAN DE VOORWAARDEN · v2.4
+endMarker: EINDE VAN DE VOORWAARDEN · v2.5
 bodyLabel: Tekst van de Servicevoorwaarden
 annexTitle: Bijlage A — Regionale voorwaarden
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TOEPASSELIJK RECHT
 -->
 
-**Version 2.4 · Effective 12 oktober 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
+**Version 2.5 · Effective 12 oktober 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
 
 **In short.** U moet 18 jaar of ouder zijn. Dialectical Engine stelt met AI-modellen argumenten op en alles wat het genereert kan onjuist zijn — het is geen advies. Uw debatten zijn privé, tenzij u ze publiceert; als u ze publiceert, kan iedereen ze lezen. Tekst die u indient, wordt verzonden naar de AI-aanbieders in ons Register van aanbieders en wordt niet gebruikt om modellen te trainen. Meld illegale inhoud via support@dezbatere.ro, ongeacht of u een account hebt. Het Roemeense recht is van toepassing, maar uw lokale consumentenbescherming blijft voor u gelden.
 
@@ -213,7 +213,11 @@ Dialectical Engine biedt een gratis abonnement. Een betaald **Premium**-abonneme
 
 **Mislukte betalingen.** Als een betaling mislukt, proberen wij deze gedurende 7 dagen opnieuw uit te voeren en waarschuwen wij u per e-mail voordat wij uw account naar het gratis abonnement terugzetten. Wij verwijderen uw debatten niet omdat een betaling is mislukt.
 
-**Belastingen en aan wie u betaalt.** Prijzen zijn inclusief BTW, GST of omzetbelasting, afhankelijk van waar u woont; dit wordt getoond voordat u betaalt. Kaartbetalingen worden verwerkt door NETOPIA Payments (netopia-payments.com). De verkoper is DMS Merchandise Shop S.R.L., die uw factuur uitreikt en verantwoordelijk blijft voor de dienst zelf en voor deze Voorwaarden.
+**Belastingen en aan wie u betaalt.** Prijzen zijn inclusief BTW, GST of omzetbelasting, afhankelijk van waar u woont; dit wordt getoond voordat u betaalt. De verkoper is DMS Merchandise Shop S.R.L., die uw factuur uitreikt en verantwoordelijk blijft voor de dienst zelf en voor deze Voorwaarden.
+
+**Betaalmethoden.** U betaalt met een kaart. Wij accepteren Visa en Mastercard; American Express accepteren wij niet. Kaartbetalingen worden verwerkt door NETOPIA Payments (netopia-payments.com), en uw volledige kaartnummer bereikt ons nooit.
+
+**Levering.** Dialectical Engine is een onlinedienst, dus er wordt niets naar u verzonden. De functies van uw betaalde abonnement zijn in uw account beschikbaar zodra uw betaling is bevestigd.
 
 **Terugboeking.** Als u een afschrijving bij uw kaartuitgever betwist, kunnen wij betaalde functies opschorten terwijl het geschil wordt opgelost. Wij brengen hiervoor geen kosten in rekening.
 
@@ -235,7 +239,7 @@ Wij vertellen u vooraf, op een duurzame gegevensdrager, wat er verandert en wann
 
 **In deze Voorwaarden.** Wij kunnen deze Voorwaarden om dezelfde soorten redenen wijzigen. Voor wijzigingen die uw rechten niet verminderen, publiceren wij de nieuwe versie met een samenvatting van wat is gewijzigd en sturen wij u ten minste **30 dagen** vóór de ingangsdatum een e-mail; als u Dialectical Engine na die datum blijft gebruiken, betekent dit dat u de wijziging aanvaardt, en u kunt uw account voordien sluiten. Voor wijzigingen die uw rechten verminderen — waaronder prijsverhogingen voor een bestaand abonnement, lagere limieten, verwijderde functies, nieuw gebruik van uw inhoud of wijzigingen in aansprakelijkheid, toepasselijk recht of geschillenbeslechting — vragen wij u bij uw volgende aanmelding uitdrukkelijk de nieuwe versie te aanvaarden en geldt de wijziging uitsluitend voor de toekomst. Wij maken een wijziging nooit met terugwerkende kracht en gebruiken dit hoofdstuk nooit om de kern van hetgeen waarvoor u hebt betaald tijdens de looptijd te wijzigen zonder u een uitweg te bieden. Eerdere versies blijven beschikbaar op dezbatere.ro/terms/versions.
 
-Versie 2.4 verving versie 2.3: zij voegt het volgende toe, namelijk de vraagcontrole, die elke vraag leest voordat een debat begint, sommige weigert en elke geweigerde vraag die dreigt met schade aan een ander persoon of andere mensen, die zulke schade plant of die vraagt of en hoe men een ander persoon of andere mensen schade kan toebrengen, al dan niet bij naam genoemd, met inbegrip van een aanval op niet bij naam genoemde mensen, of die vraagt hoe men wapens, explosieven, gif of drugs maakt of hoe men een terroristische daad kan steunen, of er een verheerlijkt bewaart zodat ons team haar kan lezen (hoofdstukken 7, 8, 10 en 11); de controle die de synthese van elk afgerond debat leest, de goedkeuring die een gemarkeerd debat nodig heeft voordat het kan worden gepubliceerd, en de debatten die die controle verwijdert (hoofdstukken 5, 8, 9, 10 en 11); wat de ondersteuningschat naar het model Claude van Anthropic stuurt, dat zij niets bewaart van wat u schrijft en geen zaak opent, en dat haar knop „Met een medewerker praten” ons ondersteuningsadres toont (hoofdstukken 8 en 10); en regels in hoofdstuk 7 die haatzaaiende uitlatingen van welke aard dan ook, instructies voor het maken van wapens of drugs, inhoud die zelfdoding of het schaden van andere mensen aanmoedigt en religieuze belediging verbieden, en zeggen welke vragen geen debat laten beginnen.
+Versie 2.5 verving versie 2.4: zij voegt het volgende toe, namelijk de vraagcontrole, die elke vraag leest voordat een debat begint, sommige weigert en elke geweigerde vraag die dreigt met schade aan een ander persoon of andere mensen, die zulke schade plant of die vraagt of en hoe men een ander persoon of andere mensen schade kan toebrengen, al dan niet bij naam genoemd, met inbegrip van een aanval op niet bij naam genoemde mensen, of die vraagt hoe men wapens, explosieven, gif of drugs maakt of hoe men een terroristische daad kan steunen, of er een verheerlijkt bewaart zodat ons team haar kan lezen (hoofdstukken 7, 8, 10 en 11); de controle die de synthese van elk afgerond debat leest, de goedkeuring die een gemarkeerd debat nodig heeft voordat het kan worden gepubliceerd, en de debatten die die controle verwijdert (hoofdstukken 5, 8, 9, 10 en 11); wat de ondersteuningschat naar het model Claude van Anthropic stuurt, dat zij niets bewaart van wat u schrijft en geen zaak opent, en dat haar knop „Met een medewerker praten” ons ondersteuningsadres toont (hoofdstukken 8 en 10); en regels in hoofdstuk 7 die haatzaaiende uitlatingen van welke aard dan ook, instructies voor het maken van wapens of drugs, inhoud die zelfdoding of het schaden van andere mensen aanmoedigt en religieuze belediging verbieden, en zeggen welke vragen geen debat laten beginnen.
 
 ## 15. Aansprakelijkheid
 

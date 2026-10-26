@@ -14,7 +14,7 @@ import {
   type PlanId
 } from "@debateai/register";
 import type { BillingAudit } from "./audit.js";
-import { decidePaymentPlace, placeRefusal } from "./place.js";
+import { decidePaymentPlace, decidePaymentRegion, placeRefusal, regionRefusal } from "./place.js";
 import { sealQuoteLocation, taxLocationOf, type QuoteLocation } from "./records.js";
 import { BillingRefusal } from "./refusal.js";
 
@@ -140,6 +140,17 @@ export class QuoteService implements QuoteServicePort {
       geo: this.deps.geo, policy: this.deps.countryPolicy, ip: input.ip, declaredCountry: input.country
     });
     if (place.kind === "REFUSE") throw this.refused(placeRefusal(place, this.deps.audit));
+    // Payment region blocks (spec 2026-10-20 §8): the pricing page's first quote has no address, so nothing to check;
+    // checkout start checks the full address again.
+    if (input.postalCode !== null || input.region !== null) {
+      const region = decidePaymentRegion({
+        policy: this.deps.countryPolicy, postcodeMustFit: true, location: {
+          country: place.declaredCountry, postalCode: input.postalCode, region: input.region, company: input.company
+        }
+      });
+      if (region.kind === "REFUSE") throw this.refused(regionRefusal(region, place.declaredCountry, this.deps.audit));
+      if (region.kind === "POSTCODE_INVALID") throw this.refused(new BillingRefusal(422, "BILLING_POSTCODE_INVALID"));
+    }
     // Spec 2026-10-05 §2.6.1: the server keeps the phone as E.164; a number it cannot read is refused, never guessed.
     const phone = input.phone === null ? null : e164Phone(input.phone);
     if (input.phone !== null && phone === null) throw this.refused(new BillingRefusal(422, "BILLING_PHONE_INVALID"));

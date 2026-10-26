@@ -8,8 +8,8 @@ import {
   providerCallGateUnsent,
   structureRepairOriginalKey,
   type PreviewGateRemaining,
+  type PreviewGateSettings,
   type PreviewProviderName,
-  type PreviewProviderTestConfig,
   type ProviderGateway,
   type StructureRepairRoute
 } from "@debateai/providers";
@@ -38,9 +38,10 @@ function unknownSubject(providerRef: string): CallSubject {
 
 /**
  * On the preview: each ref's reviewed row. The model is the row's model (two refs of one model share its slots), and
- * the row's provider is both the vendor (its runner-wide limit) and the gate its calls go through.
+ * the row's provider is both the vendor (its runner-wide limit) and the gate its calls go through. Addition D16: only the
+ * gate part of the preview configuration is read (PreviewGateSettings).
  */
-export function previewCallSubjects(config: PreviewProviderTestConfig): CallSubjectResolver {
+export function previewCallSubjects(config: PreviewGateSettings): CallSubjectResolver {
   return Object.freeze({
     subjectOf(providerRef: string): CallSubject {
       const row = previewModelRowForRef(providerRef);
@@ -198,13 +199,13 @@ export function structureRepairThroughLane(route: StructureRepairRoute | null, s
 }
 
 /** The preview gates this configuration names, each with a socket: the gate names `previewCallSubjects` reports. */
-export function previewGateNames(config: PreviewProviderTestConfig): readonly PreviewProviderName[] {
+export function previewGateNames(config: PreviewGateSettings): readonly PreviewProviderName[] {
   return Object.freeze((["deepinfra", ...Object.keys(PREVIEW_PROVIDER_SOCKET_KEYS)] as PreviewProviderName[])
     .filter((gate) => previewProviderSocket(config, gate) !== undefined));
 }
 
 /** Each preview gate's read-only `/remaining`, over the configuration's own sockets (main.ts). */
-export function previewGateRemainingReaders(config: PreviewProviderTestConfig): readonly Readonly<{
+export function previewGateRemainingReaders(config: PreviewGateSettings): readonly Readonly<{
   gate: PreviewProviderName;
   remaining: () => Promise<PreviewGateRemaining>;
 }>[] {

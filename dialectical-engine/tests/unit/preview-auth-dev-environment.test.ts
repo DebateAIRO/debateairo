@@ -1,16 +1,75 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import * as runtime from '../../packages/register/src/runtime-environment.js';
-import { validApiEnvironmentFixture } from '../support/apiEnvironmentFixture.js';
+import { fixtureReleaseKey, validApiEnvironmentFixture, validRunnerEnvironmentFixture } from '../support/apiEnvironmentFixture.js';
 const env=await import('../../deploy/'+'preview-auth-dev/v1/environment.mjs');
 const native={registerVersion:'12'};
-const approved={apiPort:'3101',uiPort:'3100',mailExecutable:'/opt/release/mail-handoff.mjs',mailFrom:'noreply@dezbatere.ro'};
-function configured():Record<string,string>{return{...validApiEnvironmentFixture(),NODE_ENV:'production',REGISTER_VERSION:'12',PUBLIC_APP_URL:'https://v3-preview.dezbatere.ro',API_PORT:'3101',API_HOST:'127.0.0.1',MAIL_SENDMAIL_PATH:approved.mailExecutable,MAIL_FROM:'noreply@dezbatere.ro'};}
+// Side-by-side spec §1: the plan's source revision starts with the fixture key's 12 hex, so fixtureReleaseKey('12') is this plan's key.
+const approved={apiPort:'3101',uiPort:'3100',mailExecutable:'/opt/release/mail-handoff.mjs',mailFrom:'noreply@dezbatere.ro',sourceRevision:'0123456789ab'.padEnd(40,'c')};
+function configured():Record<string,string>{return{...validApiEnvironmentFixture(),NODE_ENV:'production',REGISTER_VERSION:'12',RELEASE_KEY:fixtureReleaseKey('12'),PUBLIC_APP_URL:'https://v3-preview.dezbatere.ro',API_PORT:'3101',API_HOST:'127.0.0.1',MAIL_SENDMAIL_PATH:approved.mailExecutable,MAIL_FROM:'noreply@dezbatere.ro'};}
 describe('source-derived strict preview environment',()=>{
  it('retains opaque values only for current source keys and privately normalizes exact local register selection',()=>{const input=configured();const result=env.narrowEnvironment('api',input,runtime,native,approved);expect(result.environment.DATABASE_URL).toBe(input.DATABASE_URL);expect(result.selectedRegisterVersion).toBe('12');expect(result.deploymentMode).toBe('local');expect(result.environment.PATH).toBe('/usr/local/bin:/usr/bin:/bin');});
- it.each([{NODE_OPTIONS:'--require attacker'},{EXTRA:'unrecognized'},{REGISTER_VERSION:'11'},{PUBLIC_APP_URL:'https://dezbatere.ro'},{DEBATEAI_DEPLOYMENT_MODE:'hosted'},{TURNSTILE_SOCKET_PATH:'/tmp/relay.sock'},{MAIL_SENDMAIL_PATH:'/usr/sbin/sendmail'},{RECORDS_KEY_PATH:'/run/secrets/kek'}])('rejects env, domain, native version, mail or key-domain drift without emitting values',patch=>expect(()=>env.narrowEnvironment('api',{...configured(),...patch},runtime,native,approved)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/));
+ it.each([{NODE_OPTIONS:'--require attacker'},{EXTRA:'unrecognized'},{REGISTER_VERSION:'11',RELEASE_KEY:fixtureReleaseKey('11')},{PUBLIC_APP_URL:'https://dezbatere.ro'},{DEBATEAI_DEPLOYMENT_MODE:'hosted'},{TURNSTILE_SOCKET_PATH:'/tmp/relay.sock'},{MAIL_SENDMAIL_PATH:'/usr/sbin/sendmail'},{RECORDS_KEY_PATH:'/run/secrets/kek'}])('rejects env, domain, native version, mail or key-domain drift without emitting values',patch=>expect(()=>env.narrowEnvironment('api',{...configured(),...patch},runtime,native,approved)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/));
  it('admits only the exact optional public Turnstile mapping',()=>expect(env.narrowEnvironment('api',{...configured(),TURNSTILE_SOCKET_PATH:'/run/debateai-preview-turnstile/siteverify.sock'},runtime,native,approved).environment.TURNSTILE_SOCKET_PATH).toBe('/run/debateai-preview-turnstile/siteverify.sock'));
  it.each(['A=one\nA=two\n','A=$(command)\n','export A=one\n','A=one\r\n','BAD-NAME=one\n'])('refuses ambiguous executable environment syntax',text=>expect(()=>env.parseEnvironmentText(text)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/));
  it('parses exact bare values including embedded equals without expansion',()=>expect(env.parseEnvironmentText('A=one=two\nB={"fixed":true}\n')).toEqual({A:'one=two',B:'{"fixed":true}'}));
+});
+
+// Side-by-side spec §1: every preview process starts only with its own release key, r<plan register pin>-<first 12 hex of the plan's source revision>.
+describe('the release key in the narrowed environment',()=>{
+ const KEY=['r17','d50e33165a1b'].join('-');
+ const plan={...approved,sourceRevision:'d50e33165a1b'+'0'.repeat(28)},pin={...native,registerVersion:'17'};
+ const api=(key:string|undefined):Record<string,string>=>{const value:Record<string,string>={...configured(),REGISTER_VERSION:'17'};if(key!==undefined)value.RELEASE_KEY=key;else delete value.RELEASE_KEY;return value;};
+ it('admits each service only with the release key of its plan\'s revision and register version',()=>{
+  expect(env.expectedReleaseKey(pin,plan.sourceRevision)).toBe(KEY);
+  expect(env.narrowEnvironment('api',api(KEY),runtime,pin,plan).environment.RELEASE_KEY).toBe(KEY);
+  for(const bad of [['r18','d50e33165a1b'].join('-'),['r17','d50e33165a1c'].join('-'),'R17-d50e33165a1b',['r17','000000000000'].join('-'),'legacy',undefined])
+   expect(()=>env.narrowEnvironment('api',api(bad),runtime,pin,plan),String(bad)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
+ });
+ const PREVIEW=JSON.stringify({deployment:'v3-preview',free_model_ids:['zai-org/GLM-5.3-Flash'],requested_thinking_level:'high',budget_socket:'/run/debateai-v3-preview/team-budget-v2.sock',scope_id:'preview-team-v2-20261009'});
+ const runner=(patch:Record<string,string>={}):Record<string,string>=>{
+  const {VLLM_BASE_URL:_a,VLLM_MODEL:_b,VLLM_MAKER:_c,...rest}=validRunnerEnvironmentFixture();
+  return {...rest,NODE_ENV:'production',REGISTER_VERSION:'17',RELEASE_KEY:KEY,DEBATEAI_DEPLOYMENT_MODE:'local',PREVIEW_PROVIDER_TEST_CONFIG_JSON:PREVIEW,
+   RUNNER_WORKER_ID:`debateai-preview-runner-${KEY}`,HATCHET_WORKER_NAME:`debateai-preview-runner-${KEY}`,...patch};
+ };
+ it('refuses a runner whose worker id or worker name is not this release\'s',()=>{
+  const result=env.narrowEnvironment('runner',runner(),runtime,pin,plan);
+  expect(result.environment.RUNNER_WORKER_ID).toBe('debateai-preview-runner-r17-d50e33165a1b');
+  expect(result.environment.HATCHET_WORKER_NAME).toBe('debateai-preview-runner-r17-d50e33165a1b');
+  for(const key of ['RUNNER_WORKER_ID','HATCHET_WORKER_NAME'])
+   for(const other of ['debateai-preview-runner-r16-d50e33165a1b','debateai-preview-runner',`debateai-preview-runner-${KEY}-x`,`${KEY}-debateai-preview-runner`])
+    expect(()=>env.narrowEnvironment('runner',runner({[key]:other}),runtime,pin,plan),`${key}=${other}`).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
+  expect(()=>env.narrowEnvironment('runner',runner({RELEASE_KEY:['r17','d50e33165a1c'].join('-'),RUNNER_WORKER_ID:'debateai-preview-runner-r17-d50e33165a1c',HATCHET_WORKER_NAME:'debateai-preview-runner-r17-d50e33165a1c'}),runtime,pin,plan)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
+ });
+ it('admits the website only with its plan\'s release key, which reaches the website\'s environment',()=>{
+  const ui=(key:string|undefined)=>({NODE_ENV:'production',PUBLIC_APP_URL:'https://v3-preview.dezbatere.ro',PORT:'3100',DIALECTICAL_UI_HOST:'127.0.0.1',DIALECTICAL_API_BASE:'http://127.0.0.1:3101',NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON:env.PREVIEW_FREE_MODEL_IDS_JSON,...(key===undefined?{}:{RELEASE_KEY:key})});
+  const built={builtModelRosterFlag:env.PREVIEW_FREE_MODEL_IDS_JSON};
+  expect(env.narrowEnvironment('ui',ui(KEY),built,pin,plan).environment.RELEASE_KEY).toBe(KEY);
+  for(const bad of [['r18','d50e33165a1b'].join('-'),['r17','d50e33165a1c'].join('-'),'legacy',undefined])
+   expect(()=>env.narrowEnvironment('ui',ui(bad),built,pin,plan),String(bad)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
+  expect(()=>env.narrowEnvironment('ui',ui(KEY),built,null,plan)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
+ });
+ // README §14.7: the website's payment marks list. A typo never stops the website (it ignores unknown names); the strict form is release-env's check.
+ it('admits PAYMENT_MARKS_AVAILABLE on the website, whatever its form, and on no other service',()=>{
+  const ui=(marks:string)=>({NODE_ENV:'production',PUBLIC_APP_URL:'https://v3-preview.dezbatere.ro',PORT:'3100',DIALECTICAL_UI_HOST:'127.0.0.1',DIALECTICAL_API_BASE:'http://127.0.0.1:3101',NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON:env.PREVIEW_FREE_MODEL_IDS_JSON,RELEASE_KEY:KEY,PAYMENT_MARKS_AVAILABLE:marks});
+  const built={builtModelRosterFlag:env.PREVIEW_FREE_MODEL_IDS_JSON};
+  expect(env.narrowEnvironment('ui',ui('visa,mastercard'),built,pin,plan).environment.PAYMENT_MARKS_AVAILABLE).toBe('visa,mastercard');
+  expect(env.narrowEnvironment('ui',ui('Visa, amex'),built,pin,plan).environment.PAYMENT_MARKS_AVAILABLE).toBe('Visa, amex');
+  expect(()=>env.narrowEnvironment('api',{...api(KEY),PAYMENT_MARKS_AVAILABLE:'visa,mastercard'},runtime,pin,plan)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
+ });
+ it('isPaymentMarksList takes only the strict form',()=>{
+  expect(env.PAYMENT_MARK_NAMES).toEqual(['netopia','visa','mastercard']);
+  expect(Object.isFrozen(env.PAYMENT_MARK_NAMES)).toBe(true);
+  for(const value of ['visa','netopia,visa,mastercard','mastercard,netopia'])expect(env.isPaymentMarksList(value),value).toBe(true);
+  for(const value of ['','Visa','visa, mastercard','visa,',',visa','visa,visa','amex','visa,mastercard,netopia,visa',undefined,7])expect(env.isPaymentMarksList(value),String(value)).toBe(false);
+ });
+ it('RELEASE_KEY_PATTERN agrees with the kernel\'s parser',async()=>{
+  const { parseReleaseKey, RELEASE_KEY_PATTERN } = await import('../../packages/kernel/src/release-key.js');
+  expect(env.RELEASE_KEY_PATTERN.source).toBe(RELEASE_KEY_PATTERN.source);
+  for(const key of [['r1','000000000000'].join('-'),['r17','d50e33165a1b'].join('-'),['r0','000000000000'].join('-'),['r17','D50E33165A1B'].join('-'),'legacy','r17-d50e33165a1',['r017','d50e33165a1b'].join('-')])
+   expect(env.RELEASE_KEY_PATTERN.test(key),key).toBe((()=>{try{parseReleaseKey(key);return true;}catch{return false;}})());
+ });
 });
 
 const LEGACY_FLAG='["zai-org/GLM-5.3-Flash"]';
@@ -29,14 +88,14 @@ describe('the website\'s model list: one reviewed value per stage of the switch-
   for(const value of [JSON.stringify({free:ALL_FIVE.slice(0,4),premium:ALL_FIVE.slice(0,4)}),JSON.stringify({free:[...ALL_FIVE].reverse(),premium:ALL_FIVE})])expect(env.isReviewedModelRosterFlag(value)).toBe(false);
   for(const value of [undefined,'',' '+LEGACY_FLAG,'["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash"]',MULTI_FLAG.replace(',"Qwen/Qwen3.8-Flash"',''),MULTI_FLAG.replace(',"XiaomiMiMo/MiMo-V2.6-Pro"',''),JSON.stringify(JSON.parse(MULTI_FLAG),null,1)])expect(env.isReviewedModelRosterFlag(value)).toBe(false);
  });
- const ui=(flag:string)=>({NODE_ENV:'production',PUBLIC_APP_URL:'https://v3-preview.dezbatere.ro',PORT:'3100',DIALECTICAL_UI_HOST:'127.0.0.1',DIALECTICAL_API_BASE:'http://127.0.0.1:3101',NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON:flag});
+ const ui=(flag:string)=>({NODE_ENV:'production',PUBLIC_APP_URL:'https://v3-preview.dezbatere.ro',PORT:'3100',DIALECTICAL_UI_HOST:'127.0.0.1',DIALECTICAL_API_BASE:'http://127.0.0.1:3101',NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON:flag,RELEASE_KEY:fixtureReleaseKey('12')});
  it('ui.env must name the list the website was built with',()=>{
-  for(const flag of [LEGACY_FLAG,MULTI_FLAG,ALL_FLAG])expect(env.narrowEnvironment('ui',ui(flag),{builtModelRosterFlag:flag},null,approved).environment.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON).toBe(flag);
-  expect(()=>env.narrowEnvironment('ui',ui(LEGACY_FLAG),{builtModelRosterFlag:MULTI_FLAG},null,approved)).toThrow('PREVIEW_ENVIRONMENT_REFUSED');
-  expect(()=>env.narrowEnvironment('ui',ui(MULTI_FLAG),{builtModelRosterFlag:LEGACY_FLAG},null,approved)).toThrow('PREVIEW_ENVIRONMENT_REFUSED');
-  expect(()=>env.narrowEnvironment('ui',ui(LEGACY_FLAG),{},null,approved)).toThrow('PREVIEW_ENVIRONMENT_REFUSED');
+  for(const flag of [LEGACY_FLAG,MULTI_FLAG,ALL_FLAG])expect(env.narrowEnvironment('ui',ui(flag),{builtModelRosterFlag:flag},native,approved).environment.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON).toBe(flag);
+  expect(()=>env.narrowEnvironment('ui',ui(LEGACY_FLAG),{builtModelRosterFlag:MULTI_FLAG},native,approved)).toThrow('PREVIEW_ENVIRONMENT_REFUSED');
+  expect(()=>env.narrowEnvironment('ui',ui(MULTI_FLAG),{builtModelRosterFlag:LEGACY_FLAG},native,approved)).toThrow('PREVIEW_ENVIRONMENT_REFUSED');
+  expect(()=>env.narrowEnvironment('ui',ui(LEGACY_FLAG),{},native,approved)).toThrow('PREVIEW_ENVIRONMENT_REFUSED');
   const other='["deepseek-ai/DeepSeek-V4.1-Flash"]';
-  expect(()=>env.narrowEnvironment('ui',ui(other),{builtModelRosterFlag:other},null,approved)).toThrow('PREVIEW_ENVIRONMENT_REFUSED');
+  expect(()=>env.narrowEnvironment('ui',ui(other),{builtModelRosterFlag:other},native,approved)).toThrow('PREVIEW_ENVIRONMENT_REFUSED');
  });
  it.each([
   ['the legacy array with the legacy five-key config',LEGACY_FLAG,apiConfig({free_model_ids:[GLM]}),true],
@@ -63,7 +122,20 @@ describe('the website\'s model list: one reviewed value per stage of the switch-
   ['the multi-model value with the all-models config',MULTI_FLAG,apiConfig({free_model_ids:ALL_FIVE,premium_model_ids:ALL_FIVE,anthropic_budget_socket:ANTHROPIC_SOCKET}),false],
   ['no API config',LEGACY_FLAG,undefined,false],
   ['an API config that is not JSON',LEGACY_FLAG,'{',false],
-  ['an unreviewed website list that matches the config',JSON.stringify([GLM,DEEPSEEK]),apiConfig({free_model_ids:[GLM,DEEPSEEK]}),false]
+  ['an unreviewed website list that matches the config',JSON.stringify([GLM,DEEPSEEK]),apiConfig({free_model_ids:[GLM,DEEPSEEK]}),false],
+  // Addition D14/D24 items 5-6 (owner 2026-10-22): the sockets-only API config names no line-up (it lives in the settings
+  // version), so any reviewed website list matches it; the list only feeds the new-debate page's fallback and the ask ceiling.
+  ['the legacy array with the sockets-only config',LEGACY_FLAG,apiConfig({}),true],
+  ['the two-list value with the sockets-only config',MULTI_FLAG,apiConfig({}),true],
+  ['the all-models value with the sockets-only config',ALL_FLAG,apiConfig({}),true],
+  ['the legacy array with the sockets-only config plus the Anthropic socket',LEGACY_FLAG,apiConfig({anthropic_budget_socket:ANTHROPIC_SOCKET}),true],
+  ['the two-list value with the sockets-only config plus the Anthropic socket',MULTI_FLAG,apiConfig({anthropic_budget_socket:ANTHROPIC_SOCKET}),true],
+  ['the all-models value with the sockets-only config plus the Anthropic socket',ALL_FLAG,apiConfig({anthropic_budget_socket:ANTHROPIC_SOCKET}),true],
+  ['an unreviewed website list with the sockets-only config',JSON.stringify([GLM,DEEPSEEK]),apiConfig({}),false],
+  ['an unreviewed two-list value with the sockets-only config',JSON.stringify({free:ALL_FIVE.slice(0,4),premium:ALL_FIVE.slice(0,4)}),apiConfig({anthropic_budget_socket:ANTHROPIC_SOCKET}),false],
+  ['the sockets-only config with a thinking_levels table (no line-up to apply it to)',LEGACY_FLAG,apiConfig({thinking_levels:{[GLM]:{level:'high'}}}),false],
+  ['the sockets-only config with an extra key',ALL_FLAG,apiConfig({extra:true}),false],
+  ['the sockets-only config missing its scope',LEGACY_FLAG,JSON.stringify({deployment:'v3-preview',requested_thinking_level:'high',budget_socket:'/run/debateai-v3-preview/deepinfra-budget-v3.sock'}),false]
  ])('the stage check: %s',(_name,flag,config,expected)=>{expect(env.uiRosterMatchesApiConfig(flag,config)).toBe(expected);});
 });
 
@@ -81,12 +153,19 @@ describe('hosted preview environment', async () => {
  const INVOICING = { QUADERNO_API_BASE_URL: 'https://dezbatere-test.sandbox-quadernoapp.com/api', QUADERNO_API_KEY_PATH: '/etc/debateai-v3-preview/billing/quaderno-api-key',
   SMARTBILL_API_BASE_URL: 'https://smartbill.invalid', SMARTBILL_CREDENTIALS_PATH: '/etc/debateai-v3-preview/billing/smartbill-credentials', SMARTBILL_SERIES: 'DBAI',
   OWNER_REPORT_EMAIL_PATH: '/etc/debateai-v3-preview/billing/owner-report-email' };
+ const SPOOL = '/var/lib/debateai-v3-preview/api/billing-notice-spool';
  const narrow = (input: Record<string, string>) => env.narrowEnvironment('api', input, runtime, native, approved);
  it.each([
   ['hosted, billing off', {}],
   ['hosted with NETOPIA\'s sandbox alone (the provider-only mode)', NETOPIA],
   ['hosted with the whole billing group', { ...NETOPIA, ...INVOICING }],
-  ['hosted with NETOPIA\'s other sandbox base', { ...NETOPIA, ...INVOICING, NETOPIA_API_BASE_URL: 'https://secure.sandbox.netopia-payments.com' }]
+  ['hosted with NETOPIA\'s other sandbox base', { ...NETOPIA, ...INVOICING, NETOPIA_API_BASE_URL: 'https://secure.sandbox.netopia-payments.com' }],
+  // B3a (NETOPIA answers 2026-10-21): the optional spool of NETOPIA messages the database could not store.
+  ['hosted with NETOPIA\'s sandbox alone and the billing notice spool', { ...NETOPIA, BILLING_NOTICE_SPOOL_PATH: SPOOL }],
+  ['hosted with the whole billing group and the billing notice spool', { ...NETOPIA, ...INVOICING, BILLING_NOTICE_SPOOL_PATH: SPOOL }],
+  // Addition D14 (owner 2026-10-22): the preview configuration may carry only the gate part (the line-up lives in settings).
+  ['hosted with the sockets-only preview configuration', { PREVIEW_PROVIDER_TEST_CONFIG_JSON: JSON.stringify({ deployment: 'v3-preview', requested_thinking_level: 'high',
+   budget_socket: '/run/debateai-v3-preview/team-budget-v2.sock', anthropic_budget_socket: '/run/debateai-v3-preview/anthropic-budget-v1.sock', scope_id: 'preview-team-v2-20261009' }) }]
  ])('admits %s', (_name, patch) => {
   const result = narrow({ ...hosted(), ...patch });
   expect(result.deploymentMode).toBe('hosted');
@@ -117,6 +196,11 @@ describe('hosted preview environment', async () => {
   ['the moved billing clock (owner ruling 2026-10-13: still refused)', { ...hosted(), ...NETOPIA, ...INVOICING, BILLING_STAGE_CLOCK_OFFSET_DAYS: '31' }],
   ['the moved billing clock in local mode', { ...configured(), BILLING_STAGE_CLOCK_OFFSET_DAYS: '31' }],
   ['a billing setting in local mode', { ...configured(), ...NETOPIA }],
+  ['the billing notice spool without NETOPIA\'s settings (hosted, billing off)', { ...hosted(), BILLING_NOTICE_SPOOL_PATH: SPOOL }],
+  ['the billing notice spool beside the invoicing settings without NETOPIA\'s', { ...hosted(), ...INVOICING, BILLING_NOTICE_SPOOL_PATH: SPOOL }],
+  ['the billing notice spool in the hosted kit\'s folder', { ...hosted(), ...NETOPIA, ...INVOICING, BILLING_NOTICE_SPOOL_PATH: '/var/lib/debateai/api/billing-notice-spool' }],
+  ['the billing notice spool with a trailing slash', { ...hosted(), ...NETOPIA, ...INVOICING, BILLING_NOTICE_SPOOL_PATH: `${SPOOL}/` }],
+  ['the billing notice spool in local mode', { ...configured(), BILLING_NOTICE_SPOOL_PATH: SPOOL }],
   ['proxy settings in the environment file', { ...hosted(), HTTPS_PROXY: 'http://127.0.0.1:3180' }],
   ['Node\'s proxy switch in the environment file', { ...hosted(), NODE_USE_ENV_PROXY: '1' }]
  ])('refuses %s without emitting values', (_name, input) => expect(() => narrow(input)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/));
@@ -137,5 +221,46 @@ describe('hosted preview environment', async () => {
   expect(egress.PREVIEW_EGRESS_PROXY_URL).toBe('http://127.0.0.1:3180');
   expect(process.env).toEqual(before);
   expect(() => env.installHostedEgress('staging', setProxy)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
+ });
+});
+
+// B3a (NETOPIA answers 2026-10-21): the preview's spool folder, the API unit's write permission for it and the guide agree.
+describe('the billing notice spool on the preview', () => {
+ const read = (path: string) => readFileSync(resolve(import.meta.dirname, '../..', path), 'utf8');
+ const SPOOL = env.PREVIEW_HOSTED_FIXED_VALUES.BILLING_NOTICE_SPOOL_PATH;
+ const DROPIN = 'deploy/preview-auth-dev/v1/debateai-preview-api-notice-spool.conf';
+ const INSTALLED = 'zzzzzzzzzz-billing-notice-spool.conf';
+ it('is an optional key of the API, in the preview\'s own state folder under the hosted kit\'s name', () => {
+  expect(runtime.API_ENVIRONMENT_KEYS.optional).toContain('BILLING_NOTICE_SPOOL_PATH');
+  expect(SPOOL).toBe('/var/lib/debateai-v3-preview/api/billing-notice-spool');
+  const vps = /^# BILLING_NOTICE_SPOOL_PATH=(.+)$/m.exec(read('deploy/vps/env/api.env.example'))?.[1];
+  expect(vps?.replace('/var/lib/debateai/', '/var/lib/debateai-v3-preview/')).toBe(SPOOL);
+ });
+ it('the drop-in adds exactly that one write path, optional, and sorts after the older drop-ins and before the release one', async () => {
+  const text = read(DROPIN);
+  expect(text.split('\n').filter(line => line !== '' && !line.startsWith('#'))).toEqual(['[Service]', `ReadWritePaths=-${SPOOL}`]);
+  expect(text).toContain(`# Install as /etc/systemd/system/debateai-preview-api.service.d/${INSTALLED}\n`);
+  // The release drop-in sets no ReadWritePaths= (its lines are pinned in preview-lifecycle-prestart.test.ts).
+  const { RELEASE_DROPIN_NAME } = await import('../../deploy/' + 'preview-lifecycle/v1/prestart.mjs');
+  const order = ['50-lifecycle.conf', '60-hosted-egress.conf', 'zzzzzzzzz-auth-dev-task12-final.conf', INSTALLED, RELEASE_DROPIN_NAME];
+  expect([...order].sort()).toEqual(order);
+ });
+ it('the guide makes the folder 0700 as the API\'s user, installs that drop-in under that name and reloads, then adds the line once', () => {
+  const guide = read('deploy/preview-release/v1/README.md');
+  const steps = [
+   `SP=${SPOOL}`,
+   'install -d -m 0700 -o "$AU" -g "$AGRP" "$SP"',
+   `install -o root -g root -m 0644 "$CAPI/dialectical-engine/${DROPIN}" /etc/systemd/system/debateai-preview-api.service.d/${INSTALLED}`,
+   'systemctl daemon-reload',
+   'systemctl show -p ReadWritePaths debateai-preview-api',
+   `grep -q '^BILLING_NOTICE_SPOOL_PATH=' "$E/api.env" || printf '\\nBILLING_NOTICE_SPOOL_PATH=%s\\n' "$SP" >> "$E/api.env"`
+  ];
+  let from = guide.indexOf('### H9. The billing notice spool');
+  expect(from).toBeGreaterThan(0);
+  for (const step of steps) {
+   const at = guide.indexOf(step, from);
+   expect(at, step).toBeGreaterThan(from);
+   from = at;
+  }
  });
 });

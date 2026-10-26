@@ -43,8 +43,8 @@ describe("R2b: the comparing judges in the run body", () => {
       "callSiteKey: comparingJudgeCallSiteKey(judge.seat)",
       "contractHash: engineSeal",
       // pre-flight PF-R2b3.15: the run body's one engine seal, A14's (equal to `engineContractHash()` on any runner R1d boots).
-      "const engineSeal = this.settings.engine?.engineContractHash;",
-      "guidedCallBound(this.settings.judgeBound, \"comparing_judge\", lengthGuidance)",
+      "const engineSeal = settings.engine?.engineContractHash;",
+      "guidedCallBound(settings.judgeBound, \"comparing_judge\", lengthGuidance)",
       "moneyStopped: runBodyBudgetStop !== null",
       "readVerdictVotesForRun(run.runId)",
       "eligible: sameMaker",

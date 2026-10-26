@@ -35,6 +35,7 @@ import { AskRoom, nextWholeMinute, type RoomPreview } from "../../apps/api/src/a
 import { economyCaps, testCandidate, testEntry, testScorecard } from "../support/scorecardFixtures.js";
 import { createLegacyStoryRun } from "../support/storyEncryptedOwner.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 let database: TestDatabase;
 
@@ -103,6 +104,7 @@ function settings(site: AskMoneyPolicy = SITE, world: World = TWO_TIERS): RunCre
   return {
     strangerSampleRate: 0,
     registerVersion: 1,
+    releaseKey: TEST_RELEASE_KEY,
     batteryVersion: "battery:s2",
     settlementWatchHandle: "watch:s2",
     resolveDiscoveredPanel: async () => world.panel,

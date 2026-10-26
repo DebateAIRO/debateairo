@@ -26,6 +26,8 @@
   "runFailure.RUN_LIMIT_REACHED": "Este debate atingiu o seu limite antes de conseguir chegar a uma resposta.",
   "runFailure.STOPPED": "Este debate parou a meio devido a um problema do nosso lado. Por favor, volte a fazer a sua pergunta.",
   "runFailure.PLAN_ENDED": "O seu plano pago terminou ou foi suspenso enquanto esta pergunta aguardava, por isso o debate não começou. Pode fazê-la novamente.",
+  "runFailure.CHOICE_GONE": "O site foi atualizado enquanto a sua pergunta esperava na fila, e uma das opções que escolheu já não é oferecida. Faça a pergunta novamente, por favor. Não foi usada nenhuma parte da sua dotação.",
+  "runFailure.SET_ASIDE": "Não foi possível concluir este debate devido a uma atualização do nosso lado. Este debate não foi descontado da sua dotação. Por favor, volte a fazer a sua pergunta.",
   "home.status.waiting": "A aguardar o início. O seu debate começará sozinho às {time}.",
   "home.status.waitingOwnDebates": "Os seus outros debates estão a usar, por agora, o resto do seu limite. Este debate começará sozinho assim que um deles terminar.",
   "home.noPublishedDebates": "Ainda não foi publicado nenhum debate.",

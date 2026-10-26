@@ -307,6 +307,12 @@ structure-repair call on Haiku, PATCH, FULL, LENGTH_RETRY, or NONE), whether the
 characters (report.json only). A call fixed by the structure-repair call is one call of the original AI, repaired: a
 warning, never a failure. `report.md` shows the counts and the codes only.
 
+`languageFollowUps` (the stray-letter rule, PR #194; information only): per AI, step and code, the replies refused for
+text in another language or script (`TEXT_NOT_IN_QUESTION_LANGUAGE`, or `MAP_WRONG_LANGUAGE`, the map's name for the
+same refusal), how many of them the same call asked again by the short follow-up, and how many of those follow-ups came
+back accepted. Every admitted debate has it, so an empty list means none. `report.md` shows it as "Reply-language
+refusals".
+
 How a slip was fixed (patch follow-up, owner design 2026-10-12; information only, the verdict is the same either way).
 When a reply was a readable answer with only some parts wrong, the app first sends a SHORT follow-up: the AI gets its
 own answer back and is asked only for the wrong parts (for example `{"value_laden": true}`), which the app puts into
@@ -597,6 +603,53 @@ echo "exit: $?"
   sat out cannot be picked, and a cost fallback or a backup storyteller serving instead is not the pinned model: either
   way the verdict is NOT_PROVEN with `PRACTICE_PIN_NOT_HELD:<ROLE>`.
 
+### Trying a new line-up before an activation (`--line-up`)
+
+The line-up is which AIs debate on Free and on Premium, and how hard each one thinks (the thinking levels). Since the
+Phase 2 addition it is a settings value: the `previewLineUpPolicy` row of a sealed settings version, so a change is an
+activation, not an upload. The practice always runs the line-up of the settings version it runs on, read the way the
+runner and the API read it:
+
+- the version's own `previewLineUpPolicy` row, when it has one;
+- otherwise the line-up in the settings file (`PREVIEW_PROVIDER_TEST_CONFIG_JSON` with its two lists of AIs and its
+  optional thinking table: today's server setting);
+- a settings file in the sockets-only form (the server setting from the first Phase 2 upload on: the gate sockets, the
+  scope and nothing else) and a version without the row: refused before anything is spent (`PREVIEW_LINE_UP_REQUIRED`);
+- a version with the row beside a settings file that still lists AIs: refused (`PREVIEW_LINE_UP_ENV_CONFLICT`), as the
+  live server refuses to start the same way.
+
+The progress line `line-up of version N: …` says where the line-up came from, both lists and whether a thinking table is
+set.
+
+**The trial (optional).** No practice is needed before an activation (the six checks are). When you want to see a new
+line-up debate first:
+
+1. Write the planned line-up to a file. Either the bare three members, for example
+   `{"free_model_ids":["zai-org/GLM-5.3-Flash","claude-haiku-5-5"],"premium_model_ids":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro","claude-haiku-5-5"],"thinking_levels":{"deepseek-ai/DeepSeek-V4.1-Flash":{"level":"low"}}}`,
+   or what `check-thinking-levels.ts --print-line-up` prints (`{"lineUp":{…}}`). It is the same file the release tool's
+   `native-plan --line-up` takes, so the line-up you try is the line-up you then publish.
+2. Run S-6's debate command plus `--line-up FILE`. The row goes into the practice's own throwaway database only, in the
+   same one throwaway version as `--shape-policy`, `--length-policy` and `--engine-policy` (live version + 1; with
+   `--register-next`, into the code's next version, as the plan's `--line-up` would carry it). The live register is
+   never written.
+3. The settings file's own lists, if it still has them, are set aside for the trial, as on a server whose settings
+   version carries the row. So the trial works with today's settings file and with the sockets-only one.
+
+The file is checked before anything is spent, by the same checks the publish kit runs (every AI a reviewed one, each
+once, at least two makers on each plan when the line-up has more than one, each thinking level on that AI's reviewed menu): a refusal names why
+(`PRACTICE_LINE_UP_INVALID <code>:<detail>`, for example `PREVIEW_LINE_UP_POLICY_INVALID:maker_rule`), or
+`PRACTICE_LINE_UP_UNREADABLE`. Every AI of the line-up must be switched on at its gate: a debate AI the gate does not
+serve sits out, and the verdict is not PASS. If the version the debate runs on does not carry exactly the file's line-up
+(no row, or another one), the debate is refused before any AI is asked (`PRACTICE_LINE_UP_NOT_PUBLISHED`).
+
+formats, openings, language and judge-order take `--line-up FILE` too: they run no settings version, so they ask with
+the file's line-up (formats' `--models` must be on its Premium list); without it they ask with the settings file's, and
+with a sockets-only settings file they need it (`PREVIEW_LINE_UP_REQUIRED` otherwise). language with `--register-export`
+reads the line-up as debate mode does: the file's, else the export's newest version's row, else the settings file's (a
+row beside a settings file that still lists AIs is refused, `PREVIEW_LINE_UP_ENV_CONFLICT`). report and rescore refuse it.
+
+Example (S-6's debate command plus): `--line-up "$P/line-up.json"`.
+
 ### The question language (language mode, and debate's `--site-language`)
 
 With the new shape on, the site fixes the language of each question before the debate starts (P2L):
@@ -609,7 +662,7 @@ With the new shape on, the site fixes the language of each question before the d
 - With no fast AI (a signed-out person, or no paid AI), eld and the question's alphabet decide, else the site's
   language.
 
-`language` mode checks this on nine fixed questions, with no debate and no database:
+`language` mode checks this on ten fixed questions, with no debate and no database:
 
 - For each question: eld's reading, the fast AI's reading (always asked here, so its reading is written down even when
   eld was sure), and one call to the AI that plans a debate's angles (the AIs take turns).
@@ -631,9 +684,20 @@ With the new shape on, the site fixes the language of each question before the d
 | `lang-ro-borrowed` | ro | ro | no |
 | `lang-zh-short` | en | zh | no |
 | `lang-ku-arab` | ar | ku | no |
+| `lang-en-hukou` | en | en | no |
 
 `lang-zh-short` is a short Chinese question, worked out as if there were no fast AI. `lang-ku-arab` is Kurdish
 (Sorani) written in Arabic letters, asked on the Arabic site: it must lock Kurdish (`ku`).
+
+`lang-en-hukou` is for the reply-language check's stray-letter rule (PR #194). The rule refuses Chinese, Japanese or
+Korean letters written outside quotation marks into text in a language with another alphabet (English or Romanian, for
+example), and the usual short follow-up asks the AI for that piece again. The practice debates so far asked about
+nuclear power, buses, the euro, moving abroad and social media, so no AI had a reason to add such a term on purpose.
+This one asks, in English, whether China should abolish its "hukou" household registration system, so an AI may well
+write "hukou (户口)". At the next release, run the release's practice debate once with
+`--question lang-en-hukou` (each paid run needs the owner's yes), and read "Reply-language refusals" in `report.md`.
+The owners may reword it, but only in Latin letters: such letters in the question itself switch the rule off for the
+whole debate.
 
 The verdict:
 
@@ -770,7 +834,8 @@ also-raised claims are sent whole (LG-C part 2, Task 15).
   instead of being refused by the gate. A gate whose number cannot be read at the start runs with 1 call at a time, and
   the report says so. Without `--call-concurrency` the practice uses the live register's own setting, and one call at
   a time when the register has none (today's preview). `--call-concurrency 12/3/default=50,deepinfra=150,anthropic=50`
-  sets it for this practice only; it is never written to any register. The relay must accept at least 3 more
+  sets it for this practice only, for every settings version its runner loads (each debate's own calls at once and
+  calls to one model take the flag's first two numbers); it is never written to any register. The relay must accept at least 3 more
   connections than the two gates' numbers added up: today 10 DeepInfra and 2 Anthropic calls at once, so at least 15
   (S-4 starts it with `--max-connections 20`); if a gate's `max_concurrent_calls` is raised, raise
   `--max-connections` with it.
@@ -846,7 +911,13 @@ wc -c /root/practice/register-export.json
 
 ### S-2, server, root: export the allowed settings (no secret is copied)
 
-Only these keys are copied; `grep` prints nothing on screen.
+Only these keys are copied; `grep` prints nothing on screen. `RELEASE_KEY` is not copied on purpose: the practice
+names its release from the Mac checkout it runs (`r<REGISTER_VERSION>-<first 12 hex of git HEAD>`), and its runner and
+its ask both use that one key (side-by-side spec §1, §3). A settings line `RELEASE_KEY=…` would win if one were added;
+a hosted practice with neither a line nor a readable git HEAD refuses (`PRACTICE_SETTINGS_VALUE_INVALID: RELEASE_KEY`).
+From the first Phase 2 upload on, `PREVIEW_PROVIDER_TEST_CONFIG_JSON` is the sockets-only form (no lists of AIs): the
+practice then takes the line-up from the settings version (or `--line-up`, see "Trying a new line-up before an
+activation").
 
 ```sh
 grep -E '^(PREVIEW_PROVIDER_TEST_CONFIG_JSON|PROVIDER_DISCOVERY_TARGETS_JSON|REGISTER_VERSION|DEBATEAI_DEPLOYMENT_MODE|NODE_ENV|CLAIM_MS|CLAIM_MARGIN_MS|MAX_RECOMPOSE|JUDGEMENT_NUMBER_KIND|JUDGEMENT_PRODUCER|PROPAGATION_NUMBER_KIND|PROPAGATION_PRODUCER|PROVIDER_PROBE_TIMEOUT_MS|PROVIDER_REF|VLLM_BASE_URL|VLLM_MODEL|VLLM_MAKER)=' /etc/debateai-v3-preview/auth-dev-v1/runner.env > /root/practice/settings.env
@@ -967,13 +1038,15 @@ Optional flags:
 - report: `report --out DIR` builds DIR/report.json and DIR/report.md again from DIR/openings.jsonl when DIR holds one
   (an openings run), else from DIR/samples.jsonl. `report --side-by-side FILE --out DIR` writes only
   DIR/side-by-side.html from a formats samples log (see S-6b).
-- debate: `--depth 1|2`, `--question ro|en` or one of the comparison's ids (`ro-euro`, `ro-strainatate`, `en-nuclear`,
-  `en-social-media-age`, see S-8), `--call-concurrency A/B/default=N,deepinfra=N,anthropic=N` (A: calls at
+- debate: `--depth 1|2`, `--question ro|en`, one of the comparison's ids (`ro-euro`, `ro-strainatate`, `en-nuclear`,
+  `en-social-media-age`, see S-8) or a language case's id (for example `lang-en-hukou`, see "The question language"),
+  `--call-concurrency A/B/default=N,deepinfra=N,anthropic=N` (A: calls at
   once in the debate, 1 to 64; B: calls at once to one model in the debate, 1 to 16; each N: calls at once to one model
   across the runner for that vendor, 1 to 1000, `default` required; for example `12/3/default=50,deepinfra=150,anthropic=50`;
   formats, openings and report refuse it), `--transcript` (also write `transcript.json`: every prompt and every answer, see "The whole
   debate, word for word" above), `--shape-policy FILE`, `--depth-mode fixed|adaptive`, `--scrutiny standard|deep|exhaustive`
-  and `--answer-length short|standard|detailed` (see "The new debate shape"; debate only). The register is copied only
+  and `--answer-length short|standard|detailed` (see "The new debate shape"; debate only), `--line-up FILE` (see "Trying a
+  new line-up before an activation"; every mode that reads the settings). The register is copied only
   through the register's own publication paths; an export holding a support-configuration version refuses
   (`PRACTICE_REGISTER_PATH_UNSUPPORTED`).
   `--register-next` practises a release that needs a NEW register version (new sealed prompts) before it is uploaded:
@@ -1323,7 +1396,7 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 - `practice-judge-order.ts`: the judges' order practice (D3).
 - `practice-shape.ts`: the debate-shape flags (`--shape-policy`, `--depth-mode`, `--scrutiny`, `--answer-length`), what
   the shape run did (the report's `shape` block, the transcript's `structure.map`).
-- `practice-language.ts`: the question language: mode `language` (the nine cases, the lock as the site works it
+- `practice-language.ts`: the question language: mode `language` (the ten cases, the lock as the site works it
   out, `language.jsonl`, the report) and debate mode's `--site-language` and `--language-choice`.
 - `shape-policy-start.json`: the owners' start values for `--shape-policy`.
 - `practice-length.ts`: the length flag (`--length-policy`), what the run was admitted with (the report's `length` block).
@@ -1334,8 +1407,8 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 - `practice-gate-observer.ts` (the watch and the brake), `practice-verdict.ts`, `practice-report.ts`,
   `practice-samples-log.ts` (samples.jsonl and the report rebuilt from it), `practice-concurrency.ts` (formats: models at once,
   the per-gate and overall limits), `practice-parallel.ts` (debate: `--call-concurrency` and the report's
-  "Calls at once"), `practice-interrupt.ts` (Ctrl-C), `practice-redaction.ts`, `practice-settings.ts`,
-  `practice-questions.ts`.
+  "Calls at once"), `practice-interrupt.ts` (Ctrl-C), `practice-redaction.ts`, `practice-settings.ts` (also the line-up:
+  `--line-up` and the version's own, by the runner's and the API's one rule), `practice-questions.ts`.
 - `practice-tokens.ts`: the tokens and words per AI and step (length guidance LG-B, information only).
 - `practice-openings.ts` (the openings run), `practice-openings-questions.ts` (the 12 fixed questions),
   `practice-openings-log.ts` (openings.jsonl and its report), `practice-openings-dry.ts` (`--dry`'s scripted gates).
@@ -1343,6 +1416,8 @@ Keep `$P` (the reports) as long as the owner wants them; it holds only our own p
 - `check-thinking-levels.ts`: the offline check of a `thinking_levels` table before any API or runner restart
   (deploy/preview-auth-dev/v1/README.md, "The optional `thinking_levels` table"; it sends nothing and needs no gate):
   `node_modules/.bin/tsx tools/preview-practice/check-thinking-levels.ts --settings "$P/candidate-settings.env"`.
+  With `--print-line-up` it prints the value's line-up instead, as the publish kit's plan member `{"lineUp":{…}}`
+  (side-by-side spec §13 addition D23; deploy/preview-auth-dev/v1/README.md, "Line-up and answer seats on the preview").
 - `gate-relay.py` and `test_gate_relay.py` (run: `python3 tools/preview-practice/test_gate_relay.py`).
 - Tests: `tests/unit/preview-practice.test.ts`, `tests/unit/preview-practice-hosted.test.ts` (hosted settings and the
   kit-v3 `--register-next`), `tests/unit/preview-practice-levels.test.ts`,

@@ -323,6 +323,8 @@
   "runFailure.RUN_LIMIT_REACHED": "Shroich an díospóireacht seo a teorainn sula raibh sí in ann freagra a thabhairt.",
   "runFailure.STOPPED": "Stad an díospóireacht seo i lár báire mar gheall ar fhadhb ar ár dtaobh. Cuir do cheist arís, le do thoil.",
   "runFailure.PLAN_ENDED": "Tháinig deireadh le do phlean íoctha nó cuireadh ar sos é fad a bhí an cheist seo ag fanacht, mar sin níor thosaigh an díospóireacht. Is féidir leat í a chur arís.",
+  "runFailure.CHOICE_GONE": "Nuashonraíodh an suíomh agus do cheist ag fanacht, agus níl ceann de na roghanna a roghnaigh tú ar fáil a thuilleadh. Cuir an cheist arís, le do thoil. Níor úsáideadh aon chuid de do liúntas.",
+  "runFailure.SET_ASIDE": "Níorbh fhéidir linn an díospóireacht seo a chríochnú mar gheall ar nuashonrú ar ár dtaobh. Níor laghdaigh an díospóireacht seo do liúntas. Cuir do cheist arís, le do thoil.",
   "requestFailure.kind.MODEL_BUDGET_TOO_SMALL": "Chosnódh an díospóireacht seo níos mó ná mar a cheadaíonn an suíomh seo do dhíospóireacht amháin.",
   "requestFailure.kind.MODEL_UNAVAILABLE": "Dhiúltaigh an comhordaitheoir don iarratas: níl samhail IS ar bith ar fáil faoi láthair do cheann de thascanna na díospóireachta. Bain triail eile as níos déanaí.",
   "debateChrome.condition.backupModelUsed": "Nuair nárbh fhéidir samhail IS phleanáilte a úsáid, tháinig ceann eile ina háit"

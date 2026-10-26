@@ -29,10 +29,13 @@ describe("the ask's question-language fields (question-language spec 2026-10-13)
     expect(Object.keys(AskRequestSchema.shape)).toEqual([
       "question_line", "risk_tier", "tier_source", "tier_provenance_ref", "composition_budget_tier", "depth_params",
       "decision_scope", "as_of", "steering_presets", "plan_tier", "model_strength", "steering_annotations",
-      "site_language", "question_language_choice"
+      "site_language", "question_language_choice",
+      // Side-by-side spec §13 (Task S12): the room read's settings version, a later optional key of its own.
+      "settings_version"
     ]);
     expect(AskRequestSchema.shape.site_language.safeParse(undefined).success).toBe(true);
     expect(AskRequestSchema.shape.question_language_choice.safeParse(undefined).success).toBe(true);
+    expect(AskRequestSchema.shape.settings_version.safeParse(undefined).success).toBe(true);
     // Still strict: an unknown key is refused exactly as before.
     expect(AskRequestSchema.safeParse({ ...ASK, question_language: "ro" }).success).toBe(false);
   });
