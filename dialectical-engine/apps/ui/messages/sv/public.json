@@ -216,7 +216,7 @@
   "public.publicationReview.askSubmit": "Be om godkännande",
   "public.publicationReview.asked": "Din begäran har skickats. Den här debatten granskas nu av vårt team.",
   "public.publicationReview.flaggedLine": "Vår automatiska kontroll markerade den här debatten för:",
-  "public.publicationReview.category.HATE_SPEECH": "hatretorik av något slag",
+  "public.publicationReview.category.HATE_SPEECH": "hatretorik av alla slag",
   "public.publicationReview.category.TERRORISM": "Möjlig terrorism",
   "public.publicationReview.category.WEAPONS_OR_DRUGS": "tillverkning av vapen eller droger",
   "public.publicationReview.category.SUICIDE_OR_HARM_TO_OTHERS": "tendenser till självmord eller till att skada andra människor",
