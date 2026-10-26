@@ -4,16 +4,8 @@ import type { ComponentProps } from "react";
 import type { Answer, AnswerFloor, DebateMapView } from "@debateai/contract";
 import DebatePageGate from "./DebatePageGate";
 import { getDebateServer, questionLanguageTagOf, readSessionCookie, readTrustedClientIp } from "@/lib/serverApi";
-import { createServerContractClient } from "@/lib/serverApi";
 import { readCrisisCountryHint } from "@/lib/crisisLines";
-import { CheckRemovalNotice, CrisisCountryHintProvider } from "@/components/CheckRemovalNotice";
-import { AiNotice } from "@/components/AiNotice";
-import { SupportWidget } from "@/components/support/SupportWidget";
-import { t } from "@/lib/i18n/translate";
-import { BrandMark } from "@/components/TopBar";
-import { AccountMenu } from "@/components/AccountMenu";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-import { ModeToggle } from "@/components/ModeToggle";
+import { CrisisCountryHintProvider } from "@/components/CheckRemovalNotice";
 import type { DebateDetail } from "@/lib/types";
 import { debateDetailFromRunProjection } from "@/lib/v3/adapter";
 import { isLocale, LOCALE_COOKIE, type LocaleCode } from "@/lib/i18n/locales";
@@ -49,8 +41,7 @@ export default async function DebatePage({
     publicCatalog,
     composeCatalog,
     homeCatalog,
-    newDebateCatalog,
-    chromeCatalog
+    newDebateCatalog
   ] = await Promise.all([
     loadNamespace(locale, "time"),
     loadNamespace(locale, "debateChrome"),
@@ -59,8 +50,7 @@ export default async function DebatePage({
     loadNamespace(locale, "public"),
     loadNamespace(locale, "compose"),
     loadNamespace(locale, "home"),
-    loadNamespace(locale, "newDebate"),
-    loadNamespace(locale, "chrome")
+    loadNamespace(locale, "newDebate")
   ]);
   const countryHint = readCrisisCountryHint(await headers());
 
@@ -136,23 +126,7 @@ export default async function DebatePage({
       initialError = runFailureMessage(result.reason, debateChromeCatalog);
       initialPending = false;
     } else if (result.kind === "not_found") {
-      try {
-        const taken = await createServerContractClient(fetch, token, userAgent, readTrustedClientIp(await headers())).takeRemovalNotice();
-        if (taken.notice) {
-          return <div className="debateView">
-            <header className="debateTopBar" data-debate-reference-chrome>
-              <div className="debateTopIdentityRow"><BrandMark /><span className="debateTopDivider" aria-hidden /></div>
-              <div className="debateTopControlRow"><AccountMenu catalog={chromeCatalog} /><LanguageSwitcher /><ModeToggle compact /></div>
-            </header>
-            <div className="debateAiDisclosure"><AiNotice catalog={{ ...homeCatalog, ...chromeCatalog }}
-              body={t(debateChromeCatalog, "debateChrome.aiNotice")} /></div>
-            <CheckRemovalNotice catalog={homeCatalog} locale={locale} countryHint={countryHint} />
-            <SupportWidget />
-          </div>;
-        }
-      } catch {
-        // A missing run with an unavailable notice read remains a normal 404.
-      }
+      // S01-R39: a deleted debate's notice is taken by this segment's not-found page, from the browser.
       notFound();
     }
   }

@@ -230,47 +230,33 @@ describe("S01 held debate page", () => {
     node.remove();
   });
 
-  it("serves the once-only notice at a removed debate address and otherwise returns 404", async () => {
+  it("a removed debate's address is the app's 404 and never takes the notice on the server", async () => {
+    // Found on the merged stack (2026-10-26): a signed-in POST needs the page's CSRF pair and origin, which a server
+    // render does not send, so the server-side take was always refused and the notice never showed here.
     serverRead.mockResolvedValue({ ok: false, kind: "not_found" });
-    takeNotice.mockResolvedValueOnce({ notice: true }).mockResolvedValueOnce({ notice: false });
-    const shown = await DebatePage({ params: Promise.resolve({ id: "run-1" }) });
-    const markup = renderToStaticMarkup(shown);
-    expect(markup).toContain("We deleted this debate");
-    expect(markup).toContain('class="debateTopBar"');
-    expect(markup).toContain('class="debateTopDivider"');
-    expect(markup).toContain('data-mode-toggle="true"');
-    expect(markup).toContain("Everything in this debate");
-    // S05 (V-125): the widget renders only after the browser's country check says the chat is offered, so the
-    // server markup carries none; sup-04-mounts pins that this page still mounts it.
-    expect(markup).not.toContain('class="supportWidget"');
     await expect(DebatePage({ params: Promise.resolve({ id: "run-1" }) })).rejects.toThrow("NEXT_NOT_FOUND_TEST");
-    expect(takeNotice).toHaveBeenCalledTimes(2);
+    expect(takeNotice).not.toHaveBeenCalled();
   });
 
-  it("hydrates the removed page without losing the topbar mode control", async () => {
-    serverRead.mockResolvedValue({ ok: false, kind: "not_found" });
-    takeNotice.mockResolvedValue({ notice: true });
-    const shown = await DebatePage({ params: Promise.resolve({ id: "run-1" }) });
+  it("the address's 404 takes the notice from the browser and shows it once, for a signed-in reader (S01-R39)", async () => {
+    const { default: DebateNotFound } = await import("../../apps/ui/app/debate/[id]/not-found");
+    takeNotice.mockResolvedValueOnce({ notice: true }).mockResolvedValue({ notice: false });
+    const shown = await DebateNotFound();
     const node = document.createElement("div");
     node.innerHTML = renderToString(shown);
     document.body.append(node);
-    const priorLanguages = Object.getOwnPropertyDescriptor(navigator, "languages");
-    Object.defineProperty(navigator, "languages", { configurable: true, value: ["en-US"] });
-    const originalOf = Intl.DisplayNames.prototype.of;
-    vi.spyOn(Intl.DisplayNames.prototype, "of").mockImplementation(function (this: Intl.DisplayNames, code: string) {
-      return code === "HK" ? "Hong Kong" : originalOf.call(this, code);
-    });
+    expect(node.querySelector("h1")?.textContent).toBe("404");
+    // The server markup holds no notice: only the browser's take may show it.
+    expect(node.querySelector('[data-dialog="removal-notice"]')).toBeNull();
     const recovered: unknown[] = [];
     let root: ReturnType<typeof hydrateRoot> | undefined;
     try {
-      await act(async () => { root = hydrateRoot(node, shown,
-        { onRecoverableError: (error) => recovered.push(error) }); });
+      await act(async () => { root = hydrateRoot(node, shown, { onRecoverableError: (error) => recovered.push(error) }); });
       expect(recovered).toEqual([]);
-      expect(node.querySelector('[data-mode-toggle="true"]')).not.toBeNull();
+      expect(takeNotice).toHaveBeenCalledTimes(1);
+      expect(node.querySelector('[data-dialog="removal-notice"]')?.textContent).toContain("We deleted this debate");
     } finally {
       await act(async () => { root?.unmount(); });
-      if (priorLanguages) Object.defineProperty(navigator, "languages", priorLanguages);
-      else delete (navigator as { languages?: readonly string[] }).languages;
       node.remove();
     }
   });

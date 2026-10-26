@@ -8,7 +8,7 @@ import { LibraryComposer } from "@/components/LibraryComposer";
 import { readCrisisCountryHint } from "@/lib/crisisLines";
 import { LegalAcceptGate } from "@/components/billing/LegalAcceptGate";
 import { DebatesBuffer, PublicDebatesBuffer } from "@/components/DebatesBuffer";
-import { RemovalNoticeLatch } from "@/components/CheckRemovalNotice";
+import { RemovalNoticeTake } from "@/components/CheckRemovalNotice";
 import { SynthesisHoldRefresher } from "@/components/SynthesisHoldRefresher";
 import { LandingPage } from "@/components/landing/LandingPage";
 import { SupportWidget } from "@/components/support/SupportWidget";
@@ -97,7 +97,6 @@ export default async function HomePage({
   let sessionConfirmed = false;
   let published: Awaited<ReturnType<ContractClient["readPublicDebates"]>> = { items: [], total: 0 };
   let publishedError: string | null = null;
-  let removalNoticeTaken = false;
   try {
     published = await createServerContractClient(fetch, undefined, userAgent, clientIp).readPublicDebates(50, 0);
   } catch {
@@ -112,13 +111,6 @@ export default async function HomePage({
       sessionConfirmed = true;
     } catch {
       error = t(catalog, "home.sessionUnconfirmed");
-    }
-  }
-  if (sessionConfirmed && tab === "yours") {
-    try {
-      removalNoticeTaken = (await createServerContractClient(fetch, token, userAgent, clientIp).takeRemovalNotice()).notice;
-    } catch {
-      removalNoticeTaken = false;
     }
   }
   // Age gate (8k): a signed-in account created before the date-of-birth field answers its
@@ -236,7 +228,9 @@ export default async function HomePage({
           </>
         )}
       </div>
-      <RemovalNoticeLatch taken={removalNoticeTaken} catalog={catalog} locale={locale} countryHint={crisisCountryHint} />
+      {/* S01-R39: the notice is taken from the browser, which sends the CSRF pair a signed-in POST needs. */}
+      {sessionConfirmed && tab === "yours"
+        ? <RemovalNoticeTake catalog={catalog} locale={locale} countryHint={crisisCountryHint} /> : null}
       <SupportWidget />
     </div>
   );

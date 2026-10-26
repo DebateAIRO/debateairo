@@ -4,6 +4,7 @@ import * as React from "react";
 import { useModalSurface } from "@/components/consent/modalSemantics";
 import { useHideOutside } from "@/components/dialogSurface";
 import { CrisisHelpNumbers } from "@/components/CrisisSupport";
+import { contractClient } from "@/lib/api";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 type NoticeProps = Readonly<{
@@ -58,8 +59,22 @@ export function CheckRemovalNotice({ catalog, locale, countryHint, onClose }: No
   </div>;
 }
 
-export function RemovalNoticeLatch({ taken, ...props }: NoticeProps & { taken: boolean }) {
-  const [open, setOpen] = React.useState(taken);
-  React.useEffect(() => { if (taken) setOpen(true); }, [taken]);
-  return open ? <CheckRemovalNotice {...props} onClose={() => setOpen(false)} /> : null;
+/**
+ * S01-R39: Your debates and a deleted debate's address take the account's notice from the browser. A signed-in POST
+ * needs the page's CSRF pair and origin, which only the browser's client sends; a server render's take was refused, so
+ * the notice never showed there. One take per mount (the ref outlives React's dev double effect); the notice shows only
+ * when this take found it. `closeTo` leaves for that address on Close; without it, Close hides the notice.
+ */
+export function RemovalNoticeTake({ closeTo, ...props }: NoticeProps & { closeTo?: string }) {
+  const taking = React.useRef<Promise<boolean> | null>(null);
+  const [open, setOpen] = React.useState(false);
+  React.useEffect(() => {
+    let live = true;
+    taking.current ??= (async () => (await contractClient.takeRemovalNotice()).notice)().catch(() => false);
+    void taking.current.then((notice) => { if (live && notice) setOpen(true); });
+    return () => { live = false; };
+  }, []);
+  if (!open) return null;
+  return <CheckRemovalNotice {...props}
+    onClose={closeTo === undefined ? () => setOpen(false) : () => window.location.assign(closeTo)} />;
 }

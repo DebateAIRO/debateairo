@@ -37,7 +37,8 @@ describe("SUP-04 widget mount boundary", () => {
       .map(({ file }) => file).sort();
     expect(importers).toEqual([
       "apps/ui/app/debate/[id]/DebatePageGate.tsx",
-      "apps/ui/app/debate/[id]/page.tsx",
+      // S01-R39: a deleted debate's notice shows on this address's 404 (taken from the browser), beside the chat.
+      "apps/ui/app/debate/[id]/not-found.tsx",
       "apps/ui/app/new/NewDebatePageClient.tsx",
       "apps/ui/app/page.tsx",
       "apps/ui/app/public/debate/[id]/PublicDebatePageClient.tsx"

@@ -1,18 +1,22 @@
 // @vitest-environment jsdom
 import { createHash } from "node:crypto";
-import { act } from "react";
+import { act, StrictMode } from "react";
 import { isValidElement } from "react";
 import { createRoot, hydrateRoot } from "react-dom/client";
 import { renderToStaticMarkup, renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { CrisisHelpNumbers, CrisisSupportDialog } from "../../apps/ui/components/CrisisSupport";
-import { CheckRemovalNotice, RemovalNoticeLatch } from "../../apps/ui/components/CheckRemovalNotice";
+import { CheckRemovalNotice, RemovalNoticeTake } from "../../apps/ui/components/CheckRemovalNotice";
 import { ModeToggle } from "../../apps/ui/components/ModeToggle";
 import { CRISIS_LINES, STABLE_CRISIS_COUNTRY_OPTIONS, crisisCountryOptions, formatCrisisHours } from "../../apps/ui/lib/crisisLines";
 import HomePage from "../../apps/ui/app/page";
 import home from "../../apps/ui/messages/en/home.json";
 
-const { takeNotice } = vi.hoisted(() => ({ takeNotice: vi.fn() }));
+const { takeNotice, browserTake } = vi.hoisted(() => ({ takeNotice: vi.fn(), browserTake: vi.fn() }));
+vi.mock("@/lib/api", async (original) => {
+  const actual = await original() as Record<string, unknown>;
+  return { ...actual, contractClient: { ...(actual.contractClient as object), takeRemovalNotice: browserTake } };
+});
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => undefined }), headers: async () => new Headers() }));
 vi.mock("@/lib/serverApi", () => ({
   readSessionCookie: () => "test-session", readTrustedClientIp: () => null,
@@ -26,11 +30,11 @@ vi.mock("@/lib/serverApi", () => ({
 }));
 vi.mock("@/lib/i18n/server", () => ({ loadNamespace: async () => ({}) }));
 
-function findLatch(tree: unknown): React.ReactElement | null {
-  if (Array.isArray(tree)) return tree.map(findLatch).find(Boolean) ?? null;
+function findTaker(tree: unknown): React.ReactElement | null {
+  if (Array.isArray(tree)) return tree.map(findTaker).find(Boolean) ?? null;
   if (!isValidElement(tree)) return null;
-  if (tree.type === RemovalNoticeLatch) return tree;
-  return findLatch((tree.props as { children?: unknown }).children);
+  if (tree.type === RemovalNoticeTake) return tree;
+  return findTaker((tree.props as { children?: unknown }).children);
 }
 
 describe("S01 removal notice", () => {
@@ -173,13 +177,14 @@ describe("S01 removal notice", () => {
     node.remove();
   });
 
-  it("keeps a taken notice open across a false server refresh until Close", () => {
+  it("takes the notice from the browser once, even under React's double effects, and keeps it open until Close", async () => {
+    // A signed-in POST needs the page's CSRF pair, which only the browser's client sends (a server take was refused).
+    browserTake.mockReset().mockResolvedValueOnce({ notice: true }).mockResolvedValue({ notice: false });
     const node = document.createElement("div");
     document.body.append(node);
     const root = createRoot(node);
-    act(() => root.render(<RemovalNoticeLatch taken catalog={home} locale="en" countryHint="US" />));
-    expect(node.querySelector('[data-dialog="removal-notice"]')).not.toBeNull();
-    act(() => root.render(<RemovalNoticeLatch taken={false} catalog={home} locale="en" countryHint="US" />));
+    await act(async () => { root.render(<StrictMode><RemovalNoticeTake catalog={home} locale="en" countryHint="US" /></StrictMode>); });
+    expect(browserTake).toHaveBeenCalledTimes(1);
     expect(node.querySelector('[data-dialog="removal-notice"]')).not.toBeNull();
     act(() => node.querySelector<HTMLButtonElement>(".crisisSupportBack")?.click());
     expect(node.querySelector('[data-dialog="removal-notice"]')).toBeNull();
@@ -187,13 +192,27 @@ describe("S01 removal notice", () => {
     node.remove();
   });
 
-  it("Your debates takes the notice once and passes only that result to the latch", async () => {
-    takeNotice.mockReset().mockResolvedValueOnce({ notice: true }).mockResolvedValueOnce({ notice: false });
-    const first = findLatch(await HomePage({ searchParams: Promise.resolve({ tab: "yours" }) }));
-    const second = findLatch(await HomePage({ searchParams: Promise.resolve({ tab: "yours" }) }));
-    expect(first?.props).toMatchObject({ taken: true });
-    expect(second?.props).toMatchObject({ taken: false });
-    expect(takeNotice).toHaveBeenCalledTimes(2);
+  it("shows nothing when there is no notice or the take fails", async () => {
+    for (const take of [async () => ({ notice: false }), async () => { throw new Error("CSRF_VALIDATION_FAILED"); }]) {
+      browserTake.mockReset().mockImplementation(take);
+      const node = document.createElement("div");
+      document.body.append(node);
+      const root = createRoot(node);
+      await act(async () => { root.render(<RemovalNoticeTake catalog={home} locale="en" countryHint="US" />); });
+      expect(browserTake).toHaveBeenCalledTimes(1);
+      expect(node.querySelector('[data-dialog="removal-notice"]')).toBeNull();
+      act(() => root.unmount());
+      node.remove();
+    }
+  });
+
+  it("Your debates leaves the take to the browser: no server take, and the taker on the Your debates tab only", async () => {
+    takeNotice.mockReset();
+    const yours = await HomePage({ searchParams: Promise.resolve({ tab: "yours" }) });
+    const publicTab = await HomePage({ searchParams: Promise.resolve({ tab: "public" }) });
+    expect(findTaker(yours)?.props).toMatchObject({ locale: "en" });
+    expect(findTaker(publicTab)).toBeNull();
+    expect(takeNotice).not.toHaveBeenCalled();
   });
 
   it("keeps the crisis dialog's existing markup byte for byte after number extraction", () => {
