@@ -61,8 +61,10 @@ login can write — a setting, a role, a function argument — makes the databas
   that account: a subscription event or cancel link naming another account's subscription let the public cancel page
   cancel that plan (FIX-S01-p1a NEW-2, measured), and a subscription event naming another account's saved card would let
   a renewal charge it. Since V-18's default a row written under an account's context may name only a subscription with no
-  event yet or whose first event is the context's, and only a saved card of the context's customer: the trigger guard
-  `billing.guard_own_references()` on the five tables that name a subscription refuses anything else (42501). It is a
+  event yet or whose first event is the context's, only a saved card whose customer and source charge are the context's
+  (a card's customer row may be gone, and `customer_id` has no foreign key), and only a quote of its own in
+  `billing.quote_use` (one row per quote, so another account's quote named there would refuse that account's checkout):
+  the trigger guard `billing.guard_own_references()` on those six tables refuses anything else (42501). It is a
   trigger, EXECUTE-able by no login, because a function a request login may EXECUTE answers R42's calls, and a
   "may name" answer is true for an id no row carries (FIX-S01-p1e: two such definers made `rls:proof` print `widened=1`).
   The owner predicate is also ANDed with a run the context owns (`rls.owns_run`) or a parent row the request login can

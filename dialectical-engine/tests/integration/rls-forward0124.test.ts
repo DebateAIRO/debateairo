@@ -54,9 +54,10 @@ const DRIFT_0124 = `POSTCONDITION_DRIFT ${HEAD}`;
 const TABLES = RLS_IN_SCOPE.filter(({ kind }) => kind === "r").map(({ relation }) => relation);
 const VIEWS = RLS_IN_SCOPE.filter(({ kind }) => kind === "v").map(({ relation }) => relation);
 const FUNCTIONS = ["rls.session_credential_hash()", "rls.context_user_id()", "rls.context_owner_ref()", "rls.owns_run(uuid)", "rls.owns_execution_ref(text)"];
-/** V-18's guard (FIX-S01-p1e) and the five tables its trigger guard_own_references fires on. */
+/** V-18's guard (FIX-S01-p1e) and the six tables its trigger guard_own_references fires on. */
 const GUARD = "billing.guard_own_references()";
-const GUARDED = ["billing.cancel_token", "billing.charge", "billing.entitlement_event", "billing.subscription_event", "billing.withdrawal_owner_settlement"];
+const GUARDED = ["billing.cancel_token", "billing.charge", "billing.entitlement_event", "billing.quote_use", "billing.subscription_event",
+  "billing.withdrawal_owner_settlement"];
 const POLICIES = ["rls_account", "rls_all_accounts"];
 /** The six amendments of D38 and F-C1-1, hand-copied (relations sorted), as T11 expects them stored. */
 const AMENDMENTS = [
@@ -191,7 +192,7 @@ describe("S1.2 migration 0124 on an empty database", () => {
     expect(schema).toEqual({ runtime: true, public_grants: 0 });
   });
 
-  it("S1.2-T6b (V-18, FIX-S01-p1e) the guard is a migrator definer on pg_catalog that no login may EXECUTE, fired before each INSERT and UPDATE of the five tables", async () => {
+  it("S1.2-T6b (V-18, FIX-S01-p1e) the guard is a migrator definer on pg_catalog that no login may EXECUTE, fired before each INSERT and UPDATE of the six tables", async () => {
     const migrator = (await db.pool.query<{ name: string }>("SELECT current_user AS name")).rows[0]!.name;
     const guard = (await db.pool.query(`
       SELECT pg_get_userbyid(p.proowner)::text AS owner,p.prosecdef AS definer,p.proconfig AS config,

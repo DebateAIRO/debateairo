@@ -8,7 +8,7 @@
 --   (1) the marker role debateai_rls_all_accounts (NOLOGIN NOINHERIT; the provisioners grant it to the system logins);
 --   (2) schema rls, usable by debateai_runtime only;
 --   (3) the five rls functions (bodies measured in probes/ARCH-S01/spike-policies.mts), and V-18's guard
---       billing.guard_own_references(), a trigger on five K2 tables that no T1 login may EXECUTE;
+--       billing.guard_own_references(), a trigger on six billing tables that no T1 login may EXECUTE;
 --   (4) the three in-scope views apply the invoker's security, and core.run_waiting_v's SELECT moves from
 --       debateai_runtime to debateai_billing_runtime (D33);
 --   (5) on each of the 110 in-scope tables, in D32's row order: row security enabled (never forced), policy
@@ -16,9 +16,9 @@
 --       rls_all_accounts TO the eleven cross-account roles of D29 with USING (true) WITH CHECK (true); billing.cancel_token
 --       first gains its own owner_ref and keys on it (V-15's default, REV-S01-p1-security B1), not on D32's key. Six
 --       billing tables a child row of which may have no parent row key on `false` (V-17's default, FIX-S01-p1a NEW-1),
---       and five K2 tables refuse a row written under an account's context that names another account's subscription
---       or saved card (V-18's default, NEW-2); charge, run_charge_scope and withdrawal_owner_settlement also check the
---       parent rows they name.
+--       and six billing tables refuse a row written under an account's context that names another account's
+--       subscription, saved card or quote (V-18's default, NEW-2); charge, run_charge_scope and
+--       withdrawal_owner_settlement also check the parent rows they name.
 -- The loader (packages/db/src/migration-forward0124.ts) digests every RLS field of the 110 tables, the views, the
 -- functions and the marker role, and records the six earlier postconditions that pinned the flag as amended (D38, F-C1-1).
 -- Its verifier supersedes 0111's (lineage/verify-effective-capabilities-124.sql, R34), so the header keeps none.
@@ -73,7 +73,9 @@ GRANT EXECUTE ON FUNCTION rls.owns_execution_ref(text) TO debateai_runtime;
 -- another account that a cross-account reader then acts on for that account (cancelByToken and subscription_latest_v by
 -- subscription, the renewal's usableSavedCard by card token). Written under an account's context (a T1 login's request;
 -- the system logins carry none), a row may name a subscription that has no event yet or whose first event (the owner
--- every billing reader acts for) is the context's, and a card token whose customer is the context's. A trigger, not a
+-- every billing reader acts for) is the context's, a card token whose customer and whose source charge (a card's customer
+-- row may be gone, and customer_id has no foreign key) are the context's, and a quote the context owns (billing.quote_use
+-- holds one row per quote: an own row naming another account's quote would refuse that account's checkout). A trigger, not a
 -- policy function: a function a T1 login may EXECUTE answers R42's calls (FIX-S01-p1e: two such definers returned true
 -- for a NULL and for an unknown id, and rls:proof's F7 read that as a private value), and this one is EXECUTE-able by
 -- no login, as billing.guard_internal_charge_scope is (0123).
@@ -81,6 +83,12 @@ CREATE OR REPLACE FUNCTION billing.guard_own_references() RETURNS trigger LANGUA
 DECLARE v_context uuid := rls.context_owner_ref(); v_first uuid;
 BEGIN
   IF v_context IS NULL THEN RETURN NEW; END IF;
+  IF TG_TABLE_NAME = 'quote_use' THEN
+    IF NOT EXISTS (SELECT 1 FROM billing.quote AS q WHERE q.quote_id = NEW.quote_id AND q.owner_ref = v_context) THEN
+      RAISE EXCEPTION 'RLS_FOREIGN_QUOTE' USING ERRCODE = '42501';
+    END IF;
+    RETURN NEW;
+  END IF;
   IF NEW.subscription_id IS NOT NULL THEN
     SELECT e.owner_ref INTO v_first FROM billing.subscription_event AS e WHERE e.subscription_id = NEW.subscription_id ORDER BY e.seq LIMIT 1;
     IF FOUND AND v_first IS DISTINCT FROM v_context THEN RAISE EXCEPTION 'RLS_FOREIGN_SUBSCRIPTION' USING ERRCODE = '42501'; END IF;
@@ -88,7 +96,9 @@ BEGIN
   -- Nested: PL/pgSQL prepares a whole condition, and the other four tables have no card_token_id.
   IF TG_TABLE_NAME = 'subscription_event' THEN
     IF NEW.card_token_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM billing.card_token AS t JOIN billing.customer AS c
-        ON c.customer_id = t.customer_id WHERE t.token_id = NEW.card_token_id AND c.owner_ref = v_context) THEN
+        ON c.customer_id = t.customer_id WHERE t.token_id = NEW.card_token_id AND c.owner_ref = v_context
+          AND (t.source_charge_id IS NULL OR EXISTS (SELECT 1 FROM billing.charge AS s WHERE s.charge_id = t.source_charge_id
+            AND s.owner_ref = v_context))) THEN
       RAISE EXCEPTION 'RLS_FOREIGN_CARD_TOKEN' USING ERRCODE = '42501';
     END IF;
   END IF;
@@ -98,6 +108,7 @@ REVOKE ALL ON FUNCTION billing.guard_own_references() FROM PUBLIC;
 CREATE TRIGGER guard_own_references BEFORE INSERT OR UPDATE ON billing.cancel_token FOR EACH ROW EXECUTE FUNCTION billing.guard_own_references();
 CREATE TRIGGER guard_own_references BEFORE INSERT OR UPDATE ON billing.charge FOR EACH ROW EXECUTE FUNCTION billing.guard_own_references();
 CREATE TRIGGER guard_own_references BEFORE INSERT OR UPDATE ON billing.entitlement_event FOR EACH ROW EXECUTE FUNCTION billing.guard_own_references();
+CREATE TRIGGER guard_own_references BEFORE INSERT OR UPDATE ON billing.quote_use FOR EACH ROW EXECUTE FUNCTION billing.guard_own_references();
 CREATE TRIGGER guard_own_references BEFORE INSERT OR UPDATE ON billing.subscription_event FOR EACH ROW EXECUTE FUNCTION billing.guard_own_references();
 CREATE TRIGGER guard_own_references BEFORE INSERT OR UPDATE ON billing.withdrawal_owner_settlement FOR EACH ROW EXECUTE FUNCTION billing.guard_own_references();
 

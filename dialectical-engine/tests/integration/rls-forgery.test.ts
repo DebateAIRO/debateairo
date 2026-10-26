@@ -500,6 +500,24 @@ describe("row-level security S01 C6: forgery by SQL on the four T1 logins widens
     });
     const a = await ids(A.ownerRef);
     const b = await ids(B.ownerRef);
+    // billing.quote_use holds one row per quote, so each side gets a quote no use names yet (copied from its seeded one).
+    const unusedQuote = async (quote: string): Promise<string> => {
+      const id = randomUUID();
+      await su.query(`INSERT INTO billing.quote(quote_id,owner_ref,plan_id,kind,net_micros,tax_micros,total_micros,tax_country,
+        tax_rate_bp,tax_status,tax_name,created_at,expires_at,location_ciphertext,key_id,currency) SELECT $2,owner_ref,plan_id,kind,
+        net_micros,tax_micros,total_micros,tax_country,tax_rate_bp,tax_status,tax_name,now(),now()+interval '1 hour',
+        location_ciphertext,key_id,currency FROM billing.quote WHERE quote_id=$1`, [quote, id]);
+      return id;
+    };
+    const unused = { a: await unusedQuote(a.quote), b: await unusedQuote(b.quote) };
+    // Review F3: card_token.customer_id has no foreign key, so a card of B whose customer row is gone can come to carry
+    // A's customer_id (A takes the freed id in its own customer row). Planted here directly: B's card, A's customer, B's
+    // source charge. Its source charge is still B's, so the card is still not A's to name.
+    const retaken = randomUUID();
+    await su.query(`INSERT INTO billing.card_token(token_id,payment_provider,payment_environment,token_ciphertext,key_id,created_at,
+      customer_id,source_charge_id) SELECT $2,payment_provider,payment_environment,token_ciphertext,key_id,now(),
+      (SELECT customer_id FROM billing.customer WHERE owner_ref=$3),source_charge_id FROM billing.card_token WHERE token_id=$1`,
+    [b.card, retaken, A.ownerRef]);
     const ctx = "(SELECT rls.context_owner_ref())";
     const netopia = JSON.stringify({ payment_provider: "netopia", payment_environment: "sandbox" });
     // 0086's checks: a CARD_CHECK carries no quote and may be zero; any other kind carries one and is positive. Every
@@ -530,12 +548,21 @@ describe("row-level security S01 C6: forgery by SQL on the four T1 logins widens
           const entitlement = (subscription: string): Statement => [`INSERT INTO billing.entitlement_event(event_id,owner_ref,plan_id,
             effective_at,period_anchor_at,cause,subscription_id,paid_through) VALUES($1,${ctx},'PLUS',now(),now(),'SUBSCRIBED',$2,
             now()+interval '30 days')`, [randomUUID(), subscription]];
+          // An own CARD_CHECK charge on the fresh subscription, for quote_use's charge (one use per charge).
+          const useCharge = randomBytes(16).toString("hex");
+          await attempt(c, `INSERT INTO billing.charge(charge_id,owner_ref,subscription_id,kind,attempt,period_start,period_end,net_micros,
+            tax_micros,total_micros,currency,created_at,payment_environment,payment_provider) VALUES($1,${ctx},$2,'CARD_CHECK',1,now(),
+            now()+interval '30 days',0,0,0,'EUR',now(),'sandbox','netopia')`, [useCharge, fresh.subscription]);
+          const use = (quote: string): Statement => [`INSERT INTO billing.quote_use(quote_id,used_at,charge_id) VALUES($1,now(),$2)`,
+            [quote, useCharge]];
           const members: ReadonlyArray<readonly [string, Statement, Statement]> = [
             ["billing.subscription_event.subscription_id", event("CANCEL_REQUESTED", b.subscription, null), event("CANCEL_REQUESTED", a.subscription, null)],
             ["billing.subscription_event.card_token_id", event("CARD_SAVED", a.subscription, b.card), event("CARD_SAVED", a.subscription, a.card)],
+            ["billing.subscription_event.card_token_id(retaken)", event("CARD_SAVED", a.subscription, retaken), event("CARD_SAVED", a.subscription, a.card)],
             ["billing.cancel_token.subscription_id", link(b.subscription), link(a.subscription)],
             ["billing.charge.subscription_id", charge(b.subscription, null), charge(a.subscription, null)],
             ["billing.charge.quote_id", charge(a.subscription, b.quote), charge(a.subscription, a.quote)],
+            ["billing.quote_use.quote_id", use(unused.b), use(unused.a)],
             ["billing.entitlement_event.subscription_id", entitlement(b.subscription), entitlement(a.subscription)],
             ["billing.run_charge_scope.run_id", scope(B.runId, a.entitlement), scope(A.runId, a.entitlement)],
             ["billing.run_charge_scope.entitlement_event_id", scope(A.runId, b.entitlement), scope(A.runId, a.entitlement)],
@@ -556,7 +583,8 @@ describe("row-level security S01 C6: forgery by SQL on the four T1 logins widens
     }
     console.info(`F12 FRAME ${outcomes.join(" | ")}`);
     const members = ["billing.subscription_event.subscription_id", "billing.subscription_event.card_token_id",
-      "billing.cancel_token.subscription_id", "billing.charge.subscription_id", "billing.charge.quote_id",
+      "billing.subscription_event.card_token_id(retaken)",
+      "billing.cancel_token.subscription_id", "billing.charge.subscription_id", "billing.charge.quote_id", "billing.quote_use.quote_id",
       "billing.entitlement_event.subscription_id", "billing.run_charge_scope.run_id", "billing.run_charge_scope.entitlement_event_id",
       "billing.withdrawal_owner_settlement.subscription_id", "billing.withdrawal_owner_settlement.withdrawn_event_id"];
     expect(outcomes).toEqual(["debateai_dev_runtime", "debateai_prod_api_runtime"].flatMap((login) =>

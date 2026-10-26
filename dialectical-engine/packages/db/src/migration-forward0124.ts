@@ -54,8 +54,8 @@ const VIEWS=['billing.person_windows_v','billing.subscription_latest_v','core.ru
 /** The five context functions of schema rls (D27, D39), and V-18's trigger guard (FIX-S01-p1e). */
 const FUNCTIONS=['billing.guard_own_references()','rls.context_owner_ref()','rls.context_user_id()',
  'rls.owns_execution_ref(text)','rls.owns_run(uuid)','rls.session_credential_hash()'] as const;
-/** The five tables V-18's guard fires on, each by its trigger guard_own_references (FIX-S01-p1e). */
-const GUARDED=['billing.cancel_token','billing.charge','billing.entitlement_event','billing.subscription_event',
+/** The six tables V-18's guard fires on, each by its trigger guard_own_references (FIX-S01-p1e). */
+const GUARDED=['billing.cancel_token','billing.charge','billing.entitlement_event','billing.quote_use','billing.subscription_event',
  'billing.withdrawal_owner_settlement'] as const;
 const MARKER_ROLE='debateai_rls_all_accounts';
 const POLICIES=['rls_account','rls_all_accounts'] as const;

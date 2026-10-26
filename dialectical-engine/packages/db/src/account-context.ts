@@ -144,11 +144,14 @@ export async function attestEveryRoute(attest: () => Promise<unknown>): Promise<
 
 /**
  * The account reach of the login a connection runs as (`current_user`, the session's own login unless its role was
- * switched): superuser, BYPASSRLS, the marker role, a role the `rls_all_accounts` policies name (D29 iii), or the owner
- * of a row-secured relation each reach every account's rows. Catalog functions only; no account row is read.
+ * switched): superuser, BYPASSRLS, membership of a superuser or BYPASSRLS role (the login may SET ROLE to it), the marker
+ * role, a role the `rls_all_accounts` policies name (D29 iii), or the owner of a row-secured relation each reach every
+ * account's rows. Catalog functions only; no account row is read.
  */
 const LOGIN_REACH_SQL = `
   SELECT session_user <> current_user AS switched, role.rolsuper AS superuser, role.rolbypassrls AS bypass,
+    EXISTS (SELECT 1 FROM pg_catalog.pg_roles AS other WHERE other.oid <> role.oid AND (other.rolsuper OR other.rolbypassrls)
+      AND pg_catalog.pg_has_role(current_user, other.oid, 'MEMBER')) AS escalates,
     COALESCE(pg_catalog.pg_has_role(current_user, to_regrole('debateai_rls_all_accounts'), 'MEMBER'), false) AS marker,
     COALESCE(pg_catalog.pg_has_role(current_user, to_regrole('debateai_rls_all_accounts'), 'USAGE'), false) AS marker_usage,
     EXISTS (SELECT 1 FROM pg_catalog.pg_policy AS policy CROSS JOIN LATERAL unnest(policy.polroles) AS listed(role)
@@ -159,8 +162,8 @@ const LOGIN_REACH_SQL = `
   FROM pg_catalog.pg_roles AS role WHERE role.rolname = current_user`;
 
 type LoginReach = Readonly<{
-  switched: boolean; superuser: boolean; bypass: boolean; marker: boolean; marker_usage: boolean; policy_role: boolean;
-  owner: boolean;
+  switched: boolean; superuser: boolean; bypass: boolean; escalates: boolean; marker: boolean; marker_usage: boolean;
+  policy_role: boolean; owner: boolean;
 }>;
 
 async function loginReach(pool: Pool): Promise<LoginReach | undefined> {
@@ -170,11 +173,11 @@ async function loginReach(pool: Pool): Promise<LoginReach | undefined> {
 /**
  * COR-B1, the boot attestation of the logins themselves (main.ts, boot.run("account-context-logins")). Every pool built
  * on a T1 URL is read on its own connections: its login must reach no other account — not superuser, no BYPASSRLS, not a
- * member of the marker or of a role the rls_all_accounts policies name, owner of no row-secured relation, its role not
+ * member of a superuser or BYPASSRLS role, of the marker or of a role the rls_all_accounts policies name, owner of no row-secured relation, its role not
  * switched — else RLS_REQUEST_LOGIN_REACHES_ALL_ACCOUNTS (an alias of a system login as DATABASE_URL passes the URL
  * compare of runtime-environment.ts and every role check, and is refused here). Every pool built on a system URL must
- * reach every account through the marker and nothing wider — it holds the marker's privileges, is not superuser and has
- * no BYPASSRLS — else RLS_SYSTEM_LOGIN_INVALID (also on a database without the marker role: row security not installed).
+ * reach every account through the marker and nothing wider — it holds the marker's privileges, is not superuser, has
+ * no BYPASSRLS and is a member of no role that has either — else RLS_SYSTEM_LOGIN_INVALID (also on a database without the marker role: row security not installed).
  */
 export async function assertAccountContextLogins(input: Readonly<{
   requestPools: readonly Pool[];
@@ -184,11 +187,11 @@ export async function assertAccountContextLogins(input: Readonly<{
     Promise.all(input.requestPools.map((pool) => onOwnConnections(() => loginReach(pool)))),
     Promise.all(input.systemPools.map((pool) => onOwnConnections(() => loginReach(pool))))
   ]);
-  if (requests.some((reach) => reach === undefined || reach.switched || reach.superuser || reach.bypass
+  if (requests.some((reach) => reach === undefined || reach.switched || reach.superuser || reach.bypass || reach.escalates
     || reach.marker || reach.policy_role || reach.owner)) {
     throw new TypeError("RLS_REQUEST_LOGIN_REACHES_ALL_ACCOUNTS");
   }
-  if (systems.some((reach) => reach === undefined || !reach.marker_usage || reach.superuser || reach.bypass)) {
+  if (systems.some((reach) => reach === undefined || !reach.marker_usage || reach.superuser || reach.bypass || reach.escalates)) {
     throw new TypeError("RLS_SYSTEM_LOGIN_INVALID");
   }
 }

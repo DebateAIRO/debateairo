@@ -275,7 +275,10 @@ describe("row-level security S01 FIX p1b: main.ts's boot attestations attest the
       policyRole: (name) => [`GRANT debateai_release_owner TO ${name}`],
       owner: (name) => [`CREATE TABLE public.${name}_t (id int)`, `ALTER TABLE public.${name}_t ENABLE ROW LEVEL SECURITY`,
         `ALTER TABLE public.${name}_t OWNER TO ${name}`],
-      switchedRole: (name) => [`ALTER ROLE ${name} SET role = 'debateai_billing_runtime'`]
+      switchedRole: (name) => [`ALTER ROLE ${name} SET role = 'debateai_billing_runtime'`],
+      // Review of fce5c2d4c..b8bf8b0a4, F1: a role the login may SET ROLE to reaches what that role reaches.
+      bypassMember: (name) => [`CREATE ROLE ${name}_r NOLOGIN BYPASSRLS`, `GRANT ${name}_r TO ${name}`],
+      superuserMember: (name) => [`CREATE ROLE ${name}_r NOLOGIN SUPERUSER`, `GRANT ${name}_r TO ${name}`]
     };
     for (const [reach, statements] of Object.entries(reaches)) {
       const login = await fixtureLogin(`rls_boot_${reach.toLowerCase()}`);
@@ -290,6 +293,10 @@ describe("row-level security S01 FIX p1b: main.ts's boot attestations attest the
     results.systemTwinBypass = await asSystemLogin(twin);
     await database.pool.query(`ALTER ROLE ${twinName} NOBYPASSRLS SUPERUSER`);
     results.systemTwinSuperuser = await asSystemLogin(twin);
+    await database.pool.query(`ALTER ROLE ${twinName} NOSUPERUSER`);
+    await database.pool.query(`CREATE ROLE ${twinName}_r NOLOGIN BYPASSRLS`);
+    await database.pool.query(`GRANT ${twinName}_r TO ${twinName}`);
+    results.systemTwinBypassMember = await asSystemLogin(twin);
     expect(results).toEqual({
       plain: "PASSED",
       superuser: "REFUSED RLS_REQUEST_LOGIN_REACHES_ALL_ACCOUNTS",
@@ -298,10 +305,13 @@ describe("row-level security S01 FIX p1b: main.ts's boot attestations attest the
       policyRole: "REFUSED RLS_REQUEST_LOGIN_REACHES_ALL_ACCOUNTS",
       owner: "REFUSED RLS_REQUEST_LOGIN_REACHES_ALL_ACCOUNTS",
       switchedRole: "REFUSED RLS_REQUEST_LOGIN_REACHES_ALL_ACCOUNTS",
+      bypassMember: "REFUSED RLS_REQUEST_LOGIN_REACHES_ALL_ACCOUNTS",
+      superuserMember: "REFUSED RLS_REQUEST_LOGIN_REACHES_ALL_ACCOUNTS",
       systemTwin: "PASSED",
       systemPlain: "REFUSED RLS_SYSTEM_LOGIN_INVALID",
       systemTwinBypass: "REFUSED RLS_SYSTEM_LOGIN_INVALID",
-      systemTwinSuperuser: "REFUSED RLS_SYSTEM_LOGIN_INVALID"
+      systemTwinSuperuser: "REFUSED RLS_SYSTEM_LOGIN_INVALID",
+      systemTwinBypassMember: "REFUSED RLS_SYSTEM_LOGIN_INVALID"
     });
   });
 });
