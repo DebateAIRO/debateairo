@@ -1099,10 +1099,11 @@ export class BillingRepository {
     return Number(result.rows[0]?.issued ?? "0");
   }
 
-  async useCancelToken(c: PoolClient, tokenSha256: string, now: Date): Promise<{ subscriptionId: string } | null> {
-    const row = (await c.query<{ subscription_id: string }>(`
+  /** `ownerRef`: the link's stored owner (V-15; null for a link 0124 found with no subscription event), which V-18 compares. */
+  async useCancelToken(c: PoolClient, tokenSha256: string, now: Date): Promise<{ subscriptionId: string; ownerRef: string | null } | null> {
+    const row = (await c.query<{ subscription_id: string; owner_ref: string | null }>(`
       WITH usable AS (
-        SELECT token.token_sha256, token.subscription_id FROM billing.cancel_token AS token
+        SELECT token.token_sha256, token.subscription_id, token.owner_ref FROM billing.cancel_token AS token
         WHERE token.token_sha256 = $1 AND token.expires_at > $2
       ), used AS (
         INSERT INTO billing.cancel_token_use (token_sha256, used_at)
@@ -1110,9 +1111,9 @@ export class BillingRepository {
         ON CONFLICT (token_sha256) DO NOTHING
         RETURNING token_sha256
       )
-      SELECT usable.subscription_id FROM usable JOIN used ON used.token_sha256 = usable.token_sha256
+      SELECT usable.subscription_id, usable.owner_ref FROM usable JOIN used ON used.token_sha256 = usable.token_sha256
     `, [tokenSha256, now])).rows[0];
-    return row === undefined ? null : Object.freeze({ subscriptionId: row.subscription_id });
+    return row === undefined ? null : Object.freeze({ subscriptionId: row.subscription_id, ownerRef: row.owner_ref });
   }
 
   /**

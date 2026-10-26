@@ -53,7 +53,19 @@ login can write — a setting, a role, a function argument — makes the databas
   `billing.cancel_token` keyed on `billing.subscription_event.subscription_id`, a key any account may append under its
   own owner, so one own event naming another account's subscription read that account's cancel links (REV-S01-p1-security
   B1, measured); since V-15's default it keys on its own `owner_ref`. `tests/integration/rls-catalog.test.ts` S6.4-e
-  sweeps every parent predicate against these conditions; S6.4-f pins the members whose child rows need no parent row.
+  sweeps every parent predicate against these conditions; S6.4-f requires that no child row may lack its parent row.
+  Six billing tables failed the foreign-key condition (saved cards, their revocations, NETOPIA notices, their outcomes
+  and raw copies, quarantined notices: FIX-S01-p1a NEW-1, measured); no signed-in request reads them on a request
+  login, so since V-17's default their request-login predicate is `false`, as `billing.outbox`'s is.
+- A row keyed on its own owner may still NAME an entity of another account that a cross-account reader then acts on for
+  that account: a subscription event or cancel link naming another account's subscription let the public cancel page
+  cancel that plan (FIX-S01-p1a NEW-2, measured), and a subscription event naming another account's saved card would let
+  a renewal charge it. Since V-18's default the owner predicate of such a table is ANDed with what the row may name: a
+  subscription with no event yet or whose first event is the context's (`rls.may_name_subscription`), a saved card of the
+  context's customer (`rls.may_name_card_token`), a run the context owns (`rls.owns_run`), or a parent row the request
+  login can see (`EXISTS`). `cancelByToken` also refuses a link whose owner is not its subscription's first owner.
+  `tests/integration/rls-forgery.test.ts` S6.3-F12 writes each of the ten members, once naming the other account's
+  entity (refused) and once naming its own (accepted).
 - A statement on a request login costs one InitPlan per policy evaluation (re-hash and session lookup); measured once
   (25.1 ms for a full scan of 1,001 runs), otherwise UNVERIFIED.
 - Code that runs on a system login (the billing runtime, background loops, the listed sites) is not limited by row

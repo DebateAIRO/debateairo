@@ -190,25 +190,22 @@ export const RLS_ALL_ACCOUNTS_ROLES: readonly string[] = Object.freeze([
  * R15's predicate allow-list: the texts of D34, JSON-decoded, as `pg_get_expr` prints them — 38 since V-15's default
  * (SEC-B1, t_37152b67): billing.cancel_token keys on its own owner_ref (the K2 text), so D34's 39th text, its EXISTS over
  * billing.subscription_event (a key any account may append under its own owner_ref), is no longer printed by any policy.
+ * 37 since FIX-S01-p1d: V-17's default prints `false` for six billing tables, so their six EXISTS texts go; V-18's default
+ * prints the K2 text ANDed with what the row may name, five new texts (billing.cancel_token and billing.entitlement_event
+ * share one).
  */
 export const RLS_ALLOW_LIST: readonly string[] = Object.freeze([
   "(EXISTS ( SELECT 1\n   FROM billing.cancel_token p\n  WHERE (p.token_sha256 = cancel_token_use.token_sha256)))",
-  "(EXISTS ( SELECT 1\n   FROM billing.card_token p\n  WHERE (p.token_id = card_token_revocation.token_id)))",
   "(EXISTS ( SELECT 1\n   FROM billing.charge p\n  WHERE ((p.charge_id = charge_event.charge_id) AND (p.payment_environment = charge_event.payment_environment) AND (p.payment_provider = charge_event.payment_provider))))",
   "(EXISTS ( SELECT 1\n   FROM billing.charge p\n  WHERE (p.charge_id = hosted_payment.charge_id)))",
   "(EXISTS ( SELECT 1\n   FROM billing.charge p\n  WHERE (p.charge_id = invoice_intent.charge_id)))",
   "(EXISTS ( SELECT 1\n   FROM billing.charge p\n  WHERE (p.charge_id = location_evidence.charge_id)))",
-  "(EXISTS ( SELECT 1\n   FROM billing.charge p\n  WHERE (p.charge_id = notice_quarantine.order_id)))",
-  "(EXISTS ( SELECT 1\n   FROM billing.charge p\n  WHERE (p.charge_id = payment_notice.order_id)))",
   "(EXISTS ( SELECT 1\n   FROM billing.charge p\n  WHERE (p.charge_id = quote_use.charge_id)))",
   "(EXISTS ( SELECT 1\n   FROM billing.charge p\n  WHERE (p.charge_id = status_read.charge_id)))",
-  "(EXISTS ( SELECT 1\n   FROM billing.customer p\n  WHERE (p.customer_id = card_token.customer_id)))",
   "(EXISTS ( SELECT 1\n   FROM billing.customer p\n  WHERE (p.customer_id = customer_profile_event.customer_id)))",
   "(EXISTS ( SELECT 1\n   FROM billing.customer p\n  WHERE (p.customer_id = customer_xmoney.customer_id)))",
   "(EXISTS ( SELECT 1\n   FROM billing.invoice p\n  WHERE (p.invoice_id = invoice_status_event.invoice_id)))",
   "(EXISTS ( SELECT 1\n   FROM billing.invoice_intent p\n  WHERE ((p.charge_id = invoice.charge_id) AND (p.kind = invoice.kind) AND (p.issuer = invoice.issuer))))",
-  "(EXISTS ( SELECT 1\n   FROM billing.payment_notice p\n  WHERE (p.notice_id = payment_notice_outcome.notice_id)))",
-  "(EXISTS ( SELECT 1\n   FROM billing.payment_notice p\n  WHERE (p.notice_id = payment_notice_raw.notice_id)))",
   "(EXISTS ( SELECT 1\n   FROM core.node p\n  WHERE (p.node_id = condition_mark_node.node_id)))",
   "(EXISTS ( SELECT 1\n   FROM core.node p\n  WHERE (p.node_id = node_strength_record.node_id)))",
   "(EXISTS ( SELECT 1\n   FROM core.node p\n  WHERE (p.node_id = sensitivity_record.removed_node_id)))",
@@ -222,6 +219,11 @@ export const RLS_ALLOW_LIST: readonly string[] = Object.freeze([
   "(EXISTS ( SELECT 1\n   FROM serve.answer p\n  WHERE ((p.answer_id = shadow_suppression.answer_id) AND (p.answer_version = shadow_suppression.answer_version))))",
   "(EXISTS ( SELECT 1\n   FROM serve.composed_text p\n  WHERE (p.composed_text_id = conformance_record.composed_text_id)))",
   "(EXISTS ( SELECT 1\n   FROM serve.served_number p\n  WHERE (p.served_number_id = served_number_event.served_number_id)))",
+  "((owner_ref = ( SELECT rls.context_owner_ref() AS context_owner_ref)) AND rls.may_name_subscription(subscription_id))",
+  "((owner_ref = ( SELECT rls.context_owner_ref() AS context_owner_ref)) AND rls.may_name_subscription(subscription_id) AND ((quote_id IS NULL) OR (EXISTS ( SELECT 1\n   FROM billing.quote p\n  WHERE (p.quote_id = charge.quote_id)))))",
+  "((owner_ref = ( SELECT rls.context_owner_ref() AS context_owner_ref)) AND rls.may_name_subscription(subscription_id) AND (EXISTS ( SELECT 1\n   FROM billing.subscription_event p\n  WHERE (p.event_id = withdrawal_owner_settlement.withdrawn_event_id))))",
+  "((owner_ref = ( SELECT rls.context_owner_ref() AS context_owner_ref)) AND rls.may_name_subscription(subscription_id) AND rls.may_name_card_token(card_token_id))",
+  "((owner_ref = ( SELECT rls.context_owner_ref() AS context_owner_ref)) AND rls.owns_run(run_id) AND ((entitlement_event_id IS NULL) OR (EXISTS ( SELECT 1\n   FROM billing.entitlement_event p\n  WHERE (p.event_id = run_charge_scope.entitlement_event_id)))))",
   "(owner_ref = ( SELECT rls.context_owner_ref() AS context_owner_ref))",
   "(user_id = ( SELECT rls.context_user_id() AS context_user_id))",
   "false",

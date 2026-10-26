@@ -8,9 +8,11 @@
  * core.append_run_ownership_event (`main` carries the run-scoped rows; `sOld`→`sNew` and `mOld`→`mNew` are the two
  * supersession edges), the execution binding of `main`, one encrypted run (`enc`: the rows that need live private
  * content — the publication and the routing of its execution — hang off it), and then one row per table (several where a
- * later row needs them). A row belongs to an account by SPEC-v4 T4; for the four tables whose D32 predicate is `false` (no account key
- * exists in the row) the row is attributed by what it names: identity.audit_event's target_id (the user id),
- * billing.outbox's ref and payload and billing.xmoney_notice's external order id (the owner_ref), and its outcome's notice.
+ * later row needs them). A row belongs to an account by SPEC-v4 T4; for the ten tables whose predicate is `false` (D32's
+ * four, where no account key exists in the row, and V-17's six) the row is attributed by what it names: identity.audit_event's
+ * target_id (the user id), billing.outbox's ref and payload and billing.xmoney_notice's external order id (the owner_ref),
+ * and its outcome's notice; billing.card_token's customer, its revocation's token, billing.payment_notice's and
+ * billing.notice_quarantine's order (the charge), and the notice's outcome and raw copy.
  *
  * F-SEC-1 (t_2e3023cd): the four two-run tables whose policy keys on ONE run column also get mixed-owner rows — `ab`, whose
  * policy column names a run of A and whose other run column names a run of B, and `ba`, the reverse. The supersession

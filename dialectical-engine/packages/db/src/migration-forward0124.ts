@@ -51,9 +51,9 @@ const TABLES=['billing.cancel_token','billing.cancel_token_use','billing.card_to
  'serve.synthesis_round'] as const;
 /** The three in-scope views (R12, D33). */
 const VIEWS=['billing.person_windows_v','billing.subscription_latest_v','core.run_waiting_v'] as const;
-/** The five context functions of schema rls (D27, D39). */
-const FUNCTIONS=['rls.context_owner_ref()','rls.context_user_id()','rls.owns_execution_ref(text)','rls.owns_run(uuid)',
- 'rls.session_credential_hash()'] as const;
+/** The five context functions of schema rls (D27, D39), and the two of V-18 that say what an own row may name. */
+const FUNCTIONS=['rls.context_owner_ref()','rls.context_user_id()','rls.may_name_card_token(uuid)','rls.may_name_subscription(uuid)',
+ 'rls.owns_execution_ref(text)','rls.owns_run(uuid)','rls.session_credential_hash()'] as const;
 const MARKER_ROLE='debateai_rls_all_accounts';
 const POLICIES=['rls_account','rls_all_accounts'] as const;
 /**

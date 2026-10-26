@@ -102,6 +102,21 @@ async function forgery(login: T1Login, context: Context, family: string, label: 
   });
 }
 
+type Statement = [string, unknown[]];
+
+/** One statement in a savepoint: "ACCEPTED", or the SQLSTATE that refused it. `undo` rolls an accepted one back as well. */
+async function attempt(client: pg.Client, sql: string, values: readonly unknown[], undo = false): Promise<string> {
+  await client.query("SAVEPOINT attempt");
+  try {
+    await client.query(sql, [...values]);
+    await client.query(undo ? "ROLLBACK TO SAVEPOINT attempt" : "RELEASE SAVEPOINT attempt");
+    return "ACCEPTED";
+  } catch (error) {
+    await client.query("ROLLBACK TO SAVEPOINT attempt");
+    return (error as { code?: string }).code ?? "NO_SQLSTATE";
+  }
+}
+
 /** F1's setting names: the credential plus every name passed to current_setting( by an in-scope policy or a function it calls. */
 async function policySettingNames(): Promise<string[]> {
   const su = database.pool;
@@ -318,10 +333,11 @@ describe("row-level security S01 C6: forgery by SQL on the four T1 logins widens
     expect(failures).toEqual([]);
   });
 
-  it("S6.3-F10 (SEC-B1, V-15) an own-account subscription event naming B's subscription makes no row of B readable, and no cancel link of B writable", async () => {
+  it("S6.3-F10 (SEC-B1, V-15, V-18) an own-account subscription event naming B's subscription is refused, and one already stored makes no row of B readable and no cancel link of B writable", async () => {
     // REV-S01-p1-security B1: billing.cancel_token was B's when ANY subscription event with its subscription_id was
-    // visible, and A may append one under A's own owner_ref. The bridge below is that permitted write; it must be
-    // accepted on the logins that hold INSERT on billing.subscription_event, or this case pins nothing.
+    // visible, and A could append one under A's own owner_ref. V-18 refuses that write on every T1 login; a bridge
+    // stored before 0124 (planted here by the superuser: A's owner_ref on B's subscription) must still widen nothing,
+    // which is what keeps the read half of this case from being vacuous now that no T1 login can write the bridge.
     const su = database.pool;
     const bSubscription = (await su.query(`SELECT subscription_id::text AS id FROM billing.subscription_event WHERE owner_ref = $1
       ORDER BY seq LIMIT 1`, [B.ownerRef])).rows[0]!.id as string;
@@ -330,58 +346,205 @@ describe("row-level security S01 C6: forgery by SQL on the four T1 logins widens
     expect(bToken).toHaveLength(1);
     expect((await su.query("SELECT count(*)::int AS n FROM billing.cancel_token_use WHERE token_sha256 = $1", [bToken[0]])).rows[0].n)
       .toBe(1);
+    const bridge = `INSERT INTO billing.subscription_event(event_id, subscription_id, owner_ref, kind, at, plan_id, data)
+      VALUES ($1, $2, $3, 'CREATED', now(), 'PLUS', $4::jsonb)`;
+    const netopia = JSON.stringify({ payment_provider: "netopia", payment_environment: "sandbox" });
     const failures: string[] = [];
-    const bridged: string[] = [];
     const writes: string[] = [];
-    const attempt = async (client: pg.Client, sql: string, values: readonly unknown[]): Promise<string> => {
-      await client.query("SAVEPOINT f10");
-      try {
-        await client.query(sql, [...values]);
-        await client.query("RELEASE SAVEPOINT f10");
-        return "ACCEPTED";
-      } catch (error) {
-        await client.query("ROLLBACK TO SAVEPOINT f10");
-        return (error as { code?: string }).code ?? "NO_SQLSTATE";
-      }
-    };
     for (const login of t1) {
-      const eventId = randomUUID();
-      failures.push(...(await forgery(login, "A", "F10", "F10:subscription-bridge", async (c) => {
+      await asLogin(login.url, async (c) => {
+        await c.query(CREDENTIAL, [A.token]);
         await c.query("BEGIN");
-        const bridge = await attempt(c, `INSERT INTO billing.subscription_event(event_id, subscription_id, owner_ref, kind, at, plan_id, data)
-          VALUES ($1, $2, (SELECT rls.context_owner_ref()), 'CREATED', now(), 'PLUS', $3::jsonb)`,
-        [eventId, bSubscription, JSON.stringify({ payment_provider: "netopia", payment_environment: "sandbox" })]);
-        if (bridge === "ACCEPTED") bridged.push(login.name);
-      }, async (c) => {
         try {
-          // The bridge event is A's own row (T4: its owner_ref is A's), and so is the one row of the latest-event view it
-          // makes for B's subscription id while that row carries A's owner_ref; every other returned row is classified.
-          const own = new Set<string>();
-          if (bridged.includes(login.name)) {
-            own.add(`RLS_FAIL ${login.name} billing.subscription_event R14:F10:subscription-bridge:A foreign=other:${JSON.stringify([eventId])}`);
-            const latest = (await c.query("SELECT owner_ref::text AS owner FROM billing.subscription_latest_v WHERE subscription_id = $1",
-              [bSubscription])).rows;
-            if (latest.length === 1 && latest[0].owner === A.ownerRef) {
-              own.add(`RLS_FAIL ${login.name} billing.subscription_latest_v R14:F10:subscription-bridge:A foreign=b:${JSON.stringify([bSubscription])}`);
-            }
-          }
-          const read = (await readFailures(c, login.name, "A", "F10:subscription-bridge")).filter((line) => !own.has(line));
+          writes.push(`${login.name} bridge ${await attempt(c, bridge.replace("$3", "(SELECT rls.context_owner_ref())").replace("$4", "$3"),
+            [randomUUID(), bSubscription, netopia])}`);
+        } finally {
+          await c.query("ROLLBACK");
+        }
+      });
+    }
+    await su.query(bridge, [randomUUID(), bSubscription, A.ownerRef, netopia]);
+    for (const login of t1) {
+      failures.push(...(await forgery(login, "A", "F10", "F10:stored-bridge", (c) => c.query("BEGIN"), async (c) => {
+        try {
+          const read = await readFailures(c, login.name, "A", "F10:stored-bridge");
           writes.push(`${login.name} use-of-b-token ${await attempt(c,
             "INSERT INTO billing.cancel_token_use(token_sha256, used_at) VALUES ($1, now())", [bToken[0]])}`);
           writes.push(`${login.name} token-owned-by-b ${await attempt(c, `INSERT INTO billing.cancel_token(token_sha256, subscription_id,
             issued_at, expires_at, owner_ref) VALUES ($1, $2, now(), now() + interval '1 day', $3)`,
           [randomBytes(32).toString("hex"), bSubscription, B.ownerRef])}`);
+          writes.push(`${login.name} own-token-naming-b ${await attempt(c, `INSERT INTO billing.cancel_token(token_sha256, subscription_id,
+            issued_at, expires_at, owner_ref) VALUES ($1, $2, now(), now() + interval '1 day', (SELECT rls.context_owner_ref()))`,
+          [randomBytes(32).toString("hex"), bSubscription])}`);
           return read;
         } finally {
           await c.query("ROLLBACK");
         }
       })).failures);
     }
-    console.info(`F10 FRAME bridged=${bridged.join(",")} writes=${writes.join(";")} reads_failed=${failures.length}`);
-    expect(bridged).toEqual(["debateai_dev_runtime", "debateai_prod_api_runtime"]);
+    console.info(`F10 FRAME writes=${writes.join(";")} reads_failed=${failures.length}`);
     expect(failures).toEqual([]);
     // 42501: the row-security WITH CHECK refuses it (a login without INSERT on the table refuses with the same code).
-    expect(writes).toEqual(t1.flatMap(({ name }) => [`${name} use-of-b-token 42501`, `${name} token-owned-by-b 42501`]));
+    expect(writes).toEqual([...t1.map(({ name }) => `${name} bridge 42501`), ...t1.flatMap(({ name }) => [
+      `${name} use-of-b-token 42501`, `${name} token-owned-by-b 42501`, `${name} own-token-naming-b 42501`])]);
+  });
+
+  it("S6.3-F11 (FIX-S01-p1a NEW-1, V-17) a row with no parent row stays unreadable after A inserts an own parent row carrying its key", async () => {
+    // FIX-S01-p1a's orphan probe: each child keyed on its parent through a parent check, and no foreign key holds its
+    // parent (an unmatched NETOPIA notice, a quarantined notice, a revocation whose token 0111's purge deleted, a saved
+    // card whose customer row is gone). Measured before V-17's default: 0 → 1 on both runtime logins.
+    const su = database.pool;
+    const C = await seedSessionAccount(su, "C");
+    const hex = (n: number): string => randomBytes(n).toString("hex");
+    const orderId = hex(16), quarantineOrder = hex(16), revokedToken = randomUUID(), noticeId = randomUUID();
+    const orphanCustomer = randomUUID(), orphanToken = randomUUID();
+    await su.query(`INSERT INTO billing.payment_notice(notice_id,payment_provider,payment_environment,received_at,body_sha256,
+      key_fingerprint,allowed_ciphertext,key_id,order_id) VALUES($1,'netopia','sandbox',now(),$2,$3,$4,'0123456789abcdef',$5)`,
+    [noticeId, hex(32), hex(32), randomBytes(16), orderId]);
+    await su.query("INSERT INTO billing.payment_notice_outcome(notice_id,at,outcome) VALUES($1,now(),'APPLIED')", [noticeId]);
+    await su.query("INSERT INTO billing.payment_notice_raw(notice_id,raw_ciphertext,key_id,stored_at) VALUES($1,$2,'0123456789abcdef',now())",
+      [noticeId, randomBytes(16)]);
+    await su.query(`INSERT INTO billing.notice_quarantine(quarantine_id,received_at,reason,raw_ciphertext,key_id,order_id)
+      VALUES($1,now(),'NOTICE_HEADER_MISSING',$2,'0123456789abcdef',$3)`, [randomUUID(), randomBytes(16), quarantineOrder]);
+    await su.query("INSERT INTO billing.card_token_revocation(token_id,at,reason) VALUES($1,now()-interval '3 days','OWNER')", [revokedToken]);
+    const aCustomer = (await su.query("SELECT customer_id FROM billing.customer WHERE owner_ref=$1", [A.ownerRef])).rows[0]!.customer_id as string;
+    const aCharge = (await su.query("SELECT charge_id FROM billing.charge WHERE owner_ref=$1 LIMIT 1", [A.ownerRef])).rows[0]!.charge_id as string;
+    const aSub = (await su.query("SELECT subscription_id FROM billing.subscription_event WHERE owner_ref=$1 ORDER BY seq LIMIT 1",
+      [A.ownerRef])).rows[0]!.subscription_id as string;
+    await su.query(`INSERT INTO billing.card_token(token_id,payment_provider,payment_environment,token_ciphertext,key_id,created_at,
+      customer_id,source_charge_id) VALUES($1,'netopia','sandbox',$2,'0123456789abcdef',now(),$3,$4)`,
+    [orphanToken, randomBytes(16), orphanCustomer, aCharge]);
+    const charge = (n: number) => `INSERT INTO billing.charge(charge_id,owner_ref,subscription_id,kind,attempt,period_start,
+      period_end,net_micros,tax_micros,total_micros,currency,created_at,payment_environment,payment_provider)
+      VALUES($1,(SELECT rls.context_owner_ref()),$2,'CARD_CHECK',${n},now(),now()+interval '30 days',0,0,0,'EUR',now(),'sandbox','netopia')`;
+    const frames: string[] = [];
+    for (const login of t1) {
+      for (const [who, account, parents, counts] of [
+        ["A", A, [[charge(1), [orderId, aSub]], [charge(2), [quarantineOrder, aSub]],
+          [`INSERT INTO billing.card_token(token_id,payment_provider,payment_environment,token_ciphertext,key_id,created_at,customer_id,
+            source_charge_id) VALUES($1,'netopia','sandbox',$2,'0123456789abcdef',now(),$3,$4)`, [revokedToken, randomBytes(16), aCustomer, aCharge]]],
+        [["billing.payment_notice", "order_id", orderId], ["billing.payment_notice_outcome", "notice_id", noticeId],
+          ["billing.payment_notice_raw", "notice_id", noticeId], ["billing.notice_quarantine", "order_id", quarantineOrder],
+          ["billing.card_token_revocation", "token_id", revokedToken]]],
+        ["C", C, [["INSERT INTO billing.customer(customer_id,owner_ref,created_at,created_locale) VALUES($1,(SELECT rls.context_owner_ref()),now(),'en')",
+          [orphanCustomer]]], [["billing.card_token", "token_id", orphanToken]]]
+      ] as const) {
+        await asLogin(login.url, async (c) => {
+          await c.query(CREDENTIAL, [account.token]);
+          // Each count in its own savepoint: a login without SELECT on a child refuses it (42501), and that refusal must
+          // not abort the transaction the parent writes run in.
+          const count = async (): Promise<string> => {
+            const parts: string[] = [];
+            for (const [relation, column, key] of counts) {
+              await c.query("SAVEPOINT count");
+              try {
+                parts.push(`${relation}=${(await c.query(`SELECT count(*)::int AS n FROM ${relation} WHERE ${column} = $1`, [key])).rows[0].n}`);
+                await c.query("RELEASE SAVEPOINT count");
+              } catch (error) {
+                parts.push(`${relation}=refused-${(error as { code?: string }).code ?? "NO_SQLSTATE"}`);
+                await c.query("ROLLBACK TO SAVEPOINT count");
+              }
+            }
+            return parts.join(",");
+          };
+          await c.query("BEGIN");
+          try {
+            const before = await count();
+            const wrote: string[] = [];
+            for (const [sql, values] of parents) wrote.push(await attempt(c, sql, values));
+            frames.push(`${login.name} ${who} parents=${wrote.join(",")} before=${before} after=${await count()}`);
+          } finally {
+            await c.query("ROLLBACK");
+          }
+        });
+      }
+    }
+    console.info(`F11 FRAME ${frames.join(" | ")}`);
+    // A login without SELECT on a child refuses the count (42501); one with SELECT must count 0 before and after.
+    const leaks = frames.filter((frame) => /=[1-9]/u.test(frame.replace(/^.* before=/u, "")));
+    expect(leaks).toEqual([]);
+    expect(frames.filter((frame) => frame.includes(" A parents=ACCEPTED,ACCEPTED,"))).toHaveLength(2);
+  });
+
+  it("S6.3-F12 (FIX-S01-p1a NEW-2, V-18) no own-account row a T1 login writes may name B's subscription, card, quote, run, entitlement or subscription event", async () => {
+    // The class of NEW-2: an own row (its owner_ref A's, so the K2 key admits it) whose OTHER key names an entity of B
+    // that a cross-account reader then acts on for B (cancelByToken and subscription_latest_v by subscription, the
+    // renewal's usableSavedCard by card token, the invoice by quote, the funding pin by run and entitlement, the
+    // withdrawal settlement by subscription and event). Each member is written twice in a rolled-back savepoint: naming
+    // B's entity (refused, 42501) and naming A's own (accepted: the statement is valid, so the refusal is the naming's).
+    const su = database.pool;
+    const first = async (sql: string, owner: string): Promise<string> => String((await su.query(sql, [owner])).rows[0]!.id);
+    const ids = async (owner: string) => ({
+      subscription: await first("SELECT subscription_id AS id FROM billing.subscription_event WHERE owner_ref=$1 ORDER BY seq LIMIT 1", owner),
+      event: await first("SELECT event_id AS id FROM billing.subscription_event WHERE owner_ref=$1 ORDER BY seq LIMIT 1", owner),
+      card: await first(`SELECT t.token_id AS id FROM billing.card_token t JOIN billing.customer c ON c.customer_id = t.customer_id
+        WHERE c.owner_ref=$1 LIMIT 1`, owner),
+      quote: await first("SELECT quote_id AS id FROM billing.quote WHERE owner_ref=$1 LIMIT 1", owner),
+      entitlement: await first("SELECT event_id AS id FROM billing.entitlement_event WHERE owner_ref=$1 LIMIT 1", owner)
+    });
+    const a = await ids(A.ownerRef);
+    const b = await ids(B.ownerRef);
+    const ctx = "(SELECT rls.context_owner_ref())";
+    const netopia = JSON.stringify({ payment_provider: "netopia", payment_environment: "sandbox" });
+    // 0086's checks: a CARD_CHECK carries no quote and may be zero; any other kind carries one and is positive. Every
+    // member write below is undone in its savepoint, so attempt 1 never meets charge_attempt_unique.
+    const charge = (subscription: string, quote: string | null): Statement => [`INSERT INTO billing.charge(charge_id,owner_ref,
+      subscription_id,kind,attempt,period_start,period_end,net_micros,tax_micros,total_micros,currency,created_at,payment_environment,
+      payment_provider,quote_id) VALUES($1,${ctx},$2,'${quote === null ? "CARD_CHECK" : "INITIAL"}',1,now(),now()+interval '30 days',
+      ${quote === null ? "0,0,0" : "10000,0,10000"},'EUR',now(),'sandbox','netopia',$3)`, [randomBytes(16).toString("hex"), subscription, quote]];
+    const settlement = (subscription: string, event: string): Statement => [`INSERT INTO billing.withdrawal_owner_settlement(
+      subscription_id,withdrawn_event_id,owner_ref,dashboard_refund_micros,settled_at) VALUES($1,$2,${ctx},0,now())`, [subscription, event]];
+    const scope = (run: string, entitlement: string): Statement => [`INSERT INTO billing.run_charge_scope(run_id,owner_ref,
+      admitted_at,funding_kind,plan_id,entitlement_event_id) VALUES($1,${ctx},now(),'SUBSCRIPTION','FREE',$2)`, [run, entitlement]];
+    const outcomes: string[] = [];
+    for (const login of t1) {
+      await asLogin(login.url, async (c) => {
+        await c.query(CREDENTIAL, [A.token]);
+        await c.query("BEGIN");
+        try {
+          // A fresh own subscription with its first event (a new subscription is A's to name), for the settlement's pair.
+          const fresh = { subscription: randomUUID(), event: randomUUID() };
+          const freshMade = await attempt(c, `INSERT INTO billing.subscription_event(event_id,subscription_id,owner_ref,kind,at,plan_id,data)
+            VALUES($1,$2,${ctx},'CREATED',now(),'PLUS',$3::jsonb)`, [fresh.event, fresh.subscription, netopia]);
+          const event = (kind: string, subscription: string, card: string | null): Statement => [`INSERT INTO billing.subscription_event(
+            event_id,subscription_id,owner_ref,kind,at,plan_id,data,card_token_id) VALUES($1,$2,${ctx},'${kind}',now(),'PLUS',$3::jsonb,$4)`,
+          [randomUUID(), subscription, netopia, card]];
+          const link = (subscription: string): Statement => [`INSERT INTO billing.cancel_token(token_sha256,subscription_id,issued_at,
+            expires_at,owner_ref) VALUES($1,$2,now(),now()+interval '1 day',${ctx})`, [randomBytes(32).toString("hex"), subscription]];
+          const entitlement = (subscription: string): Statement => [`INSERT INTO billing.entitlement_event(event_id,owner_ref,plan_id,
+            effective_at,period_anchor_at,cause,subscription_id,paid_through) VALUES($1,${ctx},'PLUS',now(),now(),'SUBSCRIBED',$2,
+            now()+interval '30 days')`, [randomUUID(), subscription]];
+          const members: ReadonlyArray<readonly [string, Statement, Statement]> = [
+            ["billing.subscription_event.subscription_id", event("CANCEL_REQUESTED", b.subscription, null), event("CANCEL_REQUESTED", a.subscription, null)],
+            ["billing.subscription_event.card_token_id", event("CARD_SAVED", a.subscription, b.card), event("CARD_SAVED", a.subscription, a.card)],
+            ["billing.cancel_token.subscription_id", link(b.subscription), link(a.subscription)],
+            ["billing.charge.subscription_id", charge(b.subscription, null), charge(a.subscription, null)],
+            ["billing.charge.quote_id", charge(a.subscription, b.quote), charge(a.subscription, a.quote)],
+            ["billing.entitlement_event.subscription_id", entitlement(b.subscription), entitlement(a.subscription)],
+            ["billing.run_charge_scope.run_id", scope(B.runId, a.entitlement), scope(A.runId, a.entitlement)],
+            ["billing.run_charge_scope.entitlement_event_id", scope(A.runId, b.entitlement), scope(A.runId, a.entitlement)],
+            ["billing.withdrawal_owner_settlement.subscription_id", settlement(b.subscription, fresh.event), settlement(fresh.subscription, fresh.event)],
+            ["billing.withdrawal_owner_settlement.withdrawn_event_id", settlement(fresh.subscription, b.event), settlement(fresh.subscription, fresh.event)]
+          ];
+          for (const [member, [badSql, badValues], [ownSql, ownValues]] of members) {
+            const table = member.split(".").slice(0, 2).join(".");
+            const may = (await su.query("SELECT has_table_privilege($1, $2::regclass, 'INSERT') AS may", [login.name, table])).rows[0].may as boolean;
+            if (!may) continue;
+            outcomes.push(`${login.name} ${member} naming-b=${await attempt(c, badSql, badValues, true)} naming-own=${
+              freshMade === "ACCEPTED" ? await attempt(c, ownSql, ownValues, true) : `fresh-${freshMade}`}`);
+          }
+        } finally {
+          await c.query("ROLLBACK");
+        }
+      });
+    }
+    console.info(`F12 FRAME ${outcomes.join(" | ")}`);
+    const members = ["billing.subscription_event.subscription_id", "billing.subscription_event.card_token_id",
+      "billing.cancel_token.subscription_id", "billing.charge.subscription_id", "billing.charge.quote_id",
+      "billing.entitlement_event.subscription_id", "billing.run_charge_scope.run_id", "billing.run_charge_scope.entitlement_event_id",
+      "billing.withdrawal_owner_settlement.subscription_id", "billing.withdrawal_owner_settlement.withdrawn_event_id"];
+    expect(outcomes).toEqual(["debateai_dev_runtime", "debateai_prod_api_runtime"].flatMap((login) =>
+      members.map((member) => `${login} ${member} naming-b=42501 naming-own=ACCEPTED`)));
   });
 
   it("S6.3-F9 while an A call runs and after it ends, a second connection of the same login sees no credential or context value of A", async () => {

@@ -35,8 +35,13 @@ type Seen = ReadonlyMap<string, readonly string[]>;
 type Queryable = Readonly<{ query: (text: string, values?: unknown[]) => Promise<pg.QueryResult> }>;
 
 const CREDENTIAL = "SELECT set_config('debateai.session_credential', $1, false)";
-/** The four tables whose D32 predicate is `false`: they admit no row to any T1 context (their writers run on system logins, D41). */
-const ADMITS_NO_ROW = new Set(["billing.outbox", "billing.xmoney_notice", "billing.xmoney_notice_outcome", "identity.audit_event"]);
+/**
+ * The ten tables whose predicate is `false`: they admit no row to any T1 context (their writers run on system logins, D41):
+ * D32's four, and the six of FIX-S01-p1a NEW-1 under V-17's default (no signed-in request reads them on a T1 login).
+ */
+const ADMITS_NO_ROW = new Set(["billing.card_token", "billing.card_token_revocation", "billing.notice_quarantine", "billing.outbox",
+  "billing.payment_notice", "billing.payment_notice_outcome", "billing.payment_notice_raw", "billing.xmoney_notice",
+  "billing.xmoney_notice_outcome", "identity.audit_event"]);
 /** F-SEC-1: the two-run tables whose policy keys on one run column. */
 const TWO_RUN = ["core.run_supersession", "memory.alias_row", "memory.candidate_record", "memory.memory_link"] as const;
 /**
@@ -396,12 +401,17 @@ describe("row-level security S01 C6: isolation of every in-scope relation on the
   it("S6.2-R23 an own-row INSERT under an account's own context succeeds on every table the login may INSERT into (rolled back; account C, which holds no rows yet: billing.customer keeps one row per owner)", async () => {
     const world = await prepareRlsSeedWorld(database.pool, C, "C");
     // The `false` tables' rows come from the superuser (their writers run on system logins, D41), so a T1 INSERT into a
-    // child of one (billing.xmoney_notice_outcome) meets its own policy, not a missing parent.
-    const superuserMade = new Map<string, Record<string, unknown>>();
+    // child of one (billing.xmoney_notice_outcome, billing.payment_notice_outcome) meets its own policy, not a missing
+    // parent. Several of them hang off rows C must write itself (billing.card_token off C's customer, which is one row
+    // per owner), so the superuser writes them in the world of a fourth account D, every step in order, and only the
+    // `false` tables' rows are carried over.
+    const D = await seedSessionAccount(database.pool, "D");
+    const dWorld = await prepareRlsSeedWorld(database.pool, D, "D");
     const superuserInsert = await rlsSeedInserter(database.pool);
-    for (const step of RLS_SEED_STEPS.filter(({ relation }) => ADMITS_NO_ROW.has(relation))) {
-      await step.run(superuserInsert, database.pool, { ...world, made: superuserMade });
-    }
+    for (const step of RLS_SEED_STEPS) await step.run(superuserInsert, database.pool, dWorld);
+    const superuserMade = new Map([...dWorld.made].filter(([name]) =>
+      RLS_SEED_STEPS.some(({ relation }) => ADMITS_NO_ROW.has(relation) && relation.endsWith(`.${name}`))));
+    expect(superuserMade.size).toBe(ADMITS_NO_ROW.size);
     const failures: string[] = [];
     let written = 0;
     for (const login of t1) {

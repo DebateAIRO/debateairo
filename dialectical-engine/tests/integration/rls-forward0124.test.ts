@@ -53,7 +53,8 @@ const VERIFIER_124 = "lineage/verify-effective-capabilities-124.sql";
 const DRIFT_0124 = `POSTCONDITION_DRIFT ${HEAD}`;
 const TABLES = RLS_IN_SCOPE.filter(({ kind }) => kind === "r").map(({ relation }) => relation);
 const VIEWS = RLS_IN_SCOPE.filter(({ kind }) => kind === "v").map(({ relation }) => relation);
-const FUNCTIONS = ["rls.session_credential_hash()", "rls.context_user_id()", "rls.context_owner_ref()", "rls.owns_run(uuid)", "rls.owns_execution_ref(text)"];
+const FUNCTIONS = ["rls.session_credential_hash()", "rls.context_user_id()", "rls.context_owner_ref()", "rls.owns_run(uuid)", "rls.owns_execution_ref(text)",
+  "rls.may_name_subscription(uuid)", "rls.may_name_card_token(uuid)"];
 const POLICIES = ["rls_account", "rls_all_accounts"];
 /** The six amendments of D38 and F-C1-1, hand-copied (relations sorted), as T11 expects them stored. */
 const AMENDMENTS = [
@@ -166,8 +167,11 @@ describe("S1.2 migration 0124 on an empty database", () => {
     ]);
   });
 
-  it("S1.2-T6 (D27, D39) the five rls functions are the migrator's STABLE definers on pg_catalog, executable as D39 says", async () => {
+  it("S1.2-T6 (D27, D39, V-18) the seven rls functions, and no other, are the migrator's STABLE definers on pg_catalog, executable as D39 says", async () => {
     const migrator = (await db.pool.query<{ name: string }>("SELECT current_user AS name")).rows[0]!.name;
+    const present = (await db.pool.query<{ signature: string }>(`SELECT p.oid::regprocedure::text AS signature FROM pg_proc p
+      JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'rls' ORDER BY 1`)).rows.map(({ signature }) => signature);
+    expect(present).toEqual([...FUNCTIONS].sort());
     const functions = (await db.pool.query(`
       SELECT signature,pg_get_userbyid(p.proowner)::text AS owner,p.prosecdef AS definer,p.proconfig AS config,p.provolatile::text AS volatility,
        coalesce((SELECT jsonb_agg(g.name ORDER BY g.name COLLATE "C") FROM (SELECT DISTINCT CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee)::text END AS name

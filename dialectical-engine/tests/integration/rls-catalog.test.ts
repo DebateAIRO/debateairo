@@ -58,6 +58,11 @@ const MANIFEST_PATH = fileURLToPath(new URL(
  * the parent's own check holds.
  */
 const ANCHORED_CHECK = /^(?:\((?:owner_ref|user_id) = \( SELECT rls\.context_(?:owner_ref|user_id)\(\) AS context_(?:owner_ref|user_id)\)\)|false|rls\.owns_run\([a-z0-9_]+\)|rls\.owns_execution_ref\([a-z0-9_]+\))$/u;
+/**
+ * V-18 (FIX-S01-p1d): the K2 key ANDed with checks on what the row names (a subscription, a card token, a run, a parent
+ * row). Its first conjunct is the anchored key, and a conjunction only narrows it, so it is anchored too.
+ */
+const ANCHORED_NARROWED = /^\(\(owner_ref = \( SELECT rls\.context_owner_ref\(\) AS context_owner_ref\)\) AND .+\)$/su;
 const PARENT_CHECK = /^\(EXISTS \( SELECT 1\n {3}FROM ([a-z0-9_]+\.[a-z0-9_]+) p\n {2}WHERE (.+)\)\)$/su;
 const PARENT_PAIR = /\(p\.([a-z0-9_]+) = ([a-z0-9_]+)\.([a-z0-9_]+)\)/gu;
 
@@ -86,18 +91,11 @@ afterAll(async () => {
  * FIX-S01-p1a NEW-1 (measured 2026-10-25 on debateai_dev_runtime and debateai_prod_api_runtime, A's live credential: an
  * unmatched payment_notice, its outcome, an unmatched notice_quarantine row and a card_token_revocation whose token
  * 0111's purge_revoked_card_tokens deleted each became readable, 0 → 1, once A inserted an own parent row carrying the
- * key). Its parent keys are unique, so no duplicate is possible; the child rows simply need no parent row. The remedy
- * (a foreign key, or an owner column filled by the NETOPIA writers) is outside FIX-S01-p1a's contract, so the set is
- * pinned here: a new member, or a fixed one, moves it.
+ * key). Its parent keys are unique, so no duplicate is possible; the child rows simply need no parent row. V-17's
+ * default (FIX-S01-p1d): no signed-in request reads those six tables on a T1 login (every reader is BillingRepository on
+ * the X11 system pool, apps/api/src/main.ts), so their T1 check is `false`, as billing.outbox's is. No member is left.
  */
-const ORPHAN_CLAIM_RESIDUE: readonly string[] = Object.freeze([
-  "billing.card_token",
-  "billing.card_token_revocation",
-  "billing.notice_quarantine",
-  "billing.payment_notice",
-  "billing.payment_notice_outcome via billing.payment_notice",
-  "billing.payment_notice_raw via billing.payment_notice"
-]);
+const ORPHAN_CLAIM_RESIDUE: readonly string[] = Object.freeze([]);
 
 type ClassVerdict = Readonly<{ kind: "ANCHORED" | "HOLDS" | "NON_UNIQUE" | "REKEY" | "ORPHAN" | "UNRECOGNIZED"; via?: string }>;
 let swept: Promise<Readonly<{ verdicts: ReadonlyMap<string, ClassVerdict>; unrecognized: readonly string[] }>> | undefined;
@@ -118,7 +116,7 @@ function classSweep(): Promise<Readonly<{ verdicts: ReadonlyMap<string, ClassVer
       if (known !== undefined) return known;
       const text = checks.get(child);
       const settle = (verdict: ClassVerdict): ClassVerdict => { verdicts.set(child, verdict); return verdict; };
-      if (text !== undefined && ANCHORED_CHECK.test(text)) return settle({ kind: "ANCHORED" });
+      if (text !== undefined && (ANCHORED_CHECK.test(text) || ANCHORED_NARROWED.test(text))) return settle({ kind: "ANCHORED" });
       const parsed = text === undefined ? null : PARENT_CHECK.exec(text);
       const pairs = parsed === null ? [] : [...parsed[2]!.matchAll(PARENT_PAIR)].map((m) => ({ parent: m[1]!, alias: m[2]!, child: m[3]! }));
       if (parsed === null || pairs.length === 0 || pairs.some(({ alias }) => alias !== child.split(".")[1])
@@ -163,14 +161,14 @@ function classSweep(): Promise<Readonly<{ verdicts: ReadonlyMap<string, ClassVer
 }
 
 describe("row-level security S01 C6: the catalog keeps every T1 login inside its own account", () => {
-  it("S6.4-a R15 a verbatim copy of probes/REQ-FIX-RLS-2/policy-reach-v3.sql, run with the 4 T1 logins provisioned, prints texts whose set EQUALS RLS_ALLOW_LIST (38)", async () => {
+  it("S6.4-a R15 a verbatim copy of probes/REQ-FIX-RLS-2/policy-reach-v3.sql, run with the 4 T1 logins provisioned, prints texts whose set EQUALS RLS_ALLOW_LIST (37)", async () => {
     expect(createHash("sha256").update(POLICY_REACH_V3_SQL).digest("hex")).toBe(POLICY_REACH_V3_SHA256);
     const present = (await database.pool.query("SELECT rolname FROM pg_roles WHERE rolname = ANY ($1::text[]) ORDER BY 1",
       [T1_LOGINS])).rows.map((row) => row.rolname as string);
     expect(present).toEqual([...T1_LOGINS].sort());
     const rows = (await database.pool.query(POLICY_REACH_V3_SQL)).rows as { using_expr: string | null; check_expr: string | null }[];
     const texts = [...new Set(rows.flatMap((row) => [row.using_expr, row.check_expr]).filter((text): text is string => text !== null))];
-    expect(RLS_ALLOW_LIST).toHaveLength(38);
+    expect(RLS_ALLOW_LIST).toHaveLength(37);
     expect(texts.sort()).toEqual([...RLS_ALLOW_LIST].sort());
   });
 
@@ -215,7 +213,7 @@ describe("row-level security S01 C6: the catalog keeps every T1 login inside its
     }).toEqual({ unrecognized: [], bridges: [] });
   });
 
-  it("S6.4-f R7 (FIX-S01-p1a NEW-1, the orphan-claim residue) the parent checks a child row without its parent row lets a T1 login meet are exactly these six", async () => {
+  it("S6.4-f R7 (FIX-S01-p1a NEW-1, V-17) no parent check lets a T1 login meet a child row whose parent row it can insert with a chosen key", async () => {
     const sweep = await classSweep();
     expect([...sweep.verdicts].filter(([, { kind }]) => kind === "ORPHAN")
       .map(([child, verdict]) => `${child}${verdict.via === undefined ? "" : ` via ${verdict.via}`}`).sort())
