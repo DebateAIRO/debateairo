@@ -152,7 +152,7 @@ export function PublicationReviewsPanel({ client, catalog = staffEnglish, public
     {!notElevated && snapshot !== null ? <><header className="staffHeading"><h1 className="setTitle rvQuestion">{snapshot.question}</h1></header><section className="rvReview">
       {categories(snapshot.categories, "staffPermissions rvChips")}
       <PublicDebateOverview debate={snapshot as unknown as PublicDebate} catalog={publicCatalog} storyCatalog={publicCatalog} storyLocale={locale} composeCatalog={locale === "ro" ? composeRomanian : composeEnglish} viewingNote="NONE" onDetails={() => setDetail({ kind: "verdict" })} onRead={(nodeId) => setDetail({ kind: "argument", nodeId })} />
-      {detail !== null ? <div role="dialog" aria-label={t(publicCatalog, detail.kind === "verdict" ? "public.overview.details" : "public.overview.read")} data-review-detail={detail.kind} className="rvDetail">
+      {detail !== null ? <section aria-label={t(publicCatalog, detail.kind === "verdict" ? "public.overview.details" : "public.overview.read")} data-review-detail={detail.kind} className="rvDetail">
         <h2>{t(publicCatalog, detail.kind === "verdict" ? "public.overview.details" : "public.overview.read")}</h2>
         {detail.kind === "verdict" ? <>
           {snapshot.answer.summary_segments.map((segment, index) => <p key={index}>{segment.text}</p>)}
@@ -163,7 +163,7 @@ export function PublicationReviewsPanel({ client, catalog = staffEnglish, public
           {selectedNode.review?.reasons.map((reason, index) => <p key={index}>{reason}</p>)}
         </> : null}
         <button className="setBtn" type="button" onClick={() => setDetail(null)}>{t(publicCatalog, "public.honesty.close")}</button>
-      </div> : null}
+      </section> : null}
       {!reasonVisible ? <div className="staffActions rvActions">
         <button className="setBtn" type="button" disabled={busy} onClick={() => { void decide("APPROVE"); }}>{t(catalog, "staff.reviews.approve")}</button>
         <button className="setBtn" type="button" disabled={busy} onClick={() => setReasonVisible(true)}>{t(catalog, "staff.reviews.refuse")}</button>

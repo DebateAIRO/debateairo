@@ -156,14 +156,19 @@ describe("publication reviews staff surface", () => {
     const readable = { ...snapshot, answer: { ...snapshot.answer, verdict: "SUPPORTED", nodes: fair.nodes ?? [], edges: fair.edges ?? [] } };
     const host = await reviews(panelClient({ publicationReview: async () => readable }));
     await click(button(host, enStaff["staff.reviews.open"]));
-    expect(host.querySelector("[role=dialog]")).toBeNull();
+    expect(host.querySelector("[data-review-detail]")).toBeNull();
     await click(host.querySelector(".publicDetailsAction"));
-    expect(host.querySelector('[role=dialog][data-review-detail="verdict"]')?.textContent).toContain("The synthesis to review.");
+    // REV-S02-p3 product N2: the panel sits in the page flow and traps nothing, so it is a labelled section, not a dialog.
+    expect(host.querySelector("[role=dialog]")).toBeNull();
+    expect(host.querySelector('section[data-review-detail="verdict"]')?.getAttribute("aria-label")).toBe(enPublic["public.overview.details"]);
+    expect(host.querySelector('section[data-review-detail="verdict"]')?.textContent).toContain("The synthesis to review.");
     expect(host.querySelector('[data-review-detail="verdict"]')?.textContent).toContain("Clear answer");
     expect(host.querySelector('[data-review-detail="verdict"]')?.textContent).not.toContain("SUPPORTED");
     await click(button(host, enPublic["public.honesty.close"]));
     await click(host.querySelector(".publicReadAction"));
-    expect(host.querySelector('[role=dialog][data-review-detail="argument"]')?.textContent).toContain("The defeater claim attacking the position.");
+    expect(host.querySelector("[role=dialog]")).toBeNull();
+    expect(host.querySelector('section[data-review-detail="argument"]')?.getAttribute("aria-label")).toBe(enPublic["public.overview.read"]);
+    expect(host.querySelector('section[data-review-detail="argument"]')?.textContent).toContain("The defeater claim attacking the position.");
   });
 
   it("Refuse needs 1..500 trimmed characters before the ceremony starts", async () => {
