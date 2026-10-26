@@ -171,6 +171,17 @@ describe("publication reviews staff surface", () => {
     expect(host.querySelector('section[data-review-detail="argument"]')?.textContent).toContain("The defeater claim attacking the position.");
   });
 
+  it("a snapshot with no verdict shows the unavailable badge alone in Details (REV-S02-p3 translation N4)", async () => {
+    // Property: the label is not repeated inside its own value ("Verdict: VERDICT UNAVAILABLE").
+    const unavailable = { ...snapshot, answer: { ...snapshot.answer, verdict: null, verdict_available: false } };
+    const host = await reviews(panelClient({ publicationReview: async () => unavailable }));
+    await click(button(host, enStaff["staff.reviews.open"]));
+    await click(host.querySelector(".publicDetailsAction"));
+    const lines = [...host.querySelectorAll('section[data-review-detail="verdict"] p')].map((line) => line.textContent);
+    expect(lines).toContain(enPublic["public.overview.verdictUnavailable"]);
+    expect(lines.some((line) => line?.startsWith(`${enPublic["public.honesty.verdict"]}:`))).toBe(false);
+  });
+
   it("Refuse needs 1..500 trimmed characters before the ceremony starts", async () => {
     const prove = vi.fn().mockResolvedValue({ proof_handle: "p".repeat(43) });
     const refuse = vi.fn().mockResolvedValue({ review_ref: reviewRef, outcome: "REFUSE", decided_at: older.asked_at });

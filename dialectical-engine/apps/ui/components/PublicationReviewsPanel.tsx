@@ -156,7 +156,8 @@ export function PublicationReviewsPanel({ client, catalog = staffEnglish, public
         <h2>{t(publicCatalog, detail.kind === "verdict" ? "public.overview.details" : "public.overview.read")}</h2>
         {detail.kind === "verdict" ? <>
           {snapshot.answer.summary_segments.map((segment, index) => <p key={index}>{segment.text}</p>)}
-          <p>{t(publicCatalog, "public.honesty.verdict")}: {snapshot.answer.verdict === null ? t(publicCatalog, "public.overview.verdictUnavailable") : storyLabelWords(snapshot.answer.verdict, publicCatalog)}</p>
+          <p>{snapshot.answer.verdict === null ? t(publicCatalog, "public.overview.verdictUnavailable")
+            : `${t(publicCatalog, "public.honesty.verdict")}: ${storyLabelWords(snapshot.answer.verdict, publicCatalog)}`}</p>
           {snapshot.answer.reversal_point ? <p>{snapshot.answer.reversal_point}</p> : null}
         </> : selectedNode !== null && selectedNode !== undefined ? <>
           <p>{selectedNode.claim}</p>
