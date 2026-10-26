@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { copyFileSync, mkdirSync, rmSync } from "node:fs";
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import test, { after } from "node:test";
 import { pathToFileURL } from "node:url";
@@ -311,13 +310,6 @@ test("DL1-F5c: x-support-case-token is forwarded, in the same capability grammar
     if ("error" in refused) continue;
     assert.equal(refused.forwarded.get("x-support-case-token"), null, `unlawful value must not be forwarded: ${JSON.stringify(bad)}`);
   }
-});
-
-test("DL1-F5c: the case surfaces put the bearer in the header and never in a path", async () => {
-  const source = await readFile(new URL("../components/support/CaseView.tsx", import.meta.url), "utf8");
-  assert.match(source, /"x-support-case-token"/, "the case read carries the bearer as a header");
-  assert.match(source, /"\/api\/v1\/support\/case\/messages"/, "the reply path names no token");
-  assert.doesNotMatch(source, /support\/cases\/\$\{/, "no path may interpolate the bearer");
 });
 
 // ---------------------------------------------------------------- C03.1: the locale cookie carrier (R-09, R-24)

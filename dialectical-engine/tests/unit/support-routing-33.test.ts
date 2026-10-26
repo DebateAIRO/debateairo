@@ -25,6 +25,7 @@ import { createSupportModelReferenceFactory } from "../../apps/api/src/support/m
 // ranking changes and 66 approved action additions; recovery-source and source-policy fields remain byte-identical.
 const GOLDEN = resolve(process.cwd(), "tests/support/fixtures/support-routing-33.json");
 const INTEGRATION = resolve(process.cwd(), "tests/support/fixtures/support-routing-auth-dev-overlay.json");
+const V131 = resolve(process.cwd(), "tests/support/fixtures/support-routing-v131-overlay.json");
 const QUERY_KEYS = [
   "chrome:chrome.aiTransparency", "chrome:chrome.legal.notice", "chrome:chrome.legal.terms", "chrome:chrome.legal.versions",
   "chrome:chrome.legal.privacy", "chrome:chrome.legal.health", "chrome:chrome.legal.cookies", "chrome:chrome.legal.providers",
@@ -93,6 +94,15 @@ describe("S05 33-locale routing pin (SPEC-v5 R10, R13)", () => {
         "privacy-preferences,delete-account|security,privacy-preferences,delete-account"
       ]).toContain(`${prior[1]}|${current[1]}`);
     }
-    expect(now).toEqual({...golden,...overlay});
+    const v131 = JSON.parse(readFileSync(V131, "utf8")) as Record<string,string>;
+    const beforeV131 = {...golden,...overlay};
+    for (const [key,value] of Object.entries(v131)) {
+      expect(golden).toHaveProperty(key);
+      const prior = beforeV131[key]!.split("|");
+      const current = value.split("|");
+      expect(current.slice(1), key).toEqual(prior.slice(1));
+      if (prior[0] !== "") expect(current[0], key).not.toBe("");
+    }
+    expect(now).toEqual({...golden,...overlay,...v131});
   });
 });

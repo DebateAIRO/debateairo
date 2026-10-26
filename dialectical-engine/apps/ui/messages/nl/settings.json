@@ -108,7 +108,7 @@
   "settings.transparency.downloadsTail": "object dat de gegenereerde inhoud en het ontbreken van menselijke redactionele beoordeling beschrijft. Vastgelegde antwoordgegevens, modelherkomst en operationele gegevens behouden hun oorspronkelijke waarden.",
   "settings.transparency.markingsLimit": "Deze markeringen beschrijven inhoud in onze gebruikersinterface en downloads. Het zijn geen watermerken of echtheidscertificaten; bij het kopiëren van platte tekst kunnen ze verdwijnen.",
   "settings.transparency.supportTitle": "Ondersteuning en menselijke hulp",
-  "settings.transparency.supportLead": "De ondersteuningsassistent is een AI-systeem. Gebruik ‘Met een medewerker praten’ of ‘Doorzetten naar een medewerker’ in",
+  "settings.transparency.supportLead": "De ondersteuningsassistent is een AI-systeem. Gebruik ‘Met een medewerker praten’ in",
   "settings.transparency.help": "Hulp",
   "settings.transparency.supportTail": "om menselijke hulp aan te vragen.",
   "settings.transparency.back": "Terug naar {brand}",

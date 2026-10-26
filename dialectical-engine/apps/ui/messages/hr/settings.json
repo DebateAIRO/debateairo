@@ -108,7 +108,7 @@
   "settings.transparency.downloadsTail": "koji opisuje generirani sadržaj i izostanak ljudskog uredničkog pregleda. Zabilježeni podaci odgovora, podrijetlo modela i operativni zapisi zadržavaju izvorne vrijednosti.",
   "settings.transparency.markingsLimit": "Te oznake opisuju sadržaj u našem sučelju i preuzimanjima. Nisu vodeni žig ni potvrda autentičnosti; kopiranje običnog teksta može ih ukloniti.",
   "settings.transparency.supportTitle": "Podrška i ljudska pomoć",
-  "settings.transparency.supportLead": "Pomoćnik za podršku sustav je umjetne inteligencije. Upotrijebite „Razgovor s osobom” ili „Proslijedite osobi” u odjeljku",
+  "settings.transparency.supportLead": "Pomoćnik za podršku sustav je umjetne inteligencije. Upotrijebite „Razgovor s osobom” u odjeljku",
   "settings.transparency.help": "Pomoć",
   "settings.transparency.supportTail": "kako biste zatražili da vam pomogne osoba.",
   "settings.transparency.back": "Natrag na {brand}",

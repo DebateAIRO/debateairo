@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -193,16 +193,16 @@ const DEV_SUPPORT_TEMPLATES = Object.freeze({
     ro: "Nu pot ajuta cu autentificarea, parolele, codurile de verificare, autentificarea în doi pași, recuperarea contului, schimbarea emailului sau ștergerea contului — nici măcar să le verific. Acestea se fac doar din paginile contului tău: {link}. Dacă pagina nu funcționează, alege „Vorbiți cu o persoană”."
   }),
   REFUSE_INJECTION: Object.freeze({
-    en: "I only follow the product's own instructions, so I'll skip that request. Your message has been recorded. Ask me about the product, or choose 'Talk to a human'.",
-    ro: "Urmez doar instrucțiunile produsului, așa că voi sări peste această cerere. Mesajul tău a fost înregistrat. Întreabă-mă despre produs sau alege „Vorbiți cu o persoană”."
+    en: "I only follow the product's own instructions, so I'll skip that request. Ask me about the product, or choose 'Talk to a human'.",
+    ro: "Urmez doar instrucțiunile produsului, așa că voi sări peste această cerere. Întreabă-mă despre produs sau alege „Vorbiți cu o persoană”."
   }),
   REFUSE_SAFETY: Object.freeze({
-    en: "This needs a person, not an assistant. Choose 'Talk to a human' and a person will read your message.",
-    ro: "Aici e nevoie de o persoană, nu de un asistent. Alege „Vorbiți cu o persoană” și o persoană îți va citi mesajul."
+    en: "This needs a person, not an assistant. Choose 'Talk to a human' and write to the address it shows; a person reads it.",
+    ro: "Aici e nevoie de o persoană, nu de un asistent. Alege „Vorbiți cu o persoană” și scrie la adresa pe care o afișează; o persoană citește emailul."
   }),
   DEGRADED: Object.freeze({
-    en: "The assistant's model is unavailable right now. You can still leave a message for a person: choose 'Talk to a human'.",
-    ro: "Modelul asistentului nu este disponibil acum. Poți totuși lăsa un mesaj pentru o persoană: alege „Vorbiți cu o persoană”."
+    en: "The assistant's model is unavailable right now. To reach a person, choose 'Talk to a human'.",
+    ro: "Modelul asistentului nu este disponibil acum. Pentru a ajunge la o persoană, alege „Vorbiți cu o persoană”."
   }),
   DISABLED: Object.freeze({
     en: "The support assistant is switched off at the moment.",
@@ -282,7 +282,7 @@ const DEV_MOVED_SUPPORT_STRINGS = Object.freeze({
 const MISSION_ADDED_TEMPLATE_IDS = [
   "SUMMARY_REPLACED", "SHREDDED_NOTICE", "INCIDENT_SURFACE_DEBATES",
   "INCIDENT_SURFACE_PUBLISHING", "INCIDENT_SURFACE_SIGN_IN", "INCIDENT_SURFACE_WHOLE_SITE",
-  "COUNTRY_UNAVAILABLE"
+  "COUNTRY_UNAVAILABLE", "OFF_TOPIC", "OFF_TOPIC_PART", "CRISIS_SUPPORT", "THREAT_LINE", "TOO_LONG"
 ] as const;
 
 describe("Help Corpus loader", () => {
@@ -346,21 +346,18 @@ describe("Help Corpus loader", () => {
     }));
   });
 
-  it("keeps paired public scoring and human-case draft facts aligned", () => {
+  it("keeps paired public scoring draft facts aligned", () => {
     const content = fileURLToPath(
       new URL("../../packages/support-kb/content/", import.meta.url),
     );
     const enScoring = readFileSync(join(content,"debate-workspace-menus.en.md"),"utf8");
     const roScoring = readFileSync(join(content,"debate-workspace-menus.ro.md"),"utf8");
-    const enCases = readFileSync(join(content,"support-cases.en.md"),"utf8");
-    const roCases = readFileSync(join(content,"support-cases.ro.md"),"utf8");
 
-    for (const [document,terms] of [
+    const pairs = [
       [enScoring,["provider and model","cache or staleness","unresolved holes and fatal flags"]],
-      [roScoring,["furnizorul și modelul","cache sau învechire","golurile nerezolvate și marcajele fatale"]],
-      [enCases,["email support does not create this case","receipt, response target, or private case link"]],
-      [roCases,["emailul de asistență nu creează acest caz","confirmarea, termenul de răspuns sau legătura privată"]]
-    ] as const) for (const term of terms) expect(document).toContain(term);
+      [roScoring,["furnizorul și modelul","cache sau învechire","golurile nerezolvate și marcajele fatale"]]
+    ] as const;
+    for (const [document,terms] of pairs) for (const term of terms) expect(document).toContain(term);
   });
 
   it("binds the separately reviewed public-guide corpus in the editorial manifest", () => {
@@ -1039,9 +1036,9 @@ describe("OWNER review records: the owner read the exact bytes and signed", () =
   });
 });
 
-it('current integration SOL evidence identifies exact changed recovery text and component bytes',()=>{
- const base=resolve(process.cwd(),'packages/support-kb');const doc=readFileSync(resolve(process.cwd(),'docs/missions/account-onboarding/dev-integration-kb-editorial.md'),'utf8');const labels=new Map([...doc.matchAll(/^- `([^`]+)`: `([a-f0-9]{64})`/gm)].map(m=>[m[1],m[2]]));const raw=readFileSync(resolve(base,'recovery/components.json'));const data=JSON.parse(raw.toString());const manifest=JSON.parse(readFileSync(resolve(base,'reviews/manifest.json'),'utf8'));
- expect(doc).toContain(sha256(raw));expect(manifest.recovery.componentFileSha256).toBe(sha256(raw));
- for(const row of data.components.filter((r:any)=>['account-access','account-settings','settings-help-menus'].includes(r.id))){const review=manifest.recovery.components.find((r:any)=>r.id===row.id&&r.lang===row.lang);expect(labels.get(`recovery:${row.id}.${row.lang}:modelProjection`)).toBe(sha256(row.modelProjection));expect(labels.get(`recovery:${row.id}.${row.lang}:fallback`)).toBe(sha256(row.fallback));expect(review.modelProjectionSha256).toBe(sha256(row.modelProjection));expect(review.fallbackSha256).toBe(sha256(row.fallback));expect(review.articleSha256).toBe(row.articleSha256);}
+it("current integration SOL evidence identifies its recovery rows, and S05's sign-off names the component bytes",()=>{
+ const base=resolve(process.cwd(),'packages/support-kb');const doc=readFileSync(resolve(process.cwd(),'docs/missions/account-onboarding/dev-integration-kb-editorial.md'),'utf8');const labels=new Map([...doc.matchAll(/^- `([^`]+)`: `([a-f0-9]{64})`/gm)].map(m=>[m[1],m[2]]));const signoff=resolve(process.cwd(),'docs/missions/synthesis-flag/OWNER-SIGNOFF-S05-support-kb.md');expect(existsSync(signoff)).toBe(true);const signedDoc=readFileSync(signoff,'utf8');const raw=readFileSync(resolve(base,'recovery/components.json'));const data=JSON.parse(raw.toString());const manifest=JSON.parse(readFileSync(resolve(base,'reviews/manifest.json'),'utf8'));
+ expect(signedDoc).toContain(sha256(raw));expect(manifest.recovery.componentFileSha256).toBe(sha256(raw));
+ for(const row of data.components.filter((r:any)=>['account-access','account-settings'].includes(r.id))){const review=manifest.recovery.components.find((r:any)=>r.id===row.id&&r.lang===row.lang);expect(labels.get(`recovery:${row.id}.${row.lang}:modelProjection`)).toBe(sha256(row.modelProjection));expect(labels.get(`recovery:${row.id}.${row.lang}:fallback`)).toBe(sha256(row.fallback));expect(review.modelProjectionSha256).toBe(sha256(row.modelProjection));expect(review.fallbackSha256).toBe(sha256(row.fallback));expect(review.articleSha256).toBe(row.articleSha256);}
 });
 it('Romanian account recovery projection is ordinary route-free Romanian',()=>{const doc=JSON.parse(readFileSync(resolve(process.cwd(),'packages/support-kb/recovery/components.json'),'utf8'));const row=doc.components.find((r:any)=>r.id==='account-settings'&&r.lang==='ro');for(const field of ['modelProjection','fallback']){expect(row[field]).not.toMatch(/the (?:Account|Security) page/);expect(row[field]).toContain('pagina contului');expect(row[field]).toContain('pagina de securitate');}});

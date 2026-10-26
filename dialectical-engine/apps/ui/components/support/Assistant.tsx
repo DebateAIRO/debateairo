@@ -14,11 +14,13 @@ import { useChromeI18n } from "../../lib/i18n/I18nProvider";
 import { catalogLocale, type LocaleCode } from "../../lib/i18n/locales";
 import { t } from "../../lib/i18n/translate";
 import { AiBanner } from "../AiNotice";
-import { supportCaseLink } from "./caseLink.js";
+import { CrisisHelpNumbers,browserLanguages } from "../CrisisSupport.js";
+import { HarmHelpLine } from "../HarmHelpLine.js";
+import { resolveCrisisCountry } from "../../lib/crisisLines.js";
+import { markSupportNotOffered } from "./availability.js";
 import {
   browserSupportConversationStorage,
   clearStoredSupportConversation,
-  hasExactKeys,
   restoreSupportConversation,
   serverTimeFromDateHeader,
   storedConversationVerdict,
@@ -30,7 +32,7 @@ import {
   type SupportSource,
   type WakeFacts
 } from "./conversation.js";
-import { isStaleSupportSession, supportPost, SupportHttpError } from "./http.js";
+import { supportPost, SupportHttpError } from "./http.js";
 import {
   onConversationReset,
   onConversationWake,
@@ -50,70 +52,37 @@ export type SupportAssistantOutcome =
   | "DEGRADED"
   | "DISABLED"
   | "RATE_LIMITED"
-  | "SHREDDED"
+  | "OFF_TOPIC"
+  | "CRISIS"
+  | "THREAT"
+  | "TOO_LONG"
   | "CONSENT_NEEDED"
   | "ANON_CONTEXT"
   | "REFUSE_OTHER_USER"
   | "ANSWER_OWN_STATE"
   | "ANSWER_INCIDENT"
-  | "NO_INCIDENT"
-  | "CASE_OPENED"
-  | "CASE_ALREADY_OPENED";
+  | "NO_INCIDENT";
 
 const SUPPORT_ASSISTANT_OUTCOMES = new Set<SupportAssistantOutcome>([
   "ANSWER_GROUNDED","NO_SOURCE","REFUSE_ZONE","REFUSE_INJECTION","REFUSE_SAFETY",
-  "DEGRADED","DISABLED","RATE_LIMITED","SHREDDED","CONSENT_NEEDED","ANON_CONTEXT",
-  "REFUSE_OTHER_USER","ANSWER_OWN_STATE","ANSWER_INCIDENT","NO_INCIDENT","CASE_OPENED",
-  "CASE_ALREADY_OPENED"
+  "DEGRADED","DISABLED","RATE_LIMITED","OFF_TOPIC","CRISIS","THREAT","TOO_LONG",
+  "CONSENT_NEEDED","ANON_CONTEXT","REFUSE_OTHER_USER","ANSWER_OWN_STATE","ANSWER_INCIDENT","NO_INCIDENT"
 ]);
 
-type SupportSession = Readonly<{
-  sessionId: string;
-  token: string;
-  identityBound: boolean;
-  /** The language the session was opened in; its actions resolve in it. */
-  language?: SupportAssistantLanguage;
-  firstMessage?: string;
-  /** S04-R05: whole seconds from the UI server's `Date` header of the response that opened the session. */
-  serverTime?: number;
-}>;
-export type SupportCaseAcknowledgement = Readonly<{
-  text: string;
-  token: string;
-  slaHours: number;
-  link: string;
-}>;
 type SupportReply = Readonly<{
-  messageId: string;
   outcome: SupportAssistantOutcome;
   text: string;
   link?: string;
   sources?: readonly SupportSource[];
   actions?: readonly SupportAction[];
-  caseAcknowledgement?: SupportCaseAcknowledgement;
   /** S04-R05: whole seconds from the UI server's `Date` header of this response. */
   serverTime?: number;
 }>;
 /** S04-R05: the server time a support response carried, when its `Date` header could be read. */
 type ServerTimed = Readonly<{ serverTime?: number }>;
-type SupportSessionStart = SupportSession | SupportReply;
 export type SupportAssistantClient = Readonly<{
-  createSession(language: SupportAssistantLanguage): Promise<SupportSessionStart>;
-  sendMessage(session: SupportSession,text: string): Promise<SupportReply>;
   isSignedIn?(): Promise<boolean>;
-  /**
-   * Paid plans G3a: false when this address may not use the support assistant. The API refuses
-   * there anyway; asking first lets the panel say so instead of offering a composer.
-   */
-  isOpenHere?(): Promise<boolean>;
-  rate(
-    session: SupportSession,messageId: string,rating: "yes" | "no"
-  ): Promise<(SupportCaseAcknowledgement & ServerTimed) | SupportReply | null>;
-  escalate(session: SupportSession,language: SupportAssistantLanguage): Promise<SupportReply | Readonly<{
-    token: string;
-    text: string;
-    serverTime?: number;
-  }>>;
+  sendMessage(text: string,language: SupportAssistantLanguage): Promise<SupportReply>;
 }>;
 
 // Points inward, back toward the dock corner the panel folds into.
@@ -184,41 +153,9 @@ function relayStateLabel(
 
 const STATIC_ROUTES = new Set(["/","/new","/login","/sign-up","/settings","/help","/recover"]);
 const PUBLIC_DEBATE = /^\/public\/debate\/[A-Za-z0-9_-]+$/u;
-/** The API's case-capability grammar (`apps/api/src/support/session.ts`). */
-const CASE_BEARER = /^[A-Za-z0-9_-]{43}$/u;
-const SUPPORT_CASE = /^\/help(?:[?]|#)case=([A-Za-z0-9_-]{43})$/u;
-
-/**
- * DL3-F4: the single place a case link becomes an href. The API mints the
- * fragment form only (`apps/api/src/support/index.ts`, DL1-F5c), and the
- * retired `/help?case=…` form is still recognised here for one release, for a
- * link a person saved before the change — and rendered as `/help#case=…`,
- * because a bearer in the query string reaches the address bar, browser history
- * and any future access log, and a bearer in the fragment does not reach a
- * server at all. Corrected in the final-review fix wave: the sentence above
- * this function used to say the API still minted the query form.
- */
 function safeFirstPartyLink(link: string | undefined): string | null {
   if (link === undefined) return null;
-  const bearer = SUPPORT_CASE.exec(link);
-  if (bearer !== null) return supportCaseLink(bearer[1]!);
   return STATIC_ROUTES.has(link) || PUBLIC_DEBATE.test(link) ? link : null;
-}
-
-function caseAcknowledgement(body: Readonly<Record<string,unknown>>): SupportCaseAcknowledgement | null {
-  if (typeof body.case_acknowledgement !== "string"
-    || typeof body.case_token !== "string" || !CASE_BEARER.test(body.case_token)
-    || typeof body.sla_hours !== "number" || !Number.isSafeInteger(body.sla_hours)
-    // DL1-F5c: the API mints the fragment form and nothing else, so the
-    // tolerance for a query-string bearer from the server is gone. The
-    // browser-side read of a `?case=` link a person saved stays for one
-    // release, in `caseLink.ts`, where it belongs.
-    || typeof body.link !== "string"
-    || body.link !== supportCaseLink(body.case_token)) return null;
-  return Object.freeze({
-    text: body.case_acknowledgement,token: body.case_token,
-    slaHours: body.sla_hours,link: supportCaseLink(body.case_token)
-  });
 }
 
 function replyFrom(
@@ -228,51 +165,32 @@ function replyFrom(
   if (typeof body.outcome !== "string"
     || !SUPPORT_ASSISTANT_OUTCOMES.has(body.outcome as SupportAssistantOutcome)
     || typeof body.text !== "string") return null;
-  const acknowledgement = caseAcknowledgement(body);
   const sources = supportSourcesFrom(body.sources);
   const actions = supportActionsFrom(body.actions,context);
   if (sources === null || actions === null) return null;
   const responseLink = typeof body.refusal_link === "string"
-    ? body.refusal_link
-    : acknowledgement === null && typeof body.link === "string" ? body.link : undefined;
+    ? body.refusal_link : typeof body.link === "string" ? body.link : undefined;
   return Object.freeze({
-    messageId: String(body.message_id ?? ""),
     outcome: body.outcome as SupportAssistantOutcome,
     text: body.text,
     sources,
     actions,
-    ...(responseLink === undefined ? {} : { link: responseLink }),
-    ...(acknowledgement === null ? {} : { caseAcknowledgement: acknowledgement })
+    ...(responseLink === undefined ? {} : { link: responseLink })
   });
 }
 
-function isSupportReply(value: unknown): value is SupportReply {
-  return value !== null && typeof value === "object" && "outcome" in value
-    && typeof value.outcome === "string"
-    && SUPPORT_ASSISTANT_OUTCOMES.has(value.outcome as SupportAssistantOutcome)
-    && "text" in value && typeof value.text === "string";
-}
-
-class SupportSnapshotUnavailableError extends Error {
-  constructor() {
-    super("SUPPORT_KB_SNAPSHOT_UNAVAILABLE");
-    this.name = "SupportSnapshotUnavailableError";
-  }
-}
-
 async function readJson(response: Response): Promise<Record<string,unknown>> {
+  // The proxy and edge may send an empty or HTML 413; inspect status before reading JSON.
+  if (response.status === 413) return { outcome: "TOO_LONG",text: "" };
   const value = await response.json() as unknown;
   const body = value !== null && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string,unknown> : {};
-  // dev: the exact restart envelope, and nothing wider, asks for a new session.
-  if (response.status === 409 && hasExactKeys(body,["error","restart_session"])
-    && body.error === "SUPPORT_KB_SNAPSHOT_UNAVAILABLE" && body.restart_session === true) {
-    throw new SupportSnapshotUnavailableError();
+  if (response.status === 403 && body.code === "COUNTRY_SERVICE_UNAVAILABLE") {
+    markSupportNotOffered();
+    throw new SupportHttpError(response.status);
   }
   if (!response.ok
     && (typeof body.outcome !== "string" || typeof body.text !== "string")) {
-    // DL3-F3: the status travels with the failure so a stale session (404) can
-    // be told apart from an outage and recovered from instead of dead-ending.
     throw new SupportHttpError(response.status);
   }
   return body;
@@ -301,103 +219,18 @@ export const supportAssistantClient: SupportAssistantClient = Object.freeze({
     if (!response.ok) throw new Error("SUPPORT_IDENTITY_UNKNOWN");
     return true;
   },
-  /** Like the sign-up page, a failed check shows the composer: the API applies the same gate. */
-  async isOpenHere() {
-    try {
-      const response = await fetch("/api/v1/geo/availability",{
-        method: "GET",cache: "no-store",credentials: "same-origin"
-      });
-      if (!response.ok) return true;
-      const body = await response.json() as unknown;
-      return !(body !== null && typeof body === "object" && (body as Record<string,unknown>).service === false);
-    } catch {
-      return true;
-    }
-  },
-  async createSession(language) {
-    const response = await supportPost("/api/v1/support/sessions",{ language });
+  async sendMessage(text,language) {
+    const response = await supportPost("/api/v1/support/messages",{ text,language });
     const body = await readJson(response);
-    const terminal = replyFrom(body);
-    if (terminal !== null) return withServerTime(terminal,response);
-    if (body.session === null || typeof body.session !== "object"
-      || typeof (body.session as Record<string,unknown>).session_id !== "string"
-      || typeof body.session_token !== "string") {
-      throw new Error("SUPPORT_RESPONSE_INVALID");
-    }
-    const session = body.session as Record<string,unknown>;
-    const firstMessage = body.first_message !== null && typeof body.first_message === "object"
-      && (body.first_message as Record<string,unknown>).role === "assistant"
-      && typeof (body.first_message as Record<string,unknown>).text === "string"
-      ? String((body.first_message as Record<string,unknown>).text)
-      : undefined;
-    return withServerTime(Object.freeze({
-      sessionId: String(session.session_id),token: String(body.session_token),
-      identityBound: session.identity_bound === true,language,
-      ...(firstMessage === undefined ? {} : { firstMessage })
-    }),response);
-  },
-  async sendMessage(session,text) {
-    const response = await supportPost(
-      `/api/v1/support/sessions/${encodeURIComponent(session.sessionId)}/messages`,
-      { text },session.token
-    );
-    const body = await readJson(response);
-    const reply = replyFrom(body,{ signedIn: session.identityBound,language: session.language ?? "en" });
+    const signedIn = Array.isArray(body.actions) && body.actions.length > 0
+      ? await supportAssistantClient.isSignedIn!() : false;
+    const reply = replyFrom(body,{ signedIn,language });
     if (reply === null) throw new Error("SUPPORT_RESPONSE_INVALID");
     return withServerTime(reply,response);
-  },
-  async rate(session,messageId,rating) {
-    const response = await supportPost(
-      `/api/v1/support/messages/${encodeURIComponent(messageId)}/rating`,
-      { session_id: session.sessionId,rating },session.token
-    );
-    const body = await readJson(response);
-    const result = replyFrom(body) ?? caseAcknowledgement(body);
-    return result === null ? null : withServerTime(result,response);
-  },
-  async escalate(session,language) {
-    const response = await supportPost(
-      `/api/v1/support/sessions/${encodeURIComponent(session.sessionId)}/escalate`,
-      { language },session.token
-    );
-    const body = await readJson(response);
-    const terminal = replyFrom(body,{ signedIn: session.identityBound,language });
-    if (terminal !== null) return withServerTime(terminal,response);
-    if (typeof body.case_token !== "string" || typeof body.text !== "string") {
-      throw new Error("SUPPORT_RESPONSE_INVALID");
-    }
-    return withServerTime(Object.freeze({ token: body.case_token,text: body.text }),response);
   }
 });
 
 type ConversationMessage = SupportConversationMessage;
-
-/** DL1-F5c: the case capability, for as long as this page is on screen. */
-type SupportCaseBearer = Readonly<{ token: string;text: string }>;
-
-/**
- * The only door a case bearer takes into this component's memory. The
- * acknowledgement path has already checked the grammar; the escalate reply is a
- * bare `{case_token,text}`, and a link is built only from a value that reads
- * like the capability it claims to be.
- */
-function caseBearerOf(token: string,text: string): SupportCaseBearer | null {
-  return CASE_BEARER.test(token) ? Object.freeze({ token,text }) : null;
-}
-
-/**
- * The acknowledgement as it may rest in the browser: the fact that a case was
- * opened, never the code that opens it. The id is the message's position, so it
- * is a stable React key that carries nothing (it used to be `case-<token>`).
- */
-function caseOpenedMessage(
-  index: number,catalog: Readonly<Record<string,string>>
-): ConversationMessage {
-  return Object.freeze({
-    id: `case-${index}`,role: "assistant" as const,
-    text: t(catalog,"support.caseOpenedNotice"),caseOpened: true as const
-  });
-}
 
 export { SUPPORT_CONVERSATION_STORAGE_KEY };
 
@@ -407,30 +240,21 @@ const NO_MESSAGES: readonly ConversationMessage[] = Object.freeze([]);
 
 export function Assistant({
   client = supportAssistantClient,signedIn,
-  fullPage = false,auxiliaryContent,onClose
+  fullPage = false,auxiliaryContent,onClose,crisisCountryHint = null
 }: Readonly<{
   client?: SupportAssistantClient;
   signedIn?: boolean;
   fullPage?: boolean;
   auxiliaryContent?: ReactNode;
   onClose?: () => void;
+  crisisCountryHint?: string | null;
 }>) {
   const { catalog: chromeCatalog,locale: uiLocale } = useChromeI18n();
   const language = catalogLocale(uiLocale);
   const persistent = client === supportAssistantClient;
-  // DL3-F3: the capability lives here and nowhere else. It is never written to
-  // sessionStorage, so it cannot outlive the page that minted it.
-  const [session,setSession] = useState<SupportSession | null>(null);
-  /**
-   * DL1-F5c: the case capability lives here and in the URL fragment, and in
-   * neither `sessionStorage` nor the transcript: it reads a whole case and
-   * replies as the reporter for thirty days, with no cookie, for anyone holding
-   * it. The stored acknowledgement is the token-free notice; this is what puts
-   * the code and its link back on screen for the page that opened the case.
-   */
-  const [caseBearer,setCaseBearer] = useState<SupportCaseBearer | null>(null);
   const [messages,setMessages] = useState<readonly ConversationMessage[]>([]);
   const [busy,setBusy] = useState(false);
+  const [humanOpen,setHumanOpen] = useState<"standing" | "crisis" | null>(null);
   const [identityAvailable,setIdentityAvailable] = useState(signedIn ?? false);
   // DL3-F3: nothing stored is read back until the identity at the keyboard is
   // known, so a signed-out first paint can never show a signed-in transcript.
@@ -442,12 +266,10 @@ export function Assistant({
   const [identityKnown,setIdentityKnown] = useState(signedIn !== undefined);
   /**
    * FIX p1 (PT-B1): from a sleep until the wake's gate decides, the conversation is held in memory but not shown —
-   * no message, no case link, no draft, no session reference. A keep shows it again; an erase discards it.
+   * no message or draft. A keep shows it again; an erase discards it.
    * FIX p2 (CT2-B1): while concealed the panel is busy — no control acts on what it holds.
    */
   const [concealed,setConcealed] = useState(false);
-  /** Paid plans G3a: the support assistant is not offered at this address (the sign-up rule). */
-  const [countryClosed,setCountryClosed] = useState(false);
   /**
    * S04 (PLAN S3.2): the stored transcript is restored only through the gate. "pending" waits for the identity,
    * "settling" awaits the gate, "done" lets the write effect run, "asleep" is a parked page: no gate, no fetch,
@@ -665,15 +487,6 @@ export function Assistant({
     return () => { active = false; };
   },[client,signedIn,identityEpoch]);
 
-  useEffect(() => {
-    if (client.isOpenHere === undefined) return;
-    let active = true;
-    void client.isOpenHere().then((open) => {
-      if (active) setCountryClosed(!open);
-    });
-    return () => { active = false; };
-  },[client]);
-
   // S04 (PLAN S3.3, ADR-0033): a session change in any tab resets this panel to
   // "New conversation"; a sleep parks it at once — hidden, held in memory
   // (PT-B1); a wake re-resolves identity and runs the gate on facts read after
@@ -767,10 +580,8 @@ export function Assistant({
 
   /** The state "New conversation" leaves the panel in (S04-R03). */
   function clearConversationState(): void {
-    setSession(null);
-    // DL1-F5c: the bearer goes with the transcript it belongs to.
-    setCaseBearer(null);
     setMessages([]);
+    setHumanOpen(null);
     setActiveTopic("reading");
     if (inputRef.current !== null) inputRef.current.value = "";
   }
@@ -782,8 +593,8 @@ export function Assistant({
   }
 
   /**
-   * A session change, or a wake whose gate erased: the old conversation goes whole — messages, support session,
-   * case code and link, draft, topic — and a request in flight drops its result (S3.4, R03). At a wake the
+   * A session change, or a wake whose gate erased: the old conversation goes whole — messages,
+   * draft, topic — and a request in flight drops its result (S3.4, R03). At a wake the
    * composer holds only what was typed after the wake (the sleep emptied it), so `keepTyped` keeps that text.
    */
   function discardConversation(keepTyped = false): void {
@@ -822,107 +633,18 @@ export function Assistant({
 
   function appendReply(response: SupportReply): void {
     rememberServerTime(response.serverTime);
-    if (response.outcome === "SHREDDED") setSession(null);
-    const acknowledgement = response.caseAcknowledgement;
-    // DL1-F5c: the code and the link go to memory, the fact goes to the transcript.
-    if (acknowledgement !== undefined) {
-      setCaseBearer(caseBearerOf(acknowledgement.token,acknowledgement.text));
-    }
     setMessages((current) => [
       ...current,
       {
-        id: response.messageId || `assistant-${current.length}`,
-        role: "assistant",text: redactSupportText(response.text).text,
+        id: `assistant-${current.length}`,
+        role: "assistant",text: response.outcome === "TOO_LONG"
+          ? t(chromeCatalog,"support.tooLong") : redactSupportText(response.text).text,
         outcome: response.outcome,language,
         sources: response.sources ?? Object.freeze([]),
         actions: response.actions ?? Object.freeze([]),
         ...(response.link === undefined ? {} : { link: response.link })
-      },
-      ...(acknowledgement === undefined ? [] : [caseOpenedMessage(current.length + 1,chromeCatalog)])
+      }
     ]);
-  }
-
-  function appendFirstMessage(started: SupportSession): void {
-    const firstMessage = started.firstMessage;
-    if (firstMessage === undefined) return;
-    setMessages((current) => {
-      const message: ConversationMessage = {
-      id: `session-${started.sessionId}-${current.length}`,role: "assistant",
-      text: redactSupportText(firstMessage).text,language
-      };
-      const last = current.at(-1);
-      return last?.role === "user"
-        ? [...current.slice(0,-1),message,last]
-        : [...current,message];
-    });
-  }
-
-  async function activeSession(generation: number,discardCurrent = false): Promise<SupportSession | null> {
-    let currentIdentity = identityAvailable;
-    if (signedIn !== undefined) {
-      currentIdentity = signedIn;
-    } else if (client.isSignedIn !== undefined) {
-      let known = true;
-      try {
-        currentIdentity = await client.isSignedIn();
-      } catch {
-        // SD-B1: unknown, not signed out — the server binds the session it opens; nothing is written until known.
-        currentIdentity = false;
-        known = false;
-      }
-      if (superseded(generation)) return null;
-      setIdentityAvailable(currentIdentity);
-      setIdentityKnown(known);
-    }
-    if (!discardCurrent && session !== null && session.identityBound === currentIdentity) {
-      return session;
-    }
-    const started = await client.createSession(language);
-    if (superseded(generation)) return null;
-    rememberServerTime(started.serverTime);
-    if (isSupportReply(started)) {
-      appendReply(started);
-      return null;
-    }
-    appendFirstMessage(started);
-    setSession(started);
-    return started;
-  }
-
-  /**
-   * DL3-F3: one attempt, and if the API says the capability is unknown (404 —
-   * a stale identity-bound session on a shared tab, an expiry, a lock) one
-   * retry on a brand-new session. Without this the compact widget answered
-   * "Support is unavailable" for the life of the tab, with no reset control.
-   *
-   * dev's snapshot restart takes the same door: the API's exact 409
-   * `SUPPORT_KB_SNAPSHOT_UNAVAILABLE` envelope retires the session the way a
-   * stale 404 does, and the turn is retried once on a fresh session held in
-   * memory — the session is never read back from, or written to, storage. A
-   * second mismatch leaves no session held and surfaces as unavailable.
-   */
-  async function withSupportSession<T>(
-    generation: number,run: (active: SupportSession) => Promise<T>
-  ): Promise<T | null> {
-    const active = await activeSession(generation);
-    if (active === null) return null;
-    try {
-      return await run(active);
-    } catch (failure) {
-      if (superseded(generation)) return null;
-      if (!isStaleSupportSession(failure)
-        && !(failure instanceof SupportSnapshotUnavailableError)) throw failure;
-      setSession(null);
-      const fresh = await activeSession(generation,true);
-      if (fresh === null) return null;
-      try {
-        return await run(fresh);
-      } catch (retryFailure) {
-        if (superseded(generation)) return null;
-        if (retryFailure instanceof SupportSnapshotUnavailableError) setSession(null);
-        throw retryFailure;
-      }
-    }
   }
 
   async function sendRequest(rawRequest: string,clearComposer?: () => void): Promise<void> {
@@ -935,12 +657,14 @@ export function Assistant({
       id: `user-${current.length}`,role: "user",text: request
     }]);
     try {
-      const response = await withSupportSession(generation,(active) => client.sendMessage(active,request));
+      const response = await client.sendMessage(request,language);
       if (superseded(generation)) return;
-      if (response !== null) appendReply(response);
-    } catch {
+      appendReply(response);
+    } catch (failure) {
       if (superseded(generation)) return;
-      appendReply({ messageId: "",outcome: "DEGRADED",text: t(chromeCatalog,"support.unavailable") });
+      if (!(failure instanceof SupportHttpError && failure.status === 403)) {
+        appendReply({ outcome: "DEGRADED",text: t(chromeCatalog,"support.unavailable") });
+      }
     } finally {
       if (!superseded(generation)) setBusy(false);
     }
@@ -953,71 +677,22 @@ export function Assistant({
     await sendRequest(field.value,() => { field.value = ""; });
   }
 
-  async function escalate(): Promise<void> {
-    if (busy || concealedRef.current) return;
-    const generation = generationRef.current;
-    setBusy(true);
-    try {
-      const opened = await withSupportSession(generation,(active) => client.escalate(active,language));
-      if (superseded(generation) || opened === null) return;
-      if (isSupportReply(opened)) {
-        appendReply(opened);
-      } else {
-        rememberServerTime(opened.serverTime);
-        setCaseBearer(caseBearerOf(opened.token,opened.text));
-        setMessages((current) => [...current,caseOpenedMessage(current.length,chromeCatalog)]);
-      }
-    } catch {
-      if (superseded(generation)) return;
-      appendReply({ messageId: "",outcome: "DEGRADED",text: t(chromeCatalog,"support.unavailable") });
-    } finally {
-      if (!superseded(generation)) setBusy(false);
-    }
-  }
-
-  // CT2-B1: while concealed every control that acts on the conversation is busy (send, suggestions, escalate,
-  // topics, shortcuts, "New conversation"); text typed in the composer stays where it is.
-  const inert = busy || concealed || countryClosed;
-  // PT-B1: while parked, and until the wake's gate decides, nothing of the conversation is on screen.
+  // While concealed every control that acts on the conversation is inert.
+  const inert = busy || concealed;
   const shownMessages = concealed ? NO_MESSAGES : messages;
-  const last = shownMessages.at(-1);
-  const canRate = last?.outcome === "ANSWER_GROUNDED" || last?.outcome === "NO_SOURCE";
 
-  async function rateLast(messageId: string,rating: "yes" | "no"): Promise<void> {
-    if (session === null || concealedRef.current) return;
-    const generation = generationRef.current;
-    try {
-      const acknowledgement = await client.rate(session,messageId,rating);
-      if (superseded(generation) || acknowledgement === null) return;
-      if (isSupportReply(acknowledgement)) {
-        appendReply(acknowledgement);
-      } else {
-        rememberServerTime(acknowledgement.serverTime);
-        setCaseBearer(caseBearerOf(acknowledgement.token,acknowledgement.text));
-        setMessages((current) => [...current,caseOpenedMessage(current.length,chromeCatalog)]);
-      }
-    } catch {
-      if (superseded(generation)) return;
-      appendReply({ messageId: "",outcome: "DEGRADED",text: t(chromeCatalog,"support.unavailable") });
-    }
+  function humanAddress(): ReactNode {
+    const sentence = t(chromeCatalog,"support.humanAddress");
+    const [before,after] = sentence.split("{address}",2);
+    return <p className="supportHumanAddress">{before}<a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>{after}</p>;
   }
-
-  /**
-   * DL1-F5c: the acknowledgement the in-memory bearer belongs to — the newest
-   * one, which is the case this page just opened. Every other acknowledgement,
-   * and all of them after a reload or in another tab, render the stored
-   * token-free notice with no link, because the code is not there to render.
-   */
-  const liveCaseMessageId = caseBearer === null ? null : shownMessages.reduce<string | null>(
-    (newest,message) => message.caseOpened === true ? message.id : newest,null
-  );
 
   const conversation = <div className="supportConversation"
     aria-label={t(chromeCatalog,"support.conversation")} aria-live="polite">
+    <p className="supportNotice">{t(chromeCatalog,"support.notice")}</p>
     {shownMessages.map((message) => {
-      const bearer = caseBearer !== null && message.id === liveCaseMessageId ? caseBearer : null;
-      const text = bearer === null ? message.text : bearer.text;
-      const link = bearer === null ? safeFirstPartyLink(message.link) : supportCaseLink(bearer.token);
+      const text = message.text;
+      const link = safeFirstPartyLink(message.link);
       const sources = message.sources ?? Object.freeze([]);
       const actions = message.actions ?? Object.freeze([]);
       const hasFooter = link !== null || sources.length > 0 || actions.length > 0;
@@ -1029,6 +704,19 @@ export function Assistant({
           <div className="supportMessageTab" aria-hidden />
           <div className="supportMessageCore">
             <p>{text}</p>
+            {message.outcome === "CRISIS" ? <>
+              <div className="supportHelpNumbers">
+                <CrisisHelpNumbers catalog={chromeCatalog} locale={uiLocale} countryHint={crisisCountryHint} />
+              </div>
+              <button className="supportHelpHuman" type="button" aria-expanded={humanOpen === "crisis"}
+                onClick={() => setHumanOpen(humanOpen === "crisis" ? null : "crisis")}>{t(chromeCatalog,"support.talkToHuman")}</button>
+              {humanOpen === "crisis" ? humanAddress() : null}
+            </> : null}
+            {message.outcome === "THREAT" ? <div className="supportHelpNumbers">
+              <HarmHelpLine catalog={chromeCatalog} locale={uiLocale} country={resolveCrisisCountry({
+                hint: crisisCountryHint,browserLanguages: browserLanguages(),locale: uiLocale
+              })} />
+            </div> : null}
             {!hasFooter ? null : <footer className="supportCitation">
               {sources.length === 0 ? null : <div role="list" aria-label={t(chromeCatalog,"support.sources")}>
                 {sources.map((source) => <span role="listitem" key={source.id}>{source.label}</span>)}
@@ -1047,18 +735,7 @@ export function Assistant({
     })}
   </div>;
 
-  const ratingControls = canRate && last !== undefined ? (
-    <div className="supportRating" aria-label={t(chromeCatalog,"support.answerRating")}>
-      <span>{t(chromeCatalog,"support.ratingQuestion")}</span>
-      <button type="button" onClick={() => void rateLast(last.id,"yes")}>{t(chromeCatalog,"support.yes")}</button>
-      <button type="button" onClick={() => void rateLast(last.id,"no")}>{t(chromeCatalog,"support.no")}</button>
-    </div>
-  ) : null;
-
-  // Paid plans G3a: where support is not offered the sentence stands in for the composer.
-  const composer = countryClosed ? <p className="supportComposer supportCountryUnavailable" role="status"
-    data-support-country-unavailable><span>{t(chromeCatalog,"support.countryUnavailable")}</span></p>
-    : <form className="supportComposer" onSubmit={(event) => void submit(event)}>
+  const composer = <form className="supportComposer" onSubmit={(event) => void submit(event)}>
     <label className="supportComposerLabel" htmlFor="support-message">{t(chromeCatalog,"support.message")}</label>
     <input
       ref={inputRef}
@@ -1086,13 +763,14 @@ export function Assistant({
       </div>
       <AiBanner catalog={chromeCatalog} />
       {conversation}
-      {ratingControls}
       <button
         type="button"
         className="supportEscalateCompact"
         disabled={inert}
-        onClick={() => void escalate()}
+        aria-expanded={humanOpen === "standing"}
+        onClick={() => setHumanOpen(humanOpen === "standing" ? null : "standing")}
       >{PERSON_MARK}<span>{t(chromeCatalog,"support.talkToHuman")}</span></button>
+      {humanOpen === "standing" ? humanAddress() : null}
       {composer}
     </section>
   );
@@ -1102,7 +780,6 @@ export function Assistant({
   const statusState = statusUnavailable || pageStatus?.available === false
     ? "UNAVAILABLE" : pageStatus === null ? "CHECKING" : "ONLINE";
   const statusLabel = t(chromeCatalog,SUPPORT_STATUS_LABEL_KEYS[statusState]);
-  const reference = session === null || concealed ? "HLP—NEW" : `HLP-${session.sessionId.slice(0,4).toUpperCase()}`;
   const privacyShortcut = resolveSupportActions(["privacy-preferences"],{
     signedIn: identityAvailable,language
   }).at(0);
@@ -1189,7 +866,6 @@ export function Assistant({
           <p className="supportTimestamp">{t(chromeCatalog,"support.timestamp")} · {t(chromeCatalog,"support.conversation")}</p>
           {conversation}
           <div ref={conversationEndRef} data-support-conversation-end aria-hidden />
-          {ratingControls}
           <div className="supportSuggestions" aria-label={t(chromeCatalog,"support.suggestions")}>
             {HELP_SUGGESTIONS.map((suggestionKey) => <button
               type="button" key={suggestionKey} disabled={inert}
@@ -1207,7 +883,6 @@ export function Assistant({
         <section className="supportSideCard">
           <p className="supportEyebrow">{t(chromeCatalog,"support.thisConversation")}</p>
           <dl className="supportMetadata">
-            <div><dt>{t(chromeCatalog,"support.reference")}</dt><dd>{reference}</dd></div>
             <div><dt>{t(chromeCatalog,"support.opened")}</dt><dd>{t(chromeCatalog,"support.thisVisit")}</dd></div>
             <div><dt>{t(chromeCatalog,"support.data")}</dt><dd>{t(chromeCatalog,"support.publicGuidance")}</dd></div>
           </dl>
@@ -1217,9 +892,6 @@ export function Assistant({
           <span className="supportEscalationTab" aria-hidden />
           <h2>{t(chromeCatalog,"support.needPerson")}</h2>
           <p>{t(chromeCatalog,"support.escalateBody")}</p>
-          <button type="button" disabled={inert} onClick={() => void escalate()}>
-            {t(chromeCatalog,"support.escalate")}
-          </button>
           <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
         </section>
 

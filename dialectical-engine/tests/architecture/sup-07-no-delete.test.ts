@@ -65,17 +65,4 @@ describe("SUP-07 destructive-boundary architecture", () => {
     expect(cli).not.toContain("SUPPORT_KEK_PATH");
   });
 
-  it("orders case-reply locks with shred and revalidates both parent and key under lock", async () => {
-    const source = await readFile("packages/db/src/support.ts","utf8");
-    const start = source.indexOf("async appendCaseMessage(");
-    const end = source.indexOf("async closeCase(",start);
-    const append = source.slice(start,end);
-    const sessionLock = append.indexOf("await lockSupportSessions(client,[parent.session_id])");
-    const rowLock = append.indexOf("FOR UPDATE OF opened,key");
-    expect(sessionLock).toBeGreaterThanOrEqual(0);
-    expect(rowLock).toBeGreaterThan(sessionLock);
-    expect(append).toContain("opened.shredded_at");
-    expect(append).toContain("key.destroyed_at");
-    expect(append).toContain("current.wrapped_key.equals(ZERO_WRAPPED_SUPPORT_KEY)");
-  });
 });

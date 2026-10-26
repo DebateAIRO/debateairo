@@ -83,7 +83,7 @@
   "home.aiPill": "AI-genereret indhold. Argumenter, bedømmelser og konklusioner produceres af AI-modeller, ikke mennesker.",
   "home.aiBlock": "Dialectical Engine er et AI-system. Argumenter, gennemgange, bedømmelser, konklusioner og supportsvar genereres af AI-modeller og kan være unøjagtige eller ufuldstændige. Al genereret tekst har en maskinlæsbar markering, der identificerer den som AI-genereret, og offentliggjorte debatter er mærket til læsere. Ingen menneskelig redaktionel gennemgang udføres før offentliggørelse, og ingen navngivne personer har det redaktionelle ansvar for genereret indhold.",
   "home.aiLandingBlock": "Dialectical Engine er et AI-system. Argumenter, gennemgange, bedømmelser, konklusioner og støttesvar genereres af AI-modeller og kan være unøjagtige eller ufuldstændige – behandl dem som materiale at bedømme, ikke som fakta. Al genereret tekst har en maskinlæsbar markering, der identificerer den som AI-genereret, og offentliggjorte debatter er mærket til læsere. Ingen menneskelig redaktionel gennemgang udføres før offentliggørelse, og ingen navngivne personer har det redaktionelle ansvar for genereret indhold.",
-  "home.aiBanner": "Svar er AI-genereret, maskinlæsbart markeret og kan være forkerte. Spørg efter et menneske på ethvert tidspunkt.",
+  "home.aiBanner": "Svar er AI-genereret, maskinlæsbart markeret og kan være forkerte.",
   "home.aiDebate": "Alt i denne debat — argumenter, gennemgange, bedømmelser og konklusionen — er genereret af AI-modeller, maskinlæsbart markeret og kan være unøjagtigt.",
   "home.aiTransparency": "AI-GENNEMSIGTIGHED",
   "home.aiDisclosure": "AI-meddelelse",

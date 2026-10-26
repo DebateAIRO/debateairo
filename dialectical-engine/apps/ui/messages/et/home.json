@@ -83,7 +83,7 @@
   "home.aiPill": "Tehisintellekti loodud sisu. Argumendid, hinded ja otsused loovad tehisintellektimudelid, mitte inimesed.",
   "home.aiBlock": "Dialectical Engine on tehisintellektisüsteem. Argumendid, hinnangud, hinded, otsused ja kasutajatoe vastused genereerivad tehisintellektimudelid ning need võivad olla ebatäpsed või puudulikud. Kogu genereeritud tekst kannab masinloetavat märgistust, mis tähistab seda tehisintellekti looduna, ja avaldatud väitlused märgistatakse lugejate jaoks. Enne avaldamist ei tehta inimtoimetaja sisulist ülevaatust ning ükski nimetatud isik ei kanna genereeritud sisu eest toimetusvastutust.",
   "home.aiLandingBlock": "Dialectical Engine on tehisintellektisüsteem. Argumendid, hinnangud, hinded, otsused ja kasutajatoe vastused genereerivad tehisintellektimudelid ning need võivad olla ebatäpsed või puudulikud — käsitlege neid hinnatava materjali, mitte faktina. Kogu genereeritud tekst kannab masinloetavat märgistust, mis tähistab seda tehisintellekti looduna, ja avaldatud väitlused märgistatakse lugejate jaoks. Enne avaldamist ei tehta inimtoimetaja sisulist ülevaatust ning ükski nimetatud isik ei kanna genereeritud sisu eest toimetusvastutust.",
-  "home.aiBanner": "Vastused on tehisintellekti loodud, masinloetavalt märgistatud ja võivad olla valed. Võite igal ajal paluda inimesega rääkida.",
+  "home.aiBanner": "Vastused on tehisintellekti loodud, masinloetavalt märgistatud ja võivad olla valed.",
   "home.aiDebate": "Kõik selles väitluses — argumendid, hinnangud, hinded ja otsus — on loodud tehisintellektimudelitega, masinloetavalt märgistatud ning võivad olla ebatäpsed.",
   "home.aiTransparency": "TEHISINTELLEKTI LÄBIPAISTVUS",
   "home.aiDisclosure": "Tehisintellekti teade",

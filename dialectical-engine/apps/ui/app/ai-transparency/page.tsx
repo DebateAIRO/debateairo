@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/translate";
+import { WhenSupportOffered } from "@/components/support/WhenSupportOffered";
 
 const AI_GENERATED_MARKING = 'data-ai-generated="true"';
 const AUTOMATED_ORIGIN_MARKING = 'data-content-origin="automated"';
@@ -50,12 +51,14 @@ export default async function AiTransparencyPage() {
           {t(catalog, "settings.transparency.downloadsTail")}
         </p>
         <p>{t(catalog, "settings.transparency.markingsLimit")}</p>
-        <h2>{t(catalog, "settings.transparency.supportTitle")}</h2>
-        <p>
-          {t(catalog, "settings.transparency.supportLead")}{" "}
-          <a href="/help">{t(catalog, "settings.transparency.help")}</a>{" "}
-          {t(catalog, "settings.transparency.supportTail")}
-        </p>
+        <WhenSupportOffered>
+          <h2>{t(catalog, "settings.transparency.supportTitle")}</h2>
+          <p>
+            {t(catalog, "settings.transparency.supportLead")}{" "}
+            <a href="/help">{t(catalog, "settings.transparency.help")}</a>{" "}
+            {t(catalog, "settings.transparency.supportTail")}
+          </p>
+        </WhenSupportOffered>
         <a className="btn" href="/">
           {t(catalog, "settings.transparency.back", { brand: DEBATEAI_BRAND })}
         </a>

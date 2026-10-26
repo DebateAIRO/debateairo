@@ -83,7 +83,7 @@
   "home.aiPill": "Tekoälyn tuottamaa sisältöä. Argumentit, pisteet ja ratkaisut ovat tekoälymallien, eivät ihmisten, tuottamia.",
   "home.aiBlock": "Dialectical Engine on tekoälyjärjestelmä. Tekoälymallit tuottavat argumentit, arviot, pisteet, ratkaisut ja tukivastaukset, ja ne voivat olla virheellisiä tai puutteellisia. Kaikessa tuotetussa tekstissä on koneellisesti luettava merkintä, joka tunnistaa sen tekoälyn tuottamaksi, ja julkaistut väittelyt merkitään lukijoille. Ihminen ei tarkasta sisältöä toimituksellisesti ennen julkaisua, eikä nimetty henkilö kanna toimituksellista vastuuta tuotetusta sisällöstä.",
   "home.aiLandingBlock": "Dialectical Engine on tekoälyjärjestelmä. Tekoälymallit tuottavat argumentit, arviot, pisteet, ratkaisut ja tukivastaukset, ja ne voivat olla virheellisiä tai puutteellisia — käsittele niitä arvioitavana aineistona, älä tosiasioina. Kaikessa tuotetussa tekstissä on koneellisesti luettava merkintä, joka tunnistaa sen tekoälyn tuottamaksi, ja julkaistut väittelyt merkitään lukijoille. Ihminen ei tarkasta sisältöä toimituksellisesti ennen julkaisua, eikä nimetty henkilö kanna toimituksellista vastuuta tuotetusta sisällöstä.",
-  "home.aiBanner": "Vastaukset ovat tekoälyn tuottamia ja koneellisesti luettavasti merkittyjä, ja ne voivat olla vääriä. Voit pyytää ihmistä mukaan milloin tahansa.",
+  "home.aiBanner": "Vastaukset ovat tekoälyn tuottamia ja koneellisesti luettavasti merkittyjä, ja ne voivat olla vääriä.",
   "home.aiDebate": "Kaikki tässä väittelyssä — argumentit, arviot, pisteet ja ratkaisu — on tekoälymallien tuottamaa, koneellisesti luettavasti merkittyä ja mahdollisesti virheellistä.",
   "home.aiTransparency": "TEKOÄLYN LÄPINÄKYVYYS",
   "home.aiDisclosure": "Tekoälyä koskeva ilmoitus",

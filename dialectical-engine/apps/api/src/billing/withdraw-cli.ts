@@ -16,10 +16,12 @@ import { pathToFileURL } from "node:url";
 import { exhaustive, TypedDomainError } from "@debateai/kernel";
 import { PostgresModelSpendStore } from "@debateai/budget";
 import { decimalToMicros, foldSubscription, microsToDecimal, type PriceCurrency } from "@debateai/billing-core";
+import { createEmailBlindIndex, loadSecretKey, normalizeEmailForBlindIndex } from "@debateai/crypto";
 import {
   BillingJobQueries,
   BillingRepository,
   EntitlementRepository,
+  PostgresIdentityRepository,
   type ChargeEventRow,
   type ChargeRow,
   type Pool
@@ -40,6 +42,10 @@ import { allocateRefund, hostCommand, paidTransactions, RefundDesk } from "./ref
 import { BillingRefusal } from "./refusal.js";
 import { refuse } from "./subscription-core.js";
 import { recordWithdrawal, type WithdrawalDeps } from "./withdrawal.js";
+import {
+  loadBillingOwnerLookupEnvironment,
+  parseBillingOwnerLookupEnvironment
+} from "../../../../packages/register/src/runtime-environment.js";
 
 export type WithdrawArguments =
   /** `receivedAt` null: no `--received` was given, so the statement counts as received when the command runs. */
@@ -59,6 +65,13 @@ export type OpenWithdrawCommand = () => Promise<Readonly<{
   run(input: WithdrawArguments): Promise<WithdrawResult>;
   close(): Promise<void>;
 }>>;
+
+type OwnerLookupDependencies = Readonly<{
+  environment: ReturnType<typeof parseBillingOwnerLookupEnvironment>;
+  readStdin(): Promise<string>;
+  readKey: typeof loadSecretKey;
+  openPool: typeof openBillingOperatorPool;
+}>;
 
 /** Owner refs are lower-case UUIDs (B5). */
 const OWNER_REF = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
@@ -259,9 +272,91 @@ function refusalCode(error: unknown): string {
   return "BILLING_WITHDRAW_FAILED";
 }
 
-export async function runBillingWithdrawCli(
-  args: readonly string[], output: WithdrawCliOutput, open: OpenWithdrawCommand
+/** One bounded address comes from stdin, so it never appears in argv or shell history. */
+async function readOwnerEmailStdin(): Promise<string> {
+  const chunks: Buffer[] = [];
+  let length = 0;
+  for await (const chunk of process.stdin) {
+    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string);
+    length += bytes.byteLength;
+    if (length > 4_096) throw new TypeError("BILLING_OWNER_LOOKUP_USAGE");
+    chunks.push(bytes);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+async function runOwnerOfEmailLookup(
+  output: WithdrawCliOutput, injected?: OwnerLookupDependencies
 ): Promise<number> {
+  try {
+    const deps = injected ?? {
+      environment: loadBillingOwnerLookupEnvironment(),
+      readStdin: readOwnerEmailStdin,
+      readKey: loadSecretKey,
+      openPool: openBillingOperatorPool
+    };
+    const raw = await deps.readStdin();
+    const address = raw.replace(/\r?\n$/u, "");
+    if (Buffer.byteLength(raw, "utf8") > 4_096 || address.includes("\n") || address.includes("\r")) {
+      throw new TypeError("BILLING_OWNER_LOOKUP_USAGE");
+    }
+    let normalized: string;
+    try {
+      normalized = normalizeEmailForBlindIndex(address);
+    } catch {
+      throw new TypeError("BILLING_OWNER_LOOKUP_USAGE");
+    }
+    const key = deps.readKey(deps.environment.BLIND_INDEX_KEY_PATH);
+    let blindIndex: Buffer;
+    try {
+      blindIndex = createEmailBlindIndex(key, normalized);
+    } finally {
+      key.fill(0);
+    }
+    const pool = await deps.openPool(deps.environment.DATABASE_URL, {
+      production: deps.environment.NODE_ENV === "production", readOnly: true, max: 1
+    });
+    let ownerRef: string | null;
+    try {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN READ ONLY");
+        try {
+          // This repository method uses only query; its audit hasher is not used on this read path.
+          const identity = new PostgresIdentityRepository(client as unknown as Pool, null as never);
+          ownerRef = await identity.ownerRefByEmailBlindIndex(blindIndex);
+          await client.query("COMMIT");
+        } catch (error) {
+          await client.query("ROLLBACK").catch(() => undefined);
+          throw error;
+        }
+      } finally {
+        client.release();
+      }
+    } finally {
+      blindIndex.fill(0);
+      await pool.end();
+    }
+    output.stdout(`owner_ref: ${ownerRef ?? "none"}\n`);
+    return 0;
+  } catch (error) {
+    const code = refusalCode(error);
+    output.stderr(`${code}\n`);
+    return code === "BILLING_OWNER_LOOKUP_USAGE" ? 2 : 1;
+  }
+}
+
+export async function runBillingWithdrawCli(
+  args: readonly string[], output: WithdrawCliOutput, open: OpenWithdrawCommand,
+  ownerLookup?: OwnerLookupDependencies
+): Promise<number> {
+  if (args.includes("--owner-of-email")) {
+    if (args.length !== 1 || args[0] !== "--owner-of-email") {
+      output.stderr("BILLING_OWNER_LOOKUP_USAGE\n");
+      return 2;
+    }
+    return runOwnerOfEmailLookup(output, ownerLookup);
+  }
   let input: WithdrawArguments;
   try {
     input = parseWithdrawArguments(args);

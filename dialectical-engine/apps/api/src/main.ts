@@ -57,7 +57,7 @@ import {
   PublicationCipher,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresThreatReportRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, SynthesisCheckErasureCoordinator, PostgresSynthesisCheckErasureRepository, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
+import { AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresThreatReportRepository, PrivateRunErasureCoordinator, SynthesisCheckErasureCoordinator, PostgresSynthesisCheckErasureRepository, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
 // Role rotation (spec 2026-10-11): the per-role, per-model counts admission reads when the row is ON.
 import { readRoleRotationCounts } from "@debateai/db";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes, type AskRequest } from "@debateai/contract";
@@ -100,6 +100,8 @@ import {
   engineInForce,
   readLengthGuidancePolicy,
   lengthGuidedFirstCallCeiling,
+  readSupportNoSourceCheckPolicy,
+  supportNoSourceCheckPolicyStartValues,
   readRecoveryPolicy,
   readSessionPolicy,
   readStructuralCeilingPolicyInputs,
@@ -137,7 +139,7 @@ import {
 } from "./index.js";
 import { InProcessAuthRateLimiter, RegistrationService } from "./registration.js";
 import { RepositoryLegalAcceptanceApplication } from "./legal.js";
-import { AdmissionLimiter } from "./admission.js";
+import { AdmissionLimiter, SUPPORT_SWEPT_SCOPES } from "./admission.js";
 import { openGeoLookup } from "@debateai/geo";
 import { CountryGate, countryPolicyInForce } from "./country-gate.js";
 import { AskRoom, everyWholeMinute } from "./ask-room.js";
@@ -159,7 +161,6 @@ import {
   assertNoRecordsDatedAhead, assertOtherSystemRecordsClosed, assertProviderOnlyNotifySealed, billingCustodyPaths,
   billingModeOf, incompleteNetopiaKey, loadBillingConnectors, loadNetopiaConnectors, type BillingConnectors, type BillingMode, type NetopiaConnectors
 } from "./billing/connectors.js";
-import { createSupportCaseMaterial, createSupportCaseService, createSupportMessageCipher, createWrappedSupportSessionKey } from "./support/session.js";
 import { MfaEnrollmentService } from "./mfa.js";
 import { SessionService } from "./sessions.js";
 import { StaffWebAuthnService } from "./staff/webauthn.js";
@@ -219,11 +220,12 @@ import {
 import {
   SupportModelReservationLedger,createReservedSupportModelPort
 } from "./support/model-reservation.js";
-import { createAdvisorySummaryService,createSupportCaseAccessService,createSupportSummarySealer } from "./support/cases.js";
 import { PostgresSupportIncidentRepository } from "./support/incidents.js";
 import { readLimits } from "./support/limits.js";
 import { SupportRelayQueue } from "./support/queue.js";
 import { SupportDegradedState } from "./support/degraded.js";
+import { SupportMessageLimiter, SUPPORT_COUNTER_SWEEP_MS } from "./support/memory-limits.js";
+import { createMemorySupportCallRecords } from "./support/memory-call-records.js";
 import { assertEngineHasLengthPolicy } from "./engine-ask.js";
 
 const environment = loadApiEnvironment();
@@ -1291,9 +1293,6 @@ const evaluatorDevMenu = evaluatorDevMenuPool !== undefined
   ? new PostgresEvaluatorDevMenuRepository(evaluatorDevMenuPool)
   : undefined;
 const supportPool = boot.hold(createPool(environment.SUPPORT_DATABASE_URL, API_DATABASE_POOLS.support));
-const supportRelayLeasePool = boot.hold(
-  createPool(environment.SUPPORT_DATABASE_URL, API_DATABASE_POOLS.supportRelayLease)
-);
 const supportKeys = await boot.run("support-keys", () => createSupportKeyPort({
   supportKekPath: environment.SUPPORT_KEK_PATH,
   // V-3: the support envelope carries no key label, so a row written before a
@@ -1308,18 +1307,9 @@ const supportKeys = await boot.run("support-keys", () => createSupportKeyPort({
     environment.RECORDS_KEY_PATH
   ].filter((path): path is string => path !== undefined)
 }));
-// DL7-F7: the support KEK is the third key the boot holds, and every stage
-// after this one — the model target parse and eight repository constructions —
-// used to be able to throw with it live in memory.
+// DL7-F7: the support KEK is the third key the boot holds; later composition
+// stages may throw, so boot custody closes it on failure.
 boot.hold({ end: () => supportKeys.close() });
-const supportSessions = new PostgresSupportSessionRepository(
-  supportPool,
-  createWrappedSupportSessionKey(supportKeys)
-);
-const supportMessages = createSupportMessageCipher(
-  supportKeys,
-  new PostgresSupportMessageRepository(supportPool)
-);
 const supportConfiguration = createSupportConfigurationPort(
   createSupportControlPlanePool(environment.DATABASE_URL)
 );
@@ -1329,14 +1319,12 @@ const reportSupportDiagnostic = (diagnostic: Readonly<{ code: string }> | string
 const reportSupportDraftDiagnostic = (diagnostic: SupportDraftReport): void => {
   console.error(projectSupportDraftReport(diagnostic));
 };
-const supportRelayReservations = new PostgresSupportRelayReservationRepository(supportRelayLeasePool);
-const supportRelayCallRecords = new PostgresSupportRelayReservationRepository(supportPool);
 const supportRelayQueue = new SupportRelayQueue({
   readLimits: () => readLimits(supportConfiguration),
-  reservations: supportRelayReservations,
   reportCleanupFailure: reportSupportDiagnostic
 });
 const supportDegraded = new SupportDegradedState();
+const supportLimiter = new SupportMessageLimiter();
 // V-30(1): the support chat's model target is parsed above, before the question-language step (P2L Task 19,
 // pre-flight PF-L36); the support chat receives that same target here.
 const supportModels = new Map<string,SupportModelPort>(supportModelTarget === undefined ? [] : [[
@@ -1511,84 +1499,26 @@ const supportModelReservations = new SupportModelReservationLedger({
 const supportAdmittedModel = createReservedSupportModelPort({
   configuration: supportConfiguration,
   ledger: supportModelReservations,
-  durableCalls: supportRelayCallRecords,
+  durableCalls: createMemorySupportCallRecords(),
   modelFor: (modelRef) => supportModels.get(modelRef),
   // V-30: a configured model ref that names no composed model says so, once,
   // instead of degrading every visitor's answer with no reason recorded.
   reportDiagnostic: reportSupportDiagnostic
 });
-const supportCaseSummaries = new PostgresSupportCaseSummaryRepository(supportPool);
-const supportSummaryService = createAdvisorySummaryService({
-  complete: async (request) => {
-    return (await supportRelayQueue.execute({
-      modelBacked: true,language: request.language,signal: request.signal
-    },(signal) => supportAdmittedModel.complete({
-      ...request,...(signal === undefined ? {} : { signal })
-    }))).text;
-  },
-  seal: createSupportSummarySealer(
-    supportKeys,supportCaseSummaries.readCaseKey.bind(supportCaseSummaries)
-  ),
-  persist: supportCaseSummaries.updateCaseSummary.bind(supportCaseSummaries)
-});
-const supportCases = createSupportCaseService({
-  messages: supportMessages,
-  summaries: supportSummaryService,
-  reportSummaryFailure: reportSupportDiagnostic,
-  createOnce: async (input) => {
-    let snapshot: Uint8Array | undefined;
-    const repository = new PostgresSupportCaseRepository(
-      supportPool,
-      async (caseId) => {
-        if (snapshot === undefined) throw new TypeError("SUPPORT_CASE_SNAPSHOT_UNAVAILABLE");
-        return createSupportCaseMaterial(supportKeys,snapshot)(caseId);
-      }
-    );
-    return repository.createCaseOnce({
-      sessionId: input.sessionId,identityOwnerRef: input.identityOwnerRef,
-      language: input.language,createdAt: input.createdAt,
-      triggerPredicate: input.triggerPredicate,triggerGeneration: input.triggerGeneration,
-      toolCalls: input.toolCalls,kbVersion: input.kbVersion,slaHours: input.slaHours,
-      prepare: async () => {
-        const prepared = await input.prepare();
-        snapshot = prepared.transcriptSnapshot;
-        return Object.freeze({
-          caseId: prepared.caseId,token: prepared.token,tokenSha256: prepared.tokenSha256
-        });
-      }
-    });
-  },
-  create: async (input) => {
-    const repository = new PostgresSupportCaseRepository(
-      supportPool,
-      createSupportCaseMaterial(supportKeys,input.transcriptSnapshot)
-    );
-    return repository.createCase({
-      caseId: input.caseId,
-      tokenSha256: input.tokenSha256,
-      sessionId: input.sessionId,
-      language: input.language,
-      createdAt: input.createdAt,
-      identityOwnerRef: input.identityOwnerRef,
-      triggerPredicate: input.triggerPredicate,
-      toolCalls: input.toolCalls,
-      kbVersion: input.kbVersion,
-      slaHours: input.slaHours
-    });
-  }
-});
 const supportIncidents = new PostgresSupportIncidentRepository(supportPool as never);
+const supportNoSourceCheckPolicy = await boot.run("support-no-source-check-policy", async () =>
+  (await readSupportNoSourceCheckPolicy(pool, environment.REGISTER_VERSION))
+    ?? supportNoSourceCheckPolicyStartValues());
 const supportAnswers = createSupportAnswerService({
   entries: supportKnowledge.entries,
   requireStructuredDraft: true,
-  messages: supportMessages,
   incidents: supportIncidents,
   reportDraftDiagnostic: reportSupportDraftDiagnostic,
   queue: supportRelayQueue,
   degraded: supportDegraded,
+  noSourceCheck: { timeoutMs: supportNoSourceCheckPolicy.timeoutMs },
   modelFor: () => supportAdmittedModel
 });
-const supportStatus = new PostgresSupportStatusRepository(supportPool);
 /**
  * Paid plans P16c (R-35): where and when each tax is paid, read only while billing is on (the owner's O1 text);
  * billing on with no taxAuthorities row at REGISTER_VERSION is refused below by name.
@@ -1759,6 +1689,7 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
   dataExportTimer = setInterval(triggerDataExportWork, DATA_EXPORT_TICK_MS);
   dataExportTimer.unref();
 }
+const admission = new AdmissionLimiter(admissionPolicy);
 const api = buildApi({
   questionCheck,
   ...(previewConfig === undefined ? {} : { previewProviderTestConfig: previewConfig, previewTeamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [] }),
@@ -1799,7 +1730,7 @@ const api = buildApi({
   accountProfile,
   recoveryEmail,
   // B10: the sealed admission budgets are always composed in production.
-  admission: new AdmissionLimiter(admissionPolicy),
+  admission,
   // B7a: the room read and, while billing is on, the usage read. Absent, the
   // room answers FITS and the usage route 404.
   ...(askRoom === undefined ? {} : { askRoom }),
@@ -1813,28 +1744,14 @@ const api = buildApi({
   // ends the plan once the erasure commits).
   ...(billingRuntime === undefined ? {} : { billingErasure: billingRuntime.erasure }),
   ...(countryGate === undefined ? {} : { countryGate }),
+  networkPseudonym: (value: string) => supportKeys.sourcePseudonym(value),
   support: {
     configuration: supportConfiguration,
-    // DL5-F3: the caller's network is pseudonymised under a key derived from
-    // the support KEK before it ever reaches an append-only table.
     sourcePseudonym: (value: string) => supportKeys.sourcePseudonym(value),
-    sessions: Object.freeze({
-      create: supportSessions.create.bind(supportSessions),
-      read: supportSessions.read.bind(supportSessions),
-      admitMessage: supportSessions.admitMessage.bind(supportSessions),
-      admitIpSession: supportSessions.admitIpSession.bind(supportSessions),
-      recordRateLimit: supportSessions.recordRateLimit.bind(supportSessions),
-      rateMessage: supportSessions.rateMessage.bind(supportSessions),
-      status: supportStatus.status.bind(supportStatus)
-    }),
-    messages: supportMessages,
-    cases: supportCases,
-    caseAccess: createSupportCaseAccessService({
-      repository: supportCaseSummaries,keys: supportKeys
-    }),
+    limiter: supportLimiter,
+    degraded: supportDegraded,
     answer: supportAnswers,
     incidents: supportIncidents,
-    reportDiagnostic: reportSupportDiagnostic,
     knowledge: {
       snapshot: (version) => supportKnowledgeSnapshots.get(version),
       status: async () => Object.freeze({
@@ -1886,6 +1803,11 @@ const api = buildApi({
 if (publicationCleanupTimer !== undefined) {
   api.addHook("onClose",async () => clearInterval(publicationCleanupTimer));
 }
+const supportSweepTimer = setInterval(() => {
+  admission.sweep(new Date(), SUPPORT_SWEPT_SCOPES);
+  supportLimiter.sweep(Date.now());
+}, SUPPORT_COUNTER_SWEEP_MS).unref();
+api.addHook("onClose", async () => clearInterval(supportSweepTimer));
 api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
 api.addHook("onClose",async () => clearInterval(threatReportAlertsTimer));
 api.addHook("onClose",async () => clearInterval(threatReportErasureTimer));
@@ -1928,7 +1850,6 @@ const startup = installStartupResourceOwner({
     ...(evaluatorDevMenuPool === undefined ? [] : [evaluatorDevMenuPool]),
     ...(dataExportPool === undefined ? [] : [dataExportPool]),
     supportPool,
-    supportRelayLeasePool,
     { end: () => supportKeys.close() },
     { end: () => supportConfiguration.close() },
     // Paid plans G3a: the country lookup is closed with the process (close only sets a flag, so twice is harmless).
@@ -1964,7 +1885,6 @@ announceArgon2BreakerTrip = (): void => {
 };
 await startup.run("support-attestation", async () => {
   await assertSupportDatabaseRole(pool, supportPool);
-  await assertSupportDatabaseRole(pool, supportRelayLeasePool);
   await assertSupportKeyCoverage(supportPool);
 });
 await startup.run("listen", async () => {

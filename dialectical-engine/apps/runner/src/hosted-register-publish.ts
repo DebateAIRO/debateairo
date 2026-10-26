@@ -148,6 +148,9 @@ import {
   parseQuestionLanguagePolicy,
   questionLanguagePolicyRow,
   questionLanguagePolicyStartValues,
+  SUPPORT_NO_SOURCE_CHECK_POLICY_ROW_KEY,
+  parseSupportNoSourceCheckPolicy,
+  supportNoSourceCheckPolicyRow,
   readDebateShapePolicy,
   readQuestionLanguagePolicy,
   type QuestionLanguagePolicy,
@@ -262,7 +265,8 @@ const TOP_LEVEL_KEYS = Object.freeze([
   // Length guidance (spec 2026-10-15): OPTIONAL. Left out, no row is sealed and every request keeps today's bytes.
   "lengthGuidancePolicy",
   // Engine redesign (spec 2026-10-15 §3): OPTIONAL, and only with lengthGuidancePolicy. Left out, every debate is engine 1.
-  "engineVersionPolicy"
+  "engineVersionPolicy",
+  "supportNoSourceCheckPolicy"
 ] as const);
 const OPERATOR_ROW_KEYS = Object.freeze([CONFIGURED_PROVIDER_SET_ROW_KEY, COST_ENVELOPE_POLICY_ROW_KEY] as const);
 
@@ -466,6 +470,8 @@ export type HostedRegisterFile = Readonly<{
   lengthGuidancePolicy?: unknown;
   /** Optional (engine redesign 2026-10-15): the engine row's policy without its kind; absent = no engineVersionPolicy row. */
   engineVersionPolicy?: unknown;
+  /** Optional S05 no-source judgement deadline, without its kind; absent = code's 15-second start value. */
+  supportNoSourceCheckPolicy?: unknown;
 }>;
 
 /**
@@ -532,7 +538,8 @@ export function parseHostedRegisterFile(bytes: Uint8Array): HostedRegisterFile {
     ...(Object.hasOwn(record, "debateShapePolicy") ? { debateShapePolicy: record.debateShapePolicy } : {}),
     ...(Object.hasOwn(record, "questionLanguagePolicy") ? { questionLanguagePolicy: record.questionLanguagePolicy } : {}),
     ...(Object.hasOwn(record, "lengthGuidancePolicy") ? { lengthGuidancePolicy: record.lengthGuidancePolicy } : {}),
-    ...(Object.hasOwn(record, "engineVersionPolicy") ? { engineVersionPolicy: record.engineVersionPolicy } : {})
+    ...(Object.hasOwn(record, "engineVersionPolicy") ? { engineVersionPolicy: record.engineVersionPolicy } : {}),
+    ...(Object.hasOwn(record, "supportNoSourceCheckPolicy") ? { supportNoSourceCheckPolicy: record.supportNoSourceCheckPolicy } : {})
   });
 }
 
@@ -951,6 +958,19 @@ function questionLanguageRowOf(member: unknown, sourceRef: string): ReturnType<t
   return hostedQuestionLanguageBootable(policy) ? row : refuse("HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID");
 }
 
+/** S05's optional D5 deadline is an additive row; the file member never carries the row's kind. */
+function supportNoSourceCheckRowOf(member: unknown, sourceRef: string): ReturnType<typeof supportNoSourceCheckPolicyRow> {
+  if (typeof member !== "object" || member === null || Array.isArray(member) || Object.hasOwn(member, "kind")) {
+    return refuse("HOSTED_REGISTER_SUPPORT_NO_SOURCE_CHECK_INVALID");
+  }
+  try {
+    const policy = parseSupportNoSourceCheckPolicy({ kind: "SUPPORT_NO_SOURCE_CHECK_POLICY", ...member });
+    return supportNoSourceCheckPolicyRow(policy, sourceRef);
+  } catch {
+    return refuse("HOSTED_REGISTER_SUPPORT_NO_SOURCE_CHECK_INVALID");
+  }
+}
+
 /**
  * I4, the readiness half: the API's question-language boot step over the SEALED version, exactly when the API asks it
  * (the debate shape row in force; absent or `enabled: false` = the row is never read, as at boot). The row absent =
@@ -1020,6 +1040,8 @@ export async function planHostedRegisterPublication(
   // Question language (spec 2026-10-13): the same, for the optional questionLanguagePolicy member. Absent = no row.
   const questionLanguageRow = file.questionLanguagePolicy === undefined ? null
     : questionLanguageRowOf(file.questionLanguagePolicy, file.sourceRef);
+  const supportNoSourceCheckRow = file.supportNoSourceCheckPolicy === undefined ? null
+    : supportNoSourceCheckRowOf(file.supportNoSourceCheckPolicy, file.sourceRef);
   // Paid plans (spec 2026-09-29 §2.5.1): a supplied billing row is checked by
   // the register's own parser, so its refusal keeps its own code.
   if (file.billingPlans !== null) billingPlansFromValue(file.billingPlans.value, file.sourceRef);
@@ -1182,6 +1204,14 @@ export async function planHostedRegisterPublication(
     valueJsonText: questionLanguageRow.valueJsonText,
     sourceRef: questionLanguageRow.sourceRef
   })];
+  if (supportNoSourceCheckRow !== null && codeOwnedRows.some((row) => row.rowKey === SUPPORT_NO_SOURCE_CHECK_POLICY_ROW_KEY)) {
+    refuse("HOSTED_REGISTER_COMPOSITION_INVALID");
+  }
+  const supportNoSourceCheckRows: readonly RegisterPublicationRow[] = supportNoSourceCheckRow === null ? [] : [Object.freeze({
+    rowKey: supportNoSourceCheckRow.rowKey,
+    valueJsonText: supportNoSourceCheckRow.valueJsonText,
+    sourceRef: supportNoSourceCheckRow.sourceRef
+  })];
   // Length guidance (spec 2026-10-15) is ADDITIVE too, for the same reason.
   if (lengthGuidance !== null && codeOwnedRows.some((row) => row.rowKey === LENGTH_GUIDANCE_POLICY_ROW_KEY)) {
     refuse("HOSTED_REGISTER_COMPOSITION_INVALID");
@@ -1207,6 +1237,7 @@ export async function planHostedRegisterPublication(
     ...callConcurrencyRows,
     ...debateShapeRows,
     ...questionLanguageRows,
+    ...supportNoSourceCheckRows,
     ...lengthGuidanceRows,
     ...engineVersionRows
   ]);

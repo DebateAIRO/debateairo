@@ -1246,6 +1246,47 @@ select {
 .supportEscalateCompact:hover { background: var(--surface-2); }
 .supportEscalateCompact:disabled { opacity: .5; cursor: wait; }
 
+.supportNotice {
+  margin: 0;
+  color: var(--muted);
+  font: 500 10px/1.5 var(--font-sans);
+}
+
+.supportHelpNumbers {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  color: var(--text-2);
+}
+
+.supportHelpNumbers .crisisSupportLines { gap: 12px; }
+.supportHelpNumbers .crisisSupportEmergency { margin-top: 4px; }
+
+.supportHelpHuman {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.supportHumanAddress {
+  margin: 6px 0 0;
+  color: var(--text-2);
+  font: 500 10px/1.5 var(--font-sans);
+}
+.supportHumanAddress a { color: var(--link); text-decoration: underline; }
+
+.supportHelpUnavailable {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface-1);
+  color: var(--text-2);
+}
+
 .supportComposerBar--compact { justify-content: flex-end; }
 
 .supportAssistantCompact .supportSend {

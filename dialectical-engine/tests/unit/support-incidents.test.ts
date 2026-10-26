@@ -178,15 +178,6 @@ describe("SUP-05 deterministic incident answers", () => {
     const complete = vi.fn(async (_input: Parameters<SupportModelPort["complete"]>[0]) => ({
       text: "Model reply."
     }));
-    const messages = {
-      write: vi.fn(async (input) => ({ ...input,redacted: false })),
-      writeAndTransit: vi.fn(async (input,transit) => {
-        await transit(input.text);
-        return { ...input,redacted: false };
-      }),
-      read: vi.fn(async () => null),
-      listSession: vi.fn(async () => [])
-    } as never;
     const instants = [
       new Date("2026-09-07T09:00:00.001Z"),new Date("2026-09-07T09:00:00.002Z")
     ];
@@ -195,12 +186,12 @@ describe("SUP-05 deterministic incident answers", () => {
         id: "publish-a-debate",lang: "en",title: "Publish a debate",status: "shipped",
         sources: ["test"],verifiedAgainst: "test",ratifiedBy: "V",ratifiedOn: "2026-09-01",
         body: "Owners can publish a debate from its page."
-      }],messages,modelFor: () => ({ complete }),
+      }],modelFor: () => ({ complete }),
       incidents: { readActiveIncidents: async () => [ACTIVE] },
       clock: () => instants.shift() ?? new Date("2026-09-07T09:00:00.003Z")
     });
     const result = await answer.respond({
-      sessionId: "session",text: "How do I publish a debate?",language: "en",
+      text: "How do I publish a debate?",language: "en",
       detectedLanguage: "en",overrideLanguage: null,modelRef: "relay",
       receivedAt: new Date("2026-09-07T09:00:00.000Z")
     });

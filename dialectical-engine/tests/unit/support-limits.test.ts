@@ -12,7 +12,6 @@ import {
 import {
   parseSupportLimitsArguments,runSupportLimits
 } from "../../apps/runner/src/support-limits-cli.js";
-import { formatSpend } from "../../apps/runner/src/support-status-cli.js";
 
 const VALUES: SupportConfigurationValues = Object.freeze({
   supportEnabled: true,supportModelRef: "development:claude-cli",
@@ -52,20 +51,6 @@ describe("SUP-06 V-owned limits", () => {
     await expect(readLimits({
       current: async () => ({ kind: "DISABLED",code: "SUPPORT_CONFIG_UNINITIALIZED" })
     })).rejects.toMatchObject({ code: "SUPPORT_LIMITS_UNAVAILABLE" });
-  });
-
-  it("formats cost honestly and prints typed token counts only when reported", () => {
-    expect(formatSpend({ period: "today",calls: 3 })).toEqual([
-      "calls today: 3","cost today: UNKNOWN"
-    ]);
-    expect(formatSpend({
-      period: "today",calls: 3,inputTokens: 120,outputTokens: 42,costUsd: 0.42
-    })).toEqual([
-      "calls today: 3","input tokens today: 120","output tokens today: 42","cost today: $0.42"
-    ]);
-    expect(formatSpend({ period: "last 7 days",calls: 9,costUsd: 0 })).toEqual([
-      "calls last 7 days: 9","cost last 7 days: $0.00"
-    ]);
   });
 
   it("parses every current mutable support value type", () => {

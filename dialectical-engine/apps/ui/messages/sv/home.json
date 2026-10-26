@@ -83,7 +83,7 @@
   "home.aiPill": "AI-genererat innehåll. Argument, poäng och utslag produceras av AI-modeller, inte människor.",
   "home.aiBlock": "Dialectical Engine är ett AI-system. Argument, granskningar, poäng, utslag och supportsvar genereras av AI-modeller och kan vara felaktiga eller ofullständiga. All genererad text har en maskinläsbar märkning som identifierar den som AI-genererad, och publicerade debatter märks för läsarna. Ingen mänsklig redaktionell granskning görs före publicering, och ingen namngiven person har redaktionellt ansvar för det genererade innehållet.",
   "home.aiLandingBlock": "Dialectical Engine är ett AI-system. Argument, granskningar, poäng, utslag och supportsvar genereras av AI-modeller och kan vara felaktiga eller ofullständiga — behandla dem som material att bedöma, inte som fakta. All genererad text har en maskinläsbar märkning som identifierar den som AI-genererad, och publicerade debatter märks för läsarna. Ingen mänsklig redaktionell granskning görs före publicering, och ingen namngiven person har redaktionellt ansvar för det genererade innehållet.",
-  "home.aiBanner": "Svaren är AI-genererade, maskinläsbart märkta och kan vara felaktiga. Be när som helst att få prata med en person.",
+  "home.aiBanner": "Svaren är AI-genererade, maskinläsbart märkta och kan vara felaktiga.",
   "home.aiDebate": "Allt i den här debatten — argument, granskningar, poäng och utslag — genereras av AI-modeller, är maskinläsbart märkt och kan vara felaktigt.",
   "home.aiTransparency": "AI-TRANSPARENS",
   "home.aiDisclosure": "Information om AI",

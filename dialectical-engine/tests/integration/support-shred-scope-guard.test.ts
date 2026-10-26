@@ -63,7 +63,7 @@ async function timeCommits(
 ): Promise<number> {
   const started = process.hrtime.bigint();
   for (let index = 0; index < count; index += 1) {
-    const client = await supportPool.connect();
+    const client = await database.pool.connect();
     try {
       await client.query("BEGIN");
       await work(client);
@@ -78,7 +78,7 @@ async function timeCommits(
   return Number(process.hrtime.bigint() - started) / 1e6 / count;
 }
 
-/** One commit per session, exactly as PostgresSupportSessionRepository.create does. */
+/** Historical session pairs are seeded by the database owner after 0126. */
 async function createSessions(count: number): Promise<number> {
   return timeCommits(count, (client) => insertSessionPair(client, randomUUID()));
 }
@@ -110,7 +110,6 @@ beforeAll(async () => {
       token char(64) NOT NULL UNIQUE,
       created_at timestamptz NOT NULL
     );
-    GRANT INSERT ON public.db1_timing_control TO debateai_support;
   `);
   supportPool = createPool(database.connectionString);
   supportPool.on("connect", (client) => {
@@ -154,8 +153,8 @@ describe("0065 §4 the shred guard is no longer a global serialisation point (DL
   it("lets a second session commit while the first transaction is still open", async () => {
     // The singleton row lock is held to COMMIT, so the second INSERT waited for
     // the first transaction to end (the audit measured 735 ms on a live table).
-    const holder = await supportPool.connect();
-    const contender = await supportPool.connect();
+    const holder = await database.pool.connect();
+    const contender = await database.pool.connect();
     try {
       await holder.query("BEGIN");
       await insertSessionPair(holder, randomUUID());
@@ -188,7 +187,7 @@ describe("0065 §4 the shred guard is no longer a global serialisation point (DL
   }, 120_000);
 
   it("checks only the touched scope, and says so through the validation counter", async () => {
-    const client = await supportPool.connect();
+    const client = await database.pool.connect();
     try {
       await client.query("BEGIN");
       await client.query(
@@ -212,7 +211,7 @@ describe("0065 §4 the shred guard is no longer a global serialisation point (DL
 
 describe("0065 §4 the shred invariant is unchanged (DL2-F2, DL5-F1)", () => {
   it("still refuses a session without its key, at commit, inside the touched scope", async () => {
-    const client = await supportPool.connect();
+    const client = await database.pool.connect();
     try {
       await client.query("BEGIN");
       await client.query(`
@@ -229,7 +228,7 @@ describe("0065 §4 the shred invariant is unchanged (DL2-F2, DL5-F1)", () => {
 
   it("still refuses a destroyed key whose session carries no tombstone", async () => {
     const sessionId = randomUUID();
-    const client = await supportPool.connect();
+    const client = await database.pool.connect();
     try {
       await client.query("BEGIN");
       await insertSessionPair(client, sessionId);
@@ -249,7 +248,7 @@ describe("0065 §4 the shred invariant is unchanged (DL2-F2, DL5-F1)", () => {
 
   it("still refuses an audit row whose owner keeps an unshredded session", async () => {
     const ownerRef = randomUUID();
-    const client = await supportPool.connect();
+    const client = await database.pool.connect();
     try {
       await client.query("BEGIN");
       await insertSessionPair(client, randomUUID(), ownerRef);
@@ -270,7 +269,7 @@ describe("0065 §4 the shred invariant is unchanged (DL2-F2, DL5-F1)", () => {
   it("still refuses a deleted audit row that a shredded session depends on", async () => {
     const ownerRef = randomUUID();
     const sessionId = randomUUID();
-    const client = await supportPool.connect();
+    const client = await database.pool.connect();
     try {
       await client.query("BEGIN");
       await insertSessionPair(client, sessionId, ownerRef);
@@ -304,7 +303,7 @@ describe("0065 §4 the shred invariant is unchanged (DL2-F2, DL5-F1)", () => {
     for (const shredFirst of [true, false]) {
       const ownerRef = randomUUID();
       const existing = randomUUID();
-      const seed = await supportPool.connect();
+      const seed = await database.pool.connect();
       try {
         await seed.query("BEGIN");
         await insertSessionPair(seed, existing, ownerRef);
@@ -314,7 +313,7 @@ describe("0065 §4 the shred invariant is unchanged (DL2-F2, DL5-F1)", () => {
       }
 
       const shred = await supportPool.connect();
-      const insert = await supportPool.connect();
+      const insert = await database.pool.connect();
       const settle = async (client: PoolClient, work: () => Promise<void>): Promise<boolean> => {
         try {
           await work();

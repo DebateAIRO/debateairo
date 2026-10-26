@@ -237,6 +237,20 @@ The eight shared objects it changes are `model_spend_spend_source_check`, `subje
 `verify-effective-capabilities-111.sql` stays the verifier in force; there is no `replayVerifierSql`.
 If an earlier pending step takes 0125 first, renumber this step, recompute its manifest and re-pin the chain lists before merge.
 
+## The support answer scope (0126)
+
+The sixteenth step, after the threat reports (0125), is `0126_support_answer_scope.sql` with
+`support-answer-scope-forward0126.json` and `packages/db/src/migration-forward0126.ts`.
+It revokes `INSERT` on the fourteen support conversation and model-call tables from `debateai_support`.
+It deletes every row in those tables and `support.shred_audit` in dependency order, with the thirteen
+0065 mutation and delete guards temporarily disabled, then makes `support.support_shred_row_guard`
+immediate and restores all thirteen guards. The terminal block checks the guards, the seventeen
+truncate guards, the revoked privileges and empty tables. Its catalog-only postcondition binds
+the support relation grants and guard definitions without retaining a row count: a later owner
+seed followed by `migrate()` does not drift. The effective verifier remains
+`verify-effective-capabilities-111.sql`; there is no `replayVerifierSql`. If an earlier pending
+step takes 0126 first, renumber it and recompute the manifest and `STEPS` chain pins.
+
 ## Replay: every applied step keeps its own checks
 
 On a later `migrate()` EVERY applied step is checked by its receipt and by its postcondition digest (not only the

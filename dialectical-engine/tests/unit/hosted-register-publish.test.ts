@@ -54,6 +54,7 @@ import {
   lengthGuidancePolicyStartValues,
   questionLanguagePolicyRow,
   questionLanguagePolicyStartValues,
+  supportNoSourceCheckPolicyStartValues,
   type GeneralRegisterPublication
 } from "../../packages/register/src/index.js";
 import { engineContractHash } from "../../apps/runner/src/engine-contracts.js";
@@ -446,6 +447,29 @@ describe("Task 14b · the operator's hosted register file", () => {
   ])("length guidance (LG-C): refuses %s with the file's own code", async (_name, member) => {
     await expect(planHostedRegisterPublication(parseHostedRegisterFile(bytesOf({ ...validFile(), lengthGuidancePolicy: member }))))
       .rejects.toMatchObject({ code: "HOSTED_REGISTER_LENGTH_GUIDANCE_INVALID" });
+  });
+
+  it("seals the supportNoSourceCheckPolicy row from the file's optional member", async () => {
+    const member = { version: 1, timeoutMs: 8000 };
+    const parsed = parseHostedRegisterFile(bytesOf({ ...validFile(), supportNoSourceCheckPolicy: member }));
+    const plan = await planHostedRegisterPublication(parsed);
+    const rows = plan.rows.filter((row) => row.rowKey === "supportNoSourceCheckPolicy");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.sourceRef).toBe(parsed.sourceRef);
+    expect(JSON.parse(rows[0]!.valueJsonText)).toEqual({
+      kind: "SUPPORT_NO_SOURCE_CHECK_POLICY", version: 1, timeoutMs: 8000
+    });
+  });
+
+  it("seals no supportNoSourceCheckPolicy row when the member is absent", async () => {
+    const plan = await planHostedRegisterPublication(parseHostedRegisterFile(bytesOf(validFile())));
+    expect(plan.rows.map((row) => row.rowKey)).not.toContain("supportNoSourceCheckPolicy");
+  });
+
+  it("refuses an invalid supportNoSourceCheckPolicy member with HOSTED_REGISTER_SUPPORT_NO_SOURCE_CHECK_INVALID", async () => {
+    const { kind: _kind, ...member } = supportNoSourceCheckPolicyStartValues();
+    expect(await planCode({ ...validFile(), supportNoSourceCheckPolicy: { ...member, timeoutMs: 999 } }))
+      .toBe("HOSTED_REGISTER_SUPPORT_NO_SOURCE_CHECK_INVALID");
   });
 
   it("question language (P2L Task 12): the optional member seals one ADDITIVE row, the publishers' own; no member, no row", async () => {

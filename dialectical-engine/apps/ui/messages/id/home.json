@@ -82,7 +82,7 @@
   "home.aiPill": "Konten buatan AI. Argumen, skor, dan putusan dibuat oleh model AI, bukan manusia.",
   "home.aiBlock": "Dialectical Engine adalah sistem AI. Argumen, tinjauan, skor, putusan, dan balasan dukungan dibuat oleh model AI dan mungkin tidak akurat atau tidak lengkap. Semua teks buatan memiliki penanda yang dapat dibaca mesin yang mengidentifikasinya sebagai buatan AI, dan debat yang diterbitkan diberi label untuk pembaca. Tidak ada tinjauan editorial oleh manusia sebelum penerbitan, dan tidak ada orang tertentu yang memegang tanggung jawab editorial atas konten buatan tersebut.",
   "home.aiLandingBlock": "Dialectical Engine adalah sistem AI. Argumen, tinjauan, skor, putusan, dan balasan dukungan dibuat oleh model AI dan mungkin tidak akurat atau tidak lengkap — perlakukan sebagai bahan untuk dinilai, bukan sebagai fakta. Semua teks buatan memiliki penanda yang dapat dibaca mesin yang mengidentifikasinya sebagai buatan AI, dan debat yang diterbitkan diberi label untuk pembaca. Tidak ada tinjauan editorial oleh manusia sebelum penerbitan, dan tidak ada orang tertentu yang memegang tanggung jawab editorial atas konten buatan tersebut.",
-  "home.aiBanner": "Balasan dibuat oleh AI, diberi penanda yang dapat dibaca mesin, dan mungkin salah. Minta bantuan manusia kapan saja.",
+  "home.aiBanner": "Balasan dibuat oleh AI, diberi penanda yang dapat dibaca mesin, dan mungkin salah.",
   "home.aiDebate": "Semua isi debat ini — argumen, tinjauan, skor, dan putusan — dihasilkan oleh model AI, diberi penanda yang dapat dibaca mesin, dan mungkin tidak akurat.",
   "home.aiTransparency": "TRANSPARANSI AI",
   "home.aiDisclosure": "Pengungkapan AI",

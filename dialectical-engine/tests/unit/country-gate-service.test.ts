@@ -4,7 +4,6 @@ import { COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW, countryPolicyFromValue } from "
 import type { GeoLookup } from "@debateai/geo";
 import { SUPPORT_TEMPLATES } from "../../apps/api/src/support/templates.js";
 import { CountryGate } from "../../apps/api/src/country-gate.js";
-import type { SupportApplication } from "../../apps/api/src/support/index.js";
 import { supportHarness } from "../support/supportHarness.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 
@@ -40,24 +39,17 @@ function countryGate() {
 
 function harness(gate?: CountryGate) {
   const support = supportHarness();
-  const rateMessage = vi.fn(async () => { throw new Error("rating reached past the gate"); });
-  const openCase = vi.fn(async () => { throw new Error("escalation reached past the gate"); });
-  const application: SupportApplication = {
-    ...support.application,
-    sessions: { ...support.application.sessions, rateMessage } as SupportApplication["sessions"],
-    cases: { open: openCase } as unknown as NonNullable<SupportApplication["cases"]>
-  };
   const api = buildApi({
     application: {} as AskApplication,
-    support: application,
+    support: support.application,
     allowedOrigin: TEST_APP_ORIGIN,
     ...(gate === undefined ? {} : { countryGate: gate })
   });
-  const post = (url: string, remoteAddress: string, payload: Record<string, unknown>, token?: string) => api.inject({
+  const post = (url: string, remoteAddress: string, payload: Record<string, unknown>) => api.inject({
     method: "POST", url, remoteAddress, payload,
-    headers: { origin: TEST_APP_ORIGIN, ...(token === undefined ? {} : { "x-support-session-token": token }) }
+    headers: { origin: TEST_APP_ORIGIN }
   });
-  return { api, support, rateMessage, openCase, post };
+  return { api, support, post };
 }
 
 const REFUSAL = Object.freeze({
@@ -81,51 +73,27 @@ describe("the country gate in front of the support assistant", () => {
     expect(audit.recordCountryGateRefusal).not.toHaveBeenCalled();
   });
 
-  it("refuses a new support chat from every closed place, in the visitor's language, before a session exists", async () => {
-    const { api, support, post } = harness(countryGate().gate);
+  it("availability(ip).service is false for a Tor exit in a country we serve", () => {
+    expect(countryGate().gate.availability("185.220.101.7").service).toBe(false);
+  });
+
+  it("availability(ip).service is false for an address with no known country", () => {
+    expect(countryGate().gate.availability("10.0.0.1").service).toBe(false);
+  });
+
+  it("refuses a support message from every closed place, in the visitor's language", async () => {
+    const { api, post } = harness(countryGate().gate);
     for (const remoteAddress of CLOSED_PLACES) {
-      const refused = await post("/v1/support/sessions", remoteAddress, { language: "en" });
+      const refused = await post("/v1/support/messages", remoteAddress, { language: "en", text: "hello" });
       expect(refused.statusCode, remoteAddress).toBe(403);
       expect(refused.json(), remoteAddress).toEqual(REFUSAL);
     }
-    const romanian = await post("/v1/support/sessions", "5.45.1.1", { language: "ro" });
+    const romanian = await post("/v1/support/messages", "5.45.1.1", { language: "ro", text: "hello" });
     expect(romanian.json()).toEqual({
       ...REFUSAL, text: "Dialectical Engine nu este încă disponibil în țara dumneavoastră."
     });
-    expect(support.sessions.size).toBe(0);
-    const admitted = await post("/v1/support/sessions", OPEN_HERE, { language: "en" });
-    expect(admitted.statusCode).toBe(201);
-    expect(support.sessions.size).toBe(1);
-    await api.close();
-  });
-
-  it("refuses messages, ratings and escalation on a session opened elsewhere, once the address is closed", async () => {
-    const { api, rateMessage, openCase, post } = harness(countryGate().gate);
-    const opened = (await post("/v1/support/sessions", OPEN_HERE, { language: "en" })).json() as Readonly<{
-      session: Readonly<{ session_id: string }>; session_token: string;
-    }>;
-    const id = opened.session.session_id;
-    const token = opened.session_token;
-    const message = await post(`/v1/support/sessions/${id}/messages`, "5.45.1.1", { text: "hello" }, token);
-    expect(message.statusCode).toBe(403);
-    expect(message.json()).toEqual(REFUSAL);
-    const rating = await post(
-      "/v1/support/messages/33333333-3333-4333-8333-333333333333/rating", "5.45.1.1",
-      { session_id: id, rating: "no" }, token
-    );
-    expect(rating.statusCode).toBe(403);
-    expect(rating.json()).toEqual(REFUSAL);
-    const escalation = await post(`/v1/support/sessions/${id}/escalate`, "5.45.1.1", {}, token);
-    expect(escalation.statusCode).toBe(403);
-    expect(escalation.json()).toEqual(REFUSAL);
-    expect(rateMessage).not.toHaveBeenCalled();
-    expect(openCase).not.toHaveBeenCalled();
-    // Reading the conversation back is never gated.
-    const read = await api.inject({
-      method: "GET", url: `/v1/support/sessions/${id}`, remoteAddress: "5.45.1.1",
-      headers: { "x-support-session-token": token }
-    });
-    expect(read.statusCode).toBe(200);
+    const admitted = await post("/v1/support/messages", OPEN_HERE, { language: "en", text: "hello" });
+    expect(admitted.statusCode).toBe(200);
     await api.close();
   });
 
@@ -144,8 +112,8 @@ describe("the country gate in front of the support assistant", () => {
     const ungated = harness();
     const response = await ungated.api.inject({ method: "GET", url: "/v1/geo/availability", remoteAddress: "5.45.1.1" });
     expect(response.json()).toEqual({ signup: true, pay: false, service: true });
-    const created = await ungated.post("/v1/support/sessions", "5.45.1.1", { language: "en" });
-    expect(created.statusCode).toBe(201);
+    const created = await ungated.post("/v1/support/messages", "5.45.1.1", { language: "en", text: "hello" });
+    expect(created.statusCode).toBe(200);
     await ungated.api.close();
   });
 

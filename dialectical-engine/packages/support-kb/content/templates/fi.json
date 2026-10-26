@@ -2,9 +2,9 @@
   "DISCLOSURE": "Hei — olen Dialectical Engine -tukiavustaja, AI. Voin selittää, miten tuote toimii, ja ohjata teidät oikealle sivulle. En voi kirjata teitä sisään, muuttaa tiliänne tai nollata mitään. Käyttäkää näihin antamiani linkkejä tai pyytäkää henkilöä avuksi.",
   "NO_SOURCE": "Minulla ei ole tälle lähdettä, joten en arvaa. Kysykää jotakin muuta väittelyiden toiminnasta tai valitkaa ”Keskustele henkilön kanssa”.",
   "REFUSE_ZONE": "En voi auttaa sisäänkirjautumisessa, salasanoissa, vahvistuskoodeissa, kaksivaiheisessa tunnistautumisessa, tilin palauttamisessa, sähköpostiosoitteen muuttamisessa tai tilin poistamisessa — en edes tarkistaa niitä. Niitä käsitellään vain tilinne sivuilla: {link}. Jos sivu ei toimi, valitkaa ”Keskustele henkilön kanssa”.",
-  "REFUSE_INJECTION": "Noudatan vain tuotteen omia ohjeita, joten ohitan tämän pyynnön. Viestinne on tallennettu. Kysykää tuotteesta tai valitkaa ”Keskustele henkilön kanssa”.",
-  "REFUSE_SAFETY": "Tämä vaatii ihmisen, ei avustajaa. Valitkaa ”Keskustele henkilön kanssa”, niin henkilö lukee viestinne.",
-  "DEGRADED": "Avustajan malli ei ole juuri nyt käytettävissä. Voitte silti jättää viestin henkilölle: valitkaa ”Keskustele henkilön kanssa”.",
+  "REFUSE_INJECTION": "Noudatan vain tuotteen omia ohjeita, joten ohitan tämän pyynnön. Kysykää tuotteesta tai valitkaa ”Keskustele henkilön kanssa”.",
+  "REFUSE_SAFETY": "Tämä vaatii ihmisen, ei avustajaa. Valitkaa ”Keskustele henkilön kanssa” ja kirjoittakaa osoitteeseen, jonka se näyttää; henkilö lukee kirjoittamanne.",
+  "DEGRADED": "Avustajan malli ei ole juuri nyt käytettävissä. Jos haluatte tavoittaa henkilön, valitkaa ”Keskustele henkilön kanssa”.",
   "DISABLED": "Tukiavustaja ei ole tällä hetkellä käytössä.",
   "RATE_LIMITED": "Olette lähettänyt paljon viestejä lyhyessä ajassa. Odottakaa muutama minuutti.",
   "RATING": "Vastasiko tämä kysymykseenne? Kyllä · Ei · Keskustele henkilön kanssa",
@@ -25,5 +25,10 @@
   "INCIDENT_SURFACE_PUBLISHING": "julkaisemiseen",
   "INCIDENT_SURFACE_SIGN_IN": "sisäänkirjautumiseen",
   "INCIDENT_SURFACE_WHOLE_SITE": "koko sivustoon",
-  "COUNTRY_UNAVAILABLE": "Dialectical Engine ei ole vielä saatavilla maassasi."
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine ei ole vielä saatavilla maassasi.",
+  "OFF_TOPIC": "Voin auttaa vain Dialectical Engine -asioissa, jotka koskevat tiliänne, tilauspaketteja, väittelyjä, julkaisemista ja käytäntöjämme. En voi auttaa teitä siinä.",
+  "OFF_TOPIC_PART": "Voin auttaa vain Dialectical Engine -asioissa, joten en ole vastannut viestinne muuhun osaan.",
+  "CRISIS_SUPPORT": "Kirjoittamasi kuulostaa hyvin kipeältä, eikä sinun tarvitse kohdata sitä yksin. Täältä saat yhteyden johonkuhun juuri nyt.",
+  "THREAT_LINE": "En voi auttaa sinua siinä. Jos joku voi loukkaantua, ole hyvä ja hae heti apua.",
+  "TOO_LONG": "Viestinne on liian pitkä tähän keskusteluun. Lyhentäkää viesti ja lähettäkää se uudelleen."
 }

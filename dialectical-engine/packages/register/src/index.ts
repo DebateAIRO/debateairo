@@ -1330,6 +1330,14 @@ export {
   type QuestionLanguagePolicy
 } from "./question-language-policy.js";
 export {
+  SUPPORT_NO_SOURCE_CHECK_POLICY_ROW_KEY,
+  parseSupportNoSourceCheckPolicy,
+  readSupportNoSourceCheckPolicy,
+  supportNoSourceCheckPolicyRow,
+  supportNoSourceCheckPolicyStartValues,
+  type SupportNoSourceCheckPolicy
+} from "./support-no-source-check-policy.js";
+export {
   DEBATE_SHAPE_FORMULA_VERSION,
   assertDebateShapeCeilingInput,
   debateShapeOfReceipt,

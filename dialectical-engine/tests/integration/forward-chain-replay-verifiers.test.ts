@@ -63,7 +63,7 @@ it("keeps NETOPIA's 0111 verifier in force and replaying once the auth DB batch 
   // R2), then the engine's map answer step (0122), last (spec 2026-10-15 engine redesign R3).
   expect(real.forwardChain.map((step) => step.name)).toEqual([NETOPIA, AUTH_DB_BATCH_MIGRATION, PART_C, ROLE_ROTATION, "0115_data_export.sql",
     "0116_mail_locale.sql", "0117_debate_shape_map.sql", "0118_language_check_spend.sql", "0119_reclaim_resume.sql",
-    "0120_reply_measures.sql", "0121_engine_verdict.sql", "0122_engine_map_check.sql", "0123_synthesis_check.sql", "0124_publication_review.sql", "0125_threat_reports.sql"]);
+    "0120_reply_measures.sql", "0121_engine_verdict.sql", "0122_engine_map_check.sql", "0123_synthesis_check.sql", "0124_publication_review.sql", "0125_threat_reports.sql", "0126_support_answer_scope.sql"]);
   const [netopia, batch, partC, rotation] = real.forwardChain;
   const applied = new Set(await ledger());
   expect(applied.has(NETOPIA) && applied.has(AUTH_DB_BATCH_MIGRATION) && applied.has(PART_C) && applied.has(ROLE_ROTATION)).toBe(true);

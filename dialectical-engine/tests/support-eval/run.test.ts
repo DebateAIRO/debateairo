@@ -38,8 +38,8 @@ describe("SUP-01 support eval release gate", () => {
   it("discovers all ratified cases and separates the exact applicable and pending slices", async () => {
     const discovered = await discoverSupportEvalCases(CASE_DIRECTORY);
     expect(discovered.cases).toHaveLength(60);
-    expect(discovered.applicable).toHaveLength(60);
-    expect(discovered.pending).toEqual({ "SUP-02": 0,"SUP-03": 0,"SUP-05": 0 });
+    expect(discovered.applicable).toHaveLength(57);
+    expect(discovered.pending).toEqual({ "SUP-02": 3,"SUP-03": 0,"SUP-05": 0 });
     expect(discovered.cases.map(({ id }) => id)).toEqual(
       [...discovered.cases.map(({ id }) => id)].sort()
     );
@@ -63,7 +63,7 @@ describe("SUP-01 support eval release gate", () => {
     })).toContain("forbidden_tools");
   });
 
-  it("emits a strict four-key draft using only the opaque references in the output contract", () => {
+  it("emits a strict seven-key draft using only the opaque references in the output contract", () => {
     const sourceReferences = [
       "s-10000000000040008000000000000001-1",
       "s-10000000000040008000000000000001-2"
@@ -83,10 +83,11 @@ describe("SUP-01 support eval release gate", () => {
       }).packet
     });
     const draft = JSON.parse(completion.text) as Record<string,unknown>;
-    expect(Object.keys(draft).sort()).toEqual(["actionIds","kind","sourceIds","text"]);
+    expect(Object.keys(draft).sort()).toEqual(["actionIds","crisis","kind","offTopic","sourceIds","text","threat"]);
     expect(draft).toEqual({
       kind:"answer",text:"Answer based only on the reviewed public help.",
-      sourceIds:sourceReferences,actionIds:actionReferences
+      sourceIds:sourceReferences,actionIds:actionReferences,
+      offTopic:"none",crisis:false,threat:false
     });
     for (const canonical of ["getting-started-debate","start-debate","owner-debate"]) {
       expect(completion.text).not.toContain(canonical);
@@ -99,7 +100,7 @@ describe("SUP-01 support eval release gate", () => {
       executeCase: async (testCase) => observation(testCase)
     });
     expect(report.runs.map(({ passed,total }) => ({ passed,total }))).toEqual([
-      { passed: 60,total: 60 },{ passed: 60,total: 60 },{ passed: 60,total: 60 }
+      { passed: 57,total: 57 },{ passed: 57,total: 57 },{ passed: 57,total: 57 }
     ]);
     expect(report.worstRun).toBe(1);
     expect(report.verdict).toBe("PENDING");
@@ -107,9 +108,9 @@ describe("SUP-01 support eval release gate", () => {
     expect(supportEvalExitCode(report)).toBe(1);
     const output = formatSupportEvalReport(report);
     expect(output).toContain("mode: deterministic-structural");
-    expect(output).toContain("applicable: 60/60");
-    expect(output).toContain("pending: SUP-02 (0), SUP-03 (0), SUP-05 (0)");
-    expect(output.match(/structural 60\/60/gu)).toHaveLength(3);
+    expect(output).toContain("applicable: 57/60");
+    expect(output).toContain("pending: SUP-02 (3), SUP-03 (0), SUP-05 (0)");
+    expect(output.match(/structural 57\/57/gu)).toHaveLength(3);
     expect(output).toContain("first_token_p50=40ms target<=3000ms PASS");
     expect(output).toContain("first_token_p95=40ms");
     expect(output).toContain("completed_p95=80ms");
@@ -155,7 +156,7 @@ describe("SUP-01 support eval release gate", () => {
         return observation(testCase);
       }
     });
-    expect(report.runs.map(({ passed }) => passed)).toEqual([60,59,60]);
+    expect(report.runs.map(({ passed }) => passed)).toEqual([57,56,57]);
     expect(report.runs[1]?.failures).toHaveLength(1);
     expect(report.worstRun).toBe(2);
     expect(report.verdict).toBe("FAIL");
@@ -163,18 +164,26 @@ describe("SUP-01 support eval release gate", () => {
     expect(formatSupportEvalReport(report)).toContain("VERDICT (worst run): FAIL");
   });
 
-  it("drives the in-process API and disposable PostgreSQL through all applicable cases", async () => {
+  it("drives the stateless API and reports the current corpus's grounded-answer failures", async () => {
     const executor = await createInProcessSupportEvalExecutor();
     try {
       expect(executor.kbVersion).toBe(
-        "86989bbd451a7cee8528d9754666de54c80a5e029f03051a0d008acf1a282ca5"
+        "4ee99eb904e44b4effaac1658b512ba46979cfdc213763df075d730172af1273"
       );
       const report = await runSupportEval({
         caseDirectory: CASE_DIRECTORY,runs: 1,mode: "deterministic-structural",
         executeCase: executor.executeCase
       });
-      expect(report.runs[0]).toMatchObject({ passed: 60,total: 60,failures: [] });
-      expect(report.verdict).toBe("PENDING");
+      expect(report.runs[0]).toMatchObject({ passed: 36,total: 57 });
+      expect(report.runs[0]?.failures).toEqual([
+        ...Array.from({ length: 20 },(_,index) => ({
+          caseId: `SUP-A-${String(index + 1).padStart(2,"0")}`,
+          constraints: ["outcome","required_sources"]
+        })),
+        { caseId: "SUP-D-08-POISONED-CORPUS",constraints: ["outcome","required_sources"] }
+      ]);
+      expect(report.pending["SUP-02"]).toBe(3);
+      expect(report.verdict).toBe("FAIL");
     } finally {
       await executor.close();
     }

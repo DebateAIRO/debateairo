@@ -70,7 +70,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0122_engine_map_check.sql",
       "0123_synthesis_check.sql",
       "0124_publication_review.sql",
-      "0125_threat_reports.sql"
+      "0125_threat_reports.sql",
+      "0126_support_answer_scope.sql"
     ]);
     const [step] = plan.forwardChain;
     // 0110 runs the sealed effective-capability verifier after its SQL (applyForward110) and its own manifest names it
@@ -126,7 +127,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0122_engine_map_check.sql",
       "0123_synthesis_check.sql",
       "0124_publication_review.sql",
-      "0125_threat_reports.sql"
+      "0125_threat_reports.sql",
+      "0126_support_answer_scope.sql"
     ]);
     // The verifier in force after 0112 is the one 0112's manifest names (it adds no billing object): 0111's.
     const batchManifest = JSON.parse((await bytesOf("lineage/auth-db-batch-forward.json")).toString("utf8"));
@@ -176,7 +178,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0122_engine_map_check.sql",
       "0123_synthesis_check.sql",
       "0124_publication_review.sql",
-      "0125_threat_reports.sql"
+      "0125_threat_reports.sql",
+      "0126_support_answer_scope.sql"
     ]);
     expect(partC!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/role-rotation-forward0114.json")).toString("utf8"));
@@ -222,7 +225,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0122_engine_map_check.sql",
       "0123_synthesis_check.sql",
       "0124_publication_review.sql",
-      "0125_threat_reports.sql"
+      "0125_threat_reports.sql",
+      "0126_support_answer_scope.sql"
     ]);
     expect(mailLocale!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/debate-shape-map-forward0117.json")).toString("utf8"));
@@ -268,7 +272,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0122_engine_map_check.sql",
       "0123_synthesis_check.sql",
       "0124_publication_review.sql",
-      "0125_threat_reports.sql"
+      "0125_threat_reports.sql",
+      "0126_support_answer_scope.sql"
     ]);
     expect(mapStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/language-check-spend-forward0118.json")).toString("utf8"));
@@ -314,7 +319,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0122_engine_map_check.sql",
       "0123_synthesis_check.sql",
       "0124_publication_review.sql",
-      "0125_threat_reports.sql"
+      "0125_threat_reports.sql",
+      "0126_support_answer_scope.sql"
     ]);
     expect(languageStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/reclaim-resume-forward0119.json")).toString("utf8"));
@@ -548,8 +554,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
 
   it("chains the synthesis check 0123 after 0122: the recipe, 0122's manifest and the effective verifier 0122 keeps (0111's)", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-3);
-    const prior = plan.forwardChain.at(-4);
+    const step = plan.forwardChain.at(-4);
+    const prior = plan.forwardChain.at(-5);
     expect(step?.name).toBe("0123_synthesis_check.sql");
     expect(prior?.name).toBe("0122_engine_map_check.sql");
     const manifest = JSON.parse((await bytesOf("lineage/synthesis-check-forward0123.json")).toString("utf8"));
@@ -587,15 +593,15 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
 
   it("0124 is followed by 0125 and its previous is 0123", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-2);
+    const step = plan.forwardChain.at(-3);
     expect(step?.name).toBe("0124_publication_review.sql");
     expect(step?.previousName).toBe("0123_synthesis_check.sql");
   });
 
   it("0124's manifest binds 0123's manifest and effective verifier SHA-256", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-2);
-    const prior = plan.forwardChain.at(-3);
+    const step = plan.forwardChain.at(-3);
+    const prior = plan.forwardChain.at(-4);
     const manifest = JSON.parse((await bytesOf("lineage/publication-review-forward0124.json")).toString("utf8"));
     expect(manifest.previous).toEqual({
       name: "0123_synthesis_check.sql",
@@ -770,8 +776,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   }, 120_000);
   it("chains the threat reports 0125 after 0124 with 0124's manifest and effective verifier", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-1);
-    const previous = plan.forwardChain.at(-2);
+    const step = plan.forwardChain.at(-2);
+    const previous = plan.forwardChain.at(-3);
     const manifest = JSON.parse((await bytesOf("lineage/threat-reports-forward0125.json")).toString("utf8"));
     expect(step?.name).toBe("0125_threat_reports.sql");
     expect(previous?.name).toBe("0124_publication_review.sql");
@@ -791,5 +797,19 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "replayVerifierSql", "staff.threat_report", "MIGRATION_FORWARD0125_", "`STEPS`", "renumber"])
       expect(section, needle).toContain(needle);
     expect(readme.replace(/\s+/gu, " ")).toContain("the publication review (0124, below) the fourteenth and the threat reports (0125, below) the fifteenth");
+  });
+
+  it("chains support deletion 0126 after 0125 and records its source digest", async () => {
+    const plan = await loadMigrationPlan();
+    const step = plan.forwardChain.at(-1);
+    const previous = plan.forwardChain.at(-2);
+    const manifest = JSON.parse((await bytesOf("lineage/support-answer-scope-forward0126.json")).toString("utf8"));
+    expect(step?.name).toBe("0126_support_answer_scope.sql");
+    expect(previous?.name).toBe("0125_threat_reports.sql");
+    expect(manifest.previous).toEqual({ name: previous?.name,
+      manifestSha256: sha256(await bytesOf("lineage/threat-reports-forward0125.json")),
+      verifierSha256: previous?.verifierSha256 });
+    expect(manifest.migration.sha256).toBe(sha256(await bytesOf("0126_support_answer_scope.sql")));
+    expect(step?.replayVerifierSql).toBeUndefined();
   });
 });

@@ -82,7 +82,7 @@ describe("P22 the Billing runbook", () => {
       "What the address answers", "`429`", "`503`", "No rebuild is needed",
       // §14.8 (ruling Q-9, D6b P14c): a withdrawal sent by email, carried out by the owner's command.
       "A withdrawal sent by email or on the model form", "pnpm billing:withdraw --owner", "--received", "--refund",
-      "WITHDRAWAL_BY_OWNER", "identity_owner_ref",
+      "WITHDRAWAL_BY_OWNER", "pnpm billing:withdraw --owner-of-email",
       // §14.8 (D6b P14c): the dashboard part is refunded there first, then recorded with --dashboard; M8 names the sum.
       "First, in NETOPIA's admin,", '--dashboard "$DASHBOARD"',
       // §14.8 (ruling Q-1): an outage at renewal keeps the plan quietly for up to 3 days.

@@ -110,7 +110,7 @@
   "settings.transparency.supportTitle": "Podpora a pomoc človeka",
   "settings.transparency.supportLead": "Asistent podpory je systém AI. Ak chcete požiadať o pomoc človeka, v časti",
   "settings.transparency.help": "Pomoc",
-  "settings.transparency.supportTail": "vyberte možnosť „Porozprávať sa s človekom“ alebo „Postúpiť človeku“.",
+  "settings.transparency.supportTail": "vyberte možnosť „Porozprávať sa s človekom“.",
   "settings.transparency.back": "Späť na {brand}",
   "settings.workers.eyebrow": "SÚBOR MODELOV",
   "settings.workers.title": "Stav vykonávania",
