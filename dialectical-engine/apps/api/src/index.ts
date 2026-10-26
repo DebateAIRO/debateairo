@@ -3986,6 +3986,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         return reply.status(409).send({ error: PUBLICATION_APPROVAL_REQUIRED, message: PUBLICATION_APPROVAL_REQUIRED });
       }
       if (synthesisDecision === "REMOVED") {
+        // S01-R38: 410 while the owner's removal notice exists (a Publish whose own check removed the debate
+        // finds the notice that check wrote); once the notice is taken, Publish answers as for any deleted debate,
+        // even while the keys still wait for the erasure timer.
+        const ownerRef = ownershipFor(request).ownerRef;
+        if (options.synthesisAnswerAccess !== undefined && ownerRef !== null
+          && !await options.synthesisAnswerAccess.removalNoticeExists(ownerRef)) {
+          return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+        }
         return reply.status(410).send({ error: DEBATE_REMOVED_BY_CHECK, message: DEBATE_REMOVED_BY_CHECK });
       }
       if (synthesisDecision === "UNAVAILABLE") {

@@ -215,15 +215,44 @@ describe("synthesis check core", () => {
     // Property: a sent, billable call consumes the site pot even when its reply cannot be used.
     const { runSynthesisCheck } = await import("../../apps/api/src/synthesis-check/check.js");
     const { SynthesisCheckFailure } = await import("../../apps/api/src/synthesis-check/transport.js");
-    for (const [code, expectedRows] of [
-      ["ANSWER_NOT_JSON", 1], ["TRANSPORT_FAILED", 1], ["HTTP_STATUS", 0]
+    for (const [code, responded, expectedRows] of [
+      ["ANSWER_NOT_JSON", true, 1], ["TRANSPORT_FAILED", true, 1], ["HTTP_STATUS", true, 0]
     ] as const) {
-      const f = checkFixture({ complete: async () => { throw new SynthesisCheckFailure(code); } });
+      const f = checkFixture({ complete: async () => { throw new SynthesisCheckFailure(code, responded); } });
       const result = await runSynthesisCheck(f.deps, f.input);
       expect(result.outcome).toEqual({ verdict: "UNAVAILABLE", categories: [], failureCode: code });
       expect(f.calls()).toBe(1);
       expect(f.records, code).toHaveLength(expectedRows);
     }
+  });
+
+  it("records no spend for a transport failure that never got a response (REV-S01-p3 security N2, t_79c1879c)", async () => {
+    // Property: a refused connection, a missing credential or an adapter error before the request reaches the
+    // provider costs nothing, so it writes no ledger row and does not fill the day pot.
+    const { runSynthesisCheck } = await import("../../apps/api/src/synthesis-check/check.js");
+    const { SynthesisCheckFailure } = await import("../../apps/api/src/synthesis-check/transport.js");
+    const f = checkFixture({ complete: async () => { throw new SynthesisCheckFailure("TRANSPORT_FAILED", false); } });
+    const result = await runSynthesisCheck(f.deps, f.input);
+    expect(result.outcome).toEqual({ verdict: "UNAVAILABLE", categories: [], failureCode: "TRANSPORT_FAILED" });
+    expect(f.calls()).toBe(1);
+    expect(f.records).toHaveLength(0);
+  });
+
+  it("the transport says whether a response arrived: none for a refused connection, one for a rejected 2xx body", async () => {
+    const { createSynthesisCheckTransport, SynthesisCheckFailure } = await import("../../apps/api/src/synthesis-check/transport.js");
+    const { synthesisCheckContract } = await import("../../apps/api/src/synthesis-check/policy.js");
+    const packet = buildFramedPrompt({ contract: synthesisCheckContract(), material: [{ name: "synthesis", content: "A debate conclusion" }] }).packet;
+    const target = { providerRef: "anthropic", model: "claude-haiku-5-5", baseUrl: "https://example.invalid/v1", authorizationHeader: "Bearer fake" };
+    const failure = async (fetchImplementation: typeof fetch): Promise<unknown> => {
+      const port = createSynthesisCheckTransport(target, { readAuthorizationHeader: () => "Bearer fake", deadlineMs: 1500, fetchImplementation });
+      return port.complete({ packet, signal: new AbortController().signal }).then(() => null, (error: unknown) => error);
+    };
+    const refused = await failure(async () => { throw new TypeError("fetch failed"); });
+    expect(refused).toBeInstanceOf(SynthesisCheckFailure);
+    expect(refused).toMatchObject({ code: "TRANSPORT_FAILED", responded: false });
+    const garbled = await failure(async () => new Response("not json", { status: 200, headers: { "content-type": "application/json" } }));
+    expect(garbled).toBeInstanceOf(SynthesisCheckFailure);
+    expect(garbled).toMatchObject({ responded: true });
   });
 
   it("a day pot at or over its ceiling records UNAVAILABLE MONEY_REFUSED with no model call", async () => {

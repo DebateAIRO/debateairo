@@ -266,6 +266,37 @@ describe("synthesis publish gate under debateai_runtime", () => {
     expect(afterNotice.publicationCalls).toBe(0);
   });
 
+  it("a Publish of a debate the check removed answers 404 once its notice is taken, even before its keys are destroyed (S01-R38)", async () => {
+    // REV-S01-p3 security N4 (t_885de6a3): the gate reads the stored harm verdict while the keys still exist.
+    const target = await settled();
+    await final(target, "FLAGGED", ["SUICIDE_OR_HARM_TO_OTHERS"]);
+    const gate = await gateFor({ text: "Synthesis", flags: [0, 0, 0, 0], onModel: () => undefined });
+    const access = createSynthesisAnswerAccess({ repository, deadlineMs: 60_000 });
+    expect(await routeDecision(target, gate, access)).toEqual({
+      status: 410, body: { error: "DEBATE_REMOVED_BY_CHECK", message: "DEBATE_REMOVED_BY_CHECK" }, publicationCalls: 0
+    });
+    // Notices are per owner, not per debate: the owner opens every pending one before Publish stops answering 410.
+    let taken = 0;
+    while (await access.takeRemovalNotice(owner.ownerRef)) taken += 1;
+    expect(taken).toBeGreaterThanOrEqual(1);
+    expect(await routeDecision(target, gate, access)).toEqual({
+      status: 404, body: { error: "RUN_NOT_FOUND" }, publicationCalls: 0
+    });
+  });
+
+  it("Your debates' total stops counting a debate the moment the check removes it, before its keys are destroyed (S01-R37, t_9931dbe1)", async () => {
+    // REV-S01-p3 security N3: the item list already dropped the debate; the count kept it until the erasure timer.
+    const ownership = { ownerRef: owner.ownerRef, legacyAskerId: null };
+    const target = await settled();
+    const before = await serve.readAnswerIndex(ownership, 100, 0);
+    expect(before.items.some((item) => item.run_ref === target.runId)).toBe(true);
+    await final(target, "FLAGGED", ["SUICIDE_OR_HARM_TO_OTHERS"]);
+    expect(await repository.runRemovedByCheck(target.runId)).toBe(true);
+    const after = await serve.readAnswerIndex(ownership, 100, 0);
+    expect(after.items.some((item) => item.run_ref === target.runId)).toBe(false);
+    expect(after.total).toBe(before.total - 1);
+  });
+
   it("an unchecked flagged synthesis requires approval and persists its category", async () => {
     const target = await settled();
     let calls = 0;

@@ -99,6 +99,19 @@ describe("S01 held debate page", () => {
     expect(css).toMatch(/\.heldMobileQuestion\s*\{[^}]*display:\s*none/);
     expect(css).toMatch(/@media\s*\(max-width:\s*920px\)[\s\S]*?\.heldMobileQuestion\s*\{[^}]*display:\s*block/);
   });
+
+  it("starts the held question line at the checking notice's inset at every width (REV-S01-p3 product N1, t_88cd6e3e)", () => {
+    // Property: from 601 to 920 px both lines sit 20 px in, and at 600 px and below both sit 12 px in.
+    const css = readFileSync(`${process.cwd()}/apps/ui/app/globals.css`, "utf8");
+    const inline = (block: string | undefined) => block?.match(/padding:\s*\S+\s+(\S+?);/)?.[1];
+    const notice = inline(css.match(/\n\.checkingNotice\s*\{([^}]*)\}/)?.[1]);
+    const held920 = inline(css.match(/@media\s*\(max-width:\s*920px\)\s*\{\s*\.heldMobileQuestion\s*\{([^}]*)\}/)?.[1]);
+    const narrow = css.match(/@media\s*\(max-width:\s*600px\)\s*\{([^\n]*)\}/)?.[1] ?? "";
+    expect(notice).toBe("20px");
+    expect(held920).toBe(notice);
+    expect(inline(narrow.match(/\.checkingNotice[^{]*\{([^}]*)\}/)?.[1])).toBe("12px");
+    expect(inline(narrow.match(/\.heldMobileQuestion[^{]*\{([^}]*)\}/)?.[1])).toBe("12px");
+  });
   it("shows only the question and checking notice on the first held server render", () => {
     const html = renderToStaticMarkup(<DebatePageClient id="run-1" initialDebate={held} initialPending
       timeCatalog={time} publicCatalog={publicCatalog} homeCatalog={home}
@@ -299,6 +312,55 @@ describe("S01 held debate page", () => {
       timeCatalog={time} publicCatalog={publicCatalog} homeCatalog={home} storyLocale="en" storyCatalog={publicCatalog} />); });
     expect(node.querySelector(".checkingNotice")).not.toBeNull();
     expect(node.textContent).not.toContain("Sensitive draft");
+    act(() => root.unmount()); node.remove();
+  });
+
+  it("after a run.terminal that beats the settle, re-reads the run every 1.5 s until it reads the hold (REV-S01-p3 correctness N1, t_7baea3dd)", async () => {
+    // Property: the streamed debate stays on screen at most one 1.5 s read past the settle, not until the 15 s poll,
+    // and those reads ask for the run only.
+    vi.useFakeTimers();
+    stream.mockImplementation((_id: string, emit: (event: unknown) => void) => {
+      emit({ event_id: "terminal-1", event_type: "run.terminal", run_ref: "run-1", at_sequence: 2, payload: { state: "SETTLED" } });
+      return new Promise<void>(() => {});
+    });
+    let settled = false;
+    const projection = { run_ref: "run-1", question_line: "Should the city change its plan?", state: "RUNNING",
+      hold_until: null, waits_until: null, waits_for: null };
+    readRun.mockImplementation(async () => settled ? { ...projection, state: "SETTLED", synthesis_check: "CHECKING" } : projection);
+    readRunAnswer.mockRejectedValue(Object.assign(Object.create(ContractHttpError.prototype),
+      { code: "NOT_FOUND", serverCode: "RUN_ANSWER_NOT_FOUND", status: 404 }));
+    const node = document.createElement("div"); document.body.append(node); const root = createRoot(node);
+    await act(async () => { root.render(<DebatePageClient id="run-1" initialDebate={running} initialPending
+      timeCatalog={time} publicCatalog={publicCatalog} homeCatalog={home} storyLocale="en" storyCatalog={publicCatalog} />); });
+    for (let i = 0; i < 3; i++) await act(async () => { vi.advanceTimersByTime(1_000); });
+    expect(node.querySelector(".checkingNotice")).toBeNull();
+    const answerReadsBefore = readRunAnswer.mock.calls.length;
+    settled = true;
+    for (let i = 0; i < 3; i++) await act(async () => { vi.advanceTimersByTime(500); });
+    expect(node.querySelector(".checkingNotice")).not.toBeNull();
+    expect(readRunAnswer.mock.calls.length).toBe(answerReadsBefore);
+    act(() => root.unmount()); node.remove();
+  });
+
+  it("stops the 1.5 s reads a minute after run.terminal when the run never reads settled", async () => {
+    // Property: the fast reads are bounded; a run stuck RUNNING falls back to the 15 s poll.
+    vi.useFakeTimers();
+    stream.mockImplementation((_id: string, emit: (event: unknown) => void) => {
+      emit({ event_id: "terminal-1", event_type: "run.terminal", run_ref: "run-1", at_sequence: 2, payload: { state: "SETTLED" } });
+      return new Promise<void>(() => {});
+    });
+    readRun.mockResolvedValue({ run_ref: "run-1", question_line: "Should the city change its plan?", state: "RUNNING",
+      hold_until: null, waits_until: null, waits_for: null });
+    readRunAnswer.mockRejectedValue(Object.assign(Object.create(ContractHttpError.prototype),
+      { code: "NOT_FOUND", serverCode: "RUN_ANSWER_NOT_FOUND", status: 404 }));
+    const node = document.createElement("div"); document.body.append(node); const root = createRoot(node);
+    await act(async () => { root.render(<DebatePageClient id="run-1" initialDebate={running} initialPending
+      timeCatalog={time} publicCatalog={publicCatalog} homeCatalog={home} storyLocale="en" storyCatalog={publicCatalog} />); });
+    for (let i = 0; i < 60; i++) await act(async () => { vi.advanceTimersByTime(1_000); });
+    const firstMinute = readRun.mock.calls.length;
+    expect(firstMinute).toBeGreaterThanOrEqual(30);
+    for (let i = 0; i < 60; i++) await act(async () => { vi.advanceTimersByTime(1_000); });
+    expect(readRun.mock.calls.length - firstMinute).toBeLessThanOrEqual(5);
     act(() => root.unmount()); node.remove();
   });
 

@@ -3197,6 +3197,7 @@ export class ServeRepository {
            WHERE core.run_is_owned_by(run.run_id,$1,$2)
              AND (run.content_encryption_version IS DISTINCT FROM 1
                OR core.run_private_content_is_live(run.run_id))
+             AND NOT serve.run_removed_by_synthesis_check(run.run_id)
            ORDER BY run.run_id, answer.sealed_at_seq DESC
          ), open_run AS (
            SELECT
@@ -3209,6 +3210,7 @@ export class ServeRepository {
            WHERE core.run_is_owned_by(run.run_id,$1,$2)
              AND (run.content_encryption_version IS DISTINCT FROM 1
                OR core.run_private_content_is_live(run.run_id))
+             AND NOT serve.run_removed_by_synthesis_check(run.run_id)
              AND NOT EXISTS (SELECT 1 FROM serve.answer AS answer WHERE answer.run_id = run.run_id)
          )
          SELECT kind, answer_id, run_ref, question_line, created_at_sequence
@@ -3220,7 +3222,9 @@ export class ServeRepository {
         `SELECT count(*)::text AS count FROM core.run AS run
          WHERE core.run_is_owned_by(run.run_id,$1,$2)
            AND (run.content_encryption_version IS DISTINCT FROM 1
-             OR core.run_private_content_is_live(run.run_id))`,
+             OR core.run_private_content_is_live(run.run_id))
+           -- S01-R37 (t_9931dbe1): a debate the check removed is deleted for its owner before its keys are destroyed.
+           AND NOT serve.run_removed_by_synthesis_check(run.run_id)`,
         [access.ownerRef, access.legacyAskerId]
       )
     ]);

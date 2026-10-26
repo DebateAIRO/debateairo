@@ -13,7 +13,8 @@ export interface SynthesisCheckPort {
 }
 
 export class SynthesisCheckFailure extends Error {
-  constructor(readonly code: SynthesisCheckFailureCode) {
+  // responded: the provider sent an HTTP response, so the call may have been billed (t_79c1879c).
+  constructor(readonly code: SynthesisCheckFailureCode, readonly responded = false) {
     super(code);
     this.name = "SynthesisCheckFailure";
   }
@@ -55,7 +56,7 @@ export function createSynthesisCheckTransport(target: SupportModelTarget, option
         });
         return await adapter.complete({ ...input, language: "en" });
       } catch (error) {
-        throw new SynthesisCheckFailure(synthesisCheckFailureCode(error, input.signal, httpStatus));
+        throw new SynthesisCheckFailure(synthesisCheckFailureCode(error, input.signal, httpStatus), httpStatus !== undefined);
       }
     }
   };

@@ -7703,7 +7703,7 @@ a:focus-visible {
   .heldMobileQuestion {
     display: block;
     margin: 0;
-    padding: 8px 12px;
+    padding: 8px 20px;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -7713,7 +7713,7 @@ a:focus-visible {
     color: var(--muted);
   }
 }
-@media (max-width: 600px) { .checkingNotice { padding: 8px 12px; } }
+@media (max-width: 600px) { .checkingNotice, .heldMobileQuestion { padding: 8px 12px; } }
 .removalNoticeReasons { margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--line); }
 .removalNoticeReasons p { margin: 0 0 8px; font-size: 12px; line-height: 1.5; color: var(--text-2); }
 .removalNoticeReasons p:last-child { margin-bottom: 0; }

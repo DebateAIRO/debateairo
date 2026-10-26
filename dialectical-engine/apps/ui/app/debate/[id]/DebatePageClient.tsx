@@ -246,6 +246,10 @@ type AdaptiveDepthDryRunAsyncState =
   | { status: "unavailable"; data: DebateAdaptiveDepthDryRunResponse | null; error: string | null }
   | { status: "error"; data: DebateAdaptiveDepthDryRunResponse | null; error: string };
 
+// The run-events tail's own poll (1.5 s); forty reads cover a minute after run.terminal.
+const POST_TERMINAL_READ_MS = 1_500;
+const POST_TERMINAL_READS = 40;
+
 const SCORE_AWARE_FILTERS = [
   { id: "all", key: "debateChrome.filter.all" },
   { id: "issues", key: "debateChrome.filter.issues" },
@@ -924,6 +928,22 @@ export default function DebatePageClient({
     const timer = setInterval(() => { void refresh(false); }, held ? 5_000 : 15_000);
     return () => clearInterval(timer);
   }, [debate, debateTerminal, held, removedByCheck, refresh]);
+
+  // S01-R3 (REV-S01-p3 correctness N1, t_7baea3dd): a run.terminal can beat the settle, so its read still finds the
+  // run RUNNING and the stream does not reconnect. Re-read the run at the stream's tail cadence until it reads settled
+  // or held, for at most a minute, instead of leaving the streamed debate up until the 15 s poll.
+  const runPhaseTerminal = live.runPhase === "terminal";
+  const hasDebate = debate !== null;
+  useEffect(() => {
+    if (removedByCheck || held || !hasDebate || debateTerminal || !runPhaseTerminal) return;
+    let reads = 0;
+    const timer = setInterval(() => {
+      reads += 1;
+      if (reads > POST_TERMINAL_READS) { clearInterval(timer); return; }
+      void refresh(false);
+    }, POST_TERMINAL_READ_MS);
+    return () => clearInterval(timer);
+  }, [debateTerminal, hasDebate, held, removedByCheck, refresh, runPhaseTerminal]);
 
   useEffect(() => {
     setScoringState({ status: "idle", data: null, error: null });
