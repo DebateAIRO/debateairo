@@ -192,11 +192,11 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
   it("changes nothing behind it when the policy is closed", () => {
     // PROPERTY (S01-R20, S01-S39): the read-only modal owns no consent state and
     // touches no storage, so the card it came from is unchanged after it closes —
-    // still its twenty rows — and nothing was written. S01 passes `onClose` and asserts the
+    // still its twenty-one rows — and nothing was written. S01 passes `onClose` and asserts the
     // EFFECT; the close route itself is the helper's, which S02 implements.
     mountBar();
     activate(barOpener());
-    expect(rows(), "the card shows its twenty rows").toBe(20);
+    expect(rows(), "the card shows its twenty-one rows").toBe(21);
     const storedBefore = raw();
 
     activate(labelled("Privacy notice"));
@@ -205,7 +205,7 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
 
     expect(policy(), "the policy is gone").toBeNull();
     expect(card(), "and the card it came from is still there").not.toBeNull();
-    expect(rows(), "with its twenty rows").toBe(20);
+    expect(rows(), "with its twenty-one rows").toBe(21);
     expect(raw(), "and storage untouched").toBe(storedBefore);
     expect(raw(), "which is still nothing at all").toBeNull();
     expect(bar(), "the bar stays away while the card is open").toBeNull();
@@ -238,7 +238,7 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
 
     expect(policy(), "(a) the policy dialog is gone").toBeNull();
     expect(card(), "(b) the preferences card is STILL in the document").not.toBeNull();
-    expect(rows(), "with its twenty rows").toBe(20);
+    expect(rows(), "with its twenty-one rows").toBe(21);
     expect(bar(), "(c) and the bar is still absent").toBeNull();
     expect(openSurfaceCount(), "one surface left").toBe(1);
     expect(raw(), "and nothing was written by a dismissal").toBeNull();

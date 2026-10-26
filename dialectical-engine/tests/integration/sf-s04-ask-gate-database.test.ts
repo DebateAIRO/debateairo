@@ -3,6 +3,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { buildApi, type AskApplication } from "@debateai/api";
 import { recordQuestionCheckSpend } from "@debateai/budget";
 import { migrate, PostgresThreatReportRepository, RunRepository } from "@debateai/db";
+import { readPromptFrame } from "@debateai/providers";
+import { judgeCallValue } from "../../apps/api/src/publication-check/verdict.js";
 import { createQuestionCheck } from "../../apps/api/src/question-check/check.js";
 import { QuestionCheckFailure, type QuestionCheckPort } from "../../apps/api/src/question-check/transport.js";
 import { SUPPORT_RELAY_PROVIDER_REF } from "../../apps/api/src/support/model.js";
@@ -16,7 +18,6 @@ const question = "Should a private sentinel question lead to a debate?";
 const labels = ["ORDINARY", "HARM_TO_OTHERS", "WEAPONS_DRUGS_TERRORISM", "HATE_SPEECH",
   "RELIGIOUS_INSULT", "SENSITIVE_TOPIC", "OWN_CRISIS", "METHODS_OR_ENCOURAGEMENT",
   "QUESTION_CHECK_HTTP_STATUS"] as const;
-const marker = /DEBATEAI-FENCE-([0-9a-f]{32})/u;
 
 async function asRuntime<T extends Record<string, unknown> = Record<string, unknown>>(
   statement: string, values: unknown[] = []
@@ -75,7 +76,7 @@ function serverFor(label: typeof labels[number], reports: { event: string; code:
     providerRef: SUPPORT_RELAY_PROVIDER_REF, modelId: "claude-haiku-5-5",
     complete: async ({ packet }) => {
       if (label === "QUESTION_CHECK_HTTP_STATUS") throw new QuestionCheckFailure(label);
-      return { text: JSON.stringify({ call: packet.messages[1]!.content.match(marker)![1], label }),
+      return { text: JSON.stringify({ call: judgeCallValue(readPromptFrame(packet).fence), label }),
         usage: { inputTokens: 3, outputTokens: 4 } };
     }
   };

@@ -227,7 +227,9 @@ describe("S01 held debate page", () => {
     expect(markup).toContain('class="debateTopDivider"');
     expect(markup).toContain('data-mode-toggle="true"');
     expect(markup).toContain("Everything in this debate");
-    expect(markup).toContain('class="supportWidget"');
+    // S05 (V-125): the widget renders only after the browser's country check says the chat is offered, so the
+    // server markup carries none; sup-04-mounts pins that this page still mounts it.
+    expect(markup).not.toContain('class="supportWidget"');
     await expect(DebatePage({ params: Promise.resolve({ id: "run-1" }) })).rejects.toThrow("NEXT_NOT_FOUND_TEST");
     expect(takeNotice).toHaveBeenCalledTimes(2);
   });

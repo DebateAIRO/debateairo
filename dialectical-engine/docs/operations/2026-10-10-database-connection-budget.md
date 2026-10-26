@@ -45,7 +45,7 @@ guard that keeps the code and the numbers in step is
 | `api:erasure` | 10 | 4 | 5 s | The erasure timer holds 2; deletes need the rest |
 | `api:evaluator-dev-menu` | 10 | 2 | 5 s | Development only: the server refuses to start it anywhere else |
 | `api:support` | 10 | 6 | 5 s | Opening a support case holds one connection and reads messages on a second |
-| `api:support-relay-lease` | 18 | 18 | 5 s | Unchanged: up to 16 AI support chats at once (a live register setting the owner can raise without a restart) plus 2 for the queue |
+| `api:support-relay-lease` | 18 | removed | — | Removed by synthesis-flag S05 (V-111, V-114, 2026-10-25): the relay queue and its daily call count now live in the API's memory, so the pool is no longer opened. The total below is the 2026-10-10 figure, before this removal (61 after it) |
 | `support:control` | 2 | 2 | 0.2 s | Unchanged; the support settings reader |
 | `api:data-export` (only when the export store is set; mission data-export S01) | — | 1 | 15 s | One export build at a time on one connection: its lease renewal (every 15 s) waits for the snapshot read to free it, so a read of up to about 30 s keeps its lease |
 | **Total on the server** (dev menu off) | **104** | **79** | | |

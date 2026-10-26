@@ -802,14 +802,16 @@ describe("VPS baseline: runbook and environment templates", () => {
       // V-9(a)(b).
       "V-9(a) and (b)", "ssh -L 8888:127.0.0.1:8888",
       // Honest limitations for what the owner ruled out of this round.
-      "ASK_PLAN_TIER_MODEL_UNAVAILABLE", "Task 16", "V-26", "V-17", "B28", "Task 13",
+      // (V-26's limitation left the runbook with synthesis-flag S05: the support chat keeps nothing, V-111.)
+      "ASK_PLAN_TIER_MODEL_UNAVAILABLE", "Task 16", "V-17", "B28", "Task 13",
       // The provisioner's real command line, and the six principals provisioned expired.
       "pnpm db:provision-principals --support-config-credential-file", "VALID UNTIL '-infinity'",
       // The observation agent's database access, consistent with V-29.
       "a narrow statistics window (V-29)"
     ]) expect(readme, needle).toContain(needle);
     // Task 14b landed: the runbook must no longer say publishing is impossible.
-    for (const stale of ["No hosted register-publication command", "A hosted publish command lands in a companion change", "which, today, is not\npossible"]) {
+    for (const stale of ["No hosted register-publication command", "A hosted publish command lands in a companion change", "which, today, is not\npossible",
+      "Account deletion does not erase the account's support conversations"]) {
       expect(readme, stale).not.toContain(stale);
     }
     // The first publication runs inside the migrator window: after the principals, before it closes.

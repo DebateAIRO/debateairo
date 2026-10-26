@@ -67,7 +67,7 @@ describe("every always-on pool has a size and a bounded wait", () => {
   it("opens every API pool from the budget table, each row exactly once", async () => {
     const keys = budgetKeys(await readFile(API_MAIN, "utf8"), "API_DATABASE_POOLS");
     // Sanity: the sweep found the pools, or this row could never fail.
-    expect(keys.length).toBeGreaterThanOrEqual(11);
+    expect(keys.length).toBeGreaterThanOrEqual(10);
     expect([...keys].sort()).toEqual(Object.keys(API_DATABASE_POOLS).sort());
   });
 
@@ -102,9 +102,6 @@ describe("every always-on pool has a size and a bounded wait", () => {
 
 describe("no pool is smaller than what one of its flows holds at once", () => {
   it("keeps every API pool at or above its measured floor", async () => {
-    const supportSource = await readFile("packages/db/src/support.ts", "utf8");
-    const relaySlots = Number(/static readonly MAX_CONCURRENCY_SLOTS = (\d+);/u.exec(supportSource)?.[1]);
-    expect(relaySlots).toBe(16);
     // Each floor is "flows that may overlap × connections one flow holds at
     // once + 1 free", from the 2026-10-10 audit (the plan document, table 2).
     const floors: Readonly<Record<keyof typeof API_DATABASE_POOLS, number>> = {
@@ -128,8 +125,6 @@ describe("no pool is smaller than what one of its flows holds at once", () => {
       evaluatorDevMenu: 1,
       // Opening a case holds one connection and reads the messages on another.
       support: 2 * 2,
-      // Every relay slot the register may allow, plus the queue's bookkeeping.
-      supportRelayLease: relaySlots + 2,
       // One export build at a time (single-flight timer) on one connection (V-43): its lease renewal queues behind its snapshot read.
       dataExport: 1
     };

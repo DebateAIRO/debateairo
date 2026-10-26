@@ -9,8 +9,10 @@ describe("data export production wiring", () => {
     const application = source.indexOf("new DataExportApplication(");
     expect(guard).toBeGreaterThan(-1);
     expect(application).toBeGreaterThan(guard);
-    const nextTopLevel = source.indexOf("\n}\nconst api = buildApi", guard);
-    expect(application).toBeLessThan(nextTopLevel);
+    // The guard's own closing brace: the first unindented `}` after it (S05 composes `const admission` between it and buildApi).
+    const blockEnd = source.indexOf("\n}\n", guard);
+    expect(blockEnd).toBeGreaterThan(guard);
+    expect(application).toBeLessThan(blockEnd);
   });
 
   it("W2 schedules the module-private 15-second worker and clears it on close", () => {

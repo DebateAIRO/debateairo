@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const gitRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
-const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: gitRoot, encoding: "utf8" }).split("\0").filter(Boolean);
+const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: gitRoot, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }).split("\0").filter(Boolean);
 
 describe("repository hygiene (F-06)", () => {
   it("tracks no dotenv files except the non-secret compose file and examples", () => {
