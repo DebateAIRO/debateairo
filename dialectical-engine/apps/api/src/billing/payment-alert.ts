@@ -21,3 +21,20 @@ export async function queuePaymentAlert(
   }));
   return client === undefined ? deps.repository.withTransaction(queue) : queue(client);
 }
+
+/**
+ * The dedupe ref of a charge's one O3 CHARGEBACK_LOST (VERIFY_PAYMENT's lost charge-back, NETOPIA status 10). Shared
+ * with `queueRefundHeldAlert`, which queues no REFUND_HELD_BY_CHARGEBACK once that O3 exists (it already names the
+ * held refund).
+ */
+export function chargebackLostAlertRef(chargeId: string): string {
+  return `${chargeId}:CHARGEBACK_LOST`;
+}
+
+/** Whether the O3 `queuePaymentAlert` queues for `dedupeRef` was ever queued (the same job kind and ref it writes). */
+export async function paymentAlertQueued(
+  jobs: Pick<BillingJobQueries, "outboxJobExists">, client: PoolClient, dedupeRef: string
+): Promise<boolean> {
+  const job = emailJob({ template: "O3", recipient: { kind: "OWNER" }, dedupeRef, params: {}, notBefore: new Date(0) });
+  return jobs.outboxJobExists(client, job.kind, job.ref);
+}

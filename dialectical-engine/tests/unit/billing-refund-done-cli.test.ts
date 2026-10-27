@@ -225,16 +225,60 @@ describe("F8 the owner commands in O3 emails are the runbook's host form", () =>
     expect(steps(false)).not.toMatch(/(^|[^/])pnpm billing:|--confirm --|--despite-chargeback --confirm/u);
   });
 
-  it("O3 OWNER_REVIEW for a dispute NETOPIA reports lost: the dispute command on its own line", () => {
-    const tail = " NETOPIA has not confirmed what this status means, so nothing ends by itself. Once you have checked it in"
-      + " NETOPIA's admin, record the outcome as root on the server with the command below (it records at once; if the"
-      + " dispute ended for us, put --outcome won in place of --outcome lost).\n"
-      + `  ${ON_HOST} billing:dispute --charge ${REF} --outcome lost`;
-    expect(chargebackLostSteps({ chargeId: REF, paymentId: PAYMENT, paused: true })).toBe(
-      `NETOPIA reports the dispute on this payment (NETOPIA payment ${PAYMENT}) as lost: status 10, "chargeback accepted".`
-        + " The paid features are paused. The customer was emailed that the plan is paused (M10)." + tail);
-    expect(chargebackLostSteps({ chargeId: REF, paymentId: PAYMENT, paused: false })).toBe(
-      `NETOPIA reports the dispute on this payment (NETOPIA payment ${PAYMENT}) as lost: status 10, "chargeback accepted".`
-        + " No plan was paused for it: the payment bought nothing, or its plan was not active." + tail);
+  it("O3 CHARGEBACK_LOST (the owner's decision of 24 October 2026): what happened, no command, and the accountant's storno question", () => {
+    const head = `NETOPIA reports that the person's bank took back this payment (NETOPIA payment ${PAYMENT}): the dispute on it`
+      + " is lost (status 10). ";
+    const storno = "Ask your accountant whether a cancelling invoice (storno) is needed for this payment.";
+    const tail = `No command is needed.\n${storno}`;
+    const base = { chargeId: REF, paymentId: PAYMENT, heldRefund: null, releasedRefund: null } as const;
+    expect(chargebackLostSteps({ ...base, ended: true })).toBe(head
+      + "The site has ended the plan, the person is on Free, and the customer was emailed that the plan has ended"
+      + " (M10_ENDED).\n" + tail);
+    const unchanged = chargebackLostSteps({ ...base, ended: false });
+    expect(unchanged).toBe(head
+      + "No plan changed: the payment bought nothing, or its plan had already ended, was not active, or its dispute"
+      + " was already recorded.\n" + tail);
+    // No held or released refund: nothing to run, in either form.
+    expect(unchanged).not.toContain("billing:");
+  });
+
+  it("O3 CHARGEBACK_LOST with a held refund (reviewer I-1): nothing left to refund, unless it was already refunded: then the host-form refund-done --despite-chargeback", () => {
+    const held = chargebackLostSteps({
+      chargeId: REF, paymentId: PAYMENT, ended: true, releasedRefund: null,
+      heldRefund: { openMicros: 12_100_000, currency: "USD", reason: "WITHDRAWAL" }
+    });
+    expect(held).toContain("(M10_ENDED).\n" + [
+      "A refund of 12.10 USD (reason WITHDRAWAL) was held on this payment because of the dispute. The bank has taken the"
+        + " money back, so nothing is left to refund: do not refund it in NETOPIA's admin.",
+      "If you had already refunded this payment in NETOPIA's admin before the dispute, the person got the money twice:"
+        + " record your refund with the command below and tell NETOPIA, so they can answer the bank.",
+      `  ${ON_HOST} billing:refund-done --charge ${REF} --amount 12.10 --despite-chargeback`,
+      "Run it as root on the server once to see what it records, then again with --confirm added at the end to record it.",
+      "No command is needed unless you had already refunded it.",
+      "Ask your accountant whether a cancelling invoice (storno) is needed for this payment."
+    ].join("\n"));
+    expect(held).not.toContain("No command is needed.");
+    expect(held).not.toMatch(/(^|[^/])pnpm billing:|--despite-chargeback --confirm/u);
+  });
+
+  it("O3 CHARGEBACK_LOST after a dispute recorded won (reviewer M-2): the released refund, the plan not ended, and no command that ends it", () => {
+    const released = { openMicros: 12_100_000, currency: "USD", reason: "WITHDRAWAL" };
+    const notEnded = chargebackLostSteps({ chargeId: REF, paymentId: PAYMENT, ended: false, heldRefund: null, releasedRefund: released });
+    expect(notEnded).toBe(`NETOPIA reports that the person's bank took back this payment (NETOPIA payment ${PAYMENT}): the`
+      + " dispute on it is lost (status 10). No plan changed: the payment bought nothing, or its plan had already ended,"
+      + " was not active, or its dispute was already recorded.\n" + [
+      "This dispute was recorded as won earlier, but NETOPIA now reports it lost: the plan was not ended. Check the payment"
+        + " in NETOPIA's admin before making the released refund, and end the plan by hand if the bank kept the money.",
+      "No owner command ends it: billing:dispute --outcome lost answers that the dispute is already settled once it was"
+        + " recorded won.",
+      "Ask your accountant whether a cancelling invoice (storno) is needed for this payment."
+    ].join("\n"));
+    expect(notEnded).not.toContain("No command is needed");
+    expect(notEnded).not.toContain("held on this payment");
+    // A won call that left the plan SUSPENDED (RESOLVED_AFTER_END) lets the 10 end it: the plan clause is left out.
+    const ended = chargebackLostSteps({ chargeId: REF, paymentId: PAYMENT, ended: true, heldRefund: null, releasedRefund: released });
+    expect(ended).toContain("(M10_ENDED).\nThis dispute was recorded as won earlier, but NETOPIA now reports it lost. Check the"
+      + " payment in NETOPIA's admin before making the released refund.\nAsk your accountant");
+    expect(ended).not.toContain("the plan was not ended");
   });
 });

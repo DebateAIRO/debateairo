@@ -3,11 +3,12 @@
  * M8_RECEIVED (a withdrawal's acknowledgement of receipt) and O2_WITHDRAWAL (a withdrawal the owner settles by hand),
  * W12's (P2-I16) O3 (a legal document or an email that was never sent), and N9's O4 (NETOPIA's message about an open
  * charge could not be verified), and N14's O2_REFUND_DUE and O2_REFUND_REMINDER (a NETOPIA refund for the owner to make
- * in NETOPIA's admin, and the daily list of the open ones), and N17's M12 (a card is needed before a renewal).
+ * in NETOPIA's admin, and the daily list of the open ones), and N17's M12 (a card is needed before a renewal), and
+ * M10_ENDED (the owner's decision of 24 October 2026: a lost charge-back ended the plan).
  */
 export const MAIL_TEMPLATE_IDS = Object.freeze([
   "M1", "M2_INVOICE_LINK", "M2_INVOICE_ATTACHED", "M3", "M4", "M5A", "M5B", "M5C",
-  "M6", "M7", "M8", "M8_RECEIVED", "M9", "M10", "M11", "M11_DUPLICATE", "M12", "O1", "O2", "O2_WITHDRAWAL",
+  "M6", "M7", "M8", "M8_RECEIVED", "M9", "M10", "M10_ENDED", "M11", "M11_DUPLICATE", "M12", "O1", "O2", "O2_WITHDRAWAL",
   "O2_REFUND_DUE", "O2_REFUND_REMINDER", "O3", "O4",
   "DATA_EXPORT"
 ] as const);
@@ -223,6 +224,13 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
   M10: define({
     catalogue: "mail", subject: "mail.M10.subject",
     paragraphs: ["mail.M10.paused", "mail.M10.contact"],
+    params: { plan: "plan" }
+  }),
+  // The owner's decision of 24 October 2026: NETOPIA reports a lost charge-back (status 10), and VERIFY_PAYMENT ends
+  // the plan by itself, as `pnpm billing:dispute --outcome lost` does. M10 stays the email of a pause (status 9 or 16).
+  M10_ENDED: define({
+    catalogue: "mail", subject: "mail.M10_ENDED.subject",
+    paragraphs: ["mail.M10_ENDED.ended", "mail.M10.contact"],
     params: { plan: "plan" }
   }),
   // M11 follows a payment refused for the card's country. A refused card change (P12e, CARD_CHECK_REFUSED) sends no
