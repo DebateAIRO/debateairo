@@ -614,8 +614,11 @@ describe("row-level security S01 C6: forgery by SQL on the four T1 logins widens
     // row security. Left out, nothing following them: work_item.settled_* (the projection projects no column of the
     // matched item), serve_disclosure.floor_leading_node_id (publishing refuses a node outside the answer), the text
     // subject refs of review_clock and revision_trigger (read by run), and the provider and model refs (global).
+    // `tag` names a second variant of one column; `extra` sets more columns (it wins over the named values).
     type EngineMember = Readonly<{ table: string; columns: readonly string[]; parent: string; parentColumns: readonly string[];
-      list?: true; late?: true; already?: string; extra?: (values: readonly unknown[]) => Record<string, unknown> }>;
+      tag?: string; list?: true; late?: true; already?: string; extra?: (values: readonly unknown[]) => Record<string, unknown> }>;
+    // How a consumer that casts text to uuid still reads B's id: braced and upper case.
+    const braced = (value: unknown): string => `{${String(value).toUpperCase()}}`;
     const node = ["core.node", ["node_id"]] as const;
     const artifact = ["ledger.raw_artifact", ["raw_artifact_id"]] as const;
     const propagation = ["ledger.propagation_run", ["propagation_run_id"]] as const;
@@ -633,7 +636,11 @@ describe("row-level security S01 C6: forgery by SQL on the four T1 logins widens
       member("core.reversal_point", ["value_hinge_id"], ["core.value_hinge", ["value_hinge_id"]]),
       member("core.run_supersession", ["new_run_id"], run, { already: "23514" }),
       member("core.staleness_state", ["subject_ref"], answerId),
+      // The subject columns name a node or an answer whatever their kind column says.
+      member("core.staleness_state", ["subject_ref"], node, { tag: "NODE", extra: () => ({ subject_kind: "NODE" }) }),
+      member("core.staleness_state", ["subject_ref"], answerId, { tag: "braced", extra: (values) => ({ subject_ref: braced(values[0]) }) }),
       member("core.stranger_restatement", ["subject_id"], node),
+      member("core.stranger_restatement", ["subject_id"], node, { tag: "verdict", extra: () => ({ subject_kind: "verdict" }) }),
       member("ledger.ledger_entry", ["raw_artifact_ref"], artifact),
       member("ledger.node_review", ["node_id"], node, { already: "P0001" }),
       member("ledger.node_review", ["author_raw_artifact_ref"], artifact, { already: "P0001" }),
@@ -659,6 +666,7 @@ describe("row-level security S01 C6: forgery by SQL on the four T1 logins widens
       member("serve.answer", ["conformance_record_id"], ["serve.conformance_record", ["conformance_record_id"]]),
       member("serve.answer_story", ["answer_id", "answer_version"], answer, { already: "23503" }),
       member("serve.answer_story", ["artifact_refs"], artifact, { list: true }),
+      member("serve.answer_story", ["artifact_refs"], artifact, { tag: "braced", extra: (values) => ({ artifact_refs: [braced(values[0])] }) }),
       member("serve.composed_text", ["fact_bundle_id"], ["serve.fact_bundle", ["fact_bundle_id"]]),
       // 0053's check: a reviewed mark's subject is the reviewed node.
       member("serve.condition_mark", ["review_ref", "review_node_ref", "review_outcome"], ["ledger.node_review", ["node_review_id", "node_id",
@@ -679,7 +687,7 @@ describe("row-level security S01 C6: forgery by SQL on the four T1 logins widens
       member("memory.memory_link", ["alias_row_ids"], ["memory.alias_row", ["alias_row_id"]], { list: true }),
       member("scorecard.session_assignment", ["routing_decision_id"], ["scorecard.routing_decision", ["routing_decision_id"]])
     ];
-    const label = (m: EngineMember): string => `${m.table}.${m.columns.join("+")}`;
+    const label = (m: EngineMember): string => `${m.table}.${m.columns.join("+")}${m.tag === undefined ? "" : `(${m.tag})`}`;
     const su = database.pool;
     const keyOf = (relation: string): string => shapes.find((s) => s.relation === relation)!.columns.map((c) => `t."${c}"`).join(",");
     const valuesOf = (row: Record<string, unknown>, columns: readonly string[]): unknown[] => columns.map((c) => row[c]);

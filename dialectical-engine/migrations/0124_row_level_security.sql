@@ -121,9 +121,11 @@ CREATE TRIGGER guard_own_references BEFORE INSERT OR UPDATE ON billing.withdrawa
 -- login's request; the system logins carry none), each column a trigger lists must name nothing, or an entity of a run
 -- the context owns (rls.owns_run; a routing by its execution, rls.owns_execution_ref), and serve.answer may not add a
 -- version to another account's answer. The trigger's arguments are pairs: a column, then the kind of entity it names
--- ('<kind>[]': a jsonb list of them). A NULL column, a column an UPDATE leaves as it was, and a value no row carries
--- (where there is a foreign key, it refuses that one) are not refused here. EXECUTE-able by no login, as
--- billing.guard_own_references is. Measured non-members (tests/integration/rls-forgery.test.ts S6.3-F14): already refused
+-- ('<kind>[]': a jsonb list of them; 'node_or_answer' for the subject columns, whatever their kind column says). A value
+-- is read as uuid exactly as a cast reads it (braces, upper case, no hyphens), so no spelling a consumer could cast slips
+-- past. A NULL column, a column an UPDATE leaves as it was, a value that is no uuid, and one no row carries (where there
+-- is a foreign key, it refuses that one) are not refused here. EXECUTE-able by no login, as billing.guard_own_references
+-- is. Measured non-members (tests/integration/rls-forgery.test.ts S6.3-F14): already refused
 -- by an older check (run_supersession.new_run_id; answer_story's and serve_disclosure's answer; node_review's node and
 -- artifacts, whose lineage triggers read them under the writer's row security), or followed by no reader.
 CREATE OR REPLACE FUNCTION core.guard_own_references() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog AS $$
@@ -143,10 +145,16 @@ BEGIN
       END IF;
       FOREACH v_ref IN ARRAY v_refs LOOP
         -- A value that is no uuid names no row of these tables.
-        v_id := CASE WHEN v_ref ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN v_ref::uuid END;
+        BEGIN
+          v_id := v_ref::uuid;
+        EXCEPTION WHEN invalid_text_representation THEN
+          v_id := NULL;
+        END;
         v_owned := CASE v_kind
           WHEN 'run' THEN CASE WHEN EXISTS (SELECT 1 FROM core.run AS p WHERE p.run_id = v_id) THEN rls.owns_run(v_id) END
           WHEN 'node' THEN (SELECT rls.owns_run(p.run_id) FROM core.node AS p WHERE p.node_id = v_id)
+          WHEN 'node_or_answer' THEN (SELECT bool_and(s.owned) FROM (SELECT rls.owns_run(p.run_id) FROM core.node AS p WHERE p.node_id = v_id
+            UNION ALL SELECT rls.owns_run(p.run_id) FROM serve.answer AS p WHERE p.answer_id = v_id) AS s(owned))
           WHEN 'raw_artifact' THEN (SELECT rls.owns_run(p.run_id) FROM ledger.raw_artifact AS p WHERE p.raw_artifact_id = v_id)
           WHEN 'ledger_entry' THEN (SELECT rls.owns_run(p.run_id) FROM ledger.ledger_entry AS p WHERE p.ledger_entry_id = v_id)
           WHEN 'value_hinge' THEN (SELECT rls.owns_run(p.run_id) FROM core.value_hinge AS p WHERE p.value_hinge_id = v_id)
@@ -167,7 +175,7 @@ BEGIN
           WHEN 'routing_decision' THEN (SELECT rls.owns_execution_ref(p.session_id) FROM scorecard.routing_decision AS p
             WHERE p.routing_decision_id = v_id)
         END;
-        IF v_kind NOT IN ('run', 'node', 'raw_artifact', 'ledger_entry', 'value_hinge', 'work_item', 'propagation_run',
+        IF v_kind NOT IN ('run', 'node', 'node_or_answer', 'raw_artifact', 'ledger_entry', 'value_hinge', 'work_item', 'propagation_run',
             'reduced_judgement', 'node_review', 'answer', 'fact_bundle', 'composed_text', 'conformance_record', 'condition_mark',
             'alias_row', 'routing_decision') THEN
           RAISE EXCEPTION 'RLS_GUARD_UNKNOWN_KIND %', v_kind;
@@ -185,8 +193,8 @@ REVOKE ALL ON FUNCTION core.guard_own_references() FROM PUBLIC;
 CREATE TRIGGER guard_own_references BEFORE INSERT OR UPDATE ON core.independence_receipt FOR EACH ROW EXECUTE FUNCTION core.guard_own_references('critic_ledger_entry_ref', 'ledger_entry');
 CREATE TRIGGER guard_own_references BEFORE INSERT OR UPDATE ON core.node FOR EACH ROW EXECUTE FUNCTION core.guard_own_references('provenance_ref', 'raw_artifact');
 CREATE TRIGGER guard_own_references BEFORE INSERT OR UPDATE ON core.reversal_point FOR EACH ROW EXECUTE FUNCTION core.guard_own_references('value_hinge_id', 'value_hinge');
-CREATE TRIGGER guard_own_references BEFORE INSERT OR UPDATE ON core.staleness_state FOR EACH ROW EXECUTE FUNCTION core.guard_own_references('subject_ref', 'answer');
-CREATE TRIGGER guard_own_references BEFORE INSERT OR UPDATE ON core.stranger_restatement FOR EACH ROW EXECUTE FUNCTION core.guard_own_references('subject_id', 'node');
+CREATE TRIGGER guard_own_references BEFORE INSERT OR UPDATE ON core.staleness_state FOR EACH ROW EXECUTE FUNCTION core.guard_own_references('subject_ref', 'node_or_answer');
+CREATE TRIGGER guard_own_references BEFORE INSERT OR UPDATE ON core.stranger_restatement FOR EACH ROW EXECUTE FUNCTION core.guard_own_references('subject_id', 'node_or_answer');
 CREATE TRIGGER guard_own_references BEFORE INSERT OR UPDATE ON ledger.ledger_entry FOR EACH ROW EXECUTE FUNCTION core.guard_own_references('raw_artifact_ref', 'raw_artifact');
 CREATE TRIGGER guard_own_references BEFORE INSERT OR UPDATE ON ledger.node_strength_record FOR EACH ROW EXECUTE FUNCTION core.guard_own_references('propagation_run_id', 'propagation_run', 'reduced_judgement_ref', 'reduced_judgement');
 CREATE TRIGGER guard_own_references BEFORE INSERT OR UPDATE ON ledger.overlay_run FOR EACH ROW EXECUTE FUNCTION core.guard_own_references('propagation_run_id', 'propagation_run');
