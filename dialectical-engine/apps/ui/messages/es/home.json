@@ -129,6 +129,7 @@
   "home.questionRefusal.automatic": "Nuestra comprobación automática la ha rechazado. En esta decisión no ha intervenido ninguna persona.",
   "home.questionRefusal.rule.HARM_TO_OTHERS": "Encaja en la sección «7. Uso aceptable» de nuestros Términos: no organizamos debates sobre causar daño, amenazar o atacar a personas.",
   "home.questionRefusal.rule.WEAPONS_DRUGS_TERRORISM": "Encaja en la sección «7. Uso aceptable» de nuestros Términos: no organizamos debates sobre fabricar armas, explosivos, venenos o drogas, ni debates que apoyen o elogien el terrorismo.",
+  "home.questionRefusal.rule.CRIME": "Encaja en la sección «7. Uso aceptable» de nuestros Términos: no organizamos debates sobre cómo cometer un delito o quedar impune, ni sobre si alguien debería cometer uno.",
   "home.questionRefusal.rule.HATE_SPEECH": "Encaja en la sección «7. Uso aceptable» de nuestros Términos: no organizamos debates que ataquen o denigren a las personas por lo que son.",
   "home.questionRefusal.rule.RELIGIOUS_INSULT": "Encaja en la sección «7. Uso aceptable» de nuestros Términos: no organizamos debates que insulten o ridiculicen a una religión, a sus creyentes o a lo que consideran sagrado.",
   "home.questionRefusal.rule.SENSITIVE_TOPIC": "Encaja en la sección «7. Uso aceptable» de nuestros Términos: no organizamos debates sobre el suicidio, la autolesión, la eutanasia o la muerte asistida, ni siquiera como cuestiones de derecho o de política.",

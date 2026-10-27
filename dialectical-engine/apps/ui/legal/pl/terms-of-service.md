@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: W skrócie
-eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v2.5 · OBOWIĄZUJĄ OD 12 PAŹDZIERNIKA 2026
+eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v2.6 · OBOWIĄZUJĄ OD 27 LISTOPADA 2026
 title: Na co wyrażasz zgodę
 lede: Umowa między Tobą a DMS Merchandise Shop S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.
-endMarker: KONIEC WARUNKÓW · v2.5
+endMarker: KONIEC WARUNKÓW · v2.6
 bodyLabel: Treść Warunków świadczenia usług
 annexTitle: Załącznik A — Warunki regionalne
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAWO WŁAŚCIWE
 -->
 
-**Version 2.5 · Effective 12 października 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
+**Version 2.6 · Effective 27 listopada 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
 
 **In short.** Musisz mieć ukończone 18 lat. Dialectical Engine tworzy argumenty przy użyciu modeli sztucznej inteligencji, a wszystko, co generuje, może być błędne — nie jest to porada. Twoje debaty są prywatne, chyba że je opublikujesz; po publikacji każdy może je przeczytać. Przesyłany przez Ciebie tekst jest przekazywany dostawcom AI wymienionym w naszym Rejestrze Dostawców i nie jest wykorzystywany do trenowania modeli. Nielegalne treści zgłaszaj pod adresem support@dezbatere.ro, niezależnie od tego, czy masz konto. Zastosowanie ma prawo rumuńskie, jednak zachowujesz ochronę konsumencką wynikającą z prawa miejscowego.
 
@@ -106,7 +106,7 @@ Niniejsze zasady mają zastosowanie do przesyłanych przez Ciebie treści, sposo
 
 **Żadnego znieważania religii.** Nie przesyłaj ani nie publikuj treści, które znieważają lub wyśmiewają religię, jej wyznawców albo to, co uważają za święte.
 
-**Pytania, które nie rozpoczynają debaty.** Nasza kontrola pytań (sekcja 8) nie rozpoczyna debaty na podstawie tych pytań, nawet jeśli są sformułowane pośrednio: pytanie grożące skrzywdzeniem innej osoby lub innych osób, wskazanych z imienia lub nie, w tym atakiem na osoby niewskazane, planujące to lub pytające, czy i jak skrzywdzić inną osobę lub inne osoby; pytanie o to, jak wytwarzać broń, materiały wybuchowe, trucizny lub narkotyki albo jak wesprzeć akt terrorystyczny, lub pytanie go gloryfikujące; pytanie, które jest mową nienawiści lub znieważeniem religii albo o to prosi; oraz pytanie o samobójstwo, samookaleczenie, eutanazję lub wspomagane umieranie jako temat prawa, etyki, medycyny lub zdrowia publicznego. Ostatni rodzaj nie jest niezgodny z prawem i nie narusza żadnej z powyższych zasad; odmawiamy go na podstawie tej zasady. Pytanie, które brzmi jak słowa osoby w kryzysie, również nie rozpoczyna debaty: widzisz w zamian numery pomocy (sekcja 10).
+**Pytania, które nie rozpoczynają debaty.** Nasza kontrola pytań (sekcja 8) nie rozpoczyna debaty na podstawie tych pytań, nawet jeśli są sformułowane pośrednio: pytanie grożące skrzywdzeniem innej osoby lub innych osób, wskazanych z imienia lub nie, w tym atakiem na osoby niewskazane, planujące to lub pytające, czy i jak skrzywdzić inną osobę lub inne osoby; pytanie o to, jak wytwarzać broń, materiały wybuchowe, trucizny lub narkotyki albo jak wesprzeć akt terrorystyczny, lub pytanie go gloryfikujące; pytanie, które jest mową nienawiści lub znieważeniem religii albo o to prosi; oraz pytanie o samobójstwo, samookaleczenie, eutanazję lub wspomagane umieranie jako temat prawa, etyki, medycyny lub zdrowia publicznego. Ostatni rodzaj nie jest niezgodny z prawem i nie narusza żadnej z powyższych zasad; odmawiamy go na podstawie tej zasady. Pytanie, które brzmi jak słowa osoby w kryzysie, również nie rozpoczyna debaty: widzisz w zamian numery pomocy (sekcja 10). Debaty nie rozpoczyna również pytanie o to, jak popełnić przestępstwo lub uniknąć za nie kary, albo czy ktoś powinien je popełnić, na przykład nielegalnie kupić lub sprzedać narkotyki lub broń, ukraść coś lub uchylać się od podatków; pytanie o to, czy należy zmienić jakieś prawo, na przykład czy marihuana powinna być legalna, nadal rozpoczyna debatę.
 
 **Nie używaj Dialectical Engine do wprowadzania w błąd.** Nie przedstawiaj wygenerowanych wyników jako napisanych przez człowieka, jeżeli mogłoby to wprowadzać w błąd, nie usuwaj z nich oznaczenia o wygenerowaniu przez AI ani nie używaj ich do tworzenia pozorów konsensusu, fałszywych dowodów lub podszywania się pod inne osoby.
 
@@ -238,6 +238,8 @@ Jeżeli mieszkasz w innym miejscu, załącznik A określa prawo odstąpienia lub
 Z wyprzedzeniem informujemy Cię na trwałym nośniku, co i kiedy ulegnie zmianie. Jeżeli zmiana ma więcej niż nieznaczny negatywny wpływ na Twój dostęp do usługi lub korzystanie z niej, możesz bezpłatnie rozwiązać umowę w terminie **30 dni** od otrzymania informacji lub wejścia zmiany w życie — w zależności od tego, która z tych dat jest późniejsza — a my zwrócimy wszelkie kwoty zapłacone z góry za niewykorzystany okres.
 
 **Zmiany niniejszych Warunków.** Możemy zmieniać niniejsze Warunki z tych samych rodzajów powodów. W przypadku zmian, które nie ograniczają Twoich praw, publikujemy nową wersję wraz z podsumowaniem zmian i wysyłamy Ci wiadomość e-mail co najmniej **30 dni** przed jej wejściem w życie; dalsze korzystanie z Dialectical Engine po tej dacie oznacza akceptację zmiany, a przed tą datą możesz zamknąć konto. W przypadku zmian ograniczających Twoje prawa — w tym podwyżek cen w istniejącym planie, obniżenia limitów, usunięcia funkcji, nowych sposobów wykorzystywania Twoich treści albo zmian odpowiedzialności, prawa właściwego lub rozstrzygania sporów — prosimy Cię o wyraźne zaakceptowanie nowej wersji przy kolejnym logowaniu, a zmiana obowiązuje wyłącznie na przyszłość. Nigdy nie wprowadzamy zmian z mocą wsteczną ani nie wykorzystujemy niniejszej sekcji do zmiany w trakcie okresu podstawowego zakresu opłaconej przez Ciebie usługi bez zapewnienia możliwości rezygnacji. Poprzednie wersje pozostają dostępne pod adresem dezbatere.ro/terms/versions.
+
+Wersja 2.6 zastąpiła wersję 2.5: kontrola pytań odrzuca również pytanie o to, jak popełnić przestępstwo lub uniknąć za nie kary, albo czy ktoś powinien je popełnić, na przykład nielegalnie kupić lub sprzedać narkotyki lub broń, ukraść coś lub uchylać się od podatków, i go nie przechowuje; pytanie o to, czy należy zmienić jakieś prawo, nadal rozpoczyna debatę (sekcja 7).
 
 Wersja 2.5 zastąpiła wersję 2.4: dodaje kontrolę pytań, która odczytuje każde pytanie, zanim debata się rozpocznie, niektóre odrzuca, a każde odrzucone pytanie, które grozi skrzywdzeniem innej osoby lub innych osób, wskazanych z imienia lub nie, w tym atakiem na osoby niewskazane, planuje to lub pyta, czy i jak skrzywdzić inną osobę lub inne osoby, albo które pyta, jak wytwarzać broń, materiały wybuchowe, trucizny lub narkotyki albo jak wesprzeć akt terrorystyczny, albo go gloryfikuje, przechowuje do przeczytania przez nasz zespół (sekcje 7, 8, 10 i 11); kontrolę, która odczytuje syntezę każdej zakończonej debaty, zatwierdzenie, którego oznaczona debata wymaga przed opublikowaniem, oraz debaty, które ta kontrola usuwa (sekcje 5, 8, 9, 10 i 11); dane, które czat wsparcia wysyła do modelu Claude firmy Anthropic, fakt, że nie przechowuje on niczego z tego, co piszesz, i nie otwiera sprawy, oraz fakt, że jego przycisk „Porozmawiaj z człowiekiem” pokazuje nasz adres wsparcia (sekcje 8 i 10); a także zasady w sekcji 7, które zakazują mowy nienawiści w jakiejkolwiek formie, instrukcji wytwarzania broni lub narkotyków, treści zachęcających do samobójstwa lub krzywdzenia innych osób oraz znieważania religii i wskazują, które pytania nie rozpoczynają debaty.
 

@@ -15,7 +15,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 let database: TestDatabase;
 const identity = testHttpIdentity("s04-database-gate");
 const question = "Should a private sentinel question lead to a debate?";
-const labels = ["ORDINARY", "HARM_TO_OTHERS", "WEAPONS_DRUGS_TERRORISM", "HATE_SPEECH",
+const labels = ["ORDINARY", "HARM_TO_OTHERS", "WEAPONS_DRUGS_TERRORISM", "CRIME", "HATE_SPEECH",
   "RELIGIOUS_INSULT", "SENSITIVE_TOPIC", "OWN_CRISIS", "METHODS_OR_ENCOURAGEMENT",
   "QUESTION_CHECK_HTTP_STATUS"] as const;
 

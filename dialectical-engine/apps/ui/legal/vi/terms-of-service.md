@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Tóm tắt
-eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v2.5 · CÓ HIỆU LỰC 12 THÁNG 10 NĂM 2026
+eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v2.6 · CÓ HIỆU LỰC 27 THÁNG 11 NĂM 2026
 title: Những điều bạn đồng ý
 lede: Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.
-endMarker: HẾT ĐIỀU KHOẢN · v2.5
+endMarker: HẾT ĐIỀU KHOẢN · v2.6
 bodyLabel: Nội dung Điều khoản dịch vụ
 annexTitle: Phụ lục A — Điều khoản theo khu vực
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LUẬT ĐIỀU CHỈNH
 -->
 
-**Version 2.5 · Effective 12 tháng 10 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
+**Version 2.6 · Effective 27 tháng 11 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
 
 **In short.** Bạn phải từ 18 tuổi trở lên. Dialectical Engine xây dựng các lập luận bằng mô hình AI và mọi nội dung do dịch vụ tạo ra đều có thể sai — đó không phải là lời tư vấn. Các cuộc tranh luận của bạn là riêng tư trừ khi bạn công khai chúng; nếu bạn công khai, bất kỳ ai cũng có thể đọc. Văn bản bạn gửi được chuyển đến các nhà cung cấp AI nêu trong Sổ đăng ký nhà cung cấp của chúng tôi và không được dùng để huấn luyện mô hình. Hãy báo cáo nội dung bất hợp pháp tại support@dezbatere.ro dù bạn có tài khoản hay không. Luật Romania điều chỉnh, nhưng các biện pháp bảo vệ người tiêu dùng tại nơi bạn sinh sống vẫn được bảo đảm.
 
@@ -106,7 +106,7 @@ Các quy tắc này áp dụng đối với nội dung bạn gửi, cách bạn 
 
 **Không cho phép xúc phạm tôn giáo.** Không gửi hoặc công khai nội dung xúc phạm hoặc nhạo báng một tôn giáo, các tín đồ của tôn giáo đó hoặc những gì họ coi là thiêng liêng.
 
-**Những câu hỏi không bắt đầu một cuộc tranh luận.** Bước kiểm tra câu hỏi của chúng tôi (mục 8) không bắt đầu một cuộc tranh luận từ những câu hỏi này, kể cả khi chúng được diễn đạt gián tiếp: câu hỏi đe dọa, lên kế hoạch hoặc hỏi liệu hoặc làm thế nào để làm hại một người khác hoặc những người khác, dù có nêu tên hay không, kể cả tấn công những người không nêu tên; câu hỏi hỏi cách chế tạo vũ khí, chất nổ, chất độc hoặc ma túy hoặc cách hỗ trợ một hành vi khủng bố, hoặc ca ngợi hành vi đó; câu hỏi là hoặc yêu cầu ngôn từ thù hận hoặc xúc phạm tôn giáo; và câu hỏi về tự tử, tự làm hại bản thân, an tử hoặc chết có hỗ trợ như một chủ đề của pháp luật, đạo đức, y học hoặc sức khỏe cộng đồng. Loại cuối cùng không trái pháp luật và không vi phạm quy tắc nào ở trên; chúng tôi từ chối nó theo quy tắc này. Một câu hỏi đọc lên giống như lời của một người đang trong khủng hoảng cũng không bắt đầu một cuộc tranh luận: bạn thấy số điện thoại hỗ trợ thay thế (mục 10).
+**Những câu hỏi không bắt đầu một cuộc tranh luận.** Bước kiểm tra câu hỏi của chúng tôi (mục 8) không bắt đầu một cuộc tranh luận từ những câu hỏi này, kể cả khi chúng được diễn đạt gián tiếp: câu hỏi đe dọa, lên kế hoạch hoặc hỏi liệu hoặc làm thế nào để làm hại một người khác hoặc những người khác, dù có nêu tên hay không, kể cả tấn công những người không nêu tên; câu hỏi hỏi cách chế tạo vũ khí, chất nổ, chất độc hoặc ma túy hoặc cách hỗ trợ một hành vi khủng bố, hoặc ca ngợi hành vi đó; câu hỏi là hoặc yêu cầu ngôn từ thù hận hoặc xúc phạm tôn giáo; và câu hỏi về tự tử, tự làm hại bản thân, an tử hoặc chết có hỗ trợ như một chủ đề của pháp luật, đạo đức, y học hoặc sức khỏe cộng đồng. Loại cuối cùng không trái pháp luật và không vi phạm quy tắc nào ở trên; chúng tôi từ chối nó theo quy tắc này. Một câu hỏi đọc lên giống như lời của một người đang trong khủng hoảng cũng không bắt đầu một cuộc tranh luận: bạn thấy số điện thoại hỗ trợ thay thế (mục 10). Một câu hỏi về cách phạm tội hoặc thoát khỏi hình phạt, hoặc về việc liệu ai đó có nên phạm tội hay không, chẳng hạn như mua hoặc bán trái phép ma túy hay vũ khí, trộm cắp hoặc trốn thuế, cũng không bắt đầu một cuộc tranh luận; một câu hỏi về việc liệu một luật có nên thay đổi hay không, chẳng hạn như cần sa có nên được hợp pháp hóa hay không, vẫn bắt đầu một cuộc tranh luận.
 
 **Không sử dụng Dialectical Engine để lừa dối.** Không trình bày kết quả do AI tạo ra như thể do con người viết khi điều đó gây hiểu lầm, không loại bỏ nhãn do AI tạo, và không sử dụng kết quả để tạo ra sự đồng thuận giả tạo, bằng chứng giả hoặc hành vi mạo danh.
 
@@ -238,6 +238,8 @@ Nếu sống tại nơi khác, Phụ lục A quy định quyền rút lui hoặc
 Chúng tôi thông báo trước cho bạn trên một phương tiện bền vững về nội dung và thời điểm thay đổi. Nếu thay đổi có tác động tiêu cực lớn hơn mức không đáng kể đối với khả năng truy cập hoặc sử dụng dịch vụ của bạn, bạn có thể chấm dứt miễn phí trong vòng **30 ngày** kể từ khi được thông báo hoặc kể từ khi thay đổi có hiệu lực, tùy thời điểm nào muộn hơn, và chúng tôi hoàn trả mọi khoản đã trả trước cho thời gian chưa sử dụng.
 
 **Đối với các Điều khoản này.** Chúng tôi có thể thay đổi các Điều khoản này vì các loại lý do tương tự. Đối với thay đổi không làm giảm quyền của bạn, chúng tôi đăng phiên bản mới kèm bản tóm tắt nội dung thay đổi và gửi email cho bạn ít nhất **30 ngày** trước khi phiên bản có hiệu lực; tiếp tục sử dụng Dialectical Engine sau ngày đó có nghĩa là bạn chấp nhận phiên bản mới, và bạn có thể đóng tài khoản trước ngày đó. Đối với thay đổi làm giảm quyền của bạn — bao gồm tăng giá đối với gói hiện có, hạ thấp giới hạn, loại bỏ tính năng, cách sử dụng mới đối với nội dung của bạn, hoặc thay đổi về trách nhiệm, luật điều chỉnh hay giải quyết tranh chấp — chúng tôi yêu cầu bạn chấp nhận rõ ràng phiên bản mới vào lần đăng nhập tiếp theo, và thay đổi chỉ áp dụng về sau. Chúng tôi không bao giờ áp dụng thay đổi hồi tố và không bao giờ dùng mục này để thay đổi nội dung cốt lõi mà bạn đã thanh toán giữa kỳ mà không cho bạn một lối thoát. Các phiên bản trước vẫn được cung cấp tại dezbatere.ro/terms/versions.
+
+Phiên bản 2.6 thay thế phiên bản 2.5: bước kiểm tra câu hỏi cũng từ chối một câu hỏi về cách phạm tội hoặc thoát khỏi hình phạt, hoặc về việc liệu ai đó có nên phạm tội hay không, chẳng hạn như mua hoặc bán trái phép ma túy hay vũ khí, trộm cắp hoặc trốn thuế, và không lưu giữ câu hỏi đó; một câu hỏi về việc liệu một luật có nên thay đổi hay không vẫn bắt đầu một cuộc tranh luận (mục 7).
 
 Phiên bản 2.5 thay thế phiên bản 2.4: phiên bản này bổ sung bước kiểm tra câu hỏi, đọc từng câu hỏi trước khi một cuộc tranh luận bắt đầu, từ chối một số, và lưu giữ để nhóm của chúng tôi đọc từng câu hỏi bị từ chối đe dọa, lên kế hoạch hoặc hỏi liệu hoặc làm thế nào để làm hại một người khác hoặc những người khác, dù có nêu tên hay không, kể cả tấn công những người không nêu tên, hoặc hỏi cách chế tạo vũ khí, chất nổ, chất độc hoặc ma túy hoặc cách hỗ trợ một hành vi khủng bố, hoặc ca ngợi hành vi đó (mục 7, 8, 10 và 11); bước kiểm tra đọc phần tổng hợp của mỗi cuộc tranh luận đã kết thúc, việc phê duyệt mà một cuộc tranh luận bị gắn cờ cần có trước khi được công khai, và các cuộc tranh luận mà bước kiểm tra đó xóa (mục 5, 8, 9, 10 và 11); những gì trò chuyện hỗ trợ gửi đến mô hình Claude của Anthropic, việc nó không lưu giữ gì từ những gì bạn viết và không mở trường hợp nào, và việc nút “Trò chuyện với nhân viên hỗ trợ” của nó hiển thị địa chỉ hỗ trợ của chúng tôi (mục 8 và 10); và các quy tắc tại mục 7 cấm ngôn từ thù hận dưới mọi hình thức, hướng dẫn chế tạo vũ khí hoặc ma túy, nội dung cổ vũ tự tử hoặc làm hại người khác và xúc phạm tôn giáo, đồng thời nêu những câu hỏi nào không bắt đầu một cuộc tranh luận.
 

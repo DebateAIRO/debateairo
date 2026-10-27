@@ -53,6 +53,7 @@ describe("S04 question check", () => {
     ["METHODS_OR_ENCOURAGEMENT", { outcome: "CRISIS" }],
     ["HARM_TO_OTHERS", { outcome: "REFUSE", kind: "HARM_TO_OTHERS", kept: true }],
     ["WEAPONS_DRUGS_TERRORISM", { outcome: "REFUSE", kind: "WEAPONS_DRUGS_TERRORISM", kept: true }],
+    ["CRIME", { outcome: "REFUSE", kind: "CRIME", kept: false }],
     ["HATE_SPEECH", { outcome: "REFUSE", kind: "HATE_SPEECH", kept: false }],
     ["RELIGIOUS_INSULT", { outcome: "REFUSE", kind: "RELIGIOUS_INSULT", kept: false }],
     ["SENSITIVE_TOPIC", { outcome: "REFUSE", kind: "SENSITIVE_TOPIC", kept: false }],

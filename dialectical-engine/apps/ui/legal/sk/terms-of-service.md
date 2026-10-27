@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručne
-eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.5 · ÚČINNÉ OD 12. OKTÓBRA 2026
+eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.6 · ÚČINNÉ OD 27. NOVEMBRA 2026
 title: S čím súhlasíte
 lede: Zmluva medzi vami a DMS Merchandise Shop S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.
-endMarker: KONIEC PODMIENOK · v2.5
+endMarker: KONIEC PODMIENOK · v2.6
 bodyLabel: Text Podmienok poskytovania služby
 annexTitle: Príloha A — Regionálne podmienky
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ROZHODNÉ PRÁVO
 -->
 
-**Version 2.5 · Effective 12. októbra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
+**Version 2.6 · Effective 27. novembra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
 
 **In short.** Musíte mať aspoň 18 rokov. Dialectical Engine vytvára argumenty pomocou modelov umelej inteligencie a všetko, čo vygeneruje, môže byť nesprávne — nejde o poradenstvo. Vaše debaty sú súkromné, pokiaľ ich nezverejníte; ak ich zverejníte, môže ich čítať ktokoľvek. Text, ktorý zadáte, sa odosiela poskytovateľom umelej inteligencie uvedeným v našom Registri poskytovateľov a nepoužíva sa na trénovanie modelov. Nezákonný obsah nahláste na support@dezbatere.ro bez ohľadu na to, či máte účet. Rozhodným právom je rumunské právo, vaše miestne práva na ochranu spotrebiteľa vám však zostávajú zachované.
 
@@ -106,7 +106,7 @@ Tieto pravidlá sa vzťahujú na to, čo zadávate, ako službu používate a č
 
 **Žiadna urážka náboženstva.** Nezadávajte ani nezverejňujte obsah, ktorý uráža alebo zosmiešňuje náboženstvo, jeho vyznávačov alebo to, čo považujú za posvätné.
 
-**Otázky, ktoré nezačnú debatu.** Naša kontrola otázky (časť 8) nezačne debatu z týchto otázok, ani keď sú formulované nepriamo: otázka, ktorá sa vyhráža ublížením inej osobe alebo iným osobám, menovaným alebo nie, vrátane útoku na nemenované osoby, plánuje takéto ublíženie alebo sa pýta, či a ako inej osobe alebo iným osobám ublížiť; otázka, ktorá sa pýta, ako vyrobiť zbrane, výbušniny, jedy alebo drogy alebo ako podporiť teroristický čin, alebo ktorá ho oslavuje; otázka, ktorá je nenávistným prejavom alebo urážkou náboženstva alebo o ne žiada; a otázka o samovražde, sebapoškodzovaní, eutanázii alebo asistovanom umieraní ako o téme práva, etiky, medicíny alebo verejného zdravia. Posledný druh nie je nezákonný a neporušuje žiadne z vyššie uvedených pravidiel; zamietame ho podľa tohto pravidla. Ani otázka, ktorá znie ako slová osoby v kríze, nezačne debatu: namiesto toho sa zobrazia čísla pomoci (časť 10).
+**Otázky, ktoré nezačnú debatu.** Naša kontrola otázky (časť 8) nezačne debatu z týchto otázok, ani keď sú formulované nepriamo: otázka, ktorá sa vyhráža ublížením inej osobe alebo iným osobám, menovaným alebo nie, vrátane útoku na nemenované osoby, plánuje takéto ublíženie alebo sa pýta, či a ako inej osobe alebo iným osobám ublížiť; otázka, ktorá sa pýta, ako vyrobiť zbrane, výbušniny, jedy alebo drogy alebo ako podporiť teroristický čin, alebo ktorá ho oslavuje; otázka, ktorá je nenávistným prejavom alebo urážkou náboženstva alebo o ne žiada; a otázka o samovražde, sebapoškodzovaní, eutanázii alebo asistovanom umieraní ako o téme práva, etiky, medicíny alebo verejného zdravia. Posledný druh nie je nezákonný a neporušuje žiadne z vyššie uvedených pravidiel; zamietame ho podľa tohto pravidla. Ani otázka, ktorá znie ako slová osoby v kríze, nezačne debatu: namiesto toho sa zobrazia čísla pomoci (časť 10). Debatu nezačne ani otázka, ako spáchať trestný čin alebo ako za neho uniknúť trestu, alebo či by ho niekto mal spáchať, napríklad nelegálne kúpiť či predať drogy alebo zbrane, kradnúť alebo krátiť dane; otázka, či by sa mal zmeniť zákon, napríklad či by mala byť marihuana legálna, debatu naďalej začne.
 
 **Nepoužívajte Dialectical Engine na klamanie.** Nevydávajte vygenerovaný výstup za text napísaný človekom, ak by to bolo zavádzajúce, neodstraňujte z neho označenie, že ho vytvorila umelá inteligencia, a nepoužívajte ho na vytváranie zdania konsenzu, falošných dôkazov alebo na vydávanie sa za inú osobu.
 
@@ -238,6 +238,8 @@ Ak žijete inde, príloha A uvádza právo na odstúpenie alebo lehotu na rozmys
 O tom, čo a kedy sa mení, vás vopred informujeme na trvanlivom médiu. Ak má zmena viac než nepodstatný nepriaznivý vplyv na váš prístup k službe alebo jej používanie, môžete zmluvu bezplatne ukončiť do **30 dní** odo dňa, keď ste boli informovaní, alebo odo dňa nadobudnutia účinnosti zmeny, podľa toho, ktorý deň nastane neskôr, a vrátime vám prípadnú predplatenú sumu za nevyužité obdobie.
 
 **Zmeny týchto Podmienok.** Tieto Podmienky môžeme meniť z rovnakých druhov dôvodov. Pri zmenách, ktoré neobmedzujú vaše práva, zverejníme novú verziu so zhrnutím zmien a najmenej **30 dní** pred nadobudnutím účinnosti vám zašleme e-mail; pokračovaním v používaní Dialectical Engine po tomto dátume zmenu prijímate a pred týmto dátumom môžete svoj účet odstrániť. Pri zmenách, ktoré obmedzujú vaše práva — vrátane zvýšenia ceny existujúceho programu, zníženia limitov, odstránenia funkcií, nového spôsobu použitia vášho obsahu alebo zmien zodpovednosti, rozhodného práva či riešenia sporov — vás pri nasledujúcom prihlásení požiadame, aby ste novú verziu výslovne prijali, a zmena platí iba do budúcnosti. Žiadnu zmenu nikdy neuplatníme spätne a túto časť nikdy nepoužijeme na zmenu podstaty toho, za čo ste počas obdobia zaplatili, bez toho, aby sme vám ponúkli možnosť zmluvu ukončiť. Predchádzajúce verzie zostávajú dostupné na adrese dezbatere.ro/terms/versions.
+
+Verzia 2.6 nahradila verziu 2.5: kontrola otázky zamieta aj otázku, ako spáchať trestný čin alebo ako za neho uniknúť trestu, alebo či by ho niekto mal spáchať, napríklad nelegálne kúpiť či predať drogy alebo zbrane, kradnúť alebo krátiť dane, a takú otázku neuchováva; otázka, či by sa mal zmeniť zákon, debatu naďalej začne (časť 7).
 
 Verzia 2.5 nahradila verziu 2.4: pridáva kontrolu otázky, ktorá číta každú otázku skôr, ako debata začne, niektoré zamieta a každú zamietnutú otázku, ktorá sa vyhráža ublížením inej osobe alebo iným osobám, menovaným alebo nie, vrátane útoku na nemenované osoby, plánuje takéto ublíženie alebo sa pýta, či a ako inej osobe alebo iným osobám ublížiť, alebo ktorá sa pýta, ako vyrobiť zbrane, výbušniny, jedy alebo drogy alebo ako podporiť teroristický čin, alebo ho oslavuje, uchováva na prečítanie naším tímom (časti 7, 8, 10 a 11); kontrolu, ktorá číta syntézu každej dokončenej debaty, schválenie, ktoré označená debata potrebuje, kým sa môže zverejniť, a debaty, ktoré táto kontrola odstraňuje (časti 5, 8, 9, 10 a 11); čo chat podpory posiela modelu Claude od Anthropic, že nič z toho, čo napíšete, neuchováva a neotvára žiadny prípad, a že jeho tlačidlo „Porozprávať sa s človekom“ zobrazuje našu adresu podpory (časti 8 a 10); a pravidlá v časti 7, ktoré zakazujú nenávistné prejavy akéhokoľvek druhu, návody na výrobu zbraní alebo drog, obsah podnecujúci k samovražde alebo k ubližovaniu iným ľuďom a urážku náboženstva a uvádzajú, ktoré otázky nezačnú debatu.
 

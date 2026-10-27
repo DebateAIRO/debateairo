@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kısaca
-eyebrow: HİZMET KOŞULLARI · v2.5 · YÜRÜRLÜK TARİHİ 12 EKİM 2026
+eyebrow: HİZMET KOŞULLARI · v2.6 · YÜRÜRLÜK TARİHİ 27 KASIM 2026
 title: Kabul ettiğiniz hükümler
 lede: Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.
-endMarker: KOŞULLARIN SONU · v2.5
+endMarker: KOŞULLARIN SONU · v2.6
 bodyLabel: Hizmet Koşulları metni
 annexTitle: Ek A — Bölgesel koşullar
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 UYGULANACAK HUKUK
 -->
 
-**Version 2.5 · Effective 12 Ekim 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
+**Version 2.6 · Effective 27 Kasım 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
 
 **In short.** En az 18 yaşında olmalısınız. Dialectical Engine, yapay zekâ modelleriyle argümanlar oluşturur ve ürettiği her şey yanlış olabilir — bunlar tavsiye değildir. Tartışmalarınız, siz yayımlamadıkça özeldir; yayımlarsanız herkes okuyabilir. Gönderdiğiniz metin, Sağlayıcı Sicilimizde belirtilen yapay zekâ sağlayıcılarına iletilir ve modelleri eğitmek için kullanılmaz. Hesabınız olsun veya olmasın, hukuka aykırı içerikleri support@dezbatere.ro adresine bildirin. Romanya hukuku uygulanır; ancak yerel tüketici korumalarınız saklıdır.
 
@@ -106,7 +106,7 @@ Bu kurallar gönderdiklerinize, hizmeti kullanma biçiminize ve yayımladıklar�
 
 **Dine hakaret yasaktır.** Bir dine, o dinin müntesiplerine veya onların kutsal saydığı şeylere hakaret eden ya da alay eden içerik göndermeyin veya yayımlamayın.
 
-**Tartışma başlatmayan sorular.** Soru kontrolümüz (8. bölüm), dolaylı olarak ifade edilmiş olsalar bile şu sorulardan tartışma başlatmaz: adı belirtilmiş olsun olmasın başka bir kişiye veya başka kişilere (adı belirtilmeyen kişilere yönelik bir saldırı dâhil) zarar vermekle tehdit eden, bunu planlayan veya buna zarar verilip verilemeyeceğini ya da nasıl verileceğini soran bir soru; silah, patlayıcı, zehir veya uyuşturucunun nasıl yapılacağını ya da bir terör eylemine nasıl destek olunacağını soran ya da terörü öven bir soru; nefret söylemi ya da dine hakaret olan veya bunu isteyen bir soru; ve intiharı, kendine zarar vermeyi, ötanaziyi veya yardımlı ölümü hukuk, etik, tıp ya da halk sağlığı konusu olarak ele alan bir soru. Son tür hukuka aykırı değildir ve yukarıdaki kuralların hiçbirini ihlal etmez; onu bu kural uyarınca reddederiz. Kriz içindeki bir kişinin sözleri gibi okunan bir soru da tartışma başlatmaz: bunun yerine yardım numaralarını görürsünüz (10. bölüm).
+**Tartışma başlatmayan sorular.** Soru kontrolümüz (8. bölüm), dolaylı olarak ifade edilmiş olsalar bile şu sorulardan tartışma başlatmaz: adı belirtilmiş olsun olmasın başka bir kişiye veya başka kişilere (adı belirtilmeyen kişilere yönelik bir saldırı dâhil) zarar vermekle tehdit eden, bunu planlayan veya buna zarar verilip verilemeyeceğini ya da nasıl verileceğini soran bir soru; silah, patlayıcı, zehir veya uyuşturucunun nasıl yapılacağını ya da bir terör eylemine nasıl destek olunacağını soran ya da terörü öven bir soru; nefret söylemi ya da dine hakaret olan veya bunu isteyen bir soru; ve intiharı, kendine zarar vermeyi, ötanaziyi veya yardımlı ölümü hukuk, etik, tıp ya da halk sağlığı konusu olarak ele alan bir soru. Son tür hukuka aykırı değildir ve yukarıdaki kuralların hiçbirini ihlal etmez; onu bu kural uyarınca reddederiz. Kriz içindeki bir kişinin sözleri gibi okunan bir soru da tartışma başlatmaz: bunun yerine yardım numaralarını görürsünüz (10. bölüm). Bir suçun nasıl işleneceğini ya da cezasından nasıl kaçılacağını veya birinin suç işleyip işlememesi gerektiğini soran bir soru da (örneğin yasa dışı olarak uyuşturucu ya da silah alıp satmak, hırsızlık yapmak veya vergi kaçırmak) tartışma başlatmaz; bir yasanın değişip değişmemesi gerektiğine dair bir soru (örneğin esrarın yasal olup olmaması gerektiği) ise tartışma başlatmaya devam eder.
 
 **Dialectical Engine'i aldatma amacıyla kullanmayın.** Yanıltıcı olacağı durumlarda üretilen çıktıyı insan tarafından yazılmış gibi sunmayın, yapay zekâ tarafından üretildiği etiketini kaldırmayın ve görünürde uzlaşma, sahte kanıt veya kimliğe bürünme oluşturmak için kullanmayın.
 
@@ -238,6 +238,8 @@ Başka bir yerde yaşıyorsanız bölgenizde geçerli olan cayma veya vazgeçme 
 Neyin ne zaman değişeceğini kalıcı veri saklayıcısıyla önceden bildiririz. Değişiklik, hizmete erişiminiz veya hizmeti kullanımınız üzerinde önemsizden daha fazla olumsuz etkiye sahipse, bildirimin size iletilmesinden veya değişikliğin yürürlüğe girmesinden hangisi daha geç ise o tarihten itibaren **30 gün içinde** ücretsiz olarak sözleşmeyi sona erdirebilirsiniz; kullanılmayan dönem için önceden ödenmiş tutarları iade ederiz.
 
 **Bu Koşullarda.** Bu Koşulları aynı tür nedenlerle değiştirebiliriz. Haklarınızı azaltmayan değişiklikler için yeni sürümü, değişikliklerin özetiyle yayımlar ve yürürlüğe girmesinden en az **30 gün önce** size e-posta göndeririz; o tarihten sonra Dialectical Engine'i kullanmaya devam etmeniz değişikliği kabul ettiğiniz anlamına gelir ve hesabınızı o tarihten önce kapatabilirsiniz. Mevcut bir plandaki fiyat artışları, daha düşük sınırlar, kaldırılan özellikler, içeriğinizin yeni kullanım biçimleri veya sorumluluk, uygulanacak hukuk ya da uyuşmazlık çözümüne ilişkin değişiklikler dahil, haklarınızı azaltan değişiklikler için bir sonraki oturum açışınızda yeni sürümü açıkça kabul etmenizi isteriz ve değişiklik yalnızca ileriye dönük uygulanır. Hiçbir değişikliği geriye yürütmeyiz ve size bir çıkış yolu sunmadan, sürenin ortasında ücretini ödediğiniz hususun özünü değiştirmek için bu bölümü kullanmayız. Önceki sürümler dezbatere.ro/terms/versions adresinde erişilebilir kalır.
+
+Sürüm 2.6, sürüm 2.5'in yerine geçmiştir: soru kontrolümüz artık bir suçun nasıl işleneceğini ya da cezasından nasıl kaçılacağını veya birinin suç işleyip işlememesi gerektiğini soran bir soruyu da (örneğin yasa dışı olarak uyuşturucu ya da silah alıp satmak, hırsızlık yapmak veya vergi kaçırmak) reddeder ve bu soruyu saklamaz; bir yasanın değişip değişmemesi gerektiğine dair bir soru ise tartışma başlatmaya devam eder (7. bölüm).
 
 Sürüm 2.5, sürüm 2.4'ün yerine geçmiştir: her soruyu bir tartışma başlamadan önce okuyan, bazılarını reddeden ve ekibimizin okuması için, adı belirtilmiş olsun olmasın başka bir kişiye veya başka kişilere zarar vermekle tehdit eden (adı belirtilmeyen kişilere yönelik bir saldırı dâhil), bunu planlayan veya buna zarar verilip verilemeyeceğini ya da nasıl verileceğini soran, silah, patlayıcı, zehir veya uyuşturucunun nasıl yapılacağını ya da bir terör eylemine nasıl destek olunacağını soran veya terörü öven her reddedilmiş soruyu saklayan soru kontrolünü (7., 8., 10. ve 11. bölümler); her biten tartışmanın sentezini okuyan kontrolü, işaretlenmiş bir tartışmanın yayımlanabilmesi için gereken onayı ve o kontrolün sildiği tartışmaları (5., 8., 9., 10. ve 11. bölümler); destek sohbetinin Anthropic'in modeli Claude'a neler gönderdiğini, yazdıklarınızdan hiçbir şey saklamadığını ve hiçbir destek talebi açmadığını, ayrıca “Bir yetkiliyle görüş” düğmesinin destek adresimizi gösterdiğini (8. ve 10. bölümler); ve 7. bölümde her türlü nefret söylemini, silah veya uyuşturucu yapımına ilişkin talimatları, intihara veya başkalarına zarar vermeye teşvik eden içeriği ve dine hakareti yasaklayan ve hangi soruların tartışma başlatmadığını belirten kuralları ekler.
 

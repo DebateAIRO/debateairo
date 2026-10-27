@@ -130,6 +130,7 @@
   "home.questionRefusal.automatic": "Naše samodejno preverjanje ga je zavrnilo. Pri tej odločitvi ni sodelovala nobena oseba.",
   "home.questionRefusal.rule.HARM_TO_OTHERS": "Spada pod razdelek „7. Dopustna uporaba“ naših Pogojev: ne vodimo razprav o škodovanju ljudem, groženju ljudem ali napadanju ljudi.",
   "home.questionRefusal.rule.WEAPONS_DRUGS_TERRORISM": "Spada pod razdelek „7. Dopustna uporaba“ naših Pogojev: ne vodimo razprav o izdelavi orožja, eksplozivov, strupov ali drog niti razprav, ki podpirajo ali poveličujejo terorizem.",
+  "home.questionRefusal.rule.CRIME": "Spada pod razdelek „7. Dopustna uporaba“ naših Pogojev: ne vodimo razprav o tem, kako storiti kaznivo dejanje ali se izogniti kazni zanj, niti o tem, ali bi ga kdo moral storiti.",
   "home.questionRefusal.rule.HATE_SPEECH": "Spada pod razdelek „7. Dopustna uporaba“ naših Pogojev: ne vodimo razprav, ki napadajo ali ponižujejo ljudi zaradi tega, kar so.",
   "home.questionRefusal.rule.RELIGIOUS_INSULT": "Spada pod razdelek „7. Dopustna uporaba“ naših Pogojev: ne vodimo razprav, ki žalijo ali zasmehujejo vero, njene vernike ali to, kar imajo za sveto.",
   "home.questionRefusal.rule.SENSITIVE_TOPIC": "Spada pod razdelek „7. Dopustna uporaba“ naših Pogojev: ne vodimo razprav o samomoru, samopoškodovanju, evtanaziji ali pomoči pri umiranju, tudi ne kot o vprašanjih prava ali politike.",

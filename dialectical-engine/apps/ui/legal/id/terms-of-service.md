@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ringkasnya
-eyebrow: KETENTUAN LAYANAN · v2.5 · BERLAKU 12 OKTOBER 2026
+eyebrow: KETENTUAN LAYANAN · v2.6 · BERLAKU 27 NOVEMBER 2026
 title: Hal yang Anda setujui
 lede: Kontrak antara Anda dan DMS Merchandise Shop S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.
-endMarker: AKHIR KETENTUAN · v2.5
+endMarker: AKHIR KETENTUAN · v2.6
 bodyLabel: Teks Ketentuan Layanan
 annexTitle: Lampiran A — Ketentuan regional
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 HUKUM YANG BERLAKU
 -->
 
-**Version 2.5 · Effective 12 Oktober 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
+**Version 2.6 · Effective 27 November 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
 
 **In short.** Anda harus berusia 18 tahun atau lebih. Dialectical Engine menyusun argumen dengan model AI dan segala sesuatu yang dihasilkannya mungkin salah — ini bukan nasihat. Debat Anda bersifat privat kecuali Anda memublikasikannya; jika Anda memublikasikannya, siapa pun dapat membacanya. Teks yang Anda kirim diteruskan kepada penyedia AI yang tercantum dalam Daftar Penyedia kami, dan tidak digunakan untuk melatih model. Laporkan konten ilegal ke support@dezbatere.ro, baik Anda memiliki akun maupun tidak. Hukum Rumania berlaku, tetapi perlindungan konsumen setempat Anda tetap berlaku bagi Anda.
 
@@ -106,7 +106,7 @@ Aturan ini berlaku atas hal yang Anda kirimkan, cara Anda menggunakan layanan, d
 
 **Tidak boleh ada penghinaan agama.** Jangan mengirimkan atau memublikasikan konten yang menghina atau mengolok-olok suatu agama, pemeluknya, atau apa yang mereka anggap suci.
 
-**Pertanyaan yang tidak memulai debat.** Pemeriksaan pertanyaan kami (bagian 8) tidak memulai debat dari pertanyaan-pertanyaan ini, meskipun dirumuskan secara tidak langsung: pertanyaan yang mengancam, merencanakan, atau menanyakan apakah atau bagaimana menyakiti orang lain, disebutkan namanya atau tidak, termasuk serangan terhadap orang yang tidak disebutkan namanya; yang menanyakan cara membuat senjata, bahan peledak, racun, atau narkoba atau cara mendukung tindakan terorisme, atau memujinya; yang merupakan atau meminta ujaran kebencian atau penghinaan agama; dan yang tentang bunuh diri, menyakiti diri sendiri, eutanasia, atau kematian dengan bantuan sebagai topik hukum, etika, kedokteran, atau kesehatan masyarakat. Jenis terakhir tidak melanggar hukum dan tidak melanggar aturan di atas; kami menolaknya berdasarkan aturan ini. Pertanyaan yang terbaca seperti kata-kata orang yang sedang dalam krisis juga tidak memulai debat: Anda melihat nomor bantuan sebagai gantinya (bagian 10).
+**Pertanyaan yang tidak memulai debat.** Pemeriksaan pertanyaan kami (bagian 8) tidak memulai debat dari pertanyaan-pertanyaan ini, meskipun dirumuskan secara tidak langsung: pertanyaan yang mengancam, merencanakan, atau menanyakan apakah atau bagaimana menyakiti orang lain, disebutkan namanya atau tidak, termasuk serangan terhadap orang yang tidak disebutkan namanya; yang menanyakan cara membuat senjata, bahan peledak, racun, atau narkoba atau cara mendukung tindakan terorisme, atau memujinya; yang merupakan atau meminta ujaran kebencian atau penghinaan agama; dan yang tentang bunuh diri, menyakiti diri sendiri, eutanasia, atau kematian dengan bantuan sebagai topik hukum, etika, kedokteran, atau kesehatan masyarakat. Jenis terakhir tidak melanggar hukum dan tidak melanggar aturan di atas; kami menolaknya berdasarkan aturan ini. Pertanyaan yang terbaca seperti kata-kata orang yang sedang dalam krisis juga tidak memulai debat: Anda melihat nomor bantuan sebagai gantinya (bagian 10). Pertanyaan yang menanyakan cara melakukan kejahatan atau lolos dari hukumannya, atau apakah seseorang sebaiknya melakukan kejahatan, seperti membeli atau menjual narkoba atau senjata secara ilegal, mencuri, atau menghindari pajak, juga tidak memulai debat; pertanyaan tentang apakah suatu undang-undang sebaiknya diubah, seperti apakah ganja sebaiknya legal, tetap memulai debat.
 
 **Jangan menggunakan Dialectical Engine untuk menipu.** Jangan menyajikan keluaran yang dihasilkan sebagai tulisan manusia jika hal itu akan menyesatkan, menghapus label bahwa konten dihasilkan AI, atau menggunakannya untuk menciptakan kesan adanya konsensus, bukti palsu, atau penyamaran identitas.
 
@@ -238,6 +238,8 @@ Jika Anda tinggal di tempat lain, Lampiran A menyatakan hak penarikan diri atau 
 Kami memberi tahu Anda terlebih dahulu, pada media tahan lama, mengenai hal yang berubah dan waktu perubahan. Jika perubahan tersebut menimbulkan dampak negatif yang lebih dari kecil terhadap akses ke atau penggunaan layanan oleh Anda, Anda dapat mengakhiri layanan tanpa biaya dalam waktu **30 hari** sejak menerima pemberitahuan, atau sejak perubahan berlaku, mana yang lebih akhir, dan kami mengembalikan setiap jumlah yang telah dibayar di muka untuk periode yang tidak digunakan.
 
 **Pada Ketentuan ini.** Kami dapat mengubah Ketentuan ini untuk jenis alasan yang sama. Untuk perubahan yang tidak mengurangi hak Anda, kami memublikasikan versi baru beserta ringkasan perubahan dan mengirim email kepada Anda sekurang-kurangnya **30 hari** sebelum perubahan berlaku; jika Anda terus menggunakan Dialectical Engine setelah tanggal tersebut, berarti Anda menerimanya, dan Anda dapat menutup akun sebelumnya. Untuk perubahan yang mengurangi hak Anda — termasuk kenaikan harga pada paket yang sudah ada, batas yang lebih rendah, fitur yang dihapus, penggunaan baru atas konten Anda, atau perubahan pada tanggung jawab, hukum yang berlaku, maupun penyelesaian sengketa — kami meminta Anda menerima versi baru secara tegas saat masuk berikutnya, dan perubahan hanya berlaku untuk waktu mendatang. Kami tidak pernah memberlakukan perubahan secara surut, dan tidak pernah menggunakan bagian ini untuk mengubah inti dari hal yang telah Anda bayar di tengah masa berlaku tanpa menawarkan jalan keluar. Versi sebelumnya tetap tersedia di dezbatere.ro/terms/versions.
+
+Versi 2.6 menggantikan versi 2.5: pemeriksaan pertanyaan juga menolak pertanyaan yang menanyakan cara melakukan kejahatan atau lolos dari hukumannya, atau apakah seseorang sebaiknya melakukan kejahatan, seperti membeli atau menjual narkoba atau senjata secara ilegal, mencuri, atau menghindari pajak, dan tidak menyimpannya; pertanyaan tentang apakah suatu undang-undang sebaiknya diubah tetap memulai debat (bagian 7).
 
 Versi 2.5 menggantikan versi 2.4: versi ini menambahkan pemeriksaan pertanyaan, yang membaca setiap pertanyaan sebelum debat dimulai, menolak sebagian, dan menyimpan untuk dibaca tim kami setiap pertanyaan ditolak yang mengancam, merencanakan, atau menanyakan apakah atau bagaimana menyakiti orang lain, disebutkan namanya atau tidak, termasuk serangan terhadap orang yang tidak disebutkan namanya, atau yang menanyakan cara membuat senjata, bahan peledak, racun, atau narkoba atau cara mendukung tindakan terorisme, atau memujinya (bagian 7, 8, 10, dan 11); pemeriksaan yang membaca sintesis setiap debat yang telah selesai, persetujuan yang diperlukan debat yang ditandai sebelum dapat dipublikasikan, dan debat yang dihapus pemeriksaan itu (bagian 5, 8, 9, 10, dan 11); apa yang dikirim obrolan dukungan kepada model Claude milik Anthropic, bahwa obrolan itu tidak menyimpan apa pun dari yang Anda tulis dan tidak membuka kasus, dan bahwa tombol “Bicara dengan petugas” menampilkan alamat dukungan kami (bagian 8 dan 10); serta aturan pada bagian 7 yang melarang ujaran kebencian dalam bentuk apa pun, petunjuk pembuatan senjata atau narkoba, konten yang mendorong bunuh diri atau menyakiti orang lain, dan penghinaan agama, dan menyatakan pertanyaan mana yang tidak memulai debat.
 

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Īsumā
-eyebrow: PAKALPOJUMA NOTEIKUMI · v2.5 · SPĒKĀ NO 2026. GADA 12. OKTOBRA
+eyebrow: PAKALPOJUMA NOTEIKUMI · v2.6 · SPĒKĀ NO 2026. GADA 27. NOVEMBRA
 title: Kam jūs piekrītat
 lede: Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.
-endMarker: NOTEIKUMU BEIGAS · v2.5
+endMarker: NOTEIKUMU BEIGAS · v2.6
 bodyLabel: Pakalpojuma noteikumu teksts
 annexTitle: A pielikums — Reģionālie noteikumi
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PIEMĒROJAMIE TIESĪBU AKTI
 -->
 
-**Version 2.5 · Effective 2026. gada 12. oktobris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
+**Version 2.6 · Effective 2026. gada 27. novembris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
 
 **In short.** Jums jābūt vismaz 18 gadus vecam. Dialectical Engine veido argumentus ar MI modeļiem, un viss, ko tas ģenerē, var būt nepareizs — tā nav konsultācija. Jūsu debates ir privātas, ja vien tās nepublicējat; ja tās publicējat, ikviens tās var lasīt. Jūsu iesniegtais teksts tiek nosūtīts mūsu Pakalpojumu sniedzēju reģistrā norādītajiem MI pakalpojumu sniedzējiem un netiek izmantots modeļu apmācīšanai. Par nelikumīgu saturu ziņojiet uz support@dezbatere.ro neatkarīgi no tā, vai jums ir konts. Piemēro Rumānijas tiesību aktus, taču jums joprojām ir vietējā patērētāju aizsardzība.
 
@@ -106,7 +106,7 @@ Jebkurā laikā varat slēgt kontu sadaļā **Iestatījumi → Konts**. Slēgša
 
 **Nekādas reliģijas apvainošanas.** Neiesniedziet un nepublicējiet saturu, kas apvaino vai izsmej reliģiju, tās piekritējus vai to, ko viņi uzskata par svētu.
 
-**Jautājumi, kas neļauj debatēm sākties.** Mūsu jautājumu pārbaude (8. sadaļa) neļauj debatēm sākties no šādiem jautājumiem, pat ja tie formulēti netieši: jautājums, kas draud nodarīt kaitējumu citam cilvēkam vai citiem cilvēkiem, nosaucot viņus vai nenosaucot, tostarp uzbrukumu nenosauktiem cilvēkiem, plāno šādu kaitējumu vai jautā, vai un kā to nodarīt; jautājums, kas jautā, kā izgatavot ieročus, sprāgstvielas, indes vai narkotikas vai kā atbalstīt teroristisku aktu, vai kas to slavina; jautājums, kas ir naida runa vai reliģiska apvainošana vai tādu pieprasa; un jautājums par pašnāvību, paškaitējumu, eitanāziju vai asistēto miršanu kā tiesību, ētikas, medicīnas vai sabiedrības veselības tēmu. Pēdējais veids nav nelikumīgs un nepārkāpj nevienu no iepriekš minētajiem noteikumiem; mēs to noraidām saskaņā ar šo noteikumu. Arī jautājums, kas skan kā krīzē esoša cilvēka vārdi, neļauj debatēm sākties: tā vietā redzat palīdzības tālruņu numurus (10. sadaļa).
+**Jautājumi, kas neļauj debatēm sākties.** Mūsu jautājumu pārbaude (8. sadaļa) neļauj debatēm sākties no šādiem jautājumiem, pat ja tie formulēti netieši: jautājums, kas draud nodarīt kaitējumu citam cilvēkam vai citiem cilvēkiem, nosaucot viņus vai nenosaucot, tostarp uzbrukumu nenosauktiem cilvēkiem, plāno šādu kaitējumu vai jautā, vai un kā to nodarīt; jautājums, kas jautā, kā izgatavot ieročus, sprāgstvielas, indes vai narkotikas vai kā atbalstīt teroristisku aktu, vai kas to slavina; jautājums, kas ir naida runa vai reliģiska apvainošana vai tādu pieprasa; un jautājums par pašnāvību, paškaitējumu, eitanāziju vai asistēto miršanu kā tiesību, ētikas, medicīnas vai sabiedrības veselības tēmu. Pēdējais veids nav nelikumīgs un nepārkāpj nevienu no iepriekš minētajiem noteikumiem; mēs to noraidām saskaņā ar šo noteikumu. Arī jautājums, kas skan kā krīzē esoša cilvēka vārdi, neļauj debatēm sākties: tā vietā redzat palīdzības tālruņu numurus (10. sadaļa). Debatēm neļauj sākties arī jautājums par to, kā izdarīt noziegumu vai izvairīties no soda par to, vai par to, vai kādam vajadzētu izdarīt noziegumu, piemēram, nelikumīgi pirkt vai pārdot narkotikas vai ieročus, zagt vai izvairīties no nodokļu nomaksas; jautājums par to, vai kāds likums būtu jāmaina, piemēram, vai kaņepēm vajadzētu būt legālām, joprojām ļauj debatēm sākties.
 
 **Neizmantojiet Dialectical Engine maldināšanai.** Neuzdodiet ģenerēto rezultātu par cilvēka rakstītu, ja tas maldinātu, nenoņemiet MI ģenerēta satura marķējumu un neizmantojiet to šķietamas vienprātības, viltotu pierādījumu vai citas personas atdarināšanas radīšanai.
 
@@ -238,6 +238,8 @@ Ja dzīvojat citviet, A pielikumā norādītas jūsu reģionā piemērojamās at
 Mēs pastāvīgā informācijas nesējā iepriekš paziņojam, kas un kad mainīsies. Ja izmaiņas vairāk nekā nebūtiski nelabvēlīgi ietekmē jūsu piekļuvi pakalpojumam vai tā lietošanu, varat bez maksas izbeigt līgumu **30 dienu laikā** pēc paziņojuma saņemšanas vai izmaiņu stāšanās spēkā atkarībā no tā, kurš datums ir vēlāks, un mēs atmaksājam iepriekš samaksāto summu par neizmantoto periodu.
 
 **Šo Noteikumu izmaiņas.** Mēs varam mainīt šos Noteikumus tādu pašu iemeslu dēļ. Attiecībā uz izmaiņām, kas nesamazina jūsu tiesības, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un vismaz **30 dienu iepriekš** nosūtām jums e-pasta ziņojumu par tās stāšanos spēkā; turpinot lietot Dialectical Engine pēc šī datuma, jūs izmaiņām piekrītat, un pirms tam varat slēgt kontu. Attiecībā uz izmaiņām, kas samazina jūsu tiesības, — tostarp esoša plāna cenas paaugstinājumu, zemākiem ierobežojumiem, noņemtām funkcijām, jauniem jūsu satura lietošanas veidiem vai izmaiņām atbildībā, piemērojamajos tiesību aktos vai strīdu izšķiršanā — mēs lūdzam nākamajā pierakstīšanās reizē skaidri piekrist jaunajai versijai, un izmaiņas attiecas tikai uz turpmāko laiku. Mēs nekad neveicam izmaiņas ar atpakaļejošu spēku un nekad neizmantojam šo sadaļu, lai termiņa vidū mainītu jums apmaksātā pakalpojuma būtību, nepiedāvājot iespēju izstāties. Iepriekšējās versijas ir pieejamas vietnē dezbatere.ro/terms/versions.
+
+Versija 2.6 aizstāja versiju 2.5: jautājumu pārbaude noraida arī jautājumu par to, kā izdarīt noziegumu vai izvairīties no soda par to, vai par to, vai kādam vajadzētu izdarīt noziegumu, piemēram, nelikumīgi pirkt vai pārdot narkotikas vai ieročus, zagt vai izvairīties no nodokļu nomaksas, un to nesaglabā; jautājums par to, vai kāds likums būtu jāmaina, joprojām ļauj debatēm sākties (7. sadaļa).
 
 Versija 2.5 aizstāja versiju 2.4: tā pievieno jautājumu pārbaudi, kas izlasa katru jautājumu pirms debašu sākuma, dažus noraida un mūsu komandas izlasīšanai glabā katru noraidītu jautājumu, kas draud nodarīt kaitējumu citam cilvēkam vai citiem cilvēkiem, nosaucot viņus vai nenosaucot, tostarp uzbrukumu nenosauktiem cilvēkiem, plāno šādu kaitējumu vai jautā, vai un kā to nodarīt, vai kas jautā, kā izgatavot ieročus, sprāgstvielas, indes vai narkotikas vai kā atbalstīt teroristisku aktu, vai kas to slavina (7., 8., 10. un 11. sadaļa); pārbaudi, kas izlasa katru noslēgto debašu sintēzi, apstiprinājumu, kas atzīmētām debatēm nepieciešams pirms to publicēšanas, un debates, ko šī pārbaude izdzēš (5., 8., 9., 10. un 11. sadaļa); to, ko atbalsta tērzēšana nosūta Anthropic modelim Claude, ka tā neglabā neko no tā, ko rakstāt, un neatver lietu, un to, ka tās poga „Runāt ar cilvēku” parāda mūsu atbalsta adresi (8. un 10. sadaļa); un 7. sadaļas noteikumus, kas aizliedz jebkāda veida naida runu, norādījumus par ieroču vai narkotiku izgatavošanu, saturu, kas mudina uz pašnāvību vai kaitējuma nodarīšanu citiem cilvēkiem, un reliģisku apvainošanu, kā arī norāda, kuri jautājumi neļauj debatēm sākties.
 

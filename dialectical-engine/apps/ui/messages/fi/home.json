@@ -128,6 +128,7 @@
   "home.questionRefusal.automatic": "Automaattinen tarkistuksemme hylkäsi sen. Päätöksessä ei ollut mukana yhtään henkilöä.",
   "home.questionRefusal.rule.HARM_TO_OTHERS": "Se kuuluu Ehtojemme kohtaan ”7. Hyväksyttävä käyttö”: emme järjestä väittelyjä ihmisten vahingoittamisesta, uhkaamisesta tai heihin hyökkäämisestä.",
   "home.questionRefusal.rule.WEAPONS_DRUGS_TERRORISM": "Se kuuluu Ehtojemme kohtaan ”7. Hyväksyttävä käyttö”: emme järjestä väittelyjä aseiden, räjähteiden, myrkkyjen tai huumeiden valmistamisesta emmekä väittelyjä, jotka tukevat tai ylistävät terrorismia.",
+  "home.questionRefusal.rule.CRIME": "Se kuuluu Ehtojemme kohtaan ”7. Hyväksyttävä käyttö”: emme järjestä väittelyjä siitä, miten rikos tehdään tai miten siitä selvitään rangaistuksetta, emmekä siitä, pitäisikö jonkun tehdä rikos.",
   "home.questionRefusal.rule.HATE_SPEECH": "Se kuuluu Ehtojemme kohtaan ”7. Hyväksyttävä käyttö”: emme järjestä väittelyjä, jotka hyökkäävät ihmisiä vastaan tai halventavat heitä sen vuoksi, keitä he ovat.",
   "home.questionRefusal.rule.RELIGIOUS_INSULT": "Se kuuluu Ehtojemme kohtaan ”7. Hyväksyttävä käyttö”: emme järjestä väittelyjä, jotka loukkaavat tai pilkkaavat uskontoa, sen uskovia tai sitä, mitä he pitävät pyhänä.",
   "home.questionRefusal.rule.SENSITIVE_TOPIC": "Se kuuluu Ehtojemme kohtaan ”7. Hyväksyttävä käyttö”: emme järjestä väittelyjä itsemurhasta, itsensä vahingoittamisesta, eutanasiasta tai avustetusta kuolemasta, emme edes lakiin tai politiikkaan liittyvinä kysymyksinä.",

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Trumpai
-eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.5 · ĮSIGALIOJA 2026 M. SPALIO 12 D.
+eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.6 · ĮSIGALIOJA 2026 M. LAPKRIČIO 27 D.
 title: Su kuo sutinkate
 lede: Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.
-endMarker: SĄLYGŲ PABAIGA · v2.5
+endMarker: SĄLYGŲ PABAIGA · v2.6
 bodyLabel: Paslaugų teikimo sąlygų tekstas
 annexTitle: A priedas — Regioninės sąlygos
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TAIKYTINA TEISĖ
 -->
 
-**Version 2.5 · Effective 2026 m. spalio 12 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
+**Version 2.6 · Effective 2026 m. lapkričio 27 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
 
 **In short.** Turite būti ne jaunesni kaip 18 metų. Dialectical Engine kuria argumentus naudodama DI modelius, todėl viskas, ką ji sugeneruoja, gali būti klaidinga — tai nėra konsultacija. Jūsų debatai yra privatūs, nebent juos paskelbiate; paskelbtus debatus gali skaityti bet kas. Jūsų pateiktas tekstas siunčiamas mūsų Paslaugų teikėjų registre nurodytiems DI paslaugų teikėjams ir nenaudojamas modeliams mokyti. Apie neteisėtą turinį praneškite adresu support@dezbatere.ro, nesvarbu, ar turite paskyrą. Taikoma Rumunijos teisė, tačiau jums ir toliau taikoma vietos vartotojų apsauga.
 
@@ -106,7 +106,7 @@ Savo paskyrą galite bet kada uždaryti pasirinkę **Nustatymai → Paskyra**. U
 
 **Draudžiamas religijos įžeidimas.** Nepateikite ir neskelbkite turinio, kuris įžeidžia ar tyčiojasi iš religijos, jos išpažinėjų ar to, ką jie laiko šventu.
 
-**Klausimai, dėl kurių debatai neprasideda.** Mūsų klausimų patikra (8 skyrius) nepradeda debatų iš šių klausimų, net jei jie suformuluoti netiesiogiai: klausimas, kuriame grasinama pakenkti vienam ar keliems kitiems žmonėms, įvardytiems ar ne, įskaitant išpuolį prieš neįvardytus žmones, planuojama tai padaryti arba klausiama, ar ir kaip jiems pakenkti; klausimas, kuriame klausiama, kaip pagaminti ginklų, sprogmenų, nuodų ar narkotikų arba kaip paremti teroro aktą, arba kuris jį šlovina; klausimas, kuris yra neapykantos kalba ar religijos įžeidimas arba jų prašo; ir klausimas apie savižudybę, savęs žalojimą, eutanaziją ar padėjimą mirti kaip teisės, etikos, medicinos ar visuomenės sveikatos temą. Paskutinė rūšis nėra neteisėta ir nepažeidžia jokių pirmiau nurodytų taisyklių; mes ją atmetame pagal šią taisyklę. Klausimas, kuris primena krizę patiriančio žmogaus žodžius, taip pat nepradeda debatų: vietoje to matote pagalbos telefonų numerius (10 skyrius).
+**Klausimai, dėl kurių debatai neprasideda.** Mūsų klausimų patikra (8 skyrius) nepradeda debatų iš šių klausimų, net jei jie suformuluoti netiesiogiai: klausimas, kuriame grasinama pakenkti vienam ar keliems kitiems žmonėms, įvardytiems ar ne, įskaitant išpuolį prieš neįvardytus žmones, planuojama tai padaryti arba klausiama, ar ir kaip jiems pakenkti; klausimas, kuriame klausiama, kaip pagaminti ginklų, sprogmenų, nuodų ar narkotikų arba kaip paremti teroro aktą, arba kuris jį šlovina; klausimas, kuris yra neapykantos kalba ar religijos įžeidimas arba jų prašo; ir klausimas apie savižudybę, savęs žalojimą, eutanaziją ar padėjimą mirti kaip teisės, etikos, medicinos ar visuomenės sveikatos temą. Paskutinė rūšis nėra neteisėta ir nepažeidžia jokių pirmiau nurodytų taisyklių; mes ją atmetame pagal šią taisyklę. Klausimas, kuris primena krizę patiriančio žmogaus žodžius, taip pat nepradeda debatų: vietoje to matote pagalbos telefonų numerius (10 skyrius). Debatų nepradeda ir klausimas, kaip padaryti nusikaltimą ar išvengti už jį bausmės, arba ar kas nors turėtų jį padaryti, pavyzdžiui, neteisėtai pirkti ar parduoti narkotikus ar ginklus, vogti ar vengti mokėti mokesčius; klausimas, ar reikėtų pakeisti kokį nors įstatymą, pavyzdžiui, ar kanapės turėtų būti legalios, ir toliau pradeda debatus.
 
 **Nenaudokite Dialectical Engine apgaulei.** Nepateikite sugeneruoto rezultato kaip parašyto žmogaus, kai tai klaidintų, nepašalinkite žymos, kad turinys sugeneruotas DI, ir nenaudokite jo tariamam sutarimui, melagingiems įrodymams ar apsimetimui kitu asmeniu sukurti.
 
@@ -238,6 +238,8 @@ Jei gyvenate kitur, A priede nurodyta jūsų regione taikoma teisė atsisakyti s
 Patvariojoje laikmenoje iš anksto pranešame, kas ir kada keisis. Jei pakeitimas turi didesnį nei nedidelį neigiamą poveikį jūsų prieigai prie paslaugos ar naudojimuisi ja, galite nemokamai nutraukti sutartį per **30 dienų** nuo pranešimo gavimo arba pakeitimo įsigaliojimo dienos, atsižvelgiant į tai, kuri data vėlesnė, o mes grąžinsime visas iš anksto už nepanaudotą laikotarpį sumokėtas sumas.
 
 **Šių Sąlygų pakeitimai.** Šias Sąlygas galime keisti dėl tokių pačių priežasčių. Jei pakeitimai nesumažina jūsų teisių, paskelbiame naują versiją su pakeitimų santrauka ir išsiunčiame jums el. laišką bent prieš **30 dienų** iki jos įsigaliojimo; jei po tos dienos toliau naudositės Dialectical Engine, tai reikš, kad su pakeitimais sutinkate, o iki tol galite uždaryti paskyrą. Jei pakeitimais sumažinamos jūsų teisės — įskaitant esamo plano kainos padidinimą, mažesnes ribas, pašalintas funkcijas, naujus jūsų turinio naudojimo būdus arba atsakomybės, taikytinos teisės ar ginčų sprendimo pakeitimus — kitą kartą prisijungus prašome aiškiai sutikti su nauja versija, o pakeitimas taikomas tik ateityje. Niekada netaikome pakeitimo atgaline data ir niekada nesinaudojame šiuo skyriumi tam, kad sutarties laikotarpio viduryje pakeistume esminius dalykus, už kuriuos sumokėjote, nepasiūlydami galimybės atsisakyti sutarties. Ankstesnes versijas galima rasti adresu dezbatere.ro/terms/versions.
+
+2.6 versija pakeitė 2.5 versiją: mūsų klausimų patikra taip pat atmeta klausimą, kaip padaryti nusikaltimą ar išvengti už jį bausmės, arba ar kas nors turėtų jį padaryti, pavyzdžiui, neteisėtai pirkti ar parduoti narkotikus ar ginklus, vogti ar vengti mokėti mokesčius, ir jo nesaugo; klausimas, ar reikėtų pakeisti kokį nors įstatymą, ir toliau pradeda debatus (7 skyrius).
 
 2.5 versija pakeitė 2.4 versiją: ji prideda klausimų patikrą, kuri perskaito kiekvieną klausimą prieš debatų pradžią, kai kuriuos atmeta ir mūsų komandos perskaitymui saugo kiekvieną atmestą klausimą, kuriame grasinama pakenkti vienam ar keliems kitiems žmonėms, įvardytiems ar ne, įskaitant išpuolį prieš neįvardytus žmones, planuojama tai padaryti arba klausiama, ar ir kaip jiems pakenkti, arba kuriame klausiama, kaip pagaminti ginklų, sprogmenų, nuodų ar narkotikų arba kaip paremti teroro aktą, arba kuris jį šlovina (7, 8, 10 ir 11 skyriai); patikrą, kuri perskaito kiekvienų pasibaigusių debatų apibendrinimą, pritarimą, kurio reikia pažymėtiems debatams prieš juos paskelbiant, ir debatus, kuriuos ta patikra ištrina (5, 8, 9, 10 ir 11 skyriai); tai, ką pagalbos pokalbis siunčia Anthropic modeliui Claude, kad jis nesaugo nieko, ką rašote, ir neatidaro atvejo, ir kad jo mygtukas „Kalbėtis su žmogumi“ parodo mūsų pagalbos adresą (8 ir 10 skyriai); ir 7 skyriaus taisykles, kurios draudžia bet kokios rūšies neapykantos kalbą, ginklų ar narkotikų gaminimo instrukcijas, turinį, skatinantį savižudybę arba kenkimą kitiems žmonėms, ir religijos įžeidimą bei nurodo, dėl kokių klausimų debatai neprasideda.
 

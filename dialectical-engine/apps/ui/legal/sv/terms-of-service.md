@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort sagt
-eyebrow: ANVÄNDARVILLKOR · v2.5 · GÄLLER FRÅN 12 OKTOBER 2026
+eyebrow: ANVÄNDARVILLKOR · v2.6 · GÄLLER FRÅN 27 NOVEMBER 2026
 title: Vad du godkänner
 lede: Avtalet mellan dig och DMS Merchandise Shop S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.
-endMarker: SLUT PÅ VILLKOREN · v2.5
+endMarker: SLUT PÅ VILLKOREN · v2.6
 bodyLabel: Användarvillkorens text
 annexTitle: Bilaga A — Regionala villkor
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TILLÄMPLIG LAG
 -->
 
-**Version 2.5 · Effective 12 oktober 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
+**Version 2.6 · Effective 27 november 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
 
 **In short.** Du måste ha fyllt 18 år. Dialectical Engine bygger argument med AI-modeller, och allt som tjänsten genererar kan vara felaktigt — det är inte rådgivning. Dina debatter är privata om du inte publicerar dem; om du publicerar kan vem som helst läsa dem. Text som du skickar in överförs till de AI-leverantörer som anges i vårt register över AI-leverantörer och används inte för att träna modeller. Rapportera olagligt innehåll till support@dezbatere.ro, oavsett om du har ett konto eller inte. Rumänsk lag är tillämplig, men du behåller ditt lokala konsumentskydd.
 
@@ -106,7 +106,7 @@ Dessa regler gäller för vad du skickar in, hur du använder tjänsten och vad 
 
 **Ingen förolämpning av religion.** Skicka inte in eller publicera innehåll som förolämpar eller hånar en religion, dess anhängare eller det de håller heligt.
 
-**Frågor som inte startar en debatt.** Vår frågekontroll (avsnitt 8) startar ingen debatt utifrån dessa frågor, även om de är formulerade indirekt: en fråga som hotar att skada, planerar att skada eller frågar om eller hur man ska skada en annan person eller andra personer, namngivna eller inte, inklusive ett angrepp på ej namngivna personer; en som frågar hur man tillverkar vapen, sprängämnen, gifter eller droger eller hur man stöder en terrorhandling, eller som hyllar en sådan; en som är eller begär hatretorik eller förolämpning av religion; och en om självmord, självskada, dödshjälp eller assisterat döende som ämne för juridik, etik, medicin eller folkhälsa. Den sista sorten är inte olaglig och bryter inte mot någon av reglerna ovan; vi avvisar den enligt denna regel. En fråga som låter som ord från en person i kris startar inte heller en debatt: du ser hjälpnummer i stället (avsnitt 10).
+**Frågor som inte startar en debatt.** Vår frågekontroll (avsnitt 8) startar ingen debatt utifrån dessa frågor, även om de är formulerade indirekt: en fråga som hotar att skada, planerar att skada eller frågar om eller hur man ska skada en annan person eller andra personer, namngivna eller inte, inklusive ett angrepp på ej namngivna personer; en som frågar hur man tillverkar vapen, sprängämnen, gifter eller droger eller hur man stöder en terrorhandling, eller som hyllar en sådan; en som är eller begär hatretorik eller förolämpning av religion; och en om självmord, självskada, dödshjälp eller assisterat döende som ämne för juridik, etik, medicin eller folkhälsa. Den sista sorten är inte olaglig och bryter inte mot någon av reglerna ovan; vi avvisar den enligt denna regel. En fråga som låter som ord från en person i kris startar inte heller en debatt: du ser hjälpnummer i stället (avsnitt 10). En fråga om hur man begår ett brott eller kommer undan med det, eller om någon borde begå ett, till exempel att köpa eller sälja droger eller vapen olagligt, stjäla eller undandra skatt, startar inte heller en debatt; en fråga om huruvida en lag borde ändras, till exempel om cannabis borde vara lagligt, startar fortfarande en debatt.
 
 **Använd inte Dialectical Engine för att vilseleda.** Framställ inte genererat material som människoskapat när det skulle vara vilseledande, ta inte bort märkningen om AI-generering och använd inte materialet för att skapa skenbar enighet eller fabricerade bevis, eller för att utge dig för att vara någon annan.
 
@@ -238,6 +238,8 @@ Om du bor någon annanstans anger bilaga A den ånger- eller betänketid som gä
 Vi underrättar dig i förväg, på ett varaktigt medium, om vad som ändras och när. Om ändringen har mer än en mindre negativ inverkan på din åtkomst till eller användning av tjänsten får du säga upp avtalet utan kostnad inom **30 dagar** från det att du underrättades eller från det att ändringen trädde i kraft, beroende på vilket som inträffar senare, och vi återbetalar eventuellt förskottsbetalt belopp för den oanvända perioden.
 
 **Dessa villkor.** Vi får ändra dessa villkor av samma slags skäl. Vid ändringar som inte minskar dina rättigheter publicerar vi den nya versionen tillsammans med en sammanfattning av ändringarna och skickar e-post till dig minst **30 dagar** innan ändringen träder i kraft; om du fortsätter att använda Dialectical Engine efter det datumet innebär det att du godkänner ändringen, och du får avsluta ditt konto före dess. Vid ändringar som minskar dina rättigheter — däribland prishöjningar för ett befintligt abonnemang, lägre gränser, borttagna funktioner, ny användning av ditt innehåll eller ändringar av ansvar, tillämplig lag eller tvistlösning — ber vi dig uttryckligen godkänna den nya versionen nästa gång du loggar in, och ändringen gäller endast framåt i tiden. Vi gör aldrig en ändring retroaktiv och använder aldrig detta avsnitt för att ändra kärnan i det som du har betalat för under en pågående avtalsperiod utan att erbjuda dig en utväg. Tidigare versioner finns kvar på dezbatere.ro/terms/versions.
+
+Version 2.6 ersatte version 2.5: frågekontrollen avvisar också en fråga om hur man begår ett brott eller kommer undan med det, eller om någon borde begå ett, till exempel att köpa eller sälja droger eller vapen olagligt, stjäla eller undandra skatt, och sparar den inte; en fråga om huruvida en lag borde ändras startar fortfarande en debatt (avsnitt 7).
 
 Version 2.5 ersatte version 2.4: den lägger till frågekontrollen, som läser varje fråga innan en debatt startar, avvisar vissa och behåller för vårt team att läsa varje avvisad fråga som hotar att skada, planerar att skada eller frågar om eller hur man ska skada en annan person eller andra personer, namngivna eller inte, inklusive ett angrepp på ej namngivna personer, eller som frågar hur man tillverkar vapen, sprängämnen, gifter eller droger eller hur man stöder en terrorhandling, eller som hyllar en sådan (avsnitt 7, 8, 10 och 11); kontrollen som läser syntesen av varje avslutad debatt, godkännandet som en markerad debatt behöver innan den kan publiceras och de debatter som den kontrollen raderar (avsnitt 5, 8, 9, 10 och 11); vad supportchatten skickar till modellen Claude hos Anthropic, att den inte behåller något av det du skriver och inte öppnar något ärende, och att dess knapp ”Prata med en person” visar vår supportadress (avsnitt 8 och 10); samt regler i avsnitt 7 som förbjuder hatretorik av alla slag, instruktioner för tillverkning av vapen eller droger, innehåll som uppmuntrar till självmord eller till att skada andra människor och förolämpning av religion, och som anger vilka frågor som inte startar en debatt.
 

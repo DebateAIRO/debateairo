@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: En resumen
-eyebrow: TÉRMINOS DE SERVICIO · v2.5 · EN VIGOR DESDE 12 DE OCTUBRE DE 2026
+eyebrow: TÉRMINOS DE SERVICIO · v2.6 · EN VIGOR DESDE 27 DE NOVIEMBRE DE 2026
 title: Lo que usted acepta
 lede: El contrato entre usted y DMS Merchandise Shop S.R.L., en lenguaje claro. Diecinueve secciones y el anexo A — desplácese hasta el final.
-endMarker: FIN DE LOS TÉRMINOS · v2.5
+endMarker: FIN DE LOS TÉRMINOS · v2.6
 bodyLabel: Texto de los Términos de servicio
 annexTitle: Anexo A — Términos regionales
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEY APLICABLE
 -->
 
-**Version 2.5 · Effective 12 de octubre de 2026 · Versiones anteriores en dezbatere.ro/terms/versions · Idioma: español.**
+**Version 2.6 · Effective 27 de noviembre de 2026 · Versiones anteriores en dezbatere.ro/terms/versions · Idioma: español.**
 
 **In short.** Debe tener al menos 18 años. Dialectical Engine elabora argumentos mediante modelos de IA y todo lo que genera puede ser erróneo; no constituye asesoramiento. Sus debates son privados salvo que los publique; si los publica, cualquiera podrá leerlos. El texto que envía se remite a los proveedores de IA incluidos en nuestro Registro de proveedores y no se utiliza para entrenar modelos. Denuncie contenido ilícito en support@dezbatere.ro, tenga o no una cuenta. Se aplica la legislación rumana, pero usted conserva la protección local que le corresponda como consumidor.
 
@@ -106,7 +106,7 @@ Estas normas se aplican a lo que envía, a cómo utiliza el servicio y a lo que 
 
 **Prohibido el insulto religioso.** No envíe ni publique contenido que insulte o ridiculice una religión, a sus creyentes o aquello que consideran sagrado.
 
-**Preguntas con las que no empieza un debate.** Nuestra comprobación de preguntas (sección 8) no inicia un debate a partir de estas preguntas, aunque estén formuladas de manera indirecta: una pregunta que amenaza, planea o pregunta si o cómo causar daño a otra persona o a otras personas, con nombre o sin él, incluido un ataque contra personas sin nombre; una que pregunta cómo fabricar armas, explosivos, venenos o drogas o cómo apoyar un acto terrorista, o que hace apología de él; una que es discurso de odio o insulto religioso, o que lo pide; y una sobre el suicidio, la autolesión, la eutanasia o la muerte asistida como tema de derecho, ética, medicina o salud pública. El último tipo no es ilícito y no infringe ninguna de las normas anteriores; lo rechazamos en virtud de esta norma. Una pregunta que se lee como las palabras de una persona en crisis tampoco inicia un debate: verá números de ayuda en su lugar (sección 10).
+**Preguntas con las que no empieza un debate.** Nuestra comprobación de preguntas (sección 8) no inicia un debate a partir de estas preguntas, aunque estén formuladas de manera indirecta: una pregunta que amenaza, planea o pregunta si o cómo causar daño a otra persona o a otras personas, con nombre o sin él, incluido un ataque contra personas sin nombre; una que pregunta cómo fabricar armas, explosivos, venenos o drogas o cómo apoyar un acto terrorista, o que hace apología de él; una que es discurso de odio o insulto religioso, o que lo pide; y una sobre el suicidio, la autolesión, la eutanasia o la muerte asistida como tema de derecho, ética, medicina o salud pública. El último tipo no es ilícito y no infringe ninguna de las normas anteriores; lo rechazamos en virtud de esta norma. Una pregunta que se lee como las palabras de una persona en crisis tampoco inicia un debate: verá números de ayuda en su lugar (sección 10). Una pregunta sobre cómo cometer un delito o quedar impune, o sobre si alguien debería cometer uno, como comprar o vender drogas o armas ilegalmente, robar o evadir impuestos, tampoco inicia un debate; una pregunta sobre si debería cambiar una ley, como si el cannabis debería ser legal, sí inicia un debate.
 
 **No utilice Dialectical Engine para engañar.** No presente resultados generados como si hubieran sido escritos por una persona cuando ello pudiera inducir a error, no elimine la etiqueta de contenido generado por IA ni los utilice para fabricar un consenso aparente, pruebas falsas o suplantaciones de identidad.
 
@@ -238,6 +238,8 @@ Si vive en otro lugar, el anexo A indica el derecho de desistimiento o período 
 Le informaremos de antemano, en un soporte duradero, de qué va a cambiar y cuándo. Si el cambio tiene un efecto negativo que no sea menor sobre su acceso al servicio o su uso, podrá resolver el contrato sin coste alguno en un plazo de **30 días** desde que se le informe o desde que el cambio surta efecto, si esta fecha es posterior, y le reembolsaremos cualquier importe pagado por adelantado correspondiente al período no utilizado.
 
 **En estos Términos.** Podemos modificar estos Términos por los mismos tipos de motivos. Para los cambios que no reduzcan sus derechos, publicaremos la nueva versión con un resumen de las modificaciones y le enviaremos un correo electrónico al menos **30 días** antes de que entre en vigor; si continúa utilizando Dialectical Engine después de esa fecha, se entenderá que la acepta, y puede cerrar su cuenta antes de entonces. Para los cambios que reduzcan sus derechos —incluidos aumentos de precio de un plan existente, límites inferiores, funciones retiradas, nuevos usos de su contenido o cambios en la responsabilidad, la ley aplicable o la resolución de controversias—, le pediremos que acepte expresamente la nueva versión la próxima vez que inicie sesión, y el cambio solo se aplicará en lo sucesivo. Nunca aplicamos cambios con carácter retroactivo ni utilizamos esta sección para modificar, durante la vigencia del contrato, la esencia de aquello por lo que ha pagado sin ofrecerle una vía de salida. Las versiones anteriores seguirán disponibles en dezbatere.ro/terms/versions.
+
+La versión 2.6 sustituyó a la versión 2.5: la comprobación de preguntas también rechaza una pregunta sobre cómo cometer un delito o quedar impune, o sobre si alguien debería cometer uno, como comprar o vender drogas o armas ilegalmente, robar o evadir impuestos, y no la conserva; una pregunta sobre si debería cambiar una ley sigue iniciando un debate (sección 7).
 
 La versión 2.5 sustituyó a la versión 2.4: añade la comprobación de preguntas, que lee cada pregunta antes de que empiece un debate, rechaza algunas y conserva, para que las lea nuestro equipo, cada pregunta rechazada que amenaza, planea o pregunta si o cómo causar daño a otra persona o a otras personas, con nombre o sin él, incluido un ataque contra personas sin nombre, o que pregunta cómo fabricar armas, explosivos, venenos o drogas o cómo apoyar un acto terrorista, o que hace apología de él (secciones 7, 8, 10 y 11); la comprobación que lee la síntesis de cada debate terminado, la aprobación que necesita un debate marcado antes de poder publicarse y los debates que esa comprobación elimina (secciones 5, 8, 9, 10 y 11); qué envía el chat de soporte al modelo Claude de Anthropic, que no conserva nada de lo que usted escribe y no abre ningún caso, y que su botón «Hablar con una persona» muestra nuestra dirección de soporte (secciones 8 y 10); y normas de la sección 7 que prohíben el discurso de odio de cualquier tipo, las instrucciones de fabricación de armas o drogas, el contenido que incite al suicidio o a dañar a otras personas y el insulto religioso, e indican qué preguntas no inician un debate.
 

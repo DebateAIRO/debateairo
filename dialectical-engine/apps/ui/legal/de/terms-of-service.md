@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kurz gesagt
-eyebrow: NUTZUNGSBEDINGUNGEN · v2.5 · GÜLTIG AB 12. OKTOBER 2026
+eyebrow: NUTZUNGSBEDINGUNGEN · v2.6 · GÜLTIG AB 27. NOVEMBER 2026
 title: Womit Sie sich einverstanden erklären
 lede: Der Vertrag zwischen Ihnen und DMS Merchandise Shop S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.
-endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.5
+endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.6
 bodyLabel: Text der Nutzungsbedingungen
 annexTitle: Anhang A – Regionale Bestimmungen
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ANWENDBARES RECHT
 -->
 
-**Version 2.5 · Effective 12. Oktober 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
+**Version 2.6 · Effective 27. November 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
 
 **In short.** Sie müssen mindestens 18 Jahre alt sein. Dialectical Engine erstellt Argumente mithilfe von KI-Modellen, und alles, was es erzeugt, kann falsch sein – es handelt sich nicht um Beratung. Ihre Debatten sind privat, sofern Sie sie nicht veröffentlichen; wenn Sie sie veröffentlichen, kann jede Person sie lesen. Von Ihnen übermittelter Text wird an die in unserem Verzeichnis aufgeführten KI-Anbieter gesendet und nicht zum Trainieren von Modellen verwendet. Melden Sie rechtswidrige Inhalte unter support@dezbatere.ro, unabhängig davon, ob Sie ein Konto haben. Es gilt rumänisches Recht, Ihre örtlichen Verbraucherschutzrechte bleiben Ihnen jedoch erhalten.
 
@@ -106,7 +106,7 @@ Diese Regeln gelten für Ihre Eingaben, Ihre Nutzung des Dienstes und Ihre Verö
 
 **Religiöse Beleidigungen sind verboten.** Übermitteln oder veröffentlichen Sie keine Inhalte, die eine Religion, ihre Gläubigen oder das, was ihnen heilig ist, beleidigen oder verspotten.
 
-**Fragen, mit denen keine Debatte beginnt.** Unsere Fragenprüfung (Abschnitt 8) beginnt aus diesen Fragen keine Debatte, auch wenn sie indirekt formuliert sind: eine Frage, die droht, plant oder fragt, ob oder wie man einer anderen Person oder anderen Personen schaden kann, ob namentlich genannt oder nicht, einschließlich eines Angriffs auf nicht genannte Personen; eine, die fragt, wie man Waffen, Sprengstoffe, Gifte oder Drogen herstellt oder wie man einen terroristischen Akt unterstützt, oder die einen solchen verherrlicht; eine, die Hassrede oder religiöse Beleidigung ist oder darum bittet; und eine über Suizid, Selbstverletzung, Euthanasie oder Sterbehilfe als Gegenstand von Recht, Ethik, Medizin oder öffentlicher Gesundheit. Die letzte Art ist nicht rechtswidrig und verstößt gegen keine der obigen Regeln; wir lehnen sie aufgrund dieser Regel ab. Auch eine Frage, die sich wie die Worte einer Person in einer Krise liest, lässt keine Debatte beginnen: Sie sehen stattdessen Hilfsnummern (Abschnitt 10).
+**Fragen, mit denen keine Debatte beginnt.** Unsere Fragenprüfung (Abschnitt 8) beginnt aus diesen Fragen keine Debatte, auch wenn sie indirekt formuliert sind: eine Frage, die droht, plant oder fragt, ob oder wie man einer anderen Person oder anderen Personen schaden kann, ob namentlich genannt oder nicht, einschließlich eines Angriffs auf nicht genannte Personen; eine, die fragt, wie man Waffen, Sprengstoffe, Gifte oder Drogen herstellt oder wie man einen terroristischen Akt unterstützt, oder die einen solchen verherrlicht; eine, die Hassrede oder religiöse Beleidigung ist oder darum bittet; und eine über Suizid, Selbstverletzung, Euthanasie oder Sterbehilfe als Gegenstand von Recht, Ethik, Medizin oder öffentlicher Gesundheit. Die letzte Art ist nicht rechtswidrig und verstößt gegen keine der obigen Regeln; wir lehnen sie aufgrund dieser Regel ab. Auch eine Frage, die sich wie die Worte einer Person in einer Krise liest, lässt keine Debatte beginnen: Sie sehen stattdessen Hilfsnummern (Abschnitt 10). Auch eine Frage, wie man eine Straftat begeht oder ungestraft davonkommt, oder ob jemand eine begehen sollte, etwa Drogen oder Waffen illegal kaufen oder verkaufen, stehlen oder Steuern hinterziehen, lässt keine Debatte beginnen; eine Frage, ob ein Gesetz geändert werden sollte, etwa ob Cannabis legal sein sollte, lässt weiterhin eine Debatte beginnen.
 
 **Verwenden Sie Dialectical Engine nicht zur Täuschung.** Stellen Sie erzeugte Ergebnisse nicht als von Menschen verfasst dar, wenn dies irreführend wäre, entfernen Sie nicht deren Kennzeichnung als KI-generiert und verwenden Sie sie nicht, um einen vermeintlichen Konsens, gefälschte Beweise oder eine Identitätstäuschung zu erzeugen.
 
@@ -238,6 +238,8 @@ Wenn Sie anderswo leben, nennt Anhang A das in Ihrer Region gegebenenfalls gelte
 Wir teilen Ihnen im Voraus auf einem dauerhaften Datenträger mit, was sich wann ändert. Hat die Änderung mehr als geringfügige nachteilige Auswirkungen auf Ihren Zugang zum Dienst oder dessen Nutzung, können Sie innerhalb von **30 Tagen** nach der Mitteilung oder nach Inkrafttreten der Änderung, je nachdem, welcher Zeitpunkt später liegt, kostenlos kündigen; wir erstatten alle für den ungenutzten Zeitraum vorausgezahlten Beträge.
 
 **Änderungen dieser Nutzungsbedingungen.** Wir können diese Nutzungsbedingungen aus denselben Arten von Gründen ändern. Bei Änderungen, die Ihre Rechte nicht einschränken, veröffentlichen wir die neue Fassung mit einer Zusammenfassung der Änderungen und senden Ihnen mindestens **30 Tage vor ihrem Inkrafttreten** eine E-Mail; wenn Sie Dialectical Engine nach diesem Datum weiterhin nutzen, stimmen Sie der Änderung zu, und Sie können Ihr Konto vorher schließen. Bei Änderungen, die Ihre Rechte einschränken – darunter Preiserhöhungen für einen bestehenden Tarif, niedrigere Limits, entfernte Funktionen, neue Nutzungen Ihrer Inhalte oder Änderungen der Haftung, des anwendbaren Rechts oder der Streitbeilegung – bitten wir Sie, der neuen Fassung bei Ihrer nächsten Anmeldung ausdrücklich zuzustimmen; die Änderung gilt nur für die Zukunft. Wir nehmen Änderungen niemals rückwirkend vor und verwenden diesen Abschnitt niemals dazu, den Kern Ihrer bereits bezahlten Leistung während der Laufzeit zu ändern, ohne Ihnen eine Beendigungsmöglichkeit einzuräumen. Frühere Fassungen bleiben unter dezbatere.ro/terms/versions verfügbar.
+
+Version 2.6 ersetzte Version 2.5: Die Fragenprüfung lehnt auch eine Frage ab, wie man eine Straftat begeht oder ungestraft davonkommt, oder ob jemand eine begehen sollte, etwa Drogen oder Waffen illegal kaufen oder verkaufen, stehlen oder Steuern hinterziehen, und bewahrt sie nicht auf; eine Frage, ob ein Gesetz geändert werden sollte, lässt weiterhin eine Debatte beginnen (Abschnitt 7).
 
 Version 2.5 ersetzte Version 2.4: Sie ergänzt die Fragenprüfung, die jede Frage liest, bevor eine Debatte beginnt, einige ablehnt und jede abgelehnte Frage, die droht, plant oder fragt, ob oder wie man einer anderen Person oder anderen Personen schaden kann, ob namentlich genannt oder nicht, einschließlich eines Angriffs auf nicht genannte Personen, oder die fragt, wie man Waffen, Sprengstoffe, Gifte oder Drogen herstellt oder wie man einen terroristischen Akt unterstützt, oder die einen solchen verherrlicht, für unser Team zum Lesen aufbewahrt (Abschnitte 7, 8, 10 und 11); die Prüfung, die die Synthese jeder abgeschlossenen Debatte liest, die Genehmigung, die eine markierte Debatte benötigt, bevor sie veröffentlicht werden kann, und die Debatten, die diese Prüfung löscht (Abschnitte 5, 8, 9, 10 und 11); was der Support-Chat an das Modell Claude von Anthropic sendet, dass er nichts von dem aufbewahrt, was Sie schreiben, und keinen Fall eröffnet, und dass seine Schaltfläche „Mit einem Menschen sprechen“ unsere Support-Adresse anzeigt (Abschnitte 8 und 10); und Regeln in Abschnitt 7, die Hassrede jeder Art, Anleitungen zur Herstellung von Waffen oder Drogen, Inhalte, die zu Suizid oder zur Schädigung anderer Menschen ermutigen, und religiöse Beleidigung verbieten und nennen, aus welchen Fragen keine Debatte beginnt.
 

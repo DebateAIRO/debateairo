@@ -10,7 +10,7 @@ const locales = [
 const keys = [
   "home.questionRefusal.title", "home.questionRefusal.notStarted", "home.questionRefusal.back",
   "home.questionRefusal.automatic", "home.questionRefusal.rule.HARM_TO_OTHERS",
-  "home.questionRefusal.rule.WEAPONS_DRUGS_TERRORISM", "home.questionRefusal.rule.HATE_SPEECH",
+  "home.questionRefusal.rule.WEAPONS_DRUGS_TERRORISM", "home.questionRefusal.rule.CRIME", "home.questionRefusal.rule.HATE_SPEECH",
   "home.questionRefusal.rule.RELIGIOUS_INSULT", "home.questionRefusal.rule.SENSITIVE_TOPIC",
   "home.questionRefusal.complain", "home.questionRefusal.months", "home.questionRefusal.kept",
   "home.questionRefusal.helpNumbers", "home.questionRefusal.unavailableTitle",

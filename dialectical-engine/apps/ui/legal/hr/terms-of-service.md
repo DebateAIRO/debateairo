@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ukratko
-eyebrow: UVJETI KORIŠTENJA · v2.5 · NA SNAZI OD 12. LISTOPADA 2026.
+eyebrow: UVJETI KORIŠTENJA · v2.6 · NA SNAZI OD 27. STUDENOGA 2026.
 title: Na što pristajete
 lede: Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.
-endMarker: KRAJ UVJETA · v2.5
+endMarker: KRAJ UVJETA · v2.6
 bodyLabel: Tekst Uvjeta korištenja
 annexTitle: Prilog A — Regionalni uvjeti
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 MJERODAVNO PRAVO
 -->
 
-**Version 2.5 · Effective 12. listopada 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
+**Version 2.6 · Effective 27. studenoga 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
 
 **In short.** Morate imati najmanje 18 godina. Dialectical Engine izrađuje argumente pomoću modela umjetne inteligencije i sve što generira može biti pogrešno — to nije savjet. Vaše su rasprave privatne osim ako ih objavite; ako ih objavite, svatko ih može pročitati. Tekst koji pošaljete prosljeđuje se pružateljima usluga umjetne inteligencije navedenima u našem Registru pružatelja i ne upotrebljava se za treniranje modela. Nezakonit sadržaj prijavite na support@dezbatere.ro, bez obzira na to imate li račun. Primjenjuje se rumunjsko pravo, ali zadržavate zaštitu potrošača prema svojem lokalnom pravu.
 
@@ -106,7 +106,7 @@ Ova se pravila primjenjuju na ono što šaljete, način na koji upotrebljavate u
 
 **Nema vrijeđanja religije.** Ne šaljite niti objavljujte sadržaj koji vrijeđa ili ismijava religiju, njezine vjernike ili ono što smatraju svetim.
 
-**Pitanja koja ne pokreću raspravu.** Naša provjera pitanja (odjeljak 8.) ne pokreće raspravu iz ovih pitanja, čak i ako su formulirana neizravno: pitanje koje prijeti nanošenjem štete drugoj osobi ili drugim osobama, imenovanima ili ne, uključujući napad na neimenovane osobe, planira takvu štetu ili pita treba li i kako nanijeti štetu drugoj osobi ili drugim osobama; pitanje koje pita kako izraditi oružje, eksploziv, otrove ili droge ili kako podržati teroristički čin, ili koje ga veliča; pitanje koje jest govor mržnje ili vrijeđanje religije ili ih traži; te pitanje o samoubojstvu, samoozljeđivanju, eutanaziji ili potpomognutom umiranju kao temi prava, etike, medicine ili javnog zdravlja. Posljednja vrsta nije nezakonita i ne krši nijedno od gornjih pravila; odbijamo je prema ovom pravilu. Ni pitanje koje zvuči kao riječi osobe u krizi ne pokreće raspravu: umjesto toga vidite brojeve za pomoć (odjeljak 10.).
+**Pitanja koja ne pokreću raspravu.** Naša provjera pitanja (odjeljak 8.) ne pokreće raspravu iz ovih pitanja, čak i ako su formulirana neizravno: pitanje koje prijeti nanošenjem štete drugoj osobi ili drugim osobama, imenovanima ili ne, uključujući napad na neimenovane osobe, planira takvu štetu ili pita treba li i kako nanijeti štetu drugoj osobi ili drugim osobama; pitanje koje pita kako izraditi oružje, eksploziv, otrove ili droge ili kako podržati teroristički čin, ili koje ga veliča; pitanje koje jest govor mržnje ili vrijeđanje religije ili ih traži; te pitanje o samoubojstvu, samoozljeđivanju, eutanaziji ili potpomognutom umiranju kao temi prava, etike, medicine ili javnog zdravlja. Posljednja vrsta nije nezakonita i ne krši nijedno od gornjih pravila; odbijamo je prema ovom pravilu. Ni pitanje koje zvuči kao riječi osobe u krizi ne pokreće raspravu: umjesto toga vidite brojeve za pomoć (odjeljak 10.). Raspravu ne pokreće ni pitanje kako počiniti kazneno djelo ili izbjeći kaznu za njega, ili treba li ga netko počiniti, na primjer nezakonito kupovati ili prodavati drogu ili oružje, krasti ili utajiti porez; pitanje treba li promijeniti neki zakon, na primjer treba li kanabis biti legalan, i dalje pokreće raspravu.
 
 **Ne upotrebljavajte Dialectical Engine za obmanjivanje.** Nemojte generirani izlazni sadržaj prikazivati kao ljudsko djelo ako bi to dovelo u zabludu, uklanjati s njega oznaku da je generiran umjetnom inteligencijom niti ga upotrebljavati za stvaranje privida suglasnosti, lažnih dokaza ili lažnog predstavljanja.
 
@@ -238,6 +238,8 @@ Ako živite drugdje, Prilog A navodi pravo na odustanak ili razdoblje za odustan
 Na trajnom mediju unaprijed vas obavještavamo što se mijenja i kada. Ako promjena ima više nego neznatan negativan učinak na vaš pristup usluzi ili njezinu uporabu, možete bez naknade raskinuti ugovor u roku od **30 dana** od obavijesti ili od stupanja promjene na snagu, ovisno o tome što je kasnije, a mi ćemo vratiti svaki unaprijed plaćeni iznos za neiskorišteno razdoblje.
 
 **Promjene ovih Uvjeta.** Ove Uvjete možemo mijenjati zbog istih vrsta razloga. Za promjene koje ne umanjuju vaša prava objavljujemo novu verziju sa sažetkom promjena i šaljemo vam e-poruku najmanje **30 dana** prije njezina stupanja na snagu; nastavak uporabe Dialectical Engine-a nakon tog datuma znači da je prihvaćate, a prije toga možete zatvoriti račun. Za promjene koje umanjuju vaša prava — uključujući povećanja cijena postojećeg plana, niža ograničenja, uklonjene značajke, nove načine uporabe vašeg sadržaja ili promjene odgovornosti, mjerodavnog prava ili rješavanja sporova — tražimo da izričito prihvatite novu verziju pri sljedećoj prijavi, a promjena se primjenjuje samo ubuduće. Promjenu nikada ne primjenjujemo retroaktivno i ovaj odjeljak nikada ne upotrebljavamo za izmjenu bitnog sadržaja onoga što ste platili usred razdoblja bez omogućavanja izlaska iz ugovora. Prethodne verzije ostaju dostupne na dezbatere.ro/terms/versions.
+
+Verzija 2.6 zamijenila je verziju 2.5: provjera pitanja odbija i pitanje kako počiniti kazneno djelo ili izbjeći kaznu za njega, ili treba li ga netko počiniti, na primjer nezakonito kupovati ili prodavati drogu ili oružje, krasti ili utajiti porez, i ne čuva ga; pitanje treba li promijeniti neki zakon i dalje pokreće raspravu (odjeljak 7.).
 
 Verzija 2.5 zamijenila je verziju 2.4: dodaje provjeru pitanja, koja čita svako pitanje prije nego što rasprava započne, neka odbija, a svako odbijeno pitanje, koje prijeti nanošenjem štete drugoj osobi ili drugim osobama, imenovanima ili ne, uključujući napad na neimenovane osobe, planira takvu štetu ili pita treba li i kako nanijeti štetu drugoj osobi ili drugim osobama, ili koje pita kako izraditi oružje, eksploziv, otrove ili droge ili kako podržati teroristički čin, ili ga veliča, čuva kako bi ga čitao naš tim (odjeljci 7., 8., 10. i 11.); provjeru koja čita sintezu svake završene rasprave, odobrenje koje označena rasprava treba prije nego što se može objaviti i rasprave koje ta provjera briše (odjeljci 5., 8., 9., 10. i 11.); što chat za podršku šalje modelu Claude tvrtke Anthropic, da ne čuva ništa od onoga što napišete i ne otvara slučaj te da njegov gumb „Razgovor s osobom” prikazuje našu adresu za podršku (odjeljci 8. i 10.); te pravila u odjeljku 7. koja zabranjuju govor mržnje bilo koje vrste, upute za izradu oružja ili droga, sadržaj koji potiče na samoubojstvo ili nanošenje štete drugim ljudima i vrijeđanje religije te navode koja pitanja ne pokreću raspravu.
 

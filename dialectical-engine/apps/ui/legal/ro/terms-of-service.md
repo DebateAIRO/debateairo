@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Pe scurt
-eyebrow: TERMENII SERVICIULUI · v2.5 · ÎN VIGOARE DE LA 12 OCTOMBRIE 2026
+eyebrow: TERMENII SERVICIULUI · v2.6 · ÎN VIGOARE DE LA 27 NOIEMBRIE 2026
 title: Ce acceptați
 lede: Contractul dintre dumneavoastră și DMS Merchandise Shop S.R.L., într-un limbaj clar. Nouăsprezece secțiuni și Anexa A — derulați până la final.
-endMarker: SFÂRȘITUL TERMENILOR · v2.5
+endMarker: SFÂRȘITUL TERMENILOR · v2.6
 bodyLabel: Textul Termenilor serviciului
 annexTitle: Anexa A — Termeni regionali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEGEA APLICABILĂ
 -->
 
-**Version 2.5 · Effective 12 octombrie 2026 · Versiunile anterioare la dezbatere.ro/terms/versions · Limba: română.**
+**Version 2.6 · Effective 27 noiembrie 2026 · Versiunile anterioare la dezbatere.ro/terms/versions · Limba: română.**
 
 **In short.** Trebuie să aveți cel puțin 18 ani. Dialectical Engine construiește argumente cu modele de inteligență artificială, iar tot ceea ce generează poate fi greșit — nu constituie consultanță. Dezbaterile dumneavoastră sunt private dacă nu le publicați; dacă le publicați, oricine le poate citi. Textul pe care îl transmiteți este trimis furnizorilor de IA enumerați în Registrul furnizorilor de IA și nu este folosit pentru antrenarea modelelor. Raportați conținutul ilegal la support@dezbatere.ro, indiferent dacă aveți sau nu un cont. Se aplică legea română, însă protecția locală a consumatorilor de care beneficiați se menține.
 
@@ -106,7 +106,7 @@ Aceste reguli se aplică informațiilor pe care le transmiteți, modului în car
 
 **Nicio insultă la adresa religiei.** Nu transmiteți și nu publicați conținut care insultă sau ridiculizează o religie, credincioșii ei sau ceea ce aceștia consideră sacru.
 
-**Întrebări pentru care nu începe o dezbatere.** Verificarea noastră a întrebărilor (secțiunea 8) nu începe o dezbatere pe baza acestor întrebări, chiar dacă sunt formulate indirect: o întrebare care amenință, plănuiește sau întreabă dacă ori cum să se facă rău unei alte persoane sau unor alte persoane, numite sau nu, inclusiv printr-un atac asupra unor persoane nenumite; una care cere cum se fabrică arme, explozibili, otrăvuri sau droguri ori cum să fie sprijinit un act terorist, sau care face apologia unuia; una care este discurs de ură sau insultă la adresa religiei ori care cere așa ceva; și una despre sinucidere, autovătămare, eutanasie sau moarte asistată ca subiect de drept, etică, medicină sau sănătate publică. Ultimul tip nu este ilegal și nu încalcă niciuna dintre regulile de mai sus; îl refuzăm în temeiul acestei reguli. O întrebare care pare scrisă de o persoană aflată în criză nu duce nici ea la începerea unei dezbateri: vedeți în schimb numere de ajutor (secțiunea 10).
+**Întrebări pentru care nu începe o dezbatere.** Verificarea noastră a întrebărilor (secțiunea 8) nu începe o dezbatere pe baza acestor întrebări, chiar dacă sunt formulate indirect: o întrebare care amenință, plănuiește sau întreabă dacă ori cum să se facă rău unei alte persoane sau unor alte persoane, numite sau nu, inclusiv printr-un atac asupra unor persoane nenumite; una care cere cum se fabrică arme, explozibili, otrăvuri sau droguri ori cum să fie sprijinit un act terorist, sau care face apologia unuia; una care este discurs de ură sau insultă la adresa religiei ori care cere așa ceva; și una despre sinucidere, autovătămare, eutanasie sau moarte asistată ca subiect de drept, etică, medicină sau sănătate publică. Ultimul tip nu este ilegal și nu încalcă niciuna dintre regulile de mai sus; îl refuzăm în temeiul acestei reguli. O întrebare care pare scrisă de o persoană aflată în criză nu duce nici ea la începerea unei dezbateri: vedeți în schimb numere de ajutor (secțiunea 10). Nici o întrebare despre cum se comite o infracțiune sau cum se scapă nepedepsit ori despre dacă cineva ar trebui să comită una, de exemplu cumpărarea sau vânzarea ilegală de droguri ori arme, furtul sau evaziunea fiscală, nu duce la începerea unei dezbateri; o întrebare despre dacă o lege ar trebui schimbată, de exemplu dacă canabisul ar trebui legalizat, duce în continuare la o dezbatere.
 
 **Nu utilizați Dialectical Engine pentru a induce în eroare.** Nu prezentați conținutul generat ca fiind scris de o persoană atunci când aceasta ar induce în eroare, nu eliminați eticheta care indică generarea de către inteligența artificială și nu îl utilizați pentru a crea aparența unui consens, dovezi false sau uzurparea identității.
 
@@ -238,6 +238,8 @@ Dacă locuiți în altă parte, Anexa A precizează dreptul de retragere sau per
 Vă informăm în avans, pe un suport durabil, ce se modifică și când. Dacă modificarea are un efect negativ mai mult decât minor asupra accesului la serviciu sau a utilizării acestuia, puteți înceta contractul fără costuri în termen de **30 de zile** de la informare sau de la data la care modificarea produce efecte, luându-se în considerare data mai recentă, iar noi rambursăm orice sumă plătită în avans pentru perioada neutilizată.
 
 **Cu privire la acești Termeni.** Putem modifica acești Termeni pentru aceleași tipuri de motive. Pentru modificările care nu vă reduc drepturile, publicăm noua versiune însoțită de un rezumat al modificărilor și vă trimitem un e-mail cu cel puțin **30 de zile** înainte ca aceasta să producă efecte; continuarea utilizării Dialectical Engine după data respectivă înseamnă că o acceptați și vă puteți închide contul înainte de acea dată. Pentru modificările care vă reduc drepturile — inclusiv majorarea prețurilor unui plan existent, reducerea limitelor, eliminarea unor funcții, noi utilizări ale conținutului dumneavoastră sau modificări privind răspunderea, legea aplicabilă ori soluționarea litigiilor — vă solicităm să acceptați în mod expres noua versiune la următoarea autentificare, iar modificarea se aplică numai pentru viitor. Nu aplicăm niciodată retroactiv o modificare și nu folosim niciodată această secțiune pentru a modifica, pe parcursul termenului, esența serviciului pentru care ați plătit fără să vă oferim o posibilitate de încetare. Versiunile anterioare rămân disponibile la dezbatere.ro/terms/versions.
+
+Versiunea 2.6 a înlocuit versiunea 2.5: verificarea întrebărilor refuză și o întrebare despre cum se comite o infracțiune sau cum se scapă nepedepsit ori despre dacă cineva ar trebui să comită una, de exemplu cumpărarea sau vânzarea ilegală de droguri ori arme, furtul sau evaziunea fiscală, și nu o păstrează; o întrebare despre dacă o lege ar trebui schimbată duce în continuare la o dezbatere (secțiunea 7).
 
 Versiunea 2.5 a înlocuit versiunea 2.4: adaugă verificarea întrebărilor, care citește fiecare întrebare înainte de începerea unei dezbateri, refuză unele întrebări și păstrează, pentru a fi citită de echipa noastră, fiecare întrebare refuzată care amenință, plănuiește sau întreabă dacă ori cum să se facă rău unei alte persoane sau unor alte persoane, numite sau nu, inclusiv printr-un atac asupra unor persoane nenumite, sau care cere cum se fabrică arme, explozibili, otrăvuri sau droguri ori cum să fie sprijinit un act terorist, sau care face apologia unuia (secțiunile 7, 8, 10 și 11); verificarea care citește sinteza fiecărei dezbateri încheiate, aprobarea de care are nevoie o dezbatere marcată înainte de a putea fi publicată și dezbaterile pe care această verificare le șterge (secțiunile 5, 8, 9, 10 și 11); ce trimite chatul de suport modelului Claude al Anthropic, faptul că nu păstrează nimic din ce scrieți și nu deschide niciun caz, precum și faptul că butonul său „Vorbiți cu o persoană” afișează adresa noastră de asistență (secțiunile 8 și 10); precum și regulile din secțiunea 7 care interzic discursul de ură de orice fel, instrucțiunile pentru fabricarea de arme sau droguri, conținutul care încurajează sinuciderea sau faptul de a face rău altor persoane și insulta la adresa religiei, și arată pentru care întrebări nu începe o dezbatere.
 

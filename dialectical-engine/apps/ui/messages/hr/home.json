@@ -129,6 +129,7 @@
   "home.questionRefusal.automatic": "Naša ga je automatska provjera odbila. U ovoj odluci nije sudjelovala nijedna osoba.",
   "home.questionRefusal.rule.HARM_TO_OTHERS": "Spada pod odjeljak „7. Prihvatljiva uporaba“ naših Uvjeta: ne provodimo rasprave o ozljeđivanju ljudi, prijetnjama ljudima ili napadima na ljude.",
   "home.questionRefusal.rule.WEAPONS_DRUGS_TERRORISM": "Spada pod odjeljak „7. Prihvatljiva uporaba“ naših Uvjeta: ne provodimo rasprave o izradi oružja, eksploziva, otrova ili droga niti rasprave koje podržavaju ili veličaju terorizam.",
+  "home.questionRefusal.rule.CRIME": "Spada pod odjeljak „7. Prihvatljiva uporaba“ naših Uvjeta: ne provodimo rasprave o tome kako počiniti kazneno djelo ili izbjeći kaznu za njega niti o tome treba li ga netko počiniti.",
   "home.questionRefusal.rule.HATE_SPEECH": "Spada pod odjeljak „7. Prihvatljiva uporaba“ naših Uvjeta: ne provodimo rasprave koje napadaju ili omalovažavaju ljude zbog toga tko su.",
   "home.questionRefusal.rule.RELIGIOUS_INSULT": "Spada pod odjeljak „7. Prihvatljiva uporaba“ naših Uvjeta: ne provodimo rasprave koje vrijeđaju ili ismijavaju religiju, njezine vjernike ili ono što smatraju svetim.",
   "home.questionRefusal.rule.SENSITIVE_TOPIC": "Spada pod odjeljak „7. Prihvatljiva uporaba“ naših Uvjeta: ne provodimo rasprave o samoubojstvu, samoozljeđivanju, eutanaziji ili potpomognutom umiranju, čak ni kao o pitanjima prava ili politike.",

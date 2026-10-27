@@ -128,6 +128,7 @@
   "home.questionRefusal.automatic": "Meie automaatne kontroll lükkas selle tagasi. Selles otsuses ei osalenud ükski inimene.",
   "home.questionRefusal.rule.HARM_TO_OTHERS": "See kuulub meie Tingimuste jaotise „7. Lubatud kasutus“ alla: me ei korralda väitlusi inimeste kahjustamise, ähvardamise ega ründamise teemal.",
   "home.questionRefusal.rule.WEAPONS_DRUGS_TERRORISM": "See kuulub meie Tingimuste jaotise „7. Lubatud kasutus“ alla: me ei korralda väitlusi relvade, lõhkeainete, mürkide või uimastite valmistamise teemal ega väitlusi, mis toetavad või ülistavad terrorismi.",
+  "home.questionRefusal.rule.CRIME": "See kuulub meie Tingimuste jaotise „7. Lubatud kasutus“ alla: me ei korralda väitlusi selle üle, kuidas kuritegu toime panna või karistusest pääseda, ega selle üle, kas keegi peaks kuriteo toime panema.",
   "home.questionRefusal.rule.HATE_SPEECH": "See kuulub meie Tingimuste jaotise „7. Lubatud kasutus“ alla: me ei korralda väitlusi, mis ründavad või alandavad inimesi selle pärast, kes nad on.",
   "home.questionRefusal.rule.RELIGIOUS_INSULT": "See kuulub meie Tingimuste jaotise „7. Lubatud kasutus“ alla: me ei korralda väitlusi, mis solvavad või naeruvääristavad religiooni, selle järgijaid või seda, mida nad pühaks peavad.",
   "home.questionRefusal.rule.SENSITIVE_TOPIC": "See kuulub meie Tingimuste jaotise „7. Lubatud kasutus“ alla: me ei korralda väitlusi enesetapu, enesevigastamise, eutanaasia ega abistatud suremise teemal, isegi mitte õiguse või poliitika küsimustena.",

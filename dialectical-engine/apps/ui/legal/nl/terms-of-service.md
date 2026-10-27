@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In het kort
-eyebrow: SERVICEVOORWAARDEN · v2.5 · VAN KRACHT OP 12 OKTOBER 2026
+eyebrow: SERVICEVOORWAARDEN · v2.6 · VAN KRACHT OP 27 NOVEMBER 2026
 title: Waarmee u instemt
 lede: De overeenkomst tussen u en DMS Merchandise Shop S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.
-endMarker: EINDE VAN DE VOORWAARDEN · v2.5
+endMarker: EINDE VAN DE VOORWAARDEN · v2.6
 bodyLabel: Tekst van de Servicevoorwaarden
 annexTitle: Bijlage A — Regionale voorwaarden
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TOEPASSELIJK RECHT
 -->
 
-**Version 2.5 · Effective 12 oktober 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
+**Version 2.6 · Effective 27 november 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
 
 **In short.** U moet 18 jaar of ouder zijn. Dialectical Engine stelt met AI-modellen argumenten op en alles wat het genereert kan onjuist zijn — het is geen advies. Uw debatten zijn privé, tenzij u ze publiceert; als u ze publiceert, kan iedereen ze lezen. Tekst die u indient, wordt verzonden naar de AI-aanbieders in ons Register van aanbieders en wordt niet gebruikt om modellen te trainen. Meld illegale inhoud via support@dezbatere.ro, ongeacht of u een account hebt. Het Roemeense recht is van toepassing, maar uw lokale consumentenbescherming blijft voor u gelden.
 
@@ -106,7 +106,7 @@ Deze regels gelden voor wat u indient, hoe u de dienst gebruikt en wat u publice
 
 **Geen religieuze belediging.** Dien geen inhoud in die een religie, haar gelovigen of wat zij heilig achten beledigt of bespot en publiceer die niet.
 
-**Vragen waaruit geen debat begint.** Onze vraagcontrole (hoofdstuk 8) laat geen debat beginnen op grond van deze vragen, ook niet als ze indirect zijn geformuleerd: een vraag die dreigt met schade aan een ander persoon of andere mensen, die zulke schade plant of die vraagt of en hoe men een ander persoon of andere mensen schade kan toebrengen, al dan niet bij naam genoemd, met inbegrip van een aanval op niet bij naam genoemde mensen; een vraag die vraagt hoe men wapens, explosieven, gif of drugs maakt of hoe men een terroristische daad kan steunen, of er een verheerlijkt; een vraag die haatzaaiende uitlatingen of religieuze belediging is of daarom vraagt; en een vraag over zelfdoding, zelfbeschadiging, euthanasie of hulp bij sterven als onderwerp van recht, ethiek, geneeskunde of volksgezondheid. De laatste soort is niet onrechtmatig en schendt geen van de bovenstaande regels; wij weigeren haar op grond van deze regel. Een vraag die klinkt als de woorden van een persoon in crisis, laat evenmin een debat beginnen: u ziet in plaats daarvan hulpnummers (hoofdstuk 10).
+**Vragen waaruit geen debat begint.** Onze vraagcontrole (hoofdstuk 8) laat geen debat beginnen op grond van deze vragen, ook niet als ze indirect zijn geformuleerd: een vraag die dreigt met schade aan een ander persoon of andere mensen, die zulke schade plant of die vraagt of en hoe men een ander persoon of andere mensen schade kan toebrengen, al dan niet bij naam genoemd, met inbegrip van een aanval op niet bij naam genoemde mensen; een vraag die vraagt hoe men wapens, explosieven, gif of drugs maakt of hoe men een terroristische daad kan steunen, of er een verheerlijkt; een vraag die haatzaaiende uitlatingen of religieuze belediging is of daarom vraagt; en een vraag over zelfdoding, zelfbeschadiging, euthanasie of hulp bij sterven als onderwerp van recht, ethiek, geneeskunde of volksgezondheid. De laatste soort is niet onrechtmatig en schendt geen van de bovenstaande regels; wij weigeren haar op grond van deze regel. Een vraag die klinkt als de woorden van een persoon in crisis, laat evenmin een debat beginnen: u ziet in plaats daarvan hulpnummers (hoofdstuk 10). Ook een vraag hoe je een misdrijf pleegt of ermee wegkomt, of een vraag of iemand er een zou moeten plegen, zoals illegaal drugs of wapens kopen of verkopen, stelen of belasting ontduiken, laat geen debat beginnen; een vraag of een wet zou moeten veranderen, zoals of cannabis legaal zou moeten zijn, laat nog steeds een debat beginnen.
 
 **Gebruik Dialectical Engine niet om te misleiden.** Presenteer gegenereerde uitvoer niet als door een mens geschreven wanneer dat misleidend zou zijn, verwijder niet het label dat aangeeft dat deze door AI is gegenereerd en gebruik deze niet om schijnbare consensus, vals bewijs of persoonsnabootsing te fabriceren.
 
@@ -238,6 +238,8 @@ Als u elders woont, vermeldt Bijlage A welk herroepingsrecht of welke bedenktijd
 Wij vertellen u vooraf, op een duurzame gegevensdrager, wat er verandert en wanneer. Als de wijziging meer dan een gering negatief effect heeft op uw toegang tot of gebruik van de dienst, kunt u binnen **30 dagen** nadat u hierover bent geïnformeerd of nadat de wijziging van kracht wordt, afhankelijk van welk moment later valt, de overeenkomst kosteloos beëindigen en betalen wij elk voorafbetaald bedrag voor de ongebruikte periode terug.
 
 **In deze Voorwaarden.** Wij kunnen deze Voorwaarden om dezelfde soorten redenen wijzigen. Voor wijzigingen die uw rechten niet verminderen, publiceren wij de nieuwe versie met een samenvatting van wat is gewijzigd en sturen wij u ten minste **30 dagen** vóór de ingangsdatum een e-mail; als u Dialectical Engine na die datum blijft gebruiken, betekent dit dat u de wijziging aanvaardt, en u kunt uw account voordien sluiten. Voor wijzigingen die uw rechten verminderen — waaronder prijsverhogingen voor een bestaand abonnement, lagere limieten, verwijderde functies, nieuw gebruik van uw inhoud of wijzigingen in aansprakelijkheid, toepasselijk recht of geschillenbeslechting — vragen wij u bij uw volgende aanmelding uitdrukkelijk de nieuwe versie te aanvaarden en geldt de wijziging uitsluitend voor de toekomst. Wij maken een wijziging nooit met terugwerkende kracht en gebruiken dit hoofdstuk nooit om de kern van hetgeen waarvoor u hebt betaald tijdens de looptijd te wijzigen zonder u een uitweg te bieden. Eerdere versies blijven beschikbaar op dezbatere.ro/terms/versions.
+
+Versie 2.6 verving versie 2.5: onze vraagcontrole weigert ook een vraag hoe je een misdrijf pleegt of ermee wegkomt, of een vraag of iemand er een zou moeten plegen, zoals illegaal drugs of wapens kopen of verkopen, stelen of belasting ontduiken, en bewaart die niet; een vraag of een wet zou moeten veranderen, laat nog steeds een debat beginnen (hoofdstuk 7).
 
 Versie 2.5 verving versie 2.4: zij voegt het volgende toe, namelijk de vraagcontrole, die elke vraag leest voordat een debat begint, sommige weigert en elke geweigerde vraag die dreigt met schade aan een ander persoon of andere mensen, die zulke schade plant of die vraagt of en hoe men een ander persoon of andere mensen schade kan toebrengen, al dan niet bij naam genoemd, met inbegrip van een aanval op niet bij naam genoemde mensen, of die vraagt hoe men wapens, explosieven, gif of drugs maakt of hoe men een terroristische daad kan steunen, of er een verheerlijkt bewaart zodat ons team haar kan lezen (hoofdstukken 7, 8, 10 en 11); de controle die de synthese van elk afgerond debat leest, de goedkeuring die een gemarkeerd debat nodig heeft voordat het kan worden gepubliceerd, en de debatten die die controle verwijdert (hoofdstukken 5, 8, 9, 10 en 11); wat de ondersteuningschat naar het model Claude van Anthropic stuurt, dat zij niets bewaart van wat u schrijft en geen zaak opent, en dat haar knop „Met een medewerker praten” ons ondersteuningsadres toont (hoofdstukken 8 en 10); en regels in hoofdstuk 7 die haatzaaiende uitlatingen van welke aard dan ook, instructies voor het maken van wapens of drugs, inhoud die zelfdoding of het schaden van andere mensen aanmoedigt en religieuze belediging verbieden, en zeggen welke vragen geen debat laten beginnen.
 

@@ -137,6 +137,7 @@
   "home.questionRefusal.automatic": "Our automatic check refused it. No person was involved in this decision.",
   "home.questionRefusal.rule.HARM_TO_OTHERS": "It falls under section 7. Acceptable use of our Terms: we don't run debates about hurting, threatening or attacking people.",
   "home.questionRefusal.rule.WEAPONS_DRUGS_TERRORISM": "It falls under section 7. Acceptable use of our Terms: we don't run debates on making weapons, explosives, poisons or drugs, or debates that support or praise terrorism.",
+  "home.questionRefusal.rule.CRIME": "It falls under section 7. Acceptable use of our Terms: we don't run debates on how to commit a crime or get away with one, or on whether someone should commit one.",
   "home.questionRefusal.rule.HATE_SPEECH": "It falls under section 7. Acceptable use of our Terms: we don't run debates that attack or demean people for who they are.",
   "home.questionRefusal.rule.RELIGIOUS_INSULT": "It falls under section 7. Acceptable use of our Terms: we don't run debates that insult or mock a religion, its believers or what they hold sacred.",
   "home.questionRefusal.rule.SENSITIVE_TOPIC": "It falls under section 7. Acceptable use of our Terms: we don't run debates about suicide, self-harm, euthanasia or assisted dying, even as questions of law or policy.",

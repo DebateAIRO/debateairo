@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lyhyesti
-eyebrow: KÄYTTÖEHDOT · v2.5 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN
+eyebrow: KÄYTTÖEHDOT · v2.6 · VOIMASSA 27. MARRASKUUTA 2026 ALKAEN
 title: Mihin sitoudut
 lede: Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.
-endMarker: KÄYTTÖEHTOJEN LOPPU · v2.5
+endMarker: KÄYTTÖEHTOJEN LOPPU · v2.6
 bodyLabel: Käyttöehtojen teksti
 annexTitle: Liite A — Alueelliset ehdot
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 SOVELLETTAVA LAKI
 -->
 
-**Version 2.5 · Effective 12. lokakuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
+**Version 2.6 · Effective 27. marraskuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
 
 **In short.** Sinun on oltava vähintään 18-vuotias. Dialectical Engine muodostaa argumentteja tekoälymalleilla, ja kaikki sen tuottama voi olla virheellistä — se ei ole neuvontaa. Väittelysi ovat yksityisiä, ellet julkaise niitä; jos julkaiset ne, kuka tahansa voi lukea niitä. Lähettämäsi teksti toimitetaan palveluntarjoajarekisterissämme luetelluille tekoälypalveluntarjoajille, eikä sitä käytetä mallien kouluttamiseen. Ilmoita lainvastaisesta sisällöstä osoitteeseen support@dezbatere.ro riippumatta siitä, onko sinulla tiliä. Sopimukseen sovelletaan Romanian lakia, mutta paikallinen kuluttajansuojasi säilyy.
 
@@ -106,7 +106,7 @@ Näitä sääntöjä sovelletaan lähettämääsi sisältöön, palvelun käytt�
 
 **Ei uskonnon loukkaamista.** Älä lähetä tai julkaise sisältöä, joka loukkaa tai pilkkaa uskontoa, sen kannattajia tai sitä, mitä he pitävät pyhänä.
 
-**Kysymykset, jotka eivät käynnistä väittelyä.** Kysymystarkistuksemme (kohta 8) ei käynnistä väittelyä näistä kysymyksistä, vaikka ne olisi muotoiltu epäsuorasti: kysymys, joka uhkaa vahingoittaa toista ihmistä tai muita ihmisiä, nimeltä mainittuja tai ei, mukaan lukien hyökkäys nimeämättömiä ihmisiä vastaan, suunnittelee sitä tai kysyy, saako tai miten toista ihmistä tai muita ihmisiä vahingoitetaan; kysymys, joka kysyy, miten valmistetaan aseita, räjähteitä, myrkkyjä tai huumeita tai miten tuetaan terroritekoa, tai joka ylistää sellaista; kysymys, joka on vihapuhetta tai uskonnon loukkaamista tai pyytää sellaista; sekä kysymys itsemurhasta, itsensä vahingoittamisesta, eutanasiasta tai avustetusta kuolemasta oikeuden, etiikan, lääketieteen tai kansanterveyden aiheena. Viimeinen laji ei ole laiton eikä riko mitään edellä olevista säännöistä; hylkäämme sen tämän säännön perusteella. Kysymys, joka kuulostaa kriisissä olevan henkilön sanoilta, ei myöskään käynnistä väittelyä: näet sen sijaan apunumerot (kohta 10).
+**Kysymykset, jotka eivät käynnistä väittelyä.** Kysymystarkistuksemme (kohta 8) ei käynnistä väittelyä näistä kysymyksistä, vaikka ne olisi muotoiltu epäsuorasti: kysymys, joka uhkaa vahingoittaa toista ihmistä tai muita ihmisiä, nimeltä mainittuja tai ei, mukaan lukien hyökkäys nimeämättömiä ihmisiä vastaan, suunnittelee sitä tai kysyy, saako tai miten toista ihmistä tai muita ihmisiä vahingoitetaan; kysymys, joka kysyy, miten valmistetaan aseita, räjähteitä, myrkkyjä tai huumeita tai miten tuetaan terroritekoa, tai joka ylistää sellaista; kysymys, joka on vihapuhetta tai uskonnon loukkaamista tai pyytää sellaista; sekä kysymys itsemurhasta, itsensä vahingoittamisesta, eutanasiasta tai avustetusta kuolemasta oikeuden, etiikan, lääketieteen tai kansanterveyden aiheena. Viimeinen laji ei ole laiton eikä riko mitään edellä olevista säännöistä; hylkäämme sen tämän säännön perusteella. Kysymys, joka kuulostaa kriisissä olevan henkilön sanoilta, ei myöskään käynnistä väittelyä: näet sen sijaan apunumerot (kohta 10). Väittelyä ei käynnistä myöskään kysymys siitä, miten rikos tehdään tai miten siitä selvitään rangaistuksetta, tai pitäisikö jonkun tehdä rikos, esimerkiksi ostaa tai myydä huumeita tai aseita laittomasti, varastaa tai kiertää veroja; kysymys siitä, pitäisikö jotakin lakia muuttaa, esimerkiksi pitäisikö kannabiksen olla laillista, käynnistää edelleen väittelyn.
 
 **Älä käytä Dialectical Engine -palvelua harhaanjohtamiseen.** Älä esitä tuotettua sisältöä ihmisen kirjoittamana, jos se johtaisi harhaan, poista siitä tekoälyn tuottamaa sisältöä koskevaa merkintää äläkä käytä sitä näennäisen yhteisymmärryksen, väärennetyn näytön tai toisena henkilönä esiintymisen luomiseen.
 
@@ -238,6 +238,8 @@ Jos asut muualla, liitteessä A ilmoitetaan alueellasi mahdollisesti sovellettav
 Ilmoitamme sinulle etukäteen pysyvällä välineellä, mikä muuttuu ja milloin. Jos muutoksella on vähäistä suurempi kielteinen vaikutus mahdollisuuteesi käyttää palvelua tai palvelun käyttöösi, voit päättää sopimuksen maksutta **30 päivän** kuluessa ilmoituksesta tai muutoksen voimaantulosta sen mukaan, kumpi ajankohta on myöhäisempi, ja palautamme käyttämättömään aikaan kohdistuvat ennakkomaksut.
 
 **Näiden käyttöehtojen muutokset.** Voimme muuttaa näitä käyttöehtoja samanlaisista syistä. Jos muutos ei vähennä oikeuksiasi, julkaisemme uuden version ja yhteenvedon muutoksista sekä lähetämme sinulle sähköpostia vähintään **30 päivää ennen** sen voimaantuloa; Dialectical Engine -palvelun käytön jatkaminen kyseisen ajankohdan jälkeen merkitsee hyväksyntääsi, ja voit sulkea tilisi ennen sitä. Jos muutos vähentää oikeuksiasi — mukaan lukien olemassa olevan tilauksen hinnankorotukset, alhaisemmat rajat, poistetut ominaisuudet, sisältösi uudet käyttötavat tai vastuuta, sovellettavaa lakia tai riidanratkaisua koskevat muutokset — pyydämme sinua hyväksymään uuden version nimenomaisesti seuraavan kirjautumisesi yhteydessä, ja muutosta sovelletaan vain jatkossa. Emme koskaan muuta ehtoja taannehtivasti emmekä käytä tätä kohtaa muuttaaksemme kesken sopimuskauden maksamasi palvelun ydintä tarjoamatta sinulle mahdollisuutta irtautua. Aiemmat versiot säilyvät saatavilla osoitteessa dezbatere.ro/terms/versions.
+
+Versio 2.6 korvasi version 2.5: kysymystarkistus hylkää myös kysymyksen siitä, miten rikos tehdään tai miten siitä selvitään rangaistuksetta, tai pitäisikö jonkun tehdä rikos, esimerkiksi ostaa tai myydä huumeita tai aseita laittomasti, varastaa tai kiertää veroja, eikä säilytä sitä; kysymys siitä, pitäisikö jotakin lakia muuttaa, käynnistää edelleen väittelyn (kohta 7).
 
 Versio 2.5 korvasi version 2.4: se lisää kysymystarkistuksen, joka lukee jokaisen kysymyksen ennen väittelyn alkua, hylkää osan niistä ja säilyttää tiimimme luettavaksi jokaisen hylätyn kysymyksen, joka uhkaa vahingoittaa toista ihmistä tai muita ihmisiä, nimeltä mainittuja tai ei, mukaan lukien hyökkäys nimeämättömiä ihmisiä vastaan, suunnittelee sitä tai kysyy, saako tai miten toista ihmistä tai muita ihmisiä vahingoitetaan, tai joka kysyy, miten valmistetaan aseita, räjähteitä, myrkkyjä tai huumeita tai miten tuetaan terroritekoa, tai joka ylistää sellaista (kohdat 7, 8, 10 ja 11); tarkistuksen, joka lukee jokaisen päättyneen väittelyn synteesin, hyväksynnän, jota merkitty väittely tarvitsee ennen julkaisemista, ja väittelyt, jotka tuo tarkistus poistaa (kohdat 5, 8, 9, 10 ja 11); sen, mitä tukipalvelun chat lähettää Anthropicin mallille Claude, ettei se säilytä mitään siitä, mitä kirjoitat, eikä avaa tapausta, ja että sen ”Keskustele henkilön kanssa” -painike näyttää tukiosoitteemme (kohdat 8 ja 10); sekä kohdan 7 säännöt, jotka kieltävät vihapuheen missä tahansa muodossa, ohjeet aseiden tai huumeiden valmistukseen, itsemurhaan tai muiden ihmisten vahingoittamiseen kannustavan sisällön ja uskonnon loukkaamisen ja kertovat, mitkä kysymykset eivät käynnistä väittelyä.
 

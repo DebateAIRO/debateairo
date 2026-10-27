@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In short
-eyebrow: TERMS OF SERVICE · v2.5 · EFFECTIVE 12 OCTOBER 2026
+eyebrow: TERMS OF SERVICE · v2.6 · EFFECTIVE 27 NOVEMBER 2026
 title: What you agree to
 lede: The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.
-endMarker: END OF TERMS · v2.5
+endMarker: END OF TERMS · v2.6
 bodyLabel: Terms of Service text
 annexTitle: Annex A — Regional terms
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 GOVERNING LAW
 -->
 
-**Version 2.5 · Effective 12 October 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
+**Version 2.6 · Effective 27 November 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
 
 **In short.** You must be 18 or over. Dialectical Engine builds arguments with AI models and everything it generates may be wrong — it is not advice. Your debates are private unless you publish them; if you publish, anyone can read them. Text you submit is sent to AI providers listed in our Provider Register, and is not used to train models. Report illegal content at support@dezbatere.ro whether or not you have an account. Romanian law governs, but your local consumer protections stay with you.
 
@@ -106,7 +106,7 @@ These rules apply to what you submit, how you use the service, and what you publ
 
 **No religious insult.** Do not submit or publish content that insults or mocks a religion, its believers or what they hold sacred.
 
-**Questions that do not start a debate.** Our question check (section 8) does not start a debate from these questions, even if they are worded indirectly: a question that threatens, plans or asks whether or how to harm another person or other people, named or not, including an attack on unnamed people; one that asks how to make weapons, explosives, poisons or drugs or how to support a terrorist act, or praises one; one that is or asks for hate speech or religious insult; and one about suicide, self-harm, euthanasia or assisted dying as a subject of law, ethics, medicine or public health. The last kind is not unlawful and breaks none of the rules above; we refuse it under this rule. A question that reads like the words of a person in crisis does not start a debate either: you see help numbers instead (section 10).
+**Questions that do not start a debate.** Our question check (section 8) does not start a debate from these questions, even if they are worded indirectly: a question that threatens, plans or asks whether or how to harm another person or other people, named or not, including an attack on unnamed people; one that asks how to make weapons, explosives, poisons or drugs or how to support a terrorist act, or praises one; one that is or asks for hate speech or religious insult; and one about suicide, self-harm, euthanasia or assisted dying as a subject of law, ethics, medicine or public health. The last kind is not unlawful and breaks none of the rules above; we refuse it under this rule. A question that reads like the words of a person in crisis does not start a debate either: you see help numbers instead (section 10). A question that asks how to commit a crime or get away with one, or whether someone should commit one, such as buying or selling drugs or weapons illegally, stealing or evading tax, does not start a debate either; a question about whether a law should change, such as whether cannabis should be legal, still does.
 
 **Do not use Dialectical Engine to deceive.** Do not present generated output as human-written where that would mislead, strip the AI-generated label from it, or use it to manufacture apparent consensus, fake evidence or impersonation.
 
@@ -238,6 +238,8 @@ If you live elsewhere, Annex A states the withdrawal or cooling-off right that a
 We tell you in advance, on a durable medium, what is changing and when. If the change has more than a minor negative effect on your access to or use of the service, you may terminate free of charge within **30 days** of being told, or of the change taking effect, whichever is later, and we refund any prepaid amount for the unused period.
 
 **To these Terms.** We may change these Terms for the same kinds of reasons. For changes that do not reduce your rights, we post the new version with a summary of what changed and email you at least **30 days** before it takes effect; continuing to use Dialectical Engine after that date means you accept it, and you may close your account before then. For changes that reduce your rights — including price increases on an existing plan, lower limits, removed features, new uses of your content, or changes to liability, governing law or dispute resolution — we ask you to accept the new version expressly at your next sign-in, and the change applies only going forward. We never make a change retroactive, and we never use this section to change the core of what you have paid for mid-term without offering you a way out. Prior versions stay available at dezbatere.ro/terms/versions.
+
+Version 2.6 replaced version 2.5: the question check also refuses a question that asks how to commit a crime or get away with one, or whether someone should commit one, such as buying or selling drugs or weapons illegally, stealing or evading tax, and does not keep it; a question about whether a law should change still starts a debate (section 7).
 
 Version 2.5 replaced version 2.4: it adds the question check, which reads each question before a debate starts, refuses some, and keeps for our team to read each refused question that threatens, plans or asks whether or how to harm another person or other people, named or not, including an attack on unnamed people, or that asks how to make weapons, explosives, poisons or drugs or how to support a terrorist act, or praises one (sections 7, 8, 10 and 11); the check that reads the synthesis of each finished debate, the approval a flagged debate needs before it can be published, and the debates that check deletes (sections 5, 8, 9, 10 and 11); what the support chat sends to Anthropic's model Claude, that it keeps nothing of what you write and opens no case, and that its "Talk to a human" button shows our support address (sections 8 and 10); and rules in section 7 that forbid hate speech of any kind, instructions for crafting weapons or drugs, content encouraging suicide or harming other people, and religious insult, and say which questions do not start a debate.
 

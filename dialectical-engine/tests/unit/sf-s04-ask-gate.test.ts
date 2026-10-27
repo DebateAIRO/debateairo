@@ -122,7 +122,7 @@ describe("S04 kept refusals", () => {
   });
 
   it.each([
-    "HATE_SPEECH", "RELIGIOUS_INSULT", "SENSITIVE_TOPIC", "OWN_CRISIS", "METHODS_OR_ENCOURAGEMENT", "phrase check"
+    "CRIME", "HATE_SPEECH", "RELIGIOUS_INSULT", "SENSITIVE_TOPIC", "OWN_CRISIS", "METHODS_OR_ENCOURAGEMENT", "phrase check"
   ])("keeps nothing for %s", async (kind) => {
     const outcome: QuestionCheckOutcome = kind === "phrase check" ? { outcome: "PASS" }
       : kind === "OWN_CRISIS" || kind === "METHODS_OR_ENCOURAGEMENT" ? { outcome: "CRISIS" }

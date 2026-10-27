@@ -130,6 +130,7 @@
   "home.questionRefusal.automatic": "Nasza automatyczna kontrola je odrzuciła. W tej decyzji nie brał udziału żaden człowiek.",
   "home.questionRefusal.rule.HARM_TO_OTHERS": "Podpada pod sekcję „7. Dozwolone korzystanie” naszych Warunków: nie prowadzimy debat o krzywdzeniu ludzi, grożeniu im lub atakowaniu ich.",
   "home.questionRefusal.rule.WEAPONS_DRUGS_TERRORISM": "Podpada pod sekcję „7. Dozwolone korzystanie” naszych Warunków: nie prowadzimy debat o wytwarzaniu broni, materiałów wybuchowych, trucizn lub narkotyków ani debat, które wspierają lub gloryfikują terroryzm.",
+  "home.questionRefusal.rule.CRIME": "Podpada pod sekcję „7. Dozwolone korzystanie” naszych Warunków: nie prowadzimy debat o tym, jak popełnić przestępstwo lub uniknąć za nie kary, ani o tym, czy ktoś powinien je popełnić.",
   "home.questionRefusal.rule.HATE_SPEECH": "Podpada pod sekcję „7. Dozwolone korzystanie” naszych Warunków: nie prowadzimy debat, które atakują lub poniżają ludzi z powodu tego, kim są.",
   "home.questionRefusal.rule.RELIGIOUS_INSULT": "Podpada pod sekcję „7. Dozwolone korzystanie” naszych Warunków: nie prowadzimy debat, które znieważają lub wyszydzają religię, jej wyznawców albo to, co uważają za święte.",
   "home.questionRefusal.rule.SENSITIVE_TOPIC": "Podpada pod sekcję „7. Dozwolone korzystanie” naszych Warunków: nie prowadzimy debat o samobójstwie, samookaleczeniu, eutanazji lub wspomaganym umieraniu, nawet gdy chodzi o kwestie prawa lub polityki.",

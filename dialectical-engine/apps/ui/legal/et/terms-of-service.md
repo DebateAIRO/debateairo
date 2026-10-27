@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lühidalt
-eyebrow: TEENUSETINGIMUSED · v2.5 · KEHTIB ALATES 12. OKTOOBRIST 2026
+eyebrow: TEENUSETINGIMUSED · v2.6 · KEHTIB ALATES 27. NOVEMBRIST 2026
 title: Millega te nõustute
 lede: Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.
-endMarker: TINGIMUSTE LÕPP · v2.5
+endMarker: TINGIMUSTE LÕPP · v2.6
 bodyLabel: Teenusetingimuste tekst
 annexTitle: Lisa A — Piirkondlikud tingimused
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 KOHALDATAV ÕIGUS
 -->
 
-**Version 2.5 · Effective 12. oktoober 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
+**Version 2.6 · Effective 27. november 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
 
 **In short.** Peate olema vähemalt 18-aastane. Dialectical Engine koostab tehisintellektimudelite abil argumente ja kõik selle loodud tulemused võivad olla valed — need ei ole nõuanded. Teie väitlused on privaatsed, kui te neid ei avalda; avaldamise korral saab igaüks neid lugeda. Teie sisestatud tekst saadetakse meie tehisintellekti pakkujate registris loetletud pakkujatele ja seda ei kasutata mudelite treenimiseks. Teatage ebaseaduslikust sisust aadressil support@dezbatere.ro, olenemata sellest, kas teil on konto. Kohaldatakse Rumeenia õigust, kuid teile jääb teie kohaliku tarbijakaitse tagatud kaitse.
 
@@ -106,7 +106,7 @@ Need reeglid kehtivad teie esitatud sisu, teenuse kasutamise viisi ja avaldatava
 
 **Religioosne solvang on keelatud.** Ärge esitage ega avaldage sisu, mis solvab või pilkab religiooni, selle järgijaid või seda, mida nad pühaks peavad.
 
-**Küsimused, mis ei lase väitlusel alata.** Meie küsimuse kontroll (jaotis 8) ei lase nendest küsimustest väitlust alata, isegi kui need on sõnastatud kaudselt: küsimus, mis ähvardab kahjustada teist inimest või teisi inimesi, nimeliselt või nimetult, sealhulgas rünnak nimetute inimeste vastu, kavandab seda või küsib, kas või kuidas neid kahjustada; küsimus, mis küsib, kuidas valmistada relvi, lõhkeaineid, mürke või uimasteid või kuidas toetada terroriakti, või mis seda ülistab; küsimus, mis on vihakõne või religioosne solvang või nõuab seda; ning küsimus enesetapust, enesevigastamisest, eutanaasiast või abistatud suremisest õiguse, eetika, meditsiini või rahvatervise teemana. Viimane liik ei ole ebaseaduslik ega riku ühtegi ülaltoodud reeglit; lükkame selle tagasi selle reegli alusel. Ka küsimus, mis kõlab nagu kriisis oleva inimese sõnad, ei lase väitlusel alata: selle asemel näete abinumbreid (jaotis 10).
+**Küsimused, mis ei lase väitlusel alata.** Meie küsimuse kontroll (jaotis 8) ei lase nendest küsimustest väitlust alata, isegi kui need on sõnastatud kaudselt: küsimus, mis ähvardab kahjustada teist inimest või teisi inimesi, nimeliselt või nimetult, sealhulgas rünnak nimetute inimeste vastu, kavandab seda või küsib, kas või kuidas neid kahjustada; küsimus, mis küsib, kuidas valmistada relvi, lõhkeaineid, mürke või uimasteid või kuidas toetada terroriakti, või mis seda ülistab; küsimus, mis on vihakõne või religioosne solvang või nõuab seda; ning küsimus enesetapust, enesevigastamisest, eutanaasiast või abistatud suremisest õiguse, eetika, meditsiini või rahvatervise teemana. Viimane liik ei ole ebaseaduslik ega riku ühtegi ülaltoodud reeglit; lükkame selle tagasi selle reegli alusel. Ka küsimus, mis kõlab nagu kriisis oleva inimese sõnad, ei lase väitlusel alata: selle asemel näete abinumbreid (jaotis 10). Väitlust ei lase alata ka küsimus, kuidas kuritegu toime panna või karistusest pääseda või kas keegi peaks kuriteo toime panema, näiteks uimasteid või relvi ebaseaduslikult osta või müüa, varastada või makse varjata; küsimus, kas mõnda seadust tuleks muuta, näiteks kas kanep peaks olema seaduslik, laseb väitlusel endiselt alata.
 
 **Ärge kasutage Dialectical Engine-d petmiseks.** Ärge esitage loodud väljundit inimese kirjutatuna, kui see oleks eksitav, ärge eemaldage sellelt tehisintellekti loodud sisu märgist ega kasutage seda näilise üksmeele, võltstõendite või kellegi teisena esinemise loomiseks.
 
@@ -238,6 +238,8 @@ Kui elate mujal, on lisas A märgitud teie piirkonnas kohaldatav taganemis- või
 Teatame teile püsival andmekandjal ette, mis ja millal muutub. Kui muudatusel on teie juurdepääsule teenusele või selle kasutamisele enam kui vähene negatiivne mõju, võite lepingu tasuta lõpetada **30 päeva** jooksul pärast teate saamist või muudatuse jõustumist, olenevalt sellest, kumb on hilisem, ning tagastame kasutamata ajavahemiku eest ette makstud summa.
 
 **Nende Tingimuste muudatused.** Võime neid Tingimusi samalaadsetel põhjustel muuta. Muudatuste puhul, mis ei vähenda teie õigusi, avaldame uue versiooni koos muudatuste kokkuvõttega ja saadame teile e-kirja vähemalt **30 päeva** enne selle jõustumist; Dialectical Engine kasutamise jätkamine pärast seda kuupäeva tähendab, et nõustute muudatusega, ning võite oma konto enne seda sulgeda. Muudatuste puhul, mis vähendavad teie õigusi — sealhulgas olemasoleva paketi hinnatõus, madalamad kasutuslimiidid, eemaldatud funktsioonid, teie sisu uued kasutusviisid või vastutuse, kohaldatava õiguse või vaidluste lahendamise muudatused — palume teil järgmisel sisselogimisel uue versiooniga sõnaselgelt nõustuda ning muudatust kohaldatakse ainult edaspidi. Me ei kohalda muudatust kunagi tagasiulatuvalt ega kasuta seda jaotist selleks, et muuta tähtaja kestel tasulise teenuse põhiolemust ilma teile väljumisvõimalust pakkumata. Varasemad versioonid jäävad kättesaadavaks aadressil dezbatere.ro/terms/versions.
+
+Versioon 2.6 asendas versiooni 2.5: küsimuse kontroll lükkab tagasi ka küsimuse, kuidas kuritegu toime panna või karistusest pääseda või kas keegi peaks kuriteo toime panema, näiteks uimasteid või relvi ebaseaduslikult osta või müüa, varastada või makse varjata, ega säilita seda; küsimus, kas mõnda seadust tuleks muuta, laseb väitlusel endiselt alata (jaotis 7).
 
 Versioon 2.5 asendas versiooni 2.4: see lisab küsimuse kontrolli, mis loeb iga küsimuse enne väitluse algust, lükkab mõned tagasi ja säilitab meie meeskonna lugemiseks iga tagasilükatud küsimuse, mis ähvardab kahjustada teist inimest või teisi inimesi, nimeliselt või nimetult, sealhulgas rünnak nimetute inimeste vastu, kavandab seda või küsib, kas või kuidas neid kahjustada, või mis küsib, kuidas valmistada relvi, lõhkeaineid, mürke või uimasteid või kuidas toetada terroriakti, või mis seda ülistab (jaotised 7, 8, 10 ja 11); kontrolli, mis loeb iga lõppenud väitluse sünteesi, heakskiitu, mida märgistatud väitlus vajab enne avaldamist, ja väitlusi, mille see kontroll kustutab (jaotised 5, 8, 9, 10 ja 11); seda, mida kasutajatoe vestlus saadab ettevõtte Anthropic mudelile Claude, et see ei säilita midagi sellest, mida kirjutate, ega ava juhtumit, ning et selle nupp „Rääkige inimesega“ näitab meie kasutajatoe aadressi (jaotised 8 ja 10); ning jaotise 7 reegleid, mis keelavad vihakõne mis tahes kujul, relvade või uimastite valmistamise juhised, enesetapule või teiste inimeste kahjustamisele õhutava sisu ja religioosse solvangu ning ütlevad, millised küsimused ei lase väitlusel alata.
 

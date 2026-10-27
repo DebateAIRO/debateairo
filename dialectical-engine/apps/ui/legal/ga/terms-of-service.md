@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Go hachomair
-eyebrow: TÉARMAÍ SEIRBHÍSE · v2.5 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026
+eyebrow: TÉARMAÍ SEIRBHÍSE · v2.6 · I bhFEIDHM 27 SAMHAIN 2026
 title: An méid lena n-aontaíonn tú
 lede: An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.
-endMarker: DEIREADH NA dTÉARMAÍ · v2.5
+endMarker: DEIREADH NA dTÉARMAÍ · v2.6
 bodyLabel: Téacs na dTéarmaí Seirbhíse
 annexTitle: Iarscríbhinn A — Téarmaí réigiúnacha
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 AN DLÍ RIALAITHE
 -->
 
-**Version 2.5 · Effective 12 Deireadh Fómhair 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
+**Version 2.6 · Effective 27 Samhain 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
 
 **In short.** Ní mór duit a bheith 18 mbliana d'aois nó os a chionn. Tógann Dialectical Engine argóintí le samhlacha IS agus d'fhéadfadh gach rud a ghineann sé a bheith mícheart — ní comhairle é. Bíonn do dhíospóireachtaí príobháideach mura bhfoilsíonn tú iad; má fhoilsíonn tú iad, is féidir le duine ar bith iad a léamh. Seoltar téacs a chuireann tú isteach chuig soláthraithe IS atá liostaithe inár gClár Soláthraithe, agus ní úsáidtear é chun samhlacha a oiliúint. Tuairiscigh ábhar neamhdhleathach ag support@dezbatere.ro cibé acu atá cuntas agat nó nach bhfuil. Is é dlí na Rómáine an dlí rialaithe, ach coimeádann tú do chosaintí áitiúla tomhaltóra.
 
@@ -106,7 +106,7 @@ Baineann na rialacha seo leis an méid a chuireann tú isteach, leis an gcaoi a 
 
 **Gan maslú reiligiúnach.** Ná cuir ábhar a mhaslaíonn nó a dhéanann ceap magaidh de reiligiún, dá lucht leanúna nó den mhéid a mheasann siad a bheith naofa isteach agus ná foilsigh é.
 
-**Ceisteanna nach dtosaíonn díospóireacht.** Ní thosaíonn ár seiceáil ceiste (rannán 8) díospóireacht ó na ceisteanna seo, fiú má tá siad foirmlithe go hindíreach: ceist a bhagraíonn, a phleanálann nó a fhiafraíonn ar cheart dochar a dhéanamh do dhuine eile nó do dhaoine eile, ainmnithe nó gan ainm, ionsaí ar dhaoine gan ainm san áireamh, nó conas é a dhéanamh; ceist a iarrann conas airm, pléascáin, nimh nó drugaí a dhéanamh nó conas gníomh sceimhlitheoireachta a thacú, nó a mholann ceann; ceist ar óráid fhuatha nó ar mhaslú reiligiúnach í nó a iarrann ceann acu; agus ceist faoi fhéinmharú, féindochar, eotanáis nó bás cuidithe mar ábhar dlí, eitice, leighis nó sláinte poiblí. Níl an cineál deireanach neamhdhleathach agus ní sháraíonn sé aon cheann de na rialacha thuas; diúltaímid dó faoin riail seo. Ní thosaíonn ceist is cosúil le focail duine i ngéarchéim í díospóireacht ach an oiread: feiceann tú uimhreacha cabhrach ina ionad (rannán 10).
+**Ceisteanna nach dtosaíonn díospóireacht.** Ní thosaíonn ár seiceáil ceiste (rannán 8) díospóireacht ó na ceisteanna seo, fiú má tá siad foirmlithe go hindíreach: ceist a bhagraíonn, a phleanálann nó a fhiafraíonn ar cheart dochar a dhéanamh do dhuine eile nó do dhaoine eile, ainmnithe nó gan ainm, ionsaí ar dhaoine gan ainm san áireamh, nó conas é a dhéanamh; ceist a iarrann conas airm, pléascáin, nimh nó drugaí a dhéanamh nó conas gníomh sceimhlitheoireachta a thacú, nó a mholann ceann; ceist ar óráid fhuatha nó ar mhaslú reiligiúnach í nó a iarrann ceann acu; agus ceist faoi fhéinmharú, féindochar, eotanáis nó bás cuidithe mar ábhar dlí, eitice, leighis nó sláinte poiblí. Níl an cineál deireanach neamhdhleathach agus ní sháraíonn sé aon cheann de na rialacha thuas; diúltaímid dó faoin riail seo. Ní thosaíonn ceist is cosúil le focail duine i ngéarchéim í díospóireacht ach an oiread: feiceann tú uimhreacha cabhrach ina ionad (rannán 10). Ní thosaíonn ceist díospóireacht ach an oiread má fhiafraíonn sí conas coir a dhéanamh nó éalú ó phionós ina leith, nó cé acu ar cheart do dhuine coir a dhéanamh, mar shampla drugaí nó airm a cheannach nó a dhíol go mídhleathach, goid nó imghabháil cánach; tosaíonn ceist faoi cé acu ar cheart dlí a athrú, mar shampla ar cheart cannabas a bheith dleathach, díospóireacht i gcónaí.
 
 **Ná húsáid Dialectical Engine chun meabhlaireacht a dhéanamh.** Ná cuir aschur ginte i láthair mar ábhar scríofa ag duine sa chás ina mbeadh sé sin míthreorach, ná bain an lipéad gur ghin IS é de, ná húsáid é chun comhthoil dhealraitheach, fianaise bhréige nó pearsanú a chruthú.
 
@@ -238,6 +238,8 @@ Má tá cónaí ort in áit eile, sonraítear in Iarscríbhinn A cibé ceart tar
 Insímid duit roimh ré, ar mheán marthanach, cad atá ag athrú agus cathain. Má bhíonn éifeacht dhiúltach níos mó ná mionéifeacht ag an athrú ar do rochtain ar an tseirbhís nó ar d'úsáid aisti, féadfaidh tú foirceannadh saor in aisce laistigh de **30 lá** tar éis duit a bheith curtha ar an eolas, nó tar éis don athrú teacht i bhfeidhm, cibé acu is déanaí, agus aisíocaimid aon mhéid réamhíoctha don tréimhse nár úsáideadh.
 
 **Ar na Téarmaí seo.** Féadfaimid na Téarmaí seo a athrú ar na cineálacha céanna cúiseanna. I gcás athruithe nach laghdaíonn do chearta, foilsímid an leagan nua le hachoimre ar an méid a d'athraigh agus seolaimid ríomhphost chugat **30 lá ar a laghad** sula dtagann sé i bhfeidhm; má leanann tú d'úsáid Dialectical Engine tar éis an dáta sin, ciallaíonn sé go nglacann tú leis, agus féadfaidh tú do chuntas a dhúnadh roimhe sin. I gcás athruithe a laghdaíonn do chearta — lena n-áirítear méaduithe praghais ar phlean atá ann cheana, teorainneacha níos ísle, gnéithe a baineadh, úsáidí nua as d'ábhar, nó athruithe ar dhliteanas, ar an dlí rialaithe nó ar réiteach díospóidí — iarraimid ort glacadh go sainráite leis an leagan nua ag do chéad síniú isteach eile, agus ní bhíonn feidhm ag an athrú ach feasta. Ní dhéanaimid athrú aisghníomhach riamh, agus ní úsáidimid an rannán seo riamh chun croílár an mhéid ar íoc tú as a athrú i lár téarma gan bealach amach a thairiscint duit. Fanann leaganacha roimhe seo ar fáil ag dezbatere.ro/terms/versions.
+
+Tháinig leagan 2.6 in ionad leagan 2.5: diúltaíonn ár seiceáil ceiste freisin do cheist a fhiafraíonn conas coir a dhéanamh nó éalú ó phionós ina leith, nó cé acu ar cheart do dhuine coir a dhéanamh, mar shampla drugaí nó airm a cheannach nó a dhíol go mídhleathach, goid nó imghabháil cánach, agus ní choinnímid í; tosaíonn ceist faoi cé acu ar cheart dlí a athrú díospóireacht i gcónaí (rannán 7).
 
 Tháinig leagan 2.5 in ionad leagan 2.4: cuireann sé an tseiceáil ceiste leis, a léann gach ceist sula dtosaíonn díospóireacht, a dhiúltaíonn do chuid acu, agus a choinníonn gach ceist dhiúltaithe a bhagraíonn dochar a dhéanamh do dhuine eile nó do dhaoine eile, ainmnithe nó gan ainm, ionsaí ar dhaoine gan ainm san áireamh, a phleanálann dochar den sórt sin, nó a fhiafraíonn ar cheart é a dhéanamh nó conas é a dhéanamh, nó a iarrann conas airm, pléascáin, nimh nó drugaí a dhéanamh nó conas gníomh sceimhlitheoireachta a thacú, nó a mholann ceann le go léifidh ár bhfoireann í (rannáin 7, 8, 10 agus 11); an tseiceáil a léann sintéis gach díospóireachta críochnaithe, an formheas a theastaíonn ó dhíospóireacht mharcáilte sula bhféadfar í a fhoilsiú, agus na díospóireachtaí a scriosann an tseiceáil sin (rannáin 5, 8, 9, 10 agus 11); an méid a sheolann an comhrá tacaíochta chuig samhail Claude de chuid Anthropic, an fhíric nach gcoinníonn sé aon ní den méid a scríobhann tú agus nach n-osclaíonn sé aon chás, agus an fhíric go dtaispeánann a chnaipe «Labhair le duine» ár seoladh tacaíochta (rannáin 8 agus 10); agus rialacha i rannán 7 a thoirmisceann óráid fhuatha de gach cineál, treoracha le haghaidh monarú arm nó drugaí, ábhar a spreagann féinmharú nó dochar a dhéanamh do dhaoine eile, agus maslú reiligiúnach, agus a deir na ceisteanna nach dtosaíonn díospóireacht uathu.
 

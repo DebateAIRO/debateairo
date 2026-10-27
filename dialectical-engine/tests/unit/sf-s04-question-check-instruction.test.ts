@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 const labels = [
-  "OWN_CRISIS", "METHODS_OR_ENCOURAGEMENT", "HARM_TO_OTHERS", "WEAPONS_DRUGS_TERRORISM",
+  "OWN_CRISIS", "METHODS_OR_ENCOURAGEMENT", "HARM_TO_OTHERS", "WEAPONS_DRUGS_TERRORISM", "CRIME",
   "HATE_SPEECH", "RELIGIOUS_INSULT", "SENSITIVE_TOPIC", "ORDINARY"
 ] as const;
 
@@ -37,8 +37,17 @@ describe("S04 question-check instruction", () => {
     expect(questionCheckContract().instruction).not.toContain("is not this label, and neither is a question about violence as a subject of politics");
   });
 
+  // Property: crime questions are refused at the start (V 2026-10-27); questions whether a law should change still start.
+  it("carries the crime row exactly, after the weapons row", async () => {
+    const { QUESTION_CHECK_CRIME_ROW_TEXT, questionCheckContract } = await instructionModule();
+    expect(QUESTION_CHECK_CRIME_ROW_TEXT).toBe("CRIME: The question asks how to commit a crime or get away with one, or whether the asker or someone else should commit one, such as buying or selling drugs or weapons illegally, stealing or evading tax; a question about whether a law should change, such as \"Should Romania legalise cannabis?\" or \"Should civilians be allowed to own guns?\", is not this label.");
+    const text = questionCheckContract().instruction;
+    expect(text).toContain(`\n${QUESTION_CHECK_CRIME_ROW_TEXT}\n`);
+    expect(text.indexOf("CRIME:")).toBeGreaterThan(text.indexOf("WEAPONS_DRUGS_TERRORISM:"));
+  });
+
   // Property: the first applicable label wins in the SPEC's priority order.
-  it("lists the eight codes in the SPEC's order", async () => {
+  it("lists the nine codes in the SPEC's order", async () => {
     const { questionCheckContract } = await instructionModule();
     const text = questionCheckContract().instruction;
     const locations = labels.map((label) => text.indexOf(label));

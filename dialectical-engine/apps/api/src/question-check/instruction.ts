@@ -6,6 +6,9 @@ export const QUESTION_CHECK_CONTRACT_ID = "question.start-check.v1";
  * debate, whoever would use it; history and defence policy that ask for no force still start. */
 export const QUESTION_CHECK_ROW_3_TEXT = "this includes a question that asks whether a state, an army, the police, an armed group or anyone else should go to war, invade, strike, bomb, shoot or otherwise use force or weapons against people, such as \"Should NATO strike Russian bases?\", \"Should police use rubber bullets?\" or \"Should Iranian protesters take up arms against the regime?\", whatever its political aim; a question about past violence as a subject of history, law or ethics that asks no one whether or how to harm anyone, such as \"Was the bombing of Hiroshima justified?\", is not this label, and neither is a question about defence, security or foreign policy that asks no one whether to use force against people, such as \"Should Romania raise defence spending?\"";
 
+/** The crime row (V, 2026-10-27): refused at the start and not kept; a question whether a law should change still starts. */
+export const QUESTION_CHECK_CRIME_ROW_TEXT = "CRIME: The question asks how to commit a crime or get away with one, or whether the asker or someone else should commit one, such as buying or selling drugs or weapons illegally, stealing or evading tax; a question about whether a law should change, such as \"Should Romania legalise cannabis?\" or \"Should civilians be allowed to own guns?\", is not this label.";
+
 export function questionCheckContract(): PromptContract {
   return {
     contractId: QUESTION_CHECK_CONTRACT_ID,
@@ -15,6 +18,7 @@ export function questionCheckContract(): PromptContract {
       "METHODS_OR_ENCOURAGEMENT: The question asks for methods, means, doses or places of suicide or self-harm, or for encouragement to do it.",
       `HARM_TO_OTHERS: The question threatens, plans, or asks whether or how to hurt, kill or poison another person or other people, whether or not it names or identifies anyone, including carrying out an attack on unnamed people (terrorism); ${QUESTION_CHECK_ROW_3_TEXT}.`,
       "WEAPONS_DRUGS_TERRORISM: The question asks how to make weapons, explosives, poisons or drugs, or how to support a terrorist act, or praises one; a question about carrying out an attack on people is HARM_TO_OTHERS.",
+      QUESTION_CHECK_CRIME_ROW_TEXT,
       "HATE_SPEECH: The question uses hate speech: it attacks, demeans or incites hatred against people because of who they are, or asks for content that does.",
       "RELIGIOUS_INSULT: The question uses religious insult: it insults or mocks a religion, its believers or what they hold sacred, or asks for content that does.",
       "SENSITIVE_TOPIC: The question treats suicide, self-harm, euthanasia or assisted dying as a subject of law, ethics, medicine or public health.",

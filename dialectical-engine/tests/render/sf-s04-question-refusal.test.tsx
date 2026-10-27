@@ -74,7 +74,7 @@ describe("question refusal screens", () => {
     expect(node.textContent).not.toContain(home["home.crisisSupport.notSaved"]);
   });
 
-  it.each(["HATE_SPEECH", "RELIGIOUS_INSULT", "SENSITIVE_TOPIC"] as const)("does not show a kept line for %s", async (kind) => {
+  it.each(["CRIME", "HATE_SPEECH", "RELIGIOUS_INSULT", "SENSITIVE_TOPIC"] as const)("does not show a kept line for %s", async (kind) => {
     const { node } = await open(refusal(kind));
     expect(part(node, "kept")).toBeNull();
   });
@@ -121,7 +121,7 @@ describe("question refusal screens", () => {
     for (const name of ["emergency", "helpline", "kept"]) expect(part(node, name)).toBeNull();
   });
 
-  it.each(["WEAPONS_DRUGS_TERRORISM", "HATE_SPEECH", "RELIGIOUS_INSULT"] as const)("does not show harm or help-number parts for %s", async (kind) => {
+  it.each(["WEAPONS_DRUGS_TERRORISM", "CRIME", "HATE_SPEECH", "RELIGIOUS_INSULT"] as const)("does not show harm or help-number parts for %s", async (kind) => {
     const { node } = await open(refusal(kind));
     for (const name of ["emergency", "helpline", "help-numbers"]) expect(part(node, name)).toBeNull();
   });

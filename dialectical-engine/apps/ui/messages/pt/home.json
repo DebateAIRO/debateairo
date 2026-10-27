@@ -129,6 +129,7 @@
   "home.questionRefusal.automatic": "A nossa verificação automática recusou-a. Nenhuma pessoa esteve envolvida nesta decisão.",
   "home.questionRefusal.rule.HARM_TO_OTHERS": "Enquadra-se na secção «7. Utilização aceitável» dos nossos Termos: não promovemos debates sobre fazer mal a pessoas, ameaçá-las ou atacá-las.",
   "home.questionRefusal.rule.WEAPONS_DRUGS_TERRORISM": "Enquadra-se na secção «7. Utilização aceitável» dos nossos Termos: não promovemos debates sobre o fabrico de armas, explosivos, venenos ou drogas, nem debates que apoiem ou exaltem o terrorismo.",
+  "home.questionRefusal.rule.CRIME": "Enquadra-se na secção «7. Utilização aceitável» dos nossos Termos: não promovemos debates sobre como cometer um crime ou escapar impune, nem sobre se alguém deveria cometer um.",
   "home.questionRefusal.rule.HATE_SPEECH": "Enquadra-se na secção «7. Utilização aceitável» dos nossos Termos: não promovemos debates que ataquem ou denigram pessoas pelo que são.",
   "home.questionRefusal.rule.RELIGIOUS_INSULT": "Enquadra-se na secção «7. Utilização aceitável» dos nossos Termos: não promovemos debates que insultem ou ridicularizem uma religião, os seus crentes ou aquilo que consideram sagrado.",
   "home.questionRefusal.rule.SENSITIVE_TOPIC": "Enquadra-se na secção «7. Utilização aceitável» dos nossos Termos: não promovemos debates sobre suicídio, automutilação, eutanásia ou morte assistida, nem sequer como questões de direito ou de política.",
