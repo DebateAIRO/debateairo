@@ -2,6 +2,7 @@ import { z } from "zod";
 import { ABSTENTION_KINDS, CLAIM_TYPES, isRunLevelSpendStop, type AbstentionKind, type ClaimType } from "@debateai/kernel";
 import type { CompositionMapRegisterRow } from "@debateai/register";
 import {
+  admitsOnlyTheEmptyList,
   fixReplyStructure,
   modelJsonFenceBody,
   modelJsonLateRepair,
@@ -351,13 +352,6 @@ function dropUnaskedKeys(decoded: unknown, shape: RootShape): Record<string, unk
   return kept;
 }
 
-/** Whether a member's schema admits exactly one value, the empty list: a list pinned to at most 0 entries. */
-function pinnedEmptyList(memberSchema: z.ZodType): boolean {
-  if (!(memberSchema instanceof z.ZodArray) || !memberSchema.safeParse([]).success) return false;
-  const bag = (memberSchema as unknown as { _zod?: { bag?: { maximum?: unknown } } })._zod?.bag;
-  return bag?.maximum === 0;
-}
-
 /**
  * MiMo salvage (2026-10-12, debate 3 seq 160): reviewing a node that sources no edges, MiMo-V2.6-Pro left out
  * `edge_bearings`, which the prompt said "has exactly 0 entries" and the schema pins to length 0: the one value it
@@ -368,7 +362,7 @@ function fillPinnedEmptyLists(decoded: unknown, shape: RootShape): Record<string
   const source = plainObject(decoded);
   if (source === null) return null;
   const missing = missingRequiredMembers(source, shape);
-  if (missing.length === 0 || !missing.every((member) => pinnedEmptyList(shape[member]!))) return null;
+  if (missing.length === 0 || !missing.every((member) => admitsOnlyTheEmptyList(shape[member]!))) return null;
   const filled: Record<string, unknown> = { ...source };
   for (const member of missing) filled[member] = [];
   return filled;

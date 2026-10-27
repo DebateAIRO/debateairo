@@ -59,6 +59,8 @@
   "mail.M10.subject": "Vaše placené funkce jsou pozastaveny",
   "mail.M10.paused": "Vaše banka nám oznámila, že platba za váš tarif {plan} je sporná. Placené funkce jsou pozastaveny, dokud je spor otevřený. Vaše debaty zůstávají zachovány.",
   "mail.M10.contact": "Pokud jde o omyl, napište nám na {merchantEmail}.",
+  "mail.M10_ENDED.subject": "Váš tarif {plan} skončil",
+  "mail.M10_ENDED.ended": "Platba za váš tarif {plan} vám byla po sporu vrácena prostřednictvím vaší banky. Tarif proto skončil a váš účet je nyní na tarifu Zdarma. Vaše debaty zůstávají zachovány.",
   "mail.M11.subject": "Vaši kartu jsme nemohli přijmout",
   "mail.M11.refunded": "Nemůžeme přijímat karty vydané v zemi této karty, proto se částka {refundAmount} stržená nebo blokovaná na ní vrací v plné výši na vaši kartu.",
   "mail.M11.planEnded": "Z tohoto důvodu váš tarif {endedPlan} skončil a váš účet je nyní na tarifu Zdarma. Vaše debaty zůstávají zachovány.",
