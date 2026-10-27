@@ -69,7 +69,10 @@ login can write — a setting, a role, a function argument — makes the databas
   trigger, EXECUTE-able by no login, because a function a request login may EXECUTE answers R42's calls, and a
   "may name" answer is true for an id no row carries (FIX-S01-p1e: two such definers made `rls:proof` print `widened=1`).
   The owner predicate is also ANDed with a run the context owns (`rls.owns_run`) or a parent row the request login can
-  see (`EXISTS`). `cancelByToken` also refuses a link whose owner is not its subscription's first owner.
+  see (`EXISTS`). `cancelByToken` also refuses a link whose owner is not its subscription's first owner, and the
+  renewal's `usableSavedCard` answers only a card a charge of the subscription's owner saved, because the guard checks
+  new writes only: an event stored before 0124 may still name another account's card or link (the subscription fold
+  already refuses an event of another owner).
   `tests/integration/rls-forgery.test.ts` S6.3-F12 writes each of the ten members, once naming the other account's
   entity (refused) and once naming its own (accepted).
 - A statement on a request login costs one InitPlan per policy evaluation (re-hash and session lookup); measured once
