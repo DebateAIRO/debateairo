@@ -16,7 +16,7 @@ import {
   claimLost, DONE, enqueueOnce, failureRetryAt, isThisPaymentSystem, otherPaymentSystem, otherSystemCode, type OutboxHandler,
   type OutboxOutcome
 } from "./outbox.js";
-import { queuePaymentAlert } from "./payment-alert.js";
+import { chargebackLostAlertRef, paymentAlertQueued, queuePaymentAlert } from "./payment-alert.js";
 import { chargeEvent, refundTarget } from "./rows.js";
 import { enqueueCreditNote } from "./settlement.js";
 
@@ -203,6 +203,8 @@ export const PAUSED_EMAIL_SENTENCE = "The customer was emailed that the plan is 
  * before, so the caller's audit line billing.refund.held_by_chargeback stays once per payment too. F6a (final review
  * ui-3): `pausedEmailQueued` is true when the same transaction queued the customer's M10 (the plan paused for this
  * charge-back); the steps then say so, since O3's payment intro leaves what the customer was told to the steps.
+ * Reviewer M-1: nothing is queued (false) once the charge has its O3 CHARGEBACK_LOST (`chargebackLostAlertRef`), which
+ * already tells the owner the refund is held for good; so a PAYMENT_REFUND job running after a 10 sends no second O3.
  */
 export async function queueRefundHeldAlert(
   deps: Parameters<typeof queuePaymentAlert>[0],
@@ -214,12 +216,17 @@ export async function queueRefundHeldAlert(
 ): Promise<boolean> {
   const { chargeId, currency } = charge;
   const paymentId = open.intent.transactionId;
-  return queuePaymentAlert(deps, {
-    code: "REFUND_HELD_BY_CHARGEBACK", reference: `charge ${chargeId}`, dedupeRef: `${chargeId}:REFUND_HELD:${paymentId}`, now,
-    nextSteps: refundHeldSteps({
-      chargeId, currency, paymentId, reason: open.intent.reason, openMicros: open.openMicros, pausedEmailQueued
-    })
-  }, client);
+  const queue = async (on: PoolClient): Promise<boolean> => {
+    // Reviewer M-1: a lost charge-back's O3 CHARGEBACK_LOST already names the held refund; no second O3 after it.
+    if (await paymentAlertQueued(deps.jobs, on, chargebackLostAlertRef(chargeId))) return false;
+    return queuePaymentAlert(deps, {
+      code: "REFUND_HELD_BY_CHARGEBACK", reference: `charge ${chargeId}`, dedupeRef: `${chargeId}:REFUND_HELD:${paymentId}`, now,
+      nextSteps: refundHeldSteps({
+        chargeId, currency, paymentId, reason: open.intent.reason, openMicros: open.openMicros, pausedEmailQueued
+      })
+    }, on);
+  };
+  return client === undefined ? deps.repository.withTransaction(queue) : queue(client);
 }
 
 /**

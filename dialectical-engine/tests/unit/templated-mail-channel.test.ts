@@ -128,9 +128,10 @@ describe("P17 TemplatedMailSender over the dev sendmail capture", { concurrent: 
   it("both senders are P7's BillingMailPort, and the EMAIL job's message goes through unchanged", async () => {
     expect([BILLING_IN_MAIL, ONLY_EXPORT_OUTSIDE_BILLING]).toEqual([true, true]);
     // R-8's sixteen, ruling Q-5's owner template O2, W9's M8_RECEIVED and O2_WITHDRAWAL (P2-I11), and W12's O3 (P2-I16), N9's O4,
-    // N14's O2_REFUND_DUE and O2_REFUND_REMINDER, N17's M12 (ruling PR-17) + data-export S01's DATA_EXPORT.
-    expect(MAIL_TEMPLATE_IDS).toHaveLength(25);
-    expect(MAIL_TEMPLATE_IDS.filter((id) => id !== "DATA_EXPORT")).toHaveLength(24);
+    // N14's O2_REFUND_DUE and O2_REFUND_REMINDER, N17's M12 (ruling PR-17), M10_ENDED (the owner's decision of
+    // 24 October 2026: a lost charge-back ended the plan) + data-export S01's DATA_EXPORT.
+    expect(MAIL_TEMPLATE_IDS).toHaveLength(26);
+    expect(MAIL_TEMPLATE_IDS.filter((id) => id !== "DATA_EXPORT")).toHaveLength(25);
     const memory = new MemoryTemplatedMailSender();
     const ports: BillingMailPort[] = [
       memory,
