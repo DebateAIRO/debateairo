@@ -3129,7 +3129,7 @@ export { replyWordCount } from "./reply-words.js";
 export { CONTENT_FOLLOW_UP_SENTENCES, contentFollowUpSentence, isContentFollowUpSentence } from "./content-follow-up.js";
 // LG-A (spec 2026-10-15, L31-L34): the reply fixer and the failure classes.
 export {
-  REPLY_FAILURE_CLASSES, fixReplyStructure, replyFailureClassOf,
+  REPLY_FAILURE_CLASSES, admitsOnlyTheEmptyList, fixReplyStructure, replyFailureClassOf,
   type ReplyFailureClass, type ReplyFixed, type ReplyFixerOptions, type ReplyFixerRepair
 } from "./reply-fixer.js";
 // LG-A (spec 2026-10-15, L32): the structure-repair call.
