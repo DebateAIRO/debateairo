@@ -296,7 +296,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "欧洲联盟和欧洲经济区",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "本条款正文是为您制定的。此外：您可在居住国法院提起诉讼；适用第 13 节的撤回权；可通过 www.onoratainstanta.ro 使用替代性争议解决机制。德国：dezbatere.ro/cancel 的取消按钮允许您无需登录即可终止订阅；订阅条款、续订期限及通知期限符合《德国民法典》第 309 条第 9 项：每种方案的期限为一个月，并按月续订，直至您取消；您可随时取消，自当月月底起生效。法国：您可在 dezbatere.ro/cancel 通过三个在线步骤终止订阅。意大利：有关责任（第 15 节）、暂停（第 11 节）、变更（第 14 节）和适用法律（第 18 节）的条款须经您特别批准，您在注册时通过单独确认作出该批准。荷兰：本条款在合同订立前以可存储形式提供。波兰：提供波兰语版本；请在语言菜单中选择 Polski。" }
+      { kind: "p", text: "本条款正文是为您制定的。此外：您可在居住国法院提起诉讼；适用第 13 节的撤回权；可通过 www.onoratainstanta.ro 使用替代性争议解决机制。德国：dezbatere.ro/cancel 的取消按钮允许您无需登录即可终止订阅；订阅条款、续订期限及通知期限符合《德国民法典》第 309 条第 9 项：每种方案的期限为一个月，并按月续订，直至您取消；您可随时取消，自当月月底起生效。法国：您可在 dezbatere.ro/cancel 通过三个在线步骤终止订阅。意大利：有关暂停与终止（第 11 节）、付费方案及其续订（第 12 节）、变更（第 14 节）、责任（第 15 节）和适用法律及争议审理地点（第 18 节）的条款，须经您依据《意大利民法典》第 1341 条和第 1342 条特别批准。您在注册时通过单独的方框作出该批准；凡在“地区”字段选择意大利或连接来自意大利的用户，均会看到该方框。荷兰：本条款在合同订立前以可存储形式提供。波兰：提供波兰语版本；请在语言菜单中选择 Polski。" }
     ]
   },
   {
@@ -353,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.4",
-  sha256: "edacef5682f452989d08b743f344e5b15f5cc6631fe7ce4f27dbf987f4882a55",
-  eyebrow: "服务条款 · v2.4 · 生效日期 2026 年 10 月 12 日",
+  version: "2.5",
+  sha256: "ff74e02e881f63f7a7af26b6e35e9d6eb7f08172ce09b39a8ee0c97c25f2c377",
+  eyebrow: "服务条款 · v2.5 · 生效日期 2026 年 10 月 24 日",
   title: "您同意的内容",
   lede: "以通俗语言说明您与 DMS Merchandise Shop S.R.L. 之间的合同。共十九节及附件 A — 请滚动至末尾。",
-  endMarker: "服务条款结束 · v2.4",
+  endMarker: "服务条款结束 · v2.5",
   contact: "support@dezbatere.ro",
   bodyLabel: "服务条款正文",
   sectionIdPrefix: "terms-section-",

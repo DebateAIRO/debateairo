@@ -296,7 +296,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Uni Eropa dan Wilayah Ekonomi Eropa",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Bagian utama Ketentuan ini ditulis untuk Anda. Selain itu: Anda dapat mengajukan perkara di pengadilan negara tempat Anda tinggal; hak penarikan diri dalam bagian 13 berlaku; penyelesaian sengketa alternatif tersedia melalui www.onoratainstanta.ro. Jerman: tombol pembatalan di dezbatere.ro/cancel memungkinkan Anda mengakhiri langganan tanpa masuk; jangka waktu langganan, periode perpanjangan, dan periode pemberitahuan mematuhi §309(9) BGB: setiap paket berjalan selama satu bulan dan diperpanjang setiap bulan hingga Anda membatalkan, dan Anda dapat membatalkan kapan saja, dengan pembatalan berlaku efektif pada akhir bulan berjalan. Prancis: Anda dapat mengakhiri langganan secara daring dalam tiga langkah di dezbatere.ro/cancel. Italia: klausul mengenai tanggung jawab (15), penangguhan (11), perubahan (14), dan hukum yang berlaku (18) memerlukan persetujuan khusus Anda, yang Anda berikan melalui konfirmasi terpisah saat pendaftaran. Belanda: Ketentuan ini diberikan dalam bentuk yang dapat disimpan sebelum kontrak dibuat. Polandia: versi bahasa Polandia tersedia; pilih Polski di menu bahasa." }
+      { kind: "p", text: "Bagian utama Ketentuan ini ditulis untuk Anda. Selain itu: Anda dapat mengajukan perkara di pengadilan negara tempat Anda tinggal; hak penarikan diri dalam bagian 13 berlaku; penyelesaian sengketa alternatif tersedia melalui www.onoratainstanta.ro. Jerman: tombol pembatalan di dezbatere.ro/cancel memungkinkan Anda mengakhiri langganan tanpa masuk; jangka waktu langganan, periode perpanjangan, dan periode pemberitahuan mematuhi §309(9) BGB: setiap paket berjalan selama satu bulan dan diperpanjang setiap bulan hingga Anda membatalkan, dan Anda dapat membatalkan kapan saja, dengan pembatalan berlaku efektif pada akhir bulan berjalan. Prancis: Anda dapat mengakhiri langganan secara daring dalam tiga langkah di dezbatere.ro/cancel. Italia: klausul mengenai penangguhan dan pengakhiran (11), paket berbayar dan perpanjangannya (12), perubahan (14), tanggung jawab (15), dan hukum yang berlaku serta tempat sengketa diperiksa (18) memerlukan persetujuan khusus Anda berdasarkan pasal 1341 dan 1342 Kitab Undang-Undang Hukum Perdata Italia. Anda memberikannya melalui kotak terpisah saat pendaftaran, yang ditampilkan kepada siapa pun yang memilih Italia di kolom Wilayah atau yang koneksinya berasal dari Italia. Belanda: Ketentuan ini diberikan dalam bentuk yang dapat disimpan sebelum kontrak dibuat. Polandia: versi bahasa Polandia tersedia; pilih Polski di menu bahasa." }
     ]
   },
   {
@@ -353,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.4",
-  sha256: "a63685de0aef0265eee785f98172768a23c6fd672b73021336ddc301f8d9b44e",
-  eyebrow: "KETENTUAN LAYANAN · v2.4 · BERLAKU 12 OKTOBER 2026",
+  version: "2.5",
+  sha256: "2b2306c970fa59f9d9361043c0556115a81de63d65a6d086a19cad81f75b8235",
+  eyebrow: "KETENTUAN LAYANAN · v2.5 · BERLAKU 24 OKTOBER 2026",
   title: "Hal yang Anda setujui",
   lede: "Kontrak antara Anda dan DMS Merchandise Shop S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.",
-  endMarker: "AKHIR KETENTUAN · v2.4",
+  endMarker: "AKHIR KETENTUAN · v2.5",
   contact: "support@dezbatere.ro",
   bodyLabel: "Teks Ketentuan Layanan",
   sectionIdPrefix: "terms-section-",

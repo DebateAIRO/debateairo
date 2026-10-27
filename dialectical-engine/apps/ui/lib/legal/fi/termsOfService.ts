@@ -296,7 +296,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Euroopan unioni ja Euroopan talousalue",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Näiden käyttöehtojen yleinen osa on laadittu sinua varten. Lisäksi: voit nostaa kanteen asuinmaasi tuomioistuimissa; kohdan 13 peruuttamisoikeutta sovelletaan; vaihtoehtoinen riidanratkaisu on saatavilla sivuston www.onoratainstanta.ro kautta. Saksa: osoitteessa dezbatere.ro/cancel olevalla peruutuspainikkeella voit päättää tilauksen kirjautumatta; tilauskaudet, uusimisjaksot ja irtisanomisajat ovat BGB:n §309(9):n mukaisia: kukin tilaus kestää yhden kuukauden ja uusiutuu kuukausittain, kunnes peruutat sen, ja voit peruuttaa milloin tahansa niin, että peruutus tulee voimaan kuluvan kuukauden lopussa. Ranska: voit päättää tilauksen verkossa kolmessa vaiheessa osoitteessa dezbatere.ro/cancel. Italia: vastuuta (15), keskeyttämistä (11), muutoksia (14) ja sovellettavaa lakia (18) koskevat ehdot edellyttävät erillistä hyväksyntääsi, jonka annat rekisteröitymisen yhteydessä erillisellä vahvistuksella. Alankomaat: nämä käyttöehdot toimitetaan ennen sopimuksen tekemistä tallennettavassa muodossa. Puola: puolankielinen versio on saatavilla; valitse kielivalikosta Polski." }
+      { kind: "p", text: "Näiden käyttöehtojen yleinen osa on laadittu sinua varten. Lisäksi: voit nostaa kanteen asuinmaasi tuomioistuimissa; kohdan 13 peruuttamisoikeutta sovelletaan; vaihtoehtoinen riidanratkaisu on saatavilla sivuston www.onoratainstanta.ro kautta. Saksa: osoitteessa dezbatere.ro/cancel olevalla peruutuspainikkeella voit päättää tilauksen kirjautumatta; tilauskaudet, uusimisjaksot ja irtisanomisajat ovat BGB:n §309(9):n mukaisia: kukin tilaus kestää yhden kuukauden ja uusiutuu kuukausittain, kunnes peruutat sen, ja voit peruuttaa milloin tahansa niin, että peruutus tulee voimaan kuluvan kuukauden lopussa. Ranska: voit päättää tilauksen verkossa kolmessa vaiheessa osoitteessa dezbatere.ro/cancel. Italia: keskeyttämistä ja päättämistä (11), maksullisia tilauksia ja niiden uusimista (12), muutoksia (14), vastuuta (15) sekä sovellettavaa lakia ja riitojen käsittelypaikkaa (18) koskevat ehdot edellyttävät erityistä hyväksyntääsi Italian siviililain 1341 ja 1342 artiklan nojalla. Annat sen erillisellä ruudulla rekisteröitymisen yhteydessä; ruutu näytetään jokaiselle, joka valitsee Alue-kentässä Italian tai jonka yhteys tulee Italiasta. Alankomaat: nämä käyttöehdot toimitetaan ennen sopimuksen tekemistä tallennettavassa muodossa. Puola: puolankielinen versio on saatavilla; valitse kielivalikosta Polski." }
     ]
   },
   {
@@ -353,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.4",
-  sha256: "3b3011716e6f3587f86008ab3d9f25e4e975e54d657cf5888dccb9ce1c8f0201",
-  eyebrow: "KÄYTTÖEHDOT · v2.4 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN",
+  version: "2.5",
+  sha256: "21d344d24da6585fe3a64b95480046544b6a1c01b8312d30bc1cd776c8033eb9",
+  eyebrow: "KÄYTTÖEHDOT · v2.5 · VOIMASSA 24. LOKAKUUTA 2026 ALKAEN",
   title: "Mihin sitoudut",
   lede: "Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.",
-  endMarker: "KÄYTTÖEHTOJEN LOPPU · v2.4",
+  endMarker: "KÄYTTÖEHTOJEN LOPPU · v2.5",
   contact: "support@dezbatere.ro",
   bodyLabel: "Käyttöehtojen teksti",
   sectionIdPrefix: "terms-section-",

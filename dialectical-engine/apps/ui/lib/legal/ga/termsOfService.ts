@@ -296,7 +296,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "An tAontas Eorpach agus an Limistéar Eorpach Eacnamaíoch",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Scríobhadh príomhchorp na dTéarmaí seo duit. Ina theannta sin: féadfaidh tú imeachtaí a thionscnamh i gcúirteanna na tíre ina bhfuil cónaí ort; tá feidhm ag an gceart tarraingt siar i rannán 13; tá réiteach malartach díospóidí ar fáil trí www.onoratainstanta.ro. An Ghearmáin: ligeann an cnaipe cealaithe ag dezbatere.ro/cancel duit deireadh a chur le síntiús gan síniú isteach; comhlíonann téarmaí síntiúis, tréimhsí athnuachana agus tréimhsí fógra §309(9) BGB: leanann gach plean ar feadh míosa agus athnuaitear gach mí é go dtí go gcealaíonn tú é, agus féadfaidh tú é a chealú am ar bith, le héifeacht ó dheireadh na míosa reatha. An Fhrainc: féadfaidh tú deireadh a chur le síntiús ar líne i dtrí chéim ag dezbatere.ro/cancel. An Iodáil: éilíonn na clásail maidir le dliteanas (15), fionraí (11), athruithe (14) agus an dlí rialaithe (18) do cheadú sonrach, a thugann tú leis an deimhniú ar leith tráth sínithe suas. An Ísiltír: cuirtear na Téarmaí seo ar fáil i bhfoirm instóráilte roimh thabhairt i gcrích. An Pholainn: tá leagan Polainnise ar fáil; roghnaigh Polski sa roghchlár teangacha." }
+      { kind: "p", text: "Scríobhadh príomhchorp na dTéarmaí seo duit. Ina theannta sin: féadfaidh tú imeachtaí a thionscnamh i gcúirteanna na tíre ina bhfuil cónaí ort; tá feidhm ag an gceart tarraingt siar i rannán 13; tá réiteach malartach díospóidí ar fáil trí www.onoratainstanta.ro. An Ghearmáin: ligeann an cnaipe cealaithe ag dezbatere.ro/cancel duit deireadh a chur le síntiús gan síniú isteach; comhlíonann téarmaí síntiúis, tréimhsí athnuachana agus tréimhsí fógra §309(9) BGB: leanann gach plean ar feadh míosa agus athnuaitear gach mí é go dtí go gcealaíonn tú é, agus féadfaidh tú é a chealú am ar bith, le héifeacht ó dheireadh na míosa reatha. An Fhrainc: féadfaidh tú deireadh a chur le síntiús ar líne i dtrí chéim ag dezbatere.ro/cancel. An Iodáil: éilíonn na clásail maidir le fionraí agus foirceannadh (11), pleananna íoctha agus a n-athnuachan (12), athruithe (14), dliteanas (15) agus an dlí rialaithe agus an áit ina n-éistear díospóidí (18) do cheadú sonrach faoi airteagail 1341 agus 1342 de Chód Sibhialta na hIodáile. Tugann tú é le bosca ar leith tráth sínithe suas, a thaispeántar d'aon duine a roghnaíonn an Iodáil sa réimse Réigiún nó a dtagann a gceangal ón Iodáil. An Ísiltír: cuirtear na Téarmaí seo ar fáil i bhfoirm instóráilte roimh thabhairt i gcrích. An Pholainn: tá leagan Polainnise ar fáil; roghnaigh Polski sa roghchlár teangacha." }
     ]
   },
   {
@@ -353,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.4",
-  sha256: "15a6fb837b3e6d646719dc3f25aaa4700bbfd883da57045cf8852147984d06ef",
-  eyebrow: "TÉARMAÍ SEIRBHÍSE · v2.4 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026",
+  version: "2.5",
+  sha256: "bff8536e9152d6c80551047b0d38d9a7c2a78b609556bb22e565f84a8c62f5dc",
+  eyebrow: "TÉARMAÍ SEIRBHÍSE · v2.5 · I bhFEIDHM 24 DEIREADH FÓMHAIR 2026",
   title: "An méid lena n-aontaíonn tú",
   lede: "An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.",
-  endMarker: "DEIREADH NA dTÉARMAÍ · v2.4",
+  endMarker: "DEIREADH NA dTÉARMAÍ · v2.5",
   contact: "support@dezbatere.ro",
   bodyLabel: "Téacs na dTéarmaí Seirbhíse",
   sectionIdPrefix: "terms-section-",

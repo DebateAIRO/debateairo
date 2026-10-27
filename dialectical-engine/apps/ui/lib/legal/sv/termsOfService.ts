@@ -296,7 +296,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Europeiska unionen och Europeiska ekonomiska samarbetsområdet",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Huvuddelen av dessa villkor är skriven för dig. Därutöver gäller följande: du får väcka talan vid domstolarna i det land där du bor; ångerrätten i avsnitt 13 gäller; alternativ tvistlösning är tillgänglig genom www.onoratainstanta.ro. Tyskland: uppsägningsknappen på dezbatere.ro/cancel låter dig säga upp ett abonnemang utan att logga in; abonnemangsvillkor, förnyelseperioder och uppsägningstider följer §309(9) BGB: varje abonnemang löper i en månad och förnyas månadsvis tills du säger upp det, och du kan när som helst säga upp det med verkan från slutet av den pågående månaden. Frankrike: du får säga upp ett abonnemang online i tre steg på dezbatere.ro/cancel. Italien: bestämmelserna om ansvar (15), avstängning (11), ändringar (14) och tillämplig lag (18) kräver ditt särskilda godkännande, vilket du lämnar genom den separata bekräftelsen vid registrering. Nederländerna: dessa villkor tillhandahålls i ett lagringsbart format innan avtalet ingås. Polen: en polsk version finns; välj Polski i språkmenyn." }
+      { kind: "p", text: "Huvuddelen av dessa villkor är skriven för dig. Därutöver gäller följande: du får väcka talan vid domstolarna i det land där du bor; ångerrätten i avsnitt 13 gäller; alternativ tvistlösning är tillgänglig genom www.onoratainstanta.ro. Tyskland: uppsägningsknappen på dezbatere.ro/cancel låter dig säga upp ett abonnemang utan att logga in; abonnemangsvillkor, förnyelseperioder och uppsägningstider följer §309(9) BGB: varje abonnemang löper i en månad och förnyas månadsvis tills du säger upp det, och du kan när som helst säga upp det med verkan från slutet av den pågående månaden. Frankrike: du får säga upp ett abonnemang online i tre steg på dezbatere.ro/cancel. Italien: bestämmelserna om avstängning och uppsägning (11), betalabonnemang och deras förnyelse (12), ändringar (14), ansvar (15) samt tillämplig lag och forum för tvister (18) kräver ditt särskilda godkännande enligt artiklarna 1341 och 1342 i den italienska civillagen. Du lämnar det i en separat ruta vid registrering, som visas för alla som väljer Italien i fältet Region eller vars anslutning kommer från Italien. Nederländerna: dessa villkor tillhandahålls i ett lagringsbart format innan avtalet ingås. Polen: en polsk version finns; välj Polski i språkmenyn." }
     ]
   },
   {
@@ -353,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.4",
-  sha256: "b78e28ca35281d91298a15e87c66d7dfd1a7528d45eb69cea6378a1660e3081e",
-  eyebrow: "ANVÄNDARVILLKOR · v2.4 · GÄLLER FRÅN 12 OKTOBER 2026",
+  version: "2.5",
+  sha256: "73ef2c7049aae76941e9b8fbd07f2dc167b68fd0d67d6d2be6616d9e7de84de0",
+  eyebrow: "ANVÄNDARVILLKOR · v2.5 · GÄLLER FRÅN 24 OKTOBER 2026",
   title: "Vad du godkänner",
   lede: "Avtalet mellan dig och DMS Merchandise Shop S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.",
-  endMarker: "SLUT PÅ VILLKOREN · v2.4",
+  endMarker: "SLUT PÅ VILLKOREN · v2.5",
   contact: "support@dezbatere.ro",
   bodyLabel: "Användarvillkorens text",
   sectionIdPrefix: "terms-section-",

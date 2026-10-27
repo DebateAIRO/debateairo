@@ -250,6 +250,30 @@ describe("data-export snapshot", () => {
     await expect(h.collect()).rejects.toMatchObject({ code: "DATA_EXPORT_SOURCE_FAILED" });
   });
 
+  it("S-IT carries clauses and leg on every legal_acceptances element, null for a non-Italy row, and refuses a raw element lacking clauses", async () => {
+    const h = harness();
+    const fixtureElement = structuredClone(rawFixture.legal_acceptances[0]);
+    const italyElement = { ...structuredClone(fixtureElement), acceptance_id: "acceptance-2", kind: "ITALY_SPECIFIC_APPROVAL", clauses: [11, 12, 14, 15, 18], leg: "IP" };
+    h.raw.legal_acceptances = [fixtureElement, italyElement];
+    const accepted = (await h.collect()).consents.legal_acceptances;
+    expect(accepted).toHaveLength(2);
+    for (const element of accepted) expect(Object.keys(element).sort()).toEqual(["accepted_at", "clauses", "document_sha256", "document_version", "evidence", "kind", "leg", "locale", "surface"]);
+    expect(accepted[0]?.kind).toBe("PRIVACY");
+    expect(accepted[0]?.clauses).toBeNull();
+    expect(accepted[0]?.leg).toBeNull();
+    expect(accepted[1]?.kind).toBe("ITALY_SPECIFIC_APPROVAL");
+    expect(accepted[1]?.clauses).toEqual([11, 12, 14, 15, 18]);
+    expect(accepted[1]?.leg).toBe("IP");
+    expect(JSON.stringify(accepted)).not.toContain('"acceptance_id"');
+
+    const lacking = harness();
+    delete lacking.raw.legal_acceptances[0].clauses;
+    await expect(lacking.collect()).rejects.toMatchObject({ code: "DATA_EXPORT_SOURCE_FAILED" });
+    const lackingLeg = harness();
+    delete lackingLeg.raw.legal_acceptances[0].leg;
+    await expect(lackingLeg.collect()).rejects.toMatchObject({ code: "DATA_EXPORT_SOURCE_FAILED" });
+  });
+
   it("S-11 rejects a records-key failure without a destruction record", async () => {
     const h = harness();
     h.decrypt.openRecord.mockImplementation(() => { throw new Error("records key unavailable"); });

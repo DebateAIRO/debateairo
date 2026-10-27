@@ -296,7 +296,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Avrupa Birliği ve Avrupa Ekonomik Alanı",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Bu Koşulların ana metni sizin için kaleme alınmıştır. Buna ek olarak: yaşadığınız ülkenin mahkemelerinde dava açabilirsiniz; 13. bölümdeki cayma hakkı uygulanır; www.onoratainstanta.ro üzerinden alternatif uyuşmazlık çözümü kullanılabilir. Almanya: dezbatere.ro/cancel adresindeki iptal düğmesi, oturum açmadan aboneliği sona erdirmenize olanak tanır; abonelik süreleri, yenileme dönemleri ve bildirim süreleri §309(9) BGB'ye uygundur: her plan bir ay sürer, siz iptal edene kadar aylık olarak yenilenir ve istediğiniz zaman, içinde bulunulan ayın sonunda geçerli olacak şekilde iptal edebilirsiniz. Fransa: dezbatere.ro/cancel adresinden üç adımda çevrim içi abonelik iptali yapabilirsiniz. İtalya: sorumluluk (15), askıya alma (11), değişiklikler (14) ve uygulanacak hukuk (18) hakkındaki hükümler özel onayınızı gerektirir; kayıt sırasında ayrı bir teyitle bu onayı verirsiniz. Hollanda: bu Koşullar sözleşme kurulmadan önce saklanabilir bir biçimde sunulur. Polonya: Lehçe sürüm mevcuttur; dil menüsünden Polski'yi seçin." }
+      { kind: "p", text: "Bu Koşulların ana metni sizin için kaleme alınmıştır. Buna ek olarak: yaşadığınız ülkenin mahkemelerinde dava açabilirsiniz; 13. bölümdeki cayma hakkı uygulanır; www.onoratainstanta.ro üzerinden alternatif uyuşmazlık çözümü kullanılabilir. Almanya: dezbatere.ro/cancel adresindeki iptal düğmesi, oturum açmadan aboneliği sona erdirmenize olanak tanır; abonelik süreleri, yenileme dönemleri ve bildirim süreleri §309(9) BGB'ye uygundur: her plan bir ay sürer, siz iptal edene kadar aylık olarak yenilenir ve istediğiniz zaman, içinde bulunulan ayın sonunda geçerli olacak şekilde iptal edebilirsiniz. Fransa: dezbatere.ro/cancel adresinden üç adımda çevrim içi abonelik iptali yapabilirsiniz. İtalya: askıya alma ve sona erdirme (11), ücretli planlar ve yenilenmeleri (12), değişiklikler (14), sorumluluk (15) ile uygulanacak hukuk ve uyuşmazlıkların görüleceği yer (18) hakkındaki hükümler, İtalyan Medeni Kanunu'nun 1341 ve 1342. maddeleri uyarınca özel onayınızı gerektirir. Bu onayı kayıt sırasında ayrı bir kutuyla verirsiniz; kutu, Bölge alanında İtalya'yı seçen veya bağlantısı İtalya'dan gelen herkese gösterilir. Hollanda: bu Koşullar sözleşme kurulmadan önce saklanabilir bir biçimde sunulur. Polonya: Lehçe sürüm mevcuttur; dil menüsünden Polski'yi seçin." }
     ]
   },
   {
@@ -353,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.4",
-  sha256: "6fe06d9517e58942de71fc82049b8b245a1a033524ea475a3e30b752c59add25",
-  eyebrow: "HİZMET KOŞULLARI · v2.4 · YÜRÜRLÜK TARİHİ 12 EKİM 2026",
+  version: "2.5",
+  sha256: "80c071f9eb0fc9a68500c8f74213a5b7fa7c8614d52ef7cd8d0aaecb1cb72c68",
+  eyebrow: "HİZMET KOŞULLARI · v2.5 · YÜRÜRLÜK TARİHİ 24 EKİM 2026",
   title: "Kabul ettiğiniz hükümler",
   lede: "Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.",
-  endMarker: "KOŞULLARIN SONU · v2.4",
+  endMarker: "KOŞULLARIN SONU · v2.5",
   contact: "support@dezbatere.ro",
   bodyLabel: "Hizmet Koşulları metni",
   sectionIdPrefix: "terms-section-",

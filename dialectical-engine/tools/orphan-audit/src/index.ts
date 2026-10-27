@@ -590,7 +590,9 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // readRunRegisterVersion (both cast register_version in SQL). migrate() is byte-identical.
 // Side-by-side Phase 2, S9 fix round 1 (2026-10-22, spec §13, ruling R31): isDatabaseFailure and settingsRefusalCode
 // (the one rule both settings caches use) moved here beside isDatabasePoolBusy. migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "86dcfe0ab92121807b4e8d9ef19f84f89c126046f2fda863ee38d43c126e5b1a";
+// Italy clause approval S01-C1 (2026-10-24, mission italy-clause-approval): the reviewed module after its legal-acceptance
+// re-export gained ItalyApprovalAcceptanceRow (migration 0125's row type, one type-only line). migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "f4b13b8ff58a96ffa45abe08353cfe896eb841887a9891df951b6567e635f877";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each

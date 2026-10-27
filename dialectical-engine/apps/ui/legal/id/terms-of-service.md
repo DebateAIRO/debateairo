@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ringkasnya
-eyebrow: KETENTUAN LAYANAN · v2.4 · BERLAKU 12 OKTOBER 2026
+eyebrow: KETENTUAN LAYANAN · v2.5 · BERLAKU 24 OKTOBER 2026
 title: Hal yang Anda setujui
 lede: Kontrak antara Anda dan DMS Merchandise Shop S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.
-endMarker: AKHIR KETENTUAN · v2.4
+endMarker: AKHIR KETENTUAN · v2.5
 bodyLabel: Teks Ketentuan Layanan
 annexTitle: Lampiran A — Ketentuan regional
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 HUKUM YANG BERLAKU
 -->
 
-**Version 2.4 · Effective 12 Oktober 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
+**Version 2.5 · Effective 24 Oktober 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
 
 **In short.** Anda harus berusia 18 tahun atau lebih. Dialectical Engine menyusun argumen dengan model AI dan segala sesuatu yang dihasilkannya mungkin salah — ini bukan nasihat. Debat Anda bersifat privat kecuali Anda memublikasikannya; jika Anda memublikasikannya, siapa pun dapat membacanya. Teks yang Anda kirim diteruskan kepada penyedia AI yang tercantum dalam Daftar Penyedia kami, dan tidak digunakan untuk melatih model. Laporkan konten ilegal ke support@dezbatere.ro, baik Anda memiliki akun maupun tidak. Hukum Rumania berlaku, tetapi perlindungan konsumen setempat Anda tetap berlaku bagi Anda.
 
@@ -277,7 +277,7 @@ Setiap entri berlaku bagi orang yang tinggal di wilayahnya, dan hanya menyatakan
 
 ### A.1 Uni Eropa dan Wilayah Ekonomi Eropa
 
-Bagian utama Ketentuan ini ditulis untuk Anda. Selain itu: Anda dapat mengajukan perkara di pengadilan negara tempat Anda tinggal; hak penarikan diri dalam bagian 13 berlaku; penyelesaian sengketa alternatif tersedia melalui www.onoratainstanta.ro. **Jerman:** tombol pembatalan di dezbatere.ro/cancel memungkinkan Anda mengakhiri langganan tanpa masuk; jangka waktu langganan, periode perpanjangan, dan periode pemberitahuan mematuhi §309(9) BGB: setiap paket berjalan selama satu bulan dan diperpanjang setiap bulan hingga Anda membatalkan, dan Anda dapat membatalkan kapan saja, dengan pembatalan berlaku efektif pada akhir bulan berjalan. **Prancis:** Anda dapat mengakhiri langganan secara daring dalam tiga langkah di dezbatere.ro/cancel. **Italia:** klausul mengenai tanggung jawab (15), penangguhan (11), perubahan (14), dan hukum yang berlaku (18) memerlukan persetujuan khusus Anda, yang Anda berikan melalui konfirmasi terpisah saat pendaftaran. **Belanda:** Ketentuan ini diberikan dalam bentuk yang dapat disimpan sebelum kontrak dibuat. **Polandia:** versi bahasa Polandia tersedia; pilih Polski di menu bahasa.
+Bagian utama Ketentuan ini ditulis untuk Anda. Selain itu: Anda dapat mengajukan perkara di pengadilan negara tempat Anda tinggal; hak penarikan diri dalam bagian 13 berlaku; penyelesaian sengketa alternatif tersedia melalui www.onoratainstanta.ro. **Jerman:** tombol pembatalan di dezbatere.ro/cancel memungkinkan Anda mengakhiri langganan tanpa masuk; jangka waktu langganan, periode perpanjangan, dan periode pemberitahuan mematuhi §309(9) BGB: setiap paket berjalan selama satu bulan dan diperpanjang setiap bulan hingga Anda membatalkan, dan Anda dapat membatalkan kapan saja, dengan pembatalan berlaku efektif pada akhir bulan berjalan. **Prancis:** Anda dapat mengakhiri langganan secara daring dalam tiga langkah di dezbatere.ro/cancel. **Italia:** klausul mengenai penangguhan dan pengakhiran (11), paket berbayar dan perpanjangannya (12), perubahan (14), tanggung jawab (15), dan hukum yang berlaku serta tempat sengketa diperiksa (18) memerlukan persetujuan khusus Anda berdasarkan pasal 1341 dan 1342 Kitab Undang-Undang Hukum Perdata Italia. Anda memberikannya melalui kotak terpisah saat pendaftaran, yang ditampilkan kepada siapa pun yang memilih Italia di kolom Wilayah atau yang koneksinya berasal dari Italia. **Belanda:** Ketentuan ini diberikan dalam bentuk yang dapat disimpan sebelum kontrak dibuat. **Polandia:** versi bahasa Polandia tersedia; pilih Polski di menu bahasa.
 
 ### A.2 Amerika Serikat
 

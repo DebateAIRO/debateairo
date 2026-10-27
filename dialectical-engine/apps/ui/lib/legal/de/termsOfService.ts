@@ -296,7 +296,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Europäische Union und Europäischer Wirtschaftsraum",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Der allgemeine Teil dieser Nutzungsbedingungen ist für Sie abgefasst. Zusätzlich gilt: Sie können vor den Gerichten des Landes klagen, in dem Sie leben; das Widerrufsrecht nach Abschnitt 13 findet Anwendung; alternative Streitbeilegung ist über www.onoratainstanta.ro möglich. Deutschland: Über die Kündigungsschaltfläche unter dezbatere.ro/cancel können Sie ein Abonnement ohne Anmeldung beenden; Vertragslaufzeiten, Verlängerungszeiträume und Kündigungsfristen entsprechen §309(9) BGB: Jeder Tarif läuft einen Monat und verlängert sich monatlich, bis Sie kündigen, und Sie können jederzeit mit Wirkung zum Ende des laufenden Monats kündigen. Frankreich: Sie können ein Abonnement online in drei Schritten unter dezbatere.ro/cancel beenden. Italien: Die Klauseln zur Haftung (15), Sperrung (11), zu Änderungen (14) und zum anwendbaren Recht (18) bedürfen Ihrer gesonderten Zustimmung, die Sie durch eine separate Bestätigung bei der Registrierung erteilen. Niederlande: Diese Nutzungsbedingungen werden vor Vertragsschluss in speicherbarer Form bereitgestellt. Polen: Eine polnische Fassung ist verfügbar; wählen Sie im Sprachmenü Polski." }
+      { kind: "p", text: "Der allgemeine Teil dieser Nutzungsbedingungen ist für Sie abgefasst. Zusätzlich gilt: Sie können vor den Gerichten des Landes klagen, in dem Sie leben; das Widerrufsrecht nach Abschnitt 13 findet Anwendung; alternative Streitbeilegung ist über www.onoratainstanta.ro möglich. Deutschland: Über die Kündigungsschaltfläche unter dezbatere.ro/cancel können Sie ein Abonnement ohne Anmeldung beenden; Vertragslaufzeiten, Verlängerungszeiträume und Kündigungsfristen entsprechen §309(9) BGB: Jeder Tarif läuft einen Monat und verlängert sich monatlich, bis Sie kündigen, und Sie können jederzeit mit Wirkung zum Ende des laufenden Monats kündigen. Frankreich: Sie können ein Abonnement online in drei Schritten unter dezbatere.ro/cancel beenden. Italien: Die Klauseln zu Sperrung und Kündigung (11), zu kostenpflichtigen Tarifen und ihrer Verlängerung (12), zu Änderungen (14), zur Haftung (15) sowie zu anwendbarem Recht und Gerichtsstand (18) bedürfen Ihrer gesonderten Zustimmung nach den Artikeln 1341 und 1342 des italienischen Zivilgesetzbuchs. Sie erteilen sie durch ein separates Kästchen bei der Registrierung, das jedem angezeigt wird, der im Feld Region Italien wählt oder dessen Verbindung aus Italien stammt. Niederlande: Diese Nutzungsbedingungen werden vor Vertragsschluss in speicherbarer Form bereitgestellt. Polen: Eine polnische Fassung ist verfügbar; wählen Sie im Sprachmenü Polski." }
     ]
   },
   {
@@ -353,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.4",
-  sha256: "cf3cd14cabfd3e9e3173cc49cee7282912c2175fdb3d2bc64abbbbc40d93204f",
-  eyebrow: "NUTZUNGSBEDINGUNGEN · v2.4 · GÜLTIG AB 12. OKTOBER 2026",
+  version: "2.5",
+  sha256: "01543ed19d57b208cda12e60206b35dc57eb26ed7e055310ae014856a46bd4fb",
+  eyebrow: "NUTZUNGSBEDINGUNGEN · v2.5 · GÜLTIG AB 24. OKTOBER 2026",
   title: "Womit Sie sich einverstanden erklären",
   lede: "Der Vertrag zwischen Ihnen und DMS Merchandise Shop S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.",
-  endMarker: "ENDE DER NUTZUNGSBEDINGUNGEN · v2.4",
+  endMarker: "ENDE DER NUTZUNGSBEDINGUNGEN · v2.5",
   contact: "support@dezbatere.ro",
   bodyLabel: "Text der Nutzungsbedingungen",
   sectionIdPrefix: "terms-section-",

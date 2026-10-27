@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lühidalt
-eyebrow: TEENUSETINGIMUSED · v2.4 · KEHTIB ALATES 12. OKTOOBRIST 2026
+eyebrow: TEENUSETINGIMUSED · v2.5 · KEHTIB ALATES 24. OKTOOBRIST 2026
 title: Millega te nõustute
 lede: Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.
-endMarker: TINGIMUSTE LÕPP · v2.4
+endMarker: TINGIMUSTE LÕPP · v2.5
 bodyLabel: Teenusetingimuste tekst
 annexTitle: Lisa A — Piirkondlikud tingimused
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 KOHALDATAV ÕIGUS
 -->
 
-**Version 2.4 · Effective 12. oktoober 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
+**Version 2.5 · Effective 24. oktoober 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
 
 **In short.** Peate olema vähemalt 18-aastane. Dialectical Engine koostab tehisintellektimudelite abil argumente ja kõik selle loodud tulemused võivad olla valed — need ei ole nõuanded. Teie väitlused on privaatsed, kui te neid ei avalda; avaldamise korral saab igaüks neid lugeda. Teie sisestatud tekst saadetakse meie tehisintellekti pakkujate registris loetletud pakkujatele ja seda ei kasutata mudelite treenimiseks. Teatage ebaseaduslikust sisust aadressil support@dezbatere.ro, olenemata sellest, kas teil on konto. Kohaldatakse Rumeenia õigust, kuid teile jääb teie kohaliku tarbijakaitse tagatud kaitse.
 
@@ -277,7 +277,7 @@ Iga kirjet kohaldatakse inimestele, kes elavad vastavas piirkonnas, ning selles 
 
 ### A.1 Euroopa Liit ja Euroopa Majanduspiirkond
 
-Nende Tingimuste põhiosa on kirjutatud teile. Lisaks: võite esitada hagi oma elukohariigi kohtule; kohaldatakse jaotises 13 sätestatud taganemisõigust; alternatiivne vaidluste lahendamine on kättesaadav veebisaidi www.onoratainstanta.ro kaudu. **Saksamaa:** tühistamisnupp aadressil dezbatere.ro/cancel võimaldab teil tellimuse sisse logimata lõpetada; tellimistingimused, uuendamisperioodid ja etteteatamistähtajad vastavad BGB § 309 lõikele 9: iga pakett kestab ühe kuu ja uueneb igakuiselt, kuni selle tühistate, ning tühistada saab igal ajal, kusjuures tühistamine jõustub jooksva kuu lõpus. **Prantsusmaa:** saate tellimuse veebis kolme sammuga lõpetada aadressil dezbatere.ro/cancel. **Itaalia:** vastutuse (15), peatamise (11), muudatuste (14) ja kohaldatava õiguse (18) klauslid nõuavad teie eraldi heakskiitu, mille annate registreerumisel eraldi kinnitusega. **Madalmaad:** need Tingimused esitatakse enne lepingu sõlmimist salvestatavas vormis. **Poola:** poolakeelne versioon on saadaval; valige keelemenüüst Polski.
+Nende Tingimuste põhiosa on kirjutatud teile. Lisaks: võite esitada hagi oma elukohariigi kohtule; kohaldatakse jaotises 13 sätestatud taganemisõigust; alternatiivne vaidluste lahendamine on kättesaadav veebisaidi www.onoratainstanta.ro kaudu. **Saksamaa:** tühistamisnupp aadressil dezbatere.ro/cancel võimaldab teil tellimuse sisse logimata lõpetada; tellimistingimused, uuendamisperioodid ja etteteatamistähtajad vastavad BGB § 309 lõikele 9: iga pakett kestab ühe kuu ja uueneb igakuiselt, kuni selle tühistate, ning tühistada saab igal ajal, kusjuures tühistamine jõustub jooksva kuu lõpus. **Prantsusmaa:** saate tellimuse veebis kolme sammuga lõpetada aadressil dezbatere.ro/cancel. **Itaalia:** peatamise ja lõpetamise (11), tasuliste pakettide ja nende uuendamise (12), muudatuste (14), vastutuse (15) ning kohaldatava õiguse ja vaidluste lahendamise koha (18) klauslid nõuavad teie eraldi heakskiitu Itaalia tsiviilkoodeksi artiklite 1341 ja 1342 alusel. Annate selle registreerumisel eraldi ruuduga, mis kuvatakse igaühele, kes valib väljal Piirkond Itaalia või kelle ühendus pärineb Itaaliast. **Madalmaad:** need Tingimused esitatakse enne lepingu sõlmimist salvestatavas vormis. **Poola:** poolakeelne versioon on saadaval; valige keelemenüüst Polski.
 
 ### A.2 Ameerika Ühendriigid
 

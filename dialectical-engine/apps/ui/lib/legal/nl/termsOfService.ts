@@ -296,7 +296,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Europese Unie en Europese Economische Ruimte",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "De hoofdtekst van deze Voorwaarden is voor u geschreven. Daarnaast geldt: u kunt een procedure aanhangig maken bij de rechter van het land waar u woont; het herroepingsrecht van hoofdstuk 13 is van toepassing; alternatieve geschillenbeslechting is beschikbaar via www.onoratainstanta.ro. Duitsland: met de opzeggingsknop op dezbatere.ro/cancel kunt u een abonnement beëindigen zonder u aan te melden; de abonnementsduur, verlengingsperioden en opzegtermijnen voldoen aan §309(9) BGB: elk abonnement loopt een maand en wordt maandelijks verlengd totdat u opzegt, en u kunt op elk moment opzeggen met ingang van het einde van de lopende maand. Frankrijk: u kunt een abonnement in drie stappen online beëindigen op dezbatere.ro/cancel. Italië: de bepalingen inzake aansprakelijkheid (15), opschorting (11), wijzigingen (14) en toepasselijk recht (18) vereisen uw specifieke goedkeuring, die u via de afzonderlijke bevestiging bij registratie geeft. Nederland: deze Voorwaarden worden vóór het sluiten van de overeenkomst in een opslagbare vorm verstrekt. Polen: er is een Poolse versie beschikbaar; kies Polski met de taalkeuzeschakelaar." }
+      { kind: "p", text: "De hoofdtekst van deze Voorwaarden is voor u geschreven. Daarnaast geldt: u kunt een procedure aanhangig maken bij de rechter van het land waar u woont; het herroepingsrecht van hoofdstuk 13 is van toepassing; alternatieve geschillenbeslechting is beschikbaar via www.onoratainstanta.ro. Duitsland: met de opzeggingsknop op dezbatere.ro/cancel kunt u een abonnement beëindigen zonder u aan te melden; de abonnementsduur, verlengingsperioden en opzegtermijnen voldoen aan §309(9) BGB: elk abonnement loopt een maand en wordt maandelijks verlengd totdat u opzegt, en u kunt op elk moment opzeggen met ingang van het einde van de lopende maand. Frankrijk: u kunt een abonnement in drie stappen online beëindigen op dezbatere.ro/cancel. Italië: de bepalingen inzake opschorting en beëindiging (11), betaalde abonnementen en de verlenging daarvan (12), wijzigingen (14), aansprakelijkheid (15) en toepasselijk recht en bevoegde rechter (18) vereisen uw specifieke goedkeuring op grond van de artikelen 1341 en 1342 van het Italiaanse Burgerlijk Wetboek. U geeft die goedkeuring met een afzonderlijk vakje bij registratie, dat wordt getoond aan iedereen die in het veld \"Regio\" Italië kiest of van wie de verbinding uit Italië komt. Nederland: deze Voorwaarden worden vóór het sluiten van de overeenkomst in een opslagbare vorm verstrekt. Polen: er is een Poolse versie beschikbaar; kies Polski met de taalkeuzeschakelaar." }
     ]
   },
   {
@@ -353,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.4",
-  sha256: "15af2c8c0f812e419911d11070a71e4b7b56e7cdb1cdc65b50f1606458dfa8af",
-  eyebrow: "SERVICEVOORWAARDEN · v2.4 · VAN KRACHT OP 12 OKTOBER 2026",
+  version: "2.5",
+  sha256: "9488ba7d7d56ade285e3b75c90e252c456901bba17ae9b64f0f8b6a8d44d0d5a",
+  eyebrow: "SERVICEVOORWAARDEN · v2.5 · VAN KRACHT OP 24 OKTOBER 2026",
   title: "Waarmee u instemt",
   lede: "De overeenkomst tussen u en DMS Merchandise Shop S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.",
-  endMarker: "EINDE VAN DE VOORWAARDEN · v2.4",
+  endMarker: "EINDE VAN DE VOORWAARDEN · v2.5",
   contact: "support@dezbatere.ro",
   bodyLabel: "Tekst van de Servicevoorwaarden",
   sectionIdPrefix: "terms-section-",

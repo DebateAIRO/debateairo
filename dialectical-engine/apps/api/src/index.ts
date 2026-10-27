@@ -215,7 +215,9 @@ import {
   parseReleaseKey,
   releaseTaskName,
   TypedDomainError,
+  ITALY_APPROVAL_REQUIRED,
   type DeclaredRegion,
+  type ItalyApprovalLeg,
   type RiskTier,
   type TierSource
 } from "@debateai/kernel";
@@ -292,6 +294,8 @@ import {
 import type { LegacyRunClaimApplication } from "./legacy-claim.js";
 import type { LegalAcceptanceApplication } from "./legal.js";
 import type { CountryGate } from "./country-gate.js";
+import type { GeoLookup } from "@debateai/geo";
+import { decideItalyApproval } from "./italy-approval.js";
 import {
   EmailChangeError,
   type EmailChangeErrorCode,
@@ -1869,6 +1873,13 @@ export interface ApiOptions {
    */
   readonly countryGate?: CountryGate;
   /**
+   * Italy clause approval (S01, R14-R17): the one GeoLookup the country gate also asks (main.ts composes it whenever
+   * hosted, gate or not) and the line sink for the IP leg's skips. Without `lookup` the IP leg is skipped and logged on
+   * every sign-up; the picked leg still decides. Absent = a composition that predates this mission (tests): the picked
+   * leg still decides, the IP leg is skipped and nothing is logged.
+   */
+  readonly italyApproval?: Readonly<{ lookup?: GeoLookup; log: (line: string) => void }>;
+  /**
    * A21 (owner decision O4): whether a VALID model scorecard is in force — the yes/no
    * GET /v1/session tells the /new page, which marks the model-strength control "not in
    * effect" when it is not. Composed from the same scorecard read admission runs under
@@ -2398,6 +2409,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   const mailDisplays = new WeakMap<object, Readonly<{ locale: string; timeZone: string | null }>>();
   // Region picker S01: parsed region for the current register request only.
   const registerDeclaredRegions = new WeakMap<object, DeclaredRegion>();
+  // Italy clause approval S01: the leg the Italy hook decided for this register request (set only when one fired).
+  const registerItalyLegs = new WeakMap<object, ItalyApprovalLeg>();
   const sourceFor = (request: {
     readonly ip: string;
     readonly id: string;
@@ -2429,7 +2442,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       ...(mailDisplays.get(request) === undefined ? {} : { mailDisplay: mailDisplays.get(request)! }),
       // C03.3 (R-09, D-54): the request's mail language, read once here: the register or resend body, else the cookie, else en.
       mailLocale: resolveSourceMailLocale(request.headers.cookie as string | undefined, mailDisplays.get(request)?.locale),
-      ...(region === undefined ? {} : { region })
+      ...(region === undefined ? {} : { region }),
+      ...(registerItalyLegs.get(request) === undefined ? {} : { italyLeg: registerItalyLegs.get(request)! })
     });
   };
   const admissionRefusalAuditedUntil = new Map<string, number>();
@@ -2739,6 +2753,33 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (admission !== undefined) sourceAdmissions.set(request, admission);
     try { await requireTurnstileProof(options.turnstile, { token: parsed.data.turnstile_token, action: signup ? "signup" : "resend-verification" }); }
     catch (error) { admission?.release(); sourceAdmissions.delete(request); throw error; }
+  });
+  /**
+   * Italy clause approval S01 (R7, R9-R11, R15): the server decides with the page's OR — Italy picked in Region, or
+   * this request's IP in Italy by the one GeoLookup — after every earlier guard (country gate, region and US state,
+   * age, strict schema, stale documents, bot check). A triggered sign-up without the approval gets one constant 409
+   * that names neither the leg nor a country, whatever the address; the onResponse hook above releases its source
+   * admission as for every response. The approval is read from the SUBMITTED copy, and where neither leg fired it is
+   * ignored and never stored.
+   */
+  api.addHook("preHandler", async (request, reply) => {
+    const path = request.routeOptions.url;
+    if (request.method !== "POST" || (path !== "/v1/auth/register" && path !== "/v1/auth/social/signup/complete")) return;
+    const region = registerDeclaredRegions.get(request);
+    const submitted = registerPublicBodies.get(request);
+    if (region === undefined || submitted === undefined) throw new AuthFlowError("AUTH_INPUT_INVALID");
+    const leg = decideItalyApproval({
+      pickedCountry: region.country,
+      ip: sourceFor(request).ip,
+      surface: path === "/v1/auth/register" ? "register" : "social_complete",
+      lookup: options.italyApproval?.lookup,
+      log: options.italyApproval?.log ?? (() => undefined)
+    });
+    if (leg === null) return;
+    if (submitted.italy_approval !== true) {
+      return reply.status(409).send({ error: ITALY_APPROVAL_REQUIRED, message: ITALY_APPROVAL_REQUIRED });
+    }
+    registerItalyLegs.set(request, leg);
   });
   /**
    * L1-F6: unknown routes, and HEAD/OPTIONS on known ones (`exposeHeadRoutes`

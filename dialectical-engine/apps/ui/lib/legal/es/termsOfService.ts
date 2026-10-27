@@ -296,7 +296,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Unión Europea y Espacio Económico Europeo",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "El cuerpo de estos Términos está redactado para usted. Además: puede iniciar un procedimiento ante los tribunales del país donde vive; se aplica el derecho de desistimiento de la sección 13; puede recurrir a la resolución alternativa de litigios a través de www.onoratainstanta.ro. Alemania: el botón de cancelación disponible en dezbatere.ro/cancel le permite finalizar una suscripción sin iniciar sesión; las condiciones de suscripción, los períodos de renovación y los plazos de preaviso cumplen lo dispuesto en el §309(9) BGB: cada plan tiene una duración de un mes y se renueva mensualmente hasta que lo cancele, y puede cancelarlo en cualquier momento con efecto al final del mes en curso. Francia: puede finalizar una suscripción en línea en tres pasos en dezbatere.ro/cancel. Italia: las cláusulas sobre responsabilidad (15), suspensión (11), cambios (14) y ley aplicable (18) requieren su aprobación específica, que presta mediante la confirmación separada al registrarse. Países Bajos: estos Términos se facilitan en un formato almacenable antes de su celebración. Polonia: hay una versión en polaco disponible; elija Polski en el selector de idioma." }
+      { kind: "p", text: "El cuerpo de estos Términos está redactado para usted. Además: puede iniciar un procedimiento ante los tribunales del país donde vive; se aplica el derecho de desistimiento de la sección 13; puede recurrir a la resolución alternativa de litigios a través de www.onoratainstanta.ro. Alemania: el botón de cancelación disponible en dezbatere.ro/cancel le permite finalizar una suscripción sin iniciar sesión; las condiciones de suscripción, los períodos de renovación y los plazos de preaviso cumplen lo dispuesto en el §309(9) BGB: cada plan tiene una duración de un mes y se renueva mensualmente hasta que lo cancele, y puede cancelarlo en cualquier momento con efecto al final del mes en curso. Francia: puede finalizar una suscripción en línea en tres pasos en dezbatere.ro/cancel. Italia: las cláusulas sobre suspensión y terminación (11), planes de pago y su renovación (12), cambios (14), responsabilidad (15) y ley aplicable y órganos competentes para conocer de las controversias (18) requieren su aprobación específica conforme a los artículos 1341 y 1342 del Código Civil italiano. Usted la presta mediante una casilla separada al registrarse, que se muestra a quien elija Italia en el campo Región o cuya conexión proceda de Italia. Países Bajos: estos Términos se facilitan en un formato almacenable antes de su celebración. Polonia: hay una versión en polaco disponible; elija Polski en el selector de idioma." }
     ]
   },
   {
@@ -353,12 +353,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.4",
-  sha256: "98684be8aa41b41fb239d70a9af88605ba76cec643fe6253e87a15b0d07cfe7b",
-  eyebrow: "TÉRMINOS DE SERVICIO · v2.4 · EN VIGOR DESDE 12 DE OCTUBRE DE 2026",
+  version: "2.5",
+  sha256: "216369bb8dec659ce0dbd50bdd145ffc04b86fa29edfae8096a6088de1a02f3e",
+  eyebrow: "TÉRMINOS DE SERVICIO · v2.5 · EN VIGOR DESDE 24 DE OCTUBRE DE 2026",
   title: "Lo que usted acepta",
   lede: "El contrato entre usted y DMS Merchandise Shop S.R.L., en lenguaje claro. Diecinueve secciones y el anexo A — desplácese hasta el final.",
-  endMarker: "FIN DE LOS TÉRMINOS · v2.4",
+  endMarker: "FIN DE LOS TÉRMINOS · v2.5",
   contact: "support@dezbatere.ro",
   bodyLabel: "Texto de los Términos de servicio",
   sectionIdPrefix: "terms-section-",
