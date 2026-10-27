@@ -8,7 +8,8 @@ import {
   digTargetQuestions,
   ownWords,
   parseDigQuestion,
-  sameQuestionText
+  sameQuestionText,
+  startsWithLabel
 } from "../../apps/ui/lib/v4/askText.js";
 import { EMPTY_GOAL, type V4OpenQuestion, type V4Path } from "../../apps/ui/lib/v4/types.js";
 
@@ -304,5 +305,14 @@ describe("parseDigQuestion (round trips)", () => {
     expect(parsed?.parentQuestion.endsWith("…")).toBe(true);
     expect(sameQuestionText(parsed?.parentQuestion ?? "", longQuestion)).toBe(true);
     expect(sameQuestionText(parsed?.parentQuestion ?? "", "Something else entirely")).toBe(false);
+  });
+});
+
+describe("startsWithLabel", () => {
+  it("spots a sentence that already opens with the label, ignoring case and the colon", () => {
+    expect(startsWithLabel("How sure we are: fairly sure.", "How sure we are:")).toBe(true);
+    expect(startsWithLabel("how sure we are — fairly", "How sure we are:")).toBe(true);
+    expect(startsWithLabel("We are fairly sure about the direction.", "How sure we are:")).toBe(false);
+    expect(startsWithLabel("Anything", "  :  ")).toBe(false);
   });
 });

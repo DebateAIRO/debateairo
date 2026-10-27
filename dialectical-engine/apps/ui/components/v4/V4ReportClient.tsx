@@ -8,7 +8,7 @@ import { V4Header } from "@/components/v4/V4Header";
 import { V4TrustBar } from "@/components/v4/V4TrustBar";
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { STORY_POLLING, unreadableStory } from "@/lib/v3/useAnswerStory";
-import { addedLines, ownWords } from "@/lib/v4/askText";
+import { addedLines, ownWords, startsWithLabel } from "@/lib/v4/askText";
 import { digLinksFor, readQuestionIndex, type IndexEntry } from "@/lib/v4/digIndex";
 import { loadDigView, loadStory, loadV4, storyReadFailed } from "@/lib/v4/load";
 import { buildV4Map } from "@/lib/v4/mapModel";
@@ -274,7 +274,10 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
           {noShortAnswer ? <p className="v4RepNote" role="status">{storyNote}</p> : null}
           {showConfidence ? (
             <p className="v4RepConfidence">
-              <b>{t(catalog, "v4.report.confidenceLabel")}</b>{" "}
+              {/* The story's sentence may already open with these words; then the label is not repeated. */}
+              {startsWithLabel(map.confidence ?? "", t(catalog, "v4.report.confidenceLabel"))
+                ? null
+                : <><b>{t(catalog, "v4.report.confidenceLabel")}</b>{" "}</>}
               <span data-ai-generated="true">{map.confidence}</span>
             </p>
           ) : null}

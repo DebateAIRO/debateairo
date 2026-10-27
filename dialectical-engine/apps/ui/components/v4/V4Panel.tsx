@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { ReactNode, RefObject } from "react";
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
-import { addedLines, ownWords } from "@/lib/v4/askText";
+import { addedLines, ownWords, startsWithLabel } from "@/lib/v4/askText";
 import { openQuestionsOf } from "@/lib/v4/mapModel";
 import { levelHref } from "@/lib/v4/storage";
 import { countTrust } from "@/lib/v4/trust";
@@ -380,7 +380,9 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
       {panel.readingLevel === "expert" && confidence.length > 0
         ? (
           <p className="v4PanelText">
-            <b>{t(catalog, "v4.panel.confidence")}</b>{" "}
+            {startsWithLabel(confidence, t(catalog, "v4.panel.confidence"))
+              ? null
+              : <><b>{t(catalog, "v4.panel.confidence")}</b>{" "}</>}
             <span data-ai-generated="true">{confidence}</span>
           </p>
         )

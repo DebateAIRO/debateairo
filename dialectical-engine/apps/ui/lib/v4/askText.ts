@@ -91,6 +91,15 @@ export function ownWords(questionLine: string): string {
   return at === -1 ? text : text.slice(0, at).trim();
 }
 
+/**
+ * True when an AI sentence already opens with a page label ("How sure we are: …"), so the label is not printed twice.
+ * Case and the label's closing colon or spaces are ignored.
+ */
+export function startsWithLabel(text: string, label: string): boolean {
+  const stem = label.replace(/[\s:：]+$/u, "").toLocaleLowerCase();
+  return stem.length > 0 && text.trim().toLocaleLowerCase().startsWith(stem);
+}
+
 /** The non-empty lines after the first blank line (the D2 sentences, or a dig's "follows from" chain), trimmed. */
 export function addedLines(questionLine: string): readonly string[] {
   const text = questionLine.trim();
