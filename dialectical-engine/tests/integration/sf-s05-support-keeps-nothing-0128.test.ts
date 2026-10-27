@@ -28,6 +28,7 @@ async function prepared(check: (db: TestDatabase, before: readonly unknown[], ow
     [userId, createHash("sha256").update(userId).digest(), userId])).rows[0]!.owner_ref as string;
     await db.pool.query(`GRANT INSERT ON ${tables.map((table) => `support.${table}`).join(", ")} TO debateai_support`);
     await seedSupportFixture(db.pool, { ownerRef: owner });
+    await db.pool.query("DELETE FROM public.debateai_schema_migration_step_n1 WHERE source_name='0128_support_answer_scope.sql'");
     await db.pool.query("DELETE FROM public.debateai_schema_migration_step WHERE source_name='0128_support_answer_scope.sql'");
     await db.pool.query("DELETE FROM public.debateai_schema_migration WHERE name='0128_support_answer_scope.sql'");
     await migrate(db.pool);
