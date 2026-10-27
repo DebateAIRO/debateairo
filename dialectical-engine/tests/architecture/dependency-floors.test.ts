@@ -38,7 +38,9 @@ const VULNERABLE: Record<string, (version: string) => boolean> = {
   // 2026-10-01: GHSA advisories on fastify < 5.12.2 (request body replacement, authentication,
   // request and header validation bypasses) and < 5.12.5 (an unhandled-error denial of service)
   // turned pnpm audit red; 5.12.5 was published 2026-09-16, so it clears the cooldown.
-  fastify: (v) => compare(v, "5.12.5") < 0,
+  // 2026-10-25: a low advisory on fastify >=5.12.2 <5.12.6; fastify is a direct dependency, so the fix is the PIN
+  // in package.json and apps/api/package.json (5.12.7, the newest release, published 2026-10-13, clears the cooldown).
+  fastify: (v) => compare(v, "5.12.6") < 0,
   // 2026-10-01: the axios advisories of 1.x < 1.20.0 (ReDoS, prototype-pollution gadgets, header
   // injection, proxy and redirect bypasses), reached through the Hatchet SDK; 1.20.0 was
   // published 2026-08-26.
@@ -51,8 +53,10 @@ const VULNERABLE: Record<string, (version: string) => boolean> = {
   // 4.1.4 were published 2026-09-02, so they clear the 7-day cooldown on their own.
   // 2026-09-30: GHSA-hrr3-gc8f-f4qj (3.x < 3.1.8, 4.x < 4.1.5) and GHSA-jvvf-x445-j334;
   // 3.1.8 and 4.1.5 were published 2026-09-15.
-  "fast-uri": (v) => (v.startsWith("3.") && compare(v, "3.1.8") < 0)
-    || (v.startsWith("4.") && compare(v, "4.1.5") < 0),
+  // 2026-10-27: GHSA-w74x-v6f9-j3xg / GHSA-wjr9-j795-jxcr / GHSA-xhq7-xmqj-769h / GHSA-333x-w4r6-6crp
+  // (3.x < 3.1.9, 4.x < 4.2.3); 3.1.9 and 4.2.3 were published 2026-10-19.
+  "fast-uri": (v) => (v.startsWith("3.") && compare(v, "3.1.9") < 0)
+    || (v.startsWith("4.") && compare(v, "4.2.3") < 0),
   // 2026-09-30: GHSA-6j4f-fj2g-mc7p / GHSA-qhr7-859c-m2p7 / GHSA-q2hr-2g5m-vwhr (2.x < 2.1.7),
   // reached through testcontainers > archiver > minimatch (test tooling only); 2.1.7 was
   // published 2026-09-14.
@@ -63,6 +67,10 @@ const VULNERABLE: Record<string, (version: string) => boolean> = {
   // error; two moderate: an unbounded-growth denial of service and a Subresource Integrity bypass), reached
   // through jsdom (test tooling only); 8.12.2 was published 2026-10-15, so it clears the 7-day cooldown.
   undici: (v) => v.startsWith("8.") && compare(v, "8.12.2") < 0,
+  // 2026-10-25: zod < 4.6.6 (high: memory exhaustion while validating oversized input). zod is a direct
+  // dependency, so the fix is the PIN in every package.json that lists it (4.6.7, the newest release, published
+  // 2026-10-12, so it clears the 7-day cooldown), not an override.
+  zod: (v) => compare(v, "4.6.6") < 0,
   qs: (v) => compare(v, "6.16.0") < 0,
   // 2026-10-21: GHSA-8r9p-f939-6h3c and its sibling follow-redirects advisory (>=1.16.0 <1.16.1, array-form headers
   // and sensitiveHeaders regex escaping), reached through the Hatchet SDK's axios; 1.16.1 was published 2026-10-01.
