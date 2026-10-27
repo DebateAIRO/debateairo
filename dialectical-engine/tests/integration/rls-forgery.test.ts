@@ -13,7 +13,8 @@ import { randomBytes, randomUUID } from "node:crypto";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPool, migrate, runInRequestScope, setRequestCredential, type Pool } from "../../packages/db/src/index.js";
-import { rlsRelationSql, seedRlsRows, type RlsSeedReport } from "../../tools/rls/seed.js";
+import { prepareRlsSeedWorld, RLS_SEED_STEPS, rlsRelationSql, rlsSeedInserter, seedRlsRows, type RlsSeedInsert,
+  type RlsSeedReport } from "../../tools/rls/seed.js";
 import { provisionRlsLogins, seedSessionAccount, type RlsLogins, type RlsTestAccount } from "../support/rls-logins.js";
 import { RLS_IN_SCOPE } from "../support/rls-scope.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
@@ -596,6 +597,200 @@ describe("row-level security S01 C6: forgery by SQL on the four T1 logins widens
       "billing.withdrawal_owner_settlement.subscription_id", "billing.withdrawal_owner_settlement.withdrawn_event_id"];
     expect(outcomes).toEqual(["debateai_dev_runtime", "debateai_prod_api_runtime"].flatMap((login) =>
       members.map((member) => `${login} ${member} naming-b=42501 naming-own=ACCEPTED`)));
+  });
+
+  it("S6.3-F14 (V-18 on the engine tables) no own-run row a T1 login writes may name a run, node, artifact, ledger entry, judgement, propagation, answer, review, work item or routing of B", async () => {
+    // F12's class on core, ledger, serve, memory and scorecard: each rls_account policy there checks the row's own run
+    // (or the parent it keys on), not the OTHER entities the row names, which a cross-account reader then follows (the
+    // runner's snapshot takes B's node's score from any judgement naming it, the data export worker reads an answer's
+    // fact bundle and composed text by id, B's projection reads a stranger check, a reversal point or a served number by
+    // the id A named). A fresh account E writes the seed's own row of every engine table under its own context, rolled
+    // back (as S6.2-R23). Before each member's table is written, its row is written once to a template and rolled back,
+    // then twice more in a rolled-back savepoint: naming B's entity (refused, 42501, by core.guard_own_references) and
+    // naming E's own (accepted: the statement is valid, so the refusal is the naming's). A member whose parent the seed
+    // writes later is tried after the whole world. `already` members are the class's measured non-members, refused by
+    // an older check before the guard: the supersession guard (one principal), the answer-run triggers of answer_story
+    // and serve_disclosure, and node_review's lineage triggers, which read B's node and artifacts under the writer's own
+    // row security. Left out, nothing following them: work_item.settled_* (the projection projects no column of the
+    // matched item), serve_disclosure.floor_leading_node_id (publishing refuses a node outside the answer), the text
+    // subject refs of review_clock and revision_trigger (read by run), and the provider and model refs (global).
+    type EngineMember = Readonly<{ table: string; columns: readonly string[]; parent: string; parentColumns: readonly string[];
+      list?: true; late?: true; already?: string; extra?: (values: readonly unknown[]) => Record<string, unknown> }>;
+    const node = ["core.node", ["node_id"]] as const;
+    const artifact = ["ledger.raw_artifact", ["raw_artifact_id"]] as const;
+    const propagation = ["ledger.propagation_run", ["propagation_run_id"]] as const;
+    const answer = ["serve.answer", ["answer_id", "answer_version"]] as const;
+    const answerId = ["serve.answer", ["answer_id"]] as const;
+    const run = ["core.run", ["run_id"]] as const;
+    const member = (table: string, columns: readonly string[], [parent, parentColumns]: readonly [string, readonly string[]],
+      flags: Omit<EngineMember, "table" | "columns" | "parent" | "parentColumns"> = {}): EngineMember =>
+      ({ table, columns, parent, parentColumns, ...flags });
+    const members: readonly EngineMember[] = [
+      // 0011's checks: a critic entry comes with its sequence.
+      member("core.independence_receipt", ["critic_ledger_entry_ref"], ["ledger.ledger_entry", ["ledger_entry_id"]],
+        { late: true, extra: () => ({ critic_at_seq: 1 }) }),
+      member("core.node", ["provenance_ref"], artifact),
+      member("core.reversal_point", ["value_hinge_id"], ["core.value_hinge", ["value_hinge_id"]]),
+      member("core.run_supersession", ["new_run_id"], run, { already: "23514" }),
+      member("core.staleness_state", ["subject_ref"], answerId),
+      member("core.stranger_restatement", ["subject_id"], node),
+      member("ledger.ledger_entry", ["raw_artifact_ref"], artifact),
+      member("ledger.node_review", ["node_id"], node, { already: "P0001" }),
+      member("ledger.node_review", ["author_raw_artifact_ref"], artifact, { already: "P0001" }),
+      member("ledger.node_review", ["review_raw_artifact_ref"], artifact, { already: "P0001" }),
+      member("ledger.node_review", ["node_id", "author_raw_artifact_ref", "review_raw_artifact_ref"],
+        ["ledger.node_review", ["node_id", "author_raw_artifact_ref", "review_raw_artifact_ref"]], { already: "P0001" }),
+      member("ledger.node_strength_record", ["propagation_run_id"], propagation),
+      member("ledger.node_strength_record", ["reduced_judgement_ref"], ["ledger.reduced_judgement", ["reduced_judgement_id"]]),
+      member("ledger.overlay_run", ["propagation_run_id"], propagation),
+      // 0121's checks: an artifact belongs to an investigated outcome, which names its investigator and basis.
+      member("ledger.point_investigation", ["raw_artifact_ref"], artifact, { extra: () => ({ result: "HOLDS", basis: "established",
+        maker: "maker-rls", provider_ref: "provider-rls", model_id: "model-rls" }) }),
+      member("ledger.reduced_judgement", ["node_id"], node),
+      member("ledger.reduced_judgement", ["raw_artifact_ref"], artifact),
+      member("ledger.reduced_judgement", ["selected_judgement_ref"], artifact),
+      member("ledger.sensitivity_record", ["propagation_run_id"], propagation),
+      member("ledger.verdict_vote", ["raw_artifact_ref"], artifact),
+      // A new version under B's answer_id: the primary key is (answer_id, answer_version).
+      member("serve.answer", ["answer_id"], answerId, { extra: () => ({ answer_version: 99 }) }),
+      member("serve.answer", ["work_item_id"], ["core.work_item", ["work_item_id"]]),
+      member("serve.answer", ["fact_bundle_id"], ["serve.fact_bundle", ["fact_bundle_id"]]),
+      member("serve.answer", ["composed_text_id"], ["serve.composed_text", ["composed_text_id"]]),
+      member("serve.answer", ["conformance_record_id"], ["serve.conformance_record", ["conformance_record_id"]]),
+      member("serve.answer_story", ["answer_id", "answer_version"], answer, { already: "23503" }),
+      member("serve.answer_story", ["artifact_refs"], artifact, { list: true }),
+      member("serve.composed_text", ["fact_bundle_id"], ["serve.fact_bundle", ["fact_bundle_id"]]),
+      // 0053's check: a reviewed mark's subject is the reviewed node.
+      member("serve.condition_mark", ["review_ref", "review_node_ref", "review_outcome"], ["ledger.node_review", ["node_review_id", "node_id",
+        "outcome"]], { extra: (values) => ({ subject_ref: values[1] }) }),
+      member("serve.condition_mark_node", ["condition_mark_id"], ["serve.condition_mark", ["condition_mark_id"]]),
+      member("serve.conformance_record", ["raw_artifact_refs"], artifact, { list: true }),
+      member("serve.serve_disclosure", ["answer_id", "answer_version"], answer, { already: "23503" }),
+      member("serve.served_number", ["provenance_ref"], propagation),
+      member("serve.served_number", ["answer_id"], answerId),
+      // B's answer already has its round 1 (unique per answer version and round).
+      member("serve.synthesis_round", ["answer_id", "answer_version"], answer, { extra: () => ({ round: 2 }) }),
+      member("serve.synthesis_round", ["candidate_artifact_ref"], artifact),
+      member("serve.synthesis_round", ["evaluator_artifact_ref"], artifact),
+      member("memory.alias_row", ["source_run_id"], run),
+      member("memory.candidate_record", ["prior_run_id"], run),
+      member("memory.memory_link", ["prior_run_id"], run),
+      member("memory.memory_link", ["prior_answer_id"], answerId),
+      member("memory.memory_link", ["alias_row_ids"], ["memory.alias_row", ["alias_row_id"]], { list: true }),
+      member("scorecard.session_assignment", ["routing_decision_id"], ["scorecard.routing_decision", ["routing_decision_id"]])
+    ];
+    const label = (m: EngineMember): string => `${m.table}.${m.columns.join("+")}`;
+    const su = database.pool;
+    const keyOf = (relation: string): string => shapes.find((s) => s.relation === relation)!.columns.map((c) => `t."${c}"`).join(",");
+    const valuesOf = (row: Record<string, unknown>, columns: readonly string[]): unknown[] => columns.map((c) => row[c]);
+    // B's entity: the parent's first seeded row of B, its columns as JSON values.
+    const ofB = new Map<string, unknown[]>();
+    for (const m of members) {
+      ofB.set(label(m), m.parent === "core.run" ? [B.runId] : valuesOf((await su.query(`SELECT ${m.parentColumns.map((c) =>
+        `to_jsonb(t."${c}") AS "${c}"`).join(",")} FROM ${m.parent} t WHERE jsonb_build_array(${keyOf(m.parent)})::text = $1`,
+      [report.keys.get(m.parent)!.b[0]])).rows[0]!, m.parentColumns));
+    }
+    const E = await seedSessionAccount(su, "E");
+    const world = await prepareRlsSeedWorld(su, E, "E");
+    const insertable = async (login: string, relation: string): Promise<readonly string[]> =>
+      (await su.query(`SELECT attname::text AS name FROM pg_attribute WHERE attrelid = $2::regclass AND attnum > 0 AND NOT attisdropped
+        AND attgenerated = '' AND attidentity <> 'a' AND has_column_privilege($1, attrelid, attname, 'INSERT')`, [login, relation]))
+        .rows.map((row) => row.name as string);
+    const patch = (m: EngineMember, values: readonly unknown[]): Record<string, unknown> => ({
+      ...Object.fromEntries(m.columns.map((c, i) => [c, m.list === true ? [values[i]] : values[i]])), ...m.extra?.(values) });
+    // The row again with the member's columns patched, through the columns the login may INSERT (the rest keep defaults).
+    const copy = (columns: readonly string[], table: string, row: Record<string, unknown>): Statement => {
+      const listed = Object.keys(row).filter((c) => columns.includes(c)).map((c) => `"${c}"`).join(",");
+      return [`INSERT INTO ${table}(${listed}) SELECT ${listed} FROM jsonb_populate_record(NULL::${table}, $1::jsonb)`, [JSON.stringify(row)]];
+    };
+    // "ACCEPTED", "42501" when the guard refused it, or "REFUSED <SQLSTATE>" for any other refusal (its message goes to
+    // `messages`); always rolled back.
+    const messages: string[] = [];
+    const tryWrite = async (c: pg.Client, [sql, values]: Statement): Promise<string> => {
+      await c.query("SAVEPOINT member");
+      try {
+        await c.query(sql, [...values]);
+        return "ACCEPTED";
+      } catch (error) {
+        const e = error as { code?: string; message?: string };
+        if (e.code === "42501" && e.message?.startsWith("RLS_FOREIGN_REFERENCE ")) return "42501";
+        messages.push(`${e.code ?? "NO_SQLSTATE"} ${e.message ?? String(error)}`);
+        return `REFUSED ${e.code ?? "NO_SQLSTATE"}`;
+      } finally {
+        await c.query("ROLLBACK TO SAVEPOINT member");
+      }
+    };
+    // E's own entity: the template's own values, or else a row of the parent E's context reads (E's alone).
+    const ofOwn = async (c: pg.Client, m: EngineMember, template: Record<string, unknown>): Promise<unknown[]> =>
+      m.list !== true && m.columns.every((col) => template[col] !== null && template[col] !== undefined) ? valuesOf(template, m.columns)
+        : m.parent === "core.run" ? [world.runs.sOld]
+        : valuesOf((await c.query(`SELECT ${m.parentColumns.map((col) => `to_jsonb(t."${col}") AS "${col}"`).join(",")} FROM ${m.parent} t
+          LIMIT 1`)).rows[0] ?? {}, m.parentColumns);
+    const outcomes: string[] = [];
+    const expected: string[] = [];
+    const failures: string[] = [];
+    for (const login of t1) {
+      await asLogin(login.url, async (c) => {
+        await c.query(CREDENTIAL, [E.token]);
+        await c.query("BEGIN");
+        try {
+          const base = await rlsSeedInserter(c);
+          const templates = new Map<string, Record<string, unknown>>();
+          const capture: RlsSeedInsert = async (relation, sql, values) => {
+            const row = await base(relation, sql, values);
+            templates.set(relation, (await c.query(`SELECT to_jsonb(t) AS row FROM ${relation} t
+              WHERE jsonb_build_array(${keyOf(relation)})::text = $1`, [row.rls_identity])).rows[0].row as Record<string, unknown>);
+            return row;
+          };
+          const own = { ...world, made: new Map(world.made) };
+          const tried = async (m: EngineMember): Promise<void> => {
+            const template = templates.get(m.table);
+            if (template === undefined) { failures.push(`${login.name} ${label(m)} no-template`); return; }
+            const columns = await insertable(login.name, m.table);
+            // A late template's sequence was handed out again once its savepoint rolled the allocator back.
+            const row = m.late === true && "at_seq" in template
+              ? { ...template, at_seq: (await c.query("SELECT ledger.allocate_sequence() AS s")).rows[0].s } : template;
+            const named = await tryWrite(c, copy(columns, m.table, { ...row, ...patch(m, ofB.get(label(m))!) }));
+            const owned = await tryWrite(c, copy(columns, m.table, { ...row, ...patch(m, await ofOwn(c, m, template)) }));
+            outcomes.push(`${login.name} ${label(m)} naming-b=${named} naming-own=${owned}`);
+            expected.push(`${login.name} ${label(m)} naming-b=${m.already === undefined ? "42501" : `REFUSED ${m.already}`} naming-own=ACCEPTED`);
+          };
+          const late: EngineMember[] = [];
+          for (const step of RLS_SEED_STEPS) {
+            if (!/^(core|ledger|serve|memory|scorecard)\./u.test(step.relation)) continue;
+            if ((await insertable(login.name, step.relation)).length === 0) continue;
+            const of = members.filter((m) => m.table === step.relation);
+            if (of.length > 0) {
+              await c.query("SAVEPOINT template");
+              try {
+                await step.run(capture, c, own);
+              } catch (error) {
+                failures.push(`${login.name} ${step.relation} template ${(error as { code?: string }).code ?? String(error)}`);
+              }
+              await c.query("ROLLBACK TO SAVEPOINT template");
+              for (const m of of) if (m.late === true) late.push(m); else await tried(m);
+            }
+            await c.query("SAVEPOINT step");
+            try {
+              await step.run(base, c, own);
+              await c.query("RELEASE SAVEPOINT step");
+            } catch (error) {
+              await c.query("ROLLBACK TO SAVEPOINT step");
+              failures.push(`${login.name} ${step.relation} step ${(error as { code?: string }).code ?? String(error)}`);
+            }
+          }
+          for (const m of late) await tried(m);
+        } finally {
+          await c.query("ROLLBACK");
+        }
+      });
+    }
+    console.info(`F14 FRAME ${outcomes.join(" | ")}${failures.length > 0 ? ` FAILURES ${failures.join(" | ")}` : ""}`);
+    console.info(`F14 REFUSALS ${[...new Set(messages.map((m) => m.replace(/[0-9a-f]{8}-[0-9a-f-]{27}/gu, "<uuid>")))].join(" | ")}`);
+    expect(failures).toEqual([]);
+    // All four T1 logins may INSERT the engine tables (the authorization logins too), so every one is tried.
+    expect(new Set(outcomes.map((line) => line.split(" ")[0]))).toEqual(new Set(t1.map(({ name }) => name)));
+    expect([...outcomes].sort()).toEqual([...expected].sort());
   });
 
   it("S6.3-F9 while an A call runs and after it ends, a second connection of the same login sees no credential or context value of A", async () => {
