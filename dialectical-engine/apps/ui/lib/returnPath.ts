@@ -1,4 +1,4 @@
-export const RETURN_PATH_ALLOW_LIST = ["/new", "/", "/settings", "/settings/security", "/account", "/checkout", "/checkout/return", "/settings/card", "/export"] as const;
+export const RETURN_PATH_ALLOW_LIST = ["/new", "/", "/v4", "/settings", "/settings/security", "/account", "/checkout", "/checkout/return", "/settings/card", "/export"] as const;
 
 export const DEFAULT_RETURN_PATH = "/new";
 

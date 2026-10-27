@@ -1,0 +1,163 @@
+/* V4 initial (2026-10-28): debate page shell styles (rail, layout, changes bar). Site tokens and the V4 tokens from
+   v4-base.css only. Desktop ≥ 1100 px: rail | map | panel; 768–1099 px: the rail becomes a top strip; < 768 px: one
+   question per screen with a pinned bottom bar (D6) and the map as a full-screen outline (D7). */
+
+.v4DebPage { min-height: 100vh; display: flex; flex-direction: column; }
+.v4DebMain {
+  flex: 1; width: 100%; max-width: 1600px; margin: 0 auto;
+  padding: 16px var(--v4-gutter) 32px; display: flex; flex-direction: column; gap: 14px; min-width: 0;
+}
+
+/* ---------- screens before the map ---------- */
+.v4DebCentre { flex: 1; display: flex; justify-content: center; padding: 40px var(--v4-gutter); }
+.v4DebStatus { width: 100%; max-width: 640px; align-self: flex-start; display: flex; flex-direction: column; gap: 12px; padding: 28px; }
+.v4DebStatus p { margin: 0; }
+.v4DebStatusTitle { margin: 0; font-size: var(--t-title); line-height: 1.2; }
+.v4DebStatusQuestion {
+  margin: 0; font-size: var(--t-title); line-height: 1.25; color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+.v4DebStatusActions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-top: 4px; }
+.v4DebStatus .v4Link { align-self: flex-start; min-height: 44px; display: inline-flex; align-items: center; }
+.v4DebStatusActions .v4Link { align-self: center; }
+.v4DebLoading { margin: 0; }
+.v4DebProgressState { display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--text); }
+.v4DebPulse {
+  flex: none; width: 10px; height: 10px; border-radius: var(--r-dot); background: var(--accent);
+  animation: v4DebPulse 1.6s ease-in-out infinite;
+}
+@keyframes v4DebPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
+@media (prefers-reduced-motion: reduce) { .v4DebPulse { animation: none; } }
+
+/* ---------- header extras, back link, notes ---------- */
+.v4DebReportLink { text-decoration: none; }
+.v4DebBack {
+  display: inline-flex; align-items: center; gap: 4px; min-height: 44px; max-width: 100%; align-self: flex-start;
+  color: var(--link); font-size: var(--t-ui); font-weight: 600; text-decoration: none;
+}
+.v4DebBack:hover { text-decoration: underline; text-underline-offset: 3px; }
+.v4DebBackQuestion {
+  display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; min-width: 0;
+  font-weight: 500;
+}
+.v4DebNote { margin: 0; font-size: var(--t-ui); }
+
+/* ---------- what changed (D4) ---------- */
+.v4DebChanges {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+  background: var(--con-bg); border: 1px solid var(--con-border); border-radius: var(--r-card); padding: 10px 14px;
+}
+.v4DebChangesDot { flex: none; width: 9px; height: 9px; border-radius: var(--r-dot); background: var(--accent); }
+.v4DebChangesText { margin: 0; flex: 1 1 240px; min-width: 0; }
+.v4DebChangesStep { font-size: var(--t-ui); color: var(--text-2); font-weight: 600; }
+.v4DebChangesActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.v4DebChangesDismiss { min-height: 44px; font-size: var(--t-ui); }
+
+/* ---------- the three columns ---------- */
+.v4DebGrid { display: grid; gap: 20px; align-items: start; min-width: 0; }
+.v4DebLayout-desktop .v4DebGrid { grid-template-columns: 210px minmax(0, 1fr) 380px; }
+.v4DebLayout-mid .v4DebGrid { grid-template-columns: minmax(0, 1fr) 360px; }
+.v4DebLayout-phone .v4DebGrid { grid-template-columns: minmax(0, 1fr); }
+.v4DebRailCol { position: sticky; top: 16px; min-width: 0; }
+.v4DebMapCol { min-width: 0; }
+.v4DebPanelCol { min-width: 0; }
+.v4DebLayout-desktop .v4DebPanelCol, .v4DebLayout-mid .v4DebPanelCol {
+  position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; overscroll-behavior: contain;
+}
+/* Room for the pinned phone bar (and the tray above it) so the panel's end is never hidden. */
+.v4DebLayout-phone .v4DebMain { padding-bottom: calc(150px + var(--safe-b)); }
+
+/* ---------- the rail (when) ---------- */
+.v4DebRail { display: flex; flex-direction: column; gap: 18px; font-size: var(--t-ui); min-width: 0; }
+.v4DebRail p { margin: 0; }
+.v4DebRailSteps, .v4DebRailRounds { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.v4DebRailStep, .v4DebRailRounds li { display: flex; align-items: flex-start; gap: 10px; color: var(--text-2); }
+.v4DebRailStep .v4Link { min-height: 24px; }
+.v4DebRailMark {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px;
+  border-radius: var(--r-dot); border: 1.5px solid var(--line-strong); font-size: var(--t-micro); font-weight: 700;
+  color: var(--text-2); background: var(--surface);
+}
+.v4DebRailDone { color: var(--text); }
+.v4DebRailDone > .v4DebRailMark { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+.v4DebRailHere { color: var(--text-strong); font-weight: 700; }
+.v4DebRailHere > .v4DebRailMark { border-color: var(--accent); color: var(--con-text); }
+.v4DebRailNote { display: block; font-weight: 400; color: var(--text-3); font-size: var(--t-meta); }
+.v4DebRailBlock { display: flex; flex-direction: column; gap: 8px; }
+.v4DebRailOpen {
+  flex-direction: row; align-items: baseline; justify-content: space-between; gap: 12px;
+  border-top: 1px solid var(--line-2); padding-top: 14px; color: var(--text-2);
+}
+.v4DebRailOpenCount { font-family: var(--font-display); font-weight: var(--fw-display); font-size: 26px; line-height: 1; color: var(--ink); }
+.v4DebRailGoodTime {
+  display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: var(--r-card);
+  background: var(--ok-bg); border: 1px solid var(--ok-border);
+}
+.v4DebRailGoodTitle { font-weight: 700; color: var(--ok-text); }
+.v4DebRailReport { text-decoration: none; align-self: flex-start; }
+
+/* 768–1099 px: the rail as one wrapping strip under the header. */
+.v4DebRail-strip {
+  flex-direction: row; flex-wrap: wrap; align-items: center; gap: 10px 22px;
+  width: 100%; max-width: 1600px; margin: 0 auto; padding: 10px var(--v4-gutter);
+  border-bottom: 1px solid var(--line-2); background: var(--surface);
+}
+.v4DebRail-strip .v4DebRailSteps, .v4DebRail-strip .v4DebRailRounds { flex-direction: row; flex-wrap: wrap; gap: 6px 16px; }
+.v4DebRail-strip .v4DebRailBlock { flex-direction: row; align-items: center; gap: 10px; }
+.v4DebRail-strip .v4DebRailBlock > .v4Eyebrow { display: none; }
+.v4DebRail-strip .v4DebRailNote { display: inline; margin-left: 6px; }
+.v4DebRail-strip .v4DebRailOpen { border-top: 0; padding-top: 0; }
+.v4DebRail-strip .v4DebRailOpenCount { font-size: 20px; }
+.v4DebRail-strip .v4DebRailGoodTime { flex-direction: row; flex-wrap: wrap; align-items: center; padding: 6px 10px; }
+
+/* ---------- the dock: the tray and the phone bar ---------- */
+.v4DebDock {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 0 var(--v4-gutter) calc(16px + var(--safe-b));
+}
+.v4DebDock > * { pointer-events: auto; }
+.v4DebDock:empty { display: none; }
+.v4DebDockPhone { padding-bottom: 0; gap: 0; padding-left: 0; padding-right: 0; }
+.v4DebTray {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px;
+  width: 100%; max-width: 640px; padding: 10px 14px; border-radius: var(--r-card);
+  background: var(--surface); border: 1px solid var(--line-strong); box-shadow: var(--shadow-pop);
+}
+.v4DebDockPhone .v4DebTray { max-width: none; border-radius: var(--r-card) var(--r-card) 0 0; box-shadow: none; border-bottom: 0; }
+.v4DebTrayText { margin: 0; min-width: 0; }
+.v4DebTrayActions { display: flex; align-items: center; gap: 14px; }
+.v4DebTrayClear { min-height: 44px; }
+.v4DebPhoneBar {
+  display: flex; gap: 10px; width: 100%; padding: 10px var(--v4-gutter) calc(10px + var(--safe-b));
+  background: var(--surface); border-top: 1px solid var(--line-strong); box-shadow: var(--shadow-chrome);
+}
+.v4DebPhoneMap { flex: 0 0 auto; }
+.v4DebPhoneDig { flex: 1 1 auto; min-width: 0; }
+
+/* ---------- the phone map sheet (D7) ---------- */
+.v4DebSheet {
+  position: fixed; inset: 0; z-index: 55; display: flex; flex-direction: column;
+  background: var(--bg); overflow: hidden;
+}
+.v4DebSheetHead {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px var(--v4-gutter); border-bottom: 1px solid var(--line-2); background: var(--surface);
+}
+.v4DebSheetTitle { margin: 0; font-size: var(--t-title); }
+.v4DebSheetClose { width: 44px; padding: 0; }
+.v4DebSheetBody {
+  flex: 1; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 20px;
+  padding: 16px var(--v4-gutter) calc(150px + var(--safe-b));
+}
+/* The tray stays usable over the sheet (D7 doubles as the tray). */
+.v4DebLayout-phone .v4DebDock { z-index: 57; }
+
+/* ---------- the dig note ---------- */
+.v4DebToast { flex-wrap: wrap; }
+.v4DebToastText { min-width: 0; overflow-wrap: anywhere; }
+.v4DebToastMode { color: var(--gold-bg); }
+.v4DebToastLifted { bottom: calc(150px + var(--safe-b)); }
+@media (min-width: 768px) {
+  .v4DebToastLifted { bottom: calc(96px + var(--safe-b)); }
+}
