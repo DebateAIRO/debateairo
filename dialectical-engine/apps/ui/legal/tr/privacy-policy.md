@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kısaca
-eyebrow: GİZLİLİK POLİTİKASI · v3.5 · YÜRÜRLÜK TARİHİ 12 EKİM 2026
+eyebrow: GİZLİLİK POLİTİKASI · v3.6 · YÜRÜRLÜK TARİHİ 12 EKİM 2026
 title: Neleri neden saklıyoruz?
 lede: GDPR (EU) 2016/679 kapsamındaki haklarınız ve yükümlülüklerimiz sade bir dille açıklanmıştır. On dört bölüm ve Ek B — sonuna kadar kaydırın.
-endMarker: POLİTİKANIN SONU · GDPR (EU) 2016/679 · v3.5
+endMarker: POLİTİKANIN SONU · GDPR (EU) 2016/679 · v3.6
 bodyLabel: Gizlilik Politikası metni
 annexTitle: Ek B — Bölgesel gizlilik hükümleri
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 ÇEREZLER
 -->
 
-**Version 3.5 · Effective 12 Ekim 2026 · Önceki sürümler: dezbatere.ro/privacy/versions · Veri sorumlusu: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 12 Ekim 2026 · Önceki sürümler: dezbatere.ro/privacy/versions · Veri sorumlusu: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Bir hesabın ihtiyaç duyduğu bilgileri ve yazmayı seçtiğiniz içerikleri toplarız. Sorularınız Sicilimizde listelenen yapay zekâ sağlayıcılarına gider; model eğitimi için kullanılmazlar. Barındırma sağlayıcımız hesabınızı ve tartışmalarınızı Birleşik Krallık'taki Londra'da saklar; verilerinizin başka nerelere gittiğini bölüm 5 anlatır. Tartışmalar, siz yayımlamadıkça gizlidir. Hesabınızı silmek özel verilerinizin anahtarlarını imha eder; silme işlemini planlarken yayımlanmış tartışmalarınızın da kaldırılmasını veya kullanımdan kaldırılmış takma adınız altında herkese açık kalmasını seçersiniz. Bize privacy@dezbatere.ro adresinden ulaşabilirsiniz; bir tartışmada adı geçen kişiler de hesapları olmadan kaldırma talebinde bulunabilir.
 
@@ -87,7 +87,9 @@ Profilinizi çıkarmayız, verilerinizi reklam amacıyla kullanmayız ve satmay�
 
 **Gönderilenler.** Bir tartışmayı yürütmek için bir veya daha fazla haricî yapay zekâ sağlayıcısına metin göndeririz: sorunuz, belirlediğiniz yönlendirme notları ve tartışma geliştikçe motorun oluşturduğu ifadeler. Dolayısıyla sağlayıcı, yazdıklarınızdan türetilen ve bunların etrafında oluşturulan metni görür. Destek sohbetini kullanırsanız, oraya yazdıklarınız destek sohbetinin modeline gider. Sağlayıcı, e-posta adresinizi, hesap veya oturum tanımlayıcılarınızı, IP adresinizi ya da ödeme ayrıntılarınızı hiçbir zaman almaz.
 
-**Hangi sağlayıcılar.** Bu sağlayıcılar, bu politikanın bir parçası olan dezbatere.ro/providers adresindeki **Yapay Zekâ Sağlayıcı Sicilimizde** listelenmiştir. Sicil, nerede yaşarsanız yaşayın her kullanıcı için geçerlidir. Her sağlayıcı için tüzel kişiliğini ve kuruluş ülkesini; neyi hangi amaçla aldığını — tartışmanın argümanlarını yazmak, bunları değerlendirmek ve kontrol etmek, hükmün hikâyesini yazmak ya da destek sohbetinde size yanıt vermek; verileri işlediği ülkeleri veya bölgeleri; saklama koşullarını ve kullandığımız uç nokta ile özellikler bakımından sıfır veri saklamanın etkin olup olmadığını; sözleşmemiz kapsamında girdileri eğitim için kullanıp kullanamayacağını; dayandığımız aktarım mekanizmasını; verileriniz konusunda kendisiyle nasıl iletişime geçebileceğinizi ve her kaydı en son doğruladığımız tarihi belirtir. Sağlayıcılar değişebilir; Sicil sürümlendirilir ve değişiklik orada belirtilir.
+**Perplexity üzerinden web araması.** Bir tartışma için kanıt bulmak amacıyla modeller, Amerika Birleşik Devletleri'ndeki Perplexity AI, Inc. tarafından işletilen Perplexity üzerinden internette arama yapabilir. Perplexity, modellerin tartışmadan yola çıkarak yazdığı arama sorgularını alır; bu sorgular sorunuzdaki sözcükleri içerebilir. Her yapay zekâ sağlayıcısı gibi Perplexity de e-posta adresinizi, hesap veya oturum tanımlayıcılarınızı, IP adresinizi ya da ödeme ayrıntılarınızı hiçbir zaman almaz. Perplexity Sicilde listelenmiştir ve aşağıdaki aktarım kuralları ona da uygulanır.
+
+**Hangi sağlayıcılar.** Bu sağlayıcılar, bu politikanın bir parçası olan dezbatere.ro/providers adresindeki **Yapay Zekâ Sağlayıcı Sicilimizde** listelenmiştir. Sicil, nerede yaşarsanız yaşayın her kullanıcı için geçerlidir. Her sağlayıcı için tüzel kişiliğini ve kuruluş ülkesini; neyi hangi amaçla aldığını — tartışmanın argümanlarını yazmak, bunları değerlendirmek ve kontrol etmek, hükmün hikâyesini yazmak, kanıt bulmak için internette arama yapmak ya da destek sohbetinde size yanıt vermek; verileri işlediği ülkeleri veya bölgeleri; saklama koşullarını ve kullandığımız uç nokta ile özellikler bakımından sıfır veri saklamanın etkin olup olmadığını; sözleşmemiz kapsamında girdileri eğitim için kullanıp kullanamayacağını; dayandığımız aktarım mekanizmasını; verileriniz konusunda kendisiyle nasıl iletişime geçebileceğinizi ve her kaydı en son doğruladığımız tarihi belirtir. Sağlayıcılar değişebilir; Sicil sürümlendirilir ve değişiklik orada belirtilir.
 
 **Eğitim ve saklama farklı şeylerdir.** Yapay zekâ sağlayıcılarını yalnızca içeriğinizi modellerini eğitmek veya geliştirmek için kullanmalarına izin vermeyen koşullar altında kullanırız; Sicil, her sağlayıcı için bunu hesabımız üzerinden doğrulayıp doğrulamadığımızı ve ne zaman doğruladığımızı gösterir. Bazı sağlayıcılar istemleri ve yanıtları güvenlik, kötüye kullanımı önleme veya kendi hukuki yükümlülükleri için sınırlı bir süre saklar; Sicil ne kadar süreyle ve neden saklandığını belirtir. Sıfır veri saklama etkinse Sicil bunu ve hangi özellikler için geçerli olduğunu açıklar. Saklanan içeriği saklanmıyormuş gibi tanımlamayız.
 
@@ -215,7 +217,7 @@ Bu öğeleri reddetmek için tarayıcı ayarlarınızda bu sitenin çerezlerini 
 
 Bu politikayı değiştirdiğimizde yeni sürümü, değişikliklerin özeti ve yeni bir yürürlük tarihiyle birlikte yayımlar ve önceki sürümleri dezbatere.ro/privacy/versions adresinde tutarız. Yeni bir amaç veya yeni bir alıcı ekleyen değişikliklerde, yeni işleme başlamadan önce size e-postayla ve ürün içinde bilgi verir ve itiraz etmeniz için süre tanırız. Yeni bir amaç rızanıza bağlıysa — örneğin bir gün içeriği modelleri geliştirmek için kullanmak istersek — bu rızayı ayrıca ve özel olarak isteriz; güncellenmiş Koşulların kabulünü hiçbir zaman yeni işleme için rıza saymayız. Yaptıklarımızı değiştirmeyen açıklamalar bakımından yeni sürümü yayımlamakla yetiniriz.
 
-Bu politika en son 12 Ekim 2026 tarihinde güncellenmiştir. Sürüm 3.5, sürüm 3.4'ün yerine geçmiştir: 2. bölüm artık hangi fatura ve kart bilgilerini sakladığımızı ve tam kart numaranızın hiçbir zaman bize ulaşmadığını söylüyor; 7. bölüm ise kayıtlı bir kartı ve ödeme sağlayıcısının ödemelerle ilgili mesajlarını ne kadar süreyle sakladığımızı söylüyor.
+Bu politika en son 12 Ekim 2026 tarihinde güncellenmiştir. Sürüm 3.6, sürüm 3.5'in yerine geçmiştir: 5. bölüm artık modellerin Perplexity üzerinden internette arama yapabileceğini ve Perplexity'nin neleri aldığını söylüyor. Sürüm 3.5, sürüm 3.4'ün yerine geçmiştir: 2. bölüm artık hangi fatura ve kart bilgilerini sakladığımızı ve tam kart numaranızın hiçbir zaman bize ulaşmadığını söylüyor; 7. bölüm ise kayıtlı bir kartı ve ödeme sağlayıcısının ödemelerle ilgili mesajlarını ne kadar süreyle sakladığımızı söylüyor.
 
 ## Annex B — Bölgesel gizlilik hükümleri
 

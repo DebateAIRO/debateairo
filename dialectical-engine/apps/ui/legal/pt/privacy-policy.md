@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Em resumo
-eyebrow: POLÍTICA DE PRIVACIDADE · v3.5 · EM VIGOR DESDE 12 DE OUTUBRO DE 2026
+eyebrow: POLÍTICA DE PRIVACIDADE · v3.6 · EM VIGOR DESDE 12 DE OUTUBRO DE 2026
 title: O que armazenamos e porquê
 lede: Os seus direitos e as nossas obrigações ao abrigo do GDPR (EU) 2016/679, em linguagem clara. Catorze secções e o Anexo B — desloque-se até ao fim.
-endMarker: FIM DA POLÍTICA · GDPR (EU) 2016/679 · v3.5
+endMarker: FIM DA POLÍTICA · GDPR (EU) 2016/679 · v3.6
 bodyLabel: Texto da Política de Privacidade
 annexTitle: Anexo B — Termos regionais de privacidade
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 3.5 · Effective 12 de outubro de 2026 · Versões anteriores em dezbatere.ro/privacy/versions · Responsável pelo tratamento: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 12 de outubro de 2026 · Versões anteriores em dezbatere.ro/privacy/versions · Responsável pelo tratamento: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Recolhemos o que é necessário para uma conta e o que decide escrever. As suas perguntas são enviadas aos fornecedores de IA indicados no nosso Registo; não são utilizadas para treinar modelos. O nosso fornecedor de alojamento armazena a sua conta e os seus debates em Londres, no Reino Unido; a secção 5 indica para onde mais vão os seus dados. Os debates são privados, salvo se os publicar. A eliminação da conta destrói as chaves dos seus dados privados; ao programá-la, escolhe se os debates que publicou também são retirados ou se continuam públicos sob o seu pseudónimo desativado. Pode contactar-nos através de privacy@dezbatere.ro, e as pessoas mencionadas num debate podem pedir a remoção sem terem uma conta.
 
@@ -87,7 +87,9 @@ Não elaboramos perfis a seu respeito, não utilizamos os seus dados para public
 
 **O que é enviado.** Para executar um debate, enviamos texto para um ou mais fornecedores externos de IA: a sua pergunta, as anotações de orientação que definiu e as alegações que o motor compõe à medida que o debate se desenvolve. Por conseguinte, um fornecedor vê texto derivado e desenvolvido a partir do que escreveu. Se utilizar o chat de apoio, o que aí escrever é enviado para o modelo do chat de apoio. Um fornecedor nunca recebe o seu endereço de correio eletrónico, os identificadores da sua conta ou sessão, o seu endereço IP ou os seus dados de pagamento.
 
-**Quais são os fornecedores.** Estão indicados no nosso **Registo de Fornecedores de IA** em dezbatere.ro/providers, que faz parte desta política. O Registo aplica-se a todos os utilizadores, independentemente do local onde residam. Para cada fornecedor, indica a respetiva entidade jurídica e o país de estabelecimento; o que recebe e para que finalidade — redigir os argumentos do debate, avaliá-los e verificá-los, redigir a história do veredito ou responder-lhe no chat de apoio; os países ou regiões onde efetua o tratamento; as condições de conservação e se a conservação zero de dados está ativa para o ponto terminal e as funcionalidades que utilizamos; se pode utilizar os dados de entrada para treino ao abrigo do nosso contrato; o mecanismo de transferência em que nos baseamos; como contactá-lo a respeito dos seus dados; e a data em que verificámos pela última vez cada entrada. Os fornecedores podem mudar; o Registo tem controlo de versões e a alteração é nele assinalada.
+**Pesquisa na web através da Perplexity.** Para encontrar provas para um debate, os modelos podem pesquisar na web através da Perplexity, operada pela Perplexity AI, Inc. nos Estados Unidos. A Perplexity recebe as consultas de pesquisa que os modelos redigem a partir do debate, as quais podem conter palavras da sua pergunta. Tal como qualquer fornecedor de IA, nunca recebe o seu endereço de correio eletrónico, os identificadores da sua conta ou sessão, o seu endereço IP ou os seus dados de pagamento. Consta do Registo, e aplicam-se-lhe as regras sobre transferências indicadas abaixo.
+
+**Quais são os fornecedores.** Estão indicados no nosso **Registo de Fornecedores de IA** em dezbatere.ro/providers, que faz parte desta política. O Registo aplica-se a todos os utilizadores, independentemente do local onde residam. Para cada fornecedor, indica a respetiva entidade jurídica e o país de estabelecimento; o que recebe e para que finalidade — redigir os argumentos do debate, avaliá-los e verificá-los, redigir a história do veredito, pesquisar provas na web ou responder-lhe no chat de apoio; os países ou regiões onde efetua o tratamento; as condições de conservação e se a conservação zero de dados está ativa para o ponto terminal e as funcionalidades que utilizamos; se pode utilizar os dados de entrada para treino ao abrigo do nosso contrato; o mecanismo de transferência em que nos baseamos; como contactá-lo a respeito dos seus dados; e a data em que verificámos pela última vez cada entrada. Os fornecedores podem mudar; o Registo tem controlo de versões e a alteração é nele assinalada.
 
 **O treino e a conservação são coisas diferentes.** Recorremos a fornecedores de IA apenas ao abrigo de condições que não lhes permitem utilizar o seu conteúdo para treinar ou melhorar os respetivos modelos; o Registo indica, para cada fornecedor, se o confirmámos relativamente à nossa conta e quando. Alguns fornecedores conservam comandos e respostas por um período limitado para fins de segurança, prevenção de abusos ou cumprimento das suas próprias obrigações jurídicas; o Registo indica durante quanto tempo e porquê. Quando a conservação zero de dados está ativa, o Registo indica-o e identifica as funcionalidades abrangidas. Não descreveremos o conteúdo como não conservado quando este for efetivamente conservado.
 
@@ -215,7 +217,7 @@ Para recusar estes elementos, bloqueie ou elimine os cookies e os dados do site 
 
 Quando alteramos esta política, publicamos a nova versão com um resumo das alterações e uma nova data de produção de efeitos, e mantemos as versões anteriores em dezbatere.ro/privacy/versions. Se uma alteração acrescentar uma nova finalidade ou um novo destinatário, informamo-lo antes do início do novo tratamento, por correio eletrónico e no produto, e damos-lhe tempo para se opor. Quando uma nova finalidade depender do seu consentimento — por exemplo, se alguma vez pretendêssemos utilizar conteúdo para melhorar modelos — pedimos esse consentimento de forma separada e específica; nunca tratamos a aceitação de Termos atualizados como consentimento para novo tratamento. Para esclarecimentos que nada alterem no que fazemos, limitamo-nos a publicar a nova versão.
 
-Esta política foi atualizada pela última vez em 12 de outubro de 2026. A versão 3.5 substituiu a versão 3.4: a secção 2 passa a indicar que dados de faturação e do cartão conservamos e que o número completo do seu cartão nunca chega até nós, e a secção 7 indica durante quanto tempo conservamos um cartão guardado e as mensagens do prestador de serviços de pagamento sobre pagamentos.
+Esta política foi atualizada pela última vez em 12 de outubro de 2026. A versão 3.6 substituiu a versão 3.5: a secção 5 passa a indicar que os modelos podem pesquisar na web através da Perplexity e o que a Perplexity recebe. A versão 3.5 substituiu a versão 3.4: a secção 2 passa a indicar que dados de faturação e do cartão conservamos e que o número completo do seu cartão nunca chega até nós, e a secção 7 indica durante quanto tempo conservamos um cartão guardado e as mensagens do prestador de serviços de pagamento sobre pagamentos.
 
 ## Annex B — Termos regionais de privacidade
 

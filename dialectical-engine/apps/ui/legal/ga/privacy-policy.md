@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Go hachomair
-eyebrow: BEARTAS PRÍOBHÁIDEACHAIS · v3.5 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026
+eyebrow: BEARTAS PRÍOBHÁIDEACHAIS · v3.6 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026
 title: An méid a stórálaimid, agus an fáth
 lede: Do chearta agus ár n-oibleagáidí faoin GDPR (EU) 2016/679, i bhfriotal soiléir. Ceithre rannán déag agus Iarscríbhinn B — scrollaigh go dtí an deireadh.
-endMarker: DEIREADH AN BHEARTAIS · GDPR (EU) 2016/679 · v3.5
+endMarker: DEIREADH AN BHEARTAIS · GDPR (EU) 2016/679 · v3.6
 bodyLabel: Téacs an Bheartais Príobháideachais
 annexTitle: Iarscríbhinn B — Téarmaí príobháideachais réigiúnacha
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 FIANÁIN
 -->
 
-**Version 3.5 · Effective 12 Deireadh Fómhair 2026 · Leaganacha roimhe seo ag dezbatere.ro/privacy/versions · Rialaitheoir: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 12 Deireadh Fómhair 2026 · Leaganacha roimhe seo ag dezbatere.ro/privacy/versions · Rialaitheoir: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Bailímid an méid atá de dhíth ar chuntas agus an méid a roghnaíonn tú a chlóscríobh. Seoltar do cheisteanna chuig soláthraithe IS atá liostaithe inár gClár; ní úsáidtear iad chun samhlacha a oiliúint. Stórálann ár soláthraí óstála do chuntas agus do dhíospóireachtaí i Londain, sa Ríocht Aontaithe; insíonn rannán 5 cá háit eile a dtéann do shonraí. Bíonn díospóireachtaí príobháideach mura bhfoilsíonn tú iad. Scriosann scriosadh do chuntais na heochracha do do shonraí príobháideacha; nuair a sceidealaíonn tú é, roghnaíonn tú an mbainfear anuas do dhíospóireachtaí foilsithe freisin nó an bhfanfaidh siad poiblí faoi d'ainm cleite scortha. Is féidir teagmháil a dhéanamh linn ag privacy@dezbatere.ro, agus is féidir le daoine a ainmnítear i ndíospóireacht a iarraidh go mbainfí í gan cuntas a bheith acu.
 
@@ -87,7 +87,9 @@ Ní dhéanaimid próifíliú ort, ní úsáidimid do shonraí le haghaidh fógra
 
 **An méid a sheoltar.** Chun díospóireacht a reáchtáil, seolaimid téacs chuig soláthraí seachtrach IS amháin nó níos mó: do cheist, na nótaí stiúrtha a shocraíonn tú, agus ráitis a chumann an t-inneall de réir mar a fhorbraíonn an díospóireacht. Dá bhrí sin, feiceann soláthraí téacs a dhíorthaítear ón méid a chlóscríobh tú agus a tógadh timpeall air. Má úsáideann tú an comhrá tacaíochta, téann an méid a chlóscríobhann tú ann chuig samhail an chomhrá tacaíochta. Ní fhaigheann soláthraí do sheoladh ríomhphoist, d'aitheantóirí cuntais ná seisiúin, do sheoladh IP ná do shonraí íocaíochta riamh.
 
-**Cé hiad na soláthraithe.** Tá siad liostaithe inár **gClár Soláthraithe IS** ag dezbatere.ro/providers, atá mar chuid den bheartas seo. Baineann an Clár le gach úsáideoir, cibé áit ina bhfuil cónaí ort. I gcás gach soláthraí, luann sé a eintiteas dlíthiúil agus a thír bhunaíochta; an méid a fhaigheann sé agus an cuspóir — argóintí na díospóireachta a scríobh, breithiúnas a thabhairt orthu agus iad a sheiceáil, scéal an bhreithiúnais a scríobh, nó freagra a thabhairt ort sa chomhrá tacaíochta; na tíortha nó na réigiúin ina bpróiseálann sé; a théarmaí coinneála, agus an bhfuil coinneáil nialasach sonraí gníomhach don chríochphointe agus do na gnéithe a úsáidimid; an bhféadfaidh sé ionchuir a úsáid le haghaidh oiliúna faoinár gconradh; an sásra aistrithe ar a mbraithimid; conas teagmháil a dhéanamh leis faoi do shonraí; agus an dáta ar dheimhníomar gach iontráil an uair dheireanach. Féadfaidh soláthraithe athrú; coinnítear leaganacha den Chlár agus taifeadtar an t-athrú ann.
+**Cuardach gréasáin trí Perplexity.** Chun fianaise a aimsiú do dhíospóireacht, féadfaidh na samhlacha an gréasán a chuardach trí Perplexity, arna oibriú ag Perplexity AI, Inc. sna Stáit Aontaithe. Faigheann Perplexity na ceisteanna cuardaigh a scríobhann na samhlacha ón díospóireacht, agus d'fhéadfadh focail as do cheist a bheith iontu. Cosúil le gach soláthraí IS, ní fhaigheann sé do sheoladh ríomhphoist, d'aitheantóirí cuntais ná seisiúin, do sheoladh IP ná do shonraí íocaíochta riamh. Tá sé liostaithe sa Chlár, agus baineann na rialacha aistrithe thíos leis.
+
+**Cé hiad na soláthraithe.** Tá siad liostaithe inár **gClár Soláthraithe IS** ag dezbatere.ro/providers, atá mar chuid den bheartas seo. Baineann an Clár le gach úsáideoir, cibé áit ina bhfuil cónaí ort. I gcás gach soláthraí, luann sé a eintiteas dlíthiúil agus a thír bhunaíochta; an méid a fhaigheann sé agus an cuspóir — argóintí na díospóireachta a scríobh, breithiúnas a thabhairt orthu agus iad a sheiceáil, scéal an bhreithiúnais a scríobh, an gréasán a chuardach le haghaidh fianaise, nó freagra a thabhairt ort sa chomhrá tacaíochta; na tíortha nó na réigiúin ina bpróiseálann sé; a théarmaí coinneála, agus an bhfuil coinneáil nialasach sonraí gníomhach don chríochphointe agus do na gnéithe a úsáidimid; an bhféadfaidh sé ionchuir a úsáid le haghaidh oiliúna faoinár gconradh; an sásra aistrithe ar a mbraithimid; conas teagmháil a dhéanamh leis faoi do shonraí; agus an dáta ar dheimhníomar gach iontráil an uair dheireanach. Féadfaidh soláthraithe athrú; coinnítear leaganacha den Chlár agus taifeadtar an t-athrú ann.
 
 **Ní hionann oiliúint agus coinneáil.** Ní úsáidimid soláthraithe IS ach amháin faoi théarmaí nach gceadaíonn dóibh d'ábhar a úsáid chun a samhlacha a oiliúint nó a fheabhsú; léiríonn an Clár, i gcás gach soláthraí, an ndearna muid é seo a dheimhniú inár gcuntas féin, agus cathain. Coinníonn roinnt soláthraithe leideanna agus freagraí ar feadh tréimhse teoranta ar mhaithe le slándáil nó le cosc ar mhí-úsáid, nó chun a n-oibleagáidí dlíthiúla féin a chomhlíonadh; deir an Clár cé chomh fada agus cén fáth. Sa chás ina bhfuil coinneáil nialasach sonraí gníomhach, deir an Clár é sin agus luaitear ann na gnéithe lena mbaineann. Ní chuirfimid síos ar ábhar mar ábhar nach gcoinnítear nuair a choinnítear é.
 
@@ -215,7 +217,7 @@ Chun na míreanna seo a dhiúltú, cuir bac ar fhianáin agus ar shonraí suímh
 
 Nuair a athraímid an beartas seo, cuirimid an leagan nua ar fáil mar aon le hachoimre ar an méid a d'athraigh agus dáta nua teachta i bhfeidhm, agus coinnímid na leaganacha roimhe seo ag dezbatere.ro/privacy/versions. I gcás athraithe lena gcuirtear cuspóir nua nó faighteoir nua leis, insímid duit sula dtosaíonn an phróiseáil nua, trí ríomhphost agus sa táirge, agus tugaimid am duit agóid a dhéanamh. Sa chás ina mbraitheann cuspóir nua ar do thoiliú — mar shampla, dá mba mhian linn riamh ábhar a úsáid chun samhlacha a fheabhsú — iarraimid an toiliú sin ar leithligh agus go sonrach; ní chaithimid riamh le glacadh le Téarmaí nuashonraithe mar thoiliú le próiseáil nua. I gcás soiléirithe nach n-athraíonn aon ní faoin méid a dhéanaimid, ní dhéanaimid ach an leagan nua a fhoilsiú.
 
-Nuashonraíodh an beartas seo an uair dheireanach ar 12 Deireadh Fómhair 2026. Tháinig Leagan 3.5 in ionad leagan 3.4: deir rannán 2 anois cé na sonraí billeála agus cárta a choinnímid agus nach sroicheann uimhir iomlán do chárta sinn riamh, agus deir rannán 7 cá fhad a choinnímid cárta sábháilte agus teachtaireachtaí an tsoláthraí íocaíochta faoi íocaíochtaí.
+Nuashonraíodh an beartas seo an uair dheireanach ar 12 Deireadh Fómhair 2026. Tháinig Leagan 3.6 in ionad leagan 3.5: deir rannán 5 anois go bhféadfaidh na samhlacha an gréasán a chuardach trí Perplexity, agus cad a fhaigheann Perplexity. Tháinig Leagan 3.5 in ionad leagan 3.4: deir rannán 2 anois cé na sonraí billeála agus cárta a choinnímid agus nach sroicheann uimhir iomlán do chárta sinn riamh, agus deir rannán 7 cá fhad a choinnímid cárta sábháilte agus teachtaireachtaí an tsoláthraí íocaíochta faoi íocaíochtaí.
 
 ## Annex B — Téarmaí príobháideachais réigiúnacha
 

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ukratko
-eyebrow: PRAVILA O PRIVATNOSTI · v3.5 · NA SNAZI OD 12. LISTOPADA 2026.
+eyebrow: PRAVILA O PRIVATNOSTI · v3.6 · NA SNAZI OD 12. LISTOPADA 2026.
 title: Što pohranjujemo i zašto
 lede: Vaša prava i naše obveze prema Uredbi GDPR (EU) 2016/679, jednostavnim jezikom. Četrnaest odjeljaka i Prilog B — pomaknite se do kraja.
-endMarker: KRAJ PRAVILA · GDPR (EU) 2016/679 · v3.5
+endMarker: KRAJ PRAVILA · GDPR (EU) 2016/679 · v3.6
 bodyLabel: Tekst Pravila o privatnosti
 annexTitle: Prilog B — Regionalne odredbe o privatnosti
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 KOLAČIĆI
 -->
 
-**Version 3.5 · Effective 12. listopada 2026. · Prethodne verzije na dezbatere.ro/privacy/versions · Voditelj obrade: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 12. listopada 2026. · Prethodne verzije na dezbatere.ro/privacy/versions · Voditelj obrade: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Prikupljamo ono što je potrebno za račun i ono što odlučite upisati. Vaša se pitanja šalju pružateljima usluga umjetne inteligencije navedenima u našem Registru; ne upotrebljavaju se za treniranje modela. Naš pružatelj usluga smještaja pohranjuje vaš račun i vaše rasprave u Londonu, u Ujedinjenoj Kraljevini; odjeljak 5 navodi kamo još idu vaši podaci. Rasprave su privatne osim ako ih objavite. Brisanjem računa uništavaju se ključevi vaših privatnih podataka; pri zakazivanju birate hoće li se i vaše objavljene rasprave ukloniti ili ostati javne pod vašim pseudonimom koji se više ne upotrebljava. Možete nam se obratiti na privacy@dezbatere.ro, a osobe imenovane u raspravi mogu zatražiti uklanjanje i bez računa.
 
@@ -87,7 +87,9 @@ Ne izrađujemo vaš profil, ne upotrebljavamo vaše podatke za oglašavanje i ne
 
 **Što se šalje.** Za vođenje rasprave šaljemo tekst jednom ili više vanjskih pružatelja usluga umjetne inteligencije: vaše pitanje, usmjeravajuće bilješke koje postavite i izjave koje sustav sastavlja tijekom razvoja rasprave. Pružatelj stoga vidi tekst koji proizlazi iz onoga što ste upisali i koji je oblikovan oko toga. Ako upotrebljavate razgovor s podrškom, ono što ondje upišete prima model za razgovor s podrškom. Pružatelj nikada ne prima vašu adresu e-pošte, identifikatore računa ili sesije, IP adresu ni podatke o plaćanju.
 
-**Koji pružatelji.** Navedeni su u našem **Registru pružatelja usluga umjetne inteligencije** na dezbatere.ro/providers, koji je dio ovih pravila. Registar se primjenjuje na svakog korisnika, bez obzira na to gdje živite. Za svakog pružatelja navodi njegov pravni subjekt i državu poslovnog nastana; što prima i u koju svrhu — pisanje argumenata rasprave, njihovo ocjenjivanje i provjera, pisanje priče o presudi ili odgovaranje vama u razgovoru s podrškom; države ili regije u kojima obrađuje podatke; njegove uvjete čuvanja i je li za krajnju točku i značajke koje upotrebljavamo aktivno nulto zadržavanje podataka; smije li prema našem ugovoru upotrebljavati ulazne podatke za treniranje; mehanizam prijenosa na koji se oslanjamo; kako mu se obratiti u vezi s vašim podacima; te datum posljednje provjere svakog unosa. Pružatelji se mogu promijeniti; Registar ima verzije, a promjena se u njemu bilježi.
+**Pretraživanje interneta putem usluge Perplexity.** Kako bi pronašli dokaze za raspravu, modeli mogu pretraživati internet putem usluge Perplexity, kojom upravlja društvo Perplexity AI, Inc. u Sjedinjenim Američkim Državama. Perplexity prima upite za pretraživanje koje modeli sastavljaju iz rasprave i koji mogu sadržavati riječi iz vašeg pitanja. Kao i svaki pružatelj usluga umjetne inteligencije, Perplexity nikada ne prima vašu adresu e-pošte, identifikatore računa ili sesije, IP adresu ni podatke o plaćanju. Navedena je u Registru, a na nju se primjenjuju pravila o prijenosima navedena u nastavku.
+
+**Koji pružatelji.** Navedeni su u našem **Registru pružatelja usluga umjetne inteligencije** na dezbatere.ro/providers, koji je dio ovih pravila. Registar se primjenjuje na svakog korisnika, bez obzira na to gdje živite. Za svakog pružatelja navodi njegov pravni subjekt i državu poslovnog nastana; što prima i u koju svrhu — pisanje argumenata rasprave, njihovo ocjenjivanje i provjera, pisanje priče o presudi, pretraživanje interneta radi pronalaženja dokaza ili odgovaranje vama u razgovoru s podrškom; države ili regije u kojima obrađuje podatke; njegove uvjete čuvanja i je li za krajnju točku i značajke koje upotrebljavamo aktivno nulto zadržavanje podataka; smije li prema našem ugovoru upotrebljavati ulazne podatke za treniranje; mehanizam prijenosa na koji se oslanjamo; kako mu se obratiti u vezi s vašim podacima; te datum posljednje provjere svakog unosa. Pružatelji se mogu promijeniti; Registar ima verzije, a promjena se u njemu bilježi.
 
 **Treniranje i čuvanje različite su stvari.** Pružatelje usluga umjetne inteligencije koristimo samo uz uvjete koji im ne dopuštaju da vaš sadržaj upotrebljavaju za treniranje ili poboljšavanje svojih modela; Registar za svakog pružatelja navodi jesmo li to potvrdili na našem računu i kada. Neki pružatelji određeno vrijeme čuvaju upite i odgovore radi sigurnosti, sprječavanja zlouporabe ili vlastitih pravnih obveza; u Registru je navedeno koliko dugo i zašto. Ako je aktivno nulto zadržavanje podataka, u Registru je navedeno i na koje se značajke odnosi. Nećemo opisati sadržaj kao sadržaj koji se ne čuva ako to nije tako.
 
@@ -215,7 +217,7 @@ Da biste odbili ove stavke, blokirajte ili izbrišite kolačiće i podatke web-m
 
 Kada izmijenimo ova pravila, objavljujemo novu verziju sa sažetkom izmjena i novim datumom stupanja na snagu te čuvamo prethodne verzije na dezbatere.ro/privacy/versions. Za izmjenu kojom se dodaje nova svrha ili novi primatelj obavještavamo vas prije početka nove obrade, e-poštom i u proizvodu, te vam dajemo vrijeme za prigovor. Ako nova svrha ovisi o vašoj privoli — primjerice ako ikada poželimo upotrebljavati sadržaj za poboljšavanje modela — tu privolu tražimo zasebno i određeno; prihvaćanje ažuriranih Uvjeta nikada ne smatramo privolom za novu obradu. Za pojašnjenja koja ništa ne mijenjaju u vezi s našim postupanjem jednostavno objavljujemo novu verziju.
 
-Ova su pravila posljednji put ažurirana 12. listopada 2026. Verzija 3.5 zamijenila je verziju 3.4: u odjeljku 2. sada stoji koje podatke za naplatu i koje podatke o kartici čuvamo te da vaš puni broj kartice nikada ne dolazi do nas, a u odjeljku 7. stoji koliko dugo čuvamo spremljenu karticu i poruke pružatelja platnih usluga o plaćanjima.
+Ova su pravila posljednji put ažurirana 12. listopada 2026. Verzija 3.6 zamijenila je verziju 3.5: u odjeljku 5. sada stoji da modeli mogu pretraživati internet putem usluge Perplexity i što Perplexity prima. Verzija 3.5 zamijenila je verziju 3.4: u odjeljku 2. sada stoji koje podatke za naplatu i koje podatke o kartici čuvamo te da vaš puni broj kartice nikada ne dolazi do nas, a u odjeljku 7. stoji koliko dugo čuvamo spremljenu karticu i poruke pružatelja platnih usluga o plaćanjima.
 
 ## Annex B — Regionalne odredbe o privatnosti
 

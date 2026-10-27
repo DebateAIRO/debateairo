@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Trumpai
-eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.4 · ĮSIGALIOJA 2026 M. SPALIO 12 D.
+eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.5 · ĮSIGALIOJA 2026 M. SPALIO 12 D.
 title: Su kuo sutinkate
 lede: Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.
-endMarker: SĄLYGŲ PABAIGA · v2.4
+endMarker: SĄLYGŲ PABAIGA · v2.5
 bodyLabel: Paslaugų teikimo sąlygų tekstas
 annexTitle: A priedas — Regioninės sąlygos
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TAIKYTINA TEISĖ
 -->
 
-**Version 2.4 · Effective 2026 m. spalio 12 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
+**Version 2.5 · Effective 2026 m. spalio 12 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
 
 **In short.** Turite būti ne jaunesni kaip 18 metų. Dialectical Engine kuria argumentus naudodama DI modelius, todėl viskas, ką ji sugeneruoja, gali būti klaidinga — tai nėra konsultacija. Jūsų debatai yra privatūs, nebent juos paskelbiate; paskelbtus debatus gali skaityti bet kas. Jūsų pateiktas tekstas siunčiamas mūsų Paslaugų teikėjų registre nurodytiems DI paslaugų teikėjams ir nenaudojamas modeliams mokyti. Apie neteisėtą turinį praneškite adresu support@dezbatere.ro, nesvarbu, ar turite paskyrą. Taikoma Rumunijos teisė, tačiau jums ir toliau taikoma vietos vartotojų apsauga.
 
@@ -119,6 +119,8 @@ Jei abejojate, ar kas nors leidžiama, prieš paskelbdami paklauskite mūsų.
 **Kaip jūsų turinys pasiekia DI paslaugų teikėjus.** Kad galėtume vykdyti debatus, tekstą siunčiame vienam ar keliems išoriniams modelių teikėjams. Teikėjas gauna jūsų klausimą, jūsų nustatytas valdymo pastabas ir teiginius, kuriuos variklis sudaro debatų metu, todėl jis mato iš jūsų įvesto teksto išvestą ir aplink jį sudarytą tekstą, o ne vien pirminius jūsų žodžius. Jis niekada negauna jūsų el. pašto adreso, paskyros identifikatorių, seansų įrašų ar mokėjimo duomenų.
 
 **Ką siunčia pagalbos pokalbis.** Pagalbos asistentas taip pat yra DI modelis. Kai jam rašote, jūsų žinutę kartu su pagalbos straipsniais, kuriais jis grindžia atsakymą, siunčiame išoriniam modelių teikėjui, kad modelis galėtų atsakyti. Prieš siųsdami užmaskuojame viską, kas atrodo kaip slaptažodis, vienkartinis kodas ar raktas. Jei paprašote pasikalbėti su žmogumi, modeliui siunčiame ir pokalbį, užmaskuotą tokiu pačiu būdu, kad jis parašytų trumpą santrauką mūsų komandos nariui, perimančiam jūsų atvejį. Nepridedame jūsų el. pašto adreso, paskyros identifikatorių ar mokėjimo duomenų, tačiau modelis gauna visa kita, ką įrašote į pokalbį, todėl nerašykite ten nieko, ko nenorėtumėte, kad jis perskaitytų.
+
+**Paieška internete per Perplexity.** Siekdami rasti įrodymų debatams, modeliai gali ieškoti internete per **Perplexity** (Perplexity AI, Inc., Jungtinės Amerikos Valstijos), kuri įtraukta į DI paslaugų teikėjų registrą. Perplexity gauna paieškos užklausas, kurias modeliai parašo remdamiesi debatais, todėl, kaip ir modelių teikėjas, ji mato aplink jūsų įvestą tekstą sudarytą tekstą. Ji niekada negauna jūsų el. pašto adreso, paskyros identifikatorių, seansų įrašų ar mokėjimo duomenų.
 
 **Kurie paslaugų teikėjai ir kur jie veikia.** Mūsų **DI paslaugų teikėjų registras** adresu dezbatere.ro/providers yra šių Sąlygų dalis. Jame nurodytas kiekvienas paslaugų teikėjas, kurį galime naudoti: jo juridinis asmuo ir šalis; ką ir kodėl jis gauna; kur tvarko duomenis; jo saugojimo sąlygos; ar mūsų naudojamam prieigos taškui taikomas visiškas duomenų nesaugojimas; ar pagal mūsų sutartį jis gali naudoti įvestis mokymui; perdavimo mechanizmas, kuriuo remiamės; ir data, kada paskutinį kartą patikrinome kiekvieną įrašą. Paslaugų teikėjai gali būti įsisteigę ne jūsų šalyje ir už Europos ekonominės erdvės ribų. Apsaugos priemonės paaiškintos mūsų Privatumo politikoje.
 

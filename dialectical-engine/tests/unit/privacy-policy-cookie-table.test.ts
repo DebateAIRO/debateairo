@@ -157,6 +157,10 @@ describe("Privacy Policy §13 — the twenty actual stored items in every locale
   it("the English 3.5 summary names the 3.5 changes and no 3.4-only change", () => {
     const line = /^This policy was last updated on .*$/m.exec(readFileSync(join(LEGAL_DIR, "en", "privacy-policy.md"), "utf8"))?.[0] ?? "";
     const summary = line.split("Version 3.5 replaced version 3.4:")[1] ?? "";
+    const latest = line.split("Version 3.6 replaced version 3.5:")[1]?.split("Version 3.5 replaced")[0] ?? "";
+    for (const keyword of ["section 5", "Perplexity"]) {
+      expect(latest, `the 3.6 summary does not name the 3.6 change "${keyword}"`).toContain(keyword);
+    }
     expect(summary, "the version 3.5 summary follows the version line").not.toBe("");
     for (const phrase of ["debateai.locale", "queue"]) {
       expect(summary, `the 3.5 summary still names the 3.4 change "${phrase}"`).not.toContain(phrase);

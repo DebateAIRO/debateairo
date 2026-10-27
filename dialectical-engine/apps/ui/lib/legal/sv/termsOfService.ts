@@ -134,6 +134,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Vi tränar inte på ditt innehåll. Vi använder AI-leverantörer endast på villkor som inte tillåter dem att använda ditt innehåll för att träna eller förbättra sina modeller; vårt register över AI-leverantörer visar för varje leverantör om vi har bekräftat detta, och när." },
       { kind: "p", text: "Hur ditt innehåll når AI-leverantörer. För att genomföra en debatt skickar vi text till en eller flera externa modelleverantörer. Det en leverantör tar emot är din fråga, de styranteckningar som du har angett och uttalanden som motorn sammanställer under debatten — en leverantör ser således text som härrör från och har byggts kring det du skrev, inte bara dina ursprungliga ord. Leverantören tar aldrig emot din e-postadress, dina kontoidentifierare, dina sessionsuppgifter eller dina betalningsuppgifter." },
       { kind: "p", text: "Vad supportchatten skickar. Supportassistenten är också en AI-modell. När du skriver till den skickar vi ditt meddelande till en extern modelleverantör så att modellen kan svara, tillsammans med de hjälpartiklar som den grundar sitt svar på. Innan vi skickar maskerar vi allt som ser ut som ett lösenord, en engångskod eller en nyckel. Om du ber att få tala med en person skickar vi även samtalet, maskerat på samma sätt, till modellen så att den kan skriva en kort sammanfattning till den medlem i vårt team som tar över ditt ärende. Vi bifogar inte din e-postadress, dina kontoidentifierare eller dina betalningsuppgifter, men modellen tar emot allt annat du skriver i chatten, så skriv inte något där som du inte vill att den ska läsa." },
+      { kind: "p", text: "Webbsökning via Perplexity. För att hitta belägg för en debatt kan modellerna söka på webben via Perplexity (Perplexity AI, Inc., USA), som finns med i vårt register över AI-leverantörer. Det Perplexity tar emot är de sökfrågor som modellerna formulerar utifrån debatten — liksom en modelleverantör ser Perplexity således text som har byggts kring det du skrev. Perplexity tar aldrig emot din e-postadress, dina kontoidentifierare, dina sessionsuppgifter eller dina betalningsuppgifter." },
       { kind: "p", text: "Vilka leverantörer och var. Vårt register över AI-leverantörer på dezbatere.ro/providers är en del av dessa villkor. Där anges varje leverantör som vi kan använda: dess juridiska person och land; vad den tar emot och varför; var den behandlar uppgifter; dess lagringsvillkor; huruvida nollagring av uppgifter är aktiv för den slutpunkt som vi använder; huruvida den enligt vårt avtal får använda indata för träning; vilken överföringsmekanism vi förlitar oss på; samt datumet då vi senast kontrollerade varje post. Leverantörer kan vara etablerade utanför ditt land och utanför Europeiska ekonomiska samarbetsområdet. Vår integritetspolicy förklarar skyddsåtgärderna." },
       { kind: "p", text: "Tre olika saker. ”Används inte för att träna modeller”, ”lagras under en begränsad tid av säkerhetsskäl, för att förhindra missbruk eller av rättsliga skäl” och ”nollagring av uppgifter — bevaras inte efter behandlingen” är tre olika saker. Om en leverantör behåller promptar under en begränsad tid anger registret hur länge och varför. Om nollagring av uppgifter är aktiv anger registret detta och för vilka funktioner. Vi kommer inte att uppge att innehåll inte lagras när så inte är fallet." },
       { kind: "p", text: "Resultat. I förhållandet mellan dig och oss får du använda resultatet från dina egna debatter för varje lagligt ändamål, och vi gör inte anspråk på äganderätt till genererad text. Observera att genererade resultat i många jurisdiktioner kanske inte kan skyddas av upphovsrätt; att liknande resultat kan genereras för andra användare; att resultat kan återge eller likna material från tredje part; och att visst källmaterial som en AI-leverantör hämtar kan omfattas av begränsningar avseende återanvändning. Du ansvarar för att kontrollera detta innan du förlitar dig på eller återpublicerar resultat." }
@@ -353,12 +354,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.4",
-  sha256: "b78e28ca35281d91298a15e87c66d7dfd1a7528d45eb69cea6378a1660e3081e",
-  eyebrow: "ANVÄNDARVILLKOR · v2.4 · GÄLLER FRÅN 12 OKTOBER 2026",
+  version: "2.5",
+  sha256: "30c823344e7d7a02159a8e3bb583b5340fdd77231055680d2bd3ec27cbb1df70",
+  eyebrow: "ANVÄNDARVILLKOR · v2.5 · GÄLLER FRÅN 12 OKTOBER 2026",
   title: "Vad du godkänner",
   lede: "Avtalet mellan dig och DMS Merchandise Shop S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.",
-  endMarker: "SLUT PÅ VILLKOREN · v2.4",
+  endMarker: "SLUT PÅ VILLKOREN · v2.5",
   contact: "support@dezbatere.ro",
   bodyLabel: "Användarvillkorens text",
   sectionIdPrefix: "terms-section-",

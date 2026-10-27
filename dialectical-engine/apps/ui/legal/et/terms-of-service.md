@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lühidalt
-eyebrow: TEENUSETINGIMUSED · v2.4 · KEHTIB ALATES 12. OKTOOBRIST 2026
+eyebrow: TEENUSETINGIMUSED · v2.5 · KEHTIB ALATES 12. OKTOOBRIST 2026
 title: Millega te nõustute
 lede: Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.
-endMarker: TINGIMUSTE LÕPP · v2.4
+endMarker: TINGIMUSTE LÕPP · v2.5
 bodyLabel: Teenusetingimuste tekst
 annexTitle: Lisa A — Piirkondlikud tingimused
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 KOHALDATAV ÕIGUS
 -->
 
-**Version 2.4 · Effective 12. oktoober 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
+**Version 2.5 · Effective 12. oktoober 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
 
 **In short.** Peate olema vähemalt 18-aastane. Dialectical Engine koostab tehisintellektimudelite abil argumente ja kõik selle loodud tulemused võivad olla valed — need ei ole nõuanded. Teie väitlused on privaatsed, kui te neid ei avalda; avaldamise korral saab igaüks neid lugeda. Teie sisestatud tekst saadetakse meie tehisintellekti pakkujate registris loetletud pakkujatele ja seda ei kasutata mudelite treenimiseks. Teatage ebaseaduslikust sisust aadressil support@dezbatere.ro, olenemata sellest, kas teil on konto. Kohaldatakse Rumeenia õigust, kuid teile jääb teie kohaliku tarbijakaitse tagatud kaitse.
 
@@ -119,6 +119,8 @@ Kui te ei ole kindel, kas miski on lubatud, küsige meilt enne selle postitamist
 **Kuidas teie sisu jõuab tehisintellekti pakkujateni.** Väitluse läbiviimiseks saadame teksti ühele või mitmele välisele mudelipakkujale. Pakkuja saab teie küsimuse, teie määratud suunavad annotatsioonid ja väitluse käigus mootori koostatud väited — seega näeb pakkuja teie sisestatud tekstist tuletatud ja selle ümber loodud teksti, mitte ainult teie algseid sõnu. Pakkuja ei saa kunagi teie e-posti aadressi, konto tunnuseid, seansikirjeid ega makseandmeid.
 
 **Mida kasutajatoe vestlus saadab.** Kasutajatoe assistent on samuti tehisintellekti mudel. Kui te talle kirjutate, saadame teie sõnumi koos abiartiklitega, millel tema vastus põhineb, välisele mudelipakkujale, et mudel saaks vastata. Enne saatmist maskeerime kõik, mis näeb välja nagu parool, ühekordne kood või võti. Kui palute inimesega rääkida, saadame mudelile ka vestluse, samamoodi maskeerituna, et see kirjutaks lühikese kokkuvõtte meie meeskonna liikmele, kes teie juhtumi üle võtab. Me ei lisa teie e-posti aadressi, konto tunnuseid ega makseandmeid, kuid mudel saab kõik muu, mida vestlusesse kirjutate, seega ärge kirjutage sinna midagi, mida te ei soovi, et mudel loeks.
+
+**Veebiotsing Perplexity kaudu.** Väitluse jaoks tõendite leidmiseks võivad mudelid otsida veebist teenuse **Perplexity** (Perplexity AI, Inc., Ameerika Ühendriigid) kaudu, mis on kantud pakkujate registrisse. Perplexity saab otsingupäringud, mille mudelid väitluse põhjal koostavad — seega näeb ta nagu mudelipakkujagi teie sisestatu ümber loodud teksti. Ta ei saa kunagi teie e-posti aadressi, konto tunnuseid, seansikirjeid ega makseandmeid.
 
 **Millised pakkujad ja kus.** Meie **tehisintellekti pakkujate register** aadressil dezbatere.ro/providers on nende Tingimuste osa. Selles on iga võimaliku pakkuja kohta märgitud tema juriidiline isik ja riik; mida ja miks ta saab; kus ta andmeid töötleb; tema säilitamistingimused; kas meie kasutatavas otspunktis rakendatakse andmete säilitamata jätmist; kas ta võib meie lepingu alusel kasutada sisendeid treenimiseks; edastusmehhanism, millele tugineme; ning iga kirje viimase kontrollimise kuupäev. Pakkujad võivad asuda väljaspool teie riiki ja Euroopa Majanduspiirkonda. Meie Privaatsuspoliitikas selgitatakse kaitsemeetmeid.
 

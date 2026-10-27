@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kurz gesagt
-eyebrow: NUTZUNGSBEDINGUNGEN · v2.4 · GÜLTIG AB 12. OKTOBER 2026
+eyebrow: NUTZUNGSBEDINGUNGEN · v2.5 · GÜLTIG AB 12. OKTOBER 2026
 title: Womit Sie sich einverstanden erklären
 lede: Der Vertrag zwischen Ihnen und DMS Merchandise Shop S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.
-endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.4
+endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.5
 bodyLabel: Text der Nutzungsbedingungen
 annexTitle: Anhang A – Regionale Bestimmungen
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ANWENDBARES RECHT
 -->
 
-**Version 2.4 · Effective 12. Oktober 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
+**Version 2.5 · Effective 12. Oktober 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
 
 **In short.** Sie müssen mindestens 18 Jahre alt sein. Dialectical Engine erstellt Argumente mithilfe von KI-Modellen, und alles, was es erzeugt, kann falsch sein – es handelt sich nicht um Beratung. Ihre Debatten sind privat, sofern Sie sie nicht veröffentlichen; wenn Sie sie veröffentlichen, kann jede Person sie lesen. Von Ihnen übermittelter Text wird an die in unserem Verzeichnis aufgeführten KI-Anbieter gesendet und nicht zum Trainieren von Modellen verwendet. Melden Sie rechtswidrige Inhalte unter support@dezbatere.ro, unabhängig davon, ob Sie ein Konto haben. Es gilt rumänisches Recht, Ihre örtlichen Verbraucherschutzrechte bleiben Ihnen jedoch erhalten.
 
@@ -119,6 +119,8 @@ Wenn Sie nicht sicher sind, ob etwas erlaubt ist, fragen Sie uns, bevor Sie es v
 **Wie Ihre Inhalte KI-Anbieter erreichen.** Zur Durchführung einer Debatte senden wir Text an einen oder mehrere externe Modellanbieter. Ein Anbieter erhält Ihre Frage, die von Ihnen festgelegten Steuerungsanmerkungen und Aussagen, die das System während der Debatte zusammensetzt – ein Anbieter sieht also Text, der aus Ihren Eingaben abgeleitet und um sie herum aufgebaut wurde, nicht nur Ihre ursprünglichen Worte. Ihre E-Mail-Adresse, Ihre Kontokennungen, Ihre Sitzungsaufzeichnungen oder Ihre Zahlungsdaten erhält er niemals.
 
 **Was der Support-Chat sendet.** Der Support-Assistent ist ebenfalls ein KI-Modell. Wenn Sie ihm schreiben, senden wir Ihre Nachricht an einen externen Modellanbieter, damit das Modell antworten kann, zusammen mit den Hilfeartikeln, auf die es seine Antwort stützt. Vor dem Senden maskieren wir alles, was wie ein Passwort, ein Einmalcode oder ein Schlüssel aussieht. Wenn Sie darum bitten, mit einem Menschen zu sprechen, senden wir auch das Gespräch, auf dieselbe Weise maskiert, an das Modell, damit es eine kurze Zusammenfassung für das Mitglied unseres Teams schreibt, das Ihren Fall übernimmt. Ihre E-Mail-Adresse, Ihre Kontokennungen oder Ihre Zahlungsdaten fügen wir nicht bei, aber das Modell erhält alles andere, was Sie in den Chat schreiben – schreiben Sie dort also nichts, was es nicht lesen soll.
+
+**Websuche über Perplexity.** Um Belege für eine Debatte zu finden, können die Modelle das Web über **Perplexity** (Perplexity AI, Inc., Vereinigte Staaten) durchsuchen, das im Verzeichnis der KI-Anbieter aufgeführt ist. Perplexity erhält die Suchanfragen, die die Modelle aus der Debatte formulieren – wie ein Modellanbieter sieht Perplexity also Text, der um Ihre Eingaben herum aufgebaut ist. Ihre E-Mail-Adresse, Ihre Kontokennungen, Ihre Sitzungsaufzeichnungen oder Ihre Zahlungsdaten erhält Perplexity niemals.
 
 **Welche Anbieter und wo.** Unser **Verzeichnis der KI-Anbieter** unter dezbatere.ro/providers ist Bestandteil dieser Nutzungsbedingungen. Es führt jeden Anbieter auf, den wir verwenden können: seinen Rechtsträger und sein Land; welche Daten er zu welchem Zweck erhält; wo er sie verarbeitet; seine Aufbewahrungsbedingungen; ob für den von uns verwendeten Endpunkt eine Null-Daten-Aufbewahrung aktiv ist; ob er Eingaben nach unserem Vertrag für Trainingszwecke verwenden darf; auf welchen Übermittlungsmechanismus wir uns stützen und wann wir den jeweiligen Eintrag zuletzt überprüft haben. Anbieter können sich außerhalb Ihres Landes und außerhalb des Europäischen Wirtschaftsraums befinden. Unsere Datenschutzerklärung erläutert die Schutzmaßnahmen.
 

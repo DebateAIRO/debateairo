@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In het kort
-eyebrow: PRIVACYBELEID · v3.5 · VAN KRACHT OP 12 OKTOBER 2026
+eyebrow: PRIVACYBELEID · v3.6 · VAN KRACHT OP 12 OKTOBER 2026
 title: Wat wij opslaan en waarom
 lede: Uw rechten en onze verplichtingen krachtens de GDPR (EU) 2016/679, in begrijpelijke taal. Veertien hoofdstukken en Bijlage B — scrol tot het einde.
-endMarker: EINDE VAN HET BELEID · GDPR (EU) 2016/679 · v3.5
+endMarker: EINDE VAN HET BELEID · GDPR (EU) 2016/679 · v3.6
 bodyLabel: Tekst van het privacybeleid
 annexTitle: Bijlage B — Regionale privacybepalingen
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 3.5 · Effective 12 oktober 2026 · Eerdere versies op dezbatere.ro/privacy/versions · Verwerkingsverantwoordelijke: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 12 oktober 2026 · Eerdere versies op dezbatere.ro/privacy/versions · Verwerkingsverantwoordelijke: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Wij verzamelen wat nodig is voor een account en wat u zelf invoert. Uw vragen gaan naar de AI-aanbieders die in ons Register staan en worden niet gebruikt om modellen te trainen. Onze hostingprovider bewaart uw account en uw debatten in Londen, in het Verenigd Koninkrijk; hoofdstuk 5 zegt waar uw gegevens verder naartoe gaan. Debatten zijn privé, tenzij u ze publiceert. Wanneer u uw account verwijdert, worden de sleutels tot uw privégegevens vernietigd; bij het plannen kiest u of ook uw gepubliceerde debatten worden verwijderd of openbaar blijven onder uw uitgefaseerde pseudoniem. U kunt ons bereiken via privacy@dezbatere.ro, en personen die in een debat worden genoemd, kunnen zonder account om verwijdering verzoeken.
 
@@ -87,7 +87,9 @@ Wij profileren u niet, gebruiken uw gegevens niet voor reclame en verkopen ze ni
 
 **Wat wordt verzonden.** Om een debat uit te voeren, sturen wij tekst naar een of meer externe AI-aanbieders: uw vraag, de sturende annotaties die u instelt en verklaringen die de engine opstelt naarmate het debat zich ontwikkelt. Een aanbieder ziet dus tekst die is afgeleid van en opgebouwd rond wat u hebt ingevoerd. Als u de ondersteuningschat gebruikt, gaat wat u daar typt naar het model van de ondersteuningschat. Een aanbieder ontvangt nooit uw e-mailadres, account- of sessie-identificatoren, IP-adres of betalingsgegevens.
 
-**Welke aanbieders.** Zij staan vermeld in ons **Register van AI-aanbieders** op dezbatere.ro/providers, dat deel uitmaakt van dit beleid. Het Register geldt voor iedere gebruiker, waar u ook woont. Voor elke aanbieder vermeldt het diens juridische entiteit en vestigingsland; wat die ontvangt en met welk doel — het schrijven van de argumenten van het debat, het beoordelen en controleren daarvan, het schrijven van het verhaal achter het oordeel of het beantwoorden van uw berichten in de ondersteuningschat; de landen of regio's waar de verwerking plaatsvindt; de bewaartermijnen en of er geen gegevens worden bewaard voor het eindpunt en de functies die wij gebruiken; of de aanbieder op grond van onze overeenkomst invoer voor training mag gebruiken; het doorgiftemechanisme waarop wij ons baseren; hoe u contact met de aanbieder kunt opnemen over uw gegevens; en de datum waarop wij elke vermelding voor het laatst hebben gecontroleerd. Aanbieders kunnen veranderen; het Register heeft versiebeheer en de wijziging wordt daarin vermeld.
+**Zoeken op het web via Perplexity.** Om bewijs voor een debat te vinden, kunnen de modellen op het web zoeken via Perplexity, dat wordt aangeboden door Perplexity AI, Inc. in de Verenigde Staten. Perplexity ontvangt de zoekvragen die de modellen op basis van het debat opstellen en die woorden uit uw vraag kunnen bevatten. Zoals elke AI-aanbieder ontvangt Perplexity nooit uw e-mailadres, account- of sessie-identificatoren, IP-adres of betalingsgegevens. Perplexity staat vermeld in het Register, en de onderstaande regels voor doorgiften zijn erop van toepassing.
+
+**Welke aanbieders.** Zij staan vermeld in ons **Register van AI-aanbieders** op dezbatere.ro/providers, dat deel uitmaakt van dit beleid. Het Register geldt voor iedere gebruiker, waar u ook woont. Voor elke aanbieder vermeldt het diens juridische entiteit en vestigingsland; wat die ontvangt en met welk doel — het schrijven van de argumenten van het debat, het beoordelen en controleren daarvan, het schrijven van het verhaal achter het oordeel, het zoeken naar bewijs op het web of het beantwoorden van uw berichten in de ondersteuningschat; de landen of regio's waar de verwerking plaatsvindt; de bewaartermijnen en of er geen gegevens worden bewaard voor het eindpunt en de functies die wij gebruiken; of de aanbieder op grond van onze overeenkomst invoer voor training mag gebruiken; het doorgiftemechanisme waarop wij ons baseren; hoe u contact met de aanbieder kunt opnemen over uw gegevens; en de datum waarop wij elke vermelding voor het laatst hebben gecontroleerd. Aanbieders kunnen veranderen; het Register heeft versiebeheer en de wijziging wordt daarin vermeld.
 
 **Training en bewaring zijn verschillende zaken.** Wij gebruiken AI-aanbieders alleen onder voorwaarden die hen niet toestaan uw inhoud te gebruiken om hun modellen te trainen of te verbeteren; het Register toont per aanbieder of wij dit aan de hand van ons account hebben bevestigd, en wanneer. Sommige aanbieders bewaren prompts en antwoorden gedurende een beperkte periode voor beveiliging, het voorkomen van misbruik of hun eigen wettelijke verplichtingen; het Register vermeldt hoe lang en waarom. Waar geen gegevens worden bewaard, vermeldt het Register dit en voor welke functies. Wij zullen niet stellen dat inhoud niet wordt bewaard wanneer dat wel het geval is.
 
@@ -215,7 +217,7 @@ Om deze items te weigeren, blokkeert of verwijdert u cookies en sitegegevens voo
 
 Wanneer wij dit beleid wijzigen, publiceren wij de nieuwe versie met een samenvatting van de wijzigingen en een nieuwe ingangsdatum, en bewaren wij eerdere versies op dezbatere.ro/privacy/versions. Bij een wijziging die een nieuw doel of een nieuwe ontvanger toevoegt, informeren wij u per e-mail en in het product voordat de nieuwe verwerking begint en geven wij u tijd om bezwaar te maken. Wanneer een nieuw doel afhankelijk is van uw toestemming — bijvoorbeeld als wij ooit inhoud zouden willen gebruiken om modellen te verbeteren — vragen wij die toestemming afzonderlijk en specifiek; wij beschouwen aanvaarding van bijgewerkte Voorwaarden nooit als toestemming voor nieuwe verwerking. Bij verduidelijkingen die niets veranderen aan wat wij doen, publiceren wij eenvoudigweg de nieuwe versie.
 
-Dit beleid is voor het laatst bijgewerkt op 12 oktober 2026. Versie 3.5 verving versie 3.4: hoofdstuk 2 zegt nu welke factuur- en kaartgegevens wij bewaren en dat uw volledige kaartnummer ons nooit bereikt, en hoofdstuk 7 zegt hoe lang wij een opgeslagen kaart en de berichten van de betalingsaanbieder over betalingen bewaren.
+Dit beleid is voor het laatst bijgewerkt op 12 oktober 2026. Versie 3.6 verving versie 3.5: hoofdstuk 5 zegt nu dat de modellen via Perplexity op het web kunnen zoeken, en wat Perplexity ontvangt. Versie 3.5 verving versie 3.4: hoofdstuk 2 zegt nu welke factuur- en kaartgegevens wij bewaren en dat uw volledige kaartnummer ons nooit bereikt, en hoofdstuk 7 zegt hoe lang wij een opgeslagen kaart en de berichten van de betalingsaanbieder over betalingen bewaren.
 
 ## Annex B — Regionale privacybepalingen
 

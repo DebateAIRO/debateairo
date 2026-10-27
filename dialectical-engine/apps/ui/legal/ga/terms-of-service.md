@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Go hachomair
-eyebrow: TÉARMAÍ SEIRBHÍSE · v2.4 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026
+eyebrow: TÉARMAÍ SEIRBHÍSE · v2.5 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026
 title: An méid lena n-aontaíonn tú
 lede: An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.
-endMarker: DEIREADH NA dTÉARMAÍ · v2.4
+endMarker: DEIREADH NA dTÉARMAÍ · v2.5
 bodyLabel: Téacs na dTéarmaí Seirbhíse
 annexTitle: Iarscríbhinn A — Téarmaí réigiúnacha
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 AN DLÍ RIALAITHE
 -->
 
-**Version 2.4 · Effective 12 Deireadh Fómhair 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
+**Version 2.5 · Effective 12 Deireadh Fómhair 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
 
 **In short.** Ní mór duit a bheith 18 mbliana d'aois nó os a chionn. Tógann Dialectical Engine argóintí le samhlacha IS agus d'fhéadfadh gach rud a ghineann sé a bheith mícheart — ní comhairle é. Bíonn do dhíospóireachtaí príobháideach mura bhfoilsíonn tú iad; má fhoilsíonn tú iad, is féidir le duine ar bith iad a léamh. Seoltar téacs a chuireann tú isteach chuig soláthraithe IS atá liostaithe inár gClár Soláthraithe, agus ní úsáidtear é chun samhlacha a oiliúint. Tuairiscigh ábhar neamhdhleathach ag support@dezbatere.ro cibé acu atá cuntas agat nó nach bhfuil. Is é dlí na Rómáine an dlí rialaithe, ach coimeádann tú do chosaintí áitiúla tomhaltóra.
 
@@ -119,6 +119,8 @@ Mura bhfuil tú cinnte an gceadaítear rud éigin, cuir ceist orainn sula gcuire
 **An chaoi a sroicheann d'ábhar soláthraithe IS.** Chun díospóireacht a reáchtáil, seolaimid téacs chuig soláthraí seachtrach samhlacha amháin nó níos mó. Is iad do cheist, na nótaí stiúrtha a shocraíonn tú, agus ráitis a chumann an t-inneall le linn na díospóireachta a fhaigheann soláthraí — mar sin feiceann soláthraí téacs a dhíorthaítear ón méid a chlóscríobh tú agus a tógadh timpeall air, ní hamháin do bhunfhocail. Ní fhaigheann sé do sheoladh ríomhphoist, d'aitheantóirí cuntais, do thaifid sheisiúin ná do shonraí íocaíochta riamh.
 
 **An méid a sheolann an comhrá tacaíochta.** Is samhail IS é an cúntóir tacaíochta freisin. Nuair a scríobhann tú chuige, seolaimid do theachtaireacht chuig soláthraí seachtrach samhlacha ionas gur féidir leis an tsamhail freagra a thabhairt, mar aon leis na hailt chabhrach ar a mbunaíonn sí a freagra. Sula seolaimid í, ceilimid aon rud a bhfuil cuma pasfhocail, cóid aonuaire nó eochrach air. Má iarrann tú labhairt le duine, seolaimid an comhrá chuig an tsamhail freisin, ceilte ar an mbealach céanna, ionas go scríobhfaidh sí achoimre ghearr don bhall dár bhfoireann a ghlacfaidh do chás. Ní chuirimid do sheoladh ríomhphoist, d'aitheantóirí cuntais ná do shonraí íocaíochta leis, ach faigheann an tsamhail gach rud eile a chlóscríobhann tú sa chomhrá, mar sin ná scríobh aon rud ansin nach mbeadh uait go léifeadh sí.
+
+**Cuardach gréasáin trí Perplexity.** Chun fianaise a aimsiú do dhíospóireacht, féadfaidh na samhlacha an gréasán a chuardach trí **Perplexity** (Perplexity AI, Inc., na Stáit Aontaithe), atá liostaithe sa Chlár Soláthraithe IS. Is iad na ceisteanna cuardaigh a scríobhann na samhlacha ón díospóireacht a fhaigheann Perplexity — mar sin, cosúil le soláthraí samhlacha, feiceann sé téacs a tógadh timpeall ar an méid a chlóscríobh tú. Ní fhaigheann sé do sheoladh ríomhphoist, d'aitheantóirí cuntais, do thaifid sheisiúin ná do shonraí íocaíochta riamh.
 
 **Cé hiad na soláthraithe, agus cá bhfuil siad.** Is cuid de na Téarmaí seo ár **gClár Soláthraithe IS** ag dezbatere.ro/providers. Liostaítear ann gach soláthraí a fhéadfaimid a úsáid: a eintiteas dlíthiúil agus a thír; an méid a fhaigheann sé agus an fáth; an áit a bpróiseálann sé; a théarmaí coinneála; an bhfuil coinneáil nialasach sonraí gníomhach don chríochphointe a úsáidimid; an bhféadfaidh sé ionchuir a úsáid le haghaidh oiliúna faoinár gconradh; an sásra aistrithe ar a mbraithimid; agus an dáta ar dheimhníomar gach iontráil an uair dheireanach. D'fhéadfadh soláthraithe a bheith lonnaithe lasmuigh de do thír agus lasmuigh den Limistéar Eorpach Eacnamaíoch. Mínítear na coimircí inár mBeartas Príobháideachais.
 

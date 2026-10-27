@@ -134,6 +134,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Emme kouluta malleja sisällölläsi. Käytämme tekoälypalveluntarjoajia vain ehdoilla, jotka eivät salli niiden käyttää sisältöäsi malliensa kouluttamiseen tai parantamiseen; tekoälypalveluntarjoajarekisteri näyttää kunkin palveluntarjoajan kohdalla, olemmeko vahvistaneet tämän, ja milloin." },
       { kind: "p", text: "Miten sisältösi päätyy tekoälypalveluntarjoajille. Lähetämme väittelyn suorittamiseksi tekstiä yhdelle tai useammalle ulkoiselle mallipalveluntarjoajalle. Palveluntarjoaja saa kysymyksesi, asettamasi ohjaavat huomautukset ja väittelyn aikana järjestelmän koostamat lausumat — joten palveluntarjoaja näkee kirjoittamastasi tekstistä johdettua ja sen ympärille rakennettua tekstiä, ei ainoastaan alkuperäisiä sanojasi. Se ei koskaan saa sähköpostiosoitettasi, tilitunnisteitasi, istuntotietojasi tai maksutietojasi." },
       { kind: "p", text: "Mitä tukipalvelun chat lähettää. Tukipalveluavustaja on myös tekoälymalli. Kun kirjoitat sille, lähetämme viestisi ulkoiselle mallipalveluntarjoajalle, jotta malli voi vastata, yhdessä niiden ohjeartikkelien kanssa, joihin se perustaa vastauksensa. Ennen lähettämistä peitämme kaiken, mikä näyttää salasanalta, kertakäyttökoodilta tai avaimelta. Jos pyydät saada keskustella henkilön kanssa, lähetämme mallille myös keskustelun samalla tavalla peitettynä, jotta se voi kirjoittaa lyhyen yhteenvedon tapauksesi vastaanottavalle tiimimme jäsenelle. Emme liitä mukaan sähköpostiosoitettasi, tilitunnisteitasi tai maksutietojasi, mutta malli saa kaiken muun, mitä kirjoitat chattiin, joten älä kirjoita sinne mitään, mitä et halua sen lukevan." },
+      { kind: "p", text: "Verkkohaku Perplexity-palvelun kautta. Löytääkseen näyttöä väittelyä varten mallit voivat tehdä verkkohakuja palvelun Perplexity (Perplexity AI, Inc., Yhdysvallat) kautta, ja palvelu on lueteltu tekoälypalveluntarjoajarekisterissä. Perplexity saa hakukyselyt, jotka mallit kirjoittavat väittelyn pohjalta — joten mallipalveluntarjoajan tavoin se näkee kirjoittamasi tekstin ympärille rakennettua tekstiä. Se ei koskaan saa sähköpostiosoitettasi, tilitunnisteitasi, istuntotietojasi tai maksutietojasi." },
       { kind: "p", text: "Mitkä palveluntarjoajat ja missä. Osoitteessa dezbatere.ro/providers oleva tekoälypalveluntarjoajarekisterimme on osa näitä käyttöehtoja. Siinä luetellaan jokainen palveluntarjoaja, jota voimme käyttää: sen oikeushenkilö ja kotimaa; sen saamat tiedot ja niiden käyttötarkoitus; käsittelypaikat; tietojen säilytysehdot; onko käyttämässämme rajapinnassa käytössä tietojen säilyttämättömyys; voiko se sopimuksemme nojalla käyttää syötteitä kouluttamiseen; käyttämämme siirtomekanismi sekä kunkin merkinnän viimeisin tarkistuspäivä. Palveluntarjoajat voivat sijaita maasi ja Euroopan talousalueen ulkopuolella. Suojatoimet kuvataan tietosuojakäytännössämme." },
       { kind: "p", text: "Kolme eri asiaa. ”Ei käytetä mallien kouluttamiseen”, ”säilytetään rajoitetun ajan turvallisuus-, väärinkäytösten ehkäisy- tai oikeudellisista syistä” ja ”tietoja ei säilytetä — niitä ei tallenneta käsittelyn jälkeen” ovat eri asioita. Jos palveluntarjoaja säilyttää kehotteita rajoitetun ajan, rekisterissä ilmoitetaan säilytysaika ja syy. Jos tietojen säilyttämättömyys on käytössä, se ja sitä koskevat ominaisuudet ilmoitetaan rekisterissä. Emme väitä, ettei sisältöä säilytetä, jos sitä tosiasiassa säilytetään." },
       { kind: "p", text: "Tuotokset. Sinun ja meidän välisessä suhteessa saat käyttää omien väittelyidesi tuotoksia mihin tahansa lailliseen tarkoitukseen, emmekä vaadi tuotetun tekstin omistusoikeutta. Huomaa, ettei tuotettu sisältö välttämättä saa tekijänoikeussuojaa monilla lainkäyttöalueilla; muille käyttäjille voidaan tuottaa samankaltaista sisältöä; tuotokset voivat toisintaa kolmannen osapuolen aineistoa tai muistuttaa sitä; ja joihinkin tekoälypalveluntarjoajan hakemiin lähdeaineistoihin voi kohdistua uudelleenkäyttörajoituksia. Vastaat tarkistamisesta ennen tuotoksiin luottamista tai niiden julkaisemista uudelleen." }
@@ -353,12 +354,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.4",
-  sha256: "3b3011716e6f3587f86008ab3d9f25e4e975e54d657cf5888dccb9ce1c8f0201",
-  eyebrow: "KÄYTTÖEHDOT · v2.4 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN",
+  version: "2.5",
+  sha256: "3b1a53496a610bd4dd94fd8f1f322da8aa055a73229d5bc6f2ecd48dd36731ba",
+  eyebrow: "KÄYTTÖEHDOT · v2.5 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN",
   title: "Mihin sitoudut",
   lede: "Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.",
-  endMarker: "KÄYTTÖEHTOJEN LOPPU · v2.4",
+  endMarker: "KÄYTTÖEHTOJEN LOPPU · v2.5",
   contact: "support@dezbatere.ro",
   bodyLabel: "Käyttöehtojen teksti",
   sectionIdPrefix: "terms-section-",

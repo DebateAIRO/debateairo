@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In breve
-eyebrow: INFORMATIVA SULLA PRIVACY · v3.5 · IN VIGORE DAL 12 OTTOBRE 2026
+eyebrow: INFORMATIVA SULLA PRIVACY · v3.6 · IN VIGORE DAL 12 OTTOBRE 2026
 title: Cosa conserviamo e perché
 lede: I tuoi diritti e i nostri obblighi ai sensi del GDPR (EU) 2016/679, in un linguaggio chiaro. Quattordici sezioni e Allegato B — scorri fino alla fine.
-endMarker: FINE DELL'INFORMATIVA · GDPR (EU) 2016/679 · v3.5
+endMarker: FINE DELL'INFORMATIVA · GDPR (EU) 2016/679 · v3.6
 bodyLabel: Testo dell'Informativa sulla privacy
 annexTitle: Allegato B — Condizioni regionali sulla privacy
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIE
 -->
 
-**Version 3.5 · Effective 12 ottobre 2026 · Versioni precedenti su dezbatere.ro/privacy/versions · Titolare del trattamento: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 12 ottobre 2026 · Versioni precedenti su dezbatere.ro/privacy/versions · Titolare del trattamento: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Raccogliamo ciò che serve a un account e ciò che scegli di digitare. Le tue domande vengono inviate ai fornitori di IA elencati nel nostro Registro; non sono utilizzate per addestrare i modelli. Il nostro fornitore di hosting conserva il tuo account e i tuoi dibattiti a Londra, nel Regno Unito; la sezione 5 spiega dove altro vanno i tuoi dati. I dibattiti sono privati, salvo che tu non li pubblichi. La cancellazione dell’account distrugge le chiavi dei tuoi dati privati; quando la programmi, scegli se rimuovere anche i dibattiti pubblicati o lasciarli pubblici con il tuo pseudonimo dismesso. Puoi contattarci all'indirizzo privacy@dezbatere.ro e le persone nominate in un dibattito possono chiederne la rimozione senza avere un account.
 
@@ -87,7 +87,9 @@ Non effettuiamo profilazione, non utilizziamo i tuoi dati per la pubblicità e n
 
 **Cosa viene inviato.** Per svolgere un dibattito inviamo testo a uno o più fornitori esterni di IA: la tua domanda, le annotazioni di orientamento che imposti e le affermazioni formulate dal motore durante lo sviluppo del dibattito. Un fornitore vede pertanto testo derivato da ciò che hai digitato e costruito attorno a esso. Se utilizzi la chat di supporto, ciò che vi scrivi viene inviato al modello della chat di supporto. Un fornitore non riceve mai il tuo indirizzo email, gli identificativi del tuo account o della tua sessione, il tuo indirizzo IP o i tuoi dati di pagamento.
 
-**Quali fornitori.** Sono elencati nel nostro **Registro dei fornitori di IA** all'indirizzo dezbatere.ro/providers, che è parte integrante della presente informativa. Il Registro si applica a tutti gli utenti, ovunque tu viva. Per ciascun fornitore, indica la persona giuridica e il Paese di stabilimento; cosa riceve e per quale finalità — redigere le argomentazioni del dibattito, giudicarle e verificarle, scrivere la storia del verdetto o risponderti nella chat di supporto; i Paesi o le regioni in cui tratta i dati; le condizioni di conservazione e se la conservazione zero dei dati è attiva per l'endpoint e le funzionalità che utilizziamo; se, in base al nostro contratto, può utilizzare gli input per l'addestramento; il meccanismo di trasferimento su cui facciamo affidamento; come contattarlo in merito ai tuoi dati; e la data dell'ultima verifica di ciascuna voce. I fornitori possono cambiare; il Registro è versionato e ogni modifica vi viene annotata.
+**Ricerca sul web tramite Perplexity.** Per trovare prove utili a un dibattito, i modelli possono effettuare ricerche sul web tramite Perplexity, gestito da Perplexity AI, Inc. negli Stati Uniti. Perplexity riceve le query di ricerca che i modelli formulano a partire dal dibattito, le quali possono contenere parole della tua domanda. Come ogni fornitore di IA, non riceve mai il tuo indirizzo email, gli identificativi del tuo account o della tua sessione, il tuo indirizzo IP o i tuoi dati di pagamento. È elencato nel Registro e gli si applicano le regole sui trasferimenti indicate di seguito.
+
+**Quali fornitori.** Sono elencati nel nostro **Registro dei fornitori di IA** all'indirizzo dezbatere.ro/providers, che è parte integrante della presente informativa. Il Registro si applica a tutti gli utenti, ovunque tu viva. Per ciascun fornitore, indica la persona giuridica e il Paese di stabilimento; cosa riceve e per quale finalità — redigere le argomentazioni del dibattito, giudicarle e verificarle, scrivere la storia del verdetto, cercare prove sul web o risponderti nella chat di supporto; i Paesi o le regioni in cui tratta i dati; le condizioni di conservazione e se la conservazione zero dei dati è attiva per l'endpoint e le funzionalità che utilizziamo; se, in base al nostro contratto, può utilizzare gli input per l'addestramento; il meccanismo di trasferimento su cui facciamo affidamento; come contattarlo in merito ai tuoi dati; e la data dell'ultima verifica di ciascuna voce. I fornitori possono cambiare; il Registro è versionato e ogni modifica vi viene annotata.
 
 **Addestramento e conservazione sono concetti diversi.** Ci avvaliamo dei fornitori di IA solo a condizioni che non consentono loro di utilizzare i tuoi contenuti per addestrare o migliorare i loro modelli; il Registro indica, per ciascun fornitore, se lo abbiamo verificato rispetto al nostro account e quando. Alcuni fornitori conservano prompt e risposte per un periodo limitato a fini di sicurezza, prevenzione degli abusi o adempimento dei propri obblighi legali; il Registro indica per quanto tempo e perché. Laddove sia attiva la conservazione zero dei dati, il Registro lo specifica e indica per quali funzionalità. Non descriveremo i contenuti come non conservati quando non è così.
 
@@ -215,7 +217,7 @@ Per rifiutare questi elementi, blocca o elimina i cookie e i dati di questo sito
 
 Quando modifichiamo la presente informativa, pubblichiamo la nuova versione insieme a una sintesi delle modifiche e a una nuova data di entrata in vigore e conserviamo le versioni precedenti su dezbatere.ro/privacy/versions. Per una modifica che aggiunga una nuova finalità o un nuovo destinatario, ti informiamo per email e all'interno del prodotto prima dell'inizio del nuovo trattamento e ti concediamo il tempo necessario per opporti. Laddove una nuova finalità dipenda dal tuo consenso — ad esempio, se in futuro volessimo utilizzare i contenuti per migliorare i modelli — chiediamo tale consenso separatamente e in modo specifico; non consideriamo mai l'accettazione di Condizioni aggiornate come consenso a un nuovo trattamento. Per chiarimenti che non modificano in alcun modo le nostre attività, ci limitiamo a pubblicare la nuova versione.
 
-La presente informativa è stata aggiornata da ultimo il 12 ottobre 2026. La versione 3.5 ha sostituito la versione 3.4: la sezione 2 ora precisa quali dati di fatturazione e della carta conserviamo e che il numero completo della tua carta non ci arriva mai, e la sezione 7 precisa per quanto tempo conserviamo una carta salvata e i messaggi del fornitore di servizi di pagamento sui pagamenti.
+La presente informativa è stata aggiornata da ultimo il 12 ottobre 2026. La versione 3.6 ha sostituito la versione 3.5: la sezione 5 ora precisa che i modelli possono effettuare ricerche sul web tramite Perplexity e cosa riceve Perplexity. La versione 3.5 ha sostituito la versione 3.4: la sezione 2 ora precisa quali dati di fatturazione e della carta conserviamo e che il numero completo della tua carta non ci arriva mai, e la sezione 7 precisa per quanto tempo conserviamo una carta salvata e i messaggi del fornitore di servizi di pagamento sui pagamenti.
 
 ## Annex B — Condizioni regionali sulla privacy
 

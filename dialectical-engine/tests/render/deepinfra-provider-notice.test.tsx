@@ -24,9 +24,10 @@ describe("the DeepInfra serving provider is disclosed when the API's targets rea
     expect(entry?.zeroRetention).toBe("unconfirmed");
     expect(entry?.purposes).toEqual(["arguments", "judging", "story"]);
     expect(entry?.purposesConfirmed).toBe(true);
-    // The support chat's model stays last.
+    // The support chat's model stays last, after Perplexity.
     expect(register.at(-1)?.key).toBe("support");
-    expect(register.at(-2)?.key).toBe("deepinfra");
+    expect(register.at(-2)?.key).toBe("perplexity");
+    expect(register.at(-3)?.key).toBe("deepinfra");
   });
 
   for (const [locale, catalog] of [["English", en], ["Romanian", ro]] as const) {
@@ -42,11 +43,12 @@ describe("the DeepInfra serving provider is disclosed when the API's targets rea
 });
 
 describe("with no answer from the API, the page lists every reviewed company", () => {
-  it("lists DeepInfra just before the support chat's model, and no model", () => {
+  it("lists DeepInfra just before Perplexity and the support chat's model, and no model", () => {
     for (const companies of [null, []]) {
       const register = providerRegister(companies);
       expect(register.at(-1)?.key).toBe("support");
-      expect(register.at(-2)?.key).toBe("deepinfra");
+      expect(register.at(-2)?.key).toBe("perplexity");
+      expect(register.at(-3)?.key).toBe("deepinfra");
       const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={en} entries={register} />);
       expect(html).toContain('id="legal-provider-deepinfra"');
       expect(html).toContain("Deep Infra Inc.");

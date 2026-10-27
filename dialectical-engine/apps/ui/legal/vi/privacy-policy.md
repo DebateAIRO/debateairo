@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Tóm tắt
-eyebrow: CHÍNH SÁCH QUYỀN RIÊNG TƯ · v3.5 · CÓ HIỆU LỰC 12 THÁNG 10 NĂM 2026
+eyebrow: CHÍNH SÁCH QUYỀN RIÊNG TƯ · v3.6 · CÓ HIỆU LỰC 12 THÁNG 10 NĂM 2026
 title: Dữ liệu chúng tôi lưu trữ và lý do
 lede: Các quyền của bạn và nghĩa vụ của chúng tôi theo GDPR (EU) 2016/679, được trình bày bằng ngôn ngữ dễ hiểu. Mười bốn mục và Phụ lục B — cuộn đến cuối.
-endMarker: HẾT CHÍNH SÁCH · GDPR (EU) 2016/679 · v3.5
+endMarker: HẾT CHÍNH SÁCH · GDPR (EU) 2016/679 · v3.6
 bodyLabel: Nội dung Chính sách quyền riêng tư
 annexTitle: Phụ lục B — Điều khoản quyền riêng tư theo khu vực
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIE
 -->
 
-**Version 3.5 · Effective 12 tháng 10 năm 2026 · Các phiên bản trước tại dezbatere.ro/privacy/versions · Bên kiểm soát: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 12 tháng 10 năm 2026 · Các phiên bản trước tại dezbatere.ro/privacy/versions · Bên kiểm soát: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Chúng tôi thu thập những gì cần thiết để tài khoản hoạt động và những gì bạn lựa chọn nhập. Câu hỏi của bạn được gửi đến các nhà cung cấp AI nêu trong Sổ đăng ký của chúng tôi; chúng không được dùng để huấn luyện mô hình. Nhà cung cấp dịch vụ lưu trữ của chúng tôi lưu trữ tài khoản và các cuộc tranh luận của bạn tại London, Vương quốc Anh; mục 5 cho biết dữ liệu của bạn còn được chuyển đến đâu nữa. Các cuộc tranh luận là riêng tư trừ khi bạn công khai chúng. Việc xóa tài khoản sẽ hủy khóa của dữ liệu riêng tư; khi lên lịch xóa, bạn chọn gỡ cả các cuộc tranh luận đã công khai hoặc để chúng tiếp tục công khai dưới bút danh đã ngừng sử dụng. Bạn có thể liên hệ với chúng tôi tại privacy@dezbatere.ro, và người được nêu tên trong một cuộc tranh luận có thể yêu cầu gỡ bỏ mà không cần tài khoản.
 
@@ -87,7 +87,9 @@ Chúng tôi không lập hồ sơ về bạn, không sử dụng dữ liệu c�
 
 **Dữ liệu được gửi.** Để vận hành một cuộc tranh luận, chúng tôi gửi văn bản đến một hoặc nhiều nhà cung cấp AI bên ngoài: câu hỏi của bạn, các chú thích định hướng bạn thiết lập và các phát biểu do công cụ soạn khi cuộc tranh luận phát triển. Do đó, nhà cung cấp nhìn thấy văn bản được phái sinh từ và xây dựng xoay quanh nội dung bạn đã nhập. Nếu bạn sử dụng kênh trò chuyện hỗ trợ, nội dung bạn nhập tại đó được gửi đến mô hình của kênh trò chuyện hỗ trợ. Nhà cung cấp không bao giờ nhận được địa chỉ email, mã định danh tài khoản hoặc phiên, địa chỉ IP hay thông tin thanh toán của bạn.
 
-**Các nhà cung cấp.** Họ được liệt kê trong **Sổ đăng ký Nhà cung cấp AI** của chúng tôi tại dezbatere.ro/providers, là một phần của chính sách này. Sổ đăng ký áp dụng cho mọi người dùng, bất kể bạn sống ở đâu. Đối với từng nhà cung cấp, Sổ đăng ký nêu pháp nhân và quốc gia thành lập; dữ liệu họ nhận và mục đích nhận — viết các lập luận của cuộc tranh luận, đánh giá và kiểm tra các lập luận đó, viết phần diễn biến dẫn đến phán quyết, hoặc trả lời bạn trong kênh trò chuyện hỗ trợ; các quốc gia hoặc khu vực nơi họ xử lý dữ liệu; điều khoản lưu giữ và việc chế độ không lưu giữ dữ liệu có được kích hoạt đối với điểm cuối và các tính năng chúng tôi sử dụng hay không; theo hợp đồng với chúng tôi, họ có thể dùng dữ liệu đầu vào để huấn luyện hay không; cơ chế chuyển dữ liệu mà chúng tôi dựa vào; cách liên hệ với họ về dữ liệu của bạn; và ngày chúng tôi xác minh gần nhất từng mục. Nhà cung cấp có thể thay đổi; Sổ đăng ký có quản lý phiên bản và thay đổi được ghi nhận tại đó.
+**Tìm kiếm trên web qua Perplexity.** Để tìm bằng chứng cho một cuộc tranh luận, các mô hình có thể tìm kiếm trên web qua Perplexity, do Perplexity AI, Inc. tại Hoa Kỳ vận hành. Perplexity nhận các truy vấn tìm kiếm mà mô hình viết ra từ cuộc tranh luận, và các truy vấn này có thể chứa từ ngữ trong câu hỏi của bạn. Giống như mọi nhà cung cấp AI, Perplexity không bao giờ nhận được địa chỉ email, mã định danh tài khoản hoặc phiên, địa chỉ IP hay thông tin thanh toán của bạn. Perplexity được liệt kê trong Sổ đăng ký, và các quy định về chuyển dữ liệu dưới đây áp dụng cho Perplexity.
+
+**Các nhà cung cấp.** Họ được liệt kê trong **Sổ đăng ký Nhà cung cấp AI** của chúng tôi tại dezbatere.ro/providers, là một phần của chính sách này. Sổ đăng ký áp dụng cho mọi người dùng, bất kể bạn sống ở đâu. Đối với từng nhà cung cấp, Sổ đăng ký nêu pháp nhân và quốc gia thành lập; dữ liệu họ nhận và mục đích nhận — viết các lập luận của cuộc tranh luận, đánh giá và kiểm tra các lập luận đó, viết phần diễn biến dẫn đến phán quyết, tìm kiếm bằng chứng trên web, hoặc trả lời bạn trong kênh trò chuyện hỗ trợ; các quốc gia hoặc khu vực nơi họ xử lý dữ liệu; điều khoản lưu giữ và việc chế độ không lưu giữ dữ liệu có được kích hoạt đối với điểm cuối và các tính năng chúng tôi sử dụng hay không; theo hợp đồng với chúng tôi, họ có thể dùng dữ liệu đầu vào để huấn luyện hay không; cơ chế chuyển dữ liệu mà chúng tôi dựa vào; cách liên hệ với họ về dữ liệu của bạn; và ngày chúng tôi xác minh gần nhất từng mục. Nhà cung cấp có thể thay đổi; Sổ đăng ký có quản lý phiên bản và thay đổi được ghi nhận tại đó.
 
 **Huấn luyện và lưu giữ là hai vấn đề khác nhau.** Chúng tôi chỉ sử dụng các nhà cung cấp AI theo những điều khoản không cho phép họ dùng nội dung của bạn để huấn luyện hoặc cải thiện mô hình của họ; Sổ đăng ký cho biết, với từng nhà cung cấp, chúng tôi đã xác nhận điều này trên tài khoản của mình hay chưa và vào thời điểm nào. Một số nhà cung cấp lưu giữ câu lệnh và phản hồi trong một thời gian giới hạn để bảo mật, ngăn chặn lạm dụng hoặc thực hiện nghĩa vụ pháp lý của chính họ; Sổ đăng ký nêu rõ thời gian và lý do. Khi chế độ không lưu giữ dữ liệu được kích hoạt, Sổ đăng ký nêu rõ điều đó áp dụng cho những tính năng nào. Chúng tôi sẽ không mô tả nội dung là không được lưu giữ khi thực tế không phải vậy.
 
@@ -215,7 +217,7 @@ Trình duyệt có thể gửi tín hiệu “Do Not Track” hoặc một tín 
 
 Khi thay đổi chính sách này, chúng tôi đăng phiên bản mới kèm bản tóm tắt những thay đổi và ngày hiệu lực mới, đồng thời lưu các phiên bản trước tại dezbatere.ro/privacy/versions. Đối với thay đổi bổ sung mục đích mới hoặc bên nhận mới, chúng tôi thông báo cho bạn trước khi hoạt động xử lý mới bắt đầu, qua email và trong sản phẩm, đồng thời dành cho bạn thời gian phản đối. Khi mục đích mới phụ thuộc vào sự đồng ý của bạn — ví dụ nếu sau này chúng tôi muốn sử dụng nội dung để cải thiện mô hình — chúng tôi sẽ xin sự đồng ý đó một cách riêng biệt và cụ thể; chúng tôi không bao giờ coi việc chấp nhận Điều khoản cập nhật là sự đồng ý cho hoạt động xử lý mới. Đối với các nội dung làm rõ không làm thay đổi cách chúng tôi hành động, chúng tôi chỉ đăng phiên bản mới.
 
-Chính sách này được cập nhật lần cuối vào ngày 12 tháng 10 năm 2026. Phiên bản 3.5 thay thế phiên bản 3.4: mục 2 nay nêu rõ chúng tôi lưu những thông tin lập hóa đơn và thông tin thẻ nào và số thẻ đầy đủ của bạn không bao giờ đến được với chúng tôi, và mục 7 nêu rõ chúng tôi giữ thẻ đã lưu và các thông báo của nhà cung cấp dịch vụ thanh toán về các khoản thanh toán trong bao lâu.
+Chính sách này được cập nhật lần cuối vào ngày 12 tháng 10 năm 2026. Phiên bản 3.6 thay thế phiên bản 3.5: mục 5 nay nêu rõ các mô hình có thể tìm kiếm trên web qua Perplexity và những gì Perplexity nhận được. Phiên bản 3.5 thay thế phiên bản 3.4: mục 2 nay nêu rõ chúng tôi lưu những thông tin lập hóa đơn và thông tin thẻ nào và số thẻ đầy đủ của bạn không bao giờ đến được với chúng tôi, và mục 7 nêu rõ chúng tôi giữ thẻ đã lưu và các thông báo của nhà cung cấp dịch vụ thanh toán về các khoản thanh toán trong bao lâu.
 
 ## Annex B — Điều khoản quyền riêng tư theo khu vực
 

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: En bref
-eyebrow: CONDITIONS D’UTILISATION · v2.4 · PRISE D’EFFET 12 OCTOBRE 2026
+eyebrow: CONDITIONS D’UTILISATION · v2.5 · PRISE D’EFFET 12 OCTOBRE 2026
 title: Ce que vous acceptez
 lede: Le contrat entre vous et DMS Merchandise Shop S.R.L., en termes clairs. Dix-neuf sections et l’annexe A — faites défiler jusqu’à la fin.
-endMarker: FIN DES CONDITIONS · v2.4
+endMarker: FIN DES CONDITIONS · v2.5
 bodyLabel: Texte des Conditions d’utilisation
 annexTitle: Annexe A — Conditions régionales
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 DROIT APPLICABLE
 -->
 
-**Version 2.4 · Effective 12 octobre 2026 · Versions précédentes sur dezbatere.ro/terms/versions · Langue : français.**
+**Version 2.5 · Effective 12 octobre 2026 · Versions précédentes sur dezbatere.ro/terms/versions · Langue : français.**
 
 **In short.** Vous devez avoir au moins 18 ans. Dialectical Engine construit des arguments à l’aide de modèles d’IA et tout ce qu’il génère peut être erroné — il ne s’agit pas d’un conseil. Vos débats sont privés, sauf si vous les publiez ; si vous les publiez, tout le monde peut les lire. Le texte que vous soumettez est transmis aux fournisseurs d’IA inscrits dans notre Registre des fournisseurs et n’est pas utilisé pour entraîner des modèles. Signalez tout contenu illicite à support@dezbatere.ro, que vous ayez ou non un compte. Le droit roumain s’applique, mais les protections locales dont vous bénéficiez en tant que consommateur demeurent acquises.
 
@@ -119,6 +119,8 @@ Si vous ne savez pas si une utilisation est autorisée, interrogez-nous avant de
 **Comment votre contenu parvient aux fournisseurs d’IA.** Pour exécuter un débat, nous envoyons du texte à un ou plusieurs fournisseurs externes de modèles. Un fournisseur reçoit votre question, les annotations d’orientation que vous définissez et les énoncés composés par le moteur au cours du débat ; il voit donc du texte dérivé de ce que vous avez saisi et construit autour de celui-ci, et non uniquement vos mots d’origine. Il ne reçoit jamais votre adresse e-mail, les identifiants de votre compte, vos enregistrements de session ni vos informations de paiement.
 
 **Ce qu’envoie le chat d’aide.** L’assistant d’aide est lui aussi un modèle d’IA. Lorsque vous lui écrivez, nous envoyons votre message à un fournisseur externe de modèles pour que le modèle puisse répondre, avec les articles d’aide sur lesquels il fonde sa réponse. Avant l’envoi, nous masquons tout ce qui ressemble à un mot de passe, à un code à usage unique ou à une clé. Si vous demandez à parler à une personne, nous envoyons aussi au modèle la conversation, masquée de la même manière, afin qu’il rédige un bref résumé pour le membre de notre équipe qui prend en charge votre demande. Nous n’y joignons ni votre adresse e-mail, ni les identifiants de votre compte, ni vos informations de paiement, mais le modèle reçoit tout ce que vous écrivez d’autre dans le chat : n’y écrivez donc rien que vous ne voudriez pas qu’il lise.
+
+**Recherche sur le web via Perplexity.** Pour trouver des éléments de preuve pour un débat, les modèles peuvent effectuer des recherches sur le web via **Perplexity** (Perplexity AI, Inc., États-Unis), qui figure dans le Registre des fournisseurs d’IA. Perplexity reçoit les requêtes de recherche que les modèles rédigent à partir du débat ; comme un fournisseur de modèles, il voit donc du texte construit autour de ce que vous avez saisi. Il ne reçoit jamais votre adresse e-mail, les identifiants de votre compte, vos enregistrements de session ni vos informations de paiement.
 
 **Quels fournisseurs, et où.** Notre **Registre des fournisseurs d’IA**, disponible à l’adresse dezbatere.ro/providers, fait partie des présentes Conditions. Il indique pour chaque fournisseur que nous pouvons utiliser : son entité juridique et son pays ; ce qu’il reçoit et pourquoi ; le lieu où il traite les données ; ses conditions de conservation ; si l’absence de conservation des données est activée pour le point de terminaison que nous utilisons ; s’il peut utiliser les entrées pour l’entraînement en vertu de notre contrat ; le mécanisme de transfert sur lequel nous nous appuyons ; et la date de notre dernière vérification de chaque entrée. Les fournisseurs peuvent être établis en dehors de votre pays et de l’Espace économique européen. Notre Politique de confidentialité explique les garanties applicables.
 

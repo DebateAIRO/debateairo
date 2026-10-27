@@ -134,6 +134,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Na vaši vsebini ne učimo modelov. Ponudnike umetne inteligence uporabljamo samo pod pogoji, ki jim ne dovoljujejo uporabe vaše vsebine za učenje ali izboljševanje njihovih modelov; Register ponudnikov umetne inteligence za vsakega ponudnika prikaže, ali smo to potrdili, in kdaj." },
       { kind: "p", text: "Kako vaša vsebina doseže ponudnike umetne inteligence. Za izvedbo razprave pošljemo besedilo enemu ali več zunanjim ponudnikom modelov. Ponudnik prejme vaše vprašanje, usmerjevalne opombe, ki jih nastavite, in izjave, ki jih sistem sestavi med razpravo — ponudnik torej vidi besedilo, izpeljano iz tega, kar ste vnesli, in zgrajeno okoli tega, ne samo vaših izvirnih besed. Nikoli ne prejme vašega e-poštnega naslova, identifikatorjev računa, zapisov o sejah ali podatkov o plačilu." },
       { kind: "p", text: "Kaj pošlje klepet s podporo. Tudi pomočnik za podporo je model umetne inteligence. Ko mu pišete, vaše sporočilo pošljemo zunanjemu ponudniku modelov, da lahko model odgovori, skupaj s članki pomoči, na katerih temelji njegov odgovor. Pred pošiljanjem zakrijemo vse, kar je videti kot geslo, enkratna koda ali ključ. Če zaprosite za pogovor z osebo, modelu pošljemo tudi pogovor, zakrit na enak način, da napiše kratek povzetek za člana naše ekipe, ki prevzame vaš primer. Ne priložimo vašega e-poštnega naslova, identifikatorjev računa ali podatkov o plačilu, vendar model prejme vse drugo, kar vpišete v klepet, zato tja ne pišite ničesar, česar ne bi želeli, da prebere." },
+      { kind: "p", text: "Spletno iskanje prek storitve Perplexity. Da bi našli dokaze za razpravo, lahko modeli iščejo po spletu prek storitve Perplexity (Perplexity AI, Inc., Združene države), ki je navedena v Registru ponudnikov umetne inteligence. Perplexity prejme iskalne poizvedbe, ki jih modeli sestavijo iz razprave — tako kot ponudnik modelov torej vidi besedilo, zgrajeno okoli tega, kar ste vnesli. Nikoli ne prejme vašega e-poštnega naslova, identifikatorjev računa, zapisov o sejah ali podatkov o plačilu." },
       { kind: "p", text: "Kateri ponudniki in kje. Naš Register ponudnikov umetne inteligence na dezbatere.ro/providers je del teh Pogojev. Za vsakega ponudnika, ki ga lahko uporabimo, navaja: njegovo pravno osebo in državo; kaj prejme in zakaj; kje obdeluje podatke; njegove pogoje hrambe; ali je za končno točko, ki jo uporabljamo, vključena ničelna hramba podatkov; ali sme po naši pogodbi uporabljati vhodne podatke za učenje; mehanizem prenosa, na katerega se opiramo; in datum zadnjega preverjanja vsakega vnosa. Ponudniki so lahko zunaj vaše države in zunaj Evropskega gospodarskega prostora. Naš Pravilnik o zasebnosti pojasnjuje zaščitne ukrepe." },
       { kind: "p", text: "Tri različne stvari. »Ne uporablja se za učenje modelov«, »hrani se omejeno obdobje iz varnostnih razlogov, zaradi preprečevanja zlorab ali iz pravnih razlogov« in »ničelna hramba podatkov — po obdelavi se ne shrani« niso isto. Če ponudnik pozive hrani omejeno obdobje, Register navaja, kako dolgo in zakaj. Če je vključena ničelna hramba podatkov, je to navedeno v Registru skupaj s funkcijami, za katere velja. Ne bomo vam trdili, da se vsebina ne hrani, kadar to ni res." },
       { kind: "p", text: "Rezultati. V razmerju med vami in nami lahko rezultate svojih razprav uporabljate za kateri koli zakonit namen, mi pa ne uveljavljamo lastništva ustvarjenega besedila. Upoštevajte, da ustvarjenega rezultata v številnih pravnih redih morda ni mogoče avtorskopravno zaščititi; da se lahko podoben rezultat ustvari za druge uporabnike; da lahko rezultati reproducirajo gradivo tretjih oseb ali so mu podobni; ter da za nekatera izvorna gradiva, ki jih pridobi ponudnik umetne inteligence, lahko veljajo omejitve ponovne uporabe. Preden se zanesete na rezultate ali jih ponovno objavite, ste odgovorni za preverjanje." }
@@ -353,12 +354,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.4",
-  sha256: "6fa70fc80e693110e08159e16028e0ed24a06f689e9d85dccb08c543233aa662",
-  eyebrow: "POGOJI UPORABE · v2.4 · VELJAVNI OD 12. OKTOBRA 2026",
+  version: "2.5",
+  sha256: "d78dada0ac079ee73c8394a36d83a4239e86a4c6768357f73f85e0f4fdc65622",
+  eyebrow: "POGOJI UPORABE · v2.5 · VELJAVNI OD 12. OKTOBRA 2026",
   title: "S čim soglašate",
   lede: "Pogodba med vami in družbo DMS Merchandise Shop S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.",
-  endMarker: "KONEC POGOJEV · v2.4",
+  endMarker: "KONEC POGOJEV · v2.5",
   contact: "support@dezbatere.ro",
   bodyLabel: "Besedilo Pogojev uporabe",
   sectionIdPrefix: "terms-section-",

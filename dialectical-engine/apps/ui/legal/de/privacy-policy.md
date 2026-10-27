@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kurz gesagt
-eyebrow: DATENSCHUTZERKLÄRUNG · v3.5 · GÜLTIG AB 12. OKTOBER 2026
+eyebrow: DATENSCHUTZERKLÄRUNG · v3.6 · GÜLTIG AB 12. OKTOBER 2026
 title: Was wir speichern und warum
 lede: DSGVO – GDPR (EU) 2016/679: Ihre Rechte und unsere Pflichten, verständlich formuliert. Vierzehn Abschnitte und Anhang B – scrollen Sie bis zum Ende.
-endMarker: ENDE DER DATENSCHUTZERKLÄRUNG · DSGVO – GDPR (EU) 2016/679 · v3.5
+endMarker: ENDE DER DATENSCHUTZERKLÄRUNG · DSGVO – GDPR (EU) 2016/679 · v3.6
 bodyLabel: Text der Datenschutzerklärung
 annexTitle: Anhang B – Regionale Datenschutzbestimmungen
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 3.5 · Effective 12. Oktober 2026 · Frühere Fassungen unter dezbatere.ro/privacy/versions · Verantwortlicher: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 12. Oktober 2026 · Frühere Fassungen unter dezbatere.ro/privacy/versions · Verantwortlicher: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Wir erheben, was für ein Konto erforderlich ist und was Sie freiwillig eingeben. Ihre Fragen werden an die in unserem Verzeichnis aufgeführten KI-Anbieter übermittelt; sie werden nicht zum Trainieren von Modellen verwendet. Unser Hostinganbieter speichert Ihr Konto und Ihre Debatten in London im Vereinigten Königreich; Abschnitt 5 nennt, wohin Ihre Daten sonst noch gelangen. Debatten sind privat, sofern Sie sie nicht veröffentlichen. Bei der Löschung Ihres Kontos werden die Schlüssel zu Ihren privaten Daten vernichtet; bei der Planung entscheiden Sie, ob auch Ihre veröffentlichten Debatten entfernt werden oder unter Ihrem stillgelegten Pseudonym öffentlich bleiben. Sie erreichen uns unter privacy@dezbatere.ro; in einer Debatte genannte Personen können auch ohne Konto die Entfernung verlangen.
 
@@ -87,7 +87,9 @@ Wir erstellen keine Profile von Ihnen, verwenden Ihre Daten nicht für Werbung u
 
 **Welche Daten übermittelt werden.** Zur Durchführung einer Debatte übermitteln wir Text an einen oder mehrere externe KI-Anbieter: Ihre Frage, die von Ihnen festgelegten Steuerungsanmerkungen und Aussagen, die das System im Verlauf der Debatte verfasst. Ein Anbieter sieht daher Text, der aus Ihren Eingaben abgeleitet und um diese herum aufgebaut ist. Wenn Sie den Support-Chat nutzen, geht das, was Sie dort eingeben, an das Modell des Support-Chats. Ein Anbieter erhält niemals Ihre E-Mail-Adresse, Ihre Konto- oder Sitzungskennungen, Ihre IP-Adresse oder Ihre Zahlungsdaten.
 
-**Welche Anbieter.** Sie sind in unserem **Verzeichnis der KI-Anbieter** unter dezbatere.ro/providers aufgeführt, das Bestandteil dieser Datenschutzerklärung ist. Das Verzeichnis gilt für alle Nutzer, unabhängig davon, wo Sie wohnen. Es nennt für jeden Anbieter dessen Rechtsträger und Sitzstaat; welche Daten er zu welchem Zweck erhält – das Verfassen der Argumente der Debatte, deren Bewertung und Prüfung, das Verfassen der Geschichte hinter dem Urteil oder die Beantwortung Ihrer Nachrichten im Support-Chat; die Länder oder Regionen der Verarbeitung; seine Aufbewahrungsbedingungen und ob für den von uns verwendeten Endpunkt und die verwendeten Funktionen eine Null-Daten-Aufbewahrung aktiv ist; ob er Eingaben nach unserem Vertrag für Trainingszwecke verwenden darf; den von uns herangezogenen Übermittlungsmechanismus; wie Sie ihn in Bezug auf Ihre Daten kontaktieren können; sowie das Datum der letzten Überprüfung jedes Eintrags. Anbieter können wechseln; das Verzeichnis wird versioniert und Änderungen werden dort vermerkt.
+**Websuche über Perplexity.** Um Belege für eine Debatte zu finden, können die Modelle das Web über Perplexity durchsuchen, das von Perplexity AI, Inc. in den Vereinigten Staaten betrieben wird. Perplexity erhält die Suchanfragen, die die Modelle aus der Debatte formulieren und die Wörter aus Ihrer Frage enthalten können. Wie jeder KI-Anbieter erhält Perplexity niemals Ihre E-Mail-Adresse, Ihre Konto- oder Sitzungskennungen, Ihre IP-Adresse oder Ihre Zahlungsdaten. Perplexity ist im Verzeichnis aufgeführt, und die nachstehenden Regeln für Übermittlungen gelten auch für Perplexity.
+
+**Welche Anbieter.** Sie sind in unserem **Verzeichnis der KI-Anbieter** unter dezbatere.ro/providers aufgeführt, das Bestandteil dieser Datenschutzerklärung ist. Das Verzeichnis gilt für alle Nutzer, unabhängig davon, wo Sie wohnen. Es nennt für jeden Anbieter dessen Rechtsträger und Sitzstaat; welche Daten er zu welchem Zweck erhält – das Verfassen der Argumente der Debatte, deren Bewertung und Prüfung, das Verfassen der Geschichte hinter dem Urteil, die Suche nach Belegen im Web oder die Beantwortung Ihrer Nachrichten im Support-Chat; die Länder oder Regionen der Verarbeitung; seine Aufbewahrungsbedingungen und ob für den von uns verwendeten Endpunkt und die verwendeten Funktionen eine Null-Daten-Aufbewahrung aktiv ist; ob er Eingaben nach unserem Vertrag für Trainingszwecke verwenden darf; den von uns herangezogenen Übermittlungsmechanismus; wie Sie ihn in Bezug auf Ihre Daten kontaktieren können; sowie das Datum der letzten Überprüfung jedes Eintrags. Anbieter können wechseln; das Verzeichnis wird versioniert und Änderungen werden dort vermerkt.
 
 **Training und Aufbewahrung sind unterschiedliche Dinge.** Wir setzen KI-Anbieter nur zu Bedingungen ein, die es ihnen nicht erlauben, Ihre Inhalte zum Trainieren oder Verbessern ihrer Modelle zu nutzen; das Verzeichnis zeigt für jeden Anbieter, ob und wann wir dies für unser Konto bestätigt haben. Einige Anbieter bewahren Eingaben und Antworten für einen begrenzten Zeitraum zur Sicherheit, Missbrauchsprävention oder zur Erfüllung eigener rechtlicher Verpflichtungen auf; das Verzeichnis gibt Dauer und Grund an. Wo eine Null-Daten-Aufbewahrung aktiv ist, nennt das Verzeichnis dies und die betroffenen Funktionen. Wir werden Inhalte nicht als ungespeichert bezeichnen, wenn sie gespeichert werden.
 
@@ -215,7 +217,7 @@ Um diese Elemente abzulehnen, blockieren oder löschen Sie Cookies und Websiteda
 
 Wenn wir diese Datenschutzerklärung ändern, veröffentlichen wir die neue Fassung mit einer Zusammenfassung der Änderungen und einem neuen Gültigkeitsdatum und bewahren die früheren Fassungen unter dezbatere.ro/privacy/versions auf. Bei einer Änderung, durch die ein neuer Zweck oder ein neuer Empfänger hinzukommt, informieren wir Sie vor Beginn der neuen Verarbeitung per E-Mail und im Produkt und geben Ihnen Zeit zum Widerspruch. Hängt ein neuer Zweck von Ihrer Einwilligung ab – etwa wenn wir Inhalte jemals zur Verbesserung von Modellen nutzen wollten –, holen wir diese Einwilligung gesondert und ausdrücklich ein; die Annahme aktualisierter Nutzungsbedingungen behandeln wir niemals als Einwilligung in eine neue Verarbeitung. Bei Klarstellungen, die nichts an unserem Vorgehen ändern, veröffentlichen wir lediglich die neue Fassung.
 
-Diese Datenschutzerklärung wurde zuletzt am 12. Oktober 2026 aktualisiert. Version 3.5 ersetzte Version 3.4: Abschnitt 2 nennt nun, welche Rechnungs- und Kartendaten wir speichern und dass Ihre vollständige Kartennummer uns nie erreicht, und Abschnitt 7 nennt, wie lange wir eine gespeicherte Karte und die Nachrichten des Zahlungsanbieters zu Zahlungen aufbewahren.
+Diese Datenschutzerklärung wurde zuletzt am 12. Oktober 2026 aktualisiert. Version 3.6 ersetzte Version 3.5: Abschnitt 5 nennt nun, dass die Modelle das Web über Perplexity durchsuchen können, und was Perplexity erhält. Version 3.5 ersetzte Version 3.4: Abschnitt 2 nennt nun, welche Rechnungs- und Kartendaten wir speichern und dass Ihre vollständige Kartennummer uns nie erreicht, und Abschnitt 7 nennt, wie lange wir eine gespeicherte Karte und die Nachrichten des Zahlungsanbieters zu Zahlungen aufbewahren.
 
 ## Annex B — Regionale Datenschutzbestimmungen
 

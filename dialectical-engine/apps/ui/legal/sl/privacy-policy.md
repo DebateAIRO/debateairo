@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Na kratko
-eyebrow: PRAVILNIK O ZASEBNOSTI · v3.5 · VELJA OD 12. OKTOBRA 2026
+eyebrow: PRAVILNIK O ZASEBNOSTI · v3.6 · VELJA OD 12. OKTOBRA 2026
 title: Kaj hranimo in zakaj
 lede: Vaše pravice in naše obveznosti po GDPR (EU) 2016/679 v razumljivem jeziku. Štirinajst razdelkov in Priloga B — pomaknite se do konca.
-endMarker: KONEC PRAVILNIKA · GDPR (EU) 2016/679 · v3.5
+endMarker: KONEC PRAVILNIKA · GDPR (EU) 2016/679 · v3.6
 bodyLabel: Besedilo pravilnika o zasebnosti
 annexTitle: Priloga B — Regionalne določbe o zasebnosti
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 PIŠKOTKI
 -->
 
-**Version 3.5 · Effective 12. oktobra 2026 · Prejšnje različice na dezbatere.ro/privacy/versions · Upravljavec: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 12. oktobra 2026 · Prejšnje različice na dezbatere.ro/privacy/versions · Upravljavec: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Zbiramo podatke, ki jih potrebuje račun, in to, kar se odločite vnesti. Vaša vprašanja se pošljejo ponudnikom umetne inteligence, navedenim v našem Registru; ne uporabljajo se za učenje modelov. Naš ponudnik gostovanja hrani vaš račun in vaše razprave v Londonu v Združenem kraljestvu; razdelek 5 pojasnjuje, kam še gredo vaši podatki. Razprave so zasebne, razen če jih objavite. Z izbrisom računa se uničijo ključi vaših zasebnih podatkov; ob načrtovanju izbrisa izberete, ali bodo odstranjene tudi objavljene razprave ali bodo ostale javne pod vašim umaknjenim psevdonimom. Dosegljivi smo na privacy@dezbatere.ro, osebe, navedene v razpravi, pa lahko zahtevajo odstranitev brez računa.
 
@@ -87,7 +87,9 @@ Ne profiliramo vas, vaših podatkov ne uporabljamo za oglaševanje in jih ne pro
 
 **Kaj se pošlje.** Za izvedbo razprave pošljemo besedilo enemu ali več zunanjim ponudnikom umetne inteligence: vaše vprašanje, usmerjevalne opombe, ki jih nastavite, in izjave, ki jih sistem sestavlja med razvojem razprave. Ponudnik zato vidi besedilo, izpeljano iz tega, kar ste vnesli, in zgrajeno okoli tega. Če uporabljate klepet s podporo, kar vanj vnesete, prejme model klepeta s podporo. Ponudnik nikoli ne prejme vašega e-poštnega naslova, identifikatorjev računa ali seje, naslova IP ali podatkov o plačilu.
 
-**Kateri ponudniki.** Navedeni so v našem **Registru ponudnikov umetne inteligence** na dezbatere.ro/providers, ki je del tega pravilnika. Register velja za vsakega uporabnika, ne glede na to, kje živite. Za vsakega ponudnika navaja njegovo pravno osebo in državo ustanovitve; kaj prejema in za kakšen namen — pisanje argumentov razprave, njihova presoja in preverjanje, pisanje zgodbe razsodbe ali odgovarjanje vam v klepetu s podporo; države ali regije, v katerih obdeluje podatke; njegove pogoje hrambe ter ali je za končno točko in funkcije, ki jih uporabljamo, vključena ničelna hramba podatkov; ali sme po naši pogodbi uporabljati vhodne podatke za učenje; mehanizem prenosa, na katerega se opiramo; kako se z njim povezati glede vaših podatkov; in datum zadnjega preverjanja vsakega vnosa. Ponudniki se lahko spremenijo; Register vsebuje različice in sprememba je v njem zabeležena.
+**Spletno iskanje prek storitve Perplexity.** Da bi našli dokaze za razpravo, lahko modeli iščejo po spletu prek storitve Perplexity, ki jo upravlja družba Perplexity AI, Inc. v Združenih državah. Perplexity prejme iskalne poizvedbe, ki jih modeli sestavijo iz razprave in ki lahko vsebujejo besede iz vašega vprašanja. Tako kot vsak ponudnik umetne inteligence tudi Perplexity nikoli ne prejme vašega e-poštnega naslova, identifikatorjev računa ali seje, naslova IP ali podatkov o plačilu. Navedena je v Registru, zanjo pa veljajo spodaj opisana pravila o prenosih.
+
+**Kateri ponudniki.** Navedeni so v našem **Registru ponudnikov umetne inteligence** na dezbatere.ro/providers, ki je del tega pravilnika. Register velja za vsakega uporabnika, ne glede na to, kje živite. Za vsakega ponudnika navaja njegovo pravno osebo in državo ustanovitve; kaj prejema in za kakšen namen — pisanje argumentov razprave, njihova presoja in preverjanje, pisanje zgodbe razsodbe, iskanje dokazov po spletu ali odgovarjanje vam v klepetu s podporo; države ali regije, v katerih obdeluje podatke; njegove pogoje hrambe ter ali je za končno točko in funkcije, ki jih uporabljamo, vključena ničelna hramba podatkov; ali sme po naši pogodbi uporabljati vhodne podatke za učenje; mehanizem prenosa, na katerega se opiramo; kako se z njim povezati glede vaših podatkov; in datum zadnjega preverjanja vsakega vnosa. Ponudniki se lahko spremenijo; Register vsebuje različice in sprememba je v njem zabeležena.
 
 **Učenje in hramba sta različni stvari.** Ponudnike umetne inteligence uporabljamo samo pod pogoji, ki jim ne dovoljujejo uporabe vaše vsebine za učenje ali izboljševanje njihovih modelov; Register za vsakega ponudnika prikaže, ali smo to preverili na našem računu, in kdaj. Nekateri ponudniki navodila in odgovore hranijo omejeno obdobje zaradi varnosti, preprečevanja zlorab ali lastnih pravnih obveznosti; Register navaja trajanje in razlog. Če je vključena ničelna hramba podatkov, Register to navede skupaj s funkcijami, za katere velja. Za vsebino ne bomo trdili, da se ne hrani, kadar se dejansko hrani.
 
@@ -215,7 +217,7 @@ Brskalniki lahko pošiljajo signal »Do Not Track« ali podoben signal. Dialecti
 
 Ko ta pravilnik spremenimo, objavimo novo različico s povzetkom sprememb in novim datumom začetka veljavnosti, prejšnje različice pa ohranimo na dezbatere.ro/privacy/versions. O spremembi, ki dodaja nov namen ali novega prejemnika, vas obvestimo po e-pošti in v izdelku pred začetkom nove obdelave ter vam damo čas za ugovor. Kadar je nov namen odvisen od vaše privolitve — na primer, če bi kadar koli želeli uporabiti vsebino za izboljševanje modelov — vas za to privolitev zaprosimo ločeno in posebej; sprejetja posodobljenih Pogojev nikoli ne obravnavamo kot privolitev za novo obdelavo. Pri pojasnilih, ki ničesar ne spremenijo glede našega ravnanja, preprosto objavimo novo različico.
 
-Ta pravilnik je bil nazadnje posodobljen 12. oktobra 2026. Različica 3.5 je nadomestila različico 3.4: razdelek 2 zdaj navaja, katere podatke za obračun in katere podatke o kartici hranimo ter da vaša celotna številka kartice nikoli ne pride do nas, razdelek 7 pa navaja, kako dolgo hranimo shranjeno kartico in sporočila ponudnika plačilnih storitev o plačilih.
+Ta pravilnik je bil nazadnje posodobljen 12. oktobra 2026. Različica 3.6 je nadomestila različico 3.5: razdelek 5 zdaj navaja, da lahko modeli iščejo po spletu prek storitve Perplexity, in kaj Perplexity prejme. Različica 3.5 je nadomestila različico 3.4: razdelek 2 zdaj navaja, katere podatke za obračun in katere podatke o kartici hranimo ter da vaša celotna številka kartice nikoli ne pride do nas, razdelek 7 pa navaja, kako dolgo hranimo shranjeno kartico in sporočila ponudnika plačilnih storitev o plačilih.
 
 ## Annex B — Regionalne določbe o zasebnosti
 

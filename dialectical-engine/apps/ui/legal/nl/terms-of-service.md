@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In het kort
-eyebrow: SERVICEVOORWAARDEN · v2.4 · VAN KRACHT OP 12 OKTOBER 2026
+eyebrow: SERVICEVOORWAARDEN · v2.5 · VAN KRACHT OP 12 OKTOBER 2026
 title: Waarmee u instemt
 lede: De overeenkomst tussen u en DMS Merchandise Shop S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.
-endMarker: EINDE VAN DE VOORWAARDEN · v2.4
+endMarker: EINDE VAN DE VOORWAARDEN · v2.5
 bodyLabel: Tekst van de Servicevoorwaarden
 annexTitle: Bijlage A — Regionale voorwaarden
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TOEPASSELIJK RECHT
 -->
 
-**Version 2.4 · Effective 12 oktober 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
+**Version 2.5 · Effective 12 oktober 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
 
 **In short.** U moet 18 jaar of ouder zijn. Dialectical Engine stelt met AI-modellen argumenten op en alles wat het genereert kan onjuist zijn — het is geen advies. Uw debatten zijn privé, tenzij u ze publiceert; als u ze publiceert, kan iedereen ze lezen. Tekst die u indient, wordt verzonden naar de AI-aanbieders in ons Register van aanbieders en wordt niet gebruikt om modellen te trainen. Meld illegale inhoud via support@dezbatere.ro, ongeacht of u een account hebt. Het Roemeense recht is van toepassing, maar uw lokale consumentenbescherming blijft voor u gelden.
 
@@ -119,6 +119,8 @@ Als u twijfelt of iets is toegestaan, vraag het ons voordat u het plaatst.
 **Hoe uw inhoud AI-aanbieders bereikt.** Om een debat uit te voeren, sturen wij tekst naar een of meer externe modelaanbieders. Een aanbieder ontvangt uw vraag, de sturende annotaties die u instelt en verklaringen die de engine tijdens het debat opstelt — een aanbieder ziet dus tekst die is afgeleid van en opgebouwd rond wat u hebt ingevoerd, niet alleen uw oorspronkelijke woorden. De aanbieder ontvangt nooit uw e-mailadres, accountidentificatoren, sessiegegevens of betalingsgegevens.
 
 **Wat de ondersteuningschat verstuurt.** De ondersteuningsassistent is ook een AI-model. Wanneer u de assistent schrijft, sturen wij uw bericht naar een externe modelaanbieder zodat het model kan antwoorden, samen met de helpartikelen waarop het zijn antwoord baseert. Vóór het versturen maskeren wij alles wat eruitziet als een wachtwoord, een eenmalige code of een sleutel. Als u vraagt met een persoon te spreken, sturen wij ook het gesprek, op dezelfde manier gemaskeerd, naar het model zodat het een korte samenvatting schrijft voor het lid van ons team dat uw zaak overneemt. Wij voegen uw e-mailadres, accountidentificatoren of betalingsgegevens niet toe, maar het model ontvangt alles wat u verder in de chat typt, dus schrijf daar niets wat u het model niet wilt laten lezen.
+
+**Zoeken op het web via Perplexity.** Om bewijs voor een debat te vinden, kunnen de modellen op het web zoeken via **Perplexity** (Perplexity AI, Inc., Verenigde Staten), dat in het Register van AI-aanbieders is vermeld. Perplexity ontvangt de zoekvragen die de modellen op basis van het debat opstellen — net als een modelaanbieder ziet Perplexity dus tekst die is opgebouwd rond wat u hebt ingevoerd. Perplexity ontvangt nooit uw e-mailadres, accountidentificatoren, sessiegegevens of betalingsgegevens.
 
 **Welke aanbieders en waar.** Ons **Register van AI-aanbieders** op dezbatere.ro/providers maakt deel uit van deze Voorwaarden. Het vermeldt voor elke aanbieder die wij kunnen gebruiken: diens juridische entiteit en land; wat deze ontvangt en waarom; waar deze de gegevens verwerkt; de bewaartermijnen; of voor het door ons gebruikte eindpunt geen gegevens worden bewaard; of de aanbieder invoer krachtens onze overeenkomst voor training mag gebruiken; het doorgiftemechanisme waarop wij ons baseren; en de datum waarop wij elke vermelding voor het laatst hebben gecontroleerd. Aanbieders kunnen buiten uw land en buiten de Europese Economische Ruimte zijn gevestigd. Ons Privacybeleid legt de waarborgen uit.
 

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: W skrócie
-eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v2.4 · OBOWIĄZUJĄ OD 12 PAŹDZIERNIKA 2026
+eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v2.5 · OBOWIĄZUJĄ OD 12 PAŹDZIERNIKA 2026
 title: Na co wyrażasz zgodę
 lede: Umowa między Tobą a DMS Merchandise Shop S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.
-endMarker: KONIEC WARUNKÓW · v2.4
+endMarker: KONIEC WARUNKÓW · v2.5
 bodyLabel: Treść Warunków świadczenia usług
 annexTitle: Załącznik A — Warunki regionalne
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAWO WŁAŚCIWE
 -->
 
-**Version 2.4 · Effective 12 października 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
+**Version 2.5 · Effective 12 października 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
 
 **In short.** Musisz mieć ukończone 18 lat. Dialectical Engine tworzy argumenty przy użyciu modeli sztucznej inteligencji, a wszystko, co generuje, może być błędne — nie jest to porada. Twoje debaty są prywatne, chyba że je opublikujesz; po publikacji każdy może je przeczytać. Przesyłany przez Ciebie tekst jest przekazywany dostawcom AI wymienionym w naszym Rejestrze Dostawców i nie jest wykorzystywany do trenowania modeli. Nielegalne treści zgłaszaj pod adresem support@dezbatere.ro, niezależnie od tego, czy masz konto. Zastosowanie ma prawo rumuńskie, jednak zachowujesz ochronę konsumencką wynikającą z prawa miejscowego.
 
@@ -119,6 +119,8 @@ Jeżeli nie masz pewności, czy dana treść jest dozwolona, skontaktuj się z n
 **W jaki sposób Twoje treści trafiają do dostawców AI.** W celu przeprowadzenia debaty przesyłamy tekst jednemu lub większej liczbie zewnętrznych dostawców modeli. Dostawca otrzymuje Twoje pytanie, ustawione przez Ciebie adnotacje sterujące oraz wypowiedzi tworzone przez silnik w toku debaty — widzi zatem tekst wyprowadzony z tego, co wpisujesz, i utworzony wokół tej treści, a nie wyłącznie Twoje pierwotne słowa. Dostawca nigdy nie otrzymuje Twojego adresu e-mail, identyfikatorów konta, zapisów sesji ani danych płatniczych.
 
 **Co wysyła czat wsparcia.** Asystent wsparcia również jest modelem AI. Gdy do niego piszesz, przesyłamy Twoją wiadomość zewnętrznemu dostawcy modeli, aby model mógł odpowiedzieć, wraz z artykułami pomocy, na których opiera odpowiedź. Przed wysłaniem maskujemy wszystko, co wygląda na hasło, kod jednorazowy lub klucz. Jeśli poprosisz o rozmowę z człowiekiem, przesyłamy modelowi także rozmowę, zamaskowaną w ten sam sposób, aby napisał krótkie podsumowanie dla członka naszego zespołu, który przejmie Twoją sprawę. Nie dołączamy Twojego adresu e-mail, identyfikatorów konta ani danych płatniczych, ale model otrzymuje wszystko inne, co wpiszesz na czacie, dlatego nie pisz tam niczego, czego nie chcesz, aby przeczytał.
+
+**Wyszukiwanie w internecie przez Perplexity.** Aby znaleźć dowody na potrzeby debaty, modele mogą przeszukiwać internet za pośrednictwem **Perplexity** (Perplexity AI, Inc., Stany Zjednoczone), który jest wymieniony w Rejestrze Dostawców AI. Perplexity otrzymuje zapytania wyszukiwania, które modele formułują na podstawie debaty — widzi zatem, podobnie jak dostawca modeli, tekst utworzony wokół tego, co wpisujesz. Nigdy nie otrzymuje Twojego adresu e-mail, identyfikatorów konta, zapisów sesji ani danych płatniczych.
 
 **Którzy dostawcy i gdzie.** Nasz **Rejestr Dostawców AI**, dostępny pod adresem dezbatere.ro/providers, stanowi część niniejszych Warunków. Wymieniono w nim każdego dostawcę, z którego możemy korzystać: jego podmiot prawny i państwo; otrzymywane dane i cel ich otrzymywania; miejsce przetwarzania; warunki przechowywania; informację, czy dla używanego przez nas punktu końcowego aktywna jest opcja zerowej retencji danych; informację, czy na mocy zawartej z nami umowy dostawca może wykorzystywać dane wejściowe do trenowania; mechanizm przekazywania danych, na którym się opieramy; oraz datę ostatniej weryfikacji każdego wpisu. Dostawcy mogą mieć siedzibę poza Twoim państwem oraz poza Europejskim Obszarem Gospodarczym. Stosowane zabezpieczenia wyjaśnia nasza Polityka prywatności.
 

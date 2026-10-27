@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Em resumo
-eyebrow: TERMOS DE SERVIÇO · v2.4 · EM VIGOR DESDE 12 DE OUTUBRO DE 2026
+eyebrow: TERMOS DE SERVIÇO · v2.5 · EM VIGOR DESDE 12 DE OUTUBRO DE 2026
 title: Aquilo com que concorda
 lede: O contrato entre si e a DMS Merchandise Shop S.R.L., em linguagem clara. Dezanove secções e o Anexo A — desloque-se até ao fim.
-endMarker: FIM DOS TERMOS · v2.4
+endMarker: FIM DOS TERMOS · v2.5
 bodyLabel: Texto dos Termos de Serviço
 annexTitle: Anexo A — Termos regionais
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEI APLICÁVEL
 -->
 
-**Version 2.4 · Effective 12 de outubro de 2026 · Versões anteriores em dezbatere.ro/terms/versions · Idioma: português.**
+**Version 2.5 · Effective 12 de outubro de 2026 · Versões anteriores em dezbatere.ro/terms/versions · Idioma: português.**
 
 **In short.** Tem de ter pelo menos 18 anos. A Dialectical Engine constrói argumentos com modelos de IA e tudo o que gera pode estar errado — não constitui aconselhamento. Os seus debates são privados, a menos que os publique; se os publicar, qualquer pessoa poderá lê-los. O texto que envia é transmitido aos fornecedores de IA indicados no nosso Registo de Fornecedores e não é utilizado para treinar modelos. Denuncie conteúdos ilegais através de support@dezbatere.ro, tenha ou não uma conta. É aplicável a lei romena, mas as proteções locais de que beneficia enquanto consumidor mantêm-se.
 
@@ -119,6 +119,8 @@ Se tiver dúvidas sobre se algo é permitido, pergunte-nos antes de o publicar.
 **Como o seu conteúdo chega aos fornecedores de IA.** Para executar um debate, enviamos texto a um ou mais fornecedores externos de modelos. O que um fornecedor recebe é a sua pergunta, as anotações de orientação que definiu e as alegações que o motor compõe durante o debate — pelo que o fornecedor vê texto derivado e construído em torno do que escreveu, e não apenas as suas palavras originais. Nunca recebe o seu endereço de correio eletrónico, os identificadores da sua conta, os registos de sessão ou os dados de pagamento.
 
 **O que o chat de apoio envia.** O assistente de apoio é também um modelo de IA. Quando lhe escreve, enviamos a sua mensagem a um fornecedor externo de modelos para que o modelo possa responder, juntamente com os artigos de ajuda em que baseia a resposta. Antes do envio, ocultamos tudo o que pareça uma palavra-passe, um código de utilização única ou uma chave. Se pedir para falar com uma pessoa, enviamos também ao modelo a conversa, ocultada da mesma forma, para que redija um breve resumo para o membro da nossa equipa que assumir o seu caso. Não anexamos o seu endereço de correio eletrónico, os identificadores da sua conta nem os seus dados de pagamento, mas o modelo recebe tudo o resto que escrever no chat, pelo que não escreva aí nada que não queira que ele leia.
+
+**Pesquisa na web através da Perplexity.** Para encontrar provas para um debate, os modelos podem pesquisar na web através da **Perplexity** (Perplexity AI, Inc., Estados Unidos), que consta do Registo de Fornecedores de IA. O que a Perplexity recebe são as consultas de pesquisa que os modelos redigem a partir do debate — pelo que, tal como um fornecedor de modelos, vê texto construído em torno do que escreveu. Nunca recebe o seu endereço de correio eletrónico, os identificadores da sua conta, os registos de sessão ou os dados de pagamento.
 
 **Quais os fornecedores e onde operam.** O nosso **Registo de Fornecedores de IA**, disponível em dezbatere.ro/providers, faz parte destes Termos. Indica, para cada fornecedor que podemos utilizar: a respetiva entidade jurídica e país; o que recebe e porquê; onde efetua o tratamento; as respetivas condições de conservação; se está ativa a conservação zero de dados para o ponto terminal que utilizamos; se pode utilizar dados de entrada para treino ao abrigo do nosso contrato; o mecanismo de transferência em que nos baseamos; e a data em que verificámos pela última vez cada entrada. Os fornecedores podem estar localizados fora do seu país e fora do Espaço Económico Europeu. A nossa Política de Privacidade explica as salvaguardas.
 

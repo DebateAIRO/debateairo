@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Īsumā
-eyebrow: PAKALPOJUMA NOTEIKUMI · v2.4 · SPĒKĀ NO 2026. GADA 12. OKTOBRA
+eyebrow: PAKALPOJUMA NOTEIKUMI · v2.5 · SPĒKĀ NO 2026. GADA 12. OKTOBRA
 title: Kam jūs piekrītat
 lede: Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.
-endMarker: NOTEIKUMU BEIGAS · v2.4
+endMarker: NOTEIKUMU BEIGAS · v2.5
 bodyLabel: Pakalpojuma noteikumu teksts
 annexTitle: A pielikums — Reģionālie noteikumi
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PIEMĒROJAMIE TIESĪBU AKTI
 -->
 
-**Version 2.4 · Effective 2026. gada 12. oktobris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
+**Version 2.5 · Effective 2026. gada 12. oktobris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
 
 **In short.** Jums jābūt vismaz 18 gadus vecam. Dialectical Engine veido argumentus ar MI modeļiem, un viss, ko tas ģenerē, var būt nepareizs — tā nav konsultācija. Jūsu debates ir privātas, ja vien tās nepublicējat; ja tās publicējat, ikviens tās var lasīt. Jūsu iesniegtais teksts tiek nosūtīts mūsu Pakalpojumu sniedzēju reģistrā norādītajiem MI pakalpojumu sniedzējiem un netiek izmantots modeļu apmācīšanai. Par nelikumīgu saturu ziņojiet uz support@dezbatere.ro neatkarīgi no tā, vai jums ir konts. Piemēro Rumānijas tiesību aktus, taču jums joprojām ir vietējā patērētāju aizsardzība.
 
@@ -119,6 +119,8 @@ Ja neesat pārliecināts, vai kaut kas ir atļauts, pirms publicēšanas jautāj
 **Kā jūsu saturs nonāk pie MI pakalpojumu sniedzējiem.** Lai īstenotu debates, mēs nosūtām tekstu vienam vai vairākiem ārējiem modeļu pakalpojumu sniedzējiem. Pakalpojumu sniedzējs saņem jūsu jautājumu, jūsu iestatītās vadības piezīmes un apgalvojumus, ko dzinējs debašu laikā izveido, — tādēļ pakalpojumu sniedzējs redz tekstu, kas atvasināts no jūsu ievadītā un veidots ap to, ne tikai jūsu sākotnējos vārdus. Tas nekad nesaņem jūsu e-pasta adresi, konta identifikatorus, sesiju ierakstus vai maksājumu informāciju.
 
 **Ko nosūta atbalsta tērzēšana.** Arī atbalsta asistents ir MI modelis. Kad jūs tam rakstāt, mēs nosūtām jūsu ziņojumu ārējam modeļu pakalpojumu sniedzējam, lai modelis varētu atbildēt, kopā ar palīdzības rakstiem, uz kuriem tas balsta atbildi. Pirms nosūtīšanas mēs maskējam visu, kas izskatās pēc paroles, vienreizēja koda vai atslēgas. Ja lūdzat sazināties ar cilvēku, mēs modelim nosūtām arī sarunu, maskētu tādā pašā veidā, lai tas uzrakstītu īsu kopsavilkumu mūsu komandas dalībniekam, kurš pārņem jūsu lietu. Mēs nepievienojam jūsu e-pasta adresi, konta identifikatorus vai maksājumu informāciju, taču modelis saņem visu pārējo, ko ierakstāt tērzēšanā, tāpēc nerakstiet tur neko, ko nevēlaties, lai tas izlasītu.
+
+**Meklēšana tīmeklī, izmantojot Perplexity.** Lai atrastu pierādījumus debatēm, modeļi var meklēt tīmeklī, izmantojot **Perplexity** (Perplexity AI, Inc., Amerikas Savienotās Valstis), kas ir iekļauts MI pakalpojumu sniedzēju reģistrā. Perplexity saņem meklēšanas vaicājumus, ko modeļi uzraksta, balstoties uz debatēm, — tādēļ, tāpat kā modeļu pakalpojumu sniedzējs, tas redz tekstu, kas veidots ap jūsu ievadīto. Tas nekad nesaņem jūsu e-pasta adresi, konta identifikatorus, sesiju ierakstus vai maksājumu informāciju.
 
 **Kuri pakalpojumu sniedzēji un kur.** Mūsu **MI pakalpojumu sniedzēju reģistrs** vietnē dezbatere.ro/providers ir šo Noteikumu sastāvdaļa. Tajā par katru iespējamo pakalpojumu sniedzēju norādīts: tā juridiskā persona un valsts; ko un kādēļ tas saņem; kur tas veic apstrādi; tā glabāšanas noteikumi; vai mūsu izmantotajam galapunktam ir ieslēgts datu neglabāšanas režīms; vai saskaņā ar mūsu līgumu tas drīkst izmantot ievaddatus apmācībai; mūsu izmantotais nosūtīšanas mehānisms; un datums, kad pēdējoreiz pārbaudījām katru ierakstu. Pakalpojumu sniedzēji var atrasties ārpus jūsu valsts un Eiropas Ekonomikas zonas. Mūsu Privātuma politikā paskaidroti aizsardzības pasākumi.
 

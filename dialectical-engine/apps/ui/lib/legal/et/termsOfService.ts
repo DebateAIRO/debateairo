@@ -134,6 +134,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Me ei kasuta teie sisu mudelite treenimiseks. Kasutame tehisintellekti pakkujaid ainult tingimustel, mis ei luba neil kasutada teie sisu oma mudelite treenimiseks ega täiustamiseks; pakkujate register näitab iga pakkuja kohta, kas ja millal oleme seda kinnitanud." },
       { kind: "p", text: "Kuidas teie sisu jõuab tehisintellekti pakkujateni. Väitluse läbiviimiseks saadame teksti ühele või mitmele välisele mudelipakkujale. Pakkuja saab teie küsimuse, teie määratud suunavad annotatsioonid ja väitluse käigus mootori koostatud väited — seega näeb pakkuja teie sisestatud tekstist tuletatud ja selle ümber loodud teksti, mitte ainult teie algseid sõnu. Pakkuja ei saa kunagi teie e-posti aadressi, konto tunnuseid, seansikirjeid ega makseandmeid." },
       { kind: "p", text: "Mida kasutajatoe vestlus saadab. Kasutajatoe assistent on samuti tehisintellekti mudel. Kui te talle kirjutate, saadame teie sõnumi koos abiartiklitega, millel tema vastus põhineb, välisele mudelipakkujale, et mudel saaks vastata. Enne saatmist maskeerime kõik, mis näeb välja nagu parool, ühekordne kood või võti. Kui palute inimesega rääkida, saadame mudelile ka vestluse, samamoodi maskeerituna, et see kirjutaks lühikese kokkuvõtte meie meeskonna liikmele, kes teie juhtumi üle võtab. Me ei lisa teie e-posti aadressi, konto tunnuseid ega makseandmeid, kuid mudel saab kõik muu, mida vestlusesse kirjutate, seega ärge kirjutage sinna midagi, mida te ei soovi, et mudel loeks." },
+      { kind: "p", text: "Veebiotsing Perplexity kaudu. Väitluse jaoks tõendite leidmiseks võivad mudelid otsida veebist teenuse Perplexity (Perplexity AI, Inc., Ameerika Ühendriigid) kaudu, mis on kantud pakkujate registrisse. Perplexity saab otsingupäringud, mille mudelid väitluse põhjal koostavad — seega näeb ta nagu mudelipakkujagi teie sisestatu ümber loodud teksti. Ta ei saa kunagi teie e-posti aadressi, konto tunnuseid, seansikirjeid ega makseandmeid." },
       { kind: "p", text: "Millised pakkujad ja kus. Meie tehisintellekti pakkujate register aadressil dezbatere.ro/providers on nende Tingimuste osa. Selles on iga võimaliku pakkuja kohta märgitud tema juriidiline isik ja riik; mida ja miks ta saab; kus ta andmeid töötleb; tema säilitamistingimused; kas meie kasutatavas otspunktis rakendatakse andmete säilitamata jätmist; kas ta võib meie lepingu alusel kasutada sisendeid treenimiseks; edastusmehhanism, millele tugineme; ning iga kirje viimase kontrollimise kuupäev. Pakkujad võivad asuda väljaspool teie riiki ja Euroopa Majanduspiirkonda. Meie Privaatsuspoliitikas selgitatakse kaitsemeetmeid." },
       { kind: "p", text: "Kolm eri asja. „Ei kasutata mudelite treenimiseks“, „säilitatakse piiratud aja jooksul turvalisuse, kuritarvitamise ennetamise või õiguslikel põhjustel“ ja „andmeid ei säilitata — neid ei talletata pärast töötlemist“ on eri asjad. Kui pakkuja säilitab viipasid piiratud aja, märgitakse registris, kui kaua ja miks. Kui rakendatakse andmete säilitamata jätmist, märgitakse registris nii see kui ka funktsioonid, mille suhtes see kehtib. Me ei väida, et sisu ei säilitata, kui seda tegelikult säilitatakse." },
       { kind: "p", text: "Väljundid. Teie ja meie vahelises suhtes võite oma väitluste väljundit kasutada mis tahes seaduslikul eesmärgil ning me ei pretendeeri loodud teksti omandiõigusele. Võtke arvesse, et loodud väljund ei pruugi paljudes jurisdiktsioonides olla autoriõigusega kaitstav; et sarnast väljundit võidakse luua teistele kasutajatele; et väljundid võivad reprodutseerida või meenutada kolmandate isikute materjali; ning et mõnele tehisintellekti pakkuja hangitud lähtematerjalile võivad kehtida taaskasutuse piirangud. Vastutate kontrollimise eest enne väljunditele tuginemist või nende uuesti avaldamist." }
@@ -353,12 +354,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.4",
-  sha256: "d45c8d3db6a543397fc6485a9d950d6c7913ee7b4ede77a3ec49c7926ff8cf90",
-  eyebrow: "TEENUSETINGIMUSED · v2.4 · KEHTIB ALATES 12. OKTOOBRIST 2026",
+  version: "2.5",
+  sha256: "1b283def3d805682c6089f8f28a8824a495d3d71c2cc09f51d371698cbb1799f",
+  eyebrow: "TEENUSETINGIMUSED · v2.5 · KEHTIB ALATES 12. OKTOOBRIST 2026",
   title: "Millega te nõustute",
   lede: "Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.",
-  endMarker: "TINGIMUSTE LÕPP · v2.4",
+  endMarker: "TINGIMUSTE LÕPP · v2.5",
   contact: "support@dezbatere.ro",
   bodyLabel: "Teenusetingimuste tekst",
   sectionIdPrefix: "terms-section-",

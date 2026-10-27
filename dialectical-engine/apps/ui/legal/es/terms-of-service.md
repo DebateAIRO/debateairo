@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: En resumen
-eyebrow: TÉRMINOS DE SERVICIO · v2.4 · EN VIGOR DESDE 12 DE OCTUBRE DE 2026
+eyebrow: TÉRMINOS DE SERVICIO · v2.5 · EN VIGOR DESDE 12 DE OCTUBRE DE 2026
 title: Lo que usted acepta
 lede: El contrato entre usted y DMS Merchandise Shop S.R.L., en lenguaje claro. Diecinueve secciones y el anexo A — desplácese hasta el final.
-endMarker: FIN DE LOS TÉRMINOS · v2.4
+endMarker: FIN DE LOS TÉRMINOS · v2.5
 bodyLabel: Texto de los Términos de servicio
 annexTitle: Anexo A — Términos regionales
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEY APLICABLE
 -->
 
-**Version 2.4 · Effective 12 de octubre de 2026 · Versiones anteriores en dezbatere.ro/terms/versions · Idioma: español.**
+**Version 2.5 · Effective 12 de octubre de 2026 · Versiones anteriores en dezbatere.ro/terms/versions · Idioma: español.**
 
 **In short.** Debe tener al menos 18 años. Dialectical Engine elabora argumentos mediante modelos de IA y todo lo que genera puede ser erróneo; no constituye asesoramiento. Sus debates son privados salvo que los publique; si los publica, cualquiera podrá leerlos. El texto que envía se remite a los proveedores de IA incluidos en nuestro Registro de proveedores y no se utiliza para entrenar modelos. Denuncie contenido ilícito en support@dezbatere.ro, tenga o no una cuenta. Se aplica la legislación rumana, pero usted conserva la protección local que le corresponda como consumidor.
 
@@ -119,6 +119,8 @@ Si no está seguro de si algo está permitido, pregúntenos antes de publicarlo.
 **Cómo llega su contenido a los proveedores de IA.** Para ejecutar un debate, enviamos texto a uno o varios proveedores externos de modelos. Lo que recibe un proveedor es su pregunta, las anotaciones de orientación que establece y las declaraciones que el motor redacta durante el debate; por tanto, el proveedor ve texto derivado y construido en torno a lo que usted escribió, no solo sus palabras originales. Nunca recibe su dirección de correo electrónico, los identificadores de su cuenta, sus registros de sesión ni sus datos de pago.
 
 **Qué envía el chat de soporte.** El asistente de soporte también es un modelo de IA. Cuando usted le escribe, enviamos su mensaje a un proveedor externo de modelos para que el modelo pueda responder, junto con los artículos de ayuda en los que basa su respuesta. Antes del envío, ocultamos todo lo que parezca una contraseña, un código de un solo uso o una clave. Si pide hablar con una persona, también enviamos al modelo la conversación, ocultada de la misma manera, para que redacte un breve resumen para el miembro de nuestro equipo que se haga cargo de su caso. No adjuntamos su dirección de correo electrónico, los identificadores de su cuenta ni sus datos de pago, pero el modelo recibe todo lo demás que usted escriba en el chat, así que no escriba allí nada que no quiera que lea.
+
+**Búsqueda web a través de Perplexity.** Para encontrar pruebas para un debate, los modelos pueden buscar en la web a través de **Perplexity** (Perplexity AI, Inc., Estados Unidos), que figura en el Registro de proveedores de IA. Lo que recibe Perplexity son las consultas de búsqueda que los modelos redactan a partir del debate; por tanto, al igual que un proveedor de modelos, ve texto construido en torno a lo que usted escribió. Nunca recibe su dirección de correo electrónico, los identificadores de su cuenta, sus registros de sesión ni sus datos de pago.
 
 **Qué proveedores y dónde.** Nuestro **Registro de proveedores de IA**, disponible en dezbatere.ro/providers, forma parte de estos Términos. Enumera cada proveedor que podemos utilizar: su entidad jurídica y país; qué recibe y por qué; dónde realiza el tratamiento; sus plazos de conservación; si se aplica la conservación cero de datos al punto de conexión que utilizamos; si puede usar las entradas para entrenamiento conforme a nuestro contrato; el mecanismo de transferencia en el que nos basamos; y la fecha en que verificamos por última vez cada entrada. Los proveedores pueden estar situados fuera de su país y del Espacio Económico Europeo. Nuestra Política de privacidad explica las garantías aplicables.
 

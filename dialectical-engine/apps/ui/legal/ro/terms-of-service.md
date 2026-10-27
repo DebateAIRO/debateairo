@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Pe scurt
-eyebrow: TERMENII SERVICIULUI · v2.4 · ÎN VIGOARE DE LA 12 OCTOMBRIE 2026
+eyebrow: TERMENII SERVICIULUI · v2.5 · ÎN VIGOARE DE LA 12 OCTOMBRIE 2026
 title: Ce acceptați
 lede: Contractul dintre dumneavoastră și DMS Merchandise Shop S.R.L., într-un limbaj clar. Nouăsprezece secțiuni și Anexa A — derulați până la final.
-endMarker: SFÂRȘITUL TERMENILOR · v2.4
+endMarker: SFÂRȘITUL TERMENILOR · v2.5
 bodyLabel: Textul Termenilor serviciului
 annexTitle: Anexa A — Termeni regionali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEGEA APLICABILĂ
 -->
 
-**Version 2.4 · Effective 12 octombrie 2026 · Versiunile anterioare la dezbatere.ro/terms/versions · Limba: română.**
+**Version 2.5 · Effective 12 octombrie 2026 · Versiunile anterioare la dezbatere.ro/terms/versions · Limba: română.**
 
 **In short.** Trebuie să aveți cel puțin 18 ani. Dialectical Engine construiește argumente cu modele de inteligență artificială, iar tot ceea ce generează poate fi greșit — nu constituie consultanță. Dezbaterile dumneavoastră sunt private dacă nu le publicați; dacă le publicați, oricine le poate citi. Textul pe care îl transmiteți este trimis furnizorilor de IA enumerați în Registrul furnizorilor de IA și nu este folosit pentru antrenarea modelelor. Raportați conținutul ilegal la support@dezbatere.ro, indiferent dacă aveți sau nu un cont. Se aplică legea română, însă protecția locală a consumatorilor de care beneficiați se menține.
 
@@ -119,6 +119,8 @@ Dacă nu sunteți sigur dacă un anumit conținut este permis, întrebați-ne î
 **Cum ajunge conținutul dumneavoastră la furnizorii de IA.** Pentru a derula o dezbatere, trimitem text către unul sau mai mulți furnizori externi de modele. Un furnizor primește întrebarea dumneavoastră, adnotările de orientare pe care le stabiliți și enunțurile pe care motorul le compune pe parcursul dezbaterii — astfel, furnizorul vede text derivat din și construit în jurul a ceea ce ați introdus, nu doar cuvintele dumneavoastră originale. Acesta nu primește niciodată adresa dumneavoastră de e-mail, identificatorii contului, înregistrările sesiunilor sau datele de plată.
 
 **Ce trimite chatul de suport.** Asistentul de suport este și el un model de IA. Când îi scrieți, trimitem mesajul dumneavoastră către un furnizor extern de modele, pentru ca modelul să poată răspunde, împreună cu articolele de ajutor pe care își sprijină răspunsul. Înainte de trimitere, mascăm tot ce seamănă cu o parolă, un cod de unică folosință sau o cheie. Dacă cereți să vorbiți cu o persoană, trimitem modelului și conversația, mascată în același mod, pentru ca acesta să scrie un scurt rezumat pentru membrul echipei noastre care preia cazul dumneavoastră. Nu atașăm adresa dumneavoastră de e-mail, identificatorii contului sau datele de plată, dar modelul primește orice altceva scrieți în chat, așa că nu scrieți acolo nimic din ce nu ați vrea să citească.
+
+**Căutarea pe web prin Perplexity.** Pentru a găsi dovezi pentru o dezbatere, modelele pot căuta pe web prin **Perplexity** (Perplexity AI, Inc., Statele Unite), care este inclus în Registrul furnizorilor de IA. Perplexity primește întrebările de căutare pe care modelele le formulează pornind de la dezbatere — astfel, la fel ca un furnizor de modele, vede text construit în jurul a ceea ce ați introdus. Nu primește niciodată adresa dumneavoastră de e-mail, identificatorii contului, înregistrările sesiunilor sau datele de plată.
 
 **Ce furnizori folosim și unde se află.** **Registrul furnizorilor de IA** de la dezbatere.ro/providers face parte din acești Termeni. Acesta enumeră fiecare furnizor pe care îl putem utiliza: entitatea juridică și țara sa; ce primește și de ce; unde efectuează prelucrarea; condițiile sale de păstrare; dacă pentru punctul final pe care îl utilizăm este activată păstrarea zero a datelor; dacă poate utiliza datele de intrare pentru antrenare conform contractului nostru; mecanismul de transfer pe care ne bazăm; și data la care am verificat ultima dată fiecare înregistrare. Furnizorii pot fi situați în afara țării dumneavoastră și în afara Spațiului Economic European. Politica noastră de confidențialitate explică garanțiile aplicabile.
 

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In short
-eyebrow: PRIVACY POLICY · v3.5 · EFFECTIVE 12 OCTOBER 2026
+eyebrow: PRIVACY POLICY · v3.6 · EFFECTIVE 12 OCTOBER 2026
 title: What we store, and why
 lede: Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end.
-endMarker: END OF POLICY · GDPR (EU) 2016/679 · v3.5
+endMarker: END OF POLICY · GDPR (EU) 2016/679 · v3.6
 bodyLabel: Privacy Policy text
 annexTitle: Annex B — Regional privacy terms
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 3.5 · Effective 12 October 2026 · Previous versions at dezbatere.ro/privacy/versions · Controller: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 12 October 2026 · Previous versions at dezbatere.ro/privacy/versions · Controller: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** We collect what an account needs and what you choose to type. Your questions go to AI providers listed in our Register; they are not used to train models. Our hosting provider stores your account and your debates in London, in the United Kingdom; section 5 says where else your data goes. Debates are private unless you publish them. Deleting your account destroys the keys to your private data; when you schedule it, you choose whether your published debates are taken down too or stay public under your retired pseudonym. You can reach us at privacy@dezbatere.ro, and people named in a debate can ask for removal without an account.
 
@@ -87,7 +87,9 @@ We do not profile you, we do not use your data for advertising, and we do not se
 
 **What is sent.** To run a debate we send text to one or more external AI providers: your question, the steering annotations you set, and statements the engine composes as the debate develops. A provider therefore sees text derived from and built around what you typed. If you use the support chat, what you type there goes to the support chat's model. A provider never receives your email address, your account or session identifiers, your IP address or your payment details.
 
-**Which providers.** They are listed in our **AI Provider Register** at dezbatere.ro/providers, which is part of this policy. The Register applies to every user, wherever you live. For each provider it states its legal entity and country of establishment; what it receives and for what purpose — writing the debate's arguments, judging and checking them, writing the verdict story, or answering you in the support chat; the countries or regions where it processes; its retention terms, and whether zero-data-retention is active for the endpoint and features we use; whether it may use inputs for training under our contract; the transfer mechanism we rely on; how to contact it about your data; and the date we last verified each entry. Providers may change; the Register is versioned and the change is noted there.
+**Web search through Perplexity.** To find evidence for a debate, the models may search the web through Perplexity, run by Perplexity AI, Inc. in the United States. Perplexity receives the search questions the models write from the debate, which can contain words from your question. Like every AI provider, it never receives your email address, your account or session identifiers, your IP address or your payment details. It is listed in the Register, and the transfer rules below apply to it.
+
+**Which providers.** They are listed in our **AI Provider Register** at dezbatere.ro/providers, which is part of this policy. The Register applies to every user, wherever you live. For each provider it states its legal entity and country of establishment; what it receives and for what purpose — writing the debate's arguments, judging and checking them, writing the verdict story, searching the web for evidence, or answering you in the support chat; the countries or regions where it processes; its retention terms, and whether zero-data-retention is active for the endpoint and features we use; whether it may use inputs for training under our contract; the transfer mechanism we rely on; how to contact it about your data; and the date we last verified each entry. Providers may change; the Register is versioned and the change is noted there.
 
 **Training and retention are different things.** We use AI providers only under terms that do not allow them to use your content to train or improve their models; the Register shows, for each provider, whether we have confirmed this against our account, and when. Some providers keep prompts and responses for a limited period for security, abuse prevention or their own legal obligations; the Register says how long and why. Where zero-data-retention is active, the Register says so and for which features. We will not describe content as unretained when it is not.
 
@@ -215,7 +217,7 @@ To refuse these items, block or delete cookies and site data for this site in yo
 
 When we change this policy we post the new version with a summary of what changed and a new effective date, and keep the previous versions at dezbatere.ro/privacy/versions. For a change that adds a new purpose or a new recipient we tell you before the new processing starts, by email and in the product, and give you time to object. Where a new purpose depends on your consent — for example if we ever wanted to use content to improve models — we ask for that consent separately and specifically; we never treat acceptance of updated Terms as consent to new processing. For clarifications that change nothing about what we do, we simply post the new version.
 
-This policy was last updated on 12 October 2026. Version 3.5 replaced version 3.4: section 2 now says which billing and card details we keep and that your full card number never reaches us, and section 7 says how long we keep a saved card and the payment provider's messages about payments.
+This policy was last updated on 12 October 2026. Version 3.6 replaced version 3.5: section 5 now says that the models may search the web through Perplexity, and what Perplexity receives. Version 3.5 replaced version 3.4: section 2 now says which billing and card details we keep and that your full card number never reaches us, and section 7 says how long we keep a saved card and the payment provider's messages about payments.
 
 ## Annex B — Regional privacy terms
 

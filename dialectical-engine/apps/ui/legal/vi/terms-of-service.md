@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Tóm tắt
-eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v2.4 · CÓ HIỆU LỰC 12 THÁNG 10 NĂM 2026
+eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v2.5 · CÓ HIỆU LỰC 12 THÁNG 10 NĂM 2026
 title: Những điều bạn đồng ý
 lede: Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.
-endMarker: HẾT ĐIỀU KHOẢN · v2.4
+endMarker: HẾT ĐIỀU KHOẢN · v2.5
 bodyLabel: Nội dung Điều khoản dịch vụ
 annexTitle: Phụ lục A — Điều khoản theo khu vực
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LUẬT ĐIỀU CHỈNH
 -->
 
-**Version 2.4 · Effective 12 tháng 10 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
+**Version 2.5 · Effective 12 tháng 10 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
 
 **In short.** Bạn phải từ 18 tuổi trở lên. Dialectical Engine xây dựng các lập luận bằng mô hình AI và mọi nội dung do dịch vụ tạo ra đều có thể sai — đó không phải là lời tư vấn. Các cuộc tranh luận của bạn là riêng tư trừ khi bạn công khai chúng; nếu bạn công khai, bất kỳ ai cũng có thể đọc. Văn bản bạn gửi được chuyển đến các nhà cung cấp AI nêu trong Sổ đăng ký nhà cung cấp của chúng tôi và không được dùng để huấn luyện mô hình. Hãy báo cáo nội dung bất hợp pháp tại support@dezbatere.ro dù bạn có tài khoản hay không. Luật Romania điều chỉnh, nhưng các biện pháp bảo vệ người tiêu dùng tại nơi bạn sinh sống vẫn được bảo đảm.
 
@@ -119,6 +119,8 @@ Nếu không chắc một nội dung có được phép hay không, hãy hỏi c
 **Cách nội dung của bạn được chuyển đến các nhà cung cấp AI.** Để tiến hành một cuộc tranh luận, chúng tôi gửi văn bản đến một hoặc nhiều nhà cung cấp mô hình bên ngoài. Nội dung một nhà cung cấp nhận được là câu hỏi của bạn, các chú thích định hướng bạn thiết lập và các phát biểu do công cụ tổng hợp trong quá trình tranh luận — vì vậy nhà cung cấp thấy văn bản được phái sinh và xây dựng xoay quanh nội dung bạn nhập, chứ không chỉ những từ ngữ ban đầu của bạn. Nhà cung cấp không bao giờ nhận địa chỉ email, mã định danh tài khoản, hồ sơ phiên hoặc thông tin thanh toán của bạn.
 
 **Những gì cuộc trò chuyện hỗ trợ gửi đi.** Trợ lý hỗ trợ cũng là một mô hình AI. Khi bạn viết cho trợ lý, chúng tôi gửi tin nhắn của bạn đến một nhà cung cấp mô hình bên ngoài để mô hình có thể trả lời, cùng với các bài viết trợ giúp mà mô hình dựa vào để trả lời. Trước khi gửi, chúng tôi che mọi thứ trông giống mật khẩu, mã dùng một lần hoặc khóa. Nếu bạn yêu cầu nói chuyện với một người, chúng tôi cũng gửi cuộc trò chuyện, được che theo cùng cách, đến mô hình để mô hình viết một bản tóm tắt ngắn cho thành viên trong nhóm của chúng tôi tiếp nhận trường hợp của bạn. Chúng tôi không đính kèm địa chỉ email, mã định danh tài khoản hoặc thông tin thanh toán của bạn, nhưng mô hình nhận mọi nội dung khác bạn nhập vào cuộc trò chuyện, vì vậy đừng viết ở đó bất cứ điều gì bạn không muốn mô hình đọc.
+
+**Tìm kiếm trên web qua Perplexity.** Để tìm bằng chứng cho một cuộc tranh luận, các mô hình có thể tìm kiếm trên web qua **Perplexity** (Perplexity AI, Inc., Hoa Kỳ), được liệt kê trong Sổ đăng ký nhà cung cấp AI. Nội dung Perplexity nhận được là các truy vấn tìm kiếm mà mô hình viết ra từ cuộc tranh luận — vì vậy, giống như một nhà cung cấp mô hình, Perplexity thấy văn bản được xây dựng xoay quanh nội dung bạn nhập. Perplexity không bao giờ nhận địa chỉ email, mã định danh tài khoản, hồ sơ phiên hoặc thông tin thanh toán của bạn.
 
 **Nhà cung cấp nào và tại đâu.** **Sổ đăng ký nhà cung cấp AI** của chúng tôi tại dezbatere.ro/providers là một phần của các Điều khoản này. Sổ đăng ký liệt kê từng nhà cung cấp chúng tôi có thể sử dụng: pháp nhân và quốc gia của họ; dữ liệu họ nhận và lý do; nơi họ xử lý; điều khoản lưu giữ; liệu chế độ không lưu giữ dữ liệu có được kích hoạt cho điểm cuối chúng tôi sử dụng hay không; liệu họ có thể dùng dữ liệu đầu vào để huấn luyện theo hợp đồng với chúng tôi hay không; cơ chế chuyển dữ liệu mà chúng tôi dựa vào; và ngày chúng tôi xác minh lần gần nhất đối với mỗi mục. Các nhà cung cấp có thể ở ngoài quốc gia của bạn và ngoài Khu vực Kinh tế Châu Âu. Chính sách quyền riêng tư của chúng tôi giải thích các biện pháp bảo đảm.
 

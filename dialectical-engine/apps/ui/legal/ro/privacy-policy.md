@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Pe scurt
-eyebrow: POLITICA DE CONFIDENȚIALITATE · v3.5 · ÎN VIGOARE DE LA 12 OCTOMBRIE 2026
+eyebrow: POLITICA DE CONFIDENȚIALITATE · v3.6 · ÎN VIGOARE DE LA 12 OCTOMBRIE 2026
 title: Ce stocăm și de ce
 lede: Drepturile dumneavoastră și obligațiile noastre în temeiul GDPR (EU) 2016/679, într-un limbaj clar. Paisprezece secțiuni și Anexa B — derulați până la final.
-endMarker: SFÂRȘITUL POLITICII · GDPR (EU) 2016/679 · v3.5
+endMarker: SFÂRȘITUL POLITICII · GDPR (EU) 2016/679 · v3.6
 bodyLabel: Textul Politicii de confidențialitate
 annexTitle: Anexa B — Condiții regionale privind confidențialitatea
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 MODULE COOKIE
 -->
 
-**Version 3.5 · Effective 12 octombrie 2026 · Versiunile anterioare la dezbatere.ro/privacy/versions · Operator: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 12 octombrie 2026 · Versiunile anterioare la dezbatere.ro/privacy/versions · Operator: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Colectăm ceea ce este necesar unui cont și ceea ce alegeți să introduceți. Întrebările dumneavoastră sunt transmise furnizorilor de IA enumerați în Registrul furnizorilor de IA; acestea nu sunt folosite pentru antrenarea modelelor. Furnizorul nostru de găzduire vă stochează contul și dezbaterile la Londra, în Regatul Unit; secțiunea 5 arată unde ajung în rest datele dumneavoastră. Dezbaterile sunt private dacă nu le publicați. Ștergerea contului distruge cheile datelor dumneavoastră private; când o programați, alegeți dacă dezbaterile publicate sunt și ele eliminate sau rămân publice sub pseudonimul dumneavoastră retras. Ne puteți contacta la privacy@dezbatere.ro, iar persoanele menționate într-o dezbatere pot solicita eliminarea fără a avea cont.
 
@@ -87,7 +87,9 @@ Nu vă creăm profiluri, nu folosim datele dumneavoastră pentru publicitate și
 
 **Ce se trimite.** Pentru desfășurarea unei dezbateri trimitem text unuia sau mai multor furnizori externi de IA: întrebarea dumneavoastră, indicațiile de orientare stabilite și afirmațiile pe care motorul le compune pe măsură ce dezbaterea evoluează. Prin urmare, furnizorul vede text derivat din și construit în jurul celor introduse de dumneavoastră. Dacă folosiți chatul de asistență, ceea ce scrieți acolo ajunge la modelul chatului de asistență. Un furnizor nu primește niciodată adresa de e-mail, identificatorii contului sau ai sesiunii, adresa IP ori datele de plată.
 
-**Care furnizori.** Aceștia sunt enumerați în **Registrul furnizorilor de IA** la dezbatere.ro/providers, care face parte din această politică. Registrul se aplică tuturor utilizatorilor, oriunde ați locui. Pentru fiecare furnizor, Registrul precizează entitatea juridică și țara de stabilire; ce primește și în ce scop — redactarea argumentelor dezbaterii, evaluarea și verificarea acestora, redactarea poveștii verdictului sau răspunsul la mesajele dumneavoastră în chatul de asistență; țările sau regiunile în care prelucrează; condițiile sale de păstrare și dacă păstrarea zero a datelor este activă pentru punctul final și funcțiile utilizate de noi; dacă poate utiliza datele de intrare pentru antrenare potrivit contractului nostru; mecanismul de transfer pe care ne bazăm; cum îl puteți contacta în legătură cu datele dumneavoastră; și data ultimei verificări a fiecărei înregistrări. Furnizorii se pot schimba; Registrul este versionat, iar modificarea este consemnată acolo.
+**Căutarea pe web prin Perplexity.** Pentru a găsi dovezi pentru o dezbatere, modelele pot căuta pe web prin Perplexity, operat de Perplexity AI, Inc. în Statele Unite. Perplexity primește întrebările de căutare pe care modelele le formulează pornind de la dezbatere, întrebări care pot conține cuvinte din întrebarea dumneavoastră. La fel ca orice furnizor de IA, nu primește niciodată adresa de e-mail, identificatorii contului sau ai sesiunii, adresa IP ori datele de plată. Este inclus în Registru, iar regulile privind transferurile de mai jos se aplică și în cazul său.
+
+**Care furnizori.** Aceștia sunt enumerați în **Registrul furnizorilor de IA** la dezbatere.ro/providers, care face parte din această politică. Registrul se aplică tuturor utilizatorilor, oriunde ați locui. Pentru fiecare furnizor, Registrul precizează entitatea juridică și țara de stabilire; ce primește și în ce scop — redactarea argumentelor dezbaterii, evaluarea și verificarea acestora, redactarea poveștii verdictului, căutarea de dovezi pe web sau răspunsul la mesajele dumneavoastră în chatul de asistență; țările sau regiunile în care prelucrează; condițiile sale de păstrare și dacă păstrarea zero a datelor este activă pentru punctul final și funcțiile utilizate de noi; dacă poate utiliza datele de intrare pentru antrenare potrivit contractului nostru; mecanismul de transfer pe care ne bazăm; cum îl puteți contacta în legătură cu datele dumneavoastră; și data ultimei verificări a fiecărei înregistrări. Furnizorii se pot schimba; Registrul este versionat, iar modificarea este consemnată acolo.
 
 **Antrenarea și păstrarea sunt lucruri diferite.** Folosim furnizori de IA numai în condiții care nu le permit să utilizeze conținutul dumneavoastră pentru antrenarea sau îmbunătățirea modelelor lor; Registrul arată, pentru fiecare furnizor, dacă am confirmat acest lucru în raport cu contul nostru și când. Unii furnizori păstrează solicitările și răspunsurile o perioadă limitată pentru securitate, prevenirea abuzurilor sau propriile obligații legale; Registrul precizează durata și motivul. Dacă este activă păstrarea zero a datelor, Registrul arată acest lucru și funcțiile vizate. Nu vom descrie conținutul ca fiind nepăstrat atunci când este păstrat.
 
@@ -215,7 +217,7 @@ Pentru a refuza aceste elemente, blocați sau ștergeți modulele cookie și dat
 
 Când modificăm această politică, publicăm noua versiune împreună cu un rezumat al modificărilor și o nouă dată de intrare în vigoare și păstrăm versiunile anterioare la dezbatere.ro/privacy/versions. Pentru o modificare care adaugă un scop sau un destinatar nou, vă informăm prin e-mail și în produs înainte de începerea noii prelucrări și vă acordăm timp pentru a vă opune. Dacă un scop nou depinde de consimțământul dumneavoastră — de exemplu, dacă am dori vreodată să folosim conținutul pentru îmbunătățirea modelelor — solicităm consimțământul separat și specific; nu considerăm niciodată acceptarea Termenilor actualizați drept consimțământ pentru o prelucrare nouă. Pentru clarificări care nu schimbă nimic din ceea ce facem, publicăm pur și simplu noua versiune.
 
-Această politică a fost actualizată ultima dată la 12 octombrie 2026. Versiunea 3.5 a înlocuit versiunea 3.4: secțiunea 2 spune acum ce date de facturare și ce date ale cardului păstrăm și că numărul complet al cardului nu ajunge niciodată la noi, iar secțiunea 7 spune cât timp păstrăm un card salvat și mesajele furnizorului de plăți despre plăți.
+Această politică a fost actualizată ultima dată la 12 octombrie 2026. Versiunea 3.6 a înlocuit versiunea 3.5: secțiunea 5 spune acum că modelele pot căuta pe web prin Perplexity și ce primește Perplexity. Versiunea 3.5 a înlocuit versiunea 3.4: secțiunea 2 spune acum ce date de facturare și ce date ale cardului păstrăm și că numărul complet al cardului nu ajunge niciodată la noi, iar secțiunea 7 spune cât timp păstrăm un card salvat și mesajele furnizorului de plăți despre plăți.
 
 ## Annex B — Condiții regionale privind confidențialitatea
 

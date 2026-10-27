@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lühidalt
-eyebrow: PRIVAATSUSPOLIITIKA · v3.5 · KEHTIB ALATES 12. OKTOOBRIST 2026
+eyebrow: PRIVAATSUSPOLIITIKA · v3.6 · KEHTIB ALATES 12. OKTOOBRIST 2026
 title: Mida ja miks me talletame
 lede: Teie õigused ja meie kohustused GDPR (EU) 2016/679 alusel lihtsas keeles. Neliteist jaotist ja lisa B — kerige lõpuni.
-endMarker: POLIITIKA LÕPP · GDPR (EU) 2016/679 · v3.5
+endMarker: POLIITIKA LÕPP · GDPR (EU) 2016/679 · v3.6
 bodyLabel: Privaatsuspoliitika tekst
 annexTitle: Lisa B — Piirkondlikud privaatsustingimused
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 KÜPSISED
 -->
 
-**Version 3.5 · Effective 12. oktoober 2026 · Varasemad versioonid aadressil dezbatere.ro/privacy/versions · Vastutav töötleja: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 12. oktoober 2026 · Varasemad versioonid aadressil dezbatere.ro/privacy/versions · Vastutav töötleja: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Kogume seda, mida konto vajab, ja seda, mida otsustate sisestada. Teie küsimused saadetakse meie registris loetletud tehisintellekti pakkujatele; neid ei kasutata mudelite treenimiseks. Meie majutusteenuse pakkuja säilitab teie konto ja väitlused Londonis Ühendkuningriigis; jaotises 5 on öeldud, kuhu mujale teie andmed jõuavad. Väitlused on privaatsed, kui te neid ei avalda. Konto kustutamisel hävitatakse teie privaatsete andmete võtmed; kustutamist ajastades valite, kas ka teie avaldatud väitlused eemaldatakse või jäävad teie kasutuselt kõrvaldatud pseudonüümi all avalikuks. Meiega saab ühendust aadressil privacy@dezbatere.ro ning väitluses nimetatud isikud võivad taotleda eemaldamist ilma kontota.
 
@@ -87,7 +87,9 @@ Me ei tee teie kohta profiilianalüüsi, ei kasuta teie andmeid reklaamiks ega m
 
 **Mida saadetakse.** Väitluse läbiviimiseks saadame teksti ühele või mitmele välisele tehisintellekti pakkujale: teie küsimuse, teie määratud suunavad annotatsioonid ja väitluse arenedes mootori koostatud väited. Seega näeb pakkuja teie sisestatud tekstist tuletatud ja selle ümber loodud teksti. Kui kasutate kasutajatoe vestlust, jõuab see, mida seal sisestate, kasutajatoe vestluse mudelini. Pakkuja ei saa kunagi teie e-posti aadressi, konto- ega seansitunnuseid, IP-aadressi ega makseandmeid.
 
-**Millised pakkujad.** Need on loetletud meie **tehisintellekti pakkujate registris** aadressil dezbatere.ro/providers, mis on selle poliitika osa. Register kehtib iga kasutaja kohta, olenemata sellest, kus te elate. Iga pakkuja kohta on selles märgitud tema juriidiline isik ja asutamisriik; mida ja mis eesmärgil ta saab — väitluse argumentide kirjutamiseks, nende hindamiseks ja kontrollimiseks, otsuse loo kirjutamiseks või teile kasutajatoe vestluses vastamiseks; riigid või piirkonnad, kus ta andmeid töötleb; säilitamistingimused ning kas meie kasutatavas otspunktis ja funktsioonides rakendatakse andmete säilitamata jätmist; kas ta võib meie lepingu alusel kasutada sisendeid treenimiseks; edastusmehhanism, millele tugineme; kuidas temaga oma andmete asjus ühendust võtta; ning iga kirje viimase kontrollimise kuupäev. Pakkujad võivad muutuda; registril on versioonid ja muudatus märgitakse sinna.
+**Veebiotsing Perplexity kaudu.** Väitluse jaoks tõendite leidmiseks võivad mudelid otsida veebist teenuse Perplexity kaudu, mida haldab Perplexity AI, Inc. Ameerika Ühendriikides. Perplexity saab otsingupäringud, mille mudelid väitluse põhjal koostavad ja mis võivad sisaldada sõnu teie küsimusest. Perplexity, nagu iga teinegi tehisintellekti pakkuja, ei saa kunagi teie e-posti aadressi, konto- ega seansitunnuseid, IP-aadressi ega makseandmeid. Perplexity on registris loetletud ja tema suhtes kehtivad allpool kirjeldatud edastamise reeglid.
+
+**Millised pakkujad.** Need on loetletud meie **tehisintellekti pakkujate registris** aadressil dezbatere.ro/providers, mis on selle poliitika osa. Register kehtib iga kasutaja kohta, olenemata sellest, kus te elate. Iga pakkuja kohta on selles märgitud tema juriidiline isik ja asutamisriik; mida ja mis eesmärgil ta saab — väitluse argumentide kirjutamiseks, nende hindamiseks ja kontrollimiseks, otsuse loo kirjutamiseks, veebist tõendite otsimiseks või teile kasutajatoe vestluses vastamiseks; riigid või piirkonnad, kus ta andmeid töötleb; säilitamistingimused ning kas meie kasutatavas otspunktis ja funktsioonides rakendatakse andmete säilitamata jätmist; kas ta võib meie lepingu alusel kasutada sisendeid treenimiseks; edastusmehhanism, millele tugineme; kuidas temaga oma andmete asjus ühendust võtta; ning iga kirje viimase kontrollimise kuupäev. Pakkujad võivad muutuda; registril on versioonid ja muudatus märgitakse sinna.
 
 **Treenimine ja säilitamine on eri asjad.** Kasutame tehisintellekti pakkujaid ainult tingimustel, mis ei luba neil kasutada teie sisu oma mudelite treenimiseks ega täiustamiseks; register näitab iga pakkuja kohta, kas ja millal oleme seda oma konto suhtes kinnitanud. Mõned pakkujad säilitavad viipasid ja vastuseid piiratud aja turvalisuse, kuritarvitamise ennetamise või oma juriidiliste kohustuste tõttu; registris on märgitud, kui kaua ja miks. Kui rakendatakse andmete säilitamata jätmist, märgitakse registris, milliste funktsioonide suhtes see kehtib. Me ei kirjelda sisu mittesäilitatavana, kui seda tegelikult säilitatakse.
 
@@ -215,7 +217,7 @@ Nende üksuste keelamiseks blokeerige või kustutage selle saidi küpsised ja sa
 
 Kui muudame seda poliitikat, avaldame uue versiooni koos muudatuste kokkuvõtte ja uue jõustumiskuupäevaga ning säilitame varasemad versioonid aadressil dezbatere.ro/privacy/versions. Uue eesmärgi või vastuvõtja lisamisel teavitame teid enne uue töötlemise algust e-posti teel ja tootes ning anname teile aega vastuväite esitamiseks. Kui uus eesmärk sõltub teie nõusolekust — näiteks kui sooviksime kunagi kasutada sisu mudelite täiustamiseks — küsime selleks eraldi ja konkreetset nõusolekut; me ei käsita uuendatud Tingimustega nõustumist kunagi nõusolekuna uueks töötlemiseks. Selgituste korral, mis ei muuda meie tegevust, avaldame lihtsalt uue versiooni.
 
-Seda poliitikat ajakohastati viimati 12. oktoobril 2026. Versioon 3.5 asendas versiooni 3.4: jaotis 2 ütleb nüüd, milliseid arveldus- ja kaardiandmeid me säilitame ning et teie kaardi täisnumber ei jõua kunagi meieni, ja jaotis 7 ütleb, kui kaua säilitame salvestatud kaarti ja makseteenuse pakkuja sõnumeid maksete kohta.
+Seda poliitikat ajakohastati viimati 12. oktoobril 2026. Versioon 3.6 asendas versiooni 3.5: jaotis 5 ütleb nüüd, et mudelid võivad otsida veebist Perplexity kaudu, ja mida Perplexity saab. Versioon 3.5 asendas versiooni 3.4: jaotis 2 ütleb nüüd, milliseid arveldus- ja kaardiandmeid me säilitame ning et teie kaardi täisnumber ei jõua kunagi meieni, ja jaotis 7 ütleb, kui kaua säilitame salvestatud kaarti ja makseteenuse pakkuja sõnumeid maksete kohta.
 
 ## Annex B — Piirkondlikud privaatsustingimused
 

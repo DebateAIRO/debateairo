@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort sagt
-eyebrow: INTEGRITETSPOLICY · v3.5 · GÄLLER FRÅN 12 OKTOBER 2026
+eyebrow: INTEGRITETSPOLICY · v3.6 · GÄLLER FRÅN 12 OKTOBER 2026
 title: Vad vi lagrar och varför
 lede: Dina rättigheter och våra skyldigheter enligt GDPR (EU) 2016/679, på ett lättbegripligt språk. Fjorton avsnitt och bilaga B — rulla till slutet.
-endMarker: SLUT PÅ POLICYN · GDPR (EU) 2016/679 · v3.5
+endMarker: SLUT PÅ POLICYN · GDPR (EU) 2016/679 · v3.6
 bodyLabel: Integritetspolicyns text
 annexTitle: Bilaga B — Regionala integritetsvillkor
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 3.5 · Effective 12 oktober 2026 · Tidigare versioner på dezbatere.ro/privacy/versions · Personuppgiftsansvarig: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 12 oktober 2026 · Tidigare versioner på dezbatere.ro/privacy/versions · Personuppgiftsansvarig: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Vi samlar in det som behövs för ett konto och det du väljer att skriva. Dina frågor skickas till de AI-leverantörer som anges i vårt register; de används inte för att träna modeller. Vår värdleverantör lagrar ditt konto och dina debatter i London i Storbritannien; avsnitt 5 anger vart dina uppgifter i övrigt skickas. Debatter är privata om du inte publicerar dem. När du raderar ditt konto förstörs nycklarna till dina privata uppgifter; när du schemalägger raderingen väljer du om dina publicerade debatter också ska tas bort eller förbli offentliga under din avvecklade pseudonym. Du kan nå oss på privacy@dezbatere.ro, och personer som nämns i en debatt kan begära borttagning utan att ha ett konto.
 
@@ -87,7 +87,9 @@ Vi profilerar dig inte, vi använder inte dina uppgifter för reklam och vi säl
 
 **Vad som skickas.** För att genomföra en debatt skickar vi text till en eller flera externa AI-leverantörer: din fråga, de styranteckningar du anger och uttalanden som motorn sammanställer under debattens gång. En leverantör ser därför text som härletts från och byggts upp kring det du skrev. Om du använder supportsamtalet går det du skriver där till supportsamtalets modell. En leverantör får aldrig din e-postadress, dina konto- eller sessionsidentifierare, din IP-adress eller dina betalningsuppgifter.
 
-**Vilka leverantörer.** De anges i vårt **register över AI-leverantörer** på dezbatere.ro/providers, som utgör en del av denna policy. Registret gäller för alla användare, oavsett var du bor. För varje leverantör anger det dess juridiska person och etableringsland; vad den tar emot och i vilket syfte — att skriva debattens argument, bedöma och kontrollera dem, skriva berättelsen om utslaget eller svara dig i supportsamtalet; i vilka länder eller regioner den behandlar uppgifterna; dess lagringsvillkor och om nollagring av uppgifter är aktiv för den slutpunkt och de funktioner vi använder; om den enligt vårt avtal får använda indata för träning; vilken överföringsmekanism vi stödjer oss på; hur du kontaktar den om dina uppgifter; samt när vi senast verifierade varje post. Leverantörer kan ändras; registret är versionshanterat och ändringen noteras där.
+**Webbsökning via Perplexity.** För att hitta belägg för en debatt kan modellerna söka på webben via Perplexity, som drivs av Perplexity AI, Inc. i USA. Perplexity får de sökfrågor som modellerna formulerar utifrån debatten, och de kan innehålla ord från din fråga. Liksom alla AI-leverantörer får Perplexity aldrig din e-postadress, dina konto- eller sessionsidentifierare, din IP-adress eller dina betalningsuppgifter. Perplexity anges i registret, och reglerna om överföringar nedan gäller för Perplexity.
+
+**Vilka leverantörer.** De anges i vårt **register över AI-leverantörer** på dezbatere.ro/providers, som utgör en del av denna policy. Registret gäller för alla användare, oavsett var du bor. För varje leverantör anger det dess juridiska person och etableringsland; vad den tar emot och i vilket syfte — att skriva debattens argument, bedöma och kontrollera dem, skriva berättelsen om utslaget, söka på webben efter belägg eller svara dig i supportsamtalet; i vilka länder eller regioner den behandlar uppgifterna; dess lagringsvillkor och om nollagring av uppgifter är aktiv för den slutpunkt och de funktioner vi använder; om den enligt vårt avtal får använda indata för träning; vilken överföringsmekanism vi stödjer oss på; hur du kontaktar den om dina uppgifter; samt när vi senast verifierade varje post. Leverantörer kan ändras; registret är versionshanterat och ändringen noteras där.
 
 **Träning och lagring är olika saker.** Vi använder AI-leverantörer endast på villkor som inte tillåter dem att använda ditt innehåll för att träna eller förbättra sina modeller; registret visar för varje leverantör om vi har bekräftat detta mot vårt konto, och när. Vissa leverantörer behåller promptar och svar under en begränsad tid av säkerhetsskäl, för att förebygga missbruk eller för att uppfylla sina egna rättsliga skyldigheter; registret anger hur länge och varför. När nollagring av uppgifter är aktiv anges detta i registret tillsammans med vilka funktioner den gäller. Vi kommer inte att beskriva innehåll som om det inte behålls när det faktiskt behålls.
 
@@ -215,7 +217,7 @@ För att vägra dessa objekt blockerar eller raderar du cookies och webbplatsdat
 
 När vi ändrar denna policy publicerar vi den nya versionen med en sammanfattning av vad som har ändrats och ett nytt ikraftträdandedatum, och vi behåller tidigare versioner på dezbatere.ro/privacy/versions. Om en ändring lägger till ett nytt ändamål eller en ny mottagare informerar vi dig via e-post och i produkten innan den nya behandlingen börjar och ger dig tid att invända. Om ett nytt ändamål är beroende av ditt samtycke — exempelvis om vi någon gång skulle vilja använda innehåll för att förbättra modeller — ber vi separat och specifikt om det samtycket; vi behandlar aldrig godkännande av uppdaterade villkor som samtycke till ny behandling. Vid förtydliganden som inte ändrar något i det vi gör publicerar vi helt enkelt den nya versionen.
 
-Denna policy uppdaterades senast den 12 oktober 2026. Version 3.5 ersatte version 3.4: avsnitt 2 anger nu vilka fakturerings- och kortuppgifter vi lagrar och att ditt fullständiga kortnummer aldrig når oss, och avsnitt 7 anger hur länge vi lagrar ett sparat kort och betalningsleverantörens meddelanden om betalningar.
+Denna policy uppdaterades senast den 12 oktober 2026. Version 3.6 ersatte version 3.5: avsnitt 5 anger nu att modellerna kan söka på webben via Perplexity och vad Perplexity tar emot. Version 3.5 ersatte version 3.4: avsnitt 2 anger nu vilka fakturerings- och kortuppgifter vi lagrar och att ditt fullständiga kortnummer aldrig når oss, och avsnitt 7 anger hur länge vi lagrar ett sparat kort och betalningsleverantörens meddelanden om betalningar.
 
 ## Annex B — Regionala integritetsvillkor
 

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Trumpai
-eyebrow: PRIVATUMO POLITIKA · v3.5 · ĮSIGALIOJA 2026 M. SPALIO 12 D.
+eyebrow: PRIVATUMO POLITIKA · v3.6 · ĮSIGALIOJA 2026 M. SPALIO 12 D.
 title: Ką saugome ir kodėl
 lede: Jūsų teisės ir mūsų pareigos pagal GDPR (EU) 2016/679, paaiškintos paprastai. Keturiolika skyrių ir B priedas — slinkite iki pabaigos.
-endMarker: POLITIKOS PABAIGA · GDPR (EU) 2016/679 · v3.5
+endMarker: POLITIKOS PABAIGA · GDPR (EU) 2016/679 · v3.6
 bodyLabel: Privatumo politikos tekstas
 annexTitle: B priedas — Regioninės privatumo sąlygos
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 SLAPUKAI
 -->
 
-**Version 3.5 · Effective 2026 m. spalio 12 d. · Ankstesnės versijos adresu dezbatere.ro/privacy/versions · Duomenų valdytojas: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.6 · Effective 2026 m. spalio 12 d. · Ankstesnės versijos adresu dezbatere.ro/privacy/versions · Duomenų valdytojas: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Renkame tai, ko reikia paskyrai, ir tai, ką nusprendžiate įvesti. Jūsų klausimai perduodami mūsų Registre išvardytiems DI paslaugų teikėjams; jie nenaudojami modeliams mokyti. Mūsų prieglobos paslaugų teikėjas jūsų paskyrą ir debatus saugo Londone, Jungtinėje Karalystėje; 5 skyriuje nurodyta, kur dar siunčiami jūsų duomenys. Debatai yra privatūs, nebent juos paskelbiate. Ištrynus paskyrą sunaikinami jūsų privačių duomenų raktai; planuodami ištrynimą pasirenkate, ar bus pašalinti ir paskelbti debatai, ar jie liks vieši su jūsų nebenaudojamu slapyvardžiu. Su mumis galite susisiekti adresu privacy@dezbatere.ro, o debatuose paminėti asmenys gali prašyti pašalinti duomenis ir neturėdami paskyros.
 
@@ -87,7 +87,9 @@ Mes jūsų neprofiliuojame, nenaudojame jūsų duomenų reklamai ir jų neparduo
 
 **Kas siunčiama.** Debatams vykdyti tekstą siunčiame vienam ar keliems išoriniams DI paslaugų teikėjams: jūsų klausimą, jūsų nustatytas valdymo pastabas ir teiginius, kuriuos variklis sudaro plėtojantis debatams. Todėl paslaugų teikėjas mato iš jūsų įvesto teksto išvestą ir aplink jį sudarytą tekstą. Jei naudojatės pagalbos pokalbiu, tai, ką jame įvedate, perduodama pagalbos pokalbio modeliui. Paslaugų teikėjas niekada negauna jūsų el. pašto adreso, paskyros ar seanso identifikatorių, IP adreso ar mokėjimo duomenų.
 
-**Kurie paslaugų teikėjai.** Jie išvardyti mūsų **DI paslaugų teikėjų registre** adresu dezbatere.ro/providers, kuris yra šios politikos dalis. Registras taikomas kiekvienam naudotojui, nesvarbu, kur gyvenate. Apie kiekvieną teikėją jame nurodomas jo juridinis asmuo ir įsisteigimo šalis; ką ir kokiu tikslu jis gauna — debatų argumentams rašyti, jiems vertinti ir tikrinti, verdikto istorijai parašyti ar jums atsakyti pagalbos pokalbyje; šalys ar regionai, kuriuose jis tvarko duomenis; jo saugojimo sąlygos ir ar mūsų naudojamam prieigos taškui bei funkcijoms taikomas visiškas duomenų nesaugojimas; ar pagal sutartį jis gali naudoti įvestis mokymui; perdavimo mechanizmas, kuriuo remiamės; kaip su juo susisiekti dėl jūsų duomenų; ir data, kada paskutinį kartą patikrinome kiekvieną įrašą. Teikėjai gali keistis; Registro versijos išsaugomos, o pakeitimas jame pažymimas.
+**Paieška internete per Perplexity.** Siekdami rasti įrodymų debatams, modeliai gali ieškoti internete per Perplexity, kurią valdo Perplexity AI, Inc. Jungtinėse Amerikos Valstijose. Perplexity gauna paieškos užklausas, kurias modeliai parašo remdamiesi debatais ir kuriose gali būti žodžių iš jūsų klausimo. Kaip ir bet kuris DI paslaugų teikėjas, Perplexity niekada negauna jūsų el. pašto adreso, paskyros ar seanso identifikatorių, IP adreso ar mokėjimo duomenų. Perplexity įtraukta į Registrą, ir jai taikomos toliau nurodytos perdavimo taisyklės.
+
+**Kurie paslaugų teikėjai.** Jie išvardyti mūsų **DI paslaugų teikėjų registre** adresu dezbatere.ro/providers, kuris yra šios politikos dalis. Registras taikomas kiekvienam naudotojui, nesvarbu, kur gyvenate. Apie kiekvieną teikėją jame nurodomas jo juridinis asmuo ir įsisteigimo šalis; ką ir kokiu tikslu jis gauna — debatų argumentams rašyti, jiems vertinti ir tikrinti, verdikto istorijai parašyti, įrodymų paieškai internete ar jums atsakyti pagalbos pokalbyje; šalys ar regionai, kuriuose jis tvarko duomenis; jo saugojimo sąlygos ir ar mūsų naudojamam prieigos taškui bei funkcijoms taikomas visiškas duomenų nesaugojimas; ar pagal sutartį jis gali naudoti įvestis mokymui; perdavimo mechanizmas, kuriuo remiamės; kaip su juo susisiekti dėl jūsų duomenų; ir data, kada paskutinį kartą patikrinome kiekvieną įrašą. Teikėjai gali keistis; Registro versijos išsaugomos, o pakeitimas jame pažymimas.
 
 **Mokymas ir saugojimas yra skirtingi dalykai.** DI paslaugų teikėjais naudojamės tik tokiomis sąlygomis, pagal kurias jiems neleidžiama naudoti jūsų turinio savo modeliams mokyti ar tobulinti; Registre nurodoma, ar kiekvieno teikėjo atveju tai patvirtinome pagal savo paskyrą, ir kada. Kai kurie teikėjai ribotą laiką saugo užklausas ir atsakymus saugumo, piktnaudžiavimo prevencijos arba savo teisinių prievolių tikslais; Registre nurodyta, kiek laiko ir kodėl. Kai taikomas visiškas duomenų nesaugojimas, Registre nurodoma, kurioms funkcijoms jis taikomas. Neapibūdinsime turinio kaip nesaugomo, jei jis iš tiesų saugomas.
 
@@ -215,7 +217,7 @@ Norėdami atsisakyti šių elementų, naršyklės nustatymuose užblokuokite arb
 
 Pakeitę šią politiką paskelbiame naują versiją kartu su pakeitimų santrauka ir nauja įsigaliojimo data, o ankstesnes versijas saugome adresu dezbatere.ro/privacy/versions. Jei pakeitimu pridedamas naujas tikslas ar naujas gavėjas, prieš pradėdami naują tvarkymą informuojame jus el. paštu ir produkte bei suteikiame laiko nesutikti. Jei naujas tikslas priklauso nuo jūsų sutikimo — pavyzdžiui, jei kada nors norėtume naudoti turinį modeliams tobulinti — tokio sutikimo prašome atskirai ir konkrečiai; atnaujintų Sąlygų priėmimo niekada nelaikome sutikimu su nauju duomenų tvarkymu. Jei paaiškinimai nieko nekeičia mūsų veikloje, tiesiog paskelbiame naują versiją.
 
-Ši politika paskutinį kartą atnaujinta 2026 m. spalio 12 d. 3.5 versija pakeitė 3.4 versiją: 2 skyriuje dabar nurodyta, kokius atsiskaitymo ir kortelės duomenis saugome ir kad visas jūsų kortelės numeris niekada mūsų nepasiekia, o 7 skyriuje nurodyta, kiek laiko saugome išsaugotą kortelę ir mokėjimo paslaugų teikėjo pranešimus apie mokėjimus.
+Ši politika paskutinį kartą atnaujinta 2026 m. spalio 12 d. 3.6 versija pakeitė 3.5 versiją: 5 skyriuje dabar nurodyta, kad modeliai gali ieškoti internete per Perplexity, ir ką Perplexity gauna. 3.5 versija pakeitė 3.4 versiją: 2 skyriuje dabar nurodyta, kokius atsiskaitymo ir kortelės duomenis saugome ir kad visas jūsų kortelės numeris niekada mūsų nepasiekia, o 7 skyriuje nurodyta, kiek laiko saugome išsaugotą kortelę ir mokėjimo paslaugų teikėjo pranešimus apie mokėjimus.
 
 ## Annex B — Regioninės privatumo sąlygos
 
