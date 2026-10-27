@@ -164,13 +164,14 @@ describe("S01-C13 a checkout's language is the profile's and the system rows' (R
     expect(created?.data.locale).toBe("ro");
   });
 
-  it("sends each of the twelve system rows in the profile's language, the checkout's (R-18)", async () => {
+  it("sends each of the thirteen system rows in the profile's language, the checkout's (R-18)", async () => {
     const world = checkoutWorld();
     const now = new Date();
     const bought = await buy(world, "ro", now);
     const { sent, handler } = mailer(world.repository);
     const templates = [
-      "M2_INVOICE_LINK", "M2_INVOICE_ATTACHED", "M3", "M4", "M5A", "M5B", "M5C", "M6", "M10", "M11", "M11_DUPLICATE", "M12"
+      "M2_INVOICE_LINK", "M2_INVOICE_ATTACHED", "M3", "M4", "M5A", "M5B", "M5C", "M6", "M10", "M10_ENDED", "M11", "M11_DUPLICATE",
+      "M12"
     ] as const;
     for (const template of templates) {
       const job = await queue(world.repository, emailJob({

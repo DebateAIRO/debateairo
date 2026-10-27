@@ -59,6 +59,8 @@
   "mail.M10.subject": "Dine betalte funktioner er sat på pause",
   "mail.M10.paused": "Din bank har oplyst os, at en betaling for dit {plan}-abonnement er bestridt. Betalte funktioner er sat på pause, så længe tvisten er åben. Dine debatter bevares.",
   "mail.M10.contact": "Hvis dette er en fejl, så skriv til os på {merchantEmail}.",
+  "mail.M10_ENDED.subject": "Dit {plan}-abonnement er afsluttet",
+  "mail.M10_ENDED.ended": "Betalingen for dit {plan}-abonnement er blevet tilbageført til dig via din bank efter tvisten. Derfor er abonnementet afsluttet, og din konto er nu på Gratis-abonnementet. Dine debatter bevares.",
   "mail.M11.subject": "Vi kunne ikke acceptere dit kort",
   "mail.M11.refunded": "Vi kan ikke acceptere kort, der er udstedt i det korts land, så de {refundAmount}, der er trukket eller reserveret på det, går fuldt ud tilbage til dit kort.",
   "mail.M11.planEnded": "Derfor er dit {endedPlan}-abonnement ophørt, og din konto er nu på Gratis-abonnementet. Dine debatter bevares.",
