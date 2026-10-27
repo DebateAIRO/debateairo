@@ -4,7 +4,7 @@ import { buildV4Map } from "../../apps/ui/lib/v4/mapModel.js";
 import { diffSnapshots, selectionForChange, snapshotItems } from "../../apps/ui/lib/v4/changes.js";
 import type { DigLink, DigView, V4Change } from "../../apps/ui/lib/v4/types.js";
 
-/** V4 initial (2026-10-28), D4: what this browser saw, what changed since, and where the tour goes. */
+/** V4 initial (2026-10-28), D4: what the page saw, what changed since (in memory, "while you were here"), and where the tour goes. */
 
 const MAP = buildV4Map({ runId: "run-1", answer: STORY_FIXTURE_ANSWER, story: storyFixture("READY") });
 
@@ -26,16 +26,24 @@ describe("snapshotItems", () => {
       ["open:w", "dug"],
       ["open:o:0", "open"],
       ["open:p:n-hybrid-school", "open"],
-      ["open:p:n-not-now", "open"],
       ["point:n-yes", "SURE_FOR_CASE"],
       ["point:n-yes-pay", "SURE"],
       ["point:n-yes-rent", "SURE"],
-      ["point:n-not-now", "STILL_ARGUED"],
+      ["point:n-not-now", "DIDNT_HOLD"],
       ["point:n-not-now-once", "SURE_FOR_CASE"],
       ["point:n-hybrid", "SURE_FOR_CASE"],
       ["point:n-hybrid-school", "STILL_ARGUED"],
       ["point:n-hybrid-forum", "unchecked"]
     ]);
+  });
+
+  it("leaves a question open when its only dig FAILED, as the map shows it (DATA-9)", () => {
+    const items = snapshotItems(MAP, [dig("child-1", "FAILED", ["w"]), dig("child-2", "DONE", ["o:0"])]);
+    expect(items["open:w"]).toBe("open");
+    expect(items["open:o:0"]).toBe("dug");
+    expect(items["dig:child-1"]).toBe("FAILED");
+    // A failed dig next to a live one still counts the question as dug.
+    expect(snapshotItems(MAP, [dig("child-1", "FAILED", ["w"]), dig("child-3", "WAITING", ["w"])])["open:w"]).toBe("dug");
   });
 
   it("writes 'none' for the stand-in path's missing fate", () => {

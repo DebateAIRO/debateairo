@@ -1,51 +1,72 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Answer, AnswerStory } from "@debateai/contract";
 import { AuthGate } from "@/components/AuthGate";
 import { V4Header } from "@/components/v4/V4Header";
 import { V4TrustBar } from "@/components/v4/V4TrustBar";
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
-import { loadDigView, loadStory, loadV4 } from "@/lib/v4/load";
+import { STORY_POLLING, unreadableStory } from "@/lib/v3/useAnswerStory";
+import { addedLines, ownWords } from "@/lib/v4/askText";
+import { digLinksFor, readQuestionIndex, type IndexEntry } from "@/lib/v4/digIndex";
+import { loadDigView, loadStory, loadV4, storyReadFailed } from "@/lib/v4/load";
 import { buildV4Map } from "@/lib/v4/mapModel";
-import { readDigLinks, useReadingLevel } from "@/lib/v4/storage";
+import { levelHref, useReadingLevel } from "@/lib/v4/storage";
 import { TRUST_WORDS, type DigLink, type DigView, type ReadingLevel, type V4Map, type V4Path } from "@/lib/v4/types";
 
 /*
  * V4 initial (2026-10-28), D5: the report. A document made from the same served answer as the map — nothing is
  * invented; parts the engine has no data for yet ("Gives up:", the per-round rewrite) are left out (row D 3, 4).
+ * Fix wave 1, Decision A: nothing is kept in the browser — the level comes from the address, digs from the account.
  */
 
-type Props = Readonly<{ id: string; locale: string; catalog: MessageCatalog; newDebateCatalog: MessageCatalog }>;
+type Props = Readonly<{
+  id: string;
+  locale: string;
+  initialLevel: ReadingLevel | null;
+  catalog: MessageCatalog;
+  newDebateCatalog: MessageCatalog;
+}>;
 
 type ReportLoad =
   | Readonly<{ kind: "LOADING" }>
   | Readonly<{ kind: "ERROR" }>
   | Readonly<{ kind: "NOT_READY"; failed: boolean }>
-  | Readonly<{ kind: "SERVED"; runId: string; answer: Answer; story: AnswerStory | null }>;
+  /** readFailures: failed story reads in a row (V3's rule: the fourth one is accepted as the story's state). */
+  | Readonly<{ kind: "SERVED"; runId: string; answer: Answer; story: AnswerStory | null; readFailures: number }>;
 
-/** A dig as the report lists it; `view` is null when its follow-up could not be read just now. */
-type ReportDig = Readonly<{ link: DigLink; view: DigView | null }>;
+/** A dig as the report lists it; `view` is undefined while it loads and null when it could not be read just now. */
+type ReportDig = Readonly<{ link: DigLink; view: DigView | null | undefined }>;
 
 const STORY_POLL_MS = 10_000;
 const STORY_POLL_MAX = 30;
-/** Spec D5: the reading level defaults to "Some background" when none is saved. */
+/** Spec D5: the reading level defaults to "Some background" when none is chosen. */
 const DEFAULT_LEVEL: ReadingLevel = "background";
 
-export function V4ReportClient({ id, locale, catalog, newDebateCatalog }: Props) {
+export function V4ReportClient({ id, locale, initialLevel, catalog, newDebateCatalog }: Props) {
   // AuthGate reads newDebate.* keys (checking session / sign-in redirect), so it gets that namespace.
-  return <AuthGate catalog={newDebateCatalog}>{() => <ReportBody id={id} locale={locale} catalog={catalog} />}</AuthGate>;
+  return (
+    <AuthGate catalog={newDebateCatalog}>
+      {() => <ReportBody id={id} locale={locale} initialLevel={initialLevel} catalog={catalog} />}
+    </AuthGate>
+  );
 }
 
-function ReportBody({ id, locale, catalog }: Readonly<{ id: string; locale: string; catalog: MessageCatalog }>) {
-  const [savedLevel, setLevel, levelLoaded] = useReadingLevel();
-  const level: ReadingLevel = savedLevel ?? DEFAULT_LEVEL;
+function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
+  id: string;
+  locale: string;
+  initialLevel: ReadingLevel | null;
+  catalog: MessageCatalog;
+}>) {
+  // Decision A: the level lives in the address; choosing one rewrites `?level=` (useReadingLevel does that).
+  const [chosenLevel, chooseLevel] = useReadingLevel(initialLevel);
+  const level: ReadingLevel = chosenLevel ?? DEFAULT_LEVEL;
+
   const [load, setLoad] = useState<ReportLoad>({ kind: "LOADING" });
   const [attempt, setAttempt] = useState(0);
-  const [digs, setDigs] = useState<readonly ReportDig[]>([]);
   const [today] = useState(() => new Date());
-  // B1's rule: a missing story reads as "still being written" until the page stops waiting for it.
+  // B1's rule: a story still being written reads as such until the page stops waiting for it.
   const [storyGaveUp, setStoryGaveUp] = useState(false);
 
   useEffect(() => {
@@ -56,7 +77,13 @@ function ReportBody({ id, locale, catalog }: Readonly<{ id: string; locale: stri
       (result) => {
         if (!active) return;
         if (result.kind === "SERVED") {
-          setLoad({ kind: "SERVED", runId: result.runId, answer: result.answer, story: result.story });
+          setLoad({
+            kind: "SERVED",
+            runId: result.runId,
+            answer: result.answer,
+            story: result.story,
+            readFailures: storyReadFailed(result.story) ? 1 : 0
+          });
         } else {
           setLoad({ kind: "NOT_READY", failed: result.run.state === "FAILED" });
         }
@@ -66,57 +93,102 @@ function ReportBody({ id, locale, catalog }: Readonly<{ id: string; locale: stri
     return () => { active = false; };
   }, [id, attempt]);
 
+  // DATA-3: the fourth failed story read in a row ends the wait too (buildV4Map reads a failed read as "still being
+  // written" until the page gives up).
+  const gaveUp = storyGaveUp || (load.kind === "SERVED" && load.readFailures >= STORY_POLLING.readFailureLimit);
   const map: V4Map | null = useMemo(
-    () => load.kind === "SERVED" ? buildV4Map({ runId: load.runId, answer: load.answer, story: load.story, storyGaveUp }) : null,
-    [load, storyGaveUp]
+    () => load.kind === "SERVED" ? buildV4Map({ runId: load.runId, answer: load.answer, story: load.story, storyGaveUp: gaveUp }) : null,
+    [load, gaveUp]
   );
 
-  // Same rule as the map page: a missing or still-writing story is read again every 10 s, at most 30 times.
+  // Same rule as the map page: a story still being written, or a read that failed for a moment, is read again every
+  // 10 s, at most 30 times; a failed read is accepted only on the fourth failure in a row (DATA-3).
   const answerId = load.kind === "SERVED" ? load.answer.answer_id : null;
-  const storyPending = map !== null && map.storyState === "WRITING" && !storyGaveUp;
+  const answerVersion = load.kind === "SERVED" ? load.answer.answer_version : null;
+  const storyPending = map !== null && !gaveUp && map.storyState === "WRITING";
+  const retrying = storyPending && load.kind === "SERVED" && storyReadFailed(load.story);
   useEffect(() => {
-    if (answerId === null || !storyPending) return;
+    if (answerId === null || answerVersion === null || !storyPending) return;
     let active = true;
     let tries = 0;
+    // null: the read itself threw; it counts as a failed read, labelled as V3 labels it.
+    const settle = (read: AnswerStory | null) => {
+      if (!active) return;
+      setLoad((current) => {
+        if (current.kind !== "SERVED" || current.answer.answer_id !== answerId) return current;
+        const next = read ?? unreadableStory(answerId, answerVersion, "STORY_READ_FAILED");
+        if (!storyReadFailed(next)) return { ...current, story: next, readFailures: 0 };
+        const readFailures = current.readFailures + 1;
+        // Until the limit the page keeps what it shows; the last failure then becomes the story's state.
+        return readFailures < STORY_POLLING.readFailureLimit ? { ...current, readFailures } : { ...current, story: next, readFailures };
+      });
+    };
     const timer = window.setInterval(() => {
       tries += 1;
       if (tries > STORY_POLL_MAX) { window.clearInterval(timer); setStoryGaveUp(true); return; }
-      loadStory(answerId).then(
-        (story) => {
-          if (!active || story === null) return;
-          setLoad((current) => current.kind === "SERVED" && current.answer.answer_id === answerId ? { ...current, story } : current);
-        },
-        () => { /* a failed read waits for the next tick */ }
-      );
+      loadStory(answerId, undefined, answerVersion).then(settle, () => settle(null));
     }, STORY_POLL_MS);
     return () => { active = false; window.clearInterval(timer); };
-  }, [answerId, storyPending]);
+  }, [answerId, answerVersion, storyPending]);
 
-  // Digs are linked in this browser only (lib/v4/storage.ts); each is read once — the report is a snapshot.
+  // Decision A: digs are found again from the account's question list (lib/v4/digIndex.ts); read once — the report is a
+  // snapshot. A failed list read leaves the digs out quietly.
   const runId = load.kind === "SERVED" ? load.runId : null;
+  const questionLine = load.kind === "SERVED" ? load.answer.question_line : null;
+  const [index, setIndex] = useState<readonly IndexEntry[] | null>(null);
   useEffect(() => {
     if (runId === null) return;
     let active = true;
-    const links = readDigLinks(runId);
-    if (links.length === 0) { setDigs([]); return; }
-    void Promise.allSettled(links.map((link) => loadDigView(link))).then((results) => {
-      if (!active) return;
-      setDigs(results.map((result, index) => ({
-        link: links[index] as DigLink,
-        view: result.status === "fulfilled" ? result.value : null
-      })));
-    });
+    setIndex(null);
+    readQuestionIndex().then(
+      (entries) => { if (active) setIndex(entries); },
+      () => { if (active) setIndex([]); }
+    );
     return () => { active = false; };
   }, [runId]);
 
-  const mapHref = `/v4/debate/${encodeURIComponent(id)}`;
+  const digLinks: readonly DigLink[] = useMemo(
+    () => runId === null || questionLine === null || index === null ? [] : digLinksFor(runId, questionLine, map, index, catalog),
+    [runId, questionLine, map, index, catalog]
+  );
+
+  // Each dig's follow-up is read once (by its run id), even when the links are worked out again after the story lands.
+  const [views, setViews] = useState<ReadonlyMap<string, DigView | null>>(() => new Map());
+  const requested = useRef(new Set<string>());
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => { alive.current = false; };
+  }, []);
+  useEffect(() => {
+    for (const link of digLinks) {
+      if (requested.current.has(link.childRunId)) continue;
+      requested.current.add(link.childRunId);
+      const done = (view: DigView | null) => {
+        if (alive.current) setViews((current) => new Map(current).set(link.childRunId, view));
+      };
+      loadDigView(link).then(done, () => done(null));
+    }
+  }, [digLinks]);
+  const digs: readonly ReportDig[] = digLinks.map((link) => ({ link, view: views.get(link.childRunId) }));
+
+  // The browser tab and a printed file are named after the person's own words, not the added lines.
+  const ownQuestion = map !== null ? ownWords(map.question) : null;
+  useEffect(() => {
+    if (ownQuestion === null) return;
+    const before = document.title;
+    document.title = t(catalog, "v4.report.documentTitle", { question: ownQuestion });
+    return () => { document.title = before; };
+  }, [ownQuestion, catalog]);
+
+  const mapHref = levelHref(`/v4/debate/${encodeURIComponent(id)}`, chosenLevel);
   const classicHref = `/debate/${encodeURIComponent(id)}`;
   // V3's PDF (app/debate/[id]/report/route.ts) resolves an answer id first, then a run id, and serves only READY stories.
   const pdfReady = map !== null && map.storyState === "READY";
 
   const header = (
     <div className="v4RepChrome">
-      <V4Header catalog={catalog} readingLevel={levelLoaded ? level : savedLevel} onReadingLevel={setLevel} classicHref={classicHref}>
+      <V4Header catalog={catalog} readingLevel={level} onReadingLevel={chooseLevel} classicHref={classicHref}>
         <div className="v4RepActions">
           <Link className="v4Btn" href={mapHref}>{t(catalog, "v4.report.backToMap")}</Link>
           {pdfReady ? <a className="v4Btn" href={`${classicHref}/report`}>{t(catalog, "v4.report.downloadPdf")}</a> : null}
@@ -128,7 +200,7 @@ function ReportBody({ id, locale, catalog }: Readonly<{ id: string; locale: stri
     </div>
   );
 
-  if (load.kind !== "SERVED" || map === null) {
+  if (load.kind !== "SERVED" || map === null || ownQuestion === null) {
     return (
       <div className="v4RepPage">
         {header}
@@ -154,6 +226,18 @@ function ReportBody({ id, locale, catalog }: Readonly<{ id: string; locale: stri
   }
 
   const showConfidence = level !== "plain" && map.confidence !== null;
+  const noShortAnswer = map.headline === null && map.summary === null;
+  // DATA-2 ("always an answer"): with no written short answer, the AIs' whole composed answer stands in.
+  const fallback = noShortAnswer && map.fallbackText !== null
+    ? map.fallbackText.split(/\n\s*\n/).map((part) => part.trim()).filter((part) => part.length > 0)
+    : [];
+  const storyNote = retrying
+    ? t(catalog, "v4.report.storyRetrying")
+    : fallback.length > 0
+      ? (storyPending ? t(catalog, "v4.report.fallbackWriting") : t(catalog, "v4.report.fallbackUnavailable"))
+      : (storyPending ? t(catalog, "v4.report.storyWriting") : t(catalog, "v4.report.storyUnavailable"));
+  const sent = addedLines(map.question).length > 0;
+
   return (
     <div className="v4RepPage">
       {header}
@@ -166,18 +250,28 @@ function ReportBody({ id, locale, catalog }: Readonly<{ id: string; locale: stri
               level: t(catalog, `v4.readingLevel.${level}`)
             })}
           </p>
-          <h1 id="v4-report-title" className="v4RepTitle" data-ai-generated="true">{map.question}</h1>
+          <h1 id="v4-report-title" className="v4RepTitle" data-ai-generated="true">{ownQuestion}</h1>
         </header>
+
+        {sent ? (
+          <section className="v4RepSent" aria-labelledby="v4-report-sent">
+            <h2 id="v4-report-sent" className="v4Eyebrow v4RepSentLabel">{t(catalog, "v4.report.sentHeading")}</h2>
+            <p className="v4RepSentText" data-ai-generated="true">{map.question}</p>
+          </section>
+        ) : null}
 
         <section className="v4RepAnswer" aria-labelledby="v4-report-answer">
           <h2 id="v4-report-answer" className="v4Eyebrow v4RepAnswerLabel">{t(catalog, "v4.report.answerHeading")}</h2>
           {map.headline !== null ? <p className="v4RepHeadline" data-ai-generated="true">{map.headline}</p> : null}
           {map.summary !== null ? <p className="v4RepProse" data-ai-generated="true">{map.summary}</p> : null}
-          {map.headline === null && map.summary === null ? (
-            <p className="v4RepNote" role="status">
-              {storyPending ? t(catalog, "v4.report.storyWriting") : t(catalog, "v4.report.storyUnavailable")}
-            </p>
+          {fallback.length > 0 ? (
+            <div className="v4RepFallback" data-ai-generated="true">
+              {fallback.map((part, at) => <p key={at} className="v4RepProse">{part}</p>)}
+            </div>
           ) : null}
+          {/* RULES-1: V3's caveat for a READY_WITH_RESERVATION story; our own words, so not marked as AI text. */}
+          {map.reservation ? <p className="v4RepNote">{t(catalog, "v4.story.reservation")}</p> : null}
+          {noShortAnswer ? <p className="v4RepNote" role="status">{storyNote}</p> : null}
           {showConfidence ? (
             <p className="v4RepConfidence">
               <b>{t(catalog, "v4.report.confidenceLabel")}</b>{" "}
@@ -190,7 +284,7 @@ function ReportBody({ id, locale, catalog }: Readonly<{ id: string; locale: stri
           <section className="v4RepSection" aria-labelledby="v4-report-why">
             <h2 id="v4-report-why" className="v4RepH2">{t(catalog, "v4.report.whyHeading")}</h2>
             <ul className="v4RepList">
-              {map.why.map((reason, index) => <li key={index} data-ai-generated="true">{reason}</li>)}
+              {map.why.map((reason, at) => <li key={at} data-ai-generated="true">{reason}</li>)}
             </ul>
           </section>
         ) : null}
@@ -206,7 +300,7 @@ function ReportBody({ id, locale, catalog }: Readonly<{ id: string; locale: stri
           <section className="v4RepSection" aria-labelledby="v4-report-objections">
             <h2 id="v4-report-objections" className="v4RepH2">{t(catalog, "v4.report.objectionsHeading")}</h2>
             <ul className="v4RepList">
-              {map.objections.map((objection, index) => <li key={index} data-ai-generated="true">{objection}</li>)}
+              {map.objections.map((objection, at) => <li key={at} data-ai-generated="true">{objection}</li>)}
             </ul>
           </section>
         ) : null}
@@ -224,7 +318,7 @@ function ReportBody({ id, locale, catalog }: Readonly<{ id: string; locale: stri
           <section className="v4RepSection" aria-labelledby="v4-report-digs">
             <h2 id="v4-report-digs" className="v4RepH2">{t(catalog, "v4.report.digsHeading")}</h2>
             <ul className="v4RepDigs">
-              {digs.map((dig) => <ReportDigItem key={dig.link.childRunId} dig={dig} catalog={catalog} />)}
+              {digs.map((dig) => <ReportDigItem key={dig.link.childRunId} dig={dig} level={chosenLevel} catalog={catalog} />)}
             </ul>
           </section>
         ) : null}
@@ -233,11 +327,11 @@ function ReportBody({ id, locale, catalog }: Readonly<{ id: string; locale: stri
           <section className="v4RepSection" aria-labelledby="v4-report-story">
             <h2 id="v4-report-story" className="v4RepH2">{t(catalog, "v4.report.fullStoryHeading")}</h2>
             <div className="v4RepStory">
-              {map.sections.map((section, index) => (
-                <div key={index} className="v4RepStoryPart">
+              {map.sections.map((section, at) => (
+                <div key={at} className="v4RepStoryPart">
                   <h3 className="v4RepH3" data-ai-generated="true">{section.title}</h3>
-                  {section.paragraphs.map((paragraph, paragraphIndex) => (
-                    <p key={paragraphIndex} className="v4RepProse" data-ai-generated="true">{paragraph}</p>
+                  {section.paragraphs.map((paragraph, paragraphAt) => (
+                    <p key={paragraphAt} className="v4RepProse" data-ai-generated="true">{paragraph}</p>
                   ))}
                 </div>
               ))}
@@ -293,26 +387,29 @@ function ReportPath({ path, level, catalog, locale }: Readonly<{ path: V4Path; l
   );
 }
 
-function ReportDigItem({ dig, catalog }: Readonly<{ dig: ReportDig; catalog: MessageCatalog }>) {
+function ReportDigItem({ dig, level, catalog }: Readonly<{ dig: ReportDig; level: ReadingLevel | null; catalog: MessageCatalog }>) {
   const view = dig.view;
+  const state = view === undefined
+    ? t(catalog, "v4.common.loading")
+    : view === null ? t(catalog, "v4.report.digUnknown") : t(catalog, `v4.report.digState.${view.state}`);
   return (
     <li className="v4RepDig">
       <ul className="v4RepDigQuestions">
-        {dig.link.questions.map((question, index) => <li key={index} data-ai-generated="true">{question}</li>)}
+        {dig.link.questions.map((question, at) => <li key={at} data-ai-generated="true">{question}</li>)}
       </ul>
       <p className="v4RepDigMeta">
-        {t(catalog, `v4.digMode.${dig.link.mode}`)}
-        {" · "}
-        {view !== null ? t(catalog, `v4.report.digState.${view.state}`) : t(catalog, "v4.report.digUnknown")}
+        {/* A dig found again from the account list has no known mode: then only its state is shown. */}
+        {dig.link.mode !== null ? <>{t(catalog, `v4.digMode.${dig.link.mode}`)}{" · "}</> : null}
+        {state}
       </p>
-      {view !== null && view.state === "DONE" && view.headline !== null ? (
+      {view?.state === "DONE" && view.headline !== null ? (
         <p className="v4RepProse" data-ai-generated="true">{view.headline}</p>
       ) : null}
-      {view !== null && view.state === "DONE" && view.counts !== null ? (
+      {view?.state === "DONE" && view.counts !== null ? (
         <div className="v4RepBar"><V4TrustBar counts={view.counts} catalog={catalog} size="small" showCounts /></div>
       ) : null}
-      {view !== null && view.state === "DONE" ? (
-        <Link className="v4Link v4RepDigLink" href={`/v4/debate/${encodeURIComponent(dig.link.childRunId)}`}>
+      {view?.state === "DONE" ? (
+        <Link className="v4Link v4RepDigLink" href={levelHref(`/v4/debate/${encodeURIComponent(dig.link.childRunId)}`, level)}>
           {t(catalog, "v4.report.digOpenMap")}
         </Link>
       ) : null}

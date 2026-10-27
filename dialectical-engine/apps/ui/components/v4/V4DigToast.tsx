@@ -8,7 +8,8 @@ import type { PendingDig } from "@/lib/v4/types";
 /*
  * V4 initial (2026-10-28), row D decision 1: a dig starts at once with a 10-second Undo. This note only counts down
  * and offers Undo; the page sends nothing before `sendsAt` (V4DebateClient owns the timer). After the send it shows
- * one short outcome: started, or the plain reason it was refused.
+ * one short outcome: started, or the plain reason it was refused. UI-10: only the words are a live region; the Undo
+ * button sits beside it with a fixed name, so a screen reader is not told every second of the countdown.
  */
 
 export type V4DigNotice =
@@ -33,7 +34,7 @@ export function V4DigToast(props: Readonly<{
   onUndo: () => void;
   notice: V4DigNotice | null;
   onCloseNotice: () => void;
-  /** Phone: sit above the pinned bottom bar. */
+  /** Phone (or a tray showing): sit above the pinned bottom bar. */
   lifted: boolean;
   catalog: MessageCatalog;
   locale: string;
@@ -67,16 +68,17 @@ export function V4DigToast(props: Readonly<{
     const [before = "", after = ""] = t(catalog, "v4.dig.digging", { question: QUESTION_MARK }).split(QUESTION_MARK);
     const seconds = secondsLeft(pending.sendsAt, now);
     return (
-      <div className={className} role="status">
-        <span className="v4DebToastText">
+      <div className={className}>
+        <span className="v4DebToastText" role="status">
           {before}
           <span data-ai-generated="true">{first}</span>
           {after}
           {questions.length > 1 ? <>{" "}{tPlural(catalog, "v4.dig.andMore", questions.length - 1, locale)}</> : null}
           <span className="v4DebToastMode">{" · "}{t(catalog, `v4.digMode.${pending.mode}`)}</span>
         </span>
-        <button type="button" onClick={onUndo} aria-label={t(catalog, "v4.dig.undoLabel", { seconds })}>
-          {t(catalog, "v4.dig.undo", { seconds })}
+        <button type="button" onClick={onUndo} aria-label={t(catalog, "v4.dig.undoLabel")}>
+          {t(catalog, "v4.dig.undo")}
+          <span aria-hidden="true">{" "}{t(catalog, "v4.dig.undoSeconds", { seconds })}</span>
         </button>
       </div>
     );
@@ -84,8 +86,8 @@ export function V4DigToast(props: Readonly<{
 
   if (notice === null) return null;
   return (
-    <div className={className} role="status">
-      <span className="v4DebToastText">
+    <div className={className}>
+      <span className="v4DebToastText" role="status">
         {notice.kind === "STARTED" ? t(catalog, "v4.dig.started") : notice.message}
       </span>
       <button type="button" onClick={onCloseNotice}>{t(catalog, "v4.dig.close")}</button>

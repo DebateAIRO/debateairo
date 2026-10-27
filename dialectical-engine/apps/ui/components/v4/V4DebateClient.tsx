@@ -8,26 +8,19 @@ import { RoomNotice } from "@/components/billing/RoomNotice";
 import { V4ChangesBar } from "@/components/v4/V4ChangesBar";
 import { V4DigToast, type V4DigNotice } from "@/components/v4/V4DigToast";
 import { V4Header } from "@/components/v4/V4Header";
-import { openCount, resolveSelection, selectionIdOf, V4MapTree } from "@/components/v4/V4MapTree";
+import { digFor, openCount, resolveSelection, selectionIdOf, V4MapTree } from "@/components/v4/V4MapTree";
 import { V4Outline } from "@/components/v4/V4Outline";
 import { V4Panel } from "@/components/v4/V4Panel";
 import { V4Rail, type V4DigCounts } from "@/components/v4/V4Rail";
 import { isNotFound } from "@/lib/api";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { runFailureMessage } from "@/lib/v3/runFailure";
-import { digQuestion, digTargetQuestions } from "@/lib/v4/askText";
+import { digQuestion, digTargetQuestions, ownWords } from "@/lib/v4/askText";
 import { diffSnapshots, selectionForChange, snapshotItems } from "@/lib/v4/changes";
-import { loadDigView, loadStory, loadV4, type V4Load } from "@/lib/v4/load";
-import { buildV4Map, openQuestionsOf } from "@/lib/v4/mapModel";
-import {
-  addDigLink,
-  findDigParent,
-  readDigLinks,
-  readSeen,
-  readStartedRuns,
-  useReadingLevel,
-  writeSeen
-} from "@/lib/v4/storage";
+import { digLinksFor, digParentOf, readQuestionIndex, type IndexEntry } from "@/lib/v4/digIndex";
+import { loadDigView, loadStory, loadV4, storyReadFailed, type V4Load } from "@/lib/v4/load";
+import { buildV4Map, uniqueOpenQuestions } from "@/lib/v4/mapModel";
+import { levelHref, useReadingLevel } from "@/lib/v4/storage";
 import type {
   DigLink,
   DigMode,
@@ -37,6 +30,7 @@ import type {
   ReadingLevel,
   V4Change,
   V4Map,
+  V4OpenQuestion,
   V4Selection
 } from "@/lib/v4/types";
 import { useV4Ask, type V4AskOutcome } from "@/lib/v4/useV4Ask";
@@ -45,27 +39,60 @@ import { useV4Ask, type V4AskOutcome } from "@/lib/v4/useV4Ask";
  * V4 initial (2026-10-28), the map page shell (D3 map, D4 what changed, D6/D7 phone). It loads the debate over
  * today's V3 reads, waits calmly while it runs, then lays out rail | map | panel and owns the dig flow (row D
  * decision 1: a dig starts at once with a 10-second Undo, nothing is sent before then). Every polling loop keeps one
- * request in flight at a time and stops when the page goes.
+ * request in flight at a time and stops when the page goes. Fix wave 1, Decision A: nothing is kept in the browser's
+ * storage; digs are found again from the account's question list, and "what changed" is "while you were here".
  */
 
 const RUN_POLL_MS = 5_000;
 const RUN_POLL_AFTER_ERROR_MS = 30_000;
 const STORY_POLL_MS = 10_000;
 const STORY_POLL_TRIES = 30;
+/** DATA-3: a story read that failed is accepted only after this many failures in a row (V3's readFailureLimit). */
+const STORY_READ_FAILURE_LIMIT = 4;
 const DIG_POLL_MS = 15_000;
+/** TIME-8/FIT-3: a dig read as done before its story was written is asked again, at most this many times. */
+const DIG_HEADLESS_TRIES = 30;
+/** TIME-1: a dig whose reads keep failing stops holding back "what changed" after this many failures. */
+const DIG_FIRST_READ_FAILURES = 3;
+/** Decision A: the account's question list is read again this often while a dig is going, and when all are final. */
+const INDEX_POLL_BUSY_MS = 20_000;
+const INDEX_POLL_IDLE_MS = 60_000;
 const UNDO_MS = 10_000;
 const CLOCK_TICK_MS = 15_000;
-/** The reading level a page uses before one is saved (as the report does). */
+/** The reading level a page uses when the address names none (Decision A). */
 const DEFAULT_LEVEL: ReadingLevel = "background";
 /** Spec: desktop ≥ 1100 px, 768–1099 px a top strip, < 768 px the phone layout. */
 const PHONE_QUERY = "(max-width: 767px)";
 const MID_QUERY = "(max-width: 1099px)";
+const FOCUSABLE = "a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex='-1'])";
 
 type Layout = "desktop" | "mid" | "phone";
 type LoadProblem = "NOT_FOUND" | "UNREACHABLE";
 
+/** What the page last read of one dig, and how its reads went. */
+type DigStatus = Readonly<{
+  view: Pick<DigView, "state" | "headline" | "counts"> | null;
+  /** Failed reads in a row. */
+  failures: number;
+  /** Reads that found it done but without its story headline yet. */
+  headlessTries: number;
+}>;
+
+const NO_STATUS: DigStatus = { view: null, failures: 0, headlessTries: 0 };
+/** RULES-4/TIME-1: a dig not read yet shows as working, never as "waiting for a free spot" and never vanishes. */
+const STAND_IN: NonNullable<DigStatus["view"]> = { state: "RUNNING", headline: null, counts: null };
+
+/**
+ * Decision A: the digs started in this tab, in memory only (gone on reload). Module-level so they survive moving
+ * between V4 pages without a reload: the dig's own page then knows when it started and where it came from.
+ */
+type VisitDig = Readonly<{ link: DigLink; parentQuestion: string }>;
+const startedThisVisit = new Map<string, VisitDig>();
+
 export type V4DebateClientProps = Readonly<{
   id: string;
+  /** The reading level the address names (`?level=`), or null. */
+  initialLevel: ReadingLevel | null;
   catalog: MessageCatalog;
   homeCatalog: MessageCatalog;
   newDebateCatalog: MessageCatalog;
@@ -75,29 +102,12 @@ export type V4DebateClientProps = Readonly<{
 }>;
 
 /** Every V3 read is asker-scoped, so the page waits for a session first (the classic page does the same). */
-export function V4DebateClient({
-  id,
-  catalog,
-  homeCatalog,
-  newDebateCatalog,
-  billingCatalog,
-  locale,
-  crisisCountryHint
-}: V4DebateClientProps) {
+export function V4DebateClient(props: V4DebateClientProps) {
   return (
-    <AuthGate catalog={newDebateCatalog}>
+    <AuthGate catalog={props.newDebateCatalog}>
       {() => (
         // Keyed by id: moving between two debates (a dig's back link) starts fresh, never with the last one's state.
-        <V4Debate
-          key={id}
-          id={id}
-          catalog={catalog}
-          homeCatalog={homeCatalog}
-          newDebateCatalog={newDebateCatalog}
-          billingCatalog={billingCatalog}
-          locale={locale}
-          crisisCountryHint={crisisCountryHint}
-        />
+        <V4Debate key={props.id} {...props} />
       )}
     </AuthGate>
   );
@@ -137,28 +147,71 @@ function isRunning(dig: DigView): boolean {
   return dig.state === "WAITING" || dig.state === "RUNNING";
 }
 
+/** No more reads needed: it failed, or it is done with its headline (or we stopped waiting for the headline). */
+function isFinal(status: DigStatus | undefined): boolean {
+  const view = status?.view ?? null;
+  if (view === null) return false;
+  if (view.state === "FAILED") return true;
+  return view.state === "DONE" && (view.headline !== null || (status?.headlessTries ?? 0) >= DIG_HEADLESS_TRIES);
+}
+
+/** Read once, or given up on for now (TIME-1): only then may "what changed" take its baseline. */
+function isSettled(status: DigStatus | undefined): boolean {
+  return status !== undefined && (status.view !== null || status.failures >= DIG_FIRST_READ_FAILURES);
+}
+
+function linkKeyOf(links: readonly DigLink[]): string {
+  return links.map((link) => link.childRunId).join("|");
+}
+
 /** A dig of a whole path is linked by the path ("path:<id>"), as the map pieces place it (V4MapTree digHome). */
 function linkedIdsOf(target: DigTarget): readonly string[] {
   return target.kind === "path" ? [`path:${target.path.id}`] : target.questions.map((question) => question.id);
 }
 
-/** What the phone's pinned "Dig deeper here" digs into: a path or one open question (never the root or a dig). */
-function targetOf(map: V4Map, selection: V4Selection): DigTarget | null {
+/**
+ * What the phone's pinned "Dig deeper here" digs into: a path or one open question (never the root or a dig).
+ * RULES-5: an open question that already has a dig offers none.
+ */
+function targetOf(map: V4Map, digs: readonly DigView[], selection: V4Selection): DigTarget | null {
   if (selection.startsWith("path:")) {
     const path = map.paths.find((candidate) => `path:${candidate.id}` === selection);
     return path === undefined ? null : { kind: "path", path };
   }
   if (selection.startsWith("open:")) {
-    const question = openQuestionsOf(map).find((candidate) => `open:${candidate.id}` === selection);
-    return question === undefined ? null : { kind: "open", questions: [question] };
+    const question = uniqueOpenQuestions(map).find((candidate) => `open:${candidate.id}` === selection);
+    return question === undefined || digFor(question, digs) !== null ? null : { kind: "open", questions: [question] };
   }
   return null;
 }
 
-function V4Debate({ id, catalog, homeCatalog, newDebateCatalog, billingCatalog, locale, crisisCountryHint }: V4DebateClientProps) {
+/**
+ * "While you were here" (fix wave 1): which live changes are news. A dig this tab started is not news when it appears
+ * (the person just started it), nor is it while it is still going; it is news when it finishes or fails, and a dig that
+ * appears from elsewhere (another tab) is news. An open question turning "dug" is told by its dig, not twice.
+ */
+function isNews(change: V4Change, startedHere: ReadonlySet<string>): boolean {
+  if (change.id.startsWith("dig:")) {
+    if (change.kind === "ADDED") return !startedHere.has(change.id.slice("dig:".length));
+    return change.now === "DONE" || change.now === "FAILED";
+  }
+  if (change.id.startsWith("open:")) return change.kind === "ADDED";
+  return true;
+}
+
+function V4Debate({
+  id,
+  initialLevel,
+  catalog,
+  homeCatalog,
+  newDebateCatalog,
+  billingCatalog,
+  locale,
+  crisisCountryHint
+}: V4DebateClientProps) {
   const layout = useLayout();
-  const [savedLevel, saveLevel] = useReadingLevel();
-  const readingLevel: ReadingLevel = savedLevel ?? DEFAULT_LEVEL;
+  const [chosenLevel, chooseLevel] = useReadingLevel(initialLevel);
+  const readingLevel: ReadingLevel = chosenLevel ?? DEFAULT_LEVEL;
   const [digMode, setDigMode] = useState<DigMode>("quick");
   const ask = useV4Ask({ catalog, homeCatalog, newDebateCatalog, locale, crisisCountryHint, mode: digMode, readingLevel });
 
@@ -205,28 +258,42 @@ function V4Debate({ id, catalog, homeCatalog, newDebateCatalog, billingCatalog, 
   const served = load?.kind === "SERVED" ? load : null;
   const runId = load?.runId ?? id;
   const answerId = served?.answer.answer_id ?? null;
+  const answerVersion = served?.answer.answer_version ?? 1;
+  /** The whole text that was sent for this debate (the person's words plus any added lines). */
+  const questionLine = served !== null ? served.answer.question_line : load?.kind === "RUN" ? load.run.question_line : null;
 
-  // ── The story: while it is missing or still being written, ask again every 10 s (at most 30 times) ──────────────
+  // ── The story: while it is missing, being written or its read failed, ask again every 10 s (at most 30 times) ────
   const [polledStory, setPolledStory] = useState<Readonly<{ answerId: string; story: AnswerStory | null }> | null>(null);
   const [storyGaveUp, setStoryGaveUp] = useState(false);
   const story = polledStory !== null && polledStory.answerId === answerId ? polledStory.story : served?.story ?? null;
-  const storyPending = served !== null && (story === null || story.status === "WRITING");
+  const storyFailedRead = story !== null && storyReadFailed(story);
+  const storyPending = served !== null && !storyGaveUp && (story === null || story.status === "WRITING" || storyFailedRead);
+  const storyFailedReadRef = useRef(storyFailedRead);
+  useEffect(() => {
+    storyFailedReadRef.current = storyFailedRead;
+  });
   useEffect(() => {
     if (answerId === null || !storyPending) return;
     let active = true;
     let timer: number | undefined;
     let tries = 0;
+    // The read the page already holds counts: a failed one is the first of the four in a row (DATA-3).
+    let failuresInARow = storyFailedReadRef.current ? 1 : 0;
     const tick = async (): Promise<void> => {
       tries += 1;
+      let next: AnswerStory | null = null;
+      let failed = false;
       try {
-        const next = await loadStory(answerId);
-        if (!active) return;
-        setPolledStory({ answerId, story: next });
-        if (next !== null && next.status !== "WRITING") return;
+        next = await loadStory(answerId, undefined, answerVersion);
       } catch {
-        if (!active) return;
+        failed = true;
       }
-      if (tries >= STORY_POLL_TRIES) {
+      if (!active) return;
+      if (!failed) setPolledStory({ answerId, story: next });
+      const readFailed = failed || (next !== null && storyReadFailed(next));
+      failuresInARow = readFailed ? failuresInARow + 1 : 0;
+      if (!readFailed && next !== null && next.status !== "WRITING") return;
+      if (failuresInARow >= STORY_READ_FAILURE_LIMIT || tries >= STORY_POLL_TRIES) {
         setStoryGaveUp(true);
         return;
       }
@@ -237,50 +304,145 @@ function V4Debate({ id, catalog, homeCatalog, newDebateCatalog, billingCatalog, 
       active = false;
       window.clearTimeout(timer);
     };
-  }, [answerId, storyPending]);
+  }, [answerId, answerVersion, storyPending]);
 
+  // TIME-6/FIT-5: once the page stops waiting, the map says the summary is unavailable, not "still being written".
   const map = useMemo<V4Map | null>(
-    () => (served === null ? null : buildV4Map({ runId: served.runId, answer: served.answer, story })),
-    [served, story]
+    () => (served === null ? null : buildV4Map({ runId: served.runId, answer: served.answer, story, storyGaveUp })),
+    [served, story, storyGaveUp]
   );
-
-  // ── Digs: the follow-ups started from this map (kept in this browser), polled while any is still going ─────────
-  const [digs, setDigs] = useState<readonly DigView[]>([]);
-  const [digsLoaded, setDigsLoaded] = useState(false);
-  const [digLinksVersion, setDigLinksVersion] = useState(0);
-  const digsRef = useRef<readonly DigView[]>([]);
   const servedRunId = served?.runId ?? null;
+  const servedQuestionLine = served?.answer.question_line ?? null;
+
+  // ── The account's question list (Decision A): digs and the back link are found again in it, by text ───────────
+  const [index, setIndex] = useState<readonly IndexEntry[]>([]);
+  const [indexSettled, setIndexSettled] = useState(false);
+  const digsLiveRef = useRef(false);
+  const hasLoad = load !== null;
   useEffect(() => {
-    if (servedRunId === null) return;
+    if (!hasLoad) return;
     let active = true;
     let timer: number | undefined;
     const tick = async (): Promise<void> => {
-      const links = readDigLinks(servedRunId);
-      const before = new Map(digsRef.current.map((view) => [view.link.childRunId, view]));
-      const results = await Promise.all(links.map(async (link) => {
-        const known = before.get(link.childRunId);
-        // DONE and FAILED do not change again: no need to ask.
-        if (known !== undefined && !isRunning(known)) return { view: known, live: false };
-        try {
-          const view = await loadDigView(link);
-          return { view, live: isRunning(view) };
-        } catch {
-          return { view: known ?? null, live: true };
-        }
-      }));
-      if (!active) return;
-      const next = results.flatMap((result) => (result.view === null ? [] : [result.view]));
-      digsRef.current = next;
-      setDigs(next);
-      setDigsLoaded(true);
-      if (results.some((result) => result.live)) timer = window.setTimeout(() => void tick(), DIG_POLL_MS);
+      try {
+        const entries = await readQuestionIndex();
+        if (!active) return;
+        setIndex(entries);
+      } catch {
+        if (!active) return;
+        // Quiet: the digs started in this visit still show; the list is asked again later.
+      }
+      setIndexSettled(true);
+      timer = window.setTimeout(() => void tick(), digsLiveRef.current ? INDEX_POLL_BUSY_MS : INDEX_POLL_IDLE_MS);
     };
     void tick();
     return () => {
       active = false;
       window.clearTimeout(timer);
     };
-  }, [servedRunId, digLinksVersion]);
+  }, [hasLoad]);
+
+  // ── Digs: the ones started in this visit (memory) merged with the ones found in the account's list ─────────────
+  const [visitLinks, setVisitLinks] = useState<readonly DigLink[]>(() => [...startedThisVisit.values()].map((entry) => entry.link));
+  const links = useMemo<readonly DigLink[]>(() => {
+    if (map === null || servedRunId === null || servedQuestionLine === null) return [];
+    const mine = visitLinks.filter((link) => link.parentRunId === servedRunId);
+    const mineById = new Map(mine.map((link) => [link.childRunId, link]));
+    // Oldest first (the order they were started). A dig started here keeps its exact link (mode, start time).
+    const found = digLinksFor(servedRunId, servedQuestionLine, map, index, catalog);
+    const foundIds = new Set(found.map((link) => link.childRunId));
+    return [
+      ...found.map((link) => mineById.get(link.childRunId) ?? link),
+      ...mine.filter((link) => !foundIds.has(link.childRunId))
+    ];
+  }, [map, servedRunId, servedQuestionLine, visitLinks, index, catalog]);
+  const linkKey = linkKeyOf(links);
+
+  const [statuses, setStatuses] = useState<ReadonlyMap<string, DigStatus>>(() => new Map());
+  const statusesRef = useRef(statuses);
+  const linksRef = useRef(links);
+  useEffect(() => {
+    linksRef.current = links;
+  });
+  const digs = useMemo<readonly DigView[]>(
+    () => links.map((link) => {
+      const view = statuses.get(link.childRunId)?.view ?? STAND_IN;
+      return { link, state: view.state, headline: view.headline, counts: view.counts };
+    }),
+    [links, statuses]
+  );
+  useEffect(() => {
+    digsLiveRef.current = links.some((link) => !isFinal(statuses.get(link.childRunId)));
+  }, [links, statuses]);
+
+  // One loop per debate, one round of reads in flight; a new link "kicks" it instead of starting a second loop.
+  const digLoop = useRef<Readonly<{ kick: () => void; seenKey: () => string }> | null>(null);
+  useEffect(() => {
+    if (servedRunId === null) return;
+    let active = true;
+    let busy = false;
+    let again = false;
+    let timer: number | undefined;
+    let seenKey = "";
+    const tick = async (): Promise<void> => {
+      window.clearTimeout(timer);
+      timer = undefined;
+      if (busy) {
+        again = true;
+        return;
+      }
+      busy = true;
+      const current = linksRef.current;
+      seenKey = linkKeyOf(current);
+      const due = current.filter((link) => !isFinal(statusesRef.current.get(link.childRunId)));
+      const results = await Promise.all(due.map(async (link) => {
+        try {
+          return { childRunId: link.childRunId, view: await loadDigView(link) };
+        } catch {
+          return { childRunId: link.childRunId, view: null };
+        }
+      }));
+      busy = false;
+      if (!active) return;
+      const next = new Map(statusesRef.current);
+      for (const result of results) {
+        const before = next.get(result.childRunId) ?? NO_STATUS;
+        if (result.view === null) {
+          // TIME-1: a failed read keeps what was shown (or the stand-in), never drops the dig.
+          next.set(result.childRunId, { ...before, failures: before.failures + 1 });
+          continue;
+        }
+        const { state, headline, counts } = result.view;
+        const headless = state === "DONE" && headline === null;
+        next.set(result.childRunId, {
+          view: { state, headline, counts },
+          failures: 0,
+          headlessTries: headless ? before.headlessTries + 1 : before.headlessTries
+        });
+      }
+      statusesRef.current = next;
+      setStatuses(next);
+      if (again) {
+        again = false;
+        void tick();
+        return;
+      }
+      if (linksRef.current.some((link) => !isFinal(next.get(link.childRunId)))) {
+        timer = window.setTimeout(() => void tick(), DIG_POLL_MS);
+      }
+    };
+    digLoop.current = { kick: () => void tick(), seenKey: () => seenKey };
+    void tick();
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+      digLoop.current = null;
+    };
+  }, [servedRunId]);
+  useEffect(() => {
+    const loop = digLoop.current;
+    if (loop !== null && loop.seenKey() !== linkKey) loop.kick();
+  }, [linkKey]);
 
   // ── Selection ───────────────────────────────────────────────────────────────────────────────────────────────────
   const [selected, setSelected] = useState<V4Selection>("root");
@@ -288,20 +450,27 @@ function V4Debate({ id, catalog, homeCatalog, newDebateCatalog, billingCatalog, 
   const [focusRequest, setFocusRequest] = useState(0);
   const [outlineOpen, setOutlineOpen] = useState(false);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
+  const panelColRef = useRef<HTMLElement | null>(null);
   const shownSelection: V4Selection = map === null ? "root" : selectionIdOf(resolveSelection(map, digs, selected));
+  const sheetOpen = layout === "phone" && outlineOpen;
 
   const select = useCallback((selection: V4Selection, viaKeyboard: boolean): void => {
     setSelected(selection);
     setOpened((previous) => (previous.has(selection) ? previous : new Set([...previous, selection])));
-    // Phone: tapping a row of the outline opens it in the panel, so the sheet closes and the heading takes focus.
-    const fromSheet = layout === "phone" && outlineOpen;
-    if (fromSheet) setOutlineOpen(false);
-    if (viaKeyboard || fromSheet) setFocusRequest((count) => count + 1);
+    // Phone: tapping a row of the outline opens it in the panel, so the sheet closes.
+    if (layout === "phone" && outlineOpen) setOutlineOpen(false);
+    // UI-5: on the phone the new question always opens at its heading (focus scrolls it into view).
+    if (viaKeyboard || layout === "phone") setFocusRequest((count) => count + 1);
   }, [layout, outlineOpen]);
 
   useEffect(() => {
     if (focusRequest > 0) headingRef.current?.focus();
   }, [focusRequest]);
+
+  // UI-5: the side panel scrolls on its own; a new question starts at its top, not where the last one was left.
+  useEffect(() => {
+    if (panelColRef.current !== null) panelColRef.current.scrollTop = 0;
+  }, [shownSelection]);
 
   // ── Picks for the tray (row D decision 1: a tray only when several are picked) ────────────────────────────────
   const [picked, setPicked] = useState<ReadonlySet<string>>(() => new Set());
@@ -313,10 +482,12 @@ function V4Debate({ id, catalog, homeCatalog, newDebateCatalog, billingCatalog, 
       return next;
     });
   }, []);
-  const pickedQuestions = useMemo(
-    () => (map === null ? [] : openQuestionsOf(map).filter((question) => picked.has(question.id))),
+  // FIT-1: a point still argued under two paths is one pick, sent once.
+  const pickedQuestions = useMemo<readonly V4OpenQuestion[]>(
+    () => (map === null ? [] : uniqueOpenQuestions(map).filter((question) => picked.has(question.id))),
     [map, picked]
   );
+  const hasTray = pickedQuestions.length >= 2;
 
   // ── The dig flow ────────────────────────────────────────────────────────────────────────────────────────────────
   const [pending, setPending] = useState<PendingDig | null>(null);
@@ -332,12 +503,13 @@ function V4Debate({ id, catalog, homeCatalog, newDebateCatalog, billingCatalog, 
 
   const undoDig = useCallback((): void => setPending(null), []);
 
-  const send = async (dig: PendingDig, parentRunId: string, rootQuestion: string): Promise<void> => {
+  const send = async (dig: PendingDig, parentRunId: string, parentQuestionLine: string): Promise<void> => {
     setPending(null);
     setSending(true);
     let outcome: V4AskOutcome;
     try {
-      outcome = await ask.submit(digQuestion(dig.target, rootQuestion, catalog), dig.mode);
+      // ASK-4: a dig carries AI-written text, so it is sent as a dig (no client crisis pop-up on AI words).
+      outcome = await ask.submit(digQuestion(dig.target, parentQuestionLine, catalog, locale), dig.mode, "dig");
     } catch {
       outcome = { kind: "REFUSED", message: t(catalog, "v4.dig.failed") };
     }
@@ -350,14 +522,11 @@ function V4Debate({ id, catalog, homeCatalog, newDebateCatalog, billingCatalog, 
         mode: dig.mode,
         startedAt: new Date().toISOString()
       };
-      // Kept even when the page has gone meanwhile: the dig is real, so the map must find it next time.
-      addDigLink(link);
+      // Kept for this visit even when the page has gone meanwhile (Decision A: memory only).
+      startedThisVisit.set(link.childRunId, { link, parentQuestion: ownWords(parentQuestionLine) });
       if (!mounted.current) return;
-      // Shown at once as waiting; the dig loop reads its real state straight away.
-      const shown: DigView = { link, state: "WAITING", headline: null, counts: null };
-      digsRef.current = [...digsRef.current.filter((view) => view.link.childRunId !== link.childRunId), shown];
-      setDigs(digsRef.current);
-      setDigLinksVersion((version) => version + 1);
+      // Shown at once (as working); the dig loop reads its real state straight away.
+      setVisitLinks((previous) => [...previous.filter((known) => known.childRunId !== link.childRunId), link]);
       if (dig.target.kind === "open") {
         const sent = new Set(link.openQuestionIds);
         setPicked((previous) => new Set([...previous].filter((idOf) => !sent.has(idOf))));
@@ -378,46 +547,56 @@ function V4Debate({ id, catalog, homeCatalog, newDebateCatalog, billingCatalog, 
   });
 
   // Nothing is sent before `sendsAt`. Undo (pending → null) and leaving the page both clear the timer.
-  const mapRunId = map?.runId ?? null;
-  const mapQuestion = map?.question ?? null;
   useEffect(() => {
-    if (pending === null || mapRunId === null || mapQuestion === null) return;
+    if (pending === null || servedRunId === null || servedQuestionLine === null) return;
     const timer = window.setTimeout(
-      () => void sendRef.current(pending, mapRunId, mapQuestion),
+      () => void sendRef.current(pending, servedRunId, servedQuestionLine),
       Math.max(0, pending.sendsAt - Date.now())
     );
     return () => window.clearTimeout(timer);
-  }, [pending, mapRunId, mapQuestion]);
+  }, [pending, servedRunId, servedQuestionLine]);
 
-  // ── What changed since the last visit (D4) ──────────────────────────────────────────────────────────────────────
-  const [changes, setChanges] = useState<readonly V4Change[] | null>(null);
-  const [changesHidden, setChangesHidden] = useState(false);
+  // ── What changed while you were here (D4, fix wave 1) ─────────────────────────────────────────────────────────
+  // The first complete load (map + every dig read once + the question list read once) is the baseline; later live
+  // changes are news, each with a dot and a tour stop. Nothing is written anywhere (Decision A).
+  const [news, setNews] = useState<readonly V4Change[]>([]);
+  const [hiddenStops, setHiddenStops] = useState(0);
   const [tourIndex, setTourIndex] = useState<number | null>(null);
-  const storySettled = !storyPending || storyGaveUp;
-  const seenReady = map !== null && digsLoaded && storySettled;
-  const diffDone = useRef(false);
+  const baseline = useRef<Readonly<Record<string, string>> | null>(null);
+  const selectedRef = useRef(selected);
   useEffect(() => {
-    if (!seenReady || map === null) return;
+    selectedRef.current = selected;
+  });
+  const digsSettled = indexSettled && links.every((link) => isSettled(statuses.get(link.childRunId)));
+  const liveReady = map !== null && digsSettled;
+  useEffect(() => {
+    if (!liveReady || map === null) return;
     const items = snapshotItems(map, digs);
-    if (!diffDone.current) {
-      diffDone.current = true;
-      setChanges(diffSnapshots(readSeen(map.runId), items));
-    }
-    // What the person has now seen live counts as seen, so the next visit tells only what came after.
-    writeSeen(map.runId, { at: new Date().toISOString(), items });
-  }, [seenReady, map, digs]);
+    const before = baseline.current;
+    baseline.current = items;
+    if (before === null) return;
+    const startedHere = new Set(visitLinks.map((link) => link.childRunId));
+    const fresh = diffSnapshots({ at: "", items: before }, items).filter((change) => isNews(change, startedHere));
+    if (fresh.length === 0) return;
+    setNews((previous) => [...previous, ...fresh]);
+    // A question opened earlier gets its "New" dot back when news lands on it (not the one on screen now).
+    const landed = new Set<string>(fresh.map((change) => selectionForChange(map, change)));
+    setOpened((previous) => new Set([...previous].filter((stop) => !landed.has(stop) || stop === selectedRef.current)));
+  }, [liveReady, map, digs, visitLinks]);
 
+  // RULES-11/FIT-7: the bar counts stops (questions), the same unit the tour numbers; news on the question itself is
+  // one stop too, so every change can be reached.
   const tourStops = useMemo<readonly V4Selection[]>(() => {
-    if (map === null || changes === null) return [];
+    if (map === null) return [];
     const stops: V4Selection[] = [];
-    for (const change of changes) {
+    for (const change of news) {
       const stop = selectionForChange(map, change);
-      if (stop !== "root" && !stops.includes(stop)) stops.push(stop);
+      if (!stops.includes(stop)) stops.push(stop);
     }
     return stops;
-  }, [map, changes]);
+  }, [map, news]);
   const changed = useMemo<ReadonlySet<string>>(
-    () => new Set(tourStops.filter((stop) => !opened.has(stop))),
+    () => new Set(tourStops.filter((stop) => stop !== "root" && !opened.has(stop))),
     [tourStops, opened]
   );
 
@@ -433,40 +612,19 @@ function V4Debate({ id, catalog, homeCatalog, newDebateCatalog, billingCatalog, 
     select(tourStops[next]!, false);
   }, [tourStops, tourIndex, select]);
 
-  // ── The back link of a dig, and when it started (for the progress screen) ─────────────────────────────────────
-  const [parent, setParent] = useState<Readonly<{ runId: string; question: string | null }> | null>(null);
-  const [startedAt, setStartedAt] = useState<string | null>(null);
-  useEffect(() => {
-    const link = findDigParent(runId);
-    const started = readStartedRuns().find((entry) => entry.runId === runId);
-    setStartedAt(link?.startedAt ?? started?.startedAt ?? null);
-    if (link === null) {
-      setParent(null);
-      return;
-    }
-    const known = readStartedRuns().find((entry) => entry.runId === link.parentRunId);
-    if (known !== undefined && known.question.trim() !== "") {
-      setParent({ runId: link.parentRunId, question: known.question });
-      return;
-    }
-    setParent({ runId: link.parentRunId, question: null });
-    let active = true;
-    loadV4(link.parentRunId).then(
-      (parentLoad) => {
-        if (!active) return;
-        const question = parentLoad.kind === "SERVED" ? parentLoad.answer.question_line : parentLoad.run.question_line;
-        setParent({ runId: link.parentRunId, question });
-      },
-      () => undefined
-    );
-    return () => {
-      active = false;
-    };
-  }, [runId]);
+  // ── The back link of a dig, and when it started (known only for a dig started in this visit) ────────────────
+  const visitEntry = startedThisVisit.get(runId) ?? null;
+  const parent = useMemo<Readonly<{ runId: string; question: string }> | null>(() => {
+    if (visitEntry !== null) return { runId: visitEntry.link.parentRunId, question: visitEntry.parentQuestion };
+    if (questionLine === null) return null;
+    const entry = digParentOf(questionLine, index, catalog);
+    return entry === null || entry.runId === runId ? null : { runId: entry.runId, question: ownWords(entry.questionLine) };
+  }, [visitEntry, questionLine, index, catalog, runId]);
+  const startedAt = visitEntry?.link.startedAt ?? null;
 
-  // A slow clock for "started N minutes ago" while the debate runs.
+  // A slow clock for "started N minutes ago" while the debate runs (only when the start time is known).
   const [now, setNow] = useState<number | null>(null);
-  const waiting = load?.kind === "RUN" && load.run.state !== "FAILED";
+  const waiting = load?.kind === "RUN" && load.run.state !== "FAILED" && startedAt !== null;
   useEffect(() => {
     if (!waiting) return;
     setNow(Date.now());
@@ -476,9 +634,10 @@ function V4Debate({ id, catalog, homeCatalog, newDebateCatalog, billingCatalog, 
 
   // ── Layout ──────────────────────────────────────────────────────────────────────────────────────────────────────
   const classicHref = `/debate/${encodeURIComponent(runId)}`;
-  const reportHref = `/v4/debate/${encodeURIComponent(runId)}/report`;
+  const reportHref = levelHref(`/v4/debate/${encodeURIComponent(runId)}/report`, readingLevel);
+  const askHref = levelHref("/v4", readingLevel);
   const header = (
-    <V4Header catalog={catalog} readingLevel={readingLevel} onReadingLevel={saveLevel} classicHref={classicHref}>
+    <V4Header catalog={catalog} readingLevel={readingLevel} onReadingLevel={chooseLevel} classicHref={classicHref}>
       {served !== null ? (
         <Link className="v4Btn v4BtnPrimary v4DebReportLink" href={reportHref}>{t(catalog, "v4.debate.report")}</Link>
       ) : null}
@@ -489,7 +648,8 @@ function V4Debate({ id, catalog, homeCatalog, newDebateCatalog, billingCatalog, 
     return (
       <div className="v4DebPage">
         {header}
-        <main className="v4DebCentre">
+        {/* UI-4: the layout already holds the page's one <main>. */}
+        <div className="v4DebCentre">
           {load === null || load.kind !== "RUN" ? (
             <StatusScreen
               problem={loadProblem}
@@ -497,10 +657,11 @@ function V4Debate({ id, catalog, homeCatalog, newDebateCatalog, billingCatalog, 
                 setLoadProblem(null);
                 setLoadAttempt((count) => count + 1);
               }}
+              askHref={askHref}
               catalog={catalog}
             />
           ) : load.run.state === "FAILED" ? (
-            <FailedScreen run={load.run} classicHref={classicHref} catalog={catalog} homeCatalog={homeCatalog} />
+            <FailedScreen run={load.run} classicHref={classicHref} askHref={askHref} catalog={catalog} homeCatalog={homeCatalog} />
           ) : (
             <ProgressScreen
               run={load.run}
@@ -512,7 +673,7 @@ function V4Debate({ id, catalog, homeCatalog, newDebateCatalog, billingCatalog, 
               locale={locale}
             />
           )}
-        </main>
+        </div>
       </div>
     );
   }
@@ -527,11 +688,19 @@ function V4Debate({ id, catalog, homeCatalog, newDebateCatalog, billingCatalog, 
   const roomNotice = room !== null && (room.room === "CLOSE" || room.room === "FULL" || room.room === "ALREADY_WAITING")
     ? <RoomNotice room={room} catalog={{ ...newDebateCatalog, ...billingCatalog }} locale={locale} />
     : null;
-  const phoneTarget = layout === "phone" ? targetOf(map, shownSelection) : null;
-  const showChanges = changes !== null && changes.length > 0 && !changesHidden;
+  const phoneTarget = layout === "phone" ? targetOf(map, digs, shownSelection) : null;
+  const showChanges = tourStops.length > hiddenStops;
 
   const rail = (variant: "column" | "strip") => (
-    <V4Rail runId={runId} openLeft={openLeft} digs={dugCounts} variant={variant} catalog={catalog} locale={locale} />
+    <V4Rail
+      runId={runId}
+      level={readingLevel}
+      openLeft={openLeft}
+      digs={dugCounts}
+      variant={variant}
+      catalog={catalog}
+      locale={locale}
+    />
   );
   const pieces = {
     map,
@@ -544,122 +713,130 @@ function V4Debate({ id, catalog, homeCatalog, newDebateCatalog, billingCatalog, 
     catalog
   } as const;
 
-  return (
-    <div className={`v4DebPage v4DebLayout-${layout}`}>
-      {header}
-      {layout === "mid" ? rail("strip") : null}
-      <main className="v4DebMain">
-        <h1 className="v4SrOnly" data-ai-generated="true">{map.question}</h1>
-        {parent !== null ? (
-          <Link className="v4DebBack" href={`/v4/debate/${encodeURIComponent(parent.runId)}`}>
-            <span aria-hidden="true">‹</span>{" "}
-            {parent.question === null ? (
-              t(catalog, "v4.debate.backToEarlier")
-            ) : (
-              <>
-                {t(catalog, "v4.debate.backTo")}{" "}
-                <span className="v4DebBackQuestion" data-ai-generated="true">{parent.question}</span>
-              </>
-            )}
-          </Link>
-        ) : null}
-        {showChanges ? (
-          <V4ChangesBar
-            changes={changes}
-            stops={tourStops.length}
-            tourIndex={tourIndex}
-            onTour={onTour}
-            onDismiss={() => {
-              setChangesHidden(true);
-              setTourIndex(null);
-            }}
-            catalog={catalog}
-            locale={locale}
-          />
-        ) : null}
-        {map.storyState === "WRITING" && !storyGaveUp ? (
-          <p className="v4DebNote v4Muted" role="status">{t(catalog, "v4.debate.storyWriting")}</p>
-        ) : null}
+  const tray = hasTray ? (
+    <section className="v4DebTray" aria-label={t(catalog, "v4.dig.trayLabel")}>
+      <p className="v4DebTrayText">
+        <strong>{tPlural(catalog, "v4.dig.trayPicked", pickedQuestions.length, locale)}</strong>
+        {" · "}
+        {t(catalog, `v4.digMode.${digMode}`)}
+      </p>
+      <div className="v4DebTrayActions">
+        <button
+          type="button"
+          className="v4Btn v4BtnPrimary"
+          disabled={digBusy}
+          onClick={() => startDig({ kind: "open", questions: pickedQuestions })}
+        >
+          {tPlural(catalog, "v4.dig.trayDig", pickedQuestions.length, locale)}
+        </button>
+        <button type="button" className="v4Link v4DebTrayClear" onClick={() => setPicked(new Set())}>
+          {t(catalog, "v4.dig.trayClear")}
+        </button>
+      </div>
+    </section>
+  ) : null;
 
-        <div className="v4DebGrid">
-          {layout === "desktop" ? <div className="v4DebRailCol">{rail("column")}</div> : null}
-          {layout !== "phone" ? (
-            <section className="v4DebMapCol" aria-label={t(catalog, "v4.debate.mapRegion")}>
-              <V4MapTree {...pieces} />
-            </section>
+  const toast = (
+    <V4DigToast
+      pending={pending}
+      onUndo={undoDig}
+      notice={notice}
+      onCloseNotice={() => setNotice(null)}
+      lifted={layout === "phone" || hasTray}
+      catalog={catalog}
+      locale={locale}
+    />
+  );
+
+  const pageClass = `v4DebPage v4DebLayout-${layout}${hasTray ? " v4DebHasTray" : ""}${sheetOpen ? " v4DebSheetOpen" : ""}`;
+  return (
+    <div className={pageClass}>
+      {/* UI-6: while the phone map is open, everything behind it is inert (the sheet is a real modal). */}
+      <div className="v4DebBehind" inert={sheetOpen}>
+        {header}
+        {layout === "mid" ? rail("strip") : null}
+        <div className="v4DebMain">
+          {/* The tab title follows this heading (DocumentTitle): the person's own words, not the added lines. */}
+          <h1 className="v4SrOnly" data-ai-generated="true">{ownWords(map.question)}</h1>
+          {parent !== null ? (
+            <Link className="v4DebBack" href={levelHref(`/v4/debate/${encodeURIComponent(parent.runId)}`, readingLevel)}>
+              <span aria-hidden="true">‹</span>{" "}
+              {t(catalog, "v4.debate.backTo")}{" "}
+              <span className="v4DebBackQuestion" data-ai-generated="true">{parent.question}</span>
+            </Link>
           ) : null}
-          <section className="v4DebPanelCol" aria-label={t(catalog, "v4.debate.panelRegion")}>
-            <V4Panel
-              map={map}
-              digs={digs}
-              selected={shownSelection}
-              readingLevel={readingLevel}
-              picked={picked}
-              onTogglePick={togglePick}
-              onSelect={select}
-              digMode={digMode}
-              onDigMode={setDigMode}
-              onDig={startDig}
-              digBusy={digBusy}
-              roomNotice={roomNotice}
-              headingRef={headingRef}
+          {showChanges ? (
+            <V4ChangesBar
+              stops={tourStops.length}
+              tourIndex={tourIndex}
+              onTour={onTour}
+              onDismiss={() => {
+                setHiddenStops(tourStops.length);
+                setTourIndex(null);
+              }}
               catalog={catalog}
               locale={locale}
             />
-          </section>
-        </div>
-      </main>
+          ) : null}
+          {map.storyState === "WRITING" ? (
+            <p className="v4DebNote v4Muted" role="status">{t(catalog, "v4.debate.storyWriting")}</p>
+          ) : null}
 
-      <div className={`v4DebDock${layout === "phone" ? " v4DebDockPhone" : ""}`}>
-        {pickedQuestions.length >= 2 ? (
-          <section className="v4DebTray" aria-label={t(catalog, "v4.dig.trayLabel")}>
-            <p className="v4DebTrayText">
-              <strong>{tPlural(catalog, "v4.dig.trayPicked", pickedQuestions.length, locale)}</strong>
-              {" · "}
-              {t(catalog, `v4.digMode.${digMode}`)}
-            </p>
-            <div className="v4DebTrayActions">
-              <button
-                type="button"
-                className="v4Btn v4BtnPrimary"
-                disabled={digBusy}
-                onClick={() => startDig({ kind: "open", questions: pickedQuestions })}
-              >
-                {tPlural(catalog, "v4.dig.trayDig", pickedQuestions.length, locale)}
-              </button>
-              <button type="button" className="v4Link v4DebTrayClear" onClick={() => setPicked(new Set())}>
-                {t(catalog, "v4.dig.trayClear")}
-              </button>
-            </div>
-          </section>
-        ) : null}
-        {layout === "phone" ? (
-          <PhoneBar
-            onMap={() => setOutlineOpen(true)}
-            target={phoneTarget}
-            onDig={startDig}
-            digBusy={digBusy}
-            catalog={catalog}
-          />
-        ) : null}
+          <div className="v4DebGrid">
+            {layout === "desktop" ? <div className="v4DebRailCol">{rail("column")}</div> : null}
+            {layout !== "phone" ? (
+              <section className="v4DebMapCol" aria-label={t(catalog, "v4.debate.mapRegion")}>
+                <V4MapTree {...pieces} />
+              </section>
+            ) : null}
+            <section ref={panelColRef} className="v4DebPanelCol" aria-label={t(catalog, "v4.debate.panelRegion")}>
+              <V4Panel
+                map={map}
+                digs={digs}
+                selected={shownSelection}
+                readingLevel={readingLevel}
+                picked={picked}
+                onTogglePick={togglePick}
+                onSelect={select}
+                digMode={digMode}
+                onDigMode={setDigMode}
+                onDig={startDig}
+                digBusy={digBusy}
+                roomNotice={roomNotice}
+                headingRef={headingRef}
+                catalog={catalog}
+                locale={locale}
+              />
+            </section>
+          </div>
+        </div>
       </div>
 
-      {layout === "phone" && outlineOpen ? (
-        <OutlineSheet onClose={() => setOutlineOpen(false)} catalog={catalog}>
+      {sheetOpen ? null : (
+        <div className={`v4DebDock${layout === "phone" ? " v4DebDockPhone" : ""}`}>
+          {tray}
+          {layout === "phone" ? (
+            <PhoneBar
+              onMap={() => setOutlineOpen(true)}
+              target={phoneTarget}
+              onDig={startDig}
+              digBusy={digBusy}
+              catalog={catalog}
+            />
+          ) : null}
+        </div>
+      )}
+
+      {sheetOpen ? (
+        <OutlineSheet
+          onClose={() => setOutlineOpen(false)}
+          footer={<>{tray}{toast}</>}
+          catalog={catalog}
+        >
           {rail("column")}
           <V4Outline {...pieces} />
         </OutlineSheet>
-      ) : null}
-
-      <V4DigToast
-        pending={pending}
-        onUndo={undoDig}
-        notice={notice}
-        onCloseNotice={() => setNotice(null)}
-        lifted={layout === "phone" || pickedQuestions.length >= 2}
-        catalog={catalog}
-        locale={locale}
-      />
+      ) : toast}
       {ask.dialogs}
     </div>
   );
@@ -667,9 +844,10 @@ function V4Debate({ id, catalog, homeCatalog, newDebateCatalog, billingCatalog, 
 
 // ── Screens before the map ──────────────────────────────────────────────────────────────────────────────────────
 
-function StatusScreen({ problem, onRetry, catalog }: Readonly<{
+function StatusScreen({ problem, onRetry, askHref, catalog }: Readonly<{
   problem: LoadProblem | null;
   onRetry: () => void;
+  askHref: string;
   catalog: MessageCatalog;
 }>) {
   if (problem === "NOT_FOUND") {
@@ -677,7 +855,7 @@ function StatusScreen({ problem, onRetry, catalog }: Readonly<{
       <section className="v4Card v4DebStatus">
         <h1 className="v4Serif v4DebStatusTitle">{t(catalog, "v4.debate.notFoundTitle")}</h1>
         <p className="v4Muted">{t(catalog, "v4.debate.notFoundBody")}</p>
-        <Link className="v4Btn" href="/v4">{t(catalog, "v4.debate.askNew")}</Link>
+        <Link className="v4Btn" href={askHref}>{t(catalog, "v4.debate.askNew")}</Link>
       </section>
     );
   }
@@ -693,26 +871,28 @@ function StatusScreen({ problem, onRetry, catalog }: Readonly<{
   return <p className="v4DebLoading v4Muted" role="status">{t(catalog, "v4.common.loading")}</p>;
 }
 
-function FailedScreen({ run, classicHref, catalog, homeCatalog }: Readonly<{
+function FailedScreen({ run, classicHref, askHref, catalog, homeCatalog }: Readonly<{
   run: RunProjection;
   classicHref: string;
+  askHref: string;
   catalog: MessageCatalog;
   homeCatalog: MessageCatalog;
 }>) {
   return (
     <section className="v4Card v4DebStatus">
       <p className="v4Eyebrow">{t(catalog, "v4.debate.yourQuestion")}</p>
-      <p className="v4Serif v4DebStatusQuestion" data-ai-generated="true">{run.question_line}</p>
+      <p className="v4Serif v4DebStatusQuestion" data-ai-generated="true">{ownWords(run.question_line)}</p>
       <h1 className="v4DebStatusTitle">{t(catalog, "v4.debate.failedTitle")}</h1>
       <p>{runFailureMessage(run.terminal_reason, homeCatalog)}</p>
       <div className="v4DebStatusActions">
-        <Link className="v4Btn v4BtnPrimary" href="/v4">{t(catalog, "v4.debate.askNew")}</Link>
+        <Link className="v4Btn v4BtnPrimary" href={askHref}>{t(catalog, "v4.debate.askNew")}</Link>
         <Link className="v4Link" href={classicHref}>{t(catalog, "v4.common.classicView")}</Link>
       </div>
     </section>
   );
 }
 
+/** RULES-4: QUEUED and CLAIMED say "Starting"; only a run that really waits for a spot says so. */
 function stateLine(run: RunProjection, catalog: MessageCatalog, locale: string): string {
   switch (run.state) {
     case "WAITING": {
@@ -748,7 +928,8 @@ function ProgressScreen({ run, startedAt, now, reconnecting, classicHref, catalo
   return (
     <section className="v4Card v4DebStatus v4DebProgress">
       <p className="v4Eyebrow">{t(catalog, "v4.debate.yourQuestion")}</p>
-      <h1 className="v4Serif v4DebStatusQuestion" data-ai-generated="true">{run.question_line}</h1>
+      {/* The person's own words (the tab title follows this heading); the added lines are not a title. */}
+      <h1 className="v4Serif v4DebStatusQuestion" data-ai-generated="true">{ownWords(run.question_line)}</h1>
       <p className="v4DebProgressState" role="status">
         <span className="v4DebPulse" aria-hidden="true" />
         {stateLine(run, catalog, locale)}
@@ -788,11 +969,17 @@ function PhoneBar({ onMap, target, onDig, digBusy, catalog }: Readonly<{
   );
 }
 
-function OutlineSheet({ onClose, catalog, children }: Readonly<{
+/**
+ * D7: the phone map, full screen. UI-6: a real modal — the page behind is inert, Tab stays inside, Escape closes, and
+ * the tray (and the dig note with its Undo) live inside it while it is open.
+ */
+function OutlineSheet({ onClose, footer, catalog, children }: Readonly<{
   onClose: () => void;
+  footer: ReactNode;
   catalog: MessageCatalog;
   children: ReactNode;
 }>) {
+  const sheetRef = useRef<HTMLDivElement | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -806,10 +993,32 @@ function OutlineSheet({ onClose, catalog, children }: Readonly<{
     if (event.key === "Escape") {
       event.stopPropagation();
       onClose();
+      return;
+    }
+    if (event.key !== "Tab" || sheetRef.current === null) return;
+    const items = [...sheetRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+      (item) => item.getClientRects().length > 0
+    );
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (first === undefined || last === undefined) return;
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
     }
   };
   return (
-    <div className="v4DebSheet" role="dialog" aria-modal="true" aria-labelledby="v4-deb-sheet-title" onKeyDown={onKeyDown}>
+    <div
+      ref={sheetRef}
+      className="v4DebSheet"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="v4-deb-sheet-title"
+      onKeyDown={onKeyDown}
+    >
       <div className="v4DebSheetHead">
         <h2 id="v4-deb-sheet-title" className="v4Serif v4DebSheetTitle">{t(catalog, "v4.debate.mapTitle")}</h2>
         <button
@@ -823,6 +1032,7 @@ function OutlineSheet({ onClose, catalog, children }: Readonly<{
         </button>
       </div>
       <div className="v4DebSheetBody">{children}</div>
+      <div className="v4DebSheetFoot">{footer}</div>
     </div>
   );
 }

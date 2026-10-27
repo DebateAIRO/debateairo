@@ -1,6 +1,7 @@
 "use client";
 
 import { t } from "@/lib/i18n/translate";
+import { ownWords } from "@/lib/v4/askText";
 import type { DigView, V4OpenQuestion, V4Selection } from "@/lib/v4/types";
 import {
   digNote,
@@ -14,6 +15,7 @@ import {
   resolveSelection,
   selectionIdOf,
   shortText,
+  TitleText,
   undugOpen,
   viaKeyboard,
   type MapPiecesProps
@@ -46,9 +48,9 @@ function OpenRow(props: Readonly<{ question: V4OpenQuestion; pieces: MapPiecesPr
         aria-current={selected ? "true" : undefined}
         onClick={(event) => pieces.onSelect(id, viaKeyboard(event))}
       >
-        <span className="v4OutTitle" data-ai-generated="true">
+        <span className="v4OutTitle">
           {question.star ? <span className="v4MapStar" aria-hidden="true">★ </span> : null}
-          {shortText(question.text)}
+          <span data-ai-generated="true">{shortText(question.text)}</span>
         </span>
         <span className="v4MapNote">
           {question.star ? `${t(pieces.catalog, "v4.map.starHint")} · ` : null}
@@ -74,7 +76,7 @@ function DigRow(props: Readonly<{ dig: DigView; pieces: MapPiecesProps; selected
         aria-current={selected ? "true" : undefined}
         onClick={(event) => pieces.onSelect(id, viaKeyboard(event))}
       >
-        <span className="v4OutTitle" data-ai-generated="true">{digTitle(dig, pieces.catalog)}</span>
+        <TitleText className="v4OutTitle" title={digTitle(dig, pieces.catalog)} catalog={pieces.catalog} />
         <span className="v4MapNote">
           {working ? <span className="v4MapPulse" aria-hidden="true" /> : null}
           {digNote(dig, pieces.catalog)}
@@ -122,7 +124,7 @@ export function V4Outline(props: MapPiecesProps) {
             aria-current={rootSelected ? "true" : undefined}
             onClick={(event) => props.onSelect("root", viaKeyboard(event))}
           >
-            <span className="v4OutRootTitle v4Serif" data-ai-generated="true">{shortText(map.question, 110)}</span>
+            <span className="v4OutRootTitle v4Serif" data-ai-generated="true">{shortText(ownWords(map.question), 110)}</span>
             {waiting > 0 ? <span className="v4MapRootChip">{t(catalog, "v4.map.openCount", { count: waiting })}</span> : null}
             {props.changed.has("root") ? <NewDot catalog={catalog} /> : null}
           </button>
@@ -148,7 +150,7 @@ export function V4Outline(props: MapPiecesProps) {
                         aria-current={selected ? "true" : undefined}
                         onClick={(event) => props.onSelect(id, viaKeyboard(event))}
                       >
-                        <span className="v4OutTitle" data-ai-generated="true">{pathTitle(path, catalog)}</span>
+                        <TitleText className="v4OutTitle" title={pathTitle(path, catalog)} catalog={catalog} />
                         <span className="v4OutMeta">
                           {path.fate !== null
                             ? <span className={`v4MapFate v4MapFate${path.fate}`}>{t(catalog, `v4.fate.${path.fate}`)}</span>

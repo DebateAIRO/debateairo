@@ -3,6 +3,8 @@
    question per screen with a pinned bottom bar (D6) and the map as a full-screen outline (D7). */
 
 .v4DebPage { min-height: 100vh; display: flex; flex-direction: column; }
+/* UI-6: the wrapper that turns inert behind the phone map; it adds no box of its own. */
+.v4DebBehind { display: contents; }
 .v4DebMain {
   flex: 1; width: 100%; max-width: 1600px; margin: 0 auto;
   padding: 16px var(--v4-gutter) 32px; display: flex; flex-direction: column; gap: 14px; min-width: 0;
@@ -64,15 +66,26 @@
 .v4DebLayout-desktop .v4DebPanelCol, .v4DebLayout-mid .v4DebPanelCol {
   position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; overscroll-behavior: contain;
 }
-/* Room for the pinned phone bar (and the tray above it) so the panel's end is never hidden. */
-.v4DebLayout-phone .v4DebMain { padding-bottom: calc(150px + var(--safe-b)); }
+/* UI-9: a desktop/mid tray floats over the bottom of the screen; leave room so the panel's end (the Dig button and the
+   room note) can scroll above it. */
+.v4DebHasTray:not(.v4DebLayout-phone) .v4DebPanelCol { padding-bottom: 96px; }
+.v4DebHasTray:not(.v4DebLayout-phone) .v4DebMain { padding-bottom: calc(110px + var(--safe-b)); }
+
+/* UI-1: the pinned phone bar (and the tray above it) must not hide the end of the page, the site footer or the cookie
+   bar. This page only: the shell gets room at the bottom and the cookie bar sits above the dock. */
+.appShell:has(.v4DebLayout-phone) { padding-bottom: calc(66px + var(--safe-b)); }
+.appShell:has(.v4DebLayout-phone.v4DebHasTray) { padding-bottom: calc(150px + var(--safe-b)); }
+.appShell:has(.v4DebLayout-phone) .consentBar { bottom: calc(78px + var(--safe-b)); }
+.appShell:has(.v4DebLayout-phone.v4DebHasTray) .consentBar { bottom: calc(162px + var(--safe-b)); }
+.appShell:has(.v4DebSheetOpen) { padding-bottom: 0; }
 
 /* ---------- the rail (when) ---------- */
 .v4DebRail { display: flex; flex-direction: column; gap: 18px; font-size: var(--t-ui); min-width: 0; }
 .v4DebRail p { margin: 0; }
 .v4DebRailSteps, .v4DebRailRounds { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .v4DebRailStep, .v4DebRailRounds li { display: flex; align-items: flex-start; gap: 10px; color: var(--text-2); }
-.v4DebRailStep .v4Link { min-height: 24px; }
+/* UI-8: the report step is a link; give it a full touch target. */
+.v4DebRailStep .v4Link { min-height: 44px; display: inline-flex; align-items: center; }
 .v4DebRailMark {
   flex: none; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px;
   border-radius: var(--r-dot); border: 1.5px solid var(--line-strong); font-size: var(--t-micro); font-weight: 700;
@@ -148,16 +161,22 @@
 .v4DebSheetClose { width: 44px; padding: 0; }
 .v4DebSheetBody {
   flex: 1; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 20px;
-  padding: 16px var(--v4-gutter) calc(150px + var(--safe-b));
+  padding: 16px var(--v4-gutter) 24px;
 }
-/* The tray stays usable over the sheet (D7 doubles as the tray). */
-.v4DebLayout-phone .v4DebDock { z-index: 57; }
+/* UI-6: the tray lives inside the sheet while it is open (D7 doubles as the tray), pinned under the outline. */
+.v4DebSheetFoot { flex: none; padding-bottom: var(--safe-b); background: var(--surface); }
+.v4DebSheetFoot:empty { display: none; }
+.v4DebSheetFoot .v4DebTray {
+  max-width: none; border-radius: 0; box-shadow: none; border-width: 1px 0 0;
+}
 
 /* ---------- the dig note ---------- */
 .v4DebToast { flex-wrap: wrap; }
 .v4DebToastText { min-width: 0; overflow-wrap: anywhere; }
 .v4DebToastMode { color: var(--gold-bg); }
 .v4DebToastLifted { bottom: calc(150px + var(--safe-b)); }
+/* The phone bar is hidden while the map is open; the note then sits just above the sheet's tray. */
+.v4DebSheetOpen .v4DebToastLifted { bottom: calc(96px + var(--safe-b)); }
 @media (min-width: 768px) {
   .v4DebToastLifted { bottom: calc(96px + var(--safe-b)); }
 }

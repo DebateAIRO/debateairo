@@ -12,7 +12,7 @@ export type TrustCounts = Readonly<Record<TrustWord, number>>;
 
 /**
  * Why a point carries its word. V3 has no sources, so the words are worked out from the second AI's review, how the
- * point is known, how fresh it is and whether another point answered it (lib/v4/trust.ts). Each basis has its own
+ * point is known, how fresh it is and whether its story path fell (lib/v4/trust.ts). Each basis has its own
  * plain line in the v4 catalogue ("v4.basis.<BASIS>").
  */
 export const TRUST_BASES = [
@@ -21,7 +21,10 @@ export const TRUST_BASES = [
   "AGREED_BUT_DATED",
   "DISPUTED",
   "COULD_NOT_CHECK",
-  "ANSWERED"
+  /** Not produced tonight (Decision B: no edge or defeater rule yet); kept so existing key tables stay whole. */
+  "ANSWERED",
+  /** Decision B (fix wave 1): the position of a story path whose fate is FELL. */
+  "FELL"
 ] as const;
 export type TrustBasis = (typeof TRUST_BASES)[number];
 
@@ -92,6 +95,13 @@ export type V4Map = Readonly<{
   wouldChange: string | null;
   objections: readonly string[];
   storyState: "READY" | "WRITING" | "UNAVAILABLE";
+  /**
+   * DATA-2: the whole composed answer (V3's toStoryView fallback), set only when there is no ready story body, so the
+   * page still has the answer to show while the story is missing or being written. AI text.
+   */
+  fallbackText: string | null;
+  /** RULES-1: the story is READY_WITH_RESERVATION with a body (parts of the summary could not be double-checked). */
+  reservation: boolean;
 }>;
 
 /** Row D / sieve 2026-10-26: the reading level is chosen once; ids follow the D1 prototype's three choices. */
@@ -103,8 +113,9 @@ export const DIG_MODES = ["quick", "thorough"] as const;
 export type DigMode = (typeof DIG_MODES)[number];
 
 /**
- * V4 initial: a dig is a follow-up debate started from an open question. The link from the question to the new debate
- * is kept in this browser only (lib/v4/storage.ts); the API has no link field yet.
+ * V4 initial: a dig is a follow-up debate started from an open question. Fix wave 1 (Decision A): nothing is stored in
+ * the browser; links are kept in memory for this visit and found again from the account's question list by text
+ * (lib/v4/digIndex.ts). The API has no link field yet.
  */
 export type DigLink = Readonly<{
   parentRunId: string;
@@ -113,8 +124,10 @@ export type DigLink = Readonly<{
   openQuestionIds: readonly string[];
   /** The questions as shown when the dig started (AI text). */
   questions: readonly string[];
-  mode: DigMode;
-  startedAt: string;
+  /** null: unknown (a dig found again from the account's question list). */
+  mode: DigMode | null;
+  /** ISO time; null when unknown (a dig found again from the account's question list). */
+  startedAt: string | null;
 }>;
 
 /** D2 "How we read your question": the optional parts a person may set. Every part is optional and starts unset. */
@@ -146,10 +159,10 @@ export const EMPTY_GOAL: V4Goal = Object.freeze({
   angles: Object.freeze([])
 });
 
-/** What this browser saw last time, per item id: the item's word (a trust word, a fate or a dig state). */
+/** What the page saw earlier in this visit, per item id: the item's word (a trust word, a fate or a dig state). Kept in memory only. */
 export type SeenSnapshot = Readonly<{ at: string; items: Readonly<Record<string, string>> }>;
 
-/** D4 "back after a round": what changed since the last visit. */
+/** D4: what changed while the person was on the page (fix wave 1: "while you were here", in memory only). */
 export type V4Change = Readonly<{
   id: string;
   kind: "ADDED" | "CHANGED";

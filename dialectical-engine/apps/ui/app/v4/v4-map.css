@@ -65,6 +65,10 @@
   min-height: 80px;
 }
 .v4MapRoot .v4BarSure { background: var(--surface); }
+/* UI-12: on the dark card the softer-ink and outline segments need 3:1 against --ink in both modes; a surface/ink mix
+   stays apart from Sure (surface) and the --con-border outline keeps Didn't hold in the accent family. */
+.v4MapRoot .v4BarCase { background: color-mix(in srgb, var(--surface) 60%, var(--ink)); }
+.v4MapRoot .v4BarFell { box-shadow: inset 0 0 0 1.5px var(--con-border); }
 .v4MapRoot .v4BarEmpty { border-color: var(--text-3); }
 .v4MapRoot .v4MapNew { color: var(--gold-bg); }
 .v4MapRootTitle {
@@ -201,6 +205,17 @@
 }
 .v4PanelText { margin: 0; }
 .v4PanelHeadline { margin: 0 0 6px; font-size: 18px; line-height: 1.35; }
+.v4PanelFallback { display: flex; flex-direction: column; gap: 8px; }
+/* "What we asked the AIs": the full question as sent, with the lines added from the person's choices. */
+.v4PanelSent { border: 1px solid var(--line-2); border-radius: var(--r-card); background: var(--surface); }
+.v4PanelSent > summary {
+  cursor: pointer; font-size: var(--t-ui); font-weight: 600; color: var(--text-2); padding: 10px 14px; min-height: 44px;
+  display: flex; align-items: center;
+}
+.v4PanelSent > summary::-webkit-details-marker { display: none; }
+.v4PanelSent > summary::before { content: "▸"; margin-right: 8px; color: var(--text-3); }
+.v4PanelSent[open] > summary::before { content: "▾"; }
+.v4PanelSentText { margin: 0; padding: 0 14px 12px; white-space: pre-wrap; font-size: var(--t-ui); color: var(--text); }
 .v4PanelHint { margin: 0; font-size: var(--t-ui); }
 .v4PanelBar { display: flex; }
 .v4PanelGroups { display: flex; flex-direction: column; gap: 8px; }

@@ -2,7 +2,8 @@
 
 import { useState, type MouseEvent } from "react";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
-import { findOpenQuestion, openQuestionsOf } from "@/lib/v4/mapModel";
+import { ownWords } from "@/lib/v4/askText";
+import { findOpenQuestion, uniqueOpenQuestions } from "@/lib/v4/mapModel";
 import type { DigView, V4Map, V4OpenQuestion, V4Path, V4Selection } from "@/lib/v4/types";
 import { V4TrustBar } from "./V4TrustBar";
 
@@ -84,13 +85,28 @@ export function undugOpen(list: readonly V4OpenQuestion[], digs: readonly DigVie
   return [...open.filter((question) => question.star), ...open.filter((question) => !question.star)];
 }
 
-/** Every open question on the map; how many are still waiting for a dig. */
+/** How many open questions are still waiting for a dig; a point argued under two paths counts once (FIT-2). */
 export function openCount(map: V4Map, digs: readonly DigView[]): number {
-  return undugOpen(openQuestionsOf(map), digs).length;
+  return undugOpen(uniqueOpenQuestions(map), digs).length;
 }
 
+/** Does this dig come from the open questions of this group (a path, or the question's own list when null)? */
+function digLivesIn(map: V4Map, dig: DigView, pathId: string | null): boolean {
+  const list = pathId === null ? map.open : map.paths.find((path) => path.id === pathId)?.open ?? [];
+  return dig.link.openQuestionIds.some((id) => (pathId !== null && id === `path:${pathId}`) || list.some((question) => question.id === id));
+}
+
+/**
+ * The digs shown under one group. FIT-9: a dig shows under every group that holds one of its questions, so a point
+ * argued under two paths keeps its dig card under both (its open card is hidden under both). A dig whose questions are
+ * nowhere on the map any more hangs where digHome puts it.
+ */
 export function digsUnder(map: V4Map, digs: readonly DigView[], pathId: string | null): readonly DigView[] {
-  return digs.filter((dig) => (digHome(map, dig).path?.id ?? null) === pathId);
+  return digs.filter((dig) => {
+    if (digLivesIn(map, dig, pathId)) return true;
+    const anywhere = digLivesIn(map, dig, null) || map.paths.some((path) => digLivesIn(map, dig, path.id));
+    return !anywhere && (digHome(map, dig).path?.id ?? null) === pathId;
+  });
 }
 
 /** A click that came from the keyboard (Enter or Space on a button) has no pointer detail. */
@@ -152,16 +168,34 @@ export function digNote(dig: DigView, catalog: MessageCatalog): string {
   return t(catalog, "v4.map.digging");
 }
 
+/**
+ * A title made of AI text, or the site's own words when there is none. RULES-14: only `ai` text is marked
+ * data-ai-generated; `more` (picked together) is the site's "and N more" tail, shown outside the AI mark.
+ */
+export type Title = Readonly<{ text: string; ai: boolean; more: number }>;
+
 /** The question a dig was started from (several when picked together: the first, and how many more). */
-export function digTitle(dig: DigView, catalog: MessageCatalog, max = 70): string {
+export function digTitle(dig: DigView, catalog: MessageCatalog, max = 70): Title {
   const [first, ...rest] = dig.link.questions;
-  if (first === undefined || first.trim().length === 0) return t(catalog, "v4.map.digUntitled");
-  const title = shortText(first, max);
-  return rest.length > 0 ? t(catalog, "v4.map.digMore", { question: title, count: rest.length }) : title;
+  if (first === undefined || first.trim().length === 0) return { text: t(catalog, "v4.map.digUntitled"), ai: false, more: 0 };
+  return { text: shortText(first, max), ai: true, more: rest.filter((question) => question.trim().length > 0).length };
 }
 
-export function pathTitle(path: V4Path, catalog: MessageCatalog, max = 70): string {
-  return path.line.trim().length > 0 ? shortText(path.line, max) : t(catalog, "v4.map.pathUntitled");
+export function pathTitle(path: V4Path, catalog: MessageCatalog, max = 70): Title {
+  return path.line.trim().length > 0
+    ? { text: shortText(path.line, max), ai: true, more: 0 }
+    : { text: t(catalog, "v4.map.pathUntitled"), ai: false, more: 0 };
+}
+
+/** Renders a Title: the AI part marked, the site's words not (RULES-14). */
+export function TitleText(props: Readonly<{ title: Title; catalog: MessageCatalog; className?: string }>) {
+  const { title, catalog } = props;
+  return (
+    <span className={props.className}>
+      <span data-ai-generated={title.ai ? "true" : undefined}>{title.text}</span>
+      {title.more > 0 ? <> {t(catalog, "v4.map.digMoreTail", { count: title.more })}</> : null}
+    </span>
+  );
 }
 
 function OpenCard(props: Readonly<{
@@ -206,7 +240,7 @@ function DigCard(props: Readonly<{ dig: DigView; pieces: MapPiecesProps; selecte
       aria-current={selected ? "true" : undefined}
       onClick={(event) => pieces.onSelect(id, viaKeyboard(event))}
     >
-      <span className="v4MapDigTitle" data-ai-generated="true">{digTitle(dig, pieces.catalog)}</span>
+      <TitleText className="v4MapDigTitle" title={digTitle(dig, pieces.catalog)} catalog={pieces.catalog} />
       <span className="v4MapNote">
         {working ? <span className="v4MapPulse" aria-hidden="true" /> : null}
         {digNote(dig, pieces.catalog)}
@@ -287,7 +321,7 @@ export function V4MapTree(props: MapPiecesProps) {
                 aria-current={rootSelected ? "true" : undefined}
                 onClick={(event) => props.onSelect("root", viaKeyboard(event))}
               >
-                <span className="v4MapRootTitle v4Serif" data-ai-generated="true">{shortText(map.question, 110)}</span>
+                <span className="v4MapRootTitle v4Serif" data-ai-generated="true">{shortText(ownWords(map.question), 110)}</span>
                 <V4TrustBar counts={map.counts} unchecked={map.unchecked} catalog={catalog} />
                 {waiting > 0
                   ? <span className="v4MapRootChip">{t(catalog, "v4.map.openCount", { count: waiting })}</span>
@@ -321,7 +355,7 @@ export function V4MapTree(props: MapPiecesProps) {
                           aria-current={selected ? "true" : undefined}
                           onClick={(event) => props.onSelect(id, viaKeyboard(event))}
                         >
-                          <span className="v4MapPathTitle" data-ai-generated="true">{pathTitle(path, catalog)}</span>
+                          <TitleText className="v4MapPathTitle" title={pathTitle(path, catalog)} catalog={catalog} />
                           {path.fate !== null
                             ? <span className={`v4MapFate v4MapFate${path.fate}`}>{t(catalog, `v4.fate.${path.fate}`)}</span>
                             : null}

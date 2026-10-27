@@ -49,6 +49,23 @@
 .v4RepList { padding-left: 22px; display: flex; flex-direction: column; gap: 8px; line-height: 1.6; }
 .v4RepNote { color: var(--text-2); font-size: var(--t-ui); }
 
+/* "What we asked the AIs": the full text sent, shown only when the person's choices added lines to their question. */
+.v4RepSent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: -16px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-card);
+  background: var(--surface-2);
+}
+.v4RepSentLabel { margin: 0; font-weight: 500; color: var(--text-3); }
+.v4RepSentText { white-space: pre-wrap; font-size: var(--t-ui); line-height: 1.55; color: var(--text-2); }
+
+/* DATA-2: the whole composed answer when no short answer was written. */
+.v4RepFallback { display: flex; flex-direction: column; gap: 12px; }
+
 /* "The answer": the one card on the page, as in the prototype's "Our best answer". */
 .v4RepAnswer {
   background: var(--surface);
@@ -150,6 +167,9 @@
   body:has(.v4RepDoc) .newVersionNote,
   body:has(.v4RepDoc) .siteFooterLine,
   body:has(.v4RepDoc) .siteFooterFull,
+  body:has(.v4RepDoc) .consentBar,
+  body:has(.v4RepDoc) .consentScrim,
+  body:has(.v4RepDoc) .consentCard,
   .v4RepChrome,
   .v4RepNoPrint { display: none !important; }
   body:has(.v4RepDoc) { background: var(--qr-paper); }
@@ -164,7 +184,8 @@
   }
   .v4RepDoc { width: 100%; max-width: none; padding: 0; gap: 24px; font-size: 11pt; }
   .v4RepPrintBrand { display: block; font-family: var(--font-display); font-size: 10pt; }
-  .v4RepAnswer, .v4RepDig { box-shadow: none; background: none; border-radius: 0; }
+  .v4RepAnswer, .v4RepDig, .v4RepSent { box-shadow: none; background: none; border-radius: 0; }
+  .v4RepSent { margin-top: 0; border: 0; border-left: 2px solid var(--qr-ink); padding: 0 0 0 12px; }
   .v4RepAnswer { border: 1px solid var(--qr-ink); }
   .v4RepDig { border: 0; border-left: 2px solid var(--qr-ink); padding: 0 0 0 12px; }
   .v4RepH2, .v4RepH3 { break-after: avoid; }

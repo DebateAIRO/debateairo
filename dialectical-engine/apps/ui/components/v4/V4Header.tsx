@@ -1,15 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
 import { contractClient } from "@/lib/api";
 import { readBillingUsage } from "@/lib/billing/usage";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { levelHref } from "@/lib/v4/storage";
 import { READING_LEVELS, type ReadingLevel } from "@/lib/v4/types";
 
 /*
  * V4 initial (spec "/v4", header everywhere): brand + badge to /v4, the reading level as a small menu (changing it
- * saves it, through the page's onReadingLevel), the classic-view link and the page's own extras. Today's allowance is
+ * saves it, through the page's onReadingLevel; the level lives in the address, FIXES Decision A), the classic-view
+ * link and the page's own extras. Today's allowance is
  * shown only as "N% used" (no prices, no other numbers) and only when the usage read succeeds.
  */
 
@@ -60,6 +62,13 @@ function ReadingLevelMenu({ catalog, level, onLevel }: Readonly<{
     toggle.current?.focus();
   }
 
+  // UI-11: keyboard focus moving outside the menu closes it, like a click outside. A blur with no new target is left
+  // to the mousedown handler: Safari blurs without focusing the option being clicked, and closing then would lose it.
+  function onBlur(event: FocusEvent<HTMLDivElement>) {
+    const next = event.relatedTarget;
+    if (open && next instanceof Node && root.current !== null && !root.current.contains(next)) setOpen(false);
+  }
+
   function choose(next: ReadingLevel) {
     onLevel(next);
     setOpen(false);
@@ -67,7 +76,7 @@ function ReadingLevelMenu({ catalog, level, onLevel }: Readonly<{
   }
 
   return (
-    <div className="v4HdrLevel" ref={root} onKeyDown={onKeyDown}>
+    <div className="v4HdrLevel" ref={root} onKeyDown={onKeyDown} onBlur={onBlur}>
       <button
         ref={toggle}
         type="button"
@@ -112,7 +121,7 @@ export function V4Header({ catalog, readingLevel, onReadingLevel, classicHref = 
   const dayPercent = useDayPercent();
   return (
     <header className="v4Hdr">
-      <Link href="/v4" className="v4HdrBrand">
+      <Link href={levelHref("/v4", readingLevel)} className="v4HdrBrand">
         <span className="v4HdrMark" aria-hidden="true" />
         <span className="v4HdrName">Dialectical Engine</span>
         <span className="v4HdrBadge">{t(catalog, "v4.brand.badge")}</span>

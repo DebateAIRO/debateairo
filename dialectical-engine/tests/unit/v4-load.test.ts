@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ContractHttpError, type Answer, type AnswerStory, type RunProjection } from "@debateai/contract";
 import { STORY_FIXTURE_ANSWER, storyFixture } from "../../apps/ui/lib/v3/storyFixture.js";
-import { loadDigView, loadStory, loadV4 } from "../../apps/ui/lib/v4/load.js";
+import { loadDigView, loadStory, loadV4, storyReadFailed, unreadableStory } from "../../apps/ui/lib/v4/load.js";
 import type { DigLink } from "../../apps/ui/lib/v4/types.js";
 
 /** V4 initial (2026-10-28): every branch of the V4 reads, over a small fake client. */
@@ -47,11 +47,37 @@ function fakeClient(replies: Readonly<{
 }
 
 describe("loadStory", () => {
-  it("returns the story, null on 404, and throws other failures", async () => {
+  it("returns the story as read", async () => {
     const story = storyFixture("READY");
     expect(await loadStory("a", fakeClient({ story }))).toBe(story);
-    expect(await loadStory("a", fakeClient({ story: notFound() }))).toBeNull();
-    await expect(loadStory("a", fakeClient({ story: new ContractHttpError("SERVER_FAILURE", 500, "boom") }))).rejects.toThrow("boom");
+  });
+
+  it("turns 404, SESSION_REQUIRED and FORBIDDEN into V3's final UNAVAILABLE record, never null (DATA-3)", async () => {
+    const cases = [
+      [notFound(), "STORY_NOT_FOUND"],
+      [new ContractHttpError("SESSION_REQUIRED", 401, "sign in"), "STORY_SESSION_REQUIRED"],
+      [new ContractHttpError("FORBIDDEN", 403, "no"), "STORY_FORBIDDEN"]
+    ] as const;
+    for (const [failure, reason] of cases) {
+      const story = await loadStory("a", fakeClient({ story: failure }), 3);
+      expect(story).toEqual(unreadableStory("a", 3, reason));
+      expect(storyReadFailed(story)).toBe(false);
+    }
+  });
+
+  it("turns any other failure into a passing STORY_READ_FAILED record the page tries again (DATA-10)", async () => {
+    for (const failure of [new ContractHttpError("SERVER_FAILURE", 500, "boom"), new Error("offline")]) {
+      const story = await loadStory("a", fakeClient({ story: failure }));
+      expect(story).toEqual(unreadableStory("a", 1, "STORY_READ_FAILED"));
+      expect(storyReadFailed(story)).toBe(true);
+    }
+    const throwsAtOnce = { readAnswerStory: (): Promise<AnswerStory> => { throw new Error("sync"); } };
+    expect((await loadStory("a", throwsAtOnce)).unavailable_reason).toBe("STORY_READ_FAILED");
+  });
+
+  it("counts the server's own STORY_UNREADABLE answer as a failed read", async () => {
+    const server = unreadableStory("a", 1, "STORY_UNREADABLE");
+    expect(storyReadFailed(await loadStory("a", fakeClient({ story: server })))).toBe(true);
   });
 });
 
@@ -71,9 +97,18 @@ describe("loadV4", () => {
     expect(client.calls).toEqual([`readRun:${RUN_ID}`, `readRunAnswer:${RUN_ID}`, `readAnswerStory:${ANSWER.answer_id}`]);
   });
 
-  it("serves with a null story when the story read is 404", async () => {
-    const loaded = await loadV4(RUN_ID, fakeClient({ run: run("SETTLED"), runAnswer: ANSWER, story: notFound() }));
-    expect(loaded).toMatchObject({ kind: "SERVED", story: null });
+  it("serves with V3's UNAVAILABLE record when the story read is 404, labelled with the answer's version", async () => {
+    const answer: Answer = { ...ANSWER, answer_version: 2 };
+    const loaded = await loadV4(RUN_ID, fakeClient({ run: run("SETTLED"), runAnswer: answer, story: notFound() }));
+    expect(loaded).toEqual({ kind: "SERVED", runId: RUN_ID, answer, story: unreadableStory(answer.answer_id, 2, "STORY_NOT_FOUND") });
+  });
+
+  it("never hides an answer already read when the story read fails (DATA-10/TIME-5)", async () => {
+    const boom = new ContractHttpError("SERVER_FAILURE", 500, "boom");
+    const served = await loadV4(RUN_ID, fakeClient({ run: run("SETTLED"), runAnswer: ANSWER, story: boom }));
+    expect(served).toMatchObject({ kind: "SERVED", answer: ANSWER, story: { status: "UNAVAILABLE", unavailable_reason: "STORY_READ_FAILED" } });
+    const byAnswerId = await loadV4(ANSWER.answer_id, fakeClient({ run: notFound(), answer: ANSWER, story: boom }));
+    expect(byAnswerId).toMatchObject({ kind: "SERVED", runId: RUN_ID, story: { unavailable_reason: "STORY_READ_FAILED" } });
   });
 
   it("treats a settled run without a readable answer as still finishing", async () => {
@@ -102,7 +137,8 @@ describe("loadDigView", () => {
   };
 
   it("maps every unfinished run state to its dig state", async () => {
-    const expected = { QUEUED: "WAITING", WAITING: "WAITING", CLAIMED: "RUNNING", RUNNING: "RUNNING", HOLDING: "RUNNING", FAILED: "FAILED" } as const;
+    // RULES-4: only a real wait for a free spot says WAITING; a queued follow-up is starting.
+    const expected = { QUEUED: "RUNNING", WAITING: "WAITING", CLAIMED: "RUNNING", RUNNING: "RUNNING", HOLDING: "RUNNING", FAILED: "FAILED" } as const;
     for (const [state, digState] of Object.entries(expected)) {
       const view = await loadDigView(link, fakeClient({ run: run(state as RunProjection["state"]) }));
       expect(view).toEqual({ link, state: digState, headline: null, counts: null });
@@ -122,14 +158,21 @@ describe("loadDigView", () => {
     const view = await loadDigView(link, fakeClient({ run: run("SETTLED"), runAnswer: ANSWER, story }));
     expect(view).toEqual({
       link, state: "DONE", headline: story.story!.short.headline,
-      counts: { SURE: 2, SURE_FOR_CASE: 3, STILL_ARGUED: 2, DIDNT_HOLD: 0 }
+      counts: { SURE: 2, SURE_FOR_CASE: 3, STILL_ARGUED: 1, DIDNT_HOLD: 1 }
     });
   });
 
-  it("is DONE without a headline while the follow-up's story is not written", async () => {
-    const view = await loadDigView(link, fakeClient({ run: run("SETTLED"), runAnswer: ANSWER, story: notFound() }));
-    expect(view).toMatchObject({ state: "DONE", headline: null });
-    expect(view.counts).not.toBeNull();
+  it("is DONE without a headline while the follow-up's story is not written or cannot be read", async () => {
+    for (const story of [storyFixture("WRITING"), notFound(), new ContractHttpError("SERVER_FAILURE", 500, "boom")]) {
+      const view = await loadDigView(link, fakeClient({ run: run("SETTLED"), runAnswer: ANSWER, story }));
+      expect(view).toMatchObject({ state: "DONE", headline: null });
+      expect(view.counts).not.toBeNull();
+    }
+  });
+
+  it("works for a dig found again from the account list (mode and start unknown)", async () => {
+    const found: DigLink = { ...link, mode: null, startedAt: null };
+    expect(await loadDigView(found, fakeClient({ run: run("RUNNING") }))).toEqual({ link: found, state: "RUNNING", headline: null, counts: null });
   });
 
   it("throws failures other than 404", async () => {

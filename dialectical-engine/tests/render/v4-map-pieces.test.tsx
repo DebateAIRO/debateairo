@@ -3,7 +3,7 @@
 import { createRef } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { V4MapTree } from "../../apps/ui/components/v4/V4MapTree.js";
+import { openCount, V4MapTree } from "../../apps/ui/components/v4/V4MapTree.js";
 import { V4Outline } from "../../apps/ui/components/v4/V4Outline.js";
 import { V4Panel } from "../../apps/ui/components/v4/V4Panel.js";
 import { V4TrustBar } from "../../apps/ui/components/v4/V4TrustBar.js";
@@ -102,7 +102,9 @@ function buildMap(): V4Map {
     unchecked: 1,
     wouldChange: "Open question w",
     objections: ["Open question o:0"],
-    storyState: "READY"
+    storyState: "READY",
+    fallbackText: null,
+    reservation: false
   };
 }
 
@@ -203,7 +205,7 @@ describe("V4 map tree", () => {
 
   it("cuts long titles at a word boundary and keeps AI text marked", () => {
     const root = tree(buildMap(), "root");
-    const title = root.querySelector(".v4MapPathTitle")!;
+    const title = root.querySelector(".v4MapPathTitle [data-ai-generated]")!;
     expect(title.getAttribute("data-ai-generated")).toBe("true");
     expect(title.textContent!.endsWith("…")).toBe(true);
     expect(title.textContent!.length).toBeLessThanOrEqual(71);
@@ -308,7 +310,7 @@ describe("V4 panel", () => {
     const done = panel(buildMap(), "dig:c-done", "plain");
     expect(done.querySelector("h2")?.textContent).toBe("Dig question c-done");
     expect(done.textContent).toContain("Headline c-done");
-    expect(done.querySelector('a[href="/v4/debate/c-done"]')).not.toBeNull();
+    expect(done.querySelector('a[href="/v4/debate/c-done?level=plain"]')).not.toBeNull();
     expect(done.querySelector(".v4PanelDigBtn")).toBeNull();
     const gone = panel(buildMap(), "dig:missing", "plain");
     expect(gone.querySelector("h2")?.textContent).toBe("Should we do the thing?");
@@ -320,5 +322,93 @@ describe("V4 panel", () => {
     expect(root.querySelectorAll("details")).toHaveLength(0);
     expect(root.textContent).toContain(t(catalog, "v4.panel.storyWriting"));
     expect(root.textContent).toContain(t(catalog, "v4.panel.noOpenRoot"));
+  });
+});
+
+describe("V4 map pieces, fix wave 1", () => {
+  // A point still argued under two paths (FIT-2 / FIT-9).
+  function sharedMap(): V4Map {
+    const base = buildMap();
+    const shared = open("p:s1", "a");
+    const paths = base.paths.map((candidate) =>
+      candidate.id === "a" ? { ...candidate, open: [shared] } : candidate.id === "d" ? { ...candidate, open: [{ ...shared, pathId: "d" }] } : candidate
+    );
+    return { ...base, paths, open: [open("w", null, "WOULD_CHANGE", true)] };
+  }
+
+  it("counts a point argued under two paths once, and shows its dig under both paths", () => {
+    const map = sharedMap();
+    expect(openCount(map, [])).toBe(2);
+    const shownDigs = [dig("c-s1", "RUNNING", ["p:s1"])];
+    expect(openCount(map, shownDigs)).toBe(1);
+    const root = tree(map, "root", { digs: shownDigs });
+    const branches = root.querySelectorAll(".v4MapBranch");
+    expect(branches[0]!.querySelectorAll(".v4MapDig")).toHaveLength(1);
+    expect(branches[3]!.querySelectorAll(".v4MapDig")).toHaveLength(1);
+    expect(root.querySelectorAll(".v4MapOpenTitle")).toHaveLength(1);
+  });
+
+  it("marks only AI text as AI-written: untitled fallbacks and the 'and N more' tail are the site's words", () => {
+    const base = buildMap();
+    const map: V4Map = { ...base, paths: [path("x", { line: "  " }), ...base.paths.slice(1)] };
+    const together: DigView = { ...dig("c-two", "RUNNING", ["w"]), link: { ...dig("c-two", "RUNNING", ["w"]).link, questions: ["First asked", "Second asked"] } };
+    const untitled: DigView = { ...dig("c-none", "RUNNING", ["w"]), link: { ...dig("c-none", "RUNNING", ["w"]).link, questions: [] } };
+    const root = tree(map, "root", { digs: [together, untitled] });
+    const pathTitle = root.querySelector(".v4MapPathTitle")!;
+    expect(pathTitle.textContent).toBe(t(catalog, "v4.map.pathUntitled"));
+    expect(pathTitle.querySelector("[data-ai-generated]")).toBeNull();
+    const digTitles = [...root.querySelectorAll(".v4MapDigTitle")];
+    expect(digTitles[0]!.querySelector('[data-ai-generated="true"]')?.textContent).toBe("First asked");
+    expect(digTitles[0]!.textContent).toContain(t(catalog, "v4.map.digMoreTail", { count: 1 }));
+    expect(digTitles[1]!.querySelector("[data-ai-generated]")).toBeNull();
+    const heading = panel(map, "dig:c-none", "plain", { digs: [untitled] }).querySelector("h2")!;
+    expect(heading.textContent).toBe(t(catalog, "v4.map.digUntitled"));
+    expect(heading.hasAttribute("data-ai-generated")).toBe(false);
+  });
+
+  it("shows the whole answer while the short one is missing, with a small note under it", () => {
+    const map: V4Map = { ...buildMap(), headline: null, summary: null, storyState: "WRITING", fallbackText: "First part.\n\nSecond part." };
+    const root = panel(map, "root", "plain");
+    const fallback = root.querySelector('.v4PanelFallback[data-ai-generated="true"]')!;
+    expect([...fallback.querySelectorAll("p")].map((p) => p.textContent)).toEqual(["First part.", "Second part."]);
+    expect(root.textContent).toContain(t(catalog, "v4.panel.fallbackWriting"));
+    expect(root.textContent).not.toContain(t(catalog, "v4.panel.storyWriting"));
+    const gone = panel({ ...map, storyState: "UNAVAILABLE" }, "root", "plain");
+    expect(gone.textContent).toContain(t(catalog, "v4.panel.fallbackMissing"));
+  });
+
+  it("adds the reservation line, outside the AI text, when the story carries one", () => {
+    const root = panel({ ...buildMap(), reservation: true }, "root", "plain");
+    const note = [...root.querySelectorAll(".v4PanelHint")].find((element) => element.textContent === t(catalog, "v4.story.reservation"));
+    expect(note).toBeDefined();
+    expect(note!.closest("[data-ai-generated]")).toBeNull();
+    expect(panel(buildMap(), "root", "plain").textContent).not.toContain(t(catalog, "v4.story.reservation"));
+  });
+
+  it("explains a point that did not hold because its answer fell", () => {
+    const fell = point("f1", "DIDNT_HOLD", { basis: "FELL", answeredBy: null });
+    const map: V4Map = { ...buildMap(), points: [fell], counts: counts(0, 0, 0, 1), unchecked: 0 };
+    const root = panel(map, "root", "expert");
+    expect(root.textContent).toContain(t(catalog, "v4.basis.FELL"));
+    expect(root.textContent).not.toContain(t(catalog, "v4.panel.answeredBy"));
+  });
+
+  it("titles the question with the person's own words and keeps the full text sent in a closed fold", () => {
+    const question = "Should we do the thing?\n\nThis is for Romania.\nThe time frame is the next 5 years.";
+    const map: V4Map = { ...buildMap(), question };
+    const root = panel(map, "root", "plain");
+    expect(root.querySelector("h2")?.textContent).toBe("Should we do the thing?");
+    const sent = root.querySelector("details.v4PanelSent")!;
+    expect(sent.hasAttribute("open")).toBe(false);
+    expect(sent.querySelector("summary")?.textContent).toBe(t(catalog, "v4.panel.sentHeading"));
+    expect(sent.querySelector('[data-ai-generated="true"]')?.textContent).toBe(question);
+    expect(tree(map, "root").querySelector(".v4MapRootTitle")?.textContent).toBe("Should we do the thing?");
+    expect(panel(buildMap(), "root", "plain").querySelector("details.v4PanelSent")).toBeNull();
+  });
+
+  it("names a dig's mode only when it is known", () => {
+    const found: DigView = { ...dig("c-found", "RUNNING", ["w"]), link: { ...dig("c-found", "RUNNING", ["w"]).link, mode: null, startedAt: null } };
+    expect(panel(buildMap(), "dig:c-found", "plain", { digs: [found] }).querySelector(".v4PanelModeTag")).toBeNull();
+    expect(panel(buildMap(), "dig:c-run", "plain").querySelector(".v4PanelModeTag")?.textContent).toBe(t(catalog, "v4.digMode.quick"));
   });
 });

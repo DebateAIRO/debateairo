@@ -127,12 +127,12 @@
 .v4AskAngles { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
 .v4AskAngle {
   display: inline-flex; align-items: center; gap: 4px; max-width: 100%;
-  padding: 2px 4px 2px 14px; border-radius: var(--r-pill); background: var(--con-bg); border: 1.5px solid var(--accent);
+  padding: 0 0 0 14px; border-radius: var(--r-pill); background: var(--con-bg); border: 1.5px solid var(--accent);
   font-size: var(--t-ui); font-weight: 600;
 }
 .v4AskAngle > span { overflow-wrap: anywhere; }
 .v4AskAngleRemove {
-  flex: none; width: 36px; height: 36px; border: 0; border-radius: var(--r-dot); background: none;
+  flex: none; width: 44px; height: 44px; border: 0; border-radius: var(--r-dot); background: none;
   cursor: pointer; font-size: 18px; line-height: 1;
 }
 .v4AskAngleRemove:hover { background: var(--surface); }
@@ -160,7 +160,7 @@
   border: 1px solid var(--line-strong); border-radius: var(--r-pill); background: var(--surface-2);
 }
 .v4AskMode button {
-  min-height: 40px; padding: 0 14px; border: 0; border-radius: var(--r-pill); background: none;
+  min-height: 44px; padding: 0 14px; border: 0; border-radius: var(--r-pill); background: none;
   cursor: pointer; font-size: var(--t-ui); font-weight: 600; color: var(--text-2);
 }
 .v4AskMode button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
@@ -169,3 +169,12 @@
   .v4AskStart { flex: 0 0 auto; margin-left: auto; padding: 0 30px; }
 }
 .v4AskStart[aria-busy="true"] { cursor: progress; }
+
+/* C4: the site's cookie bar (.consentBar, fixed at the bottom, z above this page) would cover the sticky D2 bar and
+   Start. While it shows, the D2 bar sits in the page flow instead, and the page gets room at the bottom so Start can
+   scroll clear of the cookie bar. Scoped to this page; globals.css is not touched. */
+.appShell:has(.consentBar) .v4AskBar { position: static; }
+.appShell:has(.consentBar) .v4AskMain { padding-bottom: 340px; }
+@media (min-width: 720px) {
+  .appShell:has(.consentBar) .v4AskMain { padding-bottom: 180px; }
+}

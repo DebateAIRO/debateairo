@@ -3,17 +3,26 @@ import { V4AskClient } from "@/components/v4/V4AskClient";
 import { readCrisisCountryHint } from "@/lib/crisisLines";
 import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
+import { parseReadingLevel } from "@/lib/v4/storage";
 
 export const dynamic = "force-dynamic";
 
 /** A topic handed in by a link (`/v4?topic=…`) pre-fills the question; anything longer is cut, never refused. */
 const TOPIC_MAX = 4000;
 
-/* V4 initial (spec "/v4 — D1 Ask + D2"): the ask page, beside V3's /new. Locale exactly as app/new/page.tsx. */
+/** One value of a search param (a repeated param keeps its first value). */
+function firstParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+/*
+ * V4 initial (spec "/v4 — D1 Ask + D2"): the ask page, beside V3's /new. Locale exactly as app/new/page.tsx. The
+ * reading level comes from the address (`?level=`, FIXES Decision A: V4 stores nothing in the browser).
+ */
 export default async function V4AskPage({
   searchParams = Promise.resolve({})
 }: {
-  searchParams?: Promise<{ topic?: string | string[] }>;
+  searchParams?: Promise<{ topic?: string | string[]; level?: string | string[] }>;
 }) {
   const requestedLocale = (await cookies()).get(LOCALE_COOKIE)?.value;
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
@@ -23,7 +32,8 @@ export default async function V4AskPage({
     loadNamespace(locale, "newDebate"),
     loadNamespace(locale, "billing")
   ]);
-  const topic = (await searchParams).topic;
+  const query = await searchParams;
+  const topic = firstParam(query.topic);
   const initialQuestion = typeof topic === "string" ? topic.slice(0, TOPIC_MAX) : "";
   return (
     <V4AskClient
@@ -34,6 +44,7 @@ export default async function V4AskPage({
       locale={locale}
       crisisCountryHint={readCrisisCountryHint(await headers())}
       initialQuestion={initialQuestion}
+      initialLevel={parseReadingLevel(firstParam(query.level))}
     />
   );
 }

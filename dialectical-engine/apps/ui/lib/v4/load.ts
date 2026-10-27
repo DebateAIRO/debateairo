@@ -1,7 +1,9 @@
-import type { Answer, AnswerStory, ContractClient, RunProjection } from "@debateai/contract";
+import { ContractHttpError, type Answer, type AnswerStory, type ContractClient, type RunProjection } from "@debateai/contract";
 import { contractClient, isNotFound } from "../api.js";
 import { buildV4Map } from "./mapModel.js";
 import type { DigLink, DigView } from "./types.js";
+
+export { storyReadFailed } from "./mapModel.js";
 
 /*
  * V4 initial (2026-10-28): the V4 pages read only today's V3 endpoints (run, run answer, answer, story). The id in a
@@ -10,19 +12,55 @@ import type { DigLink, DigView } from "./types.js";
 
 export type V4Load =
   | Readonly<{ kind: "RUN"; runId: string; run: RunProjection }>
+  /** `story` is never null from loadV4 (fix wave 1: a failed read is an UNAVAILABLE record); the type keeps null for callers. */
   | Readonly<{ kind: "SERVED"; runId: string; answer: Answer; story: AnswerStory | null }>;
 
 type StoryClient = Pick<ContractClient, "readAnswerStory">;
 type LoadClient = Pick<ContractClient, "readRun" | "readRunAnswer" | "readAnswer" | "readAnswerStory">;
 type DigClient = Pick<ContractClient, "readRun" | "readRunAnswer" | "readAnswerStory">;
 
-/** The answer's story, or null when there is none yet (404). Other failures are the caller's to show. */
-export async function loadStory(answerId: string, client: StoryClient = contractClient): Promise<AnswerStory | null> {
+/**
+ * V3's unreadableStory record (lib/v3/useAnswerStory.ts), field for field. It is restated, not imported, because that
+ * module's "@/lib/api" import does not resolve under the root typecheck that covers tests/**.
+ */
+export function unreadableStory(answerId: string, answerVersion: number, reason: string): AnswerStory {
+  return {
+    answer_id: answerId,
+    answer_version: answerVersion,
+    status: "UNAVAILABLE",
+    unavailable_reason: reason,
+    shape: null,
+    pack: null,
+    written_at: null,
+    storyteller: null,
+    checker: null,
+    rounds: null,
+    language: null,
+    reservation: null,
+    verdict_basis: null,
+    point_numbers: null,
+    story: null
+  };
+}
+
+/** The same three failures V3's story poll treats as final (lib/v3/useAnswerStory.ts). */
+const FINAL_STORY_FAILURES: ReadonlySet<string> = new Set(["NOT_FOUND", "SESSION_REQUIRED", "FORBIDDEN"]);
+
+/**
+ * The answer's story. It never throws and never returns null (DATA-3, DATA-10/TIME-5), so a story failure can never
+ * hide an answer already read: a 404, SESSION_REQUIRED or FORBIDDEN becomes V3's final UNAVAILABLE record
+ * (`STORY_<code>`), and any other failure a passing STORY_READ_FAILED record that `storyReadFailed` tells the page to
+ * try again, as V3's poll does.
+ */
+export async function loadStory(answerId: string, client: StoryClient = contractClient, answerVersion = 1): Promise<AnswerStory> {
   try {
-    return await client.readAnswerStory(answerId);
+    // Inside the promise chain on purpose: a client that throws at once is a failed read, never a crash.
+    return await Promise.resolve().then(() => client.readAnswerStory(answerId));
   } catch (failure) {
-    if (isNotFound(failure)) return null;
-    throw failure;
+    if (failure instanceof ContractHttpError && FINAL_STORY_FAILURES.has(failure.code)) {
+      return unreadableStory(answerId, answerVersion, `STORY_${failure.code}`);
+    }
+    return unreadableStory(answerId, answerVersion, "STORY_READ_FAILED");
   }
 }
 
@@ -34,7 +72,7 @@ export async function loadV4(id: string, client: LoadClient = contractClient): P
     if (!isNotFound(failure)) throw failure;
     // Not a run id: read it as an answer id.
     const answer = await client.readAnswer(id);
-    return { kind: "SERVED", runId: answer.run_ref, answer, story: await loadStory(answer.answer_id, client) };
+    return { kind: "SERVED", runId: answer.run_ref, answer, story: await loadStory(answer.answer_id, client, answer.answer_version) };
   }
   if (run.state !== "SETTLED") return { kind: "RUN", runId: id, run };
   let answer: Answer;
@@ -45,7 +83,7 @@ export async function loadV4(id: string, client: LoadClient = contractClient): P
     if (isNotFound(failure)) return { kind: "RUN", runId: id, run };
     throw failure;
   }
-  return { kind: "SERVED", runId: id, answer, story: await loadStory(answer.answer_id, client) };
+  return { kind: "SERVED", runId: id, answer, story: await loadStory(answer.answer_id, client, answer.answer_version) };
 }
 
 function digView(link: DigLink, state: DigView["state"]): DigView {
@@ -62,9 +100,10 @@ export async function loadDigView(link: DigLink, client: DigClient = contractCli
     throw failure;
   }
   switch (run.state) {
-    case "QUEUED":
     case "WAITING":
+      // Only a real wait for a free spot says so (RULES-4).
       return digView(link, "WAITING");
+    case "QUEUED":
     case "CLAIMED":
     case "RUNNING":
     case "HOLDING":
@@ -81,7 +120,8 @@ export async function loadDigView(link: DigLink, client: DigClient = contractCli
     if (isNotFound(failure)) return digView(link, "RUNNING");
     throw failure;
   }
-  const story = await loadStory(answer.answer_id, client);
+  // A failed story read leaves the dig DONE without a headline; the page reads it again later (TIME-5, TIME-8).
+  const story = await loadStory(answer.answer_id, client, answer.answer_version);
   const map = buildV4Map({ runId: link.childRunId, answer, story });
   return { link, state: "DONE", headline: map.headline, counts: map.counts };
 }

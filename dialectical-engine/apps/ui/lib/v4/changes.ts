@@ -1,9 +1,10 @@
-import { openQuestionsOf } from "./mapModel.js";
+import { uniqueOpenQuestions } from "./mapModel.js";
 import type { DigView, SeenSnapshot, V4Change, V4Map, V4Selection } from "./types.js";
 
 /*
- * V4 initial (2026-10-28), D4 "back after a round": what this browser saw last time, item by item, and what changed
- * since. Each item id carries its word (a dig state, a fate, open/dug, a trust word); removed items are not news.
+ * V4 initial (2026-10-28), D4: what the page saw, item by item, and what changed since. Fix wave 1 (Decision A): the
+ * snapshot lives in memory only — the first complete load is the baseline and later live changes are news ("while you
+ * were here"). Each item id carries its word (a dig state, a fate, open/dug, a trust word); removed items are not news.
  */
 
 /** The item kinds in the order the changes are told: digs, paths, open questions, points. */
@@ -18,8 +19,9 @@ export function snapshotItems(map: V4Map, digs: readonly DigView[]): Readonly<Re
   const items: Record<string, string> = {};
   for (const dig of digs) items[`dig:${dig.link.childRunId}`] = dig.state;
   for (const path of map.paths) items[`path:${path.id}`] = path.fate ?? "none";
-  const dug = new Set(digs.flatMap((dig) => dig.link.openQuestionIds));
-  for (const question of openQuestionsOf(map)) {
+  // DATA-9: a failed dig leaves its question open again, as the map shows it.
+  const dug = new Set(digs.filter((dig) => dig.state !== "FAILED").flatMap((dig) => dig.link.openQuestionIds));
+  for (const question of uniqueOpenQuestions(map)) {
     items[`open:${question.id}`] = dug.has(question.id) ? "dug" : "open";
   }
   for (const point of map.points) items[`point:${point.id}`] = point.trust ?? "unchecked";

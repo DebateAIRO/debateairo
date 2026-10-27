@@ -3,7 +3,9 @@
 import Link from "next/link";
 import type { ReactNode, RefObject } from "react";
 import { formatDate, t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
+import { addedLines, ownWords } from "@/lib/v4/askText";
 import { openQuestionsOf } from "@/lib/v4/mapModel";
+import { levelHref } from "@/lib/v4/storage";
 import { countTrust } from "@/lib/v4/trust";
 import {
   DIG_MODES,
@@ -29,9 +31,11 @@ import {
   PickBox,
   resolveSelection,
   shortText,
+  TitleText,
   undugOpen,
   viaKeyboard,
-  type ResolvedSelection
+  type ResolvedSelection,
+  type Title
 } from "./V4MapTree";
 import { V4TrustBar } from "./V4TrustBar";
 
@@ -139,19 +143,19 @@ function PointGroups(props: Readonly<{ points: readonly V4Point[]; level: Readin
 /** Breadcrumb: every part but the last can be clicked. */
 function Crumbs(props: Readonly<{ resolved: ResolvedSelection; onSelect: PanelProps["onSelect"]; catalog: MessageCatalog }>) {
   const { resolved, onSelect, catalog } = props;
-  const parts: { id: V4Selection; label: string; ai: boolean }[] = [
-    { id: "root", label: t(catalog, "v4.panel.crumbRoot"), ai: false }
+  const parts: { id: V4Selection; title: Title }[] = [
+    { id: "root", title: { text: t(catalog, "v4.panel.crumbRoot"), ai: false, more: 0 } }
   ];
-  if (resolved.kind === "path") parts.push({ id: `path:${resolved.path.id}`, label: pathTitle(resolved.path, catalog, 40), ai: true });
+  if (resolved.kind === "path") parts.push({ id: `path:${resolved.path.id}`, title: pathTitle(resolved.path, catalog, 40) });
   if (resolved.kind === "open") {
-    if (resolved.path !== null) parts.push({ id: `path:${resolved.path.id}`, label: pathTitle(resolved.path, catalog, 40), ai: true });
-    parts.push({ id: `open:${resolved.question.id}`, label: shortText(resolved.question.text, 40), ai: true });
+    if (resolved.path !== null) parts.push({ id: `path:${resolved.path.id}`, title: pathTitle(resolved.path, catalog, 40) });
+    parts.push({ id: `open:${resolved.question.id}`, title: { text: shortText(resolved.question.text, 40), ai: true, more: 0 } });
   }
   if (resolved.kind === "dig") {
     if (resolved.home.path !== null) {
-      parts.push({ id: `path:${resolved.home.path.id}`, label: pathTitle(resolved.home.path, catalog, 40), ai: true });
+      parts.push({ id: `path:${resolved.home.path.id}`, title: pathTitle(resolved.home.path, catalog, 40) });
     }
-    parts.push({ id: `dig:${resolved.dig.link.childRunId}`, label: digTitle(resolved.dig, catalog, 40), ai: true });
+    parts.push({ id: `dig:${resolved.dig.link.childRunId}`, title: digTitle(resolved.dig, catalog, 40) });
   }
   return (
     <nav className="v4PanelCrumbs" aria-label={t(catalog, "v4.panel.crumbsLabel")}>
@@ -161,15 +165,14 @@ function Crumbs(props: Readonly<{ resolved: ResolvedSelection; onSelect: PanelPr
           return (
             <li key={part.id}>
               {last
-                ? <span aria-current="location" data-ai-generated={part.ai ? "true" : undefined}>{part.label}</span>
+                ? <span aria-current="location"><TitleText title={part.title} catalog={catalog} /></span>
                 : (
                   <button
                     type="button"
                     className="v4Link"
-                    data-ai-generated={part.ai ? "true" : undefined}
                     onClick={(event) => onSelect(part.id, viaKeyboard(event))}
                   >
-                    {part.label}
+                    <TitleText title={part.title} catalog={catalog} />
                   </button>
                 )}
             </li>
@@ -198,7 +201,7 @@ function DigLinkRow(props: Readonly<{ dig: DigView; onSelect: PanelProps["onSele
         className="v4PanelRowBtn"
         onClick={(event) => props.onSelect(`dig:${dig.link.childRunId}`, viaKeyboard(event))}
       >
-        <span className="v4PanelRowTitle" data-ai-generated="true">{digTitle(dig, props.catalog)}</span>
+        <TitleText className="v4PanelRowTitle" title={digTitle(dig, props.catalog)} catalog={props.catalog} />
         <span className="v4MapNote">
           {dig.state === "WAITING" || dig.state === "RUNNING" ? <span className="v4MapPulse" aria-hidden="true" /> : null}
           {digNote(dig, props.catalog)}
@@ -238,9 +241,9 @@ function WhereToDig(props: Readonly<{
                     className="v4PanelRowBtn"
                     onClick={(event) => panel.onSelect(`open:${question.id}`, viaKeyboard(event))}
                   >
-                    <span className="v4PanelRowTitle" data-ai-generated="true">
+                    <span className="v4PanelRowTitle">
                       {question.star ? <span className="v4MapStar" aria-hidden="true">★ </span> : null}
-                      {shortText(question.text, 120)}
+                      <span data-ai-generated="true">{shortText(question.text, 120)}</span>
                     </span>
                     <span className="v4MapNote">
                       {question.star ? `${t(panel.catalog, "v4.map.starHint")} · ` : null}
@@ -329,17 +332,40 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
   const confidence = map.confidence?.trim() ?? "";
   const star = openQuestionsOf(map).find((question) => question.star && question.pathId !== null);
   const open = undugOpen(star === undefined ? map.open : [...map.open, star], panel.digs);
+  // DATA-2: with no short answer yet, the whole composed answer is shown, so there is always an answer to read.
+  const fallback = (map.fallbackText ?? "").split(/\n\s*\n/).map((paragraph) => paragraph.trim()).filter((paragraph) => paragraph.length > 0);
+  const writing = map.storyState === "WRITING";
   return (
     <>
+      {addedLines(map.question).length > 0
+        ? (
+          <details className="v4PanelSent">
+            <summary>{t(catalog, "v4.panel.sentHeading")}</summary>
+            <p className="v4PanelSentText" data-ai-generated="true">{map.question.trim()}</p>
+          </details>
+        )
+        : null}
       <Section title={t(catalog, "v4.panel.answerRoot")}>
         {headline.length > 0 || summary.length > 0
           ? (
-            <div data-ai-generated="true">
-              {headline.length > 0 ? <p className="v4PanelHeadline v4Serif">{headline}</p> : null}
-              {summary.length > 0 ? <p className="v4PanelText">{summary}</p> : null}
-            </div>
+            <>
+              <div data-ai-generated="true">
+                {headline.length > 0 ? <p className="v4PanelHeadline v4Serif">{headline}</p> : null}
+                {summary.length > 0 ? <p className="v4PanelText">{summary}</p> : null}
+              </div>
+              {map.reservation ? <p className="v4PanelHint v4Muted">{t(catalog, "v4.story.reservation")}</p> : null}
+            </>
           )
-          : <p className="v4Muted">{t(catalog, map.storyState === "WRITING" ? "v4.panel.storyWriting" : "v4.panel.storyMissing")}</p>}
+          : fallback.length > 0
+            ? (
+              <>
+                <div className="v4PanelFallback" data-ai-generated="true">
+                  {fallback.map((paragraph, index) => <p key={index} className="v4PanelText">{paragraph}</p>)}
+                </div>
+                <p className="v4PanelHint v4Muted">{t(catalog, writing ? "v4.panel.fallbackWriting" : "v4.panel.fallbackMissing")}</p>
+              </>
+            )
+            : <p className="v4Muted">{t(catalog, writing ? "v4.panel.storyWriting" : "v4.panel.storyMissing")}</p>}
       </Section>
       <TrustSection counts={map.counts} points={map.points} unchecked={map.unchecked} panel={panel} />
       {panel.readingLevel === "expert" && map.why.length > 0
@@ -449,8 +475,9 @@ function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolved
         <p className="v4PanelText">
           {dig.state === "WAITING" || dig.state === "RUNNING" ? <span className="v4MapPulse" aria-hidden="true" /> : null}
           {t(panel.catalog, `v4.panel.digState.${dig.state}`)}
-          {" "}
-          <span className="v4PanelModeTag">{t(panel.catalog, `v4.digMode.${dig.link.mode}`)}</span>
+          {dig.link.mode !== null
+            ? <> <span className="v4PanelModeTag">{t(panel.catalog, `v4.digMode.${dig.link.mode}`)}</span></>
+            : null}
         </p>
         {dig.state === "DONE"
           ? (headline.length > 0
@@ -467,7 +494,7 @@ function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolved
         : null}
       {dig.state === "DONE"
         ? (
-          <Link className="v4Btn" href={`/v4/debate/${encodeURIComponent(dig.link.childRunId)}`}>
+          <Link className="v4Btn" href={levelHref(`/v4/debate/${encodeURIComponent(dig.link.childRunId)}`, panel.readingLevel)}>
             {t(panel.catalog, "v4.panel.openDig")}
           </Link>
         )
@@ -476,25 +503,30 @@ function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolved
   );
 }
 
-function headingOf(resolved: ResolvedSelection, map: V4Map, catalog: MessageCatalog): string {
+/** The panel heading; the site's own fallback words are not marked as AI text (RULES-14). */
+function headingOf(resolved: ResolvedSelection, map: V4Map, catalog: MessageCatalog): Title {
   if (resolved.kind === "path") return pathTitle(resolved.path, catalog);
-  if (resolved.kind === "open") return resolved.question.text;
+  if (resolved.kind === "open") return { text: resolved.question.text, ai: true, more: 0 };
   if (resolved.kind === "dig") {
     const first = resolved.dig.link.questions[0];
-    return first !== undefined && first.trim().length > 0 ? first : t(catalog, "v4.map.digUntitled");
+    return first !== undefined && first.trim().length > 0
+      ? { text: first, ai: true, more: 0 }
+      : { text: t(catalog, "v4.map.digUntitled"), ai: false, more: 0 };
   }
-  return map.question;
+  // The person's own words; the lines added from their choices sit in "What we asked the AIs".
+  return { text: ownWords(map.question), ai: true, more: 0 };
 }
 
 export function V4Panel(props: PanelProps) {
   const { map, catalog } = props;
   const resolved = resolveSelection(map, props.digs, props.selected);
+  const heading = headingOf(resolved, map, catalog);
   return (
     <div className={`v4Panel v4Panel-${resolved.kind}`}>
       <Crumbs resolved={resolved} onSelect={props.onSelect} catalog={catalog} />
       <span className="v4Eyebrow">{t(catalog, `v4.panel.kind.${resolved.kind}`)}</span>
-      <h2 className="v4PanelH2" ref={props.headingRef} tabIndex={-1} data-ai-generated="true">
-        {headingOf(resolved, map, catalog)}
+      <h2 className="v4PanelH2" ref={props.headingRef} tabIndex={-1} data-ai-generated={heading.ai ? "true" : undefined}>
+        {heading.text}
       </h2>
       {resolved.kind === "root" ? <RootBody panel={props} /> : null}
       {resolved.kind === "path" ? <PathBody panel={props} resolved={resolved} /> : null}

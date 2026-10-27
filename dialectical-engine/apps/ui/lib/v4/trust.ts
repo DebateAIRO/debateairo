@@ -1,16 +1,18 @@
-import type { Answer } from "@debateai/contract";
+import type { Answer, AnswerStory } from "@debateai/contract";
 import { TRUST_WORDS, type TrustBasis, type TrustCounts, type TrustWord, type V4Point } from "./types.js";
 
 /*
  * V4 initial (2026-10-28): the four trust words (row D decision 2), worked out from today's V3 answer. First-version
  * mapping, to be revalidated by the owner:
- *   an incoming "defeat" edge (target_kind NODE)  → DIDNT_HOLD / ANSWERED (answeredBy = the defeating point's claim)
+ *   the position of a ready story path whose fate is FELL  → DIDNT_HOLD / FELL (fix wave 1, Decision B)
  *   no second-AI review                           → no word yet (decision 6: left out of the groups and the bar)
  *   dispute                                       → STILL_ARGUED / DISPUTED
  *   cannot-assess                                 → STILL_ARGUED / COULD_NOT_CHECK
  *   agree, not FRESH                              → SURE_FOR_CASE / AGREED_BUT_DATED (asOf = relevant_as_of)
  *   agree, REASONING                              → SURE_FOR_CASE / ARGUED_AND_AGREED
  *   agree, LOOKED_UP or RAN                       → SURE / LOOKED_UP_AND_AGREED
+ * Edges are not read (DATA-1/RULES-2): serve sends "defeat" only at edges, and node.defeater_refs means "an objection
+ * was recorded", not "it won" (morning question). No other point is marked DIDNT_HOLD tonight.
  * Scores (base_score, final_strength) are never read here: no number from the engine reaches a V4 page.
  */
 
@@ -28,37 +30,28 @@ function placeReviewed(node: AnswerNode): Placed {
   return { trust: "SURE", basis: "LOOKED_UP_AND_AGREED" };
 }
 
-/** Every point of the answer with its trust word, keyed by node id, in the answer's order (first copy of an id wins). */
-export function pointsOf(answer: Answer): ReadonlyMap<string, V4Point> {
-  const claimOf = new Map<string, string>();
-  for (const node of answer.nodes) {
-    if (!claimOf.has(node.node_id)) claimOf.set(node.node_id, node.claim);
+/** Decision B: the position nodes of a ready story's FELL paths (none without a ready story body). */
+export function fellPositionsOf(story: AnswerStory | null): ReadonlySet<string> {
+  const fell = new Set<string>();
+  if (story === null || story.story === null) return fell;
+  if (story.status !== "READY" && story.status !== "READY_WITH_RESERVATION") return fell;
+  for (const path of story.story.short.paths) {
+    if (path.fate === "FELL") fell.add(path.position_ref);
   }
-  // The first defeat edge aimed at a point names who answered it.
-  const defeatedBy = new Map<string, string>();
-  for (const edge of answer.edges) {
-    if (edge.relation !== "defeat" || edge.target_kind !== "NODE") continue;
-    if (!defeatedBy.has(edge.target_ref)) defeatedBy.set(edge.target_ref, edge.from_node_ref);
-  }
+  return fell;
+}
+
+/**
+ * Every point of the answer with its trust word, keyed by node id, in the answer's order (first copy of an id wins).
+ * `story` (optional) adds Decision B: a FELL path's position does not hold, whatever its review said.
+ */
+export function pointsOf(answer: Answer, story: AnswerStory | null = null): ReadonlyMap<string, V4Point> {
+  const fell = fellPositionsOf(story);
   const points = new Map<string, V4Point>();
   for (const node of answer.nodes) {
     if (points.has(node.node_id)) continue;
     const reasons = node.review === null ? [] : [...node.review.reasons];
-    const defeater = defeatedBy.get(node.node_id);
-    if (defeater !== undefined) {
-      // DIDNT_HOLD beats every other rule, a review or not.
-      points.set(node.node_id, {
-        id: node.node_id,
-        text: node.claim,
-        trust: "DIDNT_HOLD",
-        basis: "ANSWERED",
-        reasons,
-        answeredBy: claimOf.get(defeater) ?? null,
-        asOf: null
-      });
-      continue;
-    }
-    const placed = placeReviewed(node);
+    const placed: Placed = fell.has(node.node_id) ? { trust: "DIDNT_HOLD", basis: "FELL" } : placeReviewed(node);
     points.set(node.node_id, {
       id: node.node_id,
       text: node.claim,

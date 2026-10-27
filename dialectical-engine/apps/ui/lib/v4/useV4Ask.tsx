@@ -36,7 +36,12 @@ const QUESTION_MIN_LENGTH = 7;
 export type V4AskOutcome =
   | Readonly<{ kind: "STARTED"; runId: string }>
   | Readonly<{ kind: "STOPPED" }>
-  | Readonly<{ kind: "REFUSED"; message: string }>;
+  /** ASK-5 (V3 ruling L-USE-STICKS): `acceptedQuestion` is the rewrite the person chose ("Use this version") before the
+   * refusal, so the next Start can send it again instead of asking a second time. */
+  | Readonly<{ kind: "REFUSED"; message: string; acceptedQuestion?: string }>;
+
+/** Where an ask comes from: the ask page, or a dig button (AI-written text around the person's earlier question). */
+export type V4AskOrigin = "ask" | "dig";
 
 type DecidedPlan = NonNullable<AskRoom["plan_id"]>;
 type InternalFunding = Readonly<{ kind: "INTERNAL"; expires_at: string }>;
@@ -47,7 +52,9 @@ export function useV4Ask(input: Readonly<{
   catalog: MessageCatalog; homeCatalog: MessageCatalog; newDebateCatalog: MessageCatalog;
   locale: string; crisisCountryHint: string | null; mode: DigMode; readingLevel: ReadingLevel;
 }>): Readonly<{
-  submit(questionLine: string, mode: DigMode): Promise<V4AskOutcome>;
+  submit(questionLine: string, mode: DigMode, origin?: V4AskOrigin): Promise<V4AskOutcome>;
+  /** ASK-3: whether this text reads as a person in crisis (the page enables Start for it even when it is short). */
+  flagsCrisis(text: string): boolean;
   room: AskRoom | null;
   planTier: "free" | "premium";
   submitting: boolean;
@@ -129,35 +136,45 @@ export function useV4Ask(input: Readonly<{
       pageLocale, consent, crisis, languageChoice };
   });
 
-  const submit = React.useCallback(async (questionLine: string, askMode: DigMode): Promise<V4AskOutcome> => {
+  const submit = React.useCallback(async (questionLine: string, askMode: DigMode, origin: V4AskOrigin = "ask"): Promise<V4AskOutcome> => {
     if (submitFlight.current) return STOPPED;
     const now = live.current;
     const question = questionLine.trim();
+    const dig = origin === "dig";
     // V, 2026-09-30: a question that reads as a person in crisis gets help numbers, never a debate — before anything else.
-    if (now.crisis.offerIfCrisis(question)) return STOPPED;
+    // ASK-4: a dig is AI-written text around a question that already passed this check, so the page's check is skipped
+    // for it (the API's own gate still runs; its refusal is answered below without the help pop-up).
+    if (!dig && now.crisis.offerIfCrisis(question)) return STOPPED;
     if (question.length < QUESTION_MIN_LENGTH) return { kind: "REFUSED", message: t(now.catalog, "v4.askError.tooShort") };
     // Sentence D: one question already waits.
     if (now.room?.room === "ALREADY_WAITING") return { kind: "REFUSED", message: t(now.catalog, "v4.askError.alreadyWaiting") };
     submitFlight.current = true;
     setSubmitting(true);
-    const askSettings = settingsFor(now.planTier, now.shapeSettings, now.lengthSettings);
-    const askRoomQuery = v4RoomQuery(askMode, now.readingLevel, askSettings);
+    let askSettings = settingsFor(now.planTier, now.shapeSettings, now.lengthSettings);
+    const askRoomQuery = (): ReturnType<typeof v4RoomQuery> => v4RoomQuery(askMode, now.readingLevel, askSettings);
+    // ASK-5: the rewrite the person accepted in this press, returned with any later refusal.
+    let acceptedRewrite: string | undefined;
+    const refused = (message: string): V4AskOutcome => (acceptedRewrite === undefined
+      ? { kind: "REFUSED", message }
+      : { kind: "REFUSED", message, acceptedQuestion: acceptedRewrite });
     try {
       // V, 2026-09-29: no debate starts before the one-time sensitive-data consent.
       if (!await now.consent.ensureConsent()) return STOPPED;
-      const config = v4AskConfig(askMode, now.readingLevel, askSettings, new Date(), now.newDebateCatalog);
-      // Question language (spec 2026-10-13; ruling CR-5, D1 order), exactly as /new: the page's language goes with the
-      // ask only once the room said the shape row is in force (L-SITELANG-GATED); one offer per press, a second offer is
-      // answered with the person's own wording, a stale reference is checked once more without a choice.
-      const sendsLanguage = now.shapeSettings;
       const siteLanguage = catalogLocale(now.pageLocale);
       let next: Readonly<{ line: string; choice?: QuestionLanguageChoice }> = { line: question };
       let asks = 0;
       let consentRetried = false;
       let offerShown = false;
       let rechecked = false;
+      let settingsRetried = false;
       let debate: { id: string } | null = null;
       while (debate === null) {
+        // Rebuilt on every pass: the one retry after a 409 settings-changed (ASK-7) sends the adopted switches.
+        const config = v4AskConfig(askMode, now.readingLevel, askSettings, new Date(), now.newDebateCatalog);
+        // Question language (spec 2026-10-13; ruling CR-5, D1 order), exactly as /new: the page's language goes with the
+        // ask only once the room said the shape row is in force (L-SITELANG-GATED); one offer per press, a second offer
+        // is answered with the person's own wording, a stale reference is checked once more without a choice.
+        const sendsLanguage = askSettings.shapeSettings;
         try {
           debate = !sendsLanguage
             ? await createDebate(next.line, config, COOKIE_SESSION_MARKER)
@@ -170,11 +187,30 @@ export function useV4Ask(input: Readonly<{
             if (!await now.consent.ensureConsent({ known: "required" })) return STOPPED;
             continue;
           }
+          // ASK-7: V4 shows none of the switches a 409 names, so the room is read again, its version adopted (R50/R51)
+          // and the ask sent ONCE more; only a second refusal (or a re-read naming no version) reaches the person.
+          if (isAskSettingsChanged(refusal) && !settingsRetried) {
+            settingsRetried = true;
+            const fresh = await readAskRoom(contractClient, askRoomQuery());
+            if (fresh !== null) setRoom(fresh);
+            if (fresh?.settings_version === undefined) {
+              settingsVersion.current = undefined;
+              adoptNextVersion.current = true;
+              return refused(t(now.catalog, "v4.askError.settingsChanged"));
+            }
+            adoptSettingsRead(fresh);
+            settingsVersion.current = fresh.settings_version;
+            adoptNextVersion.current = false;
+            askSettings = settingsFor(now.planTier, fresh.shape_settings === true, fresh.length_settings === true);
+            continue;
+          }
           asks += 1;
           if (asks >= LANGUAGE_ASKS_PER_PRESS) throw refusal;
           if (refusal instanceof QuestionLanguageChoiceNeededError) {
             const offer = refusal.offer;
-            if (offerShown) {
+            // A dig's text is mostly AI-written: it is sent as written, never rewritten, so the account's question list
+            // can still find it from its parent (fix wave 1, Decision A). An assumption; the owner may rule otherwise.
+            if (offerShown || dig) {
               next = { line: question, choice: { check_ref: offer.check_ref, choice: "KEEP_MINE" } };
               continue;
             }
@@ -182,6 +218,7 @@ export function useV4Ask(input: Readonly<{
             const answer = await now.languageChoice.ensureChoice(offer);
             // "Edit": nothing is sent; the person is back at their question.
             if (answer === "EDIT") return STOPPED;
+            if (answer === "USE") acceptedRewrite = offer.proposed_question;
             next = answer === "USE"
               ? { line: offer.proposed_question,
                 choice: { check_ref: offer.check_ref, choice: "USE_REWRITE", original_question_line: question } }
@@ -199,13 +236,15 @@ export function useV4Ask(input: Readonly<{
       return { kind: "STARTED", runId: debate.id };
     } catch (exc) {
       if (isCrisisSupportRefusal(exc)) {
+        // ASK-4: the API's crisis gate refused a dig: no help pop-up for AI-written text, a plain sentence instead.
+        if (dig) return refused(t(now.catalog, "v4.digError.cannotFollow"));
         now.crisis.offer();
         return STOPPED;
       }
-      // Side-by-side spec §13 (Task S12): the choices for new debates changed under the page. Nothing started; the room
-      // is read again and its version adopted (R50), so the next press sends the new version's ask.
+      // A second 409 after the retry (ASK-7): nothing started; the room is read again and its version adopted (R50), so
+      // the next press sends the new version's ask. V4 has no settings to check, so its own sentence is shown.
       if (isAskSettingsChanged(exc)) {
-        const fresh = await readAskRoom(contractClient, askRoomQuery);
+        const fresh = await readAskRoom(contractClient, askRoomQuery());
         if (fresh?.settings_version === undefined) {
           settingsVersion.current = undefined;
           adoptNextVersion.current = true;
@@ -215,27 +254,28 @@ export function useV4Ask(input: Readonly<{
           adoptNextVersion.current = false;
         }
         if (fresh !== null) setRoom(fresh);
-        return { kind: "REFUSED", message: requestFailureMessage("DEBATE_CREATE", exc, now.newDebateCatalog) };
+        return refused(t(now.catalog, "v4.askError.settingsChanged"));
       }
       // DL3-F7: ALREADY_WAITING is shown by the room notice (sentence D, with its time), from the room re-read or the
       // refusal's own body; the plain V4 sentence goes with it, and /new's banner only when neither names a wait.
       if (classifyRequestFailure("DEBATE_CREATE", exc).kind === "ALREADY_WAITING") {
-        const fresh = await readAskRoom(contractClient, askRoomQuery);
+        const fresh = await readAskRoom(contractClient, askRoomQuery());
         const shown = fresh === null ? waitingRoomOf(exc) : fresh;
         setRoom(shown);
-        return {
-          kind: "REFUSED",
-          message: shown?.room === "ALREADY_WAITING"
-            ? t(now.catalog, "v4.askError.alreadyWaiting")
-            : requestFailureMessage("DEBATE_CREATE", exc, now.newDebateCatalog)
-        };
+        return refused(shown?.room === "ALREADY_WAITING"
+          ? t(now.catalog, "v4.askError.alreadyWaiting")
+          : requestFailureMessage("DEBATE_CREATE", exc, now.newDebateCatalog));
       }
-      return { kind: "REFUSED", message: requestFailureMessage("DEBATE_CREATE", exc, now.newDebateCatalog) };
+      return refused(requestFailureMessage("DEBATE_CREATE", exc, now.newDebateCatalog));
     } finally {
       submitFlight.current = false;
       setSubmitting(false);
     }
   }, [settingsFor, adoptSettingsRead, setRoom]);
+
+  // ASK-3: the same test the crisis check runs, so a short message in crisis can still reach the help numbers.
+  // Read each render (not memoised): it turns true once the crisis patterns finish warming up, like /new's Start.
+  const flagsCrisis = crisis.flags;
 
   const dialogs = (
     <>
@@ -248,5 +288,5 @@ export function useV4Ask(input: Readonly<{
     </>
   );
 
-  return { submit, room, planTier, submitting, dialogs };
+  return { submit, flagsCrisis, room, planTier, submitting, dialogs };
 }

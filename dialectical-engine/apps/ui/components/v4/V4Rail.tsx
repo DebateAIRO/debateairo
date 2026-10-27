@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
+import { levelHref } from "@/lib/v4/storage";
+import type { ReadingLevel } from "@/lib/v4/types";
 
 /*
  * V4 initial (2026-10-28), D3 rail ("when"): the steps, the rounds, how many open questions could still change the
@@ -21,7 +23,9 @@ export function goodTimeForReport(openLeft: number, digs: V4DigCounts): boolean 
 
 export function V4Rail(props: Readonly<{
   runId: string;
-  /** Open questions with no dig yet. */
+  /** The page's reading level, carried by the report link (Decision A: the level lives in the address). */
+  level: ReadingLevel | null;
+  /** Open questions with no dig yet (each counted once). */
   openLeft: number;
   digs: V4DigCounts;
   /** "strip": the 768–1099 px top strip; "column": the desktop rail and the phone map sheet. */
@@ -29,8 +33,8 @@ export function V4Rail(props: Readonly<{
   catalog: MessageCatalog;
   locale: string;
 }>) {
-  const { runId, openLeft, digs, variant, catalog, locale } = props;
-  const reportHref = `/v4/debate/${encodeURIComponent(runId)}/report`;
+  const { runId, level, openLeft, digs, variant, catalog, locale } = props;
+  const reportHref = levelHref(`/v4/debate/${encodeURIComponent(runId)}/report`, level);
   const anyDig = digs.running + digs.done + digs.failed > 0;
   const goodTime = goodTimeForReport(openLeft, digs);
   return (

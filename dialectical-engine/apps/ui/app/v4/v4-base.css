@@ -17,7 +17,8 @@
 }
 .v4Root *, .v4Root *::before, .v4Root *::after { box-sizing: border-box; }
 .v4Root :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.v4Root button { font: inherit; color: inherit; }
+/* :where keeps this reset at element weight, so every class below (.v4BtnPrimary's light text included) wins over it. */
+:where(.v4Root) button { font: inherit; color: inherit; }
 .v4Eyebrow {
   font-family: var(--font-mono);
   font-size: var(--t-micro);
