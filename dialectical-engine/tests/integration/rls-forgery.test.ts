@@ -12,7 +12,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createPool, migrate, runInRequestScope, setRequestCredential, type Pool } from "../../packages/db/src/index.js";
+import { createPool, EntitlementRepository, migrate, runInRequestScope, setRequestCredential, type Pool } from "../../packages/db/src/index.js";
 import { rlsRelationSql, seedRlsRows, type RlsSeedReport } from "../../tools/rls/seed.js";
 import { provisionRlsLogins, seedSessionAccount, type RlsLogins, type RlsTestAccount } from "../support/rls-logins.js";
 import { RLS_IN_SCOPE } from "../support/rls-scope.js";
@@ -408,7 +408,9 @@ describe("row-level security S01 C6: forgery by SQL on the four T1 logins widens
   it("S6.3-F11 (FIX-S01-p1a NEW-1, V-17) a row with no parent row stays unreadable after A inserts an own parent row carrying its key", async () => {
     // FIX-S01-p1a's orphan probe: each child keyed on its parent through a parent check, and no foreign key holds its
     // parent (an unmatched NETOPIA notice, a quarantined notice, a revocation whose token 0111's purge deleted, a saved
-    // card whose customer row is gone). Measured before V-17's default: 0 → 1 on both runtime logins.
+    // card whose customer row is gone). Measured before V-17's default: 0 → 1 on both runtime logins. Since the unpaid-plan
+    // review no T1 login writes a billing parent under a context (refused, 42501), so the parents are then planted for A and
+    // C by the superuser under their contexts, and each login counts again: V-17's `false` must still read 0.
     const su = database.pool;
     const C = await seedSessionAccount(su, "C");
     const hex = (n: number): string => randomBytes(n).toString("hex");
@@ -434,41 +436,61 @@ describe("row-level security S01 C6: forgery by SQL on the four T1 logins widens
       period_end,net_micros,tax_micros,total_micros,currency,created_at,payment_environment,payment_provider)
       VALUES($1,(SELECT rls.context_owner_ref()),$2,'CARD_CHECK',${n},now(),now()+interval '30 days',0,0,0,'EUR',now(),'sandbox','netopia')`;
     const frames: string[] = [];
+    const sides = [
+      ["A", A, [[charge(1), [orderId, aSub]], [charge(2), [quarantineOrder, aSub]],
+        [`INSERT INTO billing.card_token(token_id,payment_provider,payment_environment,token_ciphertext,key_id,created_at,customer_id,
+          source_charge_id) VALUES($1,'netopia','sandbox',$2,'0123456789abcdef',now(),$3,$4)`, [revokedToken, randomBytes(16), aCustomer, aCharge]]],
+      [["billing.payment_notice", "order_id", orderId], ["billing.payment_notice_outcome", "notice_id", noticeId],
+        ["billing.payment_notice_raw", "notice_id", noticeId], ["billing.notice_quarantine", "order_id", quarantineOrder],
+        ["billing.card_token_revocation", "token_id", revokedToken]]],
+      ["C", C, [["INSERT INTO billing.customer(customer_id,owner_ref,created_at,created_locale) VALUES($1,(SELECT rls.context_owner_ref()),now(),'en')",
+        [orphanCustomer]]], [["billing.card_token", "token_id", orphanToken]]]
+    ] as const;
+    // Each count in its own savepoint: a login without SELECT on a child refuses it (42501), and that refusal must not
+    // abort the transaction the parent writes run in.
+    const count = async (c: pg.Client, counts: (typeof sides)[number][3]): Promise<string> => {
+      const parts: string[] = [];
+      for (const [relation, column, key] of counts) {
+        await c.query("SAVEPOINT count");
+        try {
+          parts.push(`${relation}=${(await c.query(`SELECT count(*)::int AS n FROM ${relation} WHERE ${column} = $1`, [key])).rows[0].n}`);
+          await c.query("RELEASE SAVEPOINT count");
+        } catch (error) {
+          parts.push(`${relation}=refused-${(error as { code?: string }).code ?? "NO_SQLSTATE"}`);
+          await c.query("ROLLBACK TO SAVEPOINT count");
+        }
+      }
+      return parts.join(",");
+    };
     for (const login of t1) {
-      for (const [who, account, parents, counts] of [
-        ["A", A, [[charge(1), [orderId, aSub]], [charge(2), [quarantineOrder, aSub]],
-          [`INSERT INTO billing.card_token(token_id,payment_provider,payment_environment,token_ciphertext,key_id,created_at,customer_id,
-            source_charge_id) VALUES($1,'netopia','sandbox',$2,'0123456789abcdef',now(),$3,$4)`, [revokedToken, randomBytes(16), aCustomer, aCharge]]],
-        [["billing.payment_notice", "order_id", orderId], ["billing.payment_notice_outcome", "notice_id", noticeId],
-          ["billing.payment_notice_raw", "notice_id", noticeId], ["billing.notice_quarantine", "order_id", quarantineOrder],
-          ["billing.card_token_revocation", "token_id", revokedToken]]],
-        ["C", C, [["INSERT INTO billing.customer(customer_id,owner_ref,created_at,created_locale) VALUES($1,(SELECT rls.context_owner_ref()),now(),'en')",
-          [orphanCustomer]]], [["billing.card_token", "token_id", orphanToken]]]
-      ] as const) {
+      for (const [who, account, parents, counts] of sides) {
         await asLogin(login.url, async (c) => {
           await c.query(CREDENTIAL, [account.token]);
-          // Each count in its own savepoint: a login without SELECT on a child refuses it (42501), and that refusal must
-          // not abort the transaction the parent writes run in.
-          const count = async (): Promise<string> => {
-            const parts: string[] = [];
-            for (const [relation, column, key] of counts) {
-              await c.query("SAVEPOINT count");
-              try {
-                parts.push(`${relation}=${(await c.query(`SELECT count(*)::int AS n FROM ${relation} WHERE ${column} = $1`, [key])).rows[0].n}`);
-                await c.query("RELEASE SAVEPOINT count");
-              } catch (error) {
-                parts.push(`${relation}=refused-${(error as { code?: string }).code ?? "NO_SQLSTATE"}`);
-                await c.query("ROLLBACK TO SAVEPOINT count");
-              }
-            }
-            return parts.join(",");
-          };
           await c.query("BEGIN");
           try {
-            const before = await count();
+            const before = await count(c, counts);
             const wrote: string[] = [];
             for (const [sql, values] of parents) wrote.push(await attempt(c, sql, values));
-            frames.push(`${login.name} ${who} parents=${wrote.join(",")} before=${before} after=${await count()}`);
+            frames.push(`${login.name} ${who} parents=${wrote.join(",")} before=${before} after=${await count(c, counts)}`);
+          } finally {
+            await c.query("ROLLBACK");
+          }
+        });
+      }
+    }
+    for (const [, account, parents] of sides) {
+      await asLogin(database.connectionString, async (c) => {
+        await c.query(CREDENTIAL, [account.token]);
+        for (const [sql, values] of parents) await c.query(sql, [...values]);
+      });
+    }
+    for (const login of t1) {
+      for (const [who, account, , counts] of sides) {
+        await asLogin(login.url, async (c) => {
+          await c.query(CREDENTIAL, [account.token]);
+          await c.query("BEGIN");
+          try {
+            frames.push(`${login.name} ${who} planted before=${await count(c, counts)}`);
           } finally {
             await c.query("ROLLBACK");
           }
@@ -479,7 +501,8 @@ describe("row-level security S01 C6: forgery by SQL on the four T1 logins widens
     // A login without SELECT on a child refuses the count (42501); one with SELECT must count 0 before and after.
     const leaks = frames.filter((frame) => /=[1-9]/u.test(frame.replace(/^.* before=/u, "")));
     expect(leaks).toEqual([]);
-    expect(frames.filter((frame) => frame.includes(" A parents=ACCEPTED,ACCEPTED,"))).toHaveLength(2);
+    expect(frames.filter((frame) => / [AC] parents=42501(,42501)*( |$)/u.test(frame))).toHaveLength(2 * t1.length);
+    expect(frames.filter((frame) => frame.includes(" planted before="))).toHaveLength(2 * t1.length);
   });
 
   it("S6.3-F12 (FIX-S01-p1a NEW-2, V-18) no own-account row a T1 login writes may name B's subscription, card, quote, run, entitlement or subscription event", async () => {
@@ -487,7 +510,10 @@ describe("row-level security S01 C6: forgery by SQL on the four T1 logins widens
     // that a cross-account reader then acts on for B (cancelByToken and subscription_latest_v by subscription, the
     // renewal's usableSavedCard by card token, the invoice by quote, the funding pin by run and entitlement, the
     // withdrawal settlement by subscription and event). Each member is written twice in a rolled-back savepoint: naming
-    // B's entity (refused, 42501) and naming A's own (accepted: the statement is valid, so the refusal is the naming's).
+    // B's entity and naming A's own. Both are refused (42501) since the unpaid-plan review, which leaves a T1 login no
+    // billing write under a context but the lazy Free entitlement (F13), so each outcome names the check that refused it:
+    // V-18's guard (its RLS_ message; it fires before the WITH CHECK) or the policy. Naming A's own reaches the policy,
+    // so a guard refusal of B's is the naming's.
     const su = database.pool;
     const first = async (sql: string, owner: string): Promise<string> => String((await su.query(sql, [owner])).rows[0]!.id);
     const ids = async (owner: string) => ({
@@ -542,7 +568,23 @@ describe("row-level security S01 C6: forgery by SQL on the four T1 logins widens
         await c.query(CREDENTIAL, [A.token]);
         await c.query("BEGIN");
         try {
-          // A fresh own subscription with its first event (a new subscription is A's to name), for the settlement's pair.
+          // One statement in a savepoint, always undone: ACCEPTED, or the SQLSTATE and the check that refused it.
+          const refusal = async ([sql, values]: Statement): Promise<string> => {
+            await c.query("SAVEPOINT member");
+            try {
+              await c.query(sql, [...values]);
+              return "ACCEPTED";
+            } catch (error) {
+              const e = error as { code?: string; message?: string };
+              const message = e.message ?? "";
+              return `${e.code ?? "NO_SQLSTATE"}:${/^RLS_[A-Z_]+$/u.test(message) ? message
+                : /violates row-level security policy/u.test(message) ? "policy" : message.slice(0, 60)}`;
+            } finally {
+              await c.query("ROLLBACK TO SAVEPOINT member");
+            }
+          };
+          // A fresh own subscription with its first event (a new subscription is A's to name, but no longer A's to make
+          // under a context), for the settlement's pair, and an own CARD_CHECK charge on it for quote_use's.
           const fresh = { subscription: randomUUID(), event: randomUUID() };
           const freshMade = await attempt(c, `INSERT INTO billing.subscription_event(event_id,subscription_id,owner_ref,kind,at,plan_id,data)
             VALUES($1,$2,${ctx},'CREATED',now(),'PLUS',$3::jsonb)`, [fresh.event, fresh.subscription, netopia]);
@@ -554,11 +596,13 @@ describe("row-level security S01 C6: forgery by SQL on the four T1 logins widens
           const entitlement = (subscription: string): Statement => [`INSERT INTO billing.entitlement_event(event_id,owner_ref,plan_id,
             effective_at,period_anchor_at,cause,subscription_id,paid_through) VALUES($1,${ctx},'PLUS',now(),now(),'SUBSCRIBED',$2,
             now()+interval '30 days')`, [randomUUID(), subscription]];
-          // An own CARD_CHECK charge on the fresh subscription, for quote_use's charge (one use per charge).
           const useCharge = randomBytes(16).toString("hex");
-          await attempt(c, `INSERT INTO billing.charge(charge_id,owner_ref,subscription_id,kind,attempt,period_start,period_end,net_micros,
-            tax_micros,total_micros,currency,created_at,payment_environment,payment_provider) VALUES($1,${ctx},$2,'CARD_CHECK',1,now(),
-            now()+interval '30 days',0,0,0,'EUR',now(),'sandbox','netopia')`, [useCharge, fresh.subscription]);
+          const useChargeMade = await attempt(c, `INSERT INTO billing.charge(charge_id,owner_ref,subscription_id,kind,attempt,period_start,
+            period_end,net_micros,tax_micros,total_micros,currency,created_at,payment_environment,payment_provider) VALUES($1,${ctx},$2,
+            'CARD_CHECK',1,now(),now()+interval '30 days',0,0,0,'EUR',now(),'sandbox','netopia')`, [useCharge, fresh.subscription]);
+          if ((await su.query("SELECT has_table_privilege($1, 'billing.subscription_event', 'INSERT') AS may", [login.name])).rows[0].may) {
+            outcomes.push(`${login.name} fresh-subscription=${freshMade} use-charge=${useChargeMade}`);
+          }
           const use = (quote: string): Statement => [`INSERT INTO billing.quote_use(quote_id,used_at,charge_id) VALUES($1,now(),$2)`,
             [quote, useCharge]];
           const members: ReadonlyArray<readonly [string, Statement, Statement]> = [
@@ -580,8 +624,7 @@ describe("row-level security S01 C6: forgery by SQL on the four T1 logins widens
             const table = member.split(".").slice(0, 2).join(".");
             const may = (await su.query("SELECT has_table_privilege($1, $2::regclass, 'INSERT') AS may", [login.name, table])).rows[0].may as boolean;
             if (!may) continue;
-            outcomes.push(`${login.name} ${member} naming-b=${await attempt(c, badSql, badValues, true)} naming-own=${
-              freshMade === "ACCEPTED" ? await attempt(c, ownSql, ownValues, true) : `fresh-${freshMade}`}`);
+            outcomes.push(`${login.name} ${member} naming-b=${await refusal([badSql, badValues])} naming-own=${await refusal([ownSql, ownValues])}`);
           }
         } finally {
           await c.query("ROLLBACK");
@@ -589,13 +632,85 @@ describe("row-level security S01 C6: forgery by SQL on the four T1 logins widens
       });
     }
     console.info(`F12 FRAME ${outcomes.join(" | ")}`);
-    const members = ["billing.subscription_event.subscription_id", "billing.subscription_event.card_token_id",
-      "billing.subscription_event.card_token_id(retaken)", "billing.subscription_event.card_token_id(tool order)",
-      "billing.cancel_token.subscription_id", "billing.charge.subscription_id", "billing.charge.quote_id", "billing.quote_use.quote_id",
-      "billing.entitlement_event.subscription_id", "billing.run_charge_scope.run_id", "billing.run_charge_scope.entitlement_event_id",
-      "billing.withdrawal_owner_settlement.subscription_id", "billing.withdrawal_owner_settlement.withdrawn_event_id"];
-    expect(outcomes).toEqual(["debateai_dev_runtime", "debateai_prod_api_runtime"].flatMap((login) =>
-      members.map((member) => `${login} ${member} naming-b=42501 naming-own=ACCEPTED`)));
+    // Who refuses naming B's: V-18's guard where it checks the member (an entitlement is refused whole first: F13's rule),
+    // the policy where V-18's check was the policy's (charge.quote_id, run_charge_scope) or names a subscription with no
+    // event (the fresh one, which A could not make).
+    const guard = (message: string): string => `42501:${message}`;
+    const members: ReadonlyArray<readonly [string, string]> = [
+      ["billing.subscription_event.subscription_id", guard("RLS_FOREIGN_SUBSCRIPTION")],
+      ["billing.subscription_event.card_token_id", guard("RLS_FOREIGN_CARD_TOKEN")],
+      ["billing.subscription_event.card_token_id(retaken)", guard("RLS_FOREIGN_CARD_TOKEN")],
+      ["billing.subscription_event.card_token_id(tool order)", guard("RLS_FOREIGN_CARD_TOKEN")],
+      ["billing.cancel_token.subscription_id", guard("RLS_FOREIGN_SUBSCRIPTION")],
+      ["billing.charge.subscription_id", guard("RLS_FOREIGN_SUBSCRIPTION")],
+      ["billing.charge.quote_id", "42501:policy"],
+      ["billing.quote_use.quote_id", guard("RLS_FOREIGN_QUOTE")],
+      ["billing.entitlement_event.subscription_id", guard("RLS_UNPAID_ENTITLEMENT")],
+      ["billing.run_charge_scope.run_id", "42501:policy"],
+      ["billing.run_charge_scope.entitlement_event_id", "42501:policy"],
+      ["billing.withdrawal_owner_settlement.subscription_id", guard("RLS_FOREIGN_SUBSCRIPTION")],
+      ["billing.withdrawal_owner_settlement.withdrawn_event_id", "42501:policy"]];
+    expect(outcomes).toEqual(["debateai_dev_runtime", "debateai_prod_api_runtime"].flatMap((login) => [
+      `${login} fresh-subscription=42501 use-charge=42501`,
+      ...members.map(([member, namingB]) => `${login} ${member} naming-b=${namingB} naming-own=${
+        member.startsWith("billing.entitlement_event.") ? guard("RLS_UNPAID_ENTITLEMENT") : "42501:policy"}`)]));
+  });
+
+  it("S6.3-F13 under its own context a T1 login adds no billing state a payment does not back: an own MAX entitlement is refused and person_windows_v stays Free, while the lazy Free entitlement is still accepted", async () => {
+    // The independent review's case: debateai_billing_runtime gives both runtime logins INSERT on every billing table, and
+    // an own MAX entitlement (cause SUBSCRIBED, paid through ten years out, no subscription) made person_windows_v read MAX.
+    // The one billing row a T1 login writes under a context is EntitlementRepository.current's lazy Free (the ask room's
+    // `pool`, apps/api/src/main.ts); checkout, renewal, settlement and the charge scope write on api-system. Each forgery runs
+    // in a rolled-back transaction of A's context; the lazy Free runs through the product's repository on a pool built as
+    // main.ts builds `pool`, for an account with no billing row yet (one per login: the Free row is one per account).
+    const su = database.pool;
+    const ctx = "(SELECT rls.context_owner_ref())";
+    const outcomes: string[] = [];
+    for (const login of t1) {
+      if (!(await su.query("SELECT has_table_privilege($1, 'billing.entitlement_event', 'INSERT') AS may", [login.name])).rows[0].may) continue;
+      await asLogin(login.url, async (c) => {
+        await c.query(CREDENTIAL, [A.token]);
+        await c.query("BEGIN");
+        try {
+          const max = await attempt(c, `INSERT INTO billing.entitlement_event(event_id,owner_ref,plan_id,effective_at,period_anchor_at,
+            cause,subscription_id,paid_through) VALUES($1,${ctx},'MAX',now(),now(),'SUBSCRIBED',NULL,now()+interval '10 years')`, [randomUUID()]);
+          const view = (await c.query(`SELECT plan_id FROM billing.person_windows_v WHERE owner_ref=${ctx}`)).rows[0]?.plan_id ?? "none";
+          const quote = await attempt(c, `INSERT INTO billing.quote(quote_id,owner_ref,plan_id,kind,net_micros,tax_micros,total_micros,
+            tax_country,tax_rate_bp,tax_status,tax_name,created_at,expires_at,location_ciphertext,key_id,currency) SELECT $1,${ctx},'MAX',
+            kind,0,0,0,tax_country,tax_rate_bp,tax_status,tax_name,now(),now()+interval '1 hour',location_ciphertext,key_id,currency
+            FROM billing.quote WHERE owner_ref=$2 LIMIT 1`, [randomUUID(), A.ownerRef], true);
+          outcomes.push(`${login.name} max=${max} view=${view} zero-quote=${quote}`);
+        } finally {
+          await c.query("ROLLBACK");
+        }
+      });
+      const fresh = await seedSessionAccount(su, `F13-${login.name}`);
+      const forgedAnchor = await asLogin(login.url, async (c) => {
+        await c.query(CREDENTIAL, [fresh.token]);
+        await c.query("BEGIN");
+        try {
+          return await attempt(c, `INSERT INTO billing.entitlement_event(event_id,owner_ref,plan_id,effective_at,period_anchor_at,cause)
+            VALUES($1,${ctx},'FREE',now(),now(),'SIGNED_UP_FREE')`, [randomUUID()]);
+        } finally {
+          await c.query("ROLLBACK");
+        }
+      });
+      const target = createPool(login.systemUrl, { max: 1 });
+      const routed = createPool(login.url, { max: 1, crossAccount: target });
+      ownPools.push(routed, target);
+      const lazy = await runInRequestScope(async () => {
+        setRequestCredential(fresh.token);
+        return new EntitlementRepository(routed).current(fresh.ownerRef, new Date()).then((e) => `${e.planId}`, (e) => `refused-${e.code ?? e.message}`);
+      });
+      const stored = (await su.query(`SELECT e.cause FROM billing.entitlement_event e JOIN identity."user" u ON u.owner_ref=e.owner_ref
+        WHERE e.owner_ref=$1 AND e.plan_id='FREE' AND e.subscription_id IS NULL AND e.effective_at=u.created_at AND e.period_anchor_at=u.created_at`,
+      [fresh.ownerRef])).rows.map((row) => row.cause as string);
+      outcomes.push(`${login.name} free-at-chosen-anchor=${forgedAnchor} lazy-free=${lazy} stored=${stored.join(",") || "none"}`);
+    }
+    console.info(`F13 FRAME ${outcomes.join(" | ")}`);
+    expect(outcomes).toEqual(["debateai_dev_runtime", "debateai_prod_api_runtime"].flatMap((login) => [
+      `${login} max=42501 view=FREE zero-quote=42501`,
+      `${login} free-at-chosen-anchor=42501 lazy-free=FREE stored=SIGNED_UP_FREE`]));
   });
 
   it("S6.3-F9 while an A call runs and after it ends, a second connection of the same login sees no credential or context value of A", async () => {

@@ -42,6 +42,13 @@ const CREDENTIAL = "SELECT set_config('debateai.session_credential', $1, false)"
 const ADMITS_NO_ROW = new Set(["billing.card_token", "billing.card_token_revocation", "billing.notice_quarantine", "billing.outbox",
   "billing.payment_notice", "billing.payment_notice_outcome", "billing.payment_notice_raw", "billing.xmoney_notice",
   "billing.xmoney_notice_outcome", "identity.audit_event"]);
+/**
+ * The unpaid-plan review: every other billing table admits a T1 context its own rows to read but none to write (WITH
+ * CHECK false), and billing.entitlement_event only the lazy Free row (its guard), which the seed's row is not. R23 takes
+ * their rows from the superuser too, and requires each own write refused.
+ */
+const WRITES_NO_ROW = new Set(RLS_SEED_STEPS.map(({ relation }) => relation)
+  .filter((relation) => relation.startsWith("billing.") && !ADMITS_NO_ROW.has(relation)));
 /** F-SEC-1: the two-run tables whose policy keys on one run column. */
 const TWO_RUN = ["core.run_supersession", "memory.alias_row", "memory.candidate_record", "memory.memory_link"] as const;
 /**
@@ -404,18 +411,18 @@ describe("row-level security S01 C6: isolation of every in-scope relation on the
     // child of one (billing.xmoney_notice_outcome, billing.payment_notice_outcome) meets its own policy, not a missing
     // parent. Several of them hang off rows C must write itself (billing.card_token off C's customer, which is one row
     // per owner), so the superuser writes them in the world of a fourth account D, every step in order, and only the
-    // `false` tables' rows are carried over.
+    // `false` tables' rows are carried over, and the rows of the billing tables a context may not write (WRITES_NO_ROW).
     const D = await seedSessionAccount(database.pool, "D");
     const dWorld = await prepareRlsSeedWorld(database.pool, D, "D");
     const superuserInsert = await rlsSeedInserter(database.pool);
     for (const step of RLS_SEED_STEPS) await step.run(superuserInsert, database.pool, dWorld);
-    const superuserMade = new Map([...dWorld.made].filter(([name]) =>
-      RLS_SEED_STEPS.some(({ relation }) => ADMITS_NO_ROW.has(relation) && relation.endsWith(`.${name}`))));
-    expect(superuserMade.size).toBe(ADMITS_NO_ROW.size);
+    const superuserMade = new Map([...dWorld.made].filter(([name]) => RLS_SEED_STEPS.some(({ relation }) =>
+      (ADMITS_NO_ROW.has(relation) || WRITES_NO_ROW.has(relation)) && relation.endsWith(`.${name}`))));
+    expect([WRITES_NO_ROW.size, superuserMade.size]).toEqual([19, ADMITS_NO_ROW.size + 19]);
     const failures: string[] = [];
     let written = 0;
     for (const login of t1) {
-      let insertable = 0, refused = 0, wrote = 0;
+      let insertable = 0, refused = 0, wrote = 0, billingRefused = 0;
       await asLogin(login.url, async (client) => {
         await client.query(CREDENTIAL, [C.token]);
         await client.query("BEGIN");
@@ -433,6 +440,9 @@ describe("row-level security S01 C6: isolation of every in-scope relation on the
             if (ADMITS_NO_ROW.has(step.relation)) {
               if (error === null || !error.startsWith("42501 ")) failures.push(`RLS_FAIL ${login.name} ${step.relation} R23 false-policy-admitted=${error}`);
               else refused += 1;
+            } else if (WRITES_NO_ROW.has(step.relation)) {
+              if (error === null || !error.startsWith("42501 ")) failures.push(`RLS_FAIL ${login.name} ${step.relation} R23 billing-write-admitted=${error}`);
+              else billingRefused += 1;
             } else if (error !== null) {
               failures.push(`RLS_FAIL ${login.name} ${step.relation} R23 ${error}`);
             } else {
@@ -444,7 +454,7 @@ describe("row-level security S01 C6: isolation of every in-scope relation on the
         }
       });
       written += wrote;
-      console.info(`R23 FRAME login=${login.name} insertable=${insertable} written=${wrote} false_policy_refused=${refused}`);
+      console.info(`R23 FRAME login=${login.name} insertable=${insertable} written=${wrote} false_policy_refused=${refused} billing_write_refused=${billingRefused}`);
     }
     expect(failures).toEqual([]);
     expect(written).toBeGreaterThan(0);

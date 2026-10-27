@@ -74,7 +74,17 @@ login can write — a setting, a role, a function argument — makes the databas
   new writes only: an event stored before 0124 may still name another account's card or link (the subscription fold
   already refuses an event of another owner).
   `tests/integration/rls-forgery.test.ts` S6.3-F12 writes each of the ten members, once naming the other account's
-  entity (refused) and once naming its own (accepted).
+  entity and once naming its own; since the rule below both are refused, and the case pins which check refuses each.
+- A request login may not write billing state that no payment backs. The two runtime logins hold INSERT on every
+  billing table through `debateai_billing_runtime`, which also carries their registration, legal and side-by-side
+  grants, so an own MAX entitlement (cause `SUBSCRIBED`, paid ten years out) made `billing.person_windows_v` read MAX,
+  and an own quote at a price of the account's choosing was accepted (the unpaid-plan review, measured on both logins).
+  Measured: the one billing row a signed-in request writes on a request login is the lazy Free entitlement
+  (`EntitlementRepository.current`, the ask room's request pool); checkout, renewal, settlement and the charge scope
+  write on api-system. So every billing table's request-login check writes nothing (`WITH CHECK (false)`) but
+  `billing.entitlement_event`'s, where `billing.guard_own_references()` admits only that Free row: no subscription,
+  credit override or paid-through, anchored and effective at the account's `created_at`. The role stays as it is: the
+  system logins inherit `debateai_runtime` through it. `tests/integration/rls-forgery.test.ts` S6.3-F13 pins both halves.
 - A statement on a request login costs one InitPlan per policy evaluation (re-hash and session lookup); measured once
   (25.1 ms for a full scan of 1,001 runs), otherwise UNVERIFIED.
 - Code that runs on a system login (the billing runtime, background loops, the listed sites) is not limited by row

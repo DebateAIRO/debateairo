@@ -18,7 +18,9 @@
 --       billing tables a child row of which may have no parent row key on `false` (V-17's default, FIX-S01-p1a NEW-1),
 --       and six billing tables refuse a row written under an account's context that names another account's
 --       subscription, saved card or quote (V-18's default, NEW-2); charge, run_charge_scope and
---       withdrawal_owner_settlement also check the parent rows they name.
+--       withdrawal_owner_settlement also check the parent rows they name. Under an account's context a T1 login writes
+--       no billing row but the lazy Free entitlement: every other billing table's T1 WITH CHECK is `false`, and the guard
+--       admits on billing.entitlement_event only the Free row EntitlementRepository.current appends (the unpaid-plan review).
 -- The loader (packages/db/src/migration-forward0124.ts) digests every RLS field of the 110 tables, the views, the
 -- functions and the marker role, and records the six earlier postconditions that pinned the flag as amended (D38, F-C1-1).
 -- Its verifier supersedes 0111's (lineage/verify-effective-capabilities-124.sql, R34), so the header keeps none.
@@ -79,10 +81,26 @@ GRANT EXECUTE ON FUNCTION rls.owns_execution_ref(text) TO debateai_runtime;
 -- policy function: a function a T1 login may EXECUTE answers R42's calls (FIX-S01-p1e: two such definers returned true
 -- for a NULL and for an unknown id, and rls:proof's F7 read that as a private value), and this one is EXECUTE-able by
 -- no login, as billing.guard_internal_charge_scope is (0123).
+-- The unpaid-plan review (2026-10-27, measured: an own MAX entitlement, cause SUBSCRIBED and paid ten years out, made
+-- person_windows_v read MAX on both runtime logins): the one billing row a T1 login writes under a context is the lazy
+-- Free entitlement EntitlementRepository.current appends for an account with no event yet (the ask room's request pool);
+-- checkout, renewal, settlement and the charge scope write on api-system. So an entitlement written under a context must
+-- be that row: FREE, SIGNED_UP_FREE, no subscription, credit override or paid-through, anchored and effective at the
+-- account's created_at (a chosen anchor would move the Free windows). The guard checks it, not the policy: the check
+-- reads identity."user", and R15's allow-list pins the policy texts.
 CREATE OR REPLACE FUNCTION billing.guard_own_references() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog AS $$
 DECLARE v_context uuid := rls.context_owner_ref(); v_first uuid;
 BEGIN
   IF v_context IS NULL THEN RETURN NEW; END IF;
+  IF TG_TABLE_NAME = 'entitlement_event' THEN
+    IF NEW.plan_id IS DISTINCT FROM 'FREE' OR NEW.cause IS DISTINCT FROM 'SIGNED_UP_FREE' OR NEW.subscription_id IS NOT NULL
+        OR NEW.month_credit_override_micros IS NOT NULL OR NEW.paid_through IS NOT NULL
+        OR NOT EXISTS (SELECT 1 FROM identity."user" AS u WHERE u.owner_ref = v_context
+          AND u.created_at = NEW.effective_at AND u.created_at = NEW.period_anchor_at) THEN
+      RAISE EXCEPTION 'RLS_UNPAID_ENTITLEMENT' USING ERRCODE = '42501';
+    END IF;
+    RETURN NEW;
+  END IF;
   IF TG_TABLE_NAME = 'quote_use' THEN
     IF NOT EXISTS (SELECT 1 FROM billing.quote AS q WHERE q.quote_id = NEW.quote_id AND q.owner_ref = v_context) THEN
       RAISE EXCEPTION 'RLS_FOREIGN_QUOTE' USING ERRCODE = '42501';
@@ -118,7 +136,12 @@ ALTER VIEW core.run_waiting_v SET (security_invoker = true);
 REVOKE SELECT ON core.run_waiting_v FROM debateai_runtime;
 GRANT SELECT ON core.run_waiting_v TO debateai_billing_runtime;
 
--- (5) The 110 in-scope tables, in D32's row order.
+-- (5) The 110 in-scope tables, in D32's row order. On every billing table but billing.entitlement_event the T1 policy
+--     reads with D32's key and writes nothing (WITH CHECK false, the unpaid-plan review): the request logins hold INSERT
+--     on every billing table through debateai_billing_runtime, which also carries their registration, legal and
+--     side-by-side grants, and a signed-in request writes no billing row on them but the lazy Free entitlement (the
+--     guard above). An own quote at a price of the account's choosing, an own subscription, charge or invoice is no
+--     longer the context's to write; api-system writes them all, through rls_all_accounts.
 -- 1 · billing.cancel_token · K2 (V-15's default; D32's K7 key was an EXISTS over billing.subscription_event, whose
 --     subscription_id any account may append under its own owner_ref, so one own event naming another account's
 --     subscription read and wrote that account's links: REV-S01-p1-security B1, t_37152b67). The link carries its own
@@ -134,12 +157,12 @@ UPDATE billing.cancel_token AS token SET owner_ref = (SELECT event.owner_ref FRO
   WHERE event.subscription_id = token.subscription_id ORDER BY event.seq LIMIT 1);
 ALTER TABLE billing.cancel_token ENABLE TRIGGER reject_mutation;
 ALTER TABLE billing.cancel_token ENABLE ROW LEVEL SECURITY;
-CREATE POLICY rls_account ON billing.cancel_token AS PERMISSIVE FOR ALL TO debateai_runtime USING ((owner_ref = (SELECT rls.context_owner_ref()))) WITH CHECK ((owner_ref = (SELECT rls.context_owner_ref())));
+CREATE POLICY rls_account ON billing.cancel_token AS PERMISSIVE FOR ALL TO debateai_runtime USING ((owner_ref = (SELECT rls.context_owner_ref()))) WITH CHECK (false);
 CREATE POLICY rls_all_accounts ON billing.cancel_token AS PERMISSIVE FOR ALL TO debateai_rls_all_accounts, debateai_replay, debateai_settlement_watch, debateai_evaluator_worker, debateai_staff_security_owner, debateai_mfa_recovery_owner, debateai_password_recovery_owner, debateai_password_reset_owner, debateai_obs_view_owner, debateai_backup_email_owner, debateai_release_owner USING (true) WITH CHECK (true);
 -- 2 · billing.cancel_token_use · K7 (ARCH key, D32), through billing.cancel_token's primary key (a foreign key holds every
 --     use to its link) and so through the link's own owner since V-15
 ALTER TABLE billing.cancel_token_use ENABLE ROW LEVEL SECURITY;
-CREATE POLICY rls_account ON billing.cancel_token_use AS PERMISSIVE FOR ALL TO debateai_runtime USING ((EXISTS (SELECT 1 FROM billing.cancel_token p WHERE p.token_sha256 = cancel_token_use.token_sha256))) WITH CHECK ((EXISTS (SELECT 1 FROM billing.cancel_token p WHERE p.token_sha256 = cancel_token_use.token_sha256)));
+CREATE POLICY rls_account ON billing.cancel_token_use AS PERMISSIVE FOR ALL TO debateai_runtime USING ((EXISTS (SELECT 1 FROM billing.cancel_token p WHERE p.token_sha256 = cancel_token_use.token_sha256))) WITH CHECK (false);
 CREATE POLICY rls_all_accounts ON billing.cancel_token_use AS PERMISSIVE FOR ALL TO debateai_rls_all_accounts, debateai_replay, debateai_settlement_watch, debateai_evaluator_worker, debateai_staff_security_owner, debateai_mfa_recovery_owner, debateai_password_recovery_owner, debateai_password_reset_owner, debateai_obs_view_owner, debateai_backup_email_owner, debateai_release_owner USING (true) WITH CHECK (true);
 -- 3 · billing.card_token · K7 (V-17's default; D32's key was an EXISTS over billing.customer, but customer_id has no
 --     foreign key, so a saved card whose customer row is gone became readable once an account inserted an own customer
@@ -155,23 +178,23 @@ CREATE POLICY rls_account ON billing.card_token_revocation AS PERMISSIVE FOR ALL
 CREATE POLICY rls_all_accounts ON billing.card_token_revocation AS PERMISSIVE FOR ALL TO debateai_rls_all_accounts, debateai_replay, debateai_settlement_watch, debateai_evaluator_worker, debateai_staff_security_owner, debateai_mfa_recovery_owner, debateai_password_recovery_owner, debateai_password_reset_owner, debateai_obs_view_owner, debateai_backup_email_owner, debateai_release_owner USING (true) WITH CHECK (true);
 -- 5 · billing.charge · K2, naming only a quote the context may read (V-18; its subscription: guard_own_references)
 ALTER TABLE billing.charge ENABLE ROW LEVEL SECURITY;
-CREATE POLICY rls_account ON billing.charge AS PERMISSIVE FOR ALL TO debateai_runtime USING (((owner_ref = (SELECT rls.context_owner_ref())) AND (quote_id IS NULL OR EXISTS (SELECT 1 FROM billing.quote p WHERE p.quote_id = charge.quote_id)))) WITH CHECK (((owner_ref = (SELECT rls.context_owner_ref())) AND (quote_id IS NULL OR EXISTS (SELECT 1 FROM billing.quote p WHERE p.quote_id = charge.quote_id))));
+CREATE POLICY rls_account ON billing.charge AS PERMISSIVE FOR ALL TO debateai_runtime USING (((owner_ref = (SELECT rls.context_owner_ref())) AND (quote_id IS NULL OR EXISTS (SELECT 1 FROM billing.quote p WHERE p.quote_id = charge.quote_id)))) WITH CHECK (false);
 CREATE POLICY rls_all_accounts ON billing.charge AS PERMISSIVE FOR ALL TO debateai_rls_all_accounts, debateai_replay, debateai_settlement_watch, debateai_evaluator_worker, debateai_staff_security_owner, debateai_mfa_recovery_owner, debateai_password_recovery_owner, debateai_password_reset_owner, debateai_obs_view_owner, debateai_backup_email_owner, debateai_release_owner USING (true) WITH CHECK (true);
 -- 6 · billing.charge_event · K6 via billing.charge(K2)
 ALTER TABLE billing.charge_event ENABLE ROW LEVEL SECURITY;
-CREATE POLICY rls_account ON billing.charge_event AS PERMISSIVE FOR ALL TO debateai_runtime USING ((EXISTS (SELECT 1 FROM billing.charge p WHERE p.charge_id = charge_event.charge_id AND p.payment_environment = charge_event.payment_environment AND p.payment_provider = charge_event.payment_provider))) WITH CHECK ((EXISTS (SELECT 1 FROM billing.charge p WHERE p.charge_id = charge_event.charge_id AND p.payment_environment = charge_event.payment_environment AND p.payment_provider = charge_event.payment_provider)));
+CREATE POLICY rls_account ON billing.charge_event AS PERMISSIVE FOR ALL TO debateai_runtime USING ((EXISTS (SELECT 1 FROM billing.charge p WHERE p.charge_id = charge_event.charge_id AND p.payment_environment = charge_event.payment_environment AND p.payment_provider = charge_event.payment_provider))) WITH CHECK (false);
 CREATE POLICY rls_all_accounts ON billing.charge_event AS PERMISSIVE FOR ALL TO debateai_rls_all_accounts, debateai_replay, debateai_settlement_watch, debateai_evaluator_worker, debateai_staff_security_owner, debateai_mfa_recovery_owner, debateai_password_recovery_owner, debateai_password_reset_owner, debateai_obs_view_owner, debateai_backup_email_owner, debateai_release_owner USING (true) WITH CHECK (true);
 -- 7 · billing.customer · K2
 ALTER TABLE billing.customer ENABLE ROW LEVEL SECURITY;
-CREATE POLICY rls_account ON billing.customer AS PERMISSIVE FOR ALL TO debateai_runtime USING ((owner_ref = (SELECT rls.context_owner_ref()))) WITH CHECK ((owner_ref = (SELECT rls.context_owner_ref())));
+CREATE POLICY rls_account ON billing.customer AS PERMISSIVE FOR ALL TO debateai_runtime USING ((owner_ref = (SELECT rls.context_owner_ref()))) WITH CHECK (false);
 CREATE POLICY rls_all_accounts ON billing.customer AS PERMISSIVE FOR ALL TO debateai_rls_all_accounts, debateai_replay, debateai_settlement_watch, debateai_evaluator_worker, debateai_staff_security_owner, debateai_mfa_recovery_owner, debateai_password_recovery_owner, debateai_password_reset_owner, debateai_obs_view_owner, debateai_backup_email_owner, debateai_release_owner USING (true) WITH CHECK (true);
 -- 8 · billing.customer_profile_event · K6 via billing.customer(K2)
 ALTER TABLE billing.customer_profile_event ENABLE ROW LEVEL SECURITY;
-CREATE POLICY rls_account ON billing.customer_profile_event AS PERMISSIVE FOR ALL TO debateai_runtime USING ((EXISTS (SELECT 1 FROM billing.customer p WHERE p.customer_id = customer_profile_event.customer_id))) WITH CHECK ((EXISTS (SELECT 1 FROM billing.customer p WHERE p.customer_id = customer_profile_event.customer_id)));
+CREATE POLICY rls_account ON billing.customer_profile_event AS PERMISSIVE FOR ALL TO debateai_runtime USING ((EXISTS (SELECT 1 FROM billing.customer p WHERE p.customer_id = customer_profile_event.customer_id))) WITH CHECK (false);
 CREATE POLICY rls_all_accounts ON billing.customer_profile_event AS PERMISSIVE FOR ALL TO debateai_rls_all_accounts, debateai_replay, debateai_settlement_watch, debateai_evaluator_worker, debateai_staff_security_owner, debateai_mfa_recovery_owner, debateai_password_recovery_owner, debateai_password_reset_owner, debateai_obs_view_owner, debateai_backup_email_owner, debateai_release_owner USING (true) WITH CHECK (true);
 -- 9 · billing.customer_xmoney · K6 via billing.customer(K2)
 ALTER TABLE billing.customer_xmoney ENABLE ROW LEVEL SECURITY;
-CREATE POLICY rls_account ON billing.customer_xmoney AS PERMISSIVE FOR ALL TO debateai_runtime USING ((EXISTS (SELECT 1 FROM billing.customer p WHERE p.customer_id = customer_xmoney.customer_id))) WITH CHECK ((EXISTS (SELECT 1 FROM billing.customer p WHERE p.customer_id = customer_xmoney.customer_id)));
+CREATE POLICY rls_account ON billing.customer_xmoney AS PERMISSIVE FOR ALL TO debateai_runtime USING ((EXISTS (SELECT 1 FROM billing.customer p WHERE p.customer_id = customer_xmoney.customer_id))) WITH CHECK (false);
 CREATE POLICY rls_all_accounts ON billing.customer_xmoney AS PERMISSIVE FOR ALL TO debateai_rls_all_accounts, debateai_replay, debateai_settlement_watch, debateai_evaluator_worker, debateai_staff_security_owner, debateai_mfa_recovery_owner, debateai_password_recovery_owner, debateai_password_reset_owner, debateai_obs_view_owner, debateai_backup_email_owner, debateai_release_owner USING (true) WITH CHECK (true);
 -- 10 · billing.entitlement_event · K2 (V-18: its subscription, guard_own_references)
 ALTER TABLE billing.entitlement_event ENABLE ROW LEVEL SECURITY;
@@ -179,23 +202,23 @@ CREATE POLICY rls_account ON billing.entitlement_event AS PERMISSIVE FOR ALL TO 
 CREATE POLICY rls_all_accounts ON billing.entitlement_event AS PERMISSIVE FOR ALL TO debateai_rls_all_accounts, debateai_replay, debateai_settlement_watch, debateai_evaluator_worker, debateai_staff_security_owner, debateai_mfa_recovery_owner, debateai_password_recovery_owner, debateai_password_reset_owner, debateai_obs_view_owner, debateai_backup_email_owner, debateai_release_owner USING (true) WITH CHECK (true);
 -- 11 · billing.hosted_payment · K6 via billing.charge(K2)
 ALTER TABLE billing.hosted_payment ENABLE ROW LEVEL SECURITY;
-CREATE POLICY rls_account ON billing.hosted_payment AS PERMISSIVE FOR ALL TO debateai_runtime USING ((EXISTS (SELECT 1 FROM billing.charge p WHERE p.charge_id = hosted_payment.charge_id))) WITH CHECK ((EXISTS (SELECT 1 FROM billing.charge p WHERE p.charge_id = hosted_payment.charge_id)));
+CREATE POLICY rls_account ON billing.hosted_payment AS PERMISSIVE FOR ALL TO debateai_runtime USING ((EXISTS (SELECT 1 FROM billing.charge p WHERE p.charge_id = hosted_payment.charge_id))) WITH CHECK (false);
 CREATE POLICY rls_all_accounts ON billing.hosted_payment AS PERMISSIVE FOR ALL TO debateai_rls_all_accounts, debateai_replay, debateai_settlement_watch, debateai_evaluator_worker, debateai_staff_security_owner, debateai_mfa_recovery_owner, debateai_password_recovery_owner, debateai_password_reset_owner, debateai_obs_view_owner, debateai_backup_email_owner, debateai_release_owner USING (true) WITH CHECK (true);
 -- 12 · billing.invoice · K6 via billing.invoice_intent(K6)
 ALTER TABLE billing.invoice ENABLE ROW LEVEL SECURITY;
-CREATE POLICY rls_account ON billing.invoice AS PERMISSIVE FOR ALL TO debateai_runtime USING ((EXISTS (SELECT 1 FROM billing.invoice_intent p WHERE p.charge_id = invoice.charge_id AND p.kind = invoice.kind AND p.issuer = invoice.issuer))) WITH CHECK ((EXISTS (SELECT 1 FROM billing.invoice_intent p WHERE p.charge_id = invoice.charge_id AND p.kind = invoice.kind AND p.issuer = invoice.issuer)));
+CREATE POLICY rls_account ON billing.invoice AS PERMISSIVE FOR ALL TO debateai_runtime USING ((EXISTS (SELECT 1 FROM billing.invoice_intent p WHERE p.charge_id = invoice.charge_id AND p.kind = invoice.kind AND p.issuer = invoice.issuer))) WITH CHECK (false);
 CREATE POLICY rls_all_accounts ON billing.invoice AS PERMISSIVE FOR ALL TO debateai_rls_all_accounts, debateai_replay, debateai_settlement_watch, debateai_evaluator_worker, debateai_staff_security_owner, debateai_mfa_recovery_owner, debateai_password_recovery_owner, debateai_password_reset_owner, debateai_obs_view_owner, debateai_backup_email_owner, debateai_release_owner USING (true) WITH CHECK (true);
 -- 13 · billing.invoice_intent · K6 via billing.charge(K2)
 ALTER TABLE billing.invoice_intent ENABLE ROW LEVEL SECURITY;
-CREATE POLICY rls_account ON billing.invoice_intent AS PERMISSIVE FOR ALL TO debateai_runtime USING ((EXISTS (SELECT 1 FROM billing.charge p WHERE p.charge_id = invoice_intent.charge_id))) WITH CHECK ((EXISTS (SELECT 1 FROM billing.charge p WHERE p.charge_id = invoice_intent.charge_id)));
+CREATE POLICY rls_account ON billing.invoice_intent AS PERMISSIVE FOR ALL TO debateai_runtime USING ((EXISTS (SELECT 1 FROM billing.charge p WHERE p.charge_id = invoice_intent.charge_id))) WITH CHECK (false);
 CREATE POLICY rls_all_accounts ON billing.invoice_intent AS PERMISSIVE FOR ALL TO debateai_rls_all_accounts, debateai_replay, debateai_settlement_watch, debateai_evaluator_worker, debateai_staff_security_owner, debateai_mfa_recovery_owner, debateai_password_recovery_owner, debateai_password_reset_owner, debateai_obs_view_owner, debateai_backup_email_owner, debateai_release_owner USING (true) WITH CHECK (true);
 -- 14 · billing.invoice_status_event · K6 via billing.invoice(K6)
 ALTER TABLE billing.invoice_status_event ENABLE ROW LEVEL SECURITY;
-CREATE POLICY rls_account ON billing.invoice_status_event AS PERMISSIVE FOR ALL TO debateai_runtime USING ((EXISTS (SELECT 1 FROM billing.invoice p WHERE p.invoice_id = invoice_status_event.invoice_id))) WITH CHECK ((EXISTS (SELECT 1 FROM billing.invoice p WHERE p.invoice_id = invoice_status_event.invoice_id)));
+CREATE POLICY rls_account ON billing.invoice_status_event AS PERMISSIVE FOR ALL TO debateai_runtime USING ((EXISTS (SELECT 1 FROM billing.invoice p WHERE p.invoice_id = invoice_status_event.invoice_id))) WITH CHECK (false);
 CREATE POLICY rls_all_accounts ON billing.invoice_status_event AS PERMISSIVE FOR ALL TO debateai_rls_all_accounts, debateai_replay, debateai_settlement_watch, debateai_evaluator_worker, debateai_staff_security_owner, debateai_mfa_recovery_owner, debateai_password_recovery_owner, debateai_password_reset_owner, debateai_obs_view_owner, debateai_backup_email_owner, debateai_release_owner USING (true) WITH CHECK (true);
 -- 15 · billing.location_evidence · K6 via billing.charge(K2)
 ALTER TABLE billing.location_evidence ENABLE ROW LEVEL SECURITY;
-CREATE POLICY rls_account ON billing.location_evidence AS PERMISSIVE FOR ALL TO debateai_runtime USING ((EXISTS (SELECT 1 FROM billing.charge p WHERE p.charge_id = location_evidence.charge_id))) WITH CHECK ((EXISTS (SELECT 1 FROM billing.charge p WHERE p.charge_id = location_evidence.charge_id)));
+CREATE POLICY rls_account ON billing.location_evidence AS PERMISSIVE FOR ALL TO debateai_runtime USING ((EXISTS (SELECT 1 FROM billing.charge p WHERE p.charge_id = location_evidence.charge_id))) WITH CHECK (false);
 CREATE POLICY rls_all_accounts ON billing.location_evidence AS PERMISSIVE FOR ALL TO debateai_rls_all_accounts, debateai_replay, debateai_settlement_watch, debateai_evaluator_worker, debateai_staff_security_owner, debateai_mfa_recovery_owner, debateai_password_recovery_owner, debateai_password_reset_owner, debateai_obs_view_owner, debateai_backup_email_owner, debateai_release_owner USING (true) WITH CHECK (true);
 -- 16 · billing.notice_quarantine · K7 (V-17's default: `false`, as row 3; an unmatched notice's order_id names no charge)
 ALTER TABLE billing.notice_quarantine ENABLE ROW LEVEL SECURITY;
@@ -219,27 +242,27 @@ CREATE POLICY rls_account ON billing.payment_notice_raw AS PERMISSIVE FOR ALL TO
 CREATE POLICY rls_all_accounts ON billing.payment_notice_raw AS PERMISSIVE FOR ALL TO debateai_rls_all_accounts, debateai_replay, debateai_settlement_watch, debateai_evaluator_worker, debateai_staff_security_owner, debateai_mfa_recovery_owner, debateai_password_recovery_owner, debateai_password_reset_owner, debateai_obs_view_owner, debateai_backup_email_owner, debateai_release_owner USING (true) WITH CHECK (true);
 -- 22 · billing.quote · K2
 ALTER TABLE billing.quote ENABLE ROW LEVEL SECURITY;
-CREATE POLICY rls_account ON billing.quote AS PERMISSIVE FOR ALL TO debateai_runtime USING ((owner_ref = (SELECT rls.context_owner_ref()))) WITH CHECK ((owner_ref = (SELECT rls.context_owner_ref())));
+CREATE POLICY rls_account ON billing.quote AS PERMISSIVE FOR ALL TO debateai_runtime USING ((owner_ref = (SELECT rls.context_owner_ref()))) WITH CHECK (false);
 CREATE POLICY rls_all_accounts ON billing.quote AS PERMISSIVE FOR ALL TO debateai_rls_all_accounts, debateai_replay, debateai_settlement_watch, debateai_evaluator_worker, debateai_staff_security_owner, debateai_mfa_recovery_owner, debateai_password_recovery_owner, debateai_password_reset_owner, debateai_obs_view_owner, debateai_backup_email_owner, debateai_release_owner USING (true) WITH CHECK (true);
 -- 23 · billing.quote_use · K6 via billing.charge(K2)
 ALTER TABLE billing.quote_use ENABLE ROW LEVEL SECURITY;
-CREATE POLICY rls_account ON billing.quote_use AS PERMISSIVE FOR ALL TO debateai_runtime USING ((EXISTS (SELECT 1 FROM billing.charge p WHERE p.charge_id = quote_use.charge_id))) WITH CHECK ((EXISTS (SELECT 1 FROM billing.charge p WHERE p.charge_id = quote_use.charge_id)));
+CREATE POLICY rls_account ON billing.quote_use AS PERMISSIVE FOR ALL TO debateai_runtime USING ((EXISTS (SELECT 1 FROM billing.charge p WHERE p.charge_id = quote_use.charge_id))) WITH CHECK (false);
 CREATE POLICY rls_all_accounts ON billing.quote_use AS PERMISSIVE FOR ALL TO debateai_rls_all_accounts, debateai_replay, debateai_settlement_watch, debateai_evaluator_worker, debateai_staff_security_owner, debateai_mfa_recovery_owner, debateai_password_recovery_owner, debateai_password_reset_owner, debateai_obs_view_owner, debateai_backup_email_owner, debateai_release_owner USING (true) WITH CHECK (true);
 -- 24 · billing.run_charge_scope · K2, for a run the context owns and an entitlement event it may read (V-18)
 ALTER TABLE billing.run_charge_scope ENABLE ROW LEVEL SECURITY;
-CREATE POLICY rls_account ON billing.run_charge_scope AS PERMISSIVE FOR ALL TO debateai_runtime USING (((owner_ref = (SELECT rls.context_owner_ref())) AND rls.owns_run(run_id) AND (entitlement_event_id IS NULL OR EXISTS (SELECT 1 FROM billing.entitlement_event p WHERE p.event_id = run_charge_scope.entitlement_event_id)))) WITH CHECK (((owner_ref = (SELECT rls.context_owner_ref())) AND rls.owns_run(run_id) AND (entitlement_event_id IS NULL OR EXISTS (SELECT 1 FROM billing.entitlement_event p WHERE p.event_id = run_charge_scope.entitlement_event_id))));
+CREATE POLICY rls_account ON billing.run_charge_scope AS PERMISSIVE FOR ALL TO debateai_runtime USING (((owner_ref = (SELECT rls.context_owner_ref())) AND rls.owns_run(run_id) AND (entitlement_event_id IS NULL OR EXISTS (SELECT 1 FROM billing.entitlement_event p WHERE p.event_id = run_charge_scope.entitlement_event_id)))) WITH CHECK (false);
 CREATE POLICY rls_all_accounts ON billing.run_charge_scope AS PERMISSIVE FOR ALL TO debateai_rls_all_accounts, debateai_replay, debateai_settlement_watch, debateai_evaluator_worker, debateai_staff_security_owner, debateai_mfa_recovery_owner, debateai_password_recovery_owner, debateai_password_reset_owner, debateai_obs_view_owner, debateai_backup_email_owner, debateai_release_owner USING (true) WITH CHECK (true);
 -- 25 · billing.status_read · K6 via billing.charge(K2)
 ALTER TABLE billing.status_read ENABLE ROW LEVEL SECURITY;
-CREATE POLICY rls_account ON billing.status_read AS PERMISSIVE FOR ALL TO debateai_runtime USING ((EXISTS (SELECT 1 FROM billing.charge p WHERE p.charge_id = status_read.charge_id))) WITH CHECK ((EXISTS (SELECT 1 FROM billing.charge p WHERE p.charge_id = status_read.charge_id)));
+CREATE POLICY rls_account ON billing.status_read AS PERMISSIVE FOR ALL TO debateai_runtime USING ((EXISTS (SELECT 1 FROM billing.charge p WHERE p.charge_id = status_read.charge_id))) WITH CHECK (false);
 CREATE POLICY rls_all_accounts ON billing.status_read AS PERMISSIVE FOR ALL TO debateai_rls_all_accounts, debateai_replay, debateai_settlement_watch, debateai_evaluator_worker, debateai_staff_security_owner, debateai_mfa_recovery_owner, debateai_password_recovery_owner, debateai_password_reset_owner, debateai_obs_view_owner, debateai_backup_email_owner, debateai_release_owner USING (true) WITH CHECK (true);
 -- 26 · billing.subscription_event · K2 (V-18: its subscription and card token, guard_own_references)
 ALTER TABLE billing.subscription_event ENABLE ROW LEVEL SECURITY;
-CREATE POLICY rls_account ON billing.subscription_event AS PERMISSIVE FOR ALL TO debateai_runtime USING ((owner_ref = (SELECT rls.context_owner_ref()))) WITH CHECK ((owner_ref = (SELECT rls.context_owner_ref())));
+CREATE POLICY rls_account ON billing.subscription_event AS PERMISSIVE FOR ALL TO debateai_runtime USING ((owner_ref = (SELECT rls.context_owner_ref()))) WITH CHECK (false);
 CREATE POLICY rls_all_accounts ON billing.subscription_event AS PERMISSIVE FOR ALL TO debateai_rls_all_accounts, debateai_replay, debateai_settlement_watch, debateai_evaluator_worker, debateai_staff_security_owner, debateai_mfa_recovery_owner, debateai_password_recovery_owner, debateai_password_reset_owner, debateai_obs_view_owner, debateai_backup_email_owner, debateai_release_owner USING (true) WITH CHECK (true);
 -- 28 · billing.withdrawal_owner_settlement · K2, for a withdrawn event the context may read (V-18; its subscription: guard_own_references)
 ALTER TABLE billing.withdrawal_owner_settlement ENABLE ROW LEVEL SECURITY;
-CREATE POLICY rls_account ON billing.withdrawal_owner_settlement AS PERMISSIVE FOR ALL TO debateai_runtime USING (((owner_ref = (SELECT rls.context_owner_ref())) AND EXISTS (SELECT 1 FROM billing.subscription_event p WHERE p.event_id = withdrawal_owner_settlement.withdrawn_event_id))) WITH CHECK (((owner_ref = (SELECT rls.context_owner_ref())) AND EXISTS (SELECT 1 FROM billing.subscription_event p WHERE p.event_id = withdrawal_owner_settlement.withdrawn_event_id)));
+CREATE POLICY rls_account ON billing.withdrawal_owner_settlement AS PERMISSIVE FOR ALL TO debateai_runtime USING (((owner_ref = (SELECT rls.context_owner_ref())) AND EXISTS (SELECT 1 FROM billing.subscription_event p WHERE p.event_id = withdrawal_owner_settlement.withdrawn_event_id))) WITH CHECK (false);
 CREATE POLICY rls_all_accounts ON billing.withdrawal_owner_settlement AS PERMISSIVE FOR ALL TO debateai_rls_all_accounts, debateai_replay, debateai_settlement_watch, debateai_evaluator_worker, debateai_staff_security_owner, debateai_mfa_recovery_owner, debateai_password_recovery_owner, debateai_password_reset_owner, debateai_obs_view_owner, debateai_backup_email_owner, debateai_release_owner USING (true) WITH CHECK (true);
 -- 29 · billing.xmoney_notice · K7 (ARCH key, D32)
 ALTER TABLE billing.xmoney_notice ENABLE ROW LEVEL SECURITY;

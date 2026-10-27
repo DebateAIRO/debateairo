@@ -148,7 +148,9 @@ describe("S1.2 migration 0124 on an empty database", () => {
       expect(row.policies.map(({ name }) => name), row.relation).toEqual(POLICIES);
       const [account, all] = row.policies;
       expect(account, row.relation).toMatchObject({ command: "*", permissive: true, roles: ["debateai_runtime"] });
-      expect(account!.using, row.relation).toBe(account!.check);
+      // The unpaid-plan review: under a context a T1 login writes no billing row but the lazy Free entitlement (its guard).
+      expect(account!.check, row.relation).toBe(row.relation.startsWith("billing.") && row.relation !== "billing.entitlement_event"
+        ? "false" : account!.using);
       expect(RLS_ALLOW_LIST, row.relation).toContain(account!.using);
       expect(all, row.relation).toEqual({ name: "rls_all_accounts", command: "*", permissive: true, roles: allAccounts, using: "true", check: "true" });
     }
