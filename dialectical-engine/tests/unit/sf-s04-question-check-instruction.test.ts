@@ -27,12 +27,14 @@ describe("S04 question-check instruction", () => {
     expect(questionCheckContract().instruction).toMatch(/explicit or indirect/u);
   });
 
-  // Property: the political-question edge is the full approved SPEC rule, including the V-78 stop.
-  it("carries row 3's text from history to political aim exactly", async () => {
+  // Property: wars and other force against people are refused at the start whoever would use it (V 2026-10-27,
+  // replacing V-58's carve-out); history and defence policy that ask for no force still start.
+  it("carries row 3's text on wars, history and defence policy exactly", async () => {
     const { QUESTION_CHECK_ROW_3_TEXT, questionCheckContract } = await instructionModule();
-    const specSpan = "a question about violence as a subject of history, law or ethics that asks no one whether or how to harm a person is not this label, and neither is a question about violence as a subject of politics, current affairs or public policy, including whether a state, an army or the police should use force, such as \"Should NATO strike Russian bases?\", \"Should police use rubber bullets?\" or \"Should Iranian protesters take up arms against the regime?\"; a question that asks how to hurt someone, that threatens or plans an attack, or that asks whether anyone other than a state, an army or the police should kill or attack a named or identifiable person or unarmed people, is this label whatever its political aim";
+    const specSpan = "this includes a question that asks whether a state, an army, the police, an armed group or anyone else should go to war, invade, strike, bomb, shoot or otherwise use force or weapons against people, such as \"Should NATO strike Russian bases?\", \"Should police use rubber bullets?\" or \"Should Iranian protesters take up arms against the regime?\", whatever its political aim; a question about past violence as a subject of history, law or ethics that asks no one whether or how to harm anyone, such as \"Was the bombing of Hiroshima justified?\", is not this label, and neither is a question about defence, security or foreign policy that asks no one whether to use force against people, such as \"Should Romania raise defence spending?\"";
     expect(QUESTION_CHECK_ROW_3_TEXT).toBe(specSpan);
     expect(questionCheckContract().instruction).toContain(QUESTION_CHECK_ROW_3_TEXT);
+    expect(questionCheckContract().instruction).not.toContain("is not this label, and neither is a question about violence as a subject of politics");
   });
 
   // Property: the first applicable label wins in the SPEC's priority order.
