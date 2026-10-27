@@ -65,8 +65,8 @@ overrides:
   # floors below, published 2026-08-26 and 2026-09-17: cooldown satisfied, no exclusion.
   'axios@>=1.0.0 <1.20.0': '1.20.0'
   '@grpc/grpc-js@>=1.14.0 <1.14.5': '1.14.5'
-  'fast-uri@<3.1.8': '3.1.8'
-  'fast-uri@>=4.0.0 <4.1.5': '4.1.5'
+  'fast-uri@<3.1.9': '3.1.9'
+  'fast-uri@>=4.0.0 <4.2.3': '4.2.3'
   'brace-expansion@>=2.0.0 <2.1.7': '2.1.7'
   'undici@>=8.0.0 <8.12.2': '8.12.2'
   'qs@<6.16.0': '6.16.0'
@@ -76,8 +76,8 @@ overrides:
   # cooldown satisfied), not an override; the code that read zod's internals now reads its JSON Schema output.
   # fastify >=5.12.2 <5.12.6 (low) is fixed the same way: the 5.12.7 PIN in package.json and apps/api/package.json
   # (published 2026-10-13, cooldown satisfied).
-  # fast-uri 3.1.9 / 4.2.3 (published 2026-10-19) are still inside the 7-day cooldown: BLOCKED until
-  # 2026-10-26 23:06Z, never excluded.
+  # 2026-10-27: fast-uri was bumped to 3.1.9 / 4.2.3 (published 2026-10-19), once the 7-day cooldown
+  # had passed: no exclusion.
   # 2026-10-21: follow-redirects >=1.16.0 <1.16.1 (two header advisories, through the Hatchet SDK's axios) and
   # vite >=8.2.0 <=8.2.3 (three launch-editor advisories, test tooling only: vitest). Floors published
   # 2026-10-01 and 2026-10-06: cooldown satisfied, no exclusion.

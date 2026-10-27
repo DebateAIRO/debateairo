@@ -53,8 +53,10 @@ const VULNERABLE: Record<string, (version: string) => boolean> = {
   // 4.1.4 were published 2026-09-02, so they clear the 7-day cooldown on their own.
   // 2026-09-30: GHSA-hrr3-gc8f-f4qj (3.x < 3.1.8, 4.x < 4.1.5) and GHSA-jvvf-x445-j334;
   // 3.1.8 and 4.1.5 were published 2026-09-15.
-  "fast-uri": (v) => (v.startsWith("3.") && compare(v, "3.1.8") < 0)
-    || (v.startsWith("4.") && compare(v, "4.1.5") < 0),
+  // 2026-10-27: GHSA-w74x-v6f9-j3xg / GHSA-wjr9-j795-jxcr / GHSA-xhq7-xmqj-769h / GHSA-333x-w4r6-6crp
+  // (3.x < 3.1.9, 4.x < 4.2.3); 3.1.9 and 4.2.3 were published 2026-10-19.
+  "fast-uri": (v) => (v.startsWith("3.") && compare(v, "3.1.9") < 0)
+    || (v.startsWith("4.") && compare(v, "4.2.3") < 0),
   // 2026-09-30: GHSA-6j4f-fj2g-mc7p / GHSA-qhr7-859c-m2p7 / GHSA-q2hr-2g5m-vwhr (2.x < 2.1.7),
   // reached through testcontainers > archiver > minimatch (test tooling only); 2.1.7 was
   // published 2026-09-14.
