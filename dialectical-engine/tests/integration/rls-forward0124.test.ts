@@ -58,6 +58,35 @@ const FUNCTIONS = ["rls.session_credential_hash()", "rls.context_user_id()", "rl
 const GUARD = "billing.guard_own_references()";
 const GUARDED = ["billing.cancel_token", "billing.charge", "billing.entitlement_event", "billing.quote_use", "billing.subscription_event",
   "billing.withdrawal_owner_settlement"];
+/** V-18 on the engine tables: the guard, and each table its trigger guard_own_references fires on with its column/kind pairs. */
+const ENGINE_GUARD = "core.guard_own_references()";
+const ENGINE_GUARDED: ReadonlyArray<readonly [string, readonly string[]]> = [
+  ["core.independence_receipt", ["critic_ledger_entry_ref", "ledger_entry"]],
+  ["core.node", ["provenance_ref", "raw_artifact"]],
+  ["core.reversal_point", ["value_hinge_id", "value_hinge"]],
+  ["core.staleness_state", ["subject_ref", "node_or_answer"]],
+  ["core.stranger_restatement", ["subject_id", "node_or_answer"]],
+  ["ledger.ledger_entry", ["raw_artifact_ref", "raw_artifact"]],
+  ["ledger.node_strength_record", ["propagation_run_id", "propagation_run", "reduced_judgement_ref", "reduced_judgement"]],
+  ["ledger.overlay_run", ["propagation_run_id", "propagation_run"]],
+  ["ledger.point_investigation", ["raw_artifact_ref", "raw_artifact"]],
+  ["ledger.reduced_judgement", ["node_id", "node", "raw_artifact_ref", "raw_artifact", "selected_judgement_ref", "raw_artifact"]],
+  ["ledger.sensitivity_record", ["propagation_run_id", "propagation_run"]],
+  ["ledger.verdict_vote", ["raw_artifact_ref", "raw_artifact"]],
+  ["memory.alias_row", ["source_run_id", "run"]],
+  ["memory.candidate_record", ["prior_run_id", "run"]],
+  ["memory.memory_link", ["prior_run_id", "run", "prior_answer_id", "answer", "alias_row_ids", "alias_row[]"]],
+  ["scorecard.session_assignment", ["routing_decision_id", "routing_decision"]],
+  ["serve.answer", ["answer_id", "answer", "work_item_id", "work_item", "fact_bundle_id", "fact_bundle", "composed_text_id", "composed_text",
+    "conformance_record_id", "conformance_record"]],
+  ["serve.answer_story", ["artifact_refs", "raw_artifact[]"]],
+  ["serve.composed_text", ["fact_bundle_id", "fact_bundle"]],
+  ["serve.condition_mark", ["review_ref", "node_review"]],
+  ["serve.condition_mark_node", ["condition_mark_id", "condition_mark"]],
+  ["serve.conformance_record", ["raw_artifact_refs", "raw_artifact[]"]],
+  ["serve.served_number", ["provenance_ref", "propagation_run", "answer_id", "answer"]],
+  ["serve.synthesis_round", ["answer_id", "answer", "candidate_artifact_ref", "raw_artifact", "evaluator_artifact_ref", "raw_artifact"]]
+];
 const POLICIES = ["rls_account", "rls_all_accounts"];
 /** The six amendments of D38 and F-C1-1, hand-copied (relations sorted), as T11 expects them stored. */
 const AMENDMENTS = [
@@ -262,6 +291,49 @@ describe("S1.2 migration 0124 on an empty database", () => {
       };
       for (const table of GUARDED) await moved(`DROP TRIGGER guard_own_references ON ${table}`, `${table}:guard_own_references`);
       await moved(`GRANT EXECUTE ON FUNCTION ${GUARD} TO debateai_runtime`, "guard:execute");
+      return missed;
+    });
+    expect(unpinned).toEqual([]);
+  }, 600_000);
+
+  it("S1.2-T6c (V-18 on the engine tables) the engine guard is a migrator definer on pg_catalog that no login may EXECUTE, fired before each INSERT and UPDATE of its tables with their column/kind pairs", async () => {
+    const migrator = (await db.pool.query<{ name: string }>("SELECT current_user AS name")).rows[0]!.name;
+    const guard = (await db.pool.query(`
+      SELECT pg_get_userbyid(p.proowner)::text AS owner,p.prosecdef AS definer,p.proconfig AS config,
+       coalesce((SELECT jsonb_agg(g.name ORDER BY g.name COLLATE "C") FROM (SELECT DISTINCT CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee)::text END AS name
+         FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE a.privilege_type='EXECUTE' AND a.grantee<>p.proowner) g),'[]'::jsonb) AS executors
+      FROM pg_proc p WHERE p.oid=to_regprocedure($1)`, [ENGINE_GUARD])).rows;
+    expect(guard).toEqual([{ owner: migrator, definer: true, config: ["search_path=pg_catalog"], executors: [] }]);
+    const triggers = (await db.pool.query<{ relation: string; enabled: string; definition: string }>(`
+      SELECT t.tgrelid::regclass::text AS relation,t.tgenabled::text AS enabled,pg_get_triggerdef(t.oid) AS definition
+      FROM pg_trigger t WHERE t.tgfoid=to_regprocedure($1) AND NOT t.tgisinternal ORDER BY 1`, [ENGINE_GUARD])).rows;
+    expect(triggers).toEqual(ENGINE_GUARDED.map(([relation, pairs]) => ({ relation, enabled: "O",
+      definition: `CREATE TRIGGER guard_own_references BEFORE INSERT OR UPDATE ON ${relation} FOR EACH ROW EXECUTE FUNCTION ${
+        ENGINE_GUARD.replace("()", "")}(${pairs.map((arg) => `'${arg}'`).join(", ")})` })));
+  });
+
+  it("S1.2-T8c (R29, V-18 on the engine tables) disabling the engine guard on ledger.reduced_judgement makes the next migrate() refuse 0124, and 0124's digest moves with each engine table's trigger and the guard's EXECUTE grants", async () => {
+    await db.pool.query("ALTER TABLE ledger.reduced_judgement DISABLE TRIGGER guard_own_references");
+    try {
+      await expect(migrate(db.pool)).rejects.toThrow(DRIFT_0124);
+    } finally {
+      await db.pool.query("ALTER TABLE ledger.reduced_judgement ENABLE TRIGGER guard_own_references");
+    }
+    expect(await outcome(migrate(db.pool))).toEqual({ ok: true });
+    const step = await step0124();
+    const unpinned = await rolledBack(db, async (client) => {
+      const baseline = await step.postconditionEvidence(client);
+      const missed: string[] = [];
+      const moved = async (statement: string, label: string): Promise<void> => {
+        await client.query("SAVEPOINT mutant");
+        await client.query(statement);
+        if (await step.postconditionEvidence(client) === baseline) missed.push(label);
+        await client.query("ROLLBACK TO SAVEPOINT mutant");
+      };
+      for (const [table] of ENGINE_GUARDED) await moved(`DROP TRIGGER guard_own_references ON ${table}`, `${table}:guard_own_references`);
+      await moved(`DROP TRIGGER guard_own_references ON serve.answer; CREATE TRIGGER guard_own_references BEFORE INSERT OR UPDATE ON
+        serve.answer FOR EACH ROW EXECUTE FUNCTION ${ENGINE_GUARD.replace("()", "")}('work_item_id', 'work_item')`, "serve.answer:pairs");
+      await moved(`GRANT EXECUTE ON FUNCTION ${ENGINE_GUARD} TO debateai_runtime`, "engine-guard:execute");
       return missed;
     });
     expect(unpinned).toEqual([]);
