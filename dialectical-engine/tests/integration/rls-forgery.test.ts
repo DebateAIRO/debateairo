@@ -518,6 +518,12 @@ describe("row-level security S01 C6: forgery by SQL on the four T1 logins widens
       customer_id,source_charge_id) SELECT $2,payment_provider,payment_environment,token_ciphertext,key_id,now(),
       (SELECT customer_id FROM billing.customer WHERE owner_ref=$3),source_charge_id FROM billing.card_token WHERE token_id=$1`,
     [b.card, retaken, A.ownerRef]);
+    // A test-tool order's card has no source charge (0111's card_token_one_source), and nothing stops it carrying a
+    // customer_id. Planted with A's: no charge of A's saved it, so it is not A's to name either.
+    const toolCard = randomUUID();
+    await su.query(`INSERT INTO billing.card_token(token_id,payment_provider,payment_environment,token_ciphertext,key_id,created_at,
+      customer_id,source_tool_order) SELECT $2,payment_provider,payment_environment,token_ciphertext,key_id,now(),customer_id,$3
+      FROM billing.card_token WHERE token_id=$1`, [a.card, toolCard, `t-${randomBytes(15).toString("hex")}`]);
     const ctx = "(SELECT rls.context_owner_ref())";
     const netopia = JSON.stringify({ payment_provider: "netopia", payment_environment: "sandbox" });
     // 0086's checks: a CARD_CHECK carries no quote and may be zero; any other kind carries one and is positive. Every
@@ -559,6 +565,7 @@ describe("row-level security S01 C6: forgery by SQL on the four T1 logins widens
             ["billing.subscription_event.subscription_id", event("CANCEL_REQUESTED", b.subscription, null), event("CANCEL_REQUESTED", a.subscription, null)],
             ["billing.subscription_event.card_token_id", event("CARD_SAVED", a.subscription, b.card), event("CARD_SAVED", a.subscription, a.card)],
             ["billing.subscription_event.card_token_id(retaken)", event("CARD_SAVED", a.subscription, retaken), event("CARD_SAVED", a.subscription, a.card)],
+            ["billing.subscription_event.card_token_id(tool order)", event("CARD_SAVED", a.subscription, toolCard), event("CARD_SAVED", a.subscription, a.card)],
             ["billing.cancel_token.subscription_id", link(b.subscription), link(a.subscription)],
             ["billing.charge.subscription_id", charge(b.subscription, null), charge(a.subscription, null)],
             ["billing.charge.quote_id", charge(a.subscription, b.quote), charge(a.subscription, a.quote)],
@@ -583,7 +590,7 @@ describe("row-level security S01 C6: forgery by SQL on the four T1 logins widens
     }
     console.info(`F12 FRAME ${outcomes.join(" | ")}`);
     const members = ["billing.subscription_event.subscription_id", "billing.subscription_event.card_token_id",
-      "billing.subscription_event.card_token_id(retaken)",
+      "billing.subscription_event.card_token_id(retaken)", "billing.subscription_event.card_token_id(tool order)",
       "billing.cancel_token.subscription_id", "billing.charge.subscription_id", "billing.charge.quote_id", "billing.quote_use.quote_id",
       "billing.entitlement_event.subscription_id", "billing.run_charge_scope.run_id", "billing.run_charge_scope.entitlement_event_id",
       "billing.withdrawal_owner_settlement.subscription_id", "billing.withdrawal_owner_settlement.withdrawn_event_id"];

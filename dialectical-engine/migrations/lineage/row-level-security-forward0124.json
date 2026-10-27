@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0124_row_level_security.sql",
-    "sha256": "14c4cf420c3beebcda60918c7a577764d421587c57dff11e0d624806b1932768"
+    "sha256": "03cb16f36319b439ff63a7dbd4a3db12ae065a52a4d5028d78f401d8f8232ab9"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-124.sql",

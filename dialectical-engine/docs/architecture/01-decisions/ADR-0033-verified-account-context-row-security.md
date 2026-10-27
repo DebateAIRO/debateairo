@@ -62,7 +62,8 @@ login can write — a setting, a role, a function argument — makes the databas
   cancel that plan (FIX-S01-p1a NEW-2, measured), and a subscription event naming another account's saved card would let
   a renewal charge it. Since V-18's default a row written under an account's context may name only a subscription with no
   event yet or whose first event is the context's, only a saved card whose customer and source charge are the context's
-  (a card's customer row may be gone, and `customer_id` has no foreign key), and only a quote of its own in
+  (a card's customer row may be gone, and `customer_id` has no foreign key; a test-tool order's card has no source
+  charge, so it is never one), and only a quote of its own in
   `billing.quote_use` (one row per quote, so another account's quote named there would refuse that account's checkout):
   the trigger guard `billing.guard_own_references()` on those six tables refuses anything else (42501). It is a
   trigger, EXECUTE-able by no login, because a function a request login may EXECUTE answers R42's calls, and a

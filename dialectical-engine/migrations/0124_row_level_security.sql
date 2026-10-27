@@ -97,8 +97,7 @@ BEGIN
   IF TG_TABLE_NAME = 'subscription_event' THEN
     IF NEW.card_token_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM billing.card_token AS t JOIN billing.customer AS c
         ON c.customer_id = t.customer_id WHERE t.token_id = NEW.card_token_id AND c.owner_ref = v_context
-          AND (t.source_charge_id IS NULL OR EXISTS (SELECT 1 FROM billing.charge AS s WHERE s.charge_id = t.source_charge_id
-            AND s.owner_ref = v_context))) THEN
+          AND EXISTS (SELECT 1 FROM billing.charge AS s WHERE s.charge_id = t.source_charge_id AND s.owner_ref = v_context)) THEN
       RAISE EXCEPTION 'RLS_FOREIGN_CARD_TOKEN' USING ERRCODE = '42501';
     END IF;
   END IF;
