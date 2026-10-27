@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Röviden
-eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.5 · HATÁLYOS 2026. OKTÓBER 12.
+eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.6 · HATÁLYOS 2026. OKTÓBER 24.
 title: Amit Ön elfogad
 lede: Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.
-endMarker: A FELTÉTELEK VÉGE · v2.5
+endMarker: A FELTÉTELEK VÉGE · v2.6
 bodyLabel: A Szolgáltatási feltételek szövege
 annexTitle: A. melléklet — Regionális feltételek
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 IRÁNYADÓ JOG
 -->
 
-**Version 2.5 · Effective 2026. október 12. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
+**Version 2.6 · Effective 2026. október 24. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
 
 **In short.** Önnek legalább 18 évesnek kell lennie. A Dialectical Engine mesterségesintelligencia-modellekkel épít fel érveket, és minden általa létrehozott tartalom téves lehet — nem minősül tanácsadásnak. Vitái mindaddig bizalmasak, amíg közzé nem teszi őket; közzététel esetén bárki elolvashatja azokat. Az Ön által beküldött szöveget továbbítjuk a Szolgáltatói nyilvántartásunkban felsorolt MI-szolgáltatóknak, és azt nem használjuk modellek betanítására. Jogellenes tartalmat a support@dezbatere.ro címen jelenthet be, függetlenül attól, hogy rendelkezik-e fiókkal. A román jog az irányadó, de az Ön helyi fogyasztóvédelmi jogai változatlanul megilletik.
 
@@ -279,7 +279,7 @@ Minden bejegyzés az adott régióban élő személyekre alkalmazandó, és csak
 
 ### A.1 Európai Unió és Európai Gazdasági Térség
 
-E Feltételek törzsszövege Önnek szól. Ezen túlmenően: Ön a lakóhelye szerinti ország bíróságai előtt indíthat eljárást; a 13. szakasz szerinti elállási jog alkalmazandó; alternatív vitarendezés a www.onoratainstanta.ro útján érhető el. **Németország:** a dezbatere.ro/cancel címen található lemondási gombbal bejelentkezés nélkül megszüntetheti előfizetését; az előfizetési feltételek, a megújítási időszakok és a felmondási idők megfelelnek a BGB 309. § (9) bekezdésének: minden csomag egy hónapra szól, és havonta megújul, amíg Ön le nem mondja; bármikor lemondhatja, a lemondás az aktuális hónap végével lép hatályba. **Franciaország:** előfizetését három lépésben, online megszüntetheti a dezbatere.ro/cancel címen. **Olaszország:** a felelősségre (15), a felfüggesztésre (11), a módosításokra (14) és az irányadó jogra (18) vonatkozó rendelkezésekhez az Ön külön jóváhagyása szükséges, amelyet regisztrációkor külön megerősítéssel ad meg. **Hollandia:** e Feltételeket a szerződéskötés előtt tárolható formában bocsátjuk rendelkezésre. **Lengyelország:** lengyel nyelvű változat is elérhető; válassza a Polski nyelvet a nyelvválasztóban.
+E Feltételek törzsszövege Önnek szól. Ezen túlmenően: Ön a lakóhelye szerinti ország bíróságai előtt indíthat eljárást; a 13. szakasz szerinti elállási jog alkalmazandó; alternatív vitarendezés a www.onoratainstanta.ro útján érhető el. **Németország:** a dezbatere.ro/cancel címen található lemondási gombbal bejelentkezés nélkül megszüntetheti előfizetését; az előfizetési feltételek, a megújítási időszakok és a felmondási idők megfelelnek a BGB 309. § (9) bekezdésének: minden csomag egy hónapra szól, és havonta megújul, amíg Ön le nem mondja; bármikor lemondhatja, a lemondás az aktuális hónap végével lép hatályba. **Franciaország:** előfizetését három lépésben, online megszüntetheti a dezbatere.ro/cancel címen. **Olaszország:** a felfüggesztésre és megszüntetésre (11), a fizetős csomagokra és azok megújítására (12), a módosításokra (14), a felelősségre (15), valamint az irányadó jogra és a jogviták elbírálásának helyére (18) vonatkozó rendelkezésekhez az Ön külön jóváhagyása szükséges az olasz Polgári Törvénykönyv 1341. és 1342. cikke alapján. Ezt a regisztrációkor megjelenő külön négyzettel adja meg, amely mindenkinek megjelenik, aki a Régió mezőben Olaszországot választja, vagy akinek a kapcsolata Olaszországból érkezik. **Hollandia:** e Feltételeket a szerződéskötés előtt tárolható formában bocsátjuk rendelkezésre. **Lengyelország:** lengyel nyelvű változat is elérhető; válassza a Polski nyelvet a nyelvválasztóban.
 
 ### A.2 Egyesült Államok
 

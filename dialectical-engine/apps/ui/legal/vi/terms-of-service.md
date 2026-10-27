@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Tóm tắt
-eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v2.5 · CÓ HIỆU LỰC 12 THÁNG 10 NĂM 2026
+eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v2.6 · CÓ HIỆU LỰC 24 THÁNG 10 NĂM 2026
 title: Những điều bạn đồng ý
 lede: Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.
-endMarker: HẾT ĐIỀU KHOẢN · v2.5
+endMarker: HẾT ĐIỀU KHOẢN · v2.6
 bodyLabel: Nội dung Điều khoản dịch vụ
 annexTitle: Phụ lục A — Điều khoản theo khu vực
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LUẬT ĐIỀU CHỈNH
 -->
 
-**Version 2.5 · Effective 12 tháng 10 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
+**Version 2.6 · Effective 24 tháng 10 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
 
 **In short.** Bạn phải từ 18 tuổi trở lên. Dialectical Engine xây dựng các lập luận bằng mô hình AI và mọi nội dung do dịch vụ tạo ra đều có thể sai — đó không phải là lời tư vấn. Các cuộc tranh luận của bạn là riêng tư trừ khi bạn công khai chúng; nếu bạn công khai, bất kỳ ai cũng có thể đọc. Văn bản bạn gửi được chuyển đến các nhà cung cấp AI nêu trong Sổ đăng ký nhà cung cấp của chúng tôi và không được dùng để huấn luyện mô hình. Hãy báo cáo nội dung bất hợp pháp tại support@dezbatere.ro dù bạn có tài khoản hay không. Luật Romania điều chỉnh, nhưng các biện pháp bảo vệ người tiêu dùng tại nơi bạn sinh sống vẫn được bảo đảm.
 
@@ -279,7 +279,7 @@ Mỗi mục áp dụng cho người sống tại khu vực tương ứng và ch�
 
 ### A.1 Liên minh Châu Âu và Khu vực Kinh tế Châu Âu
 
-Phần nội dung chung của các Điều khoản này được soạn cho bạn. Ngoài ra: bạn có thể khởi kiện tại tòa án của quốc gia nơi bạn sống; quyền rút lui tại mục 13 được áp dụng; phương thức giải quyết tranh chấp thay thế được cung cấp thông qua www.onoratainstanta.ro. **Đức:** nút hủy tại dezbatere.ro/cancel cho phép bạn chấm dứt gói đăng ký mà không cần đăng nhập; thời hạn đăng ký, kỳ gia hạn và thời hạn thông báo tuân thủ §309(9) BGB: mỗi gói kéo dài một tháng và tự động gia hạn hằng tháng cho đến khi bạn hủy, và bạn có thể hủy bất cứ lúc nào, có hiệu lực từ cuối tháng hiện tại. **Pháp:** bạn có thể chấm dứt gói đăng ký trực tuyến trong ba bước tại dezbatere.ro/cancel. **Ý:** các điều khoản về trách nhiệm (15), đình chỉ (11), thay đổi (14) và luật điều chỉnh (18) cần sự chấp thuận cụ thể của bạn, được đưa ra bằng xác nhận riêng khi đăng ký. **Hà Lan:** các Điều khoản này được cung cấp dưới hình thức có thể lưu trữ trước khi giao kết. **Ba Lan:** có phiên bản tiếng Ba Lan; hãy chọn Polski trong menu ngôn ngữ.
+Phần nội dung chung của các Điều khoản này được soạn cho bạn. Ngoài ra: bạn có thể khởi kiện tại tòa án của quốc gia nơi bạn sống; quyền rút lui tại mục 13 được áp dụng; phương thức giải quyết tranh chấp thay thế được cung cấp thông qua www.onoratainstanta.ro. **Đức:** nút hủy tại dezbatere.ro/cancel cho phép bạn chấm dứt gói đăng ký mà không cần đăng nhập; thời hạn đăng ký, kỳ gia hạn và thời hạn thông báo tuân thủ §309(9) BGB: mỗi gói kéo dài một tháng và tự động gia hạn hằng tháng cho đến khi bạn hủy, và bạn có thể hủy bất cứ lúc nào, có hiệu lực từ cuối tháng hiện tại. **Pháp:** bạn có thể chấm dứt gói đăng ký trực tuyến trong ba bước tại dezbatere.ro/cancel. **Ý:** các điều khoản về đình chỉ và chấm dứt (11), gói trả phí và việc gia hạn (12), thay đổi (14), trách nhiệm (15) cũng như luật điều chỉnh và nơi giải quyết tranh chấp (18) cần sự chấp thuận cụ thể của bạn theo Điều 1341 và Điều 1342 của Bộ luật Dân sự Ý. Bạn đưa ra chấp thuận này bằng một ô riêng khi đăng ký, ô này được hiển thị cho bất kỳ ai chọn Ý trong trường Khu vực hoặc có kết nối đến từ Ý. **Hà Lan:** các Điều khoản này được cung cấp dưới hình thức có thể lưu trữ trước khi giao kết. **Ba Lan:** có phiên bản tiếng Ba Lan; hãy chọn Polski trong menu ngôn ngữ.
 
 ### A.2 Hoa Kỳ
 

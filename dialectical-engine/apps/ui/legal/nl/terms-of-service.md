@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In het kort
-eyebrow: SERVICEVOORWAARDEN · v2.5 · VAN KRACHT OP 12 OKTOBER 2026
+eyebrow: SERVICEVOORWAARDEN · v2.6 · VAN KRACHT OP 24 OKTOBER 2026
 title: Waarmee u instemt
 lede: De overeenkomst tussen u en DMS Merchandise Shop S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.
-endMarker: EINDE VAN DE VOORWAARDEN · v2.5
+endMarker: EINDE VAN DE VOORWAARDEN · v2.6
 bodyLabel: Tekst van de Servicevoorwaarden
 annexTitle: Bijlage A — Regionale voorwaarden
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TOEPASSELIJK RECHT
 -->
 
-**Version 2.5 · Effective 12 oktober 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
+**Version 2.6 · Effective 24 oktober 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
 
 **In short.** U moet 18 jaar of ouder zijn. Dialectical Engine stelt met AI-modellen argumenten op en alles wat het genereert kan onjuist zijn — het is geen advies. Uw debatten zijn privé, tenzij u ze publiceert; als u ze publiceert, kan iedereen ze lezen. Tekst die u indient, wordt verzonden naar de AI-aanbieders in ons Register van aanbieders en wordt niet gebruikt om modellen te trainen. Meld illegale inhoud via support@dezbatere.ro, ongeacht of u een account hebt. Het Roemeense recht is van toepassing, maar uw lokale consumentenbescherming blijft voor u gelden.
 
@@ -279,7 +279,7 @@ Elke vermelding is van toepassing op personen die in de betreffende regio wonen 
 
 ### A.1 Europese Unie en Europese Economische Ruimte
 
-De hoofdtekst van deze Voorwaarden is voor u geschreven. Daarnaast geldt: u kunt een procedure aanhangig maken bij de rechter van het land waar u woont; het herroepingsrecht van hoofdstuk 13 is van toepassing; alternatieve geschillenbeslechting is beschikbaar via www.onoratainstanta.ro. **Duitsland:** met de opzeggingsknop op dezbatere.ro/cancel kunt u een abonnement beëindigen zonder u aan te melden; de abonnementsduur, verlengingsperioden en opzegtermijnen voldoen aan §309(9) BGB: elk abonnement loopt een maand en wordt maandelijks verlengd totdat u opzegt, en u kunt op elk moment opzeggen met ingang van het einde van de lopende maand. **Frankrijk:** u kunt een abonnement in drie stappen online beëindigen op dezbatere.ro/cancel. **Italië:** de bepalingen inzake aansprakelijkheid (15), opschorting (11), wijzigingen (14) en toepasselijk recht (18) vereisen uw specifieke goedkeuring, die u via de afzonderlijke bevestiging bij registratie geeft. **Nederland:** deze Voorwaarden worden vóór het sluiten van de overeenkomst in een opslagbare vorm verstrekt. **Polen:** er is een Poolse versie beschikbaar; kies Polski met de taalkeuzeschakelaar.
+De hoofdtekst van deze Voorwaarden is voor u geschreven. Daarnaast geldt: u kunt een procedure aanhangig maken bij de rechter van het land waar u woont; het herroepingsrecht van hoofdstuk 13 is van toepassing; alternatieve geschillenbeslechting is beschikbaar via www.onoratainstanta.ro. **Duitsland:** met de opzeggingsknop op dezbatere.ro/cancel kunt u een abonnement beëindigen zonder u aan te melden; de abonnementsduur, verlengingsperioden en opzegtermijnen voldoen aan §309(9) BGB: elk abonnement loopt een maand en wordt maandelijks verlengd totdat u opzegt, en u kunt op elk moment opzeggen met ingang van het einde van de lopende maand. **Frankrijk:** u kunt een abonnement in drie stappen online beëindigen op dezbatere.ro/cancel. **Italië:** de bepalingen inzake opschorting en beëindiging (11), betaalde abonnementen en de verlenging daarvan (12), wijzigingen (14), aansprakelijkheid (15) en toepasselijk recht en bevoegde rechter (18) vereisen uw specifieke goedkeuring op grond van de artikelen 1341 en 1342 van het Italiaanse Burgerlijk Wetboek. U geeft die goedkeuring met een afzonderlijk vakje bij registratie, dat wordt getoond aan iedereen die in het veld "Regio" Italië kiest of van wie de verbinding uit Italië komt. **Nederland:** deze Voorwaarden worden vóór het sluiten van de overeenkomst in een opslagbare vorm verstrekt. **Polen:** er is een Poolse versie beschikbaar; kies Polski met de taalkeuzeschakelaar.
 
 ### A.2 Verenigde Staten
 

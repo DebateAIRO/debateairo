@@ -10659,6 +10659,28 @@ a:focus-visible {
   line-height: 1.5;
 }
 
+/* The Italy approval box's clause list (mission italy-clause-approval S01; MOCK.md "The Italy row, measured",
+   V's DONE.md 2026-10-24): one clause per line, 5px under the box sentence, the number in its own bold column with
+   tabular figures and no "§" (V's one change to the canvas), the title in a regular column it wraps inside. Each
+   clause is `display: contents`, so its number and title are the grid's two cells; the list is spans because a
+   <label> holds phrasing content only. */
+.consentClauseList {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 6px;
+  row-gap: 0;
+  margin-top: 5px;
+}
+
+.consentClause {
+  display: contents;
+}
+
+.consentClauseNumber {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 /* The design draws `Privacy Policy` as an <a>; ARCH-S02 ruled it a <button type="button">
    because it opens a modal and navigates nowhere, so the button's UA chrome is reset back to
    the anchor the artboard draws (:8). */

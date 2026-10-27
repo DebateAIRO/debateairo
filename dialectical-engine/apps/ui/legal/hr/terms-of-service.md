@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ukratko
-eyebrow: UVJETI KORIŠTENJA · v2.5 · NA SNAZI OD 12. LISTOPADA 2026.
+eyebrow: UVJETI KORIŠTENJA · v2.6 · NA SNAZI OD 24. LISTOPADA 2026.
 title: Na što pristajete
 lede: Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.
-endMarker: KRAJ UVJETA · v2.5
+endMarker: KRAJ UVJETA · v2.6
 bodyLabel: Tekst Uvjeta korištenja
 annexTitle: Prilog A — Regionalni uvjeti
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 MJERODAVNO PRAVO
 -->
 
-**Version 2.5 · Effective 12. listopada 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
+**Version 2.6 · Effective 24. listopada 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
 
 **In short.** Morate imati najmanje 18 godina. Dialectical Engine izrađuje argumente pomoću modela umjetne inteligencije i sve što generira može biti pogrešno — to nije savjet. Vaše su rasprave privatne osim ako ih objavite; ako ih objavite, svatko ih može pročitati. Tekst koji pošaljete prosljeđuje se pružateljima usluga umjetne inteligencije navedenima u našem Registru pružatelja i ne upotrebljava se za treniranje modela. Nezakonit sadržaj prijavite na support@dezbatere.ro, bez obzira na to imate li račun. Primjenjuje se rumunjsko pravo, ali zadržavate zaštitu potrošača prema svojem lokalnom pravu.
 
@@ -279,7 +279,7 @@ Svaka se stavka primjenjuje na osobe koje žive u njezinoj regiji i navodi samo 
 
 ### A.1 Europska unija i Europski gospodarski prostor
 
-Opći dio ovih Uvjeta napisan je za vas. Dodatno: postupak možete pokrenuti pred sudovima države u kojoj živite; primjenjuje se pravo na odustanak iz odjeljka 13.; alternativno rješavanje sporova dostupno je putem www.onoratainstanta.ro. **Njemačka:** gumb za otkazivanje na dezbatere.ro/cancel omogućuje vam raskid pretplate bez prijave; trajanje pretplate, razdoblja obnavljanja i otkazni rokovi u skladu su s §309(9) BGB-a: svaki plan traje jedan mjesec i obnavlja se svaki mjesec dok ga ne otkažete, a možete ga otkazati u bilo kojem trenutku s učinkom od kraja tekućeg mjeseca. **Francuska:** pretplatu možete raskinuti putem interneta u tri koraka na dezbatere.ro/cancel. **Italija:** odredbe o odgovornosti (15.), suspenziji (11.), promjenama (14.) i mjerodavnom pravu (18.) zahtijevaju vaše posebno odobrenje, koje dajete zasebnom potvrdom pri registraciji. **Nizozemska:** ovi Uvjeti dostavljaju se prije sklapanja u obliku koji se može pohraniti. **Poljska:** dostupna je poljska verzija; odaberite Polski u izborniku jezika.
+Opći dio ovih Uvjeta napisan je za vas. Dodatno: postupak možete pokrenuti pred sudovima države u kojoj živite; primjenjuje se pravo na odustanak iz odjeljka 13.; alternativno rješavanje sporova dostupno je putem www.onoratainstanta.ro. **Njemačka:** gumb za otkazivanje na dezbatere.ro/cancel omogućuje vam raskid pretplate bez prijave; trajanje pretplate, razdoblja obnavljanja i otkazni rokovi u skladu su s §309(9) BGB-a: svaki plan traje jedan mjesec i obnavlja se svaki mjesec dok ga ne otkažete, a možete ga otkazati u bilo kojem trenutku s učinkom od kraja tekućeg mjeseca. **Francuska:** pretplatu možete raskinuti putem interneta u tri koraka na dezbatere.ro/cancel. **Italija:** odredbe o suspenziji i prestanku (11.), plaćenim planovima i njihovu obnavljanju (12.), promjenama (14.), odgovornosti (15.) te mjerodavnom pravu i mjestu rješavanja sporova (18.) zahtijevaju vaše posebno odobrenje na temelju članaka 1341. i 1342. talijanskog Građanskog zakonika. Dajete ga zasebnim poljem pri registraciji, koje se prikazuje svakome tko u polju Regija odabere Italiju ili čija veza dolazi iz Italije. **Nizozemska:** ovi Uvjeti dostavljaju se prije sklapanja u obliku koji se može pohraniti. **Poljska:** dostupna je poljska verzija; odaberite Polski u izborniku jezika.
 
 ### A.2 Sjedinjene Američke Države
 

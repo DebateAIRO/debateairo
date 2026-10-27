@@ -1,8 +1,11 @@
 /**
- * A9 / spec §2.13 — the owner records a card dispute's outcome, which the payment provider does not signal for certain
- * (NETOPIA's status 10, "chargeback accepted", is unconfirmed, N-8, so it only pauses the plan and emails the owner):
+ * A9 / spec §2.13 — the owner records a card dispute's outcome:
  *
  *   pnpm billing:dispute --charge <32-hex charge ref> --outcome won|lost
+ *
+ * NETOPIA notifies only a LOST charge-back (status 10; the owner's decision of 24 October 2026): VERIFY_PAYMENT then
+ * ends the plan by itself through `endForLostDispute`, this command's own end path, so `--outcome lost` afterwards
+ * answers ALREADY_SETTLED. A won dispute is still recorded only by this command (RESOLVED_AFTER_END once ended).
  *
  * Disputes are keyed by the payment (`provider_payment_id`). On the host it runs under `systemd-run` with the API's
  * EnvironmentFile and writes as the API's own principal. It prints one plain line; a refusal is ONE code on stderr
@@ -99,51 +102,70 @@ export async function recordDisputeOutcome(stores: DisputeStores, input: Dispute
     });
   }
   return stores.billing.withTransaction(async (client): Promise<DisputeResult> => {
+    // A lost call ends a SUSPENDED plan of this subscription and writes nothing else (no charge event: a refund the
+    // dispute holds stays held, PR-41); any other state is ALREADY_SETTLED.
+    if (input.outcome === "lost") return endForLostDispute(stores, client, first.ownerRef, charge.subscriptionId, now);
     const locked = await lockedSubscription(stores, client, first.ownerRef);
     const suspended = locked !== null && locked.state.subscriptionId === charge.subscriptionId
       && locked.state.status === "SUSPENDED" ? locked : null;
     // The plan is no longer SUSPENDED: its own dispute may already have been recorded lost (which writes no charge
     // event) or ended by the sweep, so a won call while another charge-back of this charge is open may be meant for
-    // that other one. Refuse rather than guess; nothing is written. A lost call writes nothing either way.
-    if (input.outcome === "won" && suspended === null && open.length > 1) {
-      throw new TypeError("BILLING_DISPUTE_AMBIGUOUS");
+    // that other one. Refuse rather than guess; nothing is written.
+    if (suspended === null && open.length > 1) throw new TypeError("BILLING_DISPUTE_AMBIGUOUS");
+    const written = await stores.billing.appendChargeEvent(client, chargeEvent(charge.chargeId, "CHARGEBACK_RESOLVED", now, {
+      providerPaymentId: transactionId, amountMicros: chargeback.amountMicros ?? charge.totalMicros,
+      errorCode: null
+    }));
+    if (written === "DUPLICATE") return "ALREADY_SETTLED";
+    // A8b, P11b's sweep check: a suspension whose paid period is over is ended (ENDED(DISPUTE)), never resumed,
+    // even when the sweep has not run yet. Resuming it would make an unpaid, ended period read ACTIVE for ever.
+    const periodEnd = suspended?.state.currentPeriodEnd ?? null;
+    if (suspended === null || suspended.state.periodAnchorAt === null
+      || periodEnd === null || periodEnd.getTime() <= now.getTime()) {
+      return "RESOLVED_AFTER_END";
     }
-    if (input.outcome === "won") {
-      const written = await stores.billing.appendChargeEvent(client, chargeEvent(charge.chargeId, "CHARGEBACK_RESOLVED", now, {
-        providerPaymentId: transactionId, amountMicros: chargeback.amountMicros ?? charge.totalMicros,
-        errorCode: null
-      }));
-      if (written === "DUPLICATE") return "ALREADY_SETTLED";
-      // A8b, P11b's sweep check: a suspension whose paid period is over is ended (ENDED(DISPUTE)), never resumed,
-      // even when the sweep has not run yet. Resuming it would make an unpaid, ended period read ACTIVE for ever.
-      const periodEnd = suspended?.state.currentPeriodEnd ?? null;
-      if (suspended === null || suspended.state.periodAnchorAt === null
-        || periodEnd === null || periodEnd.getTime() <= now.getTime()) {
-        return "RESOLVED_AFTER_END";
-      }
-      // Spec 1.3: paid features stay paused while any dispute lasts. P9c writes SUSPENDED only once, so a second
-      // charge-back of the same subscription (an upgrade's or a renewal's payment) is only a CHARGEBACK row: the
-      // plan resumes only when no charge-back of its own payments is still open.
-      if (await otherOwnChargebackOpen(stores, client, charge.subscriptionId, charge.chargeId, transactionId)) {
-        return "STILL_DISPUTED";
-      }
-      // A6: the credit this period had before the charge-back (an upgrade's prorated override), not the plan's full one.
-      const override = suspended.state.currentPeriodStart === null ? null : await stores.billing.periodCreditOverride({
-        subscriptionId: suspended.state.subscriptionId, planId: suspended.state.planId,
-        since: suspended.state.currentPeriodStart, until: now
-      }, client);
-      await appendChecked(stores.billing, client, suspended, { kind: "RESUMED", at: now });
-      await stores.entitlements.append(client, {
-        ownerRef: suspended.state.ownerRef, planId: suspended.state.planId, periodAnchorAt: suspended.state.periodAnchorAt,
-        cause: "RESUMED", effectiveAt: now, subscriptionId: suspended.state.subscriptionId,
-        paidThrough: suspended.state.currentPeriodEnd, monthCreditOverrideMicros: override
-      });
-      return "RESUMED";
+    // Spec 1.3: paid features stay paused while any dispute lasts. P9c writes SUSPENDED only once, so a second
+    // charge-back of the same subscription (an upgrade's or a renewal's payment) is only a CHARGEBACK row: the
+    // plan resumes only when no charge-back of its own payments is still open.
+    if (await otherOwnChargebackOpen(stores, client, charge.subscriptionId, charge.chargeId, transactionId)) {
+      return "STILL_DISPUTED";
     }
-    if (suspended === null) return "ALREADY_SETTLED";
-    await appendChecked(stores.billing, client, suspended, { kind: "ENDED", at: now, data: { cause: "DISPUTE" } });
-    return "ENDED_DISPUTE";
+    // A6: the credit this period had before the charge-back (an upgrade's prorated override), not the plan's full one.
+    const override = suspended.state.currentPeriodStart === null ? null : await stores.billing.periodCreditOverride({
+      subscriptionId: suspended.state.subscriptionId, planId: suspended.state.planId,
+      since: suspended.state.currentPeriodStart, until: now
+    }, client);
+    await appendChecked(stores.billing, client, suspended, { kind: "RESUMED", at: now });
+    await stores.entitlements.append(client, {
+      ownerRef: suspended.state.ownerRef, planId: suspended.state.planId, periodAnchorAt: suspended.state.periodAnchorAt,
+      cause: "RESUMED", effectiveAt: now, subscriptionId: suspended.state.subscriptionId,
+      paidThrough: suspended.state.currentPeriodEnd, monthCreditOverrideMicros: override
+    });
+    return "RESUMED";
   });
+}
+
+/** The stores `endForLostDispute` needs: the subscription reads and write, and the owner lock. */
+export type LostDisputeStores = Readonly<{
+  billing: Pick<BillingRepository, "subscriptionForOwner" | "subscriptionEvents" | "appendSubscriptionEvent">;
+  jobs: Pick<BillingJobQueries, "lockOwner">;
+}>;
+
+/**
+ * A lost dispute's end, on the caller's transaction and under the owner lock: the owner's current subscription, when it
+ * is `subscriptionId` and SUSPENDED, is ENDED(DISPUTE) (its Free entitlement was written with the SUSPENDED). Any
+ * other state is ALREADY_SETTLED and nothing is written. `pnpm billing:dispute --outcome lost` and VERIFY_PAYMENT's
+ * lost charge-back (NETOPIA status 10, the owner's decision of 24 October 2026) both end a plan only through this.
+ */
+export async function endForLostDispute(
+  stores: LostDisputeStores, client: PoolClient, ownerRef: string, subscriptionId: string, now: Date
+): Promise<"ENDED_DISPUTE" | "ALREADY_SETTLED"> {
+  const locked = await lockedSubscription(stores, client, ownerRef);
+  if (locked === null || locked.state.subscriptionId !== subscriptionId || locked.state.status !== "SUSPENDED") {
+    return "ALREADY_SETTLED";
+  }
+  await appendChecked(stores.billing, client, locked, { kind: "ENDED", at: now, data: { cause: "DISPUTE" } });
+  return "ENDED_DISPUTE";
 }
 
 /**

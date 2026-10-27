@@ -59,6 +59,8 @@
   "mail.M10.subject": "Vaše plačljive funkcije so začasno ustavljene",
   "mail.M10.paused": "Vaša banka nam je sporočila, da je plačilo za vaš paket {plan} sporno. Plačljive funkcije so ustavljene, dokler je spor odprt. Vaše debate ostanejo shranjene.",
   "mail.M10.contact": "Če gre za napako, nam pišite na {merchantEmail}.",
+  "mail.M10_ENDED.subject": "Vaš paket {plan} se je končal",
+  "mail.M10_ENDED.ended": "Plačilo za vaš paket {plan} vam je bilo po sporu vrnjeno prek vaše banke. Zato se je paket končal, vaš račun pa je zdaj na paketu Brezplačno. Vaše debate ostanejo shranjene.",
   "mail.M11.subject": "Vaše kartice nismo mogli sprejeti",
   "mail.M11.refunded": "Ne moremo sprejemati kartic, izdanih v državi te kartice, zato se znesek {refundAmount}, ki je bil z nje zaračunan ali na njej rezerviran, v celoti vrne na vašo kartico.",
   "mail.M11.planEnded": "Zato se je vaš paket {endedPlan} končal, vaš račun pa je zdaj na paketu Brezplačno. Vaše debate ostanejo shranjene.",

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Go hachomair
-eyebrow: TÉARMAÍ SEIRBHÍSE · v2.5 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026
+eyebrow: TÉARMAÍ SEIRBHÍSE · v2.6 · I bhFEIDHM 24 DEIREADH FÓMHAIR 2026
 title: An méid lena n-aontaíonn tú
 lede: An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.
-endMarker: DEIREADH NA dTÉARMAÍ · v2.5
+endMarker: DEIREADH NA dTÉARMAÍ · v2.6
 bodyLabel: Téacs na dTéarmaí Seirbhíse
 annexTitle: Iarscríbhinn A — Téarmaí réigiúnacha
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 AN DLÍ RIALAITHE
 -->
 
-**Version 2.5 · Effective 12 Deireadh Fómhair 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
+**Version 2.6 · Effective 24 Deireadh Fómhair 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
 
 **In short.** Ní mór duit a bheith 18 mbliana d'aois nó os a chionn. Tógann Dialectical Engine argóintí le samhlacha IS agus d'fhéadfadh gach rud a ghineann sé a bheith mícheart — ní comhairle é. Bíonn do dhíospóireachtaí príobháideach mura bhfoilsíonn tú iad; má fhoilsíonn tú iad, is féidir le duine ar bith iad a léamh. Seoltar téacs a chuireann tú isteach chuig soláthraithe IS atá liostaithe inár gClár Soláthraithe, agus ní úsáidtear é chun samhlacha a oiliúint. Tuairiscigh ábhar neamhdhleathach ag support@dezbatere.ro cibé acu atá cuntas agat nó nach bhfuil. Is é dlí na Rómáine an dlí rialaithe, ach coimeádann tú do chosaintí áitiúla tomhaltóra.
 
@@ -279,7 +279,7 @@ Baineann gach iontráil le daoine a bhfuil cónaí orthu sa réigiún lena mbain
 
 ### A.1 An tAontas Eorpach agus an Limistéar Eorpach Eacnamaíoch
 
-Scríobhadh príomhchorp na dTéarmaí seo duit. Ina theannta sin: féadfaidh tú imeachtaí a thionscnamh i gcúirteanna na tíre ina bhfuil cónaí ort; tá feidhm ag an gceart tarraingt siar i rannán 13; tá réiteach malartach díospóidí ar fáil trí www.onoratainstanta.ro. **An Ghearmáin:** ligeann an cnaipe cealaithe ag dezbatere.ro/cancel duit deireadh a chur le síntiús gan síniú isteach; comhlíonann téarmaí síntiúis, tréimhsí athnuachana agus tréimhsí fógra §309(9) BGB: leanann gach plean ar feadh míosa agus athnuaitear gach mí é go dtí go gcealaíonn tú é, agus féadfaidh tú é a chealú am ar bith, le héifeacht ó dheireadh na míosa reatha. **An Fhrainc:** féadfaidh tú deireadh a chur le síntiús ar líne i dtrí chéim ag dezbatere.ro/cancel. **An Iodáil:** éilíonn na clásail maidir le dliteanas (15), fionraí (11), athruithe (14) agus an dlí rialaithe (18) do cheadú sonrach, a thugann tú leis an deimhniú ar leith tráth sínithe suas. **An Ísiltír:** cuirtear na Téarmaí seo ar fáil i bhfoirm instóráilte roimh thabhairt i gcrích. **An Pholainn:** tá leagan Polainnise ar fáil; roghnaigh Polski sa roghchlár teangacha.
+Scríobhadh príomhchorp na dTéarmaí seo duit. Ina theannta sin: féadfaidh tú imeachtaí a thionscnamh i gcúirteanna na tíre ina bhfuil cónaí ort; tá feidhm ag an gceart tarraingt siar i rannán 13; tá réiteach malartach díospóidí ar fáil trí www.onoratainstanta.ro. **An Ghearmáin:** ligeann an cnaipe cealaithe ag dezbatere.ro/cancel duit deireadh a chur le síntiús gan síniú isteach; comhlíonann téarmaí síntiúis, tréimhsí athnuachana agus tréimhsí fógra §309(9) BGB: leanann gach plean ar feadh míosa agus athnuaitear gach mí é go dtí go gcealaíonn tú é, agus féadfaidh tú é a chealú am ar bith, le héifeacht ó dheireadh na míosa reatha. **An Fhrainc:** féadfaidh tú deireadh a chur le síntiús ar líne i dtrí chéim ag dezbatere.ro/cancel. **An Iodáil:** éilíonn na clásail maidir le fionraí agus foirceannadh (11), pleananna íoctha agus a n-athnuachan (12), athruithe (14), dliteanas (15) agus an dlí rialaithe agus an áit ina n-éistear díospóidí (18) do cheadú sonrach faoi airteagail 1341 agus 1342 de Chód Sibhialta na hIodáile. Tugann tú é le bosca ar leith tráth sínithe suas, a thaispeántar d'aon duine a roghnaíonn an Iodáil sa réimse Réigiún nó a dtagann a gceangal ón Iodáil. **An Ísiltír:** cuirtear na Téarmaí seo ar fáil i bhfoirm instóráilte roimh thabhairt i gcrích. **An Pholainn:** tá leagan Polainnise ar fáil; roghnaigh Polski sa roghchlár teangacha.
 
 ### A.2 Stáit Aontaithe Mheiriceá
 

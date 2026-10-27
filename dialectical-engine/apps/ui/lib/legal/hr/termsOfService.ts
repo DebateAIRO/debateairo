@@ -297,7 +297,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Europska unija i Europski gospodarski prostor",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Opći dio ovih Uvjeta napisan je za vas. Dodatno: postupak možete pokrenuti pred sudovima države u kojoj živite; primjenjuje se pravo na odustanak iz odjeljka 13.; alternativno rješavanje sporova dostupno je putem www.onoratainstanta.ro. Njemačka: gumb za otkazivanje na dezbatere.ro/cancel omogućuje vam raskid pretplate bez prijave; trajanje pretplate, razdoblja obnavljanja i otkazni rokovi u skladu su s §309(9) BGB-a: svaki plan traje jedan mjesec i obnavlja se svaki mjesec dok ga ne otkažete, a možete ga otkazati u bilo kojem trenutku s učinkom od kraja tekućeg mjeseca. Francuska: pretplatu možete raskinuti putem interneta u tri koraka na dezbatere.ro/cancel. Italija: odredbe o odgovornosti (15.), suspenziji (11.), promjenama (14.) i mjerodavnom pravu (18.) zahtijevaju vaše posebno odobrenje, koje dajete zasebnom potvrdom pri registraciji. Nizozemska: ovi Uvjeti dostavljaju se prije sklapanja u obliku koji se može pohraniti. Poljska: dostupna je poljska verzija; odaberite Polski u izborniku jezika." }
+      { kind: "p", text: "Opći dio ovih Uvjeta napisan je za vas. Dodatno: postupak možete pokrenuti pred sudovima države u kojoj živite; primjenjuje se pravo na odustanak iz odjeljka 13.; alternativno rješavanje sporova dostupno je putem www.onoratainstanta.ro. Njemačka: gumb za otkazivanje na dezbatere.ro/cancel omogućuje vam raskid pretplate bez prijave; trajanje pretplate, razdoblja obnavljanja i otkazni rokovi u skladu su s §309(9) BGB-a: svaki plan traje jedan mjesec i obnavlja se svaki mjesec dok ga ne otkažete, a možete ga otkazati u bilo kojem trenutku s učinkom od kraja tekućeg mjeseca. Francuska: pretplatu možete raskinuti putem interneta u tri koraka na dezbatere.ro/cancel. Italija: odredbe o suspenziji i prestanku (11.), plaćenim planovima i njihovu obnavljanju (12.), promjenama (14.), odgovornosti (15.) te mjerodavnom pravu i mjestu rješavanja sporova (18.) zahtijevaju vaše posebno odobrenje na temelju članaka 1341. i 1342. talijanskog Građanskog zakonika. Dajete ga zasebnim poljem pri registraciji, koje se prikazuje svakome tko u polju Regija odabere Italiju ili čija veza dolazi iz Italije. Nizozemska: ovi Uvjeti dostavljaju se prije sklapanja u obliku koji se može pohraniti. Poljska: dostupna je poljska verzija; odaberite Polski u izborniku jezika." }
     ]
   },
   {
@@ -354,12 +354,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.5",
-  sha256: "070b04f02bbe4691dcfb86a17be29e3f87df4b50fc53ea58784e7e06d21151ce",
-  eyebrow: "UVJETI KORIŠTENJA · v2.5 · NA SNAZI OD 12. LISTOPADA 2026.",
+  version: "2.6",
+  sha256: "b3432898c3a8f2d8d5fd1bb94c907e67379ca76082f9b079e1ab0a14f14ea4c8",
+  eyebrow: "UVJETI KORIŠTENJA · v2.6 · NA SNAZI OD 24. LISTOPADA 2026.",
   title: "Na što pristajete",
   lede: "Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.",
-  endMarker: "KRAJ UVJETA · v2.5",
+  endMarker: "KRAJ UVJETA · v2.6",
   contact: "support@dezbatere.ro",
   bodyLabel: "Tekst Uvjeta korištenja",
   sectionIdPrefix: "terms-section-",

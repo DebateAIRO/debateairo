@@ -297,7 +297,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Europos Sąjunga ir Europos ekonominė erdvė",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Pagrindinė šių Sąlygų dalis parengta jums. Be to: galite iškelti bylą šalies, kurioje gyvenate, teismuose; taikoma 13 skyriuje nustatyta teisė atsisakyti sutarties; alternatyviu ginčų sprendimu galima pasinaudoti per www.onoratainstanta.ro. Vokietija: naudodamiesi atšaukimo mygtuku adresu dezbatere.ro/cancel galite nutraukti prenumeratą neprisijungę; prenumeratos sąlygos, atnaujinimo laikotarpiai ir įspėjimo terminai atitinka BGB §309(9): kiekvienas planas galioja vieną mėnesį ir kas mėnesį atnaujinamas, kol jo neatšauksite; atšaukti galite bet kada, o atšaukimas įsigalioja einamojo mėnesio pabaigoje. Prancūzija: galite internetu trimis veiksmais nutraukti prenumeratą adresu dezbatere.ro/cancel. Italija: atsakomybės (15), sustabdymo (11), pakeitimų (14) ir taikytinos teisės (18) nuostatoms būtinas konkretus jūsų pritarimas, kurį duodate atskiru patvirtinimu registruodamiesi. Nyderlandai: prieš sudarant sutartį šios Sąlygos pateikiamos forma, kurią galima išsaugoti. Lenkija: pateikiama ir versija lenkų kalba; kalbos perjungikliu pasirinkite Polski." }
+      { kind: "p", text: "Pagrindinė šių Sąlygų dalis parengta jums. Be to: galite iškelti bylą šalies, kurioje gyvenate, teismuose; taikoma 13 skyriuje nustatyta teisė atsisakyti sutarties; alternatyviu ginčų sprendimu galima pasinaudoti per www.onoratainstanta.ro. Vokietija: naudodamiesi atšaukimo mygtuku adresu dezbatere.ro/cancel galite nutraukti prenumeratą neprisijungę; prenumeratos sąlygos, atnaujinimo laikotarpiai ir įspėjimo terminai atitinka BGB §309(9): kiekvienas planas galioja vieną mėnesį ir kas mėnesį atnaujinamas, kol jo neatšauksite; atšaukti galite bet kada, o atšaukimas įsigalioja einamojo mėnesio pabaigoje. Prancūzija: galite internetu trimis veiksmais nutraukti prenumeratą adresu dezbatere.ro/cancel. Italija: sustabdymo ir nutraukimo (11), mokamų planų ir jų atnaujinimo (12), pakeitimų (14), atsakomybės (15) bei taikytinos teisės ir ginčų nagrinėjimo vietos (18) nuostatoms pagal Italijos civilinio kodekso 1341 ir 1342 straipsnius būtinas konkretus jūsų pritarimas. Jį duodate registruodamiesi pažymėdami atskirą langelį; jis rodomas kiekvienam, kuris lauke „Regionas“ pasirenka Italiją arba jungiasi iš Italijos. Nyderlandai: prieš sudarant sutartį šios Sąlygos pateikiamos forma, kurią galima išsaugoti. Lenkija: pateikiama ir versija lenkų kalba; kalbos perjungikliu pasirinkite Polski." }
     ]
   },
   {
@@ -354,12 +354,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.5",
-  sha256: "d12330e7c536a72d227a4d8c54f08208d262337dd41a7296d2ec3802fe47b9dc",
-  eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.5 · ĮSIGALIOJA 2026 M. SPALIO 12 D.",
+  version: "2.6",
+  sha256: "76704c76dfdeec0e3fdeebe6612635e7fd0d561d7748df8f7528e625deb4a3da",
+  eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.6 · ĮSIGALIOJA 2026 M. SPALIO 24 D.",
   title: "Su kuo sutinkate",
   lede: "Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.",
-  endMarker: "SĄLYGŲ PABAIGA · v2.5",
+  endMarker: "SĄLYGŲ PABAIGA · v2.6",
   contact: "support@dezbatere.ro",
   bodyLabel: "Paslaugų teikimo sąlygų tekstas",
   sectionIdPrefix: "terms-section-",

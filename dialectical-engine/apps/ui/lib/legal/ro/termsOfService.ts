@@ -297,7 +297,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Uniunea Europeană și Spațiul Economic European",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Corpul acestor Termeni este redactat pentru dumneavoastră. În plus: puteți introduce acțiuni în fața instanțelor din țara în care locuiți; se aplică dreptul de retragere din secțiunea 13; soluționarea alternativă a litigiilor este disponibilă prin www.onoratainstanta.ro. Germania: butonul de anulare de la dezbatere.ro/cancel vă permite să încetați un abonament fără autentificare; durata abonamentelor, perioadele de reînnoire și termenele de notificare respectă §309(9) BGB: fiecare plan se derulează pe o durată de o lună și se reînnoiește lunar până la anulare, și îl puteți anula oricând, cu efect de la sfârșitul lunii în curs. Franța: puteți înceta online un abonament în trei pași la dezbatere.ro/cancel. Italia: clauzele privind răspunderea (15), suspendarea (11), modificările (14) și legea aplicabilă (18) necesită aprobarea dumneavoastră specifică, pe care o acordați prin confirmarea separată la înregistrare. Țările de Jos: acești Termeni vă sunt furnizați într-o formă care poate fi stocată înainte de încheiere. Polonia: o versiune în limba polonă este disponibilă; alegeți Polski în selectorul de limbă." }
+      { kind: "p", text: "Corpul acestor Termeni este redactat pentru dumneavoastră. În plus: puteți introduce acțiuni în fața instanțelor din țara în care locuiți; se aplică dreptul de retragere din secțiunea 13; soluționarea alternativă a litigiilor este disponibilă prin www.onoratainstanta.ro. Germania: butonul de anulare de la dezbatere.ro/cancel vă permite să încetați un abonament fără autentificare; durata abonamentelor, perioadele de reînnoire și termenele de notificare respectă §309(9) BGB: fiecare plan se derulează pe o durată de o lună și se reînnoiește lunar până la anulare, și îl puteți anula oricând, cu efect de la sfârșitul lunii în curs. Franța: puteți înceta online un abonament în trei pași la dezbatere.ro/cancel. Italia: clauzele privind suspendarea și încetarea (11), planurile cu plată și reînnoirea lor (12), modificările (14), răspunderea (15) și legea aplicabilă și instanțele competente pentru soluționarea litigiilor (18) necesită aprobarea dumneavoastră specifică, în temeiul articolelor 1341 și 1342 din Codul civil italian. O acordați printr-o căsuță separată la înregistrare, afișată oricui alege Italia în câmpul „Regiune” sau a cărui conexiune provine din Italia. Țările de Jos: acești Termeni vă sunt furnizați într-o formă care poate fi stocată înainte de încheiere. Polonia: o versiune în limba polonă este disponibilă; alegeți Polski în selectorul de limbă." }
     ]
   },
   {
@@ -354,12 +354,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.5",
-  sha256: "e354a17b2529385122e93441c606972ed5a54ab82fcee2aa14546849eaa77f74",
-  eyebrow: "TERMENII SERVICIULUI · v2.5 · ÎN VIGOARE DE LA 12 OCTOMBRIE 2026",
+  version: "2.6",
+  sha256: "af223b77f181ce6c2d3eb34270ee40308f398efd772b8a3d9a2f1f48b58b4e8e",
+  eyebrow: "TERMENII SERVICIULUI · v2.6 · ÎN VIGOARE DE LA 24 OCTOMBRIE 2026",
   title: "Ce acceptați",
   lede: "Contractul dintre dumneavoastră și DMS Merchandise Shop S.R.L., într-un limbaj clar. Nouăsprezece secțiuni și Anexa A — derulați până la final.",
-  endMarker: "SFÂRȘITUL TERMENILOR · v2.5",
+  endMarker: "SFÂRȘITUL TERMENILOR · v2.6",
   contact: "support@dezbatere.ro",
   bodyLabel: "Textul Termenilor serviciului",
   sectionIdPrefix: "terms-section-",

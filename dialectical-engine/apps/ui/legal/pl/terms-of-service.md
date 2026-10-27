@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: W skrócie
-eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v2.5 · OBOWIĄZUJĄ OD 12 PAŹDZIERNIKA 2026
+eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v2.6 · OBOWIĄZUJĄ OD 24 PAŹDZIERNIKA 2026
 title: Na co wyrażasz zgodę
 lede: Umowa między Tobą a DMS Merchandise Shop S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.
-endMarker: KONIEC WARUNKÓW · v2.5
+endMarker: KONIEC WARUNKÓW · v2.6
 bodyLabel: Treść Warunków świadczenia usług
 annexTitle: Załącznik A — Warunki regionalne
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAWO WŁAŚCIWE
 -->
 
-**Version 2.5 · Effective 12 października 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
+**Version 2.6 · Effective 24 października 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
 
 **In short.** Musisz mieć ukończone 18 lat. Dialectical Engine tworzy argumenty przy użyciu modeli sztucznej inteligencji, a wszystko, co generuje, może być błędne — nie jest to porada. Twoje debaty są prywatne, chyba że je opublikujesz; po publikacji każdy może je przeczytać. Przesyłany przez Ciebie tekst jest przekazywany dostawcom AI wymienionym w naszym Rejestrze Dostawców i nie jest wykorzystywany do trenowania modeli. Nielegalne treści zgłaszaj pod adresem support@dezbatere.ro, niezależnie od tego, czy masz konto. Zastosowanie ma prawo rumuńskie, jednak zachowujesz ochronę konsumencką wynikającą z prawa miejscowego.
 
@@ -279,7 +279,7 @@ Każdy wpis ma zastosowanie do osób mieszkających w danym regionie i określa 
 
 ### A.1 Unia Europejska i Europejski Obszar Gospodarczy
 
-Część główna niniejszych Warunków została opracowana z myślą o Tobie. Ponadto: możesz wszcząć postępowanie przed sądami państwa, w którym mieszkasz; ma zastosowanie prawo odstąpienia określone w sekcji 13; alternatywne metody rozstrzygania sporów są dostępne za pośrednictwem www.onoratainstanta.ro. **Niemcy:** przycisk anulowania pod adresem dezbatere.ro/cancel umożliwia zakończenie subskrypcji bez logowania; okresy subskrypcji i odnowienia oraz terminy wypowiedzenia są zgodne z §309(9) BGB: każdy plan obowiązuje przez jeden miesiąc i odnawia się co miesiąc do czasu anulowania, a anulować można w dowolnym momencie ze skutkiem na koniec bieżącego miesiąca. **Francja:** możesz zakończyć subskrypcję online w trzech krokach pod adresem dezbatere.ro/cancel. **Włochy:** postanowienia dotyczące odpowiedzialności (15), zawieszenia (11), zmian (14) i prawa właściwego (18) wymagają Twojej szczególnej akceptacji, której udzielasz w odrębnym potwierdzeniu podczas rejestracji. **Niderlandy:** niniejsze Warunki są udostępniane przed zawarciem umowy w formie umożliwiającej ich przechowywanie. **Polska:** polska wersja jest dostępna; wybierz Polski w przełączniku języka.
+Część główna niniejszych Warunków została opracowana z myślą o Tobie. Ponadto: możesz wszcząć postępowanie przed sądami państwa, w którym mieszkasz; ma zastosowanie prawo odstąpienia określone w sekcji 13; alternatywne metody rozstrzygania sporów są dostępne za pośrednictwem www.onoratainstanta.ro. **Niemcy:** przycisk anulowania pod adresem dezbatere.ro/cancel umożliwia zakończenie subskrypcji bez logowania; okresy subskrypcji i odnowienia oraz terminy wypowiedzenia są zgodne z §309(9) BGB: każdy plan obowiązuje przez jeden miesiąc i odnawia się co miesiąc do czasu anulowania, a anulować można w dowolnym momencie ze skutkiem na koniec bieżącego miesiąca. **Francja:** możesz zakończyć subskrypcję online w trzech krokach pod adresem dezbatere.ro/cancel. **Włochy:** postanowienia dotyczące zawieszenia i rozwiązania umowy (11), planów płatnych i ich odnawiania (12), zmian (14), odpowiedzialności (15) oraz prawa właściwego i sądów rozpatrujących spory (18) wymagają Twojej szczególnej akceptacji na podstawie art. 1341 i 1342 włoskiego Kodeksu cywilnego. Udzielasz jej w odrębnym polu wyboru podczas rejestracji; pole to jest wyświetlane każdemu, kto w polu „Region” wybierze Włochy lub którego połączenie pochodzi z Włoch. **Niderlandy:** niniejsze Warunki są udostępniane przed zawarciem umowy w formie umożliwiającej ich przechowywanie. **Polska:** polska wersja jest dostępna; wybierz Polski w przełączniku języka.
 
 ### A.2 Stany Zjednoczone
 

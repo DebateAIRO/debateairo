@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Fil-qosor
-eyebrow: TERMINI TAS-SERVIZZ · v2.5 · EFFETTIVI 12 TA’ OTTUBRU 2026
+eyebrow: TERMINI TAS-SERVIZZ · v2.6 · EFFETTIVI 24 TA’ OTTUBRU 2026
 title: Dak li taqbel miegħu
 lede: Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.
-endMarker: TMIEM IT-TERMINI · v2.5
+endMarker: TMIEM IT-TERMINI · v2.6
 bodyLabel: Test tat-Termini tas-Servizz
 annexTitle: Anness A — Termini reġjonali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LIĠI APPLIKABBLI
 -->
 
-**Version 2.5 · Effective 12 ta’ Ottubru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
+**Version 2.6 · Effective 24 ta’ Ottubru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
 
 **In short.** Irid ikollok 18-il sena jew aktar. Dialectical Engine tibni argumenti b’mudelli tal-IA u dak kollu li tiġġenera jista’ jkun żbaljat — mhuwiex parir. Id-dibattiti tiegħek huma privati sakemm ma tippubblikahomx; jekk tippubblikahom, kulħadd jista’ jaqrahom. It-test li tissottometti jintbagħat lill-fornituri tal-IA elenkati fir-Reġistru tal-Fornituri tagħna, u ma jintużax għat-taħriġ tal-mudelli. Irrapporta kontenut illegali fuq support@dezbatere.ro kemm jekk għandek kont kif ukoll jekk le. Tapplika l-liġi Rumena, iżda l-protezzjonijiet lokali tiegħek bħala konsumatur jibqgħu japplikaw għalik.
 
@@ -279,7 +279,7 @@ Kull entrata tapplika għall-persuni li jgħixu fir-reġjun tagħha, u tiddikjar
 
 ### A.1 L-Unjoni Ewropea u ż-Żona Ekonomika Ewropea
 
-Il-parti ewlenija ta’ dawn it-Termini nkitbet għalik. Barra minn hekk: tista’ tibda proċedimenti fil-qrati tal-pajjiż fejn tgħix; japplika d-dritt tal-irtirar fit-taqsima 13; soluzzjoni alternattiva għat-tilwim hija disponibbli permezz ta’ www.onoratainstanta.ro. **Il-Ġermanja:** il-buttuna tal-kanċellazzjoni fuq dezbatere.ro/cancel tħallik ittemm abbonament mingħajr ma tidħol fil-kont; it-termini tal-abbonament, il-perjodi tat-tiġdid u l-perjodi tal-avviż jikkonformaw mal-§309(9) BGB: kull pjan jgħaddi għal xahar u jitġedded kull xahar sakemm tikkanċella, u tista’ tikkanċella fi kwalunkwe ħin b’effett minn tmiem ix-xahar kurrenti. **Franza:** tista’ ttemm abbonament fuq l-internet fi tliet passi fuq dezbatere.ro/cancel. **L-Italja:** il-klawżoli dwar ir-responsabbiltà (15), is-sospensjoni (11), il-bidliet (14) u l-liġi applikabbli (18) jeħtieġu l-approvazzjoni speċifika tiegħek, li tagħtiha bil-konferma separata waqt ir-reġistrazzjoni. **Il-Pajjiżi l-Baxxi:** dawn it-Termini jiġu pprovduti f’forma li tista’ tinħażen qabel il-konklużjoni. **Il-Polonja:** verżjoni bil-Pollakk hija disponibbli; agħżel Polski bis-selettur tal-lingwa.
+Il-parti ewlenija ta’ dawn it-Termini nkitbet għalik. Barra minn hekk: tista’ tibda proċedimenti fil-qrati tal-pajjiż fejn tgħix; japplika d-dritt tal-irtirar fit-taqsima 13; soluzzjoni alternattiva għat-tilwim hija disponibbli permezz ta’ www.onoratainstanta.ro. **Il-Ġermanja:** il-buttuna tal-kanċellazzjoni fuq dezbatere.ro/cancel tħallik ittemm abbonament mingħajr ma tidħol fil-kont; it-termini tal-abbonament, il-perjodi tat-tiġdid u l-perjodi tal-avviż jikkonformaw mal-§309(9) BGB: kull pjan jgħaddi għal xahar u jitġedded kull xahar sakemm tikkanċella, u tista’ tikkanċella fi kwalunkwe ħin b’effett minn tmiem ix-xahar kurrenti. **Franza:** tista’ ttemm abbonament fuq l-internet fi tliet passi fuq dezbatere.ro/cancel. **L-Italja:** il-klawżoli dwar is-sospensjoni u t-terminazzjoni (11), il-pjanijiet bi ħlas u t-tiġdid tagħhom (12), il-bidliet (14), ir-responsabbiltà (15) u l-liġi applikabbli u fejn jinstema’ t-tilwim (18) jeħtieġu l-approvazzjoni speċifika tiegħek skont l-artikoli 1341 u 1342 tal-Kodiċi Ċivili Taljan. Tagħtiha b’kaxxa separata waqt ir-reġistrazzjoni, murija lil kull min jagħżel l-Italja fil-qasam “Reġjun” jew li l-konnessjoni tiegħu tiġi mill-Italja. **Il-Pajjiżi l-Baxxi:** dawn it-Termini jiġu pprovduti f’forma li tista’ tinħażen qabel il-konklużjoni. **Il-Polonja:** verżjoni bil-Pollakk hija disponibbli; agħżel Polski bis-selettur tal-lingwa.
 
 ### A.2 L-Istati Uniti
 

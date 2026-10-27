@@ -297,7 +297,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Union européenne et Espace économique européen",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Le corps des présentes Conditions est rédigé pour vous. En outre : vous pouvez saisir les juridictions du pays dans lequel vous résidez ; le droit de rétractation prévu à la section 13 s’applique ; un règlement extrajudiciaire des litiges est disponible par l’intermédiaire du site www.onoratainstanta.ro. Allemagne : le bouton de résiliation disponible à l’adresse dezbatere.ro/cancel vous permet de mettre fin à un abonnement sans vous connecter ; les durées d’abonnement et de renouvellement ainsi que les délais de préavis sont conformes au §309(9) BGB : chaque formule dure un mois et se renouvelle chaque mois jusqu’à ce que vous la résiliiez, et vous pouvez la résilier à tout moment avec effet à la fin du mois en cours. France : vous pouvez résilier un abonnement en ligne en trois étapes à l’adresse dezbatere.ro/cancel. Italie : les clauses relatives à la responsabilité (15), à la suspension (11), aux modifications (14) et au droit applicable (18) nécessitent votre approbation expresse, que vous donnez par une confirmation distincte lors de l’inscription. Pays-Bas : les présentes Conditions sont fournies sous une forme permettant leur conservation avant la conclusion du contrat. Pologne : une version polonaise est disponible ; choisissez Polski dans le menu des langues." }
+      { kind: "p", text: "Le corps des présentes Conditions est rédigé pour vous. En outre : vous pouvez saisir les juridictions du pays dans lequel vous résidez ; le droit de rétractation prévu à la section 13 s’applique ; un règlement extrajudiciaire des litiges est disponible par l’intermédiaire du site www.onoratainstanta.ro. Allemagne : le bouton de résiliation disponible à l’adresse dezbatere.ro/cancel vous permet de mettre fin à un abonnement sans vous connecter ; les durées d’abonnement et de renouvellement ainsi que les délais de préavis sont conformes au §309(9) BGB : chaque formule dure un mois et se renouvelle chaque mois jusqu’à ce que vous la résiliiez, et vous pouvez la résilier à tout moment avec effet à la fin du mois en cours. France : vous pouvez résilier un abonnement en ligne en trois étapes à l’adresse dezbatere.ro/cancel. Italie : les clauses relatives à la suspension et à la résiliation (11), aux formules payantes et à leur renouvellement (12), aux modifications (14), à la responsabilité (15) et au droit applicable et aux juridictions compétentes (18) nécessitent votre approbation expresse au titre des articles 1341 et 1342 du Code civil italien. Vous la donnez au moyen d’une case distincte lors de l’inscription, affichée à toute personne qui choisit l’Italie dans le champ Région ou dont la connexion provient d’Italie. Pays-Bas : les présentes Conditions sont fournies sous une forme permettant leur conservation avant la conclusion du contrat. Pologne : une version polonaise est disponible ; choisissez Polski dans le menu des langues." }
     ]
   },
   {
@@ -354,12 +354,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.5",
-  sha256: "d6808c12c4966d621a3251a93e50b6fbfd03f71912af7adbd7e1d9758cbd2bd8",
-  eyebrow: "CONDITIONS D’UTILISATION · v2.5 · PRISE D’EFFET 12 OCTOBRE 2026",
+  version: "2.6",
+  sha256: "78280f4212e667053704a2d69bdaad76997296a66d51886303f239968ab5c9ed",
+  eyebrow: "CONDITIONS D’UTILISATION · v2.6 · PRISE D’EFFET 24 OCTOBRE 2026",
   title: "Ce que vous acceptez",
   lede: "Le contrat entre vous et DMS Merchandise Shop S.R.L., en termes clairs. Dix-neuf sections et l’annexe A — faites défiler jusqu’à la fin.",
-  endMarker: "FIN DES CONDITIONS · v2.5",
+  endMarker: "FIN DES CONDITIONS · v2.6",
   contact: "support@dezbatere.ro",
   bodyLabel: "Texte des Conditions d’utilisation",
   sectionIdPrefix: "terms-section-",

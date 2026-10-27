@@ -1,6 +1,6 @@
 import type { Pool } from 'pg';
 import type { AuditContextHasher, CryptoEnvelope } from '@debateai/crypto';
-import type { AuthSourceContext, PendingAccountInput } from './identity.js';
+import { recordSignupItalyApproval, type AuthSourceContext, type PendingAccountInput } from './identity.js';
 import { ProfileTransactions, type ProfileSession } from './account-profile.js';
 import { withMailLocale } from './mail-locale.js';
 import { isDeclaredRegion } from '@debateai/kernel';
@@ -114,6 +114,8 @@ export class PostgresSocialIdentityRepository {
                 await c.query('SELECT identity.record_social_registration_region($1::uuid,$2::text,$3::text,$4::text,$5::text)',[
                     result.userId,region.country,region.usState,input.proofHash,input.socialEnrollmentHash
                 ]);
+                // Italy clause approval S01 (R12): the same writer as the email path, in this transaction.
+                await recordSignupItalyApproval(c, result.userId, input);
                 await beforeCommit();
                 return { ...result, verificationExpiresAt: new Date(result.verificationExpiresAt) };
             }

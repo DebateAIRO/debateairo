@@ -297,7 +297,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Unia Europejska i Europejski Obszar Gospodarczy",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Część główna niniejszych Warunków została opracowana z myślą o Tobie. Ponadto: możesz wszcząć postępowanie przed sądami państwa, w którym mieszkasz; ma zastosowanie prawo odstąpienia określone w sekcji 13; alternatywne metody rozstrzygania sporów są dostępne za pośrednictwem www.onoratainstanta.ro. Niemcy: przycisk anulowania pod adresem dezbatere.ro/cancel umożliwia zakończenie subskrypcji bez logowania; okresy subskrypcji i odnowienia oraz terminy wypowiedzenia są zgodne z §309(9) BGB: każdy plan obowiązuje przez jeden miesiąc i odnawia się co miesiąc do czasu anulowania, a anulować można w dowolnym momencie ze skutkiem na koniec bieżącego miesiąca. Francja: możesz zakończyć subskrypcję online w trzech krokach pod adresem dezbatere.ro/cancel. Włochy: postanowienia dotyczące odpowiedzialności (15), zawieszenia (11), zmian (14) i prawa właściwego (18) wymagają Twojej szczególnej akceptacji, której udzielasz w odrębnym potwierdzeniu podczas rejestracji. Niderlandy: niniejsze Warunki są udostępniane przed zawarciem umowy w formie umożliwiającej ich przechowywanie. Polska: polska wersja jest dostępna; wybierz Polski w przełączniku języka." }
+      { kind: "p", text: "Część główna niniejszych Warunków została opracowana z myślą o Tobie. Ponadto: możesz wszcząć postępowanie przed sądami państwa, w którym mieszkasz; ma zastosowanie prawo odstąpienia określone w sekcji 13; alternatywne metody rozstrzygania sporów są dostępne za pośrednictwem www.onoratainstanta.ro. Niemcy: przycisk anulowania pod adresem dezbatere.ro/cancel umożliwia zakończenie subskrypcji bez logowania; okresy subskrypcji i odnowienia oraz terminy wypowiedzenia są zgodne z §309(9) BGB: każdy plan obowiązuje przez jeden miesiąc i odnawia się co miesiąc do czasu anulowania, a anulować można w dowolnym momencie ze skutkiem na koniec bieżącego miesiąca. Francja: możesz zakończyć subskrypcję online w trzech krokach pod adresem dezbatere.ro/cancel. Włochy: postanowienia dotyczące zawieszenia i rozwiązania umowy (11), planów płatnych i ich odnawiania (12), zmian (14), odpowiedzialności (15) oraz prawa właściwego i sądów rozpatrujących spory (18) wymagają Twojej szczególnej akceptacji na podstawie art. 1341 i 1342 włoskiego Kodeksu cywilnego. Udzielasz jej w odrębnym polu wyboru podczas rejestracji; pole to jest wyświetlane każdemu, kto w polu „Region” wybierze Włochy lub którego połączenie pochodzi z Włoch. Niderlandy: niniejsze Warunki są udostępniane przed zawarciem umowy w formie umożliwiającej ich przechowywanie. Polska: polska wersja jest dostępna; wybierz Polski w przełączniku języka." }
     ]
   },
   {
@@ -354,12 +354,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.5",
-  sha256: "d5b2948706ead0d7fb5bddfc69dd5c97b5a211cdc54e4c6c44f396d185a73efb",
-  eyebrow: "WARUNKI ŚWIADCZENIA USŁUG · v2.5 · OBOWIĄZUJĄ OD 12 PAŹDZIERNIKA 2026",
+  version: "2.6",
+  sha256: "75a120009c5a6d58327bb3021abb631a830fb4de784d66ec105ca290f6b69b1e",
+  eyebrow: "WARUNKI ŚWIADCZENIA USŁUG · v2.6 · OBOWIĄZUJĄ OD 24 PAŹDZIERNIKA 2026",
   title: "Na co wyrażasz zgodę",
   lede: "Umowa między Tobą a DMS Merchandise Shop S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.",
-  endMarker: "KONIEC WARUNKÓW · v2.5",
+  endMarker: "KONIEC WARUNKÓW · v2.6",
   contact: "support@dezbatere.ro",
   bodyLabel: "Treść Warunków świadczenia usług",
   sectionIdPrefix: "terms-section-",

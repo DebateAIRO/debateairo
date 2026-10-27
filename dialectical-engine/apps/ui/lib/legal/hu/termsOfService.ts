@@ -297,7 +297,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Európai Unió és Európai Gazdasági Térség",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "E Feltételek törzsszövege Önnek szól. Ezen túlmenően: Ön a lakóhelye szerinti ország bíróságai előtt indíthat eljárást; a 13. szakasz szerinti elállási jog alkalmazandó; alternatív vitarendezés a www.onoratainstanta.ro útján érhető el. Németország: a dezbatere.ro/cancel címen található lemondási gombbal bejelentkezés nélkül megszüntetheti előfizetését; az előfizetési feltételek, a megújítási időszakok és a felmondási idők megfelelnek a BGB 309. § (9) bekezdésének: minden csomag egy hónapra szól, és havonta megújul, amíg Ön le nem mondja; bármikor lemondhatja, a lemondás az aktuális hónap végével lép hatályba. Franciaország: előfizetését három lépésben, online megszüntetheti a dezbatere.ro/cancel címen. Olaszország: a felelősségre (15), a felfüggesztésre (11), a módosításokra (14) és az irányadó jogra (18) vonatkozó rendelkezésekhez az Ön külön jóváhagyása szükséges, amelyet regisztrációkor külön megerősítéssel ad meg. Hollandia: e Feltételeket a szerződéskötés előtt tárolható formában bocsátjuk rendelkezésre. Lengyelország: lengyel nyelvű változat is elérhető; válassza a Polski nyelvet a nyelvválasztóban." }
+      { kind: "p", text: "E Feltételek törzsszövege Önnek szól. Ezen túlmenően: Ön a lakóhelye szerinti ország bíróságai előtt indíthat eljárást; a 13. szakasz szerinti elállási jog alkalmazandó; alternatív vitarendezés a www.onoratainstanta.ro útján érhető el. Németország: a dezbatere.ro/cancel címen található lemondási gombbal bejelentkezés nélkül megszüntetheti előfizetését; az előfizetési feltételek, a megújítási időszakok és a felmondási idők megfelelnek a BGB 309. § (9) bekezdésének: minden csomag egy hónapra szól, és havonta megújul, amíg Ön le nem mondja; bármikor lemondhatja, a lemondás az aktuális hónap végével lép hatályba. Franciaország: előfizetését három lépésben, online megszüntetheti a dezbatere.ro/cancel címen. Olaszország: a felfüggesztésre és megszüntetésre (11), a fizetős csomagokra és azok megújítására (12), a módosításokra (14), a felelősségre (15), valamint az irányadó jogra és a jogviták elbírálásának helyére (18) vonatkozó rendelkezésekhez az Ön külön jóváhagyása szükséges az olasz Polgári Törvénykönyv 1341. és 1342. cikke alapján. Ezt a regisztrációkor megjelenő külön négyzettel adja meg, amely mindenkinek megjelenik, aki a Régió mezőben Olaszországot választja, vagy akinek a kapcsolata Olaszországból érkezik. Hollandia: e Feltételeket a szerződéskötés előtt tárolható formában bocsátjuk rendelkezésre. Lengyelország: lengyel nyelvű változat is elérhető; válassza a Polski nyelvet a nyelvválasztóban." }
     ]
   },
   {
@@ -354,12 +354,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.5",
-  sha256: "63ed6e92cf1fa481f9a78e4d72d49b0fb73a5cd3c6a990b5de23a18feb7b4c4f",
-  eyebrow: "SZOLGÁLTATÁSI FELTÉTELEK · v2.5 · HATÁLYOS 2026. OKTÓBER 12.",
+  version: "2.6",
+  sha256: "8f882fa87ce40bee71ddf85453e715d5487ce7f0600293a9fce3f45e558daf6d",
+  eyebrow: "SZOLGÁLTATÁSI FELTÉTELEK · v2.6 · HATÁLYOS 2026. OKTÓBER 24.",
   title: "Amit Ön elfogad",
   lede: "Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.",
-  endMarker: "A FELTÉTELEK VÉGE · v2.5",
+  endMarker: "A FELTÉTELEK VÉGE · v2.6",
   contact: "support@dezbatere.ro",
   bodyLabel: "A Szolgáltatási feltételek szövege",
   sectionIdPrefix: "terms-section-",

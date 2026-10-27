@@ -133,7 +133,7 @@ describe("terms of service modal — rendered", () => {
     await render(<TermsOfServiceModal open mode="consent" onClose={vi.fn()} />);
 
     expect(dialog().querySelector(".policyEyebrow")!.textContent).toBe(
-      "TERMS OF SERVICE · v2.5 · EFFECTIVE 12 OCTOBER 2026"
+      "TERMS OF SERVICE · v2.6 · EFFECTIVE 24 OCTOBER 2026"
     );
     expect(dialog().querySelector(".policyTitle")!.textContent).toBe("What you agree to");
     expect(dialog().querySelector(".policyLede")!.textContent).toBe(
@@ -152,7 +152,7 @@ describe("terms of service modal — rendered", () => {
     expect(contacts.length).toBeGreaterThanOrEqual(1);
 
     const last = dialog().querySelector(".policyBody")!.lastElementChild!;
-    expect(last.textContent).toBe("END OF TERMS · v2.5");
+    expect(last.textContent).toBe("END OF TERMS · v2.6");
 
     const pdf = [...dialog().querySelectorAll("*")].filter(
       (element) => element.textContent?.trim() === "Download PDF"

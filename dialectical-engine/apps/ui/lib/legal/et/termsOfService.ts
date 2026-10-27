@@ -297,7 +297,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Euroopa Liit ja Euroopa Majanduspiirkond",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Nende Tingimuste põhiosa on kirjutatud teile. Lisaks: võite esitada hagi oma elukohariigi kohtule; kohaldatakse jaotises 13 sätestatud taganemisõigust; alternatiivne vaidluste lahendamine on kättesaadav veebisaidi www.onoratainstanta.ro kaudu. Saksamaa: tühistamisnupp aadressil dezbatere.ro/cancel võimaldab teil tellimuse sisse logimata lõpetada; tellimistingimused, uuendamisperioodid ja etteteatamistähtajad vastavad BGB § 309 lõikele 9: iga pakett kestab ühe kuu ja uueneb igakuiselt, kuni selle tühistate, ning tühistada saab igal ajal, kusjuures tühistamine jõustub jooksva kuu lõpus. Prantsusmaa: saate tellimuse veebis kolme sammuga lõpetada aadressil dezbatere.ro/cancel. Itaalia: vastutuse (15), peatamise (11), muudatuste (14) ja kohaldatava õiguse (18) klauslid nõuavad teie eraldi heakskiitu, mille annate registreerumisel eraldi kinnitusega. Madalmaad: need Tingimused esitatakse enne lepingu sõlmimist salvestatavas vormis. Poola: poolakeelne versioon on saadaval; valige keelemenüüst Polski." }
+      { kind: "p", text: "Nende Tingimuste põhiosa on kirjutatud teile. Lisaks: võite esitada hagi oma elukohariigi kohtule; kohaldatakse jaotises 13 sätestatud taganemisõigust; alternatiivne vaidluste lahendamine on kättesaadav veebisaidi www.onoratainstanta.ro kaudu. Saksamaa: tühistamisnupp aadressil dezbatere.ro/cancel võimaldab teil tellimuse sisse logimata lõpetada; tellimistingimused, uuendamisperioodid ja etteteatamistähtajad vastavad BGB § 309 lõikele 9: iga pakett kestab ühe kuu ja uueneb igakuiselt, kuni selle tühistate, ning tühistada saab igal ajal, kusjuures tühistamine jõustub jooksva kuu lõpus. Prantsusmaa: saate tellimuse veebis kolme sammuga lõpetada aadressil dezbatere.ro/cancel. Itaalia: peatamise ja lõpetamise (11), tasuliste pakettide ja nende uuendamise (12), muudatuste (14), vastutuse (15) ning kohaldatava õiguse ja vaidluste lahendamise koha (18) klauslid nõuavad teie eraldi heakskiitu Itaalia tsiviilkoodeksi artiklite 1341 ja 1342 alusel. Annate selle registreerumisel eraldi ruuduga, mis kuvatakse igaühele, kes valib väljal Piirkond Itaalia või kelle ühendus pärineb Itaaliast. Madalmaad: need Tingimused esitatakse enne lepingu sõlmimist salvestatavas vormis. Poola: poolakeelne versioon on saadaval; valige keelemenüüst Polski." }
     ]
   },
   {
@@ -354,12 +354,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.5",
-  sha256: "1b283def3d805682c6089f8f28a8824a495d3d71c2cc09f51d371698cbb1799f",
-  eyebrow: "TEENUSETINGIMUSED · v2.5 · KEHTIB ALATES 12. OKTOOBRIST 2026",
+  version: "2.6",
+  sha256: "7fc853ea47705c4373e61efd3eea13844d85582b00ac6c3d4a1a99042ee7bbcb",
+  eyebrow: "TEENUSETINGIMUSED · v2.6 · KEHTIB ALATES 24. OKTOOBRIST 2026",
   title: "Millega te nõustute",
   lede: "Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.",
-  endMarker: "TINGIMUSTE LÕPP · v2.5",
+  endMarker: "TINGIMUSTE LÕPP · v2.6",
   contact: "support@dezbatere.ro",
   bodyLabel: "Teenusetingimuste tekst",
   sectionIdPrefix: "terms-section-",

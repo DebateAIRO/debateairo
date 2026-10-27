@@ -1530,6 +1530,39 @@ socket here, never a runtime login); the API's runtime login may only read the a
 what passed. No new environment key. Until an activation exists, every release runs on its own site version, as before;
 on this server nothing activates anything before Phase 3.
 
+### Upgrading to the Italy-specific approval (migration 0125)
+
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
+
+This release adds one migration, `migrations/0125_italy_specific_approval.sql` (after `0124_settings_activation.sql`;
+`n1: expand`, so §5's migration step applies it while the older release keeps serving). It is the database half of the
+second, unticked sign-up box for the Italian Civil Code arts. 1341-1342, owed when Italy is picked in Region or the
+request IP resolves to Italy: two nullable columns on `legal.acceptance`, `clauses` (the Terms clauses approved: 11, 12,
+14, 15 and 18) and `leg` (`PICKED`, `IP` or `BOTH`: which test placed the sign-up in Italy); the new acceptance kind
+`ITALY_SPECIFIC_APPROVAL` in the two widened CHECKs `acceptance_kind_check` and `acceptance_document_version_shape`, and
+the new CHECK `acceptance_italy_fields`; and two functions, `identity.record_signup_italy_approval` (the sign-up writer,
+inside the sign-up transaction; EXECUTE for `debateai_billing_runtime`, the API's role, only) and
+`identity.read_data_export_snapshot_v2` (0115's export snapshot with `clauses` and `leg` on every acceptance; EXECUTE for
+`debateai_data_export_worker` only). Apply it BEFORE the new code runs, as step 1 of the debate-shape upgrade above does
+(open the migrator window, `pnpm db:migrate`, then `hardening.sql`, close the window), then restart the API. On a
+database without it the new API fails in two ways. Wherever the data-export pool is configured (`DATA_EXPORT_STORE_PATH`
+set, as `env/api.env.example` has it), its boot step `database-roles` (`assertDataExportDatabaseRoles`) refuses the
+WHOLE API with `DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED`, because the export worker's function list now names the v2
+reader, which only 0125 creates. And every sign-up that owes the Italy approval fails: its transaction calls the missing
+writer and is rolled back, account included.
+
+The DB-IP and Tor files (§5 "Country data") now feed the Italy approval's IP leg on every hosted boot, whether or not
+the register version in force publishes `countryPolicy`: the API opens them at boot (boot step `geo-lookup`). With a
+`countryPolicy` row a missing file still refuses the boot, as before. Without one the API still starts: it writes one
+`italy_approval.ip_leg_off` line (its `code` names the refusal, for example `GEOIP_COUNTRY_DB_UNAVAILABLE`), each
+sign-up then writes `italy_approval.ip_leg_skipped` with `reason` `NO_LOOKUP`, and the picked Region alone decides. The
+IP leg stays off until the API is restarted after the files appear.
+
+No new environment key. This release publishes Terms of Service 2.5 and Privacy Policy 3.6, and re-asks nobody. Rolling
+back the code needs no database step: the two columns, the three CHECKs and the two functions stay; the older code never
+writes the new kind or the two columns, and its export still calls 0115's `identity.read_data_export_snapshot`, which
+0125 calls and does not replace.
+
 ### Upgrading an existing host (paid plans Part 1a)
 
 > Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
@@ -1552,8 +1585,9 @@ checkout in place, with its dependencies installed: this release adds the `mmdb-
 3. **Add the two country-data paths to `api.env`**, as `env/api.env.example` has them:
    `GEOIP_COUNTRY_DB_PATH=/var/lib/debateai-geoip/dbip-country-lite.mmdb` and
    `TOR_EXIT_LIST_PATH=/var/lib/debateai-geoip/tor-exit-list.txt`. Only the paths are needed now: a
-   hosted API without them refuses with `GEOIP_PATHS_REQUIRED`. The files themselves are needed
-   once a register version carrying `countryPolicy` is in force (§5 "Country data").
+   hosted API without them refuses with `GEOIP_PATHS_REQUIRED`. For this release the files themselves
+   were needed only once a register version carrying `countryPolicy` is in force; from the
+   Italy-specific approval (migration 0125) on, every hosted server needs them (§5 "Country data").
 4. **Add `RECORDS_KEY_PATH=/etc/debateai/api/records-key.bin` to `/etc/debateai/backup.conf`**, as
    `backup.conf.example` has it. Without it `backup.sh` stops before it writes anything — the whole
    nightly backup, not only the key — and the restore drill refuses too.
@@ -1601,16 +1635,22 @@ appears in any file under `/etc/debateai`, and the architecture test pins that.
 
 ### Country data — the GeoIP and Tor refresh (paid plans G4)
 
-The country gate reads two public data files: DB-IP's Lite country database and the Tor exit list.
+The country gate and the Italy approval's IP leg (§5 "Upgrading to the Italy-specific approval
+(migration 0125)") read two public data files: DB-IP's Lite country database and the Tor exit list.
 Their PATHS are required in every hosted `api.env` (`GEOIP_COUNTRY_DB_PATH`, `TOR_EXIT_LIST_PATH`;
-without them the API refuses with `GEOIP_PATHS_REQUIRED`). The FILES must exist from the moment the
-register version in force publishes a `countryPolicy` row: the API then opens them at boot, and a
+without them the API refuses with `GEOIP_PATHS_REQUIRED`). The FILES are needed on every hosted
+server, whatever the register version in force publishes, because the IP leg reads them. The API
+opens them only at boot (a file it opened is re-read within a minute of being replaced, below; one
+missing at boot is not looked for again): without a `countryPolicy` row, a file missing at boot
+leaves the IP leg off, with one `italy_approval.ip_leg_off` line, until the API is restarted after
+the file appears. From the moment the register version in force publishes a `countryPolicy` row, a
 missing file refuses the boot with `GEOIP_COUNTRY_DB_UNAVAILABLE` or `TOR_EXIT_LIST_UNAVAILABLE` (a
 malformed one with `GEOIP_COUNTRY_DB_INVALID` or `TOR_EXIT_LIST_INVALID`; what the refresh checks
 before it renames a file into place, and where that falls short of the API's own check, is at the
 end of this section). A Tor list with no address in it — an
-empty file, or only blank lines and `#` comments — counts as malformed: the boot refuses it with
-`TOR_EXIT_LIST_INVALID`, and a running API keeps its last good list and logs the code
+empty file, or only blank lines and `#` comments — counts as malformed: with a `countryPolicy` row
+the boot refuses it with `TOR_EXIT_LIST_INVALID` (without one it turns the IP leg off, as a missing
+file does), and a running API keeps its last good list and logs the code
 (`geo.reload.failed`), because an empty list would let every Tor exit through. So never create the
 file by hand to get past a first boot's `TOR_EXIT_LIST_UNAVAILABLE`: run the refresh (below) until
 it prints `GEOIP_REFRESH_OK tor-list`. `debateai-geoip-refresh.service` writes
@@ -3614,21 +3654,38 @@ being on a command line. Change `2026-Q4` to the quarter you want:
 systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:tax-summary --quarter 2026-Q4
 ```
 
-**Disputes (chargebacks).** A disputed payment pauses the paid features. NETOPIA reports a dispute as a status of the
-payment itself, and says nothing the site can rely on when a dispute ends, so when NETOPIA tells you the outcome,
-record it with `pnpm billing:dispute`, giving the charge reference (find it with the command below: the list shows
-NETOPIA's payment number of the payment the dispute is about) with `--charge` and the outcome with
-`--outcome won` or `--outcome lost`:
+**Disputes (chargebacks).** NETOPIA reports a dispute as a status of the payment itself, and it sends a message
+only when a dispute is LOST (status 10, "chargeback accepted"). A lost dispute needs no command from you: the site
+ends the plan by itself, at once, exactly as `pnpm billing:dispute --outcome lost` would. The person is on Free and
+gets one email that the plan has ended because their bank gave the payment back to them (M10_ENDED), and you get one
+email (O3 `CHARGEBACK_LOST`) saying what happened. That email also asks you to check with your accountant whether a
+cancelling invoice (storno) is needed for that payment. If the payment bought nothing, or its plan had already ended,
+no plan changes and only your email is sent. A refund the dispute held stays held: nothing is left to refund. If you
+had already refunded that payment in NETOPIA's admin before the dispute, the person got the money twice: the email
+gives the `pnpm billing:refund-done … --despite-chargeback` command to record your refund, and you tell NETOPIA. If you
+had recorded the dispute as won earlier, the plan is not ended: the email asks you to check the payment in NETOPIA's
+admin before making the released refund, and to end the plan by hand if the bank kept the money (no owner command
+ends it then).
+
+A dispute NETOPIA reports as opened (status 9) or defended (status 16), if one ever arrives, pauses the paid
+features until its outcome is recorded. The command is for the outcomes NETOPIA does not send: a dispute won (you hear
+it from NETOPIA, or see it in NETOPIA's admin), or a paused one you learn was lost. Record it with
+`pnpm billing:dispute`, giving the charge reference (find it with the command below: the list shows NETOPIA's payment
+number of the payment the dispute is about) with `--charge` and the outcome with `--outcome won` or `--outcome lost`:
 
 - `won` gives the plan back; a plan its person cancelled while it was paused comes back only until its period end,
   then ends; nobody is emailed;
-- `lost` ends it.
+- `lost` ends it; after the site has ended it by itself (status 10), `lost` answers that it is already settled and
+  changes nothing;
+- `won` after a lost dispute ended the plan records the money as won back (`RESOLVED_AFTER_END`); the plan stays
+  ended, and the person subscribes again to use a paid plan.
 
 The command below lists the chargebacks not recorded as won, each with its charge reference, the kind of charge,
 NETOPIA's payment number, its `error_code`, when it arrived, and the subscription's state now. A charge-back counts as
 won only by a `CHARGEBACK_RESOLVED` on its own payment. It is not a list of open disputes: a lost dispute writes
 no charge event, so it stays on the list. The state tells you which are still waiting (`SUSPENDED`) and which have
-ended (`ENDED`: either recorded as lost, or ended by the period-end sweep, when a won outcome can still be recorded).
+ended (`ENDED`: ended by the site on NETOPIA's lost status 10, recorded as lost, or ended by the period-end sweep;
+a won outcome can still be recorded for each).
 `CANCEL_REQUESTED` (the person cancelled while the plan was paused) is still waiting for its outcome: record it as
 you would a `SUSPENDED` one. The command:
 
@@ -3656,8 +3713,6 @@ It prints one line saying what it did. Two answers need a word:
   more than one open charge-back, so the command cannot tell which one you mean. Nothing is written. Check both
   disputes in NETOPIA's admin and report the case: it is settled by hand, not by running the command again.
 
-NETOPIA's status 10 ("chargeback accepted") pauses the plan as a new dispute does and emails you (O3 `OWNER_REVIEW`),
-but never ends it by itself: NETOPIA has not confirmed what it means. Record `lost` (or `won`) once NETOPIA tells you.
 Status 16 records that the payment was defended (pausing the plan first if no dispute was recorded for it yet), and
 changes nothing else.
 
@@ -3750,7 +3805,8 @@ records it (needed for a part of a payment): run as given, it only shows what it
 refund of that amount, an earlier refund went through: never refund it again. If it shows a dispute (a chargeback) on
 that payment, do not refund it: the site holds that refund while the dispute lasts and has emailed you once (O3
 `REFUND_HELD_BY_CHARGEBACK`). If the dispute ends for us, record that with `pnpm billing:dispute --outcome won`, and the
-refund comes back into the reminder; if it ends for the person, nothing is left to refund. If you had already refunded
+refund comes back into the reminder; if it ends for the person, nothing is left to refund (NETOPIA reports that itself,
+status 10: the site ends the plan, and its O3 `CHARGEBACK_LOST` names the held refund). If you had already refunded
 it before the dispute, record that refund with `pnpm billing:refund-done … --despite-chargeback`.
 If not, refund exactly the amount the email names, on that payment, in one refund. A whole refund is recorded by the
 site itself as soon as NETOPIA reports it: the person's email (M8 or M11) and the credit note follow by themselves.
@@ -3870,12 +3926,13 @@ signals that matter:
 | `"event":"billing.notice.parse_failed"` (no other field) | A message that passed could not be read: it is stored as it came, and you get O3. Its payment is still found by the status reads. | Report it at once: NETOPIA's message may have changed shape. |
 | `"event":"billing.notice.unknown_order"` (no other field) | A message that passed names an order the site does not know (neither a charge nor a test order). It is stored with no effect. | A single line: nothing. Several: report them; NETOPIA may be sending another shop's messages to this address. |
 | `"event":"billing.payment.status_unexpected"`, with `status` | NETOPIA reported a status whose meaning it has not confirmed (for example `17`). Nothing is recorded on the charge; you get O3 naming the status (with a `billing.payment.owner_review` line). | Look the payment up in NETOPIA's admin and decide with the existing commands (`billing:dispute`, a refund); report the status. |
-| `"event":"billing.payment.owner_review"`, with `state` | A payment was handed to you, and you got O3. `state` names NETOPIA's state. For `UNCLEAR`, nothing was recorded on the charge. For `CHARGEBACK_LOST` (status 10, "chargeback accepted"), the site has recorded the dispute; unless the payment bought nothing, an active or past-due plan is paused (`SUSPENDED`) and the person gets an email (M10). Nothing ends by itself. | Do what the O3 says: look the payment up in NETOPIA's admin; record a dispute's outcome with `pnpm billing:dispute`. |
+| `"event":"billing.payment.owner_review"`, with `state` | A payment was handed to you, and you got O3. `state` names NETOPIA's state. For `UNCLEAR`, nothing was recorded on the charge. (A lost dispute, status 10, writes `billing.chargeback.lost` instead.) | Do what the O3 says: look the payment up in NETOPIA's admin, then record what happened with the owner commands this section names. |
 | `"event":"billing.setting.retired"`, with `key` | At its start the API found a setting of the previous card processor in `api.env` (`key` names it; its value is never printed). The API ignores it and starts normally. | Delete that line from `/etc/debateai/api.env`, and the key file it named if there is one, then restart `debateai-api` at a quiet moment. |
 | `"event":"billing.quote.refused"`, with `code` `TAX_SERVICE_REFUSED` and `reason` | The tax service (Quaderno) refused to price a purchase. That is not an outage: most often the Quaderno key is wrong or revoked (`reason` `QUADERNO_HTTP_401` or `QUADERNO_HTTP_403`), or Quaderno rejects the request (`QUADERNO_HTTP_422`). The person is told to try again in a minute, and nothing is charged. The same event with `code` `TAX_SERVICE_UNAVAILABLE` is an outage of the tax service; with any other code it is one person's own refusal (for example `ALREADY_SUBSCRIBED` or `TAX_ID_INVALID`). | `TAX_SERVICE_REFUSED`: every purchase fails until it is fixed. Check the Quaderno key file and the Quaderno account at once; fix the key and restart `debateai-api`. `TAX_SERVICE_UNAVAILABLE`: nothing, unless it lasts; then check Quaderno's status page. |
 | `"event":"billing.invoice.unknown"`, with `issuer`, `kind` and `code` | A legal document the site could not settle itself. `INVOICE_UNKNOWN`: SmartBill did not say whether it issued a Romanian invoice or credit note, and cannot be asked afterwards, so it may exist. `CREDIT_NOTE_MANUAL`: a credit note the site cannot issue itself (a second refund of one sale, or a refund made in NETOPIA's admin whose amount the site does not know). The owner summary lists it under "Invoices and credit notes to check by hand". | `INVOICE_UNKNOWN`: look in SmartBill the same day, because a Romanian document must reach e-Factura in time (your accountant knows the deadline). If it was issued, record it with `pnpm billing:invoice --record`; if not, re-queue it with `--requeue --confirm-not-issued` (**An invoice, a credit note or an email that was never sent**, below). `CREDIT_NOTE_MANUAL`: issue it by hand in SmartBill or Quaderno and record it with `--record`; for a `DASHBOARD_REFUND` line, record it with `--record` and the amount you refunded, `--amount` (**An invoice, a credit note or an email that was never sent**, below). |
 | `"event":"billing.payment.mismatch"`, with `code` or `chargeKind` | A payment check found a payment that does not match its charge, so nothing was recorded and nothing moved: `PAYMENT_AMOUNT_MISMATCH` (the amount or the currency NETOPIA reports differs from the charge's) or `PAYMENT_CUSTOMER_MISMATCH` (NETOPIA echoes another client id than our customer's). The card **is** charged, and nothing refunds it by itself. The check ends there (a `billing.outbox.dead` line with the same code) and you get O3. | Look the payment up in NETOPIA's admin by the charge reference the O3 names (it is NETOPIA's order id) and, if no plan was given for it, refund it there by hand. Report every such line: a mismatch on every first payment means NETOPIA reports amounts differently than the site reads them; stop sales (**Stopping sales, and switching billing off**, above) and report it at once. |
-| `"event":"billing.chargeback"`, with `chargeKind` | NETOPIA reported a card dispute (status 9, 10 or 16) on a payment. An active or past-due plan is paused (`SUSPENDED`): its paid features stop, and the person gets an email (M10). With `code` `DUPLICATE_PAYMENT`, the dispute is on a payment that bought nothing (a second or refused payment of the same person, a card check, or a payment the site never saw paid), which never pauses the plan. NETOPIA sends no signal the site relies on when a dispute ends. | When NETOPIA tells you the outcome, record it with `pnpm billing:dispute` (**Disputes (chargebacks)**, above). |
+| `"event":"billing.chargeback"`, with `chargeKind` | NETOPIA reported a card dispute (status 9, 10 or 16) on a payment, and the site recorded it. For status 9 or 16, an active or past-due plan is paused (`SUSPENDED`): its paid features stop, and the person gets an email (M10). For status 10 (a lost dispute), the plan ends at once (see `billing.chargeback.lost`). With `code` `DUPLICATE_PAYMENT`, the dispute is on a payment that bought nothing (a second or refused payment of the same person, a card check, or a payment the site never saw paid), which never changes the plan. | For status 9 or 16: when NETOPIA tells you the outcome, record it with `pnpm billing:dispute` (**Disputes (chargebacks)**, above). For status 10: nothing. |
+| `"event":"billing.chargeback.lost"`, with `chargeKind` and `ended` | NETOPIA reported a dispute as lost (status 10): the person's bank took the payment back. With `ended` `true`, the site has just ended the plan by itself, exactly as `pnpm billing:dispute --outcome lost` would: the person is on Free and was emailed that the plan has ended (M10_ENDED). With `ended` `false`, no plan changed: the payment bought nothing, its plan had already ended or was not active, its dispute was already recorded, or NETOPIA sent the same message again. You get one O3 `CHARGEBACK_LOST` for the payment. | No command is needed. Ask your accountant whether a cancelling invoice (storno) is needed for that payment. If NETOPIA later tells you the dispute was won after all, record that with `pnpm billing:dispute --outcome won`. |
 | `"event":"billing.withdrawal.owner_review"`, with `source` | A withdrawal was recorded and the plan ended, but its refund cannot be worked out from our records (a refund made in NETOPIA's admin, or an earlier refund request, already touched one of the payments), so nothing was refunded. You get O2_WITHDRAWAL at once, and the owner summary lists it as `WITHDRAWAL_BY_OWNER` until you settle it. | Within 14 days of the withdrawal, work out what is due and settle it as **A withdrawal sent by email or on the model form**, above, says. |
 | `"event":"billing.card.reminder"`, with `line` | Ten days before a renewal, a plan had no usable saved card, and the person was emailed M12 (`line` `EXPIRING`: the card expires first; `MISSING`: no card was kept from the last payment). | Nothing: the person changes the card in Settings. Many `MISSING` lines after first payments: report it; NETOPIA may not be sending the saved card (go-live row N-4). |
 | `"event":"billing.cancel_link.failed"`, with `code` | Someone asked on `/cancel` for an emailed cancel link, and finding their plan or queuing the email failed, most often because the database did not answer. The page had already said a link is on its way, so the person gets no email (M9). | One: nothing; the person can ask again. Several, or the same code again and again: check the database and the API's other lines from the same minutes, and report the code. |

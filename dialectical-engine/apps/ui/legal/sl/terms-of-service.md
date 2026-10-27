@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Na kratko
-eyebrow: POGOJI UPORABE · v2.5 · VELJAVNI OD 12. OKTOBRA 2026
+eyebrow: POGOJI UPORABE · v2.6 · VELJAVNI OD 24. OKTOBRA 2026
 title: S čim soglašate
 lede: Pogodba med vami in družbo DMS Merchandise Shop S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.
-endMarker: KONEC POGOJEV · v2.5
+endMarker: KONEC POGOJEV · v2.6
 bodyLabel: Besedilo Pogojev uporabe
 annexTitle: Priloga A — Regionalni pogoji
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAVO, KI SE UPORABLJA
 -->
 
-**Version 2.5 · Effective 12. oktobra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
+**Version 2.6 · Effective 24. oktobra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
 
 **In short.** Stari morate biti najmanj 18 let. Dialectical Engine z modeli umetne inteligence oblikuje argumente in vse, kar ustvari, je lahko napačno — to ni nasvet. Vaše razprave so zasebne, razen če jih objavite; če jih objavite, jih lahko prebere vsakdo. Besedilo, ki ga pošljete, se posreduje ponudnikom umetne inteligence, navedenim v našem Registru ponudnikov, in se ne uporablja za učenje modelov. Nezakonito vsebino prijavite na support@dezbatere.ro, ne glede na to, ali imate račun. Uporablja se romunsko pravo, vendar ohranite varstvo potrošnikov po svojem lokalnem pravu.
 
@@ -279,7 +279,7 @@ Vsak vnos velja za osebe, ki živijo v njegovi regiji, in navaja samo razlike od
 
 ### A.1 Evropska unija in Evropski gospodarski prostor
 
-Splošni del teh Pogojev je napisan za vas. Poleg tega velja: postopek lahko začnete na sodiščih države, v kateri živite; velja pravica do odstopa iz razdelka 13; alternativno reševanje sporov je na voljo prek www.onoratainstanta.ro. **Nemčija:** gumb za preklic na dezbatere.ro/cancel vam omogoča, da naročnino prekinete brez prijave; trajanje naročnine, obdobja podaljšanja in odpovedni roki so skladni s členom 309(9) BGB: vsak paket traja en mesec in se vsak mesec podaljša, dokler ga ne odpoveste, odpoveste pa ga lahko kadar koli z učinkom ob koncu tekočega meseca. **Francija:** naročnino lahko v treh korakih prek spleta prekinete na dezbatere.ro/cancel. **Italija:** določbe o odgovornosti (15), začasni onemogočitvi (11), spremembah (14) in pravu, ki se uporablja (18), zahtevajo vašo posebno odobritev, ki jo podate z ločeno potrditvijo ob registraciji. **Nizozemska:** ti Pogoji so vam pred sklenitvijo zagotovljeni v obliki, ki jo je mogoče shraniti. **Poljska:** poljska različica je na voljo; v izbirniku jezikov izberite Polski.
+Splošni del teh Pogojev je napisan za vas. Poleg tega velja: postopek lahko začnete na sodiščih države, v kateri živite; velja pravica do odstopa iz razdelka 13; alternativno reševanje sporov je na voljo prek www.onoratainstanta.ro. **Nemčija:** gumb za preklic na dezbatere.ro/cancel vam omogoča, da naročnino prekinete brez prijave; trajanje naročnine, obdobja podaljšanja in odpovedni roki so skladni s členom 309(9) BGB: vsak paket traja en mesec in se vsak mesec podaljša, dokler ga ne odpoveste, odpoveste pa ga lahko kadar koli z učinkom ob koncu tekočega meseca. **Francija:** naročnino lahko v treh korakih prek spleta prekinete na dezbatere.ro/cancel. **Italija:** določbe o začasni onemogočitvi in prenehanju (11), plačljivih paketih in njihovem podaljšanju (12), spremembah (14), odgovornosti (15) in pravu, ki se uporablja, ter pristojnosti za spore (18) zahtevajo vašo posebno odobritev na podlagi 1341. in 1342. člena italijanskega civilnega zakonika. Podate jo z ločenim poljem ob registraciji, ki se prikaže vsakomur, ki v polju Regija izbere Italijo ali se povezuje iz Italije. **Nizozemska:** ti Pogoji so vam pred sklenitvijo zagotovljeni v obliki, ki jo je mogoče shraniti. **Poljska:** poljska različica je na voljo; v izbirniku jezikov izberite Polski.
 
 ### A.2 Združene države Amerike
 

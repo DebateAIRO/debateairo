@@ -297,7 +297,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Evropská unie a Evropský hospodářský prostor",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Hlavní část těchto Podmínek je určena pro vás. Dále platí: řízení můžete zahájit u soudů země, v níž žijete; použije se právo na odstoupení podle oddílu 13; alternativní řešení sporů je dostupné prostřednictvím www.onoratainstanta.ro. Německo: tlačítko pro zrušení na adrese dezbatere.ro/cancel vám umožňuje ukončit předplatné bez přihlášení; podmínky předplatného, období obnovení a výpovědní lhůty jsou v souladu s §309 odst. 9 BGB: každý tarif trvá jeden měsíc a každý měsíc se obnovuje, dokud jej nezrušíte, a zrušit jej můžete kdykoli s účinností od konce probíhajícího měsíce. Francie: předplatné můžete ukončit online ve třech krocích na adrese dezbatere.ro/cancel. Itálie: ustanovení o odpovědnosti (15), pozastavení (11), změnách (14) a rozhodném právu (18) vyžadují váš zvláštní souhlas, který udělujete samostatným potvrzením při registraci. Nizozemsko: tyto Podmínky jsou před uzavřením poskytnuty v podobě, kterou lze uložit. Polsko: polská verze je k dispozici; v přepínači jazyků zvolte Polski." }
+      { kind: "p", text: "Hlavní část těchto Podmínek je určena pro vás. Dále platí: řízení můžete zahájit u soudů země, v níž žijete; použije se právo na odstoupení podle oddílu 13; alternativní řešení sporů je dostupné prostřednictvím www.onoratainstanta.ro. Německo: tlačítko pro zrušení na adrese dezbatere.ro/cancel vám umožňuje ukončit předplatné bez přihlášení; podmínky předplatného, období obnovení a výpovědní lhůty jsou v souladu s §309 odst. 9 BGB: každý tarif trvá jeden měsíc a každý měsíc se obnovuje, dokud jej nezrušíte, a zrušit jej můžete kdykoli s účinností od konce probíhajícího měsíce. Francie: předplatné můžete ukončit online ve třech krocích na adrese dezbatere.ro/cancel. Itálie: ustanovení o pozastavení a ukončení (11), placených tarifech a jejich obnovení (12), změnách (14), odpovědnosti (15) a rozhodném právu a soudní příslušnosti (18) vyžadují váš zvláštní souhlas podle článků 1341 a 1342 italského občanského zákoníku. Udělujete jej samostatným políčkem při registraci, které se zobrazí každému, kdo v poli Oblast vybere Itálii nebo jehož připojení pochází z Itálie. Nizozemsko: tyto Podmínky jsou před uzavřením poskytnuty v podobě, kterou lze uložit. Polsko: polská verze je k dispozici; v přepínači jazyků zvolte Polski." }
     ]
   },
   {
@@ -354,12 +354,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.5",
-  sha256: "5de44bacaddc211a8af284009fb9d50aa422586252b60a445d065299fd105899",
-  eyebrow: "PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.5 · ÚČINNÉ OD 12. ŘÍJNA 2026",
+  version: "2.6",
+  sha256: "58587ee0b3a45c0b7f1cb236a435c43d9347c46eb282ac5b991b762982efff3e",
+  eyebrow: "PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.6 · ÚČINNÉ OD 24. ŘÍJNA 2026",
   title: "S čím souhlasíte",
   lede: "Smlouva mezi vámi a DMS Merchandise Shop S.R.L. srozumitelným jazykem. Devatenáct oddílů a příloha A — přejděte až na konec.",
-  endMarker: "KONEC PODMÍNEK · v2.5",
+  endMarker: "KONEC PODMÍNEK · v2.6",
   contact: "support@dezbatere.ro",
   bodyLabel: "Text Podmínek poskytování služby",
   sectionIdPrefix: "terms-section-",

@@ -23,6 +23,8 @@ export const RegisterRequestFieldsSchema = z.object({
   date_of_birth: z.iso.date(),
   country: z.string().regex(/^[A-Z]{2}$/u),
   us_state: z.string().regex(/^[A-Z]{2}$/u).nullable().optional(),
+  // Italy clause approval: only the ticked box is sent; absent means not approved. The leg is a server decision.
+  italy_approval: z.literal(true).optional(),
   terms: LegalDocumentPairSchema,
   privacy: LegalDocumentPairSchema,
   ...LocalePreferenceShape

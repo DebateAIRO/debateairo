@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import type { SecretToken } from "@debateai/billing-core";
+import { BillingCardChangeRequestSchema, BillingQuoteRequestSchema } from "@debateai/contract";
 import { openRecord, sealRecord } from "@debateai/crypto";
 import {
   openBillingProfile,
@@ -94,6 +95,22 @@ describe("N7 the payer's fields (spec 2026-10-05 §2.5.3)", () => {
     expect(() => sealBillingProfile(KEY, CUSTOMER, { ...PROFILE, firstName: "  " })).toThrow();
     expect(() => sealQuoteLocation(KEY, QUOTE, { ...LOCATION, lastName: "" })).toThrow();
     expect(() => sealQuoteLocation(KEY, QUOTE, { ...LOCATION, phone: "+40712345678" })).not.toThrow();
+  });
+
+  it("seals the longest first and last name each payer form takes, joined as the one name (first + last)", () => {
+    const longest = (field: { safeParse(value: unknown): { success: boolean } }): number => {
+      let length = 0;
+      while (length < 1_000 && field.safeParse("A".repeat(length + 1)).success) length += 1;
+      return length;
+    };
+    const forms = [["quote", BillingQuoteRequestSchema.shape], ["card change", BillingCardChangeRequestSchema.shape]] as const;
+    for (const [form, shape] of forms) {
+      const firstName = "A".repeat(longest(shape.first_name));
+      const lastName = "B".repeat(longest(shape.last_name));
+      const names = { name: `${firstName} ${lastName}`, firstName, lastName };
+      expect(() => sealBillingProfile(KEY, CUSTOMER, { ...PROFILE, ...names }), form).not.toThrow();
+      expect(() => sealQuoteLocation(KEY, QUOTE, { ...LOCATION, ...names }), form).not.toThrow();
+    }
   });
 });
 

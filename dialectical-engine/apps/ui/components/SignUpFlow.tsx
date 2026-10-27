@@ -1,12 +1,13 @@
 "use client";
 import { useEffect, useRef, useState, type FormEvent, type MouseEvent as ReactMouseEvent, type RefObject } from 'react';
 import { ContractHttpError, type ContractClient } from '@debateai/contract';
-import { checkDob, declaredRegionFromPick, dobToIso, meetsMinimumAge, type DobErrorCode, type DobParts } from '@debateai/kernel';
+import { checkDob, declaredRegionFromPick, dobToIso, ITALY_APPROVAL_REQUIRED, ITALY_COUNTRY, meetsMinimumAge, type DobErrorCode, type DobParts } from '@debateai/kernel';
 import { RegionField, EMPTY_REGION_PICK, type RegionPick } from '@/components/RegionField';
 import { AgeRefusal } from '@/components/AgeRefusal';
 import { AuthShell } from '@/components/AuthShell';
 import { DateOfBirthField, EMPTY_DOB } from '@/components/DateOfBirthField';
 import { EmailPendingScreen } from '@/components/auth/EmailPendingScreen';
+import { ItalyApprovalBox } from '@/components/auth/ItalyApprovalBox';
 import { SocialProviderButtons } from '@/components/auth/SocialProviderButtons';
 import { PhoneField } from '@/components/auth/PhoneField';
 import { InlineFieldMessage, useFormAnnouncer } from '@/components/auth/InlineFieldMessage';
@@ -114,6 +115,16 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
     const [errors, setErrors] = useState<SignupFieldErrors>({});
     const [proof, setProof] = useState<string | null>(null);
     const [proofReset, setProofReset] = useState(0);
+    /* The Italy approval box (mission italy-clause-approval S01). It is shown while Region says Italy (the picked leg,
+       decided here at once, with no request) or after the server refused the sign-up with ITALY_APPROVAL_REQUIRED
+       (the IP leg: the request came from Italy), and it then stays shown. It starts unticked and lives in this state
+       only: nothing about it is stored. */
+    const [italyApproved, setItalyApproved] = useState(false);
+    const [italyRevealed, setItalyRevealed] = useState(false);
+    const [italyError, setItalyError] = useState<string | null>(null);
+    const [italyFocusRequest, setItalyFocusRequest] = useState(0);
+    const italyFocusHandled = useRef(0);
+    const italyInputRef = useRef<HTMLInputElement | null>(null);
     const privacyInputRef = useRef<HTMLInputElement | null>(null);
     const termsInputRef = useRef<HTMLInputElement | null>(null);
     const flight = useRef(false);
@@ -126,6 +137,16 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
         if (next !== null)
             setLoginHref(`/login?next=${encodeURIComponent(next)}`);
     }, []);
+    /* The refusal that reveals the box also re-enables the form, so the box exists and can take focus only after that
+       render commits; each request is honoured once. */
+    useEffect(() => {
+        if (italyFocusRequest === italyFocusHandled.current || busy)
+            return;
+        italyFocusHandled.current = italyFocusRequest;
+        italyInputRef.current?.focus();
+    }, [italyFocusRequest, busy]);
+    const italyShown = region.country === ITALY_COUNTRY || italyRevealed;
+    const italyMissing = italyShown && !italyApproved;
     function fieldError(field: keyof SignupFieldErrors) {
         return errors[field] ? t(catalog, errors[field]!) : undefined;
     }
@@ -137,16 +158,17 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
         if (flight.current)
             return;
         const form = event.currentTarget;
-        /* Owner ruling V-18 (R17): no account without a region and both boxes ticked. Create account stays
+        /* Owner ruling V-18 (R17): no account without a region and both boxes ticked, and the Italy box too while it
+           is shown (italy-clause-approval S01). Create account stays
            focusable (aria-disabled, a11y repair 2026-10-15), so a press made while one is missing — a click on it,
            or Enter in a field, both of which name it (the form's only submit button) as the submitter — is answered
            here and sends nothing: the hint is said, and focus goes to the first thing still missing. That is exactly
            what the native `disabled` used to block; a submission with no submitter was never blocked by it, and it
-           still meets validateSignup's two boxes and the region check below. */
-        if ((event.nativeEvent as SubmitEvent).submitter && (declaredRegion === null || !privacyAccepted || !termsAccepted)) {
+           still meets validateSignup's two boxes, the region check and the Italy box check below. */
+        if ((event.nativeEvent as SubmitEvent).submitter && (declaredRegion === null || !privacyAccepted || !termsAccepted || italyMissing)) {
             const missing = declaredRegion === null
                 ? form.querySelector<HTMLElement>(region.country === 'US' ? '#signup-region-state' : '#signup-region-trigger')
-                : !privacyAccepted ? privacyInputRef.current : termsInputRef.current;
+                : !privacyAccepted ? privacyInputRef.current : !termsAccepted ? termsInputRef.current : italyInputRef.current;
             missing?.focus();
             announcer.announce(submitHint.join(' '));
             return;
@@ -162,6 +184,9 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
         setErrors(checked);
         const dateCheck = checkDob(dateOfBirth);
         setDateOfBirthError(dateCheck.code === 'ok' ? null : dateCheck.code);
+        // A submission with no submitter also meets the Italy box: unticked, it says so under the box, last in focus order.
+        const italyHint = t(catalog, "auth.signUp.italyApprovalHint");
+        setItalyError(italyMissing ? italyHint : null);
         if (Object.keys(checked).length) {
             const selector = checked.email ? '[name=email]' : checked.phone ? '[name=phone]' : checked.password ? '[name=password]' : checked.dateOfBirth ? '[name=dob-d]' : checked.privacy ? '[name=privacy-accepted]' : '[name=terms-accepted]';
             form.querySelector<HTMLElement>(selector)?.focus();
@@ -171,6 +196,11 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
             return;
         }
         if (declaredRegion === null) return;
+        if (italyMissing) {
+            italyInputRef.current?.focus();
+            announcer.announce(italyHint);
+            return;
+        }
         if (!proof) {
             setError(t(catalog, "auth.pending.proofUnavailable"));
             return;
@@ -186,7 +216,7 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
                 setRefused(true);
                 return;
             }
-            const acknowledgement = await client.register({ email: submitted, password: rawPassword, ...(rawPhone.trim() === '' ? {} : { phone: rawPhone }), country: declaredRegion.country, ...(declaredRegion.country === "US" ? { us_state: declaredRegion.usState! } : {}), date_of_birth: isoDate, terms: { version: termsDocument.version, sha256: termsDocument.sha256 }, privacy: { version: privacyDocument.version, sha256: privacyDocument.sha256 }, locale: catalogLocale(locale), ui_locale: locale, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null, turnstile_token: proof });
+            const acknowledgement = await client.register({ email: submitted, password: rawPassword, ...(rawPhone.trim() === '' ? {} : { phone: rawPhone }), country: declaredRegion.country, ...(declaredRegion.country === "US" ? { us_state: declaredRegion.usState! } : {}), date_of_birth: isoDate, terms: { version: termsDocument.version, sha256: termsDocument.sha256 }, privacy: { version: privacyDocument.version, sha256: privacyDocument.sha256 }, ...(italyShown && italyApproved ? { italy_approval: true as const } : {}), locale: catalogLocale(locale), ui_locale: locale, time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null, turnstile_token: proof });
             setEmail('');
             setPhone('');
             setRegion(EMPTY_REGION_PICK);
@@ -197,12 +227,25 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
             setTermsAccepted(false);
             setPolicyOpen(false);
             setTermsOpen(false);
+            setItalyApproved(false);
+            setItalyRevealed(false);
+            setItalyError(null);
             setRetryAfterSeconds(acknowledgement.retry_after_seconds);
             setSubmittedEmail(submitted);
         }
         catch (failure) {
             if (failure instanceof ContractHttpError && failure.serverCode === 'AUTH_AGE_REFUSED') {
                 setRefused(true);
+                return;
+            }
+            if (failure instanceof ContractHttpError && failure.serverCode === ITALY_APPROVAL_REQUIRED) {
+                /* The IP leg, which only the server can see: the box appears unticked and stays shown whatever Region
+                   says next, every field is kept, and focus goes to the box. The bot-check token was spent on this
+                   refusal; `finally` resets the challenge as after every attempt, so the resubmit carries a fresh one. */
+                setItalyRevealed(true);
+                setItalyApproved(false);
+                setError(t(catalog, "auth.signUp.italyApprovalRequired"));
+                setItalyFocusRequest(request => request + 1);
                 return;
             }
             if (failure instanceof ContractHttpError && failure.serverCode === 'LEGAL_DOCUMENT_STALE') {
@@ -212,6 +255,7 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
                     termsInputRef.current.checked = false;
                 setPrivacyAccepted(false);
                 setTermsAccepted(false);
+                setItalyApproved(false);
                 setDocumentsStale(true);
                 setError(t(catalog, "auth.signUp.documentsUpdated"));
                 return;
@@ -248,7 +292,8 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
     }
     const submitHint = [
         ...(declaredRegion === null ? [t(catalog, "auth.signUp.regionHint")] : []),
-        ...(!privacyAccepted || !termsAccepted ? [t(catalog, "auth.signUp.consentHint")] : [])
+        ...(!privacyAccepted || !termsAccepted ? [t(catalog, "auth.signUp.consentHint")] : []),
+        ...(italyMissing ? [t(catalog, "auth.signUp.italyApprovalHint")] : [])
     ];
     if (refused)
         return <AgeRefusal catalog={catalog}/>;
@@ -270,7 +315,14 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
             setPassword(e.target.value);
             edit('password');
         }} required disabled={busy} aria-invalid={!!errors.password} aria-describedby={errors.password ? 'signup-password-error' : 'signup-password-hint'}/><button type="button" className="authInlineToggle" aria-controls="signup-password" aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? t(catalog, "auth.password.hide") : t(catalog, "auth.password.show")}</button></div><p className="authFieldHint" id="signup-password-hint">{t(catalog, "auth.signUp.passwordInvalid")}</p><InlineFieldMessage id="signup-password-error" message={fieldError('password')}/></div>
- <RegionField catalog={catalog} locale={locale} value={region} onChange={setRegion} disabled={busy}/>
+ <RegionField catalog={catalog} locale={locale} value={region} onChange={next => {
+            setRegion(next);
+            // Leaving Italy before any refusal revealed the box unmounts it, and its tick goes with it.
+            if (next.country !== ITALY_COUNTRY && !italyRevealed) {
+                setItalyApproved(false);
+                setItalyError(null);
+            }
+        }} disabled={busy}/>
  <div className="authField"><DateOfBirthField catalog={catalog} locale={dobLocale} value={dateOfBirth} error={dateOfBirthError} onChange={next => {
             setDateOfBirth(next);
             setDateOfBirthError(null);
@@ -279,15 +331,20 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
  <div className="consentGroup">
  <div className="consentRow" onClick={onPrivacyRowClick}><input className="consentBox" name="privacy-accepted" type="checkbox" required disabled={busy} aria-labelledby={PRIVACY_CONSENT_TEXT_ID} ref={privacyInputRef} aria-invalid={!!errors.privacy} aria-describedby={errors.privacy ? 'signup-privacy-error' : undefined} onChange={e => setPrivacyAccepted(e.currentTarget.checked && !e.nativeEvent.defaultPrevented)}/><span className="consentText" id={PRIVACY_CONSENT_TEXT_ID}>{t(catalog, "auth.signUp.privacyAgreementPrefix")} <button type="button" className="consentPolicyLink" onClick={onPrivacyDocumentClick}>{t(catalog, "auth.signUp.privacyPolicy")}</button>{t(catalog, "auth.signUp.privacyAgreementSuffix")}</span></div><InlineFieldMessage id="signup-privacy-error" message={fieldError('privacy')}/>
  <div className="consentRow" onClick={onTermsRowClick}><input className="consentBox" name="terms-accepted" type="checkbox" required disabled={busy} aria-labelledby={TERMS_CONSENT_TEXT_ID} ref={termsInputRef} aria-invalid={!!errors.terms} aria-describedby={errors.terms ? 'signup-terms-error' : undefined} onChange={e => setTermsAccepted(e.currentTarget.checked && !e.nativeEvent.defaultPrevented)}/><span className="consentText" id={TERMS_CONSENT_TEXT_ID}>{t(catalog, "auth.signUp.termsAgreementPrefix")} <button type="button" className="consentPolicyLink" onClick={onTermsDocumentClick}>{t(catalog, "auth.signUp.termsOfService")}</button>{t(catalog, "auth.signUp.privacyAgreementSuffix")}</span></div><InlineFieldMessage id="signup-terms-error" message={fieldError('terms')}/>
+ {italyShown ? <ItalyApprovalBox idPrefix="signup" catalog={catalog} terms={termsDocument} checked={italyApproved} onChange={next => {
+            setItalyApproved(next);
+            setItalyError(null);
+        }} disabled={busy} error={italyError} inputRef={italyInputRef}/> : null}
  </div>
  {turnstile ? <TurnstileChallenge siteKey={turnstile.siteKey} nonce={turnstile.nonce} action="signup" locale={locale} resetKey={proofReset} onToken={setProof} onError={() => {
                 setProof(null);
                 setError(t(catalog, "auth.pending.proofUnavailable"));
             }}/> : null}
  {/* Owner ruling V-18 (R17) keeps Create account unavailable until a region is chosen and both boxes are
-     ticked; the hint says which of those is still missing (auth UI repair, 2026-10-09). It is aria-disabled, not
-     disabled, so Tab still reaches it and its hint (a11y repair, 2026-10-15); submitRegistration refuses the press. */}
- <button className="authPrimary" type="submit" aria-describedby={submitHint.length ? 'signup-submit-hint' : undefined} disabled={busy} aria-disabled={declaredRegion === null || !privacyAccepted || !termsAccepted || (checkDob(dateOfBirth).code !== 'incomplete' && !meetsMinimumAge(dateOfBirth)) || undefined}>{busy ? t(catalog, "auth.signUp.creating") : t(catalog, "auth.signUp.createAccount")}</button>
+     ticked, and the Italy approval box too while it is shown; the hint says which of those is still missing (auth
+     UI repair, 2026-10-09). It is aria-disabled, not disabled, so Tab still reaches it and its hint (a11y repair,
+     2026-10-15); submitRegistration refuses the press. */}
+ <button className="authPrimary" type="submit" aria-describedby={submitHint.length ? 'signup-submit-hint' : undefined} disabled={busy} aria-disabled={declaredRegion === null || !privacyAccepted || !termsAccepted || italyMissing || (checkDob(dateOfBirth).code !== 'incomplete' && !meetsMinimumAge(dateOfBirth)) || undefined}>{busy ? t(catalog, "auth.signUp.creating") : t(catalog, "auth.signUp.createAccount")}</button>
  {submitHint.length ? <p className="authFieldHint" id="signup-submit-hint">{submitHint.join(' ')}</p> : null}
  <p className="authPanelFooter">{t(catalog, "auth.signUp.alreadyHaveOne")} <a href={loginHref}>{t(catalog, "auth.signUp.logIn")}</a></p>
  {announcer.region}

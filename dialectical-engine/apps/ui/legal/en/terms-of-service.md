@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In short
-eyebrow: TERMS OF SERVICE · v2.5 · EFFECTIVE 12 OCTOBER 2026
+eyebrow: TERMS OF SERVICE · v2.6 · EFFECTIVE 24 OCTOBER 2026
 title: What you agree to
 lede: The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.
-endMarker: END OF TERMS · v2.5
+endMarker: END OF TERMS · v2.6
 bodyLabel: Terms of Service text
 annexTitle: Annex A — Regional terms
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 GOVERNING LAW
 -->
 
-**Version 2.5 · Effective 12 October 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
+**Version 2.6 · Effective 24 October 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
 
 **In short.** You must be 18 or over. Dialectical Engine builds arguments with AI models and everything it generates may be wrong — it is not advice. Your debates are private unless you publish them; if you publish, anyone can read them. Text you submit is sent to AI providers listed in our Provider Register, and is not used to train models. Report illegal content at support@dezbatere.ro whether or not you have an account. Romanian law governs, but your local consumer protections stay with you.
 
@@ -279,7 +279,7 @@ Each entry applies to people who live in its region and only states what differs
 
 ### A.1 European Union and European Economic Area
 
-The body of these Terms is written for you. In addition: you may bring proceedings in the courts of the country where you live; the withdrawal right in section 13 applies; alternative dispute resolution is available through www.onoratainstanta.ro. **Germany:** the cancellation button at dezbatere.ro/cancel lets you end a subscription without logging in; subscription terms, renewal periods and notice periods comply with §309(9) BGB: each plan runs for one month and renews monthly until you cancel, and you can cancel at any time with effect from the end of the current month. **France:** you may end a subscription online in three steps at dezbatere.ro/cancel. **Italy:** the clauses on liability (15), suspension (11), changes (14) and governing law (18) require your specific approval, which you give by the separate confirmation at sign-up. **Netherlands:** these Terms are provided in a storable form before conclusion. **Poland:** a Polish version is available; choose Polski in the language menu.
+The body of these Terms is written for you. In addition: you may bring proceedings in the courts of the country where you live; the withdrawal right in section 13 applies; alternative dispute resolution is available through www.onoratainstanta.ro. **Germany:** the cancellation button at dezbatere.ro/cancel lets you end a subscription without logging in; subscription terms, renewal periods and notice periods comply with §309(9) BGB: each plan runs for one month and renews monthly until you cancel, and you can cancel at any time with effect from the end of the current month. **France:** you may end a subscription online in three steps at dezbatere.ro/cancel. **Italy:** the clauses on suspension and termination (11), paid plans and their renewal (12), changes (14), liability (15) and governing law and jurisdiction (18) require your specific approval under articles 1341 and 1342 of the Italian Civil Code. You give it with a separate box at sign-up, shown to anyone who picks Italy in the Region field or whose connection comes from Italy. **Netherlands:** these Terms are provided in a storable form before conclusion. **Poland:** a Polish version is available; choose Polski in the language menu.
 
 ### A.2 United States
 
