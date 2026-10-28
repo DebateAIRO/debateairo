@@ -49,7 +49,6 @@ const aliasKeys = Object.freeze({
 // control shows on the screen; start-debate takes its named exception's key (V-19/V-20). Source of SUPPORT_CONTROL_NAMES.
 const controlKeys = Object.freeze({
   "talk-to-human": ["support", "support.talkToHuman"],
-  "escalate": ["support", "support.escalate"],
   "report-bug": ["support", "support.reportBug"],
   "service-status": ["support", "support.serviceStatus"],
   "debate-engine": ["support", "support.debateEngine"],

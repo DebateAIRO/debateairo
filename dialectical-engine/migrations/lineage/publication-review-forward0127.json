@@ -1,0 +1,17 @@
+{
+  "version": "publication-review-forward0127-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0126_synthesis_check.sql",
+    "manifestSha256": "5e61e225f94f62693f728c63e7449747502465619bdcd6ecdeaea538582ee2eb",
+    "verifierSha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
+  },
+  "migration": {
+    "name": "0127_publication_review.sql",
+    "sha256": "1cb28a67ac058e7776372e0b22b7dec36a54c86138a3e4988615aae356c0e7d9"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-111.sql",
+    "sha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
+  }
+}

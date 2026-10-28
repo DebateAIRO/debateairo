@@ -108,7 +108,7 @@
   "settings.transparency.downloadsTail": "object describing the generated content and the absence of human editorial review. Recorded answer data, model provenance, and operational records retain their original values.",
   "settings.transparency.markingsLimit": "These markings describe content in our UI and downloads. They are not a watermark or authenticity certificate; copying plain text may remove them.",
   "settings.transparency.supportTitle": "Support and human help",
-  "settings.transparency.supportLead": "The support assistant is an AI system. Use “Talk to a human” or “Escalate to a human” in",
+  "settings.transparency.supportLead": "The support assistant is an AI system. Use “Talk to a human” in",
   "settings.transparency.help": "Help",
   "settings.transparency.supportTail": "to request human assistance.",
   "settings.transparency.back": "Back to {brand}",

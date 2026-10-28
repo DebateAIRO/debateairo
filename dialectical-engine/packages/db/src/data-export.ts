@@ -119,6 +119,7 @@ const WORKER_FUNCTIONS = [
   "identity.claim_data_export(uuid,integer)",
   "identity.renew_data_export_lease(uuid,uuid,integer)",
   "identity.read_data_export_snapshot_v2(uuid,uuid)",
+  "identity.read_data_export_threat_reports(uuid,uuid)",
   "identity.complete_data_export(uuid,uuid,text,text,bigint,timestamp with time zone)",
   "identity.fail_data_export(uuid,uuid,text)",
   "identity.sweep_data_exports()",
@@ -145,7 +146,7 @@ export async function assertDataExportDatabaseRoles(requestPool: Pool, workerPoo
     const [request, worker] = await Promise.all([roleWitness(requestPool), roleWitness(workerPool)]);
     if (request === undefined || worker === undefined || request.principal === worker.principal
       || !request.authorization_member || request.worker_member || request.request_count !== 4 || request.worker_count !== 0
-      || !worker.worker_member || worker.authorization_member || worker.request_count !== 0 || worker.worker_count !== 8
+      || !worker.worker_member || worker.authorization_member || worker.request_count !== 0 || worker.worker_count !== 9
       || request.privileged || worker.privileged) {
       throw new TypeError("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
     }
@@ -158,7 +159,9 @@ export class PostgresDataExportSource implements DataExportSourcePort {
   constructor(private readonly pool: Pool) {}
 
   async readRaw(exportId: string, workerId: string): Promise<RawExportRows> {
-    return (await this.pool.query<{ snapshot: RawExportRows }>(
-      "SELECT identity.read_data_export_snapshot_v2($1,$2) snapshot", [exportId, workerId])).rows[0]!.snapshot;
+    const row = (await this.pool.query<{ snapshot: RawExportRows; threat_reports: unknown }>(
+      "SELECT identity.read_data_export_snapshot_v2($1,$2) snapshot, identity.read_data_export_threat_reports($1,$2) threat_reports",
+      [exportId, workerId])).rows[0]!;
+    return { ...row.snapshot, threat_reports: row.threat_reports };
   }
 }

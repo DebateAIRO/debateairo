@@ -29,7 +29,10 @@
  *    band must carry it (ruling C7, `ASK_ROOM_ADMISSION_UNSEALED`). Likewise optional, the
  *    `publicationCheckPolicy` (the pre-publish check's deadline, owner's ruling 2026-10-04,
  *    checked by the register's own parser); without the member the seeder's code-owned row is
- *    sealed as it is. Likewise optional, the `answerRoleRotation` (spec 2026-10-11, role rotation):
+ *    sealed as it is. Likewise optional, the `questionCheckPolicy` (the pre-start question
+ *    check's deadline, synthesis-flag S04-R8, checked by the register's own parser); without
+ *    the member the seeder's code-owned row is sealed as it is. Likewise optional, the
+ *    `answerRoleRotation` (spec 2026-10-11, role rotation):
  *    `{ "enabled": true | false }`, sealed as the ADDITIVE `answerRoleRotationPolicy` row under the
  *    file's sourceRef; left out, no such row is sealed and the engine keeps its fixed roles. Likewise optional,
  *    the `callConcurrencyPolicy` (spec 2026-10-12, parallel calls): `{ "perDebate", "perModelPerDebate",
@@ -112,6 +115,7 @@ import {
   MODEL_SCORECARD_MAX_BYTES,
   MODEL_SCORECARD_ROW_KEY,
   PUBLICATION_CHECK_POLICY_ROW_KEY,
+  QUESTION_CHECK_POLICY_ROW_KEY,
   STORY_ROW_KEYS,
   TAX_AUTHORITIES_ROW_KEY,
   admissionPolicyFromValue,
@@ -144,6 +148,9 @@ import {
   parseQuestionLanguagePolicy,
   questionLanguagePolicyRow,
   questionLanguagePolicyStartValues,
+  SUPPORT_NO_SOURCE_CHECK_POLICY_ROW_KEY,
+  parseSupportNoSourceCheckPolicy,
+  supportNoSourceCheckPolicyRow,
   readDebateShapePolicy,
   readQuestionLanguagePolicy,
   type QuestionLanguagePolicy,
@@ -164,6 +171,7 @@ import {
   persistBootstrapRegister,
   planCapMicros,
   publicationCheckPolicyFromValue,
+  questionCheckPolicyFromValue,
   readAdmissionPolicy,
   readAnswerRoleRotationPolicy,
   readCallConcurrencyPolicy,
@@ -246,6 +254,7 @@ const TOP_LEVEL_KEYS = Object.freeze([
   "askRoomReads",
   // hate-speech S02 (owner, 2026-10-04): OPTIONAL. Left out, the code-owned publicationCheckPolicy row is sealed as it is.
   "publicationCheckPolicy",
+  "questionCheckPolicy",
   // Role rotation (spec 2026-10-11): OPTIONAL. Left out, no row is sealed and the engine keeps its fixed roles.
   "answerRoleRotation",
   // Parallel calls (spec 2026-10-12): OPTIONAL. Left out, no row is sealed and the runner makes one call at a time per debate.
@@ -257,7 +266,8 @@ const TOP_LEVEL_KEYS = Object.freeze([
   // Length guidance (spec 2026-10-15): OPTIONAL. Left out, no row is sealed and every request keeps today's bytes.
   "lengthGuidancePolicy",
   // Engine redesign (spec 2026-10-15 §3): OPTIONAL, and only with lengthGuidancePolicy. Left out, every debate is engine 1.
-  "engineVersionPolicy"
+  "engineVersionPolicy",
+  "supportNoSourceCheckPolicy"
 ] as const);
 const OPERATOR_ROW_KEYS = Object.freeze([CONFIGURED_PROVIDER_SET_ROW_KEY, COST_ENVELOPE_POLICY_ROW_KEY] as const);
 
@@ -447,6 +457,8 @@ export type HostedRegisterFile = Readonly<{
   askRoomReads?: unknown;
   /** Optional (2026-10-04): the pre-publish check's deadline; absent = the code-owned row. */
   publicationCheckPolicy?: unknown;
+  /** Optional S04 question-check deadline; absent = the code-owned row. */
+  questionCheckPolicy?: unknown;
   /** Optional (spec 2026-10-11): `{ "enabled": boolean }`; absent = no answerRoleRotationPolicy row. */
   answerRoleRotation?: unknown;
   /** Optional (spec 2026-10-12): the policy without its `kind`; absent = no callConcurrencyPolicy row. */
@@ -459,6 +471,8 @@ export type HostedRegisterFile = Readonly<{
   lengthGuidancePolicy?: unknown;
   /** Optional (engine redesign 2026-10-15): the engine row's policy without its kind; absent = no engineVersionPolicy row. */
   engineVersionPolicy?: unknown;
+  /** Optional S05 no-source judgement deadline, without its kind; absent = code's 15-second start value. */
+  supportNoSourceCheckPolicy?: unknown;
 }>;
 
 /**
@@ -519,12 +533,14 @@ export function parseHostedRegisterFile(bytes: Uint8Array): HostedRegisterFile {
     ...(Object.hasOwn(record, "taxAuthorities") ? { taxAuthorities: record.taxAuthorities } : {}),
     ...(Object.hasOwn(record, "askRoomReads") ? { askRoomReads: record.askRoomReads } : {}),
     ...(Object.hasOwn(record, "publicationCheckPolicy") ? { publicationCheckPolicy: record.publicationCheckPolicy } : {}),
+    ...(Object.hasOwn(record, "questionCheckPolicy") ? { questionCheckPolicy: record.questionCheckPolicy } : {}),
     ...(Object.hasOwn(record, "answerRoleRotation") ? { answerRoleRotation: record.answerRoleRotation } : {}),
     ...(Object.hasOwn(record, "callConcurrencyPolicy") ? { callConcurrencyPolicy: record.callConcurrencyPolicy } : {}),
     ...(Object.hasOwn(record, "debateShapePolicy") ? { debateShapePolicy: record.debateShapePolicy } : {}),
     ...(Object.hasOwn(record, "questionLanguagePolicy") ? { questionLanguagePolicy: record.questionLanguagePolicy } : {}),
     ...(Object.hasOwn(record, "lengthGuidancePolicy") ? { lengthGuidancePolicy: record.lengthGuidancePolicy } : {}),
-    ...(Object.hasOwn(record, "engineVersionPolicy") ? { engineVersionPolicy: record.engineVersionPolicy } : {})
+    ...(Object.hasOwn(record, "engineVersionPolicy") ? { engineVersionPolicy: record.engineVersionPolicy } : {}),
+    ...(Object.hasOwn(record, "supportNoSourceCheckPolicy") ? { supportNoSourceCheckPolicy: record.supportNoSourceCheckPolicy } : {})
   });
 }
 
@@ -943,6 +959,19 @@ function questionLanguageRowOf(member: unknown, sourceRef: string): ReturnType<t
   return hostedQuestionLanguageBootable(policy) ? row : refuse("HOSTED_REGISTER_QUESTION_LANGUAGE_INVALID");
 }
 
+/** S05's optional D5 deadline is an additive row; the file member never carries the row's kind. */
+function supportNoSourceCheckRowOf(member: unknown, sourceRef: string): ReturnType<typeof supportNoSourceCheckPolicyRow> {
+  if (typeof member !== "object" || member === null || Array.isArray(member) || Object.hasOwn(member, "kind")) {
+    return refuse("HOSTED_REGISTER_SUPPORT_NO_SOURCE_CHECK_INVALID");
+  }
+  try {
+    const policy = parseSupportNoSourceCheckPolicy({ kind: "SUPPORT_NO_SOURCE_CHECK_POLICY", ...member });
+    return supportNoSourceCheckPolicyRow(policy, sourceRef);
+  } catch {
+    return refuse("HOSTED_REGISTER_SUPPORT_NO_SOURCE_CHECK_INVALID");
+  }
+}
+
 /**
  * I4, the readiness half: the API's question-language boot step over the SEALED version, exactly when the API asks it
  * (the debate shape row in force; absent or `enabled: false` = the row is never read, as at boot). The row absent =
@@ -984,6 +1013,7 @@ export async function planHostedRegisterPublication(
   // hate-speech S02: the operator's deadline, by the register's own parser (PUBLICATION_CHECK_POLICY_INVALID).
   // Absent member = the code-owned row, sealed as it is.
   if (file.publicationCheckPolicy !== undefined) publicationCheckPolicyFromValue(file.publicationCheckPolicy, file.sourceRef);
+  if (file.questionCheckPolicy !== undefined) questionCheckPolicyFromValue(file.questionCheckPolicy, file.sourceRef);
   // Role rotation (spec 2026-10-11): the member is the file's own shape, exactly `{ "enabled": boolean }`, so it is
   // checked here, before anything is sealed. Absent = no row (the fixed roles, as before).
   const roleRotationRow = file.answerRoleRotation === undefined ? null
@@ -1011,6 +1041,8 @@ export async function planHostedRegisterPublication(
   // Question language (spec 2026-10-13): the same, for the optional questionLanguagePolicy member. Absent = no row.
   const questionLanguageRow = file.questionLanguagePolicy === undefined ? null
     : questionLanguageRowOf(file.questionLanguagePolicy, file.sourceRef);
+  const supportNoSourceCheckRow = file.supportNoSourceCheckPolicy === undefined ? null
+    : supportNoSourceCheckRowOf(file.supportNoSourceCheckPolicy, file.sourceRef);
   // Paid plans (spec 2026-09-29 §2.5.1): a supplied billing row is checked by
   // the register's own parser, so its refusal keeps its own code.
   if (file.billingPlans !== null) billingPlansFromValue(file.billingPlans.value, file.sourceRef);
@@ -1113,6 +1145,13 @@ export async function planHostedRegisterPublication(
       sourceRef: file.sourceRef
     }));
   }
+  if (file.questionCheckPolicy !== undefined) {
+    operatorRows.set(QUESTION_CHECK_POLICY_ROW_KEY, Object.freeze({
+      rowKey: QUESTION_CHECK_POLICY_ROW_KEY,
+      valueJsonText: canonicalRowValue(file.questionCheckPolicy),
+      sourceRef: file.sourceRef
+    }));
+  }
   const replaced = codeOwnedRows.filter((row) => operatorRows.has(row.rowKey));
   if (replaced.length !== operatorRows.size) refuse("HOSTED_REGISTER_COMPOSITION_INVALID");
   // A19 — THE ONE ADDITIVE OPERATOR ROW. The two rows above REPLACE a
@@ -1166,6 +1205,14 @@ export async function planHostedRegisterPublication(
     valueJsonText: questionLanguageRow.valueJsonText,
     sourceRef: questionLanguageRow.sourceRef
   })];
+  if (supportNoSourceCheckRow !== null && codeOwnedRows.some((row) => row.rowKey === SUPPORT_NO_SOURCE_CHECK_POLICY_ROW_KEY)) {
+    refuse("HOSTED_REGISTER_COMPOSITION_INVALID");
+  }
+  const supportNoSourceCheckRows: readonly RegisterPublicationRow[] = supportNoSourceCheckRow === null ? [] : [Object.freeze({
+    rowKey: supportNoSourceCheckRow.rowKey,
+    valueJsonText: supportNoSourceCheckRow.valueJsonText,
+    sourceRef: supportNoSourceCheckRow.sourceRef
+  })];
   // Length guidance (spec 2026-10-15) is ADDITIVE too, for the same reason.
   if (lengthGuidance !== null && codeOwnedRows.some((row) => row.rowKey === LENGTH_GUIDANCE_POLICY_ROW_KEY)) {
     refuse("HOSTED_REGISTER_COMPOSITION_INVALID");
@@ -1191,6 +1238,7 @@ export async function planHostedRegisterPublication(
     ...callConcurrencyRows,
     ...debateShapeRows,
     ...questionLanguageRows,
+    ...supportNoSourceCheckRows,
     ...lengthGuidanceRows,
     ...engineVersionRows
   ]);

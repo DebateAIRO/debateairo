@@ -14,6 +14,8 @@ const sourcePaths = [
   "components/PublicAnswerDisclosure.tsx",
   "components/PublicHonestyDrawer.tsx",
   "components/PublicationControl.tsx",
+  "components/PublicationReviewPanel.tsx",
+  "components/TakeDownControl.tsx",
   "components/auth/SecurityActionResume.tsx",
   "lib/publicDebatePresentation.ts",
   "lib/v3/publicAnswerExport.ts",
@@ -129,6 +131,17 @@ test("the public namespace exists and covers every public translation call", () 
       usedKeys.add(`${match[1]}.one`);
       usedKeys.add(`${match[1]}.other`);
     }
+  }
+  // S02-R22: the owner review panel selects category/rule keys from the four
+  // wire categories. Its other review keys include conditional arguments to
+  // t(), which the literal-call matcher above cannot see.
+  const reviewSource = sources.get("components/PublicationReviewPanel.tsx");
+  for (const match of reviewSource.matchAll(/\bpublic\.publicationReview\.(?:[A-Za-z0-9_]+\.)*[A-Za-z0-9_]+/g)) {
+    if (match[0] !== "public.publicationReview.category" && match[0] !== "public.publicationReview.rule") usedKeys.add(match[0]);
+  }
+  for (const category of ["TERRORISM", "HATE_SPEECH", "SUICIDE_OR_HARM_TO_OTHERS", "WEAPONS_OR_DRUGS"]) {
+    usedKeys.add(`public.publicationReview.category.${category}`);
+    usedKeys.add(`public.publicationReview.rule.${category}`);
   }
   assert.ok(usedKeys.size > 0, "S2-public sources must use public namespace keys");
   for (const key of usedKeys) assert.ok(Object.hasOwn(catalog, key), `missing ${key}`);

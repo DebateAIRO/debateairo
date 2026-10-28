@@ -14,10 +14,11 @@ const expectedKeys = [
   "support.message",
   "support.send",
   "support.talkToHuman",
-  "support.yes",
-  "support.no",
+  "support.notice",
+  "support.humanAddress",
+  "support.tooLong",
+  "support.helpUnavailable",
   "support.close",
-  "support.ratingQuestion",
   "support.placeholder",
   "support.sources",
   "support.actions",
@@ -55,25 +56,13 @@ const expectedKeys = [
   "support.conversation",
   "support.suggestions",
   "support.thisConversation",
-  "support.reference",
   "support.opened",
   "support.thisVisit",
   "support.data",
   "support.publicGuidance",
   "support.needPerson",
   "support.escalateBody",
-  "support.escalate",
   "support.shortcuts",
-  "support.summaryAdvisory",
-  "support.caseOpenedNotice",
-  "support.case.missing",
-  "support.case.shredded",
-  "support.case.human",
-  "support.case.closed",
-  "support.case.reply",
-  "support.case.state",
-  "support.case.yours",
-  "support.case.region",
   "support.bannerLead",
   // FIX-DEBATE-CATALOGS follow-up 4 (review F1/F4): the banner's own label key.
   "support.aiDisclosure",
@@ -92,7 +81,6 @@ const expectedKeys = [
   "support.agentConversation",
   "support.conversationDetails",
   "support.shortcutsLabel",
-  "support.answerRating",
   "support.privacyPreferences",
   "support.aiBanner",
   "support.cookiePreferences",
@@ -100,7 +88,7 @@ const expectedKeys = [
   "support.countryUnavailable"
 ].sort();
 
-test("all 35 locales expose the exact 85-key support chrome contract", () => {
+test("all 35 locales expose the exact 73-key support chrome contract", () => {
   assert.deepEqual(Object.keys(english).sort(), expectedKeys);
   const locales = readdirSync(join(root, "messages"), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
@@ -119,13 +107,11 @@ test("all 35 locales expose the exact 85-key support chrome contract", () => {
 test("support chrome uses the shared catalogue and removes the language override", () => {
   const assistant = source("components/support/Assistant.tsx");
   const widget = source("components/support/SupportWidget.tsx");
-  const caseView = source("components/support/CaseView.tsx");
   const notice = source("components/AiNotice.tsx");
   const help = source("app/help/page.tsx");
 
-  assert.doesNotMatch(`${assistant}\n${widget}\n${caseView}`, /Language override/);
+  assert.doesNotMatch(`${assistant}\n${widget}`, /Language override/);
   assert.doesNotMatch(assistant, /const (?:DISCLOSURE|WORDS|REQUEST_UNAVAILABLE)\b/);
-  assert.doesNotMatch(caseView, /const COPY\b/);
   assert.doesNotMatch(notice, /language\s*===\s*"ro"|language\?:/);
   assert.doesNotMatch(help, /["'][A-Za-z][^"']*\s[^"']*["']/);
   assert.doesNotMatch(

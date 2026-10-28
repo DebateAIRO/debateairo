@@ -1,0 +1,1391 @@
+{
+  "ar": {
+    "templates": {
+      "REFUSE_INJECTION": "لا أتبع إلا تعليمات المنتج نفسه، لذا سأتجاوز هذا الطلب. اسألني عن المنتج أو اختر «التحدث إلى شخص».",
+      "REFUSE_SAFETY": "يتطلب هذا الأمر تدخل شخص، لا مساعد. اختر «التحدث إلى شخص» واكتب إلى العنوان الذي يعرضه؛ يقرأ رسالتك شخص.",
+      "DEGRADED": "نموذج المساعد غير متاح حاليًا. للوصول إلى شخص، اختر «التحدث إلى شخص».",
+      "TOO_LONG": "رسالتك طويلة جدًا بالنسبة إلى المحادثة. اختصرها وأرسلها مرة أخرى."
+    },
+    "support": {
+      "support.notice": "تُرسل رسائلك إلى Claude من Anthropic ليتمكن من الرد عليك. لا نحتفظ بأي شيء تكتبه هنا.",
+      "support.humanAddress": "للوصول إلى شخص، اكتب إلى {address}. لا تستطيع هذه المحادثة نقل رسالتك إلى أي شخص.",
+      "support.tooLong": "رسالتك طويلة جدًا بالنسبة إلى المحادثة. اختصرها وأرسلها مرة أخرى.",
+      "support.helpUnavailable": "تعذّر تحميل محتوى المساعدة. أعد تحميل الصفحة للمحاولة مرة أخرى.",
+      "support.escalateBody": "هذه المحادثة لا تحتفظ بأي شيء ولا تستطيع نقل رسالتك إلى أي شخص. راسلنا ويقرأ رسالتك شخص.",
+      "support.agentLead": "يجيب استنادًا إلى إرشادات المنتج العامة، ويذكر مصدره، ويعرض عنوان الدعم لدينا عندما يتعذّر عليه الإجابة.",
+      "support.aiBanner": "الردود مولّدة بالذكاء الاصطناعي وموسومة بما يمكن للآلة قراءته، وقد تكون خاطئة."
+    },
+    "home": {
+      "home.aiBanner": "الردود مولّدة بالذكاء الاصطناعي وموسومة بما يمكن للآلة قراءته، وقد تكون خاطئة."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "مساعد الدعم نظام ذكاء اصطناعي. استخدم «التحدث إلى شخص» في"
+    },
+    "consent": {
+      "consent.preferences.lede": "21 عنصرًا، كلٌّ منها ضروري لعمل الخدمة. لا شيء هنا اختياري، ولا شيء نشاركه مع أي جهة أخرى."
+    },
+    "capability": {
+      "help-desk": "محادثات الدعم وعنوان البريد الإلكتروني للدعم"
+    },
+    "members": {
+      "REFUSE_INJECTION": "تم تسجيل رسالتك.",
+      "REFUSE_SAFETY": "وسيقرأ شخص رسالتك.",
+      "DEGRADED": "لا يزال بإمكانك ترك رسالة لشخص: اختر «التحدث إلى شخص».",
+      "support.escalateBody": "صعّد الطلب ليقرأ شخص سلسلة المحادثة كاملة.",
+      "support.agentLead": "ويحيل المحادثة إلى شخص عندما يتعذّر عليه الإجابة.",
+      "support.aiBanner": "اطلب التحدث إلى إنسان في أي وقت.",
+      "home.aiBanner": "اطلب التحدث إلى إنسان في أي وقت.",
+      "settings.transparency.supportLead": "استخدم «التحدث إلى شخص» أو «التصعيد إلى شخص» في"
+    }
+  },
+  "bg": {
+    "templates": {
+      "REFUSE_INJECTION": "Следвам само собствените инструкции на продукта, затова ще пропусна тази заявка. Попитайте ме за продукта или изберете „Разговор с човек“.",
+      "REFUSE_SAFETY": "Тук е необходим човек, а не асистент. Изберете „Разговор с човек“ и пишете на адреса, който се показва; написаното се чете от човек.",
+      "DEGRADED": "Моделът на асистента в момента не е достъпен. За да се свържете с човек, изберете „Разговор с човек“.",
+      "TOO_LONG": "Съобщението Ви е твърде дълго за чата. Съкратете го и го изпратете отново."
+    },
+    "support": {
+      "support.notice": "Съобщенията Ви се изпращат до Claude на Anthropic, за да може да Ви отговори. Не съхраняваме нищо от написаното тук.",
+      "support.humanAddress": "За да се свържете с човек, пишете на {address}. Този чат не може да предаде съобщението Ви.",
+      "support.tooLong": "Съобщението Ви е твърде дълго за чата. Съкратете го и го изпратете отново.",
+      "support.helpUnavailable": "Помощното съдържание не можа да бъде заредено. Презаредете страницата, за да опитате отново.",
+      "support.escalateBody": "Този чат не съхранява нищо и не може да предаде съобщението Ви. Пишете ни и написаното ще бъде прочетено от човек.",
+      "support.agentLead": "Отговаря въз основа на публичните насоки за продукта, посочва източника си и показва нашия адрес за поддръжка, когато не може да помогне.",
+      "support.aiBanner": "Отговорите са генерирани от ИИ, обозначени са в машинночетим вид и може да са погрешни."
+    },
+    "home": {
+      "home.aiBanner": "Отговорите са генерирани от ИИ, обозначени са в машинночетим вид и може да са погрешни."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "Асистентът за поддръжка е система с ИИ. За да поискате помощ от човек, отворете раздела",
+      "settings.transparency.supportTail": "и изберете „Разговор с човек“."
+    },
+    "consent": {
+      "consent.preferences.lede": "21 елемента, всеки от които е нужен, за да работи услугата. Нищо тук не е по избор и нищо не се споделя с някой друг."
+    },
+    "capability": {
+      "help-desk": "Разговори с поддръжката и имейл адрес на поддръжката"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Съобщението Ви е записано.",
+      "REFUSE_SAFETY": "и човек ще прочете съобщението Ви.",
+      "DEGRADED": "Все пак можете да оставите съобщение за човек: изберете „Разговор с човек“.",
+      "support.escalateBody": "Ескалирайте случая и човек ще прочете цялата нишка.",
+      "support.agentLead": "и прехвърля разговора към човек, когато не може да помогне.",
+      "support.aiBanner": "По всяко време можете да поискате разговор с човек.",
+      "home.aiBanner": "По всяко време можете да поискате разговор с човек.",
+      "settings.transparency.supportTail": "изберете „Разговор с човек“ или „Ескалиране към човек“"
+    }
+  },
+  "cs": {
+    "templates": {
+      "REFUSE_INJECTION": "Řídím se pouze vlastními pokyny produktu, takže tento požadavek přeskočím. Zeptejte se mě na produkt nebo zvolte „Promluvit si s člověkem“.",
+      "REFUSE_SAFETY": "Tohle musí řešit člověk, ne asistent. Zvolte „Promluvit si s člověkem“ a napište na adresu, kterou zobrazí; člověk si to přečte.",
+      "DEGRADED": "Model asistenta momentálně není dostupný. Chcete-li se obrátit na člověka, zvolte „Promluvit si s člověkem“.",
+      "TOO_LONG": "Vaše zpráva je pro chat příliš dlouhá. Zkraťte ji a odešlete znovu."
+    },
+    "support": {
+      "support.notice": "Vaše zprávy se odesílají modelu Claude od společnosti Anthropic, aby mohl odpovědět. Nic, co sem napíšete, neuchováváme.",
+      "support.humanAddress": "Chcete-li se obrátit na člověka, napište na {address}. Tento chat vaši zprávu nemůže předat dál.",
+      "support.tooLong": "Vaše zpráva je pro chat příliš dlouhá. Zkraťte ji a odešlete znovu.",
+      "support.helpUnavailable": "Nápovědu se nepodařilo načíst. Obnovte stránku a zkuste to znovu.",
+      "support.escalateBody": "Tento chat nic neuchovává a vaši zprávu nemůže předat dál. Napište nám a člověk si to přečte.",
+      "support.agentLead": "Odpovídá na základě veřejných pokynů k produktu, uvádí svůj zdroj a zobrazí naši adresu podpory, když si neví rady.",
+      "support.aiBanner": "Odpovědi jsou generované AI, strojově čitelně označené a mohou být chybné."
+    },
+    "home": {
+      "home.aiBanner": "Odpovědi jsou generované AI, strojově čitelně označené a mohou být chybné."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "Asistent podpory je systém AI. Chcete-li požádat o pomoc člověka, použijte „Promluvit si s člověkem“ v části"
+    },
+    "consent": {
+      "consent.preferences.lede": "21 položek, každá nezbytná pro fungování služby. Nic z toho není volitelné a nic se nesdílí s nikým dalším."
+    },
+    "capability": {
+      "help-desk": "Konverzace s podporou a e-mailová adresa podpory"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Vaše zpráva byla zaznamenána.",
+      "REFUSE_SAFETY": "a člověk si vaši zprávu přečte.",
+      "DEGRADED": "Stále můžete zanechat zprávu člověku: zvolte „Promluvit si s člověkem“.",
+      "support.escalateBody": "Předejte případ člověku, který si přečte celé vlákno.",
+      "support.agentLead": "a předá konverzaci člověku, když si neví rady.",
+      "support.aiBanner": "Požádejte o člověka kdykoli.",
+      "home.aiBanner": "Požádejte o člověka kdykoli.",
+      "settings.transparency.supportLead": "použijte „Mluvit s člověkem“ nebo „Předat člověku“ v"
+    }
+  },
+  "da": {
+    "templates": {
+      "REFUSE_INJECTION": "Jeg følger kun produktets egne instruktioner, så jeg springer den anmodning over. Spørg mig om produktet, eller vælg 'Tal med et menneske'.",
+      "REFUSE_SAFETY": "Dette kræver et menneske, ikke en assistent. Vælg 'Tal med et menneske', og skriv til den adresse, der vises; et menneske læser det.",
+      "DEGRADED": "Assistentens model er ikke tilgængelig lige nu. For at komme i kontakt med et menneske skal du vælge 'Tal med et menneske'.",
+      "TOO_LONG": "Din besked er for lang til chatten. Forkort den, og send den igen."
+    },
+    "support": {
+      "support.notice": "Dine beskeder sendes til Claude fra Anthropic, så Claude kan svare. Vi gemmer intet af det, du skriver her.",
+      "support.humanAddress": "For at komme i kontakt med et menneske skal du skrive til {address}. Denne chat kan ikke give din besked videre.",
+      "support.tooLong": "Din besked er for lang til chatten. Forkort den, og send den igen.",
+      "support.helpUnavailable": "Hjælpeindholdet kunne ikke indlæses. Genindlæs siden for at prøve igen.",
+      "support.escalateBody": "Denne chat gemmer intet og kan ikke give din besked videre. Skriv til os, så læser et menneske det.",
+      "support.agentLead": "Den svarer ud fra offentlig produktvejledning, angiver sin kilde og viser vores supportadresse, når den ikke kan hjælpe.",
+      "support.aiBanner": "Svar er AI-genereret, maskinlæsbart markeret og kan være forkerte."
+    },
+    "home": {
+      "home.aiBanner": "Svar er AI-genereret, maskinlæsbart markeret og kan være forkerte."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "Supportassistenten er et AI-system. Brug “Tal med et menneske” i"
+    },
+    "consent": {
+      "consent.preferences.lede": "21 elementer, som hver især er nødvendige, for at tjenesten virker. Intet her er valgfrit, og intet deles med andre."
+    },
+    "capability": {
+      "help-desk": "Supportsamtaler og e-mailadressen til support"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Din besked er blevet registreret.",
+      "REFUSE_SAFETY": "så vil et menneske læse din besked.",
+      "DEGRADED": "Du kan stadig efterlade en besked til et menneske: vælg 'Tal med et menneske'.",
+      "support.escalateBody": "Eskaler sagen, så et menneske læser hele tråden.",
+      "support.agentLead": "og overdrager samtalen til et menneske, når den ikke kan hjælpe.",
+      "support.aiBanner": "Spørg efter et menneske på ethvert tidspunkt.",
+      "home.aiBanner": "Spørg efter et menneske på ethvert tidspunkt.",
+      "settings.transparency.supportLead": "Brug “Tal med et menneske” eller “Eskalér til et menneske” i"
+    }
+  },
+  "de": {
+    "templates": {
+      "REFUSE_INJECTION": "Ich befolge nur die eigenen Anweisungen des Produkts und überspringe diese Anfrage daher. Fragen Sie mich nach dem Produkt oder wählen Sie „Mit einem Menschen sprechen“.",
+      "REFUSE_SAFETY": "Hierfür ist ein Mensch erforderlich, kein Assistent. Wählen Sie „Mit einem Menschen sprechen“ und schreiben Sie an die angezeigte Adresse; ein Mensch liest, was dort ankommt.",
+      "DEGRADED": "Das Modell des Assistenten ist derzeit nicht verfügbar. Um einen Menschen zu erreichen, wählen Sie „Mit einem Menschen sprechen“.",
+      "TOO_LONG": "Ihre Nachricht ist für den Chat zu lang. Kürzen Sie sie und senden Sie sie erneut."
+    },
+    "support": {
+      "support.notice": "Ihre Nachrichten werden an Claude von Anthropic gesendet, damit Claude antworten kann. Wir speichern nichts von dem, was Sie hier schreiben.",
+      "support.humanAddress": "Um einen Menschen zu erreichen, schreiben Sie an {address}. Dieser Chat kann Ihre Nachricht nicht weitergeben.",
+      "support.tooLong": "Ihre Nachricht ist für den Chat zu lang. Kürzen Sie sie und senden Sie sie erneut.",
+      "support.helpUnavailable": "Die Hilfeinhalte konnten nicht geladen werden. Laden Sie die Seite neu, um es erneut zu versuchen.",
+      "support.escalateBody": "Dieser Chat speichert nichts und kann Ihre Nachricht nicht weitergeben. Schreiben Sie uns, dann liest es ein Mensch.",
+      "support.agentLead": "Er antwortet auf Grundlage öffentlicher Produkthinweise, nennt seine Quelle und zeigt unsere Support-Adresse an, wenn er nicht weiterhelfen kann.",
+      "support.aiBanner": "Antworten werden von KI erzeugt, maschinenlesbar gekennzeichnet und können fehlerhaft sein."
+    },
+    "home": {
+      "home.aiBanner": "Antworten werden von KI erzeugt, maschinenlesbar gekennzeichnet und können fehlerhaft sein."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "Der Support-Assistent ist ein KI-System. Öffnen Sie",
+      "settings.transparency.supportTail": "und wählen Sie „Mit einem Menschen sprechen“, um menschliche Unterstützung anzufordern."
+    },
+    "consent": {
+      "consent.preferences.lede": "21 Einträge, jeder für das Funktionieren des Dienstes nötig. Nichts davon ist optional, und nichts wird mit anderen geteilt."
+    },
+    "capability": {
+      "help-desk": "Support-Gespräche und die Support-E-Mail-Adresse"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Ihre Nachricht wurde aufgezeichnet.",
+      "REFUSE_SAFETY": "damit ein Mensch Ihre Nachricht liest.",
+      "DEGRADED": "Sie können trotzdem eine Nachricht für einen Menschen hinterlassen: Wählen Sie „Mit einem Menschen sprechen“.",
+      "support.escalateBody": "Leiten Sie das Anliegen weiter, damit ein Mensch den gesamten Verlauf liest.",
+      "support.agentLead": "und übergibt an einen Menschen, wenn er nicht weiterhelfen kann.",
+      "support.aiBanner": "Sie können jederzeit einen Menschen verlangen.",
+      "home.aiBanner": "Sie können jederzeit einen Menschen verlangen.",
+      "settings.transparency.supportTail": "wählen Sie „Mit einem Menschen sprechen“ oder „An einen Menschen weiterleiten“"
+    }
+  },
+  "el": {
+    "templates": {
+      "REFUSE_INJECTION": "Ακολουθώ μόνο τις οδηγίες του ίδιου του προϊόντος, οπότε θα παραλείψω αυτό το αίτημα. Ρωτήστε με για το προϊόν ή επιλέξτε «Συνομιλία με άνθρωπο».",
+      "REFUSE_SAFETY": "Αυτό απαιτεί άνθρωπο, όχι βοηθό. Επιλέξτε «Συνομιλία με άνθρωπο» και γράψτε στη διεύθυνση που εμφανίζει. Ένας άνθρωπος διαβάζει όσα γράφετε.",
+      "DEGRADED": "Το μοντέλο του βοηθού δεν είναι διαθέσιμο αυτήν τη στιγμή. Για να επικοινωνήσετε με έναν άνθρωπο, επιλέξτε «Συνομιλία με άνθρωπο».",
+      "TOO_LONG": "Το μήνυμά σας είναι πολύ μεγάλο για τη συνομιλία. Συντομεύστε το και στείλτε το ξανά."
+    },
+    "support": {
+      "support.notice": "Τα μηνύματά σας αποστέλλονται στο Claude της Anthropic, ώστε να μπορεί να απαντήσει. Δεν διατηρούμε τίποτα από όσα γράφετε εδώ.",
+      "support.humanAddress": "Για να επικοινωνήσετε με έναν άνθρωπο, γράψτε στη διεύθυνση {address}. Αυτή η συνομιλία δεν μπορεί να προωθήσει το μήνυμά σας.",
+      "support.tooLong": "Το μήνυμά σας είναι πολύ μεγάλο για τη συνομιλία. Συντομεύστε το και στείλτε το ξανά.",
+      "support.helpUnavailable": "Το περιεχόμενο βοήθειας δεν μπόρεσε να φορτωθεί. Φορτώστε ξανά τη σελίδα και δοκιμάστε πάλι.",
+      "support.escalateBody": "Αυτή η συνομιλία δεν διατηρεί τίποτα και δεν μπορεί να προωθήσει το μήνυμά σας. Γράψτε μας και ένας άνθρωπος θα το διαβάσει.",
+      "support.agentLead": "Απαντά με βάση δημόσιες οδηγίες για το προϊόν, αναφέρει την πηγή του και εμφανίζει τη διεύθυνση υποστήριξής μας όταν δεν μπορεί να βοηθήσει.",
+      "support.aiBanner": "Οι απαντήσεις δημιουργούνται από ΤΝ, επισημαίνονται με μηχανικώς αναγνώσιμο τρόπο και μπορεί να είναι λανθασμένες."
+    },
+    "home": {
+      "home.aiBanner": "Οι απαντήσεις δημιουργούνται από ΤΝ, επισημαίνονται με μηχανικώς αναγνώσιμο τρόπο και μπορεί να είναι λανθασμένες."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "Ο βοηθός υποστήριξης είναι σύστημα ΤΝ. Χρησιμοποιήστε την επιλογή «Συνομιλία με άνθρωπο» στην ενότητα"
+    },
+    "consent": {
+      "consent.preferences.lede": "21 στοιχεία, το καθένα απαραίτητο για να λειτουργεί η υπηρεσία. Τίποτα εδώ δεν είναι προαιρετικό και τίποτα δεν κοινοποιείται σε άλλους."
+    },
+    "capability": {
+      "help-desk": "Συνομιλίες υποστήριξης και διεύθυνση email υποστήριξης"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Το μήνυμά σας καταγράφηκε.",
+      "REFUSE_SAFETY": "και ένας άνθρωπος θα διαβάσει το μήνυμά σας.",
+      "DEGRADED": "Μπορείτε ακόμη να αφήσετε μήνυμα για έναν άνθρωπο: επιλέξτε «Συνομιλία με άνθρωπο».",
+      "support.escalateBody": "Κλιμακώστε το αίτημα και ένας άνθρωπος θα διαβάσει ολόκληρο το νήμα.",
+      "support.agentLead": "και παραπέμπει σε άνθρωπο όταν δεν μπορεί να βοηθήσει.",
+      "support.aiBanner": "Ζητήστε άνθρωπο οποιαδήποτε στιγμή.",
+      "home.aiBanner": "Ζητήστε άνθρωπο οποιαδήποτε στιγμή.",
+      "settings.transparency.supportLead": "Χρησιμοποιήστε τις επιλογές «Συνομιλία με άνθρωπο» ή «Κλιμάκωση σε άνθρωπο» στην ενότητα"
+    }
+  },
+  "en": {
+    "templates": {
+      "REFUSE_INJECTION": "I only follow the product's own instructions, so I'll skip that request. Ask me about the product, or choose 'Talk to a human'.",
+      "REFUSE_SAFETY": "This needs a person, not an assistant. Choose 'Talk to a human' and write to the address it shows; a person reads it.",
+      "DEGRADED": "The assistant's model is unavailable right now. To reach a person, choose 'Talk to a human'.",
+      "TOO_LONG": "Your message is too long for the chat. Shorten it and send it again."
+    },
+    "support": {
+      "support.notice": "Your messages go to Anthropic's Claude so it can answer. We keep nothing you write here.",
+      "support.humanAddress": "To reach a person, write to {address}. This chat cannot pass your message on.",
+      "support.tooLong": "Your message is too long for the chat. Shorten it and send it again.",
+      "support.helpUnavailable": "Help could not be loaded. Reload the page to try again.",
+      "support.escalateBody": "This chat keeps nothing and cannot pass your message on. Write to us and a person reads it.",
+      "support.agentLead": "It answers from public product guidance, cites its source, and shows our support address when it cannot help.",
+      "support.aiBanner": "Replies are AI-generated, machine-readably marked, and can be wrong."
+    },
+    "home": {
+      "home.aiBanner": "Replies are AI-generated, machine-readably marked, and can be wrong."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "The support assistant is an AI system. Use “Talk to a human” in"
+    },
+    "consent": {
+      "consent.preferences.lede": "21 items, each needed for the service to work. Nothing here is optional, and nothing is shared with anyone else."
+    },
+    "catalog": {
+      "help-desk.label": "Support conversations and the support email address",
+      "help-desk.searchTerms": [
+        "help",
+        "support",
+        "email",
+        "human",
+        "status"
+      ],
+      "settings-help-menus.guideLabels": []
+    }
+  },
+  "es": {
+    "templates": {
+      "REFUSE_INJECTION": "Solo sigo las instrucciones del propio producto, así que omitiré esa solicitud. Pregúnteme sobre el producto o elija «Hablar con una persona».",
+      "REFUSE_SAFETY": "Esto requiere una persona, no un asistente. Elija «Hablar con una persona» y escriba a la dirección que muestra; una persona lo lee.",
+      "DEGRADED": "El modelo del asistente no está disponible en este momento. Para ponerse en contacto con una persona, elija «Hablar con una persona».",
+      "TOO_LONG": "Su mensaje es demasiado largo para el chat. Acórtelo y envíelo de nuevo."
+    },
+    "support": {
+      "support.notice": "Sus mensajes se envían a Claude, de Anthropic, para que pueda responder. No guardamos nada de lo que escriba aquí.",
+      "support.humanAddress": "Para ponerse en contacto con una persona, escriba a {address}. Este chat no puede transmitir su mensaje.",
+      "support.tooLong": "Su mensaje es demasiado largo para el chat. Acórtelo y envíelo de nuevo.",
+      "support.helpUnavailable": "No se pudo cargar el contenido de ayuda. Recargue la página para intentarlo de nuevo.",
+      "support.escalateBody": "Este chat no guarda nada y no puede transmitir su mensaje. Escríbanos y una persona lo leerá.",
+      "support.agentLead": "Responde a partir de la información pública sobre el producto, cita su fuente y muestra nuestra dirección de soporte cuando no puede ayudar.",
+      "support.aiBanner": "Las respuestas las genera la IA, llevan una marca legible por máquina y pueden ser erróneas."
+    },
+    "home": {
+      "home.aiBanner": "Las respuestas las genera la IA, llevan una marca legible por máquina y pueden ser erróneas."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "El asistente de soporte es un sistema de IA. Use «Hablar con una persona» en"
+    },
+    "consent": {
+      "consent.preferences.lede": "21 elementos, cada uno necesario para que el servicio funcione. Nada de esto es opcional y nada se comparte con nadie más."
+    },
+    "capability": {
+      "help-desk": "Conversaciones de soporte y dirección de correo de soporte"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Su mensaje ha quedado registrado.",
+      "REFUSE_SAFETY": "y una persona leerá su mensaje.",
+      "DEGRADED": "Aun así, puede dejar un mensaje para una persona: elija «Hablar con una persona».",
+      "support.escalateBody": "Derive el caso y una persona leerá todo el hilo.",
+      "support.agentLead": "y transfiere la conversación a una persona cuando no puede ayudar.",
+      "support.aiBanner": "Puede pedir que intervenga una persona en cualquier momento.",
+      "home.aiBanner": "Puede pedir que intervenga una persona en cualquier momento.",
+      "settings.transparency.supportLead": "Use «Hablar con una persona» o «Derivar a una persona» en"
+    }
+  },
+  "et": {
+    "templates": {
+      "REFUSE_INJECTION": "Järgin ainult toote enda juhiseid, seega jätan selle taotluse vahele. Küsige minult toote kohta või valige „Rääkige inimesega“.",
+      "REFUSE_SAFETY": "Siin on vaja inimest, mitte assistenti. Valige „Rääkige inimesega“ ja kirjutage aadressile, mida see näitab; inimene loeb seda.",
+      "DEGRADED": "Assistendi mudel pole praegu saadaval. Inimesega ühenduse võtmiseks valige „Rääkige inimesega“.",
+      "TOO_LONG": "Teie sõnum on vestluse jaoks liiga pikk. Lühendage seda ja saatke see uuesti."
+    },
+    "support": {
+      "support.notice": "Teie sõnumid saadetakse ettevõtte Anthropic mudelile Claude, et see saaks vastata. Me ei salvesta midagi, mida te siia kirjutate.",
+      "support.humanAddress": "Inimesega ühenduse võtmiseks kirjutage aadressile {address}. See vestlus ei saa teie sõnumit edasi anda.",
+      "support.tooLong": "Teie sõnum on vestluse jaoks liiga pikk. Lühendage seda ja saatke see uuesti.",
+      "support.helpUnavailable": "Abisisu laadimine ebaõnnestus. Laadige leht uuesti ja proovige veel kord.",
+      "support.escalateBody": "See vestlus ei salvesta midagi ega saa teie sõnumit edasi anda. Kirjutage meile ja inimene loeb seda.",
+      "support.agentLead": "See vastab avaliku tooteteabe põhjal, viitab oma allikale ja näitab meie tugiaadressi, kui ei suuda aidata.",
+      "support.aiBanner": "Vastused on tehisintellekti loodud, masinloetavalt märgistatud ja võivad olla valed."
+    },
+    "home": {
+      "home.aiBanner": "Vastused on tehisintellekti loodud, masinloetavalt märgistatud ja võivad olla valed."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "Kasutajatoe assistent on tehisintellektisüsteem. Inimese abi taotlemiseks kasutage jaotises",
+      "settings.transparency.supportTail": "valikut „Rääkige inimesega“."
+    },
+    "consent": {
+      "consent.preferences.lede": "21 kirjet, igaüks teenuse tööks vajalik. Siin pole midagi valikulist ja midagi ei jagata kellegi teisega."
+    },
+    "capability": {
+      "help-desk": "Tugivestlused ja kasutajatoe e-posti aadress"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Teie sõnum on salvestatud.",
+      "REFUSE_SAFETY": "ja inimene loeb teie sõnumit.",
+      "DEGRADED": "Saate siiski jätta inimesele sõnumi: valige „Rääkige inimesega“.",
+      "support.escalateBody": "Edastage juhtum ja inimene loeb kogu vestluslõime.",
+      "support.agentLead": "ja suunab vestluse inimesele, kui ei suuda aidata.",
+      "support.aiBanner": "Võite igal ajal paluda inimesega rääkida.",
+      "home.aiBanner": "Võite igal ajal paluda inimesega rääkida.",
+      "settings.transparency.supportTail": "valikut „Rääkige inimesega“ või „Edastage inimesele“"
+    }
+  },
+  "fi": {
+    "templates": {
+      "REFUSE_INJECTION": "Noudatan vain tuotteen omia ohjeita, joten ohitan tämän pyynnön. Kysykää tuotteesta tai valitkaa ”Keskustele henkilön kanssa”.",
+      "REFUSE_SAFETY": "Tämä vaatii ihmisen, ei avustajaa. Valitkaa ”Keskustele henkilön kanssa” ja kirjoittakaa osoitteeseen, jonka se näyttää; henkilö lukee kirjoittamanne.",
+      "DEGRADED": "Avustajan malli ei ole juuri nyt käytettävissä. Jos haluatte tavoittaa henkilön, valitkaa ”Keskustele henkilön kanssa”.",
+      "TOO_LONG": "Viestinne on liian pitkä tähän keskusteluun. Lyhentäkää viesti ja lähettäkää se uudelleen."
+    },
+    "support": {
+      "support.notice": "Viestisi lähetetään Anthropic-yhtiön Claude-mallille, jotta se voi vastata. Emme tallenna mitään, mitä tähän kirjoitat.",
+      "support.humanAddress": "Jos haluat tavoittaa henkilön, kirjoita osoitteeseen {address}. Tämä keskustelu ei voi välittää viestiäsi eteenpäin.",
+      "support.tooLong": "Viestinne on liian pitkä tähän keskusteluun. Lyhentäkää viesti ja lähettäkää se uudelleen.",
+      "support.helpUnavailable": "Ohjesisältöä ei voitu ladata. Lataa sivu uudelleen ja yritä uudestaan.",
+      "support.escalateBody": "Tämä keskustelu ei tallenna mitään eikä voi välittää viestiäsi eteenpäin. Kirjoita meille, niin henkilö lukee kirjoittamasi.",
+      "support.agentLead": "Se vastaa julkisen tuoteohjeistuksen perusteella, mainitsee lähteensä ja näyttää tukiosoitteemme, kun se ei pysty auttamaan.",
+      "support.aiBanner": "Vastaukset ovat tekoälyn tuottamia ja koneellisesti luettavasti merkittyjä, ja ne voivat olla vääriä."
+    },
+    "home": {
+      "home.aiBanner": "Vastaukset ovat tekoälyn tuottamia ja koneellisesti luettavasti merkittyjä, ja ne voivat olla vääriä."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "Tukiavustaja on tekoälyjärjestelmä. Pyydä ihmisen apua valitsemalla ”Keskustele henkilön kanssa” kohdassa"
+    },
+    "consent": {
+      "consent.preferences.lede": "21 kohdetta, jokainen välttämätön palvelun toiminnalle. Mikään tässä ei ole valinnaista, eikä mitään jaeta muille."
+    },
+    "capability": {
+      "help-desk": "Tukikeskustelut ja tuen sähköpostiosoite"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Viestinne on tallennettu.",
+      "REFUSE_SAFETY": "niin henkilö lukee viestinne.",
+      "DEGRADED": "Voitte silti jättää viestin henkilölle: valitkaa ”Keskustele henkilön kanssa”.",
+      "support.escalateBody": "Siirrä asia henkilölle, joka lukee koko keskusteluketjun.",
+      "support.agentLead": "ja siirtää keskustelun ihmiselle, kun se ei pysty auttamaan.",
+      "support.aiBanner": "Voit pyytää ihmistä mukaan milloin tahansa.",
+      "home.aiBanner": "Voit pyytää ihmistä mukaan milloin tahansa.",
+      "settings.transparency.supportLead": "valitsemalla ”Keskustele ihmisen kanssa” tai ”Siirrä ihmiselle” kohdassa"
+    }
+  },
+  "fr": {
+    "templates": {
+      "REFUSE_INJECTION": "Je suis uniquement les instructions propres au produit ; je vais donc ignorer cette demande. Posez-moi une question sur le produit ou choisissez « Parler à une personne ».",
+      "REFUSE_SAFETY": "Cette demande nécessite une personne, pas un assistant. Choisissez « Parler à une personne » et écrivez à l’adresse affichée ; une personne lit ce que vous écrivez.",
+      "DEGRADED": "Le modèle de l’assistant est indisponible pour le moment. Pour joindre une personne, choisissez « Parler à une personne ».",
+      "TOO_LONG": "Votre message est trop long pour le chat. Raccourcissez-le et envoyez-le de nouveau."
+    },
+    "support": {
+      "support.notice": "Vos messages sont envoyés à Claude, d’Anthropic, afin qu’il puisse répondre. Nous ne conservons rien de ce que vous écrivez ici.",
+      "support.humanAddress": "Pour joindre une personne, écrivez à {address}. Ce chat ne peut pas transmettre votre message.",
+      "support.tooLong": "Votre message est trop long pour le chat. Raccourcissez-le et envoyez-le de nouveau.",
+      "support.helpUnavailable": "Le contenu d’aide n’a pas pu être chargé. Rechargez la page pour réessayer.",
+      "support.escalateBody": "Ce chat ne conserve rien et ne peut pas transmettre votre message. Écrivez-nous et une personne lira votre message.",
+      "support.agentLead": "Il répond à partir des informations publiques sur le produit, indique d’où elles proviennent et affiche notre adresse d’assistance lorsqu’il ne peut pas répondre.",
+      "support.aiBanner": "Les réponses sont générées par l’IA, signalées dans un format lisible par machine et peuvent être erronées."
+    },
+    "home": {
+      "home.aiBanner": "Les réponses sont générées par l’IA, signalées dans un format lisible par machine et peuvent être erronées."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "L’assistant d’aide est un système d’IA. Utilisez « Parler à une personne » dans"
+    },
+    "consent": {
+      "consent.preferences.lede": "21 éléments, chacun nécessaire au fonctionnement du service. Rien ici n’est facultatif, et rien n’est partagé avec qui que ce soit."
+    },
+    "capability": {
+      "help-desk": "Conversations d’assistance et adresse e-mail d’assistance"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Votre message a été enregistré.",
+      "REFUSE_SAFETY": "et une personne lira votre message.",
+      "DEGRADED": "Vous pouvez tout de même laisser un message à une personne : choisissez « Parler à une personne ».",
+      "support.escalateBody": "Transmettez la demande pour qu’une personne lise l’intégralité du fil.",
+      "support.agentLead": "et transmet la demande à une personne lorsqu’il ne peut pas répondre.",
+      "support.aiBanner": "Demandez l’intervention d’une personne à tout moment.",
+      "home.aiBanner": "Demandez l’intervention d’une personne à tout moment.",
+      "settings.transparency.supportLead": "Utilisez « Parler à une personne » ou « Transmettre à une personne » dans"
+    }
+  },
+  "ga": {
+    "templates": {
+      "REFUSE_INJECTION": "Ní leanaim ach treoracha an táirge féin, mar sin fágfaidh mé an t-iarratas sin ar lár. Cuir ceist orm faoin táirge, nó roghnaigh ‘Labhair le duine’.",
+      "REFUSE_SAFETY": "Tá duine de dhíth chuige seo, ní cúntóir. Roghnaigh ‘Labhair le duine’ agus scríobh chuig an seoladh a thaispeánann sé; léann duine an méid a scríobhann tú.",
+      "DEGRADED": "Níl samhail an chúntóra ar fáil faoi láthair. Chun teagmháil a dhéanamh le duine, roghnaigh ‘Labhair le duine’.",
+      "TOO_LONG": "Tá do theachtaireacht rófhada don chomhrá. Giorraigh í agus seol arís í."
+    },
+    "support": {
+      "support.notice": "Seoltar do theachtaireachtaí chuig Claude ó Anthropic chun go mbeidh sé in ann freagra a thabhairt. Ní choinnímid aon rud a scríobhann tú anseo.",
+      "support.humanAddress": "Chun teagmháil a dhéanamh le duine, scríobh chuig {address}. Ní féidir leis an gcomhrá seo do theachtaireacht a chur ar aghaidh.",
+      "support.tooLong": "Tá do theachtaireacht rófhada don chomhrá. Giorraigh í agus seol arís í.",
+      "support.helpUnavailable": "Níorbh fhéidir an t-ábhar cabhrach a luchtú. Athluchtaigh an leathanach chun triail eile a bhaint as.",
+      "support.escalateBody": "Ní choinníonn an comhrá seo aon rud agus ní féidir leis do theachtaireacht a chur ar aghaidh. Scríobh chugainn agus léann duine an méid a scríobhann tú.",
+      "support.agentLead": "Freagraíonn sé bunaithe ar threoir phoiblí faoin táirge, luann sé a fhoinse, agus taispeánann sé ár seoladh tacaíochta nuair nach féidir leis cabhrú.",
+      "support.aiBanner": "Is é IS a ghineann na freagraí, marcáiltear iad ar bhealach atá inléite ag meaisín, agus d’fhéadfadh siad a bheith mícheart."
+    },
+    "home": {
+      "home.aiBanner": "Is é IS a ghineann na freagraí, marcáiltear iad ar bhealach atá inléite ag meaisín, agus d’fhéadfadh siad a bheith mícheart."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "Is córas IS é an cúntóir tacaíochta. Úsáid “Labhair le duine” sa rannán"
+    },
+    "consent": {
+      "consent.preferences.lede": "21 mír, gach ceann acu riachtanach chun go n-oibreoidh an tseirbhís. Níl aon rud anseo roghnach, agus ní roinntear aon rud le duine ar bith eile."
+    },
+    "capability": {
+      "help-desk": "Comhráite tacaíochta agus seoladh ríomhphoist na tacaíochta"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Taifeadadh do theachtaireacht.",
+      "REFUSE_SAFETY": "agus léifidh duine do theachtaireacht.",
+      "DEGRADED": "Is féidir leat teachtaireacht a fhágáil do dhuine fós: roghnaigh ‘Labhair le duine’.",
+      "support.escalateBody": "Ardaigh chuig duine é agus léifidh duine an snáithe iomlán.",
+      "support.agentLead": "agus aistríonn sé an comhrá chuig duine nuair nach féidir leis cabhrú.",
+      "support.aiBanner": "Iarr labhairt le duine am ar bith.",
+      "home.aiBanner": "Iarr labhairt le duine am ar bith.",
+      "settings.transparency.supportLead": "Úsáid “Labhair le duine” nó “Ardaigh chuig duine” sa rannán"
+    }
+  },
+  "he": {
+    "templates": {
+      "REFUSE_INJECTION": "אני פועל רק בהתאם להוראות המוצר עצמו, ולכן אדלג על הבקשה הזו. אפשר לשאול אותי על המוצר או לבחור „שיחה עם נציג אנושי”.",
+      "REFUSE_SAFETY": "הנושא הזה מחייב נציג אנושי, לא עוזר. יש לבחור „שיחה עם נציג אנושי” ולכתוב אל הכתובת המוצגת; נציג קורא את מה שנכתב.",
+      "DEGRADED": "המודל של העוזר אינו זמין כעת. כדי להגיע לנציג אנושי, יש לבחור „שיחה עם נציג אנושי”.",
+      "TOO_LONG": "הודעתך ארוכה מדי לצ׳אט. יש לקצר אותה ולשלוח שוב."
+    },
+    "support": {
+      "support.notice": "ההודעות נשלחות אל Claude של Anthropic כדי שיוכל לענות. איננו שומרים דבר ממה שנכתב כאן.",
+      "support.humanAddress": "כדי להגיע לנציג אנושי, יש לכתוב אל {address}. הצ׳אט הזה אינו יכול להעביר את הודעתך הלאה.",
+      "support.tooLong": "הודעתך ארוכה מדי לצ׳אט. יש לקצר אותה ולשלוח שוב.",
+      "support.helpUnavailable": "לא ניתן היה לטעון את תוכן העזרה. יש לרענן את הדף ולנסות שוב.",
+      "support.escalateBody": "הצ׳אט הזה אינו שומר דבר ואינו יכול להעביר את הודעתך הלאה. יש לכתוב לנו, ונציג אנושי קורא את מה שנכתב.",
+      "support.agentLead": "הוא עונה על סמך הנחיות ציבוריות על המוצר, מציין את המקור ומציג את כתובת התמיכה שלנו כשאינו יכול לעזור.",
+      "support.aiBanner": "התשובות נוצרות בידי בינה מלאכותית, מסומנות באופן קריא למכונה ועלולות להיות שגויות."
+    },
+    "home": {
+      "home.aiBanner": "התשובות נוצרות בידי בינה מלאכותית, מסומנות באופן קריא למכונה ועלולות להיות שגויות."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "מסייע התמיכה הוא מערכת בינה מלאכותית. השתמשו באפשרות ״שיחה עם נציג אנושי״ תחת"
+    },
+    "consent": {
+      "consent.preferences.lede": "21 פריטים, כל אחד מהם נחוץ כדי שהשירות יפעל. שום דבר כאן אינו אופציונלי, ושום דבר אינו משותף עם אף אחד אחר."
+    },
+    "capability": {
+      "help-desk": "שיחות תמיכה וכתובת דוא״ל לתמיכה"
+    },
+    "members": {
+      "REFUSE_INJECTION": "הודעתך תועדה.",
+      "REFUSE_SAFETY": "ונציג יקרא את הודעתך.",
+      "DEGRADED": "עדיין אפשר להשאיר הודעה לנציג אנושי: יש לבחור „שיחה עם נציג אנושי”.",
+      "support.escalateBody": "העברה לנציג אנושי מאפשרת קריאה של כל השרשור.",
+      "support.agentLead": "ומעביר את השיחה לנציג אנושי כשאינו יכול לעזור.",
+      "support.aiBanner": "אפשר לבקש לדבר עם אדם בכל עת.",
+      "home.aiBanner": "אפשר לבקש לדבר עם אדם בכל עת.",
+      "settings.transparency.supportLead": "השתמשו באפשרות ״שיחה עם נציג אנושי״ או ״העברה לנציג אנושי״ תחת"
+    }
+  },
+  "hi": {
+    "templates": {
+      "REFUSE_INJECTION": "मैं केवल उत्पाद के अपने निर्देशों का पालन करता हूँ, इसलिए इस अनुरोध को छोड़ दूँगा। मुझसे उत्पाद के बारे में पूछें या ‘किसी व्यक्ति से बात करें’ चुनें।",
+      "REFUSE_SAFETY": "इसके लिए सहायक नहीं, किसी व्यक्ति की आवश्यकता है। ‘किसी व्यक्ति से बात करें’ चुनें और जो पता दिखे, उस पर लिखें; उसे कोई व्यक्ति पढ़ता है।",
+      "DEGRADED": "सहायक का मॉडल अभी उपलब्ध नहीं है। किसी व्यक्ति तक पहुँचने के लिए ‘किसी व्यक्ति से बात करें’ चुनें।",
+      "TOO_LONG": "आपका संदेश चैट के लिए बहुत लंबा है। उसे छोटा करें और फिर से भेजें।"
+    },
+    "support": {
+      "support.notice": "आपके संदेश उत्तर देने के लिए Anthropic के Claude को भेजे जाते हैं। आप यहाँ जो कुछ लिखते हैं, उसमें से हम कुछ भी नहीं रखते।",
+      "support.humanAddress": "किसी व्यक्ति तक पहुँचने के लिए {address} पर लिखें। यह चैट आपका संदेश आगे नहीं पहुँचा सकती।",
+      "support.tooLong": "आपका संदेश चैट के लिए बहुत लंबा है। उसे छोटा करें और फिर से भेजें।",
+      "support.helpUnavailable": "सहायता सामग्री लोड नहीं हो सकी। फिर से प्रयास करने के लिए पृष्ठ को रीलोड करें।",
+      "support.escalateBody": "यह चैट कुछ भी सहेजकर नहीं रखती और आपका संदेश आगे नहीं पहुँचा सकती। हमें लिखें और कोई व्यक्ति उसे पढ़ता है।",
+      "support.agentLead": "यह सार्वजनिक उत्पाद मार्गदर्शन के आधार पर उत्तर देता है, अपना स्रोत बताता है और जब उत्तर नहीं दे पाता तो हमारा सहायता ईमेल पता दिखाता है।",
+      "support.aiBanner": "उत्तर AI द्वारा जनरेट किए गए हैं, मशीन-पठनीय रूप में चिह्नित हैं और गलत हो सकते हैं।"
+    },
+    "home": {
+      "home.aiBanner": "उत्तर AI द्वारा जनरेट किए गए हैं, मशीन-पठनीय रूप में चिह्नित हैं और गलत हो सकते हैं।"
+    },
+    "settings": {
+      "settings.transparency.supportLead": "सहायता सहायक एक AI प्रणाली है। मानवीय सहायता माँगने के लिए",
+      "settings.transparency.supportTail": "में “किसी व्यक्ति से बात करें” चुनें।"
+    },
+    "consent": {
+      "consent.preferences.lede": "21 आइटम, हर एक सेवा के काम करने के लिए ज़रूरी। यहाँ कुछ भी वैकल्पिक नहीं है, और किसी और के साथ कुछ भी साझा नहीं किया जाता।"
+    },
+    "capability": {
+      "help-desk": "सहायता बातचीत और सहायता का ईमेल पता"
+    },
+    "members": {
+      "REFUSE_INJECTION": "आपका संदेश दर्ज कर लिया गया है।",
+      "REFUSE_SAFETY": "और कोई व्यक्ति आपका संदेश पढ़ेगा।",
+      "DEGRADED": "फिर भी आप किसी व्यक्ति के लिए संदेश छोड़ सकते हैं: ‘किसी व्यक्ति से बात करें’ चुनें।",
+      "support.escalateBody": "इसे आगे भेजने पर कोई व्यक्ति पूरा संवाद पढ़ेगा।",
+      "support.agentLead": "और जब उत्तर नहीं दे पाता तो बातचीत किसी व्यक्ति को सौंप देता है।",
+      "support.aiBanner": "आप कभी भी किसी व्यक्ति से सहायता माँग सकते हैं।",
+      "home.aiBanner": "आप कभी भी किसी व्यक्ति से सहायता माँग सकते हैं।",
+      "settings.transparency.supportTail": "“किसी व्यक्ति से बात करें” या “किसी व्यक्ति तक भेजें” चुनें"
+    }
+  },
+  "hr": {
+    "templates": {
+      "REFUSE_INJECTION": "Slijedim samo upute samog proizvoda pa ću preskočiti taj zahtjev. Pitajte me o proizvodu ili odaberite „Razgovor s osobom“.",
+      "REFUSE_SAFETY": "Za ovo je potrebna osoba, a ne asistent. Odaberite „Razgovor s osobom“ i napišite na adresu koju prikazuje; osoba čita ono što ondje napišete.",
+      "DEGRADED": "Model asistenta trenutačno nije dostupan. Da biste došli do osobe, odaberite „Razgovor s osobom“.",
+      "TOO_LONG": "Vaša je poruka predugačka za chat. Skratite je i pošaljite ponovno."
+    },
+    "support": {
+      "support.notice": "Vaše se poruke šalju modelu Claude tvrtke Anthropic kako bi vam mogao odgovoriti. Ne čuvamo ništa što ovdje napišete.",
+      "support.humanAddress": "Da biste došli do osobe, pišite na {address}. Ovaj chat ne može proslijediti vašu poruku dalje.",
+      "support.tooLong": "Vaša je poruka predugačka za chat. Skratite je i pošaljite ponovno.",
+      "support.helpUnavailable": "Sadržaj pomoći nije se mogao učitati. Osvježite stranicu i pokušajte ponovno.",
+      "support.escalateBody": "Ovaj chat ne čuva ništa i ne može proslijediti vašu poruku dalje. Napišite nam, a poruku čita osoba.",
+      "support.agentLead": "Odgovara na temelju javnih uputa o proizvodu, navodi svoj izvor i prikazuje našu adresu podrške kada ne može pomoći.",
+      "support.aiBanner": "Odgovore generira umjetna inteligencija; ti su odgovori strojno čitljivo označeni i mogu biti pogrešni."
+    },
+    "home": {
+      "home.aiBanner": "Odgovore generira umjetna inteligencija; ti su odgovori strojno čitljivo označeni i mogu biti pogrešni."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "Pomoćnik za podršku sustav je umjetne inteligencije. Upotrijebite „Razgovor s osobom” u odjeljku"
+    },
+    "consent": {
+      "consent.preferences.lede": "21 stavka, svaka potrebna za rad usluge. Ništa ovdje nije neobavezno i ništa se ne dijeli ni s kim drugim."
+    },
+    "capability": {
+      "help-desk": "Razgovori s podrškom i adresa e-pošte podrške"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Vaša je poruka zabilježena.",
+      "REFUSE_SAFETY": "i osoba će pročitati Vašu poruku.",
+      "DEGRADED": "I dalje možete ostaviti poruku osobi: odaberite „Razgovor s osobom“.",
+      "support.escalateBody": "Proslijedite razgovor osobi i ona će pročitati cijelu temu.",
+      "support.agentLead": "i prepušta razgovor osobi kada ne može pomoći.",
+      "support.aiBanner": "U bilo kojem trenutku zatražite razgovor s osobom.",
+      "home.aiBanner": "U bilo kojem trenutku zatražite razgovor s osobom.",
+      "settings.transparency.supportLead": "Upotrijebite „Razgovor s osobom” ili „Proslijedite osobi” u"
+    }
+  },
+  "hu": {
+    "templates": {
+      "REFUSE_INJECTION": "Csak a termék saját utasításait követem, ezért ezt a kérést kihagyom. Kérdezzen a termékről, vagy válassza a „Beszélgetés munkatárssal” lehetőséget.",
+      "REFUSE_SAFETY": "Ehhez munkatársra, nem asszisztensre van szükség. Válassza a „Beszélgetés munkatárssal” lehetőséget, és írjon az általa megjelenített címre; azt egy munkatárs olvassa el.",
+      "DEGRADED": "Az asszisztens modellje jelenleg nem érhető el. Munkatárs eléréséhez válassza a „Beszélgetés munkatárssal” lehetőséget.",
+      "TOO_LONG": "Az üzenete túl hosszú a csevegéshez. Rövidítse le, és küldje el újra."
+    },
+    "support": {
+      "support.notice": "Az Ön üzenetei az Anthropic Claude nevű modelljéhez kerülnek, hogy válaszolhasson. Semmit sem őrzünk meg abból, amit itt ír.",
+      "support.humanAddress": "Munkatárs eléréséhez írjon a következő címre: {address}. Ez a csevegés nem tudja továbbítani az Ön üzenetét.",
+      "support.tooLong": "Az üzenete túl hosszú a csevegéshez. Rövidítse le, és küldje el újra.",
+      "support.helpUnavailable": "A súgó tartalmát nem sikerült betölteni. Töltse újra az oldalt, és próbálja meg ismét.",
+      "support.escalateBody": "Ez a csevegés semmit sem őriz meg, és nem tudja továbbítani az Ön üzenetét. Írjon nekünk, és azt egy munkatárs olvassa el.",
+      "support.agentLead": "Nyilvános termékútmutatás alapján válaszol, megjelöli a forrását, és megjeleníti ügyfélszolgálatunk e-mail-címét, ha nem tud segíteni.",
+      "support.aiBanner": "A válaszokat MI hozza létre, géppel olvashatóan jelöljük őket, és tévesek lehetnek."
+    },
+    "home": {
+      "home.aiBanner": "A válaszokat MI hozza létre, géppel olvashatóan jelöljük őket, és tévesek lehetnek."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "Az ügyfélszolgálati asszisztens MI-rendszer. Emberi segítség kéréséhez használja a „Beszélgetés munkatárssal” lehetőséget itt:"
+    },
+    "consent": {
+      "consent.preferences.lede": "21 elem, mindegyik szükséges a szolgáltatás működéséhez. Itt semmi sem opcionális, és semmit sem osztunk meg másokkal."
+    },
+    "capability": {
+      "help-desk": "Ügyfélszolgálati beszélgetések és az ügyfélszolgálat e-mail-címe"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Üzenetét rögzítettük.",
+      "REFUSE_SAFETY": "és egy munkatárs elolvassa az üzenetét.",
+      "DEGRADED": "Ettől függetlenül hagyhat üzenetet egy munkatársnak: válassza a „Beszélgetés munkatárssal” lehetőséget.",
+      "support.escalateBody": "Továbbítás esetén egy munkatárs elolvassa a teljes beszélgetést.",
+      "support.agentLead": "és munkatárshoz irányítja a beszélgetést, ha nem tud segíteni.",
+      "support.aiBanner": "Bármikor kérhet emberi segítséget.",
+      "home.aiBanner": "Bármikor kérhet emberi segítséget.",
+      "settings.transparency.supportLead": "használja a „Beszélgetés emberrel” vagy az „Átadás embernek” lehetőséget itt:"
+    }
+  },
+  "id": {
+    "templates": {
+      "REFUSE_INJECTION": "Saya hanya mengikuti petunjuk produk itu sendiri, jadi saya akan melewati permintaan tersebut. Tanyakan tentang produk atau pilih ‘Bicara dengan petugas’.",
+      "REFUSE_SAFETY": "Hal ini memerlukan petugas, bukan asisten. Pilih ‘Bicara dengan petugas’ dan tulis ke alamat yang ditampilkan; petugas membacanya.",
+      "DEGRADED": "Model asisten sedang tidak tersedia. Untuk menghubungi petugas, pilih ‘Bicara dengan petugas’.",
+      "TOO_LONG": "Pesan Anda terlalu panjang untuk obrolan ini. Persingkat, lalu kirim lagi."
+    },
+    "support": {
+      "support.notice": "Pesan Anda dikirim ke Claude milik Anthropic agar dapat menjawab. Kami tidak menyimpan apa pun yang Anda tulis di sini.",
+      "support.humanAddress": "Untuk menghubungi petugas, tulis ke {address}. Obrolan ini tidak dapat meneruskan pesan Anda.",
+      "support.tooLong": "Pesan Anda terlalu panjang untuk obrolan ini. Persingkat, lalu kirim lagi.",
+      "support.helpUnavailable": "Konten bantuan tidak dapat dimuat. Muat ulang halaman untuk mencoba lagi.",
+      "support.escalateBody": "Obrolan ini tidak menyimpan apa pun dan tidak dapat meneruskan pesan Anda. Tulis kepada kami dan petugas membacanya.",
+      "support.agentLead": "Asisten ini menjawab berdasarkan panduan produk publik, menyebutkan sumbernya, dan menampilkan alamat dukungan kami jika tidak dapat membantu.",
+      "support.aiBanner": "Balasan dibuat oleh AI, diberi penanda yang dapat dibaca mesin, dan mungkin salah."
+    },
+    "home": {
+      "home.aiBanner": "Balasan dibuat oleh AI, diberi penanda yang dapat dibaca mesin, dan mungkin salah."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "Asisten dukungan adalah sistem AI. Gunakan “Bicara dengan petugas” di"
+    },
+    "consent": {
+      "consent.preferences.lede": "21 item, masing-masing diperlukan agar layanan berfungsi. Tidak ada yang opsional di sini, dan tidak ada yang dibagikan kepada pihak lain."
+    },
+    "capability": {
+      "help-desk": "Percakapan dukungan dan alamat email dukungan"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Pesan Anda telah dicatat.",
+      "REFUSE_SAFETY": "dan petugas akan membaca pesan Anda.",
+      "DEGRADED": "Anda tetap dapat meninggalkan pesan untuk petugas: pilih ‘Bicara dengan petugas’.",
+      "support.escalateBody": "Teruskan agar petugas membaca seluruh percakapan.",
+      "support.agentLead": "dan meneruskan percakapan kepada petugas jika tidak dapat membantu.",
+      "support.aiBanner": "Minta bantuan manusia kapan saja.",
+      "home.aiBanner": "Minta bantuan manusia kapan saja.",
+      "settings.transparency.supportLead": "Gunakan “Bicara dengan manusia” atau “Eskalasi ke manusia” di"
+    }
+  },
+  "it": {
+    "templates": {
+      "REFUSE_INJECTION": "Seguo soltanto le istruzioni del prodotto, quindi ignorerò questa richiesta. Mi chieda informazioni sul prodotto oppure scelga «Parla con una persona».",
+      "REFUSE_SAFETY": "Questa richiesta richiede l'intervento di una persona, non di un assistente. Scelga «Parla con una persona» e scriva all'indirizzo che mostra; una persona legge il suo messaggio.",
+      "DEGRADED": "Il modello dell'assistente non è al momento disponibile. Per raggiungere una persona, scelga «Parla con una persona».",
+      "TOO_LONG": "Il suo messaggio è troppo lungo per la chat. Lo abbrevi e lo invii di nuovo."
+    },
+    "support": {
+      "support.notice": "I tuoi messaggi vengono inviati a Claude di Anthropic perché possa risponderti. Non conserviamo nulla di ciò che scrivi qui.",
+      "support.humanAddress": "Per raggiungere una persona, scrivi a {address}. Questa chat non può inoltrare il tuo messaggio.",
+      "support.tooLong": "Il suo messaggio è troppo lungo per la chat. Lo abbrevi e lo invii di nuovo.",
+      "support.helpUnavailable": "Non è stato possibile caricare i contenuti dell’Aiuto. Ricarica la pagina per riprovare.",
+      "support.escalateBody": "Questa chat non conserva nulla e non può inoltrare il tuo messaggio. Scrivici e una persona lo legge.",
+      "support.agentLead": "Risponde sulla base delle indicazioni pubbliche sul prodotto, cita la fonte e mostra il nostro indirizzo di supporto quando non è in grado di aiutare.",
+      "support.aiBanner": "Le risposte sono generate dall’IA, contrassegnate in un formato leggibile dalle macchine e possono essere errate."
+    },
+    "home": {
+      "home.aiBanner": "Le risposte sono generate dall’IA, contrassegnate in un formato leggibile dalle macchine e possono essere errate."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "L’assistente del servizio di supporto è un sistema di IA. Utilizza «Parla con una persona» in"
+    },
+    "consent": {
+      "consent.preferences.lede": "21 elementi, ciascuno necessario al funzionamento del servizio. Qui niente è facoltativo e niente viene condiviso con altri."
+    },
+    "capability": {
+      "help-desk": "Conversazioni di assistenza e indirizzo email dell’assistenza"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Il suo messaggio è stato registrato.",
+      "REFUSE_SAFETY": "e una persona leggerà il suo messaggio.",
+      "DEGRADED": "Può comunque lasciare un messaggio per una persona: scelga «Parla con una persona».",
+      "support.escalateBody": "Richiedi l’intervento di una persona, che leggerà l’intera conversazione.",
+      "support.agentLead": "e passa la conversazione a una persona quando non è in grado di aiutare.",
+      "support.aiBanner": "Puoi chiedere di parlare con una persona in qualsiasi momento.",
+      "home.aiBanner": "Puoi chiedere di parlare con una persona in qualsiasi momento.",
+      "settings.transparency.supportLead": "Utilizza «Parla con una persona» o «Richiedi l’intervento di una persona» in"
+    }
+  },
+  "ja": {
+    "templates": {
+      "REFUSE_INJECTION": "製品自体の指示にのみ従うため、その依頼には対応しません。製品について質問するか、「担当者と話す」を選択してください。",
+      "REFUSE_SAFETY": "これはアシスタントではなく担当者による対応が必要です。「担当者と話す」を選択し、表示されるアドレスにメールを送ってください。担当者がそのメールを読みます。",
+      "DEGRADED": "アシスタントのモデルは現在利用できません。担当者に連絡するには、「担当者と話す」を選択してください。",
+      "TOO_LONG": "メッセージがチャットには長すぎます。短くして、もう一度送信してください。"
+    },
+    "support": {
+      "support.notice": "メッセージは、回答するためにAnthropicのClaudeに送信されます。ここに入力された内容を当社が保存することはありません。",
+      "support.humanAddress": "担当者に連絡するには、次のアドレスにメールを送ってください：{address}。このチャットではメッセージを転送できません。",
+      "support.tooLong": "メッセージがチャットには長すぎます。短くして、もう一度送信してください。",
+      "support.helpUnavailable": "ヘルプの内容を読み込めませんでした。ページを再読み込みして、もう一度お試しください。",
+      "support.escalateBody": "このチャットは何も保存せず、メッセージを転送することもできません。メールでご連絡いただければ、担当者が読みます。",
+      "support.agentLead": "公開されている製品情報に基づいて回答し、情報源を示し、対応できない場合は当社のサポート用メールアドレスを表示します。",
+      "support.aiBanner": "回答はAIが生成し、機械可読の印が付きますが、誤っている場合があります。"
+    },
+    "home": {
+      "home.aiBanner": "回答はAIが生成し、機械可読の印が付きますが、誤っている場合があります。"
+    },
+    "settings": {
+      "settings.transparency.supportLead": "サポートアシスタントはAIシステムです。人による支援を希望する場合は、",
+      "settings.transparency.supportTail": "で「担当者と話す」を選択してください。"
+    },
+    "consent": {
+      "consent.preferences.lede": "21 件の項目は、いずれもサービスの動作に必要なものです。任意の項目はなく、他者と共有するものもありません。"
+    },
+    "capability": {
+      "help-desk": "サポートの会話とサポート用メールアドレス"
+    },
+    "members": {
+      "REFUSE_INJECTION": "メッセージは記録されました。",
+      "REFUSE_SAFETY": "担当者がメッセージを確認します。",
+      "DEGRADED": "担当者へのメッセージは引き続き送信できます。「担当者と話す」を選択してください。",
+      "support.escalateBody": "担当者に引き継ぐと、会話全体が読まれます。",
+      "support.agentLead": "対応できない場合は担当者に引き継ぎます。",
+      "support.aiBanner": "いつでも人による対応を依頼できます。",
+      "home.aiBanner": "いつでも人による対応を依頼できます。",
+      "settings.transparency.supportTail": "「担当者と話す」または「担当者に引き継ぐ」を選択してください"
+    }
+  },
+  "ko": {
+    "templates": {
+      "REFUSE_INJECTION": "제품 자체의 지침만 따르므로 해당 요청은 처리하지 않겠습니다. 제품에 관해 질문하거나 ‘상담원과 대화하기’를 선택하세요.",
+      "REFUSE_SAFETY": "이 사안은 도우미가 아닌 상담원이 처리해야 합니다. ‘상담원과 대화하기’를 선택하고 표시되는 주소로 이메일을 보내세요. 상담원이 그 이메일을 읽습니다.",
+      "DEGRADED": "도우미의 모델을 현재 이용할 수 없습니다. 상담원에게 연락하려면 ‘상담원과 대화하기’를 선택하세요.",
+      "TOO_LONG": "메시지가 너무 길어 채팅으로 보낼 수 없습니다. 줄여서 다시 보내세요."
+    },
+    "support": {
+      "support.notice": "메시지는 답변을 위해 Anthropic의 Claude로 전송됩니다. 여기에 입력한 내용은 저희가 저장하지 않습니다.",
+      "support.humanAddress": "상담원에게 연락하려면 다음 주소로 이메일을 보내세요: {address}. 이 채팅은 메시지를 다른 사람에게 전달할 수 없습니다.",
+      "support.tooLong": "메시지가 너무 길어 채팅으로 보낼 수 없습니다. 줄여서 다시 보내세요.",
+      "support.helpUnavailable": "도움말을 불러오지 못했습니다. 페이지를 새로고침하여 다시 시도하세요.",
+      "support.escalateBody": "이 채팅은 아무것도 저장하지 않으며 메시지를 다른 사람에게 전달할 수 없습니다. 저희에게 이메일을 보내면 상담원이 읽습니다.",
+      "support.agentLead": "공개된 제품 안내를 바탕으로 답변하고 출처를 밝히며, 답변할 수 없을 때는 저희 지원 이메일 주소를 보여 줍니다.",
+      "support.aiBanner": "답변은 AI가 생성하고 기계 판독 가능 표시가 있으며 틀릴 수 있습니다."
+    },
+    "home": {
+      "home.aiBanner": "답변은 AI가 생성하고 기계 판독 가능 표시가 있으며 틀릴 수 있습니다."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "지원 도우미는 AI 시스템입니다. 상담원의 도움이 필요하면",
+      "settings.transparency.supportTail": "메뉴에서 ‘상담원과 대화하기’를 선택하세요."
+    },
+    "consent": {
+      "consent.preferences.lede": "21개 항목 모두 서비스가 작동하는 데 필요합니다. 필수가 아닌 항목은 없으며, 다른 누구와도 공유하지 않습니다."
+    },
+    "capability": {
+      "help-desk": "지원 대화 및 지원 이메일 주소"
+    },
+    "members": {
+      "REFUSE_INJECTION": "메시지는 기록되었습니다.",
+      "REFUSE_SAFETY": "상담원이 메시지를 읽습니다.",
+      "DEGRADED": "상담원에게 메시지를 남길 수는 있습니다. ‘상담원과 대화하기’를 선택하세요.",
+      "support.escalateBody": "상담원에게 전달하면 전체 대화를 읽습니다.",
+      "support.agentLead": "답변할 수 없을 때는 상담원에게 연결합니다.",
+      "support.aiBanner": "언제든 사람의 지원을 요청하세요.",
+      "home.aiBanner": "언제든 사람의 지원을 요청하세요.",
+      "settings.transparency.supportTail": "‘상담원과 대화하기’ 또는 ‘상담원에게 전달’을 선택하세요"
+    }
+  },
+  "lt": {
+    "templates": {
+      "REFUSE_INJECTION": "Vadovaujuosi tik paties produkto nurodymais, todėl šį prašymą praleisiu. Klauskite apie produktą arba pasirinkite „Kalbėtis su žmogumi“.",
+      "REFUSE_SAFETY": "Čia reikia žmogaus, o ne asistento. Pasirinkite „Kalbėtis su žmogumi“ ir rašykite parodytu adresu; žmogus tai perskaito.",
+      "DEGRADED": "Asistento modelis šiuo metu nepasiekiamas. Norėdami susisiekti su žmogumi, pasirinkite „Kalbėtis su žmogumi“.",
+      "TOO_LONG": "Jūsų pranešimas per ilgas pokalbiui. Sutrumpinkite jį ir išsiųskite dar kartą."
+    },
+    "support": {
+      "support.notice": "Jūsų pranešimai siunčiami Anthropic modeliui Claude, kad jis galėtų atsakyti. Mes nesaugome nieko, ką čia rašote.",
+      "support.humanAddress": "Norėdami susisiekti su žmogumi, rašykite adresu {address}. Šis pokalbis negali persiųsti jūsų pranešimo.",
+      "support.tooLong": "Jūsų pranešimas per ilgas pokalbiui. Sutrumpinkite jį ir išsiųskite dar kartą.",
+      "support.helpUnavailable": "Pagalbos turinio nepavyko įkelti. Norėdami bandyti dar kartą, įkelkite puslapį iš naujo.",
+      "support.escalateBody": "Šis pokalbis nieko nesaugo ir negali persiųsti jūsų pranešimo. Parašykite mums, o laišką skaito žmogus.",
+      "support.agentLead": "Jis atsako remdamasis vieša informacija apie produktą, nurodo šaltinį ir parodo mūsų pagalbos el. pašto adresą, kai negali padėti.",
+      "support.aiBanner": "Atsakymus generuoja DI, jie pažymėti kompiuterio skaitoma žyma ir gali būti klaidingi."
+    },
+    "home": {
+      "home.aiBanner": "Atsakymus generuoja DI, jie pažymėti kompiuterio skaitoma žyma ir gali būti klaidingi."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "Pagalbos asistentas yra DI sistema. Norėdami paprašyti žmogaus pagalbos, skiltyje",
+      "settings.transparency.supportTail": "pasirinkite „Kalbėtis su žmogumi“."
+    },
+    "consent": {
+      "consent.preferences.lede": "21 įrašas, kiekvienas būtinas, kad paslauga veiktų. Čia nėra nieko neprivalomo, ir niekuo nesidalijama su kitais."
+    },
+    "capability": {
+      "help-desk": "Pagalbos pokalbiai ir pagalbos el. pašto adresas"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Jūsų pranešimas įrašytas.",
+      "REFUSE_SAFETY": "ir žmogus perskaitys jūsų pranešimą.",
+      "DEGRADED": "Vis tiek galite palikti pranešimą žmogui: pasirinkite „Kalbėtis su žmogumi“.",
+      "support.escalateBody": "Perduokite pokalbį žmogui, kuris perskaitys visą susirašinėjimą.",
+      "support.agentLead": "ir perduoda pokalbį žmogui, kai negali padėti.",
+      "support.aiBanner": "Bet kada galite paprašyti žmogaus pagalbos.",
+      "home.aiBanner": "Bet kada galite paprašyti žmogaus pagalbos.",
+      "settings.transparency.supportTail": "pasirinkite „Kalbėtis su žmogumi“ arba „Perduoti pokalbį žmogui“"
+    }
+  },
+  "lv": {
+    "templates": {
+      "REFUSE_INJECTION": "Es ievēroju tikai paša produkta norādījumus, tāpēc šo pieprasījumu izlaidīšu. Jautājiet par produktu vai izvēlieties “Runāt ar cilvēku”.",
+      "REFUSE_SAFETY": "Šeit ir vajadzīgs cilvēks, nevis asistents. Izvēlieties “Runāt ar cilvēku” un rakstiet uz parādīto adresi; cilvēks izlasa uzrakstīto.",
+      "DEGRADED": "Asistenta modelis pašlaik nav pieejams. Lai sazinātos ar cilvēku, izvēlieties “Runāt ar cilvēku”.",
+      "TOO_LONG": "Jūsu ziņojums ir pārāk garš šai tērzēšanai. Saīsiniet to un nosūtiet vēlreiz."
+    },
+    "support": {
+      "support.notice": "Jūsu ziņojumi tiek sūtīti Anthropic modelim Claude, lai tas varētu atbildēt. Mēs neglabājam neko, ko jūs šeit rakstāt.",
+      "support.humanAddress": "Lai sazinātos ar cilvēku, rakstiet uz e-pasta adresi {address}. Šī tērzēšana nevar pārsūtīt jūsu ziņojumu tālāk.",
+      "support.tooLong": "Jūsu ziņojums ir pārāk garš šai tērzēšanai. Saīsiniet to un nosūtiet vēlreiz.",
+      "support.helpUnavailable": "Palīdzības saturu neizdevās ielādēt. Lai mēģinātu vēlreiz, atkārtoti ielādējiet lapu.",
+      "support.escalateBody": "Šī tērzēšana neglabā neko un nevar pārsūtīt jūsu ziņojumu tālāk. Rakstiet mums, un to izlasa cilvēks.",
+      "support.agentLead": "Tas atbild, balstoties uz publisku informāciju par produktu, norāda savu avotu un parāda mūsu atbalsta e-pasta adresi, ja nevar palīdzēt.",
+      "support.aiBanner": "Atbildes ģenerē MI, tās ir mašīnlasāmi marķētas un var būt kļūdainas."
+    },
+    "home": {
+      "home.aiBanner": "Atbildes ģenerē MI, tās ir mašīnlasāmi marķētas un var būt kļūdainas."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "Atbalsta asistents ir MI sistēma. Lai lūgtu cilvēka palīdzību, sadaļā",
+      "settings.transparency.supportTail": "izmantojiet „Runāt ar cilvēku”."
+    },
+    "consent": {
+      "consent.preferences.lede": "21 ieraksts, katrs nepieciešams, lai pakalpojums darbotos. Šeit nav nekā neobligāta, un nekas netiek kopīgots ar citiem."
+    },
+    "capability": {
+      "help-desk": "Atbalsta sarunas un atbalsta e-pasta adrese"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Jūsu ziņojums ir reģistrēts.",
+      "REFUSE_SAFETY": "un cilvēks izlasīs jūsu ziņojumu.",
+      "DEGRADED": "Joprojām varat atstāt ziņojumu cilvēkam: izvēlieties “Runāt ar cilvēku”.",
+      "support.escalateBody": "Nododiet sarunu cilvēkam, kurš izlasīs visu saraksti.",
+      "support.agentLead": "un nodod sarunu cilvēkam, ja nevar palīdzēt.",
+      "support.aiBanner": "Jebkurā brīdī varat lūgt cilvēka palīdzību.",
+      "home.aiBanner": "Jebkurā brīdī varat lūgt cilvēka palīdzību.",
+      "settings.transparency.supportTail": "izmantojiet „Runāt ar cilvēku” vai „Nodot sarunu cilvēkam”"
+    }
+  },
+  "mt": {
+    "templates": {
+      "REFUSE_INJECTION": "Insegwi biss l-istruzzjonijiet tal-prodott stess, għalhekk se naqbeż dik it-talba. Staqsini dwar il-prodott, jew agħżel “Tkellem ma’ persuna”.",
+      "REFUSE_SAFETY": "Għal dan hemm bżonn persuna, mhux assistent. Agħżel “Tkellem ma’ persuna”, imbagħad ibgħat email lill-indirizz li jintwera; persuna taqra dak li tibgħat.",
+      "DEGRADED": "Il-mudell tal-assistent mhuwiex disponibbli bħalissa. Biex tilħaq persuna, agħżel “Tkellem ma’ persuna”.",
+      "TOO_LONG": "Il-messaġġ tiegħek huwa twil wisq għal din il-konverżazzjoni. Qassar il-messaġġ u erġa’ ibgħat."
+    },
+    "support": {
+      "support.notice": "Il-messaġġi tiegħek jintbagħtu lil Claude ta’ Anthropic biex ikun jista’ jwieġeb. Aħna ma nżommu xejn minn dak li tikteb hawn.",
+      "support.humanAddress": "Biex tilħaq persuna, ikteb lil {address}. Din il-konverżazzjoni ma tistax tgħaddi l-messaġġ tiegħek.",
+      "support.tooLong": "Il-messaġġ tiegħek huwa twil wisq għal din il-konverżazzjoni. Qassar il-messaġġ u erġa’ ibgħat.",
+      "support.helpUnavailable": "Il-kontenut tal-għajnuna ma setax jitgħabba. Erġa’ tella’ l-paġna biex tipprova mill-ġdid.",
+      "support.escalateBody": "Din il-konverżazzjoni ma żżommx xejn u ma tistax tgħaddi l-messaġġ tiegħek. Ikteb lilna u persuna taqra dak li tikteb.",
+      "support.agentLead": "Iwieġeb abbażi ta’ gwida pubblika dwar il-prodott, jikkwota s-sors tiegħu, u juri l-indirizz tal-email tal-appoġġ tagħna meta ma jkunx jista’ jgħin.",
+      "support.aiBanner": "It-tweġibiet huma ġġenerati mill-IA, immarkati b’mod li jista’ jinqara minn magna, u jistgħu jkunu żbaljati."
+    },
+    "home": {
+      "home.aiBanner": "It-tweġibiet huma ġġenerati mill-IA, immarkati b’mod li jista’ jinqara minn magna, u jistgħu jkunu żbaljati."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "L-assistent tal-appoġġ huwa sistema tal-IA. Uża “Tkellem ma’ persuna” fit-taqsima"
+    },
+    "consent": {
+      "consent.preferences.lede": "21 oġġett, kull wieħed meħtieġ biex is-servizz jaħdem. Xejn hawn mhu fakultattiv, u xejn ma jinqasam ma’ ħaddieħor."
+    },
+    "capability": {
+      "help-desk": "Konversazzjonijiet ta’ appoġġ u l-indirizz tal-email tal-appoġġ"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Il-messaġġ tiegħek ġie rreġistrat.",
+      "REFUSE_SAFETY": "u persuna taqra l-messaġġ tiegħek.",
+      "DEGRADED": "Xorta tista' tħalli messaġġ lil persuna: agħżel “Tkellem ma’ persuna”.",
+      "support.escalateBody": "Għaddi l-każ lil persuna u hi taqra l-konverżazzjoni kollha.",
+      "support.agentLead": "u jgħaddi l-konverżazzjoni lil persuna meta ma jkunx jista’ jgħin.",
+      "support.aiBanner": "Tista’ titlob persuna fi kwalunkwe ħin.",
+      "home.aiBanner": "Tista’ titlob persuna fi kwalunkwe ħin.",
+      "settings.transparency.supportLead": "Uża “Tkellem ma’ persuna” jew “Għaddi l-każ lil persuna” fit-taqsima"
+    }
+  },
+  "nl": {
+    "templates": {
+      "REFUSE_INJECTION": "Ik volg alleen de eigen instructies van het product en sla dat verzoek daarom over. Stel me een vraag over het product of kies 'Met een medewerker praten'.",
+      "REFUSE_SAFETY": "Hiervoor is een medewerker nodig, geen assistent. Kies 'Met een medewerker praten' en schrijf naar het adres dat wordt getoond; een medewerker leest wat u stuurt.",
+      "DEGRADED": "Het model van de assistent is momenteel niet beschikbaar. Kies 'Met een medewerker praten' om een medewerker te bereiken.",
+      "TOO_LONG": "Uw bericht is te lang voor de chat. Kort het in en verstuur het opnieuw."
+    },
+    "support": {
+      "support.notice": "Uw berichten worden naar Claude van Anthropic gestuurd, zodat Claude kan antwoorden. Wij bewaren niets van wat u hier schrijft.",
+      "support.humanAddress": "Om een medewerker te bereiken, schrijft u naar {address}. Deze chat kan uw bericht niet doorgeven.",
+      "support.tooLong": "Uw bericht is te lang voor de chat. Kort het in en verstuur het opnieuw.",
+      "support.helpUnavailable": "De hulp kon niet worden geladen. Laad de pagina opnieuw om het nog eens te proberen.",
+      "support.escalateBody": "Deze chat bewaart niets en kan uw bericht niet doorgeven. Schrijf ons, dan leest een medewerker uw bericht.",
+      "support.agentLead": "Hij antwoordt op basis van openbare productinformatie, vermeldt zijn bron en toont ons ondersteuningsadres als hij niet verder kan helpen.",
+      "support.aiBanner": "Antwoorden worden door AI gegenereerd, zijn machineleesbaar gemarkeerd en kunnen fout zijn."
+    },
+    "home": {
+      "home.aiBanner": "Antwoorden worden door AI gegenereerd, zijn machineleesbaar gemarkeerd en kunnen fout zijn."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "De ondersteuningsassistent is een AI-systeem. Gebruik ‘Met een medewerker praten’ in"
+    },
+    "consent": {
+      "consent.preferences.lede": "21 items, elk nodig om de dienst te laten werken. Niets hiervan is optioneel en niets wordt met anderen gedeeld."
+    },
+    "capability": {
+      "help-desk": "Supportgesprekken en het e-mailadres van de support"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Uw bericht is vastgelegd.",
+      "REFUSE_SAFETY": "een medewerker zal uw bericht lezen.",
+      "DEGRADED": "U kunt nog steeds een bericht achterlaten voor een medewerker: kies 'Met een medewerker praten'.",
+      "support.escalateBody": "Zet het gesprek door, waarna een medewerker de volledige conversatie leest.",
+      "support.agentLead": "en draagt het gesprek over aan een medewerker als hij niet verder kan helpen.",
+      "support.aiBanner": "Vraag op elk moment om een medewerker.",
+      "home.aiBanner": "Vraag op elk moment om een medewerker.",
+      "settings.transparency.supportLead": "Gebruik ‘Met een medewerker praten’ of ‘Doorzetten naar een medewerker’ in"
+    }
+  },
+  "pl": {
+    "templates": {
+      "REFUSE_INJECTION": "Wykonuję wyłącznie instrukcje samego produktu, dlatego pominę tę prośbę. Proszę zapytać o produkt lub wybrać opcję „Porozmawiaj z człowiekiem”.",
+      "REFUSE_SAFETY": "Ta sprawa wymaga pomocy człowieka, a nie asystenta. Proszę wybrać opcję „Porozmawiaj z człowiekiem” i napisać na wyświetlany przez nią adres; człowiek to przeczyta.",
+      "DEGRADED": "Model asystenta jest obecnie niedostępny. Aby skontaktować się z człowiekiem, proszę wybrać opcję „Porozmawiaj z człowiekiem”.",
+      "TOO_LONG": "Państwa wiadomość jest zbyt długa jak na czat. Proszę ją skrócić i wysłać ponownie."
+    },
+    "support": {
+      "support.notice": "Państwa wiadomości są przekazywane do modelu Claude firmy Anthropic, aby mógł Państwu odpowiedzieć. Nie przechowujemy niczego, co tutaj Państwo piszą.",
+      "support.humanAddress": "Aby skontaktować się z człowiekiem, proszę napisać na adres {address}. Ten czat nie może przekazać Państwa wiadomości dalej.",
+      "support.tooLong": "Państwa wiadomość jest zbyt długa jak na czat. Proszę ją skrócić i wysłać ponownie.",
+      "support.helpUnavailable": "Nie udało się wczytać pomocy. Proszę odświeżyć stronę, aby spróbować ponownie.",
+      "support.escalateBody": "Ten czat niczego nie przechowuje i nie może przekazać Państwa wiadomości dalej. Proszę do nas napisać, a człowiek to przeczyta.",
+      "support.agentLead": "Odpowiada na podstawie publicznych informacji o produkcie, podaje źródło i wyświetla nasz adres pomocy technicznej, gdy nie może pomóc.",
+      "support.aiBanner": "Odpowiedzi są generowane przez AI, oznaczone w sposób możliwy do odczytu maszynowego i mogą być błędne."
+    },
+    "home": {
+      "home.aiBanner": "Odpowiedzi są generowane przez AI, oznaczone w sposób możliwy do odczytu maszynowego i mogą być błędne."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "Asystent pomocy technicznej jest systemem AI. Aby poprosić o pomoc człowieka, wybierz „Porozmawiaj z człowiekiem” w sekcji"
+    },
+    "consent": {
+      "consent.preferences.lede": "21 elementów, każdy niezbędny do działania usługi. Nic tutaj nie jest opcjonalne i nic nie jest udostępniane komukolwiek innemu."
+    },
+    "capability": {
+      "help-desk": "Rozmowy z pomocą techniczną i adres e-mail pomocy technicznej"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Państwa wiadomość została zarejestrowana.",
+      "REFUSE_SAFETY": "a człowiek przeczyta Państwa wiadomość.",
+      "DEGRADED": "Nadal mogą Państwo zostawić wiadomość dla człowieka: proszę wybrać opcję „Porozmawiaj z człowiekiem”.",
+      "support.escalateBody": "Proszę przekazać sprawę człowiekowi, który przeczyta cały wątek.",
+      "support.agentLead": "i przekazuje rozmowę człowiekowi, gdy nie może pomóc.",
+      "support.aiBanner": "W każdej chwili możesz poprosić o kontakt z człowiekiem.",
+      "home.aiBanner": "W każdej chwili możesz poprosić o kontakt z człowiekiem.",
+      "settings.transparency.supportLead": "wybierz „Porozmawiaj z człowiekiem” lub „Przekaż człowiekowi” w sekcji"
+    }
+  },
+  "pt": {
+    "templates": {
+      "REFUSE_INJECTION": "Sigo apenas as instruções do próprio produto, por isso ignorarei esse pedido. Pergunte-me sobre o produto ou selecione «Falar com uma pessoa».",
+      "REFUSE_SAFETY": "Este assunto requer uma pessoa, não um assistente. Selecione «Falar com uma pessoa» e escreva para o endereço que aparece; uma pessoa lê o que lá escrever.",
+      "DEGRADED": "O modelo do assistente não está disponível neste momento. Para contactar uma pessoa, selecione «Falar com uma pessoa».",
+      "TOO_LONG": "A sua mensagem é demasiado longa para o chat. Encurte-a e envie-a novamente."
+    },
+    "support": {
+      "support.notice": "As suas mensagens são enviadas para o Claude, da Anthropic, para que possa responder. Não guardamos nada do que escreve aqui.",
+      "support.humanAddress": "Para contactar uma pessoa, escreva para {address}. Este chat não pode reencaminhar a sua mensagem.",
+      "support.tooLong": "A sua mensagem é demasiado longa para o chat. Encurte-a e envie-a novamente.",
+      "support.helpUnavailable": "Não foi possível carregar a ajuda. Recarregue a página para tentar novamente.",
+      "support.escalateBody": "Este chat não guarda nada e não pode reencaminhar a sua mensagem. Escreva-nos e uma pessoa lê a sua mensagem.",
+      "support.agentLead": "Responde com base em orientações públicas sobre o produto, cita a sua fonte e mostra o nosso endereço de apoio quando não consegue ajudar.",
+      "support.aiBanner": "As respostas são geradas por IA, marcadas de forma legível por máquina e podem estar erradas."
+    },
+    "home": {
+      "home.aiBanner": "As respostas são geradas por IA, marcadas de forma legível por máquina e podem estar erradas."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "O assistente de apoio é um sistema de IA. Utilize «Falar com uma pessoa» em"
+    },
+    "consent": {
+      "consent.preferences.lede": "21 itens, cada um necessário para o serviço funcionar. Nada aqui é opcional e nada é partilhado com mais ninguém."
+    },
+    "capability": {
+      "help-desk": "Conversas de apoio e o endereço de email de apoio"
+    },
+    "members": {
+      "REFUSE_INJECTION": "A sua mensagem foi registada.",
+      "REFUSE_SAFETY": "e uma pessoa lerá a sua mensagem.",
+      "DEGRADED": "Ainda pode deixar uma mensagem para uma pessoa: selecione «Falar com uma pessoa».",
+      "support.escalateBody": "Encaminhe o caso para uma pessoa, que lerá toda a conversa.",
+      "support.agentLead": "e encaminha a conversa para uma pessoa quando não consegue ajudar.",
+      "support.aiBanner": "Pode pedir para falar com uma pessoa a qualquer momento.",
+      "home.aiBanner": "Pode pedir para falar com uma pessoa a qualquer momento.",
+      "settings.transparency.supportLead": "Utilize «Falar com uma pessoa» ou «Encaminhar para uma pessoa» em"
+    }
+  },
+  "ro": {
+    "templates": {
+      "REFUSE_INJECTION": "Urmez doar instrucțiunile produsului, așa că voi sări peste această cerere. Întreabă-mă despre produs sau alege „Vorbiți cu o persoană”.",
+      "REFUSE_SAFETY": "Aici e nevoie de o persoană, nu de un asistent. Alege „Vorbiți cu o persoană” și scrie la adresa pe care o afișează; o persoană citește emailul.",
+      "DEGRADED": "Modelul asistentului nu este disponibil acum. Pentru a ajunge la o persoană, alege „Vorbiți cu o persoană”.",
+      "TOO_LONG": "Mesajul tău este prea lung pentru chat. Scurtează-l și trimite-l din nou."
+    },
+    "support": {
+      "support.notice": "Mesajele dumneavoastră sunt trimise către Claude de la Anthropic, ca să vă poată răspunde. Nu păstrăm nimic din ce scrieți aici.",
+      "support.humanAddress": "Pentru a ajunge la o persoană, scrieți la {address}. Acest chat nu vă poate transmite mesajul mai departe.",
+      "support.tooLong": "Mesajul tău este prea lung pentru chat. Scurtează-l și trimite-l din nou.",
+      "support.helpUnavailable": "Ajutorul nu a putut fi încărcat. Reîncărcați pagina pentru a încerca din nou.",
+      "support.escalateBody": "Acest chat nu păstrează nimic și nu vă poate transmite mesajul mai departe. Scrieți-ne și o persoană îl citește.",
+      "support.agentLead": "Răspunde pe baza îndrumărilor publice despre produs, își citează sursa și vă arată adresa noastră de asistență atunci când nu poate ajuta.",
+      "support.aiBanner": "Răspunsurile sunt generate de IA, marcate într-un format care poate fi citit automat și pot fi greșite."
+    },
+    "home": {
+      "home.aiBanner": "Răspunsurile sunt generate de IA, marcate într-un format care poate fi citit automat și pot fi greșite."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "Asistentul de suport este un sistem de IA. Folosiți „Vorbiți cu o persoană” în"
+    },
+    "consent": {
+      "consent.preferences.lede": "21 de elemente, fiecare necesar pentru funcționarea serviciului. Nimic de aici nu este opțional și nimic nu este împărtășit cu altcineva."
+    },
+    "catalog": {
+      "help-desk.label": "Conversații de asistență și adresa de email de asistență",
+      "help-desk.searchTerms": [
+        "ajutor",
+        "asistență",
+        "email",
+        "persoană",
+        "stare"
+      ],
+      "settings-help-menus.guideLabels": []
+    },
+    "members": {
+      "REFUSE_INJECTION": "Mesajul tău a fost înregistrat.",
+      "REFUSE_SAFETY": "și o persoană îți va citi mesajul.",
+      "DEGRADED": "Poți totuși lăsa un mesaj pentru o persoană: alege „Vorbiți cu o persoană”.",
+      "support.escalateBody": "Escaladați, iar o persoană va citi întregul fir.",
+      "support.agentLead": "și transferă conversația unei persoane atunci când nu poate ajuta.",
+      "support.aiBanner": "Puteți cere oricând intervenția unei persoane.",
+      "home.aiBanner": "Puteți cere oricând intervenția unei persoane.",
+      "settings.transparency.supportLead": "Folosiți „Discutați cu o persoană” sau „Escaladați către o persoană” în",
+      "support-cases:14": "pentru a crea un caz asincron.",
+      "settings-help-menus:18": "Escaladează către o persoană creează un transfer separat, iar emailul de asistență este un flux separat de mail.",
+      "settings-help-menus:20": "Un caz uman poate include conversația;",
+      "app-navigation:21": "Emailul de asistență și „Escaladați către o persoană” sunt fluxuri separate de asistență umană.",
+      "ai-transparency:23": "Pentru a cere ajutorul unei persoane, folosește „Vorbiți cu o persoană” sau „Escaladați către o persoană” în Ajutor."
+    }
+  },
+  "ru": {
+    "templates": {
+      "REFUSE_INJECTION": "Я следую только инструкциям самого продукта, поэтому пропущу этот запрос. Спросите меня о продукте или выберите «Поговорить с человеком».",
+      "REFUSE_SAFETY": "Здесь нужен человек, а не помощник. Выберите «Поговорить с человеком» и напишите на адрес, который там показан; человек прочитает ваше письмо.",
+      "DEGRADED": "Модель помощника сейчас недоступна. Чтобы связаться с человеком, выберите «Поговорить с человеком».",
+      "TOO_LONG": "Ваше сообщение слишком длинное для чата. Сократите его и отправьте снова."
+    },
+    "support": {
+      "support.notice": "Ваши сообщения отправляются в Claude от Anthropic, чтобы он мог ответить. Мы ничего не храним из того, что вы здесь пишете.",
+      "support.humanAddress": "Чтобы связаться с человеком, напишите на адрес {address}. Этот чат не может передать ваше сообщение дальше.",
+      "support.tooLong": "Ваше сообщение слишком длинное для чата. Сократите его и отправьте снова.",
+      "support.helpUnavailable": "Справку не удалось загрузить. Перезагрузите страницу, чтобы повторить попытку.",
+      "support.escalateBody": "Этот чат ничего не хранит и не может передать ваше сообщение дальше. Напишите нам, и человек прочитает ваше письмо.",
+      "support.agentLead": "Он отвечает на основе общедоступной информации о продукте, указывает источник и показывает наш адрес поддержки, если не может помочь.",
+      "support.aiBanner": "Ответы создаются ИИ, имеют машиночитаемую маркировку и могут быть ошибочными."
+    },
+    "home": {
+      "home.aiBanner": "Ответы создаются ИИ, имеют машиночитаемую маркировку и могут быть ошибочными."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "Ассистент службы поддержки — система ИИ. Чтобы запросить помощь человека, откройте раздел",
+      "settings.transparency.supportTail": "и выберите «Поговорить с человеком»."
+    },
+    "consent": {
+      "consent.preferences.lede": "21 элемент, каждый из которых нужен для работы сервиса. Здесь нет ничего необязательного, и ничего не передаётся другим."
+    },
+    "capability": {
+      "help-desk": "Разговоры с поддержкой и адрес электронной почты поддержки"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Ваше сообщение записано.",
+      "REFUSE_SAFETY": "и он прочитает ваше сообщение.",
+      "DEGRADED": "Вы по-прежнему можете оставить сообщение человеку: выберите «Поговорить с человеком».",
+      "support.escalateBody": "Передайте обращение человеку: он прочитает всю переписку.",
+      "support.agentLead": "и передаёт разговор человеку, если не может помочь.",
+      "support.aiBanner": "В любой момент можно попросить подключить человека.",
+      "home.aiBanner": "В любой момент можно попросить подключить человека.",
+      "settings.transparency.supportTail": "выберите «Поговорить с человеком» или «Передать человеку»"
+    }
+  },
+  "sk": {
+    "templates": {
+      "REFUSE_INJECTION": "Riadim sa iba pokynmi samotného produktu, preto túto požiadavku preskočím. Opýtajte sa ma na produkt alebo vyberte „Porozprávať sa s človekom“.",
+      "REFUSE_SAFETY": "Toto musí riešiť človek, nie asistent. Vyberte „Porozprávať sa s človekom“ a napíšte na adresu, ktorú zobrazí; človek si to prečíta.",
+      "DEGRADED": "Model asistenta momentálne nie je dostupný. Ak sa chcete spojiť s človekom, vyberte „Porozprávať sa s človekom“.",
+      "TOO_LONG": "Vaša správa je na chat príliš dlhá. Skráťte ju a odošlite znova."
+    },
+    "support": {
+      "support.notice": "Vaše správy sa odosielajú modelu Claude od spoločnosti Anthropic, aby vám mohol odpovedať. Nič, čo tu napíšete, neuchovávame.",
+      "support.humanAddress": "Ak sa chcete spojiť s človekom, napíšte na adresu {address}. Tento chat nemôže vašu správu odovzdať ďalej.",
+      "support.tooLong": "Vaša správa je na chat príliš dlhá. Skráťte ju a odošlite znova.",
+      "support.helpUnavailable": "Nepodarilo sa načítať pomoc. Znova načítajte stránku a skúste to ešte raz.",
+      "support.escalateBody": "Tento chat nič neuchováva a nemôže vašu správu odovzdať ďalej. Napíšte nám a človek si ju prečíta.",
+      "support.agentLead": "Odpovedá na základe verejných informácií o produkte, uvádza svoj zdroj a zobrazí našu adresu podpory, keď nevie pomôcť.",
+      "support.aiBanner": "Odpovede sú vytvorené AI, strojovo čitateľne označené a môžu byť nesprávne."
+    },
+    "home": {
+      "home.aiBanner": "Odpovede sú vytvorené AI, strojovo čitateľne označené a môžu byť nesprávne."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "Asistent podpory je systém AI. Ak chcete požiadať o pomoc človeka, v časti",
+      "settings.transparency.supportTail": "vyberte možnosť „Porozprávať sa s človekom“."
+    },
+    "consent": {
+      "consent.preferences.lede": "21 položiek, každá nevyhnutná na fungovanie služby. Nič z toho nie je voliteľné a nič sa nezdieľa s nikým iným."
+    },
+    "capability": {
+      "help-desk": "Konverzácie s podporou a e-mailová adresa podpory"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Vaša správa bola zaznamenaná.",
+      "REFUSE_SAFETY": "a človek si prečíta vašu správu.",
+      "DEGRADED": "Stále môžete nechať správu človeku: vyberte „Porozprávať sa s človekom“.",
+      "support.escalateBody": "Postúpte konverzáciu človeku, ktorý si prečíta celé vlákno.",
+      "support.agentLead": "a odovzdá konverzáciu človeku, keď nevie pomôcť.",
+      "support.aiBanner": "Kedykoľvek môžete požiadať o pomoc človeka.",
+      "home.aiBanner": "Kedykoľvek môžete požiadať o pomoc človeka.",
+      "settings.transparency.supportTail": "vyberte možnosť „Porozprávať sa s človekom“ alebo „Postúpiť človeku“"
+    }
+  },
+  "sl": {
+    "templates": {
+      "REFUSE_INJECTION": "Upoštevam samo navodila samega izdelka, zato bo ta zahteva prezrta. Vprašajte me o izdelku ali izberite »Pogovori se z osebo«.",
+      "REFUSE_SAFETY": "To mora obravnavati oseba, ne pomočnik. Izberite »Pogovori se z osebo« in napišite na naslov, ki ga prikaže; oseba bo prebrala, kar boste napisali.",
+      "DEGRADED": "Pomočnikov model trenutno ni na voljo. Če želite doseči osebo, izberite »Pogovori se z osebo«.",
+      "TOO_LONG": "Vaše sporočilo je za klepet predolgo. Skrajšajte ga in ga pošljite znova."
+    },
+    "support": {
+      "support.notice": "Vaša sporočila se pošiljajo modelu Claude podjetja Anthropic, da vam lahko odgovori. Ničesar, kar tukaj napišete, ne hranimo.",
+      "support.humanAddress": "Če želite doseči osebo, pišite na naslov {address}. Ta klepet vašega sporočila ne more posredovati naprej.",
+      "support.tooLong": "Vaše sporočilo je za klepet predolgo. Skrajšajte ga in ga pošljite znova.",
+      "support.helpUnavailable": "Pomoči ni bilo mogoče naložiti. Znova naložite stran in poskusite še enkrat.",
+      "support.escalateBody": "Ta klepet ničesar ne hrani in vašega sporočila ne more posredovati naprej. Pišite nam in oseba bo prebrala vaše sporočilo.",
+      "support.agentLead": "Odgovarja na podlagi javnih informacij o izdelku, navede svoj vir in prikaže naš naslov podpore, kadar ne more pomagati.",
+      "support.aiBanner": "Odgovori so ustvarjeni z UI, strojno berljivo označeni in so lahko napačni."
+    },
+    "home": {
+      "home.aiBanner": "Odgovori so ustvarjeni z UI, strojno berljivo označeni in so lahko napačni."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "Pomočnik za podporo je sistem UI. Če želite pomoč človeka, v razdelku",
+      "settings.transparency.supportTail": "izberite »Pogovori se z osebo«."
+    },
+    "consent": {
+      "consent.preferences.lede": "21 elementov, vsak potreben za delovanje storitve. Nič tukaj ni neobvezno in nič se ne deli z nikomer drugim."
+    },
+    "capability": {
+      "help-desk": "Pogovori s podporo in e-poštni naslov podpore"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Vaše sporočilo je bilo zabeleženo.",
+      "REFUSE_SAFETY": "in oseba bo prebrala vaše sporočilo.",
+      "DEGRADED": "Še vedno lahko pustite sporočilo osebi: izberite »Pogovori se z osebo«.",
+      "support.escalateBody": "Predajte pogovor osebi, ki bo prebrala celotno nit.",
+      "support.agentLead": "in pogovor preda osebi, kadar ne more pomagati.",
+      "support.aiBanner": "Kadar koli lahko zahtevate pomoč človeka.",
+      "home.aiBanner": "Kadar koli lahko zahtevate pomoč človeka.",
+      "settings.transparency.supportTail": "izberite »Pogovori se z osebo« ali »Predaj osebi«"
+    }
+  },
+  "sv": {
+    "templates": {
+      "REFUSE_INJECTION": "Jag följer endast produktens egna instruktioner och hoppar därför över den begäran. Fråga mig om produkten eller välj ”Prata med en person”.",
+      "REFUSE_SAFETY": "Det här kräver en person, inte en assistent. Välj ”Prata med en person” och skriv till adressen som visas; en person läser det du skriver.",
+      "DEGRADED": "Assistentens modell är inte tillgänglig just nu. Välj ”Prata med en person” för att nå en person.",
+      "TOO_LONG": "Ditt meddelande är för långt för chatten. Korta ner det och skicka det igen."
+    },
+    "support": {
+      "support.notice": "Dina meddelanden skickas till Claude från Anthropic så att Claude kan svara. Vi sparar inget av det du skriver här.",
+      "support.humanAddress": "För att nå en person, skriv till {address}. Den här chatten kan inte vidarebefordra ditt meddelande.",
+      "support.tooLong": "Ditt meddelande är för långt för chatten. Korta ner det och skicka det igen.",
+      "support.helpUnavailable": "Hjälpen kunde inte laddas. Ladda om sidan och försök igen.",
+      "support.escalateBody": "Den här chatten sparar inget och kan inte vidarebefordra ditt meddelande. Skriv till oss så läser en person det.",
+      "support.agentLead": "Den svarar utifrån offentlig produktvägledning, anger sin källa och visar vår supportadress när den inte kan hjälpa till.",
+      "support.aiBanner": "Svaren är AI-genererade, maskinläsbart märkta och kan vara felaktiga."
+    },
+    "home": {
+      "home.aiBanner": "Svaren är AI-genererade, maskinläsbart märkta och kan vara felaktiga."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "Supportassistenten är ett AI-system. Använd ”Prata med en person” under"
+    },
+    "consent": {
+      "consent.preferences.lede": "21 poster, var och en nödvändig för att tjänsten ska fungera. Inget här är valfritt, och inget delas med någon annan."
+    },
+    "capability": {
+      "help-desk": "Supportsamtal och supportens e-postadress"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Ditt meddelande har registrerats.",
+      "REFUSE_SAFETY": "så läser en person ditt meddelande.",
+      "DEGRADED": "Du kan fortfarande lämna ett meddelande till en person: välj ”Prata med en person”.",
+      "support.escalateBody": "Eskalera så läser en person hela tråden.",
+      "support.agentLead": "och lämnar över till en person när den inte kan hjälpa till.",
+      "support.aiBanner": "Be när som helst att få prata med en person.",
+      "home.aiBanner": "Be när som helst att få prata med en person.",
+      "settings.transparency.supportLead": "Använd ”Prata med en person” eller ”Eskalera till en person” under"
+    }
+  },
+  "tr": {
+    "templates": {
+      "REFUSE_INJECTION": "Yalnızca ürünün kendi talimatlarını izlediğim için bu isteği atlayacağım. Bana ürün hakkında bir şey sorun veya “Bir yetkiliyle görüş” seçeneğini belirleyin.",
+      "REFUSE_SAFETY": "Bu konu bir asistan değil, bir yetkili gerektiriyor. “Bir yetkiliyle görüş” seçeneğini belirleyin ve görüntülenen adrese yazın; bir yetkili yazdıklarınızı okur.",
+      "DEGRADED": "Asistanın modeli şu anda kullanılamıyor. Bir yetkiliye ulaşmak için “Bir yetkiliyle görüş” seçeneğini belirleyin.",
+      "TOO_LONG": "Mesajınız sohbet için çok uzun. Kısaltıp yeniden gönderin."
+    },
+    "support": {
+      "support.notice": "Mesajlarınız, yanıt verebilmesi için Anthropic şirketinin Claude modeline gönderilir. Burada yazdığınız hiçbir şeyi saklamıyoruz.",
+      "support.humanAddress": "Bir yetkiliye ulaşmak için {address} adresine yazın. Bu sohbet mesajınızı başkasına iletemez.",
+      "support.tooLong": "Mesajınız sohbet için çok uzun. Kısaltıp yeniden gönderin.",
+      "support.helpUnavailable": "Yardım yüklenemedi. Yeniden denemek için sayfayı yenileyin.",
+      "support.escalateBody": "Bu sohbet hiçbir şey saklamaz ve mesajınızı iletemez. Bize yazın, bir yetkili okur.",
+      "support.agentLead": "Ürüne ilişkin herkese açık rehberliğe dayanarak yanıt verir, kaynağını belirtir ve yardımcı olamadığında destek adresimizi gösterir.",
+      "support.aiBanner": "Yanıtlar yapay zekâ tarafından üretilir, makinece okunabilir biçimde işaretlenir ve yanlış olabilir."
+    },
+    "home": {
+      "home.aiBanner": "Yanıtlar yapay zekâ tarafından üretilir, makinece okunabilir biçimde işaretlenir ve yanlış olabilir."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "Destek asistanı bir yapay zekâ sistemidir. İnsan yardımı istemek için",
+      "settings.transparency.supportTail": "bölümündeki “Bir yetkiliyle görüş” seçeneğini kullanın."
+    },
+    "consent": {
+      "consent.preferences.lede": "21 öğe; her biri hizmetin çalışması için gerekli. Burada isteğe bağlı hiçbir şey yok ve hiçbir şey başkalarıyla paylaşılmıyor."
+    },
+    "capability": {
+      "help-desk": "Destek konuşmaları ve destek e-posta adresi"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Mesajınız kaydedildi.",
+      "REFUSE_SAFETY": "bir yetkili mesajınızı okuyacaktır.",
+      "DEGRADED": "Yine de bir yetkiliye mesaj bırakabilirsiniz: “Bir yetkiliyle görüş” seçeneğini belirleyin.",
+      "support.escalateBody": "Aktardığınızda bir yetkili tüm yazışmayı okur.",
+      "support.agentLead": "ve yardımcı olamadığında görüşmeyi bir yetkiliye aktarır.",
+      "support.aiBanner": "İstediğiniz zaman bir insanla görüşmeyi talep edin.",
+      "home.aiBanner": "İstediğiniz zaman bir insanla görüşmeyi talep edin.",
+      "settings.transparency.supportTail": "“Bir insanla konuş” veya “Bir insana yönlendir” seçeneklerini kullanın"
+    }
+  },
+  "uk": {
+    "templates": {
+      "REFUSE_INJECTION": "Я виконую лише інструкції самого продукту, тому пропущу цей запит. Запитайте мене про продукт або виберіть «Поговорити з людиною».",
+      "REFUSE_SAFETY": "Тут потрібна людина, а не асистент. Виберіть «Поговорити з людиною» і напишіть на адресу, яку там показано; людина прочитає ваш лист.",
+      "DEGRADED": "Модель асистента зараз недоступна. Щоб зв’язатися з людиною, виберіть «Поговорити з людиною».",
+      "TOO_LONG": "Ваше повідомлення задовге для чату. Скоротіть його й надішліть ще раз."
+    },
+    "support": {
+      "support.notice": "Ваші повідомлення надходять до Claude від Anthropic, щоб він міг відповісти. Ми нічого не зберігаємо з того, що ви тут пишете.",
+      "support.humanAddress": "Щоб зв’язатися з людиною, напишіть на адресу {address}. Цей чат не може передати ваше повідомлення далі.",
+      "support.tooLong": "Ваше повідомлення задовге для чату. Скоротіть його й надішліть ще раз.",
+      "support.helpUnavailable": "Довідку не вдалося завантажити. Перезавантажте сторінку, щоб спробувати ще раз.",
+      "support.escalateBody": "Цей чат нічого не зберігає й не може передати ваше повідомлення далі. Напишіть нам, і людина прочитає ваш лист.",
+      "support.agentLead": "Він відповідає на основі загальнодоступної інформації про продукт, зазначає джерело й показує нашу адресу підтримки, коли не може допомогти.",
+      "support.aiBanner": "Відповіді створює ШІ; вони мають машинозчитуване маркування й можуть бути помилковими."
+    },
+    "home": {
+      "home.aiBanner": "Відповіді створює ШІ; вони мають машинозчитуване маркування й можуть бути помилковими."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "Помічник служби підтримки — це система ШІ. Щоб попросити допомоги людини, виберіть «Поговорити з людиною» в розділі"
+    },
+    "consent": {
+      "consent.preferences.lede": "21 елемент, кожен із яких потрібен для роботи сервісу. Тут немає нічого необов’язкового, і нічого не передається іншим."
+    },
+    "capability": {
+      "help-desk": "Розмови з підтримкою та адреса електронної пошти підтримки"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Ваше повідомлення записано.",
+      "REFUSE_SAFETY": "і вона прочитає ваше повідомлення.",
+      "DEGRADED": "Ви все одно можете залишити повідомлення для людини: виберіть «Поговорити з людиною».",
+      "support.escalateBody": "Передайте звернення людині: вона прочитає всю переписку.",
+      "support.agentLead": "й передає розмову людині, коли не може допомогти.",
+      "support.aiBanner": "Будь-коли попросіть залучити людину.",
+      "home.aiBanner": "Будь-коли попросіть залучити людину.",
+      "settings.transparency.supportLead": "виберіть «Поговорити з людиною» або «Передати людині» в розділі"
+    }
+  },
+  "vi": {
+    "templates": {
+      "REFUSE_INJECTION": "Tôi chỉ làm theo hướng dẫn của chính sản phẩm nên sẽ bỏ qua yêu cầu đó. Hãy hỏi tôi về sản phẩm hoặc chọn “Trò chuyện với nhân viên hỗ trợ”.",
+      "REFUSE_SAFETY": "Việc này cần nhân viên hỗ trợ, không phải trợ lý. Hãy chọn “Trò chuyện với nhân viên hỗ trợ” rồi viết đến địa chỉ được hiển thị; nhân viên sẽ đọc thư đó.",
+      "DEGRADED": "Mô hình của trợ lý hiện không khả dụng. Để liên hệ với nhân viên hỗ trợ, hãy chọn “Trò chuyện với nhân viên hỗ trợ”.",
+      "TOO_LONG": "Tin nhắn của bạn quá dài đối với cuộc trò chuyện này. Hãy rút ngắn rồi gửi lại."
+    },
+    "support": {
+      "support.notice": "Tin nhắn của bạn được gửi đến Claude của Anthropic để Claude có thể trả lời. Chúng tôi không lưu giữ bất kỳ nội dung nào bạn viết ở đây.",
+      "support.humanAddress": "Để liên hệ với nhân viên hỗ trợ, vui lòng viết đến {address}. Cuộc trò chuyện này không thể chuyển tiếp tin nhắn của bạn.",
+      "support.tooLong": "Tin nhắn của bạn quá dài đối với cuộc trò chuyện này. Hãy rút ngắn rồi gửi lại.",
+      "support.helpUnavailable": "Không thể tải phần trợ giúp. Vui lòng tải lại trang để thử lại.",
+      "support.escalateBody": "Cuộc trò chuyện này không lưu giữ gì và không thể chuyển tiếp tin nhắn của bạn. Vui lòng viết thư cho chúng tôi, nhân viên hỗ trợ sẽ đọc thư đó.",
+      "support.agentLead": "Trợ lý trả lời dựa trên hướng dẫn công khai về sản phẩm, nêu nguồn và hiển thị địa chỉ hỗ trợ của chúng tôi khi không thể giúp.",
+      "support.aiBanner": "Phản hồi do AI tạo, có dấu hiệu máy có thể đọc và có thể sai."
+    },
+    "home": {
+      "home.aiBanner": "Phản hồi do AI tạo, có dấu hiệu máy có thể đọc và có thể sai."
+    },
+    "settings": {
+      "settings.transparency.supportLead": "Trợ lý hỗ trợ là một hệ thống AI. Dùng “Trò chuyện với nhân viên hỗ trợ” trong"
+    },
+    "consent": {
+      "consent.preferences.lede": "21 mục, mỗi mục đều cần thiết để dịch vụ hoạt động. Không có gì ở đây là tùy chọn, và không có gì được chia sẻ với bất kỳ ai khác."
+    },
+    "capability": {
+      "help-desk": "Trò chuyện hỗ trợ và địa chỉ email hỗ trợ"
+    },
+    "members": {
+      "REFUSE_INJECTION": "Tin nhắn của bạn đã được ghi lại.",
+      "REFUSE_SAFETY": "và nhân viên sẽ đọc tin nhắn của bạn.",
+      "DEGRADED": "Bạn vẫn có thể để lại tin nhắn cho nhân viên hỗ trợ: hãy chọn “Trò chuyện với nhân viên hỗ trợ”.",
+      "support.escalateBody": "Chuyển tiếp để nhân viên hỗ trợ đọc toàn bộ cuộc trò chuyện.",
+      "support.agentLead": "và chuyển cuộc trò chuyện cho nhân viên hỗ trợ khi không thể giúp.",
+      "support.aiBanner": "Bạn có thể yêu cầu gặp người hỗ trợ bất cứ lúc nào.",
+      "home.aiBanner": "Bạn có thể yêu cầu gặp người hỗ trợ bất cứ lúc nào.",
+      "settings.transparency.supportLead": "Dùng “Trao đổi với nhân viên” hoặc “Chuyển cho nhân viên” trong"
+    }
+  },
+  "zh": {
+    "templates": {
+      "REFUSE_INJECTION": "我只遵循产品本身的指示，因此会跳过这项请求。您可以询问有关产品的问题，或选择“与人工客服交谈”。",
+      "REFUSE_SAFETY": "这需要人工客服处理，而不是助手。请选择“与人工客服交谈”，并写信至其显示的地址；人工客服会阅读来信。",
+      "DEGRADED": "助手所用的模型目前不可用。如需联系人工客服，请选择“与人工客服交谈”。",
+      "TOO_LONG": "您的消息过长，无法在聊天中发送。请缩短后重新发送。"
+    },
+    "support": {
+      "support.notice": "您的消息会发送给 Anthropic 的 Claude，以便它作答。您在此处写下的任何内容，我们都不会保存。",
+      "support.humanAddress": "如需联系人工客服，请写信至 {address}。此聊天无法将您的消息转交给他人。",
+      "support.tooLong": "您的消息过长，无法在聊天中发送。请缩短后重新发送。",
+      "support.helpUnavailable": "无法加载帮助内容。请刷新页面后重试。",
+      "support.escalateBody": "此聊天不会保存任何内容，也无法转交您的消息。请给我们写信，人工客服会阅读来信。",
+      "support.agentLead": "它根据公开的产品指南作答，注明来源，无法解答时会显示我们的支持邮箱地址。",
+      "support.aiBanner": "回复由 AI 生成，带有机器可读标记，并且可能有误。"
+    },
+    "home": {
+      "home.aiBanner": "回复由 AI 生成，带有机器可读标记，并且可能有误。"
+    },
+    "settings": {
+      "settings.transparency.supportLead": "支持助理是一个 AI 系统。请在",
+      "settings.transparency.supportTail": "中使用“与人工客服交谈”来请求人工协助。"
+    },
+    "consent": {
+      "consent.preferences.lede": "21个项目，每一项都是服务运行所必需的。这里没有任何可选项，也不与任何其他方共享。"
+    },
+    "capability": {
+      "help-desk": "支持对话和支持邮箱地址"
+    },
+    "members": {
+      "REFUSE_INJECTION": "您的消息已被记录。",
+      "REFUSE_SAFETY": "人工客服会阅读您的消息。",
+      "DEGRADED": "您仍可给人工客服留言：请选择“与人工客服交谈”。",
+      "support.escalateBody": "转交后，人工客服将阅读完整对话。",
+      "support.agentLead": "无法解答时会转交真人处理。",
+      "support.aiBanner": "您可以随时要求人工协助。",
+      "home.aiBanner": "您可以随时要求人工协助。",
+      "settings.transparency.supportTail": "使用“联系人工”或“升级至人工”"
+    }
+  }
+}

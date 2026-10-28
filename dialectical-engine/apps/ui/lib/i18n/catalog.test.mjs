@@ -5,7 +5,7 @@ import test from "node:test";
 
 import { LOCALES } from "./locales.ts";
 
-const namespaces = ["chrome", "home", "newDebate", "time"];
+const namespaces = ["chrome", "home", "newDebate", "public", "time"];
 const messagesRoot = join(process.cwd(), "messages");
 const readCatalog = (locale, namespace) => JSON.parse(
   readFileSync(join(messagesRoot, locale, `${namespace}.json`), "utf8")
@@ -70,6 +70,58 @@ test("all 35 locales have exact CLDR plural categories, non-plural keys, and pla
           assert.deepEqual(placeholders(value), placeholders(english[key]), `${code}/${namespace}:${key} placeholders`);
         }
       }
+    }
+  }
+});
+
+// Values that equal their English value in a non-English home/public catalogue, measured at 95d36b737
+// (FIX-SF-S01-p1-C): brand and product names, file names, cognates. Any other English value fails.
+const SAME_AS_ENGLISH = {
+  "home.baseScore": ["it", "pt"],
+  "home.crisisSupport.chat": ["cs", "da", "ro", "sk"],
+  "home.crisisSupport.website": ["de", "nl"],
+  "home.finalScore": ["pt", "ro"],
+  "home.models.one": ["cs", "da", "hr", "nl", "pl", "ro", "sk", "sl", "tr"],
+  "home.pro": ["cs", "de", "hu", "id", "ro"],
+  "public.badges.heading": ["fr"],
+  "public.export.filename": ["ar", "bg", "cs", "da", "el", "et", "fi", "fr", "ga", "he", "hi", "hr", "hu", "id", "it", "ja", "ko", "lt", "mt", "nl", "pl", "pt", "sk", "sl", "sv", "tr", "vi", "zh"],
+  "public.honesty.verdict": ["fr", "ro"],
+  "public.overview.baseAndFinalAria": ["pt"],
+  "public.overview.convergence": ["fr"],
+  "public.overview.details": ["de", "nl"],
+  "public.overview.proLabel": ["cs", "de", "hu", "id", "ro"],
+  "public.overview.proSideName": ["cs", "hu", "id", "ro"],
+  "public.report.point.position": ["da", "de", "fr"]
+};
+
+test("no home or public value is left in English outside the measured allow-list (review N8)", () => {
+  for (const namespace of ["home", "public"]) {
+    const english = readCatalog("en", namespace);
+    for (const { code } of LOCALES.filter(({ code }) => code !== "en")) {
+      const catalog = readCatalog(code, namespace);
+      for (const [key, value] of Object.entries(catalog)) {
+        if ((SAME_AS_ENGLISH[key] ?? []).includes(code)) continue;
+        assert.notEqual(value, english[key], `${code}/${namespace}:${key} is the English value`);
+      }
+    }
+  }
+});
+
+test("the flagged card label is in capitals in every locale whose script has them (V-110 default)", () => {
+  for (const { code } of LOCALES) {
+    const label = readCatalog(code, "home")["home.flag.flagged"];
+    const cased = [...label].some((character) => character.toLowerCase() !== character.toUpperCase());
+    if (cased) assert.equal(label, label.toLocaleUpperCase(code), `${code}/home:home.flag.flagged is not in capitals`);
+  }
+});
+
+test("S02's card labels are in capitals in every locale whose script has them (V-110, FIX-SF-S02-p1-W)", () => {
+  for (const { code } of LOCALES) {
+    const home = readCatalog(code, "home");
+    for (const key of ["home.flag.underReview", "home.flag.approved", "home.flag.refused"]) {
+      const label = home[key];
+      const cased = [...label].some((character) => character.toLowerCase() !== character.toUpperCase());
+      if (cased) assert.equal(label, label.toLocaleUpperCase(code), `${code}/home:${key} is not in capitals`);
     }
   }
 });

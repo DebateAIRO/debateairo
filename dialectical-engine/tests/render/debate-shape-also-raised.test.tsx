@@ -25,7 +25,8 @@ const mocks = vi.hoisted(() => ({
   readAnswerMapView: vi.fn(),
   readEvents: vi.fn(),
   readLedgerDigest: vi.fn(),
-  readRunVisibility: vi.fn()
+  readRunVisibility: vi.fn(),
+  readPublicationReview: vi.fn()
 }));
 
 vi.mock("@/lib/api", async (importOriginal) => {
@@ -50,7 +51,8 @@ vi.mock("@/lib/api", async (importOriginal) => {
       readAnswerStory: mocks.readAnswerStory,
       readEvents: mocks.readEvents,
       readLedgerDigest: mocks.readLedgerDigest,
-      readRunVisibility: mocks.readRunVisibility
+      readRunVisibility: mocks.readRunVisibility,
+      readPublicationReview: mocks.readPublicationReview
     },
     getDebateBundle: (id: string, token: string, _client?: unknown, options?: unknown) =>
       actual.getDebateBundle(id, token, readClient as never, options as never)
@@ -211,6 +213,7 @@ beforeEach(() => {
   mocks.readEvents.mockReset().mockResolvedValue([]);
   mocks.readLedgerDigest.mockReset().mockRejectedValue(new Error("not needed by this render test"));
   mocks.readRunVisibility.mockReset().mockResolvedValue({ state: "PRIVATE", public_ref: null });
+    mocks.readPublicationReview.mockReset().mockResolvedValue({ flagged: false, state: "NONE", categories: [], asks_used: 0, may_ask: false, refusal: null });
 });
 
 afterEach(async () => {

@@ -108,7 +108,7 @@
   "settings.transparency.downloadsTail": "המתאר את התוכן שנוצר ואת היעדרה של ביקורת עריכה אנושית. נתוני תשובה מתועדים, מקור המודל ורשומות תפעוליות שומרים על ערכיהם המקוריים.",
   "settings.transparency.markingsLimit": "סימונים אלה מתארים תוכן בממשק ובהורדות שלנו. הם אינם סימן מים או תעודת מקוריות; העתקת טקסט פשוט עשויה להסיר אותם.",
   "settings.transparency.supportTitle": "תמיכה וסיוע אנושי",
-  "settings.transparency.supportLead": "מסייע התמיכה הוא מערכת בינה מלאכותית. השתמשו באפשרות ״שיחה עם נציג אנושי״ או ״העברה לנציג אנושי״ תחת",
+  "settings.transparency.supportLead": "מסייע התמיכה הוא מערכת בינה מלאכותית. השתמשו באפשרות ״שיחה עם נציג אנושי״ תחת",
   "settings.transparency.help": "עזרה",
   "settings.transparency.supportTail": "כדי לבקש סיוע אנושי.",
   "settings.transparency.back": "חזרה אל {brand}",

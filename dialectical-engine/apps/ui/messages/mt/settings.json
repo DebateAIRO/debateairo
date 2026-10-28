@@ -108,7 +108,7 @@
   "settings.transparency.downloadsTail": "li jiddeskrivi l-kontenut iġġenerat u n-nuqqas ta’ rieżami editorjali uman. Id-data rreġistrata tar-risposta, il-provenjenza tal-mudell u r-rekords operattivi jżommu l-valuri oriġinali tagħhom.",
   "settings.transparency.markingsLimit": "Dawn il-marki jiddeskrivu l-kontenut fl-interfaċċa u fit-tniżżil tagħna. Mhumiex marka tal-ilma jew ċertifikat tal-awtentiċità; meta jiġi kkupjat test sempliċi jistgħu jitneħħew.",
   "settings.transparency.supportTitle": "Appoġġ u għajnuna minn persuna",
-  "settings.transparency.supportLead": "L-assistent tal-appoġġ huwa sistema tal-IA. Uża “Tkellem ma’ persuna” jew “Għaddi l-każ lil persuna” fit-taqsima",
+  "settings.transparency.supportLead": "L-assistent tal-appoġġ huwa sistema tal-IA. Uża “Tkellem ma’ persuna” fit-taqsima",
   "settings.transparency.help": "Għajnuna",
   "settings.transparency.supportTail": "biex titlob għajnuna minn persuna.",
   "settings.transparency.back": "Lura għal {brand}",

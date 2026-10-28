@@ -2,9 +2,9 @@
   "DISCLOSURE": "Bonjour — je suis l’assistant d’assistance de Dialectical Engine, une AI. Je peux expliquer le fonctionnement du produit et vous orienter vers la bonne page. Je ne peux pas vous connecter, modifier votre compte ni réinitialiser quoi que ce soit. Pour cela, utilisez les liens que je vous fournis ou demandez à parler à une personne.",
   "NO_SOURCE": "Je n’ai pas de source à ce sujet, je ne vais donc pas émettre d’hypothèse. Posez-moi une autre question sur le fonctionnement des débats ou choisissez « Parler à une personne ».",
   "REFUSE_ZONE": "Je ne peux pas vous aider pour la connexion, les mots de passe, les codes de vérification, l’authentification à deux facteurs, la récupération du compte, la modification de l’adresse e-mail ou la suppression du compte — pas même pour les vérifier. Ces opérations se font uniquement dans les pages de votre compte : {link}. Si cette page ne fonctionne pas, choisissez « Parler à une personne ».",
-  "REFUSE_INJECTION": "Je suis uniquement les instructions propres au produit ; je vais donc ignorer cette demande. Votre message a été enregistré. Posez-moi une question sur le produit ou choisissez « Parler à une personne ».",
-  "REFUSE_SAFETY": "Cette demande nécessite une personne, pas un assistant. Choisissez « Parler à une personne » et une personne lira votre message.",
-  "DEGRADED": "Le modèle de l’assistant est indisponible pour le moment. Vous pouvez tout de même laisser un message à une personne : choisissez « Parler à une personne ».",
+  "REFUSE_INJECTION": "Je suis uniquement les instructions propres au produit ; je vais donc ignorer cette demande. Posez-moi une question sur le produit ou choisissez « Parler à une personne ».",
+  "REFUSE_SAFETY": "Cette demande nécessite une personne, pas un assistant. Choisissez « Parler à une personne » et écrivez à l’adresse affichée ; une personne lit ce que vous écrivez.",
+  "DEGRADED": "Le modèle de l’assistant est indisponible pour le moment. Pour joindre une personne, choisissez « Parler à une personne ».",
   "DISABLED": "L’assistant d’assistance est actuellement désactivé.",
   "RATE_LIMITED": "Vous avez envoyé beaucoup de messages en peu de temps. Veuillez patienter quelques minutes.",
   "RATING": "Cette réponse a-t-elle répondu à votre question ? Oui · Non · Parler à une personne",
@@ -25,5 +25,10 @@
   "INCIDENT_SURFACE_PUBLISHING": "la publication",
   "INCIDENT_SURFACE_SIGN_IN": "la connexion",
   "INCIDENT_SURFACE_WHOLE_SITE": "l’ensemble du site",
-  "COUNTRY_UNAVAILABLE": "Dialectical Engine n’est pas encore disponible dans votre pays."
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine n’est pas encore disponible dans votre pays.",
+  "OFF_TOPIC": "Je ne peux vous aider qu’en ce qui concerne Dialectical Engine : votre compte, les formules, les débats, la publication et nos politiques. Je ne peux pas vous aider à ce sujet.",
+  "OFF_TOPIC_PART": "Je ne peux vous aider qu’en ce qui concerne Dialectical Engine ; je n’ai donc pas répondu au reste de votre message.",
+  "CRISIS_SUPPORT": "Ce que vous avez écrit semble très douloureux, et vous n’avez pas à y faire face sans soutien. Voici où vous pouvez joindre quelqu’un dès maintenant.",
+  "THREAT_LINE": "Je ne peux pas vous aider à ce sujet. Si quelqu’un risque d’être blessé, veuillez demander de l’aide immédiatement.",
+  "TOO_LONG": "Votre message est trop long pour le chat. Raccourcissez-le et envoyez-le de nouveau."
 }

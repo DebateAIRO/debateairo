@@ -79,12 +79,6 @@ export type SupportConversationMessage = Readonly<{
   sources?: readonly SupportSource[];
   /** Canonical first-party actions, exactly as `resolveSupportActions` builds them. */
   actions?: readonly SupportAction[];
-  /**
-   * DL1-F5c: this message says that a case was opened — and says only that.
-   * The code itself and its link are rendered from the bearer the tab holds in
-   * memory; a transcript restored without that bearer shows the notice alone.
-   */
-  caseOpened?: true;
 }>;
 
 export type StoredSupportConversation = Readonly<{
@@ -301,8 +295,7 @@ function storedMessage(
     text: withoutBearer(message.text),
     ...(link === undefined ? {} : { link }),
     ...(message.outcome === undefined ? {} : { outcome: message.outcome }),
-    ...(decorations === undefined ? {} : decorations),
-    ...(message.caseOpened === true ? { caseOpened: true as const } : {})
+    ...(decorations === undefined ? {} : decorations)
   });
 }
 

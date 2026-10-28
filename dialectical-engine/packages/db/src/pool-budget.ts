@@ -66,9 +66,8 @@ export const API_DATABASE_POOLS = Object.freeze({
   evaluatorDevMenu: budget("api:evaluator-dev-menu", 2, 5_000),
   // Opening a support case holds one connection and reads the messages on another.
   support: budget("api:support", 6, 5_000),
-  // Every relay slot the register may allow (16, live, no restart) holds one
-  // for the whole AI call, plus 2 for the queue's bookkeeping.
-  supportRelayLease: budget("api:support-relay-lease", 18, 5_000),
+  // (synthesis-flag S05, V-111/V-114: the relay queue and its call count live in the API's memory, so the
+  // 18-connection api:support-relay-lease pool is gone.)
   // The data export worker (mission data-export S01; opened only when DATA_EXPORT_STORE_PATH is set): one build at a
   // time (single-flight timer) on one connection (V-43). Its 15 s lease renewal queues behind the snapshot read and
   // waits the full 15 s, so a read of up to ~30 s keeps its lease.

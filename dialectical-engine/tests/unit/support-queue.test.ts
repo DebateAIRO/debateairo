@@ -183,24 +183,16 @@ describe("SUP-06 relay queue and daily cap", () => {
     let now = new Date("2026-09-07T12:00:00.000Z");
     const relay = queue({ support_daily_call_cap: 1 },() => now);
     const complete = vi.fn(async () => ({ text: "Open the new debate page." }));
-    const messages = {
-      write: vi.fn(async (input) => ({ ...input,redacted: false })),
-      writeAndTransit: vi.fn(async (input,transit) => {
-        await transit(input.text);
-        return { ...input,redacted: false };
-      }),
-      read: vi.fn(async () => null),listSession: vi.fn(async () => [])
-    } as never;
     const answer = createSupportAnswerService({
       entries: [{
         id: "getting-started-debate",lang: "en",title: "Start a debate",status: "shipped",
         sources: ["test"],verifiedAgainst: "test",ratifiedBy: "V",ratifiedOn: "2026-09-01",
         body: "Open the new debate page to start your first debate."
-      }],messages,modelFor: () => ({ complete }),queue: relay,
+      }],modelFor: () => ({ complete }),queue: relay,
       clock: () => { now = new Date(now.getTime()+1);return now; }
     });
     const request = {
-      sessionId: "session",text: "How do I start my first debate?",language: "en" as const,
+      text: "How do I start my first debate?",language: "en" as const,
       detectedLanguage: "en" as const,overrideLanguage: null,modelRef: "relay",
       receivedAt: new Date("2026-09-07T12:00:00.000Z")
     };

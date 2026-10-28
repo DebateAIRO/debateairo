@@ -1,12 +1,18 @@
 import { randomUUID } from "node:crypto";
+import type { PoolClient } from "pg";
 import { afterAll,beforeAll,describe,expect,it } from "vitest";
-import { migrate,PostgresSupportSessionRepository } from "../../packages/db/src/index.js";
+import { migrate } from "../../packages/db/src/index.js";
 import { applyMigrationSql,retiredUpgradeReason } from "../support/migrationReplay.js";
 import { startTestDatabase,type TestDatabase } from "../support/testDatabase.js";
 
 const REPAIRING_MIGRATIONS = [
   "0054_support_keys_audit.sql","0055_register_support_publication.sql"
 ] as const;
+const HISTORICAL_SUPPORT_INSERT_TABLES = `support.session, support.session_key,
+  support.message, support.abuse_event, support."case", support.case_key,
+  support.case_event, support.case_message, support.rating, support.tool_call,
+  support.admission_event, support.relay_call, support.relay_waiter,
+  support.relay_waiter_event`;
 
 type ShapeRow = Readonly<{
   kind: string;
@@ -16,6 +22,19 @@ type ShapeRow = Readonly<{
 
 let fresh: TestDatabase;
 let upgraded: TestDatabase;
+
+async function replayHistoricalSupportMigrations(): Promise<void> {
+  try {
+    await applyMigrationSql(upgraded.pool, REPAIRING_MIGRATIONS,
+      async (client: PoolClient) => client.query(
+        `GRANT INSERT ON ${HISTORICAL_SUPPORT_INSERT_TABLES} TO debateai_support`
+      ));
+  } finally {
+    await upgraded.pool.query(
+      `REVOKE INSERT ON ${HISTORICAL_SUPPORT_INSERT_TABLES} FROM debateai_support`
+    );
+  }
+}
 
 async function supportTelemetryShape(database: TestDatabase): Promise<readonly ShapeRow[]> {
   const result = await database.pool.query<ShapeRow>(`
@@ -48,17 +67,22 @@ async function supportTelemetryShape(database: TestDatabase): Promise<readonly S
 
 async function expectV2CaseInsertEnforcement(database: TestDatabase): Promise<void> {
   const sessionId = randomUUID();
-  await new PostgresSupportSessionRepository(database.pool,async () =>
-    Buffer.concat([Buffer.from([1]),Buffer.alloc(60,4)]))
-    .create({
-      sessionId,tokenSha256: randomUUID().replaceAll("-","").repeat(2),
-      identityOwnerRef: null,language: "en",kbVersion: "b".repeat(64),
-      createdAt: new Date("2026-09-08T00:00:00.000Z")
-    });
   const client = await database.pool.connect();
   try {
     await client.query("BEGIN");
-    await client.query("SET LOCAL ROLE debateai_support");
+    await client.query(`INSERT INTO support.session(
+      session_id,session_token_sha256,identity_owner_ref,language,state,kb_version,created_at
+    ) VALUES($1,$2,NULL,'en','OPEN',$3,$4)`, [
+      sessionId, randomUUID().replaceAll("-", "").repeat(2), "b".repeat(64),
+      new Date("2026-09-08T00:00:00.000Z")
+    ]);
+    await client.query(`INSERT INTO support.session_key(session_id,wrapped_key,created_at)
+      VALUES($1,$2,$3)`, [
+      sessionId, Buffer.concat([Buffer.from([1]), Buffer.alloc(60, 4)]),
+      new Date("2026-09-08T00:00:00.000Z")
+    ]);
+    await client.query("COMMIT");
+    await client.query("BEGIN");
     await expect(client.query(`
       INSERT INTO support."case"(
         case_id,token_sha256,session_id,language,created_at,
@@ -120,7 +144,7 @@ describe("support migration upgrade convergence", () => {
     expect(await retiredUpgradeReason(upgraded.pool, REPAIRING_MIGRATIONS)).toEqual({
       refusal: "MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE", unrecorded: []
     });
-    await applyMigrationSql(upgraded.pool, REPAIRING_MIGRATIONS);
+    await replayHistoricalSupportMigrations();
     const expected = await supportTelemetryShape(fresh);
     expect(expected.map(({ name }) => name)).toEqual([
       "cost_usd","degraded_reason","input_tokens","model_called","output_tokens",
@@ -132,7 +156,7 @@ describe("support migration upgrade convergence", () => {
     await expectV2CaseInsertEnforcement(fresh);
     await expectV2CaseInsertEnforcement(upgraded);
 
-    await expect(applyMigrationSql(upgraded.pool, REPAIRING_MIGRATIONS)).resolves.toBeUndefined();
+    await expect(replayHistoricalSupportMigrations()).resolves.toBeUndefined();
     expect(await supportTelemetryShape(upgraded)).toEqual(expected);
     await expectV2CaseInsertEnforcement(upgraded);
     await expect(migrate(upgraded.pool)).resolves.toEqual({ appliedSteps: [], extraSteps: [] });

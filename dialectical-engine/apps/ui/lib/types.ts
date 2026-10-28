@@ -1,5 +1,6 @@
 export type DebateSummary = {
   id: string;
+  run_ref?: string;
   topic: string;
   status: string;
   created_at: string;
@@ -11,6 +12,13 @@ export type DebateSummary = {
   waits_until?: string | null;
   /** Final review Part 1b, Important 1: a WAITING run that waits only for its person's own running debates. */
   waits_for?: "OWN_DEBATES" | null;
+  synthesis_flag?: { verdict: "FLAGGED" } | null;
+  synthesis_check?: "CHECKING";
+  publication_review?: {
+    review_state: "NONE" | "UNDER_REVIEW" | "APPROVED" | "REFUSED";
+    asks_used: 0 | 1 | 2;
+    visibility: "PRIVATE" | "PUBLISHED";
+  } | null;
 };
 
 export type Generation = {
@@ -721,6 +729,7 @@ export type DebateDetail = {
   status: string;
   /** Ask-run lifecycle truth while no served answer exists. */
   run_state?: "QUEUED" | "WAITING" | "CLAIMED" | "RUNNING" | "HOLDING" | "SETTLED" | "FAILED";
+  synthesis_check?: "CHECKING";
   /** Honest provider-recovery deadline when run_state is HOLDING. */
   hold_until?: string | null;
   /** Budget spec §2.7: when a WAITING run is expected to start (ISO); null otherwise. */

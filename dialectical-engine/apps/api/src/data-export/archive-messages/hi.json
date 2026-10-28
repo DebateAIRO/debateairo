@@ -17,5 +17,18 @@
   "archive.visibilityPrivate": "निजी",
   "archive.unreadable": "इस वाद-विवाद की सामग्री अब पढ़ी नहीं जा सकती क्योंकि इसकी कुंजी नष्ट कर दी गई है।",
   "archive.noDebates": "आपके कोई वाद-विवाद नहीं हैं।",
-  "archive.filesNote": "इस ZIP संग्रह की JSON फ़ाइलों में यही डेटा मशीन से पढ़े जा सकने वाले रूप में है; उनकी सूची README.txt में है।"
+  "archive.filesNote": "इस ZIP संग्रह की JSON फ़ाइलों में यही डेटा मशीन से पढ़े जा सकने वाले रूप में है; उनकी सूची README.txt में है।",
+  "archive.contentCheck": "सामग्री की जाँच",
+  "archive.verdict.flagged": "चिह्नित",
+  "archive.verdict.clear": "कोई समस्या नहीं",
+  "archive.verdict.noSynthesis": "कोई संश्लेषण नहीं",
+  "archive.verdict.unavailable": "उपलब्ध नहीं",
+  "archive.category.terrorism": "संभावित आतंकवाद",
+  "archive.category.hateSpeech": "किसी भी प्रकार का घृणास्पद भाषण",
+  "archive.category.suicideOrHarm": "आत्महत्या या दूसरों को हानि पहुँचाने की प्रवृत्तियाँ",
+  "archive.category.weaponsOrDrugs": "हथियार या नशीले पदार्थ बनाना",
+  "archive.publicationReview": "प्रकाशन समीक्षा",
+  "archive.reviewAsked": "अनुरोध किया गया",
+  "archive.reviewApproved": "अनुमोदित",
+  "archive.reviewRefused": "इनकार किया गया"
 }

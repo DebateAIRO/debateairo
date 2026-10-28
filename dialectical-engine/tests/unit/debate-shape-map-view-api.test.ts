@@ -468,7 +468,7 @@ describe("debate shape P2c — GET /v1/answers/{id}/map", () => {
 
 describe("debate shape P2c — the published copy", () => {
   const input = {
-    runId: STORY_TEST_RUN_ID, answer: answerOf(), authenticated: OWNER.authenticated, source: { requestId: "req-map" } as never
+    runId: STORY_TEST_RUN_ID, answer: answerOf(), owner: { userId: OWNER.authenticated.userId, ownerRef: OWNER.authenticated.ownerRef }, source: { requestId: "req-map" } as never
   };
 
   it("copies the owner's view, read as the publisher against the answer's nodes, and never blocks publishing when the read fails", async () => {

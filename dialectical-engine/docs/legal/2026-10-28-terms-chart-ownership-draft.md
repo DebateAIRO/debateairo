@@ -1,10 +1,10 @@
-# Terms of Service v2.7 — ownership of the charts we generate (2026-10-28)
+# Terms of Service v2.9 — ownership of the charts we generate (2026-10-28)
 
-**Status: applied on `feature/verdict-pdf-charts`, in all 35 drafts, as section 8's paragraph after "Outputs." Not
+**Status: applied on `feature/verdict-pdf-charts` as Terms 2.9 (dev had released 2.7 and 2.8 meanwhile), in all 35 drafts: section 8's paragraph after "Outputs.", and a 2.9 entry in section 14's change log. Not
 merged or published. Released as the Perplexity paragraph was (Terms 2.5): effective date unchanged, re-acceptance
 floors unchanged, so nobody is asked to accept again; the paragraph grants users a licence and takes nothing they had.
 Before merge: counsel reads the English and Romanian, and the owner confirms that route or raises the TERMS floor to
-2.7 (step 2 below). The translations want a native-speaker read, as every release's do.**
+2.9 (step 2 below). The translations want a native-speaker read, as every release's do.**
 
 The owner decided (2026-10-28) that DMS Merchandise Shop SRL takes ownership of the charts and statistics it generates
 for debate reports (design: `docs/superpowers/specs/2026-10-28-verdict-pdf-charts-design.md`). Every chart already
@@ -20,7 +20,7 @@ promise about outputs.
   30 days before it takes effect**. Claiming ownership of something drawn from the user's debate is safest treated as
   the first kind, or written so that it takes nothing away (the licence below is meant to do that).
 - All 35 language versions move together: `tests/unit/legal-manifest.test.ts` pins one Terms version for every locale,
-  the consent manifest records each file's sha256, and the archive keeps 2.6.
+  the consent manifest records each file's sha256, and the archive keeps 2.8.
 - Purely AI-generated material may have no copyright in Romania or the EU (Law 8/1996 protects human authorship; CJEU:
   "the author's own intellectual creation"). The clause claims what the company can own: the selection, arrangement,
   design and drawing of the charts, and the statistics as compiled; it does not claim the user's figures or text.
@@ -52,11 +52,11 @@ generated text (charts are covered in the next paragraph)".
 ## Release steps (when the owner says go)
 
 1. Counsel reviews the English and Romanian text above.
-2. The owner picks the route under section 14: express re-acceptance at next sign-in (raise the TERMS floor to 2.7), or
+2. The owner picks the route under section 14: express re-acceptance at next sign-in (raise the TERMS floor to 2.9), or
    a 30-day emailed notice with an effective date.
-3. Edit `apps/ui/legal/en/terms-of-service.md` and `apps/ui/legal/ro/terms-of-service.md`: the clause, version 2.7, the
+3. Edit `apps/ui/legal/en/terms-of-service.md` and `apps/ui/legal/ro/terms-of-service.md`: the clause, version 2.9, the
    effective date, the "In short" line if wanted. Translate into the other 33 drafts.
 4. `pnpm run generate:legal` (regenerates `apps/ui/lib/termsOfService.ts`, the per-locale modules and the consent
-   manifest; the archive keeps 2.6), then add 2.7 to the versions list in `apps/ui/lib/legal/pages.ts`.
+   manifest; the archive keeps 2.8), then add 2.9 to the versions list in `apps/ui/lib/legal/pages.ts`.
 5. Update the pinned version in `tests/unit/legal-manifest.test.ts`; run `pnpm run generate:legal:check` and the legal
    tests.

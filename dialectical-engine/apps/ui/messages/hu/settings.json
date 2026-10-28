@@ -108,7 +108,7 @@
   "settings.transparency.downloadsTail": "objektumot, amely leírja a létrehozott tartalmat és az emberi szerkesztői felülvizsgálat hiányát. A rögzített válaszadatok, a modell eredete és a működési nyilvántartások megőrzik eredeti értékeiket.",
   "settings.transparency.markingsLimit": "Ezek a jelölések a felületünkön és a letöltésekben található tartalmat írják le. Nem vízjelek és nem eredetiségi tanúsítványok; az egyszerű szöveg másolásakor eltűnhetnek.",
   "settings.transparency.supportTitle": "Ügyfélszolgálat és emberi segítség",
-  "settings.transparency.supportLead": "Az ügyfélszolgálati asszisztens MI-rendszer. Emberi segítség kéréséhez használja a „Beszélgetés emberrel” vagy az „Átadás embernek” lehetőséget itt:",
+  "settings.transparency.supportLead": "Az ügyfélszolgálati asszisztens MI-rendszer. Emberi segítség kéréséhez használja a „Beszélgetés munkatárssal” lehetőséget itt:",
   "settings.transparency.help": "Súgó",
   "settings.transparency.supportTail": ".",
   "settings.transparency.back": "Vissza ide: {brand}",

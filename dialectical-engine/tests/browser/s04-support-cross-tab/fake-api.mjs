@@ -10,7 +10,7 @@
 //   node --import tsx fake-api.mjs --self-check       every route answered once, every contract body parsed
 //                                                     -> FAKE_API_SELF_CHECK OK (exit 0) | FAKE_API_SELF_CHECK FAIL (exit 1)
 // Harness control (never reached by the browser: the UI proxy forwards /api/<path>, and no page calls /__fake):
-//   GET  /__fake/state            -> { supportSessions, messageRequests, unhandled }
+//   GET  /__fake/state            -> { messageRequests, unhandled }
 //   POST /__fake/hold?delay=<ms>  -> the NEXT support message reply is held <ms> before it is sent (RACE case)
 import http from "node:http";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -43,8 +43,7 @@ export function createFakeApi({ log = (line) => process.stdout.write(`${line}\n`
   const owners = new Map(); // email -> { ownerRef, ageStatus }
   const challenges = new Map(); // challenge_token -> email
   const sessions = new Map(); // cookie token -> session record
-  const supportSessions = new Map(); // support session id -> { token, ownerRef, createdAt, language }
-  const messageRequests = []; // { sessionId, status, text, at }
+  const messageRequests = []; // { status, text, language, at }
   const unhandled = [];
   let holdNextReplyMs = 0;
 
@@ -134,7 +133,6 @@ export function createFakeApi({ log = (line) => process.stdout.write(`${line}\n`
     // ---- harness control ----
     if (path === "/__fake/state" && method === "GET") {
       return send(res, 200, {
-        supportSessions: [...supportSessions.entries()].map(([id, s]) => ({ id, ownerRef: s.ownerRef, createdAt: s.createdAt })),
         messageRequests,
         unhandled
       });
@@ -241,43 +239,16 @@ export function createFakeApi({ log = (line) => process.stdout.write(`${line}\n`
     if (path === "/v1/support/status" && method === "GET") {
       return send(res, 200, { configuration: { kind: "AVAILABLE" }, relay_state: "AVAILABLE", kb_version: KB_VERSION, kb_loaded: { shipped: 1 } });
     }
-    if (path === "/v1/support/cases" && method === "GET") {
-      // support/index.ts:926-941: anonymous 401; the account's own cases (none in this fake)
-      if (!who) return send(res, 401, { error: "AUTHENTICATION_REQUIRED" });
-      return send(res, 200, { cases: [] });
-    }
-    if (path === "/v1/support/sessions" && method === "POST") {
+    if (path === "/v1/support/messages" && method === "POST") {
       const body = await readBody(req);
       const language = typeof body.language === "string" ? body.language : "en";
-      const id = randomUUID();
-      const token = token43();
-      const createdAt = new Date();
-      supportSessions.set(id, { token, ownerRef: who?.ownerRef ?? null, createdAt: createdAt.toISOString(), language });
-      // support/index.ts:386-393 with publicSession() of :118-127
-      return send(res, 201, {
-        session: { session_id: id, identity_bound: who !== null, language, state: "OPEN", kb_version: KB_VERSION, created_at: createdAt.toISOString() },
-        session_token: token,
-        first_message: { role: "assistant", text: "S04 fake support: ask a question." }
-      });
-    }
-    const msg = /^\/v1\/support\/sessions\/([^/]+)\/messages$/u.exec(path);
-    if (msg && method === "POST") {
-      const id = decodeURIComponent(msg[1]);
-      const body = await readBody(req);
       const text = typeof body.text === "string" ? body.text : "";
-      const found = supportSessions.get(id);
-      const token = req.headers["x-support-session-token"];
-      // support/index.ts:431-452: an unknown session, a wrong capability or another owner (:129-131) all answer 404
-      if (!found || typeof token !== "string" || token !== found.token || found.ownerRef !== (who?.ownerRef ?? null)) {
-        messageRequests.push({ sessionId: id, status: 404, text, at: Date.now() });
-        return send(res, 404, { error: "NOT_FOUND" });
-      }
       const hold = holdNextReplyMs; holdNextReplyMs = 0;
       if (hold > 0 && hold <= 30_000) await new Promise((r) => setTimeout(r, hold));
-      messageRequests.push({ sessionId: id, status: 200, text, at: Date.now(), heldMs: hold });
+      messageRequests.push({ status: 200, text, language, at: Date.now(), heldMs: hold });
       return send(res, 200, {
-        message_id: randomUUID(), outcome: "ANSWER_GROUNDED", text: `reply to: ${text}`,
-        can_escalate: false, sources: [], actions: []
+        outcome: "ANSWER_GROUNDED", text: `reply to: ${text}`,
+        can_escalate: true, sources: [], actions: []
       });
     }
 
@@ -292,7 +263,7 @@ export function createFakeApi({ log = (line) => process.stdout.write(`${line}\n`
       if (!res.headersSent) send(res, 500, { error: "FAKE_API_ERROR" });
     });
   });
-  return { server, state: { owners, sessions, supportSessions, messageRequests, unhandled } };
+  return { server, state: { owners, sessions, messageRequests, unhandled } };
 }
 
 // ---- self-check: every route answered once, every contract body parsed by its schema ----
@@ -326,7 +297,6 @@ async function selfCheck(port) {
   };
   try {
     await call("session anonymous 401", "GET", "/v1/session", { expect: 401 });
-    await call("support cases anonymous 401", "GET", "/v1/support/cases", { expect: 401 });
     const begin = await call("login begin", "POST", "/v1/auth/login", { body: { email: "x@s04.test", password: "pw" }, expect: 202 });
     const done = await call("login complete", "POST", "/v1/auth/login", { body: { challenge_token: begin.json.challenge_token, code: "123456" }, expect: 200 });
     // byte-exact against the API's templates (index.ts:1466-1472, Max-Age 14 d at :1230): the UI proxy drops any other shape
@@ -345,19 +315,11 @@ async function selfCheck(port) {
     await call("public debates", "GET", "/v1/public/debates?limit=20&offset=0", { schema: PublicDebateListSchema, expect: 200 });
     await call("answer index", "GET", "/v1/answers?limit=50&offset=0", { schema: AnswerIndexSchema, expect: 200 });
     await call("support status", "GET", "/v1/support/status", { expect: 200 });
-    await call("support cases signed in", "GET", "/v1/support/cases", { expect: 200 });
-    const created = await call("support session", "POST", "/v1/support/sessions", { body: { language: "en" }, expect: 201 });
-    const sid = created.json?.session?.session_id; const stok = created.json?.session_token;
     await fetch(`${base}/__fake/hold?delay=150`, { method: "POST" });
     const t0 = Date.now();
-    const reply = await call("support message", "POST", `/v1/support/sessions/${sid}/messages`, { body: { text: "hi" }, headers: { "x-support-session-token": stok }, expect: 200 });
+    const reply = await call("support message", "POST", "/v1/support/messages", { body: { text: "hi", language: "en" }, expect: 200 });
     const heldOk = Date.now() - t0 >= 140 && reply.json?.text === "reply to: hi" && reply.json?.outcome === "ANSWER_GROUNDED";
     results.push({ label: "support reply held + text", ok: heldOk, why: heldOk ? "" : "hold/text" });
-    await call("support message wrong token 404", "POST", `/v1/support/sessions/${sid}/messages`, { body: { text: "hi" }, headers: { "x-support-session-token": "nope" }, expect: 404 });
-    // owner check: a signed-out cookie jar posting to X's support session is refused (support/index.ts:129-131)
-    const saved = jar; jar = "";
-    await call("support message other owner 404", "POST", `/v1/support/sessions/${sid}/messages`, { body: { text: "hi" }, headers: { "x-support-session-token": stok }, expect: 404 });
-    jar = saved;
     // a second session of the same account, revoked by id (not current -> no cookies)
     const b2 = await (await fetch(`${base}/v1/auth/login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: "x@s04.test", password: "pw" }) })).json();
     const c2 = await fetch(`${base}/v1/auth/login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ challenge_token: b2.challenge_token, code: "1" }) });

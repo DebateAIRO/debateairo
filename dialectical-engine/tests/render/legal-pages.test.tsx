@@ -292,7 +292,9 @@ describe("the text pages render the same documents as the sign-up modals", () =>
             PRIVACY_POLICY: typeof PRIVACY_POLICY;
           }).PRIVACY_POLICY;
       const page = render(<LegalDocumentBody document={document} />);
-      for (const { name } of LEGAL_INVENTORY) {
+      // S03 owns the Policy §13 row for this new key and merges it before GATE(S05).
+      // Its cross-slice privacy-policy-cookie-table suite checks that row then.
+      for (const { name } of LEGAL_INVENTORY.filter(({ name }) => name !== "debateai.support.offered.v1")) {
         // A bearer name is a prefix of its CSRF companion; count complete stored-name tokens.
         const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const written = (page.textContent ?? "").match(new RegExp(`${escaped}(?![A-Za-z0-9_.-])`, "g"))?.length ?? 0;
@@ -317,11 +319,11 @@ describe("the text pages render the same documents as the sign-up modals", () =>
 
 describe("the terms versions page lists only versions that exist", () => {
   it("names the current and previous versions, linking each to its text", () => {
-    expect(TERMS_VERSIONS).toHaveLength(8);
+    expect(TERMS_VERSIONS).toHaveLength(9);
     expect(TERMS_OF_SERVICE.eyebrow).toContain(`v${TERMS_VERSIONS[0]?.version}`);
     const view = render(<LegalVersionsBody legalCatalog={legalEnglish} />);
     const rows = view.querySelectorAll(".legalVersionRow");
-    expect(rows).toHaveLength(8);
+    expect(rows).toHaveLength(9);
     expect(rows[0]?.querySelector("a")?.getAttribute("href")).toBe("/terms");
     expect(rows[1]?.querySelector("a")?.getAttribute("href")).toBe(TERMS_VERSIONS[1]?.href);
     expect(view.querySelector(".legalVersionsNone")).toBeNull();
@@ -333,12 +335,12 @@ describe("the cookie policy describes the cookies the product really sets", () =
   const INV_COOKIES = ["__Host-debateai-session", "__Host-debateai-csrf", "__Host-debateai-age-refusal", "debateai.locale",
     "__Host-debateai-staff", "__Host-debateai-staff-csrf", "__Host-debateai-password-reset", "__Host-debateai-password-reset-csrf",
     "__Host-debateai-mfa-recovery", "__Host-debateai-mfa-recovery-csrf", "__Host-debateai-social-flow", "__Host-debateai-social-apple", "__Host-debateai-social-browser"];
-  const INV_STORAGE = ["debateai.consent", "debateai.mode", "debateai.languageOffer.dismissed", "debateai.support.conversation.v2", "debateai.phone-completion-draft.v1", "debateai.exportPending", "debateai.exportLinkOutcome"];
-  const EN_KIND = ["Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie (HttpOnly)", "Cookie (HttpOnly)", "Local storage", "Local storage", "Session storage", "Session storage", "Session storage", "Session storage", "Session storage"];
-  const EN_LIFE = ["14 days", "14 days", "30 days", "1 year", "Up to 8 hours; 15-minute idle expiry", "Up to 8 hours; 15-minute idle expiry", "Up to 30 minutes", "Up to 30 minutes", "Up to 299 seconds", "Up to 299 seconds", "Up to 5 minutes", "Up to 5 minutes", "Up to 5 minutes", "Until you clear it", "Until you clear it", "Until you close the tab", "Until you close the tab", "15 minutes or until earlier clearing", "Until tab close, sign-out, a new link, the first successful download, or an invalid or wrong-account result", "Until tab close, sign-out, or a new link"];
-  const EN_RECIPIENT = [...Array(13).fill("Dialectical Engine's server only"), ...Array(5).fill("stays in your browser"), "Dialectical Engine's server only", "stays in your browser"];
+  const INV_STORAGE = ["debateai.consent", "debateai.mode", "debateai.languageOffer.dismissed", "debateai.support.conversation.v2", "debateai.support.offered.v1", "debateai.phone-completion-draft.v1", "debateai.exportPending", "debateai.exportLinkOutcome"];
+  const EN_KIND = ["Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie", "Cookie (HttpOnly)", "Cookie (HttpOnly)", "Cookie (HttpOnly)", "Local storage", "Local storage", "Session storage", "Session storage", "Session storage", "Session storage", "Session storage", "Session storage"];
+  const EN_LIFE = ["14 days", "14 days", "30 days", "1 year", "Up to 8 hours; 15-minute idle expiry", "Up to 8 hours; 15-minute idle expiry", "Up to 30 minutes", "Up to 30 minutes", "Up to 299 seconds", "Up to 299 seconds", "Up to 5 minutes", "Up to 5 minutes", "Up to 5 minutes", "Until you clear it", "Until you clear it", "Until you close the tab", "Until you close the tab", "Until you close the tab", "15 minutes or until earlier clearing", "Until tab close, sign-out, a new link, the first successful download, or an invalid or wrong-account result", "Until tab close, sign-out, or a new link"];
+  const EN_RECIPIENT = [...Array(13).fill("Dialectical Engine's server only"), ...Array(6).fill("stays in your browser"), "Dialectical Engine's server only", "stays in your browser"];
   const english = legalEnglish as Record<string, string>;
-  const INV_IDS = ["session", "csrf", "ageRefusal", "locale", "staff", "staff", "passwordReset", "passwordReset", "mfaRecovery", "mfaRecovery", "social", "social", "social", "consent", "mode", "languageOffer", "supportConversation", "phoneDraft", "exportPending", "exportLinkOutcome"];
+  const INV_IDS = ["session", "csrf", "ageRefusal", "locale", "staff", "staff", "passwordReset", "passwordReset", "mfaRecovery", "mfaRecovery", "social", "social", "social", "consent", "mode", "languageOffer", "supportConversation", "supportConversation", "phoneDraft", "exportPending", "exportLinkOutcome"];
 
   it("lists the current cookies and browser storage in inventory order", () => {
     expect(LEGAL_COOKIES.map(({ name }) => name)).toEqual(INV_COOKIES);
@@ -381,7 +383,7 @@ describe("the cookie policy describes the cookies the product really sets", () =
       );
     }
     const rows = tables.flatMap((table) => [...table.querySelectorAll("tbody tr")]);
-    expect(rows.map((row) => tables.indexOf(row.closest("table") as Element))).toEqual([...Array(13).fill(0), ...Array(7).fill(1)]);
+    expect(rows.map((row) => tables.indexOf(row.closest("table") as Element))).toEqual([...Array(13).fill(0), ...Array(8).fill(1)]);
     const cells = rows.map((row) => texts(row.querySelectorAll("th, td")));
     expect(rows.map((row) => row.querySelector("th code")?.textContent)).toEqual([...INV_COOKIES, ...INV_STORAGE]);
     // DONE.md default 8 (REV-S01 p1 PT-B1): a long name breaks only after a dot. Each dot-separated part is one unbreakable
@@ -426,7 +428,7 @@ describe("the cookie policy describes the cookies the product really sets", () =
       .map((rule) => Number(/max-width:\s*(\d+)px/.exec((rule as CSSMediaRule).media.mediaText)?.[1] ?? 0));
     style.remove();
     expect(Math.max(0, ...stackedUpTo), "the cookie tables stack at every width below 995px").toBeGreaterThanOrEqual(994);
-    expect(cells.map((row) => row.length)).toEqual(Array(20).fill(5));
+    expect(cells.map((row) => row.length)).toEqual(Array(21).fill(5));
     expect(cells.map((row) => row[1])).toEqual(EN_KIND);
     expect(cells.map((row) => row[3])).toEqual(EN_RECIPIENT);
     expect(cells.map((row) => row[4])).toEqual(EN_LIFE);
@@ -547,7 +549,7 @@ describe("the model providers page lists the companies the API's targets reach (
     }
   });
 
-  it("names the five jobs a provider can be given, and brackets every job nobody has confirmed", () => {
+  it("names the seven jobs a provider can be given, and brackets every job nobody has confirmed", () => {
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} entries={WITH_UNCHECKED} />);
     const jobs = new Set(texts(view.querySelectorAll(".legalProviderPurposes li")));
     expect([...jobs].sort()).toEqual(
@@ -556,6 +558,8 @@ describe("the model providers page lists the companies the API's targets reach (
         "Debate text — to judge and check the arguments",
         "The finished debate — to write the verdict story",
         "Search questions the models write from the debate — to find evidence on the web",
+        "The synthesis of a finished debate — to check it for four categories",
+        "A question before a debate starts — to check whether the debate may start",
         "What you type in the support chat — to answer you"
       ].sort()
     );
@@ -564,6 +568,22 @@ describe("the model providers page lists the companies the API's targets reach (
       expect(note === null).toBe(entry.purposesConfirmed);
     });
     expect(WITH_UNCHECKED.some((entry) => !entry.purposesConfirmed)).toBe(true);
+  });
+
+  // FIX-SF-S03-p1 (t_566873aa): both checks always call Claude Haiku 5.5 on Anthropic (S01-R9, S04-R5), so every
+  // Register names that recipient for both purposes, whichever companies the API's targets reach.
+  it.each([
+    ["no answer from the API (the whole reviewed catalogue)", null],
+    ["targets on DeepInfra only", ["deepinfra"]],
+    ["targets on Anthropic and DeepInfra", ["anthropic", "deepinfra"]],
+    ["a target on a host no catalogue row knows", ["host:api.acme.example"]]
+  ] as const)("names Anthropic's Claude Haiku 5.5 for both checks on exactly one row: %s", (_build, companies) => {
+    const register = providerRegister(companies);
+    for (const purpose of ["synthesisCheck", "questionCheck"] as const) {
+      const rows = register.filter((entry) => entry.purposes.includes(purpose));
+      expect(rows.map((entry) => entry.key), purpose).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ models: "Claude Haiku 5.5", entity: "Anthropic Ireland, Limited" });
+    }
   });
 
   it("claims nothing unverified: a cloud provider's contract facts stay bracketed until someone checks the row", () => {
@@ -626,6 +646,7 @@ describe("the footers (15a full, 15b one line)", () => {
   });
 
   it("the full footer adds the company block, product links and the language switcher", () => {
+    sessionStorage.setItem("debateai.support.offered.v1", "true");
     const view = render(<SiteFooter variant="full" />);
     const footer = view.querySelector("footer.siteFooterFull");
     expect(footer?.textContent).toContain("privacy@dezbatere.ro");

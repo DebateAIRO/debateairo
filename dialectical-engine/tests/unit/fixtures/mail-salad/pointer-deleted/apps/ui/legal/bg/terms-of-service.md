@@ -12,7 +12,7 @@ jumps:
 
 # Общи условия
 
-**Version 2.3 · Effective 12 октомври 2026 г. · Предишни версии на dezbatere.ro/terms/versions**
+**Version 2.4 · Effective 12 октомври 2026 г. · Предишни версии на dezbatere.ro/terms/versions**
 
 **In short.** Общи условия за услугата.
 

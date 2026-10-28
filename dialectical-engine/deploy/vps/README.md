@@ -78,12 +78,12 @@ never required, so restarting it never stops a release's API or a draining runne
 (side-by-side spec §4). The API and runner still require PostgreSQL, and each website is bound to
 its own release's API (`BindsTo=`).
 
-**One API serves at a time.** The support chat's admission windows (visitor message and session
-limits) are held in the API process: a restart resets them and two serving APIs would double
-them. During an upgrade the newer release's API starts in the spare slot but stays not-ready, and
-the switch is break-before-make: the older pair stops taking requests first, the newer pair takes
-them a few seconds later, and Caddy holds any request in between (§6). The older pair is then
-stopped. Keep it that way until those windows are database-backed (go-live checklist line 4).
+**One API serves at a time.** The support chat's counts live in the API process's memory only
+(message and session limits, pauses and the daily model-call count): a restart clears them and two
+serving APIs would count separately. During an upgrade the newer release's API starts in the spare
+slot but stays not-ready, and the switch is break-before-make: the older pair stops taking
+requests first, the newer pair takes them a few seconds later, and Caddy holds any request in
+between (§6). The older pair is then stopped. Keep it that way (go-live checklist line 4).
 
 ---
 
@@ -1503,6 +1503,8 @@ The runner's journal gains one line kind, `DEBATEAI_COMPARING_JUDGE` (engine 2 o
 
 A register version for this code carries the code-owned `engineContractHash` row with `ba2f15d5d89b2f7b4c3168e2f7908f5d3130aa55fc4929ad0825b15028500a4d` (was `8298e1b36638369d2e1bd58111eec69d1c997f9475965ed183c8750491053473` after R2b): R3 appends the map's eight engine-2 contracts and the fixed-words position contracts. Nothing reads the row without an `engineVersionPolicy` row, so the runner boots either way; publish the new version from this release as for any release. A practice register saved with an engine row before this seal must be rebuilt: the runner refuses a stale seal at boot. Rebuild it by running the practice with `--register-next` (tools/preview-practice/README.md, "Optional flags"), which composes this code's next version, with this code's own seal, in the throwaway database.
 
+This release adds `migrations/0129_support_answer_scope.sql` (after `0122_engine_map_check.sql`): it empties the support tables and revokes INSERT from the support database role; no chat conversation or model-call row is written afterwards.
+
 This release adds one migration, `migrations/0122_engine_map_check.sql` (after `0121_engine_verdict.sql`): two
 append-only code tables, what each engine-2 map point rests on and the answer check's codes. Apply it BEFORE the new
 code runs (every map read of the new code joins the first table, engine 1 included), as step 1 of the debate-shape
@@ -1875,21 +1877,20 @@ manifest forbids minting one a long-lived superuser credential (audit L5-F8).
    `audit-source-ip-salt`, `support-kek`, `records-key`), written only when their sha256 changed. Held by V,
    offline, on different media from the data key: whoever holds one envelope alone restores
    nothing. The audit source-IP salt is a key, not metadata: bundling it with the dump would let
-   one envelope re-identify every hashed source IP in it. The support KEK (`DL2-F5`) wraps the
-   support session and case keys, which live IN the dump — without it in escrow a restore opens no
-   support conversation, and beside the dump it would open every one. The records key is the
+   one envelope re-identify every hashed source IP in it. The support KEK (`DL2-F5`) remains the
+   fifth escrowed secret after migration 0129, but wraps no new key: the chat keeps no
+   conversation. The records key is the
    sixth escrowed secret, in this same envelope (paid plans ruling Q-12). It seals the acceptance
    and billing evidence kept for years after an account is erased; without it those rows cannot be
    read, and beside the dump it would open every one, so it rides here and never in the data
    envelope.
 
-**What erasure means for a backup.** Deleting a support conversation (or a private debate)
-destroys its key in place, and from then on the live system cannot open it. The key bytes as they
-were before the deletion survive in every backup taken earlier, until that backup ages out of
-retention (14 daily / 8 weekly, then whatever the off-host remote keeps). Whoever holds such a
-backup AND the matching escrowed master key could still open the deleted conversation. Erasure is
-therefore complete only when the last backup older than the deletion has been pruned, and the
-privacy notice must not promise more than that (`DL2-F5`).
+**What erasure means for a backup.** A dump taken after migration 0129 holds no support conversations.
+Older backups may still hold encrypted chat rows and readable metadata until V destroys those
+backups after a restore drill. The post-0129 operator step below rotates the support KEK. Once
+step (5) has destroyed every earlier copy of the old key, those old rows cannot be opened; step
+(6) then destroys every backup taken before the migration. A private debate still follows its own
+key-erasure and backup-retention rules (`DL2-F5`).
 
 Retention 14 daily / 8 weekly, then an off-host copy (`rclone copy`, or `scp` — configure exactly
 one in `backup.conf`). Encrypted before it leaves the box, so the remote is untrusted by
@@ -2051,10 +2052,6 @@ Each is a fact about the tree at this commit, not a plan. Several are go-live it
   serves is refused with `ASK_PLAN_TIER_MODEL_UNAVAILABLE`. Until a per-deployment tier mapping
   exists, the hosted site cannot serve a debate unless its vendor targets' `model` values are
   exactly the roster's names.
-- **Account deletion does not erase the account's support conversations (V-26, not built).** A
-  deleted account's support chats and case replies stay in the database; the erasure never
-  reaches them. The owner removed this from the go-live checklist on 2026-09-25: an accepted
-  limitation, not a go-live condition.
 - **A hosted register carries development source refs on its code-owned rows.** `pnpm
   register:publish-hosted` (§11) reuses the development seeder's row builder byte for byte, because
   the runner's start-up reader (`readDevelopmentRunnerPolicy`) refuses runner and algorithm rows
@@ -2065,9 +2062,8 @@ Each is a fact about the tree at this commit, not a plan. Several are go-live it
   cap and per-visitor share (go-live checklist line 2).
 - **One API instance only** (§1, go-live checklist line 4).
 - **The observation agent does not run on this host** (§12).
-- **`support:inbox` and `support:incident` have no production credential path**, and
-  `support:shred` reads its production credential from `secrets/api-support.json` relative to its
-  working directory (§13).
+- **`support:status` still asks for a support-data credential file**, though after migration 0129
+  it reads no support conversation or model-call data (§13).
 - **No units for the scheduler's three jobs** (replay self-test, liveness sweep, settlement
   watch), although their principals are provisioned live.
 - **Not claimed by this kit:** a test that the schema mirror cannot drift from the database
@@ -2536,6 +2532,7 @@ version must carry, besides the algorithm's own rows:
 |---|---|
 | `costEnvelopePolicy` | both services refuse: `COST_ENVELOPE_POLICY_UNRESOLVED` |
 | `publicationCheckPolicy` | the API refuses: `PUBLICATION_CHECK_POLICY_UNRESOLVED`. Every version `pnpm register:publish-hosted` seals from the publication-check deadline release on carries it (the code-owned 60000 ms, or the file's member); a version sealed before that release does not |
+| `questionCheckPolicy` | the API refuses: `QUESTION_CHECK_POLICY_UNRESOLVED`. Every version `pnpm register:publish-hosted` seals from S04's release on carries it (the code-owned 15000 ms, or the file's member); a version sealed before that release does not |
 | `billingPlans`, `billingPolicy` | optional: without them in the file, the engine's own rows are sealed (billing OFF); a file that supplies either supersedes it, and a version with `enabled: true` also needs `billingPlans` and the three budget members of `costEnvelopePolicy` |
 | `answerRoleRotationPolicy` | optional: without it the engine keeps its fixed roles. The file's `answerRoleRotation` member seals it (`"Upgrading to role rotation"` below); the API reads it at start-up, and a malformed row refuses the boot (`ANSWER_ROLE_ROTATION_POLICY_INVALID`) |
 | `lengthGuidancePolicy` | optional: without it every request keeps today's bytes; the API reads it at start-up, and a malformed row refuses the boot (`LENGTH_GUIDANCE_POLICY_INVALID:<path>`) |
@@ -2602,6 +2599,7 @@ vendor, the real ceilings after the owner's first paid run — opens a migrator 
 | `BILLING_REQUIRES_ENVELOPE_MEMBERS` / `BILLING_PLANS_UNRESOLVED` | billing is switched on without the three budget members in `costEnvelopePolicy`, or without plans |
 | `ASK_ROOM_ADMISSION_UNSEALED` | the file seals the band (the budget rule's three members in `costEnvelopePolicy`) without `askRoomReads`, the room read's budget. Refused by the plan (a dry run included), by the publish's boot check as `HOSTED_REGISTER_BOOT_CHECK_FAILED:ASK_ROOM_ADMISSION_UNSEALED`, and when the API starts. Add `askRoomReads` to the same file (go-live line 13, "Publishing them" under the cost envelopes above) |
 | `PUBLICATION_CHECK_POLICY_INVALID` | the file's optional `publicationCheckPolicy` is not `{"kind": "PUBLICATION_CHECK_POLICY", "deadline_ms": N}` with N whole milliseconds from 1000 to 60000, or the member is `null` |
+| `QUESTION_CHECK_POLICY_INVALID` | the file's optional `questionCheckPolicy` is not `{"kind": "QUESTION_CHECK_POLICY", "deadline_ms": N}` with N whole milliseconds from 1000 to 15000, or the member is `null` |
 | `HOSTED_REGISTER_ROLE_ROTATION_INVALID` | the file's optional `answerRoleRotation` (role rotation, spec 2026-10-11) is not exactly `{"enabled": true}` or `{"enabled": false}`: another member, a value that is not `true` or `false`, or the member is `null`. Nothing is sealed |
 | `ANSWER_ROLE_ROTATION_POLICY_INVALID` | the sealed `answerRoleRotationPolicy` row does not parse (a hand-made or damaged row). Refused by the publish's boot check as `HOSTED_REGISTER_BOOT_CHECK_FAILED:ANSWER_ROLE_ROTATION_POLICY_INVALID`, and the API refuses to start on that version: pin nothing, publish a corrected file |
 | `HOSTED_REGISTER_DEBATE_SHAPE_INVALID` | the file's optional `debateShapePolicy` is not an object, carries `kind`, or the register's own parser refuses it (a size outside its bounds, a missing plan, an unknown field). Nothing was sealed. |
@@ -2623,14 +2621,14 @@ vendor, the real ceilings after the owner's first paid run — opens a migrator 
 with "malformed debate shape": fail that run's job (its work item), which drops it from `PREVIEW_UNFINISHED_RUNS_SQL`;
 nothing else is needed.
 
-Before restarting anything on a new version, check that the newest version carries the four
+Before restarting anything on a new version, check that the newest version carries the five
 rows a hosted start-up refuses without:
 
 ```sh
-sudo -u postgres psql -d debateai -c "SELECT register_version, row_key FROM register.register_row WHERE register_version = (SELECT max(register_version) FROM register.register_row) AND row_key IN ('costEnvelopePolicy', 'admissionPolicy', 'configuredProviderSet', 'publicationCheckPolicy') ORDER BY row_key"
+sudo -u postgres psql -d debateai -c "SELECT register_version, row_key FROM register.register_row WHERE register_version = (SELECT max(register_version) FROM register.register_row) AND row_key IN ('costEnvelopePolicy', 'admissionPolicy', 'configuredProviderSet', 'publicationCheckPolicy', 'questionCheckPolicy') ORDER BY row_key"
 ```
 
-Four rows is the pass. Then make that version a new release (§5 "A new register version is a new release").
+Five rows is the pass. Then make that version a new release (§5 "A new register version is a new release").
 
 ### Settings activation (Phase 3)
 
@@ -2771,11 +2769,40 @@ The support chat is part of the API: there is no separate unit. Its settings are
 | the register's support configuration rows | on or off, which model ref, and the limits — published by the operator commands below |
 | the register's `admissionPolicy` row | the three support budgets a hosted API refuses to start without (§11) |
 
+**After migration 0129 — once, by V**. Run this after the hosted deploy of 0129 and before
+recording the support-data cutover. These steps destroy old copies; keep the go-live record.
+
+(1) Inspect all fifteen tables and see zero rows; run `VACUUM FULL`, then `CHECKPOINT`, outside a
+transaction. On this host use these commands, in this order:
+
+```sh
+sudo -u postgres psql -XAt -v ON_ERROR_STOP=1 -d debateai -c "SELECT 'rating' AS t, count(*) FROM support.rating UNION ALL SELECT 'case_message', count(*) FROM support.case_message UNION ALL SELECT 'case_event', count(*) FROM support.case_event UNION ALL SELECT 'case_key', count(*) FROM support.case_key UNION ALL SELECT 'case', count(*) FROM support.\"case\" UNION ALL SELECT 'tool_call', count(*) FROM support.tool_call UNION ALL SELECT 'abuse_event', count(*) FROM support.abuse_event UNION ALL SELECT 'message', count(*) FROM support.message UNION ALL SELECT 'session_key', count(*) FROM support.session_key UNION ALL SELECT 'admission_event', count(*) FROM support.admission_event UNION ALL SELECT 'session', count(*) FROM support.session UNION ALL SELECT 'shred_audit', count(*) FROM support.shred_audit UNION ALL SELECT 'relay_waiter_event', count(*) FROM support.relay_waiter_event UNION ALL SELECT 'relay_waiter', count(*) FROM support.relay_waiter UNION ALL SELECT 'relay_call', count(*) FROM support.relay_call"
+sudo -u postgres psql -v ON_ERROR_STOP=1 -d debateai -c "VACUUM FULL support.rating, support.case_message, support.case_event, support.case_key, support.\"case\", support.tool_call, support.abuse_event, support.message, support.session_key, support.admission_event, support.session, support.shred_audit, support.relay_waiter_event, support.relay_waiter, support.relay_call"
+sudo -u postgres psql -v ON_ERROR_STOP=1 -d debateai -c "CHECKPOINT"
+```
+
+(2) Use the procedure in §3 to rotate the support KEK. With empty tables, it re-wraps no key.
+
+(3) Use §3's previous-key procedure to shred its previous copy on the host.
+
+(4) After the next nightly backup, run a restore drill with that backup and its new escrow
+envelope; proceed only after the drill has opened it.
+
+(5) Compare each older envelope's other secrets with the new envelope, file by file by SHA-256,
+using the escrow identity. Destroy each older envelope on the host, off-host remote and any drill
+or rehearsal medium. Where another secret differs, first make and open a replacement envelope
+holding that secret but not the old support KEK.
+
+(6) Destroy every backup taken before 0129's hosted deploy, on the host (daily and weekly), on
+the off-host remote and on any drill or rehearsal medium, only after step (4)'s restore drill.
+
+(7) Enter the date and the numbers of envelopes and backups destroyed in the go-live record.
+
 **The operator commands need two credentials.** Configuration changes run as the JIT
 support-config operator, whose credential the provisioner publishes to
 `/run/debateai/support-config/operator.json` and which is valid for at most fifteen minutes (§4;
-how to open a new window is P3-02's "Support configuration rollout"). `support:status` also reads
-support data, as `debateai_prod_api_support`, from a one-entry credential file. Both URLs must
+how to open a new window is P3-02's "Support configuration rollout"). `support:status` still asks
+for a one-entry support-data credential file, but reads no support data after 0129. Both URLs must
 carry one of the two shapes the host's `pg_hba` admits — the socket or verified TLS (§4,
 `DL7-F6`); the URL in `api.env` already does. Run as root from `/opt/debateai/dialectical-engine`.
 
@@ -2800,12 +2827,6 @@ If `support:status` refuses, the credential stays in `/run/debateai/support-data
 `0600`); read the refusal, then destroy it by hand.
 
 `support:switch off` is the emergency stop and takes the same arguments.
-
-**Not available on this host yet:** `support:inbox` and `support:incident` (the case inbox and
-incident notes) have no production credential path at all, and `support:shred` looks for its
-production credential at `secrets/api-support.json` under its working directory. Answering a
-case or shredding a conversation on this host is not possible until those are given production
-paths.
 
 ### Staff independent alerts (v2 source only; activation blocked)
 
@@ -3726,19 +3747,19 @@ went back (M8) follows once the refund is done; when nothing is due back, M8 goe
 email. A withdrawal made in Settings sends the same emails. When the 14th day is a Saturday or a Sunday, the person
 still has until the end of the next Monday; the command counts it the same way.
 
-First find the person's owner reference. If they wrote through the support chat while signed in, it is the
-`identity_owner_ref` of their case. `pnpm support:inbox` has no production credential on this host yet (§13), so
-match the case by when they wrote. Never guess: run `pnpm billing:withdraw` only when exactly one case matches the
-time the person gives, because the command ends that owner's plan and queues the refund. If two cases are close
-together, ask the person for the exact time they wrote from the chat:
+First find the person's owner reference from the account address. Send the address on stdin to
+`pnpm billing:withdraw --owner-of-email`; it prints `owner_ref: <uuid>` or `owner_ref: none`.
+On the host, enter the account address at the prompt; the command runs as the API user with its
+environment file:
 
 ```sh
-sudo -u postgres psql -d debateai -c "SELECT case_id, identity_owner_ref, created_at, state FROM support.\"case\" WHERE identity_owner_ref IS NOT NULL ORDER BY created_at DESC LIMIT 20"
+read -r ADDRESS && printf '%s\n' "$ADDRESS" | sudo systemd-run --pipe --wait --quiet --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:withdraw --owner-of-email
 ```
 
-If they wrote only by email, reply and ask them to send the same statement from the support chat while signed in.
-The time you record is still the arrival of their first email. Then record the withdrawal; the command asks for the
-two values at the prompt:
+If it prints `owner_ref: none`, ask the person to send the statement again from their account's
+address. Record the arrival time of the first statement, even when the account-address reply comes
+later. Never guess an owner reference. Then record the withdrawal; the command asks for the two
+values at the prompt:
 
 ```sh
 # Paste the owner reference and press Enter; then the time the first statement arrived, in UTC (for example 2026-10-12T08:30:00Z), and press Enter.

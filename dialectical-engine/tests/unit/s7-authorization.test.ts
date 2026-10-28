@@ -9,6 +9,7 @@ import {
   RETIRED_DEV_HEADER,TEST_APP_ORIGIN,testHttpIdentity,
   testSessionApplication,testSessionHeaders
 } from "../support/httpSession.js";
+import { questionCheckPass } from "../support/questionCheckPass.js";
 import type { AnswerStoryApplication } from "../../apps/api/src/stories.js";
 import type { AnswerDisclosureApplication } from "../../apps/api/src/disclosures.js";
 import type { AnswerMapViewApplication } from "../../apps/api/src/map-views.js";
@@ -82,6 +83,7 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "GET /v1/account/export", auth: "user", resource: "identity", action: "read-data-export" },
   { route: "POST /v1/account/export", auth: "user", resource: "identity", action: "request-data-export" },
   { route: "POST /v1/account/export/download", auth: "user", resource: "identity", action: "download-data-export" },
+  { route: "POST /v1/account/removal-notice/take", auth: "user", resource: "identity", action: "take-removal-notice" },
   { route: "GET /v1/account/legal-status", auth: "user", resource: "identity", action: "read-legal-status" },
   { route: "POST /v1/account/legal-accept", auth: "user", resource: "identity", action: "accept-legal" },
   { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
@@ -104,16 +106,8 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   // Side-by-side §13 addition D24 (owner 2026-10-22): the companies the declared provider targets reach, public.
   { route: "GET /v1/public/ai-providers", auth: "public", resource: "deployment", action: "read-ai-providers" },
   { route: "GET /v1/geo/availability", auth: "public", resource: "geo", action: "read-availability" },
-  // DL1-F7: every mutating support route, anonymous callers included.
-  { route: "POST /v1/support/sessions", auth: "public", origin: "trusted", session: "optional", resource: "support-session", action: "create" },
-  { route: "GET /v1/support/sessions/{id}", auth: "public", session: "optional", resource: "support-session", action: "read" },
-  { route: "POST /v1/support/sessions/{id}/messages", auth: "public", origin: "trusted", session: "optional", resource: "support-message", action: "create" },
-  { route: "POST /v1/support/messages/{id}/rating", auth: "public", origin: "trusted", session: "optional", resource: "support-message", action: "rate" },
-  { route: "POST /v1/support/sessions/{id}/escalate", auth: "public", origin: "trusted", session: "optional", resource: "support-case", action: "create" },
-  { route: "GET /v1/support/cases", auth: "user", resource: "support-case", action: "list" },
-  // DL1-F5c/DL3-F4: the bearer is a header, never a path segment.
-  { route: "GET /v1/support/case", auth: "public", session: "optional", resource: "support-case", action: "read" },
-  { route: "POST /v1/support/case/messages", auth: "public", origin: "trusted", session: "optional", resource: "support-case", action: "reply" },
+  // One stateless message door. The removed session and case doors have no policy.
+  { route: "POST /v1/support/messages", auth: "public", origin: "trusted", session: "optional", resource: "support-message", action: "create" },
   { route: "GET /v1/support/status", auth: "public", session: "optional", resource: "support-status", action: "read" },
   { route: "POST /v1/asks", auth: "user", resource: "run-owner", action: "create" },
   { route: "GET /v1/asks/room", auth: "user", resource: "run-owner", action: "read-room" },
@@ -140,6 +134,8 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "GET /v1/runs/{id}/answer", auth: "user", resource: "run-owner", action: "read-run-answer" },
   { route: "POST /v1/runs/{id}/publish", auth: "user", resource: "run-owner", action: "publish" },
   { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" },
+  { route: "POST /v1/runs/{id}/publication-review", auth: "user", resource: "run-owner", action: "request-review" },
+  { route: "GET /v1/runs/{id}/publication-review", auth: "user", resource: "run-owner", action: "read-review" },
   { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
   { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" },
   { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
@@ -180,6 +176,14 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   // No static capability: the handler selects TEAM_DISABLE or EMERGENCY_DISABLE from the strict mode.
   { route: "POST /v1/admin/team/{staffId}/disable", auth: "staff", resource: "staff-team", action: "disable" },
   { route: "GET /v1/admin/audit", auth: "staff", staffCapability: "AUDIT_READ", resource: "staff-audit", action: "list" },
+  { route: "GET /v1/admin/threat-reports", auth: "staff", staffCapability: "THREAT_REPORT", resource: "staff-threat-report", action: "list" },
+  { route: "GET /v1/admin/threat-reports/summary", auth: "staff", staffCapability: "THREAT_REPORT", resource: "staff-threat-report", action: "summary" },
+  { route: "GET /v1/admin/threat-reports/{reportRef}", auth: "staff", staffCapability: "THREAT_REPORT", resource: "staff-threat-report", action: "read" },
+  { route: "POST /v1/admin/threat-reports/{reportRef}/decision", auth: "staff", staffCapability: "THREAT_REPORT", resource: "staff-threat-report", action: "decide" },
+  { route: "GET /v1/admin/publication-reviews", auth: "staff", staffCapability: "PUBLICATION_REVIEW", resource: "staff-publication-review", action: "list" },
+  { route: "GET /v1/admin/publication-reviews/{reviewRef}", auth: "staff", staffCapability: "PUBLICATION_REVIEW", resource: "staff-publication-review", action: "read" },
+  { route: "POST /v1/admin/publication-reviews/{reviewRef}/approve", auth: "staff", staffCapability: "PUBLICATION_REVIEW", resource: "staff-publication-review", action: "approve" },
+  { route: "POST /v1/admin/publication-reviews/{reviewRef}/refuse", auth: "staff", staffCapability: "PUBLICATION_REVIEW", resource: "staff-publication-review", action: "refuse" },
   { route: "POST /v1/admin/internal-allowances", auth: "staff", staffCapability: "ALLOWANCE_WRITE", resource: "staff-self", action: "allowance-configure" },
   { route: "DELETE /v1/admin/internal-allowances/{grantId}", auth: "staff", staffCapability: "ALLOWANCE_WRITE", resource: "staff-self", action: "allowance-revoke" },
 ] as const);
@@ -309,7 +313,7 @@ const USER_MUTATION_HEADERS=testSessionHeaders(USER_IDENTITY,true);
 
 function buildUserApi(application:AskApplication=fixtureApplication()) {
   return buildApi({
-    application,sessions:testSessionApplication([USER_IDENTITY]),allowedOrigin:TEST_APP_ORIGIN
+    application,questionCheck:questionCheckPass,sessions:testSessionApplication([USER_IDENTITY]),allowedOrigin:TEST_APP_ORIGIN
   });
 }
 
@@ -329,16 +333,17 @@ describe("S7 deny-by-default authorization", () => {
     // The WHOLE inventory, staff rows included, row for row (no route family is filtered out).
     const order=(a:{route:string},b:{route:string})=>a.route<b.route?-1:a.route>b.route?1:0;
     expect([...authorizationPolicyInventory].sort(order)).toEqual([...EXPECTED_AUTHORIZATION_MATRIX].sort(order));
-    // 18 staff contract routes + the two internal-allowance routes.
-    expect(EXPECTED_AUTHORIZATION_MATRIX.filter(policy => policy.route.includes(" /v1/admin/"))).toHaveLength(20);
-    expect(staffContractInventory.routes).toHaveLength(18);
+    // 26 staff contract routes + the two internal-allowance routes.
+    expect(EXPECTED_AUTHORIZATION_MATRIX.filter(policy => policy.route.includes(" /v1/admin/"))).toHaveLength(28);
+    expect(staffContractInventory.routes).toHaveLength(26);
     // The merged closed inventory adds the twenty-one external recovery routes to the current ordinary inventory and 20 staff/internal
     // allowance routes; set equality and Fastify mounting above check each one. NETOPIA's card page (N13) adds
     // GET /v1/billing/subscription/card, the auth DB batch's four MFA-recovery wait routes, beside dev's 158, and
     // data-export S01's 3 routes.
     // Debate shape P2c adds GET /v1/answers/{id}/map. Side-by-side C5 adds GET /livez and GET /readyz. Side-by-side §13
     // addition D24 adds GET /v1/public/ai-providers.
-    expect(contractInventory.routes).toHaveLength(170);
+    // The synthesis check adds the once-only removal notice route.
+    expect(contractInventory.routes).toHaveLength(174);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 

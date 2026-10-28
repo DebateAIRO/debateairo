@@ -561,17 +561,21 @@ describe("SUP-01 final model-call reservation", () => {
     expect(reservations.activeCount()).toBe(0);
   });
 
-  it("binds every production answer and advisory-summary provider call through the final wrapper", () => {
+  it("binds every production answer provider call through the final wrapper", () => {
     const main = readFileSync(new URL("../../apps/api/src/main.ts",import.meta.url),"utf8");
-    const supportComposition = main.slice(
-      main.indexOf("const supportModels"),main.indexOf("const supportStatus")
-    );
+    // synthesis-flag S05 removed `const supportStatus`; the support block now ends where billing's begins.
+    const start = main.indexOf("const supportModels"), end = main.indexOf("const taxAuthorities");
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const supportComposition = main.slice(start,end);
 
     expect(supportComposition).toContain("createReservedSupportModelPort");
     expect(supportComposition).toContain("const supportAdmittedModel");
-    expect(supportComposition).toContain("durableCalls: supportRelayCallRecords");
+    // synthesis-flag S05 (V-114): the daily call count lives in the API's memory.
+    expect(supportComposition).toContain("durableCalls: createMemorySupportCallRecords()");
     expect(supportComposition).not.toMatch(/\bmodel\.complete\(/u);
-    expect(supportComposition.match(/supportAdmittedModel\.complete\(/gu)).toHaveLength(1);
+    // V-111: the case advisory summary, the one direct caller, left with the support cases.
+    expect(supportComposition).not.toMatch(/supportAdmittedModel\.complete\(/u);
     expect(supportComposition).toContain("modelFor: (modelRef) => supportModels.get(modelRef)");
     expect(supportComposition).toMatch(
       /createSupportAnswerService\(\{[\s\S]*?modelFor: \(\) => supportAdmittedModel/u

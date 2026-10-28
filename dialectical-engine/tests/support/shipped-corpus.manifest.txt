@@ -147,7 +147,17 @@ apps/api/src/publication-check/judge-transport.ts
 apps/api/src/publication-check/material.ts
 apps/api/src/publication-check/policy.ts
 apps/api/src/publication-check/verdict.ts
+apps/api/src/publication-review/owner.ts
+apps/api/src/publication-review/staff.ts
 apps/api/src/publications.ts
+apps/api/src/question-check/ask-gate.ts
+apps/api/src/question-check/check.ts
+apps/api/src/question-check/compose.ts
+apps/api/src/question-check/contract.ts
+apps/api/src/question-check/instruction.ts
+apps/api/src/question-check/subjects.ts
+apps/api/src/question-check/transport.ts
+apps/api/src/question-check/verdict.ts
 apps/api/src/question-language/boot.ts
 apps/api/src/question-language/decide.ts
 apps/api/src/question-language/decider.ts
@@ -178,6 +188,9 @@ apps/api/src/staff/alerts.ts
 apps/api/src/staff/internal-allowances.ts
 apps/api/src/staff/routes.ts
 apps/api/src/staff/runtime.ts
+apps/api/src/staff/threat-report-alert.ts
+apps/api/src/staff/threat-report-closure.ts
+apps/api/src/staff/threat-reports.ts
 apps/api/src/staff/webauthn-codec.ts
 apps/api/src/staff/webauthn-verifier.ts
 apps/api/src/staff/webauthn.ts
@@ -187,6 +200,7 @@ apps/api/src/support/answer.ts
 apps/api/src/support/c3-admission.ts
 apps/api/src/support/cases.ts
 apps/api/src/support/classify.ts
+apps/api/src/support/crisis-first.ts
 apps/api/src/support/degraded.ts
 apps/api/src/support/draft-screens.ts
 apps/api/src/support/escalation.ts
@@ -194,6 +208,8 @@ apps/api/src/support/incidents.ts
 apps/api/src/support/index.ts
 apps/api/src/support/keys.ts
 apps/api/src/support/limits.ts
+apps/api/src/support/memory-call-records.ts
+apps/api/src/support/memory-limits.ts
 apps/api/src/support/model-references.ts
 apps/api/src/support/model-reservation.ts
 apps/api/src/support/model.ts
@@ -207,6 +223,13 @@ apps/api/src/support/session.ts
 apps/api/src/support/shred.ts
 apps/api/src/support/templates.ts
 apps/api/src/support/tools.ts
+apps/api/src/synthesis-check/check.ts
+apps/api/src/synthesis-check/hold.ts
+apps/api/src/synthesis-check/policy.ts
+apps/api/src/synthesis-check/publish-gate.ts
+apps/api/src/synthesis-check/transport.ts
+apps/api/src/synthesis-check/verdict.ts
+apps/api/src/synthesis-check/worker.ts
 apps/api/src/turnstile.ts
 apps/api/src/verification-email.ts
 apps/evaluator-worker/src/index.ts
@@ -399,7 +422,6 @@ apps/runner/src/shape-seats.ts
 apps/runner/src/shape-select.ts
 apps/runner/src/story-snapshot.ts
 apps/runner/src/support-config-cli-credentials.ts
-apps/runner/src/support-inbox-cli.ts
 apps/runner/src/support-incident-cli.ts
 apps/runner/src/support-limits-cli.ts
 apps/runner/src/support-shred-cli.ts
@@ -409,7 +431,9 @@ apps/runner/src/support-switch-cli.ts
 apps/scheduler/src/cli.ts
 apps/scheduler/src/index.ts
 apps/ui/app/admin/invitation/page.tsx
+apps/ui/app/admin/reviews/page.tsx
 apps/ui/app/admin/team/page.tsx
+apps/ui/app/admin/threat-reports/page.tsx
 apps/ui/app/admin/workers/page.tsx
 apps/ui/app/ai-transparency/page.tsx
 apps/ui/app/api/[...path]/route.ts
@@ -420,6 +444,7 @@ apps/ui/app/cookies/page.tsx
 apps/ui/app/debate/[id]/DebatePageClient.tsx
 apps/ui/app/debate/[id]/DebatePageGate.tsx
 apps/ui/app/debate/[id]/loading.tsx
+apps/ui/app/debate/[id]/not-found.tsx
 apps/ui/app/debate/[id]/page.tsx
 apps/ui/app/debate/[id]/report/route.ts
 apps/ui/app/enroll-mfa/layout.tsx
@@ -474,6 +499,7 @@ apps/ui/components/AuthShell.tsx
 apps/ui/components/BackupEmailVerification.tsx
 apps/ui/components/CanvasViewport.tsx
 apps/ui/components/ChallengePopover.tsx
+apps/ui/components/CheckRemovalNotice.tsx
 apps/ui/components/CrisisSupport.tsx
 apps/ui/components/DataExportCard.tsx
 apps/ui/components/DateOfBirthField.tsx
@@ -491,6 +517,7 @@ apps/ui/components/EvaluatorDevMenu.tsx
 apps/ui/components/ExportDownloadClient.tsx
 apps/ui/components/FloorAnswer.tsx
 apps/ui/components/GuideModal.tsx
+apps/ui/components/HarmHelpLine.tsx
 apps/ui/components/InvestigationDrawer.tsx
 apps/ui/components/KnownPasswordRecoveryLink.tsx
 apps/ui/components/LanguageSwitcher.tsx
@@ -510,8 +537,11 @@ apps/ui/components/PublicAnswerDisclosure.tsx
 apps/ui/components/PublicDebateOverview.tsx
 apps/ui/components/PublicHonestyDrawer.tsx
 apps/ui/components/PublicationControl.tsx
+apps/ui/components/PublicationReviewPanel.tsx
+apps/ui/components/PublicationReviewsPanel.tsx
 apps/ui/components/QuestionLanguageChoice.tsx
 apps/ui/components/QuestionLanguageOffer.tsx
+apps/ui/components/QuestionRefusal.tsx
 apps/ui/components/RecommendedInvestigations.tsx
 apps/ui/components/ReferenceNodeMeta.tsx
 apps/ui/components/RegionField.tsx
@@ -526,7 +556,11 @@ apps/ui/components/StaffAccessPanel.tsx
 apps/ui/components/StaffInvitationPanel.tsx
 apps/ui/components/StoryPanel.tsx
 apps/ui/components/StoryShortBlocks.tsx
+apps/ui/components/SynthesisHoldRefresher.tsx
 apps/ui/components/SynthesisPanel.tsx
+apps/ui/components/TakeDownControl.tsx
+apps/ui/components/ThreatReportsLink.tsx
+apps/ui/components/ThreatReportsPanel.tsx
 apps/ui/components/Toast.tsx
 apps/ui/components/TopBar.tsx
 apps/ui/components/VerdictBanner.tsx
@@ -594,11 +628,11 @@ apps/ui/components/legal/LegalPageLayout.tsx
 apps/ui/components/modeTransition.test.mjs
 apps/ui/components/modeTransition.ts
 apps/ui/components/support/Assistant.tsx
-apps/ui/components/support/CaseView.tsx
+apps/ui/components/support/HelpSupport.tsx
 apps/ui/components/support/SupportConversationGuard.tsx
 apps/ui/components/support/SupportWidget.tsx
-apps/ui/components/support/caseLink.test.mjs
-apps/ui/components/support/caseLink.ts
+apps/ui/components/support/WhenSupportOffered.tsx
+apps/ui/components/support/availability.ts
 apps/ui/components/support/conversation.ts
 apps/ui/components/support/http.ts
 apps/ui/components/support/sessionChange.ts
@@ -631,6 +665,7 @@ apps/ui/lib/consumerWebAuthn.ts
 apps/ui/lib/contentSecurityPolicy.test.mjs
 apps/ui/lib/crisisLineDirectory.ts
 apps/ui/lib/crisisLines.ts
+apps/ui/lib/crisisNames.generated.ts
 apps/ui/lib/dataExportPending.ts
 apps/ui/lib/debateHeaderOverflow.ts
 apps/ui/lib/debatePresentation.ts
@@ -785,6 +820,7 @@ apps/ui/lib/socialStepUpHandoff.ts
 apps/ui/lib/staffApi.ts
 apps/ui/lib/staffWebAuthn.ts
 apps/ui/lib/termsOfService.ts
+apps/ui/lib/threatReportsApi.ts
 apps/ui/lib/totpQr.ts
 apps/ui/lib/trustedClientIp.test.mjs
 apps/ui/lib/turnstile.ts
@@ -899,6 +935,7 @@ packages/contract/src/crisis-lexicon/zh.ts
 packages/contract/src/crisis.ts
 packages/contract/src/disclosure.ts
 packages/contract/src/generate.ts
+packages/contract/src/harm-helpline.ts
 packages/contract/src/http-error.ts
 packages/contract/src/index.ts
 packages/contract/src/lineage.ts
@@ -907,10 +944,13 @@ packages/contract/src/map-view.ts
 packages/contract/src/mfa-recovery.ts
 packages/contract/src/password-reset.ts
 packages/contract/src/plan-tiers.ts
+packages/contract/src/publication-review.ts
+packages/contract/src/question-check.ts
 packages/contract/src/romania-address.ts
 packages/contract/src/social-auth.ts
 packages/contract/src/staff-access.ts
 packages/contract/src/story.ts
+packages/contract/src/synthesis-check.ts
 packages/contract/src/verdict-state.ts
 packages/critique/src/index.ts
 packages/crypto/src/argon2-worker-pool.ts
@@ -952,6 +992,10 @@ packages/db/src/migration-forward0122.ts
 packages/db/src/migration-forward0123.ts
 packages/db/src/migration-forward0124.ts
 packages/db/src/migration-forward0125.ts
+packages/db/src/migration-forward0126.ts
+packages/db/src/migration-forward0127.ts
+packages/db/src/migration-forward0128.ts
+packages/db/src/migration-forward0129.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
 packages/db/src/migration-forward111.ts
@@ -982,6 +1026,8 @@ packages/db/src/social-identity.ts
 packages/db/src/spend-waiver.ts
 packages/db/src/staff-access.ts
 packages/db/src/support.ts
+packages/db/src/synthesis-check-erasure.ts
+packages/db/src/threat-reports.ts
 packages/evaluator/src/blind-sample.ts
 packages/evaluator/src/consumer-postgres.ts
 packages/evaluator/src/consumer.ts
@@ -1130,6 +1176,7 @@ packages/register/src/password-reset-policy.ts
 packages/register/src/preview-line-up-policy.ts
 packages/register/src/product-role-policy.ts
 packages/register/src/publication-check-policy.ts
+packages/register/src/question-check-policy.ts
 packages/register/src/question-language-policy.ts
 packages/register/src/recovery-policy.ts
 packages/register/src/register-publication.ts
@@ -1141,6 +1188,7 @@ packages/register/src/settings-classification.ts
 packages/register/src/staff-access-policy.ts
 packages/register/src/story-policy.ts
 packages/register/src/support-config.ts
+packages/register/src/support-no-source-check-policy.ts
 packages/register/src/tax-authorities.ts
 packages/scorecard/scripts/write-schema.ts
 packages/scorecard/src/estimate.ts
@@ -1157,6 +1205,8 @@ packages/serve/src/engine-verdict.ts
 packages/serve/src/index.ts
 packages/serve/src/judges-comparison.ts
 packages/serve/src/model-assignment.ts
+packages/serve/src/publication-review.ts
+packages/serve/src/synthesis-check.ts
 packages/serve/src/synthesis.ts
 packages/settlement/src/index.ts
 packages/story/src/backup.ts

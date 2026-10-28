@@ -120,76 +120,39 @@ describe("DL5-F3 the stored source pseudonym is keyed", () => {
   });
 });
 
-describe("DL5-F3 the support routes record the keyed pseudonym", () => {
-  const harness = () => {
-    const support = supportHarness();
-    const api = buildApi({
-      application: fixtureAskApplication(),
-      support: support.application,
-      allowedOrigin: TEST_APP_ORIGIN
-    });
-    return Object.freeze({ api, support, close: async () => api.close() });
-  };
-
-  it("pseudonymises the source at the /64, and writes no bare digest", async () => {
-    const h = harness();
+describe("DL5-F3 the stateless route counts by a keyed pseudonym", () => {
+  it("uses one /64 pseudonym for two IPv6 addresses and never exposes the network in keys", async () => {
+    const port = await makePort();
+    const support = supportHarness({ sourcePseudonym: (value) => port.sourcePseudonym(value) });
+    const api = buildApi({ application: fixtureAskApplication(), support: support.application,
+      allowedOrigin: TEST_APP_ORIGIN });
     try {
-      const created = await h.api.inject({
-        method: "POST", url: "/v1/support/sessions", headers: { origin: TEST_APP_ORIGIN },
-        remoteAddress: "2001:db8:1:2::9", payload: { language: "en" }
-      });
-      expect(created.statusCode).toBe(201);
-      // The repository saw the keyed value for the /64, never `sha256(address)`.
-      expect(h.support.spies.sourcePseudonym).toHaveBeenCalledWith("2001:db8:1:2::/64");
-      const [admitted] = h.support.spies.admitIpSession.mock.calls;
-      expect((admitted?.[0] as { ipSha256: string }).ipSha256).toBe("keyed:2001:db8:1:2::/64");
-      expect((admitted?.[0] as { ipSha256: string }).ipSha256)
-        .not.toBe(createHash("sha256").update("2001:db8:1:2::9", "utf8").digest("hex"));
-
-      // A second address in the same /64 is the same source, not a fresh one.
-      await h.api.inject({
-        method: "POST", url: "/v1/support/sessions", headers: { origin: TEST_APP_ORIGIN },
-        remoteAddress: "2001:db8:1:2:a:b:c:d", payload: { language: "en" }
-      });
-      const scopes = h.support.spies.admitIpSession.mock.calls
-        .map((call) => (call[0] as { ipSha256: string }).ipSha256);
-      expect(new Set(scopes).size).toBe(1);
-
-      // And an IPv4 caller keeps its own whole address as the scope.
-      await h.api.inject({
-        method: "POST", url: "/v1/support/sessions", headers: { origin: TEST_APP_ORIGIN },
-        remoteAddress: "203.0.113.5", payload: { language: "en" }
-      });
-      expect(h.support.spies.sourcePseudonym).toHaveBeenCalledWith("203.0.113.5");
-    } finally {
-      await h.close();
-    }
+      for (const remoteAddress of ["2001:db8:1:2::9", "2001:db8:1:2:a:b:c:d"]) {
+        const result = await api.inject({ method: "POST", url: "/v1/support/messages", remoteAddress,
+          headers: { origin: TEST_APP_ORIGIN }, payload: { language: "en", text: "How do I use the app?" } });
+        expect(result.statusCode).toBe(200);
+      }
+      expect(support.spies.sourcePseudonym).toHaveBeenCalledWith("2001:db8:1:2::/64");
+      const keys = support.application.limiter.keys();
+      expect(keys).toHaveLength(1);
+      expect(keys[0]).toBe(`source:${port.sourcePseudonym("2001:db8:1:2::/64")}`);
+      expect(keys[0]).not.toContain("2001:db8");
+    } finally { await api.close(); }
   });
 
-  it("pseudonymises the source on the message route too", async () => {
-    const h = harness();
+  it("keeps IPv4 source keys separate without storing either address", async () => {
+    const port = await makePort();
+    const support = supportHarness({ sourcePseudonym: (value) => port.sourcePseudonym(value) });
+    const api = buildApi({ application: fixtureAskApplication(), support: support.application,
+      allowedOrigin: TEST_APP_ORIGIN });
     try {
-      const created = await h.api.inject({
-        method: "POST", url: "/v1/support/sessions", headers: { origin: TEST_APP_ORIGIN },
-        remoteAddress: "198.51.100.7", payload: { language: "en" }
-      });
-      const body = created.json() as Readonly<{
-        session: Readonly<{ session_id: string }>;session_token: string;
-      }>;
-      h.support.spies.sourcePseudonym.mockClear();
-      const answered = await h.api.inject({
-        method: "POST",
-        url: `/v1/support/sessions/${body.session.session_id}/messages`,
-        remoteAddress: "198.51.100.7",
-        headers: { "x-support-session-token": body.session_token, origin: TEST_APP_ORIGIN },
-        payload: { text: "how do I change my password?" }
-      });
-      expect(answered.statusCode).toBeLessThan(500);
-      expect(h.support.spies.sourcePseudonym).toHaveBeenCalledWith("198.51.100.7");
-      const [admitted] = h.support.spies.admitMessage.mock.calls;
-      expect((admitted?.[0] as { ipSha256: string }).ipSha256).toBe("keyed:198.51.100.7");
-    } finally {
-      await h.close();
-    }
+      for (const remoteAddress of ["203.0.113.5", "203.0.113.6"]) {
+        const result = await api.inject({ method: "POST", url: "/v1/support/messages", remoteAddress,
+          headers: { origin: TEST_APP_ORIGIN }, payload: { language: "en", text: "How do I use the app?" } });
+        expect(result.statusCode).toBe(200);
+      }
+      expect(support.application.limiter.keys()).toHaveLength(2);
+      expect(JSON.stringify(support.application.limiter.keys())).not.toContain("203.0.113.");
+    } finally { await api.close(); }
   });
 });

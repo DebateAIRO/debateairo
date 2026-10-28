@@ -337,9 +337,7 @@ function parseContentEnvelope(ciphertext: Uint8Array): Readonly<{
  * root, so the file is still opened by one uid. `SUPPORT_KEK_PATH` is absent
  * from the runner service's environment shape and from
  * `deploy/vps/env/runner.env.example`, so `debateai-runner` cannot be configured
- * with it at all; the rows it wraps live in `support.session_key` /
- * `support.case_key`, reached through `SUPPORT_DATABASE_URL` and the
- * `debateai_support` role, which is likewise not the runner service's.
+ * with it at all. The API and operator commands retain one custodial uid.
  *
  * So the support KEK stays single-owner: 0600 owned by this uid inside a 0700
  * directory. Widen it only when a second SERVICE principal genuinely needs it.
