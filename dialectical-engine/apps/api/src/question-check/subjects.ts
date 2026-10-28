@@ -72,7 +72,7 @@ export function parseQuestionSubjects(value: unknown): QuestionSubjects {
 export function readQuestionSubjects(path: string = resolve(QUESTION_SUBJECTS_PATH)): QuestionSubjects {
   let value: unknown;
   try {
-    value = JSON.parse(readFileSync(path, "utf8").replace(/^﻿/u, ""));
+    value = JSON.parse(readFileSync(path, "utf8").replace(/^\uFEFF/u, ""));
   } catch {
     invalid(`cannot read ${path} as JSON`);
   }
