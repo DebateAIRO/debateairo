@@ -120,6 +120,7 @@ apps/api/src/email-mfa-routes.ts
 apps/api/src/engine-ask.ts
 apps/api/src/graceful-shutdown.ts
 apps/api/src/index.ts
+apps/api/src/italy-approval.ts
 apps/api/src/legacy-claim.ts
 apps/api/src/legal.ts
 apps/api/src/length-guidance-ask.ts
@@ -567,6 +568,7 @@ apps/ui/components/accountNavigation.source-test.mjs
 apps/ui/components/auth/EmailPendingScreen.tsx
 apps/ui/components/auth/EphemeralCodes.tsx
 apps/ui/components/auth/InlineFieldMessage.tsx
+apps/ui/components/auth/ItalyApprovalBox.tsx
 apps/ui/components/auth/LockoutPrompt.tsx
 apps/ui/components/auth/OnboardingEvidence.tsx
 apps/ui/components/auth/PhoneField.tsx
@@ -986,6 +988,7 @@ packages/db/src/migration-forward0121.ts
 packages/db/src/migration-forward0122.ts
 packages/db/src/migration-forward0123.ts
 packages/db/src/migration-forward0124.ts
+packages/db/src/migration-forward0125.ts
 packages/db/src/migration-forward0126.ts
 packages/db/src/migration-forward0127.ts
 packages/db/src/migration-forward0128.ts
@@ -1050,6 +1053,7 @@ packages/kernel/src/debate-roles.ts
 packages/kernel/src/engine-material.ts
 packages/kernel/src/engine.ts
 packages/kernel/src/index.ts
+packages/kernel/src/italy-approval.ts
 packages/kernel/src/length-guidance.ts
 packages/kernel/src/mail-address.ts
 packages/kernel/src/manualPhone.ts

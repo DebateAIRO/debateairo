@@ -513,9 +513,10 @@ const apiEnvironmentShape = {
     RECORDS_KEY_PATH: z.string().min(1),
     /**
      * Paid plans G1: the country data the country gate reads — DB-IP's Lite country MMDB and the Tor
-     * exit list. PUBLIC data, not custody files (the refresh timer writes them 0644). Optional in
+     * exit list. PUBLIC data, not custody files (the refresh timer writes them 0644). The same files
+     * also feed the Italy approval's IP leg on every hosted boot, gate or not (ADR-0038). Optional in
      * the shape and REQUIRED when hosted (validateApiEnvironment, GEOIP_PATHS_REQUIRED); local mode
-     * has no country gate and needs neither.
+     * has no country gate and no IP leg, and needs neither.
      */
     GEOIP_COUNTRY_DB_PATH: z.string().min(1).optional(),
     TOR_EXIT_LIST_PATH: z.string().min(1).optional(),

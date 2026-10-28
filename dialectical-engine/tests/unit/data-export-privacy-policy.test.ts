@@ -111,13 +111,14 @@ describe("data export privacy policy", () => {
     }
   });
 
-  // SPEC-v6 R40 (V-6, no bump) kept the base's version. origin/dev raised it to 3.5 (card payments) and synthesis-flag S03
-  // to 3.6 on top. No one re-accepts it (synthesis-flag S03-R5, V-24/V-70), so the reacceptance floor stays "3.2".
-  it("pins the current Privacy version (3.6, raised from origin/dev's 3.5) and the reacceptance floor (3.2)", () => {
+  // SPEC-v6 R40 (V-6, no bump) kept the base's version. origin/dev raised it to 3.5 (card payments), 3.6 (the Italy
+  // approval) and 3.7 (Perplexity), and synthesis-flag to 3.8 on top. No one re-accepts it (synthesis-flag S03-R5,
+  // V-24/V-70), so the reacceptance floor stays "3.2".
+  it("pins the current Privacy version (3.8, raised from origin/dev's 3.7) and the reacceptance floor (3.2)", () => {
     const manifest = JSON.parse(
       readFileSync(join(root, "packages/legal-manifest/src/manifest.json"), "utf8"),
     ) as { reacceptance: { PRIVACY: string } };
-    expect(PRIVACY_POLICY.version).toBe("3.6");
+    expect(PRIVACY_POLICY.version).toBe("3.8");
     expect(manifest.reacceptance.PRIVACY).toBe("3.2");
   });
 });

@@ -11,6 +11,7 @@ import {
   DEEPINFRA_PROVIDER,
   GOOGLE_PREVIEW_PROVIDER,
   MODEL_PROVIDERS,
+  PERPLEXITY_PROVIDER,
   SUPPORT_PROVIDER,
   providerRegister,
   type ProviderRegisterEntry
@@ -60,13 +61,14 @@ const catalogOf = (locale: string) =>
 
 /** Every company list the page can be built from, and the rows each gives. */
 const CASES: ReadonlyArray<readonly [label: string, companies: readonly string[] | null, keys: readonly string[]]> = [
-  ["anthropic + deepinfra", ["anthropic", "deepinfra"], ["claude", "deepinfra", "support"]],
-  ["the answer's order does not matter", ["deepinfra", "anthropic"], ["claude", "deepinfra", "support"]],
-  ["deepinfra alone (the GLM-only set)", ["deepinfra"], ["deepinfra", "support"]],
-  ["anthropic alone", ["anthropic"], ["claude", "support"]],
-  ["no answer", null, ["claude", "deepinfra", "support"]],
-  ["an empty answer", [], ["claude", "deepinfra", "support"]],
-  ["deepinfra + an unknown host", ["deepinfra", ACME], ["deepinfra", ACME, "support"]]
+  ["anthropic + deepinfra", ["anthropic", "deepinfra"], ["claude", "deepinfra", "perplexity", "support"]],
+  ["the answer's order does not matter", ["deepinfra", "anthropic"], ["claude", "deepinfra", "perplexity", "support"]],
+  ["deepinfra alone (the GLM-only set)", ["deepinfra"], ["deepinfra", "perplexity", "support"]],
+  ["anthropic alone", ["anthropic"], ["claude", "perplexity", "support"]],
+  ["no answer", null, ["claude", "deepinfra", "perplexity", "support"]],
+  ["an empty answer", [], ["claude", "deepinfra", "perplexity", "support"]],
+  ["deepinfra + an unknown host", ["deepinfra", ACME], ["deepinfra", ACME, "perplexity", "support"]],
+  ["perplexity named by the API is still listed once", ["deepinfra", "perplexity"], ["deepinfra", "perplexity", "support"]]
 ];
 
 describe("the rows are the companies the API answers (addition D24)", () => {
@@ -86,7 +88,7 @@ describe("the rows are the companies the API answers (addition D24)", () => {
 
   it("unknown hosts come after the reviewed rows, sorted, once each", () => {
     expect(keysOf(providerRegister(["host:b.example", "deepinfra", "host:a.example", "host:b.example", "anthropic"])))
-      .toEqual(["claude", "deepinfra", "host:a.example", "host:b.example", "support"]);
+      .toEqual(["claude", "deepinfra", "host:a.example", "host:b.example", "perplexity", "support"]);
   });
 
   it("every company the API's host table can name is a reviewed row, never an unchecked one", () => {
@@ -117,7 +119,7 @@ describe("the rows are the companies the API answers (addition D24)", () => {
     });
     for (const catalog of [en, ro]) {
       const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={catalog} entries={providerRegister(["deepinfra", ACME])} />);
-      const section = html.slice(html.indexOf(`id="legal-provider-${ACME}"`), html.indexOf('id="legal-provider-support"'));
+      const section = html.slice(html.indexOf(`id="legal-provider-${ACME}"`), html.indexOf('id="legal-provider-perplexity"'));
       expect(section).toContain(">api.acme.example</h2>");
       expect(section).toContain(escaped(catalog["legal.providers.notChecked"]));
       expect(section).toContain(escaped(catalog["legal.providers.purposesUnconfirmed"]));
@@ -362,4 +364,34 @@ describe("the Register words still exist in all 35 languages", () => {
       expect(Object.keys(catalog).filter((key) => key === "legal.providers.colModels"), locale).toEqual([]);
     });
   }
+});
+
+describe("Perplexity, the models' web search provider, is always listed (owner, 2026-10-27)", () => {
+  it("is the row just before the support chat's model in every case, exactly once", () => {
+    for (const [label, companies] of CASES) {
+      const entries = providerRegister(companies);
+      expect(entries.at(-2), label).toBe(PERPLEXITY_PROVIDER);
+      expect(keysOf(entries).filter((key) => key === "perplexity"), label).toHaveLength(1);
+    }
+  });
+
+  it("names the company and the search job, and keeps every unchecked contract fact bracketed", () => {
+    expect(PERPLEXITY_PROVIDER).toMatchObject({
+      provider: "Perplexity",
+      entity: "Perplexity AI, Inc.",
+      homeCountryKey: "legal.providers.unitedStates",
+      purposes: ["search"],
+      purposesConfirmed: true,
+      zeroRetention: "unconfirmed",
+      training: "unconfirmed",
+      checkedOn: null
+    });
+    for (const catalog of [en, ro]) {
+      const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={catalog} entries={providerRegister(null)} />);
+      const section = html.slice(html.indexOf('id="legal-provider-perplexity"'), html.indexOf('id="legal-provider-support"'));
+      expect(section).toContain(">Perplexity</h2>");
+      expect(section).toContain(escaped(catalog["legal.providers.purpose.search"]));
+      expect(section).toContain(escaped(catalog["legal.providers.notChecked"]));
+    }
+  });
 });

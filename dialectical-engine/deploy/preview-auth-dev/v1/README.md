@@ -157,6 +157,13 @@ Team rule at start: on the preview, before the worker exists, every claimable ru
   cluster's socket (the principal `release-table.mjs` uses), never a runtime login. The API's runtime login may only
   read the active version, the runner's may only ask what its release passed (the runner never reads the pointer).
   Until the first activation (the first T+1 switch makes one), each release runs on its own site version, as before.
+- A release with the Italy-specific approval (mission italy-clause-approval, S01) adds the database step
+  `0125_italy_specific_approval.sql` (`n1: expand`): two nullable columns on `legal.acceptance` (`clauses`, `leg`), the
+  kind `ITALY_SPECIFIC_APPROVAL`, the sign-up writer `identity.record_signup_italy_approval` and the export reader
+  `identity.read_data_export_snapshot_v2`. Run the native operator's `apply-and-plan` with the owner's yes before that
+  release's first start (see "Verify never applies a database step"). Without it the API's boot step `database-roles`
+  refuses the whole API with `DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED` wherever the data-export pool is configured
+  (`DATA_EXPORT_STORE_PATH` set), and every sign-up that owes the Italy approval fails on the missing writer.
 - A call runs at its step's level if the table sets one, else its AI's `level` if the table sets one, else the row's default (its first menu word, which is today's request). A model the table leaves out runs at its default.
 - The API and the runner read the same value. A bad table (an unknown model, step or level, an empty entry, or any other key) makes both refuse to start, but their launchers print only `PREVIEW_API_STARTUP_REFUSED` and `PREVIEW_RUNNER_STARTUP_REFUSED`, never why. So run the checker below first; it prints the detail.
 - An entry for a reviewed model that is not on this config's `free_model_ids` or `premium_model_ids` is accepted but unused (no call goes to that AI); the checker's row for it says so.

@@ -16,6 +16,11 @@ export type BillingAuditEvent =
   /** P9b (A4c): a partial refund whose earlier call may have moved the money; handed to the owner, never re-sent. */
   | "billing.refund.outcome_unknown"
   | "billing.chargeback"
+  /**
+   * The owner's decision of 24 October 2026: NETOPIA reported a lost charge-back (status 10). The charge kind, and
+   * `ended`: true when this notification ended the plan by itself (ENDED(DISPUTE), the customer's M10_ENDED).
+   */
+  | "billing.chargeback.lost"
   | "billing.country.refused"
   /** Payment region blocks (spec 2026-10-20 §8): the code, the country and the region id only. */
   | "billing.region.refused"

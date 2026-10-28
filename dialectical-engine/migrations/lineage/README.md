@@ -10,7 +10,7 @@ base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
 first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third, role rotation (0114,
-below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the synthesis check (0126, below) the fifteenth, the publication review (0127, below) the sixteenth, the threat reports (0128, below) the seventeenth and the support answer scope (0129, below) the eighteenth. A step is added with new files only; NNNN is its number, the step before's number plus one:
+below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth and the support answer scope (0129, below) the nineteenth. A step is added with new files only; NNNN is its number, the step before's number plus one:
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
@@ -324,11 +324,37 @@ supplemental verifier, so no `replayVerifierSql`: its postcondition is the three
 whole. If `origin/dev` takes 0124 first, renumber this step (rename every file and constant that carries the number,
 recompute the manifest, re-pin the chain lists).
 
+## The Italy-specific approval (0125)
+
+The fifteenth chain step, after the settings activation's 0124 (mission italy-clause-approval, slice S01; the second,
+unticked sign-up checkbox of the Italian Civil Code arts. 1341-1342, `docs/missions/italy-clause-approval/slices/S01/`):
+`0125_italy_specific_approval.sql`, `italy-specific-approval-forward0125.json`, `packages/db/src/migration-forward0125.ts`
+(`loadForward0125`, appended last to `STEPS`, `MIGRATION_FORWARD0125_*` refusals). The second `-- n1: expand` step
+(with `-- n1: keeps-verifier`): two nullable columns without a default, `legal.acceptance.clauses` (smallint[], the
+Terms clauses approved, 11, 12, 14, 15 and 18 in that order) and `legal.acceptance.leg` (text: `PICKED`, `IP` or
+`BOTH`, which test placed the sign-up in Italy); three CHECKs, added `NOT VALID` behind a reviewed line each:
+`acceptance_kind_check` (0080's inline kind list) and `acceptance_document_version_shape` (0080) widened with the kind
+`ITALY_SPECIFIC_APPROVAL` (which carries the Terms' `N.M` version), and the new `acceptance_italy_fields` (the two
+columns are set exactly on that kind, to that one list and a known leg, and are NULL on every other kind; null-safe);
+and two new functions: `identity.record_signup_italy_approval(uuid,jsonb)` (the sign-up writer, EXECUTE for
+`debateai_billing_runtime` only: inside the sign-up transaction it refuses `ITALY_APPROVAL_INVALID`,
+`ITALY_APPROVAL_ACCOUNT_INVALID`, `ITALY_APPROVAL_TERMS_MISSING` and `ITALY_APPROVAL_DUPLICATE` in that order, then
+writes one row whose document version, digest, locale and time are the account's sign-up TERMS row's) and
+`identity.read_data_export_snapshot_v2(uuid,uuid)` (EXECUTE for `debateai_data_export_worker` only, owned by 0115's
+export owner: it calls 0115's frozen `identity.read_data_export_snapshot`, lease check included, and adds `clauses` and
+`leg` to every `legal_acceptances` element). The release before writes only kinds both CHECK versions accept and neither
+new column, so it keeps running beside the step. No billing relation or function, so
+`verify-effective-capabilities-111.sql` stays the verifier in force; no supplemental verifier, so no
+`replayVerifierSql`: its postcondition is the two columns (type, NOT NULL, default) and the two functions whole. The
+three CHECKs are checked by the file's closing block and by tests, not digested, so a later step may widen the kind list
+again without a postcondition drift on 0125. If `origin/dev` takes 0125 first, renumber this step (rename every file and
+constant that carries the number, recompute the manifest, re-pin the chain lists).
+
 ## The synthesis check (0126)
 
-The fifteenth chain step, after the settings activation's 0124, is `0126_synthesis_check.sql` with
+The sixteenth chain step, after the Italy-specific approval's 0125, is `0126_synthesis_check.sql` with
 `synthesis-check-forward0126.json` and `packages/db/src/migration-forward0126.ts`. Its loader is appended to
-`STEPS` and refuses altered inputs with `MIGRATION_FORWARD0125_` codes. It has no supplemental
+`STEPS` and refuses altered inputs with `MIGRATION_FORWARD0126_` codes. It has no supplemental
 `replayVerifierSql`; the effective `verify-effective-capabilities-111.sql` stays in force. Its postcondition
 records its own seven tables: `serve.synthesis_check_request`, `serve.synthesis_check_attempt`,
 `serve.synthesis_check_result`, `serve.synthesis_check_inheritance`,
@@ -340,7 +366,7 @@ its manifest and chain pins before merge.
 
 ## The publication review (0127)
 
-The sixteenth step adds the request, decision and transient reviewer-copy tables in serve, plus the staff review event table.
+The seventeenth step adds the request, decision and transient reviewer-copy tables in serve, plus the staff review event table.
 It extends the staff capability and staff-action lists and installs two sever triggers so key destruction removes the run-linked review rows.
 The Ask consumes a PUBLISH grant; no identity step-up object changes.
 Its manifest is `publication-review-forward0127.json`, and its loader is `packages/db/src/migration-forward0127.ts`.
@@ -349,7 +375,7 @@ A hosted deploy applies it with `pnpm db:migrate`.
 
 ## The threat reports (0128)
 
-The seventeenth chain step, after the publication review's 0127 (synthesis-flag S04, `docs/missions/synthesis-flag/slices/S04/SPEC-v8.md` §5a): `0128_threat_reports.sql`, `threat-reports-forward0128.json`, `packages/db/src/migration-forward0128.ts` (`loadForward0128`, appended last to `STEPS`, `MIGRATION_FORWARD0127_` refusals).
+The eighteenth chain step, after the publication review's 0127 (synthesis-flag S04, `docs/missions/synthesis-flag/slices/S04/SPEC-v8.md` §5a): `0128_threat_reports.sql`, `threat-reports-forward0128.json`, `packages/db/src/migration-forward0128.ts` (`loadForward0128`, appended last to `STEPS`, `MIGRATION_FORWARD0128_` refusals).
 It creates `staff.threat_report`, `staff.threat_report_event`, `staff.threat_report_alert`, eleven staff and export functions, and two ledger functions for the question-check spend writer and its invoker trigger.
 The eight shared objects it changes are `model_spend_spend_source_check`, `subject_capabilities_check`, `staff.valid_capabilities`, `staff.authorize_action`, `staff.owned_action_allowed`, `staff.begin_owned_webauthn`, `staff.commit_owner_command` and `staff.read_audit_page`; it pins none of them (W-0117).
 `verify-effective-capabilities-111.sql` stays the verifier in force; there is no `replayVerifierSql`.
@@ -357,7 +383,7 @@ If an earlier pending step takes 0128 first, renumber this step, recompute its m
 
 ## The support answer scope (0129)
 
-The eighteenth step, after the threat reports (0128), is `0129_support_answer_scope.sql` with
+The nineteenth step, after the threat reports (0128), is `0129_support_answer_scope.sql` with
 `support-answer-scope-forward0129.json` and `packages/db/src/migration-forward0129.ts`.
 It revokes `INSERT` on the fourteen support conversation and model-call tables from `debateai_support`.
 It deletes every row in those tables and `support.shred_audit` in dependency order, with the thirteen
@@ -380,7 +406,7 @@ changes something an earlier step's verifier pins must change that verifier thro
 cannot silently pass. The effective-capability verifier of the last applied step (after 0129: 0111's, which the batch,
 Part C's step, role rotation, the data export, the mail locale, the debate shape map, the language check's site cost,
 the reclaim resume, the reply measures, the engine verdict, the engine's map answer step, the side-by-side releases,
-the settings activation, the synthesis check, the publication review, the threat reports and the support answer scope keep) still runs at the end of every `migrate()`.
+the settings activation, the Italy-specific approval, the synthesis check, the publication review, the threat reports and the support answer scope keep) still runs at the end of every `migrate()`.
 
 ## One transaction per step (side-by-side §5)
 

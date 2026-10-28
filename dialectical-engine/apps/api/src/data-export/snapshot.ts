@@ -74,7 +74,7 @@ export const KEEP_COLUMNS = {
   runs: ["as_of", "composition_budget_tier", "depth_params", "plan_tier", "role_rotation"],
   erasure_tombstones: ["completed_at"],
   visibility_events: ["state", "occurred_at"],
-  legal_acceptances: ["kind", "document_version", "document_sha256", "locale", "surface", "accepted_at", "evidence_ciphertext"],
+  legal_acceptances: ["kind", "document_version", "document_sha256", "locale", "surface", "accepted_at", "evidence_ciphertext", "clauses", "leg"],
   sensitive_data_consents: ["notice_version", "locale", "consented_at"],
   billing: {
     customers: ["customer_id", "created_at", "created_locale"],

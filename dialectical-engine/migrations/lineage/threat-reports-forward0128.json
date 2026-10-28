@@ -3,7 +3,7 @@
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
     "name": "0127_publication_review.sql",
-    "manifestSha256": "0cd446d6d90093714e4761d6d1d11f8265849a3b2c30d28cfc3fdbe043a3a840",
+    "manifestSha256": "b270443f221d4616d7d8494d979fda3fbc096514bd858e507222546a35ce18d6",
     "verifierSha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
   },
   "migration": {

@@ -3,7 +3,7 @@
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
     "name": "0128_threat_reports.sql",
-    "manifestSha256": "3f0ab5329eccfa4cecb32c371807d0da235df5045353fde3a309d5799243bf72",
+    "manifestSha256": "36275d3e5b06a9b249d5f5ecbddd6f039219c6cbe01d5a76f7e7ab0f9bf94052",
     "verifierSha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
   },
   "migration": {

@@ -118,7 +118,7 @@ const REQUEST_FUNCTIONS = [
 const WORKER_FUNCTIONS = [
   "identity.claim_data_export(uuid,integer)",
   "identity.renew_data_export_lease(uuid,uuid,integer)",
-  "identity.read_data_export_snapshot(uuid,uuid)",
+  "identity.read_data_export_snapshot_v2(uuid,uuid)",
   "identity.read_data_export_threat_reports(uuid,uuid)",
   "identity.complete_data_export(uuid,uuid,text,text,bigint,timestamp with time zone)",
   "identity.fail_data_export(uuid,uuid,text)",
@@ -160,7 +160,7 @@ export class PostgresDataExportSource implements DataExportSourcePort {
 
   async readRaw(exportId: string, workerId: string): Promise<RawExportRows> {
     const row = (await this.pool.query<{ snapshot: RawExportRows; threat_reports: unknown }>(
-      "SELECT identity.read_data_export_snapshot($1,$2) snapshot, identity.read_data_export_threat_reports($1,$2) threat_reports",
+      "SELECT identity.read_data_export_snapshot_v2($1,$2) snapshot, identity.read_data_export_threat_reports($1,$2) threat_reports",
       [exportId, workerId])).rows[0]!;
     return { ...row.snapshot, threat_reports: row.threat_reports };
   }

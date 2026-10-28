@@ -74,7 +74,9 @@ import {
   planHostedRegisterPublication,
   publishHostedRegister
 } from "../../apps/runner/src/hosted-register-publish.js";
+import { countryPolicyInForce } from "../../apps/api/src/country-gate.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { everyCountryClosedPolicyValue } from "../support/billingFixtures.js";
 import { importHistoricalRegisterFixture, registerFixtureRow } from "../support/registerFixtures.js";
 
 let database: TestDatabase;
@@ -468,6 +470,27 @@ describe("Task 14b · hosted register publication on PostgreSQL", () => {
     })).rejects.toMatchObject({
       code: "HOSTED_REGISTER_BOOT_CHECK_FAILED:BILLING_CONFIGURATION_INCOMPLETE"
     });
+  }, 120_000);
+
+  // NETOPIA's check of the public main site (the owner's choice of 24 October 2026): purchases off is billing ON with
+  // every country closed for payment. No boot stage asks for a country that can pay.
+  it("billing on with every country closed: the publish check accepts the version, and the API boot's country-policy read gets the closed policy", async () => {
+    const result = await publishHostedRegister({
+      plan: await planOf({ ...billingOnFile(), countryPolicy: everyCountryClosedPolicyValue() }),
+      operations: createPostgresHostedRegisterOperations(database.pool)
+    });
+    // publishHostedRegister runs verifyHostedRegisterBootReadiness, the API's and the runner's boot readers in order.
+    expect(result.outcome).toBe("CREATED");
+    const version = registerVersionToSafeLegacyNumber(result.registerVersion);
+    await expect(readBillingPolicy(database.pool, version)).resolves.toMatchObject({ enabled: true });
+    // main.ts's country-policy stage, in hosted mode, over the published version.
+    const policy = await countryPolicyInForce("hosted", () => readCountryPolicy(database.pool, version));
+    expect(policy).not.toBeNull();
+    expect(policy!.defaultRule.pay).toBe(false);
+    expect(Object.keys(policy!.countries).length).toBeGreaterThan(0);
+    expect(Object.entries(policy!.countries).filter(([, rule]) => rule.pay)).toEqual([]);
+    expect(Object.entries(policy!.usStates).filter(([, rule]) => rule.pay)).toEqual([]);
+    for (const country of ["RO", "DE", "US"]) expect(policy!.countries[country], country).toMatchObject({ signup: true, pay: false });
   }, 120_000);
 
   it("seals the billing rows both boots read, billing off (B11a)", async () => {

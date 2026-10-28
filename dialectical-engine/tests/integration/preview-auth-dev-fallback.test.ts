@@ -176,6 +176,7 @@ describe('the general preview guard on each complete 0108 lineage (PR-59)',()=>{
     '0122_engine_map_check.sql',
     '0123_side_by_side_releases.sql',
     '0124_settings_activation.sql',
+    '0125_italy_specific_approval.sql',
     '0126_synthesis_check.sql',
     '0127_publication_review.sql',
     '0128_threat_reports.sql',

@@ -90,13 +90,13 @@ describe("the question subjects file (V, 2026-10-28)", () => {
     const reasons = terms.find(line => line.startsWith("**Statement of reasons.**"))!;
     expect(reasons).toContain("When our question check refuses a question under the paragraph \"Questions that do not start a debate\" in section 7, the screen that tells you is our statement of reasons for it");
     expect(reasons).not.toMatch(/as hate speech, as religious insult/u);
-    expect(terms.find(line => line.startsWith("Version 2.6 replaced version 2.5:")))
+    expect(terms.find(line => line.startsWith("Version 2.8 replaced version 2.7:")))
       .toContain("the screen that refuses a question is our statement of reasons for every question section 7 does not start (section 10)");
     const privacy = readFileSync("apps/ui/legal/en/privacy-policy.md", "utf8").split("\n");
     const row = privacy.find(line => line.startsWith("| Checking each question before a debate starts"))!;
     expect(row).toContain("refusing to start a debate whose question section 7 of our Terms of Service says does not start one");
     expect(row).toContain("keeping debates that could lead to harm, crime, hate speech or religious insult from starting");
-    expect(privacy.find(line => line.includes("Version 3.6 replaced version 3.5")))
+    expect(privacy.find(line => line.includes("Version 3.8 replaced version 3.7")))
       .toContain("keeps nothing of any question (sections 3, 4 and 8)");
   });
 });

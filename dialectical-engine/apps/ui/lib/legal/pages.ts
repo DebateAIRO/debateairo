@@ -169,9 +169,9 @@ export function inventoryCopy(legal: MessageCatalog): MessageCatalog {
 }
 
 /** The jobs a provider can be given, and so why it receives text (PP §5 "what it receives and for what purpose"). */
-export type ProviderPurpose = "arguments" | "judging" | "story" | "synthesisCheck" | "questionCheck" | "support";
+export type ProviderPurpose = "arguments" | "judging" | "story" | "search" | "synthesisCheck" | "questionCheck" | "support";
 
-export const PROVIDER_PURPOSES: readonly ProviderPurpose[] = Object.freeze(["arguments", "judging", "story", "synthesisCheck", "questionCheck", "support"]);
+export const PROVIDER_PURPOSES: readonly ProviderPurpose[] = Object.freeze(["arguments", "judging", "story", "search", "synthesisCheck", "questionCheck", "support"]);
 
 /** A yes/no fact from the provider's contract, or "unconfirmed" until someone has read that contract. */
 export type ContractFlag = "yes" | "no" | "unconfirmed";
@@ -387,6 +387,23 @@ export const GOOGLE_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
 });
 
 /**
+ * The web search provider the debate models ask questions through (owner, 2026-10-26: "our models will ask
+ * questions via Perplexity"; Terms §8, Privacy Policy §5). Not one of the API's declared targets yet, so it is
+ * listed on every answer rather than when the API names it (owner, 2026-10-27: always listed). Perplexity AI, Inc.
+ * is the US company behind the API; every other fact stays "[to confirm]" until someone checks it against
+ * Perplexity's API terms.
+ */
+export const PERPLEXITY_PROVIDER: ProviderRegisterEntry = Object.freeze({
+  ...UNCHECKED_CLOUD,
+  key: "perplexity",
+  provider: "Perplexity",
+  models: "",
+  entity: "Perplexity AI, Inc.",
+  purposes: Object.freeze<ProviderPurpose[]>(["search"]),
+  purposesConfirmed: true
+});
+
+/**
  * Addition D24 (owner's answer to Q-L6, 2026-10-22: providers only, not the models, listed automatically): the
  * reviewed catalogue, keyed by the company keys the API answers on `GET /v1/public/ai-providers`
  * (`providerCompaniesOfTargets`, `PROVIDER_COMPANY_HOSTS` in `@debateai/providers`), in the order the page shows
@@ -428,7 +445,8 @@ function uncheckedCompanyEntry(company: string): ProviderRegisterEntry {
  * support chat's model always last. No answer (`null`) or an empty list lists the whole reviewed catalogue: a legal
  * page discloses rather than hides. No row names a model, so a model or line-up change never changes the page, and
  * the hosted cloud rows (`MODEL_PROVIDERS`: OpenAI, xAI, Google, the own-servers Qwen) never show, since no
- * declared target reaches them. Never throws.
+ * declared target reaches them. Perplexity (`PERPLEXITY_PROVIDER`) is always listed, just before the support chat's
+ * model, and never twice. Never throws.
  */
 export function providerRegister(companies: readonly string[] | null): readonly ProviderRegisterEntry[] {
   const named = companies === null || companies.length === 0
@@ -437,7 +455,8 @@ export function providerRegister(companies: readonly string[] | null): readonly 
   const reviewed = REVIEWED_PROVIDER_COMPANIES
     .filter(([company]) => named === null || named.size === 0 || named.has(company))
     .map(([, entry]) => entry);
-  const unchecked = named === null ? [] : [...named].filter((company) => !REVIEWED_COMPANY_KEYS.has(company)).sort()
+  const unchecked = named === null ? [] : [...named]
+    .filter((company) => !REVIEWED_COMPANY_KEYS.has(company) && company !== PERPLEXITY_PROVIDER.key).sort()
     .map(uncheckedCompanyEntry);
   // The two checks always call Claude Haiku 5.5 on Anthropic's API (synthesis-flag S01-R9, S04-R5), the model and
   // contract the support chat uses. When the Anthropic row is not shown, the support chat's row names both checks,
@@ -445,7 +464,7 @@ export function providerRegister(companies: readonly string[] | null): readonly 
   const support = reviewed.includes(ANTHROPIC_PREVIEW_PROVIDER)
     ? SUPPORT_PROVIDER
     : Object.freeze({ ...SUPPORT_PROVIDER, purposes: Object.freeze<ProviderPurpose[]>(["synthesisCheck", "questionCheck", "support"]) });
-  return Object.freeze([...reviewed, ...unchecked, support]);
+  return Object.freeze([...reviewed, ...unchecked, PERPLEXITY_PROVIDER, support]);
 }
 
 export type TermsVersion = Readonly<{
@@ -461,9 +480,11 @@ export type TermsVersion = Readonly<{
  * that was current before the next revision.
  */
 export const TERMS_VERSIONS: readonly TermsVersion[] = Object.freeze([
-  { version: "2.6", dateKey: "legal.versions.v2.date", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "2.8", dateKey: "legal.versions.v2.date", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "2.6", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+    href: "/terms/versions/27e7229ee49faffd2cdf5eb609acc1b4ad5ea95c4e5c36bd057867de492b33ab" },
   { version: "2.5", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
-    href: "/terms/versions/8addbba29762792f2aa627e9bd643b51fb4379c47747bcbe2b3e3c489d033cc3" },
+    href: "/terms/versions/e6fe4e6897c5c4aa03214da2e79954c8903fe8fe2d3c2785a000357618d3b195" },
   { version: "2.4", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/3f238233a301a4e98945d8164e1f5b7d0934d68f01adcdf421f8602e11ca2ef6" },
   { version: "2.3", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,

@@ -755,12 +755,15 @@ export const BillingCardDetailsResponseSchema = z.object({
   postal_code: z.string().max(16).nullable()
 }).strict();
 export type BillingCardDetailsResponse = z.infer<typeof BillingCardDetailsResponseSchema>;
-/** N13: the card-saving agreement and the corrected payer (spec §2.5.3: the country and the region are never sent). */
+/**
+ * N13: the card-saving agreement and the corrected payer (spec §2.5.3: the country and the region are never sent). The
+ * names are the quote's 120 each, so the profile's joined "first last" name fits its 256.
+ */
 export const BillingCardChangeRequestSchema = z.object({
   locale: z.string().regex(/^[a-z]{2}$/),
   renewal_terms: BillingDocumentPairSchema,
-  first_name: z.string().trim().min(1).max(128),
-  last_name: z.string().trim().min(1).max(128),
+  first_name: z.string().trim().min(1).max(120),
+  last_name: z.string().trim().min(1).max(120),
   phone: z.string().trim().min(8).max(20),
   street: z.string().trim().min(1).max(256),
   city: z.string().trim().min(1).max(128),

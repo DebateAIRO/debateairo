@@ -59,6 +59,6 @@ describe("0129 support tables keep nothing", () => {
       previousName: manifest.previous.name, previousManifestSha256: manifest.previous.manifestSha256,
       previousVerifierSha256: manifest.previous.verifierSha256 });
     await expect(step.postconditionEvidence({ query: async () => ({ rows: [] }) } as never))
-      .rejects.toThrow("MIGRATION_FORWARD0128_POSTCONDITION_OBJECTS");
+      .rejects.toThrow("MIGRATION_FORWARD0129_POSTCONDITION_OBJECTS");
   });
 });

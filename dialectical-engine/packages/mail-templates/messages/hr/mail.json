@@ -59,6 +59,8 @@
   "mail.M10.subject": "Vaše plaćene značajke pauzirane su",
   "mail.M10.paused": "Vaša banka obavijestila nas je da je plaćanje za vaš plan {plan} osporeno. Plaćene značajke pauzirane su dok je spor otvoren. Vaše rasprave ostaju sačuvane.",
   "mail.M10.contact": "Ako je ovo pogreška, pišite nam na {merchantEmail}.",
+  "mail.M10_ENDED.subject": "Vaš plan {plan} je završio",
+  "mail.M10_ENDED.ended": "Vaše plaćanje za plan {plan} vraćeno vam je preko vaše banke nakon spora oko njega. Zato je plan završio, a vaš račun sada je na planu Besplatno. Vaše rasprave ostaju sačuvane.",
   "mail.M11.subject": "Nismo mogli prihvatiti vašu karticu",
   "mail.M11.refunded": "Ne možemo prihvatiti kartice izdane u zemlji te kartice, pa se iznos od {refundAmount} naplaćen ili rezerviran na njoj u cijelosti vraća na vašu karticu.",
   "mail.M11.planEnded": "Zbog toga je vaš plan {endedPlan} završio, a vaš je račun sada na planu Besplatno. Vaše rasprave ostaju sačuvane.",

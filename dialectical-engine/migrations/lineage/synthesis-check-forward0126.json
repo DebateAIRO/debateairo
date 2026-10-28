@@ -2,8 +2,8 @@
   "version": "synthesis-check-forward0126-v1",
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
-    "name": "0124_settings_activation.sql",
-    "manifestSha256": "860ea0de6288405ec798f03d17b45367a263c8d627bc7cbaa1082a765b87ffd7",
+    "name": "0125_italy_specific_approval.sql",
+    "manifestSha256": "ba4a534306ce77eba248d273295b4515869710173dc42f90ea22e7f52e2ccb7b",
     "verifierSha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
   },
   "migration": {

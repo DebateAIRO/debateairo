@@ -2325,6 +2325,20 @@
       ]
     },
     {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0125_italy_specific_approval.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.record_signup_italy_approval(uuid,jsonb)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0125_italy_specific_approval.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_snapshot_v2(uuid,uuid)"
+      ]
+    },
+    {
       "roleName": "debateai_staff_security_owner",
       "source": "migrations/0127_publication_review.sql",
       "grants": [

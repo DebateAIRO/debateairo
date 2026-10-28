@@ -2954,6 +2954,7 @@ export {
   type AcceptanceInput,
   type AcceptanceKind,
   type AcceptanceSurface,
+  type ItalyApprovalAcceptanceRow,
   type SignUpAcceptanceRow
 } from "./legal-acceptance.js";
 export * from "./obs-schema.js";

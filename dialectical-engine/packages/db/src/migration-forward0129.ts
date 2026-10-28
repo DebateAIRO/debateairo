@@ -9,7 +9,7 @@ const VERSION='support-answer-scope-forward0129-v1';
 const MANIFEST_PATH='lineage/support-answer-scope-forward0129.json';
 const VERIFIER_PATH='lineage/verify-effective-capabilities-111.sql';
 const PREVIOUS='0128_threat_reports.sql';
-const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD0128_${detail}`);};
+const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD0129_${detail}`);};
 const sha=(value:string|Buffer)=>createHash('sha256').update(value).digest('hex');
 const exactKeys=(value:unknown,keys:readonly string[]):value is Record<string,unknown>=>typeof value==='object'&&value!==null&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.hasOwn(value,key));
 const digest=(value:unknown):value is string=>typeof value==='string'&&/^[0-9a-f]{64}$/.test(value);

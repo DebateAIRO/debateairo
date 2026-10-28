@@ -93,6 +93,7 @@ rule.
 | [**0034**](ADR-0034-staff-review-window-and-erasure-severed-records.md) | **Staff review window and erasure-severed records** | *not in the planned set* — minted by the **`synthesis-flag`** mission (slice S02) |
 | [**0039**](ADR-0039-support-replies-are-code-chosen.md) | **The support assistant's model reports judgements; code chooses every refusal, crisis reply and threat line** | *not in the planned set* — minted by the **`synthesis-flag`** mission (slice S05) |
 | [**0022**](ADR-0022-shared-modal-semantics.md) | **One shared modal-semantics module, and the Esc stack** | *not in the planned set* — minted by the **`consent-ui`** mission (slice S02) |
+| [**0038**](ADR-0038-one-geo-lookup-per-api-process.md) | **One geo lookup per API process, opened in hosted mode whether or not the country gate is published** | *not in the planned set* — minted by the **`italy-clause-approval`** mission (slice S01) |
 
 ---
 

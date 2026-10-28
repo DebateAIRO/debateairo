@@ -58,7 +58,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     // follows 0116, the language check's site cost (0118) follows 0117, the reclaim resume (0119) follows 0118, then the
     // reply measures (0120, spec 2026-10-15), then the engine verdict (0121, spec 2026-10-15 engine redesign R2), then
     // the engine's map answer step (0122, spec 2026-10-15 engine redesign R3), then the side-by-side releases (0123,
-    // spec 2026-10-21 side-by-side uploads), then the settings activation (0124), last (side-by-side spec §13)
+    // spec 2026-10-21 side-by-side uploads), then the settings activation (0124, side-by-side spec §13), then the
+    // Italy-specific approval (0125, mission italy-clause-approval), last
     // (migrations/lineage/README.md).
     expect(plan.forwardChain.map((step) => step.name)).toEqual([
       "0111_billing_netopia.sql",
@@ -75,6 +76,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0122_engine_map_check.sql",
       "0123_side_by_side_releases.sql",
       "0124_settings_activation.sql",
+      "0125_italy_specific_approval.sql",
       "0126_synthesis_check.sql",
       "0127_publication_review.sql",
       "0128_threat_reports.sql",
@@ -134,6 +136,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0122_engine_map_check.sql",
       "0123_side_by_side_releases.sql",
       "0124_settings_activation.sql",
+      "0125_italy_specific_approval.sql",
       "0126_synthesis_check.sql",
       "0127_publication_review.sql",
       "0128_threat_reports.sql",
@@ -187,6 +190,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0122_engine_map_check.sql",
       "0123_side_by_side_releases.sql",
       "0124_settings_activation.sql",
+      "0125_italy_specific_approval.sql",
       "0126_synthesis_check.sql",
       "0127_publication_review.sql",
       "0128_threat_reports.sql",
@@ -236,6 +240,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0122_engine_map_check.sql",
       "0123_side_by_side_releases.sql",
       "0124_settings_activation.sql",
+      "0125_italy_specific_approval.sql",
       "0126_synthesis_check.sql",
       "0127_publication_review.sql",
       "0128_threat_reports.sql",
@@ -285,6 +290,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0122_engine_map_check.sql",
       "0123_side_by_side_releases.sql",
       "0124_settings_activation.sql",
+      "0125_italy_specific_approval.sql",
       "0126_synthesis_check.sql",
       "0127_publication_review.sql",
       "0128_threat_reports.sql",
@@ -334,6 +340,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0122_engine_map_check.sql",
       "0123_side_by_side_releases.sql",
       "0124_settings_activation.sql",
+      "0125_italy_specific_approval.sql",
       "0126_synthesis_check.sql",
       "0127_publication_review.sql",
       "0128_threat_reports.sql",
@@ -612,19 +619,19 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth");
   });
 
-  it("chains the synthesis check 0126 after 0124: the recipe, 0124's manifest and the effective verifier 0124 keeps (0111's)", async () => {
+  it("chains the synthesis check 0126 after 0125: the recipe, 0125's manifest and the effective verifier 0125 keeps (0111's)", async () => {
     const plan = await loadMigrationPlan();
     const step = plan.forwardChain.at(-4);
     const prior = plan.forwardChain.at(-5);
     expect(step?.name).toBe("0126_synthesis_check.sql");
-    expect(prior?.name).toBe("0124_settings_activation.sql");
+    expect(prior?.name).toBe("0125_italy_specific_approval.sql");
     const manifest = JSON.parse((await bytesOf("lineage/synthesis-check-forward0126.json")).toString("utf8"));
     expect(manifest).toEqual({
       version: "synthesis-check-forward0126-v1",
       baseRecipeSha256: plan.recipeSha256,
       previous: {
-        name: "0124_settings_activation.sql",
-        manifestSha256: sha256(await bytesOf("lineage/settings-activation-forward0124.json")),
+        name: "0125_italy_specific_approval.sql",
+        manifestSha256: sha256(await bytesOf("lineage/italy-specific-approval-forward0125.json")),
         verifierSha256: sha256(await bytesOf("lineage/verify-effective-capabilities-111.sql"))
       },
       migration: { name: "0126_synthesis_check.sql", sha256: sha256(await bytesOf("0126_synthesis_check.sql")) },
@@ -636,19 +643,19 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     expect(step!.replayVerifierSql).toBeUndefined();
   });
 
-  it("documents the synthesis check 0126 as the step after 0124, with its manifest, its loader and the verifier it keeps", async () => {
+  it("documents the synthesis check 0126 as the step after 0125, with its manifest, its loader and the verifier it keeps", async () => {
     const readme = (await bytesOf("lineage/README.md")).toString("utf8");
     const section = readme.slice(readme.indexOf("## The synthesis check (0126)"));
     expect(section.startsWith("## The synthesis check (0126)")).toBe(true);
     const own = section.slice(0, section.indexOf("\n## ", 1));
-    for (const needle of ["0124", "0126_synthesis_check.sql", "synthesis-check-forward0126.json",
-      "packages/db/src/migration-forward0126.ts", "MIGRATION_FORWARD0125_", "replayVerifierSql",
+    for (const needle of ["0125", "0126_synthesis_check.sql", "synthesis-check-forward0126.json",
+      "packages/db/src/migration-forward0126.ts", "MIGRATION_FORWARD0126_", "replayVerifierSql",
       "verify-effective-capabilities-111.sql", "synthesis_check_request", "synthesis_check_attempt",
       "synthesis_check_result", "synthesis_check_inheritance", "synthesis_check_removal_request",
       "synthesis_check_removal_notice", "synthesis_check_erasure_binding", "SYNTHESIS_CHECK",
       "debateai_erasure_runtime", "renumber", "`STEPS`"
     ]) expect(own, needle).toContain(needle);
-    expect(readme.replace(/\s+/gu, " ")).toContain("the settings activation (0124, below) the fourteenth, the synthesis check (0126, below) the fifteenth, the publication review (0127, below) the sixteenth, the threat reports (0128, below) the seventeenth and the support answer scope (0129, below) the eighteenth");
+    expect(readme.replace(/\s+/gu, " ")).toContain("the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth and the support answer scope (0129, below) the nineteenth");
   });
 
   it("0127 is followed by 0128 and its previous is 0126", async () => {
@@ -852,26 +859,26 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
           await writeFile(manifestPath, originalManifest);
         }
       }
-      // The synthesis check 0126 changed by one character, and its manifest bound to 0123 instead of 0124.
-      await refusal("0126_synthesis_check.sql", (text) => `${text} `, "MIGRATION_FORWARD0125_SOURCE_DIGEST");
+      // The synthesis check 0126 changed by one character, and its manifest bound to 0123 instead of 0125.
+      await refusal("0126_synthesis_check.sql", (text) => `${text} `, "MIGRATION_FORWARD0126_SOURCE_DIGEST");
       const releasesDigest = sha256(await bytesOf("lineage/side-by-side-releases-forward0123.json"));
       await refusal("lineage/synthesis-check-forward0126.json", (text) => {
         const manifest = JSON.parse(text);
         manifest.previous.name = "0123_side_by_side_releases.sql";
         manifest.previous.manifestSha256 = releasesDigest;
         return `${JSON.stringify(manifest, null, 2)}\n`;
-      }, "MIGRATION_FORWARD0125_MANIFEST");
-      // The same refusal when 0124's own manifest changes under 0126: 0124 stays valid, 0126 alone refuses.
-      await refusal("lineage/settings-activation-forward0124.json", (text) => `${text}\n`, "MIGRATION_FORWARD0125_MANIFEST");
+      }, "MIGRATION_FORWARD0126_MANIFEST");
+      // The same refusal when 0125's own manifest changes under 0126: 0125 stays valid, 0126 alone refuses.
+      await refusal("lineage/italy-specific-approval-forward0125.json", (text) => `${text}\n`, "MIGRATION_FORWARD0126_MANIFEST");
       // The threat reports 0128 changed by one character, its manifest bound to 0126 instead of 0127, and 0127's manifest
       // changed under it.
-      await refusal("0128_threat_reports.sql", (text) => `${text} `, "MIGRATION_FORWARD0127_SOURCE_DIGEST");
+      await refusal("0128_threat_reports.sql", (text) => `${text} `, "MIGRATION_FORWARD0128_SOURCE_DIGEST");
       await refusal("lineage/threat-reports-forward0128.json", (text) => {
         const manifest = JSON.parse(text);
         manifest.previous.name = "0126_synthesis_check.sql";
         return `${JSON.stringify(manifest, null, 2)}\n`;
-      }, "MIGRATION_FORWARD0127_MANIFEST");
-      await refusal("lineage/publication-review-forward0127.json", (text) => `${text}\n`, "MIGRATION_FORWARD0127_MANIFEST");
+      }, "MIGRATION_FORWARD0128_MANIFEST");
+      await refusal("lineage/publication-review-forward0127.json", (text) => `${text}\n`, "MIGRATION_FORWARD0128_MANIFEST");
       const extra = join(root, "migrations/0199_unbound_step.sql");
       await writeFile(extra, "SELECT 1;\n");
       await expect(run()).rejects.toMatchObject({ stderr: expect.stringContaining("MIGRATION_LINEAGE_REFUSED SOURCE_INVENTORY") });
@@ -896,14 +903,14 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     expect(step?.replayVerifierSql).toBeUndefined();
   });
 
-  it("documents the threat reports 0128 as the seventeenth chain step", async () => {
+  it("documents the threat reports 0128 as the eighteenth chain step", async () => {
     const readme = (await bytesOf("lineage/README.md")).toString("utf8");
     const section = readme.split("## The threat reports (0128)")[1]?.split("\n## ")[0] ?? "";
     for (const needle of ["0127", "0128_threat_reports.sql", "threat-reports-forward0128.json",
       "verify-effective-capabilities-111.sql", "packages/db/src/migration-forward0128.ts",
-      "replayVerifierSql", "staff.threat_report", "MIGRATION_FORWARD0127_", "`STEPS`", "renumber"])
+      "replayVerifierSql", "staff.threat_report", "MIGRATION_FORWARD0128_", "`STEPS`", "renumber"])
       expect(section, needle).toContain(needle);
-    expect(readme.replace(/\s+/gu, " ")).toContain("the publication review (0127, below) the sixteenth, the threat reports (0128, below) the seventeenth");
+    expect(readme.replace(/\s+/gu, " ")).toContain("the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth");
   });
 
   it("chains support deletion 0129 after 0128 and records its source digest", async () => {
