@@ -235,6 +235,15 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
       await expect(runtimePool.query(
         "SELECT * FROM support.session LIMIT 1"
       )).rejects.toMatchObject({ code: "42501" });
+      const supportInsertRows = await supportPool.query<{ table_name: string }>(`
+        SELECT table_name FROM information_schema.tables
+        WHERE table_schema='support' AND table_type='BASE TABLE'
+          AND has_table_privilege(current_user,
+            format('%I.%I',table_schema,table_name),'INSERT')
+        ORDER BY table_name
+      `);
+      expect(supportInsertRows.rows.map(({ table_name }) => table_name))
+        .toEqual(["public_incident", "shred_audit"]);
       await expect(assertSupportDatabaseRole(runtimePool, supportPool)).resolves.toBeUndefined();
     } finally {
       await Promise.all([runtimePool.end(), supportPool.end()]);

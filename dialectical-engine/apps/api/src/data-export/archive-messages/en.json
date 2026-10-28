@@ -17,5 +17,18 @@
   "archive.visibilityPrivate": "Private",
   "archive.unreadable": "The content of this debate can no longer be read: its key was destroyed.",
   "archive.noDebates": "You have no debates.",
-  "archive.filesNote": "The JSON files in this ZIP hold the same data in machine-readable form; README.txt lists them."
+  "archive.filesNote": "The JSON files in this ZIP hold the same data in machine-readable form; README.txt lists them.",
+  "archive.contentCheck": "Content check",
+  "archive.verdict.flagged": "Flagged",
+  "archive.verdict.clear": "Clear",
+  "archive.verdict.noSynthesis": "No synthesis",
+  "archive.verdict.unavailable": "Unavailable",
+  "archive.category.terrorism": "Possible terrorism",
+  "archive.category.hateSpeech": "hate speech of any kind",
+  "archive.category.suicideOrHarm": "tendencies to suicide or harming other people",
+  "archive.category.weaponsOrDrugs": "crafting weapons or drugs",
+  "archive.publicationReview": "Publication review",
+  "archive.reviewAsked": "Asked",
+  "archive.reviewApproved": "Approved",
+  "archive.reviewRefused": "Refused"
 }

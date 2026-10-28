@@ -108,7 +108,7 @@
   "settings.transparency.downloadsTail": "que descreve o conteúdo gerado e a ausência de revisão editorial humana. Os dados registados da resposta, a proveniência dos modelos e os registos operacionais conservam os respetivos valores originais.",
   "settings.transparency.markingsLimit": "Estas marcações descrevem o conteúdo na nossa interface e nos descarregamentos. Não são uma marca de água nem um certificado de autenticidade; a cópia de texto simples pode removê-las.",
   "settings.transparency.supportTitle": "Apoio e assistência humana",
-  "settings.transparency.supportLead": "O assistente de apoio é um sistema de IA. Utilize «Falar com uma pessoa» ou «Encaminhar para uma pessoa» em",
+  "settings.transparency.supportLead": "O assistente de apoio é um sistema de IA. Utilize «Falar com uma pessoa» em",
   "settings.transparency.help": "Ajuda",
   "settings.transparency.supportTail": "para pedir assistência humana.",
   "settings.transparency.back": "Voltar à {brand}",

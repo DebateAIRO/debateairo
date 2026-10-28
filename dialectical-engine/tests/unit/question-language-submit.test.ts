@@ -33,6 +33,7 @@ import {
   QuestionLanguageChoiceNeeded, type QuestionLanguageLock, type QuestionLanguagePort
 } from "../../apps/api/src/question-language/decider.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
+import { questionCheckPass } from "../support/questionCheckPass.js";
 import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 // stubPool, PANEL, CEILING_TERMS, serverSession, serverPrincipal, fixtureApplication, billingFor: as debate-shape-submit.test.ts.
@@ -339,7 +340,7 @@ describe("submit with the question-language step (question-language spec 2026-10
     const identity = testHttpIdentity("language");
     const sessions = { ...testSessionApplication([identity]), readSensitiveDataConsent: async () => "given" as const, recordSensitiveDataConsent: async () => "given" as const };
     const offering = buildApi({ application: fixtureApplication(async () => { throw new QuestionLanguageChoiceNeeded(OFFER, { eld: null, fast: null, contractHash: null }); }),
-      sessions, allowedOrigin: TEST_APP_ORIGIN });
+      questionCheck: questionCheckPass, sessions, allowedOrigin: TEST_APP_ORIGIN });
     const offered = await offering.inject({ method: "POST", url: "/v1/asks", headers: testSessionHeaders(identity, true), payload: ask({ site_language: "ro" }) });
     expect(offered.statusCode).toBe(409);
     expect(offered.json()).toEqual({ error: QUESTION_LANGUAGE_CHOICE_NEEDED, message: QUESTION_LANGUAGE_CHOICE_NEEDED, offer: OFFER });
@@ -347,7 +348,7 @@ describe("submit with the question-language step (question-language spec 2026-10
     await offering.close();
     for (const code of ["QUESTION_LANGUAGE_CHECK_INVALID", "QUESTION_LANGUAGE_CHECK_EXPIRED", "QUESTION_LANGUAGE_CHOICE_MISMATCH"]) {
       const refusing = buildApi({ application: fixtureApplication(async () => { throw new AskRefusal(new TypedDomainError(code, code)); }),
-        sessions, allowedOrigin: TEST_APP_ORIGIN });
+        questionCheck: questionCheckPass, sessions, allowedOrigin: TEST_APP_ORIGIN });
       const refused = await refusing.inject({ method: "POST", url: "/v1/asks", headers: testSessionHeaders(identity, true),
         payload: ask({ question_language_choice: { check_ref: "a.b", choice: "KEEP_MINE" } }) });
       expect(refused.statusCode, code).toBe(409);

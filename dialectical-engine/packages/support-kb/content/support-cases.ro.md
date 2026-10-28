@@ -11,4 +11,4 @@ ratified_by: ""
 ratified_on: ""
 ---
 
-Folosește **Vorbiți cu o persoană** sau **Escaladați către o persoană** în Asistență pentru a crea un caz asincron. Cazul nu este un apel telefonic. Emailul de asistență este un flux separat de mail: emailul de asistență nu creează acest caz și nu primește confirmarea, termenul de răspuns sau legătura privată a cazului. Confirmarea serverului pentru caz indică un termen țintă de răspuns de 48 de ore, iar un alt panou din Asistență spune în prezent că răspunsurile sosesc într-o zi lucrătoare, în zilele lucrătoare. Bazează-te pe confirmarea cazului până când textele sunt aliniate. Păstrează confirmarea cazului privată deoarece ea controlează accesul la caz. Asistența nu verifică livrarea în inbox.
+Pentru a ajunge la o persoană, scrie la support@dezbatere.ro. O persoană citește mesajele trimise la această adresă. **Vorbiți cu o persoană** din Asistență afișează această adresă; nu trimite nimic și nu deschide niciun caz. Chatul de asistență nu păstrează nimic din ce scrii și nu poate transmite un mesaj mai departe, așa că pune în email tot ce trebuie să știe o persoană. Asistența nu este o linie telefonică.

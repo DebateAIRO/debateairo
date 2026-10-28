@@ -108,7 +108,7 @@
   "settings.transparency.downloadsTail": "يصف المحتوى المُنشأ وغياب المراجعة التحريرية البشرية. وتحتفظ بيانات الإجابة المسجّلة ومصدر النموذج والسجلات التشغيلية بقيمها الأصلية.",
   "settings.transparency.markingsLimit": "تصف هذه العلامات المحتوى في واجهتنا وتنزيلاتنا. وهي ليست علامة مائية أو شهادة أصالة؛ وقد يؤدي نسخ النص العادي إلى إزالتها.",
   "settings.transparency.supportTitle": "الدعم والمساعدة البشرية",
-  "settings.transparency.supportLead": "مساعد الدعم نظام ذكاء اصطناعي. استخدم «التحدث إلى شخص» أو «التصعيد إلى شخص» في",
+  "settings.transparency.supportLead": "مساعد الدعم نظام ذكاء اصطناعي. استخدم «التحدث إلى شخص» في",
   "settings.transparency.help": "المساعدة",
   "settings.transparency.supportTail": "لطلب مساعدة بشرية.",
   "settings.transparency.back": "العودة إلى {brand}",

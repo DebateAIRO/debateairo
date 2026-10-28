@@ -1,7 +1,7 @@
 // Preview register publish kit v2.
 //
-// Plain words: v1 (publish-register.ts, kept byte for byte: the live v9 was composed by it) could
-// only make ONE publication: a 66-row source on top of a 65-row base, adding exactly three fixed
+// Plain words: v1 (publish-register.ts, unchanged but for S04's questionCheckPolicy, which the API reads at start-up) could
+// only make ONE publication: a 67-row source on top of a 65-row base, adding exactly four fixed
 // keys. From the live v9 (68 rows) it refuses, and it can never add a further key.
 // v2 composes the next snapshot from the CURRENT published version plus the reviewed source rows:
 // - a changed value or source reference shows in the delta as `changed`;
@@ -96,7 +96,7 @@ export const PREVIEW_SOURCE_ROW_KEYS_V2 = Object.freeze([
   'disagreementThreshold','dispersionScale','downgradeBands','engineContractHash','envelopeFormulaInputs','evaluatorCallBound','evaluatorLoopMaxRounds',
   'evaluatorRoleRef','globalStopDelta','hiddenNodeScoreThreshold','judgeContractHash','judgementSelectionPolicy','livenessPolicy',
   'mapContractHash','mfaPolicy','mfaRecoveryPolicy','nodeRuntimeVersion','panelDiscoveryPolicy','passwordPolicy','passwordResetPolicy',
-  'pnpmVersion','postgresMajorVersion','productRolePolicy','propagationContractHash','providerFamilyMap','publicationCheckPolicy',
+  'pnpmVersion','postgresMajorVersion','productRolePolicy','propagationContractHash','providerFamilyMap','publicationCheckPolicy','questionCheckPolicy',
   'rateLimitPolicy','recoveryPolicy','repeatedFamilyMultiplier','riskTier','runDeathPolicy','scoringOperator',
   'serveContractHash','sessionPolicy','storyCheckerCallBound','storyCheckerRoleRef','storyLoopMaxRounds','storyMaterialBudget',
   'storytellerCallBound','storytellerRoleRef','synthesizerCallBound','synthesizerRoleRef','taxAuthorities','typescriptVersion',

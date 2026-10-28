@@ -1,8 +1,11 @@
 import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
+import type { ComponentProps } from "react";
 import type { Answer, AnswerFloor, DebateMapView } from "@debateai/contract";
 import DebatePageGate from "./DebatePageGate";
 import { getDebateServer, questionLanguageTagOf, readSessionCookie, readTrustedClientIp } from "@/lib/serverApi";
+import { readCrisisCountryHint } from "@/lib/crisisLines";
+import { CrisisCountryHintProvider } from "@/components/CheckRemovalNotice";
 import type { DebateDetail } from "@/lib/types";
 import { debateDetailFromRunProjection } from "@/lib/v3/adapter";
 import { isLocale, LOCALE_COOKIE, type LocaleCode } from "@/lib/i18n/locales";
@@ -11,6 +14,12 @@ import { loadNamespace } from "@/lib/i18n/server";
 import { runFailureMessage } from "@/lib/v3/runFailure";
 
 export const dynamic = "force-dynamic";
+
+function DebatePageWithCountryHint({ countryHint, ...gateProps }: ComponentProps<typeof DebatePageGate> & { countryHint: string | null }) {
+  return <CrisisCountryHintProvider countryHint={countryHint}>
+    <DebatePageGate {...gateProps} />
+  </CrisisCountryHintProvider>;
+}
 
 export default async function DebatePage({
   params,
@@ -43,6 +52,7 @@ export default async function DebatePage({
     loadNamespace(locale, "home"),
     loadNamespace(locale, "newDebate")
   ]);
+  const countryHint = readCrisisCountryHint(await headers());
 
   // The accepted ask already owns a durable run id. Do not make the client
   // transition wait behind the runner's private-content lease: mount the
@@ -51,7 +61,8 @@ export default async function DebatePage({
   // retain the full asker-scoped SSR read below.
   if (starting) {
     return (
-      <DebatePageGate
+      <DebatePageWithCountryHint
+        countryHint={countryHint}
         id={id}
         initialDebate={null}
         initialAnswer={null}
@@ -115,6 +126,7 @@ export default async function DebatePage({
       initialError = runFailureMessage(result.reason, debateChromeCatalog);
       initialPending = false;
     } else if (result.kind === "not_found") {
+      // S01-R39: a deleted debate's notice is taken by this segment's not-found page, from the browser.
       notFound();
     }
   }
@@ -126,7 +138,8 @@ export default async function DebatePage({
   const storyCatalog = storyLocale === locale ? publicCatalog : await loadNamespace(storyLocale, "public");
 
   return (
-    <DebatePageGate
+    <DebatePageWithCountryHint
+      countryHint={countryHint}
       id={id}
       initialDebate={initialDebate}
       initialAnswer={initialAnswer}

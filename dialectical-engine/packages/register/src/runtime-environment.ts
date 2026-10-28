@@ -401,6 +401,19 @@ export function loadBillingWithdrawEnvironment() {
   return parseBillingWithdrawEnvironment(process.env);
 }
 
+/** The owner-of-email lookup uses only the API database and its sign-in blind-index key. */
+export function parseBillingOwnerLookupEnvironment(source: EnvironmentSource) {
+  return withProductionFloors(parseEnvironmentSource({
+    DATABASE_URL: z.string().url(),
+    BLIND_INDEX_KEY_PATH: z.string().min(1),
+    NODE_ENV: nodeEnvironment
+  }, source));
+}
+
+export function loadBillingOwnerLookupEnvironment() {
+  return parseBillingOwnerLookupEnvironment(process.env);
+}
+
 /**
  * Paid plans W12 (P2-I17), NETOPIA spec 2026-10-05 §2.17.1: `pnpm billing:invoice` reads, from the API's
  * EnvironmentFile, `NETOPIA_API_BASE_URL` (the payment system the API's invoicers follow: it refuses a charge of

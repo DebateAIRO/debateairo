@@ -17,5 +17,18 @@
   "archive.visibilityPrivate": "Privat",
   "archive.unreadable": "Indholdet af denne debat kan ikke længere læses, fordi dens nøgle er blevet slettet.",
   "archive.noDebates": "Du har ingen debatter.",
-  "archive.filesNote": "JSON-filerne i denne ZIP-fil indeholder de samme data i maskinlæsbart format; README.txt viser en oversigt over dem."
+  "archive.filesNote": "JSON-filerne i denne ZIP-fil indeholder de samme data i maskinlæsbart format; README.txt viser en oversigt over dem.",
+  "archive.contentCheck": "Indholdskontrol",
+  "archive.verdict.flagged": "Markeret",
+  "archive.verdict.clear": "Uden problemer",
+  "archive.verdict.noSynthesis": "Ingen syntese",
+  "archive.verdict.unavailable": "Ikke tilgængelig",
+  "archive.category.terrorism": "Mulig terrorisme",
+  "archive.category.hateSpeech": "hadtale af enhver art",
+  "archive.category.suicideOrHarm": "tendenser til selvmord eller til at skade andre mennesker",
+  "archive.category.weaponsOrDrugs": "fremstilling af våben eller narkotika",
+  "archive.publicationReview": "Gennemgang før offentliggørelse",
+  "archive.reviewAsked": "Anmodet",
+  "archive.reviewApproved": "Godkendt",
+  "archive.reviewRefused": "Afvist"
 }

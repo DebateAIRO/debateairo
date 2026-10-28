@@ -5,11 +5,16 @@ import {
   type OwnerReadDeps
 } from "../owner-read.js";
 import type { OwnerViewPort } from "./snapshot.js";
+import type { SynthesisCheckEntry } from "./types.js";
+import type { PublicationReviewEntry } from "./types.js";
+import type { PublicationReviewRepository } from "@debateai/serve";
+import { OPEN_SYNTHESIS_ANSWER_ACCESS } from "../synthesis-check/hold.js";
 
 export class OwnerViewAdapter implements OwnerViewPort {
   constructor(
     private readonly deps: OwnerReadDeps,
     private readonly keys: Pick<RunContentKeyStore, "exists">,
+    private readonly reviews: Pick<PublicationReviewRepository, "readStates">,
     private readonly sessionId: string = "00000000-0000-0000-0000-000000000000"
   ) {}
 
@@ -18,6 +23,26 @@ export class OwnerViewAdapter implements OwnerViewPort {
   }
 
   readonly runKeyPresent = (runId: string): Promise<boolean> => this.keys.exists(runId);
+  readonly runRemovedByCheck = async (runId: string): Promise<boolean> =>
+    (await (this.deps.synthesisAnswerAccess ?? OPEN_SYNTHESIS_ANSWER_ACCESS).stateOf({ runId })) === "REMOVED";
+  readonly readSynthesisChecks = (ownerRef: string, answerId: string): Promise<readonly SynthesisCheckEntry[]> => {
+    const a = this.access(ownerRef);
+    return this.deps.application.readSynthesisChecks?.(answerId, a.session, a.ownership) ?? Promise.resolve([]);
+  };
+  readonly readPublicationReviews = async (ownerRef: string, runId: string, answerId: string): Promise<readonly PublicationReviewEntry[]> => {
+    const records = await this.reviews.readStates({ ownerRef, runId, answerId });
+    return records.map((record) => {
+      if (!(record.askedAt instanceof Date) || !Number.isFinite(record.askedAt.getTime())) {
+        throw new Error("PUBLICATION_REVIEW_ASKED_AT_MISSING");
+      }
+      return {
+        asked_at: record.askedAt.toISOString(),
+        outcome: record.decision?.outcome ?? null,
+        decided_at: record.decision?.decidedAt.toISOString() ?? null,
+        reason: record.decision?.outcome === "REFUSE" ? record.decision.reason ?? null : null,
+      };
+    });
+  };
   readonly readRun = (ownerRef: string, runId: string): Promise<unknown> => {
     const a = this.access(ownerRef); return readOwnerRun(this.deps, runId, a.session, a.ownership);
   };

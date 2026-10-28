@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => ({
   readEvents: vi.fn(),
   readLedgerDigest: vi.fn(),
   readRunVisibility: vi.fn(),
+  readPublicationReview: vi.fn(),
   getDebateServer: vi.fn(),
   locale: "en"
 }));
@@ -47,7 +48,8 @@ vi.mock("@/lib/api", async (importOriginal) => {
       streamEvents: mocks.streamEvents,
       readEvents: mocks.readEvents,
       readLedgerDigest: mocks.readLedgerDigest,
-      readRunVisibility: mocks.readRunVisibility
+      readRunVisibility: mocks.readRunVisibility,
+      readPublicationReview: mocks.readPublicationReview
     },
     getDebateBundle: (id: string, token: string, _client?: unknown, options?: unknown) =>
       actual.getDebateBundle(id, token, readClient as never, options as never)
@@ -175,6 +177,7 @@ beforeEach(() => {
   mocks.readEvents.mockReset().mockResolvedValue([]);
   mocks.readLedgerDigest.mockReset().mockRejectedValue(new Error("not needed by this render test"));
   mocks.readRunVisibility.mockReset().mockResolvedValue({ state: "PRIVATE", public_ref: null });
+    mocks.readPublicationReview.mockReset().mockResolvedValue({ flagged: false, state: "NONE", categories: [], asks_used: 0, may_ask: false, refusal: null });
   mocks.streamEvents.mockReset().mockImplementation(async (_runRef: string, emit: (event: RunEvent) => void) => {
     mocks.emit = emit;
     await new Promise<void>(() => {});

@@ -43,6 +43,7 @@ import {
   testSessionHeaders,
   type TestHttpIdentity
 } from "../support/httpSession.js";
+import { questionCheckPass } from "../support/questionCheckPass.js";
 import { reviewArtifact, withRequestDerivedBearings } from "../support/reviewBearings.js";
 import {
   provisionStoryEncryptedOwner,
@@ -543,7 +544,7 @@ async function waitWakeAndAnswer(input: Readonly<{
     billing: input.billing,
     dispatcher: { dispatch: async (job) => { dispatched.push(Object.freeze({ runId: job.runId, workItemId: job.workItemId })); } }
   });
-  const api = buildApi({ application, sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN });
+  const api = buildApi({ application, questionCheck: questionCheckPass, sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN });
   const read = (path: string) => api.inject({ method: "GET", url: path, headers: testSessionHeaders(identity) });
   try {
     // The site's day is spent: one support charge fills it to the ceiling.

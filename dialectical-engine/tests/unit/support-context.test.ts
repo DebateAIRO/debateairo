@@ -112,7 +112,8 @@ describe("Support knowledge context", () => {
     // 2026-10-06: updated account access and recovery navigation have current SOL evidence.
     // 2026-10-05: changed menu/article/recovery bytes have SOL evidence; unchanged legal entries retain OWNER signatures.
     // Prior 2026-09-29: the owner signed the catalogue with the seven Turn 15 legal pages.
-    expect(corpus.kbVersion).toBe("f65033fa2929ec4f3c83efded440d3d7b74c2a18830c7f969c0bc21b2132a5a9");
+    // DONE S05 r2: the words check pins the reviewed article and catalogue bytes.
+    expect(corpus.kbVersion).toBe("d1d7500ead3325a16f22ef509e21c798ac2480972f28ed4e215f2fcf1e615a20");
     expect(Object.isFrozen(corpus)).toBe(true);
     expect(Object.isFrozen(corpus.entries)).toBe(true);
 
@@ -565,6 +566,7 @@ describe("Support knowledge context", () => {
   });
 
   it.each([
+    // DONE S05 r2: topicRows in the words-check pins.json keep these twelve routes.
     // Measured through origin/dev's context.ts on this corpus (orchestrator rule 1,
     // 2026-09-25): an en/ro topic-chip prompt gets dev's retrieval, no source-id binding.
     ["en","support.topic.gettingStarted.prompt",["getting-started-debate","risk-tier-choice","budget-tier-choice"],[],["start-debate"]],

@@ -33,7 +33,9 @@ describe("Support catalog route coverage", () => {
     expect(SUPPORT_PAGE_ROUTES).toEqual([
       "/",
       "/admin/invitation",
+      "/admin/reviews",
       "/admin/team",
+      "/admin/threat-reports",
       "/admin/workers",
       "/ai-transparency",
       "/social/complete",
@@ -85,6 +87,8 @@ describe("Support catalog route coverage", () => {
       expect(SUPPORT_CAPABILITIES.find(capability => capability.route === route)).toBeUndefined();
     }
     expect(disposition.get("/admin/workers")).toBe("excluded");
+    expect(SUPPORT_PAGE_ROUTES).toContain("/admin/reviews");
+    expect(SUPPORT_CAPABILITIES.find(({ route }) => route === "/admin/reviews")).toBeUndefined();
     expect(disposition.get("/debate/[id]")).toBe("trusted-context-only");
     expect(disposition.get("/public/debate/[id]")).toBe("trusted-context-only");
     expect(SUPPORT_PROXY_ROUTES).toEqual(["/api/[...path]"]);

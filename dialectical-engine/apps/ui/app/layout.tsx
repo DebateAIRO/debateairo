@@ -65,10 +65,11 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = await requestLocale();
   const localeDefinition = getLocale(locale);
-  const [chrome, debateViews, support, consentNamespace, legalNamespace, privacy, terms, auth] = await Promise.all([
+  const [chrome, debateViews, support, home, consentNamespace, legalNamespace, privacy, terms, auth] = await Promise.all([
     loadNamespace(locale, "chrome"),
     loadNamespace(locale, "debateViews"),
     loadNamespace(locale, "support"),
+    loadNamespace(locale, "home"),
     // Served with the render so every consent surface paints in the reader's locale
     // on its first render, with no client chunk load and no English in between.
     loadNamespace(locale, "consent"),
@@ -78,7 +79,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     loadLegalDocument(locale, "terms"),
     loadNamespace(locale, "auth")
   ]);
-  const sharedCatalog = Object.freeze({ ...chrome, ...debateViews, ...support });
+  const sharedCatalog = Object.freeze({ ...chrome, ...debateViews, ...support, ...home });
   const consent = Object.freeze({ ...consentNamespace, ...inventoryCopy(legalNamespace) });
 
   // F-08: the per-request nonce the middleware stamped on the request. Reading

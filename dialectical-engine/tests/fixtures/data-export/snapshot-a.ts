@@ -40,7 +40,7 @@ export const snapshotA: ExportSnapshot = {
       phone_verification_status: null, state: "active", created_at: "2024-01-02T00:00:00.000Z",
       adult_affirmed_at: "2024-01-02T00:00:00.000Z", email: "ada@example.test" },
     channels: [], registration_region: { country_code: "RO", us_state: null },
-    age_checks: [], erasure_requests: [] },
+    age_checks: [], erasure_requests: [], kept_questions: [] },
   security: { mfa_factors: [], passkeys: [], recovery_codes: { unused_count: 4, generated_at: "2024-01-02T00:00:00.000Z" },
     sessions: [], social_identities: [], email_changes: [], recovery_email_changes: [], recovery_requests: [] },
   consents: { legal_acceptances: [], sensitive_data_consents: [] },

@@ -17,5 +17,18 @@
   "archive.visibilityPrivate": "Privāts",
   "archive.unreadable": "Šo debašu saturu vairs nevar nolasīt, jo to atslēga ir iznīcināta.",
   "archive.noDebates": "Jums nav debašu.",
-  "archive.filesNote": "Šajā ZIP arhīvā esošie JSON faili satur tos pašus datus mašīnlasāmā formā; to saraksts ir README.txt."
+  "archive.filesNote": "Šajā ZIP arhīvā esošie JSON faili satur tos pašus datus mašīnlasāmā formā; to saraksts ir README.txt.",
+  "archive.contentCheck": "Satura pārbaude",
+  "archive.verdict.flagged": "Atzīmēts",
+  "archive.verdict.clear": "Bez problēmām",
+  "archive.verdict.noSynthesis": "Nav sintēzes",
+  "archive.verdict.unavailable": "Nav pieejams",
+  "archive.category.terrorism": "Iespējams terorisms",
+  "archive.category.hateSpeech": "jebkāda veida naida runa",
+  "archive.category.suicideOrHarm": "tieksmes uz pašnāvību vai kaitējuma nodarīšanu citiem cilvēkiem",
+  "archive.category.weaponsOrDrugs": "ieroču vai narkotiku izgatavošana",
+  "archive.publicationReview": "Publicēšanas pārskatīšana",
+  "archive.reviewAsked": "Lūgts",
+  "archive.reviewApproved": "Apstiprināts",
+  "archive.reviewRefused": "Atteikts"
 }

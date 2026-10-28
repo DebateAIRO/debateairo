@@ -206,7 +206,7 @@ const CASE_ACKNOWLEDGEMENT = Object.freeze({
   link: `/help#case=${CASE_TOKEN}`
 });
 
-test("DL1-F5c: a persisted acknowledgement carries no case bearer in its id, text or link", async () => {
+test("a legacy case acknowledgement stores no bearer or caseOpened field", async () => {
   const { writeStoredSupportConversation } = await loadConversation();
   const storage = memoryStorage();
   writeStoredSupportConversation(storage, {
@@ -220,7 +220,7 @@ test("DL1-F5c: a persisted acknowledgement carries no case bearer in its id, tex
   assert.doesNotMatch(raw, TOKEN_SHAPED, "and nothing token-shaped survives the writer");
   assert.doesNotMatch(raw, /case=[A-Za-z0-9_-]/u, "nor any link fragment still carrying one");
   const stored = JSON.parse(raw).messages.at(-1);
-  assert.equal(stored.caseOpened, true, "the transcript still says a case was opened");
+  assert.equal(stored.caseOpened, undefined, "the retired case flag is dropped");
   assert.equal(stored.link, undefined, "the bearer link is dropped, never half-written");
 });
 
@@ -276,56 +276,49 @@ test("DL1-F5c: the retired key and any payload the reader refuses are erased, no
   }
 });
 
-test("DL1-F5c: the assistant holds the case bearer in memory and stores a token-free notice", () => {
-  const source = read("./Assistant.tsx");
-  assert.doesNotMatch(
-    source,
-    /id:\s*`case-\$\{[^}]*[Tt]oken\}`/u,
-    "no message id is minted from the bearer"
-  );
-  assert.match(source, /setCaseBearer\(/u, "the bearer is React state, like the session capability");
-  assert.match(
-    source,
-    /supportCaseLink\(bearer\.token\)/u,
-    "the link is rebuilt from the in-memory bearer when rendering"
-  );
-  assert.match(
-    source,
-    /t\(catalog,"support\.caseOpenedNotice"\)/u,
-    "and the transcript keeps a token-free notice for when the bearer is gone"
-  );
+test("a stored message with caseOpened parses without it", async () => {
+  const { readStoredSupportConversation } = await loadConversation();
+  const storage = memoryStorage({ [KEY]: JSON.stringify({
+    language: "en",identityBound: false,
+    messages: [{ id: "old",role: "assistant",text: "Old notice",caseOpened: true }]
+  }) });
+  assert.deepEqual(readStoredSupportConversation(storage)?.messages, [
+    { id: "old",role: "assistant",text: "Old notice" }
+  ]);
 });
 
-// ---------------------------------------------- DL3-F3: a stale session is not an outage
-
-test("DL3-F3: the API's 404 is classified as a stale session, not a dead end", async () => {
-  const { SupportHttpError, isStaleSupportSession } = await loadHttp();
-  assert.equal(isStaleSupportSession(new SupportHttpError(404)), true);
-  for (const other of [
-    new SupportHttpError(401), new SupportHttpError(429), new SupportHttpError(503),
-    new Error("SUPPORT_REQUEST_UNAVAILABLE"), null, undefined, 404
-  ]) {
-    assert.equal(isStaleSupportSession(other), false, `${String(other)} is not a stale session`);
+test("support POST carries no support session or case capability header", async () => {
+  const { supportPost } = await loadHttp();
+  const original = globalThis.fetch;
+  let sent;
+  globalThis.fetch = async (path,options) => {
+    sent = { path,options };
+    return new Response(JSON.stringify({ outcome: "NO_SOURCE",text: "Answer" }));
+  };
+  try {
+    await supportPost("/api/v1/support/messages",{ text: "Question",language: "en" });
+    assert.equal(sent.path,"/api/v1/support/messages");
+    assert.deepEqual(JSON.parse(sent.options.body),{ text: "Question",language: "en" });
+    assert.equal(sent.options.headers["x-support-session-token"],undefined);
+    assert.equal(sent.options.headers["x-support-case-token"],undefined);
+    await assert.rejects(() => supportPost("https://example.test",{}),/SUPPORT_SAME_ORIGIN_PATH_REQUIRED/u);
+  } finally {
+    globalThis.fetch = original;
   }
 });
 
 // ---------------------------------------------- DL3-F3: the call sites
 
-test("DL3-F3: the assistant persists through the whitelisting writer and holds the capability in memory", () => {
-  const source = read("./Assistant.tsx");
-  assert.match(source, /writeStoredSupportConversation\(/u, "the assistant writes through the whitelist");
-  assert.match(source, /restoreSupportConversation\(/u, "and restores only an identity-matched transcript");
-  assert.doesNotMatch(
-    source,
-    /sessionStorage\.setItem/u,
-    "no raw write can put the capability back in sessionStorage"
-  );
-  assert.doesNotMatch(
-    source,
-    /stored\?\.session|session:\s*stored/u,
-    "the session is never seeded from storage"
-  );
-  assert.match(source, /isStaleSupportSession\(/u, "a 404 starts a new session instead of dead-ending");
+test("the conversation writer drops retired caseOpened on new messages", async () => {
+  const { writeStoredSupportConversation } = await loadConversation();
+  const storage = memoryStorage();
+  writeStoredSupportConversation(storage,{
+    language: "en",identityBound: false,
+    messages: [{ id: "new",role: "assistant",text: "Answer",caseOpened: true }]
+  });
+  assert.deepEqual(JSON.parse(storage.getItem(KEY)).messages,[
+    { id: "new",role: "assistant",text: "Answer" }
+  ]);
 });
 
 test("DL3-F3: ending a session erases the support conversation in the same tab", () => {

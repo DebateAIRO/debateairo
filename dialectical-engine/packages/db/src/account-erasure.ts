@@ -3,6 +3,7 @@ import type { Pool, PoolClient } from "pg";
 import {
   type AuditContextHasher,
   type CryptoEnvelope,
+  decrypt,
   type PublicationCipher,
   type ReadableUserDekStore,
   type RunContentKeyStore
@@ -36,7 +37,10 @@ const ERASURE_FUNCTION_SIGNATURES = Object.freeze([
   "core.private_run_erasure_status(uuid)",
   "core.private_run_erasure_manifest(uuid)",
   "core.pending_private_run_key_cleanup(integer)",
-  "core.finalize_private_run_erasure(uuid,timestamptz,timestamptz,integer,integer)"
+  "core.finalize_private_run_erasure(uuid,timestamptz,timestamptz,integer,integer)",
+  "core.prepare_synthesis_check_erasures(integer)",
+  "core.pending_synthesis_check_erasure_cleanup(integer)",
+  "core.finalize_synthesis_check_erasure(uuid,timestamptz,timestamptz,integer,integer)"
 ] as const);
 const ERASURE_FORBIDDEN_ROLES = Object.freeze([
   "public","debateai_runtime","debateai_authorization_runtime",
@@ -660,7 +664,11 @@ export class AccountErasureCoordinator {
     private readonly users: ReadableUserDekStore,
     private readonly runs: RunContentKeyStore,
     private readonly publications?: Pick<PublicationCipher,
-      "destroy" | "exists" | "keyReadable">
+      "destroy" | "exists" | "keyReadable">,
+    private readonly options: Readonly<{
+      readEmailCiphertext?: (userId: string) => Promise<CryptoEnvelope | null>;
+      beforeKeyDestruction?: (input: Readonly<{ erasureId: string; userId: string; email: string }>) => Promise<void>;
+    }> = {}
   ) {}
 
   async execute(erasureId: string, source: AuthSourceContext): Promise<AccountErasureTransitionOutcome> {
@@ -720,6 +728,23 @@ export class AccountErasureCoordinator {
     // prevents a cross-process SCHEDULED sender from retaining plaintext while
     // a later completion cycle shreds the key.
     if (!await this.repository.completionNotificationsReady(erasureId)) return "CONTENDED";
+    if (this.options.beforeKeyDestruction !== undefined) {
+      try {
+        // A retry after key destruction already ran the hold on its first attempt.
+        if (await this.users.exists(cleanup.userId)) {
+          if (this.options.readEmailCiphertext === undefined) return "CONTENDED";
+          const encrypted = await this.options.readEmailCiphertext(cleanup.userId);
+          if (encrypted === null) return "CONTENDED";
+          const key = await this.users.load(cleanup.userId);
+          let email: string;
+          try {
+            email = decrypt(key, encrypted, ["identity", "user.email_ciphertext", cleanup.userId,
+              "run:none", cleanup.userId, `user-dek:${cleanup.userId}`, "1"]).toString("utf8");
+          } finally { key.fill(0); }
+          await this.options.beforeKeyDestruction({ erasureId, userId: cleanup.userId, email });
+        }
+      } catch { return "CONTENDED"; }
+    }
     if ((cleanup.currentPublicationRefs.length > 0
         || cleanup.cleanupPublicationRefs.length > 0)
       && this.publications === undefined) return "INVALID_EVIDENCE";

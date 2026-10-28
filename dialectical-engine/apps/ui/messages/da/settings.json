@@ -108,7 +108,7 @@
   "settings.transparency.downloadsTail": "objekt, der beskriver det genererede indhold og fraværet af menneskelig redaktionel gennemgang. Registrerede svardata, modeloprindelse og driftsregistreringer bevarer deres oprindelige værdier.",
   "settings.transparency.markingsLimit": "Disse markeringer beskriver indhold i vores brugerflade og downloads. De er ikke et vandmærke eller ægthedscertifikat; kopiering som almindelig tekst kan fjerne dem.",
   "settings.transparency.supportTitle": "Support og menneskelig hjælp",
-  "settings.transparency.supportLead": "Supportassistenten er et AI-system. Brug “Tal med et menneske” eller “Eskalér til et menneske” i",
+  "settings.transparency.supportLead": "Supportassistenten er et AI-system. Brug “Tal med et menneske” i",
   "settings.transparency.help": "Hjælp",
   "settings.transparency.supportTail": "for at anmode om menneskelig hjælp.",
   "settings.transparency.back": "Tilbage til {brand}",

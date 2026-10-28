@@ -108,7 +108,7 @@
   "settings.transparency.downloadsTail": "que describe el contenido generado y la ausencia de revisión editorial humana. Los datos registrados de la respuesta, la procedencia del modelo y los registros operativos conservan sus valores originales.",
   "settings.transparency.markingsLimit": "Estas marcas describen el contenido en nuestra interfaz y nuestras descargas. No son una marca de agua ni un certificado de autenticidad; al copiar texto sin formato pueden eliminarse.",
   "settings.transparency.supportTitle": "Soporte y ayuda humana",
-  "settings.transparency.supportLead": "El asistente de soporte es un sistema de IA. Use «Hablar con una persona» o «Derivar a una persona» en",
+  "settings.transparency.supportLead": "El asistente de soporte es un sistema de IA. Use «Hablar con una persona» en",
   "settings.transparency.help": "Ayuda",
   "settings.transparency.supportTail": "para solicitar ayuda humana.",
   "settings.transparency.back": "Volver a {brand}",

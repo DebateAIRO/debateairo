@@ -57,6 +57,7 @@ describe("S10 rendered erasure boundaries",()=>{
         const client={
           authMethods:vi.fn(async()=>({methods:[],recovery_codes_remaining:0,available_step_up_methods:['password_totp' as const],step_up_providers:[]})),
           readRunVisibility:vi.fn(async ()=>({ state:"PRIVATE" as const,public_ref:null })),
+          readPublicationReview:vi.fn(async ()=>({ flagged: false, state: "NONE", categories: [], asks_used: 0, may_ask: false, refusal: null })),
           stepUp:vi.fn(async ()=>({
             status:"step_up_complete" as const,csrf_token:"c".repeat(43),
             step_up_grant:{ token:"g".repeat(43),action:"DELETE_PRIVATE_DEBATE" as const,
@@ -93,6 +94,7 @@ describe("S10 rendered erasure boundaries",()=>{
       const client={
         authMethods:vi.fn(async()=>({methods:[],recovery_codes_remaining:0,available_step_up_methods:['password_totp' as const],step_up_providers:[]})),
         readRunVisibility:vi.fn(async ()=>({ state:"PRIVATE" as const,public_ref:null })),
+          readPublicationReview:vi.fn(async ()=>({ flagged: false, state: "NONE", categories: [], asks_used: 0, may_ask: false, refusal: null })),
         stepUp:vi.fn(async ()=>({
           status:"step_up_complete" as const,csrf_token:"c".repeat(43),
           step_up_grant:{ token:"g".repeat(43),action:"DELETE_PRIVATE_DEBATE" as const,

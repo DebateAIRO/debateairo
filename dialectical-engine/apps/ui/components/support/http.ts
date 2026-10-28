@@ -9,17 +9,6 @@ export class SupportHttpError extends Error {
   }
 }
 
-/**
- * DL3-F3: the API answers 404 for a session capability whose owner no longer
- * matches the cookie — an identity change on a shared tab, an expiry, or a
- * server-side lock. That is a stale session, not an outage, and the widget's
- * answer is a new session rather than "Support is unavailable" forever (the
- * compact surface has no "New conversation" control to escape with).
- */
-export function isStaleSupportSession(failure: unknown): boolean {
-  return failure instanceof SupportHttpError && failure.status === 404;
-}
-
 function csrfToken(): string | null {
   if (typeof document === "undefined") return null;
   return document.cookie.split(";").flatMap((member) => {
@@ -37,9 +26,7 @@ function csrfToken(): string | null {
  * the host CSRF cookie.
  */
 export async function supportPost(
-  path: string,body: Readonly<Record<string,unknown>>,supportSessionToken?: string,
-  /** DL1-F5c/DL3-F4: a case bearer, which never travels in the path. */
-  supportCaseToken?: string
+  path: string,body: Readonly<Record<string,unknown>>
 ): Promise<Response> {
   if (!SUPPORT_API_PATH.test(path) || path.includes("\\")) {
     throw new Error("SUPPORT_SAME_ORIGIN_PATH_REQUIRED");
@@ -50,10 +37,6 @@ export async function supportPost(
     credentials: "same-origin",
     headers: {
       "content-type": "application/json",
-      ...(supportSessionToken === undefined
-        ? {} : { "x-support-session-token": supportSessionToken }),
-      ...(supportCaseToken === undefined
-        ? {} : { "x-support-case-token": supportCaseToken }),
       ...(csrf === null ? {} : { "x-csrf-token": csrf })
     },
     body: JSON.stringify(body)
