@@ -84,6 +84,13 @@ describe("the chart axes", () => {
     expect(linearScale([-3, 5], { fromZero: true, percent: false }).min).toBeLessThan(0);
   });
 
+  it("always ends: extreme values fall back to the axis's two ends instead of looping", () => {
+    // A step too small for the magnitude would never move a running total; an underflowed decade never grows.
+    expect(linearScale([1e17, 1e17 + 16], { fromZero: false, percent: false }).ticks.length).toBeLessThanOrEqual(51);
+    expect(logScale([5e-324, 10]).ticks).toEqual([5e-324, 10]);
+    expect(logScale([1e-40, 1e40]).ticks).toEqual([1e-40, 1e40]);
+  });
+
   it("a log scale spans whole decades, with 2 and 5 between them", () => {
     const scale = logScale([0.15, 10]);
     expect(scale).toEqual({ min: 0.1, max: 10, ticks: [0.1, 0.2, 0.5, 1, 2, 5, 10] });

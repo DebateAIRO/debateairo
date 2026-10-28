@@ -83,6 +83,7 @@ export type StoryChartDropCode =
   | "CHART_FIGURE_MISSING"
   | "CHART_FIGURE_NOT_IN_CLAIM"
   | "CHART_FIGURE_MISMATCH"
+  | "CHART_FIGURE_OUT_OF_RANGE"
   | "CHART_LOG_NOT_POSITIVE"
   | "CHART_LABEL_REPEATED"
   | "CHART_TEXT_CHARACTERS"
@@ -139,6 +140,9 @@ export function figureReadings(text: string): readonly number[] {
   return readings;
 }
 
+/** The largest and the smallest non-zero size a charted figure may have. */
+export const STORY_CHART_FIGURE_BOUNDS = Object.freeze({ maxMagnitude: 1e15, minMagnitude: 1e-9 });
+
 function sameNumber(a: number, b: number): boolean {
   return Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
 }
@@ -146,6 +150,11 @@ function sameNumber(a: number, b: number): boolean {
 /** The figure is in the claim, character for character, and it states the number the plan gives it. */
 function figureIssue(figure: StoryChartFigure | null, claim: string): StoryChartDropCode | null {
   if (figure === null) return "CHART_FIGURE_MISSING";
+  // A chart compares everyday magnitudes; a figure beyond these bounds is not one a reader can compare on an axis.
+  const size = Math.abs(figure.value);
+  if (size > STORY_CHART_FIGURE_BOUNDS.maxMagnitude || (size !== 0 && size < STORY_CHART_FIGURE_BOUNDS.minMagnitude)) {
+    return "CHART_FIGURE_OUT_OF_RANGE";
+  }
   if (!normalised(claim).includes(normalised(figure.text))) return "CHART_FIGURE_NOT_IN_CLAIM";
   return figureReadings(figure.text).some((reading) => sameNumber(reading, figure.value)) ? null : "CHART_FIGURE_MISMATCH";
 }

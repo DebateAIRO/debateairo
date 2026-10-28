@@ -112,6 +112,9 @@ describe("readStoryCharts: a chart is kept whole or dropped whole", () => {
     ["CHART_LOG_NOT_POSITIVE", { y: { label: "Change (%)", source: "figure", log: true }, items: [
       { label: "Output per hour", node_ref: "P1", x: null, y: { value: 12, text: "12%" } },
       { label: "Fewer sick days", node_ref: "P3", x: null, y: { value: 0, text: "0" } }], after: "long.1.1" }],
+    ["CHART_FIGURE_OUT_OF_RANGE", { items: [
+      { label: "Output per hour", node_ref: "P1", x: null, y: { value: 1e300, text: "12%" } },
+      { label: "Payroll", node_ref: "P2", x: null, y: { value: 8, text: "8 %" } }] }],
     ["CHART_SCHEMA", { kind: "pie" }]
   ])("drops %s", (code, overrides) => {
     const read = readStoryCharts({ charts: [bar(overrides as Record<string, unknown>)] }, CONTEXT);

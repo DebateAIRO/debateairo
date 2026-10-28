@@ -181,10 +181,17 @@ export function linearScale(values: readonly number[], options: Readonly<{ fromZ
   const step = niceStep(high - low, 5);
   const min = tidy(Math.floor(low / step) * step);
   const max = tidy(Math.ceil(high / step) * step);
-  const ticks: number[] = [];
-  for (let tick = min; tick <= max + step / 2; tick += step) ticks.push(tidy(tick));
+  // By index, never by adding: a step too small for the values' magnitude would never move a running total.
+  const count = Math.round((max - min) / step);
+  if (!Number.isFinite(count) || count < 1 || count > REPORT_CHART_SCALE_LIMITS.maxTicks) {
+    return { min: low, max: high, ticks: Object.freeze([low, high]) };
+  }
+  const ticks = Array.from({ length: count + 1 }, (_, index) => tidy(min + index * step));
   return { min, max, ticks: Object.freeze(ticks) };
 }
+
+/** The most ticks a linear axis draws, and the most decades a log axis spans, before it falls back to its two ends. */
+export const REPORT_CHART_SCALE_LIMITS = Object.freeze({ maxTicks: 50, maxDecades: 30 });
 
 /** A log scale over positive `values`: whole decades, with 2 and 5 between them when it spans three decades or fewer. */
 export function logScale(values: readonly number[]): ReportChartScale {
@@ -192,8 +199,14 @@ export function logScale(values: readonly number[]): ReportChartScale {
   const high = 10 ** Math.ceil(Math.log10(Math.max(...values)));
   const max = high === low ? high * 10 : high;
   const decades = Math.round(Math.log10(max / low));
+  // By decade index: a lowest decade that underflows to 0 would never grow by multiplying.
+  if (!(low > 0) || !Number.isFinite(max) || !Number.isFinite(decades) || decades > REPORT_CHART_SCALE_LIMITS.maxDecades) {
+    const ends = [Math.min(...values), Math.max(...values)];
+    return { min: ends[0]!, max: ends[1]!, ticks: Object.freeze(ends) };
+  }
   const ticks: number[] = [];
-  for (let decade = low; decade < max * 1.0001; decade *= 10) {
+  for (let index = 0; index <= decades; index += 1) {
+    const decade = low * 10 ** index;
     for (const value of decades <= 3 ? [decade, decade * 2, decade * 5] : [decade]) {
       const tick = tidy(value);
       if (tick <= max * 1.0001) ticks.push(tick);
