@@ -9,9 +9,15 @@ import * as billing from "@debateai/billing-core";
 import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW,billingPlansFromValue } from "@debateai/register";
 import { startTestDatabase,type TestDatabase } from "../support/testDatabase.js";
 import { internalFundingFixture } from "../support/internalFundingFixture.js";
-let database:TestDatabase,runtime:Pool,fixture:ReturnType<typeof internalFundingFixture>;
-beforeAll(async()=>{database=await startTestDatabase();await migrate(database.pool);await database.pool.query("CREATE ROLE task11_races LOGIN PASSWORD 'private-fixture-only' IN ROLE debateai_runtime,debateai_billing_runtime");const url=new URL(database.connectionString);url.username="task11_races";url.password="private-fixture-only";runtime=createPool(url.toString());fixture=internalFundingFixture(database.pool,runtime);},120000);
-afterAll(async()=>{await runtime?.end();await database?.stop();});
+import { createSystemTwin } from "../support/rls-logins.js";
+/**
+ * Row-level security (0126, D29): the provider seam runs on the runner's login (debateai_runtime and the cross-account
+ * marker) and the room's pins on api-system (the billing role and the marker), so `runtime` is the system twin of the
+ * file's login. `bare` holds the same roles with no account context and no marker: it reads no person and opens no hold.
+ */
+let database:TestDatabase,runtime:Pool,bare:Pool,fixture:ReturnType<typeof internalFundingFixture>;
+beforeAll(async()=>{database=await startTestDatabase();await migrate(database.pool);runtime=createPool(await createSystemTwin(database,"task11_races",["debateai_runtime","debateai_billing_runtime"]));await database.pool.query("CREATE ROLE task11_races_bare LOGIN PASSWORD 'private-fixture-only' IN ROLE debateai_runtime,debateai_billing_runtime");const url=new URL(database.connectionString);url.username="task11_races_bare";url.password="private-fixture-only";bare=createPool(url.toString());fixture=internalFundingFixture(database.pool,runtime);},120000);
+afterAll(async()=>{await runtime?.end();await bare?.end();await database?.stop();});
 async function pinned(change:Record<string,unknown>={}){const actor=await fixture.fundedActor(),command=fixture.configureCommand(actor,change);await fixture.configure(actor,command);const allowances=new PostgresInternalAllowanceRepository(runtime),grant=(await allowances.current(actor.ownerRef,new Date()))!;const runId=await fixture.run(actor.ownerRef),entitlements=new EntitlementRepository(runtime),tx=await runtime.connect();try{await entitlements.recordRunChargeScope(tx,{runId,ownerRef:actor.ownerRef,basis:{kind:"INTERNAL",grantId:grant.grantId,grantEventId:grant.grantEventId},admittedAt:new Date()});}finally{tx.release();}return {actor,command,runId,grant,allowances,entitlements};}
 const reserve=(call:string,run:string,amount:number)=>runtime.query("SELECT billing.reserve_internal_provider_call($1::uuid,$2::uuid,$3::bigint,'RUN','BODY') AS internal",[call,run,amount]);
 const settle=(call:string,amount:number,runId:string,attempt:string|null=null)=>runtime.query("SELECT billing.settle_internal_provider_call($1::uuid,$2::uuid,'RUN','BODY','fake-provider',$3::bigint,1::bigint,1::bigint,$4::uuid)",[call,runId,amount,attempt]);
@@ -132,6 +138,15 @@ describe("finite grants serialize fake provider admissions and settle admitted c
   await expect(reserve(randomUUID(),p.runId,201)).rejects.toThrow("INTERNAL_ALLOWANCE_REACHED");await reserve(randomUUID(),other,800);
   expect(await store.readOwnerCountedHoldsMicros(p.actor.ownerRef,basis)).toBe(800);await reserve(randomUUID(),p.runId,200);expect(await store.readOwnerCountedHoldsMicros(p.actor.ownerRef,basis)).toBe(1000);
   await expect(reserve(randomUUID(),p.runId,1)).rejects.toThrow("INTERNAL_ALLOWANCE_REACHED");
+ });
+ it("row-level security (0126): the same roles with no account context read no person and open no hold",async()=>{
+  const actor=await fixture.fundedActor(),runId=await fixture.run(actor.ownerRef,"free");
+  // The control on the system twin: the person reads as Free.
+  expect((await new EntitlementRepository(runtime).current(actor.ownerRef,new Date())).planId).toBe("FREE");
+  await expect(new EntitlementRepository(bare).current(actor.ownerRef,new Date())).rejects.toMatchObject({code:"BILLING_OWNER_UNKNOWN"});
+  const tx=await bare.connect();
+  try{await expect(new PostgresModelSpendStore(bare).openHold(tx,{runId,heldMicros:1})).rejects.toMatchObject({code:"42501"});}finally{tx.release();}
+  expect((await database.pool.query("SELECT count(*)::int AS n FROM ledger.model_spend_hold WHERE run_id=$1",[runId])).rows[0].n).toBe(0);
  });
  it("keeps the admission table private with five runtime definers and one retired owner-only overload",async()=>{
   for(const sql of ["SELECT * FROM billing.internal_provider_admission","INSERT INTO billing.internal_provider_admission(call_id) VALUES(gen_random_uuid())","DELETE FROM billing.internal_provider_admission","TRUNCATE billing.internal_provider_admission"])

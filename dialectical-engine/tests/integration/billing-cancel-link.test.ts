@@ -117,10 +117,11 @@ describe("P13 the cancel link on real PostgreSQL", () => {
     expect(mails[0]).toMatchObject({ to: "subscriber@example.test", templateId: "M9", locale: "en", attachments: [] });
     expect(mails[0]!.params.cancelLinkUrl).toMatch(new RegExp(`^${TEST_PUBLIC_APP_URL}/cancel#token=[A-Za-z0-9_-]{43}$`));
     const token = tokenOf(mails[0]!);
-    const stored = await database.pool.query<{ token_sha256: string }>(
-      "SELECT token_sha256 FROM billing.cancel_token WHERE subscription_id=$1", [seeded.subscriptionId]
+    // V-15 (SEC-B1): the link is issued with its owner, the column 0126's row security reads.
+    const stored = await database.pool.query<{ token_sha256: string; owner_ref: string | null }>(
+      "SELECT token_sha256, owner_ref::text AS owner_ref FROM billing.cancel_token WHERE subscription_id=$1", [seeded.subscriptionId]
     );
-    expect(stored.rows).toEqual([{ token_sha256: cancelTokenSha256(token) }]);
+    expect(stored.rows).toEqual([{ token_sha256: cancelTokenSha256(token), owner_ref: ownerRef }]);
     expect(JSON.stringify(stored.rows)).not.toContain(token);
     expect(await links.cancelByToken(token)).toBe("CANCELLED");
     const events = await new BillingRepository(database.pool).subscriptionEvents(seeded.subscriptionId);
@@ -134,6 +135,25 @@ describe("P13 the cancel link on real PostgreSQL", () => {
       { event: "billing.cancel_link.sent", fields: {} },
       { event: "billing.cancel", fields: { source: "EMAIL_LINK" } }
     ]);
+  });
+
+  it("V-18: refuses a link whose owner is not its subscription's first owner, and leaves that plan as it was", async () => {
+    const clock = { now: new Date() };
+    const { links, audit } = service(clock);
+    const victim = await account(`v18-b-${randomUUID().slice(0, 8)}@example.test`);
+    const other = await account(`v18-a-${randomUUID().slice(0, 8)}@example.test`);
+    const seeded = await seedNetopiaSubscription(database.pool, {
+      ownerRef: victim, planId: "PLUS", activatedAt: new Date(Date.now() - 3 * DAY), taxCountry: "RO"
+    });
+    // A link stored under another account naming the victim's subscription: what a T1 login could write before 0126
+    // refused it (FIX-S01-p1a NEW-2), and what a row stored then still holds.
+    const token = randomBytes(32).toString("base64url");
+    await database.pool.query(`INSERT INTO billing.cancel_token(token_sha256,subscription_id,issued_at,expires_at,owner_ref)
+      VALUES ($1,$2,now(),now()+interval '1 day',$3)`, [cancelTokenSha256(token), seeded.subscriptionId, other]);
+    expect(await links.cancelByToken(token)).toBe("INVALID");
+    const events = await new BillingRepository(database.pool).subscriptionEvents(seeded.subscriptionId);
+    expect(foldSubscription(events).cancelRequested).toBe(false);
+    expect(audit.events).toEqual([]);
   });
 
   it("sends a link for a plan paused by a card dispute, and the link cancels it with M7's paused words (P2-W10)", async () => {

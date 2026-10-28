@@ -259,17 +259,24 @@ function hourOf(at: Date): string {
 
 /**
  * Spec §2.15.2 / §2.15.3: the subscription's saved card when a renewal can use it now: the token its newest adopting
- * event names, not revoked, of NETOPIA in the subscription's own environment, and not past the end of its expiry month
- * (an unknown expiry is usable). Null otherwise; N17's look-ahead asks the same at the renewal date.
+ * event names, saved by a charge of the subscription's owner, not revoked, of NETOPIA in the subscription's own
+ * environment, and not past the end of its expiry month (an unknown expiry is usable). Null otherwise; N17's look-ahead
+ * asks the same at the renewal date. The owner check is V-18's residue: since 0126 the database refuses an event naming
+ * another account's card, but one stored before 0126 may still name it, and a test-tool order's card has no charge.
  */
 export async function usableSavedCard(
-  repository: Pick<BillingRepository, "withTransaction" | "cardTokenById">,
-  state: Pick<SubscriptionState, "cardTokenId" | "paymentEnvironment">, at: Date
+  repository: Pick<BillingRepository, "withTransaction" | "cardTokenById" | "charge">,
+  state: Pick<SubscriptionState, "cardTokenId" | "paymentEnvironment" | "ownerRef">, at: Date
 ): Promise<CardTokenRow | null> {
   const tokenId = state.cardTokenId;
   if (tokenId === null) return null;
-  const row = await repository.withTransaction((client) => repository.cardTokenById(client, tokenId));
+  const { row, source } = await repository.withTransaction(async (client) => {
+    const token = await repository.cardTokenById(client, tokenId);
+    const chargeId = token?.sourceChargeId ?? null;
+    return { row: token, source: chargeId === null ? null : await repository.charge(chargeId, client) };
+  });
   if (row === null || row.revokedAt !== null || row.paymentProvider !== "netopia") return null;
+  if (source === null || source.ownerRef !== state.ownerRef) return null;
   if (row.paymentEnvironment !== state.paymentEnvironment) return null;
   if (row.expMonth !== null && row.expYear !== null && Date.UTC(row.expYear, row.expMonth, 1) <= at.getTime()) return null;
   return row;

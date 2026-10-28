@@ -1,0 +1,103 @@
+{
+  "version": "row-level-security-forward0126-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0125_italy_specific_approval.sql",
+    "manifestSha256": "ba4a534306ce77eba248d273295b4515869710173dc42f90ea22e7f52e2ccb7b",
+    "verifierSha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
+  },
+  "migration": {
+    "name": "0126_row_level_security.sql",
+    "sha256": "c911bb0e7575715e0a0dd7627b0a40bbec7a15277f0b17610650343d2aa90c54"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-126.sql",
+    "sha256": "60d46548a0a1e31d0c31cf96bbf7d523514d0e384aeec8e34e169251e5583fe6"
+  },
+  "amendsPostconditionsOf": [
+    {
+      "step": "0111_billing_netopia.sql",
+      "relations": [
+        "billing.card_token",
+        "billing.card_token_revocation",
+        "billing.hosted_payment",
+        "billing.notice_quarantine",
+        "billing.payment_notice",
+        "billing.payment_notice_outcome",
+        "billing.payment_notice_raw",
+        "billing.status_read"
+      ],
+      "field": "relrowsecurity",
+      "value": true,
+      "policies": [
+        "rls_account",
+        "rls_all_accounts"
+      ]
+    },
+    {
+      "step": "0117_debate_shape_map.sql",
+      "relations": [
+        "core.map_choice",
+        "core.map_item",
+        "core.map_position"
+      ],
+      "field": "relrowsecurity",
+      "value": true,
+      "policies": [
+        "rls_account",
+        "rls_all_accounts"
+      ]
+    },
+    {
+      "step": "0119_reclaim_resume.sql",
+      "relations": [
+        "core.map_position_repoint"
+      ],
+      "field": "relrowsecurity",
+      "value": true,
+      "policies": [
+        "rls_account",
+        "rls_all_accounts"
+      ]
+    },
+    {
+      "step": "0121_engine_verdict.sql",
+      "relations": [
+        "ledger.point_investigation",
+        "ledger.verdict_vote"
+      ],
+      "field": "relrowsecurity",
+      "value": true,
+      "policies": [
+        "rls_account",
+        "rls_all_accounts"
+      ]
+    },
+    {
+      "step": "0122_engine_map_check.sql",
+      "relations": [
+        "core.map_answer_check",
+        "core.map_item_rests_on"
+      ],
+      "field": "relrowsecurity",
+      "value": true,
+      "policies": [
+        "rls_account",
+        "rls_all_accounts"
+      ]
+    },
+    {
+      "step": "0123_side_by_side_releases.sql",
+      "relations": [
+        "core.run_supersession",
+        "ledger.model_spend_waiver"
+      ],
+      "field": "relrowsecurity",
+      "value": true,
+      "policies": [
+        "rls_account",
+        "rls_all_accounts"
+      ]
+    }
+  ]
+}

@@ -558,6 +558,10 @@ describe("S02 — the development stack names its deployment mode", () => {
           HATCHET_TLS_STRATEGY: "none"
         });
       },
+      // Row-level security S01 (PLAN S2.4, SPEC X1): the dev runner connects on its own login, never the API's.
+      async loadRunnerDatabaseUrl() {
+        return "postgresql://runner:opaque-runner@127.0.0.1:55432/debateai";
+      },
       startRunner(values) {
         captured.push(values);
         return child;

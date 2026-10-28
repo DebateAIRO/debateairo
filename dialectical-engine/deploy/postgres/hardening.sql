@@ -13,11 +13,14 @@
 \set ON_ERROR_STOP on
 
 -- Who may connect at all. PUBLIC keeps CONNECT by default; close it, then open it for exactly the
--- thirteen capability roles the managed principals inherit from (INHERIT TRUE memberships, P3-01),
--- the NOINHERIT LOGIN roles the migrations mint themselves (the four obs roles of 0034, the
+-- capability roles the managed principals inherit from (INHERIT TRUE memberships, P3-01), the
+-- NOINHERIT LOGIN roles the migrations mint themselves (the four obs roles of 0034, the
 -- observation agent of 0057 and its threshold operator of 0071, and, guarded below, the staff
--- readiness writer of the auth DB batch step), the migrator and the Hatchet owner.
--- tests/architecture/vps-deployment-baseline.test.ts checks this list against the manifest.
+-- readiness writer of the auth DB batch step), the migrator and the Hatchet owner. A capability
+-- role minted by a migration after the auth DB batch step (the data export's worker of 0115, the
+-- row-level security marker of 0126) is granted only behind its existence check, below.
+-- tests/architecture/vps-deployment-baseline.test.ts checks this list against the manifest and
+-- against the migration that creates each role.
 REVOKE CONNECT ON DATABASE debateai FROM PUBLIC;
 -- No temporary tables for anyone by default either: no app or runtime code uses them, and the
 -- auth DB batch step revokes the same. (The provisioner's pg_temp helper runs as the superuser
@@ -27,7 +30,7 @@ REVOKE CONNECT ON DATABASE hatchet FROM PUBLIC;
 GRANT CONNECT ON DATABASE hatchet TO debateai_prod_hatchet;
 GRANT CONNECT ON DATABASE debateai TO debateai_prod_migrator;
 GRANT CONNECT ON DATABASE debateai TO
-  debateai_runtime, debateai_content_provision, debateai_erasure_runtime, debateai_data_export_worker,
+  debateai_runtime, debateai_content_provision, debateai_erasure_runtime,
   debateai_authorization_runtime, debateai_billing_runtime, debateai_publication_cleanup, debateai_replay,
   debateai_settlement_watch, debateai_evaluator_worker, debateai_evaluator_api,
   debateai_evaluator_reader;
@@ -51,6 +54,25 @@ DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'debateai_staff_readiness_writer') THEN
     GRANT CONNECT ON DATABASE debateai TO debateai_staff_readiness_writer;
+  END IF;
+END
+$$;
+-- The data export's worker role (migration 0115, V-41), inherited by debateai_prod_api_data_export.
+-- On a database that predates 0115 it does not exist yet: the guard skips the grant.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'debateai_data_export_worker') THEN
+    GRANT CONNECT ON DATABASE debateai TO debateai_data_export_worker;
+  END IF;
+END
+$$;
+-- Row-level security's marker role (migration 0126, D29), inherited by the cross-account logins
+-- (api-system, api-authorization-system, the runner and the liveness scheduler). On a database that
+-- predates 0126 it does not exist yet: the guard skips the grant.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'debateai_rls_all_accounts') THEN
+    GRANT CONNECT ON DATABASE debateai TO debateai_rls_all_accounts;
   END IF;
 END
 $$;

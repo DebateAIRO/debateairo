@@ -592,7 +592,14 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // (the one rule both settings caches use) moved here beside isDatabasePoolBusy. migrate() is byte-identical.
 // Italy clause approval S01-C1 (2026-10-24, mission italy-clause-approval): the reviewed module after its legal-acceptance
 // re-export gained ItalyApprovalAcceptanceRow (migration 0125's row type, one type-only line). migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "f4b13b8ff58a96ffa45abe08353cfe896eb841887a9891df951b6567e635f877";
+// Row-level security S01, C3 (2026-10-24, 47e673787; PLAN §0.3, DECISIONS D55, D58, D72): the module after it re-exported
+// ./account-context.js, createPool gained the crossAccount option and the request-scope routing (the credential sent at
+// checkout, release rule v3), wrapClientQueries looked a client's query up per call, and readRoleRotationCounts ran
+// inside crossAccount("X24"). migrate() is byte-identical (its 13,111-byte slice, sha256 d1495dbe4bbf…, at ca61cbe00 and
+// b6a70bc0c). Re-pinned by BUILD-S01-C10 (Ruling R-15), not by the module's writer; REV(S01) reviews the module.
+// Row-level security S01 merged into dev (2026-10-28): the module carries both changes above. migrate() is byte-identical
+// (its 13,114-byte slice, sha256 d1495dbe4bbf…, at ca61cbe00, origin/dev b1005606c and the slice head 235bd65df).
+const NATIVE_MIGRATE_MODULE_SHA256 = "167e2d71b1cfc32e8b9be6bab8da664e9331cb799c5fe76cf1bde8b946ff731d";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each

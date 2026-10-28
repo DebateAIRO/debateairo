@@ -17,6 +17,24 @@ import type {
 import { MODEL_STRENGTHS, TypedDomainError, parseReleaseKey, type ActivationState, type CompositionBudgetTier, type ModelStrength, type RiskTier, type TierSource } from "@debateai/kernel";
 
 export * from "./publication-check.js";
+// Row-level security S01 (PLAN §0.3): the request scope and the cross-account routing createPool applies.
+export {
+  ACCOUNT_CREDENTIAL_SETTING,
+  crossAccount,
+  crossAccountPool,
+  requestScopeActive,
+  runInRequestScope,
+  setCrossAccountTarget,
+  setRequestCredential,
+  type CrossAccountReader
+} from "./account-context.js";
+import {
+  ACCOUNT_CREDENTIAL_SETTING,
+  accountContextRoute,
+  crossAccount,
+  onCrossAccountTarget,
+  registerAccountContextPool
+} from "./account-context.js";
 export { PostgresDataExportRepository, PostgresDataExportSource } from "./data-export.js";
 export * from "./pool-budget.js";
 export * from "./release-state.js";
@@ -966,7 +984,13 @@ function rejectKnownFailure(args: readonly unknown[], failure: TypedDomainError)
 function wrapClientQueries(client: PoolClient): PoolClient {
   if (wrappedPoolClients.has(client)) return client;
   const mutableClient = client as unknown as { query: UntypedMethod };
-  const query = mutableClient.query.bind(client);
+  // Row-level security S01 (PLAN §0.3, D55): the client's own `query` is looked up at each call, not bound at its
+  // first checkout, so a method installed on pg.Client.prototype later (the R21 test guard) reaches a client checked
+  // out before it. An own `query` the client already carried is kept, as before. No product code patches pg.
+  const ownQuery = Object.prototype.hasOwnProperty.call(client, "query") ? mutableClient.query : undefined;
+  const query = (...args: unknown[]): unknown =>
+    (ownQuery ?? (Reflect.get(Object.getPrototypeOf(client) as object, "query", client) as UntypedMethod))
+      .apply(client, args);
   mutableClient.query = (...args: unknown[]): unknown => {
     const callback = args.at(-1);
     if (typeof callback === "function") {
@@ -989,9 +1013,66 @@ function wrapClientQueries(client: PoolClient): PoolClient {
   return client;
 }
 
+const ACCOUNT_CONTEXT_RELEASE_IN_TRANSACTION = "ACCOUNT_CONTEXT_RELEASE_IN_TRANSACTION";
+
+/**
+ * Row-level security S01, release rule v3 (PLAN §0.3; DECISIONS D58, D72): a client that carries a request's credential
+ * goes back to the pool only idle and cleared. Released with an error by its caller, or not idle (`getTransactionStatus()`
+ * pg 8.22.0: "I" idle, "T" in a block, "E" aborted, null unknown) — it is released WITH an error, so pg destroys it and
+ * its session, the credential with it. Otherwise the credential is cleared first; a failed clear destroys it; and the
+ * status is read AGAIN once the clear resolved, because a BEGIN the caller sent and did not await ran before the clear
+ * and left the clear inside its block (a ROLLBACK there would restore the credential).
+ */
+function releaseAfterClearing(client: PoolClient, release: (error?: Error | boolean) => void,
+  callerError: Error | boolean | undefined): void {
+  if (callerError) {
+    release(callerError);
+    return;
+  }
+  if (client.getTransactionStatus() !== "I") {
+    release(new Error(ACCOUNT_CONTEXT_RELEASE_IN_TRANSACTION));
+    return;
+  }
+  // pg-pool listens for a checked-out client's errors only once it is back; the clear's own rejection reports them.
+  const ignoreClientError = (): void => undefined;
+  client.on("error", ignoreClientError);
+  client.query("SELECT set_config($1,'',false)", [ACCOUNT_CREDENTIAL_SETTING]).then(() => {
+    client.removeListener("error", ignoreClientError);
+    release(client.getTransactionStatus() === "I" ? undefined : new Error(ACCOUNT_CONTEXT_RELEASE_IN_TRANSACTION));
+  }, (failure: unknown) => {
+    client.removeListener("error", ignoreClientError);
+    release(failure instanceof Error ? failure : new Error(String(failure)));
+  });
+}
+
+/** Sends the request's credential on a fresh checkout (a bind parameter, never query text) and arms the release rule. */
+async function sendAccountCredential(client: PoolClient, credential: string): Promise<PoolClient> {
+  const release = client.release.bind(client);
+  try {
+    await client.query("SELECT set_config($1,$2,false)", [ACCOUNT_CREDENTIAL_SETTING, credential]);
+  } catch (error) {
+    release(error instanceof Error ? error : new Error(String(error)));
+    throw error;
+  }
+  let released = false;
+  client.release = (error?: Error | boolean): void => {
+    if (released) throw new Error("Release called on client which has already been released to the pool.");
+    released = true;
+    releaseAfterClearing(client, release, error);
+  };
+  return client;
+}
+
+/**
+ * Row-level security S01 (PLAN §0.3, DECISIONS D28, D29): `crossAccount` names the pool's cross-account target (or
+ * `setCrossAccountTarget` gives it one later). A statement goes to the pool's own connections iff a request scope is
+ * active and no `crossAccount(...)` frame is; otherwise to the target. On its own connections, inside a scope whose
+ * credential is set, each checkout (pool.query checks out internally) sends the credential first and the release rule
+ * above clears it. A pool with no target behaves as before: no routing, no credential.
+ */
 export function createPool(
   connectionString: string,
-  options: Readonly<{ max?: number; connectionTimeoutMillis?: number; name?: string }> = {}
+  options: Readonly<{ max?: number; connectionTimeoutMillis?: number; name?: string; crossAccount?: Pool }> = {}
 ): Pool {
   if (options.max !== undefined
     && (!Number.isSafeInteger(options.max) || options.max < 1 || options.max > 100)) {
@@ -1005,7 +1086,7 @@ export function createPool(
   if (options.name !== undefined && !/^[a-z][a-z0-9:-]{0,47}$/u.test(options.name)) {
     throw new TypeError("DATABASE_POOL_NAME_INVALID");
   }
-  const { name, ...sizing } = options;
+  const { name, crossAccount: crossAccountTarget, ...sizing } = options;
   const pool = new PgPool({ connectionString, ...sizing, ...(name === undefined ? {} : { application_name: name }) });
   const reportBusy = busyReporter(pool, name ?? "unnamed");
   let terminalFailure: TypedDomainError | undefined;
@@ -1017,53 +1098,88 @@ export function createPool(
 
   const mutablePool = pool as unknown as { query: UntypedMethod; connect: UntypedMethod };
   const query = mutablePool.query.bind(pool);
-  mutablePool.query = (...args: unknown[]): unknown => {
+  // pg-pool's query checks out through `this.connect` synchronously: that checkout belongs to the statement already
+  // routed, so it takes this credential instead of being routed a second time (undefined: no such statement running).
+  let statementCredential: string | null | undefined;
+  const ownQuery = (credential: string | null, args: unknown[]): unknown => {
     if (terminalFailure !== undefined) return rejectKnownFailure(args, terminalFailure);
-    const callback = args.at(-1);
-    if (typeof callback === "function") {
-      const wrappedArgs = [...args];
-      wrappedArgs[wrappedArgs.length - 1] = (error: unknown, ...values: unknown[]) => {
-        callback(error === undefined || error === null ? error : typedQueryFailure(error), ...values);
-      };
-      return query(...wrappedArgs);
-    }
+    const enclosing = statementCredential;
+    statementCredential = credential;
     try {
-      const result = query(...args);
-      return result instanceof Promise
-        ? result.catch((error: unknown) => Promise.reject(typedQueryFailure(error)))
-        : result;
-    } catch (error) {
-      throw typedQueryFailure(error);
+      const callback = args.at(-1);
+      if (typeof callback === "function") {
+        const wrappedArgs = [...args];
+        wrappedArgs[wrappedArgs.length - 1] = (error: unknown, ...values: unknown[]) => {
+          callback(error === undefined || error === null ? error : typedQueryFailure(error), ...values);
+        };
+        return query(...wrappedArgs);
+      }
+      try {
+        const result = query(...args);
+        return result instanceof Promise
+          ? result.catch((error: unknown) => Promise.reject(typedQueryFailure(error)))
+          : result;
+      } catch (error) {
+        throw typedQueryFailure(error);
+      }
+    } finally {
+      statementCredential = enclosing;
     }
   };
 
   const connect = mutablePool.connect.bind(pool);
-  mutablePool.connect = (...args: unknown[]): unknown => {
+  const ownConnect = (credential: string | null, args: unknown[]): unknown => {
     if (terminalFailure !== undefined) return rejectKnownFailure(args, terminalFailure);
     const callback = args.at(-1);
     if (typeof callback === "function") {
       return connect((error: unknown, client: PoolClient | undefined, release: unknown) => {
         if (error !== undefined && error !== null) reportBusy(error);
-        callback(
-          error === undefined || error === null ? error : typedPoolFailure(error),
-          client === undefined ? undefined : wrapClientQueries(client),
-          release
+        if (credential === null || client === undefined || (error !== undefined && error !== null)) {
+          callback(
+            error === undefined || error === null ? error : typedPoolFailure(error),
+            client === undefined ? undefined : wrapClientQueries(client),
+            release
+          );
+          return;
+        }
+        sendAccountCredential(wrapClientQueries(client), credential).then(
+          (carrying) => { callback(error, carrying, carrying.release); },
+          (failure: unknown) => { callback(failure, undefined, () => undefined); }
         );
       });
     }
     try {
       const result = connect();
-      return result instanceof Promise
-        ? result.then((client: PoolClient) => wrapClientQueries(client))
-          .catch((error: unknown) => {
-            reportBusy(error);
-            return Promise.reject(typedPoolFailure(error));
-          })
-        : result;
+      if (!(result instanceof Promise)) return result;
+      const checkedOut = result.then((client: PoolClient) => wrapClientQueries(client))
+        .catch((error: unknown) => {
+          reportBusy(error);
+          return Promise.reject(typedPoolFailure(error));
+        });
+      return credential === null ? checkedOut : checkedOut.then((client) => sendAccountCredential(client, credential));
     } catch (error) {
       throw typedPoolFailure(error);
     }
   };
+
+  mutablePool.query = (...args: unknown[]): unknown => {
+    const route = accountContextRoute(pool);
+    return route.kind === "target"
+      ? onCrossAccountTarget(route.target, "query", args)
+      : ownQuery(route.credential, args);
+  };
+  mutablePool.connect = (...args: unknown[]): unknown => {
+    if (statementCredential !== undefined) return ownConnect(statementCredential, args);
+    const route = accountContextRoute(pool);
+    return route.kind === "target"
+      ? onCrossAccountTarget(route.target, "connect", args)
+      : ownConnect(route.credential, args);
+  };
+  registerAccountContextPool(pool, {
+    target: crossAccountTarget,
+    ownQuery: (...args: unknown[]) => ownQuery(null, args),
+    ownConnect: (...args: unknown[]) => ownConnect(null, args)
+  });
 
   return pool;
 }
@@ -1604,30 +1720,32 @@ export async function readRunRoleRotation(executor: Pick<Pool, "query"> | PoolCl
  * (A per-role tally table is a later optimisation, spec Part 3.)
  */
 export async function readRoleRotationCounts(pool: Pick<Pool, "connect">): Promise<RunRoleRotationCounts> {
-  const client = await pool.connect();
-  let destroy: unknown;
-  let rows: { role: RoleRotationCountRole; model_id: string; picked: number; eligible: number }[];
-  try {
-    await client.query("BEGIN");
-    await client.query("SET LOCAL statement_timeout = '5s'");
-    rows = await queryRoleRotationCounts(client);
-    await client.query("COMMIT");
-  } catch (error) {
-    try { await client.query("ROLLBACK"); } catch (rollbackFailure) { destroy = rollbackFailure; }
-    throw error;
-  } finally {
-    client.release(destroy as Error | undefined);
-  }
-  const counts = new Map(ROLE_ROTATION_COUNT_ROLES.map((role) => [role, new Map<string, RunRoleRotationTally>()]));
-  for (const row of rows) {
-    const byModel = counts.get(row.role);
-    if (byModel === undefined || !Number.isSafeInteger(row.picked) || !Number.isSafeInteger(row.eligible)) {
-      throw new TypeError("RUN_ROLE_ROTATION_INVALID");
+  return crossAccount("X24", async () => {
+    const client = await pool.connect();
+    let destroy: unknown;
+    let rows: { role: RoleRotationCountRole; model_id: string; picked: number; eligible: number }[];
+    try {
+      await client.query("BEGIN");
+      await client.query("SET LOCAL statement_timeout = '5s'");
+      rows = await queryRoleRotationCounts(client);
+      await client.query("COMMIT");
+    } catch (error) {
+      try { await client.query("ROLLBACK"); } catch (rollbackFailure) { destroy = rollbackFailure; }
+      throw error;
+    } finally {
+      client.release(destroy as Error | undefined);
     }
-    byModel.set(row.model_id, Object.freeze({ picked: row.picked, eligible: row.eligible }));
-  }
-  return Object.freeze(Object.fromEntries([...counts].map(([role, byModel]) =>
-    [role, Object.freeze(Object.fromEntries(byModel))]))) as RunRoleRotationCounts;
+    const counts = new Map(ROLE_ROTATION_COUNT_ROLES.map((role) => [role, new Map<string, RunRoleRotationTally>()]));
+    for (const row of rows) {
+      const byModel = counts.get(row.role);
+      if (byModel === undefined || !Number.isSafeInteger(row.picked) || !Number.isSafeInteger(row.eligible)) {
+        throw new TypeError("RUN_ROLE_ROTATION_INVALID");
+      }
+      byModel.set(row.model_id, Object.freeze({ picked: row.picked, eligible: row.eligible }));
+    }
+    return Object.freeze(Object.fromEntries([...counts].map(([role, byModel]) =>
+      [role, Object.freeze(Object.fromEntries(byModel))]))) as RunRoleRotationCounts;
+  });
 }
 
 async function queryRoleRotationCounts(client: PoolClient) {

@@ -44,6 +44,8 @@ const PRODUCT_ROLES = [
   "debateai_release_operator",
   "debateai_release_owner",
   "debateai_replay",
+  // Row-level security (0126, D29): the marker role the cross-account logins hold.
+  "debateai_rls_all_accounts",
   "debateai_runtime",
   "debateai_settlement_watch",
   "debateai_staff_readiness_writer",

@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { beforeAll, afterAll, describe, it, expect } from 'vitest';
-import { createPool, migrate, PostgresConsumerRecoveryRepository, PostgresConsumerAuthRepository, PostgresOnboardingEvidenceRepository, PostgresSessionRepository, PostgresConsumerSecurityRepository, PostgresIdentityRepository, PostgresRecoveryStartRepository, PostgresConsumerSecurityNoticeRepository, type Pool } from '@debateai/db';
-import { Argon2WorkerPool, encrypt, generateRecoveryCode, generateTotpSecret, hashRecoveryCode, hashPassword, hashToken, decodeBase32, totpCodeAtStep, createEmailBlindIndex, type AuditContextHasher } from '@debateai/crypto';
+import { createPool, migrate, PostgresConsumerRecoveryRepository, PostgresConsumerAuthRepository, PostgresOnboardingEvidenceRepository, PostgresSessionRepository, PostgresConsumerSecurityRepository, PostgresIdentityRepository, PostgresRecoveryStartRepository, PostgresConsumerSecurityNoticeRepository, runInRequestScope, type Pool } from '@debateai/db';
+import { Argon2WorkerPool, encrypt, generateRecoveryCode, generateTotpSecret, hashRecoveryCode, hashPassword, hashToken, decodeBase32, totpCodeAtStep, createEmailBlindIndex, recoveryCodeSlot, type AuditContextHasher } from '@debateai/crypto';
 import { AUTH_POLICY_REGISTER_ROWS, authPolicyFromRegisterRows, MFA_POLICY_REGISTER_ROW, mfaPolicyFromValue, SESSION_POLICY_DEPLOYMENT_REGISTER_ROW, sessionPolicyFromValue, CONSUMER_RECOVERY_POLICY_REGISTER_ROW, consumerRecoveryPolicyFromValue } from '@debateai/register';
 import { currentDocument } from '@debateai/legal-manifest';
 import { ConsumerRecoveryService } from '../../apps/api/src/consumer-recovery.js';
@@ -14,12 +14,19 @@ import { RecoveryStartService, RECOVERY_START_PUBLIC_RESPONSE } from '../../apps
 import { SessionService } from '../../apps/api/src/sessions.js';
 import { consumerFixture, origin, rpId, b64 } from '../support/consumerWebAuthnFixtures.js';
 import { startTestDatabase, type TestDatabase } from '../support/testDatabase.js';
+import { createSystemTwin } from '../support/rls-logins.js';
 let db: TestDatabase, runtime: Pool, p2Runtime: Pool, argon2: Argon2WorkerPool, passwordHash: string;
+// Row-level security (0126; D28, D29): the authorization pool as main.ts wires it. Inside a request it runs on its own
+// login with that request's account context; outside one, or inside a crossAccount frame (X18a), on its system twin.
+let runtimeSystem: Pool, scopedRuntime: Pool;
 const audit = { hashSourceIp: async () => 'ab'.repeat(32), hashUserAgent: async () => 'cd'.repeat(32) } as unknown as AuditContextHasher;
 const mfaPolicy = mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value), authPolicy = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS), blindKey = Buffer.alloc(32, 7), recordsKey = Buffer.alloc(32, 9);
 let sequence = 0;
-beforeAll(async () => { db = await startTestDatabase(); await migrate(db.pool); await db.pool.query("CREATE ROLE recovery_journey LOGIN PASSWORD 'journey-test-only' IN ROLE debateai_authorization_runtime"); const u = new URL(db.connectionString); u.username = 'recovery_journey'; u.password = 'journey-test-only'; runtime = createPool(u.toString()); await db.pool.query("CREATE ROLE p2_recovery_journey LOGIN PASSWORD 'journey-test-only' IN ROLE debateai_runtime"); u.username = 'p2_recovery_journey'; p2Runtime = createPool(u.toString()); argon2 = new Argon2WorkerPool({ workers: 1 }); await argon2.ready(); passwordHash = await hashPassword(argon2, 'Strong fixture password 123!', authPolicy.password.argon2id); }, 120000);
-afterAll(async () => { await argon2?.close(); await runtime?.end(); await p2Runtime?.end(); await db?.stop(); });
+beforeAll(async () => { db = await startTestDatabase(); await migrate(db.pool); await db.pool.query("CREATE ROLE recovery_journey LOGIN PASSWORD 'journey-test-only' IN ROLE debateai_authorization_runtime"); const u = new URL(db.connectionString); u.username = 'recovery_journey'; u.password = 'journey-test-only'; runtime = createPool(u.toString()); runtimeSystem = createPool(await createSystemTwin(db, 'recovery_journey_system', ['debateai_authorization_runtime'])); scopedRuntime = createPool(u.toString(), { crossAccount: runtimeSystem }); await db.pool.query("CREATE ROLE p2_recovery_journey LOGIN PASSWORD 'journey-test-only' IN ROLE debateai_runtime"); u.username = 'p2_recovery_journey'; p2Runtime = createPool(u.toString()); argon2 = new Argon2WorkerPool({ workers: 1 }); await argon2.ready(); passwordHash = await hashPassword(argon2, 'Strong fixture password 123!', authPolicy.password.argon2id); }, 120000);
+afterAll(async () => { await argon2?.close(); await scopedRuntime?.end(); await runtimeSystem?.end(); await runtime?.end(); await p2Runtime?.end(); await db?.stop(); });
+function sessionService(pool: Pool, users: { load: (id: string) => Promise<Buffer> }) {
+    return SessionService.create({ repository: new PostgresSessionRepository(pool, audit), riskSignals: { recordForSession: async () => 'recorded' } as never, onRiskSignalFailure: () => { }, dekStore: users as never, argon2, authPolicy, mfaPolicy, sessionPolicy: sessionPolicyFromValue(SESSION_POLICY_DEPLOYMENT_REGISTER_ROW.value, SESSION_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef), blindIndexKey: blindKey, dummyPasswordHash: passwordHash });
+}
 async function account() {
     const userId = randomUUID(), channelId = randomUUID(), dek = randomBytes(32), email = `recovery-${userId}@example.test`, code = generateRecoveryCode(1), codeHash = await hashRecoveryCode(argon2, code, mfaPolicy.recoveryCodes.argon2id), source = { ip: `198.51.100.${++sequence}`, userAgent: 'recovery-journey', requestId: randomUUID(), countryCode: 'RO' }, old = consumerFixture();
     const cipher = encrypt(dek, Buffer.from(email), ['identity', 'user.email_ciphertext', userId, 'run:none', userId, `user-dek:${userId}`, '1']);
@@ -30,7 +37,7 @@ async function account() {
     await db.pool.connect().then(async (c) => { try { await c.query('BEGIN'); await c.query("SELECT set_config('debateai.mail_locale', 'en', true)"); await c.query(`INSERT INTO identity.consumer_passkey_credential(user_id,credential_id,public_key,signature_counter,device_type,backed_up,rp_id,origin) VALUES($1,$2,$3,0,'multiDevice',true,$4,$5)`, [userId, old.credentialId, b64(old.k.wire), rpId, origin]); await c.query('COMMIT'); } catch (e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); } });
     const users = { load: async (id: string) => { if (id !== userId)
             throw new Error('WRONG_DEK'); return Buffer.from(dek); } };
-    const sessions = await SessionService.create({ repository: new PostgresSessionRepository(runtime, audit), riskSignals: { recordForSession: async () => 'recorded' } as never, onRiskSignalFailure: () => { }, dekStore: users as never, argon2, authPolicy, mfaPolicy, sessionPolicy: sessionPolicyFromValue(SESSION_POLICY_DEPLOYMENT_REGISTER_ROW.value, SESSION_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef), blindIndexKey: blindKey, dummyPasswordHash: passwordHash });
+    const sessions = await sessionService(runtime, users);
     const delivered: {
         recipient: string;
         token: string;
@@ -136,8 +143,12 @@ describe('real consumer recovery crypto and replacement journeys', () => {
         const codes = await security.regenerateRecoveryCodes({ step_up_grant: codesProof.response.step_up_grant.token }, codesSession, a.source);
         expect(codes.codes).toHaveLength(10);
         await expect(security.regenerateRecoveryCodes({ step_up_grant: codesProof.response.step_up_grant.token }, codesSession, a.source)).rejects.toThrow();
-        const login = await a.sessions.beginLogin({ email: a.email, password: 'Strong fixture password 123!' }, a.source);
-        const result = await a.sessions.completeLogin({ challengeToken: login.challengeToken, code: codes.codes[0]! }, a.source);
+        // The sign-in runs as the API runs it: in a request that carries no session yet, on the wired authorization pool, so
+        // the saved-code lookup (X18a) reads on the system twin. The bare login with no account context reads no saved code.
+        const signIn = await sessionService(scopedRuntime, a.users);
+        const login = await runInRequestScope(() => signIn.beginLogin({ email: a.email, password: 'Strong fixture password 123!' }, a.source));
+        expect(await new PostgresSessionRepository(runtime, audit).readRecoveryCodeForLogin(hashToken('login-challenge', login.challengeToken), recoveryCodeSlot(codes.codes[0]!))).toBeNull();
+        const result = await runInRequestScope(() => signIn.completeLogin({ challengeToken: login.challengeToken, code: codes.codes[0]! }, a.source));
         expect(result.status).toBe('authenticated');
         expect(result).not.toHaveProperty('replacementRecoveryCode');
         expect((await db.pool.query('SELECT count(*)::int n FROM identity.recovery_code WHERE user_id=$1 AND consumed_at IS NULL AND revoked_at IS NULL', [a.userId])).rows[0].n).toBe(9);

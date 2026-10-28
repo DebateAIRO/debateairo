@@ -9,13 +9,19 @@ export type DevelopmentDatabasePrincipal = Readonly<{
   roleName: string;
   capabilityRole: string;
   environmentKey: string;
+  /**
+   * Row-level security S01 (DECISIONS D29, D46): the NOLOGIN marker role migration 0126 creates, which the
+   * rls_all_accounts policy names. Granted beside the capability role, with the same option set (D54), to the
+   * logins that read across accounts outside a signed-in request; never to a login the API serves requests on.
+   */
+  crossAccountRole?: "debateai_rls_all_accounts";
 }>;
 
 export const DEVELOPMENT_DATABASE_PRINCIPALS = Object.freeze([
   // Go-live row 41 (migration 0093): the API's own login holds billing's role, which inherits
   // debateai_runtime (and, since 0094, the acceptance record, sign-up with consent and the
-  // country-gate audit). In development the runner shares this login (DATABASE_URL), so only the
-  // production principals (P3-01) keep these writes away from the runner.
+  // country-gate audit). Since row-level security S01 the development runner has its own login
+  // (debateai_dev_runner, RUNNER_DATABASE_URL, below), as the production runner does (P3-01).
   Object.freeze({
     roleName: "debateai_dev_runtime",
     capabilityRole: "debateai_billing_runtime",
@@ -49,7 +55,8 @@ export const DEVELOPMENT_DATABASE_PRINCIPALS = Object.freeze([
   Object.freeze({
     roleName: "debateai_dev_liveness",
     capabilityRole: "debateai_runtime",
-    environmentKey: "LIVENESS_DATABASE_URL"
+    environmentKey: "LIVENESS_DATABASE_URL",
+    crossAccountRole: "debateai_rls_all_accounts"
   }),
   Object.freeze({
     roleName: "debateai_dev_settlement",
@@ -75,6 +82,27 @@ export const DEVELOPMENT_DATABASE_PRINCIPALS = Object.freeze([
     roleName: "debateai_dev_data_export",
     capabilityRole: "debateai_data_export_worker",
     environmentKey: "DATA_EXPORT_DATABASE_URL"
+  }),
+  // Row-level security S01 (DECISIONS D29, D46): appended last, so a credential file written before them is
+  // upgraded by suffix append. The API's system pool (every statement outside a request) and room-decision pool,
+  // the authorization pool's system target, and the runner's own login (it no longer shares DATABASE_URL).
+  Object.freeze({
+    roleName: "debateai_dev_api_system",
+    capabilityRole: "debateai_billing_runtime",
+    environmentKey: "API_SYSTEM_DATABASE_URL",
+    crossAccountRole: "debateai_rls_all_accounts"
+  }),
+  Object.freeze({
+    roleName: "debateai_dev_authorization_system",
+    capabilityRole: "debateai_authorization_runtime",
+    environmentKey: "API_AUTHORIZATION_SYSTEM_DATABASE_URL",
+    crossAccountRole: "debateai_rls_all_accounts"
+  }),
+  Object.freeze({
+    roleName: "debateai_dev_runner",
+    capabilityRole: "debateai_runtime",
+    environmentKey: "RUNNER_DATABASE_URL",
+    crossAccountRole: "debateai_rls_all_accounts"
   })
 ] satisfies readonly DevelopmentDatabasePrincipal[]);
 
@@ -93,12 +121,16 @@ const ROLE_NAME_PATTERN = /^[a-z][a-z0-9_]*$/;
 const PRIVATE_DIRECTORY_MODE = 0o700;
 const PRIVATE_FILE_MODE = 0o600;
 const MAX_CREDENTIAL_FILE_BYTES = 64 * 1024;
+// The first 9, 10 and 11 keys (the files before the support and data-export logins) and the 12 keys every file had
+// before row-level security S01 (D46). A 13- or 14-key file matches none and is refused.
 const LEGACY_DEVELOPMENT_DATABASE_ENVIRONMENT_KEY_SETS = Object.freeze([
+  Object.freeze(DEVELOPMENT_DATABASE_PRINCIPALS.slice(0, -6)
+    .map(({ environmentKey }) => environmentKey)),
+  Object.freeze(DEVELOPMENT_DATABASE_PRINCIPALS.slice(0, -5)
+    .map(({ environmentKey }) => environmentKey)),
+  Object.freeze(DEVELOPMENT_DATABASE_PRINCIPALS.slice(0, -4)
+    .map(({ environmentKey }) => environmentKey)),
   Object.freeze(DEVELOPMENT_DATABASE_PRINCIPALS.slice(0, -3)
-    .map(({ environmentKey }) => environmentKey)),
-  Object.freeze(DEVELOPMENT_DATABASE_PRINCIPALS.slice(0, -2)
-    .map(({ environmentKey }) => environmentKey)),
-  Object.freeze(DEVELOPMENT_DATABASE_PRINCIPALS.slice(0, -1)
     .map(({ environmentKey }) => environmentKey))
 ]);
 
@@ -461,14 +493,26 @@ async function provisionPrincipal(
     await client.query(`CREATE ROLE ${roleName} NOLOGIN`);
     await client.query(await formattedPasswordStatement(client, principal.roleName, databaseUrl.password));
     await client.query(`GRANT ${capabilityRole} TO ${roleName} WITH INHERIT TRUE, SET TRUE`);
+    if (principal.crossAccountRole !== undefined) {
+      await client.query(
+        `GRANT ${quoteIdentifier(principal.crossAccountRole)} TO ${roleName} WITH INHERIT TRUE, SET TRUE`
+      );
+    }
     return;
   }
   await client.query(await formattedPasswordStatement(client, principal.roleName, databaseUrl.password));
 }
 
+function expectedDirectRoles(principal: DevelopmentDatabasePrincipal): readonly string[] {
+  return [
+    principal.capabilityRole,
+    ...(principal.crossAccountRole === undefined ? [] : [principal.crossAccountRole])
+  ].sort();
+}
+
 async function assertExistingPrincipalState(client: PoolClient): Promise<void> {
-  const expected = new Map<string, string>(DEVELOPMENT_DATABASE_PRINCIPALS
-    .map((principal) => [principal.roleName, principal.capabilityRole]));
+  const expected = new Map<string, readonly string[]>(DEVELOPMENT_DATABASE_PRINCIPALS
+    .map((principal) => [principal.roleName, expectedDirectRoles(principal)]));
   const roles = await client.query<{
     rolname: string;
     rolcanlogin: boolean;
@@ -505,13 +549,13 @@ async function assertExistingPrincipalState(client: PoolClient): Promise<void> {
     ORDER BY target.rolname
   `,[[...expected.keys()]]);
   if (roles.rows.some((role) => {
-    const directRole = role.direct_roles[0];
+    const expectedRoles = expected.get(role.rolname) ?? [];
     return !role.rolcanlogin || !role.rolinherit
       || role.rolsuper || role.rolcreatedb || role.rolcreaterole
       || role.rolreplication || role.rolbypassrls || role.rolconnlimit !== -1
-      || role.rolconfig !== null || role.direct_roles.length !== 1
-      || directRole === undefined || directRole.roleName !== expected.get(role.rolname)
-      || directRole.adminOption || !directRole.inheritOption || !directRole.setOption;
+      || role.rolconfig !== null || role.direct_roles.length !== expectedRoles.length
+      || role.direct_roles.some((directRole, index) => directRole.roleName !== expectedRoles[index]
+        || directRole.adminOption || !directRole.inheritOption || !directRole.setOption);
   })) {
     throw new TypeError("DEV_DATABASE_PRINCIPAL_DRIFT");
   }
@@ -543,6 +587,38 @@ async function upgradePreBillingRuntimeMembership(client: PoolClient): Promise<v
     "GRANT \"debateai_billing_runtime\" TO \"debateai_dev_runtime\" WITH INHERIT TRUE, SET TRUE"
   );
   await client.query("REVOKE \"debateai_runtime\" FROM \"debateai_dev_runtime\"");
+}
+
+/**
+ * Row-level security S01 (DECISIONS D46, D54): a development database provisioned before 0126 gave each existing
+ * principal that now carries crossAccountRole (debateai_dev_liveness) only its capability role. That exact shape,
+ * and nothing else, gains the marker with the capability role's option set; any other membership is still drift.
+ */
+async function upgradePreRlsMarkerMembership(client: PoolClient): Promise<void> {
+  for (const principal of DEVELOPMENT_DATABASE_PRINCIPALS as readonly DevelopmentDatabasePrincipal[]) {
+    if (principal.crossAccountRole === undefined) continue;
+    const legacy = (await client.query<{ legacy: boolean }>(`
+      SELECT COALESCE((
+        SELECT jsonb_agg(jsonb_build_object(
+          'roleName',capability.rolname,
+          'adminOption',membership.admin_option,
+          'inheritOption',membership.inherit_option,
+          'setOption',membership.set_option
+        ))
+        FROM pg_catalog.pg_auth_members AS membership
+        JOIN pg_catalog.pg_roles AS target ON target.oid=membership.member
+        JOIN pg_catalog.pg_roles AS capability ON capability.oid=membership.roleid
+        WHERE target.rolname=$1
+      ),'[]'::jsonb)=jsonb_build_array(jsonb_build_object(
+        'roleName',$2::text,'adminOption',false,'inheritOption',true,'setOption',true
+      )) AS legacy
+    `,[principal.roleName, principal.capabilityRole])).rows[0]?.legacy;
+    if (legacy !== true) continue;
+    await client.query(
+      `GRANT ${quoteIdentifier(principal.crossAccountRole)} TO ${quoteIdentifier(principal.roleName)} `
+      + "WITH INHERIT TRUE, SET TRUE"
+    );
+  }
 }
 
 async function assertNoPrincipalMembers(client: PoolClient): Promise<void> {
@@ -596,6 +672,7 @@ export async function provisionDevelopmentDatabasePrincipals(
       await assertCapabilityRoles(client);
       await assertNoPrincipalMembers(client);
       await upgradePreBillingRuntimeMembership(client);
+      await upgradePreRlsMarkerMembership(client);
       await assertExistingPrincipalState(client);
       await assertNoOwnership(client);
       const credentials = await ensureCredentialFile(

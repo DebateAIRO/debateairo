@@ -49,7 +49,9 @@ guard that keeps the code and the numbers in step is
 | `support:control` | 2 | 2 | 0.2 s | Unchanged; the support settings reader |
 | `api:data-export` (only when the export store is set; mission data-export S01) | — | 1 | 15 s | One export build at a time on one connection: its lease renewal (every 15 s) waits for the snapshot read to free it, so a read of up to about 30 s keeps its lease |
 | `api:release-watch` (since 2026-10-22, side by side; section 8) | — | 1 | 1 s | The release watcher's read of the current release, once a second, never two at once. Its own pool, so a burst of page reads on `api:runtime` can never make `/readyz` say the database is unreachable |
-| **Total on the server** (dev menu off) | **104** | **80** (79 before 2026-10-22) | | |
+| `api:system` (since 2026-10-23, row-level security; section 9) | — | 6 | 5 s | The `api-system` login: every statement the API makes outside a signed-in request (background loops, billing jobs, boot checks) |
+| `api:authorization-system` (since 2026-10-23, row-level security; section 9) | — | 2 | 5 s | The `api-authorization-system` login: the same for the authorization pool |
+| **Total on the server** (dev menu off) | **104** | **88** (80 before 2026-10-23, 79 before 2026-10-22) | | |
 
 ### Debate runner
 
@@ -63,17 +65,17 @@ guard that keeps the code and the numbers in step is
 
 | Who | Connections at most |
 |---|---|
-| Website (API), one process | 80 (79 before 2026-10-22) |
+| Website (API), one process | 88 (80 before 2026-10-23, 79 before 2026-10-22) |
 | Debate runner (32 + 2 for claim renewal) | 34 |
 | Hatchet (its role's limit, `deploy/postgres/bootstrap.sql`) | 50 |
 | Migrator (its role's limit) | 3 |
 | Owner's commands (billing, support, owner CLI; by hand, one at a time) | about 10 |
-| **Sum of ceilings** | **177 of 197** (176 before 2026-10-22, 162 before 2026-10-12) |
-| Left free | 20 (21 before 2026-10-22, 35 before 2026-10-12): room for cancellation connections (a cancelled query briefly opens one more, up to 4 per pool), the owner logging in during an incident, and slack |
+| **Sum of ceilings** | **185 of 197** (177 before 2026-10-23, 176 before 2026-10-22, 162 before 2026-10-12) |
+| Left free | 12 (20 before 2026-10-23, 21 before 2026-10-22, 35 before 2026-10-12): room for cancellation connections (a cancelled query briefly opens one more, up to 4 per pool), the owner logging in during an incident, and slack |
 
 Backups (`pg_dump` as the `postgres` user) use the 3 administrator slots.
 
-A second API process does **not** fit at 200: 177 + 80 is more than 197. Two releases, each with its own API, do fit at
+A second API process does **not** fit at 200: 185 + 88 is more than 197. Two releases, each with its own API, do fit at
 the transition's 320 (section 8). Before running a further API process (for example to restart without a gap, or to
 grow), put PgBouncer in front (section 4) or raise `max_connections` together with the memory settings (section 3).
 
@@ -291,3 +293,27 @@ and the next poll, a second later, tries again). One API is 80 at most, and the 
 * **After the transition.** When the old release retires, one release's numbers from section 1 apply again (177 of 197 at
   200). Whether the limit goes back to 200 is the owner's decision, and changing the limit also needs a restart.
 * **The alert in section 5** fires above 240 connections while the limit is 320.
+
+## 9. Row-level security (2026-10-23)
+
+Mission row-level security S01 (`docs/missions/row-level-security/slices/S01/DECISIONS.md` D29, D50) turns row security
+on for every table that holds an account's rows. The two everyday API logins then see only the signed-in account's rows,
+so every statement the API makes outside a signed-in request (background loops, billing jobs and webhooks, boot checks)
+runs on one of two new logins instead, each on a pool of its own: `api:system` (6, the `api-system` login) and
+`api:authorization-system` (2, the `api-authorization-system` login). The room-decision pool keeps its 4 and connects as
+`api-system`. One API is 88 at most.
+
+| Who | Connections at most |
+|---|---|
+| Website program (API), two releases at 88 each | 176 |
+| Debate runner, two releases at 34 each | 68 |
+| Hatchet (its role's limit) | 50 |
+| Migrator (its role's limit) | 3 |
+| Owner's commands | about 10 |
+| **Sum of ceilings** | **307** (291 before row-level security) |
+| Left free | 10 (317 = 320 less the administrator's 3; 26 before row-level security) |
+
+`max_connections` stays 320. One release at the old 200 is 185 of 197, 12 free (section 1). The cancellation gap of
+section 8 grows: one API and one runner are now 16 pools that can cancel (14 API pools with the dev menu off, plus the
+runner's 2), 32 for two releases, and the 10 free connections cover one cancellation for 10 of them at the same moment.
+No other pool size changed.

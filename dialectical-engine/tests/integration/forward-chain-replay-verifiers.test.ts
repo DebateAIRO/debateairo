@@ -70,24 +70,29 @@ it("keeps NETOPIA's 0111 verifier in force and replaying once the auth DB batch 
   // (0120), after the reclaim resume (spec 2026-10-15), then the engine verdict (0121, spec 2026-10-15 engine redesign
   // R2), then the engine's map answer step (0122, spec 2026-10-15 engine redesign R3), then the side-by-side releases
   // (0123, spec 2026-10-21 side-by-side uploads), then the settings activation (0124, side-by-side spec §13), then the
-  // Italy-specific approval (0125), last.
+  // Italy-specific approval (0125), then row-level security (0126), last (mission row-level-security, SPEC-v4 R26), which
+  // supersedes 0111's verifier with its own (R34).
   expect(real.forwardChain.map((step) => step.name)).toEqual([NETOPIA, AUTH_DB_BATCH_MIGRATION, PART_C, ROLE_ROTATION, "0115_data_export.sql",
     "0116_mail_locale.sql", "0117_debate_shape_map.sql", "0118_language_check_spend.sql", "0119_reclaim_resume.sql",
     "0120_reply_measures.sql", "0121_engine_verdict.sql", "0122_engine_map_check.sql", "0123_side_by_side_releases.sql",
-    "0124_settings_activation.sql", "0125_italy_specific_approval.sql"]);
+    "0124_settings_activation.sql", "0125_italy_specific_approval.sql", "0126_row_level_security.sql"]);
   const [netopia, batch, partC, rotation] = real.forwardChain;
   const applied = new Set(await ledger());
   expect(applied.has(NETOPIA) && applied.has(AUTH_DB_BATCH_MIGRATION) && applied.has(PART_C) && applied.has(ROLE_ROTATION)).toBe(true);
   // The batch, Part C's step, role rotation's, the export's, the map's, the language check's, the reclaim resume's, the
   // reply measures', the engine verdict's, the engine's map answer step's, the side-by-side releases', the settings
-  // activation's and the Italy-specific approval's keep 0111's effective-capability verifier: with 0125 last, the verifier
-  // in force is 0111's, byte for byte.
+  // activation's and the Italy-specific approval's keep 0111's effective-capability verifier: with 0125 the last of them,
+  // the verifier in force is 0111's, byte for byte. 0126's verifier supersedes it at the head: every check 0111's makes,
+  // its row-security clause aside (SPEC-v4 R34).
   expect(batch!.verifierSha256).toBe(netopia!.verifierSha256);
-  expect(real.forwardChain.at(-1)!.verifierSha256).toBe(netopia!.verifierSha256);
+  expect(real.forwardChain.at(-2)!.verifierSha256).toBe(netopia!.verifierSha256);
+  expect(real.forwardChain.at(-1)!.verifierPath).toBe("lineage/verify-effective-capabilities-126.sql");
+  expect(real.forwardChain.at(-1)!.verifierSha256).not.toBe(netopia!.verifierSha256);
   expect(partC!.verifierSha256).toBe(netopia!.verifierSha256);
   expect(rotation!.verifierSha256).toBe(netopia!.verifierSha256);
-  expect(effectiveForwardVerifierSql(real, applied)).toBe(netopia!.verifierSql);
-  // A drift only 0111's verifier knows (a NETOPIA table granted to a wrong role) is refused by migrate() with 0125 last.
+  expect(effectiveForwardVerifierSql(real, new Set([...applied].filter((name) => name !== "0126_row_level_security.sql")))).toBe(netopia!.verifierSql);
+  expect(effectiveForwardVerifierSql(real, applied)).toBe(real.forwardChain.at(-1)!.verifierSql);
+  // A drift only 0111's verifier knows (a NETOPIA table granted to a wrong role) is refused by migrate() with 0126 last.
   await db.pool.query("GRANT SELECT ON billing.card_token TO debateai_authorization_runtime");
   try {
     await expect(migrate(db.pool)).rejects.toThrow("BILLING_NETOPIA_111_TABLE_PRIVILEGE card_token");

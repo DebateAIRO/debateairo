@@ -59,8 +59,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     // reply measures (0120, spec 2026-10-15), then the engine verdict (0121, spec 2026-10-15 engine redesign R2), then
     // the engine's map answer step (0122, spec 2026-10-15 engine redesign R3), then the side-by-side releases (0123,
     // spec 2026-10-21 side-by-side uploads), then the settings activation (0124, side-by-side spec §13), then the
-    // Italy-specific approval (0125, mission italy-clause-approval), last
-    // (migrations/lineage/README.md).
+    // Italy-specific approval (0125, mission italy-clause-approval), then row-level security (0126, mission
+    // row-level-security, SPEC-v4 R26), last (migrations/lineage/README.md).
     expect(plan.forwardChain.map((step) => step.name)).toEqual([
       "0111_billing_netopia.sql",
       "0112_auth_db_batch.sql",
@@ -76,7 +76,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0122_engine_map_check.sql",
       "0123_side_by_side_releases.sql",
       "0124_settings_activation.sql",
-      "0125_italy_specific_approval.sql"
+      "0125_italy_specific_approval.sql",
+      "0126_row_level_security.sql"
     ]);
     const [step] = plan.forwardChain;
     // 0110 runs the sealed effective-capability verifier after its SQL (applyForward110) and its own manifest names it
@@ -132,7 +133,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0122_engine_map_check.sql",
       "0123_side_by_side_releases.sql",
       "0124_settings_activation.sql",
-      "0125_italy_specific_approval.sql"
+      "0125_italy_specific_approval.sql",
+      "0126_row_level_security.sql"
     ]);
     // The verifier in force after 0112 is the one 0112's manifest names (it adds no billing object): 0111's.
     const batchManifest = JSON.parse((await bytesOf("lineage/auth-db-batch-forward.json")).toString("utf8"));
@@ -182,7 +184,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0122_engine_map_check.sql",
       "0123_side_by_side_releases.sql",
       "0124_settings_activation.sql",
-      "0125_italy_specific_approval.sql"
+      "0125_italy_specific_approval.sql",
+      "0126_row_level_security.sql"
     ]);
     expect(partC!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/role-rotation-forward0114.json")).toString("utf8"));
@@ -228,7 +231,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0122_engine_map_check.sql",
       "0123_side_by_side_releases.sql",
       "0124_settings_activation.sql",
-      "0125_italy_specific_approval.sql"
+      "0125_italy_specific_approval.sql",
+      "0126_row_level_security.sql"
     ]);
     expect(mailLocale!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/debate-shape-map-forward0117.json")).toString("utf8"));
@@ -274,7 +278,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0122_engine_map_check.sql",
       "0123_side_by_side_releases.sql",
       "0124_settings_activation.sql",
-      "0125_italy_specific_approval.sql"
+      "0125_italy_specific_approval.sql",
+      "0126_row_level_security.sql"
     ]);
     expect(mapStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/language-check-spend-forward0118.json")).toString("utf8"));
@@ -320,7 +325,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0122_engine_map_check.sql",
       "0123_side_by_side_releases.sql",
       "0124_settings_activation.sql",
-      "0125_italy_specific_approval.sql"
+      "0125_italy_specific_approval.sql",
+      "0126_row_level_security.sql"
     ]);
     expect(languageStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/reclaim-resume-forward0119.json")).toString("utf8"));

@@ -135,7 +135,7 @@ export class CancelLinkService {
       );
       if (recent >= LINKS_PER_DAY) return false;
       await this.deps.billing.insertCancelToken(client, {
-        tokenSha256: cancelTokenSha256(token), subscriptionId: state.subscriptionId,
+        tokenSha256: cancelTokenSha256(token), subscriptionId: state.subscriptionId, ownerRef,
         issuedAt: now, expiresAt: new Date(now.getTime() + DAY_MS)
       });
       return true;
@@ -152,7 +152,9 @@ export class CancelLinkService {
 
   /**
    * One use per token, within 24 hours; the cancel itself is Settings' own (`requestCancelLocked`, M7 included). The
-   * MLV of the page's request (S01-C13) is M7's language, as the Settings cancel's is.
+   * MLV of the page's request (S01-C13) is M7's language, as the Settings cancel's is. V-18: a link acts only for the
+   * owner it was issued to, and only when that owner is its subscription's first owner (a link stored under one account
+   * naming another's subscription is no link of that plan).
    */
   async cancelByToken(token: string, mailLocale?: string): Promise<"CANCELLED" | "NOTHING_TO_CANCEL" | "INVALID"> {
     const now = this.deps.clock();
@@ -161,6 +163,7 @@ export class CancelLinkService {
       if (used === null) return "INVALID" as const;
       const first = (await this.deps.billing.subscriptionEvents(used.subscriptionId, client))[0];
       if (first === undefined) return "NOTHING_TO_CANCEL" as const;
+      if (used.ownerRef !== first.ownerRef) return "INVALID" as const;
       const locked = await lockedSubscription(this.deps, client, first.ownerRef);
       if (locked === null || locked.state.subscriptionId !== used.subscriptionId) return "NOTHING_TO_CANCEL" as const;
       // P2-M12: the cancel is dated once the owner lock is held (the token was checked at the first reading).

@@ -4,6 +4,7 @@ import {
   type CryptoEnvelope
 } from "@debateai/crypto";
 import type { AuthSourceContext } from "./identity.js";
+import { crossAccount } from "./account-context.js";
 import { withPublicationContentLease } from "./publication-lease.js";
 import { FLOOR_BASIS_INCOMPLETE_SQL } from "./serve-disclosure.js";
 
@@ -405,15 +406,17 @@ export class PostgresPublicationRepository {
   }
 
   async readAuthorPseudonym(runId: string, userId: string, ownerRef: string): Promise<string | null> {
-    const result = await this.pool.query<{ pseudonym: string }>(`
-      SELECT identity_user.pseudonym
-      FROM identity."user" AS identity_user
-      WHERE identity_user.user_id=$2
-        AND identity_user.owner_ref=$3
-        AND identity_user.state='active'
-        AND core.run_is_owned_by($1,$3,NULL)
-    `, [runId, userId, ownerRef]);
-    return result.rows[0]?.pseudonym ?? null;
+    return crossAccount("X18j", async () => {
+      const result = await this.pool.query<{ pseudonym: string }>(`
+        SELECT identity_user.pseudonym
+        FROM identity."user" AS identity_user
+        WHERE identity_user.user_id=$2
+          AND identity_user.owner_ref=$3
+          AND identity_user.state='active'
+          AND core.run_is_owned_by($1,$3,NULL)
+      `, [runId, userId, ownerRef]);
+      return result.rows[0]?.pseudonym ?? null;
+    });
   }
 
   /**
@@ -558,60 +561,66 @@ export class PostgresPublicationRepository {
   }
 
   async readPublic(publicationRef: string): Promise<PublicSnapshotRecord | null> {
-    const result = await this.pool.query<{
-      publication_ref: string;
-      run_id: string;
-      content_ciphertext: CryptoEnvelope;
-      created_at: Date;
-    }>(`
-      SELECT snapshot.publication_ref,snapshot.run_id,
-        snapshot.content_ciphertext,snapshot.created_at
-      FROM serve.publication_snapshot AS snapshot
-      WHERE snapshot.publication_ref=$1
-        AND core.run_is_published(snapshot.run_id,snapshot.publication_ref)
-    `, [publicationRef]);
-    const row = result.rows[0];
-    return row === undefined ? null : Object.freeze({
-      publicationRef: row.publication_ref,
-      runId: row.run_id,
-      contentCiphertext: row.content_ciphertext,
-      createdAt: row.created_at
+    return crossAccount("X10", async () => {
+      const result = await this.pool.query<{
+        publication_ref: string;
+        run_id: string;
+        content_ciphertext: CryptoEnvelope;
+        created_at: Date;
+      }>(`
+        SELECT snapshot.publication_ref,snapshot.run_id,
+          snapshot.content_ciphertext,snapshot.created_at
+        FROM serve.publication_snapshot AS snapshot
+        WHERE snapshot.publication_ref=$1
+          AND core.run_is_published(snapshot.run_id,snapshot.publication_ref)
+      `, [publicationRef]);
+      const row = result.rows[0];
+      return row === undefined ? null : Object.freeze({
+        publicationRef: row.publication_ref,
+        runId: row.run_id,
+        contentCiphertext: row.content_ciphertext,
+        createdAt: row.created_at
+      });
     });
   }
 
   async revalidatePublic(runId: string, publicationRef: string): Promise<boolean> {
-    const result = await this.pool.query<{ published: boolean }>(`
-      SELECT core.run_is_published($1,$2) AS published
-    `, [runId, publicationRef]);
-    return result.rows[0]?.published === true;
+    return crossAccount("X10", async () => {
+      const result = await this.pool.query<{ published: boolean }>(`
+        SELECT core.run_is_published($1,$2) AS published
+      `, [runId, publicationRef]);
+      return result.rows[0]?.published === true;
+    });
   }
 
   async listPublicRefs(limit: number, offset: number): Promise<Readonly<{
     refs: readonly string[];
     total: number;
   }>> {
-    const result = await this.pool.query<{ publication_ref: string | null; total: string }>(`
-      WITH latest AS (
-        SELECT DISTINCT ON (event.run_id)
-          event.run_id,event.publication_ref,event.state,event.at_seq
-        FROM core.run_visibility_event AS event
-        ORDER BY event.run_id,event.at_seq DESC
-      ), published AS (
-        SELECT publication_ref,at_seq FROM latest WHERE state='PUBLISHED'
-      ), page AS (
-        SELECT publication_ref,at_seq FROM published
-        ORDER BY at_seq DESC,publication_ref
-        LIMIT $1 OFFSET $2
-      )
-      SELECT page.publication_ref,(SELECT count(*) FROM published)::text AS total
-      FROM (SELECT 1) AS one
-      LEFT JOIN page ON true
-      ORDER BY page.at_seq DESC NULLS LAST,page.publication_ref
-    `, [limit, offset]);
-    return Object.freeze({
-      refs: Object.freeze(result.rows.flatMap((row) => row.publication_ref === null
-        ? [] : [row.publication_ref])),
-      total: Number(result.rows[0]?.total ?? 0)
+    return crossAccount("X10", async () => {
+      const result = await this.pool.query<{ publication_ref: string | null; total: string }>(`
+        WITH latest AS (
+          SELECT DISTINCT ON (event.run_id)
+            event.run_id,event.publication_ref,event.state,event.at_seq
+          FROM core.run_visibility_event AS event
+          ORDER BY event.run_id,event.at_seq DESC
+        ), published AS (
+          SELECT publication_ref,at_seq FROM latest WHERE state='PUBLISHED'
+        ), page AS (
+          SELECT publication_ref,at_seq FROM published
+          ORDER BY at_seq DESC,publication_ref
+          LIMIT $1 OFFSET $2
+        )
+        SELECT page.publication_ref,(SELECT count(*) FROM published)::text AS total
+        FROM (SELECT 1) AS one
+        LEFT JOIN page ON true
+        ORDER BY page.at_seq DESC NULLS LAST,page.publication_ref
+      `, [limit, offset]);
+      return Object.freeze({
+        refs: Object.freeze(result.rows.flatMap((row) => row.publication_ref === null
+          ? [] : [row.publication_ref])),
+        total: Number(result.rows[0]?.total ?? 0)
+      });
     });
   }
 }

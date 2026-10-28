@@ -31,7 +31,7 @@ import { auditMigrationReplaySafety } from "../../tools/orphan-audit/src/index.j
 // escaping every rule below.
 const APPLICATION_SCHEMAS = [
   "billing", "core", "evaluator", "evidence", "identity", "ledger", "legal", "memory",
-  "obs", "observation", "register", "scorecard", "serve", "staff", "support"
+  "obs", "observation", "register", "rls", "scorecard", "serve", "staff", "support"
 ] as const;
 
 // The exhaustive set of application base tables that legitimately carry NO
@@ -629,7 +629,8 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
     // (spec 2026-10-13), then the reclaim resume (spec 2026-10-14), then the reply measures (0120, spec 2026-10-15), then
     // the engine verdict (0121, spec 2026-10-15 engine redesign R2), then the engine's map answer step (0122, spec
     // 2026-10-15 engine redesign R3), then the side-by-side releases (0123, spec 2026-10-21 side-by-side uploads), then the
-    // settings activation (0124, side-by-side spec §13), then the Italy-specific approval (0125), last.
+    // settings activation (0124, side-by-side spec §13), then the Italy-specific approval (0125), then row-level security
+    // (0126, schema rls), last (mission row-level-security, SPEC-v4 R26).
     expect(plan.forwardChain.map((step) => step.name)).toEqual([
       "0111_billing_netopia.sql",
       "0112_auth_db_batch.sql",
@@ -645,7 +646,8 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
       "0122_engine_map_check.sql",
       "0123_side_by_side_releases.sql",
       "0124_settings_activation.sql",
-      "0125_italy_specific_approval.sql"
+      "0125_italy_specific_approval.sql",
+      "0126_row_level_security.sql"
     ]);
     expect(plan.forwardChain[1]!.name).toBe(AUTH_DB_BATCH_MIGRATION);
   });

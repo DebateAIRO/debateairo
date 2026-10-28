@@ -350,4 +350,13 @@ describe("dev custody root (F-05, L2-F1, L2-F2)", () => {
       expect(await readFile(join(REPOSITORY_ROOT, file), "utf8"), file).toContain(spread);
     }
   });
+
+  // Row-level security S01 (PLAN S2.5, S2.9; DECISIONS D43): V's TEST stack runs on its own profile, chosen through
+  // the same allow-listed command environment; an unknown profile name is still refused.
+  it("S2.5-c loadDevelopmentCommandEnvironment() accepts DEBATEAI_DEV_AUTH_STACK_PROFILE=rls", () => {
+    vi.stubEnv("DEBATEAI_DEV_AUTH_STACK_PROFILE", "rls");
+    expect(loadDevelopmentCommandEnvironment().DEBATEAI_DEV_AUTH_STACK_PROFILE).toBe("rls");
+    vi.stubEnv("DEBATEAI_DEV_AUTH_STACK_PROFILE", "rls-other");
+    expect(() => loadDevelopmentCommandEnvironment()).toThrow();
+  });
 });

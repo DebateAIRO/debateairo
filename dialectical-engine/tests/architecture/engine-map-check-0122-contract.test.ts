@@ -56,8 +56,8 @@ describe("0122: the map answer step's two code tables", () => {
     expect(manifest.version).toBe("engine-map-check-forward0122-v1");
     expect(manifest.migration.name).toBe("0122_engine_map_check.sql");
     expect(manifest.previous.name).toBe("0121_engine_verdict.sql");
-    // Pre-flight PF-R34.2: the loader follows R2's in the one chain list (the side-by-side releases 0123 and the settings
-    // activation 0124 come after it).
-    expect(readFileSync(new URL("../../packages/db/src/migration-forward-chain.ts", import.meta.url), "utf8")).toContain("loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125]");
+    // Pre-flight PF-R34.2: the loader follows R2's in the one chain list (the side-by-side releases 0123, the settings
+    // activation 0124, the Italy-specific approval 0125 and row-level security 0126 come after it).
+    expect(readFileSync(new URL("../../packages/db/src/migration-forward-chain.ts", import.meta.url), "utf8")).toContain("loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126]");
   });
 });

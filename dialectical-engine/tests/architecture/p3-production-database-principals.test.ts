@@ -118,6 +118,9 @@ const capabilityRoles = [
   "debateai_evaluator_worker",
   "debateai_publication_cleanup",
   "debateai_replay",
+  // Row-level security S01 (migration 0126, DECISIONS D29, D47): the NOLOGIN NOINHERIT marker role that the
+  // rls_all_accounts policy names; held by the API system logins, the runner and the liveness sweep, never by T1.
+  "debateai_rls_all_accounts",
   "debateai_runtime",
   "debateai_settlement_watch",
   "debateai_staff_recovery",
@@ -156,10 +159,21 @@ const peerReadinessRoles = ["debateai_staff_readiness_writer"] as const;
 // brings them into the manifest.
 const sideBySideReleaseRoles = ["debateai_release_operator", "debateai_release_owner"] as const;
 
+// Row-level security S01 (SPEC R15, DECISIONS D47 (3)): the roles of the rls_all_accounts policy (migration 0126)
+// that neither list above governs. Every principal that does not hold one forbids it, so the policy's role is in
+// the forbiddenMemberships of api-runtime and api-authorization. They stay outside ownershipRoles (whose owned
+// objects the provisioner checks) and keep externalRecoveryRoles' and sideBySideReleaseRoles' meaning.
+const rlsCrossAccountGovernedRoles = [
+  "debateai_backup_email_owner",
+  "debateai_mfa_recovery_owner",
+  "debateai_password_reset_owner",
+  "debateai_release_owner"
+] as const;
+
 // V-29 removed the one exception (the observation agent's pg_monitor login): no
 // principal may hold any predefined pg_* role.
 function exactForbidden(effectiveMemberships: readonly string[]): readonly string[] {
-  const governedRoles: string[] = [...capabilityRoles, ...ownershipRoles];
+  const governedRoles: string[] = [...capabilityRoles, ...ownershipRoles, ...rlsCrossAccountGovernedRoles];
   return governedRoles
     .filter((role) => !effectiveMemberships.includes(role))
     .concat("debateai_prod_*", "pg_*")
@@ -198,6 +212,7 @@ describe("P3-01 production database-principal manifest", () => {
       { roleName: "debateai_evaluator_worker", inherit: true, directMemberships: [] },
       { roleName: "debateai_publication_cleanup", inherit: false, directMemberships: [] },
       { roleName: "debateai_replay", inherit: true, directMemberships: [] },
+      { roleName: "debateai_rls_all_accounts", inherit: false, directMemberships: [] },
       { roleName: "debateai_runtime", inherit: true, directMemberships: [] },
       { roleName: "debateai_settlement_watch", inherit: true, directMemberships: [] },
       { roleName: "debateai_staff_recovery", inherit: false, directMemberships: [] },
@@ -257,6 +272,9 @@ describe("P3-01 production database-principal manifest", () => {
         { id: "api-publication-cleanup", roleName: "debateai_prod_api_publication_cleanup", kind: "SERVICE" },
         { id: "api-support", roleName: "debateai_prod_api_support", kind: "SERVICE" },
         { id: "api-data-export", roleName: "debateai_prod_api_data_export", kind: "SERVICE" },
+        // Row-level security S01 (DECISIONS D29): the API process's cross-account logins, outside any request.
+        { id: "api-system", roleName: "debateai_prod_api_system", kind: "SERVICE" },
+        { id: "api-authorization-system", roleName: "debateai_prod_api_authorization_system", kind: "SERVICE" },
         { id: "runner-runtime", roleName: "debateai_prod_runner_runtime", kind: "SERVICE" },
         { id: "scheduler-replay", roleName: "debateai_prod_scheduler_replay", kind: "SERVICE" },
         { id: "scheduler-liveness", roleName: "debateai_prod_scheduler_liveness", kind: "SERVICE" },
@@ -315,9 +333,11 @@ describe("P3-01 production database-principal manifest", () => {
         { id: "api-publication-cleanup", database: "debateai", inherit: true, directMemberships: ["debateai_publication_cleanup"], effectiveMemberships: ["debateai_publication_cleanup"] },
         { id: "api-support", database: "debateai", inherit: true, directMemberships: ["debateai_support"], effectiveMemberships: ["debateai_support"] },
         { id: "api-data-export", database: "debateai", inherit: true, directMemberships: ["debateai_data_export_worker"], effectiveMemberships: ["debateai_data_export_worker"] },
-        { id: "runner-runtime", database: "debateai", inherit: true, directMemberships: ["debateai_runtime"], effectiveMemberships: ["debateai_runtime"] },
+        { id: "api-system", database: "debateai", inherit: true, directMemberships: ["debateai_billing_runtime", "debateai_rls_all_accounts"], effectiveMemberships: ["debateai_billing_runtime", "debateai_rls_all_accounts", "debateai_runtime"] },
+        { id: "api-authorization-system", database: "debateai", inherit: true, directMemberships: ["debateai_authorization_runtime", "debateai_rls_all_accounts"], effectiveMemberships: ["debateai_authorization_runtime", "debateai_rls_all_accounts", "debateai_runtime"] },
+        { id: "runner-runtime", database: "debateai", inherit: true, directMemberships: ["debateai_rls_all_accounts", "debateai_runtime"], effectiveMemberships: ["debateai_rls_all_accounts", "debateai_runtime"] },
         { id: "scheduler-replay", database: "debateai", inherit: true, directMemberships: ["debateai_replay"], effectiveMemberships: ["debateai_replay"] },
-        { id: "scheduler-liveness", database: "debateai", inherit: true, directMemberships: ["debateai_runtime"], effectiveMemberships: ["debateai_runtime"] },
+        { id: "scheduler-liveness", database: "debateai", inherit: true, directMemberships: ["debateai_rls_all_accounts", "debateai_runtime"], effectiveMemberships: ["debateai_rls_all_accounts", "debateai_runtime"] },
         { id: "scheduler-settlement", database: "debateai", inherit: true, directMemberships: ["debateai_settlement_watch"], effectiveMemberships: ["debateai_settlement_watch"] },
         { id: "evaluator-worker", database: "debateai", inherit: true, directMemberships: ["debateai_evaluator_worker"], effectiveMemberships: ["debateai_evaluator_worker"] },
         { id: "evaluator-api", database: "debateai", inherit: true, directMemberships: ["debateai_evaluator_api"], effectiveMemberships: ["debateai_evaluator_api"] },
@@ -351,7 +371,7 @@ describe("P3-01 production database-principal manifest", () => {
           ownsDatabases: ["debateai"],
           ownsSchemas: [
             "audit_crypto_internal", "billing", "core", "evidence", "identity", "ledger", "legal",
-            "memory", "obs", "observation", "register", "scorecard", "serve", "support"
+            "memory", "obs", "observation", "register", "rls", "scorecard", "serve", "support"
           ]
         });
         expect(principal.connectionPurposes).toEqual([
@@ -450,6 +470,11 @@ describe("P3-01 production database-principal manifest", () => {
         { component: "apps/runner:hosted-register-publish-cli", environmentKey: "MIGRATION_DATABASE_URL", purpose: "PRODUCTION_REGISTER_PUBLICATION", binding: "WIRED", condition: "package script register:publish-hosted" },
         { component: "apps/api", environmentKey: "DATABASE_URL", purpose: "PRODUCT_RUNTIME", binding: "WIRED" },
         { component: "apps/api", environmentKey: "DATABASE_URL", purpose: "LEGACY_ASK_ADMISSION_POOL", binding: "WIRED" },
+        // Row-level security S01 (DECISIONS D29, D50): the API's system pool (every statement outside a request) and the
+        // room-decision pool connect as api-system; the authorization pool's system target as api-authorization-system.
+        { component: "apps/api", environmentKey: "API_SYSTEM_DATABASE_URL", purpose: "PRODUCT_SYSTEM", binding: "WIRED" },
+        { component: "apps/api", environmentKey: "API_SYSTEM_DATABASE_URL", purpose: "ROOM_DECISION_POOL", binding: "WIRED" },
+        { component: "apps/api", environmentKey: "API_AUTHORIZATION_SYSTEM_DATABASE_URL", purpose: "AUTHORIZATION_SYSTEM", binding: "WIRED" },
         // Paid plans, Task P14b: the owner's dispute command (`pnpm billing:dispute`)
         // runs as the API, with the API's own EnvironmentFile, under systemd-run,
         // and writes only billing rows that principal already writes
@@ -498,7 +523,8 @@ describe("P3-01 production database-principal manifest", () => {
         // API, with the API's own EnvironmentFile, under systemd-run; it inserts only billing.tool_order and reads
         // billing.card_token, card_token_revocation, payment_notice and payment_notice_raw, all granted by 0111 to
         // debateai_billing_runtime; no privilege is added.
-        { component: "tools/billing:netopia-sandbox", environmentKey: "DATABASE_URL", purpose: "BILLING_NETOPIA_RECORDING_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:netopia-sandbox" },
+        // Row-level security S01 (DECISIONS D48, PLAN S2.7): the recording reads API_SYSTEM_DATABASE_URL from the same file.
+        { component: "tools/billing:netopia-sandbox", environmentKey: "API_SYSTEM_DATABASE_URL", purpose: "BILLING_NETOPIA_RECORDING_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:netopia-sandbox" },
         { component: "apps/api", environmentKey: "CONTENT_PROVISION_DATABASE_URL", purpose: "CONTENT_PROVISION", binding: "WIRED" },
         { component: "apps/api", environmentKey: "CONTENT_PROVISION_DATABASE_URL", purpose: "SERVER_ASK_ADMISSION_POOL", binding: "WIRED" },
         { component: "apps/api", environmentKey: "DATA_EXPORT_DATABASE_URL", purpose: "DATA_EXPORT_WORKER", binding: "WIRED_WHEN_ENABLED", condition: "DATA_EXPORT_STORE_PATH set" },
@@ -791,17 +817,20 @@ describe("P3-01 production database-principal manifest", () => {
       "NO_SERVICE_TO_SERVICE_MEMBERSHIP",
       "NO_PREDEFINED_PG_ROLE_MEMBERSHIP_EXCEPT_OBSERVATION_AGENT_PG_MONITOR",
       "AUTHORIZATION_EFFECTIVE_MEMBERSHIP_IS_AUTHORIZATION_PLUS_RUNTIME_ONLY",
-      "BILLING_CAPABILITY_HELD_BY_API_RUNTIME_ONLY",
+      // Row-level security S01 (DECISIONS D48, V-10's default): the API PROCESS holds billing, through api-runtime and
+      // api-system; the runner and scheduler logins still hold none of it.
+      "BILLING_CAPABILITY_HELD_BY_API_PROCESS_ONLY",
       // Migration 0094: legal.acceptance, the legal retention purge, sign-up with consent and the country-gate
       // audit sit on debateai_billing_runtime too, not on the shared debateai_runtime.
-      "LEGAL_ACCEPTANCE_SIGN_UP_AND_COUNTRY_GATE_WRITES_HELD_BY_API_RUNTIME_ONLY",
+      "LEGAL_ACCEPTANCE_SIGN_UP_AND_COUNTRY_GATE_WRITES_HELD_BY_API_PROCESS_ONLY",
       "PRODUCTION_EVALUATOR_DEV_MENU_FORBIDDEN"
     ]);
     // Go-live row 41: runner-runtime and scheduler-liveness hold debateai_runtime, which since 0093 writes
-    // nothing in billing; the billing role is api-runtime's alone, so only the API writes billing rows.
+    // nothing in billing; the billing role is the API process's alone (api-runtime and, since row-level security
+    // S01, api-system: DECISIONS D48), so only the API writes billing rows.
     expect(manifest.principals
       .filter(({ effectiveMemberships }) => effectiveMemberships.includes("debateai_billing_runtime"))
-      .map(({ id }) => id)).toEqual(["api-runtime"]);
+      .map(({ id }) => id)).toEqual(["api-runtime", "api-system"]);
   });
 
   it("maps the manifest to current migrations and executable connection seams without inventing completion", async () => {
@@ -1095,4 +1124,23 @@ it("discloses exactly 0125's grants to the API's billing role and the export wor
   // The sign-up writer for the API's role; the export reader v2 for the worker. Nothing else, and no table grant.
   expect(declared).toHaveLength(2);
   expect(declared.some(grant => /\bON legal\./u.test(grant))).toBe(false);
+});
+
+it("S2.8-a the release note names every principal id, login, role and environment key the manifest adds (CONTAINS each)", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const note = await readFile("docs/releases/2026-10-23-row-level-security.md", "utf8");
+  // Row-level security (S01, D29, D47, D48): two API logins outside a request and the cross-account marker role.
+  const added = manifest.principals.filter(({ id }) => id === "api-system" || id === "api-authorization-system");
+  expect(added.map(({ id, roleName }) => [id, roleName])).toEqual([
+    ["api-system", "debateai_prod_api_system"],
+    ["api-authorization-system", "debateai_prod_api_authorization_system"]
+  ]);
+  expect(manifest.capabilityRoles.map(({ roleName }) => roleName)).toContain("debateai_rls_all_accounts");
+  const keys = [...new Set(added.flatMap(({ connectionPurposes }) => connectionPurposes.map(({ environmentKey }) => environmentKey)))]
+    .filter((key): key is string => key !== null && key !== "DATABASE_URL").sort();
+  expect(keys).toEqual(["API_AUTHORIZATION_SYSTEM_DATABASE_URL", "API_SYSTEM_DATABASE_URL"]);
+  // RUNNER_DATABASE_URL is development only (S2.4) and never in the production manifest.
+  for (const name of [...added.flatMap(({ id, roleName }) => [id, roleName]), "debateai_rls_all_accounts", ...keys, "RUNNER_DATABASE_URL"]) {
+    expect(note, name).toContain(name);
+  }
 });

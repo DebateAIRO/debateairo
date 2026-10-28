@@ -28,7 +28,8 @@ import {
 } from "../../packages/db/src/index.js";
 import {
   DEVELOPMENT_DATABASE_PRINCIPALS,
-  provisionDevelopmentDatabasePrincipals
+  provisionDevelopmentDatabasePrincipals,
+  type DevelopmentDatabasePrincipal
 } from "../../apps/runner/src/dev-database-principals.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { LivenessRepository } from "../../packages/liveness/src/index.js";
@@ -140,15 +141,21 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
       WHERE member.rolname=ANY($1::text[])
       ORDER BY member.rolname,capability.rolname
     `,[DEVELOPMENT_DATABASE_PRINCIPALS.map(({ roleName }) => roleName)]);
+    // Row-level security S01 (PLAN S2.3, DECISIONS D46, D54): a principal with crossAccountRole also holds the
+    // marker, with the same option set as its capability role, in the query's member-then-role order.
     expect(memberships.rows).toEqual(DEVELOPMENT_DATABASE_PRINCIPALS
-      .map(({ roleName, capabilityRole }) => ({
+      .flatMap(({ roleName, capabilityRole, crossAccountRole }: DevelopmentDatabasePrincipal) => [
+        capabilityRole,
+        ...(crossAccountRole === undefined ? [] : [crossAccountRole])
+      ].map((role_name) => ({
         member_name: roleName,
-        role_name: capabilityRole,
+        role_name,
         admin_option: false,
         inherit_option: true,
         set_option: true
-      }))
-      .sort((left, right) => left.member_name.localeCompare(right.member_name)));
+      })))
+      .sort((left, right) => left.member_name.localeCompare(right.member_name)
+        || (left.role_name < right.role_name ? -1 : left.role_name > right.role_name ? 1 : 0)));
 
     for (const principal of DEVELOPMENT_DATABASE_PRINCIPALS) {
       const databaseUrl = credentials.get(principal.environmentKey);
@@ -383,7 +390,11 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
       credentialFilePath
     });
     const credentials = parseCredentialFile(await readFile(credentialFilePath, "utf8"));
-    const runtimePool = createPool(credentials.get("DATABASE_URL")!);
+    // Row-level security S01 (Ruling R-12 F-C2-2; SPEC-v4 X1, S2.4): liveness and memory are the runner's writes, and
+    // the development runner now has its own login (debateai_dev_runner: debateai_runtime and the cross-account
+    // marker). The API's request login (DATABASE_URL, T1) with no account context sees no run: that is the isolation.
+    const runnerPool = createPool(credentials.get("RUNNER_DATABASE_URL")!);
+    const requestPool = createPool(credentials.get("DATABASE_URL")!);
     const legacyAskerId = "asker:dev-runtime-memory";
     const question = "Can the actual development runtime persist private memory?";
     const runId = await new RunRepository(database.pool).startRun({
@@ -410,11 +421,19 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
         "SELECT core.run_is_owned_by($1,NULL,$2) AS owned",
         [runId, legacyAskerId]
       )).rows[0]?.owned).toBe(true);
-      expect((await runtimePool.query<{ run_id: string }>(
+      expect((await requestPool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM core.run WHERE run_id=$1",
+        [runId]
+      )).rows[0]?.count).toBe("0");
+      expect((await runnerPool.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM core.run WHERE run_id=$1",
+        [runId]
+      )).rows[0]?.count).toBe("1");
+      expect((await runnerPool.query<{ run_id: string }>(
         "SELECT run_id FROM core.lock_owned_live_runs(ARRAY[$1]::uuid[],NULL,$2)",
         [runId, legacyAskerId]
       )).rows).toEqual([{ run_id: runId }]);
-      const matchedRuntimePool = new Proxy(runtimePool, {
+      const matchedRunnerPool = new Proxy(runnerPool, {
         get(target, property) {
           if (property === "query") return async (...args: unknown[]) => {
             const sql = String(args[0]);
@@ -435,14 +454,14 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
           return typeof value === "function" ? value.bind(target) : value;
         }
       }) as Pool;
-      await expect(new LivenessRepository(matchedRuntimePool).recordQuery(
+      await expect(new LivenessRepository(matchedRunnerPool).recordQuery(
         question,
         { ownerRef: null, legacyAskerId }
       )).resolves.toBe(1);
-      await expect(runtimePool.query(
+      await expect(runnerPool.query(
         "SELECT run_id FROM serve.private_run_key_cleanup_intent LIMIT 1"
       )).rejects.toMatchObject({ code: "42501" });
-      await expect(new MemoryRepository(runtimePool).recordQuestionAndMatch({
+      await expect(new MemoryRepository(runnerPool).recordQuestionAndMatch({
         key: {
           runId,
           canonicalQuestionText: "can the actual development runtime persist private memory?",
@@ -466,7 +485,8 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
         [runId]
       )).rows[0]?.count).toBe("1");
     } finally {
-      await runtimePool.end();
+      await runnerPool.end();
+      await requestPool.end();
     }
   }, 120_000);
 
@@ -494,7 +514,7 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
       adminPool: database.pool,
       adminDatabaseUrl: database.connectionString,
       credentialFilePath
-    })).resolves.toEqual({ credentialFilePath, principalCount: 12 });
+    })).resolves.toEqual({ credentialFilePath, principalCount: 15 });
     const repaired = (await database.pool.query<{
       rolinherit: boolean;
       rolcreatedb: boolean;
@@ -550,14 +570,14 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
       REVOKE debateai_billing_runtime FROM debateai_dev_runtime;
       GRANT debateai_runtime TO debateai_dev_runtime WITH INHERIT TRUE, SET TRUE
     `);
-    await expect(provision()).resolves.toEqual({ credentialFilePath, principalCount: 12 });
+    await expect(provision()).resolves.toEqual({ credentialFilePath, principalCount: 15 });
     expect(await directRoles()).toEqual(billingOnly);
 
     // Anything else is drift, as before: here, both roles at once.
     await database.pool.query("GRANT debateai_runtime TO debateai_dev_runtime WITH INHERIT TRUE, SET TRUE");
     await expect(provision()).rejects.toThrow("DEV_DATABASE_PRINCIPAL_DRIFT");
     await database.pool.query("REVOKE debateai_runtime FROM debateai_dev_runtime");
-    await expect(provision()).resolves.toEqual({ credentialFilePath, principalCount: 12 });
+    await expect(provision()).resolves.toEqual({ credentialFilePath, principalCount: 15 });
     expect(await directRoles()).toEqual(billingOnly);
   });
 
@@ -617,10 +637,13 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
     });
     const currentSource = await readFile(credentialFilePath, "utf8");
     const legacySource = currentSource.split("\n")
-      .filter((row) => row.length > 0 && !row.startsWith("SUPPORT_DATABASE_URL=") && !row.startsWith("DATA_EXPORT_DATABASE_URL="))
+      .filter((row) => row.length > 0 && !row.startsWith("SUPPORT_DATABASE_URL=") && !row.startsWith("DATA_EXPORT_DATABASE_URL=")
+        // Row-level security S01: the three keys after DATA_EXPORT_DATABASE_URL go too, so this stays a 10-row prefix.
+        && !row.startsWith("API_SYSTEM_DATABASE_URL=") && !row.startsWith("API_AUTHORIZATION_SYSTEM_DATABASE_URL=")
+        && !row.startsWith("RUNNER_DATABASE_URL="))
       .join("\n") + "\n";
     const legacyCredentials = parseCredentialFile(legacySource);
-    expect(legacyCredentials.size).toBe(DEVELOPMENT_DATABASE_PRINCIPALS.length-2);
+    expect(legacyCredentials.size).toBe(DEVELOPMENT_DATABASE_PRINCIPALS.length-5);
     const upgradedPath = join(secretRoot, "legacy-database-principals.env");
     await writeFile(upgradedPath, legacySource, { encoding: "utf8", mode: 0o600 });
 
@@ -759,6 +782,139 @@ describe("DEV-03 isolated development database LOGIN principals", () => {
         ({ environmentKey }) => environmentKey
       ));
     }
+  }, 120_000);
+
+  // Row-level security S01 (PLAN S2.3, DECISIONS D46, D54): the API's two system logins and the runner's own login,
+  // appended last, each holding the cross-account marker 0126 creates; the liveness login gains the marker too.
+  const markerRows = async (): Promise<unknown> => (await database.pool.query(`
+    SELECT member.rolname AS member,membership.admin_option,membership.inherit_option,membership.set_option
+    FROM pg_catalog.pg_auth_members AS membership
+    JOIN pg_catalog.pg_roles AS marker ON marker.oid=membership.roleid
+    JOIN pg_catalog.pg_roles AS member ON member.oid=membership.member
+    WHERE marker.rolname='debateai_rls_all_accounts'
+    ORDER BY member.rolname
+  `)).rows;
+  const markerHolders = (members: readonly string[]) => members.map((member) =>
+    ({ member, admin_option: false, inherit_option: true, set_option: true }));
+
+  it("S2.3-a fifteen principals, the last three debateai_dev_api_system, debateai_dev_authorization_system, debateai_dev_runner in that order", async () => {
+    expect(DEVELOPMENT_DATABASE_PRINCIPALS.length).toBe(15);
+    expect(DEVELOPMENT_DATABASE_PRINCIPALS.slice(-3)).toEqual([
+      { roleName: "debateai_dev_api_system", capabilityRole: "debateai_billing_runtime",
+        environmentKey: "API_SYSTEM_DATABASE_URL", crossAccountRole: "debateai_rls_all_accounts" },
+      { roleName: "debateai_dev_authorization_system", capabilityRole: "debateai_authorization_runtime",
+        environmentKey: "API_AUTHORIZATION_SYSTEM_DATABASE_URL", crossAccountRole: "debateai_rls_all_accounts" },
+      { roleName: "debateai_dev_runner", capabilityRole: "debateai_runtime",
+        environmentKey: "RUNNER_DATABASE_URL", crossAccountRole: "debateai_rls_all_accounts" }
+    ]);
+    await provisionDevelopmentDatabasePrincipals({
+      adminPool: database.pool,
+      adminDatabaseUrl: database.connectionString,
+      credentialFilePath
+    });
+    expect(await markerRows()).toEqual(markerHolders([
+      "debateai_dev_api_system", "debateai_dev_authorization_system", "debateai_dev_liveness", "debateai_dev_runner"
+    ]));
+  }, 120_000);
+
+  it("S2.3-b a 12-key credential file is upgraded by appending exactly API_SYSTEM_DATABASE_URL, API_AUTHORIZATION_SYSTEM_DATABASE_URL, RUNNER_DATABASE_URL and keeps mode 0600", async () => {
+    await provisionDevelopmentDatabasePrincipals({
+      adminPool: database.pool,
+      adminDatabaseUrl: database.connectionString,
+      credentialFilePath
+    });
+    // The file every stack provisioned before this slice holds exactly these twelve keys, in this order.
+    const preSliceKeys = [
+      "DATABASE_URL", "CONTENT_PROVISION_DATABASE_URL", "ERASURE_DATABASE_URL", "AUTHORIZATION_DATABASE_URL",
+      "PUBLICATION_CLEANUP_DATABASE_URL", "REPLAY_SELF_TEST_DATABASE_URL", "LIVENESS_DATABASE_URL",
+      "SETTLEMENT_DATABASE_URL", "EVALUATOR_DEV_MENU_DATABASE_URL", "SUPPORT_CONFIG_OPERATOR_DATABASE_URL",
+      "SUPPORT_DATABASE_URL", "DATA_EXPORT_DATABASE_URL"
+    ];
+    const rows = (await readFile(credentialFilePath, "utf8")).trimEnd().split("\n");
+    const legacySource = rows.slice(0, 12).join("\n") + "\n";
+    expect([...parseCredentialFile(legacySource).keys()]).toEqual(preSliceKeys);
+    const root = join(secretRoot, "pre-rls-12-key");
+    const path = join(root, "database-principals.env");
+    await mkdir(root, { mode: 0o700 });
+    await writeFile(path, legacySource, { mode: 0o600 });
+
+    await expect(provisionDevelopmentDatabasePrincipals({
+      adminPool: database.pool,
+      adminDatabaseUrl: database.connectionString,
+      credentialFilePath: path
+    })).resolves.toEqual({ credentialFilePath: path, principalCount: 15 });
+    const upgraded = await readFile(path, "utf8");
+    expect(upgraded.slice(0, legacySource.length)).toBe(legacySource);
+    expect(upgraded.slice(legacySource.length).trimEnd().split("\n").map((row) => row.slice(0, row.indexOf("="))))
+      .toEqual(["API_SYSTEM_DATABASE_URL", "API_AUTHORIZATION_SYSTEM_DATABASE_URL", "RUNNER_DATABASE_URL"]);
+    expect((await lstat(path)).mode & 0o777).toBe(0o600);
+  }, 120_000);
+
+  it("S2.3-c a 13-key file is refused DEV_DATABASE_CREDENTIAL_FILE_INVALID", async () => {
+    await provisionDevelopmentDatabasePrincipals({
+      adminPool: database.pool,
+      adminDatabaseUrl: database.connectionString,
+      credentialFilePath
+    });
+    const rows = (await readFile(credentialFilePath, "utf8")).trimEnd().split("\n");
+    const thirteen = rows.slice(0, 13).join("\n") + "\n";
+    const root = join(secretRoot, "rls-13-key");
+    const path = join(root, "database-principals.env");
+    await mkdir(root, { mode: 0o700 });
+    await writeFile(path, thirteen, { mode: 0o600 });
+    await expect(provisionDevelopmentDatabasePrincipals({
+      adminPool: database.pool,
+      adminDatabaseUrl: database.connectionString,
+      credentialFilePath: path
+    })).rejects.toThrow("DEV_DATABASE_CREDENTIAL_FILE_INVALID");
+    expect(await readFile(path, "utf8")).toBe(thirteen);
+  }, 120_000);
+
+  it("S2.3-d an existing debateai_dev_liveness holding only debateai_runtime gains the marker and passes", async () => {
+    await provisionDevelopmentDatabasePrincipals({
+      adminPool: database.pool,
+      adminDatabaseUrl: database.connectionString,
+      credentialFilePath
+    });
+    // The shape every development database had before this slice.
+    await database.pool.query("REVOKE debateai_rls_all_accounts FROM debateai_dev_liveness");
+    await expect(provisionDevelopmentDatabasePrincipals({
+      adminPool: database.pool,
+      adminDatabaseUrl: database.connectionString,
+      credentialFilePath
+    })).resolves.toEqual({ credentialFilePath, principalCount: 15 });
+    expect(await markerRows()).toEqual(markerHolders([
+      "debateai_dev_api_system", "debateai_dev_authorization_system", "debateai_dev_liveness", "debateai_dev_runner"
+    ]));
+  }, 120_000);
+
+  it("S2.3-e a crossAccountRole principal holding the marker with inherit_option false is refused DEV_DATABASE_PRINCIPAL_DRIFT", async () => {
+    await provisionDevelopmentDatabasePrincipals({
+      adminPool: database.pool,
+      adminDatabaseUrl: database.connectionString,
+      credentialFilePath
+    });
+    await database.pool.query(`
+      REVOKE debateai_rls_all_accounts FROM debateai_dev_runner;
+      GRANT debateai_rls_all_accounts TO debateai_dev_runner WITH INHERIT FALSE, SET TRUE
+    `);
+    try {
+      await expect(provisionDevelopmentDatabasePrincipals({
+        adminPool: database.pool,
+        adminDatabaseUrl: database.connectionString,
+        credentialFilePath
+      })).rejects.toThrow("DEV_DATABASE_PRINCIPAL_DRIFT");
+    } finally {
+      await database.pool.query(`
+        REVOKE debateai_rls_all_accounts FROM debateai_dev_runner;
+        GRANT debateai_rls_all_accounts TO debateai_dev_runner WITH INHERIT TRUE, SET TRUE
+      `);
+    }
+    await expect(provisionDevelopmentDatabasePrincipals({
+      adminPool: database.pool,
+      adminDatabaseUrl: database.connectionString,
+      credentialFilePath
+    })).resolves.toEqual({ credentialFilePath, principalCount: 15 });
   }, 120_000);
 });
 import { spawn } from "node:child_process";

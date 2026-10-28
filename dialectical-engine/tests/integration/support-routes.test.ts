@@ -57,16 +57,18 @@ import {
   PostgresSupportStatusRepository,
   type Pool
 } from "../../packages/db/src/index.js";
-import { provisionDevelopmentDatabasePrincipals } from "../../apps/runner/src/dev-database-principals.js";
+import { apiTestPools, provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
 import type {
   SupportConfigurationState,
   SupportConfigurationValues
 } from "../../packages/register/src/index.js";
 import {
+  persistLiveSession,
   TEST_APP_ORIGIN,
   testHttpIdentity,
   testSessionApplication,
-  testSessionHeaders
+  testSessionHeaders,
+  type TestHttpIdentity
 } from "../support/httpSession.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
@@ -183,7 +185,27 @@ describe("SUP-01 support routes", () => {
   let caseAccess: SupportCaseAccessPort;
   let supportKeys: SupportKeyPort;
   let restrictedSupportPool: Pool;
+  /** R21 (PLAN S5.2): the API's support pool (main.ts: supportPool) — the dev support login in login mode. */
+  let supportPool: Pool;
+  let logins: RlsLogins | undefined;
   let keyRoot: string;
+
+  /**
+   * D55: testSessionApplication accepts `identity` with no row of its own, so the identity gets an active
+   * identity."user" row and a live identity.session row for its token (seeding, as the harness superuser).
+   */
+  async function persistLiveIdentity(identity: TestHttpIdentity): Promise<void> {
+    await database.pool.query(
+      `INSERT INTO identity."user" (
+         user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,
+         phone_ciphertext,password_hash,pseudonym,audit_token,owner_ref,state,
+         adult_affirmed_at,created_at
+       ) VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,NULL,'test-password-hash',$3,$4,$5,'active',now(),now())`,
+      [identity.authenticated.userId, createHash("sha256").update(identity.authenticated.userId).digest(),
+        `support-routes-${randomUUID()}`, randomUUID(), identity.authenticated.ownerRef]
+    );
+    await persistLiveSession(database.pool, identity);
+  }
 
   beforeAll(async () => {
     database = await startTestDatabase();
@@ -193,36 +215,28 @@ describe("SUP-01 support routes", () => {
     await mkdir(secrets,{ mode: 0o700 });
     const supportKekPath = join(secrets,"support-kek.bin");
     await writeFile(supportKekPath,Buffer.alloc(32,0x4e),{ mode: 0o600 });
-    const credentialFilePath = join(keyRoot,"database-principals.env");
-    await provisionDevelopmentDatabasePrincipals({
-      adminPool: database.pool,
-      adminDatabaseUrl: database.connectionString,
-      credentialFilePath
-    });
-    const credentials = new Map((await readFile(credentialFilePath,"utf8")).trim()
-      .split("\n").map((line) => {
-        const separator = line.indexOf("=");
-        if (separator < 1) throw new TypeError("TEST_CREDENTIAL_LINE_INVALID");
-        return [line.slice(0,separator),line.slice(separator+1)] as const;
-      }));
-    const supportDatabaseUrl = credentials.get("SUPPORT_DATABASE_URL");
-    if (supportDatabaseUrl === undefined) throw new TypeError("TEST_SUPPORT_DATABASE_URL_MISSING");
-    restrictedSupportPool = createPool(supportDatabaseUrl);
+    // B7 (PLAN S5.2 (3)): the dev logins come from provisionRlsLogins, one provisioning run per TestDatabase, which
+    // apiTestPools shares in login mode, instead of a second dev provisioner run on a credential file of this file's own.
+    logins = await provisionRlsLogins(database);
+    restrictedSupportPool = createPool(logins.url("SUPPORT_DATABASE_URL"));
+    supportPool = (await apiTestPools(database, import.meta.url)).support;
+    await persistLiveIdentity(IDENTITY);
+    await persistLiveIdentity(CASE_OWNER);
     supportKeys = await createSupportKeyPort({ supportKekPath });
     const creation = new PostgresSupportSessionRepository(
-      database.pool,
+      supportPool,
       createWrappedSupportSessionKey(supportKeys)
     );
     messageCipher = createSupportMessageCipher(
       supportKeys,
-      new PostgresSupportMessageRepository(database.pool)
+      new PostgresSupportMessageRepository(supportPool)
     );
     cases = createSupportCaseService({
       messages: messageCipher,
       createOnce: async (input) => {
         let snapshot: Uint8Array | undefined;
         const repository = new PostgresSupportCaseRepository(
-          database.pool,
+          supportPool,
           async (caseId) => {
             if (snapshot === undefined) throw new TypeError("SUPPORT_CASE_SNAPSHOT_UNAVAILABLE");
             return createSupportCaseMaterial(supportKeys,snapshot)(caseId);
@@ -245,7 +259,7 @@ describe("SUP-01 support routes", () => {
       },
       create: async (input) => {
         const repository = new PostgresSupportCaseRepository(
-          database.pool,
+          supportPool,
           createSupportCaseMaterial(supportKeys,input.transcriptSnapshot)
         );
         return repository.createCase({
@@ -263,9 +277,9 @@ describe("SUP-01 support routes", () => {
       }
     });
     caseAccess = createSupportCaseAccessService({
-      repository: new PostgresSupportCaseSummaryRepository(database.pool),keys: supportKeys
+      repository: new PostgresSupportCaseSummaryRepository(supportPool),keys: supportKeys
     });
-    const status = new PostgresSupportStatusRepository(database.pool);
+    const status = new PostgresSupportStatusRepository(supportPool);
     sessions = Object.freeze({
       create: creation.create.bind(creation),
       read: creation.read.bind(creation),
@@ -280,6 +294,7 @@ describe("SUP-01 support routes", () => {
   afterAll(async () => {
     await supportKeys?.close();
     await restrictedSupportPool?.end();
+    await logins?.end();
     await database?.stop();
     if (keyRoot !== undefined) await rm(keyRoot,{ recursive: true,force: true });
   }, 120_000);
@@ -1081,7 +1096,7 @@ describe("SUP-01 support routes", () => {
   });
 
   it("rolls back the session row when key material creation fails", async () => {
-    const repository = new PostgresSupportSessionRepository(database.pool, async () => {
+    const repository = new PostgresSupportSessionRepository(supportPool, async () => {
       throw new TypeError("TEST_KEY_FAILURE");
     });
     const sessionId = randomUUID();
@@ -1104,7 +1119,7 @@ describe("SUP-01 support routes", () => {
 
     const invalidId = randomUUID();
     const invalid = new PostgresSupportSessionRepository(
-      database.pool,
+      supportPool,
       async () => Buffer.alloc(60,1)
     );
     await expect(invalid.create({
@@ -1128,7 +1143,7 @@ describe("SUP-01 support routes", () => {
     const supportKekPath = join(secrets,"support-kek.bin");
     await writeFile(supportKekPath,Buffer.alloc(32,0x4d),{ mode: 0o600 });
     const keys = await createSupportKeyPort({ supportKekPath });
-    const repository = new PostgresSupportMessageRepository(database.pool);
+    const repository = new PostgresSupportMessageRepository(supportPool);
     const writes: unknown[] = [];
     const messagePort: SupportMessageRepositoryPort = Object.freeze({
       readSessionKey: repository.readSessionKey.bind(repository),
@@ -1149,7 +1164,7 @@ describe("SUP-01 support routes", () => {
     const modelInput: string[] = [];
     try {
       const sessionRepository = new PostgresSupportSessionRepository(
-        database.pool,
+        supportPool,
         createWrappedSupportSessionKey(keys)
       );
       await sessionRepository.create({
@@ -2709,7 +2724,7 @@ describe("SUP-01 support routes", () => {
     });
     expect(stored?.text).toBe(response.json().text);
     expect(stored?.text).not.toContain(unsafe);
-    expect((await new PostgresSupportStatusRepository(database.pool).status()).relayState)
+    expect((await new PostgresSupportStatusRepository(supportPool).status()).relayState)
       .toBe("AVAILABLE");
     const rating = await server.inject({
       method: "POST",url: `/v1/support/messages/${assistant.message_id}/rating`,
@@ -2819,7 +2834,7 @@ describe("SUP-01 support routes", () => {
       "UPDATE support.message SET received_at=statement_timestamp()-interval '1 second' WHERE message_id=$1",
       [assistant.message_id]
     );
-    await expect(new PostgresSupportStatusRepository(database.pool).status()).resolves.toMatchObject({
+    await expect(new PostgresSupportStatusRepository(supportPool).status()).resolves.toMatchObject({
       callsToday: 1,callsLast7Days: 1,inputTokensToday: 9,outputTokensToday: 11,
       costUsdToday: 0.001,inputTokensLast7Days: 9,outputTokensLast7Days: 11,
       costUsdLast7Days: 0.001,relayState: "AVAILABLE"

@@ -7,6 +7,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { AUTH_DB_BATCH_MIGRATION } from "../../packages/db/src/migration-forward-auth-db-batch.js";
 
 const engineRoot = resolve(import.meta.dirname, "../..");
 const read = (relative: string): string => readFileSync(resolve(engineRoot, relative), "utf8");
@@ -151,6 +152,17 @@ describe("VPS baseline: native hardened Postgres (L5-F6, L5-F7, L5-F11)", () => 
       expect(line, line).toMatch(/\s(127\.0\.0\.1\/32|::1\/128)\s+scram-sha-256$/);
       expect(line, line).not.toMatch(/^hostssl\s+all\s/);
     }
+    // Every API login api.env.example names (nine since row-level security added api-system and
+    // api-authorization-system, D29) also has its TLS loopback line, on both address families.
+    const apiLogins = [...envKeys(read("deploy/vps/env/api.env.example")).entries()]
+      .filter(([key]) => key.endsWith("DATABASE_URL"))
+      .map(([, url]) => /^postgresql:\/\/([a-z_]+):/.exec(url)?.[1] ?? url);
+    expect(apiLogins).toHaveLength(9);
+    for (const address of ["127.0.0.1/32", "::1/128"]) {
+      const line = hostssl.find((entry) => entry.startsWith("hostssl debateai ") && entry.includes(` ${address} `));
+      const users = new Set((line?.split(" ")[2] ?? "").split(","));
+      for (const login of apiLogins) expect(users.has(login), `${login} on hostssl ${address}`).toBe(true);
+    }
     expect(hostssl.some((line) => /\s127\.0\.0\.1\/32\s/.test(line))).toBe(true);
     expect(hostssl.some((line) => /\s::1\/128\s/.test(line))).toBe(true);
     expect(host).toEqual(["host all all 0.0.0.0/0 reject", "host all all ::/0 reject"]);
@@ -259,21 +271,62 @@ describe("VPS baseline: hardening.sql re-opens CONNECT for every manifest role (
     return grantees;
   }
 
+  /** Every capability role and migration-minted principal hardening.sql must open CONNECT for. */
+  const migrationMinted = new Set(fullManifest.principalProvisioning
+    .filter(({ state }) => state === "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL")
+    .map(({ principalId }) => principalId));
+  const expected = [
+    ...fullManifest.capabilityRoles.map(({ roleName }) => roleName),
+    ...fullManifest.principals
+      .filter(({ id, database }) => database === "debateai" && migrationMinted.has(id))
+      .map(({ roleName }) => roleName)
+  ];
+  /** The numbered migrations, executable SQL only, in name order. */
+  const migrations = readdirSync(resolve(engineRoot, "migrations"))
+    .filter((name) => /^\d{4}_[a-z0-9_]+\.sql$/u.test(name)).sort()
+    .map((name) => ({ name, sql: sqlStatements(read(`migrations/${name}`)) }));
+  /** The first migration whose SQL has a literal CREATE ROLE for `role` (undefined for 0034's format() loop). */
+  const creatingMigration = (role: string): string | undefined =>
+    migrations.find(({ sql }) => new RegExp(`\\bCREATE\\s+ROLE\\s+${role}\\b`, "iu").test(sql))?.name;
+  /**
+   * The roles a migration after the auth DB batch step creates: hardening.sql is re-run on databases that predate
+   * that step (and so the role), so their grant must sit behind an existence check, derived from the creating
+   * migration, never from a role name (Ruling R-17).
+   */
+  const minted = (role: string): boolean => (creatingMigration(role) ?? "") > AUTH_DB_BATCH_MIGRATION;
+  const later = expected.filter(minted);
+  /** What the census refuses: a role older than the step not granted unguarded, a later one granted unguarded or not guarded. */
+  function connectCensus(sql: string): string[] {
+    const unguarded = connectGrantees(unguardedSql(sql));
+    const guarded = new Map(guardedBlocks(sql).map(({ role, body }) => [role, body.replace(/\s+/g, " ").trim()] as const));
+    return expected.flatMap((role) => {
+      if (!minted(role)) return unguarded.has(role) ? [] : [`MISSING ${role}`];
+      return [
+        ...(unguarded.has(role) ? [`UNGUARDED ${role}`] : []),
+        ...(guarded.get(role) === `GRANT CONNECT ON DATABASE debateai TO ${role};` ? [] : [`MISSING ${role}`])
+      ];
+    });
+  }
+
   it("grants CONNECT on debateai to every capability role and every migration-minted principal, unconditionally", () => {
     // Unguarded: these roles predate the auth DB batch step, so a missing one must stop the file, not be skipped.
-    const grantees = connectGrantees(unguardedSql(read("deploy/postgres/hardening.sql")));
-    const migrationMinted = new Set(fullManifest.principalProvisioning
-      .filter(({ state }) => state === "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL")
-      .map(({ principalId }) => principalId));
-    const expected = [
-      ...fullManifest.capabilityRoles.map(({ roleName }) => roleName),
-      ...fullManifest.principals
-        .filter(({ id, database }) => database === "debateai" && migrationMinted.has(id))
-        .map(({ roleName }) => roleName)
-    ];
+    const sql = read("deploy/postgres/hardening.sql");
+    const grantees = connectGrantees(unguardedSql(sql));
     expect(expected).toContain("debateai_support");
     expect(expected).toContain("debateai_support_config_operator");
-    expect(expected.filter((role) => !grantees.has(role))).toEqual([]);
+    expect(expected.filter((role) => !grantees.has(role) && !minted(role))).toEqual([]);
+    // A role a later migration creates (row-level security's marker of 0126, the data export's worker of 0115) is
+    // granted only behind its existence check; the census refuses its grant unguarded or missing.
+    expect(later.length).toBeGreaterThan(0);
+    expect(connectCensus(sql)).toEqual([]);
+    const statements = sqlStatements(sql);
+    for (const role of later) {
+      const block = [...statements.matchAll(/DO\s+\$\$[\s\S]*?\$\$;/g)].map(([text]) => text)
+        .find((text) => guardedBlocks(text)[0]?.role === role)!;
+      expect(block, role).toBeDefined();
+      expect(connectCensus(statements.replace(block, `GRANT CONNECT ON DATABASE debateai TO ${role};`)), role).toContain(`UNGUARDED ${role}`);
+      expect(connectCensus(statements.replace(block, "")), role).toContain(`MISSING ${role}`);
+    }
   });
 
   /**
@@ -287,7 +340,8 @@ describe("VPS baseline: hardening.sql re-opens CONNECT for every manifest role (
     expect(connectGrantees(sql).has(READINESS_WRITER)).toBe(true);
     expect(unguardedSql(sql)).not.toContain(READINESS_WRITER);
     const blocks = guardedBlocks(sql);
-    expect(blocks.map(({ role }) => role)).toEqual([READINESS_WRITER]);
+    // Besides the readiness writer: each capability role a migration after the auth DB batch step creates.
+    expect(blocks.map(({ role }) => role)).toEqual([READINESS_WRITER, ...later]);
     for (const { role, body } of blocks) {
       expect(body.replace(/\s+/g, " ").trim()).toBe(`GRANT CONNECT ON DATABASE debateai TO ${role};`);
     }
@@ -814,19 +868,22 @@ describe("VPS baseline: runbook and environment templates", () => {
     expect(env.get("HATCHET_TLS_STRATEGY")).toBe("tls");
     expect(env.get("HATCHET_HOST_PORT")).toBe("127.0.0.1:7077");
     expect(env.get("ACCOUNT_ERASURE_GRACE_MS")).toBe("604800000");
-    // Seven API principals, one URL each (P3-01: api-runtime, content-provision, authorization,
-    // publication-cleanup, erasure, api-support, data-export). SUPPORT_DATABASE_URL was the sixth;
-    // DATA_EXPORT_DATABASE_URL is the seventh. There is no eighth:
-    // MIGRATION_DATABASE_URL is the just-in-time superuser credential and the manifest invariant
-    // NO_LONG_LIVED_SUPERUSER_CREDENTIAL forbids parking it in an EnvironmentFile.
+    // Nine API principals, one URL each (P3-01: api-runtime, content-provision, authorization,
+    // publication-cleanup, erasure, api-support, data-export, api-system, api-authorization-system).
+    // SUPPORT_DATABASE_URL was the sixth; DATA_EXPORT_DATABASE_URL the seventh; row-level security
+    // (SPEC-v4 S2.5, D29) adds the two cross-account system logins as the eighth and ninth. There is
+    // no tenth: MIGRATION_DATABASE_URL is the just-in-time superuser credential and the manifest
+    // invariant NO_LONG_LIVED_SUPERUSER_CREDENTIAL forbids parking it in an EnvironmentFile.
     const urls = [...env.entries()].filter(([key]) => key.endsWith("DATABASE_URL"));
-    expect(urls.length).toBe(7);
+    expect(urls.length).toBe(9);
+    expect(env.get("API_SYSTEM_DATABASE_URL")).toMatch(/^postgresql:\/\/debateai_prod_api_system:/);
+    expect(env.get("API_AUTHORIZATION_SYSTEM_DATABASE_URL")).toMatch(/^postgresql:\/\/debateai_prod_api_authorization_system:/);
     expect(env.has("MIGRATION_DATABASE_URL")).toBe(false);
     const roles = urls.map(([key, url]) => {
       expect(url, key).toMatch(/^postgresql:\/\/debateai_prod_[a-z_]+:<[a-z-]+>@localhost\/debateai\?host=\/var\/run\/postgresql$/);
       return /^postgresql:\/\/([a-z_]+):/.exec(url)?.[1];
     });
-    expect(new Set(roles).size).toBe(7);
+    expect(new Set(roles).size).toBe(9);
     for (const [key] of env) expect(key).not.toMatch(/^DEBATEAI_DEV_|^EVALUATOR_DEV_MENU/);
   });
 

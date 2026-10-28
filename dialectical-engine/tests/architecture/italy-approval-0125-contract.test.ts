@@ -27,8 +27,8 @@ const sha256 = (text: string): string => createHash("sha256").update(text).diges
 const code = (sql: string): string => sql.split("\n").map((line) => line.replace(/--.*$/u, "")).join("\n");
 
 describe("0125: the Italy-specific approval step", () => {
-  it("C-T is appended last to the chain's STEPS, after 0124, with its own loader", () => {
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0124,loadForward0125]");
+  it("C-T is appended to the chain's STEPS after 0124, with its own loader (row-level security's 0126 follows it)", () => {
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0124,loadForward0125,loadForward0126]");
     const loader = read("packages/db/src/migration-forward0125.ts");
     expect(loader).toContain("const NAME='0125_italy_specific_approval.sql';");
     expect(loader).toContain("const VERSION='italy-specific-approval-forward0125-v1';");
@@ -99,7 +99,7 @@ describe("0125: the Italy-specific approval step", () => {
   it("C-R is documented as the fifteenth step, after the settings activation's section", () => {
     const readme = read("migrations/lineage/README.md");
     expect(readme.replace(/\s+/gu, " ")).toContain(
-      "the side-by-side releases (0123, below) the thirteenth and the settings activation (0124, below) the fourteenth, and the Italy-specific approval (0125, below) the fifteenth.");
+      "the side-by-side releases (0123, below) the thirteenth and the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, and row-level security (0126, below) the sixteenth.");
     const heading = "## The Italy-specific approval (0125)";
     const at = readme.indexOf(heading);
     expect(at).toBeGreaterThan(readme.indexOf("## The settings activation (0124)"));
