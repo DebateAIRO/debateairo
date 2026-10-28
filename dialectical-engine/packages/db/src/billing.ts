@@ -1073,12 +1073,12 @@ export class BillingRepository {
     return released.rowCount === 1;
   }
 
-  async insertCancelToken(c: PoolClient, i: Readonly<{
-    tokenSha256: string; subscriptionId: string; issuedAt: Date; expiresAt: Date;
+  async insertCancelToken(c: PoolClient, i: Readonly<{ // ownerRef: the link's owner, the key 0126's row security reads (V-15)
+    tokenSha256: string; subscriptionId: string; issuedAt: Date; expiresAt: Date; ownerRef?: string;
   }>): Promise<void> {
     await c.query(`
-      INSERT INTO billing.cancel_token (token_sha256, subscription_id, issued_at, expires_at) VALUES ($1,$2,$3,$4)
-    `, [i.tokenSha256, i.subscriptionId, i.issuedAt, i.expiresAt]);
+      INSERT INTO billing.cancel_token (token_sha256, subscription_id, issued_at, expires_at, owner_ref) VALUES ($1,$2,$3,$4,$5)
+    `, [i.tokenSha256, i.subscriptionId, i.issuedAt, i.expiresAt, i.ownerRef ?? null]);
   }
 
   /**
@@ -1099,10 +1099,11 @@ export class BillingRepository {
     return Number(result.rows[0]?.issued ?? "0");
   }
 
-  async useCancelToken(c: PoolClient, tokenSha256: string, now: Date): Promise<{ subscriptionId: string } | null> {
-    const row = (await c.query<{ subscription_id: string }>(`
+  /** `ownerRef`: the link's stored owner (V-15; null for a link 0126 found with no subscription event), which V-18 compares. */
+  async useCancelToken(c: PoolClient, tokenSha256: string, now: Date): Promise<{ subscriptionId: string; ownerRef: string | null } | null> {
+    const row = (await c.query<{ subscription_id: string; owner_ref: string | null }>(`
       WITH usable AS (
-        SELECT token.token_sha256, token.subscription_id FROM billing.cancel_token AS token
+        SELECT token.token_sha256, token.subscription_id, token.owner_ref FROM billing.cancel_token AS token
         WHERE token.token_sha256 = $1 AND token.expires_at > $2
       ), used AS (
         INSERT INTO billing.cancel_token_use (token_sha256, used_at)
@@ -1110,9 +1111,9 @@ export class BillingRepository {
         ON CONFLICT (token_sha256) DO NOTHING
         RETURNING token_sha256
       )
-      SELECT usable.subscription_id FROM usable JOIN used ON used.token_sha256 = usable.token_sha256
+      SELECT usable.subscription_id, usable.owner_ref FROM usable JOIN used ON used.token_sha256 = usable.token_sha256
     `, [tokenSha256, now])).rows[0];
-    return row === undefined ? null : Object.freeze({ subscriptionId: row.subscription_id });
+    return row === undefined ? null : Object.freeze({ subscriptionId: row.subscription_id, ownerRef: row.owner_ref });
   }
 
   /**

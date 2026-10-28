@@ -19,6 +19,8 @@ function deferred<T>() {
 }
 
 const DEV_RELEASE_KEY = ["r424242", "000000000000"].join("-");
+// Row-level security S01 (PLAN S2.4, SPEC X1): the dev runner's own login, read from the credential file.
+const RUNNER_DATABASE_URL = "postgresql://runner:opaque-runner@127.0.0.1:55432/debateai";
 
 function apiEnvironment(): Readonly<Record<string, string>> {
   return Object.freeze({
@@ -48,6 +50,7 @@ function operations(input: Readonly<{
   exitFirst?: boolean;
   startError?: Error;
   apiEnvironment?: Readonly<Record<string, string>>;
+  runnerDatabaseUrl?: string;
 }> = {}): DevelopmentRunnerProcessOperations & Readonly<{
   terminate: ReturnType<typeof vi.fn>;
   environment: Readonly<Record<string, string>>[];
@@ -67,6 +70,7 @@ function operations(input: Readonly<{
     terminate,
     environment,
     loadApiEnvironment: vi.fn(async () => input.apiEnvironment ?? apiEnvironment()),
+    loadRunnerDatabaseUrl: vi.fn(async () => input.runnerDatabaseUrl ?? RUNNER_DATABASE_URL),
     startRunner: vi.fn((values) => {
       if (input.startError !== undefined) throw input.startError;
       environment.push(values);
@@ -147,6 +151,23 @@ describe("development runner process lifecycle", () => {
     expect(runtime.terminate).not.toHaveBeenCalled();
   });
 
+  it("S2.4-b the dev runner's DATABASE_URL is RUNNER_DATABASE_URL, never the API's DATABASE_URL", async () => {
+    const runtime = operations();
+    const runner = await startDevelopmentRunnerProcess({
+      repositoryRoot: "/workspace", commandEnvironment: { DATABASE_URL: "postgresql://ambient@127.0.0.1/x" }, operations: runtime
+    });
+    expect(runtime.loadRunnerDatabaseUrl).toHaveBeenCalledWith("/workspace");
+    expect(runtime.environment[0]?.DATABASE_URL).toBe(RUNNER_DATABASE_URL);
+    expect(runtime.environment[0]?.DATABASE_URL).not.toBe(apiEnvironment().DATABASE_URL);
+    await runner.stop();
+    // A credential file that hands the runner the API's own login is refused before spawning.
+    const shared = operations({ runnerDatabaseUrl: apiEnvironment().DATABASE_URL! });
+    await expect(startDevelopmentRunnerProcess({
+      repositoryRoot: "/workspace", commandEnvironment: {}, operations: shared
+    })).rejects.toThrow("DEV_RUNNER_PROCESS_ENVIRONMENT_INVALID");
+    expect(shared.environment).toEqual([]);
+  });
+
   it("refuses a dropped deployment receipt before spawning", async () => {
     const { REGISTER_DEPLOYMENT_RECEIPT_SHA256: _dropped, ...withoutReceipt } = apiEnvironment();
     const runtime = operations({ apiEnvironment: withoutReceipt });
@@ -221,8 +242,10 @@ describe("development runner process lifecycle", () => {
     });
     const forwarded = runtime.environment[0]!;
     const api = apiEnvironment();
+    // Row-level security S01 (Ruling R-12 F-C2-3; SPEC-v4 X1): DATABASE_URL is the one value the runner reads on its own
+    // login (RUNNER_DATABASE_URL), never the API's, so this sweep skips it and S2.4-b pins it.
     for (const key of [
-      "KEK_PATH", "DATABASE_URL", "REGISTER_VERSION", "RELEASE_KEY", "REGISTER_DEPLOYMENT_RECEIPT_SHA256",
+      "KEK_PATH", "REGISTER_VERSION", "RELEASE_KEY", "REGISTER_DEPLOYMENT_RECEIPT_SHA256",
       "REGISTER_DEPLOYMENT_RECEIPT_FILE", "CONTENT_ENCRYPTION_ENABLED", "USER_DEK_STORE_PATH",
       "PROVIDER_DISCOVERY_TARGETS_JSON", "PROVIDER_PROBE_TIMEOUT_MS",
       "HATCHET_CLIENT_TOKEN", "HATCHET_HOST_PORT", "HATCHET_API_URL", "HATCHET_TENANT_ID",

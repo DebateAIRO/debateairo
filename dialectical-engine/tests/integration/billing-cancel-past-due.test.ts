@@ -100,11 +100,12 @@ describe("P12b a cancel while PAST_DUE ends the plan and every retry", () => {
   it("ends a PAST_DUE plan through the emailed link exactly as through Settings (P13)", async () => {
     const { paid, failedAt } = await pastDue(testHttpIdentity("p13-past-due").authenticated.ownerRef);
     h.clock.now = new Date(failedAt.getTime() + 60 * MINUTE);
-    // The link's token as M9 would carry it; only its hash is stored (P1b's insertCancelToken).
+    // The link's token as M9 would carry it; only its hash is stored (P1b's insertCancelToken), under the owner M9 issues
+    // it to (V-15; V-18: a link with no owner is no link of this plan).
     const token = randomBytes(32).toString("base64url");
     await h.repository.withTransaction((client) => h.repository.insertCancelToken(client, {
       tokenSha256: cancelTokenSha256(token), subscriptionId: paid.subscriptionId,
-      issuedAt: h.clock.now, expiresAt: new Date(h.clock.now.getTime() + DAY)
+      issuedAt: h.clock.now, expiresAt: new Date(h.clock.now.getTime() + DAY), ownerRef: paid.ownerRef
     }));
     const links = new CancelLinkService({
       billing: h.repository, jobs: h.jobs, entitlements: h.entitlements,

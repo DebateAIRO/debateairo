@@ -18,10 +18,12 @@ import { requireTurnstileProof, TurnstileGateError, type TurnstileVerifier } fro
 import { AccountProfileError, type AccountProfileService } from "./account-profile.js";
 import { RecoveryEmailError, type RecoveryEmailService } from "./recovery-email.js";
 import type { ProfileSession } from "@debateai/db";
+import { runInRequestScope, setRequestCredential } from "@debateai/db";
 import { normalizeManualPhone } from "./phone-profile.js";
 import { answerForOutcome, type AskQuestionCheck } from "./question-check/ask-gate.js";
 import { resolveSourceMailLocale } from "./mail-locale.js";
 import { exhaustive, type FundingBasis } from "@debateai/kernel";
+import { AsyncResource } from "node:async_hooks";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -983,6 +985,10 @@ const KNOWN_FAILURE_CONSTANTS: readonly string[] = Object.freeze([
   "ACCOUNT_NOT_ACTIVE",
   "ACCOUNT_RECOVERY_BINDING_IMMUTABLE",
   "ADDON_GRADING_LINEAGE_UNRESOLVED",
+  "API_AUTHORIZATION_SYSTEM_DATABASE_URL_MUST_BE_SEPARATE",
+  "API_AUTHORIZATION_SYSTEM_DATABASE_URL_REQUIRED",
+  "API_SYSTEM_DATABASE_URL_MUST_BE_SEPARATE",
+  "API_SYSTEM_DATABASE_URL_REQUIRED",
   "ARGON2_POOL_CAPACITY_INVALID",
   "ARGON2_POOL_WORKER_COUNT_INVALID",
   "ASK_ADMISSION_DATABASE_POOLS_MUST_BE_SEPARATE",
@@ -2208,6 +2214,9 @@ function exactCsrfPair(header: unknown, cookie: string | null): string | null {
 }
 
 function sessionCookie(value: string, maxAgeSeconds: number): string {
+  // Row-level security S01 (PLAN S4.2, DECISIONS D28): the one place a request issues a session token, so every
+  // statement the request makes from here on carries that session's account context.
+  setRequestCredential(value);
   return `${SESSION_COOKIE_NAME}=${value}; Path=/; Max-Age=${maxAgeSeconds}; HttpOnly; Secure; SameSite=Lax`;
 }
 
@@ -2396,6 +2405,28 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       void reply.status(fault.statusCode).send({ error: fault.code, message: fault.code });
     }
   });
+  /**
+   * Row-level security S01 (PLAN S4.2, DECISIONS D28, D29): every request runs in a request scope of its own, opened
+   * here, by the first hook registered, so each statement it makes on a T1 pool runs on that pool's own login and
+   * carries the account context of its session once the session preHandler below has authenticated it — and never
+   * another request's. A statement made outside every request goes to the pool's system login. preValidation re-enters
+   * the request's scope after the body is parsed (defensive: Fastify 5.12.5 keeps it without, spike 2).
+   */
+  const requestScopes = new WeakMap<object, AsyncResource>();
+  api.addHook("onRequest", (request, _reply, done) => {
+    runInRequestScope(() => {
+      requestScopes.set(request, new AsyncResource("debateai-request-scope"));
+      done();
+    });
+  });
+  api.addHook("preValidation", (request, _reply, done) => {
+    const scope = requestScopes.get(request);
+    if (scope === undefined) {
+      done();
+      return;
+    }
+    scope.runInAsyncScope(done);
+  });
   api.addHook("onRoute", (route) => {
     for (const method of Array.isArray(route.method) ? route.method : [route.method]) {
       const key = canonicalRoute(method, route.url);
@@ -2544,6 +2575,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         if (sessionToken === null || options.sessions === undefined) return;
         const authenticated = await options.sessions.authenticate(sessionToken, sourceFor(request));
         if (authenticated === null) return;
+        setRequestCredential(sessionToken);
         request.authenticatedSession = authenticated;
         request.session = authenticated.session;
         const csrfCookieToken = exactCookie(rawCookie, CSRF_COOKIE_NAME);
@@ -2581,6 +2613,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         );
       }
       if (authenticated === null) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+      setRequestCredential(sessionToken!);
       request.authenticatedSession = authenticated;
       request.session = authenticated.session;
       const csrfCookieToken = exactCookie(rawCookie, CSRF_COOKIE_NAME);

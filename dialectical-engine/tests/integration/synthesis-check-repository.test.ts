@@ -7,6 +7,7 @@ import { WorkItemRepository } from "@debateai/battery";
 import { FileRunContentKeyStore } from "@debateai/crypto";
 import type { SynthesisCheckOutcome } from "@debateai/contract";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
 import { persistTerminalAnswer, persistTerminalRun } from "../support/settledRun.js";
 import {
   createEncryptedStoryRun, provisionStoryEncryptedOwner, releaseStoryEncryptedOwner,
@@ -19,9 +20,11 @@ const flagged = { verdict: "FLAGGED", categories: ["SUICIDE_OR_HARM_TO_OTHERS"] 
 const unavailable = { verdict: "UNAVAILABLE", categories: [], failureCode: "TRANSPORT_FAILED" } as const;
 
 let database: TestDatabase;
+let logins: RlsLogins | undefined;
 let runtime: Pool;
 /** The answer list as the API's login reads it: debateai_billing_runtime, which 0123 (side-by-side releases) grants
- * core.run_supersession, a table the list reads since that merge. Everything else here stays on debateai_runtime. */
+ * core.run_supersession, a table the list reads since that merge. Since row security (S01) both pools are the API's
+ * system login, which holds that role and sees every account. */
 let apiPool: Pool;
 let owner: StoryEncryptedOwner;
 let repository: SynthesisCheckRepository;
@@ -30,13 +33,12 @@ beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
   owner = await provisionStoryEncryptedOwner(database.pool);
-  const url = new URL(database.connectionString);
-  url.searchParams.set("options", "-c role=debateai_runtime");
-  runtime = createPool(url.toString());
+  // Row-level security S01: bare debateai_runtime carries no account context, so it now sees no account's rows. These
+  // statements run where the API runs every statement outside a request: its system login (tests/support/rls-logins.ts).
+  logins = await provisionRlsLogins(database);
+  runtime = createPool(logins.url("API_SYSTEM_DATABASE_URL"));
   configureContentEncryption(runtime, contentCipherFor(database.pool)!);
-  const apiUrl = new URL(database.connectionString);
-  apiUrl.searchParams.set("options", "-c role=debateai_billing_runtime");
-  apiPool = createPool(apiUrl.toString());
+  apiPool = createPool(logins.url("API_SYSTEM_DATABASE_URL"));
   configureContentEncryption(apiPool, contentCipherFor(database.pool)!);
   repository = new SynthesisCheckRepository(runtime);
 }, 180_000);
@@ -44,6 +46,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await runtime?.end();
   await apiPool?.end();
+  await logins?.end();
   await database?.stop();
   if (owner !== undefined) await releaseStoryEncryptedOwner(owner);
 });
@@ -115,7 +118,7 @@ describe("synthesis check repository under debateai_runtime", () => {
 
   it("claims each request once: two claimers running at once insert one attempt per request", async () => {
     expect((await runtime.query<{ current_user: string }>("SELECT current_user")).rows[0]?.current_user)
-      .toBe("debateai_runtime");
+      .toBe("debateai_dev_api_system"); // row-level security S01: the API's system login, holding debateai_runtime
     const first = await fixture();
     const second = await fixture();
     expect(await repository.insertRequest(first)).toBe("INSERTED");

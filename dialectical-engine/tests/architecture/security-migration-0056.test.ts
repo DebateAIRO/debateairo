@@ -2,6 +2,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "@debateai/db";
 import type { PoolClient } from "pg";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { createSystemTwin } from "../support/rls-logins.js";
+
+/** The runner's login shape since row-level security (D29): debateai_runtime and the cross-account marker. */
+const RUNNER_TWIN = "sec0056_runner_twin";
 
 // B22 of the 2026-09-01 security-hardening mission pins
 // migrations/0056_security_truncate_definer_searchpath.sql on real PostgreSQL:
@@ -248,6 +252,7 @@ async function executeMap(signature: string, granted: readonly string[]): Promis
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
+  await createSystemTwin(database, RUNNER_TWIN, ["debateai_runtime"]);
 }, 120_000);
 
 afterAll(async () => database?.stop());
@@ -390,6 +395,10 @@ describe("0056 search_path pins (L5-F10)", () => {
         ) VALUES ($1,$2,'unknown',$3,$4,$5,$6,$7,'complete','active','continue','REASONING',NULL,NULL,false,ledger.allocate_sequence())
         RETURNING node_id
       `;
+      // Row-level security (0126, D29): the bare runtime role with no account context may not write a run's node; the
+      // runner writes it on its own login (debateai_runtime and the cross-account marker), as below.
+      expect(sqlState(await failureOf(client, insertNode, [runId, "root", null, null, 0, 0, "0"]))).toBe("42501");
+      await client.query(`SET LOCAL ROLE ${RUNNER_TWIN}`);
       const root = await client.query<{ node_id: string }>(insertNode, [runId, "root", null, null, 0, 0, "0"]);
       const rootId = root.rows[0]!.node_id;
       const inconsistentChild = await failureOf(client, insertNode, [runId, "child", rootId, "support", 5, 1, "0/1"]);

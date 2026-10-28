@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "@debateai/db";
 import { PostgresModelSpendStore } from "../../packages/budget/src/model-spend.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
 
 let database: TestDatabase;
 const query = (sql: string, args: unknown[] = []) => database.pool.query(sql,args);
@@ -35,11 +36,11 @@ async function secondVersion(run: Run): Promise<void> {
     [run.answerId,run.runId,run.workId,run.bundleId]);
 }
 
-async function withRuntime<T>(use: (client: PoolClient) => Promise<T>): Promise<T> {
+async function withRuntime<T>(use: (client: PoolClient) => Promise<T>, role = "debateai_runtime"): Promise<T> {
   const client = await database.pool.connect();
   try {
     await client.query("BEGIN");
-    await client.query("SET LOCAL ROLE debateai_runtime");
+    await client.query(`SET LOCAL ROLE ${role}`);
     return await use(client);
   } finally {
     await client.query("ROLLBACK").catch(() => undefined);
@@ -69,11 +70,13 @@ async function insertResult(run: Run, attemptId: string, options: { final?: bool
   return resultId;
 }
 
+let logins: RlsLogins | undefined;
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
+  logins = await provisionRlsLogins(database);
 }, 600_000);
-afterAll(async () => { await database?.stop(); });
+afterAll(async () => { await logins?.end(); await database?.stop(); });
 
 describe("0126 synthesis check records and runtime boundaries", () => {
   it("the result writer refuses an attempt whose answer version differs from its parameters", async () => {
@@ -120,6 +123,9 @@ describe("0126 synthesis check records and runtime boundaries", () => {
 
   it("the runtime role inserts and selects a request and an attempt, and stores a sealed result only through the writer", async () => {
     const run = await seedRun();
+    // Row-level security S01: the seeded run has no account, and bare debateai_runtime with no account context sees no
+    // answer to check the request against; the API writes these as the owner's request or on its system login, whose
+    // capability role holds debateai_runtime's grants.
     await withRuntime(async (client) => {
       const requestId = randomUUID(), attemptId = randomUUID(), resultId = randomUUID();
       await client.query("INSERT INTO serve.synthesis_check_request(request_id,run_id,answer_id,answer_version) VALUES($1,$2,$3,1)",
@@ -137,7 +143,7 @@ describe("0126 synthesis check records and runtime boundaries", () => {
       ] as const) {
         expect((await client.query(`SELECT ${key} FROM serve.${table} WHERE ${key}=$1`, [id])).rows).toHaveLength(1);
       }
-    });
+    }, "debateai_dev_api_system");
   });
 
   it("the runtime role cannot insert a result row directly, so it cannot forge a second final past the writer's origin guard (REV-S01-p3 security N1)", async () => {

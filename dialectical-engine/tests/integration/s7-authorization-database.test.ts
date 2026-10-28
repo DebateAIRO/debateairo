@@ -1,5 +1,5 @@
 import { readFile, readdir } from "node:fs/promises";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   CSRF_COOKIE_NAME,
@@ -20,6 +20,7 @@ import {
   MemoryRunContentKeyStore,
   appendAuditEvent,
   generateDek,
+  hashToken,
   type ReadableUserDekStore
 } from "../../packages/crypto/src/index.js";
 import { persistTerminalRun } from "../support/settledRun.js";
@@ -27,6 +28,7 @@ import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import {
   createTestAskAdmissionPoolFacades,startTestDatabase,type TestDatabase
 } from "../support/testDatabase.js";
+import { apiTestPools, provisionRlsLogins, type ApiTestPools, type RlsLogins } from "../support/rls-logins.js";
 import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const ORIGIN = "https://ui.s7.test";
@@ -55,6 +57,9 @@ interface RunFixture {
 
 let database: TestDatabase;
 let api: ReturnType<typeof buildApi>;
+let pools: ApiTestPools;
+/** The dev logins apiTestPools provisioned (login mode only), ended after the suite. */
+let apiLogins: RlsLogins | undefined;
 let owner: IdentityFixture;
 let foreign: IdentityFixture;
 let owned: RunFixture;
@@ -110,19 +115,21 @@ async function createIdentity(label: string, token: string, csrf: string): Promi
   const session = serverSession(ownerRef);
   userIdsByOwnerRef.set(ownerRef, userId);
   await users.store(userId, generateDek());
+  // Row-level security S01 (PLAN S5.2 (2), DECISIONS D55): the rows hold hashToken("session"/"csrf", …), the hashes the
+  // database's rls.* functions compute from the credential a request carries, so this session is live to the database.
+  const tokenHash = hashToken("session", token), csrfTokenHash = hashToken("csrf", csrf);
   await database.pool.query(
     `INSERT INTO identity.session(
        session_id,user_id,token_hash,csrf_token_hash,binding_context,
        created_at,last_seen_at,idle_expires_at,absolute_expires_at,last_mfa_at
      ) VALUES ($1,$2,$3,$4,'{}'::jsonb,now(),now(),now()+interval '1 hour',
        now()+interval '2 hours',now())`,
-    [session.session_id,userId,`sha256:${createHash("sha256").update(token).digest("hex")}`,
-      `sha256:${createHash("sha256").update(csrf).digest("hex")}`]
+    [session.session_id,userId,tokenHash,csrfTokenHash]
   );
   return Object.freeze({
     userId, ownerRef, auditToken, pseudonym, email, blindHex: blind.toString("hex"), csrf,
     auth: Object.freeze({
-      session, userId, ownerRef, tokenHash: `sha256:${createHash("sha256").update(token).digest("hex")}`, csrfTokenHash: `sha256:${createHash("sha256").update(csrf).digest("hex")}`, authKind: "cookie"
+      session, userId, ownerRef, tokenHash, csrfTokenHash, authKind: "cookie"
     })
   });
 }
@@ -295,6 +302,13 @@ beforeAll(async () => {
     }
   ));
   configureContentEncryption(database.pool, contentCipher);
+  // Row-level security S01, R21 (PLAN S5.2): the API's pools as apps/api/src/main.ts builds them. In login mode the
+  // runtime pool is a login pool of its own and carries the same content cipher; in superuser mode it is database.pool.
+  pools = await apiTestPools(database, import.meta.url);
+  if (pools.runtime !== database.pool) {
+    apiLogins = await provisionRlsLogins(database);
+    configureContentEncryption(pools.runtime, contentCipher);
+  }
   owner = await createIdentity("owner", OWNER_TOKEN, OWNER_CSRF);
   foreign = await createIdentity("foreign", FOREIGN_TOKEN, FOREIGN_CSRF);
   owned = await createOwnedTerminalRun(owner, "owned");
@@ -336,7 +350,8 @@ beforeAll(async () => {
     [OWNER_TOKEN, owner.auth],
     [FOREIGN_TOKEN, foreign.auth]
   ]);
-  const currentSessions = new PostgresSessionRepository(database.pool,{} as never);
+  // main.ts builds PostgresSessionRepository on authorizationPool.
+  const currentSessions = new PostgresSessionRepository(pools.authorization,{} as never);
   const sessions = {
     assertCurrent: async (session:AuthenticatedSession,signal?:AbortSignal) => {
       if (![...sessionsByToken.values()].some(current => current.userId===session.userId
@@ -347,10 +362,14 @@ beforeAll(async () => {
     verifyCsrf: (authenticated: AuthenticatedSession, supplied: string) =>
       supplied === (authenticated.userId === owner.userId ? OWNER_CSRF : FOREIGN_CSRF)
   } as unknown as SessionApplication;
+  // In superuser mode every field is database.pool, so the admission pools are its facades, as before this slice.
+  const admission = pools.serverAskAdmission === pools.legacyAskAdmission
+    ? createTestAskAdmissionPoolFacades(pools.serverAskAdmission)
+    : { server: pools.serverAskAdmission, legacy: pools.legacyAskAdmission };
   api = buildApi({
     application:new PostgresAskApplication(
-      database.pool,{} as never,{ releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never,undefined,database.pool,
-      createTestAskAdmissionPoolFacades(database.pool)
+      pools.runtime,{} as never,{ releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never,undefined,pools.contentProvision,
+      admission
     ),
     sessions,
     allowedOrigin: ORIGIN
@@ -359,6 +378,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await api?.close();
+  await apiLogins?.end();
   await database?.stop();
 });
 
@@ -726,6 +746,68 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
     expect((await api.inject({ method: "GET", url: `/v1/runs/${owned.runId}/answer`, headers: ownerHeaders })).statusCode).toBe(200);
     await paired(`/v1/runs/${foreignRun.runId}/answer`, `/v1/runs/${absentRunId}/answer`, { error: "ANSWER_NOT_SERVED" });
     const openRunId = await createOwnedRunHead(owner, "open-no-answer");
+    expect((await api.inject({ method: "GET", url: `/v1/runs/${openRunId}`, headers: ownerHeaders })).statusCode).toBe(200);
+    const noServedAnswer = await api.inject({ method: "GET", url: `/v1/runs/${openRunId}/answer`, headers: ownerHeaders });
+    expect(noServedAnswer.statusCode).toBe(404);
+    expect(noServedAnswer.json()).toEqual({ error: "ANSWER_NOT_SERVED" });
+  }, 60_000);
+
+  // Row-level security S01, PRD-N1 (t_f667b6ff): under the real logins the ten-route test above stops at its owner gap
+  // write (V-13: no API login holds INSERT on core.investigation_request nor UPDATE on memory.memory_link, so the
+  // owner's writes answer 500), and the routes after it went unmeasured there. V-13 keeps that test as it is; this one
+  // pins those routes again, foreign-valid against absent plus the owner's reads, with none of the owner writes, so it
+  // runs in both modes.
+  it("keeps memory-link unlink and the run, events and answer routes indistinguishable for foreign-valid and absent resources, without the owner writes V-13 lists", async () => {
+    const absentRunId = randomUUID();
+    const absentAnswerId = randomUUID();
+    const ownerHeaders = cookieHeaders(owner);
+    const ownerMutationHeaders = cookieHeaders(owner, true);
+    const paired = async (foreignUrl: string, absentUrl: string, expectedBody: unknown) => {
+      const [foreignResponse, absentResponse] = await Promise.all([
+        api.inject({ method: "GET", url: foreignUrl, headers: ownerHeaders }),
+        api.inject({ method: "GET", url: absentUrl, headers: ownerHeaders })
+      ]);
+      expect(foreignResponse.statusCode).toBe(404);
+      expect(absentResponse.statusCode).toBe(404);
+      expect(foreignResponse.json()).toEqual(expectedBody);
+      expect(absentResponse.json()).toEqual(expectedBody);
+      expect(foreignResponse.body).toBe(absentResponse.body);
+      return foreignResponse;
+    };
+
+    const unlinkCount = async () => Number((await database.pool.query<{ count: string }>(
+      "SELECT count(*) FROM memory.memory_link_event"
+    )).rows[0]!.count);
+    const beforeUnlinks = await unlinkCount();
+    const foreignLinkEventsBefore = Number((await database.pool.query<{ count: string }>(
+      `SELECT count(*) FROM memory.memory_link_event WHERE memory_link_id=$1`, [foreignMemoryLinkId]
+    )).rows[0]!.count);
+    expect(foreignLinkEventsBefore).toBeGreaterThan(0);
+    const [foreignUnlink, absentUnlink] = await Promise.all([
+      api.inject({ method: "POST", url: `/v1/answers/${foreignRun.answerId}/memory-link/unlink`, headers: ownerMutationHeaders }),
+      api.inject({ method: "POST", url: `/v1/answers/${absentAnswerId}/memory-link/unlink`, headers: ownerMutationHeaders })
+    ]);
+    expect(foreignUnlink.statusCode).toBe(404);
+    expect(absentUnlink.statusCode).toBe(404);
+    expect(foreignUnlink.body).toBe(absentUnlink.body);
+    expect(await unlinkCount()).toBe(beforeUnlinks);
+    expect(Number((await database.pool.query<{ count: string }>(
+      `SELECT count(*) FROM memory.memory_link_event WHERE memory_link_id=$1`, [foreignMemoryLinkId]
+    )).rows[0]!.count)).toBe(foreignLinkEventsBefore);
+
+    expect((await api.inject({ method: "GET", url: `/v1/runs/${owned.runId}`, headers: ownerHeaders })).statusCode).toBe(200);
+    await paired(`/v1/runs/${foreignRun.runId}`, `/v1/runs/${absentRunId}`, { error: "RUN_NOT_FOUND" });
+
+    const ownedEvents = await api.inject({ method: "GET", url: `/v1/runs/${owned.runId}/events`, headers: ownerHeaders });
+    expect(ownedEvents.statusCode).toBe(200);
+    expect(ownedEvents.headers["content-type"]).toContain("text/event-stream");
+    expect(ownedEvents.body).toContain("event: run.terminal");
+    const deniedEvents = await paired(`/v1/runs/${foreignRun.runId}/events`, `/v1/runs/${absentRunId}/events`, { error: "RUN_NOT_FOUND" });
+    expect(deniedEvents.headers["content-type"]).not.toContain("text/event-stream");
+
+    expect((await api.inject({ method: "GET", url: `/v1/runs/${owned.runId}/answer`, headers: ownerHeaders })).statusCode).toBe(200);
+    await paired(`/v1/runs/${foreignRun.runId}/answer`, `/v1/runs/${absentRunId}/answer`, { error: "ANSWER_NOT_SERVED" });
+    const openRunId = await createOwnedRunHead(owner, "open-no-answer-prd-n1");
     expect((await api.inject({ method: "GET", url: `/v1/runs/${openRunId}`, headers: ownerHeaders })).statusCode).toBe(200);
     const noServedAnswer = await api.inject({ method: "GET", url: `/v1/runs/${openRunId}/answer`, headers: ownerHeaders });
     expect(noServedAnswer.statusCode).toBe(404);

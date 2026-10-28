@@ -39,8 +39,11 @@ import {
   registerFixtureRow
 } from "../support/registerFixtures.js";
 import { testReleaseKey } from "../support/releaseKey.js";
+import { createSystemTwin } from "../support/rls-logins.js";
 
 let database: TestDatabase;
+/** Row-level security (0126, D29): the runner's login is debateai_runtime and the cross-account marker. */
+const RUNNER_TWIN = "evaluator_database_runner_twin";
 
 const APPROVED_STARTER_DOMAINS = [
   "Agriculture & Food",
@@ -74,6 +77,7 @@ const APPROVED_STARTER_DOMAINS = [
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
+  await createSystemTwin(database, RUNNER_TWIN, ["debateai_runtime"]);
 }, 120_000);
 
 afterAll(async () => {
@@ -893,7 +897,21 @@ describe("evaluator tag attempts stay outside the product run boundary", () => {
         "SELECT ledger.allocate_sequence()::text AS sequence"
       )).rows[0]!.sequence);
 
+      // The bare runtime role with no account context may write no ledger row of any run (row-level security, 0126).
       await direct.query("SET ROLE debateai_runtime");
+      await expect(direct.query(`
+        INSERT INTO ledger.ledger_entry (
+          sequence,run_id,attempt_id,action_kind,call_site_key,subject_item_id,
+          stance_at_action,outcome,actor_ref,input_hash,contract_hash,
+          raw_artifact_ref,started_at,finished_at
+        ) VALUES ($1,$2,$3,'MODEL_CALL','product:rls-bare',$4,
+          'UNASSIGNED','OK','provider:product',repeat('a',64),repeat('b',64),NULL,now(),now())
+      `, [await nextSequence(), runA, randomUUID(), "product:rls-bare"]))
+        .rejects.toThrow('new row violates row-level security policy for table "ledger_entry"');
+      await direct.query("RESET ROLE");
+
+      // The runner's login (RUNNER_TWIN), which row-level security lets write any run's rows, is refused by scope.
+      await direct.query(`SET ROLE ${RUNNER_TWIN}`);
       const runtimeSequence = await nextSequence();
       await expect(direct.query(`
         INSERT INTO ledger.ledger_entry (

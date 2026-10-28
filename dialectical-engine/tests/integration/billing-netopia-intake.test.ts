@@ -10,7 +10,7 @@ import type { PoolClient } from "pg";
 import { buildApi } from "@debateai/api";
 import { openRecord } from "@debateai/crypto";
 import { foldSubscription } from "@debateai/billing-core";
-import { BillingJobQueries, BillingRepository, migrate } from "@debateai/db";
+import { BillingJobQueries, BillingRepository, crossAccountPool, migrate, type Pool } from "@debateai/db";
 import type { AdmissionLimiter } from "../../apps/api/src/admission.js";
 import { writeCardSaved } from "../../apps/api/src/billing/card-adoption.js";
 import { NETOPIA_NOTIFY_PATH } from "../../apps/api/src/billing/index.js";
@@ -27,6 +27,7 @@ import { signedNetopiaNotice, testNetopiaKeys } from "../support/netopia-notice.
 import { netopiaVerifyHandler, verifyJob } from "../support/netopia-verify.js";
 import { StubCardPayments, stubPaymentReport } from "../support/stub-card-payments.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { apiTestPools, provisionRlsLogins, type ApiTestPools } from "../support/rls-logins.js";
 
 const POS = ["NT9A", "B2C3", "D4E5", "F6G7", "H8J9"].join("-");
 const TOKEN = ["tok", "n9", "4f1c2b"].join("-");
@@ -37,15 +38,23 @@ const WRONG_KEYS = testNetopiaKeys();
 const hour = (offset: number): Date => new Date(Date.UTC(2026, 9, 6, 10 + offset));
 
 let database: TestDatabase;
+let pools: ApiTestPools | undefined;
+/** The billing runtime's pool as main.ts builds it: `crossAccountPool(pool, "X11")` (R21, PLAN S5.3). */
+let billingPool: Pool;
 let repository: BillingRepository;
 let jobs: BillingJobQueries;
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
-  repository = new BillingRepository(database.pool);
-  jobs = new BillingJobQueries(database.pool);
+  pools = await apiTestPools(database, import.meta.url);
+  billingPool = crossAccountPool(pools.runtime, "X11");
+  repository = new BillingRepository(billingPool);
+  jobs = new BillingJobQueries(billingPool);
 }, 120_000);
-afterAll(async () => database?.stop());
+afterAll(async () => {
+  if (database !== undefined && pools !== undefined && pools.runtime !== database.pool) await (await provisionRlsLogins(database)).end();
+  await database?.stop();
+});
 
 function body(orderId: string, payment: Readonly<Record<string, unknown>> = {}): object {
   return {
@@ -528,7 +537,7 @@ describe("F7 the sandbox clock offset (final review money-3)", () => {
     expect(token!.source_paid_at).toEqual(new Date(checkPaidReal.getTime() + offsetMs));
     // VERIFY_PAYMENT decides the check from NETOPIA's status through the same time-shifted port: the card is adopted.
     stub.scriptStatus(checkId, stubPaymentReport(checkId, "AUTHORIZED", { amountMicros: 0, occurredAt: checkPaidReal }));
-    const { verify } = netopiaVerifyHandler(database.pool, { payments: shifted, clock: () => stageNow });
+    const { verify } = netopiaVerifyHandler(billingPool, { payments: shifted, clock: () => stageNow });
     expect(await verify.handle(verifyJob(checkId, stageNow), stageNow)).toEqual({ kind: "DONE" });
     const state = foldSubscription(await repository.subscriptionEvents(seeded.subscriptionId));
     expect(state.cardTokenId).toBe(token!.token_id);
@@ -576,13 +585,13 @@ describe("N9 the quarantine in keyset pages (ruling PR-30)", () => {
       }
     });
     const page = (after: { receivedAt: Date; quarantineId: string } | null) =>
-      repository.quarantineSince(database.pool, at, { after, limit: 2 });
+      repository.quarantineSince(billingPool, at, { after, limit: 2 });
     const first = await page(null);
     expect(first.map((row) => row.quarantineId)).toEqual(ids.slice(0, 2));
     const second = await page({ receivedAt: first[1]!.receivedAt, quarantineId: first[1]!.quarantineId });
     expect(second.map((row) => row.quarantineId)).toEqual(ids.slice(2, 4));
     const third = await page({ receivedAt: second[1]!.receivedAt, quarantineId: second[1]!.quarantineId });
     expect(third.map((row) => row.quarantineId)).toEqual(ids.slice(4));
-    expect((await repository.quarantineSince(database.pool, at)).map((row) => row.quarantineId)).toEqual(ids);
+    expect((await repository.quarantineSince(billingPool, at)).map((row) => row.quarantineId)).toEqual(ids);
   });
 });

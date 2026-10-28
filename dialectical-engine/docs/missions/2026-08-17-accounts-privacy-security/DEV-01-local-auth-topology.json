@@ -165,7 +165,7 @@
       "id": "debateai_dev_liveness",
       "login": true,
       "attributes": ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
-      "memberships": ["debateai_runtime"],
+      "memberships": ["debateai_runtime", "debateai_rls_all_accounts"],
       "forbiddenMemberships": ["debateai_billing_runtime", "debateai_content_provision", "debateai_erasure_runtime", "debateai_authorization_runtime", "debateai_publication_cleanup", "debateai_replay", "debateai_settlement_watch", "pg_*"],
       "owns": [],
       "purpose": ["LIVENESS_DATABASE_URL"],
@@ -219,6 +219,36 @@
       "forbiddenMemberships": ["debateai_runtime", "debateai_authorization_runtime", "debateai_erasure_runtime", "debateai_support", "pg_*"],
       "owns": [],
       "purpose": ["DATA_EXPORT_DATABASE_URL"],
+      "serviceCredential": true
+    },
+    {
+      "id": "debateai_dev_api_system",
+      "login": true,
+      "attributes": ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
+      "memberships": ["debateai_billing_runtime", "debateai_rls_all_accounts"],
+      "forbiddenMemberships": ["debateai_content_provision", "debateai_erasure_runtime", "pg_*"],
+      "owns": [],
+      "purpose": ["API_SYSTEM_DATABASE_URL", "ROOM_DECISION_POOL"],
+      "serviceCredential": true
+    },
+    {
+      "id": "debateai_dev_authorization_system",
+      "login": true,
+      "attributes": ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
+      "memberships": ["debateai_authorization_runtime", "debateai_rls_all_accounts"],
+      "forbiddenMemberships": ["debateai_content_provision", "debateai_erasure_runtime", "debateai_publication_cleanup", "debateai_replay", "debateai_settlement_watch", "pg_*"],
+      "owns": [],
+      "purpose": ["API_AUTHORIZATION_SYSTEM_DATABASE_URL"],
+      "serviceCredential": true
+    },
+    {
+      "id": "debateai_dev_runner",
+      "login": true,
+      "attributes": ["INHERIT", "NOSUPERUSER", "NOCREATEDB", "NOCREATEROLE", "NOREPLICATION", "NOBYPASSRLS"],
+      "memberships": ["debateai_runtime", "debateai_rls_all_accounts"],
+      "forbiddenMemberships": ["debateai_billing_runtime", "debateai_content_provision", "debateai_erasure_runtime", "debateai_authorization_runtime", "debateai_publication_cleanup", "debateai_replay", "debateai_settlement_watch", "pg_*"],
+      "owns": [],
+      "purpose": ["RUNNER_DATABASE_URL"],
       "serviceCredential": true
     },
     {

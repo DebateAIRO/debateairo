@@ -7,6 +7,7 @@ import { LedgerRepository } from "@debateai/ledger";
 import { MapChoiceRepository, type MapResult } from "@debateai/map";
 import { ServeRepository } from "@debateai/serve";
 import { recordNodeReviewAlone } from "../support/unsafeReviewWrites.js";
+import { createSystemTwin } from "../support/rls-logins.js";
 import { persistTerminalRun } from "../support/settledRun.js";
 import {
   createEncryptedStoryRun,
@@ -30,9 +31,17 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 let database: TestDatabase;
 let owner: StoryEncryptedOwner | undefined;
 
+/**
+ * The runner's own login (row-level security S01): debateai_runtime and the marker role debateai_rls_all_accounts, a
+ * system twin as deploy/postgres/hardening.sql and the dev runner login grant it. The bare debateai_runtime role, with
+ * no account context, sees no node of any run (its own cases below).
+ */
+const RUNNER_TWIN = "reclaim_runner";
+
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
+  await createSystemTwin(database, RUNNER_TWIN, ["debateai_runtime"]);
   owner = await provisionStoryEncryptedOwner(database.pool);
 }, 240_000);
 
@@ -66,12 +75,16 @@ async function heldClaim(runId: string): Promise<RetireClaimFence> {
   return fence;
 }
 
-/** `sql` as debateai_runtime (the role the runner's pool logs in as), in its own transaction. */
-async function asRuntime<T>(sql: string, values: readonly unknown[] = []): Promise<{ rowCount: number; rows: T[] }> {
+/** `sql` as the runner's own login (RUNNER_TWIN: debateai_runtime and the marker role), in its own transaction. */
+const asRuntime = <T>(sql: string, values: readonly unknown[] = []) => asRole<T>(RUNNER_TWIN, sql, values);
+/** `sql` as the bare debateai_runtime role, with no account context, in its own transaction. */
+const asBareRuntime = <T>(sql: string, values: readonly unknown[] = []) => asRole<T>("debateai_runtime", sql, values);
+
+async function asRole<T>(role: string, sql: string, values: readonly unknown[]): Promise<{ rowCount: number; rows: T[] }> {
   const client = await database.pool.connect();
   try {
     await client.query("BEGIN");
-    await client.query("SET LOCAL ROLE debateai_runtime");
+    await client.query(`SET LOCAL ROLE ${role}`);
     const result = await client.query(sql, [...values]);
     await client.query("COMMIT");
     return { rowCount: result.rowCount ?? 0, rows: result.rows as T[] };
@@ -217,6 +230,17 @@ describe("0119: the runtime role may set a node aside, and nothing else", () => 
     await expect(asRuntime(`UPDATE core.node SET generation_status='stale' WHERE node_id=$1`, [second]))
       .rejects.toMatchObject({ code: "55000", message: "PRIVATE_CONTENT_ERASED" });
     expect(await statuses(runId)).toEqual({ [first]: "stale", [second]: "complete" });
+  });
+
+  it("the bare runtime role, with no account context, sees no node and sets none aside (row-level security, 0126)", async () => {
+    const runId = await legacyRun();
+    const nodeId = await oneNode(runId);
+    expect((await asBareRuntime<{ n: number }>(`SELECT count(*)::int AS n FROM core.node WHERE run_id=$1`, [runId])).rows).toEqual([{ n: 0 }]);
+    expect((await asBareRuntime(`UPDATE core.node SET generation_status='stale' WHERE node_id=$1`, [nodeId])).rowCount).toBe(0);
+    expect(await statuses(runId)).toEqual({ [nodeId]: "complete" });
+    // Not vacuous: the runner's own login sets the same node aside.
+    expect((await asRuntime(`UPDATE core.node SET generation_status='stale' WHERE node_id=$1`, [nodeId])).rowCount).toBe(1);
+    expect(await statuses(runId)).toEqual({ [nodeId]: "stale" });
   });
 });
 
@@ -420,6 +444,16 @@ describe("0119: an answer's map root moves only from a stale root to a live node
     expect((await repoint(runId, dead.root, live.root)).rowCount).toBe(1);
     // The old root is in force no more: a second move from it is refused (the primary key, or the trigger).
     await expect(repoint(runId, dead.root, live.child)).rejects.toThrow();
+  });
+
+  it("the bare runtime role, with no account context, sees no map position and writes no re-point (row-level security, 0126)", async () => {
+    const { runId, dead, live } = await mappedRun();
+    await new GraphRepository(database.pool).retireNodes(runId, [live.root, live.child], await heldClaim(runId));
+    await expect(asBareRuntime(`INSERT INTO core.map_position_repoint (run_id, answer_id, from_root_node_id, root_node_id, maker) VALUES ($1,'a1',$2,$3,'maker-1')`,
+      [runId, dead.root, live.root])).rejects.toMatchObject({ code: "23503", message: "MAP_POSITION_REPOINT_NO_POSITION" });
+    expect((await database.pool.query(`SELECT count(*)::int AS n FROM core.map_position_repoint WHERE run_id=$1`, [runId])).rows[0]).toEqual({ n: 0 });
+    // Not vacuous: the runner's own login makes the same move.
+    expect((await repoint(runId, dead.root, live.root)).rowCount).toBe(1);
   });
 
   it("the re-point table is append-only for every role: UPDATE, DELETE and TRUNCATE refused", async () => {

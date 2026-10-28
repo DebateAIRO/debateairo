@@ -48,6 +48,9 @@ describe("dev-only evaluator API", () => {
       DATABASE_URL: "postgresql://runtime:runtime@localhost/debateai",
       SUPPORT_DATABASE_URL: "postgresql://support:fixture@localhost/debateai",
       AUTHORIZATION_DATABASE_URL: "postgresql://authorization:fixture@localhost/debateai",
+      // Row-level security S01 (PLAN S2.5): the API's two system logins.
+      API_SYSTEM_DATABASE_URL: "postgresql://api_system:fixture@localhost/debateai",
+      API_AUTHORIZATION_SYSTEM_DATABASE_URL: "postgresql://authorization_system:fixture@localhost/debateai",
       CONTENT_PROVISION_DATABASE_URL: "postgresql://content:fixture@localhost/debateai",
       ERASURE_DATABASE_URL: "postgresql://erasure:fixture@localhost/debateai",
       ACCOUNT_ERASURE_GRACE_MS: "604800000",

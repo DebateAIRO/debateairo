@@ -13,6 +13,7 @@ import type { SynthesisCheckEntry } from "../../apps/api/src/data-export/types.j
 import { snapshotA } from "../fixtures/data-export/snapshot-a.js";
 import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 import { startTestDatabase, createTestAskAdmissionPoolFacades } from "../support/testDatabase.js";
+import { provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
 import { createEncryptedStoryRun, provisionStoryEncryptedOwner, releaseStoryEncryptedOwner } from "../support/storyEncryptedOwner.js";
 import { persistTerminalRun } from "../support/settledRun.js";
 
@@ -64,13 +65,14 @@ describe("synthesis checks in the owner's data export", () => {
   it("the export of an owner with one FLAGGED and one CLEAR version lists both: verdict, category codes and checked_at in the JSON", async () => {
     const db = await startTestDatabase();
     let runtime: ReturnType<typeof createPool> | undefined;
+    let logins: RlsLogins | undefined;
     let owner: Awaited<ReturnType<typeof provisionStoryEncryptedOwner>> | undefined;
     try {
       await migrate(db.pool);
       owner = await provisionStoryEncryptedOwner(db.pool);
-      const url = new URL(db.connectionString);
-      url.searchParams.set("options", "-c role=debateai_runtime");
-      runtime = createPool(url.toString());
+      // Row-level security S01: the API's system login, where it runs every statement outside a request.
+      logins = await provisionRlsLogins(db);
+      runtime = createPool(logins.url("API_SYSTEM_DATABASE_URL"));
       configureContentEncryption(runtime, contentCipherFor(db.pool)!);
       const runId = await createEncryptedStoryRun(db.pool, owner, `Export check ${randomUUID()}?`);
       const { answerId } = await persistTerminalRun({
@@ -141,6 +143,7 @@ describe("synthesis checks in the owner's data export", () => {
       ]);
     } finally {
       await runtime?.end();
+      await logins?.end();
       await db.stop();
       if (owner !== undefined) await releaseStoryEncryptedOwner(owner);
     }
@@ -194,13 +197,14 @@ describe("synthesis checks in the owner's data export", () => {
   it("a held debate is listed with no answer", async () => {
     const db = await startTestDatabase();
     let runtime: ReturnType<typeof createPool> | undefined;
+    let logins: RlsLogins | undefined;
     let owner: Awaited<ReturnType<typeof provisionStoryEncryptedOwner>> | undefined;
     try {
       await migrate(db.pool);
       owner = await provisionStoryEncryptedOwner(db.pool);
-      const url = new URL(db.connectionString);
-      url.searchParams.set("options", "-c role=debateai_runtime");
-      runtime = createPool(url.toString());
+      // Row-level security S01: the API's system login, where it runs every statement outside a request.
+      logins = await provisionRlsLogins(db);
+      runtime = createPool(logins.url("API_SYSTEM_DATABASE_URL"));
       configureContentEncryption(runtime, contentCipherFor(db.pool)!);
       const runId = await createEncryptedStoryRun(db.pool, owner, `Held export ${randomUUID()}?`);
       const { answerId } = await persistTerminalRun({
@@ -228,6 +232,7 @@ describe("synthesis checks in the owner's data export", () => {
       expect(h.ownerView.readSynthesisChecks).not.toHaveBeenCalled();
     } finally {
       await runtime?.end();
+      await logins?.end();
       await db.stop();
       if (owner !== undefined) await releaseStoryEncryptedOwner(owner);
     }
