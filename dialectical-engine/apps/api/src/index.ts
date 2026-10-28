@@ -1385,6 +1385,8 @@ export const authorizationPolicyInventory = Object.freeze([
   // same exact-Origin rule as login, so a browser on another site cannot drive them.
   { route: "POST /v1/auth/register", auth: "public", origin: "trusted", resource: "identity", action: "register" },
   { route: "POST /v1/auth/verify-email", auth: "public", origin: "trusted", resource: "identity", action: "verify-email" },
+  // NV-14 Revision 3: the same rule for the route that carries the token holder's password (mounted after S04).
+  { route: "POST /v1/auth/verify-email/password", auth: "public", origin: "trusted", resource: "identity", action: "verify-email" },
   { route: "POST /v1/auth/resend-verification", auth: "public", origin: "trusted", resource: "identity", action: "resend-verification" },
   { route:"POST /v1/auth/recovery/prove",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
   { route:"POST /v1/auth/recovery/enrollment/options",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
@@ -3610,13 +3612,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
-      // NV-14: the token holder's password, bounded as register bounds it; absent from the release before's UI.
-      if (!passwordWithinRequestBound(body) || (body.password !== undefined && typeof body.password !== "string")) {
-        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
-      }
       const response = await options.registration!.verifyEmail({
-        token: typeof body.token === "string" ? body.token : "",
-        ...(typeof body.password === "string" ? { password: body.password } : {})
+        token: typeof body.token === "string" ? body.token : ""
       }, sourceFor(request));
       return reply.send(response);
     });
@@ -3643,6 +3640,26 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       if (meetsMinimumAge(dateOfBirth)) return reply.send({ outcome: "allowed" });
       reply.header("set-cookie", ageRefusalCookie());
       return reply.send({ outcome: "refused" });
+    });
+  }
+  // NV-14 Revision 3: verification with the password the token holder chooses (the new verify page's only call).
+  // Mounted after the registration region (S04), which keeps POST /v1/auth/verify-email as it was at d5c02f8bd: the
+  // password-less route the release before's page calls, so it stays the N-1 fallback.
+  if (registrationMounted) {
+    api.post("/v1/auth/verify-email/password", credentialRoutePolicy("POST /v1/auth/verify-email/password"), async (request, reply) => {
+      const body = typeof request.body === "object" && request.body !== null
+        ? request.body as Record<string, unknown>
+        : {};
+      // Required here, and bounded as register bounds it, before any service work.
+      const password = body.password;
+      if (typeof password !== "string" || !passwordWithinRequestBound(body)) {
+        return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      }
+      const response = await options.registration!.verifyEmail({
+        token: typeof body.token === "string" ? body.token : "",
+        password
+      }, sourceFor(request));
+      return reply.send(response);
     });
   }
   // Paid plans L4: re-acceptance. Mounted after the registration region (S04), whatever the list order.

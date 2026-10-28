@@ -60,6 +60,7 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "POST /v1/auth/age-check", auth: "public", origin: "trusted", resource: "identity", action: "age-check" },
   { route: "POST /v1/auth/register", auth: "public", origin: "trusted", resource: "identity", action: "register" },
   { route: "POST /v1/auth/verify-email", auth: "public", origin: "trusted", resource: "identity", action: "verify-email" },
+  { route: "POST /v1/auth/verify-email/password", auth: "public", origin: "trusted", resource: "identity", action: "verify-email" },
   { route: "POST /v1/auth/resend-verification", auth: "public", origin: "trusted", resource: "identity", action: "resend-verification" },
   { route: "POST /v1/auth/recovery/start", auth: "public", origin: "trusted", resource: "identity", action: "start-recovery" },
   { route: "POST /v1/auth/mfa/totp/begin", auth: "public", origin:"trusted", session:"optional", resource: "identity", action: "begin-totp" },
@@ -337,8 +338,8 @@ describe("S7 deny-by-default authorization", () => {
     // GET /v1/billing/subscription/card, the auth DB batch's four MFA-recovery wait routes, beside dev's 158, and
     // data-export S01's 3 routes.
     // Debate shape P2c adds GET /v1/answers/{id}/map. Side-by-side C5 adds GET /livez and GET /readyz. Side-by-side §13
-    // addition D24 adds GET /v1/public/ai-providers.
-    expect(contractInventory.routes).toHaveLength(170);
+    // addition D24 adds GET /v1/public/ai-providers. NV-14 Revision 3 adds POST /v1/auth/verify-email/password.
+    expect(contractInventory.routes).toHaveLength(171);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 

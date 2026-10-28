@@ -47,7 +47,10 @@ export async function verifyMfaEmail(
   }
 }
 
-/** NV-14: verification with the password the token holder chooses; it replaces any password set at sign-up. */
+/**
+ * NV-14: verification with the password the token holder chooses, on the route that requires it; it replaces any
+ * password set at sign-up.
+ */
 export async function verifyMfaEmailWithPassword(
   token: string,
   password: string,
@@ -55,7 +58,7 @@ export async function verifyMfaEmailWithPassword(
   apiBase: string = API_BASE
 ): Promise<void> {
   const payload = await postMfa(
-    "/v1/auth/verify-email",
+    "/v1/auth/verify-email/password",
     { token, password },
     fetchImplementation,
     apiBase

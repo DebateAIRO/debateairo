@@ -1665,6 +1665,7 @@ export const contractInventory = Object.freeze({
     "POST /v1/auth/age-check",
     "POST /v1/auth/register",
     "POST /v1/auth/verify-email",
+    "POST /v1/auth/verify-email/password",
     "POST /v1/auth/resend-verification",
     "POST /v1/auth/recovery/start",
     "POST /v1/auth/recovery/prove",

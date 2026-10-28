@@ -89,7 +89,8 @@ it.each(['AUTH_INPUT_INVALID', 'MALFORMED_REQUEST'])('shows the policy hint for 
   expect(field()).not.toBeNull();
 });
 
-it.each([['AUTH_TEMPORARILY_UNAVAILABLE', 503], ['AUTH_RATE_LIMITED', 429], ['MFA_REQUEST_FAILED', 503]] as const)('keeps the form with a retry message when verification is unavailable (%s %d)', async (code, status) => {
+// NV-14 Revision 3: NOT_FOUND 404 is an API from before verify-email/password (a switch or a rollback); the link still works.
+it.each([['AUTH_TEMPORARILY_UNAVAILABLE', 503], ['AUTH_RATE_LIMITED', 429], ['MFA_REQUEST_FAILED', 503], ['NOT_FOUND', 404]] as const)('keeps the form with a retry message when verification is unavailable (%s %d)', async (code, status) => {
   state.verifyWithPassword.mockRejectedValueOnce(new MfaEnrollmentHttpError(code, status));
   await render();
   await type('Inbox owner pass 1');

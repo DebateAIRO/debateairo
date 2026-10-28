@@ -8677,6 +8677,38 @@ describe("NV-14 verification sets the token holder's password", () => {
       .resolves.toMatchObject({ status: "mfa_required" });
   }, 120_000);
 
+  // NV-14 Revision 3: the end-to-end witness that the route the verify page posts to reaches the password-setting
+  // consume. A request without a password, or with one the policy refuses, consumes nothing.
+  it("sets the inbox owner's password through POST /v1/auth/verify-email/password and refuses a request without one", async () => {
+    const flow = buildService({ legalAcceptance: true, initialNow: new Date() });
+    const email = `victim-http-${randomUUID()}@example.test`;
+    const registered = await registerAccount(flow.service, "nv14-http-registrant", { email, password: "Registrant pass 1" });
+    const token = (flow.mail as MemoryMailSender).messages[0]!.token;
+    const api = buildApi({ allowedOrigin: enrollmentOrigin, application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
+    const headers = { origin: enrollmentOrigin, "user-agent": "nv14-r3-http" };
+    const verify = (payload: Record<string, unknown>) => api.inject({
+      method: "POST", url: "/v1/auth/verify-email/password", headers, payload
+    });
+    try {
+      const missing = await verify({ token });
+      expect(missing.statusCode).toBe(400);
+      expect(missing.json()).toEqual({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      const refused = await verify({ token, password: "seven77" });
+      expect(refused.statusCode).toBe(400);
+      expect(refused.json()).toMatchObject({ error: "AUTH_INPUT_INVALID" });
+      expect(await accountState(registered.user.user_id)).toBe("pending_verification");
+      const verified = await verify({ token, password: "Inbox owner pass 1" });
+      expect(verified.statusCode).toBe(200);
+      expect(verified.json()).toEqual({ status: "mfa_required" });
+      expect(await accountState(registered.user.user_id)).toBe("pending_mfa");
+      const hash = await storedHash(registered.user.user_id);
+      expect(await verifyPassword(sharedArgon2Pool(), hash!, "Inbox owner pass 1")).toBe(true);
+      expect(await verifyPassword(sharedArgon2Pool(), hash!, "Registrant pass 1")).toBe(false);
+    } finally {
+      await api.close();
+    }
+  }, 120_000);
+
   // Guard (green before NV-14 too, where the password is ignored): a registrant who verifies with the password they
   // chose keeps a working password + TOTP sign-in.
   it("guard: a legitimate registrant who re-types their password signs in with it and TOTP", async () => {

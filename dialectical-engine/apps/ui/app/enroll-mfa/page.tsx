@@ -66,7 +66,9 @@ export default function EnrollMfaPage() {
             // Below the minimum or over the ruled maximum (the route's own bound answers MALFORMED_REQUEST).
             else if (code === 'AUTH_INPUT_INVALID' || code === 'MALFORMED_REQUEST')
                 setPasswordError(t(catalog, "auth.signUp.passwordInvalid"));
-            else if (code === 'AUTH_TEMPORARILY_UNAVAILABLE' || status === 503 || status === 429)
+            // NV-14 Revision 3: a 404 is an API from before verify-email/password (a release switch or a rollback,
+            // per request); nothing was consumed and the link still works, so keep the form for a retry.
+            else if (code === 'AUTH_TEMPORARILY_UNAVAILABLE' || status === 503 || status === 429 || status === 404)
                 setPasswordError(t(catalog, "auth.pending.proofUnavailable"));
             else {
                 setPassword('');

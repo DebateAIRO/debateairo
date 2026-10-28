@@ -1480,6 +1480,12 @@ const AUTH_ROUTE_REQUESTS = Object.freeze([
     name: "resend" as const,
     url: "/v1/auth/resend-verification",
     payload: canonicalResend
+  }),
+  // NV-14 Revision 3: the route that hashes the token holder's password.
+  Object.freeze({
+    name: "verify-password" as const,
+    url: "/v1/auth/verify-email/password",
+    payload: { token: "A".repeat(43), password: "correct horse battery staple" }
   })
 ]);
 

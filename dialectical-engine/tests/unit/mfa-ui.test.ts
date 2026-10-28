@@ -152,8 +152,9 @@ describe("S4 mailed-token enrolment UI", () => {
     });
   });
 
-  // NV-14: the verify page sends the token holder's password with the bearer, through the same proxy.
-  it("POSTs verify-email with the chosen password through the same-origin proxy", async () => {
+  // NV-14: the verify page sends the token holder's password with the bearer, through the same proxy, to the route
+  // that requires it (Revision 3: verify-email/password; verify-email above stays token-only).
+  it("POSTs verify-email/password with the chosen password through the same-origin proxy", async () => {
     const token = "C".repeat(43);
     const observed: Array<{ input: string; init?: RequestInit }> = [];
     const fetchImplementation: typeof fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
@@ -165,7 +166,7 @@ describe("S4 mailed-token enrolment UI", () => {
     }) as typeof fetch;
     await expect(verifyMfaEmailWithPassword(token, "pw-123456", fetchImplementation, "/api")).resolves.toBeUndefined();
     expect(observed).toHaveLength(1);
-    expect(observed[0]!.input).toBe("/api/v1/auth/verify-email");
+    expect(observed[0]!.input).toBe("/api/v1/auth/verify-email/password");
     expect(observed[0]!.init).toMatchObject({
       method: "POST",
       body: JSON.stringify({ token, password: "pw-123456" })
