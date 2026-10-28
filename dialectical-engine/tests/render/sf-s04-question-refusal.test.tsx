@@ -5,7 +5,7 @@ import * as React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ContractHttpError, QUESTION_NOT_STARTED, QUESTION_NOT_STARTED_KINDS, type QuestionNotStartedKind } from "@debateai/contract";
+import { ContractHttpError, QUESTION_NOT_STARTED } from "@debateai/contract";
 import { CRISIS_LINES } from "../../apps/ui/lib/crisisLines.js";
 import home from "../../apps/ui/messages/en/home.json";
 const catalog: Record<string, string> = home;
@@ -16,8 +16,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function refusal(kind: QuestionNotStartedKind): ContractHttpError {
-  return new ContractHttpError("UNPROCESSABLE", 422, QUESTION_NOT_STARTED, QUESTION_NOT_STARTED, null, null, null, { kind });
+// V, 2026-10-28: a refusal names its subject, its screen and whether to show the emergency number.
+const SCREENS: Record<string, { screen: "REFUSE" | "SENSITIVE"; emergencyNumber: boolean }> = {
+  HARM_TO_OTHERS: { screen: "REFUSE", emergencyNumber: true },
+  SUICIDE_AND_ASSISTED_DYING: { screen: "SENSITIVE", emergencyNumber: false }
+};
+function refusal(kind: string): ContractHttpError {
+  return new ContractHttpError("UNPROCESSABLE", 422, QUESTION_NOT_STARTED, QUESTION_NOT_STARTED, null, null, null,
+    { kind, ...(SCREENS[kind] ?? { screen: "REFUSE", emergencyNumber: false }) });
 }
 const unavailable = () => new ContractHttpError("SERVER_FAILURE", 503, "QUESTION_CHECK_UNAVAILABLE", "QUESTION_CHECK_UNAVAILABLE");
 
@@ -42,8 +48,8 @@ async function open(error: unknown, options: { country?: string | null; locale?:
 }
 
 const part = (node: HTMLElement, name: string) => node.querySelector(`[data-part="${name}"]`);
-const REFUSING_KINDS = QUESTION_NOT_STARTED_KINDS;
-const KEPT_LABELS = ["HARM_TO_OTHERS", "WEAPONS_DRUGS_TERRORISM"] as const;
+const REFUSING_KINDS = ["HARM_TO_OTHERS", "WEAPONS_TERRORISM", "DRUGS", "CRIME", "HATE_SPEECH", "RELIGIOUS_INSULT",
+  "SUICIDE_AND_ASSISTED_DYING", "GAMBLING"] as const;
 
 describe("question refusal screens", () => {
   it.each([...REFUSING_KINDS, "UNAVAILABLE"] as const)("places the opening words with the title for %s", async (kind) => {
@@ -59,7 +65,7 @@ describe("question refusal screens", () => {
     expect(accepted).toBe(true);
     expect(node.querySelector('[role="dialog"][aria-modal="true"]')).not.toBeNull();
     for (const name of ["not-started", "back", "automatic", "rule", "complain"]) expect(part(node, name), name).not.toBeNull();
-    expect(part(node, "rule")?.textContent).toBe(catalog[`home.questionRefusal.rule.${kind}`]);
+    expect(part(node, "rule")?.textContent).toBe(catalog["home.questionRefusal.rule"]);
     expect(part(node, "complain")?.textContent).toContain(home["home.questionRefusal.months"]);
     expect(part(node, "complain")?.querySelector('a[href="mailto:office@dezbatere.ro"]')).not.toBeNull();
     expect(node.querySelectorAll("button")).toHaveLength(1);
@@ -68,15 +74,11 @@ describe("question refusal screens", () => {
     expect(node.querySelector(".policyEyebrow")).toBeNull();
   });
 
-  it.each(KEPT_LABELS)("shows the kept line and no not-saved statement for %s", async (kind) => {
-    const { node } = await open(refusal(kind));
-    expect(part(node, "kept")?.textContent).toBe(home["home.questionRefusal.kept"]);
-    expect(node.textContent).not.toContain(home["home.crisisSupport.notSaved"]);
-  });
-
-  it.each(["CRIME", "HATE_SPEECH", "RELIGIOUS_INSULT", "SENSITIVE_TOPIC"] as const)("does not show a kept line for %s", async (kind) => {
-    const { node } = await open(refusal(kind));
+  // Property (V, 2026-10-28): nothing of a question is kept, so no screen says it was.
+  it.each(REFUSING_KINDS)("shows no kept line for %s", async (kind) => {
+    const { node } = await open(refusal(kind), { country: "RO" });
     expect(part(node, "kept")).toBeNull();
+    expect(node.textContent).not.toContain("We kept your question");
   });
 
   it("shows Romania's emergency number on a harm-to-others refusal", async () => {
@@ -115,13 +117,13 @@ describe("question refusal screens", () => {
   });
 
   it("shows only a help-number pointer for a sensitive topic", async () => {
-    const { node } = await open(refusal("SENSITIVE_TOPIC"));
+    const { node } = await open(refusal("SUICIDE_AND_ASSISTED_DYING"));
     expect(part(node, "help-numbers")?.tagName).toBe("A");
     expect(part(node, "help-numbers")?.getAttribute("href")).toBe("#");
     for (const name of ["emergency", "helpline", "kept"]) expect(part(node, name)).toBeNull();
   });
 
-  it.each(["WEAPONS_DRUGS_TERRORISM", "CRIME", "HATE_SPEECH", "RELIGIOUS_INSULT"] as const)("does not show harm or help-number parts for %s", async (kind) => {
+  it.each(["WEAPONS_TERRORISM", "DRUGS", "CRIME", "HATE_SPEECH", "RELIGIOUS_INSULT", "GAMBLING"] as const)("does not show harm or help-number parts for %s", async (kind) => {
     const { node } = await open(refusal(kind));
     for (const name of ["emergency", "helpline", "help-numbers"]) expect(part(node, name)).toBeNull();
   });
@@ -145,7 +147,7 @@ describe("question refusal screens", () => {
   it("declares the new classes with token-only colors", async () => {
     const { node } = await open(refusal("HARM_TO_OTHERS"), { country: "RO" });
     const css = readFileSync(join(process.cwd(), "apps/ui/app/globals.css"), "utf8");
-    for (const className of ["questionRefusal", "questionRefusalKept", "questionRefusalRule", "questionRefusalComplain", "harmHelpLine"]) {
+    for (const className of ["questionRefusal", "questionRefusalRule", "questionRefusalComplain", "harmHelpLine"]) {
       if (className !== "harmHelpLine") expect(node.querySelector(`.${className}`), className).not.toBeNull();
       const rule = css.match(new RegExp(`\\.${className}\\s*\\{([^}]*)\\}`, "u"));
       expect(rule, className).not.toBeNull();

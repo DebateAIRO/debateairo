@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ContractHttpError, type QuestionNotStartedKind } from "@debateai/contract";
+import { ContractHttpError, type QuestionNotStarted } from "@debateai/contract";
 import { useModalSurface } from "@/components/consent/modalSemantics";
 import { useHideOutside } from "@/components/dialogSurface";
 import { CrisisSupportDialog } from "@/components/CrisisSupport";
@@ -9,7 +9,8 @@ import { HarmHelpLine } from "@/components/HarmHelpLine";
 import { resolveCrisisCountry } from "@/lib/crisisLines";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
-type RefusalScreen = QuestionNotStartedKind | "UNAVAILABLE";
+/** V, 2026-10-28: a refusal carries its subject, its screen and whether to show the emergency number; nothing is kept. */
+type RefusalScreen = QuestionNotStarted | "UNAVAILABLE";
 
 export function useQuestionRefusal({ catalog, locale, countryHint = null }: Readonly<{
   catalog: MessageCatalog;
@@ -22,7 +23,7 @@ export function useQuestionRefusal({ catalog, locale, countryHint = null }: Read
     if (!(failure instanceof ContractHttpError)) return false;
     if (failure.status === 422 && failure.questionNotStarted !== null) {
       setHelpOpen(false);
-      setScreen(failure.questionNotStarted.kind);
+      setScreen(failure.questionNotStarted);
       return true;
     }
     if (failure.serverCode === "QUESTION_CHECK_UNAVAILABLE") {
@@ -64,7 +65,8 @@ function QuestionRefusalDialog({ catalog, locale, countryHint, screen, onBack, o
   const title = t(catalog, unavailable ? "home.questionRefusal.unavailableTitle" : "home.questionRefusal.title");
   const complain = t(catalog, "home.questionRefusal.complain", { months: t(catalog, "home.questionRefusal.months") });
   const [beforeAddress, afterAddress] = complain.split("{address}", 2);
-  const country = screen === "HARM_TO_OTHERS"
+  const refusal = unavailable ? null : screen;
+  const country = refusal?.emergencyNumber === true
     ? resolveCrisisCountry({ hint: countryHint, browserLanguages: browserLanguages(), locale }) : null;
   return <div className="policyScrim">
     <div className="policyBezel questionRefusal" role="dialog" aria-modal="true"
@@ -80,19 +82,16 @@ function QuestionRefusalDialog({ catalog, locale, countryHint, screen, onBack, o
             : <p className="crisisSupportLede" data-part="automatic">{t(catalog, "home.questionRefusal.automatic")}</p>}
         </div></div>
         <div className="crisisSupportBody">
-          {!unavailable ? (
+          {refusal !== null ? (
             <>
-              <p className="questionRefusalRule" data-part="rule">{t(catalog, `home.questionRefusal.rule.${screen}`)}</p>
+              <p className="questionRefusalRule" data-part="rule">{t(catalog, "home.questionRefusal.rule")}</p>
               <p className="questionRefusalComplain" data-part="complain">
                 {beforeAddress}<a className="crisisSupportAction" href={`mailto:${COMPLAINT_ADDRESS}`}>{COMPLAINT_ADDRESS}</a>{afterAddress}
               </p>
-              {(screen === "HARM_TO_OTHERS" || screen === "WEAPONS_DRUGS_TERRORISM") ? (
-                <p className="questionRefusalKept" data-part="kept">{t(catalog, "home.questionRefusal.kept")}</p>
-              ) : null}
-              {screen === "HARM_TO_OTHERS" ? <HarmHelpLine catalog={catalog} locale={locale} country={country} /> : null}
+              {refusal.emergencyNumber ? <HarmHelpLine catalog={catalog} locale={locale} country={country} /> : null}
             </>
           ) : null}
-          {(unavailable || screen === "SENSITIVE_TOPIC") ? (
+          {(unavailable || refusal?.screen === "SENSITIVE") ? (
             <a className="crisisSupportElsewhere" data-part="help-numbers" href="#"
               onClick={(event) => { event.preventDefault(); onHelpNumbers(); }}>
               {t(catalog, "home.questionRefusal.helpNumbers")}

@@ -784,7 +784,6 @@ apps/ui/lib/previewPlanRoster.ts
 apps/ui/lib/privacyPolicy.ts
 apps/ui/lib/publicDebatePresentation.test.mjs
 apps/ui/lib/publicDebatePresentation.ts
-apps/ui/lib/questionRefusal.ts
 apps/ui/lib/recommendation.test.mjs
 apps/ui/lib/recommendation.ts
 apps/ui/lib/report/ReportDocument.tsx

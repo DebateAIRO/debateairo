@@ -130,7 +130,7 @@ describe("S04 storing nothing (V, 2026-10-28)", () => {
 });
 
 describe("S04 question gate outcomes", () => {
-  it.each(["OWN_CRISIS", "METHODS_OR_ENCOURAGEMENT"])("answers 422 CRISIS_SUPPORT_OFFERED with edge country for %s", async () => {
+  it.each(["OWN_CRISIS", "SUICIDE_METHODS"])("answers 422 CRISIS_SUPPORT_OFFERED with edge country for %s", async () => {
     const h = harness({ outcome: { outcome: "CRISIS" } });
     try {
       const response = await h.ask(undefined, "RO");

@@ -3,7 +3,7 @@ import * as React from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ContractHttpError, CRISIS_SUPPORT_OFFERED, QUESTION_NOT_STARTED, QUESTION_NOT_STARTED_KINDS, type QuestionNotStartedKind } from "@debateai/contract";
+import { ContractHttpError, CRISIS_SUPPORT_OFFERED, QUESTION_NOT_STARTED, type QuestionNotStarted } from "@debateai/contract";
 import home from "../../apps/ui/messages/en/home.json";
 import chrome from "../../apps/ui/messages/en/chrome.json";
 import newDebate from "../../apps/ui/messages/en/newDebate.json";
@@ -50,15 +50,19 @@ async function submit(error: unknown): Promise<HTMLElement> {
   return node;
 }
 
-function notStarted(kind: QuestionNotStartedKind) {
-  return new ContractHttpError("UNPROCESSABLE", 422, QUESTION_NOT_STARTED, QUESTION_NOT_STARTED, null, null, null, { kind });
+function notStarted(refusal: QuestionNotStarted) {
+  return new ContractHttpError("UNPROCESSABLE", 422, QUESTION_NOT_STARTED, QUESTION_NOT_STARTED, null, null, null, refusal);
 }
 
 describe("the new-debate page routes pre-start refusals", () => {
-  it.each(QUESTION_NOT_STARTED_KINDS)("a 422 QUESTION_NOT_STARTED %s opens its screen without navigation", async (kind) => {
-    const node = await submit(notStarted(kind));
+  it.each([
+    { kind: "DRUGS", screen: "REFUSE", emergencyNumber: false },
+    { kind: "HARM_TO_OTHERS", screen: "REFUSE", emergencyNumber: true },
+    { kind: "SUICIDE_AND_ASSISTED_DYING", screen: "SENSITIVE", emergencyNumber: false }
+  ] as const)("a 422 QUESTION_NOT_STARTED %j opens its screen without navigation", async (refusal) => {
+    const node = await submit(notStarted(refusal));
     expect(node.querySelector('[data-dialog="question-refusal"]')).not.toBeNull();
-    expect(node.querySelector('[data-part="rule"]')?.textContent).toBe((home as Record<string, string>)[`home.questionRefusal.rule.${kind}`]);
+    expect(node.querySelector('[data-part="rule"]')?.textContent).toBe((home as Record<string, string>)["home.questionRefusal.rule"]);
     expect(mocks.push).not.toHaveBeenCalled();
   });
 
