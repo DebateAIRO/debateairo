@@ -45,7 +45,7 @@ export const STORY_CHECKER_V4_CONTRACT_ID = "story.checker.v4" as const;
  * Both current forms end with this sentence. A straight double quote inside a JSON text ends that text; a
  * Romanian checker wrote „…" with a straight closing quote and its whole verdict was lost (2026-10-12).
  */
-const STORY_QUOTE_SENTENCE = "No text contains a straight double quote (\"): to quote words, use typographic quotes such as „ ” or « », or escape the straight quote as \\\".";
+export const STORY_QUOTE_SENTENCE = "No text contains a straight double quote (\"): to quote words, use typographic quotes such as „ ” or « », or escape the straight quote as \\\".";
 
 /** Shipped v1 history: every byte mirrors the original `StoryBodySchema` and deterministic-check contract. */
 export const STORYTELLER_V1_ANSWER_FORM = `Return only one JSON object with exactly the following schema and no additional keys, with no text before or after it and no code fence. Every string is plain text: no Markdown, no HTML, no links, no control characters other than line feed and tab, and no bidirectional embedding, override or isolate characters (U+202A to U+202E and U+2066 to U+2069).

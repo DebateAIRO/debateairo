@@ -113,6 +113,8 @@ export function buildAnswerStory(input: {
     reservation: stored !== null && input.derived.status === "READY_WITH_RESERVATION" ? stored.reservation : null,
     verdict_basis: stored === null ? null : stored.verdictBasis,
     point_numbers: stored === null || stored.pointNumbers === null ? null : { ...stored.pointNumbers },
-    story: stored === null ? null : stored.body
+    story: stored === null ? null : stored.body,
+    // Charts (design 2026-10-28): owner-only like the long story, and only when the story has some.
+    ...(stored === null || stored.charts === undefined || stored.charts.length === 0 ? {} : { charts: [...stored.charts] })
   };
 }

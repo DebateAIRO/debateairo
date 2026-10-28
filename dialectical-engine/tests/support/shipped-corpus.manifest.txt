@@ -755,10 +755,12 @@ apps/ui/lib/publicDebatePresentation.test.mjs
 apps/ui/lib/publicDebatePresentation.ts
 apps/ui/lib/recommendation.test.mjs
 apps/ui/lib/recommendation.ts
+apps/ui/lib/report/ReportChart.tsx
 apps/ui/lib/report/ReportDocument.tsx
 apps/ui/lib/report/fonts.test.mjs
 apps/ui/lib/report/pointNumbers.ts
 apps/ui/lib/report/renderReport.ts
+apps/ui/lib/report/reportCharts.ts
 apps/ui/lib/report/reportFonts.ts
 apps/ui/lib/report/reportGlyphs.ts
 apps/ui/lib/report/reportLanguage.ts
@@ -801,6 +803,7 @@ apps/ui/lib/v3/releaseWatch.ts
 apps/ui/lib/v3/requestFailure.ts
 apps/ui/lib/v3/runFailure.test.mjs
 apps/ui/lib/v3/runFailure.ts
+apps/ui/lib/v3/storyChartsSample.ts
 apps/ui/lib/v3/storyFixture.ts
 apps/ui/lib/v3/storyScriptSamples.ts
 apps/ui/lib/v3/storyView.ts
@@ -1157,6 +1160,7 @@ packages/serve/src/model-assignment.ts
 packages/serve/src/synthesis.ts
 packages/settlement/src/index.ts
 packages/story/src/backup.ts
+packages/story/src/charts.ts
 packages/story/src/contracts.ts
 packages/story/src/enrichment.ts
 packages/story/src/index.ts

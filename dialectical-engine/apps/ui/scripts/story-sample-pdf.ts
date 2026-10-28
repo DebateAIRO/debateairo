@@ -3,12 +3,14 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadReportCatalogs, type ReportCatalogLoader } from "../lib/report/reportLanguage";
 import { renderReportPdf } from "../lib/report/renderReport";
+import { STORY_CHARTS_SAMPLE_ANSWER, STORY_CHARTS_SAMPLE_LANGUAGE, storyChartsSample } from "../lib/v3/storyChartsSample";
 import {
   STORY_FIXTURE_ANSWER,
   STORY_FIXTURE_FLOOR_ANSWER,
   STORY_FIXTURE_LANGUAGE,
   storyFixture,
-  storyFixtureDisclosure
+  storyFixtureDisclosure,
+  storyFixtureWithCharts
 } from "../lib/v3/storyFixture";
 import { STORY_SCRIPT_SAMPLE_LOCALES, storyScriptSample, type StoryScriptSampleLocale } from "../lib/v3/storyScriptSamples";
 
@@ -25,12 +27,14 @@ import { STORY_SCRIPT_SAMPLE_LOCALES, storyScriptSample, type StoryScriptSampleL
  * answer is the debate's strongest position) or "lower-cost" (a lower-cost
  * model wrote the answer, the debate stopped exploring early, and the answer
  * was written from its most important points). Only About says so.
+ * Charts (design 2026-10-28): "charts" prints the Romanian sample with its two bar charts; "scatter" prints an English
+ * sample whose points cite a price and a score for five AI models, charted cost against score.
  *
- * Usage: pnpm --filter dialectical-engine-v2ui run story:sample-pdf <absolute path to the output .pdf> [language|floor|lower-cost]
+ * Usage: pnpm --filter dialectical-engine-v2ui run story:sample-pdf <absolute path to the output .pdf> [language|floor|lower-cost|charts|scatter]
  * (pnpm runs the script from apps/ui, so a relative path is resolved from there,
  * and so are the vendored fonts).
  */
-const VARIANTS: readonly string[] = Object.freeze(["floor", "lower-cost"]);
+const VARIANTS: readonly string[] = Object.freeze(["floor", "lower-cost", "charts", "scatter"]);
 const [outputPath, choice] = process.argv.slice(2);
 const samples: readonly string[] = STORY_SCRIPT_SAMPLE_LOCALES;
 if (outputPath === undefined || outputPath.trim().length === 0 || (choice !== undefined && !samples.includes(choice) && !VARIANTS.includes(choice))) {
@@ -50,6 +54,10 @@ const load: ReportCatalogLoader = async (locale, namespace) =>
 
 const sample = choice === "floor"
   ? { answer: STORY_FIXTURE_FLOOR_ANSWER, story: storyFixture("READY"), disclosure: storyFixtureDisclosure("floor") }
+  : choice === "charts"
+    ? { answer: STORY_FIXTURE_ANSWER, story: storyFixtureWithCharts("READY"), disclosure: storyFixtureDisclosure("served") }
+  : choice === "scatter"
+    ? { answer: STORY_CHARTS_SAMPLE_ANSWER, story: storyChartsSample(), disclosure: null }
   : choice === "lower-cost"
     ? { answer: STORY_FIXTURE_ANSWER, story: storyFixture("READY_WITH_RESERVATION"), disclosure: storyFixtureDisclosure("lower-cost") }
     : language === undefined
@@ -58,7 +66,11 @@ const sample = choice === "floor"
 const pdf = await renderReportPdf({
   ...sample,
   generatedAt: new Date(),
-  catalogs: await loadReportCatalogs({ questionTag: language ?? STORY_FIXTURE_LANGUAGE.tag, interfaceLocale: "en", load })
+  catalogs: await loadReportCatalogs({
+    questionTag: language ?? (choice === "scatter" ? STORY_CHARTS_SAMPLE_LANGUAGE.tag : STORY_FIXTURE_LANGUAGE.tag),
+    interfaceLocale: "en",
+    load
+  })
 });
 writeFileSync(resolve(outputPath), pdf);
 console.log(`STORY_SAMPLE_PDF_WRITTEN=${resolve(outputPath)} bytes=${pdf.length}`);

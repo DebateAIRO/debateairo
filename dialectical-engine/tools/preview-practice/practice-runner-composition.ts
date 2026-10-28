@@ -299,7 +299,9 @@ export async function composePracticeRunner(input: Readonly<{
       ].find((candidate) => candidate.providerRef === roleRef);
       return member === undefined ? null : { provider: member.provider, providerRef: member.providerRef };
     },
-    log: storyLog
+    log: storyLog,
+    // Charts in the verdict PDF (design 2026-10-28), as main.ts: the practice debate makes the same chart call.
+    charts: true
   });
   function observeClaimTarget(target: (typeof providerTargets)[number]) {
     return observeClaimTimeTarget({

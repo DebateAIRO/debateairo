@@ -25,6 +25,8 @@ const sourcePaths = [
   "lib/v3/storyWords.ts",
   "lib/v3/storyView.ts",
   "lib/report/reportModel.ts",
+  // Charts in the verdict PDF (design 2026-10-28): each chart's caption and its strength axis.
+  "lib/report/reportCharts.ts",
   // The PDF download route's refusals (Task 15): short plain lines, `public.report.error.*`.
   "lib/report/reportRoute.ts",
   // The floor answer (Task M6): "Our best answer:" and the thin-basis line, `public.story.floor*`.

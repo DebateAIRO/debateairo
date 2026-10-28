@@ -132,6 +132,74 @@ export const StoryVerdictBasisSchema = z.object({
 export type StoryVerdictBasis = z.infer<typeof StoryVerdictBasisSchema>;
 
 /**
+ * Charts in the verdict PDF (design 2026-10-28). An AI model chooses where a chart helps and what it compares; code
+ * checks every number and draws it. The limits every chart obeys, in one place.
+ *  - maxCharts: the most charts one story carries.
+ *  - minItems / minScatterItems / maxItems: a bar chart compares at least two things, a scatter at least three.
+ *  - titleMaxChars / labelMaxChars / figureTextMaxChars: a title, an axis or item label, a figure as the claim writes it.
+ */
+export const STORY_CHART_LIMITS = Object.freeze({
+  maxCharts: 4,
+  minItems: 2,
+  minScatterItems: 3,
+  maxItems: 12,
+  titleMaxChars: 160,
+  labelMaxChars: 80,
+  figureTextMaxChars: 40
+});
+
+/**
+ * Where a chart sits: right after one paragraph, 1-based. `why.2` is the second reason of "Why this answer";
+ * `long.3.1` the first paragraph of the long story's third section.
+ */
+export const StoryChartAnchorSchema = z.string().regex(/^(why\.[1-9]|long\.(1[0-2]|[1-9])\.(1[0-2]|[1-9]))$/u);
+
+/**
+ * A measure the chart plots. `figure`: numbers the debate's points cite, each copied from its point's claim.
+ * `strength`: the engine's own strength of each point, which code reads from the answer and never from the model.
+ */
+export const StoryChartAxisSchema = z.object({
+  label: z.string().trim().min(1).max(STORY_CHART_LIMITS.labelMaxChars),
+  source: z.enum(["figure", "strength"]),
+  log: z.boolean()
+}).strict();
+export type StoryChartAxis = z.infer<typeof StoryChartAxisSchema>;
+
+/** A cited figure: the number, and the exact characters of the claim that state it ("$0.15", "52 %"). */
+export const StoryChartFigureSchema = z.object({
+  value: z.number().finite(),
+  text: z.string().trim().min(1).max(STORY_CHART_LIMITS.figureTextMaxChars)
+}).strict();
+export type StoryChartFigure = z.infer<typeof StoryChartFigureSchema>;
+
+/** One thing on the chart: what it is called, the point that states its numbers, and its figure on each figure axis. */
+export const StoryChartItemSchema = z.object({
+  label: z.string().trim().min(1).max(STORY_CHART_LIMITS.labelMaxChars),
+  node_ref: z.string().min(1),
+  /** Null on a bar chart (it has no x measure) and on a strength axis. */
+  x: StoryChartFigureSchema.nullable(),
+  /** Null on a strength axis. */
+  y: StoryChartFigureSchema.nullable()
+}).strict();
+export type StoryChartItem = z.infer<typeof StoryChartItemSchema>;
+
+/**
+ * One chart as stored and served. A bar chart has no `x` axis and plots `y` for each item; a scatter plots `x` against
+ * `y`. Every figure has passed the number check (packages/story/src/charts.ts) before it is stored.
+ */
+export const StoryChartSchema = z.object({
+  after: StoryChartAnchorSchema,
+  kind: z.enum(["bar", "scatter"]),
+  title: z.string().trim().min(1).max(STORY_CHART_LIMITS.titleMaxChars),
+  x: StoryChartAxisSchema.nullable(),
+  y: StoryChartAxisSchema,
+  items: z.array(StoryChartItemSchema).min(STORY_CHART_LIMITS.minItems).max(STORY_CHART_LIMITS.maxItems)
+}).strict();
+export type StoryChart = z.infer<typeof StoryChartSchema>;
+
+export const StoryChartsSchema = z.array(StoryChartSchema).max(STORY_CHART_LIMITS.maxCharts);
+
+/**
  * GET /v1/answers/{id}/story (spec 2026-09-26 §10). `status` is WRITING while
  * the runner may still be writing, the stored outcome once a row exists, and
  * UNAVAILABLE otherwise (a FAILED row, no verdict, an unreadable row, or the
@@ -159,7 +227,12 @@ export const AnswerStorySchema = z.object({
   reservation: z.string().nullable(),
   verdict_basis: StoryVerdictBasisSchema.nullable(),
   point_numbers: z.record(z.string(), z.string().regex(/^P[1-9][0-9]*$/)).nullable(),
-  story: StoryBodySchema.nullable()
+  story: StoryBodySchema.nullable(),
+  /**
+   * The story's charts (design 2026-10-28), owner-only like the long story. Optional, so a server older than the charts
+   * still parses; absent or empty when the story has none.
+   */
+  charts: StoryChartsSchema.optional()
 }).strict();
 export type AnswerStory = z.infer<typeof AnswerStorySchema>;
 

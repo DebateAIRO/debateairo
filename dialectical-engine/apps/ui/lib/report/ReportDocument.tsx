@@ -2,6 +2,7 @@ import { Fragment, type JSX } from "react";
 import { Document, Link, Page, StyleSheet, Text, View, type Styles } from "@react-pdf/renderer";
 import type { Answer, AnswerDisclosure, AnswerStory } from "@debateai/contract";
 import { formatNumber } from "../i18n/translate.js";
+import { ReportChartBlock } from "./ReportChart.js";
 import { REPORT_FONT_FAMILIES } from "./reportFonts.js";
 import type { ReportCatalogs } from "./reportLanguage.js";
 import { reportLineBreaker } from "./reportLineBreaks.js";
@@ -158,13 +159,16 @@ interface Look {
   /** The footer's words, and the page numbers opposite them on the side a line ends. */
   readonly footerText: Style;
   readonly footerPages: Style;
+  /** Charts (design 2026-10-28): the logo file in each chart's corner, or null for the wordmark. */
+  readonly logo: string | null;
 }
 
-function lookOf(model: ReportModel, layout: ReportLayout): Look {
+function lookOf(model: ReportModel, layout: ReportLayout, logo: string | null): Look {
   const rtl = layout.direction === "rtl";
   const pagesLeft = layout.pageNumberSide === "left";
   return {
     model,
+    logo,
     page: rtl ? { fontFamily: [...layout.faces.body], textAlign: layout.textAlign } : { fontFamily: [...layout.faces.body] },
     heading: { fontFamily: [...layout.faces.heading], fontWeight: layout.faces.headingWeight },
     tracked: layout.trackedCapitals ? {} : { letterSpacing: 0 },
@@ -326,6 +330,21 @@ function CoverAndShort({ look }: { look: Look }): JSX.Element {
   );
 }
 
+/** Charts (design 2026-10-28): the chart that follows the paragraph `after` names, or nothing. */
+function ChartAfter({ look, after }: { look: Look; after: string }): JSX.Element | null {
+  const chart = look.model.charts.find((item) => item.after === after);
+  if (chart === undefined) return null;
+  return (
+    <ReportChartBlock
+      chart={chart}
+      locale={look.model.language}
+      logo={look.logo}
+      row={look.row}
+      Words={({ style, text }) => <Words look={look} style={style} text={text} />}
+    />
+  );
+}
+
 function LongStory({ look }: { look: Look }): JSX.Element {
   const { model } = look;
   return (
@@ -338,7 +357,10 @@ function LongStory({ look }: { look: Look }): JSX.Element {
             <Words look={look} style={styles.sectionTitle} text={section.title} />
           </KeepWithNext>
           {section.paragraphs.map((item, itemIndex) => (
-            <StoryText look={look} key={itemIndex} paragraph={item} variant="paragraph" />
+            <Fragment key={itemIndex}>
+              <StoryText look={look} paragraph={item} variant="paragraph" />
+              <ChartAfter look={look} after={`long.${String(index + 1)}.${String(itemIndex + 1)}`} />
+            </Fragment>
           ))}
         </Fragment>
       ))}
@@ -369,12 +391,15 @@ function Why({ look }: { look: Look }): JSX.Element {
     <>
       <Heading look={look} title={why.title} first />
       {why.reasons.map((reason, index) => (
-        <View key={index} style={[styles.reasonRow, look.row]}>
-          <Words look={look} style={styles.reasonNumber} text={reasonNumber(model, index)} />
-          <View style={styles.reasonText}>
-            <StoryText look={look} paragraph={reason} variant="paragraph" />
+        <Fragment key={index}>
+          <View style={[styles.reasonRow, look.row]}>
+            <Words look={look} style={styles.reasonNumber} text={reasonNumber(model, index)} />
+            <View style={styles.reasonText}>
+              <StoryText look={look} paragraph={reason} variant="paragraph" />
+            </View>
           </View>
-        </View>
+          <ChartAfter look={look} after={`why.${String(index + 1)}`} />
+        </Fragment>
       ))}
       <Subheading look={look} text={why.changeLead} />
       <StoryText look={look} paragraph={why.change} variant="paragraph" />
@@ -430,8 +455,12 @@ function About({ look }: { look: Look }): JSX.Element {
   );
 }
 
-export function ReportDocumentView({ model }: { model: ReportModel }): JSX.Element {
-  const look = lookOf(model, reportLayout(model.language, reportPrintedText(model)));
+export function ReportDocumentView({ model, logo = null }: {
+  model: ReportModel;
+  /** Charts (design 2026-10-28): the logo file for each chart's corner (`resolveReportLogo`), or null for the wordmark. */
+  logo?: string | null;
+}): JSX.Element {
+  const look = lookOf(model, reportLayout(model.language, reportPrintedText(model)), logo);
   const page = [styles.page, look.page];
   return (
     <Document

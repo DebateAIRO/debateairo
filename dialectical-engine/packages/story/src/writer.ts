@@ -1,7 +1,8 @@
 import { STORY_COST_ENVELOPE_REACHED } from "@debateai/budget";
-import { StoryLanguageTagSchema, type MakerLineage, type StoryBody } from "@debateai/contract";
+import { StoryLanguageTagSchema, type MakerLineage, type StoryBody, type StoryChart } from "@debateai/contract";
 import type { Pool } from "@debateai/db";
-import { TypedDomainError, questionLanguageFromRun, replyLanguageCheckFor, withQuestionLanguageField, type EngineQuestionKind } from "@debateai/kernel";
+import { TypedDomainError, questionLanguageFromRun, replyLanguageCheckFor, withQuestionLanguageField, type EngineQuestionKind,
+  type QuestionLanguage } from "@debateai/kernel";
 import {
   buildFramedPrompt,
   buildFramedRepairPrompt,
@@ -29,6 +30,13 @@ import {
   type StoryBackupRecord
 } from "./backup.js";
 import {
+  STORY_CHARTS_CALL_SITE_KEY,
+  buildStoryChartsContract,
+  classifyStoryChartsContent,
+  parseStoryCharts,
+  restoreChartRefs
+} from "./charts.js";
+import {
   buildStoryCheckerContract,
   buildStorytellerContract,
   storyCheckerLengthField,
@@ -46,8 +54,11 @@ import {
   restoreStoryRefs,
   storyMaterialHasMapFields,
   storyDraftText,
+  storyMaterialClaims,
+  toChartsPromptMaterial,
   toCheckerPromptMaterial,
   toStoryPromptMaterial,
+  type StoryMaterial,
   type StoryNodeEnrichment,
   type StoryRunSnapshot
 } from "./material.js";
@@ -154,6 +165,12 @@ export interface StoryWriterDependencies {
   readonly repository?: StoryRecordSink;
   /** Test seam; absent means `readStoryEnrichment`. */
   readonly readEnrichment?: typeof readStoryEnrichment;
+  /**
+   * Charts (design 2026-10-28): true makes ONE more call after every accepted story, `STORY:CHARTS:1`, and stores the
+   * charts that pass their checks. The runner's composition turns it on; absent or false, a story is written exactly as
+   * before, with no chart call.
+   */
+  readonly charts?: boolean;
 }
 
 /**
@@ -259,11 +276,15 @@ const STORY_BACKUP_ROUNDS = Object.freeze({ lastCallSiteRound: storyLoopLastRoun
 /** Story v4 round 2 (R1d decision 3): the accepted round-1 draft as the model's own turn, and the checker's problems. */
 type StoryRevisionTurn = Readonly<{ ownDraft: string; problems: string }>;
 
-/** The story's two call sites and the named role each one carries (the gateway checks the pair). */
-type StoryCallSite = "STORYTELLER" | "CHECKER";
+/**
+ * The story's call sites and the named role each one carries (the gateway checks the pair). Charts (design 2026-10-28):
+ * the chart call is the storyteller's role, at its one key `STORY:CHARTS:1`.
+ */
+type StoryCallSite = "STORYTELLER" | "CHECKER" | "CHARTS";
 const STORY_SITE_ROLES: Readonly<Record<StoryCallSite, TypedRole>> = Object.freeze({
   STORYTELLER: "SYNTHESIZER",
-  CHECKER: "EVALUATOR"
+  CHECKER: "EVALUATOR",
+  CHARTS: "SYNTHESIZER"
 });
 
 function isStoryPack(pack: StoryPack | { readonly error: string }): pack is StoryPack {
@@ -351,7 +372,7 @@ function storyCallRequest(input: {
   const request: ProviderCallRequest = {
     runId: input.story.runId,
     subjectItemId: input.story.workItemId,
-    callSiteKey: storyCallSiteKey(input.site, input.round),
+    callSiteKey: input.site === "CHARTS" ? STORY_CHARTS_CALL_SITE_KEY : storyCallSiteKey(input.site, input.round),
     role: STORY_SITE_ROLES[input.site],
     lane: "story",
     preferredResponseFormat: "json_object",
@@ -428,7 +449,8 @@ function recordFromOutcome(
   outcome: StoryLoopOutcome,
   refMap: ReadonlyMap<string, string>,
   storytellerRepairs: number,
-  backup: StoryBackupRecord | null
+  backup: StoryBackupRecord | null,
+  charts: readonly StoryChart[] = []
 ): StoryRecordInput {
   // The lineage is the SERVED round's: under the earlier-draft fallback that is
   // the earlier round, whose writer wrote and whose checker judged the story
@@ -478,7 +500,9 @@ function recordFromOutcome(
     failureCode: null,
     shapeId: body.shape_id,
     body,
-    reservation: outcome.reservation
+    reservation: outcome.reservation,
+    // Charts (design 2026-10-28): only a story that has some carries the member.
+    ...(charts.length === 0 ? {} : { charts })
   };
   return Object.freeze(written);
 }
@@ -879,7 +903,70 @@ export class StoryWriter {
         }
       }
     }
-    return recordFromOutcome(input, pack, served, built.refMap, repairedRounds.size, backup);
+    // Charts (design 2026-10-28): one more call, after an accepted story, to the maker that wrote the served draft. The
+    // story is stored as it is whatever becomes of it.
+    const charts = served.outcome === "FAILED" || this.#deps.charts !== true ? [] : await this.#chartsFor(input, {
+      material: built.material,
+      scoreTexts: built.index.scoreTexts,
+      refMap: built.refMap,
+      body: served.body,
+      teller: draftTellerByRound.get(served.servedRound) ?? storyteller,
+      bound: storytellerBound,
+      languageName,
+      lock,
+      call: (planned, request) => callStoryRole(planned, request, null)
+    });
+    return recordFromOutcome(input, pack, served, built.refMap, repairedRounds.size, backup, charts);
+  }
+
+  /**
+   * Charts (design 2026-10-28): the chart call and its checks (packages/story/src/charts.ts). Never throws: a refused
+   * call, money, a reply that is not a chart plan, or a plan with no chart that passes, all mean no charts, logged by
+   * code and counts only.
+   */
+  async #chartsFor(input: StoryWriteInput, args: Readonly<{
+    material: StoryMaterial;
+    scoreTexts: ReadonlySet<string>;
+    refMap: ReadonlyMap<string, string>;
+    body: StoryBody;
+    teller: StoryRoleMaker;
+    bound: CallBound;
+    languageName: string | null;
+    lock: QuestionLanguage | null;
+    call: (planned: StoryRoleMaker, request: ProviderCallRequest) => Promise<Readonly<{ result: ProviderCallResult }>>;
+  }>): Promise<readonly StoryChart[]> {
+    try {
+      const contract = storyContractInArgumentLanguage(buildStoryChartsContract(), args.languageName, args.lock);
+      const reading = rememberingAcceptedReply((content, reply) => classifyStoryChartsContent(content, reply));
+      const request = storyCallRequest({
+        story: input,
+        site: "CHARTS",
+        round: 1,
+        providerRef: args.teller.providerRef,
+        bound: args.bound,
+        contract,
+        contractHash: storyContractHash(contract),
+        material: withQuestionLanguageField(toChartsPromptMaterial(args.material, args.body), args.lock),
+        classifyContent: reading.classifyContent
+      });
+      const { result } = await args.call(args.teller, request);
+      const accepted = reading.acceptedAs(result.content);
+      const read = parseStoryCharts(result.content, {
+        body: args.body,
+        claims: storyMaterialClaims(args.material),
+        scoreTexts: args.scoreTexts
+      }, accepted.reply);
+      const charts = restoreChartRefs(read.charts, args.refMap);
+      this.#log("STORY_CHARTS_WRITTEN", () => ({
+        answerId: input.answerId, answerVersion: input.answerVersion, charts: charts.length, dropped: [...read.dropped]
+      }));
+      return charts;
+    } catch (error) {
+      this.#log("STORY_CHARTS_FAILED", () => ({
+        answerId: input.answerId, answerVersion: input.answerVersion, code: codeOf(error)
+      }));
+      return [];
+    }
   }
 
   /** Why a story failed, or why an earlier draft is the one served: codes only (today's two logs, one loop at a time). */

@@ -109,6 +109,22 @@ export {
 } from "./repository.js";
 export { readStoryEnrichment } from "./enrichment.js";
 export {
+  STORY_CHARTS_ANSWER_FORM,
+  STORY_CHARTS_CALL_SITE_KEY,
+  STORY_CHARTS_CONTRACT_ID,
+  STORY_CHARTS_INSTRUCTION,
+  buildStoryChartsContract,
+  classifyStoryChartsContent,
+  figureReadings,
+  parseStoryCharts,
+  readStoryCharts,
+  restoreChartRefs,
+  storyChartParagraph,
+  type StoryChartDropCode,
+  type StoryChartsContext,
+  type StoryChartsReading
+} from "./charts.js";
+export {
   StoryWriter,
   storyV4ShapeId,
   withoutStoryNodeIds,
