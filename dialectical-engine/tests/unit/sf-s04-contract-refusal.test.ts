@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ContractHttpError, createContractClient, QUESTION_NOT_STARTED_KINDS, type AskRequest } from "@debateai/contract";
+import { ContractHttpError, createContractClient, type AskRequest } from "@debateai/contract";
 
 const ASK = {
   question_line: "Should cities price congestion?", risk_tier: "casual", tier_source: "ASKER",
@@ -16,14 +16,26 @@ async function refused(status: number, body: unknown): Promise<ContractHttpError
 }
 
 describe("S04 contract refusal", () => {
-  it.each(QUESTION_NOT_STARTED_KINDS)("a 422 body with kind %s yields questionNotStarted.kind", async (kind) => {
-    const error = await refused(422, { error: "QUESTION_NOT_STARTED", message: "QUESTION_NOT_STARTED", kind });
-    expect(error.questionNotStarted).toEqual({ kind });
+  // Property (V, 2026-10-28): any subject id from the subjects file reaches the screen with its screen and emergency number,
+  // including a subject added after this client was built.
+  it.each([
+    ["DRUGS", "REFUSE", false], ["HARM_TO_OTHERS", "REFUSE", true], ["SUICIDE_AND_ASSISTED_DYING", "SENSITIVE", false],
+    ["GAMBLING", "REFUSE", false]
+  ] as const)("a 422 body with kind %s yields its screen", async (kind, screen, emergency) => {
+    const error = await refused(422, { error: "QUESTION_NOT_STARTED", message: "QUESTION_NOT_STARTED", kind, screen,
+      emergency_number: emergency });
+    expect(error.questionNotStarted).toEqual({ kind, screen, emergencyNumber: emergency });
     expect(error.serverCode).toBe("QUESTION_NOT_STARTED");
   });
 
-  it("keeps serverCode but no kind for an unknown refusal kind", async () => {
-    const error = await refused(422, { error: "QUESTION_NOT_STARTED", message: "QUESTION_NOT_STARTED", kind: "UNKNOWN" });
+  it.each([
+    ["a lowercase kind", { kind: "drugs", screen: "REFUSE", emergency_number: false }],
+    ["no screen", { kind: "DRUGS", emergency_number: false }],
+    ["the crisis screen", { kind: "DRUGS", screen: "HELP_NUMBERS", emergency_number: false }],
+    ["no emergency flag", { kind: "DRUGS", screen: "REFUSE" }],
+    ["an extra key", { kind: "DRUGS", screen: "REFUSE", emergency_number: false, kept: true }]
+  ])("keeps serverCode but no refusal for %s", async (_name, fields) => {
+    const error = await refused(422, { error: "QUESTION_NOT_STARTED", message: "QUESTION_NOT_STARTED", ...fields });
     expect(error.questionNotStarted).toBeNull();
     expect(error.serverCode).toBe("QUESTION_NOT_STARTED");
   });

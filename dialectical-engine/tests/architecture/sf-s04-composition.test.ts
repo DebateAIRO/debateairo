@@ -24,10 +24,25 @@ describe("S04 production composition", () => {
     expect(source).toMatch(/startThreatReportAlerts\(\{[\s\S]*?readRecipientEmail: readThreatReportStaffEmail/u);
   });
 
-  it("keeps a threat with its email when account erasure is already prepared", () => {
+  // Property (V, 2026-10-28): the subjects file is read at boot, so a bad file stops the API; nothing keeps a question.
+  it("reads the subjects file at boot and keeps no question", () => {
     const source = main();
-    expect(source).toContain("keepWithHeldEmail(questionLine, accountUserId, email)");
-    expect(source).toContain("const email = await readThreatReportRecipientEmail(accountUserId);");
+    expect(source).toMatch(/boot\.run\("question-subjects", async \(\) => readQuestionSubjects\(\)\)/u);
+    expect(source).toMatch(/composeQuestionCheck\(\{[\s\S]*?subjects: questionSubjects/u);
+    expect(source).not.toContain("keepWithHeldEmail(questionLine");
+    expect(source).not.toMatch(/keeper:/u);
+    expect(readFileSync("apps/api/src/question-check/compose.ts", "utf8")).not.toMatch(/keeper|\.keep\(/u);
+    expect(readFileSync("apps/api/src/question-check/ask-gate.ts", "utf8")).not.toMatch(/keep\(/u);
+    const askRoute = readFileSync("apps/api/src/index.ts", "utf8");
+    const at = askRoute.indexOf("options.questionCheck.check(ask.question_line)");
+    expect(at).toBeGreaterThan(0);
+    expect(askRoute.slice(at, at + 1_500)).not.toMatch(/\.keep\(/u);
+  });
+
+  // Property: the price bound counts the instruction built from the subjects file, which is longer than the old one.
+  it("projects the price from the instruction built from the subjects file", () => {
+    const source = readFileSync("apps/api/src/question-check/compose.ts", "utf8");
+    expect(source).toContain("Buffer.byteLength(questionCheckContract(input.subjects).instruction");
   });
 
   it("composes from the support target and the sealed policy through the local switch", () => {

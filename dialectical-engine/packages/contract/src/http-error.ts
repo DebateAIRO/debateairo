@@ -1,5 +1,5 @@
 import type { PublicationRefusalStatement } from "./index.js";
-import type { QuestionNotStartedKind } from "./question-check.js";
+import type { QuestionNotStarted } from "./question-check.js";
 
 export type ContractErrorCode =
   | "SESSION_REQUIRED"
@@ -36,7 +36,7 @@ export class ContractHttpError extends Error {
      * response that carries the header — the admission gate's 429 always does.
      */
     readonly retryAfterMs: number | null = null,
-    readonly questionNotStarted: Readonly<{ kind: QuestionNotStartedKind }> | null = null
+    readonly questionNotStarted: QuestionNotStarted | null = null
   ) {
     super(message);
     this.name = "ContractHttpError";

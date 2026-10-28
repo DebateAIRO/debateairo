@@ -166,7 +166,7 @@ async function contractErrorForResponse(response: Response): Promise<ContractHtt
   let serverMessage: string | null = null;
   let statement: PublicationRefusalStatement | null = null;
   let waiting: ContractWaitingRefusal | null = null;
-  let questionNotStarted: Readonly<{ kind: import("./question-check.js").QuestionNotStartedKind }> | null = null;
+  let questionNotStarted: import("./question-check.js").QuestionNotStarted | null = null;
   try {
     const candidate: unknown = await response.json();
     if (response.status === 409) {
@@ -186,7 +186,10 @@ async function contractErrorForResponse(response: Response): Promise<ContractHtt
         });
       }
       const questionRefusal = response.status === 422 ? QuestionNotStartedSchema.safeParse(body) : null;
-      if (questionRefusal?.success === true) questionNotStarted = Object.freeze({ kind: questionRefusal.data.kind });
+      if (questionRefusal?.success === true) {
+        questionNotStarted = Object.freeze({ kind: questionRefusal.data.kind, screen: questionRefusal.data.screen,
+          emergencyNumber: questionRefusal.data.emergency_number });
+      }
     }
   } catch {
     // A non-JSON failure still retains its transport status below.

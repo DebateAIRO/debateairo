@@ -153,7 +153,7 @@ function buildAskApi(application: AskApplication = fixtureApplication()) {
   return buildApiBase({
     application,
     sessions: testSessionApplication([IDENTITY]),
-    questionCheck: { check: async () => ({ outcome: "PASS" }), keep: async () => {} },
+    questionCheck: { check: async () => ({ outcome: "PASS" }) },
     allowedOrigin: TEST_APP_ORIGIN
   });
 }

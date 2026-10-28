@@ -151,6 +151,7 @@ import { PostgresPublicationApplication, buildPublicDebateBody } from "./publica
 import { createPublicationReviewStaffService } from "./publication-review/staff.js";
 import { createPublicationContentCheck } from "./publication-check/check.js";
 import { composeQuestionCheck } from "./question-check/compose.js";
+import { readQuestionSubjects } from "./question-check/subjects.js";
 import { startThreatReportAlerts } from "./staff/threat-report-alert.js";
 import { startThreatReportErasure, threatReportEmailHold } from "./staff/threat-report-closure.js";
 import { threatReportEmailReader } from "./staff/threat-reports.js";
@@ -1288,6 +1289,8 @@ const publicationContentCheck = createPublicationContentCheck({
 });
 const questionCheckPolicy = await boot.run("question-check-policy", () =>
   readQuestionCheckPolicy(pool, environment.REGISTER_VERSION));
+// V, 2026-10-28: the question check's subjects come from one file; a bad file stops the boot.
+const questionSubjects = await boot.run("question-subjects", async () => readQuestionSubjects());
 const questionCheck = await boot.run("question-check", () => composeQuestionCheck({
   mode: environment.DEPLOYMENT_MODE,
   apiPort: environment.API_PORT,
@@ -1295,6 +1298,7 @@ const questionCheck = await boot.run("question-check", () => composeQuestionChec
   readAuthorizationHeader: readCustodyAuthorizationHeader,
   reportDiagnostic: reportSupportDiagnostic,
   policy: questionCheckPolicy,
+  subjects: questionSubjects,
   spend: {
     writerPresent: () => questionCheckSpendWriterPresent(pool),
     record: entry => recordQuestionCheckSpend(pool, entry)
@@ -1303,17 +1307,6 @@ const questionCheck = await boot.run("question-check", () => composeQuestionChec
     ceilingMicros: siteAdmission.costEnvelope.guardPolicy.dailyCeilingMicros,
     spentMicros: day => new PostgresModelSpendStore(pool).readDaySpentMicros(day)
   },
-  keeper: { keep: async (questionLine, accountUserId) => {
-    try {
-      return await threatReportRepository.keep(questionLine, accountUserId);
-    } catch (error) {
-      if (accountUserId === null || !(error instanceof Error)
-        || error.message !== "THREAT_REPORT_ACCOUNT_ERASING") throw error;
-      const email = await readThreatReportRecipientEmail(accountUserId);
-      if (email === null) throw error;
-      return threatReportRepository.keepWithHeldEmail(questionLine, accountUserId, email);
-    }
-  } },
   clock: () => new Date(),
   report: line => console.error(JSON.stringify(line))
 }));

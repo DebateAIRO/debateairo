@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildApi, type AskApplication } from "@debateai/api";
-import { CRISIS_SUPPORT_OFFERED, QUESTION_NOT_STARTED_KINDS, SENSITIVE_DATA_CONSENT_REQUIRED } from "@debateai/contract";
+import { CRISIS_SUPPORT_OFFERED, SENSITIVE_DATA_CONSENT_REQUIRED } from "@debateai/contract";
 import { parsePreviewProviderTestConfig } from "@debateai/providers";
 import type { AdmissionLimiter } from "../../apps/api/src/admission.js";
 import type { CountryGate } from "../../apps/api/src/country-gate.js";
-import { KEPT_LABELS, QUESTION_CHECK_FAILURE_CODES, QUESTION_CHECK_LABELS, REFUSING_KINDS, type QuestionCheckOutcome } from "../../apps/api/src/question-check/contract.js";
+import { QUESTION_CHECK_FAILURE_CODES, type QuestionCheckOutcome } from "../../apps/api/src/question-check/contract.js";
+import { readQuestionSubjects } from "../../apps/api/src/question-check/subjects.js";
 import { answerForOutcome } from "../../apps/api/src/question-check/ask-gate.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 
@@ -20,16 +21,15 @@ const PREVIEW = parsePreviewProviderTestConfig(JSON.stringify({
 }))!;
 
 function harness(input: { consent?: "given" | "required"; preview?: boolean; rate?: boolean; country?: boolean; check?: boolean;
-  outcome?: QuestionCheckOutcome; keepFails?: boolean } = {}) {
+  outcome?: QuestionCheckOutcome } = {}) {
   const identity = testHttpIdentity("s04-gate");
   const submitted = vi.fn(async (_ask: unknown, _session: unknown, _principal: unknown) => (
     { run_ref: "11111111-1111-4111-8111-111111111111", status: "QUEUED" }
   ));
   const application = new Proxy({}, { get: (_target, key) => key === "submit" ? submitted : async () => null }) as AskApplication;
   const check = vi.fn(async (_question: string): Promise<QuestionCheckOutcome> => input.outcome ?? { outcome: "PASS" });
-  const keep = vi.fn(async (_record: unknown) => {
-    if (input.keepFails) throw Object.assign(new Error("private question must not be logged"), { code: "KEEP_IO_DOWN" });
-  });
+  // A keep method the route must never call (V, 2026-10-28: nothing of a question is stored).
+  const keep = vi.fn(async (_record: unknown) => {});
   const sessions = { ...testSessionApplication([identity]), readSensitiveDataConsent: async () => input.consent ?? "given" };
   const admission = { decide: () => input.rate
     ? { allowed: false, reason: "ASKS_EXHAUSTED", retryAfterMs: 60_000, windowMs: 60_000 }
@@ -37,7 +37,7 @@ function harness(input: { consent?: "given" | "required"; preview?: boolean; rat
   const countryGate = { recordedCountry: () => null, ask: () => input.country ? "COUNTRY_ASK_BLOCKED" : null } as unknown as CountryGate;
   const api = buildApi({ application, sessions, admission, countryGate, allowedOrigin: TEST_APP_ORIGIN,
     ...(input.preview ? { previewProviderTestConfig: PREVIEW, previewTeamUserIds: [] } : {}),
-    ...(input.check === false ? {} : { questionCheck: { check, keep } })
+    ...(input.check === false ? {} : { questionCheck: Object.assign({ check }, { keep }) })
   });
   const ask = (questionLine: string = ASK.question_line, countryHeader?: string) => api.inject({
     method: "POST", url: "/v1/asks", headers: { ...testSessionHeaders(identity, true),
@@ -109,52 +109,23 @@ it("throws for a future outcome instead of silently allowing an undefined answer
   expect(() => answerForOutcome({ outcome: "FUTURE" } as unknown as QuestionCheckOutcome, null)).toThrow();
 });
 
-describe("S04 kept refusals", () => {
-  it.each(KEPT_LABELS)("keeps the trimmed question and account once for %s", async (kind) => {
-    const h = harness({ outcome: { outcome: "REFUSE", kind, kept: true } });
-    try {
-      const response = await h.ask("  Should this happen?  ");
-      expect(response.statusCode).toBe(422);
-      expect(h.keep).toHaveBeenCalledExactlyOnceWith({ questionLine: "Should this happen?",
-        accountUserId: h.identity.authenticated.userId });
-      expect(h.submitted).not.toHaveBeenCalled();
-    } finally { await h.api.close(); }
-  });
+const REFUSALS: readonly QuestionCheckOutcome[] = [
+  { outcome: "REFUSE", kind: "HARM_TO_OTHERS", screen: "REFUSE", emergencyNumber: true },
+  { outcome: "REFUSE", kind: "DRUGS", screen: "REFUSE", emergencyNumber: false },
+  { outcome: "REFUSE", kind: "SUICIDE_AND_ASSISTED_DYING", screen: "SENSITIVE", emergencyNumber: false },
+  { outcome: "REFUSE", kind: "GAMBLING", screen: "REFUSE", emergencyNumber: false }
+];
 
+describe("S04 storing nothing (V, 2026-10-28)", () => {
+  // Property: no outcome of the question check leads the route to keep the question.
   it.each([
-    "CRIME", "HATE_SPEECH", "RELIGIOUS_INSULT", "SENSITIVE_TOPIC", "OWN_CRISIS", "METHODS_OR_ENCOURAGEMENT", "phrase check"
-  ])("keeps nothing for %s", async (kind) => {
-    const outcome: QuestionCheckOutcome = kind === "phrase check" ? { outcome: "PASS" }
-      : kind === "OWN_CRISIS" || kind === "METHODS_OR_ENCOURAGEMENT" ? { outcome: "CRISIS" }
-      : { outcome: "REFUSE", kind: kind as "HATE_SPEECH", kept: false };
+    ...REFUSALS, { outcome: "CRISIS" }, { outcome: "PASS" }, { outcome: "UNAVAILABLE", code: "QUESTION_CHECK_HTTP_STATUS" }
+  ] as QuestionCheckOutcome[])("keeps nothing for %j", async (outcome) => {
     const h = harness({ outcome });
     try {
-      await h.ask(kind === "phrase check" ? "Should I kill myself?" : undefined);
+      await h.ask("  Should this happen?  ");
       expect(h.keep).not.toHaveBeenCalled();
     } finally { await h.api.close(); }
-  });
-
-  it("answers 503 and does not submit when keeping fails", async () => {
-    const h = harness({ outcome: { outcome: "REFUSE", kind: "HARM_TO_OTHERS", kept: true }, keepFails: true });
-    try {
-      const response = await h.ask();
-      expect(response.statusCode).toBe(503);
-      expect(response.json()).toEqual({ error: "QUESTION_CHECK_UNAVAILABLE", message: "QUESTION_CHECK_UNAVAILABLE" });
-      expect(h.submitted).not.toHaveBeenCalled();
-    } finally { await h.api.close(); }
-  });
-
-  it("logs a failed keep as a generic check outage without naming its outcome class", async () => {
-    // Property: a log reader cannot infer that this refusal was one of the two kept labels.
-    // Mutant: call the event keep_failed; changing the failure code is a neighbour.
-    const lines: string[] = [];
-    const log = vi.spyOn(console, "error").mockImplementation(value => { lines.push(String(value)); });
-    const h = harness({ outcome: { outcome: "REFUSE", kind: "HARM_TO_OTHERS", kept: true }, keepFails: true });
-    try {
-      await h.ask();
-      expect(lines.map(line => JSON.parse(line))).toContainEqual({ event: "api.question_check.unavailable", code: "KEEP_IO_DOWN" });
-      expect(lines.join(" ")).not.toMatch(/keep_failed|HARM_TO_OTHERS|WEAPONS_DRUGS_TERRORISM/u);
-    } finally { log.mockRestore(); await h.api.close(); }
   });
 });
 
@@ -169,13 +140,14 @@ describe("S04 question gate outcomes", () => {
     } finally { await h.api.close(); }
   });
 
-  it.each(REFUSING_KINDS)("answers 422 QUESTION_NOT_STARTED with kind %s and does not submit", async (kind) => {
-    expect(QUESTION_NOT_STARTED_KINDS).toEqual(REFUSING_KINDS);
-    const h = harness({ outcome: { outcome: "REFUSE", kind, kept: false } });
+  it.each(REFUSALS)("answers 422 QUESTION_NOT_STARTED with the subject and its screen for %j", async (outcome) => {
+    const refusal = outcome as Extract<QuestionCheckOutcome, { outcome: "REFUSE" }>;
+    const h = harness({ outcome });
     try {
       const response = await h.ask();
       expect(response.statusCode).toBe(422);
-      expect(response.json()).toEqual({ error: "QUESTION_NOT_STARTED", message: "QUESTION_NOT_STARTED", kind });
+      expect(response.json()).toEqual({ error: "QUESTION_NOT_STARTED", message: "QUESTION_NOT_STARTED", kind: refusal.kind,
+        screen: refusal.screen, emergency_number: refusal.emergencyNumber });
       expect(h.submitted).not.toHaveBeenCalled();
     } finally { await h.api.close(); }
   });
@@ -204,25 +176,19 @@ describe("S04 question gate outcomes", () => {
 });
 
 describe("S04 route disclosure", () => {
-  it("logs neither question text nor label for every outcome and failure", async () => {
+  it("logs neither question text nor subject id for every outcome and failure", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     const question = "private sentinel question Ω";
     try {
-      const outcomes: QuestionCheckOutcome[] = QUESTION_CHECK_LABELS.map((label) =>
-        label === "ORDINARY" ? { outcome: "PASS" }
-          : label === "OWN_CRISIS" || label === "METHODS_OR_ENCOURAGEMENT" ? { outcome: "CRISIS" }
-          : { outcome: "REFUSE", kind: label, kept: label === "HARM_TO_OTHERS" || label === "WEAPONS_DRUGS_TERRORISM" });
+      const outcomes: QuestionCheckOutcome[] = [{ outcome: "PASS" }, { outcome: "CRISIS" }, ...REFUSALS];
       outcomes.push(...QUESTION_CHECK_FAILURE_CODES.map((code) => ({ outcome: "UNAVAILABLE" as const, code })));
       for (const outcome of outcomes) {
         const h = harness({ outcome });
         try { await h.ask(question); } finally { await h.api.close(); }
       }
-      const failedKeep = harness({ outcome: { outcome: "REFUSE", kind: "HARM_TO_OTHERS", kept: true }, keepFails: true });
-      try { await failedKeep.ask(question); } finally { await failedKeep.api.close(); }
       const lines = log.mock.calls.map((call) => call.map(String).join(" ")).join("\n");
       expect(lines).not.toContain(question);
-      for (const label of QUESTION_CHECK_LABELS) expect(lines).not.toContain(label);
-      expect(lines).toContain('"code":"KEEP_IO_DOWN"');
+      for (const id of readQuestionSubjects().map(subject => subject.id)) expect(lines).not.toContain(id);
     } finally { log.mockRestore(); }
   });
 
@@ -230,7 +196,7 @@ describe("S04 route disclosure", () => {
     const question = "private sentinel question Ω";
     const outcomes: QuestionCheckOutcome[] = [
       { outcome: "CRISIS" },
-      ...REFUSING_KINDS.map((kind) => ({ outcome: "REFUSE" as const, kind, kept: false })),
+      ...REFUSALS,
       ...QUESTION_CHECK_FAILURE_CODES.map((code) => ({ outcome: "UNAVAILABLE" as const, code }))
     ];
     for (const outcome of outcomes) {

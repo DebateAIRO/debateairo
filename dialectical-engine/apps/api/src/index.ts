@@ -19,7 +19,7 @@ import { AccountProfileError, type AccountProfileService } from "./account-profi
 import { RecoveryEmailError, type RecoveryEmailService } from "./recovery-email.js";
 import type { ProfileSession } from "@debateai/db";
 import { normalizeManualPhone } from "./phone-profile.js";
-import { answerForOutcome, keepFailureCode, type AskQuestionCheck } from "./question-check/ask-gate.js";
+import { answerForOutcome, type AskQuestionCheck } from "./question-check/ask-gate.js";
 import { resolveSourceMailLocale } from "./mail-locale.js";
 import { exhaustive, type FundingBasis } from "@debateai/kernel";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
@@ -3823,17 +3823,6 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return reply.status(503).send({ error: "QUESTION_CHECK_UNAVAILABLE", message: "QUESTION_CHECK_UNAVAILABLE" });
     }
     const outcome = await options.questionCheck.check(ask.question_line);
-    if (outcome.outcome === "REFUSE" && outcome.kept) {
-      try {
-        await options.questionCheck.keep({
-          questionLine: ask.question_line,
-          accountUserId: request.authenticatedSession?.userId ?? null
-        });
-      } catch (error) {
-        console.error(JSON.stringify({ event: "api.question_check.unavailable", code: keepFailureCode(error) }));
-        return reply.status(503).send({ error: "QUESTION_CHECK_UNAVAILABLE", message: "QUESTION_CHECK_UNAVAILABLE" });
-      }
-    }
     const answer = answerForOutcome(outcome, edgeCountry(request.headers));
     if (answer !== null) return reply.status(answer.status).send(answer.body);
     const accepted = AskAcceptedSchema.parse(await options.application.submit(

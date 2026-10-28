@@ -6,6 +6,7 @@ import type { SupportModelTarget } from "../support/model.js";
 import type { AskQuestionCheck } from "./ask-gate.js";
 import { createQuestionCheck, type QuestionCheckSpendEntry } from "./check.js";
 import { questionCheckContract } from "./instruction.js";
+import type { QuestionSubjects } from "./subjects.js";
 import { createQuestionCheckTransport, questionCheckTarget } from "./transport.js";
 
 export async function composeQuestionCheck(input: Readonly<{
@@ -15,12 +16,12 @@ export async function composeQuestionCheck(input: Readonly<{
   readAuthorizationHeader(path: string): string;
   reportDiagnostic(diagnostic: Readonly<{ code: string }>): void;
   policy: QuestionCheckPolicy;
+  subjects: QuestionSubjects;
   spend: {
     writerPresent(): Promise<boolean>;
     record(entry: QuestionCheckSpendEntry): Promise<void>;
   };
   dayPot: Readonly<{ ceilingMicros: number; spentMicros(day: string): Promise<number> }> | null;
-  keeper: { keep(questionLine: string, accountUserId: string | null): Promise<string> };
   clock(): Date;
   report(line: Readonly<{ event: string; code: string }>): void;
 }>): Promise<AskQuestionCheck> {
@@ -31,8 +32,8 @@ export async function composeQuestionCheck(input: Readonly<{
   let price: Readonly<{ input: number; output: number }> | null = null;
   if (target !== null) {
     try {
-      // Bytes are an upper bound on charged input tokens. Include the fixed instruction as well.
-      const projectedInput = askQuestionMaxBytes() + Buffer.byteLength(questionCheckContract().instruction, "utf8");
+      // Bytes are an upper bound on charged input tokens. Include the instruction built from the subjects file as well.
+      const projectedInput = askQuestionMaxBytes() + Buffer.byteLength(questionCheckContract(input.subjects).instruction, "utf8");
       price = hostedLanguageCheckPrice({ input: 0, output: 0 }, target.model, projectedInput);
     } catch {
       input.report({ event: "api.question_check.unpriced", code: "QUESTION_CHECK_NOT_CONFIGURED" });
@@ -48,6 +49,7 @@ export async function composeQuestionCheck(input: Readonly<{
     { offFlagPath: input.mode === "hosted" ? null : localOffFlagPath(input.apiPort, "question-check") }
   );
   const checker = createQuestionCheck({
+    subjects: input.subjects,
     port: switcher.current,
     deadlineMs: input.policy.deadlineMs,
     price: writerPresent ? price : null,
@@ -56,10 +58,5 @@ export async function composeQuestionCheck(input: Readonly<{
     clock: input.clock,
     report: input.report
   });
-  return {
-    check: checker.check,
-    async keep({ questionLine, accountUserId }) {
-      await input.keeper.keep(questionLine, accountUserId);
-    }
-  };
+  return { check: checker.check };
 }

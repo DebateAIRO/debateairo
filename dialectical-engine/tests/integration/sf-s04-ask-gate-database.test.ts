@@ -2,11 +2,12 @@ import { createHash, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { buildApi, type AskApplication } from "@debateai/api";
 import { recordQuestionCheckSpend } from "@debateai/budget";
-import { migrate, PostgresThreatReportRepository, RunRepository } from "@debateai/db";
+import { migrate, RunRepository } from "@debateai/db";
 import { readPromptFrame } from "@debateai/providers";
 import { judgeCallValue } from "../../apps/api/src/publication-check/verdict.js";
 import { createQuestionCheck } from "../../apps/api/src/question-check/check.js";
 import { QuestionCheckFailure, type QuestionCheckPort } from "../../apps/api/src/question-check/transport.js";
+import { readQuestionSubjects } from "../../apps/api/src/question-check/subjects.js";
 import { SUPPORT_RELAY_PROVIDER_REF } from "../../apps/api/src/support/model.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
@@ -15,9 +16,11 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 let database: TestDatabase;
 const identity = testHttpIdentity("s04-database-gate");
 const question = "Should a private sentinel question lead to a debate?";
-const labels = ["ORDINARY", "HARM_TO_OTHERS", "WEAPONS_DRUGS_TERRORISM", "CRIME", "HATE_SPEECH",
-  "RELIGIOUS_INSULT", "SENSITIVE_TOPIC", "OWN_CRISIS", "METHODS_OR_ENCOURAGEMENT",
+// V, 2026-10-28: the model answers the subject (or NONE) and whether the question is healthy; nothing is kept.
+const labels = ["NONE healthy", "DRUGS healthy", "HARM_TO_OTHERS not", "WEAPONS_TERRORISM not", "DRUGS not", "CRIME not",
+  "HATE_SPEECH not", "RELIGIOUS_INSULT not", "SUICIDE_AND_ASSISTED_DYING not", "OWN_CRISIS not", "SUICIDE_METHODS healthy",
   "QUESTION_CHECK_HTTP_STATUS"] as const;
+const starts = (label: string) => label.endsWith(" healthy") && !label.startsWith("SUICIDE_METHODS");
 
 async function asRuntime<T extends Record<string, unknown> = Record<string, unknown>>(
   statement: string, values: unknown[] = []
@@ -76,16 +79,15 @@ function serverFor(label: typeof labels[number], reports: { event: string; code:
     providerRef: SUPPORT_RELAY_PROVIDER_REF, modelId: "claude-haiku-5-5",
     complete: async ({ packet }) => {
       if (label === "QUESTION_CHECK_HTTP_STATUS") throw new QuestionCheckFailure(label);
-      return { text: JSON.stringify({ call: judgeCallValue(readPromptFrame(packet).fence), label }),
+      const [subject, health] = label.split(" ");
+      return { text: JSON.stringify({ call: judgeCallValue(readPromptFrame(packet).fence), subject, healthy: health === "healthy" }),
         usage: { inputTokens: 3, outputTokens: 4 } };
     }
   };
-  const check = createQuestionCheck({ port: () => port, deadlineMs: 1_000,
+  const check = createQuestionCheck({ subjects: readQuestionSubjects(), port: () => port, deadlineMs: 1_000,
     price: { input: 1, output: 2 }, dayPot: null, clock: () => new Date(),
     spend: { record: entry => recordQuestionCheckSpend({ query: async (sql: string, values?: unknown[]) =>
       ({ rows: await asRuntime(sql, values) }) } as never, entry) }, report: line => { reports.push(line); } });
-  const repository = new PostgresThreatReportRepository({ query: async (sql: string, values?: unknown[]) =>
-    ({ rows: await asRuntime(sql, values) }) } as never);
   const application = new Proxy({}, { get: (_target, key) => key === "submit"
     ? async () => {
       const runId = await new RunRepository(database.pool).startRun({
@@ -101,7 +103,7 @@ function serverFor(label: typeof labels[number], reports: { event: string; code:
       return { run_ref: runId, status: "QUEUED" };
     } : async () => null }) as AskApplication;
   const api = buildApi({ application, sessions: testSessionApplication([identity]), allowedOrigin: TEST_APP_ORIGIN,
-    questionCheck: { check: line => check.check(line), keep: async input => { await repository.keep(input.questionLine, input.accountUserId); } } });
+    questionCheck: { check: line => check.check(line) } });
   return api;
 }
 
@@ -124,7 +126,7 @@ describe("S04 ask gate over the database", () => {
   const spent = new Map<string, [number, number]>();
 
   it.each(labels)("lists the rows %s adds", async label => {
-    // Property: only ORDINARY starts a run; kept refusals add only the private record and two alerts.
+    // Property: only a healthy question starts a run; every other outcome adds only the cost record, so no question is stored.
     // Mutant: call application.submit for a refused label; a response-body change is a neighbour.
     const reports: { event: string; code: string }[] = [];
     const log = vi.spyOn(console, "error").mockImplementation((...args) => { captured.push(args.map(String).join(" ")); });
@@ -135,20 +137,18 @@ describe("S04 ask gate over the database", () => {
         payload: { question_line: question, risk_tier: "casual", tier_source: "ASKER", tier_provenance_ref: "asker:test",
           composition_budget_tier: "low", depth_params: { depth: 1 }, decision_scope: "test",
           as_of: "2026-10-21T00:00:00.000Z", steering_presets: [], plan_tier: "free", steering_annotations: [] } });
-      expect(response.statusCode).toBe(label === "ORDINARY" ? 202 : label === "QUESTION_CHECK_HTTP_STATUS" ? 503 : 422);
+      expect(response.statusCode).toBe(starts(label) ? 202 : label === "QUESTION_CHECK_HTTP_STATUS" ? 503 : 422);
       const change = delta(before, await tableCounts());
       observed.set(label, change);
       spent.set(label, [personBefore, await personSpend()]);
       captured.push(...reports.map(line => JSON.stringify(line)));
       expect(change["ledger.model_spend"]).toBe(1);
-      if (label === "ORDINARY") {
+      if (starts(label)) {
         expect(change).toEqual({ "ledger.model_spend": 1, "core.run": 1,
           "core.question_liveness_event": 1, "core.run_progress_event": 3,
           "core.run_ownership_event": 1 });
       } else {
-        const extras = label === "HARM_TO_OTHERS" || label === "WEAPONS_DRUGS_TERRORISM"
-          ? { "staff.threat_report": 1, "staff.threat_report_alert": 2 } : {};
-        expect(change).toEqual({ "ledger.model_spend": 1, ...extras });
+        expect(change).toEqual({ "ledger.model_spend": 1 });
       }
     } finally { log.mockRestore(); await api.close(); }
   }, 600_000);
@@ -160,12 +160,12 @@ describe("S04 ask gate over the database", () => {
     for (const [label, [before, after]] of spent) expect(after, label).toBe(before);
   });
 
-  it("captures no question text or label code in logs across all nine outcomes", () => {
+  it("captures no question text or subject id in logs across every outcome", () => {
     // Property: diagnostics hold machine failure codes, not the private material or classifier labels.
     // Mutant: include questionLine in a report call; a spend amount change is a neighbour.
     expect(observed.size).toBe(labels.length);
     const lines = captured.join("\n");
     expect(lines).not.toContain(question);
-    for (const label of labels.filter(label => label !== "QUESTION_CHECK_HTTP_STATUS")) expect(lines).not.toContain(label);
+    for (const id of readQuestionSubjects().map(subject => subject.id)) expect(lines).not.toContain(id);
   });
 });
