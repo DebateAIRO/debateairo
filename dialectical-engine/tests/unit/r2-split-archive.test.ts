@@ -16,7 +16,7 @@ type ListedFloor = Awaited<ReturnType<PostgresPublicationApplication["list"]>>["
 
 describe("R2 SPLIT in the data export (Q1 option 1)", () => {
   it("adds one archive key", () => {
-    expect(ARCHIVE_KEYS).toHaveLength(19);
+    expect(ARCHIVE_KEYS).toHaveLength(32);
     expect(ARCHIVE_KEYS).toContain("archive.verdictSplit");
     expect(ARCHIVE_KEYS.indexOf("archive.verdictSplit")).toBe(ARCHIVE_KEYS.indexOf("archive.verdictUnsupported") + 1);
   });

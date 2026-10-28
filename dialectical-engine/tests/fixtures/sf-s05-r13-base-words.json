@@ -1,0 +1,362 @@
+{
+  "ar": {
+    "REFUSE_INJECTION": "تم تسجيل رسالتك.",
+    "REFUSE_SAFETY": "وسيقرأ شخص رسالتك.",
+    "DEGRADED": "لا يزال بإمكانك ترك رسالة لشخص: اختر «التحدث إلى شخص».",
+    "support.escalateBody": "صعّد الطلب ليقرأ شخص سلسلة المحادثة كاملة.",
+    "support.agentLead": "ويحيل المحادثة إلى شخص عندما يتعذّر عليه الإجابة.",
+    "support.aiBanner": "اطلب التحدث إلى إنسان في أي وقت.",
+    "home.aiBanner": "اطلب التحدث إلى إنسان في أي وقت.",
+    "settings.transparency.supportLead": "استخدم «التحدث إلى شخص» أو «التصعيد إلى شخص» في"
+  },
+  "bg": {
+    "REFUSE_INJECTION": "Съобщението Ви е записано.",
+    "REFUSE_SAFETY": "и човек ще прочете съобщението Ви.",
+    "DEGRADED": "Все пак можете да оставите съобщение за човек: изберете „Разговор с човек“.",
+    "support.escalateBody": "Ескалирайте случая и човек ще прочете цялата нишка.",
+    "support.agentLead": "и прехвърля разговора към човек, когато не може да помогне.",
+    "support.aiBanner": "По всяко време можете да поискате разговор с човек.",
+    "home.aiBanner": "По всяко време можете да поискате разговор с човек.",
+    "settings.transparency.supportTail": "изберете „Разговор с човек“ или „Ескалиране към човек“"
+  },
+  "cs": {
+    "REFUSE_INJECTION": "Vaše zpráva byla zaznamenána.",
+    "REFUSE_SAFETY": "a člověk si vaši zprávu přečte.",
+    "DEGRADED": "Stále můžete zanechat zprávu člověku: zvolte „Promluvit si s člověkem“.",
+    "support.escalateBody": "Předejte případ člověku, který si přečte celé vlákno.",
+    "support.agentLead": "a předá konverzaci člověku, když si neví rady.",
+    "support.aiBanner": "Požádejte o člověka kdykoli.",
+    "home.aiBanner": "Požádejte o člověka kdykoli.",
+    "settings.transparency.supportLead": "použijte „Mluvit s člověkem“ nebo „Předat člověku“ v"
+  },
+  "da": {
+    "REFUSE_INJECTION": "Din besked er blevet registreret.",
+    "REFUSE_SAFETY": "så vil et menneske læse din besked.",
+    "DEGRADED": "Du kan stadig efterlade en besked til et menneske: vælg 'Tal med et menneske'.",
+    "support.escalateBody": "Eskaler sagen, så et menneske læser hele tråden.",
+    "support.agentLead": "og overdrager samtalen til et menneske, når den ikke kan hjælpe.",
+    "support.aiBanner": "Spørg efter et menneske på ethvert tidspunkt.",
+    "home.aiBanner": "Spørg efter et menneske på ethvert tidspunkt.",
+    "settings.transparency.supportLead": "Brug “Tal med et menneske” eller “Eskalér til et menneske” i"
+  },
+  "de": {
+    "REFUSE_INJECTION": "Ihre Nachricht wurde aufgezeichnet.",
+    "REFUSE_SAFETY": "damit ein Mensch Ihre Nachricht liest.",
+    "DEGRADED": "Sie können trotzdem eine Nachricht für einen Menschen hinterlassen: Wählen Sie „Mit einem Menschen sprechen“.",
+    "support.escalateBody": "Leiten Sie das Anliegen weiter, damit ein Mensch den gesamten Verlauf liest.",
+    "support.agentLead": "und übergibt an einen Menschen, wenn er nicht weiterhelfen kann.",
+    "support.aiBanner": "Sie können jederzeit einen Menschen verlangen.",
+    "home.aiBanner": "Sie können jederzeit einen Menschen verlangen.",
+    "settings.transparency.supportTail": "wählen Sie „Mit einem Menschen sprechen“ oder „An einen Menschen weiterleiten“"
+  },
+  "el": {
+    "REFUSE_INJECTION": "Το μήνυμά σας καταγράφηκε.",
+    "REFUSE_SAFETY": "και ένας άνθρωπος θα διαβάσει το μήνυμά σας.",
+    "DEGRADED": "Μπορείτε ακόμη να αφήσετε μήνυμα για έναν άνθρωπο: επιλέξτε «Συνομιλία με άνθρωπο».",
+    "support.escalateBody": "Κλιμακώστε το αίτημα και ένας άνθρωπος θα διαβάσει ολόκληρο το νήμα.",
+    "support.agentLead": "και παραπέμπει σε άνθρωπο όταν δεν μπορεί να βοηθήσει.",
+    "support.aiBanner": "Ζητήστε άνθρωπο οποιαδήποτε στιγμή.",
+    "home.aiBanner": "Ζητήστε άνθρωπο οποιαδήποτε στιγμή.",
+    "settings.transparency.supportLead": "Χρησιμοποιήστε τις επιλογές «Συνομιλία με άνθρωπο» ή «Κλιμάκωση σε άνθρωπο» στην ενότητα"
+  },
+  "en": {
+    "REFUSE_INJECTION": "Your message has been recorded.",
+    "REFUSE_SAFETY": "and a person will read your message.",
+    "DEGRADED": "You can still leave a message for a person: choose 'Talk to a human'.",
+    "support.escalateBody": "Escalate and a human reads the whole thread.",
+    "support.agentLead": "and hands off to a person when it cannot.",
+    "support.aiBanner": "Ask for a human at any point.",
+    "home.aiBanner": "Ask for a human at any point.",
+    "settings.transparency.supportLead": "Use “Talk to a human” or “Escalate to a human” in",
+    "support-cases:14": "to create an asynchronous case.",
+    "settings-help-menus:18": "Escalate to a human creates a separate human handoff, and email support is a separate mail workflow.",
+    "settings-help-menus:20": "A human case may include the conversation thread;",
+    "app-navigation:21": "Email support and Escalate to a human are separate human-support workflows.",
+    "ai-transparency:23": "To request human assistance, use Talk to a human or Escalate to a human in Help."
+  },
+  "es": {
+    "REFUSE_INJECTION": "Su mensaje ha quedado registrado.",
+    "REFUSE_SAFETY": "y una persona leerá su mensaje.",
+    "DEGRADED": "Aun así, puede dejar un mensaje para una persona: elija «Hablar con una persona».",
+    "support.escalateBody": "Derive el caso y una persona leerá todo el hilo.",
+    "support.agentLead": "y transfiere la conversación a una persona cuando no puede ayudar.",
+    "support.aiBanner": "Puede pedir que intervenga una persona en cualquier momento.",
+    "home.aiBanner": "Puede pedir que intervenga una persona en cualquier momento.",
+    "settings.transparency.supportLead": "Use «Hablar con una persona» o «Derivar a una persona» en"
+  },
+  "et": {
+    "REFUSE_INJECTION": "Teie sõnum on salvestatud.",
+    "REFUSE_SAFETY": "ja inimene loeb teie sõnumit.",
+    "DEGRADED": "Saate siiski jätta inimesele sõnumi: valige „Rääkige inimesega“.",
+    "support.escalateBody": "Edastage juhtum ja inimene loeb kogu vestluslõime.",
+    "support.agentLead": "ja suunab vestluse inimesele, kui ei suuda aidata.",
+    "support.aiBanner": "Võite igal ajal paluda inimesega rääkida.",
+    "home.aiBanner": "Võite igal ajal paluda inimesega rääkida.",
+    "settings.transparency.supportTail": "valikut „Rääkige inimesega“ või „Edastage inimesele“"
+  },
+  "fi": {
+    "REFUSE_INJECTION": "Viestinne on tallennettu.",
+    "REFUSE_SAFETY": "niin henkilö lukee viestinne.",
+    "DEGRADED": "Voitte silti jättää viestin henkilölle: valitkaa ”Keskustele henkilön kanssa”.",
+    "support.escalateBody": "Siirrä asia henkilölle, joka lukee koko keskusteluketjun.",
+    "support.agentLead": "ja siirtää keskustelun ihmiselle, kun se ei pysty auttamaan.",
+    "support.aiBanner": "Voit pyytää ihmistä mukaan milloin tahansa.",
+    "home.aiBanner": "Voit pyytää ihmistä mukaan milloin tahansa.",
+    "settings.transparency.supportLead": "valitsemalla ”Keskustele ihmisen kanssa” tai ”Siirrä ihmiselle” kohdassa"
+  },
+  "fr": {
+    "REFUSE_INJECTION": "Votre message a été enregistré.",
+    "REFUSE_SAFETY": "et une personne lira votre message.",
+    "DEGRADED": "Vous pouvez tout de même laisser un message à une personne : choisissez « Parler à une personne ».",
+    "support.escalateBody": "Transmettez la demande pour qu’une personne lise l’intégralité du fil.",
+    "support.agentLead": "et transmet la demande à une personne lorsqu’il ne peut pas répondre.",
+    "support.aiBanner": "Demandez l’intervention d’une personne à tout moment.",
+    "home.aiBanner": "Demandez l’intervention d’une personne à tout moment.",
+    "settings.transparency.supportLead": "Utilisez « Parler à une personne » ou « Transmettre à une personne » dans"
+  },
+  "ga": {
+    "REFUSE_INJECTION": "Taifeadadh do theachtaireacht.",
+    "REFUSE_SAFETY": "agus léifidh duine do theachtaireacht.",
+    "DEGRADED": "Is féidir leat teachtaireacht a fhágáil do dhuine fós: roghnaigh ‘Labhair le duine’.",
+    "support.escalateBody": "Ardaigh chuig duine é agus léifidh duine an snáithe iomlán.",
+    "support.agentLead": "agus aistríonn sé an comhrá chuig duine nuair nach féidir leis cabhrú.",
+    "support.aiBanner": "Iarr labhairt le duine am ar bith.",
+    "home.aiBanner": "Iarr labhairt le duine am ar bith.",
+    "settings.transparency.supportLead": "Úsáid “Labhair le duine” nó “Ardaigh chuig duine” sa rannán"
+  },
+  "he": {
+    "REFUSE_INJECTION": "הודעתך תועדה.",
+    "REFUSE_SAFETY": "ונציג יקרא את הודעתך.",
+    "DEGRADED": "עדיין אפשר להשאיר הודעה לנציג אנושי: יש לבחור „שיחה עם נציג אנושי”.",
+    "support.escalateBody": "העברה לנציג אנושי מאפשרת קריאה של כל השרשור.",
+    "support.agentLead": "ומעביר את השיחה לנציג אנושי כשאינו יכול לעזור.",
+    "support.aiBanner": "אפשר לבקש לדבר עם אדם בכל עת.",
+    "home.aiBanner": "אפשר לבקש לדבר עם אדם בכל עת.",
+    "settings.transparency.supportLead": "השתמשו באפשרות ״שיחה עם נציג אנושי״ או ״העברה לנציג אנושי״ תחת"
+  },
+  "hi": {
+    "REFUSE_INJECTION": "आपका संदेश दर्ज कर लिया गया है।",
+    "REFUSE_SAFETY": "और कोई व्यक्ति आपका संदेश पढ़ेगा।",
+    "DEGRADED": "फिर भी आप किसी व्यक्ति के लिए संदेश छोड़ सकते हैं: ‘किसी व्यक्ति से बात करें’ चुनें।",
+    "support.escalateBody": "इसे आगे भेजने पर कोई व्यक्ति पूरा संवाद पढ़ेगा।",
+    "support.agentLead": "और जब उत्तर नहीं दे पाता तो बातचीत किसी व्यक्ति को सौंप देता है।",
+    "support.aiBanner": "आप कभी भी किसी व्यक्ति से सहायता माँग सकते हैं।",
+    "home.aiBanner": "आप कभी भी किसी व्यक्ति से सहायता माँग सकते हैं।",
+    "settings.transparency.supportTail": "“किसी व्यक्ति से बात करें” या “किसी व्यक्ति तक भेजें” चुनें"
+  },
+  "hr": {
+    "REFUSE_INJECTION": "Vaša je poruka zabilježena.",
+    "REFUSE_SAFETY": "i osoba će pročitati Vašu poruku.",
+    "DEGRADED": "I dalje možete ostaviti poruku osobi: odaberite „Razgovor s osobom“.",
+    "support.escalateBody": "Proslijedite razgovor osobi i ona će pročitati cijelu temu.",
+    "support.agentLead": "i prepušta razgovor osobi kada ne može pomoći.",
+    "support.aiBanner": "U bilo kojem trenutku zatražite razgovor s osobom.",
+    "home.aiBanner": "U bilo kojem trenutku zatražite razgovor s osobom.",
+    "settings.transparency.supportLead": "Upotrijebite „Razgovor s osobom” ili „Proslijedite osobi” u"
+  },
+  "hu": {
+    "REFUSE_INJECTION": "Üzenetét rögzítettük.",
+    "REFUSE_SAFETY": "és egy munkatárs elolvassa az üzenetét.",
+    "DEGRADED": "Ettől függetlenül hagyhat üzenetet egy munkatársnak: válassza a „Beszélgetés munkatárssal” lehetőséget.",
+    "support.escalateBody": "Továbbítás esetén egy munkatárs elolvassa a teljes beszélgetést.",
+    "support.agentLead": "és munkatárshoz irányítja a beszélgetést, ha nem tud segíteni.",
+    "support.aiBanner": "Bármikor kérhet emberi segítséget.",
+    "home.aiBanner": "Bármikor kérhet emberi segítséget.",
+    "settings.transparency.supportLead": "használja a „Beszélgetés emberrel” vagy az „Átadás embernek” lehetőséget itt:"
+  },
+  "id": {
+    "REFUSE_INJECTION": "Pesan Anda telah dicatat.",
+    "REFUSE_SAFETY": "dan petugas akan membaca pesan Anda.",
+    "DEGRADED": "Anda tetap dapat meninggalkan pesan untuk petugas: pilih ‘Bicara dengan petugas’.",
+    "support.escalateBody": "Teruskan agar petugas membaca seluruh percakapan.",
+    "support.agentLead": "dan meneruskan percakapan kepada petugas jika tidak dapat membantu.",
+    "support.aiBanner": "Minta bantuan manusia kapan saja.",
+    "home.aiBanner": "Minta bantuan manusia kapan saja.",
+    "settings.transparency.supportLead": "Gunakan “Bicara dengan manusia” atau “Eskalasi ke manusia” di"
+  },
+  "it": {
+    "REFUSE_INJECTION": "Il suo messaggio è stato registrato.",
+    "REFUSE_SAFETY": "e una persona leggerà il suo messaggio.",
+    "DEGRADED": "Può comunque lasciare un messaggio per una persona: scelga «Parla con una persona».",
+    "support.escalateBody": "Richiedi l’intervento di una persona, che leggerà l’intera conversazione.",
+    "support.agentLead": "e passa la conversazione a una persona quando non è in grado di aiutare.",
+    "support.aiBanner": "Puoi chiedere di parlare con una persona in qualsiasi momento.",
+    "home.aiBanner": "Puoi chiedere di parlare con una persona in qualsiasi momento.",
+    "settings.transparency.supportLead": "Utilizza «Parla con una persona» o «Richiedi l’intervento di una persona» in"
+  },
+  "ja": {
+    "REFUSE_INJECTION": "メッセージは記録されました。",
+    "REFUSE_SAFETY": "担当者がメッセージを確認します。",
+    "DEGRADED": "担当者へのメッセージは引き続き送信できます。「担当者と話す」を選択してください。",
+    "support.escalateBody": "担当者に引き継ぐと、会話全体が読まれます。",
+    "support.agentLead": "対応できない場合は担当者に引き継ぎます。",
+    "support.aiBanner": "いつでも人による対応を依頼できます。",
+    "home.aiBanner": "いつでも人による対応を依頼できます。",
+    "settings.transparency.supportTail": "「担当者と話す」または「担当者に引き継ぐ」を選択してください"
+  },
+  "ko": {
+    "REFUSE_INJECTION": "메시지는 기록되었습니다.",
+    "REFUSE_SAFETY": "상담원이 메시지를 읽습니다.",
+    "DEGRADED": "상담원에게 메시지를 남길 수는 있습니다. ‘상담원과 대화하기’를 선택하세요.",
+    "support.escalateBody": "상담원에게 전달하면 전체 대화를 읽습니다.",
+    "support.agentLead": "답변할 수 없을 때는 상담원에게 연결합니다.",
+    "support.aiBanner": "언제든 사람의 지원을 요청하세요.",
+    "home.aiBanner": "언제든 사람의 지원을 요청하세요.",
+    "settings.transparency.supportTail": "‘상담원과 대화하기’ 또는 ‘상담원에게 전달’을 선택하세요"
+  },
+  "lt": {
+    "REFUSE_INJECTION": "Jūsų pranešimas įrašytas.",
+    "REFUSE_SAFETY": "ir žmogus perskaitys jūsų pranešimą.",
+    "DEGRADED": "Vis tiek galite palikti pranešimą žmogui: pasirinkite „Kalbėtis su žmogumi“.",
+    "support.escalateBody": "Perduokite pokalbį žmogui, kuris perskaitys visą susirašinėjimą.",
+    "support.agentLead": "ir perduoda pokalbį žmogui, kai negali padėti.",
+    "support.aiBanner": "Bet kada galite paprašyti žmogaus pagalbos.",
+    "home.aiBanner": "Bet kada galite paprašyti žmogaus pagalbos.",
+    "settings.transparency.supportTail": "pasirinkite „Kalbėtis su žmogumi“ arba „Perduoti pokalbį žmogui“"
+  },
+  "lv": {
+    "REFUSE_INJECTION": "Jūsu ziņojums ir reģistrēts.",
+    "REFUSE_SAFETY": "un cilvēks izlasīs jūsu ziņojumu.",
+    "DEGRADED": "Joprojām varat atstāt ziņojumu cilvēkam: izvēlieties “Runāt ar cilvēku”.",
+    "support.escalateBody": "Nododiet sarunu cilvēkam, kurš izlasīs visu saraksti.",
+    "support.agentLead": "un nodod sarunu cilvēkam, ja nevar palīdzēt.",
+    "support.aiBanner": "Jebkurā brīdī varat lūgt cilvēka palīdzību.",
+    "home.aiBanner": "Jebkurā brīdī varat lūgt cilvēka palīdzību.",
+    "settings.transparency.supportTail": "izmantojiet „Runāt ar cilvēku” vai „Nodot sarunu cilvēkam”"
+  },
+  "mt": {
+    "REFUSE_INJECTION": "Il-messaġġ tiegħek ġie rreġistrat.",
+    "REFUSE_SAFETY": "u persuna taqra l-messaġġ tiegħek.",
+    "DEGRADED": "Xorta tista' tħalli messaġġ lil persuna: agħżel “Tkellem ma’ persuna”.",
+    "support.escalateBody": "Għaddi l-każ lil persuna u hi taqra l-konverżazzjoni kollha.",
+    "support.agentLead": "u jgħaddi l-konverżazzjoni lil persuna meta ma jkunx jista’ jgħin.",
+    "support.aiBanner": "Tista’ titlob persuna fi kwalunkwe ħin.",
+    "home.aiBanner": "Tista’ titlob persuna fi kwalunkwe ħin.",
+    "settings.transparency.supportLead": "Uża “Tkellem ma’ persuna” jew “Għaddi l-każ lil persuna” fit-taqsima"
+  },
+  "nl": {
+    "REFUSE_INJECTION": "Uw bericht is vastgelegd.",
+    "REFUSE_SAFETY": "een medewerker zal uw bericht lezen.",
+    "DEGRADED": "U kunt nog steeds een bericht achterlaten voor een medewerker: kies 'Met een medewerker praten'.",
+    "support.escalateBody": "Zet het gesprek door, waarna een medewerker de volledige conversatie leest.",
+    "support.agentLead": "en draagt het gesprek over aan een medewerker als hij niet verder kan helpen.",
+    "support.aiBanner": "Vraag op elk moment om een medewerker.",
+    "home.aiBanner": "Vraag op elk moment om een medewerker.",
+    "settings.transparency.supportLead": "Gebruik ‘Met een medewerker praten’ of ‘Doorzetten naar een medewerker’ in"
+  },
+  "pl": {
+    "REFUSE_INJECTION": "Państwa wiadomość została zarejestrowana.",
+    "REFUSE_SAFETY": "a człowiek przeczyta Państwa wiadomość.",
+    "DEGRADED": "Nadal mogą Państwo zostawić wiadomość dla człowieka: proszę wybrać opcję „Porozmawiaj z człowiekiem”.",
+    "support.escalateBody": "Proszę przekazać sprawę człowiekowi, który przeczyta cały wątek.",
+    "support.agentLead": "i przekazuje rozmowę człowiekowi, gdy nie może pomóc.",
+    "support.aiBanner": "W każdej chwili możesz poprosić o kontakt z człowiekiem.",
+    "home.aiBanner": "W każdej chwili możesz poprosić o kontakt z człowiekiem.",
+    "settings.transparency.supportLead": "wybierz „Porozmawiaj z człowiekiem” lub „Przekaż człowiekowi” w sekcji"
+  },
+  "pt": {
+    "REFUSE_INJECTION": "A sua mensagem foi registada.",
+    "REFUSE_SAFETY": "e uma pessoa lerá a sua mensagem.",
+    "DEGRADED": "Ainda pode deixar uma mensagem para uma pessoa: selecione «Falar com uma pessoa».",
+    "support.escalateBody": "Encaminhe o caso para uma pessoa, que lerá toda a conversa.",
+    "support.agentLead": "e encaminha a conversa para uma pessoa quando não consegue ajudar.",
+    "support.aiBanner": "Pode pedir para falar com uma pessoa a qualquer momento.",
+    "home.aiBanner": "Pode pedir para falar com uma pessoa a qualquer momento.",
+    "settings.transparency.supportLead": "Utilize «Falar com uma pessoa» ou «Encaminhar para uma pessoa» em"
+  },
+  "ro": {
+    "REFUSE_INJECTION": "Mesajul tău a fost înregistrat.",
+    "REFUSE_SAFETY": "și o persoană îți va citi mesajul.",
+    "DEGRADED": "Poți totuși lăsa un mesaj pentru o persoană: alege „Vorbiți cu o persoană”.",
+    "support.escalateBody": "Escaladați, iar o persoană va citi întregul fir.",
+    "support.agentLead": "și transferă conversația unei persoane atunci când nu poate ajuta.",
+    "support.aiBanner": "Puteți cere oricând intervenția unei persoane.",
+    "home.aiBanner": "Puteți cere oricând intervenția unei persoane.",
+    "settings.transparency.supportLead": "Folosiți „Discutați cu o persoană” sau „Escaladați către o persoană” în",
+    "support-cases:14": "pentru a crea un caz asincron.",
+    "settings-help-menus:18": "Escaladează către o persoană creează un transfer separat, iar emailul de asistență este un flux separat de mail.",
+    "settings-help-menus:20": "Un caz uman poate include conversația;",
+    "app-navigation:21": "Emailul de asistență și „Escaladați către o persoană” sunt fluxuri separate de asistență umană.",
+    "ai-transparency:23": "Pentru a cere ajutorul unei persoane, folosește „Vorbiți cu o persoană” sau „Escaladați către o persoană” în Ajutor."
+  },
+  "ru": {
+    "REFUSE_INJECTION": "Ваше сообщение записано.",
+    "REFUSE_SAFETY": "и он прочитает ваше сообщение.",
+    "DEGRADED": "Вы по-прежнему можете оставить сообщение человеку: выберите «Поговорить с человеком».",
+    "support.escalateBody": "Передайте обращение человеку: он прочитает всю переписку.",
+    "support.agentLead": "и передаёт разговор человеку, если не может помочь.",
+    "support.aiBanner": "В любой момент можно попросить подключить человека.",
+    "home.aiBanner": "В любой момент можно попросить подключить человека.",
+    "settings.transparency.supportTail": "выберите «Поговорить с человеком» или «Передать человеку»"
+  },
+  "sk": {
+    "REFUSE_INJECTION": "Vaša správa bola zaznamenaná.",
+    "REFUSE_SAFETY": "a človek si prečíta vašu správu.",
+    "DEGRADED": "Stále môžete nechať správu človeku: vyberte „Porozprávať sa s človekom“.",
+    "support.escalateBody": "Postúpte konverzáciu človeku, ktorý si prečíta celé vlákno.",
+    "support.agentLead": "a odovzdá konverzáciu človeku, keď nevie pomôcť.",
+    "support.aiBanner": "Kedykoľvek môžete požiadať o pomoc človeka.",
+    "home.aiBanner": "Kedykoľvek môžete požiadať o pomoc človeka.",
+    "settings.transparency.supportTail": "vyberte možnosť „Porozprávať sa s človekom“ alebo „Postúpiť človeku“"
+  },
+  "sl": {
+    "REFUSE_INJECTION": "Vaše sporočilo je bilo zabeleženo.",
+    "REFUSE_SAFETY": "in oseba bo prebrala vaše sporočilo.",
+    "DEGRADED": "Še vedno lahko pustite sporočilo osebi: izberite »Pogovori se z osebo«.",
+    "support.escalateBody": "Predajte pogovor osebi, ki bo prebrala celotno nit.",
+    "support.agentLead": "in pogovor preda osebi, kadar ne more pomagati.",
+    "support.aiBanner": "Kadar koli lahko zahtevate pomoč človeka.",
+    "home.aiBanner": "Kadar koli lahko zahtevate pomoč človeka.",
+    "settings.transparency.supportTail": "izberite »Pogovori se z osebo« ali »Predaj osebi«"
+  },
+  "sv": {
+    "REFUSE_INJECTION": "Ditt meddelande har registrerats.",
+    "REFUSE_SAFETY": "så läser en person ditt meddelande.",
+    "DEGRADED": "Du kan fortfarande lämna ett meddelande till en person: välj ”Prata med en person”.",
+    "support.escalateBody": "Eskalera så läser en person hela tråden.",
+    "support.agentLead": "och lämnar över till en person när den inte kan hjälpa till.",
+    "support.aiBanner": "Be när som helst att få prata med en person.",
+    "home.aiBanner": "Be när som helst att få prata med en person.",
+    "settings.transparency.supportLead": "Använd ”Prata med en person” eller ”Eskalera till en person” under"
+  },
+  "tr": {
+    "REFUSE_INJECTION": "Mesajınız kaydedildi.",
+    "REFUSE_SAFETY": "bir yetkili mesajınızı okuyacaktır.",
+    "DEGRADED": "Yine de bir yetkiliye mesaj bırakabilirsiniz: “Bir yetkiliyle görüş” seçeneğini belirleyin.",
+    "support.escalateBody": "Aktardığınızda bir yetkili tüm yazışmayı okur.",
+    "support.agentLead": "ve yardımcı olamadığında görüşmeyi bir yetkiliye aktarır.",
+    "support.aiBanner": "İstediğiniz zaman bir insanla görüşmeyi talep edin.",
+    "home.aiBanner": "İstediğiniz zaman bir insanla görüşmeyi talep edin.",
+    "settings.transparency.supportTail": "“Bir insanla konuş” veya “Bir insana yönlendir” seçeneklerini kullanın"
+  },
+  "uk": {
+    "REFUSE_INJECTION": "Ваше повідомлення записано.",
+    "REFUSE_SAFETY": "і вона прочитає ваше повідомлення.",
+    "DEGRADED": "Ви все одно можете залишити повідомлення для людини: виберіть «Поговорити з людиною».",
+    "support.escalateBody": "Передайте звернення людині: вона прочитає всю переписку.",
+    "support.agentLead": "й передає розмову людині, коли не може допомогти.",
+    "support.aiBanner": "Будь-коли попросіть залучити людину.",
+    "home.aiBanner": "Будь-коли попросіть залучити людину.",
+    "settings.transparency.supportLead": "виберіть «Поговорити з людиною» або «Передати людині» в розділі"
+  },
+  "vi": {
+    "REFUSE_INJECTION": "Tin nhắn của bạn đã được ghi lại.",
+    "REFUSE_SAFETY": "và nhân viên sẽ đọc tin nhắn của bạn.",
+    "DEGRADED": "Bạn vẫn có thể để lại tin nhắn cho nhân viên hỗ trợ: hãy chọn “Trò chuyện với nhân viên hỗ trợ”.",
+    "support.escalateBody": "Chuyển tiếp để nhân viên hỗ trợ đọc toàn bộ cuộc trò chuyện.",
+    "support.agentLead": "và chuyển cuộc trò chuyện cho nhân viên hỗ trợ khi không thể giúp.",
+    "support.aiBanner": "Bạn có thể yêu cầu gặp người hỗ trợ bất cứ lúc nào.",
+    "home.aiBanner": "Bạn có thể yêu cầu gặp người hỗ trợ bất cứ lúc nào.",
+    "settings.transparency.supportLead": "Dùng “Trao đổi với nhân viên” hoặc “Chuyển cho nhân viên” trong"
+  },
+  "zh": {
+    "REFUSE_INJECTION": "您的消息已被记录。",
+    "REFUSE_SAFETY": "人工客服会阅读您的消息。",
+    "DEGRADED": "您仍可给人工客服留言：请选择“与人工客服交谈”。",
+    "support.escalateBody": "转交后，人工客服将阅读完整对话。",
+    "support.agentLead": "无法解答时会转交真人处理。",
+    "support.aiBanner": "您可以随时要求人工协助。",
+    "home.aiBanner": "您可以随时要求人工协助。",
+    "settings.transparency.supportTail": "使用“联系人工”或“升级至人工”"
+  }
+}

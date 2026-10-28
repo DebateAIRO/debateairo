@@ -182,11 +182,8 @@ describe("S04-R06 blocked storage: every D2 member completes", () => {
         if (url === "/api/v1/support/status") return json({
           configuration: { kind: "AVAILABLE" }, relay_state: "AVAILABLE", kb_loaded: { shipped: 12, ignored: 0 }
         });
-        if (url === "/api/v1/support/sessions") return json({
-          session: { session_id: "support-1", identity_bound: true }, session_token: "t".repeat(43)
-        }, 201);
-        if (url === "/api/v1/support/sessions/support-1/messages") return json({
-          message_id: "answer-1", outcome: "NO_SOURCE", text: "The stub's reply."
+        if (url === "/api/v1/support/messages") return json({
+          outcome: "NO_SOURCE", text: "The stub's reply.", sources: [], actions: []
         });
         throw new Error(`UNEXPECTED_FETCH:${url}`);
       }));
@@ -209,7 +206,7 @@ describe("S04-R06 blocked storage: every D2 member completes", () => {
 
     it("B07 the panel opens, sends the typed question and renders the reply", async () => {
       await askQuestion();
-      expect(calls).toContain("/api/v1/support/sessions/support-1/messages");
+      expect(calls).toContain("/api/v1/support/messages");
       expect(document.body.textContent).toContain("Where is my debate?");
       expect(document.body.textContent).toContain("The stub's reply.");
     });

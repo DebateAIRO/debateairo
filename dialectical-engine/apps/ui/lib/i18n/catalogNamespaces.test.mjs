@@ -39,7 +39,7 @@ const namespaces = new Set(
     .filter((name) => name.endsWith(".json") && !name.startsWith("_"))
     .map((name) => name.replace(/\.json$/, ""))
 );
-const LAYOUT_SHARED = ["chrome", "debateViews", "support"];
+const LAYOUT_SHARED = ["chrome", "debateViews", "support", "home"];
 const catalogName = /^(catalog|[a-z][A-Za-z]*Catalog)$/;
 
 function sourceFiles(dir) {

@@ -17,5 +17,18 @@
   "archive.visibilityPrivate": "Приватне",
   "archive.unreadable": "Вміст цих дебатів більше неможливо прочитати, оскільки їхній ключ знищено.",
   "archive.noDebates": "У вас немає дебатів.",
-  "archive.filesNote": "Файли JSON у цьому ZIP-архіві містять ті самі дані у форматі для машинної обробки; їх перелік наведено в README.txt."
+  "archive.filesNote": "Файли JSON у цьому ZIP-архіві містять ті самі дані у форматі для машинної обробки; їх перелік наведено в README.txt.",
+  "archive.contentCheck": "Перевірка вмісту",
+  "archive.verdict.flagged": "Позначено",
+  "archive.verdict.clear": "Без порушень",
+  "archive.verdict.noSynthesis": "Немає синтезу",
+  "archive.verdict.unavailable": "Недоступно",
+  "archive.category.terrorism": "Можливий тероризм",
+  "archive.category.hateSpeech": "мова ворожнечі будь-якого виду",
+  "archive.category.suicideOrHarm": "схильності до самогубства або до заподіяння шкоди іншим людям",
+  "archive.category.weaponsOrDrugs": "виготовлення зброї або наркотиків",
+  "archive.publicationReview": "Розгляд перед оприлюдненням",
+  "archive.reviewAsked": "Запитано",
+  "archive.reviewApproved": "Схвалено",
+  "archive.reviewRefused": "Відмовлено"
 }

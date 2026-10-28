@@ -119,6 +119,7 @@ describe("B10 sealed admission-policy register row", () => {
     expect(composeIndex).toBeGreaterThan(readIndex);
     // The limiter is optional for test compositions and always supplied by main.
     expect(apiIndex).toContain("readonly admission?: AdmissionLimiter");
-    expect(apiMain.slice(composeIndex)).toContain("admission:");
+    // Either `admission: <limiter>` or the shorthand `admission,` after `const admission = new AdmissionLimiter(…)`.
+    expect(apiMain.slice(composeIndex)).toMatch(/\n\s*admission(?::|,)/u);
   });
 });

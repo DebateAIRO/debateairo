@@ -4,6 +4,7 @@ import { useEffect,useRef,useState } from "react";
 import { useChromeI18n } from "../../lib/i18n/I18nProvider";
 import { t } from "../../lib/i18n/translate";
 import { Assistant } from "./Assistant.js";
+import { useSupportOffered } from "./availability.js";
 
 // The panel folds back into the dock corner on the way out, and those frames need
 // it mounted, so the widget holds a "closing" state for exactly that long. Reduced
@@ -30,6 +31,7 @@ const FULL_PAGE_ARROW = <svg
 
 export function SupportWidget() {
   const { catalog } = useChromeI18n();
+  const offered = useSupportOffered();
   const [expanded,setExpanded] = useState(false);
   const [closing,setClosing] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -68,6 +70,7 @@ export function SupportWidget() {
 
   const label = t(catalog,"chrome.help");
   const state = expanded ? "expanded" : closing ? "closing" : "collapsed";
+  if (offered !== "offered") return null;
   return (
     <div
       ref={root}

@@ -8,6 +8,8 @@ import { LibraryComposer } from "@/components/LibraryComposer";
 import { readCrisisCountryHint } from "@/lib/crisisLines";
 import { LegalAcceptGate } from "@/components/billing/LegalAcceptGate";
 import { DebatesBuffer, PublicDebatesBuffer } from "@/components/DebatesBuffer";
+import { RemovalNoticeTake } from "@/components/CheckRemovalNotice";
+import { SynthesisHoldRefresher } from "@/components/SynthesisHoldRefresher";
 import { LandingPage } from "@/components/landing/LandingPage";
 import { SupportWidget } from "@/components/support/SupportWidget";
 import { ContractHttpError } from "@debateai/contract";
@@ -64,11 +66,12 @@ export default async function HomePage({
   const token = readSessionCookie(cookieStore);
   const requestedLocale = cookieStore.get(LOCALE_COOKIE)?.value;
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
-  const [homeCatalog, timeCatalog, chromeCatalog, composeCatalog] = await Promise.all([
+  const [homeCatalog, timeCatalog, chromeCatalog, composeCatalog, publicCatalog] = await Promise.all([
     loadNamespace(locale, "home"),
     loadNamespace(locale, "time"),
     loadNamespace(locale, "chrome"),
-    loadNamespace(locale, "compose")
+    loadNamespace(locale, "compose"),
+    loadNamespace(locale, "public")
   ]);
   const catalog = Object.freeze({ ...homeCatalog, ...chromeCatalog });
   if (token === null) {
@@ -206,7 +209,9 @@ export default async function HomePage({
         {tab === "yours" ? (
           sessionConfirmed ? (
             <div className="libList recentList">
-              <DebatesBuffer debates={debates} catalog={catalog} timeCatalog={timeCatalog} locale={locale} composeCatalog={composeCatalog} />
+              <SynthesisHoldRefresher active={debates.some((debate) => debate.synthesis_check === "CHECKING")} />
+              <DebatesBuffer debates={debates} catalog={catalog} timeCatalog={timeCatalog} locale={locale}
+                checkingLabel={t(publicCatalog, "public.publication.checkingDebate")} composeCatalog={composeCatalog} publicCatalog={publicCatalog} />
             </div>
           ) : (
             <p className="tabEmptyHint">{t(catalog, "home.signInHint")}</p>
@@ -223,6 +228,9 @@ export default async function HomePage({
           </>
         )}
       </div>
+      {/* S01-R39: the notice is taken from the browser, which sends the CSRF pair a signed-in POST needs. */}
+      {sessionConfirmed && tab === "yours"
+        ? <RemovalNoticeTake catalog={catalog} locale={locale} countryHint={crisisCountryHint} /> : null}
       <SupportWidget />
     </div>
   );

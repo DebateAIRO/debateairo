@@ -121,9 +121,64 @@ function withCallLink(message: string, number: string): React.ReactNode {
   );
 }
 
-function browserLanguages(): readonly string[] {
+export function browserLanguages(): readonly string[] {
   if (typeof navigator === "undefined") return [];
   return navigator.languages?.length ? navigator.languages : [navigator.language].filter(Boolean);
+}
+
+export function CrisisHelpNumbers({ catalog, locale, countryHint }: Readonly<{
+  catalog: MessageCatalog;
+  locale: string;
+  countryHint: string | null;
+}>): React.ReactElement {
+  const [country, setCountry] = React.useState<string>(() =>
+    resolveCrisisCountry({ hint: countryHint, locale }) ?? "");
+  const visitorChoseCountry = React.useRef(false);
+  React.useEffect(() => {
+    if (!visitorChoseCountry.current)
+      setCountry(resolveCrisisCountry({ hint: countryHint, browserLanguages: browserLanguages(), locale }) ?? "");
+  }, [countryHint, locale]);
+  const options = crisisCountryOptions(locale);
+  const entry = country === "" ? undefined : CRISIS_LINES[country];
+  return <>
+    <label className="crisisSupportCountry">
+      <span>{t(catalog, "home.crisisSupport.countryLabel")}</span>
+      <select value={country} onChange={(event) => { visitorChoseCountry.current = true; setCountry(event.target.value); }}>
+        {country === "" ? <option value="">—</option> : null}
+        {options.map((option) => (
+          <option key={option.code} value={option.code}>{option.name}</option>
+        ))}
+      </select>
+    </label>
+
+    {entry === undefined ? (
+      <p className="crisisSupportNote">{t(catalog, "home.crisisSupport.chooseCountry")}</p>
+    ) : entry.lines.length === 0 ? (
+      <p className="crisisSupportNote">
+        {withCallLink(t(catalog, "home.crisisSupport.noVerifiedLine"), entry.emergency)}
+      </p>
+    ) : (
+      <ul className="crisisSupportLines">
+        {entry.lines.map((line) => (
+          <CrisisLineCard
+            key={`${line.name}-${line.phone ?? line.website}`}
+            catalog={catalog}
+            locale={locale}
+            line={line}
+          />
+        ))}
+      </ul>
+    )}
+
+    <p className="crisisSupportEmergency" role="note">
+      {entry === undefined
+        ? t(catalog, "home.crisisSupport.emergencyAnywhere")
+        : withCallLink(t(catalog, "home.crisisSupport.emergency"), entry.emergency)}
+    </p>
+    <a className="crisisSupportElsewhere" href={FIND_A_HELPLINE_URL} target="_blank" rel="noopener noreferrer">
+      {t(catalog, "home.crisisSupport.elsewhere")}
+    </a>
+  </>;
 }
 
 export function CrisisSupportDialog({
@@ -142,10 +197,6 @@ export function CrisisSupportDialog({
 }>): React.ReactElement {
   const dialogRef = React.useRef<HTMLElement | null>(null);
   const titleRef = React.useRef<HTMLElement | null>(null);
-  const [country, setCountry] = React.useState<string>(() =>
-    resolveCrisisCountry({ hint: countryHint, browserLanguages: browserLanguages(), locale }) ?? "");
-  const options = crisisCountryOptions(locale);
-  const entry = country === "" ? undefined : CRISIS_LINES[country];
   // Esc and "Back to my question" close it. The backdrop does not: a stray click must not take
   // the numbers away from someone who needs them.
   useHideOutside(dialogRef);
@@ -181,43 +232,7 @@ export function CrisisSupportDialog({
             </div>
           </div>
           <div className="crisisSupportBody">
-            <label className="crisisSupportCountry">
-              <span>{t(catalog, "home.crisisSupport.countryLabel")}</span>
-              <select value={country} onChange={(event) => setCountry(event.target.value)}>
-                {country === "" ? <option value="">—</option> : null}
-                {options.map((option) => (
-                  <option key={option.code} value={option.code}>{option.name}</option>
-                ))}
-              </select>
-            </label>
-
-            {entry === undefined ? (
-              <p className="crisisSupportNote">{t(catalog, "home.crisisSupport.chooseCountry")}</p>
-            ) : entry.lines.length === 0 ? (
-              <p className="crisisSupportNote">
-                {withCallLink(t(catalog, "home.crisisSupport.noVerifiedLine"), entry.emergency)}
-              </p>
-            ) : (
-              <ul className="crisisSupportLines">
-                {entry.lines.map((line) => (
-                  <CrisisLineCard
-                    key={`${line.name}-${line.phone ?? line.website}`}
-                    catalog={catalog}
-                    locale={locale}
-                    line={line}
-                  />
-                ))}
-              </ul>
-            )}
-
-            <p className="crisisSupportEmergency" role="note">
-              {entry === undefined
-                ? t(catalog, "home.crisisSupport.emergencyAnywhere")
-                : withCallLink(t(catalog, "home.crisisSupport.emergency"), entry.emergency)}
-            </p>
-            <a className="crisisSupportElsewhere" href={FIND_A_HELPLINE_URL} target="_blank" rel="noopener noreferrer">
-              {t(catalog, "home.crisisSupport.elsewhere")}
-            </a>
+            <CrisisHelpNumbers catalog={catalog} locale={locale} countryHint={countryHint} />
             <p className="crisisSupportFine">
               {t(catalog, "home.crisisSupport.notSaved")} {t(catalog, "home.crisisSupport.misread")}
             </p>

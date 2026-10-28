@@ -139,7 +139,7 @@ export const LEGAL_COOKIES: readonly LegalInventoryItem[] = Object.freeze([
 ]);
 
 /**
- * Browser-storage keys the UI writes: two in local storage and five in session storage. The
+ * Browser-storage keys the UI writes: two in local storage and six in session storage. The
  * export link token is sent to the Dialectical Engine server when redeemed; the link outcome stays in the
  * browser. The help-chat name is literal so this page does not pull in the support widget.
  */
@@ -148,6 +148,7 @@ export const LEGAL_BROWSER_STORAGE: readonly LegalInventoryItem[] = Object.freez
   { name: "debateai.mode", kindKey: "legal.cookies.mode.kind", purposeKey: "legal.cookies.mode.purpose", lifeKey: "legal.cookies.mode.life", recipientKey: "legal.cookies.recipient.browser" },
   { name: LANGUAGE_OFFER_DISMISSED_KEY, kindKey: "legal.cookies.languageOffer.kind", purposeKey: "legal.cookies.languageOffer.purpose", lifeKey: "legal.cookies.languageOffer.life", recipientKey: "legal.cookies.recipient.browser" },
   { name: "debateai.support.conversation.v2", kindKey: "legal.cookies.supportConversation.kind", purposeKey: "legal.cookies.supportConversation.purpose", lifeKey: "legal.cookies.supportConversation.life", recipientKey: "legal.cookies.recipient.browser" },
+  { name: "debateai.support.offered.v1", kindKey: "legal.cookies.supportConversation.kind", purposeKey: "legal.cookies.supportOffered.purpose", lifeKey: "legal.cookies.supportConversation.life", recipientKey: "legal.cookies.recipient.browser" },
   { name: "debateai.phone-completion-draft.v1", kindKey: "legal.cookies.supportConversation.kind", purposeKey: "legal.cookies.phoneDraft.purpose", lifeKey: "legal.cookies.phoneDraft.life", recipientKey: "legal.cookies.recipient.browser" },
   { name: "debateai.exportPending", kindKey: "legal.cookies.languageOffer.kind", purposeKey: "legal.cookies.exportPending.purpose", lifeKey: "legal.cookies.exportPending.life", recipientKey: "legal.cookies.recipient.server" },
   { name: "debateai.exportLinkOutcome", kindKey: "legal.cookies.languageOffer.kind", purposeKey: "legal.cookies.exportLinkOutcome.purpose", lifeKey: "legal.cookies.exportLinkOutcome.life", recipientKey: "legal.cookies.recipient.browser" }
@@ -168,9 +169,9 @@ export function inventoryCopy(legal: MessageCatalog): MessageCatalog {
 }
 
 /** The jobs a provider can be given, and so why it receives text (PP §5 "what it receives and for what purpose"). */
-export type ProviderPurpose = "arguments" | "judging" | "story" | "search" | "support";
+export type ProviderPurpose = "arguments" | "judging" | "story" | "search" | "synthesisCheck" | "questionCheck" | "support";
 
-export const PROVIDER_PURPOSES: readonly ProviderPurpose[] = Object.freeze(["arguments", "judging", "story", "search", "support"]);
+export const PROVIDER_PURPOSES: readonly ProviderPurpose[] = Object.freeze(["arguments", "judging", "story", "search", "synthesisCheck", "questionCheck", "support"]);
 
 /** A yes/no fact from the provider's contract, or "unconfirmed" until someone has read that contract. */
 export type ContractFlag = "yes" | "no" | "unconfirmed";
@@ -346,6 +347,9 @@ export const ANTHROPIC_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
   entity: "Anthropic Ireland, Limited",
   homeCountryKey: "legal.providers.ireland",
   // One of the five launch models (owner, 12 October 2026): role rotation gives it every debate job.
+  // It is also the model of the end-of-debate check of each synthesis (synthesis-flag S01-R9; PP §5)
+  // and of the question check before a debate starts (synthesis-flag S04-R5; PP §5).
+  purposes: Object.freeze<ProviderPurpose[]>(["arguments", "judging", "story", "synthesisCheck", "questionCheck"]),
   purposesConfirmed: true,
   locationKey: "legal.providers.locationAnthropic",
   retentionKey: "legal.providers.retentionAnthropic",
@@ -454,7 +458,13 @@ export function providerRegister(companies: readonly string[] | null): readonly 
   const unchecked = named === null ? [] : [...named]
     .filter((company) => !REVIEWED_COMPANY_KEYS.has(company) && company !== PERPLEXITY_PROVIDER.key).sort()
     .map(uncheckedCompanyEntry);
-  return Object.freeze([...reviewed, ...unchecked, PERPLEXITY_PROVIDER, SUPPORT_PROVIDER]);
+  // The two checks always call Claude Haiku 5.5 on Anthropic's API (synthesis-flag S01-R9, S04-R5), the model and
+  // contract the support chat uses. When the Anthropic row is not shown, the support chat's row names both checks,
+  // so the Register still names their recipient (REV-S03-p1 privacy N2).
+  const support = reviewed.includes(ANTHROPIC_PREVIEW_PROVIDER)
+    ? SUPPORT_PROVIDER
+    : Object.freeze({ ...SUPPORT_PROVIDER, purposes: Object.freeze<ProviderPurpose[]>(["synthesisCheck", "questionCheck", "support"]) });
+  return Object.freeze([...reviewed, ...unchecked, PERPLEXITY_PROVIDER, support]);
 }
 
 export type TermsVersion = Readonly<{
@@ -470,7 +480,9 @@ export type TermsVersion = Readonly<{
  * that was current before the next revision.
  */
 export const TERMS_VERSIONS: readonly TermsVersion[] = Object.freeze([
-  { version: "2.6", dateKey: "legal.versions.v2.date", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "2.8", dateKey: "legal.versions.v2.date", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "2.6", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+    href: "/terms/versions/27e7229ee49faffd2cdf5eb609acc1b4ad5ea95c4e5c36bd057867de492b33ab" },
   { version: "2.5", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/e6fe4e6897c5c4aa03214da2e79954c8903fe8fe2d3c2785a000357618d3b195" },
   { version: "2.4", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,

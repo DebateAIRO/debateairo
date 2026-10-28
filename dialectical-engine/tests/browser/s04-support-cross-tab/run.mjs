@@ -11,7 +11,7 @@
 //        a run with it ends with the marker INJECTED, never CLUSTER_GREEN. Faults: flash (a marker node shown for 100 ms
 //        after a reload wake) · gate-at-sleep (an identity request at pagehide) · second-at-sleep (an /auth/sessions
 //        request at pagehide — must NOT fail, N4-p3) · erase-on-wake (the key removed before the woken page reads it) ·
-//        erase-at-<ms> (tab A's copy erased <ms> after tab B's member request) · no-date (the first support-session
+//        erase-at-<ms> (tab A's copy erased <ms> after tab B's member request) · no-date (the first support-message
 //        response loses its date header).
 // Output: one `PASS <id> <ms> …` or `FAIL <id> <reason>` per counted case, `RECORDED …` lines (not counted),
 //   `cases=<n> failures=<n>`, then the marker as the LAST line: CLUSTER_GREEN | CLUSTER_RED | BROKEN (| PARTIAL).
@@ -28,10 +28,9 @@
 //              (`/api/v1/auth/sessions`) in that window is printed but is not a failure (N4-p3, packet charge 3).
 //   keep       the marker is rendered in tab A and the key still holds it. The sleep keep case (R02-keep-sleep-0) also
 //              holds the rest of the conversation across the sleep (FIX p2, PT2-N5; SPEC-v2 Terms, R04): the case
-//              link opened before the sleep is shown, the unsent draft is back in the composer, and the next message
-//              goes to the support session opened before the sleep.
+//              unsent draft is back in the composer, and the next message uses the message route.
 //   R01 timing from tab B's session request completing until `absent` holds; FAIL above 2000 ms.
-//   DATE-HEADER precondition: the first `/api/v1/support/sessions` response carries a parseable `date`.
+//   DATE-HEADER precondition: the first `POST /api/v1/support/messages` response carries a parseable `date`.
 import { spawn, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import fs from "node:fs";
@@ -188,11 +187,11 @@ const WAKE = `document.dispatchEvent(new Event("resume")); dispatchEvent(Object.
 let dateHeaderChecked = false;
 function watchDateHeader(page) {
   page.on("response", (r) => {
-    if (dateHeaderChecked || r.request().method() !== "POST" || new URL(r.url()).pathname !== "/api/v1/support/sessions") return;
+    if (dateHeaderChecked || r.request().method() !== "POST" || new URL(r.url()).pathname !== "/api/v1/support/messages") return;
     dateHeaderChecked = true;
     const d = r.headers().date;
     if (d && Number.isFinite(Date.parse(d))) out(`precondition DATE-HEADER ok (${d})`);
-    else { out(`BROKEN DATE-HEADER the first /api/v1/support/sessions response has no parseable date (${d})`); dateBroken = true; }
+    else { out(`BROKEN DATE-HEADER the first POST /api/v1/support/messages response has no parseable date (${d})`); dateBroken = true; }
   });
 }
 let dateBroken = false;
@@ -210,7 +209,7 @@ async function openCase(id, { clockOffset } = {}) {
   const a = await context.newPage();
   await a.addInitScript(s04Init, marker);
   if (INJECT === "no-date") {
-    await a.route("**/api/v1/support/sessions", async (route) => {
+    await a.route("**/api/v1/support/messages", async (route) => {
       const resp = await route.fetch();
       const headers = { ...resp.headers() }; delete headers.date;
       await route.fulfill({ response: resp, headers });
@@ -348,7 +347,7 @@ async function setupMember(c, kind) {
 }
 
 /** S04_INJECT=erase-at-<ms>: tab A's copy (key + marker text) erased <ms> after tab B's member request — a
- *  harness-side erase that leaves the panel's React state (its support session, a pending reply) untouched. */
+ *  harness-side erase that leaves the panel's React state (including a pending reply) untouched. */
 async function injectEraseAt(c, doneAt) {
   const eraseAt = /^erase-at-(\d+)$/.exec(INJECT);
   if (!eraseAt) return;
@@ -415,9 +414,7 @@ async function runR01(c, kind, state) {
 }
 
 async function runR03(c, kind) {
-  const before = new Set((await fakeState()).supportSessions.map((s) => s.id));
   const ctx = await setupMember(c, kind);
-  const mine = (await fakeState()).supportSessions.map((s) => s.id).filter((id) => !before.has(id));
   const { status, doneAt } = await member(c, kind, ctx);
   if (status >= 400) return { fail: `member request answered ${status}` };
   await injectEraseAt(c, doneAt);
@@ -430,9 +427,6 @@ async function runR03(c, kind) {
   const st = await fakeState();
   const req = st.messageRequests.filter((m) => m.text === next);
   if (req.length === 0) return { fail: "no support message request carried the new text" };
-  if (req.some((m) => mine.includes(m.sessionId))) return { fail: `the new message used a support session from before the change (${req.map((m) => m.status).join(",")})` };
-  const fresh = st.supportSessions.find((s) => s.id === req[0].sessionId && !before.has(s.id) && !mine.includes(s.id));
-  if (!fresh) return { fail: "the new message's support session was not created after the change" };
   if (req[0].status !== 200) return { fail: `the new message was answered ${req[0].status}` };
   const rendered = await c.a.getByText(`reply to: ${next}`, { exact: true }).count();
   if (rendered === 0) return { fail: "the reply to the new message did not render" };
@@ -547,36 +541,24 @@ async function runR02(c, fam, how) {
   return v.fail ? { fail: `${v.fail}${extra}` } : { ms: Date.now() - t0, extra };
 }
 
-/** PT2-N5: before a no-change sleep — a case opened (its code lives in memory only) and an unsent draft. */
+/** PT2-N5: before a no-change sleep, leave an unsent draft. */
 async function keepExtrasBefore(c) {
-  c.step = "tab A open a case and leave a draft";
-  const caseToken = ("K" + randomBytes(4).toString("hex") + "a".repeat(43)).slice(0, 43);
-  await c.a.route("**/api/v1/support/sessions/*/escalate", (route) => route.fulfill({
-    status: 200, contentType: "application/json", headers: { date: new Date().toUTCString() },
-    body: JSON.stringify({ case_token: caseToken, text: "Case opened words" })
-  }));
-  await c.a.locator(".supportEscalation button").click();
-  await c.a.locator('a[href*="#case="]').first().waitFor({ state: "visible", timeout: 10000 });
+  c.step = "tab A leave a draft";
   // A1: words, never c.tag. The tag's 6 random hex chars are all digits ~6% of the time ((10/16)^6), and the panel shows a
   // 6-digit run as "[REDACTED_SECRET_LIKE]" (packages/kernel/src/index.ts:446 \b\d{6}\b), which made the exact-text waits flaky.
   const draft = `unsent draft ${nonce()}`;
   await c.a.locator("#support-message").fill(draft);
-  const st = await fakeState();
-  const sessionId = st.messageRequests.filter((r) => r.status === 200).at(-1)?.sessionId ?? null;
-  return { draft, sessionId };
+  return { draft };
 }
-/** PT2-N5: after the keep — the case link, the draft and the support session are the ones from before the sleep. */
+/** PT2-N5: after the keep, the draft returns and a new message can be sent. */
 async function keepExtrasAfter(c, before) {
   const reasons = [];
-  const caseLink = await c.a.locator('a[href*="#case="]').count();
-  if (caseLink === 0) reasons.push("keep: the case link opened before the sleep is gone");
   const draft = await c.a.locator("#support-message").inputValue();
   if (draft !== before.draft) reasons.push(`keep: the draft is "${draft}", expected "${before.draft}"`);
   const next = `after the keep ${nonce()}`; // A1: words, as in every other sent text (see markerFor)
   await sendA(c, next);
   const st = await fakeState();
-  const used = st.messageRequests.filter((r) => (r.text ?? "") === next).at(-1)?.sessionId ?? null;
-  if (before.sessionId === null || used !== before.sessionId) reasons.push(`keep: the next message used support session ${used}, expected ${before.sessionId}`);
+  if (!st.messageRequests.some((r) => r.text === next && r.status === 200)) reasons.push("keep: the next message was not answered");
   return reasons;
 }
 
@@ -664,7 +646,7 @@ await browser.close();
 const st = await fakeState().catch(() => ({ unhandled: [] }));
 const unhandled = [...new Set(st.unhandled)];
 out(`fake API unhandled routes: ${unhandled.length ? unhandled.join(", ") : "none"}`);
-if (!dateHeaderChecked && counted > 0) { out("BROKEN DATE-HEADER no /api/v1/support/sessions response was seen"); dateBroken = true; }
+if (!dateHeaderChecked && counted > 0) { out("BROKEN DATE-HEADER no POST /api/v1/support/messages response was seen"); dateBroken = true; }
 out(`cases=${counted} failures=${failures}`);
 teardown();
 if (dateBroken) out("BROKEN");

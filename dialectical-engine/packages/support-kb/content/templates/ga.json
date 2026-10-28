@@ -2,9 +2,9 @@
   "DISCLOSURE": "Dia dhuit — is mise cúntóir tacaíochta Dialectical Engine, AI. Is féidir liom míniú a thabhairt ar an gcaoi a n-oibríonn an táirge agus tú a threorú chuig an leathanach ceart. Ní féidir liom tú a shíniú isteach, do chuntas a athrú ná aon rud a athshocrú. Chuige sin, úsáid na naisc a thugaim duit nó iarr labhairt le duine.",
   "NO_SOURCE": "Níl foinse agam dó sin, mar sin ní dhéanfaidh mé buille faoi thuairim. Cuir ceist eile orm faoin gcaoi a n-oibríonn díospóireachtaí, nó roghnaigh ‘Labhair le duine’.",
   "REFUSE_ZONE": "Ní féidir liom cabhrú le síniú isteach, pasfhocail, cóid fíorúcháin, fíordheimhniú dhá fhachtóir, aisghabháil cuntais, athruithe ríomhphoist ná scriosadh cuntais — ní féidir liom iad a sheiceáil fiú. Ní dhéantar iad sin ach ar leathanaigh do chuntais: {link}. Mura n-oibríonn an leathanach sin duit, roghnaigh ‘Labhair le duine’.",
-  "REFUSE_INJECTION": "Ní leanaim ach treoracha an táirge féin, mar sin fágfaidh mé an t-iarratas sin ar lár. Taifeadadh do theachtaireacht. Cuir ceist orm faoin táirge, nó roghnaigh ‘Labhair le duine’.",
-  "REFUSE_SAFETY": "Tá duine de dhíth chuige seo, ní cúntóir. Roghnaigh ‘Labhair le duine’ agus léifidh duine do theachtaireacht.",
-  "DEGRADED": "Níl samhail an chúntóra ar fáil faoi láthair. Is féidir leat teachtaireacht a fhágáil do dhuine fós: roghnaigh ‘Labhair le duine’.",
+  "REFUSE_INJECTION": "Ní leanaim ach treoracha an táirge féin, mar sin fágfaidh mé an t-iarratas sin ar lár. Cuir ceist orm faoin táirge, nó roghnaigh ‘Labhair le duine’.",
+  "REFUSE_SAFETY": "Tá duine de dhíth chuige seo, ní cúntóir. Roghnaigh ‘Labhair le duine’ agus scríobh chuig an seoladh a thaispeánann sé; léann duine an méid a scríobhann tú.",
+  "DEGRADED": "Níl samhail an chúntóra ar fáil faoi láthair. Chun teagmháil a dhéanamh le duine, roghnaigh ‘Labhair le duine’.",
   "DISABLED": "Tá an cúntóir tacaíochta múchta faoi láthair.",
   "RATE_LIMITED": "Sheol tú a lán teachtaireachtaí in achar gearr. Fan cúpla nóiméad, le do thoil.",
   "RATING": "Ar fhreagair sé seo do cheist? Tá · Níl · Labhair le duine",
@@ -25,5 +25,10 @@
   "INCIDENT_SURFACE_PUBLISHING": "an fhoilsitheoireacht",
   "INCIDENT_SURFACE_SIGN_IN": "an síniú isteach",
   "INCIDENT_SURFACE_WHOLE_SITE": "an suíomh iomlán",
-  "COUNTRY_UNAVAILABLE": "Níl Dialectical Engine ar fáil i do thír fós."
+  "COUNTRY_UNAVAILABLE": "Níl Dialectical Engine ar fáil i do thír fós.",
+  "OFF_TOPIC": "Ní féidir liom cabhrú ach le Dialectical Engine: do chuntas, na pleananna, na díospóireachtaí, an fhoilsitheoireacht agus ár bpolasaithe. Ní féidir liom cabhrú leis sin.",
+  "OFF_TOPIC_PART": "Ní féidir liom cabhrú ach le Dialectical Engine, mar sin níor fhreagair mé an chuid eile de do theachtaireacht.",
+  "CRISIS_SUPPORT": "Is cosúil go bhfuil an méid a scríobh tú an-phianmhar, agus ní gá duit aghaidh a thabhairt air i d’aonar. Seo áit ar féidir leat teagmháil a dhéanamh le duine éigin anois díreach.",
+  "THREAT_LINE": "Ní féidir liom cabhrú leis sin. Má tá baol ann go ngortófar duine éigin, faigh cabhair láithreach, le do thoil.",
+  "TOO_LONG": "Tá do theachtaireacht rófhada don chomhrá. Giorraigh í agus seol arís í."
 }

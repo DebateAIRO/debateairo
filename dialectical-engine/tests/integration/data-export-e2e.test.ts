@@ -103,7 +103,7 @@ describe("data export over a real database and encrypted file store", () => {
     const source = new PostgresDataExportSource(workerRuntime);
     const store = new FileDataExportStore({ directory, users: { load: async () => Buffer.alloc(32, 7) } });
     const ownerView = new OwnerViewAdapter({ application: {} as never },
-      { exists: async () => false });
+      { exists: async () => false }, { readStates: async () => [] });
     const mail = new TemplatedDataExportMail({
       sendTemplated: async (message: (typeof sent)[number]) => { sent.push(message); }
     } as never);
@@ -488,7 +488,7 @@ describe("data export over a real database and encrypted file store", () => {
     [oldId, a.userId, a.sessionId, oldHash, "a".repeat(64)]);
     await db.pool.query("INSERT INTO identity.password_recovery_retry_lock(user_id,locked_until) VALUES($1,clock_timestamp()+interval '1 hour')", [a.userId]);
     const f = application(join(root, randomUUID()), a.email, leaseOwner, undefined, undefined, undefined,
-      new OwnerViewAdapter({ application: ask }, { exists: async () => true }, a.sessionId));
+      new OwnerViewAdapter({ application: ask }, { exists: async () => true }, { readStates: async () => [] }, a.sessionId));
     await accepted(a, f.app);
     await f.app.runOnce();
     const row = (await db.pool.query("SELECT * FROM identity.data_export WHERE user_id=$1 AND status='SENT' ORDER BY requested_at DESC LIMIT 1", [a.userId])).rows[0];
@@ -614,7 +614,7 @@ describe("data export over a real database and encrypted file store", () => {
       const disclosures = new RepositoryAnswerDisclosureApplication(new ServeDisclosureRepository(contentPool));
       const ownerDeps = { application: ask, stories, disclosures };
       const fixture = application(join(root, randomUUID()), a.email, randomUUID(), undefined, undefined, undefined,
-        new OwnerViewAdapter(ownerDeps, keys, a.sessionId));
+        new OwnerViewAdapter(ownerDeps, keys, { readStates: async () => [] }, a.sessionId));
       const ownerToken = randomBytes(32).toString("base64url");
       api = buildApi({ ...ownerDeps, allowedOrigin: "https://example.test",
         sessions: { authenticate: async (token: string) => token === ownerToken ? {

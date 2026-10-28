@@ -2,9 +2,9 @@
   "DISCLOSURE": "Halo — saya asisten dukungan Dialectical Engine, sebuah AI. Saya dapat menjelaskan cara kerja produk dan mengarahkan Anda ke halaman yang tepat. Saya tidak dapat memasukkan Anda, mengubah akun Anda, atau mengatur ulang apa pun. Untuk hal tersebut, gunakan tautan yang saya berikan atau minta bicara dengan petugas.",
   "NO_SOURCE": "Saya tidak memiliki sumber untuk hal itu, jadi saya tidak akan menebak. Tanyakan hal lain tentang cara kerja debat atau pilih ‘Bicara dengan petugas’.",
   "REFUSE_ZONE": "Saya tidak dapat membantu terkait masuk, kata sandi, kode verifikasi, autentikasi dua faktor, pemulihan akun, perubahan email, atau penghapusan akun — termasuk memeriksanya. Semua itu hanya tersedia di halaman akun Anda: {link}. Jika halaman tersebut tidak berfungsi, pilih ‘Bicara dengan petugas’.",
-  "REFUSE_INJECTION": "Saya hanya mengikuti petunjuk produk itu sendiri, jadi saya akan melewati permintaan tersebut. Pesan Anda telah dicatat. Tanyakan tentang produk atau pilih ‘Bicara dengan petugas’.",
-  "REFUSE_SAFETY": "Hal ini memerlukan petugas, bukan asisten. Pilih ‘Bicara dengan petugas’ dan petugas akan membaca pesan Anda.",
-  "DEGRADED": "Model asisten sedang tidak tersedia. Anda tetap dapat meninggalkan pesan untuk petugas: pilih ‘Bicara dengan petugas’.",
+  "REFUSE_INJECTION": "Saya hanya mengikuti petunjuk produk itu sendiri, jadi saya akan melewati permintaan tersebut. Tanyakan tentang produk atau pilih ‘Bicara dengan petugas’.",
+  "REFUSE_SAFETY": "Hal ini memerlukan petugas, bukan asisten. Pilih ‘Bicara dengan petugas’ dan tulis ke alamat yang ditampilkan; petugas membacanya.",
+  "DEGRADED": "Model asisten sedang tidak tersedia. Untuk menghubungi petugas, pilih ‘Bicara dengan petugas’.",
   "DISABLED": "Asisten dukungan sedang dinonaktifkan.",
   "RATE_LIMITED": "Anda telah mengirim banyak pesan dalam waktu singkat. Harap tunggu beberapa menit.",
   "RATING": "Apakah jawaban ini menjawab pertanyaan Anda? Ya · Tidak · Bicara dengan petugas",
@@ -25,5 +25,10 @@
   "INCIDENT_SURFACE_PUBLISHING": "penerbitan",
   "INCIDENT_SURFACE_SIGN_IN": "proses masuk",
   "INCIDENT_SURFACE_WHOLE_SITE": "seluruh situs",
-  "COUNTRY_UNAVAILABLE": "Dialectical Engine belum tersedia di negara Anda."
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine belum tersedia di negara Anda.",
+  "OFF_TOPIC": "Saya hanya dapat membantu terkait Dialectical Engine: akun Anda, paket, debat, penerbitan, dan kebijakan kami. Saya tidak dapat membantu terkait hal itu.",
+  "OFF_TOPIC_PART": "Saya hanya dapat membantu terkait Dialectical Engine, jadi saya tidak menjawab sisa pesan Anda.",
+  "CRISIS_SUPPORT": "Apa yang Anda tulis terdengar sangat berat, dan Anda tidak harus menghadapinya sendirian. Berikut tempat Anda dapat menghubungi seseorang sekarang juga.",
+  "THREAT_LINE": "Saya tidak dapat membantu terkait hal itu. Jika ada orang yang mungkin terluka, mohon segera cari bantuan.",
+  "TOO_LONG": "Pesan Anda terlalu panjang untuk obrolan ini. Persingkat, lalu kirim lagi."
 }

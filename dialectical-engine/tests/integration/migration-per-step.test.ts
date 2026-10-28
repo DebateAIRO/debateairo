@@ -61,13 +61,13 @@ describe("Review Focus 1: a step that fails (or a kill) between steps", () => {
 
   it("a failing step leaves every earlier step committed", async () => {
     const real = (await loadMigrationPlan()).forwardChain.map((step) => step.name);
-    expect(real).toHaveLength(15);
+    expect(real).toHaveLength(19);
     chain.shape = extendedBy((last) => probe(last, "0199_probe_fail.sql", "SELECT 1/0"));
     await expect(migrate(db.pool)).rejects.toMatchObject({ code: "22012" });
     chain.shape = undefined;
-    // All fifteen real steps were applied by that same run and stay committed; the probe left nothing.
+    // All nineteen real steps were applied by that same run and stay committed; the probe left nothing.
     expect(await receipts()).toEqual(real);
-    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(15);
+    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(19);
     expect(await ledger()).toEqual(expect.arrayContaining(real));
     expect(await ledger()).not.toContain("0199_probe_fail.sql");
     // The next run continues where the last one stopped: everything replays, nothing is left to apply.
@@ -79,10 +79,10 @@ describe("Review Focus 1: a step that fails (or a kill) between steps", () => {
 describe("Review Focus 2: a page read holding a lock on core.run while 0123's ALTER waits", () => {
   beforeAll(async () => {
     db = await startTestDatabase();
-    // The database a release before 0123 leaves: the chain minus its last three steps (0123, then the settings activation
-    // 0124 and the Italy-specific approval 0125, which migrate() applies after 0123 and which take no lock on core.run:
-    // 0125 alters legal.acceptance only).
-    chain.shape = (steps) => steps.slice(0, -3);
+    // The database a release before 0123 leaves: the chain up to 0123 (then the settings activation 0124, the
+    // Italy-specific approval 0125 and synthesis-flag's 0126 to 0129, which migrate() applies after 0123 and which take no
+    // lock on core.run: 0125 alters legal.acceptance only).
+    chain.shape = (steps) => steps.slice(0, (steps as readonly ChainStep[]).findIndex((step) => step.name === SIDE_BY_SIDE));
     try { await migrate(db.pool); } finally { chain.shape = undefined; }
     expect(await ledger()).not.toContain(SIDE_BY_SIDE);
   }, 300_000);

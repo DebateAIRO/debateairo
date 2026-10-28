@@ -13,6 +13,7 @@ import {
   testSessionApplication,
   testSessionHeaders
 } from "../support/httpSession.js";
+import { questionCheckPass } from "../support/questionCheckPass.js";
 import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
 const RUN_ID = "11111111-1111-4111-8111-111111111111";
@@ -208,6 +209,7 @@ describe("S02 tier roster admission", () => {
     });
     const api = buildApi({
       application,
+      questionCheck: questionCheckPass,
       sessions: testSessionApplication([HTTP_IDENTITY]),
       allowedOrigin: TEST_APP_ORIGIN
     });
@@ -297,6 +299,7 @@ describe("S02 tier roster admission", () => {
     });
     const api = buildApi({
       application,
+      questionCheck: questionCheckPass,
       sessions: testSessionApplication([HTTP_IDENTITY]),
       allowedOrigin: TEST_APP_ORIGIN
     });

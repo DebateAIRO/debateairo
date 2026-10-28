@@ -17,5 +17,18 @@
   "archive.visibilityPrivate": "Privaatne",
   "archive.unreadable": "Selle väitluse sisu ei saa enam lugeda, sest selle võti hävitati.",
   "archive.noDebates": "Teil pole väitlusi.",
-  "archive.filesNote": "Selle ZIP-arhiivi JSON-failid sisaldavad samu andmeid masinloetaval kujul; failis README.txt on nende loend."
+  "archive.filesNote": "Selle ZIP-arhiivi JSON-failid sisaldavad samu andmeid masinloetaval kujul; failis README.txt on nende loend.",
+  "archive.contentCheck": "Sisu kontrollimine",
+  "archive.verdict.flagged": "Märgistatud",
+  "archive.verdict.clear": "Probleemideta",
+  "archive.verdict.noSynthesis": "Süntees puudub",
+  "archive.verdict.unavailable": "Pole saadaval",
+  "archive.category.terrorism": "Võimalik terrorism",
+  "archive.category.hateSpeech": "vihakõne mis tahes kujul",
+  "archive.category.suicideOrHarm": "kalduvused enesetapule või teiste inimeste kahjustamisele",
+  "archive.category.weaponsOrDrugs": "relvade või uimastite valmistamine",
+  "archive.publicationReview": "Avaldamise läbivaatamine",
+  "archive.reviewAsked": "Taotletud",
+  "archive.reviewApproved": "Heaks kiidetud",
+  "archive.reviewRefused": "Keeldutud"
 }
