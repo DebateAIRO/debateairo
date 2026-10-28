@@ -5,10 +5,9 @@ import { SUPPORT_CAPABILITIES, SUPPORT_GUIDE_LABELS } from "../../packages/suppo
 import { supportCapabilityName } from "../../packages/support-kb/src/capability-names.js";
 
 const root = process.cwd();
-const inputRoot = "/Users/vladmihaimiron/Documents/DebateAIRO/dialectical-engine/.hermes/reports/synthesis-flag/probes";
 const readJson = (path: string): any => JSON.parse(readFileSync(path, "utf8"));
 const local = (path: string): any => readJson(resolve(root, path));
-const strings = readJson(resolve(inputRoot, "TEXT-S05-r2/strings.json")) as Record<string, any>;
+const strings = local("tests/fixtures/sf-s05-r2-strings.json") as Record<string, any>;
 const baseWords = local("tests/fixtures/sf-s05-r13-base-words.json") as Record<string, Record<string, string>>;
 const purpose = local("tests/fixtures/sf-s05-s13-purpose.json").purpose_by_locale as Record<string, string>;
 const locales = Object.keys(strings);
