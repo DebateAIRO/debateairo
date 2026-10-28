@@ -137,7 +137,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Zoeken op het web via Perplexity. Om bewijs voor een debat te vinden, kunnen de modellen op het web zoeken via Perplexity (Perplexity AI, Inc., Verenigde Staten), dat in het Register van AI-aanbieders is vermeld. Perplexity ontvangt de zoekvragen die de modellen op basis van het debat opstellen — net als een modelaanbieder ziet Perplexity dus tekst die is opgebouwd rond wat u hebt ingevoerd. Perplexity ontvangt nooit uw e-mailadres, accountidentificatoren, sessiegegevens of betalingsgegevens." },
       { kind: "p", text: "Welke aanbieders en waar. Ons Register van AI-aanbieders op dezbatere.ro/providers maakt deel uit van deze Voorwaarden. Het vermeldt voor elke aanbieder die wij kunnen gebruiken: diens juridische entiteit en land; wat deze ontvangt en waarom; waar deze de gegevens verwerkt; de bewaartermijnen; of voor het door ons gebruikte eindpunt geen gegevens worden bewaard; of de aanbieder invoer krachtens onze overeenkomst voor training mag gebruiken; het doorgiftemechanisme waarop wij ons baseren; en de datum waarop wij elke vermelding voor het laatst hebben gecontroleerd. Aanbieders kunnen buiten uw land en buiten de Europese Economische Ruimte zijn gevestigd. Ons Privacybeleid legt de waarborgen uit." },
       { kind: "p", text: "Drie verschillende zaken. \"Niet gebruikt om modellen te trainen\", \"gedurende een beperkte periode bewaard om redenen van beveiliging, misbruikpreventie of wetgeving\" en \"geen gegevensbewaring — niet opgeslagen na verwerking\" zijn verschillende zaken. Wanneer een aanbieder prompts gedurende een beperkte periode bewaart, vermeldt het Register hoe lang en waarom. Wanneer geen gegevens worden bewaard, vermeldt het Register dit en voor welke functies. Wij zullen niet zeggen dat inhoud niet wordt bewaard wanneer dat wel gebeurt." },
-      { kind: "p", text: "Uitvoer. In de verhouding tussen u en ons mag u de uitvoer van uw eigen debatten voor elk rechtmatig doel gebruiken en maken wij geen aanspraak op eigendom van gegenereerde tekst. Houd er rekening mee dat gegenereerde uitvoer in veel rechtsgebieden mogelijk niet auteursrechtelijk kan worden beschermd; dat soortgelijke uitvoer voor andere gebruikers kan worden gegenereerd; dat uitvoer materiaal van derden kan reproduceren of daarop kan lijken; en dat op bepaald bronmateriaal dat een AI-aanbieder ophaalt beperkingen voor hergebruik kunnen rusten. U bent verantwoordelijk voor controle voordat u op uitvoer vertrouwt of deze opnieuw publiceert." }
+      { kind: "p", text: "Uitvoer. In de verhouding tussen u en ons mag u de uitvoer van uw eigen debatten voor elk rechtmatig doel gebruiken en maken wij geen aanspraak op eigendom van gegenereerde tekst. Houd er rekening mee dat gegenereerde uitvoer in veel rechtsgebieden mogelijk niet auteursrechtelijk kan worden beschermd; dat soortgelijke uitvoer voor andere gebruikers kan worden gegenereerd; dat uitvoer materiaal van derden kan reproduceren of daarop kan lijken; en dat op bepaald bronmateriaal dat een AI-aanbieder ophaalt beperkingen voor hergebruik kunnen rusten. U bent verantwoordelijk voor controle voordat u op uitvoer vertrouwt of deze opnieuw publiceert." },
+      { kind: "p", text: "Grafieken en statistieken die wij genereren. De grafieken in een debatrapport en de statistieken die wij daarvoor samenstellen — de selectie, ordening, vormgeving en tekening ervan — worden gemaakt door Dialectical Engine en behoren toe aan DMS Merchandise Shop S.R.L.; elke grafiek is voorzien van de vermelding \"Copyrighted by DMS Merchandise Shop SRL\". Dit geldt niet voor de cijfers die een grafiek weergeeft, die afkomstig zijn uit uw debat, noch voor de tekst van uw debat. Wij verlenen u een kosteloze, wereldwijde, niet-exclusieve en eeuwigdurende licentie om die grafieken voor elk rechtmatig doel te gebruiken, te kopiëren en te delen, mits u de vermelding en het label dat aangeeft dat zij door AI zijn gegenereerd bij de grafieken laat staan. Waar de wet geen rechten erkent op door AI gegenereerd materiaal, geeft deze alinea ons niet meer dan de wet toestaat." }
     ]
   },
   {
@@ -354,12 +355,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.6",
-  sha256: "cafcc3062abe1ef8f5559f4c143b85aecdf608b9f2acd45951ca5d6784e45978",
-  eyebrow: "SERVICEVOORWAARDEN · v2.6 · VAN KRACHT OP 24 OKTOBER 2026",
+  version: "2.7",
+  sha256: "1b10207f8eb8fa3e8ed7ba2ab097bd6819d757943a383345b8638ff11d36e532",
+  eyebrow: "SERVICEVOORWAARDEN · v2.7 · VAN KRACHT OP 24 OKTOBER 2026",
   title: "Waarmee u instemt",
   lede: "De overeenkomst tussen u en DMS Merchandise Shop S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.",
-  endMarker: "EINDE VAN DE VOORWAARDEN · v2.6",
+  endMarker: "EINDE VAN DE VOORWAARDEN · v2.7",
   contact: "support@dezbatere.ro",
   bodyLabel: "Tekst van de Servicevoorwaarden",
   sectionIdPrefix: "terms-section-",

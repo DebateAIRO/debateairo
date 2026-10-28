@@ -137,7 +137,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Pesquisa na web através da Perplexity. Para encontrar provas para um debate, os modelos podem pesquisar na web através da Perplexity (Perplexity AI, Inc., Estados Unidos), que consta do Registo de Fornecedores de IA. O que a Perplexity recebe são as consultas de pesquisa que os modelos redigem a partir do debate — pelo que, tal como um fornecedor de modelos, vê texto construído em torno do que escreveu. Nunca recebe o seu endereço de correio eletrónico, os identificadores da sua conta, os registos de sessão ou os dados de pagamento." },
       { kind: "p", text: "Quais os fornecedores e onde operam. O nosso Registo de Fornecedores de IA, disponível em dezbatere.ro/providers, faz parte destes Termos. Indica, para cada fornecedor que podemos utilizar: a respetiva entidade jurídica e país; o que recebe e porquê; onde efetua o tratamento; as respetivas condições de conservação; se está ativa a conservação zero de dados para o ponto terminal que utilizamos; se pode utilizar dados de entrada para treino ao abrigo do nosso contrato; o mecanismo de transferência em que nos baseamos; e a data em que verificámos pela última vez cada entrada. Os fornecedores podem estar localizados fora do seu país e fora do Espaço Económico Europeu. A nossa Política de Privacidade explica as salvaguardas." },
       { kind: "p", text: "Três coisas diferentes. «Não utilizado para treinar modelos», «conservado durante um período limitado por motivos de segurança, prevenção de abusos ou razões legais» e «conservação zero de dados — não persistem após o tratamento» são situações diferentes. Quando um fornecedor conserva comandos durante um período limitado, o Registo indica por quanto tempo e porquê. Quando está ativa a conservação zero de dados, o Registo indica esse facto e as funcionalidades a que se aplica. Não afirmaremos que um conteúdo não é conservado quando este for efetivamente conservado." },
-      { kind: "p", text: "Resultados. Na relação entre o utilizador e nós, pode utilizar os resultados dos seus próprios debates para qualquer finalidade lícita e não reivindicamos a titularidade do texto gerado. Tenha em conta que os resultados gerados podem não ser protegidos por direitos de autor em muitas jurisdições; que podem ser gerados resultados semelhantes para outros utilizadores; que os resultados podem reproduzir ou assemelhar-se a materiais de terceiros; e que alguns materiais de origem obtidos por um fornecedor de IA podem estar sujeitos a restrições de reutilização. É responsável por efetuar verificações antes de se basear nos resultados ou de os voltar a publicar." }
+      { kind: "p", text: "Resultados. Na relação entre o utilizador e nós, pode utilizar os resultados dos seus próprios debates para qualquer finalidade lícita e não reivindicamos a titularidade do texto gerado. Tenha em conta que os resultados gerados podem não ser protegidos por direitos de autor em muitas jurisdições; que podem ser gerados resultados semelhantes para outros utilizadores; que os resultados podem reproduzir ou assemelhar-se a materiais de terceiros; e que alguns materiais de origem obtidos por um fornecedor de IA podem estar sujeitos a restrições de reutilização. É responsável por efetuar verificações antes de se basear nos resultados ou de os voltar a publicar." },
+      { kind: "p", text: "Gráficos e estatísticas que geramos. Os gráficos de um relatório de debate, bem como as estatísticas que compilamos para os mesmos — a respetiva seleção, disposição, conceção e desenho —, são criados pela Dialectical Engine e pertencem à DMS Merchandise Shop S.R.L.; cada gráfico ostenta a menção «Copyrighted by DMS Merchandise Shop SRL». Tal não abrange os valores apresentados num gráfico, que provêm do seu debate, nem o texto do seu debate. Concedemos-lhe uma licença gratuita, mundial, não exclusiva e perpétua para utilizar, copiar e partilhar esses gráficos para qualquer finalidade lícita, desde que mantenha junto deles a menção e a identificação de conteúdo gerado por IA. Quando a lei não reconheça direitos sobre materiais gerados por IA, o presente parágrafo não nos confere mais do que a lei permite." }
     ]
   },
   {
@@ -354,12 +355,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.6",
-  sha256: "c7b3be42feae6466217189dc71f76afe28ea268913dbfc1e39a3e4c536a59606",
-  eyebrow: "TERMOS DE SERVIÇO · v2.6 · EM VIGOR DESDE 24 DE OUTUBRO DE 2026",
+  version: "2.7",
+  sha256: "9527c7ef4ff488f879485b263f58c2a8cc7b95e478d80d54a96cf8c7871bdd4b",
+  eyebrow: "TERMOS DE SERVIÇO · v2.7 · EM VIGOR DESDE 24 DE OUTUBRO DE 2026",
   title: "Aquilo com que concorda",
   lede: "O contrato entre si e a DMS Merchandise Shop S.R.L., em linguagem clara. Dezanove secções e o Anexo A — desloque-se até ao fim.",
-  endMarker: "FIM DOS TERMOS · v2.6",
+  endMarker: "FIM DOS TERMOS · v2.7",
   contact: "support@dezbatere.ro",
   bodyLabel: "Texto dos Termos de Serviço",
   sectionIdPrefix: "terms-section-",

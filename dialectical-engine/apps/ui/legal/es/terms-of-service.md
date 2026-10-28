@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: En resumen
-eyebrow: TÉRMINOS DE SERVICIO · v2.6 · EN VIGOR DESDE 24 DE OCTUBRE DE 2026
+eyebrow: TÉRMINOS DE SERVICIO · v2.7 · EN VIGOR DESDE 24 DE OCTUBRE DE 2026
 title: Lo que usted acepta
 lede: El contrato entre usted y DMS Merchandise Shop S.R.L., en lenguaje claro. Diecinueve secciones y el anexo A — desplácese hasta el final.
-endMarker: FIN DE LOS TÉRMINOS · v2.6
+endMarker: FIN DE LOS TÉRMINOS · v2.7
 bodyLabel: Texto de los Términos de servicio
 annexTitle: Anexo A — Términos regionales
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEY APLICABLE
 -->
 
-**Version 2.6 · Effective 24 de octubre de 2026 · Versiones anteriores en dezbatere.ro/terms/versions · Idioma: español.**
+**Version 2.7 · Effective 24 de octubre de 2026 · Versiones anteriores en dezbatere.ro/terms/versions · Idioma: español.**
 
 **In short.** Debe tener al menos 18 años. Dialectical Engine elabora argumentos mediante modelos de IA y todo lo que genera puede ser erróneo; no constituye asesoramiento. Sus debates son privados salvo que los publique; si los publica, cualquiera podrá leerlos. El texto que envía se remite a los proveedores de IA incluidos en nuestro Registro de proveedores y no se utiliza para entrenar modelos. Denuncie contenido ilícito en support@dezbatere.ro, tenga o no una cuenta. Se aplica la legislación rumana, pero usted conserva la protección local que le corresponda como consumidor.
 
@@ -127,6 +127,8 @@ Si no está seguro de si algo está permitido, pregúntenos antes de publicarlo.
 **Tres cosas distintas.** «No utilizado para entrenar modelos», «conservado durante un período limitado por motivos de seguridad, prevención de abusos o razones legales» y «conservación cero de datos: no se conserva después del tratamiento» son conceptos distintos. Cuando un proveedor conserva instrucciones durante un período limitado, el Registro indica durante cuánto tiempo y por qué. Cuando está activa la conservación cero de datos, el Registro lo indica, así como las funciones a las que se aplica. No le diremos que el contenido no se conserva cuando sí se conserva.
 
 **Resultados.** En la relación entre usted y nosotros, puede utilizar los resultados de sus propios debates para cualquier fin lícito, y no reivindicamos la propiedad del texto generado. Tenga en cuenta que, en muchas jurisdicciones, los resultados generados pueden no estar protegidos por derechos de autor; que pueden generarse resultados similares para otros usuarios; que los resultados pueden reproducir material de terceros o parecerse a él; y que algunos materiales fuente recuperados por un proveedor de IA pueden estar sujetos a restricciones de reutilización. Usted es responsable de realizar las comprobaciones pertinentes antes de basarse en los resultados o volver a publicarlos.
+
+**Gráficos y estadísticas que generamos.** Los gráficos de un informe de debate y las estadísticas que recopilamos para ellos —su selección, disposición, diseño y trazado— son elaborados por Dialectical Engine y pertenecen a DMS Merchandise Shop S.R.L.; cada gráfico lleva la mención «Copyrighted by DMS Merchandise Shop SRL». Esto no se extiende a las cifras que muestra un gráfico, que proceden de su debate, ni al texto de su debate. Le concedemos una licencia gratuita, mundial, no exclusiva y perpetua para usar, copiar y compartir dichos gráficos para cualquier fin lícito, siempre que conserve junto a ellos la mención y la etiqueta de contenido generado por IA. Cuando la ley no reconozca derechos sobre el material generado por IA, el presente párrafo no nos otorga más de lo que la ley permite.
 
 ## 9. Publicación de un debate
 

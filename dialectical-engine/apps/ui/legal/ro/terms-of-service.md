@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Pe scurt
-eyebrow: TERMENII SERVICIULUI · v2.6 · ÎN VIGOARE DE LA 24 OCTOMBRIE 2026
+eyebrow: TERMENII SERVICIULUI · v2.7 · ÎN VIGOARE DE LA 24 OCTOMBRIE 2026
 title: Ce acceptați
 lede: Contractul dintre dumneavoastră și DMS Merchandise Shop S.R.L., într-un limbaj clar. Nouăsprezece secțiuni și Anexa A — derulați până la final.
-endMarker: SFÂRȘITUL TERMENILOR · v2.6
+endMarker: SFÂRȘITUL TERMENILOR · v2.7
 bodyLabel: Textul Termenilor serviciului
 annexTitle: Anexa A — Termeni regionali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEGEA APLICABILĂ
 -->
 
-**Version 2.6 · Effective 24 octombrie 2026 · Versiunile anterioare la dezbatere.ro/terms/versions · Limba: română.**
+**Version 2.7 · Effective 24 octombrie 2026 · Versiunile anterioare la dezbatere.ro/terms/versions · Limba: română.**
 
 **In short.** Trebuie să aveți cel puțin 18 ani. Dialectical Engine construiește argumente cu modele de inteligență artificială, iar tot ceea ce generează poate fi greșit — nu constituie consultanță. Dezbaterile dumneavoastră sunt private dacă nu le publicați; dacă le publicați, oricine le poate citi. Textul pe care îl transmiteți este trimis furnizorilor de IA enumerați în Registrul furnizorilor de IA și nu este folosit pentru antrenarea modelelor. Raportați conținutul ilegal la support@dezbatere.ro, indiferent dacă aveți sau nu un cont. Se aplică legea română, însă protecția locală a consumatorilor de care beneficiați se menține.
 
@@ -127,6 +127,8 @@ Dacă nu sunteți sigur dacă un anumit conținut este permis, întrebați-ne î
 **Trei lucruri diferite.** „Neutilizat pentru antrenarea modelelor”, „păstrat pentru o perioadă limitată din motive de securitate, prevenire a abuzurilor sau motive legale” și „păstrare zero a datelor — nepersistat după prelucrare” sunt lucruri diferite. Atunci când un furnizor păstrează solicitările pentru o perioadă limitată, Registrul precizează durata și motivul. Atunci când păstrarea zero a datelor este activă, Registrul menționează acest lucru și funcțiile pentru care se aplică. Nu vom afirma că un conținut nu este păstrat atunci când, în realitate, este păstrat.
 
 **Rezultate.** În raporturile dintre dumneavoastră și noi, puteți utiliza rezultatul propriilor dezbateri în orice scop legal, iar noi nu revendicăm drepturi de proprietate asupra textului generat. Rețineți că, în numeroase jurisdicții, conținutul generat poate să nu fie protejabil prin drepturi de autor; că pot fi generate rezultate similare pentru alți utilizatori; că rezultatele pot reproduce sau semăna cu materiale ale terților; și că anumite materiale-sursă recuperate de un furnizor de IA pot fi supuse unor restricții de reutilizare. Aveți responsabilitatea de a verifica înainte de a vă baza pe rezultate sau de a le republica.
+
+**Graficele și statisticile pe care le generăm.** Graficele dintr-un raport de dezbatere și statisticile pe care le compilăm pentru ele — selecția, aranjarea, designul și desenarea lor — sunt realizate de Dialectical Engine și aparțin DMS Merchandise Shop S.R.L.; fiecare grafic poartă mențiunea „Copyrighted by DMS Merchandise Shop SRL”. Acest lucru nu se extinde asupra cifrelor pe care le arată un grafic, care provin din dezbaterea dumneavoastră, și nici asupra textului dezbaterii. Vă acordăm o licență gratuită, mondială, neexclusivă și perpetuă de a folosi, copia și distribui aceste grafice în orice scop legal, cu condiția să păstrați mențiunea și eticheta „generat de AI” alături de ele. Acolo unde legea nu recunoaște drepturi asupra materialelor generate de AI, acest paragraf nu ne conferă mai mult decât permite legea.
 
 ## 9. Publicarea unei dezbateri
 

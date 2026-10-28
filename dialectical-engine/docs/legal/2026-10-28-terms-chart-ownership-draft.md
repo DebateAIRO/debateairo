@@ -1,6 +1,10 @@
-# Terms of Service v2.7 draft — ownership of the charts we generate (2026-10-28)
+# Terms of Service v2.7 — ownership of the charts we generate (2026-10-28)
 
-**Status: draft for the owner and counsel. Not applied to `apps/ui/legal/*/terms-of-service.md`.**
+**Status: applied on `feature/verdict-pdf-charts`, in all 35 drafts, as section 8's paragraph after "Outputs." Not
+merged or published. Released as the Perplexity paragraph was (Terms 2.5): effective date unchanged, re-acceptance
+floors unchanged, so nobody is asked to accept again; the paragraph grants users a licence and takes nothing they had.
+Before merge: counsel reads the English and Romanian, and the owner confirms that route or raises the TERMS floor to
+2.7 (step 2 below). The translations want a native-speaker read, as every release's do.**
 
 The owner decided (2026-10-28) that DMS Merchandise Shop SRL takes ownership of the charts and statistics it generates
 for debate reports (design: `docs/superpowers/specs/2026-10-28-verdict-pdf-charts-design.md`). Every chart already

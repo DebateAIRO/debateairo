@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In het kort
-eyebrow: SERVICEVOORWAARDEN · v2.6 · VAN KRACHT OP 24 OKTOBER 2026
+eyebrow: SERVICEVOORWAARDEN · v2.7 · VAN KRACHT OP 24 OKTOBER 2026
 title: Waarmee u instemt
 lede: De overeenkomst tussen u en DMS Merchandise Shop S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.
-endMarker: EINDE VAN DE VOORWAARDEN · v2.6
+endMarker: EINDE VAN DE VOORWAARDEN · v2.7
 bodyLabel: Tekst van de Servicevoorwaarden
 annexTitle: Bijlage A — Regionale voorwaarden
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TOEPASSELIJK RECHT
 -->
 
-**Version 2.6 · Effective 24 oktober 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
+**Version 2.7 · Effective 24 oktober 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
 
 **In short.** U moet 18 jaar of ouder zijn. Dialectical Engine stelt met AI-modellen argumenten op en alles wat het genereert kan onjuist zijn — het is geen advies. Uw debatten zijn privé, tenzij u ze publiceert; als u ze publiceert, kan iedereen ze lezen. Tekst die u indient, wordt verzonden naar de AI-aanbieders in ons Register van aanbieders en wordt niet gebruikt om modellen te trainen. Meld illegale inhoud via support@dezbatere.ro, ongeacht of u een account hebt. Het Roemeense recht is van toepassing, maar uw lokale consumentenbescherming blijft voor u gelden.
 
@@ -127,6 +127,8 @@ Als u twijfelt of iets is toegestaan, vraag het ons voordat u het plaatst.
 **Drie verschillende zaken.** "Niet gebruikt om modellen te trainen", "gedurende een beperkte periode bewaard om redenen van beveiliging, misbruikpreventie of wetgeving" en "geen gegevensbewaring — niet opgeslagen na verwerking" zijn verschillende zaken. Wanneer een aanbieder prompts gedurende een beperkte periode bewaart, vermeldt het Register hoe lang en waarom. Wanneer geen gegevens worden bewaard, vermeldt het Register dit en voor welke functies. Wij zullen niet zeggen dat inhoud niet wordt bewaard wanneer dat wel gebeurt.
 
 **Uitvoer.** In de verhouding tussen u en ons mag u de uitvoer van uw eigen debatten voor elk rechtmatig doel gebruiken en maken wij geen aanspraak op eigendom van gegenereerde tekst. Houd er rekening mee dat gegenereerde uitvoer in veel rechtsgebieden mogelijk niet auteursrechtelijk kan worden beschermd; dat soortgelijke uitvoer voor andere gebruikers kan worden gegenereerd; dat uitvoer materiaal van derden kan reproduceren of daarop kan lijken; en dat op bepaald bronmateriaal dat een AI-aanbieder ophaalt beperkingen voor hergebruik kunnen rusten. U bent verantwoordelijk voor controle voordat u op uitvoer vertrouwt of deze opnieuw publiceert.
+
+**Grafieken en statistieken die wij genereren.** De grafieken in een debatrapport en de statistieken die wij daarvoor samenstellen — de selectie, ordening, vormgeving en tekening ervan — worden gemaakt door Dialectical Engine en behoren toe aan DMS Merchandise Shop S.R.L.; elke grafiek is voorzien van de vermelding "Copyrighted by DMS Merchandise Shop SRL". Dit geldt niet voor de cijfers die een grafiek weergeeft, die afkomstig zijn uit uw debat, noch voor de tekst van uw debat. Wij verlenen u een kosteloze, wereldwijde, niet-exclusieve en eeuwigdurende licentie om die grafieken voor elk rechtmatig doel te gebruiken, te kopiëren en te delen, mits u de vermelding en het label dat aangeeft dat zij door AI zijn gegenereerd bij de grafieken laat staan. Waar de wet geen rechten erkent op door AI gegenereerd materiaal, geeft deze alinea ons niet meer dan de wet toestaat.
 
 ## 9. Een debat publiceren
 

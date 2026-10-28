@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Röviden
-eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.6 · HATÁLYOS 2026. OKTÓBER 24.
+eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.7 · HATÁLYOS 2026. OKTÓBER 24.
 title: Amit Ön elfogad
 lede: Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.
-endMarker: A FELTÉTELEK VÉGE · v2.6
+endMarker: A FELTÉTELEK VÉGE · v2.7
 bodyLabel: A Szolgáltatási feltételek szövege
 annexTitle: A. melléklet — Regionális feltételek
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 IRÁNYADÓ JOG
 -->
 
-**Version 2.6 · Effective 2026. október 24. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
+**Version 2.7 · Effective 2026. október 24. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
 
 **In short.** Önnek legalább 18 évesnek kell lennie. A Dialectical Engine mesterségesintelligencia-modellekkel épít fel érveket, és minden általa létrehozott tartalom téves lehet — nem minősül tanácsadásnak. Vitái mindaddig bizalmasak, amíg közzé nem teszi őket; közzététel esetén bárki elolvashatja azokat. Az Ön által beküldött szöveget továbbítjuk a Szolgáltatói nyilvántartásunkban felsorolt MI-szolgáltatóknak, és azt nem használjuk modellek betanítására. Jogellenes tartalmat a support@dezbatere.ro címen jelenthet be, függetlenül attól, hogy rendelkezik-e fiókkal. A román jog az irányadó, de az Ön helyi fogyasztóvédelmi jogai változatlanul megilletik.
 
@@ -127,6 +127,8 @@ Ha nem biztos abban, hogy valami megengedett-e, közzététele előtt kérdezzen
 **Három különböző dolog.** A „nem használják modellek betanítására”, a „biztonsági, visszaélés-megelőzési vagy jogi okból korlátozott ideig megőrzik” és a „nulla adatmegőrzés — a feldolgozást követően nem tárolják tartósan” eltérő fogalmak. Ha egy szolgáltató korlátozott ideig megőrzi a promptokat, a Nyilvántartás megadja, hogy mennyi ideig és miért. Ha aktív a nulla adatmegőrzés, a Nyilvántartás ezt, valamint az érintett funkciókat is feltünteti. Nem állítjuk, hogy egy tartalmat nem őriznek meg, ha ez nem igaz.
 
 **Kimenetek.** Az Ön és közöttünk fennálló jogviszonyban saját vitáinak kimenetét bármely jogszerű célra felhasználhatja, mi pedig nem tartunk igényt a létrehozott szöveg tulajdonjogára. Vegye figyelembe, hogy a létrehozott kimenet számos joghatóságban nem részesülhet szerzői jogi védelemben; más felhasználók számára hasonló kimenet jöhet létre; a kimenetek harmadik felek anyagait többszörözhetik vagy azokhoz hasonlíthatnak; továbbá az MI-szolgáltató által lekért egyes forrásanyagokra újrafelhasználási korlátozások vonatkozhatnak. Ön felel azért, hogy a kimenetekre való támaszkodás vagy azok újbóli közzététele előtt ellenőrzést végezzen.
+
+**Az általunk létrehozott diagramok és statisztikák.** A vitajelentésben szereplő diagramokat és az azokhoz általunk összeállított statisztikákat — azok kiválasztását, elrendezését, kialakítását és megrajzolását — a Dialectical Engine készíti, és azok a DMS Merchandise Shop S.R.L. tulajdonát képezik; minden diagramon szerepel a „Copyrighted by DMS Merchandise Shop SRL” megjelölés. Ez nem terjed ki a diagramon megjelenített számadatokra, amelyek az Ön vitájából származnak, sem az Ön vitájának szövegére. Ingyenes, az egész világra kiterjedő, nem kizárólagos és időben korlátlan engedélyt adunk Önnek arra, hogy e diagramokat bármely jogszerű célra felhasználja, másolja és megossza, feltéve, hogy megtartja rajtuk a megjelölést és az MI által létrehozott tartalomra utaló címkét. Ha a jog nem ismer el jogokat az MI által létrehozott anyagokon, e bekezdés alapján bennünket nem illet meg több, mint amit a jog lehetővé tesz.
 
 ## 9. Vita közzététele
 

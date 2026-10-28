@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Trumpai
-eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.6 · ĮSIGALIOJA 2026 M. SPALIO 24 D.
+eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.7 · ĮSIGALIOJA 2026 M. SPALIO 24 D.
 title: Su kuo sutinkate
 lede: Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.
-endMarker: SĄLYGŲ PABAIGA · v2.6
+endMarker: SĄLYGŲ PABAIGA · v2.7
 bodyLabel: Paslaugų teikimo sąlygų tekstas
 annexTitle: A priedas — Regioninės sąlygos
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TAIKYTINA TEISĖ
 -->
 
-**Version 2.6 · Effective 2026 m. spalio 24 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
+**Version 2.7 · Effective 2026 m. spalio 24 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
 
 **In short.** Turite būti ne jaunesni kaip 18 metų. Dialectical Engine kuria argumentus naudodama DI modelius, todėl viskas, ką ji sugeneruoja, gali būti klaidinga — tai nėra konsultacija. Jūsų debatai yra privatūs, nebent juos paskelbiate; paskelbtus debatus gali skaityti bet kas. Jūsų pateiktas tekstas siunčiamas mūsų Paslaugų teikėjų registre nurodytiems DI paslaugų teikėjams ir nenaudojamas modeliams mokyti. Apie neteisėtą turinį praneškite adresu support@dezbatere.ro, nesvarbu, ar turite paskyrą. Taikoma Rumunijos teisė, tačiau jums ir toliau taikoma vietos vartotojų apsauga.
 
@@ -127,6 +127,8 @@ Jei abejojate, ar kas nors leidžiama, prieš paskelbdami paklauskite mūsų.
 **Trys skirtingi dalykai.** „Nenaudojama modeliams mokyti“, „ribotą laiką saugoma saugumo, piktnaudžiavimo prevencijos ar teisiniais tikslais“ ir „visiškas duomenų nesaugojimas — po tvarkymo neišsaugoma“ reiškia skirtingus dalykus. Kai paslaugų teikėjas raginimus saugo ribotą laiką, Registre nurodyta, kiek laiko ir kodėl. Kai taikomas visiškas duomenų nesaugojimas, Registre nurodyta, kad jis taikomas, ir išvardytos funkcijos, kurioms jis taikomas. Neteigsime, kad turinys nėra saugomas, jei jis saugomas.
 
 **Rezultatai.** Jūsų ir mūsų santykiuose savo debatų rezultatus galite naudoti bet kokiu teisėtu tikslu, o mes nepretenduojame į sugeneruoto teksto nuosavybę. Atminkite, kad daugelyje jurisdikcijų sugeneruoti rezultatai gali būti nesaugomi autorių teisėmis; kad panašūs rezultatai gali būti sugeneruoti kitiems naudotojams; kad rezultatuose gali būti atgaminta trečiųjų šalių medžiaga ar jie gali būti į ją panašūs; ir kad kai kuriai šaltinių medžiagai, kurią gauna DI paslaugų teikėjas, gali būti taikomi pakartotinio naudojimo apribojimai. Prieš remdamiesi rezultatais ar juos pakartotinai skelbdami, privalote juos patikrinti.
+
+**Mūsų generuojamos diagramos ir statistika.** Debatų ataskaitoje pateikiamos diagramos ir joms mūsų sudaroma statistika — jų atranka, išdėstymas, dizainas ir braižymas — yra sukurtos Dialectical Engine ir priklauso DMS Merchandise Shop S.R.L.; kiekviena diagrama pažymėta užrašu „Copyrighted by DMS Merchandise Shop SRL“. Tai netaikoma diagramoje rodomiems skaičiams, kurie gaunami iš jūsų debatų, ir jūsų debatų tekstui. Suteikiame jums nemokamą, visame pasaulyje galiojančią, neišimtinę ir neterminuotą licenciją bet kokiu teisėtu tikslu naudoti, kopijuoti šias diagramas ir jomis dalytis, su sąlyga, kad kartu su jomis išsaugosite šį užrašą ir žymą, kad jas sugeneravo DI. Kai teisės aktai nepripažįsta teisių į DI sugeneruotą medžiagą, ši pastraipa mums nesuteikia daugiau, nei leidžia teisės aktai.
 
 ## 9. Debatų paskelbimas
 

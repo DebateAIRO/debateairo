@@ -137,7 +137,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Meklēšana tīmeklī, izmantojot Perplexity. Lai atrastu pierādījumus debatēm, modeļi var meklēt tīmeklī, izmantojot Perplexity (Perplexity AI, Inc., Amerikas Savienotās Valstis), kas ir iekļauts MI pakalpojumu sniedzēju reģistrā. Perplexity saņem meklēšanas vaicājumus, ko modeļi uzraksta, balstoties uz debatēm, — tādēļ, tāpat kā modeļu pakalpojumu sniedzējs, tas redz tekstu, kas veidots ap jūsu ievadīto. Tas nekad nesaņem jūsu e-pasta adresi, konta identifikatorus, sesiju ierakstus vai maksājumu informāciju." },
       { kind: "p", text: "Kuri pakalpojumu sniedzēji un kur. Mūsu MI pakalpojumu sniedzēju reģistrs vietnē dezbatere.ro/providers ir šo Noteikumu sastāvdaļa. Tajā par katru iespējamo pakalpojumu sniedzēju norādīts: tā juridiskā persona un valsts; ko un kādēļ tas saņem; kur tas veic apstrādi; tā glabāšanas noteikumi; vai mūsu izmantotajam galapunktam ir ieslēgts datu neglabāšanas režīms; vai saskaņā ar mūsu līgumu tas drīkst izmantot ievaddatus apmācībai; mūsu izmantotais nosūtīšanas mehānisms; un datums, kad pēdējoreiz pārbaudījām katru ierakstu. Pakalpojumu sniedzēji var atrasties ārpus jūsu valsts un Eiropas Ekonomikas zonas. Mūsu Privātuma politikā paskaidroti aizsardzības pasākumi." },
       { kind: "p", text: "Trīs atšķirīgas lietas. „Netiek izmantots modeļu apmācīšanai”, „ierobežotu laiku tiek glabāts drošības, ļaunprātīgas izmantošanas novēršanas vai juridisku iemeslu dēļ” un „datu neglabāšanas režīms — pēc apstrādes netiek saglabāts” ir atšķirīgas lietas. Ja pakalpojumu sniedzējs uzvednes glabā ierobežotu laiku, Reģistrā ir norādīts, cik ilgi un kādēļ. Ja ir ieslēgts datu neglabāšanas režīms, Reģistrā norādīts gan tas, gan attiecīgās funkcijas. Mēs neapgalvosim, ka saturs netiek glabāts, ja tas tiek glabāts." },
-      { kind: "p", text: "Rezultāti. Attiecībās starp jums un mums jūs drīkstat savu debašu rezultātu izmantot jebkuram likumīgam nolūkam, un mēs nepretendējam uz īpašumtiesībām uz ģenerēto tekstu. Ņemiet vērā, ka daudzās jurisdikcijās ģenerēto rezultātu autortiesības var neaizsargāt; ka līdzīgs rezultāts var tikt ģenerēts citiem lietotājiem; ka rezultāti var reproducēt trešo personu materiālus vai tiem līdzināties; un ka uz atsevišķiem avotu materiāliem, ko izgūst MI pakalpojumu sniedzējs, var attiekties atkārtotas izmantošanas ierobežojumi. Pirms paļaujaties uz rezultātiem vai tos pārpublicējat, jums tie jāpārbauda." }
+      { kind: "p", text: "Rezultāti. Attiecībās starp jums un mums jūs drīkstat savu debašu rezultātu izmantot jebkuram likumīgam nolūkam, un mēs nepretendējam uz īpašumtiesībām uz ģenerēto tekstu. Ņemiet vērā, ka daudzās jurisdikcijās ģenerēto rezultātu autortiesības var neaizsargāt; ka līdzīgs rezultāts var tikt ģenerēts citiem lietotājiem; ka rezultāti var reproducēt trešo personu materiālus vai tiem līdzināties; un ka uz atsevišķiem avotu materiāliem, ko izgūst MI pakalpojumu sniedzējs, var attiekties atkārtotas izmantošanas ierobežojumi. Pirms paļaujaties uz rezultātiem vai tos pārpublicējat, jums tie jāpārbauda." },
+      { kind: "p", text: "Mūsu ģenerētās diagrammas un statistika. Debašu pārskatā iekļautās diagrammas un statistika, ko mēs tām apkopojam, — to atlase, izkārtojums, dizains un zīmējums — ir Dialectical Engine veidotas un pieder DMS Merchandise Shop S.R.L.; katra diagramma ir marķēta ar norādi „Copyrighted by DMS Merchandise Shop SRL”. Tas neattiecas uz skaitļiem, ko diagramma attēlo un kas iegūti no jūsu debatēm, kā arī uz jūsu debašu tekstu. Mēs piešķiram jums bezmaksas, visā pasaulē spēkā esošu, neekskluzīvu un beztermiņa licenci izmantot, kopēt un kopīgot šīs diagrammas jebkuram likumīgam nolūkam ar nosacījumu, ka kopā ar tām saglabājat šo norādi un marķējumu, ka tās ģenerējis MI. Ja tiesību akti neatzīst tiesības uz MI ģenerētu materiālu, šī rindkopa mums nepiešķir vairāk, nekā pieļauj tiesību akti." }
     ]
   },
   {
@@ -354,12 +355,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.6",
-  sha256: "93413187e02748583642d9d93d963c35f92d33b223886ca7f82e951da460552d",
-  eyebrow: "PAKALPOJUMA NOTEIKUMI · v2.6 · SPĒKĀ NO 2026. GADA 24. OKTOBRA",
+  version: "2.7",
+  sha256: "d6c9c544c8693eb6844c2e54e71e2dfc81011be2a14bf369d85c19b09b9a5170",
+  eyebrow: "PAKALPOJUMA NOTEIKUMI · v2.7 · SPĒKĀ NO 2026. GADA 24. OKTOBRA",
   title: "Kam jūs piekrītat",
   lede: "Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.",
-  endMarker: "NOTEIKUMU BEIGAS · v2.6",
+  endMarker: "NOTEIKUMU BEIGAS · v2.7",
   contact: "support@dezbatere.ro",
   bodyLabel: "Pakalpojuma noteikumu teksts",
   sectionIdPrefix: "terms-section-",

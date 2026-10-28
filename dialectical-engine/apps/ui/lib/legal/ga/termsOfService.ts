@@ -137,7 +137,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Cuardach gréasáin trí Perplexity. Chun fianaise a aimsiú do dhíospóireacht, féadfaidh na samhlacha an gréasán a chuardach trí Perplexity (Perplexity AI, Inc., na Stáit Aontaithe), atá liostaithe sa Chlár Soláthraithe IS. Is iad na ceisteanna cuardaigh a scríobhann na samhlacha ón díospóireacht a fhaigheann Perplexity — mar sin, cosúil le soláthraí samhlacha, feiceann sé téacs a tógadh timpeall ar an méid a chlóscríobh tú. Ní fhaigheann sé do sheoladh ríomhphoist, d'aitheantóirí cuntais, do thaifid sheisiúin ná do shonraí íocaíochta riamh." },
       { kind: "p", text: "Cé hiad na soláthraithe, agus cá bhfuil siad. Is cuid de na Téarmaí seo ár gClár Soláthraithe IS ag dezbatere.ro/providers. Liostaítear ann gach soláthraí a fhéadfaimid a úsáid: a eintiteas dlíthiúil agus a thír; an méid a fhaigheann sé agus an fáth; an áit a bpróiseálann sé; a théarmaí coinneála; an bhfuil coinneáil nialasach sonraí gníomhach don chríochphointe a úsáidimid; an bhféadfaidh sé ionchuir a úsáid le haghaidh oiliúna faoinár gconradh; an sásra aistrithe ar a mbraithimid; agus an dáta ar dheimhníomar gach iontráil an uair dheireanach. D'fhéadfadh soláthraithe a bheith lonnaithe lasmuigh de do thír agus lasmuigh den Limistéar Eorpach Eacnamaíoch. Mínítear na coimircí inár mBeartas Príobháideachais." },
       { kind: "p", text: "Trí rud éagsúla. Ní hionann \"gan a bheith úsáidte chun samhlacha a oiliúint\", \"a bheith coinnithe ar feadh tréimhse teoranta ar mhaithe le slándáil, cosc ar mhí-úsáid nó cúiseanna dlíthiúla\", agus \"coinneáil nialasach sonraí — gan a bheith buanchoinnithe tar éis próiseála\". Sa chás ina gcoinníonn soláthraí leideanna ar feadh tréimhse teoranta, deir an Clár cé chomh fada agus cén fáth. Sa chás ina bhfuil coinneáil nialasach sonraí gníomhach, deir an Clár amhlaidh, agus sonraítear ann na gnéithe lena mbaineann. Ní inseoimid duit nach gcoinnítear ábhar nuair a choinnítear é." },
-      { kind: "p", text: "Aschuir. Sa chaidreamh idir tú féin agus sinne, féadfaidh tú aschur do dhíospóireachtaí féin a úsáid chun aon chríche dleathaí, agus ní éilímid úinéireacht ar théacs ginte. Tabhair faoi deara go bhféadfadh sé nach mbeadh aschur ginte incháilithe do chosaint cóipchirt i mórán dlínsí; go bhféadfaí aschur cosúil leis a ghiniúint d'úsáideoirí eile; go bhféadfadh aschuir ábhar tríú páirtí a atáirgeadh nó a bheith cosúil leis; agus go bhféadfadh srianta ar athúsáid a bheith ag gabháil le roinnt bunábhair a aisghabhann soláthraí IS. Tá tú freagrach as seiceáil sula mbraitheann tú ar aschuir nó sula n-athfhoilsíonn tú iad." }
+      { kind: "p", text: "Aschuir. Sa chaidreamh idir tú féin agus sinne, féadfaidh tú aschur do dhíospóireachtaí féin a úsáid chun aon chríche dleathaí, agus ní éilímid úinéireacht ar théacs ginte. Tabhair faoi deara go bhféadfadh sé nach mbeadh aschur ginte incháilithe do chosaint cóipchirt i mórán dlínsí; go bhféadfaí aschur cosúil leis a ghiniúint d'úsáideoirí eile; go bhféadfadh aschuir ábhar tríú páirtí a atáirgeadh nó a bheith cosúil leis; agus go bhféadfadh srianta ar athúsáid a bheith ag gabháil le roinnt bunábhair a aisghabhann soláthraí IS. Tá tú freagrach as seiceáil sula mbraitheann tú ar aschuir nó sula n-athfhoilsíonn tú iad." },
+      { kind: "p", text: "Cairteacha agus staitisticí a ghinimid. Is é Dialectical Engine a chruthaíonn na cairteacha i dtuarascáil díospóireachta agus na staitisticí a thiomsaímid dóibh — a roghnú, a socrú, a ndearadh agus a líníocht — agus is le DMS Merchandise Shop S.R.L. iad; tá an fógra \"Copyrighted by DMS Merchandise Shop SRL\" ar gach cairt. Ní bhaineann sé seo leis na figiúirí a thaispeánann cairt, a thagann ó do dhíospóireacht, ná le téacs do dhíospóireachta. Deonaímid ceadúnas saor in aisce, domhanda, neamheisiach agus suthain duit chun na cairteacha sin a úsáid, a chóipeáil agus a chomhroinnt chun aon chríche dleathaí, ar choinníoll go gcoinníonn tú an fógra agus an lipéad gur ghin IS iad in éineacht leo. Sa chás nach n-aithníonn an dlí cearta in ábhar a ghin IS, ní thugann an mhír seo níos mó dúinn ná mar a cheadaíonn an dlí." }
     ]
   },
   {
@@ -354,12 +355,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.6",
-  sha256: "0ff16c93d241ea3864869706d09fb3b200d2b62066ae1115b92b040db638ea0f",
-  eyebrow: "TÉARMAÍ SEIRBHÍSE · v2.6 · I bhFEIDHM 24 DEIREADH FÓMHAIR 2026",
+  version: "2.7",
+  sha256: "2f40bebca05dc6da751445a28875f3831e228a3020c0776980a305e8bcdb62ff",
+  eyebrow: "TÉARMAÍ SEIRBHÍSE · v2.7 · I bhFEIDHM 24 DEIREADH FÓMHAIR 2026",
   title: "An méid lena n-aontaíonn tú",
   lede: "An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.",
-  endMarker: "DEIREADH NA dTÉARMAÍ · v2.6",
+  endMarker: "DEIREADH NA dTÉARMAÍ · v2.7",
   contact: "support@dezbatere.ro",
   bodyLabel: "Téacs na dTéarmaí Seirbhíse",
   sectionIdPrefix: "terms-section-",

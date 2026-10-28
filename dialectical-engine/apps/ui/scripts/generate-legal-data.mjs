@@ -68,7 +68,7 @@ const DOCUMENTS = {
     draft: "terms-of-service.md",
     module: "termsOfService.ts",
     englishOutput: "apps/ui/lib/termsOfService.ts",
-    versionAnchor: "Version 2.6",
+    versionAnchor: "Version 2.7",
     numberedSections: 19,
     annexLetter: "A",
     annexParts: 7,

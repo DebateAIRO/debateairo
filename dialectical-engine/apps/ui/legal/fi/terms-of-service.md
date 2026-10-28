@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lyhyesti
-eyebrow: KÄYTTÖEHDOT · v2.6 · VOIMASSA 24. LOKAKUUTA 2026 ALKAEN
+eyebrow: KÄYTTÖEHDOT · v2.7 · VOIMASSA 24. LOKAKUUTA 2026 ALKAEN
 title: Mihin sitoudut
 lede: Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.
-endMarker: KÄYTTÖEHTOJEN LOPPU · v2.6
+endMarker: KÄYTTÖEHTOJEN LOPPU · v2.7
 bodyLabel: Käyttöehtojen teksti
 annexTitle: Liite A — Alueelliset ehdot
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 SOVELLETTAVA LAKI
 -->
 
-**Version 2.6 · Effective 24. lokakuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
+**Version 2.7 · Effective 24. lokakuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
 
 **In short.** Sinun on oltava vähintään 18-vuotias. Dialectical Engine muodostaa argumentteja tekoälymalleilla, ja kaikki sen tuottama voi olla virheellistä — se ei ole neuvontaa. Väittelysi ovat yksityisiä, ellet julkaise niitä; jos julkaiset ne, kuka tahansa voi lukea niitä. Lähettämäsi teksti toimitetaan palveluntarjoajarekisterissämme luetelluille tekoälypalveluntarjoajille, eikä sitä käytetä mallien kouluttamiseen. Ilmoita lainvastaisesta sisällöstä osoitteeseen support@dezbatere.ro riippumatta siitä, onko sinulla tiliä. Sopimukseen sovelletaan Romanian lakia, mutta paikallinen kuluttajansuojasi säilyy.
 
@@ -127,6 +127,8 @@ Jos et ole varma, onko jokin sallittua, kysy meiltä ennen sen julkaisemista.
 **Kolme eri asiaa.** ”Ei käytetä mallien kouluttamiseen”, ”säilytetään rajoitetun ajan turvallisuus-, väärinkäytösten ehkäisy- tai oikeudellisista syistä” ja ”tietoja ei säilytetä — niitä ei tallenneta käsittelyn jälkeen” ovat eri asioita. Jos palveluntarjoaja säilyttää kehotteita rajoitetun ajan, rekisterissä ilmoitetaan säilytysaika ja syy. Jos tietojen säilyttämättömyys on käytössä, se ja sitä koskevat ominaisuudet ilmoitetaan rekisterissä. Emme väitä, ettei sisältöä säilytetä, jos sitä tosiasiassa säilytetään.
 
 **Tuotokset.** Sinun ja meidän välisessä suhteessa saat käyttää omien väittelyidesi tuotoksia mihin tahansa lailliseen tarkoitukseen, emmekä vaadi tuotetun tekstin omistusoikeutta. Huomaa, ettei tuotettu sisältö välttämättä saa tekijänoikeussuojaa monilla lainkäyttöalueilla; muille käyttäjille voidaan tuottaa samankaltaista sisältöä; tuotokset voivat toisintaa kolmannen osapuolen aineistoa tai muistuttaa sitä; ja joihinkin tekoälypalveluntarjoajan hakemiin lähdeaineistoihin voi kohdistua uudelleenkäyttörajoituksia. Vastaat tarkistamisesta ennen tuotoksiin luottamista tai niiden julkaisemista uudelleen.
+
+**Tuottamamme kaaviot ja tilastot.** Väittelyraportin kaaviot ja niitä varten kokoamamme tilastot — niiden valinta, järjestys, ulkoasu ja piirtäminen — ovat Dialectical Engine -palvelun tekemiä ja kuuluvat yhtiölle DMS Merchandise Shop S.R.L.; jokaisessa kaaviossa on merkintä ”Copyrighted by DMS Merchandise Shop SRL”. Tämä ei koske kaavion esittämiä lukuja, jotka ovat peräisin väittelystäsi, eikä väittelysi tekstiä. Myönnämme sinulle maksuttoman, maailmanlaajuisen, ei-yksinomaisen ja pysyvän käyttöluvan käyttää, kopioida ja jakaa näitä kaavioita mihin tahansa lailliseen tarkoitukseen edellyttäen, että säilytät niiden yhteydessä tämän merkinnän sekä tekoälyn tuottamaa sisältöä koskevan merkinnän. Jos laki ei tunnusta oikeuksia tekoälyn tuottamaan aineistoon, tämä kappale ei anna meille enempää kuin laki sallii.
 
 ## 9. Väittelyn julkaiseminen
 

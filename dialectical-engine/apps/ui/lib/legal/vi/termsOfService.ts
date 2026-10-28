@@ -137,7 +137,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Tìm kiếm trên web qua Perplexity. Để tìm bằng chứng cho một cuộc tranh luận, các mô hình có thể tìm kiếm trên web qua Perplexity (Perplexity AI, Inc., Hoa Kỳ), được liệt kê trong Sổ đăng ký nhà cung cấp AI. Nội dung Perplexity nhận được là các truy vấn tìm kiếm mà mô hình viết ra từ cuộc tranh luận — vì vậy, giống như một nhà cung cấp mô hình, Perplexity thấy văn bản được xây dựng xoay quanh nội dung bạn nhập. Perplexity không bao giờ nhận địa chỉ email, mã định danh tài khoản, hồ sơ phiên hoặc thông tin thanh toán của bạn." },
       { kind: "p", text: "Nhà cung cấp nào và tại đâu. Sổ đăng ký nhà cung cấp AI của chúng tôi tại dezbatere.ro/providers là một phần của các Điều khoản này. Sổ đăng ký liệt kê từng nhà cung cấp chúng tôi có thể sử dụng: pháp nhân và quốc gia của họ; dữ liệu họ nhận và lý do; nơi họ xử lý; điều khoản lưu giữ; liệu chế độ không lưu giữ dữ liệu có được kích hoạt cho điểm cuối chúng tôi sử dụng hay không; liệu họ có thể dùng dữ liệu đầu vào để huấn luyện theo hợp đồng với chúng tôi hay không; cơ chế chuyển dữ liệu mà chúng tôi dựa vào; và ngày chúng tôi xác minh lần gần nhất đối với mỗi mục. Các nhà cung cấp có thể ở ngoài quốc gia của bạn và ngoài Khu vực Kinh tế Châu Âu. Chính sách quyền riêng tư của chúng tôi giải thích các biện pháp bảo đảm." },
       { kind: "p", text: "Ba khái niệm khác nhau. \"Không được dùng để huấn luyện mô hình\", \"được lưu giữ trong thời gian có hạn vì lý do bảo mật, phòng chống lạm dụng hoặc pháp lý\" và \"không lưu giữ dữ liệu — không được duy trì sau khi xử lý\" là những khái niệm khác nhau. Khi một nhà cung cấp lưu giữ câu lệnh trong thời gian có hạn, Sổ đăng ký cho biết thời hạn và lý do. Khi chế độ không lưu giữ dữ liệu được kích hoạt, Sổ đăng ký nêu rõ điều đó và các tính năng áp dụng. Chúng tôi sẽ không nói rằng nội dung không được lưu giữ nếu thực tế không phải vậy." },
-      { kind: "p", text: "Kết quả. Trong quan hệ giữa bạn và chúng tôi, bạn có thể sử dụng kết quả từ các cuộc tranh luận của chính mình cho bất kỳ mục đích hợp pháp nào, và chúng tôi không tuyên bố quyền sở hữu đối với văn bản được tạo ra. Hãy lưu ý rằng kết quả được tạo ra có thể không được bảo hộ quyền tác giả tại nhiều hệ thống pháp luật; kết quả tương tự có thể được tạo ra cho người dùng khác; kết quả có thể sao chép hoặc giống tài liệu của bên thứ ba; và một số tài liệu nguồn do nhà cung cấp AI truy xuất có thể chịu hạn chế về việc tái sử dụng. Bạn chịu trách nhiệm kiểm tra trước khi dựa vào hoặc công bố lại kết quả." }
+      { kind: "p", text: "Kết quả. Trong quan hệ giữa bạn và chúng tôi, bạn có thể sử dụng kết quả từ các cuộc tranh luận của chính mình cho bất kỳ mục đích hợp pháp nào, và chúng tôi không tuyên bố quyền sở hữu đối với văn bản được tạo ra. Hãy lưu ý rằng kết quả được tạo ra có thể không được bảo hộ quyền tác giả tại nhiều hệ thống pháp luật; kết quả tương tự có thể được tạo ra cho người dùng khác; kết quả có thể sao chép hoặc giống tài liệu của bên thứ ba; và một số tài liệu nguồn do nhà cung cấp AI truy xuất có thể chịu hạn chế về việc tái sử dụng. Bạn chịu trách nhiệm kiểm tra trước khi dựa vào hoặc công bố lại kết quả." },
+      { kind: "p", text: "Biểu đồ và số liệu thống kê do chúng tôi tạo ra. Các biểu đồ trong một báo cáo tranh luận và các số liệu thống kê chúng tôi tổng hợp cho các biểu đồ đó — bao gồm việc lựa chọn, sắp xếp, thiết kế và vẽ chúng — do Dialectical Engine tạo ra và thuộc về DMS Merchandise Shop S.R.L.; mỗi biểu đồ đều mang dòng thông báo \"Copyrighted by DMS Merchandise Shop SRL\". Điều này không áp dụng cho các con số mà biểu đồ thể hiện, vốn đến từ cuộc tranh luận của bạn, hoặc cho văn bản cuộc tranh luận của bạn. Chúng tôi cấp cho bạn giấy phép miễn phí, trên toàn thế giới, không độc quyền và vĩnh viễn để sử dụng, sao chép và chia sẻ các biểu đồ đó cho bất kỳ mục đích hợp pháp nào, với điều kiện bạn giữ nguyên dòng thông báo và nhãn do AI tạo đi kèm biểu đồ. Trường hợp pháp luật không công nhận quyền đối với tài liệu do AI tạo ra, đoạn này không trao cho chúng tôi nhiều hơn mức pháp luật cho phép." }
     ]
   },
   {
@@ -354,12 +355,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.6",
-  sha256: "37d77766f488dea9444a109d412036e07f1d2d95eccb63d1612e19bf1827b640",
-  eyebrow: "ĐIỀU KHOẢN DỊCH VỤ · v2.6 · CÓ HIỆU LỰC 24 THÁNG 10 NĂM 2026",
+  version: "2.7",
+  sha256: "b4de70d40a413115206159db1b1b0bb6b79abccad23c59f66331a4d2254a7a8f",
+  eyebrow: "ĐIỀU KHOẢN DỊCH VỤ · v2.7 · CÓ HIỆU LỰC 24 THÁNG 10 NĂM 2026",
   title: "Những điều bạn đồng ý",
   lede: "Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.",
-  endMarker: "HẾT ĐIỀU KHOẢN · v2.6",
+  endMarker: "HẾT ĐIỀU KHOẢN · v2.7",
   contact: "support@dezbatere.ro",
   bodyLabel: "Nội dung Điều khoản dịch vụ",
   sectionIdPrefix: "terms-section-",

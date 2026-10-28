@@ -137,7 +137,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Pencarian web melalui Perplexity. Untuk menemukan bukti bagi debat, model dapat mencari di web melalui Perplexity (Perplexity AI, Inc., Amerika Serikat), yang tercantum dalam Daftar Penyedia AI. Yang diterima Perplexity adalah pertanyaan pencarian yang ditulis model dari debat — sehingga, seperti penyedia model, Perplexity melihat teks yang dibangun seputar hal yang Anda ketik. Perplexity tidak pernah menerima alamat email, pengenal akun, catatan sesi, atau rincian pembayaran Anda." },
       { kind: "p", text: "Penyedia yang digunakan, dan lokasinya. Daftar Penyedia AI kami di dezbatere.ro/providers merupakan bagian dari Ketentuan ini. Daftar tersebut mencantumkan setiap penyedia yang mungkin kami gunakan: badan hukum dan negaranya; hal yang diterimanya dan alasannya; tempat pemrosesan dilakukan; ketentuan retensinya; apakah retensi data nihil aktif untuk titik akhir yang kami gunakan; apakah penyedia dapat menggunakan masukan untuk pelatihan berdasarkan kontrak kami; mekanisme transfer yang kami andalkan; serta tanggal terakhir kami memverifikasi setiap entri. Penyedia mungkin berlokasi di luar negara Anda dan di luar Wilayah Ekonomi Eropa. Kebijakan Privasi kami menjelaskan langkah perlindungannya." },
       { kind: "p", text: "Tiga hal yang berbeda. \"Tidak digunakan untuk melatih model\", \"disimpan selama periode terbatas untuk alasan keamanan, pencegahan penyalahgunaan, atau hukum\", dan \"retensi data nihil — tidak disimpan setelah pemrosesan\" merupakan hal yang berbeda. Jika penyedia menyimpan perintah selama periode terbatas, Daftar menyebutkan durasi dan alasannya. Jika retensi data nihil aktif, Daftar menyatakannya beserta fitur yang menggunakannya. Kami tidak akan menyatakan bahwa konten tidak disimpan apabila kenyataannya disimpan." },
-      { kind: "p", text: "Keluaran. Dalam hubungan antara Anda dan kami, Anda dapat menggunakan keluaran debat Anda sendiri untuk tujuan apa pun yang sah, dan kami tidak mengeklaim kepemilikan atas teks yang dihasilkan. Harap diketahui bahwa keluaran yang dihasilkan mungkin tidak dapat dilindungi hak cipta di banyak yurisdiksi; keluaran serupa mungkin dihasilkan untuk pengguna lain; keluaran mungkin memperbanyak atau menyerupai materi pihak ketiga; dan beberapa materi sumber yang diambil oleh penyedia AI mungkin memiliki pembatasan penggunaan kembali. Anda bertanggung jawab untuk melakukan pemeriksaan sebelum mengandalkan atau memublikasikan ulang keluaran." }
+      { kind: "p", text: "Keluaran. Dalam hubungan antara Anda dan kami, Anda dapat menggunakan keluaran debat Anda sendiri untuk tujuan apa pun yang sah, dan kami tidak mengeklaim kepemilikan atas teks yang dihasilkan. Harap diketahui bahwa keluaran yang dihasilkan mungkin tidak dapat dilindungi hak cipta di banyak yurisdiksi; keluaran serupa mungkin dihasilkan untuk pengguna lain; keluaran mungkin memperbanyak atau menyerupai materi pihak ketiga; dan beberapa materi sumber yang diambil oleh penyedia AI mungkin memiliki pembatasan penggunaan kembali. Anda bertanggung jawab untuk melakukan pemeriksaan sebelum mengandalkan atau memublikasikan ulang keluaran." },
+      { kind: "p", text: "Grafik dan statistik yang kami hasilkan. Grafik dalam laporan debat, serta statistik yang kami susun untuknya — pemilihan, penataan, desain, dan penggambarannya — dibuat oleh Dialectical Engine dan merupakan milik DMS Merchandise Shop S.R.L.; setiap grafik diberi tanda \"Copyrighted by DMS Merchandise Shop SRL\". Hal ini tidak mencakup angka yang ditampilkan grafik, yang berasal dari debat Anda, maupun teks debat Anda. Kami memberi Anda lisensi gratis, berlaku di seluruh dunia, non-eksklusif, dan abadi untuk menggunakan, menyalin, dan membagikan grafik tersebut untuk tujuan apa pun yang sah, asalkan Anda tetap menyertakan pemberitahuan tersebut dan label bahwa grafik dihasilkan AI bersama grafik tersebut. Jika hukum tidak mengakui hak atas materi yang dihasilkan AI, paragraf ini tidak memberi kami lebih dari yang diizinkan hukum." }
     ]
   },
   {
@@ -354,12 +355,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.6",
-  sha256: "13efd39b8ee84ef078e6903c02ae995eeb7c4430f6247f98ac24fcc74494054c",
-  eyebrow: "KETENTUAN LAYANAN · v2.6 · BERLAKU 24 OKTOBER 2026",
+  version: "2.7",
+  sha256: "41cc10722f6d9b929677fd19951b5913e4d3a6d701fdaccb2d875f7ae443f4a7",
+  eyebrow: "KETENTUAN LAYANAN · v2.7 · BERLAKU 24 OKTOBER 2026",
   title: "Hal yang Anda setujui",
   lede: "Kontrak antara Anda dan DMS Merchandise Shop S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.",
-  endMarker: "AKHIR KETENTUAN · v2.6",
+  endMarker: "AKHIR KETENTUAN · v2.7",
   contact: "support@dezbatere.ro",
   bodyLabel: "Teks Ketentuan Layanan",
   sectionIdPrefix: "terms-section-",

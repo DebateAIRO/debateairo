@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: W skrócie
-eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v2.6 · OBOWIĄZUJĄ OD 24 PAŹDZIERNIKA 2026
+eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v2.7 · OBOWIĄZUJĄ OD 24 PAŹDZIERNIKA 2026
 title: Na co wyrażasz zgodę
 lede: Umowa między Tobą a DMS Merchandise Shop S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.
-endMarker: KONIEC WARUNKÓW · v2.6
+endMarker: KONIEC WARUNKÓW · v2.7
 bodyLabel: Treść Warunków świadczenia usług
 annexTitle: Załącznik A — Warunki regionalne
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAWO WŁAŚCIWE
 -->
 
-**Version 2.6 · Effective 24 października 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
+**Version 2.7 · Effective 24 października 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
 
 **In short.** Musisz mieć ukończone 18 lat. Dialectical Engine tworzy argumenty przy użyciu modeli sztucznej inteligencji, a wszystko, co generuje, może być błędne — nie jest to porada. Twoje debaty są prywatne, chyba że je opublikujesz; po publikacji każdy może je przeczytać. Przesyłany przez Ciebie tekst jest przekazywany dostawcom AI wymienionym w naszym Rejestrze Dostawców i nie jest wykorzystywany do trenowania modeli. Nielegalne treści zgłaszaj pod adresem support@dezbatere.ro, niezależnie od tego, czy masz konto. Zastosowanie ma prawo rumuńskie, jednak zachowujesz ochronę konsumencką wynikającą z prawa miejscowego.
 
@@ -127,6 +127,8 @@ Jeżeli nie masz pewności, czy dana treść jest dozwolona, skontaktuj się z n
 **Trzy różne kwestie.** „Niewykorzystywanie do trenowania modeli”, „przechowywanie przez ograniczony czas ze względów bezpieczeństwa, zapobiegania nadużyciom lub z przyczyn prawnych” oraz „zerowa retencja danych — brak utrwalenia po przetworzeniu” to różne pojęcia. Jeżeli dostawca przechowuje prompty przez ograniczony okres, Rejestr wskazuje jego długość i cel. Jeżeli aktywna jest zerowa retencja danych, Rejestr zawiera taką informację i wskazuje funkcje, których ona dotyczy. Nie będziemy twierdzić, że treści nie są przechowywane, jeżeli jest inaczej.
 
 **Wyniki.** W stosunkach między Tobą a nami możesz wykorzystywać wyniki własnych debat w dowolnym zgodnym z prawem celu, a my nie rościmy sobie praw własności do wygenerowanego tekstu. Pamiętaj, że w wielu jurysdykcjach wygenerowane wyniki mogą nie podlegać ochronie prawa autorskiego; że podobne wyniki mogą zostać wygenerowane dla innych użytkowników; że wyniki mogą powielać lub przypominać materiały podmiotów trzecich; oraz że niektóre materiały źródłowe pobierane przez dostawcę AI mogą podlegać ograniczeniom dotyczącym ponownego wykorzystywania. Masz obowiązek zweryfikować wyniki przed oparciem się na nich lub ich ponownym opublikowaniem.
+
+**Wykresy i statystyki, które generujemy.** Wykresy w raporcie z debaty oraz statystyki, które dla nich zestawiamy — ich dobór, układ, projekt graficzny i rysunek — są tworzone przez Dialectical Engine i należą do DMS Merchandise Shop S.R.L.; każdy wykres jest opatrzony informacją „Copyrighted by DMS Merchandise Shop SRL”. Nie dotyczy to liczb prezentowanych na wykresie, które pochodzą z Twojej debaty, ani tekstu Twojej debaty. Udzielamy Ci nieodpłatnej, ogólnoświatowej, niewyłącznej i bezterminowej licencji na wykorzystywanie, kopiowanie i udostępnianie tych wykresów w dowolnym zgodnym z prawem celu, pod warunkiem że zachowasz przy nich tę informację oraz oznaczenie o wygenerowaniu przez AI. Jeżeli prawo nie uznaje praw do materiałów wygenerowanych przez AI, niniejszy akapit nie przyznaje nam więcej, niż pozwala prawo.
 
 ## 9. Publikowanie debaty
 

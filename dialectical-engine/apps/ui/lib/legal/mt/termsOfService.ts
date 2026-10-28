@@ -137,7 +137,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Tfittxija fuq il-web permezz ta’ Perplexity. Biex isibu evidenza għal dibattitu, il-mudelli jistgħu jfittxu fuq il-web permezz ta’ Perplexity (Perplexity AI, Inc., l-Istati Uniti), li huwa elenkat fir-Reġistru tal-Fornituri tal-IA. Dak li jirċievi Perplexity huma l-mistoqsijiet ta’ tfittxija li l-mudelli jiktbu mid-dibattitu — għalhekk, bħal fornitur tal-mudelli, jara test mibni madwar dak li ttajpjajt. Qatt ma jirċievi l-indirizz elettroniku tiegħek, l-identifikaturi tal-kont tiegħek, ir-rekords tas-sessjoni tiegħek jew id-dettalji tal-ħlas tiegħek." },
       { kind: "p", text: "Liema fornituri, u fejn. Ir-Reġistru tal-Fornituri tal-IA tagħna fuq dezbatere.ro/providers huwa parti minn dawn it-Termini. Huwa jelenka kull fornitur li nistgħu nużaw: l-entità ġuridika u l-pajjiż tiegħu; dak li jirċievi u għaliex; fejn jipproċessa; it-termini taż-żamma tiegħu; jekk iż-żamma żero tad-data hijiex attiva għall-punt aħħari li nużaw; jekk jistax juża d-data mdaħħla għat-taħriġ skont il-kuntratt tagħna; il-mekkaniżmu tat-trasferiment li niddependu fuqu; u d-data meta vverifikajna l-aħħar kull entrata. Il-fornituri jistgħu jkunu jinsabu barra pajjiżek u barra ż-Żona Ekonomika Ewropea. Il-Politika dwar il-Privatezza tagħna tispjega s-salvagwardji." },
       { kind: "p", text: "Tliet affarijiet differenti. “Ma jintużax għat-taħriġ tal-mudelli”, “jinżamm għal perjodu limitat għal raġunijiet ta’ sigurtà, prevenzjoni tal-abbuż jew raġunijiet legali”, u “żamma żero tad-data — ma jinħażinx b’mod persistenti wara l-ipproċessar” huma differenti. Fejn fornitur iżomm il-messaġġi ta’ istruzzjoni għal perjodu limitat, ir-Reġistru jgħid għal kemm żmien u għaliex. Fejn iż-żamma żero tad-data tkun attiva, ir-Reġistru jgħid dan, u għal liema funzjonalitajiet. Mhux se ngħidulek li l-kontenut ma jinżammx meta fil-fatt jinżamm." },
-      { kind: "p", text: "Riżultati. Bejnek u bejnietna, tista’ tuża r-riżultat tad-dibattiti tiegħek stess għal kwalunkwe skop legali, u aħna ma nippretendux sjieda tat-test iġġenerat. Kun af li riżultat iġġenerat jista’ ma jkunx protett mid-drittijiet tal-awtur f’ħafna ġuriżdizzjonijiet; li riżultat simili jista’ jiġi ġġenerat għal utenti oħra; li r-riżultati jistgħu jirriproduċu jew jixbhu materjal ta’ parti terza; u li xi materjal mis-sorsi miksub minn fornitur tal-IA jista’ jkollu restrizzjonijiet fuq l-użu mill-ġdid. Int responsabbli biex tivverifika qabel tiddependi fuq ir-riżultati jew terġa’ tippubblikahom." }
+      { kind: "p", text: "Riżultati. Bejnek u bejnietna, tista’ tuża r-riżultat tad-dibattiti tiegħek stess għal kwalunkwe skop legali, u aħna ma nippretendux sjieda tat-test iġġenerat. Kun af li riżultat iġġenerat jista’ ma jkunx protett mid-drittijiet tal-awtur f’ħafna ġuriżdizzjonijiet; li riżultat simili jista’ jiġi ġġenerat għal utenti oħra; li r-riżultati jistgħu jirriproduċu jew jixbhu materjal ta’ parti terza; u li xi materjal mis-sorsi miksub minn fornitur tal-IA jista’ jkollu restrizzjonijiet fuq l-użu mill-ġdid. Int responsabbli biex tivverifika qabel tiddependi fuq ir-riżultati jew terġa’ tippubblikahom." },
+      { kind: "p", text: "Graffs u statistika li niġġeneraw. Il-graffs f’rapport ta’ dibattitu, u l-istatistika li niġbru għalihom — l-għażla, l-arranġament, id-disinn u t-tpinġija tagħhom — huma magħmula minn Dialectical Engine u jappartjenu lil DMS Merchandise Shop S.R.L.; kull graff huwa mmarkat “Copyrighted by DMS Merchandise Shop SRL”. Dan ma jestendix għaċ-ċifri li juri graff, li ġejjin mid-dibattitu tiegħek, jew għat-test tad-dibattitu tiegħek. Aħna nagħtuk liċenzja b’xejn, dinjija, mhux esklużiva u perpetwa biex tuża, tikkopja u taqsam dawk il-graffs għal kwalunkwe skop legali, sakemm iżżomm magħhom l-avviż u t-tikketta li huma ġġenerati mill-IA. Fejn il-liġi ma tirrikonoxxix drittijiet f’materjal iġġenerat mill-IA, dan il-paragrafu ma jagħtina xejn aktar minn dak li tippermetti l-liġi." }
     ]
   },
   {
@@ -354,12 +355,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.6",
-  sha256: "7d03e04d3075c1e45e2f9f87aa9d960f04397fe306cadae0e23335fe794970bd",
-  eyebrow: "TERMINI TAS-SERVIZZ · v2.6 · EFFETTIVI 24 TA’ OTTUBRU 2026",
+  version: "2.7",
+  sha256: "55ec13dd8d9c5a342de6e2ce028fc2343f70e0af16e81fc19a633aece6ee1e00",
+  eyebrow: "TERMINI TAS-SERVIZZ · v2.7 · EFFETTIVI 24 TA’ OTTUBRU 2026",
   title: "Dak li taqbel miegħu",
   lede: "Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.",
-  endMarker: "TMIEM IT-TERMINI · v2.6",
+  endMarker: "TMIEM IT-TERMINI · v2.7",
   contact: "support@dezbatere.ro",
   bodyLabel: "Test tat-Termini tas-Servizz",
   sectionIdPrefix: "terms-section-",

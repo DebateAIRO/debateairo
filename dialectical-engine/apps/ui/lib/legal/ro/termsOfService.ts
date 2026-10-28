@@ -137,7 +137,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Căutarea pe web prin Perplexity. Pentru a găsi dovezi pentru o dezbatere, modelele pot căuta pe web prin Perplexity (Perplexity AI, Inc., Statele Unite), care este inclus în Registrul furnizorilor de IA. Perplexity primește întrebările de căutare pe care modelele le formulează pornind de la dezbatere — astfel, la fel ca un furnizor de modele, vede text construit în jurul a ceea ce ați introdus. Nu primește niciodată adresa dumneavoastră de e-mail, identificatorii contului, înregistrările sesiunilor sau datele de plată." },
       { kind: "p", text: "Ce furnizori folosim și unde se află. Registrul furnizorilor de IA de la dezbatere.ro/providers face parte din acești Termeni. Acesta enumeră fiecare furnizor pe care îl putem utiliza: entitatea juridică și țara sa; ce primește și de ce; unde efectuează prelucrarea; condițiile sale de păstrare; dacă pentru punctul final pe care îl utilizăm este activată păstrarea zero a datelor; dacă poate utiliza datele de intrare pentru antrenare conform contractului nostru; mecanismul de transfer pe care ne bazăm; și data la care am verificat ultima dată fiecare înregistrare. Furnizorii pot fi situați în afara țării dumneavoastră și în afara Spațiului Economic European. Politica noastră de confidențialitate explică garanțiile aplicabile." },
       { kind: "p", text: "Trei lucruri diferite. „Neutilizat pentru antrenarea modelelor”, „păstrat pentru o perioadă limitată din motive de securitate, prevenire a abuzurilor sau motive legale” și „păstrare zero a datelor — nepersistat după prelucrare” sunt lucruri diferite. Atunci când un furnizor păstrează solicitările pentru o perioadă limitată, Registrul precizează durata și motivul. Atunci când păstrarea zero a datelor este activă, Registrul menționează acest lucru și funcțiile pentru care se aplică. Nu vom afirma că un conținut nu este păstrat atunci când, în realitate, este păstrat." },
-      { kind: "p", text: "Rezultate. În raporturile dintre dumneavoastră și noi, puteți utiliza rezultatul propriilor dezbateri în orice scop legal, iar noi nu revendicăm drepturi de proprietate asupra textului generat. Rețineți că, în numeroase jurisdicții, conținutul generat poate să nu fie protejabil prin drepturi de autor; că pot fi generate rezultate similare pentru alți utilizatori; că rezultatele pot reproduce sau semăna cu materiale ale terților; și că anumite materiale-sursă recuperate de un furnizor de IA pot fi supuse unor restricții de reutilizare. Aveți responsabilitatea de a verifica înainte de a vă baza pe rezultate sau de a le republica." }
+      { kind: "p", text: "Rezultate. În raporturile dintre dumneavoastră și noi, puteți utiliza rezultatul propriilor dezbateri în orice scop legal, iar noi nu revendicăm drepturi de proprietate asupra textului generat. Rețineți că, în numeroase jurisdicții, conținutul generat poate să nu fie protejabil prin drepturi de autor; că pot fi generate rezultate similare pentru alți utilizatori; că rezultatele pot reproduce sau semăna cu materiale ale terților; și că anumite materiale-sursă recuperate de un furnizor de IA pot fi supuse unor restricții de reutilizare. Aveți responsabilitatea de a verifica înainte de a vă baza pe rezultate sau de a le republica." },
+      { kind: "p", text: "Graficele și statisticile pe care le generăm. Graficele dintr-un raport de dezbatere și statisticile pe care le compilăm pentru ele — selecția, aranjarea, designul și desenarea lor — sunt realizate de Dialectical Engine și aparțin DMS Merchandise Shop S.R.L.; fiecare grafic poartă mențiunea „Copyrighted by DMS Merchandise Shop SRL”. Acest lucru nu se extinde asupra cifrelor pe care le arată un grafic, care provin din dezbaterea dumneavoastră, și nici asupra textului dezbaterii. Vă acordăm o licență gratuită, mondială, neexclusivă și perpetuă de a folosi, copia și distribui aceste grafice în orice scop legal, cu condiția să păstrați mențiunea și eticheta „generat de AI” alături de ele. Acolo unde legea nu recunoaște drepturi asupra materialelor generate de AI, acest paragraf nu ne conferă mai mult decât permite legea." }
     ]
   },
   {
@@ -354,12 +355,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.6",
-  sha256: "af223b77f181ce6c2d3eb34270ee40308f398efd772b8a3d9a2f1f48b58b4e8e",
-  eyebrow: "TERMENII SERVICIULUI · v2.6 · ÎN VIGOARE DE LA 24 OCTOMBRIE 2026",
+  version: "2.7",
+  sha256: "f8afe0b7e6ab074bb47f18c5db990a3beada35f7270699856b835bdcde2bd432",
+  eyebrow: "TERMENII SERVICIULUI · v2.7 · ÎN VIGOARE DE LA 24 OCTOMBRIE 2026",
   title: "Ce acceptați",
   lede: "Contractul dintre dumneavoastră și DMS Merchandise Shop S.R.L., într-un limbaj clar. Nouăsprezece secțiuni și Anexa A — derulați până la final.",
-  endMarker: "SFÂRȘITUL TERMENILOR · v2.6",
+  endMarker: "SFÂRȘITUL TERMENILOR · v2.7",
   contact: "support@dezbatere.ro",
   bodyLabel: "Textul Termenilor serviciului",
   sectionIdPrefix: "terms-section-",

@@ -137,7 +137,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Websuche über Perplexity. Um Belege für eine Debatte zu finden, können die Modelle das Web über Perplexity (Perplexity AI, Inc., Vereinigte Staaten) durchsuchen, das im Verzeichnis der KI-Anbieter aufgeführt ist. Perplexity erhält die Suchanfragen, die die Modelle aus der Debatte formulieren – wie ein Modellanbieter sieht Perplexity also Text, der um Ihre Eingaben herum aufgebaut ist. Ihre E-Mail-Adresse, Ihre Kontokennungen, Ihre Sitzungsaufzeichnungen oder Ihre Zahlungsdaten erhält Perplexity niemals." },
       { kind: "p", text: "Welche Anbieter und wo. Unser Verzeichnis der KI-Anbieter unter dezbatere.ro/providers ist Bestandteil dieser Nutzungsbedingungen. Es führt jeden Anbieter auf, den wir verwenden können: seinen Rechtsträger und sein Land; welche Daten er zu welchem Zweck erhält; wo er sie verarbeitet; seine Aufbewahrungsbedingungen; ob für den von uns verwendeten Endpunkt eine Null-Daten-Aufbewahrung aktiv ist; ob er Eingaben nach unserem Vertrag für Trainingszwecke verwenden darf; auf welchen Übermittlungsmechanismus wir uns stützen und wann wir den jeweiligen Eintrag zuletzt überprüft haben. Anbieter können sich außerhalb Ihres Landes und außerhalb des Europäischen Wirtschaftsraums befinden. Unsere Datenschutzerklärung erläutert die Schutzmaßnahmen." },
       { kind: "p", text: "Drei verschiedene Dinge. „Nicht zum Trainieren von Modellen verwendet“, „für einen begrenzten Zeitraum aus Sicherheits-, Missbrauchspräventions- oder rechtlichen Gründen aufbewahrt“ und „Null-Daten-Aufbewahrung – nach der Verarbeitung nicht gespeichert“ sind unterschiedliche Sachverhalte. Bewahrt ein Anbieter Eingaben für einen begrenzten Zeitraum auf, nennt das Verzeichnis Dauer und Grund. Ist eine Null-Daten-Aufbewahrung aktiv, nennt das Verzeichnis dies und die davon erfassten Funktionen. Wir werden Ihnen nicht mitteilen, Inhalte würden nicht aufbewahrt, wenn dies nicht zutrifft." },
-      { kind: "p", text: "Ergebnisse. Im Verhältnis zwischen Ihnen und uns dürfen Sie das Ergebnis Ihrer eigenen Debatten für jeden rechtmäßigen Zweck verwenden, und wir beanspruchen kein Eigentum an erzeugtem Text. Beachten Sie, dass erzeugte Ergebnisse in vielen Rechtsordnungen möglicherweise nicht urheberrechtlich geschützt werden können, dass ähnliche Ergebnisse für andere Personen erzeugt werden können, dass Ergebnisse Material Dritter wiedergeben oder diesem ähneln können und dass für bestimmtes Ausgangsmaterial, das ein KI-Anbieter abruft, Beschränkungen für die Weiterverwendung gelten können. Sie sind dafür verantwortlich, dies zu prüfen, bevor Sie sich auf Ergebnisse verlassen oder sie erneut veröffentlichen." }
+      { kind: "p", text: "Ergebnisse. Im Verhältnis zwischen Ihnen und uns dürfen Sie das Ergebnis Ihrer eigenen Debatten für jeden rechtmäßigen Zweck verwenden, und wir beanspruchen kein Eigentum an erzeugtem Text. Beachten Sie, dass erzeugte Ergebnisse in vielen Rechtsordnungen möglicherweise nicht urheberrechtlich geschützt werden können, dass ähnliche Ergebnisse für andere Personen erzeugt werden können, dass Ergebnisse Material Dritter wiedergeben oder diesem ähneln können und dass für bestimmtes Ausgangsmaterial, das ein KI-Anbieter abruft, Beschränkungen für die Weiterverwendung gelten können. Sie sind dafür verantwortlich, dies zu prüfen, bevor Sie sich auf Ergebnisse verlassen oder sie erneut veröffentlichen." },
+      { kind: "p", text: "Von uns erzeugte Diagramme und Statistiken. Die Diagramme in einem Debattenbericht und die Statistiken, die wir für sie zusammenstellen – deren Auswahl, Anordnung, Gestaltung und zeichnerische Ausführung –, werden von Dialectical Engine erstellt und gehören der DMS Merchandise Shop S.R.L.; jedes Diagramm trägt den Vermerk „Copyrighted by DMS Merchandise Shop SRL“. Dies erstreckt sich weder auf die Zahlen, die ein Diagramm zeigt und die aus Ihrer Debatte stammen, noch auf den Text Ihrer Debatte. Wir räumen Ihnen eine unentgeltliche, weltweite, nicht ausschließliche und unbefristete Lizenz ein, diese Diagramme für jeden rechtmäßigen Zweck zu nutzen, zu vervielfältigen und weiterzugeben, sofern Sie den Vermerk und die Kennzeichnung als KI-generiert bei ihnen belassen. Soweit das Recht keine Rechte an KI-generiertem Material anerkennt, verschafft uns dieser Absatz nicht mehr, als das Recht zulässt." }
     ]
   },
   {
@@ -354,12 +355,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.6",
-  sha256: "a8d7a643b4a4f791a3c40c66c109ffaef61e7c97e8fb6c98f37926aa70708a65",
-  eyebrow: "NUTZUNGSBEDINGUNGEN · v2.6 · GÜLTIG AB 24. OKTOBER 2026",
+  version: "2.7",
+  sha256: "b8e2e48bb560611f83597cad420bbbf52801dd295c7d546e372bcc0f017c0010",
+  eyebrow: "NUTZUNGSBEDINGUNGEN · v2.7 · GÜLTIG AB 24. OKTOBER 2026",
   title: "Womit Sie sich einverstanden erklären",
   lede: "Der Vertrag zwischen Ihnen und DMS Merchandise Shop S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.",
-  endMarker: "ENDE DER NUTZUNGSBEDINGUNGEN · v2.6",
+  endMarker: "ENDE DER NUTZUNGSBEDINGUNGEN · v2.7",
   contact: "support@dezbatere.ro",
   bodyLabel: "Text der Nutzungsbedingungen",
   sectionIdPrefix: "terms-section-",

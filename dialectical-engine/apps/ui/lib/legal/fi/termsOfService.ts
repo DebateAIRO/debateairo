@@ -137,7 +137,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Verkkohaku Perplexity-palvelun kautta. Löytääkseen näyttöä väittelyä varten mallit voivat tehdä verkkohakuja palvelun Perplexity (Perplexity AI, Inc., Yhdysvallat) kautta, ja palvelu on lueteltu tekoälypalveluntarjoajarekisterissä. Perplexity saa hakukyselyt, jotka mallit kirjoittavat väittelyn pohjalta — joten mallipalveluntarjoajan tavoin se näkee kirjoittamasi tekstin ympärille rakennettua tekstiä. Se ei koskaan saa sähköpostiosoitettasi, tilitunnisteitasi, istuntotietojasi tai maksutietojasi." },
       { kind: "p", text: "Mitkä palveluntarjoajat ja missä. Osoitteessa dezbatere.ro/providers oleva tekoälypalveluntarjoajarekisterimme on osa näitä käyttöehtoja. Siinä luetellaan jokainen palveluntarjoaja, jota voimme käyttää: sen oikeushenkilö ja kotimaa; sen saamat tiedot ja niiden käyttötarkoitus; käsittelypaikat; tietojen säilytysehdot; onko käyttämässämme rajapinnassa käytössä tietojen säilyttämättömyys; voiko se sopimuksemme nojalla käyttää syötteitä kouluttamiseen; käyttämämme siirtomekanismi sekä kunkin merkinnän viimeisin tarkistuspäivä. Palveluntarjoajat voivat sijaita maasi ja Euroopan talousalueen ulkopuolella. Suojatoimet kuvataan tietosuojakäytännössämme." },
       { kind: "p", text: "Kolme eri asiaa. ”Ei käytetä mallien kouluttamiseen”, ”säilytetään rajoitetun ajan turvallisuus-, väärinkäytösten ehkäisy- tai oikeudellisista syistä” ja ”tietoja ei säilytetä — niitä ei tallenneta käsittelyn jälkeen” ovat eri asioita. Jos palveluntarjoaja säilyttää kehotteita rajoitetun ajan, rekisterissä ilmoitetaan säilytysaika ja syy. Jos tietojen säilyttämättömyys on käytössä, se ja sitä koskevat ominaisuudet ilmoitetaan rekisterissä. Emme väitä, ettei sisältöä säilytetä, jos sitä tosiasiassa säilytetään." },
-      { kind: "p", text: "Tuotokset. Sinun ja meidän välisessä suhteessa saat käyttää omien väittelyidesi tuotoksia mihin tahansa lailliseen tarkoitukseen, emmekä vaadi tuotetun tekstin omistusoikeutta. Huomaa, ettei tuotettu sisältö välttämättä saa tekijänoikeussuojaa monilla lainkäyttöalueilla; muille käyttäjille voidaan tuottaa samankaltaista sisältöä; tuotokset voivat toisintaa kolmannen osapuolen aineistoa tai muistuttaa sitä; ja joihinkin tekoälypalveluntarjoajan hakemiin lähdeaineistoihin voi kohdistua uudelleenkäyttörajoituksia. Vastaat tarkistamisesta ennen tuotoksiin luottamista tai niiden julkaisemista uudelleen." }
+      { kind: "p", text: "Tuotokset. Sinun ja meidän välisessä suhteessa saat käyttää omien väittelyidesi tuotoksia mihin tahansa lailliseen tarkoitukseen, emmekä vaadi tuotetun tekstin omistusoikeutta. Huomaa, ettei tuotettu sisältö välttämättä saa tekijänoikeussuojaa monilla lainkäyttöalueilla; muille käyttäjille voidaan tuottaa samankaltaista sisältöä; tuotokset voivat toisintaa kolmannen osapuolen aineistoa tai muistuttaa sitä; ja joihinkin tekoälypalveluntarjoajan hakemiin lähdeaineistoihin voi kohdistua uudelleenkäyttörajoituksia. Vastaat tarkistamisesta ennen tuotoksiin luottamista tai niiden julkaisemista uudelleen." },
+      { kind: "p", text: "Tuottamamme kaaviot ja tilastot. Väittelyraportin kaaviot ja niitä varten kokoamamme tilastot — niiden valinta, järjestys, ulkoasu ja piirtäminen — ovat Dialectical Engine -palvelun tekemiä ja kuuluvat yhtiölle DMS Merchandise Shop S.R.L.; jokaisessa kaaviossa on merkintä ”Copyrighted by DMS Merchandise Shop SRL”. Tämä ei koske kaavion esittämiä lukuja, jotka ovat peräisin väittelystäsi, eikä väittelysi tekstiä. Myönnämme sinulle maksuttoman, maailmanlaajuisen, ei-yksinomaisen ja pysyvän käyttöluvan käyttää, kopioida ja jakaa näitä kaavioita mihin tahansa lailliseen tarkoitukseen edellyttäen, että säilytät niiden yhteydessä tämän merkinnän sekä tekoälyn tuottamaa sisältöä koskevan merkinnän. Jos laki ei tunnusta oikeuksia tekoälyn tuottamaan aineistoon, tämä kappale ei anna meille enempää kuin laki sallii." }
     ]
   },
   {
@@ -354,12 +355,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.6",
-  sha256: "ac7dc4213bcc50ffa7b98d23eb37b272f91b6f8f4dceb854b5925eacea2b9aec",
-  eyebrow: "KÄYTTÖEHDOT · v2.6 · VOIMASSA 24. LOKAKUUTA 2026 ALKAEN",
+  version: "2.7",
+  sha256: "f1d70b21ae92b6a12dddfa09e56c58b5f7a6a39f9ef288d55f847fe603c0b1c9",
+  eyebrow: "KÄYTTÖEHDOT · v2.7 · VOIMASSA 24. LOKAKUUTA 2026 ALKAEN",
   title: "Mihin sitoudut",
   lede: "Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.",
-  endMarker: "KÄYTTÖEHTOJEN LOPPU · v2.6",
+  endMarker: "KÄYTTÖEHTOJEN LOPPU · v2.7",
   contact: "support@dezbatere.ro",
   bodyLabel: "Käyttöehtojen teksti",
   sectionIdPrefix: "terms-section-",

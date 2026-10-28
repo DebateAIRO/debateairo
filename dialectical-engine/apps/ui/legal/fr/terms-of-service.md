@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: En bref
-eyebrow: CONDITIONS D’UTILISATION · v2.6 · PRISE D’EFFET 24 OCTOBRE 2026
+eyebrow: CONDITIONS D’UTILISATION · v2.7 · PRISE D’EFFET 24 OCTOBRE 2026
 title: Ce que vous acceptez
 lede: Le contrat entre vous et DMS Merchandise Shop S.R.L., en termes clairs. Dix-neuf sections et l’annexe A — faites défiler jusqu’à la fin.
-endMarker: FIN DES CONDITIONS · v2.6
+endMarker: FIN DES CONDITIONS · v2.7
 bodyLabel: Texte des Conditions d’utilisation
 annexTitle: Annexe A — Conditions régionales
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 DROIT APPLICABLE
 -->
 
-**Version 2.6 · Effective 24 octobre 2026 · Versions précédentes sur dezbatere.ro/terms/versions · Langue : français.**
+**Version 2.7 · Effective 24 octobre 2026 · Versions précédentes sur dezbatere.ro/terms/versions · Langue : français.**
 
 **In short.** Vous devez avoir au moins 18 ans. Dialectical Engine construit des arguments à l’aide de modèles d’IA et tout ce qu’il génère peut être erroné — il ne s’agit pas d’un conseil. Vos débats sont privés, sauf si vous les publiez ; si vous les publiez, tout le monde peut les lire. Le texte que vous soumettez est transmis aux fournisseurs d’IA inscrits dans notre Registre des fournisseurs et n’est pas utilisé pour entraîner des modèles. Signalez tout contenu illicite à support@dezbatere.ro, que vous ayez ou non un compte. Le droit roumain s’applique, mais les protections locales dont vous bénéficiez en tant que consommateur demeurent acquises.
 
@@ -127,6 +127,8 @@ Si vous ne savez pas si une utilisation est autorisée, interrogez-nous avant de
 **Trois choses différentes.** Les formulations « non utilisé pour entraîner des modèles », « conservé pendant une durée limitée pour des raisons de sécurité, de prévention des abus ou des raisons juridiques » et « absence de conservation des données — aucune persistance après le traitement » ne signifient pas la même chose. Lorsqu’un fournisseur conserve les invites pendant une durée limitée, le Registre en indique la durée et la raison. Lorsque l’absence de conservation des données est activée, le Registre l’indique et précise pour quelles fonctionnalités. Nous ne vous dirons pas que le contenu n’est pas conservé si tel n’est pas le cas.
 
 **Résultats.** Dans nos rapports avec vous, vous pouvez utiliser le résultat de vos propres débats à toute fin licite et nous ne revendiquons aucun droit de propriété sur le texte généré. Sachez qu’un résultat généré peut ne pas être susceptible de protection par le droit d’auteur dans de nombreux pays ; qu’un résultat similaire peut être généré pour d’autres utilisateurs ; que les résultats peuvent reproduire ou ressembler à des éléments appartenant à des tiers ; et que certains éléments sources récupérés par un fournisseur d’IA peuvent être soumis à des restrictions de réutilisation. Il vous incombe de procéder aux vérifications nécessaires avant de vous fier aux résultats ou de les republier.
+
+**Graphiques et statistiques que nous générons.** Les graphiques figurant dans un rapport de débat, ainsi que les statistiques que nous compilons pour ceux-ci — leur sélection, leur agencement, leur conception et leur tracé —, sont réalisés par Dialectical Engine et appartiennent à DMS Merchandise Shop S.R.L. ; chaque graphique porte la mention « Copyrighted by DMS Merchandise Shop SRL ». Cela ne s’étend ni aux chiffres que présente un graphique, qui proviennent de votre débat, ni au texte de votre débat. Nous vous accordons une licence gratuite, mondiale, non exclusive et perpétuelle pour utiliser, copier et partager ces graphiques à toute fin licite, à condition que vous conserviez avec eux cette mention et la mention « généré par l’IA ». Lorsque la loi ne reconnaît pas de droits sur les contenus générés par l’IA, le présent paragraphe ne nous confère pas davantage que ce que la loi permet.
 
 ## 9. Publication d’un débat
 

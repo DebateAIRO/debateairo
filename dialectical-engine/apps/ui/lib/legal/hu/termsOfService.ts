@@ -137,7 +137,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Webes keresés a Perplexity szolgáltatáson keresztül. A vitához szükséges bizonyítékok megtalálásához a modellek a Perplexity (Perplexity AI, Inc., Egyesült Államok) szolgáltatáson keresztül kereshetnek a weben; a Perplexity szerepel az MI-szolgáltatói nyilvántartásban. A Perplexity a modellek által a vitából megfogalmazott keresési kérdéseket kapja meg — így egy modellszolgáltatóhoz hasonlóan az Ön által beírt szöveg köré épített szöveget lát. Az Ön e-mail-címét, fiókazonosítóit, munkamenet-nyilvántartásait vagy fizetési adatait soha nem kapja meg." },
       { kind: "p", text: "Mely szolgáltatók és hol. A dezbatere.ro/providers címen elérhető MI-szolgáltatói nyilvántartásunk e Feltételek részét képezi. Felsorolja az általunk igénybe vehető valamennyi szolgáltatót: jogi személyét és országát; azt, hogy mit kap meg és milyen célból; hol végzi az adatkezelést; megőrzési feltételeit; hogy az általunk használt végponton aktív-e a nulla adatmegőrzés; hogy szerződésünk alapján felhasználhatja-e a bemeneteket betanításra; az általunk alkalmazott adattovábbítási mechanizmust; valamint az egyes bejegyzések legutóbbi ellenőrzésének időpontját. A szolgáltatók az Ön országán és az Európai Gazdasági Térségen kívül is működhetnek. A garanciákat Adatvédelmi szabályzatunk ismerteti." },
       { kind: "p", text: "Három különböző dolog. A „nem használják modellek betanítására”, a „biztonsági, visszaélés-megelőzési vagy jogi okból korlátozott ideig megőrzik” és a „nulla adatmegőrzés — a feldolgozást követően nem tárolják tartósan” eltérő fogalmak. Ha egy szolgáltató korlátozott ideig megőrzi a promptokat, a Nyilvántartás megadja, hogy mennyi ideig és miért. Ha aktív a nulla adatmegőrzés, a Nyilvántartás ezt, valamint az érintett funkciókat is feltünteti. Nem állítjuk, hogy egy tartalmat nem őriznek meg, ha ez nem igaz." },
-      { kind: "p", text: "Kimenetek. Az Ön és közöttünk fennálló jogviszonyban saját vitáinak kimenetét bármely jogszerű célra felhasználhatja, mi pedig nem tartunk igényt a létrehozott szöveg tulajdonjogára. Vegye figyelembe, hogy a létrehozott kimenet számos joghatóságban nem részesülhet szerzői jogi védelemben; más felhasználók számára hasonló kimenet jöhet létre; a kimenetek harmadik felek anyagait többszörözhetik vagy azokhoz hasonlíthatnak; továbbá az MI-szolgáltató által lekért egyes forrásanyagokra újrafelhasználási korlátozások vonatkozhatnak. Ön felel azért, hogy a kimenetekre való támaszkodás vagy azok újbóli közzététele előtt ellenőrzést végezzen." }
+      { kind: "p", text: "Kimenetek. Az Ön és közöttünk fennálló jogviszonyban saját vitáinak kimenetét bármely jogszerű célra felhasználhatja, mi pedig nem tartunk igényt a létrehozott szöveg tulajdonjogára. Vegye figyelembe, hogy a létrehozott kimenet számos joghatóságban nem részesülhet szerzői jogi védelemben; más felhasználók számára hasonló kimenet jöhet létre; a kimenetek harmadik felek anyagait többszörözhetik vagy azokhoz hasonlíthatnak; továbbá az MI-szolgáltató által lekért egyes forrásanyagokra újrafelhasználási korlátozások vonatkozhatnak. Ön felel azért, hogy a kimenetekre való támaszkodás vagy azok újbóli közzététele előtt ellenőrzést végezzen." },
+      { kind: "p", text: "Az általunk létrehozott diagramok és statisztikák. A vitajelentésben szereplő diagramokat és az azokhoz általunk összeállított statisztikákat — azok kiválasztását, elrendezését, kialakítását és megrajzolását — a Dialectical Engine készíti, és azok a DMS Merchandise Shop S.R.L. tulajdonát képezik; minden diagramon szerepel a „Copyrighted by DMS Merchandise Shop SRL” megjelölés. Ez nem terjed ki a diagramon megjelenített számadatokra, amelyek az Ön vitájából származnak, sem az Ön vitájának szövegére. Ingyenes, az egész világra kiterjedő, nem kizárólagos és időben korlátlan engedélyt adunk Önnek arra, hogy e diagramokat bármely jogszerű célra felhasználja, másolja és megossza, feltéve, hogy megtartja rajtuk a megjelölést és az MI által létrehozott tartalomra utaló címkét. Ha a jog nem ismer el jogokat az MI által létrehozott anyagokon, e bekezdés alapján bennünket nem illet meg több, mint amit a jog lehetővé tesz." }
     ]
   },
   {
@@ -354,12 +355,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.6",
-  sha256: "8f882fa87ce40bee71ddf85453e715d5487ce7f0600293a9fce3f45e558daf6d",
-  eyebrow: "SZOLGÁLTATÁSI FELTÉTELEK · v2.6 · HATÁLYOS 2026. OKTÓBER 24.",
+  version: "2.7",
+  sha256: "8362b963d5e32e2121e2fe903937489786bf66d7568ac507e66d6f0640f33da6",
+  eyebrow: "SZOLGÁLTATÁSI FELTÉTELEK · v2.7 · HATÁLYOS 2026. OKTÓBER 24.",
   title: "Amit Ön elfogad",
   lede: "Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.",
-  endMarker: "A FELTÉTELEK VÉGE · v2.6",
+  endMarker: "A FELTÉTELEK VÉGE · v2.7",
   contact: "support@dezbatere.ro",
   bodyLabel: "A Szolgáltatási feltételek szövege",
   sectionIdPrefix: "terms-section-",

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Fil-qosor
-eyebrow: TERMINI TAS-SERVIZZ · v2.6 · EFFETTIVI 24 TA’ OTTUBRU 2026
+eyebrow: TERMINI TAS-SERVIZZ · v2.7 · EFFETTIVI 24 TA’ OTTUBRU 2026
 title: Dak li taqbel miegħu
 lede: Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.
-endMarker: TMIEM IT-TERMINI · v2.6
+endMarker: TMIEM IT-TERMINI · v2.7
 bodyLabel: Test tat-Termini tas-Servizz
 annexTitle: Anness A — Termini reġjonali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LIĠI APPLIKABBLI
 -->
 
-**Version 2.6 · Effective 24 ta’ Ottubru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
+**Version 2.7 · Effective 24 ta’ Ottubru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
 
 **In short.** Irid ikollok 18-il sena jew aktar. Dialectical Engine tibni argumenti b’mudelli tal-IA u dak kollu li tiġġenera jista’ jkun żbaljat — mhuwiex parir. Id-dibattiti tiegħek huma privati sakemm ma tippubblikahomx; jekk tippubblikahom, kulħadd jista’ jaqrahom. It-test li tissottometti jintbagħat lill-fornituri tal-IA elenkati fir-Reġistru tal-Fornituri tagħna, u ma jintużax għat-taħriġ tal-mudelli. Irrapporta kontenut illegali fuq support@dezbatere.ro kemm jekk għandek kont kif ukoll jekk le. Tapplika l-liġi Rumena, iżda l-protezzjonijiet lokali tiegħek bħala konsumatur jibqgħu japplikaw għalik.
 
@@ -127,6 +127,8 @@ Jekk m’intix ċert jekk xi ħaġa hijiex permessa, staqsina qabel tippubblikah
 **Tliet affarijiet differenti.** “Ma jintużax għat-taħriġ tal-mudelli”, “jinżamm għal perjodu limitat għal raġunijiet ta’ sigurtà, prevenzjoni tal-abbuż jew raġunijiet legali”, u “żamma żero tad-data — ma jinħażinx b’mod persistenti wara l-ipproċessar” huma differenti. Fejn fornitur iżomm il-messaġġi ta’ istruzzjoni għal perjodu limitat, ir-Reġistru jgħid għal kemm żmien u għaliex. Fejn iż-żamma żero tad-data tkun attiva, ir-Reġistru jgħid dan, u għal liema funzjonalitajiet. Mhux se ngħidulek li l-kontenut ma jinżammx meta fil-fatt jinżamm.
 
 **Riżultati.** Bejnek u bejnietna, tista’ tuża r-riżultat tad-dibattiti tiegħek stess għal kwalunkwe skop legali, u aħna ma nippretendux sjieda tat-test iġġenerat. Kun af li riżultat iġġenerat jista’ ma jkunx protett mid-drittijiet tal-awtur f’ħafna ġuriżdizzjonijiet; li riżultat simili jista’ jiġi ġġenerat għal utenti oħra; li r-riżultati jistgħu jirriproduċu jew jixbhu materjal ta’ parti terza; u li xi materjal mis-sorsi miksub minn fornitur tal-IA jista’ jkollu restrizzjonijiet fuq l-użu mill-ġdid. Int responsabbli biex tivverifika qabel tiddependi fuq ir-riżultati jew terġa’ tippubblikahom.
+
+**Graffs u statistika li niġġeneraw.** Il-graffs f’rapport ta’ dibattitu, u l-istatistika li niġbru għalihom — l-għażla, l-arranġament, id-disinn u t-tpinġija tagħhom — huma magħmula minn Dialectical Engine u jappartjenu lil DMS Merchandise Shop S.R.L.; kull graff huwa mmarkat “Copyrighted by DMS Merchandise Shop SRL”. Dan ma jestendix għaċ-ċifri li juri graff, li ġejjin mid-dibattitu tiegħek, jew għat-test tad-dibattitu tiegħek. Aħna nagħtuk liċenzja b’xejn, dinjija, mhux esklużiva u perpetwa biex tuża, tikkopja u taqsam dawk il-graffs għal kwalunkwe skop legali, sakemm iżżomm magħhom l-avviż u t-tikketta li huma ġġenerati mill-IA. Fejn il-liġi ma tirrikonoxxix drittijiet f’materjal iġġenerat mill-IA, dan il-paragrafu ma jagħtina xejn aktar minn dak li tippermetti l-liġi.
 
 ## 9. Pubblikazzjoni ta’ dibattitu
 

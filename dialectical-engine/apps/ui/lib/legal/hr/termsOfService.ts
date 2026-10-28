@@ -137,7 +137,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Pretraživanje interneta putem usluge Perplexity. Kako bi pronašli dokaze za raspravu, modeli mogu pretraživati internet putem usluge Perplexity (Perplexity AI, Inc., Sjedinjene Američke Države), koja je navedena u Registru pružatelja usluga umjetne inteligencije. Perplexity prima upite za pretraživanje koje modeli sastavljaju iz rasprave — stoga, kao i pružatelj modela, vidi tekst izgrađen oko onoga što ste upisali. Nikada ne prima vašu adresu e-pošte, identifikatore računa, zapise o sesijama ni podatke o plaćanju." },
       { kind: "p", text: "Koji pružatelji i gdje. Naš Registar pružatelja usluga umjetne inteligencije na dezbatere.ro/providers sastavni je dio ovih Uvjeta. U njemu je za svakog pružatelja kojeg možemo upotrebljavati navedeno: njegov pravni subjekt i država; što prima i zašto; gdje obrađuje podatke; njegovi rokovi čuvanja; je li za krajnju točku koju upotrebljavamo aktivirano nulto zadržavanje podataka; smije li prema našem ugovoru upotrebljavati ulazne podatke za treniranje; mehanizam prijenosa na koji se oslanjamo; i datum posljednje provjere svakog unosa. Pružatelji se mogu nalaziti izvan vaše države i izvan Europskoga gospodarskog prostora. Naša Pravila o privatnosti objašnjavaju zaštitne mjere." },
       { kind: "p", text: "Tri različite stvari. „Ne upotrebljava se za treniranje modela”, „čuva se ograničeno vrijeme radi sigurnosti, sprječavanja zlouporabe ili pravnih razloga” i „nulto zadržavanje podataka — ne pohranjuje se nakon obrade” nisu isto. Kada pružatelj čuva upite ograničeno vrijeme, u Registru je navedeno koliko dugo i zašto. Kada je nulto zadržavanje podataka aktivno, u Registru je to navedeno, zajedno sa značajkama na koje se odnosi. Nećemo vam tvrditi da se sadržaj ne čuva ako to nije istina." },
-      { kind: "p", text: "Izlazni sadržaj. U odnosu između vas i nas, izlazni sadržaj vlastitih rasprava možete upotrebljavati u bilo koju zakonitu svrhu, a mi ne polažemo pravo vlasništva na generirani tekst. Imajte na umu da generirani izlazni sadržaj u mnogim pravnim sustavima možda nije zaštićen autorskim pravom; da se sličan izlazni sadržaj može generirati za druge korisnike; da izlazni sadržaj može reproducirati materijale trećih strana ili im nalikovati; te da neki izvorni materijali koje pružatelj usluga umjetne inteligencije dohvati mogu podlijegati ograničenjima ponovne uporabe. Odgovorni ste za provjeru prije nego što se oslonite na izlazni sadržaj ili ga ponovno objavite." }
+      { kind: "p", text: "Izlazni sadržaj. U odnosu između vas i nas, izlazni sadržaj vlastitih rasprava možete upotrebljavati u bilo koju zakonitu svrhu, a mi ne polažemo pravo vlasništva na generirani tekst. Imajte na umu da generirani izlazni sadržaj u mnogim pravnim sustavima možda nije zaštićen autorskim pravom; da se sličan izlazni sadržaj može generirati za druge korisnike; da izlazni sadržaj može reproducirati materijale trećih strana ili im nalikovati; te da neki izvorni materijali koje pružatelj usluga umjetne inteligencije dohvati mogu podlijegati ograničenjima ponovne uporabe. Odgovorni ste za provjeru prije nego što se oslonite na izlazni sadržaj ili ga ponovno objavite." },
+      { kind: "p", text: "Grafikoni i statistike koje izrađujemo. Grafikone u izvješću o raspravi i statistike koje za njih sastavljamo — njihov odabir, raspored, dizajn i crtanje — izrađuje Dialectical Engine, a pripadaju društvu DMS Merchandise Shop S.R.L.; svaki grafikon nosi napomenu „Copyrighted by DMS Merchandise Shop SRL”. To se ne odnosi na brojčane podatke koje grafikon prikazuje, a koji potječu iz vaše rasprave, ni na tekst vaše rasprave. Dajemo vam besplatnu, svjetsku, neisključivu i trajnu licenciju za upotrebu, umnožavanje i dijeljenje tih grafikona u bilo koju zakonitu svrhu, pod uvjetom da uz njih zadržite tu napomenu i oznaku da su generirani umjetnom inteligencijom. Ako zakon ne priznaje prava na materijalu generiranom umjetnom inteligencijom, ovaj nam stavak ne daje više nego što zakon dopušta." }
     ]
   },
   {
@@ -354,12 +355,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.6",
-  sha256: "b3432898c3a8f2d8d5fd1bb94c907e67379ca76082f9b079e1ab0a14f14ea4c8",
-  eyebrow: "UVJETI KORIŠTENJA · v2.6 · NA SNAZI OD 24. LISTOPADA 2026.",
+  version: "2.7",
+  sha256: "d0159ba6ad1be9e293eb7d8f1f75d9003c016d2969d5deceac5582d591797d9b",
+  eyebrow: "UVJETI KORIŠTENJA · v2.7 · NA SNAZI OD 24. LISTOPADA 2026.",
   title: "Na što pristajete",
   lede: "Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.",
-  endMarker: "KRAJ UVJETA · v2.6",
+  endMarker: "KRAJ UVJETA · v2.7",
   contact: "support@dezbatere.ro",
   bodyLabel: "Tekst Uvjeta korištenja",
   sectionIdPrefix: "terms-section-",

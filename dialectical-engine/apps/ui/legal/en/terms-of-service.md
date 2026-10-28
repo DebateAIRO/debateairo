@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In short
-eyebrow: TERMS OF SERVICE · v2.6 · EFFECTIVE 24 OCTOBER 2026
+eyebrow: TERMS OF SERVICE · v2.7 · EFFECTIVE 24 OCTOBER 2026
 title: What you agree to
 lede: The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.
-endMarker: END OF TERMS · v2.6
+endMarker: END OF TERMS · v2.7
 bodyLabel: Terms of Service text
 annexTitle: Annex A — Regional terms
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 GOVERNING LAW
 -->
 
-**Version 2.6 · Effective 24 October 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
+**Version 2.7 · Effective 24 October 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
 
 **In short.** You must be 18 or over. Dialectical Engine builds arguments with AI models and everything it generates may be wrong — it is not advice. Your debates are private unless you publish them; if you publish, anyone can read them. Text you submit is sent to AI providers listed in our Provider Register, and is not used to train models. Report illegal content at support@dezbatere.ro whether or not you have an account. Romanian law governs, but your local consumer protections stay with you.
 
@@ -127,6 +127,8 @@ If you are unsure whether something is allowed, ask us before you post it.
 **Three different things.** "Not used to train models", "retained for a limited period for security, abuse prevention or legal reasons", and "zero data retention — not persisted after processing" are different. Where a provider retains prompts for a limited period, the Register says how long and why. Where zero-data-retention is active, the Register says so, and for which features. We will not tell you content is unretained when it is not.
 
 **Outputs.** As between you and us, you may use the output of your own debates for any lawful purpose, and we do not claim ownership of generated text. Be aware that generated output may not be protectable by copyright in many jurisdictions; that similar output may be generated for other users; that outputs may reproduce or resemble third-party material; and that some source material an AI provider retrieves may carry restrictions on reuse. You are responsible for checking before you rely on or republish outputs.
+
+**Charts and statistics we generate.** The charts in a debate report, and the statistics we compile for them — their selection, arrangement, design and drawing — are made by Dialectical Engine and belong to DMS Merchandise Shop S.R.L.; each chart is marked "Copyrighted by DMS Merchandise Shop SRL". This does not extend to the figures a chart shows, which come from your debate, or to the text of your debate. We grant you a free, worldwide, non-exclusive and perpetual licence to use, copy and share those charts for any lawful purpose, provided you keep the notice and the AI-generated label with them. Where the law does not recognise rights in AI-generated material, this paragraph gives us no more than the law allows.
 
 ## 9. Publishing a debate
 

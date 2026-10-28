@@ -137,7 +137,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Webbsökning via Perplexity. För att hitta belägg för en debatt kan modellerna söka på webben via Perplexity (Perplexity AI, Inc., USA), som finns med i vårt register över AI-leverantörer. Det Perplexity tar emot är de sökfrågor som modellerna formulerar utifrån debatten — liksom en modelleverantör ser Perplexity således text som har byggts kring det du skrev. Perplexity tar aldrig emot din e-postadress, dina kontoidentifierare, dina sessionsuppgifter eller dina betalningsuppgifter." },
       { kind: "p", text: "Vilka leverantörer och var. Vårt register över AI-leverantörer på dezbatere.ro/providers är en del av dessa villkor. Där anges varje leverantör som vi kan använda: dess juridiska person och land; vad den tar emot och varför; var den behandlar uppgifter; dess lagringsvillkor; huruvida nollagring av uppgifter är aktiv för den slutpunkt som vi använder; huruvida den enligt vårt avtal får använda indata för träning; vilken överföringsmekanism vi förlitar oss på; samt datumet då vi senast kontrollerade varje post. Leverantörer kan vara etablerade utanför ditt land och utanför Europeiska ekonomiska samarbetsområdet. Vår integritetspolicy förklarar skyddsåtgärderna." },
       { kind: "p", text: "Tre olika saker. ”Används inte för att träna modeller”, ”lagras under en begränsad tid av säkerhetsskäl, för att förhindra missbruk eller av rättsliga skäl” och ”nollagring av uppgifter — bevaras inte efter behandlingen” är tre olika saker. Om en leverantör behåller promptar under en begränsad tid anger registret hur länge och varför. Om nollagring av uppgifter är aktiv anger registret detta och för vilka funktioner. Vi kommer inte att uppge att innehåll inte lagras när så inte är fallet." },
-      { kind: "p", text: "Resultat. I förhållandet mellan dig och oss får du använda resultatet från dina egna debatter för varje lagligt ändamål, och vi gör inte anspråk på äganderätt till genererad text. Observera att genererade resultat i många jurisdiktioner kanske inte kan skyddas av upphovsrätt; att liknande resultat kan genereras för andra användare; att resultat kan återge eller likna material från tredje part; och att visst källmaterial som en AI-leverantör hämtar kan omfattas av begränsningar avseende återanvändning. Du ansvarar för att kontrollera detta innan du förlitar dig på eller återpublicerar resultat." }
+      { kind: "p", text: "Resultat. I förhållandet mellan dig och oss får du använda resultatet från dina egna debatter för varje lagligt ändamål, och vi gör inte anspråk på äganderätt till genererad text. Observera att genererade resultat i många jurisdiktioner kanske inte kan skyddas av upphovsrätt; att liknande resultat kan genereras för andra användare; att resultat kan återge eller likna material från tredje part; och att visst källmaterial som en AI-leverantör hämtar kan omfattas av begränsningar avseende återanvändning. Du ansvarar för att kontrollera detta innan du förlitar dig på eller återpublicerar resultat." },
+      { kind: "p", text: "Diagram och statistik som vi genererar. Diagrammen i en debattrapport och den statistik som vi sammanställer för dem — deras urval, uppställning, utformning och ritning — skapas av Dialectical Engine och tillhör DMS Merchandise Shop S.R.L.; varje diagram är försett med angivelsen ”Copyrighted by DMS Merchandise Shop SRL”. Detta omfattar inte de siffror som ett diagram visar, som kommer från din debatt, och inte heller texten i din debatt. Vi ger dig en kostnadsfri, världsomspännande, icke-exklusiv och evig licens att använda, kopiera och dela diagrammen för varje lagligt ändamål, förutsatt att du behåller angivelsen och märkningen om AI-generering tillsammans med dem. Om lagen inte erkänner rättigheter till AI-genererat material ger detta stycke oss inte mer än vad lagen tillåter." }
     ]
   },
   {
@@ -354,12 +355,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.6",
-  sha256: "0fe43de3bf771cda564209158a68b2818e29d8c3848c1a1632be722bd8a799ca",
-  eyebrow: "ANVÄNDARVILLKOR · v2.6 · GÄLLER FRÅN 24 OKTOBER 2026",
+  version: "2.7",
+  sha256: "7e1e3b44274e5bea4e6c97945d0aca080cd24f07ce4c9b43878469eded253f10",
+  eyebrow: "ANVÄNDARVILLKOR · v2.7 · GÄLLER FRÅN 24 OKTOBER 2026",
   title: "Vad du godkänner",
   lede: "Avtalet mellan dig och DMS Merchandise Shop S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.",
-  endMarker: "SLUT PÅ VILLKOREN · v2.6",
+  endMarker: "SLUT PÅ VILLKOREN · v2.7",
   contact: "support@dezbatere.ro",
   bodyLabel: "Användarvillkorens text",
   sectionIdPrefix: "terms-section-",

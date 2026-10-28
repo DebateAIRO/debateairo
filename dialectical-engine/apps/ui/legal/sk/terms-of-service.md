@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručne
-eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.6 · ÚČINNÉ OD 24. OKTÓBRA 2026
+eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.7 · ÚČINNÉ OD 24. OKTÓBRA 2026
 title: S čím súhlasíte
 lede: Zmluva medzi vami a DMS Merchandise Shop S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.
-endMarker: KONIEC PODMIENOK · v2.6
+endMarker: KONIEC PODMIENOK · v2.7
 bodyLabel: Text Podmienok poskytovania služby
 annexTitle: Príloha A — Regionálne podmienky
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ROZHODNÉ PRÁVO
 -->
 
-**Version 2.6 · Effective 24. októbra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
+**Version 2.7 · Effective 24. októbra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
 
 **In short.** Musíte mať aspoň 18 rokov. Dialectical Engine vytvára argumenty pomocou modelov umelej inteligencie a všetko, čo vygeneruje, môže byť nesprávne — nejde o poradenstvo. Vaše debaty sú súkromné, pokiaľ ich nezverejníte; ak ich zverejníte, môže ich čítať ktokoľvek. Text, ktorý zadáte, sa odosiela poskytovateľom umelej inteligencie uvedeným v našom Registri poskytovateľov a nepoužíva sa na trénovanie modelov. Nezákonný obsah nahláste na support@dezbatere.ro bez ohľadu na to, či máte účet. Rozhodným právom je rumunské právo, vaše miestne práva na ochranu spotrebiteľa vám však zostávajú zachované.
 
@@ -127,6 +127,8 @@ Ak si nie ste istí, či je niečo dovolené, opýtajte sa nás pred zverejnení
 **Tri rozdielne veci.** „Nepoužíva sa na trénovanie modelov“, „uchováva sa obmedzený čas z bezpečnostných dôvodov, na účely predchádzania zneužitiu alebo z právnych dôvodov“ a „nulové uchovávanie údajov — po spracovaní sa neukladajú“ sú rozdielne skutočnosti. Ak poskytovateľ uchováva zadania obmedzený čas, Register uvádza, ako dlho a prečo. Ak je aktívne nulové uchovávanie údajov, Register túto skutočnosť uvádza spolu s funkciami, na ktoré sa vzťahuje. Nebudeme tvrdiť, že obsah nie je uchovávaný, ak to nie je pravda.
 
 **Výstupy.** Vo vzťahu medzi vami a nami môžete výstup svojich vlastných debát použiť na akýkoľvek zákonný účel a my si k vygenerovanému textu neuplatňujeme vlastnícke právo. Majte na pamäti, že v mnohých právnych poriadkoch nemusí byť vygenerovaný výstup chránený autorským právom; že podobný výstup môže byť vygenerovaný aj pre iných používateľov; že výstupy môžu rozmnožovať materiál tretích strán alebo sa mu podobať; a že na niektoré zdrojové materiály získané poskytovateľom umelej inteligencie sa môžu vzťahovať obmedzenia opätovného použitia. Pred použitím výstupov ako podkladu alebo ich opätovným zverejnením zodpovedáte za ich overenie.
+
+**Grafy a štatistiky, ktoré generujeme.** Grafy v správe o debate a štatistiky, ktoré pre ne zostavujeme — ich výber, usporiadanie, dizajn a vykreslenie — sú vytvorené službou Dialectical Engine a patria spoločnosti DMS Merchandise Shop S.R.L.; každý graf nesie upozornenie „Copyrighted by DMS Merchandise Shop SRL“. Nevzťahuje sa to na údaje, ktoré graf zobrazuje a ktoré pochádzajú z vašej debaty, ani na text vašej debaty. Udeľujeme vám bezodplatnú, celosvetovú, nevýhradnú a časovo neobmedzenú licenciu tieto grafy používať, kopírovať a zdieľať na akýkoľvek zákonný účel, ak pri nich ponecháte toto upozornenie a označenie, že ich vytvorila umelá inteligencia. Ak právo neuznáva práva k materiálom vytvoreným umelou inteligenciou, tento odsek nám nedáva viac, než pripúšťa zákon.
 
 ## 9. Zverejnenie debaty
 

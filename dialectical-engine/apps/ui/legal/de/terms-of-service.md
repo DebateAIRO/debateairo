@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kurz gesagt
-eyebrow: NUTZUNGSBEDINGUNGEN · v2.6 · GÜLTIG AB 24. OKTOBER 2026
+eyebrow: NUTZUNGSBEDINGUNGEN · v2.7 · GÜLTIG AB 24. OKTOBER 2026
 title: Womit Sie sich einverstanden erklären
 lede: Der Vertrag zwischen Ihnen und DMS Merchandise Shop S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.
-endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.6
+endMarker: ENDE DER NUTZUNGSBEDINGUNGEN · v2.7
 bodyLabel: Text der Nutzungsbedingungen
 annexTitle: Anhang A – Regionale Bestimmungen
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ANWENDBARES RECHT
 -->
 
-**Version 2.6 · Effective 24. Oktober 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
+**Version 2.7 · Effective 24. Oktober 2026 · Frühere Fassungen unter dezbatere.ro/terms/versions · Sprache: Deutsch.**
 
 **In short.** Sie müssen mindestens 18 Jahre alt sein. Dialectical Engine erstellt Argumente mithilfe von KI-Modellen, und alles, was es erzeugt, kann falsch sein – es handelt sich nicht um Beratung. Ihre Debatten sind privat, sofern Sie sie nicht veröffentlichen; wenn Sie sie veröffentlichen, kann jede Person sie lesen. Von Ihnen übermittelter Text wird an die in unserem Verzeichnis aufgeführten KI-Anbieter gesendet und nicht zum Trainieren von Modellen verwendet. Melden Sie rechtswidrige Inhalte unter support@dezbatere.ro, unabhängig davon, ob Sie ein Konto haben. Es gilt rumänisches Recht, Ihre örtlichen Verbraucherschutzrechte bleiben Ihnen jedoch erhalten.
 
@@ -127,6 +127,8 @@ Wenn Sie nicht sicher sind, ob etwas erlaubt ist, fragen Sie uns, bevor Sie es v
 **Drei verschiedene Dinge.** „Nicht zum Trainieren von Modellen verwendet“, „für einen begrenzten Zeitraum aus Sicherheits-, Missbrauchspräventions- oder rechtlichen Gründen aufbewahrt“ und „Null-Daten-Aufbewahrung – nach der Verarbeitung nicht gespeichert“ sind unterschiedliche Sachverhalte. Bewahrt ein Anbieter Eingaben für einen begrenzten Zeitraum auf, nennt das Verzeichnis Dauer und Grund. Ist eine Null-Daten-Aufbewahrung aktiv, nennt das Verzeichnis dies und die davon erfassten Funktionen. Wir werden Ihnen nicht mitteilen, Inhalte würden nicht aufbewahrt, wenn dies nicht zutrifft.
 
 **Ergebnisse.** Im Verhältnis zwischen Ihnen und uns dürfen Sie das Ergebnis Ihrer eigenen Debatten für jeden rechtmäßigen Zweck verwenden, und wir beanspruchen kein Eigentum an erzeugtem Text. Beachten Sie, dass erzeugte Ergebnisse in vielen Rechtsordnungen möglicherweise nicht urheberrechtlich geschützt werden können, dass ähnliche Ergebnisse für andere Personen erzeugt werden können, dass Ergebnisse Material Dritter wiedergeben oder diesem ähneln können und dass für bestimmtes Ausgangsmaterial, das ein KI-Anbieter abruft, Beschränkungen für die Weiterverwendung gelten können. Sie sind dafür verantwortlich, dies zu prüfen, bevor Sie sich auf Ergebnisse verlassen oder sie erneut veröffentlichen.
+
+**Von uns erzeugte Diagramme und Statistiken.** Die Diagramme in einem Debattenbericht und die Statistiken, die wir für sie zusammenstellen – deren Auswahl, Anordnung, Gestaltung und zeichnerische Ausführung –, werden von Dialectical Engine erstellt und gehören der DMS Merchandise Shop S.R.L.; jedes Diagramm trägt den Vermerk „Copyrighted by DMS Merchandise Shop SRL“. Dies erstreckt sich weder auf die Zahlen, die ein Diagramm zeigt und die aus Ihrer Debatte stammen, noch auf den Text Ihrer Debatte. Wir räumen Ihnen eine unentgeltliche, weltweite, nicht ausschließliche und unbefristete Lizenz ein, diese Diagramme für jeden rechtmäßigen Zweck zu nutzen, zu vervielfältigen und weiterzugeben, sofern Sie den Vermerk und die Kennzeichnung als KI-generiert bei ihnen belassen. Soweit das Recht keine Rechte an KI-generiertem Material anerkennt, verschafft uns dieser Absatz nicht mehr, als das Recht zulässt.
 
 ## 9. Veröffentlichung einer Debatte
 

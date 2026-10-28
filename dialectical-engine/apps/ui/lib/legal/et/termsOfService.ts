@@ -137,7 +137,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Veebiotsing Perplexity kaudu. Väitluse jaoks tõendite leidmiseks võivad mudelid otsida veebist teenuse Perplexity (Perplexity AI, Inc., Ameerika Ühendriigid) kaudu, mis on kantud pakkujate registrisse. Perplexity saab otsingupäringud, mille mudelid väitluse põhjal koostavad — seega näeb ta nagu mudelipakkujagi teie sisestatu ümber loodud teksti. Ta ei saa kunagi teie e-posti aadressi, konto tunnuseid, seansikirjeid ega makseandmeid." },
       { kind: "p", text: "Millised pakkujad ja kus. Meie tehisintellekti pakkujate register aadressil dezbatere.ro/providers on nende Tingimuste osa. Selles on iga võimaliku pakkuja kohta märgitud tema juriidiline isik ja riik; mida ja miks ta saab; kus ta andmeid töötleb; tema säilitamistingimused; kas meie kasutatavas otspunktis rakendatakse andmete säilitamata jätmist; kas ta võib meie lepingu alusel kasutada sisendeid treenimiseks; edastusmehhanism, millele tugineme; ning iga kirje viimase kontrollimise kuupäev. Pakkujad võivad asuda väljaspool teie riiki ja Euroopa Majanduspiirkonda. Meie Privaatsuspoliitikas selgitatakse kaitsemeetmeid." },
       { kind: "p", text: "Kolm eri asja. „Ei kasutata mudelite treenimiseks“, „säilitatakse piiratud aja jooksul turvalisuse, kuritarvitamise ennetamise või õiguslikel põhjustel“ ja „andmeid ei säilitata — neid ei talletata pärast töötlemist“ on eri asjad. Kui pakkuja säilitab viipasid piiratud aja, märgitakse registris, kui kaua ja miks. Kui rakendatakse andmete säilitamata jätmist, märgitakse registris nii see kui ka funktsioonid, mille suhtes see kehtib. Me ei väida, et sisu ei säilitata, kui seda tegelikult säilitatakse." },
-      { kind: "p", text: "Väljundid. Teie ja meie vahelises suhtes võite oma väitluste väljundit kasutada mis tahes seaduslikul eesmärgil ning me ei pretendeeri loodud teksti omandiõigusele. Võtke arvesse, et loodud väljund ei pruugi paljudes jurisdiktsioonides olla autoriõigusega kaitstav; et sarnast väljundit võidakse luua teistele kasutajatele; et väljundid võivad reprodutseerida või meenutada kolmandate isikute materjali; ning et mõnele tehisintellekti pakkuja hangitud lähtematerjalile võivad kehtida taaskasutuse piirangud. Vastutate kontrollimise eest enne väljunditele tuginemist või nende uuesti avaldamist." }
+      { kind: "p", text: "Väljundid. Teie ja meie vahelises suhtes võite oma väitluste väljundit kasutada mis tahes seaduslikul eesmärgil ning me ei pretendeeri loodud teksti omandiõigusele. Võtke arvesse, et loodud väljund ei pruugi paljudes jurisdiktsioonides olla autoriõigusega kaitstav; et sarnast väljundit võidakse luua teistele kasutajatele; et väljundid võivad reprodutseerida või meenutada kolmandate isikute materjali; ning et mõnele tehisintellekti pakkuja hangitud lähtematerjalile võivad kehtida taaskasutuse piirangud. Vastutate kontrollimise eest enne väljunditele tuginemist või nende uuesti avaldamist." },
+      { kind: "p", text: "Meie loodud diagrammid ja statistika. Väitluse aruande diagrammid ja nende jaoks koostatav statistika — nende valik, paigutus, kujundus ja joonistus — on loonud Dialectical Engine ning need kuuluvad ettevõttele DMS Merchandise Shop S.R.L.; igal diagrammil on märge „Copyrighted by DMS Merchandise Shop SRL“. See ei laiene diagrammil näidatud arvudele, mis pärinevad teie väitlusest, ega teie väitluse tekstile. Anname teile tasuta, kogu maailmas kehtiva ja tähtajatu lihtlitsentsi neid diagramme mis tahes seaduslikul eesmärgil kasutada, kopeerida ja jagada tingimusel, et säilitate nende juures selle märke ja tehisintellekti loodud sisu märgise. Kui seadus ei tunnusta õigusi tehisintellekti loodud materjalile, ei anna see lõik meile rohkem, kui seadus lubab." }
     ]
   },
   {
@@ -354,12 +355,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.6",
-  sha256: "7fc853ea47705c4373e61efd3eea13844d85582b00ac6c3d4a1a99042ee7bbcb",
-  eyebrow: "TEENUSETINGIMUSED · v2.6 · KEHTIB ALATES 24. OKTOOBRIST 2026",
+  version: "2.7",
+  sha256: "4dcdff72ba16f6513a88dfd61701fad512e92f84cb839bb45c1d866b16f68651",
+  eyebrow: "TEENUSETINGIMUSED · v2.7 · KEHTIB ALATES 24. OKTOOBRIST 2026",
   title: "Millega te nõustute",
   lede: "Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.",
-  endMarker: "TINGIMUSTE LÕPP · v2.6",
+  endMarker: "TINGIMUSTE LÕPP · v2.7",
   contact: "support@dezbatere.ro",
   bodyLabel: "Teenusetingimuste tekst",
   sectionIdPrefix: "terms-section-",

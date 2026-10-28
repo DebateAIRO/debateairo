@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort sagt
-eyebrow: ANVÄNDARVILLKOR · v2.6 · GÄLLER FRÅN 24 OKTOBER 2026
+eyebrow: ANVÄNDARVILLKOR · v2.7 · GÄLLER FRÅN 24 OKTOBER 2026
 title: Vad du godkänner
 lede: Avtalet mellan dig och DMS Merchandise Shop S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.
-endMarker: SLUT PÅ VILLKOREN · v2.6
+endMarker: SLUT PÅ VILLKOREN · v2.7
 bodyLabel: Användarvillkorens text
 annexTitle: Bilaga A — Regionala villkor
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TILLÄMPLIG LAG
 -->
 
-**Version 2.6 · Effective 24 oktober 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
+**Version 2.7 · Effective 24 oktober 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
 
 **In short.** Du måste ha fyllt 18 år. Dialectical Engine bygger argument med AI-modeller, och allt som tjänsten genererar kan vara felaktigt — det är inte rådgivning. Dina debatter är privata om du inte publicerar dem; om du publicerar kan vem som helst läsa dem. Text som du skickar in överförs till de AI-leverantörer som anges i vårt register över AI-leverantörer och används inte för att träna modeller. Rapportera olagligt innehåll till support@dezbatere.ro, oavsett om du har ett konto eller inte. Rumänsk lag är tillämplig, men du behåller ditt lokala konsumentskydd.
 
@@ -127,6 +127,8 @@ Om du är osäker på om något är tillåtet ska du fråga oss innan du publice
 **Tre olika saker.** ”Används inte för att träna modeller”, ”lagras under en begränsad tid av säkerhetsskäl, för att förhindra missbruk eller av rättsliga skäl” och ”nollagring av uppgifter — bevaras inte efter behandlingen” är tre olika saker. Om en leverantör behåller promptar under en begränsad tid anger registret hur länge och varför. Om nollagring av uppgifter är aktiv anger registret detta och för vilka funktioner. Vi kommer inte att uppge att innehåll inte lagras när så inte är fallet.
 
 **Resultat.** I förhållandet mellan dig och oss får du använda resultatet från dina egna debatter för varje lagligt ändamål, och vi gör inte anspråk på äganderätt till genererad text. Observera att genererade resultat i många jurisdiktioner kanske inte kan skyddas av upphovsrätt; att liknande resultat kan genereras för andra användare; att resultat kan återge eller likna material från tredje part; och att visst källmaterial som en AI-leverantör hämtar kan omfattas av begränsningar avseende återanvändning. Du ansvarar för att kontrollera detta innan du förlitar dig på eller återpublicerar resultat.
+
+**Diagram och statistik som vi genererar.** Diagrammen i en debattrapport och den statistik som vi sammanställer för dem — deras urval, uppställning, utformning och ritning — skapas av Dialectical Engine och tillhör DMS Merchandise Shop S.R.L.; varje diagram är försett med angivelsen ”Copyrighted by DMS Merchandise Shop SRL”. Detta omfattar inte de siffror som ett diagram visar, som kommer från din debatt, och inte heller texten i din debatt. Vi ger dig en kostnadsfri, världsomspännande, icke-exklusiv och evig licens att använda, kopiera och dela diagrammen för varje lagligt ändamål, förutsatt att du behåller angivelsen och märkningen om AI-generering tillsammans med dem. Om lagen inte erkänner rättigheter till AI-genererat material ger detta stycke oss inte mer än vad lagen tillåter.
 
 ## 9. Publicering av en debatt
 

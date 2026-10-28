@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Tóm tắt
-eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v2.6 · CÓ HIỆU LỰC 24 THÁNG 10 NĂM 2026
+eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v2.7 · CÓ HIỆU LỰC 24 THÁNG 10 NĂM 2026
 title: Những điều bạn đồng ý
 lede: Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.
-endMarker: HẾT ĐIỀU KHOẢN · v2.6
+endMarker: HẾT ĐIỀU KHOẢN · v2.7
 bodyLabel: Nội dung Điều khoản dịch vụ
 annexTitle: Phụ lục A — Điều khoản theo khu vực
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LUẬT ĐIỀU CHỈNH
 -->
 
-**Version 2.6 · Effective 24 tháng 10 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
+**Version 2.7 · Effective 24 tháng 10 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
 
 **In short.** Bạn phải từ 18 tuổi trở lên. Dialectical Engine xây dựng các lập luận bằng mô hình AI và mọi nội dung do dịch vụ tạo ra đều có thể sai — đó không phải là lời tư vấn. Các cuộc tranh luận của bạn là riêng tư trừ khi bạn công khai chúng; nếu bạn công khai, bất kỳ ai cũng có thể đọc. Văn bản bạn gửi được chuyển đến các nhà cung cấp AI nêu trong Sổ đăng ký nhà cung cấp của chúng tôi và không được dùng để huấn luyện mô hình. Hãy báo cáo nội dung bất hợp pháp tại support@dezbatere.ro dù bạn có tài khoản hay không. Luật Romania điều chỉnh, nhưng các biện pháp bảo vệ người tiêu dùng tại nơi bạn sinh sống vẫn được bảo đảm.
 
@@ -127,6 +127,8 @@ Nếu không chắc một nội dung có được phép hay không, hãy hỏi c
 **Ba khái niệm khác nhau.** "Không được dùng để huấn luyện mô hình", "được lưu giữ trong thời gian có hạn vì lý do bảo mật, phòng chống lạm dụng hoặc pháp lý" và "không lưu giữ dữ liệu — không được duy trì sau khi xử lý" là những khái niệm khác nhau. Khi một nhà cung cấp lưu giữ câu lệnh trong thời gian có hạn, Sổ đăng ký cho biết thời hạn và lý do. Khi chế độ không lưu giữ dữ liệu được kích hoạt, Sổ đăng ký nêu rõ điều đó và các tính năng áp dụng. Chúng tôi sẽ không nói rằng nội dung không được lưu giữ nếu thực tế không phải vậy.
 
 **Kết quả.** Trong quan hệ giữa bạn và chúng tôi, bạn có thể sử dụng kết quả từ các cuộc tranh luận của chính mình cho bất kỳ mục đích hợp pháp nào, và chúng tôi không tuyên bố quyền sở hữu đối với văn bản được tạo ra. Hãy lưu ý rằng kết quả được tạo ra có thể không được bảo hộ quyền tác giả tại nhiều hệ thống pháp luật; kết quả tương tự có thể được tạo ra cho người dùng khác; kết quả có thể sao chép hoặc giống tài liệu của bên thứ ba; và một số tài liệu nguồn do nhà cung cấp AI truy xuất có thể chịu hạn chế về việc tái sử dụng. Bạn chịu trách nhiệm kiểm tra trước khi dựa vào hoặc công bố lại kết quả.
+
+**Biểu đồ và số liệu thống kê do chúng tôi tạo ra.** Các biểu đồ trong một báo cáo tranh luận và các số liệu thống kê chúng tôi tổng hợp cho các biểu đồ đó — bao gồm việc lựa chọn, sắp xếp, thiết kế và vẽ chúng — do Dialectical Engine tạo ra và thuộc về DMS Merchandise Shop S.R.L.; mỗi biểu đồ đều mang dòng thông báo "Copyrighted by DMS Merchandise Shop SRL". Điều này không áp dụng cho các con số mà biểu đồ thể hiện, vốn đến từ cuộc tranh luận của bạn, hoặc cho văn bản cuộc tranh luận của bạn. Chúng tôi cấp cho bạn giấy phép miễn phí, trên toàn thế giới, không độc quyền và vĩnh viễn để sử dụng, sao chép và chia sẻ các biểu đồ đó cho bất kỳ mục đích hợp pháp nào, với điều kiện bạn giữ nguyên dòng thông báo và nhãn do AI tạo đi kèm biểu đồ. Trường hợp pháp luật không công nhận quyền đối với tài liệu do AI tạo ra, đoạn này không trao cho chúng tôi nhiều hơn mức pháp luật cho phép.
 
 ## 9. Công khai một cuộc tranh luận
 

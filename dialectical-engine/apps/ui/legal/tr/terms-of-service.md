@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kısaca
-eyebrow: HİZMET KOŞULLARI · v2.6 · YÜRÜRLÜK TARİHİ 24 EKİM 2026
+eyebrow: HİZMET KOŞULLARI · v2.7 · YÜRÜRLÜK TARİHİ 24 EKİM 2026
 title: Kabul ettiğiniz hükümler
 lede: Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.
-endMarker: KOŞULLARIN SONU · v2.6
+endMarker: KOŞULLARIN SONU · v2.7
 bodyLabel: Hizmet Koşulları metni
 annexTitle: Ek A — Bölgesel koşullar
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 UYGULANACAK HUKUK
 -->
 
-**Version 2.6 · Effective 24 Ekim 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
+**Version 2.7 · Effective 24 Ekim 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
 
 **In short.** En az 18 yaşında olmalısınız. Dialectical Engine, yapay zekâ modelleriyle argümanlar oluşturur ve ürettiği her şey yanlış olabilir — bunlar tavsiye değildir. Tartışmalarınız, siz yayımlamadıkça özeldir; yayımlarsanız herkes okuyabilir. Gönderdiğiniz metin, Sağlayıcı Sicilimizde belirtilen yapay zekâ sağlayıcılarına iletilir ve modelleri eğitmek için kullanılmaz. Hesabınız olsun veya olmasın, hukuka aykırı içerikleri support@dezbatere.ro adresine bildirin. Romanya hukuku uygulanır; ancak yerel tüketici korumalarınız saklıdır.
 
@@ -127,6 +127,8 @@ Bir şeye izin verilip verilmediğinden emin değilseniz, göndermeden önce biz
 **Birbirinden farklı üç husus.** "Modelleri eğitmek için kullanılmama", "güvenlik, kötüye kullanımı önleme veya hukuki nedenlerle sınırlı bir süre saklanma" ve "sıfır veri saklama — işleme sonrasında kalıcı olarak saklanmama" birbirinden farklıdır. Bir sağlayıcı istemleri sınırlı bir süre saklıyorsa Sicil, bunun ne kadar süreyle ve neden yapıldığını belirtir. Sıfır veri saklamanın etkin olduğu durumlarda Sicil, bunu ve hangi özellikler için geçerli olduğunu belirtir. İçeriğin saklanmadığı doğru değilse size böyle söylemeyiz.
 
 **Çıktılar.** Sizinle aramızdaki ilişki bakımından, kendi tartışmalarınızın çıktısını hukuka uygun her amaçla kullanabilirsiniz ve üretilen metin üzerinde mülkiyet iddiasında bulunmayız. Üretilen çıktının birçok yargı çevresinde telif hakkıyla korunamayabileceğini; benzer çıktının başka kullanıcılar için de üretilebileceğini; çıktıların üçüncü taraf materyallerini çoğaltabileceğini veya bunlara benzeyebileceğini ve bir yapay zekâ sağlayıcısının eriştiği bazı kaynak materyallerin yeniden kullanım kısıtlamalarına tabi olabileceğini göz önünde bulundurun. Çıktılara dayanmadan veya onları yeniden yayımlamadan önce kontrol etmek sizin sorumluluğunuzdadır.
+
+**Ürettiğimiz grafikler ve istatistikler.** Bir tartışma raporundaki grafikler ve bunlar için derlediğimiz istatistikler — bunların seçimi, düzenlenmesi, tasarımı ve çizimi — Dialectical Engine tarafından oluşturulur ve DMS Merchandise Shop S.R.L. şirketine aittir; her grafik "Copyrighted by DMS Merchandise Shop SRL" ibaresini taşır. Bu durum, bir grafiğin gösterdiği ve tartışmanızdan gelen rakamları ya da tartışmanızın metnini kapsamaz. Size, söz konusu grafikleri hukuka uygun her amaçla kullanmanız, kopyalamanız ve paylaşmanız için ücretsiz, dünya çapında, münhasır olmayan ve süresiz bir lisans veririz; bunun koşulu, ibareyi ve yapay zekâ tarafından üretildiği etiketini grafiklerle birlikte muhafaza etmenizdir. Hukukun yapay zekâ tarafından üretilen materyal üzerinde hak tanımadığı durumlarda, bu paragraf bize hukukun izin verdiğinden fazlasını sağlamaz.
 
 ## 9. Bir tartışmanın yayımlanması
 

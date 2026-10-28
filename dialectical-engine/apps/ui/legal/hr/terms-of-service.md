@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ukratko
-eyebrow: UVJETI KORIŠTENJA · v2.6 · NA SNAZI OD 24. LISTOPADA 2026.
+eyebrow: UVJETI KORIŠTENJA · v2.7 · NA SNAZI OD 24. LISTOPADA 2026.
 title: Na što pristajete
 lede: Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.
-endMarker: KRAJ UVJETA · v2.6
+endMarker: KRAJ UVJETA · v2.7
 bodyLabel: Tekst Uvjeta korištenja
 annexTitle: Prilog A — Regionalni uvjeti
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 MJERODAVNO PRAVO
 -->
 
-**Version 2.6 · Effective 24. listopada 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
+**Version 2.7 · Effective 24. listopada 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
 
 **In short.** Morate imati najmanje 18 godina. Dialectical Engine izrađuje argumente pomoću modela umjetne inteligencije i sve što generira može biti pogrešno — to nije savjet. Vaše su rasprave privatne osim ako ih objavite; ako ih objavite, svatko ih može pročitati. Tekst koji pošaljete prosljeđuje se pružateljima usluga umjetne inteligencije navedenima u našem Registru pružatelja i ne upotrebljava se za treniranje modela. Nezakonit sadržaj prijavite na support@dezbatere.ro, bez obzira na to imate li račun. Primjenjuje se rumunjsko pravo, ali zadržavate zaštitu potrošača prema svojem lokalnom pravu.
 
@@ -127,6 +127,8 @@ Ako niste sigurni je li nešto dopušteno, obratite nam se prije objavljivanja.
 **Tri različite stvari.** „Ne upotrebljava se za treniranje modela”, „čuva se ograničeno vrijeme radi sigurnosti, sprječavanja zlouporabe ili pravnih razloga” i „nulto zadržavanje podataka — ne pohranjuje se nakon obrade” nisu isto. Kada pružatelj čuva upite ograničeno vrijeme, u Registru je navedeno koliko dugo i zašto. Kada je nulto zadržavanje podataka aktivno, u Registru je to navedeno, zajedno sa značajkama na koje se odnosi. Nećemo vam tvrditi da se sadržaj ne čuva ako to nije istina.
 
 **Izlazni sadržaj.** U odnosu između vas i nas, izlazni sadržaj vlastitih rasprava možete upotrebljavati u bilo koju zakonitu svrhu, a mi ne polažemo pravo vlasništva na generirani tekst. Imajte na umu da generirani izlazni sadržaj u mnogim pravnim sustavima možda nije zaštićen autorskim pravom; da se sličan izlazni sadržaj može generirati za druge korisnike; da izlazni sadržaj može reproducirati materijale trećih strana ili im nalikovati; te da neki izvorni materijali koje pružatelj usluga umjetne inteligencije dohvati mogu podlijegati ograničenjima ponovne uporabe. Odgovorni ste za provjeru prije nego što se oslonite na izlazni sadržaj ili ga ponovno objavite.
+
+**Grafikoni i statistike koje izrađujemo.** Grafikone u izvješću o raspravi i statistike koje za njih sastavljamo — njihov odabir, raspored, dizajn i crtanje — izrađuje Dialectical Engine, a pripadaju društvu DMS Merchandise Shop S.R.L.; svaki grafikon nosi napomenu „Copyrighted by DMS Merchandise Shop SRL”. To se ne odnosi na brojčane podatke koje grafikon prikazuje, a koji potječu iz vaše rasprave, ni na tekst vaše rasprave. Dajemo vam besplatnu, svjetsku, neisključivu i trajnu licenciju za upotrebu, umnožavanje i dijeljenje tih grafikona u bilo koju zakonitu svrhu, pod uvjetom da uz njih zadržite tu napomenu i oznaku da su generirani umjetnom inteligencijom. Ako zakon ne priznaje prava na materijalu generiranom umjetnom inteligencijom, ovaj nam stavak ne daje više nego što zakon dopušta.
 
 ## 9. Objavljivanje rasprave
 

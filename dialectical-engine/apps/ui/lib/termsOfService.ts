@@ -137,7 +137,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Web search through Perplexity. To find evidence for a debate, the models may search the web through Perplexity (Perplexity AI, Inc., United States), which is listed in the Provider Register. What Perplexity receives is the search questions the models write from the debate — so, like a model provider, it sees text built around what you typed. It never receives your email address, your account identifiers, your session records or your payment details." },
       { kind: "p", text: "Which providers, and where. Our AI Provider Register at dezbatere.ro/providers is part of these Terms. It lists each provider we may use: its legal entity and country; what it receives and why; where it processes; its retention terms; whether zero-data-retention is active for the endpoint we use; whether it may use inputs for training under our contract; the transfer mechanism we rely on; and the date we last verified each entry. Providers may be located outside your country and outside the European Economic Area. Our Privacy Policy explains the safeguards." },
       { kind: "p", text: "Three different things. \"Not used to train models\", \"retained for a limited period for security, abuse prevention or legal reasons\", and \"zero data retention — not persisted after processing\" are different. Where a provider retains prompts for a limited period, the Register says how long and why. Where zero-data-retention is active, the Register says so, and for which features. We will not tell you content is unretained when it is not." },
-      { kind: "p", text: "Outputs. As between you and us, you may use the output of your own debates for any lawful purpose, and we do not claim ownership of generated text. Be aware that generated output may not be protectable by copyright in many jurisdictions; that similar output may be generated for other users; that outputs may reproduce or resemble third-party material; and that some source material an AI provider retrieves may carry restrictions on reuse. You are responsible for checking before you rely on or republish outputs." }
+      { kind: "p", text: "Outputs. As between you and us, you may use the output of your own debates for any lawful purpose, and we do not claim ownership of generated text. Be aware that generated output may not be protectable by copyright in many jurisdictions; that similar output may be generated for other users; that outputs may reproduce or resemble third-party material; and that some source material an AI provider retrieves may carry restrictions on reuse. You are responsible for checking before you rely on or republish outputs." },
+      { kind: "p", text: "Charts and statistics we generate. The charts in a debate report, and the statistics we compile for them — their selection, arrangement, design and drawing — are made by Dialectical Engine and belong to DMS Merchandise Shop S.R.L.; each chart is marked \"Copyrighted by DMS Merchandise Shop SRL\". This does not extend to the figures a chart shows, which come from your debate, or to the text of your debate. We grant you a free, worldwide, non-exclusive and perpetual licence to use, copy and share those charts for any lawful purpose, provided you keep the notice and the AI-generated label with them. Where the law does not recognise rights in AI-generated material, this paragraph gives us no more than the law allows." }
     ]
   },
   {
@@ -354,12 +355,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.6",
-  sha256: "27e7229ee49faffd2cdf5eb609acc1b4ad5ea95c4e5c36bd057867de492b33ab",
-  eyebrow: "TERMS OF SERVICE · v2.6 · EFFECTIVE 24 OCTOBER 2026",
+  version: "2.7",
+  sha256: "94e8a2b5cb482239bd0a32d6c53711ad58f05e2cc80f7c4cbcc5dbf06f867ed8",
+  eyebrow: "TERMS OF SERVICE · v2.7 · EFFECTIVE 24 OCTOBER 2026",
   title: "What you agree to",
   lede: "The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.",
-  endMarker: "END OF TERMS · v2.6",
+  endMarker: "END OF TERMS · v2.7",
   contact: "support@dezbatere.ro",
   bodyLabel: "Terms of Service text",
   sectionIdPrefix: "terms-section-",

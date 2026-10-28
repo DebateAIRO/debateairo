@@ -137,7 +137,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Perplexity üzerinden web araması. Bir tartışma için kanıt bulmak amacıyla modeller, Sağlayıcı Sicilimizde listelenen Perplexity (Perplexity AI, Inc., Amerika Birleşik Devletleri) üzerinden internette arama yapabilir. Perplexity'nin aldığı içerik, modellerin tartışmadan yola çıkarak yazdığı arama sorgularıdır — dolayısıyla, bir model sağlayıcısı gibi, yazdıklarınızın çevresinde oluşturulan metni görür. E-posta adresinizi, hesap tanımlayıcılarınızı, oturum kayıtlarınızı veya ödeme bilgilerinizi hiçbir zaman almaz." },
       { kind: "p", text: "Hangi sağlayıcılar ve nerede. dezbatere.ro/providers adresindeki Yapay Zekâ Sağlayıcı Sicilimiz bu Koşulların bir parçasıdır. Sicil, kullanabileceğimiz her sağlayıcı için şu hususları listeler: tüzel kişiliği ve ülkesi; neyi, neden aldığı; işlemenin nerede yapıldığı; saklama koşulları; kullandığımız uç nokta için sıfır veri saklamanın etkin olup olmadığı; sözleşmemiz kapsamında girdileri eğitim için kullanıp kullanamayacağı; dayandığımız aktarım mekanizması ve her kaydı son doğruladığımız tarih. Sağlayıcılar ülkenizin ve Avrupa Ekonomik Alanı'nın dışında bulunabilir. Güvenceler Gizlilik Politikamızda açıklanmıştır." },
       { kind: "p", text: "Birbirinden farklı üç husus. \"Modelleri eğitmek için kullanılmama\", \"güvenlik, kötüye kullanımı önleme veya hukuki nedenlerle sınırlı bir süre saklanma\" ve \"sıfır veri saklama — işleme sonrasında kalıcı olarak saklanmama\" birbirinden farklıdır. Bir sağlayıcı istemleri sınırlı bir süre saklıyorsa Sicil, bunun ne kadar süreyle ve neden yapıldığını belirtir. Sıfır veri saklamanın etkin olduğu durumlarda Sicil, bunu ve hangi özellikler için geçerli olduğunu belirtir. İçeriğin saklanmadığı doğru değilse size böyle söylemeyiz." },
-      { kind: "p", text: "Çıktılar. Sizinle aramızdaki ilişki bakımından, kendi tartışmalarınızın çıktısını hukuka uygun her amaçla kullanabilirsiniz ve üretilen metin üzerinde mülkiyet iddiasında bulunmayız. Üretilen çıktının birçok yargı çevresinde telif hakkıyla korunamayabileceğini; benzer çıktının başka kullanıcılar için de üretilebileceğini; çıktıların üçüncü taraf materyallerini çoğaltabileceğini veya bunlara benzeyebileceğini ve bir yapay zekâ sağlayıcısının eriştiği bazı kaynak materyallerin yeniden kullanım kısıtlamalarına tabi olabileceğini göz önünde bulundurun. Çıktılara dayanmadan veya onları yeniden yayımlamadan önce kontrol etmek sizin sorumluluğunuzdadır." }
+      { kind: "p", text: "Çıktılar. Sizinle aramızdaki ilişki bakımından, kendi tartışmalarınızın çıktısını hukuka uygun her amaçla kullanabilirsiniz ve üretilen metin üzerinde mülkiyet iddiasında bulunmayız. Üretilen çıktının birçok yargı çevresinde telif hakkıyla korunamayabileceğini; benzer çıktının başka kullanıcılar için de üretilebileceğini; çıktıların üçüncü taraf materyallerini çoğaltabileceğini veya bunlara benzeyebileceğini ve bir yapay zekâ sağlayıcısının eriştiği bazı kaynak materyallerin yeniden kullanım kısıtlamalarına tabi olabileceğini göz önünde bulundurun. Çıktılara dayanmadan veya onları yeniden yayımlamadan önce kontrol etmek sizin sorumluluğunuzdadır." },
+      { kind: "p", text: "Ürettiğimiz grafikler ve istatistikler. Bir tartışma raporundaki grafikler ve bunlar için derlediğimiz istatistikler — bunların seçimi, düzenlenmesi, tasarımı ve çizimi — Dialectical Engine tarafından oluşturulur ve DMS Merchandise Shop S.R.L. şirketine aittir; her grafik \"Copyrighted by DMS Merchandise Shop SRL\" ibaresini taşır. Bu durum, bir grafiğin gösterdiği ve tartışmanızdan gelen rakamları ya da tartışmanızın metnini kapsamaz. Size, söz konusu grafikleri hukuka uygun her amaçla kullanmanız, kopyalamanız ve paylaşmanız için ücretsiz, dünya çapında, münhasır olmayan ve süresiz bir lisans veririz; bunun koşulu, ibareyi ve yapay zekâ tarafından üretildiği etiketini grafiklerle birlikte muhafaza etmenizdir. Hukukun yapay zekâ tarafından üretilen materyal üzerinde hak tanımadığı durumlarda, bu paragraf bize hukukun izin verdiğinden fazlasını sağlamaz." }
     ]
   },
   {
@@ -354,12 +355,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.6",
-  sha256: "4de7b39d57f02e4e526f6d7a002366cd7357f4069863c4a1c559593cc6741d63",
-  eyebrow: "HİZMET KOŞULLARI · v2.6 · YÜRÜRLÜK TARİHİ 24 EKİM 2026",
+  version: "2.7",
+  sha256: "ad2f6ab8e8a96a0f78ee8e781580f8e6640c1d2114cde3d9cda06b7df0448fea",
+  eyebrow: "HİZMET KOŞULLARI · v2.7 · YÜRÜRLÜK TARİHİ 24 EKİM 2026",
   title: "Kabul ettiğiniz hükümler",
   lede: "Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.",
-  endMarker: "KOŞULLARIN SONU · v2.6",
+  endMarker: "KOŞULLARIN SONU · v2.7",
   contact: "support@dezbatere.ro",
   bodyLabel: "Hizmet Koşulları metni",
   sectionIdPrefix: "terms-section-",

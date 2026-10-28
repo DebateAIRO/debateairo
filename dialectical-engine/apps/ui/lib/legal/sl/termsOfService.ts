@@ -137,7 +137,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Spletno iskanje prek storitve Perplexity. Da bi našli dokaze za razpravo, lahko modeli iščejo po spletu prek storitve Perplexity (Perplexity AI, Inc., Združene države), ki je navedena v Registru ponudnikov umetne inteligence. Perplexity prejme iskalne poizvedbe, ki jih modeli sestavijo iz razprave — tako kot ponudnik modelov torej vidi besedilo, zgrajeno okoli tega, kar ste vnesli. Nikoli ne prejme vašega e-poštnega naslova, identifikatorjev računa, zapisov o sejah ali podatkov o plačilu." },
       { kind: "p", text: "Kateri ponudniki in kje. Naš Register ponudnikov umetne inteligence na dezbatere.ro/providers je del teh Pogojev. Za vsakega ponudnika, ki ga lahko uporabimo, navaja: njegovo pravno osebo in državo; kaj prejme in zakaj; kje obdeluje podatke; njegove pogoje hrambe; ali je za končno točko, ki jo uporabljamo, vključena ničelna hramba podatkov; ali sme po naši pogodbi uporabljati vhodne podatke za učenje; mehanizem prenosa, na katerega se opiramo; in datum zadnjega preverjanja vsakega vnosa. Ponudniki so lahko zunaj vaše države in zunaj Evropskega gospodarskega prostora. Naš Pravilnik o zasebnosti pojasnjuje zaščitne ukrepe." },
       { kind: "p", text: "Tri različne stvari. »Ne uporablja se za učenje modelov«, »hrani se omejeno obdobje iz varnostnih razlogov, zaradi preprečevanja zlorab ali iz pravnih razlogov« in »ničelna hramba podatkov — po obdelavi se ne shrani« niso isto. Če ponudnik pozive hrani omejeno obdobje, Register navaja, kako dolgo in zakaj. Če je vključena ničelna hramba podatkov, je to navedeno v Registru skupaj s funkcijami, za katere velja. Ne bomo vam trdili, da se vsebina ne hrani, kadar to ni res." },
-      { kind: "p", text: "Rezultati. V razmerju med vami in nami lahko rezultate svojih razprav uporabljate za kateri koli zakonit namen, mi pa ne uveljavljamo lastništva ustvarjenega besedila. Upoštevajte, da ustvarjenega rezultata v številnih pravnih redih morda ni mogoče avtorskopravno zaščititi; da se lahko podoben rezultat ustvari za druge uporabnike; da lahko rezultati reproducirajo gradivo tretjih oseb ali so mu podobni; ter da za nekatera izvorna gradiva, ki jih pridobi ponudnik umetne inteligence, lahko veljajo omejitve ponovne uporabe. Preden se zanesete na rezultate ali jih ponovno objavite, ste odgovorni za preverjanje." }
+      { kind: "p", text: "Rezultati. V razmerju med vami in nami lahko rezultate svojih razprav uporabljate za kateri koli zakonit namen, mi pa ne uveljavljamo lastništva ustvarjenega besedila. Upoštevajte, da ustvarjenega rezultata v številnih pravnih redih morda ni mogoče avtorskopravno zaščititi; da se lahko podoben rezultat ustvari za druge uporabnike; da lahko rezultati reproducirajo gradivo tretjih oseb ali so mu podobni; ter da za nekatera izvorna gradiva, ki jih pridobi ponudnik umetne inteligence, lahko veljajo omejitve ponovne uporabe. Preden se zanesete na rezultate ali jih ponovno objavite, ste odgovorni za preverjanje." },
+      { kind: "p", text: "Grafikoni in statistični podatki, ki jih ustvarimo. Grafikoni v poročilu o razpravi in statistični podatki, ki jih zanje pripravimo — njihov izbor, razporeditev, oblikovanje in izris — so delo storitve Dialectical Engine in pripadajo družbi DMS Merchandise Shop S.R.L.; vsak grafikon je označen z obvestilom »Copyrighted by DMS Merchandise Shop SRL«. To ne velja za številke, ki jih prikazuje grafikon in izhajajo iz vaše razprave, niti za besedilo vaše razprave. Podeljujemo vam brezplačno, svetovno, neizključno in časovno neomejeno licenco za uporabo, kopiranje in deljenje teh grafikonov za kateri koli zakonit namen, pod pogojem, da ob njih ohranite obvestilo in oznako, da jih je ustvarila umetna inteligenca. Kadar zakon ne priznava pravic na gradivu, ki ga ustvari umetna inteligenca, nam ta odstavek ne daje več, kot dovoljuje zakon." }
     ]
   },
   {
@@ -354,12 +355,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.6",
-  sha256: "b543d749cecf5e0a292435b744e308dc66ce42dea007eced6d25ca44dddc1fc6",
-  eyebrow: "POGOJI UPORABE · v2.6 · VELJAVNI OD 24. OKTOBRA 2026",
+  version: "2.7",
+  sha256: "8d7fea066e81688a8c714ee9b8fb01cf5482ebbf4e4ce055cba02e568812a403",
+  eyebrow: "POGOJI UPORABE · v2.7 · VELJAVNI OD 24. OKTOBRA 2026",
   title: "S čim soglašate",
   lede: "Pogodba med vami in družbo DMS Merchandise Shop S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.",
-  endMarker: "KONEC POGOJEV · v2.6",
+  endMarker: "KONEC POGOJEV · v2.7",
   contact: "support@dezbatere.ro",
   bodyLabel: "Besedilo Pogojev uporabe",
   sectionIdPrefix: "terms-section-",

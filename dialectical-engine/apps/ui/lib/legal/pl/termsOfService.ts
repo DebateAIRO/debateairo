@@ -137,7 +137,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Wyszukiwanie w internecie przez Perplexity. Aby znaleźć dowody na potrzeby debaty, modele mogą przeszukiwać internet za pośrednictwem Perplexity (Perplexity AI, Inc., Stany Zjednoczone), który jest wymieniony w Rejestrze Dostawców AI. Perplexity otrzymuje zapytania wyszukiwania, które modele formułują na podstawie debaty — widzi zatem, podobnie jak dostawca modeli, tekst utworzony wokół tego, co wpisujesz. Nigdy nie otrzymuje Twojego adresu e-mail, identyfikatorów konta, zapisów sesji ani danych płatniczych." },
       { kind: "p", text: "Którzy dostawcy i gdzie. Nasz Rejestr Dostawców AI, dostępny pod adresem dezbatere.ro/providers, stanowi część niniejszych Warunków. Wymieniono w nim każdego dostawcę, z którego możemy korzystać: jego podmiot prawny i państwo; otrzymywane dane i cel ich otrzymywania; miejsce przetwarzania; warunki przechowywania; informację, czy dla używanego przez nas punktu końcowego aktywna jest opcja zerowej retencji danych; informację, czy na mocy zawartej z nami umowy dostawca może wykorzystywać dane wejściowe do trenowania; mechanizm przekazywania danych, na którym się opieramy; oraz datę ostatniej weryfikacji każdego wpisu. Dostawcy mogą mieć siedzibę poza Twoim państwem oraz poza Europejskim Obszarem Gospodarczym. Stosowane zabezpieczenia wyjaśnia nasza Polityka prywatności." },
       { kind: "p", text: "Trzy różne kwestie. „Niewykorzystywanie do trenowania modeli”, „przechowywanie przez ograniczony czas ze względów bezpieczeństwa, zapobiegania nadużyciom lub z przyczyn prawnych” oraz „zerowa retencja danych — brak utrwalenia po przetworzeniu” to różne pojęcia. Jeżeli dostawca przechowuje prompty przez ograniczony okres, Rejestr wskazuje jego długość i cel. Jeżeli aktywna jest zerowa retencja danych, Rejestr zawiera taką informację i wskazuje funkcje, których ona dotyczy. Nie będziemy twierdzić, że treści nie są przechowywane, jeżeli jest inaczej." },
-      { kind: "p", text: "Wyniki. W stosunkach między Tobą a nami możesz wykorzystywać wyniki własnych debat w dowolnym zgodnym z prawem celu, a my nie rościmy sobie praw własności do wygenerowanego tekstu. Pamiętaj, że w wielu jurysdykcjach wygenerowane wyniki mogą nie podlegać ochronie prawa autorskiego; że podobne wyniki mogą zostać wygenerowane dla innych użytkowników; że wyniki mogą powielać lub przypominać materiały podmiotów trzecich; oraz że niektóre materiały źródłowe pobierane przez dostawcę AI mogą podlegać ograniczeniom dotyczącym ponownego wykorzystywania. Masz obowiązek zweryfikować wyniki przed oparciem się na nich lub ich ponownym opublikowaniem." }
+      { kind: "p", text: "Wyniki. W stosunkach między Tobą a nami możesz wykorzystywać wyniki własnych debat w dowolnym zgodnym z prawem celu, a my nie rościmy sobie praw własności do wygenerowanego tekstu. Pamiętaj, że w wielu jurysdykcjach wygenerowane wyniki mogą nie podlegać ochronie prawa autorskiego; że podobne wyniki mogą zostać wygenerowane dla innych użytkowników; że wyniki mogą powielać lub przypominać materiały podmiotów trzecich; oraz że niektóre materiały źródłowe pobierane przez dostawcę AI mogą podlegać ograniczeniom dotyczącym ponownego wykorzystywania. Masz obowiązek zweryfikować wyniki przed oparciem się na nich lub ich ponownym opublikowaniem." },
+      { kind: "p", text: "Wykresy i statystyki, które generujemy. Wykresy w raporcie z debaty oraz statystyki, które dla nich zestawiamy — ich dobór, układ, projekt graficzny i rysunek — są tworzone przez Dialectical Engine i należą do DMS Merchandise Shop S.R.L.; każdy wykres jest opatrzony informacją „Copyrighted by DMS Merchandise Shop SRL”. Nie dotyczy to liczb prezentowanych na wykresie, które pochodzą z Twojej debaty, ani tekstu Twojej debaty. Udzielamy Ci nieodpłatnej, ogólnoświatowej, niewyłącznej i bezterminowej licencji na wykorzystywanie, kopiowanie i udostępnianie tych wykresów w dowolnym zgodnym z prawem celu, pod warunkiem że zachowasz przy nich tę informację oraz oznaczenie o wygenerowaniu przez AI. Jeżeli prawo nie uznaje praw do materiałów wygenerowanych przez AI, niniejszy akapit nie przyznaje nam więcej, niż pozwala prawo." }
     ]
   },
   {
@@ -354,12 +355,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.6",
-  sha256: "75a120009c5a6d58327bb3021abb631a830fb4de784d66ec105ca290f6b69b1e",
-  eyebrow: "WARUNKI ŚWIADCZENIA USŁUG · v2.6 · OBOWIĄZUJĄ OD 24 PAŹDZIERNIKA 2026",
+  version: "2.7",
+  sha256: "1f9658ca8fc1eccae2ba849dec4499bedcba5d3ed314c4b70fcea554f6363c31",
+  eyebrow: "WARUNKI ŚWIADCZENIA USŁUG · v2.7 · OBOWIĄZUJĄ OD 24 PAŹDZIERNIKA 2026",
   title: "Na co wyrażasz zgodę",
   lede: "Umowa między Tobą a DMS Merchandise Shop S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.",
-  endMarker: "KONIEC WARUNKÓW · v2.6",
+  endMarker: "KONIEC WARUNKÓW · v2.7",
   contact: "support@dezbatere.ro",
   bodyLabel: "Treść Warunków świadczenia usług",
   sectionIdPrefix: "terms-section-",

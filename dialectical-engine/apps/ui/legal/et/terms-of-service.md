@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lühidalt
-eyebrow: TEENUSETINGIMUSED · v2.6 · KEHTIB ALATES 24. OKTOOBRIST 2026
+eyebrow: TEENUSETINGIMUSED · v2.7 · KEHTIB ALATES 24. OKTOOBRIST 2026
 title: Millega te nõustute
 lede: Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.
-endMarker: TINGIMUSTE LÕPP · v2.6
+endMarker: TINGIMUSTE LÕPP · v2.7
 bodyLabel: Teenusetingimuste tekst
 annexTitle: Lisa A — Piirkondlikud tingimused
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 KOHALDATAV ÕIGUS
 -->
 
-**Version 2.6 · Effective 24. oktoober 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
+**Version 2.7 · Effective 24. oktoober 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
 
 **In short.** Peate olema vähemalt 18-aastane. Dialectical Engine koostab tehisintellektimudelite abil argumente ja kõik selle loodud tulemused võivad olla valed — need ei ole nõuanded. Teie väitlused on privaatsed, kui te neid ei avalda; avaldamise korral saab igaüks neid lugeda. Teie sisestatud tekst saadetakse meie tehisintellekti pakkujate registris loetletud pakkujatele ja seda ei kasutata mudelite treenimiseks. Teatage ebaseaduslikust sisust aadressil support@dezbatere.ro, olenemata sellest, kas teil on konto. Kohaldatakse Rumeenia õigust, kuid teile jääb teie kohaliku tarbijakaitse tagatud kaitse.
 
@@ -127,6 +127,8 @@ Kui te ei ole kindel, kas miski on lubatud, küsige meilt enne selle postitamist
 **Kolm eri asja.** „Ei kasutata mudelite treenimiseks“, „säilitatakse piiratud aja jooksul turvalisuse, kuritarvitamise ennetamise või õiguslikel põhjustel“ ja „andmeid ei säilitata — neid ei talletata pärast töötlemist“ on eri asjad. Kui pakkuja säilitab viipasid piiratud aja, märgitakse registris, kui kaua ja miks. Kui rakendatakse andmete säilitamata jätmist, märgitakse registris nii see kui ka funktsioonid, mille suhtes see kehtib. Me ei väida, et sisu ei säilitata, kui seda tegelikult säilitatakse.
 
 **Väljundid.** Teie ja meie vahelises suhtes võite oma väitluste väljundit kasutada mis tahes seaduslikul eesmärgil ning me ei pretendeeri loodud teksti omandiõigusele. Võtke arvesse, et loodud väljund ei pruugi paljudes jurisdiktsioonides olla autoriõigusega kaitstav; et sarnast väljundit võidakse luua teistele kasutajatele; et väljundid võivad reprodutseerida või meenutada kolmandate isikute materjali; ning et mõnele tehisintellekti pakkuja hangitud lähtematerjalile võivad kehtida taaskasutuse piirangud. Vastutate kontrollimise eest enne väljunditele tuginemist või nende uuesti avaldamist.
+
+**Meie loodud diagrammid ja statistika.** Väitluse aruande diagrammid ja nende jaoks koostatav statistika — nende valik, paigutus, kujundus ja joonistus — on loonud Dialectical Engine ning need kuuluvad ettevõttele DMS Merchandise Shop S.R.L.; igal diagrammil on märge „Copyrighted by DMS Merchandise Shop SRL“. See ei laiene diagrammil näidatud arvudele, mis pärinevad teie väitlusest, ega teie väitluse tekstile. Anname teile tasuta, kogu maailmas kehtiva ja tähtajatu lihtlitsentsi neid diagramme mis tahes seaduslikul eesmärgil kasutada, kopeerida ja jagada tingimusel, et säilitate nende juures selle märke ja tehisintellekti loodud sisu märgise. Kui seadus ei tunnusta õigusi tehisintellekti loodud materjalile, ei anna see lõik meile rohkem, kui seadus lubab.
 
 ## 9. Väitluse avaldamine
 

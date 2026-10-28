@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Īsumā
-eyebrow: PAKALPOJUMA NOTEIKUMI · v2.6 · SPĒKĀ NO 2026. GADA 24. OKTOBRA
+eyebrow: PAKALPOJUMA NOTEIKUMI · v2.7 · SPĒKĀ NO 2026. GADA 24. OKTOBRA
 title: Kam jūs piekrītat
 lede: Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.
-endMarker: NOTEIKUMU BEIGAS · v2.6
+endMarker: NOTEIKUMU BEIGAS · v2.7
 bodyLabel: Pakalpojuma noteikumu teksts
 annexTitle: A pielikums — Reģionālie noteikumi
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PIEMĒROJAMIE TIESĪBU AKTI
 -->
 
-**Version 2.6 · Effective 2026. gada 24. oktobris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
+**Version 2.7 · Effective 2026. gada 24. oktobris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
 
 **In short.** Jums jābūt vismaz 18 gadus vecam. Dialectical Engine veido argumentus ar MI modeļiem, un viss, ko tas ģenerē, var būt nepareizs — tā nav konsultācija. Jūsu debates ir privātas, ja vien tās nepublicējat; ja tās publicējat, ikviens tās var lasīt. Jūsu iesniegtais teksts tiek nosūtīts mūsu Pakalpojumu sniedzēju reģistrā norādītajiem MI pakalpojumu sniedzējiem un netiek izmantots modeļu apmācīšanai. Par nelikumīgu saturu ziņojiet uz support@dezbatere.ro neatkarīgi no tā, vai jums ir konts. Piemēro Rumānijas tiesību aktus, taču jums joprojām ir vietējā patērētāju aizsardzība.
 
@@ -127,6 +127,8 @@ Ja neesat pārliecināts, vai kaut kas ir atļauts, pirms publicēšanas jautāj
 **Trīs atšķirīgas lietas.** „Netiek izmantots modeļu apmācīšanai”, „ierobežotu laiku tiek glabāts drošības, ļaunprātīgas izmantošanas novēršanas vai juridisku iemeslu dēļ” un „datu neglabāšanas režīms — pēc apstrādes netiek saglabāts” ir atšķirīgas lietas. Ja pakalpojumu sniedzējs uzvednes glabā ierobežotu laiku, Reģistrā ir norādīts, cik ilgi un kādēļ. Ja ir ieslēgts datu neglabāšanas režīms, Reģistrā norādīts gan tas, gan attiecīgās funkcijas. Mēs neapgalvosim, ka saturs netiek glabāts, ja tas tiek glabāts.
 
 **Rezultāti.** Attiecībās starp jums un mums jūs drīkstat savu debašu rezultātu izmantot jebkuram likumīgam nolūkam, un mēs nepretendējam uz īpašumtiesībām uz ģenerēto tekstu. Ņemiet vērā, ka daudzās jurisdikcijās ģenerēto rezultātu autortiesības var neaizsargāt; ka līdzīgs rezultāts var tikt ģenerēts citiem lietotājiem; ka rezultāti var reproducēt trešo personu materiālus vai tiem līdzināties; un ka uz atsevišķiem avotu materiāliem, ko izgūst MI pakalpojumu sniedzējs, var attiekties atkārtotas izmantošanas ierobežojumi. Pirms paļaujaties uz rezultātiem vai tos pārpublicējat, jums tie jāpārbauda.
+
+**Mūsu ģenerētās diagrammas un statistika.** Debašu pārskatā iekļautās diagrammas un statistika, ko mēs tām apkopojam, — to atlase, izkārtojums, dizains un zīmējums — ir Dialectical Engine veidotas un pieder DMS Merchandise Shop S.R.L.; katra diagramma ir marķēta ar norādi „Copyrighted by DMS Merchandise Shop SRL”. Tas neattiecas uz skaitļiem, ko diagramma attēlo un kas iegūti no jūsu debatēm, kā arī uz jūsu debašu tekstu. Mēs piešķiram jums bezmaksas, visā pasaulē spēkā esošu, neekskluzīvu un beztermiņa licenci izmantot, kopēt un kopīgot šīs diagrammas jebkuram likumīgam nolūkam ar nosacījumu, ka kopā ar tām saglabājat šo norādi un marķējumu, ka tās ģenerējis MI. Ja tiesību akti neatzīst tiesības uz MI ģenerētu materiālu, šī rindkopa mums nepiešķir vairāk, nekā pieļauj tiesību akti.
 
 ## 9. Debašu publicēšana
 

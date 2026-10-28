@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Na kratko
-eyebrow: POGOJI UPORABE · v2.6 · VELJAVNI OD 24. OKTOBRA 2026
+eyebrow: POGOJI UPORABE · v2.7 · VELJAVNI OD 24. OKTOBRA 2026
 title: S čim soglašate
 lede: Pogodba med vami in družbo DMS Merchandise Shop S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.
-endMarker: KONEC POGOJEV · v2.6
+endMarker: KONEC POGOJEV · v2.7
 bodyLabel: Besedilo Pogojev uporabe
 annexTitle: Priloga A — Regionalni pogoji
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAVO, KI SE UPORABLJA
 -->
 
-**Version 2.6 · Effective 24. oktobra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
+**Version 2.7 · Effective 24. oktobra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
 
 **In short.** Stari morate biti najmanj 18 let. Dialectical Engine z modeli umetne inteligence oblikuje argumente in vse, kar ustvari, je lahko napačno — to ni nasvet. Vaše razprave so zasebne, razen če jih objavite; če jih objavite, jih lahko prebere vsakdo. Besedilo, ki ga pošljete, se posreduje ponudnikom umetne inteligence, navedenim v našem Registru ponudnikov, in se ne uporablja za učenje modelov. Nezakonito vsebino prijavite na support@dezbatere.ro, ne glede na to, ali imate račun. Uporablja se romunsko pravo, vendar ohranite varstvo potrošnikov po svojem lokalnem pravu.
 
@@ -127,6 +127,8 @@ Ta pravila veljajo za vsebino, ki jo pošljete in objavite, ter za način uporab
 **Tri različne stvari.** »Ne uporablja se za učenje modelov«, »hrani se omejeno obdobje iz varnostnih razlogov, zaradi preprečevanja zlorab ali iz pravnih razlogov« in »ničelna hramba podatkov — po obdelavi se ne shrani« niso isto. Če ponudnik pozive hrani omejeno obdobje, Register navaja, kako dolgo in zakaj. Če je vključena ničelna hramba podatkov, je to navedeno v Registru skupaj s funkcijami, za katere velja. Ne bomo vam trdili, da se vsebina ne hrani, kadar to ni res.
 
 **Rezultati.** V razmerju med vami in nami lahko rezultate svojih razprav uporabljate za kateri koli zakonit namen, mi pa ne uveljavljamo lastništva ustvarjenega besedila. Upoštevajte, da ustvarjenega rezultata v številnih pravnih redih morda ni mogoče avtorskopravno zaščititi; da se lahko podoben rezultat ustvari za druge uporabnike; da lahko rezultati reproducirajo gradivo tretjih oseb ali so mu podobni; ter da za nekatera izvorna gradiva, ki jih pridobi ponudnik umetne inteligence, lahko veljajo omejitve ponovne uporabe. Preden se zanesete na rezultate ali jih ponovno objavite, ste odgovorni za preverjanje.
+
+**Grafikoni in statistični podatki, ki jih ustvarimo.** Grafikoni v poročilu o razpravi in statistični podatki, ki jih zanje pripravimo — njihov izbor, razporeditev, oblikovanje in izris — so delo storitve Dialectical Engine in pripadajo družbi DMS Merchandise Shop S.R.L.; vsak grafikon je označen z obvestilom »Copyrighted by DMS Merchandise Shop SRL«. To ne velja za številke, ki jih prikazuje grafikon in izhajajo iz vaše razprave, niti za besedilo vaše razprave. Podeljujemo vam brezplačno, svetovno, neizključno in časovno neomejeno licenco za uporabo, kopiranje in deljenje teh grafikonov za kateri koli zakonit namen, pod pogojem, da ob njih ohranite obvestilo in oznako, da jih je ustvarila umetna inteligenca. Kadar zakon ne priznava pravic na gradivu, ki ga ustvari umetna inteligenca, nam ta odstavek ne daje več, kot dovoljuje zakon.
 
 ## 9. Objava razprave
 

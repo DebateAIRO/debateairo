@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Go hachomair
-eyebrow: TÉARMAÍ SEIRBHÍSE · v2.6 · I bhFEIDHM 24 DEIREADH FÓMHAIR 2026
+eyebrow: TÉARMAÍ SEIRBHÍSE · v2.7 · I bhFEIDHM 24 DEIREADH FÓMHAIR 2026
 title: An méid lena n-aontaíonn tú
 lede: An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.
-endMarker: DEIREADH NA dTÉARMAÍ · v2.6
+endMarker: DEIREADH NA dTÉARMAÍ · v2.7
 bodyLabel: Téacs na dTéarmaí Seirbhíse
 annexTitle: Iarscríbhinn A — Téarmaí réigiúnacha
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 AN DLÍ RIALAITHE
 -->
 
-**Version 2.6 · Effective 24 Deireadh Fómhair 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
+**Version 2.7 · Effective 24 Deireadh Fómhair 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
 
 **In short.** Ní mór duit a bheith 18 mbliana d'aois nó os a chionn. Tógann Dialectical Engine argóintí le samhlacha IS agus d'fhéadfadh gach rud a ghineann sé a bheith mícheart — ní comhairle é. Bíonn do dhíospóireachtaí príobháideach mura bhfoilsíonn tú iad; má fhoilsíonn tú iad, is féidir le duine ar bith iad a léamh. Seoltar téacs a chuireann tú isteach chuig soláthraithe IS atá liostaithe inár gClár Soláthraithe, agus ní úsáidtear é chun samhlacha a oiliúint. Tuairiscigh ábhar neamhdhleathach ag support@dezbatere.ro cibé acu atá cuntas agat nó nach bhfuil. Is é dlí na Rómáine an dlí rialaithe, ach coimeádann tú do chosaintí áitiúla tomhaltóra.
 
@@ -127,6 +127,8 @@ Mura bhfuil tú cinnte an gceadaítear rud éigin, cuir ceist orainn sula gcuire
 **Trí rud éagsúla.** Ní hionann "gan a bheith úsáidte chun samhlacha a oiliúint", "a bheith coinnithe ar feadh tréimhse teoranta ar mhaithe le slándáil, cosc ar mhí-úsáid nó cúiseanna dlíthiúla", agus "coinneáil nialasach sonraí — gan a bheith buanchoinnithe tar éis próiseála". Sa chás ina gcoinníonn soláthraí leideanna ar feadh tréimhse teoranta, deir an Clár cé chomh fada agus cén fáth. Sa chás ina bhfuil coinneáil nialasach sonraí gníomhach, deir an Clár amhlaidh, agus sonraítear ann na gnéithe lena mbaineann. Ní inseoimid duit nach gcoinnítear ábhar nuair a choinnítear é.
 
 **Aschuir.** Sa chaidreamh idir tú féin agus sinne, féadfaidh tú aschur do dhíospóireachtaí féin a úsáid chun aon chríche dleathaí, agus ní éilímid úinéireacht ar théacs ginte. Tabhair faoi deara go bhféadfadh sé nach mbeadh aschur ginte incháilithe do chosaint cóipchirt i mórán dlínsí; go bhféadfaí aschur cosúil leis a ghiniúint d'úsáideoirí eile; go bhféadfadh aschuir ábhar tríú páirtí a atáirgeadh nó a bheith cosúil leis; agus go bhféadfadh srianta ar athúsáid a bheith ag gabháil le roinnt bunábhair a aisghabhann soláthraí IS. Tá tú freagrach as seiceáil sula mbraitheann tú ar aschuir nó sula n-athfhoilsíonn tú iad.
+
+**Cairteacha agus staitisticí a ghinimid.** Is é Dialectical Engine a chruthaíonn na cairteacha i dtuarascáil díospóireachta agus na staitisticí a thiomsaímid dóibh — a roghnú, a socrú, a ndearadh agus a líníocht — agus is le DMS Merchandise Shop S.R.L. iad; tá an fógra "Copyrighted by DMS Merchandise Shop SRL" ar gach cairt. Ní bhaineann sé seo leis na figiúirí a thaispeánann cairt, a thagann ó do dhíospóireacht, ná le téacs do dhíospóireachta. Deonaímid ceadúnas saor in aisce, domhanda, neamheisiach agus suthain duit chun na cairteacha sin a úsáid, a chóipeáil agus a chomhroinnt chun aon chríche dleathaí, ar choinníoll go gcoinníonn tú an fógra agus an lipéad gur ghin IS iad in éineacht leo. Sa chás nach n-aithníonn an dlí cearta in ábhar a ghin IS, ní thugann an mhír seo níos mó dúinn ná mar a cheadaíonn an dlí.
 
 ## 9. Díospóireacht a fhoilsiú
 
