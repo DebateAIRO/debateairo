@@ -3,6 +3,7 @@ import { createSupportModelAdapter, type SupportModelTarget } from "../support/m
 import { judgeCallValue } from "../publication-check/verdict.js";
 import { type QuestionCheckFailureCode } from "./contract.js";
 import { questionCheckContract } from "./instruction.js";
+import type { QuestionSubjects } from "./subjects.js";
 
 export const QUESTION_CHECK_MODEL = "claude-haiku-5-5";
 const ADAPTER_BACKSTOP_MARGIN_MS = 10_000;
@@ -28,9 +29,9 @@ export class QuestionCheckFailure extends Error {
   }
 }
 
-export function buildQuestionCheckPacket(questionLine: string): { packet: PromptPacket; expectedCall: string } {
+export function buildQuestionCheckPacket(questionLine: string, subjects: QuestionSubjects): { packet: PromptPacket; expectedCall: string } {
   const framed = buildFramedPrompt({
-    contract: questionCheckContract(),
+    contract: questionCheckContract(subjects),
     material: [{ name: "question", content: questionLine }]
   });
   return { packet: framed.packet, expectedCall: judgeCallValue(framed.fence) };

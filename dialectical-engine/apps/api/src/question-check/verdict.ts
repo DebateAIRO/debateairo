@@ -1,8 +1,7 @@
-import { QUESTION_CHECK_LABELS, type QuestionCheckLabel } from "./contract.js";
 import { judgeCallValue } from "../publication-check/verdict.js";
 
 export type QuestionCheckAnswer =
-  | { ok: true; label: QuestionCheckLabel }
+  | { ok: true; subject: string; healthy: boolean }
   | { ok: false; code: "QUESTION_CHECK_ANSWER_NOT_JSON" | "QUESTION_CHECK_ANSWER_SCHEMA" };
 
 /** Copy of publication-check/verdict.ts:34-58: JSON.parse alone hides repeated keys. */
@@ -29,7 +28,8 @@ function repeatsAKey(json: string): boolean {
   return false;
 }
 
-export function parseQuestionCheckAnswer(text: string, expectedCall: string): QuestionCheckAnswer {
+/** `subject` is one of `subjectIds` or "NONE"; NONE is always healthy (V, 2026-10-28). */
+export function parseQuestionCheckAnswer(text: string, expectedCall: string, subjectIds: readonly string[]): QuestionCheckAnswer {
   let source = text.trim();
   if (source.startsWith("```")) {
     const match = /^```(?:json)?\r?\n([^]*?)\r?\n```$/u.exec(source);
@@ -43,7 +43,8 @@ export function parseQuestionCheckAnswer(text: string, expectedCall: string): Qu
     return { ok: false, code: "QUESTION_CHECK_ANSWER_SCHEMA" };
   }
   const object = value as Record<string, unknown>;
-  if (Object.keys(object).length !== 2 || !Object.hasOwn(object, "call") || !Object.hasOwn(object, "label")) {
+  if (Object.keys(object).length !== 3 || !Object.hasOwn(object, "call") || !Object.hasOwn(object, "subject")
+    || !Object.hasOwn(object, "healthy")) {
     return { ok: false, code: "QUESTION_CHECK_ANSWER_SCHEMA" };
   }
   try {
@@ -54,8 +55,9 @@ export function parseQuestionCheckAnswer(text: string, expectedCall: string): Qu
   if (typeof object.call !== "string" || !/^[0-9a-f]{32}$/u.test(object.call) || object.call !== expectedCall) {
     return { ok: false, code: "QUESTION_CHECK_ANSWER_SCHEMA" };
   }
-  if (typeof object.label !== "string" || !(QUESTION_CHECK_LABELS as readonly string[]).includes(object.label)) {
+  if (typeof object.healthy !== "boolean" || typeof object.subject !== "string"
+    || !(object.subject === "NONE" ? object.healthy : subjectIds.includes(object.subject))) {
     return { ok: false, code: "QUESTION_CHECK_ANSWER_SCHEMA" };
   }
-  return { ok: true, label: object.label as QuestionCheckLabel };
+  return { ok: true, subject: object.subject, healthy: object.healthy };
 }

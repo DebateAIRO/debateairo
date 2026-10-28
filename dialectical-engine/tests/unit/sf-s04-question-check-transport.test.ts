@@ -5,6 +5,7 @@ import type { SupportModelTarget } from "../../apps/api/src/support/model.js";
 const adapter = vi.hoisted(() => ({ create: vi.fn() }));
 vi.mock("../../apps/api/src/support/model.js", () => ({ createSupportModelAdapter: adapter.create }));
 import { QUESTION_CHECK_MODEL, buildQuestionCheckPacket, createQuestionCheckTransport, questionCheckTarget } from "../../apps/api/src/question-check/transport.js";
+import { readQuestionSubjects } from "../../apps/api/src/question-check/subjects.js";
 
 const target: SupportModelTarget = {
   providerRef: "test-anthropic", baseUrl: "https://unit.example/v1/messages",
@@ -37,19 +38,19 @@ function port(fetchImplementation?: typeof fetch) {
     ...(fetchImplementation === undefined ? {} : { fetchImplementation })
   });
 }
-function packet() { return buildQuestionCheckPacket("q").packet; }
+function packet() { return buildQuestionCheckPacket("q", readQuestionSubjects()).packet; }
 
 describe("S04 question-check transport", () => {
   it("sends the question line as its only material, byte for byte", () => {
     const questionLine = "  why\n😕  ";
-    const { packet } = buildQuestionCheckPacket(questionLine);
+    const { packet } = buildQuestionCheckPacket(questionLine, readQuestionSubjects());
     const fields = JSON.parse(packet.messages[1]!.content.split("\n")[1]!).fields;
     expect(fields).toEqual([{ name: "question", content: questionLine }]);
     expect(Buffer.compare(Buffer.from(fields[0].content), Buffer.from(questionLine))).toBe(0);
   });
   it("uses the prompt door and a fresh boundary marker per call", () => {
-    const first = buildQuestionCheckPacket("same");
-    const second = buildQuestionCheckPacket("same");
+    const first = buildQuestionCheckPacket("same", readQuestionSubjects());
+    const second = buildQuestionCheckPacket("same", readQuestionSubjects());
     expect(() => assertFramedPrompt(first.packet)).not.toThrow();
     expect(() => assertFramedPrompt(second.packet)).not.toThrow();
     expect(first.expectedCall).toMatch(/^[0-9a-f]{32}$/u);
@@ -70,7 +71,7 @@ describe("S04 question-check transport", () => {
       fetchImplementation: successFetch,
       reportDiagnostic
     });
-    await transport.complete({ packet: buildQuestionCheckPacket("¿por qué?").packet, signal: new AbortController().signal });
+    await transport.complete({ packet: buildQuestionCheckPacket("¿por qué?", readQuestionSubjects()).packet, signal: new AbortController().signal });
     expect(JSON.parse(String(vi.mocked(successFetch).mock.calls[0]?.[1]?.body)).language).toBe("en");
     expect(adapter.create.mock.calls[0]?.[1].timeoutMs).toBe(25000);
     adapter.create.mock.calls[0]?.[1].reportDiagnostic({ code: "SENTINEL" });

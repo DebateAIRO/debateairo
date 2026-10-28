@@ -1,29 +1,27 @@
 import type { PromptContract } from "@debateai/providers";
+import type { QuestionSubject, QuestionSubjects } from "./subjects.js";
 
-export const QUESTION_CHECK_CONTRACT_ID = "question.start-check.v1";
+export const QUESTION_CHECK_CONTRACT_ID = "question.start-check.v2";
 
-/** S04-R6 row 3 as V ruled on 2026-10-27, replacing V-58's carve-out: wars and other force against people do not start a
- * debate, whoever would use it; history and defence policy that ask for no force still start. */
-export const QUESTION_CHECK_ROW_3_TEXT = "this includes a question that asks whether a state, an army, the police, an armed group or anyone else should go to war, invade, strike, bomb, shoot or otherwise use force or weapons against people, such as \"Should NATO strike Russian bases?\", \"Should police use rubber bullets?\" or \"Should Iranian protesters take up arms against the regime?\", whatever its political aim; a question about past violence as a subject of history, law or ethics that asks no one whether or how to harm anyone, such as \"Was the bombing of Hiroshima justified?\", is not this label, and neither is a question about defence, security or foreign policy that asks no one whether to use force against people, such as \"Should Romania raise defence spending?\"";
+function subjectLine(subject: QuestionSubject): string {
+  const examples = (list: readonly string[]) => list.length === 0 ? [] : [`Examples: ${list.join(" | ")}.`];
+  return [
+    `${subject.id}: Not healthy: ${subject.notHealthy}`, ...examples(subject.examplesNotHealthy),
+    ...(subject.healthy === null ? [] : [`Still healthy: ${subject.healthy}`, ...examples(subject.examplesHealthy)])
+  ].join(" ");
+}
 
-/** The crime row (V, 2026-10-27): refused at the start and not kept; a question whether a law should change still starts. */
-export const QUESTION_CHECK_CRIME_ROW_TEXT = "CRIME: The question asks how to commit a crime or get away with one, or whether the asker or someone else should commit one, such as buying or selling drugs or weapons illegally, stealing or evading tax; a question about whether a law should change, such as \"Should Romania legalise cannabis?\" or \"Should civilians be allowed to own guns?\", is not this label.";
-
-export function questionCheckContract(): PromptContract {
+/** V, 2026-10-28: the model names the question's subject from the subjects file, or NONE, and whether it is healthy. */
+export function questionCheckContract(subjects: QuestionSubjects): PromptContract {
+  const ids = subjects.map(subject => subject.id);
   return {
     contractId: QUESTION_CHECK_CONTRACT_ID,
     instruction: [
-      "Read the question line and select exactly one label. A question counts whether its wording is explicit or indirect. Use the first row that applies, in this order:",
-      "OWN_CRISIS: The question reads as its asker, or someone close to them, thinking about ending their life or harming themselves.",
-      "METHODS_OR_ENCOURAGEMENT: The question asks for methods, means, doses or places of suicide or self-harm, or for encouragement to do it.",
-      `HARM_TO_OTHERS: The question threatens, plans, or asks whether or how to hurt, kill or poison another person or other people, whether or not it names or identifies anyone, including carrying out an attack on unnamed people (terrorism); ${QUESTION_CHECK_ROW_3_TEXT}.`,
-      "WEAPONS_DRUGS_TERRORISM: The question asks how to make weapons, explosives, poisons or drugs, or how to support a terrorist act, or praises one; a question about carrying out an attack on people is HARM_TO_OTHERS.",
-      QUESTION_CHECK_CRIME_ROW_TEXT,
-      "HATE_SPEECH: The question uses hate speech: it attacks, demeans or incites hatred against people because of who they are, or asks for content that does.",
-      "RELIGIOUS_INSULT: The question uses religious insult: it insults or mocks a religion, its believers or what they hold sacred, or asks for content that does.",
-      "SENSITIVE_TOPIC: The question treats suicide, self-harm, euthanasia or assisted dying as a subject of law, ethics, medicine or public health.",
-      "ORDINARY: The question fits none of the rows above."
+      "Read the question line. Name the one subject below that the question is about, or NONE if it is about none of them, and decide whether the question is healthy. A question counts whether its wording is explicit or indirect.",
+      "A question about a subject is healthy unless it is what that subject's 'Not healthy' line describes; a subject with no 'Still healthy' part has no healthy questions. If several subjects fit, name the first one in this order whose 'Not healthy' line applies, or else the first that fits:",
+      ...subjects.map(subjectLine),
+      "A question about NONE of these subjects is healthy."
     ].join("\n"),
-    answerForm: 'A single JSON object and nothing else: {"call":"<the 32 hexadecimal characters of this call\'s boundary marker>","label":"<one code>"}'
+    answerForm: `A single JSON object and nothing else: {"call":"<the 32 hexadecimal characters of this call's boundary marker>","subject":"<one of ${ids.join(", ")}, or NONE>","healthy":true or false}`
   };
 }

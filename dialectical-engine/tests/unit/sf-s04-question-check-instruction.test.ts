@@ -1,64 +1,69 @@
 import { describe, expect, it } from "vitest";
 
-const labels = [
-  "OWN_CRISIS", "METHODS_OR_ENCOURAGEMENT", "HARM_TO_OTHERS", "WEAPONS_DRUGS_TERRORISM", "CRIME",
-  "HATE_SPEECH", "RELIGIOUS_INSULT", "SENSITIVE_TOPIC", "ORDINARY"
-] as const;
-
 const instructionModule = () => import("../../apps/api/src/question-check/instruction.js");
+const subjectsModule = () => import("../../apps/api/src/question-check/subjects.js");
 
-describe("S04 question-check instruction", () => {
-  // Property: each outcome available to the parser is named for the model.
-  it.each(labels)("names the label %s", async (label) => {
-    const { questionCheckContract } = await instructionModule();
-    expect(questionCheckContract().instruction).toContain(label);
+async function built() {
+  const { questionCheckContract } = await instructionModule();
+  const { readQuestionSubjects } = await subjectsModule();
+  const subjects = readQuestionSubjects();
+  return { subjects, contract: questionCheckContract(subjects) };
+}
+
+describe("S04 question-check instruction, built from the subjects file (V, 2026-10-28)", () => {
+  // Property: the model sees every subject of the file, in the file's order (the first that applies wins).
+  it("names every subject id in file order", async () => {
+    const { subjects, contract } = await built();
+    const at = subjects.map(subject => contract.instruction.indexOf(`\n${subject.id}: `));
+    expect(at.every((value, index) => value >= 0 && (index === 0 || value > at[index - 1]!))).toBe(true);
   });
 
-  // Property: the instruction carries V's two extra refusal categories.
-  it("names V's words 'hate speech' and 'religious insult'", async () => {
-    const { questionCheckContract } = await instructionModule();
-    expect(questionCheckContract().instruction).toContain("hate speech");
-    expect(questionCheckContract().instruction).toContain("religious insult");
+  // Property: what is and is not healthy within a subject reaches the model word for word, with its examples.
+  it("carries each subject's not-healthy and healthy lines and its examples", async () => {
+    const { subjects, contract } = await built();
+    for (const subject of subjects) {
+      expect(contract.instruction).toContain(subject.notHealthy);
+      if (subject.healthy !== null) expect(contract.instruction).toContain(subject.healthy);
+      for (const example of [...subject.examplesNotHealthy, ...subject.examplesHealthy]) expect(contract.instruction).toContain(example);
+    }
   });
 
-  // Property: indirect wording is judged by the same rules as explicit wording.
-  it("states that indirect wording counts", async () => {
-    const { questionCheckContract } = await instructionModule();
-    expect(questionCheckContract().instruction).toMatch(/explicit or indirect/u);
+  // Property: V's MDMA pair is in front of the model on the sides V put it.
+  it("shows V's MDMA examples on V's sides of the drugs line", async () => {
+    const { contract } = await built();
+    const drugsLine = contract.instruction.split("\n").find(line => line.startsWith("DRUGS: "))!;
+    expect(drugsLine.indexOf("How do I make MDMA?")).toBeLessThan(drugsLine.indexOf("Still healthy:"));
+    expect(drugsLine.indexOf("Should I take MDMA?")).toBeGreaterThan(drugsLine.indexOf("Still healthy:"));
   });
 
-  // Property: wars and other force against people are refused at the start whoever would use it (V 2026-10-27,
-  // replacing V-58's carve-out); history and defence policy that ask for no force still start.
-  it("carries row 3's text on wars, history and defence policy exactly", async () => {
-    const { QUESTION_CHECK_ROW_3_TEXT, questionCheckContract } = await instructionModule();
-    const specSpan = "this includes a question that asks whether a state, an army, the police, an armed group or anyone else should go to war, invade, strike, bomb, shoot or otherwise use force or weapons against people, such as \"Should NATO strike Russian bases?\", \"Should police use rubber bullets?\" or \"Should Iranian protesters take up arms against the regime?\", whatever its political aim; a question about past violence as a subject of history, law or ethics that asks no one whether or how to harm anyone, such as \"Was the bombing of Hiroshima justified?\", is not this label, and neither is a question about defence, security or foreign policy that asks no one whether to use force against people, such as \"Should Romania raise defence spending?\"";
-    expect(QUESTION_CHECK_ROW_3_TEXT).toBe(specSpan);
-    expect(questionCheckContract().instruction).toContain(QUESTION_CHECK_ROW_3_TEXT);
-    expect(questionCheckContract().instruction).not.toContain("is not this label, and neither is a question about violence as a subject of politics");
+  // Property: a help-numbers subject offers the model no healthy part.
+  it("gives a help-numbers subject no 'Still healthy' part", async () => {
+    const { contract } = await built();
+    for (const id of ["OWN_CRISIS", "SUICIDE_METHODS"]) {
+      expect(contract.instruction.split("\n").find(line => line.startsWith(`${id}: `))).not.toContain("Still healthy:");
+    }
   });
 
-  // Property: crime questions are refused at the start (V 2026-10-27); questions whether a law should change still start.
-  it("carries the crime row exactly, after the weapons row", async () => {
-    const { QUESTION_CHECK_CRIME_ROW_TEXT, questionCheckContract } = await instructionModule();
-    expect(QUESTION_CHECK_CRIME_ROW_TEXT).toBe("CRIME: The question asks how to commit a crime or get away with one, or whether the asker or someone else should commit one, such as buying or selling drugs or weapons illegally, stealing or evading tax; a question about whether a law should change, such as \"Should Romania legalise cannabis?\" or \"Should civilians be allowed to own guns?\", is not this label.");
-    const text = questionCheckContract().instruction;
-    expect(text).toContain(`\n${QUESTION_CHECK_CRIME_ROW_TEXT}\n`);
-    expect(text.indexOf("CRIME:")).toBeGreaterThan(text.indexOf("WEAPONS_DRUGS_TERRORISM:"));
+  // Property: indirect wording is judged by the same rules as explicit wording, and the order rule is stated.
+  it("states that indirect wording counts and that the first applicable subject wins", async () => {
+    const { contract } = await built();
+    expect(contract.instruction).toMatch(/explicit or indirect/u);
+    expect(contract.instruction).toMatch(/first .* whose 'Not healthy' line applies/u);
+    expect(contract.instruction).toMatch(/NONE of these subjects is healthy/u);
   });
 
-  // Property: the first applicable label wins in the SPEC's priority order.
-  it("lists the nine codes in the SPEC's order", async () => {
-    const { questionCheckContract } = await instructionModule();
-    const text = questionCheckContract().instruction;
-    const locations = labels.map((label) => text.indexOf(label));
-    expect(locations.every((at, index) => at >= 0 && (index === 0 || at > locations[index - 1]!))).toBe(true);
+  // Property: the model answers with the subject (or NONE) and whether the question is healthy.
+  it("asks for the subject, NONE and healthy in the answer form", async () => {
+    const { contract } = await built();
+    expect(contract.answerForm).toContain('"subject":');
+    expect(contract.answerForm).toContain("NONE");
+    expect(contract.answerForm).toContain('"healthy":true or false');
+    expect(contract.answerForm).toContain('{"call":');
   });
 
   // Property: no interface metadata is requested as model material.
-  it("holds no interface language, country or account placeholder", async () => {
-    const { questionCheckContract } = await instructionModule();
-    const contract = questionCheckContract();
+  it("holds no placeholder in the instruction", async () => {
+    const { contract } = await built();
     expect(contract.instruction).not.toMatch(/\{[^}]+\}/u);
-    expect(contract.answerForm).toContain('{"call":');
   });
 });
