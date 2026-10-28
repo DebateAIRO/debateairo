@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ukratko
-eyebrow: UVJETI KORIŠTENJA · v2.5 · NA SNAZI OD 24. LISTOPADA 2026.
+eyebrow: UVJETI KORIŠTENJA · v2.6 · NA SNAZI OD 24. LISTOPADA 2026.
 title: Na što pristajete
 lede: Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.
-endMarker: KRAJ UVJETA · v2.5
+endMarker: KRAJ UVJETA · v2.6
 bodyLabel: Tekst Uvjeta korištenja
 annexTitle: Prilog A — Regionalni uvjeti
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 MJERODAVNO PRAVO
 -->
 
-**Version 2.5 · Effective 24. listopada 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
+**Version 2.6 · Effective 24. listopada 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
 
 **In short.** Morate imati najmanje 18 godina. Dialectical Engine izrađuje argumente pomoću modela umjetne inteligencije i sve što generira može biti pogrešno — to nije savjet. Vaše su rasprave privatne osim ako ih objavite; ako ih objavite, svatko ih može pročitati. Tekst koji pošaljete prosljeđuje se pružateljima usluga umjetne inteligencije navedenima u našem Registru pružatelja i ne upotrebljava se za treniranje modela. Nezakonit sadržaj prijavite na support@dezbatere.ro, bez obzira na to imate li račun. Primjenjuje se rumunjsko pravo, ali zadržavate zaštitu potrošača prema svojem lokalnom pravu.
 
@@ -119,6 +119,8 @@ Ako niste sigurni je li nešto dopušteno, obratite nam se prije objavljivanja.
 **Kako vaš sadržaj dolazi do pružatelja usluga umjetne inteligencije.** Radi provedbe rasprave šaljemo tekst jednom ili više vanjskih pružatelja modela. Pružatelj prima vaše pitanje, usmjeravajuće bilješke koje ste postavili i izjave koje sustav sastavlja tijekom rasprave — stoga pružatelj vidi tekst izveden iz onoga što ste upisali i izgrađen oko toga, a ne samo vaše izvorne riječi. Nikada ne prima vašu adresu e-pošte, identifikatore računa, zapise o sesijama ni podatke o plaćanju.
 
 **Što šalje chat za podršku.** Pomoćnik za podršku također je model umjetne inteligencije. Kada mu pišete, vašu poruku šaljemo vanjskom pružatelju modela kako bi model mogao odgovoriti, zajedno s člancima pomoći na kojima temelji odgovor. Prije slanja maskiramo sve što izgleda kao lozinka, jednokratni kôd ili ključ. Ako zatražite razgovor s osobom, modelu šaljemo i razgovor, maskiran na isti način, kako bi napisao kratak sažetak za člana našeg tima koji preuzima vaš slučaj. Ne prilažemo vašu adresu e-pošte, identifikatore računa ni podatke o plaćanju, ali model prima sve ostalo što upišete u chat, stoga ondje ne pišite ništa što ne biste htjeli da pročita.
+
+**Pretraživanje interneta putem usluge Perplexity.** Kako bi pronašli dokaze za raspravu, modeli mogu pretraživati internet putem usluge **Perplexity** (Perplexity AI, Inc., Sjedinjene Američke Države), koja je navedena u Registru pružatelja usluga umjetne inteligencije. Perplexity prima upite za pretraživanje koje modeli sastavljaju iz rasprave — stoga, kao i pružatelj modela, vidi tekst izgrađen oko onoga što ste upisali. Nikada ne prima vašu adresu e-pošte, identifikatore računa, zapise o sesijama ni podatke o plaćanju.
 
 **Koji pružatelji i gdje.** Naš **Registar pružatelja usluga umjetne inteligencije** na dezbatere.ro/providers sastavni je dio ovih Uvjeta. U njemu je za svakog pružatelja kojeg možemo upotrebljavati navedeno: njegov pravni subjekt i država; što prima i zašto; gdje obrađuje podatke; njegovi rokovi čuvanja; je li za krajnju točku koju upotrebljavamo aktivirano nulto zadržavanje podataka; smije li prema našem ugovoru upotrebljavati ulazne podatke za treniranje; mehanizam prijenosa na koji se oslanjamo; i datum posljednje provjere svakog unosa. Pružatelji se mogu nalaziti izvan vaše države i izvan Europskoga gospodarskog prostora. Naša Pravila o privatnosti objašnjavaju zaštitne mjere.
 

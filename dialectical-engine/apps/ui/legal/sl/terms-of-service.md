@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Na kratko
-eyebrow: POGOJI UPORABE · v2.5 · VELJAVNI OD 24. OKTOBRA 2026
+eyebrow: POGOJI UPORABE · v2.6 · VELJAVNI OD 24. OKTOBRA 2026
 title: S čim soglašate
 lede: Pogodba med vami in družbo DMS Merchandise Shop S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.
-endMarker: KONEC POGOJEV · v2.5
+endMarker: KONEC POGOJEV · v2.6
 bodyLabel: Besedilo Pogojev uporabe
 annexTitle: Priloga A — Regionalni pogoji
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAVO, KI SE UPORABLJA
 -->
 
-**Version 2.5 · Effective 24. oktobra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
+**Version 2.6 · Effective 24. oktobra 2026 · Prejšnje različice so na dezbatere.ro/terms/versions · Jezik: slovenščina.**
 
 **In short.** Stari morate biti najmanj 18 let. Dialectical Engine z modeli umetne inteligence oblikuje argumente in vse, kar ustvari, je lahko napačno — to ni nasvet. Vaše razprave so zasebne, razen če jih objavite; če jih objavite, jih lahko prebere vsakdo. Besedilo, ki ga pošljete, se posreduje ponudnikom umetne inteligence, navedenim v našem Registru ponudnikov, in se ne uporablja za učenje modelov. Nezakonito vsebino prijavite na support@dezbatere.ro, ne glede na to, ali imate račun. Uporablja se romunsko pravo, vendar ohranite varstvo potrošnikov po svojem lokalnem pravu.
 
@@ -119,6 +119,8 @@ Ta pravila veljajo za vsebino, ki jo pošljete in objavite, ter za način uporab
 **Kako vaša vsebina doseže ponudnike umetne inteligence.** Za izvedbo razprave pošljemo besedilo enemu ali več zunanjim ponudnikom modelov. Ponudnik prejme vaše vprašanje, usmerjevalne opombe, ki jih nastavite, in izjave, ki jih sistem sestavi med razpravo — ponudnik torej vidi besedilo, izpeljano iz tega, kar ste vnesli, in zgrajeno okoli tega, ne samo vaših izvirnih besed. Nikoli ne prejme vašega e-poštnega naslova, identifikatorjev računa, zapisov o sejah ali podatkov o plačilu.
 
 **Kaj pošlje klepet s podporo.** Tudi pomočnik za podporo je model umetne inteligence. Ko mu pišete, vaše sporočilo pošljemo zunanjemu ponudniku modelov, da lahko model odgovori, skupaj s članki pomoči, na katerih temelji njegov odgovor. Pred pošiljanjem zakrijemo vse, kar je videti kot geslo, enkratna koda ali ključ. Če zaprosite za pogovor z osebo, modelu pošljemo tudi pogovor, zakrit na enak način, da napiše kratek povzetek za člana naše ekipe, ki prevzame vaš primer. Ne priložimo vašega e-poštnega naslova, identifikatorjev računa ali podatkov o plačilu, vendar model prejme vse drugo, kar vpišete v klepet, zato tja ne pišite ničesar, česar ne bi želeli, da prebere.
+
+**Spletno iskanje prek storitve Perplexity.** Da bi našli dokaze za razpravo, lahko modeli iščejo po spletu prek storitve **Perplexity** (Perplexity AI, Inc., Združene države), ki je navedena v Registru ponudnikov umetne inteligence. Perplexity prejme iskalne poizvedbe, ki jih modeli sestavijo iz razprave — tako kot ponudnik modelov torej vidi besedilo, zgrajeno okoli tega, kar ste vnesli. Nikoli ne prejme vašega e-poštnega naslova, identifikatorjev računa, zapisov o sejah ali podatkov o plačilu.
 
 **Kateri ponudniki in kje.** Naš **Register ponudnikov umetne inteligence** na dezbatere.ro/providers je del teh Pogojev. Za vsakega ponudnika, ki ga lahko uporabimo, navaja: njegovo pravno osebo in državo; kaj prejme in zakaj; kje obdeluje podatke; njegove pogoje hrambe; ali je za končno točko, ki jo uporabljamo, vključena ničelna hramba podatkov; ali sme po naši pogodbi uporabljati vhodne podatke za učenje; mehanizem prenosa, na katerega se opiramo; in datum zadnjega preverjanja vsakega vnosa. Ponudniki so lahko zunaj vaše države in zunaj Evropskega gospodarskega prostora. Naš Pravilnik o zasebnosti pojasnjuje zaščitne ukrepe.
 

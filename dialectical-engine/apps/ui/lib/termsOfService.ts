@@ -134,6 +134,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "We do not train on your content. We use AI providers only under terms that do not allow them to use your content to train or improve their models; the Provider Register shows, for each provider, whether we have confirmed this, and when." },
       { kind: "p", text: "How your content reaches AI providers. To run a debate we send text to one or more external model providers. What a provider receives is your question, the steering annotations you set, and statements the engine composes during the debate — so a provider sees text derived from and built around what you typed, not only your original words. It never receives your email address, your account identifiers, your session records or your payment details." },
       { kind: "p", text: "What the support chat sends. The support assistant is also an AI model. When you write to it, we send your message to an external model provider so the model can answer, together with the help articles it bases its answer on. Before sending, we mask anything that looks like a password, a one-time code or a key. If you ask to speak to a person, we also send the conversation, masked the same way, to the model so it can write a short summary for the member of our team who takes your case. We do not attach your email address, your account identifiers or your payment details, but the model receives anything else you type in the chat, so do not write there anything you would not want it to read." },
+      { kind: "p", text: "Web search through Perplexity. To find evidence for a debate, the models may search the web through Perplexity (Perplexity AI, Inc., United States), which is listed in the Provider Register. What Perplexity receives is the search questions the models write from the debate — so, like a model provider, it sees text built around what you typed. It never receives your email address, your account identifiers, your session records or your payment details." },
       { kind: "p", text: "Which providers, and where. Our AI Provider Register at dezbatere.ro/providers is part of these Terms. It lists each provider we may use: its legal entity and country; what it receives and why; where it processes; its retention terms; whether zero-data-retention is active for the endpoint we use; whether it may use inputs for training under our contract; the transfer mechanism we rely on; and the date we last verified each entry. Providers may be located outside your country and outside the European Economic Area. Our Privacy Policy explains the safeguards." },
       { kind: "p", text: "Three different things. \"Not used to train models\", \"retained for a limited period for security, abuse prevention or legal reasons\", and \"zero data retention — not persisted after processing\" are different. Where a provider retains prompts for a limited period, the Register says how long and why. Where zero-data-retention is active, the Register says so, and for which features. We will not tell you content is unretained when it is not." },
       { kind: "p", text: "Outputs. As between you and us, you may use the output of your own debates for any lawful purpose, and we do not claim ownership of generated text. Be aware that generated output may not be protectable by copyright in many jurisdictions; that similar output may be generated for other users; that outputs may reproduce or resemble third-party material; and that some source material an AI provider retrieves may carry restrictions on reuse. You are responsible for checking before you rely on or republish outputs." }
@@ -353,12 +354,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.5",
-  sha256: "e6fe4e6897c5c4aa03214da2e79954c8903fe8fe2d3c2785a000357618d3b195",
-  eyebrow: "TERMS OF SERVICE · v2.5 · EFFECTIVE 24 OCTOBER 2026",
+  version: "2.6",
+  sha256: "27e7229ee49faffd2cdf5eb609acc1b4ad5ea95c4e5c36bd057867de492b33ab",
+  eyebrow: "TERMS OF SERVICE · v2.6 · EFFECTIVE 24 OCTOBER 2026",
   title: "What you agree to",
   lede: "The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.",
-  endMarker: "END OF TERMS · v2.5",
+  endMarker: "END OF TERMS · v2.6",
   contact: "support@dezbatere.ro",
   bodyLabel: "Terms of Service text",
   sectionIdPrefix: "terms-section-",

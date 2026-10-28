@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Īsumā
-eyebrow: PRIVĀTUMA POLITIKA · v3.6 · SPĒKĀ NO 2026. GADA 24. OKTOBRA
+eyebrow: PRIVĀTUMA POLITIKA · v3.7 · SPĒKĀ NO 2026. GADA 24. OKTOBRA
 title: Ko mēs glabājam un kāpēc
 lede: Jūsu tiesības un mūsu pienākumi saskaņā ar GDPR (EU) 2016/679, izklāstīti vienkāršā valodā. Četrpadsmit sadaļas un B pielikums — ritiniet līdz beigām.
-endMarker: POLITIKAS BEIGAS · GDPR (EU) 2016/679 · v3.6
+endMarker: POLITIKAS BEIGAS · GDPR (EU) 2016/679 · v3.7
 bodyLabel: Privātuma politikas teksts
 annexTitle: B pielikums — Reģionālie privātuma noteikumi
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 SĪKDATNES
 -->
 
-**Version 3.6 · Effective 2026. gada 24. oktobris · Iepriekšējās versijas: dezbatere.ro/privacy/versions · Pārzinis: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.7 · Effective 2026. gada 24. oktobris · Iepriekšējās versijas: dezbatere.ro/privacy/versions · Pārzinis: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Mēs vācam konta darbībai nepieciešamo informāciju un to, ko izvēlaties ievadīt. Jūsu jautājumi tiek nosūtīti mūsu Reģistrā norādītajiem MI pakalpojumu sniedzējiem; tie netiek izmantoti modeļu apmācībai. Mūsu mitināšanas pakalpojumu sniedzējs glabā jūsu kontu un debates Londonā, Apvienotajā Karalistē; 5. sadaļā norādīts, uz kurieni jūsu dati tiek nosūtīti vēl. Debates ir privātas, ja vien jūs tās nepublicējat. Dzēšot kontu, tiek iznīcinātas jūsu privāto datu atslēgas; plānojot dzēšanu, jūs izvēlaties, vai arī publicētās debates tiks noņemtas vai paliks publiskas ar jūsu vairs neizmantoto pseidonīmu. Varat ar mums sazināties, rakstot uz privacy@dezbatere.ro, un debatēs minētās personas var pieprasīt satura noņemšanu arī bez konta.
 
@@ -87,7 +87,9 @@ Mēs jūs neprofilējam, neizmantojam jūsu datus reklāmai un tos nepārdodam. 
 
 **Kas tiek nosūtīts.** Lai vadītu debates, mēs nosūtām tekstu vienam vai vairākiem ārējiem MI pakalpojumu sniedzējiem: jūsu jautājumu, jūsu iestatītās vadības piezīmes un apgalvojumus, kurus dzinējs izveido debašu gaitā. Tādējādi pakalpojumu sniedzējs redz tekstu, kas ir atvasināts no jūsu ievadītā satura un veidots ap to. Ja izmantojat atbalsta sarunu, tas, ko tajā ievadāt, tiek nosūtīts atbalsta sarunas modelim. Pakalpojumu sniedzējs nekad nesaņem jūsu e-pasta adresi, konta vai sesijas identifikatorus, IP adresi vai maksājumu datus.
 
-**Kuri pakalpojumu sniedzēji.** Tie ir norādīti mūsu **MI pakalpojumu sniedzēju reģistrā** vietnē dezbatere.ro/providers, kas ir šīs politikas daļa. Reģistrs attiecas uz ikvienu lietotāju neatkarīgi no tā, kur jūs dzīvojat. Par katru pakalpojumu sniedzēju tajā ir norādīta tā juridiskā persona un dibināšanas valsts; ko tas saņem un kādam nolūkam — debašu argumentu rakstīšanai, to vērtēšanai un pārbaudei, sprieduma stāsta rakstīšanai vai atbildēm jums atbalsta sarunā; valstis vai reģioni, kuros tas apstrādā datus; tā glabāšanas noteikumi un tas, vai mūsu izmantotajam galapunktam un funkcijām ir ieslēgts datu neglabāšanas režīms; vai saskaņā ar mūsu līgumu tas var izmantot ievaddatus apmācībai; mūsu izmantotais datu nosūtīšanas mehānisms; kā ar to sazināties saistībā ar jūsu datiem; kā arī katra ieraksta pēdējās pārbaudes datums. Pakalpojumu sniedzēji var mainīties; Reģistram ir versijas, un izmaiņas tajā tiek atzīmētas.
+**Meklēšana tīmeklī, izmantojot Perplexity.** Lai atrastu pierādījumus debatēm, modeļi var meklēt tīmeklī, izmantojot Perplexity, ko nodrošina Perplexity AI, Inc. Amerikas Savienotajās Valstīs. Perplexity saņem meklēšanas vaicājumus, ko modeļi uzraksta, balstoties uz debatēm, un tie var ietvert vārdus no jūsu jautājuma. Tāpat kā jebkurš MI pakalpojumu sniedzējs, Perplexity nekad nesaņem jūsu e-pasta adresi, konta vai sesijas identifikatorus, IP adresi vai maksājumu datus. Perplexity ir norādīts Reģistrā, un uz to attiecas tālāk aprakstītie datu nosūtīšanas noteikumi.
+
+**Kuri pakalpojumu sniedzēji.** Tie ir norādīti mūsu **MI pakalpojumu sniedzēju reģistrā** vietnē dezbatere.ro/providers, kas ir šīs politikas daļa. Reģistrs attiecas uz ikvienu lietotāju neatkarīgi no tā, kur jūs dzīvojat. Par katru pakalpojumu sniedzēju tajā ir norādīta tā juridiskā persona un dibināšanas valsts; ko tas saņem un kādam nolūkam — debašu argumentu rakstīšanai, to vērtēšanai un pārbaudei, sprieduma stāsta rakstīšanai, pierādījumu meklēšanai tīmeklī vai atbildēm jums atbalsta sarunā; valstis vai reģioni, kuros tas apstrādā datus; tā glabāšanas noteikumi un tas, vai mūsu izmantotajam galapunktam un funkcijām ir ieslēgts datu neglabāšanas režīms; vai saskaņā ar mūsu līgumu tas var izmantot ievaddatus apmācībai; mūsu izmantotais datu nosūtīšanas mehānisms; kā ar to sazināties saistībā ar jūsu datiem; kā arī katra ieraksta pēdējās pārbaudes datums. Pakalpojumu sniedzēji var mainīties; Reģistram ir versijas, un izmaiņas tajā tiek atzīmētas.
 
 **Apmācība un glabāšana ir atšķirīgas lietas.** MI pakalpojumu sniedzējus izmantojam tikai ar noteikumiem, kas neļauj tiem izmantot jūsu saturu savu modeļu apmācībai vai uzlabošanai; Reģistrā katram pakalpojumu sniedzējam ir norādīts, vai mēs to esam pārbaudījuši attiecībā uz savu kontu, un kad. Daži pakalpojumu sniedzēji ierobežotu laiku glabā uzvednes un atbildes drošības, ļaunprātīgas izmantošanas novēršanas vai savu juridisko pienākumu dēļ; Reģistrā ir norādīts, cik ilgi un kāpēc. Ja ir ieslēgts datu neglabāšanas režīms, Reģistrā tas ir norādīts, kā arī funkcijas, uz kurām tas attiecas. Mēs neapgalvosim, ka saturs netiek glabāts, ja tas neatbilst patiesībai.
 
@@ -215,7 +217,7 @@ Lai atteiktos no šiem elementiem, pārlūkprogrammas iestatījumos bloķējiet 
 
 Mainot šo politiku, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un jaunu spēkā stāšanās datumu un saglabājam iepriekšējās versijas vietnē dezbatere.ro/privacy/versions. Par izmaiņām, ar kurām tiek pievienots jauns nolūks vai jauns saņēmējs, mēs jūs informējam pa e-pastu un produktā pirms jaunās apstrādes sākšanas un dodam laiku iebilst. Ja jauns nolūks ir atkarīgs no jūsu piekrišanas — piemēram, ja mēs kādreiz vēlētos izmantot saturu modeļu uzlabošanai —, mēs šādu piekrišanu lūdzam atsevišķi un konkrēti; atjaunināto Noteikumu akceptēšanu mēs nekad neuzskatām par piekrišanu jaunai apstrādei. Ja precizējumi neko nemaina mūsu darbībās, mēs vienkārši publicējam jauno versiju.
 
-Šī politika pēdējo reizi atjaunināta 2026. gada 24. oktobrī. Versija 3.6 aizstāja versiju 3.5: 2. sadaļā tagad norādīts, ka, reģistrējoties, IP adreses valsts kopā ar jūsu izvēlēto reģionu arī nosaka, vai rādām atsevišķo apstiprinājuma rūtiņu attiecībā uz Itāliju.
+Šī politika pēdējo reizi atjaunināta 2026. gada 24. oktobrī. Versija 3.7 aizstāja versiju 3.6: 5. sadaļā tagad norādīts, ka modeļi var meklēt tīmeklī, izmantojot Perplexity, un ko Perplexity saņem. Versija 3.6 aizstāja versiju 3.5: 2. sadaļā tagad norādīts, ka, reģistrējoties, IP adreses valsts kopā ar jūsu izvēlēto reģionu arī nosaka, vai rādām atsevišķo apstiprinājuma rūtiņu attiecībā uz Itāliju.
 
 ## Annex B — Reģionālie privātuma noteikumi
 

@@ -134,6 +134,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Na vašom obsahu netrénujeme. Poskytovateľov umelej inteligencie využívame len za podmienok, ktoré im nedovoľujú používať váš obsah na trénovanie alebo zlepšovanie ich modelov; Register poskytovateľov umelej inteligencie pri každom poskytovateľovi uvádza, či sme to overili, a kedy." },
       { kind: "p", text: "Ako sa váš obsah dostáva k poskytovateľom umelej inteligencie. Na vedenie debaty posielame text jednému alebo viacerým externým poskytovateľom modelov. Poskytovateľ dostane vašu otázku, vami nastavené usmerňujúce poznámky a vyjadrenia, ktoré systém zostavuje v priebehu debaty — vidí teda text odvodený od toho, čo ste zadali, a vytvorený na tomto základe, nielen vaše pôvodné slová. Nikdy nedostane vašu e-mailovú adresu, identifikátory účtu, záznamy relácií ani platobné údaje." },
       { kind: "p", text: "Čo posiela chat podpory. Asistent podpory je tiež model umelej inteligencie. Keď mu napíšete, pošleme vašu správu externému poskytovateľovi modelov, aby model mohol odpovedať, spolu s článkami pomocníka, na ktorých zakladá svoju odpoveď. Pred odoslaním zamaskujeme všetko, čo vyzerá ako heslo, jednorazový kód alebo kľúč. Ak požiadate o rozhovor s človekom, pošleme modelu aj konverzáciu, zamaskovanú rovnakým spôsobom, aby napísal krátke zhrnutie pre člena nášho tímu, ktorý váš prípad prevezme. Neprikladáme vašu e-mailovú adresu, identifikátory účtu ani platobné údaje, model však dostane všetko ostatné, čo do chatu napíšete, preto tam nepíšte nič, čo by ste nechceli, aby si prečítal." },
+      { kind: "p", text: "Vyhľadávanie na webe prostredníctvom Perplexity. Aby našli dôkazy pre debatu, modely môžu vyhľadávať na webe prostredníctvom služby Perplexity (Perplexity AI, Inc., Spojené štáty), ktorá je uvedená v Registri poskytovateľov umelej inteligencie. Perplexity dostane vyhľadávacie dopyty, ktoré modely zostavia na základe debaty — podobne ako poskytovateľ modelov teda vidí text vytvorený na základe toho, čo ste zadali. Nikdy nedostane vašu e-mailovú adresu, identifikátory účtu, záznamy relácií ani platobné údaje." },
       { kind: "p", text: "Ktorí poskytovatelia a kde. Náš Register poskytovateľov umelej inteligencie na adrese dezbatere.ro/providers je súčasťou týchto Podmienok. Uvádza každého poskytovateľa, ktorého môžeme použiť: jeho právnickú osobu a krajinu; čo prijíma a prečo; kde údaje spracúva; jeho podmienky uchovávania; či je pre koncový bod, ktorý používame, aktívne nulové uchovávanie údajov; či smie podľa našej zmluvy používať vstupy na trénovanie; mechanizmus prenosu, o ktorý sa opierame; a dátum posledného overenia každej položky. Poskytovatelia sa môžu nachádzať mimo vašej krajiny a mimo Európskeho hospodárskeho priestoru. Naše Zásady ochrany osobných údajov vysvetľujú príslušné záruky." },
       { kind: "p", text: "Tri rozdielne veci. „Nepoužíva sa na trénovanie modelov“, „uchováva sa obmedzený čas z bezpečnostných dôvodov, na účely predchádzania zneužitiu alebo z právnych dôvodov“ a „nulové uchovávanie údajov — po spracovaní sa neukladajú“ sú rozdielne skutočnosti. Ak poskytovateľ uchováva zadania obmedzený čas, Register uvádza, ako dlho a prečo. Ak je aktívne nulové uchovávanie údajov, Register túto skutočnosť uvádza spolu s funkciami, na ktoré sa vzťahuje. Nebudeme tvrdiť, že obsah nie je uchovávaný, ak to nie je pravda." },
       { kind: "p", text: "Výstupy. Vo vzťahu medzi vami a nami môžete výstup svojich vlastných debát použiť na akýkoľvek zákonný účel a my si k vygenerovanému textu neuplatňujeme vlastnícke právo. Majte na pamäti, že v mnohých právnych poriadkoch nemusí byť vygenerovaný výstup chránený autorským právom; že podobný výstup môže byť vygenerovaný aj pre iných používateľov; že výstupy môžu rozmnožovať materiál tretích strán alebo sa mu podobať; a že na niektoré zdrojové materiály získané poskytovateľom umelej inteligencie sa môžu vzťahovať obmedzenia opätovného použitia. Pred použitím výstupov ako podkladu alebo ich opätovným zverejnením zodpovedáte za ich overenie." }
@@ -353,12 +354,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.5",
-  sha256: "39fc7ebd23665eb6511d79e7bfbbd6c02fe89ede792c563b4effb77144936cb1",
-  eyebrow: "PODMIENKY POSKYTOVANIA SLUŽBY · v2.5 · ÚČINNÉ OD 24. OKTÓBRA 2026",
+  version: "2.6",
+  sha256: "b5dc01dd63ad1423a8ce1b9b17b9447f82b873142a1f7bca818e45e1d5a230a2",
+  eyebrow: "PODMIENKY POSKYTOVANIA SLUŽBY · v2.6 · ÚČINNÉ OD 24. OKTÓBRA 2026",
   title: "S čím súhlasíte",
   lede: "Zmluva medzi vami a DMS Merchandise Shop S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.",
-  endMarker: "KONIEC PODMIENOK · v2.5",
+  endMarker: "KONIEC PODMIENOK · v2.6",
   contact: "support@dezbatere.ro",
   bodyLabel: "Text Podmienok poskytovania služby",
   sectionIdPrefix: "terms-section-",

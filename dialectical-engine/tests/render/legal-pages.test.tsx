@@ -317,11 +317,11 @@ describe("the text pages render the same documents as the sign-up modals", () =>
 
 describe("the terms versions page lists only versions that exist", () => {
   it("names the current and previous versions, linking each to its text", () => {
-    expect(TERMS_VERSIONS).toHaveLength(6);
+    expect(TERMS_VERSIONS).toHaveLength(7);
     expect(TERMS_OF_SERVICE.eyebrow).toContain(`v${TERMS_VERSIONS[0]?.version}`);
     const view = render(<LegalVersionsBody legalCatalog={legalEnglish} />);
     const rows = view.querySelectorAll(".legalVersionRow");
-    expect(rows).toHaveLength(6);
+    expect(rows).toHaveLength(7);
     expect(rows[0]?.querySelector("a")?.getAttribute("href")).toBe("/terms");
     expect(rows[1]?.querySelector("a")?.getAttribute("href")).toBe(TERMS_VERSIONS[1]?.href);
     expect(view.querySelector(".legalVersionsNone")).toBeNull();
@@ -490,7 +490,7 @@ describe("the model providers page lists the companies the API's targets reach (
     // No answer from the API: every reviewed company (Anthropic and DeepInfra), not the hosted cloud rows.
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} entries={PROVIDER_REGISTER} />);
     const headings = texts(view.querySelectorAll(".legalProviderEntry h2"));
-    expect(headings).toEqual(["Anthropic", "DeepInfra", "Support chat model"]);
+    expect(headings).toEqual(["Anthropic", "DeepInfra", "Perplexity", "Support chat model"]);
     expect(PROVIDER_REGISTER.at(-1)?.key).toBe("support");
   });
 
@@ -518,11 +518,11 @@ describe("the model providers page lists the companies the API's targets reach (
     expect(support?.textContent).not.toMatch(/\[/u);
   });
 
-  it("when the API's targets reach DeepInfra alone (the GLM-only set), lists DeepInfra just before the support chat's model, and no hosted cloud row", () => {
+  it("when the API's targets reach DeepInfra alone (the GLM-only set), lists DeepInfra, then Perplexity, then the support chat's model, and no hosted cloud row", () => {
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} entries={providerRegister(["deepinfra"])} />);
     const headings = texts(view.querySelectorAll(".legalProviderEntry h2"));
     // Owner, 10 October 2026: the page names only the companies that receive text; addition D24: no own-servers Qwen row.
-    expect(headings).toEqual(["DeepInfra", "Support chat model"]);
+    expect(headings).toEqual(["DeepInfra", "Perplexity", "Support chat model"]);
   });
 
   it("states the Privacy Policy's Register facts for every provider (PP §5, Japan and Korea)", () => {
@@ -547,7 +547,7 @@ describe("the model providers page lists the companies the API's targets reach (
     }
   });
 
-  it("names the four jobs a provider can be given, and brackets every job nobody has confirmed", () => {
+  it("names the five jobs a provider can be given, and brackets every job nobody has confirmed", () => {
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} entries={WITH_UNCHECKED} />);
     const jobs = new Set(texts(view.querySelectorAll(".legalProviderPurposes li")));
     expect([...jobs].sort()).toEqual(
@@ -555,6 +555,7 @@ describe("the model providers page lists the companies the API's targets reach (
         "Debate text — to write the arguments",
         "Debate text — to judge and check the arguments",
         "The finished debate — to write the verdict story",
+        "Search questions the models write from the debate — to find evidence on the web",
         "What you type in the support chat — to answer you"
       ].sort()
     );
@@ -567,9 +568,10 @@ describe("the model providers page lists the companies the API's targets reach (
 
   it("claims nothing unverified: a cloud provider's contract facts stay bracketed until someone checks the row", () => {
     const uncheckedRows = WITH_UNCHECKED.filter(({ checkedOn }) => checkedOn === null);
-    expect(uncheckedRows.map(({ key }) => key)).toEqual(["host:api.acme.example"]);
+    expect(uncheckedRows.map(({ key }) => key)).toEqual(["host:api.acme.example", "perplexity"]);
     for (const entry of uncheckedRows) {
-      expect(isUnverified(entry.entity)).toBe(true);
+      // Perplexity's company is known (owner, 2026-10-26); its contract facts are not checked yet.
+      if (entry.key !== "perplexity") expect(isUnverified(entry.entity)).toBe(true);
       expect(isUnverified(entry.contact)).toBe(true);
       expect(entry.training).toBe("unconfirmed");
       expect(entry.zeroRetention).toBe("unconfirmed");
@@ -582,7 +584,7 @@ describe("the model providers page lists the companies the API's targets reach (
       const unchecked = register.some(({ checkedOn }) => checkedOn === null);
       expect(view.textContent.includes("[not checked yet]")).toBe(unchecked);
     }
-    expect(PROVIDER_REGISTER.some(({ checkedOn }) => checkedOn === null)).toBe(false);
+    expect(PROVIDER_REGISTER.filter(({ checkedOn }) => checkedOn === null).map(({ key }) => key)).toEqual(["perplexity"]);
   });
 
   it("shows every register label in every locale's catalogue", () => {

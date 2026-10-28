@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručně
-eyebrow: ZÁSADY OCHRANY OSOBNÍCH ÚDAJŮ · v3.6 · ÚČINNÉ OD 24. ŘÍJNA 2026
+eyebrow: ZÁSADY OCHRANY OSOBNÍCH ÚDAJŮ · v3.7 · ÚČINNÉ OD 24. ŘÍJNA 2026
 title: Co uchováváme a proč
 lede: Vaše práva a naše povinnosti podle GDPR (EU) 2016/679 srozumitelným jazykem. Čtrnáct oddílů a příloha B — přejděte až na konec.
-endMarker: KONEC ZÁSAD · GDPR (EU) 2016/679 · v3.6
+endMarker: KONEC ZÁSAD · GDPR (EU) 2016/679 · v3.7
 bodyLabel: Text zásad ochrany osobních údajů
 annexTitle: Příloha B — Regionální podmínky ochrany osobních údajů
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 SOUBORY COOKIE
 -->
 
-**Version 3.6 · Effective 24. října 2026 · Předchozí verze na dezbatere.ro/privacy/versions · Správce: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.7 · Effective 24. října 2026 · Předchozí verze na dezbatere.ro/privacy/versions · Správce: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Shromažďujeme údaje nezbytné pro účet a údaje, které se rozhodnete zadat. Vaše otázky jsou předávány poskytovatelům AI uvedeným v našem Registru; nepoužívají se k trénování modelů. Náš poskytovatel hostingu uchovává váš účet a vaše debaty v Londýně ve Spojeném království; oddíl 5 uvádí, kam dále vaše údaje putují. Debaty jsou soukromé, dokud je nezveřejníte. Výmaz účtu zničí klíče k vašim soukromým údajům; při jeho plánování si zvolíte, zda se odstraní i vaše zveřejněné debaty, nebo zůstanou veřejné pod vaším vyřazeným pseudonymem. Můžete nás kontaktovat na privacy@dezbatere.ro a osoby uvedené v debatě mohou požádat o odstranění i bez účtu.
 
@@ -87,7 +87,9 @@ Nevytváříme o vás profily, nepoužíváme vaše údaje k reklamě a neprodá
 
 **Co se odesílá.** Za účelem vedení debaty posíláme jednomu či více externím poskytovatelům AI text: vaši otázku, vámi nastavené řídicí anotace a výroky, které systém sestavuje v průběhu debaty. Poskytovatel tedy vidí text odvozený z toho, co jste zadali, a vytvořený na tomto základě. Pokud používáte chat podpory, to, co do něj napíšete, se předává modelu chatu podpory. Poskytovatel nikdy neobdrží vaši e-mailovou adresu, identifikátory účtu nebo relace, IP adresu ani platební údaje.
 
-**Kteří poskytovatelé.** Jsou uvedeni v našem **Registru poskytovatelů AI** na adrese dezbatere.ro/providers, který je součástí těchto zásad. Registr se vztahuje na každého uživatele bez ohledu na to, kde žijete. U každého poskytovatele uvádí jeho právnickou osobu a zemi usazení; co přijímá a za jakým účelem — psaní argumentů debaty, jejich hodnocení a kontrola, psaní příběhu verdiktu nebo odpovídání vám v chatu podpory; země nebo regiony, kde údaje zpracovává; jeho podmínky uchovávání a to, zda je pro koncový bod a funkce, které používáme, aktivní režim nulového uchovávání údajů; zda smí podle naší smlouvy používat vstupy k trénování; mechanismus předávání, o který se opíráme; jak jej kontaktovat ohledně vašich údajů; a datum posledního ověření každého záznamu. Poskytovatelé se mohou měnit; Registr je verzován a změna je v něm zaznamenána.
+**Vyhledávání na webu prostřednictvím Perplexity.** Aby našly důkazy pro debatu, mohou modely vyhledávat na webu prostřednictvím služby Perplexity, kterou provozuje společnost Perplexity AI, Inc. ve Spojených státech. Perplexity obdrží vyhledávací dotazy, které modely na základě debaty sestaví a které mohou obsahovat slova z vaší otázky. Stejně jako každý poskytovatel AI nikdy neobdrží vaši e-mailovou adresu, identifikátory účtu nebo relace, IP adresu ani platební údaje. Je uvedena v Registru a vztahují se na ni níže uvedená pravidla pro předávání.
+
+**Kteří poskytovatelé.** Jsou uvedeni v našem **Registru poskytovatelů AI** na adrese dezbatere.ro/providers, který je součástí těchto zásad. Registr se vztahuje na každého uživatele bez ohledu na to, kde žijete. U každého poskytovatele uvádí jeho právnickou osobu a zemi usazení; co přijímá a za jakým účelem — psaní argumentů debaty, jejich hodnocení a kontrola, psaní příběhu verdiktu, vyhledávání důkazů na webu nebo odpovídání vám v chatu podpory; země nebo regiony, kde údaje zpracovává; jeho podmínky uchovávání a to, zda je pro koncový bod a funkce, které používáme, aktivní režim nulového uchovávání údajů; zda smí podle naší smlouvy používat vstupy k trénování; mechanismus předávání, o který se opíráme; jak jej kontaktovat ohledně vašich údajů; a datum posledního ověření každého záznamu. Poskytovatelé se mohou měnit; Registr je verzován a změna je v něm zaznamenána.
 
 **Trénování a uchovávání jsou odlišné věci.** Poskytovatele AI využíváme pouze za podmínek, které jim nedovolují používat váš obsah k trénování nebo zlepšování jejich modelů; Registr u každého poskytovatele uvádí, zda jsme to u našeho účtu ověřili, a kdy. Někteří poskytovatelé uchovávají zadání a odpovědi po omezenou dobu kvůli bezpečnosti, prevenci zneužití nebo vlastním právním povinnostem; Registr uvádí jak dlouho a proč. Je-li aktivní nulové uchovávání údajů, Registr uvádí tuto skutečnost i funkce, na které se vztahuje. Nebudeme tvrdit, že obsah není uchováván, pokud tomu tak není.
 
@@ -215,7 +217,7 @@ Chcete-li tyto položky odmítnout, zablokujte nebo smažte soubory cookie a dat
 
 Při změně těchto zásad zveřejníme novou verzi se shrnutím změn a novým datem účinnosti a předchozí verze ponecháme na dezbatere.ro/privacy/versions. O změně, která přidává nový účel nebo nového příjemce, vás informujeme e-mailem a v produktu před zahájením nového zpracování a poskytneme vám čas vznést námitku. Pokud nový účel závisí na vašem souhlasu — například kdybychom někdy chtěli používat obsah ke zlepšování modelů — požádáme o tento souhlas samostatně a konkrétně; přijetí aktualizovaných Podmínek nikdy nepovažujeme za souhlas s novým zpracováním. Upřesnění, která nic nemění na našem postupu, pouze zveřejníme v nové verzi.
 
-Tyto zásady byly naposledy aktualizovány dne 24. října 2026. Verze 3.6 nahradila verzi 3.5: oddíl 2 nyní uvádí, že při registraci země podle IP adresy spolu s oblastí, kterou vyberete, rovněž rozhoduje o tom, zda zobrazíme samostatné políčko se souhlasem pro Itálii.
+Tyto zásady byly naposledy aktualizovány dne 24. října 2026. Verze 3.7 nahradila verzi 3.6: oddíl 5 nyní uvádí, že modely mohou vyhledávat na webu prostřednictvím služby Perplexity, a co Perplexity obdrží. Verze 3.6 nahradila verzi 3.5: oddíl 2 nyní uvádí, že při registraci země podle IP adresy spolu s oblastí, kterou vyberete, rovněž rozhoduje o tom, zda zobrazíme samostatné políčko se souhlasem pro Itálii.
 
 ## Annex B — Regionální podmínky ochrany osobních údajů
 

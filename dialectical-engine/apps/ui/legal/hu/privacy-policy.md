@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Röviden
-eyebrow: ADATVÉDELMI SZABÁLYZAT · v3.6 · HATÁLYOS 2026. OKTÓBER 24.
+eyebrow: ADATVÉDELMI SZABÁLYZAT · v3.7 · HATÁLYOS 2026. OKTÓBER 24.
 title: Mit tárolunk és miért
 lede: Az Ön jogai és a GDPR (EU) 2016/679 szerinti kötelezettségeink közérthetően. Tizennégy szakasz és a B. melléklet — görgessen a végéig.
-endMarker: A SZABÁLYZAT VÉGE · GDPR (EU) 2016/679 · v3.6
+endMarker: A SZABÁLYZAT VÉGE · GDPR (EU) 2016/679 · v3.7
 bodyLabel: Az Adatvédelmi szabályzat szövege
 annexTitle: B. melléklet — Regionális adatvédelmi feltételek
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 SÜTIK
 -->
 
-**Version 3.6 · Effective 2026. október 24. · Korábbi változatok: dezbatere.ro/privacy/versions · Adatkezelő: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.7 · Effective 2026. október 24. · Korábbi változatok: dezbatere.ro/privacy/versions · Adatkezelő: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** A fiók működéséhez szükséges és az Ön által megadni választott adatokat gyűjtjük. Kérdéseit a Nyilvántartásunkban felsorolt MI-szolgáltatókhoz továbbítjuk; azokat nem használják modellek betanítására. Tárhelyszolgáltatónk az Ön fiókját és vitáit Londonban, az Egyesült Királyságban tárolja; hogy adatai még hová jutnak, azt az 5. szakasz mondja el. A viták mindaddig magánjellegűek, amíg Ön közzé nem teszi őket. Fiókja törlése megsemmisíti magánjellegű adatainak kulcsait; a törlés ütemezésekor Ön dönt arról, hogy közzétett vitáit is eltávolítsuk-e, vagy azok visszavont álneve alatt nyilvánosak maradjanak. A privacy@dezbatere.ro címen érhet el bennünket, és a vitában megnevezett személyek fiók nélkül is kérhetik az eltávolítást.
 
@@ -87,7 +87,9 @@ Nem alkotunk profilt Önről, nem használjuk adatait reklámozásra, és nem é
 
 **Mit továbbítunk.** Egy vita futtatásához szöveget küldünk egy vagy több külső MI-szolgáltatónak: az Ön kérdését, az Ön által megadott irányító megjegyzéseket és a motor által a vita alakulása során összeállított állításokat. A szolgáltató tehát az Ön által beírt szövegből származó és aköré épített szöveget lát. Ha Ön az ügyfélszolgálati csevegést használja, az ott beírt szöveget az ügyfélszolgálati csevegés modellje kapja meg. A szolgáltató soha nem kapja meg az Ön e-mail-címét, fiók- vagy munkamenet-azonosítóit, IP-címét vagy fizetési adatait.
 
-**Mely szolgáltatók.** Ezeket a szabályzat részét képező **MI-szolgáltatói Nyilvántartásunk** sorolja fel itt: dezbatere.ro/providers. A Nyilvántartás minden felhasználóra vonatkozik, bárhol éljen is. Minden szolgáltatónál feltünteti annak jogi személyét és letelepedési országát; hogy mit és milyen célból kap meg — a vita érveinek megírása, azok elbírálása és ellenőrzése, az ítélet történetének megírása vagy az Önnek adott válasz az ügyfélszolgálati csevegésben; az adatkezelés országait vagy régióit; megőrzési feltételeit, továbbá azt, hogy aktív-e a zéró adatmegőrzés az általunk használt végpont és funkciók esetében; hogy szerződésünk alapján használhat-e bemeneteket betanításra; az általunk alkalmazott adattovábbítási mechanizmust; azt, hogy az adatait érintő ügyekben hogyan veheti fel vele a kapcsolatot; valamint az egyes bejegyzések utolsó ellenőrzésének dátumát. A szolgáltatók változhatnak; a Nyilvántartás verziózott, és a változást ott jelezzük.
+**Webes keresés a Perplexity szolgáltatáson keresztül.** A vitához szükséges bizonyítékok megtalálásához a modellek a Perplexity szolgáltatáson keresztül kereshetnek a weben; a szolgáltatást az Egyesült Államokban működő Perplexity AI, Inc. üzemelteti. A Perplexity a modellek által a vitából megfogalmazott keresési kérdéseket kapja meg, amelyek az Ön kérdéséből származó szavakat is tartalmazhatnak. Minden MI-szolgáltatóhoz hasonlóan a Perplexity sem kapja meg soha az Ön e-mail-címét, fiók- vagy munkamenet-azonosítóit, IP-címét vagy fizetési adatait. Szerepel a Nyilvántartásban, és vonatkoznak rá az alábbi adattovábbítási szabályok.
+
+**Mely szolgáltatók.** Ezeket a szabályzat részét képező **MI-szolgáltatói Nyilvántartásunk** sorolja fel itt: dezbatere.ro/providers. A Nyilvántartás minden felhasználóra vonatkozik, bárhol éljen is. Minden szolgáltatónál feltünteti annak jogi személyét és letelepedési országát; hogy mit és milyen célból kap meg — a vita érveinek megírása, azok elbírálása és ellenőrzése, az ítélet történetének megírása, bizonyítékok keresése a weben vagy az Önnek adott válasz az ügyfélszolgálati csevegésben; az adatkezelés országait vagy régióit; megőrzési feltételeit, továbbá azt, hogy aktív-e a zéró adatmegőrzés az általunk használt végpont és funkciók esetében; hogy szerződésünk alapján használhat-e bemeneteket betanításra; az általunk alkalmazott adattovábbítási mechanizmust; azt, hogy az adatait érintő ügyekben hogyan veheti fel vele a kapcsolatot; valamint az egyes bejegyzések utolsó ellenőrzésének dátumát. A szolgáltatók változhatnak; a Nyilvántartás verziózott, és a változást ott jelezzük.
 
 **A betanítás és a megőrzés különböző dolgok.** Az MI-szolgáltatókat kizárólag olyan feltételekkel veszünk igénybe, amelyek nem engedik meg nekik, hogy az Ön tartalmát modelljeik betanítására vagy fejlesztésére használják; a Nyilvántartás szolgáltatónként feltünteti, hogy ezt a saját fiókunkra nézve megerősítettük-e, és mikor. Egyes szolgáltatók biztonsági, visszaélés-megelőzési vagy saját jogi kötelezettségeik miatt korlátozott ideig megőrzik a promptokat és válaszokat; a Nyilvántartás közli, hogy meddig és miért. Ahol zéró adatmegőrzés aktív, a Nyilvántartás ezt és az érintett funkciókat is feltünteti. A tartalmat nem minősítjük meg nem őrzöttnek, ha ez nem igaz.
 
@@ -215,7 +217,7 @@ Ha el szeretné utasítani ezeket az elemeket, böngészője beállításaiban t
 
 Amikor módosítjuk ezt a szabályzatot, közzétesszük az új változatot a változások összefoglalásával és új hatálybalépési dátummal, a korábbi változatokat pedig a dezbatere.ro/privacy/versions címen őrizzük meg. Új célt vagy új címzettet bevezető változásról az új adatkezelés megkezdése előtt e-mailben és a termékben tájékoztatjuk Önt, és időt biztosítunk a tiltakozásra. Ha egy új cél az Ön hozzájárulásától függ — például ha valaha tartalmat kívánnánk használni modellek fejlesztésére —, ezt a hozzájárulást külön és kifejezetten kérjük; a frissített Feltételek elfogadását soha nem tekintjük új adatkezeléshez való hozzájárulásnak. Az olyan pontosítások esetében, amelyek semmit nem változtatnak tevékenységünkön, egyszerűen közzétesszük az új változatot.
 
-Ezt a szabályzatot legutóbb 2026. október 24. napján frissítettük. A 3.6-os verzió a 3.5-ös verzió helyébe lépett: a 2. szakasz most már leírja, hogy regisztrációnál az IP-cím országa az Ön által kiválasztott régióval együtt azt is eldönti, hogy megjelenítjük-e az Olaszországra vonatkozó külön jóváhagyási négyzetet.
+Ezt a szabályzatot legutóbb 2026. október 24. napján frissítettük. A 3.7-es verzió a 3.6-os verzió helyébe lépett: az 5. szakasz most már leírja, hogy a modellek a Perplexity szolgáltatáson keresztül kereshetnek a weben, és hogy mit kap meg a Perplexity. A 3.6-os verzió a 3.5-ös verzió helyébe lépett: a 2. szakasz most már leírja, hogy regisztrációnál az IP-cím országa az Ön által kiválasztott régióval együtt azt is eldönti, hogy megjelenítjük-e az Olaszországra vonatkozó külön jóváhagyási négyzetet.
 
 ## Annex B — Regionális adatvédelmi feltételek
 

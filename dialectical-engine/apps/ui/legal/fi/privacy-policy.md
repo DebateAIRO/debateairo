@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lyhyesti
-eyebrow: TIETOSUOJAKÄYTÄNTÖ · v3.6 · VOIMASSA 24. LOKAKUUTA 2026 ALKAEN
+eyebrow: TIETOSUOJAKÄYTÄNTÖ · v3.7 · VOIMASSA 24. LOKAKUUTA 2026 ALKAEN
 title: Mitä säilytämme ja miksi
 lede: Oikeutesi ja velvollisuutemme GDPR (EU) 2016/679 -asetuksen nojalla selkeällä kielellä. Neljätoista osiota ja liite B — vieritä loppuun asti.
-endMarker: TIETOSUOJAKÄYTÄNNÖN LOPPU · GDPR (EU) 2016/679 · v3.6
+endMarker: TIETOSUOJAKÄYTÄNNÖN LOPPU · GDPR (EU) 2016/679 · v3.7
 bodyLabel: Tietosuojakäytännön teksti
 annexTitle: Liite B — Alueelliset tietosuojaehdot
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 EVÄSTEET
 -->
 
-**Version 3.6 · Effective 24. lokakuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/privacy/versions · Rekisterinpitäjä: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.7 · Effective 24. lokakuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/privacy/versions · Rekisterinpitäjä: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Keräämme tilin toimintaan tarvittavat tiedot sekä sen, mitä itse päätät kirjoittaa. Kysymyksesi lähetetään Rekisterissämme luetelluille tekoälypalveluntarjoajille; niitä ei käytetä mallien kouluttamiseen. Säilytyspalveluntarjoajamme säilyttää tilisi ja väittelysi Lontoossa, Yhdistyneessä kuningaskunnassa; osiossa 5 kerrotaan, minne tietosi muuten päätyvät. Väittelyt ovat yksityisiä, ellet julkaise niitä. Tilisi poistaminen tuhoaa yksityisten tietojesi avaimet; kun ajastat poiston, valitset, poistetaanko myös julkaistut väittelysi näkyvistä vai pysyvätkö ne julkisina käytöstä poistetulla salanimelläsi. Voit ottaa meihin yhteyttä osoitteessa privacy@dezbatere.ro, ja väittelyssä nimetyt henkilöt voivat pyytää sisällön poistamista ilman tiliä.
 
@@ -87,7 +87,9 @@ Emme profiloi sinua, emme käytä tietojasi mainontaan emmekä myy niitä. Emme 
 
 **Mitä lähetetään.** Väittelyn toteuttamiseksi lähetämme tekstiä yhdelle tai useammalle ulkopuoliselle tekoälypalveluntarjoajalle: kysymyksesi, asettamasi ohjaavat huomautukset ja väitteet, jotka järjestelmä muodostaa väittelyn edetessä. Palveluntarjoaja näkee siis kirjoittamastasi tekstistä johdettua ja sen ympärille rakennettua tekstiä. Jos käytät tukikeskustelua, sinne kirjoittamasi teksti välitetään tukikeskustelun mallille. Palveluntarjoaja ei koskaan saa sähköpostiosoitettasi, tili- tai istuntotunnisteitasi, IP-osoitettasi tai maksutietojasi.
 
-**Mitkä palveluntarjoajat.** Ne luetellaan **tekoälypalveluntarjoajien rekisterissämme** osoitteessa dezbatere.ro/providers, joka on osa tätä käytäntöä. Rekisteri koskee jokaista käyttäjää asuinpaikasta riippumatta. Siinä ilmoitetaan jokaisen palveluntarjoajan oikeushenkilö ja sijoittautumismaa; mitä tietoja se saa ja mihin tarkoitukseen — väittelyn argumenttien kirjoittamiseen, niiden arvioimiseen ja tarkistamiseen, tuomion tarinan kirjoittamiseen tai sinulle vastaamiseen tukikeskustelussa; maat tai alueet, joissa se käsittelee tietoja; sen säilytysehdot ja se, onko tietojen nollasäilytys käytössä käyttämässämme päätepisteessä ja käyttämissämme ominaisuuksissa; saako se sopimuksemme nojalla käyttää syötteitä kouluttamiseen; siirtomekanismi, johon tukeudumme; miten siihen voi ottaa yhteyttä tietojasi koskevissa asioissa; sekä päivä, jolloin viimeksi tarkistimme tiedot. Palveluntarjoajat voivat vaihtua; Rekisteri on versioitu, ja muutos merkitään siihen.
+**Verkkohaku Perplexity-palvelun kautta.** Löytääkseen näyttöä väittelyä varten mallit voivat tehdä verkkohakuja Perplexity-palvelun kautta, jota ylläpitää Perplexity AI, Inc. Yhdysvalloissa. Perplexity saa hakukyselyt, jotka mallit kirjoittavat väittelyn pohjalta ja jotka voivat sisältää sanoja kysymyksestäsi. Kuten muutkaan tekoälypalveluntarjoajat, Perplexity ei koskaan saa sähköpostiosoitettasi, tili- tai istuntotunnisteitasi, IP-osoitettasi tai maksutietojasi. Se on lueteltu Rekisterissä, ja siihen sovelletaan jäljempänä esitettyjä siirtoja koskevia sääntöjä.
+
+**Mitkä palveluntarjoajat.** Ne luetellaan **tekoälypalveluntarjoajien rekisterissämme** osoitteessa dezbatere.ro/providers, joka on osa tätä käytäntöä. Rekisteri koskee jokaista käyttäjää asuinpaikasta riippumatta. Siinä ilmoitetaan jokaisen palveluntarjoajan oikeushenkilö ja sijoittautumismaa; mitä tietoja se saa ja mihin tarkoitukseen — väittelyn argumenttien kirjoittamiseen, niiden arvioimiseen ja tarkistamiseen, tuomion tarinan kirjoittamiseen, näytön hakemiseen verkosta tai sinulle vastaamiseen tukikeskustelussa; maat tai alueet, joissa se käsittelee tietoja; sen säilytysehdot ja se, onko tietojen nollasäilytys käytössä käyttämässämme päätepisteessä ja käyttämissämme ominaisuuksissa; saako se sopimuksemme nojalla käyttää syötteitä kouluttamiseen; siirtomekanismi, johon tukeudumme; miten siihen voi ottaa yhteyttä tietojasi koskevissa asioissa; sekä päivä, jolloin viimeksi tarkistimme tiedot. Palveluntarjoajat voivat vaihtua; Rekisteri on versioitu, ja muutos merkitään siihen.
 
 **Kouluttaminen ja säilyttäminen ovat eri asioita.** Käytämme tekoälypalveluntarjoajia vain ehdoilla, jotka eivät salli niiden käyttää sisältöäsi mallien kouluttamiseen tai parantamiseen; Rekisteristä näkyy kunkin palveluntarjoajan kohdalla, olemmeko vahvistaneet tämän omaa tiliämme vasten, ja milloin. Jotkin palveluntarjoajat säilyttävät kehotteita ja vastauksia rajoitetun ajan turvallisuuden, väärinkäytön estämisen tai omien oikeudellisten velvoitteidensa vuoksi; Rekisterissä kerrotaan, kuinka kauan ja miksi. Jos tietojen nollasäilytys on käytössä, Rekisterissä kerrotaan tämä sekä ominaisuudet, joita se koskee. Emme kuvaa sisältöä säilyttämättömäksi, jos sitä tosiasiassa säilytetään.
 
@@ -215,7 +217,7 @@ Voit kieltäytyä näistä kohteista estämällä tai poistamalla tämän sivust
 
 Kun muutamme tätä käytäntöä, julkaisemme uuden version, yhteenvedon muutoksista ja uuden voimaantulopäivän sekä säilytämme aiemmat versiot osoitteessa dezbatere.ro/privacy/versions. Jos muutos lisää uuden tarkoituksen tai uuden vastaanottajan, ilmoitamme sinulle sähköpostitse ja tuotteessa ennen uuden käsittelyn aloittamista ja annamme aikaa vastustaa sitä. Jos uusi tarkoitus perustuu suostumukseesi — esimerkiksi jos joskus haluaisimme käyttää sisältöä mallien parantamiseen — pyydämme suostumuksen erikseen ja yksilöidysti; emme koskaan pidä päivitettyjen Ehtojen hyväksymistä suostumuksena uuteen käsittelyyn. Jos selvennykset eivät muuta toimintaamme, julkaisemme vain uuden version.
 
-Tämä käytäntö päivitettiin viimeksi 24. lokakuuta 2026. Versio 3.6 korvasi version 3.5: osiossa 2 kerrotaan nyt, että rekisteröitymisen yhteydessä IP-osoitteen maa yhdessä valitsemasi alueen kanssa ratkaisee myös sen, näytämmekö erillisen hyväksyntäruudun Italiaa varten.
+Tämä käytäntö päivitettiin viimeksi 24. lokakuuta 2026. Versio 3.7 korvasi version 3.6: osiossa 5 kerrotaan nyt, että mallit voivat tehdä verkkohakuja Perplexity-palvelun kautta, ja mitä Perplexity saa. Versio 3.6 korvasi version 3.5: osiossa 2 kerrotaan nyt, että rekisteröitymisen yhteydessä IP-osoitteen maa yhdessä valitsemasi alueen kanssa ratkaisee myös sen, näytämmekö erillisen hyväksyntäruudun Italiaa varten.
 
 ## Annex B — Alueelliset tietosuojaehdot
 

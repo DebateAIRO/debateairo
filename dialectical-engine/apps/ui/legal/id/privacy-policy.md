@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ringkasnya
-eyebrow: KEBIJAKAN PRIVASI · v3.6 · BERLAKU 24 OKTOBER 2026
+eyebrow: KEBIJAKAN PRIVASI · v3.7 · BERLAKU 24 OKTOBER 2026
 title: Apa yang kami simpan, dan alasannya
 lede: Hak Anda dan kewajiban kami berdasarkan GDPR (EU) 2016/679, dalam bahasa yang mudah dipahami. Empat belas bagian dan Lampiran B — gulir hingga akhir.
-endMarker: AKHIR KEBIJAKAN · GDPR (EU) 2016/679 · v3.6
+endMarker: AKHIR KEBIJAKAN · GDPR (EU) 2016/679 · v3.7
 bodyLabel: Teks Kebijakan Privasi
 annexTitle: Lampiran B — Ketentuan privasi regional
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 KUKI
 -->
 
-**Version 3.6 · Effective 24 Oktober 2026 · Versi sebelumnya di dezbatere.ro/privacy/versions · Pengendali: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.7 · Effective 24 Oktober 2026 · Versi sebelumnya di dezbatere.ro/privacy/versions · Pengendali: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Kami mengumpulkan apa yang diperlukan akun dan apa yang Anda pilih untuk diketik. Pertanyaan Anda dikirim kepada penyedia AI yang tercantum dalam Daftar kami; pertanyaan tersebut tidak digunakan untuk melatih model. Penyedia hos kami menyimpan akun dan debat Anda di London, Britania Raya; bagian 5 menjelaskan ke mana lagi data Anda dikirim. Debat bersifat privat kecuali Anda memublikasikannya. Penghapusan akun memusnahkan kunci data pribadi Anda; saat menjadwalkannya, Anda memilih apakah debat yang Anda publikasikan juga diturunkan atau tetap dapat diakses publik dengan nama samaran yang tidak lagi digunakan. Anda dapat menghubungi kami di privacy@dezbatere.ro, dan orang yang disebut dalam debat dapat meminta penghapusan tanpa memiliki akun.
 
@@ -87,7 +87,9 @@ Kami tidak membuat profil Anda, tidak menggunakan data Anda untuk iklan, dan tid
 
 **Apa yang dikirim.** Untuk menjalankan debat, kami mengirim teks kepada satu atau lebih penyedia AI eksternal: pertanyaan Anda, anotasi pengarahan yang Anda tetapkan, dan pernyataan yang disusun mesin selama debat berlangsung. Oleh karena itu, penyedia melihat teks yang diturunkan dari dan dibangun seputar apa yang Anda ketik. Jika Anda menggunakan obrolan dukungan, apa yang Anda ketik di sana dikirim ke model obrolan dukungan. Penyedia tidak pernah menerima alamat email, pengenal akun atau sesi, alamat IP, atau detail pembayaran Anda.
 
-**Penyedia yang digunakan.** Mereka tercantum dalam **Daftar Penyedia AI** kami di dezbatere.ro/providers, yang merupakan bagian dari kebijakan ini. Daftar berlaku bagi setiap pengguna, di mana pun Anda tinggal. Untuk setiap penyedia, Daftar mencantumkan badan hukum dan negara pendiriannya; apa yang diterima dan untuk tujuan apa — menulis argumen debat, menilai dan memeriksanya, menulis kisah putusan, atau menjawab Anda dalam obrolan dukungan; negara atau wilayah tempat pemrosesan dilakukan; ketentuan retensinya, dan apakah retensi data nihil aktif untuk titik akhir dan fitur yang kami gunakan; apakah penyedia dapat menggunakan masukan untuk pelatihan berdasarkan kontrak kami; mekanisme transfer yang kami andalkan; cara menghubunginya terkait data Anda; serta tanggal terakhir kami memverifikasi setiap entri. Penyedia dapat berubah; Daftar memiliki versi dan perubahan dicatat di sana.
+**Pencarian web melalui Perplexity.** Untuk menemukan bukti bagi debat, model dapat mencari di web melalui Perplexity, yang dijalankan oleh Perplexity AI, Inc. di Amerika Serikat. Perplexity menerima pertanyaan pencarian yang ditulis model dari debat, yang dapat memuat kata-kata dari pertanyaan Anda. Seperti setiap penyedia AI, Perplexity tidak pernah menerima alamat email, pengenal akun atau sesi, alamat IP, atau detail pembayaran Anda. Perplexity tercantum dalam Daftar, dan aturan transfer di bawah ini berlaku baginya.
+
+**Penyedia yang digunakan.** Mereka tercantum dalam **Daftar Penyedia AI** kami di dezbatere.ro/providers, yang merupakan bagian dari kebijakan ini. Daftar berlaku bagi setiap pengguna, di mana pun Anda tinggal. Untuk setiap penyedia, Daftar mencantumkan badan hukum dan negara pendiriannya; apa yang diterima dan untuk tujuan apa — menulis argumen debat, menilai dan memeriksanya, menulis kisah putusan, mencari bukti di web, atau menjawab Anda dalam obrolan dukungan; negara atau wilayah tempat pemrosesan dilakukan; ketentuan retensinya, dan apakah retensi data nihil aktif untuk titik akhir dan fitur yang kami gunakan; apakah penyedia dapat menggunakan masukan untuk pelatihan berdasarkan kontrak kami; mekanisme transfer yang kami andalkan; cara menghubunginya terkait data Anda; serta tanggal terakhir kami memverifikasi setiap entri. Penyedia dapat berubah; Daftar memiliki versi dan perubahan dicatat di sana.
 
 **Pelatihan dan retensi adalah dua hal berbeda.** Kami menggunakan penyedia AI hanya berdasarkan ketentuan yang tidak mengizinkan mereka menggunakan konten Anda untuk melatih atau meningkatkan model mereka; Daftar menunjukkan, untuk setiap penyedia, apakah kami telah mengonfirmasi hal ini untuk akun kami, dan kapan. Beberapa penyedia menyimpan perintah dan tanggapan selama periode terbatas untuk keamanan, pencegahan penyalahgunaan, atau kewajiban hukum mereka sendiri; Daftar menyebutkan durasi dan alasannya. Jika retensi data nihil aktif, Daftar menyatakannya dan untuk fitur mana. Kami tidak akan menyatakan bahwa konten tidak disimpan apabila kenyataannya disimpan.
 
@@ -215,7 +217,7 @@ Untuk menolak item ini, blokir atau hapus kuki dan data situs untuk situs ini di
 
 Ketika mengubah kebijakan ini, kami menerbitkan versi baru beserta ringkasan perubahan dan tanggal berlaku baru, serta menyimpan versi sebelumnya di dezbatere.ro/privacy/versions. Untuk perubahan yang menambahkan tujuan atau penerima baru, kami memberi tahu Anda sebelum pemrosesan baru dimulai, melalui email dan di dalam produk, serta memberi waktu untuk mengajukan keberatan. Jika tujuan baru bergantung pada persetujuan Anda — misalnya jika kami suatu saat ingin menggunakan konten untuk meningkatkan model — kami meminta persetujuan tersebut secara terpisah dan spesifik; kami tidak pernah menganggap penerimaan Ketentuan yang diperbarui sebagai persetujuan atas pemrosesan baru. Untuk klarifikasi yang tidak mengubah apa pun tentang tindakan kami, kami hanya menerbitkan versi baru.
 
-Kebijakan ini terakhir diperbarui pada 24 Oktober 2026. Versi 3.6 menggantikan versi 3.5: bagian 2 kini menyatakan bahwa saat pendaftaran, negara IP, bersama Wilayah yang Anda pilih, juga menentukan apakah kami menampilkan kotak persetujuan terpisah untuk Italia.
+Kebijakan ini terakhir diperbarui pada 24 Oktober 2026. Versi 3.7 menggantikan versi 3.6: bagian 5 kini menyatakan bahwa model dapat mencari di web melalui Perplexity, dan apa yang diterima Perplexity. Versi 3.6 menggantikan versi 3.5: bagian 2 kini menyatakan bahwa saat pendaftaran, negara IP, bersama Wilayah yang Anda pilih, juga menentukan apakah kami menampilkan kotak persetujuan terpisah untuk Italia.
 
 ## Annex B — Ketentuan privasi regional
 

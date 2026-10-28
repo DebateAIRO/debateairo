@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kısaca
-eyebrow: HİZMET KOŞULLARI · v2.5 · YÜRÜRLÜK TARİHİ 24 EKİM 2026
+eyebrow: HİZMET KOŞULLARI · v2.6 · YÜRÜRLÜK TARİHİ 24 EKİM 2026
 title: Kabul ettiğiniz hükümler
 lede: Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.
-endMarker: KOŞULLARIN SONU · v2.5
+endMarker: KOŞULLARIN SONU · v2.6
 bodyLabel: Hizmet Koşulları metni
 annexTitle: Ek A — Bölgesel koşullar
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 UYGULANACAK HUKUK
 -->
 
-**Version 2.5 · Effective 24 Ekim 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
+**Version 2.6 · Effective 24 Ekim 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
 
 **In short.** En az 18 yaşında olmalısınız. Dialectical Engine, yapay zekâ modelleriyle argümanlar oluşturur ve ürettiği her şey yanlış olabilir — bunlar tavsiye değildir. Tartışmalarınız, siz yayımlamadıkça özeldir; yayımlarsanız herkes okuyabilir. Gönderdiğiniz metin, Sağlayıcı Sicilimizde belirtilen yapay zekâ sağlayıcılarına iletilir ve modelleri eğitmek için kullanılmaz. Hesabınız olsun veya olmasın, hukuka aykırı içerikleri support@dezbatere.ro adresine bildirin. Romanya hukuku uygulanır; ancak yerel tüketici korumalarınız saklıdır.
 
@@ -119,6 +119,8 @@ Bir şeye izin verilip verilmediğinden emin değilseniz, göndermeden önce biz
 **İçeriğiniz yapay zekâ sağlayıcılarına nasıl ulaşır.** Bir tartışmayı yürütmek için metni bir veya daha fazla harici model sağlayıcısına göndeririz. Sağlayıcının aldığı içerik; sorunuz, belirlediğiniz yönlendirme açıklamaları ve motorun tartışma sırasında oluşturduğu ifadelerdir — dolayısıyla sağlayıcı yalnızca ilk yazdığınız sözcükleri değil, yazdıklarınızdan türetilen ve bunların çevresinde oluşturulan metni de görür. E-posta adresinizi, hesap tanımlayıcılarınızı, oturum kayıtlarınızı veya ödeme bilgilerinizi hiçbir zaman almaz.
 
 **Destek sohbeti neleri gönderir.** Destek asistanı da bir yapay zekâ modelidir. Ona yazdığınızda, modelin yanıt verebilmesi için mesajınızı, modelin yanıtını dayandırdığı yardım makaleleriyle birlikte harici bir model sağlayıcısına göndeririz. Göndermeden önce parolaya, tek kullanımlık koda veya anahtara benzeyen her şeyi maskeleriz. Bir kişiyle görüşmeyi talep ederseniz, modelin talebinizi devralan ekip üyemiz için kısa bir özet yazabilmesi amacıyla konuşmayı da aynı şekilde maskelenmiş olarak modele göndeririz. E-posta adresinizi, hesap tanımlayıcılarınızı veya ödeme bilgilerinizi eklemeyiz, ancak model sohbete yazdığınız diğer her şeyi alır; bu nedenle orada modelin okumasını istemeyeceğiniz hiçbir şey yazmayın.
+
+**Perplexity üzerinden web araması.** Bir tartışma için kanıt bulmak amacıyla modeller, Sağlayıcı Sicilimizde listelenen **Perplexity** (Perplexity AI, Inc., Amerika Birleşik Devletleri) üzerinden internette arama yapabilir. Perplexity'nin aldığı içerik, modellerin tartışmadan yola çıkarak yazdığı arama sorgularıdır — dolayısıyla, bir model sağlayıcısı gibi, yazdıklarınızın çevresinde oluşturulan metni görür. E-posta adresinizi, hesap tanımlayıcılarınızı, oturum kayıtlarınızı veya ödeme bilgilerinizi hiçbir zaman almaz.
 
 **Hangi sağlayıcılar ve nerede.** dezbatere.ro/providers adresindeki **Yapay Zekâ Sağlayıcı Sicilimiz** bu Koşulların bir parçasıdır. Sicil, kullanabileceğimiz her sağlayıcı için şu hususları listeler: tüzel kişiliği ve ülkesi; neyi, neden aldığı; işlemenin nerede yapıldığı; saklama koşulları; kullandığımız uç nokta için sıfır veri saklamanın etkin olup olmadığı; sözleşmemiz kapsamında girdileri eğitim için kullanıp kullanamayacağı; dayandığımız aktarım mekanizması ve her kaydı son doğruladığımız tarih. Sağlayıcılar ülkenizin ve Avrupa Ekonomik Alanı'nın dışında bulunabilir. Güvenceler Gizlilik Politikamızda açıklanmıştır.
 

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ringkasnya
-eyebrow: KETENTUAN LAYANAN · v2.5 · BERLAKU 24 OKTOBER 2026
+eyebrow: KETENTUAN LAYANAN · v2.6 · BERLAKU 24 OKTOBER 2026
 title: Hal yang Anda setujui
 lede: Kontrak antara Anda dan DMS Merchandise Shop S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.
-endMarker: AKHIR KETENTUAN · v2.5
+endMarker: AKHIR KETENTUAN · v2.6
 bodyLabel: Teks Ketentuan Layanan
 annexTitle: Lampiran A — Ketentuan regional
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 HUKUM YANG BERLAKU
 -->
 
-**Version 2.5 · Effective 24 Oktober 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
+**Version 2.6 · Effective 24 Oktober 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
 
 **In short.** Anda harus berusia 18 tahun atau lebih. Dialectical Engine menyusun argumen dengan model AI dan segala sesuatu yang dihasilkannya mungkin salah — ini bukan nasihat. Debat Anda bersifat privat kecuali Anda memublikasikannya; jika Anda memublikasikannya, siapa pun dapat membacanya. Teks yang Anda kirim diteruskan kepada penyedia AI yang tercantum dalam Daftar Penyedia kami, dan tidak digunakan untuk melatih model. Laporkan konten ilegal ke support@dezbatere.ro, baik Anda memiliki akun maupun tidak. Hukum Rumania berlaku, tetapi perlindungan konsumen setempat Anda tetap berlaku bagi Anda.
 
@@ -119,6 +119,8 @@ Jika Anda tidak yakin apakah sesuatu diperbolehkan, tanyakan kepada kami sebelum
 **Cara konten Anda diteruskan kepada penyedia AI.** Untuk menjalankan debat, kami mengirim teks kepada satu atau lebih penyedia model eksternal. Yang diterima penyedia adalah pertanyaan Anda, anotasi pengarahan yang Anda tetapkan, dan pernyataan yang disusun mesin selama debat — sehingga penyedia melihat teks yang diturunkan dari dan dibangun seputar hal yang Anda ketik, bukan hanya kata-kata asli Anda. Penyedia tidak pernah menerima alamat email, pengenal akun, catatan sesi, atau rincian pembayaran Anda.
 
 **Apa yang dikirim oleh obrolan dukungan.** Asisten dukungan juga merupakan model AI. Saat Anda menulis kepadanya, kami mengirim pesan Anda kepada penyedia model eksternal agar model dapat menjawab, bersama artikel bantuan yang menjadi dasar jawabannya. Sebelum mengirim, kami menyamarkan apa pun yang tampak seperti kata sandi, kode sekali pakai, atau kunci. Jika Anda meminta berbicara dengan seseorang, kami juga mengirim percakapan tersebut, yang disamarkan dengan cara yang sama, kepada model agar model menulis ringkasan singkat bagi anggota tim kami yang menangani kasus Anda. Kami tidak melampirkan alamat email, pengenal akun, atau rincian pembayaran Anda, tetapi model menerima semua hal lain yang Anda ketik di obrolan, jadi jangan menulis apa pun di sana yang tidak Anda inginkan untuk dibacanya.
+
+**Pencarian web melalui Perplexity.** Untuk menemukan bukti bagi debat, model dapat mencari di web melalui **Perplexity** (Perplexity AI, Inc., Amerika Serikat), yang tercantum dalam Daftar Penyedia AI. Yang diterima Perplexity adalah pertanyaan pencarian yang ditulis model dari debat — sehingga, seperti penyedia model, Perplexity melihat teks yang dibangun seputar hal yang Anda ketik. Perplexity tidak pernah menerima alamat email, pengenal akun, catatan sesi, atau rincian pembayaran Anda.
 
 **Penyedia yang digunakan, dan lokasinya.** **Daftar Penyedia AI** kami di dezbatere.ro/providers merupakan bagian dari Ketentuan ini. Daftar tersebut mencantumkan setiap penyedia yang mungkin kami gunakan: badan hukum dan negaranya; hal yang diterimanya dan alasannya; tempat pemrosesan dilakukan; ketentuan retensinya; apakah retensi data nihil aktif untuk titik akhir yang kami gunakan; apakah penyedia dapat menggunakan masukan untuk pelatihan berdasarkan kontrak kami; mekanisme transfer yang kami andalkan; serta tanggal terakhir kami memverifikasi setiap entri. Penyedia mungkin berlokasi di luar negara Anda dan di luar Wilayah Ekonomi Eropa. Kebijakan Privasi kami menjelaskan langkah perlindungannya.
 
