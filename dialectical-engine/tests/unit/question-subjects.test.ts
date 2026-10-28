@@ -82,4 +82,21 @@ describe("the question subjects file (V, 2026-10-28)", () => {
     expect(paragraph).toContain("a question about whether the law on suicide, euthanasia or assisted dying should change does start a debate");
     expect(paragraph).toContain("Our question check keeps nothing of any question.");
   });
+
+  // Property (final review, 2026-10-28): every refusal section 7 describes has its statement of reasons in section 10, and
+  // the Privacy Policy's purpose row covers the same refusals; neither re-lists the subjects the file can change.
+  it("ties section 10's statement of reasons and the Privacy purpose row to section 7's paragraph", () => {
+    const terms = readFileSync("apps/ui/legal/en/terms-of-service.md", "utf8").split("\n");
+    const reasons = terms.find(line => line.startsWith("**Statement of reasons.**"))!;
+    expect(reasons).toContain("When our question check refuses a question under the paragraph \"Questions that do not start a debate\" in section 7, the screen that tells you is our statement of reasons for it");
+    expect(reasons).not.toMatch(/as hate speech, as religious insult/u);
+    expect(terms.find(line => line.startsWith("Version 2.6 replaced version 2.5:")))
+      .toContain("the screen that refuses a question is our statement of reasons for every question section 7 does not start (section 10)");
+    const privacy = readFileSync("apps/ui/legal/en/privacy-policy.md", "utf8").split("\n");
+    const row = privacy.find(line => line.startsWith("| Checking each question before a debate starts"))!;
+    expect(row).toContain("refusing to start a debate whose question section 7 of our Terms of Service says does not start one");
+    expect(row).toContain("keeping debates that could lead to harm, crime, hate speech or religious insult from starting");
+    expect(privacy.find(line => line.includes("Version 3.6 replaced version 3.5")))
+      .toContain("keeps nothing of any question (sections 3, 4 and 8)");
+  });
 });
