@@ -69,7 +69,9 @@ overrides:
   'fast-uri@>=4.0.0 <4.2.3': '4.2.3'
   'brace-expansion@>=2.0.0 <2.1.7': '2.1.7'
   'undici@>=8.0.0 <8.12.2': '8.12.2'
-  'qs@<6.16.0': '6.16.0'
+  'qs@<6.16.1': '6.16.1'
+  # 2026-10-28: GHSA-6pq8-jhm2-2vcw (moderate, qs >=6.7.0 <=6.16.0 under the Hatchet SDK); 6.16.1 published
+  # 2026-10-14: cooldown satisfied, no exclusion.
   # 2026-10-25: three undici advisories of >=8.0.0 <8.12.2 (one high, two moderate; test tooling only:
   # jsdom), floor published 2026-10-15: cooldown satisfied, no exclusion. zod < 4.6.6 (high) is a direct
   # dependency, so it is fixed by the 4.6.7 PIN in every package.json that lists it (published 2026-10-12,
