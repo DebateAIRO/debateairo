@@ -104,6 +104,7 @@ function buildMap(): V4Map {
     objections: ["Open question o:0"],
     storyState: "READY",
     fallbackText: null,
+    wouldChangeAlt: null,
     reservation: false
   };
 }

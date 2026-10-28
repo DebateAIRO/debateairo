@@ -199,6 +199,24 @@ describe("buildV4Map", () => {
     expect(buildV4Map({ runId: "r", answer: STORY_FIXTURE_ANSWER, story: blankChange }).wouldChange).toBe(STORY_FIXTURE_ANSWER.reversal_point);
   });
 
+  it("keeps the other text of 'w' (the reversal_point) once the story's change text is used (R2DIG-4 / R2REG-2)", () => {
+    const ready = buildV4Map({ runId: "r", answer: STORY_FIXTURE_ANSWER, story: storyFixture("READY") });
+    expect(ready.wouldChange).toBe(storyFixture("READY").story!.short.change.text);
+    expect(ready.wouldChangeAlt).toBe(STORY_FIXTURE_ANSWER.reversal_point);
+    // Node ids are cut from the other text too.
+    const withIds = answerWith([node("a", null)], [], { reversal_point: "Cheaper gas (0f8fad5b-d9cb-469f-a165-70867728950e) for years." });
+    expect(buildV4Map({ runId: "r", answer: withIds, story: storyFixture("READY") }).wouldChangeAlt).toBe("Cheaper gas for years.");
+    // No ready story: the reversal_point IS the text shown, so there is no other text.
+    expect(buildV4Map({ runId: "r", answer: STORY_FIXTURE_ANSWER, story: storyFixture("WRITING") }).wouldChangeAlt).toBeNull();
+    expect(buildV4Map({ runId: "r", answer: STORY_FIXTURE_ANSWER, story: null }).wouldChangeAlt).toBeNull();
+    // The story says the same thing (spaces aside), or there is no reversal_point: null.
+    const same = storyFixture("READY");
+    same.story!.short.change.text = `  ${STORY_FIXTURE_ANSWER.reversal_point.replace(/ /g, "  ")} `;
+    expect(buildV4Map({ runId: "r", answer: STORY_FIXTURE_ANSWER, story: same }).wouldChangeAlt).toBeNull();
+    const noReversal = answerWith([node("a", null)], [], { reversal_point: "  " });
+    expect(buildV4Map({ runId: "r", answer: noReversal, story: storyFixture("READY") }).wouldChangeAlt).toBeNull();
+  });
+
   it("keeps the whole composed answer only while there is no ready story body (DATA-2)", () => {
     const answer = STORY_FIXTURE_ANSWER;
     expect(buildV4Map({ runId: "r", answer, story: storyFixture("WRITING") }).fallbackText).toBe(FIXTURE_COMPOSED);
@@ -245,7 +263,9 @@ describe("buildV4Map", () => {
     expect(buildV4Map({ runId: "r", answer, story: storyFixture("WRITING") }).storyState).toBe("WRITING");
     expect(buildV4Map({ runId: "r", answer, story: null }).storyState).toBe("WRITING");
     expect(buildV4Map({ runId: "r", answer, story: null, storyGaveUp: true }).storyState).toBe("UNAVAILABLE");
-    expect(buildV4Map({ runId: "r", answer, story: storyFixture("WRITING"), storyGaveUp: true }).storyState).toBe("WRITING");
+    // R2TIME-3: a story still being written reads as unavailable once the page has given up waiting (it no longer asks).
+    expect(buildV4Map({ runId: "r", answer, story: storyFixture("WRITING"), storyGaveUp: true }).storyState).toBe("UNAVAILABLE");
+    expect(buildV4Map({ runId: "r", answer, story: storyFixture("WRITING"), storyGaveUp: false }).storyState).toBe("WRITING");
     expect(buildV4Map({ runId: "r", answer, story: storyFixture("UNAVAILABLE") }).storyState).toBe("UNAVAILABLE");
     const noBody = { ...storyFixture("READY"), story: null };
     const map = buildV4Map({ runId: "r", answer, story: noBody });

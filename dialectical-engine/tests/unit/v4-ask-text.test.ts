@@ -3,11 +3,17 @@ import { describe, expect, it } from "vitest";
 
 import {
   addedLines,
+  carriedMatch,
   composeQuestion,
+  DIG_ITEM_FLOOR,
   digQuestion,
   digTargetQuestions,
   ownWords,
+  parseDigDetail,
   parseDigQuestion,
+  ROOT_QUESTION_KEEP,
+  sameItemText,
+  sameParentText,
   sameQuestionText,
   startsWithLabel
 } from "../../apps/ui/lib/v4/askText.js";
@@ -305,6 +311,124 @@ describe("parseDigQuestion (round trips)", () => {
     expect(parsed?.parentQuestion.endsWith("…")).toBe(true);
     expect(sameQuestionText(parsed?.parentQuestion ?? "", longQuestion)).toBe(true);
     expect(sameQuestionText(parsed?.parentQuestion ?? "", "Something else entirely")).toBe(false);
+  });
+});
+
+describe("digQuestion's byte cap keeps what is dug whole (R2DIG-5)", () => {
+  const bytes = (text: string) => new TextEncoder().encode(text).length;
+  const ITEM = `Electricity prices for households ${"rise and fall with the gas market ".repeat(5)}every winter.`;
+
+  it("a dig of a dig whose root is near the limit keeps the item text whole and cuts the carried root quote", () => {
+    const root = `${"Ar trebui să ne mutăm în Cluj? ".repeat(260)}\n\nThis is about Romania.\nTime frame: the next 5 years.`;
+    const first = digQuestion({ kind: "path", path: PATH }, root, CATALOG, "en");
+    expect(bytes(first)).toBeLessThanOrEqual(askQuestionMaxBytes());
+    const second = digQuestion({ kind: "open", questions: [open("STILL_ARGUED", ITEM, "p:1")] }, first, CATALOG, "en");
+    expect(bytes(second)).toBeLessThanOrEqual(askQuestionMaxBytes());
+    expect(second.startsWith(`Does this hold up, and when? ${ITEM}\n\n`)).toBe(true);
+    // Its own context line names dig 1 whole; the root's quote inside the carried line is cut, and the root's
+    // place and time lines are still carried.
+    const lines = addedLines(second);
+    expect(lines[0]).toBe("This follows from an earlier question: “Look deeper into this part of the answer: Nuclear power keeps the grid steady.”");
+    expect(lines[1]?.endsWith("…”")).toBe(true);
+    expect(Array.from(parseDigDetail(second, CATALOG)?.carried[0] ?? "").length).toBeLessThan(ROOT_QUESTION_KEEP + 60);
+    expect(lines.slice(2)).toEqual(["This is about Romania.", "Time frame: the next 5 years."]);
+  });
+
+  it("drops carried lines before it cuts an item", () => {
+    const parent = `Q?\n\n${Array.from({ length: 30 }, (_, index) => `Line ${index} ${"x".repeat(300)}`).join("\n")}`;
+    const text = digQuestion({ kind: "open", questions: [open("OBJECTION", ITEM, "o:0")] }, parent, CATALOG, "en");
+    expect(bytes(text)).toBeLessThanOrEqual(askQuestionMaxBytes());
+    expect(text).toContain(ITEM);
+    expect(text).toContain("Line 0 ");
+    expect(text).not.toContain("Line 29 ");
+  });
+
+  it("cuts items only last, and never below the floor", () => {
+    const huge = "ă".repeat(5000);
+    const text = digQuestion({ kind: "open", questions: [open("STILL_ARGUED", huge, "p:1"), open("OBJECTION", "Short one.", "o:0")] },
+      `Q?\n\n${"Line\n".repeat(50)}`, CATALOG, "en");
+    expect(bytes(text)).toBeLessThanOrEqual(askQuestionMaxBytes());
+    expect(text).toContain("2. How strong is this objection, and does it change the answer? Short one.");
+    expect(text).not.toContain("\nLine");
+    const kept = /when\? (ă+)…/u.exec(text)?.[1] ?? "";
+    expect(kept.length).toBeGreaterThanOrEqual(DIG_ITEM_FLOOR);
+  });
+});
+
+describe("digQuestion off English carries no English (R2DIG-9)", () => {
+  it("turns English context lines into quotes and drops the English D2 sentences", () => {
+    const englishDig = digQuestion({ kind: "open", questions: [open("STILL_ARGUED", "Costs fall.", "p:1")] },
+      "Should we?\n\nThis is about Romania.\nTime frame: the next 5 years.\nPlease also look at: jobs.", CATALOG, "en");
+    const text = digQuestion({ kind: "open", questions: [open("OBJECTION", "Deșeurile.", "o:0")] }, englishDig, CATALOG, "ro");
+    expect(text).toBe("Deșeurile.\n\n“Does this hold up, and when? Costs fall.”\n“Should we?”");
+    expect(parseDigQuestion(text, CATALOG)?.parentQuestion).toBe("Does this hold up, and when? Costs fall.");
+  });
+
+  it("keeps lines already in the quoted form", () => {
+    const roDig = digQuestion({ kind: "open", questions: [open("OBJECTION", "A.", "o:0")] }, "Întrebare?", CATALOG, "ro");
+    expect(digQuestion({ kind: "open", questions: [open("OBJECTION", "B.", "o:0")] }, roDig, CATALOG, "ro"))
+      .toBe("B.\n\n“A.”\n“Întrebare?”");
+  });
+});
+
+describe("matching cut texts (R2DIG-8)", () => {
+  it("a question that really ends in … matches only itself as a parent", () => {
+    expect(sameParentText("Should I quit my job…", "Should I quit my job…")).toBe(true);
+    expect(sameParentText("Should I quit my job…", "Should I quit my job to study law?")).toBe(false);
+    expect(sameParentText(" Should  I quit ", "Should I quit")).toBe(true);
+  });
+
+  it("a parent cut by digQuestion (at least 160 characters kept) matches the text it was cut from", () => {
+    const full = "word ".repeat(100).trim();
+    const shown = `${Array.from(full).slice(0, ROOT_QUESTION_KEEP).join("").trimEnd()}…`;
+    expect(sameParentText(shown, full)).toBe(true);
+    expect(sameParentText(`${full.slice(0, 100)}…`, full)).toBe(false);
+    expect(sameParentText(shown, shown.slice(0, -1))).toBe(false);
+  });
+
+  it("an item matches a cut only when at least 80 characters were kept", () => {
+    const full = "x".repeat(200);
+    expect(sameItemText(`${"x".repeat(DIG_ITEM_FLOOR)}…`, full)).toBe(true);
+    expect(sameItemText(`${"x".repeat(20)}…`, full)).toBe(false);
+    expect(sameItemText("Short…", "Short… really")).toBe(false);
+    expect(sameItemText("Same text.", " Same  text. ")).toBe(true);
+  });
+
+  it("sameQuestionText still matches any cut of a strictly longer text", () => {
+    expect(sameQuestionText("Should…", "Should we?")).toBe(true);
+    expect(sameQuestionText("Should we?…", "Should we?")).toBe(false);
+    expect(sameQuestionText("", "x")).toBe(false);
+  });
+});
+
+describe("parseDigDetail and carriedMatch (R2DIG-1, R2DIG-4)", () => {
+  const PARENT = "Should we?\n\nThis is about Romania.\nTime frame: the next 5 years.";
+
+  it("reads each item's kind (English only), the carried lines and the form", () => {
+    const text = digQuestion({ kind: "open", questions: [open("WOULD_CHANGE", "Gas.", "w"), open("OBJECTION", "Waste.", "o:0")] },
+      PARENT, CATALOG, "en");
+    expect(parseDigDetail(text, CATALOG)).toEqual({
+      parentQuestion: "Should we?",
+      items: ["Gas.", "Waste."],
+      kinds: ["WOULD_CHANGE", "OBJECTION"],
+      carried: ["This is about Romania.", "Time frame: the next 5 years."],
+      english: true
+    });
+    expect(parseDigDetail(digQuestion({ kind: "path", path: PATH }, PARENT, CATALOG, "en"), CATALOG)?.kinds).toEqual(["PATH"]);
+    const ro = parseDigDetail(digQuestion({ kind: "open", questions: [open("WOULD_CHANGE", "Gaz.", "w")] }, PARENT, CATALOG, "ro"), CATALOG);
+    expect(ro).toEqual({ parentQuestion: "Should we?", items: ["Gaz."], kinds: [null], carried: [], english: false });
+    expect(parseDigDetail("Should we?", CATALOG)).toBeNull();
+  });
+
+  it("tells a candidate whose added lines were carried whole, carried in part, or not at all", () => {
+    const dig = parseDigDetail(digQuestion({ kind: "path", path: PATH }, PARENT, CATALOG, "en"), CATALOG)!;
+    expect(carriedMatch(dig, PARENT, CATALOG)).toBe("EQUAL");
+    expect(carriedMatch(dig, `${PARENT}\nI am writing about it.`, CATALOG)).toBe("LEADS");
+    expect(carriedMatch(dig, "Should we?\n\nThis is about the European Union as a whole.", CATALOG)).toBe("NONE");
+    expect(carriedMatch(dig, "Should we?", CATALOG)).toBe("NONE");
+    // Off English the candidate's lines are mapped the way the dig carried them (its English sentences dropped).
+    const ro = parseDigDetail(digQuestion({ kind: "path", path: PATH }, PARENT, CATALOG, "ro"), CATALOG)!;
+    expect(carriedMatch(ro, PARENT, CATALOG)).toBe("EQUAL");
   });
 });
 

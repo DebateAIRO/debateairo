@@ -50,7 +50,13 @@ type PanelProps = Readonly<{
   map: V4Map;
   digs: readonly DigView[];
   selected: V4Selection;
+  /** How much each point says (display only). */
   readingLevel: ReadingLevel;
+  /**
+   * R2REG-5: the level links carry — only one the person chose (null: none). Left out, links carry `readingLevel`
+   * as before.
+   */
+  linkLevel?: ReadingLevel | null;
   picked: ReadonlySet<string>;
   onTogglePick: (openQuestionId: string) => void;
   onSelect: (selection: V4Selection, viaKeyboard: boolean) => void;
@@ -496,7 +502,13 @@ function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolved
         : null}
       {dig.state === "DONE"
         ? (
-          <Link className="v4Btn" href={levelHref(`/v4/debate/${encodeURIComponent(dig.link.childRunId)}`, panel.readingLevel)}>
+          <Link
+            className="v4Btn"
+            href={levelHref(
+              `/v4/debate/${encodeURIComponent(dig.link.childRunId)}`,
+              panel.linkLevel === undefined ? panel.readingLevel : panel.linkLevel
+            )}
+          >
             {t(panel.catalog, "v4.panel.openDig")}
           </Link>
         )

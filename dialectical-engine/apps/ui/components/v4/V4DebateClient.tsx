@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import type { AnswerStory, RunProjection } from "@debateai/contract";
 import { AuthGate } from "@/components/AuthGate";
 import { RoomNotice } from "@/components/billing/RoomNotice";
@@ -15,9 +15,9 @@ import { V4Rail, type V4DigCounts } from "@/components/v4/V4Rail";
 import { isNotFound } from "@/lib/api";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { runFailureMessage } from "@/lib/v3/runFailure";
-import { digQuestion, digTargetQuestions, ownWords } from "@/lib/v4/askText";
+import { digQuestion, digTargetQuestions, ownWords, parseDigQuestion } from "@/lib/v4/askText";
 import { diffSnapshots, selectionForChange, snapshotItems } from "@/lib/v4/changes";
-import { digLinksFor, digParentOf, readQuestionIndex, type IndexEntry } from "@/lib/v4/digIndex";
+import { digLinksFor, digParentOf, mergeIndex, readQuestionIndex, type IndexEntry } from "@/lib/v4/digIndex";
 import { loadDigView, loadStory, loadV4, storyReadFailed, type V4Load } from "@/lib/v4/load";
 import { buildV4Map, uniqueOpenQuestions } from "@/lib/v4/mapModel";
 import { levelHref, useReadingLevel } from "@/lib/v4/storage";
@@ -45,8 +45,11 @@ import { useV4Ask, type V4AskOutcome } from "@/lib/v4/useV4Ask";
 
 const RUN_POLL_MS = 5_000;
 const RUN_POLL_AFTER_ERROR_MS = 30_000;
-const STORY_POLL_MS = 10_000;
-const STORY_POLL_TRIES = 30;
+/** R2TIME-3: while the story is being written it is asked again after 10 s, then 20 s, 40 s, and every 60 s after. */
+const STORY_POLL_FIRST_MS = 10_000;
+const STORY_POLL_MAX_MS = 60_000;
+/** R2TIME-3: the page stops waiting for a story still being written only after about this long in total. */
+const STORY_WAIT_LIMIT_MS = 15 * 60_000;
 /** DATA-3: a story read that failed is accepted only after this many failures in a row (V3's readFailureLimit). */
 const STORY_READ_FAILURE_LIMIT = 4;
 const DIG_POLL_MS = 15_000;
@@ -57,6 +60,13 @@ const DIG_FIRST_READ_FAILURES = 3;
 /** Decision A: the account's question list is read again this often while a dig is going, and when all are final. */
 const INDEX_POLL_BUSY_MS = 20_000;
 const INDEX_POLL_IDLE_MS = 60_000;
+/** R2DIG-3/R2TIME-5: a failed first read of the list is tried again after 5 s, and settles after 3 failures in a row. */
+const INDEX_FIRST_RETRY_MS = 5_000;
+const INDEX_FIRST_READ_FAILURES = 3;
+/** R2DIG-7: re-reads ask only for the newest rows (a new dig is always among them) and merge them into the first read. */
+const INDEX_REREAD_LIMIT = 20;
+/** R2DIG-6: a dig's own page reads this many pages past the dig itself, to reach the older debate it came from. */
+const INDEX_PARENT_PAGES = 2;
 const UNDO_MS = 10_000;
 const CLOCK_TICK_MS = 15_000;
 /** The reading level a page uses when the address names none (Decision A). */
@@ -262,7 +272,7 @@ function V4Debate({
   /** The whole text that was sent for this debate (the person's words plus any added lines). */
   const questionLine = served !== null ? served.answer.question_line : load?.kind === "RUN" ? load.run.question_line : null;
 
-  // ── The story: while it is missing, being written or its read failed, ask again every 10 s (at most 30 times) ────
+  // ── The story: while it is missing, being written or its read failed, ask again, backing off (R2TIME-3) ─────────
   const [polledStory, setPolledStory] = useState<Readonly<{ answerId: string; story: AnswerStory | null }> | null>(null);
   const [storyGaveUp, setStoryGaveUp] = useState(false);
   const story = polledStory !== null && polledStory.answerId === answerId ? polledStory.story : served?.story ?? null;
@@ -276,11 +286,13 @@ function V4Debate({
     if (answerId === null || !storyPending) return;
     let active = true;
     let timer: number | undefined;
-    let tries = 0;
+    // R2TIME-3: no cap on tries while the story is being written (the server's own window ends WRITING); the page
+    // gives up only after the read-failure limit or about 15 minutes, so it never claims to update when it no longer asks.
+    const waitStarted = Date.now();
+    let delay = STORY_POLL_FIRST_MS;
     // The read the page already holds counts: a failed one is the first of the four in a row (DATA-3).
     let failuresInARow = storyFailedReadRef.current ? 1 : 0;
     const tick = async (): Promise<void> => {
-      tries += 1;
       let next: AnswerStory | null = null;
       let failed = false;
       try {
@@ -293,13 +305,14 @@ function V4Debate({
       const readFailed = failed || (next !== null && storyReadFailed(next));
       failuresInARow = readFailed ? failuresInARow + 1 : 0;
       if (!readFailed && next !== null && next.status !== "WRITING") return;
-      if (failuresInARow >= STORY_READ_FAILURE_LIMIT || tries >= STORY_POLL_TRIES) {
+      if (failuresInARow >= STORY_READ_FAILURE_LIMIT || Date.now() - waitStarted >= STORY_WAIT_LIMIT_MS) {
         setStoryGaveUp(true);
         return;
       }
-      timer = window.setTimeout(() => void tick(), STORY_POLL_MS);
+      delay = Math.min(STORY_POLL_MAX_MS, delay * 2);
+      timer = window.setTimeout(() => void tick(), delay);
     };
-    timer = window.setTimeout(() => void tick(), STORY_POLL_MS);
+    timer = window.setTimeout(() => void tick(), delay);
     return () => {
       active = false;
       window.clearTimeout(timer);
@@ -316,31 +329,113 @@ function V4Debate({
 
   // ── The account's question list (Decision A): digs and the back link are found again in it, by text ───────────
   const [index, setIndex] = useState<readonly IndexEntry[]>([]);
+  /** The first read of the list succeeded, or failed 3 times in a row: only then may "what changed" take its baseline. */
   const [indexSettled, setIndexSettled] = useState(false);
   const digsLiveRef = useRef(false);
+  /** R2DIG-3: set when the first successful read lands after the baseline was taken; its digs are folded in, not news. */
+  const foldArmed = useRef(false);
+  /** The "while you were here" baseline (declared here: the index loop checks it when its first read lands late). */
+  const baseline = useRef<Readonly<Record<string, string>> | null>(null);
   const hasLoad = load !== null;
+  const isServed = served !== null;
+  const servedNowRef = useRef(isServed);
+  const runIdRef = useRef(runId);
+  /** R2RULES-8 / R2DIG-6: this debate is itself a dig (its question names an earlier one). */
+  const isDigPage = useMemo(
+    () => questionLine !== null && parseDigQuestion(questionLine, catalog) !== null,
+    [questionLine, catalog]
+  );
+  const isDigPageRef = useRef(isDigPage);
+  useEffect(() => {
+    servedNowRef.current = isServed;
+    runIdRef.current = runId;
+    isDigPageRef.current = isDigPage;
+  });
+  const indexLoop = useRef<Readonly<{ kick: () => void }> | null>(null);
   useEffect(() => {
     if (!hasLoad) return;
     let active = true;
+    let busy = false;
     let timer: number | undefined;
-    const tick = async (): Promise<void> => {
-      try {
-        const entries = await readQuestionIndex();
-        if (!active) return;
-        setIndex(entries);
-      } catch {
-        if (!active) return;
-        // Quiet: the digs started in this visit still show; the list is asked again later.
-      }
-      setIndexSettled(true);
-      timer = window.setTimeout(() => void tick(), digsLiveRef.current ? INDEX_POLL_BUSY_MS : INDEX_POLL_IDLE_MS);
+    let loadedOk = false;
+    let failures = 0;
+    let known: readonly IndexEntry[] = [];
+    const arm = (ms: number): void => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => void tick(), ms);
     };
+    const nextInterval = (): number => (digsLiveRef.current ? INDEX_POLL_BUSY_MS : INDEX_POLL_IDLE_MS);
+    const tick = async (): Promise<void> => {
+      window.clearTimeout(timer);
+      timer = undefined;
+      if (busy) return;
+      // R2DIG-7: no re-reads while the tab is hidden; coming back to it reads once (the listener below).
+      if (loadedOk && document.visibilityState === "hidden") return;
+      busy = true;
+      try {
+        // R2DIG-6: the first read pages until this debate is seen (digs are newer, so they all come first); a dig's own
+        // page reads two pages more to reach the debate it came from. Later reads take only the newest rows.
+        const fresh = loadedOk
+          ? await readQuestionIndex(undefined, { limit: INDEX_REREAD_LIMIT })
+          : await readQuestionIndex(undefined, {
+            untilRunId: runIdRef.current,
+            extraPages: isDigPageRef.current ? INDEX_PARENT_PAGES : 0
+          });
+        busy = false;
+        if (!active) return;
+        known = mergeIndex(known, fresh);
+        if (!loadedOk) {
+          loadedOk = true;
+          failures = 0;
+          // R2DIG-3: the baseline was already taken without these digs (the first reads failed): fold them in.
+          if (baseline.current !== null) foldArmed.current = true;
+        }
+        setIndex(known);
+        setIndexSettled(true);
+        // A run page reads once (for the back link) and waits until the answer is served.
+        if (servedNowRef.current) arm(nextInterval());
+      } catch {
+        busy = false;
+        if (!active) return;
+        if (loadedOk) {
+          // Quiet: the digs already found still show; the list is asked again later.
+          if (servedNowRef.current) arm(nextInterval());
+          return;
+        }
+        // R2TIME-5: a failed first read is tried again soon; after 3 in a row it stops holding back the baseline,
+        // and a served page keeps trying slowly so the digs can still appear (folded in, not as news).
+        failures += 1;
+        if (failures < INDEX_FIRST_READ_FAILURES) {
+          arm(INDEX_FIRST_RETRY_MS);
+          return;
+        }
+        setIndexSettled(true);
+        if (servedNowRef.current) arm(INDEX_POLL_IDLE_MS);
+      }
+    };
+    const onVisibility = (): void => {
+      if (document.visibilityState !== "visible" || !loadedOk || !servedNowRef.current || busy) return;
+      void tick();
+    };
+    // The answer was served after the page opened: start the regular reads (or retry a first read that never worked).
+    indexLoop.current = {
+      kick: () => {
+        if (busy || timer !== undefined) return;
+        if (loadedOk || failures >= INDEX_FIRST_READ_FAILURES) arm(loadedOk ? nextInterval() : 0);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
     void tick();
     return () => {
       active = false;
       window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+      indexLoop.current = null;
     };
   }, [hasLoad]);
+  useEffect(() => {
+    if (isServed) indexLoop.current?.kick();
+  }, [isServed]);
 
   // ── Digs: the ones started in this visit (memory) merged with the ones found in the account's list ─────────────
   const [visitLinks, setVisitLinks] = useState<readonly DigLink[]>(() => [...startedThisVisit.values()].map((entry) => entry.link));
@@ -467,6 +562,18 @@ function V4Debate({
     if (focusRequest > 0) headingRef.current?.focus();
   }, [focusRequest]);
 
+  // R2TIME-4/R2REG-4: closing the phone map puts focus back on the Map button, unless a row already moved it on to
+  // the panel heading (the effect above runs first in the same commit). The button is a new one by then, so the ref
+  // points at the one on screen.
+  const mapButtonRef = useRef<HTMLButtonElement | null>(null);
+  const sheetWasOpen = useRef(false);
+  useEffect(() => {
+    if (sheetWasOpen.current && !sheetOpen && (document.activeElement === document.body || document.activeElement === null)) {
+      mapButtonRef.current?.focus();
+    }
+    sheetWasOpen.current = sheetOpen;
+  }, [sheetOpen]);
+
   // UI-5: the side panel scrolls on its own; a new question starts at its top, not where the last one was left.
   useEffect(() => {
     if (panelColRef.current !== null) panelColRef.current.scrollTop = 0;
@@ -560,23 +667,58 @@ function V4Debate({
   // The first complete load (map + every dig read once + the question list read once) is the baseline; later live
   // changes are news, each with a dot and a tour stop. Nothing is written anywhere (Decision A).
   const [news, setNews] = useState<readonly V4Change[]>([]);
-  const [hiddenStops, setHiddenStops] = useState(0);
+  /** R2TIME-6: how many news items "Hide this" put away; news that lands after it brings the bar back. */
+  const [hiddenNews, setHiddenNews] = useState(0);
   const [tourIndex, setTourIndex] = useState<number | null>(null);
-  const baseline = useRef<Readonly<Record<string, string>> | null>(null);
+  /** The story state the baseline last saw (R2TIME-1: the story arriving is one piece of news, not one per question). */
+  const baselineStory = useRef<V4Map["storyState"] | null>(null);
+  /** R2DIG-3: digs found by a first read that landed after the baseline; their first appearance is not news. */
+  const foldIds = useRef<ReadonlySet<string>>(new Set());
   const selectedRef = useRef(selected);
   useEffect(() => {
     selectedRef.current = selected;
   });
+  // Runs before the baseline effect below in the same commit, while the new links are not read yet.
+  useEffect(() => {
+    if (!foldArmed.current || baseline.current === null) return;
+    foldArmed.current = false;
+    const known = baseline.current;
+    foldIds.current = new Set(links
+      .filter((link) => !startedThisVisit.has(link.childRunId) && !(`dig:${link.childRunId}` in known))
+      .map((link) => link.childRunId));
+  }, [links]);
   const digsSettled = indexSettled && links.every((link) => isSettled(statuses.get(link.childRunId)));
   const liveReady = map !== null && digsSettled;
   useEffect(() => {
     if (!liveReady || map === null) return;
     const items = snapshotItems(map, digs);
     const before = baseline.current;
+    const storyBefore = baselineStory.current;
     baseline.current = items;
+    baselineStory.current = map.storyState;
     if (before === null) return;
     const startedHere = new Set(visitLinks.map((link) => link.childRunId));
-    const fresh = diffSnapshots({ at: "", items: before }, items).filter((change) => isNews(change, startedHere));
+    let fresh = diffSnapshots({ at: "", items: before }, items).filter((change) => isNews(change, startedHere));
+    // R2DIG-3: a dig that already existed but was missed by the failed first reads is folded into the baseline.
+    if (foldIds.current.size > 0) {
+      const folding = foldIds.current;
+      const foldedOpen = new Set(digs
+        .filter((dig) => folding.has(dig.link.childRunId))
+        .flatMap((dig) => dig.link.openQuestionIds));
+      fresh = fresh.filter((change) => {
+        if (change.id.startsWith("dig:") && change.kind === "ADDED") return !folding.has(change.id.slice("dig:".length));
+        if (change.id.startsWith("open:")) return !foldedOpen.has(change.id.slice("open:".length));
+        return true;
+      });
+      foldIds.current = new Set([...folding].filter((childRunId) => !(`dig:${childRunId}` in items)));
+    }
+    // R2TIME-1: the story arriving redraws every question under the answer; that is one piece of news at the question.
+    if (storyBefore !== null && storyBefore !== map.storyState) {
+      fresh = fresh.filter((change) => !change.id.startsWith("path:"));
+      if (map.storyState === "READY") {
+        fresh = [{ id: `story:${map.answerId}`, kind: "CHANGED", before: storyBefore, now: map.storyState }, ...fresh];
+      }
+    }
     if (fresh.length === 0) return;
     setNews((previous) => [...previous, ...fresh]);
     // A question opened earlier gets its "New" dot back when news lands on it (not the one on screen now).
@@ -586,18 +728,20 @@ function V4Debate({
 
   // RULES-11/FIT-7: the bar counts stops (questions), the same unit the tour numbers; news on the question itself is
   // one stop too, so every change can be reached.
-  const tourStops = useMemo<readonly V4Selection[]>(() => {
+  const stopsOf = useCallback((changes: readonly V4Change[]): readonly V4Selection[] => {
     if (map === null) return [];
     const stops: V4Selection[] = [];
-    for (const change of news) {
+    for (const change of changes) {
       const stop = selectionForChange(map, change);
       if (!stops.includes(stop)) stops.push(stop);
     }
     return stops;
-  }, [map, news]);
+  }, [map]);
+  // R2TIME-6: the bar and its tour cover the news since the last "Hide this"; the "New" dots cover all news.
+  const tourStops = useMemo<readonly V4Selection[]>(() => stopsOf(news.slice(hiddenNews)), [stopsOf, news, hiddenNews]);
   const changed = useMemo<ReadonlySet<string>>(
-    () => new Set(tourStops.filter((stop) => stop !== "root" && !opened.has(stop))),
-    [tourStops, opened]
+    () => new Set(stopsOf(news).filter((stop) => stop !== "root" && !opened.has(stop))),
+    [stopsOf, news, opened]
   );
 
   const onTour = useCallback((): void => {
@@ -617,7 +761,7 @@ function V4Debate({
   const parent = useMemo<Readonly<{ runId: string; question: string }> | null>(() => {
     if (visitEntry !== null) return { runId: visitEntry.link.parentRunId, question: visitEntry.parentQuestion };
     if (questionLine === null) return null;
-    const entry = digParentOf(questionLine, index, catalog);
+    const entry = digParentOf(runId, questionLine, index, catalog);
     return entry === null || entry.runId === runId ? null : { runId: entry.runId, question: ownWords(entry.questionLine) };
   }, [visitEntry, questionLine, index, catalog, runId]);
   const startedAt = visitEntry?.link.startedAt ?? null;
@@ -634,10 +778,17 @@ function V4Debate({
 
   // ── Layout ──────────────────────────────────────────────────────────────────────────────────────────────────────
   const classicHref = `/debate/${encodeURIComponent(runId)}`;
-  const reportHref = levelHref(`/v4/debate/${encodeURIComponent(runId)}/report`, readingLevel);
-  const askHref = levelHref("/v4", readingLevel);
+  // R2REG-5: links carry only a level the person chose (none chosen: /v4 still offers its one-time choice).
+  const reportHref = levelHref(`/v4/debate/${encodeURIComponent(runId)}/report`, chosenLevel);
+  const askHref = levelHref("/v4", chosenLevel);
   const header = (
-    <V4Header catalog={catalog} readingLevel={readingLevel} onReadingLevel={chooseLevel} classicHref={classicHref}>
+    <V4Header
+      catalog={catalog}
+      readingLevel={readingLevel}
+      linkLevel={chosenLevel}
+      onReadingLevel={chooseLevel}
+      classicHref={classicHref}
+    >
       {served !== null ? (
         <Link className="v4Btn v4BtnPrimary v4DebReportLink" href={reportHref}>{t(catalog, "v4.debate.report")}</Link>
       ) : null}
@@ -689,12 +840,13 @@ function V4Debate({
     ? <RoomNotice room={room} catalog={{ ...newDebateCatalog, ...billingCatalog }} locale={locale} />
     : null;
   const phoneTarget = layout === "phone" ? targetOf(map, digs, shownSelection) : null;
-  const showChanges = tourStops.length > hiddenStops;
+  const showChanges = tourStops.length > 0;
 
   const rail = (variant: "column" | "strip") => (
     <V4Rail
       runId={runId}
-      level={readingLevel}
+      level={chosenLevel}
+      showReadStep={!isDigPage}
       openLeft={openLeft}
       digs={dugCounts}
       variant={variant}
@@ -751,15 +903,16 @@ function V4Debate({
   const pageClass = `v4DebPage v4DebLayout-${layout}${hasTray ? " v4DebHasTray" : ""}${sheetOpen ? " v4DebSheetOpen" : ""}`;
   return (
     <div className={pageClass}>
+      {/* The tab title follows this heading (DocumentTitle): the person's own words, not the added lines. R2TIME-9: it
+          sits outside the inert wrapper, so the title stays while the phone map is open. */}
+      <h1 className="v4SrOnly" data-ai-generated="true">{ownWords(map.question)}</h1>
       {/* UI-6: while the phone map is open, everything behind it is inert (the sheet is a real modal). */}
       <div className="v4DebBehind" inert={sheetOpen}>
         {header}
         {layout === "mid" ? rail("strip") : null}
         <div className="v4DebMain">
-          {/* The tab title follows this heading (DocumentTitle): the person's own words, not the added lines. */}
-          <h1 className="v4SrOnly" data-ai-generated="true">{ownWords(map.question)}</h1>
           {parent !== null ? (
-            <Link className="v4DebBack" href={levelHref(`/v4/debate/${encodeURIComponent(parent.runId)}`, readingLevel)}>
+            <Link className="v4DebBack" href={levelHref(`/v4/debate/${encodeURIComponent(parent.runId)}`, chosenLevel)}>
               <span aria-hidden="true">‹</span>{" "}
               {t(catalog, "v4.debate.backTo")}{" "}
               <span className="v4DebBackQuestion" data-ai-generated="true">{parent.question}</span>
@@ -771,7 +924,7 @@ function V4Debate({
               tourIndex={tourIndex}
               onTour={onTour}
               onDismiss={() => {
-                setHiddenStops(tourStops.length);
+                setHiddenNews(news.length);
                 setTourIndex(null);
               }}
               catalog={catalog}
@@ -795,6 +948,7 @@ function V4Debate({
                 digs={digs}
                 selected={shownSelection}
                 readingLevel={readingLevel}
+                linkLevel={chosenLevel}
                 picked={picked}
                 onTogglePick={togglePick}
                 onSelect={select}
@@ -817,6 +971,7 @@ function V4Debate({
           {tray}
           {layout === "phone" ? (
             <PhoneBar
+              mapButtonRef={mapButtonRef}
               onMap={() => setOutlineOpen(true)}
               target={phoneTarget}
               onDig={startDig}
@@ -948,7 +1103,8 @@ function ProgressScreen({ run, startedAt, now, reconnecting, classicHref, catalo
 
 // ── Phone pieces (D6, D7) ───────────────────────────────────────────────────────────────────────────────────────
 
-function PhoneBar({ onMap, target, onDig, digBusy, catalog }: Readonly<{
+function PhoneBar({ mapButtonRef, onMap, target, onDig, digBusy, catalog }: Readonly<{
+  mapButtonRef: RefObject<HTMLButtonElement | null>;
   onMap: () => void;
   target: DigTarget | null;
   onDig: (target: DigTarget) => void;
@@ -957,7 +1113,7 @@ function PhoneBar({ onMap, target, onDig, digBusy, catalog }: Readonly<{
 }>) {
   return (
     <div className="v4DebPhoneBar">
-      <button type="button" className="v4Btn v4DebPhoneMap" onClick={onMap} aria-haspopup="dialog">
+      <button ref={mapButtonRef} type="button" className="v4Btn v4DebPhoneMap" onClick={onMap} aria-haspopup="dialog">
         {t(catalog, "v4.debate.mapButton")}
       </button>
       {target !== null ? (
@@ -981,13 +1137,9 @@ function OutlineSheet({ onClose, footer, catalog, children }: Readonly<{
 }>) {
   const sheetRef = useRef<HTMLDivElement | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
+  // Focus goes back to the Map button from the page (R2TIME-4): the button is re-mounted when the sheet closes.
   useEffect(() => {
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     closeRef.current?.focus();
-    return () => {
-      // Back to the Map button, unless a row moved focus on to the panel heading.
-      if (document.activeElement === document.body || document.activeElement === null) opener?.focus();
-    };
   }, []);
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
     if (event.key === "Escape") {

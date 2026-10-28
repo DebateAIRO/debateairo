@@ -110,9 +110,15 @@ function ReadingLevelMenu({ catalog, level, onLevel }: Readonly<{
   );
 }
 
-export function V4Header({ catalog, readingLevel, onReadingLevel, classicHref = null, children }: Readonly<{
+export function V4Header({ catalog, readingLevel, linkLevel, onReadingLevel, classicHref = null, children }: Readonly<{
   catalog: MessageCatalog;
+  /** The level the menu shows (a page may show its default when none was chosen). */
   readingLevel: ReadingLevel | null;
+  /**
+   * R2REG-5: the level the brand link carries — only one the person chose (null: none, so /v4 still offers the choice).
+   * Left out, the link carries `readingLevel` as before.
+   */
+  linkLevel?: ReadingLevel | null;
   onReadingLevel?: (level: ReadingLevel) => void;
   classicHref?: string | null;
   /** Right-side extras (e.g. the Report button). */
@@ -121,7 +127,7 @@ export function V4Header({ catalog, readingLevel, onReadingLevel, classicHref = 
   const dayPercent = useDayPercent();
   return (
     <header className="v4Hdr">
-      <Link href={levelHref("/v4", readingLevel)} className="v4HdrBrand">
+      <Link href={levelHref("/v4", linkLevel === undefined ? readingLevel : linkLevel)} className="v4HdrBrand">
         <span className="v4HdrMark" aria-hidden="true" />
         <span className="v4HdrName">Dialectical Engine</span>
         <span className="v4HdrBadge">{t(catalog, "v4.brand.badge")}</span>

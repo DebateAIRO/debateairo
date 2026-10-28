@@ -39,8 +39,14 @@ type ReportLoad =
 /** A dig as the report lists it; `view` is undefined while it loads and null when it could not be read just now. */
 type ReportDig = Readonly<{ link: DigLink; view: DigView | null | undefined }>;
 
-const STORY_POLL_MS = 10_000;
-const STORY_POLL_MAX = 30;
+/*
+ * R2TIME-3 / R2TIME-7: the same rule as the map page's story poll. While the story is being written it is read again
+ * on a chained timer (never two reads in flight), backing off 10 s → 20 s → 40 s → 60 s; there is no try cap while it
+ * is WRITING. The page gives up only after V3's read-failure limit (failed reads in a row) or about 15 minutes in all.
+ */
+const STORY_POLL_FIRST_MS = 10_000;
+const STORY_POLL_MAX_MS = 60_000;
+const STORY_WAIT_MAX_MS = 15 * 60_000;
 /** Spec D5: the reading level defaults to "Some background" when none is chosen. */
 const DEFAULT_LEVEL: ReadingLevel = "background";
 
@@ -101,8 +107,8 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
     [load, gaveUp]
   );
 
-  // Same rule as the map page: a story still being written, or a read that failed for a moment, is read again every
-  // 10 s, at most 30 times; a failed read is accepted only on the fourth failure in a row (DATA-3).
+  // A story still being written, or a read that failed for a moment, is read again (rule above); a failed read is
+  // accepted only on the fourth failure in a row (DATA-3).
   const answerId = load.kind === "SERVED" ? load.answer.answer_id : null;
   const answerVersion = load.kind === "SERVED" ? load.answer.answer_version : null;
   const storyPending = map !== null && !gaveUp && map.storyState === "WRITING";
@@ -110,29 +116,57 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
   useEffect(() => {
     if (answerId === null || answerVersion === null || !storyPending) return;
     let active = true;
-    let tries = 0;
+    let timer: number | undefined;
+    let delay = STORY_POLL_FIRST_MS;
+    let failuresInARow = 0;
+    const startedAt = Date.now();
     // null: the read itself threw; it counts as a failed read, labelled as V3 labels it.
-    const settle = (read: AnswerStory | null) => {
-      if (!active) return;
+    const settle = (read: AnswerStory | null): AnswerStory => {
+      const next = read ?? unreadableStory(answerId, answerVersion, "STORY_READ_FAILED");
       setLoad((current) => {
         if (current.kind !== "SERVED" || current.answer.answer_id !== answerId) return current;
-        const next = read ?? unreadableStory(answerId, answerVersion, "STORY_READ_FAILED");
         if (!storyReadFailed(next)) return { ...current, story: next, readFailures: 0 };
         const readFailures = current.readFailures + 1;
         // Until the limit the page keeps what it shows; the last failure then becomes the story's state.
         return readFailures < STORY_POLLING.readFailureLimit ? { ...current, readFailures } : { ...current, story: next, readFailures };
       });
+      return next;
     };
-    const timer = window.setInterval(() => {
-      tries += 1;
-      if (tries > STORY_POLL_MAX) { window.clearInterval(timer); setStoryGaveUp(true); return; }
-      loadStory(answerId, undefined, answerVersion).then(settle, () => settle(null));
-    }, STORY_POLL_MS);
-    return () => { active = false; window.clearInterval(timer); };
+    const tick = async (): Promise<void> => {
+      let read: AnswerStory | null = null;
+      try {
+        read = await loadStory(answerId, undefined, answerVersion);
+      } catch {
+        read = null;
+      }
+      if (!active) return;
+      const next = settle(read);
+      if (storyReadFailed(next)) {
+        failuresInARow += 1;
+        // The failure limit ends the wait through `readFailures` (gaveUp above); nothing more to schedule.
+        if (failuresInARow >= STORY_POLLING.readFailureLimit) return;
+      } else {
+        failuresInARow = 0;
+        // Written (or finally unavailable): the effect stops here; `storyPending` turns false on the next render.
+        if (next.status !== "WRITING") return;
+      }
+      if (Date.now() - startedAt >= STORY_WAIT_MAX_MS) {
+        setStoryGaveUp(true);
+        return;
+      }
+      delay = Math.min(STORY_POLL_MAX_MS, delay * 2);
+      timer = window.setTimeout(() => void tick(), delay);
+    };
+    timer = window.setTimeout(() => void tick(), delay);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
   }, [answerId, answerVersion, storyPending]);
 
   // Decision A: digs are found again from the account's question list (lib/v4/digIndex.ts); read once — the report is a
-  // snapshot. A failed list read leaves the digs out quietly.
+  // snapshot. Digs are newer than their parent, so the list is paged only until this run has been seen (FIXES2,
+  // R2DIG-6). A failed list read leaves the digs out quietly.
   const runId = load.kind === "SERVED" ? load.runId : null;
   const questionLine = load.kind === "SERVED" ? load.answer.question_line : null;
   const [index, setIndex] = useState<readonly IndexEntry[] | null>(null);
@@ -140,7 +174,7 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
     if (runId === null) return;
     let active = true;
     setIndex(null);
-    readQuestionIndex().then(
+    readQuestionIndex(undefined, { untilRunId: runId }).then(
       (entries) => { if (active) setIndex(entries); },
       () => { if (active) setIndex([]); }
     );
@@ -172,14 +206,9 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
   }, [digLinks]);
   const digs: readonly ReportDig[] = digLinks.map((link) => ({ link, view: views.get(link.childRunId) }));
 
-  // The browser tab and a printed file are named after the person's own words, not the added lines.
+  // The person's own words, not the added lines. R2TIME-8: the site's DocumentTitle names the tab (and a printed file)
+  // after the h1, so the "Report:" prefix sits inside the h1 (hidden on screen) instead of a document.title write.
   const ownQuestion = map !== null ? ownWords(map.question) : null;
-  useEffect(() => {
-    if (ownQuestion === null) return;
-    const before = document.title;
-    document.title = t(catalog, "v4.report.documentTitle", { question: ownQuestion });
-    return () => { document.title = before; };
-  }, [ownQuestion, catalog]);
 
   const mapHref = levelHref(`/v4/debate/${encodeURIComponent(id)}`, chosenLevel);
   const classicHref = `/debate/${encodeURIComponent(id)}`;
@@ -188,7 +217,8 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
 
   const header = (
     <div className="v4RepChrome">
-      <V4Header catalog={catalog} readingLevel={level} onReadingLevel={chooseLevel} classicHref={classicHref}>
+      {/* R2REG-5: the menu shows the level in use, but links carry only a level the person chose. */}
+      <V4Header catalog={catalog} readingLevel={level} linkLevel={chosenLevel} onReadingLevel={chooseLevel} classicHref={classicHref}>
         <div className="v4RepActions">
           <Link className="v4Btn" href={mapHref}>{t(catalog, "v4.report.backToMap")}</Link>
           {pdfReady ? <a className="v4Btn" href={`${classicHref}/report`}>{t(catalog, "v4.report.downloadPdf")}</a> : null}
@@ -250,7 +280,10 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
               level: t(catalog, `v4.readingLevel.${level}`)
             })}
           </p>
-          <h1 id="v4-report-title" className="v4RepTitle" data-ai-generated="true">{ownQuestion}</h1>
+          <h1 id="v4-report-title" className="v4RepTitle">
+            <span className="v4SrOnly">{t(catalog, "v4.report.titlePrefix")} </span>
+            <span data-ai-generated="true">{ownQuestion}</span>
+          </h1>
         </header>
 
         {sent ? (

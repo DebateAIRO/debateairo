@@ -33,7 +33,9 @@ function readyBody(story: AnswerStory | null): StoryBody | null {
  */
 function storyStateOf(story: AnswerStory | null, body: StoryBody | null, gaveUp: boolean): V4Map["storyState"] {
   if (body !== null) return "READY";
-  if (story?.status === "WRITING") return "WRITING";
+  // R2TIME-3 (minimal part): a story still WRITING reads as unavailable only once the page has given up waiting (the
+  // pages back off and give up only after a long wait), so the page never says it updates by itself when it no longer asks.
+  if (story?.status === "WRITING") return gaveUp ? "UNAVAILABLE" : "WRITING";
   if ((story === null || storyReadFailed(story)) && !gaveUp) return "WRITING";
   return "UNAVAILABLE";
 }
@@ -112,12 +114,22 @@ function storyPaths(body: StoryBody | null, byId: ReadonlyMap<string, V4Point>):
   });
 }
 
-/** DATA-7: the story's checked "change" paragraph when a ready body has one, else the answer's reversal_point. */
-function turningPoint(answer: Answer, body: StoryBody | null): string | null {
+type TurningPoint = Readonly<{ text: string | null; alt: string | null }>;
+
+/**
+ * DATA-7: the story's checked "change" paragraph when a ready body has one, else the answer's reversal_point.
+ * R2DIG-4 / R2REG-2: `alt` is the reversal_point (node ids cut) when the story's text is the one used and the two
+ * differ, so a dig named after the earlier text still finds "w"; null otherwise.
+ */
+function turningPoint(answer: Answer, body: StoryBody | null): TurningPoint {
   const fromStory = body === null ? "" : body.short.change.text.trim();
-  if (fromStory.length > 0) return fromStory;
   const raw = withoutNodeIds(answer.reversal_point);
-  return raw.length > 0 ? raw : null;
+  const rawText = raw.length > 0 ? raw : null;
+  if (fromStory.length > 0) {
+    const differs = rawText !== null && rawText.replace(/\s+/gu, " ") !== fromStory.replace(/\s+/gu, " ");
+    return { text: fromStory, alt: differs ? rawText : null };
+  }
+  return { text: rawText, alt: null };
 }
 
 function rootOpen(answer: Answer, turn: string | null): V4OpenQuestion[] {
@@ -187,7 +199,8 @@ export function buildV4Map(input: Readonly<{
     const first = answer.composed_text.find((segment) => segment.text.trim().length > 0);
     paths = [pathOf("all", null, first === undefined ? answer.question_line : first.text, allPoints)];
   }
-  const turn = turningPoint(answer, body);
+  const turning = turningPoint(answer, body);
+  const turn = turning.text;
   let open = rootOpen(answer, turn);
   // DATA-6: a still-argued point no story path cites still counts as open; it hangs under the question itself.
   const covered = new Set(paths.flatMap((path) => path.open.map((question) => question.id)));
@@ -228,6 +241,7 @@ export function buildV4Map(input: Readonly<{
     counts,
     unchecked,
     wouldChange: turn,
+    wouldChangeAlt: turning.alt,
     objections: answer.residual_objections.map((objection) => objection.trim()).filter((objection) => objection.length > 0),
     storyState: storyStateOf(story, body, input.storyGaveUp === true),
     fallbackText: body === null ? composedText(answer) : null,

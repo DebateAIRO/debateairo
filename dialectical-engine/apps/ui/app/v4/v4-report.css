@@ -22,6 +22,8 @@
 .v4RepTop { display: flex; flex-direction: column; gap: 12px; }
 .v4RepMeta { color: var(--text-3); }
 .v4RepTitle {
+  /* R2TIME-8: anchors the hidden "Report:" prefix (.v4SrOnly) inside the heading. */
+  position: relative;
   font-family: var(--font-display);
   font-weight: var(--fw-display);
   font-size: clamp(28px, 5vw, 42px);

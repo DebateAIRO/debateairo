@@ -23,8 +23,16 @@ export function goodTimeForReport(openLeft: number, digs: V4DigCounts): boolean 
 
 export function V4Rail(props: Readonly<{
   runId: string;
-  /** The page's reading level, carried by the report link (Decision A: the level lives in the address). */
+  /**
+   * The reading level the person chose, carried by the report link (Decision A: the level lives in the address).
+   * R2REG-5: null when none was chosen, so the link never invents one.
+   */
   level: ReadingLevel | null;
+  /**
+   * R2RULES-8: the "How we read it" step, ticked. A dig never went through that screen, so its page leaves the row
+   * out (the later steps renumber).
+   */
+  showReadStep: boolean;
   /** Open questions with no dig yet (each counted once). */
   openLeft: number;
   digs: V4DigCounts;
@@ -33,7 +41,8 @@ export function V4Rail(props: Readonly<{
   catalog: MessageCatalog;
   locale: string;
 }>) {
-  const { runId, level, openLeft, digs, variant, catalog, locale } = props;
+  const { runId, level, showReadStep, openLeft, digs, variant, catalog, locale } = props;
+  const mapStep = showReadStep ? 3 : 2;
   const reportHref = levelHref(`/v4/debate/${encodeURIComponent(runId)}/report`, level);
   const anyDig = digs.running + digs.done + digs.failed > 0;
   const goodTime = goodTimeForReport(openLeft, digs);
@@ -44,19 +53,21 @@ export function V4Rail(props: Readonly<{
           <span className="v4DebRailMark" aria-hidden="true">✓</span>
           <span>{t(catalog, "v4.rail.stepQuestion")}</span>
         </li>
-        <li className="v4DebRailStep v4DebRailDone">
-          <span className="v4DebRailMark" aria-hidden="true">✓</span>
-          <span>{t(catalog, "v4.rail.stepRead")}</span>
-        </li>
+        {showReadStep ? (
+          <li className="v4DebRailStep v4DebRailDone">
+            <span className="v4DebRailMark" aria-hidden="true">✓</span>
+            <span>{t(catalog, "v4.rail.stepRead")}</span>
+          </li>
+        ) : null}
         <li className="v4DebRailStep v4DebRailHere" aria-current="step">
-          <span className="v4DebRailMark" aria-hidden="true">3</span>
+          <span className="v4DebRailMark" aria-hidden="true">{mapStep}</span>
           <span>
             {t(catalog, "v4.rail.stepMap")}
             <span className="v4DebRailNote">{t(catalog, "v4.rail.youAreHere")}</span>
           </span>
         </li>
         <li className="v4DebRailStep">
-          <span className="v4DebRailMark" aria-hidden="true">4</span>
+          <span className="v4DebRailMark" aria-hidden="true">{mapStep + 1}</span>
           <Link className="v4Link" href={reportHref}>{t(catalog, "v4.rail.stepReport")}</Link>
         </li>
       </ol>

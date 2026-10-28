@@ -93,6 +93,12 @@ export type V4Map = Readonly<{
   counts: TrustCounts;
   unchecked: number;
   wouldChange: string | null;
+  /**
+   * R2DIG-4 / R2REG-2: the other text of the open question "w" — the answer's raw reversal_point without node ids —
+   * when the story's change text is the one shown (`wouldChange`); null otherwise. A dig sent before the story was
+   * ready names this text, so it is still placed under "w" once the story arrives. AI text.
+   */
+  wouldChangeAlt: string | null;
   objections: readonly string[];
   storyState: "READY" | "WRITING" | "UNAVAILABLE";
   /**

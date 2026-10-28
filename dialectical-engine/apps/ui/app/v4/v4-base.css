@@ -47,8 +47,9 @@
 .v4Toast {
   position: fixed; left: 50%; transform: translateX(-50%);
   bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 60;
-  display: flex; gap: 14px; align-items: center; max-width: min(560px, calc(100vw - 32px));
+  /* R2REG-3: max-content, so the left: 50% containing block does not halve the toast's width on phones. */
+  display: flex; gap: 14px; align-items: center; width: max-content; max-width: min(560px, calc(100vw - 32px));
   background: var(--ink); color: var(--surface); border-radius: var(--r-btn); padding: 10px 16px; box-shadow: var(--shadow-pop);
 }
-.v4Toast button { background: none; border: 0; color: var(--gold-bg); font-weight: 700; cursor: pointer; min-height: 40px; }
+.v4Toast button { background: none; border: 0; color: var(--gold-bg); font-weight: 700; cursor: pointer; min-height: 44px; }
 .v4SrOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
