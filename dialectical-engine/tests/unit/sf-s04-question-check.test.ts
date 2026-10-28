@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import { createQuestionCheck } from "../../apps/api/src/question-check/check.js";
 import { QuestionCheckFailure, type QuestionCheckPort } from "../../apps/api/src/question-check/transport.js";
-import type { QuestionCheckLabel } from "../../apps/api/src/question-check/contract.js";
+import { readQuestionSubjects } from "../../apps/api/src/question-check/subjects.js";
 import { SUPPORT_RELAY_PROVIDER_REF } from "../../apps/api/src/support/model.js";
 
 const day = new Date("2026-10-20T12:00:00.000Z");
 const marker = /DEBATEAI-FENCE-([0-9a-f]{32})/u;
 type Completion = Awaited<ReturnType<QuestionCheckPort["complete"]>>;
 
-function harness(label: QuestionCheckLabel = "ORDINARY") {
+function harness(subject = "NONE", healthy = true) {
   const entries: unknown[] = [];
   const reports: unknown[] = [];
   const state: {
@@ -22,7 +22,7 @@ function harness(label: QuestionCheckLabel = "ORDINARY") {
     deadlineMs: number;
   } = {
     completion: async ({ packet }) => ({
-      text: JSON.stringify({ call: packet.messages[1]!.content.match(marker)![1], label }),
+      text: JSON.stringify({ call: packet.messages[1]!.content.match(marker)![1], subject, healthy }),
       usage: { inputTokens: 3, outputTokens: 4 }
     }),
     record: async entry => { entries.push(entry); },
@@ -39,7 +39,7 @@ function harness(label: QuestionCheckLabel = "ORDINARY") {
   };
   state.port = port;
   const create = () => createQuestionCheck({
-    port: () => state.port, deadlineMs: state.deadlineMs, price: state.price,
+    subjects: readQuestionSubjects(), port: () => state.port, deadlineMs: state.deadlineMs, price: state.price,
     spend: { record: entry => state.record(entry) },
     dayPot: state.dayPot, clock: () => state.now,
     report: line => { reports.push(line); }
@@ -48,18 +48,22 @@ function harness(label: QuestionCheckLabel = "ORDINARY") {
 }
 
 describe("S04 question check", () => {
+  // Property (V, 2026-10-28): the subject and whether the question is healthy decide the outcome; a help-numbers
+  // subject shows help numbers whatever the model says about health, so a crisis question never starts a debate.
   it.each([
-    ["OWN_CRISIS", { outcome: "CRISIS" }],
-    ["METHODS_OR_ENCOURAGEMENT", { outcome: "CRISIS" }],
-    ["HARM_TO_OTHERS", { outcome: "REFUSE", kind: "HARM_TO_OTHERS", kept: true }],
-    ["WEAPONS_DRUGS_TERRORISM", { outcome: "REFUSE", kind: "WEAPONS_DRUGS_TERRORISM", kept: true }],
-    ["CRIME", { outcome: "REFUSE", kind: "CRIME", kept: false }],
-    ["HATE_SPEECH", { outcome: "REFUSE", kind: "HATE_SPEECH", kept: false }],
-    ["RELIGIOUS_INSULT", { outcome: "REFUSE", kind: "RELIGIOUS_INSULT", kept: false }],
-    ["SENSITIVE_TOPIC", { outcome: "REFUSE", kind: "SENSITIVE_TOPIC", kept: false }],
-    ["ORDINARY", { outcome: "PASS" }]
-  ] as const)("maps label %s to the exact outcome", async (label, expected) => {
-    const h = harness(label);
+    ["NONE", true, { outcome: "PASS" }],
+    ["DRUGS", true, { outcome: "PASS" }],
+    ["DRUGS", false, { outcome: "REFUSE", kind: "DRUGS", screen: "REFUSE", emergencyNumber: false }],
+    ["HARM_TO_OTHERS", false, { outcome: "REFUSE", kind: "HARM_TO_OTHERS", screen: "REFUSE", emergencyNumber: true }],
+    ["HARM_TO_OTHERS", true, { outcome: "PASS" }],
+    ["CRIME", false, { outcome: "REFUSE", kind: "CRIME", screen: "REFUSE", emergencyNumber: false }],
+    ["SUICIDE_AND_ASSISTED_DYING", false, { outcome: "REFUSE", kind: "SUICIDE_AND_ASSISTED_DYING", screen: "SENSITIVE", emergencyNumber: false }],
+    ["SUICIDE_AND_ASSISTED_DYING", true, { outcome: "PASS" }],
+    ["OWN_CRISIS", false, { outcome: "CRISIS" }],
+    ["OWN_CRISIS", true, { outcome: "CRISIS" }],
+    ["SUICIDE_METHODS", true, { outcome: "CRISIS" }]
+  ] as const)("maps subject %s with healthy %s to the exact outcome", async (subject, healthy, expected) => {
+    const h = harness(subject, healthy);
     await expect(h.create().check("line")).resolves.toEqual(expected);
     expect(h.entries).toHaveLength(1);
   });
@@ -206,7 +210,7 @@ describe("S04 question check", () => {
   it("records a projected maximum when usage is absent", async () => {
     const h = harness();
     h.state.completion = async ({ packet }) => ({
-      text: JSON.stringify({ call: packet.messages[1]!.content.match(marker)![1], label: "ORDINARY" })
+      text: JSON.stringify({ call: packet.messages[1]!.content.match(marker)![1], subject: "NONE", healthy: true })
     });
     await h.create().check("💡");
     expect(h.entries).toHaveLength(1);

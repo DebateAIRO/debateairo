@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { languageCheckChargeMicros } from "@debateai/budget";
-import { CRISIS_LABELS, KEPT_LABELS, REFUSING_KINDS, type QuestionCheckFailureCode, type QuestionCheckOutcome } from "./contract.js";
+import type { QuestionCheckFailureCode, QuestionCheckOutcome } from "./contract.js";
+import type { QuestionSubjects } from "./subjects.js";
 import { parseQuestionCheckAnswer } from "./verdict.js";
 import { buildQuestionCheckPacket, QuestionCheckFailure, type QuestionCheckPort } from "./transport.js";
 
@@ -19,6 +20,7 @@ const LATCH_SQLSTATES = new Set(["42501", "42883", "23514"]);
 const SPEND_RETRY_MS = 5 * 60_000;
 
 export function createQuestionCheck(deps: {
+  subjects: QuestionSubjects;
   port: () => QuestionCheckPort | null;
   deadlineMs: number;
   price: Readonly<{ input: number; output: number }> | null;
@@ -29,6 +31,15 @@ export function createQuestionCheck(deps: {
 }): { check(questionLine: string): Promise<QuestionCheckOutcome> } {
   let spendFailures = 0;
   let spendRetryAt = 0;
+  const subjectIds = deps.subjects.map(subject => subject.id);
+
+  // V, 2026-10-28: the subject and whether the question is healthy decide; a help-numbers subject always shows help numbers.
+  function outcomeOf(subjectId: string, healthy: boolean): QuestionCheckOutcome {
+    const subject = deps.subjects.find(candidate => candidate.id === subjectId);
+    if (subject?.whenNotHealthy === "HELP_NUMBERS") return { outcome: "CRISIS" };
+    if (subject === undefined || healthy) return { outcome: "PASS" };
+    return { outcome: "REFUSE", kind: subject.id, screen: subject.whenNotHealthy, emergencyNumber: subject.emergencyNumber };
+  }
 
   function unavailable(code: QuestionCheckFailureCode): QuestionCheckOutcome {
     deps.report({ event: "api.question_check.unavailable", code });
@@ -67,22 +78,14 @@ export function createQuestionCheck(deps: {
           }
         }
         if (abort.signal.aborted) throw new QuestionCheckFailure("QUESTION_CHECK_DEADLINE");
-        const { packet, expectedCall } = buildQuestionCheckPacket(questionLine);
+        const { packet, expectedCall } = buildQuestionCheckPacket(questionLine, deps.subjects);
         let completion: Awaited<ReturnType<QuestionCheckPort["complete"]>> | undefined;
         let outcome: QuestionCheckOutcome;
         try {
           completion = await port.complete({ packet, signal: abort.signal });
           if (abort.signal.aborted) throw new QuestionCheckFailure("QUESTION_CHECK_DEADLINE");
-          const answer = parseQuestionCheckAnswer(completion.text, expectedCall);
-          if (!answer.ok) outcome = deferredUnavailable(answer.code);
-          else if (CRISIS_LABELS.includes(answer.label as typeof CRISIS_LABELS[number])) outcome = { outcome: "CRISIS" };
-          else if (REFUSING_KINDS.includes(answer.label as typeof REFUSING_KINDS[number])) {
-            outcome = {
-              outcome: "REFUSE",
-              kind: answer.label as typeof REFUSING_KINDS[number],
-              kept: KEPT_LABELS.includes(answer.label as typeof KEPT_LABELS[number])
-            };
-          } else outcome = { outcome: "PASS" };
+          const answer = parseQuestionCheckAnswer(completion.text, expectedCall, subjectIds);
+          outcome = answer.ok ? outcomeOf(answer.subject, answer.healthy) : deferredUnavailable(answer.code);
         } catch (error) {
           const code = error instanceof QuestionCheckFailure ? error.code
             : abort.signal.aborted ? "QUESTION_CHECK_DEADLINE"
