@@ -206,7 +206,9 @@ describe("legal documents — generated data", () => {
       const human = texts(section(TERMS_OF_SERVICE, "10")).find((text) => text.startsWith("Contacting a human.")) ?? "";
       expect(human).toContain("You can write to a person at our support address, support@dezbatere.ro, at any time; the support assistant's \"Talk to a human\" button shows that address, and the chat itself passes nothing to a person.");
       const risk = texts(section(TERMS_OF_SERVICE, "10")).find((text) => text.startsWith("Serious risk to life or safety.")) ?? "";
-      expect(risk.endsWith("who informs the competent authorities when the threat is credible.")).toBe(true);
+      // V, 2026-10-28: the question check keeps nothing, so no automatic check leads a person to read what you wrote.
+      expect(risk.endsWith("What a reviewer reads in a debate whose owner asked for our approval is covered by this paragraph.")).toBe(true);
+      expect(risk).not.toMatch(/keeps the question|question check in section 8/u);
       const health = allTexts(PRIVACY_POLICY).find((text) => text.startsWith("Health information.")) ?? "";
       expect(health.endsWith("then shows help numbers instead of an answer; we keep nothing of the message or of the reply, and the chat opens no case.")).toBe(true);
       const b2 = allTexts(PRIVACY_POLICY).find((text) => text.startsWith("Notice at collection.")) ?? "";
@@ -371,12 +373,14 @@ describe("legal documents — generated data", () => {
       expect(texts(section(PRIVACY_POLICY, "00"))[0]!.startsWith("We collect what an account needs")).toBe(true);
     });
 
-    it("turns the collection table into fourteen rows joined with em dashes", () => {
+    // V, 2026-10-28: the "Refused questions we keep" row went with the keeping, leaving thirteen.
+    it("turns the collection table into thirteen rows joined with em dashes", () => {
       const collect = section(PRIVACY_POLICY, "02");
       expect(collect.blocks.map((block) => block.kind)).toEqual(["p", "list", "p", "p"]);
       const table = collect.blocks[1]!;
       if (table.kind !== "list") throw new Error("unreachable");
-      expect(table.items).toHaveLength(14);
+      expect(table.items).toHaveLength(13);
+      expect(table.items.some((item) => /refused questions/i.test(item))).toBe(false);
       expect(table.items[0]!.startsWith("Account — Email address and recovery email address")).toBe(true);
       expect(table.items[0]!.endsWith("— You, at registration")).toBe(true);
     });
