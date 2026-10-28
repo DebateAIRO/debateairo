@@ -24,6 +24,7 @@ import { performance } from "node:perf_hooks";
 import { parseEncodedArgon2id } from "./argon2-worker-pool.js";
 import type {
   Argon2AuditParameters,
+  Argon2AuditPriority,
   Argon2PasswordParameters
 } from "./argon2-worker-pool.js";
 
@@ -44,6 +45,7 @@ export {
   parseEncodedArgon2id,
   type Argon2idEncodingParameters,
   type Argon2AuditParameters,
+  type Argon2AuditPriority,
   type Argon2FailureCode,
   type Argon2Lane,
   type Argon2PasswordParameters,
@@ -1168,7 +1170,8 @@ export interface Argon2Executor {
   hashAuditContext(
     value: Uint8Array,
     salt: Uint8Array,
-    parameters: Argon2AuditParameters
+    parameters: Argon2AuditParameters,
+    priority?: Argon2AuditPriority
   ): Promise<string>;
 }
 
@@ -1211,15 +1214,20 @@ async function hashAuditContextValue(
   value: string,
   salt: Uint8Array,
   parameters: AuditSourceIpKdfParameters,
-  domain: string
+  domain: string,
+  priority: Argon2AuditPriority = "ordinary"
 ): Promise<string> {
   validateAuditKdfParameters(value, salt, parameters);
-  return executor.hashAuditContext(utf8Bytes(`${domain}${value}`), copyBytes(salt), {
+  const kdf = {
     memoryCostKiB: parameters.memoryCostKiB,
     iterations: parameters.iterations,
     parallelism: parameters.parallelism,
     hashLength: parameters.hashLength
-  });
+  };
+  // K09/NV-42: an ordinary derivation makes exactly the three-argument call it always made.
+  return priority === "login"
+    ? executor.hashAuditContext(utf8Bytes(`${domain}${value}`), copyBytes(salt), kdf, "login")
+    : executor.hashAuditContext(utf8Bytes(`${domain}${value}`), copyBytes(salt), kdf);
 }
 
 export async function hashAuditSourceIp(
@@ -1511,6 +1519,8 @@ interface AuditIpCacheEntry {
   promise: Promise<string> | undefined;
   /** Absolute, on the MONOTONIC clock; set at insertion, never extended by a hit. */
   readonly expiresAt: number;
+  /** K09/NV-42. The priority of the derivation this entry coalesces onto. */
+  readonly priority: Argon2AuditPriority;
   /**
    * Strictly increasing per-hasher use counter, not a timestamp. Two hits in
    * the same millisecond still order deterministically, so eviction is true
@@ -1613,7 +1623,10 @@ export class AuditContextHasher {
     }
   }
 
-  async hashSourceIp(normalizedIp: string): Promise<string> {
+  async hashSourceIp(
+    normalizedIp: string,
+    priority: Argon2AuditPriority = "ordinary"
+  ): Promise<string> {
     if (this.closed) throw new CryptoInputError("CRYPTO_KEY_INVALID");
     validateAuditKdfParameters(normalizedIp, this.salt, this.parameters);
     const key = this.locator(normalizedIp);
@@ -1627,13 +1640,22 @@ export class AuditContextHasher {
           // Byte-identical to a miss: the same Argon2 digest string.
           return existing.digest;
         }
-        if (existing.promise !== undefined) return existing.promise;
+        if (existing.promise !== undefined) {
+          if (priority === "ordinary" || existing.priority === "login") return existing.promise;
+          // K09/NV-42: a login caller never waits on an ordinary in-flight
+          // derivation, which may sit behind the whole ordinary queue. It runs
+          // its own reserved job and leaves the entry untouched; the digest is
+          // byte-identical.
+          return hashAuditContextValue(
+            this.executor, normalizedIp, this.salt, this.parameters, AUDIT_SOURCE_IP_KDF_DOMAIN, "login"
+          );
+        }
       }
       this.entries.delete(key);
     }
 
     const promise = hashAuditContextValue(
-      this.executor, normalizedIp, this.salt, this.parameters, AUDIT_SOURCE_IP_KDF_DOMAIN
+      this.executor, normalizedIp, this.salt, this.parameters, AUDIT_SOURCE_IP_KDF_DOMAIN, priority
     );
 
     this.reclaim();
@@ -1647,6 +1669,7 @@ export class AuditContextHasher {
       digest: undefined,
       promise,
       expiresAt: now + this.ttlMs,
+      priority,
       useSequence: this.useCounter
     };
     this.entries.set(key, entry);
@@ -1667,11 +1690,18 @@ export class AuditContextHasher {
     });
   }
 
-  /** Worker-backed but deliberately uncached. */
-  async hashUserAgent(normalizedUserAgent: string): Promise<string> {
+  /**
+   * Worker-backed but deliberately uncached. K09/NV-42: the user agent is still
+   * never cached; `priority` only selects reserved pool capacity.
+   */
+  async hashUserAgent(
+    normalizedUserAgent: string,
+    priority: Argon2AuditPriority = "ordinary"
+  ): Promise<string> {
     if (this.closed) throw new CryptoInputError("CRYPTO_KEY_INVALID");
     return hashAuditContextValue(
-      this.executor, normalizedUserAgent, this.salt, this.parameters, AUDIT_USER_AGENT_KDF_DOMAIN
+      this.executor, normalizedUserAgent, this.salt, this.parameters, AUDIT_USER_AGENT_KDF_DOMAIN,
+      priority
     );
   }
 
@@ -2431,7 +2461,9 @@ export interface RunContentKeyStore {
   store(runId: string, identity: RunContentKeyIdentity, contentKey: Uint8Array): Promise<void>;
   load(runId: string): Promise<LoadedRunContentKey>;
   exists(runId: string): Promise<boolean>;
+  /** NV-10: rejects with RunContentKeyRecordMissingError when the run directory exists but holds no published record. */
   ownerRef(runId: string): Promise<string>;
+  /** NV-10: skips non-UUIDv4 names and record-less run directories; throws for everything else it cannot attribute. */
   listByOwner(ownerRef: string): Promise<readonly string[]>;
   destroy(runId: string): Promise<KeyDestroyResult>;
 }
@@ -2465,6 +2497,20 @@ export class RunContentKeyUnresolvedError extends CryptoError {
     super("RUN_CONTENT_KEY_UNRESOLVED", "RUN_CONTENT_KEY_UNRESOLVED");
     this.name = "RunContentKeyUnresolvedError";
   }
+}
+
+/** NV-10: the run's directory exists but holds no published content-key.v1.json (a crash between mkdir and rename,
+ *  or an interrupted destroy). Same name, message and code as its parent, so every existing handler is unchanged. */
+export class RunContentKeyRecordMissingError extends RunContentKeyUnresolvedError {
+  readonly reason = "RECORD_MISSING" as const;
+}
+
+/** Instance-agnostic, so a second module instance of this package still matches; the code check keeps a foreign
+ *  object that only carries the reason from matching. */
+export function isRunContentKeyRecordMissing(error: unknown): boolean {
+  return typeof error === "object" && error !== null
+    && (error as { reason?: unknown }).reason === "RECORD_MISSING"
+    && (error as { code?: unknown }).code === "RUN_CONTENT_KEY_UNRESOLVED";
 }
 
 type StoredRunContentKey = Readonly<{
@@ -2608,7 +2654,9 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
     private readonly root: string,
     private readonly users: ReadableUserDekStore,
     private readonly resolveUserId: OwnerRefResolver,
-    private readonly fileSystem: RunContentKeyFileSystem = defaultRunContentKeyFileSystem
+    private readonly fileSystem: RunContentKeyFileSystem = defaultRunContentKeyFileSystem,
+    // NV-10: told the count of unattributed entries (record-less or non-run) after every complete listing.
+    private readonly options: Readonly<{ onUnattributedEntries?: (count: number) => void }> = {}
   ) {
     if (root.trim() === "") throw new TypeError("RUN_CONTENT_KEY_STORE_PATH_REQUIRED");
   }
@@ -2748,6 +2796,11 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
     } catch (error) {
       if (error instanceof CryptoCustodyError) throw error;
       if (error instanceof RunContentKeyUnresolvedError) throw error;
+      // NV-10: no published record, and the run path is a real directory (never a link): nothing usable is stored.
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        const run = await this.fileSystem.lstat(join(this.root, "runs", runId)).catch(() => undefined);
+        if (run?.isDirectory() === true) throw new RunContentKeyRecordMissingError();
+      }
       throw new RunContentKeyUnresolvedError();
     }
   }
@@ -2763,12 +2816,17 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
       throw new RunContentKeyUnresolvedError();
     }
     const owned: string[] = [];
+    let unattributed = 0;
     for (const entry of entries) {
-      if (typeof entry === "string" || !entry.isDirectory() || !UUID_V4.test(entry.name)) {
-        throw new RunContentKeyUnresolvedError();
-      }
-      if (await this.ownerRef(entry.name) === ownerRef) owned.push(entry.name);
+      if (typeof entry === "string") throw new RunContentKeyUnresolvedError();
+      if (!UUID_V4.test(entry.name)) { unattributed += 1; continue; }   // store() never creates such a name
+      if (!entry.isDirectory()) throw new RunContentKeyUnresolvedError(); // a file or link named like a run: fail closed
+      let owner: string;
+      try { owner = await this.ownerRef(entry.name); }
+      catch (error) { if (isRunContentKeyRecordMissing(error)) { unattributed += 1; continue; } throw error; }
+      if (owner === ownerRef) owned.push(entry.name);
     }
+    try { this.options.onUnattributedEntries?.(unattributed); } catch { /* a reporter never fails the listing */ }
     return Object.freeze(owned.sort());
   }
 

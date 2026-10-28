@@ -21,7 +21,7 @@ export type { CrisisLexicon, CrisisSignal } from "./crisis-lexicon/index.js";
 export const CRISIS_SUPPORT_OFFERED = "CRISIS_SUPPORT_OFFERED" as const;
 
 /** Names the phrase lists in force; bump with any lexicon change. */
-export const CRISIS_CHECK_VERSION = "debateai.crisis-check.v1" as const;
+export const CRISIS_CHECK_VERSION = "debateai.crisis-check.v2" as const;
 
 export type CrisisCheck = Readonly<
   | { crisis: false }
@@ -104,7 +104,10 @@ type CompiledPattern = Readonly<{
   keepAccents: boolean;
 }>;
 
-/** A lexicon pattern is written in plain spelling; it is normalised exactly as questions are. */
+/**
+ * A lexicon pattern is written in plain spelling; it is normalised exactly as questions are. Range endpoints are
+ * folded too, so a lexicon writes them as they read after the fold (`\x61-я`); every repetition is bounded (types.ts).
+ */
 export function compileCrisisPattern(source: string, accents?: "keep"): RegExp {
   const spelled = accents === "keep" ? normalizeKeepingAccents(source) : normalizeForCrisisCheck(source);
   return new RegExp(spelled.replaceAll(String.raw`\b`, WORD_EDGE), "u");
@@ -135,6 +138,25 @@ export function detectCrisis(text: string): CrisisCheck {
     }
   }
   return Object.freeze({ crisis: false });
+}
+
+/**
+ * The longest a question may be, spelled for the check, for the API to run the lists over it: twice the ask bound
+ * (askQuestionMaxBytes(), 8,192 UTF-8 bytes, at most 8,192 UTF-16 units). Spelling only lengthens text through
+ * compatibility forms (½ → 1⁄2, ﷺ → 18 letters), so no ordinary question reaches it. A function, not an exported
+ * number (the source-purity law, tools/orphan-audit auditNumericSourceLiteralExports).
+ */
+export function crisisCheckMaxChars(): number {
+  return 16_384;
+}
+
+/**
+ * True when the question, spelled either way the lists read it, is longer than crisisCheckMaxChars(). The API then
+ * answers as for a crisis (help numbers, no debate) without running the lists: never part of a check (NV-28).
+ */
+export function crisisCheckOverlong(text: string): boolean {
+  const max = crisisCheckMaxChars();
+  return normalizeKeepingAccents(text).length > max || normalizeForCrisisCheck(text).length > max;
 }
 
 // V8 compiles a pattern separately for one-byte (Latin-1) and two-byte text: warm both.

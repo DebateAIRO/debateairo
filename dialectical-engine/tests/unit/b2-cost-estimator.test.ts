@@ -88,7 +88,8 @@ describe("B2 RecentRunsCostEstimator", () => {
     const { source, reads } = sourceReturning(twentyRuns);
     const estimator = new RecentRunsCostEstimator({ source, prices: PRICES, maximumMicros: 300_000, clock: () => now });
     await expect(estimator.estimateMicros(FREE_LOW)).resolves.toBe(15_000);
-    expect(reads).toEqual([{ settings: FREE_LOW, since: new Date("2026-08-31T12:00:00.000Z"), limit: 20 }]);
+    // NV-49: and at most one run per owner.
+    expect(reads).toEqual([{ settings: FREE_LOW, since: new Date("2026-08-31T12:00:00.000Z"), limit: 20, maxPerOwner: 1 }]);
   });
 
   it("caches each class for 60 seconds per process, and each class separately", async () => {

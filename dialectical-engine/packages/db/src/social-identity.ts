@@ -83,12 +83,15 @@ export class PostgresSocialIdentityRepository {
     async begin(input: SocialFlowSeed, source: AuthSourceContext): Promise<{
         expiresAt: string;
     }> {
-        await this.pool.query('SELECT identity.prune_social_flows()');
+        // NV-41 (0125): the cleanup also gives up the heaviest source's oldest unclaimed LOGIN rows when the store is full.
+        await this.pool.query('SELECT identity.prune_social_flows_evicting($1)', [input.challengeCapacity]);
         // C08.1 (R-09, D-58): every flow row records the request's mail language; the value is read only by the LINK callback (0116:24-31).
         return withMailLocale(this.pool, source.mailLocale ?? 'en', async (client) => (await client.query('SELECT identity.begin_social_flow($1) value', [input])).rows[0].value);
     }
     async claim(input: Pick<SocialFlowSeed, 'stateHash' | 'cookieHash' | 'bindingHash' | 'provider' | 'configuration'>): Promise<SocialFlowClaim | null> { return (await this.pool.query('SELECT identity.claim_social_flow($1) value', [input])).rows[0].value; }
-    async callback(input: Readonly<Record<string, unknown>>, source: AuthSourceContext): Promise<SocialCallbackResult> { return this.tx.audited(source, async (c, audit) => (await c.query('SELECT identity.finish_social_callback($1,$2) value', [input, audit])).rows[0].value); }
+    // K09/NV-42: admitted by SOCIAL_CALLBACK and run after a verified provider exchange, so it may use the login reserve.
+    // NV-13: the v2 callback answers a link to a pending_verification account like no link (0125).
+    async callback(input: Readonly<Record<string, unknown>>, source: AuthSourceContext): Promise<SocialCallbackResult> { return this.tx.audited(source, async (c, audit) => (await c.query('SELECT identity.finish_social_callback_v2($1,$2) value', [input, audit])).rows[0].value, 'login'); }
     async loginStatus(input: Readonly<{ challengeHash:string; browserHash:string; bindingHash:string; admittedProviders:readonly string[] }>): Promise<{expiresAt:string;availableMethods:readonly ('passkey'|'totp'|'recovery_code')[]}|null> {
         return (await this.pool.query('SELECT identity.read_social_login_status($1) value',[input])).rows[0].value;
     }
@@ -109,9 +112,13 @@ export class PostgresSocialIdentityRepository {
                 pseudonym: input.pseudonym, occurredAt: input.occurredAt, verificationTokenHash: input.verificationTokenHash, verificationTokenTtlMs: input.verificationTokenTtlMs,
                 socialEnrollmentHash: input.socialEnrollmentHash, minAgeApplied: input.ageCheck.minAgeApplied, countryCode: input.ageCheck.countryCode, ruleVersion: input.ageCheck.ruleVersion,
                 acceptances: input.acceptances?.map(r => ({ acceptance_id: r.acceptanceId, kind: r.kind, document_version: r.documentVersion, document_sha256: r.documentSha256, locale: r.locale, evidence_ciphertext: r.evidenceCiphertext.toString('base64'), key_id: r.keyId })) };
-            const result = (await c.query('SELECT identity.create_social_account($1,$2) value', [p, audit])).rows[0].value;
+            // NV-13: the v2 constructor links the provider only on the trusted arm (0125).
+            const result = (await c.query('SELECT identity.create_social_account_v2($1,$2) value', [p, audit])).rows[0].value;
             if (result.status === 'created' || result.status === 'enrollment') {
-                await c.query('SELECT identity.record_social_registration_region($1::uuid,$2::text,$3::text,$4::text,$5::text)',[
+                // The untrusted arm's pending account has no link, so it takes the pending-only helper password sign-up
+                // uses (0095); the trusted arm's helper is bound to the link that arm makes (0107). Both then commit.
+                if (result.status === 'created') await c.query('SELECT identity.record_registration_region($1,$2,$3)',[result.userId,region.country,region.usState]);
+                else await c.query('SELECT identity.record_social_registration_region($1::uuid,$2::text,$3::text,$4::text,$5::text)',[
                     result.userId,region.country,region.usState,input.proofHash,input.socialEnrollmentHash
                 ]);
                 await beforeCommit();

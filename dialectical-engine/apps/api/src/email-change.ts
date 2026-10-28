@@ -23,6 +23,7 @@ export type EmailChangeErrorCode =
   | "EMAIL_UNCHANGED"
   | "STEP_UP_REQUIRED"
   | "RESEND_COOLDOWN"
+  | "SEND_LIMIT"
   | "NO_PENDING_CHANGE"
   | "LINK_INVALID"
   | "LINK_EXPIRED"
@@ -52,15 +53,18 @@ export interface EmailChangePending {
 }
 
 type Repository = Pick<PostgresEmailChangeRepository,
-  "readSettings" | "request" | "resend" | "cancelOwn" | "cancelByToken" | "confirm">;
+  "readSettings" | "requestBounded" | "resendBounded" | "cancelOwn" | "cancelByToken" | "confirm">;
 
-// The service's own timings, used when the caller passes none (the running API passes none).
+// The service's own timings, used when the caller passes none (the running API passes no timings, only the send limit).
 // Module-private: the source-purity law (tools/orphan-audit auditSourceRules) refuses an exported
 // numeric literal; tests/unit/email-change-timings.test.ts pins both by behaviour.
 /** "It expires in 24 hours" (design 14C). */
 const EMAIL_CHANGE_LINK_TTL_MS = 24 * 3_600_000;
 /** Resend rides a signed-in session and mails only the new address. */
 const EMAIL_CHANGE_RESEND_COOLDOWN_MS = 60_000;
+/** NV-12: at most three confirmation mails per account in an hour, request and resends together (the database counts). */
+const EMAIL_CHANGE_SEND_MAXIMUM = 3;
+const EMAIL_CHANGE_SEND_WINDOW_MS = 3_600_000;
 
 const BEARER = /^[A-Za-z0-9_-]{43}$/;
 const MAX_ADDRESS_LENGTH = 254;
@@ -92,6 +96,7 @@ export class EmailChangeService {
   private readonly tokenFactory: () => string;
   private readonly tokenTtlMs: number;
   private readonly resendCooldownMs: number;
+  private readonly sendLimit: Readonly<{ maximumSends: number; windowMs: number }>;
 
   constructor(private readonly dependencies: {
     readonly repository: Repository;
@@ -100,6 +105,8 @@ export class EmailChangeService {
     readonly mail: EmailChangeMailSender;
     readonly tokenTtlMs?: number;
     readonly resendCooldownMs?: number;
+    /** The per-account send budget (the API passes the register's outbound limits); 0125 checks the same bounds. */
+    readonly sendLimit?: Readonly<{ maximumSends: number; windowMs: number }>;
     readonly now?: () => Date;
     readonly tokenFactory?: () => string;
     /** Open sign-up mail (G5): refuses a new address whose domain takes no mail; fails open. Absent, nothing is asked. */
@@ -107,10 +114,18 @@ export class EmailChangeService {
   }) {
     this.tokenTtlMs = dependencies.tokenTtlMs ?? EMAIL_CHANGE_LINK_TTL_MS;
     this.resendCooldownMs = dependencies.resendCooldownMs ?? EMAIL_CHANGE_RESEND_COOLDOWN_MS;
+    this.sendLimit = Object.freeze({
+      maximumSends: dependencies.sendLimit?.maximumSends ?? EMAIL_CHANGE_SEND_MAXIMUM,
+      windowMs: dependencies.sendLimit?.windowMs ?? EMAIL_CHANGE_SEND_WINDOW_MS
+    });
     if (!Number.isInteger(this.tokenTtlMs) || this.tokenTtlMs <= 0
       || this.tokenTtlMs > 25 * 3_600_000
       || !Number.isInteger(this.resendCooldownMs)
-      || this.resendCooldownMs < 1_000 || this.resendCooldownMs > 3_600_000) {
+      || this.resendCooldownMs < 1_000 || this.resendCooldownMs > 3_600_000
+      || !Number.isInteger(this.sendLimit.maximumSends)
+      || this.sendLimit.maximumSends < 1 || this.sendLimit.maximumSends > 3
+      || !Number.isInteger(this.sendLimit.windowMs)
+      || this.sendLimit.windowMs < 60_000 || this.sendLimit.windowMs > 86_400_000) {
       throw new TypeError("EMAIL_CHANGE_POLICY_INVALID");
     }
     this.now = dependencies.now ?? (() => new Date());
@@ -146,7 +161,7 @@ export class EmailChangeService {
     const expiresAt = new Date(this.now().getTime() + this.tokenTtlMs);
     const newEmailCiphertext = await this.withDek(session.userId, (dek) =>
       encrypt(dek, Buffer.from(newEmail, "utf8"), addressAad(session.userId, "user.email_ciphertext")));
-    const outcome = await this.dependencies.repository.request({
+    const outcome = await this.dependencies.repository.requestBounded({
       userId: session.userId,
       sessionId: session.sessionId,
       grantTokenHash: hashToken("step-up-grant", input.grantToken),
@@ -155,8 +170,10 @@ export class EmailChangeService {
       confirmTokenHash: hashToken("email-change-confirm", confirmToken),
       cancelTokenHash: hashToken("email-change-cancel", cancelToken),
       expiresAt,
-      source
+      source,
+      ...this.sendLimit
     });
+    if (outcome.status === "LIMIT") throw new EmailChangeError("SEND_LIMIT");
     if (outcome.status === "UNCHANGED") throw new EmailChangeError("EMAIL_UNCHANGED");
     if (outcome.status !== "PENDING") throw new EmailChangeError("STEP_UP_REQUIRED");
     const currentEmail = await this.withDek(session.userId, (dek) =>
@@ -170,14 +187,17 @@ export class EmailChangeService {
 
   async resend(session: EmailChangeSession, source: AuthSourceContext): Promise<EmailChangePending> {
     const confirmToken = this.tokenFactory();
-    const outcome = await this.dependencies.repository.resend({
+    const outcome = await this.dependencies.repository.resendBounded({
       userId: session.userId,
       sessionId: session.sessionId,
       confirmTokenHash: hashToken("email-change-confirm", confirmToken),
       expiresAt: new Date(this.now().getTime() + this.tokenTtlMs),
       cooldownMs: this.resendCooldownMs,
-      source
+      source,
+      ...this.sendLimit,
+      linkTtlMs: this.tokenTtlMs
     });
+    if (outcome.status === "LIMIT") throw new EmailChangeError("SEND_LIMIT");
     if (outcome.status === "COOLDOWN") throw new EmailChangeError("RESEND_COOLDOWN");
     if (outcome.status !== "RESENT") throw new EmailChangeError("NO_PENDING_CHANGE");
     const newEmail = await this.withDek(session.userId, (dek) =>

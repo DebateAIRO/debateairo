@@ -1,4 +1,5 @@
-import { openRecord, sealRecord, type RecordAad } from "@debateai/crypto";
+import { createHmac } from "node:crypto";
+import { openRecord, recordsKeyId, sealRecord, type RecordAad } from "@debateai/crypto";
 import type { SecretToken, TaxLocation } from "@debateai/billing-core";
 import type { CardTokenRow, NoticeQuarantineRow } from "@debateai/db";
 import { createSecretToken } from "@debateai/payments-netopia";
@@ -207,6 +208,33 @@ export function sealQuarantined(
 ): SealedMessage {
   return sealMessage(key, quarantineAad(quarantineId, "raw_ciphertext"), quarantineAad(quarantineId, "header_ciphertext"),
     rawBody, header);
+}
+
+const QUARANTINE_ID_DOMAIN = "debateai.billing.notice-quarantine-id.v1";
+/** The header's presence byte in the id's MAC input: absent, or present and followed by its UTF-8 bytes. */
+const HEADER_ABSENT = 0x00;
+const HEADER_PRESENT = 0x01;
+
+/**
+ * NV-44: the quarantine's content key, its row id. HMAC-SHA-256 under a subkey of the records key over the body's
+ * length, the body, then the header (absent or present, and its UTF-8 bytes), cut to 128 bits and stamped as an
+ * RFC 9562 version-8 UUID: the same bytes always name the same row. Keyed, so the clear-text id reveals nothing about
+ * the sealed content. A wrong-size key throws RECORD_KEY_INVALID, as every seal does.
+ */
+export function noticeQuarantineIdOf(key: Buffer, rawBody: Buffer, header: string | undefined): string {
+  recordsKeyId(key);
+  const subkey = createHmac("sha256", key).update(QUARANTINE_ID_DOMAIN, "utf8").digest();
+  const length = Buffer.alloc(8);
+  length.writeBigUInt64BE(BigInt(rawBody.byteLength));
+  const mac = createHmac("sha256", subkey).update(length).update(rawBody);
+  subkey.fill(0);
+  if (header === undefined) mac.update(Buffer.alloc(1, HEADER_ABSENT));
+  else mac.update(Buffer.alloc(1, HEADER_PRESENT)).update(header, "utf8");
+  const bytes = mac.digest().subarray(0, 16);
+  bytes.writeUInt8((bytes.readUInt8(6) & 0x0f) | 0x80, 6);
+  bytes.writeUInt8((bytes.readUInt8(8) & 0x3f) | 0x80, 8);
+  const hex = bytes.toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 /** The re-check at every start (§2.7.4 step 2): the caller owns `rawBody` and wipes it when done. */

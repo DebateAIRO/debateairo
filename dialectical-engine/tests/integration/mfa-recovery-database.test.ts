@@ -180,3 +180,122 @@ it("re-checks the very notice it claims, whatever order the queue is in",async()
  // Its STARTED mails (older) still go out; its WAITING mails are claimed while 32 newer waiting ones are queued.
  expect((await drainNotices(target.user)).filter(m=>m.event==="WAITING"||m.event==="FINISH")).toEqual([]);expect(await stage(target.user)).toBe("EXPIRED");
 });
+
+// NV-16 (security audit run 3, migrations/0125_security_fixes_run3.sql): the new release starts through
+// identity.mfa_recovery_start_bounded, at most three starts per account and destination in any rolling hour.
+async function startBounded(a:Fixture,destination="primary"){const candidate=(await withMailLocale(db.pool, 'en', (c) => c.query(`SELECT identity.mfa_recovery_prepare($1,$2) AS value`,[a.index,destination]))).rows[0].value;return(await withMailLocale(db.pool, 'en', (c) => c.query(`SELECT identity.mfa_recovery_start_bounded($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) AS result`,[a.index,destination,a.user,[a.primary,a.backup].sort(),a.link,a.cancel,JSON.stringify([a.primary,a.backup].sort().map(channelId=>({channelId,envelope:box(a.user),...(candidate?.channels.find((c:{channelId:string;cancelAuthorized:boolean})=>c.channelId===channelId)?.cancelAuthorized?{cancelEnvelope:box(a.user)}:{}),...(channelId===(destination==="primary"?a.primary:a.backup)?{proofEnvelope:box(a.user)}:{})}))),source,3,a.challenge]))).rows[0].result;}
+const fresh=(a:Fixture):Fixture=>({...a,link:hash(),cancel:hash(),challenge:randomUUID()});
+const BOUNDED="identity.mfa_recovery_start_bounded(bytea,text,uuid,uuid[],text,text,jsonb,jsonb,bigint,uuid)";
+it("caps MFA-recovery starts at three per account and destination per rolling hour, silently; the other destination and other accounts are unaffected",async()=>{const a=await fixture();
+ const primary:boolean[]=[];for(let i=0;i<4;i++)primary.push(await startBounded(fresh(a)));expect(primary).toEqual([true,true,true,false]);
+ // The sealed start the release before calls stays unbounded: at the cap it still starts, and its row counts too.
+ expect(await start(fresh(a))).toBe(true);expect(await startBounded(fresh(a))).toBe(false);
+ // Spending the primary budget leaves the backup destination its own three.
+ expect(await startBounded(fresh(a),"backup")).toBe(true);
+ const backup:boolean[]=[];for(let i=0;i<3;i++)backup.push(await startBounded(fresh(a),"backup"));expect(backup).toEqual([true,true,false]);
+ expect((await db.pool.query(`SELECT channel_type,count(*)::int AS n FROM identity.mfa_recovery_control WHERE user_id=$1 GROUP BY 1 ORDER BY 1`,[a.user])).rows).toEqual([{channel_type:"email",n:4},{channel_type:"recovery_email",n:3}]);
+ // A refused start mails nothing: one unsent PROOF per admitted start, to that start's destination.
+ expect((await db.pool.query(`SELECT channel_id,count(*)::int AS n FROM identity.mfa_recovery_notice WHERE user_id=$1 AND event_kind='PROOF' AND sent_at IS NULL AND dead_at IS NULL GROUP BY 1`,[a.user])).rows.sort((x,y)=>y.n-x.n)).toEqual([{channel_id:a.primary,n:4},{channel_id:a.backup,n:3}]);
+ const b=await fixture();expect(await startBounded(fresh(b))).toBe(true);
+ await db.pool.query(`UPDATE identity.mfa_recovery_control SET email_expires_at=email_expires_at-interval '61 minutes',expires_at=expires_at-interval '61 minutes' WHERE user_id=$1`,[a.user]);
+ expect(await startBounded(fresh(a))).toBe(true);expect(await startBounded(fresh(a),"backup")).toBe(true);
+ // Exactly the owner and the recovery runtime may execute it (no PUBLIC row), as verify-auth-db-batch.sql requires.
+ expect((await db.pool.query(`SELECT r.rolname,a.privilege_type FROM pg_proc p CROSS JOIN LATERAL aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a LEFT JOIN pg_roles r ON r.oid=a.grantee WHERE p.oid=$1::regprocedure ORDER BY 1,2`,[BOUNDED])).rows).toEqual([{rolname:"debateai_mfa_recovery_owner",privilege_type:"EXECUTE"},{rolname:"debateai_mfa_recovery_runtime",privilege_type:"EXECUTE"}]);
+ for(const [role,allowed] of [["debateai_runtime",false],["debateai_billing_runtime",false],["debateai_authorization_runtime",false],["debateai_mfa_recovery_runtime",true]] as const)expect((await db.pool.query(`SELECT has_function_privilege($1,$2::regprocedure,'EXECUTE') AS allowed`,[role,BOUNDED])).rows[0].allowed,role).toBe(allowed);
+ expect((await db.pool.query(`SELECT pg_get_userbyid(proowner) AS owner,prosecdef,proconfig FROM pg_proc WHERE oid=$1::regprocedure`,[BOUNDED])).rows[0]).toEqual({owner:"debateai_mfa_recovery_owner",prosecdef:true,proconfig:["search_path=pg_catalog, pg_temp"]});
+});
+it("two concurrent starts at the cap's edge admit exactly one",async()=>{const a=await fixture();expect(await startBounded(fresh(a))).toBe(true);expect(await startBounded(fresh(a))).toBe(true);
+ const lock=await db.pool.connect();await lock.query("BEGIN");try{await lock.query(`SELECT identity.lock_security_subjects($1)`,[[a.user]]);
+  const pending=[startBounded(fresh(a)),startBounded(fresh(a))];
+  // Both must be queued in the bounded function's own subject lock before it is released; one still in its prepare
+  // could not tell a lock-less count from a locked one.
+  let n=0;for(const until=Date.now()+15_000;n<2&&Date.now()<until;){await new Promise(r=>setTimeout(r,25));n=(await db.pool.query(`SELECT count(*)::int AS n FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE '%mfa_recovery_start_bounded%' AND pid<>pg_backend_pid()`)).rows[0].n;}
+  expect(n).toBe(2);await lock.query("COMMIT");
+  expect((await Promise.all(pending)).sort()).toEqual([false,true]);
+  expect((await db.pool.query(`SELECT count(*)::int AS n FROM identity.mfa_recovery_control WHERE user_id=$1`,[a.user])).rows[0].n).toBe(3);
+ }finally{await lock.query("ROLLBACK");lock.release();}});
+
+// NV-15 (security audit run 3, 0125): failed email-link password proofs, summed over the account's never-paired
+// challenges whose link was still valid after its latest sign-in or successful pairing, write one RECOVERY_PROOF_FAILED
+// at the sealed proof_failures_per_attempt (5); the sealed adverse rule then refuses pairing until a newer sign-in.
+const RECORDER="identity.mfa_recovery_record_failure(text,text,jsonb,jsonb)";
+const riskContext=(user:string)=>encrypt(key,Buffer.from(JSON.stringify({v:1,networkRef:source.ipArgon2id,clientRef:source.userAgentArgon2id})),["identity","authentication_risk_signal.context_ciphertext",user,"run:none",user,`auth-risk:${user}:v1`,"1"]);
+async function recordFailure(selector:string,kind:"link"|"finish",context:unknown){return(await withMailLocale(db.pool, 'en', (c) => c.query(`SELECT identity.mfa_recovery_record_failure($1,$2,$3,$4) AS result`,[selector,kind,source,context]))).rows[0].result;}
+async function adverseRows(user:string){return(await db.pool.query(`SELECT count(*)::int AS n FROM identity.authentication_risk_signal WHERE user_id=$1 AND signal_kind='RECOVERY_PROOF_FAILED'`,[user])).rows[0].n;}
+/** A completed sign-in, as the session commit hook records it (one LOGIN_SUCCESS row now). */
+async function signIn(user:string){await db.pool.query(`INSERT INTO identity.authentication_risk_signal(user_id,signal_kind,context_ciphertext,observed_at,expires_at) SELECT $1,'LOGIN_SUCCESS',$2,n.t,n.t+interval '7776000 seconds' FROM (SELECT clock_timestamp() AS t) n`,[user,riskContext(user)]);}
+it("account-level link failures across attempts write one RECOVERY_PROOF_FAILED and refuse pairing until a newer sign-in",async()=>{const a=await fixture();expect(await start(a)).toBe(true);
+ for(let i=0;i<4;i++)expect(await recordFailure(a.link,"link",riskContext(a.user))).toBe("PROOF_INVALID");expect(await adverseRows(a.user)).toBe(0);
+ const b=fresh(a);expect(await start(b)).toBe(true);expect(await recordFailure(b.link,"link",riskContext(a.user))).toBe("REFUSED");
+ expect(await adverseRows(a.user)).toBe(1);expect((await db.pool.query(`SELECT count(*)::int AS n FROM identity.password_recovery_retry_lock WHERE user_id=$1`,[a.user])).rows[0].n).toBe(0);
+ // The per-challenge counters are 4 and 1: the account rule refused, not a challenge's own five tries.
+ expect((await db.pool.query(`SELECT failures FROM identity.mfa_recovery_control WHERE challenge_id=ANY($1::uuid[]) ORDER BY failures DESC`,[[a.challenge,b.challenge]])).rows.map(r=>r.failures)).toEqual([4,1]);
+ expect(await pair(b)).toBe("INVALID");expect(await recordFailure(b.link,"link",riskContext(a.user))).toBe("REFUSED");expect(await adverseRows(a.user)).toBe(1);
+ await signIn(a.user);
+ const c=fresh(a);expect(await start(c)).toBe(true);expect(await pair(c)).toBe("FACTOR_REQUIRED");
+});
+it("a failure after a sign-in on a challenge started before it still counts",async()=>{const a=await fixture();expect(await start(a)).toBe(true);
+ for(let i=0;i<2;i++)expect(await recordFailure(a.link,"link",riskContext(a.user))).toBe("PROOF_INVALID");
+ await signIn(a.user);
+ for(let i=0;i<2;i++)expect(await recordFailure(a.link,"link",riskContext(a.user))).toBe("PROOF_INVALID");
+ const d=fresh(a);expect(await start(d)).toBe(true);expect(await recordFailure(d.link,"link",riskContext(a.user))).toBe("REFUSED");expect(await adverseRows(a.user)).toBe(1);
+});
+it("a successful pairing ends the count for links that had expired, and a paired challenge's failures never count",async()=>{const a=await fixture();expect(await start(a)).toBe(true);
+ for(let i=0;i<4;i++)expect(await recordFailure(a.link,"link",riskContext(a.user))).toBe("PROOF_INVALID");
+ await db.pool.query(`UPDATE identity.mfa_recovery_control SET email_expires_at=clock_timestamp()-interval '1 second',expires_at=clock_timestamp()-interval '1 second' WHERE challenge_id=$1`,[a.challenge]);
+ const b=fresh(a);expect(await start(b)).toBe(true);expect(await pair(b)).toBe("FACTOR_REQUIRED");
+ // b times out during its five-minute setup, as mfa_recovery_expire closes it (0106): EXPIRED sets no retry lock.
+ await db.pool.query(`SELECT identity.mfa_recovery_close($1,'EXPIRED')`,[b.challenge]);
+ const c=fresh(a);expect(await start(c)).toBe(true);expect(await recordFailure(c.link,"link",riskContext(a.user))).toBe("PROOF_INVALID");expect(await adverseRows(a.user)).toBe(0);
+ const e=await fixture();expect(await start(e)).toBe(true);
+ for(let i=0;i<4;i++)expect(await recordFailure(e.link,"link",riskContext(e.user))).toBe("PROOF_INVALID");
+ expect(await pair(e)).toBe("FACTOR_REQUIRED");
+ const f=fresh(e);expect(await start(f)).toBe(true);expect(await recordFailure(f.link,"link",riskContext(e.user))).toBe("PROOF_INVALID");expect(await adverseRows(e.user)).toBe(0);
+});
+it("finish failures keep their own five tries and never write an adverse signal",async()=>{const {a,finishHash}=await readyWaiting();await age(a);
+ for(let i=0;i<4;i++){expect(await recordFailure(finishHash,"finish",null)).toBe("PROOF_INVALID");expect(await stage(a.user)).toBe("WAITING");}
+ expect(await recordFailure(finishHash,"finish",null)).toBe("REFUSED");expect(await stage(a.user)).toBe("REFUSED");
+ expect(await adverseRows(a.user)).toBe(0);
+});
+it("the recorder belongs to the recovery family only",async()=>{
+ expect((await db.pool.query(`SELECT pg_get_userbyid(proowner) AS owner,prosecdef,proconfig FROM pg_proc WHERE oid=$1::regprocedure`,[RECORDER])).rows[0]).toEqual({owner:"debateai_mfa_recovery_owner",prosecdef:true,proconfig:["search_path=pg_catalog, pg_temp"]});
+ // Exactly the owner and the recovery runtime may execute it (no PUBLIC row), as verify-auth-db-batch.sql requires.
+ expect((await db.pool.query(`SELECT coalesce(r.rolname,'PUBLIC') AS rolname,a.privilege_type FROM pg_proc p CROSS JOIN LATERAL aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a LEFT JOIN pg_roles r ON r.oid=nullif(a.grantee,0) WHERE p.oid=$1::regprocedure ORDER BY 1,2`,[RECORDER])).rows).toEqual([{rolname:"debateai_mfa_recovery_owner",privilege_type:"EXECUTE"},{rolname:"debateai_mfa_recovery_runtime",privilege_type:"EXECUTE"}]);
+ for(const [role,allowed] of [["debateai_runtime",false],["debateai_billing_runtime",false],["debateai_authorization_runtime",false],["debateai_mfa_recovery_runtime",true]] as const)expect((await db.pool.query(`SELECT has_function_privilege($1,$2::regprocedure,'EXECUTE') AS allowed`,[role,RECORDER])).rows[0].allowed,role).toBe(allowed);
+ expect((await db.pool.query(`SELECT has_table_privilege('debateai_mfa_recovery_owner','identity.authentication_risk_signal','INSERT') AS allowed`)).rows[0].allowed).toBe(true);
+ // A link failure must carry this account's risk context; the check runs on a started challenge, before any count.
+ const a=await fixture();expect(await start(a)).toBe(true);
+ for(const context of [null,riskContext(randomUUID())])await expect(recordFailure(a.link,"link",context)).rejects.toMatchObject({code:"22023"});
+ expect((await db.pool.query(`SELECT failures FROM identity.mfa_recovery_control WHERE challenge_id=$1`,[a.challenge])).rows[0].failures).toBe(0);
+ expect(await recordFailure(`sha256:${"0".repeat(64)}`,"link",riskContext(a.user))).toBe("INVALID");
+});
+// NV-15, NV-16 (security audit run 3, 0129): NV-15's account-level failure count and its pairing boundary, and NV-16's
+// per-destination start count, all read identity.mfa_recovery_control by user_id. The outside-transaction step 0129
+// builds the one index they share, valid, ready and not unique, and the planner can answer that lookup from it.
+it("the control table's user index serves the account-level reads by user_id (0129)",async()=>{
+ expect((await db.pool.query(`SELECT pg_get_indexdef(i.indexrelid) AS definition,i.indisvalid AS valid,i.indisready AS ready,i.indisunique AS "unique" FROM pg_index i WHERE i.indexrelid=to_regclass('identity.mfa_recovery_control_user_started') AND i.indrelid='identity.mfa_recovery_control'::regclass`)).rows)
+  .toEqual([{definition:"CREATE INDEX mfa_recovery_control_user_started ON identity.mfa_recovery_control USING btree (user_id, email_expires_at)",valid:true,ready:true,unique:false}]);
+ const client=await db.pool.connect();
+ try{await client.query("BEGIN");await client.query("SET LOCAL enable_seqscan=off");
+  const plan=(await client.query(`EXPLAIN (FORMAT JSON) SELECT count(*) FROM identity.mfa_recovery_control WHERE user_id=$1::uuid AND email_expires_at>$2::timestamptz`,[randomUUID(),new Date()])).rows[0]["QUERY PLAN"];
+  expect(JSON.stringify(plan)).toContain('"Index Name":"mfa_recovery_control_user_started"');
+ }finally{await client.query("ROLLBACK");client.release();}
+});
+// NV-38 (security audit run 3, 0125): the pending-notice MFA claim hand-copies the sealed 0112 claim's result; for a
+// WAITING notice both claims return the same object (cancelAllowed, payload, expiresAt and notBefore included), the
+// new one with mail_locale added. Each claim runs in a rolled-back transaction that retires every other pending notice.
+it("the pending-notice MFA claim returns the 0112 claim's object for a WAITING notice",async()=>{const w=await readyWaiting();const claim=async(sql:string)=>{const client=await db.pool.connect();try{await client.query("BEGIN");await client.query(`UPDATE identity.mfa_recovery_notice SET dead_at=clock_timestamp() WHERE sent_at IS NULL AND dead_at IS NULL AND NOT (event_kind='WAITING' AND user_id=$1)`,[w.a.user]);return(await client.query(sql)).rows[0].value as Record<string,unknown>;}finally{await client.query("ROLLBACK");client.release();}};const without=(value:Record<string,unknown>,...keys:string[])=>Object.fromEntries(Object.entries(value).filter(([key])=>!keys.includes(key)));const fresh=await claim("SELECT identity.mfa_recovery_claim_pending_notice(60000) AS value"),sealed=await claim("SELECT identity.mfa_recovery_claim_notice(60000) AS value");expect(fresh.event).toBe("WAITING");expect(sealed.event).toBe("WAITING");expect(fresh.mail_locale).toBe("en");expect(without(fresh,"leaseId","mail_locale")).toEqual(without(sealed,"leaseId"));expect(Object.keys(without(sealed,"leaseId")).sort()).toEqual(["cancelAllowed","channelId","event","expiresAt","notBefore","noticeId","payload","userId"]);});
+// NV-39 (security audit run 3, 0125): the window starts empty and holds exactly 65,536 rows in a strict eviction order:
+// E (expired), then L (budget left, uses 1), then the fillers (uses 2), with S (spent) last. One admit gives up 64 rows
+// and takes the new digest; the v1 admit the release before calls still refuses at capacity.
+it("NV-39: at capacity the evicting MFA admit gives up 64 rows, expired first and the spent one last; v1 still refuses",async()=>{const digest=(seed:string)=>`argon2id-audit:v1:${createHash("sha256").update(seed).digest("hex")}`,[E,L,S]=["nv39-e","nv39-l","nv39-s"].map(digest);
+ const count=async()=>(await db.pool.query(`SELECT count(*)::int AS n FROM identity.mfa_recovery_source_window`)).rows[0].n,present=async()=>(await db.pool.query(`SELECT source_digest FROM identity.mfa_recovery_source_window WHERE source_digest=ANY($1::text[]) ORDER BY 1`,[[E,L,S]])).rows.map(r=>r.source_digest);
+ try{await db.pool.query(`DELETE FROM identity.mfa_recovery_source_window`);await db.pool.query(`INSERT INTO identity.mfa_recovery_source_window(source_digest,window_started_at,uses) VALUES($1,now()-interval '1 hour',1),($2,now()-interval '1 second',1),($3,now(),21)`,[E,L,S]);
+  await db.pool.query(`INSERT INTO identity.mfa_recovery_source_window(source_digest,window_started_at,uses) SELECT 'argon2id-audit:v1:'||encode(sha256(('w'||g)::text::bytea),'hex'),now(),2 FROM generate_series(1,65533) g`);expect(await count()).toBe(65536);
+  expect((await db.pool.query(`SELECT identity.mfa_recovery_admit_evicting($1,3) AS ok`,[{...source,ipArgon2id:digest("nv39-new")}])).rows[0].ok).toBe(true);expect(await present()).toEqual([S]);expect(await count()).toBe(65536-64+1);
+  await db.pool.query(`INSERT INTO identity.mfa_recovery_source_window(source_digest,window_started_at,uses) SELECT 'argon2id-audit:v1:'||encode(sha256(('v'||g)::text::bytea),'hex'),now(),2 FROM generate_series(1,63) g`);expect(await count()).toBe(65536);
+  expect((await db.pool.query(`SELECT identity.mfa_recovery_admit($1,3) AS ok`,[{...source,ipArgon2id:digest("nv39-v1")}])).rows[0].ok).toBe(false);
+ }finally{await db.pool.query(`DELETE FROM identity.mfa_recovery_source_window`);}
+ const roles=["debateai_password_reset_runtime","debateai_mfa_recovery_runtime","debateai_backup_email_runtime","debateai_runtime","debateai_authorization_runtime","debateai_billing_runtime"];
+ expect((await db.pool.query(`SELECT p.prosecdef AS definer,p.proconfig AS config,pg_get_userbyid(p.proowner)::text AS owner,EXISTS(SELECT 1 FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE a.grantee=0) AS public_execute,ARRAY(SELECT DISTINCT pg_get_userbyid(a.grantee)::text FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE a.grantee NOT IN(0,p.proowner) ORDER BY 1) AS grantees,ARRAY(SELECT r FROM unnest($2::text[]) r WHERE has_function_privilege(r,p.oid,'EXECUTE') ORDER BY 1) AS executors FROM pg_proc p WHERE p.oid=to_regprocedure($1)`,["identity.mfa_recovery_admit_evicting(jsonb,bigint)",roles])).rows)
+  .toEqual([{definer:true,config:["search_path=pg_catalog, pg_temp"],owner:"debateai_mfa_recovery_owner",public_execute:false,grantees:["debateai_mfa_recovery_runtime"],executors:["debateai_mfa_recovery_runtime"]}]);});

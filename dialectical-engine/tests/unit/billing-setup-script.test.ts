@@ -114,7 +114,8 @@ describe("N21 deploy/vps/billing-setup.sh", () => {
       "root:root etc/debateai/api/billing/netopia-ipn-keys.pem",
       "debateai-api:debateai-api etc/debateai/api/billing/quaderno-api-key",
       "debateai-api:debateai-api etc/debateai/api/billing/smartbill-credentials",
-      "debateai-api:debateai-api etc/debateai/api/billing/owner-report-email"
+      "debateai-api:debateai-api etc/debateai/api/billing/owner-report-email",
+      "root:debateai-api etc/debateai/api.env"
     ]));
     const env = await readFile(join(root, "etc/debateai/api.env"), "utf8");
     expect(env).toContain([
@@ -146,6 +147,41 @@ describe("N21 deploy/vps/billing-setup.sh", () => {
     expect(output).toContain("That does not look right; please type it again.");
     expect(output).toContain(`SHA-256 ${FINGERPRINT}, not NETOPIA's published plugin key: confirm this fingerprint with NETOPIA.`);
     expect(output).toContain("Test root: the check command is not run.");
+  });
+
+  // NV-52: api.env is the file systemd hands to the API unit's root hooks, so it is root's (0640 root:debateai-api,
+  // README §3). Each rewrite is a new file that root owns from mktemp to mv; it never takes the old owner, so no other
+  // user can open it for writing before the rename.
+  it("NV-52: rewriting api.env writes a new root-owned 0640 file, never the old owner, even when an older host had it 0600", async () => {
+    const root = await stage();
+    await chmod(join(root, "etc/debateai/api.env"), 0o600);
+    const { code, output } = await run(["--test-root", root], ALL_ANSWERS);
+    expect(code, output).toBe(0);
+    expect(await mode(join(root, "etc/debateai/api.env"))).toBe(0o640);
+    const owners = new Set((await readFile(join(root, ".billing-setup-owners"), "utf8")).trim().split("\n"));
+    expect(owners.has("root:debateai-api etc/debateai/api.env")).toBe(true);
+    // The server branch, which record_owner never runs: the owner and mode are set on the new file before awk writes it.
+    const lines = (await readFile(SCRIPT, "utf8")).split("\n");
+    const start = lines.findIndex((line) => line.startsWith("rewrite_api_env() {"));
+    const end = lines.findIndex((line, index) => index > start && line === "}");
+    expect([start >= 0, end > start]).toEqual([true, true]);
+    const body = lines.slice(start + 1, end);
+    expect(body.filter((line) => line.includes('cp -p "$API_ENV" "$tmp"'))).toEqual([]);
+    expect(body.some((line) => line.includes('cp -p "$API_ENV" "$backup"'))).toBe(true);
+    const at = {
+      mktemp: body.findIndex((line) => line.includes('tmp="$(mktemp ')),
+      chown: body.findIndex((line) => line.includes('else chown root:debateai-api "$tmp"; fi')),
+      chmod: body.findIndex((line) => line.trim() === 'chmod 0640 "$tmp"'),
+      awk: body.findIndex((line) => line.trim().startsWith("awk -v begin=")),
+      mv: body.findIndex((line) => line.trim() === 'mv -f "$tmp" "$API_ENV"')
+    };
+    expect(at.mktemp, JSON.stringify(at)).toBeGreaterThanOrEqual(0);
+    expect({
+      mktempBeforeChown: at.mktemp < at.chown, chownBeforeAwk: at.chown < at.awk,
+      mktempBeforeChmod: at.mktemp < at.chmod, chmodBeforeAwk: at.chmod < at.awk, awkBeforeMv: at.awk < at.mv
+    }, JSON.stringify(at)).toEqual({
+      mktempBeforeChown: true, chownBeforeAwk: true, mktempBeforeChmod: true, chmodBeforeAwk: true, awkBeforeMv: true
+    });
   });
 
   it("keeps existing key files and values on a second run, replaces only what --replace names, and keeps one block", async () => {

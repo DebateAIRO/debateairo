@@ -22,7 +22,7 @@ This runbook operates the self-service account/private-debate erasure implementa
 
 1. The erasure role fairly claims bounded due work. It acquires sorted run-content leases, the user notification-custody lease, then the documented T9/account lock order.
 2. PREPARE freezes the user row and recomputes the complete run, ownership, carrier, provision-intent, publication-snapshot, and cleanup manifest under the held locks. Any pending/ambiguous/mismatched item returns pending/contended.
-3. PREPARE enqueues COMPLETION notifications. Before private-key or user-DEK destruction, every unacknowledged outbox row for the user across all current and historical erasure requests must be ACKed. The sender holds the same per-user session advisory lease across DEK load, address decrypt, send, ACK response, local buffer zeroization, and return.
+3. PREPARE enqueues COMPLETION notifications. For an owner the age gate froze after scheduling, PREPARE enqueues none; the SCHEDULED notices are that owner's only erasure notices (security audit run 3, NV-09). Before private-key or user-DEK destruction, every unacknowledged outbox row for the user across all current and historical erasure requests must be settled: ACKed after the transport accepted it, or dead-lettered. The code dead-letters a row at once when the stored address is undeliverable, and otherwise only after 10 attempts while the erasure is PREPARED. A dead letter keeps `acknowledged_at` set with a `DEAD:` code and appends an `identity.account.erasure_notice_dead_lettered` audit event (reason `recipient` or `attempt-cap`) that survives FINALIZE (security audit run 3, NV-02). The sender holds the same per-user session advisory lease across DEK load, address decrypt, send, ACK response, local buffer zeroization, and return.
 4. Reconcile every non-current publication key to a claim-bound durable absence. Current published snapshots and their keys remain. Private-debate deletion refuses a current published run.
 5. Destroy each private run key and the user DEK using the durable removal/fsync/readback/fresh-load ceremony. Preserve literal `DESTROYED` and `ALREADY_ABSENT` counts separately.
 6. FINALIZE re-locks and recomputes the manifest, checks exact count partitions, appends the canonical audit event, deletes identity/binding/outbox rows, and returns `CLEANED` only for encrypted-only scope. Claimed legacy plaintext returns `CLEANED_WITH_LEGACY_RESIDUAL`.
@@ -41,10 +41,10 @@ Do not manually delete a user, request, outbox row, provision intent, binding, o
 
 ## Notification recovery
 
-- A send failure records only a bounded content-free operator code and releases the claim for retry/backoff.
+- A send failure records only a bounded content-free operator code and releases the claim for retry/backoff, with backoff from 30 s doubling to 1 h.
 - A crash after transport send but before ACK may resend the same opaque Message-ID. ACK/fail require the exact one-use claim token.
 - A sender backend crash releases the PostgreSQL session lease. The next worker reclaims only after the lease expiry and revalidates before decrypt/send.
-- If a completion notification cannot be ACKed, leave erasure pending. Never bypass the notification ACK gate to recover availability.
+- If a notification cannot be delivered, the code dead-letters it within the bounds above and reports it as `[ERASURE_RECONCILE_ATTENTION] stage=erasure-notice DEAD_LETTERED/<reason>=n`. Dead letters are expected and recorded, not hidden. Never bypass the notification ACK gate by hand: do not ACK, dead-letter or delete an outbox row manually.
 
 ## Evidence and escalation
 

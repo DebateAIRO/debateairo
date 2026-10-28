@@ -68,6 +68,7 @@ import {
   readCostEnvelopePolicy,
   readCostEstimateStartPolicy,
   readPanelDiscoveryPolicy,
+  ownerDayShareMicrosOf,
   type CostEnvelopePolicy,
   type CostEstimateStartPolicy,
   type DeploymentMode
@@ -198,6 +199,8 @@ export function composePracticeAskRoom(input: Readonly<{
     dailyCeilingMicros: money.siteCostEnvelopePolicy.dailyCeilingMicros,
     closeBasisPoints: band.closeBasisPoints,
     waitingLinePerPerson: band.waitingLinePerPerson,
+    // NV-43, as main.ts: billing is off here, so every owner is measured against their share of the practice's day.
+    ownerDayShareMicros: ownerDayShareMicrosOf(money.siteCostEnvelopePolicy),
     // Side-by-side C8, as main.ts: the site's cap of debates and the release re-check, in the decision's lock. The
     // practice's throwaway database records no release and its runner lives in this process, so it is the only
     // release there is: read as not hosted ("no row, not hosted" is current), under the key its runs are stamped with

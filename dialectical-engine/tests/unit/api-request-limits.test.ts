@@ -291,4 +291,34 @@ describe("API request limits (F-07, L1-F4)", () => {
       await close();
     }
   });
+
+  // NV-14: verify-email carries the token holder's password, bounded as register's is; a non-string is refused.
+  it("bounds the verify-email password like register's and passes it on only as a string", async () => {
+    const { api, close, registration } = harness();
+    const token = "t".repeat(43);
+    try {
+      for (const password of ["p".repeat(AUTH_PASSWORD_MAX_BYTES + 1), 12345678, null]) {
+        const refused = await api.inject({
+          method: "POST", url: "/v1/auth/verify-email", headers: { origin: TEST_APP_ORIGIN }, payload: { token, password }
+        });
+        expect(refused.statusCode).toBe(400);
+        expect(refused.json()).toEqual({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+      }
+      expect(registration.verifyEmail).not.toHaveBeenCalled();
+      const withPassword = await api.inject({
+        method: "POST", url: "/v1/auth/verify-email", headers: { origin: TEST_APP_ORIGIN },
+        payload: { token, password: "Inbox owner pass 1" }
+      });
+      expect(withPassword.statusCode).toBe(200);
+      const without = await api.inject({
+        method: "POST", url: "/v1/auth/verify-email", headers: { origin: TEST_APP_ORIGIN }, payload: { token }
+      });
+      expect(without.statusCode).toBe(200);
+      expect((registration.verifyEmail.mock.calls as unknown[][]).map((call) => call[0])).toEqual([
+        { token, password: "Inbox owner pass 1" }, { token }
+      ]);
+    } finally {
+      await close();
+    }
+  });
 });

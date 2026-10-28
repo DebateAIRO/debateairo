@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
   API_DATABASE_POOLS,
+  LEASE_LOCK_WAITS,
   RUNNER_DATABASE_POOLS,
   RUNNER_CAPACITY,
   SUPPORT_CONTROL_PLANE_POOL,
@@ -107,6 +108,17 @@ describe("every always-on pool has a size and a bounded wait", () => {
     const names = [...all.map((row) => row.name), SUPPORT_CONTROL_PLANE_POOL.name];
     expect(new Set(names).size).toBe(names.length);
   });
+
+  it("bounds every lease lock wait below the waits of the pools that host leases", () => {
+    // Security fixes run 3, K10 (NV-21): a shared (reader) publication lease backs off with its connection returned for
+    // at most sharedMs; an exclusive one (key destruction, account erasure) waits under lock_timeout exclusiveMs.
+    for (const host of [API_DATABASE_POOLS.runtime, API_DATABASE_POOLS.publicationCleanup, API_DATABASE_POOLS.erasure]) {
+      expect(LEASE_LOCK_WAITS.exclusiveMs, host.name).toBeLessThan(host.connectionTimeoutMillis);
+    }
+    expect(LEASE_LOCK_WAITS.exclusiveMs).toBeGreaterThan(0);
+    expect(LEASE_LOCK_WAITS.exclusiveMs).toBeLessThanOrEqual(LEASE_LOCK_WAITS.sharedMs);
+    expect(LEASE_LOCK_WAITS.sharedMs).toBeLessThan(5_000);
+  });
 });
 
 describe("no pool is smaller than what one of its flows holds at once", () => {
@@ -117,14 +129,16 @@ describe("no pool is smaller than what one of its flows holds at once", () => {
     // Each floor is "flows that may overlap × connections one flow holds at
     // once + 1 free", from the 2026-10-10 audit (the plan document, table 2).
     const floors: Readonly<Record<keyof typeof API_DATABASE_POOLS, number>> = {
-      // A content lease holds one connection while its body takes a second
-      // (packages/db/src/index.ts withRunContentLease): 8 overlapping reads.
+      // A content lease holds one connection and its body's queries run on it
+      // (packages/db/src/index.ts routeLeaseBodyQueries, NV-31); a write
+      // transaction inside a lease takes a second: 8 overlapping leased writes.
       runtime: 8 * 2 + 1,
       // Every signed-in request and a check every 250 ms per open debate page
       // (apps/api/src/staff/access.ts), plus recovery mail holding one across
       // a send of up to 5 s (packages/db/src/consumer-security-mail.ts).
       authorization: 8,
-      // The 30 s timer runs both cleanups at once, each a lease plus a query.
+      // The 30 s timer runs both cleanups at once, each a lease plus a query
+      // (on the lease's connection when routed, NV-31; the floor keeps the unrouted case).
       publicationCleanup: 2 * 2,
       contentProvision: 1,
       serverAskAdmission: 2,
@@ -132,11 +146,12 @@ describe("no pool is smaller than what one of its flows holds at once", () => {
       // One decision holds the day lock; the others wait on this pool, never on
       // the pool that decision needs (packages/budget/src/spend-lock.ts).
       roomDecision: 4,
-      // The erasure timer holds the notice lease plus one more; one delete waits.
+      // The erasure timer holds the notice lease plus one more; one delete runs one statement and never waits (NV-30).
       erasure: 2 + 1,
       evaluatorDevMenu: 1,
-      // Opening a case holds one connection and reads the messages on another.
-      support: 2 * 2,
+      // Opening a case holds one connection and reads the transcript on it (NV-32), plus the erasure timer's support
+      // shred, one connection at a time (C-1).
+      support: 2 * 2 + 1,
       // Every relay slot the register may allow, plus the queue's bookkeeping.
       supportRelayLease: relaySlots + 2,
       // One export build at a time (single-flight timer) on one connection (V-43): its lease renewal queues behind its snapshot read.
@@ -147,6 +162,17 @@ describe("no pool is smaller than what one of its flows holds at once", () => {
     for (const [key, floor] of Object.entries(floors)) {
       expect(API_DATABASE_POOLS[key as keyof typeof API_DATABASE_POOLS].max, key).toBeGreaterThanOrEqual(floor);
     }
+  });
+
+  it("routes lease-body queries on the API's runtime and publication-cleanup pools, never the runner's", async () => {
+    // Security fixes run 3, K10 (NV-31): a leased read's queries run on its lease's connection
+    // (packages/db/src/index.ts routeLeaseBodyQueries). The runner's debates write side by side by design.
+    const api = await readFile(API_MAIN, "utf8");
+    const runtime = "const pool = boot.hold(createPool(environment.DATABASE_URL, API_DATABASE_POOLS.runtime));";
+    expect(api).toContain(runtime);
+    expect(api.indexOf("routeLeaseBodyQueries(pool);")).toBeGreaterThan(api.indexOf(runtime));
+    expect(api).toContain("if (publicationCleanupPool !== pool) routeLeaseBodyQueries(publicationCleanupPool);");
+    expect(await readFile(RUNNER_MAIN, "utf8")).not.toContain("routeLeaseBodyQueries");
   });
 
   it("lets the export's lease renewal wait out its snapshot read on one connection", () => {

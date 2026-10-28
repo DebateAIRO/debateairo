@@ -11,6 +11,7 @@ import {
 } from "@debateai/crypto";
 import {
   accountRecoveryChannelRefsAad,
+  createPool,
   migrate,
   PostgresRecoveryStartRepository
 } from "@debateai/db";
@@ -200,6 +201,99 @@ describe("P2-04 recovery start on real PostgreSQL", () => {
       runtime_prepare:true,runtime_start:true,runtime_select:false,
       // 0039 intentionally makes authorization a child of ordinary runtime.
       auth_prepare:true,auth_start:true,erasure_prepare:false,erasure_start:false
+    });
+  });
+
+  // NV-18 (security audit run 3, 0125): the API's one-minute maintenance pass closes every binding left open past one
+  // hour. Last in this describe: the first case counts every request and every audit row in the database.
+  it("closes a recovery binding left open past one hour, keeps younger ones, and is callable through the runtime only", async () => {
+    const SWEEPER = "identity.expire_stale_account_recovery_bindings(integer)";
+    const stale = await insertAccount(`stale-${randomUUID()}`,"active");
+    const fresh = await insertAccount(`fresh-${randomUUID()}`,"active");
+    const repository = new PostgresRecoveryStartRepository(database.pool,auditContext,users);
+    const source = { ip:"203.0.113.45",userAgent:"p2-binding-sweep",requestId:randomUUID() };
+    for (const account of [stale,fresh]) {
+      await expect(repository.start({ emailBlindIndex:account.emailBlindIndex,source }))
+        .resolves.toMatchObject({status:"created"});
+    }
+    // The binding's update trigger refuses any bound_at change, so the fixture ages it with triggers off.
+    const aging = await database.pool.connect();
+    try {
+      await aging.query("BEGIN");
+      await aging.query("SET LOCAL session_replication_role=replica");
+      await aging.query(
+        "UPDATE identity.account_recovery_binding SET bound_at=bound_at-interval '2 hours' WHERE user_id=$1",
+        [stale.userId]
+      );
+      await aging.query("COMMIT");
+    } catch (error) {
+      await aging.query("ROLLBACK");
+      throw error;
+    } finally {
+      aging.release();
+    }
+
+    await database.pool.query(
+      "CREATE ROLE p2_binding_sweeper LOGIN PASSWORD 'sweeper-test-only' IN ROLE debateai_runtime"
+    );
+    const url = new URL(database.connectionString);
+    url.username = "p2_binding_sweeper";
+    url.password = "sweeper-test-only";
+    const sweeper = createPool(url.toString());
+    try {
+      const runtimeRepository = new PostgresRecoveryStartRepository(sweeper,auditContext,users);
+      await expect(runtimeRepository.expireStaleBindings(100,10)).resolves.toBe(1);
+      await expect(runtimeRepository.expireStaleBindings(100,10)).resolves.toBe(0);
+    } finally {
+      await sweeper.end();
+    }
+
+    const bindings = await database.pool.query<{ user_id: string; closed: boolean; latest: string }>(`
+      SELECT b.user_id,b.closed_at IS NOT NULL AS closed,
+        (SELECT e.state FROM identity.account_recovery_state_event e
+          WHERE e.recovery_request_id=b.recovery_request_id ORDER BY e.event_sequence DESC LIMIT 1) AS latest
+      FROM identity.account_recovery_binding b WHERE b.user_id=ANY($1::uuid[]) ORDER BY b.user_id
+    `,[[stale.userId,fresh.userId]]);
+    expect(bindings.rows.find((row) => row.user_id===stale.userId)).toEqual({
+      user_id:stale.userId,closed:true,latest:"EXPIRED"
+    });
+    expect(bindings.rows.find((row) => row.user_id===fresh.userId)).toEqual({
+      user_id:fresh.userId,closed:false,latest:"REQUESTED"
+    });
+    // The stale account's one live slot is free again; the fresh one's is still held.
+    expect((await database.pool.query(
+      "SELECT count(*)::int AS n FROM identity.prepare_account_recovery_start($1)",[stale.emailBlindIndex]
+    )).rows[0].n).toBe(1);
+    expect((await database.pool.query(
+      "SELECT count(*)::int AS n FROM identity.prepare_account_recovery_start($1)",[fresh.emailBlindIndex]
+    )).rows[0].n).toBe(0);
+
+    for (const batch of [0,1001]) {
+      await expect(database.pool.query(`SELECT identity.expire_stale_account_recovery_bindings($1)`,[batch]))
+        .rejects.toMatchObject({ code:"22023",message:"RECOVERY_BINDING_BATCH_INVALID" });
+    }
+    expect((await database.pool.query(
+      "SELECT prosecdef,proconfig FROM pg_proc WHERE oid=$1::regprocedure",[SWEEPER]
+    )).rows[0]).toEqual({ prosecdef:true,proconfig:["search_path=pg_catalog, pg_temp"] });
+    // The explicit ACL: the owner and debateai_runtime EXECUTE (not grantable), and no PUBLIC row.
+    const acl = await database.pool.query<{ grantee: string; privilege_type: string; is_grantable: boolean }>(`
+      SELECT coalesce(r.rolname,'PUBLIC') AS grantee,a.privilege_type,a.is_grantable
+      FROM pg_proc p CROSS JOIN LATERAL aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a
+      LEFT JOIN pg_roles r ON r.oid=nullif(a.grantee,0)
+      WHERE p.oid=$1::regprocedure AND a.grantee<>p.proowner ORDER BY 1,2
+    `,[SWEEPER]);
+    expect(acl.rows).toEqual([{ grantee:"debateai_runtime",privilege_type:"EXECUTE",is_grantable:false }]);
+    const execute = await database.pool.query<Record<string,boolean>>(`
+      SELECT
+        has_function_privilege('debateai_runtime',$1,'EXECUTE') AS runtime,
+        has_function_privilege('debateai_authorization_runtime',$1,'EXECUTE') AS auth,
+        has_function_privilege('debateai_billing_runtime',$1,'EXECUTE') AS billing,
+        has_function_privilege('debateai_erasure_runtime',$1,'EXECUTE') AS erasure
+    `,[SWEEPER]);
+    expect(execute.rows[0]).toEqual({
+      runtime:true,
+      // 0039 intentionally makes authorization a child of ordinary runtime (0093 does the same for billing).
+      auth:true,billing:true,erasure:false
     });
   });
 });

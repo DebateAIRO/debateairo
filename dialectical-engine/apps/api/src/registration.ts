@@ -26,6 +26,7 @@ import { resolveSignUpDocuments, signUpAcceptanceRows, type SignUpDocuments } fr
 import { normalizeManualPhone } from "./phone-profile.js";
 import { MailDeliveryError, type MailSender } from "./mail-channel.js";
 import { mailDomainRefused, type MailDomainCheck } from "./mail-domain-check.js";
+import { clientIpNetworkScope, normalizeClientIp } from "./client-ip.js";
 
 export const REGISTRATION_PUBLIC_RESPONSE = Object.freeze({
   message: "If this address can be registered, verification instructions will arrive. Check your spam folder."
@@ -82,7 +83,8 @@ export interface RegistrationApplication {
   /** Trusted composition port; the capability never enters public JSON or source metadata. */
   admitSource?(request: AuthSourceAdmissionRequest): Promise<AuthSourceAdmission>;
   register(input: RegisterInput, source: RegistrationSource, admission?: AuthSourceAdmission): Promise<typeof REGISTRATION_PUBLIC_RESPONSE>;
-  verifyEmail(input: { readonly token: string }, source: AuthSourceContext): Promise<{ readonly status: "mfa_required" }>;
+  /** NV-14: `password` is the token holder's; it replaces any password set at sign-up (absent from the release before's UI). */
+  verifyEmail(input: { readonly token: string; readonly password?: string }, source: AuthSourceContext): Promise<{ readonly status: "mfa_required" }>;
   resendVerification(
     input: { readonly email: string },
     source: VerificationMailSource,
@@ -463,9 +465,11 @@ export class InProcessAuthRateLimiter {
     // admission budget. Admission is charged only to the caller's source. The
     // explicit per-source values preserve the ruled 20/10/3 route ceilings;
     // existing channel cooldown remains the outbound-side-effect throttle.
+    // An IPv6 caller is charged to its /64 (DL5-F3, NV-23), like the other
+    // per-source controls; IPv4 and the `unknown` fallback are unchanged.
     if (!this.take(
       input.route,
-      `${input.route}:source:${input.ip}`,
+      `${input.route}:source:${clientIpNetworkScope(normalizeClientIp(input.ip) ?? input.ip)}`,
       route.admissionPerSource,
       route.windowMs,
       now
@@ -484,6 +488,7 @@ type IdentityRepository = Pick<PostgresIdentityRepository,
   | "recordVerificationDeliveryRecordFailure"
   | "recordDuplicateRegistrationPostwork"
   | "consumeVerification"
+  | "consumeVerificationSetPassword"
   | "prepareVerificationResend"
   | "recordRegistrationFailure"
   | "recordRateLimitRefusal"
@@ -542,6 +547,11 @@ export type RecoveryMailWork = () => Promise<void>;
 export interface RecoveryMailDispatchPort {
   dispatchRecoveryMail(prepare:()=>Promise<RecoveryMailWork|null>):Promise<void>;
 }
+/** K09/NV-24: the background security-notice workers' own permits. Never reachable from a public route, so
+ * anonymous or public traffic can never directly hold, queue for or exhaust them; shares no counter, queue or
+ * cadence with the shared 32/96 verification lane. Provisional engineering bounds (not a register row), named
+ * here like ARGON2_PROVISIONAL_BOUNDS, and like them pending V's ratification. */
+const NOTICE_MAIL_DISPATCH_BOUNDS = Object.freeze({ maximumConcurrent: 16, queueCapacity: 16 });
 type MailDispatchRelease = () => Promise<void>;
 interface MailDispatchActivationReceipt {
   readonly activatedAt: number;
@@ -633,12 +643,16 @@ export class RegistrationService implements RegistrationApplication {
   private readonly clock: () => Date;
   private readonly sleep: (milliseconds: number) => Promise<void>;
   private readonly pendingMailDispatches = new Set<Promise<void>>();
-  // Ownership tracking only: these preparations already hold a slot or waiter
-  // in the SAME mail dispatcher. This is not another admission pool.
+  // Ownership tracking only: each of these preparations already holds a permit
+  // or waiter in either the shared verification lane or the notice lane, and
+  // drainMailDispatches joins both. This is not another admission pool.
   private readonly pendingMailPreparations = new Set<Promise<void>>();
   private readonly waitingMailDispatches: WaitingMailDispatch[] = [];
   private mailDispatchReservations = 0;
   private nextMailDispatchActivationAt = Number.NEGATIVE_INFINITY;
+  private readonly waitingNoticeMailDispatches: WaitingMailDispatch[] = [];
+  private noticeMailDispatchReservations = 0;
+  private nextNoticeMailDispatchActivationAt = Number.NEGATIVE_INFINITY;
   private registrationHashesActive = 0;
   private readonly waitingRegistrationHashes: Array<() => void> = [];
   /**
@@ -740,6 +754,7 @@ export class RegistrationService implements RegistrationApplication {
       if (request.route !== "resend") {
         source = this.validateRegistration(request.input, request.source, request.route === "social").source;
         // The existing 103-registration slot spans proof, provisioning, clamp and handoff: no async stage before it.
+        // Except a limiter refusal, which hands its slot back before its clamp (NV-22).
         releaseStructural = this.acquireRegistrationAdmission(randomUUID());
       } else {
         if (!validEmail(input.email)) throw new AuthFlowError("EMAIL_INVALID");
@@ -748,6 +763,9 @@ export class RegistrationService implements RegistrationApplication {
       const now = this.clock();
       const limit = this.dependencies.limiter.consume({ route, ip: source.ip, addressKey: "", now });
       if (!limit.allowed) {
+        // NV-22: a refused request answers after the clamp but gives its structural slot back now.
+        releaseStructural?.();
+        releaseStructural = undefined;
         const persistAfter = (route === "register" ? this.holdRegistrationEnumerationClamp(startedAt) : this.holdEnumerationFloor(startedAt))
           .finally(() => { refusalClamped = true; });
         await this.refuseRateLimit({ route, scope: limit.scope, now,
@@ -1358,6 +1376,92 @@ export class RegistrationService implements RegistrationApplication {
     });
   }
 
+  /**
+   * K09/NV-24: the notice lane's reservation, the shape of reserveMailDispatchPermit
+   * against the lane's own counter, FIFO and wait deadline. Self-contained: it
+   * calls none of the shared lane's reservation or activation members.
+   */
+  private reserveNoticeMailDispatchPermit(correlationId: string): Promise<MailDispatchActivation> {
+    const channel = this.dependencies.policy.channel;
+    if (this.noticeMailDispatchReservations < NOTICE_MAIL_DISPATCH_BOUNDS.maximumConcurrent) {
+      this.noticeMailDispatchReservations += 1;
+      return Promise.resolve(() => this.activateNoticeMailDispatch());
+    }
+    if (this.waitingNoticeMailDispatches.length >= NOTICE_MAIL_DISPATCH_BOUNDS.queueCapacity) {
+      this.signalMailCapacity(correlationId);
+      throw new AuthFlowError("AUTH_MAIL_BUSY");
+    }
+    return new Promise<MailDispatchActivation>((resolve, reject) => {
+      let waiting!: WaitingMailDispatch;
+      const timeout = setTimeout(() => {
+        // Removal is by the EXACT waiter object, as on the shared lane.
+        const index = this.waitingNoticeMailDispatches.indexOf(waiting);
+        if (index < 0) return;
+        this.waitingNoticeMailDispatches.splice(index, 1);
+        this.signalMailCapacity(correlationId);
+        reject(new AuthFlowError("AUTH_MAIL_BUSY"));
+      }, channel.mailDispatchQueueWaitTimeoutMs);
+      waiting = Object.freeze({
+        resolve, reject, timeout,
+        minimumReservationMs: channel.mailDispatchMinimumReservationMs,
+        activationSpacingMs: channel.mailDispatchActivationSpacingMs
+      });
+      this.waitingNoticeMailDispatches.push(waiting);
+    });
+  }
+
+  /**
+   * K09/NV-24: activation on the notice lane's own cadence cursor, then a receipt
+   * whose idempotent release always holds the minimum reservation (every notice
+   * dispatch enforces it, as dispatchRecoveryMail does) before handing the permit
+   * to the next notice waiter.
+   */
+  private async activateNoticeMailDispatch(): Promise<MailDispatchActivationReceipt> {
+    const channel = this.dependencies.policy.channel;
+    const now = performance.now();
+    const scheduledAt = Math.max(now, this.nextNoticeMailDispatchActivationAt);
+    this.nextNoticeMailDispatchActivationAt = scheduledAt + channel.mailDispatchActivationSpacingMs;
+    const delay = scheduledAt - now;
+    if (delay > 0) {
+      await new Promise<void>((resolve) => setTimeout(resolve, delay));
+    }
+    const activatedAt = performance.now();
+    let release: Promise<void> | undefined;
+    const releaseReservation = () => {
+      if (release !== undefined) return release;
+      release = (async () => {
+        const remaining = channel.mailDispatchMinimumReservationMs - (performance.now() - activatedAt);
+        if (remaining > 0) {
+          await new Promise<void>((resolve) => setTimeout(resolve, remaining));
+        }
+      })().then(() => {
+        this.noticeMailDispatchReservations -= 1;
+        const next = this.waitingNoticeMailDispatches.shift();
+        if (next !== undefined) {
+          clearTimeout(next.timeout);
+          this.noticeMailDispatchReservations += 1;
+          next.resolve(() => this.activateNoticeMailDispatch());
+        }
+      });
+      return release;
+    };
+    return Object.freeze({ activatedAt, release: releaseReservation });
+  }
+
+  noticeMailDispatchOccupancy(): Readonly<{
+    inFlight: number;
+    maximum: number;
+    queued: number;
+    maximumQueued: number;
+  }> {
+    return Object.freeze({
+      inFlight: this.noticeMailDispatchReservations,
+      maximum: NOTICE_MAIL_DISPATCH_BOUNDS.maximumConcurrent,
+      queued: this.waitingNoticeMailDispatches.length,
+      maximumQueued: NOTICE_MAIL_DISPATCH_BOUNDS.queueCapacity
+    });
+  }
+
   private async refuseRateLimit(input: {
     readonly route: AuthRoute;
     readonly scope: "ip" | "address";
@@ -1457,10 +1561,20 @@ export class RegistrationService implements RegistrationApplication {
    * Both P2 and token preparation run only after activation. No raw token is
    * retained by a waiter, and public completion never awaits real transport. */
   dispatchRecoveryMail(prepare:()=>Promise<RecoveryMailWork|null>):Promise<void> {
+    return this.dispatchPermittedMail(prepare,()=>this.reserveMailDispatchPermit({correlationId:randomUUID(),enforceMinimum:true}));
+  }
+
+  /** Composition-only (K09/NV-24): the security-notice workers' dispatcher, on the notice lane. */
+  dispatchNoticeMail(prepare:()=>Promise<RecoveryMailWork|null>):Promise<void> {
+    return this.dispatchPermittedMail(prepare,()=>this.reserveNoticeMailDispatchPermit(randomUUID()));
+  }
+
+  /** K09/NV-24: the one dispatch body both lanes share; only the permit source differs. */
+  private dispatchPermittedMail(prepare:()=>Promise<RecoveryMailWork|null>,reserve:()=>Promise<MailDispatchActivation>):Promise<void> {
     if(this.registrationAdmissionClosing)return Promise.reject(new AuthFlowError("AUTH_MAIL_BUSY"));
     const startedAt=performance.now();
     let permit:Promise<MailDispatchActivation>;
-    try { permit=this.reserveMailDispatchPermit({correlationId:randomUUID(),enforceMinimum:true}); }
+    try { permit=reserve(); }
     catch(error){return Promise.reject(error);}
     let preparing!:Promise<void>;
     preparing=(async()=>{
@@ -1692,6 +1806,9 @@ export class RegistrationService implements RegistrationApplication {
           now: this.clock()
         });
         if (!limit.allowed) {
+          // NV-22: a refused request answers after the clamp but gives its structural slot back now.
+          releaseAdmission?.();
+          releaseAdmission = undefined;
           await this.refuseRateLimit({
             route: "register",
             scope: limit.scope,
@@ -1818,14 +1935,15 @@ export class RegistrationService implements RegistrationApplication {
       // The OUTERMOST release, after the clamp and after the handoff block has
       // either given successful postwork to `dispatchVerification` or given the
       // reservation to a visible hold. Never at commit, clamp entry, or before
-      // the secret/hash and mail-capacity owners have settled.
+      // the secret/hash and mail-capacity owners have settled — except a limiter
+      // refusal, which hands its slot back before its clamp (NV-22).
       if (admission !== undefined) this.releaseSourceAdmission(admission);
       releaseAdmission?.();
     }
   }
 
   async verifyEmail(
-    input: { readonly token: string },
+    input: { readonly token: string; readonly password?: string },
     rawSource: AuthSourceContext
   ): Promise<{ readonly status: "mfa_required" }> {
     try {
@@ -1837,11 +1955,22 @@ export class RegistrationService implements RegistrationApplication {
   }
 
   private async runVerifyEmail(
-    input: { readonly token: string },
+    input: { readonly token: string; readonly password?: string },
     rawSource: AuthSourceContext
   ): Promise<{ readonly status: "mfa_required" }> {
     if (typeof input.token !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(input.token)) {
       throw new AuthFlowError("VERIFICATION_TOKEN_INVALID");
+    }
+    // NV-14: the token holder's password meets validateRegistration's rule (the minimum, and V-14's ruled maximum in
+    // the same unit) before it costs the visitor anything, so a refused password consumes nothing and the link still
+    // verifies. The route keeps its own 1024-byte request-shape bound ahead of this.
+    const password = input.password;
+    if (password !== undefined) {
+      const maximumPasswordLength = this.dependencies.policy.password.maximumLength;
+      if (typeof password !== "string" || password.length < this.dependencies.policy.password.minimumLength
+        || (maximumPasswordLength !== null && password.length > maximumPasswordLength)) {
+        throw new AuthFlowError("AUTH_INPUT_INVALID");
+      }
     }
     const source = sourceContext(rawSource);
     const tokenHash = hashToken("verification", input.token);
@@ -1871,11 +2000,29 @@ export class RegistrationService implements RegistrationApplication {
     // The stable address-limiter key lives behind this lookup. Nothing is
     // charged against it today; a per-address budget can only be charged AFTER
     // this await, never before it, which is why the read stays here.
-    await this.dependencies.repository.findAuditIdentityByVerificationHash(tokenHash);
+    const identity = await this.dependencies.repository.findAuditIdentityByVerificationHash(tokenHash);
+    // NV-14: the password is hashed only after the budget and only for a token the lookup knows. A token with no
+    // credential row is no valid consume in either function, so it gets today's invalid-token answer and buys no
+    // Argon2. The hash shares the registration queue and is handled exactly as register handles it.
+    let newPasswordHash: string | undefined;
+    if (password !== undefined && identity !== null) {
+      const passwordHashWork = this.scheduleRegistrationHash(password);
+      try {
+        newPasswordHash = await passwordHashWork.promise;
+      } catch (error) {
+        passwordHashWork.cancel();
+        await passwordHashWork.settlement;
+        throw error;
+      }
+    }
     // S3 rework4: the clock is re-read after the repository await, so the
     // consumed-at instant is the one the mutation actually happens at.
     const now = this.clock();
-    if (!await this.dependencies.repository.consumeVerification({ tokenHash, occurredAt: now, source })) {
+    const consumed = newPasswordHash === undefined
+      // A request without a password (the release before's UI) keeps 0096's consume, which leaves the stored factors.
+      ? await this.dependencies.repository.consumeVerification({ tokenHash, occurredAt: now, source })
+      : await this.dependencies.repository.consumeVerificationSetPassword({ tokenHash, occurredAt: now, source, newPasswordHash });
+    if (!consumed) {
       throw new AuthFlowError("VERIFICATION_TOKEN_INVALID");
     }
     return Object.freeze({ status: "mfa_required" as const });

@@ -55,6 +55,11 @@ export type BillingRefusalCode =
   | "WITHDRAWAL_WINDOW_CLOSED"
   /** P12d: no live WITHDRAW_SUBSCRIPTION step-up grant for this session (403); nothing was written. */
   | "STEP_UP_REQUIRED"
+  /**
+   * NV-45: a debate the person started before the withdrawal may still be using credit, and more than a day of the
+   * window is left; nothing was written and the grant was not spent (409).
+   */
+  | "WITHDRAWAL_DEBATE_RUNNING"
   /** P12e (A2): a renewal's charge may have reached NETOPIA; the card can change once its outcome is recorded. */
   | "CARD_CHANGE_NOT_AVAILABLE_NOW"
   /** P13 (A25): the emailed cancel link's token is unknown, already spent or past its 24 hours (404). */

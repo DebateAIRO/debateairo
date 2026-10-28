@@ -1,8 +1,8 @@
 #!/usr/local/bin/node
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { tsImport } from 'tsx/esm/api';
 import { exactKeys, refuse, sha256, strictJson, withPrivateBytes } from './custody.mjs';
+import { loadTsxApi } from './tsx-api.mjs';
 import { PREVIEW_ORIGIN } from './turnstile-custody.mjs';
 import { ownedForwardingMessage, recipientPolicyFromInstallation, submitVerification, validateInvocation, cleanSubmissionEnvironment } from '../../preview-mail/v4-20261005/sendmail-owned-preview.mjs';
 import { ACCOUNT_MAIL_TEMPLATES } from '../../preview-mail/v4-20261005/account-mail-template.mjs';
@@ -207,6 +207,7 @@ async function main(){
   exactKeys(plan,['schema','apiUid','mailFrom','publicAppUrl','transportTimeoutMs','recipientPolicy']);
   if(plan.schema!=='preview-auth-dev-mail-v1'||process.getuid?.()!==plan.apiUid||plan.apiUid===0||plan.mailFrom!==argv[3]
     ||plan.publicAppUrl!==PREVIEW_ORIGIN||!Number.isSafeInteger(plan.transportTimeoutMs))refuse();
+  const {tsImport}=await loadTsxApi();
   const auth=await tsImport('../../../packages/register/src/auth-policy.ts',import.meta.url);
   const sourceTimeout=auth.authPolicyFromRegisterRows(auth.AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS).channel.transportTimeoutMs;
   if(plan.transportTimeoutMs!==sourceTimeout)refuse();

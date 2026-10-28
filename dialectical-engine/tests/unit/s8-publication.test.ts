@@ -237,6 +237,7 @@ function publicationHarness(releases: ConstructorParameters<typeof PostgresPubli
       return true;
     },
     abandonKeyProvision: async () => true,
+    readOwnedVisibility: async () => ({ state: "PRIVATE", publicRef: null }),
     withContentLease: async <T>(_publicationRef: string, use: () => Promise<T>) => use(),
     readPublic: async (publicationRef: string) =>
       storedSnapshot?.publicationRef === publicationRef ? storedSnapshot : null,

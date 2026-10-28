@@ -28,10 +28,11 @@
 # run that stops early (a wrong answer, Ctrl-C, a lost connection) leaves every key file as it was and removes what it
 # staged (the API's temporary files through as_api, and any .billing-setup.* file an interrupted run left in the
 # billing folder). An existing key file is kept unless --replace names its section.
-# The plain values go into ONE block of /etc/debateai/api.env (root's, written by root as before), between the two
-# marker lines below: only that block is rewritten, a dated copy of the file is kept beside it with its mode and owner,
-# and a line outside the block that sets one of the block's keys is commented out with a note (systemd would use the
-# later one). It ends with pnpm billing:check, run as the API. It never prints an answer.
+# The plain values go into ONE block of /etc/debateai/api.env (root's: 0640 root:debateai-api, README §3; each rewrite
+# writes a new root-owned file with that owner and mode, never the old owner, NV-52), between the two marker lines
+# below: only that block is rewritten, a dated copy of the file is kept beside it with its mode and owner, and a line
+# outside the block that sets one of the block's keys is commented out with a note (systemd would use the later one).
+# It ends with pnpm billing:check, run as the API. It never prints an answer.
 #
 # --test-root <dir> exists for tests/unit/billing-setup-script.test.ts only: every path moves under <dir>, answers
 # come from standard input, as_api runs its body as the current user, owners are written to <dir>/.billing-setup-owners
@@ -158,8 +159,9 @@ awk -v b="$BEGIN_MARK" -v e="$END_MARK" '$0 == b { f = 1; next } $0 == e { f = 0
 
 server_path() { printf '%s' "${1#"$ROOT"}"; }
 
-# The owner a file is given: on the server its writer is its owner (as_api writes as debateai-api, root writes the
-# public-key file), so nothing is set; under the test root it is recorded.
+# The owner a file is given, recorded under the test root only. On the server a key file's writer is its owner (as_api
+# writes as debateai-api, root writes the public-key file), so nothing is set for those; api.env is the one file whose
+# owner root sets on the server (rewrite_api_env, NV-52).
 record_owner() { # <owner:group> <its final path>
   [ "$TEST_MODE" = 1 ] || return 0
   printf '%s %s\n' "$1" "${2#"$ROOT"/}" >> "$ROOT/.billing-setup-owners"
@@ -557,7 +559,10 @@ rewrite_api_env() {
   cp -p "$API_ENV" "$backup"
   tmp="$(mktemp "$(dirname "$API_ENV")/.api.env.XXXXXXXX")"
   PENDING="$tmp"
-  cp -p "$API_ENV" "$tmp"
+  # NV-52: the new api.env is root's from the moment it exists, 0640 with the API's group (README §3). It never takes
+  # the old file's owner, so no other user can open it for writing at any point before the rename below.
+  if [ "$TEST_MODE" = 1 ]; then record_owner root:debateai-api "$API_ENV"; else chown root:debateai-api "$tmp"; fi
+  chmod 0640 "$tmp"
   awk -v begin="$BEGIN_MARK" -v end="$END_MARK" -v entries="$WORK/entries" -v order="$BLOCK_ORDER" -v stamp="$stamp" \
     "$REWRITE_AWK" "$API_ENV" > "$tmp"
   mv -f "$tmp" "$API_ENV"

@@ -90,6 +90,9 @@ async function loginWithRecorder(recorder: SessionDependencies["riskSignals"]["r
       return true;
     },
     async readLoginChallenge() { return challenge ?? null; },
+    // NV-04: the durable login TOTP budget admits this one attempt and is cleared by the success.
+    async admitTotpLoginAttempt() { return { admitted: true, retryAfterMs: 0 }; },
+    async clearTotpLoginLockout() {},
     async completeTotpLogin() { return true; },
     async recordLoginFailure(input: Record<string, unknown>) {
       throw new Error(`UNEXPECTED_LOGIN_FAILURE:${String(input.reason)}`);

@@ -30,7 +30,7 @@ import { auditMigrationReplaySafety } from "../../tools/orphan-audit/src/index.j
 // compared with this list, so a new schema fails the test rather than silently
 // escaping every rule below.
 const APPLICATION_SCHEMAS = [
-  "billing", "core", "evaluator", "evidence", "identity", "ledger", "legal", "memory",
+  "billing", "core", "erasure_reconcile", "evaluator", "evidence", "identity", "ledger", "legal", "memory",
   "obs", "observation", "register", "scorecard", "serve", "staff", "support"
 ] as const;
 
@@ -90,6 +90,7 @@ const MUTABLE_UNGUARDED_RELATIONS: Readonly<Record<string, string>> = {
   "identity.mfa_recovery_notice_binding": "0106: private request/account-cascade binding",
   "identity.mfa_recovery_notice": "0106: delivery lease/sent/dead state changes",
   "identity.mfa_recovery_source_window": "0106: source window increments and is pruned",
+  "identity.restore_fence": "0125 NV-07: the restore fence singleton; its token and hold are updated in place every minute",
   "staff.subject": "0085/0089: capabilities/state/epoch and erased user binding change",
   "staff.privilege_session": "0087: idle renewal/revocation and account/session cascade",
   "staff.action_proof": "0085/0086: proof consumed; parent/session cascade",
@@ -115,7 +116,7 @@ const PRIVATE_READERS = [STAFF_OWNER, ...RECOVERY_READERS];
 const PRIVATE_TABLE_OWNERS: Readonly<Record<string, string>> = Object.fromEntries([
   ...["action_proof", "alert_delivery_receipt", "alert_dispatch_state", "alert_operation_readiness", "alert_outbox", "audit_event", "bootstrap_marker", "funding_policy_selection", "grant_event", "independent_alert_readiness", "invitation", "invitation_proof", "owner_command", "owner_designation", "owner_lineage", "owner_possession_receipt", "owner_recovery_generation", "owner_recovery_operation", "password_totp_rotation_receipt", "prerequisite_receipt", "privilege_session", "subject", "webauthn_challenge"].map((name) => [`staff.${name}`, STAFF_OWNER]),
   ...["internal_grant", "internal_grant_event", "internal_provider_admission"].map((name) => [`billing.${name}`, STAFF_OWNER]),
-  ...["password_reset_control", "password_reset_notice_binding", "password_reset_notice", "password_reset_source_window"].map((name) => [`identity.${name}`, "debateai_password_reset_owner"]),
+  ...["password_reset_control", "password_reset_notice_binding", "password_reset_notice", "password_reset_retry_lock", "password_reset_source_window"].map((name) => [`identity.${name}`, "debateai_password_reset_owner"]),
   ...["backup_email_control", "backup_email_notice_binding", "backup_email_notice", "backup_email_source_window", "backup_email_proof_window"].map((name) => [`identity.${name}`, "debateai_backup_email_owner"]),
   ...["mfa_recovery_control", "mfa_recovery_staged_code", "mfa_recovery_notice_binding", "mfa_recovery_notice", "mfa_recovery_source_window", "mfa_recovery_legacy_cohort"].map((name) => [`identity.${name}`, "debateai_mfa_recovery_owner"]),
   ...["password_recovery_control", "password_recovery_feed", "password_recovery_notice", "password_recovery_retry_lock", "password_recovery_source_window", "password_recovery_staged_code"].map((name) => [`identity.${name}`, "debateai_password_recovery_owner"])
@@ -629,7 +630,7 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
     // (spec 2026-10-13), then the reclaim resume (spec 2026-10-14), then the reply measures (0120, spec 2026-10-15), then
     // the engine verdict (0121, spec 2026-10-15 engine redesign R2), then the engine's map answer step (0122, spec
     // 2026-10-15 engine redesign R3), then the side-by-side releases (0123, spec 2026-10-21 side-by-side uploads), then the
-    // settings activation (0124), last (side-by-side spec §13).
+    // settings activation (0124, side-by-side spec §13), then the security fixes of audit run 3 (0125), last.
     expect(plan.forwardChain.map((step) => step.name)).toEqual([
       "0111_billing_netopia.sql",
       "0112_auth_db_batch.sql",
@@ -644,7 +645,12 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
       "0121_engine_verdict.sql",
       "0122_engine_map_check.sql",
       "0123_side_by_side_releases.sql",
-      "0124_settings_activation.sql"
+      "0124_settings_activation.sql",
+      "0125_security_fixes_run3.sql",
+      "0126_password_reset_notice_due.sql",
+      "0127_backup_email_notice_due.sql",
+      "0128_mfa_recovery_notice_due.sql",
+      "0129_mfa_recovery_control_user_started.sql"
     ]);
     expect(plan.forwardChain[1]!.name).toBe(AUTH_DB_BATCH_MIGRATION);
   });

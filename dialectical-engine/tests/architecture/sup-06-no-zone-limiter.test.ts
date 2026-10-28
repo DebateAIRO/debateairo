@@ -80,5 +80,11 @@ describe("SUP-06 remains outside the identity security zone", () => {
     expect(repository.match(/client[.]release[(]true[)]/gu)).toHaveLength(2);
     expect(repository).toContain("MAX_CONCURRENCY_SLOTS = 16");
     expect(repository).toContain("OFFSET $2");
+    // NV-33 tripwires for the ticket floor's facts (they count text, comments included; they are not proofs): only
+    // enter() inserts a waiter, the four WAITING-writer call sites, and the one WAITING writer. A later edit that
+    // trips one of them must revisit the floor (PostgresSupportRelayReservationRepository's class comment).
+    expect(repository.match(/INSERT INTO support[.]relay_waiter[(]/gu)).toHaveLength(1);
+    expect(repository.match(/this[.]#recordWait[(]/gu)).toHaveLength(4);
+    expect(repository.match(/'WAITING',\$2::timestamptz/gu)).toHaveLength(1);
   });
 });

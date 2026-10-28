@@ -157,6 +157,7 @@
   "billing.subscription.withdrawNothingDue": "Končano. Vaš paket se je končal. Že porabljeni del pokrije celotno ceno, zato vam ne pripada nobeno vračilo.",
   "billing.subscription.withdrawOwnerReview": "Vaš paket se je končal. Za eno od vaših plačil je bilo vračilo že izvedeno, zato bomo preverili, kaj vam še pripada, in vam v 14 dneh pisali po e-pošti.",
   "billing.subscription.withdrawWindowClosed": "14-dnevni rok za odstop je potekel ali pa ne velja tam, kjer živite. Še vedno lahko kadar koli prekličete.",
+  "billing.subscription.withdrawDebateRunning": "Razprava, ki ste jo začeli, morda še porablja dobroimetje, zato še ne moremo povedati, koliko ste ga porabili. Poskusite znova pozneje. Za odstop imate še več kot en dan.",
   "billing.subscription.stillConfirming": "To še potrjujemo pri ponudniku plačil. Čez nekaj minut znova preverite to stran.",
   "billing.subscription.actionFailed": "To ni uspelo. Poskusite znova.",
   "billing.subscription.invoices": "Računi",

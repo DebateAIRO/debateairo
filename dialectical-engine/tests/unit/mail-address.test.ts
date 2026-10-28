@@ -305,7 +305,7 @@ describe("the DNS question in the two settings flows", () => {
 
   it("email change refuses an undeliverable domain with EMAIL_INVALID before any key or database work", async () => {
     const request = vi.fn(), load = vi.fn();
-    const service = new EmailChangeService({ repository: { request } as never, users: { load } as never, blindIndexKey: Buffer.alloc(32, 1), mail: {} as never, mailDomainCheck: refusing });
+    const service = new EmailChangeService({ repository: { requestBounded: request } as never, users: { load } as never, blindIndexKey: Buffer.alloc(32, 1), mail: {} as never, mailDomainCheck: refusing });
     await expect(service.request(session, { newEmail: "person@gone.com", grantToken }, source)).rejects.toMatchObject({ code: "EMAIL_INVALID" });
     expect(request).not.toHaveBeenCalled();
     expect(load).not.toHaveBeenCalled();

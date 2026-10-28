@@ -42,14 +42,18 @@ function budget(name: string, max: number, connectionTimeoutMillis: number): Dat
 }
 
 export const API_DATABASE_POOLS = Object.freeze({
-  // Almost every read and write. A content lease holds one connection while its
-  // body takes a second, so 8 overlapping reads need 17; billing's timers and
-  // the other background loops take the rest.
+  // Almost every read and write. A content lease holds one connection, and its
+  // body's queries run on it (routeLeaseBodyQueries, NV-31). A write transaction
+  // inside a lease takes a second, so 8 overlapping leased writes need 17;
+  // billing's timers and the other background loops take the rest.
   runtime: budget("api:runtime", 20, 5_000),
   // Every signed-in request, a session check every 250 ms per open debate
-  // page, and recovery mail that holds one across a send of up to 5 s.
+  // page (at most 8 pages per account, NV-20), and recovery mail that holds
+  // one across a send of up to 5 s.
   authorization: budget("api:authorization", 12, 5_000),
   // The 30 s cleanup timer runs two cleanups at once, each a lease plus a query.
+  // The query runs on the lease's connection when routed (NV-31), and the floor
+  // keeps the unrouted case.
   publicationCleanup: budget("api:publication-cleanup", 4, 5_000),
   // Only the single-flight erasure cycle uses it at run time.
   contentProvision: budget("api:content-provision", 2, 5_000),
@@ -60,11 +64,13 @@ export const API_DATABASE_POOLS = Object.freeze({
   // The room decision holds the site's day lock; waiters queue on this pool,
   // never on the pool that decision needs (packages/budget/src/spend-lock.ts).
   roomDecision: budget("api:room-decision", 4, 10_000),
-  // The erasure timer holds a notice lease plus one more; deletes wait here.
+  // The erasure timer holds a notice lease plus one more (its run-lease wait is bounded, LEASE_LOCK_WAITS); a delete
+  // request never waits for a run's lease (NV-30).
   erasure: budget("api:erasure", 4, 5_000),
   // Development only: the runtime environment refuses it anywhere else.
   evaluatorDevMenu: budget("api:evaluator-dev-menu", 2, 5_000),
-  // Opening a support case holds one connection and reads the messages on another.
+  // Opening a support case holds one connection and reads the messages on it (NV-32); the erasure
+  // timer's support shred and readback take one more, one at a time (C-1).
   support: budget("api:support", 6, 5_000),
   // Every relay slot the register may allow (16, live, no restart) holds one
   // for the whole AI call, plus 2 for the queue's bookkeeping.
@@ -82,6 +88,15 @@ export const API_DATABASE_POOLS = Object.freeze({
 
 /** The support settings reader (API and the support commands): it gives up after 200 ms by design. */
 export const SUPPORT_CONTROL_PLANE_POOL = budget("support:control", 2, 200);
+
+/**
+ * Lease lock waits (security fixes run 3, K10: NV-21, NV-30). No pooled connection waits for an advisory lease
+ * without a bound. A SHARED (reader) lease that meets an exclusive holder or waiter puts its connection back and
+ * tries again every 10 ms, for at most `sharedMs`. An EXCLUSIVE lease (key destruction, account erasure) waits in
+ * PostgreSQL's queue, so readers cannot starve it, under lock_timeout `exclusiveMs`. A private-debate delete never
+ * waits (NV-30). Both stay below the 5 s connection wait of every pool that hosts a lease.
+ */
+export const LEASE_LOCK_WAITS = Object.freeze({ sharedMs: 4_000, exclusiveMs: 2_000 });
 
 /**
  * Debates one runner process runs at once. Each holds its content lease for
@@ -103,6 +118,14 @@ export const RUNNER_CAPACITY = Object.freeze({ concurrentRuns: 8 });
  * the runners' own capacity, so two releases' runners together never take more debates than one runner was sized for.
  */
 export const SITE_CONCURRENT_DEBATES: number = RUNNER_CAPACITY.concurrentRuns;
+
+/**
+ * NV-48 (security audit run 3): the debates ONE person may have live at once (a READY or CLAIMED job) across every
+ * release: a quarter of the site's places, so one account never holds more than two of the eight. Counted in the
+ * spend-decision lock on the decision's own transaction (`AskAdmissionGate.ownerActiveDebates`); a further question of
+ * that person waits in line as the person's own wait (PERSON_BUSY) and starts when one of their debates ends.
+ */
+export const OWNER_CONCURRENT_DEBATES: number = Math.max(1, Math.floor(SITE_CONCURRENT_DEBATES / 4));
 
 export const RUNNER_DATABASE_POOLS = Object.freeze({
   runtime: budget("runner:runtime", RUNNER_CAPACITY.concurrentRuns * 3 + 8, 5_000),

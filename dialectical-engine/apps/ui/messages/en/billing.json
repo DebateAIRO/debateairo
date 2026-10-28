@@ -157,6 +157,7 @@
   "billing.subscription.withdrawNothingDue": "Done. Your plan has ended. The part you already used covers the whole price, so nothing was due back.",
   "billing.subscription.withdrawOwnerReview": "Your plan has ended. A refund was already made on one of your payments, so we'll check what is still due and email you within 14 days.",
   "billing.subscription.withdrawWindowClosed": "The 14-day withdrawal period has ended, or it doesn't apply where you live. You can still cancel at any time.",
+  "billing.subscription.withdrawDebateRunning": "A debate you started may still be using credit, so we can't tell yet how much you used. Please try again later. You still have more than a day to withdraw.",
   "billing.subscription.stillConfirming": "We're still confirming this with the payment provider. Check this page again in a few minutes.",
   "billing.subscription.actionFailed": "That didn't work. Please try again.",
   "billing.subscription.invoices": "Invoices",

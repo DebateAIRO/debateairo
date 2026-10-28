@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { ContractHttpError, type Answer, type AnswerStory, type RunProjection } from "@debateai/contract";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
+import { ContractHttpError, type Answer, type AnswerStory, type RunProjection, type Session } from "@debateai/contract";
 import { GET, HEAD } from "../../apps/ui/app/debate/[id]/report/route.js";
 import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
 import { reportSupportedForLocale, type ReportCatalogLoader } from "../../apps/ui/lib/report/reportLanguage.js";
@@ -17,6 +17,7 @@ import {
   type ReportReader,
   type ReportRenderer
 } from "../../apps/ui/lib/report/reportRoute.js";
+import { stopReportRenderWorker } from "../../apps/ui/lib/report/reportRenderWorker.js";
 import {
   STORY_FIXTURE_ANSWER,
   STORY_FIXTURE_DEBATE_ID,
@@ -35,6 +36,14 @@ const SESSION = "s".repeat(43);
 const NOW = new Date("2026-09-26T12:00:00.000Z");
 const FAKE_PDF = Buffer.from("%PDF-1.3 fake");
 const JAPANESE_QUESTION = "日本に引っ越すべきですか？";
+/** The owner GET /v1/session names for SESSION: the render gate's key (NV-26). */
+const OWNER_SESSION: Session = {
+  asker_id: "owner:00000000-0000-4000-8000-0000000000a1",
+  session_id: "00000000-0000-4000-8000-000000000001",
+  caller_scope: "ASKER",
+  ownership_provenance: "server_session",
+  provisional_identity_model: false
+};
 
 const MESSAGES = resolve(process.cwd(), "apps/ui/messages");
 const publicWords = (locale: string): Record<string, string> =>
@@ -65,6 +74,7 @@ function reader(overrides: Partial<ReportReader> = {}): ReportReader {
     readAnswerStory: async () => storyFixture("READY"),
     // An answer with no record (Task M6): the report's About then says nothing it holds.
     readAnswerDisclosure: async () => { throw new ContractHttpError("NOT_FOUND", 404, "DISCLOSURE_NOT_FOUND"); },
+    readSession: async () => OWNER_SESSION,
     ...overrides
   };
 }
@@ -90,6 +100,9 @@ function textHeaders(response: Response): void {
   expect(response.headers.get("content-type")).toBe("text/plain; charset=utf-8");
   expect(response.headers.get("cache-control")).toBe("no-store");
 }
+
+// NV-27: two cases below render through the route's real default renderer, the report worker thread.
+afterAll(async () => { await stopReportRenderWorker(); });
 
 afterEach(() => {
   delete process.env.DIALECTICAL_API_BASE;
@@ -465,8 +478,8 @@ describe("GET /debate/{id}/report", () => {
   it("forwards the session cookie and the browser's user-agent, and renders the real PDF", async () => {
     process.env.DIALECTICAL_API_BASE = "http://api.internal:8000";
     const seen: Array<{ path: string; cookie: string | null; userAgent: string | null }> = [];
-    // Only the API is faked. Everything else goes to the real fetch: the PDF layout engine
-    // (yoga) loads its WebAssembly through fetch, and must keep working.
+    // Only the API is faked. Everything else goes to the real fetch. The PDF itself is made in the report worker
+    // thread (NV-27), whose own fetch (yoga's WebAssembly load) this stub never sees.
     const realFetch = globalThis.fetch;
     vi.stubGlobal("fetch", async (url: URL | string, init?: RequestInit) => {
       if (!String(url).startsWith("http://api.internal:8000/")) return realFetch(url, init);
@@ -476,6 +489,7 @@ describe("GET /debate/{id}/report", () => {
       if (target.pathname === `/v1/answers/${STORY_FIXTURE_DEBATE_ID}`) return Response.json(STORY_FIXTURE_ANSWER);
       if (target.pathname === `/v1/runs/${STORY_FIXTURE_ANSWER.run_ref}`) return Response.json(runWithTag("ro"));
       if (target.pathname === `/v1/answers/${STORY_FIXTURE_DEBATE_ID}/story`) return Response.json(storyFixture("READY"));
+      if (target.pathname === "/v1/session") return Response.json(OWNER_SESSION);
       return Response.json({ error: "NOT_FOUND" }, { status: 404 });
     });
     const response = await GET(new Request(`http://localhost/debate/${STORY_FIXTURE_DEBATE_ID}/report`, {
@@ -486,15 +500,129 @@ describe("GET /debate/{id}/report", () => {
     expect(response.headers.get("content-disposition")).toContain("filename*=UTF-8''debate-ar-trebui-s%C4%83-ne-mut%C4%83m");
     expect(Buffer.from(await response.arrayBuffer()).subarray(0, 5).toString("latin1")).toBe("%PDF-");
     // Task M6: the answer's record is read beside the story (the fake API has none: a 404).
+    // NV-26: then the owner, the render gate's key, with the same session and user-agent.
     expect(seen.map((call) => call.path)).toEqual([
       `/v1/answers/${STORY_FIXTURE_DEBATE_ID}`,
       `/v1/runs/${STORY_FIXTURE_ANSWER.run_ref}`,
       `/v1/answers/${STORY_FIXTURE_DEBATE_ID}/story`,
-      `/v1/answers/${STORY_FIXTURE_DEBATE_ID}/disclosure`
+      `/v1/answers/${STORY_FIXTURE_DEBATE_ID}/disclosure`,
+      "/v1/session"
     ]);
     for (const call of seen) {
       expect(call.cookie).toBe(`__Host-debateai-session=${SESSION}`);
       expect(call.userAgent).toBe("story-route-test/1");
     }
+  }, 60_000);
+});
+
+describe("a report asked for from another site (NV-06)", () => {
+  // Local to this block: the GET block's `params` and the per-test `notFound` are not file-level.
+  const params = { params: Promise.resolve({ id: STORY_FIXTURE_DEBATE_ID }) };
+  const notFound = async (): Promise<Answer> => { throw new ContractHttpError("NOT_FOUND", 404, "ANSWER_NOT_FOUND"); };
+  const visitors: Array<[string, string | null, ReportReader]> = [
+    ["owner of a ready story", SESSION, reader()],
+    ["not the owner", SESSION, reader({ readAnswer: notFound, readRunAnswer: notFound })],
+    ["no session", null, reader()]
+  ];
+
+  /** Fakes the API only (the PDF engine's own fetch stays real), recording every path it is asked for. */
+  function fakeApi(): string[] {
+    process.env.DIALECTICAL_API_BASE = "http://api.internal:8000";
+    const seen: string[] = [];
+    const realFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", async (url: URL | string, init?: RequestInit) => {
+      if (!String(url).startsWith("http://api.internal:8000/")) return realFetch(url, init);
+      const target = new URL(String(url));
+      seen.push(target.pathname);
+      if (target.pathname === `/v1/answers/${STORY_FIXTURE_DEBATE_ID}`) return Response.json(STORY_FIXTURE_ANSWER);
+      if (target.pathname === `/v1/runs/${STORY_FIXTURE_ANSWER.run_ref}`) return Response.json(runWithTag("ro"));
+      if (target.pathname === `/v1/answers/${STORY_FIXTURE_DEBATE_ID}/story`) return Response.json(storyFixture("READY"));
+      if (target.pathname === "/v1/session") return Response.json(OWNER_SESSION);
+      return Response.json({ error: "NOT_FOUND" }, { status: 404 });
+    });
+    return seen;
+  }
+
+  const routeRequest = (fetchSite: string, method = "GET") => new Request(`http://localhost/debate/${STORY_FIXTURE_DEBATE_ID}/report`, {
+    method,
+    headers: {
+      cookie: `__Host-debateai-session=${SESSION}; debateai.locale=en`,
+      "sec-fetch-site": fetchSite,
+      "sec-fetch-mode": "navigate",
+      "user-agent": "xs-probe/1"
+    }
+  });
+
+  it("answers one fixed refusal to every request from another site, before the session or any read", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const answers = new Set<string>();
+    for (const fetchSite of ["cross-site", "same-site", "", "Same-Origin", "same-origin, cross-site"]) {
+      for (const [name, sessionCookie, visitor] of visitors) {
+        const label = `${JSON.stringify(fetchSite)}, ${name}`;
+        const client = vi.fn(() => visitor);
+        const render = vi.fn<ReportRenderer>(async () => FAKE_PDF);
+        const response = await handleReportRequest({
+          id: STORY_FIXTURE_DEBATE_ID, sessionCookie, interfaceLocale: "de", client, now: NOW, render, fetchSite
+        });
+        expect(response.status, label).toBe(403);
+        textHeaders(response);
+        expect(response.headers.get("content-disposition"), label).toBeNull();
+        const body = await response.text();
+        expect(body, label).toBe(words("de", "public.report.error.notAvailable"));
+        expect(client, label).not.toHaveBeenCalled();
+        expect(render, label).not.toHaveBeenCalled();
+        answers.add(JSON.stringify([response.status, [...response.headers.entries()], body]));
+      }
+    }
+    // Fifteen requests, one answer: nothing about the visitor reaches the other site.
+    expect(answers.size).toBe(1);
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it("answers HEAD from another site with the same refusal, with no body, and never builds a client", async () => {
+    const client = vi.fn(() => reader());
+    const head = await handleReportHeadRequest({
+      id: STORY_FIXTURE_DEBATE_ID, sessionCookie: SESSION, interfaceLocale: "de", client, now: NOW, fetchSite: "cross-site"
+    });
+    expect(head.status).toBe(403);
+    textHeaders(head);
+    expect(head.body).toBeNull();
+    expect(client).not.toHaveBeenCalled();
+  });
+
+  it("is enforced by the route: a cross-site or same-site request makes no API call", async () => {
+    const seen = fakeApi();
+    for (const fetchSite of ["cross-site", "same-site"]) {
+      const response = await GET(routeRequest(fetchSite), params);
+      expect(response.status, fetchSite).toBe(403);
+      expect(await response.text(), fetchSite).toBe(words("en", "public.report.error.notAvailable"));
+    }
+    const head = await HEAD(routeRequest("cross-site", "HEAD"), params);
+    expect(head.status).toBe(403);
+    expect(seen).toEqual([]);
+  }, 60_000);
+
+  it("still serves the owner from the app's own page, a typed address, and a browser that sends no Fetch Metadata", async () => {
+    for (const fetchSite of ["same-origin", "none", undefined]) {
+      const response = await handleReportRequest({
+        id: STORY_FIXTURE_DEBATE_ID,
+        sessionCookie: SESSION,
+        interfaceLocale: "en",
+        client: () => reader(),
+        now: NOW,
+        render: async () => FAKE_PDF,
+        ...(fetchSite === undefined ? {} : { fetchSite })
+      });
+      expect(response.status, String(fetchSite)).toBe(200);
+      expect(response.headers.get("content-type"), String(fetchSite)).toBe("application/pdf");
+      expect(response.headers.get("content-disposition"), String(fetchSite)).toMatch(/^attachment; /u);
+    }
+  });
+
+  it("lets a same-origin request through the route to the API", async () => {
+    const seen = fakeApi();
+    const response = await GET(routeRequest("same-origin"), params);
+    expect(response.status).toBe(200);
+    expect(seen[0]).toBe(`/v1/answers/${STORY_FIXTURE_DEBATE_ID}`);
   }, 60_000);
 });

@@ -30,7 +30,7 @@ describe('production preview spending guard optional JSON mode', () => {
     // last test that ran, a traceback, the summary) comes first, on one line.
     const last = result.stderr.split('\n').filter(line => line.trim()).slice(-12).join(' | ');
     expect(result.status, `status=${result.status} signal=${result.signal} ${String(result.error ?? '')} LAST: ${last}\n${result.stderr.slice(-6000)}`).toBe(0);
-    expect(result.stderr).toContain('Ran 113 tests');
+    expect(result.stderr).toContain('Ran 114 tests');
     const summary = summaryLine(result.stderr);
     const skips = [...result.stderr.matchAll(/ skipped '([^']*)'/g)].map(match => match[1]);
     expect(summary === 'OK' || summary === `OK (skipped=${skips.length})`, String(summary)).toBe(true);

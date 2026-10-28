@@ -1,12 +1,13 @@
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { tsImport } from 'tsx/esm/api';
 import { prepareLaunch } from './launch-plan.mjs';
 import { readEnvironmentFile,narrowEnvironment,installNarrowEnvironment,installHostedEgress } from './environment.mjs';
 import { afterApiListen,linuxProcessIdentity } from './runtime-receipt.mjs';
 import { refuse } from './custody.mjs';
+import { loadTsxApi } from './tsx-api.mjs';
 export async function launchApi(argv) {
  const {plan,source}=await prepareLaunch(argv,'api',import.meta.url);
+ const {tsImport}=await loadTsxApi();
  const engine=join(plan.sourceRoot,'dialectical-engine');
  const runtime=await tsImport(join(engine,'packages/register/src/runtime-environment.ts'),import.meta.url);
  const configured=await readEnvironmentFile(plan.environment.path,plan.environment);

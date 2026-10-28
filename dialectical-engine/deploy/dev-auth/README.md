@@ -49,6 +49,16 @@ half-done in the meantime: every relay still closes its standard input and
 passes the prompt as an argument, which is the behaviour the no-hang decision
 bought.
 
+**grok runs without its sandbox profile here.** The development panel starts
+grok with `--sandbox none`, because grok refuses its `read-only` profile while
+`/var/run/docker.sock` is Docker Desktop's symlink. grok's file and shell tools
+are off only through its `--tools ""` flag, and grok runs under your own
+account and home folder. The relay refuses any grok reply that took more than
+one turn or did not end normally (NV-53), so a tool's output is never served
+as a debate turn; it cannot undo what a tool already did. So: do not paste
+other people's text into local-mode questions on a machine whose files matter,
+and use the hosted mode for that.
+
 ## Bounded auth-stack supervisor
 
 After the one-time CA trust setup, the intended entry point is:

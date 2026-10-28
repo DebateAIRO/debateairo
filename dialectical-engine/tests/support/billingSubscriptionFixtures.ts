@@ -311,7 +311,7 @@ export function subscriptionDeps(pool: Pool, overrides: Partial<SubscriptionRout
     countryPolicy: testCountryPolicy,
     geo: new StubGeo(),
     kick: () => undefined,
-    ownerSpend: { readOwnerSpentMicros: async () => 0 },
+    ownerSpend: { readWithdrawalSpend: async () => ({ spentMicros: 0, liveRuns: 0 }) },
     accountEmail: { read: async () => "p12@example.test" },
     refunds: new RefundDesk({
       repository: billing, jobs, policy: testBillingPolicy, audit, clock: () => new Date(),

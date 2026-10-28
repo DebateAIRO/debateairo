@@ -1,7 +1,9 @@
 import type { CrisisLexicon, CrisisPattern } from "./types.js";
 
-// Normalisation folds ą ć ę ń ó ś ź ż to a c e n o s z z, but "ł" is its own letter and stays:
-// every "ł" is written [łl] so that "chciałbym" and "chcialbym" both match.
+// Normalisation folds ą ć ę ń ó ś ź ż to a c e n o s z z, and ł to l, in questions and patterns alike
+// (crisis.ts). "ł" is still written [łl], so a pattern reads the same either way. Never list "x[łl]y" beside
+// "xly" as alternatives: after the fold they are one word, and a repeated group must not read a word two ways
+// (tests/unit/crisis-lexicon-lint.test.ts, R4).
 
 // Kin and people close to the writer, for `other-person` (Polish often drops "mój/moja").
 const CLOSE = String.raw`(?:przyjaciel|przyjaciela|przyjacio[łl]ka|najlepszy przyjaciel|najlepsza przyjacio[łl]ka|kolega|kolezanka|ch[łl]opak|dziewczyna|narzeczony|narzeczona|maz|zona|syn|synek|corka|coreczka|brat|siostra|mama|tata|matka|ojciec|dziecko|nastolatek|nastolatka|partner|partnerka|kuzyn|kuzynka|wspo[łl]lokator|wspo[łl]lokatorka|uczen|uczennica|wnuk|wnuczka|siostrzeniec|siostrzenica|bratanek|bratanica|znajomy|znajoma|babcia|dziadek)`;
@@ -22,7 +24,7 @@ export const PL: CrisisLexicon = Object.freeze({
     { signal: "intent", pattern: String.raw`\b(?:skoncz(?:yc|e|y[łl]bym|y[łl]abym) ze soba|ze soba skoncz(?:yc|e))\b` },
     { signal: "intent", pattern: String.raw`\b(?:${I_WANT} pope[łl]nic|pope[łl]nie) samobojstwo\b` },
     { signal: "intent", pattern: String.raw`\bmysle o (?:samobojstwie|odebraniu sobie zycia)\b` },
-    { signal: "intent", pattern: String.raw`\b(?:mam|miewam|mia[łl](?:em|am)|miewa[łl](?:em|am)|nachodza mnie|drecza mnie|mecza mnie|wracaja|wroci[łl]y|pojawiaja sie)\b (?:[a-zł]+ )?(?:mysli|sk[łl]onnosci|tendencje|zamiary) samobojcze\b` },
+    { signal: "intent", pattern: String.raw`\b(?:mam|miewam|mia[łl](?:em|am)|miewa[łl](?:em|am)|nachodza mnie|drecza mnie|mecza mnie|wracaja|wroci[łl]y|pojawiaja sie)\b (?:[a-zł]{1,32} )?(?:mysli|sk[łl]onnosci|tendencje|zamiary) samobojcze\b` },
     { signal: "intent", pattern: String.raw`\b(?:jestem w kryzysie samobojczym|mam kryzys samobojczy)\b` },
     { signal: "intent", pattern: String.raw`\b(?:chce|chcia[łl]bym|chcia[łl]abym|wola[łl]bym|wola[łl]abym|pragne|marze,? zeby|mam ochote) (?:juz |po prostu |tylko )?umrzec\b(?! za | w | we | na | ze | z | przy | u |,? niz)` },
     { signal: "intent", pattern: String.raw`\bnie chce (?:juz |d[łl]uzej |wiecej )?(?:zyc|istniec)\b${NOT_A_PLACE}` },
@@ -56,20 +58,20 @@ export const PL: CrisisLexicon = Object.freeze({
     { signal: "decision", pattern: String.raw`\b(?:zauwazy[łl]|zauwazy|zateskni[łl]|teskni[łl]|p[łl]aka[łl]|obchodzi[łl]oby|obchodzi[łl]o|przejmowa[łl]|przykro|lepiej|szkoda)\b.{0,30}\b(?:gdybym|jakbym|jesli(?: bym)?|jezeli) (?:umar[łl]a?|znikn[ae][łl]a?|nie zy[łl]a?|sie zabi[łl]a?|zabi[łl]a? sie|odebra[łl]a? sobie zycie|pope[łl]ni[łl]a? samobojstwo|umre|znikne)` },
     { signal: "decision", pattern: String.raw`\bgdybym (?:sie zabi[łl]a?|zabi[łl]a? sie|pope[łl]ni[łl]a? samobojstwo|odebra[łl]a? sobie zycie|skonczy[łl]a? ze soba)\b` },
     // method
-    { signal: "method", pattern: String.raw`\bjak (?:(?:moge|mam|mozna|najlepiej|najszybciej|najlatwiej|naj[łl]atwiej|bezbolesnie|szybko|skutecznie|po prostu|w koncu) )*(?:sie zabic|zabic sie|pope[łl]nic samobojstwo|odebrac sobie zycie|skonczyc ze soba|sie powiesic|powiesic sie|podciac sobie zy[łl]y)\b` },
+    { signal: "method", pattern: String.raw`\bjak (?:(?:moge|mam|mozna|najlepiej|najszybciej|naj[łl]atwiej|bezbolesnie|szybko|skutecznie|po prostu|w koncu) ){0,8}(?:sie zabic|zabic sie|pope[łl]nic samobojstwo|odebrac sobie zycie|skonczyc ze soba|sie powiesic|powiesic sie|podciac sobie zy[łl]y)\b` },
     { signal: "method", pattern: String.raw`\bjak (?:(?:mam|moge|najlepiej|skutecznie) )?przedawkowac\b` },
     { signal: "method", pattern: String.raw`\b(?:(?:chce|zamierzam|musze|mysle,? zeby|planuje) przedawkowac|przedawkuje (?:celowo|specjalnie|dzis|dzisiaj))\b` },
-    { signal: "method", pattern: String.raw`\bjak (?:(?:najszybciej|najlatwiej|naj[łl]atwiej|bezbolesnie|szybko|bez bolu|we snie|spokojnie|moge|mam|mozna) )*umrzec\b(?! godnie| z godnoscia| szczesliw| za | ze starosci| od | na | z powodu| przez)` },
+    { signal: "method", pattern: String.raw`\bjak (?:(?:najszybciej|naj[łl]atwiej|bezbolesnie|szybko|bez bolu|we snie|spokojnie|moge|mam|mozna) ){0,8}umrzec\b(?! godnie| z godnoscia| szczesliw| za | ze starosci| od | na | z powodu| przez)` },
     { signal: "method", pattern: String.raw`\b(?:naj[łl]atwiejsz[yaie]|najszybsz[yaie]|najpewniejsz[yaie]|najmniej bolesn[yaie]|bezbolesn[yaie]|skuteczn[yaie]|najskuteczniejsz[yaie]|najlepsz[yaie]|szybk[iae]|[łl]atw[yaie]|pewn[yaie]|spokojn[yaie]) (?:sposob|sposoby|sposobu|metoda|metody|metode) (?:na smierc|na samobojstwo|zeby umrzec|by umrzec|aby umrzec|na zabicie sie|zeby sie zabic|pope[łl]nienia samobojstwa|samobojstwa|odebrania sobie zycia|na odebranie sobie zycia|umierania|smierci)\b` },
     { signal: "method", pattern: String.raw`\bile\b.{0,40}\b(?:zeby|by|aby|zebym) (?:umrzec|sie zabic|zabic sie|przedawkowac|sie nie obudzic|nie obudzic sie|umar[łl]a?)\b` },
     { signal: "method", pattern: String.raw`\b(?:jak wysoko|z jakiej wysokosci|jak wysoki|jak wysokie|ile pieter|z ktorego pietra)\b.{0,40}\b(?:zeby|by|aby|zebym) (?:umrzec|sie zabic|zginac|zabic sie|na pewno)` },
     { signal: "method", pattern: String.raw`\b(?:(?:smiertelna|smiertelnej|letalna|letalnej) dawk|dawk[aei] (?:smiertelna|smiertelnej|letalna|letalnej)\b)` },
     { signal: "method", pattern: String.raw`\b(?:(?:chce|zamierzam|musze|mysle,? zeby|planuje|powinienem|powinnam|mam ochote) (?:sie powiesic|powiesic sie)|powiesze sie)\b` },
     { signal: "method", pattern: String.raw`\b(?:rzuce|rzucic|rzuci[łl]bym|rzuci[łl]abym) sie pod (?:pociag|tramwaj|samochod|auto|ciezarowke|autobus|metro|ko[łl]a)` },
-    { signal: "method", pattern: String.raw`\b(?:skocze|skoczy[łl]bym|skoczy[łl]abym|(?:chce|zamierzam|mysle,? zeby|powinienem|powinnam|mam ochote) skoczyc) z (?:mostu|dachu|bloku|okna|balkonu|wiezowca|klifu|wiezy|pietra|[a-zł]+ pietra|wiaduktu)\b` },
+    { signal: "method", pattern: String.raw`\b(?:skocze|skoczy[łl]bym|skoczy[łl]abym|(?:chce|zamierzam|mysle,? zeby|powinienem|powinnam|mam ochote) skoczyc) z (?:mostu|dachu|bloku|okna|balkonu|wiezowca|klifu|wiezy|pietra|[a-zł]{1,32} pietra|wiaduktu)\b` },
     { signal: "method", pattern: String.raw`\b(?:podciac|podetne|podcinam|podcia[łl](?:em|am)|podcinac|przeciac|przetne) sobie (?:zy[łl]y|nadgarstki|nadgarstek)\b` },
     { signal: "method", pattern: String.raw`\b(?:wziac|wezme|wzi[ae][łl](?:em|am)|[łl]yknac|[łl]ykne|[łl]ykn[ae][łl](?:em|am)|po[łl]knac|po[łl]kne|po[łl]kn[ae][łl](?:em|am)|zazyc|zazyje|zazy[łl](?:em|am)) (?:wszystkie|ca[łl]e opakowanie|ca[łl]a paczke|ca[łl]y blister|ca[łl]a fiolke|garsc|opakowanie) (?:moich |swoich |tych |moje |swoje )?(?:tabletek|tabletki|leki|lekow|pigu[łl]ki|pigu[łl]ek|proszki|proszkow|tabsy|tabsow)` },
-    { signal: "method", pattern: String.raw`\b(?:napisac|napisze|napisa[łl](?:em|am)|pisze|zostawic|zostawie) (?:[a-zł]+ )?list (?:pozegnalny|samobojczy)\b` },
+    { signal: "method", pattern: String.raw`\b(?:napisac|napisze|napisa[łl](?:em|am)|pisze|zostawic|zostawie) (?:[a-zł]{1,32} )?list (?:pozegnalny|samobojczy)\b` },
     // other-person
     { signal: "other-person", pattern: String.raw`\b${CLOSE}\b.{0,40}\b${THEY_AT_RISK}` },
     { signal: "other-person", pattern: String.raw`\bgrozi(?:[łl]a?)?,? ze (?:sie zabije|zabije sie|pope[łl]ni samobojstwo|odbierze sobie zycie|skonczy ze soba)\b` },

@@ -26,6 +26,8 @@ import { signQuestionLanguageReference, verifyQuestionLanguageChoice, type Quest
  * It never blocks the person: every failure ends in a lock. It logs nothing, and no error it raises carries the
  * question, the rewrite or the reply: codes and hashes only. It holds no lock (mutex, row or admission) while it
  * waits for the fast AI; the only state is the in-process repeat-offer memory below.
+ * NV-47: right before each paid check it asks the person's own count of paid checks (`fastCheckBudget`); spent, or a
+ * budget that throws, sends nothing and reads DOWN SKIPPED_OWNER_BUDGET (the fallback lock, never a block).
  */
 export type QuestionLanguageTrace = Readonly<{
   eld: Readonly<{ code: string | null; reliable: boolean; confident: boolean }> | null;
@@ -126,17 +128,21 @@ export class QuestionLanguageDecider implements QuestionLanguagePort {
   readonly #offered = new Map<string, number>();
   readonly #deps: Readonly<{ eld: EldReader; fastCheck: FastCheck | null; key: QuestionLanguageReferenceKey;
     clock: () => Date; maxQuestionBytes: number; onDecided?: (outcome: QuestionLanguageLock | QuestionLanguageChoiceNeeded) => void;
-    fastCheckOffReason?: QuestionLanguageFastCheckOffReason; repeatOfferMemoryEntries?: number }>;
+    fastCheckOffReason?: QuestionLanguageFastCheckOffReason; repeatOfferMemoryEntries?: number;
+    fastCheckBudget?: (ownerScope: string) => boolean }>;
   readonly #memoryEntries: number;
 
   /**
    * `onDecided` receives the lock (with the original question of an accepted rewrite) or the offer: wire it only to
    * practice (P2d), never to a logger. `fastCheckOffReason`: why `fastCheck` is null on this deployment (Task 12).
    * `repeatOfferMemoryEntries`: the memory's size bound (default 10,000; tests pass a small one).
+   * `fastCheckBudget` (NV-47): asked once right before a paid check, with the owner scope; false, or a throw, means
+   * skipped (no call). Absent = no per-person bound (the preview, tests).
    */
   constructor(deps: Readonly<{ eld: EldReader; fastCheck: FastCheck | null; key: QuestionLanguageReferenceKey;
     clock: () => Date; maxQuestionBytes: number; onDecided?: (outcome: QuestionLanguageLock | QuestionLanguageChoiceNeeded) => void;
-    fastCheckOffReason?: QuestionLanguageFastCheckOffReason; repeatOfferMemoryEntries?: number }>) {
+    fastCheckOffReason?: QuestionLanguageFastCheckOffReason; repeatOfferMemoryEntries?: number;
+    fastCheckBudget?: (ownerScope: string) => boolean }>) {
     const entries = deps.repeatOfferMemoryEntries ?? OFFER_MEMORY.entries;
     if (!Number.isInteger(entries) || entries < 1) throw refusal("QUESTION_LANGUAGE_DECISION_INVALID");
     this.#deps = deps;
@@ -166,7 +172,9 @@ export class QuestionLanguageDecider implements QuestionLanguagePort {
       return this.#lock(site, before, Object.freeze({ eld, fast: null, contractHash: null }), localReason);
     }
     // L-ROUTE: only reached with a fast check on this deployment. No lock is held while it runs.
-    const fast = await this.#fast(fastCheck!, questionLine, site);
+    // NV-47: the person's own count of paid checks, asked once here (the only path to #fast); spent = nothing is sent.
+    const fast = this.#budgetAllows(input.ownerScope) ? await this.#fast(fastCheck!, questionLine, site)
+      : Object.freeze({ kind: "DOWN" as const, reason: "SKIPPED_OWNER_BUDGET" as const });
     const trace = Object.freeze({ eld, fast: fastTrace(fast), contractHash: fastCheck!.contractHash });
     const offerKey = offerKeyOf(input.ownerScope, questionLine);
     const nowMs = this.#deps.clock().getTime();
@@ -174,9 +182,10 @@ export class QuestionLanguageDecider implements QuestionLanguagePort {
       this.#lastOfferAt(offerKey, nowMs), nowMs);
     if (decision.kind === "LOCK") {
       // Task 19 fix round 2: a check skipped on purpose (the site pot at its ceiling, or the spend record down) says so
-      // beside the lock's own code, so the record tells a skip from a vendor failure.
+      // beside the lock's own code, so the record tells a skip from a vendor failure. NV-47: and the person's budget spent.
       const skipped = fast.kind !== "DOWN" ? null : fast.reason === "SKIPPED_DAY_POT" ? "FAST_CHECK_SKIPPED_DAY_POT"
-        : fast.reason === "SPEND_RECORD_DOWN" ? "FAST_CHECK_SPEND_RECORD_DOWN" : null;
+        : fast.reason === "SPEND_RECORD_DOWN" ? "FAST_CHECK_SPEND_RECORD_DOWN"
+        : fast.reason === "SKIPPED_OWNER_BUDGET" ? "FAST_CHECK_SKIPPED_OWNER_BUDGET" : null;
       return this.#lock(site, decision, trace, null, skipped);
     }
     // Ruling L-POPUP-FIRST (final review I5b): an ask with no site_language comes from a client that cannot show the
@@ -224,6 +233,17 @@ export class QuestionLanguageDecider implements QuestionLanguagePort {
       return this.#deps.eld.read(questionLine);
     } catch {
       return NO_READING;
+    }
+  }
+
+  /** NV-47: no budget = no per-person bound; a budget that answers anything but true, or throws, is a skip. */
+  #budgetAllows(ownerScope: string): boolean {
+    const budget = this.#deps.fastCheckBudget;
+    if (budget === undefined) return true;
+    try {
+      return budget(ownerScope) === true;
+    } catch {
+      return false;
     }
   }
 

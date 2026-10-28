@@ -61,7 +61,7 @@ export const SL: CrisisLexicon = Object.freeze({
     { signal: "method", pattern: String.raw`\bnebolec(?:en|na|ni) (?:samomor|smrt)\b(?! za\b| zivali| pri )` },
     { signal: "method", pattern: String.raw`\b(?:samomorilno|poslovilno samomorilno) pismo\b` },
     { signal: "method", pattern: String.raw`\b(?:smrtn(?:i|a|o)|smrtonosn(?:i|a|o)) (?:odmerek|odmerka|doza|dozo)\b` },
-    { signal: "method", pattern: String.raw`\bkoliko (?:[a-z]+ )?(?:tablet|tabletk|zdravil|uspaval|paracetamola|ibuprofena|miligramov|gramov|insulina|inzulina|antidepresivov|alkohola)\b.{0,40}\b(?:za (?:predoziranje|smrt)|da (?:umrem|se predoziram|se ubijem)|ubije (?:cloveka|me)|je smrtn)` },
+    { signal: "method", pattern: String.raw`\bkoliko (?:[a-z]{1,32} )?(?:tablet|tabletk|zdravil|uspaval|paracetamola|ibuprofena|miligramov|gramov|insulina|inzulina|antidepresivov|alkohola)\b.{0,40}\b(?:za (?:predoziranje|smrt)|da (?:umrem|se predoziram|se ubijem)|ubije (?:cloveka|me)|je smrtn)` },
     { signal: "method", pattern: String.raw`\b(?:s kaksne visine|z kaksne visine|kako visoko|kako visok(?:a)?)\b.{0,40}\b(?:umreti|da umrem|se ubiti|ubije|je padec smrten)\b` },
     { signal: "method", pattern: String.raw`\b(?:(?:obesil|zastrupil|predoziral|ustrelil)(?:a)? se bom|se bom (?:obesil|zastrupil|predoziral|ustrelil)(?:a)?|(?:se obesim|obesim se))\b` },
     { signal: "method", pattern: String.raw`\b${WANT} se (?:obesiti|zastrupiti|predozirati|utopiti|ustreliti)\b` },

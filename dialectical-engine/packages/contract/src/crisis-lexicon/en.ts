@@ -18,7 +18,7 @@ export const EN: CrisisLexicon = Object.freeze({
     { signal: "intent", pattern: String.raw`\bi (?:don't|do not|dont) want to live\s*(?:$|[.!?,;])` },
     { signal: "intent", pattern: String.raw`\b(?:i|i'm|im|i am|i've|i have|i feel|i've been|me|my)\b.{0,30}\bsuicidal\b` },
     { signal: "intent", pattern: String.raw`\bsuicidal\b.{0,20}\b(?:again|lately|right now|tonight|today|these days)\b` },
-    { signal: "intent", pattern: String.raw`\b(?:i|me)\b (?:[a-z']+ ){0,3}commit(?:ting)? suicide\b` },
+    { signal: "intent", pattern: String.raw`\b(?:i|me)\b (?:[a-z']{1,32} ){0,3}commit(?:ting)? suicide\b` },
     { signal: "intent", pattern: String.raw`\bend it all\b` },
     { signal: "intent", pattern: String.raw`\bbetter off dead\b` },
     { signal: "intent", pattern: String.raw`\b(?:no|nothing|not any) (?:reason|point|purpose) (?:to|in|for) (?:live|living|go on|going on|being alive|staying alive)\b(?! in| with| on| near| abroad| here| there)` },

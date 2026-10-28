@@ -48,6 +48,30 @@ async function complete(a: Awaited<ReturnType<typeof account>>, step?: number, e
 async function startCurrentRecovery(a:Awaited<ReturnType<typeof account>>,token=hash()){
  const client=await currentRecovery.connect();try{await client.query('BEGIN');await client.query('SELECT identity.begin_runtime_audit_attempt()');const result=(await client.query('SELECT identity.start_consumer_recovery($1,$2,$3) value',[a.index,token,source])).rows[0].value;await client.query('COMMIT');return result;}catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
 }
+// NV-17: the new release's guarded entry points (0125). start/open/complete above stay the record of the 0104/0108 path.
+type Reset = Awaited<ReturnType<typeof account>>;
+async function startGuarded(a: Reset, from: typeof source = source) {
+  return (await withMailLocale(db.pool, 'en', (c) => c.query(`SELECT identity.password_reset_start_guarded($1,$2,$3,$4,$5,$6,$7,$8,$9) AS outcome`, [a.index, a.id, [a.channel, a.backup].sort(), box(a.id), a.link, a.cancel, JSON.stringify([a.channel, a.backup].sort().map(channelId => ({ channelId, envelope: box(a.id), ...(channelId === a.channel ? { proofEnvelope: box(a.id) } : {}) }))), from, 3]))).rows[0].outcome;
+}
+async function openGuarded(a: Reset) {
+  expect(await startGuarded(a)).toBe(true);
+  expect((await db.pool.query(`SELECT identity.password_reset_exchange($1,$2,$3,$4) AS outcome`, [a.link, a.session, a.csrf, source])).rows[0].outcome).toBe("PASSWORD_REQUIRED");
+}
+async function reserve(a: Reset, lockMs: number | null = 300000) {
+  return (await withMailLocale(db.pool, 'en', (c) => c.query(`SELECT identity.password_reset_proof_reserve($1,$2,$3) AS reserved`, [a.session, source, lockMs]))).rows[0].reserved;
+}
+async function refused(a: Reset) {
+  await withMailLocale(db.pool, 'en', (c) => c.query(`SELECT identity.password_reset_proof_refused($1,$2)`, [a.session, source]));
+}
+async function completeGuarded(a: Reset) {
+  const dbStep = Number((await db.pool.query(`SELECT floor(extract(epoch FROM clock_timestamp())/30)::bigint AS step`)).rows[0].step);
+  return (await withMailLocale(db.pool, 'en', (c) => c.query(`SELECT identity.password_reset_complete_guarded($1,$2,$3,$4,$5,$6,$7) AS outcome`, [a.session, password, a.factor, a.envelope, null, dbStep, source]))).rows[0].outcome;
+}
+// A new attempt needs new link, cancel, session and csrf hashes: all four are UNIQUE on the control row (0104:17-19).
+const renew = (a: Reset) => Object.assign(a, { link: hash(), cancel: hash(), session: hash(), csrf: hash() });
+const counter = async (a: Reset) => (await db.pool.query(`SELECT attempts,locked_until IS NOT NULL AS locked,(extract(epoch FROM locked_until-clock_timestamp())*1000)::int AS remaining_ms FROM identity.password_reset_retry_lock WHERE user_id=$1`, [a.id])).rows[0];
+const attempt = async (a: Reset) => (await db.pool.query(`SELECT stage,failures FROM identity.password_reset_control WHERE session_hash=$1`, [a.session])).rows[0];
+const proofDenials = async (a: Reset) => (await db.pool.query(`SELECT count(*)::int AS n FROM identity.audit_event e JOIN identity.account_recovery_request r ON e.target_id=r.public_handle::text JOIN identity.password_reset_control c USING(recovery_request_id) WHERE c.session_hash=$1 AND e.event_type='identity.password_reset.proof' AND e.decision='DENY'`, [a.session])).rows[0].n;
 beforeAll(async () => {
   db = await startTestDatabase();
   await migrate(db.pool);
@@ -229,5 +253,128 @@ describe("ordinary password-only reset database authority", () => {
         await pending;
       }
     }
+  });
+  it("NV-17: a correct fifth code still completes, and the completed reset deletes the account's counter", async () => {
+    const a = await account();
+    await openGuarded(a);
+    for (let i = 0; i < 4; i++) {
+      expect(await reserve(a)).toMatchObject({ status: "READY" });
+      await refused(a);
+    }
+    expect(await attempt(a)).toEqual({ stage: "PASSWORD_REQUIRED", failures: 4 });
+    const fifth = await reserve(a);
+    expect(fifth).toMatchObject({ status: "READY", userId: a.id, factorId: a.factor, factorSecret: a.envelope, lastAcceptedStep: null });
+    expect(typeof fifth.nowMs).toBe("number");
+    expect(await counter(a)).toMatchObject({ attempts: 5, locked: true });
+    expect(await completeGuarded(a)).toBe("COMPLETED");
+    expect(await attempt(a)).toMatchObject({ stage: "COMPLETED" });
+    expect(await counter(a)).toBeUndefined();
+  });
+  it("NV-17: cancelling keeps the account's count; the fifth reservation locks new starts for 300 s, and the next round for 600 s", async () => {
+    const a = await account();
+    const eligible = async () => (await db.pool.query(`SELECT identity.mfa_recovery_eligible($1) AS ok`, [a.id])).rows[0].ok;
+    const signals = async () => (await db.pool.query(`SELECT count(*)::int AS n FROM identity.authentication_risk_signal WHERE user_id=$1`, [a.id])).rows[0].n;
+    const recoverable = await eligible();
+    await openGuarded(a);
+    for (let i = 0; i < 3; i++) {
+      expect(await reserve(a)).toMatchObject({ status: "READY" });
+      await refused(a);
+    }
+    expect((await withMailLocale(db.pool, 'en', (c) => c.query(`SELECT identity.password_reset_cancel_session($1,$2) AS result`, [a.session, source]))).rows[0].result).toBe("CANCELLED");
+    renew(a);
+    await openGuarded(a);
+    expect(await reserve(a)).toMatchObject({ status: "READY" });
+    expect(await counter(a)).toMatchObject({ attempts: 4, locked: false });
+    expect(await reserve(a)).toMatchObject({ status: "READY" });
+    const first = await counter(a);
+    expect(first).toMatchObject({ attempts: 5, locked: true });
+    expect(first.remaining_ms).toBeGreaterThan(290000);
+    expect(first.remaining_ms).toBeLessThanOrEqual(300000);
+    await refused(a);
+    expect(await attempt(a)).toEqual({ stage: "REFUSED", failures: 2 });
+    renew(a);
+    const denied = { ...source, ipArgon2id: `argon2id-audit:v1:${"d".repeat(64)}` };
+    const denials = async () => (await db.pool.query(`SELECT count(*)::int AS n FROM identity.audit_event WHERE event_type='identity.password_reset.started' AND decision='DENY' AND source_context->>'ipArgon2id'=$1`, [denied.ipArgon2id])).rows[0].n;
+    expect(await startGuarded(a, denied)).toBe(false);
+    expect(await denials()).toBe(1);
+    expect((await db.pool.query(`SELECT count(*)::int AS n FROM identity.password_reset_control WHERE user_id=$1`, [a.id])).rows[0].n).toBe(2);
+    expect(await eligible()).toBe(recoverable);
+    expect(await signals()).toBe(0);
+    // The clock cannot be advanced, so the lapse is written: no lock is permanent.
+    await db.pool.query(`UPDATE identity.password_reset_retry_lock SET locked_until=clock_timestamp()-interval '1 second' WHERE user_id=$1`, [a.id]);
+    await openGuarded(a);
+    for (let i = 0; i < 5; i++)
+      expect(await reserve(a)).toMatchObject({ status: "READY" });
+    const second = await counter(a);
+    expect(second).toMatchObject({ attempts: 10, locked: true });
+    expect(second.remaining_ms).toBeGreaterThan(590000);
+    expect(second.remaining_ms).toBeLessThanOrEqual(600000);
+  });
+  it("NV-17: twelve concurrent reservations admit exactly five; a refused one closes nothing and the settle closes", async () => {
+    const a = await account();
+    await openGuarded(a);
+    const outcomes = await Promise.all(Array.from({ length: 12 }, () => reserve(a)));
+    expect(outcomes.filter(o => o.status === "READY")).toHaveLength(5);
+    expect(outcomes.filter(o => o.status === "REFUSED")).toHaveLength(7);
+    const row = await counter(a);
+    expect(row).toMatchObject({ attempts: 5, locked: true });
+    expect(row.remaining_ms).toBeGreaterThan(0);
+    expect(await attempt(a)).toEqual({ stage: "PASSWORD_REQUIRED", failures: 5 });
+    expect(await proofDenials(a)).toBe(7);
+    await refused(a);
+    expect(await attempt(a)).toEqual({ stage: "REFUSED", failures: 5 });
+    expect(await proofDenials(a)).toBe(8);
+  });
+  it.each([null, 59999, 3600001])("NV-17: refuses a cooldown base of %s ms before it counts anything", async (lockMs) => {
+    const a = await account();
+    await openGuarded(a);
+    await expect(reserve(a, lockMs)).rejects.toThrow("PASSWORD_RESET_LOCK_INVALID");
+    expect(await attempt(a)).toEqual({ stage: "PASSWORD_REQUIRED", failures: 0 });
+    expect(await counter(a)).toBeUndefined();
+  });
+  it("NV-17: the counter and the four entry points belong to the reset owner, and only the reset runtime may execute them", async () => {
+    const functions = ["identity.password_reset_start_guarded(bytea,uuid,uuid[],jsonb,text,text,jsonb,jsonb,bigint)", "identity.password_reset_proof_reserve(text,jsonb,bigint)", "identity.password_reset_proof_refused(text,jsonb)", "identity.password_reset_complete_guarded(text,text,uuid,jsonb,bigint,bigint,jsonb)"];
+    const rows = (await db.pool.query(`SELECT signature,pg_get_userbyid(p.proowner)::text AS owner,p.prosecdef AS definer,p.provolatile::text AS volatility,
+      has_function_privilege('debateai_password_reset_runtime',p.oid,'EXECUTE') AS reset_runtime,
+      EXISTS(SELECT 1 FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE a.grantee=0) AS public_execute,
+      has_function_privilege('debateai_runtime',p.oid,'EXECUTE') AS api_runtime,
+      has_function_privilege('debateai_authorization_runtime',p.oid,'EXECUTE') AS authorization_runtime
+      FROM unnest($1::text[]) signature JOIN pg_proc p ON p.oid=to_regprocedure(signature) ORDER BY signature`, [functions])).rows;
+    expect(rows).toEqual([...functions].sort().map(signature => ({ signature, owner: "debateai_password_reset_owner", definer: true, volatility: "v", reset_runtime: true, public_execute: false, api_runtime: false, authorization_runtime: false })));
+    const table = (await db.pool.query(`SELECT pg_get_userbyid(c.relowner)::text AS owner,
+      (SELECT array_agg(DISTINCT pg_get_userbyid(a.grantee)::text) FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a) AS grantees,
+      EXISTS(SELECT 1 FROM pg_trigger t WHERE t.tgrelid=c.oid AND t.tgname='reject_truncate' AND NOT t.tgisinternal) AS truncate_guard
+      FROM pg_class c WHERE c.oid=to_regclass('identity.password_reset_retry_lock')`)).rows;
+    expect(table).toEqual([{ owner: "debateai_password_reset_owner", grantees: ["debateai_password_reset_owner"], truncate_guard: true }]);
+  });
+  // NV-39: the window starts empty and holds exactly 65,536 rows in a strict eviction order: E (expired), then L (budget
+  // left, uses 1), then the fillers (uses 2), with S (spent) last. One admit gives up 64 rows and takes the new digest.
+  it("NV-39: at capacity the evicting admit gives up 64 rows, expired first and the spent one last; v1 still refuses", async () => {
+    const digest = (seed: string) => `argon2id-audit:v1:${createHash("sha256").update(seed).digest("hex")}`, [E, L, S] = ["nv39-e", "nv39-l", "nv39-s"].map(digest);
+    const count = async () => (await db.pool.query(`SELECT count(*)::int AS n FROM identity.password_reset_source_window`)).rows[0].n;
+    const present = async () => (await db.pool.query(`SELECT source_digest FROM identity.password_reset_source_window WHERE source_digest=ANY($1::text[]) ORDER BY 1`, [[E, L, S]])).rows.map(r => r.source_digest);
+    try {
+      await db.pool.query(`DELETE FROM identity.password_reset_source_window`);
+      await db.pool.query(`INSERT INTO identity.password_reset_source_window(source_digest,window_started_at,uses) VALUES($1,now()-interval '1 hour',1),($2,now()-interval '1 second',1),($3,now(),21)`, [E, L, S]);
+      await db.pool.query(`INSERT INTO identity.password_reset_source_window(source_digest,window_started_at,uses) SELECT 'argon2id-audit:v1:'||encode(sha256(('w'||g)::text::bytea),'hex'),now(),2 FROM generate_series(1,65533) g`);
+      expect(await count()).toBe(65536);
+      expect((await db.pool.query(`SELECT identity.password_reset_admit_evicting($1,3) AS ok`, [{ ...source, ipArgon2id: digest("nv39-new") }])).rows[0].ok).toBe(true);
+      expect(await present()).toEqual([S]);
+      expect(await count()).toBe(65536 - 64 + 1);
+      await db.pool.query(`INSERT INTO identity.password_reset_source_window(source_digest,window_started_at,uses) SELECT 'argon2id-audit:v1:'||encode(sha256(('v'||g)::text::bytea),'hex'),now(),2 FROM generate_series(1,63) g`);
+      expect(await count()).toBe(65536);
+      // The release before keeps the v1 admit, which still refuses a new digest at capacity.
+      expect((await db.pool.query(`SELECT identity.password_reset_admit($1,3) AS ok`, [{ ...source, ipArgon2id: digest("nv39-v1") }])).rows[0].ok).toBe(false);
+    }
+    finally {
+      await db.pool.query(`DELETE FROM identity.password_reset_source_window`);
+    }
+    const roles = ["debateai_password_reset_runtime", "debateai_mfa_recovery_runtime", "debateai_backup_email_runtime", "debateai_runtime", "debateai_authorization_runtime", "debateai_billing_runtime"];
+    expect((await db.pool.query(`SELECT p.prosecdef AS definer,p.proconfig AS config,pg_get_userbyid(p.proowner)::text AS owner,
+      EXISTS(SELECT 1 FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE a.grantee=0) AS public_execute,
+      ARRAY(SELECT DISTINCT pg_get_userbyid(a.grantee)::text FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE a.grantee NOT IN(0,p.proowner) ORDER BY 1) AS grantees,
+      ARRAY(SELECT r FROM unnest($2::text[]) r WHERE has_function_privilege(r,p.oid,'EXECUTE') ORDER BY 1) AS executors
+      FROM pg_proc p WHERE p.oid=to_regprocedure($1)`, ["identity.password_reset_admit_evicting(jsonb,bigint)", roles])).rows)
+      .toEqual([{ definer: true, config: ["search_path=pg_catalog, pg_temp"], owner: "debateai_password_reset_owner", public_execute: false, grantees: ["debateai_password_reset_runtime"], executors: ["debateai_password_reset_runtime"] }]);
   });
 });

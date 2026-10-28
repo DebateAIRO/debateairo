@@ -39,6 +39,7 @@ import {
   decideRunCostEnvelope,
   isCostEnvelopePhase,
   projectedCallCeilingMicros,
+  projectedCallUsage,
   providerUsageUnreported,
   readReportedUsage,
   runCostEnvelopeReached,
@@ -65,7 +66,15 @@ export type ModelSpendSource =
   | "SUPPORT"
   | "STORY"
   /** the fast language check before a debate: a run-less site cost (0118), written only by ledger.record_language_check_spend */
-  | "LANGUAGE_CHECK";
+  | "LANGUAGE_CHECK"
+  /**
+   * NV-50 (security audit run 3, migration 0125): an attempt the gateway SENT that was never charged by `recordCall`
+   * (it timed out, its connection dropped, or its reply could not be stored), charged by `recordUnanswered` at its
+   * reported usage or else its projected maximum. Its run's (or its story's) envelope and the site's day count it; no
+   * person's window, hold or withdrawal does. It always names its run and its attempt, and carries no phase.
+   */
+  | "RUN_UNANSWERED"
+  | "STORY_UNANSWERED";
 
 /**
  * Question language, P2L Task 19 (migration 0118): the ONE writer of a LANGUAGE_CHECK row, a SECURITY DEFINER
@@ -164,10 +173,11 @@ export interface ModelSpendStore {
   settleInternalCall?(callId: string, entry: ModelSpendEntry): Promise<void>;
   /**
    * Everything this ONE run's DEBATE has been charged, across every vendor it
-   * touched. STORY charges are excluded: the story has its own envelope.
+   * touched. STORY charges (and NV-50's STORY_UNANSWERED) are excluded: the story
+   * has its own envelope.
    */
   readRunSpentMicros(runId: string): Promise<number>;
-  /** Everything this run's verdict STORY has been charged (spend source STORY only). */
+  /** Everything this run's verdict STORY has been charged (spend sources STORY and NV-50's STORY_UNANSWERED). */
   readRunStorySpentMicros(runId: string): Promise<number>;
   /** Everything the WHOLE application has been charged on that UTC day. */
   readDaySpentMicros(day: string): Promise<number>;
@@ -220,12 +230,26 @@ export interface ProviderCostSeam {
   /** I4: the hosted requirement, asked only of a successful completion. */
   assertUsageReported(observed: Readonly<{ providerRef: string; usage: unknown }>): Promise<void>;
   /**
+   * NV-50 (security audit run 3): charges an attempt the gateway SENT that may have been billed and never reached
+   * `recordCall` (a deadline, a dropped connection, a reply that could not be stored), as `RUN_UNANSWERED` or
+   * `STORY_UNANSWERED`: at the body's usage when one was read (`usage`), else at `projection`'s maximum. It settles
+   * nothing (an INTERNAL admission stays unsettled) and refuses a missing `attemptId`. A throw means the charge could not
+   * be written, and the gateway then stops the call.
+   */
+  recordUnanswered?(observed: Readonly<{
+    providerRef: string;
+    usage: unknown;
+    admission?: ProviderCallAdmission;
+    projection: Readonly<{ requestBytes: number; completionTokenCeiling: number }>;
+    attemptId: string;
+  }>): Promise<void>;
+  /**
    * Parallel AI calls (spec 2026-10-12 §3.5): releases the projection this seam
    * still counts in flight (`CostEnvelopeGuardInput.inFlight`). The gateway's
    * attempt loop tells the seam about an attempt that produced a body
-   * (`recordCall`), never about one that failed before any arrived, so the
-   * runner's gateway calls this once the whole call has settled. Idempotent; a
-   * no-op without a counter.
+   * (`recordCall`) or that was sent and never answered (`recordUnanswered`, NV-50),
+   * never about one refused before it was sent, so the runner's gateway calls this
+   * once the whole call has settled. Idempotent; a no-op without a counter.
    */
   releaseInFlight?(): void;
 }
@@ -688,8 +712,9 @@ export class CostEnvelopeGuard {
      * story spends its own envelope, after the debate, and is not counted. One
      * seam serves one gateway call, whose attempts run one after another, so it
      * holds at most one projection: released when its charge is written, when
-     * the next attempt is admitted (an attempt that failed before any body came
-     * back is never charged), on refusal, or by the gateway once the call settles.
+     * the next attempt is admitted (an attempt that was sent and never charged is
+     * charged by `recordUnanswered`, NV-50), on refusal, or by the gateway once the
+     * call settles.
      */
     const inFlight = spendSource === "RUN" ? this.#inFlight : null;
     let releaseCurrent: (() => void) | null = null;
@@ -807,6 +832,47 @@ export class CostEnvelopeGuard {
         } finally {
           // After the charge is written (or could not be): from here the run's
           // spent total carries it, so it stops counting in flight.
+          releaseInFlight();
+        }
+      },
+      /**
+       * NV-50 (security audit run 3): an attempt the gateway SENT that may have been billed and never reached
+       * `recordCall` is charged here, before the next attempt is admitted, so that admission (and the site's day) sees
+       * it. Its own source, never RUN/STORY, so it is never a person's credit used. At the body's usage when one was
+       * read, else at the attempt's projected maximum (the bound admission used). No phase, no `settleInternalCall` and
+       * no admission check: nothing is settled, and the row's fresh spend id leaves an INTERNAL admission unsettled.
+       */
+      recordUnanswered: async (observed) => {
+        try {
+          if (typeof observed?.attemptId !== "string" || observed.attemptId === "") {
+            throw new TypeError("MODEL_SPEND_ATTEMPT_REQUIRED");
+          }
+          let usage: ReturnType<typeof projectedCallUsage>;
+          let chargeMicros: number;
+          try {
+            usage = chargeableUsage(observed.usage, observed.projection) ?? projectedCallUsage(observed.projection);
+            chargeMicros = chargeMicrosForUsage(input.price, usage);
+          } catch (error) {
+            if (error instanceof TypedDomainError) throw error;
+            throw new TypedDomainError(
+              COST_ENVELOPE_CHARGE_UNREPRESENTABLE,
+              `The unanswered charge for ${observed.providerRef} could not be computed:`
+                + ` ${error instanceof Error ? error.message : String(error)}`
+            );
+          }
+          await this.#store.recordSpend(Object.freeze({
+            spendId: randomUUID(),
+            spendSource: envelope.spendSource === "RUN" ? "RUN_UNANSWERED" : "STORY_UNANSWERED",
+            runId: input.runId,
+            providerRef: observed.providerRef,
+            chargedOn: costEnvelopeDay(this.#clock()),
+            chargeMicros,
+            inputTokens: usage.promptTokens,
+            outputTokens: usage.completionTokens,
+            attemptId: observed.attemptId
+          }));
+        } finally {
+          // Written (or not): from here the run's spent total carries it.
           releaseInFlight();
         }
       },
@@ -954,6 +1020,13 @@ export class CostEnvelopeGuard {
 }
 
 /**
+ * NV-45 — how long after a run's last charge it may still be writing its story (`readWithdrawalSpend`): no story call
+ * lasts longer than 900 s (`packages/register/src/story-policy.ts`, the bound's schema maximum), and each is charged as
+ * it ends.
+ */
+const WITHDRAWAL_STORY_SETTLE_SECONDS = 3_600;
+
+/**
  * `ledger.model_spend` (migration 0066), the shipped store.
  *
  * Both totals are SUMS OVER THE ROWS rather than a separate counter column. A
@@ -985,8 +1058,14 @@ export class PostgresModelSpendStore implements ModelSpendStore {
         "A language check's site cost is written only by ledger.record_language_check_spend"
       );
     }
-    if ((entry.spendSource === "RUN" || entry.spendSource === "STORY") && entry.runId === null) {
+    const unanswered = entry.spendSource === "RUN_UNANSWERED" || entry.spendSource === "STORY_UNANSWERED";
+    if ((entry.spendSource === "RUN" || entry.spendSource === "STORY" || unanswered) && entry.runId === null) {
       throw new TypedDomainError("MODEL_SPEND_RUN_REQUIRED", "A run or story charge must name its run");
+    }
+    // NV-50 (migration 0125): an unanswered attempt's charge names the attempt it pays for. The CHECK
+    // `model_spend_unanswered_names_its_attempt` says the same one layer lower.
+    if (unanswered && (typeof entry.attemptId !== "string" || entry.attemptId === "")) {
+      throw new TypedDomainError("MODEL_SPEND_ATTEMPT_REQUIRED", "An unanswered attempt's charge must name its attempt");
     }
     // Task M1 (migration 0075): only a RUN charge has a phase. The CHECK
     // `model_spend_phase_is_a_run_charge` says the same one layer lower.
@@ -1011,8 +1090,9 @@ export class PostgresModelSpendStore implements ModelSpendStore {
 
   async readRunSpentMicros(runId: string): Promise<number> {
     const result = await this.pool.query<{ total: string }>(
+      // NV-50: a story's unanswered attempts are the story's (readRunStorySpentMicros), never the debate's.
       `SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend
-       WHERE run_id = $1 AND spend_source <> 'STORY'`,
+       WHERE run_id = $1 AND spend_source NOT IN ('STORY','STORY_UNANSWERED')`,
       [runId]
     );
     return this.#total(result.rows[0]?.total);
@@ -1021,7 +1101,7 @@ export class PostgresModelSpendStore implements ModelSpendStore {
   async readRunStorySpentMicros(runId: string): Promise<number> {
     const result = await this.pool.query<{ total: string }>(
       `SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend
-       WHERE run_id = $1 AND spend_source = 'STORY'`,
+       WHERE run_id = $1 AND spend_source IN ('STORY','STORY_UNANSWERED')`,
       [runId]
     );
     return this.#total(result.rows[0]?.total);
@@ -1063,8 +1143,9 @@ export class PostgresModelSpendStore implements ModelSpendStore {
   /**
    * Budget spec §2.2/§2.6 — THE COUNTED HOLDS ON THE SITE'S DAY: for every run that
    * still has a READY or CLAIMED job and whose hold was opened no later than that
-   * UTC day, the part of its hold it has not yet spent (RUN + STORY), never less
-   * than zero. Read from the live jobs outward (`work_item_live_run_idx`).
+   * UTC day, the part of its hold it has not yet spent (RUN + STORY, and NV-50's
+   * RUN_UNANSWERED + STORY_UNANSWERED, which the site's day already counts as spend),
+   * never less than zero. Read from the live jobs outward (`work_item_live_run_idx`).
    */
   async readSiteCountedHoldsMicros(day: string): Promise<number> {
     const result = await this.pool.query<{ total: string }>(
@@ -1076,10 +1157,71 @@ export class PostgresModelSpendStore implements ModelSpendStore {
        JOIN ledger.model_spend_hold AS hold ON hold.run_id = live.run_id
        LEFT JOIN LATERAL (
          SELECT sum(spend.charge_micros) AS total FROM ledger.model_spend AS spend
-         WHERE spend.run_id = hold.run_id AND spend.spend_source IN ('RUN','STORY')
+         WHERE spend.run_id = hold.run_id AND spend.spend_source IN ('RUN','STORY','RUN_UNANSWERED','STORY_UNANSWERED')
        ) AS spent ON true
        WHERE hold.opened_at < (($1::date + 1)::timestamp AT TIME ZONE 'UTC')`,
       [day]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
+  /**
+   * NV-43 (security audit run 3) — WHAT ONE OWNER'S DEBATES HAVE SPENT ON A UTC DAY, billing on or off: the RUN and
+   * STORY charges dated `day` of every run whose owner is `ownerRef` as core.run_waiting_v reads it (the run's latest
+   * core.run_ownership_event, else an `owner:<uuid>` asker id, compared as text so no stored value is cast). Not
+   * through billing.run_charge_scope, which is written only while billing is on. Waived runs count, as they do in the
+   * site's day; a language check has no run and is not here. Only RUN and STORY (DB-RULES 8: unanswered sources never
+   * count toward a person). Today's rows grouped by run (`model_spend_day_idx`), one ownership probe per run.
+   */
+  async readOwnerDaySpentMicros(ownerRef: string, day: string): Promise<number> {
+    const result = await this.pool.query<{ total: string }>(
+      `WITH today AS (
+         SELECT spend.run_id, sum(spend.charge_micros) AS total
+         FROM ledger.model_spend AS spend
+         WHERE spend.charged_on = $2::date AND spend.spend_source IN ('RUN','STORY')
+         GROUP BY spend.run_id
+       )
+       SELECT coalesce(sum(today.total), 0)::text AS total
+       FROM today
+       JOIN core.run AS run ON run.run_id = today.run_id
+       LEFT JOIN LATERAL (
+         SELECT event.owner_ref FROM core.run_ownership_event AS event
+         WHERE event.run_id = today.run_id ORDER BY event.at_seq DESC LIMIT 1
+       ) AS latest ON true
+       WHERE latest.owner_ref = $1::uuid
+          OR (latest.owner_ref IS NULL AND run.asker_id = 'owner:' || $1::uuid::text)`,
+      [ownerRef, day]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
+  /**
+   * NV-43 (security audit run 3) — ONE OWNER'S LIVE HOLDS, billing on or off: for every run of `ownerRef` (the owner
+   * rule of `readOwnerDaySpentMicros`) that still has a READY or CLAIMED job, the part of its hold it has not yet spent
+   * (RUN + STORY), never less than zero. Waived runs count, as in the site's holds. Unlike `readSiteCountedHoldsMicros`
+   * it has no `opened_at` bound: the room measures at its own `now`, when every live hold was opened before the end of
+   * that day, so the two read the same holds (the bound only matters for a day other than today's).
+   */
+  async readOwnerLiveHoldsMicros(ownerRef: string): Promise<number> {
+    const result = await this.pool.query<{ total: string }>(
+      `SELECT coalesce(sum(greatest(0, hold.held_micros - coalesce(spent.total, 0))), 0)::text AS total
+       FROM (
+         SELECT DISTINCT work.run_id FROM core.work_item AS work
+         WHERE work.run_id IS NOT NULL AND work.state IN ('READY','CLAIMED')
+       ) AS live
+       JOIN ledger.model_spend_hold AS hold ON hold.run_id = live.run_id
+       JOIN core.run AS run ON run.run_id = hold.run_id
+       LEFT JOIN LATERAL (
+         SELECT event.owner_ref FROM core.run_ownership_event AS event
+         WHERE event.run_id = hold.run_id ORDER BY event.at_seq DESC LIMIT 1
+       ) AS latest ON true
+       LEFT JOIN LATERAL (
+         SELECT sum(spend.charge_micros) AS total FROM ledger.model_spend AS spend
+         WHERE spend.run_id = hold.run_id AND spend.spend_source IN ('RUN','STORY')
+       ) AS spent ON true
+       WHERE latest.owner_ref = $1::uuid
+          OR (latest.owner_ref IS NULL AND run.asker_id = 'owner:' || $1::uuid::text)`,
+      [ownerRef]
     );
     return this.#total(result.rows[0]?.total);
   }
@@ -1139,6 +1281,56 @@ export class PostgresModelSpendStore implements ModelSpendStore {
       [ownerRef]
     );
     return this.#total(result.rows[0]?.total);
+  }
+
+  /**
+   * NV-45 — A WITHDRAWAL'S CREDIT USED, read in one statement: the RUN and STORY charges of the owner's SUBSCRIPTION
+   * runs admitted before `withdrewAt` whose ATTEMPT WAS SENT in [from, withdrewAt) (the attempt's prompt row, written
+   * just before the send; a charge with no attempt or no prompt is dated by its own row), and how many of those runs
+   * may still be sending: held by a live runner (a CLAIMED job whose claim has not lapsed), or possibly writing their
+   * story (a hold, no story row yet, and a charge in the last hour). Only runs admitted in the day before `withdrewAt`
+   * are tested for that: no debate still sends a day after it started, and one that did would only be under-deducted,
+   * in the person's favour. Waived runs (set aside because of an upload) count for neither. Like `readOwnerSpentMicros`, this includes runs pinned while on Free and runs admitted before
+   * the period: both sides read the same set on purpose.
+   */
+  async readWithdrawalSpend(
+    ownerRef: string, from: Date, withdrewAt: Date
+  ): Promise<Readonly<{ spentMicros: number; liveRuns: number }>> {
+    const result = await this.pool.query<{ spent: string; live_runs: number }>(
+      `WITH runs AS (
+         SELECT scope.run_id, scope.admitted_at
+         FROM billing.run_charge_scope AS scope
+         WHERE scope.owner_ref = $1::uuid AND scope.funding_kind='SUBSCRIPTION' AND scope.admitted_at < $3
+           AND NOT EXISTS (SELECT 1 FROM ledger.model_spend_waiver AS waiver WHERE waiver.run_id = scope.run_id)
+       )
+       SELECT
+         (SELECT coalesce(sum(spend.charge_micros), 0)
+          FROM runs
+          JOIN ledger.model_spend AS spend ON spend.run_id = runs.run_id
+          LEFT JOIN ledger.call_prompt AS prompt
+            ON prompt.attempt_id = spend.attempt_id AND prompt.run_id = spend.run_id
+          WHERE spend.spend_source IN ('RUN','STORY')
+            AND spend.recorded_at >= $2
+            AND coalesce(prompt.recorded_at, spend.recorded_at) >= $2
+            AND coalesce(prompt.recorded_at, spend.recorded_at) < $3)::text AS spent,
+         (SELECT count(*)
+          FROM runs
+          WHERE runs.admitted_at > $3::timestamptz - interval '1 day'
+            AND (EXISTS (SELECT 1 FROM core.work_item AS work
+                         WHERE work.run_id = runs.run_id AND work.state = 'CLAIMED'
+                           AND work.claim_deadline > clock_timestamp())
+              OR (EXISTS (SELECT 1 FROM ledger.model_spend_hold AS hold WHERE hold.run_id = runs.run_id)
+                  AND NOT EXISTS (SELECT 1 FROM serve.answer_story AS story WHERE story.run_id = runs.run_id)
+                  AND (SELECT max(spend.recorded_at) FROM ledger.model_spend AS spend WHERE spend.run_id = runs.run_id)
+                      > clock_timestamp() - make_interval(secs => $4))))::int AS live_runs`,
+      [ownerRef, from, withdrewAt, WITHDRAWAL_STORY_SETTLE_SECONDS]
+    );
+    const row = result.rows[0];
+    const liveRuns = row?.live_runs;
+    if (typeof liveRuns !== "number" || !Number.isSafeInteger(liveRuns) || liveRuns < 0) {
+      throw new TypedDomainError("MODEL_SPEND_TOTAL_UNREPRESENTABLE", "The withdrawal's live debates cannot be counted");
+    }
+    return Object.freeze({ spentMicros: this.#total(row?.spent), liveRuns });
   }
 
   /**

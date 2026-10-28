@@ -81,6 +81,18 @@ describe("the claim maps the stored mail_locale column (C09.7)", () => {
     const repo = new PostgresPasswordResetRepository(claimingPool(null), {} as never, 1);
     expect(await repo.claimNotice(1000)).toBeNull();
   });
+
+  // NV-40: the new release claims through 0125's sweeping function; 0116's sealed claim stays for the release before.
+  it("claims through the pending-notice function", async () => {
+    const calls: Array<Readonly<{ text: string; args: unknown }>> = [];
+    const pool = { query: async (text: string, args: unknown) => {
+      calls.push({ text, args });
+      return { rows: [{ result: { ...notice, mail_locale: "ro" } }] };
+    } } as never;
+    const repo = new PostgresPasswordResetRepository(pool, {} as never, 1);
+    expect(await repo.claimNotice(1000)).toEqual({ ...notice, mailLocale: "ro" });
+    expect(calls).toEqual([{ text: "SELECT identity.password_reset_claim_pending_notice($1) AS result", args: [1000] }]);
+  });
 });
 
 describe("the request's mail language reaches the repository (C09.1 carrier)", () => {

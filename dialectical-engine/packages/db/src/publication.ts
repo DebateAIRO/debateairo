@@ -1,10 +1,10 @@
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import {
   type AuditContextHasher,
   type CryptoEnvelope
 } from "@debateai/crypto";
 import type { AuthSourceContext } from "./identity.js";
-import { withPublicationContentLease } from "./publication-lease.js";
+import { withPublicationContentLease, type PublicationLeaseMode } from "./publication-lease.js";
 import { FLOOR_BASIS_INCOMPLETE_SQL } from "./serve-disclosure.js";
 
 const PUBLICATION_TRANSITION_SIGNATURE =
@@ -238,8 +238,13 @@ export class PostgresPublicationRepository {
     private readonly auditContext: AuditContextHasher
   ) {}
 
-  withContentLease<T>(publicationRef: string,use: () => Promise<T>): Promise<T> {
-    return withPublicationContentLease(this.pool,[publicationRef],async () => use());
+  /** NV-21: `use` gets the lease's own connection, so a body that reads on it holds one pooled connection, not two. */
+  withContentLease<T>(
+    publicationRef: string,
+    use: (client: PoolClient) => Promise<T>,
+    mode: PublicationLeaseMode = "exclusive"
+  ): Promise<T> {
+    return withPublicationContentLease(this.pool,[publicationRef],async (lease) => use(lease.client),mode);
   }
 
   private async prepareAuditContext(source: AuthSourceContext): Promise<PreparedAuditContext> {
@@ -557,8 +562,11 @@ export class PostgresPublicationRepository {
     return result.rows[0]?.completed === true;
   }
 
-  async readPublic(publicationRef: string): Promise<PublicSnapshotRecord | null> {
-    const result = await this.pool.query<{
+  async readPublic(
+    publicationRef: string,
+    executor: Pick<PoolClient, "query"> = this.pool
+  ): Promise<PublicSnapshotRecord | null> {
+    const result = await executor.query<{
       publication_ref: string;
       run_id: string;
       content_ciphertext: CryptoEnvelope;
@@ -579,8 +587,12 @@ export class PostgresPublicationRepository {
     });
   }
 
-  async revalidatePublic(runId: string, publicationRef: string): Promise<boolean> {
-    const result = await this.pool.query<{ published: boolean }>(`
+  async revalidatePublic(
+    runId: string,
+    publicationRef: string,
+    executor: Pick<PoolClient, "query"> = this.pool
+  ): Promise<boolean> {
+    const result = await executor.query<{ published: boolean }>(`
       SELECT core.run_is_published($1,$2) AS published
     `, [runId, publicationRef]);
     return result.rows[0]?.published === true;

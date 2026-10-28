@@ -12,7 +12,7 @@ export const ES: CrisisLexicon = Object.freeze({
   patterns: Object.freeze<CrisisPattern[]>([
     // intent
     { signal: "intent", pattern: String.raw`\bsuicidarme\b` },
-    { signal: "intent", pattern: String.raw`\bme (?:[a-z]+ ){0,3}suicidar\b` },
+    { signal: "intent", pattern: String.raw`\bme (?:[a-z]{1,32} ){0,3}suicidar\b` },
     { signal: "intent", pattern: String.raw`\bme suicid(?:o|are|aria|e)\b` },
     { signal: "intent", pattern: String.raw`\b(?:quiero|quisiera|voy a|pienso|pensando en|ganas de|deberia|debo|necesito|intente|intentare|trate de|tratar de|como puedo|como|forma de|manera de|metodo para) matarme\b(?! (?:de|a|trabajando|estudiando|en el gimnasio|por (?:el|la|un|una)))` },
     { signal: "intent", pattern: String.raw`\bme (?:quiero|voy a|pienso|deberia|puedo|tengo que) matar\b(?! (?:de|a|trabajando|estudiando|en el gimnasio|por (?:el|la|un|una)))` },
@@ -24,7 +24,7 @@ export const ES: CrisisLexicon = Object.freeze({
     { signal: "intent", pattern: String.raw`\bquiero desaparecer\s*(?:$|[.!?,;]|para siempre|del mundo|de este mundo)` },
     { signal: "intent", pattern: String.raw`\b(?:ya )?no (?:quiero|tengo ganas de|aguanto|puedo|soporto) (?:seguir )?(?:vivir|viviendo|existir|estar viv[oa]|despertar(?:me)?|seguir aqui)\b(?! (?:en|con|asi en|cerca|lejos|aqui en|solo|sola|sin|de|del|con|junto|bajo)\b)` },
     { signal: "intent", pattern: String.raw`\bno puedo mas con (?:la vida|mi vida|esta vida|vivir)\b` },
-    { signal: "intent", pattern: String.raw`\b(?:tengo|he tenido|estoy teniendo|vuelvo a tener|sigo teniendo|mis) (?:[a-z]+ )?(?:pensamientos|ideas|ideaciones|tendencias|impulsos) suicidas\b` },
+    { signal: "intent", pattern: String.raw`\b(?:tengo|he tenido|estoy teniendo|vuelvo a tener|sigo teniendo|mis) (?:[a-z]{1,32} )?(?:pensamientos|ideas|ideaciones|tendencias|impulsos) suicidas\b` },
     { signal: "intent", pattern: String.raw`\b(?:estoy|me siento|me he sentido|soy|me pongo|ando) (?:muy |un poco |bastante |algo |otra vez |de nuevo )?suicida\b` },
     { signal: "intent", pattern: String.raw`\b(?:pienso|pensando|he pensado|pense) (?:mucho |cada dia |a menudo |todo el tiempo |seriamente |mucho )?en (?:el )?suicid(?:io|arme)\b(?! (?:asistido|de)\b)` },
     { signal: "intent", pattern: String.raw`\bojala (?:no hubiera|no hubiese|nunca hubiera|nunca hubiese) nacido\b` },
@@ -36,7 +36,7 @@ export const ES: CrisisLexicon = Object.freeze({
     { signal: "intent", pattern: String.raw`\bmi vida (?:ya )?no (?:tiene|vale|me vale) (?:ningun |nada de )?(?:sentido|nada|la pena)\b` },
     { signal: "intent", pattern: String.raw`\b(?:no tengo|no hay|sin|ninguna) (?:ninguna )?(?:razon|motivo|motivos|razones) (?:para|por (?:la que|el que)) (?:vivir|seguir viviendo|seguir viv[oa])\b(?! (?:en|con|aqui|alli|asi en)\b)` },
     // self-harm
-    { signal: "self-harm", pattern: String.raw`\b(?:me|mi|mis) (?:[a-z]+ )?autolesion(?:o|e|aba|es|ando)?\b` },
+    { signal: "self-harm", pattern: String.raw`\b(?:me|mi|mis) (?:[a-z]{1,32} )?autolesion(?:o|e|aba|es|ando)?\b` },
     { signal: "self-harm", pattern: String.raw`\bautolesionarme\b` },
     { signal: "self-harm", pattern: String.raw`\b(?:me corto|me estoy cortando|me he cortado|me corte|cortarme|me sigo cortando|volvi a cortarme|me vuelvo a cortar|me hago cortes|hacerme cortes|me hice cortes) (?:las venas|los brazos|los antebrazos|las munecas|la muneca|las piernas|los muslos|la piel|el brazo|a proposito|adrede|otra vez|de nuevo|a mi mism[oa])\b` },
     { signal: "self-harm", pattern: String.raw`\b(?:cortarme|me corto|cortar) las venas\b` },
@@ -66,7 +66,7 @@ export const ES: CrisisLexicon = Object.freeze({
     { signal: "method", pattern: String.raw`\b(?:darme|pegarme|me voy a dar|me voy a pegar|me quiero dar|me quiero pegar|me pego|me doy) un tiro\b(?! (?:en el pie|a mi mism[oa] en el pie)\b)` },
     { signal: "method", pattern: String.raw`\b(?:tirarme|aventarme|lanzarme|arrojarme|me tiro|me aviento|me lanzo)\b.{0,15}\b(?:puente|edificio|balcon|ventana|azotea|tren|metro|vias|acantilado|precipicio|terraza|techo|piso)\b` },
     { signal: "method", pattern: String.raw`\bsobredosis (?:a proposito|intencional|voluntaria|adrede)\b` },
-    { signal: "method", pattern: String.raw`\b(?:tomarme|me tome|me tomo|tragarme|me trague|tomar|tragar) (?:todas (?:mis|las) ${PILLS}(?: [a-z]+){0,2} (?:de golpe|de una vez|juntas|a la vez)|toda la caja|todo el frasco|un frasco entero|una caja entera|el bote entero|todo el bote|todo el blister)\b` },
+    { signal: "method", pattern: String.raw`\b(?:tomarme|me tome|me tomo|tragarme|me trague|tomar|tragar) (?:todas (?:mis|las) ${PILLS}(?: [a-z]{1,32}){0,2} (?:de golpe|de una vez|juntas|a la vez)|toda la caja|todo el frasco|un frasco entero|una caja entera|el bote entero|todo el bote|todo el blister)\b` },
     { signal: "method", pattern: String.raw`\b(?:nota de suicidio|carta de suicidio|pacto suicida|metodos? de suicidio|metodos? para suicidarse)\b` },
     // other-person
     { signal: "other-person", pattern: String.raw`\b${MY} ${CLOSE}\b.{0,40}\b(?:quiere|quiso|va a|piensa|habla de|amenaza con|amenazo con|intento|intenta|trato de|trata de|tiene ganas de|esta pensando en|dice que (?:va a|quiere)) ${SELF_END}\b` },

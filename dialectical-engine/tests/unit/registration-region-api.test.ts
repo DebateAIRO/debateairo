@@ -19,14 +19,15 @@ const gate = () => {
 };
 const { country: _defaultCountry, ...REGISTER_BODY } = canonicalSignup;
 const invalid = { error: "AUTH_INPUT_INVALID", message: "AUTH_INPUT_INVALID" };
-function api(countryGate?: CountryGate) {
+function api(countryGate?: CountryGate, uiApiProof?: Buffer) {
   const register = vi.fn(async (_input: unknown, _source: unknown) => ({ message: "If this address can be registered, verification instructions will arrive. Check your spam folder." }));
   const instance = buildApi({
     application: { submit: vi.fn() } as unknown as AskApplication,
     turnstile: passedTurnstile,
     registration: { register, verifyEmail: vi.fn(), resendVerification: vi.fn() } as never,
     sessions: testSessionApplication([testHttpIdentity("region-api")]), allowedOrigin: TEST_APP_ORIGIN,
-    ...(countryGate === undefined ? {} : { countryGate })
+    ...(countryGate === undefined ? {} : { countryGate }),
+    ...(uiApiProof === undefined ? {} : { uiApiProof })
   });
   return { register, instance };
 }
@@ -122,8 +123,10 @@ describe("registration region API", () => {
     await instance.close();
   });
   it("C14 keeps the edge and declared countries separate on the source", async () => {
-    const { instance, register } = api();
-    expect((await post(instance, { ...REGISTER_BODY, country: "RO" }, "81.196.20.30", { "cf-ipcountry": "DE" })).statusCode).toBe(202);
+    // NV-03: the edge country is honoured only from the proven UI.
+    const proof = "r".repeat(43);
+    const { instance, register } = api(undefined, Buffer.from(proof));
+    expect((await post(instance, { ...REGISTER_BODY, country: "RO" }, "81.196.20.30", { "cf-ipcountry": "DE", "x-debateai-ui-proof": proof })).statusCode).toBe(202);
     expect(register.mock.calls[0]?.[1]).toMatchObject({ countryCode: "DE", region: { country: "RO", usState: null } });
     await instance.close();
   });

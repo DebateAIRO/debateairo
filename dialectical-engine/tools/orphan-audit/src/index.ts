@@ -590,7 +590,14 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // readRunRegisterVersion (both cast register_version in SQL). migrate() is byte-identical.
 // Side-by-side Phase 2, S9 fix round 1 (2026-10-22, spec §13, ruling R31): isDatabaseFailure and settingsRefusalCode
 // (the one rule both settings caches use) moved here beside isDatabasePoolBusy. migrate() is byte-identical.
-const NATIVE_MIGRATE_MODULE_SHA256 = "86dcfe0ab92121807b4e8d9ef19f84f89c126046f2fda863ee38d43c126e5b1a";
+// Security fixes run 3 (2026-10, K02 NV-08): the content-provision attestation attests the erasure_reconcile schema by
+// OID. migrate() is byte-identical.
+// Security fixes run 3, K10 (NV-31, 2026-10-28): the run content lease records its live lease, a bare lease's key load
+// runs in its scope, and routeLeaseBodyQueries routes lease-body queries. migrate() is byte-identical.
+// Security fixes run 3 (K12, NV-38): migrate() CHANGED. It tries the schema-migrations session lock every 50 ms
+// (pg_try_advisory_lock) instead of waiting in a blocking lock statement, so a waiting migrator holds no snapshot
+// while an outside-transaction index step builds. The lock controls below follow it.
+const NATIVE_MIGRATE_MODULE_SHA256 = "249c767a9f98868c52c6b512981152f798caf49a9d7d7adb9a3c92afd4218d9a";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each
@@ -619,10 +626,12 @@ export function auditNativeMigratorControls(migrateSource: string, transactionSo
   const native = migrateSource.slice(begin, end);
   // Side-by-side §5 (A6): the session lock, the prologue transaction, one transaction per pending step with its
   // compatibility re-seal, the unlock in `finally` and the release. (A7): the ledger split before the lineage, and the
-  // database-ahead acceptance right after the replay.
+  // database-ahead acceptance right after the replay. Security fixes run 3 (NV-38): the session lock is tried
+  // (pg_try_advisory_lock) until it is held, and a blocking pg_advisory_lock anywhere in the slice is refused.
   const controls = [
     "const plan = await loadMigrationPlan();", "const client = await pool.connect();",
-    "pg_advisory_lock(hashtextextended('debateai:schema-migrations', 0))", 'await withMigrationStepTransaction(client, "PROLOGUE"',
+    "SELECT pg_try_advisory_lock(hashtextextended('debateai:schema-migrations', 0)) AS acquired",
+    "if (lock.rows[0]?.acquired === true) break;", 'await withMigrationStepTransaction(client, "PROLOGUE"',
     "const { known: applied, extra } = splitLedger(plan, ledger);",
     "const lineage = identifyLineage(plan, applied, resolutions.map", "const appliedSet = new Set(applied);",
     "const resolvedSet = new Set(resolutions.map", "for (const name of plan.manifest.order)",
@@ -643,6 +652,7 @@ export function auditNativeMigratorControls(migrateSource: string, transactionSo
     }
   };
   inOrder(native, controls);
+  if (native.includes("pg_advisory_lock(")) refused();
   inOrder(transactionSource, NATIVE_MIGRATE_TRANSACTION_CONTROLS);
 }
 
@@ -679,7 +689,7 @@ export function auditMigrationReplaySafety(name: string, source: string, native?
   for (const match of sql.matchAll(/\bCREATE\s+FUNCTION\b/gi)) {
     findings.push(`${name}:${lineAt(source, match.index)} has bare CREATE FUNCTION without OR REPLACE`);
   }
-  for (const match of sql.matchAll(/\bCREATE\s+(UNIQUE\s+)?INDEX\s+(?!IF\s+NOT\s+EXISTS\b)/gi)) {
+  for (const match of sql.matchAll(/\bCREATE\s+(UNIQUE\s+)?INDEX\s+(?!\s*(?:CONCURRENTLY\s+)?IF\s+NOT\s+EXISTS\b)/gi)) {
     const kind = match[1] === undefined ? "CREATE INDEX" : "CREATE UNIQUE INDEX";
     findings.push(`${name}:${lineAt(source, match.index)} has bare ${kind} without IF NOT EXISTS`);
   }

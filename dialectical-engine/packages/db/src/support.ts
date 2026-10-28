@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import { TypedDomainError } from "@debateai/kernel";
 import type { Pool, PoolClient } from "pg";
@@ -61,6 +62,8 @@ export type SupportShredCounts = Readonly<{
 export type SupportShredResult =
   | Readonly<{ kind: "SHREDDED"; counts: SupportShredCounts }>
   | Readonly<{ kind: "ALREADY_SHREDDED" }>;
+/** C-1: what account erasure's support step did; NONE = the owner never opened a signed-in support session. */
+export type SupportErasureShredResult = SupportShredResult | Readonly<{ kind: "NONE" }>;
 
 export type SupportRelayReservationResult =
   | Readonly<{ kind: "BUSY" }>
@@ -200,6 +203,39 @@ async function withSupportTransaction<T>(
   }
 }
 
+/**
+ * NV-32 (security fixes run 3): the client of the case transaction whose prepare() is running. The transcript it reads
+ * (PostgresSupportMessageRepository.listSession) uses that client instead of asking the same pool for a second
+ * connection while the first is held under the session lock, which let a full pool of case opens starve each other.
+ * Module-local on purpose: both repositories and this scope live in this file, and the API builds both from one
+ * @debateai/db import over one pool (apps/api/src/main.ts), so unlike the run content lease scope (index.ts) it need
+ * not be process-global. Keep both classes in this module. `live` turns false once prepare() settles, so work that
+ * outlives it (none today) reads on the pool, never on a client already released to another caller.
+ */
+const supportCaseTransaction = new AsyncLocalStorage<{
+  readonly pool: Pool;
+  readonly client: PoolClient;
+  live: boolean;
+}>();
+
+function supportReaderFor(pool: Pool): Pick<Pool, "query"> | PoolClient {
+  const scope = supportCaseTransaction.getStore();
+  return scope !== undefined && scope.live && scope.pool === pool ? scope.client : pool;
+}
+
+async function onSupportCaseClient<T>(
+  pool: Pool,
+  client: PoolClient,
+  use: () => Promise<T>
+): Promise<T> {
+  const scope = { pool, client, live: true };
+  try {
+    return await supportCaseTransaction.run(scope, use);
+  } finally {
+    scope.live = false;
+  }
+}
+
 async function lockSupportDomain(
   client: Pick<PoolClient, "query">,
   domain: 19370701 | 19370702,
@@ -228,6 +264,32 @@ export async function lockSupportSessions(
 ): Promise<void> {
   await lockSupportDomain(client, 19370702, sessionIds);
 }
+
+/**
+ * NV-34: admitMessage's counts, keyed so each reads only its own session's rows and its own source's (or owner's)
+ * rows inside the 24-hour window, through the 0054 indexes. Bounds stay inclusive on both ends and rows after the
+ * observation time are not counted, exactly as the earlier whole-table FILTER aggregate did.
+ */
+const ANONYMOUS_MESSAGE_COUNTS_SQL = `
+  SELECT
+    (SELECT count(*) FROM support.admission_event
+      WHERE session_id=$1::uuid AND scope_kind='MESSAGE' AND at <= $3::timestamptz)::text AS session_count,
+    count(*) FILTER (WHERE at >= $3::timestamptz-interval '10 minutes')::text AS short_count,
+    count(*)::text AS daily_count
+  FROM support.admission_event
+  WHERE ip_sha256=$2 AND scope_kind='MESSAGE'
+    AND at >= $3::timestamptz-interval '24 hours' AND at <= $3::timestamptz
+`;
+const ACCOUNT_MESSAGE_COUNTS_SQL = `
+  SELECT
+    (SELECT count(*) FROM support.admission_event
+      WHERE session_id=$1::uuid AND scope_kind='MESSAGE' AND at <= $3::timestamptz)::text AS session_count,
+    count(*) FILTER (WHERE at >= $3::timestamptz-interval '10 minutes')::text AS short_count,
+    count(*)::text AS daily_count
+  FROM support.admission_event
+  WHERE identity_owner_ref=$2::uuid AND identity_owner_ref IS NOT NULL AND scope_kind='MESSAGE'
+    AND at >= $3::timestamptz-interval '24 hours' AND at <= $3::timestamptz
+`;
 
 /** Session creation receives only an opaque wrapped-key callback. */
 export class PostgresSupportSessionRepository {
@@ -377,18 +439,8 @@ export class PostgresSupportSessionRepository {
         session_count: string;
         short_count: string;
         daily_count: string;
-      }>(`
-        SELECT
-          count(*) FILTER (WHERE session_id=$1)::text AS session_count,
-          count(*) FILTER (WHERE at >= $4::timestamptz-interval '10 minutes'
-            AND (($3::uuid IS NULL AND ip_sha256=$2)
-              OR ($3::uuid IS NOT NULL AND identity_owner_ref=$3::uuid)))::text AS short_count,
-          count(*) FILTER (WHERE at >= $4::timestamptz-interval '24 hours'
-            AND (($3::uuid IS NULL AND ip_sha256=$2)
-              OR ($3::uuid IS NOT NULL AND identity_owner_ref=$3::uuid)))::text AS daily_count
-        FROM support.admission_event
-        WHERE scope_kind='MESSAGE' AND at <= $4::timestamptz
-      `,[input.sessionId,input.ipSha256,input.identityOwnerRef,input.at])).rows[0] ?? {
+      }>(input.identityOwnerRef === null ? ANONYMOUS_MESSAGE_COUNTS_SQL : ACCOUNT_MESSAGE_COUNTS_SQL,
+        [input.sessionId,input.identityOwnerRef ?? input.ipSha256,input.at])).rows[0] ?? {
         session_count: "0",short_count: "0",daily_count: "0"
       };
       const shortLimit = input.identityOwnerRef === null
@@ -622,7 +674,8 @@ export class PostgresSupportMessageRepository {
   async listSession(input: Readonly<{
     sessionId: string;
   }>): Promise<readonly SupportMessageRead[]> {
-    const rows = await this.pool.query<SupportMessageRow>(`
+    // NV-32: inside a case open's prepare(), on that transaction's client (supportCaseTransaction).
+    const rows = await supportReaderFor(this.pool).query<SupportMessageRow>(`
       SELECT message.message_id,message.session_id,message.role,
         message.content_ciphertext,message.outcome,message.language,
         message.detected_language,message.override_language,message.redacted,
@@ -711,7 +764,8 @@ export class PostgresSupportCaseRepository {
             slaHours: prior.sla_hours,state: prior.state
           }) });
         }
-        const prepared = await input.prepare();
+        // NV-32: the transcript read in prepare() runs on this client, so an open holds exactly one connection.
+        const prepared = await onSupportCaseClient(this.pool,client,() => input.prepare());
         material = await this.createMaterial(prepared.caseId);
         wrapped = Buffer.from(material.wrappedKey);
         ciphertext = Buffer.from(material.transcriptSnapshotCiphertext);
@@ -1332,6 +1386,31 @@ async function destroyLockedShredTarget(
   return Object.freeze({ kind: "SHREDDED", counts });
 }
 
+/**
+ * The owner-scoped barrier and row locks both owner shreds share. The owner advisory lock is the one a signed-in
+ * session create takes (lockSupportOwners), so a create queued behind a shred is included or refused
+ * SUPPORT_OWNER_SHREDDED. Undefined when the owner has no session.
+ */
+async function lockOwnerShredTarget(
+  client: PoolClient,
+  ownerRef: string
+): Promise<LockedShredTarget | undefined> {
+  await lockSupportOwners(client, [ownerRef]);
+  const sessionIds = (await client.query<{ session_id: string }>(`
+    SELECT session_id FROM support.session
+    WHERE identity_owner_ref=$1
+    ORDER BY session_id
+  `, [ownerRef])).rows.map(({ session_id }) => session_id);
+  if (sessionIds.length === 0) return undefined;
+  await lockSupportSessions(client, sessionIds);
+  const target = await lockShredTargetRows(client, sessionIds, "owner", ownerRef);
+  if (target.sessions.length !== sessionIds.length
+    || target.sessions.some(({ identity_owner_ref }) => identity_owner_ref !== ownerRef)) {
+    supportShredFailure("SUPPORT_SHRED_STATE_INVALID");
+  }
+  return target;
+}
+
 /** Shred-only facet shared by the API service and the operator runner. */
 export class PostgresSupportShredRepository {
   constructor(readonly pool: Pool) {}
@@ -1339,19 +1418,8 @@ export class PostgresSupportShredRepository {
   async shredOwner(ownerRef: string, osUser: string, at: Date): Promise<SupportShredResult> {
     assertSupportShredInput(ownerRef, osUser, at);
     return withSupportTransaction(this.pool, async (client) => {
-      await lockSupportOwners(client, [ownerRef]);
-      const sessionIds = (await client.query<{ session_id: string }>(`
-        SELECT session_id FROM support.session
-        WHERE identity_owner_ref=$1
-        ORDER BY session_id
-      `, [ownerRef])).rows.map(({ session_id }) => session_id);
-      if (sessionIds.length === 0) supportShredFailure("SUPPORT_SHRED_TARGET_NOT_FOUND");
-      await lockSupportSessions(client, sessionIds);
-      const target = await lockShredTargetRows(client, sessionIds, "owner", ownerRef);
-      if (target.sessions.length !== sessionIds.length
-        || target.sessions.some(({ identity_owner_ref }) => identity_owner_ref !== ownerRef)) {
-        supportShredFailure("SUPPORT_SHRED_STATE_INVALID");
-      }
+      const target = await lockOwnerShredTarget(client, ownerRef);
+      if (target === undefined) return supportShredFailure("SUPPORT_SHRED_TARGET_NOT_FOUND");
       return destroyLockedShredTarget(client, target, "owner", ownerRef, osUser, at);
     });
   }
@@ -1369,6 +1437,62 @@ export class PostgresSupportShredRepository {
       }
       return destroyLockedShredTarget(client, target, "session", sessionId, osUser, at);
     });
+  }
+
+  /**
+   * C-1: account erasure's support step (AccountErasureCoordinator), on the support data credential. Same barrier,
+   * locks, classifier, zeroing and owner audit as shredOwner, so 0054/0065's guards and assertSupportKeyCoverage hold
+   * exactly as after `pnpm support:shred --owner`. Two differences. An owner with no session is NONE, not
+   * SUPPORT_SHRED_TARGET_NOT_FOUND (most accounts never open a signed-in chat, and their erasure must not stall). And
+   * a lock wait is bounded, because this runs inside the API's shared single-flight erasure cycle while it holds the
+   * user's notification lease: a 55P03 throws, and the next 30 s cycle retries.
+   */
+  async shredOwnerForErasure(ownerRef: string, actor: string, at: Date): Promise<SupportErasureShredResult> {
+    assertSupportShredInput(ownerRef, actor, at);
+    return withSupportTransaction(this.pool, async (client) => {
+      await client.query("SET LOCAL lock_timeout = '5s'");
+      const target = await lockOwnerShredTarget(client, ownerRef);
+      if (target === undefined) return Object.freeze({ kind: "NONE" as const });
+      return destroyLockedShredTarget(client, target, "owner", ownerRef, actor, at);
+    });
+  }
+
+  /**
+   * C-1: the erasure's readback, a separate read after the shred committed. Counts the owner's support sessions and
+   * cases (a case by its session's owner or its own identity_owner_ref) that are not fully shredded. The erasure
+   * accepts only 0. The session branch and the case-by-session branch use support_session_identity_owner_ref_idx and
+   * support_case_session_id_idx. The case-by-own-owner branch has no index (0065:267-268 indexes session_id only),
+   * so it scans support."case" once per readback.
+   */
+  async liveOwnerKeyCount(ownerRef: string): Promise<number> {
+    if (typeof ownerRef !== "string" || !CANONICAL_SUPPORT_UUID.test(ownerRef)) {
+      return supportShredFailure("SUPPORT_SHRED_INPUT_INVALID");
+    }
+    const row = (await this.pool.query<{ live: string }>(`
+      SELECT (
+        (SELECT pg_catalog.count(*) FROM support.session AS owned
+          LEFT JOIN support.session_key AS key ON key.session_id=owned.session_id
+          WHERE owned.identity_owner_ref=$1::uuid
+            AND (owned.shredded_at IS NULL OR key.session_id IS NULL OR key.destroyed_at IS NULL
+              OR key.wrapped_key<>pg_catalog.decode(pg_catalog.repeat('00',61),'hex')))
+        + (SELECT pg_catalog.count(*) FROM (
+            SELECT owned_case.case_id,owned_case.shredded_at
+            FROM support.session AS owned
+            JOIN support."case" AS owned_case ON owned_case.session_id=owned.session_id
+            WHERE owned.identity_owner_ref=$1::uuid
+            UNION
+            SELECT owned_case.case_id,owned_case.shredded_at
+            FROM support."case" AS owned_case
+            WHERE owned_case.identity_owner_ref=$1::uuid
+          ) AS owned_case
+          LEFT JOIN support.case_key AS key ON key.case_id=owned_case.case_id
+          WHERE owned_case.shredded_at IS NULL OR key.case_id IS NULL OR key.destroyed_at IS NULL
+            OR key.wrapped_key<>pg_catalog.decode(pg_catalog.repeat('00',61),'hex'))
+      )::text AS live
+    `, [ownerRef])).rows[0];
+    const live = Number(row?.live);
+    if (!Number.isSafeInteger(live) || live < 0) return supportShredFailure("SUPPORT_SHRED_STATE_INVALID");
+    return live;
   }
 }
 
@@ -1457,11 +1581,40 @@ export class PostgresSupportKeyRotationRepository {
  * A held PostgreSQL advisory lock is the cross-process relay lease. The
  * append-only call row is recorded only by the final provider gate; disconnect
  * releases the concurrency lease without deleting operational evidence.
+ *
+ * NV-33, the ticket floor: every waiter whose ticket is below `#floor` is
+ * settled for good (its latest event is not WAITING), so the statements run
+ * under the queue lock read only tickets at or above it, never the settled
+ * history. Three facts of this class keep that true. Settled is one-way: the
+ * WAITING writer runs only for a brand-new waiter, or after a read of a WAITING
+ * latest event with a live lease, and the one write outside the queue lock is
+ * COMPLETED after ACQUIRED. The one waiter insert runs in enter() under the
+ * queue lock, in the same transaction as that waiter's first WAITING event. And
+ * tickets come from an identity with a cache of 1, so tickets follow lock
+ * order. Hence a ticket missing below a visible one belongs to an enter() that
+ * rolled back, and any reader, locked or not, may raise the floor past settled
+ * waiters up to the first WAITING one, or past its last visible ticket when
+ * none waits; that never hides a WAITING waiter, so every bounded statement
+ * returns the rows of a full scan. The floor is per instance, and other
+ * processes may enter and settle many waiters while this one is idle, so every
+ * locked step first runs a lock-free, single-flight walk (`#refreshFloor`)
+ * before it connects. The first statement under the lock then sees only what
+ * was entered since, or the waiters above a live one that pins the floor.
  */
 export class PostgresSupportRelayReservationRepository {
   static readonly MAX_CONCURRENCY_SLOTS = 16;
+  static readonly FLOOR_FIRST_ROWS = 32;
+  static readonly FLOOR_CATCH_UP_CHUNK = 1_000;
+  /** Every waiter with a smaller ticket is settled for good (class comment); only ever raised. */
+  #floor = 0;
+  #floorWalk: Promise<void> | undefined;
 
   constructor(readonly pool: Pool) {}
+
+  /** NV-33: the boot warm-up; the same lock-free walk every locked step runs first. */
+  warmFloor(): Promise<void> {
+    return this.#refreshFloor();
+  }
 
   async enter(input: Readonly<{
     at: Date;
@@ -1473,6 +1626,7 @@ export class PostgresSupportRelayReservationRepository {
     if (!Number.isSafeInteger(input.queueDepth) || input.queueDepth < 0) {
       throw new TypeError("SUPPORT_RELAY_RESERVATION_INVALID");
     }
+    await this.#refreshFloor();
     const waiterId = randomUUID();
     const client = await this.pool.connect();
     let transaction = false;
@@ -1488,6 +1642,9 @@ export class PostgresSupportRelayReservationRepository {
         VALUES($1,$2) RETURNING ticket::text
       `,[waiterId,input.at])).rows[0]?.ticket);
       if (!Number.isSafeInteger(ticket)) throw new TypeError("SUPPORT_RELAY_RESERVATION_INVALID");
+      // NV-33: under the class's facts a new ticket is never below the floor; one that is means the ticket identity
+      // moved backwards beneath this process (a sequence restart, a restore under a live API). Named, not reset.
+      if (ticket < this.#floor) throw new TypeError("SUPPORT_RELAY_FLOOR_REGRESSED");
       await this.#recordWait(client,waiterId,input.at);
       const head = await this.#headWaiter(client,input.at);
       if (head === waiterId) slot = await this.#trySlot(client,input.concurrency);
@@ -1499,17 +1656,22 @@ export class PostgresSupportRelayReservationRepository {
       }
       const position = Number((await client.query<{ position: string }>(`
         WITH latest AS (
-          SELECT DISTINCT ON (event.waiter_id)
-            event.waiter_id,event.state,event.lease_until
-          FROM support.relay_waiter_event AS event
-          ORDER BY event.waiter_id,event.event_sequence DESC
+          SELECT waiter.waiter_id,waiter.ticket,current.state,current.lease_until
+          FROM support.relay_waiter AS waiter
+          CROSS JOIN LATERAL (
+            SELECT event.state,event.lease_until
+            FROM support.relay_waiter_event AS event
+            WHERE event.waiter_id=waiter.waiter_id
+            ORDER BY event.event_sequence DESC
+            LIMIT 1
+          ) AS current
+          WHERE waiter.ticket >= $3::bigint
         )
         SELECT pg_catalog.count(*)::text AS position
-        FROM support.relay_waiter AS waiter
-        JOIN latest USING(waiter_id)
+        FROM latest
         WHERE latest.state='WAITING' AND latest.lease_until >= $2
-          AND waiter.ticket <= $1
-      `,[ticket,input.at])).rows[0]?.position);
+          AND latest.ticket <= $1
+      `,[ticket,input.at,this.#floor])).rows[0]?.position);
       if (!Number.isSafeInteger(position) || position < 1) {
         throw new TypeError("SUPPORT_RELAY_RESERVATION_INVALID");
       }
@@ -1537,6 +1699,7 @@ export class PostgresSupportRelayReservationRepository {
       .test(input.waiterId) || !Number.isFinite(input.at.getTime())) {
       throw new TypeError("SUPPORT_RELAY_RESERVATION_INVALID");
     }
+    await this.#refreshFloor();
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
@@ -1565,6 +1728,7 @@ export class PostgresSupportRelayReservationRepository {
           .test(waiterId))) {
       throw new TypeError("SUPPORT_RELAY_RESERVATION_INVALID");
     }
+    await this.#refreshFloor();
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
@@ -1604,6 +1768,7 @@ export class PostgresSupportRelayReservationRepository {
           .test(waiterId))) {
       throw new TypeError("SUPPORT_RELAY_RESERVATION_INVALID");
     }
+    await this.#refreshFloor();
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
@@ -1700,6 +1865,7 @@ export class PostgresSupportRelayReservationRepository {
       || !Number.isSafeInteger(input.dailyCap) || input.dailyCap < 1) {
       throw new TypeError("SUPPORT_RELAY_RESERVATION_INVALID");
     }
+    await this.#refreshFloor();
     const client = await this.pool.connect();
     let slot: number | undefined;
     let transaction = false;
@@ -1766,6 +1932,7 @@ export class PostgresSupportRelayReservationRepository {
     at: Date;concurrency: number;dailyCap: number;waiterId: string;
   }>): Promise<SupportRelayReservationResult> {
     this.#validate(input);
+    await this.#refreshFloor();
     const client = await this.pool.connect();
     let transaction = false;
     let slot: number | undefined;
@@ -1824,6 +1991,64 @@ export class PostgresSupportRelayReservationRepository {
     )`);
   }
 
+  #raiseFloor(candidate: number): void {
+    if (!Number.isSafeInteger(candidate) || candidate < 0) {
+      throw new TypeError("SUPPORT_RELAY_RESERVATION_INVALID");
+    }
+    if (candidate > this.#floor) this.#floor = candidate;
+  }
+
+  /**
+   * NV-33: single-flight per instance. Callers that arrive during a walk join it; a settled walk (success or
+   * failure) is never reused, so the next step starts a new one from the progress already made. A failed walk
+   * fails every caller that joined it, never a locked step from a stale floor.
+   */
+  async #refreshFloor(): Promise<void> {
+    this.#floorWalk ??= this.#walkFloor().finally(() => { this.#floorWalk = undefined; });
+    await this.#floorWalk;
+  }
+
+  /**
+   * NV-33: lock-free (one pool statement at a time, never alongside the step's own connection). Walks tickets up
+   * from the floor and stops at the first waiter whose latest event is WAITING, or at the last ticket. A waiter row
+   * without events (never committed by this class) counts as settled, as today's statements never treat it as live.
+   */
+  async #walkFloor(): Promise<void> {
+    let limit = PostgresSupportRelayReservationRepository.FLOOR_FIRST_ROWS;
+    for (;;) {
+      const start = this.#floor;
+      const rows = (await this.pool.query<{ ticket: string;state: string | null }>(`
+        SELECT waiter.ticket::text AS ticket,current.state
+        FROM support.relay_waiter AS waiter
+        LEFT JOIN LATERAL (
+          SELECT event.state
+          FROM support.relay_waiter_event AS event
+          WHERE event.waiter_id=waiter.waiter_id
+          ORDER BY event.event_sequence DESC
+          LIMIT 1
+        ) AS current ON true
+        WHERE waiter.ticket >= $1::bigint
+        ORDER BY waiter.ticket
+        LIMIT $2::integer
+      `,[start,limit])).rows;
+      let next = start;
+      for (const row of rows) {
+        const ticket = Number(row.ticket);
+        if (!Number.isSafeInteger(ticket) || ticket < next) {
+          throw new TypeError("SUPPORT_RELAY_RESERVATION_INVALID");
+        }
+        if (row.state === "WAITING") {
+          this.#raiseFloor(ticket);
+          return;
+        }
+        next = ticket + 1;
+      }
+      this.#raiseFloor(next);
+      if (rows.length < limit) return;
+      limit = PostgresSupportRelayReservationRepository.FLOOR_CATCH_UP_CHUNK;
+    }
+  }
+
   async #recordWait(client: PoolClient,waiterId: string,at: Date): Promise<void> {
     await client.query(`
       INSERT INTO support.relay_waiter_event(waiter_id,state,at,lease_until)
@@ -1858,35 +2083,67 @@ export class PostgresSupportRelayReservationRepository {
   }
 
   async #expireWaiters(client: PoolClient,at: Date): Promise<void> {
+    // NV-33: the first statement after the queue lock in all six locked methods, so it sees committed state only
+    // (none of this step's own writes) and the floor it leaves stays valid even if the step rolls back.
+    const bound = (await client.query<{ waiting_ticket: string | null;last_ticket: string | null }>(`
+      SELECT
+        pg_catalog.min(waiter.ticket) FILTER (WHERE current.state='WAITING')::text AS waiting_ticket,
+        pg_catalog.max(waiter.ticket)::text AS last_ticket
+      FROM support.relay_waiter AS waiter
+      LEFT JOIN LATERAL (
+        SELECT event.state
+        FROM support.relay_waiter_event AS event
+        WHERE event.waiter_id=waiter.waiter_id
+        ORDER BY event.event_sequence DESC
+        LIMIT 1
+      ) AS current ON true
+      WHERE waiter.ticket >= $1::bigint
+    `,[this.#floor])).rows[0];
+    // An aggregate without GROUP BY always returns one row.
+    if (bound === undefined) throw new TypeError("SUPPORT_RELAY_RESERVATION_INVALID");
+    if (bound.waiting_ticket !== null) this.#raiseFloor(Number(bound.waiting_ticket));
+    else if (bound.last_ticket !== null) this.#raiseFloor(Number(bound.last_ticket) + 1);
     await client.query(`
       WITH latest AS (
-        SELECT DISTINCT ON (event.waiter_id)
-          event.waiter_id,event.state,event.lease_until
-        FROM support.relay_waiter_event AS event
-        ORDER BY event.waiter_id,event.event_sequence DESC
+        SELECT waiter.waiter_id,waiter.ticket,current.state,current.lease_until
+        FROM support.relay_waiter AS waiter
+        CROSS JOIN LATERAL (
+          SELECT event.state,event.lease_until
+          FROM support.relay_waiter_event AS event
+          WHERE event.waiter_id=waiter.waiter_id
+          ORDER BY event.event_sequence DESC
+          LIMIT 1
+        ) AS current
+        WHERE waiter.ticket >= $2::bigint
       )
       INSERT INTO support.relay_waiter_event(waiter_id,state,at,lease_until)
       SELECT waiter_id,'CANCELLED',$1::timestamptz,NULL
       FROM latest
       WHERE state='WAITING' AND lease_until < $1::timestamptz
       ORDER BY waiter_id
-    `,[at]);
+    `,[at,this.#floor]);
   }
 
   async #trimWaiters(client: PoolClient,at: Date,queueDepth: number): Promise<readonly string[]> {
     const excess = (await client.query<{ waiter_id: string }>(`
       WITH latest AS (
-        SELECT DISTINCT ON (event.waiter_id)
-          event.waiter_id,event.state,event.lease_until
-        FROM support.relay_waiter_event AS event
-        ORDER BY event.waiter_id,event.event_sequence DESC
+        SELECT waiter.waiter_id,waiter.ticket,current.state,current.lease_until
+        FROM support.relay_waiter AS waiter
+        CROSS JOIN LATERAL (
+          SELECT event.state,event.lease_until
+          FROM support.relay_waiter_event AS event
+          WHERE event.waiter_id=waiter.waiter_id
+          ORDER BY event.event_sequence DESC
+          LIMIT 1
+        ) AS current
+        WHERE waiter.ticket >= $3::bigint
       )
-      SELECT waiter.waiter_id
-      FROM support.relay_waiter AS waiter JOIN latest USING(waiter_id)
+      SELECT latest.waiter_id
+      FROM latest
       WHERE latest.state='WAITING' AND latest.lease_until >= $1
-      ORDER BY waiter.ticket
+      ORDER BY latest.ticket
       OFFSET $2
-    `,[at,queueDepth])).rows.map(({ waiter_id }) => waiter_id);
+    `,[at,queueDepth,this.#floor])).rows.map(({ waiter_id }) => waiter_id);
     for (const waiterId of excess) {
       await this.#recordTerminal(client,waiterId,"CANCELLED",at);
     }
@@ -1896,16 +2153,22 @@ export class PostgresSupportRelayReservationRepository {
   async #headWaiter(client: PoolClient,at: Date): Promise<string | undefined> {
     return (await client.query<{ waiter_id: string }>(`
       WITH latest AS (
-        SELECT DISTINCT ON (event.waiter_id)
-          event.waiter_id,event.state,event.lease_until
-        FROM support.relay_waiter_event AS event
-        ORDER BY event.waiter_id,event.event_sequence DESC
+        SELECT waiter.waiter_id,waiter.ticket,current.state,current.lease_until
+        FROM support.relay_waiter AS waiter
+        CROSS JOIN LATERAL (
+          SELECT event.state,event.lease_until
+          FROM support.relay_waiter_event AS event
+          WHERE event.waiter_id=waiter.waiter_id
+          ORDER BY event.event_sequence DESC
+          LIMIT 1
+        ) AS current
+        WHERE waiter.ticket >= $2::bigint
       )
-      SELECT waiter.waiter_id
-      FROM support.relay_waiter AS waiter JOIN latest USING(waiter_id)
+      SELECT latest.waiter_id
+      FROM latest
       WHERE latest.state='WAITING' AND latest.lease_until >= $1
-      ORDER BY waiter.ticket LIMIT 1
-    `,[at])).rows[0]?.waiter_id;
+      ORDER BY latest.ticket LIMIT 1
+    `,[at,this.#floor])).rows[0]?.waiter_id;
   }
 
   async #trySlot(client: PoolClient,concurrency: number): Promise<number | undefined> {

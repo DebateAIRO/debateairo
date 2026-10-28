@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import {
+  type Argon2AuditPriority,
   type AuditContextHasher,
   type CryptoEnvelope
 } from "@debateai/crypto";
@@ -103,13 +104,19 @@ export class PostgresSessionRepository {
     private readonly auditContext: AuditContextHasher
   ) {}
 
-  private async prepareAuditContext(source: AuthSourceContext): Promise<PreparedAuditContext> {
+  private async prepareAuditContext(
+    source: AuthSourceContext,
+    priority: Argon2AuditPriority = "ordinary"
+  ): Promise<PreparedAuditContext> {
     const ip = normalized(source?.ip, 64);
     const userAgent = normalized(source?.userAgent, 256);
     // Both memory-hard reductions complete before pool.connect(), BEGIN, row
     // locks, or the audit advisory lock. This is the identity repository law.
-    const ipArgon2id = versionedAuditDigest(await this.auditContext.hashSourceIp(ip));
-    const userAgentArgon2id = versionedAuditDigest(await this.auditContext.hashUserAgent(userAgent));
+    // K09/NV-42: only login success steps pass "login" (reserved audit capacity).
+    const ipArgon2id = versionedAuditDigest(await this.auditContext.hashSourceIp(ip, priority));
+    const userAgentArgon2id = versionedAuditDigest(
+      await this.auditContext.hashUserAgent(userAgent, priority)
+    );
     return Object.freeze({
       ipArgon2id,
       userAgentArgon2id,
@@ -177,7 +184,7 @@ export class PostgresSessionRepository {
   }>): Promise<boolean> {
     assertCredentialHash(input.challengeTokenHash);
     assertCredentialHash(input.bindingHash);
-    const prepared = await this.prepareAuditContext(input.source);
+    const prepared = await this.prepareAuditContext(input.source, "login");
     return this.transaction(async (client) => {
       const result = await client.query<{ valid: boolean }>(`
         SELECT identity.create_login_challenge_with_audit(
@@ -257,7 +264,7 @@ export class PostgresSessionRepository {
     assertCredentialHash(input.bindingHash);
     assertCredentialHash(input.sessionTokenHash);
     assertCredentialHash(input.csrfTokenHash);
-    const prepared = await this.prepareAuditContext(input.source);
+    const prepared = await this.prepareAuditContext(input.source, "login");
     return this.transaction(async (client) => {
       if(input.challenge.firstStep==='PROVIDER') {
         const p={userId:input.challenge.userId,ownerRef:input.challenge.ownerRef,passwordHash:input.challenge.passwordHash,
@@ -280,6 +287,37 @@ export class PostgresSessionRepository {
         })]);
       return result.rows[0]?.valid === true;
     });
+  }
+
+  /**
+   * NV-04: charge one login TOTP attempt to the (account, factor) budget before the code is checked
+   * (identity.totp_login_admit, 0125 [NV-04]). PostgreSQL errors propagate unchanged; the service maps a 23503
+   * (the account removed after its challenge was read).
+   */
+  async admitTotpLoginAttempt(input: Readonly<{
+    userId: string;
+    factorId: string;
+    maxAttempts: number;
+    baseLockMs: number;
+    maxLockMs: number;
+  }>): Promise<Readonly<{ admitted: boolean; retryAfterMs: number }>> {
+    const result = await this.pool.query<{ admitted: unknown; retry_after_ms: unknown }>(
+      "SELECT admitted,retry_after_ms FROM identity.totp_login_admit($1,$2,$3,$4,$5)",
+      [input.userId, input.factorId, input.maxAttempts, input.baseLockMs, input.maxLockMs]
+    );
+    const row = result.rows.length === 1 ? result.rows[0] : undefined;
+    // bigint arrives as a string.
+    const raw = row?.retry_after_ms;
+    const retryAfterMs = typeof raw === "string" || typeof raw === "number" ? Number(raw) : Number.NaN;
+    if (row === undefined || typeof row.admitted !== "boolean" || !Number.isSafeInteger(retryAfterMs) || retryAfterMs < 0) {
+      throw new TypeError("TOTP_LOGIN_ADMIT_INVALID");
+    }
+    return Object.freeze({ admitted: row.admitted, retryAfterMs });
+  }
+
+  /** NV-04: after a committed TOTP success, clear the round's count; the escalation level and a live cooldown stay. */
+  async clearTotpLoginLockout(input: Readonly<{ userId: string; factorId: string }>): Promise<void> {
+    await this.pool.query("SELECT identity.totp_login_clear($1,$2)", [input.userId, input.factorId]);
   }
 
   async readRecoveryCodeForLogin(challengeTokenHash: string, slot: number): Promise<Readonly<{
@@ -324,7 +362,7 @@ export class PostgresSessionRepository {
     browserHash?:string;
     recoveryCodeHash?:string;
   }>): Promise<boolean> {
-    const prepared = await this.prepareAuditContext(input.source);
+    const prepared = await this.prepareAuditContext(input.source, "login");
     // C07.5 (R-11, R-14, D-56): both branches write a RECOVERY_CODE_USED row, so the request's mail language is set in the
     // same transaction, on the same connection, before the audit attempt is begun and the write runs.
     return withMailLocale(this.pool, input.source.mailLocale ?? "en", async (client) => {

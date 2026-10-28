@@ -108,6 +108,9 @@ export function checkQuestionLanguage(environment: Pick<ApiCheckEnvironment, "DE
         record: async () => { throw new TypedDomainError("SETTINGS_CHECK_NO_AI_CALL", "check-version never records spend"); }
       },
       daySpentMicros: async () => 0,
+      // NV-47: check-version never sends, so it reads no holds and its owner budget refuses.
+      siteHeldMicros: async () => 0,
+      ownerBudget: () => ({ allowed: false, reason: "LIMIT" }),
       report: () => undefined
     }),
     referenceKey: newQuestionLanguageReferenceKey()

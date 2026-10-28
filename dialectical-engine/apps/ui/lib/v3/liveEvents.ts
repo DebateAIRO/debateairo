@@ -125,6 +125,42 @@ export function liveReconnectDelay(attempt: number, failure: unknown): number {
 }
 
 /**
+ * Security fixes run 3 (NV-20): the settled page's one recorded-event replay shares the live stream's route and
+ * its per-session and per-account stream cap. A 429 there means the cap is full, not that the debate is broken. So
+ * wait the server's Retry-After (the live loop's 60 s floor when it names none, at most 2 minutes) and ask again,
+ * at most `attempts` reads in all. Any other failure, a last 429, or an abort ends it as before.
+ */
+export const RECORDED_REPLAY_RETRY = Object.freeze({ attempts: 3, capMs: 120_000 });
+
+export async function readRecordedEvents<T>(
+  read: () => Promise<T>,
+  signal: AbortSignal,
+  sleep: (ms: number, signal: AbortSignal) => Promise<void> = abortableDelay
+): Promise<T> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await read();
+    } catch (failure) {
+      const rateLimited = failure instanceof ContractHttpError && failure.code === "RATE_LIMITED";
+      if (!rateLimited || attempt >= RECORDED_REPLAY_RETRY.attempts || signal.aborted) throw failure;
+      await sleep(Math.min(RECORDED_REPLAY_RETRY.capMs,
+        (failure as ContractHttpError).retryAfterMs ?? LIVE_STREAM_RECONNECT.rateLimitedFloorMs), signal);
+      if (signal.aborted) throw failure;
+    }
+  }
+}
+
+/** A wait that an abort ends early; it clears its timer and its abort listener on either path. */
+function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal.aborted) { resolve(); return; }
+    const done = () => { clearTimeout(timer); signal.removeEventListener("abort", done); resolve(); };
+    const timer = setTimeout(done, ms);
+    signal.addEventListener("abort", done, { once: true });
+  });
+}
+
+/**
  * The live stream's state for the page. "offline": the stream stopped for good because this page cannot read the answers
  * of the release now serving (INVALID_RESPONSE); the reload note speaks, and the page hides its stream line (final fix
  * wave W3), so it never says live, connecting or reconnecting under the note.

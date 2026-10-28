@@ -550,8 +550,9 @@ export async function resolve(specifier, context, nextResolve) {
       "./index.js": "export function buildProviderPriceMap() {} export function createPostgresProviderGateway() {} export function declareHatchetWalkingSkeletonTask() {} export function logBodyCostFallback() {} export function logServeDisclosure() {} export class WalkingSkeletonRunner {}",
       // Side-by-side spec §13 moved the per-version reads (policy, story, shape, engine, scorecard) behind the one
       // settings loader: main.ts imports these three from it, and (S6) the run → version map and each run's own
-      // version's money guard; S8 the boot preload and its line; SA5 the per-run thinking table; S14 the site reads.
-      "./run-settings.js": "export function createRunnerSettingsCache() {} export function loadRunnerVersionSettings() {} export function runnerSettingsOfVersion() {} export function createRunSettingsVersions() {} export function runCostEnvelopeGuardOf() {} export function preloadRunnerSettings() {} export function runnerSettingsLine() {} export function runPreviewThinkingLevelsOf() {} export function readRunnerSiteContext() {}",
+      // version's money guard; S8 the boot preload and its line; SA5 the per-run thinking table; S14 the site reads;
+      // NV-25: the stale-READY re-send's day admission.
+      "./run-settings.js": "export function createRunnerSettingsCache() {} export function loadRunnerVersionSettings() {} export function runnerSettingsOfVersion() {} export function createRunSettingsVersions() {} export function runCostEnvelopeGuardOf() {} export function preloadRunnerSettings() {} export function runnerSettingsLine() {} export function runPreviewThinkingLevelsOf() {} export function readRunnerSiteContext() {} export function staleReadyDayAdmission() {}",
     };
     if (Object.hasOwn(stubs, specifier)) {
       return { url: "data:text/javascript," + encodeURIComponent(stubs[specifier]), shortCircuit: true };

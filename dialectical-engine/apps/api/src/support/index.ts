@@ -901,6 +901,11 @@ export function installSupportRoutes(
     policy("POST /v1/support/sessions/{id}/escalate"),
     async (request, reply) => {
       if (application?.cases === undefined) return unavailable(reply);
+      // NV-32: the case-open door is metered like the case doors (DL1-F2): one per-network budget, charged before any
+      // pooled connection. A refusal costs neither the session read nor the case transaction.
+      if (!admit.gate(reply, "supportReads", "POST /v1/support/sessions/{id}/escalate", sourceNetwork(request))) {
+        return reply;
+      }
       const tokenSha256 = capabilityFrom(request);
       if (tokenSha256 === null) return reply.status(404).send({ error: "NOT_FOUND" });
       if (!isResourceId(request.params.id)) return notFound(reply);

@@ -2,9 +2,12 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { afterAll, beforeAll, describe, expect, it,vi } from "vitest";
 import {
+  createPool,
+  isDatabasePoolBusy,
   migrate,
   PostgresSupportCaseRepository,
   PostgresSupportCaseSummaryRepository,
+  PostgresSupportMessageRepository,
   PostgresSupportSessionRepository,
   PostgresSupportShredRepository
 } from "../../packages/db/src/index.js";
@@ -17,7 +20,10 @@ import {
 } from "../../apps/api/src/support/cases.js";
 import { SupportModelError } from "../../apps/api/src/support/model.js";
 import { SUPPORT_DRAFT_SUMMARY_CONTRACT_ID } from "../../apps/api/src/support/prompt.js";
-import { createSupportCaseService } from "../../apps/api/src/support/session.js";
+import {
+  createSupportCaseService,
+  createSupportMessageCipher
+} from "../../apps/api/src/support/session.js";
 import { readFramedMaterial } from "../support/framed-packet.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
@@ -782,5 +788,123 @@ describe("SUP-02 cases", () => {
     expect(diagnostics).toEqual([{
       code: "SUPPORT_MODEL_UNAVAILABLE",caseId: opened.record.caseId
     }]);
+  });
+
+  /**
+   * NV-32 (security fixes run 3). createCaseOnce holds one support connection and the session lock while prepare()
+   * reads the transcript. That read asked the same pool for a second connection, so a full pool of opens each waited
+   * for one more until the wait limit failed them all. The read now runs on the case transaction's own connection.
+   */
+  function caseCount(sessionId: string) {
+    return database.pool.query(
+      "SELECT count(*)::int AS count FROM support.\"case\" WHERE session_id=$1",[sessionId]
+    ).then((result) => result.rows);
+  }
+
+  function failure(error: unknown) {
+    return Object.freeze({ kind: "FAILED" as const,busy: isDatabasePoolBusy(error) });
+  }
+
+  it("opens a case on one connection: the transcript is read on the case transaction (NV-32)", async () => {
+    const small = createPool(database.connectionString,{
+      max: 1,connectionTimeoutMillis: 500,name: "test:support"
+    });
+    try {
+      const sessionId = await session();
+      const messages = new PostgresSupportMessageRepository(small);
+      const repository = new PostgresSupportCaseRepository(small,async () => Object.freeze({
+        wrappedKey: wrapped(5),transcriptSnapshotCiphertext: contentV2(5)
+      }));
+      const caseId = randomUUID();
+      let read: number | undefined;
+      const opened = await repository.createCaseOnce({
+        sessionId,identityOwnerRef: null,language: "en",createdAt,
+        triggerPredicate: "E1",triggerGeneration: "manual",toolCalls: [],
+        kbVersion: "b".repeat(64),slaHours: 48,
+        prepare: async () => {
+          read = (await messages.listSession({ sessionId })).length;
+          return Object.freeze({
+            caseId,token: `raw-token-${caseId}`,tokenSha256: caseId.replaceAll("-","").repeat(2)
+          });
+        }
+      }).catch(failure);
+      expect(opened).toMatchObject({ kind: "OPENED" });
+      expect(read).toBe(0);
+      expect(await caseCount(sessionId)).toEqual([{ count: 1 }]);
+      // Outside an open the same repository reads on its own pool, as before.
+      await expect(messages.listSession({ sessionId })).resolves.toEqual([]);
+    } finally {
+      await small.end();
+    }
+  });
+
+  it("opens two sessions' cases at once on a two-connection pool, wired as main.ts wires it (NV-32)", async () => {
+    const small = createPool(database.connectionString,{
+      max: 2,connectionTimeoutMillis: 500,name: "test:support"
+    });
+    try {
+      const sessions = [await session(),await session()];
+      const cases = createSupportCaseService({
+        messages: createSupportMessageCipher(readableKeys(),new PostgresSupportMessageRepository(small)),
+        create: async () => { throw new Error("UNUSED"); },
+        createOnce: (input) => new PostgresSupportCaseRepository(small,async () => Object.freeze({
+          wrappedKey: wrapped(6),transcriptSnapshotCiphertext: contentV2(6)
+        })).createCaseOnce({
+          ...input,
+          prepare: async () => {
+            const prepared = await input.prepare();
+            return Object.freeze({
+              caseId: prepared.caseId,token: prepared.token,tokenSha256: prepared.tokenSha256
+            });
+          }
+        })
+      });
+      const results = await Promise.all(sessions.map((sessionId) => cases.openOnce!({
+        sessionId,language: "en",createdAt,identityOwnerRef: null,
+        triggerPredicate: "E1",triggerGeneration: "manual",toolCalls: [],
+        kbVersion: "b".repeat(64),slaHours: 48,summarize: false
+      }).catch(failure)));
+      expect(results).toMatchObject([{ kind: "OPENED" },{ kind: "OPENED" }]);
+      // Neither open left the pool waiting: an unrelated read gets a connection at once.
+      await expect(small.query("SELECT 1 AS one")).resolves.toMatchObject({ rows: [{ one: 1 }] });
+      for (const sessionId of sessions) expect(await caseCount(sessionId)).toEqual([{ count: 1 }]);
+    } finally {
+      await small.end();
+    }
+  });
+
+  it("opens one case for three concurrent opens of one session on a two-connection pool (NV-32)", async () => {
+    // The opener parked on the session lock keeps its connection, so the holder must finish on its own one.
+    const small = createPool(database.connectionString,{
+      max: 2,connectionTimeoutMillis: 1_000,name: "test:support"
+    });
+    try {
+      const sessionId = await session();
+      const messages = new PostgresSupportMessageRepository(small);
+      const repository = new PostgresSupportCaseRepository(small,async () => Object.freeze({
+        wrappedKey: wrapped(8),transcriptSnapshotCiphertext: contentV2(8)
+      }));
+      let prepared = 0;
+      const attempt = () => repository.createCaseOnce({
+        sessionId,identityOwnerRef: null,language: "en",createdAt,
+        triggerPredicate: "E1",triggerGeneration: "manual",toolCalls: [],
+        kbVersion: "b".repeat(64),slaHours: 48,
+        prepare: async () => {
+          prepared += 1;
+          await messages.listSession({ sessionId });
+          const caseId = randomUUID();
+          return Object.freeze({
+            caseId,token: `raw-token-${caseId}`,tokenSha256: caseId.replaceAll("-","").repeat(2)
+          });
+        }
+      }).catch(failure);
+      const results = await Promise.all([attempt(),attempt(),attempt()]);
+      expect(results.map((result) => result.kind).sort())
+        .toEqual(["ALREADY_OPENED","ALREADY_OPENED","OPENED"]);
+      expect(prepared).toBe(1);
+      expect(await caseCount(sessionId)).toEqual([{ count: 1 }]);
+    } finally {
+      await small.end();
+    }
   });
 });

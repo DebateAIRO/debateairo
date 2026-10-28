@@ -4,6 +4,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 export const RELEASE_KEY_PATTERN: RegExp;
 /** Inside NEXT_DIST_DIR || ".next": {"releaseCode":"<12 lowercase hex>"}. */
 export const BUILD_STAMP_FILE: "debateai-release-code.json";
+/** NV-27: GET /readyz's wait for its API's /readyz, 2000 ms, below Caddy's health_timeout 3s. */
+export const READINESS_API_TIMEOUT_MS: 2000;
 /** The key, or null only under --dev without one; throws RELEASE_KEY_REQUIRED / RELEASE_KEY_INVALID. */
 export function parseWebsiteReleaseKey(raw: string | undefined, options: Readonly<{ development: boolean }>): string | null;
 /** RELEASE_KEY's code → DEBATEAI_SOURCE_REVISION[0..12] → gitHead[0..12] → "000000000000" (not production); throws RELEASE_CODE_UNRESOLVED / RELEASE_KEY_INVALID. A function gitHead is called only when neither variable is set. */
@@ -30,6 +32,8 @@ export function createReadinessResponder(options: Readonly<{
   fetch: typeof globalThis.fetch;
   timeoutMs?: number;
   draining: () => boolean;
+  /** NV-03: the boot-checked UI-to-API proof, sent on the API fetch; a refused or unaccepted one adds UI_API_PROOF_REFUSED. */
+  uiApiProof?: string | null;
 }>): (req: Pick<IncomingMessage, "method" | "url">, res: Pick<ServerResponse, "statusCode" | "setHeader" | "end">) => boolean;
 /** SIGTERM → onDrain(); server.close(); closeIdleConnections(); exit 0 when closed or at the deadline (closeAllConnections first). */
 export function installGracefulClose(options: Readonly<{

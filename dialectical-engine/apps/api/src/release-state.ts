@@ -1,5 +1,5 @@
 import type { Pool, PoolClient } from "pg";
-import { SITE_CONCURRENT_DEBATES, readCurrentRelease, readReleaseState, type ReleaseLifecycleState } from "@debateai/db";
+import { OWNER_CONCURRENT_DEBATES, SITE_CONCURRENT_DEBATES, readCurrentRelease, readReleaseState, type ReleaseLifecycleState } from "@debateai/db";
 import { readActiveSettingsVersionOn } from "./active-settings-version.js";
 import { activeVersionAlarm, type ActiveVersionAlarm } from "./admission-alarm.js";
 import type { AskAdmissionGate } from "./ask-room.js";
@@ -358,6 +358,10 @@ export function siteCapBootLine(input: Readonly<{ hosted: boolean; roomComposed:
  *   (not current) says nothing, its SWITCHING is a switch under way.
  * - `activeDebates` counts the runs with a READY or CLAIMED job across every release (0083's partial index
  *   work_item_live_run_idx answers it without reading history).
+ * - `ownerActiveDebates` (NV-48, security audit run 3) counts the same runs of ONE person, by the run's owner as
+ *   core.run_waiting_v reads it (the latest core.run_ownership_event, else an `owner:<uuid>` asker id, compared as
+ *   text so no stored value is cast), against `ownerConcurrentDebates` (`OWNER_CONCURRENT_DEBATES`, at most the site's
+ *   cap). It reads core.work_item, core.run and core.run_ownership_event, all SELECT-granted to debateai_runtime.
  * - `activeSettingsVersion` (side-by-side spec §13, C14, Task S13; only when built with `siteVersion`, as main.ts and
  *   the practice build it): the activation pointer read on the decision's own transaction
  *   (`readActiveSettingsVersionOn`, the one SQL constant of ./active-settings-version.ts; NULL = `siteVersion`). A
@@ -371,19 +375,25 @@ export function siteCapBootLine(input: Readonly<{ hosted: boolean; roomComposed:
 export class PostgresAskAdmissionGate implements AskAdmissionGate {
   readonly releaseKey: string;
   readonly siteConcurrentDebates: number;
+  readonly ownerConcurrentDebates: number;
   readonly #hosted: boolean;
   readonly activeSettingsVersion?: (tx: Pick<PoolClient, "query">) => Promise<number>;
   readonly #alarm: ActiveVersionAlarm;
 
   constructor(options: Readonly<{
     releaseKey: string; hosted: boolean; siteConcurrentDebates?: number; siteVersion?: number;
+    /** NV-48: the person's share of the site's places (absent: `OWNER_CONCURRENT_DEBATES`, at most the cap). */
+    ownerConcurrentDebates?: number;
     /** Ruling R77: the alarm a current release's unpassed version says (absent: the process's own). */
     alarm?: ActiveVersionAlarm;
   }>) {
     const cap = options.siteConcurrentDebates ?? SITE_CONCURRENT_DEBATES;
     if (!Number.isSafeInteger(cap) || cap < 1) throw new TypeError("ASK_ADMISSION_GATE_INVALID");
+    const share = options.ownerConcurrentDebates ?? Math.min(OWNER_CONCURRENT_DEBATES, cap);
+    if (!Number.isSafeInteger(share) || share < 1 || share > cap) throw new TypeError("ASK_ADMISSION_GATE_INVALID");
     this.releaseKey = options.releaseKey;
     this.siteConcurrentDebates = cap;
+    this.ownerConcurrentDebates = share;
     this.#hosted = options.hosted;
     this.#alarm = options.alarm ?? activeVersionAlarm;
     const siteVersion = options.siteVersion;
@@ -406,6 +416,27 @@ export class PostgresAskAdmissionGate implements AskAdmissionGate {
     const result = await tx.query<{ active: number }>(
       `SELECT count(DISTINCT run_id)::integer AS active FROM core.work_item
        WHERE state IN ('READY','CLAIMED') AND run_id IS NOT NULL`
+    );
+    const active = result.rows[0]?.active;
+    if (!Number.isSafeInteger(active) || (active as number) < 0) throw new TypeError("ASK_ADMISSION_GATE_COUNT_INVALID");
+    return active as number;
+  }
+
+  async ownerActiveDebates(tx: Pick<PoolClient, "query">, ownerRef: string): Promise<number> {
+    const result = await tx.query<{ active: number }>(
+      `SELECT count(DISTINCT work.run_id)::integer AS active
+       FROM core.work_item AS work
+       JOIN core.run AS run ON run.run_id = work.run_id
+       LEFT JOIN LATERAL (
+         SELECT event.owner_ref FROM core.run_ownership_event AS event
+         WHERE event.run_id = work.run_id
+         ORDER BY event.at_seq DESC
+         LIMIT 1
+       ) AS latest ON true
+       WHERE work.state IN ('READY','CLAIMED') AND work.run_id IS NOT NULL
+         AND (latest.owner_ref = $1::uuid
+           OR (latest.owner_ref IS NULL AND run.asker_id = 'owner:' || $1::uuid::text))`,
+      [ownerRef]
     );
     const active = result.rows[0]?.active;
     if (!Number.isSafeInteger(active) || (active as number) < 0) throw new TypeError("ASK_ADMISSION_GATE_COUNT_INVALID");

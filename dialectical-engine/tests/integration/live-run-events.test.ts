@@ -279,3 +279,198 @@ describe("live run events: one long-lived stream per page open", () => {
     }
   });
 });
+
+const REFUSED_LINE = (reason: "SESSION_STREAMS" | "OWNER_STREAMS") => JSON.stringify({
+  event: "api.run_events.refused", route: "GET /v1/runs/{id}/events", reason, windowMs: 30_000
+});
+
+/**
+ * Security fixes run 3 (NV-20): `startApi` with the sessions of several identities, a slower poll (ten concurrent
+ * streams stay near 40 mark reads a second), a movable admission clock, a count of the response closes the server has
+ * seen, the refusal journal lines, and, when asked, a `readRun` that counts its call and then waits on a gate.
+ */
+async function startCappedApi(identities: readonly TestHttpIdentity[], gated: { gateReadRun?: boolean } = {}) {
+  const { application, calls } = countingApplication();
+  let readRunCalls = 0;
+  let openGate: () => void = () => {};
+  if (gated.gateReadRun === true) {
+    const gate = new Promise<void>((resolve) => { openGate = resolve; });
+    const readRun = application.readRun.bind(application);
+    application.readRun = async (...args: Parameters<typeof readRun>) => {
+      readRunCalls += 1;
+      await gate;
+      return readRun(...args);
+    };
+  }
+  const limiter = new AdmissionLimiter(admissionPolicyFromValue(
+    ADMISSION_POLICY_REGISTER_ROW.value, ADMISSION_POLICY_REGISTER_ROW.sourceRef
+  ));
+  const decide = vi.spyOn(limiter, "decide");
+  let now = Date.now();
+  const errors = vi.spyOn(console, "error");
+  const api = buildApi({
+    application,
+    sessions: testSessionApplication(identities),
+    allowedOrigin: TEST_APP_ORIGIN,
+    admission: limiter,
+    admissionClock: () => new Date(now),
+    runEventTail: { pollMs: 250, heartbeatMs: 1_000, maxLifeMs: 60_000 }
+  });
+  let closes = 0;
+  api.addHook("onRequest", async (_request, reply) => { reply.raw.on("close", () => { closes += 1; }); });
+  const base = await api.listen({ port: 0, host: "127.0.0.1" });
+  const controllers: AbortController[] = [];
+  const attempt = (identity: TestHttpIdentity, runId: string) => {
+    const controller = new AbortController();
+    controllers.push(controller);
+    const response = fetch(`${base}/v1/runs/${runId}/events`, {
+      headers: testSessionHeaders(identity), signal: controller.signal
+    });
+    return { controller, response };
+  };
+  return {
+    calls,
+    attempt,
+    /** Opens one stream and waits for its replay; returns the controller that ends it. */
+    async open(identity: TestHttpIdentity, runId: string): Promise<AbortController> {
+      const { controller, response } = attempt(identity, runId);
+      const opened = await response;
+      expect(opened.status).toBe(200);
+      expect(opened.headers.get("content-type")).toContain("text/event-stream");
+      await streamReader(opened).until((text) => text.includes("event: run.running"));
+      return controller;
+    },
+    /** The next open of this identity is refused by the stream cap, with nothing streamed. */
+    async expectRefused(identity: TestHttpIdentity, runId: string): Promise<void> {
+      const refused = await attempt(identity, runId).response;
+      expect(refused.status).toBe(429);
+      expect(refused.headers.get("retry-after")).toBe("30");
+      expect(refused.headers.get("content-type") ?? "").not.toContain("text/event-stream");
+      expect(await refused.json()).toEqual({ error: "RUN_EVENT_STREAMS_LIMITED", message: "RUN_EVENT_STREAMS_LIMITED" });
+    },
+    /** Retries an open until it answers 200 (each refusal's body is cancelled), then waits for its replay. */
+    async openWhenFree(identity: TestHttpIdentity, runId: string): Promise<void> {
+      await vi.waitFor(async () => {
+        const opened = await attempt(identity, runId).response;
+        if (opened.status !== 200) {
+          await opened.body?.cancel();
+          throw new Error(`still refused: ${opened.status}`);
+        }
+        await streamReader(opened).until((text) => text.includes("event: run.running"));
+      }, { timeout: 5_000, interval: 100 });
+    },
+    advance(ms: number) { now += ms; },
+    openGate: () => openGate(),
+    readRunCalls: () => readRunCalls,
+    closes: () => closes,
+    publicReadCharges: () => decide.mock.calls.filter(([scope]) => scope === "publicReads").length,
+    refusals: () => errors.mock.calls.map(([line]) => line)
+      .filter((line): line is string => typeof line === "string" && line.includes("\"api.run_events.refused\"")),
+    async close(): Promise<void> {
+      for (const controller of controllers) controller.abort();
+      try {
+        await api.close();
+      } finally {
+        errors.mockRestore();
+      }
+    }
+  };
+}
+
+/** A second sign-in session of `owner`'s account: its own session id and tokens, the owner's user and owner ref. */
+function sameAccountSession(owner: TestHttpIdentity, label: string): TestHttpIdentity {
+  const own = testHttpIdentity(label);
+  return Object.freeze({
+    ...own,
+    authenticated: Object.freeze({
+      ...own.authenticated,
+      userId: owner.authenticated.userId,
+      ownerRef: owner.authenticated.ownerRef,
+      session: Object.freeze({ ...own.authenticated.session, asker_id: owner.authenticated.session.asker_id })
+    })
+  });
+}
+
+describe("run-event streams are capped per session and per account (NV-20)", () => {
+  it("refuses a fifth stream on one session with 429 before any admission charge, and journals once per window", async () => {
+    const identity = testHttpIdentity(`live-run-events-${randomUUID()}`);
+    const runId = await ownedRunningRun(identity, "cap-session");
+    const capped = await startCappedApi([identity]);
+    try {
+      for (let index = 0; index < 4; index += 1) await capped.open(identity, runId);
+      await capped.expectRefused(identity, runId);
+      await capped.expectRefused(identity, runId);
+      // The refusals spent none of the address's publicReads budget.
+      expect(capped.publicReadCharges()).toBe(4);
+      expect(capped.refusals()).toEqual([REFUSED_LINE("SESSION_STREAMS")]);
+      capped.advance(31_000);
+      await capped.expectRefused(identity, runId);
+      expect(capped.refusals()).toEqual([REFUSED_LINE("SESSION_STREAMS"), REFUSED_LINE("SESSION_STREAMS")]);
+      expect(capped.publicReadCharges()).toBe(4);
+    } finally {
+      await capped.close();
+    }
+  });
+
+  it("a stream whose client left frees its slot", async () => {
+    const identity = testHttpIdentity(`live-run-events-${randomUUID()}`);
+    const runId = await ownedRunningRun(identity, "cap-free");
+    const capped = await startCappedApi([identity]);
+    try {
+      const streams: AbortController[] = [];
+      for (let index = 0; index < 4; index += 1) streams.push(await capped.open(identity, runId));
+      await capped.expectRefused(identity, runId);
+      streams[0]!.abort();
+      await capped.openWhenFree(identity, runId);
+    } finally {
+      await capped.close();
+    }
+  });
+
+  it("caps an account at 8 across its sessions, reached from a third session; another account is unaffected", async () => {
+    const a = testHttpIdentity(`live-run-events-${randomUUID()}`);
+    const b = sameAccountSession(a, `live-run-events-${randomUUID()}`);
+    const c = sameAccountSession(a, `live-run-events-${randomUUID()}`);
+    const other = testHttpIdentity(`live-run-events-${randomUUID()}`);
+    const runId = await ownedRunningRun(a, "cap-account");
+    const otherRunId = await ownedRunningRun(other, "cap-other");
+    const capped = await startCappedApi([a, b, c, other]);
+    try {
+      const onA: AbortController[] = [];
+      for (let index = 0; index < 4; index += 1) onA.push(await capped.open(a, runId));
+      for (let index = 0; index < 4; index += 1) await capped.open(b, runId);
+      await capped.expectRefused(c, runId);
+      expect(capped.refusals()).toEqual([REFUSED_LINE("OWNER_STREAMS")]);
+      await capped.open(other, otherRunId);
+      onA[0]!.abort();
+      await capped.openWhenFree(c, runId);
+    } finally {
+      await capped.close();
+    }
+  });
+
+  it("a client that leaves before its stream starts holds no slot and never streams", async () => {
+    const identity = testHttpIdentity(`live-run-events-${randomUUID()}`);
+    const runId = await ownedRunningRun(identity, "cap-ghost");
+    const capped = await startCappedApi([identity], { gateReadRun: true });
+    try {
+      // An aborted fetch rejects with AbortError: caught as it is created, so it never surfaces unhandled.
+      const early = [0, 1, 2, 3].map(() => {
+        const { controller, response } = capped.attempt(identity, runId);
+        return { controller, settled: response.catch(() => undefined) };
+      });
+      await vi.waitFor(() => expect(capped.readRunCalls()).toBe(4), { timeout: 5_000, interval: 25 });
+      for (const { controller } of early) controller.abort();
+      await vi.waitFor(() => expect(capped.closes()).toBeGreaterThanOrEqual(4), { timeout: 5_000, interval: 25 });
+      await Promise.all(early.map(({ settled }) => settled));
+      const settled = { ...capped.calls };
+      capped.openGate();
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      // No ghost stream replayed or polled once its run read finished.
+      expect(capped.calls).toEqual(settled);
+      for (let index = 0; index < 4; index += 1) await capped.open(identity, runId);
+    } finally {
+      await capped.close();
+    }
+  });
+});

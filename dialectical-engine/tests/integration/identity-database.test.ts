@@ -60,15 +60,16 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "consumer_recovery_enrollment", "consumer_recovery_gate", "consumer_recovery_reservation", "consumer_recovery_token",
       "consumer_security_challenge", "consumer_security_notice", "consumer_totp_enrollment",
       "data_export",
-      "email_change_request", "login_challenge", "mfa_factor",
+      "email_change_request", "email_change_send_window", "login_challenge", "mfa_factor",
       "mfa_recovery_control", "mfa_recovery_legacy_cohort", "mfa_recovery_notice", "mfa_recovery_notice_binding",
       "mfa_recovery_source_window", "mfa_recovery_staged_code",
       "password_recovery_control", "password_recovery_feed", "password_recovery_notice",
       "password_recovery_retry_lock", "password_recovery_source_window", "password_recovery_staged_code",
-      "password_reset_control", "password_reset_notice", "password_reset_notice_binding", "password_reset_source_window",
+      "password_reset_control", "password_reset_notice", "password_reset_notice_binding", "password_reset_retry_lock", "password_reset_source_window",
       "private_erasure_audit_binding",
-      "publication_event_binding", "recovery_code", "recovery_email_request", "registration_region", "run_execution_binding", "runtime_audit_attempt",
-      "sensitive_data_consent", "session", "social_enrollment", "social_flow", "social_identity", "staff_webauthn_metadata", "step_up_grant", "user",
+      "publication_event_binding", "recovery_code", "recovery_email_request", "registration_region", "restore_fence", "run_execution_binding", "runtime_audit_attempt",
+      "sensitive_data_consent", "session", "social_enrollment", "social_flow", "social_identity", "staff_webauthn_metadata", "step_up_grant",
+      "totp_login_lockout", "user",
       "verification_delivery_reservation", "verification_token_credential"
     ]);
 

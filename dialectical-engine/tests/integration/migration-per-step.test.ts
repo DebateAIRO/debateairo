@@ -61,13 +61,13 @@ describe("Review Focus 1: a step that fails (or a kill) between steps", () => {
 
   it("a failing step leaves every earlier step committed", async () => {
     const real = (await loadMigrationPlan()).forwardChain.map((step) => step.name);
-    expect(real).toHaveLength(14);
+    expect(real).toHaveLength(19);
     chain.shape = extendedBy((last) => probe(last, "0199_probe_fail.sql", "SELECT 1/0"));
     await expect(migrate(db.pool)).rejects.toMatchObject({ code: "22012" });
     chain.shape = undefined;
-    // All fourteen real steps were applied by that same run and stay committed; the probe left nothing.
+    // All nineteen real steps were applied by that same run and stay committed; the probe left nothing.
     expect(await receipts()).toEqual(real);
-    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(14);
+    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(19);
     expect(await ledger()).toEqual(expect.arrayContaining(real));
     expect(await ledger()).not.toContain("0199_probe_fail.sql");
     // The next run continues where the last one stopped: everything replays, nothing is left to apply.
@@ -79,9 +79,11 @@ describe("Review Focus 1: a step that fails (or a kill) between steps", () => {
 describe("Review Focus 2: a page read holding a lock on core.run while 0123's ALTER waits", () => {
   beforeAll(async () => {
     db = await startTestDatabase();
-    // The database a release before 0123 leaves: the chain minus its last two steps (0123, then the settings activation
-    // 0124, which migrate() applies after 0123 and which takes no lock on core.run).
-    chain.shape = (steps) => steps.slice(0, -2);
+    // The database a release before 0123 leaves: the chain cut before 0123 (0123, then the settings activation 0124, the
+    // security fixes 0125, the due indexes 0126 to 0128 and the control user index 0129, which migrate() applies after
+    // 0123 and which take no lock on
+    // core.run).
+    chain.shape = (steps) => steps.slice(0, (steps as readonly { name: string }[]).findIndex((s) => s.name === SIDE_BY_SIDE));
     try { await migrate(db.pool); } finally { chain.shape = undefined; }
     expect(await ledger()).not.toContain(SIDE_BY_SIDE);
   }, 300_000);

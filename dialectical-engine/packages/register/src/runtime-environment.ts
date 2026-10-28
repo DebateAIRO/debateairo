@@ -541,6 +541,12 @@ const apiEnvironmentShape = {
      */
     TURNSTILE_LOGIN_REQUIRED: z.enum(["true", "false"]).default("false"),
     TURNSTILE_RECOVERY_REQUIRED: z.enum(["true", "false"]).default("false"),
+    /**
+     * NV-03: the API's copy of the UI-to-API proof (0600, owner-only, in the 0700 API key folder). The API honours a
+     * forwarded client address and the edge country only from a loopback peer that carries the same bytes; the
+     * hosted API refuses to start without it (UI_API_PROOF_REQUIRED, checked at main.ts's composition root).
+     */
+    UI_API_PROOF_PATH: z.string().min(1).optional(),
     DATABASE_URL: z.string().url(),
     SUPPORT_DATABASE_URL: z.string().url(),
     API_HOST: z.string().min(1), API_PORT: positiveInteger,
@@ -569,6 +575,11 @@ const apiEnvironmentShape = {
      * kept (one boot line says so); set, it must be an existing folder the API can write, or the API refuses to start.
      */
     BILLING_NOTICE_SPOOL_PATH: z.string().min(1).optional(),
+    /**
+     * NV-07: the restore fence file. Outside every backed-up store; one file per host, shared by every release on it;
+     * required in hosted mode (checked at boot by apps/api/src/restore-fence.ts).
+     */
+    RESTORE_FENCE_PATH: z.string().min(1).optional(),
     /**
      * OWNER-RUN sandbox only (spec 2026-10-05 §2.3, README §14.9): whole days added to the billing jobs' clock.
      * Absent in every real deployment; `billingClock` refuses it unless NETOPIA_API_BASE_URL is one of NETOPIA's
@@ -653,9 +664,21 @@ function withProductionFloors<T extends Readonly<Record<string, unknown>>>(envir
   return environment;
 }
 
+/** NV-11: publication key custody (keys, store, cleanup) is separate from publication SERVING. Erasure needs custody
+ *  whenever a database may hold publication keys, so it is engaged when serving or when it is fully configured. */
+export function publicationCustodyOf(environment: Readonly<{
+  PUBLICATION_ENABLED?: string; CORPUS_KEK_PATH?: string | undefined;
+  PUBLICATION_KEY_STORE_PATH?: string | undefined; PUBLICATION_CLEANUP_DATABASE_URL?: string | undefined;
+}>): Readonly<{ keys: boolean; cleanup: boolean }> {
+  const serving = environment.PUBLICATION_ENABLED === "true";
+  const keys = serving || (environment.CORPUS_KEK_PATH !== undefined && environment.PUBLICATION_KEY_STORE_PATH !== undefined);
+  return Object.freeze({ keys, cleanup: serving || (keys && environment.PUBLICATION_CLEANUP_DATABASE_URL !== undefined) });
+}
+
 function validateApiEnvironment(
   environment: z.infer<z.ZodObject<typeof apiEnvironmentShape>>
 ) {
+  const custody = publicationCustodyOf(environment);
   if (environment.EVALUATOR_DEV_MENU_ENABLED === "true"
     && environment.EVALUATOR_DEV_MENU_DATABASE_URL === undefined) {
     throw new TypeError("EVALUATOR_DEV_MENU_DATABASE_URL_REQUIRED");
@@ -705,7 +728,7 @@ function validateApiEnvironment(
     && environment.PUBLICATION_CLEANUP_DATABASE_URL === undefined) {
     throw new TypeError("PUBLICATION_CLEANUP_DATABASE_URL_REQUIRED");
   }
-  if (environment.PUBLICATION_ENABLED === "true"
+  if (custody.cleanup
     && (environment.PUBLICATION_CLEANUP_DATABASE_URL === environment.DATABASE_URL
       || environment.PUBLICATION_CLEANUP_DATABASE_URL === environment.AUTHORIZATION_DATABASE_URL)) {
     throw new TypeError("PUBLICATION_CLEANUP_DATABASE_URL_MUST_BE_SEPARATE");
@@ -730,7 +753,7 @@ function validateApiEnvironment(
     || environment.SUPPORT_KEK_PATH === environment.AUDIT_SOURCE_IP_SALT_PATH) {
     throw new TypeError("SUPPORT_KEK_PATH_MUST_BE_SEPARATE");
   }
-  if (environment.PUBLICATION_ENABLED === "true"
+  if (custody.keys
     && (environment.CORPUS_KEK_PATH === environment.KEK_PATH
       || environment.PUBLICATION_KEY_STORE_PATH === environment.USER_DEK_STORE_PATH)) {
     throw new TypeError("PUBLICATION_KEY_DOMAIN_MUST_BE_SEPARATE");

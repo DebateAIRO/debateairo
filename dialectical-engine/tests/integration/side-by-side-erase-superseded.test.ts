@@ -290,6 +290,11 @@ async function remains(runId: string) {
 const ERASED = { key: false, question: null, tombstone: true, intent: false, secret: false, live: false };
 const untouched = (question: string) => ({ key: true, question, tombstone: false, intent: false, secret: true, live: true });
 
+/** Resolves "TIMED_OUT" after `ms`: the other side of a race against a request that must not wait (NV-30). */
+function timeout(ms: number): Promise<"TIMED_OUT"> {
+  return new Promise((resolve) => { setTimeout(() => resolve("TIMED_OUT"), ms).unref(); });
+}
+
 async function erasedAudits(): Promise<number> {
   return (await database.pool.query<{ n: number }>(
     "SELECT count(*)::integer AS n FROM identity.audit_event WHERE event_type = 'debate.private.erased'"
@@ -385,6 +390,31 @@ describe("side-by-side A-x3: deleting a re-admitted debate erases every run of i
     expect(await remains(oldest)).toEqual(untouched(question));
     expect(await remains(newest)).toEqual(untouched(question));
     expect((await deleteDebate(owner, newest, grant)).status).toBe(200);
+    expect(await remains(oldest)).toEqual(ERASED);
+    expect(await remains(newest)).toEqual(ERASED);
+  });
+
+  it("a reader of the run named makes a delete answer PENDING at once, with nothing spent (NV-30)", async () => {
+    const question = "Should a deletion step aside for a reader of the very run it names?";
+    const [oldest, newest] = await readmittedDebate(question, 1) as [string, string];
+    const grant = await deletionGrant(owner, newest);
+    const lease = `debateai:run-content-lease:v1:${newest}`;
+    const holder = await database.pool.connect();
+    let held = false;
+    try {
+      // A reader of the newest run's private content (the runner, a story step) holds its shared lease.
+      await holder.query("SELECT pg_advisory_lock_shared(hashtextextended($1, 0))", [lease]);
+      held = true;
+      expect(await Promise.race([deleteDebate(owner, newest, grant), timeout(3_000)]))
+        .toEqual({ status: 202, body: JSON.stringify({ status: "PENDING" }) });
+      expect(await grantConsumed(grant)).toBe(false);
+      expect(await remains(oldest)).toEqual(untouched(question));
+      expect(await remains(newest)).toEqual(untouched(question));
+    } finally {
+      if (held) await holder.query("SELECT pg_advisory_unlock_shared(hashtextextended($1, 0))", [lease]);
+      holder.release();
+    }
+    expect(await deleteDebate(owner, newest, grant)).toEqual({ status: 200, body: JSON.stringify({ status: "CLEANED" }) });
     expect(await remains(oldest)).toEqual(ERASED);
     expect(await remains(newest)).toEqual(ERASED);
   });

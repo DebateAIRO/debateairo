@@ -315,6 +315,14 @@ describe("streamlined consumer auth boundary", () => {
     expect(document.components.schemas.RegisterRequestSchema?.additionalProperties).toBe(false);
     expect(inventory.resources).toHaveProperty("RegisterRequestSchema");
     expect(inventory.resources).toHaveProperty("ResendVerificationRequestSchema");
+    // NV-14: verify-email takes the token holder's password, optional for the release before's UI.
+    const verify = document.paths["/v1/auth/verify-email"].post;
+    expect(verify.requestBody?.content["application/json"].schema.$ref).toBe("#/components/schemas/VerifyEmailRequestSchema");
+    expect(document.components.schemas.VerifyEmailRequestSchema?.properties).toHaveProperty("password");
+    expect(document.components.schemas.VerifyEmailRequestSchema?.required).toContain("token");
+    expect(document.components.schemas.VerifyEmailRequestSchema?.required).not.toContain("password");
+    expect(document.components.schemas.VerifyEmailRequestSchema?.additionalProperties).toBe(false);
+    expect(inventory.resources).toHaveProperty("VerifyEmailRequestSchema");
   });
 });
 

@@ -157,6 +157,7 @@
   "billing.subscription.withdrawNothingDue": "Déanta. Tá deireadh le do phlean. Clúdaíonn an chuid a d’úsáid tú cheana an praghas iomlán, mar sin níl aon rud le tabhairt ar ais duit.",
   "billing.subscription.withdrawOwnerReview": "Tá deireadh le do phlean. Rinneadh aisíocaíocht cheana ar cheann de d’íocaíochtaí, mar sin seiceálfaimid cad atá dlite fós agus seolfaimid ríomhphost chugat laistigh de 14 lá.",
   "billing.subscription.withdrawWindowClosed": "Tá an tréimhse tarraingthe siar 14 lá thart, nó ní bhaineann sí leis an áit a gcónaíonn tú. Is féidir leat cur ar ceal am ar bith fós.",
+  "billing.subscription.withdrawDebateRunning": "D’fhéadfadh go bhfuil díospóireacht a thosaigh tú fós ag úsáid creidmheasa, mar sin ní féidir linn a rá go fóill cé mhéad a d’úsáid tú. Bain triail eile as ar ball. Tá níos mó ná lá agat fós chun tarraingt siar.",
   "billing.subscription.stillConfirming": "Táimid fós á dheimhniú seo leis an soláthraí íocaíochta. Féach ar an leathanach seo arís i gceann cúpla nóiméad.",
   "billing.subscription.actionFailed": "Níor oibrigh sé sin. Bain triail eile as.",
   "billing.subscription.invoices": "Sonraisc",

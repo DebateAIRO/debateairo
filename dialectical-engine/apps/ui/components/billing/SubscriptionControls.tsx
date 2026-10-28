@@ -143,6 +143,8 @@ function withdrawFailureWords(failure: unknown): FailureWords {
   if (failure instanceof StepUpRefused) return failure.transport ? ACTION_FAILED : Object.freeze({ key: "billing.subscription.withdrawRefused", reload: false });
   const code = refusalOf(failure);
   if (code === "WITHDRAWAL_WINDOW_CLOSED") return Object.freeze({ key: "billing.subscription.withdrawWindowClosed", reload: true });
+  // NV-45 (409): a debate may still be using credit and more than a day of the window is left; nothing was written.
+  if (code === "WITHDRAWAL_DEBATE_RUNNING") return Object.freeze({ key: "billing.subscription.withdrawDebateRunning", reload: false });
   // P12d (403): the grant expired or was already used. The password and code were right, so never blame them.
   if (code === "STEP_UP_REQUIRED") return Object.freeze({ key: "billing.subscription.stepUpExpired", reload: false });
   // A timeout after P12d queued the refund: the refund may be under way, so say so and read the state again.

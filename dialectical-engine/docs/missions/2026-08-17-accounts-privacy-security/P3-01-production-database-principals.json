@@ -474,6 +474,7 @@
         "audit_crypto_internal",
         "billing",
         "core",
+        "erasure_reconcile",
         "evidence",
         "identity",
         "ledger",
@@ -905,7 +906,7 @@
           "environmentKey": "PUBLICATION_CLEANUP_DATABASE_URL",
           "purpose": "PUBLICATION_KEY_CLEANUP",
           "binding": "WIRED_WHEN_ENABLED",
-          "condition": "PUBLICATION_ENABLED=true"
+          "condition": "PUBLICATION_ENABLED=true, or CORPUS_KEK_PATH, PUBLICATION_KEY_STORE_PATH and PUBLICATION_CLEANUP_DATABASE_URL all set"
         }
       ]
     },

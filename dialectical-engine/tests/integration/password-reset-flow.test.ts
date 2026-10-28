@@ -22,6 +22,9 @@ let db: TestDatabase, root: string, argon: Argon2WorkerPool, audit: AuditContext
 let credentialUrls: Map<string, string>;
 const auth = authPolicyFromRegisterRows(AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS), mfa = mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value), recovery = recoveryPolicyFromRegisterRows([RECOVERY_POLICY_REGISTER_ROW]), policy = passwordResetPolicyFromValue(PASSWORD_RESET_POLICY_REGISTER_ROW.value, PASSWORD_RESET_POLICY_REGISTER_ROW.sourceRef);
 const keys = new Map<string, Buffer>(), blind = Buffer.alloc(32, 41), messages: PasswordResetMail[] = [], source = { ip: "203.0.113.77", userAgent: "genuine-password-reset-test", requestId: "fixture" }, origin = "https://preview.example.test";
+// NV-40: the sweep cases start on their own network (TEST-NET-2), so their starts never spend the shared `source` window
+// (password_reset_admit keys on the IP digest alone, 20 uses per 5 minutes, 0104:223-234).
+const sweepSource = { ...source, ip: "198.51.100.40", userAgent: "password-reset-sweep-test" };
 const users: ReadableUserDekStore = { async store(id, key) {
     keys.set(id, Buffer.from(key));
   }, async load(id) {
@@ -59,6 +62,8 @@ async function receive() {
     await worker.close();
   }
 }
+// NV-40: dead-letters whatever an earlier case left pending (superuser pool; the notice table has no UPDATE trigger).
+const retirePending = () => db.pool.query("UPDATE identity.password_reset_notice SET dead_at=clock_timestamp() WHERE sent_at IS NULL AND dead_at IS NULL");
 beforeAll(async () => {
   db = await startTestDatabase();
   await migrate(db.pool);
@@ -98,14 +103,14 @@ afterAll(async () => {
 });
 describe("genuine native-role password-only HTTP reset", () => {
   it("grants all reset capabilities only to the native API, without table or owner/private-content authority", async () => {
-    const capabilities = (await db.pool.query(`SELECT oid,oid::regprocedure::text AS signature FROM pg_proc WHERE pronamespace='identity'::regnamespace AND proname=ANY($1) ORDER BY proname`, [["password_reset_prepare", "password_reset_start", "password_reset_exchange", "password_reset_read", "password_reset_complete", "password_reset_cancel", "password_reset_cancel_session", "password_reset_admit", "password_reset_failure", "expire_password_reset", "password_reset_claim_notice", "password_reset_finish_notice"]])).rows;
+    const capabilities = (await db.pool.query(`SELECT oid,oid::regprocedure::text AS signature FROM pg_proc WHERE pronamespace='identity'::regnamespace AND proname=ANY($1) ORDER BY proname`, [["password_reset_prepare", "password_reset_start", "password_reset_exchange", "password_reset_read", "password_reset_complete", "password_reset_cancel", "password_reset_cancel_session", "password_reset_admit", "password_reset_failure", "expire_password_reset", "password_reset_claim_notice", "password_reset_finish_notice", "password_reset_claim_pending_notice", "password_reset_start_guarded", "password_reset_proof_reserve", "password_reset_proof_refused", "password_reset_complete_guarded", "password_reset_admit_evicting"]])).rows;
     const tableOid = (await db.pool.query(`SELECT 'identity.password_reset_control'::regclass::oid AS oid`)).rows[0].oid;
-    expect(capabilities).toHaveLength(12);
+    expect(capabilities).toHaveLength(18);
     for (const environmentKey of ["DATABASE_URL", "AUTHORIZATION_DATABASE_URL", "LIVENESS_DATABASE_URL", "SUPPORT_DATABASE_URL", "ERASURE_DATABASE_URL"]) {
       const pool = createPool(credentialUrls.get(environmentKey)!);
       try {
         const grants = (await pool.query(`SELECT has_function_privilege(current_user,oid,'EXECUTE') AS allowed FROM unnest($1::oid[]) oid`, [capabilities.map(cap => cap.oid)])).rows;
-        expect(grants.map(r => r.allowed)).toEqual(Array(12).fill(environmentKey === "DATABASE_URL"));
+        expect(grants.map(r => r.allowed)).toEqual(Array(18).fill(environmentKey === "DATABASE_URL"));
         expect((await pool.query(`SELECT has_table_privilege(current_user,$1::oid,'SELECT,INSERT,UPDATE,DELETE') AS table_access,pg_has_role(current_user,'debateai_password_reset_owner','USAGE') AS owner_access`, [tableOid])).rows[0]).toEqual({ table_access: false, owner_access: false });
         if (environmentKey === "DATABASE_URL")
           expect(await new PostgresPasswordResetRepository(pool, audit, 5).assertRole()).toBeUndefined();
@@ -236,5 +241,95 @@ describe("genuine native-role password-only HTTP reset", () => {
     expect((await db.pool.query(`SELECT identity.password_recovery_prepare($1) AS candidate`, [createEmailBlindIndex(blind, a.email)])).rows[0].candidate).toMatchObject({ userId: a.id });
     await expect(service.status({ sessionToken: "A".repeat(43) })).rejects.toThrow("PASSWORD_RESET_INVALID");
     a.secret.fill(0);
+  });
+  // NV-40: the guard runs first, so it never follows a failing red-first case; each case starts from an empty outbox.
+  it("a PROOF out for delivery is not killed by the sweep (NV-40)", async () => {
+    await receive();
+    await retirePending();
+    const u4 = await fixture();
+    await service.start({ email: u4.email }, sweepSource);
+    const held = await repo.claimNotice(60000);
+    expect(held!.userId).toBe(u4.id);
+    expect(held!.event).toBe("PROOF");
+    await db.pool.query(`UPDATE identity.password_reset_control SET expires_at=clock_timestamp()-interval '1 second' WHERE user_id=$1`, [u4.id]);
+    expect(await repo.claimNotice(1000)).toBeNull();
+    expect((await db.pool.query(`SELECT dead_at FROM identity.password_reset_notice WHERE notice_id=$1`, [held!.noticeId])).rows[0].dead_at).toBeNull();
+    expect(await repo.finishNotice(held!.noticeId, held!.leaseId, true, 300000, 3)).toBe(true);
+    u4.secret.fill(0);
+  });
+  it("one run dead-letters every stale PROOF at the head and still delivers the next one (NV-40)", async () => {
+    await receive();
+    await retirePending();
+    const u1 = await fixture(), u2 = await fixture(), u3 = await fixture();
+    for (const u of [u1, u2, u3])
+      await service.start({ email: u.email }, sweepSource);
+    await db.pool.query(`UPDATE identity.password_reset_control SET expires_at=clock_timestamp()-interval '1 second' WHERE user_id=ANY($1)`, [[u1.id, u2.id]]);
+    const n = messages.length;
+    await receive();
+    const proofs = async (id: string) => (await db.pool.query(`SELECT dead_at,sent_at FROM identity.password_reset_notice WHERE user_id=$1 AND event_kind='PROOF'`, [id])).rows;
+    for (const u of [u1, u2]) {
+      const rows = await proofs(u.id);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].dead_at).not.toBeNull();
+      expect(rows[0].sent_at).toBeNull();
+    }
+    const delivered = await proofs(u3.id);
+    expect(delivered).toHaveLength(1);
+    expect(delivered[0].sent_at).not.toBeNull();
+    expect(messages.slice(n).map(m => ({ event: m.event, recipient: m.recipient }))).toEqual([{ event: "PROOF", recipient: u3.email }]);
+    for (const u of [u1, u2, u3])
+      u.secret.fill(0);
+  });
+  it("matches at most five codes per account round across concurrent requests, then refuses a new start until the lock lapses (NV-17)", async () => {
+    // One TEST-NET-1 address per request: an IPv4 source keeps its own full-address window (password_reset_admit, 20
+    // per 5 minutes), so the per-source admit is never the limiter here and the shared `source` window is not spent.
+    const a = await fixture(false), net = (n: number) => ({ ...source, ip: `192.0.2.${n}`, userAgent: "password-reset-cap-test" });
+    const proofs = async () => (await db.pool.query(`SELECT count(*)::int AS n FROM identity.password_reset_notice WHERE user_id=$1 AND event_kind='PROOF'`, [a.id])).rows[0].n;
+    await service.start({ email: a.email }, net(100));
+    await receive();
+    const proof = messages.find(m => m.event === "PROOF" && m.recipient === a.email)!;
+    const ticket = await service.exchange({ token: proof.token! }, net(100));
+    const step = Number((await db.pool.query(`SELECT floor(extract(epoch FROM clock_timestamp())/30)::bigint AS step`)).rows[0].step);
+    const valid = new Set([-2, -1, 0, 1, 2].map(d => totpCodeAtStep(a.secret, step + d))), wrong: string[] = [];
+    for (let code = 100000; wrong.length < 12; code++)
+      if (!valid.has(String(code)))
+        wrong.push(String(code));
+    const outcomes = await Promise.all(wrong.map((code, n) => service.complete({ sessionToken: ticket.sessionToken, password: "capped new password", code }, net(n + 1)).then(() => "COMPLETED", (error: Error) => error.message)));
+    expect(outcomes.filter(o => o === "PASSWORD_RESET_PROOF_INVALID")).toHaveLength(5);
+    expect(outcomes.filter(o => o === "PASSWORD_RESET_INVALID")).toHaveLength(7);
+    expect(await service.status({ sessionToken: ticket.sessionToken })).toMatchObject({ status: "refused" });
+    // The lock, not admit, refuses the next start: it answers the generic response, queues no PROOF and writes the
+    // delegate's own `started` DENY audit for that request's source.
+    const denied = await repo.prepareSource(net(101));
+    const denials = async () => (await db.pool.query(`SELECT count(*)::int AS n FROM identity.audit_event WHERE event_type='identity.password_reset.started' AND decision='DENY' AND source_context->>'ipArgon2id'=$1`, [denied.ipArgon2id])).rows[0].n;
+    expect(await proofs()).toBe(1);
+    expect(await service.start({ email: a.email }, net(101))).toEqual({ message: "If this account can be recovered, instructions will arrive through an eligible channel." });
+    expect(await proofs()).toBe(1);
+    expect(await denials()).toBe(1);
+    await db.pool.query(`UPDATE identity.password_reset_retry_lock SET locked_until=clock_timestamp()-interval '1 second' WHERE user_id=$1`, [a.id]);
+    await service.start({ email: a.email }, net(102));
+    expect(await proofs()).toBe(2);
+    a.secret.fill(0);
+  });
+  it("a full source window still admits a new IPv6 /64: it gives up 64 rows with budget left and keeps the spent one (NV-39)", async () => {
+    const count = async () => (await db.pool.query(`SELECT count(*)::int AS n FROM identity.password_reset_source_window`)).rows[0].n;
+    const spent = `argon2id-audit:v1:${"5".repeat(64)}`, scope = `argon2id-audit:v1:${await audit.hashSourceIp("2001:db8:39:1::/64")}`;
+    try {
+      // Earlier cases leave live rows; the window starts empty, then holds exactly 65,536 rows.
+      await db.pool.query(`DELETE FROM identity.password_reset_source_window`);
+      await db.pool.query(`INSERT INTO identity.password_reset_source_window(source_digest,window_started_at,uses) SELECT 'argon2id-audit:v1:'||encode(sha256(('w'||g)::text::bytea),'hex'),now(),2 FROM generate_series(1,65535) g`);
+      await db.pool.query(`INSERT INTO identity.password_reset_source_window(source_digest,window_started_at,uses) VALUES($1,now(),21)`, [spent]);
+      expect(await count()).toBe(65536);
+      // exchange admits before its bearer check, so the token "x" reaches the window.
+      await expect(service.exchange({ token: "x" }, { ip: "2001:db8:39:1::7", userAgent: "it", requestId: "r" })).rejects.toThrow("PASSWORD_RESET_INVALID");
+      expect(await count()).toBe(65536 - 64 + 1);
+      expect((await db.pool.query(`SELECT uses FROM identity.password_reset_source_window WHERE source_digest=$1`, [spent])).rows).toEqual([{ uses: 21 }]);
+      await expect(service.exchange({ token: "x" }, { ip: "2001:db8:39:1::8", userAgent: "it", requestId: "r" })).rejects.toThrow("PASSWORD_RESET_INVALID");
+      expect(await count()).toBe(65536 - 64 + 1);
+      expect((await db.pool.query(`SELECT uses FROM identity.password_reset_source_window WHERE source_digest=$1`, [scope])).rows).toEqual([{ uses: 2 }]);
+    }
+    finally {
+      await db.pool.query(`DELETE FROM identity.password_reset_source_window`);
+    }
   });
 });

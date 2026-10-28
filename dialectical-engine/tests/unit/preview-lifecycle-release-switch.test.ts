@@ -8,7 +8,7 @@ const releaseSwitch = await import('../../deploy/' + 'preview-lifecycle/v1/relea
 const common = await import('../../deploy/' + 'preview-lifecycle/v1/common.mjs');
 const retire = await import('../../deploy/' + 'preview-lifecycle/v1/release-retire.mjs');
 
-const { HEALTH_INTERVAL_S, TAKE_TRAFFIC_AFTER_S, EDGE_WAIT_MS, EDGE_CONFIRMATIONS, BACKSTOP_S, EDGE_REQUEST_TIMEOUT_MS, EDGE_URL, TARGET_DROPIN,
+const { HEALTH_INTERVAL_S, HEALTH_FAILS, CADDY_TAKE_OUT_S, TAKE_TRAFFIC_AFTER_S, EDGE_WAIT_MS, EDGE_CONFIRMATIONS, BACKSTOP_S, EDGE_REQUEST_TIMEOUT_MS, EDGE_URL, TARGET_DROPIN,
   MAX_LABEL_LENGTH, renderTargetDropin, renderBackstopDropin, stageRelease, seedRelease, switchRelease, finishSwitch, rollbackRelease, gateFilesDigest, gateFilesPathFor, main } = releaseSwitch;
 const layout = common.LAYOUT;
 const GATES = retire.GATES as readonly { name: string; privateDir: string; folder: string; go: string }[];
@@ -59,6 +59,8 @@ type Options = Partial<{
   settingsRefusal: string | undefined;
   // SA10, ruling R60: the live condition 6's refusal for a forward switch's --activate <v> (settings-version.mjs checkSettingsGatesLive).
   gatesLive: string | undefined;
+  // NV-55: Caddy's copy of the edge secret is unreadable (root still checks it is there; no probe sends it).
+  secretUnreadable: boolean;
 }>;
 const fail = (code: string) => Object.assign(new Error(code), { code });
 const result = (stdout = '', code: number | null = 0) => ({ code, signal: null, error: undefined, timedOut: false, overflow: false, stdout: Buffer.from(stdout), stderr: Buffer.from('') });
@@ -196,7 +198,8 @@ function host(options: Options = {}) {
         log.push(`edge:${tag(answer)}`);
       } else {
         const port = /^http:\/\/127\.0\.0\.1:(\d+)\/readyz$/.exec(url)![1]!;
-        expect(headers).toEqual({ 'x-debateai-edge-secret': SECRET });
+        // NV-55: root asks a slot's website directly with no secret (the website answers its readiness to any peer).
+        expect(headers).toEqual({});
         const label = labelAtPort(port);
         log.push(`read:website(${label})`);
         answer = websiteAnswer(label);
@@ -271,7 +274,7 @@ function host(options: Options = {}) {
       if (o.gatesLive !== undefined) throw Object.assign(fail(o.gatesLive), { fields: { codes: [`SETTINGS_GATE_MODEL_DISABLED:deepinfra:deepseek-ai/DeepSeek-V4.1-Flash`] } });
       return { version, checked: true };
     },
-    readEdgeSecret: async () => { log.push('read:secret'); return SECRET; },
+    readEdgeSecret: async () => { log.push('read:secret'); if (o.secretUnreadable === true) throw fail('EDGE_SECRET_UNREADABLE'); return SECRET; },
     pathExists: async (path: string) => { log.push(`read:exists(${path})`); return (o.maintenance && path === '/etc/debateai-v3-preview/lifecycle/maintenance-pending') || Object.hasOwn(files, path); },
     acquireLock: async () => async () => undefined,
     gateFilesDigest: async () => { log.push('read:gate-files'); return GATES.map(gate => ({ name: gate.name, goSha256: 'a'.repeat(64), folderSha256: 'b'.repeat(64) })); },
@@ -347,9 +350,10 @@ describe('the switch (side-by-side spec §6)', () => {
     expect(gateFilesPathFor(layout, NEW_KEY)).toBe(GATE_FILES);
   });
 
-  it('takes traffic from the database clock + 8 s and waits one more health interval after three confirmations', async () => {
-    // 8 s = the API watcher's 5 s stale bound + one health interval + 1 s (final fix wave P6).
-    expect([HEALTH_INTERVAL_S, TAKE_TRAFFIC_AFTER_S, EDGE_WAIT_MS, EDGE_CONFIRMATIONS, BACKSTOP_S, EDGE_REQUEST_TIMEOUT_MS]).toEqual([2, 8, 30_000, 3, 27_000, 15_000]);
+  it('takes traffic from the database clock + 8 s and waits one more take-out time after three confirmations', async () => {
+    // 8 s = the API watcher's 5 s stale bound + the 2 s take-out time + 1 s (final fix wave P6, NV-27).
+    expect([HEALTH_INTERVAL_S, HEALTH_FAILS, CADDY_TAKE_OUT_S, TAKE_TRAFFIC_AFTER_S, EDGE_WAIT_MS, EDGE_CONFIRMATIONS, BACKSTOP_S, EDGE_REQUEST_TIMEOUT_MS])
+      .toEqual([1, 2, 2, 8, 30_000, 3, 27_000, 15_000]);
     expect(EDGE_URL).toBe('http://127.0.0.1:3090/readyz');
     const h = host();
     await switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps });
@@ -374,7 +378,9 @@ describe('the switch (side-by-side spec §6)', () => {
   it.each([
     ['DRAINING', site(NEW_KEY, 503, ['DRAINING']), ['DRAINING']],
     ['DATABASE_UNREACHABLE', site(NEW_KEY, 503, ['NOT_CURRENT', 'DATABASE_UNREACHABLE']), ['NOT_CURRENT', 'DATABASE_UNREACHABLE']],
-    ['another release on its slot', site(OLD_KEY, 503, ['NOT_CURRENT']), ['RELEASE_KEY_MISMATCH']]
+    ['another release on its slot', site(OLD_KEY, 503, ['NOT_CURRENT']), ['RELEASE_KEY_MISMATCH']],
+    // NV-03: the new website's API refused its UI-to-API proof: not a waiting reason.
+    ['UI_API_PROOF_REFUSED', site(NEW_KEY, 503, ['NOT_CURRENT', 'UI_API_PROOF_REFUSED']), ['NOT_CURRENT', 'UI_API_PROOF_REFUSED']]
   ] as [string, Site, string[]][])('switches back at once when the new website says it will not become ready (%s), without waiting the 30 s (X4)', async (_case, websiteAfter, reasons) => {
     const h = host({ edgeAfter: [[caddy(502)]], websiteAfter });
     const error = await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps }));
@@ -416,6 +422,7 @@ describe('the switch (side-by-side spec §6)', () => {
     ["to's website answers for another release", { website: site(OLD_KEY, 503, ['NOT_CURRENT']) }, 'website'],
     ["to's website still booting", { website: site(NEW_KEY, 503, ['BOOTING', 'NOT_CURRENT']) }, 'website'],
     ["to's website does not answer", { website: 'refused' }, 'website'],
+    ["to's website's proof refused by its API", { website: site(NEW_KEY, 503, ['NOT_CURRENT', 'UI_API_PROOF_REFUSED']) }, 'website'],
     ['the edge does not serve the old release', { edgeBefore: caddy(502) }, 'edge'],
     ['a gate halted', { gates: { anthropic: 'halted' } }, 'gates'],
     ['maintenance pending', { maintenance: true }, 'maintenance'],
@@ -429,6 +436,17 @@ describe('the switch (side-by-side spec §6)', () => {
     const error = await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps }));
     expect(error.code).toBe('SWITCH_PRECONDITION_FAILED');
     expect(error.fields).toContain(field);
+    expect(h.writes()).toEqual([]);
+    expect(h.stops()).toEqual([]);
+  });
+
+  it('an unreadable Caddy copy of the edge secret still refuses the switch, and the website is still read without it (NV-55)', async () => {
+    const h = host({ secretUnreadable: true });
+    const error = await refusal(switchRelease({ to: 'new-v1', from: 'old-v1', layout, deps: h.deps }));
+    expect(error.code).toBe('SWITCH_PRECONDITION_FAILED');
+    expect(error.fields).toContain('edgeSecret');
+    expect(error.fields).not.toContain('website');
+    expect(h.log).toContain('read:website(new-v1)');
     expect(h.writes()).toEqual([]);
     expect(h.stops()).toEqual([]);
   });
@@ -797,7 +815,7 @@ describe('finishing a switch whose database write landed (D10 review)', () => {
       'systemctl enable debateai-preview-runner-retire@old-v1.timer', 'systemctl restart debateai-preview-runner-retire@old-v1.timer',
       `unitfile ${TARGET_DROPIN}`, 'systemctl daemon-reload', `statefile ${GATE_FILES}`
     ]);
-    // The edge first (three confirmations, then one more health interval), and only then the stop.
+    // The edge first (three confirmations, then one more take-out time), and only then the stop.
     const stopAt = h.log.indexOf('systemctl stop debateai-preview-ui@old-v1.service debateai-preview-api@old-v1.service');
     expect(h.log.slice(0, stopAt).filter(entry => entry.startsWith('edge:'))).toEqual(Array(EDGE_CONFIRMATIONS).fill('edge:new'));
     expect(h.log[stopAt - 1]).toBe('sleep 2500');
@@ -911,6 +929,16 @@ describe('stage and seed', () => {
 
 describe('the way back (side-by-side spec §11)', () => {
   const rollbackHost = (options: Options = {}) => host({ history: AFTER_SWITCH, units: AFTER_SWITCH_UNITS, ...options });
+
+  it('an unreadable Caddy copy of the edge secret refuses the rollback at the switch precondition, without the website wait (NV-55)', async () => {
+    const h = rollbackHost({ secretUnreadable: true });
+    const error = await refusal(rollbackRelease({ to: 'old-v1', from: 'new-v1', layout, deps: h.deps }));
+    expect(error.code).toBe('SWITCH_PRECONDITION_FAILED');
+    expect(error.fields).toContain('edgeSecret');
+    // It no longer waits out the website start (330 s) to end in ROLLBACK_UI_NOT_READY.
+    expect(h.clock() - START).toBeLessThan(60_000);
+    expect(h.switchCalls()).toEqual([]);
+  });
 
   it('rollback starts the old runner before the old pair, and the pair before the switch', async () => {
     // The old runner restarts in database-ahead mode and re-sends its own lapsed work (startupDispatched 3).

@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
+import type { DispatchableWorkItem } from "@debateai/battery";
 import {
   reconcileRunnerStartupWork,
   RunnerStartupReconciliationError
@@ -40,25 +41,56 @@ describe("development runner startup reconciliation", () => {
       Object.freeze({ runId: "00000000-0000-4000-8000-000000000002", workItemId: "00000000-0000-4000-8000-000000000012" })
     ]);
 
+    const log = vi.fn((_line: Readonly<Record<string, string | number>>) => undefined);
+
     await expect(reconcileRunnerStartupWork({
       work: { listDispatchable: vi.fn(async () => items) },
-      dispatcher: { dispatch }
+      dispatcher: { dispatch },
+      log
     })).resolves.toEqual({ dispatched: 2 });
     expect(dispatch.mock.calls).toEqual(items.map((item) => [item]));
+    expect(log).not.toHaveBeenCalled();
   });
 
-  it("fails closed when the ready backlog reaches the startup cap", async () => {
+  // NV-25 (security audit run 3): a larger backlog no longer refuses the start (a crash loop the unit's start limit
+  // ends with the release's runner failed); the oldest 100 are handed over, one content-free line says so.
+  it("hands over the oldest 100 of a larger backlog, says so content-free, and resolves", async () => {
     const items = Object.freeze(Array.from({ length: 101 }, (_, index) => Object.freeze({
       runId: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
       workItemId: `00000000-0000-4000-9000-${String(index).padStart(12, "0")}`
     })));
+    const listDispatchable = vi.fn(async (_limit: number) => items);
+    const dispatch = vi.fn(async (_item: DispatchableWorkItem) => undefined);
+    const log = vi.fn((_line: Readonly<Record<string, string | number>>) => undefined);
     await expect(reconcileRunnerStartupWork({
-      work: { listDispatchable: vi.fn(async () => items) },
-      dispatcher: { dispatch: vi.fn(async () => undefined) }
+      work: { listDispatchable },
+      dispatcher: { dispatch },
+      log
+    })).resolves.toEqual({ dispatched: 100 });
+    expect(listDispatchable.mock.calls).toEqual([[101]]);
+    expect(dispatch.mock.calls).toEqual(items.slice(0, 100).map((item) => [item]));
+    expect(log.mock.calls).toEqual([[{
+      kind: "DEBATEAI_RUNNER_STARTUP", event: "RUNNER_STARTUP_BACKLOG_SATURATED", listed: 101, dispatched: 100
+    }]]);
+  });
+
+  it("a dispatch that fails still refuses the start", async () => {
+    const items = Object.freeze(Array.from({ length: 3 }, (_, index) => Object.freeze({
+      runId: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+      workItemId: `00000000-0000-4000-9000-${String(index).padStart(12, "0")}`
+    })));
+    const dispatch = vi.fn(async (item: DispatchableWorkItem) => {
+      if (item.workItemId === items[1]!.workItemId) throw new Error("hatchet refused");
+    });
+    await expect(reconcileRunnerStartupWork({
+      work: { listDispatchable: vi.fn(async (_limit: number) => items) },
+      dispatcher: { dispatch },
+      log: vi.fn((_line: Readonly<Record<string, string | number>>) => undefined)
     })).rejects.toMatchObject({
       name: RunnerStartupReconciliationError.name,
-      message: "RUNNER_STARTUP_BACKLOG_SATURATED"
+      message: "RUNNER_STARTUP_REDISPATCH_FAILED"
     });
+    expect(dispatch.mock.calls).toEqual(items.slice(0, 2).map((item) => [item]));
   });
 
   it("retains only bounded machine-readable dependency diagnostics", () => {

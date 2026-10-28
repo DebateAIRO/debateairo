@@ -6,6 +6,7 @@ import type { AuthPolicy, MfaPolicy } from "@debateai/register";
 import type { PasswordResetPolicy } from "../../../packages/register/src/password-reset-policy.js";
 import { PostgresPasswordResetRepository, type PasswordResetRecord } from "../../../packages/db/src/password-reset.js";
 import { RECOVERY_START_PUBLIC_RESPONSE } from "./recovery.js";
+import { rateLimitSourceScope } from "./mfa.js";
 export class PasswordResetError extends Error {
   constructor(readonly code: "PASSWORD_RESET_INVALID" | "PASSWORD_RESET_PROOF_INVALID" | "PASSWORD_RESET_PASSWORD_INVALID" | "PASSWORD_RESET_CSRF_INVALID" | "PASSWORD_RESET_RATE_LIMITED" | "PASSWORD_RESET_UNAVAILABLE") {
     super(code);
@@ -13,6 +14,9 @@ export class PasswordResetError extends Error {
   }
 }
 const bearer = /^[A-Za-z0-9_-]{43}$/;
+// NV-17: the first round's cooldown after five reserved proofs (0125 doubles it per round to 24 h and accepts 60 s to
+// 1 h here); the siblings' failure_cooldown_ms, the 300 s T2 and MFA recovery lock on a REFUSED close.
+const PASSWORD_RESET_PROOF_LOCK_MS = 300_000;
 export function passwordResetNoticeAad(userId: string, channelId: string): AeadAad {
   return ["identity", "password_reset_notice.payload_ciphertext", channelId, "run:none", userId, `user-dek:${userId}`, "1"];
 }
@@ -100,7 +104,7 @@ export class PasswordResetService implements PasswordResetApplication {
     return { status: record.stage.toLowerCase() as PasswordResetState["status"], expires_at: new Date(record.expiresAt).toISOString(), password_min_length: this.dependencies.authPolicy.password.minimumLength, password_max_length: this.dependencies.authPolicy.password.maximumLength };
   }
   private async admit(source: AuthSourceContext) {
-    const prepared = await this.repo.prepareSource(source);
+    const prepared = await this.repo.prepareSource(source, rateLimitSourceScope(source.ip));
     if (!(await this.repo.admit(prepared)))
       throw new PasswordResetError("PASSWORD_RESET_RATE_LIMITED");
     return prepared;
@@ -118,7 +122,7 @@ export class PasswordResetService implements PasswordResetApplication {
         catch {
           return RECOVERY_START_PUBLIC_RESPONSE;
         }
-        const prepared = await this.repo.prepareSource(source);
+        const prepared = await this.repo.prepareSource(source, rateLimitSourceScope(source.ip));
         if (!(await this.repo.admit(prepared)))
           return RECOVERY_START_PUBLIC_RESPONSE;
         const index = createEmailBlindIndex(this.dependencies.blindIndexKey, email), candidate = await this.repo.prepare(index), userId = candidate?.userId ?? randomUUID(), key = candidate ? await this.dependencies.users.load(userId) : randomBytes(32), token = generateVerificationToken(), cancelToken = generateVerificationToken();
@@ -181,10 +185,15 @@ export class PasswordResetService implements PasswordResetApplication {
     code: string;
   }>, source: AuthSourceContext) {
     return this.guarded(async () => {
-      const prepared = await this.admit(source), record = await this.current(input.sessionToken, true), policy = this.dependencies.authPolicy.password;
+      const prepared = await this.admit(source), policy = this.dependencies.authPolicy.password;
+      await this.current(input.sessionToken, true);
       if (typeof input.password !== "string" || input.password.length < policy.minimumLength || policy.maximumLength !== null && input.password.length > policy.maximumLength || Buffer.byteLength(input.password, "utf8") > 1024)
         throw new PasswordResetError("PASSWORD_RESET_PASSWORD_INVALID");
-      if (!record.userId || !record.factorId || !record.factorSecret || record.nowMs === undefined || record.lastAcceptedStep === undefined)
+      // NV-17: the code is charged to the account's proof counter before it is matched; a refused reservation reads as INVALID.
+      const record = await this.repo.reserveProof(sessionHash(input.sessionToken), prepared, PASSWORD_RESET_PROOF_LOCK_MS);
+      if (record.status !== "READY")
+        throw new PasswordResetError("PASSWORD_RESET_INVALID");
+      if (!record.userId || !record.factorId || !record.factorSecret || typeof record.nowMs !== "number" || record.lastAcceptedStep === undefined)
         throw new PasswordResetError("PASSWORD_RESET_UNAVAILABLE");
       const key = await this.dependencies.users.load(record.userId);
       let secret: Buffer | undefined, step: number;
@@ -192,7 +201,7 @@ export class PasswordResetService implements PasswordResetApplication {
         secret = decrypt(key, record.factorSecret, ["identity", "mfa_factor.secret_ciphertext", record.factorId, "run:none", record.userId, `user-dek:${record.userId}`, "1"]);
         const match = matchTotpStep(secret, input.code, Math.floor(record.nowMs / (this.dependencies.mfaPolicy.totp.periodSeconds * 1000)), record.lastAcceptedStep);
         if (match.status !== "accepted") {
-          await this.repo.failure(sessionHash(input.sessionToken), prepared);
+          await this.repo.proofRefused(sessionHash(input.sessionToken), prepared);
           throw new PasswordResetError("PASSWORD_RESET_PROOF_INVALID");
         }
         step = match.step;

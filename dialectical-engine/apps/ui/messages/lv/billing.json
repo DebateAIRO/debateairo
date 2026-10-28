@@ -157,6 +157,7 @@
   "billing.subscription.withdrawNothingDue": "Gatavs. Jūsu plāns ir beidzies. Jau izmantotā daļa sedz visu cenu, tāpēc jums nekas nepienākas atpakaļ.",
   "billing.subscription.withdrawOwnerReview": "Jūsu plāns ir beidzies. Vienam no jūsu maksājumiem jau ir veikta atmaksa, tāpēc mēs pārbaudīsim, kas vēl pienākas, un 14 dienu laikā jums uzrakstīsim e-pastu.",
   "billing.subscription.withdrawWindowClosed": "14 dienu atteikuma termiņš ir beidzies, vai tas nav piemērojams jūsu dzīvesvietā. Jūs joprojām varat atcelt jebkurā laikā.",
+  "billing.subscription.withdrawDebateRunning": "Jūsu sāktās debates, iespējams, joprojām izmanto kredītu, tāpēc mēs vēl nevaram pateikt, cik daudz jūs izmantojāt. Lūdzu, mēģiniet vēlreiz vēlāk. Jums joprojām ir vairāk nekā diena, lai atteiktos.",
   "billing.subscription.stillConfirming": "Mēs to vēl apstiprinām ar maksājumu pakalpojumu sniedzēju. Pārbaudiet šo lapu vēlreiz pēc dažām minūtēm.",
   "billing.subscription.actionFailed": "Tas neizdevās. Lūdzu, mēģiniet vēlreiz.",
   "billing.subscription.invoices": "Rēķini",

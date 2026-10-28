@@ -68,8 +68,11 @@ export type FastCheckReading =
   /**
    * SKIPPED_DAY_POT / SPEND_RECORD_DOWN (Task 19 fix round 2, hosted only): nothing was sent — today's site pot is at
    * its ceiling (ruling L-POT), or the spend record is down (the breaker); the decider records the code beside the lock.
+   * SKIPPED_OWNER_BUDGET (security audit run 3, NV-47, the decider's own): nothing was sent, because the person's own
+   * count of paid checks for the window is spent.
    */
-  | Readonly<{ kind: "DOWN"; reason: "TIMEOUT" | "TRANSPORT" | "UNREADABLE" | "UNKNOWN_LANGUAGE" | "SKIPPED_DAY_POT" | "SPEND_RECORD_DOWN" }>
+  | Readonly<{ kind: "DOWN"; reason: "TIMEOUT" | "TRANSPORT" | "UNREADABLE" | "UNKNOWN_LANGUAGE" | "SKIPPED_DAY_POT" | "SPEND_RECORD_DOWN"
+    | "SKIPPED_OWNER_BUDGET" }>
   | Readonly<{ kind: "ONE"; main: QuestionLanguage }>
   | Readonly<{ kind: "MIX"; main: QuestionLanguage; seen: readonly QuestionLanguage[]; proposed: string }>
   /**

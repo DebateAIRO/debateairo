@@ -5,11 +5,18 @@ import { isIP } from "node:net";
 export const TRUSTED_CLIENT_IP_HEADER = "x-debateai-client-ip";
 /** C2b: the header a trusted reverse proxy must present alongside x-forwarded-for when a secret is configured. */
 export const EDGE_SECRET_HEADER = "x-debateai-edge-secret";
+/** NV-03: the UI-to-API proof, sent to the API with every forwarded address and on the readiness fetch. */
+export const UI_API_PROOF_HEADER = "x-debateai-ui-proof";
+/** NV-03: the API's answer on its /readyz: `accepted` or `refused`, absent when neither side holds a proof. */
+export const UI_API_PROOF_VERDICT_HEADER = "x-debateai-ui-proof-verdict";
 
 const FORWARDED_FOR_MAX_LENGTH = 512;
 const FORWARDED_FOR_MAX_HOPS = 8;
 const EDGE_SECRET_GRAMMAR = /^[A-Za-z0-9_-]{43,512}$/;
 const EDGE_SECRET_MAX_FILE_BYTES = 4096;
+/** NV-03: the process-wide slot server.mjs installs the checked proof in, shared by every copy of this module. */
+const UI_API_PROOF_SLOT = Symbol.for("debateai.ui.apiProof");
+let uiApiProofMissingNamed = false;
 
 function refuse(code) {
   const error = new TypeError(code);
@@ -61,25 +68,81 @@ export function parseTrustedProxies(text) {
  * is not exactly right refuses to start.
  */
 export function readEdgeSecret(path) {
+  return readSecretText(path, "DIALECTICAL_UI_EDGE_SECRET_INVALID");
+}
+
+/**
+ * NV-03: `DIALECTICAL_UI_API_PROOF_PATH` — the UI's copy of the UI-to-API proof (0400 to the UI user), read once at
+ * boot with the edge secret's rules; the API holds the same bytes. Unset means none; anything not exactly right
+ * refuses DIALECTICAL_UI_API_PROOF_INVALID.
+ */
+export function readUiApiProof(path) {
+  return readSecretText(path, "DIALECTICAL_UI_API_PROOF_INVALID");
+}
+
+/** A regular file with no group or other bits, at most 4096 bytes, holding the base64url grammar; null when unset. */
+function readSecretText(path, code) {
   if (path === undefined || path === "") return null;
-  if (typeof path !== "string" || path.trim() !== path) throw refuse("DIALECTICAL_UI_EDGE_SECRET_INVALID");
+  if (typeof path !== "string" || path.trim() !== path) throw refuse(code);
   let descriptor;
   try {
     descriptor = openSync(path, "r");
   } catch {
-    throw refuse("DIALECTICAL_UI_EDGE_SECRET_INVALID");
+    throw refuse(code);
   }
   try {
     const stat = fstatSync(descriptor);
     if (!stat.isFile() || (stat.mode & 0o077) !== 0 || stat.size > EDGE_SECRET_MAX_FILE_BYTES) {
-      throw refuse("DIALECTICAL_UI_EDGE_SECRET_INVALID");
+      throw refuse(code);
     }
     const text = readFileSync(descriptor, "utf8").trim();
-    if (!EDGE_SECRET_GRAMMAR.test(text)) throw refuse("DIALECTICAL_UI_EDGE_SECRET_INVALID");
+    if (!EDGE_SECRET_GRAMMAR.test(text)) throw refuse(code);
     return text;
   } finally {
     closeSync(descriptor);
   }
+}
+
+/**
+ * NV-03, at boot: outside `--dev` a website that trusts a proxy forwards visitors' addresses, so it must hold a proof
+ * to send with them (DIALECTICAL_UI_API_PROOF_REQUIRED: without it every visitor would be the loopback peer to the
+ * API). The proof must differ from the edge secret, which Caddy's group can read
+ * (DIALECTICAL_UI_API_PROOF_REUSES_EDGE_SECRET).
+ */
+export function assertUiApiProofPolicy({ development, trustedProxies, edgeSecret, uiApiProof }) {
+  if (development !== true && trustedProxies.length > 0 && uiApiProof === null) throw refuse("DIALECTICAL_UI_API_PROOF_REQUIRED");
+  if (edgeSecret !== null && uiApiProof !== null && edgeSecret === uiApiProof) {
+    throw refuse("DIALECTICAL_UI_API_PROOF_REUSES_EDGE_SECRET");
+  }
+}
+
+/**
+ * NV-03: installs the boot-checked proof (or null) for this process, once, after server.mjs's checks. It lives in a
+ * frozen `{ value }` record under a registry symbol on globalThis, so the route code Next bundles with its own copy
+ * of this module sees the same one; it is never put in the environment, so no child process or worker inherits it.
+ * Tests reset it with `installUiApiProof(null)` (installed, none), or delete
+ * `globalThis[Symbol.for("debateai.ui.apiProof")]` (never installed).
+ */
+export function installUiApiProof(value) {
+  if (value !== null && (typeof value !== "string" || !EDGE_SECRET_GRAMMAR.test(value))) {
+    throw refuse("DIALECTICAL_UI_API_PROOF_INVALID");
+  }
+  globalThis[UI_API_PROOF_SLOT] = Object.freeze({ value });
+}
+
+/**
+ * NV-03: the proof server.mjs installed, or null. A forwarder that finds no record at all behind server.mjs says so
+ * once (one content-free line per module copy) and sends none, so a bundle that does not share server.mjs's globals
+ * fails closed and visibly.
+ */
+export function installedUiApiProof() {
+  const record = globalThis[UI_API_PROOF_SLOT];
+  if (record !== null && typeof record === "object") return typeof record.value === "string" ? record.value : null;
+  if (process.env.DIALECTICAL_UI_EDGE === "server.mjs" && !uiApiProofMissingNamed) {
+    uiApiProofMissingNamed = true;
+    console.error(JSON.stringify({ event: "ui.api_proof.not_installed" }));
+  }
+  return null;
 }
 
 function edgeSecretMatches(expected, supplied) {
@@ -133,6 +196,7 @@ export function hardenIncomingProxyHeaders(headers, remoteAddress, trustedProxie
       || lower === "true-client-ip"
       || lower === TRUSTED_CLIENT_IP_HEADER
       || lower === EDGE_SECRET_HEADER
+      || lower === UI_API_PROOF_HEADER
       || lower === "content-security-policy"
       || lower === "content-security-policy-report-only"
       || lower === "x-nonce"

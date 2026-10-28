@@ -68,7 +68,7 @@ export const HR: CrisisLexicon = Object.freeze({
     { signal: "method", pattern: String.raw`\bbezboln(?:o|og|om) ${SUICIDE}(?:o|a|u)\b` },
     { signal: "method", pattern: String.raw`\b(?:${SUICIDE}o (?:pismo|plan)|oprostajno pismo prije ${SUICIDE}a|pakt o ${SUICIDE}u)\b` },
     { signal: "method", pattern: String.raw`\b(?:smrtonosn|smrtn|letaln)(?:a|u|e|oj) doz(?:a|u|e|i)\b` },
-    { signal: "method", pattern: String.raw`\bkoliko (?:[a-z]+ )?(?:tableta|tabletica|lijekova|pilula|apaurina|normabela|praksitena|paracetamola|ibuprofena|miligrama|grama|inzulina|inzulina|antidepresiva|alkohola)\b.{0,40}\b(?:za (?:predoziranje|smrt)|da (?:umrem|se predoziram|se ubijem)|ubija (?:covjeka|me)|me ubije|je smrtonosn)` },
+    { signal: "method", pattern: String.raw`\bkoliko (?:[a-z]{1,32} )?(?:tableta|tabletica|lijekova|pilula|apaurina|normabela|praksitena|paracetamola|ibuprofena|miligrama|grama|inzulina|inzulina|antidepresiva|alkohola)\b.{0,40}\b(?:za (?:predoziranje|smrt)|da (?:umrem|se predoziram|se ubijem)|ubija (?:covjeka|me)|me ubije|je smrtonosn)` },
     { signal: "method", pattern: String.raw`\b(?:s koje visine|sa koje visine|koliko visoko|koliko visok(?:a)?)\b.{0,40}\b(?:${DIE}|da umrem|se ubiti|ubije|je pad smrtonosan)\b` },
     { signal: "method", pattern: String.raw`\b(?:(?:objesit|objesiti|otrovat|otrovati|predozirat|predozirati|upucat|upucati) cu se|(?:objesicu|otrovacu) se|cu se (?:objesiti|otrovati|predozirati|upucati))\b` },
     { signal: "method", pattern: String.raw`\b${WANT} se (?:objesiti|otrovati|predozirati|utopiti|upucati|ustrijeliti)\b` },

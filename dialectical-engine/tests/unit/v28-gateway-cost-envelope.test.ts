@@ -1,6 +1,12 @@
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { describe, expect, it } from "vitest";
+import { TypedDomainError } from "@debateai/kernel";
 import {
   OpenAICompatibleProviderGateway,
+  PreviewChargeBookedMax,
+  PreviewGateUnavailable,
+  type OpenAICompatibleGatewayOptions,
   type ProviderCostEnvelopeSeam
 } from "@debateai/providers";
 import {
@@ -10,6 +16,7 @@ import {
   costEnvelopeDay,
   decideRunCostEnvelope,
   projectedCallCeilingMicros,
+  projectedCallUsage,
   providerUsageUnreported,
   readReportedUsage,
   runCostEnvelopeReached,
@@ -55,16 +62,18 @@ function vendorReporting(usage: unknown, calls: { count: number }): typeof fetch
  */
 function gatewayWith(
   fetchImplementation: typeof fetch,
-  costEnvelope: ProviderCostEnvelopeSeam
+  costEnvelope: ProviderCostEnvelopeSeam,
+  overrides: Partial<OpenAICompatibleGatewayOptions> = {}
 ) {
-  const ledger: Array<{ outcome: string }> = [];
+  const ledger: Array<{ outcome: string; attemptId?: string }> = [];
   const gateway = new OpenAICompatibleProviderGateway({
     endpoint: "http://fixture/v1", model: MODEL, maker: "fixture",
     fetchImplementation,
     sleepImplementation: async () => undefined,
     persistRawArtifact: async (artifact) => artifact.artifactId,
     appendLedgerEntry: async (entry) => { ledger.push(entry); return `ledger:${ledger.length}`; },
-    assertNoOpenWriteTransaction: () => undefined
+    assertNoOpenWriteTransaction: () => undefined,
+    ...overrides
   });
   return {
     gateway: { call: (extra: Record<string, unknown> = {}) =>
@@ -91,11 +100,17 @@ function callRequest(extra: Record<string, unknown> = {}) {
  * implementation of the rule — every line calls the same exported function the
  * runner does.
  */
-function meteredSeam(ceilingMicros: number, requireReportedUsage = false) {
+function meteredSeam(
+  ceilingMicros: number,
+  requireReportedUsage = false,
+  options: Readonly<{ failUnanswered?: boolean; failCharge?: boolean }> = {}
+) {
   const state = {
     spentMicros: 0,
     projections: [] as number[],
-    charges: [] as number[]
+    charges: [] as number[],
+    // NV-50: the attempts charged as sent and never answered, at their usage or else their projection.
+    unanswered: [] as Array<{ charge: number; attemptId: string }>
   };
   const seam: ProviderCostEnvelopeSeam = {
     assertCallAllowed: (projection) => {
@@ -112,10 +127,21 @@ function meteredSeam(ceilingMicros: number, requireReportedUsage = false) {
     // shipped seam uses, so a count this cannot read falls back to the call's
     // own projected maximum here exactly as it does in production.
     recordCall: (observed) => {
+      // NV-50 (case l): the store write failing untyped, as `PostgresModelSpendStore.recordSpend` can.
+      if (options.failCharge === true) throw new Error("db down");
       const usage = chargeableUsage(observed.usage, observed.projection);
       if (usage === null) return;
       const charge = chargeMicrosForUsage(PRICE, usage);
       state.charges.push(charge);
+      state.spentMicros += charge;
+    },
+    // NV-50: the shipped seam's rule, by the same exported functions: the body's usage when one was read, else the
+    // attempt's projected maximum.
+    recordUnanswered: async (observed) => {
+      if (options.failUnanswered === true) throw new Error("db down");
+      const usage = chargeableUsage(observed.usage, observed.projection) ?? projectedCallUsage(observed.projection);
+      const charge = chargeMicrosForUsage(PRICE, usage);
+      state.unanswered.push({ charge, attemptId: observed.attemptId });
       state.spentMicros += charge;
     },
     assertUsageReported: (observed) => {
@@ -498,5 +524,225 @@ describe("C-I1 a 200 carrying a real vendor's usage block is charged", () => {
       completion_tokens: OPENAI_USAGE.completion_tokens,
       total_tokens: OPENAI_USAGE.total_tokens
     });
+  });
+});
+
+/**
+ * NV-50 (security audit run 3) — A SENT ATTEMPT THAT NEVER ANSWERED IS CHARGED.
+ *
+ * The only charge point used to be `recordCall`, reached only once a body was read and its artifact stored. A deadline,
+ * a dropped connection or a store failure after the send went to the catch, which retried: each retry was admitted
+ * against a total that never saw the attempt before it. Now the catch charges such an attempt through the seam's
+ * `recordUnanswered` (the body's usage when one was read, else its projected maximum) before the next attempt is
+ * admitted; provably unsent failures (a connection never made, the preview gate's own refusals, fetch's argument
+ * checks) are not charged; and a charge that cannot be written stops the call.
+ */
+describe("NV-50 a sent attempt that never answered is charged", () => {
+  const timingOut = (sends: { count: number }): typeof fetch => async () => {
+    sends.count += 1;
+    throw new DOMException("timeout", "TimeoutError");
+  };
+  const throwing = (sends: { count: number }, error: () => unknown): typeof fetch => async () => {
+    sends.count += 1;
+    throw error();
+  };
+
+  it("(a) charges each timed-out attempt at its projection, under its ledger row's attempt id", async () => {
+    const sends = { count: 0 };
+    const { seam, state } = meteredSeam(1_000_000_000);
+    const { gateway, ledger } = gatewayWith(timingOut(sends), seam);
+
+    await expect(gateway.call()).rejects.toThrowError(expect.objectContaining({ code: "PROVIDER_CALL_FAILED" }));
+
+    expect(sends.count).toBe(3);
+    expect(ledger.map((entry) => entry.outcome)).toEqual(["TIMED_OUT", "TIMED_OUT", "TIMED_OUT"]);
+    expect(state.unanswered.map((entry) => entry.charge)).toEqual(state.projections);
+    expect(state.unanswered).toHaveLength(3);
+    const ids = state.unanswered.map((entry) => entry.attemptId);
+    expect(new Set(ids).size).toBe(3);
+    expect(ids).toEqual(ledger.map((entry) => entry.attemptId));
+    expect(state.charges).toEqual([]);
+  });
+
+  it("(b) charges a dropped connection (fetch failed, no cause)", async () => {
+    const sends = { count: 0 };
+    const { seam, state } = meteredSeam(1_000_000_000);
+    const { gateway, ledger } = gatewayWith(throwing(sends, () => new TypeError("fetch failed")), seam);
+
+    await expect(gateway.call()).rejects.toThrowError(expect.objectContaining({ code: "PROVIDER_CALL_FAILED" }));
+
+    expect(ledger.map((entry) => entry.outcome)).toEqual(["FAILED", "FAILED", "FAILED"]);
+    expect(state.unanswered).toHaveLength(3);
+  });
+
+  it("(c) guard: a connection that was never made is not charged", async () => {
+    const sends = { count: 0 };
+    const { seam, state } = meteredSeam(1_000_000_000);
+    const { gateway, ledger } = gatewayWith(throwing(sends, () => new TypeError("fetch failed", {
+      cause: Object.assign(new Error("connect"), { code: "ECONNREFUSED" })
+    })), seam);
+
+    await expect(gateway.call()).rejects.toThrowError(expect.objectContaining({ code: "PROVIDER_CALL_FAILED" }));
+
+    expect(ledger.map((entry) => entry.outcome)).toEqual(["FAILED", "FAILED", "FAILED"]);
+    expect(state.unanswered).toEqual([]);
+  });
+
+  it("(d) the run's ceiling stops the retries: the next attempt is refused for money after one unanswered charge", async () => {
+    // P = one attempt's projection, read off a probe call.
+    const probe = meteredSeam(1_000_000_000);
+    await gatewayWith(vendorReporting({ prompt_tokens: 1, completion_tokens: 1 }, { count: 0 }), probe.seam).gateway.call();
+    const projection = probe.state.projections[0]!;
+    const sends = { count: 0 };
+    const { seam, state } = meteredSeam(projection);
+    const { gateway } = gatewayWith(timingOut(sends), seam);
+
+    await expect(gateway.call()).rejects.toThrowError(
+      expect.objectContaining({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" })
+    );
+
+    expect(sends.count).toBe(1);
+    expect(state.unanswered.map((entry) => entry.charge)).toEqual([projection]);
+  });
+
+  it("(e) charges an answered attempt whose artifact could not be stored at the body's usage, not the projection", async () => {
+    const sends = { count: 0 };
+    const { seam, state } = meteredSeam(1_000_000_000);
+    const { gateway, ledger } = gatewayWith(
+      vendorReporting({ prompt_tokens: 10, completion_tokens: 5 }, sends), seam,
+      { persistRawArtifact: async () => { throw new Error("store down"); } }
+    );
+
+    await expect(gateway.call()).rejects.toThrowError(expect.objectContaining({ code: "PROVIDER_CALL_FAILED" }));
+
+    expect(sends.count).toBe(3);
+    expect(ledger.map((entry) => entry.outcome)).toEqual(["FAILED", "FAILED", "FAILED"]);
+    const answered = chargeMicrosForUsage(PRICE, { promptTokens: 10, completionTokens: 5 });
+    expect(state.unanswered.map((entry) => entry.charge)).toEqual([answered, answered, answered]);
+    expect(state.charges).toEqual([]);
+  });
+
+  it("(f) stops the call when the unanswered charge cannot be written: no attempt is sent on unrecorded money", async () => {
+    const sends = { count: 0 };
+    const { seam } = meteredSeam(1_000_000_000, false, { failUnanswered: true });
+    const { gateway, ledger } = gatewayWith(timingOut(sends), seam);
+
+    await expect(gateway.call()).rejects.toThrowError(expect.objectContaining({ code: "PROVIDER_CALL_FAILED" }));
+
+    expect(sends.count).toBe(1);
+    expect(ledger.map((entry) => entry.outcome)).toEqual(["TIMED_OUT"]);
+  });
+
+  it("(g) guard: a seam without recordUnanswered keeps today's three sends", async () => {
+    const sends = { count: 0 };
+    const { seam } = meteredSeam(1_000_000_000);
+    const { recordUnanswered: _absent, ...withoutUnanswered } = seam as ProviderCostEnvelopeSeam
+      & { recordUnanswered?: unknown };
+    const { gateway } = gatewayWith(timingOut(sends), withoutUnanswered);
+
+    await expect(gateway.call()).rejects.toThrowError(expect.objectContaining({ code: "PROVIDER_CALL_FAILED" }));
+
+    expect(sends.count).toBe(3);
+  });
+
+  it("(h) preview: the gate found halted before anything was reserved is not charged", async () => {
+    const sends = { count: 0 };
+    const { seam, state } = meteredSeam(1_000_000_000);
+    const { gateway } = gatewayWith(throwing(sends, () => new PreviewGateUnavailable()), seam);
+
+    await expect(gateway.call()).rejects.toThrowError();
+
+    expect(sends.count).toBeGreaterThan(0);
+    expect(state.unanswered).toEqual([]);
+  });
+
+  it("(i) preview: the gate's daily refusal stops the call and is not charged", async () => {
+    const sends = { count: 0 };
+    const { seam, state } = meteredSeam(1_000_000_000);
+    const { gateway } = gatewayWith(
+      throwing(sends, () => new TypedDomainError("DAILY_COST_ENVELOPE_REACHED", "x")), seam
+    );
+
+    await expect(gateway.call()).rejects.toThrowError(expect.objectContaining({ code: "DAILY_COST_ENVELOPE_REACHED" }));
+
+    expect(sends.count).toBe(1);
+    expect(state.unanswered).toEqual([]);
+  });
+
+  it("(j) preview: a call the gate says was sent and booked at its maximum is charged at its projection", async () => {
+    const sends = { count: 0 };
+    const { seam, state } = meteredSeam(1_000_000_000);
+    const { gateway } = gatewayWith(throwing(sends, () => new PreviewChargeBookedMax()), seam);
+
+    await expect(gateway.call({ bound: { maxAttempts: 1, tokenCeiling: 64, deadlineMs: 5_000 } }))
+      .rejects.toThrowError(expect.objectContaining({ code: "PROVIDER_CALL_FAILED" }));
+
+    expect(sends.count).toBe(1);
+    expect(state.unanswered.map((entry) => entry.charge)).toEqual([state.projections[0]]);
+  });
+
+  it("(k) guard: a TypeError the in-process fetch raises before sending is not charged", async () => {
+    const sends = { count: 0 };
+    const { seam, state } = meteredSeam(1_000_000_000);
+    const { gateway } = gatewayWith(
+      throwing(sends, () => new TypeError("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID")), seam
+    );
+
+    await expect(gateway.call()).rejects.toThrowError();
+
+    expect(state.unanswered).toEqual([]);
+  });
+
+  it("(l) stops the call when recordCall's own store write fails: one send, nothing charged twice", async () => {
+    const sends = { count: 0 };
+    const { seam, state } = meteredSeam(1_000_000_000, false, { failCharge: true });
+    const { gateway } = gatewayWith(vendorReporting({ prompt_tokens: 10, completion_tokens: 5 }, sends), seam);
+
+    await expect(gateway.call()).rejects.toThrowError(expect.objectContaining({ code: "PROVIDER_CALL_FAILED" }));
+
+    expect(sends.count).toBe(1);
+    expect(state.unanswered).toEqual([]);
+  });
+
+  /**
+   * Review r2 minor 10: rule 5 reads Node's own fetch failure by its message. These two run the REAL fetch against a
+   * loopback port (nothing leaves the machine), so a Node that renames "fetch failed" or its causes reddens here first.
+   */
+  it("(m) real fetch: a refused connection is \"fetch failed\" with an ECONNREFUSED cause, and is not charged", async () => {
+    const server = createServer();
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as AddressInfo;
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    const refused = await fetch(`http://127.0.0.1:${port}/v1/chat/completions`, { method: "POST", body: "{}" })
+      .then(() => null, (error: unknown) => error);
+    expect(refused).toBeInstanceOf(TypeError);
+    expect((refused as TypeError).message).toBe("fetch failed");
+    expect(((refused as TypeError).cause as { code?: unknown }).code).toBe("ECONNREFUSED");
+
+    const { seam, state } = meteredSeam(1_000_000_000);
+    const { gateway } = gatewayWith(fetch, seam, { endpoint: `http://127.0.0.1:${port}/v1` });
+    await expect(gateway.call()).rejects.toThrowError(expect.objectContaining({ code: "PROVIDER_CALL_FAILED" }));
+    expect(state.unanswered).toEqual([]);
+  });
+
+  it("(n) real fetch: a connection dropped after the request arrived is charged on every attempt", async () => {
+    let received = 0;
+    const server = createServer((request) => {
+      request.resume();
+      request.on("end", () => { received += 1; request.socket.destroy(); });
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as AddressInfo;
+    try {
+      const { seam, state } = meteredSeam(1_000_000_000);
+      const { gateway } = gatewayWith(fetch, seam, { endpoint: `http://127.0.0.1:${port}/v1` });
+      const failed = await gateway.call().then(() => null, (error: unknown) => error);
+      expect(failed).toMatchObject({ code: "PROVIDER_CALL_FAILED" });
+      expect(received).toBe(3);
+      expect(state.unanswered.map((entry) => entry.charge)).toEqual(state.projections);
+      expect(state.unanswered).toHaveLength(3);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 });

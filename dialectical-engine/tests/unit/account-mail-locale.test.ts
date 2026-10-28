@@ -252,7 +252,7 @@ describe("C12.6 services: the request's mail language reaches each account sende
   it("sends the email-change confirmation and the notice in the request's language", async () => {
     const mail = new (await import("../../apps/api/src/mail-channel.js")).MemoryEmailChangeMailSender();
     const service = new EmailChangeService({
-      repository: { request: async () => ({ status: "PENDING", currentEmailCiphertext: sealed("current@example.test"), serviceExpiresAt, addressAvailable: true }) } as never,
+      repository: { requestBounded: async () => ({ status: "PENDING", currentEmailCiphertext: sealed("current@example.test"), serviceExpiresAt, addressAvailable: true }) } as never,
       users: users as never, blindIndexKey: randomBytes(32), mail, tokenFactory: () => "t".repeat(43)
     });
     await service.request(session as never, { newEmail: "new@example.test", grantToken }, requestSource("ro"));
@@ -264,7 +264,7 @@ describe("C12.6 services: the request's mail language reaches each account sende
   it("sends the address-unavailable note in the request's language", async () => {
     const mail = new (await import("../../apps/api/src/mail-channel.js")).MemoryEmailChangeMailSender();
     const service = new EmailChangeService({
-      repository: { request: async () => ({ status: "PENDING", currentEmailCiphertext: sealed("current@example.test"), serviceExpiresAt, addressAvailable: false }) } as never,
+      repository: { requestBounded: async () => ({ status: "PENDING", currentEmailCiphertext: sealed("current@example.test"), serviceExpiresAt, addressAvailable: false }) } as never,
       users: users as never, blindIndexKey: randomBytes(32), mail, tokenFactory: () => "t".repeat(43)
     });
     await service.request(session as never, { newEmail: "taken@example.test", grantToken }, requestSource("ro"));
@@ -274,7 +274,7 @@ describe("C12.6 services: the request's mail language reaches each account sende
   it("sends the resent confirmation in the request's language", async () => {
     const mail = new (await import("../../apps/api/src/mail-channel.js")).MemoryEmailChangeMailSender();
     const service = new EmailChangeService({
-      repository: { resend: async () => ({ status: "RESENT", newEmailCiphertext: sealed("new@example.test"), serviceExpiresAt, addressAvailable: true }) } as never,
+      repository: { resendBounded: async () => ({ status: "RESENT", newEmailCiphertext: sealed("new@example.test"), serviceExpiresAt, addressAvailable: true }) } as never,
       users: users as never, blindIndexKey: randomBytes(32), mail, tokenFactory: () => "t".repeat(43)
     });
     await service.resend(session as never, requestSource("ro"));
@@ -284,7 +284,7 @@ describe("C12.6 services: the request's mail language reaches each account sende
   it("sends an email change with no request language in English (D4)", async () => {
     const mail = new (await import("../../apps/api/src/mail-channel.js")).MemoryEmailChangeMailSender();
     const service = new EmailChangeService({
-      repository: { request: async () => ({ status: "PENDING", currentEmailCiphertext: sealed("current@example.test"), serviceExpiresAt, addressAvailable: true }) } as never,
+      repository: { requestBounded: async () => ({ status: "PENDING", currentEmailCiphertext: sealed("current@example.test"), serviceExpiresAt, addressAvailable: true }) } as never,
       users: users as never, blindIndexKey: randomBytes(32), mail, tokenFactory: () => "t".repeat(43)
     });
     await service.request(session as never, { newEmail: "new@example.test", grantToken }, requestSource());

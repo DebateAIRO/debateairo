@@ -52,10 +52,21 @@ export const GROK_THINKING_LEVELS = Object.freeze(["low", "medium", "high", "xhi
 const GROK_MODEL_SELECTION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
 export const GROK_HANDSHAKE_PROMPT =
   "GROK-01 acceptance transport handshake. Reply with the single word: OK" as const;
+/**
+ * NV-53: a grok reply is served only when its envelope shows ONE model turn that ended normally.
+ * grok 1.0.0 (rev1 capture) and 1.0.41 (M4 capture, 2026-09-26) both print `num_turns: 1` and
+ * `stopReason: "end_turn"` for a plain answer. A reply that took tool turns may carry what a tool read, so it
+ * is refused before its text is read (the agy relay's AGY_CLI_TOOL_DENIED precedent). A missing turn count is
+ * refused too.
+ */
+export const GROK_CLI_TOOL_TURNS = "GROK_CLI_TOOL_TURNS" as const;
+export const GROK_CLI_STOP_REASON_UNEXPECTED = "GROK_CLI_STOP_REASON_UNEXPECTED" as const;
+const GROK_STOP_REASON_END_TURN = "end_turn" as const;
 
 const envelopeSchema = z.object({
   text: z.string(),
   stopReason: z.string().trim().min(1),
+  num_turns: z.unknown().optional(),
   total_cost_usd: z.number().nonnegative().optional(),
   modelUsage: z.record(z.string().trim().min(1), z.unknown())
 }).passthrough();
@@ -88,6 +99,11 @@ function parseGrokEnvelope(stdout: string): {
   }
   const envelope = envelopeSchema.safeParse(decoded);
   if (!envelope.success) throw new CliRelayFailure("FAILED", "GROK_CLI_OUTPUT_INVALID");
+  // NV-53: checked FIRST, before the text is read. A tool's output must never become a debate turn.
+  if (envelope.data.num_turns !== 1) throw new CliRelayFailure("FAILED", GROK_CLI_TOOL_TURNS);
+  if (envelope.data.stopReason !== GROK_STOP_REASON_END_TURN) {
+    throw new CliRelayFailure("FAILED", GROK_CLI_STOP_REASON_UNEXPECTED);
+  }
   const content = envelope.data.text.trim();
   if (content.length === 0) throw new CliRelayFailure("FAILED", "GROK_CLI_OUTPUT_INVALID");
   const reportedModels = Object.keys(envelope.data.modelUsage);
@@ -151,6 +167,7 @@ function grokArguments(
     "--no-memory",
     "--no-subagents",
     "--disable-web-search",
+    // grok's only tools-off flag; NV-53's envelope check refuses any reply that still took a tool turn.
     "--tools", "",
     // §2.2: APPENDED only when a level was asked, so an unasked call carries no
     // level flag (and the sandbox probe's flag list is the same at every level).
@@ -212,6 +229,12 @@ function failureCodeOf(error: unknown): string {
     : "GROK_CLI_FAILED";
 }
 
+/** NV-53: an envelope refusal says what grok DID, never that the host cannot apply the profile. */
+function isEnvelopeRefusal(error: unknown): boolean {
+  return error instanceof CliRelayFailure
+    && (error.message === GROK_CLI_TOOL_TURNS || error.message === GROK_CLI_STOP_REASON_UNEXPECTED);
+}
+
 /**
  * F-GROK-SANDBOX-PROFILE outcome (2). The relay asks for its sandbox profile
  * FIRST and only accepts an unprotected transport once it has evidence that the
@@ -240,6 +263,9 @@ function failureCodeOf(error: unknown): string {
  * costs THREE — two sandboxed, then the unsandboxed probe — and only a host
  * that refuses the profile twice ever pays for the third. (The readiness packet
  * still says two: a records line for the orchestrator, not an edit here.)
+ *
+ * An envelope refusal (NV-53) is not profile evidence: it is re-thrown at once
+ * and never reaches the unsandboxed probe.
  */
 async function handshakeWithProbedSandbox(
   command: CommandSpec,
@@ -266,12 +292,14 @@ async function handshakeWithProbedSandbox(
   try {
     return kept(await sandboxedHandshake());
   } catch (sandboxedFailure) {
+    if (isEnvelopeRefusal(sandboxedFailure)) throw sandboxedFailure;
     originalFailure = sandboxedFailure;
   }
   try {
     // The retry is the discriminator between "unlucky once" and "this host".
     return kept(await sandboxedHandshake());
-  } catch {
+  } catch (retryFailure) {
+    if (isEnvelopeRefusal(retryFailure)) throw retryFailure;
     // REPRODUCED. Only now is the profile a candidate, and the ORIGINAL failure
     // stays the one reported: it is what the run was actually refused with.
   }

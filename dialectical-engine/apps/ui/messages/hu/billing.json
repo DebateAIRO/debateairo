@@ -157,6 +157,7 @@
   "billing.subscription.withdrawNothingDue": "Kész. A csomagja véget ért. A már felhasznált rész fedezi a teljes árat, ezért nem jár vissza semmi.",
   "billing.subscription.withdrawOwnerReview": "A csomagja véget ért. Az egyik fizetésére már történt visszatérítés, ezért ellenőrizzük, mi jár még vissza, és 14 napon belül e-mailben jelentkezünk.",
   "billing.subscription.withdrawWindowClosed": "A 14 napos elállási idő lejárt, vagy az Ön lakóhelyén nem alkalmazandó. Lemondani továbbra is bármikor lehet.",
+  "billing.subscription.withdrawDebateRunning": "Egy Ön által indított vita talán még kreditet használ, ezért még nem tudjuk megmondani, mennyit használt fel. Kérjük, próbálja újra később. Az elálláshoz még több mint egy napja van.",
   "billing.subscription.stillConfirming": "Ezt még egyeztetjük a fizetési szolgáltatóval. Néhány perc múlva nézze meg újra ezt az oldalt.",
   "billing.subscription.actionFailed": "Ez nem sikerült. Kérjük, próbálja újra.",
   "billing.subscription.invoices": "Számlák",

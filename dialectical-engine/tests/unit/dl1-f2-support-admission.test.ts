@@ -88,7 +88,11 @@ function harness(policy: AdmissionPolicy | null = PUBLISHED) {
     // Composed so the case read reaches the admission gate instead of 503.
     caseAccess: Object.freeze({
       listOwn: async () => [], readByToken, replyByToken
-    }) as NonNullable<Parameters<typeof supportHarness>[0]>["caseAccess"]
+    }) as NonNullable<Parameters<typeof supportHarness>[0]>["caseAccess"],
+    // NV-32: composed so the escalate route reaches its admission gate instead of 503.
+    cases: Object.freeze({
+      open: vi.fn(), openOnce: vi.fn()
+    }) as NonNullable<Parameters<typeof supportHarness>[0]>["cases"]
   });
   const api = buildApi({
     application: fixtureAskApplication(),
@@ -116,6 +120,11 @@ function harness(policy: AdmissionPolicy | null = PUBLISHED) {
     readSession: (remoteAddress: string, id: string, token: string) => api.inject({
       method: "GET", url: `/v1/support/sessions/${id}`, remoteAddress,
       headers: { "x-support-session-token": token }
+    }),
+    escalate: (remoteAddress: string, id: string, token: string) => api.inject({
+      method: "POST", url: `/v1/support/sessions/${id}/escalate`, remoteAddress,
+      headers: { origin: TEST_APP_ORIGIN, "x-support-session-token": token },
+      payload: {}
     }),
     createAnonymous: (remoteAddress: string) => api.inject({
       method: "POST", url: "/v1/support/sessions", remoteAddress,
@@ -307,6 +316,62 @@ describe("DL1-F2 the case reply is metered like the case read", () => {
   });
 });
 
+/**
+ * NV-32 (security fixes run 3). `POST /v1/support/sessions/{id}/escalate` needs only an anonymously obtainable session
+ * bearer, and it took the session read and then the case transaction on the support pool with no per-source budget in
+ * front. It now charges the same `supportReads` budget as the session read and the case doors, before either.
+ */
+describe("NV-32 the case-open door is metered like the case doors", () => {
+  const sessionId = "11111111-1111-4111-8111-111111111111";
+
+  it("charges and refuses on the per-source read budget before the session read", async () => {
+    const h = harness(policyWith({
+      support_reads: { key: "source", limit: 2, window_ms: QUARTER_MS, capacity: 64 }
+    }));
+    const unknown = "z".repeat(43);
+    try {
+      // Admitted: the route reads the session, misses, and answers the unknown bearer.
+      for (let index = 0; index < 2; index += 1) {
+        const missed = await h.escalate(SOURCE_A, sessionId, unknown);
+        expect(missed.statusCode, `escalation ${index + 1}`).toBe(404);
+        expect(missed.json()).toEqual({ error: "NOT_FOUND" });
+      }
+      expect(h.support.spies.read).toHaveBeenCalledTimes(2);
+      h.support.spies.read.mockClear();
+
+      const refused = await h.escalate(SOURCE_A, sessionId, unknown);
+      expect(refused.statusCode).toBe(429);
+      expect(refused.json()).toEqual(REFUSAL);
+      expect(refused.headers["retry-after"]).toBe("900");
+      // Refused at the door: no session read, so no case transaction either.
+      expect(h.support.spies.read).not.toHaveBeenCalled();
+      expect(h.refusalLines()).toContainEqual({
+        event: "api.admission.refused", route: "POST /v1/support/sessions/{id}/escalate",
+        reason: "LIMIT", windowMs: QUARTER_MS
+      });
+      // The same budget the session read spends.
+      expect((await h.readSession(SOURCE_A, sessionId, unknown)).statusCode).toBe(429);
+
+      // Another source is untouched.
+      expect((await h.escalate(SOURCE_B, sessionId, unknown)).statusCode).toBe(404);
+    } finally {
+      await h.close();
+    }
+  });
+
+  it("leaves a composition without the published budget unlimited, exactly as today", async () => {
+    const h = harness(SEALED);
+    try {
+      for (let index = 0; index < 20; index += 1) {
+        expect((await h.escalate(SOURCE_A, sessionId, "z".repeat(43))).statusCode, `escalation ${index + 1}`)
+          .toBe(404);
+      }
+    } finally {
+      await h.close();
+    }
+  });
+});
+
 describe("DL1-F2 the status aggregate is answered from a cache", () => {
   it("asks the repository once per window, however many callers arrive", async () => {
     const h = harness();
@@ -446,9 +511,11 @@ describe("DL1-F2 the read budget is keyed on the network, not the address", () =
       for (const address of ["2001:db8:1:2::1", "2001:db8:1:2::2", "2001:db8:1:2::3"]) {
         expect((await h.status(address)).statusCode, address).toBe(200);
       }
-      // One /64 has taken exactly one slot, so two real sources still fit.
+      // One /64 has taken exactly one slot. The table is now full, so the next
+      // new source gives up the least-evidenced entry (the one-shot
+      // `2001:db8:9:9::/64`) instead of being refused (NV-19).
       expect((await h.status("2001:db8:9:9::1")).statusCode).toBe(200);
-      expect((await h.status(SOURCE_A)).statusCode).toBe(429);
+      expect((await h.status(SOURCE_A)).statusCode).toBe(200);
     } finally {
       await h.close();
     }

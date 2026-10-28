@@ -229,7 +229,9 @@ describe("DL7-F7 a synchronous boot decision answers to the ledger too", () => {
       "loadKekRing(",
       "new FileUserDekStore(",
       "new FileRunContentKeyStore(",
-      "new FilePublicationKeyStore("
+      "new FilePublicationKeyStore(",
+      // NV-03: the UI-to-API proof refuses a hosted boot without it, and a file outside its grammar.
+      "loadUiApiProof("
     ]) {
       const found = [...source.matchAll(literal(decision))]
         .map((match) => match.index)

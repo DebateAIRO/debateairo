@@ -1,4 +1,3 @@
-import { tsImport } from 'tsx/esm/api';
 import { join } from 'node:path';
 import { fileURLToPath,pathToFileURL } from 'node:url';
 import { withPrivateBytes,strictJson,exactKeys,refuse,sha256 } from './custody.mjs';
@@ -6,6 +5,7 @@ import { RELEASE_LABEL,readPublicArtifact } from './launch-plan.mjs';
 import { DATABASE_AHEAD_MAX_BYTES,DATABASE_AHEAD_ROOT,databaseAheadPathForLabel,newerManifestMatches,validateDatabaseAheadFile } from './database-ahead.mjs';
 import { verifySourceManifest,operatorManifestSha256 } from './source-manifest.mjs';
 import { withActiveNativePool } from './native-peer.mjs';
+import { loadTsxApi } from './tsx-api.mjs';
 const NATIVE_PLAN_KEYS=['schema','operation','sourceRoot','sourceRevision','sourceTree','sourceManifest','operatorManifestSha256','selectedBaseRegisterVersion','selectedBaseSnapshotSha256','publicationId','approval'];
 /**
  * The one reviewed non-default checker choice a plan may carry (publish-register-v2.ts PreviewCheckerChoice).
@@ -246,8 +246,11 @@ export async function runNativeOperator(argv=process.argv.slice(2)) {
  // Owner rulings 2026-10-13: a plan with the owner's hosted-billing inputs composes with kit v3 (hosted rows); every
  // other plan with kit v2, exactly as before.
  const hosted=Object.hasOwn(plan,'hostedBilling');
+ const {tsImport,restoreCacheSwitch}=await loadTsxApi();
  const [db,lineage,register,publisher,verify]=await Promise.all([tsImport(join(engine,'packages/db/src/index.ts'),import.meta.url),tsImport(join(engine,'packages/db/src/migration-lineage.ts'),import.meta.url),tsImport(join(engine,'packages/register/src/index.ts'),import.meta.url),tsImport(hosted?'./publish-register-v3.ts':'./publish-register-v2.ts',import.meta.url),tsImport('./verify-native.ts',import.meta.url)]);
  const migration=await lineage.loadMigrationPlan();
+ // NV-54: tsx chose its Map cache when loadTsxApi evaluated it; the peer actor check admits only PATH/LANG/LC_ALL/TZ.
+ restoreCacheSwitch();
  return withActiveNativePool({publicPeerModule:'/opt/debateai-v3-preview/operator/recovery106-v1/native-common106.mjs',auth106Names:migration.manifest.cohorts.auth106,peerArguments},async pool=>{
   if(plan.operation==='apply-and-plan')await db.migrate(pool);
   const base=await publisher.readSealedSnapshot(pool,plan.selectedBaseRegisterVersion);

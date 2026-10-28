@@ -4,7 +4,7 @@ import {
   AGE_REFUSAL_COOKIE_NAME,
   AGE_REFUSAL_COOKIE_VALUE
 } from "@debateai/contract";
-import { normalizeClientIp, TRUSTED_CLIENT_IP_HEADER } from "../../../trusted-client-ip.mjs";
+import { installedUiApiProof, normalizeClientIp, TRUSTED_CLIENT_IP_HEADER, UI_API_PROOF_HEADER } from "../../../trusted-client-ip.mjs";
 
 type ProxyContext = Readonly<{
   params: Promise<Readonly<{ path: string[] }>>;
@@ -140,7 +140,12 @@ function createUpstreamHeaders(request: Request): Headers {
   const cookie = filteredSessionCookies(request.headers.get("cookie"));
   if (cookie !== null) headers.set("cookie", cookie);
   const clientIp = behindOwnEdge() ? normalizeClientIp(request.headers.get(TRUSTED_CLIENT_IP_HEADER)) : null;
-  if (clientIp !== null) headers.set("x-forwarded-for", clientIp);
+  if (clientIp !== null) {
+    headers.set("x-forwarded-for", clientIp);
+    // NV-03: the proof travels with the forwarded address: the API honours it only from a loopback peer that has one.
+    const proof = installedUiApiProof();
+    if (proof !== null) headers.set(UI_API_PROOF_HEADER, proof);
+  }
   return headers;
 }
 

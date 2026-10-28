@@ -1,6 +1,8 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
 import { buildApi, type AskApplication } from "@debateai/api";
 import type { LegacyRunClaimApplication } from "../../apps/api/src/legacy-claim.js";
+import { MfaVerificationLimiter } from "../../apps/api/src/mfa.js";
 import {
   RETIRED_DEV_HEADER,
   TEST_APP_ORIGIN,
@@ -35,12 +37,13 @@ function application(): AskApplication {
   };
 }
 
-function buildClaimApi(claim: LegacyRunClaimApplication["claim"]) {
+function buildClaimApi(claim: LegacyRunClaimApplication["claim"], sourceLimiter?: MfaVerificationLimiter) {
   return buildApi({
     application: application(),
     sessions: testSessionApplication([identity]),
     allowedOrigin: TEST_APP_ORIGIN,
-    legacyRunClaim: { claim }
+    legacyRunClaim: { claim },
+    ...(sourceLimiter === undefined ? {} : { legacyRunClaimSourceLimiter: sourceLimiter })
   });
 }
 
@@ -122,5 +125,72 @@ describe("S9 legacy-token retirement HTTP boundary", () => {
     expect(response.json()).toEqual({ error: "SESSION_REQUIRED" });
     expect(claim).toHaveBeenCalledOnce();
     await api.close();
+  });
+
+  // NV-01 (security audit run 3): the claim was an unbounded guessing oracle.
+  it("refuses a source past its claim ceiling with 429 before the token reaches the application", async () => {
+    const claim = vi.fn<LegacyRunClaimApplication["claim"]>(async () => ({
+      status: "NO_MATCH",
+      claimedCount: 0
+    }));
+    const limiter = new MfaVerificationLimiter({
+      windowMs: 3_600_000, perEnrollment: 2, perSourceAcrossAccounts: 2, temporaryLockMs: 3_600_000, capacity: 100
+    });
+    const diagnostic = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const api = buildClaimApi(claim, limiter);
+    try {
+      const responses = [];
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        responses.push(await api.inject({
+          method: "POST",
+          url: "/v1/account/legacy-runs/claim",
+          headers: testSessionHeaders(identity, true),
+          payload: { legacy_token: `old-browser-token-${attempt}` }
+        }));
+      }
+      expect(responses.map((response) => response.statusCode)).toEqual([200, 200, 429]);
+      expect(responses[2]!.headers["retry-after"]).toBe("3600");
+      expect(responses[2]!.json()).toEqual({ error: "ADMISSION_RATE_LIMITED", message: "ADMISSION_RATE_LIMITED" });
+      expect(claim).toHaveBeenCalledTimes(2);
+      expect(diagnostic).toHaveBeenCalledWith(JSON.stringify({
+        event: "api.admission.refused", route: "POST /v1/account/legacy-runs/claim",
+        reason: "LEGACY_CLAIM_SOURCE", windowMs: 3_600_000
+      }));
+    } finally {
+      diagnostic.mockRestore();
+      await api.close();
+    }
+  });
+
+  it("answers the account budget's refusal as 429 with its retry-after, not as a schema failure", async () => {
+    const claim = vi.fn<LegacyRunClaimApplication["claim"]>(async () => ({
+      status: "RATE_LIMITED",
+      claimedCount: 0,
+      retryAfterMs: 1_500
+    }));
+    const diagnostic = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const api = buildClaimApi(claim);
+    try {
+      const response = await api.inject({
+        method: "POST",
+        url: "/v1/account/legacy-runs/claim",
+        headers: testSessionHeaders(identity, true),
+        payload: { legacy_token: "old-browser-token" }
+      });
+      expect(response.statusCode).toBe(429);
+      expect(response.headers["retry-after"]).toBe("2");
+      expect(response.json()).toEqual({ error: "ADMISSION_RATE_LIMITED", message: "ADMISSION_RATE_LIMITED" });
+      expect(claim).toHaveBeenCalledOnce();
+    } finally {
+      diagnostic.mockRestore();
+      await api.close();
+    }
+  });
+
+  it("wires the source limiter and the account budget in main", async () => {
+    const main = await readFile(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
+    expect(main).toContain("new MfaVerificationLimiter(LEGACY_RUN_CLAIM_SOURCE_POLICY)");
+    expect(main).toContain("legacyRunClaimSourceLimiter");
+    expect(main).toContain("LEGACY_RUN_CLAIM_ACCOUNT_POLICY");
   });
 });

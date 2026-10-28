@@ -157,6 +157,7 @@
   "billing.subscription.withdrawNothingDue": "C’est fait. Votre formule a pris fin. La part déjà utilisée couvre la totalité du prix ; aucun montant ne vous était donc dû.",
   "billing.subscription.withdrawOwnerReview": "Votre formule a pris fin. Un remboursement a déjà été effectué sur l’un de vos paiements ; nous vérifierons donc ce qui reste dû et vous écrirons par e-mail sous 14 jours.",
   "billing.subscription.withdrawWindowClosed": "Le délai de rétractation de 14 jours est écoulé, ou il ne s’applique pas là où vous résidez. Vous pouvez toujours résilier à tout moment.",
+  "billing.subscription.withdrawDebateRunning": "Un débat que vous avez lancé utilise peut-être encore du crédit, nous ne pouvons donc pas encore savoir combien vous en avez utilisé. Veuillez réessayer plus tard. Il vous reste plus d’un jour pour vous rétracter.",
   "billing.subscription.stillConfirming": "Nous attendons encore la confirmation du prestataire de paiement. Revenez sur cette page dans quelques minutes.",
   "billing.subscription.actionFailed": "Cela n’a pas fonctionné. Veuillez réessayer.",
   "billing.subscription.invoices": "Factures",

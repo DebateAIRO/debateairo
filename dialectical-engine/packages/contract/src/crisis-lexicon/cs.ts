@@ -61,7 +61,7 @@ export const CS: CrisisLexicon = Object.freeze({
     { signal: "method", pattern: String.raw`\bbezbolestn(?:a|e|ou) sebevrazd(?:a|u|y)\b` },
     { signal: "method", pattern: String.raw`\bsebevrazedn(?:y|i) (?:dopis|plan|pakt|metod[ay])\b` },
     { signal: "method", pattern: String.raw`\bsmrteln(?:a|ou|e) davk(?:a|u|y)\b` },
-    { signal: "method", pattern: String.raw`\bkolik (?:[a-z]+ )?(?:prasku|tablet|tabletek|leku|paralenu|ibalginu|paracetamolu|ibuprofenu|miligramu|gramu|inzulinu|insulinu|hypnotik|antidepresiv|alkoholu)\b.{0,40}\b(?:k (?:predavkovani|smrti|umrti)|abych (?:umrel|umrela|zemrel|zemrela|se predavkoval|se predavkovala|se zabil|se zabila)|na predavkovani|zabije (?:cloveka|me))\b` },
+    { signal: "method", pattern: String.raw`\bkolik (?:[a-z]{1,32} )?(?:prasku|tablet|tabletek|leku|paralenu|ibalginu|paracetamolu|ibuprofenu|miligramu|gramu|inzulinu|insulinu|hypnotik|antidepresiv|alkoholu)\b.{0,40}\b(?:k (?:predavkovani|smrti|umrti)|abych (?:umrel|umrela|zemrel|zemrela|se predavkoval|se predavkovala|se zabil|se zabila)|na predavkovani|zabije (?:cloveka|me))\b` },
     { signal: "method", pattern: String.raw`\b(?:z jake vysky|jak vysoko|jak vysok(?:y|a))\b.{0,40}\b(?:umrit|zemrit|abych (?:umrel|umrela)|se zabit|to zabije|je pad smrteln(?:y|ej))\b` },
     { signal: "method", pattern: String.raw`\b(?:(?:obesim|predavkuju|predavkuji|zastrelim|otravim) se|se (?:obesim|predavkuju|predavkuji|zastrelim))\b` },
     { signal: "method", pattern: String.raw`\b${WANT} se (?:obesit|predavkovat|otravit|utopit|zastrelit)\b` },

@@ -358,3 +358,66 @@ describe("M1 migration 0075 — ledger.model_spend.spend_phase", () => {
       .rejects.toThrowError(/append-only or immutable table model_spend rejects UPDATE/u);
   });
 });
+
+/**
+ * NV-50 (security audit run 3), migration 0125 — AN ATTEMPT THE GATEWAY SENT AND NEVER GOT AN ANSWER FOR is a row of
+ * its own source: `RUN_UNANSWERED` (a debate call) or `STORY_UNANSWERED` (a story call). Its run's (or story's) envelope
+ * and the site's day count it; it always names its run and its attempt, and never carries a phase.
+ */
+describe("NV-50 migration 0125 — unanswered attempts", () => {
+  const unanswered = (source: "RUN_UNANSWERED" | "STORY_UNANSWERED", runId: string, chargeMicros: number, chargedOn: string) => ({
+    spendId: randomUUID(), spendSource: source, runId, providerRef: "provider-1", chargedOn,
+    chargeMicros, inputTokens: 1, outputTokens: 1, attemptId: randomUUID()
+  });
+
+  it("counts a RUN_UNANSWERED row in its run and its day, and not in its story", async () => {
+    const store = new PostgresModelSpendStore(database.pool);
+    const runId = await createLegacyRun();
+    const day = "2026-04-04";
+    await store.recordSpend(unanswered("RUN_UNANSWERED", runId, 70, day));
+    await insertRunCharge(store, runId, 30, day);
+
+    expect(await store.readRunSpentMicros(runId)).toBe(100);
+    expect(await store.readDaySpentMicros(day)).toBe(100);
+    expect(await store.readRunStorySpentMicros(runId)).toBe(0);
+  });
+
+  it("counts a STORY_UNANSWERED row in its story and its day, and not in the debate's envelope", async () => {
+    const store = new PostgresModelSpendStore(database.pool);
+    const runId = await createLegacyRun();
+    const day = "2026-04-05";
+    await store.recordSpend(unanswered("STORY_UNANSWERED", runId, 40, day));
+
+    expect(await store.readRunStorySpentMicros(runId)).toBe(40);
+    expect(await store.readRunSpentMicros(runId)).toBe(0);
+    expect(await store.readDaySpentMicros(day)).toBe(40);
+  });
+
+  it("refuses an unanswered row without its attempt or with a phase, and a source outside the list", async () => {
+    const runId = await createLegacyRun();
+    const insert = (source: string, attemptId: string | null, phase: string | null) => database.pool.query(
+      `INSERT INTO ledger.model_spend
+         (spend_id, spend_source, run_id, provider_ref, charged_on, charge_micros, input_tokens, output_tokens, spend_phase, attempt_id)
+       VALUES ($1,$2,$3,'provider-1',current_date,1,1,1,$4,$5)`,
+      [randomUUID(), source, runId, phase, attemptId]
+    );
+    await expect(insert("RUN_UNANSWERED", null, null)).rejects.toThrowError(/model_spend_unanswered_names_its_attempt/u);
+    await expect(insert("STORY_UNANSWERED", null, null)).rejects.toThrowError(/model_spend_unanswered_names_its_attempt/u);
+    await expect(insert("RUN_UNANSWERED", randomUUID(), "BODY"))
+      .rejects.toThrowError(/model_spend_phase_is_a_run_charge|model_spend_unanswered_names_its_attempt/u);
+    await expect(insert("GIFT", randomUUID(), null)).rejects.toThrowError(/model_spend_spend_source_check/u);
+    // The release before's sources are all still written.
+    await expect(insert("RUN", null, "BODY")).resolves.toBeDefined();
+    await expect(insert("STORY", null, null)).resolves.toBeDefined();
+  });
+
+  it("refuses, in the store, an unanswered charge that names no attempt or no run", async () => {
+    const store = new PostgresModelSpendStore(database.pool);
+    const runId = await createLegacyRun();
+    const { attemptId: _attempt, ...withoutAttempt } = unanswered("RUN_UNANSWERED", runId, 1, "2026-04-06");
+    await expect(store.recordSpend(withoutAttempt))
+      .rejects.toThrowError(expect.objectContaining({ code: "MODEL_SPEND_ATTEMPT_REQUIRED" }));
+    await expect(store.recordSpend({ ...unanswered("STORY_UNANSWERED", runId, 1, "2026-04-06"), runId: null }))
+      .rejects.toThrowError(expect.objectContaining({ code: "MODEL_SPEND_RUN_REQUIRED" }));
+  });
+});

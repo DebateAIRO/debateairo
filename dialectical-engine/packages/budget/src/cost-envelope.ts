@@ -225,6 +225,24 @@ export function projectedCallCeilingMicros(
     + ceilDivToMicros(completionTokenCeiling, price.outputMicrosPerMillionTokens);
 }
 
+/**
+ * NV-50 (security audit run 3): the same maximum as token counts, for an attempt that was sent and never answered with
+ * a usage block (`recordUnanswered`). `chargeMicrosForUsage(price, projectedCallUsage(bound))` equals
+ * `projectedCallCeilingMicros(price, bound)`: the same rounding, so the charge is exactly what admission projected.
+ */
+export function projectedCallUsage(
+  bound: Readonly<{ requestBytes: number; completionTokenCeiling: number }>
+): ReportedUsage {
+  const requestBytes = assertCountedInteger(bound?.requestBytes, "COST_ENVELOPE_PROJECTION_INVALID");
+  const completionTokenCeiling = assertCountedInteger(
+    bound?.completionTokenCeiling, "COST_ENVELOPE_PROJECTION_INVALID"
+  );
+  return Object.freeze({
+    promptTokens: Math.ceil(requestBytes / PROJECTED_INPUT_BYTES_PER_TOKEN),
+    completionTokens: completionTokenCeiling
+  });
+}
+
 export type RunCostEnvelopeDecision =
   | Readonly<{
       kind: "WITHIN";

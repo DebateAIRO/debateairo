@@ -157,6 +157,7 @@
   "billing.subscription.withdrawNothingDue": "Concluído. O seu plano terminou. A parte que já utilizou cobre o preço total, pelo que não lhe é devido qualquer reembolso.",
   "billing.subscription.withdrawOwnerReview": "O seu plano terminou. Já foi feito um reembolso num dos seus pagamentos, por isso vamos verificar o que ainda é devido e enviar-lhe um e-mail no prazo de 14 dias.",
   "billing.subscription.withdrawWindowClosed": "O prazo de livre resolução de 14 dias terminou, ou não se aplica onde reside. Pode continuar a cancelar a qualquer momento.",
+  "billing.subscription.withdrawDebateRunning": "Um debate que iniciou pode ainda estar a usar crédito, por isso ainda não conseguimos saber quanto utilizou. Tente novamente mais tarde. Ainda tem mais de um dia para exercer a livre resolução.",
   "billing.subscription.stillConfirming": "Ainda estamos a confirmar isto com o prestador de pagamentos. Volte a consultar esta página dentro de alguns minutos.",
   "billing.subscription.actionFailed": "Não funcionou. Tente novamente.",
   "billing.subscription.invoices": "Faturas",

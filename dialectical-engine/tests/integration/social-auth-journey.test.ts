@@ -11,7 +11,7 @@ import type { StepUpAuthorizationRequest } from '@debateai/contract';
 import { generateKeyPairSync, randomUUID, sign } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createPool, migrate, PostgresSocialIdentityRepository, PostgresConsumerAuthRepository, PostgresIdentityRepository, PostgresConsumerSecurityRepository, PostgresSessionRepository, PostgresAccountProfileRepository, PostgresAccountErasureRepository, PostgresConsumerRecoveryRepository, type Pool } from '@debateai/db';
-import { Argon2WorkerPool, createEmailBlindIndex, hashPassword, hashToken, decrypt, decodeBase32, totpCodeAtStep, type AuditContextHasher } from '@debateai/crypto';
+import { Argon2WorkerPool, createEmailBlindIndex, hashPassword, hashToken, decrypt, decodeBase32, totpCodeAtStep, verifyPassword, type AuditContextHasher } from '@debateai/crypto';
 import { AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS, authPolicyFromRegisterRows, MFA_POLICY_REGISTER_ROW, mfaPolicyFromValue, SESSION_POLICY_DEPLOYMENT_REGISTER_ROW, sessionPolicyFromValue, CONSUMER_RECOVERY_POLICY_REGISTER_ROW, consumerRecoveryPolicyFromValue } from '@debateai/register';
 import { currentDocument } from '@debateai/legal-manifest';
 import { parseDeclaredRegion } from '@debateai/kernel';
@@ -103,7 +103,7 @@ async function harness() {
         const admission = await registration.admitSource({ route: 'social', input: { email: input.email, phone: 'phone' in input ? input.phone : null, adultAffirmed: true }, source: bound });
         return { cb, bound, input, result: await social.completeSignup(input, bound, admission) };
     };
-    return { social, repository, security, recovery, finishFlow, stepUp, mfa, sessions, registration, passkeys, prepareCallback, callback, signup, source, sent, users, disable: () => { enabled = false; } };
+    return { social, repository, security, recovery, finishFlow, stepUp, mfa, sessions, registration, passkeys, prepareCallback, callback, signup, source, sent, users, disable: () => { enabled = false; }, subject: () => assertion.sub };
 }
 describe('actual signed-provider and restricted-database journeys', () => {
     it('creates a NULL-password encrypted-phone account from a signed authoritative subject, then requires one genuine UV method', async () => {
@@ -201,7 +201,8 @@ describe('actual signed-provider and restricted-database journeys', () => {
                 expect(collision.result).not.toHaveProperty('enrollment_token');
                 await second.registration.drainMailDispatches();
                 expect(second.sent).toHaveLength(0);
-                expect((await db.pool.query('SELECT count(*)::int n FROM identity.social_identity WHERE user_id=$1', [row.user_id])).rows[0].n).toBe(1);
+                // NV-13: an untrusted typed-email sign-up links no provider
+                expect((await db.pool.query('SELECT count(*)::int n FROM identity.social_identity WHERE user_id=$1', [row.user_id])).rows[0].n).toBe(0);
             }
             finally {
                 await second.registration.drainMailDispatches();
@@ -500,8 +501,56 @@ describe('actual signed-provider and restricted-database journeys', () => {
     it('serializes concurrent verified-subject signups for one submitted email without merging identities',async()=>{
         const a=await harness(),b=await harness(),email='concurrent-'+randomUUID()+'@example.test';try{
             const results=await Promise.all([a.signup(email),b.signup(email)]);expect(results.every(r=>'message' in r.result)).toBe(true);await Promise.all([a.registration.drainMailDispatches(),b.registration.drainMailDispatches()]);
-            expect(a.sent.length+b.sent.length).toBe(1);expect((await db.pool.query('SELECT count(*)::int n FROM identity.social_identity WHERE user_id IN (SELECT user_id FROM identity."user" WHERE email_blind_index=$1)',[createEmailBlindIndex(blindKey,email)])).rows[0].n).toBe(1);
+            // NV-13: an untrusted typed-email sign-up links no provider
+            expect(a.sent.length+b.sent.length).toBe(1);expect((await db.pool.query('SELECT count(*)::int n FROM identity.social_identity WHERE user_id IN (SELECT user_id FROM identity."user" WHERE email_blind_index=$1)',[createEmailBlindIndex(blindKey,email)])).rows[0].n).toBe(0);
         }finally{await Promise.all([a.registration.drainMailDispatches(),b.registration.drainMailDispatches()]);}
+    });
+    it('the steps after an untrusted typed-email sign-up do not reveal whether that email is registered', async () => {
+        const owner = await harness(), a = await harness(), b = await harness();
+        const outcome = (h: Awaited<ReturnType<typeof harness>>, email?: string) =>
+            h.signup(email).then(s => ('status' in s.result ? 'enrollment' : 'uniform'), e => (e as Error).message);
+        try {
+            const taken = (await owner.signup()).input.email;                     // trusted, unchanged path
+            const fresh = `fresh-${randomUUID()}@example.test`;
+            expect(await outcome(a, taken)).toBe('uniform');                     // typed address registered
+            expect(await outcome(b, fresh)).toBe('uniform');                     // typed address free
+            // 1. the next callback
+            const ra = await a.callback().then(r => r.status, e => (e as Error).message);
+            const rb = await b.callback().then(r => r.status, e => (e as Error).message);
+            expect([ra, rb]).toEqual(['signup_required', 'signup_required']);
+            // 2. the next completion with another fresh address: same answer, one mail to that address each
+            await Promise.all([a, b].map(h => h.registration.drainMailDispatches()));
+            const na = a.sent.length, nb = b.sent.length;
+            const oa = await outcome(a, `fresh-${randomUUID()}@example.test`), ob = await outcome(b, `fresh-${randomUUID()}@example.test`);
+            await Promise.all([a, b].map(h => h.registration.drainMailDispatches()));
+            expect(ob).toBe(oa); expect(oa).toBe('uniform');
+            expect(b.sent.length - nb).toBe(a.sent.length - na); expect(a.sent.length - na).toBe(1);
+            // 3. the next completion with the provider's own address: same answer
+            const ta = await outcome(a), tb = await outcome(b);
+            expect(tb).toBe(ta); expect(ta).toBe('enrollment');
+            // the untrusted sign-up left no link
+            expect((await db.pool.query('SELECT count(*)::int n FROM identity.social_identity WHERE user_id=(SELECT user_id FROM identity."user" WHERE email_blind_index=$1)', [createEmailBlindIndex(blindKey, fresh)])).rows[0].n).toBe(0);
+        } finally { await Promise.all([owner, a, b].map(h => h.registration.drainMailDispatches())); }
+    });
+    it('answers a link to a pending_verification account like no link: the callback asks for sign-up and the completion mails nothing', async () => {
+        const h = await harness(), pending = `pending-${randomUUID()}@example.test`;
+        try {
+            const first = await h.signup(pending);
+            expect(first.result).not.toHaveProperty('enrollment_token');
+            // the link an instance of the release before (0112's create_social_account) makes for this untrusted sign-up
+            await db.pool.query(`INSERT INTO identity.social_identity(user_id,provider,issuer,app_scope,subject,configuration)
+                SELECT u.user_id,f.provider,f.issuer,f.app_scope,f.subject,f.configuration FROM identity.social_flow f JOIN identity."user" u ON u.email_blind_index=$2
+                WHERE f.proof_hash=$1 ON CONFLICT DO NOTHING`, [socialHash('signup', first.cb.token), createEmailBlindIndex(blindKey, pending)]);
+            expect((await db.pool.query(`SELECT count(*)::int n FROM identity.social_identity s JOIN identity."user" u ON u.user_id=s.user_id WHERE u.email_blind_index=$1 AND u.state='pending_verification'`, [createEmailBlindIndex(blindKey, pending)])).rows[0].n).toBe(1);
+            await h.registration.drainMailDispatches();
+            const before = h.sent.length;
+            expect(await h.callback().then(r => r.status, e => (e as Error).message)).toBe('signup_required');
+            const next = await h.signup(`pending-${randomUUID()}@example.test`);
+            expect(next.result).not.toHaveProperty('enrollment_token');
+            expect(next.result).toHaveProperty('message');
+            await h.registration.drainMailDispatches();
+            expect(h.sent.length).toBe(before);
+        } finally { await h.registration.drainMailDispatches(); }
     });
 
     it('cancels a pending link flow when another current session unlinks that provider',async()=>{
@@ -572,4 +621,64 @@ it('provider single-device counter nonincrease is refused without consuming its 
   await expect(h.stepUp.complete({continuation_token:cb.token,challenge_handle:options.challenge_handle,credential:key.assertion(options.options.challenge,{flags:0x05,counter:9,userHandle:enroll.options.user.id})},session,source)).rejects.toThrow();
   expect((await db.pool.query('SELECT consumed_at FROM identity.social_flow WHERE proof_hash=$1',[socialHash('step-up',cb.token)])).rows[0].consumed_at).toBeNull();
  }finally{await h.registration.drainMailDispatches();}
+});
+// NV-14: the mailed verification is where control of the address is proven, so it sets the token holder's password
+// and, on the pending_verification transition, drops every provider link on the account in the same transaction.
+describe('NV-14 verification by the inbox holder', () => {
+    const links = async (user: string) => (await db.pool.query('SELECT count(*)::int n FROM identity.social_identity WHERE user_id=$1', [user])).rows[0].n;
+    it('drops a link left on a pending_verification account, sets the inbox holder\'s password, and leaves the provider unlinked', async () => {
+        const h = await harness(), email = `edited-${randomUUID()}@example.test`;
+        try {
+            const first = await h.signup(email);
+            expect(first.result).not.toHaveProperty('enrollment_token');
+            await h.registration.drainMailDispatches();
+            expect(h.sent).toHaveLength(1);
+            const user = (await db.pool.query('SELECT user_id FROM identity."user" WHERE email_blind_index=$1', [createEmailBlindIndex(blindKey, email)])).rows[0].user_id as string;
+            // a link made by the release before (0112's create_social_account); ON CONFLICT keeps this valid with or without NV-13
+            await db.pool.query(`INSERT INTO identity.social_identity(user_id,provider,issuer,app_scope,subject,configuration)
+                SELECT $1,f.provider,f.issuer,f.app_scope,f.subject,f.configuration FROM identity.social_flow f
+                WHERE f.subject=$2 AND f.purpose='LOGIN' ORDER BY f.expires_at DESC LIMIT 1 ON CONFLICT DO NOTHING`, [user, h.subject()]);
+            expect(await links(user)).toBe(1);
+            expect(await h.registration.verifyEmail({ token: h.sent[0]!.token, password: 'Inbox owner pass 1' }, h.source)).toEqual({ status: 'mfa_required' });
+            expect(await links(user)).toBe(0);
+            const row = (await db.pool.query('SELECT password_hash,state,audit_token::text AS actor FROM identity."user" WHERE user_id=$1', [user])).rows[0];
+            expect(row.state).toBe('pending_mfa');
+            expect(row.password_hash).not.toBeNull();
+            expect(await verifyPassword(argon2, row.password_hash, 'Inbox owner pass 1')).toBe(true);
+            expect((await db.pool.query("SELECT count(*)::int n FROM identity.audit_event WHERE event_type='identity.social.UNLINK' AND actor_key_ref=$1", [row.actor])).rows[0].n).toBe(1);
+            const setup = await h.mfa.beginTotp({ enrollmentToken: h.sent[0]!.token }, h.source), secret = decodeBase32(setup.secret), code = totpCodeAtStep(secret, Math.floor(Date.now() / 30000));
+            secret.fill(0);
+            expect(await h.mfa.verifyTotp({ enrollmentToken: h.sent[0]!.token, code }, h.source)).toMatchObject({ status: 'authenticated' });
+            expect((await db.pool.query('SELECT state FROM identity."user" WHERE user_id=$1', [user])).rows[0].state).toBe('active');
+            expect((await h.callback()).status).toBe('signup_required');
+            expect((await db.pool.query("SELECT count(*)::int n FROM identity.login_challenge WHERE user_id=$1 AND first_step='PROVIDER'", [user])).rows[0].n).toBe(0);
+        }
+        finally {
+            await h.registration.drainMailDispatches();
+        }
+    });
+    it('sets the typed password on a trusted provider account resuming by mail and keeps its link', async () => {
+        const h = await harness();
+        try {
+            const signup = await h.signup();
+            if (!('status' in signup.result))
+                throw new Error('EXPECTED_ENROLLMENT');
+            await db.pool.query("WITH moment AS (SELECT clock_timestamp() AS t) UPDATE identity.social_enrollment SET created_at=moment.t-interval '6 minutes',expires_at=moment.t-interval '1 minute' FROM moment WHERE token_hash=$1", [socialHash('enrollment', signup.result.enrollment_token)]);
+            h.disable();
+            await h.registration.resendVerification({ email: signup.input.email }, h.source);
+            await h.registration.drainMailDispatches();
+            expect(h.sent).toHaveLength(1);
+            expect(await h.registration.verifyEmail({ token: h.sent[0]!.token, password: 'Resume pass 1' }, h.source)).toEqual({ status: 'mfa_required' });
+            const row = (await db.pool.query('SELECT user_id,password_hash FROM identity."user" WHERE email_blind_index=$1', [createEmailBlindIndex(blindKey, signup.input.email)])).rows[0];
+            expect(row.password_hash).not.toBeNull();
+            expect(await verifyPassword(argon2, row.password_hash, 'Resume pass 1')).toBe(true);
+            expect(await links(row.user_id)).toBe(1);
+            const setup = await h.mfa.beginTotp({ enrollmentToken: h.sent[0]!.token }, h.source), secret = decodeBase32(setup.secret), code = totpCodeAtStep(secret, Math.floor(Date.now() / 30000));
+            secret.fill(0);
+            expect(await h.mfa.verifyTotp({ enrollmentToken: h.sent[0]!.token, code }, h.source)).toMatchObject({ status: 'authenticated' });
+        }
+        finally {
+            await h.registration.drainMailDispatches();
+        }
+    });
 });

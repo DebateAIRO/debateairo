@@ -87,6 +87,8 @@ export function supportHarness(options: Readonly<{
   sourcePseudonym?: (value: string) => string;
   /** Composed only when a test needs the case routes to get past 503. */
   caseAccess?: SupportApplication["caseAccess"];
+  /** Composed only when a test needs the escalate route to get past 503 (NV-32). */
+  cases?: SupportApplication["cases"];
 }> = {}): SupportHarness {
   const stored = new Map<string, SupportSessionRecord>();
   const state = options.configuration ?? (() => supportConfigurationState());
@@ -173,7 +175,8 @@ export function supportHarness(options: Readonly<{
     knowledge,
     sourcePseudonym,
     clock,
-    ...(options.caseAccess === undefined ? {} : { caseAccess: options.caseAccess })
+    ...(options.caseAccess === undefined ? {} : { caseAccess: options.caseAccess }),
+    ...(options.cases === undefined ? {} : { cases: options.cases })
   });
 
   return Object.freeze({

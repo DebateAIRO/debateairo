@@ -157,6 +157,7 @@
   "billing.subscription.withdrawNothingDue": "Hotovo. Váš plán skončil. Již využitá část pokrývá celou cenu, takže vám nic nenáleží zpět.",
   "billing.subscription.withdrawOwnerReview": "Váš plán skončil. U jedné z vašich plateb už byla provedena refundace, proto zkontrolujeme, co je ještě splatné, a do 14 dnů vám napíšeme e-mail.",
   "billing.subscription.withdrawWindowClosed": "14denní lhůta pro odstoupení uplynula, nebo se tam, kde žijete, neuplatňuje. Zrušit můžete i tak kdykoli.",
+  "billing.subscription.withdrawDebateRunning": "Debata, kterou jste zahájili, možná ještě využívá kredit, takže zatím nevíme, kolik jste využili. Zkuste to prosím znovu později. Na odstoupení máte stále více než den.",
   "billing.subscription.stillConfirming": "Ještě to ověřujeme u poskytovatele plateb. Podívejte se na tuto stránku znovu za pár minut.",
   "billing.subscription.actionFailed": "To se nepovedlo. Zkuste to prosím znovu.",
   "billing.subscription.invoices": "Faktury",

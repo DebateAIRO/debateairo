@@ -47,6 +47,24 @@ export async function verifyMfaEmail(
   }
 }
 
+/** NV-14: verification with the password the token holder chooses; it replaces any password set at sign-up. */
+export async function verifyMfaEmailWithPassword(
+  token: string,
+  password: string,
+  fetchImplementation: typeof fetch = fetch,
+  apiBase: string = API_BASE
+): Promise<void> {
+  const payload = await postMfa(
+    "/v1/auth/verify-email",
+    { token, password },
+    fetchImplementation,
+    apiBase
+  ) as Record<string, unknown>;
+  if (payload.status !== "mfa_required") {
+    throw new MfaEnrollmentHttpError("MFA_RESPONSE_INVALID", 502);
+  }
+}
+
 type EnrollmentLocation = Readonly<{ href: string }>;
 type EnrollmentHistory = Readonly<{
   state: unknown;

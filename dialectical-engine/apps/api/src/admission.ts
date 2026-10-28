@@ -8,7 +8,9 @@ import type { AdmissionPolicy } from "@debateai/register";
  */
 export type AdmissionScope = "asks" | "publicReads" | "recoveryStart"
   | "supportReads" | "supportSessions" | "supportModelCalls" | "geoAvailability" | "billingQuote"
-  | "billingCheckout" | "billingNotify" | "billingCancelLink" | "askRoomReads";
+  | "billingCheckout" | "billingNotify" | "billingCancelLink" | "askRoomReads"
+  | "publishChecks"
+  | "languageChecks";
 
 export type AdmissionDecision =
   | Readonly<{ allowed: true }>
@@ -31,7 +33,9 @@ interface AdmissionBucket {
     | AdmissionPolicy["supportSessions"] | AdmissionPolicy["supportModelCalls"]
     | AdmissionPolicy["geoAvailability"] | AdmissionPolicy["billingQuote"]
     | AdmissionPolicy["billingCheckout"] | AdmissionPolicy["billingNotify"]
-    | AdmissionPolicy["billingCancelLink"] | AdmissionPolicy["askRoomReads"]>;
+    | AdmissionPolicy["billingCancelLink"] | AdmissionPolicy["askRoomReads"]
+    | AdmissionPolicy["publishChecks"]
+    | AdmissionPolicy["languageChecks"]>;
   readonly entries: Map<string, AdmissionEntry>;
 }
 
@@ -42,12 +46,17 @@ function expired(entry: AdmissionEntry, windowMs: number, now: number): boolean 
 }
 
 /**
- * Auth API hardening 2026-10-09: scopes whose full table gives up an entry
- * instead of refusing a new key. A refusal there would let one source minting
- * fresh keys answer 429 CAPACITY to everybody (the three public recovery
- * starts share `recoveryStart`). Every other scope stays fail-closed.
+ * Auth API hardening 2026-10-09, widened by security audit run 3 (NV-19):
+ * every scope the register keys by `source` gives up its least-evidenced
+ * entry when its table is full, instead of refusing a new key. A refusal there
+ * would let one /64, or a few, minting fresh keys answer 429 CAPACITY to
+ * everybody. The owner-keyed scopes stay fail-closed. A new source-keyed scope
+ * must be added here (tests/unit/admission-public-reads-capacity.test.ts pins it).
  */
-const EVICTING_SCOPES: ReadonlySet<AdmissionScope> = new Set<AdmissionScope>(["recoveryStart"]);
+const EVICTING_SCOPES: ReadonlySet<AdmissionScope> = new Set<AdmissionScope>([
+  "recoveryStart", "publicReads", "supportReads", "supportModelCalls", "geoAvailability", "billingNotify",
+  "billingCancelLink"
+]);
 
 /**
  * Which entry to give up when a table is full (expired entries are swept
@@ -78,16 +87,21 @@ export function leastEvidenceKey<K>(
  * wait. The key table is capped per scope so a caller minting fresh keys
  * cannot grow memory: at capacity, expired keys are evicted oldest-first and,
  * if none can be evicted, the new key is refused rather than admitted — except
- * in an EVICTING_SCOPES scope, which gives up its least-evidenced entry.
+ * in a source-keyed (EVICTING_SCOPES) scope, which gives up its least-evidenced entry.
  */
 export class AdmissionLimiter {
   private readonly buckets: ReadonlyMap<AdmissionScope, AdmissionBucket>;
+  private readonly evictionLoggedUntil = new Map<AdmissionScope, number>();
 
   constructor(policy: AdmissionPolicy) {
     this.buckets = new Map<AdmissionScope, AdmissionBucket>([
       ["asks", { policy: policy.asks, entries: new Map() }],
       ["publicReads", { policy: policy.publicReads, entries: new Map() }],
       ["recoveryStart", { policy: policy.recoveryStart, entries: new Map() }],
+      // NV-46: always present (the parser's default when the version carries none); owner-keyed, fail-closed.
+      ["publishChecks", { policy: policy.publishChecks, entries: new Map() }],
+      // NV-47: always present, the question-language owner budget; owner-keyed, fail-closed (not in EVICTING_SCOPES).
+      ["languageChecks", { policy: policy.languageChecks, entries: new Map() }],
       // DL1-F2: present only when the resolved register version carries them.
       ...(policy.supportReads === null ? [] : [[
         "supportReads", { policy: policy.supportReads, entries: new Map() }
@@ -145,10 +159,19 @@ export class AdmissionLimiter {
           if (expired(candidate, policy.windowMs, instant)) entries.delete(candidateKey);
         }
       }
+      let evicted = false;
       while (entries.size >= policy.capacity && EVICTING_SCOPES.has(scope)) {
         const victim = leastEvidenceKey(entries, instant);
         if (victim === undefined) break;
         entries.delete(victim);
+        evicted = true;
+      }
+      // NV-19: one content-free line per scope and window while a full table gives up entries.
+      if (evicted && (this.evictionLoggedUntil.get(scope) ?? 0) <= instant) {
+        this.evictionLoggedUntil.set(scope, instant + policy.windowMs);
+        console.error(JSON.stringify(Object.freeze({
+          event: "api.admission.evicting", scope, capacity: policy.capacity, windowMs: policy.windowMs
+        })));
       }
       if (entries.size >= policy.capacity) {
         return Object.freeze({

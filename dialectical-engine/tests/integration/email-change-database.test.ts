@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Pool, PoolClient } from "pg";
-import { migrate, PostgresEmailChangeRepository, PostgresSessionRepository, type LoginIdentityRecord } from "@debateai/db";
+import { createPool, migrate, PostgresEmailChangeRepository, PostgresSessionRepository, type LoginIdentityRecord } from "@debateai/db";
 import type { AuditContextHasher, CryptoEnvelope } from "../../packages/crypto/src/index.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
@@ -10,6 +10,8 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 // and every outcome lands one row on the hash-chained audit.
 
 let database: TestDatabase;
+// NV-12: the bounded entry points are driven as the role that holds them (main.ts's authorization pool).
+let authorization: Pool;
 
 const source = Object.freeze({ ip: "192.0.2.14", userAgent: "T14 Browser", requestId: "request:t14" });
 const fakeAuditHasher = Object.freeze({
@@ -146,9 +148,12 @@ async function auditEvents(auditToken: string, eventType: string): Promise<reado
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
+  const url = new URL(database.connectionString);
+  url.searchParams.set("options", "-c role=debateai_authorization_runtime");
+  authorization = createPool(url.toString());
 }, 120_000);
 
-afterAll(async () => database?.stop());
+afterAll(async () => { await authorization?.end(); await database?.stop(); });
 
 describe("Turn 14 change email on real PostgreSQL", () => {
   it("accepts a CHANGE_EMAIL step-up grant bound to the account and refuses one bound to a run", async () => {
@@ -408,5 +413,192 @@ describe("Turn 14 change email on real PostgreSQL", () => {
       { role: "debateai_runtime", table_select: false, execute: false },
       { role: "debateai_authorization_runtime", table_select: false, execute: true }
     ]);
+  });
+});
+
+// NV-12 (0125): one per-account budget of confirmation mails shared by request and resend, a resend that never moves
+// the change past its issue time + the link TTL, and thresholds the database checks itself.
+describe("NV-12 bounded change-email entry points on real PostgreSQL", () => {
+  const LIMITS = Object.freeze({ maximumSends: 3, windowMs: 3_600_000 });
+  const LINK_TTL_MS = 24 * 3_600_000;
+  const REQUEST_SIGNATURE = "identity.request_email_change_bounded(uuid,uuid,text,uuid,bytea,jsonb,text,text,timestamptz,jsonb,integer,bigint)";
+  const RESEND_SIGNATURE = "identity.resend_email_change_bounded(uuid,uuid,text,timestamptz,bigint,jsonb,integer,bigint,bigint)";
+  const PREPARED_SOURCE = Object.freeze({
+    ipArgon2id: `argon2id-audit:v1:${"11".repeat(32)}`, userAgentArgon2id: `argon2id-audit:v1:${"22".repeat(32)}`
+  });
+  const bounded = () => new PostgresEmailChangeRepository(authorization, fakeAuditHasher);
+  const resendInput = (account: Fixture) => Object.freeze({
+    userId: account.userId, sessionId: account.sessionId, confirmTokenHash: credentialHash("confirm-bounded"),
+    expiresAt: new Date(Date.now() + LINK_TTL_MS), cooldownMs: 60_000, source, ...LIMITS, linkTtlMs: LINK_TTL_MS
+  });
+  /** Moves the open change's last mail past the cooldown, so the next resend reaches the clamp and the window. */
+  const age = async (account: Fixture) => database.pool.query(`
+    UPDATE identity.email_change_request SET last_sent_at=now()-interval '2 minutes',
+      issued_at=LEAST(issued_at,now()-interval '2 minutes') WHERE user_id=$1 AND closed_at IS NULL
+  `, [account.userId]);
+  /** A denial carries a random actor and target (0079), so it is counted by its type and justification. */
+  const denials = async (eventType: string, justification: string) => Number((await database.pool.query<{ count: string }>(
+    "SELECT count(*) AS count FROM identity.audit_event WHERE event_type=$1 AND justification=$2",
+    [eventType, justification])).rows[0]!.count);
+  const sendWindow = async (account: Fixture) => (await database.pool.query<{ sends: number; window_started_at: Date }>(
+    "SELECT sends,window_started_at FROM identity.email_change_send_window WHERE user_id=$1", [account.userId])).rows[0];
+  const unconsumed = async (grant: string) => (await database.pool.query<{ unconsumed: boolean }>(
+    "SELECT consumed_at IS NULL AS unconsumed FROM identity.step_up_grant WHERE token_hash=$1", [grant])).rows[0]?.unconsumed;
+  /** One direct call as the authorization role, in its own transaction with its own audit attempt, committed. */
+  async function direct(sql: string, values: readonly unknown[]): Promise<string | undefined> {
+    const client = await authorization.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT identity.begin_runtime_audit_attempt()");
+      const status = (await client.query<{ result_status: string }>(sql, [...values])).rows[0]?.result_status;
+      await client.query("COMMIT");
+      return status;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  it("counts the request's mail and every resend against one budget of three an hour, and restarts it once the hour has passed", async () => {
+    const account = await fixtureAccount("bounded-budget");
+    const repository = bounded();
+    await expect(repository.requestBounded({ ...requestInput(account, await fixtureGrant(account)), ...LIMITS }))
+      .resolves.toMatchObject({ status: "PENDING" });
+    expect(await sendWindow(account)).toMatchObject({ sends: 1 });
+    for (const sends of [2, 3]) {
+      await age(account);
+      await expect(repository.resendBounded(resendInput(account))).resolves.toMatchObject({ status: "RESENT" });
+      expect(await sendWindow(account)).toMatchObject({ sends });
+    }
+    // The fourth send (the third resend) is refused and counts nothing.
+    await age(account);
+    const resendLimits = await denials("identity.email_change.resent", "SEND_LIMIT");
+    await expect(repository.resendBounded(resendInput(account))).resolves.toEqual({ status: "LIMIT" });
+    expect(await denials("identity.email_change.resent", "SEND_LIMIT")).toBe(resendLimits + 1);
+    expect(await sendWindow(account)).toMatchObject({ sends: 3 });
+    // A fresh step-up does not refresh the budget, and its grant survives the refusal.
+    const grant = await fixtureGrant(account);
+    const requestLimits = await denials("identity.email_change.requested", "SEND_LIMIT");
+    await expect(repository.requestBounded({ ...requestInput(account, grant, "again"), ...LIMITS }))
+      .resolves.toEqual({ status: "LIMIT" });
+    expect(await denials("identity.email_change.requested", "SEND_LIMIT")).toBe(requestLimits + 1);
+    expect(await unconsumed(grant)).toBe(true);
+    expect(await sendWindow(account)).toMatchObject({ sends: 3 });
+    // Once the window is an hour old, the next counted send starts a new one.
+    await database.pool.query(
+      "UPDATE identity.email_change_send_window SET window_started_at=now()-interval '61 minutes' WHERE user_id=$1",
+      [account.userId]);
+    await age(account);
+    await expect(repository.resendBounded(resendInput(account))).resolves.toMatchObject({ status: "RESENT" });
+    const restarted = await sendWindow(account);
+    expect(restarted?.sends).toBe(1);
+    expect(Math.abs(restarted!.window_started_at.getTime() - Date.now())).toBeLessThan(60_000);
+    expect((await auditEvents(account.auditToken, "identity.email_change.resent")).map((row) => row.decision))
+      .toEqual(["ALLOW", "ALLOW", "ALLOW"]);
+  });
+
+  it("clamps a resend to the change's issue time + the link TTL, and answers NONE once that has passed", async () => {
+    const account = await fixtureAccount("bounded-clamp");
+    const repository = bounded();
+    await expect(repository.requestBounded({ ...requestInput(account, await fixtureGrant(account)), ...LIMITS }))
+      .resolves.toMatchObject({ status: "PENDING" });
+    await database.pool.query(`
+      UPDATE identity.email_change_request SET issued_at=now()-interval '23 hours',last_sent_at=now()-interval '2 minutes'
+      WHERE user_id=$1 AND closed_at IS NULL
+    `, [account.userId]);
+    const issuedAt = (await database.pool.query<{ issued_at: Date }>(
+      "SELECT issued_at FROM identity.email_change_request WHERE user_id=$1 AND closed_at IS NULL",
+      [account.userId])).rows[0]!.issued_at;
+    const clamped = await repository.resendBounded(resendInput(account));
+    expect(clamped).toMatchObject({ status: "RESENT" });
+    if (clamped.status !== "RESENT") throw new Error("unreachable");
+    expect(clamped.expiresAt.getTime()).toBe(issuedAt.getTime() + LINK_TTL_MS);
+    expect(await sendWindow(account)).toMatchObject({ sends: 2 });
+    // That resend set last_sent_at to now: age it again, then put the issue time 25 hours back (expires_at stays ahead).
+    await database.pool.query(`
+      UPDATE identity.email_change_request SET last_sent_at=now()-interval '2 minutes',issued_at=now()-interval '25 hours'
+      WHERE user_id=$1 AND closed_at IS NULL
+    `, [account.userId]);
+    const lapsed = await denials("identity.email_change.resent", "PENDING_CHANGE_LAPSED");
+    await expect(repository.resendBounded(resendInput(account))).resolves.toEqual({ status: "NONE" });
+    expect(await denials("identity.email_change.resent", "PENDING_CHANGE_LAPSED")).toBe(lapsed + 1);
+    expect(await sendWindow(account)).toMatchObject({ sends: 2 });
+  });
+
+  it("keeps 0099's 720-hour session ceiling on the bounded resend", async () => {
+    const account = await fixtureAccount("bounded-ceiling");
+    const repository = bounded();
+    await expect(repository.requestBounded({ ...requestInput(account, await fixtureGrant(account)), ...LIMITS }))
+      .resolves.toMatchObject({ status: "PENDING" });
+    // The session's absolute expiry stays a week ahead; only its age passes the ceiling.
+    await database.pool.query("UPDATE identity.session SET created_at=now()-interval '721 hours' WHERE session_id=$1",
+      [account.sessionId]);
+    await age(account);
+    const noPending = await denials("identity.email_change.resent", "NO_PENDING_CHANGE");
+    await expect(repository.resendBounded(resendInput(account))).resolves.toEqual({ status: "NONE" });
+    expect(await denials("identity.email_change.resent", "NO_PENDING_CHANGE")).toBe(noPending + 1);
+    expect(await sendWindow(account)).toMatchObject({ sends: 1 });
+  });
+
+  it("refuses a missing or out-of-range threshold with REQUEST_INVALID and its audit", async () => {
+    const account = await fixtureAccount("bounded-thresholds");
+    const grant = await fixtureGrant(account);
+    const input = requestInput(account, grant);
+    const request = (maximumSends: number | null, windowMs: number | null) => direct(
+      "SELECT * FROM identity.request_email_change_bounded($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10::jsonb,$11::integer,$12::bigint)",
+      [input.userId, input.sessionId, input.grantTokenHash, randomUUID(), input.newEmailBlindIndex,
+        JSON.stringify(input.newEmailCiphertext), input.confirmTokenHash, input.cancelTokenHash, input.expiresAt,
+        JSON.stringify(PREPARED_SOURCE), maximumSends, windowMs]);
+    for (const [maximumSends, windowMs] of [[null, 3_600_000], [0, 3_600_000], [4, 3_600_000], [3, null], [3, 59_999], [3, 86_400_001]] as const) {
+      const before = await denials("identity.email_change.requested", "REQUEST_INVALID");
+      await expect(request(maximumSends, windowMs), `request ${maximumSends}/${windowMs}`).resolves.toBe("DENIED");
+      expect(await denials("identity.email_change.requested", "REQUEST_INVALID")).toBe(before + 1);
+    }
+    expect(await unconsumed(grant)).toBe(true);
+    expect(await sendWindow(account)).toBeUndefined();
+    const resend = (maximumSends: number | null, windowMs: number | null, linkTtlMs: number | null) => direct(
+      "SELECT * FROM identity.resend_email_change_bounded($1,$2,$3,$4,$5,$6::jsonb,$7::integer,$8::bigint,$9::bigint)",
+      [account.userId, account.sessionId, credentialHash("confirm-direct"), new Date(Date.now() + LINK_TTL_MS), 60_000,
+        JSON.stringify(PREPARED_SOURCE), maximumSends, windowMs, linkTtlMs]);
+    for (const [maximumSends, windowMs, linkTtlMs] of [
+      [null, 3_600_000, LINK_TTL_MS], [0, 3_600_000, LINK_TTL_MS], [4, 3_600_000, LINK_TTL_MS],
+      [3, null, LINK_TTL_MS], [3, 59_999, LINK_TTL_MS], [3, 86_400_001, LINK_TTL_MS],
+      [3, 3_600_000, null], [3, 3_600_000, 0], [3, 3_600_000, 90_000_001]
+    ] as const) {
+      const before = await denials("identity.email_change.resent", "REQUEST_INVALID");
+      await expect(resend(maximumSends, windowMs, linkTtlMs), `resend ${maximumSends}/${windowMs}/${linkTtlMs}`).resolves.toBe("NONE");
+      expect(await denials("identity.email_change.resent", "REQUEST_INVALID")).toBe(before + 1);
+    }
+    // Control: the same direct call with valid thresholds opens the change, so only the thresholds were refused.
+    await expect(request(3, 3_600_000)).resolves.toBe("PENDING");
+    expect(await unconsumed(grant)).toBe(false);
+    expect(await sendWindow(account)).toMatchObject({ sends: 1 });
+  });
+
+  it("grants both entry points to the authorization role only and keeps the window table behind them", async () => {
+    const execute = await database.pool.query<{ role: string; request: boolean; resend: boolean }>(`
+      SELECT role,has_function_privilege(role,$1,'EXECUTE') AS request,has_function_privilege(role,$2,'EXECUTE') AS resend
+      FROM unnest(ARRAY['debateai_runtime','debateai_authorization_runtime','debateai_erasure_runtime']) AS role
+    `, [REQUEST_SIGNATURE, RESEND_SIGNATURE]);
+    expect(execute.rows).toEqual([
+      { role: "debateai_runtime", request: false, resend: false },
+      { role: "debateai_authorization_runtime", request: true, resend: true },
+      { role: "debateai_erasure_runtime", request: false, resend: false }
+    ]);
+    const publicExecute = await database.pool.query<{ signature: string; public: boolean }>(`
+      SELECT signature,EXISTS(SELECT 1 FROM pg_proc p,aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a
+        WHERE p.oid=to_regprocedure(signature) AND a.grantee=0) AS public
+      FROM unnest($1::text[]) AS signature ORDER BY signature
+    `, [[REQUEST_SIGNATURE, RESEND_SIGNATURE]]);
+    expect(publicExecute.rows.map((row) => row.public)).toEqual([false, false]);
+    const table = await database.pool.query<{ others: number; guarded: boolean; selectable: boolean }>(`
+      SELECT (SELECT count(*)::int FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE a.grantee<>c.relowner) AS others,
+        EXISTS(SELECT 1 FROM pg_trigger t WHERE t.tgrelid=c.oid AND t.tgname='reject_truncate' AND NOT t.tgisinternal) AS guarded,
+        has_table_privilege('debateai_authorization_runtime',c.oid,'SELECT') AS selectable
+      FROM pg_class c WHERE c.oid='identity.email_change_send_window'::regclass
+    `);
+    expect(table.rows).toEqual([{ others: 0, guarded: true, selectable: false }]);
   });
 });

@@ -291,6 +291,8 @@ describe("SUP-01 support routes", () => {
    * on mutations, exactly as the browser this suite stands in for would, unless
    * a case supplies its own Origin to exercise the refusal.
    */
+  /** NV-03: the UI-to-API proof the API under test holds. */
+  const TEST_UI_API_PROOF = "s".repeat(43);
   function asBrowser(server: FastifyInstance): FastifyInstance {
     const inject: FastifyInstance["inject"] = (options?: unknown) => {
       if (typeof options !== "object" || options === null) {
@@ -301,13 +303,20 @@ describe("SUP-01 support routes", () => {
       }>;
       const mutating = typeof request.method === "string"
         && request.method.toUpperCase() !== "GET" && request.method.toUpperCase() !== "HEAD";
-      const carriesOrigin = Object.keys(request.headers ?? {})
-        .some((name) => name.toLowerCase() === "origin");
-      if (!mutating || carriesOrigin) {
+      const names = Object.keys(request.headers ?? {}).map((name) => name.toLowerCase());
+      const addOrigin = mutating && !names.includes("origin");
+      // NV-03: the API honours a forwarded address only from the proven UI, which this harness stands in for, so every
+      // case that names one through x-forwarded-for keeps its meaning.
+      const addProof = names.includes("x-forwarded-for") && !names.includes("x-debateai-ui-proof");
+      if (!addOrigin && !addProof) {
         return (server.inject as (value?: unknown) => never)(options);
       }
       return (server.inject as (value?: unknown) => never)({
-        ...request, headers: { ...request.headers, origin: TEST_APP_ORIGIN }
+        ...request, headers: {
+          ...request.headers,
+          ...(addOrigin ? { origin: TEST_APP_ORIGIN } : {}),
+          ...(addProof ? { "x-debateai-ui-proof": TEST_UI_API_PROOF } : {})
+        }
       });
     };
     return new Proxy(server, {
@@ -338,6 +347,7 @@ describe("SUP-01 support routes", () => {
       application: askApplication(),
       sessions: testSessionApplication([IDENTITY,CASE_OWNER]),
       allowedOrigin: TEST_APP_ORIGIN,
+      uiApiProof: Buffer.from(TEST_UI_API_PROOF),
       support: {
         configuration: options.configurationPort ?? configuration(enabled, options.configuration),
         sessions: options.sessionPort ?? sessions,

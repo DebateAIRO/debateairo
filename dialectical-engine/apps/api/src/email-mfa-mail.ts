@@ -99,3 +99,11 @@ export class EmailRecoveryNotificationWorker {
  }
  async close() {this.closed=true;await Promise.allSettled(this.active===null?[]:[this.active]);while(this.pending.size) await Promise.allSettled([...this.pending]);}
 }
+/** K09/NV-24: one flow's failed run never skips the next flow's run; the first failure is rethrown after all ran. */
+export async function reconcileEachIndependently(workers:readonly Readonly<{reconcile(n:number):Promise<void>}>[],n:number):Promise<void> {
+ let failed=false;let failure:unknown;
+ for(const worker of workers) {
+  try {await worker.reconcile(n);} catch(error) {if(!failed){failed=true;failure=error;}}
+ }
+ if(failed) throw failure;
+}

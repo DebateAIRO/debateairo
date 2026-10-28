@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { Argon2InfrastructureError } from "@debateai/crypto";
 import { authPolicyFromRegisterRows, AUTH_POLICY_REGISTER_ROWS } from "@debateai/register";
 import { buildApi, type AskApplication } from "../../apps/api/src/index.js";
-import { RegistrationService, InProcessAuthRateLimiter, type RegisterInput } from "../../apps/api/src/registration.js";
+import { RegistrationService, InProcessAuthRateLimiter, type AuthSourceAdmission, type RegisterInput } from "../../apps/api/src/registration.js";
 import { canonicalSignup } from "../support/turnstileFixtures.js";
 import { DISPLAYED_LEGAL_EN } from "../support/signupLegal.js";
 
@@ -89,6 +89,30 @@ describe("public registration admission ownership", () => {
       await expect(service.register(input, source, capability)).rejects.toMatchObject({ code: "AUTH_TEMPORARILY_UNAVAILABLE" }); capability.release(); capability.release();
       expect(service.registrationAdmissionOccupancy()).toMatchObject({ admitted: 0, admissions: 1, releases: 1 }); expect(charged.mock.calls).toHaveLength(1);
     } finally { logs.mockRestore(); }
+  });
+  it("a limiter refusal does not hold a structural slot through its clamp (NV-22)", async () => {
+    const held = deferred(); const { service } = fixture({ sourceLimit: 1, sleep: () => held.promise });
+    let refused: Promise<unknown>[] = []; let other: Promise<unknown> | undefined;
+    try {
+      (await admit(service)).release();
+      refused = Array.from({ length: 103 }, () => admit(service).catch(error => error)); await nextTurn();
+      expect(service.registrationAdmissionOccupancy().admitted).toBe(0);
+      other = service.admitSource({ route: "register", source: { ...source, ip: "203.0.113.99", requestId: "other" }, input }).catch(error => error);
+      held.resolve(); const capability = await other; expect(capability).toMatchObject({ release: expect.any(Function) }); (capability as AuthSourceAdmission).release();
+      for (const outcome of await Promise.all(refused)) expect(outcome).toMatchObject({ code: "AUTH_RATE_LIMITED" });
+      expect(service.registrationAdmissionOccupancy()).toMatchObject({ admitted: 0, admissions: 105, releases: 105 });
+    } finally { held.resolve(); await other; await Promise.all(refused); await service.drainRateLimitAuditFlushes(); }
+  });
+  it("a direct registerFlow refusal gives its slot back before the clamp (NV-22)", async () => {
+    const held = deferred(); const { service } = fixture({ sourceLimit: 1, sleep: () => held.promise });
+    let direct: Promise<unknown> | undefined;
+    try {
+      (await admit(service)).release();
+      direct = service.register(input, source).catch(error => error); await nextTurn();
+      expect(service.registrationAdmissionOccupancy().admitted).toBe(0);
+      held.resolve(); expect(await direct).toMatchObject({ code: "AUTH_RATE_LIMITED" });
+      expect(service.registrationAdmissionOccupancy()).toMatchObject({ admitted: 0, admissions: 2, releases: 2 });
+    } finally { held.resolve(); await direct; await service.drainRateLimitAuditFlushes(); }
   });
 });
 

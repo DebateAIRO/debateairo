@@ -180,6 +180,14 @@ describe("RoomNotice picks exactly one sentence", () => {
     expect(container.querySelector('a[href="/pricing"]')).toBeNull();
   });
 
+  // NV-43 (security audit run 3): billing off names no plan, and the person's share of the site's day is full.
+  it("offers no upgrade while billing is off (no plan) when today's share is full", async () => {
+    const container = await mount(<RoomNotice
+      room={room({ room: "FULL", scope: "PERSON_DAY", resets_at: RESET, plan_id: null }) as never} catalog={en} locale="en" />);
+    expect(container.querySelector(".roomNoticeText")?.textContent).toBe(timed("newDebate.room.personDayFullTopPlan"));
+    expect(container.querySelector('a[href="/pricing"]')).toBeNull();
+  });
+
   /**
    * Final review Part 1b, Important 1: the window is full only because of the
    * person's own running debates, so the question starts as soon as one of

@@ -158,6 +158,9 @@ type SessionRepository = Partial<Pick<PostgresSessionRepository,"assertSessionCu
   | "recordSensitiveDataConsent"
   | "completeRecoveryLogin"
   | "completeTotpLogin"
+  // NV-04: required, not optional — a repository without them must not skip the durable TOTP budget.
+  | "admitTotpLoginAttempt"
+  | "clearTotpLoginLockout"
   | "createLoginChallenge"
   | "findLoginIdentity"
   | "listActiveSessions"
@@ -233,6 +236,13 @@ const CEREMONY_RATE_FAMILY: Readonly<Record<ConsumerCeremonyOperation, SessionRa
   SECURITY_CODES: "account-security", AUTH_METHOD_REMOVE: "account-security"
 });
 
+/**
+ * NV-04: the longest single cooldown of the durable login TOTP budget (identity.totp_login_admit, 0125 [NV-04]).
+ * Rounds of `verificationLimits.perEnrollment` attempts; each completed round raises the factor's level, and its
+ * cooldown is `temporaryLockMs` doubled per level up to this cap, so no lock is permanent.
+ */
+const TOTP_LOGIN_MAX_LOCK_MS = 86_400_000;
+
 function sameHash(left: string, right: string): boolean {
   const leftBytes = Buffer.from(left, "utf8");
   const rightBytes = Buffer.from(right, "utf8");
@@ -247,6 +257,7 @@ export class SessionService implements SessionApplication {
     staffPrerequisites?: StaffPrerequisiteProducer;
     riskSignals:SessionRiskSignals;
     onRiskSignalFailure:(error:unknown)=>void;
+    onTotpLockoutClearFailure?:(error:unknown)=>void;
     dekStore: ReadableUserDekStore;
     argon2: Argon2Executor;
     authPolicy: AuthPolicy;
@@ -267,6 +278,7 @@ export class SessionService implements SessionApplication {
     staffPrerequisites?: StaffPrerequisiteProducer;
     riskSignals:SessionRiskSignals;
     onRiskSignalFailure:(error:unknown)=>void;
+    onTotpLockoutClearFailure?:(error:unknown)=>void;
     dekStore: ReadableUserDekStore;
     argon2: Argon2Executor;
     authPolicy: AuthPolicy;
@@ -554,7 +566,52 @@ export class SessionService implements SessionApplication {
       const material = this.sessionMaterial(now);
       const context = Object.freeze({ user_agent_hash: bindingHash });
       let completed = false;
+      // NV-04: set only when this attempt was charged to the account's TOTP budgets, so only a TOTP success clears them.
+      let totpFactorId: string | null = null;
+      let totpAccountKey: string | null = null;
       if (/^\d{6}$/.test(input.code)) {
+        // NV-04: a TOTP guess is budgeted per account and factor, across challenges, sources and processes, and is
+        // charged BEFORE the DEK is loaded or the code compared, so a parallel burst cannot pass the bound. A
+        // challenge with no TOTP factor can never succeed (totpStep answers null) and never meets the counters.
+        if (challenge.factorId !== null) {
+          const factorId = challenge.factorId;
+          // Layer 2, in-process: one key per account across challenges and sources. It also counts attempts refused
+          // during a durable cooldown, so it can hold a refusal up to temporaryLockMs past one (review r3 M8).
+          const accountKey = this.challengeRateKey(`login-mfa:${challenge.userId}`);
+          const accountDecision = this.limiter.decideAccount(accountKey, now, "password-login");
+          if (!accountDecision.allowed) {
+            if (accountDecision.auditRefusal) {
+              await this.dependencies.repository.recordLoginFailure({
+                actorToken: challenge.auditToken, occurredAt: now, source, reason: "AUTH_RATE_LIMITED"
+              });
+            }
+            throw new AuthFlowError("MFA_RATE_LIMITED");
+          }
+          // Layer 1, durable (identity.totp_login_admit, 0125 [NV-04]): rounds of perEnrollment attempts, an
+          // escalation level a success keeps, cooldowns from temporaryLockMs doubling to TOTP_LOGIN_MAX_LOCK_MS.
+          const limits = this.dependencies.mfaPolicy.verificationLimits;
+          let admission: Readonly<{ admitted: boolean; retryAfterMs: number }>;
+          try {
+            admission = await this.dependencies.repository.admitTotpLoginAttempt({
+              userId: challenge.userId, factorId,
+              maxAttempts: limits.perEnrollment, baseLockMs: limits.temporaryLockMs, maxLockMs: TOTP_LOGIN_MAX_LOCK_MS
+            });
+          } catch (error) {
+            // 23503: the account was removed after the challenge was read (an erasure race); it can no longer sign in.
+            if (typeof error === "object" && error !== null && (error as { code?: unknown }).code === "23503") {
+              throw new AuthFlowError("AUTH_CREDENTIALS_INVALID", { cause: error });
+            }
+            throw error;
+          }
+          if (!admission.admitted) {
+            await this.dependencies.repository.recordLoginFailure({
+              actorToken: challenge.auditToken, occurredAt: now, source, reason: "AUTH_RATE_LIMITED"
+            });
+            throw new AuthFlowError("MFA_RATE_LIMITED");
+          }
+          totpFactorId = factorId;
+          totpAccountKey = accountKey;
+        }
         const acceptedStep = await this.totpStep(challenge, input.code, now);
         completed = acceptedStep !== null && await this.dependencies.repository.completeTotpLogin({
           ...socialAuthority,challenge,
@@ -605,6 +662,17 @@ export class SessionService implements SessionApplication {
         throw new AuthFlowError("AUTH_CREDENTIALS_INVALID");
       }
       this.limiter.clearEnrollment(rateKey, "password-login");
+      if (totpFactorId !== null) {
+        // NV-04: a TOTP success clears the round's count (the durable level stays). The session is already
+        // committed, so a failed clear is reported, never turned into an error: it leaves the round's charges,
+        // which only shortens the next round (and restarts the level's quiet-day clock, review r3 M5).
+        if (totpAccountKey !== null) this.limiter.clearEnrollment(totpAccountKey, "password-login");
+        try {
+          await this.dependencies.repository.clearTotpLoginLockout({ userId: challenge.userId, factorId: totpFactorId });
+        } catch (error) {
+          this.dependencies.onTotpLockoutClearFailure?.(error);
+        }
+      }
       const result=await this.consumerProducer().committed({...material,bindingHash,sessionBindingContext:context,occurredAt:now},challenge,source);
       return Object.freeze(result);
     } catch (error) {

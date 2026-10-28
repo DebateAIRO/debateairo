@@ -10,6 +10,9 @@ import { chargeMicrosForUsage, type ProviderTargetPrice } from "./cost-envelope.
  * when it merges. This implementation:
  *  - samples the last `sampleSize` (20) hosted runs of the same settings class
  *    that settled inside the last `lookbackMs` (30 days);
+ *  - NV-49 (security audit run 3): at most one run per owner
+ *    (`MAX_SAMPLES_PER_OWNER`), and no run a DAILY or ALLOWANCE wall stopped,
+ *    so one owner, or one day of wall cuts, cannot set a class's estimate;
  *  - prices each sample run's RUN and STORY charges row by row at TODAY's price
  *    (`chargeMicrosForUsage`), a provider no longer configured at the highest
  *    current price on each side;
@@ -58,11 +61,33 @@ export interface RecentRunUsageSource {
     settings: RunSettingsClass;
     since: Date;
     limit: number;
+    /** NV-49: the most runs of one owner the sample may hold (1 … limit); left out, `MAX_SAMPLES_PER_OWNER`. */
+    maxPerOwner?: number;
   }>): Promise<ReadonlyArray<RecentRunUsage>>;
 }
 
 const PLAN_TIERS = Object.freeze(["free", "premium"] as const);
 const COMPOSITION_TIERS = Object.freeze(["low", "medium", "high"] as const);
+/**
+ * NV-49 (security audit run 3): the runs one owner may contribute to a class's sample. Not register-set, because an
+ * older release's strict start schema (costEstimateStartPolicy) would refuse a new member at boot; change it only in code.
+ */
+const MAX_SAMPLES_PER_OWNER = 1;
+
+/**
+ * NV-49: the condition-mark reasons of a DAILY or ALLOWANCE wall stop, the runner's `ENVELOPE_STOP_REASONS.DAILY` and
+ * `.ALLOWANCE` (apps/runner/src/index.ts; pinned equal by tests/unit/nv49-estimate-owner-share.test.ts). A run whose
+ * answer carries one is not sampled: the wall cut it short, so its cost is not a typical run's. A MONEY stop (the run's
+ * own ceiling) stays sampled: it marks an expensive run.
+ */
+export const BUDGET_WALL_STOP_REASONS = Object.freeze(["DAILY_COST_ENVELOPE_REACHED", "PERSON_ALLOWANCE_REACHED"] as const);
+
+/**
+ * NV-49: the same two stops as `serve.serve_disclosure`'s `body_stop` / `serve_stop` store them, the runner's
+ * `ENVELOPE_STOP_CODES.DAILY_COST_ENVELOPE_REACHED` and `.PERSON_ALLOWANCE_REACHED`. The row is kept for every answer,
+ * so it also catches a DEFECT answer, which carries no envelope mark.
+ */
+export const BUDGET_WALL_STOP_KINDS = Object.freeze(["DAILY", "ALLOWANCE"] as const);
 
 export function settingsClassKey(settings: RunSettingsClass): string {
   if (!PLAN_TIERS.includes(settings?.planTier)
@@ -215,7 +240,8 @@ export class RecentRunsCostEstimator implements CostEstimator {
     const runs = await this.#source.readRecentRunUsage({
       settings,
       since: new Date(now - this.#lookbackMs),
-      limit: this.#sampleSize
+      limit: this.#sampleSize,
+      maxPerOwner: MAX_SAMPLES_PER_OWNER
     });
     const costs: number[] = [];
     if (this.#prices.size > 0) {
@@ -247,6 +273,11 @@ function countedTokens(text: string): number {
  * Debate shape (M1): a shaped class samples only runs whose RECEIPT carries that plan's shape, so a one-maker run (the
  * four settings stored, no shape minted) never joins it; a one-maker shaped ask then samples nothing and is estimated
  * at the run's maximum, the careful side. An unshaped class still samples only runs with no settings and no shape.
+ * NV-49 (security audit run 3): at most `maxPerOwner` runs of one owner (`MAX_SAMPLES_PER_OWNER`, 1), each owner's
+ * newest, the owner read as core.run_waiting_v reads it (the run's latest ownership event, else the uuid of an `owner:`
+ * asker id; a legacy asker is its own owner). And no run a DAILY or ALLOWANCE wall stopped: one whose answer carries
+ * such a condition mark (`BUDGET_WALL_STOP_REASONS`), or whose disclosure row records such a body or serve stop
+ * (`BUDGET_WALL_STOP_KINDS`). Both are read: a DEFECT answer carries no mark, and the row's write may fail.
  */
 export class PostgresRecentRunUsageSource implements RecentRunUsageSource {
   constructor(private readonly pool: Pool) {}
@@ -255,9 +286,14 @@ export class PostgresRecentRunUsageSource implements RecentRunUsageSource {
     settings: RunSettingsClass;
     since: Date;
     limit: number;
+    maxPerOwner?: number;
   }>): Promise<ReadonlyArray<RecentRunUsage>> {
     settingsClassKey(input.settings);
     if (!Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > 1_000) {
+      throw new TypeError("COST_ESTIMATE_SAMPLE_SIZE_INVALID");
+    }
+    const perOwner = input.maxPerOwner ?? MAX_SAMPLES_PER_OWNER;
+    if (!Number.isSafeInteger(perOwner) || perOwner < 1 || perOwner > input.limit) {
       throw new TypeError("COST_ESTIMATE_SAMPLE_SIZE_INVALID");
     }
     const result = await this.pool.query<{
@@ -266,8 +302,8 @@ export class PostgresRecentRunUsageSource implements RecentRunUsageSource {
       input_tokens: string;
       output_tokens: string;
     }>(
-      `WITH sample AS (
-         SELECT run.run_id, max(spend.recorded_at) AS last_charged_at
+      `WITH candidate AS (
+         SELECT run.run_id, run.asker_id, max(spend.recorded_at) AS last_charged_at
          FROM core.run AS run
          JOIN ledger.model_spend AS spend
            ON spend.run_id = run.run_id AND spend.spend_source IN ('RUN','STORY')
@@ -284,9 +320,41 @@ export class PostgresRecentRunUsageSource implements RecentRunUsageSource {
              SELECT 1 FROM core.work_item AS work
              WHERE work.run_id = run.run_id AND work.state IN ('READY','CLAIMED','FAILED')
            )
+           AND NOT EXISTS (
+             SELECT 1 FROM serve.answer AS answer
+             JOIN serve.condition_mark AS mark
+               ON mark.answer_id = answer.answer_id AND mark.answer_version = answer.answer_version
+             WHERE answer.run_id = run.run_id AND mark.reason = ANY($12::text[])
+           )
+           AND NOT EXISTS (
+             SELECT 1 FROM serve.serve_disclosure AS disclosure
+             WHERE disclosure.run_id = run.run_id
+               AND (disclosure.body_stop = ANY($13::text[]) OR disclosure.serve_stop = ANY($13::text[]))
+           )
          GROUP BY run.run_id
          HAVING max(spend.recorded_at) >= $5
-         ORDER BY max(spend.recorded_at) DESC, run.run_id
+       ), ranked AS (
+         SELECT candidate.run_id, candidate.last_charged_at,
+                row_number() OVER (
+                  PARTITION BY CASE
+                    WHEN latest.owner_ref IS NOT NULL THEN latest.owner_ref::text
+                    WHEN candidate.asker_id LIKE 'owner:%' THEN substr(candidate.asker_id, 7)
+                    ELSE 'asker:' || candidate.asker_id
+                  END
+                  ORDER BY candidate.last_charged_at DESC, candidate.run_id
+                ) AS owner_rank
+         FROM candidate
+         LEFT JOIN LATERAL (
+           SELECT event.owner_ref FROM core.run_ownership_event AS event
+           WHERE event.run_id = candidate.run_id
+           ORDER BY event.at_seq DESC
+           LIMIT 1
+         ) AS latest ON true
+       ), sample AS (
+         SELECT ranked.run_id, ranked.last_charged_at
+         FROM ranked
+         WHERE ranked.owner_rank <= $11
+         ORDER BY ranked.last_charged_at DESC, ranked.run_id
          LIMIT $6
        )
        SELECT sample.run_id, spend.provider_ref,
@@ -305,7 +373,10 @@ export class PostgresRecentRunUsageSource implements RecentRunUsageSource {
         input.settings.shape?.depthMode ?? "",
         input.settings.shape?.scrutiny ?? "",
         input.settings.shape?.answerLength ?? "",
-        input.settings.shape?.plan ?? ""
+        input.settings.shape?.plan ?? "",
+        perOwner,
+        [...BUDGET_WALL_STOP_REASONS],
+        [...BUDGET_WALL_STOP_KINDS]
       ]
     );
     const runs = new Map<string, RecentRunCharge[]>();

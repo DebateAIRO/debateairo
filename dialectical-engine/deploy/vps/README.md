@@ -27,9 +27,9 @@ One machine. Exactly one process listens on a public interface.
         internet
            |  443 (and 80, redirect only)
        [ Caddy ]                      automatic TLS, HSTS preload, 1MB body cap
-           |  127.0.0.1:3001 (slot A) or 127.0.0.1:3002 (slot B), whichever is ready
+           |  127.0.0.1:481 (slot A) or 127.0.0.1:482 (slot B), whichever is ready
        [ debateai-ui@<label> ]        Next front door, custom server.mjs
-           |  127.0.0.1:8790 (slot A) or 127.0.0.1:8791 (slot B), its own release's API
+           |  127.0.0.1:491 (slot A) or 127.0.0.1:492 (slot B), its own release's API
        [ debateai-api@<label> ]       Fastify
            |                   \
    unix socket                   127.0.0.1:7077 (gRPC, TLS)
@@ -42,10 +42,15 @@ One machine. Exactly one process listens on a public interface.
                                  [ debateai-runner@<label> ]  -> maker CLIs (outbound only)
 ```
 
-- **Nothing but Caddy binds a public address.** The API is `127.0.0.1:8790`, the UI is
-  `127.0.0.1:3001` (slot A; slot B's are `127.0.0.1:8791` and `127.0.0.1:3002`), Caddy's own check
+- **Nothing but Caddy binds a public address.** The API is `127.0.0.1:491`, the UI is
+  `127.0.0.1:481` (slot A; slot B's are `127.0.0.1:492` and `127.0.0.1:482`), Caddy's own check
   site is `127.0.0.1:3090` (§6), Hatchet publishes `127.0.0.1:8888` and `127.0.0.1:7077`,
   PostgreSQL listens on `127.0.0.1, ::1` and its unix socket.
+- **Only the website and API units can bind the slot ports.** They are below 1024. Both units hold
+  `CAP_NET_BIND_SERVICE`, limited to their own two ports (`SocketBindAllow=`), and no other unit of
+  this kit holds it (NV-55). No unprivileged process can bind them. §2 checks that the limit is
+  enforced and that no program on the box carries the capability as a file capability; §10 names
+  what stays outside this rule.
 - **Releases run side by side (side-by-side spec §10).** Each release lives in its own root-owned
   folder `/opt/debateai/releases/<label>/` and runs as its own instances
   `debateai-api@<label>.service`, `debateai-ui@<label>.service` and
@@ -57,8 +62,13 @@ One machine. Exactly one process listens on a public interface.
 - **PostgreSQL is native, not a container.** With a bridge-networked database the host's client
   address is the docker gateway (172.x), which would force a plaintext `host` rule for the whole
   subnet and make the `hostssl`-only `pg_hba` dishonest (audit L5-F7).
-- **Docker publishes bypass `ufw`** through the `DOCKER` iptables chain. Binding every publish to
-  `127.0.0.1` is the real guard, not the firewall.
+- **Docker publishes bypass `ufw`** through the `DOCKER` iptables chain. Every publish is bound to
+  `127.0.0.1`, but on some engines that alone does not keep other hosts out. A neighbour on the
+  provider's network could send packets for `127.0.0.1` to this host's MAC address, or route to
+  the container's own bridge address, and either would reach Hatchet.
+  `debateai-ingress-guard.service` (§5) therefore drops, before Docker sees them, every packet that
+  does not arrive on `lo` and is either for `127.0.0.0/8` or TCP to Hatchet's two ports (7077,
+  8888), whatever the installed Docker version (NV-56).
 - **V-9(a) and (b), ruled 2026-09-22:** native PostgreSQL on this host (above), and no Hatchet
   dashboard exposed in production. The dashboard on 8888 is published on loopback only — the
   architecture test pins every compose publish to `127.0.0.1` — and nothing in the `Caddyfile`
@@ -76,7 +86,8 @@ independent and needs only `postgresql.service`, as would `debateai-observation-
 once it is enabled (§12). The units encode this with `After=` and `Wants=`: Hatchet is wanted,
 never required, so restarting it never stops a release's API or a draining runner mid-call
 (side-by-side spec §4). The API and runner still require PostgreSQL, and each website is bound to
-its own release's API (`BindsTo=`).
+its own release's API (`BindsTo=`). `debateai-ingress-guard.service` runs before Docker itself,
+and Hatchet does not start without it.
 
 **One API serves at a time.** The support chat's admission windows (visitor message and session
 limits) are held in the API process: a restart resets them and two serving APIs would double
@@ -90,7 +101,7 @@ stopped. Keep it that way until those windows are database-backed (go-live check
 ## 2. Host preparation
 
 ```sh
-# Firewall. Docker's published ports are NOT filtered by this — see §1.
+# Firewall. Docker's published ports are NOT filtered by this — see §1; the ingress guard (§5) drops off-host traffic to 127.0.0.0/8 and to Hatchet's ports.
 ufw default deny incoming
 ufw default allow outgoing
 ufw allow 22,80,443/tcp
@@ -113,7 +124,18 @@ apt install chrony && timedatectl set-ntp true
 swapoff -a
 
 apt install postgresql-18 caddy docker.io docker-compose-v2 age rclone postfix
+# No program may carry CAP_NET_BIND_SERVICE as a file capability (NV-55): both lines print nothing (see "No file capability" below).
+command -v getcap >/dev/null || echo GETCAP_MISSING
+getcap -r / 2>/dev/null | grep -i cap_net_bind_service
 ```
+
+Before the first enable in §5, check that this host has the raw table:
+`iptables -w -t raw -S PREROUTING` must print the chain, not an error. Some container-based VPS
+products (LXC, OpenVZ) do not offer it, and there the ingress guard fails, so Docker never
+starts. To check the `multiport` and `comment` matches too, run the two `iptables … -C` checks of
+`debateai-hatchet.service`'s `ExecStartPre=` lines by hand before the guard has run: exit 1
+("Bad rule") means the table and both matches are there, exit 2 ("Couldn't load match") means a
+match is missing (NV-56).
 
 **systemd 254 or later.** The API unit uses `RestartMode=direct`, so a crash restart of a
 release's API does not stop its website (the website is bound to its API, §1). An older systemd
@@ -124,6 +146,46 @@ version):
 ```sh
 systemctl --version
 ```
+
+**The BPF framework, and a probe of the port limit (NV-55).** The version line's feature list must
+also contain `+BPF_FRAMEWORK`. The website and API units hold `CAP_NET_BIND_SERVICE` limited to
+their own two slot ports with `SocketBindAllow=` and `SocketBindDeny=` (§5), and systemd enforces
+those lines only through its BPF framework: without it, it accepts them and ignores them. The probe
+below needs `/usr/bin/python3` (Ubuntu Server has it; a minimal Debian may not, so install
+`python3-minimal` first there). Run it:
+
+```sh
+systemctl --version | grep -q -- '+BPF_FRAMEWORK' || echo BPF_FRAMEWORK_MISSING
+P() { systemd-run --quiet --wait --pipe --collect -p User=nobody -p NoNewPrivileges=yes -p CapabilityBoundingSet=CAP_NET_BIND_SERVICE -p AmbientCapabilities=CAP_NET_BIND_SERVICE -p SocketBindAllow=tcp:483 -p SocketBindDeny=tcp:1-1023 -p SocketBindDeny=udp:1-1023 /usr/bin/python3 -c "import socket; socket.socket().bind(('127.0.0.1', $1)); print('bound', $1)"; }
+P 483; P 484
+```
+
+- `P 483` must print `bound 483`: the grant works.
+- `P 484` must fail with `PermissionError`: the limit is enforced. The probe sends no traffic, and
+  nothing in the kit uses 483 or 484.
+- If the first line prints `BPF_FRAMEWORK_MISSING`, or `P 484` binds, stop and ask before going on.
+- Repeat the block after every systemd upgrade.
+
+**No file capability (NV-55).** The two lines after `apt install` in the first block must print
+nothing. `GETCAP_MISSING` means `getcap` is not installed: `apt install libcap2-bin`, then run both
+lines again. If the second line lists `/usr/bin/caddy`, first confirm that
+`systemctl show -p AmbientCapabilities caddy` names `cap_net_bind_service` (Caddy's own unit grants
+it), then run `setcap -r /usr/bin/caddy && systemctl restart caddy`, and check again after every
+`apt upgrade` that touches caddy. Any other line: stop and ask (lines under `/var/lib/docker/` are
+files only root can reach).
+
+**The reserved ports (NV-55).** The slot ports (§1) stay reserved only while
+`net.ipv4.ip_unprivileged_port_start` is above them. Install the kit's pin from the operator
+checkout and load it:
+
+```sh
+install -m 0644 /opt/debateai/dialectical-engine/deploy/vps/sysctl.d/99-zz-debateai-reserved-ports.conf /etc/sysctl.d/ && sysctl -p /etc/sysctl.d/99-zz-debateai-reserved-ports.conf
+```
+
+It must print `net.ipv4.ip_unprivileged_port_start = 1024`. After the first reboot,
+`sysctl net.ipv4.ip_unprivileged_port_start` must print the same, and `release.mjs check` reads it
+at every release (`SLOT_FREE`, §5). The file's name sorts after Debian and Ubuntu's
+`99-sysctl.conf`, so a line there cannot lower it at boot.
 
 Create the three service users, the custody group and the runtime trees:
 
@@ -140,6 +202,7 @@ install -d -m 0755 -o root -g root /var/lib/debateai /var/lib/debateai/api
 install -d -m 0700 -o debateai-api -g debateai-api \
   /var/lib/debateai/api/publication-keys /var/lib/debateai/api/audit-keys
 install -d -m 0700 -o debateai-api -g debateai-api /var/lib/debateai/data-exports
+install -d -m 0700 -o debateai-api -g debateai-api /var/lib/debateai/api/restore-fence
 install -d -m 2750 -o debateai-api -g debateai-custody /var/lib/debateai/api/user-deks
 ```
 
@@ -166,11 +229,11 @@ process start: restart both units after either change.
 | Path | Mode | Owner | Holds |
 |---|---|---|---|
 | `/etc/debateai` | `0755` | `root:root` | the tree below (traversable; nothing secret at this level) |
-| `/etc/debateai/api.env` | `0600` | `debateai-api` | API `EnvironmentFile` |
-| `/etc/debateai/ui.env` | `0600` | `debateai-ui` | UI `EnvironmentFile` |
-| `/etc/debateai/runner.env` | `0600` | `debateai-runner` | runner `EnvironmentFile` |
+| `/etc/debateai/api.env` | `0640` | `root:debateai-api` | API `EnvironmentFile`: written by root, read by systemd as root and by the API's own group; no service user can change it (NV-52) |
+| `/etc/debateai/ui.env` | `0640` | `root:debateai-ui` | UI `EnvironmentFile`: written by root, read by systemd as root and by the UI's own group; no service user can change it (NV-52) |
+| `/etc/debateai/runner.env` | `0640` | `root:debateai-runner` | runner `EnvironmentFile`: written by root, read by systemd as root and by the runner's own group; no service user can change it (NV-52) |
 | `/etc/debateai/observation-agent.env` | `0600` | `debateai-observer` | observation agent `EnvironmentFile` (§12; the unit is not enabled) |
-| `/etc/debateai/hatchet.env` | `0600` | `root:root` | container `env_file`: `DATABASE_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SERVER_ENCRYPTION_*` |
+| `/etc/debateai/hatchet.env` | `0600` | `root:root` | container `env_file`: `DATABASE_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SERVER_ENCRYPTION_*`; `debateai-hatchet.service` checks the admin pair before every start (§5) |
 | `/etc/debateai/hatchet.pgpass` | `0600` | `root:root` | the `debateai_prod_hatchet` role's password, read once by `bootstrap.sql` (§4) |
 | `/etc/debateai/api/` | `0700` | `debateai-api` | `kek.bin`, `corpus-kek.bin`, `blind-index-key.bin`, `audit-source-ip-salt.bin`, `support-kek.bin` (the support chat's master key — the file name is checked and must be exactly this), `records-key.bin` (the records key, §9) |
 | `/etc/debateai/api/providers/` | `0700` | `debateai-api` | the API's own copy of each vendor credential (V-9, §11) |
@@ -183,6 +246,8 @@ process start: restart both units after either change.
 | `/etc/debateai/hatchet-tls/` | `0755` | `root:root` | `server.crt`, `server.key` (`0640 root:docker`), `ca.crt` |
 | `/etc/debateai/ui-edge.secret` | `0400` | `debateai-ui` | the C2b edge secret, the UI's copy |
 | `/etc/debateai/ui-edge.caddy.secret` | `0640` | `root:caddy` | the same bytes, Caddy's copy (the `Caddyfile` reads this one) |
+| `/etc/debateai/ui-api-proof.secret` | `0400` | `debateai-ui` | the UI-to-API proof (NV-03), the UI's copy |
+| `/etc/debateai/api/ui-api-proof.secret` | `0600` | `debateai-api` | the same bytes, the API's copy |
 | `/etc/debateai/payment-marks/` | `0755` | `root:root` | `netopia.svg`, `visa.svg`, `mastercard.svg` (each `0644`, owned by root): the official payment marks Caddy serves at `/payment-marks/<name>.svg` (§6, §14.7); never in the repository or a release folder |
 | `/etc/debateai/backup.conf` | `0600` | `root:root` | age **public** keys and paths — see `backup.conf.example` |
 | `/run/debateai/support-config/` | `0700` | `root:root` | `operator.json`, the JIT support-config operator credential the provisioner publishes (§4, §13). Under `/run`, so it does not survive a reboot |
@@ -194,9 +259,30 @@ process start: restart both units after either change.
 | `/var/lib/debateai/api/audit-keys` | `0700` | `debateai-api` | audit-key store |
 | `/var/lib/debateai/data-exports` | `0700` | `debateai-api` | transient encrypted exports; excluded from backups |
 | `/var/lib/debateai/api/billing-notice-spool` | `0700` | `debateai-api` | optional (§14.5): NETOPIA messages the database could not store, sealed, kept at most 14 days; not in the backups |
+| `/var/lib/debateai/api/restore-fence` | `0700` | `debateai-api` | the restore fence (`fence`, 0600, written by the API every minute; NV-07): **never** in a backup, never restored, never copied to another host |
 | `/var/lib/debateai-geoip` | `0755` | `debateai-geoip` | the DB-IP Lite country file and the Tor exit list (public data, `0644`), written only by `debateai-geoip-refresh.service` (§5 "Country data") |
 
 `/etc/default/caddy` carries `DEBATEAI_PUBLIC_HOSTNAME` and `DEBATEAI_ACME_EMAIL`.
+
+The three base `EnvironmentFile`s are root's, like the per-release overlays (§5). systemd reads
+them as root, and the units' root hooks (`ExecStartPre=+`, `ExecStopPost=+`) run with what they
+set, so a service user who could edit its own file could reach root (NV-52). Install them once,
+as root, from `/opt/debateai/dialectical-engine`, then fill in each placeholder with `sudoedit`:
+
+```sh
+for service in api ui runner; do test -e "/etc/debateai/$service.env" || install -m 0640 -o root -g "debateai-$service" "deploy/vps/env/$service.env.example" "/etc/debateai/$service.env"; done
+```
+
+A host that installed them under the older rule (`0600`, owned by the service user) replaces
+each once with a new root-owned copy, renamed over the old file. A `chown` in place would leave
+any file handle the service user already holds open for writing. The line prints
+`640 root:debateai-<service> <path>` for each file, then fails if any file is not root's `0640`,
+or if any file still sets a loader or Node start-up variable. That content was writable by the
+service user until now, so read every file through once with `sudoedit`:
+
+```sh
+for service in api ui runner; do install -m 0640 -o root -g "debateai-$service" "/etc/debateai/$service.env" "/etc/debateai/.$service.env.nv52" && mv -f "/etc/debateai/.$service.env.nv52" "/etc/debateai/$service.env"; done && stat -c '%a %U:%G %n' /etc/debateai/api.env /etc/debateai/ui.env /etc/debateai/runner.env && test "$(stat -c '%U:%a' /etc/debateai/api.env /etc/debateai/ui.env /etc/debateai/runner.env | sort -u)" = root:640 && ! grep -nE '^[[:space:]]*(export[[:space:]]+)?(LD_[A-Z_]+|GLIBC_TUNABLES|GCONV_PATH|LOCPATH|NODE_OPTIONS|NODE_PATH)[[:space:]]*=' /etc/debateai/api.env /etc/debateai/ui.env /etc/debateai/runner.env
+```
 
 ### The database principals each file names
 
@@ -222,7 +308,9 @@ observation agent's is set separately (§12).
 Every `*_PATH` key is a **raw 32-byte file** — not hex, not base64. Every line that creates a
 secret in this runbook begins with `test ! -e`: on a second paste the file already exists and the
 line does nothing, because replacing a live master key replaces the only key every stored record
-is wrapped under. A key that must really change goes through §3 "Changing a master key".
+is wrapped under. A key that must really change goes through §3 "Changing a master key". (One
+exception, the UI-to-API proof below: its `W` line writes under a temporary name with noclobber
+(`set -C`), and its own guard line runs it only when neither copy exists.)
 
 ```sh
 install -d -m 0700 -o debateai-api -g debateai-api /etc/debateai/api
@@ -272,6 +360,55 @@ files must hold the same bytes: to change the secret, remove both and paste the 
 restart the current release's website (`systemctl restart debateai-ui@$label`, §5 "The current release") and
 restart Caddy (§6).
 
+The UI-to-API proof (NV-03) is text too, and it also exists twice: the UI's copy (`0400 debateai-ui`)
+and the API's copy (`0600 debateai-api`, in the `0700` API key folder), the same bytes. The API trusts a
+loopback peer's `X-Forwarded-For`, and the edge country, only from a request that carries this proof;
+any other local process that opens the API port is just itself. The hosted API refuses to start without
+its copy (`UI_API_PROOF_REQUIRED`), and the website, which trusts Caddy, refuses to start without its own
+(`DIALECTICAL_UI_API_PROOF_REQUIRED`). A pair whose copies differ, or where only one side holds one, never
+turns ready: its website's `/readyz` says `UI_API_PROOF_REFUSED`, so Caddy never routes to it and the
+release tool refuses to switch to it. The proof must differ from the edge secret, which Caddy's group can
+read (`DIALECTICAL_UI_API_PROOF_REUSES_EDGE_SECRET`). The block writes both copies under temporary names,
+moves them into place, then compares them and checks their length:
+
+```sh
+W() { ( set -C; umask 0277 && openssl rand -base64 32 | tr '+/' '-_' | tr -d '=' > /etc/debateai/ui-api-proof.secret.new ) && chown debateai-ui:debateai-ui /etc/debateai/ui-api-proof.secret.new && install -m 0600 -o debateai-api -g debateai-api /etc/debateai/ui-api-proof.secret.new /etc/debateai/api/ui-api-proof.secret.new && mv /etc/debateai/api/ui-api-proof.secret.new /etc/debateai/api/ui-api-proof.secret && mv /etc/debateai/ui-api-proof.secret.new /etc/debateai/ui-api-proof.secret; }
+test -e /etc/debateai/ui-api-proof.secret || test -e /etc/debateai/api/ui-api-proof.secret || W
+cmp -s /etc/debateai/ui-api-proof.secret /etc/debateai/api/ui-api-proof.secret || echo UI_API_PROOF_COPIES_DIFFER
+test "$(wc -c < /etc/debateai/ui-api-proof.secret)" -ge 43 || echo UI_API_PROOF_TOO_SHORT
+```
+
+`W` runs only when neither copy exists, and noclobber (`set -C`) refuses a temporary file an earlier run
+left behind: a run that stopped half-way leaves `/etc/debateai/ui-api-proof.secret.new` or
+`/etc/debateai/api/ui-api-proof.secret.new`, so remove both before running `W` again.
+`UI_API_PROOF_COPIES_DIFFER` means the two files are not the same bytes (or one is missing): remove both
+and paste the block again. `UI_API_PROOF_TOO_SHORT` means `openssl` failed (the line runs without
+`pipefail`): both copies are then empty and both services refuse to start; remove both files and paste
+the block again. Like the edge secret, the proof is not escrowed: no stored data depends on it, so a lost
+copy is replaced by removing the other one and pasting the block again.
+
+A host whose `/etc/debateai/api.env` was installed before this release adds the API's line by hand, with
+`sudoedit /etc/debateai/api.env` (the file is `0640 root:debateai-api`, §3 above): the line is
+`UI_API_PROOF_PATH=/etc/debateai/api/ui-api-proof.secret`, as `env/api.env.example` has it. Without it the
+hosted API refuses to start (`UI_API_PROOF_REQUIRED`). A host that installs `api.env` from the example after
+this release gets the line from the example. This is the precedent of §5 "Upgrading an existing host (paid
+plans Part 1a)", step 2 (`RECORDS_KEY_PATH`). The website's line, `DIALECTICAL_UI_API_PROOF_PATH`, is in the
+`debateai-ui@.service` unit itself, and the kit installs units only at the first release (§5): a host whose
+units predate this release reinstalls that unit,
+`install -m 0644 deploy/vps/systemd/debateai-ui@.service /etc/systemd/system/`, then runs
+`systemctl daemon-reload`, as for the ingress guard (§5). Without it the new website refuses to start
+(`DIALECTICAL_UI_API_PROOF_REQUIRED`).
+
+To change the proof, prefer doing it right before a release: run `W`, the `cmp` line and the length line,
+then stage and switch the release as usual. The new pair reads the new bytes at its start, while the old
+pair keeps the old bytes in memory until it stops, so nothing goes down. Until that switch, a crash restart
+of either half of the old pair would read the new bytes while the other half holds the old ones: its
+website then reports `UI_API_PROOF_REFUSED` and Caddy takes it out until the switch, so keep that window
+short. Without a release, run `W` and both checks, then, in a maintenance window, restart the current
+release's API and website together (`systemctl restart debateai-api@$label debateai-ui@$label`, with the
+current label). The website is bound to its API (`BindsTo=`), so this is a short outage of the only
+healthy slot.
+
 ### Custody and the three service users — the custody group (V-19, ruled 2026-09-22)
 
 One OS user per service is right for almost everything: the UI cannot read `api.env`, and the
@@ -317,6 +454,7 @@ single-owner modes with the same setting on. Check the tree after provisioning:
 ```sh
 stat -c '%a %U %G %n' /var/lib/debateai/api/user-deks
 stat -c '%a %U %G %n' /var/lib/debateai/data-exports
+stat -c '%a %U %G %n' /var/lib/debateai/api/restore-fence
 find /var/lib/debateai/api/user-deks ! -group debateai-custody -print
 find /var/lib/debateai/api/user-deks -type d ! -perm 2750 -print -o -type f ! -perm 0640 -print
 ```
@@ -625,8 +763,11 @@ What the two config files pin, and why:
   installed with **no maps at all**. Nothing to create here: no `debateai-readiness` user, no
   readiness line. Never map `root` to any role: peer only sees a uid, and a process running as
   uid 0 that reaches the socket (for example a root process in the Hatchet container, which
-  bind-mounts `/var/run/postgresql`) would count as root. To confirm on the VPS, this must print
-  `0` and `0`:
+  bind-mounts `/var/run/postgresql`) would count as root. Nor may such a process run as another
+  uid that peer would map: a process running as the host `postgres` uid counts as `postgres`. So
+  the Hatchet container must never start as that uid (the check in bring-up step 1 below), and it
+  runs without `CAP_SETUID`/`CAP_SETGID` and with no new privileges, so it cannot change to it
+  (`compose.prod.yaml`, NV-57). To confirm on the VPS, this must print `0` and `0`:
 
   ```sh
   sudo -u postgres psql -XAt -c "SELECT count(*) FROM pg_hba_file_rules WHERE 'debateai_staff_readiness_writer' = ANY(user_name)" -c "SELECT count(*) FROM pg_ident_file_mappings"
@@ -669,9 +810,42 @@ nothing if `hatchet.env` already exists:
 test ! -e /etc/debateai/hatchet.env && (umask 0177 && printf 'DATABASE_URL=postgresql://debateai_prod_hatchet:%s@localhost/hatchet?host=/var/run/postgresql\n' "$(cat /etc/debateai/hatchet.pgpass)" > /etc/debateai/hatchet.env)
 ```
 
-The container reaches the socket through its bind mount (`compose.prod.yaml`). The file's other
-keys (`ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SERVER_ENCRYPTION_*`) are Hatchet's own: add them with an
-editor, `0600 root:root` stays, and no seeded or example value is ever used (audit L7-F3).
+The container reaches the socket through its bind mount (`compose.prod.yaml`), read-only: it can
+connect, but cannot create, rename or remove anything in that directory. It runs without
+`CAP_SETUID` and `CAP_SETGID` and with no new privileges, so it cannot change to the host
+`postgres` user's uid, and it must never start as that uid either: the uid the image runs as must
+differ from `id -u postgres` on this host (the check below; NV-57). Hatchet's dashboard login
+comes next, generated, like `DATABASE_URL`, from random bytes and appended only if the file names
+neither key yet: a random address under `localhost.invalid` and 24 random bytes in base64url. The
+values go into the file through the builtin `printf` and are never printed. Before every start,
+`debateai-hatchet.service` refuses a `hatchet.env` whose admin pair is missing, duplicated, the
+image's documented seeded login, or shorter than 20 characters (audit L7-F3, NV-51).
+`SERVER_ENCRYPTION_*` are added with an editor, each as one plain `KEY=value` line. The start
+check refuses a quote, backtick or backslash on any non-comment line, except in a whole
+`KEY="value"` or `KEY='value'` line with nothing after the closing quote
+(`HATCHET_ENV_TEXT_INVALID`). `0600 root:root` stays.
+
+```sh
+test -e /etc/debateai/hatchet.env && ! grep -Eq '^[[:space:]]*(export[[:space:]]+)?ADMIN_(EMAIL|PASSWORD)[[:space:]]*=' /etc/debateai/hatchet.env && printf 'ADMIN_EMAIL=debateai-hatchet-%s@localhost.invalid\nADMIN_PASSWORD=%s\n' "$(openssl rand -hex 6)" "$(openssl rand -base64 24 | tr '+/' '-_')" >> /etc/debateai/hatchet.env
+```
+
+Hatchet's self-sign-up and tenant-creation switches are not set by this kit. No file in this
+repository confirms their names for the pinned image (the audit's candidates,
+`SERVER_ALLOW_SIGNUP` and `SERVER_ALLOW_CREATE_TENANT`, are unverified). Before go-live, check the
+pinned image's configuration reference. If both exist, add each as `=false` to `hatchet.env` and
+restart `debateai-hatchet`. With `SERVER_AUTH_SET_EMAIL_VERIFIED` on, a self-registered user is
+verified at once. After Hatchet's first start, sign in once through the SSH tunnel (§1) with the
+generated pair (read it with `sudoedit /etc/debateai/hatchet.env`). If the sign-in is refused,
+regenerate the pair: delete both `ADMIN_` lines with `sudoedit`, run the line above again, and
+`systemctl restart debateai-hatchet`.
+
+After Hatchet's first start (§5 "The first release"), and after every change to its compose file
+or image, check that no process in the container runs as the host `postgres` uid; the line prints
+`postgres uid not used` or fails:
+
+```sh
+p=$(id -u postgres) && u=$(docker top debateai-prod-hatchet-lite-1 -eo pid,uid | awk 'NR > 1 { print $2 }') && test -n "$u" && ! printf '%s\n' "$u" | grep -qx "$p" && echo 'postgres uid not used'
+```
 
 **Rotating the Hatchet password — required once if this host ran the older step 1.** An earlier
 version of step 1 passed the password as `-v hatchet_password=...` on psql's command line, where
@@ -685,9 +859,13 @@ test -e /etc/debateai/hatchet.pgpass || (umask 0177 && openssl rand -hex 32 > /e
 { printf '\\set hatchet_password %s\n' "$(cat /etc/debateai/hatchet.pgpass)"; printf '%s\n' "ALTER ROLE debateai_prod_hatchet PASSWORD :'hatchet_password';"; } | sudo -u postgres psql -v ON_ERROR_STOP=1
 ```
 
-Then run the `hatchet.env` line above again, copy Hatchet's own keys (`ADMIN_EMAIL`,
-`ADMIN_PASSWORD`, `SERVER_ENCRYPTION_*`) from `hatchet.env.old` into the new file with an editor,
-delete both `.old` files, and `systemctl restart debateai-hatchet.service`.
+Then run the `hatchet.env` line above again (the `DATABASE_URL` line, **not** the admin-pair
+line), copy Hatchet's own keys (`ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SERVER_ENCRYPTION_*`) from
+`hatchet.env.old` into the new file unchanged with an editor, delete both `.old` files, and
+`systemctl restart debateai-hatchet.service`. A second pair makes the start check refuse
+(`HATCHET_ENV_ADMIN_EMAIL_DUPLICATE`). If the start check refuses the copied pair instead (one
+chosen under an older step 1 may be short, or hold `$`, a quote or a space), delete both `ADMIN_`
+lines with an editor, run the admin-pair line above once, and restart again.
 
 **2. Open the migrator for fifteen minutes.** Its password is NULL between ceremonies, and the
 provisioner refuses an admin whose credential is not bounded (manifest invariant
@@ -859,7 +1037,7 @@ commands read the version the site runs.
 
 Install Hatchet's compose file first ("Side-by-side upgrades" below, "Hatchet's compose file").
 Then prepare the first release's folder and its overlays exactly as steps 1 to 3 of "Side-by-side
-upgrades" below say, with slot A (`ui=3001 api=8790`), run `label=$new` in your shell, and record
+upgrades" below say, with slot A (`ui=481 api=491`), run `label=$new` in your shell, and record
 it in the release table as staged, so its instances may start: `release.mjs stage --label $label`.
 Then install the units and start the first release:
 
@@ -868,7 +1046,7 @@ install -m 0644 deploy/vps/systemd/*.service deploy/vps/systemd/*.timer /etc/sys
 systemctl daemon-reload
 systemctl start debateai-geoip-refresh.service
 test -n "$label" && systemctl enable --now debateai-hatchet debateai-api@$label debateai-ui@$label debateai-runner@$label \
-  debateai-backup.timer debateai-geoip-refresh.timer
+  debateai-backup.timer debateai-geoip-refresh.timer debateai-ingress-guard.service
 ```
 
 Then make it the current release: `release.mjs switch --to $label` (the first release has no older
@@ -876,19 +1054,59 @@ release, so no `--from`). The switch waits until Caddy sends traffic to the new 
 after the start, never before; it then enables the release's three instances. If it exits 2, read
 its `bad` and run it again: a release the table already names current repeats only what follows.
 
+The enable line is Hatchet's first start: then run the uid check in §4 bring-up step 1, which
+must print `postgres uid not used` (NV-57).
+
 `debateai-observation-agent.service` is installed by the first line and deliberately **not**
 enabled by the fourth (§12). The first line also installs the root timers each release's
 retirement uses (`debateai-runner-retire@.timer`, `debateai-runner-retire-check@.timer`); they
 name no time of their own and are armed only by the release tool.
 
+`debateai-ingress-guard.service` is enabled here once, and Docker then requires it at every boot
+(NV-56). Check it with `iptables -t raw -S PREROUTING`, which must list the
+`debateai-loopback-guard` and `debateai-hatchet-ports-guard` rules; `ufw status verbose` must show
+`deny (routed)`. If a firewall tool ever removes them, put both back with the lines below. This is
+not `systemctl restart debateai-ingress-guard`, which also restarts Docker and the Hatchet
+container, and not `systemctl start` on the active unit, which does nothing. If a start of
+`debateai-hatchet` was refused meanwhile, run `systemctl restart debateai-hatchet`.
+
+```sh
+/usr/sbin/iptables -w -t raw -C PREROUTING ! -i lo -d 127.0.0.0/8 -m comment --comment debateai-loopback-guard -j DROP 2>/dev/null || /usr/sbin/iptables -w -t raw -I PREROUTING 1 ! -i lo -d 127.0.0.0/8 -m comment --comment debateai-loopback-guard -j DROP
+/usr/sbin/iptables -w -t raw -C PREROUTING ! -i lo -p tcp -m multiport --dports 7077,8888 -m comment --comment debateai-hatchet-ports-guard -j DROP 2>/dev/null || /usr/sbin/iptables -w -t raw -I PREROUTING 1 ! -i lo -p tcp -m multiport --dports 7077,8888 -m comment --comment debateai-hatchet-ports-guard -j DROP
+iptables -t raw -S PREROUTING
+```
+
+No upgrade section is needed for this guard: the kit has never been booted (top of this file). A
+host that installed the units before it existed runs
+`install -m 0644 deploy/vps/systemd/debateai-ingress-guard.service deploy/vps/systemd/debateai-hatchet.service /etc/systemd/system/`,
+then `systemctl daemon-reload`, `systemctl enable --now debateai-ingress-guard.service` and,
+while no release is draining, `systemctl restart debateai-hatchet`.
+
 Before the first start, the register version named by `REGISTER_VERSION` must exist on this
 database and carry every row a hosted deployment requires (§11 "Publishing the settings register
 on this host"). The API and runner refuse to start without them.
 
+Like the ingress guard's note above, for the restore fence: a host whose kit was installed before
+NV-07 needs, before the first start of a release that carries it, the same three things §14.5 adds
+for the spool, in §14.5's order. First the folder,
+`install -d -m 0700 -o debateai-api -g debateai-api /var/lib/debateai/api/restore-fence`,
+and its `stat` line (§3). Then the updated unit,
+`install -m 0644 deploy/vps/systemd/debateai-api@.service /etc/systemd/system/`, then
+`systemctl daemon-reload`, and `systemctl show -p ReadWritePaths debateai-api@$label` lists
+`-/var/lib/debateai/api/restore-fence`. Then the setting,
+`grep -q '^RESTORE_FENCE_PATH=' /etc/debateai/api.env || printf '\nRESTORE_FENCE_PATH=%s\n' /var/lib/debateai/api/restore-fence/fence >> /etc/debateai/api.env`,
+and `grep -c '^RESTORE_FENCE_PATH=' /etc/debateai/api.env` prints `1`. Never create the file: an
+empty file is the restore marker (§9 "After any restore"). An older release sharing `api.env`
+ignores the line, because the API reads only its own shape's keys from the environment. The kit has
+never booted (top of this file), so today this is only a note.
+
 Floor shared by the three application units: `NoNewPrivileges=true`, `ProtectSystem=strict`,
 `ProtectHome=true`, `PrivateTmp=true`, `ProtectProc=invisible` + `ProcSubset=pid` (so the
 recipient address on the sendmail argv is not readable by other local uids — audit L7-F7),
-`CapabilityBoundingSet=`, `UMask=0077`, `RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6`,
+`CapabilityBoundingSet=` (empty for the runner; the API and the website have
+`CAP_NET_BIND_SERVICE` only, as an ambient capability limited to their own two slot ports by
+`SocketBindAllow=` and `SocketBindDeny=`, NV-55), `UMask=0077`,
+`RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6`,
 `SystemCallFilter=@system-service`, `TimeoutStopSec=30`, `Restart=on-failure`. Two releases run at
 once during a drain, so each instance has its own memory ceiling, the preview's values:
 `MemoryMax=2G` for the API, `1G` for the website, `3G` for the runner.
@@ -897,13 +1115,17 @@ is safe with two releases: a restarted API or runner starts again on its own rel
 folder ("database ahead" start mode, side-by-side spec §4).
 
 `ReadWritePaths` is exactly what each service writes — the API's four custody stores and the
-optional billing notice spool (§14.5; its leading `-` lets the API start while that folder does not exist), nothing for
+optional billing notice spool (§14.5; its leading `-` lets the API start while that folder does not exist) and the
+restore fence folder (§9 "After any restore"; also with a leading `-`, and a release that carries NV-07 refuses to
+start without the folder), nothing for
 the UI, and `ReadOnlyPaths` on the DEK store for the runner (it only ever *loads* run content keys;
 `ContentCipher.provisionRun` runs on the API's content-provision path).
 
 The API and runner units set `NODE_EXTRA_CA_CERTS=/etc/debateai/hatchet-tls/ca.crt` so the Hatchet
-gRPC TLS chain verifies. The UI unit sets `DIALECTICAL_UI_TRUSTED_PROXIES=127.0.0.1,::1` and
-`DIALECTICAL_UI_EDGE_SECRET_PATH=/etc/debateai/ui-edge.secret`.
+gRPC TLS chain verifies. The UI unit sets `DIALECTICAL_UI_TRUSTED_PROXIES=127.0.0.1,::1`,
+`DIALECTICAL_UI_EDGE_SECRET_PATH=/etc/debateai/ui-edge.secret` and
+`DIALECTICAL_UI_API_PROOF_PATH=/etc/debateai/ui-api-proof.secret` (NV-03); the API reads `UI_API_PROOF_PATH`
+from `api.env`.
 
 ### Side-by-side upgrades
 
@@ -940,17 +1162,20 @@ The rules, whatever the release:
   migrations and the switch with the older pair already stopped.
 
 **Hatchet's compose file, once.** It is installed from a reviewed release (the operator checkout
-at that commit) to `/etc/debateai/hatchet/compose.prod.yaml`, outside every release and the
-operator checkout, because Hatchet is shared by every release and updating code must never change
-what it runs. The line never replaces a file that is there:
+at that commit) to `/etc/debateai/hatchet/compose.prod.yaml`, with the start check
+`debateai-hatchet.service` runs before every start (`/etc/debateai/hatchet/check-env.mjs`, NV-51),
+outside every release and the operator checkout, because Hatchet is shared by every release and
+updating code must never change what it runs. Neither line replaces a file that is there:
 
 ```sh
 test ! -e /etc/debateai/hatchet/compose.prod.yaml && install -D -m 0644 deploy/vps/compose.prod.yaml /etc/debateai/hatchet/compose.prod.yaml
+test ! -e /etc/debateai/hatchet/check-env.mjs && install -D -m 0644 deploy/vps/hatchet-check-env.mjs /etc/debateai/hatchet/check-env.mjs
 ```
 
-To change it later, install the reviewed new copy over it while no release is draining and
-`systemctl restart debateai-hatchet`. The compose project keeps its fixed name (`debateai-prod`),
-so the container and its config volume carry on.
+To change either file later, install its reviewed new copy over it while no release is draining
+and `systemctl restart debateai-hatchet`. The compose project keeps its fixed name (`debateai-prod`),
+so the container and its config volume carry on. After that restart, run the uid check in §4
+bring-up step 1 again (NV-57).
 
 Run every block as root. `$label` is the current release (above); the new release's names are
 set in step 1.
@@ -984,11 +1209,11 @@ printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && printf 
 ```
 
 **3. The three overlay files.** The new release takes the slot the current one does not use:
-website `3002` and API `8791` when the current release's website is on `3001`, otherwise `3001`
-and `8790`. This picks it:
+website `482` and API `492` when the current release's website is on `481`, otherwise `481`
+and `491`. This picks it:
 
 ```sh
-printf '%s\n' "$label" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && if grep -qx 'PORT=3001' "/etc/debateai/releases/$label/ui.env"; then ui=3002 api=8791; else ui=3001 api=8790; fi && echo "new slot: website $ui, API $api"
+printf '%s\n' "$label" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && if grep -qx 'PORT=481' "/etc/debateai/releases/$label/ui.env"; then ui=482 api=492; else ui=481 api=491; fi && echo "new slot: website $ui, API $api"
 ```
 
 Then write the overlays (`0640`, root-owned, read by each service's group), once; the block
@@ -1015,15 +1240,17 @@ and the later file wins.
 | `/etc/debateai/releases/<label>/runner.env` | `0640 root:debateai-runner` | `/etc/debateai/runner.env` | `REGISTER_VERSION`, `RELEASE_KEY`, `RUNNER_WORKER_ID` and `HATCHET_WORKER_NAME` (the base names followed by the key: two runners never share a worker identity) |
 | `/etc/debateai/releases/<label>/ui.env` | `0640 root:debateai-ui` | `/etc/debateai/ui.env` | `RELEASE_KEY`, `PORT`, `DIALECTICAL_API_BASE` (its own slot's API) |
 
-The examples show slot A; slot B uses `API_PORT=8791`, `PORT=3002` and
-`DIALECTICAL_API_BASE=http://127.0.0.1:8791`. Nothing in them is secret: every credential and path
+The examples show slot A; slot B uses `API_PORT=492`, `PORT=482` and
+`DIALECTICAL_API_BASE=http://127.0.0.1:492`. Nothing in them is secret: every credential and path
 stays in the base files, shared by both releases. Root writes them once, before the release first
 starts, and never edits them while that release runs.
 
 **4. The release check** (read-only): `release.mjs check --label $new`. It compares the new
 release's folder with the current one's and answers whether every migration is additive, whether the previous older release has
 retired, whether there is enough connection, disk and memory headroom, whether Hatchet is healthy
-and whether any infrastructure maintenance is pending. Any no: stop here; nothing has changed.
+and whether any infrastructure maintenance is pending. It also checks that the spare slot is free
+(`SLOT_FREE`) and that the slot ports are still reserved (NV-55, §2). Any no: stop here; nothing
+has changed.
 
 **5. The owner's fresh yes** in the live chat, covering steps 6 to 12.
 
@@ -1104,7 +1331,7 @@ release check does not wait for it; nothing user-facing changed. After the switc
 `release.mjs rollback --to <older label> --from $label` runs the same switch in the other direction. It starts the older runner
 again first if it has retired, starts the older pair in the spare slot if it was stopped, and
 switches back; the new runner keeps finishing the debates it started. Restoring the online backup
-is a last resort only.
+is a last resort only. After any restore, do §9 "After any restore" before any API starts.
 
 **A drained upgrade** (step 4 answered `DRAINED_PATH`: a new migration is not `n1: expand`, so the
 older release cannot run beside the new database). The site is down from D1 to D4. Steps 1 to 3 as
@@ -1148,7 +1375,7 @@ It refuses while that runner runs or has open work. Then run the "current releas
 Going back: before D3's migrations, start the older release again
 (`systemctl start debateai-runner@$label debateai-api@$label debateai-ui@$label`; it is still the
 current one); after them, the older release cannot run on the new database: restore D3's online
-backup (§9) and ask the owner.
+backup (§9), then do §9 "After any restore" before any API starts, and ask the owner.
 
 ### Upgrading to the verdict-story release, and rolling it back
 
@@ -1363,10 +1590,16 @@ starts) stays off until BOTH hold: 0118 is applied (the API checks at start that
 may run it), and `SUPPORT_MODEL_TARGET_JSON` is the Anthropic Messages target (base URL exactly
 `https://api.anthropic.com/v1`), whose key it borrows. Until then the language is settled without it (the site
 language and the local detector), and the person is never blocked. It is also skipped, never blocking, while the
-day's site pot is at its ceiling or after the spend-record breaker latches (a refused grant, a missing writer or a check
-violation, or three failed records in a row: `api.question_language.spend_record_down` in the API log; a restart checks
-again). In 0118, the trigger `language_check_spend_writer_only` lets a `LANGUAGE_CHECK` row in only when the inserting
-role is the writer's owner (`debateai_staff_security_owner`): the check is by role, not by function. It holds because
+day's site spend plus its counted holds is at or above the day ceiling (the same test the room makes before new
+debates wait), or after the spend-record breaker latches (a refused grant, a missing writer or a check violation, or
+three failed records in a row: `api.question_language.spend_record_down` in the API log; a restart checks again). It
+is also skipped for one signed-in person who has had their paid checks for a fixed 24-hour window on one API process
+(the `languageChecks` admission budget: 120 unless the register version's `admissionPolicy` carries its own
+`language_checks`; on the English and Romanian sites, and 11 others, every signed-in ask is a check). Each kind of
+skip writes at most one line a minute for each settings version the process has loaded,
+`api.question_language.fast_check_skipped` with a `code` only (`OWNER_BUDGET`, `OWNER_BUDGET_CAPACITY`, `DAY_POT` or
+`DAY_POT_UNREADABLE`), never the person or the question. In 0118, the trigger `language_check_spend_writer_only` lets
+a `LANGUAGE_CHECK` row in only when the inserting role is the writer's owner (`debateai_staff_security_owner`): the check is by role, not by function. It holds because
 that role's other definer writers record only RUN or STORY rows; a future definer writer owned by that role must keep
 it so.
 
@@ -1529,6 +1762,64 @@ commands act as `debateai_release_operator` (no login: the release writers' prin
 socket here, never a runtime login); the API's runtime login may only read the active version, the runner's may only ask
 what passed. No new environment key. Until an activation exists, every release runs on its own site version, as before;
 on this server nothing activates anything before Phase 3.
+
+### Upgrading to the security fixes of audit run 3 (migrations 0125-0129)
+
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
+
+This release adds five migrations after `0124_settings_activation.sql`, all `n1: expand`, so §5's migration step
+applies them while the older release keeps serving: `migrations/0125_security_fixes_run3.sql` (the run's new functions,
+one section per issue) and four index steps: `0126_password_reset_notice_due.sql`, `0127_backup_email_notice_due.sql`
+and `0128_mfa_recovery_notice_due.sql`, the pending-only due indexes of the three recovery mail outboxes (NV-38), and
+`0129_mfa_recovery_control_user_started.sql`, the per-account index of the MFA-recovery control table (NV-15, NV-16).
+
+- **Apply 0125 in a quiet window, or with the API, the runner and any scheduler job stopped.** 0125 is one
+  transaction, and it holds every lock it takes until its COMMIT. That COMMIT comes only after all of its sections,
+  its verifier and postcondition, and every applied step's replay verifier and postcondition. Three sections take
+  strong locks on tables the serving release uses all the time:
+  - NV-01's new table's foreign key takes SHARE ROW EXCLUSIVE on `identity."user"`;
+  - NV-13's trigger swap takes ACCESS EXCLUSIVE on `identity."user"` and `identity.social_identity`;
+  - NV-50, the last section, replaces the spend-source CHECK of `ledger.model_spend` and adds one (both
+    `NOT VALID`), which takes ACCESS EXCLUSIVE on `ledger.model_spend`.
+
+  Sign-in, sign-up, every money check and every charge wait behind these until the COMMIT. Each lock wait of the step
+  lasts at most 2 s and is tried five times; then the run fails with `MIGRATION_LOCK_TIMEOUT 0125_security_fixes_run3.sql`.
+  A transaction of the serving release that already holds `ledger.model_spend` (a charge or a money check) and then
+  touches `identity."user"` can deadlock with the step. PostgreSQL then ends one side with SQLSTATE 40P01, which is
+  not retried (`packages/db/src/migration-transaction.ts` retries only 55P03). Either way the step rolls back whole
+  and nothing of 0125 remains: rerun `db:migrate` when traffic is quiet, or stop the API and the runner for the run.
+- The four index steps build their indexes concurrently (`CREATE INDEX CONCURRENTLY`) while the serving release keeps
+  writing. On a large table a build takes time.
+- Each build waits for every transaction that holds an older snapshot. A backup running at the same time, or a long or
+  idle-in-transaction session, makes the build run out of its 2 s wait five times. The backup can be the nightly
+  `deploy/vps/backup.sh`, or the online backup from §9 "The online backup before side-by-side migrations" if it starts
+  late. The run then ends with `MIGRATION_LOCK_TIMEOUT 0126_…` (or `0127_…`, `0128_…`, `0129_…`). Start the migrations after
+  `ONLINE_BACKUP_OK` and outside the nightly backup's window. If the run fails, rerun it after that transaction ends:
+  the INVALID index is dropped and rebuilt.
+- Two runs of this release's `db:migrate` no longer deadlock, because each waits for the migration lock by trying it
+  every 50 ms and holds no snapshot between tries. The older release's migrator still waits inside its lock statement,
+  holding a snapshot, until this release's run releases the lock after its last step. So do not restart the older
+  release while this release's `db:migrate` runs, from its prologue to its last step, not only while 0126-0129 build.
+  An older migrator that starts waiting during the prologue, during 0125 or during an earlier build is still waiting
+  when the next build reaches its snapshot wait, so it is in that build's cycle. If the older release restarts anyway,
+  the deadlock detector ends one side with SQLSTATE 40P01, which is not retried
+  (`packages/db/src/migration-transaction.ts` retries only 55P03). For each build, the older migrator is in the cycle
+  when it was already waiting as the build's snapshot wait began. Which side fails:
+  - the build fails if the older migrator had by then been waiting for `deadlock_timeout` (1 s) or longer. PostgreSQL
+    runs one deadlock check per wait, and the older migrator's check has already passed. This is the usual case once a
+    build is not the first thing the run does. The run fails and leaves an INVALID index, and the next run of this
+    release repairs it;
+  - the older migrator fails if it began waiting less than `deadlock_timeout` before that build's snapshot wait began.
+    Its restart fails; restart it after this release's run ends.
+
+  An older migrator that starts waiting after one build's snapshot wait has begun is not in that build's cycle. It is
+  in the next build's cycle (0127, 0128 or 0129), and by then it has waited longer than `deadlock_timeout`, so that build
+  fails. In every case, rerun the side that failed.
+- After the run (read-only, as `postgres`): `SELECT indexrelid::regclass, indisvalid FROM pg_index WHERE indexrelid IN
+  ('identity.password_reset_notice_due'::regclass,'identity.backup_email_notice_due'::regclass,'identity.mfa_recovery_notice_due'::regclass,'identity.mfa_recovery_control_user_started'::regclass);`
+  shows four valid rows. Optionally run `ANALYZE identity.password_reset_notice, identity.backup_email_notice,
+  identity.mfa_recovery_notice, identity.mfa_recovery_control;` so the claims and the MFA-recovery counts use the new
+  indexes at once rather than after the next autovacuum analyze.
 
 ### Upgrading an existing host (paid plans Part 1a)
 
@@ -1726,14 +2017,13 @@ install -m 0644 deploy/vps/Caddyfile /etc/caddy/Caddyfile
 systemctl restart caddy
 ```
 
-Then check what only a running Caddy shows (as the preview's TB7): that it filled the edge secret
-into `health_headers` (`{file.…}` is read at run time: without it every health check fails, no
-slot is ever healthy, and the check site answers Caddy's own error with no release header), and
-that the public site refuses `/readyz`. The first line prints the current release's key within
-30 s; the second prints `404`:
+Then check what only a running Caddy shows (as the preview's TB7): that a slot is healthy through
+the loopback check site (when none is, the check site answers Caddy's own error with no release
+header), and that the public site refuses `/readyz`. The first line prints the current release's
+key within 30 s; the second prints `404`:
 
 ```sh
-H=; for i in $(seq 1 30); do H=$(curl -s -m 15 -o /dev/null -D - http://127.0.0.1:3090/readyz | tr -d '\r' | grep -i '^x-debateai-release:' || true); [ -n "$H" ] && break; sleep 1; done; echo "${H:-NO SLOT HEALTHY: Caddy did not fill the file value into health_headers, or no website is ready}"
+H=; for i in $(seq 1 30); do H=$(curl -s -m 15 -o /dev/null -D - http://127.0.0.1:3090/readyz | tr -d '\r' | grep -i '^x-debateai-release:' || true); [ -n "$H" ] && break; sleep 1; done; echo "${H:-NO SLOT HEALTHY: no website is ready}"
 (set -a && . /etc/default/caddy && curl -s -o /dev/null -w '%{http_code}\n' "https://$DEBATEAI_PUBLIC_HOSTNAME/readyz")
 ```
 
@@ -1745,13 +2035,14 @@ check counts a pending Caddy change as infrastructure maintenance. Validate firs
 refuses would leave the site down after the restart.
 
 - **Two slots, one front (side-by-side spec §6).** One `reverse_proxy` lists both slots' websites,
-  `127.0.0.1:3001` (slot A) and `127.0.0.1:3002` (slot B), with `lb_policy first`. An active
-  health check asks each website's `/readyz` every 2 s, straight at the slot's port, with the edge
-  secret header (otherwise the website treats the check as an untrusted peer); a website is ready
+  `127.0.0.1:481` (slot A) and `127.0.0.1:482` (slot B), with `lb_policy first`. An active
+  health check asks each website's `/readyz` every second, straight at the slot's port, with no
+  secret: the website answers its readiness to any peer (NV-55). A website is taken out
+  after two failed checks since it last turned healthy and back in on its first pass; a probe may take
+  3 s, longer than the website's own 2 s wait for its API (NV-27). A website is ready
   only while its release is the current one, so one slot takes the traffic. The public site
-  refuses `/readyz` itself (`respond /readyz 404`): every request it proxies carries the edge
-  secret, so the website would trust a visitor's `/readyz` too. Readiness is read only by those
-  health checks and through the loopback check site below. A request that arrives while no slot is ready,
+  refuses `/readyz` itself (`respond /readyz 404`), so visitors never read a slot's readiness.
+  Readiness is read only by those health checks and through the loopback check site below. A request that arrives while no slot is ready,
   for the few seconds of a switch, is held and retried for up to 12 s (`lb_try_duration`) instead
   of failing.
 - **The loopback check site `127.0.0.1:3090`** is the same front without TLS, bound to loopback
@@ -1767,8 +2058,10 @@ refuses would leave the site down after the restart.
   such a directive is set; leaving it unset is what keeps "the last hop is the address Caddy
   observed" true for `apps/ui/trusted-client-ip.mjs`.
 - `header_up X-Debateai-Edge-Secret {file./etc/debateai/ui-edge.caddy.secret}` — without it, any local
-  process able to open `127.0.0.1:3001` or `127.0.0.1:3002` could forge a client address and evade the per-IP
-  admission limits and the audit source IP.
+  process able to open `127.0.0.1:481` or `127.0.0.1:482` could forge a client address and evade the per-IP
+  admission limits and the audit source IP; and the UI proves its forwarded address to the API with its own
+  proof (§3), so a local process that opens the API port cannot forge one either; the website's `/readyz` is
+  not ready while its API does not accept that proof (NV-03).
 - **Payment marks.** The website's footer shows the NETOPIA, Visa and Mastercard marks at
   `/payment-marks/netopia.svg`, `/payment-marks/visa.svg` and `/payment-marks/mastercard.svg`. The
   brands' artwork may not be redistributed, so it is never in the repository or a release folder:
@@ -1812,6 +2105,11 @@ MaxRetentionSec=90day
 - Caddy's access log redacts `Cookie`, `Authorization` and `Set-Cookie` by default and the
   directive that would un-redact them is deliberately absent. Add `logrotate` for `/var/log/caddy`.
 - The container is capped at `max-size: 10m`, `max-file: 3`.
+- `api.admission.evicting` (an API line, with `scope`, `capacity` and `windowMs`, at most once per
+  scope and window per API process; no address or key): a source-keyed admission table is full and
+  is giving up its least-evidenced keys, so a flood is arriving from many addresses or networks.
+  No new source is refused for capacity; a source that has spent its budget stays refused, and
+  other sources are still admitted (NV-19).
 - Backup receipts: `journalctl -u debateai-backup.service | grep BACKUP_OK`; a run that did not
   reach the off-host copy logs `BACKUP_REFUSED` or `BACKUP_FAILED` instead and the unit fails (§9).
 
@@ -1849,7 +2147,9 @@ were before the deletion survive in every backup taken earlier, until that backu
 retention (14 daily / 8 weekly, then whatever the off-host remote keeps). Whoever holds such a
 backup AND the matching escrowed master key could still open the deleted conversation. Erasure is
 therefore complete only when the last backup older than the deletion has been pruned, and the
-privacy notice must not promise more than that (`DL2-F5`).
+privacy notice must not promise more than that (`DL2-F5`). A restore brings erased accounts and
+unpublished debates back until the owner re-applies them, and the public hold keeps the library
+closed until then: "After any restore — before any API starts" below.
 
 Retention 14 daily / 8 weekly, then an off-host copy (`rclone copy`, or `scp` — configure exactly
 one in `backup.conf`). Encrypted before it leaves the box, so the remote is untrusted by
@@ -1905,9 +2205,12 @@ migrations.
 `restore-drill.sh` does not take this layout: it expects one `*.tar.age` holding all three files. To
 restore from this backup, on a machine that holds the data recipient's private key (never this
 host), first check the parts with `sha256sum -c SHA256SUMS` in the folder, then decrypt and restore
-them in the drill's own order, with the services stopped: `age -d` `globals.sql.age` and run it
-with `psql` (the roles first), then `age -d` `debateai.dump.age` into `pg_restore`, then `age -d`
-`custody.tar.age` and unpack it over the custody stores' parent folders.
+them in the drill's own order, with the services stopped: `age -d` `globals.sql.age` and apply it
+with `psql -v ON_ERROR_STOP=1` **only on a machine whose cluster does not have the roles yet** (on a
+host whose cluster already has the roles, this one when going back, skip it: re-applying would put
+back the role passwords of the artefact time), then `age -d` `debateai.dump.age` into `pg_restore`,
+then `age -d` `custody.tar.age` and unpack it over the custody stores' parent folders. Then do
+"After any restore" below before any API starts.
 
 ### Restore drill — **quarterly**, and it is not optional
 
@@ -1963,6 +2266,92 @@ escrow envelope from `/var/backups/debateai`, bring both age identities on remov
 run the drill with `DRILL_APPLY_GLOBALS=true` so the roles are recreated too. Repeat it after every
 master-key rotation, because the rotation changes what is in escrow.
 
+### After any restore — before any API starts
+
+Why (NV-07): a restored artefact's sessions, publication keys, account rows and staff rows are those of
+the artefact time. Whatever was revoked, unpublished, erased or disabled since then is back, and a
+session signed out since then would be accepted again. The restore fence (`RESTORE_FENCE_PATH`, §3) is
+the API's automatic half: a file outside every backup, compared with the restored database's own copy
+at every start. This block is the operator's half, and it works for any release, also one from before
+the fence.
+
+Every `debateai-api@`, `debateai-ui@` and `debateai-runner@` instance must be stopped. The block checks
+this itself, right after the revocation. The list goes into a variable rather than a `| grep -q` pipe,
+because under `pipefail` a `grep -q` that exits early can make the pipe fail and skip the guard.
+
+On a new machine: rebuild `/etc/debateai` exactly as §3's table and §4 step 1 lay it out, including
+owners, modes and `hatchet.env`'s generated admin pair. `backup.sh` does not capture these files, so
+never take them from an artefact. After the globals, set every DebateAI login role's password again
+(`\password <role>` as postgres) to the value its `*_DATABASE_URL` names in the env files in force, so
+that no verifier from the artefact time stays valid.
+
+One root block. The `UPDATE`s come first, so that nothing below can stop the block before the sessions
+are revoked. Each later check has its own message, and the fence question is answered in a variable, so
+a failing `psql` stops the block instead of falling into the `CLEARED` branch. Running the block again
+after a stop is safe: the `UPDATE`s touch only rows still live, and the marker is written again.
+
+```sh
+( set -euo pipefail
+  F=/var/lib/debateai/api/restore-fence/fence
+  sudo -u postgres psql -v ON_ERROR_STOP=1 -d debateai -c "UPDATE identity.session SET revoked_at = GREATEST(clock_timestamp(), created_at) WHERE revoked_at IS NULL" -c "UPDATE staff.privilege_session SET revoked_at = GREATEST(clock_timestamp(), created_at) WHERE revoked_at IS NULL"
+  echo "RESTORE_SESSIONS_REVOKED"
+  RUNNING=$(systemctl list-units --plain --no-legend --state=active 'debateai-api@*' 'debateai-ui@*' 'debateai-runner@*') || { echo "RESTORE_FENCE_NOT_DONE: systemctl could not list the app instances; the sessions are revoked; look first"; exit 1; }
+  [ -z "$RUNNING" ] || { echo "RESTORE_FENCE_NOT_DONE: app instances are running ($RUNNING); the sessions are revoked; stop them, then run this block again"; exit 1; }
+  HAS=$(sudo -u postgres psql -v ON_ERROR_STOP=1 -d debateai -XAt -c "SELECT to_regclass('identity.restore_fence') IS NOT NULL") || { echo "RESTORE_FENCE_NOT_DONE: the restored database did not answer the fence question; the sessions are revoked; look first"; exit 1; }
+  case "$HAS" in
+    t) grep -qx "RESTORE_FENCE_PATH=$F" /etc/debateai/api.env || { echo "RESTORE_FENCE_NOT_DONE: /etc/debateai/api.env does not name $F; the sessions are revoked; fix api.env (§3) before any API starts"; exit 1; }
+       [ -d "${F%/*}" ] || { echo "RESTORE_FENCE_NOT_DONE: ${F%/*} is missing; the sessions are revoked; create it as §2 does (0700 debateai-api), then run this block again"; exit 1; }
+       install -m 0600 -o debateai-api -g debateai-api /dev/null "$F"; echo "RESTORE_FENCE_MARKED" ;;
+    f) if [ -e "$F" ]; then mv "$F" "$F.before-restore-$(date -u +%Y%m%dT%H%M%SZ)"; fi; echo "RESTORE_FENCE_CLEARED" ;;
+    *) echo "RESTORE_FENCE_NOT_DONE: the fence answer was '$HAS'; the sessions are revoked; look first"; exit 1 ;;
+  esac )
+```
+
+Then start the release (§5). With the fence (`RESTORE_FENCE_MARKED`), its journal shows one
+`{"event":"api.restore_fence","outcome":"RESTORE_REVOKED","publicHold":true,…}` line: before it answers
+anything, the API has revoked every long-lived bearer (sessions, staff privilege sessions, step-up
+grants, login challenges, pending staff invitations, open email-change, recovery-address and
+backup-address confirmations, password and MFA recoveries, password-only resets), and the public
+library is empty until the hold is released.
+
+Owner reconciliation, before releasing the hold. Re-apply what you know happened after the artefact
+time, from records outside the restored database (support mail, the off-host mail log, the journal):
+
+- unpublish (as the author, or through support);
+- erasure (schedule it again);
+- staff disables;
+- DB-role rotations (`\password`).
+
+Then tell people to repeat any credential change they made after that time: a new password, a changed
+TOTP or new recovery codes, a removed passkey, an unlinked social sign-in, a removed backup or recovery
+address. The restore brought the old credential back.
+
+The release of the hold, as postgres (it prints `t`; `f` means there was no hold), and its read. Put
+the artefact's date in the note (1 to 200 characters, no control characters):
+
+```sh
+sudo -u postgres psql -v ON_ERROR_STOP=1 -d debateai -c "SELECT identity.restore_fence_release_public_hold_v1('restore of the YYYY-MM-DD artefact reconciled')"
+sudo -u postgres psql -d debateai -XAt -c "SELECT public_hold_since, last_revoked_at, last_revoked_counts FROM identity.restore_fence"
+```
+
+The current release picks the release up at its next settle (within a minute); a staged release when
+it becomes current. Then the read shows `public_hold_since` empty and the library lists debates again.
+
+Limits:
+
+- A whole-machine image restore rolls the fence file back too, so this block's marker is what catches
+  it.
+- Erased keys come back with the custody tree until they are re-erased; see "What erasure means for a
+  backup".
+- **An artefact from before migration 0125 sets no hold.** The block prints `RESTORE_FENCE_CLEARED`,
+  and the next release carrying NV-07 initialises without a hold. The custody restore can still bring
+  back the keys of debates unpublished after the artefact time. So with such an artefact, the owner
+  reconciles unpublishes and erasures **before any API starts**, and starts the API only once that is
+  done.
+- Alert on the `api.restore_fence` `RESTORE_REVOKED` journal line (with no restore behind it, check the
+  fence folder and the PostgreSQL log) and on repeated `[RESTORE_FENCE_ADVANCE_PENDING]` lines (the
+  fence has stopped moving, so a copy taken meanwhile would not be caught by the API alone).
+
 ---
 
 ## 10. What is deliberately absent
@@ -1976,6 +2365,13 @@ master-key rotation, because the rotation changes what is in escrow.
   bring-up to surface at least: whether the Next server needs writable space under
   `ProtectSystem=strict`, whether `SystemCallFilter=@system-service` is tight enough for the maker
   CLIs, and the Hatchet readiness path (the container ships without a healthcheck for that reason).
+  Hatchet's container limits: that it starts with its socket directory read-only, without
+  `CAP_SETUID`/`CAP_SETGID`, with no new privileges and never as the host `postgres` uid, and
+  whether it could also run as a non-root user with a uid of 10000 or more, or with every
+  capability dropped (NV-57). Hatchet's admin login: whether the pinned image honours
+  `ADMIN_EMAIL`/`ADMIN_PASSWORD` and accepts the generated pair (`deploy/dev-auth/README.md`
+  'Checks owed', item 1; NV-51). The Docker engine version the distribution installs, and that the
+  raw table and the `multiport` and `comment` matches are available (NV-56).
 - **Break-glass and passkeys are Phase 2**, per the mission's non-goals. There is no emergency
   admin path, no recovery ladder beyond what the app already implements, and no second operator
   account. Losing the escrow key loses every encrypted run: that is the accepted design, and it is
@@ -2011,10 +2407,12 @@ Each is a fact about the tree at this commit, not a plan. Several are go-live it
   serves is refused with `ASK_PLAN_TIER_MODEL_UNAVAILABLE`. Until a per-deployment tier mapping
   exists, the hosted site cannot serve a debate unless its vendor targets' `model` values are
   exactly the roster's names.
-- **Account deletion does not erase the account's support conversations (V-26, not built).** A
-  deleted account's support chats and case replies stay in the database; the erasure never
-  reaches them. The owner removed this from the go-live checklist on 2026-09-25: an accepted
-  limitation, not a go-live condition.
+- **Accounts erased before the support-shred release kept their support conversations (V-26).** From
+  that release on, an account erasure shreds every support session and case key bound to the account
+  before the user key is destroyed, and does not finish until a read on the support data credential
+  finds none live; the rows stay, unreadable. An erasure finished by an earlier release, by an older
+  release still current beside it, or by an older release made current again (a rollback) is not
+  reached; §13 "Accounts erased before V-26 shipped" lists them and shreds them once.
 - **A hosted register carries development source refs on its code-owned rows.** `pnpm
   register:publish-hosted` (§11) reuses the development seeder's row builder byte for byte, because
   the runner's start-up reader (`readDevelopmentRunnerPolicy`) refuses runner and algorithm rows
@@ -2034,6 +2432,12 @@ Each is a fact about the tree at this commit, not a plan. Several are go-live it
   (V-17), a tamper check on already-applied migration files (B28), a native vendor adapter for a
   vendor whose own API format is the supported one (Task 13) — only OpenAI-compatible vendors can
   be added today.
+- **Caddy's loopback check site `127.0.0.1:3090` is an ordinary port.** A process that bound it
+  before Caddy starts would block Caddy's start and could answer root's switch checks. Root's switch
+  then fails or reverts; it never routes visitors there.
+- **The daemons that hold `CAP_NET_BIND_SERVICE` by design** (Caddy, and on a stock Ubuntu
+  `systemd-resolved`, `systemd-networkd` and `chronyd`), and root itself, could bind a slot port
+  (§1, NV-55) if one of them were compromised.
 
 ---
 
@@ -2234,6 +2638,8 @@ Every limit here is in money, enforced in code, in the hosted deployment only. L
 
 Every charged call is one row in `ledger.model_spend`, and every limit is a sum over those rows. The operator record is `docs/missions/2026-09-01-security-hardening/COST-ENVELOPES-2026-09-22.md`.
 
+A call that was sent but never answered (it ran out of time, the connection dropped, or its reply could not be stored) is a row too: `RUN_UNANSWERED` or `STORY_UNANSWERED`, at what the vendor reported if a reply arrived, else at the call's largest possible cost. It counts toward its debate's (or story's) limit and the site's day, never toward a person's limits or a withdrawal. A vendor that accepts calls and then hangs can therefore use up the day quickly. A timed-out answer-writing call spends the answer's share as well, so its retry can be refused for money, and the answer then goes to a cheaper model of the debate or is not written. Check the day's split with `sudo -u postgres psql -d debateai -c "SELECT spend_source, count(*), sum(charge_micros) FROM ledger.model_spend WHERE charged_on = current_date GROUP BY 1"`.
+
 **The values in force are temporary and deliberately low**, for the owner's first paid run:
 
 | Row member | Value | Meaning |
@@ -2255,7 +2661,7 @@ The reserve and the overrun keep money for writing the answer (spec 2026-09-26 �
 - **The split.** With the values above, the calls made while a debate is argued may spend up to 70% of the per-debate ceiling (0.175 USD). The calls that write the answer may take the same debate's total up to 120% of it (0.30 USD). Both count the same running total, so the reserve is simply the part the arguing may not touch.
 - **The day must hold one debate at its maximum** (0.30 USD), or the row is refused (`COST_ENVELOPE_POLICY_INVALID`).
 - **The verdict story** has a code-owned cap that the publication seals for you (`storyCostEnvelopePolicy`: 0.05 USD, with a 20% margin, 0.06 USD). The day must hold one debate AND its story, here 0.36 USD, or publishing and both services refuse (`STORY_DAILY_CEILING_INSUFFICIENT`).
-- **Every debate charge records its part** (`spend_phase` in `ledger.model_spend`: `BODY` while arguing, `SERVE` while writing the answer).
+- **Every answered debate charge records its part** (`spend_phase` in `ledger.model_spend`: `BODY` while arguing, `SERVE` while writing the answer); an unanswered one (`RUN_UNANSWERED`) records none.
 - **A version without the two members means 0:** no money is kept back and the margin is off (go-live checklist line 12). The file format stays `debateai.hosted-register.v1`.
 
 #### The band, holds and the waiting line (budget rule, spec 2026-09-28)
@@ -2274,12 +2680,13 @@ The last three rows switch on the budget rule of `docs/superpowers/specs/2026-09
   - From 95%, or when the question would cross 100%, the debate still starts, and the ask page says the limit is close.
   - From 100%, the question is accepted (`202`, `WAITING`) and **waits in line**. The API's 60-second waker starts it by itself at the reset, oldest first and one per person.
   - A second waiting question from the same person is refused `422 ASK_ALREADY_WAITING`, and the page names the time the first will start.
+  - One person runs at most 2 debates at once (a quarter of the site's 8 places). A further question is accepted (`202`, `WAITING`) and starts by itself when one of theirs ends. It does not hold anyone else back, except for a moment at each minute until the waker records it again. With `waiting_line_per_person` of 2 or more, that moment can last up to a minute after the waker starts one of the person's questions: the person's other waiting questions are looked at again on the next tick.
 - **While a debate runs** it is measured against real spend only, up to the **finish edge**: 115% of the site's day, 110% of a person's window.
   - An arguing call that would cross it is retried on the debate's cheaper models first.
   - Only when none fits does the arguing stop, and the answer is still written.
   - The opening position and the answer are exempt.
   - Every swap is one row in `core.run_cost_substitution`. The owner sees it; the person never does.
-- **Log lines** (content-free): `api.ask.waiting` (with the wait's `scope`, or its `cause` — `SWITCHING` or `SITE_BUSY` — when that hold alone made the question wait), `api.wait.started`, `api.wait.tick` (with counts) and `runner.body.cheaper_model`.
+- **Log lines** (content-free): `api.ask.waiting` (with the wait's `scope`, or its `cause` — `SWITCHING`, `SITE_BUSY` or `PERSON_BUSY` — when that hold alone made the question wait), `api.wait.started`, `api.wait.tick` (with counts) and `runner.body.cheaper_model`.
   - After an upload a question that waited under the older release is re-admitted under the current one when it starts (side-by-side uploads): `api.wait.readmitted` (with `runId` and the new debate's `newRunId`). `api.wait.readmission_not_now` (with `runId` and the refusal `code`) means the current release would not start it now (a model unreachable, the day's limit, the preview gate): it keeps its place and the next tick asks again. `api.wait.readmission_skipped` (with `runId` and `code`) means another re-admission of it is pending or done, it no longer waits, its owner's account is closed, or it was superseded meanwhile: not this tick's to start. `api.wait.readmission_orphan` (with `runId` and `newRunId`) means an earlier re-admission of it was written but never started (the API stopped in between): that copy is recorded failed (`RUN_SETUP_FAILED:READMISSION`), so the question can be re-admitted again. Their failure lines, `api.wait.readmission_failed`, `api.wait.readmission_release_failed` and `api.wait.readmission_orphans_unread`, are in the API's signal table below ("What the runner's log says").
 - **A started debate whose first job never reached a runner** (the API stopped between starting it and handing the job over, or the hand-over failed) would keep its hold counting on every later day and window. So each minute the waker also hands every such job that has waited five minutes to the job system again: `api.wait.redispatched` with its `runId`, and `redispatched` in `api.wait.tick`. A runner claims a job once, so a debate handed over twice still runs once.
 
@@ -2309,6 +2716,10 @@ Publish them only on a build that runs the whole rule. The waiting line, holds, 
 While a model scorecard is sealed into the register version both services run, every configured model counts for every plan (the model picker may choose any of them), so the check prices the cheapest configured model; without one, each plan is priced on its own models. A misconfigured site then refuses to start instead of failing a person's debate. Raise `per_run_ceiling_micros`, or lower `serve_reserve_basis_points`.
 
 The publish command asks the same question before anything is sealed, a dry run included: it prices the opening call on the file's `providerTargets` (which must equal `PROVIDER_DISCOVERY_TARGETS_JSON`) and on the judge bound it is about to seal, and refuses with the same `RUN_CEILING_BELOW_ONE_CALL`. With `--scorecard`, every configured model counts for every plan, as both services count them while that scorecard is in force; without it, each plan is priced on its own models. Both units still ask at start-up, because the environment can differ from the file.
+
+#### One person's share of the day (billing off)
+
+While billing is off, nobody has windows of their own, so one signed-in account could otherwise fill the site's whole day. The optional member `owner_day_share_basis_points` of `costEnvelopePolicy` caps each account at a share of `daily_ceiling_micros` (from `1` to `10000`; absent means `5000`, half the day). It counts the account's debate and story spend charged that UTC day plus the holds of its debates still running. It applies only while billing is off; with billing on, each person's windows below decide instead. Beyond the share, a new question of that account is accepted (`202`, `WAITING`, `waiting_scope` `PERSON_DAY`) and waits for that account alone: until UTC midnight when its spend fills the share, or until one of its running debates ends when their holds do. Nobody else's question waits for it. Size it at several times the most one debate may spend (0.36 USD, `360000`, with the example's values and the story's cap), and at least twice that. A share below one debate's maximum leaves each account one debate a day: the first question starts (a close limit still starts), its spend then fills the share, and every later question waits until UTC midnight. `10000` is the behaviour before this member. Publish it only once no release older than this one is serving: an older release's parser refuses an unknown member (`COST_ENVELOPE_POLICY_INVALID`).
 
 #### Each person's windows (billing)
 
@@ -2405,7 +2816,7 @@ The runner writes one JSON line per event to its journal. Each line carries ids 
 never debate or model text, and none of these events changes an answer. Today's lines:
 
 ```sh
-journalctl -u 'debateai-runner@*' --since today -o cat | grep -E 'DEBATEAI_SERVE_DISCLOSURE|DEBATEAI_STORY|DEBATEAI_BODY_COST_FALLBACK|DEBATEAI_PERSON_WALL|DEBATEAI_POINT_INVESTIGATION|DEBATEAI_COMPARING_JUDGE'
+journalctl -u 'debateai-runner@*' --since today -o cat | grep -E 'DEBATEAI_SERVE_DISCLOSURE|DEBATEAI_STORY|DEBATEAI_BODY_COST_FALLBACK|DEBATEAI_SPEND|DEBATEAI_PERSON_WALL|DEBATEAI_POINT_INVESTIGATION|DEBATEAI_COMPARING_JUDGE'
 ```
 
 | Signal | What it means | What to do |
@@ -2418,6 +2829,7 @@ journalctl -u 'debateai-runner@*' --since today -o cat | grep -E 'DEBATEAI_SERVE
 | `"event":"STORY_STORED"` with `"failureCode":"STORY_NOT_CONFIGURED"` (per debate) | The pinned register version has no story rows at all, as with every version published before the verdict story. **This is expected on this host until the next hosted publish** (`pnpm register:publish-hosted`, below), which seals them. No model is called for the story, and the pages show the answer without one. | Publish once and pin the new version: a new release (§5 "A new register version is a new release"). |
 | `"event":"STORY_LOOP_FAILED"` or `"STORY_STORED"` with `"failureCode":"STORY_ENVELOPE_EXHAUSTED"` (per debate) | The story's own money cap (0.05 USD, or 0.06 with its margin) could not pay for a call on any of the debate's models. **This is expected at premium prices**: the storyteller's output bound of 12,000 tokens can cost more than the whole cap. The answer is untouched, and the page shows it without a story. | Nothing, unless every story fails this way. The cap is a code-owned row, so changing it is a code change and a new publish. |
 | `"kind":"DEBATEAI_BODY_COST_FALLBACK"`, `"event":"RUN_COST_SUBSTITUTION_WRITE_FAILED"`, with `code`, `sqlState`, `runId`, `callSiteKey` | An arguing call was moved to one of the debate's cheaper models (the `runner.body.cheaper_model` line just before it), and the owner's record of that move (`core.run_cost_substitution`) could not be written. The debate is exactly what it would have been. What is lost is that one row, so the operator's run report and the owner's read do not show that move. | Nothing writes the row later. A typed `code` is a defect to report. `UNTYPED` with a `sqlState` is the database refusing or a lost connection. More than one in a day is worth investigating. |
+| `"kind":"DEBATEAI_SPEND"`, `"event":"UNANSWERED_CHARGE_WRITE_FAILED"`, with `code`, `sqlState`, `runId`, `callSiteKey`, `attemptId` | A call to a model was sent and never answered, and its charge could not be written to `ledger.model_spend`. The runner stopped that call (the debate goes on as after any failed call), so no further attempt was sent on unrecorded money, but that attempt's possible cost is missing from the debate's and the day's totals. | A typed `code` is a defect to report. `UNTYPED` with a `sqlState` is the database refusing or a lost connection. Compare the day's vendor usage with the day's totals if it happens more than once. |
 | `{"kind":"DEBATEAI_PERSON_WALL","event":"PLANS_UNRESOLVED"}` (once, when the runner starts) | The pinned register version has a `costEnvelopePolicy` row but no `billingPlans` row, so the runner cannot read a person's windows. A debate pinned to a person (billing on at the API) would then have every walled arguing call refused as that person's month: the arguing stops and the answer is still written. A debate with no person pin, which is every debate while billing is off, is untouched. **This is expected on this host until the next hosted publish** (`pnpm register:publish-hosted`, below), which seals the engine's own billing rows (billing off). | While billing is off: nothing; it stops once you publish and pin the new version (a new release, §5 "A new register version is a new release"). After billing is switched on it means the API and the runner are on different register versions, which one release's overlays never allow: check that both overlays of the current release name the same `REGISTER_VERSION`. |
 | `"kind":"DEBATEAI_POINT_INVESTIGATION"`, `"event":"INVESTIGATION_UNAVAILABLE"`, with `runId`, `callSiteKey`, `code` (engine 2 only: never while no register version carries the engine row) | Written once per investigation that ended unavailable: one more AI was to look into a point a reviewer could not assess, and no usable answer came back (the call failed or was refused, the money stopped it, or `code` `INVESTIGATOR_SEAT_UNPLANNED`: no investigator was planned). `code` is the error's code or class name, never AI or vendor text. The point keeps its reduced "cannot assess" weight and the debate goes on; the investigation's record says unavailable. | A single one: nothing. Many in a day: read the vendor's status and the runner's other lines from the same minutes. |
 | `"kind":"DEBATEAI_COMPARING_JUDGE"`, `"event":"JUDGE_FAILED"`, with `runId`, `callSiteKey`, `code` (engine 2 only: never while no register version carries the engine row) | Written once per comparing judge whose call ended without a usable answer: one of the up to three AIs that compare the debate's answers side by side gave no vote (the call failed or was refused, or the money stopped it). `callSiteKey` names the judge's seat (`VERDICT:judge:<n>`, the judge's seat number). `code` is the error's code or class name, never AI or vendor text. The judge is recorded as failed and its vote is missing; the debate goes on and the other judges' votes decide. With no judge left, the answer is chosen by its honest strength and labelled at most "Close call". | A single one: nothing. Many in a day: read the vendor's status and the runner's other lines from the same minutes. |
@@ -2764,8 +3176,28 @@ If `support:status` refuses, the credential stays in `/run/debateai/support-data
 **Not available on this host yet:** `support:inbox` and `support:incident` (the case inbox and
 incident notes) have no production credential path at all, and `support:shred` looks for its
 production credential at `secrets/api-support.json` under its working directory. Answering a
-case or shredding a conversation on this host is not possible until those are given production
-paths.
+case on this host is not possible until those are given production paths; a one-off shred is
+possible with the working-directory credential below.
+
+**Accounts erased before V-26 shipped (once per host, after any restore, §9, and after the host has
+run an older release again).** An account erasure now shreds the account's support keys before it
+completes; one finished by an earlier release did not. List the owners whose account is closed but
+who still hold an unshredded support session or case:
+
+```sh
+sudo -u postgres psql -XAt -d debateai -c 'SELECT DISTINCT live.owner_ref FROM (SELECT identity_owner_ref AS owner_ref FROM support.session WHERE shredded_at IS NULL UNION ALL SELECT identity_owner_ref FROM support."case" WHERE shredded_at IS NULL) AS live JOIN legal.account_closure AS closure ON closure.owner_ref = live.owner_ref ORDER BY 1'
+```
+
+If it prints nothing, there is nothing to do. Otherwise, as root from
+`/opt/debateai/dialectical-engine`:
+- write the support data credential the way the status check above does, but to
+  `secrets/api-support.json`. That is the only path `support:shred` reads. The `secrets` folder
+  must be mode `0700` and the file `0600`, both owned by the user running the command. Unlike
+  `/run/debateai/support-data`, that folder is on disk, and `shred -u` is not a guaranteed wipe on
+  a journaling file system or an SSD, so keep the file there only for these commands;
+- run `NODE_ENV=production pnpm support:shred --owner <owner_ref> --yes` once for each printed
+  owner;
+- `shred -u secrets/api-support.json`, then run the query again. It must print nothing.
 
 ### Staff independent alerts (v2 source only; activation blocked)
 
@@ -3000,8 +3432,13 @@ never write it, because whoever could change it could forge payment messages. Th
 `/etc/debateai/api.env`, between the lines `# >>> billing settings (billing-setup.sh) >>>` and
 `# <<< billing settings <<<`. The script replaces only that block, keeps a dated copy of the file before it changes
 it, and turns any line outside the block that sets the same setting into a comment with a note, because systemd would
-use the later one. Before its first question it refuses with `BILLING_SETUP_UNSAFE_FOLDER` unless `/etc/debateai/api`,
-and `/etc/debateai/api/billing` if it exists, is a real folder (not a link) owned by `debateai-api`, as §3 lays them
+use the later one. That copy keeps the owner and mode the file had; on a host that once had the older layout, that
+owner is `debateai-api`. To put a copy back by hand, install it as a new root-owned file and rename it, as §3's fix-up
+line does, then read it through with `sudoedit` (NV-52). Do not `cp -p` or `mv` the copy itself, which would bring its
+owner back. The command, in prose:
+`install -m 0640 -o root -g debateai-api /etc/debateai/api.env.bak-STAMP /etc/debateai/.api.env.restore && mv -f /etc/debateai/.api.env.restore /etc/debateai/api.env`,
+with STAMP the copy's own suffix. Before its first question it refuses with `BILLING_SETUP_UNSAFE_FOLDER` unless
+`/etc/debateai/api`, and `/etc/debateai/api/billing` if it exists, is a real folder (not a link) owned by `debateai-api`, as §3 lays them
 out. Put them back as §3 says; a link there can be planted by the API's own user, so first find out how it got there.
 A key file that exists is never replaced unless you ask for its section by name with `--replace`:
 
@@ -3211,7 +3648,10 @@ checked against NETOPIA's current status, so the order in which messages arrive 
 A message that does not pass is never answered OK, because NETOPIA sends a saved card only once: if the public key were
 wrong, an OK would lose every card of that time. Instead, when the message could be NETOPIA's, it is kept for 14 days
 in a quarantine, and every kept message is checked again at every start of the API, so a corrected key (the setup's
-`--replace netopia`, then a restart) recovers it. With billing on, a message that names one of our open payments
+`--replace netopia`, then a restart) recovers it. At most 64 such messages about one payment are kept in 14 days, 64
+about one person's payments a day, and 2,000 messages or 32 MiB a day in all; a payment's first kept message, and any
+message carrying a saved card, is never refused for the last two. An identical copy is kept once, and a message naming
+no payment of ours is not kept. With billing on, a message that names one of our open payments
 emails you at once (O4, at most one an hour) with the reason, the time and the charge reference; check the key with the
 check command. The owner summary (`pnpm billing:tax-summary`, **The tax summary** in §14.8) counts the kept messages by
 the day they arrived, and every message that does not pass writes the journal line `billing.notice.unverified` (§14.8).
@@ -3690,6 +4130,12 @@ two values at the prompt:
 read -r OWNER_REF && read -r RECEIVED_AT && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:withdraw --owner "$OWNER_REF" --received "$RECEIVED_AT"
 ```
 
+If it prints `WITHDRAWAL_DEBATE_RUNNING`, nothing was written: the statement arrived less than an hour ago, more than
+a day of the 14 is left, and a debate the person started before it may still be using credit. Run the same command
+again later with the same arrival time. Once the arrival is an hour old, or inside the last day of the 14, the command
+records it at once. A debate whose runner has stopped does not hold it up for long: its claim lapses, and a debate
+counts as possibly writing its story only for an hour after its last charge.
+
 **If the person has scheduled their account deletion.** Scheduling a deletion only stops the renewal. The plan stays
 live until the deletion runs (at the earliest seven full days after it was scheduled, unless they cancel it), and so
 does the 14-day withdrawal. Settings still shows Withdraw, and the command above takes the statement as usual, so run
@@ -3860,8 +4306,9 @@ signals that matter:
 | `"event":"billing.refund.held_by_chargeback"`, with `reason` | A dispute (a chargeback) arrived on a NETOPIA payment for which a refund to the person was still open, or a refund to the person was asked for on a NETOPIA payment already under a dispute (`reason` says what the refund was for). The person's bank is taking the money back, so the site holds that refund while the dispute lasts: it leaves the O2_REFUND_REMINDER emails, and `pnpm billing:refund-done` refuses it (`BILLING_REFUND_DONE_HELD_BY_CHARGEBACK`). You got O3 `REFUND_HELD_BY_CHARGEBACK` once for that payment. | Do not refund it in NETOPIA's admin. If the dispute ends for us, record that with `pnpm billing:dispute --outcome won`, and the refund comes back into the reminder; if it ends for the person, nothing is left to refund. If you had already refunded it before the dispute, record that refund with `pnpm billing:refund-done … --despite-chargeback`: run it as **A refund handed to you**, above, shows (`systemd-run` with the API's `EnvironmentFile`), with `--despite-chargeback` after `--confirm`. |
 | `"event":"billing.payment.credentials_refused"`, with `operation` | NETOPIA refused our API key (`operation` says on what: `checkout`, `upgrade`, `card_check`, `verify`, `reconcile`, `charge`, `status` or `refund`). NETOPIA processed nothing, so nothing is counted as failed straight away, and the work is tried again, but not for ever. A renewal whose charge is refused this way is kept, as in a NETOPIA outage, for up to 3 days past its due time (a payment retry: 24 hours), and you get O3 at once. New checkouts fail while it lasts. | At once: run the check command (§14.2); it says whether NETOPIA accepts the key. A revoked or replaced key, or a sandbox key beside the live address (or the reverse): run the setup's NETOPIA section with `--replace netopia` and restart `debateai-api`; the open work then goes on by itself. Fixing the key within that time (3 days past a renewal's due time, 24 hours after a payment retry's call) keeps every renewal. |
 | `"event":"billing.payment.answer_rejected"`, with `operation` | NETOPIA answered in a shape the site cannot read (`operation` says on what), so the site took no decision from it and tries again on the call's own schedule. | Report it at once with the operation: NETOPIA's answers may have changed shape. |
-| `"event":"billing.notice.unverified"`, with `reason` | A message arrived at NETOPIA's notify address that did not pass (§14.5): `NOTICE_HEADER_MISSING`, `NOTICE_ALG_REFUSED`, `NOTICE_SIGNATURE_INVALID`, `NOTICE_ISSUER_INVALID`, `NOTICE_AUDIENCE_INVALID` or `NOTICE_BODY_HASH_INVALID`. It was answered `503` (try again) and, when it could be NETOPIA's, kept in the quarantine for 14 days. Anyone can post to that address, so a stray line now and then means nothing; each run of the check command (§14.2), and each knock of the notify alarm (every 5 minutes, `deploy/notify-alarm/README.md`), writes one with `NOTICE_HEADER_MISSING`. Messages over the intake's budget show only as `api.admission.refused` for the route `POST /v1/billing/netopia/notify`, at most once a minute per reason; NETOPIA sends them again, so a later copy is quarantined when the flood passes. | A stray line: nothing. With an O4 email, or many lines with `NOTICE_SIGNATURE_INVALID` or `NOTICE_AUDIENCE_INVALID`: run the check command (§14.2); a wrong public key or POS signature is fixed with the setup's `--replace netopia`, then restart `debateai-api`: the quarantine is checked again at that start. |
+| `"event":"billing.notice.unverified"`, with `reason` | A message arrived at NETOPIA's notify address that did not pass (§14.5): `NOTICE_HEADER_MISSING`, `NOTICE_ALG_REFUSED`, `NOTICE_SIGNATURE_INVALID`, `NOTICE_ISSUER_INVALID`, `NOTICE_AUDIENCE_INVALID` or `NOTICE_BODY_HASH_INVALID`. It was answered `503` (try again) and, when it could be NETOPIA's and the quarantine's limits allow (§14.5), kept in the quarantine for 14 days. Anyone can post to that address, so a stray line now and then means nothing; each run of the check command (§14.2), and each knock of the notify alarm (every 5 minutes, `deploy/notify-alarm/README.md`), writes one with `NOTICE_HEADER_MISSING`. Messages over the intake's budget show only as `api.admission.refused` for the route `POST /v1/billing/netopia/notify`, at most once a minute per reason; NETOPIA sends them again, so a later copy is quarantined when the flood passes, within those limits. | A stray line: nothing. With an O4 email, or many lines with `NOTICE_SIGNATURE_INVALID` or `NOTICE_AUDIENCE_INVALID`: run the check command (§14.2); a wrong public key or POS signature is fixed with the setup's `--replace netopia`, then restart `debateai-api`: the quarantine is checked again at that start. |
 | `"event":"billing.notice.recheck"`, with `quarantined`, `verified` and `failed`, or `code` | At its start the API checked the quarantined messages of the last 14 days again with its current keys; `verified` counts those that now pass and were stored as if they had just arrived. A `code` instead means the check itself failed. | `verified` above 0 after a key fix: nothing more; their payments are checked now. `failed` above 0 or a `code`: restart once more; if it repeats, report it. |
+| `"event":"billing.notice.quarantine_refused"`, with `cause` | A message that did not pass was not kept in the quarantine (§14.5): `UNKNOWN_ORDER` (it names no payment or test order of ours, so it cannot be NETOPIA's), `ORDER_FULL` (64 messages about that payment are already kept from the last 14 days), `OWNER_DAY_FULL` (64 messages about that person's payments were kept today), `DAY_FULL` (2,000 messages or 32 MiB were kept today; a payment's first kept message, and any message carrying a saved card, is never refused for this) or `BUSY` (another copy for the same payment was being kept at that instant). It was still answered `503`, so NETOPIA sends it again. | `UNKNOWN_ORDER` or `BUSY` now and then: nothing. Many `ORDER_FULL` or `OWNER_DAY_FULL`, or any `DAY_FULL`: someone is posting forged messages; check the `api.admission.refused` lines for the notify route, and run the check command (§14.2) in case the key is wrong. An O4 email still arrives (at most one an hour) when such a message names an open payment of ours. |
 | `"event":"billing.notice.spooled"` (no other field) | A message that passed could not be stored, and was kept on disk instead (§14.5). It is stored at the next replay (within 10 minutes). | One: nothing. Again and again: check the database. |
 | `"event":"billing.notice.spool_failed"` (no other field) | A message that passed could not be stored, and could not be kept on disk either (the spool folder is missing, read-only or full). NETOPIA still sends it again, but its saved card may be lost. | Check the folder with the `stat` line of §14.5 and the free disk space; then check the database. |
 | `"event":"billing.notice.spool_replay"`, with `stored`, `kept` and `expired`, or `code` | The API checked the kept messages again (at its start, then every 10 minutes): `stored` were stored and deleted, `kept` could not be read, checked or stored yet and wait for the next try, `expired` were older than 14 days and deleted unread. A `code` instead means the folder itself could not be read. | `stored` only: nothing. `kept` above 0 on several lines in a row: check the database, then run the check command (§14.2); a key fix plus a restart stores them. `expired` above 0 or a `code`: report it. |
