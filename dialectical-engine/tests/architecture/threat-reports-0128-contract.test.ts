@@ -4,14 +4,14 @@ import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
 import { auditMigrationReplaySafety } from "../../tools/orphan-audit/src/index.js";
 
 const read0125 = async (): Promise<string> =>
-  readFile(new URL("../../migrations/0127_threat_reports.sql", import.meta.url), "utf8")
+  readFile(new URL("../../migrations/0128_threat_reports.sql", import.meta.url), "utf8")
     .catch(() => "");
 
-describe("0127 threat reports contract", () => {
+describe("0128 threat reports contract", () => {
   it("keeps the synthesis source and adds a runless QUESTION_CHECK writer", async () => {
-    // Property: 0127 must preserve the prior spend sources while routing QUESTION_CHECK through its sole writer.
+    // Property: 0128 must preserve the prior spend sources while routing QUESTION_CHECK through its sole writer.
     const sql = await read0125();
-    const prior = await readFile(new URL("../../migrations/0125_synthesis_check.sql", import.meta.url), "utf8");
+    const prior = await readFile(new URL("../../migrations/0126_synthesis_check.sql", import.meta.url), "utf8");
     const sources = (value: string) => [...value.matchAll(/ADD CONSTRAINT model_spend_spend_source_check CHECK \(spend_source IN \(([^)]+)\)\)/gu)][0]?.[1]
       ?.match(/'[^']+'/gu);
     expect(sources(sql)).toEqual([...(sources(prior) ?? []), "'QUESTION_CHECK'"]);
@@ -27,11 +27,11 @@ describe("0127 threat reports contract", () => {
     expect(sql).toContain("'PUBLICATION_REVIEW','THREAT_REPORT'");
     expect(sql).toContain("'THREAT_REPORT_REPORTED','THREAT_REPORT_NOT_REPORTED'");
     expect(sql).toContain("cardinality(p_caps) BETWEEN 1 AND 5");
-    expect(sql).toContain("-- BEGIN staff.commit_owner_command (owner set of 0127;");
+    expect(sql).toContain("-- BEGIN staff.commit_owner_command (owner set of 0128;");
     expect(sql).toContain("WITH owner AS (");
     expect(sql).toContain("IN ('PUBLICATION_REVIEW_APPROVE','PUBLICATION_REVIEW_REFUSE') THEN staff.authorize_action(p_context,'PUBLICATION_REVIEW')");
     expect(sql).toContain("IN ('THREAT_REPORT_REPORTED','THREAT_REPORT_NOT_REPORTED') THEN staff.authorize_action(p_context,'THREAT_REPORT')");
-    const previous = await readFile(new URL("../../migrations/0126_publication_review.sql", import.meta.url), "utf8");
+    const previous = await readFile(new URL("../../migrations/0127_publication_review.sql", import.meta.url), "utf8");
     const ownerBlock = (value: string) => value.match(/-- BEGIN staff\.commit_owner_command[^\n]*\n([\s\S]*?)-- END staff\.commit_owner_command/u)?.[1];
     expect(ownerBlock(sql)?.replace("'PUBLICATION_REVIEW','THREAT_REPORT'", "'PUBLICATION_REVIEW'"))
       .toBe(ownerBlock(previous));
@@ -50,7 +50,7 @@ describe("0127 threat reports contract", () => {
   });
 
   it("creates the sixteen named functions and keeps the sealed export reader untouched", async () => {
-    // Property: 0127 adds a lease reader beside 0115's sealed function and exposes only named report operations.
+    // Property: 0128 adds a lease reader beside 0115's sealed function and exposes only named report operations.
     const sql = await read0125();
     for (const name of [
       "ledger.record_question_check_spend", "ledger.refuse_question_check_spend_outside_writer",
@@ -66,19 +66,19 @@ describe("0127 threat reports contract", () => {
   });
 
   it("uses the repository's replay-safe migration forms", async () => {
-    // Property: replay and orphan checks accept the 0127 DDL after earlier steps are sealed.
+    // Property: replay and orphan checks accept the 0128 DDL after earlier steps are sealed.
     const plan = await loadMigrationPlan();
     const migrateSource = await readFile(new URL("../../packages/db/src/index.ts", import.meta.url), "utf8");
     const transactionSource = await readFile(new URL("../../packages/db/src/migration-transaction.ts", import.meta.url), "utf8");
-    expect(auditMigrationReplaySafety("migrations/0127_threat_reports.sql", await read0125(), { plan, migrateSource, transactionSource })).toEqual([]);
+    expect(auditMigrationReplaySafety("migrations/0128_threat_reports.sql", await read0125(), { plan, migrateSource, transactionSource })).toEqual([]);
   });
 
-  it("makes 0127 the forward step after 0126 (S05's 0128 follows it) and pins only objects it creates", async () => {
-    // Property: the new loader records its own tables, functions, writer trigger and CHECK after 0126.
-    const loader = await readFile(new URL("../../packages/db/src/migration-forward0127.ts", import.meta.url), "utf8").catch(() => "");
+  it("makes 0128 the forward step after 0127 (S05's 0129 follows it) and pins only objects it creates", async () => {
+    // Property: the new loader records its own tables, functions, writer trigger and CHECK after 0127.
+    const loader = await readFile(new URL("../../packages/db/src/migration-forward0128.ts", import.meta.url), "utf8").catch(() => "");
     const plan = await loadMigrationPlan();
     expect(plan.forwardChain.slice(-3).map((step) => step.name))
-      .toEqual(["0126_publication_review.sql", "0127_threat_reports.sql", "0128_support_answer_scope.sql"]);
+      .toEqual(["0127_publication_review.sql", "0128_threat_reports.sql", "0129_support_answer_scope.sql"]);
     for (const name of ["staff.threat_report", "staff.threat_report_event", "staff.threat_report_alert",
       "question_check_spend_writer_only", "model_spend_question_check_is_runless"]) expect(loader).toContain(name);
     expect(loader).not.toContain("staff.commit_owner_command");

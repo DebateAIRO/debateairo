@@ -25,8 +25,8 @@ describe("S05 operator guide", () => {
     expect(withdrawal).toContain("owner_ref: none");
   });
 
-  it("G3 gives the seven post-0128 actions in order", () => {
-    const steps = between("**After migration 0128 — once, by V**", "### Staff independent alerts");
+  it("G3 gives the seven post-0129 actions in order", () => {
+    const steps = between("**After migration 0129 — once, by V**", "### Staff independent alerts");
     const numbered = [...steps.matchAll(/^\((\d)\) ([^\n]*)/gm)];
     expect(numbered.map((line) => Number(line[1]))).toEqual([1, 2, 3, 4, 5, 6, 7]);
     for (const [index, phrase] of [
@@ -42,15 +42,15 @@ describe("S05 operator guide", () => {
     const supportKey = between("The support KEK (`DL2-F5`)", "**What erasure means for a backup.**");
     const erasure = between("**What erasure means for a backup.**", "Retention 14 daily / 8 weekly");
     expect(supportKey).not.toMatch(/restore opens?[^.]*support conversation/i);
-    expect(erasure).toContain("A dump taken after migration 0128 holds no support conversations.");
+    expect(erasure).toContain("A dump taken after migration 0129 holds no support conversations.");
   });
 
   it("G5 names none of the removed support operator commands", () => {
     expect(guide).not.toMatch(/support:(?:inbox|case|reply|close)\b/);
   });
 
-  it("G6 says migration 0128 empties support tables and revokes INSERT", () => {
-    const migration = guide.split("This release adds `migrations/0128_support_answer_scope.sql`")[1]?.slice(0, 700);
+  it("G6 says migration 0129 empties support tables and revokes INSERT", () => {
+    const migration = guide.split("This release adds `migrations/0129_support_answer_scope.sql`")[1]?.slice(0, 700);
     expect(migration).toMatch(/empt(?:y|ies|ied)[^\n]*support tables/i);
     expect(migration).toMatch(/revokes? INSERT/i);
   });

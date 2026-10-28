@@ -68,7 +68,7 @@ export type ModelSpendSource =
   | "SYNTHESIS_CHECK"
   /** the fast language check before a debate: a run-less site cost (0118), written only by ledger.record_language_check_spend */
   | "LANGUAGE_CHECK"
-  /** the pre-start question check: a run-less site cost (0127), written only by ledger.record_question_check_spend */
+  /** the pre-start question check: a run-less site cost (0128), written only by ledger.record_question_check_spend */
   | "QUESTION_CHECK";
 
 /**

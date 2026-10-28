@@ -1,14 +1,14 @@
 {
-  "version": "publication-review-forward0126-v1",
+  "version": "synthesis-check-forward0126-v1",
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
-    "name": "0125_synthesis_check.sql",
-    "manifestSha256": "a867b1d9ec1dc17d52ff124480be2693c01ced29cd664686fed3f0798e44d252",
+    "name": "0124_settings_activation.sql",
+    "manifestSha256": "860ea0de6288405ec798f03d17b45367a263c8d627bc7cbaa1082a765b87ffd7",
     "verifierSha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
   },
   "migration": {
-    "name": "0126_publication_review.sql",
-    "sha256": "a097be40c63c1b38cc9c6363c47c9d6658638fee655f2ec297ebd25512663761"
+    "name": "0126_synthesis_check.sql",
+    "sha256": "1fa39a9d7067edfff7415abd20ffda2883f7398c20d27b1caf4c808a0fc2b6cb"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-111.sql",

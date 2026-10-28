@@ -590,9 +590,9 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // readRunRegisterVersion (both cast register_version in SQL). migrate() is byte-identical.
 // Side-by-side Phase 2, S9 fix round 1 (2026-10-22, spec §13, ruling R31): isDatabaseFailure and settingsRefusalCode
 // (the one rule both settings caches use) moved here beside isDatabasePoolBusy. migrate() is byte-identical.
-// synthesis-flag S01 (0125): the reviewed module after it re-exported the synthesis check's erasure module
+// synthesis-flag S01 (0126): the reviewed module after it re-exported the synthesis check's erasure module
 // (export * from "./synthesis-check-erasure.js", after the publication check's). migrate() is byte-identical.
-// synthesis-flag S04 (0127): the reviewed module after it exported the threat-report repository adapter;
+// synthesis-flag S04 (0128): the reviewed module after it exported the threat-report repository adapter;
 // migrate() is byte-identical, and the full module is re-sealed without stripping that export in the audit test.
 // synthesis-flag S05 r5: the reviewed module drops retired support repository exports; migrate() is unchanged.
 // synthesis-flag integration with origin/dev d78d58b4f (2026-10-26): the merged module of the side-by-side and

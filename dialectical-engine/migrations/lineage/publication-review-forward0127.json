@@ -1,14 +1,14 @@
 {
-  "version": "threat-reports-forward0127-v1",
+  "version": "publication-review-forward0127-v1",
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
-    "name": "0126_publication_review.sql",
-    "manifestSha256": "1af90744b84be9bd34fcc4e7036a390ba9788d39f1cb596f4bf785c60f494998",
+    "name": "0126_synthesis_check.sql",
+    "manifestSha256": "0e3f4bafa34f92a928697fd4929a6167ccdb4dd2919beb3f600edd7ed322f7a7",
     "verifierSha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
   },
   "migration": {
-    "name": "0127_threat_reports.sql",
-    "sha256": "64f1060f1bcb3a708aa07f61fd6eaab8946c78c7e124e98883b83fdf594abde8"
+    "name": "0127_publication_review.sql",
+    "sha256": "1cb28a67ac058e7776372e0b22b7dec36a54c86138a3e4988615aae356c0e7d9"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-111.sql",

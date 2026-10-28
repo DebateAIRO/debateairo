@@ -1,14 +1,14 @@
 {
-  "version": "synthesis-check-forward0125-v1",
+  "version": "support-answer-scope-forward0129-v1",
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
-    "name": "0124_settings_activation.sql",
-    "manifestSha256": "860ea0de6288405ec798f03d17b45367a263c8d627bc7cbaa1082a765b87ffd7",
+    "name": "0128_threat_reports.sql",
+    "manifestSha256": "3f0ab5329eccfa4cecb32c371807d0da235df5045353fde3a309d5799243bf72",
     "verifierSha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
   },
   "migration": {
-    "name": "0125_synthesis_check.sql",
-    "sha256": "045051313c00bc524019619d3b82f419271cb957ae2b7153969a5c45bdb04c57"
+    "name": "0129_support_answer_scope.sql",
+    "sha256": "a5e203fa37cb5e7692cac2e55b13a5be9ea82530450918067dfddcc8a9f299dd"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-111.sql",

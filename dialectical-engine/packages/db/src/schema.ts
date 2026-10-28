@@ -768,7 +768,7 @@ export const answerStory = serve.table("answer_story", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull()
 });
 
-/** S01 synthesis check (migration 0125): immutable request and check evidence. */
+/** S01 synthesis check (migration 0126): immutable request and check evidence. */
 export const synthesisCheckRequest = serve.table("synthesis_check_request", {
   requestId: uuid("request_id").primaryKey(),
   runId: uuid("run_id").notNull().references(() => run.runId),

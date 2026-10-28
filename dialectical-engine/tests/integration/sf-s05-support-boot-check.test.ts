@@ -39,8 +39,8 @@ afterAll(async () => {
   if (credentialDirectory) await rm(credentialDirectory, { recursive: true, force: true });
 });
 
-describe("S05 support principal at migration 0128", () => {
-  it("accepts the support role that 0128 leaves", async () => {
+describe("S05 support principal at migration 0129", () => {
+  it("accepts the support role that 0129 leaves", async () => {
     await expect(assertSupportPrincipalRole(supportPool)).resolves.toBeUndefined();
   });
 

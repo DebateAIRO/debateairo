@@ -1503,7 +1503,7 @@ The runner's journal gains one line kind, `DEBATEAI_COMPARING_JUDGE` (engine 2 o
 
 A register version for this code carries the code-owned `engineContractHash` row with `ba2f15d5d89b2f7b4c3168e2f7908f5d3130aa55fc4929ad0825b15028500a4d` (was `8298e1b36638369d2e1bd58111eec69d1c997f9475965ed183c8750491053473` after R2b): R3 appends the map's eight engine-2 contracts and the fixed-words position contracts. Nothing reads the row without an `engineVersionPolicy` row, so the runner boots either way; publish the new version from this release as for any release. A practice register saved with an engine row before this seal must be rebuilt: the runner refuses a stale seal at boot. Rebuild it by running the practice with `--register-next` (tools/preview-practice/README.md, "Optional flags"), which composes this code's next version, with this code's own seal, in the throwaway database.
 
-This release adds `migrations/0128_support_answer_scope.sql` (after `0122_engine_map_check.sql`): it empties the support tables and revokes INSERT from the support database role; no chat conversation or model-call row is written afterwards.
+This release adds `migrations/0129_support_answer_scope.sql` (after `0122_engine_map_check.sql`): it empties the support tables and revokes INSERT from the support database role; no chat conversation or model-call row is written afterwards.
 
 This release adds one migration, `migrations/0122_engine_map_check.sql` (after `0121_engine_verdict.sql`): two
 append-only code tables, what each engine-2 map point rests on and the answer check's codes. Apply it BEFORE the new
@@ -1838,16 +1838,16 @@ manifest forbids minting one a long-lived superuser credential (audit L5-F8).
    offline, on different media from the data key: whoever holds one envelope alone restores
    nothing. The audit source-IP salt is a key, not metadata: bundling it with the dump would let
    one envelope re-identify every hashed source IP in it. The support KEK (`DL2-F5`) remains the
-   fifth escrowed secret after migration 0128, but wraps no new key: the chat keeps no
+   fifth escrowed secret after migration 0129, but wraps no new key: the chat keeps no
    conversation. The records key is the
    sixth escrowed secret, in this same envelope (paid plans ruling Q-12). It seals the acceptance
    and billing evidence kept for years after an account is erased; without it those rows cannot be
    read, and beside the dump it would open every one, so it rides here and never in the data
    envelope.
 
-**What erasure means for a backup.** A dump taken after migration 0128 holds no support conversations.
+**What erasure means for a backup.** A dump taken after migration 0129 holds no support conversations.
 Older backups may still hold encrypted chat rows and readable metadata until V destroys those
-backups after a restore drill. The post-0128 operator step below rotates the support KEK. Once
+backups after a restore drill. The post-0129 operator step below rotates the support KEK. Once
 step (5) has destroyed every earlier copy of the old key, those old rows cannot be opened; step
 (6) then destroys every backup taken before the migration. A private debate still follows its own
 key-erasure and backup-retention rules (`DL2-F5`).
@@ -2022,7 +2022,7 @@ Each is a fact about the tree at this commit, not a plan. Several are go-live it
   cap and per-visitor share (go-live checklist line 2).
 - **One API instance only** (§1, go-live checklist line 4).
 - **The observation agent does not run on this host** (§12).
-- **`support:status` still asks for a support-data credential file**, though after migration 0128
+- **`support:status` still asks for a support-data credential file**, though after migration 0129
   it reads no support conversation or model-call data (§13).
 - **No units for the scheduler's three jobs** (replay self-test, liveness sweep, settlement
   watch), although their principals are provisioned live.
@@ -2729,7 +2729,7 @@ The support chat is part of the API: there is no separate unit. Its settings are
 | the register's support configuration rows | on or off, which model ref, and the limits — published by the operator commands below |
 | the register's `admissionPolicy` row | the three support budgets a hosted API refuses to start without (§11) |
 
-**After migration 0128 — once, by V**. Run this after the hosted deploy of 0128 and before
+**After migration 0129 — once, by V**. Run this after the hosted deploy of 0129 and before
 recording the support-data cutover. These steps destroy old copies; keep the go-live record.
 
 (1) Inspect all fifteen tables and see zero rows; run `VACUUM FULL`, then `CHECKPOINT`, outside a
@@ -2753,7 +2753,7 @@ using the escrow identity. Destroy each older envelope on the host, off-host rem
 or rehearsal medium. Where another secret differs, first make and open a replacement envelope
 holding that secret but not the old support KEK.
 
-(6) Destroy every backup taken before 0128's hosted deploy, on the host (daily and weekly), on
+(6) Destroy every backup taken before 0129's hosted deploy, on the host (daily and weekly), on
 the off-host remote and on any drill or rehearsal medium, only after step (4)'s restore drill.
 
 (7) Enter the date and the numbers of envelopes and backups destroyed in the go-live record.
@@ -2762,7 +2762,7 @@ the off-host remote and on any drill or rehearsal medium, only after step (4)'s 
 support-config operator, whose credential the provisioner publishes to
 `/run/debateai/support-config/operator.json` and which is valid for at most fifteen minutes (§4;
 how to open a new window is P3-02's "Support configuration rollout"). `support:status` still asks
-for a one-entry support-data credential file, but reads no support data after 0128. Both URLs must
+for a one-entry support-data credential file, but reads no support data after 0129. Both URLs must
 carry one of the two shapes the host's `pg_hba` admits — the socket or verified TLS (§4,
 `DL7-F6`); the URL in `api.env` already does. Run as root from `/opt/debateai/dialectical-engine`.
 

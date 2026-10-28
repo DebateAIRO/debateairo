@@ -5,7 +5,7 @@ import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
 import { auditMigrationReplaySafety } from "../../tools/orphan-audit/src/index.js";
 
 const migrations = new URL("../../migrations/", import.meta.url);
-const source = () => readFile(new URL("0125_synthesis_check.sql", migrations), "utf8");
+const source = () => readFile(new URL("0126_synthesis_check.sql", migrations), "utf8");
 const sevenTables = [
   "serve.synthesis_check_request", "serve.synthesis_check_attempt", "serve.synthesis_check_result",
   "serve.synthesis_check_inheritance", "serve.synthesis_check_removal_request",
@@ -27,15 +27,15 @@ const writerFunctions = [
   "serve.record_synthesis_check_inheritance(uuid,uuid,uuid,integer,uuid)"
 ] as const;
 
-describe("0125 synthesis check database contract", () => {
-  it("0125 is replay-safe in the repository's form", async () => {
+describe("0126 synthesis check database contract", () => {
+  it("0126 is replay-safe in the repository's form", async () => {
     const plan = await loadMigrationPlan();
     const migrateSource = await readFile(new URL("../../packages/db/src/index.ts", import.meta.url), "utf8");
     const transactionSource = await readFile(new URL("../../packages/db/src/migration-transaction.ts", import.meta.url), "utf8");
-    expect(auditMigrationReplaySafety("migrations/0125_synthesis_check.sql", await source(), { plan, migrateSource, transactionSource })).toEqual([]);
+    expect(auditMigrationReplaySafety("migrations/0126_synthesis_check.sql", await source(), { plan, migrateSource, transactionSource })).toEqual([]);
   });
 
-  it("0125 creates the check tables with their named constraints and the one-final-per-synthesis partial unique index", async () => {
+  it("0126 creates the check tables with their named constraints and the one-final-per-synthesis partial unique index", async () => {
     const sql = await source();
     expect([...sql.matchAll(/CREATE TABLE IF NOT EXISTS ([a-z_.]+)/gu)].map((match) => match[1])).toEqual([
       ...sevenTables.slice(0, 3), sevenTables[3], sevenTables[4], sevenTables[5], sevenTables[6]
@@ -52,14 +52,14 @@ describe("0125 synthesis check database contract", () => {
     expect(sql).not.toMatch(/\bverdict\s+text\b/u);
   });
 
-  it("0125 widens the spend source list by exactly SYNTHESIS_CHECK and adds model_spend_synthesis_check_names_its_run", async () => {
+  it("0126 widens the spend source list by exactly SYNTHESIS_CHECK and adds model_spend_synthesis_check_names_its_run", async () => {
     const sql = await source();
     expect(sql).toContain("spend_source IN ('RUN', 'SUPPORT', 'STORY', 'LANGUAGE_CHECK', 'SYNTHESIS_CHECK')");
     expect(sql).toContain("model_spend_synthesis_check_names_its_run");
     expect(sql).toContain("spend_source <> 'SYNTHESIS_CHECK' OR (run_id IS NOT NULL AND spend_phase IS NULL AND attempt_id IS NULL)");
   });
 
-  it("0125 leaves direct runtime INSERT only on request and attempt; results and restricted writes use definer functions", async () => {
+  it("0126 leaves direct runtime INSERT only on request and attempt; results and restricted writes use definer functions", async () => {
     const sql = await source();
     const ordinary = sql.match(/GRANT SELECT, INSERT ON ([^;]+) TO debateai_runtime;/u)?.[1] ?? "";
     for (const table of [sevenTables[0], sevenTables[1]]) {
@@ -85,7 +85,7 @@ describe("0125 synthesis check database contract", () => {
     expect(block).toContain('contentAttestation: bytea("content_attestation")');
   });
 
-  it("no earlier migration names any function 0125 creates", async () => {
+  it("no earlier migration names any function 0126 creates", async () => {
     const names = [
       "enforce_synthesis_check_answer_run", "enforce_content_attestation_v2_synthesis_check_result",
       "enforce_content_ciphertext_synthesis_check_result", "enforce_erasure_barrier_synthesis_check_result",
@@ -95,7 +95,7 @@ describe("0125 synthesis check database contract", () => {
       ...writerFunctions.map((signature) => signature.split("(")[0]!.split(".")[1]!)
     ];
     for (const file of await readdir(migrations)) {
-      if (!/^\d{4}_.+\.sql$/u.test(file) || file >= "0125_") continue;
+      if (!/^\d{4}_.+\.sql$/u.test(file) || file >= "0126_") continue;
       const earlier = await readFile(new URL(file, migrations), "utf8");
       for (const name of names) expect(earlier, `${file}: ${name}`).not.toContain(`${name}(`);
     }
@@ -129,20 +129,20 @@ describe("0125 synthesis check database contract", () => {
     }
   });
 
-  it("forward 0125 records both restricted writers in its pinned function postcondition", async () => {
-    const forward = await readFile(new URL("../../packages/db/src/migration-forward0125.ts", import.meta.url), "utf8");
+  it("forward 0126 records both restricted writers in its pinned function postcondition", async () => {
+    const forward = await readFile(new URL("../../packages/db/src/migration-forward0126.ts", import.meta.url), "utf8");
     for (const signature of writerFunctions) {
       expect(forward).toContain(`"${signature}"`);
     }
   });
 
-  it("ERASURE_FUNCTION_SIGNATURES lists the three erasure functions 0125 creates", async () => {
+  it("ERASURE_FUNCTION_SIGNATURES lists the three erasure functions 0126 creates", async () => {
     const db = await readFile(new URL("../../packages/db/src/account-erasure.ts", import.meta.url), "utf8");
     const signatures = db.slice(db.indexOf("const ERASURE_FUNCTION_SIGNATURES"), db.indexOf("] as const", db.indexOf("const ERASURE_FUNCTION_SIGNATURES")));
     for (const signature of erasureFunctions) expect(signatures).toContain(`"${signature}"`);
   });
 
-  it("0125 widens publication_ref_tombstone_ref_kind_check to exactly 19 kinds: 0040's 15 in 0040's order, then synthesis_check_erasure_request, synthesis_check_erasure_audit_id, synthesis_check_erasure_audit_actor and synthesis_check_erasure_audit_target, dropped IF EXISTS first", async () => {
+  it("0126 widens publication_ref_tombstone_ref_kind_check to exactly 19 kinds: 0040's 15 in 0040's order, then synthesis_check_erasure_request, synthesis_check_erasure_audit_id, synthesis_check_erasure_audit_actor and synthesis_check_erasure_audit_target, dropped IF EXISTS first", async () => {
     const old = await readFile(new URL("0040_account_erasure.sql", migrations), "utf8");
     const next = await source();
     const kinds = (text: string) => [...(text.match(/ref_kind IN \(([^)]+)\)/u)?.[1] ?? "").matchAll(/'([^']+)'/gu)].map((match) => match[1]);

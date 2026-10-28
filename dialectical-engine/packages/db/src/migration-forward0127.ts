@@ -3,26 +3,41 @@ import { readFile } from "node:fs/promises";
 import type { PoolClient } from "pg";
 import type { ForwardStepAnchor, ForwardStepPlan } from "./migration-forward-chain.js";
 
-/** 0127 pins only its new objects; 0125 and 0126 retain their own postconditions. */
-const NAME = "0127_threat_reports.sql";
-const VERSION = "threat-reports-forward0127-v1";
-const MANIFEST_PATH = "lineage/threat-reports-forward0127.json";
+/** The publication review's own objects are pinned; shared source and tombstone lists remain extendable. */
+const NAME = "0127_publication_review.sql";
+const VERSION = "publication-review-forward0127-v1";
+const MANIFEST_PATH = "lineage/publication-review-forward0127.json";
 const VERIFIER_PATH = "lineage/verify-effective-capabilities-111.sql";
-const PREVIOUS = "0126_publication_review.sql";
-const TABLES = ["staff.threat_report", "staff.threat_report_event", "staff.threat_report_alert"] as const;
-const FUNCTIONS = [
-  "ledger.record_question_check_spend(uuid,text,date,bigint,bigint,bigint)",
-  "ledger.refuse_question_check_spend_outside_writer()",
-  "staff.keep_threat_report(text,uuid)", "staff.keep_threat_report_with_email(text,uuid,text)",
-  "staff.list_threat_reports(jsonb,text)",
-  "staff.count_unread_threat_reports(jsonb,text)", "staff.peek_threat_report_account(jsonb,text,uuid)",
-  "staff.read_threat_report(jsonb,text,uuid)", "staff.threat_report_recipient_user(uuid)",
-  "staff.decide_threat_report(jsonb,text,uuid,text,jsonb)", "staff.erase_due_threat_reports()",
-  "staff.hold_threat_report_email(uuid,text)", "staff.claim_threat_report_alerts(integer)",
-  "staff.complete_threat_report_alert(uuid,uuid,boolean)",
-  "identity.read_data_export_threat_reports(uuid,uuid)", "identity.data_export_lease_user(uuid,uuid)"
+const PREVIOUS = "0126_synthesis_check.sql";
+const TABLES = [
+  "serve.publication_review_request", "serve.publication_review_decision",
+  "serve.publication_review_copy", "staff.publication_review_event"
 ] as const;
-const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0127_${detail}`); };
+const FUNCTIONS = [
+  "core.enforce_publication_review_answer_run()",
+  "core.enforce_erasure_barrier_publication_review_request()",
+  "core.enforce_content_attestation_v2_publication_review_decision()",
+  "core.enforce_content_ciphertext_publication_review_decision()",
+  "core.enforce_erasure_barrier_publication_review_decision()",
+  "core.enforce_content_attestation_v2_publication_review_copy()",
+  "core.enforce_content_ciphertext_publication_review_copy()",
+  "core.enforce_erasure_barrier_publication_review_copy()",
+  "serve.ask_publication_review(text,uuid,uuid,uuid,uuid,uuid,integer)",
+  "serve.read_publication_review_state(uuid,uuid,uuid)",
+  "serve.publication_review_approved(uuid,uuid,integer)",
+  "serve.sever_publication_review(uuid)",
+  "serve.sever_publication_review_on_secret_delete()",
+  "serve.sever_publication_review_on_cleanup_intent()",
+  "staff.list_publication_reviews(jsonb,text,integer)",
+  "staff.open_publication_review(jsonb,text,uuid,text)",
+  "staff.record_publication_review_copy(jsonb,text,uuid,uuid,uuid,integer,jsonb,jsonb,bytea)",
+  "staff.decide_publication_review(jsonb,text,uuid,jsonb,uuid,text,jsonb,jsonb,bytea)",
+  "serve.publication_review_run_live(uuid)"
+] as const;
+const TRIGGER_HOSTS = [
+  "core.run_content_attestation_secret", "serve.private_run_key_cleanup_intent"
+] as const;
+const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0126_${detail}`); };
 const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 const exactKeys = (value: unknown, keys: readonly string[]): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -46,16 +61,13 @@ async function postconditionEvidence(client: PoolClient): Promise<string> {
       (SELECT jsonb_agg(g.item ORDER BY g.item) FROM (SELECT coalesce(pg_get_userbyid(nullif(a.grantee,0)),'PUBLIC')||':'||a.privilege_type||':'||a.is_grantable::text item FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a) g) acl
     FROM unnest($1::text[]) signature JOIN pg_proc p ON p.oid=to_regprocedure(signature) ORDER BY signature`, [FUNCTIONS])).rows;
   if (functions.length !== FUNCTIONS.length) return fail("POSTCONDITION_OBJECTS");
-  const trigger = (await client.query(`
-    SELECT t.tgname,t.tgenabled,pg_get_triggerdef(t.oid) definition
-    FROM pg_trigger t WHERE t.tgrelid='ledger.model_spend'::regclass
-      AND t.tgname='question_check_spend_writer_only'`)).rows;
-  const check = (await client.query(`
-    SELECT k.conname,pg_get_constraintdef(k.oid) definition
-    FROM pg_constraint k WHERE k.conrelid='ledger.model_spend'::regclass
-      AND k.conname='model_spend_question_check_is_runless'`)).rows;
-  if (trigger.length !== 1 || check.length !== 1) return fail("POSTCONDITION_OBJECTS");
-  return sha(JSON.stringify({ tables, functions, trigger, check }));
+  const triggers = (await client.query(`
+    SELECT host,t.tgname,t.tgenabled,pg_get_triggerdef(t.oid) definition
+    FROM unnest($1::text[]) host
+    JOIN pg_trigger t ON t.tgrelid=to_regclass(host) AND t.tgname='zz_sever_publication_review'
+    ORDER BY host`, [TRIGGER_HOSTS])).rows;
+  if (triggers.length !== TRIGGER_HOSTS.length) return fail("POSTCONDITION_OBJECTS");
+  return sha(JSON.stringify({ tables, functions, triggers }));
 }
 
 export async function loadForward0127(anchor: ForwardStepAnchor): Promise<ForwardStepPlan> {

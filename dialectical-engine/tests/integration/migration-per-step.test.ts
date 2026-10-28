@@ -80,7 +80,7 @@ describe("Review Focus 2: a page read holding a lock on core.run while 0123's AL
   beforeAll(async () => {
     db = await startTestDatabase();
     // The database a release before 0123 leaves: the chain up to 0123 (then the settings activation 0124 and
-    // synthesis-flag's 0125 to 0128, which migrate() applies after 0123 and which take no lock on core.run).
+    // synthesis-flag's 0126 to 0129, which migrate() applies after 0123 and which take no lock on core.run).
     chain.shape = (steps) => steps.slice(0, (steps as readonly ChainStep[]).findIndex((step) => step.name === SIDE_BY_SIDE));
     try { await migrate(db.pool); } finally { chain.shape = undefined; }
     expect(await ledger()).not.toContain(SIDE_BY_SIDE);

@@ -1,5 +1,5 @@
--- 0125: append-only post-settle synthesis checks and the system erasure path.
--- Each function and trigger introduced here has an 0125-specific name. Earlier
+-- 0126: append-only post-settle synthesis checks and the system erasure path.
+-- Each function and trigger introduced here has an 0126-specific name. Earlier
 -- migration bodies are immutable, including their forward postconditions.
 -- n1 (side-by-side spec §5, the database rule): it re-adds checked constraints on tables the release before writes, so it is uploaded the old way.
 -- n1: drained

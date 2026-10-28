@@ -131,7 +131,7 @@ JSON, because the API already validates JSON with zod and no YAML parser is a de
 ## Storing nothing
 
 Today the only question text the check stores is a refused threat or weapons/drug-making question, kept for the team in
-`staff.threat_report.question` (migration 0127, plain text). The refusal screen says "We kept your question for a member of
+`staff.threat_report.question` (migration 0128, plain text). The refusal screen says "We kept your question for a member of
 our team to read"; the Terms (section 7, section 10 "Serious risk", the 2.5 change-log line) and the Privacy Policy (section 2
 "Refused questions we keep", the section 4 basis row, section 6 public authorities, the section 7 retention row) describe it.
 
@@ -140,7 +140,7 @@ The build stops storing it (orchestrator's call on scope, 2026-10-28):
   `POST /v1/asks` and the screen's kept line go, and a test proves no ask outcome writes question text;
 - the Terms and Privacy sentences about keeping come out, in all 35 languages.
 
-The threat-report feature that only read those rows (migration 0127's tables, the `forward0127` lineage and the chain tests
+The threat-report feature that only read those rows (migration 0128's tables, the `forward0128` lineage and the chain tests
 that count it, the staff permission, the admin pages, the alert e-mails, the data-export entry, the help-catalog entry; 65
 files) is left in place with no writer, and its removal is a follow-up change of its own, because it rewrites the migration
 chain. With no writer nothing is stored, so V's rule holds from this build on.

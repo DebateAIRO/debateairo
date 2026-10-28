@@ -28,9 +28,9 @@ async function prepared(check: (db: TestDatabase, before: readonly unknown[], ow
     [userId, createHash("sha256").update(userId).digest(), userId])).rows[0]!.owner_ref as string;
     await db.pool.query(`GRANT INSERT ON ${tables.map((table) => `support.${table}`).join(", ")} TO debateai_support`);
     await seedSupportFixture(db.pool, { ownerRef: owner });
-    await db.pool.query("DELETE FROM public.debateai_schema_migration_step_n1 WHERE source_name='0128_support_answer_scope.sql'");
-    await db.pool.query("DELETE FROM public.debateai_schema_migration_step WHERE source_name='0128_support_answer_scope.sql'");
-    await db.pool.query("DELETE FROM public.debateai_schema_migration WHERE name='0128_support_answer_scope.sql'");
+    await db.pool.query("DELETE FROM public.debateai_schema_migration_step_n1 WHERE source_name='0129_support_answer_scope.sql'");
+    await db.pool.query("DELETE FROM public.debateai_schema_migration_step WHERE source_name='0129_support_answer_scope.sql'");
+    await db.pool.query("DELETE FROM public.debateai_schema_migration WHERE name='0129_support_answer_scope.sql'");
     await migrate(db.pool);
     await check(db, before, owner, userId);
   } finally {
@@ -39,7 +39,7 @@ async function prepared(check: (db: TestDatabase, before: readonly unknown[], ow
 }
 
 const timeout = 300_000;
-describe("0128 destroys support records while retaining guards", () => {
+describe("0129 destroys support records while retaining guards", () => {
   it("commits with zero rows in all fifteen tables", async () => prepared(async (db) => {
     for (const table of deletion) expect((await db.pool.query(`SELECT count(*)::int count FROM support.${table}`)).rows[0]!.count, table).toBe(0);
   }), timeout);
@@ -100,13 +100,13 @@ describe("0128 destroys support records while retaining guards", () => {
   }), timeout);
 
   it("the terminal guard rejects a disabled rating guard by name", async () => prepared(async (db) => {
-    const sql = readFileSync(new URL("../../migrations/0128_support_answer_scope.sql", import.meta.url), "utf8");
+    const sql = readFileSync(new URL("../../migrations/0129_support_answer_scope.sql", import.meta.url), "utf8");
     const last = sql.slice(sql.lastIndexOf("DO $$"));
     const client = await db.pool.connect();
     try {
       await client.query("BEGIN");
       await client.query("ALTER TABLE support.rating DISABLE TRIGGER reject_mutation");
-      await expect(client.query(last)).rejects.toThrow(/MIGRATION_0128_GUARD_MISSING.*support\.rating/u);
+      await expect(client.query(last)).rejects.toThrow(/MIGRATION_0129_GUARD_MISSING.*support\.rating/u);
     } finally {
       await client.query("ROLLBACK");
       client.release();

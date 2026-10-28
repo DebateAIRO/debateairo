@@ -44,7 +44,7 @@ describe("SUP-06 remains outside the identity security zone", () => {
     expect(main).toContain("assertSupportDatabaseRole(pool, supportPool)");
   });
 
-  it("keeps no durable relay waiter or slot in the database layer (synthesis-flag S05 C8, after 0128)", async () => {
+  it("keeps no durable relay waiter or slot in the database layer (synthesis-flag S05 C8, after 0129)", async () => {
     const repository = await readFile(resolve(ROOT,"packages/db/src/support.ts"),"utf8");
     expect(repository).not.toContain("PostgresSupportRelayReservationRepository");
     expect(repository).not.toMatch(/#lockQueue|MAX_CONCURRENCY_SLOTS/u);

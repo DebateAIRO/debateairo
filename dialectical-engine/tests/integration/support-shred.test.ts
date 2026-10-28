@@ -35,7 +35,7 @@ const HISTORICAL_SUPPORT_INSERT_TABLES = `support.session, support.session_key,
   support.relay_waiter_event`;
 
 async function grantHistoricalSupportInserts(client: PoolClient): Promise<void> {
-  // 0054 predates 0128's revocation; restore its catalog only inside replay transactions.
+  // 0054 predates 0129's revocation; restore its catalog only inside replay transactions.
   await client.query(`GRANT INSERT ON ${HISTORICAL_SUPPORT_INSERT_TABLES} TO debateai_support`);
 }
 

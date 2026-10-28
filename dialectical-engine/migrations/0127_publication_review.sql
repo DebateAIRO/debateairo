@@ -1,4 +1,4 @@
--- 0126: private publication review records and a staff-only decision window.
+-- 0127: private publication review records and a staff-only decision window.
 -- The migration is applied once by the forward chain. Its DDL is replay-safe.
 -- n1 (side-by-side spec §5, the database rule): it replaces earlier staff functions and revokes their grants, so it is uploaded the old way.
 -- n1: drained
@@ -522,7 +522,7 @@ ALTER FUNCTION staff.begin_owned_webauthn(uuid,uuid,text,text,text,text,text,tex
 REVOKE ALL ON FUNCTION staff.begin_owned_webauthn(uuid,uuid,text,text,text,text,text,text,uuid,jsonb,jsonb,jsonb) FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
 GRANT EXECUTE ON FUNCTION staff.begin_owned_webauthn(uuid,uuid,text,text,text,text,text,text,uuid,jsonb,jsonb,jsonb) TO debateai_runtime;
 
--- BEGIN staff.commit_owner_command (owner set of 0126; a later migration that changes the owner set copies this block whole)
+-- BEGIN staff.commit_owner_command (owner set of 0127; a later migration that changes the owner set copies this block whole)
 CREATE OR REPLACE FUNCTION staff.commit_owner_command(p_command uuid,p_receipts uuid[],p_operation uuid,p_purpose text,p_generation uuid,p_verifier text,p_next uuid,p_next_verifier text,p_lineage uuid,p_alert jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE c staff.owner_command%ROWTYPE;g staff.owner_recovery_generation%ROWTYPE;r staff.owner_possession_receipt%ROWTYPE;t timestamptz;v_receipt jsonb;v_count integer:=0;v_base uuid;v_staff uuid;v_previous_staff uuid;v_request jsonb;BEGIN

@@ -1,5 +1,5 @@
--- 0127 · Pre-start question check and kept threat reports (synthesis-flag S04).
--- 0125's spend source remains accepted when QUESTION_CHECK is added.
+-- 0128 · Pre-start question check and kept threat reports (synthesis-flag S04).
+-- 0126's spend source remains accepted when QUESTION_CHECK is added.
 -- n1 (side-by-side spec §5, the database rule): it replaces earlier staff functions and re-adds checked constraints, so it is uploaded the old way.
 -- n1: drained
 -- n1: keeps-verifier
@@ -49,7 +49,7 @@ DROP TRIGGER IF EXISTS question_check_spend_writer_only ON ledger.model_spend;
 CREATE TRIGGER question_check_spend_writer_only BEFORE INSERT ON ledger.model_spend
   FOR EACH ROW WHEN (NEW.spend_source = 'QUESTION_CHECK') EXECUTE FUNCTION ledger.refuse_question_check_spend_outside_writer();
 
--- The 0126 staff gates, extended for the delegated THREAT_REPORT capability.
+-- The 0127 staff gates, extended for the delegated THREAT_REPORT capability.
 ALTER TABLE staff.subject DROP CONSTRAINT IF EXISTS subject_capabilities_check,
   ADD CONSTRAINT subject_capabilities_check CHECK (
     capabilities <@ ARRAY['TEAM_READ','TEAM_INVITE','TEAM_GRANT','TEAM_DISABLE','AUDIT_READ','EMERGENCY_DISABLE','PUBLICATION_REVIEW','THREAT_REPORT']::text[]
@@ -282,7 +282,7 @@ REVOKE ALL ON FUNCTION staff.begin_owned_webauthn(uuid,uuid,text,text,text,text,
 GRANT EXECUTE ON FUNCTION staff.begin_owned_webauthn(uuid,uuid,text,text,text,text,text,text,uuid,jsonb,jsonb,jsonb) TO debateai_runtime;
 
 
--- BEGIN staff.commit_owner_command (owner set of 0127; a later migration that changes the owner set copies this block whole)
+-- BEGIN staff.commit_owner_command (owner set of 0128; a later migration that changes the owner set copies this block whole)
 CREATE OR REPLACE FUNCTION staff.commit_owner_command(p_command uuid,p_receipts uuid[],p_operation uuid,p_purpose text,p_generation uuid,p_verifier text,p_next uuid,p_next_verifier text,p_lineage uuid,p_alert jsonb) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE c staff.owner_command%ROWTYPE;g staff.owner_recovery_generation%ROWTYPE;r staff.owner_possession_receipt%ROWTYPE;t timestamptz;v_receipt jsonb;v_count integer:=0;v_base uuid;v_staff uuid;v_previous_staff uuid;v_request jsonb;BEGIN
@@ -647,7 +647,7 @@ ALTER FUNCTION identity.read_data_export_threat_reports(uuid,uuid) OWNER TO deba
 REVOKE ALL ON FUNCTION identity.read_data_export_threat_reports(uuid,uuid) FROM PUBLIC,debateai_runtime,debateai_staff_recovery,debateai_data_export_worker;
 GRANT EXECUTE ON FUNCTION identity.read_data_export_threat_reports(uuid,uuid) TO debateai_data_export_worker;
 
--- Preserve the 0126 audit branches and add code-only threat-report events.
+-- Preserve the 0127 audit branches and add code-only threat-report events.
 CREATE OR REPLACE FUNCTION staff.read_audit_page(
   p_context jsonb,p_token text,p_limit integer,p_after_time timestamptz,p_after_id uuid
 ) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$

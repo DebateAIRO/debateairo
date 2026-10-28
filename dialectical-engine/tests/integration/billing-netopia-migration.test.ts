@@ -41,10 +41,10 @@ const ENGINE_MAP_CHECK_MIGRATION = "0122_engine_map_check.sql";
 const SIDE_BY_SIDE_MIGRATION = "0123_side_by_side_releases.sql";
 /** The settings activation (side-by-side spec §13), chained after the side-by-side releases'. */
 const SETTINGS_ACTIVATION_MIGRATION = "0124_settings_activation.sql";
-const SYNTHESIS_CHECK_MIGRATION = "0125_synthesis_check.sql";
-const PUBLICATION_REVIEW_MIGRATION = "0126_publication_review.sql";
-const THREAT_REPORT_MIGRATION = "0127_threat_reports.sql";
-const SUPPORT_ANSWER_SCOPE_MIGRATION = "0128_support_answer_scope.sql";
+const SYNTHESIS_CHECK_MIGRATION = "0126_synthesis_check.sql";
+const PUBLICATION_REVIEW_MIGRATION = "0127_publication_review.sql";
+const THREAT_REPORT_MIGRATION = "0128_threat_reports.sql";
+const SUPPORT_ANSWER_SCOPE_MIGRATION = "0129_support_answer_scope.sql";
 const CHAIN = [NETOPIA_MIGRATION, AUTH_DB_BATCH, PART_C_MIGRATION, ROLE_ROTATION_MIGRATION, EXPORT_MIGRATION, MAIL_LOCALE_MIGRATION, MAP_MIGRATION, LANGUAGE_CHECK_MIGRATION, RECLAIM_MIGRATION, REPLY_MEASURES_MIGRATION, ENGINE_VERDICT_MIGRATION, ENGINE_MAP_CHECK_MIGRATION, SIDE_BY_SIDE_MIGRATION, SETTINGS_ACTIVATION_MIGRATION, SYNTHESIS_CHECK_MIGRATION, PUBLICATION_REVIEW_MIGRATION, THREAT_REPORT_MIGRATION, SUPPORT_ANSWER_SCOPE_MIGRATION] as const;
 const DEV_110 = "0110_account_erasure_public_debates.sql";
 const SUPERSEDING_VERIFIER = "lineage/verify-effective-capabilities-111.sql";

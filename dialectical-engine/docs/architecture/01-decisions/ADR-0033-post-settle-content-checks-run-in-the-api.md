@@ -83,7 +83,7 @@ Consequences by category:
   writes (cleanup intent, attestation secret gone, keys destroyed, tombstone) through three new definer functions,
   attributed by a system binding and one `debate.system.erased` audit event. The private-delete functions are not
   redefined.
-- The migration of this decision is `0125_synthesis_check.sql` (Revisions 1-3 named 0119 and 0121; dev took those numbers).
+- The migration of this decision is `0126_synthesis_check.sql` (Revisions 1-3 named 0119 and 0121; dev took those numbers).
 
 ## Revision 5 of the S01 plan (2026-10-19, seat `ARCH-FIX-SF-S01-r5`, ticket `t_541ec919`; SPEC of record `SPEC-v6.md` with S01-R11's sentence planned to V-79, base `origin/dev` @ 27e21e5e1)
 
@@ -94,7 +94,7 @@ Consequences by category:
   seal margin. So a deleting verdict can reach a debate whose answer its owner has already read only through Publish's own
   check, which the SPEC allows. Revision 4's "D after the later of the request and the last attempt" let a late claim hold
   an answer again and let a slow answer land after the hold.
-- **The system deletion writes only what the registry allows, for one owner.** Migration 0125 widens the publication-ref
+- **The system deletion writes only what the registry allows, for one owner.** Migration 0126 widens the publication-ref
   registry's closed kind list (`publication_ref_tombstone_ref_kind_check`) by the four kinds the system deletion writes
   (V-77), in the replay-safe drop-then-add form; no forward step digests that constraint. The deletion proceeds only when
   the run's first and latest owners are the same account, as the private delete requires; otherwise it waits, and a request

@@ -31,10 +31,10 @@ const ENGINE_MAP_CHECK = "0122_engine_map_check.sql";
 const SIDE_BY_SIDE = "0123_side_by_side_releases.sql";
 /** The settings activation, chained after the side-by-side releases (side-by-side uploads spec §13). */
 const SETTINGS_ACTIVATION = "0124_settings_activation.sql";
-const SYNTHESIS_CHECK = "0125_synthesis_check.sql";
-const PUBLICATION_REVIEW = "0126_publication_review.sql";
-const THREAT_REPORT = "0127_threat_reports.sql";
-const SUPPORT_ANSWER_SCOPE = "0128_support_answer_scope.sql";
+const SYNTHESIS_CHECK = "0126_synthesis_check.sql";
+const PUBLICATION_REVIEW = "0127_publication_review.sql";
+const THREAT_REPORT = "0128_threat_reports.sql";
+const SUPPORT_ANSWER_SCOPE = "0129_support_answer_scope.sql";
 const ROTATE = "identity.rotate_session_after_step_up(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,timestamp with time zone,uuid,text,text,uuid,timestamp with time zone)";
 const rows = async (db: TestDatabase, table: string) => (await db.pool.query(`SELECT * FROM ${table} ORDER BY 1`)).rows;
 const ledger = (db: TestDatabase) => rows(db, "public.debateai_schema_migration");
@@ -46,7 +46,7 @@ describe("data export forward115", () => {
   beforeAll(async () => { db = await startTestDatabase(); await migrate(db.pool); }, 180_000);
   afterAll(async () => { await db?.stop(); });
 
-  it("G1 applies 0110, NETOPIA 0111, the auth batch 0112, Part C 0113, role rotation 0114, export 0115, the mail locale 0116, the map 0117, the language check 0118 and the reclaim resume 0119 and the reply measures 0120, the engine verdict 0121, the engine's map answer step 0122, the side-by-side releases 0123, the settings activation 0124, the synthesis check 0125, the publication review 0126, the threat reports 0127 and the support answer scope 0128 with linked receipts", async () => {
+  it("G1 applies 0110, NETOPIA 0111, the auth batch 0112, Part C 0113, role rotation 0114, export 0115, the mail locale 0116, the map 0117, the language check 0118 and the reclaim resume 0119 and the reply measures 0120, the engine verdict 0121, the engine's map answer step 0122, the side-by-side releases 0123, the settings activation 0124, the synthesis check 0126, the publication review 0127, the threat reports 0128 and the support answer scope 0129 with linked receipts", async () => {
     const plan = await loadMigrationPlan();
     expect(plan.forwardChain.map(step => step.name)).toEqual([NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM, REPLY_MEASURES, ENGINE_VERDICT, ENGINE_MAP_CHECK, SIDE_BY_SIDE, SETTINGS_ACTIVATION, SYNTHESIS_CHECK, PUBLICATION_REVIEW, THREAT_REPORT, SUPPORT_ANSWER_SCOPE]);
     const names = (await ledger(db)).map(row => row.name).filter(name => name.startsWith("011") || name.startsWith("012"));

@@ -3,41 +3,36 @@ import { readFile } from "node:fs/promises";
 import type { PoolClient } from "pg";
 import type { ForwardStepAnchor, ForwardStepPlan } from "./migration-forward-chain.js";
 
-/** The publication review's own objects are pinned; shared source and tombstone lists remain extendable. */
-const NAME = "0126_publication_review.sql";
-const VERSION = "publication-review-forward0126-v1";
-const MANIFEST_PATH = "lineage/publication-review-forward0126.json";
+/** The synthesis check's own objects are pinned; shared source and tombstone lists remain extendable. */
+const NAME = "0126_synthesis_check.sql";
+const VERSION = "synthesis-check-forward0126-v1";
+const MANIFEST_PATH = "lineage/synthesis-check-forward0126.json";
 const VERIFIER_PATH = "lineage/verify-effective-capabilities-111.sql";
-const PREVIOUS = "0125_synthesis_check.sql";
+const PREVIOUS = "0124_settings_activation.sql";
 const TABLES = [
-  "serve.publication_review_request", "serve.publication_review_decision",
-  "serve.publication_review_copy", "staff.publication_review_event"
+  "serve.synthesis_check_request", "serve.synthesis_check_attempt", "serve.synthesis_check_result",
+  "serve.synthesis_check_inheritance", "serve.synthesis_check_removal_request",
+  "serve.synthesis_check_removal_notice", "identity.synthesis_check_erasure_binding"
 ] as const;
 const FUNCTIONS = [
-  "core.enforce_publication_review_answer_run()",
-  "core.enforce_erasure_barrier_publication_review_request()",
-  "core.enforce_content_attestation_v2_publication_review_decision()",
-  "core.enforce_content_ciphertext_publication_review_decision()",
-  "core.enforce_erasure_barrier_publication_review_decision()",
-  "core.enforce_content_attestation_v2_publication_review_copy()",
-  "core.enforce_content_ciphertext_publication_review_copy()",
-  "core.enforce_erasure_barrier_publication_review_copy()",
-  "serve.ask_publication_review(text,uuid,uuid,uuid,uuid,uuid,integer)",
-  "serve.read_publication_review_state(uuid,uuid,uuid)",
-  "serve.publication_review_approved(uuid,uuid,integer)",
-  "serve.sever_publication_review(uuid)",
-  "serve.sever_publication_review_on_secret_delete()",
-  "serve.sever_publication_review_on_cleanup_intent()",
-  "staff.list_publication_reviews(jsonb,text,integer)",
-  "staff.open_publication_review(jsonb,text,uuid,text)",
-  "staff.record_publication_review_copy(jsonb,text,uuid,uuid,uuid,integer,jsonb,jsonb,bytea)",
-  "staff.decide_publication_review(jsonb,text,uuid,jsonb,uuid,text,jsonb,jsonb,bytea)",
-  "serve.publication_review_run_live(uuid)"
+  "core.enforce_synthesis_check_answer_run()",
+  "core.enforce_content_attestation_v2_synthesis_check_result()",
+  "core.enforce_content_ciphertext_synthesis_check_result()",
+  "core.enforce_erasure_barrier_synthesis_check_result()",
+  "core.enforce_synthesis_check_inheritance()",
+  "core.enforce_synthesis_check_removal_request()",
+  "serve.store_synthesis_check_result(uuid,uuid,uuid,uuid,integer,integer,boolean,text,text,jsonb,jsonb,bytea,boolean)",
+  "serve.record_synthesis_check_inheritance(uuid,uuid,uuid,integer,uuid)",
+  "core.prepare_synthesis_check_erasures(integer)",
+  "core.pending_synthesis_check_erasure_cleanup(integer)",
+  "core.finalize_synthesis_check_erasure(uuid,timestamptz,timestamptz,integer,integer)",
+  "serve.take_synthesis_check_removal_notice(uuid)",
+  "serve.synthesis_check_removal_notice_exists(uuid)",
+  "serve.purge_expired_synthesis_check_removal_notices()",
+  "serve.run_removed_by_synthesis_check(uuid)"
 ] as const;
-const TRIGGER_HOSTS = [
-  "core.run_content_attestation_secret", "serve.private_run_key_cleanup_intent"
-] as const;
-const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0126_${detail}`); };
+const OWN_CONSTRAINT = "model_spend_synthesis_check_names_its_run";
+const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0125_${detail}`); };
 const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 const exactKeys = (value: unknown, keys: readonly string[]): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -61,13 +56,11 @@ async function postconditionEvidence(client: PoolClient): Promise<string> {
       (SELECT jsonb_agg(g.item ORDER BY g.item) FROM (SELECT coalesce(pg_get_userbyid(nullif(a.grantee,0)),'PUBLIC')||':'||a.privilege_type||':'||a.is_grantable::text item FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a) g) acl
     FROM unnest($1::text[]) signature JOIN pg_proc p ON p.oid=to_regprocedure(signature) ORDER BY signature`, [FUNCTIONS])).rows;
   if (functions.length !== FUNCTIONS.length) return fail("POSTCONDITION_OBJECTS");
-  const triggers = (await client.query(`
-    SELECT host,t.tgname,t.tgenabled,pg_get_triggerdef(t.oid) definition
-    FROM unnest($1::text[]) host
-    JOIN pg_trigger t ON t.tgrelid=to_regclass(host) AND t.tgname='zz_sever_publication_review'
-    ORDER BY host`, [TRIGGER_HOSTS])).rows;
-  if (triggers.length !== TRIGGER_HOSTS.length) return fail("POSTCONDITION_OBJECTS");
-  return sha(JSON.stringify({ tables, functions, triggers }));
+  const constraints = (await client.query(`
+    SELECT k.conname,pg_get_constraintdef(k.oid) definition FROM pg_constraint k
+    WHERE k.conrelid='ledger.model_spend'::regclass AND k.conname=$1`, [OWN_CONSTRAINT])).rows;
+  if (constraints.length !== 1) return fail("POSTCONDITION_OBJECTS");
+  return sha(JSON.stringify({ tables, functions, constraints }));
 }
 
 export async function loadForward0126(anchor: ForwardStepAnchor): Promise<ForwardStepPlan> {

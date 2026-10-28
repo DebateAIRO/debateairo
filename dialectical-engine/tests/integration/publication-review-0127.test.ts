@@ -188,7 +188,7 @@ beforeAll(async () => {
 }, 180_000);
 afterAll(async () => database?.stop());
 
-describe("0126 publication review database boundary", () => {
+describe("0127 publication review database boundary", () => {
   it("debateai_runtime is refused SELECT on each of the four tables with 42501", async () => {
     const client = await database.pool.connect();
     try {
@@ -265,7 +265,7 @@ describe("0126 publication review database boundary", () => {
     )).rows).toEqual([{ spent: false }]);
   });
 
-  it("a missing 0126 sever trigger is rejected on forward replay", async () => {
+  it("a missing 0127 sever trigger is rejected on forward replay", async () => {
     const isolated = await startTestDatabase();
     try {
       await migrate(isolated.pool);
@@ -700,7 +700,7 @@ describe("0126 publication review database boundary", () => {
     const owner=await staffActor(undefined,['TEAM_READ','TEAM_INVITE','TEAM_GRANT','TEAM_DISABLE','AUDIT_READ','EMERGENCY_DISABLE']);
     const delegate=await staffActor(undefined,['TEAM_READ']);
     await database.pool.query('INSERT INTO staff.owner_designation(staff_id) VALUES($1)',[owner.staffId]);
-    const sql=await readFile(new URL('../../migrations/0126_publication_review.sql',import.meta.url),'utf8');
+    const sql=await readFile(new URL('../../migrations/0127_publication_review.sql',import.meta.url),'utf8');
     const start=sql.indexOf('WITH owner AS (');
     const statement=sql.slice(start,sql.indexOf(';',start)+1);
     expect(statement).toContain('UPDATE staff.privilege_session');

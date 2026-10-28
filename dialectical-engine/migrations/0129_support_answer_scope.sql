@@ -79,13 +79,13 @@ BEGIN
   FROM expected e LEFT JOIN pg_trigger t ON t.tgrelid=to_regclass(e.relation_name)
     AND t.tgname=e.trigger_name AND NOT t.tgisinternal AND t.tgenabled='O'
   WHERE t.oid IS NULL ORDER BY e.relation_name,e.trigger_name LIMIT 1;
-  IF missing IS NOT NULL THEN RAISE EXCEPTION 'MIGRATION_0128_GUARD_MISSING %', missing; END IF;
+  IF missing IS NOT NULL THEN RAISE EXCEPTION 'MIGRATION_0129_GUARD_MISSING %', missing; END IF;
 
   IF (SELECT count(*) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
       JOIN pg_namespace n ON n.oid=c.relnamespace
       WHERE n.nspname='support' AND NOT t.tgisinternal AND t.tgname='reject_truncate'
         AND t.tgenabled='O') <> 17 THEN
-    RAISE EXCEPTION 'MIGRATION_0128_TRUNCATE_GUARDS';
+    RAISE EXCEPTION 'MIGRATION_0129_TRUNCATE_GUARDS';
   END IF;
   FOREACH relation_name IN ARRAY ARRAY[
     'support.session','support.session_key','support.message','support.abuse_event',
@@ -94,7 +94,7 @@ BEGIN
     'support.relay_waiter','support.relay_waiter_event'
   ] LOOP
     IF has_table_privilege('debateai_support', relation_name, 'INSERT') THEN
-      RAISE EXCEPTION 'MIGRATION_0128_INSERT_KEPT %', relation_name;
+      RAISE EXCEPTION 'MIGRATION_0129_INSERT_KEPT %', relation_name;
     END IF;
   END LOOP;
   FOREACH relation_name IN ARRAY ARRAY[
@@ -104,7 +104,7 @@ BEGIN
     'support.relay_waiter_event','support.relay_waiter','support.relay_call'
   ] LOOP
     EXECUTE format('SELECT EXISTS(SELECT 1 FROM %s)', relation_name) INTO row_kept;
-    IF row_kept THEN RAISE EXCEPTION 'MIGRATION_0128_ROWS_KEPT %', relation_name; END IF;
+    IF row_kept THEN RAISE EXCEPTION 'MIGRATION_0129_ROWS_KEPT %', relation_name; END IF;
   END LOOP;
 END
 $$;
