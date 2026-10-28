@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Fil-qosor
-eyebrow: TERMINI TAS-SERVIZZ · v2.5 · EFFETTIVI 24 TA’ OTTUBRU 2026
+eyebrow: TERMINI TAS-SERVIZZ · v2.6 · EFFETTIVI 24 TA’ OTTUBRU 2026
 title: Dak li taqbel miegħu
 lede: Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.
-endMarker: TMIEM IT-TERMINI · v2.5
+endMarker: TMIEM IT-TERMINI · v2.6
 bodyLabel: Test tat-Termini tas-Servizz
 annexTitle: Anness A — Termini reġjonali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LIĠI APPLIKABBLI
 -->
 
-**Version 2.5 · Effective 24 ta’ Ottubru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
+**Version 2.6 · Effective 24 ta’ Ottubru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
 
 **In short.** Irid ikollok 18-il sena jew aktar. Dialectical Engine tibni argumenti b’mudelli tal-IA u dak kollu li tiġġenera jista’ jkun żbaljat — mhuwiex parir. Id-dibattiti tiegħek huma privati sakemm ma tippubblikahomx; jekk tippubblikahom, kulħadd jista’ jaqrahom. It-test li tissottometti jintbagħat lill-fornituri tal-IA elenkati fir-Reġistru tal-Fornituri tagħna, u ma jintużax għat-taħriġ tal-mudelli. Irrapporta kontenut illegali fuq support@dezbatere.ro kemm jekk għandek kont kif ukoll jekk le. Tapplika l-liġi Rumena, iżda l-protezzjonijiet lokali tiegħek bħala konsumatur jibqgħu japplikaw għalik.
 
@@ -119,6 +119,8 @@ Jekk m’intix ċert jekk xi ħaġa hijiex permessa, staqsina qabel tippubblikah
 **Kif il-kontenut tiegħek jasal għand il-fornituri tal-IA.** Biex inħaddmu dibattitu nibagħtu test lil fornitur estern wieħed jew aktar tal-mudelli. Dak li jirċievi fornitur huwa l-mistoqsija tiegħek, l-annotazzjonijiet ta’ direzzjoni li tagħti, u dikjarazzjonijiet li tikkomponi l-magna matul id-dibattitu — għalhekk fornitur jara test derivat minn dak li ttajpjajt u mibni madwaru, mhux biss il-kliem oriġinali tiegħek. Qatt ma jirċievi l-indirizz elettroniku tiegħek, l-identifikaturi tal-kont tiegħek, ir-rekords tas-sessjoni tiegħek jew id-dettalji tal-ħlas tiegħek.
 
 **X’jibgħat iċ-chat tal-appoġġ.** L-assistent tal-appoġġ huwa wkoll mudell tal-IA. Meta tiktiblu, nibagħtu l-messaġġ tiegħek lil fornitur estern tal-mudelli biex il-mudell ikun jista’ jwieġeb, flimkien mal-artikli ta’ għajnuna li fuqhom jibbaża t-tweġiba tiegħu. Qabel ma nibagħtu, naħbu kull ħaġa li tidher qisha password, kodiċi li jintuża darba biss jew ċavetta. Jekk titlob li titkellem ma’ persuna, nibagħtu wkoll il-konversazzjoni lill-mudell, moħbija bl-istess mod, biex jikteb sommarju qasir għall-membru tat-tim tagħna li jieħu f’idejh il-każ tiegħek. Ma nżidux l-indirizz elettroniku tiegħek, l-identifikaturi tal-kont tiegħek jew id-dettalji tal-ħlas tiegħek, iżda l-mudell jirċievi kull ħaġa oħra li tikteb fiċ-chat, għalhekk tiktibx hemmhekk xi ħaġa li ma tridx li jaqra.
+
+**Tfittxija fuq il-web permezz ta’ Perplexity.** Biex isibu evidenza għal dibattitu, il-mudelli jistgħu jfittxu fuq il-web permezz ta’ **Perplexity** (Perplexity AI, Inc., l-Istati Uniti), li huwa elenkat fir-Reġistru tal-Fornituri tal-IA. Dak li jirċievi Perplexity huma l-mistoqsijiet ta’ tfittxija li l-mudelli jiktbu mid-dibattitu — għalhekk, bħal fornitur tal-mudelli, jara test mibni madwar dak li ttajpjajt. Qatt ma jirċievi l-indirizz elettroniku tiegħek, l-identifikaturi tal-kont tiegħek, ir-rekords tas-sessjoni tiegħek jew id-dettalji tal-ħlas tiegħek.
 
 **Liema fornituri, u fejn.** Ir-**Reġistru tal-Fornituri tal-IA** tagħna fuq dezbatere.ro/providers huwa parti minn dawn it-Termini. Huwa jelenka kull fornitur li nistgħu nużaw: l-entità ġuridika u l-pajjiż tiegħu; dak li jirċievi u għaliex; fejn jipproċessa; it-termini taż-żamma tiegħu; jekk iż-żamma żero tad-data hijiex attiva għall-punt aħħari li nużaw; jekk jistax juża d-data mdaħħla għat-taħriġ skont il-kuntratt tagħna; il-mekkaniżmu tat-trasferiment li niddependu fuqu; u d-data meta vverifikajna l-aħħar kull entrata. Il-fornituri jistgħu jkunu jinsabu barra pajjiżek u barra ż-Żona Ekonomika Ewropea. Il-Politika dwar il-Privatezza tagħna tispjega s-salvagwardji.
 

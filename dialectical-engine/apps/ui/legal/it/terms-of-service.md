@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In breve
-eyebrow: CONDIZIONI DI SERVIZIO · v2.5 · IN VIGORE DAL 24 OTTOBRE 2026
+eyebrow: CONDIZIONI DI SERVIZIO · v2.6 · IN VIGORE DAL 24 OTTOBRE 2026
 title: Ciò che accetti
 lede: Il contratto tra te e DMS Merchandise Shop S.R.L., in un linguaggio chiaro. Diciannove sezioni e Allegato A — scorri fino alla fine.
-endMarker: FINE DELLE CONDIZIONI · v2.5
+endMarker: FINE DELLE CONDIZIONI · v2.6
 bodyLabel: Testo delle Condizioni di servizio
 annexTitle: Allegato A — Condizioni regionali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEGGE APPLICABILE
 -->
 
-**Version 2.5 · Effective 24 ottobre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
+**Version 2.6 · Effective 24 ottobre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
 
 **In short.** Devi avere almeno 18 anni. Dialectical Engine costruisce argomentazioni con modelli di IA e tutto ciò che genera può essere errato — non costituisce consulenza. I tuoi dibattiti sono privati, salvo che tu non li pubblichi; se li pubblichi, chiunque può leggerli. Il testo che invii viene trasmesso ai fornitori di IA elencati nel nostro Registro dei fornitori e non viene utilizzato per addestrare i modelli. Segnala i contenuti illegali a support@dezbatere.ro, indipendentemente dal fatto che tu abbia un account. Si applica la legge rumena, ma le tutele locali dei consumatori restano impregiudicate.
 
@@ -119,6 +119,8 @@ Se non sei sicuro che qualcosa sia consentito, chiedicelo prima di pubblicarlo.
 **Come i tuoi contenuti raggiungono i fornitori di IA.** Per svolgere un dibattito inviamo testo a uno o più fornitori esterni di modelli. Il fornitore riceve la tua domanda, le annotazioni di orientamento che imposti e le affermazioni formulate dal motore durante il dibattito; pertanto vede testo derivato da ciò che hai digitato e costruito attorno a esso, non soltanto le tue parole originali. Non riceve mai il tuo indirizzo email, gli identificativi del tuo account, le registrazioni delle tue sessioni o i dati di pagamento.
 
 **Cosa invia la chat di supporto.** Anche l'assistente di supporto è un modello di IA. Quando gli scrivi, inviamo il tuo messaggio a un fornitore esterno di modelli perché il modello possa rispondere, insieme agli articoli di aiuto su cui basa la risposta. Prima dell'invio, mascheriamo tutto ciò che sembra una password, un codice monouso o una chiave. Se chiedi di parlare con una persona, inviamo al modello anche la conversazione, mascherata allo stesso modo, perché scriva un breve riepilogo per il membro del nostro team che prende in carico il tuo caso. Non alleghiamo il tuo indirizzo email, gli identificativi del tuo account o i dati di pagamento, ma il modello riceve tutto il resto che scrivi nella chat, quindi non scrivere lì nulla che non vorresti fargli leggere.
+
+**Ricerca sul web tramite Perplexity.** Per trovare prove utili a un dibattito, i modelli possono effettuare ricerche sul web tramite **Perplexity** (Perplexity AI, Inc., Stati Uniti), che è elencato nel Registro dei fornitori di IA. Perplexity riceve le query di ricerca che i modelli formulano a partire dal dibattito; pertanto, come un fornitore di modelli, vede testo costruito attorno a ciò che hai digitato. Non riceve mai il tuo indirizzo email, gli identificativi del tuo account, le registrazioni delle tue sessioni o i dati di pagamento.
 
 **Quali fornitori e dove.** Il nostro **Registro dei fornitori di IA** all'indirizzo dezbatere.ro/providers costituisce parte integrante delle presenti Condizioni. Elenca ciascun fornitore che possiamo utilizzare: la relativa persona giuridica e il Paese; cosa riceve e perché; dove effettua il trattamento; le condizioni di conservazione; se la conservazione zero dei dati è attiva per l'endpoint che utilizziamo; se, in base al nostro contratto, può utilizzare gli input per l'addestramento; il meccanismo di trasferimento su cui facciamo affidamento; e la data dell'ultima verifica di ciascuna voce. I fornitori possono trovarsi al di fuori del tuo Paese e dello Spazio economico europeo. La nostra Informativa sulla privacy illustra le garanzie applicabili.
 

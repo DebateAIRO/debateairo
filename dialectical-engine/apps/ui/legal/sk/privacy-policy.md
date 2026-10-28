@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručne
-eyebrow: ZÁSADY OCHRANY OSOBNÝCH ÚDAJOV · v3.6 · ÚČINNÉ OD 24. OKTÓBRA 2026
+eyebrow: ZÁSADY OCHRANY OSOBNÝCH ÚDAJOV · v3.7 · ÚČINNÉ OD 24. OKTÓBRA 2026
 title: Čo uchovávame a prečo
 lede: Vaše práva a naše povinnosti podľa GDPR (EU) 2016/679 zrozumiteľne. Štrnásť častí a príloha B — prejdite až na koniec.
-endMarker: KONIEC ZÁSAD · GDPR (EU) 2016/679 · v3.6
+endMarker: KONIEC ZÁSAD · GDPR (EU) 2016/679 · v3.7
 bodyLabel: Text zásad ochrany osobných údajov
 annexTitle: Príloha B — Regionálne podmienky ochrany osobných údajov
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 SÚBORY COOKIE
 -->
 
-**Version 3.6 · Effective 24. októbra 2026 · Predchádzajúce verzie na dezbatere.ro/privacy/versions · Prevádzkovateľ: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.7 · Effective 24. októbra 2026 · Predchádzajúce verzie na dezbatere.ro/privacy/versions · Prevádzkovateľ: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Zhromažďujeme údaje potrebné pre účet a to, čo sa rozhodnete napísať. Vaše otázky sa odosielajú poskytovateľom umelej inteligencie uvedeným v našom registri; nepoužívajú sa na trénovanie modelov. Náš poskytovateľ hostingu uchováva váš účet a vaše debaty v Londýne vo Spojenom kráľovstve; časť 5 uvádza, kam ďalej putujú vaše údaje. Debaty sú súkromné, pokiaľ ich nezverejníte. Odstránením účtu sa zničia kľúče k vašim súkromným údajom; pri plánovaní odstránenia si zvolíte, či sa odstránia aj vaše zverejnené debaty, alebo zostanú verejné pod vaším vyradeným pseudonymom. Môžete nás kontaktovať na privacy@dezbatere.ro a osoby uvedené v debate môžu požiadať o odstránenie aj bez účtu.
 
@@ -87,7 +87,9 @@ Nevytvárame váš profil, nepoužívame vaše údaje na reklamu a nepredávame 
 
 **Čo sa odosiela.** Na uskutočnenie debaty odosielame text jednému alebo viacerým externým poskytovateľom umelej inteligencie: vašu otázku, vami nastavené usmerňujúce poznámky a vyjadrenia, ktoré systém vytvára počas vývoja debaty. Poskytovateľ preto vidí text odvodený od toho, čo ste napísali, a založený na tom. Ak používate chat podpory, to, čo doň napíšete, sa odovzdáva modelu chatu podpory. Poskytovateľ nikdy nedostane vašu e-mailovú adresu, identifikátory účtu alebo relácie, IP adresu ani platobné údaje.
 
-**Ktorí poskytovatelia.** Sú uvedení v našom **Registri poskytovateľov umelej inteligencie** na dezbatere.ro/providers, ktorý je súčasťou týchto zásad. Register sa vzťahuje na každého používateľa bez ohľadu na to, kde žijete. Pri každom poskytovateľovi uvádza jeho právnickú osobu a krajinu usadenia; čo dostáva a na aký účel — písanie argumentov debaty, ich hodnotenie a kontrola, písanie príbehu verdiktu alebo odpovedanie vám v chate podpory; krajiny alebo regióny, v ktorých údaje spracúva; jeho podmienky uchovávania a či je pre koncový bod a funkcie, ktoré používame, aktívne nulové uchovávanie údajov; či môže podľa našej zmluvy používať vstupy na trénovanie; mechanizmus prenosu, na ktorý sa spoliehame; ako ho kontaktovať v súvislosti s vašimi údajmi; a dátum posledného overenia každej položky. Poskytovatelia sa môžu meniť; register má jednotlivé verzie a zmena sa v ňom zaznamená.
+**Vyhľadávanie na webe prostredníctvom Perplexity.** Aby našli dôkazy pre debatu, modely môžu vyhľadávať na webe prostredníctvom služby Perplexity, ktorú prevádzkuje spoločnosť Perplexity AI, Inc. v Spojených štátoch. Perplexity dostáva vyhľadávacie dopyty, ktoré modely zostavia na základe debaty a ktoré môžu obsahovať slová z vašej otázky. Rovnako ako každý poskytovateľ umelej inteligencie nikdy nedostane vašu e-mailovú adresu, identifikátory účtu alebo relácie, IP adresu ani platobné údaje. Je uvedená v registri a vzťahujú sa na ňu nižšie uvedené pravidlá prenosu.
+
+**Ktorí poskytovatelia.** Sú uvedení v našom **Registri poskytovateľov umelej inteligencie** na dezbatere.ro/providers, ktorý je súčasťou týchto zásad. Register sa vzťahuje na každého používateľa bez ohľadu na to, kde žijete. Pri každom poskytovateľovi uvádza jeho právnickú osobu a krajinu usadenia; čo dostáva a na aký účel — písanie argumentov debaty, ich hodnotenie a kontrola, písanie príbehu verdiktu, vyhľadávanie dôkazov na webe alebo odpovedanie vám v chate podpory; krajiny alebo regióny, v ktorých údaje spracúva; jeho podmienky uchovávania a či je pre koncový bod a funkcie, ktoré používame, aktívne nulové uchovávanie údajov; či môže podľa našej zmluvy používať vstupy na trénovanie; mechanizmus prenosu, na ktorý sa spoliehame; ako ho kontaktovať v súvislosti s vašimi údajmi; a dátum posledného overenia každej položky. Poskytovatelia sa môžu meniť; register má jednotlivé verzie a zmena sa v ňom zaznamená.
 
 **Trénovanie a uchovávanie sú rozdielne veci.** Poskytovateľov umelej inteligencie využívame len za podmienok, ktoré im nedovoľujú používať váš obsah na trénovanie alebo zlepšovanie ich modelov; register pri každom poskytovateľovi uvádza, či sme to overili voči nášmu účtu, a kedy. Niektorí poskytovatelia uchovávajú zadania a odpovede obmedzený čas z dôvodov bezpečnosti, predchádzania zneužitiu alebo vlastných zákonných povinností; register uvádza dobu a dôvod. Ak je aktívne nulové uchovávanie údajov, register to uvádza spolu s príslušnými funkciami. Nebudeme tvrdiť, že sa obsah neuchováva, ak to nie je pravda.
 
@@ -215,7 +217,7 @@ Ak chcete tieto položky odmietnuť, zablokujte alebo vymažte súbory cookie a 
 
 Keď tieto zásady zmeníme, zverejníme novú verziu so zhrnutím zmien a novým dátumom účinnosti a predchádzajúce verzie ponecháme na dezbatere.ro/privacy/versions. O zmene, ktorá pridáva nový účel alebo nového príjemcu, vás informujeme e-mailom aj v produkte pred začatím nového spracúvania a poskytneme vám čas na vznesenie námietky. Ak nový účel závisí od vášho súhlasu — napríklad ak by sme niekedy chceli obsah používať na zlepšovanie modelov — požiadame vás o tento súhlas samostatne a konkrétne; prijatie aktualizovaných podmienok nikdy nepovažujeme za súhlas s novým spracúvaním. Pri spresneniach, ktoré nemenia naše postupy, jednoducho zverejníme novú verziu.
 
-Tieto zásady boli naposledy aktualizované 24. októbra 2026. Verzia 3.6 nahradila verziu 3.5: časť 2 teraz uvádza, že pri registrácii krajina IP adresy spolu s regiónom, ktorý zvolíte, rozhoduje aj o tom, či zobrazíme samostatné políčko so súhlasom pre Taliansko.
+Tieto zásady boli naposledy aktualizované 24. októbra 2026. Verzia 3.7 nahradila verziu 3.6: časť 5 teraz uvádza, že modely môžu vyhľadávať na webe prostredníctvom služby Perplexity, a čo Perplexity dostáva. Verzia 3.6 nahradila verziu 3.5: časť 2 teraz uvádza, že pri registrácii krajina IP adresy spolu s regiónom, ktorý zvolíte, rozhoduje aj o tom, či zobrazíme samostatné políčko so súhlasom pre Taliansko.
 
 ## Annex B — Regionálne podmienky ochrany osobných údajov
 

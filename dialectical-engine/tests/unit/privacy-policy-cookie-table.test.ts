@@ -166,6 +166,14 @@ describe("Privacy Policy §13 — the twenty actual stored items in every locale
     }
   });
 
+  it("the English 3.7 summary names the Perplexity change, before the 3.6 summary", () => {
+    const line = /^This policy was last updated on .*$/m.exec(readFileSync(join(LEGAL_DIR, "en", "privacy-policy.md"), "utf8"))?.[0] ?? "";
+    const latest = line.split("Version 3.7 replaced version 3.6:")[1]?.split("Version 3.6 replaced")[0] ?? "";
+    for (const keyword of ["section 5", "Perplexity"]) {
+      expect(latest, `the 3.7 summary does not name the 3.7 change "${keyword}"`).toContain(keyword);
+    }
+  });
+
   it("every other locale's §13 keeps the English block shape, the literal Do Not Track, and no English paragraph", () => {
     const english = blocks(section13("en"));
     const misses: string[] = [];

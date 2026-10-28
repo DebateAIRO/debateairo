@@ -134,6 +134,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Jūsų turinio nenaudojame mokymui. DI paslaugų teikėjais naudojamės tik tokiomis sąlygomis, pagal kurias jiems neleidžiama naudoti jūsų turinio savo modeliams mokyti ar tobulinti; Registre nurodoma, ar kiekvieno teikėjo atveju tai patvirtinome, ir kada." },
       { kind: "p", text: "Kaip jūsų turinys pasiekia DI paslaugų teikėjus. Kad galėtume vykdyti debatus, tekstą siunčiame vienam ar keliems išoriniams modelių teikėjams. Teikėjas gauna jūsų klausimą, jūsų nustatytas valdymo pastabas ir teiginius, kuriuos variklis sudaro debatų metu, todėl jis mato iš jūsų įvesto teksto išvestą ir aplink jį sudarytą tekstą, o ne vien pirminius jūsų žodžius. Jis niekada negauna jūsų el. pašto adreso, paskyros identifikatorių, seansų įrašų ar mokėjimo duomenų." },
       { kind: "p", text: "Ką siunčia pagalbos pokalbis. Pagalbos asistentas taip pat yra DI modelis. Kai jam rašote, jūsų žinutę kartu su pagalbos straipsniais, kuriais jis grindžia atsakymą, siunčiame išoriniam modelių teikėjui, kad modelis galėtų atsakyti. Prieš siųsdami užmaskuojame viską, kas atrodo kaip slaptažodis, vienkartinis kodas ar raktas. Jei paprašote pasikalbėti su žmogumi, modeliui siunčiame ir pokalbį, užmaskuotą tokiu pačiu būdu, kad jis parašytų trumpą santrauką mūsų komandos nariui, perimančiam jūsų atvejį. Nepridedame jūsų el. pašto adreso, paskyros identifikatorių ar mokėjimo duomenų, tačiau modelis gauna visa kita, ką įrašote į pokalbį, todėl nerašykite ten nieko, ko nenorėtumėte, kad jis perskaitytų." },
+      { kind: "p", text: "Paieška internete per Perplexity. Siekdami rasti įrodymų debatams, modeliai gali ieškoti internete per Perplexity (Perplexity AI, Inc., Jungtinės Amerikos Valstijos), kuri įtraukta į DI paslaugų teikėjų registrą. Perplexity gauna paieškos užklausas, kurias modeliai parašo remdamiesi debatais, todėl, kaip ir modelių teikėjas, ji mato aplink jūsų įvestą tekstą sudarytą tekstą. Ji niekada negauna jūsų el. pašto adreso, paskyros identifikatorių, seansų įrašų ar mokėjimo duomenų." },
       { kind: "p", text: "Kurie paslaugų teikėjai ir kur jie veikia. Mūsų DI paslaugų teikėjų registras adresu dezbatere.ro/providers yra šių Sąlygų dalis. Jame nurodytas kiekvienas paslaugų teikėjas, kurį galime naudoti: jo juridinis asmuo ir šalis; ką ir kodėl jis gauna; kur tvarko duomenis; jo saugojimo sąlygos; ar mūsų naudojamam prieigos taškui taikomas visiškas duomenų nesaugojimas; ar pagal mūsų sutartį jis gali naudoti įvestis mokymui; perdavimo mechanizmas, kuriuo remiamės; ir data, kada paskutinį kartą patikrinome kiekvieną įrašą. Paslaugų teikėjai gali būti įsisteigę ne jūsų šalyje ir už Europos ekonominės erdvės ribų. Apsaugos priemonės paaiškintos mūsų Privatumo politikoje." },
       { kind: "p", text: "Trys skirtingi dalykai. „Nenaudojama modeliams mokyti“, „ribotą laiką saugoma saugumo, piktnaudžiavimo prevencijos ar teisiniais tikslais“ ir „visiškas duomenų nesaugojimas — po tvarkymo neišsaugoma“ reiškia skirtingus dalykus. Kai paslaugų teikėjas raginimus saugo ribotą laiką, Registre nurodyta, kiek laiko ir kodėl. Kai taikomas visiškas duomenų nesaugojimas, Registre nurodyta, kad jis taikomas, ir išvardytos funkcijos, kurioms jis taikomas. Neteigsime, kad turinys nėra saugomas, jei jis saugomas." },
       { kind: "p", text: "Rezultatai. Jūsų ir mūsų santykiuose savo debatų rezultatus galite naudoti bet kokiu teisėtu tikslu, o mes nepretenduojame į sugeneruoto teksto nuosavybę. Atminkite, kad daugelyje jurisdikcijų sugeneruoti rezultatai gali būti nesaugomi autorių teisėmis; kad panašūs rezultatai gali būti sugeneruoti kitiems naudotojams; kad rezultatuose gali būti atgaminta trečiųjų šalių medžiaga ar jie gali būti į ją panašūs; ir kad kai kuriai šaltinių medžiagai, kurią gauna DI paslaugų teikėjas, gali būti taikomi pakartotinio naudojimo apribojimai. Prieš remdamiesi rezultatais ar juos pakartotinai skelbdami, privalote juos patikrinti." }
@@ -353,12 +354,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.5",
-  sha256: "a891471111b0cae4b562c9826e20ee8fdfeb8e8e483fbba6f8583ed390447c0c",
-  eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.5 · ĮSIGALIOJA 2026 M. SPALIO 24 D.",
+  version: "2.6",
+  sha256: "76704c76dfdeec0e3fdeebe6612635e7fd0d561d7748df8f7528e625deb4a3da",
+  eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.6 · ĮSIGALIOJA 2026 M. SPALIO 24 D.",
   title: "Su kuo sutinkate",
   lede: "Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.",
-  endMarker: "SĄLYGŲ PABAIGA · v2.5",
+  endMarker: "SĄLYGŲ PABAIGA · v2.6",
   contact: "support@dezbatere.ro",
   bodyLabel: "Paslaugų teikimo sąlygų tekstas",
   sectionIdPrefix: "terms-section-",

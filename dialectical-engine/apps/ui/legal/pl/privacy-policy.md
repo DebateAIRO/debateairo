@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: W skrócie
-eyebrow: POLITYKA PRYWATNOŚCI · v3.6 · OBOWIĄZUJE OD 24 PAŹDZIERNIKA 2026
+eyebrow: POLITYKA PRYWATNOŚCI · v3.7 · OBOWIĄZUJE OD 24 PAŹDZIERNIKA 2026
 title: Co przechowujemy i dlaczego
 lede: Twoje prawa i nasze obowiązki wynikające z RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679), wyjaśnione prostym językiem. Czternaście sekcji i załącznik B — przewiń do końca.
-endMarker: KONIEC POLITYKI · RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679) · v3.6
+endMarker: KONIEC POLITYKI · RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679) · v3.7
 bodyLabel: Tekst Polityki prywatności
 annexTitle: Załącznik B — Regionalne warunki prywatności
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 PLIKI COOKIE
 -->
 
-**Version 3.6 · Effective 24 października 2026 · Poprzednie wersje na dezbatere.ro/privacy/versions · Administrator: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.7 · Effective 24 października 2026 · Poprzednie wersje na dezbatere.ro/privacy/versions · Administrator: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Gromadzimy dane potrzebne do działania konta oraz treści, które zdecydujesz się wpisać. Twoje pytania trafiają do dostawców AI wymienionych w naszym Rejestrze; nie są wykorzystywane do trenowania modeli. Nasz dostawca hostingu przechowuje Twoje konto i Twoje debaty w Londynie, w Zjednoczonym Królestwie; sekcja 5 wskazuje, dokąd jeszcze trafiają Twoje dane. Debaty są prywatne, chyba że je opublikujesz. Usunięcie konta niszczy klucze do Twoich prywatnych danych; planując usunięcie, wybierasz, czy opublikowane debaty również zostaną wycofane, czy pozostaną publiczne pod Twoim wycofanym pseudonimem. Możesz skontaktować się z nami pod adresem privacy@dezbatere.ro, a osoby wymienione w debacie mogą zażądać jej usunięcia bez posiadania konta.
 
@@ -87,7 +87,9 @@ Nie profilujemy Cię, nie wykorzystujemy Twoich danych do reklamy i ich nie sprz
 
 **Co jest wysyłane.** Aby przeprowadzić debatę, wysyłamy tekst do jednego lub większej liczby zewnętrznych dostawców AI: Twoje pytanie, ustawione przez Ciebie adnotacje sterujące oraz wypowiedzi tworzone przez silnik w miarę rozwoju debaty. Dostawca widzi zatem tekst wywodzący się z wpisanej przez Ciebie treści i na niej oparty. Jeżeli korzystasz z czatu wsparcia, to, co tam wpisujesz, trafia do modelu czatu wsparcia. Dostawca nigdy nie otrzymuje Twojego adresu e-mail, identyfikatorów konta ani sesji, adresu IP ani danych płatniczych.
 
-**Którzy dostawcy.** Są wymienieni w naszym **Rejestrze dostawców AI** pod adresem dezbatere.ro/providers, który stanowi część niniejszej polityki. Rejestr ma zastosowanie do każdego użytkownika, niezależnie od miejsca zamieszkania. Dla każdego dostawcy wskazuje on jego podmiot prawny i kraj siedziby; otrzymywane dane i cel ich otrzymywania — pisanie argumentów debaty, ich ocenianie i sprawdzanie, pisanie historii werdyktu lub odpowiadanie Ci na czacie wsparcia; kraje lub regiony, w których je przetwarza; warunki przechowywania oraz informację, czy dla używanego przez nas punktu końcowego i funkcji obowiązuje zerowy okres przechowywania danych; czy na mocy zawartej z nami umowy może wykorzystywać dane wejściowe do trenowania; stosowany przez nas mechanizm transferu; sposób kontaktu z nim w sprawie Twoich danych; oraz datę ostatniej weryfikacji każdego wpisu. Dostawcy mogą się zmieniać; Rejestr jest wersjonowany, a zmiana zostaje w nim odnotowana.
+**Wyszukiwanie w internecie przez Perplexity.** Aby znaleźć dowody na potrzeby debaty, modele mogą przeszukiwać internet za pośrednictwem Perplexity, obsługiwanego przez Perplexity AI, Inc. w Stanach Zjednoczonych. Perplexity otrzymuje zapytania wyszukiwania, które modele formułują na podstawie debaty i które mogą zawierać słowa z Twojego pytania. Podobnie jak każdy dostawca AI, nigdy nie otrzymuje Twojego adresu e-mail, identyfikatorów konta ani sesji, adresu IP ani danych płatniczych. Jest wymieniony w Rejestrze, a poniższe zasady dotyczące transferów mają do niego zastosowanie.
+
+**Którzy dostawcy.** Są wymienieni w naszym **Rejestrze dostawców AI** pod adresem dezbatere.ro/providers, który stanowi część niniejszej polityki. Rejestr ma zastosowanie do każdego użytkownika, niezależnie od miejsca zamieszkania. Dla każdego dostawcy wskazuje on jego podmiot prawny i kraj siedziby; otrzymywane dane i cel ich otrzymywania — pisanie argumentów debaty, ich ocenianie i sprawdzanie, pisanie historii werdyktu, przeszukiwanie internetu w poszukiwaniu dowodów lub odpowiadanie Ci na czacie wsparcia; kraje lub regiony, w których je przetwarza; warunki przechowywania oraz informację, czy dla używanego przez nas punktu końcowego i funkcji obowiązuje zerowy okres przechowywania danych; czy na mocy zawartej z nami umowy może wykorzystywać dane wejściowe do trenowania; stosowany przez nas mechanizm transferu; sposób kontaktu z nim w sprawie Twoich danych; oraz datę ostatniej weryfikacji każdego wpisu. Dostawcy mogą się zmieniać; Rejestr jest wersjonowany, a zmiana zostaje w nim odnotowana.
 
 **Trenowanie i przechowywanie to różne kwestie.** Korzystamy z dostawców AI wyłącznie na warunkach, które nie pozwalają im wykorzystywać Twoich treści do trenowania lub ulepszania ich modeli; Rejestr pokazuje dla każdego dostawcy, czy potwierdziliśmy to względem naszego konta, i kiedy. Niektórzy dostawcy przechowują monity i odpowiedzi przez ograniczony czas ze względów bezpieczeństwa, zapobiegania nadużyciom lub własnych obowiązków prawnych; Rejestr podaje, jak długo i dlaczego. Jeżeli obowiązuje zerowy okres przechowywania danych, Rejestr wskazuje to oraz funkcje, których to dotyczy. Nie będziemy określać treści jako nieprzechowywanych, jeżeli są przechowywane.
 
@@ -215,7 +217,7 @@ Aby odmówić tych elementów, zablokuj lub usuń pliki cookie i dane witryny dl
 
 Gdy zmieniamy niniejszą politykę, publikujemy nową wersję wraz z podsumowaniem zmian i nową datą wejścia w życie, a poprzednie wersje zachowujemy pod adresem dezbatere.ro/privacy/versions. O zmianie wprowadzającej nowy cel lub nowego odbiorcę informujemy Cię przed rozpoczęciem nowego przetwarzania, pocztą elektroniczną i w produkcie, oraz zapewniamy czas na wniesienie sprzeciwu. Jeżeli nowy cel zależy od Twojej zgody — na przykład gdybyśmy kiedykolwiek chcieli wykorzystać treści do ulepszania modeli — prosimy o tę zgodę osobno i w sposób konkretny; nigdy nie traktujemy akceptacji zaktualizowanych Warunków świadczenia usług jako zgody na nowe przetwarzanie. W przypadku wyjaśnień, które nie zmieniają naszych działań, po prostu publikujemy nową wersję.
 
-Niniejsza polityka została ostatnio zaktualizowana 24 października 2026. Wersja 3.6 zastąpiła wersję 3.5: sekcja 2 mówi teraz, że przy rejestracji kraj adresu IP wraz z wybranym przez Ciebie regionem decyduje też o tym, czy pokazujemy odrębne pole akceptacji dotyczące Włoch.
+Niniejsza polityka została ostatnio zaktualizowana 24 października 2026. Wersja 3.7 zastąpiła wersję 3.6: sekcja 5 mówi teraz, że modele mogą przeszukiwać internet za pośrednictwem Perplexity, oraz co Perplexity otrzymuje. Wersja 3.6 zastąpiła wersję 3.5: sekcja 2 mówi teraz, że przy rejestracji kraj adresu IP wraz z wybranym przez Ciebie regionem decyduje też o tym, czy pokazujemy odrębne pole akceptacji dotyczące Włoch.
 
 ## Annex B — Regionalne warunki prywatności
 

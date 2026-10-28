@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort fortalt
-eyebrow: PRIVATLIVSPOLITIK · v3.6 · GÆLDENDE FRA 24. OKTOBER 2026
+eyebrow: PRIVATLIVSPOLITIK · v3.7 · GÆLDENDE FRA 24. OKTOBER 2026
 title: Hvad vi opbevarer, og hvorfor
 lede: Dine rettigheder og vores forpligtelser i henhold til GDPR (EU) 2016/679 forklaret i et klart sprog. Fjorten afsnit og bilag B — rul helt ned.
-endMarker: SLUT PÅ POLITIKKEN · GDPR (EU) 2016/679 · v3.6
+endMarker: SLUT PÅ POLITIKKEN · GDPR (EU) 2016/679 · v3.7
 bodyLabel: Privatlivspolitikkens tekst
 annexTitle: Bilag B — Regionale privatlivsvilkår
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 3.6 · Effective 24. oktober 2026 · Tidligere versioner på dezbatere.ro/privacy/versions · Dataansvarlig: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.7 · Effective 24. oktober 2026 · Tidligere versioner på dezbatere.ro/privacy/versions · Dataansvarlig: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Vi indsamler det, en konto har brug for, og det, du vælger at skrive. Dine spørgsmål sendes til AI-udbydere, der er anført i vores Register; de bruges ikke til at træne modeller. Vores hostingudbyder opbevarer din konto og dine debatter i London i Storbritannien; afsnit 5 beskriver, hvor dine data ellers sendes hen. Debatter er private, medmindre du offentliggør dem. Når du sletter din konto, destrueres nøglerne til dine private data; når du planlægger sletningen, vælger du, om dine offentliggjorte debatter også skal fjernes eller forblive offentlige under dit udfasede pseudonym. Du kan kontakte os på privacy@dezbatere.ro, og personer, som nævnes i en debat, kan anmode om fjernelse uden at have en konto.
 
@@ -87,7 +87,9 @@ Vi profilerer dig ikke, bruger ikke dine data til reklamer og sælger dem ikke. 
 
 **Hvad der sendes.** For at gennemføre en debat sender vi tekst til en eller flere eksterne AI-udbydere: dit spørgsmål, de styrende annotationer, du angiver, og udsagn, som systemet udarbejder, efterhånden som debatten udvikler sig. En udbyder ser derfor tekst, som er afledt af og bygget op omkring det, du skrev. Hvis du bruger supportsamtalen, går det, du skriver der, til supportsamtalens model. En udbyder modtager aldrig din e-mailadresse, dine konto- eller sessionsidentifikatorer, din IP-adresse eller dine betalingsoplysninger.
 
-**Hvilke udbydere.** De er anført i vores **Register over AI-udbydere** på dezbatere.ro/providers, som er en del af denne politik. Registret gælder for alle brugere, uanset hvor du bor. For hver udbyder angiver det den juridiske enhed og etableringslandet; hvad udbyderen modtager og til hvilket formål — at skrive debattens argumenter, bedømme og kontrollere dem, skrive historien om konklusionen eller svare dig i supportsamtalen; de lande eller regioner, hvor behandlingen finder sted; udbyderens opbevaringsvilkår, og om nuldataopbevaring er aktiv for det slutpunkt og de funktioner, vi bruger; om udbyderen må bruge input til træning i henhold til vores kontrakt; den overførselsmekanisme, vi støtter os på; hvordan du kontakter udbyderen om dine data; og datoen for vores seneste kontrol af hver registrering. Udbydere kan ændre sig; Registret er versionsstyret, og ændringen noteres deri.
+**Websøgning via Perplexity.** For at finde belæg til en debat kan modellerne søge på nettet via Perplexity, som drives af Perplexity AI, Inc. i USA. Perplexity modtager de søgespørgsmål, som modellerne formulerer ud fra debatten, og de kan indeholde ord fra dit spørgsmål. Ligesom alle andre AI-udbydere modtager Perplexity aldrig din e-mailadresse, dine konto- eller sessionsidentifikatorer, din IP-adresse eller dine betalingsoplysninger. Perplexity er anført i Registret, og reglerne om overførsler nedenfor gælder for Perplexity.
+
+**Hvilke udbydere.** De er anført i vores **Register over AI-udbydere** på dezbatere.ro/providers, som er en del af denne politik. Registret gælder for alle brugere, uanset hvor du bor. For hver udbyder angiver det den juridiske enhed og etableringslandet; hvad udbyderen modtager og til hvilket formål — at skrive debattens argumenter, bedømme og kontrollere dem, skrive historien om konklusionen, søge på nettet efter belæg eller svare dig i supportsamtalen; de lande eller regioner, hvor behandlingen finder sted; udbyderens opbevaringsvilkår, og om nuldataopbevaring er aktiv for det slutpunkt og de funktioner, vi bruger; om udbyderen må bruge input til træning i henhold til vores kontrakt; den overførselsmekanisme, vi støtter os på; hvordan du kontakter udbyderen om dine data; og datoen for vores seneste kontrol af hver registrering. Udbydere kan ændre sig; Registret er versionsstyret, og ændringen noteres deri.
 
 **Træning og opbevaring er forskellige ting.** Vi bruger kun AI-udbydere på vilkår, der ikke tillader dem at bruge dit indhold til at træne eller forbedre deres modeller; Registret viser for hver udbyder, om vi har bekræftet dette over for vores konto, og hvornår. Nogle udbydere opbevarer prompts og svar i en begrænset periode af hensyn til sikkerhed, forebyggelse af misbrug eller deres egne retlige forpligtelser; Registret angiver hvor længe og hvorfor. Hvor nuldataopbevaring er aktiv, angiver Registret dette og de funktioner, det gælder for. Vi beskriver ikke indhold som uopbevaret, når det ikke er tilfældet.
 
@@ -215,7 +217,7 @@ For at afvise disse elementer skal du blokere eller slette cookies og webstedsda
 
 Når vi ændrer denne politik, offentliggør vi den nye version med en oversigt over ændringerne og en ny ikrafttrædelsesdato og beholder de tidligere versioner på dezbatere.ro/privacy/versions. Ved en ændring, der tilføjer et nyt formål eller en ny modtager, underretter vi dig via e-mail og i produktet, før den nye behandling begynder, og giver dig tid til at gøre indsigelse. Hvor et nyt formål afhænger af dit samtykke — eksempelvis hvis vi nogensinde ønskede at bruge indhold til at forbedre modeller — beder vi særskilt og specifikt om dette samtykke; vi behandler aldrig accept af opdaterede Vilkår som samtykke til ny behandling. Ved præciseringer, der ikke ændrer noget ved det, vi gør, offentliggør vi blot den nye version.
 
-Denne politik blev senest opdateret den 24. oktober 2026. Version 3.6 erstattede version 3.5: afsnit 2 oplyser nu, at IP-landet ved tilmelding sammen med den region, du vælger, også afgør, om vi viser det særskilte godkendelsesfelt for Italien.
+Denne politik blev senest opdateret den 24. oktober 2026. Version 3.7 erstattede version 3.6: afsnit 5 oplyser nu, at modellerne kan søge på nettet via Perplexity, og hvad Perplexity modtager. Version 3.6 erstattede version 3.5: afsnit 2 oplyser nu, at IP-landet ved tilmelding sammen med den region, du vælger, også afgør, om vi viser det særskilte godkendelsesfelt for Italien.
 
 ## Annex B — Regionale privatlivsvilkår
 

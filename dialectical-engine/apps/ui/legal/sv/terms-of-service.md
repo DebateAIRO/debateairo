@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort sagt
-eyebrow: ANVÄNDARVILLKOR · v2.5 · GÄLLER FRÅN 24 OKTOBER 2026
+eyebrow: ANVÄNDARVILLKOR · v2.6 · GÄLLER FRÅN 24 OKTOBER 2026
 title: Vad du godkänner
 lede: Avtalet mellan dig och DMS Merchandise Shop S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.
-endMarker: SLUT PÅ VILLKOREN · v2.5
+endMarker: SLUT PÅ VILLKOREN · v2.6
 bodyLabel: Användarvillkorens text
 annexTitle: Bilaga A — Regionala villkor
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TILLÄMPLIG LAG
 -->
 
-**Version 2.5 · Effective 24 oktober 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
+**Version 2.6 · Effective 24 oktober 2026 · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
 
 **In short.** Du måste ha fyllt 18 år. Dialectical Engine bygger argument med AI-modeller, och allt som tjänsten genererar kan vara felaktigt — det är inte rådgivning. Dina debatter är privata om du inte publicerar dem; om du publicerar kan vem som helst läsa dem. Text som du skickar in överförs till de AI-leverantörer som anges i vårt register över AI-leverantörer och används inte för att träna modeller. Rapportera olagligt innehåll till support@dezbatere.ro, oavsett om du har ett konto eller inte. Rumänsk lag är tillämplig, men du behåller ditt lokala konsumentskydd.
 
@@ -119,6 +119,8 @@ Om du är osäker på om något är tillåtet ska du fråga oss innan du publice
 **Hur ditt innehåll når AI-leverantörer.** För att genomföra en debatt skickar vi text till en eller flera externa modelleverantörer. Det en leverantör tar emot är din fråga, de styranteckningar som du har angett och uttalanden som motorn sammanställer under debatten — en leverantör ser således text som härrör från och har byggts kring det du skrev, inte bara dina ursprungliga ord. Leverantören tar aldrig emot din e-postadress, dina kontoidentifierare, dina sessionsuppgifter eller dina betalningsuppgifter.
 
 **Vad supportchatten skickar.** Supportassistenten är också en AI-modell. När du skriver till den skickar vi ditt meddelande till en extern modelleverantör så att modellen kan svara, tillsammans med de hjälpartiklar som den grundar sitt svar på. Innan vi skickar maskerar vi allt som ser ut som ett lösenord, en engångskod eller en nyckel. Om du ber att få tala med en person skickar vi även samtalet, maskerat på samma sätt, till modellen så att den kan skriva en kort sammanfattning till den medlem i vårt team som tar över ditt ärende. Vi bifogar inte din e-postadress, dina kontoidentifierare eller dina betalningsuppgifter, men modellen tar emot allt annat du skriver i chatten, så skriv inte något där som du inte vill att den ska läsa.
+
+**Webbsökning via Perplexity.** För att hitta belägg för en debatt kan modellerna söka på webben via **Perplexity** (Perplexity AI, Inc., USA), som finns med i vårt register över AI-leverantörer. Det Perplexity tar emot är de sökfrågor som modellerna formulerar utifrån debatten — liksom en modelleverantör ser Perplexity således text som har byggts kring det du skrev. Perplexity tar aldrig emot din e-postadress, dina kontoidentifierare, dina sessionsuppgifter eller dina betalningsuppgifter.
 
 **Vilka leverantörer och var.** Vårt **register över AI-leverantörer** på dezbatere.ro/providers är en del av dessa villkor. Där anges varje leverantör som vi kan använda: dess juridiska person och land; vad den tar emot och varför; var den behandlar uppgifter; dess lagringsvillkor; huruvida nollagring av uppgifter är aktiv för den slutpunkt som vi använder; huruvida den enligt vårt avtal får använda indata för träning; vilken överföringsmekanism vi förlitar oss på; samt datumet då vi senast kontrollerade varje post. Leverantörer kan vara etablerade utanför ditt land och utanför Europeiska ekonomiska samarbetsområdet. Vår integritetspolicy förklarar skyddsåtgärderna.
 

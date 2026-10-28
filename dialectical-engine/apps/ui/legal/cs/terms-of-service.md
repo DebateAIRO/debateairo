@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručně
-eyebrow: PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.5 · ÚČINNÉ OD 24. ŘÍJNA 2026
+eyebrow: PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.6 · ÚČINNÉ OD 24. ŘÍJNA 2026
 title: S čím souhlasíte
 lede: Smlouva mezi vámi a DMS Merchandise Shop S.R.L. srozumitelným jazykem. Devatenáct oddílů a příloha A — přejděte až na konec.
-endMarker: KONEC PODMÍNEK · v2.5
+endMarker: KONEC PODMÍNEK · v2.6
 bodyLabel: Text Podmínek poskytování služby
 annexTitle: Příloha A — Regionální podmínky
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ROZHODNÉ PRÁVO
 -->
 
-**Version 2.5 · Effective 24. října 2026 · Předchozí verze na dezbatere.ro/terms/versions · Jazyk: čeština.**
+**Version 2.6 · Effective 24. října 2026 · Předchozí verze na dezbatere.ro/terms/versions · Jazyk: čeština.**
 
 **In short.** Musí vám být alespoň 18 let. Dialectical Engine vytváří argumenty pomocí modelů AI a vše, co vygeneruje, může být nesprávné — nejde o poradenství. Vaše debaty jsou soukromé, dokud je nezveřejníte; pokud je zveřejníte, může je číst kdokoli. Text, který zadáte, je odesílán poskytovatelům AI uvedeným v našem Registru poskytovatelů a nepoužívá se k trénování modelů. Nezákonný obsah hlaste na support@dezbatere.ro bez ohledu na to, zda máte účet. Rozhodným právem je rumunské právo, vaše místní spotřebitelská ochrana vám však zůstává zachována.
 
@@ -119,6 +119,8 @@ Nejste-li si jisti, zda je něco dovoleno, zeptejte se nás před zveřejněním
 **Jak se váš obsah dostává k poskytovatelům AI.** Za účelem vedení debaty posíláme text jednomu či více externím poskytovatelům modelů. Poskytovatel obdrží vaši otázku, vámi nastavené řídicí anotace a výroky, které systém sestavuje v průběhu debaty — vidí tedy text odvozený z toho, co jste zadali, a vytvořený na tomto základě, nikoli pouze vaše původní slova. Nikdy neobdrží vaši e-mailovou adresu, identifikátory účtu, záznamy relací ani platební údaje.
 
 **Co posílá chat podpory.** Asistent podpory je rovněž model AI. Když mu napíšete, pošleme vaši zprávu externímu poskytovateli modelů, aby model mohl odpovědět, spolu s články nápovědy, na kterých zakládá svou odpověď. Před odesláním zamaskujeme vše, co vypadá jako heslo, jednorázový kód nebo klíč. Pokud požádáte o rozhovor s člověkem, pošleme modelu také konverzaci, zamaskovanou stejným způsobem, aby napsal krátké shrnutí pro člena našeho týmu, který váš případ převezme. Nepřikládáme vaši e-mailovou adresu, identifikátory účtu ani platební údaje, model však obdrží vše ostatní, co do chatu napíšete, proto tam nepište nic, co byste nechtěli, aby si přečetl.
+
+**Vyhledávání na webu prostřednictvím Perplexity.** Aby našly důkazy pro debatu, mohou modely vyhledávat na webu prostřednictvím služby **Perplexity** (Perplexity AI, Inc., Spojené státy), která je uvedena v Registru poskytovatelů AI. Perplexity obdrží vyhledávací dotazy, které modely na základě debaty sestaví — stejně jako poskytovatel modelů tedy vidí text vytvořený na základě toho, co jste zadali. Nikdy neobdrží vaši e-mailovou adresu, identifikátory účtu, záznamy relací ani platební údaje.
 
 **Kteří poskytovatelé a kde.** Náš **Registr poskytovatelů AI** na adrese dezbatere.ro/providers je součástí těchto Podmínek. Uvádí každého poskytovatele, kterého můžeme použít: jeho právnickou osobu a zemi; co přijímá a proč; kde údaje zpracovává; jeho podmínky uchovávání; zda je pro koncový bod, který používáme, aktivní nulové uchovávání údajů; zda smí podle naší smlouvy používat vstupy k trénování; mechanismus předávání, o který se opíráme; a datum posledního ověření každého záznamu. Poskytovatelé se mohou nacházet mimo vaši zemi a mimo Evropský hospodářský prostor. Naše Zásady ochrany osobních údajů vysvětlují příslušné záruky.
 

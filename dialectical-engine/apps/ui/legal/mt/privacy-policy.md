@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Fil-qosor
-eyebrow: POLITIKA DWAR IL-PRIVATEZZA · v3.6 · EFFETTIVA 24 TA’ OTTUBRU 2026
+eyebrow: POLITIKA DWAR IL-PRIVATEZZA · v3.7 · EFFETTIVA 24 TA’ OTTUBRU 2026
 title: X’naħżnu, u għaliex
 lede: Id-drittijiet tiegħek u l-obbligi tagħna skont il-GDPR (EU) 2016/679, b’lingwaġġ ċar. Erbatax-il taqsima u l-Anness B — niżżel sal-aħħar.
-endMarker: TMIEM IL-POLITIKA · GDPR (EU) 2016/679 · v3.6
+endMarker: TMIEM IL-POLITIKA · GDPR (EU) 2016/679 · v3.7
 bodyLabel: Test tal-Politika dwar il-Privatezza
 annexTitle: Anness B — Termini reġjonali dwar il-privatezza
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 3.6 · Effective 24 ta’ Ottubru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/privacy/versions · Kontrollur: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.7 · Effective 24 ta’ Ottubru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/privacy/versions · Kontrollur: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Niġbru dak li jeħtieġ kont u dak li tagħżel li tittajpja. Il-mistoqsijiet tiegħek jintbagħtu lill-fornituri tal-IA elenkati fir-Reġistru tagħna; ma jintużawx għat-taħriġ tal-mudelli. Il-fornitur tal-ospitar tagħna jaħżen il-kont tiegħek u d-dibattiti tiegħek f’Londra, fir-Renju Unit; it-taqsima 5 tispjega fejn oħra tmur id-data tiegħek. Id-dibattiti huma privati sakemm ma tippubblikahomx. It-tħassir tal-kont tiegħek jeqred iċ-ċwievet tad-data privata tiegħek; meta tiskedah, tagħżel jekk id-dibattiti ppubblikati tiegħek jitneħħewx ukoll jew jibqgħux pubbliċi taħt il-psewdonimu rtirat tiegħek. Tista’ tikkuntattjana fuq privacy@dezbatere.ro, u persuni msemmija f’dibattitu jistgħu jitolbu t-tneħħija mingħajr kont.
 
@@ -87,7 +87,9 @@ Ma noħolqux profili dwarek, ma nużawx id-data tiegħek għar-reklamar, u ma nb
 
 **X’jintbagħat.** Biex inħaddmu dibattitu nibagħtu test lil fornitur estern wieħed jew aktar tal-IA: il-mistoqsija tiegħek, l-annotazzjonijiet ta’ direzzjoni li tagħti, u dikjarazzjonijiet li tikkomponi l-magna hekk kif jiżviluppa d-dibattitu. Għalhekk fornitur jara test derivat minn dak li ttajpjajt u mibni madwaru. Jekk tuża l-konverżazzjoni tal-appoġġ, dak li tikteb hemmhekk imur għand il-mudell tal-konverżazzjoni tal-appoġġ. Fornitur qatt ma jirċievi l-indirizz elettroniku tiegħek, l-identifikaturi tal-kont jew tas-sessjoni tiegħek, l-indirizz IP tiegħek jew id-dettalji tal-pagament tiegħek.
 
-**Liema fornituri.** Dawn huma elenkati fir-**Reġistru tal-Fornituri tal-IA** tagħna fuq dezbatere.ro/providers, li huwa parti minn din il-politika. Ir-Reġistru japplika għal kull utent, kull fejn tgħix. Għal kull fornitur jiddikjara l-entità ġuridika u l-pajjiż ta’ stabbiliment tiegħu; x’jirċievi u għal liema skop — il-kitba tal-argumenti tad-dibattitu, il-ġudizzju u l-verifika tagħhom, il-kitba tal-istorja tal-verdett, jew it-tweġiba lilek fil-konverżazzjoni tal-appoġġ; il-pajjiżi jew ir-reġjuni fejn jipproċessa; it-termini taż-żamma tiegħu, u jekk iż-żamma żero tad-data hijiex attiva għall-punt aħħari u l-funzjonalitajiet li nużaw; jekk jistax juża d-data mdaħħla għat-taħriġ skont il-kuntratt tagħna; il-mekkaniżmu tat-trasferiment li niddependu fuqu; kif tista’ tikkuntattjah dwar id-data tiegħek; u d-data meta vverifikajna l-aħħar kull entrata. Il-fornituri jistgħu jinbidlu; ir-Reġistru għandu verżjonijiet u l-bidla tiġi nnotata fih.
+**Tfittxija fuq il-web permezz ta’ Perplexity.** Biex isibu evidenza għal dibattitu, il-mudelli jistgħu jfittxu fuq il-web permezz ta’ Perplexity, immexxi minn Perplexity AI, Inc. fl-Istati Uniti. Perplexity jirċievi l-mistoqsijiet ta’ tfittxija li l-mudelli jiktbu mid-dibattitu, li jistgħu jinkludu kliem mill-mistoqsija tiegħek. Bħal kull fornitur tal-IA, qatt ma jirċievi l-indirizz elettroniku tiegħek, l-identifikaturi tal-kont jew tas-sessjoni tiegħek, l-indirizz IP tiegħek jew id-dettalji tal-pagament tiegħek. Huwa elenkat fir-Reġistru, u r-regoli tat-trasferiment hawn taħt japplikaw għalih.
+
+**Liema fornituri.** Dawn huma elenkati fir-**Reġistru tal-Fornituri tal-IA** tagħna fuq dezbatere.ro/providers, li huwa parti minn din il-politika. Ir-Reġistru japplika għal kull utent, kull fejn tgħix. Għal kull fornitur jiddikjara l-entità ġuridika u l-pajjiż ta’ stabbiliment tiegħu; x’jirċievi u għal liema skop — il-kitba tal-argumenti tad-dibattitu, il-ġudizzju u l-verifika tagħhom, il-kitba tal-istorja tal-verdett, it-tfittxija fuq il-web għal evidenza, jew it-tweġiba lilek fil-konverżazzjoni tal-appoġġ; il-pajjiżi jew ir-reġjuni fejn jipproċessa; it-termini taż-żamma tiegħu, u jekk iż-żamma żero tad-data hijiex attiva għall-punt aħħari u l-funzjonalitajiet li nużaw; jekk jistax juża d-data mdaħħla għat-taħriġ skont il-kuntratt tagħna; il-mekkaniżmu tat-trasferiment li niddependu fuqu; kif tista’ tikkuntattjah dwar id-data tiegħek; u d-data meta vverifikajna l-aħħar kull entrata. Il-fornituri jistgħu jinbidlu; ir-Reġistru għandu verżjonijiet u l-bidla tiġi nnotata fih.
 
 **It-taħriġ u ż-żamma huma affarijiet differenti.** Nużaw fornituri tal-IA biss b’termini li ma jippermettulhomx jużaw il-kontenut tiegħek biex iħarrġu jew itejbu l-mudelli tagħhom; ir-Reġistru juri, għal kull fornitur, jekk ikkonfermajniex dan mal-kont tagħna, u meta. Xi fornituri jżommu messaġġi ta’ istruzzjoni u tweġibiet għal perjodu limitat għas-sigurtà, għall-prevenzjoni tal-abbuż jew għall-obbligi legali tagħhom stess; ir-Reġistru jgħid għal kemm żmien u għaliex. Fejn tkun attiva ż-żamma żero tad-data, ir-Reġistru jgħid dan u għal liema funzjonalitajiet. Mhux se niddeskrivu kontenut bħala mhux miżmum meta jkun jinżamm.
 
@@ -215,7 +217,7 @@ Biex tirrifjuta dawn l-elementi, imblokka jew ħassar il-cookies u d-data tas-si
 
 Meta nibdlu din il-politika nippubblikaw il-verżjoni l-ġdida b’sommarju ta’ dak li nbidel u data effettiva ġdida, u nżommu l-verżjonijiet preċedenti fuq dezbatere.ro/privacy/versions. Għal bidla li żżid skop ġdid jew riċevitur ġdid, ngħarrfuk qabel jibda l-ipproċessar il-ġdid, bil-posta elettronika u fil-prodott, u nagħtuk żmien biex toġġezzjona. Fejn skop ġdid jiddependi mill-kunsens tiegħek — pereżempju jekk xi darba nkunu rridu nużaw il-kontenut biex intejbu l-mudelli — nitolbu dak il-kunsens separatament u b’mod speċifiku; qatt ma nqisu l-aċċettazzjoni ta’ Termini aġġornati bħala kunsens għal ipproċessar ġdid. Għal kjarifiki li ma jbiddlu xejn dwar dak li nagħmlu, sempliċement nippubblikaw il-verżjoni l-ġdida.
 
-Din il-politika ġiet aġġornata l-aħħar fl-24 ta’ Ottubru 2026. Il-Verżjoni 3.6 issostitwiet il-verżjoni 3.5: it-taqsima 2 issa tgħid li, waqt ir-reġistrazzjoni, il-pajjiż tal-IP, flimkien mar-Reġjun li tagħżel, jiddeċiedi wkoll jekk nuru l-kaxxa separata ta’ approvazzjoni għall-Italja.
+Din il-politika ġiet aġġornata l-aħħar fl-24 ta’ Ottubru 2026. Il-Verżjoni 3.7 issostitwiet il-verżjoni 3.6: it-taqsima 5 issa tgħid li l-mudelli jistgħu jfittxu fuq il-web permezz ta’ Perplexity, u x’jirċievi Perplexity. Il-Verżjoni 3.6 issostitwiet il-verżjoni 3.5: it-taqsima 2 issa tgħid li, waqt ir-reġistrazzjoni, il-pajjiż tal-IP, flimkien mar-Reġjun li tagħżel, jiddeċiedi wkoll jekk nuru l-kaxxa separata ta’ approvazzjoni għall-Italja.
 
 ## Annex B — Termini reġjonali dwar il-privatezza
 

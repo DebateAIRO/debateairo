@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Röviden
-eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.5 · HATÁLYOS 2026. OKTÓBER 24.
+eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.6 · HATÁLYOS 2026. OKTÓBER 24.
 title: Amit Ön elfogad
 lede: Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.
-endMarker: A FELTÉTELEK VÉGE · v2.5
+endMarker: A FELTÉTELEK VÉGE · v2.6
 bodyLabel: A Szolgáltatási feltételek szövege
 annexTitle: A. melléklet — Regionális feltételek
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 IRÁNYADÓ JOG
 -->
 
-**Version 2.5 · Effective 2026. október 24. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
+**Version 2.6 · Effective 2026. október 24. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
 
 **In short.** Önnek legalább 18 évesnek kell lennie. A Dialectical Engine mesterségesintelligencia-modellekkel épít fel érveket, és minden általa létrehozott tartalom téves lehet — nem minősül tanácsadásnak. Vitái mindaddig bizalmasak, amíg közzé nem teszi őket; közzététel esetén bárki elolvashatja azokat. Az Ön által beküldött szöveget továbbítjuk a Szolgáltatói nyilvántartásunkban felsorolt MI-szolgáltatóknak, és azt nem használjuk modellek betanítására. Jogellenes tartalmat a support@dezbatere.ro címen jelenthet be, függetlenül attól, hogy rendelkezik-e fiókkal. A román jog az irányadó, de az Ön helyi fogyasztóvédelmi jogai változatlanul megilletik.
 
@@ -119,6 +119,8 @@ Ha nem biztos abban, hogy valami megengedett-e, közzététele előtt kérdezzen
 **Hogyan jut el az Ön tartalma az MI-szolgáltatókhoz.** Egy vita futtatásához szöveget küldünk egy vagy több külső modellszolgáltatónak. A szolgáltató megkapja az Ön kérdését, az Ön által beállított irányító megjegyzéseket és a motor által a vita során összeállított állításokat — így nem csupán az Ön eredeti szavait látja, hanem az Ön által beírt szövegből származó és aköré épített szöveget is. Az Ön e-mail-címét, fiókazonosítóit, munkamenet-nyilvántartásait vagy fizetési adatait soha nem kapja meg.
 
 **Mit küld a támogatási csevegés.** A támogatási asszisztens szintén MI-modell. Amikor Ön ír neki, üzenetét elküldjük egy külső modellszolgáltatónak, hogy a modell válaszolni tudjon, azokkal a súgócikkekkel együtt, amelyekre a válaszát alapozza. Küldés előtt elfedünk mindent, ami jelszónak, egyszer használatos kódnak vagy kulcsnak tűnik. Ha Ön azt kéri, hogy személlyel beszélhessen, a beszélgetést is — ugyanígy elfedve — elküldjük a modellnek, hogy rövid összefoglalót írjon csapatunk azon tagjának, aki átveszi az Ön ügyét. Az Ön e-mail-címét, fiókazonosítóit vagy fizetési adatait nem csatoljuk, de a modell minden mást megkap, amit Ön a csevegésbe beír, ezért ne írjon oda semmit, amit nem szeretne, hogy elolvasson.
+
+**Webes keresés a Perplexity szolgáltatáson keresztül.** A vitához szükséges bizonyítékok megtalálásához a modellek a **Perplexity** (Perplexity AI, Inc., Egyesült Államok) szolgáltatáson keresztül kereshetnek a weben; a Perplexity szerepel az MI-szolgáltatói nyilvántartásban. A Perplexity a modellek által a vitából megfogalmazott keresési kérdéseket kapja meg — így egy modellszolgáltatóhoz hasonlóan az Ön által beírt szöveg köré épített szöveget lát. Az Ön e-mail-címét, fiókazonosítóit, munkamenet-nyilvántartásait vagy fizetési adatait soha nem kapja meg.
 
 **Mely szolgáltatók és hol.** A dezbatere.ro/providers címen elérhető **MI-szolgáltatói nyilvántartásunk** e Feltételek részét képezi. Felsorolja az általunk igénybe vehető valamennyi szolgáltatót: jogi személyét és országát; azt, hogy mit kap meg és milyen célból; hol végzi az adatkezelést; megőrzési feltételeit; hogy az általunk használt végponton aktív-e a nulla adatmegőrzés; hogy szerződésünk alapján felhasználhatja-e a bemeneteket betanításra; az általunk alkalmazott adattovábbítási mechanizmust; valamint az egyes bejegyzések legutóbbi ellenőrzésének időpontját. A szolgáltatók az Ön országán és az Európai Gazdasági Térségen kívül is működhetnek. A garanciákat Adatvédelmi szabályzatunk ismerteti.
 

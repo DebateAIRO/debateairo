@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lyhyesti
-eyebrow: KÄYTTÖEHDOT · v2.5 · VOIMASSA 24. LOKAKUUTA 2026 ALKAEN
+eyebrow: KÄYTTÖEHDOT · v2.6 · VOIMASSA 24. LOKAKUUTA 2026 ALKAEN
 title: Mihin sitoudut
 lede: Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.
-endMarker: KÄYTTÖEHTOJEN LOPPU · v2.5
+endMarker: KÄYTTÖEHTOJEN LOPPU · v2.6
 bodyLabel: Käyttöehtojen teksti
 annexTitle: Liite A — Alueelliset ehdot
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 SOVELLETTAVA LAKI
 -->
 
-**Version 2.5 · Effective 24. lokakuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
+**Version 2.6 · Effective 24. lokakuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
 
 **In short.** Sinun on oltava vähintään 18-vuotias. Dialectical Engine muodostaa argumentteja tekoälymalleilla, ja kaikki sen tuottama voi olla virheellistä — se ei ole neuvontaa. Väittelysi ovat yksityisiä, ellet julkaise niitä; jos julkaiset ne, kuka tahansa voi lukea niitä. Lähettämäsi teksti toimitetaan palveluntarjoajarekisterissämme luetelluille tekoälypalveluntarjoajille, eikä sitä käytetä mallien kouluttamiseen. Ilmoita lainvastaisesta sisällöstä osoitteeseen support@dezbatere.ro riippumatta siitä, onko sinulla tiliä. Sopimukseen sovelletaan Romanian lakia, mutta paikallinen kuluttajansuojasi säilyy.
 
@@ -119,6 +119,8 @@ Jos et ole varma, onko jokin sallittua, kysy meiltä ennen sen julkaisemista.
 **Miten sisältösi päätyy tekoälypalveluntarjoajille.** Lähetämme väittelyn suorittamiseksi tekstiä yhdelle tai useammalle ulkoiselle mallipalveluntarjoajalle. Palveluntarjoaja saa kysymyksesi, asettamasi ohjaavat huomautukset ja väittelyn aikana järjestelmän koostamat lausumat — joten palveluntarjoaja näkee kirjoittamastasi tekstistä johdettua ja sen ympärille rakennettua tekstiä, ei ainoastaan alkuperäisiä sanojasi. Se ei koskaan saa sähköpostiosoitettasi, tilitunnisteitasi, istuntotietojasi tai maksutietojasi.
 
 **Mitä tukipalvelun chat lähettää.** Tukipalveluavustaja on myös tekoälymalli. Kun kirjoitat sille, lähetämme viestisi ulkoiselle mallipalveluntarjoajalle, jotta malli voi vastata, yhdessä niiden ohjeartikkelien kanssa, joihin se perustaa vastauksensa. Ennen lähettämistä peitämme kaiken, mikä näyttää salasanalta, kertakäyttökoodilta tai avaimelta. Jos pyydät saada keskustella henkilön kanssa, lähetämme mallille myös keskustelun samalla tavalla peitettynä, jotta se voi kirjoittaa lyhyen yhteenvedon tapauksesi vastaanottavalle tiimimme jäsenelle. Emme liitä mukaan sähköpostiosoitettasi, tilitunnisteitasi tai maksutietojasi, mutta malli saa kaiken muun, mitä kirjoitat chattiin, joten älä kirjoita sinne mitään, mitä et halua sen lukevan.
+
+**Verkkohaku Perplexity-palvelun kautta.** Löytääkseen näyttöä väittelyä varten mallit voivat tehdä verkkohakuja palvelun **Perplexity** (Perplexity AI, Inc., Yhdysvallat) kautta, ja palvelu on lueteltu tekoälypalveluntarjoajarekisterissä. Perplexity saa hakukyselyt, jotka mallit kirjoittavat väittelyn pohjalta — joten mallipalveluntarjoajan tavoin se näkee kirjoittamasi tekstin ympärille rakennettua tekstiä. Se ei koskaan saa sähköpostiosoitettasi, tilitunnisteitasi, istuntotietojasi tai maksutietojasi.
 
 **Mitkä palveluntarjoajat ja missä.** Osoitteessa dezbatere.ro/providers oleva **tekoälypalveluntarjoajarekisterimme** on osa näitä käyttöehtoja. Siinä luetellaan jokainen palveluntarjoaja, jota voimme käyttää: sen oikeushenkilö ja kotimaa; sen saamat tiedot ja niiden käyttötarkoitus; käsittelypaikat; tietojen säilytysehdot; onko käyttämässämme rajapinnassa käytössä tietojen säilyttämättömyys; voiko se sopimuksemme nojalla käyttää syötteitä kouluttamiseen; käyttämämme siirtomekanismi sekä kunkin merkinnän viimeisin tarkistuspäivä. Palveluntarjoajat voivat sijaita maasi ja Euroopan talousalueen ulkopuolella. Suojatoimet kuvataan tietosuojakäytännössämme.
 
