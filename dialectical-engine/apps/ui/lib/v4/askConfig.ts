@@ -14,6 +14,8 @@ import type { DigMode, ReadingLevel } from "./types";
 /*
  * V4 initial (spec 2026-10-28, B2): the person's two V4 choices (Quick look / Thorough, and the reading level) become
  * the V3 ask, built by V3's own buildNewDebateAskConfig so createDebate validates it exactly as it validates /new's.
+ * Owner N6 (2026-10-29): the reading level also rides with every ask (`depth_params.readingLevel`), so the AIs that
+ * write the final answer and its story write for it.
  * Everything else is /new's untouched default: risk tier "standard" (not edited), the provisional budget tier, the
  * personal decision scope, no model strength, as of the moment of Start.
  */
@@ -86,6 +88,8 @@ export function v4AskConfig(mode: DigMode, level: ReadingLevel, settings: V4AskS
     riskTierWasEdited: false,
     modelStrength: null,
     ...shapeChoices(sent, level, settings),
+    // Owner N6 (2026-10-29): every V4 ask, Free and paid, whatever the switches, tells the final writers the level.
+    readingLevel: level,
     ...(settings.settingsVersion === undefined ? {} : { settingsVersion: settings.settingsVersion })
   }, submitTime, newDebateCatalog);
 }

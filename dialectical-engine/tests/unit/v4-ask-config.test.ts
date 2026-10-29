@@ -60,6 +60,8 @@ describe("v4AskConfig", () => {
       // Owner N13: every Free ask is a quick look (depth 1); paid plans keep the choice.
       expect(ask.depth_params.depth).toBe(mode === "thorough" && planTier === "premium" ? 2 : 1);
       expect(ask.depth_params.depth).toBeLessThanOrEqual(2);
+      // Owner N6 (2026-10-29): every V4 ask carries the reading level, Free and paid, whatever the switches.
+      expect(ask.depth_params.readingLevel).toBe("background");
       if (switches.shapeSettings) {
         expect(ask.depth_params.depthMode).toBe("adaptive");
         expect(ask.depth_params.scrutiny).toBe(mode === "thorough" && planTier === "premium" ? "deep" : "standard");
@@ -94,6 +96,16 @@ describe("v4AskConfig", () => {
     expect(mod.v4AskConfig("quick", "expert", settings, SUBMIT_TIME, {}).answer_length).toBe("detailed");
     expect(mod.v4AskConfig("quick", "expert", { ...settings, lengthSettings: false }, SUBMIT_TIME, {}))
       .not.toHaveProperty("answer_length");
+  });
+
+  it("sends the reading level with every V4 ask, every level × plan × switch (owner N6)", async () => {
+    for (const level of ["plain", "background", "expert"] as const) for (const planTier of TIERS) for (const switches of SWITCHES) {
+      const config = mod.v4AskConfig("quick", level, { planTier, ...switches }, SUBMIT_TIME, {});
+      expect(config.reading_level).toBe(level);
+      const { client, asks } = capturingClient();
+      await createDebate("Should the city fund the tram?", config, "cookie-session", client);
+      expect(asks[0]!.depth_params.readingLevel).toBe(level);
+    }
   });
 
   it("sends the settings version back only when the room named one", async () => {

@@ -17,7 +17,7 @@ import { SessionSchema, LegalDocumentPairSchema } from "./auth-shared.js";
 export * from "./auth-shared.js";
 import { ConsumerAuthenticationCredentialSchema, consumerAuthContractSchemas } from "./consumer-auth.js";
 export * from "./consumer-auth.js";
-import { ABSTENTION_KINDS, CONDITION_MARKS, DEBATE_ROLES, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, MODEL_STRENGTHS, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
+import { ABSTENTION_KINDS, CONDITION_MARKS, DEBATE_ROLES, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, MODEL_STRENGTHS, READING_LEVELS, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
 import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js";
 import { MakerLineageSchema, PublicMakerLineageSchema } from "./lineage.js"; export * from "./lineage.js";
 import { AnswerStorySchema, PublicStoryShortSchema, StoryLanguageTagSchema } from "./story.js"; export * from "./story.js";
@@ -193,12 +193,23 @@ export type Scrutiny = z.infer<typeof ScrutinySchema>;
 export const AnswerLengthSchema = z.enum(["short", "standard", "detailed"]);
 export type AnswerLength = z.infer<typeof AnswerLengthSchema>;
 
-/** Closed at the contract door: the depth, plus the three optional shape settings (spec 2026-10-12 §3.2). */
+/**
+ * V4 reading level (owner ruling N6, 2026-10-29): the reader the answer writer and the storyteller write for. Missing
+ * (every V3 /new ask, every older run) reads as none: today's prompts, byte for byte.
+ */
+export const ReadingLevelSchema = z.enum(READING_LEVELS);
+export type ReadingLevel = z.infer<typeof ReadingLevelSchema>;
+
+/**
+ * Closed at the contract door: the depth, plus the three optional shape settings (spec 2026-10-12 §3.2), plus the V4
+ * reading level (N6), which rides here the way `answerLength` does and is stored with the run's depth_params.
+ */
 export const DepthParamsSchema = z.object({
   depth: ExpansionDepthSchema,
   depthMode: DepthModeSchema.optional(),
   scrutiny: ScrutinySchema.optional(),
-  answerLength: AnswerLengthSchema.optional()
+  answerLength: AnswerLengthSchema.optional(),
+  readingLevel: ReadingLevelSchema.optional()
 }).strict();
 export type DepthParams = z.infer<typeof DepthParamsSchema>;
 
@@ -222,6 +233,17 @@ export function debateShapeSettingsOf(depthParams: Readonly<Record<string, unkno
     scrutiny: shapeSettingOf(depthParams, "scrutiny", ScrutinySchema, "standard"),
     answerLength: shapeSettingOf(depthParams, "answerLength", AnswerLengthSchema, "standard")
   });
+}
+
+/**
+ * V4 reading level (N6): an asked or stored depth_params' level, or null when it has none (every V3 ask, every run stored
+ * before the level). A present value outside the three levels is refused, as a shape setting is.
+ */
+export function readingLevelOf(depthParams: Readonly<Record<string, unknown>>): ReadingLevel | null {
+  if (!Object.hasOwn(depthParams, "readingLevel") || depthParams.readingLevel === undefined) return null;
+  const parsed = ReadingLevelSchema.safeParse(depthParams.readingLevel);
+  if (!parsed.success) throw new TypeError("DEPTH_PARAMS_SHAPE_INVALID:readingLevel");
+  return parsed.data;
 }
 
 /** The 35 site locales (apps/ui/messages/<locale>): the language the person's page is in (question-language spec 2026-10-13, L1). */
