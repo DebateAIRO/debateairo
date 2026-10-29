@@ -465,6 +465,49 @@ describe("DEV-09 private local API environment", () => {
     }
   });
 
+  // Row-level security S01 (PLAN S2.4, DECISIONS D29, D74): the API's two system logins reach its environment from the
+  // credential file; the runner's own login does not (it is the runner's, S2.4-b).
+  it("S2.4-a the dev API environment carries both system URLs from the credential file", async () => {
+    const test = await fixture();
+    const credentials = parseEnvironment(await readFile(test.databaseCredentialFilePath, "utf8"));
+    await assemble(test.repositoryRoot);
+    const environment = parseEnvironment(await readFile(test.outputFilePath, "utf8"));
+    expect(environment.get("API_SYSTEM_DATABASE_URL")).toBe(credentials.get("API_SYSTEM_DATABASE_URL"));
+    expect(environment.get("API_SYSTEM_DATABASE_URL")).toMatch(/^postgresql:\/\/debateai_dev_api_system:/u);
+    expect(environment.get("API_AUTHORIZATION_SYSTEM_DATABASE_URL"))
+      .toBe(credentials.get("API_AUTHORIZATION_SYSTEM_DATABASE_URL"));
+    expect(environment.get("API_AUTHORIZATION_SYSTEM_DATABASE_URL"))
+      .toMatch(/^postgresql:\/\/debateai_dev_authorization_system:/u);
+    expect(environment.has("RUNNER_DATABASE_URL")).toBe(false);
+    expect(await readFile(test.outputFilePath, "utf8")).not.toContain(credentials.get("RUNNER_DATABASE_URL")!);
+  });
+
+  it("S2.4-c an environment equal to the assembled one without its API_SYSTEM_DATABASE_URL and API_AUTHORIZATION_SYSTEM_DATABASE_URL rows is rewritten to the assembled one, reused false", async () => {
+    const test = await fixture();
+    await assemble(test.repositoryRoot);
+    const current = await readFile(test.outputFilePath, "utf8");
+    const withoutSystem = current.split("\n")
+      .filter((row) => !row.startsWith("API_SYSTEM_DATABASE_URL=")
+        && !row.startsWith("API_AUTHORIZATION_SYSTEM_DATABASE_URL="))
+      .join("\n");
+    expect(withoutSystem.length).toBeLessThan(current.length - 2 * "API_SYSTEM_DATABASE_URL=".length);
+    // The same file before the release key existed too (the chain of upgrades, side-by-side §1).
+    const withoutSystemAndRelease = withoutSystem.slice(0, withoutSystem.lastIndexOf("RELEASE_KEY="));
+    expect(withoutSystemAndRelease.endsWith("\n")).toBe(true);
+    for (const previous of [withoutSystem, withoutSystemAndRelease]) {
+      await writeFile(test.outputFilePath, previous, { mode: 0o600 });
+      await expect(assemble(test.repositoryRoot))
+        .resolves.toEqual({ keyCount: DEVELOPMENT_API_ENVIRONMENT_KEYS.length, reused: false });
+      expect(await readFile(test.outputFilePath, "utf8")).toBe(current);
+    }
+    // Anything else is still drift: the same legacy file with another port is refused and kept.
+    const drifted = withoutSystem.replace("API_PORT=8790\n", "API_PORT=8791\n");
+    expect(drifted).not.toBe(withoutSystem);
+    await writeFile(test.outputFilePath, drifted, { mode: 0o600 });
+    await expect(assemble(test.repositoryRoot)).rejects.toThrow("DEV_API_ENVIRONMENT_DRIFT");
+    expect(await readFile(test.outputFilePath, "utf8")).toBe(drifted);
+  });
+
   it("rejects an earlier environment that drops a required field", async () => {
     const test = await fixture();
     await assemble(test.repositoryRoot);

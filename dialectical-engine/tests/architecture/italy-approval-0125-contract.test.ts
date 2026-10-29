@@ -27,7 +27,7 @@ const sha256 = (text: string): string => createHash("sha256").update(text).diges
 const code = (sql: string): string => sql.split("\n").map((line) => line.replace(/--.*$/u, "")).join("\n");
 
 describe("0125: the Italy-specific approval step", () => {
-  it("C-T follows 0124 in the chain's STEPS, with its own loader (synthesis-flag's 0126-0129 come after it)", () => {
+  it("C-T follows 0124 in the chain's STEPS, with its own loader (synthesis-flag's 0126-0129 and row-level security's 0130 come after it)", () => {
     expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0124,loadForward0125,loadForward0126,");
     const loader = read("packages/db/src/migration-forward0125.ts");
     expect(loader).toContain("const NAME='0125_italy_specific_approval.sql';");

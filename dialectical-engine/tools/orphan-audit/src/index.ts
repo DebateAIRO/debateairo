@@ -601,7 +601,17 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // re-export gained ItalyApprovalAcceptanceRow (migration 0125's row type, one type-only line). migrate() is byte-identical.
 // synthesis-flag integration with origin/dev b1005606c (2026-10-28): the merged module of the synthesis-flag and
 // Italy-approval lines above, pinned once. migrate() is origin/dev's.
-const NATIVE_MIGRATE_MODULE_SHA256 = "5ec946d8fa290eb0e4fa776fb783f00d3b646f009a31270b73394ce855029f87";
+// Row-level security S01, C3 (2026-10-24, 47e673787; PLAN §0.3, DECISIONS D55, D58, D72): the module after it re-exported
+// ./account-context.js, createPool gained the crossAccount option and the request-scope routing (the credential sent at
+// checkout, release rule v3), wrapClientQueries looked a client's query up per call, and readRoleRotationCounts ran
+// inside crossAccount("X24"). migrate() is byte-identical (its 13,111-byte slice, sha256 d1495dbe4bbf…, at ca61cbe00 and
+// b6a70bc0c). Re-pinned by BUILD-S01-C10 (Ruling R-15), not by the module's writer; REV(S01) reviews the module.
+// Row-level security S01 merged into dev (2026-10-28): the module carries both changes above. migrate() is byte-identical
+// (its 13,114-byte slice, sha256 d1495dbe4bbf…, at ca61cbe00, origin/dev b1005606c and the slice head 235bd65df).
+// Row-level security S01 merged onto origin/dev 76b76f4ba (2026-10-28): the module carries the synthesis-flag lines and
+// row security's lines above. migrate() is byte-identical (its 13,114-byte slice, sha256 d1495dbe4bbf…, at ca61cbe00,
+// b1005606c, 76b76f4ba and 20808ee31).
+const NATIVE_MIGRATE_MODULE_SHA256 = "6a957bde3c9b8e1664ccd5a6bb233fdf06991411bd60112848b8d21de4bb4a87";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each

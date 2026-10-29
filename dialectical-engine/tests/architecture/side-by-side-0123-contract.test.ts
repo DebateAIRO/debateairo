@@ -28,8 +28,8 @@ const shape = (value: unknown): unknown => typeof value === "object" && value !=
   : typeof value;
 
 describe("0123: the side-by-side releases step", () => {
-  it("is appended to the chain's STEPS after the engine's map answer step (the settings activation 0124 follows it)", () => {
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129]");
+  it("is appended to the chain's STEPS after the engine's map answer step (the settings activation 0124, the Italy-specific approval 0125, synthesis-flag's 0126-0129 and row-level security 0130 follow it)", () => {
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130]");
     const loader = read("packages/db/src/migration-forward0123.ts");
     expect(loader).toContain("const NAME='0123_side_by_side_releases.sql';");
     expect(loader).toContain("const VERSION='side-by-side-releases-forward0123-v1';");
@@ -406,7 +406,7 @@ describe("0123: the side-by-side releases step", () => {
 
   it("is the plan's step after 0122 and before 0124 (the settings activation), with no supplemental verifier", async () => {
     const plan = await loadMigrationPlan();
-    // The Italy-specific approval (0125) and synthesis-flag's 0126-0129 follow 0124 (merges of 2026-10-26 and 2026-10-28),
+    // The Italy-specific approval (0125) and synthesis-flag's 0126-0129 and row-level security's 0130 follow 0124 (merges of 2026-10-26 and 2026-10-28),
     // so the steps are found by name, not by the chain's end.
     const names = plan.forwardChain.map((step) => step.name);
     const at = names.indexOf("0123_side_by_side_releases.sql");

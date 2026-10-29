@@ -1,11 +1,27 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { migrate } from "@debateai/db";
 import { PostgresDataExportRepository } from "@debateai/db";
 import { hashToken } from "@debateai/crypto";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { seedSupportFixture } from "../support/supportSeed.js";
+
+// The cases below re-run 0129 over seeded support rows by deleting its receipts, which the chain allows only while 0129 is
+// its last step. Since the merge onto row-level security, 0130 follows it and cannot run twice (its CREATE POLICY
+// statements), so this file migrates along the chain as it ends at 0129: the plan migrate() loads, cut after 0129.
+vi.mock("../../packages/db/src/migration-lineage.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../packages/db/src/migration-lineage.js")>();
+  return {
+    ...actual,
+    loadMigrationPlan: async () => {
+      const plan = await actual.loadMigrationPlan();
+      const end = plan.forwardChain.findIndex((step) => step.name === "0129_support_answer_scope.sql");
+      if (end < 0) throw new Error("TEST_0129_NOT_IN_CHAIN");
+      return Object.freeze({ ...plan, forwardChain: plan.forwardChain.slice(0, end + 1) });
+    }
+  };
+});
 
 const tables = ["session", "session_key", "message", "abuse_event", '"case"', "case_key", "case_event",
   "case_message", "rating", "tool_call", "admission_event", "relay_call", "relay_waiter", "relay_waiter_event"];

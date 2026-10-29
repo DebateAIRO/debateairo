@@ -31,6 +31,7 @@ import {
   insertRunRoleRotation,
   migrate,
   readCallPrompt,
+  type Pool,
   type RunRoleRotationInput,
   type StoredServeDisclosure
 } from "@debateai/db";
@@ -137,7 +138,7 @@ import { persistCatchUpVersion } from "../support/catchUpVersion.js";
 import { HOME_PAGE_SIZE } from "../../apps/ui/lib/serverApi.js";
 import { projectCanvasCensus } from "../../apps/ui/lib/v3/census.js";
 import {
-  TEST_APP_ORIGIN,testHttpIdentity,testSessionApplication,testSessionHeaders,
+  persistLiveSession,TEST_APP_ORIGIN,testHttpIdentity,testSessionApplication,testSessionHeaders,
   type TestHttpIdentity
 } from "../support/httpSession.js";
 import {
@@ -145,8 +146,15 @@ import {
   registerFixtureRow
 } from "../support/registerFixtures.js";
 import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
+import { apiTestPools, provisionRlsLogins, type ApiTestPools } from "../support/rls-logins.js";
 
 let database: TestDatabase;
+/**
+ * Row-level security S01 (PLAN S5.1, SPEC-v4 R21): every pool this file hands to buildApi or to an API repository,
+ * field for field as apps/api/src/main.ts builds it — the product's own logins when DEBATEAI_TEST_API_LOGINS=1, the
+ * harness superuser pool in every field otherwise. Seeding and read-back stay on database.pool.
+ */
+let apiPools: ApiTestPools;
 const batteryRows = createInitialBatteryRows({ settlementWatchHandle: "settlement-watch:test-layer" });
 
 async function persistHttpIdentity(identity:TestHttpIdentity,label:string):Promise<void> {
@@ -163,6 +171,9 @@ async function persistHttpIdentity(identity:TestHttpIdentity,label:string):Promi
     `database-http-${label}-${identity.authenticated.userId}`,
     randomUUID(),identity.authenticated.ownerRef
   ]);
+  // Row-level security S01 (PLAN S5.1 (2), DECISIONS D55): the identity's live identity.session row, so the database's
+  // rls.* functions accept the token testSessionApplication accepts and a request carries this account's context.
+  await persistLiveSession(database.pool, identity);
 }
 
 /**
@@ -835,12 +846,28 @@ function runnerWithEndpoint(endpoint: string, settings = runnerSettings()): Walk
   }), settings);
 }
 
+/**
+ * The two ask-admission pools main.ts passes to PostgresAskApplication (`serverAskAdmissionPool`,
+ * `legacyAskAdmissionPool`). In superuser mode every field is the one harness pool, which the application's
+ * separate-pools check refuses, so there the harness facades stand in for them, as at base.
+ */
+function askAdmissionPools(pools: ApiTestPools): Readonly<{ server: Pool; legacy: Pool }> {
+  return pools.serverAskAdmission === pools.contentProvision || pools.legacyAskAdmission === pools.runtime
+    ? createTestAskAdmissionPoolFacades(pools.runtime)
+    : Object.freeze({ server: pools.serverAskAdmission, legacy: pools.legacyAskAdmission });
+}
+
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
+  apiPools = await apiTestPools(database, import.meta.url);
 });
 
 afterAll(async () => {
+  // Login mode only: the dev logins' pools (provisioned once by apiTestPools) end before the cluster stops.
+  if (database !== undefined && apiPools !== undefined && apiPools.runtime !== database.pool) {
+    await (await provisionRlsLogins(database)).end();
+  }
   await database?.stop();
 });
 
@@ -869,12 +896,12 @@ describe("S-LANG argument language persistence", () => {
       })
     };
     const application = new PostgresAskApplication(
-      database.pool,
+      apiPools.runtime,
       { dispatch: async () => undefined },
       settings,
       undefined,
-      database.pool,
-      createTestAskAdmissionPoolFacades(database.pool)
+      apiPools.contentProvision,
+      askAdmissionPools(apiPools)
     );
     const ask: AskRequest = {
       question_line: "Ar trebui ca România să investească mai mult în transportul public, deoarece orașele au nevoie de aer mai curat.",
@@ -1192,8 +1219,8 @@ describe("LOAD-01 run projection ownership boundary", () => {
     });
 
     const application = new PostgresAskApplication(
-      database.pool,{} as never,{ releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never,undefined,database.pool,
-      createTestAskAdmissionPoolFacades(database.pool)
+      apiPools.runtime,{} as never,{ releaseKey: TEST_RELEASE_KEY, registerVersion: 1 } as never,undefined,
+      apiPools.contentProvision,askAdmissionPools(apiPools)
     );
     const api = buildApi({
       application,
@@ -1275,7 +1302,8 @@ describe("LOAD-01 run projection ownership boundary", () => {
       nodeSet: [],
       commandKey: `load01:${runId}:Q1`
     });
-    const repository = new RunRepository(database.pool);
+    // R21: the repository the readRun fake reads through, inside the request, is the API's runtime pool.
+    const repository = new RunRepository(apiPools.runtime);
     const readRun: AskApplication["readRun"] = async (candidateRunId, _session, ownership) => {
       const run = await repository.readLoadingProjection(candidateRunId, ownership);
       return run === null ? null : {

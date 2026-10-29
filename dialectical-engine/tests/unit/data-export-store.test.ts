@@ -43,6 +43,9 @@ function apiSource(): Record<string, string> {
     USER_DEK_STORE_PATH: "/tmp/dx-user-deks",
     CONTENT_PROVISION_DATABASE_URL: "postgresql://localhost/content",
     AUTHORIZATION_DATABASE_URL: "postgresql://localhost/authorization",
+    // Row-level security S01 (PLAN S2.5): the API's two system logins.
+    API_SYSTEM_DATABASE_URL: "postgresql://localhost/api-system",
+    API_AUTHORIZATION_SYSTEM_DATABASE_URL: "postgresql://localhost/authorization-system",
     ERASURE_DATABASE_URL: "postgresql://localhost/erasure",
     DATABASE_URL: "postgresql://localhost/main",
     SUPPORT_DATABASE_URL: "postgresql://localhost/support",

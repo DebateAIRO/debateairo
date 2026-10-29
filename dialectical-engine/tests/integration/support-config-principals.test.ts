@@ -45,6 +45,8 @@ const PRODUCTION_SUPPORT_ROLE = "debateai_prod_support_config_operator";
 const DATA_EXPORT_KEY = "DATA_EXPORT_DATABASE_URL";
 const DATA_EXPORT_ROLE = "debateai_dev_data_export";
 const DATA_EXPORT_CAPABILITY = "debateai_data_export_worker";
+// Row-level security (S2.3, D29): the thirteenth to fifteenth logins, appended last in this order.
+const ROW_LEVEL_SECURITY_KEYS = ["API_SYSTEM_DATABASE_URL", "API_AUTHORIZATION_SYSTEM_DATABASE_URL", "RUNNER_DATABASE_URL"] as const;
 
 let database: TestDatabase;
 let repositoryRoot: string;
@@ -55,10 +57,11 @@ function parseExactMaster(source: string): ReadonlyMap<string, string> {
   expect(source.endsWith("\n")).toBe(true);
   expect(source).not.toContain("\r");
   const rows = source.slice(0, -1).split("\n");
-  expect(rows).toHaveLength(12);
+  expect(rows).toHaveLength(15);
   expect(rows.map((row) => row.slice(0, row.indexOf("="))))
     .toEqual(DEVELOPMENT_DATABASE_PRINCIPALS.map(({ environmentKey }) => environmentKey));
-  expect(rows.at(-1)?.startsWith(`${DATA_EXPORT_KEY}=`)).toBe(true);
+  expect(rows.at(-4)?.startsWith(`${DATA_EXPORT_KEY}=`)).toBe(true);
+  expect(rows.slice(-3).map((row) => row.slice(0, row.indexOf("=")))).toEqual([...ROW_LEVEL_SECURITY_KEYS]);
   return new Map(rows.map((row) => {
     const separator = row.indexOf("=");
     return [row.slice(0, separator), row.slice(separator + 1)];
@@ -167,7 +170,7 @@ describe("REGISTER-SUPPORT-PUBLICATION development operator principal", () => {
       adminPool: database.pool,
       adminDatabaseUrl: LOCAL_ADMIN_DATABASE_URL,
       credentialFilePath
-    })).resolves.toEqual({ credentialFilePath, principalCount: 12 });
+    })).resolves.toEqual({ credentialFilePath, principalCount: 15 });
 
     const masterSource = await readFile(credentialFilePath, "utf8");
     const master = parseExactMaster(masterSource);
@@ -520,7 +523,7 @@ describe("REGISTER-SUPPORT-PUBLICATION development operator principal", () => {
       adminPool: database.pool,
       adminDatabaseUrl: LOCAL_ADMIN_DATABASE_URL,
       credentialFilePath
-    })).resolves.toEqual({ credentialFilePath, principalCount: 12 });
+    })).resolves.toEqual({ credentialFilePath, principalCount: 15 });
   }, 120_000);
 
   it("rejects loader custody, exact-schema, ordering, and endpoint drift", async () => {

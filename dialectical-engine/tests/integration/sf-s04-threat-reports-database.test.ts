@@ -405,14 +405,25 @@ describe("0128 applied database", () => {
       `user-dek:${recipient.userId}`, "1"] as const;
     await database.pool.query('UPDATE identity."user" SET email_ciphertext=$1 WHERE user_id=$2',
       [JSON.stringify(encrypt(key, Buffer.from(email), aad)), recipient.userId]);
-    const runtime = { query: async (sql: string, values?: unknown[]) => ({ rows: await asRole("debateai_runtime", sql, values) }) };
-    const reader = threatReportEmailReader(runtime as never, { load: async () => Buffer.from(key) } as never, "staff");
-    expect(recipient.staffId).not.toBe(recipient.userId);
-    await expect(reader(recipient.staffId)).resolves.toBe(email);
-    await database.pool.query("UPDATE staff.subject SET capabilities=ARRAY['TEAM_READ']::text[] WHERE staff_id=$1", [recipient.staffId]);
-    await expect(reader(recipient.staffId)).resolves.toBeNull();
-    await database.pool.query("UPDATE staff.subject SET capabilities=ARRAY['THREAT_REPORT']::text[],state='DISABLED' WHERE staff_id=$1", [recipient.staffId]);
-    await expect(reader(recipient.staffId)).resolves.toBeNull();
+    // Row-level security X27: main.ts gives the reader crossAccountPool(pool, "X27"), the API's system login, whose
+    // shape is the API's capability role plus the cross-account role (apps/runner/src/dev-database-principals.ts, D29).
+    // That shape is built for this transaction only, so the role catalogue the last case reads gains no role.
+    const system = await database.pool.connect();
+    try {
+      await system.query("BEGIN");
+      await system.query("CREATE ROLE threat_report_x27_api_system NOLOGIN IN ROLE debateai_billing_runtime, debateai_rls_all_accounts");
+      await system.query("SET LOCAL ROLE threat_report_x27_api_system");
+      const reader = threatReportEmailReader(system as never, { load: async () => Buffer.from(key) } as never, "staff");
+      expect(recipient.staffId).not.toBe(recipient.userId);
+      await expect(reader(recipient.staffId)).resolves.toBe(email);
+      await database.pool.query("UPDATE staff.subject SET capabilities=ARRAY['TEAM_READ']::text[] WHERE staff_id=$1", [recipient.staffId]);
+      await expect(reader(recipient.staffId)).resolves.toBeNull();
+      await database.pool.query("UPDATE staff.subject SET capabilities=ARRAY['THREAT_REPORT']::text[],state='DISABLED' WHERE staff_id=$1", [recipient.staffId]);
+      await expect(reader(recipient.staffId)).resolves.toBeNull();
+    } finally {
+      await system.query("ROLLBACK").catch(() => undefined);
+      system.release();
+    }
   });
 
   it("backfills the active owner capability with a revision, epoch and session revoke", async () => {

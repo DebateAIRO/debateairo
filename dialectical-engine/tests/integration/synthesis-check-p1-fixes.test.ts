@@ -9,10 +9,12 @@ import { readPromptFrame } from "../../packages/providers/src/prompt-frame.js";
 import type { PromptPacket } from "../../packages/providers/src/index.js";
 import { judgeCallValue } from "../../apps/api/src/publication-check/verdict.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { provisionRlsLogins, type RlsLogins } from "../support/rls-logins.js";
 import { persistTerminalRun } from "../support/settledRun.js";
 import { createEncryptedStoryRun, provisionStoryEncryptedOwner, releaseStoryEncryptedOwner, type StoryEncryptedOwner } from "../support/storyEncryptedOwner.js";
 
 let database: TestDatabase;
+let logins: RlsLogins | undefined;
 let runtime: Pool;
 let owner: StoryEncryptedOwner;
 let repository: SynthesisCheckRepository;
@@ -21,15 +23,17 @@ beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
   owner = await provisionStoryEncryptedOwner(database.pool);
-  const url = new URL(database.connectionString);
-  url.searchParams.set("options", "-c role=debateai_runtime");
-  runtime = createPool(url.toString());
+  // Row-level security S01: bare debateai_runtime carries no account context, so it now sees no account's rows. These
+  // statements run where the API runs every statement outside a request: its system login (tests/support/rls-logins.ts).
+  logins = await provisionRlsLogins(database);
+  runtime = createPool(logins.url("API_SYSTEM_DATABASE_URL"));
   configureContentEncryption(runtime, contentCipherFor(database.pool)!);
   repository = new SynthesisCheckRepository(runtime);
   serve = new ServeRepository(runtime);
 }, 180_000);
 afterAll(async () => {
   await runtime?.end();
+  await logins?.end();
   await database?.stop();
   if (owner !== undefined) await releaseStoryEncryptedOwner(owner);
 });

@@ -1,7 +1,11 @@
 import { createPool, type Pool } from "@debateai/db";
 
-/** The API's own database principal on the host (deploy/vps/README.md:178). */
-const API_RUNTIME_PRINCIPAL = "debateai_prod_api_runtime";
+/**
+ * The API's login outside a request on the host (D48, deploy/vps/README.md): the request login
+ * `debateai_prod_api_runtime` sees only its verified account's rows under row-level security, so the billing commands
+ * connect as `api-system`.
+ */
+const API_SYSTEM_PRINCIPAL = "debateai_prod_api_system";
 
 /**
  * The billing commands read and write as the API does, and in production as no one else; a read-only command
@@ -15,7 +19,7 @@ export async function assertBillingOperatorConnection(
   )).rows[0];
   if (row === undefined) throw new TypeError("BILLING_OPERATOR_CONNECTION_INVALID");
   if (options.readOnly && row.read_only !== "on") throw new TypeError("BILLING_OPERATOR_CONNECTION_NOT_READ_ONLY");
-  if (options.production && row.role !== API_RUNTIME_PRINCIPAL) throw new TypeError("BILLING_OPERATOR_PRINCIPAL_INVALID");
+  if (options.production && row.role !== API_SYSTEM_PRINCIPAL) throw new TypeError("BILLING_OPERATOR_PRINCIPAL_INVALID");
 }
 
 /**

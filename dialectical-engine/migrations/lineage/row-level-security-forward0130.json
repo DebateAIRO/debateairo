@@ -1,0 +1,119 @@
+{
+  "version": "row-level-security-forward0130-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0129_support_answer_scope.sql",
+    "manifestSha256": "c9e51b95a6f340e61cd4753cc29b19d092b2d6c930ab8619062e1ef34dc01aa5",
+    "verifierSha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
+  },
+  "migration": {
+    "name": "0130_row_level_security.sql",
+    "sha256": "9699cb9951b4c83f09454ee34fd4ff428480dfea333f4e4183c28651149215a8"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "amendsPostconditionsOf": [
+    {
+      "step": "0111_billing_netopia.sql",
+      "relations": [
+        "billing.card_token",
+        "billing.card_token_revocation",
+        "billing.hosted_payment",
+        "billing.notice_quarantine",
+        "billing.payment_notice",
+        "billing.payment_notice_outcome",
+        "billing.payment_notice_raw",
+        "billing.status_read"
+      ],
+      "field": "relrowsecurity",
+      "value": true,
+      "policies": [
+        "rls_account",
+        "rls_all_accounts"
+      ]
+    },
+    {
+      "step": "0117_debate_shape_map.sql",
+      "relations": [
+        "core.map_choice",
+        "core.map_item",
+        "core.map_position"
+      ],
+      "field": "relrowsecurity",
+      "value": true,
+      "policies": [
+        "rls_account",
+        "rls_all_accounts"
+      ]
+    },
+    {
+      "step": "0119_reclaim_resume.sql",
+      "relations": [
+        "core.map_position_repoint"
+      ],
+      "field": "relrowsecurity",
+      "value": true,
+      "policies": [
+        "rls_account",
+        "rls_all_accounts"
+      ]
+    },
+    {
+      "step": "0121_engine_verdict.sql",
+      "relations": [
+        "ledger.point_investigation",
+        "ledger.verdict_vote"
+      ],
+      "field": "relrowsecurity",
+      "value": true,
+      "policies": [
+        "rls_account",
+        "rls_all_accounts"
+      ]
+    },
+    {
+      "step": "0122_engine_map_check.sql",
+      "relations": [
+        "core.map_answer_check",
+        "core.map_item_rests_on"
+      ],
+      "field": "relrowsecurity",
+      "value": true,
+      "policies": [
+        "rls_account",
+        "rls_all_accounts"
+      ]
+    },
+    {
+      "step": "0123_side_by_side_releases.sql",
+      "relations": [
+        "core.run_supersession",
+        "ledger.model_spend_waiver"
+      ],
+      "field": "relrowsecurity",
+      "value": true,
+      "policies": [
+        "rls_account",
+        "rls_all_accounts"
+      ]
+    },
+    {
+      "step": "0126_synthesis_check.sql",
+      "relations": [
+        "serve.synthesis_check_attempt",
+        "serve.synthesis_check_inheritance",
+        "serve.synthesis_check_removal_request",
+        "serve.synthesis_check_request",
+        "serve.synthesis_check_result"
+      ],
+      "field": "relrowsecurity",
+      "value": true,
+      "policies": [
+        "rls_account",
+        "rls_all_accounts"
+      ]
+    }
+  ]
+}

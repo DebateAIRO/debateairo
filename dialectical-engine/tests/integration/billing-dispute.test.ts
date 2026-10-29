@@ -361,3 +361,31 @@ describe("P2-W10 a plan cancelled while a card dispute pauses it, on the fake st
     expect((await folded(paid.subscriptionId)).status).not.toBe("ENDED");
   }, 30_000);
 });
+
+/**
+ * S2.7 (D48, D56): in production the billing commands connect as `api-system`, the API's login outside a request. The
+ * API's request login `debateai_prod_api_runtime` sees only its verified account's rows under row-level security, so
+ * a billing command on it is refused before any row is read.
+ */
+describe("S2.7 the production billing operator principal", () => {
+  it("S2.7-a a production operator connection as debateai_prod_api_runtime is refused BILLING_OPERATOR_PRINCIPAL_INVALID and as debateai_prod_api_system accepted", async () => {
+    const urlOf = (login: string): string => {
+      const url = new URL(database.connectionString);
+      url.username = login;
+      url.password = "operator-test-only";
+      return url.toString();
+    };
+    for (const login of ["debateai_prod_api_runtime", "debateai_prod_api_system"]) {
+      await database.pool.query(`CREATE ROLE ${login} LOGIN PASSWORD 'operator-test-only'`);
+    }
+    await expect(openBillingOperatorPool(urlOf("debateai_prod_api_runtime"), { production: true, readOnly: false, max: 1 }))
+      .rejects.toThrow("BILLING_OPERATOR_PRINCIPAL_INVALID");
+    const accepted = await openBillingOperatorPool(urlOf("debateai_prod_api_system"), { production: true, readOnly: false, max: 1 });
+    try {
+      expect((await accepted.query<{ role: string }>("SELECT current_user::text AS role")).rows[0]?.role)
+        .toBe("debateai_prod_api_system");
+    } finally {
+      await accepted.end();
+    }
+  }, 20_000);
+});

@@ -1,4 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
+import type { Pool } from "pg";
+import { hashToken } from "@debateai/crypto";
 import type { AuthenticatedSession, SessionApplication } from "../../apps/api/src/sessions.js";
 
 export const RETIRED_DEV_HEADER = ["x", "user", "dev", "token"].join("-");
@@ -42,6 +44,29 @@ export function testHttpIdentity(label: string): TestHttpIdentity {
       authKind: "cookie" as const
     })
   });
+}
+
+/**
+ * Row-level security S01 (PLAN S3.1, DECISIONS D55): the identity.session row that makes `identity` a live session
+ * the database itself accepts — `rls.context_user_id()` hashes the raw token as `hashToken("session", …)` and finds
+ * it — so a test whose session application accepts the identity also gets its rows under row security. One row for the
+ * identity's session id and user, idle and absolute expiry 1 h and 2 h ahead (the shape of
+ * tests/integration/side-by-side-erase-superseded.test.ts). The identity's `identity."user"` row must exist; seeding
+ * runs on the harness superuser pool.
+ */
+export async function persistLiveSession(pool: Pool, identity: TestHttpIdentity): Promise<void> {
+  await pool.query(
+    `INSERT INTO identity.session(
+       session_id,user_id,token_hash,csrf_token_hash,binding_context,
+       created_at,last_seen_at,idle_expires_at,absolute_expires_at,last_mfa_at
+     ) VALUES ($1,$2,$3,$4,'{}'::jsonb,now(),now(),now()+interval '1 hour',now()+interval '2 hours',now())`,
+    [
+      identity.authenticated.session.session_id,
+      identity.authenticated.userId,
+      hashToken("session", identity.rawSessionToken),
+      hashToken("csrf", identity.rawCsrfToken)
+    ]
+  );
 }
 
 export function testSessionApplication(
