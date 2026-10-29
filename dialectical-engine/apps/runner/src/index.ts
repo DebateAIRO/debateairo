@@ -6835,6 +6835,16 @@ export class WalkingSkeletonRunner {
     // ledger rule (`seatCallPlan`'s `prefer`), no longer a filter, so its seat
     // keeps its backup; the ledger read still seeds `positionAnswerers`.
     const positionRule = (seat: RunSeat) => (member: SeatIdentity): boolean => positionMakerIsFree(seat, member);
+    /**
+     * R22 (owner ruling 2026-10-29, "Backup AI takes the seat") — WHO MAY WRITE A ROOT POSITION WHOSE ANSWER WAS REFUSED
+     * AFTER EVERY REPAIR: the seat's other member (its backup, which the root's own fairness rule already allows), when it
+     * is of another maker and does not sit out the rest of the run (the preview's sit-out book). The member that answers
+     * is the root's author for every later step (`positionAnswerers`, the node's maker), and the answer discloses it with
+     * BACKUP-MODEL-USED. A seat with no such member (every legacy book: no runner-up) keeps today's rule: the refusal
+     * fails the debate.
+     */
+    const positionBackup = (backup: SeatMember, refused: SeatMember): boolean =>
+      backup.maker !== refused.maker && sitOut?.sitsOut(backup.providerRef) !== true;
     /** Final review M-1: a shaped root's maker bar narrows its POSITION rule (main and backup); none is today's rule. */
     const positionSeatRule = (seat: RunSeat, bar?: (member: Readonly<{ maker: string }>) => boolean) => bar === undefined
       ? positionRule(seat) : (member: SeatIdentity): boolean => positionRule(seat)(member) && bar(member);
@@ -8015,6 +8025,7 @@ export class WalkingSkeletonRunner {
           seat: primarySeat,
           callSiteKey: "JUDGE",
           ...primaryPlan.options,
+          contentRefusalBackup: positionBackup,
           call: (member, callSiteKey) => member.judge.judge({
             runId: run.runId,
             subjectItemId: claimed.workItemId,
@@ -8291,6 +8302,8 @@ export class WalkingSkeletonRunner {
           seat: input.seat,
           callSiteKey: input.callSiteKey,
           ...childPlan.options,
+          // R22: a root's refused answer goes to its seat's backup; a reply's or a cross-exchange's halts its leg.
+          ...(input.parentNodeId === null && input.seat.role === "POSITION" ? { contentRefusalBackup: positionBackup } : {}),
           call: (member, callSiteKey) => member.judge.judge({
             runId: run.runId,
             subjectItemId: claimed.workItemId,

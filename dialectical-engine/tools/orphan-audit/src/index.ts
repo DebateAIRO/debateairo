@@ -601,7 +601,9 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // re-export gained ItalyApprovalAcceptanceRow (migration 0125's row type, one type-only line). migrate() is byte-identical.
 // synthesis-flag integration with origin/dev b1005606c (2026-10-28): the merged module of the synthesis-flag and
 // Italy-approval lines above, pinned once. migrate() is origin/dev's.
-const NATIVE_MIGRATE_MODULE_SHA256 = "5ec946d8fa290eb0e4fa776fb783f00d3b646f009a31270b73394ce855029f87";
+// R22 engine follow-ups (2026-10-29, owner ruling "Backup AI takes the seat"): the reviewed module after
+// RunBackupSwitchLifecycleValue's cause admitted CONTENT_REFUSED (a type and its comment only). migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "b174a292b92ce44e153d8037ecb0e79b0982715ff36b327a564396e7d6581750";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each
