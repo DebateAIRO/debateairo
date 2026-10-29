@@ -181,7 +181,8 @@ describe("privacy policy modal — rendered", () => {
       0
     );
     expect(expectedParagraphs).toBe(54);
-    expect(expectedBullets).toBe(81);
+    // R22 item 15: section 2's and section 7's "Page settings and visits" rows add two.
+    expect(expectedBullets).toBe(83);
     expect(dialog.querySelectorAll(".policyText").length).toBe(expectedParagraphs);
     expect(dialog.querySelectorAll(".policyItem").length).toBe(expectedBullets);
 
