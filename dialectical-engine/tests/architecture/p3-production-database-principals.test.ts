@@ -835,6 +835,25 @@ describe("P3-01 production database-principal manifest", () => {
   "roleName": "debateai_data_export_worker",
   "source": "migrations/0128_threat_reports.sql",
   "grants": ["EXECUTE ON FUNCTION identity.read_data_export_threat_reports(uuid,uuid)"]
+},
+// V4 account memory 0130 (owner rulings N7 and N11): the six account-memory functions for the API's own role (never the
+// shared runtime role), the export reader for the export worker alone. No table grant.
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0130_v4_account_memory.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_page_reading_level(uuid)",
+    "EXECUTE ON FUNCTION identity.save_page_reading_level(uuid,text)",
+    "EXECUTE ON FUNCTION identity.read_debate_last_visit(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.record_debate_last_visit(uuid,uuid,jsonb)",
+    "EXECUTE ON FUNCTION identity.read_dig_links(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.record_dig_link(uuid,uuid,uuid,text[],text)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0130_v4_account_memory.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.read_data_export_page_memory(uuid,uuid)"]
 }
 ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))
@@ -1160,6 +1179,25 @@ it("discloses exactly 0125's grants to the API's billing role and the export wor
   // The sign-up writer for the API's role; the export reader v2 for the worker. Nothing else, and no table grant.
   expect(declared).toHaveLength(2);
   expect(declared.some(grant => /\bON legal\./u.test(grant))).toBe(false);
+});
+
+it("discloses exactly 0130's grants to the API's own role and the export worker (V4 account memory)", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0130_v4_account_memory.sql", "utf8");
+  const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime|debateai_data_export_worker";
+  // As for 0125: every GRANT line naming one of the disclosed roles names it alone.
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
+    .filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+      && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = [...sql.matchAll(new RegExp(`^GRANT [^\\n]+ TO (?:${disclosed});$`, "gm"))]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0130_v4_account_memory.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  // Six API functions for the API's role, the export reader for the worker; nothing for the shared runtime, no table grant.
+  expect(declared).toHaveLength(7);
+  expect(declared.some(grant => / TO debateai_runtime;$/u.test(grant))).toBe(false);
+  expect(declared.some(grant => !/^GRANT EXECUTE ON FUNCTION /u.test(grant))).toBe(false);
 });
 
 it("discloses every 0127 publication review grant, including the run ownership columns", async () => {

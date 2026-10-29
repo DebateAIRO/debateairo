@@ -222,7 +222,7 @@ describe("0124: the settings activation step", () => {
     });
     expect(manifest.migration).toEqual({ name: "0124_settings_activation.sql", sha256: sha256(sql) });
     expect(manifest.verifier).toEqual({ path: "lineage/verify-effective-capabilities-111.sql", sha256: manifest.previous.verifierSha256 });
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129]");
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130]");
     const loader = read("packages/db/src/migration-forward0124.ts");
     for (const line of ["const NAME='0124_settings_activation.sql';", "const VERSION='settings-activation-forward0124-v1';",
       "const MANIFEST_PATH='lineage/settings-activation-forward0124.json';",

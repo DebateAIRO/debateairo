@@ -10,12 +10,12 @@ base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
 first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third, role rotation (0114,
-below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth and the support answer scope (0129, below) the nineteenth. A step is added with new files only; NNNN is its number, the step before's number plus one:
+below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth and the V4 account memory (0130, below) the twentieth. A step is added with new files only; NNNN is its number, the step before's number plus one:
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
-   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0129: 0129,
-   `support-answer-scope-forward0129.json`, and `verify-effective-capabilities-111.sql`, which 0112 to 0129 keep),
+   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0130: 0130,
+   `v4-account-memory-forward0130.json`, and `verify-effective-capabilities-111.sql`, which 0112 to 0130 keep),
    and its own migration and verifier. (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json`
    and the sealed `verify-effective-capabilities.sql`.)
 3. A new verifier `lineage/verify-effective-capabilities-NNNN.sql` only when the step adds billing relations or
@@ -395,6 +395,22 @@ seed followed by `migrate()` does not drift. The effective verifier remains
 `verify-effective-capabilities-111.sql`; there is no `replayVerifierSql`. If an earlier pending
 step takes 0129 first, renumber it and recompute the manifest and `STEPS` chain pins.
 
+## The V4 account memory (0130)
+
+The twentieth step, after the support answer scope (0129), is `0130_v4_account_memory.sql` with
+`v4-account-memory-forward0130.json` and `packages/db/src/migration-forward0130.ts` (`loadForward0130`, appended
+last to `STEPS`, `MIGRATION_FORWARD0130_` refusals). Owner rulings N7 and N11 (2026-10-29, test-site release R22):
+the V4 pages keep the reading level, each debate's last visit and each dig's link in the account, never in the
+browser. It creates `identity.page_reading_level`, `identity.debate_last_visit` and `identity.dig_link`, each keyed
+by the account's `owner_ref` with `ON DELETE CASCADE` (account erasure deletes the `identity."user"` row, so the
+rows go with it), and eight functions: six for the API's own role `debateai_billing_runtime` (never the shared
+runtime role), a private ownership helper, and the export reader `identity.read_data_export_page_memory(uuid,uuid)`
+for `debateai_data_export_worker` behind 0128's lease gate. Tables and functions take 0115's export owner, as
+0125's export reader does. Its postcondition records its own three tables and eight functions. It declares
+`-- n1: expand` (new objects only) and `-- n1: keeps-verifier`: `verify-effective-capabilities-111.sql` stays the
+verifier in force and there is no `replayVerifierSql`. If an earlier pending step takes 0130 first, renumber this
+step, recompute its manifest and re-pin the chain lists before merge.
+
 ## Replay: every applied step keeps its own checks
 
 On a later `migrate()` EVERY applied step is checked by its receipt and by its postcondition digest (not only the
@@ -403,10 +419,10 @@ own `replayVerifierSql` (the batch: `verify-auth-db-batch.sql`); both run again 
 that step included, before that step's COMMIT — so a step's promises (for example the batch's "no runtime may publish
 staff alert readiness") are still enforced after other steps are appended. A later step that deliberately
 changes something an earlier step's verifier pins must change that verifier through its own reviewed step design; it
-cannot silently pass. The effective-capability verifier of the last applied step (after 0129: 0111's, which the batch,
+cannot silently pass. The effective-capability verifier of the last applied step (after 0130: 0111's, which the batch,
 Part C's step, role rotation, the data export, the mail locale, the debate shape map, the language check's site cost,
 the reclaim resume, the reply measures, the engine verdict, the engine's map answer step, the side-by-side releases,
-the settings activation, the Italy-specific approval, the synthesis check, the publication review, the threat reports and the support answer scope keep) still runs at the end of every `migrate()`.
+the settings activation, the Italy-specific approval, the synthesis check, the publication review, the threat reports, the support answer scope and the V4 account memory keep) still runs at the end of every `migrate()`.
 
 ## One transaction per step (side-by-side §5)
 
