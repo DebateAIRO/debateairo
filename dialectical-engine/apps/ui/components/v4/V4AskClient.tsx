@@ -40,10 +40,11 @@ const ANGLES_MAX = 5;
 /** Recent questions: this many from the account, at most. */
 const RECENT_MAX = 5;
 
-const SAMPLE_KEYS: Readonly<Record<ReadingLevel, string>> = Object.freeze({
-  plain: "v4.ask.sample.plain",
-  background: "v4.ask.sample.background",
-  expert: "v4.ask.sample.expert"
+/** Owner N6b (2026-10-29): what each level shows, in plain words (the earlier example sentences are gone). */
+const SHOWS_KEYS: Readonly<Record<ReadingLevel, string>> = Object.freeze({
+  plain: "v4.ask.levelShows.plain",
+  background: "v4.ask.levelShows.background",
+  expert: "v4.ask.levelShows.expert"
 });
 
 type Step = "ask" | "read";
@@ -311,8 +312,8 @@ function V4AskForm({
                 ))}
               </div>
               <p className="v4AskSample" aria-live="polite">
-                <span className="v4Eyebrow v4AskSampleLabel">{t(catalog, "v4.ask.sampleLabel")}</span>
-                {t(catalog, SAMPLE_KEYS[draftLevel])}
+                <span className="v4Eyebrow v4AskSampleLabel">{t(catalog, "v4.ask.levelShowsLabel")}</span>
+                {t(catalog, SHOWS_KEYS[draftLevel])}
               </p>
               <p className="v4AskHint v4Muted">{t(catalog, "v4.ask.levelNote")}</p>
               <p className="v4AskHint v4Muted">{t(catalog, "v4.ask.levelHonest")}</p>
@@ -527,18 +528,21 @@ function V4AskForm({
           <div className="v4AskBar">
             <p className="v4AskBarGet">{t(catalog, "v4.read.youGet")}</p>
             <div className="v4AskBarRow">
-              <div className="v4AskMode" role="group" aria-label={t(catalog, "v4.read.modeLabel")}>
-                {DIG_MODES.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    aria-pressed={mode === option}
-                    onClick={() => setMode(option)}
-                  >
-                    {t(catalog, `v4.digMode.${option}`)}
-                  </button>
-                ))}
-              </div>
+              {/* Owner N13: Free has no Quick look / Thorough choice (askConfig sends every Free ask as a quick look). */}
+              {ask.planTier === "free" ? null : (
+                <div className="v4AskMode" role="group" aria-label={t(catalog, "v4.read.modeLabel")}>
+                  {DIG_MODES.map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      aria-pressed={mode === option}
+                      onClick={() => setMode(option)}
+                    >
+                      {t(catalog, `v4.digMode.${option}`)}
+                    </button>
+                  ))}
+                </div>
+              )}
               <button
                 type="button"
                 className="v4Btn v4BtnPrimary v4AskStart"

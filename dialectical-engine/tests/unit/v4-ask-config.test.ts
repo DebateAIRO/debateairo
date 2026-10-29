@@ -5,8 +5,8 @@ import { createDebate } from "../../apps/ui/lib/api.js";
 
 /*
  * V4 initial (spec 2026-10-28, B2): Quick look / Thorough and the reading level become /new's ask, built by
- * buildNewDebateAskConfig, and createDebate accepts every combination. Free never sends scrutiny above standard nor a
- * depth above 2; the shape and length choices go only when the room said their row is in force.
+ * buildNewDebateAskConfig, and createDebate accepts every combination. Free never sends scrutiny above standard, and
+ * every Free ask is a quick look (depth 1, owner N13 of 2026-10-29); the shape and length choices go only when the room said their row is in force.
  *
  * askConfig.ts reaches app/new/defaults.tsx, which the root test compiler (no JSX mode) cannot read, so the module is
  * loaded by a path the compiler does not follow; Vitest resolves it as usual.
@@ -16,6 +16,7 @@ type Settings = Readonly<{ planTier: "free" | "premium"; shapeSettings: boolean;
 type Mode = "quick" | "thorough";
 type Level = "plain" | "background" | "expert";
 type AskConfigModule = Readonly<{
+  effectiveDigMode(mode: Mode, planTier: Settings["planTier"]): Mode;
   v4RoomQuery(mode: Mode, level: Level, settings: Settings): Record<string, unknown>;
   v4AskConfig(mode: Mode, level: Level, settings: Settings, submitTime: Date, catalog: Readonly<Record<string, string>>): Record<string, unknown>;
 }>;
@@ -56,7 +57,8 @@ describe("v4AskConfig", () => {
       expect(ask.decision_scope).toBe("personal");
       expect(ask.as_of).toBe(SUBMIT_TIME.toISOString());
       expect(ask.model_strength).toBeUndefined();
-      expect(ask.depth_params.depth).toBe(mode === "quick" ? 1 : 2);
+      // Owner N13: every Free ask is a quick look (depth 1); paid plans keep the choice.
+      expect(ask.depth_params.depth).toBe(mode === "thorough" && planTier === "premium" ? 2 : 1);
       expect(ask.depth_params.depth).toBeLessThanOrEqual(2);
       if (switches.shapeSettings) {
         expect(ask.depth_params.depthMode).toBe("adaptive");
@@ -68,6 +70,14 @@ describe("v4AskConfig", () => {
         expect(ask.depth_params.answerLength).toBe(switches.lengthSettings ? "standard" : undefined);
       }
     }
+  });
+
+  it("sends every Free ask as a quick look, whatever was chosen, and keeps a paid plan's choice (owner N13)", () => {
+    expect(mod.effectiveDigMode("thorough", "free")).toBe("quick");
+    expect(mod.effectiveDigMode("quick", "free")).toBe("quick");
+    expect(mod.effectiveDigMode("thorough", "premium")).toBe("thorough");
+    expect(mod.v4AskConfig("thorough", "plain", { planTier: "free", shapeSettings: false, lengthSettings: false }, SUBMIT_TIME, {}).depth).toBe(1);
+    expect(mod.v4AskConfig("thorough", "plain", { planTier: "premium", shapeSettings: false, lengthSettings: false }, SUBMIT_TIME, {}).depth).toBe(2);
   });
 
   it("never sends Free a scrutiny other than standard", () => {
@@ -106,6 +116,6 @@ describe("v4RoomQuery", () => {
     expect(mod.v4RoomQuery("thorough", "plain", { planTier: "premium", shapeSettings: true, lengthSettings: false, settingsVersion: 3 }))
       .toEqual({ plan_tier: "premium", composition_budget_tier: "low", depth: 2, depth_mode: "adaptive", scrutiny: "deep", answer_length: "short" });
     expect(mod.v4RoomQuery("thorough", "plain", { planTier: "free", shapeSettings: true, lengthSettings: true }))
-      .toEqual({ plan_tier: "free", composition_budget_tier: "low", depth: 2, depth_mode: "adaptive", scrutiny: "standard", answer_length: "short" });
+      .toEqual({ plan_tier: "free", composition_budget_tier: "low", depth: 1, depth_mode: "adaptive", scrutiny: "standard", answer_length: "short" });
   });
 });

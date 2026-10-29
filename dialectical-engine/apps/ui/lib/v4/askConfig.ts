@@ -29,6 +29,14 @@ export type V4AskSettings = Readonly<{
 /** Row D decision 5: a quick look is the shallowest debate; thorough is Free's ceiling (2), so no plan is refused it. */
 const DEPTH_BY_MODE: Readonly<Record<DigMode, number>> = Object.freeze({ quick: 1, thorough: 2 });
 
+/**
+ * Owner N13 (2026-10-29): Free sees no Quick look / Thorough choice, and every Free question and dig is a quick look
+ * (the owner's Free month: questions at depth 1). Paid plans keep the person's choice.
+ */
+export function effectiveDigMode(mode: DigMode, planTier: V4AskSettings["planTier"]): DigMode {
+  return planTier === "free" ? "quick" : mode;
+}
+
 /** The reading level picks the answer length (plain → short, background → standard, expert → detailed). */
 const ANSWER_LENGTH_BY_LEVEL: Readonly<Record<ReadingLevel, AnswerLength>> = Object.freeze({
   plain: "short",
@@ -51,11 +59,12 @@ function shapeChoices(mode: DigMode, level: ReadingLevel, settings: V4AskSetting
 
 /** The room read for the ask these choices would send (/new's roomQuery, Contract deviation 9). */
 export function v4RoomQuery(mode: DigMode, level: ReadingLevel, settings: V4AskSettings): AskRoomQuery {
-  const choices = shapeChoices(mode, level, settings);
+  const sent = effectiveDigMode(mode, settings.planTier);
+  const choices = shapeChoices(sent, level, settings);
   return {
     plan_tier: settings.planTier,
     composition_budget_tier: PROVISIONAL_COMPOSITION_BUDGET_DEFAULT,
-    depth: DEPTH_BY_MODE[mode],
+    depth: DEPTH_BY_MODE[sent],
     ...(choices.depthMode === undefined ? {} : { depth_mode: choices.depthMode }),
     ...(choices.scrutiny === undefined ? {} : { scrutiny: choices.scrutiny }),
     ...(choices.answerLength === undefined ? {} : { answer_length: choices.answerLength })
@@ -65,17 +74,18 @@ export function v4RoomQuery(mode: DigMode, level: ReadingLevel, settings: V4AskS
 /** The V3 ask config for these choices (passed to createDebate). Throws only what buildNewDebateAskConfig throws. */
 export function v4AskConfig(mode: DigMode, level: ReadingLevel, settings: V4AskSettings, submitTime: Date,
   newDebateCatalog: MessageCatalog): Record<string, unknown> {
+  const sent = effectiveDigMode(mode, settings.planTier);
   return buildNewDebateAskConfig({
     planTier: settings.planTier,
     riskTier: "standard",
     budgetTier: PROVISIONAL_COMPOSITION_BUDGET_DEFAULT,
     decisionScope: DECISION_SCOPE_DEFAULT,
     asOf: dateTimeLocalValue(submitTime),
-    depth: DEPTH_BY_MODE[mode],
+    depth: DEPTH_BY_MODE[sent],
     asOfWasEdited: false,
     riskTierWasEdited: false,
     modelStrength: null,
-    ...shapeChoices(mode, level, settings),
+    ...shapeChoices(sent, level, settings),
     ...(settings.settingsVersion === undefined ? {} : { settingsVersion: settings.settingsVersion })
   }, submitTime, newDebateCatalog);
 }

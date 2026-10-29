@@ -146,7 +146,7 @@ function tree(map: V4Map, selected: V4Selection, extra: Partial<{ digs: readonly
   ));
 }
 
-function panel(map: V4Map, selected: V4Selection, level: ReadingLevel, extra: Partial<{ digBusy: boolean; digs: readonly DigView[] }> = {}) {
+function panel(map: V4Map, selected: V4Selection, level: ReadingLevel, extra: Partial<{ digBusy: boolean; digs: readonly DigView[]; showDigModes: boolean }> = {}) {
   return dom(renderToStaticMarkup(
     <V4Panel
       map={map}
@@ -158,6 +158,7 @@ function panel(map: V4Map, selected: V4Selection, level: ReadingLevel, extra: Pa
       onSelect={noop}
       digMode="quick"
       onDigMode={noop}
+      {...(extra.showDigModes === undefined ? {} : { showDigModes: extra.showDigModes })}
       onDig={noop}
       digBusy={extra.digBusy ?? false}
       headingRef={createRef<HTMLHeadingElement>()}
@@ -405,6 +406,14 @@ describe("V4 map pieces, fix wave 1", () => {
     expect(sent.querySelector('[data-ai-generated="true"]')?.textContent).toBe(question);
     expect(tree(map, "root").querySelector(".v4MapRootTitle")?.textContent).toBe("Should we do the thing?");
     expect(panel(buildMap(), "root", "plain").querySelector("details.v4PanelSent")).toBeNull();
+  });
+
+  it("offers Quick look / Thorough on a paid plan and hides the choice on Free, keeping the dig button (owner N13)", () => {
+    const paid = panel(buildMap(), "open:o:0", "plain");
+    expect(paid.querySelectorAll(".v4PanelModes button")).toHaveLength(2);
+    const free = panel(buildMap(), "open:o:0", "plain", { showDigModes: false });
+    expect(free.querySelector(".v4PanelModes")).toBeNull();
+    expect(free.querySelector(".v4PanelDig button")).not.toBeNull();
   });
 
   it("names a dig's mode only when it is known", () => {

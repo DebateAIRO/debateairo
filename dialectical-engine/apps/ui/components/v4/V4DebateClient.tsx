@@ -17,6 +17,7 @@ import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { runFailureMessage } from "@/lib/v3/runFailure";
 import { digQuestion, digTargetQuestions, ownWords, parseDigQuestion } from "@/lib/v4/askText";
 import { diffSnapshots, selectionForChange, snapshotItems } from "@/lib/v4/changes";
+import { effectiveDigMode } from "@/lib/v4/askConfig";
 import { digLinksFor, digParentOf, mergeIndex, readQuestionIndex, type IndexEntry } from "@/lib/v4/digIndex";
 import { loadDigView, loadStory, loadV4, storyReadFailed, type V4Load } from "@/lib/v4/load";
 import { buildV4Map, uniqueOpenQuestions } from "@/lib/v4/mapModel";
@@ -601,12 +602,14 @@ function V4Debate({
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState<V4DigNotice | null>(null);
   const digBusy = pending !== null || sending || ask.submitting;
+  // Owner N13: Free has no Quick look / Thorough choice; its digs are quick looks.
+  const sentDigMode = effectiveDigMode(digMode, ask.planTier);
 
   const startDig = useCallback((target: DigTarget): void => {
     if (digBusy || map === null) return;
     setNotice(null);
-    setPending({ target, mode: digMode, sendsAt: Date.now() + UNDO_MS });
-  }, [digBusy, map, digMode]);
+    setPending({ target, mode: sentDigMode, sendsAt: Date.now() + UNDO_MS });
+  }, [digBusy, map, sentDigMode]);
 
   const undoDig = useCallback((): void => setPending(null), []);
 
@@ -870,7 +873,7 @@ function V4Debate({
       <p className="v4DebTrayText">
         <strong>{tPlural(catalog, "v4.dig.trayPicked", pickedQuestions.length, locale)}</strong>
         {" · "}
-        {t(catalog, `v4.digMode.${digMode}`)}
+        {t(catalog, `v4.digMode.${sentDigMode}`)}
       </p>
       <div className="v4DebTrayActions">
         <button
@@ -954,6 +957,7 @@ function V4Debate({
                 onSelect={select}
                 digMode={digMode}
                 onDigMode={setDigMode}
+                showDigModes={ask.planTier !== "free"}
                 onDig={startDig}
                 digBusy={digBusy}
                 roomNotice={roomNotice}

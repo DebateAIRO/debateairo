@@ -62,6 +62,8 @@ type PanelProps = Readonly<{
   onSelect: (selection: V4Selection, viaKeyboard: boolean) => void;
   digMode: DigMode;
   onDigMode: (mode: DigMode) => void;
+  /** Owner N13: false on Free, which has no Quick look / Thorough choice (every Free dig is a quick look). */
+  showDigModes?: boolean;
   onDig: (target: DigTarget) => void;
   digBusy: boolean;
   roomNotice?: ReactNode;
@@ -282,20 +284,24 @@ function DigBlock(props: Readonly<{ target: DigTarget; panel: PanelProps }>) {
   const { panel } = props;
   return (
     <section className="v4PanelDig">
-      <div className="v4PanelModes" role="group" aria-label={t(panel.catalog, "v4.panel.modeLabel")}>
-        {DIG_MODES.map((mode) => (
-          <button
-            key={mode}
-            type="button"
-            className="v4Chip"
-            aria-pressed={panel.digMode === mode}
-            onClick={() => panel.onDigMode(mode)}
-          >
-            {t(panel.catalog, `v4.digMode.${mode}`)}
-          </button>
-        ))}
-      </div>
-      <p className="v4PanelHint v4Muted">{t(panel.catalog, `v4.panel.modeHint.${panel.digMode}`)}</p>
+      {panel.showDigModes === false ? null : (
+        <>
+          <div className="v4PanelModes" role="group" aria-label={t(panel.catalog, "v4.panel.modeLabel")}>
+            {DIG_MODES.map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                className="v4Chip"
+                aria-pressed={panel.digMode === mode}
+                onClick={() => panel.onDigMode(mode)}
+              >
+                {t(panel.catalog, `v4.digMode.${mode}`)}
+              </button>
+            ))}
+          </div>
+          <p className="v4PanelHint v4Muted">{t(panel.catalog, `v4.panel.modeHint.${panel.digMode}`)}</p>
+        </>
+      )}
       <button
         type="button"
         className="v4Btn v4BtnPrimary v4PanelDigBtn"
