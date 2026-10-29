@@ -8,7 +8,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * (debateai_billing_runtime) saves and reads the reading level, the last visit of a debate it owns and the dig links
  * between its own debates; every write is validated before any read; the shared runtime role reaches none of it; the
  * tables are never read directly; the export worker reads the account's rows behind the export lease; deleting the
- * account (what 0110's erasure finally does) removes every row.
+ * account (what 0110's erasure finally does) removes every row; deleting one debate (R22 item 16) removes its rows.
  */
 let database: TestDatabase;
 let api: Pool;
@@ -274,5 +274,134 @@ describe("0130 who may reach it", () => {
       + (SELECT count(*) FROM identity.dig_link WHERE owner_ref=$1) AS n`, [owner])).rows[0]!.n;
     expect(Number(await left(person.ownerRef))).toBe(0);
     expect(Number(await left(keeper.ownerRef))).toBe(2);
+  });
+});
+
+/**
+ * R22 item 16 (owner, 2026-10-29: "Yes, delete them too"): deleting one private debate also deletes its visit row and
+ * every dig link where it is the parent or the child, in the transaction that finishes the deletion (the one that writes
+ * the run's erasure tombstone: core.finalize_private_run_erasure, or 0126's system erasure). The erasure role calls
+ * identity.forget_erased_debate_page_memory(run) there; it acts only on a run whose tombstone exists, and from then on
+ * the run is no longer the account's for any page-memory read or write. The whole route is
+ * tests/integration/side-by-side-erase-superseded.test.ts.
+ */
+describe("0130 deleting one debate (R22 item 16)", () => {
+  /** The erasure tombstone core.finalize_private_run_erasure writes, seeded alone (0130 reads nothing else of it). */
+  const tombstone = (client: { query: Pool["query"] }, run: string) => client.query(`INSERT INTO serve.private_run_erasure_tombstone
+    (run_id,completed_at,destroyed_key_count,already_absent_key_count) VALUES ($1,clock_timestamp(),1,0)`, [run]);
+  async function seedTombstone(run: string): Promise<void> {
+    const seed = await database.pool.connect();
+    try {
+      await seed.query("BEGIN");
+      await seed.query("SET LOCAL session_replication_role = 'replica'");
+      await tombstone(seed, run);
+      await seed.query("COMMIT");
+    } catch (error) { await seed.query("ROLLBACK"); throw error; } finally { seed.release(); }
+  }
+  const forget = async (pool: Pool, run: string | null) =>
+    (await pool.query<{ n: number }>("SELECT identity.forget_erased_debate_page_memory($1) AS n", [run])).rows[0]!.n;
+  const visits = async (run: string) =>
+    (await database.pool.query<{ n: number }>("SELECT count(*)::int AS n FROM identity.debate_last_visit WHERE run_id=$1", [run])).rows[0]!.n;
+  const links = async (runs: readonly string[]) => (await database.pool.query<{ parent_run_id: string; child_run_id: string }>(
+    "SELECT parent_run_id,child_run_id FROM identity.dig_link WHERE parent_run_id=ANY($1::uuid[]) OR child_run_id=ANY($1::uuid[]) ORDER BY created_at,child_run_id",
+    [runs])).rows;
+  let erasure: Pool;
+  beforeAll(async () => {
+    // The erasure application's own login: a member of debateai_erasure_runtime, as the API's erasure pool.
+    await database.pool.query("CREATE ROLE memory_erasure LOGIN PASSWORD 'memory-erasure-test-only' IN ROLE debateai_erasure_runtime");
+    erasure = loginPool("memory_erasure", "memory-erasure-test-only");
+    expect((await erasure.query("SELECT current_user AS name")).rows[0].name).toBe("memory_erasure");
+  });
+  afterAll(async () => { await erasure?.end(); });
+
+  it("D12 removes an erased debate's visit row and every dig link where it is the parent or the child, nothing else", async () => {
+    const person = await account();
+    const [gone, before, after, unrelated] = [await ownedRun(person), await ownedRun(person), await ownedRun(person), await ownedRun(person)];
+    await recordVisit(api, person.ownerRef, gone, { "point:n-1": "SURE" });
+    await recordVisit(api, person.ownerRef, unrelated, { "point:n-1": "SURE" });
+    expect(await recordDig(api, person.ownerRef, before, gone, ["w"], "quick")).toBe("RECORDED");
+    expect(await recordDig(api, person.ownerRef, gone, after, [], "thorough")).toBe("RECORDED");
+    expect(await recordDig(api, person.ownerRef, before, unrelated, [], "quick")).toBe("RECORDED");
+    await seedTombstone(gone);
+    // One visit row and two links: three rows.
+    expect(await forget(erasure, gone)).toBe(3);
+    expect(await visits(gone)).toBe(0);
+    expect(await links([gone])).toEqual([]);
+    expect(await visits(unrelated)).toBe(1);
+    expect(await links([unrelated])).toEqual([{ parent_run_id: before, child_run_id: unrelated }]);
+    // Asked again (a retried finalize, the reconciler): nothing left, nothing else touched.
+    expect(await forget(erasure, gone)).toBe(0);
+    expect(await visits(unrelated)).toBe(1);
+  });
+
+  it("D13 refuses a debate that is not erased (no tombstone) and touches nothing", async () => {
+    const person = await account();
+    const live = await ownedRun(person);
+    await recordVisit(api, person.ownerRef, live, { "point:n-1": "SURE" });
+    for (const run of [live, randomUUID(), null]) {
+      expect(await sqlError(() => forget(erasure, run)), String(run)).toMatchObject({ code: "55000", message: "PAGE_MEMORY_DEBATE_NOT_ERASED" });
+    }
+    expect(await visits(live)).toBe(1);
+  });
+
+  it("D14 an erased debate is no longer the account's: reads answer not owned, writes store nothing", async () => {
+    const person = await account();
+    const [gone, other] = [await ownedRun(person), await ownedRun(person)];
+    await seedTombstone(gone);
+    expect(await readVisit(api, person.ownerRef, gone)).toEqual([{ owned: false, seen_at: null, items: null }]);
+    expect(await recordVisit(api, person.ownerRef, gone, { "point:n-1": "SURE" })).toBeNull();
+    expect(await readDigs(api, person.ownerRef, gone)).toBeNull();
+    expect(await recordDig(api, person.ownerRef, other, gone, [], "quick")).toBe("NOT_OWNED");
+    expect(await recordDig(api, person.ownerRef, gone, other, [], "quick")).toBe("NOT_OWNED");
+    expect(await visits(gone)).toBe(0);
+    expect(await links([gone])).toEqual([]);
+  });
+
+  it("D15 only the erasure role calls it, and the erasure role calls nothing else of 0130", async () => {
+    const person = await account();
+    const run = await ownedRun(person);
+    for (const pool of [api, shared, worker]) {
+      expect(await sqlError(() => forget(pool, run))).toMatchObject({ code: "42501" });
+    }
+    for (const statement of [
+      "SELECT identity.read_page_reading_level($1)", "SELECT identity.save_page_reading_level($1,'plain')",
+      "SELECT * FROM identity.read_debate_last_visit($1,$1)", "SELECT identity.record_debate_last_visit($1,$1,'{}'::jsonb)",
+      "SELECT identity.read_dig_links($1,$1)", "SELECT identity.record_dig_link($1,$1,$1,'{}'::text[],'quick')",
+      "SELECT identity.page_memory_run_owned($1,$1)", "SELECT identity.read_data_export_page_memory($1,$1)"
+    ]) {
+      expect(await sqlError(() => erasure.query(statement, [person.ownerRef])), statement).toMatchObject({ code: "42501" });
+    }
+    for (const table of ["identity.page_reading_level", "identity.debate_last_visit", "identity.dig_link"]) {
+      expect(await sqlError(() => erasure.query(`SELECT count(*) FROM ${table}`)), table).toMatchObject({ code: "42501" });
+    }
+  });
+
+  it("D16 a visit or a dig link written while the deletion commits waits for it, then stores nothing", async () => {
+    const person = await account();
+    const [gone, other] = [await ownedRun(person), await ownedRun(person)];
+    await recordVisit(api, person.ownerRef, gone, { "point:n-1": "SURE" });
+    // The deletion's last transaction, as the erasure role runs it: the tombstone, then the page memory, not yet committed.
+    const deletion = await database.pool.connect();
+    try {
+      await deletion.query("BEGIN");
+      await deletion.query("SET LOCAL session_replication_role = 'replica'");
+      await tombstone(deletion, gone);
+      await deletion.query("SET LOCAL session_replication_role = 'origin'");
+      await deletion.query("SET LOCAL ROLE debateai_erasure_runtime");
+      expect((await deletion.query<{ n: number }>("SELECT identity.forget_erased_debate_page_memory($1) AS n", [gone])).rows[0]!.n).toBe(1);
+      let visitDone = false;
+      let digDone = false;
+      const visit = recordVisit(api, person.ownerRef, gone, { "point:n-2": "SURE" }).finally(() => { visitDone = true; });
+      const dig = recordDig(api, person.ownerRef, other, gone, [], "quick").finally(() => { digDone = true; });
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      expect({ visitDone, digDone }).toEqual({ visitDone: false, digDone: false });
+      await deletion.query("COMMIT");
+      expect(await visit).toBeNull();
+      expect(await dig).toBe("NOT_OWNED");
+    } finally {
+      deletion.release();
+    }
+    expect(await visits(gone)).toBe(0);
+    expect(await links([gone])).toEqual([]);
   });
 });

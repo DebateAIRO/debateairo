@@ -215,8 +215,19 @@ describe("synthesis check system erasure over an isolated PostgreSQL database", 
   it("the coordinator destroys the run key and finalizes: a tombstone, no intent, the binding consumed, and exactly one audit event debate.system.erased whose justification is RUN_KEY_DURABLY_DESTROYED and which names no category", async () => {
     const row=await fixture();
     const keys=row.keys;
+    // R22 item 16: the V4 page memory (0130) of the removed debate goes in the finalize transaction too, and only its.
+    const elsewhere=[randomUUID(),randomUUID()];
+    await query(`INSERT INTO identity.debate_last_visit(owner_ref,run_id,items) VALUES ($1,$2,'{"point:n-1":"SURE"}'),($1,$3,'{}')`,
+      [row.ownerRef,row.runId,elsewhere[0]]);
+    await query(`INSERT INTO identity.dig_link(child_run_id,owner_ref,parent_run_id,places,mode)
+      VALUES ($2,$1,$3,'{}','quick'),($3,$1,$4,'{}','quick'),($5,$1,$2,'{}','thorough')`,
+      [row.ownerRef,randomUUID(),row.runId,elsewhere[1],elsewhere[0]]);
     const outcomes=await new SynthesisCheckErasureCoordinator(repository,keys).reconcile();
     expect(outcomes).toContainEqual({ runId: row.runId, outcome: "CLEANED" });
+    expect((await query("SELECT count(*)::int n FROM identity.debate_last_visit WHERE owner_ref=$1 AND run_id=$2",[row.ownerRef,row.runId])).rows[0].n).toBe(0);
+    expect((await query("SELECT count(*)::int n FROM identity.dig_link WHERE parent_run_id=$1 OR child_run_id=$1",[row.runId])).rows[0].n).toBe(0);
+    expect((await query("SELECT count(*)::int n FROM identity.debate_last_visit WHERE owner_ref=$1",[row.ownerRef])).rows[0].n).toBe(1);
+    expect((await query("SELECT count(*)::int n FROM identity.dig_link WHERE owner_ref=$1",[row.ownerRef])).rows[0].n).toBe(1);
     expect(await keys.exists(row.runId)).toBe(false);
     expect((await query("SELECT count(*)::int n FROM serve.private_run_erasure_tombstone WHERE run_id=$1",[row.runId])).rows[0].n).toBe(1);
     expect((await query("SELECT count(*)::int n FROM serve.private_run_key_cleanup_intent WHERE run_id=$1",[row.runId])).rows[0].n).toBe(0);

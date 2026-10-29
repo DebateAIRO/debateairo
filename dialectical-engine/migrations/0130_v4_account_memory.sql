@@ -12,7 +12,10 @@
 --      these rows instead of by question text;
 --   §4 the API's six functions, for debateai_billing_runtime alone (the API's own role, as 0125's
 --      identity.record_signup_italy_approval; never the runtime role the runner and scheduler share): every run they
---      touch must be the caller's, and what they store is validated first;
+--      touch must be the caller's (and not erased), and what they store is validated first;
+--   §4b identity.forget_erased_debate_page_memory(uuid) (R22 item 16, owner 2026-10-29: "Yes, delete them too"): deleting
+--      one private debate also deletes its visit row and every dig link where it is the parent or the child, in the
+--      transaction that finishes the deletion, for debateai_erasure_runtime alone;
 --   §5 identity.read_data_export_page_memory(uuid,uuid): the three tables for the account's data export, for the export
 --      worker alone, behind 0128's lease gate;
 --   §6 one owner for all of it: 0115's export owner (0115:383-386), as 0125 gives its export reader;
@@ -23,8 +26,14 @@
 --
 -- n1 (side-by-side spec §5, the database rule):
 -- n1: expand
---   expand          additive only: three new tables and eight new functions; the release before reads and writes none
---                   of them, so it keeps running beside it.
+--   expand          additive only: three new tables and nine new functions; the release before reads and writes none
+--                   of them, so it keeps running beside it. No earlier function, table or trigger changes: the deletion
+--                   path calls §4b from the API (packages/db/src/account-erasure.ts and synthesis-check-erasure.ts, in
+--                   the finalize transaction), not from a trigger on 0040's tombstone. The one grant to an existing role
+--                   (§4b's EXECUTE for debateai_erasure_runtime) is the erasure boot check's concern: a release's check
+--                   counts that role's functions exactly (assertAccountErasureDatabaseRole), so a release before this
+--                   one would refuse to restart its erasure worker beside it, as it already would beside 0126's three.
+--                   R22, the first release to carry 0130, goes the drained way for 0126-0129, so none does.
 -- n1: keeps-verifier
 --   keeps-verifier  no billing relation or billing function, so lineage/verify-effective-capabilities-111.sql (0111's,
 --                   migrations/lineage/README.md step 3) stays in force and the manifest names it.
@@ -55,6 +64,8 @@ CREATE TABLE IF NOT EXISTS identity.debate_last_visit (
   items jsonb NOT NULL CONSTRAINT debate_last_visit_items_check CHECK (jsonb_typeof(items) = 'object' AND octet_length(items::text) <= 65536),
   CONSTRAINT debate_last_visit_pkey PRIMARY KEY (owner_ref, run_id)
 );
+-- By the run alone, for §4b's deletion of one debate.
+CREATE INDEX IF NOT EXISTS debate_last_visit_run ON identity.debate_last_visit (run_id);
 SELECT core.install_truncate_guard('identity.debate_last_visit');
 
 -- 3. The dig links (N11) -----------------------------------------------------------------------------------------------
@@ -71,11 +82,15 @@ CREATE TABLE IF NOT EXISTS identity.dig_link (
   CONSTRAINT dig_link_not_itself CHECK (child_run_id <> parent_run_id)
 );
 CREATE INDEX IF NOT EXISTS dig_link_parent ON identity.dig_link (owner_ref, parent_run_id, created_at);
+-- By the parent alone, for §4b's deletion of one debate (the child is the primary key).
+CREATE INDEX IF NOT EXISTS dig_link_parent_run ON identity.dig_link (parent_run_id);
 SELECT core.install_truncate_guard('identity.dig_link');
 
 -- 4. The API's functions -----------------------------------------------------------------------------------------------
 -- Ownership: the server branch of 0037's core.run_is_owned_by — the run's latest ownership event names this account,
--- and the account is active. A private helper: no role may call it; the definers below run it as their owner.
+-- and the account is active — and the run is not erased (R22 item 16: once 0040's erasure tombstone exists, the debate
+-- is gone, so nothing of it is read or written again). A private helper: no role may call it; the definers below run it
+-- as their owner.
 CREATE OR REPLACE FUNCTION identity.page_memory_run_owned(p_owner_ref uuid, p_run_id uuid) RETURNS boolean
 LANGUAGE sql
 STABLE
@@ -85,8 +100,13 @@ AS $$
     AND (SELECT event.owner_ref FROM core.run_ownership_event AS event
          WHERE event.run_id = p_run_id ORDER BY event.at_seq DESC LIMIT 1) = p_owner_ref
     AND EXISTS (SELECT 1 FROM identity."user" AS identity_user
-         WHERE identity_user.owner_ref = p_owner_ref AND identity_user.state = 'active'), false)
+         WHERE identity_user.owner_ref = p_owner_ref AND identity_user.state = 'active')
+    AND NOT EXISTS (SELECT 1 FROM serve.private_run_erasure_tombstone AS tombstone
+         WHERE tombstone.run_id = p_run_id), false)
 $$;
+-- The two writers and §4b's deletion take a transaction lock on each run they touch ('identity:page-memory:<run>'),
+-- the writers before their ownership check: a write that arrives while a deletion commits waits for it and then finds
+-- the run erased, and a deletion that arrives while a write commits waits for it and then deletes what it wrote.
 
 -- The account's level, or null before the person first chooses one.
 CREATE OR REPLACE FUNCTION identity.read_page_reading_level(p_owner_ref uuid) RETURNS text
@@ -167,6 +187,9 @@ BEGIN
         OR (item.value #>> '{}') !~ '^[A-Za-z_]{1,32}$') THEN
     RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='DEBATE_VISIT_INVALID';
   END IF;
+  IF p_run_id IS NOT NULL THEN
+    PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('identity:page-memory:' || p_run_id::text, 0));
+  END IF;
   IF NOT identity.page_memory_run_owned(p_owner_ref, p_run_id) THEN
     RETURN NULL;
   END IF;
@@ -223,6 +246,9 @@ BEGIN
     OR p_mode IS NULL OR p_mode NOT IN ('quick','thorough') THEN
     RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='DIG_LINK_INVALID';
   END IF;
+  -- Both runs' locks, the lower id first, so two writers never wait on each other in a circle.
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('identity:page-memory:' || LEAST(p_parent_run_id, p_child_run_id)::text, 0));
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('identity:page-memory:' || GREATEST(p_parent_run_id, p_child_run_id)::text, 0));
   IF NOT identity.page_memory_run_owned(p_owner_ref, p_parent_run_id)
     OR NOT identity.page_memory_run_owned(p_owner_ref, p_child_run_id) THEN
     RETURN 'NOT_OWNED';
@@ -232,6 +258,37 @@ BEGIN
   ON CONFLICT (child_run_id) DO NOTHING;
   SELECT link.parent_run_id INTO v_parent FROM identity.dig_link AS link WHERE link.child_run_id = p_child_run_id;
   RETURN CASE WHEN v_parent = p_parent_run_id THEN 'RECORDED' ELSE 'CONFLICT' END;
+END;
+$$;
+
+-- 4b. Deleting one debate (R22 item 16) ----------------------------------------------------------------------------------
+-- The person deletes one private debate (DELETE /v1/debates/:id: 0123's chain of 0040's per-run erasure), or 0126's
+-- system erasure removes it: each run ends in a transaction that writes the run's serve.private_run_erasure_tombstone.
+-- In that same transaction the API's erasure repository (debateai_erasure_runtime) calls this for the run: its visit
+-- row (any account's, though only its owner's can exist) and every dig link where it is the parent or the child go, so
+-- a dig started from a deleted debate keeps its own map but loses the link back. It acts only on an erased run: without
+-- the tombstone it refuses 55000 PAGE_MEMORY_DEBATE_NOT_ERASED and deletes nothing. Returns how many rows went (0 when
+-- asked again). Account erasure needs none of this: its rows cascade with identity."user".
+CREATE OR REPLACE FUNCTION identity.forget_erased_debate_page_memory(p_run_id uuid) RETURNS integer
+LANGUAGE plpgsql
+VOLATILE
+SECURITY DEFINER
+SET search_path=pg_catalog
+AS $$
+DECLARE
+  v_visits integer;
+  v_links integer;
+BEGIN
+  IF p_run_id IS NULL OR NOT EXISTS (SELECT 1 FROM serve.private_run_erasure_tombstone AS tombstone
+      WHERE tombstone.run_id = p_run_id) THEN
+    RAISE EXCEPTION USING ERRCODE='55000', MESSAGE='PAGE_MEMORY_DEBATE_NOT_ERASED';
+  END IF;
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('identity:page-memory:' || p_run_id::text, 0));
+  DELETE FROM identity.debate_last_visit AS visit WHERE visit.run_id = p_run_id;
+  GET DIAGNOSTICS v_visits = ROW_COUNT;
+  DELETE FROM identity.dig_link AS link WHERE link.parent_run_id = p_run_id OR link.child_run_id = p_run_id;
+  GET DIAGNOSTICS v_links = ROW_COUNT;
+  RETURN v_visits + v_links;
 END;
 $$;
 
@@ -268,8 +325,9 @@ $$;
 
 -- 6. One owner, then the grants ----------------------------------------------------------------------------------------
 -- 0115 gave every export function one owner (0115:383-386); that owner reads identity."user" and core.run_ownership_event
--- (0115's snapshot) and may call 0128's lease gate, which it owns. The three tables and eight functions take it too.
--- n1: reviewed gives only the three new tables and eight new functions 0115's export owner, as 0125 does; touches no earlier object
+-- (0115's snapshot) and may call 0128's lease gate, which it owns; it reads 0040's erasure tombstones (0115's snapshot
+-- lists them). The three tables and nine functions take it too.
+-- n1: reviewed gives only the three new tables and nine new functions 0115's export owner, as 0125 does; touches no earlier object
 DO $page_memory_owner$
 DECLARE
   v_owner name;
@@ -288,6 +346,7 @@ BEGIN
     'identity.record_debate_last_visit(uuid,uuid,jsonb)',
     'identity.read_dig_links(uuid,uuid)',
     'identity.record_dig_link(uuid,uuid,uuid,text[],text)',
+    'identity.forget_erased_debate_page_memory(uuid)',
     'identity.read_data_export_page_memory(uuid,uuid)'
   ] LOOP
     EXECUTE pg_catalog.format('ALTER FUNCTION %s OWNER TO %I', v_name, v_owner);
@@ -306,6 +365,7 @@ REVOKE ALL ON FUNCTION identity.read_debate_last_visit(uuid,uuid) FROM PUBLIC,de
 REVOKE ALL ON FUNCTION identity.record_debate_last_visit(uuid,uuid,jsonb) FROM PUBLIC,debateai_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
 REVOKE ALL ON FUNCTION identity.read_dig_links(uuid,uuid) FROM PUBLIC,debateai_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
 REVOKE ALL ON FUNCTION identity.record_dig_link(uuid,uuid,uuid,text[],text) FROM PUBLIC,debateai_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker;
+REVOKE ALL ON FUNCTION identity.forget_erased_debate_page_memory(uuid) FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_replay,debateai_data_export_worker;
 REVOKE ALL ON FUNCTION identity.read_data_export_page_memory(uuid,uuid) FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay;
 GRANT EXECUTE ON FUNCTION identity.read_page_reading_level(uuid) TO debateai_billing_runtime;
 GRANT EXECUTE ON FUNCTION identity.save_page_reading_level(uuid,text) TO debateai_billing_runtime;
@@ -313,6 +373,7 @@ GRANT EXECUTE ON FUNCTION identity.read_debate_last_visit(uuid,uuid) TO debateai
 GRANT EXECUTE ON FUNCTION identity.record_debate_last_visit(uuid,uuid,jsonb) TO debateai_billing_runtime;
 GRANT EXECUTE ON FUNCTION identity.read_dig_links(uuid,uuid) TO debateai_billing_runtime;
 GRANT EXECUTE ON FUNCTION identity.record_dig_link(uuid,uuid,uuid,text[],text) TO debateai_billing_runtime;
+GRANT EXECUTE ON FUNCTION identity.forget_erased_debate_page_memory(uuid) TO debateai_erasure_runtime;
 GRANT EXECUTE ON FUNCTION identity.read_data_export_page_memory(uuid,uuid) TO debateai_data_export_worker;
 
 -- 7. THE CONTRACT THIS FILE CLAIMS, checked rather than assumed (0125's closing shape) ---------------------------------
@@ -342,27 +403,28 @@ BEGIN
     'identity.read_page_reading_level(uuid)', 'identity.save_page_reading_level(uuid,text)',
     'identity.read_debate_last_visit(uuid,uuid)', 'identity.record_debate_last_visit(uuid,uuid,jsonb)',
     'identity.read_dig_links(uuid,uuid)', 'identity.record_dig_link(uuid,uuid,uuid,text[],text)',
-    'identity.read_data_export_page_memory(uuid,uuid)'
+    'identity.forget_erased_debate_page_memory(uuid)', 'identity.read_data_export_page_memory(uuid,uuid)'
   ] LOOP
     IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_proc AS p WHERE p.oid = pg_catalog.to_regprocedure(v_name)
         AND p.prosecdef AND p.proowner = v_owner AND p.proconfig = '{search_path=pg_catalog}'::text[]) THEN
       RAISE EXCEPTION 'V4_ACCOUNT_MEMORY_0130_CONTRACT definers %', v_name;
     END IF;
-    IF pg_catalog.has_function_privilege('debateai_runtime', v_name, 'EXECUTE')
-      OR pg_catalog.has_function_privilege('debateai_authorization_runtime', v_name, 'EXECUTE')
-      OR pg_catalog.has_function_privilege('debateai_erasure_runtime', v_name, 'EXECUTE')
-      OR pg_catalog.has_function_privilege('debateai_replay', v_name, 'EXECUTE')
-      OR pg_catalog.has_function_privilege('debateai_billing_runtime', v_name, 'EXECUTE')
-        IS DISTINCT FROM (v_name <> 'identity.read_data_export_page_memory(uuid,uuid)')
-      OR pg_catalog.has_function_privilege('debateai_data_export_worker', v_name, 'EXECUTE')
-        IS DISTINCT FROM (v_name = 'identity.read_data_export_page_memory(uuid,uuid)') THEN
-      RAISE EXCEPTION 'V4_ACCOUNT_MEMORY_0130_CONTRACT privileges %', v_name;
-    END IF;
+    -- Exactly one of the six roles may call each: the export worker the reader, the erasure role §4b, the API's role the rest.
+    FOREACH v_role IN ARRAY ARRAY['debateai_runtime', 'debateai_billing_runtime', 'debateai_authorization_runtime',
+      'debateai_erasure_runtime', 'debateai_replay', 'debateai_data_export_worker'] LOOP
+      IF pg_catalog.has_function_privilege(v_role, v_name, 'EXECUTE') IS DISTINCT FROM (v_role = CASE v_name
+          WHEN 'identity.read_data_export_page_memory(uuid,uuid)' THEN 'debateai_data_export_worker'
+          WHEN 'identity.forget_erased_debate_page_memory(uuid)' THEN 'debateai_erasure_runtime'
+          ELSE 'debateai_billing_runtime' END) THEN
+        RAISE EXCEPTION 'V4_ACCOUNT_MEMORY_0130_CONTRACT privileges % %', v_role, v_name;
+      END IF;
+    END LOOP;
   END LOOP;
   IF (SELECT p.proowner FROM pg_catalog.pg_proc AS p WHERE p.oid = 'identity.page_memory_run_owned(uuid,uuid)'::regprocedure)
       IS DISTINCT FROM v_owner
     OR pg_catalog.has_function_privilege('debateai_billing_runtime', 'identity.page_memory_run_owned(uuid,uuid)', 'EXECUTE')
-    OR pg_catalog.has_function_privilege('debateai_runtime', 'identity.page_memory_run_owned(uuid,uuid)', 'EXECUTE') THEN
+    OR pg_catalog.has_function_privilege('debateai_runtime', 'identity.page_memory_run_owned(uuid,uuid)', 'EXECUTE')
+    OR pg_catalog.has_function_privilege('debateai_erasure_runtime', 'identity.page_memory_run_owned(uuid,uuid)', 'EXECUTE') THEN
     RAISE EXCEPTION 'V4_ACCOUNT_MEMORY_0130_CONTRACT helper';
   END IF;
 END

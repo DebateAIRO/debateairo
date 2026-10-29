@@ -39,6 +39,8 @@ const API_FUNCTIONS = [
 ] as const;
 const EXPORT_READER = "identity.read_data_export_page_memory(uuid,uuid)";
 const HELPER = "identity.page_memory_run_owned(uuid,uuid)";
+/** R22 item 16: deleting one private debate also deletes its page memory, called by the erasure role alone. */
+const FORGET = "identity.forget_erased_debate_page_memory(uuid)";
 
 describe("0130: the V4 account memory step", () => {
   it("C-T is the last step of the chain's STEPS, after 0129, with its own loader", async () => {
@@ -49,7 +51,7 @@ describe("0130: the V4 account memory step", () => {
     expect(loader).toContain('const PREVIOUS = "0129_support_answer_scope.sql";');
     expect(loader).toContain("MIGRATION_FORWARD0130_");
     for (const table of TABLES) expect(loader).toContain(`"${table}"`);
-    for (const signature of [...API_FUNCTIONS, EXPORT_READER, HELPER]) expect(loader).toContain(`"${signature}"`);
+    for (const signature of [...API_FUNCTIONS, FORGET, EXPORT_READER, HELPER]) expect(loader).toContain(`"${signature}"`);
     const plan = await loadMigrationPlan();
     expect(plan.forwardChain.slice(-2).map((step) => step.name)).toEqual(["0129_support_answer_scope.sql", NAME]);
     expect(plan.forwardChain.at(-1)?.replayVerifierSql).toBeUndefined();
@@ -92,7 +94,7 @@ describe("0130: the V4 account memory step", () => {
     }
     // Nothing 0130 creates existed before it.
     for (const table of TABLES) expect(earlierRelations.has(table), table).toBe(false);
-    for (const signature of [...API_FUNCTIONS, EXPORT_READER, HELPER]) {
+    for (const signature of [...API_FUNCTIONS, FORGET, EXPORT_READER, HELPER]) {
       expect(earlierFunctions.has(signature.slice(0, signature.indexOf("("))), signature).toBe(false);
     }
     const context: N1AuditContext = { earlierFunctions, earlierRelations, keepsVerifier: true };
@@ -123,11 +125,11 @@ describe("0130: the V4 account memory step", () => {
     expect(sql).toContain("mode IN ('quick','thorough')");
   });
 
-  it("C-F defines its eight functions as definers with a fixed search path, and replaces no earlier one", () => {
+  it("C-F defines its nine functions as definers with a fixed search path, and replaces no earlier one", () => {
     const sql = read(SQL_PATH);
     const created = [...code(sql).matchAll(/CREATE OR REPLACE FUNCTION ([a-z_.]+)\(/gu)].map((match) => match[1]);
-    expect(created).toEqual([HELPER, ...API_FUNCTIONS, EXPORT_READER].map((signature) => signature.slice(0, signature.indexOf("("))));
-    for (const signature of [...API_FUNCTIONS, EXPORT_READER]) {
+    expect(created).toEqual([HELPER, ...API_FUNCTIONS, FORGET, EXPORT_READER].map((signature) => signature.slice(0, signature.indexOf("("))));
+    for (const signature of [...API_FUNCTIONS, FORGET, EXPORT_READER]) {
       const name = signature.slice(0, signature.indexOf("("));
       const at = sql.indexOf(`CREATE OR REPLACE FUNCTION ${name}(`);
       const head = sql.slice(at, sql.indexOf("AS $$", at));
@@ -138,15 +140,55 @@ describe("0130: the V4 account memory step", () => {
     expect(sql).toContain("v_user := identity.data_export_lease_user(p_export_id, p_worker);");
   });
 
-  it("C-G grants exactly seven EXECUTEs: the six API functions to the API's own role, the reader to the export worker", () => {
+  it("C-G grants exactly eight EXECUTEs: six API functions to the API's role, the deletion to the erasure role, the reader to the export worker", () => {
     const sql = read(SQL_PATH);
     expect(sql.split("\n").filter((line) => /^\s*GRANT\b/u.test(line))).toEqual([
       ...API_FUNCTIONS.map((signature) => `GRANT EXECUTE ON FUNCTION ${signature} TO debateai_billing_runtime;`),
+      `GRANT EXECUTE ON FUNCTION ${FORGET} TO debateai_erasure_runtime;`,
       `GRANT EXECUTE ON FUNCTION ${EXPORT_READER} TO debateai_data_export_worker;`
     ]);
-    expect(code(sql).match(/\bGRANT\b/gu)).toHaveLength(7);
+    expect(code(sql).match(/\bGRANT\b/gu)).toHaveLength(8);
     // Never to the shared runtime role the runner and scheduler log in with.
     expect(code(sql)).not.toMatch(/\bGRANT\b[^;]*\bTO\s+debateai_runtime\b/u);
+  });
+
+  it("C-D (R22 item 16) deleting one debate deletes its page memory in the finalize transaction, only once it is erased", () => {
+    const sql = code(read(SQL_PATH));
+    const body = (name: string): string => {
+      const at = sql.indexOf(`CREATE OR REPLACE FUNCTION ${name}(`);
+      return sql.slice(at, sql.indexOf("\n$$;", at));
+    };
+    const forget = body("identity.forget_erased_debate_page_memory");
+    // Only an erased run (0040's tombstone, written by the same finalize), else 55000 and nothing deleted.
+    expect(forget).toMatch(/IF p_run_id IS NULL OR NOT EXISTS \(SELECT 1 FROM serve\.private_run_erasure_tombstone[\s\S]*?RAISE EXCEPTION USING ERRCODE='55000', MESSAGE='PAGE_MEMORY_DEBATE_NOT_ERASED';/u);
+    expect(forget).toContain("DELETE FROM identity.debate_last_visit AS visit WHERE visit.run_id = p_run_id;");
+    expect(forget).toContain("DELETE FROM identity.dig_link AS link WHERE link.parent_run_id = p_run_id OR link.child_run_id = p_run_id;");
+    expect(forget).not.toMatch(/DELETE FROM identity\.page_reading_level/u);
+    // The deletion and both writers share one lock per run; the writers take it before their ownership check.
+    const lock = "pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('identity:page-memory:' ||";
+    expect(forget.indexOf(lock)).toBeLessThan(forget.indexOf("DELETE FROM"));
+    for (const writer of ["identity.record_debate_last_visit", "identity.record_dig_link"]) {
+      const text = body(writer);
+      expect(text.indexOf(lock), writer).toBeGreaterThan(0);
+      expect(text.indexOf(lock), writer).toBeLessThan(text.indexOf("identity.page_memory_run_owned("));
+    }
+    // An erased run is no longer the account's, for every read and write.
+    expect(body("identity.page_memory_run_owned")).toContain("AND NOT EXISTS (SELECT 1 FROM serve.private_run_erasure_tombstone AS tombstone");
+    // Both finalize paths call it in their own transaction, after a COMMITTED finalize; the erasure boot check lists it.
+    const helper = read("packages/db/src/erasure-page-memory.ts");
+    expect(helper).toContain('FORGET_ERASED_DEBATE_PAGE_MEMORY = "identity.forget_erased_debate_page_memory(uuid)"');
+    const begin = helper.indexOf('client.query("BEGIN")');
+    const finalize = helper.indexOf("(finalizeSql, [...values])");
+    const committed = helper.indexOf('outcome === "COMMITTED"');
+    const forgetCall = helper.indexOf('"SELECT identity.forget_erased_debate_page_memory($1)"');
+    const commit = helper.indexOf('client.query("COMMIT")');
+    expect([begin, finalize, committed, forgetCall, commit].every((at, index, all) => at > 0 && (index === 0 || at > all[index - 1]!))).toBe(true);
+    const erasure = read("packages/db/src/account-erasure.ts");
+    expect(erasure).toContain("finalizeWithPageMemory<PrivateRunErasureOutcome>(this.pool, input.erasureId,\n      `SELECT core.finalize_private_run_erasure($1,$2,$3,$4,$5) AS outcome`");
+    expect(erasure).toMatch(/const ERASURE_FUNCTION_SIGNATURES = Object\.freeze\(\[[\s\S]*?FORGET_ERASED_DEBATE_PAGE_MEMORY\n\] as const\);/u);
+    expect(read("packages/db/src/synthesis-check-erasure.ts"))
+      .toContain('finalizeWithPageMemory<SynthesisCheckErasureOutcome>(this.pool, input.erasureId,\n      "SELECT core.finalize_synthesis_check_erasure($1,$2,$3,$4,$5) AS outcome"');
+    expect(read(SQL_PATH)).toMatch(/^-- n1: expand$/mu);
   });
 
   it("C-R is documented as the twentieth step, after the support answer scope's section", () => {

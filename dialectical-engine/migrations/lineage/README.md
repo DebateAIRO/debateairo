@@ -403,11 +403,15 @@ last to `STEPS`, `MIGRATION_FORWARD0130_` refusals). Owner rulings N7 and N11 (2
 the V4 pages keep the reading level, each debate's last visit and each dig's link in the account, never in the
 browser. It creates `identity.page_reading_level`, `identity.debate_last_visit` and `identity.dig_link`, each keyed
 by the account's `owner_ref` with `ON DELETE CASCADE` (account erasure deletes the `identity."user"` row, so the
-rows go with it), and eight functions: six for the API's own role `debateai_billing_runtime` (never the shared
-runtime role), a private ownership helper, and the export reader `identity.read_data_export_page_memory(uuid,uuid)`
-for `debateai_data_export_worker` behind 0128's lease gate. Tables and functions take 0115's export owner, as
-0125's export reader does. Its postcondition records its own three tables and eight functions. It declares
-`-- n1: expand` (new objects only) and `-- n1: keeps-verifier`: `verify-effective-capabilities-111.sql` stays the
+rows go with it), and nine functions: six for the API's own role `debateai_billing_runtime` (never the shared
+runtime role), a private ownership helper, `identity.forget_erased_debate_page_memory(uuid)` for
+`debateai_erasure_runtime` (R22 item 16: deleting one private debate also deletes its visit row and every dig link
+where it is the parent or the child, in the transaction that writes the run's erasure tombstone, called by
+`packages/db/src/erasure-page-memory.ts` from both finalize paths), and the export reader
+`identity.read_data_export_page_memory(uuid,uuid)` for `debateai_data_export_worker` behind 0128's lease gate.
+Tables and functions take 0115's export owner, as 0125's export reader does. Its postcondition records its own three
+tables and nine functions. It declares `-- n1: expand` (new objects only; the erasure role's one new grant changes
+the count the erasure boot check expects, which R22's drained upload makes moot) and `-- n1: keeps-verifier`: `verify-effective-capabilities-111.sql` stays the
 verifier in force and there is no `replayVerifierSql`. If an earlier pending step takes 0130 first, renumber this
 step, recompute its manifest and re-pin the chain lists before merge.
 

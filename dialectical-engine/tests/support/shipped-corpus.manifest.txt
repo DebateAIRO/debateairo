@@ -997,6 +997,7 @@ packages/db/src/consumer-security.ts
 packages/db/src/data-export.ts
 packages/db/src/email-change.ts
 packages/db/src/email-mfa-recovery.ts
+packages/db/src/erasure-page-memory.ts
 packages/db/src/identity.ts
 packages/db/src/index.ts
 packages/db/src/internal-allowance.ts
