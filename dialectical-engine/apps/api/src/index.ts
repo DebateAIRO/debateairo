@@ -1,6 +1,7 @@
 import { validatePreviewProviderTestConfig, previewLineUpOfConfig, previewPlanTierRosters, previewTeamAdmits, PREVIEW_TEAM_ONLY, PREVIEW_TEAM_RUNS_SQL, type PreviewProviderTestConfig } from "@debateai/providers";
 import { registerPasswordResetRoutes, passwordResetPolicyInventory } from "./password-reset-routes.js";
 import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-routes.js";
+import { AccountMemoryInputError, type AccountMemoryStore } from "./account-memory.js";
 import type { PasswordResetApplication } from "./password-reset.js";
 import { settingsVersionPassed, type ReleaseLifecycleState, type ReleaseState, type ReleaseWatcher } from "./release-state.js";
 import { activeVersionAlarm, journalSettingsCode, type ActiveVersionAlarm } from "./admission-alarm.js";
@@ -108,7 +109,16 @@ import {
   QuestionLanguageChoiceNeededSchema,
   PUBLICATION_APPROVAL_REQUIRED,
   DEBATE_REMOVED_BY_CHECK,
-  RemovalNoticeTakeSchema
+  RemovalNoticeTakeSchema,
+  ReadingLevelStateSchema,
+  ReadingLevelSaveRequestSchema,
+  LastVisitSchema,
+  LastVisitRecordRequestSchema,
+  LastVisitRecordedSchema,
+  DigLinksSchema,
+  DigLinkRecordRequestSchema,
+  DigLinkRecordedSchema,
+  ACCOUNT_MEMORY_LIMITS
 } from "@debateai/contract";
 import type { Pool, PoolClient, QueryResultRow, QueryResult } from "pg";
 import { assertPreviewBudgetAdmits, PreviewGateUnavailableRefusal, type PreviewAdmissionLock, type PreviewBudgetGateSettings } from "./preview-budget-estimate.js";
@@ -1436,6 +1446,9 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/account/export", auth: "user", resource: "identity", action: "request-data-export" },
   { route: "POST /v1/account/export/download", auth: "user", resource: "identity", action: "download-data-export" },
   { route: "POST /v1/account/removal-notice/take", auth: "user", resource: "identity", action: "take-removal-notice" },
+  // V4 account memory (N7, migration 0130): the account's reading level. A write carries the CSRF pair like any user route.
+  { route: "GET /v1/account/reading-level", auth: "user", resource: "identity", action: "read-reading-level" },
+  { route: "POST /v1/account/reading-level", auth: "user", resource: "identity", action: "save-reading-level" },
   { route: "GET /v1/account/legal-status", auth: "user", resource: "identity", action: "read-legal-status" },
   { route: "POST /v1/account/legal-accept", auth: "user", resource: "identity", action: "accept-legal" },
   { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
@@ -1491,6 +1504,11 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" },
   { route: "POST /v1/runs/{id}/publication-review", auth: "user", resource: "run-owner", action: "request-review" },
   { route: "GET /v1/runs/{id}/publication-review", auth: "user", resource: "run-owner", action: "read-review" },
+  // V4 account memory (N7, N11, migration 0130): a debate's last visit and its dig links, owner-scoped in the database.
+  { route: "GET /v1/runs/{id}/last-visit", auth: "user", resource: "run-owner", action: "read-last-visit" },
+  { route: "POST /v1/runs/{id}/last-visit", auth: "user", resource: "run-owner", action: "record-last-visit" },
+  { route: "GET /v1/runs/{id}/dig-links", auth: "user", resource: "run-owner", action: "read-dig-links" },
+  { route: "POST /v1/runs/{id}/dig-links", auth: "user", resource: "run-owner", action: "record-dig-link" },
   { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
   { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" },
   { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
@@ -1819,6 +1837,12 @@ export interface ApiOptions {
    * view. Optional like `disclosures`; without it the route answers its closed 404.
    */
   readonly mapViews?: AnswerMapViewApplication;
+  /**
+   * V4 account memory (owner rulings N7 and N11, migration 0130): the reading level, each debate's last visit and each
+   * dig's link, kept in the account. Its six routes are always mounted; without it they answer 503
+   * ACCOUNT_MEMORY_UNAVAILABLE, and the V4 pages fall back to what they do without memory.
+   */
+  readonly accountMemory?: AccountMemoryStore;
   readonly accountErasure?: AccountErasureApplication;
   readonly dataExport?: DataExportApplication;
   readonly legacyRunClaim?: LegacyRunClaimApplication;
@@ -3306,6 +3330,38 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       notice: ownerRef === null ? false : await access.takeRemovalNotice(ownerRef)
     }));
   });
+  // V4 account memory (owner rulings N7 and N11, migration 0130). The account is the signed-in one (the cookie session:
+  // `auth: "user"` admits nothing else), so a write can only ever touch the caller's own rows; the run routes below are
+  // owner-scoped in the database too. No admission scope, as every account self route: storage is one row per account
+  // (the level) or per owned debate (a visit, a dig), so it cannot grow past what the account owns.
+  const accountMemoryOrRefuse = (reply: FastifyReply): AccountMemoryStore | null => {
+    if (options.accountMemory !== undefined) return options.accountMemory;
+    void reply.status(503).send({ error: "ACCOUNT_MEMORY_UNAVAILABLE", message: "ACCOUNT_MEMORY_UNAVAILABLE" });
+    return null;
+  };
+  const accountMemoryMalformed = (reply: FastifyReply) =>
+    reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+  api.get("/v1/account/reading-level", routePolicy("GET /v1/account/reading-level"), async (request, reply) => {
+    const ownerRef = ownershipFor(request).ownerRef;
+    if (ownerRef === null) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    const memory = accountMemoryOrRefuse(reply);
+    if (memory === null) return reply;
+    return reply.send(ReadingLevelStateSchema.parse({ reading_level: await memory.readReadingLevel(ownerRef) }));
+  });
+  api.post("/v1/account/reading-level", credentialRoutePolicy("POST /v1/account/reading-level"), async (request, reply) => {
+    const ownerRef = ownershipFor(request).ownerRef;
+    if (ownerRef === null) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    const body = ReadingLevelSaveRequestSchema.safeParse(request.body);
+    if (!body.success) return accountMemoryMalformed(reply);
+    const memory = accountMemoryOrRefuse(reply);
+    if (memory === null) return reply;
+    try {
+      return reply.send(ReadingLevelStateSchema.parse({ reading_level: await memory.saveReadingLevel(ownerRef, body.data.reading_level) }));
+    } catch (error) {
+      if (error instanceof AccountMemoryInputError) return accountMemoryMalformed(reply);
+      throw error;
+    }
+  });
   api.post(
     "/v1/account/legacy-runs/claim",
     credentialRoutePolicy("POST /v1/account/legacy-runs/claim"),
@@ -4414,6 +4470,74 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return reply.status(response.status).send(response.body);
     }
   );
+  // V4 account memory (owner rulings N7 and N11, migration 0130): "not this account's debate" is the closed 404 every
+  // run-owner route answers, decided by 0130's functions (the run's latest ownership event names the caller's account).
+  // The id is the one the page holds, never resolved to a re-admitted run, so a write and its later read meet.
+  const memoryRunOf = (request: Readonly<{ params: { id: string }; session: Session; authenticatedSession?: AuthenticatedSession }>) => {
+    const runId = ResourceIdSchema.safeParse(request.params.id);
+    const ownerRef = ownershipFor(request).ownerRef;
+    return runId.success && ownerRef !== null ? { runId: runId.data, ownerRef } : null;
+  };
+  api.get<{ Params: { id: string } }>("/v1/runs/:id/last-visit", routePolicy("GET /v1/runs/{id}/last-visit"), async (request, reply) => {
+    const target = memoryRunOf(request);
+    if (target === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    const memory = accountMemoryOrRefuse(reply);
+    if (memory === null) return reply;
+    const visit = await memory.readLastVisit(target.ownerRef, target.runId);
+    return visit === null ? reply.status(404).send({ error: "RUN_NOT_FOUND" }) : reply.send(LastVisitSchema.parse(visit));
+  });
+  api.post<{ Params: { id: string } }>(
+    "/v1/runs/:id/last-visit",
+    { ...routePolicy("POST /v1/runs/{id}/last-visit"), bodyLimit: ACCOUNT_MEMORY_LIMITS.visitBodyMaxBytes },
+    async (request, reply) => {
+      const target = memoryRunOf(request);
+      if (target === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      const body = LastVisitRecordRequestSchema.safeParse(request.body);
+      if (!body.success) return accountMemoryMalformed(reply);
+      const memory = accountMemoryOrRefuse(reply);
+      if (memory === null) return reply;
+      let seenAt: Date | null;
+      try {
+        seenAt = await memory.recordLastVisit(target.ownerRef, target.runId, body.data.items);
+      } catch (error) {
+        if (error instanceof AccountMemoryInputError) return accountMemoryMalformed(reply);
+        throw error;
+      }
+      return seenAt === null
+        ? reply.status(404).send({ error: "RUN_NOT_FOUND" })
+        : reply.send(LastVisitRecordedSchema.parse({ seen_at: seenAt.toISOString() }));
+    }
+  );
+  api.get<{ Params: { id: string } }>("/v1/runs/:id/dig-links", routePolicy("GET /v1/runs/{id}/dig-links"), async (request, reply) => {
+    const target = memoryRunOf(request);
+    if (target === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    const memory = accountMemoryOrRefuse(reply);
+    if (memory === null) return reply;
+    const links = await memory.readDigLinks(target.ownerRef, target.runId);
+    return links === null ? reply.status(404).send({ error: "RUN_NOT_FOUND" }) : reply.send(DigLinksSchema.parse(links));
+  });
+  api.post<{ Params: { id: string } }>("/v1/runs/:id/dig-links", credentialRoutePolicy("POST /v1/runs/{id}/dig-links"), async (request, reply) => {
+    const target = memoryRunOf(request);
+    if (target === null) return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+    const body = DigLinkRecordRequestSchema.safeParse(request.body);
+    if (!body.success || body.data.child_run_id === target.runId) return accountMemoryMalformed(reply);
+    const memory = accountMemoryOrRefuse(reply);
+    if (memory === null) return reply;
+    let outcome: Awaited<ReturnType<AccountMemoryStore["recordDigLink"]>>;
+    try {
+      outcome = await memory.recordDigLink(target.ownerRef, target.runId, body.data);
+    } catch (error) {
+      if (error instanceof AccountMemoryInputError) return accountMemoryMalformed(reply);
+      throw error;
+    }
+    switch (outcome) {
+      case "RECORDED": return reply.send(DigLinkRecordedSchema.parse({ recorded: true }));
+      // Either debate is not the caller's: one closed answer, whichever it was.
+      case "NOT_OWNED": return reply.status(404).send({ error: "RUN_NOT_FOUND" });
+      case "CONFLICT": return reply.status(409).send({ error: "DIG_LINK_CONFLICT", message: "DIG_LINK_CONFLICT" });
+      default: return exhaustive(outcome);
+    }
+  });
   api.post<{ Params: { id: string } }>("/v1/answers/:id/memory-link/unlink", routePolicy("POST /v1/answers/{id}/memory-link/unlink"), async (request, reply) => {
     const answerId = ResourceIdSchema.safeParse(request.params.id);
     if (!answerId.success) return reply.status(404).send({ error: "MEMORY_LINK_NOT_FOUND" });

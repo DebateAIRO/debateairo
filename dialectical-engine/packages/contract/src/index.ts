@@ -24,6 +24,11 @@ import { AnswerStorySchema, PublicStoryShortSchema, StoryLanguageTagSchema } fro
 import { AnswerDisclosureSchema, AnswerFloorSchema } from "./disclosure.js"; export * from "./disclosure.js";
 import { VerdictStateSchema } from "./verdict-state.js"; export * from "./verdict-state.js";
 import { DebateMapViewSchema } from "./map-view.js"; export * from "./map-view.js";
+import {
+  ReadingLevelStateSchema, ReadingLevelSaveRequestSchema, LastVisitSchema, LastVisitRecordRequestSchema, LastVisitRecordedSchema,
+  DigLinkRecordSchema, DigLinksSchema, DigLinkRecordRequestSchema, DigLinkRecordedSchema
+} from "./account-memory.js";
+export * from "./account-memory.js";
 export * from "./crisis.js";
 export * from "./question-check.js";
 export * from "./harm-helpline.js";
@@ -1725,6 +1730,9 @@ export const contractInventory = Object.freeze({
     "POST /v1/account/export",
     "POST /v1/account/export/download",
     "POST /v1/account/removal-notice/take",
+    // V4 account memory (owner rulings N7 and N11, migration 0130): the reading level kept in the account.
+    "GET /v1/account/reading-level",
+    "POST /v1/account/reading-level",
     "GET /v1/account/legal-status",
     "POST /v1/account/legal-accept",
     "POST /v1/account/legacy-runs/claim",
@@ -1776,6 +1784,11 @@ export const contractInventory = Object.freeze({
     "POST /v1/runs/{id}/unpublish",
     "POST /v1/runs/{id}/publication-review",
     "GET /v1/runs/{id}/publication-review",
+    // V4 account memory (N7, N11): the last visit of a debate and the dig links around it.
+    "GET /v1/runs/{id}/last-visit",
+    "POST /v1/runs/{id}/last-visit",
+    "GET /v1/runs/{id}/dig-links",
+    "POST /v1/runs/{id}/dig-links",
     "GET /v1/billing/usage",
     "GET /v1/billing/plans",
     "POST /v1/billing/quote",
@@ -1828,6 +1841,8 @@ export const contractInventory = Object.freeze({
     ShadowSuppressionSchema, AbstentionSchema, InvestigationGapSchema, InvestigationRequestSchema,
     InvestigationAcceptedSchema, ExecutionLedgerDigestSchema, ValueHingeProjectionSchema, ConditionMarkSchema, EdgeSchema,
     AnswerStorySchema, AnswerDisclosureSchema, DebateMapViewSchema, BillingPlansResponseSchema,
+    ReadingLevelStateSchema, ReadingLevelSaveRequestSchema, LastVisitSchema, LastVisitRecordRequestSchema, LastVisitRecordedSchema,
+    DigLinkRecordSchema, DigLinksSchema, DigLinkRecordRequestSchema, DigLinkRecordedSchema,
     BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingCheckoutRequestSchema, BillingCheckoutResponseSchema,
     BillingCheckoutPendingErrorSchema, BillingChargeStatusResponseSchema,
     BillingSubscriptionResponseSchema, BillingDowngradeRequestSchema, BillingInvoicesResponseSchema,

@@ -1,4 +1,10 @@
 import { ContractHttpError, type ContractErrorCode, type ContractWaitingRefusal } from "./http-error.js";
+import {
+  ReadingLevelStateSchema, ReadingLevelSaveRequestSchema, LastVisitSchema, LastVisitRecordRequestSchema, LastVisitRecordedSchema,
+  DigLinksSchema, DigLinkRecordRequestSchema, DigLinkRecordedSchema,
+  type AccountReadingLevel, type ReadingLevelState, type LastVisit, type LastVisitRecorded, type VisitItems,
+  type DigLinks, type DigLinkRecordRequest, type DigLinkRecorded
+} from "./account-memory.js";
 import type { VerdictState } from "./verdict-state.js";
 import { PublicationReviewAskRequestSchema, PublicationReviewAskResponseSchema, PublicationReviewStateSchema,
   type PublicationReviewState } from "./publication-review.js";
@@ -520,6 +526,15 @@ export interface ContractClient {
   readAnswer(answerId: string, version?: number): Promise<Answer>;
   readRunAnswer(runId: string): Promise<Answer>;
   takeRemovalNotice(): Promise<RemovalNoticeTake>;
+  /** V4 account memory (N7): the reading level kept in the account (null until first chosen). */
+  readReadingLevel(): Promise<ReadingLevelState>;
+  saveReadingLevel(level: AccountReadingLevel): Promise<ReadingLevelState>;
+  /** V4 account memory (N7): what this debate's map showed when the person last looked (both null before a first visit). */
+  readLastVisit(runId: string): Promise<LastVisit>;
+  recordLastVisit(runId: string, items: VisitItems): Promise<LastVisitRecorded>;
+  /** V4 account memory (N11): the dig this debate came from, and the digs made from it. */
+  readDigLinks(runId: string): Promise<DigLinks>;
+  recordDigLink(parentRunId: string, link: DigLinkRecordRequest): Promise<DigLinkRecorded>;
   readRun(runId: string): Promise<RunProjection>;
   readInspection(answerId: string, version?: number): Promise<Inspection>;
   readLedgerDigest(answerId: string): Promise<ExecutionLedgerDigest>;
@@ -935,6 +950,15 @@ export function createContractClient(
     readAnswer: (answerId: string, version?: number) => request(`/v1/answers/${encodeURIComponent(answerId)}${versionQuery(version)}`, AnswerSchema),
     readRunAnswer: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}/answer`, AnswerSchema),
     takeRemovalNotice: () => request("/v1/account/removal-notice/take", RemovalNoticeTakeSchema, { method: "POST" }),
+    readReadingLevel: () => request("/v1/account/reading-level", ReadingLevelStateSchema),
+    saveReadingLevel: (level: AccountReadingLevel) => request("/v1/account/reading-level", ReadingLevelStateSchema,
+      { method: "POST", body: JSON.stringify(ReadingLevelSaveRequestSchema.parse({ reading_level: level })) }),
+    readLastVisit: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}/last-visit`, LastVisitSchema),
+    recordLastVisit: (runId: string, items: VisitItems) => request(`/v1/runs/${encodeURIComponent(runId)}/last-visit`, LastVisitRecordedSchema,
+      { method: "POST", body: JSON.stringify(LastVisitRecordRequestSchema.parse({ items })) }),
+    readDigLinks: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}/dig-links`, DigLinksSchema),
+    recordDigLink: (parentRunId: string, link: DigLinkRecordRequest) => request(`/v1/runs/${encodeURIComponent(parentRunId)}/dig-links`, DigLinkRecordedSchema,
+      { method: "POST", body: JSON.stringify(DigLinkRecordRequestSchema.parse(link)) }),
     readRun: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}`, RunProjectionSchema),
     readInspection: (answerId: string, version?: number) => request(`/v1/answers/${encodeURIComponent(answerId)}/inspection${versionQuery(version)}`, InspectionSchema),
     readLedgerDigest: (answerId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/ledger-digest`, ExecutionLedgerDigestSchema),

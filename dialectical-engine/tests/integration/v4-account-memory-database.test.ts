@@ -134,10 +134,16 @@ describe("0130 the last visit of a debate", () => {
     const run = await ownedRun(person);
     const tooMany = Object.fromEntries(Array.from({ length: 513 }, (_, at) => [`point:n-${at}`, "SURE"]));
     for (const items of [[], "SURE", { "question:n-1": "SURE" }, { "point:": "SURE" }, { "point:has space": "SURE" },
-      { "point:n-1": "sure-ish" }, { "point:n-1": 3 }, { "point:n-1": "" }, { [`point:${"x".repeat(151)}`]: "SURE" }, tooMany]) {
+      { "point:n-1": "sure-ish" }, { "point:n-1": 3 }, { "point:n-1": "" }, { [`point:${"x".repeat(151)}`]: "SURE" }, tooMany,
+      // Ids are printable ASCII without a double quote or a backslash, so the stored size is the contract's.
+      { 'point:a"b': "SURE" }, { "point:a\\b": "SURE" }, { "point:caf\u00e9": "SURE" }, { "point:a\tb": "SURE" },
+      // 400 entries of the longest id and word are fewer than 512 but larger than 64 KiB as stored.
+      Object.fromEntries(Array.from({ length: 400 }, (_, at) => [`point:${String(at).padStart(150, "x")}`, "S".repeat(32)]))]) {
       expect(await sqlError(() => recordVisit(api, person.ownerRef, run, items)), JSON.stringify(items).slice(0, 60))
         .toMatchObject({ code: "22023", message: "DEBATE_VISIT_INVALID" });
     }
+    // A story path id may repeat with "#2"; an open question id carries its own ":".
+    expect(await recordVisit(api, person.ownerRef, run, { "path:pos-a#2": "FELL", "open:p:n-1": "open", "open:w": "dug" })).toBeInstanceOf(Date);
     // The cap is 512 entries: exactly 512 is kept.
     expect(await recordVisit(api, person.ownerRef, run, Object.fromEntries(Object.entries(tooMany).slice(0, 512)))).toBeInstanceOf(Date);
     // The same refusal for a debate that is not the caller's: validation runs first.
@@ -191,6 +197,7 @@ describe("0130 the dig links", () => {
       [parent, parent, [], "quick"], [null, child, [], "quick"], [parent, null, [], "quick"],
       [parent, child, Array.from({ length: 17 }, (_, at) => `o:${at}`), "quick"], [parent, child, ["has space"], "quick"],
       [parent, child, [""], "quick"], [parent, child, ["x".repeat(161)], "quick"], [parent, child, null, "quick"],
+      [parent, child, ['o"1'], "quick"], [parent, child, ["p:caf\u00e9"], "quick"],
       [parent, child, [], "deep"], [parent, child, [], null]
     ] as const) {
       expect(await sqlError(() => recordDig(api, person.ownerRef, from, to, places, mode)), `${String(mode)} ${JSON.stringify(places)}`)

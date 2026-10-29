@@ -146,8 +146,9 @@ END;
 $$;
 
 -- Saves what the map showed now and returns the time it was saved, or null when the debate is not this account's.
--- Refusal 22023 DEBATE_VISIT_INVALID, before any read: not a JSON object, more than 512 entries, larger than 64 KiB, a
--- key that is not "<dig|path|open|point>:<id>" (id 1-150 characters, no spaces) or a word that is not 1-32 letters or _.
+-- Refusal 22023 DEBATE_VISIT_INVALID, before any read: not a JSON object, more than 512 entries, larger than 64 KiB as
+-- stored, a key that is not "<dig|path|open|point>:<id>" (id 1-150 printable ASCII characters other than a space, a
+-- double quote or a backslash, so the stored size is the one the contract computes) or a word that is not 1-32 letters or _.
 CREATE OR REPLACE FUNCTION identity.record_debate_last_visit(p_owner_ref uuid, p_run_id uuid, p_items jsonb) RETURNS timestamptz
 LANGUAGE plpgsql
 VOLATILE
@@ -161,7 +162,7 @@ BEGIN
     OR octet_length(p_items::text) > 65536
     OR (SELECT count(*) FROM jsonb_each(p_items)) > 512
     OR EXISTS (SELECT 1 FROM jsonb_each(p_items) AS item
-      WHERE item.key !~ '^(dig|path|open|point):\S{1,150}$'
+      WHERE item.key !~ '^(dig|path|open|point):[\x21\x23-\x5b\x5d-\x7e]{1,150}$'
         OR jsonb_typeof(item.value) IS DISTINCT FROM 'string'
         OR (item.value #>> '{}') !~ '^[A-Za-z_]{1,32}$') THEN
     RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='DEBATE_VISIT_INVALID';
@@ -205,7 +206,7 @@ $$;
 -- Records that p_child_run_id was dug from p_parent_run_id. RECORDED (also when the same link is sent again; the first
 -- places and mode stay), NOT_OWNED (either debate is not this account's), CONFLICT (the dig is already linked to another
 -- debate). Refusal 22023 DIG_LINK_INVALID, before any read: a missing id, the same id twice, more than 16 places, a place
--- that is not 1-160 characters without spaces, or a mode that is not quick or thorough.
+-- that is not 1-160 printable ASCII characters (no space, double quote or backslash), or a mode that is not quick or thorough.
 CREATE OR REPLACE FUNCTION identity.record_dig_link(p_owner_ref uuid, p_parent_run_id uuid, p_child_run_id uuid, p_places text[], p_mode text)
 RETURNS text
 LANGUAGE plpgsql
@@ -218,7 +219,7 @@ DECLARE
 BEGIN
   IF p_parent_run_id IS NULL OR p_child_run_id IS NULL OR p_parent_run_id = p_child_run_id
     OR p_places IS NULL OR cardinality(p_places) > 16 OR COALESCE(array_ndims(p_places), 1) <> 1
-    OR EXISTS (SELECT 1 FROM unnest(p_places) AS place WHERE place IS NULL OR place !~ '^\S{1,160}$')
+    OR EXISTS (SELECT 1 FROM unnest(p_places) AS place WHERE place IS NULL OR place !~ '^[\x21\x23-\x5b\x5d-\x7e]{1,160}$')
     OR p_mode IS NULL OR p_mode NOT IN ('quick','thorough') THEN
     RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='DIG_LINK_INVALID';
   END IF;
