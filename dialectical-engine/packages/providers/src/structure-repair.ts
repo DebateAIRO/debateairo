@@ -106,6 +106,19 @@ const TEXT_CLOSERS = ":}]\"";
  * with a straight one) the quote and the comma are the text's own.
  */
 const JSON_GOES_ON = /["\d\-{[tfn]/u;
+/**
+ * R22 (R21 practice 2026-10-23, GLM-5.3-Flash on a panel vote: `“steelman”: {`, `“evidence": {`): the typographic double
+ * quotes a broken reply may write in place of a straight one to OPEN a key or a text. Read so only where a text may begin
+ * (`TEXT_MAY_OPEN`: right after `{` `[` `,` or `:`, blanks between, inside the reply's object); anywhere else, and inside a
+ * straight-quoted text, they are words.
+ */
+const TYPOGRAPHIC_OPENERS = "\u201C\u201D\u201E";
+const TEXT_MAY_OPEN = "{[,:";
+/**
+ * What may close a text opened with a typographic quote: a straight or a typographic double quote, only where a straight
+ * quote would close a text (`:` `}` `]` or a quote after it, or a comma and then more JSON, a typographic opener included).
+ */
+const TYPOGRAPHIC_CLOSERS = "\"\u201C\u201D";
 /** A broken reply on the structure route finished normally (a cut reply takes the length retry instead). */
 const FINISHED = Object.freeze({ finishReason: "stop" });
 /** The names an answer form states: its quoted keys (`"summary":`, enum labels with them) and its `{a,b,c}` lists. */
@@ -264,6 +277,11 @@ function readBroken(brokenReply: string): ReplyReading {
  * a code fence around it is never a value). A missing comma does not matter. A straight quote closes a text only when
  * `:` `}` `]` or another quote follows it, or a comma and then more JSON (`JSON_GOES_ON`); any other straight quote is
  * the text's own. A key written twice in one object keeps its last value, as JSON.parse does.
+ *
+ * R22: a key or text may also open with a typographic quote (“ ” „) where a text may begin (`TYPOGRAPHIC_OPENERS`); it then
+ * closes at the first straight or typographic double quote placed as a closing quote (`TYPOGRAPHIC_CLOSERS`), so its
+ * words are read exactly as written, any other typographic quote inside them included. A text opened with a straight quote
+ * reads as before: only a straight quote closes it.
  */
 function scanValues(text: string): ReplyReading {
   /** `owned`: the values read under each key of this object so far, so a key written again drops them (JSON.parse's reading). */
@@ -309,24 +327,28 @@ function scanValues(text: string): ReplyReading {
     while (at < text.length && /\s/u.test(text[at]!)) at += 1;
     return at;
   };
-  const closes = (quoteAt: number): boolean => {
+  const closes = (quoteAt: number, typographic: boolean): boolean => {
     const at = markAt(quoteAt + 1);
     const after = text[at];
     if (after === undefined || TEXT_CLOSERS.includes(after)) return true;
     if (after !== ",") return false;
     const next = text[markAt(at + 1)];
-    return next === undefined || JSON_GOES_ON.test(next);
+    return next === undefined || JSON_GOES_ON.test(next) || (typographic && TYPOGRAPHIC_OPENERS.includes(next));
   };
+  /** R22: the last character outside every text that is not a blank (where a typographic opener may stand). */
+  let lastMark: string | null = null;
   let index = 0;
   while (index < text.length) {
     const character = text[index]!;
-    if (character === "\"") {
+    const typographic = TYPOGRAPHIC_OPENERS.includes(character) && stack.length > 0 && lastMark !== null
+      && TEXT_MAY_OPEN.includes(lastMark);
+    if (character === "\"" || typographic) {
       let body = "";
       let cursor = index + 1;
       for (; cursor < text.length; cursor += 1) {
         const inner = text[cursor]!;
         if (inner === "\\") { body += `${inner}${text[cursor + 1] ?? ""}`; cursor += 1; continue; }
-        if (inner === "\"" && closes(cursor)) break;
+        if ((typographic ? TYPOGRAPHIC_CLOSERS.includes(inner) : inner === "\"") && closes(cursor, typographic)) break;
         body += inner;
       }
       const value = unescapeJsonText(body);
@@ -341,9 +363,11 @@ function scanValues(text: string): ReplyReading {
       } else if (top !== undefined) {
         record(takeKey(true) ? { path: pathNow(), value } : keyless(pathNow(), value));
       }
+      lastMark = "\"";
       index = cursor + 1;
       continue;
     }
+    if (!/\s/u.test(character)) lastMark = character;
     if (character === "{" || character === "[") {
       const keyed = takeKey(false);
       stack.push({ object: character === "{", key: null, owned: new Map(), fresh: false, keyed, bareText: false });
