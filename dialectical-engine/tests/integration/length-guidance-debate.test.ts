@@ -1,6 +1,6 @@
 // Length guidance, plan LG-C Task 17 (spec 2026-10-15 §6 "Integration"): a whole debate admitted with the length row tells
 // every debate AI its target (its `.length.v1` contract and the `length` field; the answer writer its current length
-// variant `serve.synthesizer.length.v2`) and records the guided words on every such attempt; the same debate admitted
+// variant `serve.synthesizer.length.v3`) and records the guided words on every such attempt; the same debate admitted
 // without it sends today's contracts and records none. Scripted gates, embedded Postgres.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "@debateai/db";
@@ -26,7 +26,7 @@ const contractOf = (request: GateRecord): string => readFramedMaterial(wirePacke
 const fieldsOf = (request: GateRecord) => readFramedMaterial(wirePacket(stubChatBody(request.provider, request.body))).fields;
 const DEBATE_KINDS = new Set(["JUDGE", "PANEL", "REVIEW", "COMPOSE", "EVALUATOR"]);
 // pre-flight PF-C6.1: every told debate step's variant ends `.length.v1`; the answer writer's current length variant is
-// `serve.synthesizer.length.v2` (answer writer v4, commit 027faf30e; `.length.v1` is v3's shipped history).
+// `serve.synthesizer.length.v3` (owner 17 Oct #5, 2026-10-29; `.length.v2` is v4's and `.length.v1` v3's shipped history).
 const LENGTHED = /\.length\.v1$/u;
 const WRITER_LENGTHED = SYNTHESIZER_LENGTH_CONTRACT_ID;
 const ANY_LENGTHED = /\.length\.v\d+$/u;

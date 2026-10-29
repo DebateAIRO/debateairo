@@ -1086,6 +1086,7 @@ packages/kernel/src/manualPhone.ts
 packages/kernel/src/payment-regions.ts
 packages/kernel/src/provider-funding.ts
 packages/kernel/src/question-language.ts
+packages/kernel/src/reading-level.ts
 packages/kernel/src/region.ts
 packages/kernel/src/release-key.ts
 packages/kernel/src/reply-language.ts

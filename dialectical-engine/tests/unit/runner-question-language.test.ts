@@ -56,8 +56,11 @@ describe("the runner passes a shaped run's lock to every call site", async () =>
   });
 
   it("the writer, the checker, both readings and the story carry it", () => {
-    expect(source).toContain("buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, synthesisLength,\n          shapeLanguage);");
-    expect(source).toContain("buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, checkerLength, shapeLanguage);");
+    // V4 reading level (owner N6, 2026-10-29): the run's level follows the lock as the sixth argument.
+    expect(source).toContain("buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, synthesisLength,\n          shapeLanguage, readingLevel);");
+    expect(source).toContain("buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, checkerLength, shapeLanguage,\n          readingLevel);");
+    expect(source).toContain("const readingLevel: ReadingLevel | null = readingLevelOf(run.depthParams);");
+    expect(source).toContain("languageLocked: shapeLanguage !== null,\n              // V4 reading level (owner N6): the story is written for the person's level; null, today's story.\n              readingLevel,");
     expect(source).toContain("questionLine: run.questionLine,\n          ...shapeLanguageInput\n        }, reply));");
     expect(source).toContain("classifyEvaluatorContent(content, reply, run.questionLine, shapeLanguage)");
     expect(source).toContain("languageLocked: shapeLanguage !== null,");

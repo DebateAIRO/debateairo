@@ -1,12 +1,15 @@
 import { createHash } from "node:crypto";
 import {
   LENGTH_FIELD,
+  READER_SENTENCE_STORY_CHECKER,
+  READER_SENTENCE_WRITING,
   STORY_WORD_TARGET_FIELDS,
   argumentLanguageDirective,
   lengthGuidanceText,
   questionLanguageSentence,
   type CharactersPerWord,
   type QuestionLanguage,
+  type ReadingLevel,
   type StoryWordTargetField
 } from "@debateai/kernel";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
@@ -255,6 +258,24 @@ export function storyCheckerLengthField(targets: Readonly<Record<StoryWordTarget
     content: [...storyTargetLines(targets, languageCode, charactersPerWord),
       `objection: ${lengthGuidanceText(objectionWords, languageCode, charactersPerWord)}`].join("\n")
   });
+}
+
+/**
+ * V4 reading level (owner ruling N6, 2026-10-29): with the run's level, the storyteller's instruction gains the writers'
+ * reader sentence (READER_SENTENCE_WRITING) and the checker's the story checker's (READER_SENTENCE_STORY_CHECKER), after a
+ * blank line, as the language line is added; the level itself rides as the material field `reader`. Call it BEFORE
+ * `storyContractInArgumentLanguage`, so the language line stays last. Code's sentences, never the pack's: they enter the
+ * per-call `storyContractHash`, as the language line does. No level (null): the same contract, today's bytes.
+ * OWNER WORDING — pending approval.
+ */
+export function storyContractForReader(
+  contract: PromptContract,
+  readingLevel: ReadingLevel | null,
+  role: "STORYTELLER" | "CHECKER"
+): PromptContract {
+  if (readingLevel === null) return contract;
+  const sentence = role === "STORYTELLER" ? READER_SENTENCE_WRITING : READER_SENTENCE_STORY_CHECKER;
+  return Object.freeze({ ...contract, instruction: `${contract.instruction}\n\n${sentence}` });
 }
 
 /**

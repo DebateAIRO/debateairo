@@ -452,14 +452,14 @@ function optionalModelStrength(config: AskConfig): AskRequest["model_strength"] 
 }
 
 /**
- * Debate shape P2c (spec 2026-10-12 §3.2): depth mode, scrutiny and answer length ride beside
+ * Debate shape P2c (spec 2026-10-12 §3.2): depth mode, scrutiny and answer length (and V4's reading level) ride beside
  * the depth in `depth_params`, each only when the page chose it. A missing one means the API's
  * default, so older callers keep working. The contract's own field schema decides what is
  * valid, so the page never restates the choices.
  */
-function optionalDepthChoice<K extends "depthMode" | "scrutiny" | "answerLength">(
+function optionalDepthChoice<K extends "depthMode" | "scrutiny" | "answerLength" | "readingLevel">(
   config: AskConfig,
-  configKey: "depth_mode" | "scrutiny" | "answer_length",
+  configKey: "depth_mode" | "scrutiny" | "answer_length" | "reading_level",
   key: K
 ): Partial<Pick<DepthParams, K>> {
   const value = config[configKey];
@@ -523,7 +523,9 @@ export async function createDebate(
       depth: requiredInteger(config, "depth", 0),
       ...optionalDepthChoice(config, "depth_mode", "depthMode"),
       ...optionalDepthChoice(config, "scrutiny", "scrutiny"),
-      ...optionalDepthChoice(config, "answer_length", "answerLength")
+      ...optionalDepthChoice(config, "answer_length", "answerLength"),
+      // V4 reading level (owner N6, 2026-10-29): the reader the final writers write for, beside the answer length.
+      ...optionalDepthChoice(config, "reading_level", "readingLevel")
     },
     decision_scope: requiredString(config, "decision_scope"),
     as_of: asOf.toISOString(),

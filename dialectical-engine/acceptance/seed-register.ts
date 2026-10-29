@@ -62,6 +62,10 @@ import {
  *
  * 2026-10-15: length guidance (LG-C) moved `judgeContractHash` and `conformanceContractHash` (and `mapContractHash`, which
  * this seeder does not carry) the same way, with the same consequence for a standing ceremony database.
+ *
+ * 2026-10-29: the V4 reading level and the language-neutral length sentence (owner N6 and 17 Oct #5) moved
+ * `composerContractHash` (v4 + length.v3 + reader.v1 + length.reader.v1) and `conformanceContractHash` (v2 + length.v1 +
+ * reader.v1 + length.reader.v1) the same way, with the same consequence for a standing ceremony database.
  */
 export const ACCEPTANCE_REGISTER_VERSION = 4 as const;
 /**
@@ -182,9 +186,10 @@ async function computeContractHashes(): Promise<readonly AcceptanceRegisterRow[]
     // and none of them can ship under an old hash.
     judgeContractHash: digest(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT),
     // Debate shape (2026-10-13): the writer's seal is the current contract then its answer-length variant
-    // (since 2026-10-15 v4 + length.v2).
+    // (since 2026-10-15 v4 + length.v2; since 2026-10-29 v4, length.v3 and the two reader variants).
     composerContractHash: digest(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT),
-    // Length guidance (LG-C, 2026-10-15): the checker's seal is v2 then its length variant length.v1.
+    // Length guidance (LG-C, 2026-10-15): the checker's seal is v2 then its length variant length.v1 (since 2026-10-29
+    // with the two reader variants after them).
     conformanceContractHash: digest(EVALUATOR_CONTRACTS_FINGERPRINT_TEXT),
     // codex r2 B1a: the fingerprint is taken from the constant the runner
     // SENDS, not from a search of the runner's source. There is nothing left

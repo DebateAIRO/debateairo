@@ -8,9 +8,11 @@ import {
 } from "../../packages/judgement/src/prompts.js";
 import {
   SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT, SYNTHESIZER_PROMPT_CONTRACT, SYNTHESIZER_V1_PROMPT_CONTRACT, SYNTHESIZER_V2_PROMPT_CONTRACT,
-  SYNTHESIZER_V3_CONTRACTS_FINGERPRINT_TEXT, SYNTHESIZER_V3_PROMPT_CONTRACT
+  SYNTHESIZER_V3_CONTRACTS_FINGERPRINT_TEXT, SYNTHESIZER_V3_PROMPT_CONTRACT, SYNTHESIZER_V4_CONTRACTS_FINGERPRINT_TEXT
 } from "@debateai/serve";
-import { EVALUATOR_CONTRACTS_FINGERPRINT_TEXT, EVALUATOR_PROMPT_CONTRACT, EVALUATOR_V1_PROMPT_CONTRACT } from "@debateai/runner";
+import {
+  EVALUATOR_CONTRACTS_FINGERPRINT_TEXT, EVALUATOR_LENGTH_CONTRACTS_FINGERPRINT_TEXT, EVALUATOR_PROMPT_CONTRACT, EVALUATOR_V1_PROMPT_CONTRACT
+} from "@debateai/runner";
 import { BLIND_JUDGE_GRADE_CONTRACT_HASH, DOMAIN_TAGGER_CONTRACT_HASH } from "../../packages/evaluator/src/index.js";
 import { CONSUMER_AGGREGATE_PROMPT_CONTRACT } from "../../packages/evaluator/src/consumer.js";
 import { buildStorytellerContract, buildStoryCheckerContract, loadStoryPack, resolveStoryPackDir, storyContractHash } from "@debateai/story";
@@ -82,7 +84,11 @@ describe("S01 seals the content rule", () => {
     // Answer writer v4 (owner-approved wording, 2026-10-15): v4 + length.v2 supersede v3 + length.v1, so this row now
     // reads the exported HISTORY text (SYNTHESIZER_V3_CONTRACTS_FINGERPRINT_TEXT); its seal is unchanged (9a46af29...).
     ["composerContractHash serve.synthesizer.v3 + length.v1", () => sha256(SYNTHESIZER_V3_CONTRACTS_FINGERPRINT_TEXT), "4b141d3ab287366c4969f89e04649c5f1cc951d433206ffa0295527eba4df90f", "9a46af295fe2c32c3ce386253dbedb6061004b564b68acdf25a3eccf08b25662"],
-    ["composerContractHash serve.synthesizer.v4 + length.v2", () => sha256(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT), "9a46af295fe2c32c3ce386253dbedb6061004b564b68acdf25a3eccf08b25662", "879d2c5d0213832fe466537603e5171e53248cce41188473550616d2dd5b4a47"],
+    // V4 reading level + the language-neutral length sentence (owner N6 and 17 Oct #5, 2026-10-29): v4 + length.v2 is now
+    // the exported HISTORY text (SYNTHESIZER_V4_CONTRACTS_FINGERPRINT_TEXT), its seal unchanged (879d2c5d...); the current
+    // text is v4, length.v3, reader.v1 and length.reader.v1 (measured by this row's first run: 6fb174d4...).
+    ["composerContractHash serve.synthesizer.v4 + length.v2", () => sha256(SYNTHESIZER_V4_CONTRACTS_FINGERPRINT_TEXT), "9a46af295fe2c32c3ce386253dbedb6061004b564b68acdf25a3eccf08b25662", "879d2c5d0213832fe466537603e5171e53248cce41188473550616d2dd5b4a47"],
+    ["composerContractHash serve.synthesizer.v4 + length.v3 + reader.v1 + length.reader.v1", () => sha256(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT), "879d2c5d0213832fe466537603e5171e53248cce41188473550616d2dd5b4a47", "6fb174d4d75ad1d39bf8246f741a7ab0ee60fc2b6d117aa228de83cfca29324d"],
     // Practice debate 3 (2026-10-12): the v1 and evaluator-v1 rows now read the exported HISTORY contracts
     // (`SYNTHESIZER_V1_PROMPT_CONTRACT`, `EVALUATOR_V1_PROMPT_CONTRACT`): the current contracts carry the v3/v2
     // instruction, and spreading them would hash a contract that never shipped. The sealed values are unchanged.
@@ -91,7 +97,11 @@ describe("S01 seals the content rule", () => {
     // Length guidance (LG-C2 Task 13): the conformance row now seals serve.evaluator.v2 then its length variant
     // serve.evaluator.length.v1 (measured by this row's first run: 108f1b29...); v2 alone (the base here, 660ec7cb...)
     // stays pinned below as history.
-    ["conformanceContractHash serve.evaluator.v2 + length.v1", () => sha256(EVALUATOR_CONTRACTS_FINGERPRINT_TEXT), "660ec7cba5aa70bbd29e190580b7385802cd21bc6b212d11646b54c1d84ee22f", "108f1b29fb3c4739568a083c806ef5abdb9289e8b621bc9d895d52e5fcad22f6"],
+    // V4 reading level (owner N6, 2026-10-29): v2 + length.v1 is now the exported HISTORY text
+    // (EVALUATOR_LENGTH_CONTRACTS_FINGERPRINT_TEXT), its seal unchanged (108f1b29...); the current text adds reader.v1 and
+    // length.reader.v1 (measured by this row's first run: 02e01cbf...).
+    ["conformanceContractHash serve.evaluator.v2 + length.v1", () => sha256(EVALUATOR_LENGTH_CONTRACTS_FINGERPRINT_TEXT), "660ec7cba5aa70bbd29e190580b7385802cd21bc6b212d11646b54c1d84ee22f", "108f1b29fb3c4739568a083c806ef5abdb9289e8b621bc9d895d52e5fcad22f6"],
+    ["conformanceContractHash serve.evaluator.v2 + length.v1 + reader.v1 + length.reader.v1", () => sha256(EVALUATOR_CONTRACTS_FINGERPRINT_TEXT), "108f1b29fb3c4739568a083c806ef5abdb9289e8b621bc9d895d52e5fcad22f6", "02e01cbfebf1eeb96e61eb9a56cdbccb7ca1f8fae32186ef7a8c72ab9834c2bd"],
     ["evaluator.blind-judge-grade.v1", () => BLIND_JUDGE_GRADE_CONTRACT_HASH, "8aeaf308a59c5c9d77349c2888cccfda2f9d6589eba991cad85ef3fc03744e31", "b23685cf8ac31e68f151573b83f1e807af73fe93098d026f5e23ca70f83fabe8"],
     ["evaluator.domain-tagger.v1", () => DOMAIN_TAGGER_CONTRACT_HASH, "02fc1d4e36df8d137a1673c85b5c8d03c3379b52c00bee627f84497d65ffd7f5", "0dfa57266bb57d90481e60e9d184fed8fd61eca6fab70c93a765d79e7ec3d509"],
     ["evaluator.consumer-aggregate.v1", () => sha256(promptContractFingerprintText(CONSUMER_AGGREGATE_PROMPT_CONTRACT)), "82bf46b39a0eca190425c4e8d9d01eb100ab61c39145d0af8551de1a65d70ac4", "33ce6f2ec2ff87f03cd5f4e76123e8d61f23235d88d32808a21adbd53a85f0ab"],

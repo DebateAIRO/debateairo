@@ -1,4 +1,6 @@
-import { DEBATE_SHAPE_MARKS, type CompositionBudgetTier, type DebateShapeMark, type EngineQuestionKind, type WayOfKnowing } from "@debateai/kernel";
+import {
+  DEBATE_SHAPE_MARKS, type CompositionBudgetTier, type DebateShapeMark, type EngineQuestionKind, type ReadingLevel, type WayOfKnowing
+} from "@debateai/kernel";
 import type { VerdictState } from "@debateai/contract";
 import { MAP_ENGINE_INTERNAL_FIELD_NAMES, mapAlsoRaisedOf, type MapResult } from "@debateai/map";
 import type { EngineSettings, LengthGuidance } from "@debateai/register";
@@ -81,6 +83,8 @@ export interface StorySnapshotSource {
    * story writes in that lock; the caller decides by the receipt, never by the stored tag. Absent: today's story.
    */
   readonly languageLocked?: boolean;
+  /** V4 reading level (owner N6, 2026-10-29): the run's level, or null / absent — today's story. */
+  readonly readingLevel?: ReadingLevel | null;
   readonly compositionBudgetTier: CompositionBudgetTier;
   readonly verdict: {
     /** The contract's closed list (B4 Minor 2, R2b final wave P2), so a fifth state cannot be missed here. */
@@ -424,6 +428,7 @@ export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteIn
     ...(source.answersNote === undefined ? {} : { answersNote: source.answersNote }),
     ...(source.lengthGuidance === undefined ? {} : { lengthGuidance: source.lengthGuidance }),
     ...(source.languageLocked === true ? { languageLocked: true as const } : {}),
+    ...(source.readingLevel === undefined || source.readingLevel === null ? {} : { readingLevel: source.readingLevel }),
     // R1d: the receipt's engine and the backup storytellers, only when the runner handed them over (an engine-2 debate).
     ...(source.engine === undefined || source.engine === null ? {} : { engine: source.engine }),
     ...(source.backupCandidates === undefined ? {} : { backupCandidates: Object.freeze([...source.backupCandidates]) }),
