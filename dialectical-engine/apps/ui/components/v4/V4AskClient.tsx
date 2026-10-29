@@ -10,7 +10,7 @@ import { V4Header } from "@/components/v4/V4Header";
 import { contractClient } from "@/lib/api";
 import { catalogLocale, isLocale } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
-import { composeQuestion, ownWords } from "@/lib/v4/askText";
+import { composeQuestion, FREE_GOAL_CHOICES_MAX, goalChoiceCount, goalWithinPlan, ownWords } from "@/lib/v4/askText";
 import { levelHref, useReadingLevel } from "@/lib/v4/storage";
 import {
   DIG_MODES,
@@ -177,12 +177,16 @@ function V4AskForm({
 
   // ASK-1: the D2 choices are added as English sentences, so they are offered only on English pages for now.
   const choicesOffered = isLocale(locale) && catalogLocale(locale) === "en";
+  // Owner 2026-10-29 (Free plan shape): a Free ask carries at most FREE_GOAL_CHOICES_MAX choices; paid plans have no cap.
+  // Once Free's cap is reached, only the choices already set can still be changed. What is sent never carries more.
+  const choicesFull = ask.planTier === "free" && goalChoiceCount(goal) >= FREE_GOAL_CHOICES_MAX;
+  const sentGoal = useMemo(() => goalWithinPlan(goal, ask.planTier), [goal, ask.planTier]);
   const trimmed = question.trim();
   const longEnough = trimmed.length >= QUESTION_MIN;
   // ASK-3: a crisis message may be very short; it must still reach the crisis help (V3 enables Start for it).
   const crisisText = ask.flagsCrisis(trimmed);
   const canGoOn = longEnough || crisisText;
-  const composed = useMemo(() => composeQuestion(trimmed, goal, catalog, locale), [trimmed, goal, catalog, locale]);
+  const composed = useMemo(() => composeQuestion(trimmed, sentGoal, catalog, locale), [trimmed, sentGoal, catalog, locale]);
   // "Just answer it" sends the question alone, tidied the same way (so its title is the person's whole words).
   const plain = useMemo(() => composeQuestion(trimmed, EMPTY_GOAL, catalog, locale), [trimmed, catalog, locale]);
   const sentLine = accepted !== null && accepted.basis === composed ? accepted.text : composed;
@@ -251,7 +255,7 @@ function V4AskForm({
 
   function addAngle() {
     const angle = angleDraft.replace(/\s+/g, " ").trim();
-    if (angle.length === 0 || goal.angles.length >= ANGLES_MAX) return;
+    if (angle.length === 0 || goal.angles.length >= ANGLES_MAX || choicesFull) return;
     if (!goal.angles.some((existing) => existing.toLocaleLowerCase() === angle.toLocaleLowerCase())) {
       setGoal({ ...goal, angles: [...goal.angles, angle] });
     }
@@ -390,6 +394,9 @@ function V4AskForm({
                 <h2 className="v4AskSubTitle">
                   {t(catalog, "v4.read.optionalTitle")} <span className="v4Muted v4AskOptional">{t(catalog, "v4.read.optionalNote")}</span>
                 </h2>
+                {ask.planTier === "free" ? (
+                  <p className="v4AskHint v4Muted">{t(catalog, "v4.read.freeChoices", { count: FREE_GOAL_CHOICES_MAX })}</p>
+                ) : null}
 
                 <div className="v4AskBlock" role="group" aria-labelledby={`${ids}-place`}>
                   <span id={`${ids}-place`} className="v4AskLabel">{t(catalog, "v4.read.place.label")}</span>
@@ -400,6 +407,7 @@ function V4AskForm({
                         type="button"
                         className="v4Chip"
                         aria-pressed={goal.place === place}
+                        disabled={choicesFull && goal.place === null}
                         onClick={() => setGoal({ ...goal, place: goal.place === place ? null : place })}
                       >
                         {t(catalog, `v4.read.place.${place}`)}
@@ -430,6 +438,7 @@ function V4AskForm({
                         type="button"
                         className="v4Chip"
                         aria-pressed={goal.horizon === horizon}
+                        disabled={choicesFull && goal.horizon === null}
                         onClick={() => setGoal({ ...goal, horizon: goal.horizon === horizon ? null : horizon })}
                       >
                         {t(catalog, `v4.read.horizon.${horizon}`)}
@@ -447,6 +456,7 @@ function V4AskForm({
                         type="button"
                         className="v4Chip"
                         aria-pressed={goal.purpose === purpose}
+                        disabled={choicesFull && goal.purpose === null}
                         onClick={() => setGoal({ ...goal, purpose: goal.purpose === purpose ? null : purpose })}
                       >
                         {t(catalog, `v4.read.purpose.${purpose}`)}
@@ -463,6 +473,7 @@ function V4AskForm({
                     type="text"
                     value={goal.matters}
                     maxLength={300}
+                    disabled={choicesFull && goal.matters.trim().length === 0}
                     placeholder={t(catalog, "v4.read.matters.placeholder")}
                     onChange={(event) => setGoal({ ...goal, matters: event.target.value })}
                   />
@@ -477,7 +488,7 @@ function V4AskForm({
                       type="text"
                       value={angleDraft}
                       maxLength={200}
-                      disabled={goal.angles.length >= ANGLES_MAX}
+                      disabled={goal.angles.length >= ANGLES_MAX || choicesFull}
                       placeholder={t(catalog, "v4.read.angles.placeholder")}
                       onChange={(event) => setAngleDraft(event.target.value)}
                       onKeyDown={onAngleKey}
@@ -486,7 +497,7 @@ function V4AskForm({
                       type="button"
                       className="v4Btn"
                       onClick={addAngle}
-                      disabled={angleDraft.trim().length === 0 || goal.angles.length >= ANGLES_MAX}
+                      disabled={angleDraft.trim().length === 0 || goal.angles.length >= ANGLES_MAX || choicesFull}
                     >
                       {t(catalog, "v4.read.angles.add")}
                     </button>

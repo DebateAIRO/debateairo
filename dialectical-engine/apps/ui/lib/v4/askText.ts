@@ -54,6 +54,39 @@ export function cleanAngles(angles: readonly string[]): readonly string[] {
   return kept;
 }
 
+/** Owner 2026-10-29 (Free plan shape): a Free ask carries at most this many D2 choices; a paid plan has no cap. */
+export const FREE_GOAL_CHOICES_MAX = 3;
+
+/**
+ * How many D2 choices a goal carries: the place (a pressed "Another place" counts), the time, the purpose, what matters
+ * (when not blank) and each angle as sent (`cleanAngles`).
+ */
+export function goalChoiceCount(goal: V4Goal): number {
+  return (goal.place === null ? 0 : 1) + (goal.horizon === null ? 0 : 1) + (goal.purpose === null ? 0 : 1)
+    + (oneLine(goal.matters).length === 0 ? 0 : 1) + cleanAngles(goal.angles).length;
+}
+
+/**
+ * The goal a plan may send. A paid plan: the goal itself. Free: at most FREE_GOAL_CHOICES_MAX choices, the first ones in
+ * the order they are sent (place, time, purpose, what matters, angles); the rest are dropped from the end. A goal
+ * already within the cap is returned as it is.
+ */
+export function goalWithinPlan(goal: V4Goal, planTier: "free" | "premium"): V4Goal {
+  if (planTier !== "free" || goalChoiceCount(goal) <= FREE_GOAL_CHOICES_MAX) return goal;
+  let left = FREE_GOAL_CHOICES_MAX;
+  const keep = (set: boolean): boolean => {
+    if (!set || left === 0) return false;
+    left -= 1;
+    return true;
+  };
+  const place = keep(goal.place !== null) ? goal.place : null;
+  const horizon = keep(goal.horizon !== null) ? goal.horizon : null;
+  const purpose = keep(goal.purpose !== null) ? goal.purpose : null;
+  const matters = keep(oneLine(goal.matters).length > 0) ? goal.matters : "";
+  const angles = cleanAngles(goal.angles).slice(0, left);
+  return Object.freeze({ place, placeOther: place === "OTHER" ? goal.placeOther : "", horizon, purpose, matters, angles: Object.freeze(angles) });
+}
+
 /** The sentences the D2 choices add, in the spec's order: place, time, purpose, what matters, angles. */
 function goalSentences(goal: V4Goal, catalog: MessageCatalog): readonly string[] {
   const sentences: string[] = [];
