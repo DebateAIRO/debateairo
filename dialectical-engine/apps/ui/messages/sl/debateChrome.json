@@ -216,7 +216,7 @@
   "debateChrome.condition.missingNumber": "Številka je bila po neuspešni ponovitvi odstranjena",
   "debateChrome.condition.owedCheckUnexecuted": "Dolžno preverjanje ob zaključku ni bilo izvedeno",
   "debateChrome.condition.synthesisObjectionStanding": "Ugovor ocenjevalca glede te izjave še vedno velja",
-  "debateChrome.condition.digestCompressed": "Povzetki vozlišč so skrajšani, da ustrezajo proračunu sestavljanja",
+  "debateChrome.condition.digestCompressed": "Razprava je bila zelo obsežna, zato je bil odgovor napisan na podlagi njene skrajšane različice.",
   "debateChrome.condition.digestCannotExist": "Povzetka ni bilo mogoče ustvariti znotraj proračuna sestavljanja",
   "debateChrome.condition.protectedCoreGuardRetired": "Izvajanje se je ustavilo zaradi proračuna; preverjanje preoblikovanja ga ni več zadrževalo",
   "debateChrome.condition.hiddenUnjudgeable": "Skrito: ocena ni bila mogoča — za branje prikažite skrite elemente",

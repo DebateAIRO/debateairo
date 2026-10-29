@@ -217,7 +217,7 @@
   "debateChrome.condition.missingNumber": "Cifră eliminată după eșecul redării",
   "debateChrome.condition.owedCheckUnexecuted": "Verificarea obligatorie nu a fost executată la finalizare",
   "debateChrome.condition.synthesisObjectionStanding": "O obiecție a evaluatorului față de această afirmație este încă valabilă",
-  "debateChrome.condition.digestCompressed": "Rezumatele nodurilor au fost scurtate pentru a respecta bugetul de redactare",
+  "debateChrome.condition.digestCompressed": "Dezbaterea a fost foarte amplă, așa că răspunsul a fost scris pornind de la o versiune prescurtată a ei.",
   "debateChrome.condition.digestCannotExist": "Nu s-a putut crea niciun rezumat în limita bugetului de redactare",
   "debateChrome.condition.protectedCoreGuardRetired": "Execuția s-a oprit la limita bugetului; verificarea reformulării nu a mai condiționat-o",
   "debateChrome.condition.hiddenUnjudgeable": "Ascuns: nu a putut fi evaluat — afișați elementele ascunse pentru a-l citi",

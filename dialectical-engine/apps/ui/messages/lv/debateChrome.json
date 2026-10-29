@@ -216,7 +216,7 @@
   "debateChrome.condition.missingNumber": "Skaitlis noņemts pēc atskaņošanas kļūmes",
   "debateChrome.condition.owedCheckUnexecuted": "Līdz pabeigšanai vajadzīgā pārbaude netika izpildīta",
   "debateChrome.condition.synthesisObjectionStanding": "Vērtētāja iebildums pret šo apgalvojumu joprojām ir spēkā",
-  "debateChrome.condition.digestCompressed": "Mezglu kopsavilkumi saīsināti, lai iekļautos sastādīšanas budžetā",
+  "debateChrome.condition.digestCompressed": "Debates bija ļoti plašas, tāpēc atbilde tika uzrakstīta, balstoties uz to saīsinātu versiju.",
   "debateChrome.condition.digestCannotExist": "Sastādīšanas budžeta ietvaros kopsavilkumu nevarēja izveidot",
   "debateChrome.condition.protectedCoreGuardRetired": "Izpilde apturēta budžeta dēļ; pārformulējuma pārbaude to vairs nebloķēja",
   "debateChrome.condition.hiddenUnjudgeable": "Paslēpts: nevarēja izvērtēt — lai lasītu, parādiet paslēpto saturu",

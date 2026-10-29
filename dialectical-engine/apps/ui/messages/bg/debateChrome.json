@@ -216,7 +216,7 @@
   "debateChrome.condition.missingNumber": "Числото е премахнато след неуспешно възпроизвеждане",
   "debateChrome.condition.owedCheckUnexecuted": "Изискуемата проверка не е изпълнена при завършването",
   "debateChrome.condition.synthesisObjectionStanding": "Възражение на оценител към това твърдение все още е в сила",
-  "debateChrome.condition.digestCompressed": "Резюметата на възлите са съкратени, за да се вместят в бюджета за съставяне",
+  "debateChrome.condition.digestCompressed": "Дебатът беше много обширен, затова отговорът е написан въз основа на негова съкратена версия.",
   "debateChrome.condition.digestCannotExist": "В рамките на бюджета за съставяне не можа да бъде изградено резюме",
   "debateChrome.condition.protectedCoreGuardRetired": "Изпълнението спря поради бюджета; проверката на преформулирането вече не го ограничаваше",
   "debateChrome.condition.hiddenUnjudgeable": "Скрито: не можа да бъде оценено — покажете скритите елементи, за да го прочетете",

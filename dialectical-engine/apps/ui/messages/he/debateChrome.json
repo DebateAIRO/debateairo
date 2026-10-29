@@ -216,7 +216,7 @@
   "debateChrome.condition.missingNumber": "המספר הוסר לאחר כשל בהפעלה החוזרת",
   "debateChrome.condition.owedCheckUnexecuted": "בדיקה נדרשת לא בוצעה עד להשלמה",
   "debateChrome.condition.synthesisObjectionStanding": "התנגדות של מעריך להצהרה זו עדיין עומדת בעינה",
-  "debateChrome.condition.digestCompressed": "סיכומי הצמתים קוצרו כדי להתאים לתקציב הניסוח",
+  "debateChrome.condition.digestCompressed": "הדיון היה גדול מאוד, ולכן התשובה נכתבה על סמך גרסה מקוצרת שלו.",
   "debateChrome.condition.digestCannotExist": "לא ניתן היה לבנות תקציר במסגרת תקציב הניסוח",
   "debateChrome.condition.protectedCoreGuardRetired": "ההרצה נעצרה עקב מגבלת התקציב; בדיקת הניסוח מחדש כבר לא הייתה תנאי להמשך",
   "debateChrome.condition.hiddenUnjudgeable": "מוסתר: לא ניתן היה לשפוט אותו — הציגו פריטים מוסתרים כדי לקרוא אותו",

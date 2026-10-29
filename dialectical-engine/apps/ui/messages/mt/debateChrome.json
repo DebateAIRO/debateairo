@@ -219,7 +219,7 @@
   "debateChrome.condition.missingNumber": "In-numru tneħħa wara li falliet ir-riproduzzjoni",
   "debateChrome.condition.owedCheckUnexecuted": "Il-verifika dovuta ma twettqitx mat-tlestija",
   "debateChrome.condition.synthesisObjectionStanding": "Oġġezzjoni ta’ evalwatur dwar din id-dikjarazzjoni għadha pendenti",
-  "debateChrome.condition.digestCompressed": "Is-sommarji tan-nodi tqassru biex joqogħdu fil-baġit tal-kompożizzjoni",
+  "debateChrome.condition.digestCompressed": "Id-dibattitu kien kbir ħafna, għalhekk it-tweġiba nkitbet minn verżjoni mqassra tiegħu.",
   "debateChrome.condition.digestCannotExist": "Ma seta’ jinbena ebda diġest fil-baġit tal-kompożizzjoni",
   "debateChrome.condition.protectedCoreGuardRetired": "L-eżekuzzjoni waqfet minħabba l-baġit; il-verifika tar-riformulazzjoni ma baqgħetx timblukkaha",
   "debateChrome.condition.hiddenUnjudgeable": "Moħbi: ma setax jiġi ġġudikat — uri l-moħbi biex taqrah",

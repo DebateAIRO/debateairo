@@ -216,7 +216,7 @@
   "debateChrome.condition.missingNumber": "Getal verwijderd na mislukte herhaling",
   "debateChrome.condition.owedCheckUnexecuted": "Vereiste controle niet uitgevoerd bij voltooiing",
   "debateChrome.condition.synthesisObjectionStanding": "Een bezwaar van een beoordelaar tegen deze verklaring is nog niet weerlegd",
-  "debateChrome.condition.digestCompressed": "Samenvattingen van knooppunten ingekort om binnen het samenstellingsbudget te passen",
+  "debateChrome.condition.digestCompressed": "Het debat was zeer omvangrijk, dus het antwoord is geschreven op basis van een ingekorte versie ervan.",
   "debateChrome.condition.digestCannotExist": "Binnen het samenstellingsbudget kon geen samenvatting worden gemaakt",
   "debateChrome.condition.protectedCoreGuardRetired": "Uitvoering gestopt wegens budget; de controle van de herformulering hield deze niet langer tegen",
   "debateChrome.condition.hiddenUnjudgeable": "Verborgen: kon niet worden beoordeeld — toon verborgen items om dit te lezen",

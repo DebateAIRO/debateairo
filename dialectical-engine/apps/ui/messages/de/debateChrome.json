@@ -216,7 +216,7 @@
   "debateChrome.condition.missingNumber": "Zahl nach fehlgeschlagener Wiedergabe entfernt",
   "debateChrome.condition.owedCheckUnexecuted": "Ausstehende Prüfung bei Abschluss nicht ausgeführt",
   "debateChrome.condition.synthesisObjectionStanding": "Gegen diese Aussage besteht weiterhin ein Einwand des Evaluators",
-  "debateChrome.condition.digestCompressed": "Knotenzusammenfassungen wurden gekürzt, um das Zusammenstellungsbudget einzuhalten",
+  "debateChrome.condition.digestCompressed": "Die Debatte war sehr umfangreich, daher wurde die Antwort aus einer gekürzten Fassung der Debatte verfasst.",
   "debateChrome.condition.digestCannotExist": "Innerhalb des Zusammenstellungsbudgets konnte keine Kurzfassung erstellt werden",
   "debateChrome.condition.protectedCoreGuardRetired": "Durchlauf an der Budgetgrenze angehalten; die Prüfung der Neuformulierung blockiert ihn nicht mehr",
   "debateChrome.condition.hiddenUnjudgeable": "Ausgeblendet: konnte nicht beurteilt werden – blenden Sie verborgene Inhalte ein, um dies zu lesen",

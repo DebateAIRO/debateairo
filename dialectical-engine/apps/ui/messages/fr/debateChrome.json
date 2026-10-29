@@ -217,7 +217,7 @@
   "debateChrome.condition.missingNumber": "Nombre retiré après l’échec du rejeu",
   "debateChrome.condition.owedCheckUnexecuted": "Vérification attendue non exécutée à l’achèvement",
   "debateChrome.condition.synthesisObjectionStanding": "Une objection d’un évaluateur subsiste à l’encontre de cette déclaration",
-  "debateChrome.condition.digestCompressed": "Résumés des nœuds abrégés pour respecter le budget de composition",
+  "debateChrome.condition.digestCompressed": "Le débat était très vaste ; la réponse a donc été rédigée à partir d’une version abrégée de celui-ci.",
   "debateChrome.condition.digestCannotExist": "Aucun condensé n’a pu être produit dans le budget de composition",
   "debateChrome.condition.protectedCoreGuardRetired": "Exécution arrêtée faute de budget ; la vérification de reformulation n’était plus bloquante",
   "debateChrome.condition.hiddenUnjudgeable": "Masqué : impossible à évaluer — affichez les éléments masqués pour le lire",

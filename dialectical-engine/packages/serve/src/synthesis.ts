@@ -308,6 +308,8 @@ function selectEmphasis(
  * the first step's cap (`(K, 60)` for the K that fit), so a tight budget gets
  * longer summaries before it could ever afford more points. `decisiveCount`
  * null is every ranked point; `summaryCap` null is the statement verbatim.
+ * Above 120 points the walk climbs in steps of 40 up to 480 (owner ruling
+ * 2026-10-29), so a large debate keeps as many points as fit.
  *
  * Both rungs keep the compressed mark the summary levels ride on; no new mark
  * exists, so the sealed chain's `.marks` pass-through is unchanged. The disclosure
@@ -327,6 +329,18 @@ export const DIGEST_LADDER = Object.freeze({
     Object.freeze({ decisiveCount: 80, summaryCap: 240 }),
     Object.freeze({ decisiveCount: 80, summaryCap: 480 }),
     Object.freeze({ decisiveCount: 120, summaryCap: 480 }),
+    // Owner ruling 2026-10-29 (MORNING-2026-10-17 item 9, "finer steps in between"): above 120 points, a rung every 40
+    // up to 480, so the writer gets the largest that fits rather than 120 or every point. The whole-statement ladder
+    // (LG-E, R4's branch) takes its decisive counts from this schedule.
+    Object.freeze({ decisiveCount: 160, summaryCap: 480 }),
+    Object.freeze({ decisiveCount: 200, summaryCap: 480 }),
+    Object.freeze({ decisiveCount: 240, summaryCap: 480 }),
+    Object.freeze({ decisiveCount: 280, summaryCap: 480 }),
+    Object.freeze({ decisiveCount: 320, summaryCap: 480 }),
+    Object.freeze({ decisiveCount: 360, summaryCap: 480 }),
+    Object.freeze({ decisiveCount: 400, summaryCap: 480 }),
+    Object.freeze({ decisiveCount: 440, summaryCap: 480 }),
+    Object.freeze({ decisiveCount: 480, summaryCap: 480 }),
     Object.freeze({ decisiveCount: null, summaryCap: null })
   ]) as readonly Readonly<{ decisiveCount: number | null; summaryCap: number | null }>[]
 });

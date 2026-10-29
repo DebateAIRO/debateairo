@@ -215,7 +215,7 @@
   "debateChrome.condition.missingNumber": "Con số đã bị xóa sau khi phát lại thất bại",
   "debateChrome.condition.owedCheckUnexecuted": "Bước kiểm tra bắt buộc chưa được thực hiện khi hoàn tất",
   "debateChrome.condition.synthesisObjectionStanding": "Một phản đối của bộ đánh giá vẫn còn hiệu lực đối với nhận định này",
-  "debateChrome.condition.digestCompressed": "Bản tóm tắt nút đã được rút ngắn để vừa ngân sách tổng hợp",
+  "debateChrome.condition.digestCompressed": "Cuộc tranh luận rất lớn, vì vậy câu trả lời được viết dựa trên một bản rút gọn của nó.",
   "debateChrome.condition.digestCannotExist": "Không thể tạo bản tóm lược trong ngân sách tổng hợp",
   "debateChrome.condition.protectedCoreGuardRetired": "Lần chạy dừng do ngân sách; kiểm tra diễn đạt lại không còn là điều kiện chặn",
   "debateChrome.condition.hiddenUnjudgeable": "Đã ẩn: không thể đánh giá — hiển thị nội dung ẩn để đọc",

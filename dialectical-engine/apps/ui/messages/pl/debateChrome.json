@@ -216,7 +216,7 @@
   "debateChrome.condition.missingNumber": "Liczbę usunięto po nieudanym odtworzeniu",
   "debateChrome.condition.owedCheckUnexecuted": "Wymaganego sprawdzenia nie wykonano przed zakończeniem",
   "debateChrome.condition.synthesisObjectionStanding": "Zastrzeżenie ewaluatora do tego stwierdzenia pozostaje w mocy",
-  "debateChrome.condition.digestCompressed": "Podsumowania węzłów skrócono, aby zmieściły się w budżecie redagowania",
+  "debateChrome.condition.digestCompressed": "Debata była bardzo obszerna, dlatego odpowiedź napisano na podstawie jej skróconej wersji.",
   "debateChrome.condition.digestCannotExist": "Nie udało się utworzyć skrótu w ramach budżetu redagowania",
   "debateChrome.condition.protectedCoreGuardRetired": "Przebieg zatrzymano z powodu budżetu; test przeformułowania przestał go warunkować",
   "debateChrome.condition.hiddenUnjudgeable": "Ukryte: nie można było ocenić — włącz ukryte elementy, aby przeczytać",

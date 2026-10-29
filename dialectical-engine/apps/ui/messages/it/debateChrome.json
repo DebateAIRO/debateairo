@@ -217,7 +217,7 @@
   "debateChrome.condition.missingNumber": "Numero rimosso dopo un errore di riproduzione",
   "debateChrome.condition.owedCheckUnexecuted": "Verifica dovuta non eseguita al completamento",
   "debateChrome.condition.synthesisObjectionStanding": "Su questa affermazione permane un’obiezione di un valutatore",
-  "debateChrome.condition.digestCompressed": "Riepiloghi dei nodi abbreviati per rispettare il limite di composizione",
+  "debateChrome.condition.digestCompressed": "Il dibattito era molto ampio, quindi la risposta è stata scritta a partire da una sua versione abbreviata.",
   "debateChrome.condition.digestCannotExist": "Non è stato possibile creare un riepilogo entro il limite di composizione",
   "debateChrome.condition.protectedCoreGuardRetired": "Esecuzione interrotta per limiti di risorse; la verifica della riformulazione non ne determina più l’esito",
   "debateChrome.condition.hiddenUnjudgeable": "Nascosta: non è stato possibile valutarla — mostra gli elementi nascosti per leggerla",

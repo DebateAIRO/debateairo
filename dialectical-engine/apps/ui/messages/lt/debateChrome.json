@@ -216,7 +216,7 @@
   "debateChrome.condition.missingNumber": "Nepavykus pakartoti, skaičius pašalintas",
   "debateChrome.condition.owedCheckUnexecuted": "Iki vykdymo pabaigos neatlikta privaloma patikra",
   "debateChrome.condition.synthesisObjectionStanding": "Šiam teiginiui vis dar galioja vertintojo prieštaravimas",
-  "debateChrome.condition.digestCompressed": "Mazgų santraukos sutrumpintos, kad tilptų į kompozicijos biudžetą",
+  "debateChrome.condition.digestCompressed": "Debatai buvo labai dideli, todėl atsakymas parašytas remiantis sutrumpinta jų versija.",
   "debateChrome.condition.digestCannotExist": "Neviršijant kompozicijos biudžeto suvestinės sukurti nepavyko",
   "debateChrome.condition.protectedCoreGuardRetired": "Vykdymas sustabdytas dėl biudžeto; performulavimo patikra jo neberibojo",
   "debateChrome.condition.hiddenUnjudgeable": "Paslėpta: įvertinti nepavyko – norėdami perskaityti, įjunkite paslėpto turinio rodymą",

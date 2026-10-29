@@ -10033,9 +10033,17 @@ export class WalkingSkeletonRunner {
       const planKey = comparingJudgeCallSiteKey(1);
       const judgeSeats = seatBook.judge.filter((seat) => !seatSitsOut(seat)).flatMap((seat) => {
         const member = seatCaller.plan(seat, planKey);
-        return member === null ? [] : [Object.freeze({ seat, member })];
+        if (member === null) return [];
+        // Owner ruling 2026-10-29 ("prefer neutral judges"): the seat's other member, up and not sitting out, which judges
+        // in the planned member's place only when its maker argued no answer and the planned member's did
+        // (`pickComparingJudges`). Same seat, so its thinking level, gateway, lane and money checks are the seat's own.
+        const other = seatCaller.plan(seat, planKey, { eligible: (candidate) => candidate.pinnedAs !== member.pinnedAs });
+        const alternate = other === null || other.maker === member.maker || (sitOut !== null && sitOut.sitsOut(other.providerRef))
+          ? null : other;
+        return [Object.freeze({ seat, member, alternate })];
       });
-      const runSeatOf = new Map(judgeSeats.map(({ seat, member }) => [member.providerRef, seat] as const));
+      const runSeatOf = new Map(judgeSeats.flatMap(({ seat, member, alternate }) => [[member.providerRef, seat] as const,
+        ...(alternate === null ? [] : [[alternate.providerRef, seat] as const])]));
       const modelIdOf = (member: Readonly<{ providerRef: string; candidate: SeatCandidate | null }>): string =>
         member.candidate?.modelId ?? panelModelIds.get(member.providerRef) ?? member.providerRef;
       const verdictVotes = new VerdictVoteRepository(this.pool);
@@ -10053,8 +10061,11 @@ export class WalkingSkeletonRunner {
         material,
         arguedByMaker: new Map(authoredMakerPositions.map((root) => [root.nodeId, root.maker] as const)),
         honestFinalStrength: new Map([...strengthOf].filter(([nodeId]) => servable.has(nodeId))),
-        candidates: judgeSeats.map(({ member }) => Object.freeze({
-          maker: member.maker, providerRef: member.providerRef, modelId: modelIdOf(member)
+        candidates: judgeSeats.map(({ member, alternate }) => Object.freeze({
+          maker: member.maker, providerRef: member.providerRef, modelId: modelIdOf(member),
+          ...(alternate === null ? {} : { alternate: Object.freeze({
+            maker: alternate.maker, providerRef: alternate.providerRef, modelId: modelIdOf(alternate)
+          }) })
         })),
         rotationOffset: seatRotationOffset({ runId: run.runId, role: "JUDGE", callSiteKey: planKey }),
         moneyStopped: runBodyBudgetStop !== null,
