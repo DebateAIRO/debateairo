@@ -117,3 +117,7 @@ fd422018e71b56b9826d8d6ce9f6a0fb4840b249:dialectical-engine/tests/unit/preview_b
 42af415d85116f4e49fa24866ae9744f556e00e4:dialectical-engine/tests/unit/preview-thinking-levels-check.test.ts:generic-api-key:85
 # a fake 40-character test string (random letters and digits) that the long-run redaction test must blank, not a key (owner yes 2026-10-12)
 42af415d85116f4e49fa24866ae9744f556e00e4:dialectical-engine/tests/unit/preview-practice.test.ts:generic-api-key:355
+# 2026-10-29 — V4 initial (PR #224, first commit): generic-api-key matched the browser-storage key NAME
+# `const DIG_PARENTS_KEY = "v4.digParents"` in dialectical-engine/apps/ui/lib/v4/storage.ts, a label, not a key.
+# The line was removed in the next commit (V4 stores nothing in the browser). Owner's ruling of 2026-10-29 (U5).
+5fa1b5224445fbd36ccb2a4bb9316d0db3cf0da6:dialectical-engine/apps/ui/lib/v4/storage.ts:generic-api-key:15
