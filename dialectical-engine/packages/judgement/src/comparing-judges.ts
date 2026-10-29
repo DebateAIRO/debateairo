@@ -233,15 +233,31 @@ export function comparingJudgeMaterialFields(input: Readonly<{
 
 export type ComparingJudgeSeat = Readonly<{ seat: number; maker: string; providerRef: string; argued: boolean }>;
 
+/** One run judge seat as the pick reads it: the member planned for it, and (optional) its other member. */
+export type ComparingJudgeCandidateSeat = Readonly<{
+  maker: string;
+  providerRef: string;
+  /**
+   * Owner ruling 2026-10-29 (MORNING-2026-10-17 item 6, "prefer neutral judges"): the seat's other member, which judges
+   * in place of the planned member only when the planned member's maker argued an answer and this member's maker argued
+   * none. It never stands in as a fallback.
+   */
+  alternate?: Readonly<{ maker: string; providerRef: string }>;
+}>;
+
 /**
- * WHO JUDGES (spec §4.3; INTERFACE §9.3): the seats in rotation from `rotationOffset`; makers that argued none of the
- * answers first, then makers that argued one; never two seats of one maker; at most `count` and at most
+ * WHO JUDGES (spec §4.3; INTERFACE §9.3; owner ruling 2026-10-29, "prefer neutral judges"): the seats in rotation from
+ * `rotationOffset`. First, every seat that a maker that argued none of the answers can fill: its planned member when that
+ * member's maker argued none, else its other member when that one's maker argued none. Only then, for the seats still
+ * open, today's fallback: the remaining seats' planned members, makers that argued one, in the same rotation. Each run
+ * seat fills at most one judge seat; never two seats of one maker; at most `count` and at most
  * `COMPARING_JUDGE_LIMITS.maxSeats`. A maker that argued EVERY answer (the only arguing maker, a one-maker debate) is
  * never seated: its vote could never be counted (spec §4.7, "one maker": no judge can run). Seats are numbered 1..k in
- * the order picked; seat k is called `VERDICT:judge:<k>` and sees the answers in `comparingJudgeOrder(n, k)`.
+ * the order picked; seat k is called `VERDICT:judge:<k>` and sees the answers in `comparingJudgeOrder(n, k)`. Without
+ * any `alternate` the pick is exactly the one before the ruling.
  */
 export function pickComparingJudges(input: Readonly<{
-  seats: readonly Readonly<{ maker: string; providerRef: string }>[];
+  seats: readonly ComparingJudgeCandidateSeat[];
   arguingMakers: ReadonlySet<string>;
   count: number;
   rotationOffset: number;
@@ -255,22 +271,29 @@ export function pickComparingJudges(input: Readonly<{
   const start = input.rotationOffset % input.seats.length;
   const rotated = [...input.seats.slice(start), ...input.seats.slice(0, start)];
   const loneArguer = input.arguingMakers.size === 1 ? [...input.arguingMakers][0] : undefined;
-  const sittable = rotated.filter((seat) => seat.maker !== loneArguer);
-  const ordered = [
-    ...sittable.filter((seat) => !input.arguingMakers.has(seat.maker)),
-    ...sittable.filter((seat) => input.arguingMakers.has(seat.maker))
-  ];
   const limit = Math.min(input.count, COMPARING_JUDGE_LIMITS.maxSeats);
   const seatedMakers = new Set<string>();
+  const filled = new Set<number>();
   const picked: ComparingJudgeSeat[] = [];
-  for (const seat of ordered) {
-    if (picked.length >= limit) break;
-    if (seatedMakers.has(seat.maker)) continue;
-    seatedMakers.add(seat.maker);
+  const seatFrom = (index: number, member: Readonly<{ maker: string; providerRef: string }>): void => {
+    filled.add(index);
+    seatedMakers.add(member.maker);
     picked.push(Object.freeze({
-      seat: picked.length + 1, maker: seat.maker, providerRef: seat.providerRef, argued: input.arguingMakers.has(seat.maker)
+      seat: picked.length + 1, maker: member.maker, providerRef: member.providerRef, argued: input.arguingMakers.has(member.maker)
     }));
-  }
+  };
+  // Neutral judges first: the planned member, else the other member, of a maker that argued none of the answers.
+  rotated.forEach((seat, index) => {
+    if (picked.length >= limit) return;
+    const neutral = [seat, seat.alternate].find((member) => member !== undefined
+      && !input.arguingMakers.has(member.maker) && !seatedMakers.has(member.maker));
+    if (neutral !== undefined) seatFrom(index, neutral);
+  });
+  // Today's fallback for the seats still open: the remaining seats' planned members, in the same rotation.
+  rotated.forEach((seat, index) => {
+    if (picked.length >= limit || filled.has(index) || seat.maker === loneArguer || seatedMakers.has(seat.maker)) return;
+    seatFrom(index, seat);
+  });
   return Object.freeze(picked);
 }
 
