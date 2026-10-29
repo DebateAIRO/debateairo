@@ -120,6 +120,8 @@ const WORKER_FUNCTIONS = [
   "identity.renew_data_export_lease(uuid,uuid,integer)",
   "identity.read_data_export_snapshot_v2(uuid,uuid)",
   "identity.read_data_export_threat_reports(uuid,uuid)",
+  // V4 account memory (migration 0130): the reading level, debate visits and dig links.
+  "identity.read_data_export_page_memory(uuid,uuid)",
   "identity.complete_data_export(uuid,uuid,text,text,bigint,timestamp with time zone)",
   "identity.fail_data_export(uuid,uuid,text)",
   "identity.sweep_data_exports()",
@@ -146,7 +148,7 @@ export async function assertDataExportDatabaseRoles(requestPool: Pool, workerPoo
     const [request, worker] = await Promise.all([roleWitness(requestPool), roleWitness(workerPool)]);
     if (request === undefined || worker === undefined || request.principal === worker.principal
       || !request.authorization_member || request.worker_member || request.request_count !== 4 || request.worker_count !== 0
-      || !worker.worker_member || worker.authorization_member || worker.request_count !== 0 || worker.worker_count !== 9
+      || !worker.worker_member || worker.authorization_member || worker.request_count !== 0 || worker.worker_count !== 10
       || request.privileged || worker.privileged) {
       throw new TypeError("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
     }
@@ -159,9 +161,18 @@ export class PostgresDataExportSource implements DataExportSourcePort {
   constructor(private readonly pool: Pool) {}
 
   async readRaw(exportId: string, workerId: string): Promise<RawExportRows> {
-    const row = (await this.pool.query<{ snapshot: RawExportRows; threat_reports: unknown }>(
-      "SELECT identity.read_data_export_snapshot_v2($1,$2) snapshot, identity.read_data_export_threat_reports($1,$2) threat_reports",
+    const row = (await this.pool.query<{ snapshot: RawExportRows; threat_reports: unknown; page_memory: Record<string, unknown> | null }>(
+      "SELECT identity.read_data_export_snapshot_v2($1,$2) snapshot, identity.read_data_export_threat_reports($1,$2) threat_reports, "
+        + "identity.read_data_export_page_memory($1,$2) page_memory",
       [exportId, workerId])).rows[0]!;
-    return { ...row.snapshot, threat_reports: row.threat_reports };
+    // 0130's reader answers {page_reading_level, debate_visits, dig_links}; a missing member stays missing, so the
+    // snapshot's exact-section check refuses the export rather than leaving the records out.
+    const memory = row.page_memory ?? {};
+    return {
+      ...row.snapshot, threat_reports: row.threat_reports,
+      ...("page_reading_level" in memory ? { page_reading_level: memory.page_reading_level } : {}),
+      ...("debate_visits" in memory ? { debate_visits: memory.debate_visits } : {}),
+      ...("dig_links" in memory ? { dig_links: memory.dig_links } : {})
+    } as RawExportRows;
   }
 }

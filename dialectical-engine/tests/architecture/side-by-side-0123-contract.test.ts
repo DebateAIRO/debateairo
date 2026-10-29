@@ -29,7 +29,7 @@ const shape = (value: unknown): unknown => typeof value === "object" && value !=
 
 describe("0123: the side-by-side releases step", () => {
   it("is appended to the chain's STEPS after the engine's map answer step (the settings activation 0124 follows it)", () => {
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129]");
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130]");
     const loader = read("packages/db/src/migration-forward0123.ts");
     expect(loader).toContain("const NAME='0123_side_by_side_releases.sql';");
     expect(loader).toContain("const VERSION='side-by-side-releases-forward0123-v1';");

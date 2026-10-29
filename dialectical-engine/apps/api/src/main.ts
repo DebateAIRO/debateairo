@@ -169,6 +169,7 @@ import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } fr
 import { RepositoryAnswerDisclosureApplication } from "./disclosures.js";
 import { MapChoiceRepository } from "@debateai/map";
 import { RepositoryAnswerMapViewApplication, runOwnerCheckFrom } from "./map-views.js";
+import { accountMemoryStoreFrom } from "./account-memory.js";
 import { StoryRepository } from "@debateai/story";
 import { PostgresLegacyRunClaimApplication } from "./legacy-claim.js";
 import { SendmailRecoveryEmailMailSender, SendmailEmailChangeMailSender, SendmailMailSender, SendmailSecurityNotificationSender, TemplatedMailSender } from "./mail-channel.js";
@@ -1627,6 +1628,9 @@ const api = buildApi({
   // the content-free disclosure record, on the same runtime pool.
   disclosures: ownerDisclosures,
   mapViews,
+  // V4 account memory (owner rulings N7 and N11, migration 0130): 0130's functions on the API's runtime pool, whose
+  // principal holds debateai_billing_runtime (the only role granted them); each function checks run ownership itself.
+  accountMemory: accountMemoryStoreFrom((text, values) => pool.query(text, values)),
   ...(dataExport === undefined ? {} : { dataExport }),
   /**
    * Side-by-side spec §13 (S10): what the ACTIVE settings version says to the pages, per request — the room read's shape

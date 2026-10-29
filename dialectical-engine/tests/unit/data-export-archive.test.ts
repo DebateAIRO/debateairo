@@ -9,7 +9,7 @@ import { readZip } from "../support/zip-reader.js";
 const names = ["README.txt", "manifest.json", "your-data.html", "account.json", "security.json", "consents.json",
   "debates.json", "billing.json", "support.json", "activity.json"];
 const sections: Record<string, string[]> = {
-  "account.json": ["account", "channels", "registration_region", "age_checks", "erasure_requests", "kept_questions"],
+  "account.json": ["account", "channels", "registration_region", "age_checks", "erasure_requests", "kept_questions", "reading_level", "debate_visits", "dig_links"],
   "security.json": ["mfa_factors", "passkeys", "recovery_codes", "sessions", "social_identities", "email_changes", "recovery_email_changes", "recovery_requests"],
   "consents.json": ["legal_acceptances", "sensitive_data_consents"],
   "debates.json": ["debates"],

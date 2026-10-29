@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
-import type { AnswerStory, RunProjection } from "@debateai/contract";
+import type { AnswerStory, DigLinks, RunProjection } from "@debateai/contract";
 import { AuthGate } from "@/components/AuthGate";
 import { RoomNotice } from "@/components/billing/RoomNotice";
 import { V4ChangesBar } from "@/components/v4/V4ChangesBar";
@@ -16,6 +16,7 @@ import { isNotFound } from "@/lib/api";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { runFailureMessage } from "@/lib/v3/runFailure";
 import { digQuestion, digTargetQuestions, ownWords, parseDigQuestion } from "@/lib/v4/askText";
+import { mergeDigLinks, readDigRecords, readLastVisit, recordDig, recordLastVisit, storableItems } from "@/lib/v4/accountMemory";
 import { diffSnapshots, selectionForChange, snapshotItems } from "@/lib/v4/changes";
 import { effectiveDigMode } from "@/lib/v4/askConfig";
 import { digLinksFor, digParentOf, mergeIndex, readQuestionIndex, type IndexEntry } from "@/lib/v4/digIndex";
@@ -29,6 +30,7 @@ import type {
   DigView,
   PendingDig,
   ReadingLevel,
+  SeenSnapshot,
   V4Change,
   V4Map,
   V4OpenQuestion,
@@ -41,7 +43,10 @@ import { useV4Ask, type V4AskOutcome } from "@/lib/v4/useV4Ask";
  * today's V3 reads, waits calmly while it runs, then lays out rail | map | panel and owns the dig flow (row D
  * decision 1: a dig starts at once with a 10-second Undo, nothing is sent before then). Every polling loop keeps one
  * request in flight at a time and stops when the page goes. Fix wave 1, Decision A: nothing is kept in the browser's
- * storage; digs are found again from the account's question list, and "what changed" is "while you were here".
+ * storage. V4 account memory (owner rulings N7 and N11, 2026-10-29): the account keeps each debate's last visit, so "what
+ * changed" starts "since your last visit" (from any device) and goes on "while you were here"; and it keeps each dig's
+ * link, so digs and the back link come from those records, with the account's question list (by text) only for digs
+ * made before the records existed. Every read of that memory can fail; the page then does what it did without it.
  */
 
 const RUN_POLL_MS = 5_000;
@@ -69,6 +74,8 @@ const INDEX_REREAD_LIMIT = 20;
 /** R2DIG-6: a dig's own page reads this many pages past the dig itself, to reach the older debate it came from. */
 const INDEX_PARENT_PAGES = 2;
 const UNDO_MS = 10_000;
+/** N7: after the first save of a visit, later changes of the map are saved at most this often while the page is open. */
+const VISIT_SAVE_MS = 10_000;
 const CLOCK_TICK_MS = 15_000;
 /** The reading level a page uses when the address names none (Decision A). */
 const DEFAULT_LEVEL: ReadingLevel = "background";
@@ -208,6 +215,27 @@ function isNews(change: V4Change, startedHere: ReadonlySet<string>): boolean {
   }
   if (change.id.startsWith("open:")) return change.kind === "ADDED";
   return true;
+}
+
+/** N7: the debate's last visit as the account kept it — still being read, read (null: no visit yet), or unreadable. */
+type LastVisitRead =
+  | Readonly<{ status: "PENDING" }>
+  | Readonly<{ status: "READ"; snapshot: SeenSnapshot | null }>
+  | Readonly<{ status: "FAILED" }>;
+
+/**
+ * N7: the news a last visit's snapshot gives on the first complete load. The story arriving since (the stand-in path,
+ * fate "none", gave way to the story's paths) is one piece of news at the question, as R2TIME-1 tells it live.
+ */
+function visitNews(stored: Readonly<Record<string, string>>, now: Readonly<Record<string, string>>, map: V4Map,
+  startedHere: ReadonlySet<string>): readonly V4Change[] {
+  let fresh = diffSnapshots({ at: "", items: stored }, storableItems(now)).filter((change) => isNews(change, startedHere));
+  const standIn = (items: Readonly<Record<string, string>>) => Object.entries(items).some(([id, word]) => id.startsWith("path:") && word === "none");
+  if (standIn(stored) && !standIn(now)) {
+    fresh = fresh.filter((change) => !change.id.startsWith("path:"));
+    if (map.storyState === "READY") fresh = [{ id: `story:${map.answerId}`, kind: "CHANGED", before: "WRITING", now: "READY" }, ...fresh];
+  }
+  return fresh;
 }
 
 function V4Debate({
@@ -438,20 +466,99 @@ function V4Debate({
     if (isServed) indexLoop.current?.kick();
   }, [isServed]);
 
-  // ── Digs: the ones started in this visit (memory) merged with the ones found in the account's list ─────────────
+  // ── The dig records (N11): which debates were dug from this one, and the one it was dug from ─────────────────────
+  // Read like the question list: at once, again while digs run (or slowly when all are final), once when the tab comes
+  // back. A first read that keeps failing settles after 3 tries, and the page goes on with the digs found by text.
+  const [digRecords, setDigRecords] = useState<DigLinks | null>(null);
+  const [recordsSettled, setRecordsSettled] = useState(false);
+  const recordsLoop = useRef<Readonly<{ kick: () => void }> | null>(null);
+  useEffect(() => {
+    if (!hasLoad) return;
+    let active = true;
+    let busy = false;
+    let timer: number | undefined;
+    let loadedOk = false;
+    let failures = 0;
+    const arm = (ms: number): void => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => void tick(), ms);
+    };
+    const nextInterval = (): number => (digsLiveRef.current ? INDEX_POLL_BUSY_MS : INDEX_POLL_IDLE_MS);
+    const tick = async (): Promise<void> => {
+      window.clearTimeout(timer);
+      timer = undefined;
+      if (busy) return;
+      if (loadedOk && document.visibilityState === "hidden") return;
+      busy = true;
+      try {
+        const next = await readDigRecords(runIdRef.current);
+        busy = false;
+        if (!active) return;
+        if (!loadedOk) {
+          loadedOk = true;
+          failures = 0;
+          // As R2DIG-3 for the list: digs first seen after the baseline was taken are folded in, not news.
+          if (baseline.current !== null) foldArmed.current = true;
+        }
+        setDigRecords(next);
+        setRecordsSettled(true);
+        if (servedNowRef.current) arm(nextInterval());
+      } catch {
+        busy = false;
+        if (!active) return;
+        if (loadedOk) {
+          if (servedNowRef.current) arm(nextInterval());
+          return;
+        }
+        failures += 1;
+        if (failures < INDEX_FIRST_READ_FAILURES) {
+          arm(INDEX_FIRST_RETRY_MS);
+          return;
+        }
+        setRecordsSettled(true);
+        if (servedNowRef.current) arm(INDEX_POLL_IDLE_MS);
+      }
+    };
+    const onVisibility = (): void => {
+      if (document.visibilityState !== "visible" || !loadedOk || !servedNowRef.current || busy) return;
+      void tick();
+    };
+    recordsLoop.current = {
+      kick: () => {
+        if (busy || timer !== undefined) return;
+        if (loadedOk || failures >= INDEX_FIRST_READ_FAILURES) arm(loadedOk ? nextInterval() : 0);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    void tick();
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+      recordsLoop.current = null;
+    };
+  }, [hasLoad]);
+  useEffect(() => {
+    if (isServed) recordsLoop.current?.kick();
+  }, [isServed]);
+  /** N11: the record of the dig this debate is (null when it is not one, or when the records could not be read). */
+  const recordParent = digRecords?.parent ?? null;
+
+  // ── Digs: the ones started in this visit (memory) merged with the recorded ones and the ones found by text ──────
   const [visitLinks, setVisitLinks] = useState<readonly DigLink[]>(() => [...startedThisVisit.values()].map((entry) => entry.link));
   const links = useMemo<readonly DigLink[]>(() => {
     if (map === null || servedRunId === null || servedQuestionLine === null) return [];
     const mine = visitLinks.filter((link) => link.parentRunId === servedRunId);
     const mineById = new Map(mine.map((link) => [link.childRunId, link]));
-    // Oldest first (the order they were started). A dig started here keeps its exact link (mode, start time).
-    const found = digLinksFor(servedRunId, servedQuestionLine, map, index, catalog);
+    // Oldest first (the order they were started). A dig started here keeps its exact link (mode, start time). N11: the
+    // records decide which debates are digs of this one; the text finds only digs without a record.
+    const found = mergeDigLinks(digRecords, digLinksFor(servedRunId, servedQuestionLine, map, index, catalog), map);
     const foundIds = new Set(found.map((link) => link.childRunId));
     return [
       ...found.map((link) => mineById.get(link.childRunId) ?? link),
       ...mine.filter((link) => !foundIds.has(link.childRunId))
     ];
-  }, [map, servedRunId, servedQuestionLine, visitLinks, index, catalog]);
+  }, [map, servedRunId, servedQuestionLine, visitLinks, index, digRecords, catalog]);
   const linkKey = linkKeyOf(links);
 
   const [statuses, setStatuses] = useState<ReadonlyMap<string, DigStatus>>(() => new Map());
@@ -632,8 +739,10 @@ function V4Debate({
         mode: dig.mode,
         startedAt: new Date().toISOString()
       };
-      // Kept for this visit even when the page has gone meanwhile (Decision A: memory only).
+      // Kept for this visit even when the page has gone meanwhile (Decision A: memory only), and in the account (N11:
+      // which debate it came from, where on the map, its mode). Best-effort: without the record it is found by text.
       startedThisVisit.set(link.childRunId, { link, parentQuestion: ownWords(parentQuestionLine) });
+      void recordDig(link);
       if (!mounted.current) return;
       // Shown at once (as working); the dig loop reads its real state straight away.
       setVisitLinks((previous) => [...previous.filter((known) => known.childRunId !== link.childRunId), link]);
@@ -666,9 +775,46 @@ function V4Debate({
     return () => window.clearTimeout(timer);
   }, [pending, servedRunId, servedQuestionLine]);
 
-  // ── What changed while you were here (D4, fix wave 1) ─────────────────────────────────────────────────────────
-  // The first complete load (map + every dig read once + the question list read once) is the baseline; later live
-  // changes are news, each with a dot and a tour stop. Nothing is written anywhere (Decision A).
+  // ── What changed since your last visit and while you were here (D4, fix wave 1, N7) ─────────────────────────────
+  // The first complete load (map + every dig read once + the question list and dig records read once + the last visit
+  // read) is the baseline; when the account kept a last visit, what differs from it is the first news ("since your last
+  // visit"). Later live changes are news too ("while you were here"), each with a dot and a tour stop. The map as shown
+  // is saved as the new last visit after the first complete load, then at most every 10 s while it changes; nothing is
+  // kept in the browser (Decision A). A last visit that could not be read is never overwritten in this visit.
+  const [lastVisit, setLastVisit] = useState<LastVisitRead>({ status: "PENDING" });
+  useEffect(() => {
+    if (servedRunId === null) return;
+    let active = true;
+    readLastVisit(servedRunId).then(
+      (snapshot) => { if (active) setLastVisit({ status: "READ", snapshot }); },
+      () => { if (active) setLastVisit({ status: "FAILED" }); }
+    );
+    return () => {
+      active = false;
+    };
+  }, [servedRunId]);
+  /** How many of the first news items came from the last visit (the bar says "since your last visit" while one shows). */
+  const [visitNewsCount, setVisitNewsCount] = useState(0);
+  const visitSave = useRef<{ timer: number | undefined; items: Readonly<Record<string, string>> | null; sent: string | null }>(
+    { timer: undefined, items: null, sent: null });
+  /** Saves `items` as this debate's last visit unless they are what was saved last. Best-effort; never throws. */
+  const saveVisit = useCallback((runIdToSave: string, items: Readonly<Record<string, string>>): void => {
+    const key = JSON.stringify(storableItems(items));
+    if (key === visitSave.current.sent) return;
+    visitSave.current.sent = key;
+    void recordLastVisit(runIdToSave, items);
+  }, []);
+  useEffect(() => {
+    // Leaving the debate (or the page) saves a change still waiting for its timer.
+    if (servedRunId === null) return;
+    const pendingSave = visitSave.current;
+    return () => {
+      if (pendingSave.timer === undefined || pendingSave.items === null) return;
+      window.clearTimeout(pendingSave.timer);
+      pendingSave.timer = undefined;
+      saveVisit(servedRunId, pendingSave.items);
+    };
+  }, [servedRunId, saveVisit]);
   const [news, setNews] = useState<readonly V4Change[]>([]);
   /** R2TIME-6: how many news items "Hide this" put away; news that lands after it brings the bar back. */
   const [hiddenNews, setHiddenNews] = useState(0);
@@ -690,17 +836,38 @@ function V4Debate({
       .filter((link) => !startedThisVisit.has(link.childRunId) && !(`dig:${link.childRunId}` in known))
       .map((link) => link.childRunId));
   }, [links]);
-  const digsSettled = indexSettled && links.every((link) => isSettled(statuses.get(link.childRunId)));
-  const liveReady = map !== null && digsSettled;
+  const digsSettled = indexSettled && recordsSettled && links.every((link) => isSettled(statuses.get(link.childRunId)));
+  const liveReady = map !== null && digsSettled && lastVisit.status !== "PENDING";
   useEffect(() => {
-    if (!liveReady || map === null) return;
+    if (!liveReady || map === null || servedRunId === null) return;
     const items = snapshotItems(map, digs);
     const before = baseline.current;
     const storyBefore = baselineStory.current;
     baseline.current = items;
     baselineStory.current = map.storyState;
-    if (before === null) return;
     const startedHere = new Set(visitLinks.map((link) => link.childRunId));
+    if (lastVisit.status === "READ") {
+      // N7: the first save at once, later ones gathered for VISIT_SAVE_MS (the newest map wins).
+      if (before === null) saveVisit(servedRunId, items);
+      else {
+        visitSave.current.items = items;
+        if (visitSave.current.timer === undefined) {
+          visitSave.current.timer = window.setTimeout(() => {
+            visitSave.current.timer = undefined;
+            if (visitSave.current.items !== null) saveVisit(servedRunId, visitSave.current.items);
+          }, VISIT_SAVE_MS);
+        }
+      }
+    }
+    if (before === null) {
+      // N7: since the last visit the account kept (none on a first visit, or when it could not be read).
+      if (lastVisit.status !== "READ" || lastVisit.snapshot === null) return;
+      const fresh = visitNews(lastVisit.snapshot.items, items, map, startedHere);
+      if (fresh.length === 0) return;
+      setNews(fresh);
+      setVisitNewsCount(fresh.length);
+      return;
+    }
     let fresh = diffSnapshots({ at: "", items: before }, items).filter((change) => isNews(change, startedHere));
     // R2DIG-3: a dig that already existed but was missed by the failed first reads is folded into the baseline.
     if (foldIds.current.size > 0) {
@@ -727,7 +894,7 @@ function V4Debate({
     // A question opened earlier gets its "New" dot back when news lands on it (not the one on screen now).
     const landed = new Set<string>(fresh.map((change) => selectionForChange(map, change)));
     setOpened((previous) => new Set([...previous].filter((stop) => !landed.has(stop) || stop === selectedRef.current)));
-  }, [liveReady, map, digs, visitLinks]);
+  }, [liveReady, map, digs, visitLinks, servedRunId, lastVisit, saveVisit]);
 
   // RULES-11/FIT-7: the bar counts stops (questions), the same unit the tour numbers; news on the question itself is
   // one stop too, so every change can be reached.
@@ -759,15 +926,23 @@ function V4Debate({
     select(tourStops[next]!, false);
   }, [tourStops, tourIndex, select]);
 
-  // ── The back link of a dig, and when it started (known only for a dig started in this visit) ────────────────
+  // ── The back link of a dig, and when it started ─────────────────────────────────────────────────────────────────
+  // A dig started in this visit knows both; else N11's record names the parent and the start, from any device; else the
+  // parent is found by text (digs made before the records existed) and the start is unknown. A record's parent words come
+  // from the question list, else from this dig's own question; when neither has them the link says "the earlier debate".
   const visitEntry = startedThisVisit.get(runId) ?? null;
   const parent = useMemo<Readonly<{ runId: string; question: string }> | null>(() => {
     if (visitEntry !== null) return { runId: visitEntry.link.parentRunId, question: visitEntry.parentQuestion };
+    if (recordParent !== null) {
+      const listed = index.find((entry) => entry.runId === recordParent.parent_run_id);
+      const quoted = questionLine === null ? null : parseDigQuestion(questionLine, catalog)?.parentQuestion ?? null;
+      return { runId: recordParent.parent_run_id, question: listed !== undefined ? ownWords(listed.questionLine) : quoted ?? "" };
+    }
     if (questionLine === null) return null;
     const entry = digParentOf(runId, questionLine, index, catalog);
     return entry === null || entry.runId === runId ? null : { runId: entry.runId, question: ownWords(entry.questionLine) };
-  }, [visitEntry, questionLine, index, catalog, runId]);
-  const startedAt = visitEntry?.link.startedAt ?? null;
+  }, [visitEntry, recordParent, questionLine, index, catalog, runId]);
+  const startedAt = visitEntry?.link.startedAt ?? recordParent?.created_at ?? null;
 
   // A slow clock for "started N minutes ago" while the debate runs (only when the start time is known).
   const [now, setNow] = useState<number | null>(null);
@@ -849,7 +1024,7 @@ function V4Debate({
     <V4Rail
       runId={runId}
       level={chosenLevel}
-      showReadStep={!isDigPage}
+      showReadStep={!isDigPage && recordParent === null}
       openLeft={openLeft}
       digs={dugCounts}
       variant={variant}
@@ -917,13 +1092,18 @@ function V4Debate({
           {parent !== null ? (
             <Link className="v4DebBack" href={levelHref(`/v4/debate/${encodeURIComponent(parent.runId)}`, chosenLevel)}>
               <span aria-hidden="true">‹</span>{" "}
-              {t(catalog, "v4.debate.backTo")}{" "}
-              <span className="v4DebBackQuestion" data-ai-generated="true">{parent.question}</span>
+              {parent.question.length > 0 ? (
+                <>
+                  {t(catalog, "v4.debate.backTo")}{" "}
+                  <span className="v4DebBackQuestion" data-ai-generated="true">{parent.question}</span>
+                </>
+              ) : t(catalog, "v4.debate.backToEarlier")}
             </Link>
           ) : null}
           {showChanges ? (
             <V4ChangesBar
               stops={tourStops.length}
+              sinceLastVisit={hiddenNews < visitNewsCount}
               tourIndex={tourIndex}
               onTour={onTour}
               onDismiss={() => {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Answer, AnswerStory } from "@debateai/contract";
+import type { Answer, AnswerStory, DigLinks } from "@debateai/contract";
 import { AuthGate } from "@/components/AuthGate";
 import { V4Header } from "@/components/v4/V4Header";
 import { V4TrustBar } from "@/components/v4/V4TrustBar";
@@ -12,13 +12,15 @@ import { addedLines, ownWords, startsWithLabel } from "@/lib/v4/askText";
 import { digLinksFor, readQuestionIndex, type IndexEntry } from "@/lib/v4/digIndex";
 import { loadDigView, loadStory, loadV4, storyReadFailed } from "@/lib/v4/load";
 import { buildV4Map } from "@/lib/v4/mapModel";
+import { mergeDigLinks, readDigRecords } from "@/lib/v4/accountMemory";
 import { levelHref, useReadingLevel } from "@/lib/v4/storage";
 import { TRUST_WORDS, type DigLink, type DigView, type ReadingLevel, type V4Map, type V4Path } from "@/lib/v4/types";
 
 /*
  * V4 initial (2026-10-28), D5: the report. A document made from the same served answer as the map — nothing is
  * invented; parts the engine has no data for yet ("Gives up:", the per-round rewrite) are left out (row D 3, 4).
- * Fix wave 1, Decision A: nothing is kept in the browser — the level comes from the address, digs from the account.
+ * Fix wave 1, Decision A: nothing is kept in the browser — the level comes from the address (or, N7, the account), and
+ * the digs from the account (N11: its dig records, then its question list by text).
  */
 
 type Props = Readonly<{
@@ -181,9 +183,24 @@ function ReportBody({ id, locale, initialLevel, catalog }: Readonly<{
     return () => { active = false; };
   }, [runId]);
 
+  // N11: the dig records (read once too) decide which debates are digs of this one; the text finds only digs without a
+  // record. A failed read leaves the records out (null), and the digs found by text stay.
+  const [records, setRecords] = useState<DigLinks | null | undefined>(undefined);
+  useEffect(() => {
+    if (runId === null) return;
+    let active = true;
+    setRecords(undefined);
+    readDigRecords(runId).then(
+      (read) => { if (active) setRecords(read); },
+      () => { if (active) setRecords(null); }
+    );
+    return () => { active = false; };
+  }, [runId]);
+
   const digLinks: readonly DigLink[] = useMemo(
-    () => runId === null || questionLine === null || index === null ? [] : digLinksFor(runId, questionLine, map, index, catalog),
-    [runId, questionLine, map, index, catalog]
+    () => runId === null || questionLine === null || index === null || records === undefined
+      ? [] : mergeDigLinks(records, digLinksFor(runId, questionLine, map, index, catalog), map),
+    [runId, questionLine, map, index, records, catalog]
   );
 
   // Each dig's follow-up is read once (by its run id), even when the links are worked out again after the story lands.

@@ -2403,6 +2403,25 @@
       "grants": [
         "EXECUTE ON FUNCTION identity.read_data_export_threat_reports(uuid,uuid)"
       ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0130_v4_account_memory.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_page_reading_level(uuid)",
+        "EXECUTE ON FUNCTION identity.save_page_reading_level(uuid,text)",
+        "EXECUTE ON FUNCTION identity.read_debate_last_visit(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.record_debate_last_visit(uuid,uuid,jsonb)",
+        "EXECUTE ON FUNCTION identity.read_dig_links(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.record_dig_link(uuid,uuid,uuid,text[],text)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0130_v4_account_memory.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_page_memory(uuid,uuid)"
+      ]
     }
   ],
   "deploymentObligations": [

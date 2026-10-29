@@ -21,6 +21,7 @@ import { loadForward0126 } from './migration-forward0126.js';
 import { loadForward0127 } from './migration-forward0127.js';
 import { loadForward0128 } from './migration-forward0128.js';
 import { loadForward0129 } from './migration-forward0129.js';
+import { loadForward0130 } from './migration-forward0130.js';
 
 /**
  * The forward steps after dev's sealed lineage, its 0108 and its 0110 (PR-54, PR-58, migrations/lineage/README.md): an
@@ -65,9 +66,9 @@ export type ChainStep=ForwardStepPlan&Readonly<{n1:N1Declaration}>;
  * 2026-10-21 side-by-side uploads), then the settings activation (0124, side-by-side spec §13: settings changes without
  * an upload), then the Italy-specific approval (0125, mission italy-clause-approval), then mission synthesis-flag's
  * synthesis check (0126, S01), publication review (0127, S02), threat reports (0128, S04) and support answer scope
- * (0129, S05). A new step appends its loader here (README).
+ * (0129, S05), then the V4 account memory (0130, owner rulings N7 and N11). A new step appends its loader here (README).
  */
-const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116,loadForward0117,loadForward0118,loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129]);
+const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116,loadForward0117,loadForward0118,loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130]);
 
 /** A forward step's file name; the receipt and declaration tables CHECK the same shape. */
 export const FORWARD_STEP_NAME=/^\d{4}_[a-z0-9_]+\.sql$/;
