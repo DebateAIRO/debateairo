@@ -193,6 +193,7 @@
   "public.report.chart.figuresNote": "Navedene številke niso bile neodvisno preverjene.",
   "public.report.chart.strengthNote": "Moč točk je izračunal Dialectical Engine.",
   "public.report.chart.strengthAxis": "Moč po tehtanju (%)",
+  "public.report.chart.frontierLegend": "Črta najboljše vrednosti: nobena druga točka ni boljša od teh po obeh merilih.",
   "public.report.about.charts": "Grafikone je izbral in opremil z oznakami model UI na podlagi argumentov iz razprave, nato pa jih je narisal Dialectical Engine. Vsaka številka na grafikonu je prepisana iz točke, ki jo navaja, naša programska oprema pa je preverila, da se pojavi v besedilu te točke; same številke niso bile neodvisno preverjene. Moč točk je lastna ocena Dialectical Engine.",
   "public.report.error.signIn": "Prijavite se, da prenesete to poročilo.",
   "public.report.error.notAvailable": "To poročilo ni na voljo.",

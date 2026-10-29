@@ -193,6 +193,7 @@
   "public.report.chart.figuresNote": "Mainittuja lukuja ei ole tarkistettu riippumattomasti.",
   "public.report.chart.strengthNote": "Vahvuudet laski Dialectical Engine.",
   "public.report.chart.strengthAxis": "Vahvuus punnitsemisen jälkeen (%)",
+  "public.report.chart.frontierLegend": "Parhaan arvon viiva: mikään muu piste ei ole näitä parempi molemmilla mittareilla.",
   "public.report.about.charts": "Tekoälymalli valitsi kaaviot ja merkitsi niiden tekstit väittelyn argumenttien pohjalta, minkä jälkeen Dialectical Engine piirsi ne. Jokainen kaavion luku on kopioitu kohdasta, johon se viittaa, ja ohjelmistomme tarkisti, että luku esiintyy kyseisen kohdan tekstissä; itse lukuja ei ole tarkistettu riippumattomasti. Vahvuudet ovat Dialectical Enginen omia arvioita.",
   "public.report.error.signIn": "Kirjaudu sisään ladataksesi tämän raportin.",
   "public.report.error.notAvailable": "Tämä raportti ei ole saatavilla.",

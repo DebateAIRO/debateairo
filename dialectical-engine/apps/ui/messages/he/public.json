@@ -193,6 +193,7 @@
   "public.report.chart.figuresNote": "הנתונים המצוטטים לא אומתו באופן בלתי תלוי.",
   "public.report.chart.strengthNote": "העוצמה חושבה על ידי Dialectical Engine.",
   "public.report.chart.strengthAxis": "עוצמה לאחר השקילה (%)",
+  "public.report.chart.frontierLegend": "קו התמורה הטובה ביותר: אין נקודה אחרת שעולה עליהן בשני המדדים.",
   "public.report.about.charts": "מודל של בינה מלאכותית בחר את התרשימים ונתן להם כותרות ותוויות על סמך הטיעונים שעלו בדיון, ולאחר מכן Dialectical Engine שרטט אותם. כל נתון בתרשים הועתק מהנקודה שהוא מצטט, והתוכנה שלנו בדקה שהוא מופיע בטקסט של אותה נקודה; הנתונים עצמם לא אומתו באופן בלתי תלוי. העוצמה היא ההערכה של Dialectical Engine עצמו.",
   "public.report.error.signIn": "יש להתחבר כדי להוריד את הדוח הזה.",
   "public.report.error.notAvailable": "הדוח הזה אינו זמין.",

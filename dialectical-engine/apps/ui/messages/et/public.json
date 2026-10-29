@@ -193,6 +193,7 @@
   "public.report.chart.figuresNote": "Viidatud arve ei ole sõltumatult kontrollitud.",
   "public.report.chart.strengthNote": "Tugevused arvutas Dialectical Engine.",
   "public.report.chart.strengthAxis": "Tugevus pärast kaalumist (%)",
+  "public.report.chart.frontierLegend": "Parima väärtuse joon: ükski teine punkt ei ole neist mõlema näitaja poolest parem.",
   "public.report.about.charts": "Diagrammid valis ja märgistas tehisintellektimudel väitluse argumentide põhjal ning seejärel joonistas need Dialectical Engine. Iga diagrammil olev arv on võetud punktist, millele see viitab, ja meie tarkvara kontrollis, et see arv esineb selle punkti tekstis; arve endid ei ole sõltumatult kontrollitud. Tugevused on Dialectical Engine’i enda hinnangud.",
   "public.report.error.signIn": "Logige sisse, et see aruanne alla laadida.",
   "public.report.error.notAvailable": "See aruanne pole saadaval.",

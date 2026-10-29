@@ -115,6 +115,8 @@ describe("readStoryCharts: a chart is kept whole or dropped whole", () => {
     ["CHART_FIGURE_OUT_OF_RANGE", { items: [
       { label: "Output per hour", node_ref: "P1", x: null, y: { value: 1e300, text: "12%" } },
       { label: "Payroll", node_ref: "P2", x: null, y: { value: 8, text: "8 %" } }] }],
+    ["CHART_AXES_INVALID", { frontier: { x: "lower", y: "higher" } }],
+    ["CHART_SCHEMA", { frontier: { x: "cheaper", y: "higher" } }],
     ["CHART_SCHEMA", { kind: "pie" }]
   ])("drops %s", (code, overrides) => {
     const read = readStoryCharts({ charts: [bar(overrides as Record<string, unknown>)] }, CONTEXT);
@@ -145,8 +147,11 @@ describe("readStoryCharts: a chart is kept whole or dropped whole", () => {
         { label: "Sick days", node_ref: "P3", x: { value: 4.5, text: "4.5" }, y: null }
       ]
     });
-    const read = readStoryCharts({ charts: [bar(), scatter, bar(), ...Array.from({ length: 3 }, () => scatter)] }, CONTEXT);
+    const read = readStoryCharts({ charts: [bar(), { ...scatter, frontier: { x: "higher", y: "higher" } }, bar(),
+      ...Array.from({ length: 3 }, () => scatter)] }, CONTEXT);
     expect(read.charts.map((chart) => chart.after)).toEqual(["why.1", "long.1.1"]);
+    // A scatter keeps the best-value line its plan asks for.
+    expect(read.charts[1]?.frontier).toEqual({ x: "higher", y: "higher" });
     expect(read.dropped).toEqual(["CHART_ANCHOR_TAKEN", "CHART_ANCHOR_TAKEN", "CHART_ANCHOR_TAKEN", "CHART_ANCHOR_TAKEN"]);
   });
 

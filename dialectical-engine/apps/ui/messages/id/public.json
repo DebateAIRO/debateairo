@@ -193,6 +193,7 @@
   "public.report.chart.figuresNote": "Angka yang dikutip tidak diverifikasi secara independen.",
   "public.report.chart.strengthNote": "Kekuatan dihitung oleh Dialectical Engine.",
   "public.report.chart.strengthAxis": "Kekuatan setelah ditimbang (%)",
+  "public.report.chart.frontierLegend": "Garis nilai terbaik: tidak ada titik lain yang mengungguli titik-titik ini pada kedua ukuran.",
   "public.report.about.charts": "Grafik dipilih dan diberi label oleh model AI berdasarkan argumen-argumen dalam debat, lalu digambar oleh Dialectical Engine. Setiap angka pada grafik disalin dari poin yang dikutipnya, dan perangkat lunak kami memeriksa bahwa angka itu memang ada dalam teks poin tersebut; angka-angka itu sendiri tidak diverifikasi secara independen. Kekuatan adalah penilaian Dialectical Engine sendiri.",
   "public.report.error.signIn": "Masuk untuk mengunduh laporan ini.",
   "public.report.error.notAvailable": "Laporan ini tidak tersedia.",

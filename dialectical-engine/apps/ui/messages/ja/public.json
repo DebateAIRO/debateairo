@@ -193,6 +193,7 @@
   "public.report.chart.figuresNote": "引用した数値について、独立した検証は行っていません。",
   "public.report.chart.strengthNote": "強度はDialectical Engineが算出しました。",
   "public.report.chart.strengthAxis": "比較検討後の強度（%）",
+  "public.report.chart.frontierLegend": "最良の組み合わせを結ぶ線：両方の指標でこれらを上回る点はほかにありません。",
   "public.report.about.charts": "グラフは、ディベートの論拠をもとにAIモデルが選んでラベルを付け、Dialectical Engineが描画しました。グラフ上の数値はすべて、その数値が引用している論点から写したもので、その論点の本文に含まれていることを当社のソフトウェアで確認しています。ただし、数値そのものについて独立した検証は行っていません。強度はDialectical Engine自身による評価です。",
   "public.report.error.signIn": "このレポートをダウンロードするには、ログインしてください。",
   "public.report.error.notAvailable": "このレポートはご利用いただけません。",

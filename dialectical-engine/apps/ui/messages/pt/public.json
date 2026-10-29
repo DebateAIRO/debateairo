@@ -193,6 +193,7 @@
   "public.report.chart.figuresNote": "Os números citados não foram verificados de forma independente.",
   "public.report.chart.strengthNote": "A força foi calculada pelo Dialectical Engine.",
   "public.report.chart.strengthAxis": "Força depois de ponderada (%)",
+  "public.report.chart.frontierLegend": "Linha da melhor relação: nenhum outro ponto supera estes nas duas medidas.",
   "public.report.about.charts": "Os gráficos foram escolhidos e legendados por um modelo de IA a partir dos argumentos do debate e depois desenhados pelo Dialectical Engine. Cada número de um gráfico foi copiado do ponto que cita, e o nosso software verificou que aparece no texto desse ponto; os números em si não foram verificados de forma independente. A força é a avaliação própria do Dialectical Engine.",
   "public.report.error.signIn": "Inicie sessão para descarregar este relatório.",
   "public.report.error.notAvailable": "Este relatório não está disponível.",

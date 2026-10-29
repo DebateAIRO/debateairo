@@ -193,6 +193,7 @@
   "public.report.chart.figuresNote": "Az idézett számadatokat nem ellenőrizték függetlenül.",
   "public.report.chart.strengthNote": "Az erősségeket a Dialectical Engine számította ki.",
   "public.report.chart.strengthAxis": "Erősség mérlegelés után (%)",
+  "public.report.chart.frontierLegend": "A legjobb érték vonala: egyetlen más pont sem jobb ezeknél mindkét mérőszám szerint.",
   "public.report.about.charts": "A diagramokat egy MI-modell választotta ki és látta el feliratokkal a vita érvei alapján, majd a Dialectical Engine rajzolta meg őket. A diagramok minden számadata abból a pontból származik, amelyre hivatkozik, és szoftverünk ellenőrizte, hogy szerepel az adott pont szövegében; magukat a számadatokat nem ellenőrizték függetlenül. Az erősségek a Dialectical Engine saját értékelései.",
   "public.report.error.signIn": "Jelentkezzen be a jelentés letöltéséhez.",
   "public.report.error.notAvailable": "Ez a jelentés nem érhető el.",

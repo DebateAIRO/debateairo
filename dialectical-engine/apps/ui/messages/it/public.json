@@ -193,6 +193,7 @@
   "public.report.chart.figuresNote": "I dati numerici citati non sono stati verificati in modo indipendente.",
   "public.report.chart.strengthNote": "La solidità è stata calcolata da Dialectical Engine.",
   "public.report.chart.strengthAxis": "Solidità dopo la ponderazione (%)",
+  "public.report.chart.frontierLegend": "Linea del miglior rapporto: nessun altro punto fa meglio di questi su entrambe le misure.",
   "public.report.about.charts": "I grafici sono stati scelti ed etichettati da un modello di IA a partire dagli argomenti del dibattito, poi disegnati da Dialectical Engine. Ogni dato numerico in un grafico è stato copiato dal punto che cita, e il nostro software ha verificato che compaia nel testo di quel punto; i dati in sé non sono stati verificati in modo indipendente. La solidità è una valutazione propria di Dialectical Engine.",
   "public.report.error.signIn": "Accedi per scaricare questo rapporto.",
   "public.report.error.notAvailable": "Questo rapporto non è disponibile.",

@@ -1,4 +1,4 @@
-import type { Answer, AnswerStory, StoryChart, StoryChartAxis } from "@debateai/contract";
+import type { Answer, AnswerStory, StoryChart, StoryChartAxis, StoryChartFrontier } from "@debateai/contract";
 import { formatNumber, t, type MessageCatalog } from "../i18n/translate.js";
 import { contractNodesById } from "../v3/adapter.js";
 
@@ -46,6 +46,34 @@ export interface ReportChart {
   readonly notes: readonly string[];
   readonly copyright: string;
   readonly wordmark: string;
+  /**
+   * A scatter's best-value line (owner request 2026-10-29): the marks nothing else beats on both measures, by index into
+   * `marks`, in the order the line joins them (along the x axis), and the legend printed under the chart. Null when the
+   * plan asked for none, or fewer than two marks are on it.
+   */
+  readonly frontier: Readonly<{ marks: readonly number[]; legend: string }> | null;
+}
+
+/** Whether `a` is at least as good as `b` on one axis, and whether strictly better. */
+function compare(a: number, b: number, better: StoryChartFrontier["x"]): { atLeast: boolean; strictly: boolean } {
+  const gain = better === "lower" ? b - a : a - b;
+  return { atLeast: gain >= 0, strictly: gain > 0 };
+}
+
+/**
+ * The marks no other mark beats on both measures (the Pareto line), in x order. A mark is beaten when another is at
+ * least as good on both measures and strictly better on one. With a lower cost and a higher score better, the cheapest
+ * mark and the best-scoring mark are always on it.
+ */
+export function frontierMarks(marks: readonly Pick<ReportChartMark, "x" | "y">[], frontier: StoryChartFrontier): readonly number[] {
+  const beaten = (index: number): boolean => marks.some((other, at) => {
+    if (at === index) return false;
+    const x = compare(other.x!, marks[index]!.x!, frontier.x);
+    const y = compare(other.y, marks[index]!.y, frontier.y);
+    return x.atLeast && y.atLeast && (x.strictly || y.strictly);
+  });
+  return Object.freeze(marks.map((_, index) => index).filter((index) => !beaten(index))
+    .sort((a, b) => marks[a]!.x! - marks[b]!.x! || marks[a]!.y - marks[b]!.y));
 }
 
 /** A strength as a percentage of 0 to 100, to one decimal at most. */
@@ -122,6 +150,9 @@ function reportChart(
     return number === undefined ? [] : [number];
   }))].sort((a, b) => pointOrder(a) - pointOrder(b));
   const sources = [chart.x, chart.y].filter((axis): axis is StoryChartAxis => axis !== null).map((axis) => axis.source);
+  const onLine = chart.kind === "scatter" && chart.frontier !== undefined && chart.frontier !== null
+    ? frontierMarks(marks, chart.frontier)
+    : [];
   return {
     after: chart.after,
     kind: chart.kind,
@@ -136,7 +167,8 @@ function reportChart(
       ...(sources.includes("strength") ? [t(catalog, "public.report.chart.strengthNote")] : [])
     ]),
     copyright: REPORT_CHART_COPYRIGHT,
-    wordmark: REPORT_CHART_WORDMARK
+    wordmark: REPORT_CHART_WORDMARK,
+    frontier: onLine.length < 2 ? null : { marks: onLine, legend: t(catalog, "public.report.chart.frontierLegend") }
   };
 }
 

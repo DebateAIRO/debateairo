@@ -193,6 +193,7 @@
   "public.report.chart.figuresNote": "Iċ-ċifri kkwotati ma ġewx ivverifikati b’mod indipendenti.",
   "public.report.chart.strengthNote": "Is-saħħa ġiet ikkalkulata minn Dialectical Engine.",
   "public.report.chart.strengthAxis": "Saħħa wara l-użin (%)",
+  "public.report.chart.frontierLegend": "Linja tal-aħjar valur: l-ebda punt ieħor ma jegħleb lil dawn fiż-żewġ kejliet.",
   "public.report.about.charts": "Il-grafiki ntgħażlu u ngħataw it-tikketti minn mudell tal-IA abbażi tal-argumenti tad-dibattitu, imbagħad tpinġew minn Dialectical Engine. Kull ċifra fuq grafika ġiet ikkupjata mill-punt li tikkwota, u s-softwer tagħna ċċekkja li tidher fit-test ta’ dak il-punt; iċ-ċifri nfushom ma ġewx ivverifikati b’mod indipendenti. Is-saħħa hija l-evalwazzjoni ta’ Dialectical Engine innifsu.",
   "public.report.error.signIn": "Idħol fil-kont tiegħek biex tniżżel dan ir-rapport.",
   "public.report.error.notAvailable": "Dan ir-rapport mhuwiex disponibbli.",

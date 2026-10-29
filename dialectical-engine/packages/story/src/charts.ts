@@ -37,13 +37,15 @@ export const STORY_CHARTS_ANSWER_FORM = `Return only one JSON object with exactl
     "title": non-empty string of at most ${String(STORY_CHART_LIMITS.titleMaxChars)} characters,
     "x": null | { "label": non-empty string of at most ${String(STORY_CHART_LIMITS.labelMaxChars)} characters, "source": "figure" | "strength", "log": boolean },
     "y": { "label": non-empty string of at most ${String(STORY_CHART_LIMITS.labelMaxChars)} characters, "source": "figure" | "strength", "log": boolean },
-    "items": [{ "label": non-empty string of at most ${String(STORY_CHART_LIMITS.labelMaxChars)} characters, "node_ref": id, "x": null | { "value": number, "text": string }, "y": null | { "value": number, "text": string } }, ...]
+    "items": [{ "label": non-empty string of at most ${String(STORY_CHART_LIMITS.labelMaxChars)} characters, "node_ref": id, "x": null | { "value": number, "text": string }, "y": null | { "value": number, "text": string } }, ...],
+    "frontier": null | { "x": "lower" | "higher", "y": "lower" | "higher" }
   }, ...]
 }
 charts has 0 to ${String(STORY_CHART_LIMITS.maxCharts)} entries, and at most one chart goes after any one paragraph. A bar chart has "x": null and ${String(STORY_CHART_LIMITS.minItems)} to ${String(STORY_CHART_LIMITS.maxItems)} items, and plots y for each item. A scatter chart has both axes, two different measures, and ${String(STORY_CHART_LIMITS.minScatterItems)} to ${String(STORY_CHART_LIMITS.maxItems)} items.
 Each node_ref is copied exactly from an id in the points field or the positions field, and the paragraph the chart goes after lists that id in its node_refs. Several items may share one node_ref when one claim states figures for several things.
 On an axis whose source is "figure", each item's value for that axis is an object: "text" is copied character for character from the claim of that item's node_ref (the number with its unit or sign exactly as the claim writes it, such as $0.15 or 52 %), and "value" is that same number as a JSON number, in the unit the axis label names. On an axis whose source is "strength", and on the x of a bar chart, each item's value is null: code fills in the strengths.
 "log" is true only when the axis's values are all above zero and span more than a hundredfold.
+"frontier" is null on a bar chart. On a scatter chart, when a reader would want the best of both measures (a lower price and a higher score, say), it says which end of each axis is better, "lower" or "higher", and the report draws a line through the items nothing else beats on both; otherwise it is null.
 Titles and labels are in the question's language, say what is measured and in which unit, and contain no score or threshold from the material and no engine words such as judge, evaluator, checker, margin, band or rung.
 ${STORY_QUOTE_SENTENCE}`;
 
@@ -176,6 +178,8 @@ function checkedChart(chart: StoryChart, context: StoryChartsContext, scores: Re
   const scatter = chart.kind === "scatter";
   if (scatter !== (chart.x !== null)) return "CHART_AXES_INVALID";
   if (scatter && chart.x!.source === "strength" && chart.y.source === "strength") return "CHART_AXES_INVALID";
+  // A best-value line joins points on two measures: a bar chart has only one.
+  if (!scatter && chart.frontier !== undefined && chart.frontier !== null) return "CHART_AXES_INVALID";
   if (chart.items.length < (scatter ? STORY_CHART_LIMITS.minScatterItems : STORY_CHART_LIMITS.minItems)) return "CHART_TOO_FEW_ITEMS";
   const texts = [chart.title, chart.y.label, ...(chart.x === null ? [] : [chart.x.label]), ...chart.items.map((item) => item.label)];
   if (texts.some((text) => FORBIDDEN_CHARACTERS.test(text))) return "CHART_TEXT_CHARACTERS";

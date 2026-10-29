@@ -193,6 +193,7 @@
   "public.report.chart.figuresNote": "De citerade siffrorna har inte kontrollerats oberoende.",
   "public.report.chart.strengthNote": "Styrkorna beräknades av Dialectical Engine.",
   "public.report.chart.strengthAxis": "Styrka efter avvägning (%)",
+  "public.report.chart.frontierLegend": "Linje för bästa värde: ingen annan punkt slår dessa på båda måtten.",
   "public.report.about.charts": "Diagrammen valdes ut och försågs med etiketter av en AI-modell utifrån debattens argument och ritades sedan av Dialectical Engine. Varje siffra i ett diagram är hämtad från den punkt den hänvisar till, och vår programvara kontrollerade att den finns i punktens text; själva siffrorna har inte kontrollerats oberoende. Styrkorna är Dialectical Engines egna bedömningar.",
   "public.report.error.signIn": "Logga in för att ladda ned den här rapporten.",
   "public.report.error.notAvailable": "Den här rapporten är inte tillgänglig.",

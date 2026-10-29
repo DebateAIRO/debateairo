@@ -193,6 +193,7 @@
   "public.report.chart.figuresNote": "Przytoczone liczby nie zostały niezależnie zweryfikowane.",
   "public.report.chart.strengthNote": "Siłę punktów obliczył Dialectical Engine.",
   "public.report.chart.strengthAxis": "Siła po zważeniu argumentów (%)",
+  "public.report.chart.frontierLegend": "Linia najlepszej wartości: żaden inny punkt nie jest od nich lepszy pod obydwoma względami.",
   "public.report.about.charts": "Wykresy wybrał i opisał model AI na podstawie argumentów z debaty, a następnie narysował je Dialectical Engine. Każda liczba na wykresie została skopiowana z punktu, na który się powołuje, a nasze oprogramowanie sprawdziło, że występuje ona w tekście tego punktu; same liczby nie zostały niezależnie zweryfikowane. Siła punktów to własna ocena Dialectical Engine.",
   "public.report.error.signIn": "Zaloguj się, aby pobrać ten raport.",
   "public.report.error.notAvailable": "Ten raport nie jest dostępny.",

@@ -36,6 +36,10 @@ const BAR_ROW = 22;
 const SCATTER_HEIGHT = 220;
 /** How many places a scatter label is tried in before it is set where it first went. */
 const LABEL_TRIES = 5;
+/** The best-value line's dots (owner's example: a dotted Pareto line), and the width of its sample in the legend. */
+const FRONTIER_DASH = "0.1,2.6";
+const FRONTIER_WIDTH = 1.5;
+const LEGEND_SAMPLE = 22;
 
 const styles = StyleSheet.create({
   block: { marginTop: 4, marginBottom: 14, paddingTop: 10, paddingBottom: 9, paddingHorizontal: 12, borderWidth: 1, borderColor: LINE, borderRadius: 6 },
@@ -48,8 +52,11 @@ const styles = StyleSheet.create({
   plot: { position: "relative" },
   svg: { position: "absolute", top: 0, left: 0 },
   tick: { position: "absolute", fontSize: TICK_FONT, lineHeight: 1.2, color: MUTED },
-  markLabel: { position: "absolute", fontSize: LABEL_FONT, lineHeight: 1.2, color: INK },
+  // White behind each label, so the best-value line and the grid pass behind the words instead of through them.
+  markLabel: { position: "absolute", fontSize: LABEL_FONT, lineHeight: 1.2, color: INK, backgroundColor: "#FFFFFF", paddingHorizontal: 2.5 },
   value: { position: "absolute", fontSize: TICK_FONT, lineHeight: 1.2, color: MUTED },
+  legend: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 5 },
+  legendText: { marginLeft: 5, fontSize: LABEL_FONT, lineHeight: 1.3, color: MUTED },
   caption: { marginTop: 8, paddingTop: 6, borderTopWidth: 1, borderTopColor: GRID },
   captionLine: { fontSize: 7.5, lineHeight: 1.4, color: MUTED }
 });
@@ -147,7 +154,7 @@ function ScatterChart({ chart, locale, Words }: { chart: ReportChart; locale: st
     .sort((a, b) => a.y - b.y)
     .map(({ mark, index, x, y }) => {
       const text = fitted(mark.label, LABEL_FONT, 150, 1);
-      const width = textWidth(text, LABEL_FONT) + 4;
+      const width = textWidth(text, LABEL_FONT) + 7;
       const onLeft = x + 6 + width > right;
       const label = { left: onLeft ? x - 6 - width : x + 6, top: y - LABEL_FONT * 0.65, width };
       // Where it would go first, then a line down, a line up, two down, two up.
@@ -175,6 +182,15 @@ function ScatterChart({ chart, locale, Words }: { chart: ReportChart; locale: st
           ))}
           <Line x1={left} y1={bottom} x2={right} y2={bottom} stroke={MUTED} strokeWidth={0.8} />
           <Line x1={left} y1={top} x2={left} y2={bottom} stroke={MUTED} strokeWidth={0.8} />
+          {/* The best-value line, under the dots, joining the marks nothing else beats on both measures. */}
+          {(chart.frontier?.marks ?? []).slice(1).map((index, at) => {
+            const from = marks[chart.frontier!.marks[at]!]!;
+            const to = marks[index]!;
+            return (
+              <Line key={`frontier-${at}`} x1={px(from.x!)} y1={py(from.y)} x2={px(to.x!)} y2={py(to.y)}
+                stroke={INK} strokeWidth={FRONTIER_WIDTH} strokeDasharray={FRONTIER_DASH} strokeLinecap="round" />
+            );
+          })}
           {marks.map((mark, index) => (
             <Circle key={`dot-${index}`} cx={px(mark.x!)} cy={py(mark.y)} r={3.6} fill={ACCENT} stroke="#FFFFFF" strokeWidth={0.8} />
           ))}
@@ -193,6 +209,14 @@ function ScatterChart({ chart, locale, Words }: { chart: ReportChart; locale: st
         ))}
       </View>
       <Words style={styles.axisLabelBelow} text={xAxis.label} />
+      {chart.frontier === null ? null : (
+        <View style={styles.legend}>
+          <Svg width={LEGEND_SAMPLE} height={6}>
+            <Line x1={1} y1={3} x2={LEGEND_SAMPLE - 1} y2={3} stroke={INK} strokeWidth={FRONTIER_WIDTH} strokeDasharray={FRONTIER_DASH} strokeLinecap="round" />
+          </Svg>
+          <Words style={styles.legendText} text={chart.frontier.legend} />
+        </View>
+      )}
     </>
   );
 }

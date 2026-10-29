@@ -193,6 +193,7 @@
   "public.report.chart.figuresNote": "Наведені цифри не проходили незалежної перевірки.",
   "public.report.chart.strengthNote": "Силу тез обчислив Dialectical Engine.",
   "public.report.chart.strengthAxis": "Сила після зважування (%)",
+  "public.report.chart.frontierLegend": "Лінія найкращого співвідношення: жодна інша точка не перевершує ці за обома показниками.",
   "public.report.about.charts": "Діаграми вибрала й підписала модель ШІ на основі аргументів, що прозвучали в дебатах, а потім їх намалював Dialectical Engine. Кожну цифру на діаграмі взято з тези, на яку вона посилається, і наша програма перевірила, що ця цифра є в тексті тези; самі цифри не проходили незалежної перевірки. Сила тез — це власна оцінка Dialectical Engine.",
   "public.report.error.signIn": "Увійдіть, щоб завантажити цей звіт.",
   "public.report.error.notAvailable": "Цей звіт недоступний.",

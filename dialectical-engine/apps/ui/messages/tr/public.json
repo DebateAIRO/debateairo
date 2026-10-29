@@ -193,6 +193,7 @@
   "public.report.chart.figuresNote": "Alıntılanan sayısal veriler bağımsız olarak doğrulanmadı.",
   "public.report.chart.strengthNote": "Güç değerleri Dialectical Engine tarafından hesaplandı.",
   "public.report.chart.strengthAxis": "Tartıldıktan sonraki güç (%)",
+  "public.report.chart.frontierLegend": "En iyi değer çizgisi: başka hiçbir nokta bunları iki ölçütte birden geçmiyor.",
   "public.report.about.charts": "Grafikler, tartışmanın argümanlarından yola çıkılarak bir yapay zekâ modeli tarafından seçildi ve etiketlendi, ardından Dialectical Engine tarafından çizildi. Bir grafikteki her sayısal veri, atıfta bulunduğu noktadan aynen alındı ve yazılımımız bu verinin o noktanın metninde yer aldığını kontrol etti; verilerin kendisi ise bağımsız olarak doğrulanmadı. Güç değerleri Dialectical Engine’in kendi değerlendirmeleridir.",
   "public.report.error.signIn": "Bu raporu indirmek için oturum açın.",
   "public.report.error.notAvailable": "Bu rapor mevcut değil.",

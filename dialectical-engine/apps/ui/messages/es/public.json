@@ -193,6 +193,7 @@
   "public.report.chart.figuresNote": "Las cifras citadas no se verificaron de forma independiente.",
   "public.report.chart.strengthNote": "La solidez la calculó Dialectical Engine.",
   "public.report.chart.strengthAxis": "Solidez tras sopesar los argumentos (%)",
+  "public.report.chart.frontierLegend": "Línea de mejor relación: ningún otro punto supera a estos en ambas medidas.",
   "public.report.about.charts": "Un modelo de IA eligió y rotuló los gráficos a partir de los argumentos del debate, y después Dialectical Engine los dibujó. Cada cifra de un gráfico se copió del punto que cita, y nuestro software comprobó que aparece en el texto de ese punto; las cifras en sí no se verificaron de forma independiente. La solidez es la valoración propia de Dialectical Engine.",
   "public.report.error.signIn": "Inicie sesión para descargar este informe.",
   "public.report.error.notAvailable": "Este informe no está disponible.",

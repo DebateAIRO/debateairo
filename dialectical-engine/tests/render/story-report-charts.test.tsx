@@ -5,6 +5,7 @@ import { renderReportPdf, resolveReportFontDirectory, resolveReportLogo } from "
 import {
   REPORT_CHART_COPYRIGHT,
   REPORT_CHART_WORDMARK,
+  frontierMarks,
   linearScale,
   logScale,
   scalePosition
@@ -74,6 +75,29 @@ describe("the report model's charts", () => {
     expect(scatter.x).toMatchObject({ log: true, percent: false });
     expect(scatter.marks.find((mark) => mark.label === "Atlas Pro")).toMatchObject({ x: 1.4, y: 54, xText: "$1.40" });
     expect(scatter.notes).not.toContain(t(ENGLISH.publicCatalog, "public.report.chart.strengthNote"));
+  });
+
+  it("draws the best-value line through the marks nothing beats, cheapest first; Nimbus 4 is beaten by Atlas Pro", () => {
+    const model = buildReportModel(STORY_CHARTS_SAMPLE_ANSWER, storyChartsSample(), GENERATED, ENGLISH, null);
+    const scatter = model.charts.find((chart) => chart.kind === "scatter")!;
+    expect(scatter.frontier!.marks.map((index) => scatter.marks[index]!.label))
+      .toEqual(["Atlas Mini", "Corvus Lite", "Atlas Pro", "Corvus Max"]);
+    expect(scatter.frontier!.legend).toBe(t(ENGLISH.publicCatalog, "public.report.chart.frontierLegend"));
+    // A bar chart, and a scatter whose plan asks for no line, have none.
+    expect(model.charts.find((chart) => chart.kind === "bar")!.frontier).toBeNull();
+    const story = storyChartsSample();
+    const plain = buildReportModel(STORY_CHARTS_SAMPLE_ANSWER, { ...story, charts: story.charts!.map((chart) => ({ ...chart, frontier: null })) },
+      GENERATED, ENGLISH, null);
+    expect(plain.charts.every((chart) => chart.frontier === null)).toBe(true);
+  });
+
+  it("the best-value line follows the directions the plan gives each axis", () => {
+    const marks = [{ x: 1, y: 1 }, { x: 2, y: 3 }, { x: 3, y: 2 }, { x: 4, y: 4 }];
+    expect(frontierMarks(marks, { x: "lower", y: "higher" })).toEqual([0, 1, 3]);
+    expect(frontierMarks(marks, { x: "higher", y: "higher" })).toEqual([3]);
+    expect(frontierMarks(marks, { x: "lower", y: "lower" })).toEqual([0]);
+    // Two marks in the same place are both on the line: neither is strictly better.
+    expect(frontierMarks([{ x: 1, y: 5 }, { x: 1, y: 5 }], { x: "lower", y: "higher" })).toEqual([0, 1]);
   });
 });
 

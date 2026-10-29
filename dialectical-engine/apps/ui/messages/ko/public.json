@@ -193,6 +193,7 @@
   "public.report.chart.figuresNote": "인용된 수치는 독립적으로 검증되지 않았습니다.",
   "public.report.chart.strengthNote": "강도는 Dialectical Engine이 계산했습니다.",
   "public.report.chart.strengthAxis": "따져 본 뒤의 강도(%)",
+  "public.report.chart.frontierLegend": "최선의 균형선: 두 기준 모두에서 이 점들보다 나은 다른 점은 없습니다.",
   "public.report.about.charts": "차트는 AI 모델이 토론의 논거를 바탕으로 고르고 레이블을 붙였으며, 그림은 Dialectical Engine이 그렸습니다. 차트의 모든 수치는 그 수치가 인용한 쟁점에서 그대로 옮겨 온 것이며, 해당 쟁점의 본문에 그 수치가 있는지 저희 소프트웨어가 확인했습니다. 다만 수치 자체는 독립적으로 검증되지 않았습니다. 강도는 Dialectical Engine 자체의 평가입니다.",
   "public.report.error.signIn": "이 보고서를 다운로드하려면 로그인하세요.",
   "public.report.error.notAvailable": "이 보고서는 이용할 수 없습니다.",

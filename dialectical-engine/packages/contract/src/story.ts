@@ -184,8 +184,19 @@ export const StoryChartItemSchema = z.object({
 export type StoryChartItem = z.infer<typeof StoryChartItemSchema>;
 
 /**
+ * A scatter's best-value line (owner request 2026-10-29): which end of each axis is better, so the PDF can join the
+ * points nothing else beats on both measures (the Pareto line). Lower cost and higher score: `{ x: "lower", y: "higher" }`.
+ */
+export const StoryChartFrontierSchema = z.object({
+  x: z.enum(["lower", "higher"]),
+  y: z.enum(["lower", "higher"])
+}).strict();
+export type StoryChartFrontier = z.infer<typeof StoryChartFrontierSchema>;
+
+/**
  * One chart as stored and served. A bar chart has no `x` axis and plots `y` for each item; a scatter plots `x` against
- * `y`. Every figure has passed the number check (packages/story/src/charts.ts) before it is stored.
+ * `y`, and may carry a best-value line (`frontier`). Every figure has passed the number check
+ * (packages/story/src/charts.ts) before it is stored.
  */
 export const StoryChartSchema = z.object({
   after: StoryChartAnchorSchema,
@@ -193,7 +204,9 @@ export const StoryChartSchema = z.object({
   title: z.string().trim().min(1).max(STORY_CHART_LIMITS.titleMaxChars),
   x: StoryChartAxisSchema.nullable(),
   y: StoryChartAxisSchema,
-  items: z.array(StoryChartItemSchema).min(STORY_CHART_LIMITS.minItems).max(STORY_CHART_LIMITS.maxItems)
+  items: z.array(StoryChartItemSchema).min(STORY_CHART_LIMITS.minItems).max(STORY_CHART_LIMITS.maxItems),
+  /** Absent or null: no line. Only a scatter has one. */
+  frontier: StoryChartFrontierSchema.nullable().optional()
 }).strict();
 export type StoryChart = z.infer<typeof StoryChartSchema>;
 

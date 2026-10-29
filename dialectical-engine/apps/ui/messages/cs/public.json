@@ -193,6 +193,7 @@
   "public.report.chart.figuresNote": "Uváděné číselné údaje nebyly nezávisle ověřeny.",
   "public.report.chart.strengthNote": "Sílu bodů vypočítal Dialectical Engine.",
   "public.report.chart.strengthAxis": "Síla po zvážení argumentů (%)",
+  "public.report.chart.frontierLegend": "Linie nejlepšího poměru: žádný jiný bod není lepší než tyto v obou ukazatelích.",
   "public.report.about.charts": "Grafy vybral a popsal model AI na základě argumentů z debaty a poté je vykreslil Dialectical Engine. Každý číselný údaj v grafu byl převzat z bodu, na který odkazuje, a náš software ověřil, že se v textu tohoto bodu skutečně vyskytuje; samotné údaje však nezávisle ověřeny nebyly. Síla bodů je vlastním hodnocením Dialectical Engine.",
   "public.report.error.signIn": "Přihlaste se, abyste si mohli tuto zprávu stáhnout.",
   "public.report.error.notAvailable": "Tato zpráva není k dispozici.",

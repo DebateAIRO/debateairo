@@ -193,6 +193,7 @@
   "public.report.chart.figuresNote": "De aangehaalde getallen zijn niet onafhankelijk gecontroleerd.",
   "public.report.chart.strengthNote": "De sterktes zijn berekend door Dialectical Engine.",
   "public.report.chart.strengthAxis": "Sterkte na afweging (%)",
+  "public.report.chart.frontierLegend": "Lijn met de beste verhouding: geen ander punt doet het op beide maten beter dan deze.",
   "public.report.about.charts": "De grafieken zijn door een AI-model gekozen en van labels voorzien op basis van de argumenten uit het debat, en daarna door Dialectical Engine getekend. Elk getal in een grafiek is overgenomen uit het punt waarnaar het verwijst, en onze software heeft gecontroleerd dat het in de tekst van dat punt staat; de getallen zelf zijn niet onafhankelijk gecontroleerd. De sterktes zijn de eigen beoordelingen van Dialectical Engine.",
   "public.report.error.signIn": "Meld u aan om dit verslag te downloaden.",
   "public.report.error.notAvailable": "Dit verslag is niet beschikbaar.",

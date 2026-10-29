@@ -193,6 +193,7 @@
   "public.report.chart.figuresNote": "Các số liệu được trích dẫn chưa được kiểm chứng độc lập.",
   "public.report.chart.strengthNote": "Độ vững do Dialectical Engine tính toán.",
   "public.report.chart.strengthAxis": "Độ vững sau khi cân nhắc (%)",
+  "public.report.chart.frontierLegend": "Đường giá trị tốt nhất: không điểm nào khác vượt các điểm này ở cả hai thước đo.",
   "public.report.about.charts": "Các biểu đồ do một mô hình AI chọn và gắn nhãn dựa trên các lập luận của cuộc tranh luận, sau đó được Dialectical Engine vẽ ra. Mỗi số liệu trên biểu đồ đều được sao chép từ luận điểm mà nó trích dẫn, và phần mềm của chúng tôi đã kiểm tra rằng số liệu đó có trong nội dung của luận điểm ấy; bản thân các số liệu chưa được kiểm chứng độc lập. Độ vững là đánh giá riêng của Dialectical Engine.",
   "public.report.error.signIn": "Đăng nhập để tải xuống báo cáo này.",
   "public.report.error.notAvailable": "Báo cáo này không có sẵn.",

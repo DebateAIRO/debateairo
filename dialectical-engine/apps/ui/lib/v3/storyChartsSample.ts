@@ -115,7 +115,9 @@ const SAMPLE_CHARTS: NonNullable<AnswerStory["charts"]> = [
       { label: "Atlas Mini", node_ref: "m-mini", x: { value: 0.15, text: "$0.15" }, y: { value: 28, text: "28" } },
       { label: "Corvus Lite", node_ref: "m-lite", x: { value: 0.45, text: "$0.45" }, y: { value: 36, text: "36" } },
       { label: "Nimbus 4", node_ref: "m-nimbus", x: { value: 3.8, text: "$3.80" }, y: { value: 52, text: "52" } }
-    ]
+    ],
+    // The best value: a lower cost and a higher score. Nimbus 4 is off the line: Atlas Pro is cheaper and scores higher.
+    frontier: { x: "lower", y: "higher" }
   },
   {
     after: "long.2.1",

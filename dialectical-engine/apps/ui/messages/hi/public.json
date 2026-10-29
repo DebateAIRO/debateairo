@@ -193,6 +193,7 @@
   "public.report.chart.figuresNote": "उद्धृत आँकड़ों की स्वतंत्र रूप से पुष्टि नहीं की गई है।",
   "public.report.chart.strengthNote": "सामर्थ्य की गणना Dialectical Engine ने की है।",
   "public.report.chart.strengthAxis": "तौलने के बाद सामर्थ्य (%)",
+  "public.report.chart.frontierLegend": "सर्वोत्तम मूल्य रेखा: कोई अन्य बिंदु दोनों मापों पर इनसे बेहतर नहीं है।",
   "public.report.about.charts": "चार्ट एक AI मॉडल ने वाद-विवाद के तर्कों के आधार पर चुने और उन पर लेबल लगाए, फिर Dialectical Engine ने उन्हें बनाया। चार्ट का हर आँकड़ा उसी बिंदु से लिया गया है जिसका वह हवाला देता है, और हमारे सॉफ़्टवेयर ने जाँचा कि वह आँकड़ा उस बिंदु के पाठ में मौजूद है; आँकड़ों की स्वयं स्वतंत्र रूप से पुष्टि नहीं की गई है। सामर्थ्य Dialectical Engine का अपना आकलन है।",
   "public.report.error.signIn": "यह रिपोर्ट डाउनलोड करने के लिए साइन इन करें।",
   "public.report.error.notAvailable": "यह रिपोर्ट उपलब्ध नहीं है।",

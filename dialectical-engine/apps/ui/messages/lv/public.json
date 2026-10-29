@@ -193,6 +193,7 @@
   "public.report.chart.figuresNote": "Minētie skaitļi netika neatkarīgi pārbaudīti.",
   "public.report.chart.strengthNote": "Stiprumu aprēķināja Dialectical Engine.",
   "public.report.chart.strengthAxis": "Stiprums pēc izsvēršanas (%)",
+  "public.report.chart.frontierLegend": "Labākās vērtības līnija: neviens cits punkts nav labāks par šiem abos rādītājos.",
   "public.report.about.charts": "Diagrammas izvēlējās un ar uzrakstiem papildināja MI modelis, pamatojoties uz debašu argumentiem, un pēc tam tās uzzīmēja Dialectical Engine. Katrs diagrammas skaitlis ir pārkopēts no punkta, uz kuru tas atsaucas, un mūsu programmatūra pārbaudīja, ka tas ir atrodams šī punkta tekstā; pašus skaitļus neatkarīgi nepārbaudīja. Stiprums ir paša Dialectical Engine vērtējums.",
   "public.report.error.signIn": "Pierakstieties, lai lejupielādētu šo pārskatu.",
   "public.report.error.notAvailable": "Šis pārskats nav pieejams.",
