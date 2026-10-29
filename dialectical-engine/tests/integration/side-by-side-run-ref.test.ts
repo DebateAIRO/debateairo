@@ -155,7 +155,10 @@ describe("side-by-side C9: an old run id follows its re-admission chain", () => 
       readStory: async () => null,
       readDisclosure: async () => null,
       readNode: async () => null,
-      resolveRunRef: (runId) => app.resolveRunRef(runId)
+      resolveRunRef: (runId) => app.resolveRunRef(runId),
+      runRemovedByCheck: async () => false,
+      readSynthesisChecks: async () => [],
+      readPublicationReviews: async () => []
     };
     const snapshot = await collectSnapshot({
       claim: {

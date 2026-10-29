@@ -2477,6 +2477,7 @@ export function createPostgresReviewCatchUpDependencies(input: {
         stillSetAside: standing.hiddenNodeIds.length,
         persist: async () => serve.persist({
           runId, workItemId: source.workItemId,
+          synthesisCheckRequest: true,
           factBundleVersion: source.factBundleVersion,
           factBundleContentHash: hash(result.factBundle),
           factBundle: result.factBundle,
@@ -11482,6 +11483,7 @@ export class WalkingSkeletonRunner {
     const persisted = await runnerStage("ANSWER_PERSIST_FAILED", () => this.#serve.persist({
       runId: run.runId,
       workItemId: claimed.workItemId,
+      synthesisCheckRequest: true,
       factBundleVersion: settings.factBundleVersion,
       factBundleContentHash: hash(factBundle),
       factBundle,

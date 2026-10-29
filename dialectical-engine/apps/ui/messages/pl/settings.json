@@ -108,7 +108,7 @@
   "settings.transparency.downloadsTail": "opisujący wygenerowaną treść i brak redakcyjnej kontroli przez człowieka. Zapisane dane odpowiedzi, pochodzenie modelu i zapisy operacyjne zachowują pierwotne wartości.",
   "settings.transparency.markingsLimit": "Oznaczenia te opisują treść w naszym interfejsie i pobieranych plikach. Nie są znakiem wodnym ani certyfikatem autentyczności; skopiowanie zwykłego tekstu może je usunąć.",
   "settings.transparency.supportTitle": "Pomoc techniczna i pomoc człowieka",
-  "settings.transparency.supportLead": "Asystent pomocy technicznej jest systemem AI. Aby poprosić o pomoc człowieka, wybierz „Porozmawiaj z człowiekiem” lub „Przekaż człowiekowi” w sekcji",
+  "settings.transparency.supportLead": "Asystent pomocy technicznej jest systemem AI. Aby poprosić o pomoc człowieka, wybierz „Porozmawiaj z człowiekiem” w sekcji",
   "settings.transparency.help": "Pomoc",
   "settings.transparency.supportTail": ".",
   "settings.transparency.back": "Wróć do {brand}",

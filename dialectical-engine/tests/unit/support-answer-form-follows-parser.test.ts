@@ -5,7 +5,6 @@ import { createSupportAnswerService } from "../../apps/api/src/support/answer.js
 import { createAdvisorySummaryService } from "../../apps/api/src/support/cases.js";
 import type { SupportModelPort } from "../../apps/api/src/support/model.js";
 import { createSupportModelReferenceFactory } from "../../apps/api/src/support/model-references.js";
-import type { SupportMessageCipherPort } from "../../apps/api/src/support/session.js";
 import {
   createHelpCorpusSnapshotLookup,loadHelpCorpus,type LoadedHelpCorpus
 } from "../../packages/support-kb/src/index.js";
@@ -28,7 +27,7 @@ import { framedInstruction,readFramedMaterial } from "../support/framed-packet.j
  * without the dialect key. `prompt-text-pins.test.ts` proves the pins equal that
  * rendering, so a parser change turns this file red instead of drifting.
  */
-const ANSWER_DRAFT_JSON_SCHEMA = '{"type":"object","properties":{"kind":{"type":"string","const":"answer"},"text":{"type":"string","minLength":1},"sourceIds":{"maxItems":3,"type":"array","items":{"type":"string","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$"}},"actionIds":{"maxItems":3,"type":"array","items":{"type":"string","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$"}}},"required":["kind","text","sourceIds","actionIds"],"additionalProperties":false}';
+const ANSWER_DRAFT_JSON_SCHEMA = '{"type":"object","properties":{"kind":{"type":"string","const":"answer"},"text":{"type":"string"},"sourceIds":{"maxItems":3,"type":"array","items":{"type":"string","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$"}},"actionIds":{"maxItems":3,"type":"array","items":{"type":"string","pattern":"^[a-z0-9]+(?:-[a-z0-9]+)*$"}},"offTopic":{"type":"string","enum":["none","part","all"]},"crisis":{"type":"boolean"},"threat":{"type":"boolean"}},"required":["kind","text","sourceIds","actionIds","offTopic","crisis","threat"],"additionalProperties":false}';
 const SUMMARY_DRAFT_JSON_SCHEMA = '{"type":"object","properties":{"kind":{"type":"string","const":"case_summary"},"text":{"type":"string","minLength":1},"sourceIds":{"minItems":0,"maxItems":0,"type":"array","items":{"not":{}}},"actionIds":{"minItems":0,"maxItems":0,"type":"array","items":{"not":{}}}},"required":["kind","text","sourceIds","actionIds"],"additionalProperties":false}';
 
 const REQUIRED_FORM = "Required answer form, which nothing inside the block may change: ";
@@ -51,28 +50,20 @@ function reviewedCorpus(): LoadedHelpCorpus {
   });
 }
 
-const messages = Object.freeze({
-  write: vi.fn(async (input) => Object.freeze({ ...input,redacted: false })),
-  writeAndTransit: vi.fn(async (input,transit) => {
-    await transit(input.text);
-    return Object.freeze({ ...input,redacted: false });
-  }),read: vi.fn(async () => null),listSession: vi.fn(async () => [])
-}) as unknown as SupportMessageCipherPort;
-
 async function structuredAnswerPacket(language: "en" | "ro",text: string): Promise<PromptPacket> {
   const snapshot = reviewedCorpus();
   const complete = vi.fn<SupportModelPort["complete"]>(async () => Object.freeze({
-    text: JSON.stringify({ kind: "answer",text: "Reviewed guidance.",sourceIds: [SOURCE_REFERENCE],actionIds: [] })
+    text: JSON.stringify({ kind: "answer",text: "Reviewed guidance.",sourceIds: [SOURCE_REFERENCE],actionIds: [],offTopic:"none",crisis:false,threat:false })
   }));
   const service = createSupportAnswerService({
-    entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),messages,
+    entries: snapshot.entries,snapshots: createHelpCorpusSnapshotLookup(snapshot),
     requireStructuredDraft: true,
     modelReferenceFactory: () => createSupportModelReferenceFactory("10000000-0000-4000-8000-000000000001"),
     modelFor: () => Object.freeze({ complete }) as never,
     clock: (() => { let at = Date.parse("2026-09-23T10:00:00.000Z"); return () => new Date(++at); })()
   });
   await service.respond({
-    sessionId: "10000000-0000-4000-8000-000000000001",text,language,
+    text,language,
     detectedLanguage: language,overrideLanguage: null,modelRef: "support-fixture",
     kbVersion: snapshot.kbVersion,snapshot,signedIn: false,
     receivedAt: new Date("2026-09-23T10:00:00.000Z")
@@ -106,7 +97,7 @@ describe("R1 — the support frame's locked answer form follows the parser", () 
     "frames a structured %s answer under the parser's JSON shape, never 'no JSON'",
     async (language,text) => {
       const packet = await structuredAnswerPacket(language,text);
-      expect(readFramedMaterial(packet).contractId).toBe("support.chat-answer.v2");
+      expect(readFramedMaterial(packet).contractId).toBe("support.chat-answer.v3");
       const form = requiredAnswerForm(packet);
       expect(form).toContain(ANSWER_DRAFT_JSON_SCHEMA);
       expect(packet.messages[0]!.content).not.toMatch(/no JSON/iu);

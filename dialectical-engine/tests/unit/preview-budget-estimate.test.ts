@@ -74,6 +74,7 @@ import {
 } from "../../apps/api/src/preview-budget-estimate.js";
 import { AskRefusal, askRefusalRetryAfter } from "../../apps/api/src/index.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
+import { questionCheckPass } from "../support/questionCheckPass.js";
 
 const GLM = "zai-org/GLM-5.3-Flash";
 const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
@@ -842,6 +843,7 @@ describe("the real submit and the HTTP boundary", () => {
     }) as AskApplication;
     const api = buildApi({
       previewProviderTestConfig: PREVIEW, previewTeamUserIds: [member.authenticated.userId],
+      questionCheck: questionCheckPass,
       application, sessions: testSessionApplication([member]), allowedOrigin: TEST_APP_ORIGIN
     });
     try {
@@ -887,6 +889,7 @@ describe("the real submit and the HTTP boundary", () => {
     }) as AskApplication;
     const api = buildApi({
       previewProviderTestConfig: PREVIEW, previewTeamUserIds: [member.authenticated.userId],
+      questionCheck: questionCheckPass,
       application, sessions: testSessionApplication([member]), allowedOrigin: TEST_APP_ORIGIN
     });
     try {

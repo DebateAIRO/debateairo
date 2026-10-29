@@ -17,5 +17,18 @@
   "archive.visibilityPrivate": "Súkromné",
   "archive.unreadable": "Obsah tejto debaty už nemožno prečítať, pretože jej kľúč bol zničený.",
   "archive.noDebates": "Nemáte žiadne debaty.",
-  "archive.filesNote": "Súbory JSON v tomto archíve ZIP obsahujú tie isté údaje v strojovo čitateľnej podobe; ich zoznam je v README.txt."
+  "archive.filesNote": "Súbory JSON v tomto archíve ZIP obsahujú tie isté údaje v strojovo čitateľnej podobe; ich zoznam je v README.txt.",
+  "archive.contentCheck": "Kontrola obsahu",
+  "archive.verdict.flagged": "Označené",
+  "archive.verdict.clear": "Bez problémov",
+  "archive.verdict.noSynthesis": "Bez syntézy",
+  "archive.verdict.unavailable": "Nedostupné",
+  "archive.category.terrorism": "Možný terorizmus",
+  "archive.category.hateSpeech": "nenávistné prejavy akéhokoľvek druhu",
+  "archive.category.suicideOrHarm": "sklony k samovražde alebo k ubližovaniu iným ľuďom",
+  "archive.category.weaponsOrDrugs": "výroba zbraní alebo drog",
+  "archive.publicationReview": "Posúdenie zverejnenia",
+  "archive.reviewAsked": "Požiadané",
+  "archive.reviewApproved": "Schválené",
+  "archive.reviewRefused": "Zamietnuté"
 }

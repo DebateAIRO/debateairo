@@ -17,6 +17,8 @@ import type {
 import { MODEL_STRENGTHS, TypedDomainError, parseReleaseKey, type ActivationState, type CompositionBudgetTier, type ModelStrength, type RiskTier, type TierSource } from "@debateai/kernel";
 
 export * from "./publication-check.js";
+export * from "./synthesis-check-erasure.js";
+export { PostgresThreatReportRepository, type ThreatReportDecision, type ThreatReportListRow, type ThreatReportReadRow, type ThreatReportAlertClaim } from "./threat-reports.js";
 export { PostgresDataExportRepository, PostgresDataExportSource } from "./data-export.js";
 export * from "./pool-budget.js";
 export * from "./release-state.js";
@@ -164,14 +166,8 @@ export {
   assertSupportPrincipalRole,
   lockSupportOwners,
   lockSupportSessions,
-  PostgresSupportCaseRepository,
-  PostgresSupportCaseSummaryRepository,
-  PostgresSupportMessageRepository,
   PostgresSupportKeyRotationRepository,
-  PostgresSupportRelayReservationRepository,
   PostgresSupportShredRepository,
-  PostgresSupportSessionRepository,
-  PostgresSupportStatusRepository,
   type CreateCaseMaterial,
   type CreateWrappedSessionKey,
   type SupportCaseRecord,

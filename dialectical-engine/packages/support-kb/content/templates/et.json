@@ -2,9 +2,9 @@
   "DISCLOSURE": "Tere — olen Dialectical Engine'i kasutajatoe assistent, AI. Saan selgitada, kuidas toode töötab, ja suunata teid õigele lehele. Ma ei saa teid sisse logida, teie kontot muuta ega midagi lähtestada. Kasutage selleks minu antud linke või paluge inimesega rääkida.",
   "NO_SOURCE": "Mul pole selle kohta allikat, seega ma ei hakka oletama. Küsige minult midagi muud väitluste toimimise kohta või valige „Rääkige inimesega“.",
   "REFUSE_ZONE": "Ma ei saa aidata sisselogimise, paroolide, kinnituskoodide, kaheastmelise autentimise, konto taastamise, e-posti aadressi muutmise ega konto kustutamisega — isegi mitte nende kontrollimisega. Need toimingud on saadaval ainult teie konto lehtedel: {link}. Kui see leht teie jaoks ei tööta, valige „Rääkige inimesega“.",
-  "REFUSE_INJECTION": "Järgin ainult toote enda juhiseid, seega jätan selle taotluse vahele. Teie sõnum on salvestatud. Küsige minult toote kohta või valige „Rääkige inimesega“.",
-  "REFUSE_SAFETY": "Siin on vaja inimest, mitte assistenti. Valige „Rääkige inimesega“ ja inimene loeb teie sõnumit.",
-  "DEGRADED": "Assistendi mudel pole praegu saadaval. Saate siiski jätta inimesele sõnumi: valige „Rääkige inimesega“.",
+  "REFUSE_INJECTION": "Järgin ainult toote enda juhiseid, seega jätan selle taotluse vahele. Küsige minult toote kohta või valige „Rääkige inimesega“.",
+  "REFUSE_SAFETY": "Siin on vaja inimest, mitte assistenti. Valige „Rääkige inimesega“ ja kirjutage aadressile, mida see näitab; inimene loeb seda.",
+  "DEGRADED": "Assistendi mudel pole praegu saadaval. Inimesega ühenduse võtmiseks valige „Rääkige inimesega“.",
   "DISABLED": "Kasutajatoe assistent on praegu välja lülitatud.",
   "RATE_LIMITED": "Olete saatnud lühikese aja jooksul palju sõnumeid. Oodake mõni minut.",
   "RATING": "Kas see vastas teie küsimusele? Jah · Ei · Rääkige inimesega",
@@ -25,5 +25,10 @@
   "INCIDENT_SURFACE_PUBLISHING": "avaldamist",
   "INCIDENT_SURFACE_SIGN_IN": "sisselogimist",
   "INCIDENT_SURFACE_WHOLE_SITE": "kogu saiti",
-  "COUNTRY_UNAVAILABLE": "Dialectical Engine ei ole teie riigis veel saadaval."
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine ei ole teie riigis veel saadaval.",
+  "OFF_TOPIC": "Saan aidata ainult Dialectical Engine'iga: teie kontoga, pakettidega, väitlustega, avaldamisega ja meie põhimõtetega. Ma ei saa teid sellega aidata.",
+  "OFF_TOPIC_PART": "Saan aidata ainult Dialectical Engine'iga, seega ei ole ma teie sõnumi ülejäänud osale vastanud.",
+  "CRISIS_SUPPORT": "See, mida kirjutasite, kõlab väga valusalt ja te ei pea sellega üksi jääma. Siin saate kohe kellegagi ühendust võtta.",
+  "THREAT_LINE": "Ma ei saa teid sellega aidata. Kui keegi võib viga saada, otsige palun kohe abi.",
+  "TOO_LONG": "Teie sõnum on vestluse jaoks liiga pikk. Lühendage seda ja saatke see uuesti."
 }

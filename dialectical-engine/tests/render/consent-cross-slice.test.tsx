@@ -287,7 +287,7 @@ describe("cross-slice integration — both consent surfaces in one document", ()
    *
    * The reviewer's version recorded the DEFECT's aftermath (the bar back, the policy still
    * trapping focus). This one records the shipped outcome: the surface that closes is the one
-   * the visitor was last in, the card underneath is still open with its twenty rows, and focus
+   * the visitor was last in, the card underneath is still open with its twenty-one rows, and focus
    * returns to the control that opened the policy — the privacy checkbox in the sign-up card,
    * which is still on the page.
    */
@@ -296,7 +296,7 @@ describe("cross-slice integration — both consent surfaces in one document", ()
 
     await mountBoth();
     activate(labelled(WHAT_WE_STORE));
-    expect(rows(), "the card's twenty rows are present").toBe(20);
+    expect(rows(), "the card's twenty-one rows are present").toBe(21);
 
     await act(async () => {
       privacyBox().click();
@@ -306,7 +306,7 @@ describe("cross-slice integration — both consent surfaces in one document", ()
     expect(policy(), "the policy closed").toBeNull();
     expect(card(), "the card is still there").not.toBeNull();
     expect(bar(), "the bar has not come back underneath it").toBeNull();
-    expect(rows(), "and the card still shows its twenty rows").toBe(20);
+    expect(rows(), "and the card still shows its twenty-one rows").toBe(21);
     expect(document.activeElement, "focus returns to the control that opened the policy").toBe(
       privacyBox()
     );

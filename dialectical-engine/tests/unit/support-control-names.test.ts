@@ -13,7 +13,6 @@ import { resolveSupportActions } from "../../packages/support-kb/src/navigation.
 import { createHelpCorpusSnapshotLookup, type HelpCorpusEntry, type LoadedHelpCorpus } from "../../packages/support-kb/src/index.js";
 import { createSupportAnswerService } from "../../apps/api/src/support/answer.js";
 import { createSupportModelReferenceFactory } from "../../apps/api/src/support/model-references.js";
-import type { SupportMessageCipherPort } from "../../apps/api/src/support/session.js";
 
 const msg = (loc: string, ns: string, key: string): string =>
   (JSON.parse(readFileSync(resolve(process.cwd(), `apps/ui/messages/${loc}/${ns}.json`), "utf8")) as Record<string,string>)[key]!
@@ -90,20 +89,15 @@ describe("S05 control names for the 33 locales without their own help texts (SPE
   it("recovers a de visitor's rejected draft with the localized fallback and source label", async () => {
     const e = entry({ modelProjection: "Escalation creates a human Support case; email is separate." });
     const snapshot = Object.freeze({ entries: Object.freeze([e]), kbVersion: "s05-de-recovery" }) as LoadedHelpCorpus;
-    const messages = Object.freeze({
-      write: vi.fn(async (input) => Object.freeze({ ...input, redacted: false })),
-      writeAndTransit: vi.fn(async (input, transit) => { await transit(input.text); return Object.freeze({ ...input, redacted: false }); }),
-      read: vi.fn(async () => null), listSession: vi.fn(async () => [])
-    }) as unknown as SupportMessageCipherPort;
     const complete = vi.fn(async () => Object.freeze({ text: "not a JSON draft" }));   // unparseable: rejected in every locale
     const service = createSupportAnswerService({
-      entries: snapshot.entries, snapshots: createHelpCorpusSnapshotLookup(snapshot), messages,
+      entries: snapshot.entries, snapshots: createHelpCorpusSnapshotLookup(snapshot),
       modelReferenceFactory: () => createSupportModelReferenceFactory("10000000-0000-4000-8000-000000000001"),
       modelFor: () => Object.freeze({ complete }) as never,
       clock: (() => { let at = Date.parse("2026-10-01T10:00:00.000Z"); return () => new Date(++at); })()
     });
     const result = await service.respond({
-      sessionId: "10000000-0000-4000-8000-000000000001", text: "How do I create a human case and what does support email do?",
+      text: "How do I create a human case and what does support email do?",
       language: "de", detectedLanguage: "en", overrideLanguage: null, modelRef: "support-fixture",
       kbVersion: snapshot.kbVersion, snapshot, signedIn: false, receivedAt: new Date("2026-10-01T10:00:00.000Z")
     });

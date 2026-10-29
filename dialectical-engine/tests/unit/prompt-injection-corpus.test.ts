@@ -40,6 +40,7 @@ import { RelayAdapter } from "../../apps/api/src/support/model.js";
 import { createSupportModelReferenceFactory } from "../../apps/api/src/support/model-references.js";
 import {
   buildSupportDraftAnswerPrompt,
+  buildSupportNoSourceJudgementPrompt,
   buildSupportDraftSummaryPrompt
 } from "../../apps/api/src/support/prompt.js";
 import { wirePacket } from "../support/framed-packet.js";
@@ -294,7 +295,7 @@ const SUPPORT_HELP_ENTRIES: readonly HelpCorpusEntry[] = Object.freeze([Object.f
 })]);
 /**
  * SYNC3 / R1: the support rows drive the JSON-draft contracts the API root
- * composes (`support.chat-answer.v2`, `support.case-summary.v2`). The answer's
+ * composes (`support.chat-answer.v3`, `support.case-summary.v2`). The answer's
  * instruction slot is built exactly as `respond` builds it — dev's reviewed
  * preamble over the reviewed knowledge context and its OUTPUT CONTRACT.
  */
@@ -749,6 +750,13 @@ const HAND_OFFS = [
     }
   },
   {
+    name: "support:no-source-judgement (visitor_message — a visitor's text)",
+    payloadIn: "visitor_message",
+    render: (attack: string): readonly PromptPacket[] => [buildSupportNoSourceJudgementPrompt({
+      visitorMessage: attack
+    }).packet]
+  },
+  {
     name: "story:storyteller (question — the asker's text)",
     payloadIn: "question",
     render: (attack: string): readonly PromptPacket[] => [buildFramedPrompt({
@@ -909,11 +917,11 @@ describe("V-11 layer 4 — the injection corpus covers both languages and every 
     // (points_so_far, candidate_answers, key_points and answers are new field names; points is the story's too).
     // Engine redesign R3 Task 12: +2 rows, the v2 position leg's points_raised and assumptions (33 -> 35 and 24 -> 26:
     // neither field name is any other row's payloadIn).
-    expect(HAND_OFFS.map(({ name }) => name)).toHaveLength(35);
+    expect(HAND_OFFS.map(({ name }) => name)).toHaveLength(36);
     expect(new Set(HAND_OFFS.map(({ payloadIn }) => payloadIn)).size).toBe(26);
     // Every row's name says which lane it belongs to, so the count above cannot
     // be satisfied by three more copies of one lane.
-    expect(HAND_OFFS.filter(({ name }) => name.startsWith("support:"))).toHaveLength(3);
+    expect(HAND_OFFS.filter(({ name }) => name.startsWith("support:"))).toHaveLength(4);
     expect(HAND_OFFS.filter(({ name }) => name.startsWith("story:"))).toHaveLength(5);
     expect(HAND_OFFS.filter(({ name }) => name.startsWith("language:"))).toHaveLength(1);
     expect(HAND_OFFS.filter(({ name }) => name.startsWith("map:"))).toHaveLength(7);
@@ -954,13 +962,14 @@ describe("V-11 layer 4 — the injection corpus covers both languages and every 
     expect(refused.length).toBeLessThan(INJECTION_CORPUS.length);
   });
 
-  it("drives the support contracts the API actually sends (SYNC3 / R1: the v2 JSON drafts)", async () => {
+  it("drives the support contracts the API actually sends (SYNC3 / R1 + S05: the v3 JSON drafts and the no-source judgement)", async () => {
     const contracts = await Promise.all(HAND_OFFS
       .filter(({ name }) => name.startsWith("support:"))
       .map(async (row) => (await packetsFor(row, CLEAN_STATEMENT))
         .map((packet) => assertFramedPrompt(packet).contractId)));
     expect(contracts).toEqual([
-      ["support.chat-answer.v2"], ["support.case-summary.v2"], ["support.chat-answer.v2"]
+      ["support.chat-answer.v3"], ["support.case-summary.v2"],
+      ["support.chat-answer.v3"], ["support.no-source-judgement.v1"]
     ]);
     // The owners' slot the chat answer rows carry is the one `respond` builds:
     // dev's reviewed context, ending in its OUTPUT CONTRACT.

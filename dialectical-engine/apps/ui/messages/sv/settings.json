@@ -108,7 +108,7 @@
   "settings.transparency.downloadsTail": "objekt som beskriver det genererade innehållet och frånvaron av mänsklig redaktionell granskning. Registrerade svarsdata, uppgifter om modellernas ursprung och driftsloggar behåller sina ursprungliga värden.",
   "settings.transparency.markingsLimit": "Märkningarna beskriver innehållet i vårt gränssnitt och i hämtade filer. De är varken en vattenstämpel eller ett äkthetsintyg; märkningen kan försvinna om texten kopieras som oformaterad text.",
   "settings.transparency.supportTitle": "Support och mänsklig hjälp",
-  "settings.transparency.supportLead": "Supportassistenten är ett AI-system. Använd ”Prata med en person” eller ”Eskalera till en person” under",
+  "settings.transparency.supportLead": "Supportassistenten är ett AI-system. Använd ”Prata med en person” under",
   "settings.transparency.help": "Hjälp",
   "settings.transparency.supportTail": "för att begära hjälp av en person.",
   "settings.transparency.back": "Tillbaka till {brand}",

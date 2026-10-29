@@ -108,7 +108,7 @@
   "settings.transparency.downloadsTail": "obiect care descrie conținutul generat și absența verificării editoriale umane. Datele înregistrate ale răspunsului, proveniența modelului și înregistrările operaționale își păstrează valorile originale.",
   "settings.transparency.markingsLimit": "Aceste marcaje descriu conținutul din interfața și descărcările noastre. Ele nu sunt un filigran sau un certificat de autenticitate; copierea textului simplu le poate elimina.",
   "settings.transparency.supportTitle": "Asistență și ajutor uman",
-  "settings.transparency.supportLead": "Asistentul de suport este un sistem de IA. Folosiți „Discutați cu o persoană” sau „Escaladați către o persoană” în",
+  "settings.transparency.supportLead": "Asistentul de suport este un sistem de IA. Folosiți „Vorbiți cu o persoană” în",
   "settings.transparency.help": "Ajutor",
   "settings.transparency.supportTail": "pentru a solicita ajutor uman.",
   "settings.transparency.back": "Înapoi la {brand}",

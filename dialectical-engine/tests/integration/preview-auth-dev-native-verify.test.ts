@@ -59,7 +59,7 @@ describe('native verify never applies a pending forward step',()=>{
    expect(applied.receipts).toBe(true);
    // Then publish and verify, as the operator does after apply-and-plan: verify replays and passes.
    const source=await buildPreviewSourceRows(await loadBootstrapRegister(),observation);
-   const base=[...source.filter(row=>!['consumerRecoveryPolicy','publicationCheckPolicy','taxAuthorities'].includes(row.rowKey)),...[STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
+   const base=[...source.filter(row=>!['consumerRecoveryPolicy','publicationCheckPolicy','questionCheckPolicy','taxAuthorities'].includes(row.rowKey)),...[STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
    await createPostgresRegisterPublicationPort(pool).importHistorical({registerVersion:parseRegisterVersionText('4'),rows:base});
    const sealed=await readSealedSnapshot(pool,'4');
    const snapshot=composePreviewSnapshot({sourceRows:source,baseRows:sealed.rows,baseRegisterVersion:'4',baseSnapshotSha256:computeRegisterSnapshotSha256(base)});

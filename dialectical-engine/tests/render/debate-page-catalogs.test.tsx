@@ -183,6 +183,14 @@ function withScreenReaderMarkup(historical: string, lensCard: boolean): string {
   }, historical);
 }
 
+function withoutPendingPublicationAction(historical: string): string {
+  // S02-R4/R21: while the publication review read is pending, the control
+  // shows neither Publish nor Ask. Server rendering cannot complete that read.
+  const pendingPublish = '<button type="button" class="button" disabled="">Publish…</button>';
+  expect(historical.split(pendingPublish)).toHaveLength(2);
+  return historical.replace(pendingPublish, "");
+}
+
 function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
@@ -214,7 +222,7 @@ describe("FIX-DEBATE-CATALOGS: the debate page renders its drawers in the interf
     for (const value of english) expect(panel).not.toContain(escapeHtml(value));
   });
 
-  it("leaves the English page byte-identical to the pre-fix render at HEAD fc3cb865a", async () => {
+  it("leaves the English page byte-identical except for S02's pending publication action", async () => {
     const english = synthesisStrings("en");
     const html = await renderPage("en");
     const panel = synthesisPanel(html);
@@ -238,11 +246,11 @@ describe("FIX-DEBATE-CATALOGS: the debate page renders its drawers in the interf
     });
     const queued = liftReviewMarks(html);
     expect(queued.marks).toBe(0);
-    expect(reactIds(queued.rest)).toBe(withScreenReaderMarkup(reactIds(currentExpectedActions(headFixture("queued"))), false));
+    expect(reactIds(queued.rest)).toBe(withoutPendingPublicationAction(withScreenReaderMarkup(reactIds(currentExpectedActions(headFixture("queued"))), false)));
     mocks.getDebateServer.mockResolvedValue({ ok: true, debate: debateWithLensBranch(), answer: null });
     const lens = liftReviewMarks(await renderPage("en"));
     expect(lens.marks).toBe(1);
-    expect(reactIds(lens.rest)).toBe(withScreenReaderMarkup(reactIds(currentExpectedActions(headFixture("lens"))), true));
+    expect(reactIds(lens.rest)).toBe(withoutPendingPublicationAction(withScreenReaderMarkup(reactIds(currentExpectedActions(headFixture("lens"))), true)));
   });
 
   it("retains the historical fixture and rejects unrelated content or an unexpected Settings-anchor count", () => {

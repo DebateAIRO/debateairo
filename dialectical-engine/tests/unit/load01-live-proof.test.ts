@@ -9,6 +9,7 @@ import { getDebateServer } from "../../apps/ui/lib/serverApi.js";
 import {
   TEST_APP_ORIGIN,testHttpIdentity,testSessionApplication
 } from "../support/httpSession.js";
+import { questionCheckPass } from "../support/questionCheckPass.js";
 
 const ASK: AskRequest = {
   question_line: "Messi or Ronaldo?",
@@ -82,6 +83,7 @@ describe("LOAD-01 provider-double composition proof", () => {
   it("POST /new equivalent -> queued run ref -> debate loading projection keeps the real question", async () => {
     const api = buildApi({
       application: providerDoubleApplication(),
+      questionCheck: questionCheckPass,
       sessions:testSessionApplication([identity]),allowedOrigin:TEST_APP_ORIGIN
     });
     const client = createContractClient("http://load01.test", injectedFetch(api),{

@@ -16,6 +16,9 @@ function harness() {
   const raw = structuredClone(rawFixture) as Record<string, any>;
   const ownerView = {
     runKeyPresent: vi.fn(async () => true),
+    runRemovedByCheck: vi.fn(async () => false),
+    readSynthesisChecks: vi.fn(async () => []),
+    readPublicationReviews: vi.fn(async () => []),
     // RunProjectionSchema at contract/src/index.ts:552-559 calls the question question_line.
     readRun: vi.fn(async (_owner: string, _run: string) => ({ run_ref: "run-1", question_line: "My question", state: "SETTLED", terminal_reason: null, hold_until: null })),
     readRunAnswer: vi.fn(async (_owner: string, _run: string) => structuredClone(ownerAnswerFixture)),

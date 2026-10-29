@@ -17,5 +17,18 @@
   "archive.visibilityPrivate": "Privé",
   "archive.unreadable": "De inhoud van dit debat kan niet meer worden gelezen omdat de sleutel is vernietigd.",
   "archive.noDebates": "U hebt geen debatten.",
-  "archive.filesNote": "De JSON-bestanden in dit ZIP-archief bevatten dezelfde gegevens in een machineleesbare vorm; README.txt geeft de lijst."
+  "archive.filesNote": "De JSON-bestanden in dit ZIP-archief bevatten dezelfde gegevens in een machineleesbare vorm; README.txt geeft de lijst.",
+  "archive.contentCheck": "Inhoudscontrole",
+  "archive.verdict.flagged": "Gemarkeerd",
+  "archive.verdict.clear": "Geen probleem",
+  "archive.verdict.noSynthesis": "Geen synthese",
+  "archive.verdict.unavailable": "Niet beschikbaar",
+  "archive.category.terrorism": "Mogelijk terrorisme",
+  "archive.category.hateSpeech": "haatzaaiende uitlatingen van welke aard dan ook",
+  "archive.category.suicideOrHarm": "neigingen tot zelfdoding of het schaden van andere mensen",
+  "archive.category.weaponsOrDrugs": "het maken van wapens of drugs",
+  "archive.publicationReview": "Beoordeling voor publicatie",
+  "archive.reviewAsked": "Aangevraagd",
+  "archive.reviewApproved": "Goedgekeurd",
+  "archive.reviewRefused": "Geweigerd"
 }

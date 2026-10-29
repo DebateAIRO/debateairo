@@ -25,6 +25,11 @@ export interface PersistTerminalRunInput {
    * `subject_item_id`, or the producer binding refuses for the wrong reason.
    */
   readonly workItemId?: string;
+  /**
+   * The answer's first version. Production writes the settings version the debate ran on (runnerSettingsOfVersion:
+   * `factBundleVersion` is the register version), so a real first answer is rarely version 1. Defaults to 1.
+   */
+  readonly factBundleVersion?: number;
 }
 
 export interface PersistedTerminalRun {
@@ -48,7 +53,8 @@ export interface PersistedTerminalRun {
 export async function persistTerminalAnswer(
   input: PersistTerminalRunInput & { readonly workItemId: string }
 ): Promise<{ readonly answerId: string }> {
-  return buildAndPersist(input.pool, input.runId, input.workItemId, input.factBundle, input.loopRounds);
+  return buildAndPersist(input.pool, input.runId, input.workItemId, input.factBundle, input.loopRounds,
+    input.factBundleVersion);
 }
 
 /**
@@ -64,7 +70,7 @@ export async function persistTerminalRun(input: PersistTerminalRunInput): Promis
     commandKey: `test-layer:terminal-run:${input.fixtureKey}:${input.runId}`
   });
   const persisted = await buildAndPersist(
-    input.pool, input.runId, workItemId, input.factBundle, input.loopRounds
+    input.pool, input.runId, workItemId, input.factBundle, input.loopRounds, input.factBundleVersion
   );
   await work.settle({ workItemId, attemptId: randomUUID(), artifactRef: persisted.answerId });
   return Object.freeze({ answerId: persisted.answerId, workItemId });
@@ -76,7 +82,8 @@ async function buildAndPersist(
   runId: string,
   workItemId: string,
   inputFactBundle: FactBundle,
-  loopRounds: ServeGateResult["loopRounds"] | undefined
+  loopRounds: ServeGateResult["loopRounds"] | undefined,
+  factBundleVersion = 1
 ): Promise<{ readonly answerId: string }> {
   const factBundle = buildFactBundle(inputFactBundle);
   const gateTrace: readonly GateTrace[] = Object.freeze(["GATE1_R9_BLOCK", "COMPONENTS_ONLY_DEFECT"]);
@@ -117,7 +124,7 @@ async function buildAndPersist(
   const persisted = await new ServeRepository(pool).persist({
     runId,
     workItemId,
-    factBundleVersion: 1,
+    factBundleVersion,
     factBundleContentHash,
     factBundle,
     result,

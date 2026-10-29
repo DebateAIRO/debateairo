@@ -108,7 +108,7 @@
   "settings.transparency.downloadsTail": "objek yang menjelaskan konten hasil AI dan tidak adanya tinjauan editorial manusia. Data jawaban, asal-usul model, dan catatan operasional yang tercatat mempertahankan nilai aslinya.",
   "settings.transparency.markingsLimit": "Penanda ini menjelaskan konten dalam antarmuka dan unduhan kami. Penanda ini bukan tanda air atau sertifikat keaslian; penyalinan teks biasa dapat menghilangkannya.",
   "settings.transparency.supportTitle": "Dukungan dan bantuan manusia",
-  "settings.transparency.supportLead": "Asisten dukungan adalah sistem AI. Gunakan “Bicara dengan manusia” atau “Eskalasi ke manusia” di",
+  "settings.transparency.supportLead": "Asisten dukungan adalah sistem AI. Gunakan “Bicara dengan petugas” di",
   "settings.transparency.help": "Bantuan",
   "settings.transparency.supportTail": "untuk meminta bantuan manusia.",
   "settings.transparency.back": "Kembali ke {brand}",

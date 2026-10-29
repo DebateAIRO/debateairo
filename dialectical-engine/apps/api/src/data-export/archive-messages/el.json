@@ -17,5 +17,18 @@
   "archive.visibilityPrivate": "Ιδιωτική",
   "archive.unreadable": "Το περιεχόμενο αυτής της αντιπαράθεσης δεν μπορεί πλέον να διαβαστεί, επειδή το κλειδί της καταστράφηκε.",
   "archive.noDebates": "Δεν έχετε αντιπαραθέσεις.",
-  "archive.filesNote": "Τα αρχεία JSON σε αυτό το αρχείο ZIP περιέχουν τα ίδια δεδομένα σε μηχαναγνώσιμη μορφή· το README.txt τα απαριθμεί."
+  "archive.filesNote": "Τα αρχεία JSON σε αυτό το αρχείο ZIP περιέχουν τα ίδια δεδομένα σε μηχαναγνώσιμη μορφή· το README.txt τα απαριθμεί.",
+  "archive.contentCheck": "Έλεγχος περιεχομένου",
+  "archive.verdict.flagged": "Επισημασμένη",
+  "archive.verdict.clear": "Χωρίς πρόβλημα",
+  "archive.verdict.noSynthesis": "Χωρίς σύνθεση",
+  "archive.verdict.unavailable": "Μη διαθέσιμο",
+  "archive.category.terrorism": "Πιθανή τρομοκρατία",
+  "archive.category.hateSpeech": "ρητορική μίσους οποιουδήποτε είδους",
+  "archive.category.suicideOrHarm": "τάσεις αυτοκτονίας ή πρόκλησης βλάβης σε άλλους ανθρώπους",
+  "archive.category.weaponsOrDrugs": "κατασκευή όπλων ή ναρκωτικών",
+  "archive.publicationReview": "Εξέταση δημοσίευσης",
+  "archive.reviewAsked": "Υποβλήθηκε αίτημα",
+  "archive.reviewApproved": "Εγκρίθηκε",
+  "archive.reviewRefused": "Απορρίφθηκε"
 }

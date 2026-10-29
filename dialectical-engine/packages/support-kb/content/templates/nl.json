@@ -2,9 +2,9 @@
   "DISCLOSURE": "Hallo — ik ben de AI-supportassistent van Dialectical Engine. Ik kan uitleggen hoe het product werkt en u naar de juiste pagina verwijzen. Ik kan u niet aanmelden, uw account wijzigen of iets opnieuw instellen. Gebruik daarvoor de koppelingen die ik u geef, of vraag om een medewerker.",
   "NO_SOURCE": "Ik heb daar geen bron voor, dus ik ga niet gissen. Stel me een andere vraag over de werking van debatten of kies 'Met een medewerker praten'.",
   "REFUSE_ZONE": "Ik kan niet helpen met aanmelden, wachtwoorden, verificatiecodes, tweefactorauthenticatie, accountherstel, wijziging van het e-mailadres of verwijdering van het account — ook niet om deze te controleren. Dat kan alleen op uw accountpagina's: {link}. Als die pagina voor u niet werkt, kiest u 'Met een medewerker praten'.",
-  "REFUSE_INJECTION": "Ik volg alleen de eigen instructies van het product en sla dat verzoek daarom over. Uw bericht is vastgelegd. Stel me een vraag over het product of kies 'Met een medewerker praten'.",
-  "REFUSE_SAFETY": "Hiervoor is een medewerker nodig, geen assistent. Kies 'Met een medewerker praten'; een medewerker zal uw bericht lezen.",
-  "DEGRADED": "Het model van de assistent is momenteel niet beschikbaar. U kunt nog steeds een bericht achterlaten voor een medewerker: kies 'Met een medewerker praten'.",
+  "REFUSE_INJECTION": "Ik volg alleen de eigen instructies van het product en sla dat verzoek daarom over. Stel me een vraag over het product of kies 'Met een medewerker praten'.",
+  "REFUSE_SAFETY": "Hiervoor is een medewerker nodig, geen assistent. Kies 'Met een medewerker praten' en schrijf naar het adres dat wordt getoond; een medewerker leest wat u stuurt.",
+  "DEGRADED": "Het model van de assistent is momenteel niet beschikbaar. Kies 'Met een medewerker praten' om een medewerker te bereiken.",
   "DISABLED": "De supportassistent is momenteel uitgeschakeld.",
   "RATE_LIMITED": "U hebt in korte tijd veel berichten verzonden. Wacht enkele minuten.",
   "RATING": "Heeft dit uw vraag beantwoord? Ja · Nee · Met een medewerker praten",
@@ -25,5 +25,10 @@
   "INCIDENT_SURFACE_PUBLISHING": "publicatie",
   "INCIDENT_SURFACE_SIGN_IN": "aanmelden",
   "INCIDENT_SURFACE_WHOLE_SITE": "de hele site",
-  "COUNTRY_UNAVAILABLE": "Dialectical Engine is nog niet beschikbaar in uw land."
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine is nog niet beschikbaar in uw land.",
+  "OFF_TOPIC": "Ik kan alleen helpen met Dialectical Engine: uw account, abonnementen, debatten, publicatie en ons beleid. Daar kan ik u niet mee helpen.",
+  "OFF_TOPIC_PART": "Ik kan alleen helpen met Dialectical Engine, dus ik heb de rest van uw bericht niet beantwoord.",
+  "CRISIS_SUPPORT": "Wat u schreef, klinkt heel pijnlijk, en u hoeft dit niet alleen te dragen. Hier kunt u nu iemand bereiken.",
+  "THREAT_LINE": "Daar kan ik u niet mee helpen. Als iemand gewond zou kunnen raken, zoek dan alstublieft direct hulp.",
+  "TOO_LONG": "Uw bericht is te lang voor de chat. Kort het in en verstuur het opnieuw."
 }

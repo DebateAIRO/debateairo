@@ -1206,6 +1206,15 @@ export {
   type PublicationCheckPolicy,
   type PublicationCheckPolicyValue
 } from "./publication-check-policy.js";
+export {
+  QUESTION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW,
+  QUESTION_CHECK_POLICY_ROW_KEY,
+  questionCheckPolicyFromValue,
+  readQuestionCheckPolicy,
+  type QuestionCheckPolicy,
+  type QuestionCheckPolicyValue
+} from "./question-check-policy.js";
+
 // Fresh-site estimate (owner rulings 2026-10-22): the estimate's trusted minimum and per-depth starting figures, code-owned.
 export {
   COST_ESTIMATE_START_POLICY_DEPLOYMENT_REGISTER_ROW,
@@ -1344,6 +1353,14 @@ export {
   type QuestionLanguageFastCheck,
   type QuestionLanguagePolicy
 } from "./question-language-policy.js";
+export {
+  SUPPORT_NO_SOURCE_CHECK_POLICY_ROW_KEY,
+  parseSupportNoSourceCheckPolicy,
+  readSupportNoSourceCheckPolicy,
+  supportNoSourceCheckPolicyRow,
+  supportNoSourceCheckPolicyStartValues,
+  type SupportNoSourceCheckPolicy
+} from "./support-no-source-check-policy.js";
 export {
   DEBATE_SHAPE_FORMULA_VERSION,
   assertDebateShapeCeilingInput,
