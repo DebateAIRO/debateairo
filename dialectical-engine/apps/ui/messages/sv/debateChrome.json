@@ -216,7 +216,7 @@
   "debateChrome.condition.missingNumber": "Talet togs bort efter att uppspelningen misslyckades",
   "debateChrome.condition.owedCheckUnexecuted": "En obligatorisk kontroll hade inte utförts när körningen slutfördes",
   "debateChrome.condition.synthesisObjectionStanding": "En invändning från en utvärderare kvarstår mot det här uttalandet",
-  "debateChrome.condition.digestCompressed": "Nodsammanfattningarna kortades för att rymmas inom budgeten för sammanställningen",
+  "debateChrome.condition.digestCompressed": "Debatten var mycket omfattande, så svaret skrevs utifrån en förkortad version av den.",
   "debateChrome.condition.digestCannotExist": "Inget sammandrag kunde skapas inom budgeten för sammanställningen",
   "debateChrome.condition.protectedCoreGuardRetired": "Körningen stoppades av budgeten; omformuleringskontrollen spärrade den inte längre",
   "debateChrome.condition.hiddenUnjudgeable": "Dolt: kunde inte bedömas — visa dolt innehåll för att läsa det",

@@ -216,7 +216,7 @@
   "debateChrome.condition.missingNumber": "Tal fjernet efter fejl ved genafspilning",
   "debateChrome.condition.owedCheckUnexecuted": "Påkrævet kontrol ikke udført ved afslutning",
   "debateChrome.condition.synthesisObjectionStanding": "En bedømmers indvending mod denne erklæring står stadig ved magt",
-  "debateChrome.condition.digestCompressed": "Resuméer af knudepunkter forkortet for at passe til kompositionsbudgettet",
+  "debateChrome.condition.digestCompressed": "Debatten var meget stor, så svaret blev skrevet ud fra en forkortet udgave af den.",
   "debateChrome.condition.digestCannotExist": "Der kunne ikke udarbejdes et sammendrag inden for kompositionsbudgettet",
   "debateChrome.condition.protectedCoreGuardRetired": "Kørslen stoppede på grund af budgettet; kontrollen af omformuleringen blokerede den ikke længere",
   "debateChrome.condition.hiddenUnjudgeable": "Skjult: kunne ikke bedømmes — vis skjulte elementer for at læse det",

@@ -215,7 +215,7 @@
   "debateChrome.condition.missingNumber": "Angka dihapus setelah pemutaran ulang gagal",
   "debateChrome.condition.owedCheckUnexecuted": "Pemeriksaan wajib belum dijalankan saat proses selesai",
   "debateChrome.condition.synthesisObjectionStanding": "Keberatan penilai terhadap pernyataan ini masih berlaku",
-  "debateChrome.condition.digestCompressed": "Ringkasan simpul diperpendek agar sesuai dengan anggaran penyusunan",
+  "debateChrome.condition.digestCompressed": "Debat sangat besar, sehingga jawaban ditulis berdasarkan versi debat yang dipersingkat.",
   "debateChrome.condition.digestCannotExist": "Ringkasan tidak dapat dibuat dalam anggaran penyusunan",
   "debateChrome.condition.protectedCoreGuardRetired": "Proses dihentikan karena anggaran; pemeriksaan pernyataan ulang tidak lagi menjadi syarat",
   "debateChrome.condition.hiddenUnjudgeable": "Disembunyikan: tidak dapat dinilai — tampilkan bagian tersembunyi untuk membacanya",

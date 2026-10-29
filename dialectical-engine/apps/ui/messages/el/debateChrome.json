@@ -216,7 +216,7 @@
   "debateChrome.condition.missingNumber": "Ο αριθμός αφαιρέθηκε μετά από αποτυχία επανάληψης",
   "debateChrome.condition.owedCheckUnexecuted": "Ο απαιτούμενος έλεγχος δεν εκτελέστηκε έως την ολοκλήρωση",
   "debateChrome.condition.synthesisObjectionStanding": "Παραμένει σε ισχύ ένσταση αξιολογητή για αυτή τη δήλωση",
-  "debateChrome.condition.digestCompressed": "Οι συνόψεις των κόμβων συντομεύτηκαν για να χωρέσουν στον προϋπολογισμό σύνθεσης",
+  "debateChrome.condition.digestCompressed": "Η αντιπαράθεση ήταν πολύ εκτενής, οπότε η απάντηση γράφτηκε με βάση μια συντομευμένη εκδοχή της.",
   "debateChrome.condition.digestCannotExist": "Δεν ήταν δυνατή η δημιουργία σύνοψης εντός του προϋπολογισμού σύνθεσης",
   "debateChrome.condition.protectedCoreGuardRetired": "Η εκτέλεση σταμάτησε λόγω προϋπολογισμού· ο έλεγχος αναδιατύπωσης δεν την περιόριζε πλέον",
   "debateChrome.condition.hiddenUnjudgeable": "Κρυφό: δεν ήταν δυνατό να κριθεί — εμφανίστε τα κρυφά για να το διαβάσετε",

@@ -216,7 +216,7 @@
   "debateChrome.condition.missingNumber": "A számot a visszajátszás hibája után eltávolítottuk",
   "debateChrome.condition.owedCheckUnexecuted": "A kötelező ellenőrzés a befejezéskor nem futott le",
   "debateChrome.condition.synthesisObjectionStanding": "Egy értékelő kifogása továbbra is fennáll ennél a kijelentésnél",
-  "debateChrome.condition.digestCompressed": "A csomópont-összefoglalókat lerövidítettük, hogy beleférjenek a megfogalmazási keretbe",
+  "debateChrome.condition.digestCompressed": "A vita nagyon terjedelmes volt, ezért a választ a vita rövidített változata alapján írták meg.",
   "debateChrome.condition.digestCannotExist": "A megfogalmazási kereten belül nem lehetett kivonatot készíteni",
   "debateChrome.condition.protectedCoreGuardRetired": "A futtatás a keret miatt leállt; az újrafogalmazási ellenőrzés már nem korlátozta",
   "debateChrome.condition.hiddenUnjudgeable": "Rejtett: nem volt elbírálható – az elolvasásához jelenítse meg a rejtett elemeket",

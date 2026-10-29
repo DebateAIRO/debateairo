@@ -217,7 +217,7 @@
   "debateChrome.condition.missingNumber": "Número removido após falha na reprodução",
   "debateChrome.condition.owedCheckUnexecuted": "Verificação devida não executada na conclusão",
   "debateChrome.condition.synthesisObjectionStanding": "Mantém-se uma objeção de um avaliador a esta afirmação",
-  "debateChrome.condition.digestCompressed": "Resumos dos nós abreviados para respeitar o orçamento de composição",
+  "debateChrome.condition.digestCompressed": "O debate era muito extenso, por isso a resposta foi escrita a partir de uma versão abreviada dele.",
   "debateChrome.condition.digestCannotExist": "Não foi possível criar um resumo dentro do orçamento de composição",
   "debateChrome.condition.protectedCoreGuardRetired": "A execução parou devido ao orçamento; a verificação da reformulação deixou de a condicionar",
   "debateChrome.condition.hiddenUnjudgeable": "Oculta: não foi possível avaliá-la — mostre o conteúdo oculto para a ler",

@@ -215,7 +215,7 @@
   "debateChrome.condition.missingNumber": "재생 실패 후 수치 제거됨",
   "debateChrome.condition.owedCheckUnexecuted": "완료 시점까지 필수 검사가 실행되지 않음",
   "debateChrome.condition.synthesisObjectionStanding": "이 진술에 대한 평가기의 이의가 아직 유효함",
-  "debateChrome.condition.digestCompressed": "작성 예산에 맞추기 위해 노드 요약을 줄임",
+  "debateChrome.condition.digestCompressed": "토론 규모가 매우 커서, 답은 토론을 축약한 내용을 바탕으로 작성되었습니다.",
   "debateChrome.condition.digestCannotExist": "작성 예산 안에서 요약을 만들 수 없음",
   "debateChrome.condition.protectedCoreGuardRetired": "예산으로 실행이 중단되어 재진술 검사가 더 이상 진행을 제한하지 않음",
   "debateChrome.condition.hiddenUnjudgeable": "숨김: 심사할 수 없음 — 내용을 보려면 숨긴 항목 표시",

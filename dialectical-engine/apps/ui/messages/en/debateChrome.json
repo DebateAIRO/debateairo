@@ -216,7 +216,7 @@
   "debateChrome.condition.missingNumber": "Number removed after replay failure",
   "debateChrome.condition.owedCheckUnexecuted": "Owed check not executed at completion",
   "debateChrome.condition.synthesisObjectionStanding": "An evaluator objection is still standing on this statement",
-  "debateChrome.condition.digestCompressed": "Node summaries shortened to fit the composition budget",
+  "debateChrome.condition.digestCompressed": "The debate was very large, so the answer was written from a shortened version of it.",
   "debateChrome.condition.digestCannotExist": "No digest could be built within the composition budget",
   "debateChrome.condition.protectedCoreGuardRetired": "Run stopped on budget; the restatement check no longer gated it",
   "debateChrome.condition.hiddenUnjudgeable": "Hidden: could not be judged — show hidden to read it",
