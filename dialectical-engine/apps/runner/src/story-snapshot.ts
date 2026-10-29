@@ -53,6 +53,14 @@ const STORY_REASON_BY_MARK: ReadonlyMap<string, string> = new Map([[
  * handed them — neither the marks nor their reasons — so the story writer never reads a raw code. None on today's run.
  */
 const STORY_OMITTED_MARKS: ReadonlySet<string> = new Set(DEBATE_SHAPE_MARKS);
+/**
+ * R22 (owner ruling 2026-10-29): the coded reason of a halted-branch record whose leg was given up because its author's
+ * reply was refused after its repairs (`haltedExpansionConditionRecord` in ./index.ts). Like the shape marks' coded
+ * reasons, the story is never handed it, so the story writer never reads a raw code; the answer still carries the mark,
+ * which the story sees by name. Owner wording pending: the sentence that would replace this code is AI-facing (the
+ * story reads a record's reason), so it waits for the owner's approval.
+ */
+export const CONTENT_REFUSED_HALT_REASON = "EXPANSION_HALTED_CONTENT_REFUSED" as const;
 /** Free text with every node-id-shaped run replaced: the safety net under every field below. */
 const withoutNodeIds = withoutStoryNodeIds;
 
@@ -342,7 +350,8 @@ export function storyAnswersNoteFrom(map: StoryMapOutcome | null, arguedTodaysOp
 export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteInput {
   const baseById = new Map(source.baseStrengths.map((row) => [row.nodeId, row.baseStrength] as const));
   const finalById = new Map(source.finalStrengths.map((row) => [row.nodeId, row.strength] as const));
-  const nodeScoped = source.conditionMarkRecords.filter((record) => record.scope === "node" && !STORY_OMITTED_MARKS.has(record.mark));
+  const nodeScoped = source.conditionMarkRecords.filter((record) => record.scope === "node" && !STORY_OMITTED_MARKS.has(record.mark)
+    && record.reason !== CONTENT_REFUSED_HALT_REASON);
   const excludedReasonOf = (nodeId: string): string | null => {
     const record = nodeScoped.find((candidate) =>
       (EXCLUDING_MARKS.has(candidate.mark) || SET_ASIDE_MARKS.has(candidate.mark))

@@ -28,6 +28,7 @@ import {
 import { GraphRepository, recordEdgeMeasurementsOnClient } from "@debateai/graph";
 import {
   Judge,
+  JudgeContentRefusedError,
   JudgementRepository,
   insertPreparedNodeReview,
   translateNodeReviewFailure,
@@ -256,7 +257,7 @@ import {
   type SeatSlot
 } from "./run-seats.js";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
-import { buildStoryRunSnapshot, storyAlsoRaisedFrom, storyAnswersNoteFrom, storyBackupCandidatesFrom, storyBackupMakersFrom, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
+import { CONTENT_REFUSED_HALT_REASON, buildStoryRunSnapshot, storyAlsoRaisedFrom, storyAnswersNoteFrom, storyBackupCandidatesFrom, storyBackupMakersFrom, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
 import {
   shapeCloseCallExtraSeats, shapeCloseCallFires, shapeCloseCallFold, shapeDistinctMakerOptions, shapeRankScrutiny, shapeSelectChains,
   type ScrutinyCandidate
@@ -1426,6 +1427,38 @@ export interface HaltedExpansionRecord {
   readonly plannedLegCount: number;
   readonly terminalTransportOutcome: "TIMED_OUT" | "FAILED";
   readonly lastLedgerEntryRef: string;
+  /**
+   * R22 (owner ruling 2026-10-29): present when the leg was given up because its author's reply was refused after the
+   * gateway's repairs (`JudgeContentRefusedError`), not because its transport died; the outcome is then the refused
+   * attempt's FAILED row. Absent on every transport halt, whose record is today's to the byte.
+   */
+  readonly haltedBy?: "CONTENT_REFUSED";
+}
+
+/**
+ * The answer's class-N record for one halted leg: the branch under `parentNodeId` was never authored. A transport halt
+ * keeps today's reason; a leg given up for its refused content (R22) never claims a transport failure, and carries the
+ * coded reason the story is never handed (`CONTENT_REFUSED_HALT_REASON`) until the owner approves its words.
+ */
+export function haltedExpansionConditionRecord(record: HaltedExpansionRecord): ConditionMarkRecord {
+  return Object.freeze({
+    mark: "UNAUTHORED-BRANCH-HALTED",
+    scope: "node",
+    subjectRef: record.parentNodeId!,
+    reason: record.haltedBy === "CONTENT_REFUSED"
+      ? CONTENT_REFUSED_HALT_REASON
+      : "Expansion halted after transport exhaustion; no node was authored to hide or reveal",
+    liftPath: "Retry the halted authoring call in a new run",
+    servedRootRule: null,
+    affectedNodeIds: Object.freeze([record.parentNodeId!]),
+    callSiteKey: record.callSiteKey,
+    plannedLegCount: record.plannedLegCount,
+    terminalTransportOutcome: record.terminalTransportOutcome,
+    hiddenStrength: null,
+    hiddenScoreThreshold: null,
+    hiddenScoreThresholdSourceRef: null,
+    excludedFromServedNumber: null
+  });
 }
 
 export function remainingProviderAttempts(maxAttempts: number, consumed: number): number {
@@ -1470,19 +1503,37 @@ export async function withCooldownRetry<T>(input: {
    * today's path.
    */
   readonly haltsAtOnce?: (error: ProviderCallFailedError) => boolean;
+  /**
+   * R22 (owner ruling 2026-10-29, slip-recovery step 4): a leg whose author's reply was refused after the gateway's
+   * whole repair chain (`JudgeContentRefusedError`: code salvage, the patch follow-up, the full re-ask its allowance
+   * leaves) HALTS like a dead transport, so one author's format slip never fails the debate. No hold and no final
+   * retry: asking again is what that chain already did. The runner sets it for a reply or a cross-exchange only (a leg
+   * with a parent); absent (a root, a review, every direct caller), a refusal travels unchanged, as today.
+   */
+  readonly haltsOnContentRefusal?: boolean;
 }): Promise<
   | { readonly kind: "AUTHORED"; readonly value: T }
   | { readonly kind: "HALTED"; readonly record: HaltedExpansionRecord }
 > {
   const spent = async (fromErrors: number): Promise<number> =>
     input.siteAttemptsSpent === undefined ? fromErrors : await input.siteAttemptsSpent();
-  const halted = async (error: ProviderCallFailedError, attemptsSpent: number) => {
-    const record = Object.freeze({
+  /** The refusal this site may be given up on, or null when the failure must travel (R22). */
+  const contentRefusal = (error: unknown): JudgeContentRefusedError | null =>
+    input.haltsOnContentRefusal === true && error instanceof JudgeContentRefusedError ? error : null;
+  /** A refused reply ends as its refused attempt's FAILED row, which the gateway's refusal names (R22). */
+  const refusedAs = (error: JudgeContentRefusedError) => Object.freeze({
+    lastOutcome: "FAILED" as const, lastLedgerEntryRef: error.refusal.lastLedgerEntryRef, haltedBy: "CONTENT_REFUSED" as const
+  });
+  const halted = async (error: Readonly<{
+    lastOutcome: "TIMED_OUT" | "FAILED"; lastLedgerEntryRef: string; haltedBy?: "CONTENT_REFUSED";
+  }>, attemptsSpent: number) => {
+    const record: HaltedExpansionRecord = Object.freeze({
       callSiteKey: input.callSiteKey,
       parentNodeId: input.parentNodeId,
       plannedLegCount: input.plannedLegCount,
       terminalTransportOutcome: error.lastOutcome,
-      lastLedgerEntryRef: error.lastLedgerEntryRef
+      lastLedgerEntryRef: error.lastLedgerEntryRef,
+      ...(error.haltedBy === undefined ? {} : { haltedBy: error.haltedBy })
     });
     await input.hold.record({
       kind: "ledger.could_not_do",
@@ -1507,6 +1558,8 @@ export async function withCooldownRetry<T>(input: {
         value: await input.attempt(input.baseMaxAttempts + input.policy.finalRetryAttempts)
       };
     } catch (retryError) {
+      const refused = contentRefusal(retryError);
+      if (refused !== null) return halted(refusedAs(refused), error.attempts + refused.refusal.attempts);
       if (!(retryError instanceof ProviderCallFailedError)) throw retryError;
       return halted(retryError, error.attempts + retryError.attempts);
     }
@@ -1514,6 +1567,8 @@ export async function withCooldownRetry<T>(input: {
   try {
     return { kind: "AUTHORED", value: await input.attempt(input.baseMaxAttempts) };
   } catch (error) {
+    const refused = contentRefusal(error);
+    if (refused !== null) return halted(refusedAs(refused), refused.refusal.attempts);
     if (!(error instanceof ProviderCallFailedError)) throw error;
     if (input.haltsAtOnce?.(error) === true) return halted(error, error.attempts);
     if (input.finalRetryPermitted !== undefined && !(await input.finalRetryPermitted())) {
@@ -5727,6 +5782,8 @@ export class WalkingSkeletonRunner {
        * member that ACTUALLY retries. Absent, `seatMember` is taken.
        */
       readonly retrySeatMember?: () => SeatMember | null;
+      /** R22: a reply's or a cross-exchange's refused content halts the leg (`withCooldownRetry`), never the debate. */
+      readonly haltsOnContentRefusal?: boolean;
     }): Promise<
       | { readonly kind: "AUTHORED"; readonly value: T }
       | { readonly kind: "HALTED"; readonly record: HaltedExpansionRecord }
@@ -5805,6 +5862,7 @@ export class WalkingSkeletonRunner {
         policy,
         hold: laterParent === null ? hold : laterParentHold(hold, laterParent),
         attempt: input.attempt,
+        ...(input.haltsOnContentRefusal === true ? { haltsOnContentRefusal: true } : {}),
         ...(siteAttemptsSpent === undefined ? {} : { siteAttemptsSpent }),
         // Run resilience (spec 2026-10-12, ruling R-a): on the preview a busy member, an unavailable gate or a member
         // that already sits out halts the site at once — no ten-minute hold for a model that will not be asked again.
@@ -8176,6 +8234,7 @@ export class WalkingSkeletonRunner {
         parentNodeId: input.parentNodeId,
         plannedLegCount: input.plannedLegCount,
         failureScope: input.parentNodeId === null ? "MAKER_POSITION" : "EXPANSION",
+        haltsOnContentRefusal: input.parentNodeId !== null,
         seatMember: childPlan.seatMember,
         retrySeatMember: childPlan.retryMember,
         attempt: (maxAttempts) => seatCaller.callSeat({
@@ -10511,22 +10570,7 @@ export class WalkingSkeletonRunner {
         hiddenScoreThresholdSourceRef: threshold!.sourceRef,
         excludedFromServedNumber: false
       })),
-      ...haltedExpansionRecords.map((record): ConditionMarkRecord => Object.freeze({
-        mark: "UNAUTHORED-BRANCH-HALTED",
-        scope: "node",
-        subjectRef: record.parentNodeId!,
-        reason: "Expansion halted after transport exhaustion; no node was authored to hide or reveal",
-        liftPath: "Retry the halted authoring call in a new run",
-        servedRootRule: null,
-        affectedNodeIds: Object.freeze([record.parentNodeId!]),
-        callSiteKey: record.callSiteKey,
-        plannedLegCount: record.plannedLegCount,
-        terminalTransportOutcome: record.terminalTransportOutcome,
-        hiddenStrength: null,
-        hiddenScoreThreshold: null,
-        hiddenScoreThresholdSourceRef: null,
-        excludedFromServedNumber: null
-      })),
+      ...haltedExpansionRecords.map(haltedExpansionConditionRecord),
       // S2-3 / J5: one typed record per downgraded node, projected onto that
       // node through `affectedNodeIds` so the disclosure is visible where the
       // override happened — not only on the answer.

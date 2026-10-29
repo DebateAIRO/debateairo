@@ -781,6 +781,18 @@ export function judgeLegLengthStep(leg: JudgeLeg): "opening" | "pros_cons" | "cr
   }
 }
 
+/**
+ * R22 (owner ruling 2026-10-29, slip-recovery step 4): an author leg's reply refused after the gateway's whole repair
+ * chain (code salvage, the patch follow-up, the full re-ask its allowance leaves). To every reader of the code it is
+ * today's JUDGE_SCHEMA_FAILURE, with the same message and name; it also carries the gateway's refusal, so the runner can
+ * give up a reply or a cross-exchange on it — naming the refused attempt's ledger row — instead of failing the debate.
+ */
+export class JudgeContentRefusedError extends TypedDomainError {
+  constructor(readonly refusal: ProviderContentUnacceptedError) {
+    super("JUDGE_SCHEMA_FAILURE", refusal.lastParseError);
+  }
+}
+
 export class Judge {
   constructor(private readonly provider: ProviderGateway) {}
 
@@ -831,9 +843,7 @@ export class Judge {
         classifyContent: reading.classifyContent
       });
     } catch (error) {
-      if (error instanceof ProviderContentUnacceptedError) {
-        throw new TypedDomainError("JUDGE_SCHEMA_FAILURE", error.lastParseError);
-      }
+      if (error instanceof ProviderContentUnacceptedError) throw new JudgeContentRefusedError(error);
       throw error;
     }
     const parsed = parseStructuredArtifact(response.content, judgeArtifactSchema, reading.acceptedAs(response.content).reply, JUDGE_ARTIFACT_READING);
