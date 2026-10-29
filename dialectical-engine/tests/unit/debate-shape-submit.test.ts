@@ -234,10 +234,10 @@ describe("submit stores the normalised ask (note 1)", () => {
     const accepted = await application.submit(ask({
       plan_tier: "premium", depth_params: { depth: 5, depthMode: "fixed", scrutiny: "deep", answerLength: "detailed" }
     }), serverSession, serverPrincipal);
-    expectStoredShape(started[0]!.depthParams, { depth: 2, depthMode: "adaptive", scrutiny: "standard", answerLength: "detailed" });
+    expectStoredShape(started[0]!.depthParams, { depth: 1, depthMode: "adaptive", scrutiny: "standard", answerLength: "detailed" });
     expect(started[0]!.planTier).toBe("free");
     expect(shapes).toEqual([expect.objectContaining({ plan: "free", answerLength: "detailed" })]);
-    expect(AskAcceptedSchema.parse(accepted).applied).toMatchObject({ plan_tier: "free", depth: 2 });
+    expect(AskAcceptedSchema.parse(accepted).applied).toMatchObject({ plan_tier: "free", depth: 1 });
   });
 
   it("billing on, a PLUS person: the plan id is the shape's key, for the admission and for the coarse fit (note 6)", async () => {
@@ -315,7 +315,7 @@ describe("GET /v1/asks/room reads the query's shape settings (note 2)", () => {
       .toMatchObject({ planTier: "premium", shape: { plan: "max", depthMode: "fixed", scrutiny: "deep", answerLength: "short" } });
     // A Free person: Free's depth gauge, then the shape's normalisation (no fixed depth, no deep scrutiny on Free).
     expect((await readRoom(QUERY, { policy: true, billing: billingFor("FREE").billing })).settingsClass)
-      .toMatchObject({ planTier: "free", depth: 2, shape: { plan: "free", depthMode: "adaptive", scrutiny: "standard", answerLength: "short" } });
+      .toMatchObject({ planTier: "free", depth: 1, shape: { plan: "free", depthMode: "adaptive", scrutiny: "standard", answerLength: "short" } });
   });
 
   it("without the row the room's class is today's, whatever the query carries", async () => {

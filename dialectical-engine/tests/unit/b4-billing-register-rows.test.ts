@@ -33,7 +33,7 @@ const policyRow = () => structuredClone(BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.v
 const plansOf = (value: unknown) => billingPlansFromValue(value, "b4 test");
 const policyOf = (value: unknown) => billingPolicyFromValue(value, "b4 test");
 
-describe("billingPlans v2 carries exactly the owner's plans", () => {
+describe("billingPlans v3 carries exactly the owner's plans", () => {
   const plans = plansOf(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value);
 
   it("names the row and the four plans in price order", () => {
@@ -57,15 +57,20 @@ describe("billingPlans v2 carries exactly the owner's plans", () => {
     expect([planNetPrice(plan, "USD"), planNetPrice(plan, "EUR"), planNetPrice(plan, "RON")]).toEqual([usd, eur, ron]);
   });
 
-  it("gives Free, and only Free, fixed gauges: the values /new sends for Free today", async () => {
-    expect(planById(plans, "FREE").fixedGauges).toEqual({ riskTier: "standard", compositionBudgetTier: "low", depth: 2 });
+  it("gives Free, and only Free, fixed gauges: depth 1 (owner 2026-10-29), the depth V4 sends for every Free ask", async () => {
+    expect(planById(plans, "FREE").fixedGauges).toEqual({ riskTier: "standard", compositionBudgetTier: "low", depth: 1 });
     for (const id of ["PLUS", "PRO", "MAX"] as const) expect(planById(plans, id).fixedGauges).toBeNull();
-    // The UI's Free reset (choosePlanTier) is the source these values were copied from (spec §2.3.4).
+    expect(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.sourceRef).toContain("billingPlans v3");
+    // The UI's Free reset (choosePlanTier) is the source the risk and composition gauges were copied from (spec §2.3.4).
     const page = await readFile(new URL("../../apps/ui/app/new/NewDebatePageClient.tsx", import.meta.url), "utf8");
     const reset = page.slice(page.indexOf("function choosePlanTier("), page.indexOf("const askAsOf"));
     expect(reset).toContain('setRiskTier("standard")');
     expect(reset).toContain("setBudgetTier(PROVISIONAL_COMPOSITION_BUDGET_DEFAULT)");
-    expect(reset).toContain("setDepth(2)");
+    // Free's depth is the owner's 29 Oct ruling ("question with depth 1"): V4 sends every Free question and dig as a
+    // quick look, depth 1 (owner N13), and the server lowers an older page's Free depth to the gauge (B8).
+    const v4 = await readFile(new URL("../../apps/ui/lib/v4/askConfig.ts", import.meta.url), "utf8");
+    expect(v4).toContain("quick: 1,");
+    expect(v4).toContain('return planTier === "free" ? "quick" : mode;');
   });
 
   it("computes each cap as credit x basis points / 10000, rounded down", () => {

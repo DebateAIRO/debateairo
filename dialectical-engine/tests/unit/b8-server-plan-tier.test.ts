@@ -186,7 +186,7 @@ function arrange(billing: AskBilling | undefined, room?: AskRoomPort, panel?: re
 const setupFailureFor = (reason: string) => ({ runId: RUN_ID, batteryRowId: "Q1", commandKey: `S00:${RUN_ID}:Q1`, reason });
 
 const freeClass = Object.freeze({
-  planTier: "free", compositionBudgetTier: "low", makerCount: PLAN_TIER_ROSTERS.free.length, depth: 2
+  planTier: "free", compositionBudgetTier: "low", makerCount: PLAN_TIER_ROSTERS.free.length, depth: 1
 });
 
 /** An application for the HTTP cases: every read answers nothing, and `submit` is the case's own. */
@@ -225,14 +225,14 @@ describe("normaliseAskForPlan: Free's gauges are the server's (§2.3.4)", () => 
     expect(result.normalised).toBe(true);
     expect(result.ask).toMatchObject({
       plan_tier: "free", risk_tier: "standard", tier_source: "MACHINE_DEFAULT",
-      tier_provenance_ref: "machine:plan-tier-free", composition_budget_tier: "low", depth_params: { depth: 2 }
+      tier_provenance_ref: "machine:plan-tier-free", composition_budget_tier: "low", depth_params: { depth: 1 }
     });
   });
 
   it("changes nothing for a Free ask that already carries the defaults", () => {
     const sent = ask({
       plan_tier: "free", risk_tier: "standard", tier_source: "MACHINE_DEFAULT", tier_provenance_ref: "machine:plan-tier-free",
-      composition_budget_tier: "low", depth_params: { depth: 2 }
+      composition_budget_tier: "low", depth_params: { depth: 1 }
     });
     expect(normaliseAskForPlan(sent, planById(plans, "FREE"))).toEqual({ ask: sent, normalised: false });
   });
@@ -278,11 +278,11 @@ describe("submit with billing on", () => {
     expect(started).toHaveLength(1);
     expect(started[0]).toMatchObject({
       planTier: "free", askerRiskTier: "standard", tierSource: "MACHINE_DEFAULT",
-      tierProvenanceRef: "machine:plan-tier-free", compositionBudgetTier: "low", depthParams: { depth: 2 }
+      tierProvenanceRef: "machine:plan-tier-free", compositionBudgetTier: "low", depthParams: { depth: 1 }
     });
     expect(started[0]!.discoveredPanel.map((panelMember) => panelMember.model_id)).toEqual([...PLAN_TIER_ROSTERS.free]);
     expect(AskAcceptedSchema.parse(accepted).applied).toEqual({
-      plan_tier: "free", risk_tier: "standard", composition_budget_tier: "low", depth: 2
+      plan_tier: "free", risk_tier: "standard", composition_budget_tier: "low", depth: 1
     });
     expect(substitutions).not.toHaveBeenCalled();
   });
@@ -359,10 +359,10 @@ describe("submit through B6b's room hands it the decided ask (R-28)", () => {
     expect(enqueued).not.toHaveBeenCalled();
     expect(questions.map((question) => question.settingsClass)).toEqual([freeClass, freeClass]);
     expect(questions[0]!.access).toEqual({ ownerRef: OWNER_REF, legacyAskerId: null });
-    expect(started[0]).toMatchObject({ planTier: "free", compositionBudgetTier: "low", depthParams: { depth: 2 } });
+    expect(started[0]).toMatchObject({ planTier: "free", compositionBudgetTier: "low", depthParams: { depth: 1 } });
     expect(AskAcceptedSchema.parse(accepted)).toEqual({
       run_ref: RUN_ID, status: "QUEUED",
-      applied: { plan_tier: "free", risk_tier: "standard", composition_budget_tier: "low", depth: 2 }
+      applied: { plan_tier: "free", risk_tier: "standard", composition_budget_tier: "low", depth: 1 }
     });
     expect(substitutions).not.toHaveBeenCalled();
   });

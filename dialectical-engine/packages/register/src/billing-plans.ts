@@ -20,9 +20,11 @@ import { RISK_TIERS, TypedDomainError, type RiskTier } from "@debateai/kernel";
  *    cap, as basis points of its monthly credit (`day_bp`, `week_bp`).
  *  - `finish_bp` is how far a RUNNING debate may take a person's window so it
  *    can finish (110%). New questions still wait at 100%.
- *  - Free's `fixed_gauges` are the values `/new` sends for Free today
- *    (NewDebatePageClient.tsx `choosePlanTier`). The server enforces them when
- *    billing is on (§2.3.4); the API never imports UI code for them.
+ *  - Free's `fixed_gauges`: the risk and composition gauges are the values
+ *    `/new` sends for Free (NewDebatePageClient.tsx `choosePlanTier`); the depth
+ *    is the owner's Free month of 29 October 2026 ("question with depth 1"),
+ *    which V4 sends for every Free question and dig. The server enforces them
+ *    when billing is on (§2.3.4); the API never imports UI code for them.
  */
 export const BILLING_PLANS_ROW_KEY = "billingPlans" as const;
 
@@ -159,16 +161,18 @@ export const BILLING_PLANS_MEMBERS: readonly string[] = Object.freeze(Object.key
 
 /**
  * THE PLAN VALUES: the owner's of 29 September 2026 (§1.10), priced in USD, EUR
- * and RON by region since Part C (spec 2026-10-05 §2.16.2). The EUR and RON
+ * and RON by region since Part C (spec 2026-10-05 §2.16.2); v3 (owner's Free
+ * month, 29 October 2026) lowers Free's fixed depth from 2 to 1. The EUR and RON
  * prices are placeholders until the owner publishes a price list (go-live row
  * 73). The first paid test debates may revise them. That revision is a NEW register
  * version of this row, never an edit.
  */
 export const BILLING_PLANS_DEPLOYMENT_REGISTER_ROW = Object.freeze({
   rowKey: BILLING_PLANS_ROW_KEY,
-  sourceRef: "spec 2026-10-05 §2.16.2 billingPlans v2 (owner decisions 2026-09-29: Free/Plus/Pro/Max, day 20%,"
+  sourceRef: "spec 2026-10-05 §2.16.2 billingPlans v3 (owner decisions 2026-09-29: Free/Plus/Pro/Max, day 20%,"
     + " week 50%, finish 110%, USD 20/50/200; owner's choice 2026-10-10: RON for RO, EUR for 31 European countries, USD"
-    + " elsewhere; EUR and RON prices are placeholders until the owner's price list, go-live row 73)",
+    + " elsewhere; EUR and RON prices are placeholders until the owner's price list, go-live row 73; owner's Free month"
+    + " 2026-10-29: Free questions at depth 1)",
   value: Object.freeze({
     kind: "BILLING_PLANS" as const,
     credit_currency: "USD" as const,
@@ -185,7 +189,7 @@ export const BILLING_PLANS_DEPLOYMENT_REGISTER_ROW = Object.freeze({
         plan_id: "FREE" as const, tier: "free" as const, net_prices: Object.freeze({ USD: 0, EUR: 0, RON: 0 }),
         monthly_credit_micros: 200_000,
         day_bp: null, week_bp: null, finish_bp: 11_000,
-        fixed_gauges: Object.freeze({ risk_tier: "standard" as const, composition_budget_tier: "low" as const, depth: 2 })
+        fixed_gauges: Object.freeze({ risk_tier: "standard" as const, composition_budget_tier: "low" as const, depth: 1 })
       }),
       Object.freeze({
         plan_id: "PLUS" as const, tier: "premium" as const, net_prices: Object.freeze({ USD: 20_000_000, EUR: 20_000_000, RON: 100_000_000 }),
