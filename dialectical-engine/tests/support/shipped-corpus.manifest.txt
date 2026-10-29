@@ -13,6 +13,7 @@
 apps/api/src/account-erasure.ts
 apps/api/src/account-mail-template.d.mts
 apps/api/src/account-mail-template.mjs
+apps/api/src/account-memory.ts
 apps/api/src/account-profile.ts
 apps/api/src/active-settings-version.ts
 apps/api/src/admission-alarm.ts
@@ -859,6 +860,7 @@ apps/ui/lib/v3/storyWords.ts
 apps/ui/lib/v3/tokenUnlock.ts
 apps/ui/lib/v3/useAnswerStory.ts
 apps/ui/lib/v3/useStoryLocaleReady.ts
+apps/ui/lib/v4/accountMemory.ts
 apps/ui/lib/v4/askConfig.ts
 apps/ui/lib/v4/askText.ts
 apps/ui/lib/v4/changes.ts
@@ -914,6 +916,7 @@ packages/budget/src/model-spend.ts
 packages/budget/src/person-allowance.ts
 packages/budget/src/room.ts
 packages/budget/src/spend-lock.ts
+packages/contract/src/account-memory.ts
 packages/contract/src/auth-shared.ts
 packages/contract/src/billing-address.ts
 packages/contract/src/client.ts
@@ -1019,6 +1022,7 @@ packages/db/src/migration-forward0126.ts
 packages/db/src/migration-forward0127.ts
 packages/db/src/migration-forward0128.ts
 packages/db/src/migration-forward0129.ts
+packages/db/src/migration-forward0130.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
 packages/db/src/migration-forward111.ts

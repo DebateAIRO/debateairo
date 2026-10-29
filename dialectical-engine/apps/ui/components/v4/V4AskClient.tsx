@@ -30,7 +30,7 @@ import { useV4Ask } from "@/lib/v4/useV4Ask";
  * once, the reading level. D2: the optional choices, then EXACTLY the text the AIs will get (composeQuestion), so
  * nothing is hidden. The ask itself is V3's, through useV4Ask (consent, crisis help, room, question language).
  * Fix wave 1, Decision A: nothing is kept in this browser. The level lives in the address (`?level=`), and the recent
- * questions come from the account only.
+ * questions come from the account only. N7 (2026-10-29): the chosen level is kept in the account too (useReadingLevel).
  */
 
 /** The API's own floor for a question is a few words; Start waits for it (spec: "under 7 characters"). */
@@ -143,7 +143,9 @@ function V4AskForm({
   initialLevel: ReadingLevel | null;
 }>) {
   const router = useRouter();
-  const [savedLevel, saveLevel] = useReadingLevel(initialLevel);
+  // N7: a level the person chose before (on any device) comes back from the account; until that read has answered the
+  // one-time chooser stays hidden, so it never flashes for someone who already chose.
+  const [savedLevel, saveLevel, levelKnown] = useReadingLevel(initialLevel);
   // The D1 prototype shows "Plain words" chosen. A chip only changes this draft (so every sample can be compared,
   // UI-2/TIME-4); it is saved by Continue, "Just answer it" or the header menu.
   const [draftLevel, setDraftLevel] = useState<ReadingLevel>(initialLevel ?? "plain");
@@ -201,7 +203,8 @@ function V4AskForm({
   }, [step]);
 
   function keepLevel() {
-    if (savedLevel === null) saveLevel(draftLevel);
+    // Only a level the person saw offered is kept: before the account's level is known, the chips were not shown.
+    if (savedLevel === null && levelKnown) saveLevel(draftLevel);
   }
 
   /** The header menu saves at once (and so hides the D1 chips). */
@@ -295,7 +298,7 @@ function V4AskForm({
             ) : null}
           </div>
 
-          {savedLevel === null ? (
+          {savedLevel === null && levelKnown ? (
             <fieldset className="v4AskLevels">
               <legend className="v4AskLegend">{t(catalog, "v4.ask.levelLegend")}</legend>
               <div className="v4AskChips">

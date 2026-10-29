@@ -120,8 +120,9 @@ export type DigMode = (typeof DIG_MODES)[number];
 
 /**
  * V4 initial: a dig is a follow-up debate started from an open question. Fix wave 1 (Decision A): nothing is stored in
- * the browser; links are kept in memory for this visit and found again from the account's question list by text
- * (lib/v4/digIndex.ts). The API has no link field yet.
+ * the browser; links are kept in memory for this visit. N11 (2026-10-29): each new dig's link is recorded in the account
+ * (lib/v4/accountMemory.ts); digs made before that are found again from the account's question list by text
+ * (lib/v4/digIndex.ts).
  */
 export type DigLink = Readonly<{
   parentRunId: string;
@@ -130,9 +131,9 @@ export type DigLink = Readonly<{
   openQuestionIds: readonly string[];
   /** The questions as shown when the dig started (AI text). */
   questions: readonly string[];
-  /** null: unknown (a dig found again from the account's question list). */
+  /** null: unknown (a dig found again from the account's question list by text; a recorded dig knows it). */
   mode: DigMode | null;
-  /** ISO time; null when unknown (a dig found again from the account's question list). */
+  /** ISO time; null when unknown (a dig found again from the account's question list by text; a recorded dig knows it). */
   startedAt: string | null;
 }>;
 
@@ -165,7 +166,10 @@ export const EMPTY_GOAL: V4Goal = Object.freeze({
   angles: Object.freeze([])
 });
 
-/** What the page saw earlier in this visit, per item id: the item's word (a trust word, a fate or a dig state). Kept in memory only. */
+/**
+ * What the page saw earlier, per item id: the item's word (a trust word, a fate or a dig state). In memory for this visit;
+ * N7: the account keeps the last one per debate (lib/v4/accountMemory.ts), never the browser.
+ */
 export type SeenSnapshot = Readonly<{ at: string; items: Readonly<Record<string, string>> }>;
 
 /** D4: what changed while the person was on the page (fix wave 1: "while you were here", in memory only). */
