@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Pool } from "@debateai/db";
-import { TEXT_NOT_IN_QUESTION_LANGUAGE, TypedDomainError, argumentLanguageDirective, proseWordCount, questionLanguageSentence } from "@debateai/kernel";
+import {
+  READER_SENTENCE_STORY_CHECKER, READER_SENTENCE_WRITING, READER_SENTENCES, TEXT_NOT_IN_QUESTION_LANGUAGE, TypedDomainError,
+  argumentLanguageDirective, proseWordCount, questionLanguageSentence
+} from "@debateai/kernel";
 import {
   ProviderCallFailedError,
   ProviderContentUnacceptedError,
@@ -29,6 +32,7 @@ import {
   loadStoryPack,
   resolveStoryPackDir,
   storyCheckerLengthField,
+  storyContractForReader,
   storyContractHash,
   storyContractInArgumentLanguage,
   storyGuidedBound,
@@ -1858,5 +1862,86 @@ describe("StoryWriter — the story policy travels with each write (side-by-side
     expect(inserted[0]).toMatchObject({ outcome: "READY", failureCode: null });
     expect(calls).toHaveLength(2);
     expect(events).not.toContain("STORY_POLICY_NOT_PASSED");
+  });
+});
+
+/**
+ * V4 reading level reaches the writers (owner ruling N6, 2026-10-29): with the run's level, the storyteller's and the
+ * checker's material end with a `reader` field (before `question_language`) and each instruction gains its one reader
+ * sentence after the pack's text, before the language line. Without a level, today's bytes and today's contract hash.
+ * OWNER WORDING — pending approval.
+ */
+describe("StoryWriter — the person's reading level (V4, owner N6)", () => {
+  const GUIDANCE = resolveLengthGuidance({ policy: lengthGuidancePolicyStartValues(), plan: "premium", answerLength: "standard" });
+  const ENGINE = engineSettingsOf(engineVersionPolicyStartValues(), { makers: 3, mapOpening: false });
+  const V4: StoryWriteInput = Object.freeze<StoryWriteInput>({ ...SNAPSHOT, engine: ENGINE, lengthGuidance: GUIDANCE });
+  const CHECKER_V4_SATISFIED = JSON.stringify({ satisfied: true, misleading: false, objection: null,
+    criteria: JSON.parse(CHECKER_SATISFIED).criteria });
+  const storyV4 = (): string => {
+    const parsed = JSON.parse(story()) as Record<string, unknown>;
+    delete parsed.shape_id;
+    return JSON.stringify(parsed);
+  };
+  const answering = (request: ProviderCallRequest): string => {
+    const contract = readPromptFrame(request.packet).contractId;
+    if (contract === STORYTELLER_V4_CONTRACT_ID) return storyV4();
+    if (contract === STORYTELLER_CONTRACT_ID) return story();
+    return contract === STORY_CHECKER_V4_CONTRACT_ID ? CHECKER_V4_SATISFIED : CHECKER_SATISFIED;
+  };
+  const names = (request: ProviderCallRequest): string[] => readPromptFrame(request.packet).fields.map((field) => field.name);
+  const run = async (input: StoryWriteInput, ready = true): Promise<ProviderCallRequest[]> => {
+    const { provider, calls } = scripted(answering);
+    const { writer, inserted } = harness(providing(provider));
+    await writer.writeAfterSettle(input);
+    if (ready) expect(inserted[0]?.outcome).toBe("READY");
+    return calls;
+  };
+
+  it("storyContractForReader: the same contract with no level; else the role's sentence after a blank line", () => {
+    const teller = buildStorytellerContract(PACK);
+    const checker = buildStoryCheckerContract(PACK);
+    expect(storyContractForReader(teller, null, "STORYTELLER")).toBe(teller);
+    expect(storyContractForReader(teller, "plain", "STORYTELLER"))
+      .toEqual({ ...teller, instruction: `${teller.instruction}\n\n${READER_SENTENCE_WRITING}` });
+    expect(storyContractForReader(checker, "expert", "CHECKER"))
+      .toEqual({ ...checker, instruction: `${checker.instruction}\n\n${READER_SENTENCE_STORY_CHECKER}` });
+  });
+
+  it("without a level: no reader field, no reader sentence, today's contract hash (v3 and v4)", async () => {
+    for (const input of [SNAPSHOT, V4]) {
+      const calls = await run(input);
+      for (const call of calls) {
+        expect(names(call)).not.toContain("reader");
+        expect(call.packet.messages[0]!.content).not.toContain("the reader described in reader");
+      }
+    }
+    const [teller, checker] = await run(SNAPSHOT);
+    expect(teller!.contractHash).toBe(storyContractHash(storyContractInArgumentLanguage(buildStorytellerContract(PACK), "Romanian")));
+    expect(checker!.contractHash).toBe(storyContractHash(storyContractInArgumentLanguage(buildStoryCheckerContract(PACK), "Romanian")));
+  });
+
+  it.each(["plain", "background", "expert"] as const)("with %s: reader last in both materials, each role's sentence before the language line", async (level) => {
+    const [teller, checker] = await run({ ...SNAPSHOT, readingLevel: level });
+    for (const call of [teller!, checker!]) {
+      expect(names(call).at(-1)).toBe("reader");
+      expect(readPromptFrame(call.packet).fields.at(-1)?.content).toBe(READER_SENTENCES[level]);
+    }
+    expect(teller!.packet.messages[0]!.content).toContain(`\n\n${READER_SENTENCE_WRITING}\n\n${argumentLanguageDirective("Romanian")}`);
+    expect(checker!.packet.messages[0]!.content).toContain(`\n\n${READER_SENTENCE_STORY_CHECKER}\n\n${argumentLanguageDirective("Romanian")}`);
+    expect(teller!.contractHash).toBe(storyContractHash(storyContractInArgumentLanguage(
+      storyContractForReader(buildStorytellerContract(PACK), level, "STORYTELLER"), "Romanian")));
+    expect(checker!.contractHash).toBe(storyContractHash(storyContractInArgumentLanguage(
+      storyContractForReader(buildStoryCheckerContract(PACK), level, "CHECKER"), "Romanian")));
+  });
+
+  it("story v4: length then reader; on a locked run, question_language still last", async () => {
+    const [teller, checker] = await run({ ...V4, readingLevel: "plain" });
+    expect(names(teller!).slice(-2)).toEqual(["length", "reader"]);
+    expect(names(checker!).slice(-2)).toEqual(["length", "reader"]);
+    // The English test story is refused under the Romanian lock; the storyteller's request is what is read here.
+    const [locked] = await run({ ...V4, readingLevel: "plain",
+      questionLine: "Ar trebui echipa sa adopte saptamana de lucru de patru zile?", argumentLanguage: { tag: "ro", name: "Romanian" },
+      languageLocked: true }, false);
+    expect(names(locked!).slice(-3)).toEqual(["length", "reader", "question_language"]);
   });
 });

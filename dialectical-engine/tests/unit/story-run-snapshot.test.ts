@@ -156,6 +156,13 @@ describe("buildStoryRunSnapshot", () => {
     expect(Object.hasOwn(buildStoryRunSnapshot({ ...source(), languageLocked: false }), "languageLocked")).toBe(false);
   });
 
+  it("hands the story the person's reading level only when the run has one (V4, owner N6)", () => {
+    expect(buildStoryRunSnapshot({ ...source(), readingLevel: "plain" }).readingLevel).toBe("plain");
+    // Today's run (every V3 ask): no member at all, so the writer builds today's bytes.
+    expect(Object.hasOwn(buildStoryRunSnapshot(source()), "readingLevel")).toBe(false);
+    expect(Object.hasOwn(buildStoryRunSnapshot({ ...source(), readingLevel: null }), "readingLevel")).toBe(false);
+  });
+
   it("hands the story the run's engine, its length table and its backup storytellers only when given (engine redesign R1d)", () => {
     const engine = engineSettingsOf(engineVersionPolicyStartValues(), { makers: 3, mapOpening: false });
     const guidance = resolveLengthGuidance({ policy: lengthGuidancePolicyStartValues(), plan: "premium", answerLength: "standard" });

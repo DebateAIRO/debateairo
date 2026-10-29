@@ -112,9 +112,11 @@ describe("F-SEALEDROWS-A · the conformance fingerprint is the evaluator prompt,
     // the value they carry). The debate shape's length variant (2026-10-13)
     // joined v3 in this seal; v3's 4b141d3a…f90f is history. Answer writer v4
     // (owner-approved wording, 2026-10-15) with its length variant length.v2
-    // superseded v3 + length.v1's 9a46af29…5662, which is history too.
+    // superseded v3 + length.v1's 9a46af29…5662, which is history too. The V4 reading level and the language-neutral
+    // length sentence (owner N6 and 17 Oct #5, 2026-10-29) — v4 + length.v3 + reader.v1 + length.reader.v1 — superseded
+    // v4 + length.v2's 879d2c5d…4a47, which is history too.
     expect(acceptance.composerContractHash)
-      .toBe("879d2c5d0213832fe466537603e5171e53248cce41188473550616d2dd5b4a47");
+      .toBe("6fb174d4d75ad1d39bf8246f741a7ab0ee60fc2b6d117aa228de83cfca29324d");
     // Both deployments seal the same values, or one of them is seeding a prompt
     // the other never sends.
     expect(development.judgeContractHash).toBe(acceptance.judgeContractHash);

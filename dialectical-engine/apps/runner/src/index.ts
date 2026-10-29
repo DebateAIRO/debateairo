@@ -168,6 +168,8 @@ import {
   SYNTHESIZER_PROMPT_CONTRACT,
   SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT,
   SYNTHESIZER_LENGTH_PROMPT_CONTRACT,
+  SYNTHESIZER_LENGTH_READER_PROMPT_CONTRACT,
+  SYNTHESIZER_READER_PROMPT_CONTRACT,
   EVALUATOR_INSTRUCTIONS,
   EVALUATOR_V1_INSTRUCTIONS,
   type BandCeilingRegisterRow,
@@ -192,7 +194,7 @@ import {
   type VerdictLabelDerivation,
   verdictDerivationOfJudges
 } from "@debateai/serve";
-import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN, debateShapeSettingsOf } from "@debateai/contract";
+import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN, debateShapeSettingsOf, readingLevelOf } from "@debateai/contract";
 import {
   MapChoiceRepository, mapAnswersArgued, mapCheckFailedMergedAnswerIds, mapCheckFailedStatements, mapLimitsFor, type MapResult
 } from "@debateai/map";
@@ -208,6 +210,9 @@ import {
   lengthGuidanceText,
   lengthGuidanceField,
   LENGTH_SENTENCE_ANSWER_CHECKER,
+  READER_SENTENCE_ANSWER_CHECKER,
+  withReaderField,
+  type ReadingLevel,
   type CharactersPerWord,
   type LengthCallStep,
   type LengthGuide,
@@ -838,10 +843,39 @@ export const EVALUATOR_LENGTH_PROMPT_CONTRACT: PromptContract = Object.freeze({
   instruction: `${EVALUATOR_INSTRUCTIONS} ${LENGTH_SENTENCE_ANSWER_CHECKER}`,
   answerForm: EVALUATOR_CONTRACT_TEXT
 });
-/** What `conformanceContractHash` seals from length guidance on: v2, then its length variant (as the writer's seal). */
-export const EVALUATOR_CONTRACTS_FINGERPRINT_TEXT: string = [
+/**
+ * V4 reading level (owner ruling N6, 2026-10-29): the checker told the level the writer wrote for, so it never objects to
+ * plain wording or to precise terms that suit that reader. Two VARIANTS — v2's instruction, then (with its own target)
+ * the length sentence, then the kernel's one reader sentence (READER_SENTENCE_ANSWER_CHECKER); v2's answer form, so the
+ * verdict schema is unchanged. The level arrives as the material field `reader`. A debate asked without a level never
+ * sends them: v2 or length.v1, byte for byte. OWNER WORDING — pending approval.
+ */
+export const EVALUATOR_READER_CONTRACT_ID = "serve.evaluator.reader.v1" as const;
+export const EVALUATOR_LENGTH_READER_CONTRACT_ID = "serve.evaluator.length.reader.v1" as const;
+export const EVALUATOR_READER_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: EVALUATOR_READER_CONTRACT_ID,
+  instruction: `${EVALUATOR_INSTRUCTIONS} ${READER_SENTENCE_ANSWER_CHECKER}`,
+  answerForm: EVALUATOR_CONTRACT_TEXT
+});
+export const EVALUATOR_LENGTH_READER_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: EVALUATOR_LENGTH_READER_CONTRACT_ID,
+  instruction: `${EVALUATOR_INSTRUCTIONS} ${LENGTH_SENTENCE_ANSWER_CHECKER} ${READER_SENTENCE_ANSWER_CHECKER}`,
+  answerForm: EVALUATOR_CONTRACT_TEXT
+});
+/** Shipped history: what `conformanceContractHash` sealed from length guidance until the reading level — v2, then length.v1 (108f1b29...). */
+export const EVALUATOR_LENGTH_CONTRACTS_FINGERPRINT_TEXT: string = [
   promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT),
   promptContractFingerprintText(EVALUATOR_LENGTH_PROMPT_CONTRACT)
+].join("\n---\n");
+/**
+ * What `conformanceContractHash` seals from the reading level (2026-10-29) on: every checker contract the runner sends —
+ * v2, length.v1, reader.v1, then length.reader.v1 (as the writer's seal).
+ */
+export const EVALUATOR_CONTRACTS_FINGERPRINT_TEXT: string = [
+  promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT),
+  promptContractFingerprintText(EVALUATOR_LENGTH_PROMPT_CONTRACT),
+  promptContractFingerprintText(EVALUATOR_READER_PROMPT_CONTRACT),
+  promptContractFingerprintText(EVALUATOR_LENGTH_READER_PROMPT_CONTRACT)
 ].join("\n---\n");
 
 /**
@@ -964,35 +998,45 @@ export const evaluatorVerdictSchema = z.object({
  * Question language (spec 2026-10-13 L6): with a shaped run's lock, the named
  * sentence replaces the directive and the `question_language` field rides LAST
  * (after `answer_length`); without one (null), the packet is today's, byte for byte.
+ * V4 reading level (owner N6, 2026-10-29): with the run's level, the writer and the checker take their reader variant
+ * and the `reader` field rides after the length fields, before `question_language`; without one (null, every V3 ask),
+ * the packet is today's, byte for byte.
  */
 export function buildSynthesisRolePrompt(
   request: SynthesizerRequest | EvaluatorRequest,
   argumentLanguageName: string,
   randomBytes?: (size: number) => Buffer,
   length: RoleLength | null = null,
-  questionLanguage: QuestionLanguage | null = null
+  questionLanguage: QuestionLanguage | null = null,
+  readingLevel: ReadingLevel | null = null
 ): FramedPrompt {
   // Length guidance (spec 2026-10-15 §3.2): the writer with a target takes its length variant; the checker takes its own
   // only with its own target (`ownWords`, a run admitted with the length row). Every other call: today's packet.
   const writerLengthed = request.role === "SYNTHESIZER" && length !== null;
   const checkerLengthed = request.role === "EVALUATOR" && length !== null && length.ownWords !== null;
+  const told = readingLevel !== null;
   // V-MINIMUM-PAYLOAD: the one projection, applied once; a length variant only appends its own fields after it.
   const material = toSynthesisPromptMaterial(request);
   return buildFramedPrompt({
     contract: promptContractInArgumentLanguage(
       request.role === "SYNTHESIZER"
-        ? (writerLengthed ? SYNTHESIZER_LENGTH_PROMPT_CONTRACT : SYNTHESIZER_PROMPT_CONTRACT)
-        : (checkerLengthed ? EVALUATOR_LENGTH_PROMPT_CONTRACT : EVALUATOR_PROMPT_CONTRACT),
+        ? (writerLengthed
+          ? (told ? SYNTHESIZER_LENGTH_READER_PROMPT_CONTRACT : SYNTHESIZER_LENGTH_PROMPT_CONTRACT)
+          : (told ? SYNTHESIZER_READER_PROMPT_CONTRACT : SYNTHESIZER_PROMPT_CONTRACT))
+        : (checkerLengthed
+          ? (told ? EVALUATOR_LENGTH_READER_PROMPT_CONTRACT : EVALUATOR_LENGTH_PROMPT_CONTRACT)
+          : (told ? EVALUATOR_READER_PROMPT_CONTRACT : EVALUATOR_PROMPT_CONTRACT)),
       argumentLanguageName,
       questionLanguage
     ),
-    // The language field wraps the ONE projection (and the length fields after it): it rides LAST; with no lock
-    // `withQuestionLanguageField` returns the same array, today's bytes.
-    material: withQuestionLanguageField(
+    // The language field wraps the ONE projection (and the length and reader fields after it): it rides LAST; with no
+    // lock `withQuestionLanguageField` returns the same array, and with no level `withReaderField` does: today's bytes.
+    material: withQuestionLanguageField(withReaderField(
       writerLengthed ? [...material, answerLengthField(length)]
         : checkerLengthed ? [...material, answerLengthField(length),
           lengthGuidanceField(length.ownWords!, length.languageCode, length.charactersPerWord)]
           : material,
+      readingLevel),
       questionLanguage),
     ...(randomBytes === undefined ? {} : { randomBytes })
   });
@@ -6506,6 +6550,12 @@ export class WalkingSkeletonRunner {
     const shapeLanguage: QuestionLanguage | null = runQuestionLanguageLock(shapeShape, run);
     const shapeLanguageInput = shapeLanguage === null ? {} : { questionLanguage: shapeLanguage };
     /**
+     * V4 reading level (owner N6, 2026-10-29): the person's level, stored with the run's depth_params by the API, or null
+     * (every V3 ask, every older run). Only the final writers read it: the answer writer and checker, the storyteller and
+     * the story checker. Null: every one of their packets is today's, byte for byte.
+     */
+    const readingLevel: ReadingLevel | null = readingLevelOf(run.depthParams);
+    /**
      * A15 (R5) and controller ruling A14 (carry 1): debaters come from distinct
      * makers. On an assigned run a POSITION member may answer only when no OTHER
      * POSITION seat holds its maker — read off the CLAIMED book, never off who
@@ -10934,7 +10984,7 @@ export class WalkingSkeletonRunner {
         // step 8; Task 5 binding note): a shaped run's writer is asked for about the row's answer length — every writer
         // call, first try and retries (each is a request through here); the checker's packet is never lengthed.
         const framed = buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, synthesisLength,
-          shapeLanguage);
+          shapeLanguage, readingLevel);
         const packet = framed.packet;
         /**
          * The draft as the engine reads it. Final review I-1: it is read INSIDE
@@ -11116,7 +11166,8 @@ export class WalkingSkeletonRunner {
         const checkerOptions = synthesisSeatOptions("EVALUATOR", checkerSeat, checkerSiteKey);
         const planned: ServeRoleMaker = seatCaller.plan(checkerSeat, checkerSiteKey, checkerOptions) ?? checkerSeat.main;
         checkerPlannedByRound.set(request.round, planned.providerRef);
-        const framed = buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, checkerLength, shapeLanguage);
+        const framed = buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, checkerLength, shapeLanguage,
+          readingLevel);
         const packet = framed.packet;
         /**
          * The verdict as the engine reads it, its coherence included (the loop
@@ -11608,6 +11659,8 @@ export class WalkingSkeletonRunner {
               argumentLanguage: { tag: run.argumentLanguageTag, name: run.argumentLanguageName },
               // P2L Task 17: the story writes in the lock only when the run's shape receipt locked it.
               languageLocked: shapeLanguage !== null,
+              // V4 reading level (owner N6): the story is written for the person's level; null, today's story.
+              readingLevel,
               ...(lengthGuidance === null ? {} : { lengthGuidance }),
               // Engine redesign R1d (spec 2026-10-15 §7; INTERFACE §5.1): the receipt's engine, never the row, so an
               // engine-2 debate's story is told v4 (with the length table above); engine 1: null, today's story. The

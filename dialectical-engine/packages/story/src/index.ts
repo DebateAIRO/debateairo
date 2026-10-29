@@ -28,6 +28,7 @@ export {
   buildStoryCheckerContract,
   buildStorytellerContract,
   storyCheckerLengthField,
+  storyContractForReader,
   storyContractHash,
   storyContractInArgumentLanguage,
   storyLengthField

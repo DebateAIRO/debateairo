@@ -1,5 +1,5 @@
 import type { WayOfKnowing } from "@debateai/kernel";
-import { TypedDomainError, isRunLevelSpendStop } from "@debateai/kernel";
+import { READER_SENTENCE_WRITING, TypedDomainError, isRunLevelSpendStop } from "@debateai/kernel";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
 
 /**
@@ -1916,21 +1916,54 @@ export const SYNTHESIZER_PROMPT_CONTRACT: PromptContract = Object.freeze({
  * then one sentence; the target arrives as the material field `answer_length` ("about N words"). A run without a
  * shape never sends it, so its writer prompt is the current contract's to the byte. Sealed with it by
  * `composerContractHash` (SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT). length.v1 was v3's variant (shipped history,
- * byte for byte); length.v2 is v4's: the same instruction and sentence, v4's form.
+ * byte for byte); length.v2 was v4's: the same instruction and sentence, v4's form (shipped history, byte for byte).
+ * length.v3 (owner 17 Oct #5, ruled 2026-10-29) is what the runner sends: length.v2 with ONE new sentence that names
+ * "the length" instead of "the number of words", because for Chinese, Japanese and Thai the `answer_length` field names
+ * characters ("about N characters", `lengthGuidanceText`), and the old sentence then contradicted its own field. One
+ * sentence for every language, as the kernel's length sentences already are. OWNER WORDING — pending approval.
  */
 export const SYNTHESIZER_LENGTH_V1_CONTRACT_ID = "serve.synthesizer.length.v1" as const;
-export const SYNTHESIZER_LENGTH_CONTRACT_ID = "serve.synthesizer.length.v2" as const;
-export const SYNTHESIZER_LENGTH_SENTENCE = "Write the answer in about the number of words named in answer_length; "
+export const SYNTHESIZER_LENGTH_V2_CONTRACT_ID = "serve.synthesizer.length.v2" as const;
+export const SYNTHESIZER_LENGTH_CONTRACT_ID = "serve.synthesizer.length.v3" as const;
+/** Shipped history: the sentence of length.v1 and length.v2, byte for byte (it names words). */
+export const SYNTHESIZER_LENGTH_V1_SENTENCE = "Write the answer in about the number of words named in answer_length; "
+  + "it is a target, never a reason to leave out a point the answer needs.";
+/** length.v3's sentence: length.v2's with "the length" for "the number of words"; every other byte the same. */
+export const SYNTHESIZER_LENGTH_SENTENCE = "Write the answer in about the length named in answer_length; "
   + "it is a target, never a reason to leave out a point the answer needs.";
 /** Shipped history, as sent: v3's length variant (v3's instruction, the length sentence, v3's form). */
 export const SYNTHESIZER_LENGTH_V1_PROMPT_CONTRACT: PromptContract = Object.freeze({
   contractId: SYNTHESIZER_LENGTH_V1_CONTRACT_ID,
-  instruction: `${SYNTHESIZER_INSTRUCTIONS} ${SYNTHESIZER_LENGTH_SENTENCE}`,
+  instruction: `${SYNTHESIZER_INSTRUCTIONS} ${SYNTHESIZER_LENGTH_V1_SENTENCE}`,
   answerForm: SYNTHESIZER_V3_ANSWER_FORM
+});
+/** Shipped history, as sent: v4's first length variant (v4's instruction, the words sentence, v4's form). */
+export const SYNTHESIZER_LENGTH_V2_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: SYNTHESIZER_LENGTH_V2_CONTRACT_ID,
+  instruction: `${SYNTHESIZER_INSTRUCTIONS} ${SYNTHESIZER_LENGTH_V1_SENTENCE}`,
+  answerForm: SYNTHESIZER_ANSWER_FORM
 });
 export const SYNTHESIZER_LENGTH_PROMPT_CONTRACT: PromptContract = Object.freeze({
   contractId: SYNTHESIZER_LENGTH_CONTRACT_ID,
   instruction: `${SYNTHESIZER_INSTRUCTIONS} ${SYNTHESIZER_LENGTH_SENTENCE}`,
+  answerForm: SYNTHESIZER_ANSWER_FORM
+});
+/**
+ * V4 reading level (owner ruling N6, 2026-10-29): the writer told the person's level. Two VARIANTS of the current
+ * contract — without and with the length sentence — each with the kernel's one reader sentence last
+ * (READER_SENTENCE_WRITING); the level itself arrives as the material field `reader`. A debate asked without a level
+ * never sends them, so its writer prompt is v4's or length.v3's to the byte. OWNER WORDING — pending approval.
+ */
+export const SYNTHESIZER_READER_CONTRACT_ID = "serve.synthesizer.reader.v1" as const;
+export const SYNTHESIZER_LENGTH_READER_CONTRACT_ID = "serve.synthesizer.length.reader.v1" as const;
+export const SYNTHESIZER_READER_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: SYNTHESIZER_READER_CONTRACT_ID,
+  instruction: `${SYNTHESIZER_INSTRUCTIONS} ${READER_SENTENCE_WRITING}`,
+  answerForm: SYNTHESIZER_ANSWER_FORM
+});
+export const SYNTHESIZER_LENGTH_READER_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: SYNTHESIZER_LENGTH_READER_CONTRACT_ID,
+  instruction: `${SYNTHESIZER_INSTRUCTIONS} ${SYNTHESIZER_LENGTH_SENTENCE} ${READER_SENTENCE_WRITING}`,
   answerForm: SYNTHESIZER_ANSWER_FORM
 });
 /**
@@ -1941,10 +1974,20 @@ export const SYNTHESIZER_V3_CONTRACTS_FINGERPRINT_TEXT: string = [
   promptContractFingerprintText(SYNTHESIZER_V3_PROMPT_CONTRACT),
   promptContractFingerprintText(SYNTHESIZER_LENGTH_V1_PROMPT_CONTRACT)
 ].join("\n---\n");
-/** What `composerContractHash` seals from v4 (2026-10-15) on: v4, then its length variant length.v2. */
+/** Shipped history: what `composerContractHash` sealed from v4 (2026-10-15) until the reading level — v4, then length.v2 (879d2c5d...). */
+export const SYNTHESIZER_V4_CONTRACTS_FINGERPRINT_TEXT: string = [
+  promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT),
+  promptContractFingerprintText(SYNTHESIZER_LENGTH_V2_PROMPT_CONTRACT)
+].join("\n---\n");
+/**
+ * What `composerContractHash` seals from the reading level (2026-10-29) on: every writer contract the runner sends — v4,
+ * length.v3, reader.v1, then length.reader.v1.
+ */
 export const SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT: string = [
   promptContractFingerprintText(SYNTHESIZER_PROMPT_CONTRACT),
-  promptContractFingerprintText(SYNTHESIZER_LENGTH_PROMPT_CONTRACT)
+  promptContractFingerprintText(SYNTHESIZER_LENGTH_PROMPT_CONTRACT),
+  promptContractFingerprintText(SYNTHESIZER_READER_PROMPT_CONTRACT),
+  promptContractFingerprintText(SYNTHESIZER_LENGTH_READER_PROMPT_CONTRACT)
 ].join("\n---\n");
 /** The material field that carries the answer length the writer aims at ("about N words"; a target, never a cut). */
 export function synthesizerAnswerLengthField(words: number): Readonly<{ name: "answer_length"; content: string }> {
