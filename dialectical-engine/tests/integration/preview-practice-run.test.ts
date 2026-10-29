@@ -858,8 +858,10 @@ describe("preview practice: debate mode", () => {
       }
     }
     // Every refused call went first, then the patch follow-up. LG-A (L33, controller ruling 8; Tasks 11 and 13): the practice
-    // wires the structure-repair route (Haiku is a target), so each MiMo call is routed and sends at most 2 POSTs: no full re-ask.
-    expect(new Set(report.failures.map((failure) => failure.replyForm))).toEqual(new Set(["ORIGINAL", "PATCH"]));
+    // wires the structure-repair route (Haiku is a target), so each MiMo call is routed and sent at most 2 POSTs. R22 (owner
+    // ruling 2026-10-29, "Allow 3 sends"): a panel seat is a judge call, so after its refused patch it sends the one full
+    // re-ask too, refused again here.
+    expect(new Set(report.failures.map((failure) => failure.replyForm))).toEqual(new Set(["ORIGINAL", "PATCH", "FULL"]));
   }, 600_000);
 
   it("refuses to start (HARNESS_ERROR, exit 40) without the acknowledgement, and sends nothing", async () => {
