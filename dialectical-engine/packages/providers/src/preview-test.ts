@@ -2,8 +2,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { request as httpRequest } from "node:http";
 import {
-  LENGTH_GUIDANCE_START, THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError, answerRoomTokens, lengthCallStepOf, lengthStartWordsOf,
-  storyShortWordsSum, storytellerAnswerRoomTokens
+  LENGTH_GUIDANCE_START, THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError, answerRoomTokens, debateRoleFromCallSiteKey, lengthCallStepOf,
+  lengthStartWordsOf, storyShortWordsSum, storytellerAnswerRoomTokens
 } from "@debateai/kernel";
 import type { CallBound, ProviderCallRequest, ProviderDiscoveryTarget, ProviderGateway } from "./index.js";
 import { assertFramedPrompt } from "./prompt-frame.js";
@@ -389,6 +389,8 @@ function previewStoryRepairAllowed(request: ProviderCallRequest): boolean {
  * to an object refused at named members (the gateway decides; `planPatchFollowUp`), and a call whose second POST was a
  * patch may send a third, the full re-ask, still within the sealed bound the counting gateway hands down as what is
  * left (`remaining`), so it never meets a spent step. The story's sealed bound of two leaves the patch only.
+ * LG-A (L33) then capped every ROUTED call (every structured step on the preview) at 2 POSTs, so the full re-ask never
+ * ran; R22 (owner ruling 2026-10-29) gives it back to the judge calls only (`previewJudgeCall`, `fullReAskAfterPatch`).
  */
 function previewFormatRepairAllowed(request: ProviderCallRequest): boolean {
   if (request.lane !== "served" || (request.role !== "JUDGE" && request.role !== "SYNTHESIZER" && request.role !== "EVALUATOR")
@@ -396,6 +398,18 @@ function previewFormatRepairAllowed(request: ProviderCallRequest): boolean {
     || typeof request.classifyContent !== "function" || typeof request.buildRepairPacket !== "function") return false;
   try { assertFramedPrompt(request.packet); return true; }
   catch { return false; }
+}
+/**
+ * R22 (owner ruling 2026-10-29, "Allow 3 sends"): the judge calls, whose format repair may end with the owner's one full
+ * re-ask (`ProviderCallRequest.fullReAskAfterPatch`): the calls of the judge contract — every author leg (the roots,
+ * support/attack, cross-exchange), the panel judges, the reviews, and engine 2's comparing judges and investigators — read
+ * off the call-site key (`debateRoleFromCallSiteKey`). The answer writer and checker, the map steps (JUDGE-role calls
+ * that are not judge calls) and the story keep the patch alone.
+ */
+const PREVIEW_JUDGE_CALL_ROLES: ReadonlySet<string> = new Set(["POSITION", "SUPPORT_ATTACK", "CROSS_EXCHANGE", "JUDGE", "REVIEWER"]);
+function previewJudgeCall(request: ProviderCallRequest): boolean {
+  const role = debateRoleFromCallSiteKey(request.callSiteKey);
+  return role !== null && PREVIEW_JUDGE_CALL_ROLES.has(role);
 }
 /**
  * Story format robustness (2026-10-12), finding 1: the storyteller thinks before it writes, and on every reviewed row
@@ -660,6 +674,10 @@ export function withPreviewProviderCallPolicy(
     if (request.packetByteCap !== undefined || request.outputTokenCap !== undefined) {
       throw new TypedDomainError("PREVIEW_CALL_TIER_INVALID", "The private preview sets a call's size caps itself");
     }
+    // R22: the judge call's third send is the policy's alone (`previewJudgeCall`), never the caller's.
+    if (request.fullReAskAfterPatch !== undefined) {
+      throw new TypedDomainError("PREVIEW_CALL_TIER_INVALID", "The private preview sets a call's sends itself");
+    }
     const preview = previewCallBound(request.bound, config);
     // Length guidance L26/L29 (owner answer 7): the four final writers ask each model's own maximum and may send 1 MiB; on
     // a slow row all four keep the storyteller's 16,384 and its retry today's clamp (final review, Important 3, below).
@@ -697,6 +715,8 @@ export function withPreviewProviderCallPolicy(
           () => tierUnread("READ_FAILED"));
     const storyRepair = previewStoryRepairAllowed(request);
     const formatRepair = !storyRepair && previewFormatRepairAllowed(request);
+    // R22: a judge call's format repair may go on to the one full re-ask after its patch (a third POST in the call).
+    const judgeReAsk = formatRepair && previewJudgeCall(request);
     // Spec 2026-10-12 §4.4: one explicit level replaces whatever the request carried: the owner's table picks it per
     // step (absent = the row's default = today's request: "high" on an effort row, DEFAULT_ONLY on a row without one,
     // which the gateway treats exactly as "no level"). Decided once per call, so the unbilled resend below runs at it
@@ -719,7 +739,8 @@ export function withPreviewProviderCallPolicy(
         ...(lengthRetry === undefined ? {} : { lengthRetry }),
         ...(tier === undefined ? {} : tier.caps),
         bound: tier === undefined ? standardBound : tier.bound, maxAttemptsThisCall: storyRepair || formatRepair ? 2 : 1,
-        attemptScope: "actor", ...(formatRepair ? { retryOnlyAfterContentRejection: true } : {}) });
+        attemptScope: "actor", ...(formatRepair ? { retryOnlyAfterContentRejection: true } : {}),
+        ...(judgeReAsk ? { fullReAskAfterPatch: true } : {}) });
     };
     /** The first send, after the coordinator admits it; an answer tells the coordinator. */
     const firstSend = async () => {

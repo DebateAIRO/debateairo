@@ -206,7 +206,8 @@ export interface ProviderCallRequest {
   readonly retryOnlyAfterContentRejection?: boolean;
   /**
    * LG-A (spec 2026-10-15, L32, L33; INTERFACE §2.4-§2.5): set ONLY by `withStructureRepair` (./structure-repair.ts), never
-   * by a step. A routed call sends at most 2 POSTs. Its first reply's class decides the one follow-up: STRUCTURE ends the
+   * by a step. A routed call sends at most 2 POSTs (R22: a judge call's full re-ask after its patch is a third,
+   * `fullReAskAfterPatch`). Its first reply's class decides the one follow-up: STRUCTURE ends the
    * call with ProviderStructureUnrepairedError (the wrapper sends the structure-repair call); CONTENT gets one PATCH, or a
    * full re-ask when no member can be named; EMPTY a full re-ask; CUT_OFF today's length retry. Every follow-up states in
    * plain words what is missing (`machine_rejection_reason`). Absent: today's loop, byte for byte. Never sent.
@@ -214,6 +215,15 @@ export interface ProviderCallRequest {
    * the follow-up B, is sent alone as attempt 2.
    */
   readonly structureRepairRouted?: boolean;
+  /**
+   * R22 (owner ruling 2026-10-29, "Allow 3 sends"): set ONLY by the preview's call policy, for a judge call
+   * (`withPreviewProviderCallPolicy`). A routed call (`structureRepairRouted`) whose SECOND POST was the short patch
+   * follow-up may send a third, the step's full re-ask, so the owner's slip-recovery order runs whole: code salvage, the
+   * short follow-up, one full re-ask. Still within `bound.maxAttempts` (on the preview the counting gateway's
+   * `remaining`), and each POST passes `assertAttemptAllowed` and the money envelope before it is sent, as every POST
+   * does. Absent: L33's 2 POSTs in all, byte for byte. Never sent.
+   */
+  readonly fullReAskAfterPatch?: boolean;
   /**
    * Refused-repair salvage (2026-10-16, B): set ONLY by `withStructureRepair` (./structure-repair.ts), after its
    * structure-repair call did not do, never by a step. Requires `structureRepairRouted: true` and `classifyContent`
@@ -2039,10 +2049,11 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     const callAttempts = (): number => {
       // Refused-repair salvage (B): the continuation is the routed call's second POST and its last.
       if (followUp !== undefined) return 2;
-      const sealed = Math.min(request.bound.maxAttempts, request.maxAttemptsThisCall ?? request.bound.maxAttempts);
-      // LG-A (L33): a routed call sends at most 2 POSTs in all; the patch's extra POST is never added for it.
-      return routed ? Math.min(2, sealed) : Math.min(request.bound.maxAttempts,
-        (request.maxAttemptsThisCall ?? request.bound.maxAttempts) + (patchWasSecondPost ? 1 : 0));
+      // LG-A (L33): a routed call sends at most 2 POSTs in all; the patch's extra POST is never added for it — except
+      // R22's judge call (`fullReAskAfterPatch`), whose patch as its second POST leaves room for the one full re-ask.
+      const reAsk = patchWasSecondPost && (!routed || request.fullReAskAfterPatch === true) ? 1 : 0;
+      const sealed = Math.min(request.bound.maxAttempts, (request.maxAttemptsThisCall ?? request.bound.maxAttempts) + reAsk);
+      return routed ? Math.min(2 + reAsk, sealed) : sealed;
     };
     /**
      * V-11 addendum, layer 1 — THE DOOR. Every hand-off in the engine passes
