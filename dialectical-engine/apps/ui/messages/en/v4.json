@@ -80,6 +80,7 @@
   "v4.read.questionLabel": "Your question",
   "v4.read.optionalTitle": "A few things that would change the answer",
   "v4.read.optionalNote": "· optional",
+  "v4.read.freeChoices": "On the Free plan you can choose up to {count} of these.",
   "v4.read.place.label": "Which country or region is this for?",
   "v4.read.place.ANYWHERE": "Anywhere in general",
   "v4.read.place.ROMANIA": "Romania",

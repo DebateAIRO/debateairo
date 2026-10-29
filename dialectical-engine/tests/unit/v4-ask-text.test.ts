@@ -8,6 +8,9 @@ import {
   DIG_ITEM_FLOOR,
   digQuestion,
   digTargetQuestions,
+  FREE_GOAL_CHOICES_MAX,
+  goalChoiceCount,
+  goalWithinPlan,
   ownWords,
   parseDigDetail,
   parseDigQuestion,
@@ -103,6 +106,33 @@ describe("composeQuestion", () => {
   it("never reads the person's words as placeholders", () => {
     expect(composeQuestion("Q?", { ...EMPTY_GOAL, matters: "{list} and {place}" }, CATALOG, "en"))
       .toBe("Q?\n\nIf the answers pull in different directions, what matters most to me: {list} and {place}");
+  });
+});
+
+describe("the step-2 choices on Free (owner 2026-10-29: capped at 3)", () => {
+  const FULL = Object.freeze({ place: "EU" as const, placeOther: "", horizon: "NOW" as const, purpose: "DECIDE" as const,
+    matters: "prices", angles: Object.freeze(["jobs", "waste"]) });
+
+  it("counts each set choice once: the place, the time, the purpose, what matters, and each angle as sent", () => {
+    expect(FREE_GOAL_CHOICES_MAX).toBe(3);
+    expect(goalChoiceCount(EMPTY_GOAL)).toBe(0);
+    expect(goalChoiceCount(FULL)).toBe(6);
+    // A pressed "Another place" chip is a choice; blank matters, blank and repeated angles are not.
+    expect(goalChoiceCount({ ...EMPTY_GOAL, place: "OTHER", matters: "  ", angles: ["a", " A ", "", "  "] })).toBe(2);
+  });
+
+  it("Free keeps the first 3 choices in the order they are sent and drops the rest from the end", () => {
+    expect(goalWithinPlan(FULL, "free")).toEqual({ ...FULL, matters: "", angles: [] });
+    expect(goalWithinPlan({ ...EMPTY_GOAL, horizon: "NOW", angles: ["a", "b", "c", "d"] }, "free"))
+      .toEqual({ ...EMPTY_GOAL, horizon: "NOW", angles: ["a", "b"] });
+    const three = { ...EMPTY_GOAL, place: "ROMANIA" as const, angles: ["a", "b"] };
+    expect(goalWithinPlan(three, "free")).toBe(three);
+    const sent = composeQuestion(QUESTION, goalWithinPlan(FULL, "free"), CATALOG, "en");
+    expect(sent.split("\n\n")[1]!.split("\n")).toHaveLength(3);
+  });
+
+  it("a paid plan keeps every choice, the same object", () => {
+    expect(goalWithinPlan(FULL, "premium")).toBe(FULL);
   });
 });
 
