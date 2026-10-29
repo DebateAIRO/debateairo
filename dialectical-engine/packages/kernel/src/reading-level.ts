@@ -6,9 +6,12 @@
  * reader, so they never object to plain wording or to precise terms that suit it. A debate asked without a level (every
  * V3 /new ask, every older run) is never told anything: today's prompts, byte for byte.
  *
- * The sentences are OWNER-EDITABLE instruction text, each sealed inside the contract variant that carries it (the answer
- * writer's and checker's reader variants), so editing one is a new variant and a new register version. The story's two
- * sentences are code's, pinned byte for byte in tests and recorded in each story call's contract hash.
+ * The instruction sentences (READER_SENTENCE_*) are OWNER-EDITABLE instruction text: the writer's and the answer checker's
+ * are sealed inside the contract variants that carry them (the reader variants), so editing one is a new variant and a
+ * new register version; the story's two are code's, recorded in each story call's contract hash. The three level
+ * sentences (READER_SENTENCES) are material, not instruction: they ride in the `reader` field, are pinned byte for byte
+ * in tests and never enter a register seal (as the `answer_length` field's text does not). The expert sentence asks for
+ * no figures (coordinator, 2026-10-29): the writer's rule against printing numbers from the material stands.
  * OWNER WORDING — pending approval (drafts of 2026-10-29).
  */
 
@@ -23,7 +26,7 @@ export const READER_FIELD = "reader" as const;
 export const READER_SENTENCES: Readonly<Record<ReadingLevel, string>> = Object.freeze({
   plain: "The reader wants plain words: everyday words and short sentences, no jargon; explain any term you cannot avoid.",
   background: "The reader knows the basics: name the key terms briefly and give the main reasons behind each point.",
-  expert: "The reader knows the field: use precise terms, and keep the figures, sources and caveats."
+  expert: "The reader knows the field: use precise terms, and keep the sources and caveats."
 });
 
 /** The answer writer's and the storyteller's one instruction sentence. */

@@ -57,7 +57,7 @@ describe("the reader sentences (kernel; owner wording, pending approval)", () =>
     expect(READER_SENTENCES).toEqual({
       plain: "The reader wants plain words: everyday words and short sentences, no jargon; explain any term you cannot avoid.",
       background: "The reader knows the basics: name the key terms briefly and give the main reasons behind each point.",
-      expert: "The reader knows the field: use precise terms, and keep the figures, sources and caveats."
+      expert: "The reader knows the field: use precise terms, and keep the sources and caveats."
     });
     expect(READER_SENTENCE_WRITING).toBe("Write for the reader described in reader.");
     expect(READER_SENTENCE_ANSWER_CHECKER).toBe(
