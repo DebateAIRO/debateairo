@@ -5,7 +5,8 @@ import type { ForwardStepAnchor, ForwardStepPlan } from "./migration-forward-cha
 
 /**
  * 0130, the V4 account memory (owner rulings N7 and N11): the reading level, each debate's last visit and each dig's
- * link, kept in the account. It pins only the objects it creates; 0129 and earlier retain their own postconditions.
+ * link, kept in the account, and (R22 item 16) the erasure role's deletion of one deleted debate's rows. It pins only
+ * the objects it creates; 0129 and earlier retain their own postconditions.
  */
 const NAME = "0130_v4_account_memory.sql";
 const VERSION = "v4-account-memory-forward0130-v1";
@@ -21,6 +22,7 @@ const FUNCTIONS = [
   "identity.record_debate_last_visit(uuid,uuid,jsonb)",
   "identity.read_dig_links(uuid,uuid)",
   "identity.record_dig_link(uuid,uuid,uuid,text[],text)",
+  "identity.forget_erased_debate_page_memory(uuid)",
   "identity.read_data_export_page_memory(uuid,uuid)"
 ] as const;
 const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0130_${detail}`); };
@@ -30,7 +32,7 @@ const exactKeys = (value: unknown, keys: readonly string[]): value is Record<str
   && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 const digest = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{64}$/u.test(value);
 
-/** The three tables (owner, ACL, columns, constraints, indexes, triggers) and the eight functions (owner, definer, body, ACL). */
+/** The three tables (owner, ACL, columns, constraints, indexes, triggers) and the nine functions (owner, definer, body, ACL). */
 async function postconditionEvidence(client: PoolClient): Promise<string> {
   const tables = (await client.query(`
     SELECT relation,pg_get_userbyid(c.relowner) owner,c.relkind,c.relpersistence,c.relrowsecurity rls,c.relforcerowsecurity force_rls,

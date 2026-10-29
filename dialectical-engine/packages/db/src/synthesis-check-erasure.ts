@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import type { PublicationCipher, RunContentKeyStore } from "@debateai/crypto";
+import { finalizeWithPageMemory } from "./erasure-page-memory.js";
 import { withPublicationContentLease } from "./publication-lease.js";
 
 const SYNTHESIS_CHECK_ERASURE_WAITING_OUTCOMES = Object.freeze([
@@ -59,12 +60,13 @@ export class PostgresSynthesisCheckErasureRepository {
     destroyedKeyCount: 0 | 1;
     alreadyAbsentKeyCount: 0 | 1;
   }>): Promise<SynthesisCheckErasureOutcome> {
-    const result = await this.pool.query<{ outcome: SynthesisCheckErasureOutcome }>(
+    // R22 item 16: a removed debate's page memory (0130) goes in this same transaction (erasure-page-memory.ts).
+    const outcome = await finalizeWithPageMemory<SynthesisCheckErasureOutcome>(this.pool, input.erasureId,
       "SELECT core.finalize_synthesis_check_erasure($1,$2,$3,$4,$5) AS outcome",
       [input.erasureId,input.keyCleanupCompletedAt,input.occurredAt,
         input.destroyedKeyCount,input.alreadyAbsentKeyCount]
     );
-    return result.rows[0]?.outcome ?? "NOT_FOUND";
+    return outcome ?? "NOT_FOUND";
   }
 }
 

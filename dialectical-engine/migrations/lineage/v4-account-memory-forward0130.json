@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0130_v4_account_memory.sql",
-    "sha256": "171a3c4546f631de1a01e83e7f5756320cbda655ae9a694c70ad083320229b04"
+    "sha256": "5af49497949a649115eb30a824c0874e7fda3b86487e19cf334a415f008f68a5"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-111.sql",

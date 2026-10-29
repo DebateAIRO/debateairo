@@ -362,6 +362,44 @@ describe("side-by-side A-x3: deleting a re-admitted debate erases every run of i
     for (const runId of [oldest, middle, newest]) expect(await remains(runId), runId).toEqual(ERASED);
   });
 
+  it("R22 item 16: also deletes the debate's page memory (each run's last visit, every dig link to or from it), nothing else", async () => {
+    const question = "Does deleting a debate also forget when its map was last opened?";
+    const [oldest, newest] = await readmittedDebate(question, 1) as [string, string];
+    const from = await waitingRun("Which debate was it dug from?", ownerPrincipal(), owner.sessionId);
+    const dug = await waitingRun("Which dig was started from it?", ownerPrincipal(), owner.sessionId);
+    const kept = await waitingRun("Is another debate's memory kept?", ownerPrincipal(), owner.sessionId);
+    const keptDig = await waitingRun("Is another dig link kept?", ownerPrincipal(), owner.sessionId);
+    // What the V4 pages store (0130), written here by the test's superuser through the same functions the API calls.
+    const visit = (run: string) => database.pool.query("SELECT identity.record_debate_last_visit($1,$2,$3::jsonb)",
+      [owner.ownerRef, run, JSON.stringify({ "point:n-1": "SURE" })]);
+    const dig = async (parent: string, child: string) => expect((await database.pool.query<{ outcome: string }>(
+      "SELECT identity.record_dig_link($1,$2,$3,'{}'::text[],'quick') AS outcome", [owner.ownerRef, parent, child])).rows[0]!.outcome).toBe("RECORDED");
+    for (const run of [oldest, newest, kept]) await visit(run);
+    await dig(from, oldest);
+    await dig(newest, dug);
+    await dig(kept, keptDig);
+    const memory = async () => (await database.pool.query<{ visits: string[]; links: string[] }>(`SELECT
+      ARRAY(SELECT run_id::text FROM identity.debate_last_visit WHERE owner_ref=$1 ORDER BY run_id) AS visits,
+      ARRAY(SELECT parent_run_id||'>'||child_run_id FROM identity.dig_link WHERE owner_ref=$1 ORDER BY 1) AS links`, [owner.ownerRef])).rows[0]!;
+    const before = await memory();
+    expect(before.visits).toEqual(expect.arrayContaining([oldest, newest, kept]));
+    expect(before.links).toEqual(expect.arrayContaining([`${from}>${oldest}`, `${newest}>${dug}`, `${kept}>${keptDig}`]));
+
+    const grant = await deletionGrant(owner, newest);
+    expect(await deleteDebate(owner, newest, grant)).toEqual({ status: 200, body: JSON.stringify({ status: "CLEANED" }) });
+
+    for (const runId of [oldest, newest]) expect(await remains(runId), runId).toEqual(ERASED);
+    const after = await memory();
+    expect(after.visits).not.toContain(oldest);
+    expect(after.visits).not.toContain(newest);
+    expect(after.visits).toContain(kept);
+    expect(after.links.filter((link) => link.includes(oldest) || link.includes(newest))).toEqual([]);
+    expect(after.links).toContain(`${kept}>${keptDig}`);
+    // The debates on the other end of a deleted link are still the person's, with their own memory untouched.
+    expect(await remains(from)).toEqual(untouched("Which debate was it dug from?"));
+    expect(await remains(dug)).toEqual(untouched("Which dig was started from it?"));
+  });
+
   it("never waits: a re-admission writing its edge, or a reader of an old run, answers PENDING with nothing spent", async () => {
     const question = "Should a deletion step aside for a re-admission in flight?";
     const [oldest, newest] = await readmittedDebate(question, 1) as [string, string];
